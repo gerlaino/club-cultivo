@@ -5,8 +5,12 @@ class PlanTarea < ApplicationRecord
   belongs_to :sala, optional: true
   belongs_to :tarea_generada, class_name: 'Tarea', optional: true
 
-  TIPOS       = %w[riego poda medicion limpieza cosecha trasplante inspeccion otro].freeze
-  PRIORIDADES = %w[baja normal alta urgente].freeze
+  # Los MISMOS que Tarea: una PlanTarea se materializa como Tarea al aplicar el plan, así que
+  # dos listas distintas garantizan que algo se rompa. Acá faltaban nutricion, defoliacion,
+  # scrog_lst, ajuste_luz y revision_plagas —que el formulario sí ofrece—, y guardar el plan
+  # devolvía un 422 sin que se entendiera por qué.
+  TIPOS       = Tarea::TIPOS
+  PRIORIDADES = Tarea::PRIORIDADES
   DIAS_VALIDOS = %w[lun mar mie jue vie sab dom].freeze
 
   validates :tipo,      inclusion: { in: TIPOS }

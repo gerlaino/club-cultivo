@@ -1,5 +1,35 @@
 # Changelog
 
+## Agosto 2026 (e) — el login esperaba al club, y dos catálogos que no coincidían
+
+**El login que se trababa.** `login()` hacía `await club.fetch()` (GET `/preferences`) **antes** de
+`router.push`, y el `finally` que libera el botón recién corre después de eso: si `/preferences`
+colgaba —backend despertando—, el spinner no paraba y no se navegaba nunca. Afectaba **sólo a los
+roles sin home propia** (admin, dispensador, cultivador, manicura, supervisor); médico, auditor,
+abogado, delivery y super_admin se salteaban esa línea, y por eso a ellos les funcionaba. El club se
+carga ahora en segundo plano —ninguna vista lo necesita para pintar— y el login tiene un techo de
+15s por las dudas. El test lo reproduce: con el `await` puesto, se cuelga y falla por timeout.
+
+En el camino se arreglaron dos cosas del mismo arranque de sesión: `main.js` llamaba a `fetchMe()`
+directo (no a `ensureBootstrapped`), y `fetchMe` levantaba el `loading` del botón de login en **cada
+arranque de la app**; además salían dos `/me` en paralelo por dos caminos distintos. Ahora `fetchMe`
+**no puede** tocar ese flag —le sacamos el parámetro— y el bootstrap está memoizado.
+
+**Dos catálogos que no coincidían**, los dos daban 422 sin explicación:
+- `PlanTarea::TIPOS` tenía 8 tipos y el formulario ofrecía 13: guardar un plan con *nutrición*,
+  *defoliación*, *SCROG/LST*, *ajuste de luz* o *revisión de plagas* fallaba. Ahora usa `Tarea::TIPOS`
+  —una PlanTarea se materializa como Tarea, así que dos listas distintas garantizan que algo se rompa.
+- El formulario de tareas **de mobile** creaba con `prioridad: 'media'`, que no existe en el enum
+  (`baja normal alta urgente`): no se podía crear una tarea desde el teléfono. Los estilos de "media"
+  quedan como alias para no romper lo ya guardado.
+
+**Del dispensador:** el mostrador puede cargar la mercadería que recibe (`comprar`, con costo y
+egreso a su nombre) y vender lo que no está en el catálogo (línea suelta "Otro / Varios", que
+registra la venta sin tocar inventario). Se le retiró `reponer`, que subía stock **sin costo y sin
+asiento**. El panel del Buffet cuenta las ventas sueltas del mes para que la gestión cargue esos
+productos. Y el buscador del Buffet ahora busca por código de barras: el campo existía, pero el
+filtro sólo miraba el nombre y el cartel decía "(pronto)".
+
 ## Agosto 2026 (d) — la PWA del cultivador es la sala, no la app entera
 
 - **Las tareas atrasadas se arrastran a hoy también en el teléfono.** El escritorio ya lo hacía;

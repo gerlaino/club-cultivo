@@ -148,7 +148,7 @@
           <label class="mta__label">Prioridad</label>
           <select v-model="form.prioridad" class="mta__input">
             <option value="baja">Baja</option>
-            <option value="media">Media</option>
+            <option value="normal">Normal</option>
             <option value="alta">Alta</option>
             <option value="urgente">Urgente</option>
           </select>
@@ -269,7 +269,7 @@ const tareasDelDia = computed(() => {
   const diaData = diasProcesados.value.find(x => x.fecha === diaSeleccionado.value)
   const tareas  = diaData?.tareas || []
   return [...tareas].sort((a, b) => {
-    const P = { urgente: 0, alta: 1, media: 2, baja: 3 }
+    const P = { urgente: 0, alta: 1, normal: 2, media: 2, baja: 3 }
     if (a.estado === 'completada' && b.estado !== 'completada') return 1
     if (b.estado === 'completada' && a.estado !== 'completada') return -1
     return (P[a.prioridad] ?? 2) - (P[b.prioridad] ?? 2)
@@ -322,7 +322,7 @@ const createError = ref(null)
 const form = ref({
   titulo:           '',
   tipo:             'riego',
-  prioridad:        'media',
+  prioridad:        'normal',
   fecha_programada: toISO(hoy),
 })
 
@@ -340,7 +340,7 @@ const TIPOS = [
   { value:'mantenimiento', label:'Mantenimiento',  emoji:'🔧' },
   { value:'otro',          label:'Otro',           emoji:'📋' },
 ]
-const PRIORIDAD_LABEL = { baja:'Baja', media:'Media', alta:'Alta', urgente:'🔥 Urgente' }
+const PRIORIDAD_LABEL = { baja:'Baja', normal:'Normal', media:'Normal', alta:'Alta', urgente:'🔥 Urgente' }
 
 async function crearTarea() {
   if (!form.value.titulo.trim()) { createError.value = 'El título es obligatorio'; return }
@@ -349,7 +349,7 @@ async function crearTarea() {
     await tareasStore.create({ ...form.value, estado: 'pendiente' })
     await tareasStore.fetchSemana(toISO(addDays(hoy, -3)))
     showCreate.value = false
-    form.value = { titulo: '', tipo: 'riego', prioridad: 'media', fecha_programada: toISO(hoy) }
+    form.value = { titulo: '', tipo: 'riego', prioridad: 'normal', fecha_programada: toISO(hoy) }
   } catch {
     createError.value = 'Error al crear la tarea'
   } finally { saving.value = false }
@@ -430,6 +430,7 @@ onMounted(async () => {
 }
 .mta__card--urgente { border-left-color: #dc2626; }
 .mta__card--alta    { border-left-color: #f59e0b; }
+.mta__card--normal,
 .mta__card--media   { border-left-color: #3b82f6; }
 .mta__card--baja    { border-left-color: #94a3b8; }
 
@@ -444,6 +445,7 @@ onMounted(async () => {
 .mta__prioridad { font-weight: 700; }
 .mta__prioridad--urgente { color: #dc2626; }
 .mta__prioridad--alta    { color: #d97706; }
+.mta__prioridad--normal,
 .mta__prioridad--media   { color: #3b82f6; }
 .mta__prioridad--baja    { color: #94a3b8; }
 
