@@ -64,10 +64,12 @@ module Clubs
           crear_pacientes(club)
           crear_stocks(club)
           crear_dispensaciones(club)
-          crear_contabilidad(club)
           crear_infraestructura_finanzas(club)
           crear_insumos(club)
           crear_salon(club)
+          # Va DESPUÉS de dispensaciones y salón: los egresos se dimensionan contra los
+          # ingresos que realmente se generaron, para que el club modelo cierre con ganancia.
+          crear_contabilidad(club)
           crear_turnos(club)
           crear_reparto(club)
           crear_tareas(club)
@@ -384,6 +386,15 @@ module Clubs
             ).save!(validate: false)
           end
           venta.update_columns(total_ars: total)
+
+          # El ingreso contable: sin esto el salón vendía todo el año y no aportaba un peso al
+          # P&L —el club modelo cerraba en pérdida—. Se backdatea a la fecha de la venta.
+          begin
+            mov = venta.reload.crear_ingreso!
+            mov.update_columns(fecha: fecha)
+          rescue => e
+            Rails.logger.warn "[SembrarDemo] asiento de venta del salón: #{e.message}"
+          end
           @resumen[:ventas_bar] += 1
         end
       end
@@ -664,19 +675,49 @@ module Clubs
       end
     end
 
-    # Egresos mensuales imputados a lotes: es lo que hace que el P&L y el costo por gramo den
-    # números creíbles en vez de cero.
+    # Un club que opera bien CIERRA EN GANANCIA. Los egresos del demo estaban clavados en
+    # rangos fijos (~1M por mes) contra ingresos que dependían del azar de las dispensaciones:
+    # el resultado daba pérdida, que es justo lo que un club modelo no tiene que mostrar.
+    #
+    # Ahora se dimensionan CONTRA los ingresos reales de cada mes, dejando este margen. 32% es
+    # bueno y creíble para un club que produce lo que vende: no paga la flor, la cultiva.
+    MARGEN_OBJETIVO = 0.32
+
+    # Reparto del gasto operativo. Suma 1.0.
+    REPARTO_EGRESOS = [
+      ['sueldo',        0.46],
+      ['insumo',        0.24],
+      ['electricidad',  0.18],
+      ['alquiler',      0.12],
+    ].freeze
+
     def crear_contabilidad(club)
       lotes = Lote.where(club_id: club.id).to_a
-      MESES_HISTORIA.times do |i|
-        fecha = (hoy - (MESES_HISTORIA - 1 - i).months).beginning_of_month + 5
-        next if fecha > hoy
 
-        [['electricidad', 180_000..260_000], ['insumo', 90_000..150_000],
-         ['sueldo', 400_000..520_000], ['alquiler', 250_000..250_000]].each do |categoria, rango|
+      MESES_HISTORIA.times do |i|
+        mes   = (hoy - (MESES_HISTORIA - 1 - i).months).beginning_of_month
+        fecha = [mes + 5, hoy].min
+        next if mes > hoy
+
+        # El scope `ingresos` del modelo, no `tipo: 'ingreso'`: las dispensaciones asientan como
+        # `recupero_costo` —recuperan el costo de producir— y son el grueso de lo que entra.
+        # Contando solo 'ingreso' se dimensionaban los egresos contra el buffet nada más.
+        ingresos = club.movimientos_contables
+                       .ingresos
+                       .where(fecha: mes..mes.end_of_month)
+                       .sum(:monto_ars).to_d
+        # Los primeros meses del histórico pueden no tener ventas todavía: ahí se usa un piso
+        # para que el mes no quede sin gastos y el P&L se vea plano.
+        base = ingresos.positive? ? ingresos * (1 - MARGEN_OBJETIVO) : 350_000.to_d
+
+        REPARTO_EGRESOS.each do |categoria, peso|
+          # ±8% para que los meses no salgan calcados y el gráfico tenga vida.
+          monto = (base * peso * (0.92 + @rng.rand * 0.16)).round(-2)
+          next if monto <= 0
+
           MovimientoContable.new(
             club: club, created_by: @admin, sede: @sede,
-            tipo: 'egreso', categoria: categoria, monto_ars: @rng.rand(rango),
+            tipo: 'egreso', categoria: categoria, monto_ars: monto,
             fecha: fecha, descripcion: "#{categoria.capitalize} — #{fecha.strftime('%m/%Y')}",
             # Los de insumo van imputados a un lote: sin eso, costo/gramo por lote queda vacío.
             lote: categoria == 'insumo' ? lotes.sample(random: @rng) : nil,
