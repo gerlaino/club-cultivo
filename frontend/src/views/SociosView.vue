@@ -8,6 +8,7 @@ import { useConfirm } from '../composables/useConfirm.js'
 import { exportPacientesCSV } from '../lib/api.js'
 import EmptyState from '../components/ui/EmptyState.vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import { reprocannBadge, reprocannCategoria } from '../composables/useReprocann.js'
 
 const store  = usePacientesStore()
 const auth   = useAuthStore()
@@ -29,6 +30,7 @@ const REPRO_URL = {
   vencen_pronto: 'proximos',
   vencidos: 'vencidos',
   sin_reprocann: 'sin_rep',
+  pendientes: 'pendientes',
   todos: 'todos',
 }
 const REPRO_URL_REVERSE = Object.fromEntries(Object.entries(REPRO_URL).map(([k,v]) => [v,k]))
@@ -123,24 +125,7 @@ function safeDate(d) {
   return /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(d + 'T00:00:00') : new Date(d)
 }
 
-function reprocannDias(s) {
-  if (!s.reprocann_vencimiento) return null
-  return Math.floor((safeDate(s.reprocann_vencimiento) - new Date()) / 86400000)
-}
-
-function reprocannStatus(s) {
-  const days = reprocannDias(s)
-  if (days === null) return null
-  const estado = s.reprocann_estado_efectivo || s.reprocann_estado
-  if (days < 0) {
-    // Vencido con trámite de renovación en curso → ámbar, no rojo (igual que en la ficha)
-    if (estado === 'pendiente') return { label: 'En trámite', level: 'caution', days }
-    return { label: 'Vencido', level: 'danger', days }
-  }
-  if (days <= 30) return { label: `${days}d`,   level: 'warning', days }
-  if (days <= 90) return { label: `${days}d`,   level: 'caution', days }
-  return { label: 'Vigente', level: 'ok', days }
-}
+const reprocannStatus = reprocannBadge
 
 function formatDate(d) {
   if (!d) return '—'
@@ -163,22 +148,20 @@ const kpis = computed(() => {
   return {
     total:    items.length,
     activos:  items.filter(s => s.es_paciente).length,
-    vencidos: items.filter(s => s.reprocann_vencimiento && safeDate(s.reprocann_vencimiento) < hoy).length,
-    proximos: items.filter(s => {
-      if (!s.reprocann_vencimiento) return false
-      const v = safeDate(s.reprocann_vencimiento)
-      return v >= hoy && v <= en30
-    }).length,
-    sin_rep: items.filter(s => !s.reprocann_vencimiento).length,
+    vencidos: items.filter(s => reprocannCategoria(s) === 'vencido').length,
+    proximos: items.filter(s => reprocannCategoria(s) === 'por_vencer').length,
+    pendientes: items.filter(s => reprocannCategoria(s) === 'pendiente').length,
+    sin_rep:  items.filter(s => reprocannCategoria(s) === 'sin_reprocann').length,
   }
 })
 
 const filtrados = computed(() => {
   let list = store.items
   if (filterEstado.value === 'activos')  list = list.filter(s => s.es_paciente)
-  if (filterEstado.value === 'vencidos') list = list.filter(s => reprocannDias(s) !== null && reprocannDias(s) < 0)
-  if (filterEstado.value === 'proximos') list = list.filter(s => { const d = reprocannDias(s); return d !== null && d >= 0 && d <= 30 })
-  if (filterEstado.value === 'sin_rep')  list = list.filter(s => !s.reprocann_vencimiento)
+  if (filterEstado.value === 'vencidos')   list = list.filter(s => reprocannCategoria(s) === 'vencido')
+  if (filterEstado.value === 'proximos')   list = list.filter(s => reprocannCategoria(s) === 'por_vencer')
+  if (filterEstado.value === 'pendientes') list = list.filter(s => reprocannCategoria(s) === 'pendiente')
+  if (filterEstado.value === 'sin_rep')    list = list.filter(s => reprocannCategoria(s) === 'sin_reprocann')
   if (search.value.trim()) {
     const q = search.value.toLowerCase()
     list = list.filter(s =>
@@ -258,6 +241,10 @@ async function exportarCSV() {
       <button class="sv__kpi sv__kpi--danger" :class="{ 'sv__kpi--active': filterEstado === 'vencidos' }" @click="filterEstado = 'vencidos'">
         <div class="sv__kpi-val">{{ kpis.vencidos }}</div>
         <div class="sv__kpi-lbl">REPROCANN vencido</div>
+      </button>
+      <button v-if="kpis.pendientes" class="sv__kpi sv__kpi--warn" :class="{ 'sv__kpi--active': filterEstado === 'pendientes' }" @click="filterEstado = 'pendientes'">
+        <div class="sv__kpi-val">{{ kpis.pendientes }}</div>
+        <div class="sv__kpi-lbl">Trámite pendiente</div>
       </button>
       <button class="sv__kpi sv__kpi--gray" :class="{ 'sv__kpi--active': filterEstado === 'sin_rep' }" @click="filterEstado = 'sin_rep'">
         <div class="sv__kpi-val">{{ kpis.sin_rep }}</div>

@@ -4,7 +4,7 @@ class ReprocannDocument < BaseDocument
     "vigente"                 => "Vigente",
     "por_vencer"              => "Por vencer",
     "vencido"                 => "Vencido",
-    "vigente_sin_vencimiento" => "Sin vencimiento",
+    "pendiente"               => "Pendiente de aprobación",
     "sin_reprocann"           => "Sin REPROCANN",
   }.freeze
 
@@ -12,7 +12,7 @@ class ReprocannDocument < BaseDocument
     "vigente"                 => :ok,
     "por_vencer"              => :warn,
     "vencido"                 => :crit,
-    "vigente_sin_vencimiento" => :ok,
+    "pendiente"               => :warn,
     "sin_reprocann"           => nil,
   }.freeze
 
@@ -25,10 +25,11 @@ class ReprocannDocument < BaseDocument
   def cuerpo(pdf)
     titulo_seccion(pdf, "Resumen de situación")
     stat_strip(pdf, [
-      { label: "Socios totales",  valor: @data[:total_pacientes] },
+      { label: "Pacientes activos", valor: @data[:total_pacientes] },
       { label: "Vigentes",        valor: @data[:con_reprocann_vigente], tono: :ok },
       { label: "Vencen ≤30 días", valor: @data[:vencen_30d],            tono: :warn },
       { label: "Vencidos",        valor: @data[:vencidos],              tono: :crit },
+      { label: "Trámite pendiente", valor: @data[:pendientes],          tono: :warn },
       { label: "Sin REPROCANN",   valor: @data[:sin_reprocann] },
     ])
 

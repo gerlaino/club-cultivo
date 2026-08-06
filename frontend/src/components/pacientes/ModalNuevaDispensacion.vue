@@ -63,6 +63,14 @@ const FORMA_LABEL = {
   flor_seca: 'Flor seca', hash: 'Hash', aceite: 'Aceite',
   preroll: 'Preroll', crema: 'Crema', descarte: 'Descarte', otro: 'Otro',
 }
+// Genética + lote: lo que distingue dos stocks que comparten forma de producto.
+function detalleStock(st) {
+  if (!st) return ''
+  const gen  = st.genetica?.nombre || st.lote?.genetica?.nombre
+  const lote = st.lote?.codigo || st.numero_lote_producto
+  return [gen, lote].filter(Boolean).join(' · ')
+}
+
 const FORMA_EMOJI = {
   flor_seca: '🌿', hash: '🟤', aceite: '🫙',
   preroll: '🚬', crema: '💊', descarte: '🗑️', otro: '📦',
@@ -661,6 +669,9 @@ async function handleSubmit() {
                     🎉 {{ eventoDe(it.desdeEvento)?.evento_nombre || 'evento' }}
                   </span>
                 </span>
+                <!-- "Flor seca" sola no alcanza para saber QUÉ se puso en el carrito: hay
+                     varios stocks de la misma forma. La genética y el lote lo desambiguan. -->
+                <span v-if="detalleStock(it.stock)" class="mnd__cart-detalle">{{ detalleStock(it.stock) }}</span>
                 <span class="mnd__cart-qty">{{ it.cantidad }}{{ it.stock.unidad || 'g' }}</span>
               </span>
               <span
@@ -975,6 +986,7 @@ async function handleSubmit() {
 .mnd__cart-precio-input { width: 72px; padding: .25rem .4rem; border: 1.5px solid #86efac; border-radius: 6px; font-size: .8rem; color: #0f172a; background: #fff; outline: none; }
 .mnd__cart-precio-input:focus { border-color: #15803d; }
 .mnd__cart-guardar { display: inline-flex; align-items: center; gap: .2rem; font-size: .68rem; color: #15803d; cursor: pointer; white-space: nowrap; }
+.mnd__cart-detalle { font-size: .72rem; color: #64748b; font-style: italic; }
 .mnd__cart-qty { font-size: .75rem; font-family: monospace; color: #15803d; font-weight: 700; }
 .mnd__cart-sub { font-size: .8rem; font-weight: 700; color: #166534; font-family: monospace; white-space: nowrap; }
 .mnd__cart-rm { background: none; border: none; color: #94a3b8; cursor: pointer; padding: 2px 4px; display: flex; border-radius: 5px; }

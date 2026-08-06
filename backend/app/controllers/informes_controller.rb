@@ -135,15 +135,22 @@ class InformesController < ApplicationController
     club = current_user.club
     desde, hasta = periodo_rango
 
-    pacientes = Paciente.for_club(club.id)
-    con_vigente  = pacientes.where('reprocann_vencimiento >= ?', Date.today).count
-    vencen_30d   = pacientes.where('reprocann_vencimiento > ? AND reprocann_vencimiento <= ?',
-                                    Date.today, 30.days.from_now).count
-    vencidos     = pacientes.where('reprocann_vencimiento < ?', Date.today).count
+    # Sólo la población activa, y con las mismas categorías excluyentes del informe
+    # REPROCANN: la tasa de cumplimiento no puede pasar de 100% ni contar bajas.
+    pacientes = Paciente.for_club(club.id).where(es_paciente: true)
+    conteos = Hash.new(0)
+    pacientes.pluck(:reprocann_estado, :reprocann_numero, :reprocann_vencimiento).each do |e, n, v|
+      conteos[Paciente.reprocann_categoria(estado: e, numero: n, vencimiento: v)] += 1
+    end
+    con_vigente  = conteos['vigente']
+    vencen_30d   = conteos['por_vencer']
+    vencidos     = conteos['vencido']
     sin_seg      = pacientes.where(con_seguimiento_medico: false).count
 
-    total_pax = pacientes.count
-    tasa = total_pax.positive? ? ((con_vigente.to_f / total_pax) * 100).round(1) : 0
+    total_pax = conteos.values.sum
+    # Quien vence en 20 días HOY está en regla: cuenta como cumplimiento, aunque tenga alerta.
+    en_regla = con_vigente + vencen_30d
+    tasa = total_pax.positive? ? ((en_regla.to_f / total_pax) * 100).round(1) : 0
 
     # Socios SIN número REPROCANN que dispensaron en el período (no es un "límite": no existe
     # tope de gramos — es un indicador de cumplimiento regulatorio).
@@ -269,41 +276,33 @@ class InformesController < ApplicationController
 
   # Datos del informe REPROCANN — compartidos por la respuesta JSON y el PDF
   def reprocann_data(club)
-    pacientes = Paciente.for_club(club.id)
-    total = pacientes.count
+    # El informe es sobre la población ACTIVA del club: alguien dado de baja no se le
+    # informa a nadie ni cuenta para la tasa de cumplimiento.
+    pacientes = Paciente.for_club(club.id).where(es_paciente: true)
 
-    con_vigente   = pacientes.where('reprocann_vencimiento >= ?', Date.today).count
-    vencen_30d    = pacientes.where('reprocann_vencimiento > ? AND reprocann_vencimiento <= ?',
-                                    Date.today, 30.days.from_now).count
-    vencidos      = pacientes.where('reprocann_vencimiento < ?', Date.today).count
-    sin_reprocann = pacientes.where(reprocann_numero: nil).count
+    # Una sola clasificación para todo: los conteos son el histograma de la misma
+    # categoría que se muestra en la lista, así el total cierra siempre.
+    conteos = Hash.new(0)
+    pacientes.pluck(:reprocann_estado, :reprocann_numero, :reprocann_vencimiento).each do |e, n, v|
+      conteos[Paciente.reprocann_categoria(estado: e, numero: n, vencimiento: v)] += 1
+    end
 
     lista = pacientes.limit(200).map do |p|
-      estado = if p.reprocann_numero.blank?
-        'sin_reprocann'
-      elsif p.reprocann_vencimiento.nil?
-        'vigente_sin_vencimiento'
-      elsif p.reprocann_vencimiento < Date.today
-        'vencido'
-      elsif p.reprocann_vencimiento <= 30.days.from_now
-        'por_vencer'
-      else
-        'vigente'
-      end
       {
         iniciales:             "#{p.nombre[0]}.#{p.apellido[0]}.",
         dni_ultimos_4:         p.dni_normalizado.to_s.last(4),
-        reprocann_estado:      estado,
+        reprocann_estado:      p.reprocann_categoria,
         reprocann_vencimiento: p.reprocann_vencimiento,
       }
     end
 
     {
-      total_pacientes:        total,
-      con_reprocann_vigente:  con_vigente,
-      vencen_30d:             vencen_30d,
-      vencidos:               vencidos,
-      sin_reprocann:          sin_reprocann,
+      total_pacientes:        conteos.values.sum,
+      con_reprocann_vigente:  conteos['vigente'],
+      vencen_30d:             conteos['por_vencer'],
+      vencidos:               conteos['vencido'],
+      pendientes:             conteos['pendiente'],
+      sin_reprocann:          conteos['sin_reprocann'],
       lista_anonimizada:      lista,
     }
   end
@@ -312,7 +311,7 @@ class InformesController < ApplicationController
     'vigente'                 => 'Vigente',
     'por_vencer'              => 'Por vencer (hasta 30 días)',
     'vencido'                 => 'Vencido',
-    'vigente_sin_vencimiento' => 'Sin vencimiento',
+    'pendiente'               => 'Pendiente de aprobación',
     'sin_reprocann'           => 'Sin REPROCANN',
   }.freeze
 

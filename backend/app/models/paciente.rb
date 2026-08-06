@@ -98,6 +98,29 @@ class Paciente < ApplicationRecord
     end
   end
 
+  # Categorías del informe REPROCANN. Son MUTUAMENTE EXCLUYENTES y cubren todos los
+  # casos: así los totales cierran por construcción en vez de contarse con cuatro
+  # queries que se pisan entre sí (un paciente que vencía en 15 días caía a la vez en
+  # "vigente" y en "vence en 30 días", y uno con número pero sin fecha no caía en ninguna).
+  #
+  # El orden importa: el ESTADO manda sobre la fecha, porque un trámite en curso todavía
+  # no tiene certificado y por lo tanto tampoco tiene número ni vencimiento.
+  REPROCANN_CATEGORIAS = %w[vigente por_vencer vencido pendiente sin_reprocann].freeze
+
+  def self.reprocann_categoria(estado:, numero:, vencimiento:, hoy: Date.today)
+    return 'pendiente' if estado.to_s == 'pendiente'
+    return 'sin_reprocann' if numero.blank?
+    return 'vigente'    if vencimiento.blank? # certificado sin fecha cargada: existe igual
+    return 'vencido'    if vencimiento < hoy
+    return 'por_vencer' if vencimiento <= hoy + 30
+    'vigente'
+  end
+
+  def reprocann_categoria
+    self.class.reprocann_categoria(estado: reprocann_estado, numero: reprocann_numero,
+                                   vencimiento: reprocann_vencimiento)
+  end
+
   def saldo_cc
     cuenta_corriente&.saldo_disponible&.to_f
   end

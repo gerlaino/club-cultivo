@@ -15,7 +15,9 @@ class ReprocannVencimientoJob < ApplicationJob
     hoy = Date.today
 
     # Pacientes con REPROCANN vencido (vencimiento < hoy) — alerta diaria si no hay una de hoy
-    vencidos = club.pacientes
+    # Sólo pacientes activos: avisar del REPROCANN de alguien dado de baja es ruido, y el
+    # admin no puede hacer nada al respecto.
+    vencidos = club.pacientes.where(es_paciente: true)
                    .where.not(reprocann_vencimiento: nil)
                    .where('reprocann_vencimiento < ?', hoy)
                    .where(reprocann_estado: %w[activo pendiente])
@@ -40,7 +42,7 @@ class ReprocannVencimientoJob < ApplicationJob
     UMBRALES_DIAS.each do |dias|
       fecha_objetivo = hoy + dias.days
 
-      proximos = club.pacientes
+      proximos = club.pacientes.where(es_paciente: true)
                      .where(reprocann_vencimiento: fecha_objetivo)
                      .where(reprocann_estado: %w[activo pendiente])
                      .to_a

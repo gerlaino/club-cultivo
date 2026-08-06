@@ -1,0 +1,65 @@
+import { describe, it, expect } from 'vitest'
+import { reprocannCategoria, reprocannBadge } from '../composables/useReprocann.js'
+
+const enDias = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10)
+
+// AC: el ESTADO manda sobre la fecha. Un trámite pendiente de aprobación todavía no tiene
+// certificado —por eso no tiene número ni vencimiento— y se informaba como "Sin REPROCANN",
+// que es lo contrario de lo que pasa.
+describe('clasificación REPROCANN', () => {
+  it('un trámite pendiente SIN número ni fecha no es "sin REPROCANN"', () => {
+    const p = { reprocann_estado: 'pendiente', reprocann_numero: null, reprocann_vencimiento: null }
+
+    expect(reprocannCategoria(p)).toBe('pendiente')
+    expect(reprocannBadge(p).label).toBe('En trámite')
+  })
+
+  it('un pendiente con la fecha ya vencida sigue en trámite, no vencido', () => {
+    const p = { reprocann_estado: 'pendiente', reprocann_numero: 'R-1', reprocann_vencimiento: enDias(-10) }
+
+    expect(reprocannCategoria(p)).toBe('pendiente')
+  })
+
+  it('sin número y sin trámite sí es "sin REPROCANN"', () => {
+    expect(reprocannCategoria({ reprocann_estado: 'sin_registro' })).toBe('sin_reprocann')
+  })
+
+  it('el backend puede pisar el estado: activo vencido llega como "vencido"', () => {
+    const p = { reprocann_estado: 'activo', reprocann_estado_efectivo: 'vencido',
+                reprocann_numero: 'R-2', reprocann_vencimiento: enDias(-1) }
+
+    expect(reprocannCategoria(p)).toBe('vencido')
+  })
+
+  it('vence dentro de 30 días → por_vencer; más allá → vigente', () => {
+    const numero = { reprocann_estado: 'activo', reprocann_numero: 'R-3' }
+
+    expect(reprocannCategoria({ ...numero, reprocann_vencimiento: enDias(15) })).toBe('por_vencer')
+    expect(reprocannCategoria({ ...numero, reprocann_vencimiento: enDias(200) })).toBe('vigente')
+  })
+
+  it('un certificado sin fecha cargada existe igual: cuenta como vigente', () => {
+    const p = { reprocann_estado: 'activo', reprocann_numero: 'R-4', reprocann_vencimiento: null }
+
+    expect(reprocannCategoria(p)).toBe('vigente')
+  })
+
+  // Las categorías son la base de los KPIs de la lista: si no son excluyentes, los
+  // contadores no suman el total y el admin ve números que no cierran.
+  it('las categorías son mutuamente excluyentes: cada paciente cae en exactamente una', () => {
+    const poblacion = [
+      { reprocann_estado: 'pendiente' },
+      { reprocann_estado: 'sin_registro' },
+      { reprocann_estado: 'activo', reprocann_numero: 'a', reprocann_vencimiento: enDias(-5) },
+      { reprocann_estado: 'activo', reprocann_numero: 'b', reprocann_vencimiento: enDias(10) },
+      { reprocann_estado: 'activo', reprocann_numero: 'c', reprocann_vencimiento: enDias(300) },
+      { reprocann_estado: 'activo', reprocann_numero: 'd', reprocann_vencimiento: null },
+    ]
+
+    const cats = ['vigente', 'por_vencer', 'vencido', 'pendiente', 'sin_reprocann']
+    const suma = cats.reduce(
+      (acc, c) => acc + poblacion.filter(p => reprocannCategoria(p) === c).length, 0)
+
+    expect(suma).toBe(poblacion.length)
+  })
+})

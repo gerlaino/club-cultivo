@@ -218,6 +218,7 @@ import { useToast } from '../../composables/useToast.js'
 import { getMedicoPacientes } from '../../lib/api.js'
 import { logger } from '../../utils/logger.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
+import { reprocannBadge, reprocannDias } from '../../composables/useReprocann.js'
 
 const LIMITE = 30
 
@@ -339,18 +340,8 @@ function safeDate(d) {
   if (!d) return null
   return /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(d + 'T00:00:00') : new Date(d)
 }
-function reproDias(p) {
-  if (!p.reprocann_vencimiento) return null
-  return Math.floor((safeDate(p.reprocann_vencimiento) - new Date()) / 86400000)
-}
-function reproStatus(p) {
-  const d = reproDias(p)
-  if (d === null) return null
-  if (d < 0)   return { label: 'Vencido',  level: 'danger'  }
-  if (d <= 30) return { label: `${d}d`,    level: 'warning' }
-  if (d <= 90) return { label: `${d}d`,    level: 'caution' }
-  return               { label: 'Vigente', level: 'ok'      }
-}
+const reproDias   = reprocannDias
+const reproStatus = reprocannBadge
 function formatDate(d) {
   if (!d) return '—'
   return safeDate(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
