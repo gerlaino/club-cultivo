@@ -25,10 +25,12 @@ class MigrarFeaturesASuites < ActiveRecord::Migration[7.2]
       # WhatsApp tampoco era flag: se activa sólo si el club tiene Twilio configurado de verdad.
       f['whatsapp'] = true if club.respond_to?(:whatsapp_configurado?) && club.whatsapp_configurado?
 
-      # Los incompletos se apagan: la web pública no está deployada y ARICCAME está SIMULADO
-      # (no transmite nada a ANMAT). Dejarlos prendidos es prometer algo que no ocurre.
+      # Los incompletos se apagan: la web pública no está deployada, ARICCAME está SIMULADO
+      # (no transmite nada a ANMAT) y los eventos todavía no están pulidos. Dejarlos prendidos
+      # es prometer algo que no ocurre.
       f['web_publica'] = false
       f['ariccame']    = false
+      f['eventos']     = false
 
       # Las que dejan de ser banderas: son núcleo de sus suites y no tenía sentido apagarlas
       # por separado. Se borran para que el panel no muestre casillas que no hacen nada.

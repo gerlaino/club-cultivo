@@ -4,6 +4,7 @@ module Bar
   class EventosController < ApplicationController
     before_action :authenticate_user!
     before_action :require_feature_bar!
+    before_action -> { require_feature!(:eventos) }
     before_action :require_gestion
     before_action :set_bar
     before_action :set_evento, only: [:show, :update, :destroy]

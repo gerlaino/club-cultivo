@@ -4,6 +4,7 @@
 // Gating por rol: el dispensador solo ve Vender + Stock (sin plata, sin eventos).
 import { ref, computed, onMounted } from 'vue'
 import { useBarStore } from '../../stores/bar.js'
+import { useClubStore } from '../../stores/club.js'
 import { useAuthStore } from '../../stores/auth.js'
 import CajaSheet from './CajaSheet.vue'
 
@@ -13,6 +14,7 @@ const props = defineProps({
 })
 
 const store = useBarStore()
+const club  = useClubStore()
 const auth  = useAuthStore()
 
 const esGestion = computed(() => ['admin', 'supervisor'].includes(auth.user?.role))
@@ -44,9 +46,11 @@ const TABS = computed(() => {
     { key: 'resumen', label: 'Resumen', to: `/bar/${props.barId}/panel`,   gestion: true },
     { key: 'vender',  label: 'Vender',  to: `/bar/${props.barId}/vender`,   gestion: false },
     { key: 'stock',   label: 'Stock',   to: `/bar/${props.barId}/stock`,    gestion: false },
-    { key: 'eventos', label: 'Eventos', to: `/bar/${props.barId}/eventos`,  gestion: true },
+    // Eventos es un add-on aparte: si el club no lo tiene, no se ofrece la pestaña (y el
+    // backend además devuelve 403 si alguien entra por la URL).
+    { key: 'eventos', label: 'Eventos', to: `/bar/${props.barId}/eventos`,  gestion: true, modulo: 'eventos' },
   ]
-  return all.filter(t => !t.gestion || esGestion.value)
+  return all.filter(t => (!t.gestion || esGestion.value) && (!t.modulo || club.data?.features?.[t.modulo] === true))
 })
 </script>
 

@@ -9,6 +9,7 @@ require 'rails_helper'
 # ingreso viven en la dispensación. Lo consumido internamente sí es COGS del evento.
 RSpec.describe 'Dispensar desde lo apartado para un evento', type: :request do
   let(:club)   { create(:club, features: { 'bar' => true }) }
+  before { club.update_columns(features: club.features.merge('eventos' => true)) }
   let(:admin)  { create(:user, :admin, club: club) }
   let(:sede)   { create(:sede, club: club, tipo: 'social') }
   let(:bar)    { create(:barra, club: club, sede: sede) }

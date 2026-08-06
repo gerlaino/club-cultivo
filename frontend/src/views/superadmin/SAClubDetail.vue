@@ -98,7 +98,7 @@ const FEATURE_META = {
 const suites = ref([])
 const addons = ref([])
 const ADDON_ICO = {
-  bar: '🍺', medico: '🩺', iot: '📡', ia: '🤖',
+  bar: '🍺', eventos: '🎉', medico: '🩺', iot: '📡', ia: '🤖',
   mailer: '✉️', whatsapp: '💬', web_publica: '🌐', ariccame: '📋',
 }
 const iaActiva = computed(() => featuresForm.value.ia === true)

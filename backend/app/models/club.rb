@@ -180,7 +180,8 @@ class Club < ApplicationRecord
   # Add-ons: se suman a una suite. `requiere` documenta de qué depende para funcionar DE VERDAD
   # —no alcanza con prenderlo—, y el super admin lo muestra antes de dejar activarlo.
   ADDONS = {
-    'bar'         => { label: 'Buffet',            desc: 'Punto de venta, caja de turno y eventos.',           requiere: nil },
+    'bar'         => { label: 'Buffet',            desc: 'Punto de venta, caja de turno y stock del salón.',   requiere: nil },
+    'eventos'     => { label: 'Eventos',           desc: 'Fiestas y catas: provisión desde depósitos, entradas y rendición.', requiere: 'El Buffet tiene que estar activo.' },
     'medico'      => { label: 'Módulo médico',     desc: 'Turnos, historia clínica e indicaciones.',           requiere: nil },
     'iot'         => { label: 'Ambiente / IoT',    desc: 'Sensores, lecturas automáticas y reglas.',           requiere: 'Hardware del club (Sonoff u otro) o importación por CSV.' },
     'ia'          => { label: 'Asistente IA',      desc: 'Análisis de lote, plan de trabajo y registro por voz.', requiere: 'ANTHROPIC_API_KEY en el entorno.' },
@@ -193,7 +194,7 @@ class Club < ApplicationRecord
   # Add-ons que NO están terminados: vienen apagados por defecto y el super admin muestra la
   # advertencia de `requiere` antes de dejar activarlos. No se bloquean por completo —eso
   # dejaría su código inalcanzable— pero nadie los prende sin enterarse de qué les falta.
-  ADDONS_INCOMPLETOS = %w[web_publica ariccame].freeze
+  ADDONS_INCOMPLETOS = %w[web_publica ariccame eventos].freeze
 
   # Se mantiene para compatibilidad: hay clubes con las claves viejas guardadas en `features`.
   AVAILABLE_FEATURES = (SUITES.keys + ADDONS.keys).freeze

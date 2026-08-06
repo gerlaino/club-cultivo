@@ -50,7 +50,20 @@ RSpec.describe 'Gating por módulo', type: :request do
     it 'quedan marcados como incompletos, con el motivo a la vista' do
       expect(club.addon_incompleto?(:ariccame)).to be(true)
       expect(club.addon_incompleto?(:web_publica)).to be(true)
+      expect(club.addon_incompleto?(:eventos)).to be(true)
       expect(Club::ADDONS['ariccame'][:requiere]).to match(/INCOMPLETO/)
+    end
+
+    # Eventos existe y funciona, pero todavía no está pulido: se prende cuando lo esté.
+    it 'los eventos del Buffet no vienen activados' do
+      expect(Club::FEATURES_POR_DEFECTO).not_to have_key('eventos')
+
+      sign_in_as(admin)
+      bar = club.bares.create!(nombre: 'Buffet', sede: create(:sede, club: club, created_by: admin, tipo: 'mixta'))
+      get "/api/bares/#{bar.id}/eventos"
+
+      expect(response).to have_http_status(:forbidden)
+      expect(JSON.parse(response.body)['modulo']).to eq('eventos')
     end
 
     it 'el que está terminado no aparece como incompleto' do
