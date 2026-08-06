@@ -35,7 +35,8 @@ RSpec.describe Finanzas::SembrarDepositos, type: :service do
     end
 
     it 'sin bar, no siembra Salón' do
-      otro = create(:club) # sin feature bar
+      # El club de test ahora nace CON bar (es lo normal): acá hace falta uno sin él.
+      otro = create(:club, features: Club::FEATURES_POR_DEFECTO.except('bar'))
       otro_admin = create(:user, :admin, club: otro)
       ActsAsTenant.with_tenant(otro) do
         create(:sede, club: otro, created_by: otro_admin, tipo: 'social')

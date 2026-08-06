@@ -3,6 +3,7 @@ class IndicacionMedicaController < ApplicationController
   before_action :require_medico_or_admin
   before_action :set_paciente, only: [:index, :create]
   before_action :set_indicacion, only: [:show, :update, :destroy, :prescripcion_pdf]
+  before_action -> { require_feature!(:medico) }
 
   # GET /indicaciones_medicas — indicaciones de todos los pacientes con seguimiento.
   # Queda solo para el dashboard del médico ("por vencer"): la lista global como pantalla se

@@ -2,6 +2,7 @@ class DispositivosController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin!
   before_action :set_dispositivo, only: [:show, :update, :destroy, :regenerar_token]
+  before_action -> { require_feature!(:iot) }
 
   def index
     dispositivos = current_user.club.dispositivos

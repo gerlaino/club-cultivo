@@ -157,23 +157,96 @@ class Club < ApplicationRecord
 
   def eliminado? = deleted_at.present?
 
-  AVAILABLE_FEATURES = %w[
-    ia_analisis
-    ia_voz
-    web_publica
-    mailer
-    iot
-    alertas
-    ariccame
-    cuenta_corriente
-    analytics
-    multi_sede
-    insumos
-    bar
-  ].freeze
+  # ── Qué se vende y qué se prende ──────────────────────────────────────────
+  #
+  # DOS SUITES, no trece casillas sueltas. Un club compra "cultivo" o "producción y dispensa"
+  # (o las dos), y arriba se le suman los add-ons que le sirvan. Trece flags independientes
+  # obligaban a tildar de a uno y a acordarse de todos: la primera vez que se olvida uno, el
+  # club ve una sección a medias y pierde la confianza.
+  #
+  # Las suites NO se chequean con `feature?`: se chequean con `suite?`, y lo que un controller
+  # exige es una suite o un add-on concreto (ver `require_feature!` en ApplicationController).
+  SUITES = {
+    'cultivo' => {
+      label: 'Cultivo',
+      desc:  'Genéticas, lotes, plantas, salas, cosecha, post-cosecha y tareas.',
+    },
+    'produccion_dispensa' => {
+      label: 'Producción y dispensa',
+      desc:  'Pacientes, stock, dispensaciones, reservas, cuenta corriente, delivery y contabilidad.',
+    },
+  }.freeze
 
-  def feature?(key)
+  # Add-ons: se suman a una suite. `requiere` documenta de qué depende para funcionar DE VERDAD
+  # —no alcanza con prenderlo—, y el super admin lo muestra antes de dejar activarlo.
+  ADDONS = {
+    'bar'         => { label: 'Buffet',            desc: 'Punto de venta, caja de turno y eventos.',           requiere: nil },
+    'medico'      => { label: 'Módulo médico',     desc: 'Turnos, historia clínica e indicaciones.',           requiere: nil },
+    'iot'         => { label: 'Ambiente / IoT',    desc: 'Sensores, lecturas automáticas y reglas.',           requiere: 'Hardware del club (Sonoff u otro) o importación por CSV.' },
+    'ia'          => { label: 'Asistente IA',      desc: 'Análisis de lote, plan de trabajo y registro por voz.', requiere: 'ANTHROPIC_API_KEY en el entorno.' },
+    'mailer'      => { label: 'Correo al paciente', desc: 'Mails desde la ficha, con historial.',              requiere: 'SMTP del club cargado en Preferencias.' },
+    'whatsapp'    => { label: 'WhatsApp',          desc: 'Avisos de entrega por WhatsApp.',                    requiere: 'Cuenta de Twilio del club (SID, token y número).' },
+    'web_publica' => { label: 'Web pública',       desc: 'Sitio público del club y carnets digitales.',        requiere: 'INCOMPLETO: el sitio todavía no está deployado.' },
+    'ariccame'    => { label: 'ARICCAME',          desc: 'Reporte regulatorio de dispensaciones y stock.',     requiere: 'INCOMPLETO: la integración con ANMAT está simulada, no transmite de verdad.' },
+  }.freeze
+
+  # Add-ons que NO están terminados: vienen apagados por defecto y el super admin muestra la
+  # advertencia de `requiere` antes de dejar activarlos. No se bloquean por completo —eso
+  # dejaría su código inalcanzable— pero nadie los prende sin enterarse de qué les falta.
+  ADDONS_INCOMPLETOS = %w[web_publica ariccame].freeze
+
+  # Se mantiene para compatibilidad: hay clubes con las claves viejas guardadas en `features`.
+  AVAILABLE_FEATURES = (SUITES.keys + ADDONS.keys).freeze
+
+  # Equivalencias con el esquema viejo, para que un club existente no pierda accesos.
+  # `alertas`, `analytics`, `multi_sede`, `insumos` y `cuenta_corriente` dejan de ser flags:
+  # son parte del núcleo de sus suites y no tenía sentido poder apagarlas por separado.
+  FEATURES_LEGACY = {
+    'ia_analisis'      => 'ia',
+    'ia_voz'           => 'ia',
+    'cuenta_corriente' => 'produccion_dispensa',
+    'analytics'        => 'cultivo',
+    'multi_sede'       => 'cultivo',
+    'insumos'          => 'cultivo',
+    'alertas'          => 'cultivo',
+  }.freeze
+
+  # Con qué nace un club nuevo: las dos suites y los add-ons que funcionan sin configuración
+  # externa. Los que dependen de algo de afuera (IoT, IA, mail, WhatsApp) y los incompletos
+  # se prenden a mano cuando el club los tenga resueltos.
+  FEATURES_POR_DEFECTO = {
+    'cultivo'             => true,
+    'produccion_dispensa' => true,
+    'bar'                 => true,
+    'medico'              => true,
+  }.freeze
+
+  def suite?(key)
     features[key.to_s] == true
+  end
+
+  # Mapa inverso: qué banderas VIEJAS habilitan cada capacidad nueva. Se deriva de
+  # FEATURES_LEGACY para no mantener dos listas que se contradigan.
+  FEATURES_LEGACY_INVERSO = FEATURES_LEGACY.each_with_object({}) do |(viejo, nuevo), acc|
+    (acc[nuevo] ||= []) << viejo
+  end.freeze
+
+  # ¿Está habilitada esta capacidad? Acepta el nombre nuevo o cualquiera de los viejos que
+  # equivalían a él: un club con `ia_voz` guardado sigue teniendo el asistente.
+  def feature?(key)
+    k = key.to_s
+    return true if features[k] == true
+
+    FEATURES_LEGACY_INVERSO.fetch(k, []).any? { |viejo| features[viejo] == true }
+  end
+
+  def addon_disponible?(key)
+    feature?(key)
+  end
+
+  # ¿Este add-on está terminado? El super admin lo usa para advertir antes de activarlo.
+  def addon_incompleto?(key)
+    ADDONS_INCOMPLETOS.include?(key.to_s)
   end
 
   IA_TIERS = {

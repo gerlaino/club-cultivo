@@ -1,6 +1,7 @@
 class AriccameRegistrosController < ApplicationController
   before_action :authenticate_user!
   before_action :require_admin!
+  before_action -> { require_feature!(:ariccame) }
 
   def index
     scope = current_user.club.ariccame_registros.order(created_at: :desc)

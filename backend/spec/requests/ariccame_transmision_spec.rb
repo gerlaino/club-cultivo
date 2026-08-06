@@ -4,6 +4,8 @@ RSpec.describe 'ARICCAME — transmisión (simulada)', type: :request do
   include AuthHelpers
 
   let(:club)  { create(:club) }
+
+  before { club.update_columns(features: club.features.merge('ariccame' => true)) }
   let(:admin) { create(:user, :admin, club: club) }
 
   def registro(estado: 'pendiente', intentos: 0)

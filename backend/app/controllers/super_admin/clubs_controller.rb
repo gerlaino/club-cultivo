@@ -142,7 +142,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       :smtp_host, :smtp_port, :smtp_user, :smtp_pass,
       :smtp_from, :smtp_from_name,
       :ia_tier, :ia_limite_hora,
-      features: {}
+      features: Club::FEATURES_POR_DEFECTO.dup
     )
   end
 
@@ -182,6 +182,11 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       smtp_from:       c.smtp_from,
       smtp_from_name:  c.smtp_from_name,
       features:        c.features,
+      suites:          Club::SUITES.map { |k, v| { clave: k, label: v[:label], desc: v[:desc], activa: c.suite?(k) } },
+      addons:          Club::ADDONS.map { |k, v|
+        { clave: k, label: v[:label], desc: v[:desc], requiere: v[:requiere],
+          incompleto: c.addon_incompleto?(k), activo: c.feature?(k) }
+      },
       ia_tier:         c.ia_tier,
       ia_limite_hora:  c.ia_limite_hora,
       whatsapp_estado:      c.whatsapp_estado,

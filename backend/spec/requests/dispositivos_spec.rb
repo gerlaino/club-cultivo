@@ -2,6 +2,7 @@ require 'rails_helper'
 
 RSpec.describe 'Dispositivos', type: :request do
   let(:club)       { create(:club) }
+  before { club.update_columns(features: club.features.merge('iot' => true)) }
   let(:sala)       { create(:sala, club: club) }
   let(:admin)      { create(:user, :admin, club: club) }
   let(:cultivador) { create(:user, :cultivador, club: club) }

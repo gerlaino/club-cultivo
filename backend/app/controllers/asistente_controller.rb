@@ -1,4 +1,5 @@
 class AsistenteController < BaseController
+  before_action -> { require_feature!(:ia) }
   require 'net/http'
   require 'json'
 

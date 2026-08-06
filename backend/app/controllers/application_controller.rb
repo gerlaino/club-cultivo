@@ -12,6 +12,33 @@ class ApplicationController < ActionController::API
   before_action :block_auditor_writes!
   before_action :block_observer_writes!
 
+  # ── Gating por módulo ─────────────────────────────────────────────────────
+  #
+  #   require_feature! :bar          → en un before_action del controller
+  #
+  # Devuelve 403 DE VERDAD. Esconder el botón en el frontend no es gating: el club puede
+  # entrar por la API igual, y hasta ahora era lo único que había para 10 de los 13 flags.
+  #
+  # `super_admin` pasa siempre: administra la plataforma, no opera un club.
+  def require_feature!(clave)
+    return if current_user&.super_admin?
+
+    club = current_user&.club
+    return if club&.addon_disponible?(clave) || club&.suite?(clave)
+
+    meta   = Club::ADDONS[clave.to_s] || Club::SUITES[clave.to_s] || {}
+    nombre = meta[:label] || clave.to_s.humanize
+
+    detalle = if Club::ADDONS_INCOMPLETOS.include?(clave.to_s)
+                'Este módulo todavía no está disponible.'
+              else
+                'Tu club no tiene este módulo habilitado.'
+              end
+
+    render json: { error: "#{nombre}: #{detalle}", modulo: clave.to_s, requiere_modulo: true },
+           status: :forbidden
+  end
+
   # SPA fallback — sirve index.html para el root y las rutas del front (get '*path').
   # DEBE ser pública: una action privada no es ruteable → Rails tira ActionNotFound.
   def spa_fallback

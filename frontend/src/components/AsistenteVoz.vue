@@ -469,12 +469,30 @@ function resetear() {
   resultados.value = []; erroresEjecucion.value = []; errorVoz.value = null
 }
 
+const esMovil = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+
+const MENSAJE_ERROR_VOZ = {
+  'not-allowed':         'No diste permiso al micrófono. Habilitalo para este sitio en los ajustes del navegador y volvé a intentar.',
+  'service-not-allowed': 'El navegador bloqueó el reconocimiento de voz. En la PWA instalada suele fallar: probá desde Chrome.',
+  'audio-capture':       'No se detectó micrófono.',
+  'network':             'El reconocimiento de voz necesita internet y no pudo conectarse.',
+  'aborted':             'Se interrumpió la grabación.',
+}
+
+let textoAcumulado = ''
+
 function iniciarGrabacion() {
   errorVoz.value = null; transcripcion.value = ''; transcripcionInterim.value = ''; editandoTranscripcion.value = false
+  textoAcumulado = ''
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition
   if (!SR) { errorVoz.value = 'Tu browser no soporta reconocimiento de voz. Usá Chrome.'; return }
   recognition = new SR()
-  recognition.lang = 'es-AR'; recognition.continuous = true; recognition.interimResults = true
+  recognition.lang = 'es-AR'
+  // `continuous` NO es confiable en Chrome Android: la sesión se corta sola en cada pausa y
+  // dispara errores en medio del dictado. En el teléfono va de a un tramo, y se acumula lo
+  // dicho entre tramos (ver `textoAcumulado`).
+  recognition.continuous = !esMovil()
+  recognition.interimResults = true
   recognition.onstart  = () => { escuchando.value = true }
   recognition.onresult = (e) => {
     let final = '', interim = ''
@@ -482,12 +500,21 @@ function iniciarGrabacion() {
       if (e.results[i].isFinal) final += e.results[i][0].transcript
       else interim += e.results[i][0].transcript
     }
-    if (final) transcripcion.value = final
+    // En móvil cada tramo llega como una sesión nueva: se suma a lo ya dictado en vez de
+    // pisarlo, si no sólo quedaría la última frase.
+    if (final) {
+      transcripcion.value = recognition.continuous
+        ? final
+        : [textoAcumulado, final].filter(Boolean).join(' ').trim()
+      textoAcumulado = transcripcion.value
+    }
     transcripcionInterim.value = interim
   }
+  // Mensajes que dicen qué hacer. "Error de micrófono: not-allowed" no le sirve a nadie.
   recognition.onerror = (e) => {
     if (e.error === 'no-speech') return
-    errorVoz.value = `Error de micrófono: ${e.error}`; escuchando.value = false
+    errorVoz.value = MENSAJE_ERROR_VOZ[e.error] || `No se pudo escuchar (${e.error}).`
+    escuchando.value = false
   }
   recognition.onend = () => { escuchando.value = false; transcripcionInterim.value = '' }
   recognition.start()
@@ -584,7 +611,12 @@ function iniciarGrabacionConsulta() {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition
   if (!SR) { errorVoz.value = 'Tu browser no soporta voz. Usá Chrome.'; return }
   recognition = new SR()
-  recognition.lang = 'es-AR'; recognition.continuous = true; recognition.interimResults = true
+  recognition.lang = 'es-AR'
+  // `continuous` NO es confiable en Chrome Android: la sesión se corta sola en cada pausa y
+  // dispara errores en medio del dictado. En el teléfono va de a un tramo, y se acumula lo
+  // dicho entre tramos (ver `textoAcumulado`).
+  recognition.continuous = !esMovil()
+  recognition.interimResults = true
   recognition.onstart = () => { escuchando.value = true }
   recognition.onresult = (e) => {
     let final = ''
