@@ -24,9 +24,11 @@
             <div class="lem__field">
               <label class="lem__label">Estado</label>
               <select class="lem__input" v-model="editLoteForm.estado">
-                <!-- Fase inicial: germinación (solo lotes de semilla) → esqueje → vegetativo.
-                     Un lote de esqueje arranca en esqueje (se saltea germinación). -->
-                <option v-if="props.lote?.origen !== 'esqueje'" value="enraizado">Enraizado</option>
+                <!-- TODO lote arranca enraizando, venga de semilla o de esqueje: el origen es
+                     un eje aparte del estado (Lote#ESTADOS). Antes se escondía "Enraizado" en
+                     los lotes de esqueje —que es justo el caso más común— por el esquema viejo
+                     de germinación/esqueje como estados separados. -->
+                <option value="enraizado">Enraizado</option>
                 <option value="vegetativo">Vegetativo</option>
                 <option value="floracion">Floración</option>
                 <option value="cosecha">Cosechado</option>
