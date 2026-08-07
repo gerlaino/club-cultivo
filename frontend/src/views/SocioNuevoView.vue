@@ -273,7 +273,7 @@ async function handleSubmit() {
             <label class="snv__label">Número de certificado</label>
             <input v-model.trim="form.reprocann_numero" class="snv__input"
               placeholder="Ej: REP-2024-001234" @input="sugerirVencimiento" />
-            <span class="snv__hint">Número asignado por ANMAT al emisor</span>
+            <span class="snv__hint">Número de matrícula del profesional que firma</span>
           </div>
           <div class="snv__field">
             <label class="snv__label">Fecha de vencimiento</label>

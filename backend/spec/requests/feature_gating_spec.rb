@@ -40,7 +40,7 @@ RSpec.describe 'Gating por módulo', type: :request do
   end
 
   describe 'módulos incompletos' do
-    # ARICCAME simula el envío a ANMAT y la web pública no está deployada: vienen APAGADOS y
+    # ARICCAME simula el envío y la web pública no está deployada: vienen APAGADOS y
     # el panel advierte qué les falta, pero se pueden prender a conciencia.
     it 'no vienen activados por defecto en un club nuevo' do
       expect(Club::FEATURES_POR_DEFECTO).not_to have_key('ariccame')

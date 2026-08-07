@@ -177,7 +177,7 @@ onMounted(() => cargar())
             <i class="bi bi-x-circle-fill"></i>
             <div>
               <strong>{{ informe.pacientes.vencidos }} paciente{{ informe.pacientes.vencidos > 1 ? 's' : '' }} con autorización REPROCANN vencida</strong>
-              <span>— Requieren renovación urgente ante ANMAT.</span>
+              <span>— Requieren renovación urgente del REPROCANN.</span>
             </div>
           </div>
           <div v-if="informe.pacientes.por_vencer > 0" class="ir__alerta ir__alerta--warn">

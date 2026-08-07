@@ -61,7 +61,7 @@ const FEATURE_META = {
   whatsapp:    { label: 'WhatsApp',       desc: 'Avisos de entrega por WhatsApp',          icon: '💬', requiere: 'Cuenta Twilio del club' },
   eventos:     { label: 'Eventos',        desc: 'Fiestas y catas del Buffet',              icon: '🎉', incompleto: true },
   web_publica: { label: 'Web pública',    desc: 'Sitio público del club',                  icon: '🌐', incompleto: true },
-  ariccame:    { label: 'ARICCAME',       desc: 'Reporte regulatorio a ANMAT',             icon: '📋', incompleto: true },
+  ariccame:    { label: 'ARICCAME',       desc: 'Reporte regulatorio de dispensaciones y stock',             icon: '📋', incompleto: true },
 }
 const FEATURES_ORDER = Object.keys(FEATURE_META)
 

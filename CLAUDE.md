@@ -6,7 +6,9 @@
 
 ## 🌿 ¿Qué es este proyecto?
 
-**Club Cultivo** es una plataforma SaaS B2B para la gestión integral de clubes de cannabis (contexto legal argentino: REPROCANN, ARICCAME/ANMAT).
+**Club Cultivo** es una plataforma SaaS B2B para la gestión integral de clubes de cannabis (contexto legal argentino: REPROCANN, ARICCAME).
+
+> **Quién es quién, que se confundía en el código:** **REPROCANN** es el registro del programa de cannabis, lo emite el **Ministerio de Salud de la Nación** y habilita el cultivo para uso medicinal. **ARICCAME** es la agencia que regula la industria (Ley 27.669). **ANMAT** regula medicamentos y no interviene en ninguno de los dos: decir "REPROCANN de ANMAT" es un error.
 No es un club: es la **herramienta que usan los clubes** para operar.
 
 Cada club suscripto es un tenant aislado por `club_id` y gestiona: socios/pacientes, cultivo, post-cosecha, stock, dispensaciones, delivery, módulo médico con turnos, contabilidad, ambiente/IoT, analítica e informes de cumplimiento.
@@ -94,7 +96,7 @@ Ninguno se considera cerrado; todos son candidatos a revisión.
 8. **Ambiente / IoT** — dispositivos con webhook token, lecturas, reglas y alertas, setpoints por fase, VPD, drivers (Sonoff, CSV manual, CSV-IA).
 9. **Contabilidad** — movimientos contables, costos por lote, P&L.
 10. **Analítica e informes** — genéticas/ciclos/pérdidas/comparativa, benchmark, informe semestral, informes auditor (REPROCANN, producción, cumplimiento, plan vs real, trazabilidad).
-11. **ARICCAME** — reporte de dispensaciones y stock (feature flag por club).
+11. **ARICCAME** — reporte de dispensaciones y stock (feature flag por club). La transmisión está SIMULADA: no envía nada de verdad.
 12. **Super admin** — gestión de clubes, planes (`PlanEnforcer`), modo observador (solo lectura).
 13. **Notificaciones** — push web, ActionCable, alertas internas por rol.
 14. **Web pública del club** + carnets digitales.
@@ -202,8 +204,8 @@ cd frontend && npm run dev                                 # Vite dev server
 - **Cepa/Genética**: THC%, CBD%, terpenos, tiempo de floración, rendimiento.
 - **VPD / PPFD / DLI / EC / pH**: métricas ambientales y de solución clave.
 - **Dispensación**: entrega a socio, sujeta a REPROCANN. **No hay límite mensual de gramos**: los pacientes dispensan libremente; el control financiero real es el crédito de cuenta corriente (un club puede permitir dispensar sin pagar = crédito del paciente). `pacientes.limite_dispensacion_mensual_g` quedó reservado para el futuro (posiblemente ligado a indicación médica) — no construir features sobre él ni exponerlo más en UI.
-- **REPROCANN**: registro argentino; vencimientos y renovaciones son críticos para el club.
-- **ARICCAME**: reporte regulatorio ANMAT de dispensaciones y stock.
+- **REPROCANN**: registro del Ministerio de Salud de la Nación que habilita el cultivo para uso medicinal. Vencimientos y renovaciones son críticos para el club.
+- **ARICCAME**: agencia que regula la industria del cannabis (Ley 27.669). El reporte de dispensaciones y stock está SIMULADO: no se transmite nada.
 
 ---
 

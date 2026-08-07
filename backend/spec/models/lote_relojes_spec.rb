@@ -94,4 +94,47 @@ RSpec.describe Lote, 'los relojes del ciclo' do
       expect(data[:dias_vegetacion]).to eq(23)   # 40 - 12 enraizando - 5 en floración
     end
   end
+
+  # Reportado por Germán: avanzó un lote a vegetativo sin querer, lo volvió a enraizado
+  # editándolo, y la ficha mostraba "ENRAIZADO · DÍA 16" arriba y "Día 1 de ciclo" abajo. Dos
+  # relojes contradictorios para el mismo lote.
+  describe 'un lote que se avanzó por error y volvió atrás' do
+    it 'no muestra días de ciclo mientras esté enraizando' do
+      lote = create(:lote, club: club, sala: sala, estado: 'vegetativo',
+                    start_date: 16.days.ago.to_date, tamanio_maceta: 3)
+      lote.lote_eventos.create!(tipo: 'cambio_estado', estado_anterior: 'enraizado',
+                                estado_nuevo: 'vegetativo', registrado_en: 1.day.ago,
+                                club: club, user: admin)
+
+      # Se corrige el error: vuelve a enraizado.
+      lote.update!(estado: 'enraizado')
+
+      expect(lote.dias_ciclo).to be_nil
+    end
+
+    it 'y cuando prende de verdad, el ciclo arranca de cero' do
+      lote = create(:lote, club: club, sala: sala, estado: 'enraizado',
+                    start_date: 20.days.ago.to_date, tamanio_maceta: 3)
+      # Avance por error hace 15 días, y vuelta atrás.
+      lote.lote_eventos.create!(tipo: 'cambio_estado', estado_anterior: 'enraizado',
+                                estado_nuevo: 'vegetativo', registrado_en: 15.days.ago,
+                                club: club, user: admin)
+      # Prende de verdad hoy.
+      lote.lote_eventos.create!(tipo: 'cambio_estado', estado_anterior: 'enraizado',
+                                estado_nuevo: 'vegetativo', registrado_en: Time.current,
+                                club: club, user: admin)
+      lote.update!(estado: 'vegetativo')
+
+      # Cuenta desde que prendió de verdad, no desde el avance equivocado.
+      expect(lote.reload.dias_ciclo).to eq(0)
+    end
+
+    # La edad de la planta NO se toca: siguió viva todo ese tiempo.
+    it 'la edad de la planta no se ve afectada' do
+      lote = create(:lote, club: club, sala: sala, estado: 'enraizado',
+                    start_date: 16.days.ago.to_date)
+
+      expect(lote.dias_desde_inicio).to eq(16)
+    end
+  end
 end

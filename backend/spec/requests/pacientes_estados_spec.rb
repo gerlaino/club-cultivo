@@ -4,7 +4,8 @@ require 'rails_helper'
 # y que hoy se confunden entre sí:
 #
 #   1. `es_paciente`      → si la persona está ACTIVA EN EL CLUB (decisión del club).
-#   2. `reprocann_estado` → en qué punto del trámite ANMAT está (decisión del Estado).
+#   2. `reprocann_estado` → en qué punto del trámite del REPROCANN está (lo emite el
+#      Ministerio de Salud de la Nación, no ANMAT: acá se refleja, no se decide).
 #
 # Son independientes: se puede estar activo sin REPROCANN, e inactivo con REPROCANN vigente.
 # Los tests están escritos contra el comportamiento ESPERADO, no contra el implementado.

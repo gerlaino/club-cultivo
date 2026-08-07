@@ -1,5 +1,5 @@
 module Ariccame
-  # Registra la entrada de un producto terminado (stock) en ARICCAME/ANMAT.
+  # Registra la entrada de un producto terminado (stock) en ARICCAME.
   # No hace el envío HTTP todavía — genera el registro pendiente para el job de envío.
   class ReportadorStock
     def initialize(stock)

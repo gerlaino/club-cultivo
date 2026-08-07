@@ -1,5 +1,5 @@
 module Ariccame
-  # Registra una dispensación a paciente en ARICCAME/ANMAT.
+  # Registra una dispensación a paciente en ARICCAME.
   class ReportadorDispensacion
     def initialize(dispensacion)
       @dispensacion = dispensacion
@@ -11,7 +11,7 @@ module Ariccame
       return if AriccameRegistro.exists?(dispensacion: @dispensacion)
 
       # TODO: ariccame_reportada se setea al crear el registro local (estado: 'pendiente').
-      # La transmisión real a ARICCAME/ANMAT aún no está implementada — ver AriccameRegistro.estado.
+      # La transmisión real a ARICCAME aún no está implementada — ver AriccameRegistro.estado.
       AriccameRegistro.create!(
         club:         @dispensacion.paciente.club,
         dispensacion: @dispensacion,

@@ -188,7 +188,7 @@ class Club < ApplicationRecord
     'mailer'      => { label: 'Correo al paciente', desc: 'Mails desde la ficha, con historial.',              requiere: 'SMTP del club cargado en Preferencias.' },
     'whatsapp'    => { label: 'WhatsApp',          desc: 'Avisos de entrega por WhatsApp.',                    requiere: 'Cuenta de Twilio del club (SID, token y número).' },
     'web_publica' => { label: 'Web pública',       desc: 'Sitio público del club y carnets digitales.',        requiere: 'INCOMPLETO: el sitio todavía no está deployado.' },
-    'ariccame'    => { label: 'ARICCAME',          desc: 'Reporte regulatorio de dispensaciones y stock.',     requiere: 'INCOMPLETO: la integración con ANMAT está simulada, no transmite de verdad.' },
+    'ariccame'    => { label: 'ARICCAME',          desc: 'Reporte regulatorio de dispensaciones y stock.',     requiere: 'INCOMPLETO: la integración está simulada, no transmite de verdad.' },
   }.freeze
 
   # Add-ons que NO están terminados: vienen apagados por defecto y el super admin muestra la

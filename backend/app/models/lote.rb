@@ -156,8 +156,11 @@ class Lote < ApplicationRecord
   # Fallback a start_date: los lotes viejos y los heredados no tienen el evento de vegetativo, y sin
   # esto sus métricas históricas se vaciarían de golpe.
   def fecha_inicio_vegetativo
+    # La ÚLTIMA entrada a vegetativo, no la primera: si el lote se avanzó por error y se lo
+    # volvió a enraizado, en el medio estuvo enraizando y el ciclo arranca cuando prende de
+    # verdad. Con la primera, un lote que rebotó arrastraba días de ciclo que no vivió.
     ev = lote_eventos.select { |e| e.tipo == 'cambio_estado' && e.estado_nuevo == 'vegetativo' }
-                     .min_by(&:registrado_en)
+                     .max_by(&:registrado_en)
     ev&.registrado_en&.to_date || (estado == 'enraizado' ? nil : start_date)
   end
 
@@ -176,8 +179,14 @@ class Lote < ApplicationRecord
 
   # El ciclo productivo. nil mientras enraíza: todavía no arrancó.
   def dias_ciclo
+    # Un lote que HOY está enraizando todavía no arrancó el ciclo, aunque en su historia haya
+    # una entrada a vegetativo: es el caso de haberlo avanzado por error y haberlo vuelto
+    # atrás. Sin esto mostraba "Día 1 de ciclo" al lado de "enraizado · día 16", dos relojes
+    # contradictorios para el mismo lote.
+    return nil if estado == 'enraizado'
+
     f = fecha_inicio_vegetativo
-    f ? (Date.current - f).to_i : nil
+    f ? (Time.zone.today - f).to_i : nil
   end
 
   # Foto de portada del lote (para el slot del layout de la sala): la marcada como portada si
