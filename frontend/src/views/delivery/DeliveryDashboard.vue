@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { Package, Bike, CheckCircle2, XCircle, MapPin, Phone, User, FileText, ChevronRight, Send, Route, Navigation, PenLine, Trash2, Lock } from 'lucide-vue-next'
+import { Package, Bike, CheckCircle2, XCircle, MapPin, Phone, User, FileText, ChevronRight, Send, Route, Navigation, PenLine, Trash2, Lock, Check } from 'lucide-vue-next'
 import { getMisPaquetes, iniciarViaje, ordenarRuta } from '../../lib/api.js'
 import { useEntregasOffline } from '../../composables/useEntregasOffline.js'
 import { useToast } from '../../composables/useToast.js'
@@ -127,6 +127,11 @@ const pendientes = computed(() => paquetes.value.filter(p => p.estado_envio === 
 const enViaje    = computed(() => paquetes.value.filter(p => p.estado_envio === 'en_viaje'))
 const fallidos   = computed(() => paquetes.value.filter(p => p.estado_envio === 'fallido'))
 const activos    = computed(() => [...pendientes.value, ...enViaje.value])
+
+// La próxima parada: el primero de los que ya está llevando, respetando el orden de la ruta.
+// Es lo único que el repartidor necesita ver mientras maneja.
+const siguienteParada = computed(() =>
+  [...enViaje.value].sort((a, b) => (a.orden_entrega ?? 999) - (b.orden_entrega ?? 999))[0] || null)
 
 const todosSeleccionados = computed(() =>
   pendientes.value.length > 0 && pendientes.value.every(p => selected.value.has(p.id))
@@ -343,6 +348,53 @@ onMounted(load)
     </div>
 
     <template v-else>
+
+      <!-- LO QUE HAY QUE HACER AHORA.
+           Un repartidor mira esto parado en la vereda con una caja en la mano: necesita saber
+           a dónde va, no leer tres secciones con checkboxes. El resto de la pantalla queda
+           abajo para consultar; acá arriba hay UNA cosa a la vez. -->
+      <div v-if="siguienteParada" class="dlv__foco">
+        <div class="dlv__foco-tag">Tu próxima entrega</div>
+        <div class="dlv__foco-nombre">{{ siguienteParada.paciente?.nombre || 'Paciente' }}</div>
+        <div class="dlv__foco-dir">{{ siguienteParada.direccion_envio || 'Sin dirección cargada' }}</div>
+        <div class="dlv__foco-acts">
+          <button class="dlv__foco-btn dlv__foco-btn--nav" @click="irAParada(siguienteParada)">
+            <Route :size="16" :stroke-width="2" /> Cómo llegar
+          </button>
+          <button class="dlv__foco-btn dlv__foco-btn--ok" @click="abrirEntregar(siguienteParada)">
+            <Check :size="16" :stroke-width="2.5" /> Entregué
+          </button>
+          <button class="dlv__foco-btn dlv__foco-btn--no" @click="abrirFallo(siguienteParada)">
+            No pude
+          </button>
+        </div>
+        <p v-if="enViaje.length > 1" class="dlv__foco-resto">
+          Te quedan {{ enViaje.length - 1 }} más en este viaje.
+        </p>
+      </div>
+
+      <!-- Todavía no salió: lo único que importa es arrancar. -->
+      <div v-else-if="pendientes.length" class="dlv__foco dlv__foco--salir">
+        <div class="dlv__foco-tag">Listo para salir</div>
+        <div class="dlv__foco-nombre">
+          {{ pendientes.length }} paquete{{ pendientes.length === 1 ? '' : 's' }} para llevar
+        </div>
+        <div class="dlv__foco-dir">Elegí cuáles cargás y arrancá. Los que dejes quedan para después.</div>
+        <div class="dlv__foco-acts">
+          <button class="dlv__foco-btn dlv__foco-btn--ok" :disabled="!selected.size || saving" @click="handleIniciarViaje">
+            <Bike :size="16" :stroke-width="2" />
+            Salir a repartir{{ selected.size ? ` (${selected.size})` : '' }}
+          </button>
+        </div>
+        <p v-if="!selected.size" class="dlv__foco-resto">Marcá abajo los que llevás.</p>
+      </div>
+
+      <!-- Nada que hacer: que se note, en vez de dejar una pantalla con listas vacías. -->
+      <div v-else class="dlv__foco dlv__foco--vacio">
+        <div class="dlv__foco-nombre">No tenés entregas pendientes</div>
+        <div class="dlv__foco-dir">Cuando el club te asigne un paquete, aparece acá.</div>
+      </div>
+
 
       <!-- Stats rápidos -->
       <div class="dlv__stats">
@@ -575,7 +627,54 @@ onMounted(load)
               <div class="dlv__cobro-resto" :class="{ 'dlv__cobro-resto--info': excedenteEntrega > 0 }">
                 <template v-if="excedenteEntrega > 0">Paga de más: <strong>{{ fmtMoneda(excedenteEntrega) }}</strong> → queda a favor en su cuenta</template>
                 <template v-else-if="restoEntregaCuenta > 0">Resto a cuenta corriente: <strong>{{ fmtMoneda(restoEntregaCuenta) }}</strong></template>
-                <template v-else>Cubierto ✓</template>
+                <template v-else>
+
+      <!-- LO QUE HAY QUE HACER AHORA.
+           Un repartidor mira esto parado en la vereda con una caja en la mano: necesita saber
+           a dónde va, no leer tres secciones con checkboxes. El resto de la pantalla queda
+           abajo para consultar; acá arriba hay UNA cosa a la vez. -->
+      <div v-if="siguienteParada" class="dlv__foco">
+        <div class="dlv__foco-tag">Tu próxima entrega</div>
+        <div class="dlv__foco-nombre">{{ siguienteParada.paciente?.nombre || 'Paciente' }}</div>
+        <div class="dlv__foco-dir">{{ siguienteParada.direccion_envio || 'Sin dirección cargada' }}</div>
+        <div class="dlv__foco-acts">
+          <button class="dlv__foco-btn dlv__foco-btn--nav" @click="irAParada(siguienteParada)">
+            <Route :size="16" :stroke-width="2" /> Cómo llegar
+          </button>
+          <button class="dlv__foco-btn dlv__foco-btn--ok" @click="abrirEntregar(siguienteParada)">
+            <Check :size="16" :stroke-width="2.5" /> Entregué
+          </button>
+          <button class="dlv__foco-btn dlv__foco-btn--no" @click="abrirFallo(siguienteParada)">
+            No pude
+          </button>
+        </div>
+        <p v-if="enViaje.length > 1" class="dlv__foco-resto">
+          Te quedan {{ enViaje.length - 1 }} más en este viaje.
+        </p>
+      </div>
+
+      <!-- Todavía no salió: lo único que importa es arrancar. -->
+      <div v-else-if="pendientes.length" class="dlv__foco dlv__foco--salir">
+        <div class="dlv__foco-tag">Listo para salir</div>
+        <div class="dlv__foco-nombre">
+          {{ pendientes.length }} paquete{{ pendientes.length === 1 ? '' : 's' }} para llevar
+        </div>
+        <div class="dlv__foco-dir">Elegí cuáles cargás y arrancá. Los que dejes quedan para después.</div>
+        <div class="dlv__foco-acts">
+          <button class="dlv__foco-btn dlv__foco-btn--ok" :disabled="!selected.size || saving" @click="handleIniciarViaje">
+            <Bike :size="16" :stroke-width="2" />
+            Salir a repartir{{ selected.size ? ` (${selected.size})` : '' }}
+          </button>
+        </div>
+        <p v-if="!selected.size" class="dlv__foco-resto">Marcá abajo los que llevás.</p>
+      </div>
+
+      <!-- Nada que hacer: que se note, en vez de dejar una pantalla con listas vacías. -->
+      <div v-else class="dlv__foco dlv__foco--vacio">
+        <div class="dlv__foco-nombre">No tenés entregas pendientes</div>
+        <div class="dlv__foco-dir">Cuando el club te asigne un paquete, aparece acá.</div>
+      </div>
+Cubierto ✓</template>
               </div>
             </div>
 
@@ -714,6 +813,33 @@ onMounted(load)
 
 /* Section */
 .dlv__section { margin-bottom: var(--sp-6); }
+/* Lo que hay que hacer AHORA. Se lee de un vistazo, con el pulgar y sin frenar. */
+.dlv__foco {
+  background: #fff; border: 2px solid var(--c-leaf-500, #5A8A72); border-radius: 16px;
+  padding: var(--sp-5, 1.25rem); margin-bottom: var(--sp-5, 1.25rem);
+  box-shadow: 0 4px 16px rgba(15,23,42,.06);
+}
+.dlv__foco--salir { border-color: var(--c-sky-600, #0284C7); }
+.dlv__foco--vacio { border-color: var(--c-ink-300, #D1D5DB); border-style: dashed; text-align: center; }
+.dlv__foco-tag {
+  font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
+  color: var(--c-leaf-600, #3F6452); margin-bottom: var(--sp-2, .5rem);
+}
+.dlv__foco--salir .dlv__foco-tag { color: var(--c-sky-600, #0284C7); }
+.dlv__foco-nombre { font-size: 20px; font-weight: 800; color: var(--c-ink-900, #1A1D1F); line-height: 1.2; }
+.dlv__foco-dir { font-size: 15px; color: var(--c-ink-700, #3A3F44); margin-top: 2px; line-height: 1.4; }
+.dlv__foco-acts { display: flex; gap: .5rem; margin-top: var(--sp-4, 1rem); flex-wrap: wrap; }
+.dlv__foco-btn {
+  flex: 1; min-width: 120px; display: inline-flex; align-items: center; justify-content: center;
+  gap: .4rem; padding: .85rem 1rem; border-radius: 12px; border: 1.5px solid transparent;
+  font-size: 15px; font-weight: 700; cursor: pointer; transition: opacity .15s;
+}
+.dlv__foco-btn:disabled { opacity: .45; cursor: not-allowed; }
+.dlv__foco-btn--nav { background: var(--c-ink-100, #F3F4F6); color: var(--c-ink-900, #1A1D1F); }
+.dlv__foco-btn--ok  { background: var(--c-leaf-600, #3F6452); color: #fff; }
+.dlv__foco-btn--no  { background: #fff; border-color: var(--c-ink-300, #D1D5DB); color: var(--c-ink-500, #6B7280); flex: 0 0 auto; min-width: 100px; }
+.dlv__foco-resto { font-size: 13px; color: var(--c-ink-500, #6B7280); margin: var(--sp-3, .75rem) 0 0; }
+
 .dlv__section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--c-ink-400); margin-bottom: var(--sp-3); padding: 0 var(--sp-1); }
 
 /* List rows */

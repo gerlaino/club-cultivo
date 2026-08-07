@@ -5,7 +5,7 @@ vi.mock('../stores/auth', () => ({ useAuthStore: () => ({ user: null, isAuthenti
 vi.mock('../composables/useToast', () => ({ useToast: () => ({ warning: vi.fn() }) }))
 vi.mock('../composables/usePermissions', () => ({ usePermissions: () => ({ can: () => true }) }))
 
-const { puedeEntrar, ROLE_HOME } = await import('../router/index.js')
+const { puedeEntrar, ROLE_HOME, MOBILE_ROLES, MOBILE_HOME } = await import('../router/index.js')
 
 // AC (Germán): "que los permisos estén bien y te bloquee entrar por ejemplo directo desde la
 // URL si no tenés permisos". La matriz cubría 5 de los 11 roles: un cultivador que tipeaba
@@ -83,6 +83,26 @@ describe('acceso por URL directa', () => {
     Object.keys(PROHIBIDO).forEach(rol => {
       const destino = ROLE_HOME[rol] || '/'
       expect(puedeEntrar(rol, destino), `${rol} no puede entrar ni a su propio home`).toBe(true)
+    })
+  })
+
+  // El bug que hacía que el delivery no pudiera entrar desde la PWA instalada: el guard de
+  // PWA lo empujaba a su MOBILE_HOME (bajo /m), la matriz no admitía /m y lo rebotaba, y el
+  // guard lo volvía a empujar. Loop infinito, que desde afuera se ve como "queda cargando".
+  describe('los roles que usan la PWA', () => {
+    MOBILE_ROLES.forEach(rol => {
+      it(`${rol} puede entrar a su pantalla de la PWA (${MOBILE_HOME[rol]})`, () => {
+        expect(puedeEntrar(rol, MOBILE_HOME[rol])).toBe(true)
+      })
+
+      it(`${rol} puede navegar por el resto de /m`, () => {
+        expect(puedeEntrar(rol, '/m/horas')).toBe(true)
+      })
+    })
+
+    it('un rol que NO usa la PWA no necesita /m', () => {
+      expect(MOBILE_ROLES).not.toContain('medico')
+      expect(MOBILE_ROLES).not.toContain('auditor')
     })
   })
 })

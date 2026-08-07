@@ -983,6 +983,10 @@ const ROLE_HOME = {
 // Los que faltaban (cultivador, supervisor, manicura, dispensador, paciente) usan el shell
 // de admin, así que no alcanzaba con mirar el prefijo del layout: hay que listar qué
 // secciones son suyas.
+// Todo rol que usa la PWA necesita `/m`: el guard de PWA lo empuja a su MOBILE_HOME (que
+// vive bajo /m) y si la matriz no lo admite, lo rebota — y el guard lo vuelve a empujar. Es
+// un loop infinito que se ve como "queda cargando y no entra". Le pasaba al delivery en cada
+// login desde la app instalada.
 const COMUNES = ['/perfil', '/login', '/bienvenida']
 
 const ROLE_ALLOWED_PREFIX = {
@@ -990,7 +994,7 @@ const ROLE_ALLOWED_PREFIX = {
   auditor:     ['/auditor',  ...COMUNES],
   medico:      ['/medico',   ...COMUNES],
   abogado:     ['/abogado',  ...COMUNES],
-  delivery:    ['/delivery', ...COMUNES],
+  delivery:    ['/delivery', '/m', ...COMUNES],
 
   // Cultivo: salas, lotes, plantas y lo que rodea al trabajo diario del cuarto.
   cultivador: ['/', '/salas', '/lotes', '/plantas', '/geneticas', '/tareas', '/plan-trabajo',
@@ -1022,7 +1026,7 @@ export function puedeEntrar(role, path) {
   return permitidos.some(p => path === p || (p !== '/' && path.startsWith(p + '/')) || (p === '/' && path === '/'))
 }
 
-export { ROLE_ALLOWED_PREFIX, ROLE_HOME }
+export { ROLE_ALLOWED_PREFIX, ROLE_HOME, MOBILE_ROLES, MOBILE_HOME }
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
