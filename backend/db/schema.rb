@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_06_180000) do
+ActiveRecord::Schema[7.2].define(version: 2026_08_07_165352) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1816,6 +1816,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_06_180000) do
     t.datetime "deleted_at"
     t.bigint "responsable_id"
     t.bigint "deleted_by_id"
+    t.decimal "leaf_temp_offset", precision: 4, scale: 2, default: "-2.0", null: false
     t.index ["club_id"], name: "index_salas_on_club_id"
     t.index ["created_by_id"], name: "index_salas_on_created_by_id"
     t.index ["deleted_at"], name: "index_salas_on_deleted_at"

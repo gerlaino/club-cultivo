@@ -7,7 +7,21 @@ class Dispositivo < ApplicationRecord
 
   encrypts :metadata, deterministic: false
 
+  # OJO con los dos "Pulse": son de empresas distintas y miden cosas distintas.
+  #   `pulse`   → Pulse Grow (pulsegrow.com): monitor ambiental fijo con WiFi que sube solo
+  #               a su nube. Temperatura, humedad, luz, CO2. Es el que da lecturas continuas.
+  #   `bluelab` → Bluelab Pulse: medidor PORTÁTIL de humedad y EC del sustrato, que se lee
+  #               por Bluetooth con el celular. No sube nada a ningún servidor, así que sus
+  #               mediciones se cargan a mano (ver LecturaManualForm).
+  # La app los mostraba a los dos como "Bluelab Pulse", que es lo que hacía elegir el
+  # equivocado y quedarse esperando lecturas que nunca iban a llegar.
   TIPOS   = %w[sonoff_th pulse bluelab tuya_plug shelly_plug melcloud_ac daikin generic].freeze
+
+  # Los que mandan lecturas solos. El resto se carga a mano y no tiene sentido pedirle un
+  # token de webhook a alguien que va a anotar los números del display.
+  TIPOS_AUTOMATICOS = %w[sonoff_th pulse tuya_plug shelly_plug melcloud_ac daikin generic].freeze
+
+  def automatico? = TIPOS_AUTOMATICOS.include?(tipo)
   ESTADOS = %w[activo mantenimiento baja].freeze
 
   validates :nombre_amigable, presence: true

@@ -1,8 +1,11 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { useAmbienteStore } from '../stores/ambiente.js'
 import { useToast } from '../composables/useToast.js'
 import { listSalas } from '../lib/api.js'
+
+// La URL a la que el sensor manda los datos sale de la misma base que usa la app.
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 import DispositivoCard from '../components/ambiente/DispositivoCard.vue'
 
 const store = useAmbienteStore()
@@ -16,14 +19,21 @@ const formError = ref(null)
 const salas     = ref([])
 
 const TIPOS_DISPOSITIVO = [
-  { value: 'sonoff_th',  label: 'Sonoff TH Elite (eWeLink webhook)' },
-  { value: 'generic',    label: 'Genérico (HTTP webhook)' },
-  { value: 'bluelab',    label: 'Bluelab' },
-  { value: 'tuya_plug',  label: 'Tuya / Smart Life' },
-  { value: 'shelly_plug',label: 'Shelly' },
-  { value: 'daikin',     label: 'Daikin AC' },
-  { value: 'pulse',      label: 'Bluelab Pulse' },
-  { value: 'melcloud_ac',label: 'Mitsubishi MelCloud' },
+  // Los dos "Pulse" son de empresas distintas y miden cosas distintas. Estaban los dos
+  // etiquetados como "Bluelab Pulse", así que se elegía el equivocado y después se esperaban
+  // lecturas que nunca iban a llegar.
+  { value: 'pulse',      label: 'Pulse Grow (Pulse One / Pro)', auto: true,
+    ayuda: 'Monitor de sala con WiFi: temperatura, humedad y luz, todo el día sin tocar nada.' },
+  { value: 'sonoff_th',  label: 'Sonoff TH Elite', auto: true,
+    ayuda: 'Temperatura y humedad vía eWeLink.' },
+  { value: 'bluelab',    label: 'Bluelab Pulse (medidor de sustrato)', auto: false,
+    ayuda: 'Medidor de mano: se clava en la maceta y se lee por Bluetooth. No sube datos solo — sus mediciones se cargan a mano desde la sala.' },
+  { value: 'tuya_plug',  label: 'Tuya / Smart Life', auto: true, ayuda: 'Enchufe inteligente.' },
+  { value: 'shelly_plug',label: 'Shelly', auto: true, ayuda: 'Enchufe inteligente.' },
+  { value: 'daikin',     label: 'Daikin AC', auto: true, ayuda: 'Aire acondicionado.' },
+  { value: 'melcloud_ac',label: 'Mitsubishi MelCloud', auto: true, ayuda: 'Aire acondicionado.' },
+  { value: 'generic',    label: 'Otro (envía datos por HTTP)', auto: true,
+    ayuda: 'Cualquier equipo que pueda hacer una llamada HTTP con los datos.' },
 ]
 
 function emptyForm() {
@@ -39,15 +49,44 @@ onMounted(async () => {
   loading.value = false
 })
 
+// Tipo elegido, para saber si el equipo manda datos solo o se carga a mano.
+const tipoElegido = computed(() => TIPOS_DISPOSITIVO.find(t => t.value === form.value.tipo))
+
+// Datos de conexión del sensor recién creado: se muestran UNA vez, listos para pegar.
+const conexion = ref(null)
+async function copiarConexion() {
+  const c = conexion.value
+  await navigator.clipboard.writeText(`URL: ${c.url}\nToken: ${c.token}`)
+  toast.success('Copiado')
+}
+
 async function guardar() {
   formError.value = null
   if (!form.value.nombre_amigable.trim()) { formError.value = 'El nombre es obligatorio'; return }
   if (!form.value.sala_id) { formError.value = 'Seleccioná una sala'; return }
   guardando.value = true
   try {
-    await store.createDispositivo({ ...form.value })
-    toast.success('Dispositivo creado. Generá el token desde la card.')
+    const creado = await store.createDispositivo({ ...form.value })
     showForm.value = false
+
+    // Conectar era de DOS pasos: crear, y después buscar la card para generar el token. El
+    // que conecta un sensor quiere terminar, no cazar un botón. Si el equipo manda datos
+    // solo, el token se genera acá y se muestran las instrucciones listas para copiar.
+    if (tipoElegido.value?.auto && creado?.id) {
+      try {
+        const { token } = await store.regenerarToken(creado.id)
+        conexion.value = {
+          nombre: form.value.nombre_amigable,
+          tipo:   tipoElegido.value.label,
+          url:    `${API_BASE}/webhooks/lecturas/${creado.id}`,
+          token,
+        }
+      } catch {
+        toast.warning('Sensor creado. Generá el token desde su tarjeta para terminar de conectarlo.')
+      }
+    } else {
+      toast.success('Medidor agregado. Sus mediciones se cargan a mano desde la sala.')
+    }
     form.value = emptyForm()
   } catch (e) {
     formError.value = e?.response?.data?.errors?.[0] || 'Error al crear'
@@ -130,6 +169,34 @@ function cancelar() {
       />
     </div>
   </div>
+
+    <!-- Datos de conexión del sensor recién creado. El token se ve UNA sola vez. -->
+    <Teleport to="body">
+      <div v-if="conexion" class="dv-cx-ov" @click.self="conexion = null">
+        <div class="dv-cx">
+          <h3 class="dv-cx__title">{{ conexion.nombre }} está listo</h3>
+          <p class="dv-cx__sub">
+            Cargá estos dos datos en la app de {{ conexion.tipo }} y las lecturas empiezan a
+            llegar solas. El token se muestra una sola vez.
+          </p>
+          <div class="dv-cx__row">
+            <span class="dv-cx__lbl">URL</span>
+            <code class="dv-cx__val">{{ conexion.url }}</code>
+          </div>
+          <div class="dv-cx__row">
+            <span class="dv-cx__lbl">Token</span>
+            <code class="dv-cx__val">{{ conexion.token }}</code>
+          </div>
+          <p class="dv-cx__hint">
+            Si se pierde, se genera uno nuevo desde la tarjeta del sensor (el anterior deja de servir).
+          </p>
+          <div class="dv-cx__acts">
+            <button class="dv__btn-ghost" @click="copiarConexion"><i class="bi bi-clipboard"></i> Copiar</button>
+            <button class="dv__btn-primary" @click="conexion = null">Listo</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 </template>
 
 <style scoped>
@@ -184,4 +251,15 @@ function cancelar() {
   font-weight: 500; cursor: pointer; transition: all .15s;
 }
 .dv__btn-ghost:hover { background: #f0fdf4; }
+
+/* Datos de conexión */
+.dv-cx-ov { position: fixed; inset: 0; background: rgba(15,23,42,.5); display: flex; align-items: center; justify-content: center; z-index: 1200; padding: 1rem; }
+.dv-cx { background: #fff; border-radius: 16px; max-width: 520px; width: 100%; padding: 1.5rem; box-shadow: 0 24px 64px rgba(0,0,0,.2); }
+.dv-cx__title { font-size: 1.05rem; font-weight: 800; color: #0f172a; margin: 0 0 .35rem; }
+.dv-cx__sub { font-size: .85rem; color: #64748b; margin: 0 0 1.15rem; line-height: 1.5; }
+.dv-cx__row { display: flex; align-items: center; gap: .75rem; margin-bottom: .5rem; }
+.dv-cx__lbl { font-size: .7rem; color: #64748b; width: 56px; flex-shrink: 0; text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
+.dv-cx__val { font-family: monospace; font-size: .82rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px; padding: .4rem .65rem; color: #0f172a; user-select: all; flex: 1; word-break: break-all; }
+.dv-cx__hint { font-size: .75rem; color: #94a3b8; margin: .9rem 0 0; }
+.dv-cx__acts { display: flex; gap: .6rem; justify-content: flex-end; margin-top: 1.35rem; }
 </style>

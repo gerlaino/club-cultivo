@@ -378,6 +378,23 @@ watch(seccionActiva, (val) => {
       </div>
 
       <!-- Registro manual -->
+      <!-- Cómo se calcula el VPD de esta sala. Va acá, al lado del número que produce, y no
+           enterrado en configuración: es el dato que explica por qué el VPD de la app puede
+           no coincidir con el que muestra la app del sensor. -->
+      <div v-if="seccionActiva === 'semaforo' && sala" class="sav__vpd-nota">
+        <i class="bi bi-info-circle"></i>
+        <span>
+          El VPD que ves es el <strong>de hoja</strong>: se calcula suponiendo la hoja
+          <strong>{{ Math.abs(sala.leaf_temp_offset ?? -2) }} °C más fría</strong> que el aire,
+          que es lo que la planta siente de verdad.
+          <template v-if="puedeConectar">
+            Se ajusta desde
+            <RouterLink :to="`/salas/${salaId}`" class="sav__vpd-link">la ficha de la sala</RouterLink>
+            (bajo LED la hoja se enfría más que bajo HPS).
+          </template>
+        </span>
+      </div>
+
       <!-- Sensores de ESTA sala. Antes había que saber que existía /dispositivos, una sección
            aparte: estabas mirando el ambiente de tu sala, veías que no llegaban datos, y no
            tenías desde dónde conectar el equipo. -->
@@ -536,6 +553,10 @@ watch(seccionActiva, (val) => {
 /* Tendencia */
 .sav__hist-loading { color: #94a3b8; font-size: .82rem; padding: 2rem; text-align: center; }
 .sav__hist-info { font-size: .72rem; color: #94a3b8; margin-top: .6rem; text-align: center; }
+
+.sav__vpd-nota { display: flex; gap: .55rem; align-items: flex-start; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: .7rem .9rem; margin-bottom: 1rem; font-size: .8rem; color: #475569; line-height: 1.5; }
+.sav__vpd-nota > i { color: #64748b; margin-top: .1rem; }
+.sav__vpd-link { color: #15803d; font-weight: 600; }
 
 /* Sensores de la sala */
 .sav__sensor { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .85rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: .6rem; background: #fff; flex-wrap: wrap; }

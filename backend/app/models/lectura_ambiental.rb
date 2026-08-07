@@ -48,7 +48,9 @@ class LecturaAmbiental < ApplicationRecord
 
     temp    = tipo == 'temperatura' ? valor.to_f : otra.valor.to_f
     hum     = tipo == 'humedad'     ? valor.to_f : otra.valor.to_f
-    vpd_val = Ambiente::VpdCalculator.call(temperatura: temp, humedad: hum)
+    # El ajuste de hoja es POR SALA: bajo LED la hoja se enfría más que bajo HPS.
+    offset  = sala&.leaf_temp_offset || Ambiente::VpdCalculator::OFFSET_HOJA_DEFAULT
+    vpd_val = Ambiente::VpdCalculator.call(temperatura: temp, humedad: hum, offset_hoja: offset)
 
     LecturaAmbiental.find_or_initialize_by(
       sala_id:   sala_id,
