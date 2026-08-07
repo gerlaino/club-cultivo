@@ -475,7 +475,10 @@ class LotesController < ApplicationController
       next unless valor
       ts = Date.parse(valor).in_time_zone.change(hour: 12) rescue nil
       next unless ts
-      ev = lote.lote_eventos.where(tipo: 'cambio_estado', estado_nuevo: fase).order(:registrado_en).first
+      # El ÚLTIMO evento de esa fase, no el primero: es el que leen los relojes del lote
+      # (ver Lote#fecha_inicio_vegetativo). Si un lote se avanzó por error y se lo volvió
+      # atrás, corregir el primero editaría un evento que ya nadie mira.
+      ev = lote.lote_eventos.where(tipo: 'cambio_estado', estado_nuevo: fase).order(:registrado_en).last
       if ev
         ev.update!(registrado_en: ts)
       else

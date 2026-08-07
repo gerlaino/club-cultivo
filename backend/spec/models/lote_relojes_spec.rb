@@ -137,4 +137,24 @@ RSpec.describe Lote, 'los relojes del ciclo' do
       expect(lote.dias_desde_inicio).to eq(16)
     end
   end
+
+  # Editar el lote permite ajustar la fecha de cada fase: ES el mecanismo de corrección
+  # cuando alguien se equivoca. Lo que no puede pasar es que se corrija un evento y el reloj
+  # esté mirando otro.
+  describe 'corregir la fecha de una fase a mano' do
+    it 'el reloj lee el mismo evento que corrige la edición' do
+      lote = create(:lote, club: club, sala: sala, estado: 'vegetativo',
+                    start_date: 30.days.ago.to_date, tamanio_maceta: 3)
+      # Dos entradas a vegetativo: el avance equivocado y el de verdad.
+      lote.lote_eventos.create!(tipo: 'cambio_estado', estado_anterior: 'enraizado',
+                                estado_nuevo: 'vegetativo', registrado_en: 25.days.ago,
+                                club: club, user: admin)
+      ultimo = lote.lote_eventos.create!(tipo: 'cambio_estado', estado_anterior: 'enraizado',
+                                         estado_nuevo: 'vegetativo', registrado_en: 10.days.ago,
+                                         club: club, user: admin)
+
+      expect(lote.reload.fecha_inicio_vegetativo).to eq(ultimo.registrado_en.to_date)
+      expect(lote.dias_ciclo).to eq(10)
+    end
+  end
 end
