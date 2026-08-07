@@ -5,6 +5,9 @@
       <button class="inf__pdf" :disabled="!data || exporting" @click="exportarPdf">
           <i class="bi bi-filetype-pdf"></i> {{ exporting ? 'Generando…' : 'PDF' }}
         </button>
+        <button class="inf__pdf" :disabled="!data || exporting" @click="exportarXlsx">
+          <i class="bi bi-file-earmark-spreadsheet"></i> Excel
+        </button>
     </div>
 
     <div v-if="loading" class="inf__loading">Cargando…</div>
@@ -71,7 +74,7 @@ import { BarChart2 } from 'lucide-vue-next'
 import api from '../../lib/api.js'
 import { useInformePdf } from '../../composables/useInformePdf.js'
 
-const { hoja, exporting, exportarPdf } = useInformePdf('informe_plan_vs_real')
+const { hoja, exporting, exportarPdf, exportarXlsx } = useInformePdf('informe_plan_vs_real')
 
 const loading = ref(false)
 const data    = ref(null)

@@ -12,6 +12,9 @@
         <button class="inf__pdf" :disabled="!data || exporting" @click="exportarPdf">
           <i class="bi bi-filetype-pdf"></i> {{ exporting ? 'Generando…' : 'PDF' }}
         </button>
+        <button class="inf__pdf" :disabled="!data || exporting" @click="exportarXlsx">
+          <i class="bi bi-file-earmark-spreadsheet"></i> Excel
+        </button>
       </div>
     </div>
 
@@ -61,7 +64,7 @@ import { Package } from 'lucide-vue-next'
 import api from '../../lib/api.js'
 import { useInformePdf } from '../../composables/useInformePdf.js'
 
-const { hoja, exporting, exportarPdf } = useInformePdf('informe_dispensaciones')
+const { hoja, exporting, exportarPdf, exportarXlsx } = useInformePdf('informe_dispensaciones')
 
 const periodo = ref('mes_actual')
 const loading = ref(false)

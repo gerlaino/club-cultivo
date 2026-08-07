@@ -5,6 +5,9 @@
       <button class="inf__pdf" :disabled="!data || exporting" @click="exportarPdf">
         <i class="bi bi-filetype-pdf"></i> {{ exporting ? 'Generando…' : 'PDF' }}
       </button>
+      <button class="inf__pdf" :disabled="!data || exporting" @click="exportarXlsx">
+        <i class="bi bi-file-earmark-spreadsheet"></i> Excel
+      </button>
     </div>
 
     <div v-if="loading" class="inf__loading">Cargando…</div>
@@ -71,11 +74,11 @@
 import { ref, onMounted } from 'vue'
 import { FileBadge } from 'lucide-vue-next'
 import api from '../../lib/api.js'
+import { useInformePdf } from '../../composables/useInformePdf.js'
 
 const loading   = ref(false)
-const exporting = ref(false)
 const data      = ref(null)
-const hoja      = ref(null)
+const { hoja, exporting, exportarPdf, exportarXlsx } = useInformePdf('informe_inase')
 
 const CATEGORIAS = {
   semilla_feminizada: 'Semilla feminizada',
@@ -93,23 +96,6 @@ async function cargar() {
     data.value = res.data
   } finally {
     loading.value = false
-  }
-}
-
-async function exportarPdf() {
-  if (!hoja.value) return
-  exporting.value = true
-  try {
-    const html2pdf = (await import('html2pdf.js')).default
-    await html2pdf().set({
-      margin: 8,
-      filename: `informe_inase_${new Date().toISOString().slice(0, 10)}.pdf`,
-      image: { type: 'jpeg', quality: 0.95 },
-      html2canvas: { scale: 2 },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-    }).from(hoja.value).save()
-  } finally {
-    exporting.value = false
   }
 }
 

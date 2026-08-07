@@ -30,6 +30,33 @@ class InformesController < ApplicationController
     end
   end
 
+  # Un informe se define una sola vez (KPIs + tablas) y de esa definición salen la respuesta
+  # JSON, el PDF y el Excel. Antes el PDF era una captura de pantalla con html2canvas y el
+  # Excel no existía.
+  def responder_informe(titulo:, datos:, kpis:, secciones:, nombre:, periodo: nil, nota: nil)
+    respond_to do |format|
+      format.json { render json: datos }
+      format.pdf do
+        pdf = InformeDocument.new(club: current_user.club, usuario: current_user, titulo: titulo,
+                                  kpis: kpis, secciones: secciones, periodo: periodo, nota: nota).render
+        send_data pdf, filename: "#{nombre}_#{Time.zone.today.strftime('%Y%m%d')}.pdf",
+                  type: 'application/pdf', disposition: 'attachment'
+      end
+      format.xlsx do
+        principal = secciones.first || { headers: [], rows: [] }
+        xlsx = XlsxExport.new(
+          club: current_user.club, titulo: titulo, subtitulo: periodo,
+          headers: principal[:headers], rows: principal[:rows],
+          formatos: principal[:formatos], totales: principal[:totales],
+          resumen: kpis.to_h { |k| [k[:label], k[:valor]] },
+        ).render
+        send_data xlsx, filename: "#{nombre}_#{Time.zone.today.strftime('%Y%m%d')}.xlsx",
+                  type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                  disposition: 'attachment'
+      end
+    end
+  end
+
   def produccion
     club  = current_user.club
     desde, hasta = periodo_rango
@@ -61,7 +88,7 @@ class InformesController < ApplicationController
       { estado: e, lotes: lotes_e, plantas: plantas_por_estado[e].to_i, gramos: gramos_e }
     end
 
-    render json: {
+    datos = {
       total_lotes:      total_lotes,
       lotes_activos:    lotes_activos,
       lotes_cosechados: lotes_cosechados,
@@ -69,6 +96,26 @@ class InformesController < ApplicationController
       plantas_totales:  plantas_totales,
       por_estado:       por_estado,
     }
+
+    responder_informe(
+      titulo: 'Informe de producción', nombre: 'informe_produccion',
+      datos: datos, periodo: etiqueta_periodo(desde, hasta),
+      kpis: [
+        { label: 'Lotes totales',   valor: total_lotes },
+        { label: 'Lotes activos',   valor: lotes_activos, tono: :ok },
+        { label: 'Cosechados',      valor: lotes_cosechados },
+        { label: 'Gramos del período', valor: gramos_producidos.round(1) },
+        { label: 'Plantas en pie',  valor: plantas_totales },
+      ],
+      secciones: [{
+        titulo: 'Por estado del lote',
+        headers: ['Estado', 'Lotes', 'Plantas', 'Gramos'],
+        rows: por_estado.map { |e| [e[:estado].to_s.tr('_', ' ').capitalize, e[:lotes], e[:plantas], e[:gramos]] },
+        formatos: [:texto, :numero, :numero, :numero],
+        totales: [1, 2, 3],
+        aligns: { 1 => :right, 2 => :right, 3 => :right },
+      }],
+    )
   end
 
   def dispensaciones
@@ -94,13 +141,33 @@ class InformesController < ApplicationController
       }
     end.first(100)
 
-    render json: {
+    datos = {
       total_dispensaciones:    total,
       gramos_dispensados:      gramos,
       pacientes_atendidos:     pax,
       promedio_por_dispensacion: promedio,
       resumen_anonimizado:     resumen,
     }
+
+    responder_informe(
+      titulo: 'Informe de dispensaciones', nombre: 'informe_dispensaciones',
+      datos: datos, periodo: etiqueta_periodo(desde, hasta),
+      kpis: [
+        { label: 'Entregas',           valor: total },
+        { label: 'Gramos dispensados', valor: gramos.round(1), tono: :ok },
+        { label: 'Pacientes',          valor: pax },
+        { label: 'Promedio por entrega', valor: promedio },
+      ],
+      secciones: [{
+        titulo: 'Detalle por paciente (anonimizado)',
+        headers: ['Paciente', 'Entregas', 'Gramos', 'Última entrega'],
+        rows: resumen.map { |r| [r[:iniciales], r[:cantidad], r[:total_gramos], fmt_fecha(r[:ultima_fecha])] },
+        formatos: [:texto, :numero, :numero, :texto],
+        totales: [1, 2],
+        aligns: { 1 => :right, 2 => :right },
+      }],
+      nota: 'Los pacientes se identifican por sus iniciales: el informe no expone datos personales.',
+    )
   end
 
   def sedes
@@ -125,13 +192,31 @@ class InformesController < ApplicationController
     salas_totales  = sedes.sum { |s| s.salas.cultivo.count }
     plantas_totales = por_sede.sum { |r| r[:plantas] }
 
-    render json: {
+    datos = {
       total_sedes:    sedes.count,
       sedes_activas:  sedes_activas,
       salas_totales:  salas_totales,
       plantas_totales: plantas_totales,
       por_sede:       por_sede,
     }
+
+    responder_informe(
+      titulo: 'Informe de sedes', nombre: 'informe_sedes', datos: datos,
+      kpis: [
+        { label: 'Sedes',    valor: sedes.count },
+        { label: 'Activas',  valor: sedes_activas, tono: :ok },
+        { label: 'Salas',    valor: salas_totales },
+        { label: 'Plantas',  valor: plantas_totales },
+      ],
+      secciones: [{
+        titulo: 'Detalle por sede',
+        headers: ['Sede', 'Salas', 'Plantas', 'Flor seca (g)'],
+        rows: por_sede.map { |r| [r[:nombre], r[:salas], r[:plantas], r[:stock_disponible]] },
+        formatos: [:texto, :numero, :numero, :numero],
+        totales: [1, 2, 3],
+        aligns: { 1 => :right, 2 => :right, 3 => :right },
+      }],
+    )
   end
 
   def cumplimiento
@@ -178,7 +263,7 @@ class InformesController < ApplicationController
                    iniciales: '—', detalle: "#{sin_seg} pacientes sin seguimiento médico" }
     end
 
-    render json: {
+    datos = {
       pacientes_con_reprocann_vigente: con_vigente,
       reprocann_vencen_30d:            vencen_30d,
       reprocann_vencidos:              vencidos,
@@ -186,6 +271,25 @@ class InformesController < ApplicationController
       tasa_cumplimiento:               tasa,
       alertas:                         alertas,
     }
+
+    responder_informe(
+      titulo: 'Informe de cumplimiento', nombre: 'informe_cumplimiento',
+      datos: datos, periodo: etiqueta_periodo(desde, hasta),
+      kpis: [
+        { label: 'Tasa de cumplimiento', valor: "#{tasa}%", tono: tasa >= 90 ? :ok : :warn },
+        { label: 'Con REPROCANN vigente', valor: con_vigente, tono: :ok },
+        { label: 'Vencen en ≤30 días',    valor: vencen_30d, tono: :warn },
+        { label: 'Vencidos',              valor: vencidos,   tono: :crit },
+      ],
+      secciones: [{
+        titulo: 'Alertas',
+        headers: ['Severidad', 'Detalle'],
+        rows: alertas.map { |a| [a[:severidad] == 'error' ? 'Crítica' : 'Atención', a[:detalle]] },
+        vacio: 'Sin alertas: la población está en regla.',
+        col_widths: nil,
+      }],
+      nota: "Pacientes sin número de REPROCANN que recibieron una entrega en el período: #{disp_sin_reprocann}.",
+    )
   end
 
   def plan_vs_real
@@ -226,12 +330,32 @@ class InformesController < ApplicationController
       (devs.sum / devs.size).round(1)
     end
 
-    render json: {
+    datos = {
       total_lotes_con_objetivo: lotes_con_obj.count,
       total_lotes_cerrados:     lotes_cerrados.count,
       promedio_desviacion_pct:  promedio_desv,
       detalle:                  detalle,
     }
+
+    responder_informe(
+      titulo: 'Plan vs. real', nombre: 'informe_plan_vs_real', datos: datos,
+      kpis: [
+        { label: 'Lotes con objetivo', valor: lotes_con_obj.count },
+        { label: 'Ya cerrados',        valor: lotes_cerrados.count },
+        { label: 'Desvío promedio',    valor: promedio_desv ? "#{promedio_desv}%" : '—',
+          tono: promedio_desv && promedio_desv < 0 ? :crit : :ok },
+      ],
+      secciones: [{
+        titulo: 'Detalle por lote',
+        headers: ['Lote', 'Estado', 'Plantas obj.', 'Cosechadas', 'Gramos obj.', 'Reales', 'Desvío %'],
+        rows: detalle.map { |l|
+          [l[:codigo], l[:estado].to_s.tr('_', ' ').capitalize, l[:plants_count_objetivo],
+           l[:plants_count_cosechadas], l[:rendimiento_objetivo_g], l[:rendimiento_real_g],
+           l[:desv_rendimiento_pct]]
+        },
+        aligns: (2..6).to_h { |i| [i, :right] },
+      }],
+    )
   end
 
   # INASE — Registro de variedades del club + trazabilidad a producción.
@@ -265,7 +389,7 @@ class InformesController < ApplicationController
     end
 
     registradas = filas.count { |f| f[:registrada_inase] }
-    render json: {
+    datos = {
       total_geneticas:   filas.size,
       registradas_inase: registradas,
       sin_registrar:     filas.size - registradas,
@@ -273,6 +397,27 @@ class InformesController < ApplicationController
       lotes_totales:     filas.sum { |f| f[:lotes] },
       geneticas:         filas,
     }
+
+    responder_informe(
+      titulo: 'Informe INASE — variedades', nombre: 'informe_inase', datos: datos,
+      kpis: [
+        { label: 'Variedades',       valor: filas.size },
+        { label: 'Registradas',      valor: registradas, tono: :ok },
+        { label: 'Sin registrar',    valor: filas.size - registradas, tono: :warn },
+        { label: 'Gramos totales',   valor: datos[:gramos_totales] },
+      ],
+      secciones: [{
+        titulo: 'Variedades cultivadas',
+        headers: ['Variedad', 'N° INASE', 'Lotes', 'Plantas', 'Gramos'],
+        rows: filas.map { |g|
+          [g[:nombre], g[:numero_registro_inase].presence || 'Sin registrar',
+           g[:lotes], g[:plantas], g[:gramos_producidos]]
+        },
+        formatos: [:texto, :texto, :numero, :numero, :numero],
+        totales: [2, 3, 4],
+        aligns: { 2 => :right, 3 => :right, 4 => :right },
+      }],
+    )
   end
 
   private
@@ -406,6 +551,19 @@ class InformesController < ApplicationController
       rows:    rows,
       anchos:  [14, 16, 28, 16],
     ).render
+  end
+
+  # Rótulo legible del período, para el encabezado del PDF y del Excel.
+  def etiqueta_periodo(desde, hasta)
+    return nil if desde.blank? || hasta.blank?
+    "#{desde.strftime('%d/%m/%Y')} — #{hasta.strftime('%d/%m/%Y')}"
+  end
+
+  def fmt_fecha(f)
+    return '—' if f.blank?
+    (f.is_a?(String) ? Date.parse(f) : f).strftime('%d/%m/%Y')
+  rescue ArgumentError
+    f.to_s
   end
 
   def periodo_rango
