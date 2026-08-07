@@ -569,6 +569,8 @@ export const eliminarClub        = (id)           => api.delete(`/super_admin/cl
 export const restaurarClub       = (id)           => api.patch(`/super_admin/clubs/${id}/restaurar`)
 // Suspender ≠ eliminar: el suspendido sigue en la lista con sus datos intactos y no puede
 // operar; el eliminado sale de la lista y libera nombre, emails y DNI.
+// La API key de Pulse la carga el super admin al activar ambiente/IoT.
+export const provisionarPulse    = (id, key)      => api.patch(`/super_admin/clubs/${id}/provisionar_pulse`, { pulse_api_key: key })
 export const suspenderClub       = (id)           => api.patch(`/super_admin/clubs/${id}/suspender`)
 export const reactivarClub       = (id)           => api.patch(`/super_admin/clubs/${id}/reactivar`)
 export const provisionarWhatsappClub = (id, payload) => api.patch(`/super_admin/clubs/${id}/provisionar_whatsapp`, payload)

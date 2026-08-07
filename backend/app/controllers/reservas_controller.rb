@@ -2,6 +2,8 @@ class ReservasController < ApplicationController
   include DispensacionesFinancieras
 
   before_action :authenticate_user!
+
+  before_action -> { require_feature!(:produccion_dispensa) }
   before_action :require_reservas_role!
   before_action :set_paciente,     only: [:create]
   before_action :set_paciente_opt, only: [:index]

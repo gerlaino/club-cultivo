@@ -340,6 +340,23 @@ class Club < ApplicationRecord
     'sin_configurar'
   end
 
+  # ── Pulse Grow ────────────────────────────────────────────────────────────────
+  # La API key la carga el SUPER ADMIN al activar el add-on de ambiente/IoT: es una
+  # credencial de un servicio externo, no algo que el club deba pegar en una pantalla.
+  def pulse_api_key
+    return nil if pulse_api_key_enc.blank?
+    Rails.application.message_verifier(:pulse).verify(pulse_api_key_enc)
+  rescue ActiveSupport::MessageVerifier::InvalidSignature
+    nil
+  end
+
+  def pulse_api_key=(raw)
+    self.pulse_api_key_enc =
+      raw.present? ? Rails.application.message_verifier(:pulse).generate(raw) : nil
+  end
+
+  def pulse_configurado? = pulse_api_key_enc.present?
+
   def twilio_auth_token
     return nil unless twilio_auth_token_enc.present?
     Rails.application.message_verifier(:twilio).verify(twilio_auth_token_enc)

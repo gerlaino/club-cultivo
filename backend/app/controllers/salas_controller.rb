@@ -1,6 +1,7 @@
 # backend/app/controllers/salas_controller.rb
 class SalasController < ApplicationController
   before_action :authenticate_user!
+  before_action -> { require_feature!(:cultivo) }
   before_action :require_salas_role!
   before_action :set_sala, only: [:show, :update, :destroy, :cargar_lote, :cambiar_fase, :registrar_sala, :registrar_enraizado]
 

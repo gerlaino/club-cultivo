@@ -1,5 +1,5 @@
 class SuperAdmin::ClubsController < SuperAdmin::BaseController
-  before_action :set_club, only: [:show, :update, :crear_usuarios_default, :cambiar_plan, :observar, :detener_observacion, :destroy, :restaurar, :suspender, :reactivar, :provisionar_whatsapp, :desconectar_whatsapp]
+  before_action :set_club, only: [:show, :update, :crear_usuarios_default, :cambiar_plan, :observar, :detener_observacion, :destroy, :restaurar, :suspender, :reactivar, :provisionar_pulse, :provisionar_whatsapp, :desconectar_whatsapp]
 
   # Los ELIMINADOS no se listan salvo que se los pida: verlos mezclados con los activos, sin
   # distinguirse, era lo que hacía pensar que borrar un club no hacía nada.
@@ -87,6 +87,20 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
 
   def reactivar
     @club.reactivar!
+    render json: serialize_club_detail(@club)
+  end
+
+  # PATCH /super_admin/clubs/:id/provisionar_pulse
+  # La API key de Pulse Grow la carga el super admin al activar el add-on de ambiente/IoT: es
+  # la credencial de un servicio externo, no algo que el club deba pegar en una pantalla.
+  def provisionar_pulse
+    key = params[:pulse_api_key].to_s.strip
+    if key.blank?
+      @club.update!(pulse_api_key: nil)
+    else
+      @club.pulse_api_key = key
+      @club.save!
+    end
     render json: serialize_club_detail(@club)
   end
 
@@ -185,6 +199,8 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       deleted_at:       c.deleted_at,
       activo:           c.activo,
       estado:           estado_de(c),
+      # Qué contrató: la lista se ordena por suites, no por el plan viejo.
+      features:         c.features_expandidas,
     }
   end
 
@@ -209,6 +225,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       smtp_from:       c.smtp_from,
       smtp_from_name:  c.smtp_from_name,
       features:        c.features,
+      pulse_configurado: c.pulse_configurado?,
       suites:          Club::SUITES.map { |k, v| { clave: k, label: v[:label], desc: v[:desc], activa: c.suite?(k) } },
       addons:          Club::ADDONS.map { |k, v|
         { clave: k, label: v[:label], desc: v[:desc], requiere: v[:requiere],

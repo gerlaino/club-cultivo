@@ -20,7 +20,7 @@ export const NAV_GROUPS = [
     tabs: [],
   },
   {
-    key: 'cultivo', label: 'Cultivo', to: '/salas',
+    key: 'cultivo', label: 'Cultivo', to: '/salas', feature: 'cultivo',
     tabs: [
       { to: '/salas', label: 'Salas' },
       { to: '/lotes', label: 'Lotes' },
@@ -29,7 +29,7 @@ export const NAV_GROUPS = [
     ],
   },
   {
-    key: 'pacientes', label: 'Pacientes', to: '/pacientes',
+    key: 'pacientes', label: 'Pacientes', to: '/pacientes', feature: 'produccion_dispensa',
     tabs: [
       { to: '/pacientes', label: 'Pacientes' },
       { to: '/historial', label: 'Dispensaciones' },
@@ -38,7 +38,7 @@ export const NAV_GROUPS = [
     ],
   },
   {
-    key: 'produccion', label: 'Producción', to: '/admin/stock',
+    key: 'produccion', label: 'Producción', to: '/admin/stock', feature: 'cultivo',
     tabs: [
       { to: '/admin/stock', label: 'Stock' },
       { to: '/admin/cosechado', label: 'Cosecha' },

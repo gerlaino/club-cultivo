@@ -1,5 +1,6 @@
 class PacientesController < ApplicationController
   before_action :authenticate_user!
+  before_action -> { require_feature!(:produccion_dispensa) }
   before_action :check_pacientes_role!
   before_action :set_paciente, only: [:show, :update, :destroy, :timeline, :subir_reprocann, :eliminar_reprocann, :enviar_mail, :mails_enviados]
   before_action :require_export_role!, only: [:export_csv]

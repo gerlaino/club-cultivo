@@ -1,5 +1,6 @@
 class AplicacionPlanesController < ApplicationController
   before_action :authenticate_user!
+  before_action -> { require_feature!(:cultivo) }
   before_action :authorize_admin_or_supervisor!
   before_action :set_club
   before_action :set_aplicacion, only: [:show, :destroy, :cancelar]

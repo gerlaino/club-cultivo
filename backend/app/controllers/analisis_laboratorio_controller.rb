@@ -1,5 +1,6 @@
 class AnalisisLaboratorioController < ApplicationController
   before_action :authenticate_user!
+  before_action -> { require_feature!(:cultivo) }
   before_action :require_admin_cultivador_supervisor!
   before_action :set_lote
   before_action :set_analisis, only: [:update, :destroy]

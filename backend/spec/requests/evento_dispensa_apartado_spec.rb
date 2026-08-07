@@ -8,7 +8,9 @@ require 'rails_helper'
 # Lo dispensado sale por su canal (con socio y trazabilidad) y NO cuesta al evento: su costo e
 # ingreso viven en la dispensación. Lo consumido internamente sí es COGS del evento.
 RSpec.describe 'Dispensar desde lo apartado para un evento', type: :request do
-  let(:club)   { create(:club, features: { 'bar' => true }) }
+  # Dispensar en un evento sigue siendo dispensar: el club necesita la suite de
+  # producción/dispensa además del Buffet y los eventos.
+  let(:club)   { create(:club, features: { 'bar' => true, 'produccion_dispensa' => true }) }
   before { club.update_columns(features: club.features.merge('eventos' => true)) }
   let(:admin)  { create(:user, :admin, club: club) }
   let(:sede)   { create(:sede, club: club, tipo: 'social') }

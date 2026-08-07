@@ -1,5 +1,6 @@
 class PacienteNotasController < ApplicationController
   before_action :authenticate_user!
+  before_action -> { require_feature!(:produccion_dispensa) }
   before_action :check_notas_role!
   before_action :set_paciente, only: [:index, :create]
 

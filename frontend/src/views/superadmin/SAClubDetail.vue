@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub, suspenderClub, reactivarClub, provisionarWhatsappClub, desconectarWhatsappClub } from '../../lib/api.js'
+import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub, suspenderClub, reactivarClub, provisionarWhatsappClub, desconectarWhatsappClub, provisionarPulse } from '../../lib/api.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
 import { ArrowLeft, Pencil, Trash2, RotateCcw, Sparkles, UserPlus, Check, X, Save, Mail, Zap, Users, Info, CreditCard, PauseCircle, PlayCircle } from 'lucide-vue-next'
@@ -64,6 +64,32 @@ async function guardarInfo() {
 }
 
 // WhatsApp (provisión Twilio — solo super_admin)
+// ── Pulse Grow ────────────────────────────────────────────────────────────────
+const pulseKey    = ref('')
+const savingPulse = ref(false)
+
+async function guardarPulse() {
+  if (!pulseKey.value) { toast.error('Pegá la API key primero'); return }
+  savingPulse.value = true
+  try {
+    const { data } = await provisionarPulse(id, pulseKey.value)
+    club.value = data
+    pulseKey.value = ''
+    toast.success('API key guardada. Los sensores del club ya pueden leerse.')
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo guardar')
+  } finally { savingPulse.value = false }
+}
+
+async function borrarPulse() {
+  savingPulse.value = true
+  try {
+    const { data } = await provisionarPulse(id, '')
+    club.value = data
+    toast.success('API key quitada')
+  } finally { savingPulse.value = false }
+}
+
 const waForm    = ref({ twilio_account_sid: '', twilio_auth_token: '', twilio_whatsapp_from: '' })
 const savingWa  = ref(false)
 const waError   = ref(null)
@@ -606,8 +632,35 @@ onMounted(cargar)
 
       <!-- El correo lo configura el ADMIN del club (conecta su Gmail), no el super_admin. -->
 
-      <!-- ── WhatsApp (provisión Twilio) ── -->
-      <div class="scd__card">
+      <!-- Sensores Pulse: sólo si el club tiene ambiente/IoT. La credencial es de un servicio
+           externo, así que la carga el super admin y no el club. -->
+      <div v-if="featuresForm.iot" class="scd__card">
+        <div class="scd__card-hd">
+          <Zap :size="14" :stroke-width="1.75" class="scd__card-ico scd__card-ico--orange" /> Sensores Pulse Grow
+          <span v-if="club.pulse_configurado" class="scd__ok-badge">Configurado</span>
+          <span v-else class="scd__warn-badge">Sin API key</span>
+        </div>
+        <div class="scd__card-bd">
+          <p class="scd__hint">
+            La API key de la cuenta de Pulse del club. Con una sola se leen todos sus sensores.
+            Se saca de <strong>pulsegrow.com → Settings → API</strong>.
+          </p>
+          <input v-model.trim="pulseKey" type="password" class="scd__input"
+                 :placeholder="club.pulse_configurado ? '•••••••• (dejá vacío para no cambiarla)' : 'Pegá la API key'" />
+          <div class="scd__acts">
+            <button class="scd__btn-sm scd__btn-secondary" :disabled="savingPulse" @click="guardarPulse">
+              {{ savingPulse ? 'Guardando…' : 'Guardar API key' }}
+            </button>
+            <button v-if="club.pulse_configurado" class="scd__btn-sm scd__btn-danger" :disabled="savingPulse" @click="borrarPulse">
+              Quitar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- WhatsApp: sólo si el club tiene el add-on. Estaba siempre al pie de la ficha, así
+           que la mitad de los clubes veía una sección de un módulo que no contrataron. -->
+      <div v-if="featuresForm.whatsapp" class="scd__card">
         <div class="scd__card-hd">
           <Mail :size="14" :stroke-width="1.75" class="scd__card-ico scd__card-ico--orange" /> WhatsApp (Twilio)
           <span v-if="club.whatsapp_estado === 'conectado'" class="scd__ok-badge">Conectado</span>
@@ -881,26 +934,30 @@ onMounted(cargar)
 
 /* Features */
 .scd__feat-body { padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
-/* Suites: lo que se vende, con más peso visual que los add-ons */
+/* Suites: lo que se vende, con más peso visual que los add-ons.
+   Estaban con la paleta del tema OSCURO (texto casi blanco, bordes translúcidos) dentro de
+   una card de fondo CLARO: el nombre de cada suite era ilegible. Todo el bloque va en la
+   misma paleta que el resto de la ficha. */
 .scd__suites { display: flex; flex-direction: column; gap: 10px; margin-bottom: 4px; }
 .scd__suite {
   display: flex; align-items: center; gap: 14px; cursor: pointer;
   padding: 14px 16px; border-radius: 12px;
-  border: 1.5px solid rgba(255,255,255,.1); background: rgba(255,255,255,.03);
-  transition: all .15s;
+  border: 1.5px solid #e2e8f0; background: #f8fafc;
+  transition: border-color .15s, background .15s;
 }
-.scd__suite--on { border-color: #4ade80; background: rgba(74,222,128,.08); }
+.scd__suite:hover { border-color: #cbd5e1; }
+.scd__suite--on { border-color: #86efac; background: #f0fdf4; }
 .scd__suite-txt { flex: 1; }
-.scd__suite-name { font-size: 15px; font-weight: 700; color: #f1f5f9; }
-.scd__suite-desc { font-size: 12px; color: #94a3b8; margin-top: 2px; line-height: 1.45; }
+.scd__suite-name { font-size: 15px; font-weight: 700; color: #0f172a; }
+.scd__suite-desc { font-size: 12px; color: #64748b; margin-top: 2px; line-height: 1.45; }
 .scd__feat-badge {
   margin-left: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase;
   letter-spacing: .04em; padding: 1px 6px; border-radius: 4px;
-  background: rgba(217,119,6,.2); color: #fbbf24;
+  background: #fef3c7; color: #92400e;
 }
 .scd__feat-req { font-size: 11px; color: #64748b; margin-top: 3px; line-height: 1.4; }
-.scd__feat-req--warn { color: #fbbf24; }
-.scd__feat-toggle--warn { border-color: rgba(217,119,6,.35); }
+.scd__feat-req--warn { color: #b45309; }
+.scd__feat-toggle--warn { border-color: #fcd34d; }
 .scd__feat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: .4rem; }
 .scd__feat-toggle {
   display: flex; align-items: center; gap: .65rem; padding: .65rem .875rem;
@@ -911,7 +968,7 @@ onMounted(cargar)
 .scd__feat-left { display: flex; align-items: center; gap: .55rem; flex: 1; min-width: 0; }
 .scd__feat-ico  { font-size: .9rem; flex-shrink: 0; }
 .scd__feat-name { font-size: .78rem; font-weight: 700; color: #0f172a; }
-.scd__feat-desc { font-size: .68rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.scd__feat-desc { font-size: .68rem; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .scd__divider {
   display: flex; align-items: center; gap: .75rem;
   color: #94a3b8; font-size: .68rem; font-weight: 700;

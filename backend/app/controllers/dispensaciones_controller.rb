@@ -2,6 +2,8 @@ class DispensacionesController < ApplicationController
   include DispensacionesFinancieras
 
   before_action :authenticate_user!
+
+  before_action -> { require_feature!(:produccion_dispensa) }
   before_action :require_dispensaciones_role!
   before_action :require_dispensador_o_admin, except: [:index, :show, :iniciar_viaje, :entregar, :reportar_fallo, :cancelar_entrega, :mis_paquetes, :mi_historial, :export_csv, :entregadores]
   before_action :set_paciente,     only: [:create]

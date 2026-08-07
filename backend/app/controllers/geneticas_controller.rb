@@ -1,5 +1,6 @@
 class GeneticasController < ApplicationController
   before_action :authenticate_user!
+  before_action -> { require_feature!(:cultivo) }
   before_action :require_admin_for_write!, only: [:create, :update, :destroy, :destroy_foto]
   before_action :set_genetica, only: [:show, :update, :destroy, :destroy_foto, :resenas]
 

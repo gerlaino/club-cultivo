@@ -525,6 +525,7 @@ Rails.application.routes.draw do
           patch  :suspender
           patch  :reactivar
           patch  :provisionar_whatsapp
+          patch  :provisionar_pulse
           delete :desconectar_whatsapp
         end
       end

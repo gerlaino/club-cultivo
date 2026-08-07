@@ -1,5 +1,6 @@
 class PesadasController < ApplicationController
   before_action :authenticate_user!
+  before_action -> { require_feature!(:cultivo) }
   before_action :set_lote
   before_action :set_pesada, only: [:destroy]
 

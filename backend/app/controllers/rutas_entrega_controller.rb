@@ -1,5 +1,6 @@
 class RutasEntregaController < ApplicationController
   before_action :authenticate_user!
+  before_action -> { require_feature!(:produccion_dispensa) }
   before_action :require_admin_o_supervisor!, only: [:bloqueo]
 
   # GET /rutas_entrega?delivery_id=&fecha=

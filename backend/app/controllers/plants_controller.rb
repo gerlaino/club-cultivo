@@ -2,6 +2,8 @@ class PlantsController < ApplicationController
   include ManicuraJornadaGuard
 
   before_action :authenticate_user!
+
+  before_action -> { require_feature!(:cultivo) }
   before_action :set_plant, only: [:show, :update, :destroy, :add_foto, :remove_foto, :registrar_peso]
 
   # GET /plants/por_qr/:codigo_qr

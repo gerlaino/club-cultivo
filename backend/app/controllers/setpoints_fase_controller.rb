@@ -1,5 +1,6 @@
 class SetpointsFaseController < ApplicationController
   before_action :authenticate_user!
+  before_action -> { require_feature!(:cultivo) }
   before_action :require_cultivador_or_admin
   before_action :require_admin!, only: [:create, :update, :destroy]
   before_action :set_setpoint, only: [:show, :update, :destroy]

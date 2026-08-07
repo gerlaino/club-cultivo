@@ -1,5 +1,6 @@
 class PatientDocumentsController < ApplicationController
   before_action :authenticate_user!
+  before_action -> { require_feature!(:produccion_dispensa) }
   before_action :require_medico_or_admin
   before_action :set_paciente
   before_action :set_document, only: [:show, :update, :destroy, :firmar, :archivar]

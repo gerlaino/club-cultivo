@@ -1,6 +1,7 @@
 # app/controllers/socio_notas_controller.rb
 class SocioNotasController < ApplicationController
   before_action :authenticate_user!
+  before_action -> { require_feature!(:produccion_dispensa) }
   before_action :set_socio, only: [:index, :create]
 
   # GET /pacientes/:paciente_id/notas

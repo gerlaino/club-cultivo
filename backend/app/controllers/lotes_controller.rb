@@ -1,5 +1,6 @@
 class LotesController < ApplicationController
   before_action :authenticate_user!
+  before_action -> { require_feature!(:cultivo) }
   before_action :require_admin_cultivador_o_manicura
   before_action :set_lote, only: [:show, :update, :completar_datos, :destroy, :transiciones, :avanzar_fase, :cosechar_plantas, :timeline, :historial, :asignar_manicurador, :devolver_manicura, :reevaluar_manicura, :registrar_trasplante, :desprender]
   before_action :require_export_role!, only: [:export_csv]

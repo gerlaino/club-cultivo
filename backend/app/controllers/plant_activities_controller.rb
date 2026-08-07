@@ -1,5 +1,6 @@
 class PlantActivitiesController < ApplicationController
   before_action :authenticate_user!
+  before_action -> { require_feature!(:cultivo) }
   before_action :set_plant
   skip_before_action :require_admin_o_cultivador, raise: false
 

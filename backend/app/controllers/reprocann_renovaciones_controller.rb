@@ -1,5 +1,6 @@
 class ReprocannRenovacionesController < ApplicationController
   before_action :authenticate_user!
+  before_action -> { require_feature!(:produccion_dispensa) }
   before_action :set_paciente
   before_action :set_renovacion, only: [:update, :destroy]
 

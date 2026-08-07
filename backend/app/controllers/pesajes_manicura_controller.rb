@@ -2,6 +2,8 @@ class PesajesManicuraController < ApplicationController
   include ManicuraJornadaGuard
 
   before_action :authenticate_user!
+
+  before_action -> { require_feature!(:cultivo) }
   before_action :set_lote, except: [:index_admin]
   before_action :set_pesaje, only: [:show, :enviar, :confirmar, :destroy, :reabrir, :reajustar_peso]
 

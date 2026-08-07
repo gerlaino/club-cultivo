@@ -1,5 +1,6 @@
 class PacienteTurnosController < ApplicationController
   before_action :authenticate_user!
+  before_action -> { require_feature!(:produccion_dispensa) }
 
   # GET /api/pacientes/:paciente_id/turnos
   def index

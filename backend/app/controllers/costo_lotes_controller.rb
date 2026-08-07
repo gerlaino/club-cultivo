@@ -1,6 +1,7 @@
 # backend/app/controllers/costo_lotes_controller.rb
 class CostoLotesController < ApplicationController
   before_action :authenticate_user!
+  before_action -> { require_feature!(:cultivo) }
   before_action :require_admin_or_cultivador
   before_action :set_lote
 

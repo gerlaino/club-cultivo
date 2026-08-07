@@ -1,5 +1,6 @@
 class CuentaCorrientesController < ApplicationController
   before_action :authenticate_user!
+  before_action -> { require_feature!(:produccion_dispensa) }
   # Mostrar saldo y registrar pagos: roles de mostrador (incluye dispensador).
   # Configurar crédito/límites/ajustes: solo admin/supervisor.
   before_action :require_cobro_access!, only: [:show, :registrar_pago]

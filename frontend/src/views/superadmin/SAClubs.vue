@@ -12,18 +12,32 @@ const search  = ref('')
 const filterPlan = ref('todos')
 const verEliminados = ref(false)
 
+const FILTROS = {
+  todos:    { label: 'Todos',            color: '#0f172a', bg: '#f1f5f9' },
+  completo: { label: 'Las dos suites',   color: '#7c3aed', bg: '#ede9fe' },
+  cultivo:  { label: 'Sólo Cultivo',     color: '#15803d', bg: '#dcfce7' },
+  dispensa: { label: 'Sólo Dispensa',    color: '#0369a1', bg: '#dbeafe' },
+}
+
 const ESTADO_META = {
   suspendido: { label: 'Suspendido', color: '#92400e', bg: '#fef3c7' },
   eliminado:  { label: 'Eliminado',  color: '#b91c1c', bg: '#fee2e2' },
 }
 
-const PLAN_META = {
-  semilla:    { label: 'Semilla',    color: '#64748b', bg: '#f1f5f9' },
-  brote:      { label: 'Brote',      color: '#15803d', bg: '#dcfce7' },
-  cosecha:    { label: 'Cosecha',    color: '#0369a1', bg: '#dbeafe' },
-  federacion: { label: 'Federación', color: '#7c3aed', bg: '#ede9fe' },
+// Ya no se vende por "planes" (Semilla/Brote/Cosecha/Federación) sino por SUITES: Cultivo y
+// Producción/Dispensa, más add-ons. Lo que importa de un club en la lista es qué contrató,
+// no en qué escalón de una tabla de precios vieja quedó.
+const SUITE_META = {
+  cultivo:             { label: 'Cultivo',  color: '#15803d', bg: '#dcfce7' },
+  produccion_dispensa: { label: 'Dispensa', color: '#0369a1', bg: '#dbeafe' },
 }
-function planMeta(p) { return PLAN_META[p] || PLAN_META.semilla }
+function suitesDe(c) {
+  return Object.keys(SUITE_META).filter(k => c.features?.[k] === true)
+}
+function addonsDe(c) {
+  const f = c.features || {}
+  return Object.keys(f).filter(k => f[k] === true && !SUITE_META[k])
+}
 
 function formatDate(d) {
   if (!d) return '—'
@@ -32,7 +46,9 @@ function formatDate(d) {
 
 const filtrados = computed(() => {
   let list = clubs.value
-  if (filterPlan.value !== 'todos') list = list.filter(c => c.plan === filterPlan.value)
+  if (filterPlan.value === 'cultivo')  list = list.filter(c => c.features?.cultivo === true)
+  if (filterPlan.value === 'dispensa') list = list.filter(c => c.features?.produccion_dispensa === true)
+  if (filterPlan.value === 'completo') list = list.filter(c => c.features?.cultivo === true && c.features?.produccion_dispensa === true)
   if (search.value.trim()) {
     const q = search.value.toLowerCase()
     list = list.filter(c =>
@@ -87,12 +103,12 @@ onMounted(async () => {
       </div>
       <div class="sac__plan-filters">
         <button
-          v-for="(meta, plan) in { todos: { label: 'Todos', color: '#0f172a', bg: '#f1f5f9' }, ...PLAN_META }"
-          :key="plan"
+          v-for="(meta, k) in FILTROS"
+          :key="k"
           class="sac__plan-filter"
-          :class="{ 'sac__plan-filter--active': filterPlan === plan }"
-          :style="filterPlan === plan ? { background: meta.bg, color: meta.color, borderColor: meta.color + '60' } : {}"
-          @click="filterPlan = plan"
+          :class="{ 'sac__plan-filter--active': filterPlan === k }"
+          :style="filterPlan === k ? { background: meta.bg, color: meta.color, borderColor: meta.color + '60' } : {}"
+          @click="filterPlan = k"
         >
           {{ meta.label }}
         </button>
@@ -151,9 +167,15 @@ onMounted(async () => {
           </div>
         </div>
 
-        <div>
-          <span class="sac__plan-pill" :style="{ background: planMeta(c.plan).bg, color: planMeta(c.plan).color }">
-            {{ planMeta(c.plan).label }}{{ c.plan_trial ? ' · Trial' : '' }}
+        <!-- Qué contrató: las suites, y cuántos add-ons encima. -->
+        <div class="sac__suites">
+          <span v-for="k in suitesDe(c)" :key="k" class="sac__plan-pill"
+                :style="{ background: SUITE_META[k].bg, color: SUITE_META[k].color }">
+            {{ SUITE_META[k].label }}
+          </span>
+          <span v-if="!suitesDe(c).length" class="sac__plan-pill sac__plan-pill--none">Sin suites</span>
+          <span v-if="addonsDe(c).length" class="sac__addons" :title="addonsDe(c).join(', ')">
+            +{{ addonsDe(c).length }}
           </span>
           <div v-if="c.plan_activo_hasta" class="sac__hasta">hasta {{ formatDate(c.plan_activo_hasta) }}</div>
         </div>
@@ -201,6 +223,9 @@ onMounted(async () => {
 .sac__list-header { display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 100px 40px; padding: .65rem 1.1rem; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; border-bottom: 1px solid #f1f5f9; background: #fafbfc; }
 .sac__row { display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 100px 40px; align-items: center; padding: .875rem 1.1rem; border-bottom: 1px solid #f8fafc; text-decoration: none; color: inherit; transition: background .12s; }
 .sac__row--baja { opacity: .6; }
+.sac__suites { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem; }
+.sac__plan-pill--none { background: #f1f5f9; color: #94a3b8; }
+.sac__addons { font-size: .7rem; font-weight: 700; color: #64748b; background: #f1f5f9; border-radius: 999px; padding: .1em .45em; cursor: help; }
 .sac__estado { display: inline-flex; align-items: center; gap: .2rem; font-size: .62rem; font-weight: 700; padding: .1em .45em; border-radius: 5px; margin-left: .4rem; vertical-align: middle; }
 .sac__ver-elim { display: inline-flex; align-items: center; gap: .35rem; font-size: .75rem; color: #64748b; cursor: pointer; margin-left: .5rem; }
 .sac__row:last-child { border-bottom: none; }

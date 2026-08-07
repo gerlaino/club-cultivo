@@ -2,6 +2,7 @@
 # patrón que `FotosLoteController`, sin portada —una sala no se muestra en el layout de otra—.
 class FotosSalaController < ApplicationController
   before_action :authenticate_user!
+  before_action -> { require_feature!(:cultivo) }
   before_action :set_sala
 
   def index
