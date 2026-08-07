@@ -17,6 +17,18 @@ class SuperAdmin::StatsController < SuperAdmin::BaseController
         total_plantas:   Plant.where(club_id: reales).count,
         total_lotes:     Lote.where(club_id: reales).count,
       },
+      # Ya no se vende por plan (Semilla/Brote/...): lo que importa es cuántos clubes tienen
+      # cada suite y cada add-on, que es lo que se factura y lo que dice qué se está usando.
+      por_suite:     Club::SUITES.keys.to_h { |k|
+        [k, Club.reales.activos.count { |c| c.features_expandidas[k] == true }]
+      },
+      por_addon:     Club::ADDONS.keys.to_h { |k|
+        [k, Club.reales.activos.count { |c| c.features_expandidas[k] == true }]
+      },
+      # Los que necesitan que alguien haga algo: sin suites no pueden trabajar, y suspendidos
+      # es plata que no entra.
+      sin_suites:    Club.reales.activos.count { |c| Club::SUITES.keys.none? { |k| c.features_expandidas[k] == true } },
+      suspendidos:   Club.reales.activos.where(activo: false).count,
       por_plan:      Club.reales.group(:plan).count,
       clubs_trial:   Club.reales.where(plan_trial: true).count,
       clubs_activos: Club.reales.where('plan_activo_hasta >= ? OR plan_activo_hasta IS NULL', Time.zone.today).count,

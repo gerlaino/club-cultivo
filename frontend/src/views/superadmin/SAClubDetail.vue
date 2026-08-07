@@ -65,6 +65,11 @@ async function guardarInfo() {
 
 // WhatsApp (provisión Twilio — solo super_admin)
 // ── Pulse Grow ────────────────────────────────────────────────────────────────
+// Los add-ons que necesitan que alguien cargue algo para funcionar de verdad.
+const CONFIGURABLES = { ia: true, iot: true, whatsapp: true }
+
+const addonsActivos = computed(() => addons.value.filter(a => featuresForm.value[a.clave]))
+
 const pulseKey    = ref('')
 const savingPulse = ref(false)
 
@@ -517,12 +522,24 @@ onMounted(cargar)
           <div class="scd__card">
             <div class="scd__card-hd">
               <CreditCard :size="14" :stroke-width="1.75" class="scd__card-ico" /> Suscripción
-              <button class="scd__link-btn" @click="abrirPlanModal"><Pencil :size="12" :stroke-width="2" /> Cambiar</button>
+              <button class="scd__link-btn" @click="abrirPlanModal"><Pencil :size="12" :stroke-width="2" /> Vigencia</button>
             </div>
+            <!-- Lo que contrató son las SUITES, no un plan de una tabla vieja
+                 (Semilla/Brote/Cosecha/Federación). Se activan en Funcionalidades. -->
             <div class="scd__plan-body">
-              <span class="scd__plan-pill scd__plan-pill--lg" :style="{ background: planMeta(club.plan).bg, color: planMeta(club.plan).color }">
-                {{ planMeta(club.plan).label }}
-              </span>
+              <div class="scd__susc-suites">
+                <span v-for="s in suites.filter(x => featuresForm[x.clave])" :key="s.clave"
+                      class="scd__plan-pill scd__plan-pill--lg scd__susc-pill">
+                  {{ s.label }}
+                </span>
+                <span v-if="!suites.some(x => featuresForm[x.clave])" class="scd__plan-pill scd__plan-pill--lg scd__susc-pill--none">
+                  Sin suites contratadas
+                </span>
+              </div>
+              <p v-if="addonsActivos.length" class="scd__susc-addons">
+                + {{ addonsActivos.length }} módulo{{ addonsActivos.length === 1 ? '' : 's' }}:
+                {{ addonsActivos.map(a => a.label).join(', ') }}
+              </p>
               <span v-if="club.plan_trial" class="scd__trial-pill">TRIAL</span>
               <p class="scd__plan-until">
                 {{ club.plan_activo_hasta ? `Vigente hasta ${formatDate(club.plan_activo_hasta)}` : 'Sin vencimiento' }}
@@ -583,18 +600,23 @@ onMounted(cargar)
 
           <div class="scd__divider"><span>Módulos adicionales</span></div>
 
-          <div class="scd__feat-grid">
-            <label
+          <!-- Cada add-on con su configuración ADENTRO. Antes los toggles estaban acá y sus
+               paneles (IA, WhatsApp, Pulse) al pie de la página: se activaba algo y la
+               consecuencia aparecía tres pantallazos abajo, sin conexión visible. -->
+          <div class="scd__addons">
+            <div
               v-for="a in addons" :key="a.clave"
-              class="scd__feat-toggle"
-              :class="{ 'scd__feat-toggle--on': featuresForm[a.clave], 'scd__feat-toggle--warn': a.incompleto }"
+              class="scd__addon"
+              :class="{ 'scd__addon--on': featuresForm[a.clave], 'scd__addon--warn': a.incompleto }"
             >
-              <div class="scd__feat-left">
+              <label class="scd__addon-hd">
                 <span class="scd__feat-ico">{{ ADDON_ICO[a.clave] || '🧩' }}</span>
-                <div>
+                <div class="scd__addon-txt">
                   <div class="scd__feat-name">
                     {{ a.label }}
                     <span v-if="a.incompleto" class="scd__feat-badge">incompleto</span>
+                    <span v-if="featuresForm[a.clave] && CONFIGURABLES[a.clave]"
+                          class="scd__feat-badge scd__feat-badge--cfg">requiere configuración</span>
                   </div>
                   <div class="scd__feat-desc">{{ a.desc }}</div>
                   <!-- De qué depende para funcionar DE VERDAD. Prenderlo sin esto deja al club
@@ -603,100 +625,82 @@ onMounted(cargar)
                     {{ a.requiere }}
                   </div>
                 </div>
+                <input v-model="featuresForm[a.clave]" type="checkbox" class="scd__chk" />
+                <div class="scd__track"><div class="scd__thumb"></div></div>
+              </label>
+
+              <!-- IA -->
+              <div v-if="a.clave === 'ia' && featuresForm.ia" class="scd__addon-cfg">
+                <div class="scd__ia-tiers">
+                  <button v-for="tier in IA_TIERS" :key="tier.value" type="button"
+                    class="scd__ia-tier"
+                    :class="{ 'scd__ia-tier--active': iaTier === tier.value }"
+                    :style="iaTier === tier.value ? { borderColor: tier.color, background: tier.color + '12', color: tier.color } : {}"
+                    @click="iaTier = tier.value; iaLimiteHora = [20,60,200][IA_TIERS.findIndex(t=>t.value===tier.value)]"
+                  >
+                    <strong>{{ tier.label }}</strong><span>{{ tier.desc }}</span>
+                  </button>
+                </div>
+                <div class="scd__ia-limit">
+                  <label class="scd__lbl">Límite de llamadas por hora</label>
+                  <input v-model.number="iaLimiteHora" type="number" min="1" max="500" class="scd__input scd__input--sm" />
+                  <span class="scd__hint">Sobreescribe el límite del tier. Se guarda con el botón de arriba.</span>
+                </div>
               </div>
-              <input v-model="featuresForm[a.clave]" type="checkbox" class="scd__chk" />
-              <div class="scd__track"><div class="scd__thumb"></div></div>
-            </label>
+
+              <!-- Ambiente / IoT: la API key de Pulse -->
+              <div v-if="a.clave === 'iot' && featuresForm.iot" class="scd__addon-cfg">
+                <div class="scd__cfg-hd">
+                  <span>API key de Pulse Grow</span>
+                  <span v-if="club.pulse_configurado" class="scd__ok-badge">Configurada</span>
+                  <span v-else class="scd__warn-badge">Falta</span>
+                </div>
+                <p class="scd__hint">
+                  Con una sola key se leen todos los sensores del club. Se saca de
+                  <strong>pulsegrow.com → Settings → API</strong>.
+                </p>
+                <div class="scd__cfg-row">
+                  <input v-model.trim="pulseKey" type="password" class="scd__input"
+                         :placeholder="club.pulse_configurado ? '•••••••• (vacío = no cambiar)' : 'Pegá la API key'" />
+                  <button class="scd__btn-sm scd__btn-secondary" :disabled="savingPulse" @click="guardarPulse">
+                    {{ savingPulse ? 'Guardando…' : 'Guardar' }}
+                  </button>
+                  <button v-if="club.pulse_configurado" class="scd__btn-sm scd__btn-danger" :disabled="savingPulse" @click="borrarPulse">
+                    Quitar
+                  </button>
+                </div>
+              </div>
+
+              <!-- WhatsApp: las credenciales de Twilio -->
+              <div v-if="a.clave === 'whatsapp' && featuresForm.whatsapp" class="scd__addon-cfg">
+                <div class="scd__cfg-hd">
+                  <span>Cuenta de Twilio</span>
+                  <span v-if="club.whatsapp_estado === 'conectado'" class="scd__ok-badge">Conectado</span>
+                  <span v-else class="scd__warn-badge">Sin conectar</span>
+                </div>
+                <p class="scd__hint">El número y la cuenta son del club: los avisos salen desde ahí.</p>
+                <div class="scd__cfg-grid">
+                  <input v-model.trim="waForm.twilio_account_sid" class="scd__input" placeholder="Account SID" />
+                  <input v-model.trim="waForm.twilio_auth_token" type="password" class="scd__input"
+                         :placeholder="club.whatsapp_estado === 'conectado' ? '•••••••• (vacío = no cambiar)' : 'Auth Token'" />
+                  <input v-model.trim="waForm.twilio_whatsapp_from" class="scd__input" placeholder="+54911..." />
+                </div>
+                <div class="scd__cfg-row">
+                  <button class="scd__btn-sm scd__btn-secondary" :disabled="savingWa" @click="guardarWhatsapp">
+                    {{ savingWa ? 'Guardando…' : 'Guardar credenciales' }}
+                  </button>
+                  <button v-if="club.whatsapp_estado === 'conectado'" class="scd__btn-sm scd__btn-danger" @click="desconectarWhatsapp">
+                    Desconectar
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <template v-if="iaActiva">
-            <div class="scd__divider"><span>Configuración de IA</span></div>
-            <div class="scd__ia-tiers">
-              <button v-for="tier in IA_TIERS" :key="tier.value" type="button"
-                class="scd__ia-tier"
-                :class="{ 'scd__ia-tier--active': iaTier === tier.value }"
-                :style="iaTier === tier.value ? { borderColor: tier.color, background: tier.color + '12', color: tier.color } : {}"
-                @click="iaTier = tier.value; iaLimiteHora = [20,60,200][IA_TIERS.findIndex(t=>t.value===tier.value)]"
-              >
-                <strong>{{ tier.label }}</strong><span>{{ tier.desc }}</span>
-              </button>
-            </div>
-            <div class="scd__ia-limit">
-              <label class="scd__lbl">Límite llamadas/hora</label>
-              <input v-model.number="iaLimiteHora" type="number" min="1" max="500" class="scd__input scd__input--sm" />
-              <span class="scd__hint">Sobreescribe el límite del tier.</span>
-            </div>
-          </template>
         </div>
       </div>
 
       <!-- El correo lo configura el ADMIN del club (conecta su Gmail), no el super_admin. -->
-
-      <!-- Sensores Pulse: sólo si el club tiene ambiente/IoT. La credencial es de un servicio
-           externo, así que la carga el super admin y no el club. -->
-      <div v-if="featuresForm.iot" class="scd__card">
-        <div class="scd__card-hd">
-          <Zap :size="14" :stroke-width="1.75" class="scd__card-ico scd__card-ico--orange" /> Sensores Pulse Grow
-          <span v-if="club.pulse_configurado" class="scd__ok-badge">Configurado</span>
-          <span v-else class="scd__warn-badge">Sin API key</span>
-        </div>
-        <div class="scd__card-bd">
-          <p class="scd__hint">
-            La API key de la cuenta de Pulse del club. Con una sola se leen todos sus sensores.
-            Se saca de <strong>pulsegrow.com → Settings → API</strong>.
-          </p>
-          <input v-model.trim="pulseKey" type="password" class="scd__input"
-                 :placeholder="club.pulse_configurado ? '•••••••• (dejá vacío para no cambiarla)' : 'Pegá la API key'" />
-          <div class="scd__acts">
-            <button class="scd__btn-sm scd__btn-secondary" :disabled="savingPulse" @click="guardarPulse">
-              {{ savingPulse ? 'Guardando…' : 'Guardar API key' }}
-            </button>
-            <button v-if="club.pulse_configurado" class="scd__btn-sm scd__btn-danger" :disabled="savingPulse" @click="borrarPulse">
-              Quitar
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- WhatsApp: sólo si el club tiene el add-on. Estaba siempre al pie de la ficha, así
-           que la mitad de los clubes veía una sección de un módulo que no contrataron. -->
-      <div v-if="featuresForm.whatsapp" class="scd__card">
-        <div class="scd__card-hd">
-          <Mail :size="14" :stroke-width="1.75" class="scd__card-ico scd__card-ico--orange" /> WhatsApp (Twilio)
-          <span v-if="club.whatsapp_estado === 'conectado'" class="scd__ok-badge">Conectado</span>
-          <span v-else-if="club.whatsapp_estado === 'pendiente'" class="scd__warn-badge">Pendiente</span>
-          <span v-else class="scd__warn-badge">Sin activar</span>
-        </div>
-        <form class="scd__smtp-body" @submit.prevent="provisionarWa">
-          <div v-if="waError" class="scd__alert">{{ waError }}</div>
-          <div v-if="club.whatsapp_numero" class="scd__alert" style="background:#fef9c3;border-color:#fde68a;color:#854d0e">
-            El club pidió activar el número <strong>{{ club.whatsapp_numero }}</strong>. Registralo en Twilio y cargá las credenciales acá.
-          </div>
-          <div class="scd__smtp-grid">
-            <div class="scd__field">
-              <label class="scd__lbl">Account SID</label>
-              <input v-model.trim="waForm.twilio_account_sid" class="scd__input" placeholder="ACxxxxxxxx..." />
-            </div>
-            <div class="scd__field">
-              <label class="scd__lbl">Auth Token</label>
-              <input v-model.trim="waForm.twilio_auth_token" type="password" class="scd__input" placeholder="Dejá vacío para no cambiar" autocomplete="new-password" />
-            </div>
-            <div class="scd__field">
-              <label class="scd__lbl">Número WhatsApp (sender)</label>
-              <input v-model.trim="waForm.twilio_whatsapp_from" class="scd__input" placeholder="+14155238886" />
-              <span class="scd__hint">Le agregamos "whatsapp:" solo</span>
-            </div>
-          </div>
-          <div class="scd__smtp-footer">
-            <button type="submit" class="scd__btn-sm scd__btn-primary" :disabled="savingWa">
-              <DsSpinner v-if="savingWa" :size="13" />
-              <Save v-else :size="13" :stroke-width="1.75" />
-              {{ savingWa ? 'Guardando…' : 'Provisionar WhatsApp' }}
-            </button>
-            <button v-if="club.twilio_configurado" type="button" class="scd__btn-sm" @click="desconectarWa" style="color:#dc2626">Desconectar</button>
-          </div>
-        </form>
-      </div>
 
       <!-- ── Modal plan ── -->
       <Teleport to="body">
@@ -959,6 +963,26 @@ onMounted(cargar)
 .scd__feat-req--warn { color: #b45309; }
 .scd__feat-toggle--warn { border-color: #fcd34d; }
 .scd__feat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: .4rem; }
+
+/* Add-ons: cada uno con su configuración adentro */
+.scd__addons { display: flex; flex-direction: column; gap: .5rem; }
+.scd__addon { border: 1.5px solid #e2e8f0; border-radius: 10px; background: #f8fafc; overflow: hidden; transition: border-color .15s, background .15s; }
+.scd__addon--on { border-color: #86efac; background: #fff; }
+.scd__addon--warn { border-color: #fcd34d; }
+.scd__addon-hd { display: flex; align-items: center; gap: .65rem; padding: .7rem .9rem; cursor: pointer; user-select: none; }
+.scd__addon-txt { flex: 1; min-width: 0; }
+.scd__addon-cfg { border-top: 1px solid #e2e8f0; background: #f8fafc; padding: .9rem; display: flex; flex-direction: column; gap: .6rem; }
+.scd__cfg-hd { display: flex; align-items: center; gap: .5rem; font-size: .78rem; font-weight: 700; color: #0f172a; }
+.scd__cfg-row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+.scd__cfg-row .scd__input { flex: 1; min-width: 180px; }
+.scd__cfg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .5rem; }
+.scd__feat-badge--cfg { background: #dbeafe; color: #0369a1; }
+
+/* Suscripción */
+.scd__susc-suites { display: flex; flex-wrap: wrap; gap: .35rem; }
+.scd__susc-pill { background: #dcfce7; color: #15803d; }
+.scd__susc-pill--none { background: #f1f5f9; color: #94a3b8; }
+.scd__susc-addons { font-size: .72rem; color: #64748b; margin: .5rem 0 0; line-height: 1.45; }
 .scd__feat-toggle {
   display: flex; align-items: center; gap: .65rem; padding: .65rem .875rem;
   border-radius: 10px; border: 1.5px solid #e2e8f0; background: #f8fafc;

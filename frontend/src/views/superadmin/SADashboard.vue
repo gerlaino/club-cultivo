@@ -9,16 +9,46 @@ const router  = useRouter()
 const loading = ref(true)
 const stats   = ref(null)
 
-const PLAN_META = {
-  semilla:    { label: 'Semilla',    color: '#64748b', bg: '#f1f5f9' },
-  brote:      { label: 'Brote',      color: '#15803d', bg: '#dcfce7' },
-  cosecha:    { label: 'Cosecha',    color: '#0369a1', bg: '#dbeafe' },
-  federacion: { label: 'Federación', color: '#7c3aed', bg: '#ede9fe' },
+// Se vende por SUITES, no por planes de una tabla vieja. Lo que importa saber de un vistazo
+// es cuántos clubes tienen cada cosa —que es lo que se factura— y qué necesita atención.
+const SUITE_META = {
+  cultivo:             { label: 'Cultivo',  color: '#15803d', bg: '#dcfce7' },
+  produccion_dispensa: { label: 'Producción y dispensa', color: '#0369a1', bg: '#dbeafe' },
 }
-function planMeta(p) { return PLAN_META[p] || PLAN_META.semilla }
+const ADDON_LABEL = {
+  bar: 'Buffet', eventos: 'Eventos', medico: 'Médico', iot: 'Ambiente/IoT', ia: 'Asistente IA',
+  mailer: 'Correo', whatsapp: 'WhatsApp', web_publica: 'Web pública', ariccame: 'ARICCAME',
+}
 
 const clubsActivos    = computed(() => stats.value?.clubs?.filter(c => !c.deleted_at) || [])
 const clubsEliminados = computed(() => stats.value?.clubs?.filter(c =>  c.deleted_at) || [])
+
+function pct(n) {
+  const total = clubsActivos.value.length
+  return total ? Math.round((n / total) * 100) : 0
+}
+
+// Los add-ons ordenados por adopción: los que nadie usa quedan al final y se ven apagados.
+const addonsOrdenados = computed(() =>
+  Object.entries(stats.value?.por_addon || {}).sort((a, b) => b[1] - a[1]))
+
+// Lo accionable. Un dashboard que sólo cuenta totales no dice qué hacer con el día.
+const atencion = computed(() => {
+  const s = stats.value
+  if (!s) return []
+  const items = []
+  if (s.sin_suites)  items.push({ key: 'sin', count: s.sin_suites, tono: 'crit',
+    titulo: 'sin ninguna suite', detalle: 'no pueden trabajar hasta que se les active una',
+    to: { name: 'sa-clubs' } })
+  if (s.suspendidos) items.push({ key: 'susp', count: s.suspendidos, tono: 'warn',
+    titulo: 'suspendidos', detalle: 'sus usuarios no pueden entrar', to: { name: 'sa-clubs' } })
+  if (s.clubs_trial) items.push({ key: 'trial', count: s.clubs_trial, tono: 'info',
+    titulo: 'en periodo de prueba', detalle: 'hay que pasarlos a pago o darlos de baja',
+    to: { name: 'sa-clubs' } })
+  if (clubsEliminados.value.length) items.push({ key: 'elim', count: clubsEliminados.value.length,
+    tono: 'info', titulo: 'eliminados', detalle: 'se pueden restaurar', to: { name: 'sa-clubs' } })
+  return items
+})
 
 onMounted(async () => {
   try {
@@ -109,23 +139,60 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- Distribución por plan -->
+      <!-- Qué necesita que alguien haga algo. Va PRIMERO: un dashboard que sólo cuenta
+           totales no dice qué hacer con el día. Si no hay nada pendiente, no ocupa lugar. -->
+      <div v-if="atencion.length" class="sad__section">
+        <div class="sad__section-header">
+          <span class="sad__section-title">Requiere atención</span>
+        </div>
+        <div class="sad__atencion">
+          <button v-for="a in atencion" :key="a.key" class="sad__alerta" :class="`sad__alerta--${a.tono}`"
+                  @click="router.push(a.to)">
+            <span class="sad__alerta-num">{{ a.count }}</span>
+            <span class="sad__alerta-txt">
+              <strong>{{ a.titulo }}</strong>
+              <span>{{ a.detalle }}</span>
+            </span>
+            <i class="bi bi-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- Adopción: qué contrataron y qué están usando de verdad. Es lo que se factura. -->
       <div class="sad__section">
         <div class="sad__section-header">
-          <span class="sad__section-title">Por plan</span>
+          <span class="sad__section-title">Suites contratadas</span>
+          <span class="sad__section-sub">sobre {{ clubsActivos.length }} club{{ clubsActivos.length === 1 ? '' : 's' }}</span>
         </div>
         <div class="sad__planes">
-          <div v-for="(count, plan) in stats.por_plan" :key="plan" class="sad__plan-card"
-               :style="{ borderColor: planMeta(plan).color + '30' }">
-            <div class="sad__plan-badge" :style="{ background: planMeta(plan).bg, color: planMeta(plan).color }">
-              {{ planMeta(plan).label }}
+          <div v-for="(count, k) in (stats.por_suite || {})" :key="k" class="sad__plan-card"
+               :style="{ borderColor: (SUITE_META[k]?.color || '#94a3b8') + '30' }">
+            <div class="sad__plan-badge" :style="{ background: SUITE_META[k]?.bg, color: SUITE_META[k]?.color }">
+              {{ SUITE_META[k]?.label || k }}
             </div>
             <div class="sad__plan-count">{{ count }}</div>
             <div class="sad__plan-pct-wrap">
               <div class="sad__plan-bar-track">
-                <div class="sad__plan-bar" :style="{ width: `${clubsActivos.length ? Math.round((count / clubsActivos.length) * 100) : 0}%`, background: planMeta(plan).color }"></div>
+                <div class="sad__plan-bar" :style="{ width: `${pct(count)}%`, background: SUITE_META[k]?.color }"></div>
               </div>
-              <span class="sad__plan-pct">{{ clubsActivos.length ? Math.round((count / clubsActivos.length) * 100) : 0 }}%</span>
+              <span class="sad__plan-pct">{{ pct(count) }}%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="addonsOrdenados.length" class="sad__section">
+        <div class="sad__section-header">
+          <span class="sad__section-title">Módulos adicionales</span>
+          <span class="sad__section-sub">cuántos clubes tienen cada uno</span>
+        </div>
+        <div class="sad__addons">
+          <div v-for="[k, count] in addonsOrdenados" :key="k" class="sad__addon"
+               :class="{ 'sad__addon--cero': !count }">
+            <span class="sad__addon-name">{{ ADDON_LABEL[k] || k }}</span>
+            <span class="sad__addon-count">{{ count }}</span>
+            <div class="sad__addon-bar-track">
+              <div class="sad__addon-bar" :style="{ width: `${pct(count)}%` }"></div>
             </div>
           </div>
         </div>
@@ -166,8 +233,60 @@ onMounted(async () => {
 .sad__section-title { font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; color: #64748b; }
 
 /* Plan distribution */
+/* Requiere atención */
+.sad__atencion { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: .6rem; }
+.sad__alerta { display: flex; align-items: center; gap: .85rem; padding: .85rem 1rem; border-radius: 12px; border: 1.5px solid #e2e8f0; background: #fff; cursor: pointer; text-align: left; transition: border-color .15s, transform .15s; font: inherit; }
+.sad__alerta:hover { transform: translateY(-1px); }
+.sad__alerta > i { margin-left: auto; color: #cbd5e1; }
+.sad__alerta:hover > i { color: #0f172a; }
+.sad__alerta-num { font-size: 1.5rem; font-weight: 800; line-height: 1; min-width: 2ch; }
+.sad__alerta-txt { display: flex; flex-direction: column; gap: .1rem; }
+.sad__alerta-txt strong { font-size: .85rem; font-weight: 700; color: #0f172a; }
+.sad__alerta-txt span { font-size: .72rem; color: #64748b; line-height: 1.4; }
+.sad__alerta--crit { border-color: #fecaca; background: #fef2f2; }
+.sad__alerta--crit .sad__alerta-num { color: #b91c1c; }
+.sad__alerta--warn { border-color: #fde68a; background: #fffbeb; }
+.sad__alerta--warn .sad__alerta-num { color: #b45309; }
+.sad__alerta--info .sad__alerta-num { color: #475569; }
+
+/* Add-ons */
+.sad__addons { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: .5rem; }
+.sad__addon { display: grid; grid-template-columns: 1fr auto; gap: .15rem .5rem; padding: .7rem .85rem; border: 1px solid #f1f5f9; border-radius: 10px; background: #fff; }
+.sad__addon--cero { opacity: .5; }
+.sad__addon-name { font-size: .8rem; font-weight: 600; color: #0f172a; }
+.sad__addon-count { font-size: .95rem; font-weight: 800; color: #0f172a; }
+.sad__addon-bar-track { grid-column: 1 / -1; height: 4px; background: #f1f5f9; border-radius: 999px; overflow: hidden; margin-top: .35rem; }
+.sad__addon-bar { height: 100%; background: #15803d; border-radius: 999px; }
+.sad__section-sub { font-size: .72rem; color: #94a3b8; margin-left: .5rem; }
+
 .sad__planes { display: grid; grid-template-columns: repeat(4,1fr); gap: 0; }
-@media (max-width: 900px) { .sad__planes { grid-template-columns: repeat(2,1fr); } }
+@media (max-width: 900px) { /* Requiere atención */
+.sad__atencion { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px,1fr)); gap: .6rem; }
+.sad__alerta { display: flex; align-items: center; gap: .85rem; padding: .85rem 1rem; border-radius: 12px; border: 1.5px solid #e2e8f0; background: #fff; cursor: pointer; text-align: left; transition: border-color .15s, transform .15s; font: inherit; }
+.sad__alerta:hover { transform: translateY(-1px); }
+.sad__alerta > i { margin-left: auto; color: #cbd5e1; }
+.sad__alerta:hover > i { color: #0f172a; }
+.sad__alerta-num { font-size: 1.5rem; font-weight: 800; line-height: 1; min-width: 2ch; }
+.sad__alerta-txt { display: flex; flex-direction: column; gap: .1rem; }
+.sad__alerta-txt strong { font-size: .85rem; font-weight: 700; color: #0f172a; }
+.sad__alerta-txt span { font-size: .72rem; color: #64748b; line-height: 1.4; }
+.sad__alerta--crit { border-color: #fecaca; background: #fef2f2; }
+.sad__alerta--crit .sad__alerta-num { color: #b91c1c; }
+.sad__alerta--warn { border-color: #fde68a; background: #fffbeb; }
+.sad__alerta--warn .sad__alerta-num { color: #b45309; }
+.sad__alerta--info .sad__alerta-num { color: #475569; }
+
+/* Add-ons */
+.sad__addons { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: .5rem; }
+.sad__addon { display: grid; grid-template-columns: 1fr auto; gap: .15rem .5rem; padding: .7rem .85rem; border: 1px solid #f1f5f9; border-radius: 10px; background: #fff; }
+.sad__addon--cero { opacity: .5; }
+.sad__addon-name { font-size: .8rem; font-weight: 600; color: #0f172a; }
+.sad__addon-count { font-size: .95rem; font-weight: 800; color: #0f172a; }
+.sad__addon-bar-track { grid-column: 1 / -1; height: 4px; background: #f1f5f9; border-radius: 999px; overflow: hidden; margin-top: .35rem; }
+.sad__addon-bar { height: 100%; background: #15803d; border-radius: 999px; }
+.sad__section-sub { font-size: .72rem; color: #94a3b8; margin-left: .5rem; }
+
+.sad__planes { grid-template-columns: repeat(2,1fr); } }
 .sad__plan-card { padding: 1.1rem 1.25rem; border-right: 1px solid #f1f5f9; display: flex; flex-direction: column; gap: .5rem; }
 .sad__plan-card:last-child { border-right: none; }
 .sad__plan-badge { display: inline-block; font-size: .72rem; font-weight: 800; padding: .2em .65em; border-radius: 6px; width: fit-content; }

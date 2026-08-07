@@ -1,443 +1,533 @@
 # Guía de usuarios y flujos — Club Cultivo
 
-> Documento de referencia para armar tutoriales. Refleja el estado real del código a
-> **julio 2026**. Cubre los 11 roles, qué puede/no puede cada uno, qué ve en pantalla y el
-> flujo de trabajo de cada sección. Si algo contradice al código, manda el código.
+> Documento de referencia para armar los manuales. Refleja el estado real del código a
+> **7 de agosto de 2026** (HEAD `8e05ebf`). Si algo contradice al código, manda el código.
+
+**Cómo se verificó esta versión.** La versión anterior era del 4 de julio y quedaron 254 commits
+en el medio. Se verificaron **contra el código fuente**: el ciclo de vida del lote y la planta,
+las rutas y permisos por rol, el catálogo de módulos y su gating. El resto se reconcilió con los
+cuerpos de commit y el CHANGELOG. Las secciones marcadas con ⚠️ **no se reverificaron línea por
+línea** y hay que mirarlas antes de publicarlas en un manual.
+
+> **Nota**: el `CHANGELOG.md` está al día hasta *Agosto 2026 (e)*; los ~35 commits del 6 y 7 de
+> agosto (módulos por suites, informes en PDF real, Equipo, VPD de hoja, rutas por rol) todavía
+> no tienen entrada.
 
 App: **Vue 3 (SPA) + Rails 7.2 (API)**. Multi-tenant: cada club es un tenant aislado por
 `club_id`. Contexto legal argentino: REPROCANN, ARICCAME/ANMAT, Ley 25.326 (datos de salud).
 
 ---
 
-## 1. Cómo funciona el acceso (dos modelos)
+## 1. Cómo funciona el acceso
 
-Hay **11 roles**: `super_admin, admin, medico, cultivador, supervisor, abogado, auditor, dispensador, manicura, paciente, delivery`.
+Hay **11 roles**: `super_admin, admin, medico, cultivador, supervisor, abogado, auditor,
+dispensador, manicura, paciente, delivery`.
 
-El acceso se resuelve de dos formas según el rol:
+### La raíz ya no es el login
+- **Sin sesión, `/` muestra `/bienvenida`** — una landing pública que explica qué es el producto.
+- **Con sesión, `/` sigue siendo el dashboard de siempre.** El dashboard no se movió: los ~17
+  "Inicio" de sidebars, topbars y breadcrumbs apuntan donde apuntaban.
+- El posicionamiento dejó de ser "plataforma REPROCANN": es *"una plataforma para toda
+  organización que cultiva: clubes, investigación y producción"*. REPROCANN y ARICCAME siguen
+  estando, pero como **consecuencia** de la data que se carga operando, no como identidad.
 
+### Dos modelos de navegación
 - **Roles "silo" (bloqueados a su sección):** `super_admin`, `auditor`, `medico`, `abogado`,
-  `delivery`. Cada uno arranca en su home y **solo** puede navegar dentro de su prefijo
-  (ej. el médico solo `/medico/*`, el delivery solo `/delivery/*`). Si intentan ir a otra
-  parte, los devuelve a su home.
-- **Roles del shell principal (gateados por permiso de ruta):** `admin`, `supervisor`,
-  `cultivador`, `dispensador`, `manicura`. Comparten la app con el sidebar por secciones;
-  cada ruta se habilita/oculta según una matriz de permisos por recurso/acción.
-- **`paciente`:** no usa el panel del club; tiene su perfil, sus dispensaciones y su carnet
-  digital (más web pública por token, sin login).
+  `delivery`. Cada uno arranca en su home y solo navega dentro de su prefijo.
+- **Roles del shell principal:** `admin`, `supervisor`, `cultivador`, `dispensador`, `manicura`.
+  Comparten la app con el sidebar por secciones.
+- **`paciente`:** no usa el panel del club.
 
-> Nota técnica: la autorización **fina del backend** hoy es por chequeos ad-hoc en cada
-> controller (no por la matriz). La matriz vive en el frontend (navegación/UI). Para los
-> tutoriales, lo que importa es el comportamiento efectivo, que es el que se describe abajo.
+### La matriz de rutas ahora cubre los 11 roles
+Antes cubría solo a los 5 silos: los del shell compartido no se podían filtrar mirando el prefijo
+del layout, así que un cultivador que **escribía la URL** `/contabilidad` llegaba a la pantalla,
+el backend le devolvía 403 y veía una vista rota sin entender por qué. Hoy cada rol declara sus
+secciones (`ROLE_ALLOWED_PREFIX` en `router/index.js`):
 
-**Móvil / PWA:** `admin, supervisor, cultivador, manicura, delivery` tienen vistas móviles
-optimizadas (rutas `/m/*`), pensadas para trabajar en la sala / en la calle desde el teléfono.
+| Rol | Secciones propias (además de `/perfil`, `/login`, `/bienvenida`) |
+|---|---|
+| `cultivador` | `/` `/salas` `/lotes` `/plantas` `/geneticas` `/tareas` `/plan-trabajo` `/historial-cultivador` `/cosechado` `/dispositivos` `/reglas-ambientales` `/m` |
+| `supervisor` | lo del cultivador **+** `/pacientes` `/socios` `/historial` `/admin/stock` `/insumos` `/sedes` |
+| `manicura` | `/` `/cosechado` `/lotes` `/plantas` `/tareas` `/m` |
+| `dispensador` | `/` `/pacientes` `/socios` `/historial` `/admin/stock` `/insumos` `/bar` `/entregas` `/m` |
+| silos | su propio prefijo (`/medico`, `/auditor`, `/abogado`, `/delivery`, `/super-admin`) |
+
+Cuando bloquea, **el aviso nombra el rol y dice a quién pedirle acceso** — antes te devolvía al
+dashboard sin explicación, como si te hubieras equivocado de click.
+
+**Rutas públicas:** las marcadas `meta.public` (carnet del socio, pasaporte de dispensa, web del
+club) quedan **fuera** del chequeo de roles. Antes, un médico o un delivery logueado que abría un
+carnet recibía "Sin permisos" y era expulsado a su home.
+
+> Nota técnica: la autorización fina del backend es por chequeos ad-hoc en cada controller. Para
+> los manuales importa el comportamiento efectivo, que es el descrito acá.
+
+**Móvil / PWA:** `admin, supervisor, cultivador, manicura, delivery` tienen vistas móviles (`/m/*`).
 
 ---
 
-## 2. Roles — qué puede y no puede cada uno
+## 2. Módulos: dos suites y sus add-ons
+
+**Esto es nuevo (6–7 de agosto) y condiciona todo lo demás:** lo que un rol ve depende primero de
+qué módulos tiene contratado el club, y recién después de su rol.
+
+### Las dos suites (`Club::SUITES`)
+| Clave | Nombre | Qué incluye |
+|---|---|---|
+| `cultivo` | **Cultivo** | Genéticas, lotes, plantas, salas, cosecha, post-cosecha y tareas. |
+| `produccion_dispensa` | **Producción y dispensa** | Pacientes, stock, dispensaciones, reservas, cuenta corriente, delivery y contabilidad. |
+
+### Los add-ons (`Club::ADDONS`)
+| Clave | Nombre | Requiere |
+|---|---|---|
+| `bar` | Buffet | — |
+| `eventos` | Eventos | Que el Buffet esté activo |
+| `medico` | Módulo médico | — |
+| `iot` | Ambiente / IoT | Hardware del club (Sonoff, Pulse Grow) o importación CSV |
+| `ia` | Asistente IA | `ANTHROPIC_API_KEY` en el entorno |
+| `mailer` | Correo al paciente | SMTP del club cargado en Preferencias |
+| `whatsapp` | WhatsApp | Cuenta de Twilio del club |
+| `web_publica` | Web pública | ⚠️ **incompleto**: el sitio no está deployado |
+| `ariccame` | ARICCAME | ⚠️ **incompleto**: la integración con ANMAT está simulada |
+
+`web_publica`, `ariccame` y `eventos` están en `ADDONS_INCOMPLETOS`: vienen apagados y el super
+admin muestra la advertencia antes de dejar activarlos.
+
+**Un club nuevo nace con:** las dos suites + `bar` + `medico`. Los que dependen de algo externo
+(IoT, IA, mail, WhatsApp) se prenden a mano cuando el club los tenga resueltos.
+
+### El gating es real
+`require_feature!` (en `ApplicationController`) bloquea **27 controllers** y el menú lateral.
+Devuelve 403 con `requiere_modulo: true` y el nombre del módulo. Hasta el 6 de agosto solo cuatro
+add-ons gateaban de verdad; hoy las suites también.
+
+**Los dos clubes parciales funcionan de punta a punta:**
+- **Solo Cultivo** — cultiva, cosecha y manicura (todo eso *es* cultivo), y su lote llega igual
+  hasta el stock. Lo que cambia es la **salida**: el stock se va por transferencia, merma o
+  ajuste, no por dispensación.
+- **Solo Producción/Dispensa** — no cultiva, así que no genera stock propio. Su inventario entra
+  por **compra externa** (que exige proveedor) y de ahí dispensa normalmente.
+
+### Ya no hay planes con nombre
+El super admin **dejó de hablar de Semilla / Brote / Cosecha / Federación** (esa era la tabla de
+precios vieja). La lista de clubes muestra **qué contrató** cada uno —suites + cantidad de
+add-ons— y se filtra por eso: las dos suites, solo Cultivo, solo Dispensa.
+
+> `PlanEnforcer` con sus cupos sigue existiendo en el backend; lo que se retiró es la
+> presentación por plan nombrado en el super admin.
+
+---
+
+## 3. Roles — qué puede y no puede cada uno
 
 ### 👑 admin
 **Es el dueño operativo del club. Puede todo dentro de su club.**
-- **Ve:** todas las secciones del sidebar — Dashboard, Cultivo (Salas, Lotes, Plantas,
-  Genéticas), Pacientes (+ Dispensaciones + REPROCANN), Producción (Stock, Cosecha,
-  Manicura), Comercial (Reservas, Despachos, Contabilidad), Tareas (+ Plan de trabajo),
-  Reportes (Analítica, Auditoría, Trazabilidad, ARICCAME, Documentos), Configuración
-  (General, Suscripción, Equipo, Sedes, Alertas, Sitio web, Integraciones, Papelera).
-- **Puede:** crear/editar/borrar en todos los módulos; aprobar pesajes de manicura; cerrar
-  curado y generar stock; confirmar/editar dispensaciones; gestionar reservas; ver y editar
-  historia clínica; cerrar períodos contables; gestionar el equipo y las sedes; configurar
-  ambiente/alertas; restaurar desde la Papelera.
+- **Ve:** todas las secciones del sidebar — Dashboard, Cultivo (Salas, Lotes, Plantas, Genéticas),
+  Pacientes (+ Dispensaciones + REPROCANN), Producción (Stock, Cosecha, Manicura), Comercial
+  (Reservas, Despachos, Contabilidad), Tareas (+ Plan de trabajo), Reportes, Configuración —
+  **según los módulos que el club tenga activos**.
+- **Puede:** crear/editar/borrar en todos los módulos; aprobar pesajes de manicura; cerrar curado
+  y generar stock; confirmar/editar dispensaciones; gestionar reservas; ver y editar historia
+  clínica; cerrar períodos contables; gestionar equipo y sedes; configurar ambiente/alertas;
+  restaurar desde la Papelera.
+- **Equipo (rehecho):** al dar de alta, la **contraseña la genera el backend** —distinta para cada
+  usuario— y viene armada para **dictarse por teléfono**: sin `0/O` ni `1/l/I`, en bloques
+  (`BiTc-XnPb-5447`). Queda en pantalla, no en un toast que se va solo. Hay botón de
+  **restablecer contraseña** en la ficha del usuario: la genera, la muestra e informa si el mail
+  salió o no. **Un fallo de SMTP ya no tumba un alta.**
 - **NO puede:** cosas de plataforma (planes globales, otros clubes) — eso es del super_admin.
-- **Restricción nueva:** en un lote **asignado a un manicura**, el admin **no** registra el
-  peso desde el detalle de la planta ni desde el batch: eso lo hace el manicura asignado
-  (ver flujo de Manicura). El admin sí puede si el lote no tiene manicura asignado.
-
-### 🧑‍⚕️ medico (silo `/medico`)
-**Solo su sección clínica.** Módulo médico completo.
-- **Puede:** ver/crear/editar **pacientes** (los suyos, con seguimiento médico); **historia
-  clínica** completa (anamnesis, diagnósticos, evolución, alergias, medicación, notas
-  clínicas); **indicaciones médicas** (crear/editar) y generar la **prescripción PDF**;
-  **turnos** (agenda, disponibilidad, check-ins, fichas); ver dispensaciones del paciente
-  (lectura) y reportes médicos.
-- **NO puede:** cultivo, stock, dispensar, contabilidad, configuración del club. Está
-  encerrado en `/medico`.
+- **Candado de manicura:** en un lote **asignado a un manicura**, el admin **no** registra el peso
+  desde el detalle de la planta ni desde el batch. Sí puede si el lote no tiene manicura asignado.
 
 ### 🌱 cultivador (shell principal, foco Cultivo)
 **Opera el cultivo de las salas/sedes que tiene asignadas.**
-- **Puede:** Plantas (CRUD), Lotes (CRUD), Salas (CRUD), Plan de trabajo, mediciones y
-  ambiente (dispositivos, lecturas, setpoints por fase, reglas y alertas), Genéticas
-  (lectura), reportes de cultivo. Registra riego/fertilización/podas, avanza fases,
-  cosecha plantas, carga fotos y análisis de laboratorio.
-- **Ve solo lo suyo:** los lotes/plantas se filtran por las **salas de sus sedes asignadas**.
-- **Asistente por voz** (si el club tiene el feature `ia_voz`): dicta su reporte de sala y la
-  IA lo registra (ver 3.11). No puede crear tareas por voz.
-- **NO puede:** pacientes, dispensación, stock/comercial, contabilidad, configuración,
-  reportes oficiales. En la práctica su ciclo termina cuando el lote pasa a **cosecha**
-  (ahí lo toma manicura/admin).
-
-### 👀 supervisor (shell principal)
-**Rol de oversight de cultivo + un pie en lo comercial.**
-- **Puede (cultivo, lectura):** Salas, Lotes, Plantas, Sedes, Genéticas — solo ver.
-- **Puede (gestión):** **Tareas** (crear/editar/borrar/asignar) y **Plan de trabajo**.
-- **Puede (comercial):** **dispensar** y **gestionar reservas** (crear/editar/cancelar) —
-  esto va más allá de la matriz de navegación; es comportamiento de dominio.
-- **Puede (clínico, lectura):** ver **historia clínica** del paciente (junto a admin y
-  médico) — pero **no** la edita.
-- **NO puede:** editar cultivo (solo lectura), configuración del club, cerrar contabilidad.
-
-### ⚖️ abogado (silo `/abogado`)
-**Cumplimiento legal, solo lectura.**
-- **Puede:** ver **socios** (lectura), **reportes legales**, **informes REPROCANN** y
-  **trazabilidad**.
-- **NO puede:** nada operativo (ni cultivo, ni dispensar, ni configurar). Encerrado en
-  `/abogado`.
-
-### 🔍 auditor (silo `/auditor`)
-**Solo lectura global, para auditorías/inspecciones.**
-- **Puede:** ver informes oficiales (Producción, Cumplimiento, Sedes, Dispensaciones,
-  Plan vs Real, INASE, REPROCANN), **Trazabilidad** (cadena origen→cultivo→stock→dispensa),
-  plantas, lotes, socios, lecturas ambientales y alertas — **todo en modo lectura**. Puede
-  **descargar PDF** de los informes.
-- **NO puede:** escribir absolutamente nada. Bloqueado a nivel `ApplicationController`.
-
-### 💊 dispensador (shell principal, foco Dispensación)
-**Atiende el mostrador: dispensa y maneja el stock de su sede.**
-- **Puede:** ver **socios** (lectura) y crear pacientes básicos (sin seguimiento médico,
-  dispara una alerta al admin); **dispensar** (carrito multi-producto, medios de pago,
-  descuento, crédito de cuenta corriente); ver el **inventario por sede**; ver tareas y
-  notas de socio (crear notas).
-- **Reservas:** **convierte** una reserva en dispensa (acción *Entregar*), pero **no** las
-  crea ni las gestiona (eso es admin/supervisor).
-- **NO puede:** ver **historia clínica** (bloqueado: solo ve datos no clínicos del socio);
-  cultivo, contabilidad, configuración, informes oficiales.
+- **Puede:** Plantas, Lotes, Salas (ver/editar), Plan de trabajo, mediciones y ambiente,
+  Genéticas (lectura), reportes de cultivo. Registra riego/fertilización/podas, avanza fases,
+  cosecha, carga fotos y análisis de laboratorio.
+- **⚠️ CORRECCIÓN respecto de la versión anterior — la visibilidad es al revés de lo que decía:**
+  un cultivador **sin sedes asignadas ve TODO el cultivo del club**. Es a propósito: un club de
+  una sola sede no debería tener que asignársela a cada persona para que la app le sirva. Con
+  sedes asignadas, sí se filtra por ellas. (Vive en `User#salas_ids_asignadas` y lo consumen los
+  cuatro controllers que lo necesitan; antes estaba escrito a mano en cada uno y faltaba justo en
+  los dos de plantas, así que **veía lotes pero ninguna planta**.)
+- **Post-cosecha:** al cosechar, el lote **suelta la sala** para liberar el slot. El alcance
+  post-cosecha se resuelve por **sede** (`Lote.al_alcance_de`), si no las plantas de un lote
+  cosechado no le aparecían nunca.
+- **NO crea salas.** El backend siempre devolvió 403; ahora la UI tampoco ofrece el botón.
+- **Al crear un lote solo se ofrecen salas donde ese lote puede estar.** Un lote nuevo arranca
+  enraizando y va a vegetativo: en 12/12 no prende nada, así que las salas de floración no son
+  opción.
+- **Asistente por voz** (add-on `ia`): dicta su reporte de sala. No puede crear tareas por voz.
+- **NO puede:** pacientes, dispensación, stock/comercial, contabilidad, configuración, reportes
+  oficiales.
+- **En el teléfono** la barra es **Cultivo · Escanear · + · Tareas · Mis horas**. A una planta se
+  llega **escaneando su QR o desde su lote** — así se trabaja parado en la sala. No hay lista de
+  todas las plantas ni Genéticas en móvil (es material de consulta de escritorio).
 
 ### ✂️ manicura (home `/mnc/pendientes`)
 **Post-cosecha: pesa las cosechas que el admin le asigna.**
-- **Puede:** ver sus **lotes en manicura asignados** (cola en `/mnc/pendientes`); registrar
-  el **peso** de las plantas del lote — escaneando el QR de cada planta o con "Registrar por
-  lote" (carga conjunta, eligiendo qué plantas); ver el inventario de manicura, lotes y
-  genéticas (lectura).
-- **Regla nueva (provisorio):** si un lote está **asignado a un manicura**, **solo esa
-  persona** registra el peso (ni el admin ni otro manicura, para evitar ediciones
-  concurrentes que "pierden" la planta). Cuando cierra la jornada, la manda **a confirmar**;
-  el admin la aprueba y ahí se genera el stock de flor seca.
+- **Puede:** ver sus lotes en manicura asignados; registrar el **peso** de las plantas —escaneando
+  el QR de cada una o con "Registrar por lote"—; ver inventario de manicura, lotes y genéticas
+  (lectura).
+- **Candado (provisorio):** si un lote está **asignado a un manicura**, **solo esa persona**
+  registra el peso (ni el admin ni otro manicura), para evitar ediciones concurrentes que
+  "pierden" la planta. Cierra la jornada → la manda **a confirmar** → el admin aprueba → se genera
+  el stock de flor seca.
 - **NO puede:** dispensar, ver pacientes/clínico, contabilidad, configuración.
 
+### 💊 dispensador (shell principal, foco mostrador)
+**Atiende el mostrador: dispensa, cobra y maneja el stock de su sede.**
+- **Puede:** ver socios (lectura) y crear pacientes básicos (sin seguimiento médico, dispara
+  alerta al admin); **dispensar** (carrito multi-producto, medios de pago, descuento, crédito de
+  cuenta corriente); ver el inventario por sede; ver tareas y notas de socio.
+- **Puede asignar el envío** de una dispensa (nuevo, 6-ago).
+- **Buffet:** puede **cargar la mercadería que recibe** (`comprar`, con costo y egreso a su
+  nombre) y **vender lo que no está en el catálogo** — línea suelta *"Otro / Varios"*, que
+  registra la venta sin tocar inventario. El panel del Buffet **cuenta las ventas sueltas del
+  mes** para que la gestión termine de cargar esos productos. El buscador del Buffet busca **por
+  código de barras**.
+- **Se le retiró `reponer`**, que subía stock **sin costo y sin asiento contable**.
+- **Reservas:** **convierte** una reserva en dispensa (*Entregar*), pero **no** las crea ni las
+  gestiona.
+- **NO puede:** ver historia clínica; cultivo, contabilidad, configuración, informes oficiales.
+
+### 🧑‍⚕️ medico (silo `/medico`, add-on `medico`)
+**Solo su sección clínica.** Rehecho en agosto: tenía **tres puertas para lo mismo**.
+- **La ficha del paciente es UNA sola** (`SocioDetailView`). Antes había dos fichas del mismo
+  paciente más pantallas propias de Indicaciones y Documentos que listaban las de **todos** los
+  pacientes mezclados. Lo que era pantalla pasó a ser **tab de su paciente**.
+- **Indicaciones es una tab del paciente** (admin y médico editan, supervisor lee) y arriba
+  muestra el **consumo dispensado** (90 días, promedio mensual, sparkline) — que es el contexto
+  con el que se prescribe.
+- **Documentos: una sola puerta.** Convivían **dos modelos**: la pantalla del médico escribía
+  `Documento` (sin cifrar) y la ficha lee `PatientDocument` (cifrado, con firma y hash), así que
+  un PDF subido por una puerta **no aparecía nunca por la otra**. Ahora todo entra por
+  `PatientDocument`, que sumó los tipos que faltaban (receta, certificado médico, estudio clínico,
+  DNI). Los tipos institucionales del club **dejaron de ofrecérsele** al médico: no es él quien
+  sube el estatuto.
+- **Duración y vencimiento dejaron de pisarse.** Antes `calculate_fecha_vencimiento` sobrescribía
+  el vencimiento **siempre** que hubiera `duracion_dias`, sin avisar: el médico escribía una fecha
+  y el sistema se la cambiaba. Ahora la duración **propone** y **la fecha escrita a mano gana**;
+  el formulario dice cuál de las dos manda, y la lista marca la indicación sin fecha con **"no
+  genera alertas"**.
+- **"Mis Pacientes" se pagina en el servidor**, con filtros y KPIs server-side (contando en el
+  cliente, "3 vencidos" podía significar 40). El **orden es de agenda, no alfabético**: primero
+  quien tiene turno con ese médico, después quien tiene una indicación por vencer — y la fila dice
+  **por qué** está arriba.
+- **Puede:** historia clínica completa, indicaciones + prescripción PDF, turnos (agenda,
+  disponibilidad, check-ins), ver dispensaciones del paciente (lectura).
+- **NO puede:** cultivo, stock, contabilidad, configuración del club.
+- Tiene su **campana de alertas propia** en `MedicoTopBar` (el `NotificationBell` de `App.vue`
+  pertenece al layout viejo y solo lo ven admin y cultivador).
+
+### 👀 supervisor (shell principal)
+Oversight de cultivo + un pie en lo comercial. Cultivo en **lectura**; **Tareas** y **Plan de
+trabajo** con gestión; **dispensa** y **gestiona reservas**; ve (no edita) historia clínica.
+Misma regla de visibilidad que el cultivador: **sin sedes asignadas ve todo el cultivo del club**.
+
+### ⚖️ abogado (silo `/abogado`)
+Cumplimiento legal, solo lectura: socios, reportes legales, informes REPROCANN y trazabilidad.
+
+### 🔍 auditor (silo `/auditor`)
+**Solo lectura global**, bloqueado a nivel `ApplicationController`. Ve los informes oficiales y
+la Trazabilidad, con descarga PDF/Excel. No escribe absolutamente nada.
+
 ### 🚚 delivery (silo `/delivery`)
-**Reparte los despachos que tiene asignados.**
-- **Puede:** ver sus **paquetes** (pendiente / en viaje / entregado / fallido); iniciar
-  viaje, navegar a la dirección, **entregar** (con firma y foto), reportar fallo,
-  reprogramar; cobrar **contra-entrega** (efectivo/transferencia) cuando corresponde.
-- **NO puede/NO ve:** por privacidad, **no ve qué ni cuánto** contiene el paquete (ni en la
-  UI ni en el payload); solo ve destinatario, dirección, contacto y el monto a cobrar.
-  Nada de cultivo, pacientes, stock ni configuración.
+Reparte los despachos asignados: inicia viaje, navega, entrega con firma y foto, reporta fallo,
+reprograma, cobra contra-entrega. **No ve qué ni cuánto** contiene el paquete (ni en la UI ni en
+el payload): solo destinatario, dirección, contacto y monto a cobrar.
 
 ### 🛡️ super_admin (silo `/super-admin`)
-**Rol de plataforma (no de un club).**
-- **Puede:** gestionar **clubes**, **planes** (límites vía PlanEnforcer), métricas globales,
-  usuarios de plataforma, y el **modo observador** (entrar a un club en solo-lectura).
-- **NO puede/NO debe:** ver **datos de salud** de los socios (por diseño de privacidad queda
-  fuera de la historia clínica). No tiene club propio.
+Gestiona clubes, **módulos contratados** (suites + add-ons), métricas globales y el modo
+observador (solo lectura). Carga la **API key de Pulse Grow** del club al activar IoT (cifrada,
+igual que el token de Twilio; va por club porque la cuenta de Pulse es del club). **No ve datos de
+salud** de los socios. **Suspender ≠ eliminar** un club.
 
 ### 🙋 paciente
-**El socio del club (no opera el panel).**
-- **Puede:** ver **su perfil**, **sus dispensaciones**, sus **eventos**, y su **carnet
-  digital** (QR público). La web pública del club y el pasaporte de dispensa se ven por
-  **token, sin login**.
-- **NO puede:** nada del panel de gestión.
+Ve su perfil, sus dispensaciones, sus eventos y su carnet digital. La web pública y el pasaporte
+de dispensa se acceden por **token, sin login**.
 
 ---
 
-## 3. Flujos de trabajo por sección (end-to-end)
+## 4. Flujos de trabajo (end-to-end)
 
-### 3.1 Cultivo → cosecha → stock (el ciclo central)
+### 4.1 El ciclo del lote — CAMBIÓ EL MODELO
 
-El **lote** es la unidad que avanza de fase, y **las plantas heredan la fase del lote**: al
-avanzar el lote, sus plantas (salvo las descartadas) toman el estado que corresponde
-(`FASE_A_PLANT_STATE`).
+> **Lo más importante de esta actualización.** `germinacion` y `esqueje` **dejaron de ser
+> estados**: se colapsaron en **`enraizado`**. Cualquier manual escrito sobre el modelo viejo está
+> mal.
 
-- **Lote** (`Lote::ESTADOS`): `semilla`/`esqueje` → `vegetativo` → `floracion` → `cosecha` →
-  `en_manicura` → `curado` → `finalizado`.
-- **Planta** (`Plant::STATES`): arranca en `germinacion` (semilla) o `esqueje`; **hereda**
-  `vegetativo` y `floracion` del lote; cuando el lote pasa a **cosecha**, todas quedan
-  `cosechado`. `descartada` es una baja individual.
-- **Post-cosecha:** con el lote en `en_manicura`/`curado`/`finalizado`, la planta sigue en
-  `cosechado` — la etapa fina (en manicura, curado) se lee del **estado del lote**, no de un
-  estado propio de la planta. (Por eso en `/lotes` y `/plantas` la etapa post-cosecha se
-  deriva del lote.)
+**Dos ejes independientes:**
+- **`estado`** (la etapa): `enraizado → vegetativo → floracion → cosecha → en_manicura → curado →
+  finalizado`
+- **`origen`** (de dónde viene la planta): `semilla | esqueje`
 
-1. **Cultivador** crea el **lote** (genética, sala, cantidad de plantas). Empieza en
-   vegetativo (o semilla/esqueje según origen).
-2. Durante el ciclo registra tareas (riego, fertilización, poda), fotos, mediciones
-   ambientales y análisis de laboratorio; **avanza las fases** cuando corresponde. El
-   timeline del lote muestra: germinación → vegetativo → floración → cosecha → **en
-   manicura** → curado.
-3. Al **cosechar**, el lote pasa a estado `cosecha` (ya no tiene sala física; se ve en
-   Producción → Cosecha). Las plantas quedan `cosechado`.
-4. **Admin** asigna el lote a un **manicura** → pasa a `en_manicura` (ver 3.2).
-5. Manicura pesa → admin aprueba → se genera **stock de flor seca** (`en_manicura → curado`).
-6. El stock se asigna a una sede y queda disponible para dispensar (ver 3.3).
+El origen **ya no define la fase inicial**: los dos arrancan enraizando. Eran dos estados para una
+sola etapa —la planta sin raíz funcional— y lo que de verdad las separaba era el origen, que ya
+vivía en su propia columna.
 
-> Regla de dominio: una planta/lote cuenta como **"en ciclo activo" hasta curado** (recién
-> ahí se vuelve stock). El secado es tiempo, no una sala.
+**Estados de la planta** (`Plant::STATES`): `enraizado, vegetativo, floracion, secado, cosechado,
+descartada`. Las plantas **heredan la fase del lote** (`FASE_A_PLANT_STATE`), salvo las
+descartadas.
 
-### 3.2 Manicura (post-cosecha)
-1. **Admin** (Producción → Manicura, o desde el lote) **asigna** el lote cosechado a un
-   manicura. El lote pasa a `en_manicura` y aparece en `/mnc/pendientes` de ese manicura, y
-   en el board del admin con su **responsable**.
-2. **El manicura asignado** pesa: escanea el QR de cada planta (peso por planta) o usa
-   "Registrar por lote" (carga conjunta, **seleccionando qué plantas** y un peso total que
-   se reparte como promedio). El peso siempre queda dentro de una **jornada (pesaje)**.
-3. Cierra la jornada → **la envía a confirmar**.
-4. **Admin** revisa y **confirma** el pesaje → se crea/actualiza el **contenedor de flor
-   seca** (stock) del lote. Puede asignarle sede en el momento.
-5. El lote pasa a `curado` (o queda para curado) y la flor seca queda como stock.
+> ⚠️ `secado` figura en `Plant::STATES` pero **ninguna transición lo produce** — no está en
+> `FASE_A_PLANT_STATE`, y el comentario del modelo `Lote` dice explícitamente *"'secado' YA NO es
+> un estado: es una métrica (días de cosecha→stock)"*. Es residuo. **No mencionarlo en los
+> manuales.**
 
-> Solo el manicura asignado escribe el peso de un lote asignado. El "Guardar peso" del
-> detalle de la planta va por el flujo de pesaje (no edita el peso "suelto").
+**El avance** (`AVANCE = enraizado → vegetativo → floracion → cosecha`) tiene **un paso menos** que
+antes. Post-cosecha (`en_manicura`, `curado`) no va por `avanzar_fase!`: va por el flujo de
+manicura.
 
-### 3.3 Dispensación
-1. Desde la **ficha del socio** (o desde el Historial de dispensaciones), se abre el
-   **carrito** (ModalNuevaDispensacion). Es **multi-producto**: varias líneas, cada una con
-   su stock, cantidad y precio.
-2. Se elige **medio de pago**: efectivo / transferencia / cuenta corriente / no abona /
-   contra-entrega. Se puede aplicar **descuento** sobre el total. El admin/supervisor puede
-   fijar un **precio manual** por ítem si el producto no tiene precio (y guardarlo en el
-   producto).
-3. Si el socio tiene **crédito de cuenta corriente**, puede dispensar sin pagar (queda como
-   saldo). No hay límite mensual de gramos.
-4. Al confirmar, se **descuenta el stock** de cada línea, se registra el movimiento
-   contable y (si aplica) el débito de cuenta corriente.
-5. **Con envío:** se genera un **despacho** para delivery (ver 3.4).
-6. **Editar/anular:** el admin puede editar una dispensa multi-ítem (cantidad y precio por
-   línea) — el sistema reconcilia stock y cuenta corriente en transacción.
+#### Los tres relojes del lote
+Esto es nuevo y es la clave para leer cualquier pantalla de cultivo:
 
-> Quién dispensa: **admin, supervisor, dispensador** (el **médico** también puede, desde su
-> flujo de indicación; y **delivery** al entregar contra-entrega).
-> El dispensador **no** ve datos clínicos del socio.
+| Reloj | Qué mide | Detalle |
+|---|---|---|
+| `dias_enraizado` | Cuánto tardó en prender | Corre mientras enraíza. Es lo que delata un propagador con problemas (manta térmica muerta, humedad baja) **antes** de que caiga el prendimiento. |
+| `dias_ciclo` | El ciclo productivo | **Arranca en vegetativo, no en el esqueje.** `nil` mientras enraíza. |
+| `dias_desde_inicio` | Total calendario | Desde `start_date`. |
 
-### 3.4 Reservas
-1. **Admin/supervisor** crean una **reserva**: apartan stock de flor seca para un socio, con
-   una **fecha de entrega a partir de mañana** (una reserva "para hoy" es una dispensa
-   directa) y una **seña** opcional.
-2. El stock reservado queda **apartado**: baja el "disponible real" (se ve en el KPI
-   *Reservado (flor)* del Stock) sin descontar el stock físico.
-3. En la fecha, se **entrega**: el **dispensador** (o admin/supervisor) convierte la reserva
-   en **dispensa**, cobrando el resto (total − seña).
-4. Las reservas del día aparecen en el **dashboard del admin**.
+**Por qué el ciclo no cuenta el enraizado:** en el domo la planta no crece, gasta reservas en
+emitir raíz y ni siquiera come (por eso su registro no tiene EC ni pH). Contarlo como vegetativo
+hace que un lote que tardó 20 días en prender aparente 20 días más de vege sin haber hecho un nudo
+más, y ahí se pierde toda comparación entre lotes. Se informa aparte: *"45 días de ciclo + 12
+enraizando"*.
 
-### 3.5 Delivery / despachos
-1. Una dispensación **con envío** genera un **despacho** (paquete). El admin/dispensador lo
-   asigna a un **repartidor** (delivery) y arma la ruta.
-2. **Delivery** ve sus paradas: inicia viaje, navega, y en cada entrega toma **firma** y
-   foto; si es **contra-entrega**, cobra (efectivo/transferencia). Puede reportar fallo o
-   reprogramar.
-3. El delivery **no ve el contenido** del paquete (privacidad), solo destinatario,
-   dirección, contacto y monto a cobrar.
+En la UI son **dos columnas**: "En fase" (con el semáforo contra el objetivo) y "Total".
 
-### 3.6 Stock / inventario (Producción → Stock)
-- **KPIs:** *Flor seca disponible* (gramos reales, ya restando lo reservado), *Reservado
-  (flor)* (lo apartado, si hay), *Por asignar*, *Sedes con stock*, *Derivados* (ítems no-flor
-  como preroll, hash, aceite — inventario con su propia unidad, no se suma a los gramos).
-- **Alerta de stock bajo:** el umbral (ej. 250 g) aplica **solo a flor seca**; los derivados
-  no se comparan contra ese umbral.
-- **Producción propia vs externa:** la flor sale del cultivo (origen lote); los derivados se
-  producen consumiendo flor; también se puede **agregar stock externo** (comprado).
+#### La sala impone el fotoperíodo, no la etapa
+Una sala solo puede correr un fotoperíodo, así que lo que entra a un cuarto de 12/12 va a
+florecer. Pero **enraizado y vegetativo comparten fotoperíodo** (los dos 18/6): meter un clonador
+en una sala de vegetativo no le cambia nada.
 
-### 3.7 Contabilidad (Comercial → Contabilidad)
-- **Libro diario:** ingresos y egresos, por categoría, con balance y P&L por lote/genética.
-- **Nuevo movimiento:** en *Detalle de pago → medio de pago* hay una opción **"En cuotas"**
-  (solo egresos): el monto es el **total** y se generan N egresos **mensuales**, uno por mes
-  desde la fecha elegida (se puede backdatear). Sirve para una compra financiada (ej. un aire
-  en 6 cuotas con la tarjeta del club); cada cuota impacta el balance de su mes.
-- **Cierre de período:** el admin puede cerrar meses (quedan inmutables).
-- No existe rol contador; la contabilidad la lleva el admin.
+- **De enraizado se sale cuando prende, no cuando cambia de cuarto.** Ni una sala de floración lo
+  saca: un esqueje sin raíz no florece.
+- **Un lote en floración no puede estar en una sala de vegetativo.**
+- **Cambiar la fase de una sala ya no revegeta lotes en silencio.** El backend frena y devuelve
+  qué lotes se verían afectados y cuántos días de fase pierde cada uno; recién con el sí explícito
+  se guarda.
 
-### 3.8 Ambiente / IoT (Cultivo)
-- Dispositivos con webhook token, lecturas (temp, humedad, CO₂, pH, EC, PPFD), **setpoints
-  por fase**, reglas y **alertas**, cálculo de **VPD**. Drivers: Sonoff, CSV manual, CSV-IA.
-- El **dashboard del admin** muestra un widget de **Ambiente** con la última lectura por sala
-  (temp/humedad + frescura); si no hay sensores, un vacío con CTA para configurar.
-- Lo operan **cultivador** (sus salas) y **admin**.
+#### Prendimiento y maceta
+- **Al salir del enraizado se declara cuántas prendieron** (un número). Es el único momento en que
+  el dato existe y se sabe con certeza, mirando la bandeja. Las que no prendieron se marcan
+  `descartada` + `no_prendio` — **no se borran**.
+- **`motivo_descarte`** estructurado: `no_prendio, plaga, enfermedad, macho, hermafrodita, estres,
+  rotura, otro`. Descartar una planta que estaba enraizando se clasifica sola como `no_prendio`.
+  Revertir un descarte **borra el motivo**.
+- **`GET /analytics/prendimiento`** — global y **por genética**, que es donde sirve: hay cepas que
+  prenden al 95% y otras al 60%. Un lote que está enraizando **ahora no se mide**. Sin datos
+  devuelve **nulo, no 0**. Tab **Prendimiento** en Analítica (≥85 verde, ≥70 amarillo).
+- **La maceta se pide al prender** (validación `maceta_al_prender`): sin ese dato el lote entra a
+  vegetativo sin saber en qué volumen crece, que es lo que gobierna riego y trasplante.
+- **Alerta `maceta_chica` escalada por volumen** — el tiempo hasta que la raíz se enrolla depende
+  de los litros: ≤0,4L → 12d; ≤0,6L → 18d; ≤1,5L → 25d; ≤4L → 35d; arriba de 4L se asume maceta
+  final y no avisa. Se cuenta desde el **último trasplante** y **solo en vegetativo**.
+- El badge muestra la maceta real (`Vegetativo · 0,5L`), no una etiqueta difusa. **"Vaso" salió**:
+  el envase no es el dato, los litros sí.
 
-### 3.9 Informes, Trazabilidad y ARICCAME (Reportes / auditor)
-- **Analítica** (admin/supervisor): rendimiento por genética, ciclos, pérdidas, comparativa; export
-  CSV/PDF. La ficha de cada **genética** muestra su historial de rendimiento (g/planta, avg,
-  desvíos) + sparkline.
-- **Auditoría** (auditor/admin): informes oficiales (Producción, Cumplimiento, Sedes,
-  Dispensaciones, Plan vs Real, INASE, REPROCANN) con descarga PDF.
-- **Trazabilidad:** cadena completa de un stock (origen → cultivo → plantas → dispensaciones)
-  con verificación de compliance.
-- **ARICCAME:** reporte regulatorio ANMAT de dispensaciones y stock (feature flag por club).
+#### Mover lotes
+`POST /lotes/mover`, en tanda y **entre sedes**, desde `/lotes` (todos juntos) o desde la ficha de
+la sala. El diálogo **enumera lote por lote qué va a cambiar** antes de confirmar. Mover a otra
+sede cambia la sede del lote y con eso a dónde imputan sus costos. Los lotes post-cosecha se
+ignoran: ya no viven en una sala.
 
-### 3.10 Configuración (admin)
-General (datos del club, tipo de organización — usado en informes regulatorios), Suscripción
-(plan), **Equipo** (alta de usuarios y roles), **Sedes**, **Alertas** (umbrales/setpoints),
-**Sitio web** público del club, **Integraciones** (email/WhatsApp), **Papelera**
-(restaurar registros borrados por soft-delete).
+#### El ciclo completo
+1. **Cultivador** crea el lote (genética, sala, cantidad). Arranca **enraizando**.
+2. Registra tareas, fotos, mediciones y análisis; avanza fases. Al salir del enraizado declara
+   **cuántas prendieron** y **en qué maceta** van.
+3. Al **cosechar**, el lote pasa a `cosecha`, **suelta la sala** y conserva la sede. Las plantas
+   quedan `cosechado`. **La cosecha es un solo formulario** (antes el modal dependía de si el lote
+   tenía plantas individuales cargadas, un dato que el cultivador no elige ni ve). La letra de
+   corte se pide solo cuando aporta.
+4. **Admin** asigna el lote a un manicura → `en_manicura`.
+5. Manicura pesa → admin confirma → se crea el **stock de flor seca** → el lote pasa a `curado`.
+6. `finalizado` cuando se agota el stock del lote.
 
----
+> El cultivador que tocaba "avanzar fase" con el lote ya cosechado recibía *"Lote no puede
+> transicionar en este estado"*. Ahora se le dice que **la asignación a manicura la hace el admin**.
 
-### 3.11 Asistente IA por voz
-Es un **feature flag por club** (`ia_voz`, con límite de uso / rate limit). Pensado sobre todo
-para el **cultivador**: en vez de tipear, **dicta su reporte oral** desde el teléfono y la IA
-lo convierte en registros estructurados. Aparece en el flujo móvil del cultivador (tarjeta de
-sala, actividad rápida, registro de planta/lote, detalle del lote, barra inferior).
+### 4.2 Manicura (post-cosecha)
+Sin cambios de fondo. Admin asigna → el manicura asignado pesa (QR por planta o "Registrar por
+lote" con reparto promedio) dentro de una **jornada** → cierra y la manda a confirmar → admin
+confirma → se crea/actualiza el contenedor de flor seca, con sede asignable en el momento.
 
-Tres modos:
-1. **Registrar por voz** (`parsear` → confirmar → `ejecutar`): el navegador transcribe la voz,
-   un modelo la interpreta y arma **acciones** que el usuario confirma antes de guardar. Puede
-   generar: registro ambiental (temp/humedad), actividades físicas (riego, nutrición, poda,
-   defoliación, SCROG/LST, revisión de plagas, limpieza de sala, ajuste de luz), observaciones
-   (altura, nº de colas) y **notas** de lote/sala. Regla del prompt: *registra solo lo
-   mencionado, nunca inventa valores*; separa observación de actividad. Máx. 15 acciones por
-   comando y deduplica las idénticas. El **cultivador no puede crear tareas** por voz (las
-   tareas son de admin/supervisor y se filtran).
-2. **Consultar** (`consultar`): preguntarle al asistente con el contexto del club e historial
-   de la sesión.
-3. **Análisis IA de lote** (`analizar_lote` / historial): **solo admin/supervisor** — análisis
-   del lote generado por IA, con su historial.
+**Verificado punta a punta** (`spec/requests/cultivo_ciclo_completo_spec.rb`) que el pesaje **por
+la cola de aprobación y por el atajo del admin dan el mismo stock**, y que no se pueden saltear
+pasos.
 
-> Relacionado (no es lo mismo): la **generación IA del plan de trabajo** (`PlanTrabajoIaService`)
-> arma el plan de tareas de un lote con IA — es del módulo Cultivo, no del asistente de voz.
+### 4.3 Dispensación
+1. Desde la ficha del socio o el Historial se abre el **carrito** (`ModalNuevaDispensacion`),
+   multi-producto: varias líneas, cada una con su stock, cantidad y precio.
+2. Medio de pago: efectivo / transferencia / cuenta corriente / no abona / contra-entrega.
+   Descuento sobre el total. Admin y supervisor pueden fijar **precio manual** por ítem.
+3. Con **crédito de cuenta corriente** se puede dispensar sin pagar. **No hay límite mensual de
+   gramos.**
+4. Al confirmar: descuenta stock de cada línea, registra el movimiento contable y (si aplica) el
+   débito de cuenta corriente.
+5. **Con envío:** genera un despacho. **El dispensador puede asignarlo.**
+6. **Editar/anular:** un solo modal de edición, con reconciliación de stock y cuenta corriente en
+   transacción.
 
----
+> Quién dispensa: **admin, supervisor, dispensador** (el médico desde su flujo de indicación, y
+> delivery al entregar contra-entrega). El dispensador **no** ve datos clínicos.
+> "Nueva dispensación" abre el flujo, no el historial.
 
-## 4. Informes en detalle (qué son, para qué, qué muestran y cómo se calculan)
+### 4.4 Reservas
+Admin/supervisor apartan stock para un socio con **fecha de entrega a partir de mañana** (una
+reserva "para hoy" es una dispensa directa) y seña opcional. El stock queda **apartado**: baja el
+disponible real sin descontar el físico. En la fecha, el **dispensador** (o admin/supervisor) la
+convierte en dispensa cobrando el resto.
 
-Hay dos familias de reportes con acceso distinto:
-- **Auditoría** (Reportes → Auditoría): acceso **auditor + admin**. Son los informes
-  "oficiales/regulatorios", con descarga PDF (y Excel en REPROCANN).
-- **Analítica** (Reportes → Analítica): acceso **admin + supervisor** (y super_admin en modo
-  observador). Son los reportes internos de gestión.
+### 4.5 Delivery / despachos
+Sin cambios: el despacho nace de una dispensa con envío, se asigna a un repartidor, y el delivery
+entrega con firma y foto, cobra contra-entrega, reporta fallo o reprograma. **No ve el contenido
+del paquete.**
 
-Casi todos toman un **período** (mes actual / mes anterior / trimestre / año). Las
-dispensaciones cuentan siempre **no canceladas**. Los datos de socios salen **anonimizados**
-(iniciales + últimos 4 del DNI).
+### 4.6 Stock / inventario
+- **KPIs:** *Flor seca disponible* (ya restando lo reservado), *Reservado (flor)*, *Por asignar*,
+  *Sedes con stock*, *Derivados* (preroll, hash, aceite — con su propia unidad, no se suman a los
+  gramos).
+- **Alerta de stock bajo:** el umbral aplica **solo a flor seca**.
+- **Origen:** producción propia (del cultivo) o **compra externa** (exige proveedor) — que es la
+  única vía de entrada de un club que solo tiene la suite de Producción/Dispensa.
 
-### A) Reportes de Auditoría (auditor / admin)
+### 4.7 Contabilidad
+- **Libro diario:** ingresos y egresos por categoría, balance y P&L por lote/genética.
+- **"Sector" en vez de "área"**, y el área *Administración* pasó a llamarse **General**.
+- **Alta de movimiento: un solo formulario** (rediseñado — primero el hecho, después el asiento).
+  Incluye la opción **"En cuotas"** (solo egresos): el monto es el total y se generan N egresos
+  mensuales desde la fecha elegida, backdateable.
+- **Cierre de período:** el admin cierra meses (quedan inmutables). Guard: `hasta < hoy`.
+- **Excel de contabilidad** funcional.
+- No existe rol contador.
 
-**REPROCANN** — *estado del registro de todos los socios.*
-- Para qué: control de vigencia REPROCANN; documento presentable (PDF/Excel).
-- Muestra: total de socios; con REPROCANN vigente; vencen en ≤30 días; vencidos; sin
-  REPROCANN; y una lista anonimizada (iniciales, últimos 4 del DNI, estado, vencimiento).
-- Cálculo: cuenta socios del club comparando `reprocann_vencimiento` con hoy — vigente
-  (≥ hoy), por vencer (≤ 30 días), vencido (< hoy), sin REPROCANN (`reprocann_numero` nulo).
+### 4.8 Ambiente / IoT (add-on `iot`)
+- **El VPD que se muestra es el de HOJA, no el del aire.** La hoja transpira y se enfría respecto
+  del aire, y ese par de grados decide un riego: con 26 °C y 60% de humedad, el de aire da
+  1.35 kPa y el de hoja 0.97 — uno dice "está bien" y el otro "regá". Es también por qué el número
+  no coincidía con el de la app del sensor: los dos eran correctos, medían cosas distintas.
+- El ajuste es **por sala** (`salas.leaf_temp_offset`, default −2.0 °C) porque bajo LED la hoja se
+  enfría más que bajo HPS. Se explica **en la propia pantalla**, al lado del número que produce.
+- **Los dos "Pulse" son aparatos de empresas distintas** y la app los mezclaba:
+  - **Pulse Grow** — monitor de sala con WiFi, sube a su nube solo. Tiene driver propio
+    (`Sensors::PulseDriver`); antes caía en el genérico, que solo entiende claves en castellano, y
+    **no registraba nada**.
+  - **Bluelab Pulse** — medidor de mano de humedad y EC del **sustrato**, por Bluetooth. **No sube
+    nada.**
+- **Conectar un sensor es un solo paso:** al crear un equipo automático se genera el token y se
+  muestran URL y token listos para copiar. A los de carga manual no se les pide token.
+- La pantalla de ambiente de la sala tiene **solapa Sensores** con los de esa sala y si están
+  mandando datos o mudos.
+- **Rangos propios de enraizado** (antes se medía con la vara de vegetativo, que es lo opuesto):
+  humedad 85–95%, temperatura 22–26 °C, EC 0–0.6, pH 5.5–6.0, **temperatura de sustrato 24–26 °C**
+  (la variable que decide si prende). Chequeo diario: **1 día** sin registro, no 3 — es la etapa
+  más frágil.
+- **Los lotes enraizando no reciben el registro ambiental de la sala**: viven en un propagador con
+  su propio clima (la sala marca 60% y adentro hay 90%).
+- **El ambiente de la sala** es el registro más reciente entre sus lotes, mostrado **siempre con
+  su antigüedad y el lote del que salió** — sin sensores el dato puede ser de hace una semana.
 
-**Producción** — *resumen productivo del club en el período.*
-- Muestra: total de lotes; lotes activos (no finalizados); lotes cosechados (finalizados en
-  el período); **gramos producidos**; plantas totales (activas); y un desglose por estado
-  (lotes + gramos por estado).
-- Cálculo: `gramos_producidos` = suma de `peso_curado_g` de las **pesadas** con
-  `fase_destino = finalizado` registradas en el período. `plantas_totales` = plantas que no
-  están `cosechado`/`finalizado`, en las sedes del club.
-- Ojo (limitación conocida): la columna "plantas por estado" viene en **0** (no se computa
-  por estado, solo el total).
+### 4.9 Asistente IA por voz (add-on `ia`)
+Sin cambios de fondo. Tres modos: **Registrar por voz** (parsear → confirmar → ejecutar),
+**Consultar** y **Análisis IA de lote** (solo admin/supervisor). El cultivador **no puede crear
+tareas** por voz. Máx. 15 acciones por comando, deduplica idénticas, *registra solo lo mencionado,
+nunca inventa valores*.
 
-**Dispensaciones** — *actividad de dispensación del período (anonimizada).*
-- Muestra: total de dispensaciones; gramos dispensados; pacientes atendidos (distintos);
-  promedio por dispensación; y un resumen por paciente (iniciales, cantidad, total g, última
-  fecha) — hasta 100.
-- Cálculo: dispensaciones no canceladas del club en el período; `gramos` = suma de
-  `cantidad`; `promedio` = gramos ÷ total.
+> Relacionado pero distinto: la **generación IA del plan de trabajo** (`PlanTrabajoIaService`) es
+> del módulo Cultivo, no del asistente de voz.
 
-**Sedes** — *foto por sede.*
-- Muestra: total de sedes; activas; salas totales; plantas totales; y por sede: salas de
-  cultivo, plantas activas y **stock disponible (g)**.
-- Cálculo: plantas = Plant no cosechado/finalizado por sede; `stock_disponible` = **solo flor
-  seca** disponible (g) de esa sede (los derivados no se suman como gramos).
-
-**Cumplimiento** — *tablero de cumplimiento REPROCANN + alertas.*
-- Muestra: socios con REPROCANN vigente; vencen 30d; vencidos; "dispensaciones sobre límite";
-  **tasa de cumplimiento** (%); y alertas (vencidos, por vencer, sin seguimiento médico).
-- Cálculo: `tasa = con_vigente ÷ total × 100`. Aclaración: "dispensaciones sobre límite" en
-  realidad cuenta dispensaciones a socios **sin número REPROCANN** en el período (nombre
-  heredado — no existe límite mensual de gramos).
-
-**Plan vs Real** — *objetivo vs resultado real por lote.*
-- Muestra: lotes con objetivo (rendimiento o cantidad de plantas); por lote, objetivo vs
-  real y la **desviación %**; y el promedio de desviación de los lotes cerrados.
-- Cálculo: `desv_rendimiento = (real − objetivo) ÷ objetivo × 100`;
-  `desv_plantas = (cosechadas − objetivo) ÷ objetivo × 100`.
-
-**INASE** — *registro de variedades ligado a la producción real.*
-- Para qué: informe regulatorio de variedades cultivadas.
-- Muestra: por genética, sus datos INASE (registrada, número, categoría, fecha, criador),
-  THC/CBD, y lo que **produjo** (lotes, plantas, gramos); + totales (registradas / sin
-  registrar / gramos / lotes).
-- Cálculo: por genética — lotes = count; plantas = suma de `plants_count`; gramos = suma de
-  `rendimiento_real_g`.
-
-**Trazabilidad** — *cadena de custodia de un stock.*
-- Muestra, escaneando/eligiendo un stock: origen → lote → plantas de origen → dispensaciones,
-  con genética, cantidades y verificación de compliance. Es la trazabilidad "de la góndola a
-  la planta".
-
-### B) Analítica interna (admin / supervisor)
-
-**Rendimiento por genética** — *qué cepa rinde mejor.*
-- Muestra: por genética — lotes totales/finalizados, **rendimiento promedio (g)**, objetivo
-  promedio, desviación %, **merma % promedio**, **g/planta**; + top 20 lotes recientes; +
-  resumen global.
-- Cálculo: rendimiento promedio = media de `rendimiento_real_g` de los lotes con dato;
-  merma % = media de `(plants_count − plants_count_cosechadas) ÷ plants_count × 100`;
-  g/planta = media de `(rendimiento_real_g ÷ plants_count)`.
-
-**Producción: Pérdidas / Ciclos / Comparativa**
-- **Pérdidas** (por genética): merma % = `(total − cosechadas) ÷ total`; descarte % =
-  `descartadas ÷ total`, por lote y promediado.
-- **Ciclos** (por genética): **días promedio por fase** (vegetativo, floración, cosecha,
-  secado, curado), calculados con los **`lote_eventos`** (cambios de estado) — días reales
-  entre transiciones. Además desglosa la propagación (días de propagación / vegetativo puro)
-  usando `start_date`.
-- **Comparativa**: lotes finalizados de la **misma genética** (2 o más) enfrentados —
-  rendimiento, objetivo, plantas, tipo de cultivo y luz.
-
-**P&L por lote** — *rentabilidad de cada lote.*
-- Muestra: por lote — costo total, costo/gramo, **ingresos**, gramos dispensados,
-  ingreso/gramo, **margen** y margen %.
-- Cálculo: ingresos = suma de `cantidad × precio_unitario_ars` de las dispensaciones no
-  canceladas de ese lote; margen = ingresos − costo total.
-
-**Contabilidad (P&L mensual)** — *últimos 12 meses + proyección.*
-- Muestra: por mes — ingresos, costos, margen; + proyección de los lotes en curso.
-- Cálculo: **ingresos = del libro de caja** (`MovimientoContable` de tipo ingreso, incluye
-  señas/aportes, excluye crédito impago) — no se recomputa desde dispensaciones. Costos =
-  `CostoLote` del mes. Proyección = lotes en curso × rendimiento objetivo × precio sugerido.
-
-**Comparativa de salas** — *qué sala produce mejor.*
-- Muestra: por sala — ciclos (lotes finalizados), kg producidos, kg/planta, **días promedio**
-  del ciclo, lotes activos y la **última lectura ambiental** (temp/humedad/CO₂).
-- Cálculo: días promedio = media de `(fecha de finalización − start_date)` desde
-  `lote_eventos`; kg = `rendimiento_real_g ÷ 1000`.
-
-**Ejecutivo (resumen anual)** — *año actual vs anterior.*
-- Muestra: gramos producidos, gramos dispensados, ingresos, costo total, margen, margen %,
-  ciclos cerrados — del año en curso comparado con el anterior.
-
-**Correlación ambiental** — *¿el ambiente explica el rendimiento?*
-- Muestra: correlación (Pearson **r**, **r²**) y regresión lineal entre variables
-  ambientales y el rendimiento de los lotes (requiere ≥3 lotes con datos).
-
-### C) Otros
-- **Informe semestral:** resumen consolidado del semestre (producción + dispensaciones).
-- **ARICCAME:** reporte regulatorio ANMAT de dispensaciones y stock (feature flag por club).
-- **Dashboard del dispensador** (datos, no un informe formal): gramos de hoy/semana/mes,
-  reservas del día, etc. Acceso admin/dispensador.
+### 4.10 Configuración (admin)
+General (datos del club, tipo de organización), Suscripción, **Equipo** (ver §3), **Sedes** —que
+había desaparecido del menú al reagrupar los flags y **volvió**—, **Alertas**, **Sitio web**,
+**Integraciones**, **Papelera**.
 
 ---
 
-## 5. Notas para armar los tutoriales
+## 5. Informes — CAMBIARON DE RAÍZ
 
-- **Por rol:** conviene un tutorial por rol que arranque en su **home** y recorra solo lo que
-  ese rol ve (no mostrarle al delivery cosas de cultivo, etc.).
-- **Recalcar las reglas "sorpresa":**
-  - Manicura: solo el asignado pesa el lote; el peso va por el pesaje (no se edita suelto).
-  - Dispensador: no ve historia clínica; convierte reservas pero no las crea.
-  - Delivery: no ve el contenido del paquete.
-  - Reservas: la fecha es a partir de mañana.
-  - Stock: los gramos son **solo flor seca**; los derivados van aparte.
-  - "En ciclo activo" hasta curado; el secado es tiempo, no sala.
-- **Móvil:** cultivador, manicura y delivery trabajan principalmente desde el teléfono (PWA).
-- **Público sin login:** carnet del socio, pasaporte de dispensa (con gate de DNI) y web del
-  club se acceden por token/QR.
+**Seis de los siete informes generaban su PDF con `html2canvas`: el archivo era una foto JPEG de
+la página web.** Sin texto seleccionable ni buscable, con la calidad atada al zoom del navegador,
+columnas cortadas donde cayeran y sin membrete. Solo REPROCANN tenía un PDF de verdad.
+
+**Ahora los siete se generan en el servidor** (`InformeDocument`, sobre la infraestructura del PDF
+de REPROCANN) y **los siete tienen Excel**, que antes no existía en ninguno: montos como números,
+totales, autofiltro y encabezados fijos.
+
+Cada informe se define **una vez** —sus KPIs y sus tablas— y de esa definición salen la respuesta
+JSON, el PDF y el Excel, así los tres dicen exactamente lo mismo.
+
+- **Informe semestral REPROCANN** — el documento regulatorio más completo del club. **Su nómina NO
+  va anonimizada**, a diferencia del resto: se presenta ante la autoridad, que necesita
+  identificar a cada paciente.
+- **P&L de producción** — PDF y Excel, con los meses arriba y la proyección de lotes en curso
+  aparte, aclarando que son estimados y no dinero realizado.
+- **Trazabilidad** — reconstruye la cadena en el orden en que se recorre: producto → genética →
+  lote → plantas → entregas, con pacientes anonimizados. Es lo primero que pide un auditor.
+- **Analítica queda como captura, a propósito**: ahí el contenido son los **gráficos**, y
+  rasterizarlos es lo correcto. Para los números está el CSV de cada solapa.
+
+**El índice de Reportes se reorganizó por para qué sirve cada informe**, no por qué módulo lo
+produce:
+
+| Grupo | Para qué |
+|---|---|
+| **Cumplimiento** | Lo que hay que mostrar si golpean la puerta |
+| **Operación** | Cómo viene el club |
+| **Análisis** | Para decidir |
+
+Cada tarjeta dice **qué pregunta contesta** ("¿está todo el mundo en regla?", "¿cuánto sale y a
+cuántos?"). Trazabilidad estaba en el menú lateral pero no en este índice; ahora sí.
+
+### ⚠️ Detalle de cada informe
+Las definiciones de qué muestra y cómo se calcula cada informe (REPROCANN, Producción,
+Dispensaciones, Sedes, Cumplimiento, Plan vs Real, INASE, Trazabilidad, y la analítica interna:
+rendimiento por genética, pérdidas, ciclos, comparativa, P&L por lote, comparativa de salas,
+ejecutivo, correlación ambiental) **estaban documentadas en la versión de julio y no se
+reverificaron en esta pasada.** Hubo un commit de "auditoría de informes: que los totales cierren"
+(#29) que puede haber cambiado cálculos.
+
+**Antes de escribir el manual de Reportes hay que releer esa sección contra el código.** Se
+conserva en el historial de git: `git show 10e6580:docs/GUIA_USUARIOS.md`, sección 4.
+
+Dos cosas que sí siguen valiendo:
+- Las dispensaciones cuentan siempre **no canceladas**.
+- Los datos de socios salen **anonimizados** (iniciales + últimos 4 del DNI) **en todos los
+  informes menos el semestral REPROCANN**.
+
+---
+
+## 6. Notas para armar los manuales
+
+**Alcance acordado (fases):** `admin` → `cultivador` → `manicura` → `dispensador` → `medico`.
+Sin capturas de pantalla por ahora: se nombra el botón exacto en **negrita**. Si más adelante se
+agregan, hay que revisarlas en cada release.
+
+**Estructura:** un archivo por **tarea** con `roles:` y `plataforma:` en el frontmatter, y el
+manual de cada rol se **compila** de las tareas que lo mencionan. Una tarea escrita una vez
+aparece en los tres manuales que la necesitan.
+
+**Móvil no lleva manual aparte:** bloque `📱 En el teléfono` dentro de cada tarea, solo donde
+difiere de verdad.
+
+### Las reglas "sorpresa" que hay que recalcar
+- **El ciclo arranca en `enraizado`**, venga de semilla o de esqueje. El origen es un dato aparte,
+  no una fase.
+- **El ciclo productivo se cuenta desde vegetativo.** El enraizado se informa por separado.
+- **De enraizado se sale cuando prende**, no al cambiar de sala.
+- **Al prender hay que declarar cuántas prendieron y en qué maceta van** — sin la maceta no avanza.
+- **Manicura:** solo el asignado pesa el lote; el peso va por el pesaje, no se edita suelto.
+- **Cultivador sin sedes asignadas ve TODO el cultivo del club** (no es un bug).
+- **El cultivador no crea salas** y no asigna manicura.
+- **Dispensador:** no ve historia clínica; convierte reservas pero no las crea; puede comprar
+  mercadería del Buffet pero **no reponer**.
+- **Delivery:** no ve el contenido del paquete.
+- **Reservas:** la fecha es a partir de mañana.
+- **Stock:** los gramos son solo flor seca; los derivados van aparte.
+- **Médico:** la duración **propone** el vencimiento, la fecha escrita a mano **gana**; una
+  indicación sin fecha **no genera alertas**.
+- **El VPD que muestra la app es el de hoja** — no coincide con el del sensor y está bien.
+- **Lo que ve cada rol depende primero del módulo contratado**, después del rol.
+
+**Público sin login:** carnet del socio, pasaporte de dispensa (con gate de DNI) y web del club,
+por token/QR.
