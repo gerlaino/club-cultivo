@@ -1,8 +1,8 @@
 <script setup>
-// Catálogo de Finanzas — mapa por ÁREA: cada área del club se despliega y muestra TODO lo suyo
-// junto (sus categorías madre→sub y sus depósitos). El área es el eje: tanto las categorías como
-// los depósitos responden a un área. Los depósitos se ven acá (read-only) y se gestionan en el hub
-// "Depósito". Las categorías sin área caen en el bucket "Sin área" (así ninguna queda huérfana).
+// Catálogo de Finanzas — mapa por ÁREA: cada sector del club se despliega y muestra TODO lo suyo
+// junto (sus categorías madre→sub y sus depósitos). El sector es el eje: tanto las categorías como
+// los depósitos responden a un sector. Los depósitos se ven acá (read-only) y se gestionan en el hub
+// "Depósito". Las categorías sin sector caen en el bucket "Sin sector" (así ninguna queda huérfana).
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useCatalogoFinanzasStore } from '../../stores/catalogoFinanzas.js'
 import { useConfirm } from '../../composables/useConfirm.js'
@@ -21,12 +21,12 @@ const depositos = ref([])
 async function cargarDepositos() { try { depositos.value = (await listDepositos()).data || [] } catch { depositos.value = [] } }
 onMounted(async () => { await store.fetchAll(); await cargarDepositos() })
 
-// ── Acordeón (qué áreas están abiertas) ───────────────────────
+// ── Acordeón (qué sectores están abiertas) ───────────────────────
 const abiertas = reactive({})
 function toggle(id) { abiertas[id] = !abiertas[id] }
 const abierta = (id) => !!abiertas[id]
 
-// ── Agrupaciones por área ─────────────────────────────────────
+// ── Agrupaciones por sector ─────────────────────────────────────
 const catsDe   = (areaId, tipo) => store.categorias.filter(m => m.unidad_negocio_id === areaId && m.tipo === tipo)
 const nCatsDe  = (areaId) => store.categorias.filter(m => m.unidad_negocio_id === areaId).length
 const depsDe   = (areaId) => depositos.value.filter(d => d.unidad_negocio_id === areaId)
@@ -78,7 +78,7 @@ async function borrarCat(c) {
   catch (e) { toast.error(e?.response?.data?.error || 'No se pudo eliminar') }
 }
 
-// ── Áreas (CRUD) ──────────────────────────────────────────────
+// ── Sectors (CRUD) ──────────────────────────────────────────────
 const uniForm = ref(null)
 function nuevaUnidad()  { uniForm.value = { nombre: '', tipo: '', color: COLORES[0], activa: true, crear_deposito: true } }
 function editarUnidad(u) { uniForm.value = { id: u.id, nombre: u.nombre, tipo: u.tipo, color: u.color || COLORES[0], activa: u.activa, es_sistema: u.es_sistema } }
@@ -89,17 +89,17 @@ async function guardarUnidad() {
   try {
     if (f.id) {
       await store.actualizarUnidad(f.id, { nombre: f.nombre.trim(), tipo, color: f.color, activa: f.activa })
-      toast.success('Área guardada')
+      toast.success('Sector guardada')
     } else {
       await store.crearUnidad({ nombre: f.nombre.trim(), tipo, color: f.color, activa: f.activa }, { crear_deposito: !!f.crear_deposito })
-      toast.success(f.crear_deposito ? 'Área y depósito creados' : 'Área creada')
+      toast.success(f.crear_deposito ? 'Sector y depósito creados' : 'Sector creada')
       await cargarDepositos()
     }
     uniForm.value = null
   } catch { toast.error(store.saveError) }
 }
 async function borrarUnidad(u) {
-  if (!(await confirm({ title: 'Eliminar área', message: `¿Eliminar "${u.nombre}"?`, variant: 'danger' }))) return
+  if (!(await confirm({ title: 'Eliminar sector', message: `¿Eliminar "${u.nombre}"?`, variant: 'danger' }))) return
   try { await store.eliminarUnidad(u.id); toast.success('Eliminada') }
   catch (e) { toast.error(e?.response?.data?.error || 'No se pudo eliminar') }
 }
@@ -112,28 +112,28 @@ async function borrarUnidad(u) {
     <template v-else>
       <!-- Intro -->
       <div class="cat-intro">
-        <h2 class="cat-intro__title">El club por áreas</h2>
+        <h2 class="cat-intro__title">El club por sectores</h2>
         <p class="cat-intro__lead">
-          Cada <b>área</b> (línea de negocio: Cultivo, Bar, Dispensario…) tiene su propio resultado.
-          Desplegá un área para ver todo lo suyo: sus <b>categorías</b> (madre → subcategoría, para
+          Cada <b>sector</b> (línea de negocio: Cultivo, Bar, Dispensario…) tiene su propio resultado.
+          Desplegá un sector para ver todo lo suyo: sus <b>categorías</b> (madre → subcategoría, para
           clasificar los movimientos del libro) y sus <b>depósitos</b> (dónde vive su inventario).
         </p>
         <p class="cat-intro__note">
           <i class="bi bi-info-circle"></i>
           Los <b>depósitos</b> se ven acá pero se gestionan en la sección <b>Depósito</b>. Las categorías
-          y áreas del <b>sistema</b> no se borran (se desactivan); las que creás vos, sí (sin movimientos).
+          y sectores del <b>sistema</b> no se borran (se desactivan); las que creás vos, sí (sin movimientos).
         </p>
       </div>
 
       <!-- Header -->
       <div class="cat-head">
-        <h2>Áreas del club</h2>
-        <button class="btn btn--primary" @click="nuevaUnidad">+ Área</button>
+        <h2>Sectors del club</h2>
+        <button class="btn btn--primary" @click="nuevaUnidad">+ Sector</button>
       </div>
 
       <!-- Form ÁREA (al crear/editar) -->
       <form v-if="uniForm" class="cat-form" @submit.prevent="guardarUnidad">
-        <div class="cat-form__title">{{ uniForm.id ? 'Editar' : 'Nueva' }} área</div>
+        <div class="cat-form__title">{{ uniForm.id ? 'Editar' : 'Nueva' }} sector</div>
         <label class="fld">Nombre<input v-model.trim="uniForm.nombre" class="inp" placeholder="Ej: Cultivo" maxlength="40" /></label>
         <template v-if="uniForm.es_sistema">
           <div class="fld">Tipo<span class="uni-tipo-ro">{{ uniForm.tipo }} <small>(del sistema, no editable)</small></span></div>
@@ -147,7 +147,7 @@ async function borrarUnidad(u) {
         </div>
         <label v-if="!uniForm.id" class="fld-check">
           <input type="checkbox" v-model="uniForm.crear_deposito" />
-          <span>Crear un depósito para esta área <small>(podés sumarle más después)</small></span>
+          <span>Crear un depósito para esta sector <small>(podés sumarle más después)</small></span>
         </label>
         <div class="cat-form__actions"><button type="button" class="btn" @click="uniForm = null">Cancelar</button><button type="submit" class="btn btn--primary" :disabled="store.saving">Guardar</button></div>
       </form>
@@ -167,9 +167,9 @@ async function borrarUnidad(u) {
             <label class="fld">Tipo
               <select v-model="catForm.tipo" class="inp"><option value="egreso">Egreso (gasto)</option><option value="ingreso">Ingreso</option></select>
             </label>
-            <label class="fld">Área
+            <label class="fld">Sector
               <select v-model="catForm.unidad_negocio_id" class="inp">
-                <option :value="null">— Sin área —</option>
+                <option :value="null">— Sin sector —</option>
                 <option v-for="u in store.unidadesActivas" :key="u.id" :value="u.id">{{ u.nombre }}</option>
               </select>
             </label>
@@ -181,7 +181,7 @@ async function borrarUnidad(u) {
         <div class="cat-form__actions"><button type="button" class="btn" @click="catForm = null">Cancelar</button><button type="submit" class="btn btn--primary" :disabled="store.saving">Guardar</button></div>
       </form>
 
-      <!-- Acordeón de áreas -->
+      <!-- Acordeón de sectores -->
       <div class="acc">
         <div v-for="area in store.unidades" :key="area.id" class="acc-item" :class="{ 'is-off': !area.activa }">
           <button class="acc-head" @click="toggle(area.id)">
@@ -193,7 +193,7 @@ async function borrarUnidad(u) {
           </button>
 
           <div v-if="abierta(area.id)" class="acc-body">
-            <!-- Categorías del área -->
+            <!-- Categorías del sector -->
             <div class="acc-sub">
               <span class="acc-sub__title">Categorías</span>
               <button class="lnk" @click="nuevaMadre(area)"><i class="bi bi-plus-lg"></i> Categoría</button>
@@ -229,7 +229,7 @@ async function borrarUnidad(u) {
             </div>
             <div v-if="!nCatsDe(area.id)" class="cat-empty">Sin categorías todavía.</div>
 
-            <!-- Depósitos del área (read-only) -->
+            <!-- Depósitos del sector (read-only) -->
             <div class="acc-sub acc-sub--mt"><span class="acc-sub__title">Depósitos</span><small class="acc-sub__hint">se gestionan en Depósito</small></div>
             <div v-if="depsDe(area.id).length" class="dep-list">
               <div v-for="d in depsDe(area.id)" :key="d.id" class="dep-item">
@@ -238,26 +238,26 @@ async function borrarUnidad(u) {
                 <small> · {{ familiaLabel(d) }}</small>
               </div>
             </div>
-            <div v-else class="cat-empty">Esta área no tiene depósitos.</div>
+            <div v-else class="cat-empty">Esta sector no tiene depósitos.</div>
 
-            <!-- Acciones del área -->
+            <!-- Acciones del sector -->
             <div class="acc-actions">
-              <button class="lnk" @click="editarUnidad(area)">Editar área</button>
-              <button v-if="!area.es_sistema" class="lnk lnk--danger" @click="borrarUnidad(area)">Borrar área</button>
+              <button class="lnk" @click="editarUnidad(area)">Editar sector</button>
+              <button v-if="!area.es_sistema" class="lnk lnk--danger" @click="borrarUnidad(area)">Borrar sector</button>
             </div>
           </div>
         </div>
 
-        <!-- Bucket "Sin área" (categorías sin área asignada) -->
+        <!-- Bucket "Sin sector" (categorías sin sector asignada) -->
         <div v-if="sinArea.total" class="acc-item acc-item--sin">
           <button class="acc-head" @click="toggle('sin')">
             <i class="bi acc-chev" :class="abierta('sin') ? 'bi-chevron-down' : 'bi-chevron-right'"></i>
             <span class="dot" style="background:#cbd5e1"></span>
-            <span class="acc-name">Sin área</span>
-            <span class="acc-sum">{{ sinArea.total }} categoría{{ sinArea.total !== 1 ? 's' : '' }} sin área</span>
+            <span class="acc-name">Sin sector</span>
+            <span class="acc-sum">{{ sinArea.total }} categoría{{ sinArea.total !== 1 ? 's' : '' }} sin sector</span>
           </button>
           <div v-if="abierta('sin')" class="acc-body">
-            <p class="acc-hint">Estas categorías no tienen área. Editá cada una y asignale una para que aparezca donde corresponde.</p>
+            <p class="acc-hint">Estas categorías no tienen sector. Editá cada una y asignale una para que aparezca donde corresponde.</p>
             <div v-for="tipo in ['egreso','ingreso']" :key="tipo">
               <template v-if="sinArea[tipo].length">
                 <h5 class="cat-group__title" :class="tipo === 'ingreso' ? 'is-in' : 'is-out'">{{ tipo === 'ingreso' ? 'Ingresos' : 'Egresos' }}</h5>

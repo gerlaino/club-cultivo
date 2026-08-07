@@ -126,11 +126,11 @@ function elegirCat(c) {
   delete errores.value.categoria
 }
 
-// ─── Crear categoría y área sin salir del modal ──────────────────────────────────
-// Crear un movimiento y crear una categoría o un área piden el MISMO permiso (admin), así que
+// ─── Crear categoría y sector sin salir del modal ──────────────────────────────────
+// Crear un movimiento y crear una categoría o un sector piden el MISMO permiso (admin), así que
 // mandar a Configuración a mitad de carga era puro costo de navegación.
 //
-// Se crean subcategorías Y categorías principales. La sub hereda de su madre el área, la clave de
+// Se crean subcategorías Y categorías principales. La sub hereda de su madre el sector, la clave de
 // sistema y el `comportamiento` —el que decide si la compra entra al depósito, al salón o a ningún
 // inventario—. Una principal creada desde acá nace con `comportamiento: general`, o sea que NO
 // stockea: es un gasto y nada más. Conectarla a un inventario sigue siendo cosa de Configuración,
@@ -172,7 +172,7 @@ async function confirmarCrearCat() {
   try {
     const { data } = await createCategoriaContable({
       nombre: f.nombre.trim(), tipo: form.value.tipo, parent_id: f.parent_id,
-      // Una principal no hereda de nadie: el área se elige acá.
+      // Una principal no hereda de nadie: el sector se elige acá.
       ...(f.parent_id ? {} : { unidad_negocio_id: f.unidad_negocio_id || null }),
     })
     const madre = madresDelTipo.value.find(m => m.id === f.parent_id)
@@ -209,7 +209,7 @@ async function confirmarCrearArea() {
     crearArea.value = null
     emit('catalogo-actualizado')
   } catch (e) {
-    errorCrear.value = e?.response?.data?.errors?.join(', ') || 'No se pudo crear el área'
+    errorCrear.value = e?.response?.data?.errors?.join(', ') || 'No se pudo crear el sector'
   } finally { creando.value = false }
 }
 
@@ -225,7 +225,7 @@ const COMPORTAMIENTOS_CON_STOCK = ['insumo', 'insumo_general', 'mercaderia']
 const pideDestinoCat = computed(() =>
   COMPORTAMIENTOS_CON_STOCK.includes(catActual.value?.comportamiento))
 
-// El área ya no se elige: sale de la categoría y se muestra como dato.
+// El sector ya no se elige: sale de la categoría y se muestra como dato.
 const areaDeLaCategoria = computed(() => catActual.value?.areaNombre || null)
 const pacQuery = ref('')
 const pacOpen  = ref(false)
@@ -243,7 +243,7 @@ function elegirPac(p) { form.value.paciente_id = p.id; pacOpen.value = false; de
 const depositoSel = computed(() =>
   props.depositos.find(d => String(d.id) === String(destino.value.deposito_id)) || null)
 
-// El depósito manda: fija la sede del asiento (y el área, vía su unidad de negocio).
+// El depósito manda: fija la sede del asiento (y el sector, vía su unidad de negocio).
 watch(depositoSel, (dep) => {
   if (!dep) return
   if (dep.sede_id) form.value.sede_id = dep.sede_id
@@ -594,7 +594,7 @@ const titulo = computed(() => {
                     <p v-if="!catsFiltradas.length" class="mv-drop-empty">Sin resultados</p>
                   </div>
 
-                  <!-- Crear sin salir. Solo subcategorías: heredan de la madre el área, la clave y
+                  <!-- Crear sin salir. Solo subcategorías: heredan de la madre el sector, la clave y
                        el comportamiento (si la compra entra al depósito o al salón). -->
                   <div v-if="!crearCat" class="mv-drop-foot">
                     <button type="button" class="mv-drop-new" @click="abrirCrearCat">
@@ -615,22 +615,22 @@ const titulo = computed(() => {
                         <option v-for="m in madresDelTipo" :key="m.id" :value="m.id">{{ m.nombre }}</option>
                       </select>
                     </label>
-                    <!-- El área ya no se elige por movimiento: se define acá, una sola vez, y
+                    <!-- El sector ya no se elige por movimiento: se define acá, una sola vez, y
                          después todos los movimientos de esta categoría la heredan. -->
                     <template v-if="!crearCat.parent_id">
                       <label v-if="!crearArea" class="mv-fld">
-                        <span class="mv-lbl">Área <span class="mv-opt">(opcional)</span></span>
+                        <span class="mv-lbl">Sector <span class="mv-opt">(opcional)</span></span>
                         <select class="mv-inp" v-model.number="crearCat.unidad_negocio_id">
-                          <option :value="null">— Sin área —</option>
+                          <option :value="null">— Sin sector —</option>
                           <option v-for="u in areasDisponibles" :key="u.id" :value="u.id">{{ u.nombre }}</option>
                         </select>
                         <button type="button" class="mv-inline-new" @click.prevent="abrirCrearArea">
-                          <i class="bi bi-plus-lg"></i> Crear un área
+                          <i class="bi bi-plus-lg"></i> Crear un sector
                         </button>
                       </label>
                       <div v-else class="mv-newbox mv-newbox--flat">
                         <label class="mv-fld">
-                          <span class="mv-lbl">Nombre del área</span>
+                          <span class="mv-lbl">Nombre del sector</span>
                           <input v-model.trim="crearArea.nombre" type="text" class="mv-inp" placeholder="Ej: Eventos" />
                         </label>
                         <label class="mv-fld">
@@ -648,7 +648,7 @@ const titulo = computed(() => {
                       </div>
                     </template>
                     <p class="mv-newbox-hint">
-                      <template v-if="crearCat.parent_id">Hereda el área y el destino de stock de la que elijas.</template>
+                      <template v-if="crearCat.parent_id">Hereda el sector y el destino de stock de la que elijas.</template>
                       <template v-else-if="!madresDelTipo.length">Todavía no hay categorías de este tipo: esta va a ser la primera.</template>
                       <template v-else>Una categoría principal: después vas a poder colgarle subcategorías.</template>
                     </p>
@@ -675,7 +675,7 @@ const titulo = computed(() => {
               </label>
 
               <div v-if="areaDeLaCategoria" class="mv-fld">
-                <span class="mv-lbl">Área</span>
+                <span class="mv-lbl">Sector</span>
                 <p class="mv-area-ro">
                   <i class="bi bi-diagram-3"></i> {{ areaDeLaCategoria }}
                   <span class="mv-opt">— la define la categoría</span>
@@ -893,7 +893,7 @@ const titulo = computed(() => {
 .mv-drop-opt--on { background: var(--c-leaf-100); color: var(--c-leaf-900); font-weight: 600; }
 .mv-drop-empty { margin: 0; padding: 12px; font-size: var(--fs-13); color: var(--c-ink-500); text-align: center; }
 
-/* Crear categoría / área sin salir del modal */
+/* Crear categoría / sector sin salir del modal */
 .mv-drop-foot { border-top: 1px solid var(--c-ink-100); }
 .mv-drop-new {
   display: flex; align-items: center; gap: 6px; width: 100%; padding: 10px 12px;

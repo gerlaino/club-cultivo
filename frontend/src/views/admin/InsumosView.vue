@@ -64,7 +64,7 @@ const depositoHint = computed(() =>
   : (HINTS[depositoActivo.value?.familia] || ''))
 
 // Categorías (egreso) elegibles al dar de alta en el depósito activo: las del ÁREA del depósito.
-// Si el depósito no tiene área, se muestran todas (para no perder ninguna).
+// Si el depósito no tiene sector, se muestran todas (para no perder ninguna).
 const categoriasDelTab = computed(() => {
   const areaId = depositoActivo.value?.unidad_negocio_id
   const areaDe = (c) => c.unidad_negocio?.id ?? c.unidad_negocio_id ?? null
@@ -109,7 +109,7 @@ async function cargarDepositos() {
 }
 
 // ── Crear depósito propio ─────────────────────────────────────
-// Áreas (unidades de negocio) para vincular el depósito → el movimiento hereda el área.
+// Sectors (unidades de negocio) para vincular el depósito → el movimiento hereda el sector.
 const areas = ref([])
 async function cargarAreas() { try { areas.value = (await listUnidadesNegocio()).data || [] } catch { areas.value = [] } }
 const depoForm = ref(null)
@@ -446,9 +446,9 @@ async function revertirCompra(compra) {
       <button class="dp__tab dp__tab--add" title="Crear un depósito" @click="abrirNuevoDeposito">＋</button>
     </div>
 
-    <!-- Área a la que pertenece este depósito (a dónde va su plata en el P&L) -->
+    <!-- Sector a la que pertenece este depósito (a dónde va su plata en el P&L) -->
     <p v-if="depositoActivo && !esSoloLectura" class="dp__area-line">
-      <span class="dp__area-chip">🏷️ Área: {{ depositoActivo.area_nombre || 'sin área' }}</span>
+      <span class="dp__area-chip">🏷️ Sector: {{ depositoActivo.area_nombre || 'sin sector' }}</span>
     </p>
 
     <!-- Resumen en vivo del depósito activo -->
@@ -749,9 +749,9 @@ async function revertirCompra(compra) {
         <h3 class="modal__title">Nuevo depósito</h3>
         <p class="modal__hint">Un depósito propio para agrupar tu mercadería (ej: Merchandising, Insumos de oficina). Los productos que cargues acá se consumen como gasto general.</p>
         <label class="fld">Nombre<input v-model.trim="depoForm.nombre" class="inp" maxlength="40" placeholder="Ej: Merchandising" v-focus @keydown.enter.prevent="confirmarNuevoDeposito" /></label>
-        <label class="fld">Área <small class="mut">(a qué línea de negocio pertenece, para el P&L)</small>
+        <label class="fld">Sector <small class="mut">(a qué línea de negocio pertenece, para el P&L)</small>
           <select v-model="depoForm.unidad_negocio_id" class="inp">
-            <option :value="null">— Sin área —</option>
+            <option :value="null">— Sin sector —</option>
             <option v-for="a in areas" :key="a.id" :value="a.id">{{ a.nombre }}</option>
           </select>
         </label>
@@ -764,9 +764,9 @@ async function revertirCompra(compra) {
       <div class="dpdlg">
         <h3 class="modal__title">Gestionar depósito</h3>
         <label class="fld">Nombre<input v-model.trim="depoEdit.nombre" class="inp" maxlength="40" v-focus @keydown.enter.prevent="guardarDeposito" /></label>
-        <label class="fld">Área <small class="mut">(para el P&L)</small>
+        <label class="fld">Sector <small class="mut">(para el P&L)</small>
           <select v-model="depoEdit.unidad_negocio_id" class="inp">
-            <option :value="null">— Sin área —</option>
+            <option :value="null">— Sin sector —</option>
             <option v-for="a in areas" :key="a.id" :value="a.id">{{ a.nombre }}</option>
           </select>
         </label>

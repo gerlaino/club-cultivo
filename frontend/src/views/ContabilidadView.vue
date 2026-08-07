@@ -24,7 +24,7 @@ const depositos  = ref([])
 // Solo admin: el backend rechaza escritura de cualquier otro rol (abogado incluido)
 const canEdit = computed(() => ["admin","super_admin"].includes(auth.role))
 
-// El modal puede crear categorías y áreas sin salir (mismo permiso que crear el movimiento).
+// El modal puede crear categorías y sectores sin salir (mismo permiso que crear el movimiento).
 // Cuando lo hace refrescamos el catálogo acá, que es de donde salen los props.
 async function recargarCatalogo() {
   await Promise.all([
@@ -97,7 +97,7 @@ const toast = useToast()
 
 const vistaActiva    = ref("dashboard")
 const dashboardSede  = ref(null) // filtro de sede LOCAL del dashboard (null = todo el club)
-const unidadAbierta  = ref(new Set()) // áreas expandidas para ver su desglose por sede
+const unidadAbierta  = ref(new Set()) // sectores expandidas para ver su desglose por sede
 function toggleUnidad(id) {
   const k = id ?? 'sin'
   const s = new Set(unidadAbierta.value)
@@ -462,12 +462,12 @@ async function goToPage(p) {
   window.scrollTo({ top: 0, behavior: "smooth" })
 }
 
-async function exportar() {
+async function exportar(formato = "xlsx") {
   const params = {}
   if (filtroDesde.value) params.desde = filtroDesde.value
   if (filtroHasta.value) params.hasta = filtroHasta.value
   if (dashboardSede.value && vistaActiva.value === "dashboard") params.sede_id = dashboardSede.value
-  await store.exportCSV(params)
+  await store.exportCSV(params, formato)
 }
 
 function irALibro() {
@@ -510,8 +510,11 @@ onMounted(async () => {
         <p class="cv__sub">Libro diario · Ingresos · Egresos · Balance</p>
       </div>
       <div class="cv__header-right">
-        <button class="cv__btn-ghost" @click="exportar">
-          <i class="bi bi-download"></i> Exportar CSV
+        <button class="cv__btn-ghost" @click="exportar('xlsx')" title="Con montos que suman, totales y filtros">
+          <i class="bi bi-file-earmark-spreadsheet"></i> Exportar Excel
+        </button>
+        <button class="cv__btn-ghost" @click="exportar('csv')" title="Texto plano, para procesar en otra herramienta">
+          <i class="bi bi-download"></i> CSV
         </button>
         <button v-if="canEdit" class="cv__btn-primary" @click="openCreate">
           <i class="bi bi-plus-lg"></i> Nuevo movimiento

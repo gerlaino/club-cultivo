@@ -142,19 +142,22 @@ export const useContabilidadStore = defineStore("contabilidad", {
       }
     },
 
-    async exportCSV(params = {}) {
+    // `formato`: 'xlsx' (por defecto) o 'csv'. El Excel trae los montos como números, las
+    // fechas como fechas, totales y filtros; el CSV queda para quien lo quiera crudo.
+    async exportCSV(params = {}, formato = "xlsx") {
       try {
-        const response = await exportMovimientosCSV(params);
+        const esXlsx   = formato === "xlsx";
+        const response = esXlsx ? await exportMovimientosXLSX(params) : await exportMovimientosCSV(params);
         const url  = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement("a");
         link.href  = url;
-        link.setAttribute("download", `movimientos_${new Date().toISOString().slice(0,10)}.csv`);
+        link.setAttribute("download", `movimientos_${new Date().toISOString().slice(0,10)}.${esXlsx ? "xlsx" : "csv"}`);
         document.body.appendChild(link);
         link.click();
         link.remove();
         window.URL.revokeObjectURL(url);
       } catch (e) {
-        logger.error("Export CSV error", e);
+        logger.error("Export error", e);
       }
     },
 

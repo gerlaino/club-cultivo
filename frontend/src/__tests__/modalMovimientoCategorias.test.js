@@ -68,7 +68,7 @@ describe('ModalMovimiento — crear categorías', () => {
   })
 
   // El síntoma reportado: el selector de área mostraba una sola opción.
-  it('ofrece TODAS las áreas del club al crear una categoría principal', async () => {
+  it('ofrece TODOS los sectores del club al crear una categoría principal', async () => {
     const wrapper = await montar([])
     await abrirComboCategoria()
 
@@ -84,9 +84,9 @@ describe('ModalMovimiento — crear categorías', () => {
     wrapper.unmount()
   })
 
-  // El área ya no se elige por movimiento: se define al crear la categoría, que es el único
-  // lugar donde tiene sentido decidirla.
-  it('el tipo de área se ofrece con nombres legibles, no con la clave cruda', async () => {
+  // El SECTOR ya no se elige por movimiento: se define al crear la categoría, que es el único
+  // lugar donde tiene sentido decidirlo. (Sector > categoría > subcategoría.)
+  it('el tipo de sector se ofrece con nombres legibles, no con la clave cruda', async () => {
     const wrapper = await montar([])
     await abrirComboCategoria()
     ;[...document.body.querySelectorAll('button')]
@@ -94,7 +94,7 @@ describe('ModalMovimiento — crear categorías', () => {
     await new Promise(r => setTimeout(r, 0))
 
     const nuevaArea = [...document.body.querySelectorAll('button')]
-      .find(b => b.textContent.includes('Crear un área'))
+      .find(b => b.textContent.includes('Crear un sector'))
     nuevaArea.click()
     await new Promise(r => setTimeout(r, 0))
 
@@ -157,7 +157,7 @@ describe('ModalMovimiento — un solo formulario', () => {
   })
 
   // El área dejó de ser un campo del movimiento: la define la categoría.
-  it('el área no se elige por movimiento', async () => {
+  it('el sector no se elige por movimiento', async () => {
     const CATS = [{
       id: 1, nombre: 'Insumos', tipo: 'egreso', comportamiento_efectivo: 'insumo',
       unidad_negocio: { id: 3, nombre: 'Cultivo' }, subcategorias: [],

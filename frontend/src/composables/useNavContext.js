@@ -11,10 +11,12 @@ import { listLotes, listPesajesManicuraAdmin, getTareasDashboard } from '../lib/
 export const NAV_GROUPS = [
   { key: 'dashboard', label: 'Dashboard', to: '/', tabs: [] },
   {
-    // Sedes — parte de la suite de Cultivo. Colgaba de `multi_sede`, que dejó de ser una
-    // bandera propia al reagrupar en suites: sobrevive derivada, pero depender de la
-    // derivación ya hizo desaparecer esta sección una vez. Se pregunta por la suite.
-    key: 'sedes', label: 'Sedes', to: '/sedes', feature: 'cultivo',
+    // Sedes — SIN bandera, a propósito. Todo club tiene al menos una (el onboarding la exige) y
+    // todo lo demás cuelga de ella: salas, depósitos, stock, dispensaciones. Estuvo colgada de
+    // `multi_sede` y después de la suite `cultivo`, y las dos veces la sección desapareció del
+    // menú para clubes que sí la necesitaban. Un club con una sola sede igual quiere entrar a
+    // verla; no hay nada que esconder acá.
+    key: 'sedes', label: 'Sedes', to: '/sedes',
     tabs: [],
   },
   {

@@ -314,18 +314,30 @@ class MovimientosContablesController < ApplicationController
   def export_csv
     scope = current_user.club.movimientos_contables.recientes.sin_cuotas_futuras
 
+    desde = hasta = nil
     if params[:desde].present? && params[:hasta].present?
       desde = Date.parse(params[:desde]) rescue nil
       hasta = Date.parse(params[:hasta]) rescue nil
       scope = scope.del_periodo(desde, hasta) if desde && hasta
     end
 
-    csv_data = generate_csv(scope)
-
-    send_data csv_data,
-              filename:    "movimientos_contables_#{Time.zone.today}.csv",
-              type:        "text/csv; charset=utf-8",
-              disposition: "attachment"
+    respond_to do |format|
+      format.csv do
+        send_data generate_csv(scope),
+                  filename: "movimientos_contables_#{Time.zone.today}.csv",
+                  type: "text/csv; charset=utf-8", disposition: "attachment"
+      end
+      # Excel con tipos reales (montos que suman, fechas que ordenan), totales y filtros.
+      # El CSV plano no se podía trabajar sin rearmarlo a mano.
+      format.xlsx do
+        send_data movimientos_xlsx(scope, desde, hasta),
+                  filename: "movimientos_contables_#{Time.zone.today}.xlsx",
+                  type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                  disposition: "attachment"
+      end
+      format.any { send_data generate_csv(scope), filename: "movimientos_contables_#{Time.zone.today}.csv",
+                             type: "text/csv; charset=utf-8", disposition: "attachment" }
+    end
   end
 
   private
@@ -633,6 +645,40 @@ class MovimientosContablesController < ApplicationController
       egr     = sub.egresos.sum(:monto_ars).to_f
       { mes: mes, mes_label: I18n.l(fecha, format: "%B"), ingresos: ing, egresos: egr, balance: ing - egr }
     end
+  end
+
+  def movimientos_xlsx(scope, desde, hasta)
+    movs = scope.includes(:sede, :lote, :created_by).to_a
+    # El signo en el monto es lo que hace que el total del Excel sea el resultado real y no
+    # una suma de valores absolutos.
+    ingresos = movs.select { |m| m.tipo == 'ingreso' }.sum { |m| m.monto_ars.to_f }
+    egresos  = movs.select { |m| m.tipo == 'egreso'  }.sum { |m| m.monto_ars.to_f }
+
+    XlsxExport.new(
+      club:   current_user.club,
+      titulo: 'Movimientos contables',
+      subtitulo: (desde && hasta) ? "Período #{desde.strftime('%d/%m/%Y')} — #{hasta.strftime('%d/%m/%Y')}" : 'Todos los movimientos',
+      resumen: {
+        'Ingresos'  => ingresos,
+        'Egresos'   => -egresos,
+        'Resultado' => ingresos - egresos,
+      },
+      headers: ['Fecha', 'Tipo', 'Sector', 'Categoría', 'Descripción', 'Monto', 'Sede', 'Lote',
+                'Comprobante', 'Proveedor', 'Pagado', 'Medio de pago', 'Notas', 'Cargado por'],
+      formatos: [:fecha, :texto, :texto, :texto, :texto, :moneda, :texto, :texto,
+                 :texto, :texto, :texto, :texto, :texto, :texto],
+      totales: [5],
+      rows: movs.map { |m|
+        [
+          m.fecha, m.tipo_label, m.unidad_negocio&.nombre, m.categoria_label, m.descripcion,
+          m.tipo == 'egreso' ? -m.monto_ars.to_f : m.monto_ars.to_f,
+          m.sede&.nombre, m.lote&.codigo,
+          [m.comprobante_tipo, m.comprobante_numero].compact_blank.join(' '),
+          m.proveedor, (m.pagado ? 'Sí' : 'No'), m.medio_pago, m.notas,
+          m.created_by&.nombre_completo.presence || m.created_by&.email,
+        ]
+      },
+    ).render
   end
 
   def generate_csv(scope)
