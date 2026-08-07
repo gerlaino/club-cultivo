@@ -48,7 +48,9 @@ export const useUsuariosStore = defineStore("usuarios", {
         const { data } = await createUser(payload)
         const user = data?.data || data
         this.items = [user, ...this.items]
-        return user
+        // Las credenciales vienen del backend y se ven UNA vez: hay que mostrárselas al admin,
+        // no anunciarlas en un toast que se va solo.
+        return { ...user, credenciales: data?.credenciales || null }
       } catch (e) {
         this.error = e?.response?.data?.errors?.join(", ") || e.message
         throw e

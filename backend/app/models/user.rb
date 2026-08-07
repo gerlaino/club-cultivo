@@ -42,6 +42,17 @@ class User < ApplicationRecord
 
   validates :role,  presence: true
   validates :email, presence: true, uniqueness: true
+
+  # Contraseña inicial de un usuario nuevo (y del "restablecer"). Se arma para poder DICTARSE
+  # por teléfono sin equívocos: sin 0/O ni 1/l/I, y con un guion que separa los bloques. Igual
+  # es temporal — Devise pide cambiarla con el link del mail.
+  def self.password_temporal
+    letras = ('a'..'z').to_a - %w[l o] + (('A'..'Z').to_a - %w[I O])
+    numeros = ('2'..'9').to_a
+    bloque = -> { 4.times.map { letras.sample }.join }
+    "#{bloque.call}-#{bloque.call}-#{4.times.map { numeros.sample }.join}"
+  end
+
   validate  :club_requerido_para_no_super_admin
   validate  :acceptable_avatar
 

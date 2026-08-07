@@ -7,6 +7,7 @@ import { listSalas, listSedes, asignarSedeAUsuario } from '../lib/api.js'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import { ROLES as ROLES_DS, rolInfo, rolEstilo, rolColor, rolBg, rolPideSede, rolHintSede } from '../lib/roles.js'
 
 const store           = useUsuariosStore()
 const auth            = useAuthStore()
@@ -39,33 +40,12 @@ const pagedUsers = computed(() => {
 onMounted(() => store.fetch())
 
 // ── Roles ─────────────────────────────────────────────────────────────────
-const ROLES = [
-  { value: 'admin',       label: 'Administrador', icon: 'bi-shield-fill-check',   desc: 'Acceso total al club, usuarios y configuración.' },
-  { value: 'medico',      label: 'Médico',        icon: 'bi-heart-pulse-fill',    desc: 'Gestión de pacientes e indicaciones médicas.' },
-  { value: 'cultivador',  label: 'Cultivador',    icon: 'bi-flower1',             desc: 'Ve todas las salas de vege/floración de la sede asignada. Sin acceso a pacientes.' },
-  { value: 'supervisor',  label: 'Supervisor',    icon: 'bi-binoculars-fill',     desc: 'Supervisa las sedes asignadas y gestiona tareas.' },
-  { value: 'manicura',    label: 'Manicura',      icon: 'bi-scissors',            desc: 'Ve todas las salas de cosecha y manicura del club. Registra pesadas. Requiere aprobación del admin.' },
-  { value: 'dispensador', label: 'Dispensador',   icon: 'bi-bag-check-fill',      desc: 'Opera el dispensario y registra entregas a socios.' },
-  { value: 'delivery',    label: 'Delivery',      icon: 'bi-bicycle',             desc: 'Gestiona las entregas a domicilio.' },
-  { value: 'abogado',     label: 'Abogado',       icon: 'bi-briefcase-fill',      desc: 'Documentos, contabilidad y trazabilidad legal.' },
-  { value: 'auditor',     label: 'Auditor',       icon: 'bi-clipboard-data-fill', desc: 'Lectura completa de todos los módulos.' },
-]
+const ROLES = ROLES_DS
 
-const ROLES_CONFIG = {
-  admin:       { sedes: false, salas: false },
-  medico:      { sedes: true,  salas: false, sedeRequerida: false, sedeHint: 'Sin asignar: accede a pacientes de todo el club.' },
-  cultivador:  { sedes: true,  salas: false, sedeRequerida: true,  sedeHint: 'El cultivador necesita una sede asignada para ver salas y lotes.' },
-  supervisor:  { sedes: true,  salas: false, sedeRequerida: true },
-  manicura:    { sedes: false, salas: false },
-  dispensador: { sedes: true,  salas: false, sedeRequerida: false, sedeHint: 'Sin asignar: puede dispensar en todas las sedes.' },
-  delivery:    { sedes: true,  salas: false, sedeRequerida: false, sedeHint: 'Sin asignar: gestiona entregas de todas las sedes.' },
-  abogado:     { sedes: false, salas: false },
-  auditor:     { sedes: true,  salas: false, sedeRequerida: false, sedeHint: 'Sin asignar: accede a informes y datos de todo el club.' },
-}
-
-function getRoleInfo(role) {
-  return ROLES.find(r => r.value === role) || { label: role, icon: 'bi-person', desc: '' }
-}
+function getRoleInfo(role) { return rolInfo(role) }
+function roleStyle(role)   { return rolEstilo(role) }
+function roleColor(role)   { return rolColor(role) }
+function roleBg(role)      { return rolBg(role) }
 
 const AVATAR_COLORS = ['#1A3D2E','#1A1F36','#172B1F','#C2410C','#1A2F1E','#2A2F38','#1F1810']
 function getInitials(user) {
@@ -75,11 +55,14 @@ function getInitials(user) {
 }
 function getAvatarColor(user) { return AVATAR_COLORS[(user.id || 0) % AVATAR_COLORS.length] }
 
-function roleVar(role)    { return `--c-role-${role}` }
-function roleColor(role)  { return `var(${roleVar(role)}, #475569)` }
-function roleBg(role)     { return `color-mix(in srgb, var(${roleVar(role)}, #475569) 12%, white)` }
-function roleBorder(role) { return `color-mix(in srgb, var(${roleVar(role)}, #475569) 30%, white)` }
-function roleStyle(role)  { return { color: roleColor(role), background: roleBg(role), borderColor: roleBorder(role) } }
+// Credenciales del usuario recién creado: se muestran una vez y no se pueden recuperar
+// después (para eso está "Restablecer contraseña" en su ficha).
+const credencialesNuevas = ref(null)
+async function copiarCredenciales() {
+  const c = credencialesNuevas.value
+  await navigator.clipboard.writeText(`Usuario: ${c.email}\nContraseña: ${c.password_inicial}`)
+  toast.success('Copiado')
+}
 
 // ── Modal ─────────────────────────────────────────────────────────────────
 const showModal  = ref(false)
@@ -93,7 +76,11 @@ const sedesSeleccionadas  = ref([])
 
 const form = ref({ id: null, first_name: "", last_name: "", email: "", email_personal: "", role: "admin", sede_id: "", sala_id: "" })
 
-const roleConfig = computed(() => ROLES_CONFIG[form.value.role] || { sedes: false, salas: false })
+const roleConfig = computed(() => ({
+  sedes:         !!rolHintSede(form.value.role) || rolPideSede(form.value.role),
+  sedeRequerida: rolPideSede(form.value.role),
+  sedeHint:      rolHintSede(form.value.role),
+}))
 
 const salasDeLaSede = computed(() =>
   todasLasSalas.value.filter(s => {
@@ -189,8 +176,8 @@ async function save() {
       email:                 form.value.email,
       email_personal:        form.value.email_personal,
       role:                  form.value.role,
-      password:              '123456Aa',
-      password_confirmation: '123456Aa',
+      // La contraseña la genera el backend, distinta para cada uno. Antes se mandaba una fija
+      // desde acá, así que todo usuario de todo club nacía con la misma clave conocida.
     })
 
     // Asignar sedes seleccionadas
@@ -202,9 +189,13 @@ async function save() {
     // (sala assignment queda para el perfil — no hay endpoint create-with-sala)
 
     closeModal()
-    const n = sedesSeleccionadas.value.length
-    const sedeMsg = n > 0 ? ` con ${n} sede${n !== 1 ? 's' : ''} asignada${n !== 1 ? 's' : ''}` : ''
-    toast.success(`Usuario creado${sedeMsg}. Contraseña inicial: 123456Aa`)
+    // Un toast se va solo y la contraseña se pierde: queda en pantalla hasta que el admin la
+    // haya pasado, con el aviso de si el mail salió o no.
+    if (nuevo?.credenciales) {
+      credencialesNuevas.value = { ...nuevo.credenciales, nombre: `${form.value.first_name} ${form.value.last_name}`.trim() }
+    } else {
+      toast.success('Usuario creado.')
+    }
   } catch (e) {
     if (e.response?.status === 402) {
       toast.error(e.response.data?.mensaje || 'Límite del plan alcanzado. Contactá al equipo.')
@@ -400,7 +391,7 @@ async function removeOne(u) {
               <div class="uv__field uv__field--full">
                 <label class="uv__label">Usuario de ingreso <span class="uv__req">*</span></label>
                 <input type="email" class="uv__input" v-model.trim="form.email" placeholder="rol@nombreclub.com" autocomplete="off" />
-                <span class="uv__hint">Es con lo que se loguea. Puede ser inventado (no necesita ser un mail real). Contraseña inicial: <strong>123456Aa</strong>.</span>
+                <span class="uv__hint">Es con lo que se loguea. Puede ser inventado (no necesita ser un mail real). La contraseña se genera sola y te la mostramos al terminar.</span>
               </div>
 
               <!-- Email personal (real) -->
@@ -466,7 +457,42 @@ async function removeOne(u) {
                   </select>
                   <span class="uv__hint">Podés cambiarla o agregar más desde el perfil del usuario.</span>
                 </div>
-              </template>
+              
+    <!-- Credenciales del alta: en pantalla hasta que el admin las haya pasado. -->
+    <Teleport to="body">
+      <div v-if="credencialesNuevas" class="uv-cred-ov" @click.self="credencialesNuevas = null">
+        <div class="uv-cred">
+          <div class="uv-cred__head">
+            <i class="bi bi-check-circle-fill"></i>
+            <div>
+              <h3 class="uv-cred__title">{{ credencialesNuevas.nombre }} ya puede entrar</h3>
+              <p class="uv-cred__sub">Pasale estos datos. La contraseña no se puede volver a ver.</p>
+            </div>
+          </div>
+          <div class="uv-cred__row">
+            <span class="uv-cred__lbl">Usuario</span>
+            <code class="uv-cred__val">{{ credencialesNuevas.email }}</code>
+          </div>
+          <div class="uv-cred__row">
+            <span class="uv-cred__lbl">Contraseña</span>
+            <code class="uv-cred__val uv-cred__val--big">{{ credencialesNuevas.password_inicial }}</code>
+          </div>
+          <p v-if="credencialesNuevas.mail_enviado" class="uv-cred__mail">
+            <i class="bi bi-envelope-check"></i> También se las mandamos por mail.
+          </p>
+          <p v-else class="uv-cred__mail uv-cred__mail--off">
+            <i class="bi bi-envelope-slash"></i> El club no tiene correo configurado, así que el mail no salió: pasáselas vos.
+          </p>
+          <div class="uv-cred__acts">
+            <button class="uv__btn-secondary" @click="copiarCredenciales">
+              <i class="bi bi-clipboard"></i> Copiar
+            </button>
+            <button class="uv__btn-primary" @click="credencialesNuevas = null">Listo</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+</template>
 
             </div>
           </div>
@@ -554,6 +580,23 @@ async function removeOne(u) {
 .uv__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: var(--c-role-admin); color: #fff; border: none; padding: .65rem 1.25rem; border-radius: 10px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; text-decoration: none; }
 .uv__btn-primary:hover:not(:disabled) { background: #144a18; }
 .uv__btn-primary:disabled { opacity: .55; cursor: not-allowed; }
+.uv__btn-secondary { display: inline-flex; align-items: center; gap: .4rem; background: #fff; color: #0f172a; border: 1.5px solid #e2e8f0; padding: .6rem 1.15rem; border-radius: 10px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+.uv__btn-secondary:hover { border-color: #cbd5e1; background: #f8fafc; }
+
+/* Credenciales del alta */
+.uv-cred-ov { position: fixed; inset: 0; background: rgba(15,23,42,.5); display: flex; align-items: center; justify-content: center; z-index: 1200; padding: 1rem; }
+.uv-cred { background: #fff; border-radius: 16px; max-width: 460px; width: 100%; padding: 1.5rem; box-shadow: 0 24px 64px rgba(0,0,0,.2); }
+.uv-cred__head { display: flex; gap: .75rem; align-items: flex-start; margin-bottom: 1.25rem; }
+.uv-cred__head > i { color: #15803d; font-size: 1.5rem; flex-shrink: 0; }
+.uv-cred__title { font-size: 1.05rem; font-weight: 800; color: #0f172a; margin: 0 0 .15rem; }
+.uv-cred__sub { font-size: .8rem; color: #64748b; margin: 0; }
+.uv-cred__row { display: flex; align-items: center; gap: .75rem; margin-bottom: .5rem; }
+.uv-cred__lbl { font-size: .7rem; color: #64748b; width: 82px; flex-shrink: 0; text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
+.uv-cred__val { font-family: monospace; font-size: .9rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px; padding: .35rem .65rem; color: #0f172a; user-select: all; flex: 1; }
+.uv-cred__val--big { font-size: 1.1rem; font-weight: 700; letter-spacing: .05em; }
+.uv-cred__mail { font-size: .78rem; color: #15803d; margin: .9rem 0 0; display: flex; align-items: center; gap: .4rem; }
+.uv-cred__mail--off { color: #92400e; }
+.uv-cred__acts { display: flex; gap: .6rem; justify-content: flex-end; margin-top: 1.35rem; }
 .uv__btn-ghost { background: #fff; color: #64748b; border: 1.5px solid #e2e8f0; padding: .65rem 1.1rem; border-radius: 10px; font-size: .875rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: .4rem; }
 .uv__btn-ghost:hover { background: #f8fafc; color: #0f172a; }
 

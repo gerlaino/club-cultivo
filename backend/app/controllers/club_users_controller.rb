@@ -51,17 +51,20 @@ class ClubUsersController < ApplicationController
     user = User.new(user_params)
     user.club_id = current_user.club_id
 
-    # Si no se provee password, generar uno temporal y mandar reset
-    send_reset = params.dig(:user, :password).blank?
-    if send_reset
-      tmp_password = SecureRandom.base64(12)
-      user.password = tmp_password
-      user.password_confirmation = tmp_password
-    end
+    # Contraseña inicial: SIEMPRE generada acá y distinta para cada uno. El frontend mandaba
+    # una fija ('123456Aa') para todos, así que todo usuario de todo club nacía con la misma
+    # clave conocida. Se ignora cualquier password que venga del cliente.
+    tmp_password = User.password_temporal
+    user.password = user.password_confirmation = tmp_password
 
     if user.save
-      user.send_reset_password_instructions if send_reset
-      render json: { data: user.as_json(only: [:id, :email, :email_personal, :first_name, :last_name, :role]) }, status: :created
+      # El mail es la vía cómoda, no la única: si el club no tiene SMTP nunca llega y nadie se
+      # entera. La contraseña se devuelve para que el admin pueda dársela en mano.
+      enviado = enviar_instrucciones(user)
+      render json: {
+        data: user.as_json(only: [:id, :email, :email_personal, :first_name, :last_name, :role]),
+        credenciales: { email: user.email, password_inicial: tmp_password, mail_enviado: enviado },
+      }, status: :created
     else
       render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
     end
@@ -106,9 +109,18 @@ class ClubUsersController < ApplicationController
 
 
   # POST /usuarios/:id/reset_password
+  # POST /usuarios/:id/reset_password
+  # El caso de uso más común de esta sección —"me olvidé la contraseña"— y no estaba
+  # enchufado a ninguna pantalla. Genera una clave nueva, la devuelve para poder dictarla,
+  # y manda el mail si el club tiene correo configurado.
   def reset_password
-    @user.send_reset_password_instructions
-    head :no_content
+    nueva = User.password_temporal
+    @user.update!(password: nueva, password_confirmation: nueva)
+    enviado = enviar_instrucciones(@user)
+
+    render json: {
+      email: @user.email, password_inicial: nueva, mail_enviado: enviado,
+    }
   end
 
   def salas_asignadas
@@ -262,6 +274,17 @@ class ClubUsersController < ApplicationController
   end
 
   private
+
+  # Devuelve si el mail salió de verdad. Un fallo de SMTP no puede tumbar el alta: el usuario
+  # ya está creado y el admin tiene la contraseña en pantalla.
+  def enviar_instrucciones(user)
+    return false unless current_user.club.smtp_configured?
+    user.send_reset_password_instructions
+    true
+  rescue StandardError => e
+    Rails.logger.warn("[usuarios] no se pudo enviar el mail a #{user.email}: #{e.message}")
+    false
+  end
 
   def set_user
     @user = User.where(club_id: current_user.club_id).find(params[:id])

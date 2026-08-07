@@ -11,7 +11,8 @@ import Paginator from '../components/ui/Paginator.vue'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
-import { getUsuarioStats, getUsuarioAuditorias, recibirCajaDelivery, listJornadas, confirmarJornadas, reabrirJornadas } from '../lib/api.js'
+import { getUsuarioStats, getUsuarioAuditorias, recibirCajaDelivery, listJornadas, confirmarJornadas, reabrirJornadas, resetUserPassword } from '../lib/api.js'
+import { ROLES as ROLES_DS, rolInfo, rolColor, rolBg } from '../lib/roles.js'
 
 const route  = useRoute()
 const router = useRouter()
@@ -31,46 +32,24 @@ const canEdit     = computed(() => ['admin', 'supervisor'].includes(auth.role) &
 const canEditRole = computed(() => auth.role === 'admin' && !isMe.value)
 
 // Roles que tienen sedes asignables
-const ROLES_CON_SEDES = ['cultivador', 'supervisor', 'medico', 'dispensador', 'delivery']
+// Qué roles se acotan por sede sale de la misma fuente que todo lo demás.
+const ROLES_CON_SEDES = ROLES_DS.filter(r => r.sedes).map(r => r.value)
 // Roles con módulo propio en la columna main
 
-const ROLES = [
-  { value: "admin",       label: "Administrador", color: "#dc2626", bg: "rgba(220,38,38,.1)",   icon: "bi-shield-fill-check",   desc: "Acceso total al sistema — puede gestionar todos los módulos, usuarios y configuración." },
-  { value: "medico",      label: "Médico",        color: "#15803d", bg: "rgba(21,128,61,.1)",   icon: "bi-heart-pulse-fill",    desc: "Gestión de pacientes e indicaciones médicas. Sin acceso a producción." },
-  { value: "cultivador",  label: "Cultivador",    color: "#0891b2", bg: "rgba(8,145,178,.1)",   icon: "bi-flower1",             desc: "Accede a las salas de vegetativo y floración de la sede que le asignes. Sin acceso a pacientes." },
-  { value: "supervisor",  label: "Supervisor",    color: "#0f766e", bg: "rgba(15,118,110,.1)",  icon: "bi-binoculars-fill",     desc: "Supervisa las sedes que le asigne el admin. Puede crear y gestionar tareas en esas sedes." },
-  { value: "manicura",    label: "Manicura",      color: "#7c3aed", bg: "rgba(124,58,237,.1)",  icon: "bi-scissors",            desc: "Ve todas las salas de cosecha y manicura del club. Registra peso de cosecha por lote. Requiere aprobación del admin." },
-  { value: "dispensador", label: "Dispensador",   color: "#0891b2", bg: "rgba(8,145,178,.08)",  icon: "bi-bag-check-fill",      desc: "Opera el dispensario: registra entregas a pacientes y consulta stock disponible." },
-  { value: "delivery",    label: "Delivery",      color: "#1A3D2E", bg: "rgba(26,61,46,.1)",    icon: "bi-bicycle",             desc: "Gestiona las entregas a domicilio de dispensaciones." },
-  { value: "abogado",     label: "Abogado",       color: "#92400e", bg: "rgba(146,64,14,.1)",   icon: "bi-briefcase-fill",      desc: "Acceso a documentos, contabilidad y trazabilidad legal. Solo lectura clínica." },
-  { value: "auditor",     label: "Auditor",       color: "#475569", bg: "rgba(71,85,105,.1)",   icon: "bi-clipboard-data-fill", desc: "Lectura de todos los módulos e informes. Sin modificar datos." },
-  { value: "socio",       label: "Paciente",         color: "#64748b", bg: "rgba(100,116,139,.1)", icon: "bi-person-badge-fill",   desc: "Acceso al portal del paciente: su perfil y su historial de dispensaciones." },
-]
+// Metadata de roles: una sola fuente (lib/roles.js). Acá vivía una copia con descripciones
+// distintas de las de la lista de Equipo, para los mismos roles.
+const ROLES     = ROLES_DS
+const PERMISOS  = Object.fromEntries(ROLES_DS.map(r => [r.value, r.permisos || []]))
+const SEDE_HINTS = Object.fromEntries(
+  ROLES_DS.filter(r => r.sedes).map(r => [r.value, r.sedes.hint]))
 
-const PERMISOS = {
-  admin:       [{ ok: true, label: "Gestión total" }, { ok: true, label: "Usuarios y configuración" }, { ok: true, label: "Contabilidad" }, { ok: true, label: "Todos los módulos" }],
-  medico:      [{ ok: true, label: "Gestionar pacientes" }, { ok: true, label: "Indicaciones médicas" }, { ok: true, label: "Dispensaciones" }, { ok: false, label: "Producción" }],
-  cultivador:  [{ ok: true, label: "Salas de su sede" }, { ok: true, label: "Lotes y plantas" }, { ok: true, label: "Genéticas" }, { ok: false, label: "Pacientes" }],
-  supervisor:  [{ ok: true, label: "Sedes asignadas" }, { ok: true, label: "Crear tareas" }, { ok: true, label: "Ver salas y lotes" }, { ok: false, label: "Usuarios / pacientes" }],
-  manicura:    [{ ok: true, label: "Registrar cosecha" }, { ok: true, label: "Salas cosecha/manicura" }, { ok: false, label: "Aprobar stock" }, { ok: false, label: "Dispensar / pacientes" }],
-  dispensador: [{ ok: true, label: "Registrar dispensaciones" }, { ok: true, label: "Consultar pacientes" }, { ok: true, label: "Ver stock" }, { ok: false, label: "Producción" }],
-  delivery:    [{ ok: true, label: "Entregas a domicilio" }, { ok: true, label: "Consultar pacientes" }, { ok: false, label: "Crear dispensaciones" }, { ok: false, label: "Producción" }],
-  abogado:     [{ ok: true, label: "Documentos legales" }, { ok: true, label: "Contabilidad (lectura)" }, { ok: true, label: "Trazabilidad" }, { ok: false, label: "Modificar datos clínicos" }],
-  auditor:     [{ ok: true, label: "Lectura completa" }, { ok: true, label: "Contabilidad" }, { ok: false, label: "Crear / modificar" }, { ok: false, label: "Gestionar usuarios" }],
-  socio:       [{ ok: true, label: "Ver su perfil" }, { ok: true, label: "Sus dispensaciones" }, { ok: false, label: "Producción" }, { ok: false, label: "Otros módulos" }],
-}
-
-const SEDE_HINTS = {
-  cultivador:  'Accede a salas de vege/floración de estas sedes',
-  supervisor:  'Solo puede crear tareas en estas sedes',
-  medico:      'Solo ve pacientes de estas sedes — sin asignar: todo el club',
-  dispensador: 'Solo puede dispensar en estas sedes — sin asignar: todas',
-  delivery:    'Solo gestiona entregas de estas sedes — sin asignar: todas',
-}
 
 const AVATAR_COLORS = ['#1b5e20','#0369a1','#7c3aed','#b45309','#0891b2','#dc2626','#15803d']
 
-function roleInfo(role) { return ROLES.find(r => r.value === role) || { label: role, color: '#475569', bg: 'rgba(71,85,105,.1)', icon: 'bi-person', desc: '' } }
+// El color sale de los tokens del DS (`--c-role-<rol>`), no de hexadecimales sueltos.
+function roleInfo(role) {
+  return { ...rolInfo(role), color: rolColor(role), bg: rolBg(role) }
+}
 function getInitials(user) {
   if (!user) return '?'
   return ((user.first_name?.[0] || '') + (user.last_name?.[0] || '')).toUpperCase() || user.email?.[0]?.toUpperCase() || '?'
@@ -79,6 +58,37 @@ function getAvatarColor(user) { return AVATAR_COLORS[(user?.id || 0) % AVATAR_CO
 function formatDate(d) {
   if (!d) return '—'
   return new Date(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
+// ── Restablecer contraseña ──────────────────────────────────────────────
+// "Me olvidé la contraseña" es lo que más se pide de esta pantalla y no había forma de
+// resolverlo: el endpoint existía sin estar enchufado a nada. La clave se muestra para poder
+// dictarla, porque el mail sólo sale si el club tiene el correo configurado.
+const reseteando  = ref(false)
+const credenciales = ref(null)
+
+async function resetearPassword() {
+  const ok = await confirm({
+    title: `Restablecer la contraseña de ${u.value?.first_name || 'este usuario'}`,
+    message: 'Se genera una contraseña nueva y la actual deja de funcionar en el acto. Vas a poder verla y copiarla para dársela.',
+    confirmText: 'Generar contraseña',
+  })
+  if (!ok) return
+  reseteando.value = true
+  try {
+    const { data } = await resetUserPassword(id)
+    credenciales.value = data
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo restablecer la contraseña')
+  } finally {
+    reseteando.value = false
+  }
+}
+
+async function copiarCredenciales() {
+  const c = credenciales.value
+  await navigator.clipboard.writeText(`Usuario: ${c.email}\nContraseña: ${c.password_inicial}`)
+  toast.success('Copiado')
 }
 
 // ── Editar info personal ────────────────────────────────────────────────
@@ -353,6 +363,9 @@ onMounted(async () => {
           <div class="ud__hero-actions">
             <button v-if="canEdit && !editingInfo" class="ud__btn-edit-hero" @click="startEditInfo">
               <i class="bi bi-pencil"></i> Editar datos
+            </button>
+            <button v-if="canEdit" class="ud__btn-edit-hero" @click="resetearPassword" :disabled="reseteando">
+              <i class="bi bi-key"></i> {{ reseteando ? 'Generando…' : 'Restablecer contraseña' }}
             </button>
             <button v-if="canEdit" class="ud__btn-danger-outline" @click="doDelete">
               <i class="bi bi-trash"></i>
@@ -853,6 +866,17 @@ onMounted(async () => {
 }
 
 /* Hero actions */
+.ud__cred { margin-top: 1rem; background: #f0fdf4; border: 1px solid #86efac; border-radius: 12px; padding: 1rem 1.15rem; }
+.ud__cred-head { display: flex; align-items: center; gap: .5rem; font-size: .85rem; color: #15803d; margin-bottom: .75rem; flex-wrap: wrap; }
+.ud__cred-mail { font-size: .72rem; color: #15803d; background: #dcfce7; padding: .1em .5em; border-radius: 999px; font-weight: 700; }
+.ud__cred-mail--off { color: #92400e; background: #fef3c7; }
+.ud__cred-row { display: flex; align-items: center; gap: .75rem; margin-bottom: .4rem; }
+.ud__cred-lbl { font-size: .72rem; color: #64748b; width: 80px; flex-shrink: 0; text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
+.ud__cred-val { font-family: monospace; font-size: .9rem; background: #fff; border: 1px solid #bbf7d0; border-radius: 6px; padding: .3rem .6rem; color: #0f172a; user-select: all; }
+.ud__cred-val--big { font-size: 1.05rem; font-weight: 700; letter-spacing: .04em; }
+.ud__cred-acts { display: flex; gap: .5rem; align-items: center; margin-top: .85rem; }
+.ud__cred-close { background: none; border: none; color: #15803d; font-size: .8rem; font-weight: 600; cursor: pointer; text-decoration: underline; }
+.ud__cred-hint { font-size: .72rem; color: #64748b; margin: .6rem 0 0; }
 .ud__hero-actions { display: flex; gap: .6rem; margin-left: auto; align-self: flex-start; }
 
 /* Hero strip */
