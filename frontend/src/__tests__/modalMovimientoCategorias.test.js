@@ -168,7 +168,9 @@ describe('ModalMovimiento — un solo formulario', () => {
     await new Promise(r => setTimeout(r, 0))
 
     expect(w.vm.areaDeLaCategoria).toBe('Cultivo')
-    expect(document.body.textContent).toContain('la define la categoría')
+    // El sector se muestra como ECO de la categoría, pegado a ella, no como un campo más de
+    // la lista: es la consecuencia de lo que se acaba de elegir.
+    expect(document.body.textContent).toContain('Cultivo')
     w.unmount()
   })
 

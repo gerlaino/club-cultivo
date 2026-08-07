@@ -437,7 +437,12 @@ class InformesController < ApplicationController
 
     lista = pacientes.limit(200).map do |p|
       {
+        # Nombre completo y los últimos TRES del documento: este informe se presenta ante la
+        # autoridad, que necesita saber de quién se habla. Las iniciales sirven para un
+        # tablero interno, no para acreditar una nómina.
+        nombre_completo:       p.nombre_completo,
         iniciales:             "#{p.nombre[0]}.#{p.apellido[0]}.",
+        dni_ultimos_3:         p.dni_normalizado.to_s.last(3),
         dni_ultimos_4:         p.dni_normalizado.to_s.last(4),
         reprocann_estado:      p.reprocann_categoria,
         reprocann_vencimiento: p.reprocann_vencimiento,
@@ -538,8 +543,8 @@ class InformesController < ApplicationController
     rows = (data[:lista_anonimizada] || []).map do |p|
       venc = p[:reprocann_vencimiento].present? ? Date.parse(p[:reprocann_vencimiento].to_s).strftime('%d/%m/%Y') : '—'
       [
-        p[:iniciales].to_s,
-        p[:dni_ultimos_4].present? ? "**** #{p[:dni_ultimos_4]}" : '—',
+        p[:nombre_completo].presence || p[:iniciales].to_s,
+        p[:dni_ultimos_3].present? ? "***#{p[:dni_ultimos_3]}" : '—',
         ESTADO_REPROCANN_LABEL[p[:reprocann_estado].to_s] || p[:reprocann_estado].to_s,
         venc,
       ]
@@ -547,7 +552,7 @@ class InformesController < ApplicationController
     XlsxExport.new(
       club:    club,
       titulo:  'Informe REPROCANN',
-      headers: ['Iniciales', 'DNI (últ. 4)', 'Estado', 'Vencimiento'],
+      headers: ['Paciente', 'DNI (últ. 3)', 'Estado', 'Vencimiento'],
       rows:    rows,
       anchos:  [14, 16, 28, 16],
     ).render

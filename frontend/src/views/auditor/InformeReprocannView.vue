@@ -98,11 +98,11 @@
       <div class="inf__section">
         <h2 class="inf__section-title">Lista anonimizada (vigentes y por vencer)</h2>
         <table class="inf__table">
-          <thead><tr><th>Iniciales</th><th>DNI (últimos 4)</th><th>Estado REPROCANN</th><th>Vencimiento</th></tr></thead>
+          <thead><tr><th>Paciente</th><th>DNI (últ. 3)</th><th>Estado REPROCANN</th><th>Vencimiento</th></tr></thead>
           <tbody>
             <tr v-for="(p, i) in listaFiltrada" :key="i">
-              <td>{{ p.iniciales }}</td>
-              <td>****{{ p.dni_ultimos_4 }}</td>
+              <td>{{ p.nombre_completo || p.iniciales }}</td>
+              <td>***{{ p.dni_ultimos_3 }}</td>
               <td><span class="inf__badge" :class="`inf__badge--${p.reprocann_estado}`">{{ estadoLabel(p.reprocann_estado) }}</span></td>
               <td>{{ p.reprocann_vencimiento ? formatDate(p.reprocann_vencimiento) : '—' }}</td>
             </tr>

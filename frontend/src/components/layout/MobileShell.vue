@@ -153,7 +153,7 @@ const NAV = {
   // El cultivador es el que MÁS escanea —es lo primero que hace al entrar a una sala—, pero el
   // botón vivía solo en el FAB de admin y en el detalle de un lote: no tenía cómo llegar.
   cultivador: { fab: true, items: [
-    { to: '/m/cultivador/sedes',  icon: 'bi-diagram-3',     label: 'Cultivo' },
+    { to: '/m/cultivador/sedes',  icon: 'bi-diagram-3',     label: 'Cultivo', feature: 'cultivo' },
     { to: '/m/scan',              icon: 'bi-qr-code-scan',  label: 'Escanear' },
     { to: '/m/cultivador/tareas', icon: 'bi-check2-square', label: 'Tareas' },
     // A la planta suelta se llega escaneando su QR o desde su lote, que es como se trabaja en la
@@ -164,19 +164,22 @@ const NAV = {
   // El admin en el celular NO administra: mira cómo va el día y desbloquea lo que traba a otros.
   // Lo de escritorio —contabilidad, informes, configuración— no se bloquea (si lo necesita abre
   // Chrome y tiene la app entera), simplemente no ocupa la barra.
+  // `feature`: de qué suite depende cada destino. Sin esto, un club de sólo cultivo veía
+  // Dispensas y Pacientes en la barra, entraba, y el backend le devolvía 403: un menú que
+  // no lleva a ningún lado.
   admin: { fab: true, items: [
     { to: '/m/admin/home',    icon: 'bi-grid-1x2',      label: 'Inicio'  },
-    { to: '/m/admin/sedes',   icon: 'bi-diagram-3',     label: 'Cultivo' },
-    { to: '/m/admin/aprobar', icon: 'bi-patch-check',   label: 'Aprobar' },
+    { to: '/m/admin/sedes',   icon: 'bi-diagram-3',     label: 'Cultivo',   feature: 'cultivo' },
+    { to: '/m/admin/aprobar', icon: 'bi-patch-check',   label: 'Aprobar',   feature: 'cultivo' },
     { to: '/m/admin/tareas',  icon: 'bi-check2-square', label: 'Tareas'  },
-    { to: '/m/historial',     icon: 'bi-clock-history', label: 'Dispensas' },
-    { to: '/m/pacientes',     icon: 'bi-people',        label: 'Pacientes' },
-    { to: '/m/plantas',       icon: 'bi-flower1',       label: 'Plantas' },
+    { to: '/m/historial',     icon: 'bi-clock-history', label: 'Dispensas', feature: 'produccion_dispensa' },
+    { to: '/m/pacientes',     icon: 'bi-people',        label: 'Pacientes', feature: 'produccion_dispensa' },
+    { to: '/m/plantas',       icon: 'bi-flower1',       label: 'Plantas',   feature: 'cultivo' },
   ] },
   manicura: { items: [
-    { to: '/m/manicura/pesar',      icon: 'bi-scissors',        label: 'Por pesar'  },
-    { to: '/m/manicura/pesajes',    icon: 'bi-journal-check',   label: 'Pesajes'    },
-    { to: '/m/manicura/aprobacion', icon: 'bi-hourglass-split', label: 'Aprobación' },
+    { to: '/m/manicura/pesar',      icon: 'bi-scissors',        label: 'Por pesar',  feature: 'cultivo' },
+    { to: '/m/manicura/pesajes',    icon: 'bi-journal-check',   label: 'Pesajes',    feature: 'cultivo' },
+    { to: '/m/manicura/aprobacion', icon: 'bi-hourglass-split', label: 'Aprobación', feature: 'cultivo' },
     { to: '/m/horas',               icon: 'bi-clock-history',   label: 'Horas'      },
     { to: '/m/manicura/tareas',     icon: 'bi-check2-square',   label: 'Tareas'     },
   ] },
@@ -190,17 +193,23 @@ const NAV = {
   // NO hay tab "Pacientes": la lista completa ya está en Dispensar, con buscador y escaneo del
   // carnet. Tenerla dos veces obligaba a decidir por cuál entrar para hacer lo mismo.
   dispensador: { items: [
-    { to: '/m/dispensar', icon: 'bi-bag-plus',       label: 'Dispensar' },
-    { to: '/m/reservas',  icon: 'bi-bookmark-check', label: 'Reservas' },
+    { to: '/m/dispensar', icon: 'bi-bag-plus',       label: 'Dispensar', feature: 'produccion_dispensa' },
+    { to: '/m/reservas',  icon: 'bi-bookmark-check', label: 'Reservas',  feature: 'produccion_dispensa' },
     { to: '/m/stock',     icon: 'bi-boxes',          label: 'Stock' },
-    { to: '/m/historial', icon: 'bi-clock-history',  label: 'Historial' },
+    { to: '/m/historial', icon: 'bi-clock-history',  label: 'Historial', feature: 'produccion_dispensa' },
     { to: '/m/horas',     icon: 'bi-stopwatch',      label: 'Mis horas' },
   ] },
 }
 NAV.supervisor = NAV.admin
 
+// Un destino se ofrece sólo si el club tiene lo que ese destino necesita. Misma regla que el
+// menú de escritorio (useNavContext), para que las dos superficies no se desincronicen.
+function tieneFeature(item) {
+  return !item.feature || club.data?.features?.[item.feature] === true
+}
+
 const navItems = computed(() => {
-  const base = NAV[role.value]?.items || []
+  const base = (NAV[role.value]?.items || []).filter(tieneFeature)
   if (role.value === 'dispensador' && club.data?.features?.bar) {
     return [...base, { to: '/bar', icon: 'bi-cup-hot', label: 'Buffet' }]
   }

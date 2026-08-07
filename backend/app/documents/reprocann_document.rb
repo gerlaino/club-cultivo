@@ -89,8 +89,8 @@ class ReprocannDocument < BaseDocument
       venc = p[:reprocann_vencimiento].present? ? Date.parse(p[:reprocann_vencimiento].to_s).strftime("%d/%m/%Y") : "—"
       estado = p[:reprocann_estado].to_s
       rows << [
-        p[:iniciales].to_s,
-        p[:dni_ultimos_4].present? ? "**** #{p[:dni_ultimos_4]}" : "—",
+        p[:nombre_completo].presence || p[:iniciales].to_s,
+        p[:dni_ultimos_3].present? ? "***#{p[:dni_ultimos_3]}" : "—",
         ESTADO_LABEL[estado] || estado,
         venc,
       ]
@@ -98,7 +98,7 @@ class ReprocannDocument < BaseDocument
     end
 
     styled_table(pdf,
-      ["Iniciales", "DNI (últ. 4)", "Estado", "Vencimiento"],
+      ["Paciente", "DNI (últ. 3)", "Estado", "Vencimiento"],
       rows,
       aligns:        { 1 => :center, 3 => :center },
       mono:          [1, 3],

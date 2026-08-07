@@ -14,12 +14,15 @@ RSpec.describe 'Categorías contables', type: :request do
   describe 'GET /categorias_contables' do
     before { sign_in_as(admin) }
 
-    it 'NO auto-siembra el árbol: el club arranca en limpio (el usuario crea sus categorías)' do
-      expect(club.categorias_contables.count).to eq(0)
+    # El club arranca CON categorías. Antes arrancaba en limpio y el primer gasto se cargaba
+    # contra un combo vacío: había que inventar una taxonomía en el momento, cada uno la
+    # inventaba distinta, y después no se podía filtrar ni sacar un informe que cerrara.
+    it 'el club arranca con categorías para elegir, no con un combo vacío' do
       get '/categorias_contables', headers: auth_headers, as: :json
+
       expect(response).to have_http_status(:ok)
-      expect(JSON.parse(response.body)).to be_empty       # sin categorías preseteadas
-      expect(club.unidades_negocio).to exist              # pero las áreas sí (las usa el código)
+      expect(JSON.parse(response.body)).not_to be_empty
+      expect(club.unidades_negocio).to exist
     end
 
     it 'el árbol-guía (opt-in) tiene madres con subcategorías que heredan comportamiento' do

@@ -575,8 +575,10 @@ const titulo = computed(() => {
             <!-- Columna derecha: la consecuencia del hecho -->
             <aside class="mv-col mv-col--asiento">
               <p class="mv-rail-tit">Se registra así</p>
-
-              <div class="mv-fld mv-combo-wrap">
+              <!-- La categoría es lo ÚNICO que decide si después vas a poder filtrar esto y
+                   si va a aparecer bien en un informe. Va destacada, no como un campo más
+                   en la lista. -->
+              <div class="mv-fld mv-combo-wrap mv-fld--clave">
                 <span class="mv-lbl">Categoría <span class="mv-req">*</span></span>
                 <button type="button" class="mv-combo" :class="{ 'mv-combo--err': errores.categoria }"
                         @click="catOpen ? catOpen = false : abrirCat()">
@@ -674,13 +676,15 @@ const titulo = computed(() => {
                 </select>
               </label>
 
-              <div v-if="areaDeLaCategoria" class="mv-fld">
-                <span class="mv-lbl">Sector</span>
-                <p class="mv-area-ro">
-                  <i class="bi bi-diagram-3"></i> {{ areaDeLaCategoria }}
-                  <span class="mv-opt">— la define la categoría</span>
-                </p>
-              </div>
+              <!-- El eco de lo que la categoría acaba de decidir: a qué sector imputa y si
+                   lo comprado entra a un inventario. Va pegado a la categoría, que es lo que
+                   lo produce, y no como un campo más de la lista. -->
+              <p v-if="catActual" class="mv-cat-eco">
+                <i class="bi bi-diagram-3"></i>
+                <strong v-if="areaDeLaCategoria">{{ areaDeLaCategoria }}</strong>
+                <span v-else class="mv-opt">Sin sector</span>
+                <span v-if="pideDestinoCat" class="mv-cat-eco-tag">entra al inventario</span>
+              </p>
 
               <hr class="mv-rail-sep" />
 
@@ -789,6 +793,31 @@ const titulo = computed(() => {
   border-left: 1px solid var(--c-ink-100); background: var(--c-ink-50, #f8fafc);
   align-self: stretch;
 }
+/* Salió / entró: la primera decisión del formulario, y la única que siempre se puede tomar
+   sin pensar. Tiene que verse como una elección, no como dos botones sueltos. */
+.mv-tipo { display: flex; gap: .5rem; margin-bottom: var(--sp-4, 1rem); }
+.mv-tipo-btn {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: .45rem;
+  padding: .7rem 1rem; border: 1.5px solid #e2e8f0; background: #fff; border-radius: 10px;
+  font-size: .875rem; font-weight: 700; color: #64748b; cursor: pointer;
+  transition: border-color .15s, background .15s, color .15s;
+}
+.mv-tipo-btn:hover { border-color: #cbd5e1; background: #f8fafc; }
+.mv-tipo-btn--on { border-color: #b91c1c; background: #fef2f2; color: #b91c1c; }
+.mv-tipo-btn--in.mv-tipo-btn--on { border-color: #15803d; background: #f0fdf4; color: #15803d; }
+
+/* Los fijos del mes: un acceso discreto, no un botón que compita con Guardar. */
+.mv-fijos-link { padding: 0 var(--sp-5, 1.25rem) var(--sp-3, .75rem); }
+.mv-linkbtn {
+  display: inline-flex; align-items: center; gap: .35rem; background: none; border: none;
+  color: #64748b; font-size: .78rem; cursor: pointer; padding: 0; text-decoration: underline;
+}
+.mv-linkbtn:hover { color: #0f172a; }
+
+.mv-fld--clave { background: #fff; border: 1.5px solid #cbd5e1; border-radius: 10px; padding: .7rem .8rem; }
+.mv-cat-eco { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; font-size: .75rem; color: #64748b; margin: -.4rem 0 0; padding: 0 .2rem; }
+.mv-cat-eco-tag { font-size: .68rem; font-weight: 700; background: #dbeafe; color: #0369a1; padding: .1em .5em; border-radius: 999px; }
+
 .mv-rail-tit {
   margin: 0; font-size: var(--fs-12); font-weight: 700; letter-spacing: .04em;
   text-transform: uppercase; color: var(--c-ink-500);

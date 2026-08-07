@@ -962,17 +962,27 @@ class AnalyticsController < ApplicationController
       mes_fin = mes_ini.end_of_month
       label   = mes_ini.strftime('%b %Y')
 
-      # Ingresos del mes desde el libro de caja (mismo criterio que el dashboard y
-      # que kpis_anuales): dispensaciones cobradas + señas, sin crédito impago.
+      # El resultado del mes sale ENTERO del libro de caja: ingresos menos egresos, que es lo
+      # que el admin ve en la pantalla de Contabilidad.
+      #
+      # Antes los ingresos salían del libro y los "costos" de CostoLote (costos imputados a
+      # lotes). Dos libros distintos restados entre sí: el margen no coincidía con nada, y los
+      # egresos del libro —un alquiler, un sueldo— no aparecían en ninguna parte del informe.
       ingresos = MovimientoContable.ingresos.where(club_id: club.id)
                                    .where(fecha: mes_ini..mes_fin).sum(:monto_ars).to_f.round(2)
+      egresos  = MovimientoContable.egresos.where(club_id: club.id)
+                                  .where(fecha: mes_ini..mes_fin).sum(:monto_ars).to_f.round(2)
 
-      costos = CostoLote.joins(:lote)
-                        .where(lotes: { club_id: club.id })
-                        .where(created_at: mes_ini..mes_fin.end_of_day)
-                        .sum(:costo_total).to_f.round(2)
+      # El costo de producción va APARTE: es cuánto costó producir lo cosechado, no plata que
+      # salió de la caja este mes. Mezclarlo con el resultado del período es lo que hacía que
+      # el informe dijera una cosa y la pantalla otra.
+      costo_produccion = CostoLote.joins(:lote)
+                                  .where(lotes: { club_id: club.id })
+                                  .where(created_at: mes_ini..mes_fin.end_of_day)
+                                  .sum(:costo_total).to_f.round(2)
 
-      meses.unshift({ mes: label, mes_ini: mes_ini, ingresos: ingresos, costos: costos, margen: (ingresos - costos).round(2) })
+      meses.unshift({ mes: label, mes_ini: mes_ini, ingresos: ingresos, costos: egresos,
+                      margen: (ingresos - egresos).round(2), costo_produccion: costo_produccion })
     end
 
     # Proyección: lotes en curso (vegetativo / floración) × precio sugerido × rendimiento objetivo

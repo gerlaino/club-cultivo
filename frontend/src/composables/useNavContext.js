@@ -74,10 +74,10 @@ export const NAV_GROUPS = [
     key: 'reportes', label: 'Reportes', to: '/analitica',
     tabs: [
       { to: '/analitica', label: 'Analítica' },
-      { to: '/auditor/reprocann', label: 'REPROCANN' },
+      { to: '/auditor/reprocann', label: 'REPROCANN', feature: 'produccion_dispensa' },
       { to: '/auditor', label: 'Auditoría' },
       { to: '/auditor/trazabilidad', label: 'Trazabilidad' },
-      { to: '/ariccame', label: 'ARICCAME' },
+      { to: '/ariccame', label: 'ARICCAME', feature: 'ariccame' },
       { to: '/documentos', label: 'Documentos' },
     ],
   },

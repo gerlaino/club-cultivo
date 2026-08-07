@@ -17,10 +17,18 @@ module Finanzas
       @club = club
     end
 
-    # Por defecto NO siembra el árbol de categorías: el club arranca en limpio y el usuario crea
-    # las suyas. Las áreas (unidades de negocio) sí se siembran porque las usa el código (ej. Bar).
-    # `con_arbol: true` queda para sembrar categorías-guía a pedido más adelante.
-    def call(con_arbol: false)
+    # El club arranca CON el árbol de categorías puesto.
+    #
+    # Antes arrancaba en limpio, con la idea de que cada club armara las suyas. En la práctica
+    # eso significa que el primer gasto se carga contra un combo vacío: hay que inventar una
+    # taxonomía contable en el momento, movimiento por movimiento, y cada persona la inventa
+    # distinta. El resultado es que después no se puede filtrar nada ni sacar un informe que
+    # cierre — que es exactamente para lo que existen las categorías.
+    #
+    # Con el árbol puesto, cargar es ELEGIR de una lista y los informes tienen datos
+    # consistentes desde el primer día. El club renombra, agrega o desactiva lo que no le
+    # sirva; eso es mucho más barato que diseñar un plan de cuentas desde cero.
+    def call(con_arbol: true)
       ActsAsTenant.with_tenant(@club) do
         @unidades = sembrar_unidades
         sembrar_arbol if con_arbol
