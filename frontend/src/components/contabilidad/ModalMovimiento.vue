@@ -12,7 +12,7 @@ import MovimientosFijos from './MovimientosFijos.vue'
 import { useModalEscape } from '../../composables/useModalEscape.js'
 import { createCategoriaContable, createUnidadNegocio } from '../../lib/api.js'
 import {
-  FLOWS, FLOWS_ORDEN, flowDe, hoyLocal, fmtARS, fmtMiles, parseMonto,
+  flowDe, hoyLocal, fmtARS, fmtMiles, parseMonto,
   destinoVacio, destinoEstado, destinoPayload, esDepositoSalon,
   validarMovimiento, esValido,
 } from './movimientoFlows.js'
@@ -91,11 +91,15 @@ const catsSelectables = computed(() => {
     if (m.subcategorias?.length) {
       for (const s of m.subcategorias) {
         out.push({ id: s.id, label: `${m.nombre} › ${s.nombre}`, tipo: s.tipo, clave: s.clave_efectiva,
-                   area: s.unidad_negocio?.id || m.unidad_negocio?.id || null })
+                   area: s.unidad_negocio?.id || m.unidad_negocio?.id || null,
+                   areaNombre: s.unidad_negocio?.nombre || m.unidad_negocio?.nombre || null,
+                   comportamiento: s.comportamiento_efectivo || m.comportamiento_efectivo || 'general' })
       }
     } else {
       out.push({ id: m.id, label: m.nombre, tipo: m.tipo, clave: m.clave_efectiva,
-                 area: m.unidad_negocio?.id || null })
+                 area: m.unidad_negocio?.id || null,
+                 areaNombre: m.unidad_negocio?.nombre || null,
+                 comportamiento: m.comportamiento_efectivo || 'general' })
     }
   }
   // Las creadas recién, acá adentro: viven en local hasta que el padre refresque el catálogo, así
@@ -200,7 +204,8 @@ async function confirmarCrearArea() {
   try {
     const { data } = await createUnidadNegocio({ nombre: f.nombre.trim(), tipo: f.tipo })
     areasNuevas.value.push({ id: data.id, nombre: data.nombre, tipo: data.tipo })
-    form.value.unidad_negocio_id = data.id
+    if (crearCat.value) crearCat.value.unidad_negocio_id = data.id
+    else form.value.unidad_negocio_id = data.id
     crearArea.value = null
     emit('catalogo-actualizado')
   } catch (e) {
@@ -211,6 +216,17 @@ async function confirmarCrearArea() {
 // El paciente aparece cuando la categoría lo pide, o cuando el flujo es un aporte.
 const pacienteObligatorio = computed(() => catActual.value?.clave === 'aporte_socio' || flujo.value?.pidePaciente)
 const muestraPaciente     = computed(() => pacienteObligatorio.value || catActual.value?.clave === 'dispensacion')
+
+// El formulario es UNO SOLO: la categoría dice si lo comprado entra a un inventario y a cuál.
+// Antes había que elegir "Compré algo" vs "Pagué un gasto" ANTES de saber qué se estaba
+// cargando, y esa decisión —que el usuario no puede tomar bien de entrada— definía qué campos
+// aparecían después. El comportamiento de la categoría ya tiene esa información.
+const COMPORTAMIENTOS_CON_STOCK = ['insumo', 'insumo_general', 'mercaderia']
+const pideDestinoCat = computed(() =>
+  COMPORTAMIENTOS_CON_STOCK.includes(catActual.value?.comportamiento))
+
+// El área ya no se elige: sale de la categoría y se muestra como dato.
+const areaDeLaCategoria = computed(() => catActual.value?.areaNombre || null)
 const pacQuery = ref('')
 const pacOpen  = ref(false)
 const pacInput = ref(null)
@@ -246,7 +262,7 @@ function onMonto(e) {
 const ctxValidacion = computed(() => ({
   pacienteObligatorio: pacienteObligatorio.value,
   esCuotas: esCuotas.value,
-  pideDestino: !!flujo.value?.pideDestino,
+  pideDestino: pideDestinoCat.value,
   destino: { ...destinoEstado(destino.value, depositoSel.value), cantidad: destino.value.cantidad },
 }))
 const erroresActuales = computed(() => validarMovimiento(form.value, ctxValidacion.value))
@@ -278,9 +294,36 @@ function elegirFlujo(key) {
 }
 
 function volver() {
-  if (editando.value) { cerrar(); return }
-  paso.value = 'intencion'
-  flujo.value = null
+  cerrar()
+}
+
+// El formulario genérico: no presupone nada más que si la plata sale o entra.
+const FLUJO_LIBRE = {
+  key: 'libre',
+  labelDescripcion: '¿Qué fue?',
+  phDescripcion: 'Ej: Alquiler julio, 20 l de fertilizante…',
+  labelMonto: '¿Cuánto?',
+  cta: 'Guardar movimiento',
+}
+
+function abrirLibre(tipo = 'egreso') {
+  flujo.value = FLUJO_LIBRE
+  form.value = formVacio(tipo)
+  montoTexto.value = ''
+  destino.value = destinoVacio()
+  errores.value = {}
+  crearCat.value = null; crearArea.value = null; errorCrear.value = ''
+  if (props.depositoInicial) destino.value = { ...destinoVacio(), deposito_id: props.depositoInicial }
+  paso.value = 'form'
+}
+
+// Cambiar entre salió/entró conserva lo ya escrito: sólo se limpia la categoría, que es de
+// un tipo y no del otro.
+function setTipo(tipo) {
+  if (form.value.tipo === tipo) return
+  form.value.tipo = tipo
+  form.value.categoria_contable_id = null
+  delete errores.value.categoria
 }
 
 function cerrar() { emit('update:modelValue', false) }
@@ -300,7 +343,7 @@ function submit() {
     medio_pago: esCuotas.value ? 'en_cuotas' : form.value.medio_pago,
   }
   delete payload.plan
-  const dst = flujo.value?.pideDestino ? destinoPayload(destino.value, depositoSel.value) : null
+  const dst = pideDestinoCat.value ? destinoPayload(destino.value, depositoSel.value) : null
   if (dst) payload.destino = dst
   emit('guardado', payload)
 }
@@ -345,7 +388,7 @@ watch(() => props.modelValue, (abierto) => {
 
   destino.value = destinoVacio()
   if (props.flujoInicial && flowDe(props.flujoInicial)) elegirFlujo(props.flujoInicial)
-  else { paso.value = 'intencion'; flujo.value = null; form.value = formVacio(); montoTexto.value = '' }
+  else abrirLibre()
 })
 
 // Cerrar los dropdowns al clickear afuera
@@ -369,7 +412,6 @@ const cuotaMonto = computed(() => {
 })
 const titulo = computed(() => {
   if (editando.value) return 'Editar movimiento'
-  if (paso.value === 'intencion') return 'Nuevo movimiento'
   return flujo.value?.titulo || 'Nuevo movimiento'
 })
 </script>
@@ -383,35 +425,14 @@ const titulo = computed(() => {
 
           <!-- Header -->
           <header class="mv-hdr">
-            <button v-if="paso !== 'intencion' && !editando" type="button" class="mv-hdr-back"
-                    @click="volver" aria-label="Volver">
-              <i class="bi bi-arrow-left"></i>
-            </button>
             <h2 class="mv-hdr-title" id="mv-title">{{ titulo }}</h2>
-            <span v-if="paso === 'form' && !editando" class="mv-hdr-tag">
-              {{ esEgreso ? 'Egreso' : 'Ingreso' }}
-            </span>
             <button type="button" class="mv-hdr-x" @click="cerrar" aria-label="Cerrar">
               <i class="bi bi-x-lg"></i>
             </button>
           </header>
 
-          <!-- ① Intención -->
-          <div v-if="paso === 'intencion'" class="mv-body">
-            <p class="mv-ask">¿Qué pasó?</p>
-            <div class="mv-tiles">
-              <button v-for="key in FLOWS_ORDEN" :key="key" type="button" class="mv-tile"
-                      :class="{ 'mv-tile--wide': FLOWS[key].pantalla === 'fijos' }"
-                      @click="elegirFlujo(key)">
-                <i class="mv-tile-ico bi" :class="FLOWS[key].icono"></i>
-                <span class="mv-tile-tit">{{ FLOWS[key].titulo }}</span>
-                <span class="mv-tile-sub">{{ FLOWS[key].resumen }}</span>
-              </button>
-            </div>
-          </div>
-
           <!-- ② Fijos del mes -->
-          <div v-else-if="paso === 'fijos'" class="mv-body">
+          <div v-if="paso === 'fijos'" class="mv-body">
             <MovimientosFijos ref="fijosRef" @cargar="cargarFijos" @volver="volver" />
           </div>
 
@@ -421,6 +442,17 @@ const titulo = computed(() => {
                mal tenías que abrir un acordeón. -->
           <div v-else class="mv-body mv-body--split">
             <div class="mv-col mv-col--hecho">
+
+            <div v-if="!editando" class="mv-tipo">
+              <button type="button" class="mv-tipo-btn" :class="{ 'mv-tipo-btn--on': esEgreso }"
+                      @click="setTipo('egreso')">
+                <i class="bi bi-arrow-up-right"></i> Salió plata
+              </button>
+              <button type="button" class="mv-tipo-btn mv-tipo-btn--in" :class="{ 'mv-tipo-btn--on': !esEgreso }"
+                      @click="setTipo('ingreso')">
+                <i class="bi bi-arrow-down-left"></i> Entró plata
+              </button>
+            </div>
 
             <!-- Qué / cuánto: la línea principal -->
             <div class="mv-main">
@@ -473,7 +505,7 @@ const titulo = computed(() => {
 
             <!-- Destino del stock (compras) -->
             <DestinoStock
-              v-if="flujo?.pideDestino"
+              v-if="pideDestinoCat"
               v-model="destino"
               :depositos="depositos" :insumos="insumos" :bares="bares"
               :monto="form.monto_ars" :errores="errores"
@@ -583,13 +615,38 @@ const titulo = computed(() => {
                         <option v-for="m in madresDelTipo" :key="m.id" :value="m.id">{{ m.nombre }}</option>
                       </select>
                     </label>
-                    <label v-if="!crearCat.parent_id" class="mv-fld">
-                      <span class="mv-lbl">Área <span class="mv-opt">(opcional)</span></span>
-                      <select class="mv-inp" v-model.number="crearCat.unidad_negocio_id">
-                        <option :value="null">— Sin área —</option>
-                        <option v-for="u in areasDisponibles" :key="u.id" :value="u.id">{{ u.nombre }}</option>
-                      </select>
-                    </label>
+                    <!-- El área ya no se elige por movimiento: se define acá, una sola vez, y
+                         después todos los movimientos de esta categoría la heredan. -->
+                    <template v-if="!crearCat.parent_id">
+                      <label v-if="!crearArea" class="mv-fld">
+                        <span class="mv-lbl">Área <span class="mv-opt">(opcional)</span></span>
+                        <select class="mv-inp" v-model.number="crearCat.unidad_negocio_id">
+                          <option :value="null">— Sin área —</option>
+                          <option v-for="u in areasDisponibles" :key="u.id" :value="u.id">{{ u.nombre }}</option>
+                        </select>
+                        <button type="button" class="mv-inline-new" @click.prevent="abrirCrearArea">
+                          <i class="bi bi-plus-lg"></i> Crear un área
+                        </button>
+                      </label>
+                      <div v-else class="mv-newbox mv-newbox--flat">
+                        <label class="mv-fld">
+                          <span class="mv-lbl">Nombre del área</span>
+                          <input v-model.trim="crearArea.nombre" type="text" class="mv-inp" placeholder="Ej: Eventos" />
+                        </label>
+                        <label class="mv-fld">
+                          <span class="mv-lbl">Tipo</span>
+                          <select class="mv-inp" v-model="crearArea.tipo">
+                            <option v-for="t in AREA_TIPOS" :key="t.value" :value="t.value">{{ t.label }}</option>
+                          </select>
+                        </label>
+                        <div class="mv-newbox-acts">
+                          <button type="button" class="mv-btn-ghost mv-btn-ghost--sm" @click="crearArea = null">Cancelar</button>
+                          <button type="button" class="mv-btn mv-btn--sm" :disabled="creando" @click="confirmarCrearArea">
+                            {{ creando ? 'Creando…' : 'Crear y usar' }}
+                          </button>
+                        </div>
+                      </div>
+                    </template>
                     <p class="mv-newbox-hint">
                       <template v-if="crearCat.parent_id">Hereda el área y el destino de stock de la que elijas.</template>
                       <template v-else-if="!madresDelTipo.length">Todavía no hay categorías de este tipo: esta va a ser la primera.</template>
@@ -617,34 +674,12 @@ const titulo = computed(() => {
                 </select>
               </label>
 
-              <div class="mv-fld">
-                <span class="mv-lbl">Área <span class="mv-opt">(opcional)</span></span>
-                <select v-if="!crearArea" class="mv-inp" v-model="form.unidad_negocio_id">
-                  <option :value="null">— Sin área —</option>
-                  <option v-for="u in areasDisponibles" :key="u.id" :value="u.id">{{ u.nombre }}</option>
-                </select>
-                <button v-if="!crearArea" type="button" class="mv-inline-new" @click="abrirCrearArea">
-                  <i class="bi bi-plus-lg"></i> Crear un área
-                </button>
-                <div v-else class="mv-newbox mv-newbox--flat">
-                  <label class="mv-fld">
-                    <span class="mv-lbl">Nombre</span>
-                    <input v-model.trim="crearArea.nombre" type="text" class="mv-inp" placeholder="Ej: Eventos" />
-                  </label>
-                  <label class="mv-fld">
-                    <span class="mv-lbl">Tipo</span>
-                    <select class="mv-inp" v-model="crearArea.tipo">
-                      <option v-for="t in AREA_TIPOS" :key="t.value" :value="t.value">{{ t.label }}</option>
-                    </select>
-                  </label>
-                  <p v-if="errorCrear" class="mv-err">{{ errorCrear }}</p>
-                  <div class="mv-newbox-acts">
-                    <button type="button" class="mv-btn-ghost mv-btn-ghost--sm" @click="crearArea = null">Cancelar</button>
-                    <button type="button" class="mv-btn mv-btn--sm" :disabled="creando" @click="confirmarCrearArea">
-                      {{ creando ? 'Creando…' : 'Crear y usar' }}
-                    </button>
-                  </div>
-                </div>
+              <div v-if="areaDeLaCategoria" class="mv-fld">
+                <span class="mv-lbl">Área</span>
+                <p class="mv-area-ro">
+                  <i class="bi bi-diagram-3"></i> {{ areaDeLaCategoria }}
+                  <span class="mv-opt">— la define la categoría</span>
+                </p>
               </div>
 
               <hr class="mv-rail-sep" />
@@ -673,6 +708,12 @@ const titulo = computed(() => {
           </div>
 
           <!-- Footer -->
+          <div v-if="paso === 'form' && !editando" class="mv-fijos-link">
+            <button type="button" class="mv-linkbtn" @click="elegirFlujo('fijos')">
+              <i class="bi bi-arrow-repeat"></i> ¿Es uno de los que se repiten todos los meses?
+            </button>
+          </div>
+
           <footer v-if="paso === 'form'" class="mv-ftr">
             <p v-if="errorGuardado" class="mv-ftr-err"><i class="bi bi-exclamation-triangle-fill"></i> {{ errorGuardado }}</p>
             <button type="button" class="mv-btn-ghost" @click="cerrar">Cancelar</button>

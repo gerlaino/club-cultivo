@@ -84,8 +84,14 @@ describe('ModalMovimiento — crear categorías', () => {
     wrapper.unmount()
   })
 
+  // El área ya no se elige por movimiento: se define al crear la categoría, que es el único
+  // lugar donde tiene sentido decidirla.
   it('el tipo de área se ofrece con nombres legibles, no con la clave cruda', async () => {
     const wrapper = await montar([])
+    await abrirComboCategoria()
+    ;[...document.body.querySelectorAll('button')]
+      .find(b => b.textContent.includes('Crear una categoría')).click()
+    await new Promise(r => setTimeout(r, 0))
 
     const nuevaArea = [...document.body.querySelectorAll('button')]
       .find(b => b.textContent.includes('Crear un área'))
@@ -96,5 +102,91 @@ describe('ModalMovimiento — crear categorías', () => {
     expect(opciones).toContain('Buffet')
     expect(opciones).not.toContain('administracion')
     wrapper.unmount()
+  })
+})
+
+// AC del rediseño (#28): un solo formulario. La pantalla de intención obligaba a clasificar
+// el movimiento ANTES de cargarlo —justo cuando menos se sabe— y esa elección definía qué
+// campos aparecían después. Ahora lo único que se elige de entrada es si la plata sale o entra.
+describe('ModalMovimiento — un solo formulario', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    document.body.innerHTML = ''
+  })
+
+  const abrir = async (props = {}) => {
+    const w = mount(ModalMovimiento, {
+      props: { modelValue: false, categorias: [], unidades: [], ...props },
+      global: { stubs: { DsSpinner: true, AppDatePicker: true, ConfirmDialog: true } },
+      attachTo: document.body,
+    })
+    await w.setProps({ modelValue: true })
+    await new Promise(r => setTimeout(r, 0))
+    return w
+  }
+
+  it('abre directo en el formulario, sin preguntar antes "qué pasó"', async () => {
+    const w = await abrir()
+
+    expect(w.vm.paso).toBe('form')
+    expect(document.body.innerHTML).not.toContain('¿Qué pasó?')
+    w.unmount()
+  })
+
+  it('lo primero es si la plata salió o entró', async () => {
+    const w = await abrir()
+
+    const txt = document.body.textContent
+    expect(txt).toContain('Salió plata')
+    expect(txt).toContain('Entró plata')
+    w.unmount()
+  })
+
+  it('cambiar de salió a entró conserva el monto y limpia sólo la categoría', async () => {
+    const w = await abrir()
+    w.vm.form.monto_ars = 45000
+    w.vm.form.categoria_contable_id = 7
+
+    w.vm.setTipo('ingreso')
+    await new Promise(r => setTimeout(r, 0))
+
+    expect(w.vm.form.tipo).toBe('ingreso')
+    expect(w.vm.form.monto_ars, 'lo ya escrito no se pierde').toBe(45000)
+    expect(w.vm.form.categoria_contable_id, 'la categoría es de un tipo, no del otro').toBeNull()
+    w.unmount()
+  })
+
+  // El área dejó de ser un campo del movimiento: la define la categoría.
+  it('el área no se elige por movimiento', async () => {
+    const CATS = [{
+      id: 1, nombre: 'Insumos', tipo: 'egreso', comportamiento_efectivo: 'insumo',
+      unidad_negocio: { id: 3, nombre: 'Cultivo' }, subcategorias: [],
+    }]
+    const w = await abrir({ categorias: CATS })
+
+    w.vm.form.categoria_contable_id = 1
+    await new Promise(r => setTimeout(r, 0))
+
+    expect(w.vm.areaDeLaCategoria).toBe('Cultivo')
+    expect(document.body.textContent).toContain('la define la categoría')
+    w.unmount()
+  })
+
+  // Qué campos pide sale del COMPORTAMIENTO de la categoría, no de un flujo elegido antes.
+  it('pide depósito sólo si la categoría stockea', async () => {
+    const CATS = [
+      { id: 1, nombre: 'Insumos',  tipo: 'egreso', comportamiento_efectivo: 'insumo',  subcategorias: [] },
+      { id: 2, nombre: 'Alquiler', tipo: 'egreso', comportamiento_efectivo: 'general', subcategorias: [] },
+    ]
+    const w = await abrir({ categorias: CATS })
+
+    w.vm.form.categoria_contable_id = 1
+    await new Promise(r => setTimeout(r, 0))
+    expect(w.vm.pideDestinoCat).toBe(true)
+
+    w.vm.form.categoria_contable_id = 2
+    await new Promise(r => setTimeout(r, 0))
+    expect(w.vm.pideDestinoCat).toBe(false)
+    w.unmount()
   })
 })
