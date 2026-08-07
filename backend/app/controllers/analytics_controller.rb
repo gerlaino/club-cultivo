@@ -711,7 +711,18 @@ class AnalyticsController < ApplicationController
     data = Rails.cache.fetch(cache_key, expires_in: 30.minutes) do
       calcular_contabilidad(club)
     end
-    render json: data
+
+    respond_to do |format|
+      format.json { render json: data }
+      # PDF y Excel de servidor: el P&L se bajaba como captura de pantalla.
+      format.pdf  { send_data pl_documento(data).render,
+                              filename: "PL_produccion_#{Time.zone.today.strftime('%Y%m%d')}.pdf",
+                              type: 'application/pdf', disposition: 'attachment' }
+      format.xlsx { send_data pl_xlsx(data),
+                              filename: "PL_produccion_#{Time.zone.today.strftime('%Y%m%d')}.xlsx",
+                              type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                              disposition: 'attachment' }
+    end
   end
 
   # GET /api/analytics/comparativa_salas
@@ -889,6 +900,55 @@ class AnalyticsController < ApplicationController
     unless %w[admin dispensador super_admin].include?(current_user.role)
       render json: { error: 'No autorizado' }, status: :forbidden
     end
+  end
+
+  # El P&L como documento: meses arriba (que es la lectura del negocio) y la proyección de
+  # los lotes en curso abajo, separada, porque son números estimados y no realizados.
+  def pl_secciones(data)
+    meses = Array(data[:meses] || data['meses'])
+    proy  = Array(data[:proyeccion_lotes] || data['proyeccion_lotes'])
+    secciones = [{
+      titulo: 'Resultado por mes',
+      headers: ['Mes', 'Ingresos', 'Costos', 'Margen'],
+      rows: meses.map { |m| [m[:mes], m[:ingresos], m[:costos], m[:margen]] },
+      formatos: [:texto, :moneda, :moneda, :moneda],
+      totales: [1, 2, 3],
+      aligns: { 1 => :right, 2 => :right, 3 => :right },
+    }]
+    if proy.any?
+      secciones << {
+        titulo: 'Proyección de lotes en curso',
+        headers: ['Lote', 'Genética', 'Rendimiento objetivo (g)', 'Ingreso estimado'],
+        rows: proy.map { |l| [l[:codigo], l[:genetica], l[:rendimiento_objetivo_g], l[:ingreso_estimado] || '—'] },
+        aligns: { 2 => :right, 3 => :right },
+      }
+    end
+    secciones
+  end
+
+  def pl_kpis(data)
+    meses = Array(data[:meses] || data['meses'])
+    [
+      { label: 'Ingresos',  valor: meses.sum { |m| m[:ingresos].to_f }.round(2), tono: :ok },
+      { label: 'Costos',    valor: meses.sum { |m| m[:costos].to_f }.round(2) },
+      { label: 'Margen',    valor: meses.sum { |m| m[:margen].to_f }.round(2) },
+      { label: 'Proyectado', valor: (data[:ingreso_proy_total] || data['ingreso_proy_total']).to_f.round(2), tono: :warn },
+    ]
+  end
+
+  def pl_documento(data)
+    InformeDocument.new(club: current_user.club, usuario: current_user,
+                        titulo: 'Resultado de producción (P&L)',
+                        kpis: pl_kpis(data), secciones: pl_secciones(data), tipo_code: 'PL',
+                        nota: 'La proyección estima el ingreso de los lotes en curso con el precio por gramo del último lote cerrado de la misma genética. No es dinero realizado.')
+  end
+
+  def pl_xlsx(data)
+    principal = pl_secciones(data).first
+    XlsxExport.new(club: current_user.club, titulo: 'Resultado de producción (P&L)',
+                   headers: principal[:headers], rows: principal[:rows],
+                   formatos: principal[:formatos], totales: principal[:totales],
+                   resumen: pl_kpis(data).to_h { |k| [k[:label], k[:valor]] }).render
   end
 
   def calcular_contabilidad(club)

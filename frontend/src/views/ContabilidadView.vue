@@ -4,7 +4,7 @@ import { useRoute, useRouter } from "vue-router"
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useContabilidadStore } from "../stores/contabilidad"
 import { useAuthStore }         from "../stores/auth"
-import { listSedes, listLotes, listPacientes, cerrarPeriodoContable, reabrirPeriodoContable, createCompraCuotas, listComprasCuotas, listUnidadesNegocio, listInsumos, listBares, listCategoriasContables, listDepositos } from "../lib/api"
+import api, { listSedes, listLotes, listPacientes, cerrarPeriodoContable, reabrirPeriodoContable, createCompraCuotas, listComprasCuotas, listUnidadesNegocio, listInsumos, listBares, listCategoriasContables, listDepositos } from "../lib/api"
 import { useConfirm }           from "../composables/useConfirm.js"
 import { useToast }             from "../composables/useToast.js"
 import ModalMovimiento from "../components/contabilidad/ModalMovimiento.vue"
@@ -152,24 +152,20 @@ async function irAPL() {
   }
 }
 
-async function exportarPDF() {
+// El P&L lo arma el servidor (Prawn/caxlsx): antes se bajaba una captura de pantalla, sin
+// texto seleccionable y con las columnas cortadas donde cayeran.
+async function exportarPDF(formato = 'pdf') {
   generandoPDF.value = true
-  await nextTick()
-  const el = plContainerRef.value
-  if (!el) { generandoPDF.value = false; return }
-  const subTab = plSubTab.value === 'lotes' ? 'por-lote' : 'por-cepa'
-  const fecha  = new Date().toISOString().slice(0, 10)
-  const opt = {
-    margin:      [12, 10, 12, 10],
-    filename:    `PL_produccion_${subTab}_${fecha}.pdf`,
-    image:       { type: 'jpeg', quality: 0.95 },
-    html2canvas: { scale: 2, useCORS: true },
-    jsPDF:       { unit: 'mm', format: 'a4', orientation: 'landscape' },
-    pagebreak:   { mode: ['avoid-all', 'css', 'legacy'] },
-  }
   try {
-    const { default: html2pdf } = await import('html2pdf.js')
-    await html2pdf().set(opt).from(el).save()
+    const { data } = await api.get(`/analytics/contabilidad.${formato}`, { responseType: 'blob' })
+    const url  = URL.createObjectURL(new Blob([data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `PL_produccion_${new Date().toISOString().slice(0, 10)}.${formato}`
+    document.body.appendChild(link); link.click(); link.remove()
+    URL.revokeObjectURL(url)
+  } catch {
+    toast.error('No se pudo generar el archivo. Reintentá en un momento.')
   } finally {
     generandoPDF.value = false
   }
@@ -1037,7 +1033,10 @@ onMounted(async () => {
           <button class="cv__pl-subtab" :class="{ 'cv__pl-subtab--active': plSubTab === 'cepas' }" @click="plSubTab = 'cepas'">
             Por genética
           </button>
-          <button class="cv__btn-ghost cv__pl-pdf" :disabled="generandoPDF" @click="exportarPDF">
+          <button class="cv__btn-ghost cv__pl-pdf" :disabled="generandoPDF" @click="exportarPDF('xlsx')">
+            <i class="bi bi-file-earmark-spreadsheet"></i> Excel
+          </button>
+          <button class="cv__btn-ghost cv__pl-pdf" :disabled="generandoPDF" @click="exportarPDF('pdf')">
             <DsSpinner v-if="generandoPDF" :size="11" />
             <i v-else class="bi bi-file-earmark-pdf"></i>
             {{ generandoPDF ? 'Generando…' : 'Exportar PDF' }}

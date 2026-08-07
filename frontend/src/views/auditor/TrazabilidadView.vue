@@ -349,7 +349,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { getStockTrazabilidad, listStocks } from '../../lib/api.js'
+import api, { getStockTrazabilidad, listStocks } from '../../lib/api.js'
 
 const FORMA_LABELS = {
   flor_seca: 'Flor seca', hash: 'Hash', aceite: 'Aceite', tintura: 'Tintura',
@@ -472,19 +472,23 @@ function volver() {
   error.value = null
 }
 
+// El PDF lo arma el servidor: la trazabilidad es lo primero que pide un auditor y se bajaba
+// como una foto de la pantalla, sin texto seleccionable ni buscable.
 async function exportPdf() {
-  const el = document.getElementById('trz-report')
-  if (!el) return
-  const ref = data.value?.stock?.numero_lote_producto || data.value?.stock?.id || 'stock'
-  const opt = {
-    margin: [8, 8, 8, 8],
-    filename: `trazabilidad_${ref}_${hoy.replace(/\//g, '-')}.pdf`,
-    image: { type: 'jpeg', quality: 0.95 },
-    html2canvas: { scale: 2, useCORS: true },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+  const st = data.value?.stock
+  if (!st?.id) return
+  try {
+    const { data: blob } = await api.get(`/stocks/${st.id}/trazabilidad.pdf`, { responseType: 'blob' })
+    const ref = st.numero_lote_producto || st.id
+    const url  = URL.createObjectURL(new Blob([blob]))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `trazabilidad_${ref}_${new Date().toISOString().slice(0, 10)}.pdf`
+    document.body.appendChild(link); link.click(); link.remove()
+    URL.revokeObjectURL(url)
+  } catch {
+    error.value = 'No se pudo generar el PDF. Reintentá en un momento.'
   }
-  const { default: html2pdf } = await import('html2pdf.js')
-  await html2pdf().set(opt).from(el).save()
 }
 
 const formatDate = d => d

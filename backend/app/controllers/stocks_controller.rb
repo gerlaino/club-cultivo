@@ -399,7 +399,7 @@ class StocksController < ApplicationController
     cantidad_disponible = s.cantidad.to_f.round(2)
     cantidad_inicial    = s.cantidad_inicial.to_f.round(2) # verdad única (no reconstruir)
 
-    render json: {
+    datos = {
       stock: {
         id:                   s.id,
         numero_lote_producto: s.numero_lote_producto,
@@ -439,6 +439,17 @@ class StocksController < ApplicationController
         cantidad_disponible_g: cantidad_disponible,
       },
     }
+
+    respond_to do |format|
+      format.json { render json: datos }
+      # PDF de servidor: la trazabilidad de un lote es lo primero que pide un auditor y se
+      # bajaba como captura de pantalla.
+      format.pdf do
+        send_data TrazabilidadDocument.new(club: current_user.club, usuario: current_user, datos: datos).render,
+                  filename: "trazabilidad_#{s.numero_lote_producto.presence || s.id}_#{Time.zone.today.strftime('%Y%m%d')}.pdf",
+                  type: 'application/pdf', disposition: 'attachment'
+      end
+    end
   end
 
   # POST /stocks/:id/asignar

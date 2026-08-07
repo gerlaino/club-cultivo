@@ -127,6 +127,11 @@ function exportCsvPerdidas() {
   downloadCsv(`analitica_perdidas_${fechaHoy()}.csv`, rows)
 }
 
+// ÚNICO PDF que sigue siendo una captura de pantalla, y a propósito: acá el contenido son
+// los GRÁFICOS, y rasterizarlos es lo correcto —redibujarlos en Prawn sería reimplementar
+// Chart.js—. Para trabajar los números está el CSV de cada solapa, que sí es dato crudo.
+// El resto de los informes (los del auditor, el semestral, el P&L y la trazabilidad) se
+// generan en el servidor con tablas de verdad.
 async function exportPdf() {
   const el = document.getElementById('an-tab-content')
   if (!el) return

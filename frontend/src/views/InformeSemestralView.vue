@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from "vue"
 import { useAuthStore } from "../stores/auth"
-import { getInformeSemestral } from "../lib/api"
+import api, { getInformeSemestral } from "../lib/api"
 import DsSpinner from '../design-system/components/Spinner.vue'
 import { semestreActual as getSemestreActual, formatFechaLarga, formatFechaCorta, formatFechaSemestre } from '../utils/dates.js'
 
@@ -66,25 +66,25 @@ function vigenciaMeta(socio) {
 
 const generandoPDF = ref(false)
 
-async function descargarPDF() {
+// El PDF lo arma el servidor. Este es el documento que se presenta ante la autoridad, y se
+// bajaba como una foto JPEG de la pantalla: sin texto seleccionable ni buscable.
+async function descargarPDF(formato = 'pdf') {
   generandoPDF.value = true
-  await nextTick()
-  const el = document.getElementById('ir-contenido')
-  const semestre = informe.value?.periodo?.semestre || ''
-  const anio = informe.value?.periodo?.anio || ''
-  const club = informe.value?.club?.nombre_legal || informe.value?.club?.nombre || 'Club'
-  const filename = `REPROCANN_${semestre}S_${anio}_${club.replace(/\s+/g, '_')}.pdf`
-  const opt = {
-    margin:       [10, 10, 10, 10],
-    filename,
-    image:        { type: 'jpeg', quality: 0.95 },
-    html2canvas:  { scale: 2, useCORS: true, letterRendering: true },
-    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-    pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] },
-  }
   try {
-    const { default: html2pdf } = await import('html2pdf.js')
-    await html2pdf().set(opt).from(el).save()
+    const { data } = await api.get(`/informe_semestral.${formato}`, {
+      params: { anio: anio.value, semestre: semestre.value },
+      responseType: 'blob',
+    })
+    const club = (informe.value?.club?.nombre_legal || informe.value?.club?.nombre || 'Club')
+      .replace(/\s+/g, '_')
+    const url  = URL.createObjectURL(new Blob([data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `REPROCANN_${semestre.value}S_${anio.value}_${club}.${formato}`
+    document.body.appendChild(link); link.click(); link.remove()
+    URL.revokeObjectURL(url)
+  } catch {
+    alert('No se pudo generar el archivo. Reintentá en un momento.')
   } finally {
     generandoPDF.value = false
   }
@@ -115,7 +115,10 @@ onMounted(() => cargar())
           <i v-else class="bi bi-arrow-clockwise"></i>
           Generar
         </button>
-        <button v-if="informe" class="ir__btn-download" :disabled="generandoPDF" @click="descargarPDF">
+        <button v-if="informe" class="ir__btn-download" :disabled="generandoPDF" @click="descargarPDF('xlsx')">
+          <i class="bi bi-file-earmark-spreadsheet"></i> Excel
+        </button>
+        <button v-if="informe" class="ir__btn-download" :disabled="generandoPDF" @click="descargarPDF('pdf')">
           <DsSpinner v-if="generandoPDF" :size="14" />
           <i v-else class="bi bi-file-earmark-pdf"></i>
           {{ generandoPDF ? 'Generando PDF...' : 'Descargar PDF' }}
