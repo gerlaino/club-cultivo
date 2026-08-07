@@ -230,4 +230,35 @@ Cuando Germán plantee un problema o feature nueva antes de implementar:
 
 Suite 1239 ✓ + 58 vitest ✓. **Deploy: sumar `add_vendible_a_bar_venta_items` y `add_consumo_evento_a_provisiones_y_dispensas` al `db:migrate`.**
 
-*Última actualización: 2026-07-28. Cambios julio (ver `docs/CHANGELOG.md`): **etiquetas QR en tanda y en PDF** (`lib/pdfEtiquetas.js` es fuente única; lote 93×60mm 3/fila en A4 apaisada, banderita de planta 160×26mm plegable; jsPDF lazy — dep nueva `jspdf`). Fix seguridad AZ (historia clínica en pacientes#show), backups Postgres→R2, KPIs de stock, edición multi-ítem + cuotas contables, candado de manicura asignada, guía de usuarios (`docs/GUIA_USUARIOS.md`). **Rediseño del Salón COMPLETO (B1–B6):** sub-nav compartida, Stock unificado, Vender = lista+buscador, Resumen liviano, caja de turno con confirmación entre roles, eventos por fases, Depósito→solapa Salón read-only. **Audit log (historial por usuario):** infra `Auditoria`+`Auditable`; Fase 1 (Lote/Plant/Stock/Dispensación) + Fase 2 (Paciente/User/Reserva con allowlist estricto — NUNCA campos encriptados/clínicos) + endpoint + tab en UsuarioDetail. **Código de barras** en productos del bar (lector físico + cámara `@zxing/browser` + scan-to-create). **Comprobante NO fiscal** al cobrar. **Multi-sede: los depósitos son de una SEDE** (`Deposito.sede_id`; `SembrarDepositos` siembra por sede + sede-ifica lo legacy); transferencia entre depósitos; edge case sede-divergente prevenido (el depósito fija la sede del movimiento). **Dashboard área × sede** (`resumen_por_unidad` con desglose por sede). **`vendible`/"no vender"** en mercadería del bar (dispensador solo ve lo vendible; alta desde Nuevo Movimiento; Stock del salón edición-only). **Deploy prod pendiente:** `db:migrate` (incl. `add_sede_a_depositos`, `add_vendible_a_bar_productos`, `add_codigo_barras_a_bar_productos`, caja/horario, `unicidad_depositos_de_sistema` —deduplica y después crea el índice único—) + `npm ci` (deps `@zxing/browser`, `jspdf`). Mantener actualizado: al cerrar un bloque, actualizar "Módulos existentes" acá y `docs/CHANGELOG.md`.*
+## 📍 Dónde retomar (7-ago-2026)
+
+Todo pusheado a `master` (`71dacbb`). **1649 rspec + 299 vitest en verde.**
+
+**Antes de tocar producción:**
+```
+db:migrate      # add_leaf_temp_offset_a_salas, add_pulse_api_key_a_clubs, y las de julio
+bundle install  # gema nueva pdf-inspector (sólo test)
+```
+
+**Pendientes concretos** (tareas #36-40): informes de un club que se baja de suite (NO
+verificado), alertas de un módulo apagado, auditoría de utilidad de los informes, usuarios de
+un rol cuya suite se apagó, barrido de design system. Además, decisiones de Germán: modelo de
+precios y medición de calls de IA.
+
+**Lo que se cerró:** los PDF de informes (eran capturas de pantalla), gating real de suites en
+backend y las dos superficies de menú, el P&L que no coincidía con la pantalla, el club que
+arranca con categorías contables, el driver de Pulse Grow, el VPD de hoja, y el login del
+delivery en PWA (loop entre dos guards).
+
+### La lección que no hay que repetir
+
+**Un build que pasa no prueba que la pantalla funcione.** En esta sesión escribí el HTML de un
+modal con clases CSS que nunca creé: compiló perfecto y Germán lo siguió viendo roto. Y al
+gatear las suites verifiqué que el candado estuviera puesto, no que TODAS las puertas lo
+tuvieran — hay 23 componentes de navegación y sólo 3 miraban las features.
+
+**Si tocás una pantalla, verificala renderizada.**
+
+---
+
+*Historial hasta 2026-07-28. Cambios julio (ver `docs/CHANGELOG.md`): **etiquetas QR en tanda y en PDF** (`lib/pdfEtiquetas.js` es fuente única; lote 93×60mm 3/fila en A4 apaisada, banderita de planta 160×26mm plegable; jsPDF lazy — dep nueva `jspdf`). Fix seguridad AZ (historia clínica en pacientes#show), backups Postgres→R2, KPIs de stock, edición multi-ítem + cuotas contables, candado de manicura asignada, guía de usuarios (`docs/GUIA_USUARIOS.md`). **Rediseño del Salón COMPLETO (B1–B6):** sub-nav compartida, Stock unificado, Vender = lista+buscador, Resumen liviano, caja de turno con confirmación entre roles, eventos por fases, Depósito→solapa Salón read-only. **Audit log (historial por usuario):** infra `Auditoria`+`Auditable`; Fase 1 (Lote/Plant/Stock/Dispensación) + Fase 2 (Paciente/User/Reserva con allowlist estricto — NUNCA campos encriptados/clínicos) + endpoint + tab en UsuarioDetail. **Código de barras** en productos del bar (lector físico + cámara `@zxing/browser` + scan-to-create). **Comprobante NO fiscal** al cobrar. **Multi-sede: los depósitos son de una SEDE** (`Deposito.sede_id`; `SembrarDepositos` siembra por sede + sede-ifica lo legacy); transferencia entre depósitos; edge case sede-divergente prevenido (el depósito fija la sede del movimiento). **Dashboard área × sede** (`resumen_por_unidad` con desglose por sede). **`vendible`/"no vender"** en mercadería del bar (dispensador solo ve lo vendible; alta desde Nuevo Movimiento; Stock del salón edición-only). **Deploy prod pendiente:** `db:migrate` (incl. `add_sede_a_depositos`, `add_vendible_a_bar_productos`, `add_codigo_barras_a_bar_productos`, caja/horario, `unicidad_depositos_de_sistema` —deduplica y después crea el índice único—) + `npm ci` (deps `@zxing/browser`, `jspdf`). Mantener actualizado: al cerrar un bloque, actualizar "Módulos existentes" acá y `docs/CHANGELOG.md`.*
