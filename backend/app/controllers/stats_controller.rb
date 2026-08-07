@@ -9,7 +9,7 @@ class StatsController < ApplicationController
       plantas_act   = plantas_scope.where.not(state: %w[cosechado descartada])
 
       vencidos_count   = club.pacientes.where.not(reprocann_vencimiento: nil)
-                             .where('reprocann_vencimiento < ?', Date.today).count
+                             .where('reprocann_vencimiento < ?', Time.zone.today).count
       por_vencer_count = club.pacientes.reprocann_por_vencer.count
 
       {

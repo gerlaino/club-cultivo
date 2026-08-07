@@ -80,7 +80,7 @@ RSpec.describe 'Bar — venta con período contable cerrado', type: :request do
   before { sign_in_as(admin) }
 
   it 'sigue cobrando con el período cerrado hasta ayer' do
-    club.update!(contabilidad_cerrada_hasta: Date.today - 1)
+    club.update!(contabilidad_cerrada_hasta: Time.zone.today - 1)
     post "/bares/#{bar.id}/ventas",
          params: { lineas: [{ vendible_type: 'BarProducto', vendible_id: cerveza.id, cantidad: 1 }], medio_pago: 'efectivo' },
          headers: auth_headers, as: :json
@@ -89,7 +89,7 @@ RSpec.describe 'Bar — venta con período contable cerrado', type: :request do
   end
 
   it 'si el período llegara a incluir hoy, explica el problema en vez de romper' do
-    club.update!(contabilidad_cerrada_hasta: Date.today) # estado heredado: la UI ya no lo permite
+    club.update!(contabilidad_cerrada_hasta: Time.zone.today) # estado heredado: la UI ya no lo permite
     post "/bares/#{bar.id}/ventas",
          params: { lineas: [{ vendible_type: 'BarProducto', vendible_id: cerveza.id, cantidad: 1 }], medio_pago: 'efectivo' },
          headers: auth_headers, as: :json

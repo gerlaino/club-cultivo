@@ -218,7 +218,7 @@ class ReservasController < ApplicationController
 
   # Invalida el cache del dashboard del día para este club (analytics dispensador).
   def bust_dashboard_cache
-    Rails.cache.delete("analytics/dispensador/#{current_user.club_id}/#{Date.today}")
+    Rails.cache.delete("analytics/dispensador/#{current_user.club_id}/#{Time.zone.today}")
   end
 
   def set_paciente

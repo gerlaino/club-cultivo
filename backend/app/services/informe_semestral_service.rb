@@ -45,7 +45,7 @@ class InformeSemestralService
     pacientes  = @club.pacientes.with_deleted.where('created_at <= ?', @hasta.end_of_day)
     activos    = pacientes.where(deleted_at: nil)
     con_repro  = activos.where.not(reprocann_numero: [nil, ''])
-    vencidos   = activos.where('reprocann_vencimiento < ?', Date.today)
+    vencidos   = activos.where('reprocann_vencimiento < ?', Time.zone.today)
                         .where.not(reprocann_vencimiento: nil)
     por_vencer = activos.reprocann_por_vencer
 
@@ -66,7 +66,7 @@ class InformeSemestralService
       fecha_nacimiento:      s.fecha_nacimiento,
       reprocann_numero:      s.reprocann_numero || '—',
       reprocann_vencimiento: s.reprocann_vencimiento,
-      reprocann_vigente:     s.reprocann_vencimiento.present? && s.reprocann_vencimiento >= Date.today,
+      reprocann_vigente:     s.reprocann_vencimiento.present? && s.reprocann_vencimiento >= Time.zone.today,
     }
   end
 

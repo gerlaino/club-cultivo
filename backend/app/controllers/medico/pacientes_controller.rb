@@ -49,7 +49,7 @@ module Medico
     # Los contadores de la cabecera se cuentan sobre TODO lo que matchea la búsqueda, no sobre la
     # página: paginando, contar en el cliente daría "3 vencidos" cuando hay 40.
     def kpis(base)
-      hoy = Date.today
+      hoy = Time.zone.today
 
       {
         total:    base.count,
@@ -61,7 +61,7 @@ module Medico
     end
 
     def filtrar_por_estado(scope, filtro)
-      hoy = Date.today
+      hoy = Time.zone.today
 
       case filtro
       when 'activos'  then scope.where(es_paciente: true)
@@ -96,7 +96,7 @@ module Medico
     end
 
     def sql_indicacion_por_vencer
-      sanitize_sql([<<~SQL, hoy: Date.today])
+      sanitize_sql([<<~SQL, hoy: Time.zone.today])
         LEFT JOIN (
           SELECT paciente_id, MIN(fecha_vencimiento) AS vence
           FROM indicacion_medicas
@@ -113,7 +113,7 @@ module Medico
     end
 
     def serialize_paciente_resumen(p)
-      hoy  = Date.today
+      hoy  = Time.zone.today
       venc = p.reprocann_vencimiento
 
       {

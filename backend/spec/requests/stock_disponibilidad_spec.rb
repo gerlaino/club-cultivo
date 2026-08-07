@@ -71,7 +71,7 @@ RSpec.describe 'Stock — disponibilidad', type: :request do
       paciente = create(:paciente, club: club, created_by: admin)
       s = stock_con('produccion')
       d = Dispensacion.new(paciente: paciente, user: admin, stock: s, sede: sede,
-                           cantidad: 5, medio_pago: 'efectivo', fecha_dispensacion: Date.today,
+                           cantidad: 5, medio_pago: 'efectivo', fecha_dispensacion: Time.zone.today,
                            aporte_socio_ars: 100)
       expect(d).not_to be_valid
       expect(d.errors[:stock].join).to match(/habilitado para dispensa/)

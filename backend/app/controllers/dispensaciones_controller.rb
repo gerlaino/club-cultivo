@@ -42,12 +42,12 @@ class DispensacionesController < ApplicationController
       scope = apply_dispensacion_filters(scope)
       if params[:desde].present? || params[:hasta].present?
         desde = params[:desde].present? ? Date.parse(params[:desde]) : nil
-        hasta = params[:hasta].present? ? Date.parse(params[:hasta]) : Date.today
+        hasta = params[:hasta].present? ? Date.parse(params[:hasta]) : Time.zone.today
         scope = scope.where("fecha_dispensacion >= ?", desde) if desde
         scope = scope.where("fecha_dispensacion <= ?", hasta)
         @dispensaciones = scope.order(fecha_dispensacion: :desc, created_at: :desc)
       else
-        fecha = params[:fecha].present? ? Date.parse(params[:fecha]) : Date.today
+        fecha = params[:fecha].present? ? Date.parse(params[:fecha]) : Time.zone.today
         @dispensaciones = scope.where(fecha_dispensacion: fecha).order(created_at: :desc)
       end
     end
@@ -498,7 +498,7 @@ class DispensacionesController < ApplicationController
     end
 
     send_data "\xEF\xBB\xBF#{csv_data}",
-              filename:    "dispensaciones_#{Date.today}.csv",
+              filename:    "dispensaciones_#{Time.zone.today}.csv",
               type:        "text/csv; charset=utf-8",
               disposition: "attachment"
   end

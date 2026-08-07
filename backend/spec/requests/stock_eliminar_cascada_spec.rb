@@ -33,7 +33,7 @@ RSpec.describe 'DELETE /stocks/:id — cascada a derivados', type: :request do
 
     disp = Dispensacion.create!(
       paciente: paciente, user: admin, stock: derivado, sede: sede,
-      cantidad: 1, medio_pago: 'efectivo', fecha_dispensacion: Date.today, aporte_socio_ars: 100,
+      cantidad: 1, medio_pago: 'efectivo', fecha_dispensacion: Time.zone.today, aporte_socio_ars: 100,
     )
     disp.update_column(:estado_envio, 'entregado')
 
@@ -51,7 +51,7 @@ RSpec.describe 'DELETE /stocks/:id — cascada a derivados', type: :request do
     Reserva.new(club: club, paciente: paciente, stock: stock, user: admin, cantidad: 10,
                 estado: 'entregada', fecha_entrega_estimada: Date.yesterday).save(validate: false)
     disp = Dispensacion.create!(paciente: paciente, user: admin, stock: stock, sede: sede,
-                                cantidad: 1, medio_pago: 'efectivo', fecha_dispensacion: Date.today, aporte_socio_ars: 100)
+                                cantidad: 1, medio_pago: 'efectivo', fecha_dispensacion: Time.zone.today, aporte_socio_ars: 100)
     disp.update_column(:estado_envio, 'cancelada')
 
     delete "/stocks/#{stock.id}", headers: auth_headers, as: :json
@@ -65,7 +65,7 @@ RSpec.describe 'DELETE /stocks/:id — cascada a derivados', type: :request do
 
     disp = Dispensacion.create!(
       paciente: paciente, user: admin, stock: derivado, sede: sede,
-      cantidad: 1, medio_pago: 'efectivo', fecha_dispensacion: Date.today, aporte_socio_ars: 100,
+      cantidad: 1, medio_pago: 'efectivo', fecha_dispensacion: Time.zone.today, aporte_socio_ars: 100,
     )
     disp.update_column(:estado_envio, 'en_viaje')
 

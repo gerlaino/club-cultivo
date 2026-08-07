@@ -18,7 +18,7 @@ RSpec.describe 'PATCH /dispensaciones/iniciar_viaje — notifica al socio', type
 
   let!(:disp) do
     Dispensacion.create!(paciente: paciente, user: admin, stock: stock, sede: sede,
-                         cantidad: 1, medio_pago: 'efectivo', fecha_dispensacion: Date.today, aporte_socio_ars: 10,
+                         cantidad: 1, medio_pago: 'efectivo', fecha_dispensacion: Time.zone.today, aporte_socio_ars: 10,
                          con_envio: true, delivery_id: delivery.id, estado_envio: 'pendiente',
                          direccion_envio: 'Calle Falsa 123', contacto_nombre: 'German', contacto_telefono: '1140000000')
   end

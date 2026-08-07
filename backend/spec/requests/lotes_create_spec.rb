@@ -15,13 +15,13 @@ RSpec.describe 'POST /salas/:sala_id/lotes (alta de lote)', type: :request do
   context 'con datos válidos' do
     it 'crea el lote y sus plantas' do
       expect {
-        crear(estado: 'vegetativo', plants_count: 5, start_date: Date.today)
+        crear(estado: 'vegetativo', plants_count: 5, start_date: Time.zone.today)
       }.to change(Lote, :count).by(1)
       expect(response).to have_http_status(:created)
     end
 
     it 'las plantas heredan la fecha del lote (start_date), no la de hoy' do
-      fecha = Date.today - 30 # lote heredado, real de hace un mes
+      fecha = Time.zone.today - 30 # lote heredado, real de hace un mes
       crear(estado: 'vegetativo', plants_count: 3, start_date: fecha)
       expect(response).to have_http_status(:created)
       lote = Lote.last
@@ -33,7 +33,7 @@ RSpec.describe 'POST /salas/:sala_id/lotes (alta de lote)', type: :request do
 
   context 'cantidad de plantas' do
     it 'rechaza plants_count 0' do
-      crear(estado: 'vegetativo', plants_count: 0, start_date: Date.today)
+      crear(estado: 'vegetativo', plants_count: 0, start_date: Time.zone.today)
       expect(response).to have_http_status(:unprocessable_entity)
       expect(JSON.parse(response.body)['errors'].join).to match(/al menos 1/i)
     end
@@ -42,7 +42,7 @@ RSpec.describe 'POST /salas/:sala_id/lotes (alta de lote)', type: :request do
   context 'estados no creables (post-stock / proceso)' do
     %w[curado finalizado en_manicura].each do |estado|
       it "rechaza crear en estado '#{estado}'" do
-        crear(estado: estado, plants_count: 3, start_date: Date.today)
+        crear(estado: estado, plants_count: 3, start_date: Time.zone.today)
         expect(response).to have_http_status(:unprocessable_entity)
         expect(JSON.parse(response.body)['errors'].join).to match(/no se puede crear/i)
       end
@@ -52,7 +52,7 @@ RSpec.describe 'POST /salas/:sala_id/lotes (alta de lote)', type: :request do
   context 'estado cosechado (heredado, pendiente de manicura)' do
     it 'permite crear en estado cosecha' do
       expect {
-        crear(estado: 'cosecha', plants_count: 4, start_date: Date.today)
+        crear(estado: 'cosecha', plants_count: 4, start_date: Time.zone.today)
       }.to change(Lote, :count).by(1)
       expect(response).to have_http_status(:created)
     end
@@ -86,7 +86,7 @@ RSpec.describe 'POST /salas/:sala_id/lotes (alta de lote)', type: :request do
 
     it 'guarda el array de madres y deja planta_madre_id = la primera' do
       ids = madres.map(&:id)
-      crear(estado: 'enraizado', origen: 'esqueje', plants_count: 8, start_date: Date.today, planta_madre_ids: ids)
+      crear(estado: 'enraizado', origen: 'esqueje', plants_count: 8, start_date: Time.zone.today, planta_madre_ids: ids)
       expect(response).to have_http_status(:created)
       lote = Lote.last
       expect(lote.planta_madre_ids).to eq(ids)
@@ -96,7 +96,7 @@ RSpec.describe 'POST /salas/:sala_id/lotes (alta de lote)', type: :request do
 
   context 'tamaño de maceta decimal' do
     it 'guarda 0.5L (vaso) sin truncar' do
-      crear(estado: 'vegetativo', plants_count: 2, start_date: Date.today, tamanio_maceta: '0.5')
+      crear(estado: 'vegetativo', plants_count: 2, start_date: Time.zone.today, tamanio_maceta: '0.5')
       expect(response).to have_http_status(:created)
       expect(Lote.last.tamanio_maceta).to eq(0.5)
     end

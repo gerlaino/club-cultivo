@@ -132,7 +132,7 @@ class Stock < ApplicationRecord
 
   def dias_para_vencimiento
     return nil unless fecha_vencimiento_est
-    (fecha_vencimiento_est - Date.today).to_i
+    (fecha_vencimiento_est - Time.zone.today).to_i
   end
 
   def estado_vencimiento
@@ -200,7 +200,7 @@ class Stock < ApplicationRecord
   def generar_numero_lote_producto
     return if numero_lote_producto.present?
     return unless club_id
-    year = Date.today.strftime("%y")
+    year = Time.zone.today.strftime("%y")
     loop do
       result = ActiveRecord::Base.connection.execute(
         "UPDATE clubs SET lote_numero_seq = COALESCE(lote_numero_seq, 0) + 1 WHERE id = #{club_id.to_i} RETURNING lote_numero_seq"

@@ -14,7 +14,7 @@ RSpec.describe 'PATCH /dispensaciones/:id — edición con reversa', type: :requ
 
   def crear(params)
     post "/pacientes/#{paciente.id}/dispensaciones",
-         params: { dispensacion: { stock_id: stock.id, cantidad: 10, fecha_dispensacion: Date.today.to_s }.merge(params) },
+         params: { dispensacion: { stock_id: stock.id, cantidad: 10, fecha_dispensacion: Time.zone.today.to_s }.merge(params) },
          headers: auth_headers, as: :json
     Dispensacion.last
   end

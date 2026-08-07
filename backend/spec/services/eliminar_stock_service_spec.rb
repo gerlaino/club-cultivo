@@ -13,7 +13,7 @@ RSpec.describe EliminarStockService do
 
   def dispensar(attrs = {})
     Dispensacion.create!({ paciente: paciente, user: admin, stock: stock, cantidad: 10,
-                           fecha_dispensacion: Date.today, medio_pago: 'efectivo' }.merge(attrs))
+                           fecha_dispensacion: Time.zone.today, medio_pago: 'efectivo' }.merge(attrs))
   end
 
   it 'borra el stock arrastrando dispensaciones pendientes y sus movimientos' do
@@ -29,7 +29,7 @@ RSpec.describe EliminarStockService do
 
   it 'borra también las reservas pendientes sin seña' do
     r = Reserva.create!(club: club, paciente: paciente, stock: stock, user: admin,
-                        cantidad: 5, estado: 'pendiente', fecha_entrega_estimada: Date.today + 3, sena_ars: 0)
+                        cantidad: 5, estado: 'pendiente', fecha_entrega_estimada: Time.zone.today + 3, sena_ars: 0)
     described_class.new(stock: stock, usuario: admin).eliminar!
     expect(Reserva.exists?(r.id)).to be(false)
   end
@@ -45,7 +45,7 @@ RSpec.describe EliminarStockService do
 
   it 'BLOQUEA si hay una reserva con seña' do
     Reserva.create!(club: club, paciente: paciente, stock: stock, user: admin,
-                    cantidad: 5, estado: 'pendiente', fecha_entrega_estimada: Date.today + 3, sena_ars: 1000)
+                    cantidad: 5, estado: 'pendiente', fecha_entrega_estimada: Time.zone.today + 3, sena_ars: 1000)
     expect {
       described_class.new(stock: stock, usuario: admin).eliminar!
     }.to raise_error(EliminarStockService::Bloqueado, /seña/)

@@ -15,7 +15,7 @@ RSpec.describe 'Pasaporte público de dispensa (/d/:token)', type: :request do
 
   def dispensar
     Dispensacion.create!(paciente: paciente, user: admin, stock: stock, cantidad: 10,
-                         fecha_dispensacion: Date.today, medio_pago: 'efectivo')
+                         fecha_dispensacion: Time.zone.today, medio_pago: 'efectivo')
   end
 
   describe 'al crear la dispensa' do

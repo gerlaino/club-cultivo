@@ -333,7 +333,7 @@ class PlantsController < ApplicationController
           when 'secado'      then plant.fecha_cosecha
           when 'cosechado'   then plant.fecha_cosecha
           end
-    ref ? (Date.today - ref.to_date).to_i : nil
+    ref ? (Time.zone.today - ref.to_date).to_i : nil
   end
 
   def serialize_plant(plant)
@@ -399,7 +399,7 @@ class PlantsController < ApplicationController
       peso_seco:              plant.peso_seco,
       peso_humedo:            plant.peso_humedo,
       notas:                  plant.notas,
-      dias_desde_germinacion: plant.fecha_germinacion ? (Date.today - plant.fecha_germinacion).to_i : nil,
+      dias_desde_germinacion: plant.fecha_germinacion ? (Time.zone.today - plant.fecha_germinacion).to_i : nil,
       dias_en_vegetativo:     (plant.fecha_vegetativo && plant.fecha_floracion) ? (plant.fecha_floracion - plant.fecha_vegetativo).to_i : nil,
       dias_en_floracion:      (plant.fecha_floracion  && plant.fecha_cosecha)   ? (plant.fecha_cosecha  - plant.fecha_floracion).to_i  : nil,
       fotos:      plant.fotos.blobs.order(created_at: :desc).map { |b| serialize_blob(b) },

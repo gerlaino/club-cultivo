@@ -180,7 +180,7 @@ class SedesController < ApplicationController
                           # objetivos cargados. Restantes = ciclo objetivo − días transcurridos.
                           ciclo_objetivo = proximo_lote.dias_vegetativo_objetivo.to_i + proximo_lote.dias_floracion_objetivo.to_i
                           ciclo_objetivo = 77 if ciclo_objetivo <= 0
-                          restantes = ciclo_objetivo - (Date.today - inicio_ciclo).to_i
+                          restantes = ciclo_objetivo - (Time.zone.today - inicio_ciclo).to_i
                           restantes.positive? ? restantes : nil
                         end
 

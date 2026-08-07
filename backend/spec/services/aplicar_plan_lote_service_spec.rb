@@ -10,7 +10,7 @@ RSpec.describe AplicarPlanLoteService do
     PlanTrabajo.create!(
       club: club, creado_por: admin, titulo: 'Plan vege',
       estado: :publicado, periodo_tipo: :semanal,
-      fecha_inicio: Date.today, fecha_fin: Date.today + 20.days
+      fecha_inicio: Time.zone.today, fecha_fin: Time.zone.today + 20.days
     )
   end
 
@@ -21,7 +21,7 @@ RSpec.describe AplicarPlanLoteService do
 
   context 'cuando se pasa una fecha_inicio en el pasado' do
     it 'genera la tarea anclada a esa fecha (no a start_date del lote)' do
-      hace_dos_semanas = (Date.today - 14)
+      hace_dos_semanas = (Time.zone.today - 14)
 
       creadas = described_class.new(
         lote: lote, plan: plan, ejecutado_por: admin,

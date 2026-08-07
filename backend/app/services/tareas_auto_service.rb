@@ -55,7 +55,7 @@ class TareasAutoService
         tipo:              t[:tipo],
         prioridad:         t[:prioridad],
         estado:            'pendiente',
-        fecha_programada:  Date.today + t[:dias_offset],
+        fecha_programada:  Time.zone.today + t[:dias_offset],
       )
     end
   rescue StandardError => e

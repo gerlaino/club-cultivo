@@ -18,7 +18,7 @@ class ReprocannRenovacion < ApplicationRecord
   def aprobar!(reprocann_numero_nuevo: nil, fecha_vencimiento_nueva: nil)
     update!(
       estado:                 'aprobada',
-      fecha_aprobacion:       Date.today,
+      fecha_aprobacion:       Time.zone.today,
       reprocann_numero_nuevo: reprocann_numero_nuevo,
       fecha_vencimiento_nueva: fecha_vencimiento_nueva,
     )

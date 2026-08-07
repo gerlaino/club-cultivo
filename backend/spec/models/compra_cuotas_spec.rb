@@ -31,15 +31,15 @@ RSpec.describe CompraCuotas, type: :model do
   end
 
   it 'permite cuotas con fecha futura (vencen adelante) y las marca no pagadas' do
-    compra  = nueva(fecha_primera_cuota: Date.today, cuotas_total: 3)
-    futuras = compra.movimientos_contables.select { |m| m.fecha > Date.today }
+    compra  = nueva(fecha_primera_cuota: Time.zone.today, cuotas_total: 3)
+    futuras = compra.movimientos_contables.select { |m| m.fecha > Time.zone.today }
     expect(futuras).not_to be_empty
     expect(futuras.all?(&:valid?)).to be(true)
     expect(futuras.all? { |m| m.pagado == false }).to be(true)
   end
 
   it 'las cuotas pasadas quedan como pagadas' do
-    compra = nueva(fecha_primera_cuota: (Date.today << 3), cuotas_total: 2)
+    compra = nueva(fecha_primera_cuota: (Time.zone.today << 3), cuotas_total: 2)
     expect(compra.movimientos_contables.all?(&:pagado)).to be(true)
   end
 

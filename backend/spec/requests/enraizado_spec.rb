@@ -92,7 +92,7 @@ RSpec.describe 'Lotes enraizando', type: :request do
     it 'nace enraizando, venga de semilla o de esqueje' do
       %w[semilla esqueje].each do |origen|
         post "/api/salas/#{vege.id}/lotes",
-             params: { lote: { start_date: Date.today.to_s, estado: 'enraizado',
+             params: { lote: { start_date: Time.zone.today.to_s, estado: 'enraizado',
                                origen: origen, plants_count: 5 } }
 
         expect(response).to have_http_status(:created)

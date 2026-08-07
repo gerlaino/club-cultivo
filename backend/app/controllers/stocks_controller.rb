@@ -85,7 +85,7 @@ class StocksController < ApplicationController
     reservado_flor = Reserva.pendientes.where(stock_id: flor.select(:id)).sum(:cantidad).to_f
     flor_disponible = [flor.sum(:cantidad).to_f - reservado_flor, 0].max
 
-    hoy = Date.today
+    hoy = Time.zone.today
     totales = {
       total_g:         flor_disponible,
       reservado_g:     reservado_flor,   # flor seca apartada en reservas pendientes

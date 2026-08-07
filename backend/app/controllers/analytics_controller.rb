@@ -161,14 +161,14 @@ class AnalyticsController < ApplicationController
   # Para: dispensador, admin
   def dispensador
     club = current_user.club
-    data = Rails.cache.fetch("analytics/dispensador/#{club.id}/#{Date.today}", expires_in: 10.minutes) do
+    data = Rails.cache.fetch("analytics/dispensador/#{club.id}/#{Time.zone.today}", expires_in: 10.minutes) do
       calcular_dispensador(club)
     end
     render json: data
   end
 
   def calcular_dispensador(club)
-    hoy    = Date.today
+    hoy    = Time.zone.today
     inicio_semana = hoy.beginning_of_week
     inicio_mes    = hoy.beginning_of_month
 
@@ -217,7 +217,7 @@ class AnalyticsController < ApplicationController
         }
       end
 
-    por_dia = (6.days.ago.to_date..Date.today).map do |date|
+    por_dia = (6.days.ago.to_date..Time.zone.today).map do |date|
       { fecha: date.strftime('%d/%m'), count: base_disps.where(fecha_dispensacion: date).count }
     end
 

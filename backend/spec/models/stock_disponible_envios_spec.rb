@@ -12,7 +12,7 @@ RSpec.describe 'Stock#cantidad_disponible_real con envíos pendientes', type: :m
 
   def envio(cant)
     Dispensacion.create!(paciente: pac, user: admin, stock: stock, sede: sede, cantidad: cant,
-                         medio_pago: 'efectivo', fecha_dispensacion: Date.today, aporte_socio_ars: cant * 10,
+                         medio_pago: 'efectivo', fecha_dispensacion: Time.zone.today, aporte_socio_ars: cant * 10,
                          con_envio: true, estado_envio: 'pendiente', direccion_envio: 'C 1', contacto_nombre: 'P')
   end
 
@@ -26,9 +26,9 @@ RSpec.describe 'Stock#cantidad_disponible_real con envíos pendientes', type: :m
   it 'permite una segunda dispensación dentro de lo disponible y rechaza la que excede' do
     envio(60) # quedan 40
     ok    = Dispensacion.new(paciente: pac, user: admin, stock: stock, sede: sede, cantidad: 30,
-                             medio_pago: 'efectivo', fecha_dispensacion: Date.today, aporte_socio_ars: 300)
+                             medio_pago: 'efectivo', fecha_dispensacion: Time.zone.today, aporte_socio_ars: 300)
     nope  = Dispensacion.new(paciente: pac, user: admin, stock: stock, sede: sede, cantidad: 50,
-                             medio_pago: 'efectivo', fecha_dispensacion: Date.today, aporte_socio_ars: 500)
+                             medio_pago: 'efectivo', fecha_dispensacion: Time.zone.today, aporte_socio_ars: 500)
     expect(ok.valid?).to be true
     expect(nope.valid?).to be false
     expect(nope.errors[:cantidad].join).to match(/stock disponible/)

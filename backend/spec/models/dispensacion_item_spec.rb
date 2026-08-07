@@ -9,7 +9,7 @@ RSpec.describe DispensacionItem, type: :model do
   let(:stock) { Stock.create!(sede: sede, lote: lote, origen: 'lote', forma_producto: 'flor_seca', unidad: 'g', cantidad: 100, precio_sugerido_ars: 10) }
   let(:disp) do
     Dispensacion.create!(paciente: pac, user: admin, stock: stock, sede: sede, cantidad: 5,
-                         medio_pago: 'efectivo', fecha_dispensacion: Date.today, aporte_socio_ars: 50)
+                         medio_pago: 'efectivo', fecha_dispensacion: Time.zone.today, aporte_socio_ars: 50)
   end
 
   describe 'asociaciones y validaciones' do
@@ -36,7 +36,7 @@ RSpec.describe DispensacionItem, type: :model do
   describe 'invariante puente (línea espejo)' do
     it 'una dispensa legacy de un stock genera automáticamente su línea espejo' do
       d = Dispensacion.create!(paciente: pac, user: admin, stock: stock, sede: sede, cantidad: 7,
-                               medio_pago: 'efectivo', fecha_dispensacion: Date.today, aporte_socio_ars: 70,
+                               medio_pago: 'efectivo', fecha_dispensacion: Time.zone.today, aporte_socio_ars: 70,
                                precio_unitario_ars: 10)
       expect(d.items.count).to eq(1)
       linea = d.items.first

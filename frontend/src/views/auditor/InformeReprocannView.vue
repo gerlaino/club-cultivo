@@ -38,10 +38,38 @@
           <span class="inf__kpi-valor">{{ data.vencidos }}</span>
           <span class="inf__kpi-label">Vencidos</span>
         </div>
+        <div v-if="data.pendientes" class="inf__kpi inf__kpi--warn">
+          <span class="inf__kpi-valor">{{ data.pendientes }}</span>
+          <span class="inf__kpi-label">Trámite pendiente</span>
+        </div>
         <div class="inf__kpi">
           <span class="inf__kpi-valor">{{ data.sin_reprocann }}</span>
           <span class="inf__kpi-label">Sin REPROCANN</span>
         </div>
+      </div>
+
+      <!-- El paciente no tiene sede propia: se atiende donde dispensa. -->
+      <div v-if="data.por_sede?.length" class="inf__section">
+        <h2 class="inf__section-title">Por sede de atención</h2>
+        <table class="inf__table">
+          <thead>
+            <tr>
+              <th>Sede</th><th>Pacientes</th><th>Vigentes</th><th>Vencen ≤30d</th>
+              <th>Vencidos</th><th>En trámite</th><th>Sin REPROCANN</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="r in data.por_sede" :key="r.sede">
+              <td>{{ r.sede }}</td>
+              <td>{{ r.total }}</td>
+              <td>{{ r.vigentes }}</td>
+              <td>{{ r.por_vencer }}</td>
+              <td>{{ r.vencidos }}</td>
+              <td>{{ r.pendientes }}</td>
+              <td>{{ r.sin_reprocann }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
       <div class="inf__section">

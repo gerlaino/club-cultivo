@@ -77,7 +77,7 @@ RSpec.describe IndicacionMedica, type: :model do
   describe 'estado según el vencimiento' do
     it 'marca vencida la que quedó atrás y por vencer la que entra en 30 días' do
       vencida    = nueva(fecha_emision: 120.days.ago.to_date, duracion_dias: 90).tap(&:save!)
-      por_vencer = nueva(fecha_emision: Date.today, duracion_dias: 10).tap(&:save!)
+      por_vencer = nueva(fecha_emision: Time.zone.today, duracion_dias: 10).tap(&:save!)
 
       expect(vencida).to be_vencida
       expect(por_vencer).to be_por_vencer

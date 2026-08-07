@@ -34,6 +34,6 @@ class Documento < ApplicationRecord
 
   def actualizar_estado
     return unless fecha_vencimiento.present?
-    self.estado = fecha_vencimiento < Date.today ? 'vencido' : 'vigente'
+    self.estado = fecha_vencimiento < Time.zone.today ? 'vencido' : 'vigente'
   end
 end

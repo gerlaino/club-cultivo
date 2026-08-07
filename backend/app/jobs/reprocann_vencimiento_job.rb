@@ -12,7 +12,7 @@ class ReprocannVencimientoJob < ApplicationJob
   private
 
   def procesar_club(club)
-    hoy = Date.today
+    hoy = Time.zone.today
 
     # Pacientes con REPROCANN vencido (vencimiento < hoy) — alerta diaria si no hay una de hoy
     # Sólo pacientes activos: avisar del REPROCANN de alguien dado de baja es ruido, y el

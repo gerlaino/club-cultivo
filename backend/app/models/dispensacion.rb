@@ -123,7 +123,7 @@ class Dispensacion < ApplicationRecord
   scope :no_canceladas,  ->                     { where("dispensaciones.estado_envio IS NULL OR dispensaciones.estado_envio != 'cancelada'") }
   def cancelada? = estado_envio == 'cancelada'
 
-  scope :del_mes,        ->(fecha = Date.today) { where(fecha_dispensacion: fecha.beginning_of_month..fecha.end_of_month) }
+  scope :del_mes,        ->(fecha = Time.zone.today) { where(fecha_dispensacion: fecha.beginning_of_month..fecha.end_of_month) }
   scope :del_paciente,   ->(paciente_id)        { where(paciente_id: paciente_id) }
   scope :regalos,        ->                     { where(es_regalo: true) }
   scope :recientes,      ->                     { order(fecha_dispensacion: :desc, created_at: :desc) }
@@ -170,7 +170,7 @@ class Dispensacion < ApplicationRecord
   private
 
   def fecha_no_futura
-    errors.add(:fecha_dispensacion, 'no puede ser futura') if fecha_dispensacion.present? && fecha_dispensacion > Date.today
+    errors.add(:fecha_dispensacion, 'no puede ser futura') if fecha_dispensacion.present? && fecha_dispensacion > Time.zone.today
   end
 
   def paciente_activo_como_socio
@@ -352,7 +352,7 @@ class Dispensacion < ApplicationRecord
   end
 
   def generar_codigo_paquete
-    self.codigo_paquete = "PKG-#{Date.today.strftime('%Y%m%d')}-#{SecureRandom.hex(3).upcase}"
+    self.codigo_paquete = "PKG-#{Time.zone.today.strftime('%Y%m%d')}-#{SecureRandom.hex(3).upcase}"
     self.estado_envio   = 'pendiente'
   end
 

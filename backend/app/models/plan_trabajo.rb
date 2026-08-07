@@ -19,7 +19,7 @@ class PlanTrabajo < ApplicationRecord
 
   scope :del_club,     ->(club_id) { where(club_id: club_id) }
   scope :publicados,   -> { where(estado: :publicado) }
-  scope :vigentes,     -> { publicados.where('fecha_fin >= ?', Date.today) }
+  scope :vigentes,     -> { publicados.where('fecha_fin >= ?', Time.zone.today) }
   scope :recientes,    -> { order(created_at: :desc) }
   scope :plantillas,   -> { where(es_plantilla: true) }
   scope :no_plantillas,-> { where(es_plantilla: false) }

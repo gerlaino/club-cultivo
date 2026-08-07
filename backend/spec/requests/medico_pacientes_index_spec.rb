@@ -67,7 +67,7 @@ RSpec.describe 'GET /api/medico/pacientes', type: :request do
       con_indicacion = crear_paciente('Zzzz')
       IndicacionMedica.create!(paciente: con_indicacion, user: medico,
                                patologia: 'Dolor', dosificacion: '1 ml', via_administracion: 'oral',
-                               fecha_emision: Date.today, duracion_dias: 20, activa: true)
+                               fecha_emision: Time.zone.today, duracion_dias: 20, activa: true)
 
       body = get_index
 

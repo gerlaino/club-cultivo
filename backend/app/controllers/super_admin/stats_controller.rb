@@ -19,13 +19,13 @@ class SuperAdmin::StatsController < SuperAdmin::BaseController
       },
       por_plan:      Club.reales.group(:plan).count,
       clubs_trial:   Club.reales.where(plan_trial: true).count,
-      clubs_activos: Club.reales.where('plan_activo_hasta >= ? OR plan_activo_hasta IS NULL', Date.today).count,
+      clubs_activos: Club.reales.where('plan_activo_hasta >= ? OR plan_activo_hasta IS NULL', Time.zone.today).count,
       clubs: clubs.order(:created_at).map { |c| serialize_club(c) },
     }
   end
 
   def metricas
-    inicio_mes = Date.today.beginning_of_month
+    inicio_mes = Time.zone.today.beginning_of_month
     reales     = Club.reales.pluck(:id)
     dispensas  = Dispensacion.no_canceladas
                              .joins(:paciente).where(pacientes: { club_id: reales })

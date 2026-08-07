@@ -32,7 +32,7 @@ RSpec.describe Paciente, type: :model do
     end
 
     it 'requiere fecha_nacimiento en el pasado' do
-      expect(build_paciente(fecha_nacimiento: Date.today)).not_to be_valid
+      expect(build_paciente(fecha_nacimiento: Time.zone.today)).not_to be_valid
     end
 
     context 'dni_normalizado' do
@@ -144,7 +144,7 @@ RSpec.describe Paciente, type: :model do
       paciente = create_paciente
       Dispensacion.create!(
         paciente: paciente, user: admin, stock: stock,
-        cantidad: 25, fecha_dispensacion: Date.today, medio_pago: 'efectivo'
+        cantidad: 25, fecha_dispensacion: Time.zone.today, medio_pago: 'efectivo'
       )
       expect(paciente.dispensado_mes_actual_g).to eq(25.0)
     end
@@ -164,13 +164,13 @@ RSpec.describe Paciente, type: :model do
 
     it 'calcula el porcentaje correcto cuando hay dispensaciones' do
       Dispensacion.create!(paciente: paciente, user: admin, stock: stock,
-        cantidad: 20, fecha_dispensacion: Date.today, medio_pago: 'efectivo')
+        cantidad: 20, fecha_dispensacion: Time.zone.today, medio_pago: 'efectivo')
       expect(paciente.porcentaje_limite_mensual).to eq(50.0)
     end
 
     it 'topa en 100 aunque se exceda el límite' do
       Dispensacion.create!(paciente: paciente, user: admin, stock: stock,
-        cantidad: 40, fecha_dispensacion: Date.today, medio_pago: 'efectivo')
+        cantidad: 40, fecha_dispensacion: Time.zone.today, medio_pago: 'efectivo')
       # simular 50g ignorando la validación
       Dispensacion.where(paciente: paciente).last.update_column(:cantidad, 50)
       expect(paciente.porcentaje_limite_mensual).to eq(100.0)

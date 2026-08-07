@@ -3,10 +3,10 @@ class InformesController < ApplicationController
   before_action :require_auditor_o_admin!
 
   PERIODO_RANGOS = {
-    'mes_actual'   => -> { [Date.today.beginning_of_month, Date.today.end_of_month] },
+    'mes_actual'   => -> { [Time.zone.today.beginning_of_month, Time.zone.today.end_of_month] },
     'mes_anterior' => -> { [1.month.ago.beginning_of_month, 1.month.ago.end_of_month] },
-    'trimestre'    => -> { [3.months.ago.beginning_of_month, Date.today.end_of_month] },
-    'anio'         => -> { [Date.today.beginning_of_year, Date.today.end_of_year] },
+    'trimestre'    => -> { [3.months.ago.beginning_of_month, Time.zone.today.end_of_month] },
+    'anio'         => -> { [Time.zone.today.beginning_of_year, Time.zone.today.end_of_year] },
   }.freeze
 
   def reprocann
@@ -17,13 +17,13 @@ class InformesController < ApplicationController
       format.pdf do
         pdf = ReprocannDocument.new(club: current_user.club, usuario: current_user, data: data).render
         send_data pdf,
-                  filename:    "informe_reprocann_#{Date.today.strftime('%Y%m%d')}.pdf",
+                  filename:    "informe_reprocann_#{Time.zone.today.strftime('%Y%m%d')}.pdf",
                   type:        "application/pdf",
                   disposition: "attachment"
       end
       format.xlsx do
         send_data reprocann_xlsx(current_user.club, data),
-                  filename:    "informe_reprocann_#{Date.today.strftime('%Y%m%d')}.xlsx",
+                  filename:    "informe_reprocann_#{Time.zone.today.strftime('%Y%m%d')}.xlsx",
                   type:        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                   disposition: "attachment"
       end
@@ -304,7 +304,49 @@ class InformesController < ApplicationController
       pendientes:             conteos['pendiente'],
       sin_reprocann:          conteos['sin_reprocann'],
       lista_anonimizada:      lista,
+      por_sede:               reprocann_por_sede(club, pacientes),
     }
+  end
+
+  # Pacientes por sede de atención. El paciente NO tiene sede propia: se atiende donde
+  # dispensa, así que la sede sale de sus dispensaciones (la más reciente manda, porque
+  # alguien que se mudó de sede cuenta en la que se atiende hoy).
+  #
+  # Es lo único no-clínico que el informe agrega más allá de los pacientes: nada de cultivo,
+  # que vive en los informes de Producción y Sedes.
+  def reprocann_por_sede(club, pacientes)
+    ids = pacientes.pluck(:id)
+    return [] if ids.empty?
+
+    # Última dispensación de cada paciente, y de qué sede salió.
+    ultima_sede = Dispensacion.no_canceladas
+                              .where(paciente_id: ids)
+                              .joins(stock: :sede)
+                              .where(sedes: { club_id: club.id })
+                              .order(:paciente_id, fecha_dispensacion: :desc, id: :desc)
+                              .pluck(:paciente_id, 'sedes.id', 'sedes.nombre')
+                              .each_with_object({}) { |(pid, sid, snom), h| h[pid] ||= [sid, snom] }
+
+    datos = pacientes.pluck(:id, :reprocann_estado, :reprocann_numero, :reprocann_vencimiento)
+    agrupado = Hash.new { |h, k| h[k] = Hash.new(0) }
+
+    datos.each do |pid, estado, numero, venc|
+      _sid, nombre = ultima_sede[pid]
+      cat = Paciente.reprocann_categoria(estado: estado, numero: numero, vencimiento: venc)
+      agrupado[nombre || 'Sin dispensaciones'][cat] += 1
+    end
+
+    agrupado.map do |sede, cats|
+      {
+        sede:      sede,
+        total:     cats.values.sum,
+        vigentes:  cats['vigente'],
+        por_vencer: cats['por_vencer'],
+        vencidos:  cats['vencido'],
+        pendientes: cats['pendiente'],
+        sin_reprocann: cats['sin_reprocann'],
+      }
+    end.sort_by { |r| -r[:total] }
   end
 
   ESTADO_REPROCANN_LABEL = {

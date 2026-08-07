@@ -19,7 +19,7 @@ RSpec.describe 'Notificaciones de una ruta de entregas', type: :request do
 
   def crear_paquete(pac, orden)
     Dispensacion.create!(paciente: pac, user: admin, stock: stock, sede: sede,
-                         cantidad: 1, medio_pago: 'efectivo', fecha_dispensacion: Date.today, aporte_socio_ars: 10,
+                         cantidad: 1, medio_pago: 'efectivo', fecha_dispensacion: Time.zone.today, aporte_socio_ars: 10,
                          con_envio: true, delivery_id: delivery.id, estado_envio: 'pendiente',
                          direccion_envio: 'Calle 1', contacto_nombre: 'C', orden_entrega: orden)
   end

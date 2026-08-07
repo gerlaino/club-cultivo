@@ -24,7 +24,7 @@ RSpec.describe 'Dispensacion regalo (entrega gratis)', type: :request do
              stock_id:           stock.id,
              cantidad:           cantidad,
              es_regalo:          true,
-             fecha_dispensacion: Date.today.to_s,
+             fecha_dispensacion: Time.zone.today.to_s,
            }
          },
          headers: auth_headers,

@@ -125,6 +125,6 @@ describe('crear área desde el alta de movimiento', () => {
   it('arranca con un tipo válido puesto', async () => {
     const w = await irAlForm(montar(), 'gasto')
     w.vm.abrirCrearArea()
-    expect(w.vm.AREA_TIPOS).toContain(w.vm.crearArea.tipo)
+    expect(w.vm.AREA_TIPOS.map(t => t.value)).toContain(w.vm.crearArea.tipo)
   })
 })

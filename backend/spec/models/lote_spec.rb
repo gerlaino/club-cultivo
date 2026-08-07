@@ -184,7 +184,7 @@ RSpec.describe Lote, type: :model do
     end
 
     it 'retorna la diferencia de días desde start_date' do
-      lote = create_lote(start_date: Date.today - 10)
+      lote = create_lote(start_date: Time.zone.today - 10)
       expect(lote.dias_desde_inicio).to eq(10)
     end
   end

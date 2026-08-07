@@ -3,7 +3,7 @@ class InformeSemestralJob < ApplicationJob
 
   # modo: :recordatorio (30 días antes) o :envio (al cierre del semestre)
   def perform(modo = :envio)
-    hoy      = Date.today
+    hoy      = Time.zone.today
     anio     = hoy.year
     semestre = hoy.month <= 6 ? 1 : 2
 

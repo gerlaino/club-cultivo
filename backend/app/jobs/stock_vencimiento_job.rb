@@ -8,7 +8,7 @@ class StockVencimientoJob < ApplicationJob
   private
 
   def procesar_club(club)
-    hoy = Date.today
+    hoy = Time.zone.today
 
     stocks = Stock
       .where(club_id: club.id)

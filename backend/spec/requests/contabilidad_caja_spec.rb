@@ -37,7 +37,7 @@ RSpec.describe 'Contabilidad de caja', type: :request do
              cantidad:           cantidad,
              aporte_socio_ars:   aporte,
              medio_pago:         medio_pago,
-             fecha_dispensacion: Date.today.to_s,
+             fecha_dispensacion: Time.zone.today.to_s,
            }
          },
          headers: auth_headers,
@@ -122,7 +122,7 @@ RSpec.describe 'Contabilidad de caja', type: :request do
              movimiento_contable: {
                tipo: 'ingreso', categoria: 'aporte_socio',
                descripcion: 'Pago de deuda', monto_ars: monto,
-               fecha: Date.today.to_s, sede_id: sede.id, paciente_id: paciente.id,
+               fecha: Time.zone.today.to_s, sede_id: sede.id, paciente_id: paciente.id,
              }
            },
            headers: auth_headers, as: :json

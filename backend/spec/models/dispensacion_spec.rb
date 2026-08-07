@@ -22,7 +22,7 @@ RSpec.describe Dispensacion, type: :model do
       user:     admin,
       stock:    stock,
       cantidad: 10,
-      fecha_dispensacion: Date.today,
+      fecha_dispensacion: Time.zone.today,
       medio_pago: 'efectivo',
     }.merge(attrs))
   end
@@ -55,7 +55,7 @@ RSpec.describe Dispensacion, type: :model do
     it 'asigna fecha_dispensacion automáticamente si es nil (before_validation)' do
       d = nueva_dispensacion(fecha_dispensacion: nil)
       d.valid?
-      # Date.current (no Date.today) para coincidir con la zona horaria del modelo
+      # Date.current (no Time.zone.today) para coincidir con la zona horaria del modelo
       expect(d.fecha_dispensacion).to eq(Date.current)
     end
 
@@ -286,7 +286,7 @@ RSpec.describe Dispensacion, type: :model do
   # ── scopes ────────────────────────────────────────────────────────────────
 
   describe 'scopes' do
-    let!(:dispensa_este_mes) { nueva_dispensacion(cantidad: 5, fecha_dispensacion: Date.today).tap(&:save!) }
+    let!(:dispensa_este_mes) { nueva_dispensacion(cantidad: 5, fecha_dispensacion: Time.zone.today).tap(&:save!) }
     let!(:dispensa_mes_pasado) do
       nueva_dispensacion(cantidad: 3, fecha_dispensacion: 1.month.ago.to_date).tap(&:save!)
     end

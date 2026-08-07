@@ -14,7 +14,7 @@ class ReprocannRenovacionesController < ApplicationController
     renovacion = @paciente.reprocann_renovaciones.build(renovacion_params)
     renovacion.club        = current_user.club
     renovacion.iniciada_por = current_user
-    renovacion.fecha_inicio = Date.today if renovacion.fecha_inicio.blank?
+    renovacion.fecha_inicio = Time.zone.today if renovacion.fecha_inicio.blank?
 
     if renovacion.save
       render json: { data: serialize(renovacion) }, status: :created

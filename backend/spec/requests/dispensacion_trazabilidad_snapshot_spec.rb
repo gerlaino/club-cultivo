@@ -14,7 +14,7 @@ RSpec.describe 'Dispensación — snapshot de trazabilidad', type: :request do
 
   it 'guarda código de lote y genética al crear la dispensación' do
     post "/pacientes/#{paciente.id}/dispensaciones",
-         params: { dispensacion: { stock_id: stock.id, cantidad: 5, medio_pago: 'efectivo', fecha_dispensacion: Date.today.to_s } },
+         params: { dispensacion: { stock_id: stock.id, cantidad: 5, medio_pago: 'efectivo', fecha_dispensacion: Time.zone.today.to_s } },
          headers: auth_headers, as: :json
     expect(response).to have_http_status(:created)
     d = Dispensacion.last
@@ -24,7 +24,7 @@ RSpec.describe 'Dispensación — snapshot de trazabilidad', type: :request do
 
   it 'el snapshot sobrevive aunque se elimine el stock de origen' do
     post "/pacientes/#{paciente.id}/dispensaciones",
-         params: { dispensacion: { stock_id: stock.id, cantidad: 5, medio_pago: 'efectivo', fecha_dispensacion: Date.today.to_s } },
+         params: { dispensacion: { stock_id: stock.id, cantidad: 5, medio_pago: 'efectivo', fecha_dispensacion: Time.zone.today.to_s } },
          headers: auth_headers, as: :json
     d = Dispensacion.last
 

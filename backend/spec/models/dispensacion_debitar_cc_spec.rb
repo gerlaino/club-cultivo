@@ -34,7 +34,7 @@ RSpec.describe 'Dispensacion debitar cuenta corriente', type: :request do
              cantidad:         cantidad,
              aporte_socio_ars: aporte,
              medio_pago:       'cuenta_corriente',
-             fecha_dispensacion: Date.today.to_s,
+             fecha_dispensacion: Time.zone.today.to_s,
            }
          },
          headers: auth_headers,
@@ -104,7 +104,7 @@ RSpec.describe 'Dispensacion debitar cuenta corriente', type: :request do
                cantidad:           5,
                aporte_socio_ars:   100,
                medio_pago:         'efectivo',
-               fecha_dispensacion: Date.today.to_s,
+               fecha_dispensacion: Time.zone.today.to_s,
              }
            },
            headers: auth_headers,
@@ -120,7 +120,7 @@ RSpec.describe 'Dispensacion debitar cuenta corriente', type: :request do
                cantidad:           5,
                aporte_socio_ars:   100,
                medio_pago:         'cuenta_corriente',
-               fecha_dispensacion: Date.today.to_s,
+               fecha_dispensacion: Time.zone.today.to_s,
              }
            },
            headers: auth_headers,

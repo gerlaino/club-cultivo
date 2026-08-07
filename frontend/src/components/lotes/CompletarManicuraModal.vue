@@ -96,8 +96,9 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { CheckCheck, X } from 'lucide-vue-next'
-import { createPesajeManicura, listPlants } from '../../lib/api.js'
+import { createPesajeManicura, registrarDirectoManicura, listPlants } from '../../lib/api.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
+import { useAuthStore } from '../../stores/auth.js'
 
 const props = defineProps({
   modelValue: { type: Boolean, required: true },
@@ -108,6 +109,14 @@ const emit = defineEmits(['update:modelValue', 'completado'])
 const form = ref({ peso_seco_g: null, notas: '' })
 const error  = ref(null)
 const saving = ref(false)
+
+// El admin/supervisor tiene la última palabra: su pesaje se confirma solo y genera el stock.
+// Mandarlo a la cola de aprobación lo dejaba esperando que él mismo se aprobara. El atajo no
+// aplica si el lote está asignado a otro manicura: ahí el candado de asignación manda.
+const auth = useAuthStore()
+const confirmaSolo = computed(() =>
+  ['admin', 'supervisor'].includes(auth.user?.role) &&
+  (!props.lote?.manicurador_id || props.lote.manicurador_id === auth.user?.id))
 
 // Selección de plantas: se listan las pendientes (sin peso) y se eligen las manicuradas.
 const pendientes    = ref([])
@@ -153,12 +162,22 @@ async function confirmar() {
   saving.value = true
   error.value  = null
   try {
-    const { data } = await createPesajeManicura(props.lote.id, {
-      plant_ids:    selectedIds.value,
-      peso_total_g: form.value.peso_seco_g,
-      notas:        form.value.notas || undefined,
-      enviar:       true,
-    })
+    let data
+    if (confirmaSolo.value) {
+      // El peso declarado se reparte como promedio entre las plantas elegidas.
+      const { data: d } = await registrarDirectoManicura(props.lote.id, {
+        resto: { plant_ids: selectedIds.value, peso_total_g: form.value.peso_seco_g },
+      })
+      data = d
+    } else {
+      const { data: d } = await createPesajeManicura(props.lote.id, {
+        plant_ids:    selectedIds.value,
+        peso_total_g: form.value.peso_seco_g,
+        notas:        form.value.notas || undefined,
+        enviar:       true,
+      })
+      data = d
+    }
     emit('completado', data)
     cerrar()
   } catch (e) {

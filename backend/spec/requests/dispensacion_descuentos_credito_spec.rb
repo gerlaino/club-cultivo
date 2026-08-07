@@ -19,7 +19,7 @@ RSpec.describe 'Dispensación — descuentos y crédito por medio de pago', type
   def dispensar(user: admin, **params)
     sign_in_as(user)
     post "/pacientes/#{paciente.id}/dispensaciones",
-         params: { dispensacion: { stock_id: stock.id, cantidad: 10, fecha_dispensacion: Date.today.to_s }.merge(params) },
+         params: { dispensacion: { stock_id: stock.id, cantidad: 10, fecha_dispensacion: Time.zone.today.to_s }.merge(params) },
          headers: auth_headers, as: :json
   end
 

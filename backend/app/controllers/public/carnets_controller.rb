@@ -11,7 +11,7 @@ module Public
         'sin_registro'
       elsif paciente.reprocann_vencimiento.nil?
         'vigente'
-      elsif paciente.reprocann_vencimiento < Date.today
+      elsif paciente.reprocann_vencimiento < Time.zone.today
         'vencido'
       elsif paciente.reprocann_vencimiento <= 30.days.from_now
         'por_vencer'

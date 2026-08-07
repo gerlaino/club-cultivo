@@ -248,7 +248,7 @@ class PacientesController < ApplicationController
 
   # GET /pacientes/criticos
   def criticos
-    hoy   = Date.today
+    hoy   = Time.zone.today
     club  = current_user.club
 
     reprocann_vencidos = club.pacientes
@@ -292,9 +292,9 @@ class PacientesController < ApplicationController
 
     case params[:reprocann]
     when 'proximos'
-      scope = scope.where('reprocann_vencimiento > ? AND reprocann_vencimiento <= ?', Date.today, 30.days.from_now)
+      scope = scope.where('reprocann_vencimiento > ? AND reprocann_vencimiento <= ?', Time.zone.today, 30.days.from_now)
     when 'vencidos'
-      scope = scope.where('reprocann_vencimiento < ?', Date.today)
+      scope = scope.where('reprocann_vencimiento < ?', Time.zone.today)
     when 'sin_rep'
       scope = scope.where(reprocann_vencimiento: nil)
     end
@@ -337,7 +337,7 @@ class PacientesController < ApplicationController
     end
 
     send_data "\xEF\xBB\xBF#{csv_data}",
-              filename:    "pacientes_#{Date.today}.csv",
+              filename:    "pacientes_#{Time.zone.today}.csv",
               type:        "text/csv; charset=utf-8",
               disposition: "attachment"
   end

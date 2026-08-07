@@ -37,7 +37,7 @@ RSpec.describe 'Categorías contables', type: :request do
       sembrar_arbol!
       fert = club.categorias_contables.find_by(nombre: 'Fertilizante')
       mov = club.movimientos_contables.create!(created_by: admin, tipo: 'egreso',
-        categoria_contable: fert, descripcion: 'Test', monto_ars: 1000, fecha: Date.today)
+        categoria_contable: fert, descripcion: 'Test', monto_ars: 1000, fecha: Time.zone.today)
       expect(mov.categoria).to eq('insumo')
       expect(mov.unidad_negocio.tipo).to eq('cultivo')
     end

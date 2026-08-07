@@ -10,7 +10,7 @@ RSpec.describe 'Cierre contable, auditoría y costos por lote', type: :request d
 
   before { sign_in_as(admin) }
 
-  def crear_movimiento(fecha: Date.today, categoria: 'insumo', tipo: 'egreso', monto: 1_000, lote_id: nil)
+  def crear_movimiento(fecha: Time.zone.today, categoria: 'insumo', tipo: 'egreso', monto: 1_000, lote_id: nil)
     post '/movimientos_contables',
          params: { movimiento_contable: {
            tipo: tipo, categoria: categoria, descripcion: 'Test',
@@ -21,7 +21,7 @@ RSpec.describe 'Cierre contable, auditoría y costos por lote', type: :request d
 
   describe 'cierre de período' do
     it 'cierra hasta una fecha y lo informa en el dashboard' do
-      ayer = Date.today - 1
+      ayer = Time.zone.today - 1
       post '/movimientos_contables/cerrar_periodo',
            params: { hasta: ayer.to_s }, headers: auth_headers, as: :json
       expect(response).to have_http_status(:ok)
@@ -36,22 +36,22 @@ RSpec.describe 'Cierre contable, auditoría y costos por lote', type: :request d
     # sin poder cobrar.
     it 'no deja cerrar el día en curso' do
       post '/movimientos_contables/cerrar_periodo',
-           params: { hasta: Date.today.to_s }, headers: auth_headers, as: :json
+           params: { hasta: Time.zone.today.to_s }, headers: auth_headers, as: :json
       expect(response).to have_http_status(:unprocessable_entity)
       expect(response.parsed_body['error']).to include('hasta ayer')
       expect(club.reload.contabilidad_cerrada_hasta).to be_nil
     end
 
     it 'rechaza crear movimientos con fecha dentro del período cerrado' do
-      club.update!(contabilidad_cerrada_hasta: Date.today)
-      crear_movimiento(fecha: Date.today - 1)
+      club.update!(contabilidad_cerrada_hasta: Time.zone.today)
+      crear_movimiento(fecha: Time.zone.today - 1)
       expect(response).to have_http_status(:unprocessable_entity)
     end
 
     it 'rechaza editar y borrar movimientos del período cerrado' do
-      crear_movimiento(fecha: Date.today - 10)
+      crear_movimiento(fecha: Time.zone.today - 10)
       mov = MovimientoContable.last
-      club.update!(contabilidad_cerrada_hasta: Date.today - 5)
+      club.update!(contabilidad_cerrada_hasta: Time.zone.today - 5)
 
       patch "/movimientos_contables/#{mov.id}",
             params: { movimiento_contable: { monto_ars: 999 } }, headers: auth_headers, as: :json
@@ -64,13 +64,13 @@ RSpec.describe 'Cierre contable, auditoría y costos por lote', type: :request d
     end
 
     it 'permite movimientos posteriores al cierre' do
-      club.update!(contabilidad_cerrada_hasta: Date.today - 30)
-      crear_movimiento(fecha: Date.today)
+      club.update!(contabilidad_cerrada_hasta: Time.zone.today - 30)
+      crear_movimiento(fecha: Time.zone.today)
       expect(response).to have_http_status(:created)
     end
 
     it 'reabrir levanta el cierre y queda auditado' do
-      club.update!(contabilidad_cerrada_hasta: Date.today)
+      club.update!(contabilidad_cerrada_hasta: Time.zone.today)
       expect {
         post '/movimientos_contables/reabrir_periodo', params: {}, headers: auth_headers, as: :json
       }.to change(Auditoria, :count).by(1)
@@ -133,7 +133,7 @@ RSpec.describe 'Cierre contable — autorización', type: :request do
 
   it 'un no-admin no puede cerrar el período' do
     post '/movimientos_contables/cerrar_periodo',
-         params: { hasta: Date.today.to_s }, headers: auth_headers, as: :json
+         params: { hasta: Time.zone.today.to_s }, headers: auth_headers, as: :json
     expect(response).to have_http_status(:forbidden)
   end
 end

@@ -314,7 +314,7 @@ class PlanTrabajosController < ApplicationController
     tareas = case scope
              when 'todas'       then @club.tareas.where(plan_tarea_id: pt.id)
              when 'siguientes'  then @club.tareas.where(plan_tarea_id: pt.id)
-                                              .where('fecha_programada >= ?', Date.today)
+                                              .where('fecha_programada >= ?', Time.zone.today)
              else return
              end
 

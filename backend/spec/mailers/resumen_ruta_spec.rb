@@ -16,7 +16,7 @@ RSpec.describe NotificacionesMailer, '#resumen_ruta', type: :mailer do
 
   let(:disp) do
     Dispensacion.create!(paciente: pac, user: admin, stock: stock, sede: sede, cantidad: 1,
-                         medio_pago: 'efectivo', fecha_dispensacion: Date.today, aporte_socio_ars: 5000,
+                         medio_pago: 'efectivo', fecha_dispensacion: Time.zone.today, aporte_socio_ars: 5000,
                          con_envio: true, delivery_id: delivery.id, estado_envio: 'entregado',
                          direccion_envio: 'Calle 1', contacto_nombre: 'P')
   end

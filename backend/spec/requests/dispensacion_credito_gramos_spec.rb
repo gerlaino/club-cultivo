@@ -34,7 +34,7 @@ RSpec.describe 'Dispensacion con credito_gramos', type: :request do
              cantidad:           cantidad,
              aporte_socio_ars:   0,
              medio_pago:         medio_pago,
-             fecha_dispensacion: Date.today.to_s,
+             fecha_dispensacion: Time.zone.today.to_s,
            }
          },
          headers: auth_headers,

@@ -136,7 +136,7 @@ class MovimientoContable < ApplicationRecord
   end
 
   def fecha_no_futura
-    errors.add(:fecha, "no puede ser futura") if fecha.present? && fecha > Date.today
+    errors.add(:fecha, "no puede ser futura") if fecha.present? && fecha > Time.zone.today
   end
 
   # Cierre de período: una vez cerrado un mes, sus movimientos son inmutables.

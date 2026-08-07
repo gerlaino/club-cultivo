@@ -50,7 +50,7 @@ module Ambiente
         tipo:             'inspeccion',
         prioridad:        PRIORIDAD_REGLA_A_TAREA[@regla.prioridad] || 'normal',
         estado:           'pendiente',
-        fecha_programada: Date.today
+        fecha_programada: Time.zone.today
       )
     rescue StandardError => e
       Rails.logger.warn("[AlertaCreator] No se pudo crear tarea para regla #{@regla.id}: #{e.message}")

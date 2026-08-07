@@ -66,7 +66,7 @@ class Paciente < ApplicationRecord
   scope :reprocann_por_vencer, -> {
     where('reprocann_vencimiento IS NOT NULL')
       .where('reprocann_vencimiento <= ?', 30.days.from_now)
-      .where('reprocann_vencimiento >= ?', Date.today)
+      .where('reprocann_vencimiento >= ?', Time.zone.today)
   }
 
   def nombre_completo
@@ -91,7 +91,7 @@ class Paciente < ApplicationRecord
   #   trámite de renovación en curso (se muestra ámbar, no rojo).
   def reprocann_estado_efectivo
     if reprocann_estado.to_s == 'activo' &&
-       reprocann_vencimiento.present? && reprocann_vencimiento < Date.today
+       reprocann_vencimiento.present? && reprocann_vencimiento < Time.zone.today
       'vencido'
     else
       reprocann_estado
@@ -107,7 +107,7 @@ class Paciente < ApplicationRecord
   # no tiene certificado y por lo tanto tampoco tiene número ni vencimiento.
   REPROCANN_CATEGORIAS = %w[vigente por_vencer vencido pendiente sin_reprocann].freeze
 
-  def self.reprocann_categoria(estado:, numero:, vencimiento:, hoy: Date.today)
+  def self.reprocann_categoria(estado:, numero:, vencimiento:, hoy: Time.zone.today)
     return 'pendiente' if estado.to_s == 'pendiente'
     return 'sin_reprocann' if numero.blank?
     return 'vigente'    if vencimiento.blank? # certificado sin fecha cargada: existe igual
@@ -172,7 +172,7 @@ class Paciente < ApplicationRecord
   end
 
   def fecha_nacimiento_pasada
-    if fecha_nacimiento.present? && fecha_nacimiento >= Date.today
+    if fecha_nacimiento.present? && fecha_nacimiento >= Time.zone.today
       errors.add(:fecha_nacimiento, "debe ser una fecha pasada")
     end
   end

@@ -124,7 +124,7 @@ class Lote < ApplicationRecord
 
   def dias_desde_inicio
     return 0 unless start_date
-    (Date.today - start_date).to_i
+    (Time.zone.today - start_date).to_i
   end
 
   # ── Los tres relojes del lote ──────────────────────────────────────────────
@@ -491,7 +491,7 @@ class Lote < ApplicationRecord
   def generar_codigo
     return if codigo.present?
     base  = "L"
-    anio  = Date.today.strftime("%y")
+    anio  = Time.zone.today.strftime("%y")
     count = club.lotes.count + 1
     self.codigo = "#{base}-#{anio}-#{count.to_s.rjust(3, '0')}"
     while club.lotes.exists?(codigo: self.codigo)

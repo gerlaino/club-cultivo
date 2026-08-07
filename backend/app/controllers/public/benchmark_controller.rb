@@ -21,7 +21,7 @@ module Public
         }
       end
 
-      hoy        = Date.today
+      hoy        = Time.zone.today
       inicio_mes = hoy.beginning_of_month
 
       rendimientos = opted.flat_map do |c|

@@ -126,10 +126,13 @@ function elegirCat(c) {
 // Crear un movimiento y crear una categoría o un área piden el MISMO permiso (admin), así que
 // mandar a Configuración a mitad de carga era puro costo de navegación.
 //
-// Solo se crean SUBcategorías, a propósito: una sub hereda de su madre el área, la clave de sistema
-// y el `comportamiento` —el que decide si la compra entra al depósito, al salón o a ningún
-// inventario—. Una familia nueva DEFINE esa plomería, y decidirla en el pie de un dropdown mientras
-// cargás un gasto es la clase de error que se descubre tarde: eso sigue en Configuración.
+// Se crean subcategorías Y categorías principales. La sub hereda de su madre el área, la clave de
+// sistema y el `comportamiento` —el que decide si la compra entra al depósito, al salón o a ningún
+// inventario—. Una principal creada desde acá nace con `comportamiento: general`, o sea que NO
+// stockea: es un gasto y nada más. Conectarla a un inventario sigue siendo cosa de Configuración,
+// porque es la clase de decisión cuyo error se descubre tarde. Pero antes esto no se podía crear
+// de ninguna manera desde el modal, y como el catálogo arranca vacío, un club nuevo que quería
+// anotar su primer gasto se encontraba con el botón deshabilitado y sin explicación.
 const catsNuevas  = ref([])
 const areasNuevas = ref([])
 const crearCat    = ref(null)   // { nombre, parent_id } mientras se está creando
@@ -137,25 +140,41 @@ const crearArea   = ref(null)   // { nombre, tipo }
 const creando     = ref(false)
 const errorCrear  = ref('')
 
-const AREA_TIPOS = ['cultivo', 'dispensario', 'bar', 'social', 'administracion', 'general']
+const AREA_TIPOS = [
+  { value: 'cultivo',        label: 'Cultivo' },
+  { value: 'dispensario',    label: 'Dispensario' },
+  { value: 'bar',            label: 'Buffet' },
+  { value: 'social',         label: 'Social / eventos' },
+  { value: 'administracion', label: 'Administración' },
+  { value: 'general',        label: 'General' },
+]
 const madresDelTipo = computed(() => props.categorias.filter(m => m.tipo === form.value.tipo))
 
+// `parent_id: null` = categoría principal. Antes sólo se podían crear subcategorías, con lo
+// cual un club sin categorías madre —que es como arranca todo club, el catálogo no se siembra—
+// tenía el botón deshabilitado y no había forma de salir del paso desde acá.
 function abrirCrearCat() {
   errorCrear.value = ''
-  crearCat.value = { nombre: catQuery.value.trim(), parent_id: madresDelTipo.value[0]?.id ?? null }
+  crearCat.value = {
+    nombre: catQuery.value.trim(),
+    parent_id: madresDelTipo.value[0]?.id ?? null,
+    unidad_negocio_id: form.value.unidad_negocio_id ?? null,
+  }
 }
 async function confirmarCrearCat() {
   const f = crearCat.value
-  if (!f?.nombre?.trim() || !f.parent_id) { errorCrear.value = 'Poné un nombre y elegí dónde va'; return }
+  if (!f?.nombre?.trim()) { errorCrear.value = 'Poné un nombre'; return }
   creando.value = true; errorCrear.value = ''
   try {
     const { data } = await createCategoriaContable({
       nombre: f.nombre.trim(), tipo: form.value.tipo, parent_id: f.parent_id,
+      // Una principal no hereda de nadie: el área se elige acá.
+      ...(f.parent_id ? {} : { unidad_negocio_id: f.unidad_negocio_id || null }),
     })
     const madre = madresDelTipo.value.find(m => m.id === f.parent_id)
     catsNuevas.value.push({
       id: data.id,
-      label: `${madre?.nombre || '—'} › ${data.nombre}`,
+      label: madre ? `${madre.nombre} › ${data.nombre}` : data.nombre,
       tipo: data.tipo,
       clave: data.clave_efectiva,
       area: data.unidad_negocio?.id || madre?.unidad_negocio?.id || null,
@@ -546,7 +565,7 @@ const titulo = computed(() => {
                   <!-- Crear sin salir. Solo subcategorías: heredan de la madre el área, la clave y
                        el comportamiento (si la compra entra al depósito o al salón). -->
                   <div v-if="!crearCat" class="mv-drop-foot">
-                    <button type="button" class="mv-drop-new" :disabled="!madresDelTipo.length" @click="abrirCrearCat">
+                    <button type="button" class="mv-drop-new" @click="abrirCrearCat">
                       <i class="bi bi-plus-lg"></i>
                       <span v-if="catQuery.trim()">Crear «{{ catQuery.trim() }}»</span>
                       <span v-else>Crear una categoría</span>
@@ -560,10 +579,22 @@ const titulo = computed(() => {
                     <label class="mv-fld">
                       <span class="mv-lbl">¿Dentro de cuál?</span>
                       <select class="mv-inp" v-model.number="crearCat.parent_id">
+                        <option :value="null">— Es una categoría principal —</option>
                         <option v-for="m in madresDelTipo" :key="m.id" :value="m.id">{{ m.nombre }}</option>
                       </select>
                     </label>
-                    <p class="mv-newbox-hint">Hereda el área y el destino de stock de la que elijas.</p>
+                    <label v-if="!crearCat.parent_id" class="mv-fld">
+                      <span class="mv-lbl">Área <span class="mv-opt">(opcional)</span></span>
+                      <select class="mv-inp" v-model.number="crearCat.unidad_negocio_id">
+                        <option :value="null">— Sin área —</option>
+                        <option v-for="u in areasDisponibles" :key="u.id" :value="u.id">{{ u.nombre }}</option>
+                      </select>
+                    </label>
+                    <p class="mv-newbox-hint">
+                      <template v-if="crearCat.parent_id">Hereda el área y el destino de stock de la que elijas.</template>
+                      <template v-else-if="!madresDelTipo.length">Todavía no hay categorías de este tipo: esta va a ser la primera.</template>
+                      <template v-else>Una categoría principal: después vas a poder colgarle subcategorías.</template>
+                    </p>
                     <p v-if="errorCrear" class="mv-err">{{ errorCrear }}</p>
                     <div class="mv-newbox-acts">
                       <button type="button" class="mv-btn-ghost mv-btn-ghost--sm" @click="crearCat = null">Cancelar</button>
@@ -603,7 +634,7 @@ const titulo = computed(() => {
                   <label class="mv-fld">
                     <span class="mv-lbl">Tipo</span>
                     <select class="mv-inp" v-model="crearArea.tipo">
-                      <option v-for="t in AREA_TIPOS" :key="t" :value="t">{{ t }}</option>
+                      <option v-for="t in AREA_TIPOS" :key="t.value" :value="t.value">{{ t.label }}</option>
                     </select>
                   </label>
                   <p v-if="errorCrear" class="mv-err">{{ errorCrear }}</p>

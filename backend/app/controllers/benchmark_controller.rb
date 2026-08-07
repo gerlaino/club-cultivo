@@ -27,7 +27,7 @@ class BenchmarkController < ApplicationController
     rendimiento_promedio = lotes_finalizados.any? ?
       (lotes_finalizados.sum { |l| l.rendimiento_real_g.to_f } / lotes_finalizados.size).round(1) : nil
 
-    hoy = Date.today
+    hoy = Time.zone.today
     disps_mes = Dispensacion.no_canceladas.joins(stock: :sede)
                             .where(sedes: { club_id: club.id })
                             .where(fecha_dispensacion: hoy.beginning_of_month..hoy)
@@ -67,7 +67,7 @@ class BenchmarkController < ApplicationController
     pacientes_counts = opted_clubs.map { |c| c.pacientes.where(deleted_at: nil).count }
     avg_pacientes = (pacientes_counts.sum.to_f / total_clubes).round(1)
 
-    hoy = Date.today
+    hoy = Time.zone.today
     inicio_mes = hoy.beginning_of_month
 
     rendimientos = opted_clubs.flat_map do |c|

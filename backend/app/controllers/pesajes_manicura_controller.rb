@@ -71,7 +71,7 @@ class PesajesManicuraController < ApplicationController
     pesaje ||= @lote.pesajes_manicura.build(
       manicurador: current_user,
       club:        current_user.club,
-      fecha_pesaje: Date.today,
+      fecha_pesaje: Time.zone.today,
       notas:        params[:notas],
     )
 
@@ -115,7 +115,7 @@ class PesajesManicuraController < ApplicationController
 
     ActiveRecord::Base.transaction do
       stock  = resolver_stock_destino!
-      pesaje = @lote.pesajes_manicura.create!(manicurador: current_user, club: current_user.club, fecha_pesaje: Date.today)
+      pesaje = @lote.pesajes_manicura.create!(manicurador: current_user, club: current_user.club, fecha_pesaje: Time.zone.today)
 
       # Pesos individuales (medidos).
       individuales_ids = []
@@ -130,7 +130,10 @@ class PesajesManicuraController < ApplicationController
 
       # Resto: el peso conjunto se reparte como PROMEDIO entre las plantas que quedan sin
       # pesar (ni individual ahora, ni de un pesaje previo). Cada una queda con es_promedio.
-      distribuir_resto!(pesaje, resto_peso, excluir_ids: individuales_ids) if resto_peso.positive?
+      # `plant_ids` restringe el reparto a las plantas elegidas; sin él, va a todas las que
+      # sigan sin pesar (que es el caso de "cargar el resto del lote de una").
+      distribuir_resto!(pesaje, resto_peso, excluir_ids: individuales_ids,
+                        solo_ids: params.dig(:resto, :plant_ids)) if resto_peso.positive?
 
       raise ArgumentError, 'Cargá al menos un peso (individual o del resto)' unless pesaje.pesadas_plantas.exists?
 

@@ -10,7 +10,7 @@ class IndicacionVencimientoJob < ApplicationJob
   private
 
   def procesar_club(club)
-    hoy      = Date.today
+    hoy      = Time.zone.today
     vencidas = []
     por_vencer = {}
 

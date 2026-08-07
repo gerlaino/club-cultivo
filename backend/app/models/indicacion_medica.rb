@@ -26,11 +26,11 @@ class IndicacionMedica < ApplicationRecord
   scope :por_vencer, -> {
     activas.where('fecha_vencimiento IS NOT NULL')
            .where('fecha_vencimiento <= ?', 30.days.from_now)
-           .where('fecha_vencimiento >= ?', Date.today)
+           .where('fecha_vencimiento >= ?', Time.zone.today)
   }
   scope :vencidas, -> {
     where('fecha_vencimiento IS NOT NULL')
-      .where('fecha_vencimiento < ?', Date.today)
+      .where('fecha_vencimiento < ?', Time.zone.today)
   }
 
   before_validation :set_fecha_emision, on: :create
@@ -46,11 +46,11 @@ class IndicacionMedica < ApplicationRecord
 
   def dias_hasta_vencimiento
     return nil unless fecha_vencimiento
-    (fecha_vencimiento - Date.today).to_i
+    (fecha_vencimiento - Time.zone.today).to_i
   end
 
   def vencida?
-    fecha_vencimiento && fecha_vencimiento < Date.today
+    fecha_vencimiento && fecha_vencimiento < Time.zone.today
   end
 
   def por_vencer?
@@ -62,7 +62,7 @@ class IndicacionMedica < ApplicationRecord
   private
 
   def set_fecha_emision
-    self.fecha_emision ||= Date.today
+    self.fecha_emision ||= Time.zone.today
   end
 
   # La duración del tratamiento y la validez de la indicación son cosas distintas: un tratamiento

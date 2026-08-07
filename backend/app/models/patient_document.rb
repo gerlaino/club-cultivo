@@ -54,8 +54,8 @@ class PatientDocument < ApplicationRecord
       '{{club_direccion}}'           => [club.address, club.city, club.state].compact.join(', '),
       '{{medico_nombre}}'            => medico ? "#{medico.first_name} #{medico.last_name}".strip : '—',
       '{{medico_dni}}'               => medico&.dni || '—',
-      '{{fecha_hoy}}'                => Date.today.strftime('%d/%m/%Y'),
-      '{{fecha_hoy_largo}}' => Date.today.strftime('%d de %B de %Y'),
+      '{{fecha_hoy}}'                => Time.zone.today.strftime('%d/%m/%Y'),
+      '{{fecha_hoy_largo}}' => Time.zone.today.strftime('%d de %B de %Y'),
     }
     vars.reduce(html) { |html, (var, val)| html.gsub(var, val.to_s) }
   end

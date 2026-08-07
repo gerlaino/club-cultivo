@@ -37,7 +37,7 @@ RSpec.describe 'Pacientes — activo/inactivo y estados REPROCANN', type: :reque
     it 'CASO 02 — a un paciente INACTIVO no se le puede dispensar' do
       p = paciente!(es_paciente: false)
       d = Dispensacion.new(paciente: p, user: admin, stock: stock!,
-                           cantidad: 1, fecha_dispensacion: Date.today)
+                           cantidad: 1, fecha_dispensacion: Time.zone.today)
 
       expect(d).not_to be_valid
       expect(d.errors[:base].join).to match(/no está activo/i)
@@ -129,7 +129,7 @@ RSpec.describe 'Pacientes — activo/inactivo y estados REPROCANN', type: :reque
     it 'CASO 13 — REPROCANN vencido NO bloquea dispensar (hoy es una alerta, no un candado)' do
       p = paciente!(reprocann_estado: 'activo', reprocann_vencimiento: 1.year.ago.to_date)
       d = Dispensacion.new(paciente: p, user: admin, stock: stock!,
-                           cantidad: 1, fecha_dispensacion: Date.today)
+                           cantidad: 1, fecha_dispensacion: Time.zone.today)
 
       expect(d).to be_valid
     end
@@ -140,7 +140,7 @@ RSpec.describe 'Pacientes — activo/inactivo y estados REPROCANN', type: :reque
 
       avisados = Paciente.where(es_paciente: true)
                          .where(reprocann_estado: %w[activo pendiente])
-                         .where(reprocann_vencimiento: Date.today..30.days.from_now)
+                         .where(reprocann_vencimiento: Time.zone.today..30.days.from_now)
 
       expect(avisados).to be_empty
     end
@@ -196,6 +196,32 @@ RSpec.describe 'Pacientes — activo/inactivo y estados REPROCANN', type: :reque
 
       fila = informe['lista_anonimizada'].first
       expect(fila['reprocann_estado']).to eq('pendiente')
+    end
+
+    # El informe es de PACIENTES Y SEDE: nada de cultivo, que vive en Producción y Sedes.
+    it 'CASO 20a — agrupa a los pacientes por la sede donde se atienden' do
+      sede  = create(:sede, club: club, created_by: admin, tipo: 'mixta')
+      stock = create(:stock, club: club, sede: sede, cantidad: 500)
+      p     = paciente!(reprocann_numero: 'R-1', reprocann_vencimiento: 8.months.from_now.to_date)
+      Dispensacion.create!(paciente: p, user: admin, stock: stock, cantidad: 5,
+                           fecha_dispensacion: Time.zone.today)
+
+      fila = informe['por_sede'].find { |r| r['sede'] == sede.nombre }
+
+      expect(fila['total']).to eq(1)
+      expect(fila['vigentes']).to eq(1)
+    end
+
+    it 'CASO 20b — quien nunca dispensó no se pierde: cae en "Sin dispensaciones"' do
+      paciente!
+
+      expect(informe['por_sede'].map { |r| r['sede'] }).to include('Sin dispensaciones')
+    end
+
+    it 'CASO 20c — el informe no trae nada de cultivo' do
+      paciente!
+
+      expect(informe.keys).not_to include('lotes', 'plantas', 'gramos_producidos', 'por_estado')
     end
 
     it 'CASO 20 — el informe no filtra datos de otro club' do

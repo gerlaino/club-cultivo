@@ -6,7 +6,7 @@ RSpec.describe PlanTarea, type: :model do
   let(:club)  { create(:club) }
   let(:admin) { create(:user, :admin, club: club) }
   let(:plan)  { club.plan_trabajos.create!(titulo: 'Plan', creado_por: admin,
-                              fecha_inicio: Date.today, fecha_fin: Date.today + 7) }
+                              fecha_inicio: Time.zone.today, fecha_fin: Time.zone.today + 7) }
 
   it 'acepta exactamente los mismos tipos que Tarea' do
     expect(described_class::TIPOS).to eq(Tarea::TIPOS)

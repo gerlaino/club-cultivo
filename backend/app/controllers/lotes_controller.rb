@@ -136,7 +136,7 @@ class LotesController < ApplicationController
                      when 'cosecha'            then dias_semilla + dias_vege + dias_flora + dias_cos
                      else 0
                      end
-      @lote.start_date = total_dias > 0 ? total_dias.days.ago.to_date : Date.today
+      @lote.start_date = total_dias > 0 ? total_dias.days.ago.to_date : Time.zone.today
     end
 
     plantas_iniciales = lote_params[:plants_count].to_i
@@ -519,7 +519,7 @@ class LotesController < ApplicationController
     end
 
     send_data "\xEF\xBB\xBF#{csv_data}",
-              filename:    "lotes_#{Date.today}.csv",
+              filename:    "lotes_#{Time.zone.today}.csv",
               type:        "text/csv; charset=utf-8",
               disposition: "attachment"
   end
@@ -527,7 +527,7 @@ class LotesController < ApplicationController
   # GET /lotes/proximo_codigo
   def proximo_codigo
     club      = current_user.club
-    anio      = Date.today.strftime("%y")
+    anio      = Time.zone.today.strftime("%y")
     count     = club.lotes.count + 1
     candidate = "L-#{anio}-#{count.to_s.rjust(3, '0')}"
     while Lote.exists?(club: club, codigo: candidate)
@@ -792,7 +792,7 @@ class LotesController < ApplicationController
       plantas.update_all(
         state:          'cosechado',
         pasada_cosecha: pasada,
-        fecha_cosecha:  Date.today,
+        fecha_cosecha:  Time.zone.today,
       )
       # Mantener plants_count_cosechadas al día (idempotente = conteo real de cosechadas).
       # Antes solo se seteaba por PATCH manual → analytics caía siempre al fallback.

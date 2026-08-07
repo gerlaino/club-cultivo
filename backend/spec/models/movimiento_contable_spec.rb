@@ -11,7 +11,7 @@ RSpec.describe MovimientoContable, type: :model do
   def build_mov(attrs = {})
     club.movimientos_contables.build({
       sede: sede, created_by: admin, tipo: 'egreso',
-      descripcion: 'Test', monto_ars: 1000, fecha: Date.today
+      descripcion: 'Test', monto_ars: 1000, fecha: Time.zone.today
     }.merge(attrs))
   end
 

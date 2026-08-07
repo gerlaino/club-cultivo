@@ -24,7 +24,7 @@ class MovimientosContablesController < ApplicationController
       hasta = Date.parse(params[:hasta]) rescue nil
       scope = scope.del_periodo(desde, hasta) if desde && hasta
     elsif params[:mes].present?
-      fecha = Date.parse("#{params[:mes]}-01") rescue Date.today
+      fecha = Date.parse("#{params[:mes]}-01") rescue Time.zone.today
       scope = scope.del_mes(fecha)
     end
 
@@ -275,7 +275,7 @@ class MovimientosContablesController < ApplicationController
     # El día en curso NO se puede cerrar: todo asiento automático (venta del salón, dispensación,
     # compra) nace con fecha de hoy y quedaría rechazado por la validación de período cerrado,
     # dejando el mostrador sin poder cobrar. Un período se cierra cuando ya terminó.
-    if hasta >= Date.today
+    if hasta >= Time.zone.today
       return render json: { error: 'Solo se cierra hasta ayer: el día en curso sigue operando (ventas, dispensaciones y compras se asientan con fecha de hoy).' },
                     status: :unprocessable_entity
     end
@@ -323,7 +323,7 @@ class MovimientosContablesController < ApplicationController
     csv_data = generate_csv(scope)
 
     send_data csv_data,
-              filename:    "movimientos_contables_#{Date.today}.csv",
+              filename:    "movimientos_contables_#{Time.zone.today}.csv",
               type:        "text/csv; charset=utf-8",
               disposition: "attachment"
   end

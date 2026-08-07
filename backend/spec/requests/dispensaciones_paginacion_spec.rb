@@ -14,7 +14,7 @@ RSpec.describe 'GET /pacientes/:id/dispensaciones — paginación', type: :reque
   before do
     12.times do
       Dispensacion.create!(paciente: paciente, user: admin, stock: stock, sede: sede,
-                           cantidad: 1, medio_pago: 'efectivo', fecha_dispensacion: Date.today, aporte_socio_ars: 10)
+                           cantidad: 1, medio_pago: 'efectivo', fecha_dispensacion: Time.zone.today, aporte_socio_ars: 10)
     end
     sign_in_as(admin)
   end

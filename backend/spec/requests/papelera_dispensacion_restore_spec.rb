@@ -17,7 +17,7 @@ RSpec.describe 'Papelera — restauración de dispensación', type: :request do
 
   def crear_dispensacion(medio: 'efectivo')
     post "/pacientes/#{paciente.id}/dispensaciones",
-         params: { dispensacion: { stock_id: stock.id, cantidad: 10, fecha_dispensacion: Date.today.to_s, medio_pago: medio } },
+         params: { dispensacion: { stock_id: stock.id, cantidad: 10, fecha_dispensacion: Time.zone.today.to_s, medio_pago: medio } },
          headers: auth_headers, as: :json
     Dispensacion.last
   end
