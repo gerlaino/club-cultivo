@@ -12,7 +12,8 @@ import AmbienteChart from '../components/ambiente/AmbienteChart.vue'
 import LecturaManualForm from '../components/ambiente/LecturaManualForm.vue'
 import AlertaBadge from '../components/ambiente/AlertaBadge.vue'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
-import { getSala, listLotes, getSalaAmbienteHistorico } from '../lib/api.js'
+import { getSala, listLotes, getSalaAmbienteHistorico, listDispositivos } from '../lib/api.js'
+import { RouterLink } from 'vue-router'
 import DsSpinner from '../design-system/components/Spinner.vue'
 
 const route  = useRoute()
@@ -32,10 +33,36 @@ const desde     = ref(new Date(Date.now() - 7 * 24 * 3600_000).toISOString().sli
 const hasta     = ref(new Date().toISOString().slice(0, 16))
 
 // Activa sección
-const seccionActiva = ref('semaforo') // 'semaforo' | 'chart' | 'tendencia' | 'manual' | 'alertas'
+const seccionActiva = ref('semaforo') // 'semaforo' | 'chart' | 'tendencia' | 'sensores' | 'manual' | 'alertas'
 
 // Live updates
 const liveConectado = ref(false)
+
+// ── Sensores de esta sala ────────────────────────────────────────────────────
+// Se listan acá porque es donde el usuario nota que faltan: mirando el ambiente de su sala.
+const TIPO_LABEL = {
+  pulse: 'Pulse', sonoff_th: 'Sonoff TH', bluelab: 'Bluelab', tuya_plug: 'Tuya',
+  shelly_plug: 'Shelly', melcloud_ac: 'MELCloud', daikin: 'Daikin', generic: 'Genérico',
+}
+const dispositivos    = ref([])
+const loadingSensores = ref(false)
+const sensoresDeLaSala = computed(() => dispositivos.value.filter(d => d.sala_id === salaId))
+const puedeConectar    = computed(() => ['admin', 'supervisor'].includes(auth.user?.role))
+
+async function cargarSensores() {
+  loadingSensores.value = true
+  try { dispositivos.value = (await listDispositivos()).data || [] }
+  catch { dispositivos.value = [] }
+  finally { loadingSensores.value = false }
+}
+
+function fmtDesde(iso) {
+  const min = Math.round((Date.now() - new Date(iso)) / 60000)
+  if (min < 1)   return 'recién'
+  if (min < 60)  return `hace ${min} min`
+  if (min < 1440) return `hace ${Math.round(min / 60)} h`
+  return `hace ${Math.round(min / 1440)} d`
+}
 
 // Histórico (tendencia)
 const tipoHistorico  = ref('temperatura')
@@ -189,6 +216,7 @@ watch([tipoHistorico, semanasHistorico], () => {
 
 watch(seccionActiva, (val) => {
   if (val === 'tendencia' && !histData.value.length) cargarHistorico()
+  if (val === 'sensores'  && !dispositivos.value.length) cargarSensores()
 })
 
 </script>
@@ -233,6 +261,10 @@ watch(seccionActiva, (val) => {
         <button class="sav__tab" :class="{ 'sav__tab--active': seccionActiva === 'chart' }" @click="seccionActiva = 'chart'">📈 Gráfico</button>
         <button class="sav__tab" :class="{ 'sav__tab--active': seccionActiva === 'tendencia' }" @click="seccionActiva = 'tendencia'">📊 Tendencia</button>
         <button class="sav__tab" :class="{ 'sav__tab--active': seccionActiva === 'manual' }" @click="seccionActiva = 'manual'">✏️ Registrar</button>
+        <button class="sav__tab" :class="{ 'sav__tab--active': seccionActiva === 'sensores' }" @click="seccionActiva = 'sensores'">
+          📡 Sensores
+          <span v-if="sensoresDeLaSala.length" class="sav__tab-badge">{{ sensoresDeLaSala.length }}</span>
+        </button>
         <button class="sav__tab" :class="{ 'sav__tab--active': seccionActiva === 'alertas' }" @click="seccionActiva = 'alertas'">
           🔔 Alertas
           <span v-if="store.alertasCount > 0" class="sav__tab-badge">{{ store.alertasCount }}</span>
@@ -346,6 +378,39 @@ watch(seccionActiva, (val) => {
       </div>
 
       <!-- Registro manual -->
+      <!-- Sensores de ESTA sala. Antes había que saber que existía /dispositivos, una sección
+           aparte: estabas mirando el ambiente de tu sala, veías que no llegaban datos, y no
+           tenías desde dónde conectar el equipo. -->
+      <div v-if="seccionActiva === 'sensores'" class="sav__section">
+        <div v-if="loadingSensores" class="sav__info-msg"><DsSpinner :size="14" /> Buscando sensores…</div>
+
+        <template v-else-if="sensoresDeLaSala.length">
+          <div v-for="d in sensoresDeLaSala" :key="d.id" class="sav__sensor">
+            <div class="sav__sensor-main">
+              <span class="sav__sensor-nombre">{{ d.nombre_amigable || d.device_id || `Sensor #${d.id}` }}</span>
+              <span class="sav__sensor-tipo">{{ TIPO_LABEL[d.tipo] || d.tipo }}</span>
+            </div>
+            <span class="sav__sensor-estado" :class="d.ultima_lectura_at ? 'sav__sensor-estado--ok' : 'sav__sensor-estado--mudo'">
+              {{ d.ultima_lectura_at ? `Última lectura ${fmtDesde(d.ultima_lectura_at)}` : 'Todavía no mandó ninguna lectura' }}
+            </span>
+          </div>
+          <RouterLink to="/dispositivos" class="sav__sensor-link">Administrar sensores del club →</RouterLink>
+        </template>
+
+        <div v-else class="sav__sensor-vacio">
+          <i class="bi bi-broadcast sav__sensor-vacio-ico"></i>
+          <p class="sav__sensor-vacio-tit">Esta sala no tiene sensores conectados</p>
+          <p class="sav__sensor-vacio-sub">
+            Con un sensor (Pulse, Sonoff u otro) la temperatura y la humedad se registran solas,
+            sin tener que cargarlas a mano.
+          </p>
+          <RouterLink v-if="puedeConectar" :to="{ path: '/dispositivos', query: { sala_id: salaId, nueva: 1 } }" class="sav__sensor-cta">
+            <i class="bi bi-plus-lg"></i> Conectar un sensor a esta sala
+          </RouterLink>
+          <p v-else class="sav__sensor-vacio-sub">Pedile a un administrador que conecte uno.</p>
+        </div>
+      </div>
+
       <div v-if="seccionActiva === 'manual'" class="sav__section">
         <div v-if="!loteActivo" class="sav__info-msg">
           <i class="bi bi-info-circle"></i>
@@ -471,4 +536,21 @@ watch(seccionActiva, (val) => {
 /* Tendencia */
 .sav__hist-loading { color: #94a3b8; font-size: .82rem; padding: 2rem; text-align: center; }
 .sav__hist-info { font-size: .72rem; color: #94a3b8; margin-top: .6rem; text-align: center; }
+
+/* Sensores de la sala */
+.sav__sensor { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .85rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: .6rem; background: #fff; flex-wrap: wrap; }
+.sav__sensor-main { display: flex; flex-direction: column; gap: .15rem; }
+.sav__sensor-nombre { font-weight: 700; color: #0f172a; font-size: .9rem; }
+.sav__sensor-tipo { font-size: .75rem; color: #64748b; }
+.sav__sensor-estado { font-size: .75rem; padding: .2em .6em; border-radius: 999px; font-weight: 600; }
+.sav__sensor-estado--ok { background: #f0fdf4; color: #15803d; }
+.sav__sensor-estado--mudo { background: #fef3c7; color: #92400e; }
+.sav__sensor-link { display: inline-block; margin-top: .5rem; font-size: .8rem; color: #15803d; text-decoration: none; font-weight: 600; }
+.sav__sensor-link:hover { text-decoration: underline; }
+.sav__sensor-vacio { text-align: center; padding: 2.5rem 1.5rem; }
+.sav__sensor-vacio-ico { font-size: 2rem; color: #cbd5e1; }
+.sav__sensor-vacio-tit { font-size: 1rem; font-weight: 700; color: #0f172a; margin: .75rem 0 .3rem; }
+.sav__sensor-vacio-sub { font-size: .85rem; color: #64748b; margin: 0 auto .25rem; max-width: 46ch; line-height: 1.5; }
+.sav__sensor-cta { display: inline-flex; align-items: center; gap: .4rem; margin-top: 1rem; background: var(--c-role-admin, #1b5e20); color: #fff; padding: .6rem 1.2rem; border-radius: 10px; font-size: .875rem; font-weight: 600; text-decoration: none; }
+.sav__sensor-cta:hover { opacity: .92; }
 </style>
