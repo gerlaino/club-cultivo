@@ -32,7 +32,9 @@ export const ROLES = [
   {
     value: 'cultivador', label: 'Cultivador', icon: 'bi-flower1',
     desc: 'Salas, lotes y plantas de las sedes que le asignes. Sin acceso a pacientes.',
-    sedes: { pide: true, hint: 'Necesita al menos una sede: sin eso no ve ninguna sala ni lote.' },
+    // Sin sedes ve TODO el cultivo del club, no nada: es lo que necesita un club de una sola
+    // sede, que si no tendría que asignársela a cada persona para que la app le sirva.
+    sedes: { pide: false, hint: 'Sin sedes asignadas ve el cultivo de todo el club.' },
     permisos: [
       { ok: true,  label: 'Salas, lotes y plantas' },
       { ok: true,  label: 'Registrar ambiente y tareas' },
@@ -43,7 +45,7 @@ export const ROLES = [
   {
     value: 'supervisor', label: 'Supervisor', icon: 'bi-binoculars-fill',
     desc: 'Ve el cultivo de sus sedes y gestiona tareas. Además dispensa y maneja reservas.',
-    sedes: { pide: true, hint: 'Necesita al menos una sede: define qué cultivo supervisa.' },
+    sedes: { pide: false, hint: 'Sin sedes asignadas supervisa todo el club.' },
     permisos: [
       { ok: true,  label: 'Ver cultivo de sus sedes' },
       { ok: true,  label: 'Crear y asignar tareas' },

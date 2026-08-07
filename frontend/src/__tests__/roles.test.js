@@ -27,10 +27,12 @@ describe('metadata de roles', () => {
     expect(rolPermisos('admin').every(p => p.ok)).toBe(true)
   })
 
-  // Sin sede asignada, un cultivador entra a una app vacía: no ve ninguna sala ni lote.
-  it('cultivador y supervisor exigen sede; los demás no', () => {
-    expect(rolPideSede('cultivador')).toBe(true)
-    expect(rolPideSede('supervisor')).toBe(true)
+  // Ningún rol EXIGE sede: sin asignar, todos ven lo de todo el club. Es lo que necesita un
+  // club de una sola sede, que si no tendría que asignársela a cada persona para que la app
+  // le sirva. Lo que sí hace falta es que cada uno lo explique (ver el test de abajo).
+  it('ningún rol queda inutilizable por no tener sede asignada', () => {
+    expect(rolPideSede('cultivador')).toBe(false)
+    expect(rolPideSede('supervisor')).toBe(false)
     expect(rolPideSede('dispensador')).toBe(false)
     expect(rolPideSede('admin')).toBe(false)
   })

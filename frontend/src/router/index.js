@@ -26,7 +26,11 @@ const requiresPermission = (resource, action) => {
     if (!auth.isAuthenticated) {
       next({ name: "login", query: { redirect: to.fullPath } });
     } else if (!can(resource, action)) {
-      next("/");
+      useToast().warning(
+        `No tenés acceso a esta sección con tu rol (${auth.user?.role || 'sin rol'}). ` +
+        'Si creés que deberías tenerlo, pedíselo a un administrador del club.'
+      );
+      next(ROLE_HOME[auth.user?.role] || "/");
     } else {
       next();
     }
@@ -972,13 +976,53 @@ const ROLE_HOME = {
   delivery:    '/delivery',
 }
 
+// A dónde puede entrar cada rol ESCRIBIENDO LA URL. Sin esto, un cultivador que tipea
+// /contabilidad o /usuarios llega a la pantalla: el backend le responde 403 y ve una vista
+// rota o vacía, sin entender por qué. Cubría 5 de los 11 roles.
+//
+// Los que faltaban (cultivador, supervisor, manicura, dispensador, paciente) usan el shell
+// de admin, así que no alcanzaba con mirar el prefijo del layout: hay que listar qué
+// secciones son suyas.
+const COMUNES = ['/perfil', '/login', '/bienvenida']
+
 const ROLE_ALLOWED_PREFIX = {
-  super_admin: ['/super-admin', '/login'],
-  auditor:     ['/auditor',  '/perfil', '/login'],
-  medico:      ['/medico',   '/perfil', '/login'],
-  abogado:     ['/abogado',  '/perfil', '/login'],
-  delivery:    ['/delivery', '/perfil', '/login'],
+  super_admin: ['/super-admin', ...COMUNES],
+  auditor:     ['/auditor',  ...COMUNES],
+  medico:      ['/medico',   ...COMUNES],
+  abogado:     ['/abogado',  ...COMUNES],
+  delivery:    ['/delivery', ...COMUNES],
+
+  // Cultivo: salas, lotes, plantas y lo que rodea al trabajo diario del cuarto.
+  cultivador: ['/', '/salas', '/lotes', '/plantas', '/geneticas', '/tareas', '/plan-trabajo',
+               '/historial-cultivador', '/cosechado', '/dispositivos', '/reglas-ambientales',
+               '/m', ...COMUNES],
+
+  // Supervisa el cultivo de sus sedes y además dispensa.
+  supervisor: ['/', '/salas', '/lotes', '/plantas', '/geneticas', '/tareas', '/plan-trabajo',
+               '/historial-cultivador', '/cosechado', '/dispositivos', '/reglas-ambientales',
+               '/pacientes', '/socios', '/historial', '/admin/stock', '/insumos', '/sedes',
+               '/m', ...COMUNES],
+
+  // Post-cosecha: pesa los lotes que le asignan.
+  manicura:   ['/', '/cosechado', '/lotes', '/plantas', '/tareas', '/m', ...COMUNES],
+
+  // Mostrador: dispensa, cobra y consulta stock.
+  dispensador: ['/', '/pacientes', '/socios', '/historial', '/admin/stock', '/insumos',
+                '/bar', '/entregas', '/m', ...COMUNES],
+
+  // El paciente sólo ve lo suyo (todavía sin portal propio: ver tarea del login de paciente).
+  paciente:   ['/', ...COMUNES],
 }
+
+// Decisión pura, exportada para poder verificarla sin montar el router: ¿este rol puede
+// entrar a esta ruta escribiendo la URL?
+export function puedeEntrar(role, path) {
+  const permitidos = ROLE_ALLOWED_PREFIX[role]
+  if (!permitidos) return true // rol sin matriz (admin): el permiso fino lo aplica cada ruta
+  return permitidos.some(p => path === p || (p !== '/' && path.startsWith(p + '/')) || (p === '/' && path === '/'))
+}
+
+export { ROLE_ALLOWED_PREFIX, ROLE_HOME }
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
@@ -1059,10 +1103,12 @@ router.beforeEach(async (to) => {
   // matriz de prefijos: cualquiera las ve sin sesión, así que bloquearlas a un rol logueado
   // solo produce un "Sin permisos" que no viene al caso.
   if (auth.isAuthenticated && !to.meta.public && ROLE_ALLOWED_PREFIX[role]) {
-    const allowed = ROLE_ALLOWED_PREFIX[role].some(p => to.path === p || to.path.startsWith(p + '/'))
-    if (!allowed) {
-      useToast().warning('Sin permisos para acceder a esa sección')
-      return ROLE_HOME[role]
+    if (!puedeEntrar(role, to.path)) {
+      useToast().warning(
+        `No tenés acceso a esa sección con tu rol (${role}). ` +
+        'Si creés que deberías tenerlo, pedíselo a un administrador del club.'
+      )
+      return ROLE_HOME[role] || '/'
     }
   }
 
