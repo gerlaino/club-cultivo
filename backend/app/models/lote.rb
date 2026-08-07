@@ -18,12 +18,14 @@ class Lote < ApplicationRecord
   # Qué tipo de sala admite cada estado. Esta regla vivía SOLO en el filtro del modal de alta,
   # así que cualquier otra puerta (editar el lote, moverlo de sala, la API) metía un lote en
   # floración dentro de una sala de vegetativo. Ahora es del modelo y el frontend la consume.
-  # Una sala `mixta` sirve para todo. El ENRAIZADO no se restringe: vive en un propagador con
-  # su propio clima (ver el scope `enraizando`), así que el domo puede estar apoyado en
-  # cualquier sala sin que la fase de la sala signifique nada para él. Lo que no puede pasar
-  # es que una planta en floración esté en una sala de vegetativo, o al revés: ahí el
-  # fotoperiodo de la sala decide el destino del lote.
+  # Una sala `mixta` sirve para todo. El que manda es el FOTOPERIODO de la sala:
+  # - en floración (12/12) un esqueje no prende y un lote en vegetativo se pasa a florar;
+  # - en vegetativo (18/6) un lote en floración no cierra cogollos.
+  # El propagador tiene su propio clima —humedad, temperatura— pero NO su propia luz: la
+  # incubadora recibe la de la sala, y enraizando hace falta más tiempo de luz, no menos.
+  # Por eso el enraizado tampoco entra en una sala de floración.
   KINDS_SALA_POR_ESTADO = {
+    'enraizado'  => %w[vegetativo mixta clon],
     'vegetativo' => %w[vegetativo mixta clon],
     'floracion'  => %w[floracion mixta],
   }.freeze

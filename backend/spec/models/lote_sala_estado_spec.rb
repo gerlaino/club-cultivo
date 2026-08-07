@@ -33,6 +33,12 @@ RSpec.describe Lote, 'sala vs estado' do
     expect(lote!('enraizado', sala!('clon'))).to be_valid
   end
 
+  # El propagador tiene su propia humedad, pero la LUZ se la da la sala: enraizando hace
+  # falta más tiempo de luz (18/6), no el 12/12 de floración.
+  it 'un lote enraizando tampoco entra en una sala de floración' do
+    expect(lote!('enraizado', sala!('floracion'))).not_to be_valid
+  end
+
   # El agujero real: el lote se creaba bien y después se lo pasaba a floración sin moverlo.
   it 'no se puede avanzar a floración quedándose en la sala de vegetativo' do
     l = create(:lote, club: club, sala: sala!('vegetativo'), estado: 'vegetativo')

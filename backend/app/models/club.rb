@@ -351,12 +351,52 @@ class Club < ApplicationRecord
     self.twilio_auth_token_enc = raw_token.present? ? Rails.application.message_verifier(:twilio).generate(raw_token) : nil
   end
 
+  # ── Dar de baja vs eliminar ────────────────────────────────────────────────────
+  # Son dos cosas distintas y se confundían en una sola acción:
+  #
+  # SUSPENDER (`activo: false`) — el club dejó de pagar o está en pausa. Sigue en la lista,
+  #   sus datos intactos, pero nadie puede entrar. Se reactiva y sigue como estaba.
+  #
+  # ELIMINAR (`deleted_at`) — el club se va. Sale de la lista, y su nombre, los emails de sus
+  #   usuarios y los DNI de sus pacientes quedan LIBRES para volver a usarse. Es soft delete:
+  #   se puede restaurar mientras nadie haya tomado esos identificadores.
+  def suspender!
+    update!(activo: false)
+  end
+
+  def reactivar!
+    update!(activo: true)
+  end
+
+  def suspendido? = !activo?
+
+  # Al eliminar hay que soltar los identificadores únicos, o el nombre y los emails quedan
+  # ocupados por un club que ya no existe. El sufijo es reversible: guarda el valor original
+  # a la vista para poder devolverlo al restaurar, sin agregar columnas.
+  SUFIJO_ELIMINADO = '_eliminado_'
+
   def soft_delete!
-    update!(deleted_at: Time.current)
+    transaction do
+      marca = "#{SUFIJO_ELIMINADO}#{id}"
+      update!(deleted_at: Time.current, slug: "#{slug}#{marca}")
+      users.where.not(role: 'super_admin').find_each do |u|
+        u.update_columns(email: "#{u.email}#{marca}")
+      end
+      # Los pacientes son paranoid: al borrarlos, su DNI sale del índice de unicidad
+      # (que es GLOBAL por requisito REPROCANN) y puede darse de alta en otro club.
+      ActsAsTenant.with_tenant(self) { pacientes.find_each(&:destroy) }
+    end
   end
 
   def restaurar!
-    update!(deleted_at: nil)
+    transaction do
+      marca = "#{SUFIJO_ELIMINADO}#{id}"
+      update!(deleted_at: nil, slug: slug.to_s.delete_suffix(marca))
+      User.unscoped.where(club_id: id).find_each do |u|
+        u.update_columns(email: u.email.delete_suffix(marca)) if u.email.end_with?(marca)
+      end
+      ActsAsTenant.with_tenant(self) { Paciente.only_deleted.where(club_id: id).find_each(&:restore) }
+    end
   end
 
   private

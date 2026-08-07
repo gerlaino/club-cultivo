@@ -555,7 +555,9 @@ export const setFotoPortadaLote = (loteId, fotoId) => api.patch(`/lotes/${loteId
 
 // ── Super Admin ──────────────────────────────────────────────────────
 export const getSuperAdminStats  = ()             => api.get('/super_admin/stats')
-export const listSuperAdminClubs = ()             => api.get('/super_admin/clubs')
+// Sin params no trae los eliminados: verlos mezclados con los activos era lo que hacía
+// pensar que borrar un club no hacía nada.
+export const listSuperAdminClubs = (params = {})  => api.get('/super_admin/clubs', { params })
 export const getSuperAdminClub   = (id)           => api.get(`/super_admin/clubs/${id}`)
 export const createSuperAdminClub = (payload)     => api.post('/super_admin/clubs', payload)
 export const updateSuperAdminClub = (id, payload) => api.put(`/super_admin/clubs/${id}`, { club: payload })
@@ -563,6 +565,10 @@ export const cambiarPlanClub     = (id, payload)  => api.patch(`/super_admin/clu
 export const crearUsuariosDefault = (id)          => api.post(`/super_admin/clubs/${id}/crear_usuarios_default`)
 export const eliminarClub        = (id)           => api.delete(`/super_admin/clubs/${id}`)
 export const restaurarClub       = (id)           => api.patch(`/super_admin/clubs/${id}/restaurar`)
+// Suspender ≠ eliminar: el suspendido sigue en la lista con sus datos intactos y no puede
+// operar; el eliminado sale de la lista y libera nombre, emails y DNI.
+export const suspenderClub       = (id)           => api.patch(`/super_admin/clubs/${id}/suspender`)
+export const reactivarClub       = (id)           => api.patch(`/super_admin/clubs/${id}/reactivar`)
 export const provisionarWhatsappClub = (id, payload) => api.patch(`/super_admin/clubs/${id}/provisionar_whatsapp`, payload)
 export const desconectarWhatsappClub = (id)          => api.delete(`/super_admin/clubs/${id}/desconectar_whatsapp`)
 export const listSuperAdminUsers = ()             => api.get('/super_admin/users')

@@ -39,7 +39,7 @@ RSpec.describe 'POST /lotes/mover', type: :request do
     # sigue sin raíz. De enraizado se sale cuando prende, no cuando cambia de cuarto — y por eso el
     # clonador puede convivir en la misma sala que el vegetativo.
     it 'un lote ENRAIZANDO movido a una sala de vegetativo sigue enraizando' do
-      lote = create(:lote, club: club, sala: sala_flora, estado: 'enraizado')
+      lote = create(:lote, club: club, sala: sala_mixta, estado: 'enraizado')
       p1   = create(:plant, lote: lote, state: 'enraizado')
       sign_in_as(admin)
 
@@ -51,15 +51,17 @@ RSpec.describe 'POST /lotes/mover', type: :request do
       expect(JSON.parse(response.body)['cambios_de_fase']).to be_empty
     end
 
-    # Ni siquiera la sala de floración lo saca: un esqueje sin raíz no florece, se muere.
-    it 'tampoco lo saca una sala de floración' do
+    # A una sala de floración NO se lo deja entrar: el propagador tiene su propia humedad,
+    # pero la luz se la da la sala, y enraizando hace falta MÁS tiempo de luz, no 12/12.
+    it 'no lo deja entrar a una sala de floración' do
       lote = create(:lote, club: club, sala: sala_vege, estado: 'enraizado')
       sign_in_as(admin)
 
       mover(lote.id, sala_flora)
 
-      expect(lote.reload.estado).to eq('enraizado')
-      expect(lote.sala_id).to eq(sala_flora.id)
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)['error']).to match(/no prende/i)
+      expect(lote.reload.sala_id).to eq(sala_vege.id)
     end
 
     it 'a una sala mixta NO le impone fase: ahí conviven fases distintas a propósito' do
@@ -99,18 +101,31 @@ RSpec.describe 'POST /lotes/mover', type: :request do
 
   describe 'en tanda' do
     it 'mueve varios lotes de una y devuelve solo los que cambiaron de fase' do
-      en_vege  = create(:lote, club: club, sala: sala_vege, estado: 'vegetativo')
+      en_vege = create(:lote, club: club, sala: sala_vege, estado: 'vegetativo')
+      otro    = create(:lote, club: club, sala: sala_vege, estado: 'vegetativo')
+      sign_in_as(admin)
+
+      mover([en_vege.id, otro.id], sala_flora)
+
+      body = JSON.parse(response.body)
+      expect(body['movidos']).to eq(2)
+      expect(body['cambios_de_fase'].map { |c| c['codigo'] }).to match_array([en_vege.codigo, otro.codigo])
+      expect(en_vege.reload.estado).to eq('floracion')
+    end
+
+    # En tanda no se mueve nada a medias: si uno de los elegidos no puede entrar, se avisa
+    # cuál es y no se toca ninguno.
+    it 'rechaza la tanda entera si alguno no puede entrar, y dice cuál' do
+      en_vege    = create(:lote, club: club, sala: sala_vege, estado: 'vegetativo')
       enraizando = create(:lote, club: club, sala: sala_vege, estado: 'enraizado')
       sign_in_as(admin)
 
       mover([en_vege.id, enraizando.id], sala_flora)
 
+      expect(response).to have_http_status(:unprocessable_entity)
       body = JSON.parse(response.body)
-      expect(body['movidos']).to eq(2)
-      # Se mueven los dos, pero solo el de vegetativo cambia de fase.
-      expect(body['cambios_de_fase'].map { |c| c['codigo'] }).to eq([en_vege.codigo])
-      expect(en_vege.reload.estado).to eq('floracion')
-      expect(enraizando.reload.estado).to eq('enraizado')
+      expect(body['lotes_rechazados'].map { |l| l['codigo'] }).to eq([enraizando.codigo])
+      expect(en_vege.reload.sala_id).to eq(sala_vege.id)
     end
 
     it 'ignora un lote que ya está en la sala destino en vez de duplicar historia' do

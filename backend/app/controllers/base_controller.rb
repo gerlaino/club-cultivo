@@ -1,6 +1,5 @@
 class BaseController < ApplicationController
   before_action :authenticate_user!
-  before_action :check_club_activo!
   respond_to :json
 
   rescue_from ActiveRecord::RecordNotFound do
@@ -17,11 +16,4 @@ class BaseController < ApplicationController
     current_user.club_id
   end
 
-  def check_club_activo!
-    return if current_user&.super_admin?
-    return unless current_user&.club_id.present?
-    if current_user.club.nil? || current_user.club.eliminado?
-      render json: { error: 'Club inactivo o eliminado' }, status: :forbidden
-    end
-  end
 end

@@ -3,10 +3,10 @@ import { ref, computed, onMounted } from 'vue'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub, provisionarWhatsappClub, desconectarWhatsappClub } from '../../lib/api.js'
+import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub, suspenderClub, reactivarClub, provisionarWhatsappClub, desconectarWhatsappClub } from '../../lib/api.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
-import { ArrowLeft, Pencil, Trash2, RotateCcw, Sparkles, UserPlus, Check, X, Save, Mail, Zap, Users, Info, CreditCard } from 'lucide-vue-next'
+import { ArrowLeft, Pencil, Trash2, RotateCcw, Sparkles, UserPlus, Check, X, Save, Mail, Zap, Users, Info, CreditCard, PauseCircle, PlayCircle } from 'lucide-vue-next'
 
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -206,10 +206,45 @@ async function generarUsuarios() {
 }
 
 
+// Dar de baja: el club deja de operar pero sigue entero y en la lista. Es lo que se hace
+// cuando dejan de pagar o se toman una pausa — reversible sin consecuencias.
+async function suspender() {
+  const ok = await confirm({
+    title: `Suspender ${club.value.name}`,
+    message: 'Sus usuarios no van a poder entrar hasta que lo reactives. No se borra ni se cambia nada: el club queda tal cual está.',
+    confirmText: 'Suspender club',
+    variant: 'danger',
+  })
+  if (!ok) return
+  saving.value = true
+  try {
+    const { data } = await suspenderClub(id)
+    club.value = data
+    toast.success('Club suspendido')
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'Error al suspender')
+  } finally {
+    saving.value = false
+  }
+}
+
+async function reactivar() {
+  saving.value = true
+  try {
+    const { data } = await reactivarClub(id)
+    club.value = data
+    toast.success('Club reactivado')
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'Error al reactivar')
+  } finally {
+    saving.value = false
+  }
+}
+
 async function eliminar() {
   const ok = await confirm({
     title: `Eliminar ${club.value.name}`,
-    message: 'El club y toda su data quedarán inaccesibles para sus usuarios. Los datos NO se borran de la base de datos.',
+    message: 'El club sale de la lista y se liberan su nombre, los emails de sus usuarios y los DNI de sus pacientes, para que puedan volver a usarse. Los datos no se borran: se puede restaurar mientras nadie haya tomado esos identificadores.',
     confirmText: 'Eliminar club',
     variant: 'danger',
   })
@@ -304,9 +339,21 @@ onMounted(cargar)
       <!-- Banner eliminado -->
       <div v-if="club.deleted_at" class="scd__deleted-banner">
         <Trash2 :size="16" :stroke-width="1.75" />
-        <div><strong>Club eliminado</strong> — {{ formatDate(club.deleted_at) }}. Los usuarios no pueden acceder.</div>
+        <div>
+          <strong>Club eliminado</strong> — {{ formatDate(club.deleted_at) }}.
+          Su nombre, los emails de sus usuarios y los DNI de sus pacientes quedaron libres.
+        </div>
         <button class="scd__btn-restore" :disabled="saving" @click="restaurar">
           <RotateCcw :size="13" :stroke-width="2" /> Restaurar
+        </button>
+      </div>
+
+      <!-- Banner suspendido -->
+      <div v-else-if="club.activo === false" class="scd__susp-banner">
+        <PauseCircle :size="16" :stroke-width="1.75" />
+        <div><strong>Club suspendido</strong> — sus usuarios no pueden iniciar sesión. Los datos están intactos.</div>
+        <button class="scd__btn-restore" :disabled="saving" @click="reactivar">
+          <PlayCircle :size="13" :stroke-width="2" /> Reactivar
         </button>
       </div>
 
@@ -344,9 +391,18 @@ onMounted(cargar)
             <button class="scd__btn-sm scd__btn-secondary" @click="generarUsuarios" :disabled="saving">
               <Sparkles :size="13" :stroke-width="1.75" /> Generar usuarios
             </button>
-            <button v-if="!club.deleted_at" class="scd__btn-sm scd__btn-danger" @click="eliminar" :disabled="saving">
-              <Trash2 :size="13" :stroke-width="1.75" /> Eliminar
-            </button>
+            <!-- Dos acciones distintas, no una: suspender pausa, eliminar libera. -->
+            <template v-if="!club.deleted_at">
+              <button v-if="club.activo !== false" class="scd__btn-sm scd__btn-secondary" @click="suspender" :disabled="saving">
+                <PauseCircle :size="13" :stroke-width="1.75" /> Suspender
+              </button>
+              <button v-else class="scd__btn-sm scd__btn-secondary" @click="reactivar" :disabled="saving">
+                <PlayCircle :size="13" :stroke-width="1.75" /> Reactivar
+              </button>
+              <button class="scd__btn-sm scd__btn-danger" @click="eliminar" :disabled="saving">
+                <Trash2 :size="13" :stroke-width="1.75" /> Eliminar
+              </button>
+            </template>
           </div>
         </div>
       </div>
@@ -689,6 +745,8 @@ onMounted(cargar)
 .scd__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 
 /* Deleted banner */
+.scd__susp-banner { display: flex; align-items: center; gap: .6rem; background: #fffbeb; border: 1px solid #fcd34d; color: #92400e; border-radius: 10px; padding: .7rem 1rem; margin-bottom: 1rem; font-size: .85rem; }
+.scd__susp-banner > div { flex: 1; }
 .scd__deleted-banner {
   display: flex; align-items: center; gap: .875rem; flex-wrap: wrap;
   background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px;

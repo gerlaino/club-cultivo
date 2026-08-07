@@ -1,8 +1,11 @@
 class SuperAdmin::ClubsController < SuperAdmin::BaseController
-  before_action :set_club, only: [:show, :update, :crear_usuarios_default, :cambiar_plan, :observar, :detener_observacion, :destroy, :restaurar, :provisionar_whatsapp, :desconectar_whatsapp]
+  before_action :set_club, only: [:show, :update, :crear_usuarios_default, :cambiar_plan, :observar, :detener_observacion, :destroy, :restaurar, :suspender, :reactivar, :provisionar_whatsapp, :desconectar_whatsapp]
 
+  # Los ELIMINADOS no se listan salvo que se los pida: verlos mezclados con los activos, sin
+  # distinguirse, era lo que hacía pensar que borrar un club no hacía nada.
   def index
     clubs = Club.unscoped.includes(:users, :pacientes).order(:created_at)
+    clubs = clubs.where(deleted_at: nil) unless ActiveModel::Type::Boolean.new.cast(params[:eliminados])
     render json: clubs.map { |c| serialize_club(c) }
   end
 
@@ -75,6 +78,16 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     head :no_content
   rescue => e
     render json: { error: e.message }, status: :unprocessable_entity
+  end
+
+  def suspender
+    @club.suspender!
+    render json: serialize_club_detail(@club)
+  end
+
+  def reactivar
+    @club.reactivar!
+    render json: serialize_club_detail(@club)
   end
 
   def restaurar
@@ -170,7 +183,16 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       lotes_count:      c.lotes.count,
       created_at:       c.created_at,
       deleted_at:       c.deleted_at,
+      activo:           c.activo,
+      estado:           estado_de(c),
     }
+  end
+
+  # Tres estados, no dos flags que el frontend tenga que cruzar.
+  def estado_de(c)
+    return 'eliminado'  if c.deleted_at.present?
+    return 'suspendido' unless c.activo?
+    'activo'
   end
 
   def serialize_club_detail(c)

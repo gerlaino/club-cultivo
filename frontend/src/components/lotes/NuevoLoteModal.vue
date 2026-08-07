@@ -309,9 +309,12 @@ const heredadoDias   = ref({ semilla_esqueje: 0, vegetativo: 0, floracion: 0, co
 // de vegetativo: en floración (12/12) no germina ni prende nada, así que esa sala no es una
 // opción. Un lote existente sólo puede entrar donde su fase actual pueda vivir. Las salas
 // "mixta" corren las dos, así que entran siempre.
+// Espejo de `Lote::KINDS_SALA_POR_ESTADO` (backend). Lo que manda es el FOTOPERIODO de la
+// sala: enraizando y en vegetativo hace falta 18/6, así que ninguno de los dos entra en una
+// sala de floración (12/12).
 const KINDS_POR_ESTADO = {
   enraizado:  ['vegetativo', 'mixta', 'clon'],
-  vegetativo: ['vegetativo', 'mixta'],
+  vegetativo: ['vegetativo', 'mixta', 'clon'],
   floracion:  ['floracion',  'mixta'],
 }
 

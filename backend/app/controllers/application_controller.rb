@@ -9,6 +9,7 @@ class ApplicationController < ActionController::API
   before_action :inject_jwt_from_cookie
   before_action :set_current_user
   before_action :set_tenant_from_current_user
+  before_action :check_club_activo!
   before_action :block_auditor_writes!
   before_action :block_observer_writes!
 
@@ -54,6 +55,23 @@ class ApplicationController < ActionController::API
 
   def user_not_authorized
     render json: { error: "Forbidden" }, status: :forbidden
+  end
+
+  # Un club ELIMINADO o SUSPENDIDO no opera. Vivía en BaseController, que sólo heredan una
+  # decena de controllers (médico y públicos): los otros ~87 cuelgan de acá, así que eliminar
+  # un club no le impedía seguir usando casi toda la API.
+  def check_club_activo!
+    return if current_user&.super_admin?
+    return unless current_user&.club_id.present?
+
+    club = current_user.club
+    if club.nil? || club.eliminado?
+      render json: { error: 'Este club fue eliminado. Contactate con soporte.' }, status: :forbidden
+    elsif club.suspendido?
+      # `activo` existía en la tabla y no lo miraba nadie: suspender un club no lo suspendía.
+      render json: { error: 'Este club está suspendido. Contactate con soporte para reactivarlo.',
+                     club_suspendido: true }, status: :forbidden
+    end
   end
 
   def block_auditor_writes!

@@ -308,6 +308,25 @@ class LotesController < ApplicationController
     # ahí conviven fases distintas a propósito.
     fase_destino = destino.kind if %w[vegetativo floracion].include?(destino.kind)
 
+    # Los que la sala destino NO admite se rechazan ANTES de tocar nada: el caso típico es
+    # mandar lotes que están enraizando a una sala de floración —en 12/12 el esqueje no
+    # prende—. Sin este chequeo la transacción entera explotaba con un error de validación
+    # que no decía cuál lote era el problema.
+    kind_destino = destino.kind.presence || destino.tipo
+    incompatibles = lotes.reject do |l|
+      estado_final = (fase_destino.present? && !Plant::ESTADOS_ENRAIZANDO.include?(l.estado)) ? fase_destino : l.estado
+      permitidos = Lote::KINDS_SALA_POR_ESTADO[estado_final]
+      permitidos.blank? || kind_destino.blank? || permitidos.include?(kind_destino)
+    end
+    if incompatibles.any?
+      return render json: {
+        error: "Estos lotes no pueden ir a una sala de #{kind_destino}: " \
+               "#{incompatibles.map(&:codigo).join(', ')}. " \
+               'Un lote que está enraizando necesita 18/6 — en floración no prende.',
+        lotes_rechazados: incompatibles.map { |l| { id: l.id, codigo: l.codigo, estado: l.estado } },
+      }, status: :unprocessable_entity
+    end
+
     movidos, cambiaron_fase, plantas = 0, [], 0
 
     ActiveRecord::Base.transaction do

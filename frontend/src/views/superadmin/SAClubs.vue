@@ -1,14 +1,21 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { useRouter } from 'vue-router'
 import { listSuperAdminClubs } from '../../lib/api.js'
+import { Trash2, PauseCircle } from 'lucide-vue-next'
 
 const router  = useRouter()
 const clubs   = ref([])
 const loading = ref(true)
 const search  = ref('')
 const filterPlan = ref('todos')
+const verEliminados = ref(false)
+
+const ESTADO_META = {
+  suspendido: { label: 'Suspendido', color: '#92400e', bg: '#fef3c7' },
+  eliminado:  { label: 'Eliminado',  color: '#b91c1c', bg: '#fee2e2' },
+}
 
 const PLAN_META = {
   semilla:    { label: 'Semilla',    color: '#64748b', bg: '#f1f5f9' },
@@ -37,6 +44,17 @@ const filtrados = computed(() => {
   }
   return list
 })
+
+async function cargar() {
+  loading.value = true
+  try {
+    const { data } = await listSuperAdminClubs(verEliminados.value ? { eliminados: true } : {})
+    clubs.value = data
+  } finally {
+    loading.value = false
+  }
+}
+watch(verEliminados, cargar)
 
 onMounted(async () => {
   try {
@@ -78,6 +96,10 @@ onMounted(async () => {
         >
           {{ meta.label }}
         </button>
+        <label class="sac__ver-elim">
+          <input v-model="verEliminados" type="checkbox" />
+          Ver eliminados
+        </label>
       </div>
     </div>
 
@@ -105,11 +127,19 @@ onMounted(async () => {
         :key="c.id"
         :to="{ name: 'sa-club-detail', params: { id: c.id } }"
         class="sac__row"
+        :class="{ 'sac__row--baja': c.estado && c.estado !== 'activo' }"
       >
         <div class="sac__club-cell">
           <div class="sac__avatar">{{ c.name?.[0]?.toUpperCase() }}</div>
           <div>
-            <div class="sac__name">{{ c.name }}</div>
+            <div class="sac__name">
+              {{ c.name }}
+              <span v-if="ESTADO_META[c.estado]" class="sac__estado"
+                    :style="{ background: ESTADO_META[c.estado].bg, color: ESTADO_META[c.estado].color }">
+                <component :is="c.estado === 'eliminado' ? Trash2 : PauseCircle" :size="10" :stroke-width="2.5" />
+                {{ ESTADO_META[c.estado].label }}
+              </span>
+            </div>
             <div class="sac__slug">{{ c.slug }}</div>
           </div>
         </div>
@@ -170,6 +200,9 @@ onMounted(async () => {
 .sac__list { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; }
 .sac__list-header { display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 100px 40px; padding: .65rem 1.1rem; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; border-bottom: 1px solid #f1f5f9; background: #fafbfc; }
 .sac__row { display: grid; grid-template-columns: 2fr 1.5fr 1fr 1fr 100px 40px; align-items: center; padding: .875rem 1.1rem; border-bottom: 1px solid #f8fafc; text-decoration: none; color: inherit; transition: background .12s; }
+.sac__row--baja { opacity: .6; }
+.sac__estado { display: inline-flex; align-items: center; gap: .2rem; font-size: .62rem; font-weight: 700; padding: .1em .45em; border-radius: 5px; margin-left: .4rem; vertical-align: middle; }
+.sac__ver-elim { display: inline-flex; align-items: center; gap: .35rem; font-size: .75rem; color: #64748b; cursor: pointer; margin-left: .5rem; }
 .sac__row:last-child { border-bottom: none; }
 .sac__row:hover { background: #fafbfc; }
 
