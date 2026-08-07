@@ -52,8 +52,11 @@ class InformesController < ApplicationController
     plantas_por_estado = club.lotes.group(:estado).sum(:plants_count)
     por_estado = Lote::ESTADOS.filter_map do |e|
       next if (lotes_e = lotes_por_estado[e].to_i).zero?
+      # MISMO período que `gramos_producidos`: el desglose no lo filtraba, así que sus gramos
+      # sumaban más que el total del encabezado y el informe se contradecía a sí mismo.
       gramos_e = Pesada.joins(:lote)
                        .where(lotes: { club_id: club.id, estado: e }, fase_destino: 'finalizado')
+                       .where(registrado_at: desde..hasta)
                        .sum('COALESCE(peso_curado_g, 0)').to_f
       { estado: e, lotes: lotes_e, plantas: plantas_por_estado[e].to_i, gramos: gramos_e }
     end
