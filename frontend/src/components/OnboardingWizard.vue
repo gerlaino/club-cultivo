@@ -93,7 +93,7 @@ async function crearSala() {
   try {
     await createSala({ ...sala.value, sede_id: sedeIdCreada })
     paso.value = 4
-    setTimeout(() => { emit('completado'); router.push('/') }, 2200)
+    timerFinal = setTimeout(irAlPanel, 2200)
   } catch (e) {
     salaError.value = e.response?.data?.errors?.join(', ') || 'Error al crear la sala. Intentá de nuevo.'
   } finally {
@@ -102,6 +102,13 @@ async function crearSala() {
 }
 
 function saltarSala() {
+  emit('completado')
+  router.push('/')
+}
+
+let timerFinal = null
+function irAlPanel() {
+  clearTimeout(timerFinal)
   emit('completado')
   router.push('/')
 }
@@ -320,8 +327,8 @@ const nombreUsuario = auth.user?.first_name || ''
           <div class="ob__welcome ob__welcome--sm">
             <div class="ob__step-check">
               <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-                <circle cx="14" cy="14" r="13" stroke="#4caf50" stroke-width="1.5" opacity="0.5"/>
-                <path d="M8 14l5 5 7-8" stroke="#4caf50" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                <circle cx="14" cy="14" r="13" stroke="var(--c-leaf-500)" stroke-width="1.5" opacity="0.5"/>
+                <path d="M8 14l5 5 7-8" stroke="var(--c-leaf-500)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </div>
             <h1 class="ob__title">{{ sede.nombre }} creada</h1>
@@ -409,6 +416,10 @@ const nombreUsuario = auth.user?.first_name || ''
               <div class="ob__dot"></div>
               <div class="ob__dot"></div>
             </div>
+            <!-- La celebración dura 2 segundos; al que ya quiere entrar no se lo hace esperar. -->
+            <button type="button" class="ob__btn-skip ob__btn-skip--light" @click="irAlPanel">
+              Ir al panel ahora
+            </button>
           </div>
         </div>
 
@@ -453,7 +464,7 @@ const nombreUsuario = auth.user?.first_name || ''
   display: flex;
   flex-direction: column;
   align-items: center;
-  background: #0d1f0f;
+  background: var(--c-leaf-900);
   overflow-y: auto;
   font-family: system-ui, -apple-system, sans-serif;
 }
@@ -473,19 +484,19 @@ const nombreUsuario = auth.user?.first_name || ''
 }
 .ob__bg-orb--1 {
   width: 600px; height: 600px;
-  background: #2e7d32;
+  background: var(--c-leaf-700);
   top: -200px; left: -200px;
   animation: orb-drift 18s ease-in-out infinite alternate;
 }
 .ob__bg-orb--2 {
   width: 400px; height: 400px;
-  background: #1b5e20;
+  background: var(--c-leaf-800);
   bottom: -100px; right: -100px;
   animation: orb-drift 22s ease-in-out infinite alternate-reverse;
 }
 .ob__bg-orb--3 {
   width: 300px; height: 300px;
-  background: #388e3c;
+  background: var(--c-leaf-600);
   top: 40%; left: 60%;
   animation: orb-drift 15s ease-in-out infinite alternate;
 }
@@ -594,7 +605,7 @@ const nombreUsuario = auth.user?.first_name || ''
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: .1em;
-  color: #4caf50;
+  color: var(--c-leaf-500);
 }
 .ob__card-title {
   font-size: 1.25rem;
@@ -622,9 +633,9 @@ const nombreUsuario = auth.user?.first_name || ''
   color: rgba(255,255,255,0.65);
   letter-spacing: .01em;
 }
-.ob__req { color: #ef5350; margin-left: 2px; }
+.ob__req { color: var(--c-rust-600); margin-left: 2px; }
 .ob__opt { color: rgba(255,255,255,0.3); font-weight: 400; }
-.ob__err { font-size: .75rem; color: #ef9a9a; }
+.ob__err { font-size: .75rem; color: var(--c-rust-100); }
 
 .ob__input {
   background: rgba(255,255,255,0.06);
@@ -643,7 +654,7 @@ const nombreUsuario = auth.user?.first_name || ''
   border-color: rgba(76,175,80,0.6);
   background: rgba(255,255,255,0.09);
 }
-.ob__input--err { border-color: #ef5350; }
+.ob__input--err { border-color: var(--c-rust-600); }
 
 .ob__row {
   display: grid;
@@ -713,8 +724,8 @@ const nombreUsuario = auth.user?.first_name || ''
   transition: all .15s;
 }
 .ob__tipo--selected .ob__tipo-check {
-  background: #4caf50;
-  border-color: #4caf50;
+  background: var(--c-leaf-500);
+  border-color: var(--c-leaf-500);
   color: #fff;
 }
 
@@ -750,7 +761,7 @@ const nombreUsuario = auth.user?.first_name || ''
   flex-shrink: 0;
   transition: background .2s;
 }
-.ob__switch--on { background: #4caf50; }
+.ob__switch--on { background: var(--c-leaf-500); }
 .ob__switch-thumb {
   position: absolute;
   top: 3px;
@@ -770,7 +781,7 @@ const nombreUsuario = auth.user?.first_name || ''
   align-items: center;
   justify-content: center;
   gap: .5rem;
-  background: #2e7d32;
+  background: var(--c-leaf-700);
   color: #fff;
   border: none;
   padding: .875rem 1.5rem;
@@ -782,7 +793,7 @@ const nombreUsuario = auth.user?.first_name || ''
   width: 100%;
   letter-spacing: .01em;
 }
-.ob__btn-primary:hover { background: #1b5e20; transform: translateY(-1px); }
+.ob__btn-primary:hover { background: var(--c-leaf-800); transform: translateY(-1px); }
 .ob__btn-primary:active { transform: translateY(0); }
 .ob__btn-primary:disabled { opacity: .6; cursor: not-allowed; transform: none; }
 
@@ -862,7 +873,7 @@ const nombreUsuario = auth.user?.first_name || ''
   gap: .35rem;
   font-size: .7rem;
   font-weight: 700;
-  color: #4caf50;
+  color: var(--c-leaf-500);
   background: rgba(76,175,80,0.15);
   padding: .25em .65em;
   border-radius: 999px;
@@ -894,7 +905,7 @@ const nombreUsuario = auth.user?.first_name || ''
   border-radius: 50%;
   background: rgba(76,175,80,0.15);
   border: 1px solid rgba(76,175,80,0.3);
-  color: #4caf50;
+  color: var(--c-leaf-500);
   font-size: .72rem;
   font-weight: 700;
   display: flex;
@@ -911,7 +922,7 @@ const nombreUsuario = auth.user?.first_name || ''
 .ob__alert {
   background: rgba(239,83,80,0.15);
   border: 1px solid rgba(239,83,80,0.3);
-  color: #ef9a9a;
+  color: var(--c-rust-100);
   padding: .75rem 1rem;
   border-radius: 10px;
   font-size: .83rem;
@@ -939,6 +950,8 @@ const nombreUsuario = auth.user?.first_name || ''
   from { transform: scale(0.5); opacity: 0; }
   to   { transform: scale(1);   opacity: 1; }
 }
+.ob__btn-skip { margin-top: 1.25rem; background: none; border: 1px solid rgba(255,255,255,.35); color: #fff; padding: .5rem 1.25rem; border-radius: var(--r-md, 6px); font-size: var(--fs-13, 13px); font-weight: 600; cursor: pointer; transition: background .15s, border-color .15s; }
+.ob__btn-skip:hover { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.6); }
 .ob__dots {
   display: flex;
   gap: 6px;
@@ -977,7 +990,7 @@ const nombreUsuario = auth.user?.first_name || ''
   transition: color .2s;
 }
 .ob__progress-step--active { color: rgba(255,255,255,0.7); }
-.ob__progress-step--done   { color: #4caf50; }
+.ob__progress-step--done   { color: var(--c-leaf-500); }
 .ob__progress-dot {
   width: 8px;
   height: 8px;
@@ -993,8 +1006,8 @@ const nombreUsuario = auth.user?.first_name || ''
   border-color: rgba(255,255,255,0.7);
 }
 .ob__progress-step--done .ob__progress-dot {
-  background: #4caf50;
-  border-color: #4caf50;
+  background: var(--c-leaf-500);
+  border-color: var(--c-leaf-500);
   width: 16px;
   height: 16px;
 }

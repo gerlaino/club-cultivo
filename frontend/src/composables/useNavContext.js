@@ -11,10 +11,10 @@ import { listLotes, listPesajesManicuraAdmin, getTareasDashboard } from '../lib/
 export const NAV_GROUPS = [
   { key: 'dashboard', label: 'Dashboard', to: '/', tabs: [] },
   {
-    // Sedes — sección propia, visible solo si el club tiene el plan multi-sede. El admin ve el
-    // cockpit de sedes (crear/gestionar, resumen financiero). En clubes de una sola sede queda
-    // accesible desde Configuración → Sedes.
-    key: 'sedes', label: 'Sedes', to: '/sedes', feature: 'multi_sede',
+    // Sedes — parte de la suite de Cultivo. Colgaba de `multi_sede`, que dejó de ser una
+    // bandera propia al reagrupar en suites: sobrevive derivada, pero depender de la
+    // derivación ya hizo desaparecer esta sección una vez. Se pregunta por la suite.
+    key: 'sedes', label: 'Sedes', to: '/sedes', feature: 'cultivo',
     tabs: [],
   },
   {
@@ -31,7 +31,8 @@ export const NAV_GROUPS = [
     tabs: [
       { to: '/pacientes', label: 'Pacientes' },
       { to: '/historial', label: 'Dispensaciones' },
-      { to: '/informe-semestral', label: 'REPROCANN' },
+      // El informe REPROCANN vivía acá Y en Reportes: dos puertas al mismo asunto, con
+      // contenidos distintos. Queda una sola, en Reportes, que es donde están los informes.
     ],
   },
   {
@@ -56,8 +57,8 @@ export const NAV_GROUPS = [
     ],
   },
   {
-    // Salón (bar) — grupo propio, visible solo si el club tiene el feature activado.
-    key: 'salon', label: 'Salón', to: '/bar', feature: 'bar',
+    // Buffet — grupo propio, visible solo si el club tiene el add-on activado.
+    key: 'salon', label: 'Buffet', to: '/bar', feature: 'bar',
     tabs: [],
   },
   {
@@ -71,6 +72,7 @@ export const NAV_GROUPS = [
     key: 'reportes', label: 'Reportes', to: '/analitica',
     tabs: [
       { to: '/analitica', label: 'Analítica' },
+      { to: '/auditor/reprocann', label: 'REPROCANN' },
       { to: '/auditor', label: 'Auditoría' },
       { to: '/auditor/trazabilidad', label: 'Trazabilidad' },
       { to: '/ariccame', label: 'ARICCAME' },

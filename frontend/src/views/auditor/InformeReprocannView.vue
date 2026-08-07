@@ -48,6 +48,29 @@
         </div>
       </div>
 
+      <!-- Qué se entregó y a quién. Nada de cultivo: eso está en el informe de Producción. -->
+      <div v-if="data.dispensaciones" class="inf__section">
+        <h2 class="inf__section-title">Dispensaciones a esta población</h2>
+        <div class="inf__kpis">
+          <div class="inf__kpi">
+            <span class="inf__kpi-valor">{{ data.dispensaciones.total }}</span>
+            <span class="inf__kpi-label">Entregas</span>
+          </div>
+          <div class="inf__kpi">
+            <span class="inf__kpi-valor">{{ data.dispensaciones.gramos }} g</span>
+            <span class="inf__kpi-label">Total dispensado</span>
+          </div>
+          <div class="inf__kpi">
+            <span class="inf__kpi-valor">{{ data.dispensaciones.pacientes_atendidos }}</span>
+            <span class="inf__kpi-label">Pacientes atendidos</span>
+          </div>
+          <div class="inf__kpi" :class="data.dispensaciones.sin_reprocann_vigente ? 'inf__kpi--err' : ''">
+            <span class="inf__kpi-valor">{{ data.dispensaciones.sin_reprocann_vigente }}</span>
+            <span class="inf__kpi-label">Sin REPROCANN vigente</span>
+          </div>
+        </div>
+      </div>
+
       <!-- El paciente no tiene sede propia: se atiende donde dispensa. -->
       <div v-if="data.por_sede?.length" class="inf__section">
         <h2 class="inf__section-title">Por sede de atención</h2>

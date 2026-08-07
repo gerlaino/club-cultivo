@@ -224,6 +224,34 @@ RSpec.describe 'Pacientes — activo/inactivo y estados REPROCANN', type: :reque
       expect(informe.keys).not_to include('lotes', 'plantas', 'gramos_producidos', 'por_estado')
     end
 
+    # El informe es de pacientes, sedes y DISPENSACIONES: qué se entregó y a quién. Nada de
+    # cultivo, que vive en el informe de Producción.
+    it 'CASO 20d — informa las dispensaciones de esa población' do
+      sede  = create(:sede, club: club, created_by: admin, tipo: 'mixta')
+      stock = create(:stock, club: club, sede: sede, cantidad: 500)
+      p     = paciente!(reprocann_numero: 'R-1', reprocann_vencimiento: 8.months.from_now.to_date)
+      Dispensacion.create!(paciente: p, user: admin, stock: stock, cantidad: 12,
+                           fecha_dispensacion: Time.zone.today)
+
+      d = informe['dispensaciones']
+
+      expect(d['total']).to eq(1)
+      expect(d['gramos']).to eq(12.0)
+      expect(d['pacientes_atendidos']).to eq(1)
+      expect(d['sin_reprocann_vigente']).to eq(0)
+    end
+
+    it 'CASO 20e — marca a quién se le dispensó sin el certificado en regla' do
+      sede  = create(:sede, club: club, created_by: admin, tipo: 'mixta')
+      stock = create(:stock, club: club, sede: sede, cantidad: 500)
+      p     = paciente!(reprocann_estado: 'activo', reprocann_numero: 'R-9',
+                        reprocann_vencimiento: 2.months.ago.to_date)
+      Dispensacion.create!(paciente: p, user: admin, stock: stock, cantidad: 5,
+                           fecha_dispensacion: Time.zone.today)
+
+      expect(informe['dispensaciones']['sin_reprocann_vigente']).to eq(1)
+    end
+
     it 'CASO 20 — el informe no filtra datos de otro club' do
       otro = create(:club)
       otro_admin = create(:user, :admin, club: otro)

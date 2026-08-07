@@ -45,6 +45,11 @@ function fmtHaceAmb(medidoAt) {
 const dispensacionesHoy      = ref([])
 const ejecutivo              = ref(null)
 const loading                = ref(true)
+// Saber si el club ya tiene sedes es UN request. El resto del dashboard son ocho más, y
+// hasta que terminaban todos se veía el shell del admin con un spinner: para un club nuevo,
+// un segundo de una app que todavía no puede usar antes de que aparezca la bienvenida.
+// Se decide primero, se carga después.
+const setupListo             = ref(false)
 const erroresCarga           = ref([])
 
 const chartCanvas   = ref(null)
@@ -53,7 +58,7 @@ let   chartInstance = null
 const stats = computed(() => statsStore.data ?? {})
 // Solo después de cargar: durante la carga se muestra el spinner estándar,
 // no el wizard (su modo "checking" pintaba la pantalla verde en cada visita)
-const mostrarOnboarding = computed(() => !loading.value && sedes.value.length === 0)
+const mostrarOnboarding = computed(() => setupListo.value && sedes.value.length === 0)
 
 // ── Greeting ───────────────────────────────────────────────────────────────
 
@@ -400,10 +405,18 @@ watch(() => contable.value?.mes_actual?.por_semana, (data) => {
 const todayISO = new Date().toISOString().slice(0, 10)
 
 onMounted(async () => {
+  // Etapa 1: ¿el club está configurado? Si no, el wizard entra sin esperar nada más.
   try {
-    const [sedesRes, contableRes, manicuraRes, dispRes, stocksRes, floracionRes, lotesRes, dispHoyRes, ejecutivoRes] =
+    const { data } = await listSedes()
+    sedes.value = data || []
+  } catch { sedes.value = [] }
+  setupListo.value = true
+  if (!sedes.value.length) { loading.value = false; return }
+
+  // Etapa 2: el dashboard propiamente dicho.
+  try {
+    const [contableRes, manicuraRes, dispRes, stocksRes, floracionRes, lotesRes, dispHoyRes, ejecutivoRes] =
       await Promise.allSettled([
-        listSedes(),
         getContableDashboard(),
         listPesajesManicuraAdmin(),
         getAnalyticsDispensador(),
@@ -416,7 +429,6 @@ onMounted(async () => {
     await Promise.allSettled([statsStore.fetchAll(), tareasStore.fetchDashboard()])
     getAmbienteSalas().then(r => { ambiente.value = r.data || { salas: [], con_sensores: false } }).catch(() => {})
 
-    if (sedesRes.status      === 'fulfilled') sedes.value                  = sedesRes.value.data    || []
     if (contableRes.status   === 'fulfilled') contable.value               = contableRes.value.data
     if (manicuraRes.status   === 'fulfilled') pesajesPorConfirmar.value     = manicuraRes.value.data  || []
     if (dispRes.status       === 'fulfilled') analyticsDisp.value          = dispRes.value.data

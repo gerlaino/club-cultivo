@@ -308,6 +308,35 @@ class InformesController < ApplicationController
       sin_reprocann:          conteos['sin_reprocann'],
       lista_anonimizada:      lista,
       por_sede:               reprocann_por_sede(club, pacientes),
+      dispensaciones:         reprocann_dispensaciones(club, pacientes),
+    }
+  end
+
+  # Actividad de dispensación de la población informada. Es lo que le da sentido al informe:
+  # no alcanza con decir cuántos pacientes hay en regla, importa a quién se le entregó y si
+  # tenía el certificado al día. Nada de cultivo: eso vive en los informes de Producción.
+  def reprocann_dispensaciones(club, pacientes)
+    ids = pacientes.pluck(:id)
+    return { total: 0, gramos: 0.0, pacientes_atendidos: 0, sin_reprocann_vigente: 0 } if ids.empty?
+
+    disps = Dispensacion.no_canceladas
+                        .where(paciente_id: ids)
+                        .joins(stock: :sede)
+                        .where(sedes: { club_id: club.id })
+
+    # Los que recibieron algo sin tener el certificado en regla: el dato que un auditor busca.
+    categorias = pacientes.pluck(:id, :reprocann_estado, :reprocann_numero, :reprocann_vencimiento)
+                          .to_h { |pid, e, n, v|
+                            [pid, Paciente.reprocann_categoria(estado: e, numero: n, vencimiento: v)]
+                          }
+    atendidos = disps.distinct.pluck(:paciente_id)
+    en_falta  = atendidos.count { |pid| %w[vencido sin_reprocann].include?(categorias[pid]) }
+
+    {
+      total:                 disps.count,
+      gramos:                disps.sum(:cantidad).to_f.round(1),
+      pacientes_atendidos:   atendidos.size,
+      sin_reprocann_vigente: en_falta,
     }
   end
 
