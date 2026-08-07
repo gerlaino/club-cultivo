@@ -63,7 +63,7 @@
       <div class="msal__accion-list">
         <button class="msal__accion-item" @click="abrirNuevoLote">
           <span class="msal__accion-ico">➕</span>
-          <span class="msal__accion-lbl">Nuevo lote</span>
+          <span class="msal__accion-lbl">Crear lote</span>
           <i class="bi bi-chevron-right msal__accion-arr"></i>
         </button>
         <button class="msal__accion-item" @click="abrirFoto">
@@ -79,8 +79,8 @@
       </div>
     </SheetBottom>
 
-    <!-- Sheet: Nuevo lote -->
-    <SheetBottom v-model="showNuevoLote" title="Nuevo lote">
+    <!-- Sheet: Crear lote -->
+    <SheetBottom v-model="showNuevoLote" title="Crear lote">
       <div class="msal__sheet-body">
         <div class="msal__info-box" v-if="sala">
           Estado inicial: <strong>{{ estadoLabel(estadoInicialLote) }}</strong>

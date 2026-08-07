@@ -357,7 +357,7 @@ async function exportarCSV() {
           {{ exporting ? 'Exportando…' : 'CSV' }}
         </button>
         <button v-if="canEdit" class="lv__btn-primary" @click="openCreate">
-          <i class="bi bi-plus-lg"></i> Nuevo lote
+          <i class="bi bi-plus-lg"></i> Crear lote
         </button>
       </div>
     </div>

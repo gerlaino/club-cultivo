@@ -124,7 +124,7 @@ const CHECKLISTS = {
       descripcion: 'Un lote es un grupo de plantas de la misma genética en el mismo cultivo.',
       pasos: [
         'Andá a Lotes en el menú lateral.',
-        'Hacé clic en "Nuevo lote".',
+        'Hacé clic en "Crear lote".',
         'Elegí la genética, la sala, la cantidad de plantas y la fecha de inicio.',
         'El lote arranca en estadío Vegetativo — podés avanzarlo cuando corresponda.',
       ],

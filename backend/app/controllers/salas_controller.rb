@@ -243,6 +243,11 @@ class SalasController < ApplicationController
     plantas_count = 0
 
     ActiveRecord::Base.transaction do
+      # La SALA se da vuelta primero: es ella la que arrastra a los lotes. Al revés, cada lote
+      # pasaba a floración mientras su sala todavía figuraba en vegetativo, un estado
+      # intermedio que no existe en la realidad (y que la validación sala↔estado rechaza).
+      @sala.update!(kind: nueva_fase)
+
       lotes_a_cambiar.each do |lote|
         estado_anterior = lote.estado
         plantas = lote.plants.where(state: plant_state_orig)
@@ -263,8 +268,6 @@ class SalasController < ApplicationController
 
         lotes_count += 1
       end
-
-      @sala.update!(kind: nueva_fase)
     end
 
     render json: {

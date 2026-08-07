@@ -57,7 +57,7 @@
         <div class="ml__sheet">
           <div class="ml__sheet-handle"></div>
           <div class="ml__sheet-header">
-            <h3 class="ml__sheet-title">Nuevo lote</h3>
+            <h3 class="ml__sheet-title">Crear lote</h3>
             <button class="ml__sheet-close" @click="showCrear = false"><i class="bi bi-x-lg"></i></button>
           </div>
           <div class="ml__sheet-body">

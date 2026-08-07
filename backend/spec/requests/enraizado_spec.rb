@@ -208,8 +208,11 @@ RSpec.describe 'Lotes enraizando', type: :request do
     end
 
     # De floración en adelante no se pide: la maceta ya está puesta desde que prendió.
+    # La sala es mixta porque avanzar a floración exige una sala que la admita (la planta
+    # florece por el fotoperiodo de la sala, no por apretar un botón).
     it 'no la pide en los avances posteriores' do
-      lote = create(:lote, club: club, sala: vege, estado: 'vegetativo', tamanio_maceta: nil)
+      mixta = create(:sala, club: club, sede: sede, created_by: admin, kind: 'mixta')
+      lote = create(:lote, club: club, sala: mixta, estado: 'vegetativo', tamanio_maceta: nil)
 
       post "/api/lotes/#{lote.id}/avanzar_fase"
 

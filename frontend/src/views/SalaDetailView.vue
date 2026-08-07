@@ -881,7 +881,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
         </div>
         <div class="sd__hero-actions">
           <button v-if="(canEdit || isCultivador) && !esSalaManicura" class="sd__btn-primary" @click="openCreate">
-            <i class="bi bi-plus-lg"></i>Nuevo lote
+            <i class="bi bi-plus-lg"></i>Crear lote
           </button>
           <ActionsDropdown v-if="(canEdit || isCultivador) && salaAcciones.length" :items="salaAcciones" />
         </div>

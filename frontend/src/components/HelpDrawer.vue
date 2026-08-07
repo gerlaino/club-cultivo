@@ -181,7 +181,7 @@ const CONTENT = {
     {
       title: 'Salas y lotes',
       items: [
-        { label: 'Crear lote', text: 'Entrá a una sala → Nuevo lote. Asigná genética y cantidad de plantas. Si la sala es de floración/cosecha, el lote se carga como "existente" indicando los días previos (esqueje/vegetativo) y el sistema calcula la fecha de inicio.' },
+        { label: 'Crear lote', text: 'Entrá a una sala → Crear lote. Asigná genética y cantidad de plantas. Si la sala es de floración/cosecha, el lote se carga como "existente" indicando los días previos (esqueje/vegetativo) y el sistema calcula la fecha de inicio.' },
         { label: 'Cambiar fase', text: 'En el detalle del lote avanzá la fase: Vegetativo → Floración → Cosecha.' },
         { label: 'Registrar costos', text: 'En cada lote podés registrar costos: insumos, mano de obra, energía para calcular el costo por gramo.' },
       ]

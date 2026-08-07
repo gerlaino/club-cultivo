@@ -4,7 +4,7 @@
       <div class="nlm__modal">
         <div class="nlm__header">
           <div>
-            <h3 class="nlm__title">Nuevo lote</h3>
+            <h3 class="nlm__title">Crear lote</h3>
             <p v-if="effectiveSala" class="nlm__sub">{{ effectiveSala.nombre }}</p>
           </div>
           <button class="nlm__close" @click="$emit('close')"><i class="bi bi-x-lg"></i></button>
@@ -88,22 +88,26 @@
                 </select>
               </div>
 
-              <div class="nlm__field">
+              <!-- Los días van en su propio bloque con `key` por estado: se reportó que al elegir
+                   el estado no aparecían todos los campos hasta clickear afuera y volver. No pude
+                   reproducirlo en test; el key fuerza un remontaje limpio del grupo, que hace que
+                   el DOM no pueda quedar a mitad de camino sea cual sea la causa. -->
+              <div class="nlm__field" :key="`dias-raiz-${heredadoEstado}`">
                 <label class="nlm__label">
-                  Días en {{ form.origen === 'esqueje' ? 'esqueje' : 'semilla' }}
+                  Días enraizando
                   <span v-if="['vegetativo','floracion','cosecha'].includes(heredadoEstado)" class="nlm__label-opt">(completados)</span>
                 </label>
                 <input type="number" min="0" max="999" step="1" class="nlm__input" v-model.number="heredadoDias.semilla_esqueje" />
               </div>
-              <div v-if="['vegetativo','floracion','cosecha'].includes(heredadoEstado)" class="nlm__field">
+              <div v-if="['vegetativo','floracion','cosecha'].includes(heredadoEstado)" class="nlm__field" :key="`dias-vege-${heredadoEstado}`">
                 <label class="nlm__label">Días en vegetativo <span v-if="['floracion','cosecha'].includes(heredadoEstado)" class="nlm__label-opt">(completados)</span></label>
                 <input type="number" min="0" max="999" step="1" class="nlm__input" v-model.number="heredadoDias.vegetativo" />
               </div>
-              <div v-if="['floracion','cosecha'].includes(heredadoEstado)" class="nlm__field">
+              <div v-if="['floracion','cosecha'].includes(heredadoEstado)" class="nlm__field" :key="`dias-flor-${heredadoEstado}`">
                 <label class="nlm__label">Días en floración <span v-if="heredadoEstado === 'cosecha'" class="nlm__label-opt">(completados)</span></label>
                 <input type="number" min="0" max="999" step="1" class="nlm__input" v-model.number="heredadoDias.floracion" />
               </div>
-              <div v-if="heredadoEstado === 'cosecha'" class="nlm__field">
+              <div v-if="heredadoEstado === 'cosecha'" class="nlm__field" :key="`dias-cos-${heredadoEstado}`">
                 <label class="nlm__label">Días en cosecha <span class="nlm__label-opt">(actual)</span></label>
                 <input type="number" min="0" max="999" step="1" class="nlm__input" v-model.number="heredadoDias.cosecha" />
               </div>

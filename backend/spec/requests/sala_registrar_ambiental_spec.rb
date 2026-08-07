@@ -12,7 +12,7 @@ RSpec.describe 'POST /salas/:id/registrar_sala', type: :request do
   let(:club)  { create(:club) }
   let(:admin) { create(:user, :admin, club: club) }
   let(:sede)  { create(:sede, club: club, created_by: admin) }
-  let(:sala)  { create(:sala, club: club, sede: sede, created_by: admin, kind: 'vegetativo') }
+  let(:sala)  { create(:sala, club: club, sede: sede, created_by: admin, kind: 'mixta') }
 
   def registrar
     post "/salas/#{sala.id}/registrar_sala",

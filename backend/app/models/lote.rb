@@ -14,6 +14,23 @@ class Lote < ApplicationRecord
   # pero conserva su sede. Exigimos sala solo en estados de cultivo.
   CULTIVO_ESTADOS = %w[enraizado vegetativo floracion].freeze
   validates :sala_id, presence: true, if: -> { CULTIVO_ESTADOS.include?(estado) }
+
+  # Qué tipo de sala admite cada estado. Esta regla vivía SOLO en el filtro del modal de alta,
+  # así que cualquier otra puerta (editar el lote, moverlo de sala, la API) metía un lote en
+  # floración dentro de una sala de vegetativo. Ahora es del modelo y el frontend la consume.
+  # Una sala `mixta` sirve para todo. El ENRAIZADO no se restringe: vive en un propagador con
+  # su propio clima (ver el scope `enraizando`), así que el domo puede estar apoyado en
+  # cualquier sala sin que la fase de la sala signifique nada para él. Lo que no puede pasar
+  # es que una planta en floración esté en una sala de vegetativo, o al revés: ahí el
+  # fotoperiodo de la sala decide el destino del lote.
+  KINDS_SALA_POR_ESTADO = {
+    'vegetativo' => %w[vegetativo mixta clon],
+    'floracion'  => %w[floracion mixta],
+  }.freeze
+
+  # Se valida sólo cuando la sala o el estado cambian: si en producción quedó algún lote
+  # inconsistente de antes, no se lo deja trabado para el resto de las ediciones.
+  validate :sala_admite_el_estado, if: -> { sala_id_changed? || estado_changed? }
   belongs_to :genetica,    optional: true
   belongs_to :manicurador,   class_name: 'User',  optional: true
   belongs_to :planta_madre,  class_name: 'Plant', optional: true
@@ -478,6 +495,20 @@ class Lote < ApplicationRecord
   end
 
   private
+
+  def sala_admite_el_estado
+    permitidos = KINDS_SALA_POR_ESTADO[estado]
+    return if permitidos.blank? || sala.blank?
+    # `kind` es lo que manda; `tipo` es el campo legacy que algunas salas todavía usan.
+    kind = sala.kind.presence || sala.tipo
+    return if kind.blank? || permitidos.include?(kind)
+
+    # El mensaje tiene que decir la salida: el que avanza un lote a floración desde una sala de
+    # vegetativo no hizo nada raro, le falta mover el lote primero.
+    destino = KINDS_SALA_POR_ESTADO[estado].first
+    errors.add(:sala, "es de #{kind} y el lote está en #{estado}: movelo a una sala de #{destino} " \
+                      "(o a una mixta) antes de este cambio")
+  end
 
   def maceta_al_prender
     return if tamanio_maceta.present?
