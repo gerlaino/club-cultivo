@@ -72,26 +72,33 @@ class InformesController < ApplicationController
     lotes_cosechados = club.lotes.where(estado: 'finalizado')
                            .where(updated_at: desde..hasta).count
 
-    gramos_producidos = Pesada.joins(:lote)
-                              .where(lotes: { club_id: club.id }, fase_destino: 'finalizado')
-                              .where(registrado_at: desde..hasta)
-                              .sum('COALESCE(peso_curado_g, 0)').to_f
+    # Los gramos del período salen del RENDIMIENTO DEL LOTE, que es lo que llena el flujo de
+    # manicura al cerrar el curado (`Lote#check_and_finalize_manicura!`). Antes se sumaban
+    # `Pesada.peso_curado_g` con `fase_destino: 'finalizado'`: una tabla que en la práctica
+    # está vacía —el club pesa por PesajeManicura, no por Pesada— así que el informe mostraba
+    # "0 gramos producidos" con veinte lotes curados a la vista.
+    #
+    # La fecha del lote es la de su paso a curado (cuando el producto existe); si ese evento
+    # no está, se usa `updated_at`, que es lo mejor disponible.
+    gramos_producidos = gramos_del_periodo(club, desde, hasta)
 
     plantas_totales = Plant.joins(lote: :sala).where(salas: { sede_id: club.sede_ids })
                            .where.not(state: %w[cosechado finalizado]).count
 
-    # Agregados por estado en 2 group-queries (evita N+1) + gramos por estado no vacío.
-    lotes_por_estado   = club.lotes.group(:estado).count
-    plantas_por_estado = club.lotes.group(:estado).sum(:plants_count)
+    # Agregados por estado. Las PLANTAS se cuentan igual que el KPI de arriba: plantas que
+    # están en pie, no `lotes.plants_count`. Ese campo es el declarado histórico —incluye las
+    # cosechadas y las de lotes ya cerrados— así que la tabla sumaba 548 mientras el KPI
+    # "Plantas en pie" del mismo informe decía 156. Un informe no puede contradecirse solo.
+    lotes_por_estado = club.lotes.group(:estado).count
+    plantas_por_estado = Plant.joins(lote: :sala)
+                              .where(salas: { sede_id: club.sede_ids })
+                              .where.not(state: %w[cosechado finalizado])
+                              .group('lotes.estado').count
     por_estado = Lote::ESTADOS.filter_map do |e|
       next if (lotes_e = lotes_por_estado[e].to_i).zero?
-      # MISMO período que `gramos_producidos`: el desglose no lo filtraba, así que sus gramos
-      # sumaban más que el total del encabezado y el informe se contradecía a sí mismo.
-      gramos_e = Pesada.joins(:lote)
-                       .where(lotes: { club_id: club.id, estado: e }, fase_destino: 'finalizado')
-                       .where(registrado_at: desde..hasta)
-                       .sum('COALESCE(peso_curado_g, 0)').to_f
-      { estado: e, lotes: lotes_e, plantas: plantas_por_estado[e].to_i, gramos: gramos_e }
+
+      { estado: e, lotes: lotes_e, plantas: plantas_por_estado[e].to_i,
+        gramos: gramos_del_periodo(club, desde, hasta, estado: e) }
     end
 
     datos = {
@@ -466,6 +473,27 @@ class InformesController < ApplicationController
   end
 
   private
+
+  # Gramos producidos en el período, opcionalmente acotados a un estado de lote.
+  #
+  # La fuente es `lotes.rendimiento_real_g`: el peso que deja el cierre de manicura. La fecha
+  # del lote es la de su paso a CURADO —el momento en que el producto existe— y si ese evento
+  # falta se cae a `updated_at`. Antes esto salía de la tabla `pesadas`, que el flujo real no
+  # llena, y el informe decía "0 gramos" con veinte lotes curados.
+  def gramos_del_periodo(club, desde, hasta, estado: nil)
+    scope = club.lotes.where.not(rendimiento_real_g: nil).where('rendimiento_real_g > 0')
+    scope = scope.where(estado: estado) if estado
+
+    # Fecha de curado por lote, en una sola consulta (evita N+1 sobre lote_eventos).
+    curados = LoteEvento.where(lote_id: scope.select(:id), tipo: 'cambio_estado',
+                               estado_nuevo: %w[curado finalizado])
+                        .group(:lote_id).minimum(:registrado_en)
+
+    scope.sum do |lote|
+      fecha = curados[lote.id] || lote.updated_at
+      fecha && fecha >= desde.to_time.beginning_of_day && fecha <= hasta.to_time.end_of_day ? lote.rendimiento_real_g.to_f : 0.0
+    end.round(1)
+  end
 
   # Datos del informe REPROCANN — compartidos por la respuesta JSON y el PDF
   def reprocann_data(club)

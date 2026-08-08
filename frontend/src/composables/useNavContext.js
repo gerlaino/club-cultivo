@@ -74,9 +74,11 @@ export const NAV_GROUPS = [
     key: 'reportes', label: 'Reportes', to: '/analitica',
     tabs: [
       { to: '/analitica', label: 'Analítica' },
-      { to: '/auditor/reprocann', label: 'REPROCANN', feature: 'produccion_dispensa' },
-      { to: '/auditor', label: 'Auditoría' },
-      { to: '/auditor/trazabilidad', label: 'Trazabilidad' },
+      // Una sola puerta a los informes. REPROCANN y Trazabilidad estaban acá como tabs
+      // sueltos Y además adentro de "Auditoría", que es el índice que ya los lista: el mismo
+      // informe se veía en dos lugares del mismo menú. Y "Auditoría" tampoco era el nombre:
+      // el que entra es el admin del club, no un auditor.
+      { to: '/auditor', label: 'Informes' },
       { to: '/ariccame', label: 'ARICCAME', feature: 'ariccame' },
       { to: '/documentos', label: 'Documentos' },
     ],
@@ -98,7 +100,7 @@ export const NAV_GROUPS = [
 ]
 
 // Grupo activo según la ruta: el tab cuyo `to` es el prefijo más largo del path gana
-// (así /auditor/trazabilidad cae en Reportes y resalta Trazabilidad, no Auditoría).
+// (así /auditor/trazabilidad cae en Reportes y resalta Informes, que es su tab).
 export function detectGroup(path) {
   if (path === '/') return NAV_GROUPS[0]
   let best = null, bestLen = -1
