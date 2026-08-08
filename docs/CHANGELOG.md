@@ -1,5 +1,22 @@
 # Changelog
 
+## Agosto 2026 (k) — el modal contable reordenado y el design system por superficies
+
+**Nuevo movimiento se lee de arriba a abajo.** El problema no era el estilo: el único campo
+obligatorio —Categoría— vivía en la columna secundaria bajo un título en jerga ("Se registra
+así"), o sea que lo que bloquea el botón Guardar estaba en la columna que parece opcional. Y al
+lado convivía con Comprobante, N° y Notas, que se tocan una de cada veinte veces. Ahora la
+categoría abre el formulario (además es el atajo que completa tipo, sector y depósito), lo
+secundario queda plegado con un resumen que avisa si hay algo adentro, "Cómo se pagó"
+desaparece si marcaste Pendiente, y el modal pasa a una sola columna. Sin signos de pregunta:
+eran seis "¿…?" seguidos.
+
+**Design system (#40): cuatro superficies migradas** —super admin, Buffet, Contabilidad e
+informes del auditor—. El método importa más que el resultado: `ink` (gris neutro) y `slate`
+(azulado) NO son intercambiables, así que en vez de reemplazar la escala se le dio nombre a la
+que ya se usaba, con el valor exacto. Ni un pixel distinto, y el gris de la app se cambia en un
+solo lugar. El test recorre los directorios completos y falla si vuelve un hexadecimal a mano.
+
 ## Agosto 2026 (j) — la sede que no acotaba nada, y el módulo contable que no cerraba
 
 **Una entrega sin cobros figuraba como pago "mixto".** Mixto significa que se pagó de dos
