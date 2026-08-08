@@ -265,7 +265,14 @@ onMounted(async () => {
             </td>
             <td>
               <span v-if="gen.registrada_inase" class="gen-inase-col" title="Registrada en el INASE">🏛️</span>
-              <span v-else class="gen-empty">—</span>
+              <!-- Declarada contra una variedad inscripta: en los informes regulatorios sale
+                   con ESE nombre, así que conviene verlo sin abrir la ficha. -->
+              <span
+                v-else-if="gen.declarada_como_nombre"
+                class="gen-declarada"
+                :title="`Se declara ante el INASE como ${gen.declarada_como_nombre}`"
+              >→ {{ gen.declarada_como_nombre }}</span>
+              <span v-else class="gen-sin-declarar" title="Sin inscribir y sin declarar: no se puede acreditar ante el INASE">Sin declarar</span>
             </td>
             <td>
               <span class="gen-badge"
@@ -372,6 +379,13 @@ onMounted(async () => {
 .gv__pill--inase.gv__pill--active  { background: #dbeafe; color: #0369a1; border-color: #93c5fd; }
 .gv__pill--disp.gv__pill--active   { background: #dcfce7; color: #15803d; border-color: #86efac; }
 .gen-inase-col { font-size: 1rem; }
+.gen-declarada {
+  display: inline-block; max-width: 180px; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; vertical-align: middle;
+  font-size: .74rem; font-weight: 600; color: #1e40af;
+  background: #dbeafe; border-radius: 999px; padding: .15em .6em;
+}
+.gen-sin-declarar { font-size: .74rem; font-weight: 600; color: #92400e; background: #fef3c7; border-radius: 999px; padding: .15em .6em; }
 
 /* Loading / error */
 .gv__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }

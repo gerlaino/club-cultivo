@@ -147,7 +147,7 @@ class GeneticasController < ApplicationController
       :origen, :tiempo_floracion, :dias_vegetativo_objetivo, :dias_cosecha_objetivo, :rendimiento,
       :altura, :dificultad, :activa, :disponible,
       :registrada_inase, :numero_registro_inase, :fecha_registro_inase, :categoria_inase,
-      :criador, :terpenos, :visible_web
+      :criador, :terpenos, :visible_web, :declarada_como_id
     )
   end
 
@@ -172,6 +172,11 @@ class GeneticasController < ApplicationController
       numero_registro_inase:  genetica.numero_registro_inase,
       fecha_registro_inase:   genetica.fecha_registro_inase,
       categoria_inase:        genetica.categoria_inase,
+      # Contra qué variedad inscripta se declara esta genética ante el INASE. Los informes
+      # regulatorios usan ese nombre; las pantallas internas siguen usando `nombre`.
+      declarada_como_id:      genetica.declarada_como_id,
+      declarada_como_nombre:  genetica.declarada_como&.nombre,
+      acreditada_inase:       genetica.acreditada_inase?,
       criador:                genetica.criador,
       terpenos:               genetica.terpenos,
       visible_web:            genetica.visible_web,

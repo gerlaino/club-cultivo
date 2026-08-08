@@ -1,3 +1,36 @@
+namespace :geneticas do
+  # Qué le falta declarar a cada club. Una genética que no está inscripta en el INASE y
+  # tampoco declara contra una que lo esté no se puede acreditar ante el organismo: el
+  # informe la muestra como pendiente y esta tarea la lista sin tener que entrar club por club.
+  #
+  #   bundle exec rake geneticas:sin_declarar
+  desc 'Lista las genéticas que no están inscriptas ni declaradas contra una del INASE'
+  task sin_declarar: :environment do
+    ActsAsTenant.without_tenant do
+      pendientes = Genetica.unscoped
+                           .where.not(club_id: nil)
+                           .where(registrada_inase: [false, nil], declarada_como_id: nil)
+                           .order(:club_id, :nombre)
+
+      if pendientes.empty?
+        puts 'Todas las genéticas están inscriptas o declaradas.'
+        next
+      end
+
+      pendientes.group_by(&:club_id).each do |club_id, gs|
+        club = Club.unscoped.find_by(id: club_id)
+        puts "\n#{club&.name || "club ##{club_id}"} — #{gs.size} sin declarar"
+        gs.each do |g|
+          lotes = Lote.unscoped.where(genetica_id: g.id).count
+          puts "  #{g.nombre}#{lotes.positive? ? " (#{lotes} lote#{'s' if lotes != 1})" : ' (sin lotes)'}"
+        end
+      end
+
+      puts "\nSe declaran desde la ficha de cada genética: campo \"Se declara ante el INASE como\"."
+    end
+  end
+end
+
 namespace :lotes do
   # Un lote 'finalizado' que todavía tiene stock (o derivados) es un estado imposible: el
   # informe de trazabilidad lo muestra como ciclo cerrado con cientos de gramos adentro.

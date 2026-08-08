@@ -423,8 +423,13 @@ class StocksController < ApplicationController
         codigo_qr:            s.codigo_qr,
         genetica: genetica ? {
           id:                    genetica.id,
-          nombre:                genetica.nombre,
-          numero_registro_inase: genetica.numero_registro_inase,
+          # Informe REGULATORIO: va el nombre con el que el club acredita la variedad ante
+          # el organismo. Si declara contra una inscripta, esa es la que corresponde; el
+          # nombre real queda en `nombre_propio` para que la traducción sea auditable.
+          nombre:                genetica.nombre_declarado,
+          nombre_propio:         genetica.nombre,
+          declarada:             genetica.declarada_como.present?,
+          numero_registro_inase: genetica.numero_inase_declarado,
           tipo:                  genetica.tipo,
           thc:                   genetica.thc,
           cbd:                   genetica.cbd,
@@ -434,7 +439,10 @@ class StocksController < ApplicationController
         id:      lote.id,
         codigo:  lote.codigo,
         estado:  lote.estado,
-        genetica: lote.genetica ? { nombre: lote.genetica.nombre, numero_registro_inase: lote.genetica.numero_registro_inase } : nil,
+        genetica: lote.genetica ? { nombre: lote.genetica.nombre_declarado,
+                                    nombre_propio: lote.genetica.nombre,
+                                    declarada: lote.genetica.declarada_como.present?,
+                                    numero_registro_inase: lote.genetica.numero_inase_declarado } : nil,
       } : nil,
       pesada: pesada ? {
         id:             pesada.id,

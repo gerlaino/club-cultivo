@@ -160,6 +160,26 @@
               <input v-model.trim="form.terpenos" class="gem-form__input" placeholder="Ej: Mirceno, Limoneno, Cariofileno…" />
             </div>
 
+            <!-- Declaración ante el INASE. No aparece para las variedades que YA están
+                 inscriptas: esas no se declaran contra nada, son el destino. -->
+            <div v-if="!editingInase" class="gem-form__field gem-form__field--full">
+              <label class="gem-form__label">
+                Se declara ante el INASE como
+                <span class="gem-form__label-hint">(opcional)</span>
+              </label>
+              <select v-model="form.declarada_como_id" class="gem-form__input">
+                <option :value="null">Sin declarar</option>
+                <option v-for="v in variedadesInase" :key="v.id" :value="v.id">
+                  {{ v.nombre }}{{ v.numero_registro_inase ? ` · ${v.numero_registro_inase}` : '' }}
+                </option>
+              </select>
+              <p class="gem-form__hint">
+                Los informes regulatorios (INASE, REPROCANN, trazabilidad y semestral) van a
+                nombrar esta genética con la variedad inscripta que elijas. Adentro del club
+                se sigue llamando <strong>{{ form.nombre || 'como vos le pusiste' }}</strong>.
+              </p>
+            </div>
+
             <!-- Disponible -->
             <div class="gem-form__field gem-form__field--full">
               <label class="gem-form__toggle">
@@ -196,8 +216,8 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import api, { getGenetica, createGenetica, updateGenetica } from '../lib/api.js'
+import { ref, onMounted } from 'vue'
+import api, { getGenetica, createGenetica, updateGenetica, listGeneticas } from '../lib/api.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 
 const emit = defineEmits(['saved'])
@@ -218,12 +238,22 @@ const fotoFile     = ref(null)
 const fotoPreview  = ref(null)
 const fotoInput    = ref(null)
 
+// Catálogo contra el que se declara: las variedades inscriptas en el INASE, que son globales
+// (no se duplican por club) y ya vienen en el listado normal de genéticas.
+const variedadesInase = ref([])
+onMounted(async () => {
+  try {
+    const { data } = await listGeneticas()
+    variedadesInase.value = (data || []).filter(g => g.registrada_inase)
+  } catch { variedadesInase.value = [] }
+})
+
 function emptyForm() {
   return {
     nombre: '', tipo: '', thc: null, cbd: null,
     descripcion: '', consejos_club: '', origen: '', criador: '', terpenos: '',
     tiempo_floracion: null, dias_vegetativo_objetivo: null, dias_cosecha_objetivo: null,
-    rendimiento: null, altura: null, disponible: true,
+    rendimiento: null, altura: null, disponible: true, declarada_como_id: null,
   }
 }
 const form = ref(emptyForm())
@@ -286,6 +316,7 @@ async function openEdit(genOrId) {
     rendimiento:      gen.rendimiento      ?? null,
     altura:           gen.altura           ?? null,
     disponible:       gen.disponible       ?? true,
+    declarada_como_id: gen.declarada_como_id ?? null,
   }
   formErrors.value  = {}
   formError.value   = null
@@ -358,6 +389,8 @@ defineExpose({ openCreate, openEdit })
 @media (max-width: 560px) { .gem-form { grid-template-columns: 1fr; } .gem-form__field--full, .gem-form__field--half { grid-column: 1; } }
 .gem-form__label     { font-size: .8rem; font-weight: 600; color: #374151; }
 .gem-form__label-hint { font-size: .7rem; font-weight: 500; color: #94a3b8; }
+.gem-form__hint { margin: .4rem 0 0; font-size: .74rem; line-height: 1.45; color: #64748b; }
+.gem-form__hint strong { color: #334155; font-weight: 600; }
 .gem-form__req       { color: #dc2626; }
 .gem-form__input     { padding: .5rem .7rem; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: .875rem; color: #1e293b; background: #fff; outline: none; transition: border-color .15s; width: 100%; box-sizing: border-box; }
 .gem-form__input:focus { border-color: #1a3d2e; }

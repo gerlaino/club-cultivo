@@ -8,6 +8,26 @@ class Genetica < ApplicationRecord
   has_many :resenas, class_name: 'ResenaProducto', dependent: :destroy
   has_many_attached :fotos
 
+  # ── Declaración ante el INASE ─────────────────────────────────────────────
+  #
+  # Los clubes cultivan genéticas que no están inscriptas y las etiquetan contra una variedad
+  # que sí lo está. Esto guarda ese par: "Northern Lights se declara como ANANDA001".
+  #
+  # Apunta al catálogo GLOBAL de variedades registradas (club_id NULL), que ya existe: no se
+  # duplica por club. Es opcional — declarar es una tarea que el club hace cuando puede, y
+  # bloquear el alta por eso trabaría el trabajo diario. Las que quedan sin declarar salen
+  # listadas aparte en el informe INASE.
+  belongs_to :declarada_como, class_name: 'Genetica', optional: true
+  has_many   :declaradas_asi, class_name: 'Genetica', foreign_key: :declarada_como_id,
+                              dependent: :nullify, inverse_of: :declarada_como
+
+  validate :declaracion_valida, if: -> { declarada_como_id.present? }
+
+  scope :registradas,      -> { where(registrada_inase: true) }
+  scope :sin_declarar,     -> { where(registrada_inase: [false, nil], declarada_como_id: nil) }
+  # El catálogo que se le ofrece al club para declarar: las variedades inscriptas de verdad.
+  scope :declarables,      -> { unscoped.where(club_id: nil, registrada_inase: true).order(:nombre) }
+
   CATEGORIAS_INASE = %w[semilla_feminizada semilla_regular material_vegetativo hibrido].freeze
 
   validates :nombre, presence: true
@@ -50,7 +70,46 @@ class Genetica < ApplicationRecord
 
   before_validation :generar_slug, on: :create
 
+  # Con qué nombre sale esta genética en un informe REGULATORIO: la variedad contra la que se
+  # declara si hay una, y si no la propia. En las pantallas internas NO se usa — el cultivador
+  # trabaja con "Northern Lights", y ver "ANANDA001" en su lista de lotes no le dice nada.
+  def nombre_declarado
+    declarada_como&.nombre.presence || nombre
+  end
+
+  # El número que le corresponde ante el organismo: el propio si está inscripta, el de la
+  # variedad contra la que se declara si no.
+  def numero_inase_declarado
+    return numero_registro_inase if registrada_inase?
+
+    declarada_como&.numero_registro_inase
+  end
+
+  # ¿Este club puede acreditar esta genética? O está inscripta, o declara contra una que lo está.
+  def acreditada_inase?
+    registrada_inase? || declarada_como.present?
+  end
+
   private
+
+  def declaracion_valida
+    if registrada_inase?
+      errors.add(:declarada_como, 'no corresponde: esta variedad ya está inscripta en el INASE')
+      return
+    end
+
+    if declarada_como_id == id
+      errors.add(:declarada_como, 'no puede ser la genética misma')
+      return
+    end
+
+    destino = Genetica.unscoped.find_by(id: declarada_como_id)
+    if destino.nil?
+      errors.add(:declarada_como, 'no existe')
+    elsif !destino.registrada_inase?
+      errors.add(:declarada_como, 'tiene que ser una variedad inscripta en el INASE')
+    end
+  end
 
   def generar_slug
     return if slug.present?

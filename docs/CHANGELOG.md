@@ -1,5 +1,28 @@
 # Changelog
 
+## Agosto 2026 (i) — declarar una genética ante el INASE
+
+Los clubes cultivan variedades que **no** están inscriptas en el INASE, y la forma de
+etiquetarlas es declararlas contra una que sí lo está. Eso pasaba en la etiqueta de papel y la
+app no se enteraba: el informe INASE mostraba el nombre de fantasía y "sin registrar", que no
+es lo que el club presenta ante el organismo.
+
+Ahora cada genética puede declararse contra una variedad inscripta. El catálogo ya existía —las
+8 variedades del INASE son genéticas globales, compartidas por todos los clubes— así que lo
+único que faltaba era el vínculo: `geneticas.declarada_como_id`. Declarar es **opcional**: no
+traba el alta ni el cultivo, y lo que queda sin declarar aparece listado como pendiente.
+
+**Dónde se usa el nombre declarado y dónde no.** En los informes REGULATORIOS —INASE,
+trazabilidad y semestral— sale la variedad inscripta, que es con la que se acredita. En las
+pantallas internas (lotes, plantas, producción, analítica) sigue saliendo el nombre real: el
+cultivador trabaja con "Northern Lights" y ver "ANANDA001" en su lista de lotes no le dice
+nada. El informe INASE suma una columna "Se cultiva como" para que la traducción sea auditable
+sin salir del documento.
+
+El informe pasa a distinguir tres situaciones donde antes había dos: inscripta, declarada y
+**sin acreditar**. Sólo la tercera es un pendiente, y tiene su propia sección al pie —lo único
+accionable del informe—. `rake geneticas:sin_declarar` lista lo mismo por consola.
+
 ## Agosto 2026 (h) — el historial del delivery daba 403 y la pantalla decía "no hay nada"
 
 **El repartidor no podía ver su propio historial.** `require_dispensaciones_role!` le permite al
@@ -13,8 +36,10 @@ cerraste ninguna entrega en este período"*: fallaba en silencio. Ahora el histo
 **El rango de días filtraba por `updated_at`**, la última vez que se tocó el registro, no por
 cuándo se cerró la entrega. Con eso el filtro mentía: una entrega de hace 40 días que después se
 editó (un cobro corregido) volvía a caer dentro de "7 días". Pasa a `COALESCE(entregado_at,
-updated_at)`. Queda pendiente que `reportar_fallo` registre su propia fecha de cierre: hoy un
-fallido no tiene más marca temporal que `updated_at` (necesita columna nueva).
+fallido_at, updated_at)`, y `reportar_fallo` ahora **sí** registra cuándo falló: una entrega
+guardaba `entregado_at` y un fallo no guardaba nada, así que el otro final posible del viaje no
+tenía fecha propia. Columna `dispensaciones.fallido_at`, con los fallos ya existentes
+rellenados desde `updated_at` — que es lo que el filtro venía usando igual.
 
 **Los "No entregados" vuelven a arrancar desplegados.** Al hacer plegables las listas los había
 dejado cerrados por defecto —el repartidor no puede resolverlos, los reprograma el admin— pero

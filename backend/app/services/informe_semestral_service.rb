@@ -96,7 +96,7 @@ class InformeSemestralService
       codigo:            lote.codigo,
       estado:            lote.estado,
       start_date:        lote.start_date,
-      strain:            lote.genetica&.nombre || lote.strain,
+      strain:            lote.genetica&.nombre_declarado || lote.strain,
       plants_count:      lote.plants_count,
       sala:              lote.sala&.nombre,
       costo_por_gramo:   lote.costo_lote&.costo_por_gramo&.to_f,
@@ -127,7 +127,9 @@ class InformeSemestralService
 
     groups = {}
     lotes.each do |lote|
-      nombre = lote.genetica&.nombre.presence || lote.strain.presence
+      # Informe REGULATORIO: la variedad va con el nombre que el club acredita ante el
+      # organismo (la inscripta contra la que declara, si no está inscripta ella misma).
+      nombre = lote.genetica&.nombre_declarado.presence || lote.strain.presence
       next if nombre.blank?
       key = nombre.downcase
       groups[key] ||= { nombre: nombre, lote_ids: [], gramos_producidos: 0.0, lotes_count: 0 }

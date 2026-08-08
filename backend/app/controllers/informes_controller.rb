@@ -375,13 +375,19 @@ class InformesController < ApplicationController
     plantas_por_gen = lotes.group(:genetica_id).sum(:plants_count)
     gramos_por_gen  = lotes.where.not(rendimiento_real_g: nil).group(:genetica_id).sum(:rendimiento_real_g)
 
-    filas = geneticas.map do |g|
+    filas = geneticas.includes(:declarada_como).map do |g|
       {
         id:                    g.id,
-        nombre:                g.nombre,
+        # `nombre` es el que usa el club puertas adentro; `nombre_declarado` es el que se
+        # presenta ante el organismo. Un club cultiva "Northern Lights" y la declara contra
+        # una variedad inscripta: el informe tiene que decir la inscripta.
+        nombre:                g.nombre_declarado,
+        nombre_propio:         g.nombre,
+        declarada:             g.declarada_como.present?,
+        acreditada:            g.acreditada_inase?,
         tipo:                  g.tipo,
         registrada_inase:      g.registrada_inase,
-        numero_registro_inase: g.numero_registro_inase,
+        numero_registro_inase: g.numero_inase_declarado,
         categoria_inase:       g.categoria_inase,
         fecha_registro_inase:  g.fecha_registro_inase,
         criador:               g.criador,
@@ -394,34 +400,59 @@ class InformesController < ApplicationController
     end
 
     registradas = filas.count { |f| f[:registrada_inase] }
+    declaradas  = filas.count { |f| f[:declarada] }
+    # Lo que le falta al club: lo que cultiva sin poder acreditarlo, ni por registro propio
+    # ni por declaración. Es la única fila accionable del informe.
+    pendientes  = filas.reject { |f| f[:acreditada] }
+
     datos = {
       total_geneticas:   filas.size,
       registradas_inase: registradas,
-      sin_registrar:     filas.size - registradas,
+      declaradas:        declaradas,
+      acreditadas:       registradas + declaradas,
+      sin_registrar:     pendientes.size,
       gramos_totales:    filas.sum { |f| f[:gramos_producidos] }.round(1),
       lotes_totales:     filas.sum { |f| f[:lotes] },
       geneticas:         filas,
+      pendientes:        pendientes,
     }
+
+    secciones = [{
+      titulo: 'Variedades cultivadas',
+      headers: ['Variedad', 'N° INASE', 'Se cultiva como', 'Lotes', 'Plantas', 'Gramos'],
+      rows: filas.map { |g|
+        [g[:nombre], g[:numero_registro_inase].presence || 'Sin registrar',
+         # La columna que hace auditable la traducción: contra qué nombre real corresponde
+         # cada variedad declarada. En blanco cuando el nombre no cambió.
+         g[:declarada] ? g[:nombre_propio] : '—',
+         g[:lotes], g[:plantas], g[:gramos_producidos]]
+      },
+      formatos: [:texto, :texto, :texto, :numero, :numero, :numero],
+      totales: [3, 4, 5],
+      aligns: { 3 => :right, 4 => :right, 5 => :right },
+    }]
+
+    if pendientes.any?
+      secciones << {
+        titulo: 'Sin acreditar — hay que declararlas contra una variedad inscripta',
+        headers: ['Variedad', 'Lotes', 'Plantas'],
+        rows: pendientes.map { |g| [g[:nombre_propio], g[:lotes], g[:plantas]] },
+        formatos: [:texto, :numero, :numero],
+        aligns: { 1 => :right, 2 => :right },
+      }
+    end
 
     responder_informe(
       titulo: 'Informe INASE — variedades', nombre: 'informe_inase', datos: datos,
       kpis: [
-        { label: 'Variedades',       valor: filas.size },
-        { label: 'Registradas',      valor: registradas, tono: :ok },
-        { label: 'Sin registrar',    valor: filas.size - registradas, tono: :warn },
-        { label: 'Gramos totales',   valor: datos[:gramos_totales] },
+        { label: 'Variedades',    valor: filas.size },
+        { label: 'Inscriptas',    valor: registradas, tono: :ok },
+        { label: 'Declaradas',    valor: declaradas,  tono: :ok },
+        { label: 'Sin acreditar', valor: pendientes.size, tono: pendientes.any? ? :warn : :ok },
       ],
-      secciones: [{
-        titulo: 'Variedades cultivadas',
-        headers: ['Variedad', 'N° INASE', 'Lotes', 'Plantas', 'Gramos'],
-        rows: filas.map { |g|
-          [g[:nombre], g[:numero_registro_inase].presence || 'Sin registrar',
-           g[:lotes], g[:plantas], g[:gramos_producidos]]
-        },
-        formatos: [:texto, :texto, :numero, :numero, :numero],
-        totales: [2, 3, 4],
-        aligns: { 2 => :right, 3 => :right, 4 => :right },
-      }],
+      secciones: secciones,
+      nota: 'Las variedades que el club no tiene inscriptas se presentan declaradas contra ' \
+            'una variedad del registro INASE. La columna "Se cultiva como" deja ver el par.',
     )
   end
 

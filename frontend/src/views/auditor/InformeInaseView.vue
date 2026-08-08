@@ -21,11 +21,18 @@
           </div>
           <div class="inf__kpi inf__kpi--ok">
             <span class="inf__kpi-valor">{{ data.registradas_inase }}</span>
-            <span class="inf__kpi-label">Registradas INASE</span>
+            <span class="inf__kpi-label">Inscriptas</span>
           </div>
-          <div class="inf__kpi inf__kpi--warn">
+          <!-- Declaradas: no están inscriptas, pero el club las presenta contra una que sí
+               lo está. Cuentan como acreditadas; sólo las que no tienen ninguna de las dos
+               cosas son un pendiente. -->
+          <div class="inf__kpi inf__kpi--ok">
+            <span class="inf__kpi-valor">{{ data.declaradas ?? 0 }}</span>
+            <span class="inf__kpi-label">Declaradas</span>
+          </div>
+          <div class="inf__kpi" :class="data.sin_registrar ? 'inf__kpi--warn' : 'inf__kpi--ok'">
             <span class="inf__kpi-valor">{{ data.sin_registrar }}</span>
-            <span class="inf__kpi-label">Sin registrar</span>
+            <span class="inf__kpi-label">Sin acreditar</span>
           </div>
           <div class="inf__kpi">
             <span class="inf__kpi-valor">{{ data.lotes_totales }}</span>
@@ -42,17 +49,18 @@
           <table class="inf__table">
             <thead>
               <tr>
-                <th>Variedad</th><th>INASE</th><th>N° registro</th><th>Categoría</th>
+                <th>Variedad</th><th>Se cultiva como</th><th>INASE</th><th>N° registro</th><th>Categoría</th>
                 <th>Criador</th><th class="inf__num">Lotes</th><th class="inf__num">Plantas</th><th class="inf__num">Gramos</th>
               </tr>
             </thead>
             <tbody>
               <tr v-for="g in data.geneticas" :key="g.id">
                 <td><strong>{{ g.nombre }}</strong><span v-if="g.tipo" class="inf__tipo"> · {{ g.tipo }}</span></td>
+                <!-- El nombre real del club, cuando se declaró contra otra variedad: hace
+                     auditable la traducción sin salir del informe. -->
+                <td>{{ g.declarada ? g.nombre_propio : '—' }}</td>
                 <td>
-                  <span class="inf__badge" :class="g.registrada_inase ? 'inf__badge--ok' : 'inf__badge--no'">
-                    {{ g.registrada_inase ? '✓ Registrada' : 'Sin registro' }}
-                  </span>
+                  <span class="inf__badge" :class="badgeInase(g)">{{ etiquetaInase(g) }}</span>
                 </td>
                 <td>{{ g.numero_registro_inase || '—' }}</td>
                 <td>{{ categoriaLabel(g.categoria_inase) }}</td>
@@ -61,7 +69,25 @@
                 <td class="inf__num">{{ g.plantas }}</td>
                 <td class="inf__num">{{ formatGramos(g.gramos_producidos) }}</td>
               </tr>
-              <tr v-if="!data.geneticas.length"><td colspan="8" class="inf__empty">Sin genéticas cargadas.</td></tr>
+              <tr v-if="!data.geneticas.length"><td colspan="9" class="inf__empty">Sin genéticas cargadas.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Lo único accionable del informe: lo que el club cultiva y todavía no puede
+             acreditar, ni por registro propio ni declarándolo. -->
+        <div v-if="data.pendientes?.length" class="inf__section">
+          <h2 class="inf__section-title">Sin acreditar — hay que declararlas contra una variedad inscripta</h2>
+          <table class="inf__table">
+            <thead>
+              <tr><th>Variedad</th><th class="inf__num">Lotes</th><th class="inf__num">Plantas</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="g in data.pendientes" :key="g.id">
+                <td><strong>{{ g.nombre_propio }}</strong></td>
+                <td class="inf__num">{{ g.lotes }}</td>
+                <td class="inf__num">{{ g.plantas }}</td>
+              </tr>
             </tbody>
           </table>
         </div>
@@ -87,6 +113,11 @@ const CATEGORIAS = {
   hibrido:            'Híbrido',
 }
 const categoriaLabel = (c) => CATEGORIAS[c] || (c || '—')
+
+// Tres situaciones, no dos: inscripta, declarada contra una inscripta, o sin acreditar.
+const etiquetaInase = (g) =>
+  g.registrada_inase ? '✓ Inscripta' : g.declarada ? '✓ Declarada' : 'Sin acreditar'
+const badgeInase = (g) => (g.registrada_inase || g.declarada ? 'inf__badge--ok' : 'inf__badge--no')
 const formatGramos = (g) => g != null ? `${Number(g).toLocaleString('es-AR')} g` : '—'
 
 async function cargar() {
