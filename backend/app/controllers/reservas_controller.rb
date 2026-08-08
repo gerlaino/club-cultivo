@@ -17,8 +17,11 @@ class ReservasController < ApplicationController
     scope = if @paciente
       @paciente.reservas
     else
+      # Las reservas que se ven son las del stock de las SEDES ASIGNADAS: quien atiende una
+      # sede no gestiona las reservas de otra. `club_sede_ids` traía todas las del club.
       Reserva.joins(:stock)
-             .where("stocks.sede_id IN (?) OR stocks.club_id = ?", club_sede_ids, current_user.club_id)
+             .where("stocks.sede_id IN (?) OR (stocks.sede_id IS NULL AND stocks.club_id = ?)",
+                    current_user.sedes_visibles_ids, current_user.club_id)
     end
     scope = scope.where(estado: params[:estado]) if params[:estado].present?
     scope = scope.includes(:user, stock: :lote, paciente: :cuenta_corriente).recientes
@@ -125,7 +128,11 @@ class ReservasController < ApplicationController
       stock:                  @reserva.stock,
       sede_id:                @reserva.stock&.sede_id,
       cantidad:               cantidad,
-      medio_pago:             'mixto',          # placeholder; los cobros lo afinan
+      # El medio con el que se seña la reserva es el que se espera al entregarla. Acá había un
+      # placeholder 'mixto' "que los cobros afinan": cuando no hay cobros que afinar —el resto
+      # es cero porque la seña cubrió todo, o se cobra contra entrega— el placeholder quedaba
+      # como valor final y la entrega figuraba como pago mixto sin ningún pago.
+      medio_pago:             @reserva.medio_pago.presence || 'efectivo',
       aporte_socio_ars:       aporte,
       descuento_paciente_pct: paciente.descuento_porcentaje.to_d.clamp(0, 100),
       fecha_dispensacion:     Date.current,

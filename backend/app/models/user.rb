@@ -130,6 +130,21 @@ class User < ApplicationRecord
     sedes_asignadas.pluck(:id)
   end
 
+  # Las sedes cuyo inventario este usuario puede ver. Sin sedes asignadas ve TODAS: es lo que
+  # ya hacía `salas_ids_en_sedes_asignadas` para el cultivo, y es lo correcto para un club de
+  # una sola sede o para un admin que no se asignó ninguna.
+  #
+  # Con sedes asignadas, en cambio, la asignación tiene que valer: un dispensador de la Finca
+  # Norte veía —y podía dispensar— el stock de todas las sedes del club, que es justo lo que
+  # la asignación existe para impedir.
+  def sedes_visibles_ids
+    asignadas = sedes_ids_asignadas
+    asignadas.presence || club&.sedes&.pluck(:id) || []
+  end
+
+  # ¿Le alcanza con ver lo de sus sedes, o ve todo el club?
+  def limitado_por_sede? = sedes_ids_asignadas.any?
+
   def salas_ids_en_sedes_asignadas
     sedes = sedes_ids_asignadas
     scope = Sala.where(club_id: club_id)

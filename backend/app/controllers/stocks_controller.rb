@@ -38,12 +38,20 @@ class StocksController < ApplicationController
       return render json: stocks.map { |s| serialize_stock(s) }
     end
 
+    # El inventario que se ve es el de las SEDES ASIGNADAS. Un dispensador de la Finca Norte
+    # veía —y podía dispensar— el stock de todas las sedes del club: la asignación existe
+    # justamente para eso y no la miraba nadie. Quien no tiene sedes asignadas sigue viendo
+    # todo (club de una sola sede, o un admin que no se asignó ninguna).
+    visibles = current_user.sedes_visibles_ids
+
     if sede_id.present?
-      sede   = current_user.club.sedes.find_by(id: sede_id)
+      sede   = current_user.club.sedes.where(id: visibles).find_by(id: sede_id)
       stocks = sede ? sede.stocks.includes(:lote, :genetica).disponibles.asignados.to_a : []
     else
-      sede_stocks = current_user.club.sedes
+      sede_stocks = current_user.club.sedes.where(id: visibles)
                                 .flat_map { |s| s.stocks.includes(:lote, :genetica).disponibles.asignados }
+      # El pool (stock sin sede) es del club entero: no pertenece a ninguna sede, así que no
+      # hay asignación que lo acote.
       pool_stocks = Stock.where(club_id: current_user.club_id).includes(:lote, :genetica).disponibles.asignados.del_club.to_a
       stocks = sede_stocks + pool_stocks
     end
@@ -71,6 +79,11 @@ class StocksController < ApplicationController
     # real para usar/dispensar. Un finalizado (cantidad 0, agotado) no va; y si por dato viejo
     # quedó agotado con cantidad > 0, tampoco debe aparecer.
     base = Stock.where(club_id: current_user.club_id).where('cantidad > 0').where.not(estado: 'agotado')
+    # Mismo criterio que el listado: sólo el inventario de las sedes asignadas (más el pool,
+    # que no es de ninguna sede). La pestaña Stock mostraba el club entero.
+    if current_user.limitado_por_sede?
+      base = base.where(sede_id: current_user.sedes_visibles_ids + [nil])
+    end
     if params[:sede_id].present?
       base = params[:sede_id] == 'pool' ? base.where(sede_id: nil) : base.where(sede_id: params[:sede_id])
     end

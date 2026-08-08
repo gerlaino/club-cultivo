@@ -93,6 +93,16 @@ module DispensacionesFinancieras
   # También sincroniza monto_credito_ars (lo que quedó a cuenta) para los serializers.
   def afinar_medio_pago!(disp)
     medios = disp.cobros.pluck(:medio).uniq
+
+    # SIN COBROS no hay nada que afinar, y "mixto" es una mentira: mixto significa que se pagó
+    # de dos formas distintas, no que no se pagó. Pasaba al entregar una reserva cuyo resto era
+    # cero (la seña ya cubría todo) o que se cobra contra entrega: la dispensación quedaba
+    # marcada "mixto" sin un solo cobro detrás. Se conserva el medio con el que nació.
+    if medios.empty?
+      disp.update_columns(monto_credito_ars: 0)
+      return
+    end
+
     disp.update_columns(
       medio_pago:        medios.size == 1 ? medios.first : 'mixto',
       monto_credito_ars: disp.cobros.a_credito.sum(:monto_ars),
