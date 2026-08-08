@@ -34,7 +34,11 @@
     <div v-else class="mdh__list">
       <div v-for="p in paquetes" :key="p.id" class="mdh__card">
         <div class="mdh__card-head">
-          <span class="mdh__paciente">{{ p.paciente_nombre || '—' }}</span>
+          <!-- El endpoint del delivery devuelve el paciente anidado (`paciente.nombre`); acá
+               se leía `paciente_nombre`, que es la forma de OTROS endpoints (turnos) y acá no
+               existe: la tarjeta mostraba un guion en vez del nombre. `contacto_nombre` es el
+               respaldo real — es a quien se le entrega cuando no es el paciente mismo. -->
+          <span class="mdh__paciente">{{ p.paciente?.nombre || p.contacto_nombre || '—' }}</span>
           <span class="mdh__estado" :class="`mdh__estado--${p.estado_envio}`">
             {{ p.estado_envio === 'entregado' ? 'Entregado' : 'Fallido' }}
           </span>
