@@ -82,6 +82,9 @@ class DispensacionSerializer
       orden_entrega:      d.orden_entrega,
       ruta_bloqueada:     d.ruta_entrega&.bloqueada || false,
       entregado_at:       d.entregado_at,
+      # Los dos finales del viaje tienen su fecha. El historial la muestra sin tener que
+      # caer en `updated_at`, que no es cuándo pasó sino cuándo se tocó el registro.
+      fallido_at:         d.fallido_at,
       notas_entrega:      d.notas_entrega,
       firma_entrega_data: d.firma_entrega_data,
       motivo_fallo:       d.motivo_fallo,

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_07_175514) do
+ActiveRecord::Schema[7.2].define(version: 2026_08_08_021000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -668,6 +668,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_07_175514) do
     t.datetime "deleted_at"
     t.bigint "deleted_by_id"
     t.boolean "es_regalo", default: false, null: false
+    t.datetime "fallido_at"
     t.index ["ariccame_reportada"], name: "index_dispensaciones_on_ariccame_reportada", where: "(ariccame_reportada = false)"
     t.index ["codigo_paquete"], name: "index_dispensaciones_on_codigo_paquete", unique: true
     t.index ["deleted_at"], name: "index_dispensaciones_on_deleted_at"
@@ -949,10 +950,12 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_07_175514) do
     t.datetime "deleted_at"
     t.bigint "deleted_by_id"
     t.text "consejos_club"
+    t.bigint "declarada_como_id"
     t.index ["activa"], name: "index_geneticas_on_activa"
     t.index ["club_id", "activa"], name: "index_geneticas_on_club_id_and_activa"
     t.index ["club_id", "slug"], name: "index_geneticas_on_club_id_and_slug", unique: true
     t.index ["club_id"], name: "index_geneticas_on_club_id"
+    t.index ["declarada_como_id"], name: "index_geneticas_on_declarada_como_id"
     t.index ["deleted_at"], name: "index_geneticas_on_deleted_at"
     t.index ["deleted_by_id"], name: "index_geneticas_on_deleted_by_id"
     t.index ["numero_registro_inase"], name: "idx_geneticas_numero_inase", unique: true, where: "(numero_registro_inase IS NOT NULL)"
@@ -2255,6 +2258,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_07_175514) do
   add_foreign_key "eventos_bar", "clubs"
   add_foreign_key "eventos_bar", "users", column: "deleted_by_id"
   add_foreign_key "geneticas", "clubs"
+  add_foreign_key "geneticas", "geneticas", column: "declarada_como_id"
   add_foreign_key "geneticas", "users", column: "deleted_by_id"
   add_foreign_key "indicacion_medicas", "pacientes"
   add_foreign_key "indicacion_medicas", "users"

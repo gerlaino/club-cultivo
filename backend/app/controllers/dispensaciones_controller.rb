@@ -1,6 +1,12 @@
 class DispensacionesController < ApplicationController
   include DispensacionesFinancieras
 
+  # Cuándo terminó el viaje, sea como sea que haya terminado. Se usa para filtrar y ordenar el
+  # historial del repartidor: `updated_at` no sirve porque cambia con cualquier edición
+  # posterior. Queda de último recurso para los registros previos a estas columnas.
+  CERRADO_AT = 'COALESCE(dispensaciones.entregado_at, dispensaciones.fallido_at, ' \
+               'dispensaciones.updated_at)'.freeze
+
   before_action :authenticate_user!
 
   before_action -> { require_feature!(:produccion_dispensa) }
@@ -283,15 +289,14 @@ class DispensacionesController < ApplicationController
       .joins(stock: :sede)
       .where(sedes: { club_id: current_user.club_id })
       .where(estado_envio: %w[entregado fallido])
-      # Se filtra por CUÁNDO SE CERRÓ la entrega, no por la última vez que se tocó el
-      # registro. Con `updated_at` el rango mentía: cualquier edición posterior (un cobro que
-      # se corrige, una reprogramación) devolvía una entrega vieja al filtro de "7 días", y
-      # una entrega reciente podía quedar fuera si el registro no se volvió a tocar.
-      # Los fallidos no tienen fecha de cierre propia todavía, así que para ellos sigue
-      # valiendo `updated_at` (ver reportar_fallo).
-      .where('COALESCE(dispensaciones.entregado_at, dispensaciones.updated_at) >= ?', desde)
+      # Se filtra por CUÁNDO SE CERRÓ el viaje, no por la última vez que se tocó el registro.
+      # Con `updated_at` el rango mentía: cualquier edición posterior (un cobro que se
+      # corrige, una reprogramación) devolvía una entrega vieja al filtro de "7 días".
+      # Los dos finales posibles tienen su fecha: `entregado_at` y `fallido_at`. `updated_at`
+      # queda de último recurso para los registros anteriores a esas columnas.
+      .where("#{CERRADO_AT} >= ?", desde)
       .includes(:paciente, :sede, { stock: :lote }, { items: { stock: :lote } })
-      .order(Arel.sql('COALESCE(dispensaciones.entregado_at, dispensaciones.updated_at) DESC'))
+      .order(Arel.sql("#{CERRADO_AT} DESC"))
 
     render json: {
       dispensaciones: cerradas.map { |d| serialize_dispensacion_delivery(d) },
@@ -382,7 +387,10 @@ class DispensacionesController < ApplicationController
       return render json: { error: err }, status: :unprocessable_entity
     end
     registrar_evento_envio(@dispensacion, 'fallido', motivo: motivo)
-    @dispensacion.update!(estado_envio: 'fallido', motivo_fallo: motivo, historial_envio: @dispensacion.historial_envio)
+    # `fallido_at` es el equivalente de `entregado_at` para el otro final posible del viaje:
+    # sin él, lo único que fechaba un fallo era `updated_at` y el historial no podía filtrar.
+    @dispensacion.update!(estado_envio: 'fallido', motivo_fallo: motivo, fallido_at: Time.current,
+                          historial_envio: @dispensacion.historial_envio)
     NotificacionDeliveryService.new(@dispensacion).notificar_fallo
     avisar_proximo_de_ruta(@dispensacion)
     resumen_ruta_si_termino(@dispensacion)

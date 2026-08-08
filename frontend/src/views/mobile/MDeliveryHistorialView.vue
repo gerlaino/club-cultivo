@@ -41,7 +41,7 @@
         </div>
         <div v-if="p.direccion_envio" class="mdh__dir">{{ p.direccion_envio }}</div>
         <div class="mdh__pie">
-          <span class="mdh__fecha">{{ fechaHora(p.entregado_at || p.updated_at) }}</span>
+          <span class="mdh__fecha">{{ fechaHora(p.entregado_at || p.fallido_at || p.updated_at) }}</span>
           <span v-if="p.motivo_fallo" class="mdh__motivo">{{ p.motivo_fallo }}</span>
         </div>
       </div>

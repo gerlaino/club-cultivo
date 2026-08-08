@@ -13,7 +13,7 @@ RSpec.describe 'Delivery — historial de lo cerrado', type: :request do
   let(:paciente) { create(:paciente, club: club, created_by: admin) }
   let(:stock)    { create(:stock, club: club, sede: sede, lote: lote, cantidad: 500) }
 
-  def cerrada(estado:, entregado_at: nil, updated_at: Time.current)
+  def cerrada(estado:, entregado_at: nil, fallido_at: nil, updated_at: Time.current)
     d = Dispensacion.create!(
       paciente: paciente, stock: stock, cantidad: 5, sede: sede,
       fecha_dispensacion: Time.zone.today, user: admin,
@@ -24,7 +24,8 @@ RSpec.describe 'Delivery — historial de lo cerrado', type: :request do
     )
     # Al crear con envío, el modelo fuerza 'pendiente': el cierre se hace por los endpoints
     # de entrega. Acá se arma el estado final directo, que es lo que el historial consulta.
-    d.update_columns(estado_envio: estado, entregado_at: entregado_at, updated_at: updated_at)
+    d.update_columns(estado_envio: estado, entregado_at: entregado_at,
+                     fallido_at: fallido_at, updated_at: updated_at)
     d
   end
 
@@ -59,6 +60,32 @@ RSpec.describe 'Delivery — historial de lo cerrado', type: :request do
 
     expect(historial(7)['dispensaciones']).to be_empty
     expect(historial(90)['dispensaciones'].size).to eq(1)
+  end
+
+  # El fallo tiene su propia fecha (`fallido_at`), igual que la entrega tiene `entregado_at`.
+  # Antes lo único que lo fechaba era `updated_at`.
+  it 'NO trae un fallo viejo sólo porque el registro se tocó después' do
+    cerrada(estado: 'fallido', fallido_at: 40.days.ago, updated_at: 1.day.ago)
+
+    expect(historial(7)['dispensaciones']).to be_empty
+    expect(historial(90)['dispensaciones'].size).to eq(1)
+  end
+
+  it 'reportar un fallo deja fechado cuándo pasó' do
+    d = Dispensacion.create!(
+      paciente: paciente, stock: stock, cantidad: 5, sede: sede,
+      fecha_dispensacion: Time.zone.today, user: admin,
+      con_envio: true, delivery_id: repartidor.id,
+      direccion_envio: 'Av. Siempreviva 742', contacto_nombre: paciente.nombre_completo,
+    )
+    d.update_columns(estado_envio: 'en_viaje')
+
+    patch "/api/dispensaciones/#{d.id}/reportar_fallo",
+          params: { motivo_fallo: 'Nadie en el domicilio' }, as: :json
+
+    expect(response).to have_http_status(:ok), response.body
+    expect(d.reload.fallido_at).to be_present
+    expect(historial(7)['dispensaciones'].size).to eq(1)
   end
 
   it 'no muestra lo que todavía no se cerró' do
