@@ -2,8 +2,8 @@
 class MovimientosContablesController < ApplicationController
   before_action :authenticate_user!
   before_action :require_lectura,   only: [:index, :show, :dashboard, :export_csv, :recurrentes]
-  before_action :require_escritura, only: [:create, :update, :destroy, :cerrar_periodo, :reabrir_periodo]
-  before_action :set_movimiento,    only: [:show, :update, :destroy]
+  before_action :require_escritura, only: [:create, :update, :destroy, :cerrar_periodo, :reabrir_periodo, :registrar_pago]
+  before_action :set_movimiento,    only: [:show, :update, :destroy, :registrar_pago]
 
   # GET /movimientos_contables
   # Params opcionales: desde, hasta, tipo, categoria, sede_id, lote_id, page, per_page
@@ -264,6 +264,34 @@ class MovimientosContablesController < ApplicationController
       render json: { error: e.message }, status: :unprocessable_entity
     rescue ActiveRecord::RecordInvalid, ActiveRecord::RecordNotDestroyed => e
       render json: { error: e.record&.errors&.full_messages&.join(', ') || e.message }, status: :unprocessable_entity
+    end
+  end
+
+  # PATCH /movimientos_contables/:id/registrar_pago  { medio_pago?, fecha_pago? }
+  #
+  # Saldar una compra que había quedado en "Pendiente de pago". Antes se podía MARCAR la deuda
+  # pero no había ninguna forma de decir que se pagó: el gasto quedaba como pendiente para
+  # siempre y el total por pagar del club no bajaba nunca.
+  #
+  # No crea un movimiento nuevo: el egreso ya está asentado desde que se compró. Lo que cambia
+  # es su estado de pago —y con eso sale del "a crédito" y entra a la caja del día en que se
+  # pagó de verdad.
+  def registrar_pago
+    if @movimiento.pagado?
+      return render json: { error: 'Este movimiento ya figura como pagado.' }, status: :unprocessable_entity
+    end
+    if @movimiento.cerrado?
+      return render json: { error: 'El movimiento pertenece a un período contable cerrado.' },
+                    status: :unprocessable_entity
+    end
+
+    attrs = { pagado: true }
+    attrs[:medio_pago] = params[:medio_pago] if params[:medio_pago].present?
+
+    if @movimiento.update(attrs)
+      render json: serialize(@movimiento.reload)
+    else
+      render json: { errors: @movimiento.errors.full_messages }, status: :unprocessable_entity
     end
   end
 

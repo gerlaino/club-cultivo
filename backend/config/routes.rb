@@ -383,6 +383,9 @@ Rails.application.routes.draw do
         post :cerrar_periodo    # congela movimientos hasta una fecha (solo admin)
         post :reabrir_periodo   # retrocede/levanta el cierre (solo admin, auditado)
       end
+      member do
+        patch :registrar_pago   # saldar una compra que había quedado pendiente de pago
+      end
     end
 
     resources :compras_cuotas, only: [:index, :create, :update, :destroy]

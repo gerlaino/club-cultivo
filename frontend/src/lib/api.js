@@ -350,6 +350,10 @@ export const getMovimiento          = (id)           => api.get(`/movimientos_co
 export const createMovimiento       = (payload)      => api.post('/movimientos_contables', { movimiento_contable: payload })
 export const updateMovimiento       = (id, payload)  => api.put(`/movimientos_contables/${id}`, { movimiento_contable: payload })
 export const deleteMovimiento       = (id)           => api.delete(`/movimientos_contables/${id}`)
+// Saldar una compra que había quedado pendiente. No crea un movimiento nuevo: el egreso ya
+// estaba asentado desde que se compró; lo que cambia es su estado de pago.
+export const registrarPagoMovimiento = (id, payload = {}) =>
+  api.patch(`/movimientos_contables/${id}/registrar_pago`, payload)
 export const exportMovimientosCSV   = (params = {})  => api.get('/movimientos_contables/export_csv', { params, responseType: 'blob' })
 // Excel con tipos reales, totales y filtros: el CSV plano no se podía trabajar sin rearmarlo.
 export const exportMovimientosXLSX  = (params = {})  => api.get('/movimientos_contables/export_csv.xlsx', { params, responseType: 'blob' })
