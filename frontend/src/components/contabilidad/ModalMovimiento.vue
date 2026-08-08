@@ -114,12 +114,22 @@ const catActual   = computed(() => catsSelectables.value.find(c => c.id === form
 const catOpen  = ref(false)
 const catQuery = ref('')
 const catInput = ref(null)
+// Al BUSCAR se mira todo el catálogo, no sólo el del tipo elegido: si escribís "venta" estando
+// en "Salió plata", encontrarla y que el formulario se acomode solo es mejor que no encontrar
+// nada y tener que deducir que primero había que tocar otro botón. Sin búsqueda, la lista
+// muestra las del tipo actual, que es lo esperable.
 const catsFiltradas = computed(() => {
   const q = catQuery.value.trim().toLowerCase()
-  return q ? catsDelTipo.value.filter(c => c.label.toLowerCase().includes(q)) : catsDelTipo.value
+  if (!q) return catsDelTipo.value
+  return catsSelectables.value.filter(c => c.label.toLowerCase().includes(q))
 })
 function abrirCat()  { catOpen.value = true; catQuery.value = ''; crearCat.value = null; nextTick(() => catInput.value?.focus()) }
 function elegirCat(c) {
+  // La categoría YA SABE si es plata que entra o que sale: si elegiste una de ingreso estando
+  // en egreso, manda ella. Antes había que acertar el tipo primero para que apareciera en la
+  // lista, y el club creó las categorías justamente para no tener que pensar en eso.
+  if (c.tipo && c.tipo !== form.value.tipo) form.value.tipo = c.tipo
+
   form.value.categoria_contable_id = c.id
   if (!['aporte_socio', 'dispensacion'].includes(c.clave)) form.value.paciente_id = null
   catOpen.value = false
@@ -250,13 +260,62 @@ watch(depositoSel, (dep) => {
   if (dep.unidad_negocio_id && !form.value.unidad_negocio_id) form.value.unidad_negocio_id = dep.unidad_negocio_id
 })
 
-// ─── Monto ──────────────────────────────────────────────────────────────────────
+// ─── Monto, cantidad y precio unitario ──────────────────────────────────────────
+//
+// Los tres están ligados: el usuario completa dos y el tercero sale solo. Cuál se recalcula
+// depende de cuál acaba de tocar — si escribís el total a mano, no queremos que la cantidad
+// se lo pise; si escribís cantidad y unitario, el total es una consecuencia.
+const cantidadTexto = ref('')
+const unitarioTexto = ref('')
+const totalCalculado = ref(false)   // el total salió de cantidad × unitario, no lo tipeó nadie
+
+const numDe = (txt) => parseMonto(txt).monto
+
 function onMonto(e) {
   const { texto, monto } = parseMonto(e.target.value)
   montoTexto.value = texto
   form.value.monto_ars = monto
+  totalCalculado.value = false
+  // El total mandado a mano manda: se recalcula el unitario, que es el dato derivado.
+  const cant = numDe(cantidadTexto.value)
+  unitarioTexto.value = cant > 0 && monto > 0 ? fmtMiles(redondear(monto / cant)) : unitarioTexto.value
   if (monto > 0) delete errores.value.monto_ars
 }
+
+function onCantidad(e) {
+  cantidadTexto.value = parseMonto(e.target.value).texto
+  recalcularTotal()
+}
+
+function onUnitario(e) {
+  unitarioTexto.value = parseMonto(e.target.value).texto
+  recalcularTotal()
+}
+
+function recalcularTotal() {
+  const cant = numDe(cantidadTexto.value)
+  const uni  = numDe(unitarioTexto.value)
+  if (!(cant > 0 && uni > 0)) return
+
+  const total = multiplicarPlata(cant, uni)
+  montoTexto.value = fmtMiles(total)
+  form.value.monto_ars = total
+  totalCalculado.value = true
+  delete errores.value.monto_ars
+}
+
+// Cantidad × precio, en CENTAVOS ENTEROS.
+//
+// No es preciosismo: 2,5 × 3,33 debería dar 8,33, pero en punto flotante el producto ya nace
+// como 8.32499999999999928, así que redondearlo —con Math.round, con toFixed o sumándole
+// EPSILON, da igual— devuelve 8,32. Un centavo por movimiento, siempre para el mismo lado,
+// es la clase de diferencia que después no cierra contra el banco. Pasando el precio a
+// centavos enteros primero, la cuenta es exacta.
+const multiplicarPlata = (cantidad, unitario) =>
+  Math.round(cantidad * Math.round(unitario * 100)) / 100
+
+// El unitario derivado del total sí es una división: dos decimales y a otra cosa.
+const redondear = (n) => Math.round(n * 100) / 100
 
 // ─── Validez (una sola fuente para el botón y el submit) ────────────────────────
 const ctxValidacion = computed(() => ({
@@ -382,6 +441,10 @@ watch(() => props.modelValue, (abierto) => {
       notas:       m.notas || '',
     }
     montoTexto.value = fmtMiles(m.monto_ars)
+    // Un movimiento guardado no trae cantidad: la fila queda vacía y el total, como estaba.
+    cantidadTexto.value = ''
+    unitarioTexto.value = ''
+    totalCalculado.value = false
     paso.value = 'form'
     return
   }
@@ -472,6 +535,29 @@ const titulo = computed(() => {
                 </div>
                 <span v-if="errores.monto_ars" class="mv-err">{{ errores.monto_ars }}</span>
               </label>
+            </div>
+
+            <!-- Cantidad × precio unitario = total.
+                 Los tres campos están ligados: completás dos y el que falta se calcula. Antes
+                 sólo se podía cargar el total, así que "1000 etiquetas a $5" había que hacerlo
+                 con la calculadora, y el precio por unidad —que es lo que después dice si una
+                 compra fue cara o barata— no quedaba registrado en ningún lado. -->
+            <div class="mv-cant">
+              <label class="mv-fld">
+                <span class="mv-lbl">Cantidad <span class="mv-opt">opcional</span></span>
+                <input type="text" inputmode="decimal" class="mv-inp"
+                       :value="cantidadTexto" @input="onCantidad" placeholder="1000" />
+              </label>
+              <span class="mv-cant-op">×</span>
+              <label class="mv-fld">
+                <span class="mv-lbl">Precio c/u</span>
+                <input type="text" inputmode="decimal" class="mv-inp"
+                       :value="unitarioTexto" @input="onUnitario" placeholder="$0" />
+              </label>
+              <span class="mv-cant-op">=</span>
+              <span class="mv-cant-total" :class="{ 'is-calc': totalCalculado }">
+                {{ montoTexto ? `$${montoTexto}` : '—' }}
+              </span>
             </div>
 
             <!-- Paciente (aportes) -->
@@ -841,6 +927,17 @@ const titulo = computed(() => {
 
 /* ③ Form */
 .mv-main { display: flex; gap: var(--sp-4); align-items: flex-start; flex-wrap: wrap; }
+
+/* Cantidad × unitario = total. La fila se lee como la cuenta que es. */
+.mv-cant { display: flex; align-items: flex-end; gap: var(--sp-2); flex-wrap: wrap; margin-top: var(--sp-3); }
+.mv-cant .mv-fld { flex: 0 0 120px; }
+.mv-cant-op { padding-bottom: 10px; color: var(--c-ink-400); font-weight: 600; }
+.mv-cant-total {
+  padding-bottom: 8px; font-size: var(--fs-15); font-weight: 700; color: var(--c-ink-700);
+  min-width: 90px;
+}
+/* Cuando el total lo calculó la app y no lo tipeó nadie, se nota. */
+.mv-cant-total.is-calc { color: var(--acc); }
 .mv-fld { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .mv-fld--desc  { flex: 1 1 260px; }
 .mv-fld--monto { flex: 0 0 190px; }
