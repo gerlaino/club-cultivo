@@ -5,9 +5,11 @@
 # Se generaba con html2canvas —una foto de la pantalla— y por eso salía sin texto
 # seleccionable, cortado y con la calidad atada al zoom del navegador.
 #
-# A diferencia del resto de los informes, la nómina NO va anonimizada: este documento se
-# presenta ante la autoridad, que necesita identificar a cada paciente. Por eso tampoco lo
-# puede pedir cualquiera (ver el guard de InformeSemestralController).
+# La nómina va con nombre y apellido: este documento se presenta ante la autoridad, que
+# necesita identificar a cada paciente. Por eso tampoco lo puede pedir cualquiera (ver el
+# guard de InformeSemestralController). Desde agosto 2026 el resto de los informes también
+# muestra el nombre completo: las iniciales no protegían nada frente a quien ya tiene acceso
+# a las fichas, y volvían las tablas ilegibles.
 class InformeSemestralDocument < BaseDocument
   def initialize(club:, usuario:, datos:)
     @d = datos.deep_symbolize_keys

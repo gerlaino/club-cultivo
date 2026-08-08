@@ -129,7 +129,7 @@
           <tbody>
             <tr v-for="(p, i) in analytics.top_pacientes" :key="i">
               <td class="dd__td-rank">{{ i + 1 }}</td>
-              <td class="dd__td-name">{{ p.iniciales }}</td>
+              <td class="dd__td-name">{{ p.paciente || p.iniciales }}</td>
               <td class="dd__td-mono">…{{ p.dni_last4 }}</td>
               <td class="dd__td-r">{{ p.dispens_count }}</td>
               <td class="dd__td-r dd__td-bold">{{ formatG(p.total_g) }}</td>

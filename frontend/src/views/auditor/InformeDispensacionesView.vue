@@ -41,12 +41,12 @@
       </div>
 
       <div class="inf__section">
-        <h2 class="inf__section-title">Resumen anonimizado</h2>
+        <h2 class="inf__section-title">Detalle por paciente</h2>
         <table class="inf__table">
           <thead><tr><th>Paciente</th><th>Dispensaciones</th><th>Total (g)</th><th>Última</th></tr></thead>
           <tbody>
             <tr v-for="(r, i) in data.resumen_anonimizado" :key="i">
-              <td>{{ r.iniciales }}</td>
+              <td>{{ r.paciente || r.iniciales }}</td>
               <td>{{ r.cantidad }}</td>
               <td>{{ formatGramos(r.total_gramos) }}</td>
               <td>{{ formatDate(r.ultima_fecha) }}</td>

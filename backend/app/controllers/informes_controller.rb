@@ -131,10 +131,15 @@ class InformesController < ApplicationController
     pax    = disps.select(:paciente_id).distinct.count
     promedio = total.positive? ? (gramos / total).round(2) : 0
 
+    # Nombre y apellido completos. Estaba con iniciales "para no exponer datos personales",
+    # pero quien abre este informe (admin o auditor del club) ya puede ver la ficha entera del
+    # paciente: la inicial no protegía nada y volvía el informe ilegible — con dos "G.L." no
+    # se sabe de quién se habla ni se puede cruzar con nada.
     resumen = disps.includes(:paciente).group_by(&:paciente_id).map do |_, ds|
       p = ds.first.paciente
       {
-        iniciales:    "#{p.nombre[0]}.#{p.apellido[0]}.",
+        paciente:     p.nombre_completo,
+        iniciales:    "#{p.nombre[0]}.#{p.apellido[0]}.",   # se mantiene por compatibilidad
         cantidad:     ds.size,
         total_gramos: ds.sum { |d| d.cantidad.to_f }.round(2),
         ultima_fecha: ds.max_by(&:fecha_dispensacion)&.fecha_dispensacion,
@@ -159,14 +164,14 @@ class InformesController < ApplicationController
         { label: 'Promedio por entrega', valor: promedio },
       ],
       secciones: [{
-        titulo: 'Detalle por paciente (anonimizado)',
+        titulo: 'Detalle por paciente',
         headers: ['Paciente', 'Entregas', 'Gramos', 'Última entrega'],
-        rows: resumen.map { |r| [r[:iniciales], r[:cantidad], r[:total_gramos], fmt_fecha(r[:ultima_fecha])] },
+        rows: resumen.map { |r| [r[:paciente], r[:cantidad], r[:total_gramos], fmt_fecha(r[:ultima_fecha])] },
         formatos: [:texto, :numero, :numero, :texto],
         totales: [1, 2],
         aligns: { 1 => :right, 2 => :right },
       }],
-      nota: 'Los pacientes se identifican por sus iniciales: el informe no expone datos personales.',
+      nota: 'Contiene datos personales de pacientes: tratar como información sensible.',
     )
   end
 

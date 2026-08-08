@@ -210,6 +210,9 @@ class AnalyticsController < ApplicationController
       .map do |r|
         p = r.paciente
         {
+          # Nombre completo: quien mira la analítica ya tiene acceso a la ficha del paciente,
+          # así que la inicial no protegía nada y hacía ilegible el ranking.
+          paciente:       p&.nombre_completo,
           iniciales:      "#{p&.nombre&.[](0)}.#{p&.apellido&.[](0)}.",
           dni_last4:      p&.dni_normalizado.to_s.last(4),
           total_g:        r.total_g.to_f.round(2),

@@ -35,7 +35,7 @@ class ReprocannDocument < BaseDocument
 
     por_sede(pdf)
 
-    titulo_seccion(pdf, "Detalle anonimizado de socios")
+    titulo_seccion(pdf, "Nómina de pacientes")
     detalle(pdf)
   end
 

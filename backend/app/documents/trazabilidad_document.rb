@@ -4,8 +4,10 @@
 # se bajaba como una captura de pantalla. El documento reconstruye la cadena completa en el
 # orden en que se recorre: producto → genética → lote → plantas → entregas.
 #
-# Los pacientes van anonimizados (iniciales + últimos 4 del DNI): la cadena se puede verificar
-# sin exponer a nadie. Si hace falta identificarlos, eso es el informe semestral.
+# Los pacientes van con nombre y apellido completos y el DNI parcial (últimos 4). Antes eran
+# sólo iniciales, con el argumento de no exponer datos: no protegía nada —quien abre este
+# informe ya puede ver la ficha completa de cada paciente— y dejaba una tabla ilegible, donde
+# dos "G.L." son indistinguibles y no se puede cruzar con ningún otro registro.
 class TrazabilidadDocument < BaseDocument
   def initialize(club:, usuario:, datos:)
     @d = datos.deep_symbolize_keys
@@ -92,15 +94,15 @@ class TrazabilidadDocument < BaseDocument
     end
 
     styled_table(pdf, ["Fecha", "Paciente", "DNI", "Cantidad"],
-                 ds.map { |d| [fecha(d[:fecha]), d[:paciente_iniciales].to_s,
+                 ds.map { |d| [fecha(d[:fecha]), (d[:paciente].presence || d[:paciente_iniciales]).to_s,
                                "****#{d[:paciente_dni_last4]}", "#{d[:cantidad_g]} g"] },
                  col_widths: { 0 => 90, 1 => pdf.bounds.width - 310, 2 => 110, 3 => 110 },
                  aligns: { 3 => :right })
     pdf.move_down 6
     pdf.fill_color GRAY
     pdf.font(SANS) do
-      pdf.text "Los pacientes se identifican por sus iniciales y los últimos cuatro dígitos del " \
-               "documento: la cadena se puede verificar sin exponer datos personales.", size: 7.5
+      pdf.text "El documento se muestra parcial (últimos cuatro dígitos). El informe contiene " \
+               "datos personales de pacientes: tratar como información sensible.", size: 7.5
     end
     pdf.fill_color INK
   end

@@ -96,7 +96,7 @@
       </div>
 
       <div class="inf__section">
-        <h2 class="inf__section-title">Lista anonimizada (vigentes y por vencer)</h2>
+        <h2 class="inf__section-title">Nómina de pacientes (vigentes y por vencer)</h2>
         <table class="inf__table">
           <thead><tr><th>Paciente</th><th>DNI (últ. 3)</th><th>Estado REPROCANN</th><th>Vencimiento</th></tr></thead>
           <tbody>

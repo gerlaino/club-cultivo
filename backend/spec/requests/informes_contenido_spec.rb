@@ -48,12 +48,15 @@ RSpec.describe 'Informes — contenido de los archivos', type: :request do
       expect(texto_pdf).to include('25')  # los gramos dispensados
     end
 
-    it 'anonimiza al paciente: iniciales, no el nombre' do
+    # Antes salía "A.G." con la nota "el informe no expone datos personales". No protegía a
+    # nadie —quien lo abre ya ve la ficha completa del paciente— y con dos pacientes de
+    # iniciales iguales la tabla no se podía leer ni cruzar con nada.
+    it 'nombra al paciente completo, y avisa que el informe es sensible' do
       get '/api/informes/dispensaciones.pdf'
       t = texto_pdf
 
-      expect(t).to include('A.G.')
-      expect(t).not_to include('Gómez')
+      expect(t).to include('Gómez')
+      expect(t).to match(/informaci[óo]n sensible/i)
     end
   end
 
