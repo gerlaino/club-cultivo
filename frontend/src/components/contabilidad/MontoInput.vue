@@ -92,7 +92,7 @@ function onBlur() {
 .monto-wrap {
   display: flex;
   align-items: center;
-  border: 2px solid #e2e8f0;
+  border: 2px solid var(--c-slate-200);
   border-radius: 12px;
   overflow: hidden;
   background: #fff;
@@ -113,15 +113,15 @@ function onBlur() {
 .monto-wrap--ingreso:focus-within { border-color: #16a34a; box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.12); }
 .monto-wrap--egreso { border-color: #fecaca; }
 .monto-wrap--egreso:focus-within { border-color: #dc2626; box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.12); }
-.monto-wrap--neutral { border-color: #e2e8f0; }
-.monto-wrap--neutral:focus-within { border-color: #94a3b8; box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.12); }
+.monto-wrap--neutral { border-color: var(--c-slate-200); }
+.monto-wrap--neutral:focus-within { border-color: var(--c-slate-400); box-shadow: 0 0 0 3px rgba(100, 116, 139, 0.12); }
 
 .monto-prefix {
   padding: 0 0 0 1.1rem;
   font-size: 1.3rem;
   font-weight: 700;
   font-family: var(--font-mono, 'Geist Mono', monospace);
-  color: #94a3b8;
+  color: var(--c-slate-400);
   flex-shrink: 0;
   user-select: none;
 }
@@ -137,7 +137,7 @@ function onBlur() {
   font-size: 1.6rem;
   font-weight: 700;
   font-family: var(--font-mono, 'Geist Mono', monospace);
-  color: #0f172a;
+  color: var(--c-slate-900);
   letter-spacing: -0.03em;
   width: 100%;
   min-width: 0;

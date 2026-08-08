@@ -260,6 +260,17 @@ watch(depositoSel, (dep) => {
   if (dep.unidad_negocio_id && !form.value.unidad_negocio_id) form.value.unidad_negocio_id = dep.unidad_negocio_id
 })
 
+// Qué hay adentro del bloque plegado, para no tener que abrirlo a ver si cargaste algo.
+const resumenExtras = computed(() => {
+  const partes = []
+  if (form.value.proveedor) partes.push(form.value.proveedor)
+  if (form.value.comprobante_tipo && form.value.comprobante_tipo !== 'sin_comprobante') {
+    partes.push(form.value.comprobante_numero || 'con comprobante')
+  }
+  if (form.value.notas) partes.push('con notas')
+  return partes.join(' · ')
+})
+
 // ─── Monto, cantidad y precio unitario ──────────────────────────────────────────
 //
 // Los tres están ligados: el usuario completa dos y el tercero sale solo. Cuál se recalcula
@@ -503,7 +514,7 @@ const titulo = computed(() => {
                su CONSECUENCIA contable —visible pero en tono secundario—. Antes la clasificación
                vivía detrás de un chevron y para darte cuenta de que la categoría sugerida estaba
                mal tenías que abrir un acordeón. -->
-          <div v-else class="mv-body mv-body--split">
+          <div v-else class="mv-body mv-body--unica">
             <div class="mv-col mv-col--hecho">
 
             <div v-if="!editando" class="mv-tipo">
@@ -517,150 +528,12 @@ const titulo = computed(() => {
               </button>
             </div>
 
-            <!-- Qué / cuánto: la línea principal -->
-            <div class="mv-main">
-              <label class="mv-fld mv-fld--desc">
-                <span class="mv-lbl">{{ flujo?.labelDescripcion || 'Descripción' }}</span>
-                <input type="text" class="mv-inp mv-inp--lg" :class="{ 'mv-inp--err': errores.descripcion }"
-                       v-model.trim="form.descripcion" :placeholder="flujo?.phDescripcion" />
-                <span v-if="errores.descripcion" class="mv-err">{{ errores.descripcion }}</span>
-              </label>
+            <!-- La CATEGORÍA arriba de todo. Es el único campo obligatorio del formulario y
+                 vivía en la columna de al lado, bajo un título en jerga contable ("Se registra
+                 así"): lo que te bloquea el botón Guardar estaba en la columna que parece
+                 opcional. Y además es el atajo que completa tipo, sector y depósito, así que
+                 elegirla primero le ahorra trabajo al resto del formulario. -->
 
-              <label class="mv-fld mv-fld--monto">
-                <span class="mv-lbl">{{ flujo?.labelMonto || 'Monto' }}</span>
-                <div class="mv-monto" :class="{ 'mv-monto--err': errores.monto_ars }">
-                  <span class="mv-monto-sig">{{ esEgreso ? '−' : '+' }}$</span>
-                  <input type="text" inputmode="decimal" class="mv-monto-inp"
-                         :value="montoTexto" @input="onMonto" placeholder="0" />
-                </div>
-                <span v-if="errores.monto_ars" class="mv-err">{{ errores.monto_ars }}</span>
-              </label>
-            </div>
-
-            <!-- Cantidad × precio unitario = total.
-                 Los tres campos están ligados: completás dos y el que falta se calcula. Antes
-                 sólo se podía cargar el total, así que "1000 etiquetas a $5" había que hacerlo
-                 con la calculadora, y el precio por unidad —que es lo que después dice si una
-                 compra fue cara o barata— no quedaba registrado en ningún lado. -->
-            <div class="mv-cant">
-              <label class="mv-fld">
-                <span class="mv-lbl">Cantidad <span class="mv-opt">opcional</span></span>
-                <input type="text" inputmode="decimal" class="mv-inp"
-                       :value="cantidadTexto" @input="onCantidad" placeholder="1000" />
-              </label>
-              <span class="mv-cant-op">×</span>
-              <label class="mv-fld">
-                <span class="mv-lbl">Precio c/u</span>
-                <input type="text" inputmode="decimal" class="mv-inp"
-                       :value="unitarioTexto" @input="onUnitario" placeholder="$0" />
-              </label>
-              <span class="mv-cant-op">=</span>
-              <span class="mv-cant-total" :class="{ 'is-calc': totalCalculado }">
-                {{ montoTexto ? `$${montoTexto}` : '—' }}
-              </span>
-            </div>
-
-            <!-- Paciente (aportes) -->
-            <div v-if="muestraPaciente" class="mv-fld mv-combo-wrap">
-              <span class="mv-lbl">
-                Paciente <span v-if="pacienteObligatorio" class="mv-req">*</span>
-                <span v-else class="mv-opt">(opcional)</span>
-              </span>
-              <button type="button" class="mv-combo" :class="{ 'mv-combo--err': errores.paciente_id }"
-                      @click="pacOpen ? pacOpen = false : abrirPac()">
-                <span v-if="pacActual" class="mv-combo-val">{{ pacActual.label }}</span>
-                <span v-else class="mv-combo-ph">Buscar por nombre o DNI…</span>
-                <i class="bi bi-chevron-down"></i>
-              </button>
-              <div v-if="pacOpen" class="mv-drop">
-                <input ref="pacInput" v-model="pacQuery" type="text" class="mv-drop-inp"
-                       placeholder="Nombre o DNI…" autocomplete="off" />
-                <div class="mv-drop-list">
-                  <button v-for="p in pacsFiltrados" :key="p.id" type="button" class="mv-drop-opt"
-                          :class="{ 'mv-drop-opt--on': form.paciente_id === p.id }" @click="elegirPac(p)">
-                    {{ p.label }}
-                  </button>
-                  <p v-if="!pacsFiltrados.length" class="mv-drop-empty">Sin resultados</p>
-                </div>
-              </div>
-              <span v-if="errores.paciente_id" class="mv-err">{{ errores.paciente_id }}</span>
-              <p v-if="pacActual && pacienteObligatorio" class="mv-hint">
-                Se acredita en la cuenta corriente de <strong>{{ pacActual.label.split('—')[0].trim() }}</strong>.
-              </p>
-            </div>
-
-            <!-- Destino del stock (compras) -->
-            <DestinoStock
-              v-if="pideDestinoCat"
-              v-model="destino"
-              :depositos="depositos" :insumos="insumos" :bares="bares"
-              :monto="form.monto_ars" :errores="errores"
-            />
-            <span v-if="errores.destino_item || errores.destino_cantidad" class="mv-err">
-              {{ errores.destino_item || errores.destino_cantidad }}
-            </span>
-
-            <!-- Cuándo + estado de pago -->
-            <div class="mv-row">
-              <label class="mv-fld mv-fld--fecha">
-                <span class="mv-lbl">¿Cuándo?</span>
-                <AppDatePicker v-model="form.fecha" />
-                <span v-if="errores.fecha" class="mv-err">{{ errores.fecha }}</span>
-              </label>
-
-              <div v-if="!esCuotas" class="mv-fld">
-                <span class="mv-lbl">{{ esEgreso ? '¿Ya lo pagaste?' : '¿Ya lo cobraste?' }}</span>
-                <div class="mv-seg">
-                  <button type="button" class="mv-seg-b" :class="{ 'mv-seg-b--on': form.pagado }"
-                          @click="form.pagado = true">Sí</button>
-                  <button type="button" class="mv-seg-b" :class="{ 'mv-seg-b--on': !form.pagado }"
-                          @click="form.pagado = false">Pendiente</button>
-                </div>
-              </div>
-
-              <div class="mv-fld">
-                <span class="mv-lbl">{{ esEgreso ? '¿Cómo pagaste?' : '¿Cómo entró?' }}</span>
-                <select class="mv-inp" v-model="form.medio_pago">
-                  <option v-for="mp in MEDIOS_PAGO" :key="mp.value" :value="mp.value">{{ mp.label }}</option>
-                </select>
-              </div>
-            </div>
-
-            <!-- Plan de pago: cuotas. Es un PLAN, no un medio de pago (antes convivían en el mismo
-                 selector, así que pagar en cuotas te tapaba con qué pagabas). -->
-            <div v-if="esEgreso && !editando" class="mv-plan">
-              <div class="mv-seg mv-seg--plan">
-                <button type="button" class="mv-seg-b" :class="{ 'mv-seg-b--on': form.plan === 'unico' }"
-                        @click="form.plan = 'unico'">Pago único</button>
-                <button type="button" class="mv-seg-b" :class="{ 'mv-seg-b--on': form.plan === 'cuotas' }"
-                        @click="form.plan = 'cuotas'">En cuotas</button>
-              </div>
-              <div v-if="esCuotas" class="mv-cuotas">
-                <label class="mv-fld mv-fld--sm">
-                  <span class="mv-lbl">Cuotas</span>
-                  <input type="number" min="2" max="120" step="1" class="mv-inp"
-                         :class="{ 'mv-inp--err': errores.cuotas_total }" v-model.number="form.cuotas_total" />
-                </label>
-                <label class="mv-fld mv-fld--grow">
-                  <span class="mv-lbl">Tarjeta / responsable <span class="mv-opt">(opcional)</span></span>
-                  <input type="text" class="mv-inp" v-model.trim="form.responsable"
-                         placeholder="Ej: Tarjeta del club" />
-                </label>
-                <p class="mv-hint mv-hint--full">
-                  <template v-if="cuotaMonto">
-                    {{ form.cuotas_total }} cuotas de <strong>{{ fmtARS(cuotaMonto) }}</strong>,
-                    mensuales desde la fecha elegida. El monto de arriba es el total.
-                  </template>
-                  <template v-else>El monto de arriba es el <strong>total</strong>: se divide en cuotas mensuales.</template>
-                </p>
-              </div>
-            </div>
-
-            </div><!-- /mv-col--hecho -->
-
-            <!-- Columna derecha: la consecuencia del hecho -->
-            <aside class="mv-col mv-col--asiento">
-              <p class="mv-rail-tit">Se registra así</p>
               <!-- La categoría es lo ÚNICO que decide si después vas a poder filtrar esto y
                    si va a aparecer bien en un informe. Va destacada, no como un campo más
                    en la lista. -->
@@ -752,6 +625,157 @@ const titulo = computed(() => {
                 <span v-if="errores.categoria" class="mv-err">{{ errores.categoria }}</span>
               </div>
 
+
+            <!-- Qué / cuánto: la línea principal -->
+            <div class="mv-main">
+              <label class="mv-fld mv-fld--desc">
+                <span class="mv-lbl">{{ flujo?.labelDescripcion || 'Descripción' }}</span>
+                <input type="text" class="mv-inp mv-inp--lg" :class="{ 'mv-inp--err': errores.descripcion }"
+                       v-model.trim="form.descripcion" :placeholder="flujo?.phDescripcion" />
+                <span v-if="errores.descripcion" class="mv-err">{{ errores.descripcion }}</span>
+              </label>
+
+              <label class="mv-fld mv-fld--monto">
+                <span class="mv-lbl">{{ flujo?.labelMonto || 'Monto' }}</span>
+                <div class="mv-monto" :class="{ 'mv-monto--err': errores.monto_ars }">
+                  <span class="mv-monto-sig">{{ esEgreso ? '−' : '+' }}$</span>
+                  <input type="text" inputmode="decimal" class="mv-monto-inp"
+                         :value="montoTexto" @input="onMonto" placeholder="0" />
+                </div>
+                <span v-if="errores.monto_ars" class="mv-err">{{ errores.monto_ars }}</span>
+              </label>
+            </div>
+
+            <!-- Cantidad × precio unitario = total.
+                 Los tres campos están ligados: completás dos y el que falta se calcula. Antes
+                 sólo se podía cargar el total, así que "1000 etiquetas a $5" había que hacerlo
+                 con la calculadora, y el precio por unidad —que es lo que después dice si una
+                 compra fue cara o barata— no quedaba registrado en ningún lado. -->
+            <div class="mv-cant">
+              <label class="mv-fld">
+                <span class="mv-lbl">Cantidad <span class="mv-opt">opcional</span></span>
+                <input type="text" inputmode="decimal" class="mv-inp"
+                       :value="cantidadTexto" @input="onCantidad" placeholder="1000" />
+              </label>
+              <span class="mv-cant-op">×</span>
+              <label class="mv-fld">
+                <span class="mv-lbl">Precio c/u</span>
+                <input type="text" inputmode="decimal" class="mv-inp"
+                       :value="unitarioTexto" @input="onUnitario" placeholder="$0" />
+              </label>
+              <span class="mv-cant-op">=</span>
+              <span class="mv-cant-total" :class="{ 'is-calc': totalCalculado }">
+                {{ montoTexto ? `$${montoTexto}` : '—' }}
+              </span>
+            </div>
+
+            <!-- Paciente (aportes) -->
+            <div v-if="muestraPaciente" class="mv-fld mv-combo-wrap">
+              <span class="mv-lbl">
+                Paciente <span v-if="pacienteObligatorio" class="mv-req">*</span>
+                <span v-else class="mv-opt">(opcional)</span>
+              </span>
+              <button type="button" class="mv-combo" :class="{ 'mv-combo--err': errores.paciente_id }"
+                      @click="pacOpen ? pacOpen = false : abrirPac()">
+                <span v-if="pacActual" class="mv-combo-val">{{ pacActual.label }}</span>
+                <span v-else class="mv-combo-ph">Buscar por nombre o DNI…</span>
+                <i class="bi bi-chevron-down"></i>
+              </button>
+              <div v-if="pacOpen" class="mv-drop">
+                <input ref="pacInput" v-model="pacQuery" type="text" class="mv-drop-inp"
+                       placeholder="Nombre o DNI…" autocomplete="off" />
+                <div class="mv-drop-list">
+                  <button v-for="p in pacsFiltrados" :key="p.id" type="button" class="mv-drop-opt"
+                          :class="{ 'mv-drop-opt--on': form.paciente_id === p.id }" @click="elegirPac(p)">
+                    {{ p.label }}
+                  </button>
+                  <p v-if="!pacsFiltrados.length" class="mv-drop-empty">Sin resultados</p>
+                </div>
+              </div>
+              <span v-if="errores.paciente_id" class="mv-err">{{ errores.paciente_id }}</span>
+              <p v-if="pacActual && pacienteObligatorio" class="mv-hint">
+                Se acredita en la cuenta corriente de <strong>{{ pacActual.label.split('—')[0].trim() }}</strong>.
+              </p>
+            </div>
+
+            <!-- Destino del stock (compras) -->
+            <DestinoStock
+              v-if="pideDestinoCat"
+              v-model="destino"
+              :depositos="depositos" :insumos="insumos" :bares="bares"
+              :monto="form.monto_ars" :errores="errores"
+            />
+            <span v-if="errores.destino_item || errores.destino_cantidad" class="mv-err">
+              {{ errores.destino_item || errores.destino_cantidad }}
+            </span>
+
+            <!-- Cuándo + estado de pago -->
+            <div class="mv-row">
+              <label class="mv-fld mv-fld--fecha">
+                <span class="mv-lbl">Fecha</span>
+                <AppDatePicker v-model="form.fecha" />
+                <span v-if="errores.fecha" class="mv-err">{{ errores.fecha }}</span>
+              </label>
+
+              <div v-if="!esCuotas" class="mv-fld">
+                <span class="mv-lbl">{{ esEgreso ? 'Estado del pago' : 'Estado del cobro' }}</span>
+                <div class="mv-seg">
+                  <button type="button" class="mv-seg-b" :class="{ 'mv-seg-b--on': form.pagado }"
+                          @click="form.pagado = true">Sí</button>
+                  <button type="button" class="mv-seg-b" :class="{ 'mv-seg-b--on': !form.pagado }"
+                          @click="form.pagado = false">Pendiente</button>
+                </div>
+              </div>
+
+              <!-- Si quedó PENDIENTE no se pregunta con qué se pagó: no se pagó. Antes el
+                   selector seguía ahí, pidiendo el detalle de un pago que no ocurrió. -->
+              <div v-if="form.pagado" class="mv-fld">
+                <span class="mv-lbl">{{ esEgreso ? 'Cómo se pagó' : 'Cómo entró' }}</span>
+                <select class="mv-inp" v-model="form.medio_pago">
+                  <option v-for="mp in MEDIOS_PAGO" :key="mp.value" :value="mp.value">{{ mp.label }}</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Plan de pago: cuotas. Es un PLAN, no un medio de pago (antes convivían en el mismo
+                 selector, así que pagar en cuotas te tapaba con qué pagabas). -->
+            <div v-if="esEgreso && !editando" class="mv-plan">
+              <div class="mv-seg mv-seg--plan">
+                <button type="button" class="mv-seg-b" :class="{ 'mv-seg-b--on': form.plan === 'unico' }"
+                        @click="form.plan = 'unico'">Pago único</button>
+                <button type="button" class="mv-seg-b" :class="{ 'mv-seg-b--on': form.plan === 'cuotas' }"
+                        @click="form.plan = 'cuotas'">En cuotas</button>
+              </div>
+              <div v-if="esCuotas" class="mv-cuotas">
+                <label class="mv-fld mv-fld--sm">
+                  <span class="mv-lbl">Cuotas</span>
+                  <input type="number" min="2" max="120" step="1" class="mv-inp"
+                         :class="{ 'mv-inp--err': errores.cuotas_total }" v-model.number="form.cuotas_total" />
+                </label>
+                <label class="mv-fld mv-fld--grow">
+                  <span class="mv-lbl">Tarjeta / responsable <span class="mv-opt">(opcional)</span></span>
+                  <input type="text" class="mv-inp" v-model.trim="form.responsable"
+                         placeholder="Ej: Tarjeta del club" />
+                </label>
+                <p class="mv-hint mv-hint--full">
+                  <template v-if="cuotaMonto">
+                    {{ form.cuotas_total }} cuotas de <strong>{{ fmtARS(cuotaMonto) }}</strong>,
+                    mensuales desde la fecha elegida. El monto de arriba es el total.
+                  </template>
+                  <template v-else>El monto de arriba es el <strong>total</strong>: se divide en cuotas mensuales.</template>
+                </p>
+              </div>
+            </div>
+
+            <!-- Comprobante y notas: se tocan una de cada veinte veces y ocupaban media
+                 pantalla. Plegados, y el resumen del pie dice si hay algo cargado adentro. -->
+            <details class="mv-extra">
+              <summary class="mv-extra-sum">
+                <i class="bi bi-chevron-right mv-extra-chev"></i>
+                Comprobante, proveedor y notas
+                <span v-if="resumenExtras" class="mv-extra-tag">{{ resumenExtras }}</span>
+              </summary>
+              <div class="mv-extra-body">
               <label v-if="multiSede" class="mv-fld">
                 <span class="mv-lbl">
                   Sede <span v-if="depositoSel?.sede_id" class="mv-opt">(la fija el depósito)</span>
@@ -794,7 +818,12 @@ const titulo = computed(() => {
                 <span class="mv-lbl">Notas</span>
                 <textarea class="mv-inp mv-ta" v-model.trim="form.notas" rows="2" placeholder="Notas internas…"></textarea>
               </label>
-            </aside>
+                          </div>
+            </details>
+
+            </div><!-- /mv-col--hecho -->
+
+
           </div>
 
           <!-- Footer -->
@@ -867,28 +896,36 @@ const titulo = computed(() => {
 /* Body */
 .mv-body { flex: 1; overflow-y: auto; padding: var(--sp-5); display: flex; flex-direction: column; gap: var(--sp-4); }
 
-/* Dos columnas: el hecho y su consecuencia contable, las dos a la vista. */
-.mv-body--split {
-  display: grid; grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 0; padding: 0; align-items: start;
+/* Una sola columna. La segunda existía para sostener campos que casi no se tocan: con esos
+   plegados, no tenía qué sostener y se veía medio vacía. */
+.mv-body--unica { display: block; padding: 0; }
+
+/* Comprobante, proveedor y notas: plegados. */
+.mv-extra { margin-top: var(--sp-2); border-top: 1px solid var(--c-ink-100); padding-top: var(--sp-3); }
+.mv-extra-sum {
+  display: flex; align-items: center; gap: var(--sp-2);
+  cursor: pointer; list-style: none; user-select: none;
+  font-size: var(--fs-14); font-weight: 600; color: var(--c-ink-700);
 }
+.mv-extra-sum::-webkit-details-marker { display: none; }
+.mv-extra-chev { font-size: .8em; color: var(--c-ink-400); transition: transform .15s; }
+.mv-extra[open] .mv-extra-chev { transform: rotate(90deg); }
+.mv-extra-tag { font-size: var(--fs-12); font-weight: 500; color: var(--c-ink-500); }
+.mv-extra-body { display: flex; flex-direction: column; gap: var(--sp-4); padding-top: var(--sp-4); }
+
+/* Dos columnas: el hecho y su consecuencia contable, las dos a la vista. */
 .mv-col { display: flex; flex-direction: column; gap: var(--sp-4); min-width: 0; }
 .mv-col--hecho { padding: var(--sp-5); }
-.mv-col--asiento {
-  padding: var(--sp-5); gap: var(--sp-3);
-  border-left: 1px solid var(--c-ink-100); background: var(--c-ink-50, #f8fafc);
-  align-self: stretch;
-}
 /* Salió / entró: la primera decisión del formulario, y la única que siempre se puede tomar
    sin pensar. Tiene que verse como una elección, no como dos botones sueltos. */
 .mv-tipo { display: flex; gap: .5rem; margin-bottom: var(--sp-4, 1rem); }
 .mv-tipo-btn {
   flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: .45rem;
-  padding: .7rem 1rem; border: 1.5px solid #e2e8f0; background: #fff; border-radius: 10px;
-  font-size: .875rem; font-weight: 700; color: #64748b; cursor: pointer;
+  padding: .7rem 1rem; border: 1.5px solid var(--c-slate-200); background: #fff; border-radius: 10px;
+  font-size: .875rem; font-weight: 700; color: var(--c-slate-500); cursor: pointer;
   transition: border-color .15s, background .15s, color .15s;
 }
-.mv-tipo-btn:hover { border-color: #cbd5e1; background: #f8fafc; }
+.mv-tipo-btn:hover { border-color: var(--c-slate-300); background: var(--c-slate-50); }
 .mv-tipo-btn--on { border-color: #b91c1c; background: #fef2f2; color: #b91c1c; }
 .mv-tipo-btn--in.mv-tipo-btn--on { border-color: #15803d; background: #f0fdf4; color: #15803d; }
 
@@ -896,18 +933,14 @@ const titulo = computed(() => {
 .mv-fijos-link { padding: 0 var(--sp-5, 1.25rem) var(--sp-3, .75rem); }
 .mv-linkbtn {
   display: inline-flex; align-items: center; gap: .35rem; background: none; border: none;
-  color: #64748b; font-size: .78rem; cursor: pointer; padding: 0; text-decoration: underline;
+  color: var(--c-slate-500); font-size: .78rem; cursor: pointer; padding: 0; text-decoration: underline;
 }
-.mv-linkbtn:hover { color: #0f172a; }
+.mv-linkbtn:hover { color: var(--c-slate-900); }
 
-.mv-fld--clave { background: #fff; border: 1.5px solid #cbd5e1; border-radius: 10px; padding: .7rem .8rem; }
-.mv-cat-eco { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; font-size: .75rem; color: #64748b; margin: -.4rem 0 0; padding: 0 .2rem; }
+.mv-fld--clave { background: #fff; border: 1.5px solid var(--c-slate-300); border-radius: 10px; padding: .7rem .8rem; }
+.mv-cat-eco { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; font-size: .75rem; color: var(--c-slate-500); margin: -.4rem 0 0; padding: 0 .2rem; }
 .mv-cat-eco-tag { font-size: .68rem; font-weight: 700; background: #dbeafe; color: #0369a1; padding: .1em .5em; border-radius: 999px; }
 
-.mv-rail-tit {
-  margin: 0; font-size: var(--fs-12); font-weight: 700; letter-spacing: .04em;
-  text-transform: uppercase; color: var(--c-ink-500);
-}
 .mv-rail-sep { border: none; border-top: 1px solid var(--c-ink-100); margin: var(--sp-2) 0 0; }
 
 /* ① Intención */
@@ -1071,11 +1104,6 @@ const titulo = computed(() => {
 /* Mobile: el modal vuelve a una columna. Es un fallback para que no se rompa, no un diseño —
    la PWA se rediseña aparte y hay tareas (como cargar contabilidad) que no se hacen del celular. */
 @media (max-width: 900px) {
-  .mv-body--split { grid-template-columns: 1fr; }
-  .mv-col--asiento {
-    border-left: none; border-top: 1px solid var(--c-ink-100);
-    background: none; padding: var(--sp-4) 0 0;
-  }
 }
 @media (max-width: 620px) {
   .mv-ov { padding: 0; }

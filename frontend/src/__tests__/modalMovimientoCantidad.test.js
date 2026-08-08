@@ -121,3 +121,73 @@ describe('Nuevo movimiento — cantidad × precio, y la categoría que manda', (
     })
   })
 })
+
+// ── Reordenado del formulario ────────────────────────────────────────────────────
+// El único campo obligatorio vivía en la columna de al lado, bajo el título "Se registra así",
+// mientras la principal hacía seis preguntas seguidas y la derecha se llenaba de campos que se
+// tocan una de cada veinte veces.
+describe('Nuevo movimiento — el formulario reordenado', () => {
+  let wrapper
+
+  beforeEach(async () => {
+    const { default: Modal } = await import('../components/contabilidad/ModalMovimiento.vue')
+    wrapper = mount(Modal, {
+      props: {
+        modelValue: true, categorias: CATEGORIAS,
+        sedes: [{ id: 3, nombre: 'Finca Norte' }], unidades: [{ id: 7, nombre: 'Cultivo' }],
+        depositos: [], bares: [], insumos: [], pacientes: [], flujoInicial: 'egreso',
+      },
+      global: { stubs: { Teleport: true, AppDatePicker: true } },
+    })
+    await wrapper.vm.$nextTick()
+  })
+
+  it('la categoría está en el camino principal, no en una columna aparte', () => {
+    expect(wrapper.find('.mv-col--asiento').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('Se registra así')
+    expect(wrapper.find('.mv-fld--clave').exists()).toBe(true)
+  })
+
+  it('la categoría va ANTES que el monto', () => {
+    const html = wrapper.html()
+
+    expect(html.indexOf('mv-fld--clave')).toBeLessThan(html.indexOf('mv-monto'))
+  })
+
+  it('comprobante, proveedor y notas quedan plegados', () => {
+    const extra = wrapper.find('.mv-extra')
+
+    expect(extra.exists()).toBe(true)
+    expect(extra.attributes('open')).toBeUndefined()
+    expect(extra.find('.mv-extra-sum').text()).toContain('Comprobante')
+  })
+
+  it('el resumen del bloque plegado avisa si hay algo adentro', async () => {
+    expect(wrapper.vm.resumenExtras).toBe('')
+
+    wrapper.vm.form.proveedor = 'Edenor'
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.vm.resumenExtras).toContain('Edenor')
+  })
+
+  // No se pide el detalle de un pago que no ocurrió.
+  it('si queda pendiente, no pregunta con qué se pagó', async () => {
+    wrapper.vm.form.pagado = true
+    await wrapper.vm.$nextTick()
+    expect(wrapper.text()).toContain('Cómo se pagó')
+
+    wrapper.vm.form.pagado = false
+    await wrapper.vm.$nextTick()
+    expect(wrapper.text()).not.toContain('Cómo se pagó')
+  })
+
+  it('las etiquetas dejaron de ser un interrogatorio', () => {
+    const texto = wrapper.text()
+    const preguntas = (texto.match(/¿/g) || []).length
+
+    expect(preguntas).toBeLessThanOrEqual(1)   // sólo el link de "los que se repiten"
+    expect(texto).toContain('Fecha')
+    expect(texto).toContain('Estado del pago')
+  })
+})

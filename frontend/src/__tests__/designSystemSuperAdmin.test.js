@@ -19,13 +19,37 @@ const soloEstilo = (src) => {
   return i === -1 ? '' : src.slice(i)
 }
 
-describe('Design system — panel de super admin', () => {
+// Las superficies ya migradas. Se suman de a una por sesión: migrar los 268 archivos de golpe
+// es cambiar pantallas que no se pueden verificar renderizadas todas juntas.
+const SUPERFICIES = {
+  'super admin':  ['views/superadmin'],
+  'contabilidad': ['components/contabilidad'],
+  'informes':     ['views/auditor'],
+}
+
+const vuesDe = (rel) =>
+  readdirSync(resolve(raiz, rel)).filter((f) => f.endsWith('.vue')).map((f) => `${rel}/${f}`)
+
+describe('Design system — grises con nombre', () => {
   const dir = resolve(raiz, 'views/superadmin')
   const vistas = readdirSync(dir).filter((f) => f.endsWith('.vue'))
 
   it('hay vistas para revisar', () => {
     expect(vistas.length).toBeGreaterThan(0)
   })
+
+  for (const [superficie, dirs] of Object.entries(SUPERFICIES)) {
+    for (const archivo of dirs.flatMap(vuesDe)) {
+      it(`${superficie} · ${archivo.split('/').pop()}: sin hexadecimales de gris`, () => {
+        const estilo = soloEstilo(readFileSync(resolve(raiz, archivo), 'utf8')).toLowerCase()
+        const reincidentes = Object.entries(GRISES_CON_TOKEN)
+          .filter(([hexa]) => estilo.includes(hexa))
+          .map(([hexa, token]) => `${hexa} → var(${token})`)
+
+        expect(reincidentes, `en ${archivo}`).toEqual([])
+      })
+    }
+  }
 
   for (const archivo of vistas) {
     it(`${archivo}: usa los tokens de gris, no el hexadecimal`, () => {

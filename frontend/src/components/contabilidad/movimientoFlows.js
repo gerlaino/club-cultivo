@@ -59,9 +59,9 @@ export const FLOWS = {
     tipo: 'egreso',
     pideDestino: true,      // qué entró, cuánto y a qué depósito
     pidePaciente: false,
-    labelDescripcion: '¿Qué compré?',
+    labelDescripcion: 'Qué se compró',
     phDescripcion: 'Ej: 20 l de fertilizante base',
-    labelMonto: '¿Cuánto pagué?',
+    labelMonto: 'Cuánto se pagó',
     cta: 'Registrar compra',
   },
   aporte: {
@@ -75,7 +75,7 @@ export const FLOWS = {
     clavePreferida: 'aporte_socio', // preselecciona la categoría si existe
     labelDescripcion: 'Concepto',
     phDescripcion: 'Ej: Aporte de julio',
-    labelMonto: '¿Cuánto cobré?',
+    labelMonto: 'Cuánto se cobró',
     cta: 'Registrar aporte',
   },
   gasto: {
@@ -86,9 +86,9 @@ export const FLOWS = {
     tipo: 'egreso',
     pideDestino: false,
     pidePaciente: false,
-    labelDescripcion: '¿Qué pagué?',
+    labelDescripcion: 'Qué se pagó',
     phDescripcion: 'Ej: Alquiler julio',
-    labelMonto: '¿Cuánto pagué?',
+    labelMonto: 'Cuánto se pagó',
     cta: 'Registrar gasto',
   },
   ingreso: {
@@ -99,9 +99,9 @@ export const FLOWS = {
     tipo: 'ingreso',
     pideDestino: false,
     pidePaciente: false,
-    labelDescripcion: '¿De qué es el ingreso?',
+    labelDescripcion: 'De qué es el ingreso',
     phDescripcion: 'Ej: Venta de merchandising',
-    labelMonto: '¿Cuánto entró?',
+    labelMonto: 'Cuánto entró',
     cta: 'Registrar ingreso',
   },
   fijos: {

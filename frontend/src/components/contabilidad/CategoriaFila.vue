@@ -66,9 +66,9 @@ function accion(evento) {
   min-height: 34px; padding: .1rem .25rem .1rem .5rem;
   border-radius: 7px;
 }
-.cf:hover { background: var(--c-ink-50, #f8fafc); }
+.cf:hover { background: var(--c-slate-50); }
 .cf--sub { padding-left: 1.5rem; }
-.cf--sub .cf__nombre { font-weight: 400; color: var(--c-ink-600, #475569); font-size: .84rem; }
+.cf--sub .cf__nombre { font-weight: 400; color: var(--c-slate-600); font-size: .84rem; }
 .cf--off { opacity: .55; }
 
 .cf__nombre {
@@ -88,20 +88,20 @@ function accion(evento) {
 .cf__mas {
   flex-shrink: 0; width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
   background: none; border: none; border-radius: 6px; cursor: pointer;
-  color: var(--c-ink-400, #94a3b8); opacity: 0; transition: opacity .12s, background .12s;
+  color: var(--c-slate-400); opacity: 0; transition: opacity .12s, background .12s;
 }
 .cf:hover .cf__mas, .cf__mas:focus-visible { opacity: 1; }
-.cf__mas:hover { background: var(--c-ink-100, #f1f5f9); color: var(--c-ink-700, #334155); }
+.cf__mas:hover { background: var(--c-slate-100); color: var(--c-slate-700); }
 @media (hover: none) { .cf__mas { opacity: 1; } }
 
 .cf__menu { display: flex; flex-direction: column; padding: .25rem 0; min-width: 190px; }
 .cf__menu-item {
   display: block; width: 100%; text-align: left;
   padding: .45rem .85rem; background: none; border: none; cursor: pointer;
-  font-size: .84rem; color: var(--c-ink-700, #334155);
+  font-size: .84rem; color: var(--c-slate-700);
 }
-.cf__menu-item:hover { background: var(--c-leaf-50, #f4f8f5); color: var(--c-ink-900, #0f172a); }
+.cf__menu-item:hover { background: var(--c-leaf-50, #f4f8f5); color: var(--c-slate-900); }
 .cf__menu-item--danger { color: #dc2626; }
 .cf__menu-item--danger:hover { background: #fee2e2; color: #b91c1c; }
-.cf__menu-sep { height: 1px; margin: .25rem 0; background: var(--c-ink-100, #f1f5f9); }
+.cf__menu-sep { height: 1px; margin: .25rem 0; background: var(--c-slate-100); }
 </style>

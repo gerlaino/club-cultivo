@@ -201,13 +201,13 @@ async function guardar() {
 .ecc__card { background: #fff; border-radius: 14px; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
 .ecc__hd { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; border-bottom: 1px solid #eef2ee; }
 .ecc__title { font-size: 1rem; font-weight: 700; color: #1a2e1a; margin: 0; }
-.ecc__close { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1rem; }
+.ecc__close { background: none; border: none; color: var(--c-slate-400); cursor: pointer; font-size: 1rem; }
 .ecc__body { padding: 1rem 1.25rem; display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
 .ecc__field { display: flex; flex-direction: column; gap: .25rem; }
 .ecc__field--full { grid-column: 1 / -1; }
-.ecc__label { font-size: .75rem; font-weight: 600; color: #475569; }
-.ecc__opt { color: #94a3b8; font-weight: 400; }
-.ecc__input { border: 1.5px solid #e2e8f0; border-radius: 8px; padding: .5rem .65rem; font-size: .85rem; width: 100%; }
+.ecc__label { font-size: .75rem; font-weight: 600; color: var(--c-slate-600); }
+.ecc__opt { color: var(--c-slate-400); font-weight: 400; }
+.ecc__input { border: 1.5px solid var(--c-slate-200); border-radius: 8px; padding: .5rem .65rem; font-size: .85rem; width: 100%; }
 .ecc__input:focus { outline: none; border-color: #15803d; }
 .ecc__input--err { border-color: #dc2626; }
 .ecc__err { font-size: .7rem; color: #dc2626; }
