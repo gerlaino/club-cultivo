@@ -283,9 +283,15 @@ class DispensacionesController < ApplicationController
       .joins(stock: :sede)
       .where(sedes: { club_id: current_user.club_id })
       .where(estado_envio: %w[entregado fallido])
-      .where('dispensaciones.updated_at >= ?', desde)
+      # Se filtra por CUÁNDO SE CERRÓ la entrega, no por la última vez que se tocó el
+      # registro. Con `updated_at` el rango mentía: cualquier edición posterior (un cobro que
+      # se corrige, una reprogramación) devolvía una entrega vieja al filtro de "7 días", y
+      # una entrega reciente podía quedar fuera si el registro no se volvió a tocar.
+      # Los fallidos no tienen fecha de cierre propia todavía, así que para ellos sigue
+      # valiendo `updated_at` (ver reportar_fallo).
+      .where('COALESCE(dispensaciones.entregado_at, dispensaciones.updated_at) >= ?', desde)
       .includes(:paciente, :sede, { stock: :lote }, { items: { stock: :lote } })
-      .order(updated_at: :desc)
+      .order(Arel.sql('COALESCE(dispensaciones.entregado_at, dispensaciones.updated_at) DESC'))
 
     render json: {
       dispensaciones: cerradas.map { |d| serialize_dispensacion_delivery(d) },
@@ -747,9 +753,14 @@ class DispensacionesController < ApplicationController
   end
 
   def require_dispensaciones_role!
-    # delivery solo puede acceder a sus propias acciones
+    # delivery solo puede acceder a sus propias acciones.
+    #
+    # OJO al agregar acciones del repartidor: hay DOS guards y hay que pasar por los dos.
+    # `require_dispensador_o_admin` ya exceptuaba `mi_historial`, pero esta lista no lo
+    # incluía, así que el repartidor recibía 403 al abrir su propio historial — y el front
+    # traga el error y muestra "todavía no cerraste ninguna entrega": fallaba en silencio.
     if current_user&.role == 'delivery'
-      delivery_actions = %w[mis_paquetes iniciar_viaje entregar reportar_fallo]
+      delivery_actions = %w[mis_paquetes mi_historial iniciar_viaje entregar reportar_fallo]
       unless delivery_actions.include?(action_name)
         render json: { error: 'No autorizado' }, status: :forbidden
       end

@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { Package, Bike, CheckCircle2, XCircle, MapPin, Phone, User, FileText, ChevronRight, Send, Route, Navigation, PenLine, Trash2, Lock, Check } from 'lucide-vue-next'
+import { Package, Bike, CheckCircle2, XCircle, MapPin, Phone, User, FileText, ChevronRight, ChevronDown, Send, Route, Navigation, PenLine, Trash2, Lock, Check } from 'lucide-vue-next'
 import { getMisPaquetes, iniciarViaje, ordenarRuta } from '../../lib/api.js'
 import { useEntregasOffline } from '../../composables/useEntregasOffline.js'
 import { useToast } from '../../composables/useToast.js'
@@ -136,6 +136,29 @@ const siguienteParada = computed(() =>
 const todosSeleccionados = computed(() =>
   pendientes.value.length > 0 && pendientes.value.every(p => selected.value.has(p.id))
 )
+
+// ── Secciones plegables ────────────────────────────────────────────────────
+// Con 15 paquetes las tres listas encadenadas son un scroll de varias pantallas, y el
+// delivery trabaja siempre desde el celular, con una mano y a veces en la calle. Cada
+// sección se pliega y la elección se recuerda: si siempre cierra "No entregados", no tiene
+// que volver a cerrarla en cada viaje.
+//
+// Las tres arrancan ABIERTAS. Los fallidos los había dejado cerrados por defecto —el
+// repartidor no puede resolverlos, los reprograma el admin— pero esconder algo que acaba de
+// pasar se lee como que no se registró: reportás un fallo, volvés a la pantalla y no lo ves.
+// Que se pliegue es una decisión del que mira, no un default.
+const PLEGADAS_KEY = 'dlv_secciones_plegadas'
+const abiertas = ref({ pendientes: true, enviaje: true, fallidos: true })
+
+try {
+  const guardado = JSON.parse(localStorage.getItem(PLEGADAS_KEY) || 'null')
+  if (guardado && typeof guardado === 'object') abiertas.value = { ...abiertas.value, ...guardado }
+} catch {}
+
+function toggleSeccion(clave) {
+  abiertas.value[clave] = !abiertas.value[clave]
+  try { localStorage.setItem(PLEGADAS_KEY, JSON.stringify(abiertas.value)) } catch {}
+}
 
 function toggleSelect(id) {
   const s = new Set(selected.value)
@@ -456,8 +479,16 @@ onMounted(load)
 
       <!-- Pendientes -->
       <div v-if="pendientes.length" class="dlv__section">
-        <div class="dlv__section-title">Pendientes de retirar</div>
-        <div class="dlv__list">
+        <button
+          class="dlv__section-head"
+          :aria-expanded="abiertas.pendientes"
+          @click="toggleSeccion('pendientes')"
+        >
+          <ChevronDown class="dlv__section-caret" :class="{ 'dlv__section-caret--cerrado': !abiertas.pendientes }" :size="14" :stroke-width="2.5" />
+          <span class="dlv__section-title">Pendientes de retirar</span>
+          <span class="dlv__section-count">{{ pendientes.length }}</span>
+        </button>
+        <div v-show="abiertas.pendientes" class="dlv__list">
           <div
             v-for="(p, i) in pendientes" :key="p.id"
             class="dlv__row dlv__row--pendiente"
@@ -511,8 +542,16 @@ onMounted(load)
 
       <!-- En viaje -->
       <div v-if="enViaje.length" class="dlv__section">
-        <div class="dlv__section-title">En camino</div>
-        <div class="dlv__list">
+        <button
+          class="dlv__section-head"
+          :aria-expanded="abiertas.enviaje"
+          @click="toggleSeccion('enviaje')"
+        >
+          <ChevronDown class="dlv__section-caret" :class="{ 'dlv__section-caret--cerrado': !abiertas.enviaje }" :size="14" :stroke-width="2.5" />
+          <span class="dlv__section-title">En camino</span>
+          <span class="dlv__section-count">{{ enViaje.length }}</span>
+        </button>
+        <div v-show="abiertas.enviaje" class="dlv__list">
           <div v-for="(p, i) in enViaje" :key="p.id"
                class="dlv__row dlv__row--enviaje"
                :class="{ 'dlv__row--siguiente': i === 0, 'dlv__row--bloqueada': i !== 0 }">
@@ -562,10 +601,18 @@ onMounted(load)
 
       <!-- Fallidos -->
       <div v-if="fallidos.length" class="dlv__section dlv__section--fallidos">
-        <div class="dlv__section-title dlv__section-title--red">
-          <XCircle :size="13" :stroke-width="2" /> No entregados — pendientes de reprogramación por el admin
-        </div>
-        <div class="dlv__list">
+        <button
+          class="dlv__section-head"
+          :aria-expanded="abiertas.fallidos"
+          @click="toggleSeccion('fallidos')"
+        >
+          <ChevronDown class="dlv__section-caret dlv__section-caret--red" :class="{ 'dlv__section-caret--cerrado': !abiertas.fallidos }" :size="14" :stroke-width="2.5" />
+          <span class="dlv__section-title dlv__section-title--red">
+            <XCircle :size="13" :stroke-width="2" /> No entregados — los reprograma el admin
+          </span>
+          <span class="dlv__section-count dlv__section-count--red">{{ fallidos.length }}</span>
+        </button>
+        <div v-show="abiertas.fallidos" class="dlv__list">
           <div v-for="p in fallidos" :key="p.id" class="dlv__row dlv__row--fallido">
             <div class="dlv__row-body">
               <div class="dlv__row-top">
@@ -840,7 +887,26 @@ Cubierto ✓</template>
 .dlv__foco-btn--no  { background: #fff; border-color: var(--c-ink-300, #D1D5DB); color: var(--c-ink-500, #6B7280); flex: 0 0 auto; min-width: 100px; }
 .dlv__foco-resto { font-size: 13px; color: var(--c-ink-500, #6B7280); margin: var(--sp-3, .75rem) 0 0; }
 
-.dlv__section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--c-ink-400); margin-bottom: var(--sp-3); padding: 0 var(--sp-1); }
+/* Cabecera plegable. Es el control que más se toca desde la calle, así que ocupa todo el
+   ancho y tiene 44px de alto: el mínimo para acertarle con el pulgar sin frenar la moto. */
+.dlv__section-head {
+  display: flex; align-items: center; gap: var(--sp-2);
+  width: 100%; min-height: 44px;
+  background: none; border: none; cursor: pointer;
+  padding: 0 var(--sp-1); margin-bottom: var(--sp-2);
+  text-align: left; -webkit-tap-highlight-color: transparent;
+}
+.dlv__section-head:hover .dlv__section-title { color: var(--c-ink-600); }
+.dlv__section-caret { color: var(--c-ink-400); flex-shrink: 0; transition: transform .18s ease; }
+.dlv__section-caret--cerrado { transform: rotate(-90deg); }
+.dlv__section-caret--red { color: #dc2626; }
+.dlv__section-count {
+  margin-left: auto; flex-shrink: 0;
+  font-size: 11px; font-weight: 700; color: var(--c-ink-500);
+  background: var(--c-ink-100); border-radius: 999px; padding: 2px 8px; min-width: 22px; text-align: center;
+}
+.dlv__section-count--red { color: #dc2626; background: #fee2e2; }
+.dlv__section-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--c-ink-400); padding: 0 var(--sp-1); }
 
 /* List rows */
 .dlv__list { display: flex; flex-direction: column; gap: var(--sp-2); }

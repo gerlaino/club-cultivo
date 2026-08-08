@@ -14,19 +14,14 @@
       </RouterLink>
     </nav>
 
-    <div class="dlv-footer">
-      <button class="dlv-logout" @click="$emit('logout')">
-        <LogOut :size="16" :stroke-width="1.75" /> Salir
-      </button>
-    </div>
   </aside>
 </template>
 
 <script setup>
 import { computed } from 'vue'
-import { Truck, Home, PackageCheck, LogOut } from 'lucide-vue-next'
+import { Home, PackageCheck } from 'lucide-vue-next'
 import { useAuthStore } from '../../stores/auth'
-defineEmits(['logout'])
+// El logout vive en el menú de usuario de DeliveryTopBar, como en el resto de los roles.
 const auth = useAuthStore()
 const canSeeDespachos = computed(() => ['admin', 'supervisor'].includes(auth.user?.role))
 </script>
@@ -54,8 +49,5 @@ const canSeeDespachos = computed(() => ['admin', 'supervisor'].includes(auth.use
 }
 .dlv-link:hover { color: #fff; background: rgba(255,255,255,.1); }
 .dlv-link--active { color: #fff; background: rgba(255,255,255,.18); }
-.dlv-footer { padding: var(--sp-4) var(--sp-5); }
-.dlv-logout { display: flex; align-items: center; gap: var(--sp-2); background: none; border: none; color: rgba(255,255,255,.35); cursor: pointer; font-size: var(--fs-13); padding: 0; transition: color .15s; }
-.dlv-logout:hover { color: rgba(255,255,255,.7); }
 @media (max-width: 1023px) { .dlv-sidebar { display: none; } }
 </style>

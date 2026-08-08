@@ -390,7 +390,7 @@ onMounted(async () => {
     <!-- ── DELIVERY LAYOUT ── -->
     <template v-else-if="isDelivery && auth.isAuthenticated && !$route.meta.fullscreen">
       <div class="dlv-shell">
-        <DeliverySidebar @logout="doLogout" />
+        <DeliverySidebar />
         <div class="dlv-body">
           <DeliveryTopBar @open-drawer="dlvDrawerOpen = true" />
           <div class="dlv-accent-bar"></div>
@@ -403,7 +403,7 @@ onMounted(async () => {
         <Transition name="dlv-drawer">
           <div v-if="dlvDrawerOpen" class="dlv-drawer-overlay" @click.self="dlvDrawerOpen = false">
             <div class="dlv-drawer">
-              <DeliverySidebar @logout="doLogout" />
+              <DeliverySidebar />
             </div>
           </div>
         </Transition>

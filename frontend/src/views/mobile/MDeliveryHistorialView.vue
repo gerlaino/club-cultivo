@@ -18,6 +18,14 @@
 
     <div v-if="loading" class="mdh__muted">Cargando…</div>
 
+    <!-- "Vacío" y "no se pudo cargar" NO son lo mismo: el historial devolvía 403 y la
+         pantalla decía tranquilamente que no había entregas, escondiendo el error. -->
+    <div v-else-if="error" class="mdh__empty">
+      <span class="mdh__empty-ico">⚠️</span>
+      <p>No se pudo cargar el historial.</p>
+      <button class="mdh__retry" @click="cargar">Reintentar</button>
+    </div>
+
     <div v-else-if="!paquetes.length" class="mdh__empty">
       <span class="mdh__empty-ico">🚚</span>
       <p>Todavía no cerraste ninguna entrega en este período.</p>
@@ -49,16 +57,22 @@ const dias     = ref(30)
 const loading  = ref(false)
 const paquetes = ref([])
 const resumen  = ref({})
+const error    = ref(false)
 
 onMounted(cargar)
 
 async function cargar() {
   loading.value = true
+  error.value   = false
   try {
     const { data } = await getMiHistorialDelivery(dias.value)
     paquetes.value = data.dispensaciones ?? []
     resumen.value  = data.resumen ?? {}
-  } catch { paquetes.value = [] } finally { loading.value = false }
+  } catch {
+    paquetes.value = []
+    resumen.value  = {}
+    error.value    = true
+  } finally { loading.value = false }
 }
 
 function fechaHora(f) {
@@ -88,6 +102,11 @@ function fechaHora(f) {
 .mdh__muted { text-align: center; color: var(--c-ink-400, #94a3b8); padding: 1rem; font-size: .85rem; }
 .mdh__empty { text-align: center; padding: 2rem 1rem; color: var(--c-ink-500, #64748b); }
 .mdh__empty-ico { font-size: 2rem; display: block; margin-bottom: .5rem; }
+.mdh__retry {
+  margin-top: .6rem; min-height: 40px; padding: 0 1.1rem;
+  background: var(--c-role-delivery, #1A3D2E); color: #fff;
+  border: none; border-radius: 10px; font-size: .85rem; font-weight: 600; cursor: pointer;
+}
 
 .mdh__list { display: flex; flex-direction: column; gap: .5rem; }
 .mdh__card {
