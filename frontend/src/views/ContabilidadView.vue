@@ -97,6 +97,19 @@ const toast = useToast()
 
 const vistaActiva    = ref("dashboard")
 const dashboardSede  = ref(null) // filtro de sede LOCAL del dashboard (null = todo el club)
+
+// El resultado por sector sólo tiene sentido si hay DOS O MÁS sectores con movimientos: con
+// uno solo repite el total de arriba, y "Sin sector" no es un sector — es la bolsa de lo que
+// nadie clasificó. Por eso no cuenta para decidir si el bloque se muestra, pero sí se avisa
+// cuánta plata quedó ahí, que es lo accionable.
+const sectoresConMovimiento = computed(() =>
+  (store.dashboard?.por_unidad || []).filter(u => u.id != null && (u.ingresos || u.egresos))
+)
+const sectoresComparables = computed(() => sectoresConMovimiento.value.length >= 2)
+const sinSectorMonto = computed(() => {
+  const sin = (store.dashboard?.por_unidad || []).find(u => u.id == null)
+  return sin ? (Number(sin.ingresos) || 0) + (Number(sin.egresos) || 0) : 0
+})
 const unidadAbierta  = ref(new Set()) // sectores expandidas para ver su desglose por sede
 function toggleUnidad(id) {
   const k = id ?? 'sin'
@@ -711,14 +724,23 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- Resultado por unidad de negocio (mes actual) -->
-        <div v-if="store.dashboard?.por_unidad?.length" class="cv__card cv__card--mt">
+        <!-- Resultado por sector (mes actual).
+             Sólo aparece si hay DOS O MÁS sectores con movimientos: con uno solo no compara
+             nada, y lo que se veía era "Sin unidad +$180.000" contra "General −$120.000" —los
+             ingresos de un lado y los egresos del otro, porque nadie les asignó sector—. Eso
+             no es un resultado por sector: es el mismo total partido al azar. -->
+        <div v-if="sectoresComparables" class="cv__card cv__card--mt">
           <div class="cv__card-header">
             <span class="cv__card-title">
               <i class="bi bi-diagram-3" style="margin-right:6px;color:#2f6b3d;font-size:.9rem"></i>
-              Resultado por unidad de negocio — mes actual
+              Resultado por sector — mes actual
             </span>
           </div>
+          <p v-if="sinSectorMonto" class="cv__unidad-aviso">
+            <i class="bi bi-info-circle"></i>
+            Hay {{ fmt(sinSectorMonto) }} sin sector asignado. Se clasifica eligiendo una
+            categoría que tenga sector, o asignándoselo a la categoría en Categorías.
+          </p>
           <div class="cv__unidad-list">
             <template v-for="u in store.dashboard.por_unidad" :key="u.id ?? 'sin-unidad'">
               <div
@@ -1246,7 +1268,9 @@ onMounted(async () => {
 .cv__search-x:hover { color: var(--c-slate-900); }
 
 .cv__movs { display: flex; flex-direction: column; }
-.cv__mov { display: grid; grid-template-columns: 90px 80px 1fr 140px 110px 36px; align-items: center; gap: .5rem; padding: .75rem 1.25rem; border-bottom: 1px solid var(--c-slate-50); transition: background .1s; }
+/* La última columna medía 36px y adentro van DOS botones de 28px: se desbordaban encima del
+   monto y se leía "$ 120.00🖉". Ahora la columna reserva el ancho que ocupan de verdad. */
+.cv__mov { display: grid; grid-template-columns: 90px 80px 1fr 140px 110px 76px; align-items: center; gap: .5rem; padding: .75rem 1.25rem; border-bottom: 1px solid var(--c-slate-50); transition: background .1s; }
 .cv__mov:last-child { border-bottom: none; }
 .cv__mov:hover { background: #fafbfc; }
 @media (max-width: 900px) { .cv__mov { grid-template-columns: 1fr; } }
@@ -1272,7 +1296,7 @@ onMounted(async () => {
 .cv__dlg-link:hover { background: #dcfce7; }
 .cv__mov-cat { font-size: .75rem; color: var(--c-slate-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cv__mov-monto { font-size: .875rem; font-weight: 700; text-align: right; letter-spacing: -.02em; }
-.cv__mov-actions { display: flex; justify-content: flex-end; }
+.cv__mov-actions { display: flex; justify-content: flex-end; gap: .25rem; }
 
 .cv__cat-list { display: flex; flex-direction: column; }
 .cv__cat-item { display: flex; align-items: center; justify-content: space-between; padding: .65rem 1.25rem; border-bottom: 1px solid var(--c-slate-50); }
@@ -1535,6 +1559,11 @@ onMounted(async () => {
 }
 
 /* Resultado por unidad de negocio */
+.cv__unidad-aviso {
+  margin: 0; padding: .7rem 1.25rem; font-size: .78rem; line-height: 1.45;
+  color: #92400e; background: #fffbeb; border-bottom: 1px solid #fef3c7;
+}
+.cv__unidad-aviso .bi { margin-right: .3rem; }
 .cv__unidad-list { display: flex; flex-direction: column; }
 .cv__unidad-row {
   display: flex; align-items: center; justify-content: space-between;

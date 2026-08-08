@@ -73,7 +73,15 @@
 
       <!-- El paciente no tiene sede propia: se atiende donde dispensa. -->
       <div v-if="data.por_sede?.length" class="inf__section">
-        <h2 class="inf__section-title">Por sede de atención</h2>
+        <!-- El corte es por la sede de la ÚLTIMA dispensación de cada paciente. Decir sólo
+             "Por sede de atención" hacía que la fila de los que nunca dispensaron pareciera
+             una sede más, y que el total no cerrara con el informe de dispensaciones —que
+             cuenta otra cosa: entregas del período, no pacientes—. -->
+        <h2 class="inf__section-title">Por sede de la última dispensación</h2>
+        <p class="inf__section-hint">
+          Cada paciente cuenta en la sede donde retiró por última vez. Los que todavía no
+          dispensaron van agrupados al final.
+        </p>
         <table class="inf__table">
           <thead>
             <tr>
@@ -179,6 +187,9 @@ onMounted(cargar)
 .inf__kpi--warn .inf__kpi-valor { color: #B85C00; }
 .inf__kpi--err .inf__kpi-valor { color: var(--c-rust-600); }
 .inf__section-title { font-size: var(--fs-16); font-weight: 700; color: var(--c-ink-900); margin-bottom: var(--sp-3); }
+/* Qué está contando la tabla: sin esto, dos informes que cuentan cosas distintas parecen
+   contradecirse (uno cuenta pacientes, el otro entregas del período). */
+.inf__section-hint { margin: calc(var(--sp-3) * -1) 0 var(--sp-3); font-size: var(--fs-12); color: var(--c-ink-500); line-height: 1.5; }
 .inf__table { width: 100%; border-collapse: collapse; font-size: var(--fs-14); }
 .inf__table th { text-align: left; padding: var(--sp-2) var(--sp-3); background: var(--c-ink-50); font-weight: 600; color: var(--c-ink-600); border-bottom: 1px solid var(--c-ink-100); }
 .inf__table td { padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--c-ink-50); color: var(--c-ink-800); }

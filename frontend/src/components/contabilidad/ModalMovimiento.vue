@@ -171,7 +171,11 @@ function abrirCrearCat() {
   errorCrear.value = ''
   crearCat.value = {
     nombre: catQuery.value.trim(),
-    parent_id: madresDelTipo.value[0]?.id ?? null,
+    // Arranca como CATEGORÍA, no como subcategoría. Antes se preseleccionaba
+    // `madresDelTipo[0]`, o sea la primera madre que existiera: el formulario decidía por vos
+    // que estabas creando una subcategoría de algo que ni elegiste, y con un solo elemento en
+    // la lista parecía que no había alternativa.
+    parent_id: null,
     unidad_negocio_id: form.value.unidad_negocio_id ?? null,
   }
 }
@@ -565,16 +569,33 @@ const titulo = computed(() => {
                     </button>
                   </div>
                   <div v-else class="mv-newbox">
+                    <p class="mv-newbox-tit">Nueva categoría de {{ esEgreso ? 'egresos' : 'ingresos' }}</p>
                     <label class="mv-fld">
                       <span class="mv-lbl">Nombre</span>
                       <input v-model.trim="crearCat.nombre" type="text" class="mv-inp" placeholder="Ej: Bebidas" />
                     </label>
-                    <label class="mv-fld">
-                      <span class="mv-lbl">¿Dentro de cuál?</span>
+                    <!-- El modelo, dicho con sus palabras: un SECTOR es una línea de negocio
+                         (Cultivo, Buffet); una CATEGORÍA pertenece a un sector; una
+                         SUBCATEGORÍA pertenece a una categoría y hereda su sector. Se pregunta
+                         cuál de las dos estás creando en vez de dar por sentada una. -->
+                    <div class="mv-fld">
+                      <span class="mv-lbl">¿Qué estás creando?</span>
+                      <div class="mv-seg">
+                        <button type="button" class="mv-seg-b" :class="{ 'mv-seg-b--on': !crearCat.parent_id }"
+                                @click="crearCat.parent_id = null">Una categoría</button>
+                        <button type="button" class="mv-seg-b" :class="{ 'mv-seg-b--on': !!crearCat.parent_id }"
+                                :disabled="!madresDelTipo.length"
+                                :title="madresDelTipo.length ? '' : 'Todavía no hay ninguna categoría de la que colgar'"
+                                @click="crearCat.parent_id = madresDelTipo[0]?.id ?? null">Una subcategoría</button>
+                      </div>
+                    </div>
+
+                    <label v-if="crearCat.parent_id" class="mv-fld">
+                      <span class="mv-lbl">Subcategoría de</span>
                       <select class="mv-inp" v-model.number="crearCat.parent_id">
-                        <option :value="null">— Es una categoría principal —</option>
                         <option v-for="m in madresDelTipo" :key="m.id" :value="m.id">{{ m.nombre }}</option>
                       </select>
+                      <p class="mv-hint">Hereda el sector y el destino de stock de esa categoría.</p>
                     </label>
                     <!-- El sector ya no se elige por movimiento: se define acá, una sola vez, y
                          después todos los movimientos de esta categoría la heredan. -->
@@ -608,10 +629,9 @@ const titulo = computed(() => {
                         </div>
                       </div>
                     </template>
-                    <p class="mv-newbox-hint">
-                      <template v-if="crearCat.parent_id">Hereda el sector y el destino de stock de la que elijas.</template>
-                      <template v-else-if="!madresDelTipo.length">Todavía no hay categorías de este tipo: esta va a ser la primera.</template>
-                      <template v-else>Una categoría principal: después vas a poder colgarle subcategorías.</template>
+                    <p v-if="!crearCat.parent_id" class="mv-newbox-hint">
+                      <template v-if="!madresDelTipo.length">Va a ser la primera categoría de {{ esEgreso ? 'egresos' : 'ingresos' }}.</template>
+                      <template v-else>Después vas a poder colgarle subcategorías.</template>
                     </p>
                     <p v-if="errorCrear" class="mv-err">{{ errorCrear }}</p>
                     <div class="mv-newbox-acts">
@@ -1067,6 +1087,9 @@ const titulo = computed(() => {
 }
 .mv-newbox--flat { border-top: none; border-radius: var(--r-md); margin-top: 4px; }
 .mv-newbox-hint { margin: 0; font-size: var(--fs-12); color: var(--c-ink-500); line-height: var(--lh-base); }
+/* La caja de crear vive dentro del desplegable de búsqueda: sin un título propio se leía como
+   una fila más de la lista de resultados. */
+.mv-newbox-tit { margin: 0 0 var(--sp-1); font-size: var(--fs-13); font-weight: 700; color: var(--c-ink-900); }
 .mv-newbox-acts { display: flex; gap: var(--sp-2); justify-content: flex-end; align-items: center; }
 .mv-inline-new {
   align-self: flex-start; margin-top: 4px; padding: 2px 0;

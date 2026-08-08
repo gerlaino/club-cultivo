@@ -60,16 +60,20 @@ describe('crear categoría desde el alta de movimiento', () => {
     w.vm.catQuery = 'Bebidas'
     w.vm.abrirCrearCat()
     expect(w.vm.crearCat.nombre).toBe('Bebidas')
-    expect(w.vm.crearCat.parent_id).toBe(1)              // primera madre del tipo
+    // Arranca como CATEGORÍA. Antes se preseleccionaba la primera madre del tipo, o sea que
+    // el formulario decidía por vos que estabas creando una subcategoría de algo que ni
+    // elegiste — y con una sola madre en la lista parecía que no había alternativa.
+    expect(w.vm.crearCat.parent_id).toBeNull()
   })
 
-  it('la crea como SUBcategoría del tipo actual y la deja elegida', async () => {
+  it('la crea como subcategoría cuando lo elegís, y la deja elegida', async () => {
     createCategoriaContable.mockResolvedValue({
       data: { id: 99, nombre: 'Bebidas', tipo: 'egreso', clave_efectiva: 'insumo', unidad_negocio: { id: 10 } },
     })
     const w = await irAlForm(montar(), 'gasto')
     w.vm.catQuery = 'Bebidas'
     w.vm.abrirCrearCat()
+    w.vm.crearCat.parent_id = 1          // el usuario elige "Una subcategoría" → de Insumos
     await w.vm.confirmarCrearCat()
 
     expect(createCategoriaContable).toHaveBeenCalledWith({ nombre: 'Bebidas', tipo: 'egreso', parent_id: 1 })

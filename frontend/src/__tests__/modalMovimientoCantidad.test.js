@@ -191,3 +191,65 @@ describe('Nuevo movimiento — el formulario reordenado', () => {
     expect(texto).toContain('Estado del pago')
   })
 })
+
+// ── Crear categoría: el modelo dicho con sus palabras ────────────────────────────
+// Un SECTOR es una línea de negocio; una CATEGORÍA pertenece a un sector; una SUBCATEGORÍA
+// pertenece a una categoría y hereda su sector. El formulario daba por sentado que estabas
+// creando una subcategoría —preseleccionaba la primera madre que existiera— y preguntaba
+// "¿Dentro de cuál?" con una sola opción, que no se entendía.
+describe('Nuevo movimiento — crear una categoría', () => {
+  let wrapper
+
+  beforeEach(async () => {
+    const { default: Modal } = await import('../components/contabilidad/ModalMovimiento.vue')
+    wrapper = mount(Modal, {
+      props: {
+        modelValue: true, categorias: CATEGORIAS,
+        sedes: [{ id: 3, nombre: 'Finca Norte' }], unidades: [{ id: 7, nombre: 'Cultivo' }],
+        depositos: [], bares: [], insumos: [], pacientes: [], flujoInicial: 'egreso',
+      },
+      global: { stubs: { Teleport: true, AppDatePicker: true } },
+    })
+    await wrapper.vm.$nextTick()
+    // La caja de crear vive DENTRO del desplegable de categoría: sin abrirlo no se renderiza.
+    wrapper.vm.abrirCat()
+    wrapper.vm.abrirCrearCat()
+    await wrapper.vm.$nextTick()
+  })
+
+  it('arranca creando una CATEGORÍA, no una subcategoría de algo que no elegiste', () => {
+    expect(wrapper.vm.crearCat.parent_id).toBeNull()
+  })
+
+  it('pregunta qué estás creando, con las dos opciones a la vista', () => {
+    const texto = wrapper.text()
+
+    expect(texto).toContain('¿Qué estás creando?')
+    expect(texto).toContain('Una categoría')
+    expect(texto).toContain('Una subcategoría')
+    expect(texto).not.toContain('¿Dentro de cuál?')
+  })
+
+  it('el selector de madre aparece recién al elegir subcategoría', async () => {
+    expect(wrapper.text()).not.toContain('Subcategoría de')
+
+    wrapper.vm.crearCat.parent_id = 1
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).toContain('Subcategoría de')
+    expect(wrapper.text()).toContain('Hereda el sector')
+  })
+
+  it('creando una categoría se elige su sector; creando una subcategoría no (lo hereda)', async () => {
+    expect(wrapper.text()).toContain('Sector')
+
+    wrapper.vm.crearCat.parent_id = 1
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.text()).not.toContain('Crear un sector')
+  })
+
+  it('la caja de crear se distingue de la lista de resultados', () => {
+    expect(wrapper.find('.mv-newbox-tit').text()).toContain('Nueva categoría')
+  })
+})

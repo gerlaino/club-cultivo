@@ -213,10 +213,14 @@ RSpec.describe 'Pacientes — activo/inactivo y estados REPROCANN', type: :reque
       expect(fila['vigentes']).to eq(1)
     end
 
-    it 'CASO 20b — quien nunca dispensó no se pierde: cae en "Sin dispensaciones"' do
+    # La etiqueta dejó de ser "Sin dispensaciones" a secas: en una columna titulada "Sede" se
+    # leía como si el club tuviera una sede con ese nombre.
+    it 'CASO 20b — quien nunca dispensó no se pierde: cae en su propia fila, al final' do
       paciente!
 
-      expect(informe['por_sede'].map { |r| r['sede'] }).to include('Sin dispensaciones')
+      sedes = informe['por_sede'].map { |r| r['sede'] }
+      expect(sedes).to include('(todavía sin dispensaciones)')
+      expect(sedes.last).to eq('(todavía sin dispensaciones)')   # siempre al final
     end
 
     it 'CASO 20c — el informe no trae nada de cultivo' do

@@ -620,6 +620,11 @@ class InformesController < ApplicationController
   #
   # Es lo único no-clínico que el informe agrega más allá de los pacientes: nada de cultivo,
   # que vive en los informes de Producción y Sedes.
+  # Los pacientes se agrupan por la sede de su ÚLTIMA dispensación. Los que nunca dispensaron
+  # no tienen sede que mostrar y van juntos al final, con una etiqueta que no se confunda con
+  # el nombre de una sede.
+  SIN_SEDE_LABEL = '(todavía sin dispensaciones)'.freeze
+
   def reprocann_por_sede(club, pacientes)
     ids = pacientes.pluck(:id)
     return [] if ids.empty?
@@ -639,10 +644,14 @@ class InformesController < ApplicationController
     datos.each do |pid, estado, numero, venc|
       _sid, nombre = ultima_sede[pid]
       cat = Paciente.reprocann_categoria(estado: estado, numero: numero, vencimiento: venc)
-      agrupado[nombre || 'Sin dispensaciones'][cat] += 1
+      # OJO con la etiqueta: esta fila NO es una sede, son los pacientes que todavía no
+      # dispensaron nunca. Decía "Sin dispensaciones" a secas en una columna titulada "Sede",
+      # así que se leía como si el club tuviera una sede con ese nombre.
+      agrupado[nombre || SIN_SEDE_LABEL][cat] += 1
     end
 
-    agrupado.map do |sede, cats|
+    ordenado = agrupado.sort_by { |sede, _| [sede == SIN_SEDE_LABEL ? 1 : 0, sede.to_s] }
+    ordenado.map do |sede, cats|
       {
         sede:      sede,
         total:     cats.values.sum,

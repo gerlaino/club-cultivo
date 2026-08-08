@@ -103,7 +103,14 @@
                   <span class="trz__forma-badge">{{ FORMA_LABELS[s.forma_producto] || s.forma_producto }}</span>
                 </td>
                 <td class="trz__td-g">{{ s.cantidad ?? '—' }} {{ s.unidad || 'g' }}</td>
-                <td class="trz__td-lote">{{ s.lote_codigo || s.lote?.codigo || '—' }}</td>
+                <!-- Un stock comprado afuera no tiene lote propio y mostraba un guion, que
+                     se lee como "falta el dato". Tiene origen conocido: es externo. Un
+                     derivado (hash, preroll) sí arrastra el lote del que salió. -->
+                <td class="trz__td-lote">
+                  <span v-if="s.origen === 'compra_externa'" class="trz__externo">Externo</span>
+                  <template v-else>{{ s.lote_codigo || s.lote?.codigo || '—' }}</template>
+                  <span v-if="s.origen === 'derivado_lote'" class="trz__deriv" title="Elaborado a partir de ese lote">derivado</span>
+                </td>
                 <td class="trz__td-fecha">{{ formatDate(s.fecha_elaboracion) }}</td>
                 <td class="trz__td-action">
                   <span class="trz__td-ver">Ver cadena <i class="bi bi-arrow-right"></i></span>
@@ -603,6 +610,8 @@ const formatDate = d => d
 .trz__tr td { padding: var(--sp-3) var(--sp-4); color: var(--c-ink-900); vertical-align: middle; }
 .trz__td-code { font-weight: 700; color: var(--c-ink-900); }
 .trz__td-gen { font-weight: 600; color: var(--c-ink-800); }
+.trz__externo { font-size: .74rem; font-weight: 600; color: var(--c-slate-600); background: var(--c-slate-100); border-radius: 999px; padding: .1em .55em; }
+.trz__deriv { margin-left: .35rem; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .03em; color: #7c3aed; background: #f3e8ff; border-radius: 999px; padding: .1em .45em; }
 .trz__td-lote { font-family: var(--font-mono, monospace); font-size: var(--fs-13); color: var(--c-ink-500); }
 .trz__td-fecha { color: var(--c-ink-400); font-size: var(--fs-13); white-space: nowrap; }
 .trz__td-action { text-align: right; }
