@@ -224,6 +224,8 @@ class StocksController < ApplicationController
         usuario: current_user,
         notas:   "[#{tipo_ajuste.upcase}] #{motivo}",
       )
+      # El usuario viaja hasta el callback que cierra el lote: el evento de cierre necesita autor.
+      @stock.usuario_movimiento = current_user
       @stock.update!(estado: 'agotado') if nueva_cantidad == 0
     end
     render json: serialize_stock(@stock.reload)
@@ -261,10 +263,13 @@ class StocksController < ApplicationController
 
     nuevo = nil
     ActiveRecord::Base.transaction do
-      # 1) Descontar la flor del stock origen (sea de lote o externo).
+      # 1) Descontar la flor del stock origen (sea de lote o externo). El "agotado" NO se marca
+      #    todavía: marcarlo acá dispara el cierre del lote, y en ese instante el derivado
+      #    —que es producto del mismo lote— todavía no existe. Elaborar hash con el último
+      #    gramo de flor cerraba el ciclo y a renglón seguido nacían 40 g de hash de un lote
+      #    "finalizado". Se marca al final, cuando el derivado ya está en la base (paso 4).
       nueva_cant = @stock.cantidad.to_f - gramos
       @stock.update!(cantidad: nueva_cant)
-      @stock.update!(estado: 'agotado') if nueva_cant.zero?
 
       # 2) Crear el producto elaborado. es_split evita el auto-descuento del modelo
       # (ya descontamos arriba). Hereda el lote si lo hay; si es externo, queda externo.
@@ -298,6 +303,10 @@ class StocksController < ApplicationController
         stock_resultante: nuevo,
         notas: "[PRODUCCIÓN] #{cantidad_out} #{unidad} de #{forma} (#{gramos}g usados)",
       )
+
+      # 4) Recién ahora: el derivado ya existe, así que si el lote cierra es porque de verdad
+      #    no le quedó nada, ni flor ni elaborados.
+      @stock.marcar_agotado_si_vacio!(usuario: current_user)
     end
     render json: serialize_stock(nuevo), status: :created
   rescue ActiveRecord::RecordInvalid => e
@@ -319,6 +328,7 @@ class StocksController < ApplicationController
         usuario: current_user,
         notas:   "[FINALIZADO] #{motivo}",
       )
+      @stock.usuario_movimiento = current_user
       @stock.update!(cantidad: 0, estado: 'agotado')
     end
     render json: serialize_stock(@stock.reload)
@@ -390,6 +400,9 @@ class StocksController < ApplicationController
         id:                 d.id,
         fecha:              d.fecha_dispensacion,
         cantidad_g:         d.cantidad&.to_f,
+        # Nombre completo: la trazabilidad se lee para saber a quién le llegó cada gramo, y
+        # dos iniciales no acreditan a nadie. El DNI sigue parcial (últimos cuatro).
+        paciente:           d.paciente&.nombre_completo,
         paciente_iniciales: "#{d.paciente&.nombre&.[](0)}.#{d.paciente&.apellido&.[](0)}.",
         paciente_dni_last4: d.paciente&.dni_normalizado.to_s.last(4),
       }

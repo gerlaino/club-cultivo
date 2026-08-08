@@ -240,8 +240,25 @@ class Stock < ApplicationRecord
     end
   end
 
+  # Quién produjo el movimiento que dejó este stock en cero. No es una columna: viaja en
+  # memoria desde el llamador (la dispensación, el ajuste de inventario) hasta el callback,
+  # porque el evento que cierra el lote necesita un autor y un `after_save` no tiene
+  # `current_user`.
+  attr_accessor :usuario_movimiento
+
+  # Marca el stock como agotado cuando ya no queda nada. Hay que llamarlo explícitamente
+  # después de descontar: `decrement!` baja la cantidad pero NO toca el estado, así que sin
+  # esto un stock dispensado hasta el último gramo quedaba 'asignado' con cantidad 0 y el
+  # lote no se cerraba nunca.
+  def marcar_agotado_si_vacio!(usuario: nil)
+    return if agotado? || cantidad.to_d.positive?
+
+    self.usuario_movimiento = usuario
+    update!(estado: 'agotado')
+  end
+
   def finalizar_lote_si_agotado
-    lote&.finalizar_si_stock_agotado!
+    lote&.finalizar_si_stock_agotado!(usuario: usuario_movimiento)
   end
 
   def descontar_lote_origen_si_corresponde

@@ -1,7 +1,12 @@
 class LoteEvento < ApplicationRecord
   include Restorable
   belongs_to :lote
-  belongs_to :user
+  # Opcional porque hay eventos que NO los hace una persona: cuando se dispensa el último
+  # gramo de un lote, `Stock#finalizar_lote_si_agotado` lo cierra desde un callback, donde no
+  # existe `current_user`. Con `user` obligatorio ese evento no se podía crear y la excepción
+  # se llevaba puesta la transacción: la última dispensación de un lote fallaba. Los eventos
+  # que sí tienen autor lo siguen guardando; los del sistema se muestran como "Sistema".
+  belongs_to :user, optional: true
   belongs_to :club
   acts_as_tenant(:club)
   belongs_to :sala_origen,  class_name: 'Sala', optional: true

@@ -613,7 +613,7 @@ module Clubs
         perfil = @perfil[lote.genetica_id]
         # Parte ya dispensada: un stock intacto no muestra movimiento.
         restante = (gramos * @rng.rand(0.15..0.8)).round(1)
-        Stock.new(
+        stock = Stock.new(
           club: club, sede: @sede, lote: lote, genetica: lote.genetica,
           origen: 'lote', forma_producto: 'flor_seca', unidad: 'g',
           cantidad: restante, estado: restante.positive? ? 'asignado' : 'agotado',
@@ -622,7 +622,27 @@ module Clubs
           precio_sugerido_ars: (perfil[:cbd] > 5 ? 3_800 : 3_200) * @rng.rand(0.95..1.1),
           descripcion: "#{lote.genetica.nombre} — #{lote.codigo}",
         ).tap { |s| s.save!(validate: false); @resumen[:stocks] += 1 }
+
+        reconciliar_estado_con_stock(lote, restante)
+        stock
       end.select { |s| s.cantidad.to_d.positive? }
+    end
+
+    # El estado del lote se elegía sólo por antigüedad (`fase_para`), y el gramaje que le queda
+    # se sortea acá: un lote viejo salía 'finalizado' y a renglón seguido recibía 485 g de flor.
+    # El informe de trazabilidad lo mostraba como ciclo cerrado con producto adentro.
+    #
+    # 'finalizado' significa que no queda nada: si al lote le sobró stock, el estado que
+    # corresponde es 'curado' (en frasco, dispensándose). Se corrige acá —y no en `fase_para`—
+    # porque recién en este punto se sabe cuánto quedó.
+    def reconciliar_estado_con_stock(lote, restante)
+      return unless lote.estado == 'finalizado' && restante.to_d.positive?
+
+      lote.update_columns(estado: 'curado')
+      # El evento del avance también sobra: la línea de tiempo diría que cerró un ciclo que
+      # sigue abierto, y de ahí salen los días por fase de los informes.
+      LoteEvento.where(lote_id: lote.id, tipo: 'cambio_estado', estado_nuevo: 'finalizado')
+                .delete_all
     end
 
     # Dispensaciones repartidas a lo largo del año, con una CURVA: arranca flojo, cae en invierno y

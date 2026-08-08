@@ -116,6 +116,18 @@ function setTab(t) {
   page.value         = 1;
 }
 
+// "Finalizado" no vivía en el desplegable de estados y buscarlo ahí era el camino natural:
+// los lotes cerrados están detrás del tab de al lado, que no se lee como un filtro. Ahora la
+// opción existe y te lleva al tab donde están — elegirla y quedarse en "Activos" habría
+// devuelto cero resultados, que es peor que no ofrecerla.
+function onFiltroEstado(valor) {
+  if (valor === "finalizado") {
+    setTab("finalizados");
+    return;
+  }
+  filterEstado.value = valor;
+}
+
 const filtered = computed(() => {
   const query = q.value.trim().toLowerCase();
   return store.items.filter(l => {
@@ -406,9 +418,14 @@ async function exportarCSV() {
         />
         <span v-if="q" class="lv__search-count">{{ filtered.length }}</span>
       </div>
-      <select v-if="tab === 'activos'" class="lv__select" v-model="filterEstado">
+      <select
+        v-if="tab === 'activos'"
+        class="lv__select"
+        :value="filterEstado"
+        @change="onFiltroEstado($event.target.value)"
+      >
         <option value="">Todos los estados</option>
-        <option v-for="e in ESTADOS.filter(e => e !== 'finalizado')" :key="e" :value="e">{{ estadoLabel(e) }}</option>
+        <option v-for="e in ESTADOS" :key="e" :value="e">{{ estadoLabel(e) }}</option>
       </select>
       <select class="lv__select" v-model="filterSala">
         <option value="">Todas las salas</option>

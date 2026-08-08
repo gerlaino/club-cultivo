@@ -321,6 +321,11 @@ class Dispensacion < ApplicationRecord
           ].compact.join(' · '),
         )
         imputar_a_apartado_evento(it)
+        # Si con esta línea se fue el último gramo, el stock queda agotado — y ese es el
+        # disparador de que el lote cierre su ciclo. `decrement!` solo baja la cantidad: sin
+        # esta llamada el stock quedaba 'asignado' en cero y el lote nunca pasaba a
+        # 'finalizado', que es lo que ensuciaba los informes de trazabilidad.
+        it.stock.reload.marcar_agotado_si_vacio!(usuario: user)
       end
     end
   end

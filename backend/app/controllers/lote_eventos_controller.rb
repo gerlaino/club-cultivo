@@ -118,7 +118,7 @@ class LoteEventosController < ApplicationController
       estado_nuevo:    e.estado_nuevo,
       descripcion:     e.descripcion,
       registrado_en:   e.registrado_en,
-      usuario:         e.user.nombre_completo,
+      usuario:         e.user&.nombre_completo || 'Sistema',
       created_at:      e.created_at,
       sala_origen:     e.sala_origen  ? { id: e.sala_origen.id,  nombre: e.sala_origen.nombre  } : nil,
       sala_destino:    e.sala_destino ? { id: e.sala_destino.id, nombre: e.sala_destino.nombre } : nil,

@@ -88,6 +88,13 @@ class Lote < ApplicationRecord
   # Al prender, el esqueje va a maceta: sin ese dato el lote entra a vegetativo sin saber en qué
   # volumen crece, que es lo que gobierna riego, frecuencia y cuándo toca trasplante.
   validate :maceta_al_prender, if: -> { estado_changed? && estado_was == 'enraizado' && estado == 'vegetativo' }
+  # 'finalizado' significa UNA cosa: no queda nada de este lote. La regla vivía sólo en
+  # `finalizar_si_stock_agotado!`, así que cualquier otro código que escribiera el estado a
+  # mano la salteaba — y eso pasó: el sembrador de datos demo dejó 16 lotes finalizados con
+  # cientos de gramos adentro, que el informe de trazabilidad mostraba como ciclo cerrado.
+  # Se valida sólo al PASAR a finalizado: un lote que ya está mal no puede quedar imposible
+  # de guardar (hay que poder corregirlo).
+  validate :finalizado_exige_stock_agotado, if: -> { estado_changed? && estado == 'finalizado' }
 
   before_create :generar_codigo
   before_create :generar_codigo_qr
@@ -434,9 +441,13 @@ class Lote < ApplicationRecord
     # Las descartadas no se procesan nunca (no van a tener pesada); si contaran en el total,
     # total_procesadas >= total_plantas jamás se cumpliría y el lote quedaría pegado en_manicura.
     total_plantas = plants.where.not(state: 'descartada').count
-    if total_plantas == 0
-      # Se descartaron TODAS las plantas: el lote no produjo nada (no hay stock que curar).
-      # Se finaliza directo (no pasa por curado).
+    if total_plantas == 0 && stock_remanente.none?
+      # Se descartaron TODAS las plantas y no quedó producto: el lote no produjo nada, así que
+      # se finaliza directo (no pasa por curado).
+      #
+      # El `stock_remanente.none?` importa: un lote sin plantas vivas PUEDE tener stock, porque
+      # el pesaje de manicura crea el contenedor de flor al confirmarse. Sin esa condición el
+      # atajo cerraba el ciclo con el producto todavía en el frasco.
       update!(estado: 'finalizado', rendimiento_real_g: 0, manicurador: nil, sala_id: nil)
       lote_eventos.create!(
         tipo:            'cambio_estado',
@@ -494,8 +505,21 @@ class Lote < ApplicationRecord
   # stock y que todos estén agotados.
   def finalizar_si_stock_agotado!(usuario: nil)
     return unless estado == 'curado'
-    activos = stocks.where.not(estado: 'agotado')
-    return if activos.exists? || stocks.empty?
+    # Mismo criterio que la validación (`stock_remanente`), para que las dos no puedan
+    # divergir: si una dice "cerrado" y la otra "queda producto", el lote no se guarda nunca.
+    return if stock_remanente.exists? || stocks.empty?
+
+    # El evento necesita autor: `lote_eventos.user_id` es NOT NULL en la base. Todos los
+    # caminos reales lo traen (la dispensación pasa su `user`, el ajuste de inventario pasa
+    # `current_user`). Si alguno no lo hiciera, se avisa en el log en vez de romper la
+    # transacción que lo llamó — cerrar el lote no puede tumbar una dispensación.
+    if usuario.nil?
+      Rails.logger.warn(
+        "Lote##{id}: stock agotado pero no se pudo cerrar el ciclo — el llamador no informó " \
+        'el usuario del movimiento (ver Stock#usuario_movimiento).'
+      )
+      return
+    end
 
     update!(estado: 'finalizado')
     lote_eventos.create!(
@@ -505,7 +529,24 @@ class Lote < ApplicationRecord
     )
   end
 
+  # Lo que todavía queda del lote, en cualquier forma: la flor y también sus DERIVADOS (hash,
+  # aceite), que llevan el `lote_id` del lote del que salieron. Si un lote agotó la flor pero
+  # quedan 40 g de hash suyo, el ciclo no está cerrado.
+  def stock_remanente
+    stocks.where.not(estado: 'agotado').where('cantidad > 0')
+  end
+
   private
+
+  def finalizado_exige_stock_agotado
+    restante = stock_remanente
+    return if restante.empty?
+
+    total = restante.sum(:cantidad)
+    errors.add(:estado,
+               "no puede pasar a finalizado: el lote todavía tiene #{total.to_f.round(1)} " \
+               "en stock (incluidos sus derivados)")
+  end
 
   def sala_admite_el_estado
     permitidos = KINDS_SALA_POR_ESTADO[estado]
