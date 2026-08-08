@@ -109,7 +109,7 @@ async function cargarDepositos() {
 }
 
 // ── Crear depósito propio ─────────────────────────────────────
-// Sectors (unidades de negocio) para vincular el depósito → el movimiento hereda el sector.
+// Sectores (unidades de negocio) para vincular el depósito → el movimiento hereda el sector.
 const areas = ref([])
 async function cargarAreas() { try { areas.value = (await listUnidadesNegocio()).data || [] } catch { areas.value = [] } }
 const depoForm = ref(null)
