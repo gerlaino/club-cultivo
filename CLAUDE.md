@@ -240,6 +240,7 @@ db:migrate      # add_leaf_temp_offset_a_salas, add_pulse_api_key_a_clubs, y las
 bundle install  # gema nueva pdf-inspector (sólo test)
 rake suites:prender_iot_con_dispositivos      # ⚠️ JUNTO CON EL DEPLOY, ver abajo
 rake lotes:corregir_finalizados_con_stock     # lotes cerrados que aún tienen producto
+rake geneticas:declarar_por_nombre SIMULAR=1  # las que ya traen "- TROPICANA WFC" en el nombre
 rake geneticas:sin_declarar                   # (informativo) qué falta declarar ante el INASE
 ```
 
@@ -256,6 +257,10 @@ existía. Es opcional. `Genetica#nombre_declarado` / `#numero_inase_declarado` /
 **Regla: el nombre declarado se usa SÓLO en informes regulatorios** (INASE, trazabilidad,
 semestral). Las pantallas internas siguen mostrando el nombre real — el cultivador no
 reconoce sus lotes por el nombre del registro.
+
+**El guard (`DeclaracionInaseGuard`) bloquea la DESCARGA, nunca la pantalla.** El informe INASE
+en pantalla es el que lista los pendientes: bloquearlo dejaría al club sin poder ver su propio
+problema. PDF/Excel de INASE, trazabilidad y semestral devuelven 422 con la lista.
 
 > ⚠️ **El rake de IoT no es opcional.** La ingesta de lecturas ahora exige el add-on `iot`, y
 > ese add-on NUNCA existió como bandera vieja: ninguna migración lo escribe, así que hoy

@@ -1,4 +1,5 @@
 class StocksController < ApplicationController
+  include DeclaracionInaseGuard
   before_action :authenticate_user!
   before_action :require_lectura_stock!,        only: [:index, :inventario, :show, :movimientos]
   before_action :require_auditor_lectura!,      only: [:trazabilidad]
@@ -466,6 +467,9 @@ class StocksController < ApplicationController
       # PDF de servidor: la trazabilidad de un lote es lo primero que pide un auditor y se
       # bajaba como captura de pantalla.
       format.pdf do
+        # Documento que se presenta: no sale si hay variedades sin acreditar.
+        next if bloquear_descarga_si_falta_declarar!
+
         send_data TrazabilidadDocument.new(club: current_user.club, usuario: current_user, datos: datos).render,
                   filename: "trazabilidad_#{s.numero_lote_producto.presence || s.id}_#{Time.zone.today.strftime('%Y%m%d')}.pdf",
                   type: 'application/pdf', disposition: 'attachment'

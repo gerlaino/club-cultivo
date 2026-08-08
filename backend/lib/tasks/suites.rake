@@ -4,6 +4,84 @@ namespace :geneticas do
   # informe la muestra como pendiente y esta tarea la lista sin tener que entrar club por club.
   #
   #   bundle exec rake geneticas:sin_declarar
+  # Antes de que existiera el vínculo, los clubes declaraban a mano METIENDO EL PAR EN EL
+  # NOMBRE: "Blue Sherbet - Tropicana WFC". Eso ya es la declaración, sólo que escrita donde
+  # la app no la puede leer. Esta tarea la reconoce y la convierte en vínculo de verdad.
+  #
+  # También limpia el sufijo del nombre: el par pasa a vivir en `declarada_como_id`, así que
+  # repetirlo en el nombre es ruido — y en las pantallas internas el cultivador quiere leer
+  # "Blue Sherbet". Si el nombre limpio chocara con otra genética del mismo club, se vincula
+  # igual pero NO se renombra (y se avisa): perder un nombre distinto es peor que un sufijo.
+  #
+  #   bundle exec rake geneticas:declarar_por_nombre SIMULAR=1
+  #   bundle exec rake geneticas:declarar_por_nombre
+  #   bundle exec rake geneticas:declarar_por_nombre CONSERVAR_NOMBRE=1   # vincula sin renombrar
+  desc 'Vincula al INASE las genéticas que ya traen la variedad en el nombre ("X - TROPICANA WFC")'
+  task declarar_por_nombre: :environment do
+    simular   = ENV['SIMULAR'].present?
+    conservar = ENV['CONSERVAR_NOMBRE'].present?
+
+    ActsAsTenant.without_tenant do
+      inscriptas = Genetica.unscoped.where(club_id: nil, registrada_inase: true).to_a
+      if inscriptas.empty?
+        puts 'No hay variedades inscriptas en el catálogo: no hay contra qué declarar.'
+        next
+      end
+
+      candidatas = Genetica.unscoped
+                           .where.not(club_id: nil)
+                           .where(registrada_inase: [false, nil], declarada_como_id: nil)
+                           .order(:club_id, :nombre)
+
+      vinculadas = 0
+      renombradas = 0
+      choques = []
+
+      candidatas.each do |g|
+        # El nombre de la variedad, al final del nombre, detrás de un separador.
+        destino = inscriptas.find do |i|
+          g.nombre.match?(/\s*[-–—·|]\s*#{Regexp.escape(i.nombre)}\s*\z/i)
+        end
+        next if destino.nil?
+
+        limpio = g.nombre.sub(/\s*[-–—·|]\s*#{Regexp.escape(destino.nombre)}\s*\z/i, '').strip
+        renombrar = !conservar && limpio.present? &&
+                    !Genetica.unscoped.where(club_id: g.club_id, nombre: limpio)
+                             .where.not(id: g.id).exists?
+
+        if !conservar && limpio.present? && !renombrar
+          choques << "#{g.nombre} (ya existe «#{limpio}» en el club)"
+        end
+
+        etiqueta = renombrar ? "#{g.nombre}  →  «#{limpio}» declarada como #{destino.nombre}"
+                             : "#{g.nombre}  →  declarada como #{destino.nombre} (nombre sin tocar)"
+        puts "  #{simular ? '[simulado] ' : ''}#{etiqueta}"
+        next if simular
+
+        attrs = { declarada_como_id: destino.id }
+        attrs[:nombre] = limpio if renombrar
+        # update_columns: no se toca el slug, para no romper los links de la web pública que
+        # ya estén circulando.
+        g.update_columns(attrs)
+        vinculadas += 1
+        renombradas += 1 if renombrar
+      end
+
+      if vinculadas.zero? && !simular
+        puts 'Ninguna genética trae la variedad INASE en el nombre.'
+      elsif !simular
+        puts "\nListo: #{vinculadas} declarada(s), #{renombradas} renombrada(s)."
+      else
+        puts "\nSIMULACIÓN: no se cambió nada."
+      end
+
+      if choques.any?
+        puts "\nSin renombrar por choque de nombre (quedaron declaradas igual):"
+        choques.each { |c| puts "  #{c}" }
+      end
+    end
+  end
+
   desc 'Lista las genéticas que no están inscriptas ni declaradas contra una del INASE'
   task sin_declarar: :environment do
     ActsAsTenant.without_tenant do

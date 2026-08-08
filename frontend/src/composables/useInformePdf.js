@@ -34,10 +34,28 @@ export function useInformePdf(nombre, recurso = null) {
       link.click()
       link.remove()
       URL.revokeObjectURL(url)
-    } catch {
-      toast.error('No se pudo generar el archivo. Reintentá en un momento.')
+    } catch (e) {
+      // Con responseType 'blob' el cuerpo del error TAMBIÉN llega como blob, así que un
+      // rechazo con motivo (por ejemplo: faltan declarar variedades ante el INASE) se veía
+      // como "reintentá en un momento" — y reintentar no lo iba a resolver nunca.
+      const motivo = await leerError(e)
+      toast.error(motivo || 'No se pudo generar el archivo. Reintentá en un momento.',
+                  { timeout: motivo ? 9000 : 5000 })
     } finally {
       exporting.value = false
+    }
+  }
+
+  async function leerError(e) {
+    const data = e?.response?.data
+    if (!data) return null
+    try {
+      const json = typeof data.text === 'function' ? JSON.parse(await data.text()) : data
+      if (!json?.error) return null
+      const faltan = json.geneticas_sin_declarar
+      return faltan?.length ? `${json.error} Faltan: ${faltan.join(', ')}.` : json.error
+    } catch {
+      return null
     }
   }
 

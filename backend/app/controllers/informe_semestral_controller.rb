@@ -1,4 +1,5 @@
 class InformeSemestralController < ApplicationController
+  include DeclaracionInaseGuard
   before_action :authenticate_user!
   before_action :require_admin_or_autorizado!
 
@@ -16,12 +17,17 @@ class InformeSemestralController < ApplicationController
       # PDF de servidor: se generaba con html2canvas (una foto de la pantalla) y este es el
       # documento que se presenta ante la autoridad.
       format.pdf do
+        # Este es EL documento que se presenta ante la autoridad.
+        next if bloquear_descarga_si_falta_declarar!
+
         pdf = InformeSemestralDocument.new(club: current_user.club, usuario: current_user, datos: datos).render
         send_data pdf,
                   filename: "REPROCANN_#{semestre}S_#{anio}_#{current_user.club.slug}.pdf",
                   type: 'application/pdf', disposition: 'attachment'
       end
       format.xlsx do
+        next if bloquear_descarga_si_falta_declarar!
+
         nomina = Array(datos[:pacientes][:nomina])
         xlsx = XlsxExport.new(
           club: current_user.club,

@@ -1,4 +1,5 @@
 class InformesController < ApplicationController
+  include DeclaracionInaseGuard
   before_action :authenticate_user!
   before_action :require_auditor_o_admin!
 
@@ -33,16 +34,21 @@ class InformesController < ApplicationController
   # Un informe se define una sola vez (KPIs + tablas) y de esa definición salen la respuesta
   # JSON, el PDF y el Excel. Antes el PDF era una captura de pantalla con html2canvas y el
   # Excel no existía.
-  def responder_informe(titulo:, datos:, kpis:, secciones:, nombre:, periodo: nil, nota: nil)
+  def responder_informe(titulo:, datos:, kpis:, secciones:, nombre:, periodo: nil, nota: nil,
+                        exige_declaracion_inase: false)
     respond_to do |format|
       format.json { render json: datos }
       format.pdf do
+        next if exige_declaracion_inase && bloquear_descarga_si_falta_declarar!
+
         pdf = InformeDocument.new(club: current_user.club, usuario: current_user, titulo: titulo,
                                   kpis: kpis, secciones: secciones, periodo: periodo, nota: nota).render
         send_data pdf, filename: "#{nombre}_#{Time.zone.today.strftime('%Y%m%d')}.pdf",
                   type: 'application/pdf', disposition: 'attachment'
       end
       format.xlsx do
+        next if exige_declaracion_inase && bloquear_descarga_si_falta_declarar!
+
         principal = secciones.first || { headers: [], rows: [] }
         xlsx = XlsxExport.new(
           club: current_user.club, titulo: titulo, subtitulo: periodo,
@@ -453,6 +459,9 @@ class InformesController < ApplicationController
       secciones: secciones,
       nota: 'Las variedades que el club no tiene inscriptas se presentan declaradas contra ' \
             'una variedad del registro INASE. La columna "Se cultiva como" deja ver el par.',
+      # La pantalla se abre siempre —es la que lista los pendientes—; el archivo que se
+      # presenta ante el organismo, no, mientras haya variedades sin acreditar.
+      exige_declaracion_inase: true,
     )
   end
 

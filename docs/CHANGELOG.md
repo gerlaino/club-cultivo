@@ -23,6 +23,22 @@ El informe pasa a distinguir tres situaciones donde antes había dos: inscripta,
 **sin acreditar**. Sólo la tercera es un pendiente, y tiene su propia sección al pie —lo único
 accionable del informe—. `rake geneticas:sin_declarar` lista lo mismo por consola.
 
+**El guard va en la descarga, no en la pantalla.** Un informe que se presenta ante el organismo
+no puede nombrar variedades que el club no puede acreditar, así que el PDF y el Excel del
+informe INASE, la trazabilidad y el semestral se niegan a generarse y devuelven cuáles faltan.
+La PANTALLA se abre siempre: es la que lista los pendientes, y bloquearla dejaría al club sin
+poder ver su propio problema —con veintipico de variedades sin declarar, nunca se destrabaría—.
+Del lado del front, la descarga usa `responseType: 'blob'`, así que el cuerpo del error también
+llegaba como blob y el rechazo se mostraba como "no se pudo generar, reintentá": ahora se lee y
+se muestra el motivo real con la lista.
+
+**Backfill de lo que ya estaba declarado a mano.** Antes de que existiera el vínculo, los clubes
+escribían el par dentro del nombre: *"Blue Sherbet - Tropicana WFC"*. Eso ya es la declaración,
+sólo que en un lugar que la app no puede leer. `rake geneticas:declarar_por_nombre` la reconoce,
+la convierte en vínculo real y limpia el sufijo del nombre (el par pasa a vivir en el vínculo).
+Si el nombre limpio chocara con otra genética del club, la declara igual pero no la renombra y
+lo avisa. El slug no se toca, para no romper links de la web pública que estén circulando.
+
 ## Agosto 2026 (h) — el historial del delivery daba 403 y la pantalla decía "no hay nada"
 
 **El repartidor no podía ver su propio historial.** `require_dispensaciones_role!` le permite al
