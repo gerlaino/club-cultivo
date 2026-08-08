@@ -24,6 +24,23 @@
   --c-ink-300: #D1D5DB;
   --c-ink-100: #F3F4F6;
 
+  /* ── Paleta Slate ────────────────────────────────────────────
+     La escala `ink` de arriba es la del design system, pero el código usa DE HECHO la escala
+     slate en cientos de lugares (el panel de super admin, las tablas, los estados vacíos).
+     No son intercambiables: `ink` es gris neutro y `slate` tira a azul, así que reemplazar
+     una por otra cambia cómo se ve la pantalla.
+     Se les da nombre para poder tocarlas en un solo lugar. El valor es EXACTAMENTE el que ya
+     estaba hardcodeado: nombrarlas no cambia un pixel. */
+  --c-slate-900: #0f172a;
+  --c-slate-700: #334155;
+  --c-slate-600: #475569;
+  --c-slate-500: #64748b;
+  --c-slate-400: #94a3b8;
+  --c-slate-300: #cbd5e1;
+  --c-slate-200: #e2e8f0;
+  --c-slate-100: #f1f5f9;
+  --c-slate-50:  #f8fafc;
+
   /* ── Paper ──────────────────────────────────────────────── */
   --c-paper: #F4F8F5;
 
