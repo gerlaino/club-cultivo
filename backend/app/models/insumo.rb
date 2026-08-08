@@ -74,7 +74,10 @@ class Insumo < ApplicationRecord
           categoria: 'insumo', categoria_contable: categoria_contable,
           # El área la manda el depósito donde vive el insumo; la categoría queda de respaldo.
           unidad_negocio_id: deposito&.unidad_negocio_id || categoria_contable&.unidad_negocio_id,
-          descripcion: "Compra insumo — #{nombre} (#{cantidad.to_s('F')} #{unidad_medida})",
+          # "1000 unidad", no "1000.0 unidad": el `.0` de un decimal entero se lee como si el
+          # número siguiera, y al lado de un monto vuelve ambiguo si el importe es por unidad
+          # o total. Los decimales sólo aparecen cuando los hay (2.5 litros).
+          descripcion: "Compra insumo — #{nombre} (#{cantidad_legible(cantidad)} #{unidad_medida})",
           monto_ars: costo_total, fecha: fecha, proveedor: proveedor,
           pagado: pagado, medio_pago: medio_pago
         )
@@ -291,5 +294,11 @@ class Insumo < ApplicationRecord
     )
   rescue StandardError => e
     Rails.logger.error "[Insumo] aviso de reposición: #{e.message}"
+  end
+
+  # 1000 → "1000"; 2.5 → "2.5". Sin el ".0" que arrastra `to_s('F')` en los enteros.
+  def cantidad_legible(valor)
+    d = valor.to_d
+    d == d.to_i ? d.to_i.to_s : d.to_s('F')
   end
 end
