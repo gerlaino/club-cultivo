@@ -316,8 +316,13 @@ validación `finalizado_exige_stock_agotado` y `finalizar_si_stock_agotado!`. Da
 - `LoteEvento#user` pasó a `optional: true` (la columna sigue NOT NULL: para eventos realmente sin
   autor haría falta una migración, no hecha).
 
-**Pendientes que quedan:** **#38** auditoría de utilidad de los 8+ informes (Germán sospecha
-que sobran) y **#40** barrido de design system — que no es un barrido: son 268 `.vue` con
+**Pendientes que quedan (ago-08):** todo lo que estaba en manos del asistente se cerró — ver
+el CHANGELOG (j). Queda del lado de Germán: correr los rakes en prod, declarar a mano las
+genéticas sin sufijo, pasar los `numero_registro_inase`, y las decisiones de modelo de precios
+y medición de IA. Del lado técnico queda el REDISEÑO VISUAL del modal de nuevo movimiento (no
+acordado) y seguir #40 por las superficies que faltan (el super admin ya está).
+
+*(histórico)* **#38** auditoría de utilidad de los 8+ informes y **#40** barrido de design system — que no es un barrido: son 268 `.vue` con
 ~11.800 hexadecimales, hay que acotarlo a una superficie. Más las decisiones de Germán:
 modelo de precios y medición de calls de IA.
 

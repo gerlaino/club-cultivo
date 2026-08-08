@@ -1,5 +1,45 @@
 # Changelog
 
+## Agosto 2026 (j) — la sede que no acotaba nada, y el módulo contable que no cerraba
+
+**Una entrega sin cobros figuraba como pago "mixto".** Mixto significa que se pagó de dos
+formas distintas, no que no se pagó. Dos piezas se tapaban: la reserva creaba la dispensación
+con `medio_pago: 'mixto'` de placeholder "que los cobros afinan", y `afinar_medio_pago!` con
+CERO cobros también resolvía 'mixto' —porque `[].size == 1` es false—. Cuando no había resto
+que cobrar (la seña cubrió todo, o se cobra contra entrega), nadie corregía el placeholder.
+
+**Asignarle una sede a un dispensador no servía de nada en el inventario:** veía —y podía
+dispensar— el stock de TODAS las sedes del club. Ahora `User#sedes_visibles_ids` manda en el
+listado de stock, en la pestaña de inventario y en las reservas. Sin sedes asignadas se sigue
+viendo todo (club de una sola sede, o admin que no se asignó ninguna), y el stock del pool
+—que no es de ninguna sede— se ve siempre.
+
+**El informe de Producción decía 0 gramos** con veinte lotes curados: los sumaba de la tabla
+`pesadas`, que el flujo real no llena (el club pesa por `PesajeManicura`). Y **se contradecía
+solo**: el KPI "Plantas en pie" daba 156 y la tabla del mismo informe sumaba 548, porque una
+contaba plantas vivas y la otra el `plants_count` declarado. Los dos arreglados y verificados.
+
+**Del módulo contable**, siguiendo la idea de que la categoría tiene que trabajar por el
+usuario:
+- **Cantidad × precio c/u = total**, los tres campos ligados. La multiplicación va en centavos
+  enteros: `2,5 × 3,33` daba 8,32 en punto flotante y en plata eso no se deja pasar.
+- **La categoría define el tipo**: ya sabía el sector y el depósito, pero el combo filtraba
+  *por* tipo, así que había que acertar "Salió plata" primero. Sigue sin ser obligatorio
+  empezar por ahí — es un atajo, no un peaje.
+- **"Registrar pago"** sobre cada gasto pendiente. Se podía marcar la deuda pero no saldarla:
+  el total por pagar no bajaba nunca.
+- **Filtros por sector**, y filtrar por una categoría madre ahora trae lo de sus hijas (antes
+  devolvía vacío, porque los movimientos cuelgan de las subcategorías).
+
+**De ocho informes a seis:** Cumplimiento era REPROCANN con otro título (sus KPIs salían de los
+mismos conteos) y Sedes era el conteo de plantas de Producción partido por sede. Los endpoints
+siguen respondiendo; salen de la navegación.
+
+**Design system (#40), primera superficie:** los grises del panel de super admin salen de
+tokens. La clave fue no reemplazar la escala: `ink` (neutro) y `slate` (azulado) no son
+intercambiables, así que se le dio nombre a la que ya se usaba, con el valor exacto. 259
+reemplazos, ni un pixel distinto, y un test que impide que vuelvan los hexadecimales a mano.
+
 ## Agosto 2026 (i) — declarar una genética ante el INASE
 
 Los clubes cultivan variedades que **no** están inscriptas en el INASE, y la forma de
