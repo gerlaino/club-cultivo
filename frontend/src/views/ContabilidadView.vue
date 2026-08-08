@@ -272,6 +272,10 @@ const filtroQ         = ref("")
 const filtroTipo      = ref("")
 const filtroCategoria = ref("")
 const filtroSede      = ref("")
+// El SECTOR (unidad de negocio) es la agrupación que el club creó para leer su plata por línea
+// de negocio: "todo lo del Buffet", "todo lo de Cultivo". El backend ya sabía filtrar por él;
+// el libro no lo ofrecía, así que la jerarquía no servía para nada acá.
+const filtroSector    = ref("")
 const filtroDesde     = ref("")
 const filtroHasta     = ref("")
 
@@ -289,19 +293,21 @@ async function aplicarFiltros() {
   store.setFiltro("tipo",      filtroTipo.value)
   store.setFiltro("categoria", filtroCategoria.value)
   store.setFiltro("sede_id",   filtroSede.value)
+  store.setFiltro("unidad_negocio_id", filtroSector.value)
   store.setFiltro("desde",     filtroDesde.value)
   store.setFiltro("hasta",     filtroHasta.value)
   await store.fetch()
 }
 function limpiarFiltros() {
-  filtroQ.value = filtroTipo.value = filtroCategoria.value = filtroSede.value = ""
+  filtroQ.value = filtroTipo.value = filtroCategoria.value = filtroSede.value = filtroSector.value = ""
   filtroDesde.value = filtroHasta.value = ""
   store.resetFiltros()
   store.fetch()
 }
 
 const hayFiltros = computed(() =>
-  filtroTipo.value || filtroCategoria.value || filtroSede.value || filtroDesde.value || filtroHasta.value
+  filtroTipo.value || filtroCategoria.value || filtroSede.value || filtroSector.value ||
+  filtroDesde.value || filtroHasta.value
 )
 
 const route  = useRoute()
@@ -874,6 +880,10 @@ onMounted(async () => {
           <input v-model="filtroQ" class="cv__filtro-input cv__filtro-input--wide" placeholder="Buscar descripción, categoría, proveedor…" />
           <span v-if="filtroQ" class="cv__search-x cv__search-x--in" @click="filtroQ = ''"><i class="bi bi-x"></i></span>
         </div>
+        <select class="cv__filtro-input" v-model="filtroSector" @change="aplicarFiltros">
+          <option value="">Todos los sectores</option>
+          <option v-for="u in unidades" :key="u.id" :value="u.id">{{ u.nombre }}</option>
+        </select>
         <select class="cv__filtro-input" v-model="filtroTipo" @change="aplicarFiltros">
           <option value="">Todos los tipos</option>
           <option value="ingreso">Ingreso</option>

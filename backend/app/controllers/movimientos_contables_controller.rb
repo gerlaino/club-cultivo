@@ -14,7 +14,14 @@ class MovimientosContablesController < ApplicationController
 
     scope = scope.where(tipo: params[:tipo])                       if params[:tipo].present?
     scope = scope.where(categoria: params[:categoria])             if params[:categoria].present?
-    scope = scope.where(categoria_contable_id: params[:categoria_contable_id]) if params[:categoria_contable_id].present?
+    # Filtrar por una categoría MADRE trae también sus subcategorías: si pedís "Insumos" querés
+    # ver lo de Fertilizante y Macetas, no una lista vacía porque los movimientos cuelgan de las
+    # hijas. Pedir una subcategoría filtra sólo por ella.
+    if params[:categoria_contable_id].present?
+      cat_id = params[:categoria_contable_id]
+      hijas  = CategoriaContable.where(club_id: current_user.club_id, parent_id: cat_id).pluck(:id)
+      scope  = scope.where(categoria_contable_id: [cat_id] + hijas)
+    end
     scope = scope.where(unidad_negocio_id: params[:unidad_negocio_id])         if params[:unidad_negocio_id].present?
     scope = scope.por_sede(params[:sede_id])                       if params[:sede_id].present?
     scope = scope.por_lote(params[:lote_id])                       if params[:lote_id].present?
