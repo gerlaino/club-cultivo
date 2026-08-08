@@ -30,7 +30,7 @@
 
 <script setup>
 import {
-  FileCheck, Sprout, Package, Building2, ShieldAlert, FileBadge, Target, Search,
+  FileCheck, Sprout, Package, FileBadge, Target, Search,
 } from 'lucide-vue-next'
 
 const GRUPOS = [
@@ -38,12 +38,11 @@ const GRUPOS = [
     titulo: 'Cumplimiento',
     desc: 'Lo que hay que poder mostrar si golpean la puerta.',
     informes: [
-      { to: '/auditor/reprocann', icon: FileCheck, label: 'REPROCANN',
-        desc: 'Estado del certificado de cada paciente, por sede, y las entregas que recibieron.',
+      // Cumplimiento se fusionó acá: su tasa y sus alertas salían de los mismos conteos que
+      // este informe ya hacía, así que eran dos pantallas para un solo dato.
+      { to: '/auditor/reprocann', icon: FileCheck, label: 'REPROCANN y cumplimiento',
+        desc: 'Estado del certificado de cada paciente, la tasa al día y las alertas abiertas.',
         pregunta: '¿Está todo el mundo en regla?' },
-      { to: '/auditor/cumplimiento', icon: ShieldAlert, label: 'Cumplimiento',
-        desc: 'Tasa de pacientes al día y alertas abiertas.',
-        pregunta: '¿Qué me falta resolver?' },
       { to: '/auditor/inase', icon: FileBadge, label: 'INASE',
         desc: 'Variedades cultivadas y su registro.',
         pregunta: '¿Qué genéticas declaro?' },
@@ -53,15 +52,14 @@ const GRUPOS = [
     titulo: 'Operación',
     desc: 'Cómo viene el club puertas adentro.',
     informes: [
+      // Sedes se fusionó acá: era el mismo conteo de plantas partido por sede, y un club de
+      // una sola sede abría un informe de una fila.
       { to: '/auditor/produccion', icon: Sprout, label: 'Producción',
-        desc: 'Lotes, plantas y gramos del período.',
-        pregunta: '¿Cuánto estamos produciendo?' },
+        desc: 'Lotes, plantas y gramos del período, con el desglose por sede.',
+        pregunta: '¿Cuánto estamos produciendo, y dónde?' },
       { to: '/auditor/dispensaciones', icon: Package, label: 'Dispensaciones',
         desc: 'Entregas, gramos y pacientes atendidos.',
         pregunta: '¿Cuánto sale y a cuántos?' },
-      { to: '/auditor/sedes', icon: Building2, label: 'Sedes',
-        desc: 'Salas, plantas y stock de cada una.',
-        pregunta: '¿Cómo está repartido todo?' },
     ],
   },
   {

@@ -101,6 +101,19 @@ class InformesController < ApplicationController
         gramos: gramos_del_periodo(club, desde, hasta, estado: e) }
     end
 
+    # El informe de Sedes era este mismo dato partido en otra pantalla: plantas y flor por
+    # sede, con el MISMO criterio de conteo que el KPI de acá. Un club de una sola sede abría
+    # un informe de una fila. Vive como desglose de Producción, que es de lo que habla.
+    por_sede = club.sedes.includes(:salas).map do |s|
+      plantas = Plant.joins(lote: :sala).where(salas: { sede_id: s.id })
+                     .where.not(state: %w[cosechado finalizado]).count
+      # Flor seca solamente: los derivados (hash, preroll) tienen su propia unidad y no se
+      # suman como gramos.
+      flor = Stock.where(sede_id: s.id, forma_producto: 'flor_seca').disponibles.sum(:cantidad).to_f
+      { id: s.id, nombre: s.nombre, salas: s.salas.cultivo.count,
+        plantas: plantas, stock_disponible: flor.round(1) }
+    end
+
     datos = {
       total_lotes:      total_lotes,
       lotes_activos:    lotes_activos,
@@ -108,6 +121,8 @@ class InformesController < ApplicationController
       gramos_producidos: gramos_producidos,
       plantas_totales:  plantas_totales,
       por_estado:       por_estado,
+      por_sede:         por_sede,
+      total_sedes:      por_sede.size,
     }
 
     responder_informe(
@@ -120,14 +135,25 @@ class InformesController < ApplicationController
         { label: 'Gramos del período', valor: gramos_producidos.round(1) },
         { label: 'Plantas en pie',  valor: plantas_totales },
       ],
-      secciones: [{
-        titulo: 'Por estado del lote',
-        headers: ['Estado', 'Lotes', 'Plantas', 'Gramos'],
-        rows: por_estado.map { |e| [e[:estado].to_s.tr('_', ' ').capitalize, e[:lotes], e[:plantas], e[:gramos]] },
-        formatos: [:texto, :numero, :numero, :numero],
-        totales: [1, 2, 3],
-        aligns: { 1 => :right, 2 => :right, 3 => :right },
-      }],
+      secciones: [
+        {
+          titulo: 'Por estado del lote',
+          headers: ['Estado', 'Lotes', 'Plantas', 'Gramos'],
+          rows: por_estado.map { |e| [e[:estado].to_s.tr('_', ' ').capitalize, e[:lotes], e[:plantas], e[:gramos]] },
+          formatos: [:texto, :numero, :numero, :numero],
+          totales: [1, 2, 3],
+          aligns: { 1 => :right, 2 => :right, 3 => :right },
+        },
+        {
+          titulo: 'Por sede',
+          headers: ['Sede', 'Salas', 'Plantas', 'Flor seca (g)'],
+          rows: por_sede.map { |s| [s[:nombre], s[:salas], s[:plantas], s[:stock_disponible]] },
+          formatos: [:texto, :numero, :numero, :numero],
+          totales: [1, 2, 3],
+          aligns: { 1 => :right, 2 => :right, 3 => :right },
+          vacio: 'El club todavía no tiene sedes cargadas.',
+        },
+      ],
     )
   end
 
@@ -532,7 +558,32 @@ class InformesController < ApplicationController
       lista_anonimizada:      lista,
       por_sede:               reprocann_por_sede(club, pacientes),
       dispensaciones:         reprocann_dispensaciones(club, pacientes),
+      # El informe de Cumplimiento era esto mismo con otro título: sus cuatro KPIs salían de
+      # los conteos que ya se calculan acá arriba. Vive adentro de REPROCANN, que es de lo que
+      # habla.
+      cumplimiento:           cumplimiento_data(club, conteos),
     }
+  end
+
+  # Tasa de cumplimiento y alertas de la población de pacientes. Recibe los conteos ya hechos
+  # por `reprocann_data` para no recorrer dos veces lo mismo.
+  def cumplimiento_data(club, conteos)
+    total     = conteos.values.sum
+    vigente   = conteos['vigente']
+    por_vencer = conteos['por_vencer']
+    vencidos  = conteos['vencido']
+    sin_seg   = Paciente.for_club(club.id).where(es_paciente: true, con_seguimiento_medico: false).count
+
+    # Quien vence en 20 días HOY está en regla: cuenta como cumplimiento, aunque tenga alerta.
+    en_regla = vigente + por_vencer
+    tasa = total.positive? ? ((en_regla.to_f / total) * 100).round(1) : 0
+
+    alertas = []
+    alertas << { severidad: 'error',   detalle: "#{vencidos} pacientes con REPROCANN vencido" } if vencidos > 0
+    alertas << { severidad: 'warning', detalle: "#{por_vencer} pacientes vencen en ≤30 días" }  if por_vencer > 0
+    alertas << { severidad: 'warning', detalle: "#{sin_seg} pacientes sin seguimiento médico" } if sin_seg > 0
+
+    { tasa: tasa, en_regla: en_regla, sin_seguimiento_medico: sin_seg, alertas: alertas }
   end
 
   # Actividad de dispensación de la población informada. Es lo que le da sentido al informe:

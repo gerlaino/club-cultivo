@@ -19,12 +19,6 @@
       <RouterLink to="/auditor/dispensaciones" class="aud-link" active-class="aud-link--active">
         <Package :size="18" :stroke-width="1.75" /><span>Dispensaciones</span>
       </RouterLink>
-      <RouterLink to="/auditor/sedes" class="aud-link" active-class="aud-link--active">
-        <Building2 :size="18" :stroke-width="1.75" /><span>Sedes</span>
-      </RouterLink>
-      <RouterLink to="/auditor/cumplimiento" class="aud-link" active-class="aud-link--active">
-        <ShieldAlert :size="18" :stroke-width="1.75" /><span>Cumplimiento</span>
-      </RouterLink>
       <RouterLink to="/auditor/plan-vs-real" class="aud-link" active-class="aud-link--active">
         <BarChart2 :size="18" :stroke-width="1.75" /><span>Plan vs Real</span>
       </RouterLink>
