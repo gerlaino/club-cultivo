@@ -52,6 +52,26 @@ api.interceptors.response.use(
       }
     }
 
+    // El club apagó el módulo del que vive el rol de este usuario MIENTRAS tenía la sesión
+    // abierta. Backend responde 403 a todo: sin esto, la app se llena de pantallas vacías sin
+    // explicación. Lo sacamos afuera con el motivo, igual que un 401.
+    // (En el propio login no: ahí el store ya muestra el mensaje en el formulario, sin recargar.)
+    if (status === 403 && error?.response?.data?.modulo_rol_apagado && !url.includes('/users/sign_in')) {
+      try {
+        sessionStorage.setItem('login_error', error.response.data.error || '');
+      } catch {}
+      try {
+        const { useAuthStore } = await import("../stores/auth");
+        const auth = useAuthStore();
+        auth.user = null;
+        auth.bootstrapped = true;
+      } catch {}
+      if (!window.location.pathname.startsWith('/login')) {
+        window.location.href = '/login';
+      }
+      return Promise.reject(error);
+    }
+
     if (status === 500) {
       const toast = useToast();
       toast.error('Error en el servidor. Intentá de nuevo en unos segundos.', { timeout: 5000 });

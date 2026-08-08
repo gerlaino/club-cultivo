@@ -1,12 +1,10 @@
 class DetectarAlertasJob < ApplicationJob
   queue_as :default
 
+  # Sin filtro de suite acá: el detector es mixto (cultivo + cuenta corriente) y decide
+  # detector por detector según lo que el club tenga prendido. Ver AlertaDetectorService.
   def perform(club_id = nil)
-    clubs = club_id ? Club.where(id: club_id) : Club.all
-    clubs.find_each do |club|
-      ActsAsTenant.with_tenant(club) { AlertaDetectorService.new(club).detectar! }
-    rescue => e
-      Rails.logger.error "DetectarAlertasJob club #{club.id}: #{e.class}: #{e.message}"
-    end
+    scope = club_id ? Club.operativos.where(id: club_id) : Club.operativos
+    cada_club_con(scope: scope) { |club| AlertaDetectorService.new(club).detectar! }
   end
 end

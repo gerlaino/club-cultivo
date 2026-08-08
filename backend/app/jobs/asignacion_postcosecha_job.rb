@@ -23,7 +23,7 @@ class AsignacionPostcosechaJob < ApplicationJob
   queue_as :default
 
   def perform
-    Club.activos.find_each { |club| ActsAsTenant.with_tenant(club) { procesar_club(club) } }
+    cada_club_con(:cultivo) { |club| procesar_club(club) }
   end
 
   private

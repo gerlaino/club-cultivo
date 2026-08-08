@@ -4,9 +4,7 @@ class ReprocannVencimientoJob < ApplicationJob
   UMBRALES_DIAS = [30, 15, 7].freeze
 
   def perform
-    Club.all.find_each do |club|
-      ActsAsTenant.with_tenant(club) { procesar_club(club) }
-    end
+    cada_club_con(:produccion_dispensa) { |club| procesar_club(club) }
   end
 
   private

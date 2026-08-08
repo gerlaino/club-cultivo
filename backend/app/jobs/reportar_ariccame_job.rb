@@ -6,7 +6,12 @@ class ReportarAriccameJob < ApplicationJob
     return unless dispensacion
     return if dispensacion.ariccame_reportada?
 
-    ActsAsTenant.with_tenant(dispensacion.stock&.club) do
+    # Reportar a un organismo regulador es lo último que debería seguir pasando solo: si el
+    # club apagó ARICCAME entre que se encoló el job y que corrió, no se transmite.
+    club = dispensacion.stock&.club
+    return unless club&.feature?(:ariccame)
+
+    ActsAsTenant.with_tenant(club) do
       Ariccame::ReportadorDispensacion.new(dispensacion).call
     end
   rescue => e

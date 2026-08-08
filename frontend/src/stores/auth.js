@@ -139,6 +139,10 @@ export const useAuthStore = defineStore("auth", {
       } catch (e) {
         if (e?.response?.status === 401) {
           this.error = "Credenciales inválidas";
+        } else if (e?.response?.data?.modulo_rol_apagado) {
+          // Usuario y contraseña estaban bien: lo que falta es el módulo. El mensaje del
+          // backend nombra cuál, así que se muestra tal cual.
+          this.error = e.response.data.error;
         } else {
           this.error = e?.message || "Error al iniciar sesión";
         }

@@ -150,7 +150,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
 import DsSpinner from '../design-system/components/Spinner.vue'
@@ -168,6 +168,18 @@ const BUILD_AT = __APP_BUILD_AT__
 const retrying     = ref(false)
 const lastSubmitAt = ref(0)
 const COOLDOWN_MS  = 600
+
+// Al usuario lo expulsó el interceptor (su club apagó el módulo de su rol mientras estaba
+// adentro). El motivo viajó por sessionStorage porque en el medio hay una recarga completa.
+onMounted(() => {
+  try {
+    const motivo = sessionStorage.getItem('login_error')
+    if (motivo) {
+      auth.error = motivo
+      sessionStorage.removeItem('login_error')
+    }
+  } catch {}
+})
 
 function esErrorDeConexion(e) {
   const status = e?.response?.status

@@ -3,7 +3,11 @@ class Dispositivo < ApplicationRecord
   belongs_to :club
   acts_as_tenant(:club)
   belongs_to :sala
-  has_many   :lecturas_ambientales, dependent: :nullify
+  # `class_name` explícito: Rails singulariza "lecturas_ambientales" a "LecturasAmbientale" y
+  # no encuentra la clase (el modelo es LecturaAmbiental, con table_name a mano). Sin esto,
+  # cualquier uso de la asociación —incluido el `dependent: :nullify` al BORRAR un
+  # dispositivo— tiraba NameError: dar de baja un sensor desde la UI devolvía 500.
+  has_many   :lecturas_ambientales, class_name: 'LecturaAmbiental', dependent: :nullify
 
   encrypts :metadata, deterministic: false
 

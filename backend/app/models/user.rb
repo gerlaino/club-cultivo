@@ -43,6 +43,46 @@ class User < ApplicationRecord
   validates :role,  presence: true
   validates :email, presence: true, uniqueness: true
 
+  # ── Roles que dependen de un módulo ───────────────────────────────────────
+  #
+  # Un cultivador en un club que apagó la suite Cultivo no tiene NADA que hacer: entraba
+  # igual, caía en el home y cada endpoint suyo le devolvía 403 sin decirle por qué. Parecía
+  # la app rota. Con esto el rechazo llega una sola vez, en el login, y explica el motivo.
+  #
+  # Con que UNA de las claves esté prendida alcanza (el supervisor trabaja en las dos suites).
+  # Los roles que NO figuran acá nunca se bloquean: `admin` y `super_admin` administran,
+  # `auditor` y `abogado` son lectura transversal y tienen que poder mirar el histórico de un
+  # módulo dado de baja.
+  MODULOS_POR_ROL = {
+    'cultivador'  => %w[cultivo],
+    'manicura'    => %w[cultivo],
+    'supervisor'  => %w[cultivo produccion_dispensa],
+    # El dispensador no vive sólo de la dispensa: también atiende el mostrador del Buffet
+    # (caja de turno, ventas, stock del salón). Un club que compró sólo el Buffet tiene
+    # dispensadores que trabajan todos los días, así que `bar` alcanza para dejarlo entrar.
+    'dispensador' => %w[produccion_dispensa bar],
+    'delivery'    => %w[produccion_dispensa],
+    'paciente'    => %w[produccion_dispensa],
+    'medico'      => %w[medico],
+  }.freeze
+
+  def modulos_requeridos = MODULOS_POR_ROL.fetch(role.to_s, [])
+
+  # ¿Este usuario puede operar hoy? Sin club (super_admin) o sin módulo asociado al rol, sí.
+  def rol_habilitado?
+    requeridos = modulos_requeridos
+    return true if requeridos.empty? || club.nil?
+
+    requeridos.any? { |clave| club.feature?(clave) }
+  end
+
+  # Cómo se llama, en castellano, el módulo que le falta al club para que este rol trabaje.
+  def modulo_faltante_label
+    modulos_requeridos
+      .map { |c| (Club::SUITES[c] || Club::ADDONS[c] || {})[:label] || c.humanize }
+      .join(' o ')
+  end
+
   # Contraseña inicial de un usuario nuevo (y del "restablecer"). Se arma para poder DICTARSE
   # por teléfono sin equívocos: sin 0/O ni 1/l/I, y con un guion que separa los bloques. Igual
   # es temporal — Devise pide cambiarla con el link del mail.

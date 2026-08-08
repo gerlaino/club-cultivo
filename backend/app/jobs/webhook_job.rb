@@ -5,6 +5,10 @@ class WebhookJob < ApplicationJob
 
   def perform(dispositivo_id, payload)
     dispositivo = Dispositivo.activos.find(dispositivo_id)
+    # Defensa en profundidad: la puerta es el webhook, pero un job encolado puede ejecutarse
+    # después de que el club apagó IoT.
+    return unless dispositivo.club&.feature?(:iot)
+
     ActsAsTenant.with_tenant(dispositivo.club) do
       driver_class = driver_para(dispositivo.tipo)
       driver_class.new(dispositivo).persist!(payload)

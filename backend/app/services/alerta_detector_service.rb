@@ -29,7 +29,17 @@ class AlertaDetectorService
     @club = club
   end
 
+  # El detector es MIXTO: los cuatro detectores por lote son de la suite Cultivo y el de saldo
+  # es de Producción y dispensa. Un club que compró sólo una de las dos no tiene por qué
+  # recibir alertas de la otra, así que el filtro va acá y no en el job que lo llama.
   def detectar!
+    detectar_cultivo if @club.feature?(:cultivo)
+    detectar_saldo_cc_bajo if @club.feature?(:produccion_dispensa)
+  end
+
+  private
+
+  def detectar_cultivo
     # Precargamos todos los setpoints del club para evitar N+1 por lote
     setpoints_club = SetpointFase.del_club(@club.id).to_a
 
@@ -43,11 +53,7 @@ class AlertaDetectorService
       detectar_cosecha_pendiente(lote)
       detectar_tareas_vencidas(lote)
     end
-
-    detectar_saldo_cc_bajo
   end
-
-  private
 
   def crear_alerta(tipo:, lote: nil, severidad:, mensaje:, contexto: {})
     return if alerta_reciente?(tipo, lote&.id, contexto)

@@ -54,6 +54,11 @@ class Club < ApplicationRecord
 
   scope :activos,    -> { where(deleted_at: nil) }
   scope :eliminados, -> { where.not(deleted_at: nil) }
+  # OJO: `activos` sólo mira `deleted_at` — un club SUSPENDIDO (`activo: false`) pasa el filtro.
+  # `operativos` es el que hay que usar cuando algo produce efectos hacia afuera (alertas, mails,
+  # push): un club que dejó de pagar no debe seguir mandándole correo a sus pacientes.
+  # `check_club_activo!` ya frena a los suspendidos en la API; los jobs no tenían equivalente.
+  scope :operativos, -> { where(deleted_at: nil, activo: true) }
   # Clubes de verdad: los que operan. Excluye los demo (club modelo, copias de prueba), cuyos datos
   # son inventados y no deben entrar en métricas agregadas ni en benchmarking.
   scope :reales,     -> { where(demo: false) }

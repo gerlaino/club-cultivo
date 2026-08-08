@@ -10,6 +10,7 @@ class ApplicationController < ActionController::API
   before_action :set_current_user
   before_action :set_tenant_from_current_user
   before_action :check_club_activo!
+  before_action :check_rol_habilitado!
   before_action :block_auditor_writes!
   before_action :block_observer_writes!
 
@@ -72,6 +73,22 @@ class ApplicationController < ActionController::API
       render json: { error: 'Este club está suspendido. Contactate con soporte para reactivarlo.',
                      club_suspendido: true }, status: :forbidden
     end
+  end
+
+  # El club apagó la suite de la que vive este rol. El login ya lo rechaza con el mismo
+  # mensaje, pero esto cubre las sesiones ABIERTAS: si el admin apaga Cultivo al mediodía, el
+  # cultivador que estaba adentro tiene que enterarse, no ver 403 sueltos en cada pantalla.
+  def check_rol_habilitado!
+    return if current_user.nil? || current_user.super_admin?
+    return if current_user.rol_habilitado?
+
+    render json: { error: mensaje_rol_deshabilitado(current_user), modulo_rol_apagado: true },
+           status: :forbidden
+  end
+
+  def mensaje_rol_deshabilitado(user)
+    "Tu club no tiene activo el módulo #{user.modulo_faltante_label}, que es el que usa tu " \
+      "rol (#{user.role.humanize}). Hablá con el administrador del club."
   end
 
   def block_auditor_writes!

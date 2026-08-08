@@ -4,7 +4,7 @@ class IndicacionVencimientoJob < ApplicationJob
   UMBRALES_DIAS = [30, 15, 7].freeze
 
   def perform
-    Club.all.find_each { |club| ActsAsTenant.with_tenant(club) { procesar_club(club) } }
+    cada_club_con(:medico) { |club| procesar_club(club) }
   end
 
   private

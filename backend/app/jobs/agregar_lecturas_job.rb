@@ -3,6 +3,8 @@ class AgregarLecturasJob < ApplicationJob
 
   def perform(sala_id, tipo, lecturas_attrs)
     sala = Sala.find(sala_id)
+    return unless sala.club&.feature?(:iot)
+
     ActsAsTenant.with_tenant(sala.club) do
       lecturas_attrs.each do |attrs|
         LecturaAmbiental.find_or_initialize_by(

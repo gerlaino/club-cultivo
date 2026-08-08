@@ -14,10 +14,16 @@ RSpec.describe 'Gating por módulo', type: :request do
   describe 'módulo médico apagado' do
     before do
       features!('cultivo' => true, 'produccion_dispensa' => true, 'medico' => false)
-      sign_in_as(medico)
     end
 
+    # Se prueba con el ADMIN y no con el médico: desde el gating de roles, un médico en un
+    # club sin módulo médico ya no llega a hacer este request —lo frena el login, porque no
+    # tendría nada que hacer adentro— y el rechazo que devuelve es otro
+    # (`modulo_rol_apagado`, ver spec/requests/rol_modulo_apagado_spec.rb). El admin sí entra
+    # siempre, así que es con quien se verifica que el candado del MÓDULO sigue puesto.
     it 'rechaza la lista de pacientes del médico con 403 y explica por qué' do
+      sign_in_as(admin)
+
       get '/api/medico/pacientes'
 
       expect(response).to have_http_status(:forbidden)
@@ -25,6 +31,14 @@ RSpec.describe 'Gating por módulo', type: :request do
       expect(body['requiere_modulo']).to be(true)
       expect(body['modulo']).to eq('medico')
       expect(body['error']).to match(/Módulo médico/i)
+    end
+
+    it 'al médico lo frena antes, en el login' do
+      post '/api/users/sign_in',
+           params: { user: { email: medico.email, password: 'password123' } }, as: :json
+
+      expect(response).to have_http_status(:forbidden)
+      expect(JSON.parse(response.body)['modulo_rol_apagado']).to be(true)
     end
   end
 
