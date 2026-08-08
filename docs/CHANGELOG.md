@@ -1,5 +1,112 @@
 # Changelog
 
+## Agosto 2026 (h) — el historial del delivery daba 403 y la pantalla decía "no hay nada"
+
+**El repartidor no podía ver su propio historial.** `require_dispensaciones_role!` le permite al
+rol `delivery` una lista corta de acciones y `mi_historial` no estaba en ella: el backend
+respondía 403. El otro guard del mismo controller (`require_dispensador_o_admin`) sí lo
+exceptuaba — dos guards, uno abierto y otro cerrado, el mismo patrón que el loop del login en la
+PWA. Y el front hacía `catch { paquetes = [] }`, así que el error se veía como *"Todavía no
+cerraste ninguna entrega en este período"*: fallaba en silencio. Ahora el historial carga, y
+"vacío" y "no se pudo cargar" son dos pantallas distintas, la segunda con reintento.
+
+**El rango de días filtraba por `updated_at`**, la última vez que se tocó el registro, no por
+cuándo se cerró la entrega. Con eso el filtro mentía: una entrega de hace 40 días que después se
+editó (un cobro corregido) volvía a caer dentro de "7 días". Pasa a `COALESCE(entregado_at,
+updated_at)`. Queda pendiente que `reportar_fallo` registre su propia fecha de cierre: hoy un
+fallido no tiene más marca temporal que `updated_at` (necesita columna nueva).
+
+**Los "No entregados" vuelven a arrancar desplegados.** Al hacer plegables las listas los había
+dejado cerrados por defecto —el repartidor no puede resolverlos, los reprograma el admin— pero
+esconder algo que acaba de pasar se lee como que no se registró.
+
+## Agosto 2026 (g) — el lote que no cerraba, y los pacientes con iniciales
+
+**Un lote no pasaba a "finalizado" al dispensarse.** `Dispensacion#decrementar_stock` descuenta con
+`decrement!(:cantidad)`, que baja la cantidad pero **no toca el estado del stock** — y el callback
+que cierra el lote escucha el cambio de estado. Resultado: se dispensaba un lote hasta el último
+gramo, el stock quedaba `asignado` en cero y el lote se quedaba en `curado` para siempre. La
+finalización automática sólo ocurría desde los ajustes manuales de inventario. Ahora la
+dispensación marca el stock agotado cuando llega a cero, y eso cierra el ciclo.
+
+**Y al revés: había lotes "finalizados" con producto adentro.** El informe de trazabilidad mostraba
+un ciclo cerrado con 485 g sin dispensar. No lo hizo el flujo real: lo sembró `Clubs::SembrarDemo`,
+que elegía el estado por antigüedad y después le sorteaba el gramaje, sin cruzarlos. Eran 16 lotes,
+todos del Club Modelo. Se corrigieron tres cosas: el sembrador reconcilia estado y stock, hay un
+rake para los que ya estaban mal (`lotes:corregir_finalizados_con_stock`) y —lo que faltaba de
+raíz— **una validación**: un lote no puede pasar a `finalizado` si le queda producto. La regla
+existía en un solo método y cualquier otro código la salteaba.
+
+**Los derivados cuentan.** Un lote cierra cuando se agotan su flor **y** sus elaborados (el hash
+lleva el `lote_id` del lote del que salió). Además, elaborar hash con el último gramo de flor
+cerraba el lote un instante antes de que el derivado existiera: ahora el "agotado" del origen se
+marca al final de la transacción, con el derivado ya en la base.
+
+**En `/lotes` no se podía filtrar por "Finalizado".** Los lotes cerrados viven detrás de un tab que
+no se lee como filtro, y el desplegable de estados excluía la opción a propósito. Ahora está, y
+elegirla lleva al tab donde están — ofrecerla sin eso habría devuelto cero resultados.
+
+**Dos bugs que aparecieron en el camino:** `LoteEvento` exigía `user`, pero el cierre automático
+del lote nace de un callback donde no hay `current_user`: la última dispensación de un lote habría
+fallado. El autor ahora viaja desde el llamador (`Stock#usuario_movimiento`). Y el atajo "todas las
+plantas descartadas → finalizado" no miraba si el pesaje de manicura ya había creado el contenedor
+de flor.
+
+**Los pacientes salían con iniciales en los informes** ("A.G.") bajo la nota "el informe no expone
+datos personales". No protegía nada —quien abre un informe ya puede ver la ficha completa del
+paciente— y volvía las tablas ilegibles: dos "G.L." son indistinguibles y no se pueden cruzar con
+nada. Ahora van con nombre y apellido en dispensaciones, trazabilidad (pantalla y PDF) y analítica;
+el DNI sigue parcial. Las notas al pie que afirmaban anonimato se corrigieron: decían algo falso.
+
+## Agosto 2026 (f) — qué pasa cuando un club apaga un módulo
+
+Tres pendientes que resultaron ser la misma pregunta vista de tres lados.
+
+**Los jobs no sabían nada de las suites.** Ninguno de los 13: corren fuera de un request, así que
+no pasan por `check_club_activo!` ni por `require_feature!`. Un club que apagaba un módulo seguía
+recibiendo sus alertas como si nada. El caso más caro no era ruido interno: `ReprocannVencimientoJob`
+le manda el aviso de vencimiento **al paciente**, no al club. Ahora los jobs recorren con
+`ApplicationJob#cada_club_con(:suite)`, que resuelve club operativo + suite prendida + tenant +
+rescue por club, las tres cosas que cada uno repetía a mano o se olvidaba. `AlertaDetectorService`
+es mixto —cuatro detectores de cultivo y uno de cuenta corriente— así que filtra adentro, detector
+por detector.
+
+**Y una capa que estaba escondida abajo:** `Club.activos` es `where(deleted_at: nil)`, pero
+suspendido es `!activo?`. O sea que un club que dejó de pagar pasaba el filtro, y hasta los ocho
+jobs que ya usaban `activos` —los que parecían correctos— le seguían mandando alertas y mails.
+Scope nuevo `Club.operativos`: ni eliminado ni suspendido. `activos` queda como estaba para no
+tocar a sus otros llamadores.
+
+**El rol huérfano.** Un cultivador en un club que apagó Cultivo entraba igual, caía en el home y
+cada endpoint suyo le devolvía 403 sin decir por qué: se veía como la app rota. Ahora
+`User::MODULOS_POR_ROL` decide, el login lo rechaza nombrando el módulo que falta, y
+`check_rol_habilitado!` cubre las sesiones ya abiertas (si el admin apaga el módulo al mediodía, el
+front lo saca con el motivo en vez de llenarse de pantallas vacías). `admin`, `super_admin`,
+`auditor` y `abogado` nunca se bloquean: los dos últimos tienen que poder mirar el histórico de un
+módulo dado de baja. **Al dispensador le alcanza con `produccion_dispensa` O `bar`** — también
+atiende el mostrador del Buffet, y hay clubes que compraron sólo eso.
+
+**Los informes de un club que se baja de una suite: no hay nada que apagar.** No existe informe
+persistido —ni modelo ni tabla—, cada apertura los recalcula sobre datos vivos. Consultarlos es
+lectura pura y queda sin gating: un club dado de baja puede necesitar mostrarle papeles a un
+auditor. Lo que sí se apaga es la emisión automática, o sea `InformeSemestralJob`, el único informe
+que se manda solo.
+
+**La ingesta de IoT ahora exige el add-on** (`Webhooks::LecturasController` devuelve 403, no 401:
+el token es válido, lo que falta es el módulo). Nadie desenchufa un sensor porque el club se dio de
+baja. ⚠️ **Esto necesita `rake suites:prender_iot_con_dispositivos` junto con el deploy**: el flag
+`iot` nunca existió como bandera vieja —ninguna migración lo escribe— así que hoy ningún club lo
+tiene, y sin el rake todo club con hardware deja de recibir datos en silencio.
+
+**Del delivery.** Su logout vivía al fondo del sidebar, y el sidebar se esconde en mobile — o sea
+que estaba a dos toques de distancia (hamburguesa → scroll) para el único rol que trabaja siempre
+desde el celular. Pasó al menú de usuario de la topbar, como en todos los demás roles. Y las tres
+listas del dashboard se pliegan, con contador al costado y la elección recordada entre viajes; los
+"no entregados" arrancan cerrados, porque el repartidor no puede hacer nada con ellos.
+
+**De paso:** `Dispositivo has_many :lecturas_ambientales` no declaraba `class_name`, así que Rails
+buscaba `LecturasAmbientale` y **borrar un sensor tiraba 500**.
+
 ## Agosto 2026 (e) — el login esperaba al club, y dos catálogos que no coincidían
 
 **El login que se trababa.** `login()` hacía `await club.fetch()` (GET `/preferences`) **antes** de

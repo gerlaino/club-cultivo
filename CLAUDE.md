@@ -230,25 +230,76 @@ Cuando Germán plantee un problema o feature nueva antes de implementar:
 
 Suite 1239 ✓ + 58 vitest ✓. **Deploy: sumar `add_vendible_a_bar_venta_items` y `add_consumo_evento_a_provisiones_y_dispensas` al `db:migrate`.**
 
-## 📍 Dónde retomar (7-ago-2026)
+## 📍 Dónde retomar (7-ago-2026, cierre b)
 
-Todo pusheado a `master` (`71dacbb`). **1649 rspec + 299 vitest en verde.**
+**1682 rspec + 313 vitest en verde.** Sin commitear (Germán no lo pidió).
 
 **Antes de tocar producción:**
 ```
 db:migrate      # add_leaf_temp_offset_a_salas, add_pulse_api_key_a_clubs, y las de julio
 bundle install  # gema nueva pdf-inspector (sólo test)
+rake suites:prender_iot_con_dispositivos      # ⚠️ JUNTO CON EL DEPLOY, ver abajo
+rake lotes:corregir_finalizados_con_stock     # lotes cerrados que aún tienen producto
 ```
 
-**Pendientes concretos** (tareas #36-40): informes de un club que se baja de suite (NO
-verificado), alertas de un módulo apagado, auditoría de utilidad de los informes, usuarios de
-un rol cuya suite se apagó, barrido de design system. Además, decisiones de Germán: modelo de
-precios y medición de calls de IA.
+> ⚠️ **El rake de IoT no es opcional.** La ingesta de lecturas ahora exige el add-on `iot`, y
+> ese add-on NUNCA existió como bandera vieja: ninguna migración lo escribe, así que hoy
+> ningún club lo tiene salvo que lo hayan tildado a mano. Sin correr el rake, todo club con
+> hardware deja de recibir datos EN SILENCIO (el sensor postea, le contestan 403). El rake
+> prende `iot` a quien ya tenga dispositivos cargados; es idempotente y acepta `SIMULAR=1`.
 
-**Lo que se cerró:** los PDF de informes (eran capturas de pantalla), gating real de suites en
-backend y las dos superficies de menú, el P&L que no coincidía con la pantalla, el club que
-arranca con categorías contables, el driver de Pulse Grow, el VPD de hoja, y el login del
-delivery en PWA (loop entre dos guards).
+### Bloque "módulo apagado" (#36, #37, #39) — cerrado
+
+La misma pregunta vista de tres lados: qué pasa cuando un club apaga un módulo.
+
+- **#37 Jobs.** Ninguno de los 13 miraba las suites: un club que apagaba un módulo seguía
+  recibiendo sus alertas, y `ReprocannVencimientoJob` le manda mail **al paciente**, no al
+  club. Ahora se recorre con `ApplicationJob#cada_club_con(:suite)`, que resuelve club
+  operativo + suite + tenant + rescue. `AlertaDetectorService` es mixto y filtra adentro
+  (4 detectores de cultivo / saldo de CC). La ingesta IoT se corta en el webhook.
+- **Tercera capa, que no estaba anotada:** `Club.activos` es `where(deleted_at: nil)` y **un
+  club suspendido lo pasaba** — o sea que hasta los 8 jobs que parecían correctos procesaban
+  clubes que dejaron de pagar. Scope nuevo `Club.operativos` (ni eliminado ni suspendido).
+- **#39 Rol huérfano.** `User::MODULOS_POR_ROL`: un cultivador sin suite Cultivo entraba y
+  recibía 403 en todo, sin saber por qué. Ahora lo frena el login con el módulo nombrado, y
+  `check_rol_habilitado!` cubre las sesiones ya abiertas (el interceptor del front lo saca
+  con el motivo). `admin`/`super_admin`/`auditor`/`abogado` nunca se bloquean. **El
+  dispensador requiere `produccion_dispensa` O `bar`**: también atiende el mostrador del
+  Buffet, y hay clubes con sólo Buffet.
+- **#36 Informes.** No hay informes persistidos: no existe modelo ni tabla, cada apertura los
+  recalcula sobre datos vivos. Así que "leer el histórico" es gratis y se deja **sin gating**
+  (un club que se dio de baja puede necesitar mostrarle papeles a un auditor); lo que se
+  apaga es la **emisión automática**, o sea `InformeSemestralJob`, el único que se manda solo.
+
+**Delivery (pedido de Germán):** el logout pasó del fondo del sidebar —que se esconde en
+mobile, y el delivery trabaja siempre desde el celular— al menú de usuario de la topbar, como
+el resto de los roles. Las tres listas del dashboard se pliegan, con contador, y la elección
+se recuerda; los fallidos arrancan cerrados (no puede hacer nada con ellos).
+
+**Bug preexistente encontrado de paso:** `Dispositivo has_many :lecturas_ambientales` sin
+`class_name` → Rails buscaba `LecturasAmbientale`. Borrar un sensor tiraba 500.
+
+### El ciclo del lote (ago-08)
+
+**`finalizado` significa una sola cosa: no queda nada del lote — ni flor ni derivados.** La regla
+vive en `Lote#stock_remanente` y la hacen cumplir dos cosas que antes no existían juntas: la
+validación `finalizado_exige_stock_agotado` y `finalizar_si_stock_agotado!`. Datos del caso:
+
+- Un lote **no cerraba al dispensarse**: `decrement!(:cantidad)` no cambia el estado del stock y
+  el callback escucha el cambio de estado. Ahora la dispensación llama a
+  `Stock#marcar_agotado_si_vacio!`.
+- **El evento de cierre necesita autor** (`lote_eventos.user_id` es NOT NULL) y nace en un callback
+  sin `current_user`: el autor viaja en `Stock#usuario_movimiento`. Si algún llamador nuevo no lo
+  informa, se avisa en el log y NO se cierra — no se rompe la transacción que lo llamó.
+- Al **elaborar un derivado**, el origen se marca agotado al final de la transacción: si se marcara
+  antes, el lote cerraría un instante antes de que el hash exista.
+- `LoteEvento#user` pasó a `optional: true` (la columna sigue NOT NULL: para eventos realmente sin
+  autor haría falta una migración, no hecha).
+
+**Pendientes que quedan:** **#38** auditoría de utilidad de los 8+ informes (Germán sospecha
+que sobran) y **#40** barrido de design system — que no es un barrido: son 268 `.vue` con
+~11.800 hexadecimales, hay que acotarlo a una superficie. Más las decisiones de Germán:
+modelo de precios y medición de calls de IA.
 
 ### La lección que no hay que repetir
 
