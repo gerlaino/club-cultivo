@@ -214,7 +214,7 @@ onBeforeUnmount(detener)
 .msc__recovery { display: flex; gap: .5rem; justify-content: center; margin-top: .75rem; }
 .msc__btn {
   border: none; border-radius: 10px; padding: .6rem 1rem; cursor: pointer;
-  background: #fff; color: #0f172a; font-size: .85rem; font-weight: 600;
+  background: #fff; color: var(--c-slate-900); font-size: .85rem; font-weight: 600;
   display: inline-flex; align-items: center; gap: .4rem;
 }
 .msc__btn--ghost { background: rgba(255,255,255,.15); color: #fff; }

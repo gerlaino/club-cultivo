@@ -173,21 +173,21 @@ onMounted(cargar)
   display: flex; align-items: center; gap: .6rem;
   padding: 1rem 1rem .75rem;
 }
-.maa__title { font-size: 1.15rem; font-weight: 800; color: #0f172a; margin: 0; }
+.maa__title { font-size: 1.15rem; font-weight: 800; color: var(--c-slate-900); margin: 0; }
 .maa__count {
   background: #fef3c7; color: #b45309; border: 1px solid #fde68a;
   font-size: .68rem; font-weight: 700; padding: .15em .6em;
   border-radius: 999px;
 }
 
-.maa__loading { display: flex; align-items: center; justify-content: center; padding: 3rem; color: #94a3b8; }
+.maa__loading { display: flex; align-items: center; justify-content: center; padding: 3rem; color: var(--c-slate-400); }
 .maa__spin { animation: maa-spin .8s linear infinite; display: inline-block; font-size: 1.4rem; }
 @keyframes maa-spin { to { transform: rotate(360deg); } }
 
 .maa__empty { display: flex; flex-direction: column; align-items: center; gap: .4rem; padding: 3.5rem 1rem; text-align: center; }
 .maa__empty-icon { font-size: 2.8rem; color: #22c55e; }
-.maa__empty-title { font-size: .95rem; font-weight: 700; color: #0f172a; margin: 0; }
-.maa__empty-sub { font-size: .78rem; color: #94a3b8; margin: 0; }
+.maa__empty-title { font-size: .95rem; font-weight: 700; color: var(--c-slate-900); margin: 0; }
+.maa__empty-sub { font-size: .78rem; color: var(--c-slate-400); margin: 0; }
 
 /* Cards */
 .maa__list { display: flex; flex-direction: column; gap: .625rem; padding: 0 1rem; }
@@ -199,7 +199,7 @@ onMounted(cargar)
 }
 
 .maa__card-top { display: flex; align-items: center; gap: .5rem; }
-.maa__codigo { font-size: .95rem; font-weight: 800; color: #0f172a; font-family: monospace; }
+.maa__codigo { font-size: .95rem; font-weight: 800; color: var(--c-slate-900); font-family: monospace; }
 .maa__badge {
   font-size: .62rem; font-weight: 700; padding: .2em .6em;
   border-radius: 999px; background: #fef3c7; color: #b45309;
@@ -207,13 +207,13 @@ onMounted(cargar)
 
 .maa__card-meta {
   display: flex; flex-wrap: wrap; gap: .25rem .75rem;
-  font-size: .75rem; color: #64748b;
+  font-size: .75rem; color: var(--c-slate-500);
 }
 
 .maa__pesada {
   display: inline-flex; align-items: center; gap: .35rem;
   font-size: .78rem; color: #374151;
-  background: #f1f5f9; border-radius: 7px; padding: .3rem .6rem;
+  background: var(--c-slate-100); border-radius: 7px; padding: .3rem .6rem;
   align-self: flex-start;
 }
 
@@ -247,20 +247,20 @@ onMounted(cargar)
   padding-bottom: env(safe-area-inset-bottom, 1rem);
 }
 .maa__sheet-handle {
-  width: 40px; height: 4px; background: #e2e8f0;
+  width: 40px; height: 4px; background: var(--c-slate-200);
   border-radius: 999px; margin: .75rem auto .25rem;
 }
 .maa__sheet-header {
   display: flex; align-items: center; justify-content: space-between;
   padding: .5rem 1.25rem 1rem;
 }
-.maa__sheet-title { font-size: 1rem; font-weight: 700; color: #0f172a; margin: 0; }
+.maa__sheet-title { font-size: 1rem; font-weight: 700; color: var(--c-slate-900); margin: 0; }
 .maa__sheet-close {
-  background: none; border: none; color: #94a3b8;
+  background: none; border: none; color: var(--c-slate-400);
   font-size: 1rem; cursor: pointer; padding: .25rem;
 }
 .maa__sheet-body { padding: 0 1.25rem 1.5rem; display: flex; flex-direction: column; gap: .875rem; }
-.maa__sheet-lote { font-size: .85rem; color: #64748b; margin: 0; }
+.maa__sheet-lote { font-size: .85rem; color: var(--c-slate-500); margin: 0; }
 
 .maa__info-box {
   background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 9px;
@@ -271,12 +271,12 @@ onMounted(cargar)
 .maa__label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
 .maa__req { color: #ef4444; }
 .maa__input {
-  background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 9px;
-  padding: .7rem .875rem; font-size: .95rem; color: #0f172a;
+  background: var(--c-slate-50); border: 1.5px solid var(--c-slate-200); border-radius: 9px;
+  padding: .7rem .875rem; font-size: .95rem; color: var(--c-slate-900);
   width: 100%; box-sizing: border-box; outline: none;
 }
 .maa__input:focus { border-color: #15803d; background: #fff; }
-.maa__hint { font-size: .7rem; color: #94a3b8; }
+.maa__hint { font-size: .7rem; color: var(--c-slate-400); }
 .maa__input--warn { border-color: #f59e0b; background: #fffbeb; }
 
 .maa__error {

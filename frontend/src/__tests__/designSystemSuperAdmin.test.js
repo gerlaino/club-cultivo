@@ -25,6 +25,9 @@ const SUPERFICIES = {
   'super admin':  ['views/superadmin'],
   'contabilidad': ['components/contabilidad'],
   'informes':     ['views/auditor'],
+  'layouts':      ['components/layout'],
+  'delivery':     ['views/delivery'],
+  'mobile':       ['views/mobile'],
 }
 
 const vuesDe = (rel) =>

@@ -77,7 +77,40 @@ const FORMA_EMOJI = {
   preroll: '🚬', crema: '💊', descarte: '🗑️', otro: '📦',
 }
 
-const stocksDisponibles = computed(() => stocks.value.filter(s => s.cantidad > 0))
+// ── Primero la sede, después el stock de esa sede ────────────────────────────────
+// Un club con varias sedes mostraba todo el inventario junto en una sola lista, y quien
+// dispensa tenía que acordarse de cuál era de su mostrador. Se elige la sede y la lista queda
+// acotada. Con UNA sola sede el paso no aparece: no hay nada que elegir.
+const conStock = computed(() => stocks.value.filter(s => s.cantidad > 0))
+
+const sedesConStock = computed(() => {
+  const mapa = new Map()
+  for (const s of conStock.value) {
+    const id = s.sede?.id ?? null
+    if (!mapa.has(id)) mapa.set(id, { id, nombre: s.sede?.nombre || 'Sin sede (club)', items: 0 })
+    mapa.get(id).items += 1
+  }
+  return [...mapa.values()].sort((a, b) => (a.id === null) - (b.id === null) || a.nombre.localeCompare(b.nombre))
+})
+const hayVariasSedes = computed(() => sedesConStock.value.length > 1)
+
+const sedeElegida = ref(undefined)   // undefined = todavía no eligió
+watch(sedesConStock, (lista) => {
+  // Con una sola sede se elige sola: pedir que la confirmes sería un clic de peaje.
+  if (lista.length === 1) sedeElegida.value = lista[0].id
+  else if (sedeElegida.value !== undefined && !lista.some(x => x.id === sedeElegida.value)) {
+    sedeElegida.value = undefined
+  }
+}, { immediate: true })
+
+// Cambiar de sede limpia el stock elegido: si no, quedaba seleccionado uno que ya no se ve.
+watch(sedeElegida, () => { form.value.stock_id = null })
+
+const stocksDisponibles = computed(() =>
+  sedeElegida.value === undefined && hayVariasSedes.value
+    ? []
+    : conStock.value.filter(s => sedeElegida.value === undefined || (s.sede?.id ?? null) === sedeElegida.value)
+)
 
 // ── Cuenta corriente ARS ───────────────────────────────────────────────────────
 const tieneCc  = computed(() => props.limiteCc !== null && props.limiteCc > 0)
@@ -562,9 +595,30 @@ async function handleSubmit() {
           <!-- Stock -->
           <div v-if="!modoReserva" class="mnd__section-label">{{ esDispensaInmediata ? 'Agregar producto' : 'Stock a reservar' }} <span class="mnd__req">*</span></div>
           <div v-if="modoReserva"></div>
+          <!-- Paso 1: la sede. Sólo cuando hay más de una: si el club tiene una sola, elegirla
+               sería un clic de peaje y se selecciona sola. -->
+          <div v-if="hayVariasSedes && !loadingStocks" class="mnd__sedes">
+            <span class="mnd__sedes-lbl">¿De qué sede?</span>
+            <div class="mnd__sedes-chips">
+              <button
+                v-for="sd in sedesConStock" :key="sd.id ?? 'pool'"
+                type="button"
+                class="mnd__sede-chip"
+                :class="{ 'mnd__sede-chip--on': sedeElegida === sd.id }"
+                @click="sedeElegida = sd.id"
+              >
+                {{ sd.nombre }}
+                <span class="mnd__sede-n">{{ sd.items }}</span>
+              </button>
+            </div>
+          </div>
+
           <div v-else-if="loadingStocks" class="mnd__loading-inline"><DsSpinner :size="13" /> Cargando stocks…</div>
-          <div v-else-if="!stocksDisponibles.length" class="mnd__warn-box">
-            <i class="bi bi-exclamation-triangle"></i> Sin stock disponible
+          <div v-if="hayVariasSedes && sedeElegida === undefined" class="mnd__hint-box">
+            <i class="bi bi-arrow-up"></i> Elegí una sede para ver su stock.
+          </div>
+          <div v-else-if="!loadingStocks && !stocksDisponibles.length" class="mnd__warn-box">
+            <i class="bi bi-exclamation-triangle"></i> Sin stock disponible{{ hayVariasSedes ? ' en esta sede' : '' }}
           </div>
           <div v-else class="mnd__stock-list">
             <button
@@ -981,6 +1035,20 @@ async function handleSubmit() {
 .mnd__evento-opt small { display: block; color: #7c3aed; font-size: .7rem; }
 .mnd__evento-hint { font-size: .72rem; color: #7c6f8a; margin: .4rem 0 0; }
 .mnd__stock-check { color: #1b5e20; font-size: .9rem; flex-shrink: 0; }
+/* Paso "de qué sede": chips, no un select. Son pocas y conviene verlas todas de una. */
+.mnd__sedes { display: flex; flex-direction: column; gap: .4rem; margin-bottom: .6rem; }
+.mnd__sedes-lbl { font-size: .74rem; font-weight: 700; color: #475569; }
+.mnd__sedes-chips { display: flex; flex-wrap: wrap; gap: .4rem; }
+.mnd__sede-chip {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .35rem .7rem; border-radius: 999px; cursor: pointer;
+  border: 1px solid #e2e8f0; background: #fff; color: #334155;
+  font-size: .8rem; font-weight: 600; transition: all .12s;
+}
+.mnd__sede-chip:hover { border-color: #cbd5e1; background: #f8fafc; }
+.mnd__sede-chip--on { background: #1b5e20; border-color: #1b5e20; color: #fff; }
+.mnd__sede-n { font-size: .68rem; font-weight: 700; opacity: .75; }
+.mnd__hint-box { background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 8px; padding: .55rem .75rem; font-size: .8rem; color: #64748b; display: flex; align-items: center; gap: .4rem; }
 .mnd__warn-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: .5rem .75rem; font-size: .8rem; color: #92400e; display: flex; align-items: center; gap: .4rem; }
 
 /* Agregar item + carrito */

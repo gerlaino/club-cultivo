@@ -91,20 +91,20 @@ function fechaHora(f) {
 
 .mdh__resumen {
   display: flex; align-items: center; gap: .75rem;
-  background: #fff; border: 1px solid var(--c-ink-100, #f1f5f9); border-radius: 12px; padding: .75rem .9rem;
+  background: #fff; border: 1px solid var(--c-slate-100); border-radius: 12px; padding: .75rem .9rem;
 }
 .mdh__stat { display: flex; flex-direction: column; }
 .mdh__stat-n { font-size: 1.3rem; font-weight: 800; line-height: 1; }
 .mdh__stat-n--ok  { color: #15803d; }
 .mdh__stat-n--bad { color: #dc2626; }
-.mdh__stat-l { font-size: .7rem; color: var(--c-ink-400, #94a3b8); text-transform: uppercase; }
+.mdh__stat-l { font-size: .7rem; color: var(--c-slate-400); text-transform: uppercase; }
 .mdh__rango {
-  margin-left: auto; border: 1px solid var(--c-ink-200, #e2e8f0); border-radius: 8px;
+  margin-left: auto; border: 1px solid var(--c-slate-200); border-radius: 8px;
   padding: .4rem .5rem; font-size: .8rem; background: #fff;
 }
 
-.mdh__muted { text-align: center; color: var(--c-ink-400, #94a3b8); padding: 1rem; font-size: .85rem; }
-.mdh__empty { text-align: center; padding: 2rem 1rem; color: var(--c-ink-500, #64748b); }
+.mdh__muted { text-align: center; color: var(--c-slate-400); padding: 1rem; font-size: .85rem; }
+.mdh__empty { text-align: center; padding: 2rem 1rem; color: var(--c-slate-500); }
 .mdh__empty-ico { font-size: 2rem; display: block; margin-bottom: .5rem; }
 .mdh__retry {
   margin-top: .6rem; min-height: 40px; padding: 0 1.1rem;
@@ -114,7 +114,7 @@ function fechaHora(f) {
 
 .mdh__list { display: flex; flex-direction: column; gap: .5rem; }
 .mdh__card {
-  background: #fff; border: 1px solid var(--c-ink-100, #f1f5f9); border-radius: 12px;
+  background: #fff; border: 1px solid var(--c-slate-100); border-radius: 12px;
   padding: .75rem .9rem; display: flex; flex-direction: column; gap: .3rem;
 }
 .mdh__card-head { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
@@ -122,7 +122,7 @@ function fechaHora(f) {
 .mdh__estado { font-size: .7rem; font-weight: 700; padding: .12em .5em; border-radius: 999px; }
 .mdh__estado--entregado { background: #dcfce7; color: #15803d; }
 .mdh__estado--fallido   { background: #fee2e2; color: #b91c1c; }
-.mdh__dir { font-size: .8rem; color: var(--c-ink-600, #475569); }
-.mdh__pie { display: flex; justify-content: space-between; gap: .5rem; font-size: .72rem; color: var(--c-ink-400, #94a3b8); }
+.mdh__dir { font-size: .8rem; color: var(--c-slate-600); }
+.mdh__pie { display: flex; justify-content: space-between; gap: .5rem; font-size: .72rem; color: var(--c-slate-400); }
 .mdh__motivo { font-style: italic; }
 </style>

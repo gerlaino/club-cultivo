@@ -100,8 +100,8 @@ function fechaCorta(f) {
 
 .mres__tabs { display: flex; gap: .4rem; }
 .mres__tab {
-  flex: 1; border: 1px solid var(--c-ink-200, #e2e8f0); background: #fff; border-radius: 10px;
-  padding: .55rem; font-size: .85rem; color: var(--c-ink-500, #64748b); cursor: pointer;
+  flex: 1; border: 1px solid var(--c-slate-200); background: #fff; border-radius: 10px;
+  padding: .55rem; font-size: .85rem; color: var(--c-slate-500); cursor: pointer;
 }
 .mres__tab--on {
   border-color: var(--c-leaf-600, #16a34a); background: #f0fdf4;
@@ -112,21 +112,21 @@ function fechaCorta(f) {
   padding: 0 .4em; font-size: .72rem; margin-left: .25em;
 }
 
-.mres__muted { text-align: center; color: var(--c-ink-400, #94a3b8); padding: 1rem; font-size: .85rem; }
-.mres__empty { text-align: center; padding: 2rem 1rem; color: var(--c-ink-500, #64748b); }
+.mres__muted { text-align: center; color: var(--c-slate-400); padding: 1rem; font-size: .85rem; }
+.mres__empty { text-align: center; padding: 2rem 1rem; color: var(--c-slate-500); }
 .mres__empty-ico { font-size: 2rem; display: block; margin-bottom: .5rem; }
 
 .mres__list { display: flex; flex-direction: column; gap: .5rem; }
 .mres__card {
-  background: #fff; border: 1px solid var(--c-ink-100, #f1f5f9); border-radius: 12px;
+  background: #fff; border: 1px solid var(--c-slate-100); border-radius: 12px;
   padding: .8rem .9rem; display: flex; flex-direction: column; gap: .4rem;
 }
 .mres__card--vencida { border-color: #fecaca; background: #fef2f2; }
 .mres__card-head { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
 .mres__paciente { font-weight: 600; color: var(--c-ink-800, #1e293b); }
-.mres__fecha { font-size: .75rem; color: var(--c-ink-400, #94a3b8); white-space: nowrap; }
+.mres__fecha { font-size: .75rem; color: var(--c-slate-400); white-space: nowrap; }
 .mres__fecha--vencida { color: #dc2626; font-weight: 600; }
-.mres__prod { font-size: .85rem; color: var(--c-ink-600, #475569); }
+.mres__prod { font-size: .85rem; color: var(--c-slate-600); }
 .mres__pie { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
 .mres__resta { font-size: .8rem; color: #b45309; font-weight: 600; }
 .mres__senada { font-size: .8rem; color: #15803d; }

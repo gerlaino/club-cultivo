@@ -109,7 +109,7 @@ async function onSalaCreada() {
 
 .msd__empty  { display: flex; flex-direction: column; align-items: center; gap: .6rem; padding: 3rem 1rem; color: var(--c-ink-500, #6b7280); font-size: .875rem; }
 .msd__empty-icon { font-size: 2.5rem; color: var(--c-leaf-300, #a8c9b5); }
-.msd__empty-hint { font-size: 13px; color: #94a3b8; margin: 0; }
+.msd__empty-hint { font-size: 13px; color: var(--c-slate-400); margin: 0; }
 .msd__empty-cta {
   margin-top: .4rem; display: inline-flex; align-items: center; gap: .4rem;
   background: var(--c-leaf-100, #e8f0eb); color: var(--c-leaf-700, #2d4a3e); border: none;
@@ -133,6 +133,6 @@ async function onSalaCreada() {
 .msd__estado { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .msd__estado--activa { background: #22c55e; }
 .msd__estado--mantenimiento { background: #f59e0b; }
-.msd__estado--cerrada { background: #94a3b8; }
+.msd__estado--cerrada { background: var(--c-slate-400); }
 .msd__chevron { color: var(--c-ink-300, #d1d5db); font-size: .8rem; flex-shrink: 0; }
 </style>

@@ -93,14 +93,14 @@ onMounted(async () => {
 <style scoped>
 .ms { padding: 0 0 1.5rem; }
 .ms__header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1rem .75rem; }
-.ms__title  { font-size: 1.15rem; font-weight: 800; color: #0f172a; margin: 0; }
+.ms__title  { font-size: 1.15rem; font-weight: 800; color: var(--c-slate-900); margin: 0; }
 .ms__add-btn { width: 36px; height: 36px; border-radius: 10px; background: #1b5e20; color: #fff; border: none; font-size: 1rem; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 
-.ms__loading { display: flex; align-items: center; gap: .5rem; justify-content: center; padding: 2.5rem; color: #94a3b8; font-size: .875rem; }
+.ms__loading { display: flex; align-items: center; gap: .5rem; justify-content: center; padding: 2.5rem; color: var(--c-slate-400); font-size: .875rem; }
 .ms__spin { animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.ms__empty { display: flex; flex-direction: column; align-items: center; gap: .5rem; padding: 3rem 1rem; color: #94a3b8; font-size: .875rem; }
+.ms__empty { display: flex; flex-direction: column; align-items: center; gap: .5rem; padding: 3rem 1rem; color: var(--c-slate-400); font-size: .875rem; }
 .ms__empty-icon { font-size: 2.5rem; }
 
 .ms__list { display: flex; flex-direction: column; gap: .5rem; padding: 0 1rem; }
@@ -108,13 +108,13 @@ onMounted(async () => {
 .ms__card { display: flex; align-items: center; gap: .875rem; background: #fff; border-radius: 14px; padding: .875rem; text-decoration: none; box-shadow: 0 1px 4px rgba(0,0,0,.07); -webkit-tap-highlight-color: transparent; }
 .ms__card-left { width: 42px; height: 42px; border-radius: 11px; display: flex; align-items: center; justify-content: center; font-size: 1.3rem; flex-shrink: 0; opacity: .85; }
 .ms__card-info { flex: 1; min-width: 0; }
-.ms__card-nombre { font-size: .95rem; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ms__card-meta { font-size: .72rem; color: #64748b; display: flex; align-items: center; gap: .3rem; margin-top: .15rem; }
+.ms__card-nombre { font-size: .95rem; font-weight: 700; color: var(--c-slate-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ms__card-meta { font-size: .72rem; color: var(--c-slate-500); display: flex; align-items: center; gap: .3rem; margin-top: .15rem; }
 .ms__dot { color: #d1d5db; }
 .ms__estado { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .ms__estado--activa { background: #22c55e; }
 .ms__estado--mantenimiento { background: #f59e0b; }
-.ms__estado--cerrada { background: #94a3b8; }
+.ms__estado--cerrada { background: var(--c-slate-400); }
 .ms__chevron { color: #d1d5db; font-size: .8rem; flex-shrink: 0; }
 
 .ms__overlay { position: fixed; inset: 0; z-index: 200; background: rgba(0,0,0,.5); display: flex; align-items: flex-end; }

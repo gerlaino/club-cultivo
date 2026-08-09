@@ -37,7 +37,14 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="r in reservas" :key="r.id" :class="{ 'rsv__row--vencida': esVencidaHoy(r) }">
+        <template v-for="g in gruposPorSede" :key="g.id ?? 'pool'">
+          <tr v-if="agruparPorSede" class="rsv__sede-row">
+            <td colspan="8">
+              <i class="bi bi-geo-alt-fill"></i> {{ g.nombre }}
+              <span class="rsv__sede-n">{{ g.reservas.length }}</span>
+            </td>
+          </tr>
+        <tr v-for="r in g.reservas" :key="r.id" :class="{ 'rsv__row--vencida': esVencidaHoy(r) }">
           <td>{{ r.paciente?.nombre || '—' }}</td>
           <td>{{ r.stock?.forma_producto || '—' }}<span v-if="r.stock?.lote" class="rsv__lote"> · {{ r.stock.lote }}</span></td>
           <td>{{ r.cantidad }}{{ r.stock?.unidad || 'g' }}</td>
@@ -61,6 +68,7 @@
             </template>
           </td>
         </tr>
+        </template>
       </tbody>
     </table>
 
@@ -133,6 +141,24 @@ const ESTADO_LABEL = {
 }
 
 const reservas = ref([])
+
+// ── Agrupadas por sede ───────────────────────────────────────────────────────────
+// Quien atiende más de una sede no puede leer una lista con las reservas de dos mostradores
+// mezcladas: la de al lado no la va a entregar él. Con una sola sede no se agrupa nada — un
+// encabezado que siempre dice lo mismo es ruido.
+const gruposPorSede = computed(() => {
+  const mapa = new Map()
+  for (const r of reservas.value) {
+    const id = r.stock?.sede?.id ?? null
+    if (!mapa.has(id)) {
+      mapa.set(id, { id, nombre: r.stock?.sede?.nombre || 'Sin sede (club)', reservas: [] })
+    }
+    mapa.get(id).reservas.push(r)
+  }
+  return [...mapa.values()]
+    .sort((a, b) => (a.id === null) - (b.id === null) || a.nombre.localeCompare(b.nombre))
+})
+const agruparPorSede = computed(() => gruposPorSede.value.length > 1)
 const loading  = ref(true)
 const busy     = ref(null)
 const estado   = ref('pendiente')
@@ -262,6 +288,12 @@ onMounted(cargar)
 .rsv__table { width: 100%; border-collapse: collapse; background: #fff; border: 1.5px solid var(--c-ink-100, #f1f5f9); border-radius: 12px; overflow: hidden; font-size: .85rem; }
 .rsv__table th { text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--c-ink-400, #94a3b8); background: #f8fafc; border-bottom: 1.5px solid var(--c-ink-100, #f1f5f9); }
 .rsv__table td { padding: 11px 14px; border-bottom: 1px solid var(--c-ink-100, #f1f5f9); vertical-align: middle; }
+.rsv__sede-row td {
+  background: #f1f5f9; font-size: .74rem; font-weight: 700; color: #334155;
+  text-transform: uppercase; letter-spacing: .04em; padding: .45rem .75rem;
+}
+.rsv__sede-row .bi { color: #64748b; margin-right: .25rem; }
+.rsv__sede-n { margin-left: .4rem; font-weight: 600; color: #64748b; text-transform: none; letter-spacing: 0; }
 .rsv__row--vencida { background: #fff7ed; }
 .rsv__lote { color: var(--c-ink-400, #94a3b8); }
 .rsv__fecha--hoy { font-weight: 800; color: #b45309; }

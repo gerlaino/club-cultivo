@@ -113,27 +113,27 @@ onMounted(async () => {
 <style scoped>
 .mp { padding: 0 0 1.5rem; }
 .mp__header { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1rem .5rem; }
-.mp__title { font-size: 1.15rem; font-weight: 800; color: #0f172a; margin: 0; }
+.mp__title { font-size: 1.15rem; font-weight: 800; color: var(--c-slate-900); margin: 0; }
 .mp__add-btn { width: 36px; height: 36px; border-radius: 10px; background: #1b5e20; color: #fff; border: none; font-size: 1rem; display: flex; align-items: center; justify-content: center; cursor: pointer; }
 .mp__filtros { display: flex; gap: .5rem; padding: 0 1rem .75rem; }
-.mp__select { flex: 1; background: #fff; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: .5rem .65rem; font-size: .78rem; color: #374151; outline: none; }
-.mp__loading { display: flex; align-items: center; gap: .5rem; justify-content: center; padding: 2.5rem; color: #94a3b8; font-size: .875rem; }
+.mp__select { flex: 1; background: #fff; border: 1.5px solid var(--c-slate-200); border-radius: 9px; padding: .5rem .65rem; font-size: .78rem; color: #374151; outline: none; }
+.mp__loading { display: flex; align-items: center; gap: .5rem; justify-content: center; padding: 2.5rem; color: var(--c-slate-400); font-size: .875rem; }
 .mp__spin { animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.mp__empty { display: flex; flex-direction: column; align-items: center; gap: .5rem; padding: 3rem 1rem; color: #94a3b8; font-size: .875rem; }
+.mp__empty { display: flex; flex-direction: column; align-items: center; gap: .5rem; padding: 3rem 1rem; color: var(--c-slate-400); font-size: .875rem; }
 .mp__empty-icon { font-size: 2.5rem; }
 .mp__list { display: flex; flex-direction: column; gap: .5rem; padding: 0 1rem; }
 .mp__card { display: flex; align-items: center; gap: .75rem; background: #fff; border-radius: 14px; padding: .875rem; box-shadow: 0 1px 4px rgba(0,0,0,.07); text-decoration: none; -webkit-tap-highlight-color: transparent; }
 .mp__card-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 .mp__card-info { flex: 1; min-width: 0; }
-.mp__card-nombre { font-size: .9rem; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mp__card-nombre { font-size: .9rem; font-weight: 700; color: var(--c-slate-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mp__card-meta { display: flex; align-items: center; gap: .4rem; margin-top: .15rem; }
 .mp__lote-tag { font-family: monospace; font-size: .68rem; font-weight: 700; background: #f0fdf4; color: #15803d; padding: .1em .4em; border-radius: 4px; }
-.mp__gen { font-size: .7rem; color: #94a3b8; }
+.mp__gen { font-size: .7rem; color: var(--c-slate-400); }
 .mp__estado-label { font-size: .7rem; font-weight: 700; white-space: nowrap; flex-shrink: 0; }
 .mp__chevron { color: #d1d5db; font-size: .8rem; flex-shrink: 0; }
 .mp__pager { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 1rem; }
-.mp__pager-btn { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 9px; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; font-size: .9rem; color: #374151; cursor: pointer; }
+.mp__pager-btn { background: #fff; border: 1.5px solid var(--c-slate-200); border-radius: 9px; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center; font-size: .9rem; color: #374151; cursor: pointer; }
 .mp__pager-btn:disabled { opacity: .4; cursor: not-allowed; }
-.mp__pager-info { font-size: .8rem; color: #64748b; font-weight: 600; min-width: 50px; text-align: center; }
+.mp__pager-info { font-size: .8rem; color: var(--c-slate-500); font-weight: 600; min-width: 50px; text-align: center; }
 </style>

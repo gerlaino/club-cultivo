@@ -66,11 +66,11 @@ onMounted(async () => {
 <style scoped>
 .mcp { padding: 0 0 1.5rem; }
 .mcp__header { padding: 1rem 1rem .75rem; }
-.mcp__title { font-size: 1.15rem; font-weight: 800; color: #0f172a; margin: 0; }
-.mcp__loading { display: flex; align-items: center; gap: .5rem; justify-content: center; padding: 2.5rem; color: #94a3b8; font-size: .875rem; }
+.mcp__title { font-size: 1.15rem; font-weight: 800; color: var(--c-slate-900); margin: 0; }
+.mcp__loading { display: flex; align-items: center; gap: .5rem; justify-content: center; padding: 2.5rem; color: var(--c-slate-400); font-size: .875rem; }
 .mcp__spin { animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.mcp__empty { display: flex; flex-direction: column; align-items: center; gap: .5rem; padding: 3rem 1rem; color: #94a3b8; font-size: .875rem; }
+.mcp__empty { display: flex; flex-direction: column; align-items: center; gap: .5rem; padding: 3rem 1rem; color: var(--c-slate-400); font-size: .875rem; }
 .mcp__empty-icon { font-size: 2.5rem; }
 .mcp__list { display: flex; flex-direction: column; gap: .5rem; padding: 0 1rem; }
 .mcp__card { display: flex; align-items: center; gap: .75rem; background: #fff; border-radius: 14px; padding: .875rem; box-shadow: 0 1px 4px rgba(0,0,0,.07); text-decoration: none; -webkit-tap-highlight-color: transparent; }
@@ -78,11 +78,11 @@ onMounted(async () => {
 .mcp__estado-emoji { font-size: 1.5rem; }
 .mcp__card-body { flex: 1; min-width: 0; }
 .mcp__card-top { display: flex; align-items: center; gap: .5rem; margin-bottom: .25rem; }
-.mcp__codigo { font-size: .95rem; font-weight: 800; color: #0f172a; font-family: monospace; }
+.mcp__codigo { font-size: .95rem; font-weight: 800; color: var(--c-slate-900); font-family: monospace; }
 .mcp__badge { font-size: .62rem; font-weight: 700; padding: .2em .55em; border-radius: 999px; }
 .mcp__badge--en_manicura { background: #fef3c7; color: #b45309; }
 .mcp__badge--secado { background: #e0f2fe; color: #0369a1; }
-.mcp__card-meta { font-size: .72rem; color: #64748b; display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; }
+.mcp__card-meta { font-size: .72rem; color: var(--c-slate-500); display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; }
 .mcp__dot { color: #d1d5db; }
 .mcp__hint { font-size: .68rem; color: var(--c-leaf-700); font-weight: 600; margin-top: .2rem; }
 .mcp__chevron { color: #d1d5db; font-size: .8rem; flex-shrink: 0; }

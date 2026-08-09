@@ -24,7 +24,7 @@ class ReservasController < ApplicationController
                     current_user.sedes_visibles_ids, current_user.club_id)
     end
     scope = scope.where(estado: params[:estado]) if params[:estado].present?
-    scope = scope.includes(:user, stock: :lote, paciente: :cuenta_corriente).recientes
+    scope = scope.includes(:user, { stock: [:lote, :sede] }, paciente: :cuenta_corriente).recientes
     render json: { reservas: scope.map { |r| serialize_reserva(r) } }
   end
 
@@ -346,6 +346,9 @@ class ReservasController < ApplicationController
         forma_producto: r.stock.forma_producto,
         unidad:         r.stock.unidad,
         lote:           r.stock.lote&.codigo,
+        # De qué sede sale lo reservado: quien atiende varias no puede leer una lista donde
+        # las reservas de dos mostradores están mezcladas.
+        sede:           r.stock.sede && { id: r.stock.sede.id, nombre: r.stock.sede.nombre },
       },
       reservado_por: r.user && (r.user.first_name || r.user.email),
     }

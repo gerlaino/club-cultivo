@@ -294,7 +294,7 @@ onMounted(async () => {
 <style scoped>
 .msal { padding: 0 0 2rem; }
 .msal--loading { display: flex; align-items: center; justify-content: center; min-height: 40vh; }
-.msal__spin { font-size: 2rem; color: #94a3b8; animation: spin .8s linear infinite; }
+.msal__spin { font-size: 2rem; color: var(--c-slate-400); animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .msal__hero { padding: 1.25rem 1rem 1.1rem; }
@@ -312,22 +312,22 @@ onMounted(async () => {
 }
 .msal__btn-acciones {
   display: flex; align-items: center; gap: .4rem;
-  background: #fff; color: #374151; border: 1.5px solid #e2e8f0;
+  background: #fff; color: #374151; border: 1.5px solid var(--c-slate-200);
   padding: .875rem 1rem; border-radius: 12px;
   font-size: .875rem; font-weight: 600; cursor: pointer; white-space: nowrap;
   -webkit-tap-highlight-color: transparent;
 }
 
-.msal__section-title { font-size: .7rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .06em; padding: .75rem 1rem .5rem; }
-.msal__empty { padding: .75rem 1rem; color: #94a3b8; font-size: .82rem; text-align: center; }
+.msal__section-title { font-size: .7rem; font-weight: 700; color: var(--c-slate-400); text-transform: uppercase; letter-spacing: .06em; padding: .75rem 1rem .5rem; }
+.msal__empty { padding: .75rem 1rem; color: var(--c-slate-400); font-size: .82rem; text-align: center; }
 .msal__list { display: flex; flex-direction: column; gap: .5rem; padding: 0 1rem; }
 .msal__card { display: flex; align-items: center; background: #fff; border-radius: 14px; box-shadow: 0 1px 4px rgba(0,0,0,.07); text-decoration: none; overflow: hidden; -webkit-tap-highlight-color: transparent; }
 .msal__card-stripe { width: 4px; align-self: stretch; flex-shrink: 0; }
 .msal__card-body { flex: 1; padding: .875rem .75rem; min-width: 0; }
 .msal__card-top { display: flex; align-items: center; gap: .5rem; margin-bottom: .25rem; }
-.msal__codigo { font-size: .92rem; font-weight: 800; color: #0f172a; font-family: monospace; }
+.msal__codigo { font-size: .92rem; font-weight: 800; color: var(--c-slate-900); font-family: monospace; }
 .msal__badge { font-size: .62rem; font-weight: 700; padding: .2em .55em; border-radius: 999px; }
-.msal__card-meta { font-size: .72rem; color: #64748b; display: flex; gap: .3rem; }
+.msal__card-meta { font-size: .72rem; color: var(--c-slate-500); display: flex; gap: .3rem; }
 .msal__dot { color: #d1d5db; }
 .msal__chevron { color: #d1d5db; font-size: .8rem; padding-right: .875rem; flex-shrink: 0; }
 
@@ -337,12 +337,12 @@ onMounted(async () => {
   display: flex; align-items: center; gap: .875rem;
   height: 56px; padding: 0 .5rem;
   border-radius: 10px; border: none; background: none;
-  font-size: .95rem; font-weight: 500; color: #0f172a;
+  font-size: .95rem; font-weight: 500; color: var(--c-slate-900);
   cursor: pointer; text-align: left; width: 100%;
   -webkit-tap-highlight-color: transparent;
   transition: background .1s;
 }
-.msal__accion-item:active { background: #f1f5f9; }
+.msal__accion-item:active { background: var(--c-slate-100); }
 .msal__accion-ico { font-size: 1.2rem; width: 28px; text-align: center; flex-shrink: 0; }
 .msal__accion-lbl { flex: 1; }
 .msal__accion-arr { color: #d1d5db; font-size: .8rem; flex-shrink: 0; }
@@ -355,11 +355,11 @@ onMounted(async () => {
   text-transform: uppercase; letter-spacing: .04em;
   display: flex; align-items: center; gap: .4rem;
 }
-.msal__opt { font-weight: 400; text-transform: none; color: #94a3b8; font-size: .68rem; }
+.msal__opt { font-weight: 400; text-transform: none; color: var(--c-slate-400); font-size: .68rem; }
 .msal__input {
-  background: #f8fafc; border: 1.5px solid #e2e8f0;
+  background: var(--c-slate-50); border: 1.5px solid var(--c-slate-200);
   border-radius: 9px; padding: .65rem .875rem;
-  font-size: .9rem; color: #0f172a; outline: none;
+  font-size: .9rem; color: var(--c-slate-900); outline: none;
   width: 100%; box-sizing: border-box;
 }
 .msal__input:focus { border-color: #1b5e20; }
