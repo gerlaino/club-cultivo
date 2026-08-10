@@ -156,7 +156,7 @@ onMounted(async () => {
 /* Empty */
 .usm__empty {
   display: flex; align-items: center; gap: .5rem;
-  font-size: .82rem; color: #94a3b8; padding: .5rem 0;
+  font-size: .82rem; color: var(--c-slate-400); padding: .5rem 0;
 }
 
 /* Hint manicura */
@@ -172,7 +172,7 @@ onMounted(async () => {
 .usm__group-label {
   display: flex; align-items: center; gap: .4rem;
   font-size: .7rem; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .05em; color: #94a3b8;
+  letter-spacing: .05em; color: var(--c-slate-400);
 }
 
 /* Grid de salas */
@@ -181,8 +181,8 @@ onMounted(async () => {
 .usm__sala {
   display: inline-flex; align-items: center; gap: .45rem;
   padding: .45rem .8rem; border-radius: 9px;
-  border: 1.5px solid #e2e8f0; background: #f8fafc;
-  font-size: .82rem; font-weight: 500; color: #475569;
+  border: 1.5px solid var(--c-slate-200); background: var(--c-slate-50);
+  font-size: .82rem; font-weight: 500; color: var(--c-slate-600);
   cursor: pointer; transition: all .15s;
 }
 .usm__sala:hover:not(:disabled) {
@@ -205,7 +205,7 @@ onMounted(async () => {
 /* Footer chips */
 .usm__footer {
   padding-top: .25rem;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--c-slate-100);
 }
 .usm__chips { display: flex; flex-wrap: wrap; gap: .35rem; }
 .usm__chip {
@@ -216,7 +216,7 @@ onMounted(async () => {
   font-size: .75rem; font-weight: 600;
 }
 .usm__chip i { font-size: .65rem; }
-.usm__none { font-size: .78rem; color: #94a3b8; font-style: italic; }
+.usm__none { font-size: .78rem; color: var(--c-slate-400); font-style: italic; }
 
 /* Error */
 .usm__error {

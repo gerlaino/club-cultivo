@@ -199,10 +199,10 @@ async function doSave() {
 <style scoped>
 .lem__overlay { position: fixed; inset: 0; background: rgba(15,23,42,.45); z-index: 1050; display: flex; align-items: center; justify-content: center; padding: 1rem; }
 .lem__modal { background: #fff; border-radius: 16px; width: 100%; max-width: 620px; max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
-.lem__header { display: flex; align-items: flex-start; justify-content: space-between; padding: 1.1rem 1.4rem; border-bottom: 1px solid #f1f5f9; }
-.lem__title { font-size: 1.05rem; font-weight: 800; color: #0f172a; margin: 0; }
-.lem__sub { font-size: .8rem; color: #64748b; margin: .2rem 0 0; }
-.lem__close { background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1rem; }
+.lem__header { display: flex; align-items: flex-start; justify-content: space-between; padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--c-slate-100); }
+.lem__title { font-size: 1.05rem; font-weight: 800; color: var(--c-slate-900); margin: 0; }
+.lem__sub { font-size: .8rem; color: var(--c-slate-500); margin: .2rem 0 0; }
+.lem__close { background: none; border: none; color: var(--c-slate-400); cursor: pointer; font-size: 1rem; }
 .lem__body { padding: 1.2rem 1.4rem; overflow-y: auto; }
 .lem__alert { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c; border-radius: 8px; padding: .55rem .8rem; font-size: .82rem; margin-bottom: .9rem; }
 .lem__grid { display: grid; grid-template-columns: 1fr 1fr; gap: .85rem; }
@@ -210,20 +210,20 @@ async function doSave() {
 .lem__field { display: flex; flex-direction: column; gap: .3rem; margin-bottom: .85rem; }
 .lem__grid .lem__field { margin-bottom: 0; }
 .lem__field--full { grid-column: 1 / -1; }
-.lem__label { font-size: .74rem; font-weight: 700; color: #64748b; }
-.lem__opt { font-weight: 400; color: #94a3b8; }
-.lem__input { padding: .5rem .7rem; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: .85rem; color: #0f172a; outline: none; width: 100%; box-sizing: border-box; }
+.lem__label { font-size: .74rem; font-weight: 700; color: var(--c-slate-500); }
+.lem__opt { font-weight: 400; color: var(--c-slate-400); }
+.lem__input { padding: .5rem .7rem; border: 1.5px solid var(--c-slate-200); border-radius: 8px; font-size: .85rem; color: var(--c-slate-900); outline: none; width: 100%; box-sizing: border-box; }
 .lem__input:focus { border-color: #15803d; }
-.lem__input--ro { opacity: .75; cursor: default; background: #f8fafc; font-family: monospace; }
+.lem__input--ro { opacity: .75; cursor: default; background: var(--c-slate-50); font-family: monospace; }
 .lem__textarea { resize: vertical; }
-.lem__hint { font-size: .72rem; color: #94a3b8; }
+.lem__hint { font-size: .72rem; color: var(--c-slate-400); }
 .lem__warn { display: flex; gap: .5rem; align-items: flex-start; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 9px; padding: .6rem .8rem; font-size: .78rem; line-height: 1.4; margin: .85rem 0; }
 .lem__warn i { margin-top: 1px; flex-shrink: 0; }
-.lem__seccion-titulo { font-size: .8rem; font-weight: 800; color: #0f172a; margin: 1.1rem 0 .6rem; padding-top: .9rem; border-top: 1px solid #f1f5f9; }
+.lem__seccion-titulo { font-size: .8rem; font-weight: 800; color: var(--c-slate-900); margin: 1.1rem 0 .6rem; padding-top: .9rem; border-top: 1px solid var(--c-slate-100); }
 .lem__nota { display: flex; gap: .5rem; align-items: flex-start; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; border-radius: 9px; padding: .55rem .8rem; font-size: .74rem; line-height: 1.4; margin-top: .7rem; }
 .lem__nota i { margin-top: 1px; flex-shrink: 0; }
-.lem__footer { display: flex; justify-content: flex-end; gap: .6rem; padding: 1rem 1.4rem; border-top: 1px solid #f1f5f9; }
-.lem__btn-ghost { background: none; border: 1.5px solid #cbd5e1; color: #64748b; border-radius: 9px; padding: .5rem 1rem; font-size: .85rem; font-weight: 700; cursor: pointer; }
+.lem__footer { display: flex; justify-content: flex-end; gap: .6rem; padding: 1rem 1.4rem; border-top: 1px solid var(--c-slate-100); }
+.lem__btn-ghost { background: none; border: 1.5px solid var(--c-slate-300); color: var(--c-slate-500); border-radius: 9px; padding: .5rem 1rem; font-size: .85rem; font-weight: 700; cursor: pointer; }
 .lem__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #15803d; color: #fff; border: none; border-radius: 9px; padding: .5rem 1.2rem; font-size: .85rem; font-weight: 700; cursor: pointer; }
 .lem__btn-primary:disabled, .lem__btn-ghost:disabled { opacity: .6; cursor: wait; }
 </style>

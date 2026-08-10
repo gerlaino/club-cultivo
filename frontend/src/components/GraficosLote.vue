@@ -360,7 +360,7 @@ onMounted(async () => {
 .gl__empty {
   display: flex; align-items: center; gap: .75rem;
   justify-content: center; padding: 2rem;
-  font-size: .85rem; color: #94a3b8;
+  font-size: .85rem; color: var(--c-slate-400);
   background: #f9fdf9;
   border: 1px dashed #d4e6d4;
   border-radius: 10px;
@@ -382,7 +382,7 @@ onMounted(async () => {
 }
 
 .gl__axis-label {
-  font-size: 9px; fill: #94a3b8;
+  font-size: 9px; fill: var(--c-slate-400);
   font-family: system-ui, sans-serif;
 }
 .gl__range-label {
@@ -402,7 +402,7 @@ onMounted(async () => {
   white-space: nowrap;
   z-index: 10;
 }
-.gl__tooltip-fecha { font-size: .7rem; color: #94a3b8; }
+.gl__tooltip-fecha { font-size: .7rem; color: var(--c-slate-400); }
 .gl__tooltip-val   { font-size: .9rem; font-weight: 700; margin-top: .1rem; }
 
 .gl__stats {
@@ -413,7 +413,7 @@ onMounted(async () => {
 }
 .gl__stat { display: flex; flex-direction: column; gap: .1rem; }
 .gl__stat-label {
-  font-size: .65rem; color: #94a3b8;
+  font-size: .65rem; color: var(--c-slate-400);
   font-weight: 600; text-transform: uppercase;
   letter-spacing: .04em;
 }

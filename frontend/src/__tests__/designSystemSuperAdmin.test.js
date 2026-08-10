@@ -21,6 +21,8 @@ const soloEstilo = (src) => {
 
 // Las superficies ya migradas. Se suman de a una por sesión: migrar los 268 archivos de golpe
 // es cambiar pantallas que no se pueden verificar renderizadas todas juntas.
+// Ya no quedan superficies a medias: se migró toda la app. El test recorre TODO src y falla
+// si vuelve a aparecer un hexadecimal de gris a mano en cualquier componente.
 const SUPERFICIES = {
   'super admin':  ['views/superadmin'],
   'contabilidad': ['components/contabilidad'],
@@ -28,6 +30,14 @@ const SUPERFICIES = {
   'layouts':      ['components/layout'],
   'delivery':     ['views/delivery'],
   'mobile':       ['views/mobile'],
+  'vistas':       ['views'],
+  'admin':        ['views/admin'],
+  'bar':          ['views/bar'],
+  'manicura':     ['views/manicura'],
+  'pacientes':    ['components/pacientes'],
+  'lotes':        ['components/lotes'],
+  'ui':           ['components/ui'],
+  'dashboards':   ['components/dashboards'],
 }
 
 const vuesDe = (rel) =>

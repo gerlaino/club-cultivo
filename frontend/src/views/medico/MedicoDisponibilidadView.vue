@@ -395,7 +395,7 @@ onMounted(async () => {
 }
 .mdv__day-header:hover { background: var(--c-leaf-50); }
 .mdv__day-header--on { background: var(--c-leaf-50); border-bottom-color: #86efac; }
-.mdv__day-header--weekend { background: #f8fafc; }
+.mdv__day-header--weekend { background: var(--c-slate-50); }
 .mdv__day-header--weekend.mdv__day-header--on { background: var(--c-leaf-50); }
 .mdv__day-name { font-size: var(--fs-12); font-weight: 800; color: var(--c-ink-700); text-transform: uppercase; letter-spacing: .06em; }
 .mdv__day-summary { font-size: .62rem; font-weight: 600; }
@@ -415,12 +415,12 @@ onMounted(async () => {
 
 /* Cells */
 .mdv__cell {
-  height: 18px; border-left: 1px solid #f1f5f9;
+  height: 18px; border-left: 1px solid var(--c-slate-100);
   border-top: 1px solid transparent;
   background: #fff; cursor: pointer; position: relative;
   transition: background .06s;
 }
-.mdv__cell--hour    { border-top-color: #e2e8f0; }
+.mdv__cell--hour    { border-top-color: var(--c-slate-200); }
 .mdv__cell--weekend { background: #fafafa; }
 .mdv__cell--on      { background: #bbf7d0; border-top-color: #86efac !important; }
 .mdv__cell--on.mdv__cell--weekend { background: #a7f3d0; }
@@ -469,7 +469,7 @@ onMounted(async () => {
 
 .mdv__vac-form {
   padding: var(--sp-4) var(--sp-5); border-bottom: 1px solid var(--c-ink-100);
-  background: #f8fafc;
+  background: var(--c-slate-50);
 }
 .mdv__vac-fields {
   display: flex; gap: var(--sp-3); flex-wrap: wrap; margin-bottom: var(--sp-3);

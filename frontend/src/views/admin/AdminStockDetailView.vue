@@ -906,15 +906,15 @@ function badgeVencLabel(s) {
 .sd__back { margin-bottom: 1.25rem; }
 .sd__back-link {
   display: inline-flex; align-items: center; gap: .4rem;
-  font-size: .82rem; font-weight: 600; color: #475569;
+  font-size: .82rem; font-weight: 600; color: var(--c-slate-600);
   text-decoration: none; padding: .35rem .6rem; border-radius: 6px;
   transition: background .15s, color .15s;
 }
-.sd__back-link:hover { background: #f1f5f9; color: #0f172a; }
+.sd__back-link:hover { background: var(--c-slate-100); color: var(--c-slate-900); }
 
 /* ── Hero ─────────────────────────────────────────────────────────────────── */
 .sd__hero {
-  background: #fff; border: 1px solid #e2e8f0; border-radius: 16px;
+  background: #fff; border: 1px solid var(--c-slate-200); border-radius: 16px;
   padding: 1.5rem 1.75rem; margin-bottom: 1.5rem;
   display: flex; align-items: center; justify-content: space-between;
   gap: 1.5rem; flex-wrap: wrap;
@@ -929,17 +929,17 @@ function badgeVencLabel(s) {
 .sd__forma-ico--aceite, .sd__forma-ico--tintura { background: #eff6ff; }
 .sd__forma-ico--hash, .sd__forma-ico--prensado  { background: #fef3c7; }
 .sd__forma-ico--crema, .sd__forma-ico--capsula  { background: #fdf4ff; }
-.sd__forma-ico--compra_externa, .sd__forma-ico--externo { background: #f8fafc; }
+.sd__forma-ico--compra_externa, .sd__forma-ico--externo { background: var(--c-slate-50); }
 
-.sd__hero-forma { font-size: 1.35rem; font-weight: 800; color: #0f172a; margin: 0 0 .2rem; letter-spacing: -.03em; }
-.sd__hero-lote  { font-size: .78rem; font-weight: 700; color: #94a3b8; font-family: monospace; margin-bottom: .5rem; letter-spacing: .05em; }
+.sd__hero-forma { font-size: 1.35rem; font-weight: 800; color: var(--c-slate-900); margin: 0 0 .2rem; letter-spacing: -.03em; }
+.sd__hero-lote  { font-size: .78rem; font-weight: 700; color: var(--c-slate-400); font-family: monospace; margin-bottom: .5rem; letter-spacing: .05em; }
 .sd__hero-chips { display: flex; flex-wrap: wrap; gap: .35rem; }
 
 .sd__hero-kpis { display: flex; gap: 1.5rem; flex-shrink: 0; }
 .sd__kpi { text-align: center; }
-.sd__kpi-val  { font-size: 1.6rem; font-weight: 900; color: #0f172a; line-height: 1; letter-spacing: -.04em; }
-.sd__kpi-unit { font-size: .9rem; font-weight: 500; color: #94a3b8; margin-left: 1px; }
-.sd__kpi-lbl  { font-size: .62rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .06em; margin-top: .2rem; }
+.sd__kpi-val  { font-size: 1.6rem; font-weight: 900; color: var(--c-slate-900); line-height: 1; letter-spacing: -.04em; }
+.sd__kpi-unit { font-size: .9rem; font-weight: 500; color: var(--c-slate-400); margin-left: 1px; }
+.sd__kpi-lbl  { font-size: .62rem; font-weight: 700; color: var(--c-slate-400); text-transform: uppercase; letter-spacing: .06em; margin-top: .2rem; }
 .sd__kpi--warn .sd__kpi-val   { color: #15803d; }
 .sd__kpi--amber .sd__kpi-val  { color: #d97706; }
 
@@ -950,17 +950,17 @@ function badgeVencLabel(s) {
 }
 .sd__badge--pendiente_asignacion { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
 .sd__badge--asignado             { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
-.sd__badge--agotado              { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
+.sd__badge--agotado              { background: var(--c-slate-100); color: var(--c-slate-500); border: 1px solid var(--c-slate-200); }
 .sd__badge-venc { font-size: .68rem; font-weight: 700; padding: .22em .65em; border-radius: 5px; }
 .sd__badge-venc--vencido { background: #fee2e2; color: #dc2626; }
 .sd__badge-venc--critico { background: #ffedd5; color: #ea580c; }
 .sd__badge-venc--proximo { background: #fef9c3; color: #a16207; }
-.sd__chip { font-size: .68rem; font-weight: 600; padding: .2em .6em; border-radius: 5px; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+.sd__chip { font-size: .68rem; font-weight: 600; padding: .2em .6em; border-radius: 5px; background: var(--c-slate-100); color: var(--c-slate-600); border: 1px solid var(--c-slate-200); }
 .sd__chip--gen { background: #f0fdf4; color: #166534; border-color: #bbf7d0; }
 .sd__chip--ext { background: #fef3c7; color: #92400e; border-color: #fde68a; }
 .sd__chip--disp { background: #ede9fe; color: #6d28d9; border-color: #ddd6fe; }
-.sd__finalizado { display: flex; align-items: center; gap: .6rem; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 12px; padding: .8rem 1rem; margin-bottom: 1.25rem; color: #475569; font-size: .88rem; }
-.sd__finalizado i { color: #64748b; }
+.sd__finalizado { display: flex; align-items: center; gap: .6rem; background: var(--c-slate-100); border: 1px solid var(--c-slate-200); border-radius: 12px; padding: .8rem 1rem; margin-bottom: 1.25rem; color: var(--c-slate-600); font-size: .88rem; }
+.sd__finalizado i { color: var(--c-slate-500); }
 .sd__chip--reg { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
 
 /* ── Layout ───────────────────────────────────────────────────────────────── */
@@ -971,17 +971,17 @@ function badgeVencLabel(s) {
 
 /* ── Card ─────────────────────────────────────────────────────────────────── */
 .sd__card {
-  background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+  background: #fff; border: 1px solid var(--c-slate-200); border-radius: 14px;
   padding: 1.25rem 1.5rem; box-shadow: 0 1px 4px rgba(0,0,0,.04);
 }
 .sd__card-hd {
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 1rem;
 }
-.sd__card-title { font-size: .88rem; font-weight: 800; color: #0f172a; margin: 0; letter-spacing: -.01em; }
+.sd__card-title { font-size: .88rem; font-weight: 800; color: var(--c-slate-900); margin: 0; letter-spacing: -.01em; }
 .sd__card-count {
-  font-size: .68rem; font-weight: 700; background: #f1f5f9; color: #64748b;
-  padding: .2em .55em; border-radius: 99px; border: 1px solid #e2e8f0;
+  font-size: .68rem; font-weight: 700; background: var(--c-slate-100); color: var(--c-slate-500);
+  padding: .2em .55em; border-radius: 99px; border: 1px solid var(--c-slate-200);
 }
 .sd__card--acciones { padding: 1.25rem; }
 .sd__card--acciones .sd__card-title { margin-bottom: 1rem; }
@@ -990,8 +990,8 @@ function badgeVencLabel(s) {
 .sd__data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
 .sd__data-item { display: flex; flex-direction: column; gap: .2rem; }
 .sd__data-item--full { grid-column: 1 / -1; }
-.sd__data-lbl { font-size: .68rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .05em; }
-.sd__data-val { font-size: .85rem; color: #0f172a; font-weight: 500; }
+.sd__data-lbl { font-size: .68rem; font-weight: 700; color: var(--c-slate-400); text-transform: uppercase; letter-spacing: .05em; }
+.sd__data-val { font-size: .85rem; color: var(--c-slate-900); font-weight: 500; }
 .sd__link     { font-size: .85rem; color: #1d4ed8; text-decoration: none; font-weight: 600; }
 .sd__link:hover { text-decoration: underline; }
 
@@ -1002,12 +1002,12 @@ function badgeVencLabel(s) {
 .sd__field--full { grid-column: 1 / -1; }
 .sd__label     { font-size: .7rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
 .sd__req       { color: #ef4444; }
-.sd__input     { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 7px; padding: .5rem .75rem; font-size: .875rem; color: #0f172a; width: 100%; box-sizing: border-box; font-family: inherit; transition: border .15s; }
+.sd__input     { background: var(--c-slate-50); border: 1.5px solid var(--c-slate-200); border-radius: 7px; padding: .5rem .75rem; font-size: .875rem; color: var(--c-slate-900); width: 100%; box-sizing: border-box; font-family: inherit; transition: border .15s; }
 .sd__input:focus { outline: none; border-color: #1b5e20; background: #fff; }
 .sd__textarea  { resize: vertical; min-height: 60px; }
 .sd__input-row { display: flex; }
 .sd__input-row .sd__input { border-radius: 7px 0 0 7px; }
-.sd__input-suf { background: #f1f5f9; border: 1.5px solid #e2e8f0; border-left: none; border-radius: 0 7px 7px 0; padding: .5rem .75rem; font-size: .82rem; font-weight: 600; color: #64748b; }
+.sd__input-suf { background: var(--c-slate-100); border: 1.5px solid var(--c-slate-200); border-left: none; border-radius: 0 7px 7px 0; padding: .5rem .75rem; font-size: .82rem; font-weight: 600; color: var(--c-slate-500); }
 .sd__alert     { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; border-radius: 7px; padding: .55rem .75rem; font-size: .82rem; margin-bottom: 1rem; }
 .sd__edit-ft   { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1rem; }
 
@@ -1015,7 +1015,7 @@ function badgeVencLabel(s) {
 .sd__actions { display: flex; flex-direction: column; gap: .5rem; }
 .sd__action {
   display: flex; align-items: center; gap: .75rem;
-  padding: .75rem .9rem; border-radius: 10px; border: 1.5px solid #e2e8f0;
+  padding: .75rem .9rem; border-radius: 10px; border: 1.5px solid var(--c-slate-200);
   background: #fff; cursor: pointer; transition: all .15s; text-align: left; width: 100%;
 }
 .sd__action:hover:not(:disabled) { border-color: #a5d6a7; background: #f9fefb; }
@@ -1031,14 +1031,14 @@ function badgeVencLabel(s) {
 .sd__action-ico--amber { background: #fffbeb; color: #d97706; }
 .sd__action-ico--red   { background: #fef2f2; color: #dc2626; }
 .sd__action-txt { flex: 1; min-width: 0; }
-.sd__action-lbl { font-size: .82rem; font-weight: 700; color: #0f172a; }
-.sd__action-sub { font-size: .7rem; color: #94a3b8; margin-top: 1px; }
-.sd__actions-sep { height: 1px; background: #f1f5f9; margin: .25rem 0; }
+.sd__action-lbl { font-size: .82rem; font-weight: 700; color: var(--c-slate-900); }
+.sd__action-sub { font-size: .7rem; color: var(--c-slate-400); margin-top: 1px; }
+.sd__actions-sep { height: 1px; background: var(--c-slate-100); margin: .25rem 0; }
 
 /* QR block */
 .sd__qr-block {
   margin-top: 1.25rem; padding-top: 1.125rem;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--c-slate-100);
   display: flex; flex-direction: column; align-items: center; gap: .75rem;
 }
 .sd__qr-block-hd {
@@ -1055,7 +1055,7 @@ function badgeVencLabel(s) {
 .sd__qr-preview-link:hover { color: #144a18; text-decoration: underline; }
 .sd__qr-img-wrap {
   width: 160px; height: 160px; border-radius: 12px; overflow: hidden;
-  border: 2px solid #e2e8f0; background: #f8fafc;
+  border: 2px solid var(--c-slate-200); background: var(--c-slate-50);
   display: flex; align-items: center; justify-content: center;
 }
 .sd__qr-img { width: 100%; height: 100%; display: block; }
@@ -1064,14 +1064,14 @@ function badgeVencLabel(s) {
 }
 .sd__qr-code-mono {
   font-family: 'SF Mono', 'Fira Code', 'Courier New', monospace;
-  font-size: .62rem; color: #94a3b8; word-break: break-all; text-align: center;
+  font-size: .62rem; color: var(--c-slate-400); word-break: break-all; text-align: center;
 }
 .sd__qr-actions {
   display: flex; gap: .5rem; width: 100%;
 }
 .sd__qr-dl-btn {
   flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: .35rem;
-  background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 7px;
+  background: var(--c-slate-50); border: 1.5px solid var(--c-slate-200); border-radius: 7px;
   padding: .45rem .75rem; font-size: .75rem; font-weight: 600; color: #374151;
   cursor: pointer; transition: all .15s;
 }
@@ -1079,10 +1079,10 @@ function badgeVencLabel(s) {
 
 /* ── Movimientos timeline ──────────────────────────────────────────────────── */
 .sd__movs { display: flex; flex-direction: column; }
-.sd__mov  { display: flex; gap: .875rem; padding: .75rem 0; border-bottom: 1px solid #f8fafc; }
+.sd__mov  { display: flex; gap: .875rem; padding: .75rem 0; border-bottom: 1px solid var(--c-slate-50); }
 .sd__mov:last-child { border-bottom: none; padding-bottom: 0; }
 .sd__mov-line { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; padding-top: 4px; }
-.sd__mov-dot  { width: 10px; height: 10px; border-radius: 50%; background: #e2e8f0; border: 2px solid #fff; box-shadow: 0 0 0 2px #e2e8f0; }
+.sd__mov-dot  { width: 10px; height: 10px; border-radius: 50%; background: var(--c-slate-200); border: 2px solid #fff; box-shadow: 0 0 0 2px var(--c-slate-200); }
 .sd__mov-dot--produccion   { background: #15803d; box-shadow: 0 0 0 2px #bbf7d0; }
 .sd__mov-dot--transferencia { background: #1d4ed8; box-shadow: 0 0 0 2px #bfdbfe; }
 .sd__mov-dot--dispensacion { background: #7e22ce; box-shadow: 0 0 0 2px #e9d5ff; }
@@ -1093,7 +1093,7 @@ function badgeVencLabel(s) {
 .sd__mov-tipo {
   display: inline-flex; align-items: center; padding: .18em .55em;
   border-radius: 4px; font-size: .65rem; font-weight: 700;
-  background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0;
+  background: var(--c-slate-100); color: var(--c-slate-600); border: 1px solid var(--c-slate-200);
 }
 .sd__mov-tipo--produccion   { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
 .sd__mov-tipo--transferencia { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
@@ -1104,7 +1104,7 @@ function badgeVencLabel(s) {
 .sd__mov-g--pos { color: #15803d; }
 .sd__mov-g--neg { color: #dc2626; }
 .sd__mov-notas { font-size: .78rem; color: #374151; word-break: break-word; margin-bottom: .2rem; }
-.sd__mov-meta  { display: flex; gap: .5rem; font-size: .68rem; color: #94a3b8; flex-wrap: wrap; }
+.sd__mov-meta  { display: flex; gap: .5rem; font-size: .68rem; color: var(--c-slate-400); flex-wrap: wrap; }
 
 /* ── Buttons ──────────────────────────────────────────────────────────────── */
 .sd__btn-primary {
@@ -1117,11 +1117,11 @@ function badgeVencLabel(s) {
 .sd__btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 .sd__btn-ghost {
   display: inline-flex; align-items: center; gap: .4rem;
-  background: transparent; color: #475569; border: 1.5px solid #e2e8f0;
+  background: transparent; color: var(--c-slate-600); border: 1.5px solid var(--c-slate-200);
   padding: .5rem 1rem; border-radius: 8px; font-size: .82rem; font-weight: 500;
   cursor: pointer; transition: all .15s; text-decoration: none;
 }
-.sd__btn-ghost:hover { background: #f8fafc; }
+.sd__btn-ghost:hover { background: var(--c-slate-50); }
 .sd__btn-sm { padding: .35rem .75rem; font-size: .75rem; }
 .sd__btn-danger {
   display: inline-flex; align-items: center; gap: .4rem;
@@ -1154,7 +1154,7 @@ function badgeVencLabel(s) {
 }
 .sd__modal-hd {
   display: flex; align-items: flex-start; gap: .75rem;
-  padding: 1.25rem 1.25rem 1rem; border-bottom: 1px solid #f1f5f9;
+  padding: 1.25rem 1.25rem 1rem; border-bottom: 1px solid var(--c-slate-100);
 }
 .sd__modal-ico {
   width: 36px; height: 36px; background: #f0fdf4; color: #1b5e20;
@@ -1163,16 +1163,16 @@ function badgeVencLabel(s) {
 }
 .sd__modal-ico--amber  { background: #fffbeb; color: #d97706; }
 .sd__modal-ico--danger { background: #fef2f2; color: #dc2626; }
-.sd__modal-title { font-size: .95rem; font-weight: 800; color: #0f172a; margin: 0 0 2px; }
-.sd__modal-sub   { font-size: .75rem; color: #64748b; margin: 0; }
+.sd__modal-title { font-size: .95rem; font-weight: 800; color: var(--c-slate-900); margin: 0 0 2px; }
+.sd__modal-sub   { font-size: .75rem; color: var(--c-slate-500); margin: 0; }
 .sd__modal-close {
-  margin-left: auto; background: #f8fafc; border: none; width: 28px; height: 28px;
+  margin-left: auto; background: var(--c-slate-50); border: none; width: 28px; height: 28px;
   border-radius: 6px; cursor: pointer; display: flex; align-items: center;
-  justify-content: center; color: #64748b; flex-shrink: 0;
+  justify-content: center; color: var(--c-slate-500); flex-shrink: 0;
 }
-.sd__modal-close:hover { background: #e2e8f0; }
+.sd__modal-close:hover { background: var(--c-slate-200); }
 .sd__modal-body { padding: 1.25rem; overflow-y: auto; flex: 1; }
-.sd__modal-ft   { display: flex; justify-content: flex-end; gap: .5rem; padding: 1rem 1.25rem; border-top: 1px solid #f1f5f9; }
+.sd__modal-ft   { display: flex; justify-content: flex-end; gap: .5rem; padding: 1rem 1.25rem; border-top: 1px solid var(--c-slate-100); }
 
 /* Descarte warn */
 .sd__descarte-warn {
@@ -1186,7 +1186,7 @@ function badgeVencLabel(s) {
 .sd__ajuste-preview {
   display: flex; align-items: center; justify-content: space-between;
   border-radius: 8px; padding: .6rem .9rem; margin-top: 1rem;
-  font-size: .82rem; font-weight: 500; border: 1px solid #e2e8f0; background: #f8fafc;
+  font-size: .82rem; font-weight: 500; border: 1px solid var(--c-slate-200); background: var(--c-slate-50);
 }
 .sd__ajuste-preview--pos { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
 .sd__ajuste-preview--neg { background: #fffbeb; border-color: #fde68a; color: #92400e; }
@@ -1202,7 +1202,7 @@ function badgeVencLabel(s) {
 /* Loading / empty */
 .sd__loading    { display: flex; align-items: center; justify-content: center; padding: 4rem; }
 .sd__loading-sm { display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
-.sd__empty-sm   { font-size: .82rem; color: #94a3b8; padding: .5rem 0; }
+.sd__empty-sm   { font-size: .82rem; color: var(--c-slate-400); padding: .5rem 0; }
 .sd__not-found  { display: flex; flex-direction: column; align-items: center; gap: .75rem; padding: 5rem 1rem; text-align: center; }
 .sd__not-found span { font-size: 2.5rem; }
 .sd__not-found p    { font-size: 1rem; font-weight: 700; color: #374151; margin: 0; }
@@ -1214,10 +1214,10 @@ function badgeVencLabel(s) {
 /* Editar pesaje del lote */
 .sd__btn-link { background: none; border: none; color: #2563eb; font-size: .8rem; font-weight: 600; cursor: pointer; padding: .25rem 0; display: inline-flex; align-items: center; gap: .3rem; }
 .sd__btn-link:hover { text-decoration: underline; }
-.sd__reajuste-row { display: flex; align-items: center; gap: .75rem; padding: .65rem 0; border-bottom: 1px solid #f1f5f9; }
+.sd__reajuste-row { display: flex; align-items: center; gap: .75rem; padding: .65rem 0; border-bottom: 1px solid var(--c-slate-100); }
 .sd__reajuste-row:last-child { border-bottom: none; }
 .sd__reajuste-info { display: flex; flex-direction: column; gap: .15rem; flex: 1; min-width: 0; }
 .sd__reajuste-info strong { font-size: .85rem; color: #1e293b; }
-.sd__reajuste-info span { font-size: .75rem; color: #64748b; }
+.sd__reajuste-info span { font-size: .75rem; color: var(--c-slate-500); }
 .sd__reajuste-input { width: 120px; flex-shrink: 0; }
 </style>

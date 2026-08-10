@@ -348,10 +348,10 @@ onMounted(async () => {
 /* Filtros */
 .dv__filtros { display: flex; flex-direction: column; gap: .75rem; margin-bottom: 1.5rem; }
 .dv__search-wrap { position: relative; }
-.dv__search-icon { position: absolute; left: .9rem; top: 50%; transform: translateY(-50%); color: #94a3b8; font-size: .9rem; pointer-events: none; }
+.dv__search-icon { position: absolute; left: .9rem; top: 50%; transform: translateY(-50%); color: var(--c-slate-400); font-size: .9rem; pointer-events: none; }
 .dv__search { width: 100%; box-sizing: border-box; padding: .7rem 2.5rem .7rem 2.5rem; border: 1.5px solid #d4e6d4; border-radius: 10px; background: #f4f8f4; font-size: .875rem; color: #1a1a1a; transition: border .15s; }
 .dv__search:focus { outline: none; border-color: #1b5e20; background: #fff; }
-.dv__search-clear { position: absolute; right: .75rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: #94a3b8; cursor: pointer; font-size: 1rem; padding: 0; }
+.dv__search-clear { position: absolute; right: .75rem; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--c-slate-400); cursor: pointer; font-size: 1rem; padding: 0; }
 .dv__search-clear:hover { color: #1b5e20; }
 .dv__tipo-filtros { display: flex; gap: .4rem; flex-wrap: wrap; }
 .dv__tipo-pill { display: inline-flex; align-items: center; gap: .35rem; padding: .35rem .85rem; border: 1.5px solid #d4e6d4; border-radius: 999px; background: #f4f8f4; font-size: .75rem; font-weight: 600; cursor: pointer; transition: all .15s; color: #60725d; }
@@ -379,7 +379,7 @@ onMounted(async () => {
 .dv__doc-vence--warn   { color: #b45309; }
 .dv__doc-vence--danger { color: #dc2626; }
 .dv__doc-footer { display: flex; align-items: center; justify-content: space-between; margin-top: .25rem; padding-top: .65rem; border-top: 1px solid #e8f0e9; }
-.dv__doc-meta { font-size: .7rem; color: #94a3b8; display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; }
+.dv__doc-meta { font-size: .7rem; color: var(--c-slate-400); display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; }
 .dv__dot { color: #d4e6d4; }
 .dv__doc-actions { display: flex; gap: .35rem; }
 .dv__action-btn { width: 28px; height: 28px; border-radius: 7px; border: 1px solid #d4e6d4; background: #f4f8f4; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: .8rem; transition: all .15s; text-decoration: none; color: #60725d; }
@@ -398,7 +398,7 @@ onMounted(async () => {
 .dv__modal-footer { display: flex; justify-content: flex-end; gap: .75rem; padding: 1rem 1.5rem; border-top: 1px solid #e8f0e9; position: sticky; bottom: 0; background: #fff; }
 .dv__field { display: flex; flex-direction: column; gap: .35rem; }
 .dv__label { font-size: .78rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
-.dv__optional { font-size: .65rem; font-weight: 400; color: #94a3b8; text-transform: none; letter-spacing: 0; }
+.dv__optional { font-size: .65rem; font-weight: 400; color: var(--c-slate-400); text-transform: none; letter-spacing: 0; }
 .dv__req { color: #dc2626; }
 .dv__input { background: #f4f8f4; border: 1.5px solid #d4e6d4; border-radius: 8px; padding: .6rem .85rem; font-size: .875rem; color: #1a1a1a; width: 100%; box-sizing: border-box; transition: border .15s; }
 .dv__input:focus { outline: none; border-color: #1b5e20; background: #fff; }
@@ -410,7 +410,7 @@ onMounted(async () => {
 .dv__file-upload { display: flex; align-items: center; gap: .85rem; padding: 1rem 1.1rem; border: 1.5px dashed #d4e6d4; border-radius: 10px; background: #f4f8f4; cursor: pointer; font-size: .85rem; color: #60725d; transition: all .15s; }
 .dv__file-upload:hover { border-color: #1b5e20; background: #f0fdf4; color: #1b5e20; }
 .dv__file-name { font-weight: 600; color: #1b5e20; margin-bottom: .15rem; }
-.dv__file-hint { font-size: .7rem; color: #94a3b8; }
+.dv__file-hint { font-size: .7rem; color: var(--c-slate-400); }
 .dv__alert { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .65rem .9rem; border-radius: 8px; font-size: .82rem; }
 .dv__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .6rem 1.25rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; }
 .dv__btn-primary:hover { background: #104417; }

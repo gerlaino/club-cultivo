@@ -68,28 +68,28 @@ function irA(i) {
 </template>
 
 <style scoped>
-.stp { background: var(--c-paper, #fff); border: 1px solid #f1f5f9; border-radius: var(--r-lg, 14px); padding: 16px 18px; }
+.stp { background: var(--c-paper, #fff); border: 1px solid var(--c-slate-100); border-radius: var(--r-lg, 14px); padding: 16px 18px; }
 .stp__rail { list-style: none; display: flex; margin: 0; padding: 0; }
 .stp__step { position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 0 4px; min-width: 0; }
-.stp__dot { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #e2e8f0; background: #fff; color: #94a3b8; font-size: .8rem; font-weight: 700; display: grid; place-items: center; cursor: default; z-index: 1; }
+.stp__dot { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--c-slate-200); background: #fff; color: var(--c-slate-400); font-size: .8rem; font-weight: 700; display: grid; place-items: center; cursor: default; z-index: 1; }
 .stp__step.done .stp__dot    { background: #1b5e20; border-color: #1b5e20; color: #fff; }
 .stp__step.current .stp__dot { background: #fff; border-color: #1b5e20; color: #1b5e20; box-shadow: 0 0 0 4px #f0fdf4; }
 .stp__step.clickable .stp__dot { cursor: pointer; }
 .stp__step.clickable .stp__dot:hover { border-color: #1b5e20; color: #1b5e20; }
 .stp__meta { display: flex; flex-direction: column; align-items: center; text-align: center; min-width: 0; }
-.stp__l { font-size: var(--fs-13, 13px); font-weight: 640; color: #64748b; }
-.stp__step.current .stp__l { color: #0f172a; }
+.stp__l { font-size: var(--fs-13, 13px); font-weight: 640; color: var(--c-slate-500); }
+.stp__step.current .stp__l { color: var(--c-slate-900); }
 .stp__step.done .stp__l { color: #1b5e20; }
-.stp__h { font-size: var(--fs-11, 11px); color: #cbd5e1; }
-.stp__step.current .stp__h { color: #94a3b8; }
-.stp__line { position: absolute; top: 15px; left: 50%; width: 100%; height: 2px; background: #e2e8f0; z-index: 0; }
+.stp__h { font-size: var(--fs-11, 11px); color: var(--c-slate-300); }
+.stp__step.current .stp__h { color: var(--c-slate-400); }
+.stp__line { position: absolute; top: 15px; left: 50%; width: 100%; height: 2px; background: var(--c-slate-200); z-index: 0; }
 .stp__line.filled { background: #1b5e20; }
 
-.stp__actions { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding-top: 14px; border-top: 1px solid #f1f5f9; }
+.stp__actions { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--c-slate-100); }
 .stp__cta { background: #1b5e20; border: 1px solid #1b5e20; color: #fff; border-radius: var(--r-sm, 8px); padding: 8px 16px; font-size: var(--fs-13, 13px); font-weight: 650; cursor: pointer; }
 .stp__cta:hover { background: #154a19; }
 .stp__cta:disabled { opacity: .5; cursor: default; }
-.stp__cancel-btn { margin-left: auto; background: none; border: none; color: #94a3b8; font-size: var(--fs-13, 13px); cursor: pointer; padding: 4px 8px; }
+.stp__cancel-btn { margin-left: auto; background: none; border: none; color: var(--c-slate-400); font-size: var(--fs-13, 13px); cursor: pointer; padding: 4px 8px; }
 .stp__cancel-btn:hover { color: #dc2626; }
-.stp__cancel { text-align: center; font-size: var(--fs-14, 14px); font-weight: 640; color: #94a3b8; background: #f8fafc; border-radius: var(--r-sm, 8px); padding: 12px; text-transform: uppercase; letter-spacing: .04em; }
+.stp__cancel { text-align: center; font-size: var(--fs-14, 14px); font-weight: 640; color: var(--c-slate-400); background: var(--c-slate-50); border-radius: var(--r-sm, 8px); padding: 12px; text-transform: uppercase; letter-spacing: .04em; }
 </style>

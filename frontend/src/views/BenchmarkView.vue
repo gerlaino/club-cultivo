@@ -236,7 +236,7 @@ const metricas = computed(() => {
   transition: background .2s;
 }
 .bv__btn-toggle--on  { background: #1b5e20; color: #fff; }
-.bv__btn-toggle--off { background: #475569; color: #fff; }
+.bv__btn-toggle--off { background: var(--c-slate-600); color: #fff; }
 .bv__btn-toggle:disabled { opacity: .6; cursor: default; }
 .bv__toggle-dot {
   width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,.7);
@@ -265,7 +265,7 @@ const metricas = computed(() => {
   margin-bottom: 1.25rem;
 }
 .bv__plat-info i { color: #1b5e20; }
-.bv__plat-info--empty i { color: #94a3b8; }
+.bv__plat-info--empty i { color: var(--c-slate-400); }
 .bv__grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -273,7 +273,7 @@ const metricas = computed(() => {
 }
 .bv__card {
   background: var(--surface-card, #fff);
-  border: 1px solid var(--border-light, #e2e8f0);
+  border: 1px solid var(--border-light, var(--c-slate-200));
   border-radius: 12px;
   padding: 1rem 1.2rem;
 }
@@ -305,7 +305,7 @@ const metricas = computed(() => {
 }
 .bv__card-sep {
   width: 1px; height: 36px;
-  background: var(--border-light, #e2e8f0);
+  background: var(--border-light, var(--c-slate-200));
 }
 .bv__delta {
   font-size: .78rem;

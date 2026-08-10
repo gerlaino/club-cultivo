@@ -303,8 +303,8 @@ async function onSubmit() {
   border-radius: 50%; object-fit: cover;
   filter: drop-shadow(0 4px 16px rgba(15,42,30,.45));
 }
-.lv__logo-sub { font-size: .6rem; color: #94a3b8; font-weight: 500; text-transform: uppercase; letter-spacing: .07em; }
-.lv__sep { height: 1px; background: #f1f5f9; margin: 0 1.5rem; }
+.lv__logo-sub { font-size: .6rem; color: var(--c-slate-400); font-weight: 500; text-transform: uppercase; letter-spacing: .07em; }
+.lv__sep { height: 1px; background: var(--c-slate-100); margin: 0 1.5rem; }
 
 .lv__welcome { padding: 1.1rem 1.5rem 0; }
 .lv__welcome-h { font-family: var(--font-display, 'General Sans', sans-serif); font-size: 1.25rem; font-weight: 800; color: var(--c-ink-950, #0E1011); letter-spacing: -.04em; margin-bottom: .18rem; }
@@ -343,21 +343,21 @@ async function onSubmit() {
 @media (prefers-reduced-motion: reduce) {
   .lv__rocket, .lv__rocket:hover { animation: none; }
 }
-.lv__welcome-p { font-size: .78rem; color: #64748b; }
+.lv__welcome-p { font-size: .78rem; color: var(--c-slate-500); }
 
 .lv__form { padding: 1rem 1.5rem 1.1rem; display: flex; flex-direction: column; gap: .8rem; }
 .lv__field { display: flex; flex-direction: column; gap: .28rem; }
 .lv__label { font-size: .65rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .07em; }
 
-.lv__iw { display: flex; align-items: center; background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 12px; overflow: hidden; transition: all .2s; }
+.lv__iw { display: flex; align-items: center; background: var(--c-slate-50); border: 1.5px solid var(--c-slate-200); border-radius: 12px; overflow: hidden; transition: all .2s; }
 .lv__iw--on { border-color: var(--c-leaf-800, #1A3D2E); background: #fff; box-shadow: 0 0 0 3px rgba(26,61,46,.1); }
-.lv__ico { flex-shrink: 0; padding: 0 .75rem; color: #94a3b8; transition: color .2s; }
+.lv__ico { flex-shrink: 0; padding: 0 .75rem; color: var(--c-slate-400); transition: color .2s; }
 .lv__iw--on .lv__ico { color: var(--c-leaf-800, #1A3D2E); }
-.lv__input { flex: 1; border: none; background: transparent; padding: .85rem .2rem .85rem 0; font-size: .88rem; color: #0f172a; outline: none; width: 100%; }
-.lv__input::placeholder { color: #cbd5e1; }
+.lv__input { flex: 1; border: none; background: transparent; padding: .85rem .2rem .85rem 0; font-size: .88rem; color: var(--c-slate-900); outline: none; width: 100%; }
+.lv__input::placeholder { color: var(--c-slate-300); }
 .lv__input:disabled { opacity: .55; }
-.lv__eye { background: none; border: none; padding: 0 .75rem; color: #94a3b8; cursor: pointer; display: flex; align-items: center; }
-.lv__eye:hover { color: #475569; }
+.lv__eye { background: none; border: none; padding: 0 .75rem; color: var(--c-slate-400); cursor: pointer; display: flex; align-items: center; }
+.lv__eye:hover { color: var(--c-slate-600); }
 
 .lv__error { display: flex; align-items: center; gap: .4rem; background: var(--c-rust-100, #FEE2E2); border: 1px solid #fecaca; color: var(--c-rust-600, #DC2626); padding: .55rem .8rem; border-radius: 9px; font-size: .78rem; font-weight: 500; }
 .err-enter-active,.err-leave-active { transition: all .2s; }
@@ -374,9 +374,9 @@ async function onSubmit() {
 .lv__btn:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(15,42,30,.55); }
 .lv__btn:disabled { opacity: .45; cursor: not-allowed; }
 
-.lv__foot { display: flex; align-items: center; justify-content: space-between; padding: .7rem 1.5rem 1.4rem; border-top: 1px solid #f1f5f9; }
-.lv__secure { display: flex; align-items: center; gap: .38rem; font-size: .65rem; color: #94a3b8; }
-.lv__copy { font-size: .65rem; color: #94a3b8; }
+.lv__foot { display: flex; align-items: center; justify-content: space-between; padding: .7rem 1.5rem 1.4rem; border-top: 1px solid var(--c-slate-100); }
+.lv__secure { display: flex; align-items: center; gap: .38rem; font-size: .65rem; color: var(--c-slate-400); }
+.lv__copy { font-size: .65rem; color: var(--c-slate-400); }
 .lv__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--c-leaf-500, #5A8A72); display: inline-block; animation: pulse 2.5s ease infinite; }
 @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
 

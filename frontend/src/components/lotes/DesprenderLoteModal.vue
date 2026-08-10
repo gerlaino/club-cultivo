@@ -199,28 +199,28 @@ async function guardar() {
 .dsp__modal { background: #fff; border-radius: 14px; width: 100%; max-width: 440px; overflow: hidden; }
 .dsp__head {
   display: flex; align-items: flex-start; justify-content: space-between;
-  padding: .9rem 1rem; border-bottom: 1px solid #f1f5f9;
+  padding: .9rem 1rem; border-bottom: 1px solid var(--c-slate-100);
 }
 .dsp__title { margin: 0; font-size: .95rem; color: #1e293b; }
-.dsp__sub   { margin: .15rem 0 0; font-size: .75rem; color: #94a3b8; }
-.dsp__close { border: none; background: none; cursor: pointer; color: #94a3b8; font-size: .85rem; }
+.dsp__sub   { margin: .15rem 0 0; font-size: .75rem; color: var(--c-slate-400); }
+.dsp__close { border: none; background: none; cursor: pointer; color: var(--c-slate-400); font-size: .85rem; }
 .dsp__body  { padding: 1rem; display: flex; flex-direction: column; gap: .75rem; }
 .dsp__nota  {
-  margin: 0; font-size: .75rem; color: #64748b; line-height: 1.45; background: #f0fdf4;
+  margin: 0; font-size: .75rem; color: var(--c-slate-500); line-height: 1.45; background: #f0fdf4;
   border-left: 3px solid #86efac; padding: .5rem .65rem; border-radius: 0 6px 6px 0;
 }
-.dsp__resumen { margin: 0; font-size: .78rem; color: #475569; background: #f8fafc; padding: .55rem .7rem; border-radius: 8px; }
-.dsp__foot  { display: flex; justify-content: flex-end; gap: .5rem; padding: .8rem 1rem; border-top: 1px solid #f1f5f9; }
+.dsp__resumen { margin: 0; font-size: .78rem; color: var(--c-slate-600); background: var(--c-slate-50); padding: .55rem .7rem; border-radius: 8px; }
+.dsp__foot  { display: flex; justify-content: flex-end; gap: .5rem; padding: .8rem 1rem; border-top: 1px solid var(--c-slate-100); }
 
 .dsp__field { display: flex; flex-direction: column; gap: .25rem; }
-.dsp__label { font-size: .75rem; font-weight: 600; color: #475569; }
-.dsp__opt   { font-weight: 400; color: #94a3b8; }
+.dsp__label { font-size: .75rem; font-weight: 600; color: var(--c-slate-600); }
+.dsp__opt   { font-weight: 400; color: var(--c-slate-400); }
 .dsp__input {
-  border: 1px solid #e2e8f0; border-radius: 8px; padding: .5rem .65rem; font-size: .85rem;
+  border: 1px solid var(--c-slate-200); border-radius: 8px; padding: .5rem .65rem; font-size: .85rem;
   width: 100%; box-sizing: border-box; font-family: inherit;
 }
 .dsp__input:focus { outline: none; border-color: #16a34a; }
-.dsp__hint  { font-size: .7rem; color: #94a3b8; }
+.dsp__hint  { font-size: .7rem; color: var(--c-slate-400); }
 .dsp__alert { background: #fee2e2; color: #b91c1c; padding: .5rem .7rem; border-radius: 8px; font-size: .78rem; }
 
 .dsp__btn {
@@ -228,22 +228,22 @@ async function guardar() {
   background: #16a34a; color: #fff; font-size: .82rem; font-weight: 600;
 }
 .dsp__btn:disabled { opacity: .5; cursor: not-allowed; }
-.dsp__btn--ghost { background: none; color: #64748b; border: 1px solid #e2e8f0; }
+.dsp__btn--ghost { background: none; color: var(--c-slate-500); border: 1px solid var(--c-slate-200); }
 
 .dsp__modos { display: flex; gap: .4rem; }
 .dsp__modo {
-  flex: 1; border: 1px solid #e2e8f0; background: none; border-radius: 8px; cursor: pointer;
-  padding: .4rem .6rem; font-size: .78rem; color: #64748b;
+  flex: 1; border: 1px solid var(--c-slate-200); background: none; border-radius: 8px; cursor: pointer;
+  padding: .4rem .6rem; font-size: .78rem; color: var(--c-slate-500);
 }
 .dsp__modo--on { border-color: #16a34a; background: #f0fdf4; color: #15803d; font-weight: 600; }
 
-.dsp__lista { max-height: 220px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px; }
+.dsp__lista { max-height: 220px; overflow-y: auto; border: 1px solid var(--c-slate-200); border-radius: 8px; }
 .dsp__item {
   display: flex; align-items: center; gap: .5rem; padding: .4rem .6rem; cursor: pointer;
-  font-size: .8rem; border-bottom: 1px solid #f8fafc;
+  font-size: .8rem; border-bottom: 1px solid var(--c-slate-50);
 }
 .dsp__item:last-child { border-bottom: none; }
 .dsp__item--on { background: #f0fdf4; }
 .dsp__item-nom { flex: 1; color: #1e293b; }
-.dsp__item-cod { font-size: .7rem; color: #94a3b8; }
+.dsp__item-cod { font-size: .7rem; color: var(--c-slate-400); }
 </style>

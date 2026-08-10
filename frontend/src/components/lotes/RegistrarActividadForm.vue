@@ -73,15 +73,15 @@ function guardar() {
 <style scoped>
 .raf { display: flex; flex-direction: column; gap: .5rem; }
 .raf__row { display: flex; gap: .5rem; align-items: center; }
-.raf__sel { flex: 1; min-width: 0; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: .45rem .55rem; font-size: .82rem; color: #0f172a; background: #fff; }
+.raf__sel { flex: 1; min-width: 0; border: 1.5px solid var(--c-slate-300); border-radius: 8px; padding: .45rem .55rem; font-size: .82rem; color: var(--c-slate-900); background: #fff; }
 .raf__date { flex: 1; min-width: 0; }
-.raf__input { width: 100%; box-sizing: border-box; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: .5rem .65rem; font-size: .85rem; color: #0f172a; outline: none; }
+.raf__input { width: 100%; box-sizing: border-box; border: 1.5px solid var(--c-slate-300); border-radius: 8px; padding: .5rem .65rem; font-size: .85rem; color: var(--c-slate-900); outline: none; }
 .raf__input:focus { border-color: #16a34a; }
-.raf__num { width: 100%; min-width: 0; flex: 1; box-sizing: border-box; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: .5rem .55rem; font-size: .85rem; color: #0f172a; outline: none; }
+.raf__num { width: 100%; min-width: 0; flex: 1; box-sizing: border-box; border: 1.5px solid var(--c-slate-300); border-radius: 8px; padding: .5rem .55rem; font-size: .85rem; color: var(--c-slate-900); outline: none; }
 .raf__num:focus { border-color: #16a34a; }
-.raf__arrow { color: #94a3b8; font-weight: 800; flex-shrink: 0; }
+.raf__arrow { color: var(--c-slate-400); font-weight: 800; flex-shrink: 0; }
 .raf__actions { display: flex; justify-content: flex-end; gap: .5rem; }
-.raf__cancel { background: #fff; border: 1.5px solid #cbd5e1; color: #334155; border-radius: 8px; padding: .4rem .85rem; font-size: .8rem; font-weight: 600; cursor: pointer; }
+.raf__cancel { background: #fff; border: 1.5px solid var(--c-slate-300); color: var(--c-slate-700); border-radius: 8px; padding: .4rem .85rem; font-size: .8rem; font-weight: 600; cursor: pointer; }
 .raf__save { background: #1b5e20; border: none; color: #fff; border-radius: 8px; padding: .4rem 1rem; font-size: .8rem; font-weight: 700; cursor: pointer; }
 .raf__save:disabled { opacity: .5; cursor: not-allowed; }
 </style>

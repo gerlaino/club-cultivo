@@ -188,7 +188,7 @@ function avatarStyle(name) {
 .spv { display: flex; flex-direction: column; gap: 1rem; min-height: 0; }
 
 .spv__nav { display: flex; align-items: center; gap: .75rem; }
-.spv__nav-btn { width: 30px; height: 30px; border: 1.5px solid #e2e8f0; border-radius: 7px; background: #fff; color: #374151; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: .85rem; }
+.spv__nav-btn { width: 30px; height: 30px; border: 1.5px solid var(--c-slate-200); border-radius: 7px; background: #fff; color: #374151; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: .85rem; }
 .spv__nav-btn:disabled { opacity: .35; cursor: not-allowed; }
 .spv__nav-label { font-size: .875rem; font-weight: 600; color: #0f2611; }
 
@@ -217,7 +217,7 @@ function avatarStyle(name) {
 .spv__card:hover { box-shadow: 0 2px 6px rgba(0,0,0,.1); }
 .spv__card--alta    { background: #fff7ed; border-color: #fed7aa; }
 .spv__card--urgente { background: #fef2f2; border-color: #fecaca; }
-.spv__card--baja    { background: #f8fafc; border-color: #e2e8f0; }
+.spv__card--baja    { background: var(--c-slate-50); border-color: var(--c-slate-200); }
 .spv__card-tipo  { font-size: .8rem; flex-shrink: 0; }
 .spv__card-titulo { font-size: .72rem; font-weight: 600; color: #0f2611; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0; }
 .spv__card-hora  { font-size: .65rem; color: #60725d; flex-shrink: 0; }

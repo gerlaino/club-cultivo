@@ -54,18 +54,18 @@ const montoCobrar = computed(() => {
 .et-lbl--100x70  { width: 100mm; min-height: 70mm;  font-size: 10pt; }
 .et-lbl--100x150 { width: 100mm; min-height: 150mm; font-size: 12pt; }
 
-.et-lbl__header { display: flex; align-items: center; gap: 2mm; border-bottom: .5pt solid #cbd5e1; padding-bottom: 2mm; margin-bottom: 3mm; }
+.et-lbl__header { display: flex; align-items: center; gap: 2mm; border-bottom: .5pt solid var(--c-slate-300); padding-bottom: 2mm; margin-bottom: 3mm; }
 .et-lbl__logo { height: 8mm; width: auto; object-fit: contain; }
 .et-lbl__club { font-weight: 800; color: #1b5e20; font-size: 1.25em; line-height: 1.1; }
 
-.et-lbl__para-lbl { font-size: .7em; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; }
-.et-lbl__para { font-weight: 800; font-size: 1.6em; line-height: 1.15; color: #0f172a; margin-bottom: 2mm; }
-.et-lbl__dir { font-size: 1em; line-height: 1.3; color: #334155; }
-.et-lbl__tel { font-size: .95em; color: #475569; margin-top: 1mm; }
+.et-lbl__para-lbl { font-size: .7em; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--c-slate-400); }
+.et-lbl__para { font-weight: 800; font-size: 1.6em; line-height: 1.15; color: var(--c-slate-900); margin-bottom: 2mm; }
+.et-lbl__dir { font-size: 1em; line-height: 1.3; color: var(--c-slate-700); }
+.et-lbl__tel { font-size: .95em; color: var(--c-slate-600); margin-top: 1mm; }
 .et-lbl__cobrar { margin-top: 2mm; padding: 1.5mm 2mm; border: 1pt solid #166534; border-radius: 1.5mm; background: #f0fdf4; color: #166534; font-weight: 800; font-size: .95em; text-align: center; letter-spacing: .02em; }
 
-.et-lbl__footer { display: flex; align-items: center; gap: 2mm; border-top: .5pt solid #cbd5e1; padding-top: 2mm; margin-top: auto; }
-.et-lbl__cod-lbl { font-size: .7em; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #94a3b8; }
+.et-lbl__footer { display: flex; align-items: center; gap: 2mm; border-top: .5pt solid var(--c-slate-300); padding-top: 2mm; margin-top: auto; }
+.et-lbl__cod-lbl { font-size: .7em; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--c-slate-400); }
 .et-lbl__cod { font-family: monospace; font-weight: 800; font-size: 1.1em; color: #1b5e20; }
 
 @media print {

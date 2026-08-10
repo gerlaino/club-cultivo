@@ -245,62 +245,62 @@ async function handleSubmit() {
 .med__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 1050; padding: 1rem; backdrop-filter: blur(3px); }
 .med__modal { background: #fff; border-radius: 18px; width: 100%; max-width: 540px; max-height: 92vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,.18); display: flex; flex-direction: column; }
 
-.med__modal-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.1rem 1.25rem .9rem; border-bottom: 1px solid #f1f5f9; position: sticky; top: 0; background: #fff; z-index: 1; }
-.med__modal-title { font-size: .95rem; font-weight: 800; color: #0f172a; margin: 0; }
+.med__modal-header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1.1rem 1.25rem .9rem; border-bottom: 1px solid var(--c-slate-100); position: sticky; top: 0; background: #fff; z-index: 1; }
+.med__modal-title { font-size: .95rem; font-weight: 800; color: var(--c-slate-900); margin: 0; }
 .med__modal-title-paciente { color: #15803d; font-weight: 600; }
-.med__modal-close { background: #f1f5f9; border: none; width: 28px; height: 28px; border-radius: 7px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #64748b; }
-.med__modal-close:hover { background: #e2e8f0; }
+.med__modal-close { background: var(--c-slate-100); border: none; width: 28px; height: 28px; border-radius: 7px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--c-slate-500); }
+.med__modal-close:hover { background: var(--c-slate-200); }
 
-.med__modal-body { padding: 1.1rem 1.25rem; flex: 1; display: flex; flex-direction: column; gap: .9rem; background: #f8fafc; }
-.med__modal-footer { display: flex; justify-content: flex-end; gap: .75rem; padding: .875rem 1.25rem; border-top: 1px solid #f1f5f9; position: sticky; bottom: 0; background: #fff; }
+.med__modal-body { padding: 1.1rem 1.25rem; flex: 1; display: flex; flex-direction: column; gap: .9rem; background: var(--c-slate-50); }
+.med__modal-footer { display: flex; justify-content: flex-end; gap: .75rem; padding: .875rem 1.25rem; border-top: 1px solid var(--c-slate-100); position: sticky; bottom: 0; background: #fff; }
 
 .med__error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 9px; padding: .6rem .875rem; font-size: .82rem; display: flex; align-items: center; gap: .4rem; }
 
 /* Stock info (readonly) */
 .med__section-label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .05em; }
-.med__stock-info { display: flex; align-items: center; gap: .75rem; padding: .7rem .875rem; border-radius: 10px; border: 1.5px solid #e2e8f0; background: #fff; }
+.med__stock-info { display: flex; align-items: center; gap: .75rem; padding: .7rem .875rem; border-radius: 10px; border: 1.5px solid var(--c-slate-200); background: #fff; }
 .med__stock-emoji { font-size: 1.2rem; flex-shrink: 0; }
 .med__stock-detail { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .1rem; }
-.med__stock-nombre { font-size: .82rem; font-weight: 700; color: #0f172a; }
-.med__stock-gen { font-size: .72rem; color: #64748b; font-style: italic; }
+.med__stock-nombre { font-size: .82rem; font-weight: 700; color: var(--c-slate-900); }
+.med__stock-gen { font-size: .72rem; color: var(--c-slate-500); font-style: italic; }
 .med__stock-cantidad { display: flex; flex-direction: column; align-items: flex-end; gap: .2rem; flex-shrink: 0; }
 .med__stock-qty { font-size: .95rem; font-weight: 800; color: #1b5e20; font-family: monospace; }
-.med__stock-readonly-badge { font-size: .62rem; color: #94a3b8; background: #f1f5f9; border-radius: 4px; padding: .1em .4em; }
+.med__stock-readonly-badge { font-size: .62rem; color: var(--c-slate-400); background: var(--c-slate-100); border-radius: 4px; padding: .1em .4em; }
 .med__qty-edit { display: flex; align-items: center; gap: .3rem; }
-.med__qty-input { width: 72px; text-align: right; background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 7px; padding: .35rem .5rem; font-size: .85rem; font-weight: 700; color: #0f172a; outline: none; }
-.med__qty-unit { font-size: .78rem; color: #64748b; font-weight: 600; }
+.med__qty-input { width: 72px; text-align: right; background: var(--c-slate-50); border: 1.5px solid var(--c-slate-200); border-radius: 7px; padding: .35rem .5rem; font-size: .85rem; font-weight: 700; color: var(--c-slate-900); outline: none; }
+.med__qty-unit { font-size: .78rem; color: var(--c-slate-500); font-weight: 600; }
 
 /* Ítems editables */
 .med__items { display: flex; flex-direction: column; gap: .5rem; }
-.med__item { display: flex; align-items: center; gap: .6rem; padding: .6rem .75rem; border-radius: 10px; border: 1.5px solid #e2e8f0; background: #fff; }
+.med__item { display: flex; align-items: center; gap: .6rem; padding: .6rem .75rem; border-radius: 10px; border: 1.5px solid var(--c-slate-200); background: #fff; }
 .med__item-emoji { font-size: 1.15rem; flex-shrink: 0; }
 .med__item-detail { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .1rem; }
-.med__item-nombre { font-size: .82rem; font-weight: 700; color: #0f172a; }
-.med__item-gen { font-size: .72rem; color: #64748b; font-style: italic; }
+.med__item-nombre { font-size: .82rem; font-weight: 700; color: var(--c-slate-900); }
+.med__item-gen { font-size: .72rem; color: var(--c-slate-500); font-style: italic; }
 .med__price-edit { display: flex; align-items: center; gap: .15rem; flex-shrink: 0; }
-.med__price-prefix { font-size: .78rem; color: #64748b; font-weight: 600; }
-.med__price-input { width: 76px; text-align: right; background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 7px; padding: .35rem .5rem; font-size: .85rem; font-weight: 700; color: #0f172a; outline: none; }
+.med__price-prefix { font-size: .78rem; color: var(--c-slate-500); font-weight: 600; }
+.med__price-input { width: 76px; text-align: right; background: var(--c-slate-50); border: 1.5px solid var(--c-slate-200); border-radius: 7px; padding: .35rem .5rem; font-size: .85rem; font-weight: 700; color: var(--c-slate-900); outline: none; }
 .med__item-price { font-size: .82rem; font-weight: 700; color: #15803d; flex-shrink: 0; }
 .med__item-del { background: none; border: none; color: #dc2626; cursor: pointer; padding: .2rem; flex-shrink: 0; font-size: .85rem; }
-.med__items-total { text-align: right; font-size: .8rem; color: #64748b; margin-top: .5rem; }
+.med__items-total { text-align: right; font-size: .8rem; color: var(--c-slate-500); margin-top: .5rem; }
 .med__items-total strong { color: #15803d; font-size: .95rem; margin-left: .3rem; }
 
 /* Form */
-.med__divider { height: 1px; background: #e2e8f0; }
+.med__divider { height: 1px; background: var(--c-slate-200); }
 .med__form-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
 @media (max-width: 400px) { .med__form-row { grid-template-columns: 1fr; } }
 .med__field { display: flex; flex-direction: column; gap: .3rem; }
 .med__label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .05em; }
-.med__opt { font-size: .67rem; font-weight: 400; color: #94a3b8; text-transform: none; letter-spacing: 0; }
-.med__input { background: #fff; border: 1.5px solid #cbd5e1; border-radius: 9px; padding: .6rem .8rem; font-size: .875rem; color: #0f172a; width: 100%; box-sizing: border-box; outline: none; transition: border-color .15s, box-shadow .15s; }
+.med__opt { font-size: .67rem; font-weight: 400; color: var(--c-slate-400); text-transform: none; letter-spacing: 0; }
+.med__input { background: #fff; border: 1.5px solid var(--c-slate-300); border-radius: 9px; padding: .6rem .8rem; font-size: .875rem; color: var(--c-slate-900); width: 100%; box-sizing: border-box; outline: none; transition: border-color .15s, box-shadow .15s; }
 .med__input:focus { border-color: #2D8A6B; box-shadow: 0 0 0 3px rgba(45,138,107,.12); background: #fff; }
 .med__textarea { resize: vertical; min-height: 58px; }
 .med__input-suffix-wrap { display: flex; }
 .med__input--with-prefix { border-radius: 0 9px 9px 0; flex: 1; }
-.med__input-prefix { background: #f1f5f9; border: 1.5px solid #cbd5e1; border-right: none; border-radius: 9px 0 0 9px; padding: .6rem .7rem; font-size: .8rem; color: #64748b; display: flex; align-items: center; }
+.med__input-prefix { background: var(--c-slate-100); border: 1.5px solid var(--c-slate-300); border-right: none; border-radius: 9px 0 0 9px; padding: .6rem .7rem; font-size: .8rem; color: var(--c-slate-500); display: flex; align-items: center; }
 
 /* CC panel */
-.med__cc-panel { border-radius: 10px; padding: .7rem .9rem; border: 1.5px solid #e2e8f0; display: flex; flex-direction: column; gap: .3rem; }
+.med__cc-panel { border-radius: 10px; padding: .7rem .9rem; border: 1.5px solid var(--c-slate-200); display: flex; flex-direction: column; gap: .3rem; }
 .med__cc-panel--ok           { background: #f0fdf4; border-color: #bbf7d0; }
 .med__cc-panel--insuficiente { background: #fef2f2; border-color: #fecaca; }
 .med__cc-panel--agotado      { background: #fef2f2; border-color: #fecaca; }
@@ -315,6 +315,6 @@ async function handleSubmit() {
 .med__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .6rem 1.1rem; border-radius: 9px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; }
 .med__btn-primary:hover:not(:disabled) { background: #144a18; }
 .med__btn-primary:disabled { opacity: .5; cursor: not-allowed; }
-.med__btn-ghost { background: #fff; color: #64748b; border: 1.5px solid #e2e8f0; padding: .6rem 1.1rem; border-radius: 9px; font-size: .875rem; font-weight: 500; cursor: pointer; }
-.med__btn-ghost:hover { background: #f8fafc; }
+.med__btn-ghost { background: #fff; color: var(--c-slate-500); border: 1.5px solid var(--c-slate-200); padding: .6rem 1.1rem; border-radius: 9px; font-size: .875rem; font-weight: 500; cursor: pointer; }
+.med__btn-ghost:hover { background: var(--c-slate-50); }
 </style>

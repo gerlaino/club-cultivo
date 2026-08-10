@@ -305,7 +305,7 @@ onMounted(async () => {
 .pcd__ev-header { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; flex-wrap: wrap; margin-bottom: .2rem; }
 .pcd__ev-tipo { font-size: .8rem; font-weight: 600; color: #0f2611; }
 .pcd__ev-fecha { font-size: .72rem; color: #9ca3af; white-space: nowrap; }
-.pcd__ev-desc { font-size: .82rem; color: #475569; margin: 0 0 .35rem; line-height: 1.5; }
+.pcd__ev-desc { font-size: .82rem; color: var(--c-slate-600); margin: 0 0 .35rem; line-height: 1.5; }
 .pcd__ev-autor { font-size: .72rem; color: #9ca3af; margin: .25rem 0 0; }
 
 /* Metadata grid */

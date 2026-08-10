@@ -704,14 +704,14 @@ async function exportarCSV() {
   position: fixed; bottom: 1.25rem; left: 50%; transform: translateX(-50%); z-index: 1035;
   display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; justify-content: center;
   max-width: calc(100vw - 2rem);
-  background: #0f172a; color: #fff; padding: .6rem .75rem .6rem 1.1rem;
+  background: var(--c-slate-900); color: #fff; padding: .6rem .75rem .6rem 1.1rem;
   border-radius: 12px; box-shadow: 0 8px 28px rgba(0,0,0,.25); font-size: .82rem;
 }
 .lv-selbar__txt { font-weight: 600; white-space: nowrap; }
-.lv-selbar__txt small { font-weight: 400; color: #94a3b8; }
+.lv-selbar__txt small { font-weight: 400; color: var(--c-slate-400); }
 .lv-selbar__warn { color: #fbbf24; font-weight: 600; white-space: nowrap; }
 .lv-selbar__sel { border: none; border-radius: 999px; padding: 6px 12px; font-size: 13px; max-width: 240px; }
-.lv-selbar__ghost { background: none; border: none; color: #94a3b8; font-size: .8rem; font-weight: 600; cursor: pointer; }
+.lv-selbar__ghost { background: none; border: none; color: var(--c-slate-400); font-size: .8rem; font-weight: 600; cursor: pointer; }
 .lv-selbar__ghost:hover:not(:disabled) { color: #fff; }
 .lv-selbar__btn {
   display: inline-flex; align-items: center; gap: .35rem;
@@ -729,8 +729,8 @@ async function exportarCSV() {
 
 /* ── Header ──────────────────────────────────────────── */
 .lv__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; flex-wrap: wrap; }
-.lv__title  { font-size: 2rem; font-weight: 800; color: #0f172a; margin: 0 0 .2rem; letter-spacing: -.04em; line-height: 1; }
-.lv__sub    { font-size: .83rem; color: #94a3b8; margin: 0; }
+.lv__title  { font-size: 2rem; font-weight: 800; color: var(--c-slate-900); margin: 0 0 .2rem; letter-spacing: -.04em; line-height: 1; }
+.lv__sub    { font-size: .83rem; color: var(--c-slate-400); margin: 0; }
 .lv__header-actions { display: flex; gap: .5rem; align-items: center; }
 
 .lv__btn-primary {
@@ -744,8 +744,8 @@ async function exportarCSV() {
 
 .lv__btn-export {
   display: inline-flex; align-items: center; gap: .35rem;
-  padding: .6rem .9rem; background: transparent; color: #475569;
-  border: 1.5px solid #e2e8f0; border-radius: 9px;
+  padding: .6rem .9rem; background: transparent; color: var(--c-slate-600);
+  border: 1.5px solid var(--c-slate-200); border-radius: 9px;
   font-size: .84rem; font-weight: 600; cursor: pointer;
   transition: all .15s; white-space: nowrap;
 }
@@ -763,37 +763,37 @@ async function exportarCSV() {
 @media (max-width: 700px) { .lv__kpis { grid-template-columns: repeat(2, 1fr); } }
 
 .lv__kpi {
-  background: #fff; border: 1.5px solid #e2e8f0; border-radius: 12px;
+  background: #fff; border: 1.5px solid var(--c-slate-200); border-radius: 12px;
   padding: 1rem; text-align: left; cursor: pointer; transition: all .15s;
 }
-.lv__kpi:hover { border-color: #94a3b8; }
+.lv__kpi:hover { border-color: var(--c-slate-400); }
 .lv__kpi--active { border-color: #1b5e20 !important; box-shadow: 0 0 0 1px #1b5e20; }
 .lv__kpi--green .lv__kpi-val { color: #1b5e20; }
 .lv__kpi--green.lv__kpi--active { border-color: #1b5e20 !important; box-shadow: 0 0 0 1px #1b5e20; }
 .lv__kpi--amber .lv__kpi-val { color: #b45309; }
 .lv__kpi--amber.lv__kpi--active { border-color: #b45309 !important; box-shadow: 0 0 0 1px #b45309; }
-.lv__kpi--neutral .lv__kpi-val { color: #64748b; }
+.lv__kpi--neutral .lv__kpi-val { color: var(--c-slate-500); }
 
-.lv__kpi-val { font-size: 1.8rem; font-weight: 800; color: #0f172a; line-height: 1; letter-spacing: -.04em; margin-bottom: .2rem; }
-.lv__kpi-lbl { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: #94a3b8; }
+.lv__kpi-val { font-size: 1.8rem; font-weight: 800; color: var(--c-slate-900); line-height: 1; letter-spacing: -.04em; margin-bottom: .2rem; }
+.lv__kpi-lbl { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--c-slate-400); }
 
 /* ── Toolbar ──────────────────────────────────────────── */
 .lv__toolbar {
   display: flex; gap: .5rem; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap;
 }
 .lv__search-wrap { flex: 1; min-width: 180px; position: relative; display: flex; align-items: center; }
-.lv__search-icon { position: absolute; left: .875rem; color: #94a3b8; font-size: .875rem; pointer-events: none; }
+.lv__search-icon { position: absolute; left: .875rem; color: var(--c-slate-400); font-size: .875rem; pointer-events: none; }
 .lv__search {
-  width: 100%; background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px;
-  padding: .65rem .875rem .65rem 2.4rem; font-size: .9rem; color: #0f172a;
+  width: 100%; background: #fff; border: 1.5px solid var(--c-slate-200); border-radius: 10px;
+  padding: .65rem .875rem .65rem 2.4rem; font-size: .9rem; color: var(--c-slate-900);
   transition: border .15s, box-shadow .15s; box-sizing: border-box;
 }
 .lv__search:focus { outline: none; border-color: #1b5e20; box-shadow: 0 0 0 3px rgba(27,94,32,.1); }
-.lv__search-count { position: absolute; right: .875rem; font-size: .72rem; font-weight: 600; color: #94a3b8; }
+.lv__search-count { position: absolute; right: .875rem; font-size: .72rem; font-weight: 600; color: var(--c-slate-400); }
 
 .lv__select {
-  background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px;
-  padding: .62rem .85rem; font-size: .875rem; color: #0f172a; cursor: pointer;
+  background: #fff; border: 1.5px solid var(--c-slate-200); border-radius: 10px;
+  padding: .62rem .85rem; font-size: .875rem; color: var(--c-slate-900); cursor: pointer;
   transition: border .15s; min-width: 140px;
 }
 .lv__select--sm { min-width: 120px; }
@@ -816,16 +816,16 @@ async function exportarCSV() {
 .lv-table thead th { padding: 10px 12px; text-align: left; font-weight: 600; color: #6b7280; border-bottom: 2px solid #e5e7eb; white-space: nowrap; background: #fafafa; }
 .lv-th--sort { cursor: pointer; user-select: none; }
 .lv-th--sort:hover { color: #1b5e20; }
-.lv-sort-icon { font-size: .75rem; color: #cbd5e1; margin-left: .2rem; }
+.lv-sort-icon { font-size: .75rem; color: var(--c-slate-300); margin-left: .2rem; }
 .lv-table tbody tr { border-bottom: 1px solid #f3f4f6; transition: background .1s; cursor: pointer; }
 .lv-table tbody tr:last-child { border-bottom: none; }
-.lv-table tbody tr:hover { background: #f8fafc; }
+.lv-table tbody tr:hover { background: var(--c-slate-50); }
 .lv-table td { padding: 10px 12px; vertical-align: middle; }
 
 .lv-badge { display: inline-flex; align-items: center; gap: .25rem; padding: 3px 8px; border-radius: 5px; font-size: .75rem; font-weight: 700; white-space: nowrap; }
-.lv-codigo { font-weight: 700; color: #0f172a; font-family: monospace; font-size: .85rem; }
+.lv-codigo { font-weight: 700; color: var(--c-slate-900); font-family: monospace; font-size: .85rem; }
 .lv-genetica { font-weight: 600; color: #3F6452; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lv-strain { font-style: italic; color: #64748b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv-strain { font-style: italic; color: var(--c-slate-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lv-tipo { display: inline-block; margin-left: .4rem; font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: .1em .45em; border-radius: 999px; vertical-align: middle; }
 .lv-tipo--sativa { background: #fef3c7; color: #b45309; }
 .lv-tipo--indica { background: #ede9fe; color: #6d28d9; }
@@ -834,23 +834,23 @@ async function exportarCSV() {
 .lv-dias-dot--verde { background: #16a34a; }
 .lv-dias-dot--amarillo { background: #f59e0b; }
 .lv-dias-dot--rojo { background: #dc2626; }
-.lv-sala { color: #64748b; font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lv-sala { color: var(--c-slate-500); font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lv-num { font-weight: 600; color: #374151; }
-.lv-empty { color: #cbd5e1; }
+.lv-empty { color: var(--c-slate-300); }
 
 .lv-actions { display: flex; align-items: center; gap: .25rem; opacity: 0; transition: opacity .15s; }
 .lv-table tbody tr:hover .lv-actions { opacity: 1; }
 .lv-action-btn { background: none; border: none; cursor: pointer; padding: 5px 7px; border-radius: 6px; color: #6b7280; font-size: .875rem; transition: all .15s; }
-.lv-action-btn:hover { background: #f1f5f9; color: #0f172a; }
+.lv-action-btn:hover { background: var(--c-slate-100); color: var(--c-slate-900); }
 .lv-action-btn--danger:hover { background: #fef2f2; color: #dc2626; }
 
-.lv__table-footer { display: flex; align-items: center; justify-content: space-between; padding: .6rem 1rem; border-top: 1px solid #f1f5f9; }
+.lv__table-footer { display: flex; align-items: center; justify-content: space-between; padding: .6rem 1rem; border-top: 1px solid var(--c-slate-100); }
 .lv__pagination { display: flex; align-items: center; gap: .5rem; }
-.lv__page-btn { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 7px; padding: .3rem .65rem; font-size: .82rem; color: #374151; cursor: pointer; transition: all .15s; }
+.lv__page-btn { background: #fff; border: 1.5px solid var(--c-slate-200); border-radius: 7px; padding: .3rem .65rem; font-size: .82rem; color: #374151; cursor: pointer; transition: all .15s; }
 .lv__page-btn:hover:not(:disabled) { border-color: #1b5e20; color: #1b5e20; }
 .lv__page-btn:disabled { opacity: .4; cursor: not-allowed; }
-.lv__page-info { font-size: .8rem; color: #64748b; font-weight: 600; }
-.lv__count { font-size: .75rem; color: #94a3b8; }
+.lv__page-info { font-size: .8rem; color: var(--c-slate-500); font-weight: 600; }
+.lv__count { font-size: .75rem; color: var(--c-slate-400); }
 
 /* ── Mobile: tabla → cards ───────────────────────────── */
 @media (max-width: 640px) {
@@ -886,7 +886,7 @@ async function exportarCSV() {
     content: attr(data-label);
     font-size: .65rem;
     font-weight: 700;
-    color: #94a3b8;
+    color: var(--c-slate-400);
     text-transform: uppercase;
     letter-spacing: .04em;
     min-width: 68px;
@@ -897,7 +897,7 @@ async function exportarCSV() {
   .lv-table td[data-label="Estado"] {
     padding-bottom: .45rem;
     margin-bottom: .1rem;
-    border-bottom: 1px solid #f1f5f9;
+    border-bottom: 1px solid var(--c-slate-100);
   }
   .lv-table td[data-label="Estado"]::before { content: none; }
 
@@ -937,22 +937,22 @@ async function exportarCSV() {
 }
 .lm-modal__header {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
-  padding: 1.5rem 1.5rem 1.1rem; border-bottom: 1px solid #f1f5f9;
+  padding: 1.5rem 1.5rem 1.1rem; border-bottom: 1px solid var(--c-slate-100);
   position: sticky; top: 0; background: #fff; z-index: 1;
 }
-.lm-modal__title { font-size: 1.2rem; font-weight: 800; color: #0f172a; margin: 0 0 .2rem; letter-spacing: -.02em; }
-.lm-modal__sub   { font-size: .8rem; color: #64748b; margin: 0; }
+.lm-modal__title { font-size: 1.2rem; font-weight: 800; color: var(--c-slate-900); margin: 0 0 .2rem; letter-spacing: -.02em; }
+.lm-modal__sub   { font-size: .8rem; color: var(--c-slate-500); margin: 0; }
 .lm-modal__sub--code { font-family: monospace; color: #3F6452; font-weight: 700; }
 .lm-modal__close {
-  background: #f1f5f9; border: none; width: 32px; height: 32px;
+  background: var(--c-slate-100); border: none; width: 32px; height: 32px;
   border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center;
-  color: #64748b; flex-shrink: 0; transition: all .15s;
+  color: var(--c-slate-500); flex-shrink: 0; transition: all .15s;
 }
-.lm-modal__close:hover { background: #e2e8f0; color: #0f172a; }
+.lm-modal__close:hover { background: var(--c-slate-200); color: var(--c-slate-900); }
 .lm-modal__body   { padding: 1.4rem 1.5rem; flex: 1; }
 .lm-modal__footer {
   display: flex; justify-content: flex-end; gap: .75rem;
-  padding: 1rem 1.5rem; border-top: 1px solid #f1f5f9;
+  padding: 1rem 1.5rem; border-top: 1px solid var(--c-slate-100);
   position: sticky; bottom: 0; background: #fff;
 }
 
@@ -965,10 +965,10 @@ async function exportarCSV() {
 .lm-field--full  { grid-column: 1 / -1; }
 .lm-label        { font-size: .78rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
 .lm-req          { color: #dc2626; }
-.lm-unit         { font-size: .68rem; font-weight: 400; color: #94a3b8; text-transform: none; letter-spacing: 0; margin-left: .2rem; }
+.lm-unit         { font-size: .68rem; font-weight: 400; color: var(--c-slate-400); text-transform: none; letter-spacing: 0; margin-left: .2rem; }
 .lm-input {
-  background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 9px;
-  padding: .65rem .9rem; font-size: .875rem; color: #0f172a;
+  background: var(--c-slate-50); border: 1.5px solid var(--c-slate-200); border-radius: 9px;
+  padding: .65rem .9rem; font-size: .875rem; color: var(--c-slate-900);
   width: 100%; box-sizing: border-box; transition: border .15s, box-shadow .15s;
 }
 .lm-input:focus     { outline: none; border-color: #1b5e20; box-shadow: 0 0 0 3px rgba(27,94,32,.1); background: #fff; }
@@ -986,10 +986,10 @@ async function exportarCSV() {
 .lm-btn-primary:disabled { opacity: .6; cursor: not-allowed; }
 
 .lm-btn-ghost {
-  background: transparent; color: #64748b; border: 1.5px solid #e2e8f0;
+  background: transparent; color: var(--c-slate-500); border: 1.5px solid var(--c-slate-200);
   padding: .65rem 1.2rem; border-radius: 9px; font-size: .875rem; font-weight: 600;
   cursor: pointer; transition: all .15s;
 }
-.lm-btn-ghost:hover { background: #f8fafc; color: #0f172a; }
+.lm-btn-ghost:hover { background: var(--c-slate-50); color: var(--c-slate-900); }
 
 </style>

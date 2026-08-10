@@ -373,7 +373,7 @@ onMounted(cargar)
   font-size: .65rem; font-weight: 700; padding: .15em .55em; border-radius: 999px;
   text-transform: uppercase; letter-spacing: .04em; flex-shrink: 0;
 }
-.mpd__est--programado  { background: #f1f5f9; color: #475569; }
+.mpd__est--programado  { background: var(--c-slate-100); color: var(--c-slate-600); }
 .mpd__est--confirmado  { background: #dcfce7; color: #166534; }
 .mpd__est--realizado   { background: #d1fae5; color: #065f46; }
 .mpd__est--ausente     { background: #fef3c7; color: #92400e; }

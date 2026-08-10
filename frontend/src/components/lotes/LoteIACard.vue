@@ -62,10 +62,10 @@ onMounted(() => cargarHistorialAnalisis())
 .lia__item:first-child { border-top: none; }
 .lia__item-header { width: 100%; display: flex; justify-content: space-between; align-items: center; padding: .5rem 1rem; background: none; border: none; cursor: pointer; text-align: left; }
 .lia__item-header:hover { background: #faf5ff; }
-.lia__meta { display: flex; align-items: center; gap: .4rem; font-size: .7rem; color: #94a3b8; }
+.lia__meta { display: flex; align-items: center; gap: .4rem; font-size: .7rem; color: var(--c-slate-400); }
 .lia__badge { background: #7c3aed; color: #fff; padding: .1em .45em; border-radius: 4px; font-size: .65rem; font-weight: 700; text-transform: uppercase; }
 .lia__tokens { background: #f3e8ff; color: #7c3aed; padding: .1em .45em; border-radius: 4px; font-size: .68rem; font-weight: 600; }
-.lia__contenido { font-size: .82rem; color: #334155; line-height: 1.65; white-space: pre-wrap; max-height: 320px; overflow-y: auto; padding: .4rem 1rem .9rem; }
-.lia__empty { display: flex; flex-direction: column; align-items: center; gap: .4rem; padding: 1.2rem 1rem; color: #94a3b8; font-size: .8rem; }
+.lia__contenido { font-size: .82rem; color: var(--c-slate-700); line-height: 1.65; white-space: pre-wrap; max-height: 320px; overflow-y: auto; padding: .4rem 1rem .9rem; }
+.lia__empty { display: flex; flex-direction: column; align-items: center; gap: .4rem; padding: 1.2rem 1rem; color: var(--c-slate-400); font-size: .8rem; }
 .lia__empty i { font-size: 1.4rem; }
 </style>

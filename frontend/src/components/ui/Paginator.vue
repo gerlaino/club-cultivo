@@ -104,7 +104,7 @@ function onPerPageChange(e) {
 }
 .paginator__info {
   font-size: .75rem;
-  color: #94a3b8;
+  color: var(--c-slate-400);
   margin-right: auto;
 }
 .paginator__nav {
@@ -116,10 +116,10 @@ function onPerPageChange(e) {
   min-width: 30px;
   height: 30px;
   padding: 0 .35rem;
-  border: 1.5px solid #e2e8f0;
+  border: 1.5px solid var(--c-slate-200);
   background: #fff;
   border-radius: 7px;
-  color: #64748b;
+  color: var(--c-slate-500);
   font-size: .78rem;
   font-weight: 600;
   cursor: pointer;
@@ -131,11 +131,11 @@ function onPerPageChange(e) {
 .paginator__btn:hover:not(:disabled) { border-color: #1b5e20; color: #1b5e20; }
 .paginator__btn--active { background: #1b5e20; border-color: #1b5e20; color: #fff; }
 .paginator__btn:disabled { opacity: .35; cursor: not-allowed; }
-.paginator__ellipsis { font-size: .78rem; color: #94a3b8; padding: 0 .2rem; }
+.paginator__ellipsis { font-size: .78rem; color: var(--c-slate-400); padding: 0 .2rem; }
 .paginator__size {
   font-size: .75rem;
-  color: #64748b;
-  border: 1.5px solid #e2e8f0;
+  color: var(--c-slate-500);
+  border: 1.5px solid var(--c-slate-200);
   border-radius: 7px;
   padding: .15rem .4rem;
   background: #fff;

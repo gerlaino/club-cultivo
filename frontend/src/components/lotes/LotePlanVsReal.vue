@@ -152,13 +152,13 @@ const rendDevClass = computed(() => {
 .pvr__btn-ghost   { background: transparent; color: #60725d; border: 1px solid #d4e6d4; padding: .5rem 1rem; border-radius: 8px; font-size: .82rem; cursor: pointer; }
 .pvr__data     { padding: .5rem 1rem .8rem; display: flex; flex-direction: column; gap: .5rem; }
 .pvr__row-data { display: flex; align-items: center; gap: .5rem; font-size: .85rem; flex-wrap: wrap; }
-.pvr__item-label { font-size: .75rem; color: #64748b; min-width: 90px; }
-.pvr__objetivo { color: #334155; font-weight: 600; }
-.pvr__sep      { color: #94a3b8; font-size: .7rem; }
+.pvr__item-label { font-size: .75rem; color: var(--c-slate-500); min-width: 90px; }
+.pvr__objetivo { color: var(--c-slate-700); font-weight: 600; }
+.pvr__sep      { color: var(--c-slate-400); font-size: .7rem; }
 .pvr__real     { font-weight: 700; color: #1b5e20; }
 .pvr__dev      { font-size: .75rem; font-weight: 700; padding: .1rem .4rem; border-radius: 4px; }
 .pvr__positive { color: #15803d; background: #dcfce7; }
 .pvr__negative { color: #dc2626; background: #fee2e2; }
-.pvr__empty    { display: flex; flex-direction: column; align-items: center; gap: .4rem; padding: 1rem; color: #94a3b8; font-size: .8rem; }
+.pvr__empty    { display: flex; flex-direction: column; align-items: center; gap: .4rem; padding: 1rem; color: var(--c-slate-400); font-size: .8rem; }
 .pvr__empty i  { font-size: 1.4rem; }
 </style>

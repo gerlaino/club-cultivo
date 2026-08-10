@@ -72,8 +72,8 @@ function formatTime(ts) {
 .ab__badge--red    { background: #fef2f2; color: #dc2626; }
 .ab__badge--yellow { background: #fffbeb; color: #b45309; }
 .ab__badge--green  { background: #f0fdf4; color: #15803d; }
-.ab__badge--gray   { background: #f1f5f9; color: #64748b; }
-.ab__meta { display: flex; gap: .75rem; flex-wrap: wrap; font-size: .75rem; color: #64748b; }
+.ab__badge--gray   { background: var(--c-slate-100); color: var(--c-slate-500); }
+.ab__meta { display: flex; gap: .75rem; flex-wrap: wrap; font-size: .75rem; color: var(--c-slate-500); }
 .ab__time { margin-left: auto; }
 .ab__actions { display: flex; gap: .4rem; flex-shrink: 0; }
 .ab__btn {
@@ -81,8 +81,8 @@ function formatTime(ts) {
   width: 30px; height: 30px; border-radius: 7px; border: none; cursor: pointer;
   font-size: .85rem; transition: all .15s;
 }
-.ab__btn--outline { background: #f1f5f9; color: #64748b; }
-.ab__btn--outline:hover { background: #e2e8f0; }
+.ab__btn--outline { background: var(--c-slate-100); color: var(--c-slate-500); }
+.ab__btn--outline:hover { background: var(--c-slate-200); }
 .ab__btn--primary { background: #dcfce7; color: #15803d; }
 .ab__btn--primary:hover { background: #bbf7d0; }
 </style>

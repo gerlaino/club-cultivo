@@ -96,23 +96,23 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.et { min-height: 100vh; background: #f1f5f9; }
+.et { min-height: 100vh; background: var(--c-slate-100); }
 
 /* Toolbar */
 .et__toolbar {
   display: flex; align-items: center; gap: 1rem; padding: .75rem 1.5rem;
-  background: white; border-bottom: 1px solid #e2e8f0;
+  background: white; border-bottom: 1px solid var(--c-slate-200);
   position: sticky; top: 0; z-index: 10;
 }
-.et__btn-back { font-size: .85rem; color: #64748b; background: none; border: none; cursor: pointer; padding: .3rem .6rem; border-radius: 6px; }
-.et__btn-back:hover { background: #f8fafc; color: #334155; }
+.et__btn-back { font-size: .85rem; color: var(--c-slate-500); background: none; border: none; cursor: pointer; padding: .3rem .6rem; border-radius: 6px; }
+.et__btn-back:hover { background: var(--c-slate-50); color: var(--c-slate-700); }
 .et__toolbar-title { font-size: .95rem; font-weight: 700; color: #1a1a1a; flex: 1; }
 .et__toolbar-actions { display: flex; align-items: center; gap: .75rem; }
-.et__select { padding: .4rem .6rem; border: 1px solid #cbd5e1; border-radius: 6px; font-size: .85rem; }
+.et__select { padding: .4rem .6rem; border: 1px solid var(--c-slate-300); border-radius: 6px; font-size: .85rem; }
 .et__btn-print { padding: .5rem 1rem; background: #1b5e20; color: white; border: none; border-radius: 7px; font-size: .85rem; font-weight: 600; cursor: pointer; }
 .et__btn-print:hover { background: #104417; }
 
-.et__loading { padding: 3rem; text-align: center; color: #64748b; }
+.et__loading { padding: 3rem; text-align: center; color: var(--c-slate-500); }
 
 /* Preview area */
 .et__preview {
@@ -135,22 +135,22 @@ onMounted(async () => {
 .et__etiqueta--90x50 { width: 90mm; min-height: 50mm; font-size: 8pt; }
 .et__etiqueta--100x70 { width: 100mm; min-height: 70mm; font-size: 9pt; }
 
-.et__header { display: flex; align-items: center; gap: 1.5mm; border-bottom: .5pt solid #e2e8f0; padding-bottom: 1.5mm; margin-bottom: 2mm; }
+.et__header { display: flex; align-items: center; gap: 1.5mm; border-bottom: .5pt solid var(--c-slate-200); padding-bottom: 1.5mm; margin-bottom: 2mm; }
 .et__logo { height: 5mm; width: auto; object-fit: contain; }
 .et__club-nombre { font-weight: 800; color: #1b5e20; font-size: 1.1em; line-height: 1; }
 
 .et__qr-area { display: flex; align-items: center; gap: 2.5mm; margin-bottom: 1.5mm; }
 .et__qr-img { width: 16mm; height: 16mm; display: block; flex-shrink: 0; }
-.et__qr-placeholder { display: flex; flex-direction: column; align-items: center; gap: .5mm; padding: 1.5mm; border: 1pt solid #e2e8f0; border-radius: 2px; }
+.et__qr-placeholder { display: flex; flex-direction: column; align-items: center; gap: .5mm; padding: 1.5mm; border: 1pt solid var(--c-slate-200); border-radius: 2px; }
 .et__qr-icon { font-size: 2em; line-height: 1; color: #1b5e20; }
-.et__qr-text { font-family: monospace; font-size: .75em; color: #64748b; word-break: break-all; text-align: center; }
+.et__qr-text { font-family: monospace; font-size: .75em; color: var(--c-slate-500); word-break: break-all; text-align: center; }
 .et__lote-numero { font-family: monospace; font-size: 1em; font-weight: 800; color: #1b5e20; }
 
 .et__info { margin-bottom: 1.5mm; }
 .et__genetica { font-weight: 800; font-size: 1.1em; color: #1a1a1a; }
-.et__forma { color: #475569; font-size: .9em; }
+.et__forma { color: var(--c-slate-600); font-size: .9em; }
 
-.et__footer { display: flex; flex-wrap: wrap; gap: 1mm; color: #64748b; font-size: .85em; border-top: .5pt solid #e2e8f0; padding-top: 1.5mm; margin-top: auto; }
+.et__footer { display: flex; flex-wrap: wrap; gap: 1mm; color: var(--c-slate-500); font-size: .85em; border-top: .5pt solid var(--c-slate-200); padding-top: 1.5mm; margin-top: auto; }
 .et__inase { font-weight: 700; color: #1b5e20; }
 
 /* Print styles */

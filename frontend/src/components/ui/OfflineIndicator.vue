@@ -42,7 +42,7 @@ const queue              = useSyncQueueStore()
   white-space: nowrap;
 }
 .oi--offline {
-  background: #1e293b; color: #f8fafc;
+  background: #1e293b; color: var(--c-slate-50);
 }
 .oi--pending {
   background: #1b5e20; color: #fff;

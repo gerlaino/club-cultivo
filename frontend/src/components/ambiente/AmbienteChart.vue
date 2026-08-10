@@ -160,6 +160,6 @@ onUnmounted(destroyChart)
 .ac { position: relative; width: 100%; }
 .ac__empty {
   display: flex; align-items: center; justify-content: center;
-  height: 100%; color: #94a3b8; font-size: .82rem;
+  height: 100%; color: var(--c-slate-400); font-size: .82rem;
 }
 </style>

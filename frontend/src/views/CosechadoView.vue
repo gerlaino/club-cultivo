@@ -231,7 +231,7 @@ onMounted(async () => {
 .cv__estado-pill--secado            { background: #e0f2fe; color: #0369a1; }
 .cv__estado-pill--en_manicura       { background: #ede9fe; color: #5b21b6; }
 .cv__estado-pill--curado            { background: #dcfce7; color: #14532d; }
-.cv__estado-pill--finalizado        { background: #f1f5f9; color: #475569; }
+.cv__estado-pill--finalizado        { background: var(--c-slate-100); color: var(--c-slate-600); }
 .cv__fecha     { color: #60725d; }
 .cv__fecha--none { color: #c8e6c9; }
 .cv__td--arrow { text-align: center; padding-right: .5rem; }

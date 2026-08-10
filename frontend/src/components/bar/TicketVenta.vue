@@ -88,7 +88,7 @@ function imprimir() { window.print() }
 .tk__thanks { text-align: center; font-size: .78rem; margin-top: .4rem; }
 
 .tk-actions { display: flex; gap: .5rem; }
-.tk-btn { background: #fff; color: #334155; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: .55rem 1.1rem; font-size: .88rem; font-weight: 650; cursor: pointer; }
+.tk-btn { background: #fff; color: var(--c-slate-700); border: 1.5px solid var(--c-slate-200); border-radius: 9px; padding: .55rem 1.1rem; font-size: .88rem; font-weight: 650; cursor: pointer; }
 .tk-btn--primary { background: #1b5e20; border-color: #1b5e20; color: #fff; }
 .tk-btn--primary:hover { background: #144a18; }
 </style>

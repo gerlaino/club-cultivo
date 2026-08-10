@@ -164,47 +164,47 @@ watch(() => props.modelValue, (open) => { if (!open) { editandoId.value = null; 
 <style scoped>
 .lhm__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 1060; padding: 1rem; }
 .lhm__modal { background: #fff; border-radius: 16px; width: 100%; max-width: 680px; max-height: 88vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.3); }
-.lhm__head { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; border-bottom: 1px solid #f1f5f9; }
-.lhm__head h3 { margin: 0; font-size: 1rem; font-weight: 800; color: #0f172a; }
-.lhm__close { background: none; border: none; cursor: pointer; color: #94a3b8; font-size: 1rem; }
+.lhm__head { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; border-bottom: 1px solid var(--c-slate-100); }
+.lhm__head h3 { margin: 0; font-size: 1rem; font-weight: 800; color: var(--c-slate-900); }
+.lhm__close { background: none; border: none; cursor: pointer; color: var(--c-slate-400); font-size: 1rem; }
 
-.lhm__registrar { padding: .75rem 1.25rem; border-bottom: 1px solid #f1f5f9; }
+.lhm__registrar { padding: .75rem 1.25rem; border-bottom: 1px solid var(--c-slate-100); }
 .lhm__add-btn { width: 100%; background: #f0fdf4; border: 1px dashed #86c98a; color: #15803d; border-radius: 8px; padding: .55rem .85rem; font-size: .82rem; font-weight: 700; cursor: pointer; transition: all .15s; }
 .lhm__add-btn:hover { background: #dcfce7; border-style: solid; }
 
-.lhm__filtros { display: flex; gap: .5rem; flex-wrap: wrap; padding: .75rem 1.25rem; border-bottom: 1px solid #f1f5f9; }
-.lhm__buscar { flex: 1 1 220px; min-width: 0; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: .5rem .65rem; font-size: .85rem; outline: none; }
+.lhm__filtros { display: flex; gap: .5rem; flex-wrap: wrap; padding: .75rem 1.25rem; border-bottom: 1px solid var(--c-slate-100); }
+.lhm__buscar { flex: 1 1 220px; min-width: 0; border: 1.5px solid var(--c-slate-300); border-radius: 8px; padding: .5rem .65rem; font-size: .85rem; outline: none; }
 .lhm__buscar:focus { border-color: #16a34a; }
-.lhm__sel { border: 1.5px solid #cbd5e1; border-radius: 8px; padding: .5rem .55rem; font-size: .82rem; background: #fff; }
-.lhm__fecha { border: 1.5px solid #cbd5e1; border-radius: 8px; padding: .45rem .5rem; font-size: .8rem; color: #334155; }
+.lhm__sel { border: 1.5px solid var(--c-slate-300); border-radius: 8px; padding: .5rem .55rem; font-size: .82rem; background: #fff; }
+.lhm__fecha { border: 1.5px solid var(--c-slate-300); border-radius: 8px; padding: .45rem .5rem; font-size: .8rem; color: var(--c-slate-700); }
 
 .lhm__body { overflow-y: auto; flex: 1; }
-.lhm__vacio { padding: 2rem 1.25rem; text-align: center; color: #94a3b8; font-size: .85rem; }
+.lhm__vacio { padding: 2rem 1.25rem; text-align: center; color: var(--c-slate-400); font-size: .85rem; }
 .lhm__row { display: flex; gap: .85rem; padding: .7rem 1.25rem; border-bottom: 1px solid #f6f9f6; }
 .lhm__dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: .35rem; }
 .lhm__row-body { flex: 1; min-width: 0; }
 .lhm__row-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }
 .lhm__row-titulo { font-size: .84rem; font-weight: 600; color: #1a1a1a; }
-.lhm__row-detalle { color: #64748b; font-weight: 600; }
+.lhm__row-detalle { color: var(--c-slate-500); font-weight: 600; }
 .lhm__row-right { display: flex; align-items: center; gap: .35rem; flex-shrink: 0; }
-.lhm__row-fecha { font-size: .7rem; color: #94a3b8; white-space: nowrap; }
-.lhm__icon { background: none; border: none; cursor: pointer; color: #cbd5e1; padding: .1rem .25rem; font-size: .8rem; border-radius: 5px; }
+.lhm__row-fecha { font-size: .7rem; color: var(--c-slate-400); white-space: nowrap; }
+.lhm__icon { background: none; border: none; cursor: pointer; color: var(--c-slate-300); padding: .1rem .25rem; font-size: .8rem; border-radius: 5px; }
 .lhm__icon--edit:hover { color: #2563eb; background: #eff6ff; }
 .lhm__icon--del:hover { color: #dc2626; background: #fef2f2; }
-.lhm__row-desc { font-size: .8rem; color: #475569; margin-top: .2rem; }
-.lhm__row-meta { font-size: .72rem; color: #94a3b8; margin-top: .15rem; }
+.lhm__row-desc { font-size: .8rem; color: var(--c-slate-600); margin-top: .2rem; }
+.lhm__row-meta { font-size: .72rem; color: var(--c-slate-400); margin-top: .15rem; }
 
 .lhm__edit { display: flex; flex-direction: column; gap: .5rem; }
 .lhm__edit-titulo { font-size: .82rem; font-weight: 700; color: #166534; }
-.lhm__edit-input { width: 100%; box-sizing: border-box; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: .5rem .65rem; font-size: .85rem; outline: none; }
+.lhm__edit-input { width: 100%; box-sizing: border-box; border: 1.5px solid var(--c-slate-300); border-radius: 8px; padding: .5rem .65rem; font-size: .85rem; outline: none; }
 .lhm__edit-input:focus { border-color: #16a34a; }
-.lhm__edit-num { width: 100px; flex-shrink: 0; box-sizing: border-box; border: 1.5px solid #cbd5e1; border-radius: 8px; padding: .5rem .55rem; font-size: .85rem; outline: none; }
+.lhm__edit-num { width: 100px; flex-shrink: 0; box-sizing: border-box; border: 1.5px solid var(--c-slate-300); border-radius: 8px; padding: .5rem .55rem; font-size: .85rem; outline: none; }
 .lhm__edit-num:focus { border-color: #16a34a; }
 .lhm__edit-row { display: flex; justify-content: space-between; gap: .5rem; }
 .lhm__edit-actions { display: flex; gap: .5rem; }
-.lhm__btn-ghost { background: #fff; border: 1.5px solid #cbd5e1; color: #334155; border-radius: 8px; padding: .4rem .85rem; font-size: .8rem; font-weight: 600; cursor: pointer; }
+.lhm__btn-ghost { background: #fff; border: 1.5px solid var(--c-slate-300); color: var(--c-slate-700); border-radius: 8px; padding: .4rem .85rem; font-size: .8rem; font-weight: 600; cursor: pointer; }
 .lhm__btn-primary { background: #1b5e20; border: none; color: #fff; border-radius: 8px; padding: .4rem 1rem; font-size: .8rem; font-weight: 700; cursor: pointer; }
 
-.lhm__foot { padding: .75rem 1.25rem; border-top: 1px solid #f1f5f9; }
-.lhm__count { font-size: .75rem; color: #94a3b8; }
+.lhm__foot { padding: .75rem 1.25rem; border-top: 1px solid var(--c-slate-100); }
+.lhm__count { font-size: .75rem; color: var(--c-slate-400); }
 </style>

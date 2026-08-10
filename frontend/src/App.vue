@@ -936,7 +936,7 @@ onMounted(async () => {
   flex: 1;
   height: 100%;
   text-decoration: none;
-  color: #94a3b8;
+  color: var(--c-slate-400);
   transition: color .15s;
   min-width: 0;
   padding: 6px 4px;
@@ -983,7 +983,7 @@ onMounted(async () => {
   gap: 2px;
   background: none;
   border: none;
-  color: #94a3b8;
+  color: var(--c-slate-400);
   width: 100%;
   height: 100%;
   padding: 6px 4px;

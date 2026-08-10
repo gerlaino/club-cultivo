@@ -129,15 +129,15 @@ const {
 .lfs__foto-img-wrap { cursor: pointer; position: relative; }
 .lfs__foto-portada-badge { position: absolute; top: 6px; left: 6px; background: rgba(21,128,61,.92); color: #fff; font-size: .62rem; font-weight: 700; padding: 2px 6px; border-radius: 6px; letter-spacing: .02em; }
 .lfs__foto-acts { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
-.lfs__foto-star { background: none; border: none; padding: 2px 3px; cursor: pointer; color: #94a3b8; border-radius: 4px; font-size: .7rem; transition: color .12s, background .12s; }
+.lfs__foto-star { background: none; border: none; padding: 2px 3px; cursor: pointer; color: var(--c-slate-400); border-radius: 4px; font-size: .7rem; transition: color .12s, background .12s; }
 .lfs__foto-star:hover { color: #d97706; background: #fef3c7; }
 .lfs__foto-img { width: 100%; height: 120px; object-fit: cover; display: block; transition: opacity .15s; }
 .lfs__foto-img-wrap:hover .lfs__foto-img { opacity: .85; }
 .lfs__foto-footer { display: flex; align-items: flex-start; justify-content: space-between; gap: .25rem; padding: .35rem .5rem; background: #f4f8f4; min-height: 28px; }
 .lfs__foto-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.lfs__foto-desc { font-size: .65rem; color: #334155; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
-.lfs__foto-date { font-size: .6rem; color: #94a3b8; }
-.lfs__foto-del { flex-shrink: 0; background: none; border: none; padding: 2px 3px; cursor: pointer; color: #94a3b8; border-radius: 4px; font-size: .7rem; transition: color .12s, background .12s; }
+.lfs__foto-desc { font-size: .65rem; color: var(--c-slate-700); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+.lfs__foto-date { font-size: .6rem; color: var(--c-slate-400); }
+.lfs__foto-del { flex-shrink: 0; background: none; border: none; padding: 2px 3px; cursor: pointer; color: var(--c-slate-400); border-radius: 4px; font-size: .7rem; transition: color .12s, background .12s; }
 .lfs__foto-del:hover { color: #dc2626; background: #fee2e2; }
 .lfs__btn-outline { display: inline-flex; align-items: center; gap: .3rem; background: transparent; color: #1b5e20; border: 1.5px solid #d4e6d4; padding: .5rem 1.1rem; border-radius: 8px; font-size: .8rem; font-weight: 600; cursor: pointer; transition: all .15s; }
 .lfs__btn-outline:hover { border-color: #1b5e20; background: #f0fdf4; }
@@ -151,11 +151,11 @@ const {
 .lfs__modal-close:hover { background: #c8e6c9; }
 .lfs__modal-body { padding: 1.25rem 1.5rem; flex: 1; }
 .lfs__modal-footer { display: flex; justify-content: flex-end; gap: .75rem; padding: 1rem 1.5rem; border-top: 1px solid #e8f0e9; }
-.lfs__preview-wrap { border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0; }
-.lfs__preview-img { width: 100%; max-height: 240px; object-fit: contain; display: block; background: #f8fafc; }
+.lfs__preview-wrap { border-radius: 8px; overflow: hidden; border: 1px solid var(--c-slate-200); }
+.lfs__preview-img { width: 100%; max-height: 240px; object-fit: contain; display: block; background: var(--c-slate-50); }
 .lfs__field { display: flex; flex-direction: column; gap: .35rem; }
 .lfs__label { font-size: .78rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
-.lfs__opt { font-size: .68rem; font-weight: 500; color: #94a3b8; text-transform: none; letter-spacing: 0; }
+.lfs__opt { font-size: .68rem; font-weight: 500; color: var(--c-slate-400); text-transform: none; letter-spacing: 0; }
 .lfs__input { background: #f4f8f4; border: 1.5px solid #d4e6d4; border-radius: 8px; padding: .6rem .85rem; font-size: .875rem; color: #1a1a1a; width: 100%; box-sizing: border-box; }
 .lfs__input:focus { outline: none; border-color: #1b5e20; background: #fff; }
 .lfs__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .6rem 1.25rem; border-radius: 8px; font-size: .875rem; font-weight: 600; cursor: pointer; }

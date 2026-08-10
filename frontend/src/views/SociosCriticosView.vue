@@ -121,7 +121,7 @@ onMounted(async () => {
 .sc__group-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .sc__group-dot--error   { background: #dc2626; }
 .sc__group-dot--amber   { background: #d97706; }
-.sc__group-dot--neutral { background: #94a3b8; }
+.sc__group-dot--neutral { background: var(--c-slate-400); }
 
 .sc__group-title { font-size: .82rem; font-weight: 700; color: #0f2611; margin: 0; flex: 1; }
 .sc__group-count { font-size: .7rem; font-weight: 700; background: #e8f0e9; color: #0f2611; padding: .15em .5em; border-radius: 6px; }
@@ -129,12 +129,12 @@ onMounted(async () => {
 .sc__group--amber  .sc__group-count { background: #fef3c7; color: #d97706; }
 
 .sc__list { display: flex; flex-direction: column; }
-.sc__item { display: flex; align-items: center; justify-content: space-between; padding: .6rem 1rem; text-decoration: none; color: inherit; border-bottom: 1px solid #f8fafc; transition: background .1s; }
+.sc__item { display: flex; align-items: center; justify-content: space-between; padding: .6rem 1rem; text-decoration: none; color: inherit; border-bottom: 1px solid var(--c-slate-50); transition: background .1s; }
 .sc__item:last-child { border-bottom: none; }
 .sc__item:hover { background: #f6faf6; }
 .sc__item-nombre { font-size: .875rem; font-weight: 600; color: #0f2611; }
 .sc__item-badge { font-size: .7rem; font-weight: 700; padding: .2em .6em; border-radius: 6px; white-space: nowrap; }
 .sc__item-badge--error   { background: #fef2f2; color: #dc2626; }
 .sc__item-badge--amber   { background: #fffbeb; color: #d97706; }
-.sc__item-badge--neutral { background: #f1f5f9; color: #64748b; }
+.sc__item-badge--neutral { background: var(--c-slate-100); color: var(--c-slate-500); }
 </style>

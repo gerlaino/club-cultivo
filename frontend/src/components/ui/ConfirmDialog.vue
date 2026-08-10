@@ -68,7 +68,7 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
      qué va a cambiar) traen saltos de línea y sin esto se leían como un párrafo apelmazado. */
   white-space: pre-line;
   font-size: .875rem;
-  color: #64748b;
+  color: var(--c-slate-500);
   margin: 0 0 1.25rem;
   line-height: 1.5;
 }
@@ -83,9 +83,9 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 .cd-cancel-ghost {
   margin-right: auto;
   border: none; background: none; box-shadow: none;
-  color: #94a3b8; text-decoration: underline; padding-left: 0; padding-right: 0;
+  color: var(--c-slate-400); text-decoration: underline; padding-left: 0; padding-right: 0;
 }
-.cd-cancel-ghost:hover { color: #64748b; background: none; }
+.cd-cancel-ghost:hover { color: var(--c-slate-500); background: none; }
 .cd-enter-active, .cd-leave-active { transition: opacity .15s ease, transform .15s ease; }
 .cd-enter-from, .cd-leave-to { opacity: 0; pointer-events: none; }
 .cd-enter-from .cd-box { transform: scale(.96); }

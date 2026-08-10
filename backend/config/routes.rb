@@ -364,6 +364,7 @@ Rails.application.routes.draw do
       get :cumplimiento
       get :plan_vs_real
       get :inase
+      get :perdidas
     end
 
     # Papelera — historial de borrados / restauración (admin + super_admin)

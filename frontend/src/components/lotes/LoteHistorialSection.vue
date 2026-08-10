@@ -58,7 +58,7 @@ const historialPagina = computed(() => {
 .lhs__ver-btn { flex: 1; background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; border-radius: 8px; padding: .55rem .85rem; font-size: .82rem; font-weight: 700; cursor: pointer; transition: all .15s; }
 .lhs__ver-btn:hover { background: #dcfce7; }
 
-.lhs__placeholder { padding: 1rem 1.1rem; color: #94a3b8; font-size: .875rem; }
+.lhs__placeholder { padding: 1rem 1.1rem; color: var(--c-slate-400); font-size: .875rem; }
 .lhs__lista { display: flex; flex-direction: column; }
 .lhs__row { display: flex; gap: .85rem; padding: .7rem 1.1rem; border-bottom: 1px solid #f0fdf4; }
 .lhs__row:last-of-type { border-bottom: none; }
@@ -66,10 +66,10 @@ const historialPagina = computed(() => {
 .lhs__row-body { flex: 1; min-width: 0; }
 .lhs__row-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }
 .lhs__row-titulo { font-size: .82rem; font-weight: 600; color: #1a1a1a; }
-.lhs__row-detalle { color: #64748b; font-weight: 600; }
-.lhs__row-fecha { font-size: .7rem; color: #94a3b8; white-space: nowrap; flex-shrink: 0; }
-.lhs__row-desc { font-size: .78rem; color: #475569; margin-top: .2rem; }
-.lhs__row-meta { font-size: .72rem; color: #94a3b8; margin-top: .15rem; }
+.lhs__row-detalle { color: var(--c-slate-500); font-weight: 600; }
+.lhs__row-fecha { font-size: .7rem; color: var(--c-slate-400); white-space: nowrap; flex-shrink: 0; }
+.lhs__row-desc { font-size: .78rem; color: var(--c-slate-600); margin-top: .2rem; }
+.lhs__row-meta { font-size: .72rem; color: var(--c-slate-400); margin-top: .15rem; }
 .lhs__mas { width: 100%; background: none; border: none; border-top: 1px dashed #e8f0e9; color: #1b5e20; font-size: .78rem; font-weight: 600; padding: .6rem; cursor: pointer; }
 .lhs__mas:hover { background: #f0fdf4; }
 </style>

@@ -120,29 +120,29 @@ const vencCls = (s) =>
 
 <style scoped>
 .dd { display: flex; flex-direction: column; gap: 1rem; }
-.dd__banner { display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: #475569; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 10px; padding: .6rem .85rem; line-height: 1.4; }
-.dd__banner .bi { color: #64748b; }
+.dd__banner { display: flex; align-items: center; gap: .5rem; font-size: .8rem; color: var(--c-slate-600); background: var(--c-slate-100); border: 1px solid var(--c-slate-200); border-radius: 10px; padding: .6rem .85rem; line-height: 1.4; }
+.dd__banner .bi { color: var(--c-slate-500); }
 
 .dd__summary { display: flex; gap: 2.5rem; background: #fff; border: 1px solid #e8edf2; border-radius: 13px; padding: 1rem 1.4rem; box-shadow: 0 1px 2px rgb(15 23 42 / .04); }
 .dd__kpi { display: flex; flex-direction: column; gap: .15rem; }
-.dd__kpi-label { font-size: .64rem; text-transform: uppercase; letter-spacing: .08em; color: #94a3b8; font-weight: 700; }
-.dd__kpi-val { font-size: 1.35rem; font-weight: 800; letter-spacing: -.03em; color: #0f172a; font-variant-numeric: tabular-nums; }
-.dd__kpi-val small { font-size: .8rem; font-weight: 600; color: #94a3b8; }
+.dd__kpi-label { font-size: .64rem; text-transform: uppercase; letter-spacing: .08em; color: var(--c-slate-400); font-weight: 700; }
+.dd__kpi-val { font-size: 1.35rem; font-weight: 800; letter-spacing: -.03em; color: var(--c-slate-900); font-variant-numeric: tabular-nums; }
+.dd__kpi-val small { font-size: .8rem; font-weight: 600; color: var(--c-slate-400); }
 
 .dd__table-wrap { overflow-x: auto; border: 1px solid #e8edf2; border-radius: 13px; box-shadow: 0 1px 2px rgb(15 23 42 / .04); }
 .dd__table { width: 100%; border-collapse: collapse; font-size: .88rem; background: #fff; }
-.dd__table thead th { text-align: left; font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; font-weight: 700; padding: .7rem 1rem; border-bottom: 1.5px solid #eef2f6; white-space: nowrap; }
-.dd__table td { padding: .7rem 1rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
-.dd__table tbody tr:hover { background: #f8fafc; }
+.dd__table thead th { text-align: left; font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--c-slate-400); font-weight: 700; padding: .7rem 1rem; border-bottom: 1.5px solid #eef2f6; white-space: nowrap; }
+.dd__table td { padding: .7rem 1rem; border-bottom: 1px solid var(--c-slate-100); vertical-align: middle; }
+.dd__table tbody tr:hover { background: var(--c-slate-50); }
 .dd__table tbody tr:last-child td { border-bottom: none; }
 .dd__table .ta-r { text-align: right; }
-.dd__name { font-weight: 650; color: #0f172a; }
+.dd__name { font-weight: 650; color: var(--c-slate-900); }
 .dd__forma { display: inline-block; font-size: .72rem; font-weight: 600; color: #1b5e20; background: rgb(27 94 32 / .07); border-radius: 999px; padding: .15rem .55rem; }
 .num { font-variant-numeric: tabular-nums; }
-.mut { color: #94a3b8; }
+.mut { color: var(--c-slate-400); }
 .is-porvencer { color: #b45309; font-weight: 600; }
 .is-venc { color: #dc2626; font-weight: 600; }
 
-.dd__empty { color: #94a3b8; padding: 2.5rem; text-align: center; font-size: .9rem; }
-.dd__empty--box { background: #fbfcfd; border: 1px dashed #e2e8f0; border-radius: 14px; }
+.dd__empty { color: var(--c-slate-400); padding: 2.5rem; text-align: center; font-size: .9rem; }
+.dd__empty--box { background: #fbfcfd; border: 1px dashed var(--c-slate-200); border-radius: 14px; }
 </style>

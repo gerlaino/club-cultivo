@@ -680,7 +680,7 @@ onMounted(async () => {
 .wpv__preview-btn:hover { opacity: .88; color: #e8f5e9; }
 .wpv__preview-btn--disabled { opacity: .45; cursor: not-allowed; pointer-events: none; }
 
-.wpv__tabs { display: flex; gap: 4px; border-bottom: 1px solid #e2e8f0; margin-bottom: 2rem; }
+.wpv__tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--c-slate-200); margin-bottom: 2rem; }
 .wpv__tab {
   display: flex; align-items: center; gap: 6px;
   padding: 10px 18px; border: none; background: none;
@@ -720,10 +720,10 @@ onMounted(async () => {
 .wpv__thc-cbd { font-size: 13px; color: #4a7c59; }
 .wpv__pill { display: inline-block; font-size: 11px; padding: 3px 10px; border-radius: 20px; font-weight: 500; }
 .wpv__pill--green { background: #e8f5e9; color: #1b5e20; }
-.wpv__pill--gray  { background: #f1f5f9; color: #94a3b8; }
+.wpv__pill--gray  { background: var(--c-slate-100); color: var(--c-slate-400); }
 .wpv__toggle-col { display: flex; justify-content: center; }
 .wpv__toggle {
-  width: 46px; height: 26px; border-radius: 13px; background: #e2e8f0;
+  width: 46px; height: 26px; border-radius: 13px; background: var(--c-slate-200);
   border: none; cursor: pointer; position: relative; transition: background .25s; padding: 0; flex-shrink: 0;
 }
 .wpv__toggle--on { background: #1b5e20; }
@@ -759,7 +759,7 @@ onMounted(async () => {
 }
 .wpv__card-btn {
   display: flex; align-items: center; gap: 5px; background: none;
-  border: 1px solid #e2e8f0; color: #4a7c59; font-size: 12px;
+  border: 1px solid var(--c-slate-200); color: #4a7c59; font-size: 12px;
   padding: 5px 12px; border-radius: 7px; cursor: pointer; transition: all .15s;
 }
 .wpv__card-btn:hover { background: #f0fdf4; border-color: #1b5e20; color: #1b5e20; }
@@ -778,7 +778,7 @@ onMounted(async () => {
 }
 .wpv__evento-card:hover { box-shadow: 0 4px 16px #1b5e2010; }
 .wpv__evento-card--inactivo { opacity: .6; }
-.wpv__evento-card--inactivo::before { background: #e2e8f0; }
+.wpv__evento-card--inactivo::before { background: var(--c-slate-200); }
 .wpv__evento-card-fecha {
   background: linear-gradient(135deg, #1b5e20, #2e7d32);
   border-radius: 10px; padding: 10px 14px; text-align: center; flex-shrink: 0; min-width: 54px;
@@ -791,11 +791,11 @@ onMounted(async () => {
 .wpv__evento-desc { font-size: 13px; color: #6b8f71; line-height: 1.5; }
 .wpv__evento-card-actions { display: flex; flex-direction: column; gap: 8px; align-items: flex-end; flex-shrink: 0; }
 .wpv__icon-btn {
-  width: 32px; height: 32px; border-radius: 8px; border: 1px solid #e2e8f0;
+  width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--c-slate-200);
   background: white; cursor: pointer; display: flex; align-items: center; justify-content: center;
-  font-size: 14px; color: #64748b; transition: all .15s;
+  font-size: 14px; color: var(--c-slate-500); transition: all .15s;
 }
-.wpv__icon-btn:hover { background: #f8fafc; color: #1b5e20; border-color: #c8e6c9; }
+.wpv__icon-btn:hover { background: var(--c-slate-50); color: #1b5e20; border-color: #c8e6c9; }
 .wpv__icon-btn--danger:hover { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
 .wpv__add-btn {
   display: flex; align-items: center; gap: 7px;
@@ -812,7 +812,7 @@ onMounted(async () => {
 .wpv__cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
 .wpv__cal-titulo { font-size: 14px; font-weight: 600; color: #1a2e1b; }
 .wpv__cal-nav {
-  width: 28px; height: 28px; border-radius: 7px; border: 1px solid #e2e8f0;
+  width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--c-slate-200);
   background: white; font-size: 16px; color: #4a7c59; cursor: pointer;
   display: flex; align-items: center; justify-content: center; transition: all .15s;
 }
@@ -820,7 +820,7 @@ onMounted(async () => {
 .wpv__cal-grid-header { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: .5rem; }
 .wpv__cal-grid-header span {
   text-align: center; font-size: 10px; font-weight: 600;
-  color: #94a3b8; text-transform: uppercase; padding: 4px 0;
+  color: var(--c-slate-400); text-transform: uppercase; padding: 4px 0;
 }
 .wpv__cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
 .wpv__cal-dia {
@@ -835,7 +835,7 @@ onMounted(async () => {
 .wpv__cal-dot { width: 4px; height: 4px; border-radius: 50%; background: #1b5e20; position: absolute; bottom: 3px; }
 .wpv__cal-dia--hoy .wpv__cal-dot { background: #a5d6a7; }
 .wpv__cal-leyenda {
-  display: flex; align-items: center; gap: 8px; margin-top: 1rem; font-size: 11px; color: #94a3b8;
+  display: flex; align-items: center; gap: 8px; margin-top: 1rem; font-size: 11px; color: var(--c-slate-400);
   padding-top: 1rem; border-top: 1px solid #f0fdf4;
 }
 .wpv__cal-dot-lg { width: 6px; height: 6px; border-radius: 50%; background: #1b5e20; flex-shrink: 0; }
@@ -845,25 +845,25 @@ onMounted(async () => {
 .wpv__config-field--full { grid-column: 1 / -1; }
 .wpv__label { font-size: 13px; font-weight: 500; color: #4a7c59; margin-bottom: 2px; }
 .wpv__input {
-  padding: 10px 13px; border: 1.5px solid #e2e8f0; border-radius: 10px;
-  font-size: 14px; background: #f8fafc; color: #1a2e1b; outline: none; transition: border-color .15s, box-shadow .15s;
+  padding: 10px 13px; border: 1.5px solid var(--c-slate-200); border-radius: 10px;
+  font-size: 14px; background: var(--c-slate-50); color: #1a2e1b; outline: none; transition: border-color .15s, box-shadow .15s;
 }
 .wpv__input:focus { border-color: #1b5e20; box-shadow: 0 0 0 3px #1b5e2015; }
 .wpv__textarea {
-  padding: 10px 13px; border: 1.5px solid #e2e8f0; border-radius: 10px;
-  font-size: 14px; background: #f8fafc; color: #1a2e1b; outline: none;
+  padding: 10px 13px; border: 1.5px solid var(--c-slate-200); border-radius: 10px;
+  font-size: 14px; background: var(--c-slate-50); color: #1a2e1b; outline: none;
   resize: vertical; transition: border-color .15s, box-shadow .15s; font-family: inherit; line-height: 1.5;
 }
 .wpv__textarea:focus { border-color: #1b5e20; box-shadow: 0 0 0 3px #1b5e2015; }
 .wpv__textarea--tall { min-height: 180px; }
 .wpv__web-status-card {
   display: flex; justify-content: space-between; align-items: center;
-  padding: 16px 20px; border: 1.5px solid #e2e8f0; border-radius: 12px;
-  background: #f8fafc; transition: all .2s;
+  padding: 16px 20px; border: 1.5px solid var(--c-slate-200); border-radius: 12px;
+  background: var(--c-slate-50); transition: all .2s;
 }
 .wpv__web-status-card--on { border-color: #a5d6a7; background: #f0fdf4; }
 .wpv__web-status-info { display: flex; align-items: center; gap: 12px; }
-.wpv__web-status-dot { width: 10px; height: 10px; border-radius: 50%; background: #e2e8f0; flex-shrink: 0; transition: background .3s; }
+.wpv__web-status-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--c-slate-200); flex-shrink: 0; transition: background .3s; }
 .wpv__web-status-dot--on { background: #1b5e20; box-shadow: 0 0 0 3px #1b5e2020; }
 .wpv__web-status-label { font-size: 14px; font-weight: 500; color: #1a2e1b; }
 .wpv__web-status-sub { font-size: 12px; color: #6b8f71; margin-top: 2px; }
@@ -876,10 +876,10 @@ onMounted(async () => {
 .wpv__save-btn:hover { opacity: .88; }
 .wpv__save-btn:disabled { opacity: .5; cursor: not-allowed; }
 .wpv__cancel-btn {
-  background: #f1f5f9; color: #64748b; border: none; padding: 11px 22px;
+  background: var(--c-slate-100); color: var(--c-slate-500); border: none; padding: 11px 22px;
   border-radius: 10px; font-size: 14px; cursor: pointer; transition: background .15s;
 }
-.wpv__cancel-btn:hover { background: #e2e8f0; }
+.wpv__cancel-btn:hover { background: var(--c-slate-200); }
 .wpv__saved-msg { display: flex; align-items: center; gap: 6px; color: #1b5e20; font-size: 14px; font-weight: 500; }
 
 .wpv__modal-backdrop {
@@ -906,11 +906,11 @@ onMounted(async () => {
 .wpv__modal-title { font-size: 17px; font-weight: 600; color: #1a2e1b; margin: 0 0 3px; }
 .wpv__modal-subtitle { font-size: 13px; color: #6b8f71; margin: 0; }
 .wpv__modal-close {
-  margin-left: auto; background: #f1f5f9; border: none; width: 34px; height: 34px;
+  margin-left: auto; background: var(--c-slate-100); border: none; width: 34px; height: 34px;
   border-radius: 9px; display: flex; align-items: center; justify-content: center;
-  cursor: pointer; color: #64748b; font-size: 14px; transition: all .15s; flex-shrink: 0;
+  cursor: pointer; color: var(--c-slate-500); font-size: 14px; transition: all .15s; flex-shrink: 0;
 }
-.wpv__modal-close:hover { background: #e2e8f0; color: #1a2e1b; }
+.wpv__modal-close:hover { background: var(--c-slate-200); color: #1a2e1b; }
 .wpv__modal-body { padding: 22px 24px; }
 .wpv__modal-footer {
   padding: 16px 24px; border-top: 1px solid #f0fdf4;
@@ -933,7 +933,7 @@ onMounted(async () => {
 .wpv__upload-placeholder { display: flex; flex-direction: column; align-items: center; gap: 8px; color: #4a7c59; padding: 1rem; }
 .wpv__upload-placeholder i { font-size: 2.5rem; opacity: .5; }
 .wpv__upload-placeholder span { font-size: 13px; text-align: center; }
-.wpv__upload-hint { font-size: 11px; color: #94a3b8; }
+.wpv__upload-hint { font-size: 11px; color: var(--c-slate-400); }
 .wpv__upload-preview { width: 100%; height: 100%; object-fit: cover; position: absolute; inset: 0; }
 .wpv__upload-overlay {
   position: absolute; inset: 0; background: rgba(0,0,0,.4);
@@ -943,7 +943,7 @@ onMounted(async () => {
 .wpv__upload-zone:hover .wpv__upload-overlay { opacity: 1; }
 .wpv__remove-img-btn {
   display: flex; align-items: center; gap: 4px; background: none; border: none;
-  color: #94a3b8; font-size: 12px; cursor: pointer; padding: 4px 0; margin-top: 4px; transition: color .15s;
+  color: var(--c-slate-400); font-size: 12px; cursor: pointer; padding: 4px 0; margin-top: 4px; transition: color .15s;
 }
 .wpv__remove-img-btn:hover { color: #dc2626; }
 

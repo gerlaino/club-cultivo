@@ -70,21 +70,21 @@ function formatDateTime(d) {
 
 <style scoped>
 .stl__card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
-.stl__card-header { display: flex; align-items: center; gap: .6rem; padding: .875rem 1.25rem; border-bottom: 1px solid #f1f5f9; }
+.stl__card-header { display: flex; align-items: center; gap: .6rem; padding: .875rem 1.25rem; border-bottom: 1px solid var(--c-slate-100); }
 .stl__card-icon { width: 28px; height: 28px; background: #dbeafe; color: #1d4ed8; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-.stl__card-title { font-size: .875rem; font-weight: 700; color: #0f172a; }
+.stl__card-title { font-size: .875rem; font-weight: 700; color: var(--c-slate-900); }
 .stl__loading { display: flex; justify-content: center; padding: 2rem; }
-.stl__empty { text-align: center; padding: 3rem 1rem; color: #94a3b8; }
+.stl__empty { text-align: center; padding: 3rem 1rem; color: var(--c-slate-400); }
 .stl__empty-icon { display: flex; justify-content: center; margin-bottom: .5rem; opacity: .4; }
-.stl__empty-title { font-size: .875rem; font-weight: 600; color: #64748b; }
+.stl__empty-title { font-size: .875rem; font-weight: 600; color: var(--c-slate-500); }
 .stl__timeline { padding: 1.25rem; display: flex; flex-direction: column; gap: 0; }
-.stl__item { display: flex; gap: 1rem; padding: .875rem 0; border-bottom: 1px solid #f1f5f9; }
+.stl__item { display: flex; gap: 1rem; padding: .875rem 0; border-bottom: 1px solid var(--c-slate-100); }
 .stl__item:last-child { border-bottom: none; }
 .stl__dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: .35rem; }
 .stl__tipo-row { display: flex; align-items: center; gap: .5rem; margin-bottom: .2rem; }
 .stl__tipo { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
 .stl__desc { font-size: .875rem; color: #374151; margin-bottom: .25rem; }
-.stl__fecha { font-size: .72rem; color: #94a3b8; }
+.stl__fecha { font-size: .72rem; color: var(--c-slate-400); }
 .stl__item--turno { background: #f0f9ff; border-radius: 8px; padding: .875rem .75rem; margin: 0 -.75rem; }
 .stl__turno-chip {
   font-size: .6rem; font-weight: 700; padding: .15em .55em; border-radius: 999px;

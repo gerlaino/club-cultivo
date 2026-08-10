@@ -286,7 +286,7 @@ function timeAgo(ts) {
 .nd-header__title {
   font-size: var(--fs-15, .9375rem);
   font-weight: 700;
-  color: var(--c-ink-900, #0f172a);
+  color: var(--c-slate-900);
   letter-spacing: -.01em;
 }
 
@@ -322,7 +322,7 @@ function timeAgo(ts) {
   border-radius: var(--r-sm, 4px);
   transition: color .15s, background .15s;
 }
-.nd-btn-text:hover { color: var(--c-ink-900, #0f172a); background: var(--c-ink-100, #f3f4f6); }
+.nd-btn-text:hover { color: var(--c-slate-900); background: var(--c-ink-100, #f3f4f6); }
 
 .nd-close {
   display: flex;
@@ -337,7 +337,7 @@ function timeAgo(ts) {
   cursor: pointer;
   transition: background .15s, color .15s;
 }
-.nd-close:hover { background: var(--c-ink-100, #f3f4f6); color: var(--c-ink-900, #0f172a); }
+.nd-close:hover { background: var(--c-ink-100, #f3f4f6); color: var(--c-slate-900); }
 
 /* ── Body ─────────────────────────────────────────────────────────────────── */
 .nd-body {
@@ -431,7 +431,7 @@ function timeAgo(ts) {
 }
 
 .nd-card--unread .nd-card__msg {
-  color: var(--c-ink-900, #0f172a);
+  color: var(--c-slate-900);
   font-weight: 600;
 }
 

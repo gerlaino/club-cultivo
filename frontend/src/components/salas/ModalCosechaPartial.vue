@@ -284,25 +284,25 @@ onUnmounted(() => document.removeEventListener('keydown', escapeHandler, true))
 .mcp-header-left { display: flex; align-items: center; gap: 12px; }
 .mcp-header-emoji { font-size: 24px; }
 .mcp-title { font-size: 1.05rem; font-weight: 700; color: var(--c-ink-900, #111); margin: 0; }
-.mcp-sub { font-size: .78rem; color: var(--c-ink-500, #64748b); margin: 2px 0 0; font-family: monospace; }
-.mcp-close { background: none; border: none; cursor: pointer; color: var(--c-ink-400, #94a3b8); font-size: 1rem; padding: 4px; }
+.mcp-sub { font-size: .78rem; color: var(--c-slate-500); margin: 2px 0 0; font-family: monospace; }
+.mcp-close { background: none; border: none; cursor: pointer; color: var(--c-slate-400); font-size: 1rem; padding: 4px; }
 
 .mcp-body { padding: 20px 24px; display: flex; flex-direction: column; gap: 18px; flex: 1; }
 
-.mcp-paso-hint { font-size: .85rem; color: #64748b; margin: 0; }
+.mcp-paso-hint { font-size: .85rem; color: var(--c-slate-500); margin: 0; }
 
 /* Choices paso 1 */
 .mcp-choices { display: flex; flex-direction: column; gap: 12px; }
 .mcp-choice {
   display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
-  padding: 16px 18px; border: 1.5px solid var(--c-ink-200, #e2e8f0);
-  border-radius: 14px; background: #f8fafc; cursor: pointer;
+  padding: 16px 18px; border: 1.5px solid var(--c-slate-200);
+  border-radius: 14px; background: var(--c-slate-50); cursor: pointer;
   transition: border-color .15s, background .15s; text-align: left;
 }
 .mcp-choice:hover { border-color: #16a34a; background: #f0fdf4; }
 .mcp-choice-ico { font-size: 22px; }
 .mcp-choice-tit { font-size: .92rem; font-weight: 700; color: #15803d; }
-.mcp-choice-sub { font-size: .78rem; color: #64748b; }
+.mcp-choice-sub { font-size: .78rem; color: var(--c-slate-500); }
 
 .mcp-back {
   align-self: flex-start; background: none; border: none; padding: 0;
@@ -315,14 +315,14 @@ onUnmounted(() => document.removeEventListener('keydown', escapeHandler, true))
   font-size: .82rem; font-weight: 600; color: var(--c-ink-700, #374151);
   display: flex; align-items: center; gap: 8px;
 }
-.mcp-hint { font-size: .75rem; color: var(--c-ink-400, #94a3b8); font-weight: 400; }
-.mcp-opt  { font-size: .72rem; color: var(--c-ink-400, #94a3b8); font-weight: 400; }
-.mcp-help { font-size: .72rem; color: #94a3b8; }
-.mcp-help-ico { color: #94a3b8; cursor: help; font-size: .8rem; }
+.mcp-hint { font-size: .75rem; color: var(--c-slate-400); font-weight: 400; }
+.mcp-opt  { font-size: .72rem; color: var(--c-slate-400); font-weight: 400; }
+.mcp-help { font-size: .72rem; color: var(--c-slate-400); }
+.mcp-help-ico { color: var(--c-slate-400); cursor: help; font-size: .8rem; }
 
 .mcp-empty {
-  padding: 12px 16px; background: #f1f5f9; border-radius: 10px;
-  font-size: .82rem; color: #64748b;
+  padding: 12px 16px; background: var(--c-slate-100); border-radius: 10px;
+  font-size: .82rem; color: var(--c-slate-500);
 }
 
 .mcp-sel-all {
@@ -332,12 +332,12 @@ onUnmounted(() => document.removeEventListener('keydown', escapeHandler, true))
 .mcp-plantas-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 8px; max-height: 240px; overflow-y: auto;
-  border: 1.5px solid var(--c-ink-200, #e2e8f0); border-radius: 12px; padding: 10px;
+  border: 1.5px solid var(--c-slate-200); border-radius: 12px; padding: 10px;
 }
 .mcp-planta {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
-  padding: 8px 6px; border: 1.5px solid var(--c-ink-200, #e2e8f0);
-  border-radius: 10px; cursor: pointer; background: #f8fafc;
+  padding: 8px 6px; border: 1.5px solid var(--c-slate-200);
+  border-radius: 10px; cursor: pointer; background: var(--c-slate-50);
   transition: border-color .15s, background .15s; font-size: .72rem; color: #374151;
 }
 .mcp-planta--sel { border-color: #16a34a; background: #dcfce7; }
@@ -346,16 +346,16 @@ onUnmounted(() => document.removeEventListener('keydown', escapeHandler, true))
 
 .mcp-input-wrap { display: flex; align-items: center; gap: 8px; }
 .mcp-input {
-  flex: 1; padding: .6rem .9rem; border: 1.5px solid var(--c-ink-200, #e2e8f0);
-  border-radius: 10px; font-size: .875rem; outline: none; background: #f8fafc;
+  flex: 1; padding: .6rem .9rem; border: 1.5px solid var(--c-slate-200);
+  border-radius: 10px; font-size: .875rem; outline: none; background: var(--c-slate-50);
 }
 .mcp-input:focus { border-color: #4ade80; }
-.mcp-unit { font-size: .82rem; color: #64748b; font-weight: 600; }
+.mcp-unit { font-size: .82rem; color: var(--c-slate-500); font-weight: 600; }
 
 .mcp-pasadas { display: flex; gap: 8px; flex-wrap: wrap; }
 .mcp-pasada-btn {
-  padding: 6px 16px; border-radius: 999px; border: 1.5px solid var(--c-ink-200, #e2e8f0);
-  background: #f8fafc; font-size: .82rem; font-weight: 700; cursor: pointer;
+  padding: 6px 16px; border-radius: 999px; border: 1.5px solid var(--c-slate-200);
+  background: var(--c-slate-50); font-size: .82rem; font-weight: 700; cursor: pointer;
   color: #374151; transition: all .15s; display: flex; align-items: center; gap: 4px;
 }
 .mcp-pasada-btn--active { border-color: #16a34a; background: #dcfce7; color: #15803d; }
@@ -382,9 +382,9 @@ onUnmounted(() => document.removeEventListener('keydown', escapeHandler, true))
 
 .mcp-footer { display: flex; gap: 10px; padding: 16px 24px; border-top: 1px solid var(--c-ink-100, #f1f5f1); }
 .mcp-btn-cancel {
-  flex: 1; padding: .65rem; border: 1.5px solid var(--c-ink-200, #e2e8f0);
+  flex: 1; padding: .65rem; border: 1.5px solid var(--c-slate-200);
   border-radius: 12px; background: none; cursor: pointer; font-size: .875rem;
-  color: #64748b; font-weight: 500;
+  color: var(--c-slate-500); font-weight: 500;
 }
 .mcp-btn-submit {
   flex: 2; padding: .65rem; border-radius: 12px; border: none; cursor: pointer;

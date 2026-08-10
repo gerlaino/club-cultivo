@@ -33,7 +33,7 @@ const auth = useAuthStore()
 }
 .dd__card {
   background: var(--surface-card, #fff);
-  border: 1px solid var(--border-light, #e2e8f0);
+  border: 1px solid var(--border-light, var(--c-slate-200));
   border-radius: 16px;
   padding: 2.5rem 2rem;
   max-width: 440px;
@@ -44,14 +44,14 @@ const auth = useAuthStore()
 .dd__icon { font-size: 2.5rem; margin-bottom: 1rem; }
 .dd__title {
   font-size: 1.35rem; font-weight: 700;
-  color: var(--text-primary, #0f172a); margin: 0 0 .75rem;
+  color: var(--text-primary, var(--c-slate-900)); margin: 0 0 .75rem;
 }
 .dd__msg {
-  font-size: .9rem; color: var(--text-secondary, #64748b);
+  font-size: .9rem; color: var(--text-secondary, var(--c-slate-500));
   line-height: 1.6; margin: 0 0 1.5rem;
 }
 .dd__info {
-  background: var(--surface-muted, #f8fafc);
+  background: var(--surface-muted, var(--c-slate-50));
   border-radius: 10px; padding: .75rem 1rem;
   text-align: left; display: flex; flex-direction: column; gap: .5rem;
 }
@@ -59,6 +59,6 @@ const auth = useAuthStore()
   display: flex; justify-content: space-between;
   font-size: .85rem; gap: .5rem;
 }
-.dd__info-label { color: var(--text-secondary, #64748b); font-weight: 600; }
-.dd__info-val   { color: var(--text-primary, #0f172a); word-break: break-all; }
+.dd__info-label { color: var(--text-secondary, var(--c-slate-500)); font-weight: 600; }
+.dd__info-val   { color: var(--text-primary, var(--c-slate-900)); word-break: break-all; }
 </style>

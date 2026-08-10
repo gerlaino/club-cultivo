@@ -278,37 +278,37 @@ onMounted(cargar)
 <style scoped>
 .rsv { padding: var(--sp-6, 1.5rem); max-width: 1100px; margin: 0 auto; }
 .rsv__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
-.rsv__title { font-size: 1.5rem; font-weight: 800; color: var(--c-ink-900, #0f172a); margin: 0 0 .2rem; }
-.rsv__sub { font-size: .85rem; color: var(--c-ink-500, #64748b); margin: 0; }
-.rsv__select { border: 1.5px solid var(--c-ink-200, #e2e8f0); border-radius: 8px; padding: .45rem .7rem; font-size: .85rem; background: #fff; }
+.rsv__title { font-size: 1.5rem; font-weight: 800; color: var(--c-slate-900); margin: 0 0 .2rem; }
+.rsv__sub { font-size: .85rem; color: var(--c-slate-500); margin: 0; }
+.rsv__select { border: 1.5px solid var(--c-slate-200); border-radius: 8px; padding: .45rem .7rem; font-size: .85rem; background: #fff; }
 .rsv__loading { display: flex; justify-content: center; padding: 3rem; }
-.rsv__empty { text-align: center; padding: 3rem; color: var(--c-ink-400, #94a3b8); }
+.rsv__empty { text-align: center; padding: 3rem; color: var(--c-slate-400); }
 .rsv__empty i { font-size: 2rem; display: block; margin-bottom: .5rem; }
 
-.rsv__table { width: 100%; border-collapse: collapse; background: #fff; border: 1.5px solid var(--c-ink-100, #f1f5f9); border-radius: 12px; overflow: hidden; font-size: .85rem; }
-.rsv__table th { text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--c-ink-400, #94a3b8); background: #f8fafc; border-bottom: 1.5px solid var(--c-ink-100, #f1f5f9); }
-.rsv__table td { padding: 11px 14px; border-bottom: 1px solid var(--c-ink-100, #f1f5f9); vertical-align: middle; }
+.rsv__table { width: 100%; border-collapse: collapse; background: #fff; border: 1.5px solid var(--c-slate-100); border-radius: 12px; overflow: hidden; font-size: .85rem; }
+.rsv__table th { text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--c-slate-400); background: var(--c-slate-50); border-bottom: 1.5px solid var(--c-slate-100); }
+.rsv__table td { padding: 11px 14px; border-bottom: 1px solid var(--c-slate-100); vertical-align: middle; }
 .rsv__sede-row td {
-  background: #f1f5f9; font-size: .74rem; font-weight: 700; color: #334155;
+  background: var(--c-slate-100); font-size: .74rem; font-weight: 700; color: var(--c-slate-700);
   text-transform: uppercase; letter-spacing: .04em; padding: .45rem .75rem;
 }
-.rsv__sede-row .bi { color: #64748b; margin-right: .25rem; }
-.rsv__sede-n { margin-left: .4rem; font-weight: 600; color: #64748b; text-transform: none; letter-spacing: 0; }
+.rsv__sede-row .bi { color: var(--c-slate-500); margin-right: .25rem; }
+.rsv__sede-n { margin-left: .4rem; font-weight: 600; color: var(--c-slate-500); text-transform: none; letter-spacing: 0; }
 .rsv__row--vencida { background: #fff7ed; }
-.rsv__lote { color: var(--c-ink-400, #94a3b8); }
+.rsv__lote { color: var(--c-slate-400); }
 .rsv__fecha--hoy { font-weight: 800; color: #b45309; }
 
 .rsv__pill { font-size: 11px; font-weight: 700; padding: 2px 9px; border-radius: 999px; }
 .rsv__pill--pendiente { background: #fef9c3; color: #854d0e; }
 .rsv__pill--entregada { background: #dcfce7; color: #14532d; }
-.rsv__pill--cancelada { background: #f1f5f9; color: #475569; }
+.rsv__pill--cancelada { background: var(--c-slate-100); color: var(--c-slate-600); }
 .rsv__pill--vencida   { background: #fee2e2; color: #991b1b; }
 
 .rsv__actions { text-align: right; white-space: nowrap; }
 .rsv__btn { border: none; border-radius: 7px; padding: .35rem .7rem; font-size: .78rem; font-weight: 700; cursor: pointer; margin-left: .35rem; }
 .rsv__btn--primary { background: #15803d; color: #fff; }
 .rsv__btn--primary:hover:not(:disabled) { background: #166534; }
-.rsv__btn--ghost { background: transparent; border: 1.5px solid var(--c-ink-200, #e2e8f0); color: var(--c-ink-600, #475569); }
+.rsv__btn--ghost { background: transparent; border: 1.5px solid var(--c-slate-200); color: var(--c-slate-600); }
 .rsv__btn--danger { background: transparent; border: 1.5px solid #fecaca; color: #dc2626; }
 .rsv__btn--danger:hover:not(:disabled) { background: #fef2f2; }
 .rsv__btn:disabled { opacity: .5; cursor: not-allowed; }
@@ -316,12 +316,12 @@ onMounted(cargar)
 /* Modal editar */
 .rsv__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 1060; padding: 1rem; backdrop-filter: blur(3px); }
 .rsv__modal { background: #fff; border-radius: 14px; width: 100%; max-width: 400px; box-shadow: 0 24px 64px rgba(0,0,0,.18); }
-.rsv__modal-head { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; border-bottom: 1px solid #f1f5f9; }
-.rsv__modal-head h3 { font-size: 1rem; font-weight: 800; margin: 0; color: #0f172a; }
-.rsv__modal-close { background: #f1f5f9; border: none; width: 28px; height: 28px; border-radius: 7px; cursor: pointer; color: #64748b; }
+.rsv__modal-head { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; border-bottom: 1px solid var(--c-slate-100); }
+.rsv__modal-head h3 { font-size: 1rem; font-weight: 800; margin: 0; color: var(--c-slate-900); }
+.rsv__modal-close { background: var(--c-slate-100); border: none; width: 28px; height: 28px; border-radius: 7px; cursor: pointer; color: var(--c-slate-500); }
 .rsv__modal-body { padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: .5rem; }
 .rsv__modal-err { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 8px; padding: .5rem .7rem; font-size: .8rem; }
 .rsv__modal-label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; margin-top: .3rem; }
-.rsv__modal-input { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: .55rem .8rem; font-size: .85rem; color: #0f172a; width: 100%; box-sizing: border-box; outline: none; }
-.rsv__modal-foot { display: flex; justify-content: flex-end; gap: .6rem; padding: .85rem 1.25rem; border-top: 1px solid #f1f5f9; }
+.rsv__modal-input { background: var(--c-slate-50); border: 1.5px solid var(--c-slate-200); border-radius: 9px; padding: .55rem .8rem; font-size: .85rem; color: var(--c-slate-900); width: 100%; box-sizing: border-box; outline: none; }
+.rsv__modal-foot { display: flex; justify-content: flex-end; gap: .6rem; padding: .85rem 1.25rem; border-top: 1px solid var(--c-slate-100); }
 </style>

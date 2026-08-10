@@ -133,7 +133,7 @@ function initials(name) {
 .tpv__mes-count { font-size: .72rem; background: #e8f0e9; color: #60725d; padding: .15em .5em; border-radius: 4px; font-weight: 600; }
 
 .tpv__semanas { display: flex; flex-direction: column; }
-.tpv__semana { border-bottom: 1px solid #f1f5f9; padding: .5rem .875rem; }
+.tpv__semana { border-bottom: 1px solid var(--c-slate-100); padding: .5rem .875rem; }
 .tpv__semana:last-child { border-bottom: none; }
 .tpv__sem-hdr { display: flex; align-items: center; gap: .5rem; margin-bottom: .25rem; }
 .tpv__sem-label { font-size: .72rem; font-weight: 600; color: #60725d; min-width: 36px; }
@@ -145,8 +145,8 @@ function initials(name) {
 .tpv__tarea-ico  { flex-shrink: 0; }
 .tpv__tarea-txt  { flex: 1; color: #0f2611; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tpv__tarea-resp { background: #e8f0e9; color: #374151; padding: .1em .35em; border-radius: 3px; font-size: .65rem; font-weight: 700; flex-shrink: 0; }
-.tpv__tarea--mas { color: #64748b; cursor: default; font-size: .7rem; }
-.tpv__sem-vacia  { font-size: .72rem; color: #94a3b8; padding: .1rem 0; }
+.tpv__tarea--mas { color: var(--c-slate-500); cursor: default; font-size: .7rem; }
+.tpv__sem-vacia  { font-size: .72rem; color: var(--c-slate-400); padding: .1rem 0; }
 
 .tpv__empty { text-align: center; padding: 3rem 1rem; color: #60725d; font-size: .875rem; }
 .tpv__btn-add { margin-top: .5rem; background: #1b5e20; color: #fff; border: none; padding: .6rem 1.25rem; border-radius: 9px; font-size: .875rem; font-weight: 600; cursor: pointer; }

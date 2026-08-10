@@ -253,7 +253,7 @@ function planTooltip(t) {
   border: 2px solid var(--bs-body-bg);
 }
 .tarea-card__avatar--creador {
-  background: linear-gradient(135deg, #64748b, #94a3b8);
+  background: linear-gradient(135deg, var(--c-slate-500), var(--c-slate-400));
   margin-right: -6px;
   z-index: 0;
 }

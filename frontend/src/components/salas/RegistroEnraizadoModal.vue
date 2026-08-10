@@ -124,28 +124,28 @@ async function guardar() {
 .ren__modal { background: #fff; border-radius: 14px; width: 100%; max-width: 460px; overflow: hidden; }
 .ren__head {
   display: flex; align-items: flex-start; justify-content: space-between;
-  padding: .9rem 1rem; border-bottom: 1px solid #f1f5f9;
+  padding: .9rem 1rem; border-bottom: 1px solid var(--c-slate-100);
 }
 .ren__title { margin: 0; font-size: .95rem; color: #1e293b; }
-.ren__sub   { margin: .15rem 0 0; font-size: .75rem; color: #94a3b8; }
-.ren__close { border: none; background: none; cursor: pointer; color: #94a3b8; font-size: .85rem; }
+.ren__sub   { margin: .15rem 0 0; font-size: .75rem; color: var(--c-slate-400); }
+.ren__close { border: none; background: none; cursor: pointer; color: var(--c-slate-400); font-size: .85rem; }
 .ren__body  { padding: 1rem; display: flex; flex-direction: column; gap: .75rem; }
-.ren__nota  { margin: 0; font-size: .75rem; color: #64748b; line-height: 1.45; background: #f0fdf4;
+.ren__nota  { margin: 0; font-size: .75rem; color: var(--c-slate-500); line-height: 1.45; background: #f0fdf4;
               border-left: 3px solid #86efac; padding: .5rem .65rem; border-radius: 0 6px 6px 0; }
-.ren__foot  { display: flex; justify-content: flex-end; gap: .5rem; padding: .8rem 1rem; border-top: 1px solid #f1f5f9; }
+.ren__foot  { display: flex; justify-content: flex-end; gap: .5rem; padding: .8rem 1rem; border-top: 1px solid var(--c-slate-100); }
 
 .ren__grid  { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
 @media (max-width: 480px) { .ren__grid { grid-template-columns: 1fr; } }
 
 .ren__field { display: flex; flex-direction: column; gap: .25rem; }
-.ren__label { font-size: .75rem; font-weight: 600; color: #475569; }
-.ren__opt   { font-weight: 400; color: #94a3b8; }
+.ren__label { font-size: .75rem; font-weight: 600; color: var(--c-slate-600); }
+.ren__opt   { font-weight: 400; color: var(--c-slate-400); }
 .ren__input {
-  border: 1px solid #e2e8f0; border-radius: 8px; padding: .5rem .65rem; font-size: .85rem;
+  border: 1px solid var(--c-slate-200); border-radius: 8px; padding: .5rem .65rem; font-size: .85rem;
   width: 100%; box-sizing: border-box; font-family: inherit;
 }
 .ren__input:focus { outline: none; border-color: #16a34a; }
-.ren__hint  { font-size: .7rem; color: #94a3b8; }
+.ren__hint  { font-size: .7rem; color: var(--c-slate-400); }
 .ren__alert { background: #fee2e2; color: #b91c1c; padding: .5rem .7rem; border-radius: 8px; font-size: .78rem; }
 
 .ren__btn {
@@ -153,5 +153,5 @@ async function guardar() {
   background: #16a34a; color: #fff; font-size: .82rem; font-weight: 600;
 }
 .ren__btn:disabled { opacity: .5; cursor: not-allowed; }
-.ren__btn--ghost { background: none; color: #64748b; border: 1px solid #e2e8f0; }
+.ren__btn--ghost { background: none; color: var(--c-slate-500); border: 1px solid var(--c-slate-200); }
 </style>

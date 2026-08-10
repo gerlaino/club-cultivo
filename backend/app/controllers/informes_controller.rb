@@ -435,6 +435,80 @@ class InformesController < ApplicationController
   # INASE — Registro de variedades del club + trazabilidad a producción.
   # Liga cada genética (con su dato INASE) con lo que realmente produjo: lotes,
   # plantas y gramos. Es el informe regulatorio de variedades cultivadas.
+  # Qué se perdió, y por qué. Ningún informe lo decía: producción cuenta lo que salió bien y
+  # trazabilidad cierra el balance de UN producto, pero el club no tenía dónde ver cuánto se
+  # cayó en total. Para quien audita es de lo primero que se pregunta; para el dueño es plata.
+  def perdidas
+    club = current_user.club
+    desde, hasta = periodo_rango
+
+    # 1. PLANTAS descartadas, con su motivo. Es la pérdida más cara: cada una es un ciclo que
+    #    no llegó a cosecha.
+    descartadas = Plant.joins(lote: :sala)
+                       .where(salas: { sede_id: club.sede_ids }, state: 'descartada')
+                       .where(updated_at: desde..hasta)
+    por_motivo = descartadas.group(:motivo_descarte).count
+                            .transform_keys { |m| (m || 'sin_motivo').to_s.tr('_', ' ').capitalize }
+
+    # 2. MERMA de inventario: lo que salió del stock sin ser una dispensación. `merma` es la
+    #    pérdida declarada; los ajustes negativos son correcciones de inventario que también
+    #    son producto que ya no está.
+    movs   = StockMovimiento.joins(stock: :sede)
+                            .where(sedes: { club_id: club.id })
+                            .where(created_at: desde..hasta)
+    merma_g  = movs.where(tipo: 'merma').sum(:gramos).to_f.abs.round(1)
+    ajuste_g = movs.where(tipo: 'ajuste').where('gramos < 0').sum(:gramos).to_f.abs.round(1)
+
+    # 3. STOCK VENCIDO que sigue en góndola: todavía no es pérdida contable, pero lo va a ser.
+    vencido = Stock.where(club_id: club.id).where('cantidad > 0')
+                   .where.not(estado: 'agotado')
+                   .where('fecha_vencimiento_est < ?', Time.zone.today)
+    vencido_g = vencido.where(forma_producto: 'flor_seca').sum(:cantidad).to_f.round(1)
+
+    datos = {
+      plantas_descartadas: descartadas.count,
+      plantas_por_motivo:  por_motivo,
+      merma_g:             merma_g,
+      ajustes_negativos_g: ajuste_g,
+      total_gramos:        (merma_g + ajuste_g).round(1),
+      stock_vencido_g:     vencido_g,
+      stock_vencido_items: vencido.count,
+    }
+
+    secciones = [{
+      titulo: 'Plantas descartadas, por motivo',
+      headers: ['Motivo', 'Plantas'],
+      rows: por_motivo.sort_by { |_, n| -n }.map { |motivo, n| [motivo, n] },
+      formatos: [:texto, :numero],
+      totales: [1],
+      aligns: { 1 => :right },
+      vacio: 'No se descartó ninguna planta en el período.',
+    }, {
+      titulo: 'Producto perdido',
+      headers: ['Concepto', 'Gramos'],
+      rows: [['Merma declarada', merma_g],
+             ['Ajustes de inventario en menos', ajuste_g],
+             ['Stock vencido todavía en góndola', vencido_g]],
+      formatos: [:texto, :numero],
+      aligns: { 1 => :right },
+    }]
+
+    responder_informe(
+      titulo: 'Informe de pérdidas', nombre: 'informe_perdidas',
+      resena: 'Qué se perdió el club en el período y por qué: plantas que no llegaron a cosecha ' \
+              'con su motivo, y producto que salió del inventario sin ser una dispensación ' \
+              '(merma, ajustes en menos). El stock vencido todavía no es pérdida, pero lo va a ser.',
+      datos: datos, periodo: etiqueta_periodo(desde, hasta),
+      kpis: [
+        { label: 'Plantas descartadas', valor: descartadas.count, tono: descartadas.count.positive? ? :warn : :ok },
+        { label: 'Merma', valor: merma_g },
+        { label: 'Ajustes en menos', valor: ajuste_g },
+        { label: 'Vencido en góndola', valor: vencido_g, tono: vencido_g.positive? ? :crit : :ok },
+      ],
+      secciones: secciones,
+    )
+  end
+
   def inase
     club      = current_user.club
     geneticas = club.geneticas.order(:nombre)

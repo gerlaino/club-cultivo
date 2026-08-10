@@ -222,8 +222,8 @@ function formatDate(iso) {
   padding: 1.25rem 1.5rem 1rem; border-bottom: 1px solid #e8f0e9;
 }
 .apm__title { font-size: 1.05rem; font-weight: 700; color: #1a2e1a; margin: 0 0 .15rem; }
-.apm__sub   { font-size: .78rem; color: #64748b; margin: 0; }
-.apm__close { background: none; border: none; color: #64748b; font-size: 1.1rem; cursor: pointer; padding: .25rem; line-height: 1; }
+.apm__sub   { font-size: .78rem; color: var(--c-slate-500); margin: 0; }
+.apm__close { background: none; border: none; color: var(--c-slate-500); font-size: 1.1rem; cursor: pointer; padding: .25rem; line-height: 1; }
 .apm__close:hover { color: #1a2e1a; }
 
 .apm__body { flex: 1; overflow-y: auto; padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1rem; }
@@ -274,7 +274,7 @@ function formatDate(iso) {
 .apm__td-resp  { color: #6b7280; white-space: nowrap; }
 
 .apm__tipo {
-  background: #f1f5f9; color: #475569; font-size: .7rem; font-weight: 500;
+  background: var(--c-slate-100); color: var(--c-slate-600); font-size: .7rem; font-weight: 500;
   padding: .15rem .45rem; border-radius: 4px;
 }
 .apm__pri {
@@ -283,7 +283,7 @@ function formatDate(iso) {
 .apm__pri--urgente { background: #fee2e2; color: #dc2626; }
 .apm__pri--alta    { background: #ffedd5; color: #ea580c; }
 .apm__pri--normal  { background: #f0fdf4; color: #16a34a; }
-.apm__pri--baja    { background: #f1f5f9; color: #64748b; }
+.apm__pri--baja    { background: var(--c-slate-100); color: var(--c-slate-500); }
 
 .apm__error {
   background: #fef2f2; border: 1px solid #fecaca; color: #dc2626;

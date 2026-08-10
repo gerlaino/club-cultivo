@@ -457,11 +457,11 @@ onMounted(cargarLotes)
 }
 .mpv__hist-list {
   display: flex; flex-direction: column;
-  border: 1px solid #e2e8f0; border-radius: var(--r-md); overflow: hidden;
+  border: 1px solid var(--c-slate-200); border-radius: var(--r-md); overflow: hidden;
 }
 .mpv__hist-row {
   display: flex; align-items: center; gap: var(--sp-4);
-  background: var(--c-paper); border-bottom: 1px solid #e2e8f0;
+  background: var(--c-paper); border-bottom: 1px solid var(--c-slate-200);
   padding: var(--sp-3) var(--sp-4);
 }
 .mpv__hist-row:nth-child(even) { background: #fafcf9; }
@@ -479,7 +479,7 @@ onMounted(cargarLotes)
 .mpv__hist-del, .mpv__hist-act {
   display: inline-flex; align-items: center; justify-content: center;
   background: transparent; border: none; cursor: pointer;
-  color: var(--c-ink-300, #cbd5e1); padding: 4px; border-radius: 6px;
+  color: var(--c-slate-300); padding: 4px; border-radius: 6px;
   transition: all .15s;
 }
 .mpv__hist-del:hover:not(:disabled) { background: #fef2f2; color: #dc2626; }

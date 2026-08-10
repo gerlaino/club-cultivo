@@ -283,7 +283,7 @@ onMounted(async () => {
   transition: background var(--t-fast);
 }
 .svd__tarea-item:last-child { border-bottom: none; }
-.svd__tarea-item:hover { background: var(--c-ink-50, #f8fafc); }
+.svd__tarea-item:hover { background: var(--c-slate-50); }
 
 .svd__tarea-info {
   display: flex;

@@ -134,7 +134,7 @@ function tipoEmoji(tipo) { return TIPO_EMOJI[tipo] || '📋' }
 .mpv { display: flex; flex-direction: column; gap: 1rem; }
 
 .mpv__nav { display: flex; align-items: center; gap: .75rem; }
-.mpv__nav-btn { width: 30px; height: 30px; border: 1.5px solid #e2e8f0; border-radius: 7px; background: #fff; color: #374151; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+.mpv__nav-btn { width: 30px; height: 30px; border: 1.5px solid var(--c-slate-200); border-radius: 7px; background: #fff; color: #374151; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .mpv__nav-btn:disabled { opacity: .35; cursor: not-allowed; }
 .mpv__nav-label { font-size: .875rem; font-weight: 700; color: #0f2611; }
 
@@ -142,7 +142,7 @@ function tipoEmoji(tipo) { return TIPO_EMOJI[tipo] || '📋' }
 .mpv__cal-hdr { background: #f6faf6; padding: .5rem .75rem; font-size: .72rem; font-weight: 700; color: #60725d; text-transform: uppercase; letter-spacing: .04em; text-align: center; }
 
 .mpv__dia { background: #fff; min-height: 90px; padding: .4rem .5rem; position: relative; display: flex; flex-direction: column; gap: .2rem; }
-.mpv__dia--vacio { background: #f8fafc; }
+.mpv__dia--vacio { background: var(--c-slate-50); }
 .mpv__dia--hoy { background: #fafff5; }
 .mpv__dia--fuera { background: #fafafa; opacity: .55; }
 .mpv__dia:hover:not(.mpv__dia--vacio) .mpv__dia-add { opacity: 1; }
@@ -156,7 +156,7 @@ function tipoEmoji(tipo) { return TIPO_EMOJI[tipo] || '📋' }
 .mpv__pill--riego     { background: #e3f2fd; color: #1565c0; }
 .mpv__pill--poda      { background: #fce4ec; color: #c62828; }
 .mpv__pill--limpieza  { background: #fff8e1; color: #e65100; }
-.mpv__pill--mas       { background: #f1f5f9; color: #64748b; cursor: default; }
+.mpv__pill--mas       { background: var(--c-slate-100); color: var(--c-slate-500); cursor: default; }
 .mpv__dia-add { position: absolute; bottom: 4px; right: 4px; width: 18px; height: 18px; border-radius: 4px; border: none; background: #e8f0e9; color: #1b5e20; font-size: .85rem; cursor: pointer; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .12s; }
 
 .mpv__empty { text-align: center; padding: 2rem; color: #60725d; font-size: .875rem; }

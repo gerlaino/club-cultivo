@@ -166,40 +166,40 @@ async function doSave() {
 <style scoped>
 .sem__overlay { position: fixed; inset: 0; background: rgba(15,23,42,.45); display: flex; align-items: center; justify-content: center; z-index: 800; padding: 1rem; }
 .sem__modal { background: #fff; border-radius: 16px; width: 100%; max-width: 600px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.2); overflow-y: auto; }
-.sem__header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem; border-bottom: 1px solid #f1f5f9; position: sticky; top: 0; background: #fff; z-index: 1; }
-.sem__title { font-size: 1rem; font-weight: 700; margin: 0; color: #0f172a; }
-.sem__close { background: none; border: none; color: #94a3b8; cursor: pointer; padding: .25rem; border-radius: 6px; display: flex; transition: all .15s; }
-.sem__close:hover { background: #f1f5f9; color: #0f172a; }
+.sem__header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--c-slate-100); position: sticky; top: 0; background: #fff; z-index: 1; }
+.sem__title { font-size: 1rem; font-weight: 700; margin: 0; color: var(--c-slate-900); }
+.sem__close { background: none; border: none; color: var(--c-slate-400); cursor: pointer; padding: .25rem; border-radius: 6px; display: flex; transition: all .15s; }
+.sem__close:hover { background: var(--c-slate-100); color: var(--c-slate-900); }
 .sem__body { padding: 1.5rem; flex: 1; }
-.sem__loading { display: flex; align-items: center; gap: .5rem; justify-content: center; padding: 2rem; color: #64748b; font-size: .85rem; }
+.sem__loading { display: flex; align-items: center; gap: .5rem; justify-content: center; padding: 2rem; color: var(--c-slate-500); font-size: .85rem; }
 .sem__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 @media (max-width: 480px) { .sem__grid { grid-template-columns: 1fr; } }
 .sem__field { display: flex; flex-direction: column; gap: .4rem; }
 .sem__field--full { grid-column: 1 / -1; }
 .sem__domicilio-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: .5rem; }
 @media (max-width: 480px) { .sem__domicilio-grid { grid-template-columns: 1fr 1fr; } }
-.sem__label { font-size: .75rem; font-weight: 600; color: #64748b; display: flex; align-items: center; gap: .4rem; }
-.sem__input { padding: .55rem .75rem; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: .875rem; color: #0f172a; outline: none; transition: border-color .15s; width: 100%; box-sizing: border-box; }
+.sem__label { font-size: .75rem; font-weight: 600; color: var(--c-slate-500); display: flex; align-items: center; gap: .4rem; }
+.sem__input { padding: .55rem .75rem; border: 1.5px solid var(--c-slate-200); border-radius: 8px; font-size: .875rem; color: var(--c-slate-900); outline: none; transition: border-color .15s; width: 100%; box-sizing: border-box; }
 .sem__input:focus { border-color: #1b5e20; }
 .sem__check { width: 15px; height: 15px; accent-color: #1b5e20; }
 .sem__repro-estados { display: flex; gap: .4rem; flex-wrap: wrap; }
-.sem__repro-btn { padding: .4rem .8rem; border-radius: 7px; border: 1.5px solid #e2e8f0; background: #f8fafc; color: #64748b; font-size: .75rem; font-weight: 600; cursor: pointer; transition: all .15s; }
-.sem__repro-btn:hover { border-color: #94a3b8; }
-.sem__opt { font-size: .68rem; font-weight: 400; color: #94a3b8; text-transform: none; letter-spacing: 0; margin-left: .35rem; }
+.sem__repro-btn { padding: .4rem .8rem; border-radius: 7px; border: 1.5px solid var(--c-slate-200); background: var(--c-slate-50); color: var(--c-slate-500); font-size: .75rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+.sem__repro-btn:hover { border-color: var(--c-slate-400); }
+.sem__opt { font-size: .68rem; font-weight: 400; color: var(--c-slate-400); text-transform: none; letter-spacing: 0; margin-left: .35rem; }
 .sem__envio-sum { cursor: pointer; font-size: .78rem; font-weight: 700; color: #b45309; list-style: none; }
 .sem__envio-sum::before { content: '＋ '; font-weight: 800; }
 details[open] .sem__envio-sum::before { content: '− '; }
 .sem__limit-wrap { display: flex; align-items: center; gap: .4rem; }
 .sem__input--limit { max-width: 140px; }
-.sem__limit-unit { font-size: .8rem; font-weight: 600; color: #64748b; white-space: nowrap; }
-.sem__hint { font-size: .72rem; color: #94a3b8; margin-top: .2rem; display: block; }
+.sem__limit-unit { font-size: .8rem; font-weight: 600; color: var(--c-slate-500); white-space: nowrap; }
+.sem__hint { font-size: .72rem; color: var(--c-slate-400); margin-top: .2rem; display: block; }
 .sem__error { margin-top: .875rem; padding: .75rem 1rem; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; font-size: .8rem; color: #dc2626; }
-.sem__footer { display: flex; justify-content: flex-end; gap: .75rem; padding: 1.25rem 1.5rem; border-top: 1px solid #f1f5f9; position: sticky; bottom: 0; background: #fff; }
+.sem__footer { display: flex; justify-content: flex-end; gap: .75rem; padding: 1.25rem 1.5rem; border-top: 1px solid var(--c-slate-100); position: sticky; bottom: 0; background: #fff; }
 .sem__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .6rem 1.1rem; border-radius: 9px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: background .15s; }
 .sem__btn-primary:hover:not(:disabled) { background: #144a18; }
 .sem__btn-primary:disabled { opacity: .5; cursor: not-allowed; }
-.sem__btn-ghost { display: inline-flex; align-items: center; gap: .4rem; background: none; color: #475569; border: 1.5px solid #e2e8f0; padding: .6rem 1.1rem; border-radius: 9px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .15s; }
-.sem__btn-ghost:hover { border-color: #94a3b8; }
+.sem__btn-ghost { display: inline-flex; align-items: center; gap: .4rem; background: none; color: var(--c-slate-600); border: 1.5px solid var(--c-slate-200); padding: .6rem 1.1rem; border-radius: 9px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+.sem__btn-ghost:hover { border-color: var(--c-slate-400); }
 .sem__btn-ghost:disabled { opacity: .5; cursor: not-allowed; }
 .sem-modal-enter-active, .sem-modal-leave-active { transition: opacity .2s; }
 .sem-modal-enter-from, .sem-modal-leave-to { opacity: 0; pointer-events: none; }

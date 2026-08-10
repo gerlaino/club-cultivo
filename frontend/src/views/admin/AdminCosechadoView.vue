@@ -315,7 +315,7 @@ onMounted(cargar)
   text-transform: uppercase;
   letter-spacing: .05em;
   color: var(--c-ink-400);
-  background: var(--c-ink-50, #f8fafc);
+  background: var(--c-slate-50);
   border-bottom: 1.5px solid var(--c-ink-100);
 }
 .acs__pager { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 1.25rem 0 .5rem; }
@@ -329,7 +329,7 @@ onMounted(cargar)
   cursor: pointer;
 }
 .acs__row:last-child { border-bottom: none; }
-.acs__row:hover { background: var(--c-ink-50, #f8fafc); }
+.acs__row:hover { background: var(--c-slate-50); }
 .acs__row td { padding: 12px 14px; vertical-align: middle; }
 
 .acs__lote-link {

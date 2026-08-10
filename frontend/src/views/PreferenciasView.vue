@@ -490,8 +490,8 @@ async function runTestSmtp() {
   background: rgba(242,245,242,.95); backdrop-filter: blur(8px);
   border-bottom: 1px solid rgba(0,0,0,.06); flex-wrap: wrap;
 }
-.pv__title { font-size: 1.6rem; font-weight: 800; color: #0f172a; margin: 0 0 .15rem; letter-spacing: -.03em; }
-.pv__sub   { font-size: .8rem; color: #94a3b8; margin: 0; }
+.pv__title { font-size: 1.6rem; font-weight: 800; color: var(--c-slate-900); margin: 0 0 .15rem; letter-spacing: -.03em; }
+.pv__sub   { font-size: .8rem; color: var(--c-slate-400); margin: 0; }
 
 .pv__body {
   display: grid; grid-template-columns: 280px 1fr;
@@ -501,12 +501,12 @@ async function runTestSmtp() {
 .pv__aside { position: sticky; top: 90px; }
 .pv__main  { display: flex; flex-direction: column; }
 
-.pv__card { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; }
+.pv__card { background: #fff; border: 1px solid var(--c-slate-200); border-radius: 14px; overflow: hidden; }
 .pv__card--mt { margin-top: 1.25rem; }
-.pv__card-header { display: flex; align-items: center; gap: .875rem; padding: 1rem 1.25rem; border-bottom: 1px solid #f1f5f9; background: #fafbfc; }
+.pv__card-header { display: flex; align-items: center; gap: .875rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--c-slate-100); background: #fafbfc; }
 .pv__card-icon  { width: 36px; height: 36px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: .9rem; flex-shrink: 0; }
-.pv__card-title { font-size: .9rem; font-weight: 800; color: #0f172a; }
-.pv__card-sub   { font-size: .75rem; color: #94a3b8; margin-top: .1rem; }
+.pv__card-title { font-size: .9rem; font-weight: 800; color: var(--c-slate-900); }
+.pv__card-sub   { font-size: .75rem; color: var(--c-slate-400); margin-top: .1rem; }
 .pv__card-body  { padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
 
 .pv__logo-wrap    { display: flex; flex-direction: column; align-items: center; gap: .75rem; }
@@ -514,7 +514,7 @@ async function runTestSmtp() {
 .pv__logo-img     { width: 88px; height: 88px; border-radius: 50%; object-fit: cover; box-shadow: 0 2px 10px rgba(0,0,0,.12); }
 .pv__logo-overlay { position: absolute; inset: 0; background: rgba(0,0,0,.45); border-radius: 50%; display: flex; align-items: center; justify-content: center; }
 .pv__logo-actions { display: flex; gap: .5rem; flex-wrap: wrap; justify-content: center; }
-.pv__logo-hint    { font-size: .7rem; color: #94a3b8; text-align: center; margin: 0; }
+.pv__logo-hint    { font-size: .7rem; color: var(--c-slate-400); text-align: center; margin: 0; }
 
 .pv__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 @media (max-width: 640px) { .pv__grid { grid-template-columns: 1fr; } }
@@ -526,17 +526,17 @@ async function runTestSmtp() {
 .pv__hint-warn { display: block; margin-top: .3rem; font-size: .7rem; color: #b45309; }
 .pv__req   { color: #dc2626; }
 .pv__input {
-  background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 9px;
-  padding: .65rem .9rem; font-size: .875rem; color: #0f172a;
+  background: var(--c-slate-50); border: 1.5px solid var(--c-slate-200); border-radius: 9px;
+  padding: .65rem .9rem; font-size: .875rem; color: var(--c-slate-900);
   width: 100%; box-sizing: border-box; transition: border .15s, box-shadow .15s;
 }
 .pv__input:focus { outline: none; border-color: #1b5e20; box-shadow: 0 0 0 3px rgba(27,94,32,.1); background: #fff; }
 .pv__input--err { border-color: #dc2626 !important; }
 .pv__input--prefixed { border-radius: 0 9px 9px 0; border-left: none; }
 .pv__input-group { display: flex; }
-.pv__input-prefix { display: flex; align-items: center; justify-content: center; padding: 0 .75rem; background: #f1f5f9; border: 1.5px solid #e2e8f0; border-right: none; border-radius: 9px 0 0 9px; color: #94a3b8; }
+.pv__input-prefix { display: flex; align-items: center; justify-content: center; padding: 0 .75rem; background: var(--c-slate-100); border: 1.5px solid var(--c-slate-200); border-right: none; border-radius: 9px 0 0 9px; color: var(--c-slate-400); }
 .pv__err  { font-size: .72rem; color: #dc2626; font-weight: 600; }
-.pv__hint { font-size: .72rem; color: #94a3b8; }
+.pv__hint { font-size: .72rem; color: var(--c-slate-400); }
 .pv__file-hidden { display: none; }
 
 .pv__infobox {
@@ -559,11 +559,11 @@ async function runTestSmtp() {
 
 .pv__btn-outline {
   display: inline-flex; align-items: center; gap: .4rem;
-  background: #fff; color: #475569; border: 1.5px solid #e2e8f0;
+  background: #fff; color: var(--c-slate-600); border: 1.5px solid var(--c-slate-200);
   padding: .45rem .875rem; border-radius: 8px; font-size: .78rem;
   font-weight: 600; cursor: pointer; transition: all .15s;
 }
-.pv__btn-outline:hover { border-color: #94a3b8; background: #f8fafc; }
+.pv__btn-outline:hover { border-color: var(--c-slate-400); background: var(--c-slate-50); }
 .pv__btn--disabled { opacity: .5; pointer-events: none; }
 
 .pv__btn-danger-ghost {
@@ -577,9 +577,9 @@ async function runTestSmtp() {
 
 .pv__footer-save {
   display: flex; align-items: center; gap: 1rem;
-  margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid #f1f5f9;
+  margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--c-slate-100);
 }
-.pv__no-changes { font-size: .78rem; color: #94a3b8; }
+.pv__no-changes { font-size: .78rem; color: var(--c-slate-400); }
 
 .pv__toast {
   display: flex; align-items: center; gap: .75rem;
@@ -600,12 +600,12 @@ async function runTestSmtp() {
   font-size: .72rem; font-weight: 700; padding: .25rem .7rem; border-radius: 999px;
 }
 .pv__smtp-badge--ok  { background: #dcfce7; color: #15803d; }
-.pv__smtp-badge--off { background: #f1f5f9; color: #64748b; }
+.pv__smtp-badge--off { background: var(--c-slate-100); color: var(--c-slate-500); }
 
 .pv__smtp-actions { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
 .pv__connect { display: flex; flex-direction: column; gap: 1rem; }
 .pv__connect a { color: #2563eb; font-weight: 600; }
-.pv__steps { margin: 0; padding-left: 1.25rem; display: flex; flex-direction: column; gap: .4rem; font-size: .82rem; color: #475569; line-height: 1.45; }
+.pv__steps { margin: 0; padding-left: 1.25rem; display: flex; flex-direction: column; gap: .4rem; font-size: .82rem; color: var(--c-slate-600); line-height: 1.45; }
 .pv__steps li::marker { color: #16a34a; font-weight: 700; }
 </style>
 

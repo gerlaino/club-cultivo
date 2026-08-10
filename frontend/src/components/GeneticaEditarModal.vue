@@ -366,10 +366,10 @@ defineExpose({ openCreate, openEdit })
 .gem-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.55); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 1rem; }
 .gem-modal { background: #fff; border-radius: 16px; width: 100%; max-width: 680px; max-height: 90vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
 .gem-modal__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.5rem; border-bottom: 1px solid #e5e7eb; flex-shrink: 0; }
-.gem-modal__title    { font-size: 1rem; font-weight: 700; color: #0f172a; margin: 0; }
-.gem-modal__subtitle { font-size: .78rem; color: #64748b; display: block; margin-top: .1rem; }
-.gem-modal__close    { background: none; border: none; cursor: pointer; color: #94a3b8; font-size: 1rem; padding: .2rem; border-radius: 6px; transition: all .15s; flex-shrink: 0; }
-.gem-modal__close:hover { background: #f1f5f9; color: #475569; }
+.gem-modal__title    { font-size: 1rem; font-weight: 700; color: var(--c-slate-900); margin: 0; }
+.gem-modal__subtitle { font-size: .78rem; color: var(--c-slate-500); display: block; margin-top: .1rem; }
+.gem-modal__close    { background: none; border: none; cursor: pointer; color: var(--c-slate-400); font-size: 1rem; padding: .2rem; border-radius: 6px; transition: all .15s; flex-shrink: 0; }
+.gem-modal__close:hover { background: var(--c-slate-100); color: var(--c-slate-600); }
 .gem-modal__body  { overflow-y: auto; padding: 1.25rem 1.5rem; flex: 1; }
 .gem-modal__footer { display: flex; justify-content: flex-end; gap: .75rem; padding: 1rem 1.5rem; border-top: 1px solid #e5e7eb; flex-shrink: 0; }
 .gem-modal__inase-notice { margin-bottom: 1.25rem; }
@@ -379,8 +379,8 @@ defineExpose({ openCreate, openEdit })
 
 .gem-btn-new { display: inline-flex; align-items: center; gap: .4rem; background: #1a3d2e; color: #fff; border: none; padding: .6rem 1.1rem; border-radius: 9px; font-size: .875rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; }
 .gem-btn-new:hover { background: #0f2a1e; }
-.gem-btn-ghost { background: #fff; border: 1.5px solid #e2e8f0; color: #64748b; padding: .5rem 1rem; border-radius: 8px; font-size: .82rem; cursor: pointer; }
-.gem-btn-ghost:hover { background: #f8fafc; }
+.gem-btn-ghost { background: #fff; border: 1.5px solid var(--c-slate-200); color: var(--c-slate-500); padding: .5rem 1rem; border-radius: 8px; font-size: .82rem; cursor: pointer; }
+.gem-btn-ghost:hover { background: var(--c-slate-50); }
 
 .gem-form { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: .875rem; }
 .gem-form__field { display: flex; flex-direction: column; gap: .3rem; }
@@ -388,24 +388,24 @@ defineExpose({ openCreate, openEdit })
 .gem-form__field--half { grid-column: span 1; }
 @media (max-width: 560px) { .gem-form { grid-template-columns: 1fr; } .gem-form__field--full, .gem-form__field--half { grid-column: 1; } }
 .gem-form__label     { font-size: .8rem; font-weight: 600; color: #374151; }
-.gem-form__label-hint { font-size: .7rem; font-weight: 500; color: #94a3b8; }
-.gem-form__hint { margin: .4rem 0 0; font-size: .74rem; line-height: 1.45; color: #64748b; }
-.gem-form__hint strong { color: #334155; font-weight: 600; }
+.gem-form__label-hint { font-size: .7rem; font-weight: 500; color: var(--c-slate-400); }
+.gem-form__hint { margin: .4rem 0 0; font-size: .74rem; line-height: 1.45; color: var(--c-slate-500); }
+.gem-form__hint strong { color: var(--c-slate-700); font-weight: 600; }
 .gem-form__req       { color: #dc2626; }
-.gem-form__input     { padding: .5rem .7rem; border: 1.5px solid #e2e8f0; border-radius: 8px; font-size: .875rem; color: #1e293b; background: #fff; outline: none; transition: border-color .15s; width: 100%; box-sizing: border-box; }
+.gem-form__input     { padding: .5rem .7rem; border: 1.5px solid var(--c-slate-200); border-radius: 8px; font-size: .875rem; color: #1e293b; background: #fff; outline: none; transition: border-color .15s; width: 100%; box-sizing: border-box; }
 .gem-form__input:focus { border-color: #1a3d2e; }
 .gem-form__input--error { border-color: #ef4444; }
 .gem-form__textarea  { resize: vertical; min-height: 80px; }
 .gem-form__field-error { font-size: .75rem; color: #ef4444; }
 
 .gem-form__btn-group  { display: flex; flex-wrap: wrap; gap: .35rem; }
-.gem-form__tipo-btn   { padding: .35rem .7rem; border: 1.5px solid #e2e8f0; border-radius: 7px; font-size: .78rem; font-weight: 500; background: #fff; color: #374151; cursor: pointer; transition: all .15s; }
-.gem-form__tipo-btn:hover:not(:disabled) { border-color: #94a3b8; }
+.gem-form__tipo-btn   { padding: .35rem .7rem; border: 1.5px solid var(--c-slate-200); border-radius: 7px; font-size: .78rem; font-weight: 500; background: #fff; color: #374151; cursor: pointer; transition: all .15s; }
+.gem-form__tipo-btn:hover:not(:disabled) { border-color: var(--c-slate-400); }
 .gem-form__tipo-btn:disabled { opacity: .45; cursor: not-allowed; }
 
 .gem-form__toggle       { display: inline-flex; align-items: center; gap: .65rem; cursor: pointer; }
 .gem-form__toggle-input { position: absolute; opacity: 0; width: 0; height: 0; }
-.gem-form__toggle-track { width: 40px; height: 22px; border-radius: 11px; background: #e2e8f0; position: relative; transition: background .2s; flex-shrink: 0; }
+.gem-form__toggle-track { width: 40px; height: 22px; border-radius: 11px; background: var(--c-slate-200); position: relative; transition: background .2s; flex-shrink: 0; }
 .gem-form__toggle-track::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .2s; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
 .gem-form__toggle-input:checked + .gem-form__toggle-track { background: #1a3d2e; }
 .gem-form__toggle-input:checked + .gem-form__toggle-track::after { transform: translateX(18px); }

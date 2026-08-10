@@ -639,7 +639,7 @@ watch(() => auth.user, (u) => {
 /* ── Pasos ─────────────────────────────────────────────────────────────────── */
 .oc__pasos { display: flex; flex-direction: column; }
 
-.oc__paso { border-top: 1px solid #f1f5f9; }
+.oc__paso { border-top: 1px solid var(--c-slate-100); }
 .oc__paso:first-child { border-top: none; }
 .oc__paso--done { opacity: .65; }
 .oc__paso--active { background: #fafffe; }
@@ -682,7 +682,7 @@ watch(() => auth.user, (u) => {
 .oc__paso-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .1rem; }
 .oc__paso-titulo { font-size: .85rem; font-weight: 700; color: #0f2611; }
 .oc__paso--done .oc__paso-titulo { color: #60725d; text-decoration: line-through; text-decoration-color: #a8c5a0; }
-.oc__paso-desc { font-size: .75rem; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.oc__paso-desc { font-size: .75rem; color: var(--c-slate-400); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 540px) { .oc__paso-desc { display: none; } }
 
 .oc__chevron { color: #b0c4b1; font-size: .75rem; flex-shrink: 0; transition: transform .2s; }
@@ -756,12 +756,12 @@ watch(() => auth.user, (u) => {
   align-items: center;
   gap: .35rem;
   padding: .45rem 1rem;
-  background: #f8fafc;
-  border: 1.5px solid #e2e8f0;
+  background: var(--c-slate-50);
+  border: 1.5px solid var(--c-slate-200);
   border-radius: 8px;
   font-size: .78rem;
   font-weight: 600;
-  color: #64748b;
+  color: var(--c-slate-500);
   cursor: pointer;
   transition: all .15s;
   white-space: nowrap;

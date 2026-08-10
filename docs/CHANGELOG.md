@@ -1,5 +1,25 @@
 # Changelog
 
+## Agosto 2026 (m) — pérdidas, el arrastre del "mixto" y el design system completo
+
+**Informe de PÉRDIDAS**, que no existía. Producción cuenta lo que salió bien y trazabilidad
+cierra el balance de un producto, pero el club no tenía dónde ver cuánto se cayó en total.
+Muestra plantas descartadas **con su motivo** —que es lo accionable: varias por plaga es un
+problema de sala, varios machos es un problema de semilla—, la merma declarada, los ajustes de
+inventario en menos, y el stock vencido que sigue en góndola (todavía no es pérdida, pero lo va
+a ser). Una dispensación no cuenta como pérdida.
+
+**`rake dispensaciones:recalcular_medio_pago`** para el arrastre del placeholder: las dispensas
+que quedaron marcadas "mixto" antes del fix se recalculan desde sus cobros reales, con el mismo
+criterio que `afinar_medio_pago!`. Un solo medio → ese medio; dos distintos → mixto de verdad;
+sin cobros y sin contra entrega → no se toca, porque no hay con qué decidir y adivinar sería
+peor.
+
+**Design system (#40) completo:** 3.403 reemplazos en toda la app, con el mismo valor exacto —
+ni un pixel distinto— más 46 fallbacks anidados simplificados. El test recorre ahora todos los
+componentes: el gris de la app se cambia en un solo lugar y no puede volver un hexadecimal a
+mano.
+
 ## Agosto 2026 (l) — los informes dicen a quién le hablan
 
 El problema no era que faltaran columnas: los informes estaban armados **por entidad** y no

@@ -284,15 +284,15 @@ onMounted(async () => {
 .dd__reserva {
   display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
   padding: var(--sp-3) var(--sp-4); border-radius: var(--r-md);
-  background: var(--c-paper, #fff); border: 1px solid var(--c-ink-100, #e2e8f0);
+  background: var(--c-paper, #fff); border: 1px solid var(--c-slate-200);
   text-decoration: none; color: inherit; transition: border-color .15s, box-shadow .15s;
 }
 .dd__reserva:hover { border-color: var(--c-leaf-400, #86efac); box-shadow: 0 1px 6px rgba(0,0,0,.06); }
 .dd__reserva--vencida { border-left: 3px solid #ef4444; }
-.dd__reserva-nombre { font-weight: 700; color: var(--c-ink-900, #0f172a); font-size: var(--fs-14); }
-.dd__reserva-prod { font-size: var(--fs-13); color: var(--c-ink-500, #64748b); margin-top: 1px; }
+.dd__reserva-nombre { font-weight: 700; color: var(--c-slate-900); font-size: var(--fs-14); }
+.dd__reserva-prod { font-size: var(--fs-13); color: var(--c-slate-500); margin-top: 1px; }
 .dd__reserva-side { text-align: right; white-space: nowrap; }
-.dd__reserva-fecha { font-size: var(--fs-13); font-weight: 600; color: var(--c-ink-700, #334155); }
+.dd__reserva-fecha { font-size: var(--fs-13); font-weight: 600; color: var(--c-slate-700); }
 .dd__reserva-fecha--vencida { color: #dc2626; }
 .dd__reserva-resta { font-size: var(--fs-12); color: #b45309; margin-top: 1px; }
 .dd__reserva-pago { font-size: var(--fs-12); color: #15803d; margin-top: 1px; }

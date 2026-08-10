@@ -126,7 +126,7 @@ function openPicker() {
 .adp__btn {
   position: absolute; right: .4rem; top: 50%; transform: translateY(-50%);
   background: none; border: none; cursor: pointer;
-  color: #94a3b8; font-size: .9rem; padding: .25rem .35rem; line-height: 1;
+  color: var(--c-slate-400); font-size: .9rem; padding: .25rem .35rem; line-height: 1;
 }
 .adp__btn:hover:not(:disabled) { color: #1b5e20; }
 .adp__btn:disabled { cursor: not-allowed; }

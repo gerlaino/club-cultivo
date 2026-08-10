@@ -524,7 +524,7 @@ async function guardar() {
 .mt-close {
   background: #f1f5f1; border: none; width: 30px; height: 30px;
   border-radius: 8px; cursor: pointer; display: flex;
-  align-items: center; justify-content: center; color: #64748b;
+  align-items: center; justify-content: center; color: var(--c-slate-500);
   font-size: .8rem; flex-shrink: 0; transition: all .15s;
 }
 .mt-close:hover { background: #c8e6c9; color: #1b5e20; }
@@ -542,8 +542,8 @@ async function guardar() {
   width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
   font-size: .72rem; font-weight: 800;
-  background: #f1f5f1; color: #94a3b8;
-  border: 1.5px solid #e2e8f0; transition: all .2s;
+  background: #f1f5f1; color: var(--c-slate-400);
+  border: 1.5px solid var(--c-slate-200); transition: all .2s;
 }
 .mt-step--active .mt-step-dot {
   background: #1b5e20; color: #fff; border-color: #1b5e20;
@@ -553,13 +553,13 @@ async function guardar() {
   background: #e8f5e9; color: #1b5e20; border-color: #a5d6a7;
 }
 .mt-step-lbl {
-  font-size: .72rem; font-weight: 600; color: #94a3b8; white-space: nowrap;
+  font-size: .72rem; font-weight: 600; color: var(--c-slate-400); white-space: nowrap;
   transition: color .2s;
 }
 .mt-step--active .mt-step-lbl { color: #1b5e20; font-weight: 700; }
 .mt-step--done .mt-step-lbl { color: #4caf50; }
 .mt-step-line {
-  flex: 1; height: 2px; background: #e2e8f0; margin: 0 .5rem; min-width: 20px;
+  flex: 1; height: 2px; background: var(--c-slate-200); margin: 0 .5rem; min-width: 20px;
   transition: background .2s;
 }
 .mt-step-line--done { background: #a5d6a7; }
@@ -578,8 +578,8 @@ async function guardar() {
 /* ── Fields ── */
 .mt-field { display: flex; flex-direction: column; gap: .4rem; }
 .mt-label { font-size: .7rem; font-weight: 700; color: #60725d; text-transform: uppercase; letter-spacing: .05em; }
-.mt-opt   { font-size: .67rem; font-weight: 400; color: #94a3b8; text-transform: none; letter-spacing: 0; }
-.mt-hint  { font-size: .72rem; color: #94a3b8; margin: 0; }
+.mt-opt   { font-size: .67rem; font-weight: 400; color: var(--c-slate-400); text-transform: none; letter-spacing: 0; }
+.mt-hint  { font-size: .72rem; color: var(--c-slate-400); margin: 0; }
 .mt-row   { display: grid; grid-template-columns: 1fr 1fr; gap: .85rem; }
 @media (max-width: 440px) { .mt-row { grid-template-columns: 1fr; } }
 
@@ -628,7 +628,7 @@ async function guardar() {
 /* ── Divider ── */
 .mt-divider { display: flex; align-items: center; gap: .75rem; }
 .mt-divider::before, .mt-divider::after { content: ''; flex: 1; height: 1px; background: #e8f0e9; }
-.mt-divider span { font-size: .65rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .07em; white-space: nowrap; }
+.mt-divider span { font-size: .65rem; font-weight: 700; color: var(--c-slate-400); text-transform: uppercase; letter-spacing: .07em; white-space: nowrap; }
 
 /* ── Info box ── */
 .mt-info-box { display: flex; align-items: center; gap: .6rem; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; padding: .75rem 1rem; border-radius: 10px; font-size: .82rem; }
@@ -640,7 +640,7 @@ async function guardar() {
 }
 .mt-search__ico {
   position: absolute; left: .8rem; top: 50%; transform: translateY(-50%);
-  color: #94a3b8; font-size: .8rem; pointer-events: none;
+  color: var(--c-slate-400); font-size: .8rem; pointer-events: none;
 }
 .mt-search__input {
   width: 100%; box-sizing: border-box;
@@ -649,13 +649,13 @@ async function guardar() {
   outline: none; transition: border .15s, background .15s;
 }
 .mt-search__input:focus { border-color: #1b5e20; background: #fff; }
-.mt-search__input::placeholder { color: #94a3b8; }
+.mt-search__input::placeholder { color: var(--c-slate-400); }
 
 /* ── Asignación (step 1) ── */
 .mt-asign-list { display: flex; flex-direction: column; gap: .4rem; }
 .mt-asign-card {
   display: flex; align-items: center; gap: .75rem;
-  padding: .7rem 1rem; border: 1.5px solid #e2e8f0;
+  padding: .7rem 1rem; border: 1.5px solid var(--c-slate-200);
   border-radius: 12px; cursor: pointer; transition: all .15s; background: #fafbfc;
 }
 .mt-asign-card:hover { border-color: #c8e6c9; background: #f0fdf4; }
@@ -665,10 +665,10 @@ async function guardar() {
   display: flex; align-items: center; justify-content: center;
   color: #fff; font-size: .78rem; font-weight: 800;
 }
-.mt-asign-avatar--none { background: #e2e8f0; color: #94a3b8; font-size: 1rem; }
+.mt-asign-avatar--none { background: var(--c-slate-200); color: var(--c-slate-400); font-size: 1rem; }
 .mt-asign-info { flex: 1; min-width: 0; }
-.mt-asign-nombre { font-size: .875rem; font-weight: 600; color: #0f172a; }
-.mt-asign-rol    { font-size: .7rem; color: #64748b; text-transform: capitalize; }
+.mt-asign-nombre { font-size: .875rem; font-weight: 600; color: var(--c-slate-900); }
+.mt-asign-rol    { font-size: .7rem; color: var(--c-slate-500); text-transform: capitalize; }
 .mt-asign-check {
   width: 22px; height: 22px; border-radius: 50%; background: #1b5e20;
   color: #fff; display: flex; align-items: center; justify-content: center;
@@ -683,10 +683,10 @@ async function guardar() {
   cursor: pointer; width: 100%; transition: all .15s;
 }
 .mt-sala-toggle:hover { background: #f0fdf4; border-color: #66bb6a; }
-.mt-sala-toggle__opt { font-size: .67rem; font-weight: 400; color: #94a3b8; }
+.mt-sala-toggle__opt { font-size: .67rem; font-weight: 400; color: var(--c-slate-400); }
 .mt-sala-quitar {
   background: none; border: none; padding: 0; margin-left: auto;
-  font-size: .65rem; font-weight: 600; color: #94a3b8; cursor: pointer;
+  font-size: .65rem; font-weight: 600; color: var(--c-slate-400); cursor: pointer;
   text-transform: uppercase; letter-spacing: .04em;
 }
 .mt-sala-quitar:hover { color: #dc2626; }
@@ -719,7 +719,7 @@ async function guardar() {
 .mt-dia-btn {
   width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
   border: 1.5px solid #d4e6d4; background: #f4f8f4;
-  font-size: .75rem; font-weight: 700; color: #94a3b8;
+  font-size: .75rem; font-weight: 700; color: var(--c-slate-400);
   cursor: pointer; transition: all .15s;
   display: flex; align-items: center; justify-content: center;
 }

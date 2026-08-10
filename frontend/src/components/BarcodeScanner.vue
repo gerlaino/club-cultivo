@@ -69,10 +69,10 @@ onBeforeUnmount(() => { try { controls?.stop() } catch { /* noop */ } })
 
 <style scoped>
 .bcs { position: fixed; inset: 0; background: rgb(15 23 42 / .75); backdrop-filter: blur(3px); display: grid; place-items: center; z-index: 1200; padding: 1rem; }
-.bcs__box { background: #0f172a; border-radius: 16px; width: 100%; max-width: 420px; overflow: hidden; box-shadow: 0 20px 50px rgb(0 0 0 / .4); }
+.bcs__box { background: var(--c-slate-900); border-radius: 16px; width: 100%; max-width: 420px; overflow: hidden; box-shadow: 0 20px 50px rgb(0 0 0 / .4); }
 .bcs__head { display: flex; align-items: center; justify-content: space-between; padding: .9rem 1.1rem; color: #fff; }
 .bcs__title { font-size: .95rem; font-weight: 700; }
-.bcs__x { background: none; border: none; color: #cbd5e1; font-size: 1.6rem; line-height: 1; cursor: pointer; padding: 0 .3rem; }
+.bcs__x { background: none; border: none; color: var(--c-slate-300); font-size: 1.6rem; line-height: 1; cursor: pointer; padding: 0 .3rem; }
 .bcs__x:hover { color: #fff; }
 .bcs__viewport { position: relative; aspect-ratio: 4 / 3; background: #000; display: grid; place-items: center; }
 .bcs__video { width: 100%; height: 100%; object-fit: cover; }
@@ -83,5 +83,5 @@ onBeforeUnmount(() => { try { controls?.stop() } catch { /* noop */ } })
 .bcs__frame span:nth-child(3) { bottom: 0; left: 0; border-right: none; border-top: none; }
 .bcs__frame span:nth-child(4) { bottom: 0; right: 0; border-left: none; border-top: none; }
 .bcs__error { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; color: #fca5a5; font-size: .88rem; padding: 1.5rem; }
-.bcs__hint { color: #94a3b8; font-size: .76rem; margin: 0; padding: .8rem 1.1rem 1rem; line-height: 1.45; }
+.bcs__hint { color: var(--c-slate-400); font-size: .76rem; margin: 0; padding: .8rem 1.1rem 1rem; line-height: 1.45; }
 </style>

@@ -194,3 +194,56 @@ namespace :suites do
     end
   end
 end
+
+namespace :dispensaciones do
+  # Arrastre del placeholder 'mixto'.
+  #
+  # Hasta el fix, tanto la creación de dispensaciones como la entrega de reservas nacían con
+  # `medio_pago: 'mixto'` "que los cobros afinan". En contra entrega no hay cobros al crear
+  # —los hace el delivery después— así que el placeholder quedaba como valor final: toda
+  # entrega a domicilio figuraba como pago mixto sin haberse pagado de dos formas.
+  #
+  # Esta tarea recalcula esos registros a partir de sus COBROS REALES, con el mismo criterio
+  # que `afinar_medio_pago!`: un solo medio → ese medio; dos o más distintos → mixto de verdad;
+  # sin cobros → no se toca (no hay información para decidir, y adivinar sería peor).
+  #
+  #   bundle exec rake dispensaciones:recalcular_medio_pago SIMULAR=1
+  #   bundle exec rake dispensaciones:recalcular_medio_pago
+  desc 'Recalcula el medio de pago de las dispensaciones marcadas "mixto" sin serlo'
+  task recalcular_medio_pago: :environment do
+    simular = ENV['SIMULAR'].present?
+
+    ActsAsTenant.without_tenant do
+      candidatas = Dispensacion.unscoped.where(medio_pago: 'mixto')
+      corregidas = 0
+      sin_datos  = 0
+
+      candidatas.find_each do |d|
+        medios = d.cobros.pluck(:medio).uniq
+
+        if medios.empty?
+          # Sin cobros no se puede deducir nada. Si es contra entrega y todavía no se cobró,
+          # 'efectivo' es lo que asume el alta nueva; si no, se deja como está y se cuenta.
+          if d.cobrar_en_entrega?
+            puts "  #{simular ? '[simulado] ' : ''}##{d.id} contra entrega sin cobrar → efectivo"
+            d.update_columns(medio_pago: 'efectivo') unless simular
+            corregidas += 1
+          else
+            sin_datos += 1
+          end
+          next
+        end
+
+        next if medios.size > 1   # mixto de verdad: dos medios distintos
+
+        puts "  #{simular ? '[simulado] ' : ''}##{d.id} → #{medios.first}"
+        d.update_columns(medio_pago: medios.first) unless simular
+        corregidas += 1
+      end
+
+      puts "\nMarcadas 'mixto': #{candidatas.count}"
+      puts "Corregidas: #{corregidas}#{simular ? ' (simulado)' : ''}"
+      puts "Sin cobros y sin contra entrega (se dejan como están): #{sin_datos}" if sin_datos.positive?
+    end
+  end
+end

@@ -785,18 +785,18 @@ onMounted(async () => {
 .cvd__panel-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 1040; display: flex; justify-content: flex-end; }
 .cvd__panel { width: min(420px, 100vw); height: 100%; background: #fff; display: flex; flex-direction: column; box-shadow: -8px 0 32px rgba(0,0,0,.12); animation: cvd-slide .2s ease; }
 @keyframes cvd-slide { from { transform: translateX(100%); } to { transform: translateX(0); } }
-.cvd__panel-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem; border-bottom: 1px solid #f1f5f9; }
+.cvd__panel-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--c-slate-100); }
 .cvd__panel-title  { font-size: .95rem; font-weight: 700; margin: 0; }
-.cvd__panel-close  { background: #f1f5f9; border: none; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: #64748b; }
-.cvd__panel-close:hover { background: #e2e8f0; }
+.cvd__panel-close  { background: var(--c-slate-100); border: none; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; color: var(--c-slate-500); }
+.cvd__panel-close:hover { background: var(--c-slate-200); }
 .cvd__panel-body { padding: 1.5rem; flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 1rem; }
 .cvd__tipo-pill { display: inline-flex; align-items: center; gap: .35rem; background: #e8f5e9; color: #1b5e20; font-size: .75rem; font-weight: 700; padding: .25em .75em; border-radius: 6px; }
-.cvd__panel-nombre { font-size: 1.15rem; font-weight: 800; color: #0f172a; margin: 0; letter-spacing: -.03em; }
-.cvd__panel-desc   { font-size: .85rem; color: #64748b; margin: 0; line-height: 1.6; }
-.cvd__panel-info   { border: 1px solid #f1f5f9; border-radius: 10px; overflow: hidden; }
-.cvd__panel-row    { display: flex; justify-content: space-between; align-items: center; padding: .65rem 1rem; border-bottom: 1px solid #f8fafc; font-size: .82rem; }
+.cvd__panel-nombre { font-size: 1.15rem; font-weight: 800; color: var(--c-slate-900); margin: 0; letter-spacing: -.03em; }
+.cvd__panel-desc   { font-size: .85rem; color: var(--c-slate-500); margin: 0; line-height: 1.6; }
+.cvd__panel-info   { border: 1px solid var(--c-slate-100); border-radius: 10px; overflow: hidden; }
+.cvd__panel-row    { display: flex; justify-content: space-between; align-items: center; padding: .65rem 1rem; border-bottom: 1px solid var(--c-slate-50); font-size: .82rem; }
 .cvd__panel-row:last-child { border-bottom: none; }
-.cvd__panel-key    { color: #94a3b8; font-size: .72rem; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
+.cvd__panel-key    { color: var(--c-slate-400); font-size: .72rem; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
 .cvd__panel-link   { color: #1b5e20; text-decoration: none; font-weight: 600; }
 .cvd__estado-pill  { font-size: .7rem; font-weight: 700; padding: .2em .65em; border-radius: 6px; text-transform: capitalize; }
 .cvd__panel-actions { display: flex; flex-direction: column; gap: .5rem; padding-top: .5rem; }
@@ -804,9 +804,9 @@ onMounted(async () => {
 .cvd__panel-btn:disabled { opacity: .6; cursor: not-allowed; }
 .cvd__panel-btn--primary { background: #1b5e20; color: #fff; }
 .cvd__panel-btn--primary:not(:disabled):hover { background: #144a18; }
-.cvd__panel-btn--ghost { background: #f8fafc; color: #475569; border: 1.5px solid #e2e8f0; }
-.cvd__panel-btn--ghost:not(:disabled):hover { background: #e2e8f0; }
-.cvd__futura-hint { display: flex; align-items: center; gap: .4rem; font-size: .8rem; color: #64748b; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: .55rem .875rem; margin: 0; }
+.cvd__panel-btn--ghost { background: var(--c-slate-50); color: var(--c-slate-600); border: 1.5px solid var(--c-slate-200); }
+.cvd__panel-btn--ghost:not(:disabled):hover { background: var(--c-slate-200); }
+.cvd__futura-hint { display: flex; align-items: center; gap: .4rem; font-size: .8rem; color: var(--c-slate-500); background: var(--c-slate-50); border: 1px solid var(--c-slate-200); border-radius: 8px; padding: .55rem .875rem; margin: 0; }
 
 /* Tareas de hoy */
 .cvd__hoy-wrap { background: #fff; border: 1.5px solid #e8f0e9; border-radius: 12px; padding: .75rem 1rem; display: flex; flex-direction: column; gap: .6rem; }

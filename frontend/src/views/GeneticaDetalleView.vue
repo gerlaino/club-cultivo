@@ -587,17 +587,17 @@ function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
 .gdv__badges    { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .5rem; }
 .gdv__badge { display: inline-flex; align-items: center; padding: .2rem .6rem; border-radius: 99px; font-size: .75rem; font-weight: 600; }
 .gdv__badge--inase { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
-.gdv__badge--muted  { background: #f1f5f9; color: #64748b; border: 1px solid #e2e8f0; }
-.gdv__nombre { font-size: 1.75rem; font-weight: 800; color: #0f172a; margin: 0 0 .25rem; }
-.gdv__sub    { font-size: .82rem; color: #64748b; display: flex; gap: .4rem; flex-wrap: wrap; }
+.gdv__badge--muted  { background: var(--c-slate-100); color: var(--c-slate-500); border: 1px solid var(--c-slate-200); }
+.gdv__nombre { font-size: 1.75rem; font-weight: 800; color: var(--c-slate-900); margin: 0 0 .25rem; }
+.gdv__sub    { font-size: .82rem; color: var(--c-slate-500); display: flex; gap: .4rem; flex-wrap: wrap; }
 .gdv__sub i  { font-size: .75rem; }
 .gdv__btn-editar { display: inline-flex; align-items: center; gap: .4rem; background: #15803d; color: #fff; border: none; border-radius: 9px; padding: .5rem .95rem; font-size: .85rem; font-weight: 700; cursor: pointer; transition: background .15s; white-space: nowrap; align-self: flex-start; }
 .gdv__btn-editar:hover { background: #166534; }
 
 .gdv__hero-actions { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
 .gdv__btn { display: inline-flex; align-items: center; gap: .4rem; padding: .5rem .9rem; border-radius: 8px; font-size: .82rem; font-weight: 600; cursor: pointer; border: 1.5px solid; transition: all .15s; white-space: nowrap; }
-.gdv__btn--ghost   { background: #fff; border-color: #e2e8f0; color: #374151; }
-.gdv__btn--ghost:hover:not(:disabled) { background: #f8fafc; }
+.gdv__btn--ghost   { background: #fff; border-color: var(--c-slate-200); color: #374151; }
+.gdv__btn--ghost:hover:not(:disabled) { background: var(--c-slate-50); }
 .gdv__btn:disabled { opacity: .6; cursor: not-allowed; }
 .gdv__btn-label    { display: none; }
 @media (min-width: 480px) { .gdv__btn-label { display: inline; } }
@@ -605,10 +605,10 @@ function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
 /* Dropdown */
 .gdv__dropdown { position: relative; }
 .gdv__dropdown-arrow { font-size: .7rem; }
-.gdv__dropdown-menu { position: absolute; right: 0; top: calc(100% + .35rem); background: #fff; border: 1.5px solid #e2e8f0; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.1); min-width: 180px; z-index: 100; padding: .3rem; }
+.gdv__dropdown-menu { position: absolute; right: 0; top: calc(100% + .35rem); background: #fff; border: 1.5px solid var(--c-slate-200); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.1); min-width: 180px; z-index: 100; padding: .3rem; }
 .gdv__dropdown-item { display: flex; align-items: center; gap: .5rem; padding: .5rem .75rem; font-size: .82rem; color: #374151; cursor: pointer; border-radius: 7px; text-decoration: none; background: none; border: none; width: 100%; transition: background .1s; }
-.gdv__dropdown-item:hover { background: #f8fafc; }
-.gdv__dropdown-sep { height: 1px; background: #f1f5f9; margin: .25rem 0; }
+.gdv__dropdown-item:hover { background: var(--c-slate-50); }
+.gdv__dropdown-sep { height: 1px; background: var(--c-slate-100); margin: .25rem 0; }
 
 .gdv__kpi-row { margin-top: 1rem; }
 
@@ -617,13 +617,13 @@ function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
 @media (max-width: 900px) { .gdv__body { grid-template-columns: 1fr; } }
 
 /* Cards */
-.gdv__card { background: #fff; border: 1.5px solid #e2e8f0; border-radius: 14px; padding: 1.25rem; }
+.gdv__card { background: #fff; border: 1.5px solid var(--c-slate-200); border-radius: 14px; padding: 1.25rem; }
 .gdv__card--mb { margin-bottom: 1rem; }
 .gdv__card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: .875rem; }
 .gdv__section-mb0 { margin-bottom: 0; }
-.gdv__count-badge { background: #f1f5f9; color: #64748b; padding: .15rem .55rem; border-radius: 99px; font-size: .75rem; font-weight: 600; }
-.gdv__desc { color: #475569; line-height: 1.65; margin: 0; font-size: .9rem; }
-.gdv__empty-note { color: #94a3b8; font-size: .82rem; font-style: italic; }
+.gdv__count-badge { background: var(--c-slate-100); color: var(--c-slate-500); padding: .15rem .55rem; border-radius: 99px; font-size: .75rem; font-weight: 600; }
+.gdv__desc { color: var(--c-slate-600); line-height: 1.65; margin: 0; font-size: .9rem; }
+.gdv__empty-note { color: var(--c-slate-400); font-size: .82rem; font-style: italic; }
 .gdv__terpenos { display: flex; flex-wrap: wrap; gap: .4rem; }
 
 /* Hero */
@@ -635,7 +635,7 @@ function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
 .kpi-row { display: flex; flex-wrap: wrap; gap: .75rem; }
 .kpi-cell { flex: 1 1 90px; background: #f8f9fa; border-radius: .75rem; padding: .5rem .875rem; min-width: 70px; }
 .kpi-cell__label { font-size: .65rem; text-transform: uppercase; letter-spacing: .06em; color: #6c757d; margin-bottom: .1rem; }
-.kpi-cell__value { font-size: 1.15rem; font-weight: 800; color: #0f172a; line-height: 1; }
+.kpi-cell__value { font-size: 1.15rem; font-weight: 800; color: var(--c-slate-900); line-height: 1; }
 .gdv__completar { background: #f0fdf4; border: 1px dashed #86efac; color: #15803d; font-size: .68rem; font-weight: 700; border-radius: 6px; padding: .15em .5em; cursor: pointer; }
 .gdv__completar:hover { background: #dcfce7; }
 
@@ -647,7 +647,7 @@ function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
 .dato-item { display: flex; align-items: center; gap: .65rem; background: #f8f9fa; border-radius: .6rem; padding: .6rem .875rem; flex: 1 1 140px; }
 .dato-item__icon  { font-size: 1.25rem; flex-shrink: 0; }
 .dato-item__label { font-size: .65rem; text-transform: uppercase; letter-spacing: .06em; color: #6c757d; line-height: 1.2; }
-.dato-item__val   { font-size: .875rem; font-weight: 600; color: #0f172a; }
+.dato-item__val   { font-size: .875rem; font-weight: 600; color: var(--c-slate-900); }
 
 /* Terpenos */
 .terpeno-chip { padding: .3rem .75rem; background: rgba(27,94,32,.1); color: #16a34a; border-radius: 999px; font-size: .8rem; font-weight: 600; border: 1px solid rgba(27,94,32,.2); }
@@ -658,7 +658,7 @@ function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
 .gdv__table thead th { padding: .5rem .75rem; text-align: left; font-size: .65rem; text-transform: uppercase; letter-spacing: .06em; color: #6c757d; font-weight: 600; border-bottom: 2px solid #e5e7eb; white-space: nowrap; }
 .gdv__table tbody tr { border-bottom: 1px solid #f3f4f6; transition: background .1s; }
 .gdv__table tbody tr:last-child { border-bottom: none; }
-.gdv__table tbody tr:hover { background: #f8fafc; }
+.gdv__table tbody tr:hover { background: var(--c-slate-50); }
 .gdv__table td { padding: .55rem .75rem; vertical-align: middle; }
 .gdv__col-md { display: none; }
 @media (min-width: 640px) { .gdv__col-md { display: table-cell; } }
@@ -682,27 +682,27 @@ function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
 
 /* Rendimiento real */
 .rend-stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: .75rem; margin-top: .5rem; }
-.rend-stat { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: .75rem; text-align: center; }
-.rend-stat__label { font-size: .68rem; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: .04em; margin-bottom: .3rem; }
-.rend-stat__value { font-size: 1.4rem; font-weight: 800; color: #0f172a; letter-spacing: -.04em; line-height: 1; }
+.rend-stat { background: var(--c-slate-50); border: 1.5px solid var(--c-slate-200); border-radius: 10px; padding: .75rem; text-align: center; }
+.rend-stat__label { font-size: .68rem; font-weight: 700; color: var(--c-slate-400); text-transform: uppercase; letter-spacing: .04em; margin-bottom: .3rem; }
+.rend-stat__value { font-size: 1.4rem; font-weight: 800; color: var(--c-slate-900); letter-spacing: -.04em; line-height: 1; }
 .rend-stat__value--main { color: #16a34a; }
-.rend-stat__unit { font-size: .62rem; font-weight: 500; color: #94a3b8; margin-left: .15rem; }
+.rend-stat__unit { font-size: .62rem; font-weight: 500; color: var(--c-slate-400); margin-left: .15rem; }
 
 /* Configuración card */
 .gdv__config { display: flex; flex-direction: column; gap: .5rem; font-size: .82rem; }
 .gdv__config-row { display: flex; justify-content: space-between; align-items: center; }
-.gdv__config-row--muted { color: #64748b; }
-.gdv__config-label { color: #64748b; }
+.gdv__config-row--muted { color: var(--c-slate-500); }
+.gdv__config-label { color: var(--c-slate-500); }
 .gdv__config-badge { display: inline-block; padding: .15rem .55rem; border-radius: 99px; font-size: .75rem; font-weight: 600; }
-.gdv__config-code  { font-size: .75rem; color: #94a3b8; font-family: monospace; }
-.gdv__config-sep   { height: 1px; background: #f1f5f9; margin: .25rem 0; }
+.gdv__config-code  { font-size: .75rem; color: var(--c-slate-400); font-family: monospace; }
+.gdv__config-sep   { height: 1px; background: var(--c-slate-100); margin: .25rem 0; }
 .gdv__toggle-sm { font-size: .72rem; font-weight: 600; padding: .2em .65em; border-radius: 6px; border: 1.5px solid; cursor: pointer; transition: all .15s; }
 .gdv__toggle-sm--on  { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
-.gdv__toggle-sm--off { background: #f8fafc; color: #94a3b8; border-color: #e2e8f0; }
+.gdv__toggle-sm--off { background: var(--c-slate-50); color: var(--c-slate-400); border-color: var(--c-slate-200); }
 .gdv__toggle-sm:disabled { opacity: .6; cursor: not-allowed; }
 
 /* Sparkline */
-.gdv__sparkline-wrap { height: 120px; margin-top: 1rem; border-top: 1px solid #f1f5f9; padding-top: .75rem; }
+.gdv__sparkline-wrap { height: 120px; margin-top: 1rem; border-top: 1px solid var(--c-slate-100); padding-top: .75rem; }
 
 /* Desvío en tabla */
 .gdv__desv { font-size: .76rem; font-weight: 700; }
@@ -715,7 +715,7 @@ function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
 .gdv__resena-top { display: flex; align-items: center; justify-content: space-between; gap: .6rem; flex-wrap: wrap; }
 .gdv__resena-stars { color: #f5a623; font-size: 1rem; letter-spacing: 1px; }
 .gdv__resena-stars-off { color: #dfe5df; }
-.gdv__resena-meta { font-size: .72rem; color: #94a3b8; font-weight: 600; }
+.gdv__resena-meta { font-size: .72rem; color: var(--c-slate-400); font-weight: 600; }
 .gdv__resena-axes { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: .3rem; font-size: .72rem; color: #56635b; font-weight: 600; }
 .gdv__resena-com { margin: .35rem 0 0; font-size: .84rem; color: #374151; font-style: italic; line-height: 1.45; }
 </style>

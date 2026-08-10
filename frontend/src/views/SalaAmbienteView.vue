@@ -512,11 +512,11 @@ watch(seccionActiva, (val) => {
 .sav__card-body { padding: 1rem; }
 
 .sav__lecturas-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: .75rem; }
-.sav__lectura-item { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: .7rem; }
-.sav__lectura-tipo { font-size: .7rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: .04em; margin-bottom: .25rem; }
+.sav__lectura-item { background: var(--c-slate-50); border: 1px solid var(--c-slate-200); border-radius: 10px; padding: .7rem; }
+.sav__lectura-tipo { font-size: .7rem; font-weight: 700; color: var(--c-slate-500); text-transform: uppercase; letter-spacing: .04em; margin-bottom: .25rem; }
 .sav__lectura-valor { font-size: 1.3rem; font-weight: 800; letter-spacing: -.03em; color: #1a1a1a; }
-.sav__lectura-unit { font-size: .72rem; font-weight: 500; color: #94a3b8; margin-left: .1rem; }
-.sav__lectura-time { font-size: .65rem; color: #94a3b8; margin-top: .2rem; }
+.sav__lectura-unit { font-size: .72rem; font-weight: 500; color: var(--c-slate-400); margin-left: .1rem; }
+.sav__lectura-time { font-size: .65rem; color: var(--c-slate-400); margin-top: .2rem; }
 
 .sav__chart-controls {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
@@ -540,8 +540,8 @@ watch(seccionActiva, (val) => {
 .sav__ok-msg { background: #f0fdf4; border: 1px solid #d4e6d4; color: #15803d; }
 
 .sav__alertas-list { display: flex; flex-direction: column; gap: .6rem; }
-.sav__empty { color: #94a3b8; font-size: .82rem; grid-column: 1/-1; }
-.sav__empty--center { text-align: center; padding: 2rem 1rem; background: #f8fafc; border-radius: 10px; grid-column: unset; }
+.sav__empty { color: var(--c-slate-400); font-size: .82rem; grid-column: 1/-1; }
+.sav__empty--center { text-align: center; padding: 2rem 1rem; background: var(--c-slate-50); border-radius: 10px; grid-column: unset; }
 
 /* Live dot */
 .sav__title-row { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
@@ -551,27 +551,27 @@ watch(seccionActiva, (val) => {
 }
 
 /* Tendencia */
-.sav__hist-loading { color: #94a3b8; font-size: .82rem; padding: 2rem; text-align: center; }
-.sav__hist-info { font-size: .72rem; color: #94a3b8; margin-top: .6rem; text-align: center; }
+.sav__hist-loading { color: var(--c-slate-400); font-size: .82rem; padding: 2rem; text-align: center; }
+.sav__hist-info { font-size: .72rem; color: var(--c-slate-400); margin-top: .6rem; text-align: center; }
 
-.sav__vpd-nota { display: flex; gap: .55rem; align-items: flex-start; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: .7rem .9rem; margin-bottom: 1rem; font-size: .8rem; color: #475569; line-height: 1.5; }
-.sav__vpd-nota > i { color: #64748b; margin-top: .1rem; }
+.sav__vpd-nota { display: flex; gap: .55rem; align-items: flex-start; background: var(--c-slate-50); border: 1px solid var(--c-slate-200); border-radius: 10px; padding: .7rem .9rem; margin-bottom: 1rem; font-size: .8rem; color: var(--c-slate-600); line-height: 1.5; }
+.sav__vpd-nota > i { color: var(--c-slate-500); margin-top: .1rem; }
 .sav__vpd-link { color: #15803d; font-weight: 600; }
 
 /* Sensores de la sala */
-.sav__sensor { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .85rem 1rem; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: .6rem; background: #fff; flex-wrap: wrap; }
+.sav__sensor { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .85rem 1rem; border: 1px solid var(--c-slate-200); border-radius: 10px; margin-bottom: .6rem; background: #fff; flex-wrap: wrap; }
 .sav__sensor-main { display: flex; flex-direction: column; gap: .15rem; }
-.sav__sensor-nombre { font-weight: 700; color: #0f172a; font-size: .9rem; }
-.sav__sensor-tipo { font-size: .75rem; color: #64748b; }
+.sav__sensor-nombre { font-weight: 700; color: var(--c-slate-900); font-size: .9rem; }
+.sav__sensor-tipo { font-size: .75rem; color: var(--c-slate-500); }
 .sav__sensor-estado { font-size: .75rem; padding: .2em .6em; border-radius: 999px; font-weight: 600; }
 .sav__sensor-estado--ok { background: #f0fdf4; color: #15803d; }
 .sav__sensor-estado--mudo { background: #fef3c7; color: #92400e; }
 .sav__sensor-link { display: inline-block; margin-top: .5rem; font-size: .8rem; color: #15803d; text-decoration: none; font-weight: 600; }
 .sav__sensor-link:hover { text-decoration: underline; }
 .sav__sensor-vacio { text-align: center; padding: 2.5rem 1.5rem; }
-.sav__sensor-vacio-ico { font-size: 2rem; color: #cbd5e1; }
-.sav__sensor-vacio-tit { font-size: 1rem; font-weight: 700; color: #0f172a; margin: .75rem 0 .3rem; }
-.sav__sensor-vacio-sub { font-size: .85rem; color: #64748b; margin: 0 auto .25rem; max-width: 46ch; line-height: 1.5; }
+.sav__sensor-vacio-ico { font-size: 2rem; color: var(--c-slate-300); }
+.sav__sensor-vacio-tit { font-size: 1rem; font-weight: 700; color: var(--c-slate-900); margin: .75rem 0 .3rem; }
+.sav__sensor-vacio-sub { font-size: .85rem; color: var(--c-slate-500); margin: 0 auto .25rem; max-width: 46ch; line-height: 1.5; }
 .sav__sensor-cta { display: inline-flex; align-items: center; gap: .4rem; margin-top: 1rem; background: var(--c-role-admin, #1b5e20); color: #fff; padding: .6rem 1.2rem; border-radius: 10px; font-size: .875rem; font-weight: 600; text-decoration: none; }
 .sav__sensor-cta:hover { opacity: .92; }
 </style>

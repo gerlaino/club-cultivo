@@ -157,7 +157,7 @@ onMounted(() => cargarCostos())
 .lcc__gramos-estado { display: flex; align-items: center; gap: .45rem; padding: .5rem .65rem; border-radius: 8px; font-size: .78rem; }
 .lcc__gramos-estado--ok       { background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d; }
 .lcc__gramos-estado--pendiente { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
-.lcc__gramos-estado--vacio    { background: #f8fafc; border: 1px solid #e2e8f0; color: #94a3b8; }
+.lcc__gramos-estado--vacio    { background: var(--c-slate-50); border: 1px solid var(--c-slate-200); color: var(--c-slate-400); }
 .lcc__gramos-valor { font-weight: 800; font-size: .9rem; }
 .lcc__gramos-valor--muted { opacity: .7; }
 .lcc__gramos-desc { font-size: .72rem; flex: 1; }
@@ -174,12 +174,12 @@ onMounted(() => cargarCostos())
 .lcc__rend-ok { display: flex; align-items: center; gap: .45rem; padding: .5rem .65rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; font-size: .78rem; color: #15803d; font-weight: 600; }
 .lcc__rend-sub { font-weight: 400; color: #4ade80; font-size: .7rem; }
 .lcc__rend-pendiente { display: flex; align-items: center; gap: .45rem; padding: .5rem .65rem; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; font-size: .78rem; color: #92400e; }
-.lcc__rend-vacio { display: flex; align-items: center; gap: .45rem; padding: .5rem .65rem; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; font-size: .78rem; color: #94a3b8; }
+.lcc__rend-vacio { display: flex; align-items: center; gap: .45rem; padding: .5rem .65rem; background: var(--c-slate-50); border: 1px solid var(--c-slate-200); border-radius: 8px; font-size: .78rem; color: var(--c-slate-400); }
 
 .lcc__cpg-badge { display: flex; justify-content: space-between; align-items: center; margin: 0 1rem .9rem; padding: .5rem .75rem; background: linear-gradient(135deg, #f0fdf4, #dcfce7); border-radius: 8px; border: 1px solid #bbf7d0; }
 .lcc__cpg-label { font-size: .75rem; font-weight: 600; color: #15803d; }
 .lcc__cpg-value { font-family: monospace; font-size: .95rem; font-weight: 800; color: #15803d; }
-.lcc__empty { display: flex; flex-direction: column; align-items: center; gap: .4rem; padding: 1.2rem 1rem; color: #94a3b8; font-size: .8rem; }
+.lcc__empty { display: flex; flex-direction: column; align-items: center; gap: .4rem; padding: 1.2rem 1rem; color: var(--c-slate-400); font-size: .8rem; }
 .lcc__empty i { font-size: 1.4rem; }
 .lcc__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .5rem 1rem; border-radius: 8px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: background .15s; }
 .lcc__btn-primary:hover { background: #104417; }

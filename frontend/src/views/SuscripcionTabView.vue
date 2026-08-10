@@ -59,10 +59,10 @@ const planNombre = computed(() => {
 .sus__plan-nombre { font-size: 1.5rem; font-weight: 800; color: #0f2611; margin: 0; letter-spacing: -.03em; }
 .sus__plan-desc { font-size: .875rem; color: #60725d; margin: 0; line-height: 1.6; }
 
-.sus__specs { margin: 0; display: flex; flex-direction: column; border: 1px solid #f1f5f9; border-radius: 10px; overflow: hidden; }
-.sus__spec-row { display: flex; justify-content: space-between; align-items: center; padding: .65rem 1rem; border-bottom: 1px solid #f8fafc; font-size: .82rem; }
+.sus__specs { margin: 0; display: flex; flex-direction: column; border: 1px solid var(--c-slate-100); border-radius: 10px; overflow: hidden; }
+.sus__spec-row { display: flex; justify-content: space-between; align-items: center; padding: .65rem 1rem; border-bottom: 1px solid var(--c-slate-50); font-size: .82rem; }
 .sus__spec-row:last-child { border-bottom: none; }
-.sus__spec-key { color: #94a3b8; font-size: .72rem; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
+.sus__spec-key { color: var(--c-slate-400); font-size: .72rem; font-weight: 500; text-transform: uppercase; letter-spacing: .04em; }
 .sus__spec-val { color: #0f2611; font-weight: 600; }
 .sus__spec-val--green { color: #15803d; }
 

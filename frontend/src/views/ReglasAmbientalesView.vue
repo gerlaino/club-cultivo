@@ -306,11 +306,11 @@ function tipoLabel(v)      { return TIPOS.find(t => t.value === v)?.label || v }
 .rav__form-actions { display: flex; justify-content: flex-end; gap: .6rem; margin-top: 1rem; }
 .rav__alert { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .6rem .9rem; border-radius: 8px; font-size: .82rem; margin-bottom: .75rem; }
 
-.rav__loading { padding: 3rem; text-align: center; color: #94a3b8; }
+.rav__loading { padding: 3rem; text-align: center; color: var(--c-slate-400); }
 .rav__empty { text-align: center; padding: 4rem 1rem; }
 .rav__empty-icon { font-size: 3rem; margin-bottom: .75rem; }
 .rav__empty-title { font-size: 1rem; font-weight: 700; color: #1a1a1a; margin-bottom: .35rem; }
-.rav__empty-sub { font-size: .82rem; color: #94a3b8; }
+.rav__empty-sub { font-size: .82rem; color: var(--c-slate-400); }
 
 .rav__table-wrap { overflow-x: auto; }
 .rav__table { width: 100%; border-collapse: collapse; font-size: .82rem; }
@@ -329,12 +329,12 @@ function tipoLabel(v)      { return TIPOS.find(t => t.value === v)?.label || v }
   padding: .2em .55em; border-radius: 6px;
 }
 .rav__badge--green { background: #dcfce7; color: #15803d; }
-.rav__badge--gray  { background: #f1f5f9; color: #64748b; }
+.rav__badge--gray  { background: var(--c-slate-100); color: var(--c-slate-500); }
 
 .rav__td-actions { display: flex; gap: .35rem; }
 .rav__btn-sm {
-  width: 28px; height: 28px; border-radius: 6px; border: 1px solid #e2e8f0;
-  background: #f8fafc; color: #64748b; cursor: pointer;
+  width: 28px; height: 28px; border-radius: 6px; border: 1px solid var(--c-slate-200);
+  background: var(--c-slate-50); color: var(--c-slate-500); cursor: pointer;
   display: flex; align-items: center; justify-content: center; font-size: .8rem; transition: all .15s;
 }
 .rav__btn-sm:hover { background: #e8f5e9; color: #1b5e20; border-color: #d4e6d4; }

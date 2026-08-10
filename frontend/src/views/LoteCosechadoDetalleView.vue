@@ -290,9 +290,9 @@ onMounted(async () => {
 .lcd__ev-header { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; flex-wrap: wrap; margin-bottom: .2rem; }
 .lcd__ev-tipo { font-size: .8rem; font-weight: 600; color: #0f2611; }
 .lcd__ev-fecha { font-size: .72rem; color: #9ca3af; white-space: nowrap; }
-.lcd__ev-desc { font-size: .82rem; color: #475569; margin: 0 0 .2rem; line-height: 1.5; }
+.lcd__ev-desc { font-size: .82rem; color: var(--c-slate-600); margin: 0 0 .2rem; line-height: 1.5; }
 .lcd__ev-transicion { display: flex; align-items: center; gap: .4rem; font-size: .78rem; margin-bottom: .2rem; }
-.lcd__ev-estado { background: #f1f5f9; color: #475569; padding: .15em .5em; border-radius: 4px; font-weight: 600; }
+.lcd__ev-estado { background: var(--c-slate-100); color: var(--c-slate-600); padding: .15em .5em; border-radius: 4px; font-weight: 600; }
 .lcd__ev-estado--nuevo { background: #dcfce7; color: #14532d; }
 .lcd__ev-arrow { color: #9ca3af; }
 .lcd__ev-autor { font-size: .72rem; color: #9ca3af; margin: 0; }
@@ -311,7 +311,7 @@ onMounted(async () => {
 .lcd__tarea-estado { font-size: .68rem; font-weight: 700; padding: .2em .55em; border-radius: 999px; white-space: nowrap; flex-shrink: 0; align-self: center; }
 .lcd__tarea-estado--completada { background: #dcfce7; color: #14532d; }
 .lcd__tarea-estado--en_progreso { background: #fef3c7; color: #92400e; }
-.lcd__tarea-estado--pendiente   { background: #f1f5f9; color: #475569; }
+.lcd__tarea-estado--pendiente   { background: var(--c-slate-100); color: var(--c-slate-600); }
 .lcd__tarea-estado--cancelada   { background: #fef2f2; color: #991b1b; }
 
 /* Plantas */

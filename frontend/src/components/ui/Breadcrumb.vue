@@ -49,9 +49,9 @@ const visible  = computed(() => {
   padding: 0;
   font-size: .78rem;
 }
-.bc__link         { color: #94a3b8; text-decoration: none; transition: color .12s; }
+.bc__link         { color: var(--c-slate-400); text-decoration: none; transition: color .12s; }
 .bc__link:hover   { color: #1b5e20; }
 .bc__current      { color: #1a2e1a; font-weight: 600; }
-.bc__sep          { color: #cbd5e1; font-size: .7rem; }
-.bc__item--ellipsis { color: #94a3b8; }
+.bc__sep          { color: var(--c-slate-300); font-size: .7rem; }
+.bc__item--ellipsis { color: var(--c-slate-400); }
 </style>

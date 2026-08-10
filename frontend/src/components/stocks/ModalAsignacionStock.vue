@@ -151,41 +151,41 @@ function decidirDespues() {
 .mas__header {
   display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem;
   padding: 1.5rem 1.5rem 1rem;
-  border-bottom: 1px solid #f1f5f9;
+  border-bottom: 1px solid var(--c-slate-100);
 }
-.mas__title { font-size: 1.1rem; font-weight: 700; color: #0f172a; margin: 0; }
-.mas__subtitle { font-size: .8rem; color: #64748b; margin: .2rem 0 0; }
+.mas__title { font-size: 1.1rem; font-weight: 700; color: var(--c-slate-900); margin: 0; }
+.mas__subtitle { font-size: .8rem; color: var(--c-slate-500); margin: .2rem 0 0; }
 .mas__close {
-  background: none; border: none; cursor: pointer; color: #94a3b8;
+  background: none; border: none; cursor: pointer; color: var(--c-slate-400);
   font-size: 1rem; padding: .25rem; border-radius: 6px;
   transition: all .15s; flex-shrink: 0;
 }
-.mas__close:hover { background: #f1f5f9; color: #1e293b; }
+.mas__close:hover { background: var(--c-slate-100); color: #1e293b; }
 
 .mas__body { padding: 1rem 1.5rem; display: flex; flex-direction: column; gap: 1.25rem; }
 
 .mas__stock-item { display: flex; flex-direction: column; gap: .6rem; }
 .mas__stock-info { display: flex; align-items: center; gap: .6rem; }
-.mas__stock-lote { font-weight: 700; font-size: .875rem; color: #0f172a; }
-.mas__stock-detalle { font-size: .78rem; color: #64748b; background: #f1f5f9; padding: .15em .5em; border-radius: 5px; }
+.mas__stock-lote { font-weight: 700; font-size: .875rem; color: var(--c-slate-900); }
+.mas__stock-detalle { font-size: .78rem; color: var(--c-slate-500); background: var(--c-slate-100); padding: .15em .5em; border-radius: 5px; }
 
 .mas__opciones { display: flex; flex-direction: column; gap: .4rem; }
 .mas__opcion {
   display: flex; align-items: center; gap: .75rem;
   padding: .65rem .9rem;
-  border: 1.5px solid #e2e8f0;
+  border: 1.5px solid var(--c-slate-200);
   border-radius: 10px;
   cursor: pointer;
   transition: all .15s;
 }
 .mas__opcion input[type="radio"] { accent-color: #1a3d2e; flex-shrink: 0; }
-.mas__opcion:hover { border-color: #94a3b8; background: #f8fafc; }
+.mas__opcion:hover { border-color: var(--c-slate-400); background: var(--c-slate-50); }
 .mas__opcion--selected { border-color: #1a3d2e; background: #f0fdf4; }
 .mas__opcion--club { border-style: dashed; }
 .mas__opcion--club.mas__opcion--selected { border-color: #0369a1; background: #f0f9ff; border-style: solid; }
 .mas__opcion-body { display: flex; flex-direction: column; gap: .1rem; }
 .mas__opcion-nombre { font-size: .875rem; font-weight: 600; color: #1e293b; }
-.mas__opcion-tipo { font-size: .72rem; color: #64748b; }
+.mas__opcion-tipo { font-size: .72rem; color: var(--c-slate-500); }
 
 .mas__error {
   background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c;
@@ -195,14 +195,14 @@ function decidirDespues() {
 .mas__footer {
   display: flex; justify-content: flex-end; gap: .6rem;
   padding: 1rem 1.5rem;
-  border-top: 1px solid #f1f5f9;
+  border-top: 1px solid var(--c-slate-100);
 }
 .mas__btn-ghost {
-  background: none; border: 1.5px solid #e2e8f0; color: #64748b;
+  background: none; border: 1.5px solid var(--c-slate-200); color: var(--c-slate-500);
   padding: .6rem 1.1rem; border-radius: 9px; font-size: .875rem; font-weight: 500;
   cursor: pointer; transition: all .15s;
 }
-.mas__btn-ghost:hover:not(:disabled) { background: #f8fafc; color: #1e293b; }
+.mas__btn-ghost:hover:not(:disabled) { background: var(--c-slate-50); color: #1e293b; }
 .mas__btn-ghost:disabled { opacity: .5; cursor: not-allowed; }
 .mas__btn-primary {
   background: #1a3d2e; color: #fff;

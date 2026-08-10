@@ -211,7 +211,7 @@ function stageGradient(estado) {
 .slg__empty-sub   { font-size: .82rem; color: #9ca3af; margin: 0; }
 
 /* Camera */
-.slg__camera { border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; }
+.slg__camera { border-radius: 12px; overflow: hidden; border: 1px solid var(--c-slate-200); }
 .slg__camera-header {
   display: flex; align-items: center; gap: .5rem;
   padding: .55rem .875rem; background: #1a1f36; color: #fff;
@@ -223,9 +223,9 @@ function stageGradient(estado) {
 
 /* Ocupación */
 .slg__occ { display: flex; align-items: center; gap: .75rem; }
-.slg__occ-track { flex: 1; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
+.slg__occ-track { flex: 1; height: 6px; background: var(--c-slate-200); border-radius: 3px; overflow: hidden; }
 .slg__occ-fill  { height: 100%; background: #16a34a; border-radius: 3px; transition: width .4s; }
-.slg__occ-label { font-size: .73rem; color: #64748b; white-space: nowrap; font-weight: 500; }
+.slg__occ-label { font-size: .73rem; color: var(--c-slate-500); white-space: nowrap; font-weight: 500; }
 
 /* Grid */
 .slg__grid { display: grid; gap: 10px; }
@@ -298,7 +298,7 @@ function stageGradient(estado) {
 
 /* Slot libre */
 .slg__card--libre {
-  background: #f8fafc; border: 2px dashed #cbd5e1;
+  background: var(--c-slate-50); border: 2px dashed var(--c-slate-300);
   box-shadow: none; cursor: default;
 }
 .slg__card--libre:hover { transform: none; box-shadow: none; }
@@ -306,18 +306,18 @@ function stageGradient(estado) {
   height: 100%; display: flex; flex-direction: column;
   align-items: center; justify-content: center; gap: .3rem;
 }
-.slg__card-libre-n     { font-size: 1.1rem; font-weight: 800; color: #cbd5e1; }
-.slg__card-libre-label { font-size: .68rem; font-weight: 600; color: #94a3b8; letter-spacing: .04em; text-transform: uppercase; }
+.slg__card-libre-n     { font-size: 1.1rem; font-weight: 800; color: var(--c-slate-300); }
+.slg__card-libre-label { font-size: .68rem; font-weight: 600; color: var(--c-slate-400); letter-spacing: .04em; text-transform: uppercase; }
 
 /* Leyenda */
 .slg__legend { display: flex; flex-wrap: wrap; gap: .35rem; }
 .slg__legend-item {
   display: flex; align-items: center; gap: .3rem;
-  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 7px;
+  background: var(--c-slate-50); border: 1px solid var(--c-slate-200); border-radius: 7px;
   padding: .25rem .6rem; font-size: .72rem;
 }
 .slg__legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
 .slg__legend-code { font-weight: 800; color: #1a1a1a; font-family: monospace; }
-.slg__legend-gen  { color: #475569; }
-.slg__legend-cnt  { color: #94a3b8; }
+.slg__legend-gen  { color: var(--c-slate-600); }
+.slg__legend-cnt  { color: var(--c-slate-400); }
 </style>

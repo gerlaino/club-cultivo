@@ -48,6 +48,6 @@ function estadoLabel(e) { return { borrador: 'Borrador', publicado: 'Publicado',
 .esp__ant-meta   { font-size: .75rem; color: #60725d; }
 .esp__ant-badge  { font-size: .68rem; font-weight: 700; padding: .2em .6em; border-radius: 5px; flex-shrink: 0; }
 .esp__ant-badge--publicado { background: #f0fdf4; color: #15803d; }
-.esp__ant-badge--borrador  { background: #f8fafc; color: #64748b; }
-.esp__ant-badge--archivado { background: #f1f5f9; color: #94a3b8; }
+.esp__ant-badge--borrador  { background: var(--c-slate-50); color: var(--c-slate-500); }
+.esp__ant-badge--archivado { background: var(--c-slate-100); color: var(--c-slate-400); }
 </style>

@@ -289,7 +289,7 @@ onMounted(cargar)
 .cp__grid { display: grid; grid-template-columns: 1fr auto; gap: .9rem; align-items: stretch; }
 
 .cp__reprocann {
-  background: #f3f6f2; border: 1px solid #e4ebe3; border-left: 3px solid #94a3b8;
+  background: #f3f6f2; border: 1px solid #e4ebe3; border-left: 3px solid var(--c-slate-400);
   border-radius: 13px; padding: .85rem .95rem;
   display: flex; flex-direction: column; justify-content: center; gap: .5rem; min-width: 0;
 }
@@ -300,7 +300,7 @@ onMounted(cargar)
 .cp__reprocann-label { font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: #7c8a80; }
 .cp__reprocann-chip {
   display: inline-flex; align-items: center; gap: .32rem;
-  font-size: .74rem; font-weight: 800; letter-spacing: -.01em; color: #64748b;
+  font-size: .74rem; font-weight: 800; letter-spacing: -.01em; color: var(--c-slate-500);
 }
 .cp__reprocann--vigente    .cp__reprocann-chip { color: #15803d; }
 .cp__reprocann--por_vencer .cp__reprocann-chip { color: #b45309; }
@@ -331,7 +331,7 @@ onMounted(cargar)
 .cp__error { padding: 2.5rem 1.5rem; display: flex; flex-direction: column; align-items: center; text-align: center; gap: .5rem; }
 .cp__error-ico { width: 46px; height: 46px; border-radius: 50%; background: #fdecec; color: #dc2626; display: flex; align-items: center; justify-content: center; font-size: 1.6rem; font-weight: 800; margin-bottom: .3rem; }
 .cp__error-title { font-size: 1.1rem; font-weight: 800; color: #12251b; }
-.cp__error-desc  { font-size: .82rem; color: #64748b; max-width: 24ch; line-height: 1.45; }
+.cp__error-desc  { font-size: .82rem; color: var(--c-slate-500); max-width: 24ch; line-height: 1.45; }
 
 /* Acciones */
 .cp__actions { display: flex; gap: .7rem; width: 100%; max-width: 420px; }

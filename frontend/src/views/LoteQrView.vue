@@ -136,8 +136,8 @@ onMounted(async () => {
   gap: 1rem;
 }
 .qr-redirect__icon   { font-size: 3rem; }
-.qr-redirect__titulo { font-size: 1.15rem; font-weight: 800; color: #0f172a; margin: 0; }
-.qr-redirect__mensaje { font-size: .875rem; color: #64748b; margin: 0; line-height: 1.5; }
+.qr-redirect__titulo { font-size: 1.15rem; font-weight: 800; color: var(--c-slate-900); margin: 0; }
+.qr-redirect__mensaje { font-size: .875rem; color: var(--c-slate-500); margin: 0; line-height: 1.5; }
 .qr-redirect__btn {
   display: inline-flex; align-items: center; gap: .4rem;
   background: #1b5e20; color: #fff; border: none;

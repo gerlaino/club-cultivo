@@ -215,10 +215,10 @@ function formaLabel(f) {
 .pdv__item-main { flex: 1; }
 .pdv__item-name { font-size: var(--fs-14); font-weight: 600; color: var(--c-ink-900); }
 .pdv__item-meta { display: flex; align-items: center; gap: var(--sp-2); margin-top: 2px; }
-.pdv__ultima { font-size: .72rem; color: var(--c-ink-400, #94a3b8); }
+.pdv__ultima { font-size: .72rem; color: var(--c-slate-400); }
 .pdv__count {
-  font-size: .78rem; font-weight: 600; color: var(--c-ink-500, #64748b);
-  background: var(--c-ink-100, #f1f5f9); padding: .1em .5em; border-radius: 999px; margin-left: .4em;
+  font-size: .78rem; font-weight: 600; color: var(--c-slate-500);
+  background: var(--c-slate-100); padding: .1em .5em; border-radius: 999px; margin-left: .4em;
 }
 .pdv__dni { font-family: var(--font-mono); font-size: var(--fs-12); color: var(--c-ink-500); }
 .pdv__item-arrow { color: var(--c-ink-300); flex-shrink: 0; }

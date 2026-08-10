@@ -394,7 +394,7 @@ async function guardar() {
   background: #f0f4f0; color: #374151; cursor: pointer;
   display: flex; align-items: center; justify-content: center; font-size: .9rem;
 }
-.rps__close:hover { background: #e2e8f0; }
+.rps__close:hover { background: var(--c-slate-200); }
 
 .rps__today-bar {
   background: #f0fdf4; border-bottom: 1px solid #dcfce7;
@@ -446,12 +446,12 @@ async function guardar() {
 .rps__simple-form { display: flex; flex-direction: column; gap: .75rem; }
 .rps__field { display: flex; flex-direction: column; gap: .3rem; }
 .rps__label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
-.rps__input { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: .6rem .8rem; font-size: .9rem; color: #0f172a; outline: none; width: 100%; box-sizing: border-box; }
+.rps__input { background: var(--c-slate-50); border: 1.5px solid var(--c-slate-200); border-radius: 9px; padding: .6rem .8rem; font-size: .9rem; color: var(--c-slate-900); outline: none; width: 100%; box-sizing: border-box; }
 .rps__input:focus { border-color: #1b5e20; }
-.rps__textarea { background: #f8fafc; border: 1.5px solid #e2e8f0; border-radius: 9px; padding: .6rem .8rem; font-size: .875rem; color: #0f172a; outline: none; width: 100%; box-sizing: border-box; resize: none; font-family: inherit; }
+.rps__textarea { background: var(--c-slate-50); border: 1.5px solid var(--c-slate-200); border-radius: 9px; padding: .6rem .8rem; font-size: .875rem; color: var(--c-slate-900); outline: none; width: 100%; box-sizing: border-box; resize: none; font-family: inherit; }
 .rps__textarea:focus { border-color: #1b5e20; }
 .rps__row2 { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
-.rps__optional { font-size: .68rem; font-weight: 400; color: #94a3b8; text-transform: none; letter-spacing: 0; margin-left: .25rem; }
+.rps__optional { font-size: .68rem; font-weight: 400; color: var(--c-slate-400); text-transform: none; letter-spacing: 0; margin-left: .25rem; }
 
 .rps__error { margin: 0 1.5rem .5rem; background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .6rem .875rem; border-radius: 8px; font-size: .82rem; flex-shrink: 0; }
 

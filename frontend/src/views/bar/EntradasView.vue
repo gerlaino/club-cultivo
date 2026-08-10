@@ -176,33 +176,33 @@ async function anular(e) {
 .en__head { display: flex; align-items: center; gap: 14px; margin-bottom: var(--sp-4, 16px); flex-wrap: wrap; }
 .en__head-acts { display: flex; gap: 8px; margin-left: auto; }
 .en__back { font-size: var(--fs-13, 13px); color: #1b5e20; text-decoration: none; font-weight: 600; }
-.en__head h1 { font-size: var(--fs-22, 22px); font-weight: 700; color: #0f172a; margin: 0; }
-.en__loading, .en__empty { color: #64748b; padding: var(--sp-8, 32px); text-align: center; }
+.en__head h1 { font-size: var(--fs-22, 22px); font-weight: 700; color: var(--c-slate-900); margin: 0; }
+.en__loading, .en__empty { color: var(--c-slate-500); padding: var(--sp-8, 32px); text-align: center; }
 
-.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-14, 14px); background: var(--c-paper, #fff); border: 1px solid #f1f5f9; border-radius: var(--r-md, 10px); overflow: hidden; }
-.tbl th { text-align: left; font-size: var(--fs-11, 11px); text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; font-weight: 700; padding: 10px 12px; border-bottom: 1px solid #f1f5f9; }
-.tbl td { padding: 10px 12px; border-bottom: 1px solid #f1f5f9; color: #1e293b; }
+.tbl { width: 100%; border-collapse: collapse; font-size: var(--fs-14, 14px); background: var(--c-paper, #fff); border: 1px solid var(--c-slate-100); border-radius: var(--r-md, 10px); overflow: hidden; }
+.tbl th { text-align: left; font-size: var(--fs-11, 11px); text-transform: uppercase; letter-spacing: .05em; color: var(--c-slate-400); font-weight: 700; padding: 10px 12px; border-bottom: 1px solid var(--c-slate-100); }
+.tbl td { padding: 10px 12px; border-bottom: 1px solid var(--c-slate-100); color: #1e293b; }
 .tbl tr:last-child td { border-bottom: none; }
-.cod { display: block; font-family: inherit; font-size: var(--fs-11, 11px); color: #94a3b8; }
+.cod { display: block; font-family: inherit; font-size: var(--fs-11, 11px); color: var(--c-slate-400); }
 .num { text-align: right; font-variant-numeric: tabular-nums; }
-.mut { color: #94a3b8; }
+.mut { color: var(--c-slate-400); }
 .acts { text-align: right; white-space: nowrap; }
 .st { font-size: .66rem; font-weight: 640; padding: 3px 9px; border-radius: 999px; }
 .st.ok { background: #f0fdf4; color: #1b5e20; }
-.st.used { background: #f1f5f9; color: #64748b; }
+.st.used { background: var(--c-slate-100); color: var(--c-slate-500); }
 .st.bad { background: #fee2e2; color: #dc2626; }
-.lnk { background: none; border: none; color: #64748b; font-size: var(--fs-13, 13px); cursor: pointer; padding: 2px 6px; }
-.lnk:hover { color: #0f172a; }
+.lnk { background: none; border: none; color: var(--c-slate-500); font-size: var(--fs-13, 13px); cursor: pointer; padding: 2px 6px; }
+.lnk:hover { color: var(--c-slate-900); }
 .lnk--danger:hover { color: #dc2626; }
 
 .ov { position: fixed; inset: 0; background: rgba(20,20,20,.5); display: grid; place-items: center; z-index: 1000; padding: 16px; }
 .modal { position: relative; z-index: 1; background: var(--c-paper, #fff); border-radius: var(--r-lg, 14px); padding: var(--sp-5, 20px); width: 100%; max-width: 320px; text-align: center; box-shadow: var(--sh-3, 0 20px 50px rgba(0,0,0,.25)); }
-.modal h3 { margin: 0; font-size: var(--fs-18, 18px); color: #0f172a; }
-.modal__hint { color: #64748b; font-size: var(--fs-13, 13px); margin: 4px 0 var(--sp-3, 12px); }
+.modal h3 { margin: 0; font-size: var(--fs-18, 18px); color: var(--c-slate-900); }
+.modal__hint { color: var(--c-slate-500); font-size: var(--fs-13, 13px); margin: 4px 0 var(--sp-3, 12px); }
 .qrimg { width: 220px; height: 220px; border-radius: var(--r-md, 10px); }
-.cod2 { font-family: inherit; font-size: var(--fs-12, 12px); color: #94a3b8; margin: 8px 0 var(--sp-3, 12px); }
+.cod2 { font-family: inherit; font-size: var(--fs-12, 12px); color: var(--c-slate-400); margin: 8px 0 var(--sp-3, 12px); }
 .modal__actions { display: flex; gap: 8px; justify-content: center; }
-.btn { border: 1px solid #e2e8f0; background: var(--c-paper, #fff); color: #1e293b; border-radius: var(--r-sm, 8px); padding: 8px 16px; font-size: var(--fs-13, 13px); font-weight: 600; cursor: pointer; }
+.btn { border: 1px solid var(--c-slate-200); background: var(--c-paper, #fff); color: #1e293b; border-radius: var(--r-sm, 8px); padding: 8px 16px; font-size: var(--fs-13, 13px); font-weight: 600; cursor: pointer; }
 .btn--primary { background: #1b5e20; border-color: #1b5e20; color: #fff; }
 .btn--sm { padding: 6px 12px; font-size: var(--fs-12, 12px); }
 .btn:disabled, .lnk:disabled { opacity: .5; cursor: default; }

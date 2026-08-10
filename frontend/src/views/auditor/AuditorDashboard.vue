@@ -30,7 +30,7 @@
 
 <script setup>
 import {
-  FileCheck, Sprout, Package, FileBadge, Target, Search,
+  FileCheck, Sprout, Package, FileBadge, Target, Search, TrendingDown,
 } from 'lucide-vue-next'
 
 const GRUPOS = [
@@ -60,6 +60,10 @@ const GRUPOS = [
       { to: '/auditor/dispensaciones', icon: Package, label: 'Dispensaciones',
         desc: 'Entregas, gramos y pacientes atendidos.',
         pregunta: '¿Cuánto sale y a cuántos?' },
+      // La contracara de producción: ningún otro informe dice cuánto se cayó en el camino.
+      { to: '/auditor/perdidas', icon: TrendingDown, label: 'Pérdidas',
+        desc: 'Plantas descartadas con su motivo, merma y vencido en góndola.',
+        pregunta: '¿Cuánto se perdió, y por qué?' },
     ],
   },
   {

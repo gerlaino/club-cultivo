@@ -90,7 +90,7 @@ const enriched = computed(() =>
 .sem__pill--green  { background: #f0fdf4; border-color: #86efac; color: #15803d; }
 .sem__pill--yellow { background: #fffbeb; border-color: #fde68a; color: #b45309; }
 .sem__pill--red    { background: #fef2f2; border-color: #fca5a5; color: #dc2626; }
-.sem__pill--gray   { background: #f8fafc; border-color: #e2e8f0; color: #64748b; }
+.sem__pill--gray   { background: var(--c-slate-50); border-color: var(--c-slate-200); color: var(--c-slate-500); }
 
 .sem__icon { font-size: 1.2rem; flex-shrink: 0; }
 .sem__body { min-width: 0; }
