@@ -97,7 +97,7 @@ Ninguno se considera cerrado; todos son candidatos a revisión.
 9. **Contabilidad** — movimientos contables, costos por lote, P&L.
 10. **Analítica e informes** — genéticas/ciclos/pérdidas/comparativa, benchmark, informe semestral, informes auditor (REPROCANN, producción, cumplimiento, plan vs real, trazabilidad).
 11. **ARICCAME** — reporte de dispensaciones y stock (feature flag por club). La transmisión está SIMULADA: no envía nada de verdad.
-12. **Super admin** — gestión de clubes, planes (`PlanEnforcer`), modo observador (solo lectura).
+12. **Super admin** — panel de plataforma (vencimientos, módulos prendidos que no funcionan, clubes en silencio, salud), clubes, **dos planes** (`PlanEnforcer`: básico/total, sólo límites), catálogo de módulos, informes de plataforma, historial por club. **El modo observador está SUSPENDIDO** (`User::OBSERVADOR_HABILITADO = false`).
 13. **Notificaciones** — push web, ActionCable, alertas internas por rol.
 14. **Web pública del club** + carnets digitales.
 15. **App móvil** (Capacitor) — cultivador y manicura principalmente; vistas bajo `/m`.
@@ -230,13 +230,50 @@ Cuando Germán plantee un problema o feature nueva antes de implementar:
 
 Suite 1239 ✓ + 58 vitest ✓. **Deploy: sumar `add_vendible_a_bar_venta_items` y `add_consumo_evento_a_provisiones_y_dispensas` al `db:migrate`.**
 
-## 📍 Dónde retomar (10-ago-2026) — SIGUIENTE: super_admin
+## 📍 Dónde retomar (10-ago-2026) — super_admin HECHO
 
-**1776 rspec + 873 vitest en verde.** Todo pusheado a `master` (`f3d1a6d`).
+**1871 rspec (25 pending) + 889 vitest en verde.** Commiteado en `master`, sin pushear.
 
-> **Lo próximo es el rol super_admin**, y Germán avisó que no es sólo rediseño: hay que
-> conectar bien cosas y modificar otras. Arrancar por entender qué administra hoy y qué le
-> falta, antes de tocar.
+### El modelo comercial, que cambió de raíz
+
+**Dos planes, y el plan dice CUÁNTO, nunca QUÉ.** `PlanEnforcer::PLANES` = `basico` / `total`,
+con seis límites (sedes, salas, lotes, plantas, pacientes, usuarios). Qué puede hacer un club lo
+deciden las suites, y no se cruzan. Los cuatro planes viejos siguen mapeados en `PLANES_LEGACY`
+por si aparece uno guardado.
+
+**Los módulos viven en tres cajones** (`Club`): `SUITES` contratables · `INCLUIDOS_EN_SUITE`
+(médico y correo, dentro de Producción y dispensa, derivados y NO guardados) · `ADDONS` ·
+`EN_CONSTRUCCION` (Vista del paciente, no activable ni por API). **`Club#estado_modulo` es la
+pieza clave**: prendido ≠ andando, y devuelve `andando` / `falta_config` / `apagado` con
+`falta_para_funcionar` explicando qué le falta a ESE club.
+
+**El catálogo de qué se vende sale de `GET /super_admin/catalogo`.** No volver a duplicar la
+lista de módulos en las vistas: ya había tres copias que se contradecían.
+
+### Lo que NO hay que romper
+
+- **El modo observador está SUSPENDIDO** con `User::OBSERVADOR_HABILITADO = false`. Está
+  construido (club efectivo, tenant, gating por módulos del club observado, datos clínicos
+  bloqueados) pero apagado: los guards de ROL de 26 controllers lo dejarían navegando secciones
+  vacías y 403, y el club lo nota. **Reactivarlo exige darle rol efectivo de admin del club
+  observado** — enmascarar `User#role`, que toca el enum de auth. Los specs del modo andando se
+  saltan solos y vuelven al prender la bandera.
+- **`Auditable` fija el tenant sólo cuando no hay ninguno.** Envolver siempre contaminaba
+  `Current.current_tenant` entre ejemplos y el spec siguiente heredaba un club revertido.
+
+### Bug preexistente conocido (no del bloque)
+
+Un `super_admin` **sin** observar que pega a un endpoint de club revienta con **500**:
+`current_user.club` es nil y varios controllers hacen `current_user.club.algo` sin protegerse.
+
+### Pendientes de Germán
+
+- **Su socio tiene que dar de alta un club sin ayuda**, y anotar dónde se traba. Es la prueba
+  que vale más que todo lo demás.
+- Decisiones: **modelo de precios** (sin eso no hay MRR real: `mrr` y `churn_30d` siguen en 0) y
+  **medición de calls de IA** (`ia_limite_hora` se aplica pero no se mide).
+- Un **segundo nivel de super_admin** (rol comercial sin borrar clubes ni ver datos de
+  pacientes): hoy es todo o nada. Toca el enum de roles, no se hizo.
 
 ### Antes de tocar producción
 

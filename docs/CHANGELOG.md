@@ -1,5 +1,73 @@
 # Changelog
 
+## Agosto 2026 (n) — el panel de plataforma: el plan mide, las suites habilitan
+
+**Dos planes en vez de cuatro, y el plan dice CUÁNTO, nunca QUÉ.** Convivían dos sistemas que
+se contradecían: los planes (semilla/brote/cosecha/federación) fijaban los límites duros y las
+suites decidían las capacidades, así que un club "federación" sin suites quedaba sin límites y
+sin poder hacer nada. Ahora hay **básico** y **total**, y sólo miden crecimiento: sedes, salas,
+lotes, plantas, pacientes y usuarios.
+
+**Vuelve el límite de plantas** — con el tope sólo en lotes, dos lotes de mil plantas pasaban
+por el plan chico — y **se suma el de salas**, que no existía. El de salas cuenta las salas que
+EXISTEN y no las activas: si contara sólo las activas, se abrían salas sin techo poniéndolas
+todas en mantenimiento. `PlanEnforcer` decide todos los límites de cobro y no tenía un solo spec.
+
+**Los módulos, en tres cajones.** El **módulo médico y el correo salen de los add-ons** y pasan
+a venir dentro de la suite de Producción y dispensa: los dos viven de la ficha del paciente, así
+que un club de sólo Cultivo no los ve, y poder apagárselos a uno que sí la tiene era una perilla
+que —olvidada— lo dejaba con media ficha. No se guardan como bandera: se derivan de la suite,
+para que no puedan contradecirla. **La web pública pasa a llamarse "Vista del paciente"** y queda
+EN CONSTRUCCIÓN: se lista para que nadie la prometa creyendo que está, y no se puede activar ni
+por la API.
+
+**Los interruptores dejaron de mentir por omisión.** Era lo más caro del panel: se prendía
+WhatsApp y no pasaba nada hasta cargar Twilio tres pantallas más allá; se prendía Correo y no
+andaba sin SMTP. Ahora cada módulo reporta su **estado real** —`andando`, `no funciona todavía`,
+`apagado`— con qué le falta a ESE club, y la ficha abre diciendo cuántos módulos están prendidos
+sin hacer nada.
+
+**El alta, en cuatro pasos:** Identidad → Plan (dos tarjetas con sus topes) → Módulos (los tres
+cajones) → Acceso. **La contraseña temporal se ve y se copia** —detrás de puntitos había que
+acordarse de lo que uno mismo acababa de tipear— y al terminar entrega los datos de acceso
+juntos. Los roles del alta se reducen a los cinco del arranque (admin, médico, cultivador,
+dispensador, manicura), **filtrados también en el backend** porque el endpoint aceptaba
+cualquiera que le mandaran.
+
+**Un catálogo servido por el backend** (`GET /super_admin/catalogo`): la lista de módulos estaba
+duplicada a mano en tres vistas y ya decía cosas distintas entre sí.
+
+**El panel contesta qué hacer hoy, no cuántas plantas hay.** Era un recuento de plantas, lotes y
+pacientes sumando todos los clubes: eso no le sirve a quien vende el software y tapaba lo único
+accionable. Ahora responde tres preguntas en orden — **quién vence, quién necesita algo hoy y
+quién se está por ir** — y los agregados se mudaron a **Informes**, donde son la semilla del
+benchmarking del sector. "Necesita que hagas algo" junta planes vencidos, clubes sin suites,
+módulos prendidos que no funcionan y **clubes que pagan IoT con las sondas calladas** — el fallo
+silencioso que sólo se cazaba corriendo un rake a mano. "En silencio" es el churn que todavía no
+pasó, medido por la última dispensación y el último lote. **Adopción** muestra contratado contra
+andando: la diferencia es el trabajo pendiente.
+
+**Shell del super admin al mismo patrón que el resto**, con el menú de usuario que no existía
+—el logout era un ícono suelto al pie del sidebar— y **Mi perfil**, que no tenía ninguna
+pantalla. Vive dentro del shell de plataforma porque `/perfil` no es hija de ese layout y
+mandaba a una pantalla pelada sin forma de volver.
+
+**Ahora queda rastro de lo que hacemos nosotros.** `Club` no era auditable y ninguna acción de
+super_admin se registraba: cuando un club reclamaba "yo no pedí que me cambien el plan" no había
+forma de saber quién ni cuándo. Allowlist estricta, con las credenciales fuera y un test que lo
+verifica, e historial en la ficha del club.
+
+**Modo observador: construido y SUSPENDIDO.** Entrar a medias a un club que está trabajando se
+nota. Funciona el club efectivo, el tenant, el gating por los módulos del club observado y el
+bloqueo de datos clínicos —que necesitó candado propio, porque los guards del namespace médico
+dejan pasar a `super_admin` a propósito—, pero los guards de ROL de 26 controllers lo dejarían
+navegando secciones vacías y 403. Queda apagado con `User::OBSERVADOR_HABILITADO`: una bandera
+deja todo inerte, el endpoint responde 503 y una migración limpió las observaciones vivas.
+**Para reactivarlo hace falta darle rol efectivo de admin del club observado.**
+
+**Deploy:** `db:migrate` (`migrar_planes_a_basico_total`, `limpiar_features_incluidas_en_suite`,
+`limpiar_observaciones_activas`).
+
 ## Agosto 2026 (m) — pérdidas, el arrastre del "mixto" y el design system completo
 
 **Informe de PÉRDIDAS**, que no existía. Producción cuenta lo que salió bien y trazabilidad
