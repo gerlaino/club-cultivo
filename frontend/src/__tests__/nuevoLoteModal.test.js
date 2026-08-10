@@ -145,3 +145,87 @@ describe('NuevoLoteModal — interacción real', () => {
     w.unmount()
   })
 })
+
+// ── La sala se elige dentro de una sede ──────────────────────────────────────────
+// Un club con varias sedes ofrecía TODAS las salas juntas, así que había que saber de memoria
+// cuál pertenece a dónde — y un lote creado en la sala equivocada después hay que moverlo a
+// mano. La sede va primero. Los TIPOS de sala siguen la regla de siempre: un lote nuevo nace
+// enraizando (vegetativo/mixta/clon) y uno existente va según el estado que le declares.
+describe('Nuevo lote — la sala sale de la sede elegida', () => {
+  const SALAS = [
+    { id: 1, nombre: 'Veg Norte',  kind: 'vegetativo', sede: { id: 10, nombre: 'Finca Norte' } },
+    { id: 2, nombre: 'Flor Norte', kind: 'floracion',  sede: { id: 10, nombre: 'Finca Norte' } },
+    { id: 3, nombre: 'Veg Sur',    kind: 'vegetativo', sede: { id: 20, nombre: 'Finca Sur' } },
+  ]
+
+  async function abrir(salas = SALAS, sedes = [{ id: 10, nombre: 'Finca Norte' }, { id: 20, nombre: 'Finca Sur' }]) {
+    setActivePinia(createPinia())
+    const w = mount(NuevoLoteModal, {
+      props: { show: false, salas },
+      global: { stubs: { Teleport: true, AppDatePicker: true, DsSpinner: true } },
+      attachTo: document.body,
+    })
+    await w.setProps({ show: true })
+    await new Promise(r => setTimeout(r, 0))
+    // Las sedes las carga el modal por API; en el test se fijan a mano.
+    w.vm.sedes = sedes
+    await w.vm.$nextTick()
+    return w
+  }
+
+  it('con varias sedes, no ofrece ninguna sala hasta elegir una', async () => {
+    const w = await abrir()
+
+    expect(w.vm.faltaElegirSede).toBe(true)
+    expect(w.vm.salasOfrecidas).toHaveLength(0)
+  })
+
+  it('elegida la sede, sólo ofrece las salas de esa sede', async () => {
+    const w = await abrir()
+
+    w.vm.sedeFiltro = 10
+    await w.vm.$nextTick()
+
+    expect(w.vm.salasOfrecidas.map((s) => s.id)).toEqual([1])   // Flor Norte no: el lote nace enraizando
+  })
+
+  it('un lote NUEVO nace enraizando: sólo salas donde eso puede estar', async () => {
+    const w = await abrir()
+    w.vm.sedeFiltro = 10
+    await w.vm.$nextTick()
+
+    expect(w.vm.estadoObjetivo).toBe('enraizado')
+    expect(w.vm.salasOfrecidas.every((s) => ['vegetativo', 'mixta', 'clon'].includes(s.kind))).toBe(true)
+  })
+
+  it('un lote EXISTENTE en floración sí puede ir a una sala de floración', async () => {
+    const w = await abrir()
+    w.vm.sedeFiltro = 10
+    w.vm.tipoCreacion = 'existente'
+    w.vm.heredadoEstado = 'floracion'
+    await w.vm.$nextTick()
+
+    expect(w.vm.salasOfrecidas.map((s) => s.id)).toEqual([2])
+  })
+
+  it('cambiar de sede limpia la sala ya elegida', async () => {
+    const w = await abrir()
+    w.vm.sedeFiltro = 10
+    await w.vm.$nextTick()
+    w.vm.salaId = 1
+
+    w.vm.sedeFiltro = 20
+    await w.vm.$nextTick()
+
+    expect(w.vm.salaId).toBe('')
+    expect(w.vm.salasOfrecidas.map((s) => s.id)).toEqual([3])
+  })
+
+  // Con una sola sede el paso sobra: se ofrecen sus salas directamente.
+  it('con una sola sede no pide elegirla', async () => {
+    const w = await abrir([SALAS[0], SALAS[1]], [{ id: 10, nombre: 'Finca Norte' }])
+
+    expect(w.vm.faltaElegirSede).toBe(false)
+    expect(w.vm.salasOfrecidas.map((s) => s.id)).toEqual([1])
+  })
+})

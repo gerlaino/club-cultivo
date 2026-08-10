@@ -39,11 +39,14 @@
 
           <!-- Selector de sala (solo cuando no viene fija y no es cosechado) -->
           <template v-else-if="!sala">
-            <div v-if="sedes.length > 1" class="nlm__field">
-              <label class="nlm__label">Sede</label>
-              <select class="nlm__input" v-model="sedeFiltro">
-                <option value="">Todas las sedes</option>
-                <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+            <!-- La sede va PRIMERO y es obligatoria cuando hay más de una: la sala se elige
+                 dentro de ella, no de una lista con las salas de todo el club mezcladas. -->
+            <div v-if="sedesDeSalas.length > 1" class="nlm__field">
+              <label class="nlm__label">Sede <span class="nlm__req">*</span></label>
+              <select class="nlm__input" :class="{ 'nlm__input--err': faltaElegirSede && errors.sala_id }"
+                      v-model="sedeFiltro">
+                <option value="" disabled>Elegí una sede…</option>
+                <option v-for="s in sedesDeSalas" :key="s.id" :value="s.id">{{ s.nombre }}</option>
               </select>
             </div>
             <div class="nlm__field">
@@ -52,7 +55,10 @@
                 <option value="" disabled>Seleccioná una sala…</option>
                 <option v-for="s in salasOfrecidas" :key="s.id" :value="s.id">{{ s.nombre }}</option>
               </select>
-              <span v-if="!salasOfrecidas.length" class="nlm__hint">
+              <span v-if="faltaElegirSede" class="nlm__hint">
+                Elegí una sede para ver sus salas.
+              </span>
+              <span v-else-if="!salasOfrecidas.length" class="nlm__hint">
                 No hay salas de {{ estadoObjetivo === 'floracion' ? 'floración' : 'vegetativo' }}
                 {{ sedeFiltro ? 'en esa sede' : 'disponibles' }}.
               </span>
@@ -321,7 +327,13 @@ const KINDS_POR_ESTADO = {
 const estadoObjetivo = computed(() =>
   tipoCreacion.value === 'existente' ? heredadoEstado.value : 'enraizado')
 
+// Las salas que se ofrecen son las de LA SEDE ELEGIDA y del tipo que admite el estado en que
+// va a nacer el lote. Con varias sedes, la sede se elige primero: mezclar las salas de todas
+// obliga a saber de memoria cuál pertenece a dónde, y un lote creado en la sala equivocada
+// después hay que moverlo a mano.
 const salasOfrecidas = computed(() => {
+  if (faltaElegirSede.value) return []
+
   const permitidos = KINDS_POR_ESTADO[estadoObjetivo.value] || []
   return (props.salas || []).filter(s => {
     const okKind = permitidos.includes(s.kind)
@@ -329,6 +341,13 @@ const salasOfrecidas = computed(() => {
     return okKind && okSede
   })
 })
+
+// Con una sola sede no hay nada que elegir: se resuelve sola y el paso no aparece.
+const sedesDeSalas = computed(() => {
+  const ids = new Set((props.salas || []).map(s => String(s.sede?.id ?? s.sede_id ?? '')))
+  return sedes.value.filter(s => ids.has(String(s.id)))
+})
+const faltaElegirSede = computed(() => sedesDeSalas.value.length > 1 && !sedeFiltro.value)
 
 // Filtro por sede del selector de salas: en un club con varias sedes, la lista completa de
 // salas no dice nada hasta que sabés de qué sede es cada una.
