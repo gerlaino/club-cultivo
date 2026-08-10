@@ -19,15 +19,23 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     # cosa: crearlo con features vacío significaría, con el gating real, un club que no puede
     # hacer nada.
     attrs['features'] = Club::FEATURES_POR_DEFECTO.merge(attrs['features'] || {})
+    # El plan no viaja en `club_params` (ver el comentario ahí), pero el alta sí lo elige.
+    attrs['plan'] = PlanEnforcer.normalizar(params.dig(:club, :plan))
     club = Club.new(attrs)
     if club.save
-      roles    = Array(params[:roles_a_crear]).map(&:to_s).presence || Club::ROLES_DEFAULT
+      # Sólo los roles que el alta ofrece. No alcanza con sacarlos de la pantalla: el endpoint
+      # acepta lo que le manden y un rol no ofrecido entraría igual por la API.
+      roles    = (Array(params[:roles_a_crear]).map(&:to_s) & Club::ROLES_ALTA).presence || Club::ROLES_DEFAULT
       password = params[:password_inicial].presence || Club::PASSWORD_DEFAULT
       usuarios = club.crear_usuarios_default!(roles: roles, password: password)
       club.crear_geneticas_default!
       render json: {
         club:     serialize_club_detail(club),
-        usuarios: usuarios.map { |u| { id: u.id, email: u.email, role: u.role } }
+        usuarios: usuarios.map { |u| { id: u.id, email: u.email, role: u.role } },
+        # La contraseña se devuelve EN CLARO y a propósito: es temporal, la fija quien da de
+        # alta y hay que poder dictársela al club. Ocultarla detrás de puntitos obligaba a
+        # acordarse de lo que uno mismo acababa de tipear.
+        password_inicial: password,
       }, status: :created
     else
       render json: { errors: club.errors.full_messages }, status: :unprocessable_entity
@@ -48,20 +56,32 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     render json: { usuarios: usuarios.map { |u| { id: u.id, email: u.email, role: u.role } } }
   end
 
+  # POST /super_admin/clubs/:id/observar — "Ingresar al club".
+  #
+  # A partir de acá el super admin navega la app como la ve el club, en SOLO LECTURA: el club
+  # efectivo del request pasa a ser éste (ver User#club) y `block_observer_writes!` rechaza
+  # cualquier escritura. Los datos clínicos quedan afuera (`block_observer_clinico!`).
+  #
+  # Dura una hora, no quince minutos: entrar a entender qué le pasa a un club lleva más que
+  # eso, y que se corte a la mitad de una revisión obliga a empezar de nuevo.
+  DURACION_OBSERVACION = 1.hour
+
   def observar
-    token = SecureRandom.hex(24)
+    # SUSPENDIDO: ver User::OBSERVADOR_HABILITADO. No alcanza con no ponerle botón —el endpoint
+    # se puede llamar igual—, y entrar a medias a un club que está trabajando se nota.
+    unless User::OBSERVADOR_HABILITADO
+      return render json: {
+        error: 'El modo observador está suspendido.',
+        observador_suspendido: true,
+      }, status: :service_unavailable
+    end
+
     current_user.update!(
-      observer_club_id:   @club.id,
-      observer_token:     token,
-      observer_expires_at: 15.minutes.from_now
+      observer_club_id:    @club.id,
+      observer_token:      SecureRandom.hex(24),
+      observer_expires_at: DURACION_OBSERVACION.from_now
     )
-    render json: {
-      token:            token,
-      club_id:          @club.id,
-      club_nombre:      @club.name,
-      expires_at:       current_user.observer_expires_at,
-      instrucciones:    'Incluir header X-Observer-Token en requests. Modo solo lectura activo.',
-    }, status: :created
+    render json: estado_observacion, status: :created
   end
 
   def detener_observacion
@@ -160,22 +180,45 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
 
   private
 
+  def estado_observacion
+    {
+      observando:         true,
+      club_id:            @club.id,
+      club_nombre:        @club.name,
+      expires_at:         current_user.observer_expires_at,
+      solo_lectura:       true,
+      sin_acceso_clinico: true,
+    }
+  end
+
   def set_club
     @club = Club.unscoped.find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Club no encontrado' }, status: :not_found
   end
 
+  # El plan (CUÁNTO) y los módulos (QUÉ) son dos decisiones distintas y viajan por caminos
+  # distintos: el plan sólo por `cambiar_plan`, los módulos sólo acá. Aceptar `plan` en el
+  # update general era lo que permitía cambiarlo sin querer al guardar otra cosa.
   def club_params
-    params.require(:club).permit(
+    permitidos = params.require(:club).permit(
       :name, :legal_name, :email, :phone, :website,
       :address, :city, :state, :country, :timezone,
-      :plan, :plan_activo_hasta, :plan_trial, :web_activa,
+      :plan_activo_hasta, :plan_trial, :web_activa,
       :smtp_host, :smtp_port, :smtp_user, :smtp_pass,
       :smtp_from, :smtp_from_name,
       :ia_tier, :ia_limite_hora,
       features: {}
     )
+    permitidos[:features] = features_editables(permitidos[:features]) if permitidos.key?(:features)
+    permitidos
+  end
+
+  # Sólo se guardan las claves que el super admin puede prender de verdad. Los módulos
+  # incluidos en una suite se derivan de ella, y los que están en construcción no existen:
+  # aceptarlos sería guardar un `true` que nadie lee y que después contradice a la pantalla.
+  def features_editables(enviadas)
+    (enviadas || {}).to_h.slice(*Club::FEATURES_EDITABLES)
   end
 
   def serialize_club(c)
@@ -204,6 +247,11 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     }
   end
 
+  # El estado real del módulo, calculado en el modelo: prendido no es lo mismo que andando.
+  def estado_modulo(c, clave)
+    { estado: c.estado_modulo(clave), falta: c.falta_para_funcionar(clave) }
+  end
+
   # Tres estados, no dos flags que el frontend tenga que cruzar.
   def estado_de(c)
     return 'eliminado'  if c.deleted_at.present?
@@ -229,8 +277,21 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       suites:          Club::SUITES.map { |k, v| { clave: k, label: v[:label], desc: v[:desc], activa: c.suite?(k) } },
       addons:          Club::ADDONS.map { |k, v|
         { clave: k, label: v[:label], desc: v[:desc], requiere: v[:requiere],
-          incompleto: c.addon_incompleto?(k), activo: c.feature?(k) }
+          incompleto: c.addon_incompleto?(k), activo: c.feature?(k) }.merge(estado_modulo(c, k))
       },
+      # Los que vienen dentro de una suite: se muestran para que se sepa qué tiene el club,
+      # pero sin interruptor — se prenden y se apagan con la suite que los contiene.
+      incluidos:       Club::INCLUIDOS_EN_SUITE.map { |k, suite|
+        meta = Club::INCLUIDOS_META[k]
+        { clave: k, label: meta[:label], desc: meta[:desc], requiere: meta[:requiere],
+          incluido_en: suite, incluido_en_label: Club::SUITES.dig(suite, :label),
+          activo: c.incluido_por_suite?(k) }.merge(estado_modulo(c, k))
+      },
+      # Lo que todavía no existe. Se lista para que nadie lo prometa creyendo que está.
+      en_construccion: Club::EN_CONSTRUCCION.map { |k, v|
+        { clave: k, label: v[:label], desc: v[:desc], requiere: v[:requiere], activo: false }
+      },
+      plan_info:       PlanEnforcer.new(c).info,
       ia_tier:         c.ia_tier,
       ia_limite_hora:  c.ia_limite_hora,
       whatsapp_estado:      c.whatsapp_estado,

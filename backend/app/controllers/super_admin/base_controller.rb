@@ -21,11 +21,15 @@ module SuperAdmin
       end
     end
 
+    # Resuelve el club por slug cuando la ruta lo trae. NO tiene fallback: la versión anterior
+    # caía a `Club.first` si no venía slug, así que una action que se olvidara de pasarlo
+    # operaba en silencio sobre el club 1. Sin slug no hay club, y quien lo necesite que se
+    # entere con un nil en vez de trabajar sobre el equivocado.
     def current_club
-      @current_club ||= begin
-                          slug = params[:club_slug] || request.subdomain.presence
-                          slug.present? ? Club.find_by(slug: slug) : Club.first
-                        end
+      slug = params[:club_slug] || request.subdomain.presence
+      return nil if slug.blank?
+
+      @current_club ||= Club.find_by(slug: slug)
     end
   end
 end

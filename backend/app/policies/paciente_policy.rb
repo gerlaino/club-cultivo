@@ -1,6 +1,9 @@
 class PacientePolicy < ApplicationPolicy
   # ── Allowlists explícitas por ROL ─────────────────────────────────────────────
   # Quién puede VER la ficha (datos NO clínicos). El dispensador entra para dispensar.
+  # El super admin entra SÓLO mientras observa un club (ver `observando?`): es lo que hace que
+  # "ver el club como lo ve su admin" incluya la ficha operativa del paciente. La historia
+  # clínica sigue afuera — ROLES_CLINICA no lo incluye — y eso es a propósito.
   ROLES_LECTURA        = %w[admin medico supervisor dispensador].freeze
   # Quién puede VER datos clínicos / historia clínica. Decisión POR ROL (allowlist),
   # NO por presencia/ausencia de club: super_admin y dispensador quedan FUERA a propósito
@@ -23,11 +26,11 @@ class PacientePolicy < ApplicationPolicy
   end
 
   def index?
-    mismo_club? && ROLES_LECTURA.include?(user&.role)
+    mismo_club? && puede_leer_ficha?
   end
 
   def show?
-    mismo_club? && ROLES_LECTURA.include?(user&.role)
+    mismo_club? && puede_leer_ficha?
   end
 
   def create?
@@ -67,5 +70,14 @@ class PacientePolicy < ApplicationPolicy
   # un usuario de un club nunca ve datos de otro club.
   def mismo_club?
     user.present? && user.club_id.present? && record.club_id == user.club_id
+  end
+
+  # El super admin sólo lee fichas mientras OBSERVA un club, nunca por ser super admin: fuera
+  # del modo observador no tiene club, así que `mismo_club?` ya lo dejaría afuera — esto lo
+  # hace explícito en vez de depender de ese efecto lateral.
+  def puede_leer_ficha?
+    return user.modo_observador? if user&.super_admin?
+
+    ROLES_LECTURA.include?(user&.role)
   end
 end

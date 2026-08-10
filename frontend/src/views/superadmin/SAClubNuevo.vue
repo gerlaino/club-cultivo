@@ -1,17 +1,34 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { useRouter } from 'vue-router'
-import { Building2, MapPin, Zap, Users, ChevronRight, ChevronLeft, Check, ArrowLeft } from 'lucide-vue-next'
-import { createSuperAdminClub } from '../../lib/api.js'
+import { Building2, Gauge, Zap, Users, ChevronRight, ChevronLeft, Check, ArrowLeft,
+         AlertTriangle, Lock, Copy, Info } from 'lucide-vue-next'
+import { createSuperAdminClub, getSuperAdminCatalogo } from '../../lib/api.js'
 
 const router = useRouter()
+
+const PASOS = ['Identidad', 'Plan', 'Módulos', 'Acceso']
 
 const paso    = ref(1)
 const saving  = ref(false)
 const error   = ref(null)
 const creado  = ref(null)
+
+// ── Catálogo ──────────────────────────────────────────────────────────
+// Qué se puede vender lo dice el backend. Antes esta pantalla repetía la lista a mano y ya
+// decía cosas distintas que `Club::ADDONS`: un módulo nuevo obligaba a acordarse de cuatro
+// lugares y el que se olvidaba quedaba invisible.
+const catalogo  = ref(null)
+const cargando  = ref(true)
+
+const planes         = computed(() => catalogo.value?.planes || [])
+const suites         = computed(() => catalogo.value?.suites || [])
+const addons         = computed(() => catalogo.value?.addons || [])
+const incluidos      = computed(() => catalogo.value?.incluidos || [])
+const enConstruccion = computed(() => catalogo.value?.en_construccion || [])
+const rolesAlta      = computed(() => catalogo.value?.roles_alta || [])
 
 // ── Form ──────────────────────────────────────────────────────────────
 const form = ref({
@@ -23,68 +40,51 @@ const form = ref({
   state:             '',
   country:           'Argentina',
   timezone:          'America/Argentina/Buenos_Aires',
-  plan:              'semilla',
+  plan:              'basico',
   plan_trial:        true,
   plan_activo_hasta: '',
-  features:          { cultivo: true, produccion_dispensa: true, bar: true, medico: true },
+  features:          { cultivo: true, produccion_dispensa: true, bar: true },
 })
 
-const haySuite = computed(() => SUITES.some(x => form.value.features[x.value] === true))
+const haySuite = computed(() => suites.value.some(s => form.value.features[s.clave] === true))
+
+// Un módulo incluido sólo entra si el club se lleva la suite que lo contiene.
+function incluidoActivo(inc) { return form.value.features[inc.incluido_en] === true }
 
 const PAISES    = ['Argentina', 'Uruguay', 'Colombia', 'España', 'Alemania', 'Canadá', 'Estados Unidos', 'México', 'Chile', 'Brasil', 'Otro']
 const TIMEZONES = ['America/Argentina/Buenos_Aires', 'America/Montevideo', 'America/Bogota', 'America/Santiago', 'Europe/Berlin', 'America/Toronto', 'America/New_York']
 
-// ── Plan ──────────────────────────────────────────────────────────────
-// Lo que se vende son SUITES, no planes por tamaño: un club contrata "cultivo", "producción
-// y dispensa", o las dos. Los add-ons se suman arriba.
-const SUITES = [
-  { value: 'cultivo',             label: 'Cultivo',                desc: 'Genéticas, lotes, plantas, salas, cosecha y tareas' },
-  { value: 'produccion_dispensa', label: 'Producción y dispensa',  desc: 'Pacientes, stock, dispensaciones, cuenta corriente y contabilidad' },
-]
-
-const PLANES = [
-  { value: 'semilla',    label: 'Semilla',    color: '#64748b', bg: '#f1f5f9', desc: '1 sede · 50 plantas · 30 socios' },
-  { value: 'brote',      label: 'Brote',      color: '#15803d', bg: '#dcfce7', desc: '2 sedes · 150 plantas · 100 socios' },
-  { value: 'cosecha',    label: 'Cosecha',    color: '#0369a1', bg: '#dbeafe', desc: '3 sedes · 250 plantas · ilimitado' },
-  { value: 'federacion', label: 'Federación', color: '#7c3aed', bg: '#ede9fe', desc: 'Todo ilimitado — federaciones' },
-]
-
-// ── Add-ons ───────────────────────────────────────────────────────────
-// Mismos que Club::ADDONS en el backend. Los marcados `incompleto` existen pero todavía no
-// están terminados: se dejan apagados y se avisa por qué.
-const FEATURE_META = {
-  bar:         { label: 'Buffet',         desc: 'Punto de venta, caja y stock del salón',  icon: '🍺' },
-  medico:      { label: 'Módulo médico',  desc: 'Turnos, historia clínica e indicaciones', icon: '🩺' },
-  iot:         { label: 'Ambiente / IoT', desc: 'Sensores y reglas ambientales',           icon: '📡', requiere: 'Hardware del club o import CSV' },
-  ia:          { label: 'Asistente IA',   desc: 'Análisis de lote, plan de trabajo y voz', icon: '🤖' },
-  mailer:      { label: 'Correo',         desc: 'Mails al paciente desde su ficha',        icon: '✉️', requiere: 'SMTP del club' },
-  whatsapp:    { label: 'WhatsApp',       desc: 'Avisos de entrega por WhatsApp',          icon: '💬', requiere: 'Cuenta Twilio del club' },
-  eventos:     { label: 'Eventos',        desc: 'Fiestas y catas del Buffet',              icon: '🎉', incompleto: true },
-  web_publica: { label: 'Web pública',    desc: 'Sitio público del club',                  icon: '🌐', incompleto: true },
-  ariccame:    { label: 'ARICCAME',       desc: 'Reporte regulatorio de dispensaciones y stock',             icon: '📋', incompleto: true },
-}
-const FEATURES_ORDER = Object.keys(FEATURE_META)
-
 // ── Usuarios ──────────────────────────────────────────────────────────
-const ROLES_META = {
-  admin:       { label: 'Admin',       desc: 'Acceso total al panel',          required: true },
-  medico:      { label: 'Médico',      desc: 'Informes y recetas médicas' },
-  cultivador:  { label: 'Cultivador',  desc: 'Salas, lotes y plantas' },
-  supervisor:  { label: 'Supervisor',  desc: 'Supervisión general de salas' },
-  abogado:     { label: 'Abogado',     desc: 'Documentación y compliance' },
-  auditor:     { label: 'Auditor',     desc: 'Auditoría y trazabilidad' },
-  dispensador: { label: 'Dispensador', desc: 'Entregas y dispensaciones' },
-  manicura:    { label: 'Manicura',    desc: 'Post-cosecha y pesaje' },
-}
 const rolesSeleccionados = ref(['admin'])
-const passwordInicial    = ref('123456Aa')
+const passwordInicial    = ref('')
+const passwordCopiada    = ref(false)
 
 function toggleRol(rol) {
-  if (ROLES_META[rol].required) return
+  if (rol === 'admin') return          // el admin siempre se crea: sin él nadie entra al club
   const idx = rolesSeleccionados.value.indexOf(rol)
   if (idx >= 0) rolesSeleccionados.value.splice(idx, 1)
   else rolesSeleccionados.value.push(rol)
 }
+
+async function copiarPassword(valor) {
+  try {
+    await navigator.clipboard.writeText(valor)
+    passwordCopiada.value = true
+    setTimeout(() => { passwordCopiada.value = false }, 1800)
+  } catch { /* sin portapapeles: queda visible igual, que es lo que importa */ }
+}
+
+onMounted(async () => {
+  try {
+    const { data } = await getSuperAdminCatalogo()
+    catalogo.value = data
+    passwordInicial.value = data.password_default || ''
+  } catch {
+    error.value = 'No se pudo cargar el catálogo de planes y módulos.'
+  } finally {
+    cargando.value = false
+  }
+})
 
 // ── Slug preview ──────────────────────────────────────────────────────
 const slugPreview = computed(() =>
@@ -110,7 +110,7 @@ function validarPaso1() {
 
 function siguiente() {
   if (paso.value === 1 && !validarPaso1()) return
-  if (paso.value < 3) paso.value++
+  if (paso.value < PASOS.length) paso.value++
 }
 function anterior() { if (paso.value > 1) paso.value-- }
 
@@ -149,13 +149,29 @@ async function handleSubmit() {
       <h2 class="cnv__success-title">Club creado</h2>
       <p class="cnv__success-sub">
         <strong>{{ creado.club.name }}</strong> está listo.
-        Se crearon {{ creado.usuarios.length }} usuario{{ creado.usuarios.length !== 1 ? 's' : '' }}.
+        Se {{ creado.usuarios.length === 1 ? 'creó' : 'crearon' }}
+        {{ creado.usuarios.length }} usuario{{ creado.usuarios.length !== 1 ? 's' : '' }}.
       </p>
 
-      <div class="cnv__usuarios-grid">
-        <div v-for="u in creado.usuarios" :key="u.id" class="cnv__usuario-card">
-          <div class="cnv__usuario-role">{{ u.role }}</div>
-          <div class="cnv__usuario-email">{{ u.email }}</div>
+      <!-- Lo que hay que pasarle al club. Es el único momento en que está todo junto, así que
+           se muestra entero y se puede copiar de una. -->
+      <div class="cnv__entrega">
+        <div class="cnv__entrega-head">
+          <span class="cnv__entrega-title">Datos de acceso</span>
+          <button type="button" class="cnv__pass-copy" @click="copiarPassword(creado.password_inicial)">
+            <Check v-if="passwordCopiada" :size="14" :stroke-width="2.5" />
+            <Copy v-else :size="14" :stroke-width="2" />
+            {{ passwordCopiada ? 'Copiada' : 'Copiar contraseña' }}
+          </button>
+        </div>
+        <div class="cnv__entrega-pass">
+          Contraseña temporal: <code>{{ creado.password_inicial }}</code>
+        </div>
+        <div class="cnv__usuarios-grid">
+          <div v-for="u in creado.usuarios" :key="u.id" class="cnv__usuario-card">
+            <div class="cnv__usuario-role">{{ u.role }}</div>
+            <div class="cnv__usuario-email">{{ u.email }}</div>
+          </div>
         </div>
       </div>
 
@@ -168,6 +184,12 @@ async function handleSubmit() {
       </div>
     </div>
 
+    <!-- ══ CARGANDO EL CATÁLOGO ══ -->
+    <div v-else-if="cargando" class="cnv__cargando">
+      <DsSpinner :size="22" />
+      <span>Cargando planes y módulos…</span>
+    </div>
+
     <!-- ══ WIZARD ══ -->
     <template v-else>
 
@@ -176,17 +198,17 @@ async function handleSubmit() {
         <h1 class="cnv__title">Nuevo club</h1>
         <div class="cnv__stepper">
           <div
-            v-for="n in 3" :key="n"
+            v-for="(nombre, i) in PASOS" :key="nombre"
             class="cnv__step"
-            :class="{ 'cnv__step--done': paso > n, 'cnv__step--active': paso === n }"
+            :class="{ 'cnv__step--done': paso > i + 1, 'cnv__step--active': paso === i + 1 }"
           >
             <div class="cnv__step-dot">
-              <Check v-if="paso > n" :size="12" :stroke-width="3" />
-              <span v-else>{{ n }}</span>
+              <Check v-if="paso > i + 1" :size="12" :stroke-width="3" />
+              <span v-else>{{ i + 1 }}</span>
             </div>
-            <span class="cnv__step-label">{{ ['Identidad', 'Suscripción', 'Acceso'][n - 1] }}</span>
+            <span class="cnv__step-label">{{ nombre }}</span>
           </div>
-          <div class="cnv__step-line" :style="{ width: `${((paso - 1) / 2) * 100}%` }"></div>
+          <div class="cnv__step-line" :style="{ width: `${((paso - 1) / (PASOS.length - 1)) * 100}%` }"></div>
         </div>
       </div>
 
@@ -250,39 +272,38 @@ async function handleSubmit() {
         </div>
       </div>
 
-      <!-- ─── Paso 2: Suscripción & Features ─── -->
+      <!-- ─── Paso 2: Plan ───
+           El plan dice CUÁNTO. Qué módulos tiene el club es la pantalla siguiente: mezclarlas
+           era lo que hacía que un club quedara sin límites y sin poder hacer nada. -->
       <div v-if="paso === 2" class="cnv__panel">
         <div class="cnv__panel-header">
-          <div class="cnv__panel-ico cnv__panel-ico--purple"><Zap :size="18" :stroke-width="1.75" /></div>
+          <div class="cnv__panel-ico cnv__panel-ico--purple"><Gauge :size="18" :stroke-width="1.75" /></div>
           <div>
-            <div class="cnv__panel-title">Qué contrata este club</div>
-            <div class="cnv__panel-sub">Las suites definen a qué accede; los módulos se suman arriba</div>
+            <div class="cnv__panel-title">Cuánto puede crecer</div>
+            <div class="cnv__panel-sub">El plan fija los topes. Qué módulos usa se elige en el paso siguiente</div>
           </div>
         </div>
         <div class="cnv__panel-body">
 
-          <!-- Suites: lo que realmente se vende. Un club puede tomar una, la otra o las dos. -->
-          <div class="cnv__section-label">Suites</div>
-          <div class="cnv__suites">
+          <div class="cnv__planes">
             <button
-              v-for="s in SUITES" :key="s.value"
+              v-for="p in planes" :key="p.clave"
               type="button"
-              class="cnv__suite"
-              :class="{ 'cnv__suite--on': form.features[s.value] }"
-              @click="form.features[s.value] = !form.features[s.value]"
+              class="cnv__plan"
+              :class="{ 'cnv__plan--on': form.plan === p.clave }"
+              @click="form.plan = p.clave"
             >
-              <span class="cnv__suite-check">{{ form.features[s.value] ? '✓' : '' }}</span>
-              <span class="cnv__suite-txt">
-                <span class="cnv__suite-name">{{ s.label }}</span>
-                <span class="cnv__suite-desc">{{ s.desc }}</span>
-              </span>
+              <div class="cnv__plan-top">
+                <span class="cnv__plan-check"><Check v-if="form.plan === p.clave" :size="12" :stroke-width="3" /></span>
+                <span class="cnv__plan-name">{{ p.label }}</span>
+              </div>
+              <ul class="cnv__plan-limites">
+                <li v-for="linea in p.resumen" :key="linea">{{ linea }}</li>
+              </ul>
             </button>
           </div>
-          <p v-if="!haySuite" class="cnv__warn">
-            Sin ninguna suite, el club entra pero no puede operar. Elegí al menos una.
-          </p>
 
-          <div class="cnv__row-2" style="margin-top:1rem">
+          <div class="cnv__row-2" style="margin-top:1.5rem">
             <div class="cnv__field">
               <label class="cnv__label">Vigente hasta</label>
               <AppDatePicker v-model="form.plan_activo_hasta" />
@@ -293,73 +314,163 @@ async function handleSubmit() {
               <div class="cnv__toggle__track"><div class="cnv__toggle__thumb"></div></div>
               <div>
                 <div class="cnv__toggle__label">Período de prueba</div>
-                <div class="cnv__hint">Muestra badge "Trial" en el panel</div>
+                <div class="cnv__hint">Muestra el cartel "Trial" en el panel del club</div>
               </div>
-            </label>
-          </div>
-
-          <!-- Feature flags -->
-          <div class="cnv__section-label" style="margin-top:1.5rem">Funcionalidades habilitadas</div>
-          <div class="cnv__feat-grid">
-            <label
-              v-for="key in FEATURES_ORDER" :key="key"
-              class="cnv__feat-toggle"
-              :class="{ 'cnv__feat-toggle--on': form.features[key], 'cnv__feat-toggle--warn': FEATURE_META[key].incompleto }"
-            >
-              <div class="cnv__feat-left">
-                <span class="cnv__feat-ico">{{ FEATURE_META[key].icon }}</span>
-                <div>
-                  <div class="cnv__feat-name">{{ FEATURE_META[key].label }}</div>
-                  <div class="cnv__feat-desc">{{ FEATURE_META[key].desc }}</div>
-                </div>
-              </div>
-              <input v-model="form.features[key]" type="checkbox" class="cnv__toggle__input" />
-              <div class="cnv__toggle__track cnv__toggle__track--sm"><div class="cnv__toggle__thumb cnv__toggle__thumb--sm"></div></div>
             </label>
           </div>
 
         </div>
       </div>
 
-      <!-- ─── Paso 3: Acceso inicial ─── -->
+      <!-- ─── Paso 3: Módulos ─── -->
       <div v-if="paso === 3" class="cnv__panel">
         <div class="cnv__panel-header">
-          <div class="cnv__panel-ico cnv__panel-ico--blue"><Users :size="18" :stroke-width="1.75" /></div>
+          <div class="cnv__panel-ico cnv__panel-ico--purple"><Zap :size="18" :stroke-width="1.75" /></div>
           <div>
-            <div class="cnv__panel-title">Acceso inicial</div>
-            <div class="cnv__panel-sub">Seleccioná qué roles crear y la contraseña temporal</div>
+            <div class="cnv__panel-title">Qué puede hacer</div>
+            <div class="cnv__panel-sub">Primero la suite; después lo que se le suma encima</div>
           </div>
         </div>
         <div class="cnv__panel-body">
 
-          <div class="cnv__field" style="max-width:260px;margin-bottom:1.5rem">
-            <label class="cnv__label">Contraseña temporal</label>
-            <input v-model="passwordInicial" type="password" autocomplete="new-password" class="cnv__input" placeholder="123456Aa" />
-            <span class="cnv__hint">El usuario puede cambiarla desde su perfil</span>
+          <!-- Suites: lo que realmente se vende. Un club puede tomar una, la otra o las dos. -->
+          <div class="cnv__section-label">Suites</div>
+          <div class="cnv__suites">
+            <button
+              v-for="s in suites" :key="s.clave"
+              type="button"
+              class="cnv__suite"
+              :class="{ 'cnv__suite--on': form.features[s.clave] }"
+              @click="form.features[s.clave] = !form.features[s.clave]"
+            >
+              <span class="cnv__suite-check">{{ form.features[s.clave] ? '✓' : '' }}</span>
+              <span class="cnv__suite-txt">
+                <span class="cnv__suite-name">{{ s.label }}</span>
+                <span class="cnv__suite-desc">{{ s.desc }}</span>
+              </span>
+            </button>
+          </div>
+          <p v-if="!haySuite" class="cnv__warn">
+            Sin ninguna suite, el club entra pero no puede operar. Elegí al menos una.
+          </p>
+
+          <!-- Incluidos: van con la suite. Sin interruptor, porque no hay nada que decidir. -->
+          <div v-if="incluidos.length" class="cnv__section-label" style="margin-top:1.5rem">
+            Ya incluido
+          </div>
+          <div v-if="incluidos.length" class="cnv__incluidos">
+            <div
+              v-for="inc in incluidos" :key="inc.clave"
+              class="cnv__incluido"
+              :class="{ 'cnv__incluido--off': !incluidoActivo(inc) }"
+            >
+              <Check v-if="incluidoActivo(inc)" :size="14" :stroke-width="3" class="cnv__incluido-ico" />
+              <Lock v-else :size="13" :stroke-width="2" class="cnv__incluido-ico" />
+              <div>
+                <div class="cnv__incluido-name">{{ inc.label }}</div>
+                <div class="cnv__incluido-desc">
+                  <template v-if="incluidoActivo(inc)">Viene con {{ inc.incluido_en_label }}</template>
+                  <template v-else>Necesita la suite {{ inc.incluido_en_label }}</template>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div class="cnv__section-label">Roles a crear</div>
+          <!-- Add-ons: lo que sí se decide. Cada uno avisa si necesita algo más para andar. -->
+          <div class="cnv__section-label" style="margin-top:1.5rem">Módulos adicionales</div>
+          <div class="cnv__feat-grid">
+            <label
+              v-for="a in addons" :key="a.clave"
+              class="cnv__feat-toggle"
+              :class="{ 'cnv__feat-toggle--on': form.features[a.clave], 'cnv__feat-toggle--warn': a.incompleto }"
+            >
+              <div class="cnv__feat-left">
+                <div>
+                  <div class="cnv__feat-name">{{ a.label }}</div>
+                  <div class="cnv__feat-desc">{{ a.desc }}</div>
+                  <!-- Lo que antes era una nota al pie: prender el interruptor no alcanza. -->
+                  <div v-if="a.requiere && form.features[a.clave]" class="cnv__feat-requiere">
+                    <AlertTriangle :size="11" :stroke-width="2.5" />
+                    {{ a.requiere }}
+                  </div>
+                </div>
+              </div>
+              <input v-model="form.features[a.clave]" type="checkbox" class="cnv__toggle__input" />
+              <div class="cnv__toggle__track cnv__toggle__track--sm"><div class="cnv__toggle__thumb cnv__toggle__thumb--sm"></div></div>
+            </label>
+          </div>
+
+          <!-- En construcción: se listan para que nadie los prometa creyendo que están. -->
+          <template v-if="enConstruccion.length">
+            <div class="cnv__section-label" style="margin-top:1.5rem">Todavía no disponible</div>
+            <div class="cnv__construccion">
+              <div v-for="e in enConstruccion" :key="e.clave" class="cnv__constr-item">
+                <Info :size="14" :stroke-width="2" class="cnv__constr-ico" />
+                <div>
+                  <div class="cnv__constr-name">{{ e.label }}</div>
+                  <div class="cnv__constr-desc">{{ e.desc }}</div>
+                </div>
+                <span class="cnv__constr-badge">En construcción</span>
+              </div>
+            </div>
+          </template>
+
+        </div>
+      </div>
+
+      <!-- ─── Paso 4: Acceso inicial ─── -->
+      <div v-if="paso === 4" class="cnv__panel">
+        <div class="cnv__panel-header">
+          <div class="cnv__panel-ico cnv__panel-ico--blue"><Users :size="18" :stroke-width="1.75" /></div>
+          <div>
+            <div class="cnv__panel-title">Con qué entran</div>
+            <div class="cnv__panel-sub">Qué usuarios se crean y con qué contraseña</div>
+          </div>
+        </div>
+        <div class="cnv__panel-body">
+
+          <!-- En claro y a propósito: es temporal y hay que poder dictársela al club. Detrás
+               de puntitos había que acordarse de lo que uno mismo acababa de tipear. -->
+          <div class="cnv__field cnv__pass" style="margin-bottom:1.5rem">
+            <label class="cnv__label">Contraseña temporal</label>
+            <div class="cnv__pass-row">
+              <input v-model="passwordInicial" type="text" autocomplete="off" spellcheck="false"
+                     class="cnv__input cnv__input--mono" placeholder="ClaveDelClub1" />
+              <button type="button" class="cnv__pass-copy" :disabled="!passwordInicial"
+                      @click="copiarPassword(passwordInicial)">
+                <Check v-if="passwordCopiada" :size="14" :stroke-width="2.5" />
+                <Copy v-else :size="14" :stroke-width="2" />
+                {{ passwordCopiada ? 'Copiada' : 'Copiar' }}
+              </button>
+            </div>
+            <span class="cnv__hint">La misma para todos los usuarios que se creen. Cada uno la cambia desde su perfil.</span>
+          </div>
+
+          <div class="cnv__section-label">Usuarios a crear</div>
           <div class="cnv__roles-grid">
             <div
-              v-for="(meta, rol) in ROLES_META" :key="rol"
+              v-for="r in rolesAlta" :key="r.clave"
               class="cnv__role-card"
               :class="{
-                'cnv__role-card--on':       rolesSeleccionados.includes(rol),
-                'cnv__role-card--required': meta.required,
+                'cnv__role-card--on':       rolesSeleccionados.includes(r.clave),
+                'cnv__role-card--required': r.clave === 'admin',
               }"
-              @click="toggleRol(rol)"
+              @click="toggleRol(r.clave)"
             >
               <div class="cnv__role-top">
                 <div class="cnv__role-check">
-                  <Check v-if="rolesSeleccionados.includes(rol)" :size="12" :stroke-width="3" />
+                  <Check v-if="rolesSeleccionados.includes(r.clave)" :size="12" :stroke-width="3" />
                 </div>
-                <span class="cnv__role-label">{{ meta.label }}</span>
-                <span v-if="meta.required" class="cnv__role-req">siempre</span>
+                <span class="cnv__role-label">{{ r.label }}</span>
+                <span v-if="r.clave === 'admin'" class="cnv__role-req">siempre</span>
               </div>
-              <div class="cnv__role-desc">{{ meta.desc }}</div>
-              <div class="cnv__role-email">{{ emailRol(rol) }}</div>
+              <div class="cnv__role-desc">{{ r.desc }}</div>
+              <div class="cnv__role-email">{{ emailRol(r.clave) }}</div>
             </div>
           </div>
+          <p class="cnv__hint" style="margin-top:.75rem">
+            Los demás roles (supervisor, abogado, auditor, delivery) se crean después desde la ficha del club.
+          </p>
 
           <div v-if="error" class="cnv__alert" style="margin-top:1.25rem">{{ error }}</div>
         </div>
@@ -371,7 +482,7 @@ async function handleSubmit() {
           <ChevronLeft :size="16" :stroke-width="2" /> Anterior
         </button>
         <div class="cnv__nav-spacer"></div>
-        <button v-if="paso < 3" class="cnv__btn-primary" @click="siguiente">
+        <button v-if="paso < PASOS.length" class="cnv__btn-primary" @click="siguiente">
           Siguiente <ChevronRight :size="16" :stroke-width="2" />
         </button>
         <button v-else class="cnv__btn-primary" :disabled="saving" @click="handleSubmit">
@@ -514,16 +625,99 @@ async function handleSubmit() {
 .cnv__suite-desc { font-size: 12px; color: var(--c-slate-500); line-height: 1.4; }
 .cnv__warn { margin: 10px 0 0; font-size: 12px; color: #b45309; }
 .cnv__feat-toggle--warn { border-color: #fcd34d; }
-.cnv__planes { display: grid; grid-template-columns: repeat(4,1fr); gap: .5rem; }
-@media (max-width: 700px) { .cnv__planes { grid-template-columns: 1fr 1fr; } }
-.cnv__plan-btn {
-  padding: .75rem .875rem; border: 1.5px solid var(--c-slate-200); border-radius: 10px;
+/* Cargando el catálogo */
+.cnv__cargando {
+  display: flex; align-items: center; justify-content: center; gap: .75rem;
+  padding: 4rem 0; color: var(--c-slate-500); font-size: .85rem;
+}
+
+/* Planes — dos tarjetas con sus topes a la vista */
+.cnv__planes { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+@media (max-width: 700px) { .cnv__planes { grid-template-columns: 1fr; } }
+.cnv__plan {
+  padding: 1rem 1.125rem; border: 1.5px solid var(--c-slate-200); border-radius: 12px;
   background: var(--c-slate-50); text-align: left; cursor: pointer; transition: all .15s;
 }
-.cnv__plan-btn:hover:not(.cnv__plan-btn--active) { border-color: var(--c-slate-400); background: var(--c-slate-100); }
-.cnv__plan-name { font-size: .85rem; font-weight: 800; display: block; margin-bottom: .2rem; }
-.cnv__plan-desc { font-size: .68rem; color: var(--c-slate-400); line-height: 1.4; }
-.cnv__plan-btn--active .cnv__plan-desc { color: inherit; opacity: .75; }
+.cnv__plan:hover:not(.cnv__plan--on) { border-color: var(--c-slate-400); background: var(--c-slate-100); }
+.cnv__plan--on { border-color: #1b5e20; background: #f0fdf4; }
+.cnv__plan-top { display: flex; align-items: center; gap: .5rem; margin-bottom: .625rem; }
+.cnv__plan-check {
+  width: 18px; height: 18px; border-radius: 5px; flex-shrink: 0;
+  border: 1.5px solid var(--c-slate-300); background: #fff;
+  display: flex; align-items: center; justify-content: center; color: #fff;
+}
+.cnv__plan--on .cnv__plan-check { background: #1b5e20; border-color: #1b5e20; }
+.cnv__plan-name { font-size: .95rem; font-weight: 800; color: var(--c-slate-900); }
+.cnv__plan-limites { list-style: none; margin: 0; padding: 0; display: grid; gap: .25rem; }
+.cnv__plan-limites li { font-size: .74rem; color: var(--c-slate-500); line-height: 1.35; }
+.cnv__plan--on .cnv__plan-limites li { color: var(--c-slate-600); }
+
+/* Incluidos en la suite — sin interruptor, porque no hay nada que decidir */
+.cnv__incluidos { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px,1fr)); gap: .5rem; }
+.cnv__incluido {
+  display: flex; align-items: flex-start; gap: .55rem;
+  padding: .7rem .85rem; border: 1px dashed var(--c-slate-300); border-radius: 10px;
+  background: #f0fdf4;
+}
+.cnv__incluido--off { background: var(--c-slate-50); }
+.cnv__incluido-ico { flex-shrink: 0; margin-top: .1rem; color: #1b5e20; }
+.cnv__incluido--off .cnv__incluido-ico { color: var(--c-slate-400); }
+.cnv__incluido-name { font-size: .8rem; font-weight: 700; color: var(--c-slate-900); }
+.cnv__incluido--off .cnv__incluido-name { color: var(--c-slate-500); }
+.cnv__incluido-desc { font-size: .69rem; color: var(--c-slate-500); line-height: 1.35; margin-top: .1rem; }
+
+/* Qué le falta a un módulo prendido para andar de verdad */
+.cnv__feat-requiere {
+  display: flex; align-items: center; gap: .3rem; margin-top: .35rem;
+  font-size: .66rem; font-weight: 600; color: #b45309; line-height: 1.3;
+}
+
+/* En construcción — se lista para que nadie lo prometa creyendo que está */
+.cnv__construccion { display: grid; gap: .5rem; }
+.cnv__constr-item {
+  display: flex; align-items: center; gap: .6rem;
+  padding: .7rem .85rem; border: 1px solid var(--c-slate-200); border-radius: 10px;
+  background: var(--c-slate-50);
+}
+.cnv__constr-ico  { flex-shrink: 0; color: var(--c-slate-400); }
+.cnv__constr-name { font-size: .8rem; font-weight: 700; color: var(--c-slate-500); }
+.cnv__constr-desc { font-size: .69rem; color: var(--c-slate-400); line-height: 1.35; }
+.cnv__constr-badge {
+  margin-left: auto; flex-shrink: 0;
+  font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--c-slate-500); background: var(--c-slate-200);
+  padding: .2rem .45rem; border-radius: 5px;
+}
+
+/* Contraseña temporal — visible a propósito */
+.cnv__pass { max-width: 420px; }
+.cnv__pass-row { display: flex; gap: .5rem; align-items: stretch; }
+.cnv__pass-row .cnv__input { flex: 1; }
+.cnv__input--mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .02em; }
+.cnv__pass-copy {
+  display: inline-flex; align-items: center; gap: .35rem; flex-shrink: 0;
+  padding: 0 .75rem; border: 1.5px solid var(--c-slate-200); border-radius: 9px;
+  background: #fff; color: var(--c-slate-600);
+  font-size: .75rem; font-weight: 700; cursor: pointer; transition: all .15s;
+}
+.cnv__pass-copy:hover:not(:disabled) { border-color: #1b5e20; color: #1b5e20; }
+.cnv__pass-copy:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Lo que hay que pasarle al club, todo junto */
+.cnv__entrega {
+  border: 1px solid var(--c-slate-200); border-radius: 12px;
+  background: var(--c-slate-50); padding: 1rem 1.125rem; margin-bottom: 1.5rem; text-align: left;
+}
+.cnv__entrega-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: .625rem; }
+.cnv__entrega-title {
+  font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--c-slate-500);
+}
+.cnv__entrega-pass { font-size: .8rem; color: var(--c-slate-600); margin-bottom: .75rem; }
+.cnv__entrega-pass code {
+  font-size: .85rem; font-weight: 700; color: var(--c-slate-900);
+  background: #fff; border: 1px solid var(--c-slate-200); border-radius: 6px; padding: .15rem .4rem;
+}
 
 /* Toggle */
 .cnv__toggle {
@@ -562,7 +756,6 @@ async function handleSubmit() {
 }
 .cnv__feat-toggle--on { border-color: #bbf7d0; background: #f0fdf4; }
 .cnv__feat-left { display: flex; align-items: center; gap: .5rem; flex: 1; min-width: 0; }
-.cnv__feat-ico  { font-size: .9rem; flex-shrink: 0; }
 .cnv__feat-name { font-size: .78rem; font-weight: 700; color: var(--c-slate-900); }
 .cnv__feat-desc { font-size: .68rem; color: var(--c-slate-400); }
 

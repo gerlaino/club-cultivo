@@ -1,0 +1,49 @@
+# Qué se puede vender, servido por el backend.
+#
+# Antes cada pantalla del super admin repetía la lista de módulos a mano —con sus labels, sus
+# íconos y sus advertencias— y las tres copias ya decían cosas distintas entre sí y con
+# `Club::ADDONS`. Un módulo nuevo obligaba a acordarse de cuatro lugares.
+#
+# Acá sale UNA vez, del modelo, y las pantallas la consumen.
+class SuperAdmin::CatalogoController < SuperAdmin::BaseController
+  def show
+    render json: {
+      planes: PlanEnforcer::PLANES.map { |clave, l|
+        {
+          clave:    clave,
+          label:    l[:label],
+          limites:  PlanEnforcer::RECURSOS.to_h { |r| [r, l[r]] },
+          # Para la tarjeta del wizard: "1 sede · 3 salas · …" sin que el frontend
+          # tenga que saber cómo se dice cada recurso.
+          resumen:  PlanEnforcer::RECURSOS.map { |r|
+            l[r].nil? ? "#{RECURSO_LABEL[r]} sin límite" : "#{l[r]} #{RECURSO_LABEL[r]}"
+          },
+        }
+      },
+      suites: Club::SUITES.map { |k, v| { clave: k, label: v[:label], desc: v[:desc] } },
+      addons: Club::ADDONS.map { |k, v|
+        { clave: k, label: v[:label], desc: v[:desc], requiere: v[:requiere],
+          incompleto: Club::ADDONS_INCOMPLETOS.include?(k) }
+      },
+      # Vienen dentro de una suite: se muestran para que se sepa qué entra, sin interruptor.
+      incluidos: Club::INCLUIDOS_EN_SUITE.map { |k, suite|
+        meta = Club::INCLUIDOS_META[k]
+        { clave: k, label: meta[:label], desc: meta[:desc], requiere: meta[:requiere],
+          incluido_en: suite, incluido_en_label: Club::SUITES.dig(suite, :label) }
+      },
+      en_construccion: Club::EN_CONSTRUCCION.map { |k, v|
+        { clave: k, label: v[:label], desc: v[:desc], requiere: v[:requiere] }
+      },
+      roles_alta: Club::ROLES_ALTA.map { |r| { clave: r, label: Club::ROLES_META.dig(r, :label),
+                                               desc: Club::ROLES_META.dig(r, :desc) } },
+      password_default: Club::PASSWORD_DEFAULT,
+    }
+  end
+
+  private
+
+  RECURSO_LABEL = {
+    sedes: 'sedes', salas: 'salas', lotes: 'lotes',
+    plantas: 'plantas', pacientes: 'pacientes', usuarios: 'usuarios',
+  }.freeze
+end

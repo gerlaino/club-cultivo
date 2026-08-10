@@ -26,15 +26,25 @@ RSpec.describe 'Ola 5 — Super Admin', type: :request do
     end
   end
 
+  # El modo observador está SUSPENDIDO (User::OBSERVADOR_HABILITADO). Estos tres contextos
+  # describen el modo ANDANDO y vuelven solos cuando se reactive; el estado suspendido lo cubre
+  # spec/requests/super_admin_observador_suspendido_spec.rb.
   context 'POST /super_admin/clubs/:id/observar' do
-    before { sign_in_as(super_admin) }
+    before do
+      skip 'modo observador suspendido' unless User::OBSERVADOR_HABILITADO
+      sign_in_as(super_admin)
+    end
 
-    it 'genera token de observación' do
+    # Ya no devuelve un `token`: la respuesta pedía mandarlo en un header `X-Observer-Token`
+    # que ningún controller leía nunca, así que era una sensación de seguridad y nada más. El
+    # modo se activa por el estado de la sesión (ver User#modo_observador?).
+    it 'devuelve el estado de la observación' do
       post "/super_admin/clubs/#{club.id}/observar", headers: auth_headers
       expect(response).to have_http_status(:created)
       body = JSON.parse(response.body)
-      expect(body['token']).to be_present
+      expect(body['observando']).to be(true)
       expect(body['club_id']).to eq(club.id)
+      expect(body['solo_lectura']).to be(true)
     end
 
     it 'pone al super_admin en modo observador' do
@@ -65,6 +75,7 @@ RSpec.describe 'Ola 5 — Super Admin', type: :request do
 
   context 'modo observador bloquea escritura' do
     before do
+      skip 'modo observador suspendido' unless User::OBSERVADOR_HABILITADO
       sign_in_as(super_admin)
       super_admin.update_columns(
         observer_club_id:    club.id,

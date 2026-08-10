@@ -51,8 +51,10 @@ RSpec.describe 'Rol cuyo módulo está apagado', type: :request do
       expect(JSON.parse(response.body)['error']).to include('Producción y dispensa')
     end
 
-    it 'rechaza al médico cuando el club apagó el módulo médico' do
-      club = club_sin(:medico)
+    # El módulo médico viene DENTRO de la suite de Producción y dispensa, así que al médico lo
+    # deja afuera perder la suite, no un interruptor propio que ya no existe.
+    it 'rechaza al médico cuando el club no tiene la suite que incluye su módulo' do
+      club = club_sin(:produccion_dispensa)
       user = create(:user, :medico, club: club)
 
       intentar_login(user)

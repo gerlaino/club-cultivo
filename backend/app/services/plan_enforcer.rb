@@ -1,20 +1,56 @@
 class PlanEnforcer
+  # El plan dice CUÁNTO, nunca QUÉ. Qué módulos tiene un club se decide aparte, en
+  # `Club::SUITES` / `Club::ADDONS`: mezclar las dos cosas era lo que hacía que un club
+  # "federación" quedara sin límites y sin poder hacer nada.
+  #
+  # `nil` = sin límite.
   PLANES = {
-    'semilla'    => { label: 'Semilla',    sedes: 1,   lotes: 2,   plantas: 50,  pacientes: 30,  usuarios: 3  },
-    'brote'      => { label: 'Brote',      sedes: 2,   lotes: 6,   plantas: 150, pacientes: 100, usuarios: 8  },
-    'cosecha'    => { label: 'Cosecha',    sedes: 3,   lotes: nil, plantas: nil, pacientes: 250, usuarios: 20 },
-    'federacion' => { label: 'Federación', sedes: nil, lotes: nil, plantas: nil, pacientes: nil, usuarios: nil },
+    'basico' => { label: 'Básico', sedes: 1,   salas: 3,   lotes: 4,   plantas: 200, pacientes: 80,  usuarios: 5   },
+    'total'  => { label: 'Total',  sedes: nil, salas: nil, lotes: nil, plantas: nil, pacientes: nil, usuarios: nil },
   }.freeze
+
+  PLAN_POR_DEFECTO = 'basico'.freeze
+
+  # Los cuatro planes viejos, mapeados a los dos nuevos. La migración de datos reescribe la
+  # columna, pero un club con el valor viejo (una copia vieja, un seed) no puede quedar sin
+  # límites por accidente: cae al que le corresponde en vez de a `PLANES[nil]`.
+  PLANES_LEGACY = {
+    'semilla'    => 'basico',
+    'brote'      => 'basico',
+    'cosecha'    => 'total',
+    'federacion' => 'total',
+  }.freeze
+
+  # Qué se limita, en el orden en que se le muestra al super admin.
+  RECURSOS = %i[sedes salas lotes plantas pacientes usuarios].freeze
+
+  # Normaliza cualquier valor guardado en `clubs.plan` a uno de los dos planes vigentes.
+  def self.normalizar(plan)
+    p = plan.to_s
+    return p if PLANES.key?(p)
+    PLANES_LEGACY[p] || PLAN_POR_DEFECTO
+  end
 
   def initialize(club)
     @club   = club
-    @plan   = club.plan || 'semilla'
-    @limite = PLANES[@plan] || PLANES['semilla']
+    @plan   = self.class.normalizar(club.plan)
+    @limite = PLANES[@plan]
   end
 
   def puede_crear_sede?
     return true if @limite[:sedes].nil?
     @club.sedes.activas.count < @limite[:sedes]
+  end
+
+  # Sin este límite, un club de una sola sede podía abrir salas sin techo: el plan medía el
+  # continente y no el contenido.
+  #
+  # Cuenta las salas que EXISTEN, no las que están en uso: una sala en mantenimiento sigue
+  # siendo del club y vuelve mañana. Contar sólo `activas` habría dejado abrir salas sin techo
+  # poniéndolas todas en mantenimiento. Sólo la sala cerrada —dada de baja— libera lugar.
+  def puede_crear_sala?
+    return true if @limite[:salas].nil?
+    salas_vigentes < @limite[:salas]
   end
 
   def puede_crear_lote?
@@ -49,20 +85,21 @@ class PlanEnforcer
       label:        @limite[:label],
       trial:        @club.plan_trial,
       activo_hasta: @club.plan_activo_hasta,
-      limites: {
-        sedes:     @limite[:sedes],
-        lotes:     @limite[:lotes],
-        plantas:   @limite[:plantas],
-        pacientes: @limite[:pacientes],
-        usuarios:  @limite[:usuarios],
-      },
-      uso: {
-        sedes:     @club.sedes.activas.count,
-        lotes:     @club.lotes.count,
-        plantas:   Plant.joins(:lote).where(lotes: { club_id: @club.id }).count,
-        pacientes: @club.pacientes.count,
-        usuarios:  @club.users.count,
-      },
+      limites:      RECURSOS.to_h { |r| [r, @limite[r]] },
+      uso:          uso,
+    }
+  end
+
+  def salas_vigentes = @club.salas.where.not(state: 'cerrada').count
+
+  def uso
+    {
+      sedes:     @club.sedes.activas.count,
+      salas:     salas_vigentes,
+      lotes:     @club.lotes.count,
+      plantas:   Plant.joins(:lote).where(lotes: { club_id: @club.id }).count,
+      pacientes: @club.pacientes.count,
+      usuarios:  @club.users.count,
     }
   end
 

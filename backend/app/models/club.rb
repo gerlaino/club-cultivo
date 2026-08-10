@@ -69,6 +69,25 @@ class Club < ApplicationRecord
 
   ROLES_DEFAULT    = %w[admin].freeze
   ROLES_VALIDOS_CLUB = %w[admin medico cultivador supervisor abogado auditor dispensador manicura delivery].freeze
+
+  # Los que se ofrecen al dar de alta un club. Es un subconjunto de ROLES_VALIDOS_CLUB a
+  # propósito: supervisor, abogado y auditor existen y funcionan, pero no son parte del arranque
+  # de un club —se crean después, cuando el club sabe que los necesita—, y ofrecerlos en el alta
+  # llenaba la pantalla de opciones que nadie tilda.
+  ROLES_ALTA = %w[admin medico cultivador dispensador manicura].freeze
+
+  ROLES_META = {
+    'admin'       => { label: 'Admin',       desc: 'Acceso total al panel del club' },
+    'medico'      => { label: 'Médico',      desc: 'Turnos, historia clínica e indicaciones' },
+    'cultivador'  => { label: 'Cultivador',  desc: 'Salas, lotes y plantas' },
+    'dispensador' => { label: 'Dispensador', desc: 'Entregas y dispensaciones' },
+    'manicura'    => { label: 'Manicura',    desc: 'Post-cosecha y pesaje' },
+    'supervisor'  => { label: 'Supervisor',  desc: 'Supervisión de cultivo y tareas' },
+    'abogado'     => { label: 'Abogado',     desc: 'Documentación y compliance' },
+    'auditor'     => { label: 'Auditor',     desc: 'Solo lectura para auditoría' },
+    'delivery'    => { label: 'Delivery',    desc: 'Reparto de paquetes' },
+  }.freeze
+
   PASSWORD_DEFAULT = ENV.fetch('CLUB_DEFAULT_PASSWORD', '123456Aa').freeze
 
   GENETICAS_INASE = [
@@ -182,27 +201,56 @@ class Club < ApplicationRecord
     },
   }.freeze
 
-  # Add-ons: se suman a una suite. `requiere` documenta de qué depende para funcionar DE VERDAD
-  # —no alcanza con prenderlo—, y el super admin lo muestra antes de dejar activarlo.
-  ADDONS = {
-    'bar'         => { label: 'Buffet',            desc: 'Punto de venta, caja de turno y stock del salón.',   requiere: nil },
-    'eventos'     => { label: 'Eventos',           desc: 'Fiestas y catas: provisión desde depósitos, entradas y rendición.', requiere: 'El Buffet tiene que estar activo.' },
-    'medico'      => { label: 'Módulo médico',     desc: 'Turnos, historia clínica e indicaciones.',           requiere: nil },
-    'iot'         => { label: 'Ambiente / IoT',    desc: 'Sensores, lecturas automáticas y reglas.',           requiere: 'Hardware del club (Sonoff u otro) o importación por CSV.' },
-    'ia'          => { label: 'Asistente IA',      desc: 'Análisis de lote, plan de trabajo y registro por voz.', requiere: 'ANTHROPIC_API_KEY en el entorno.' },
-    'mailer'      => { label: 'Correo al paciente', desc: 'Mails desde la ficha, con historial.',              requiere: 'SMTP del club cargado en Preferencias.' },
-    'whatsapp'    => { label: 'WhatsApp',          desc: 'Avisos de entrega por WhatsApp.',                    requiere: 'Cuenta de Twilio del club (SID, token y número).' },
-    'web_publica' => { label: 'Web pública',       desc: 'Sitio público del club y carnets digitales.',        requiere: 'INCOMPLETO: el sitio todavía no está deployado.' },
-    'ariccame'    => { label: 'ARICCAME',          desc: 'Reporte regulatorio de dispensaciones y stock.',     requiere: 'INCOMPLETO: la integración está simulada, no transmite de verdad.' },
+  # Módulos que vienen DENTRO de una suite y no se prenden ni se apagan por separado: todo club
+  # que compró la suite los tiene. El módulo médico y el correo al paciente viven de la ficha
+  # del paciente, así que un club de sólo Cultivo —que no tiene pacientes— no los ve nunca.
+  # Poder apagarlos era una perilla que no le servía a nadie y que, olvidada, dejaba al club
+  # con media ficha.
+  INCLUIDOS_EN_SUITE = {
+    'medico' => 'produccion_dispensa',
+    'mailer' => 'produccion_dispensa',
   }.freeze
 
-  # Add-ons que NO están terminados: vienen apagados por defecto y el super admin muestra la
+  INCLUIDOS_META = {
+    'medico' => { label: 'Módulo médico',      desc: 'Turnos, historia clínica e indicaciones.', requiere: nil },
+    'mailer' => { label: 'Correo al paciente', desc: 'Mails desde la ficha, con historial.',     requiere: 'SMTP del club cargado en Preferencias.' },
+  }.freeze
+
+  # Add-ons: se suman a una suite y SÍ se venden por separado. `requiere` documenta de qué
+  # dependen para funcionar DE VERDAD —no alcanza con prenderlos—, y el super admin lo muestra
+  # antes de dejar activarlos.
+  ADDONS = {
+    'bar'      => { label: 'Buffet',         desc: 'Punto de venta, caja de turno y stock del salón.',   requiere: nil },
+    'eventos'  => { label: 'Eventos',        desc: 'Fiestas y catas: provisión desde depósitos, entradas y rendición.', requiere: 'El Buffet tiene que estar activo.' },
+    'iot'      => { label: 'Ambiente / IoT', desc: 'Sensores, lecturas automáticas y reglas.',           requiere: 'Hardware del club (Sonoff u otro) o importación por CSV.' },
+    'ia'       => { label: 'Asistente IA',   desc: 'Análisis de lote, plan de trabajo y registro por voz.', requiere: 'ANTHROPIC_API_KEY en el entorno.' },
+    'whatsapp' => { label: 'WhatsApp',       desc: 'Avisos de entrega por WhatsApp.',                    requiere: 'Cuenta de Twilio del club (SID, token y número).' },
+    'ariccame' => { label: 'ARICCAME',       desc: 'Reporte regulatorio de dispensaciones y stock.',     requiere: 'INCOMPLETO: la integración está simulada, no transmite de verdad.' },
+  }.freeze
+
+  # Módulos que TODAVÍA NO EXISTEN. Se listan para que el super admin sepa que vienen, pero no
+  # se pueden activar: prenderlos no haría nada y prometerle al club algo que no está es peor
+  # que no ofrecerlo. Distinto de ADDONS_INCOMPLETOS, que funcionan a medias y sólo avisan.
+  EN_CONSTRUCCION = {
+    'vista_paciente' => {
+      label: 'Vista del paciente',
+      desc:  'Qué ve el paciente cuando entra: su carnet, sus dispensaciones y el sitio del club.',
+      requiere: 'En construcción — todavía no se puede activar.',
+    },
+  }.freeze
+
+  # Add-ons que funcionan a medias: vienen apagados por defecto y el super admin muestra la
   # advertencia de `requiere` antes de dejar activarlos. No se bloquean por completo —eso
   # dejaría su código inalcanzable— pero nadie los prende sin enterarse de qué les falta.
-  ADDONS_INCOMPLETOS = %w[web_publica ariccame eventos].freeze
+  ADDONS_INCOMPLETOS = %w[ariccame eventos].freeze
 
   # Se mantiene para compatibilidad: hay clubes con las claves viejas guardadas en `features`.
-  AVAILABLE_FEATURES = (SUITES.keys + ADDONS.keys).freeze
+  AVAILABLE_FEATURES = (SUITES.keys + ADDONS.keys + INCLUIDOS_EN_SUITE.keys).freeze
+
+  # Lo único que el super admin puede prender y apagar a mano. Los incluidos salen de su suite
+  # y los de EN_CONSTRUCCION no existen todavía: aceptarlos por parámetro sería guardar un
+  # `true` que nadie lee.
+  FEATURES_EDITABLES = (SUITES.keys + ADDONS.keys).freeze
 
   # Equivalencias con el esquema viejo, para que un club existente no pierda accesos.
   # `alertas`, `analytics`, `multi_sede`, `insumos` y `cuenta_corriente` dejan de ser flags:
@@ -215,16 +263,17 @@ class Club < ApplicationRecord
     'multi_sede'       => 'cultivo',
     'insumos'          => 'cultivo',
     'alertas'          => 'cultivo',
+    'web_publica'      => 'vista_paciente',
   }.freeze
 
-  # Con qué nace un club nuevo: las dos suites y los add-ons que funcionan sin configuración
-  # externa. Los que dependen de algo de afuera (IoT, IA, mail, WhatsApp) y los incompletos
-  # se prenden a mano cuando el club los tenga resueltos.
+  # Con qué nace un club nuevo: las dos suites y el Buffet, que funciona sin nada de afuera.
+  # Médico y correo no se listan porque ya vienen con Producción y dispensa. Los que dependen
+  # de algo externo (IoT, IA, WhatsApp) y los incompletos se prenden cuando el club los tenga
+  # resueltos.
   FEATURES_POR_DEFECTO = {
     'cultivo'             => true,
     'produccion_dispensa' => true,
     'bar'                 => true,
-    'medico'              => true,
   }.freeze
 
   # Features tal como las ve el frontend: las guardadas MÁS las claves viejas derivadas.
@@ -233,6 +282,10 @@ class Club < ApplicationRecord
   # nombre para decidir qué sección mostrar.
   def features_expandidas
     base = features.dup
+    # Los incluidos no se guardan: se derivan de su suite, y son verdad para todo club que la
+    # tenga. Guardarlos habría dejado dos fuentes que se contradicen en cuanto alguien apague
+    # la suite y se olvide del módulo.
+    INCLUIDOS_EN_SUITE.each { |modulo, suite| base[modulo] = true if base[suite] == true }
     FEATURES_LEGACY.each do |viejo, nuevo|
       base[viejo] = true if base[nuevo] == true
     end
@@ -242,6 +295,14 @@ class Club < ApplicationRecord
   def suite?(key)
     features[key.to_s] == true
   end
+
+  # ¿Este módulo viene incluido en una suite que el club tiene?
+  def incluido_por_suite?(key)
+    suite = INCLUIDOS_EN_SUITE[key.to_s]
+    suite.present? && features[suite] == true
+  end
+
+  def en_construccion?(key) = EN_CONSTRUCCION.key?(key.to_s)
 
   # Mapa inverso: qué banderas VIEJAS habilitan cada capacidad nueva. Se deriva de
   # FEATURES_LEGACY para no mantener dos listas que se contradigan.
@@ -253,13 +314,50 @@ class Club < ApplicationRecord
   # equivalían a él: un club con `ia_voz` guardado sigue teniendo el asistente.
   def feature?(key)
     k = key.to_s
-    return true if features[k] == true
+    # Lo que todavía no existe no está habilitado para nadie, tenga lo que tenga guardado.
+    return false if EN_CONSTRUCCION.key?(k)
+    return true  if features[k] == true
+    return true  if incluido_por_suite?(k)
 
     FEATURES_LEGACY_INVERSO.fetch(k, []).any? { |viejo| features[viejo] == true }
   end
 
   def addon_disponible?(key)
     feature?(key)
+  end
+
+  # ── ¿Este módulo ANDA de verdad? ──────────────────────────────────────────
+  #
+  # Prender el interruptor no alcanza: el WhatsApp necesita Twilio, el Correo necesita SMTP,
+  # el IoT necesita hardware. Antes eso sólo estaba escrito en el campo `requiere` como nota al
+  # pie, así que se prendían los nueve, se mostraba la demo y no funcionaba ninguno — sin que
+  # la pantalla dijera por qué.
+  #
+  # Devuelve qué le falta al módulo para funcionar, o nil si ya está listo. Sólo tiene sentido
+  # preguntarlo de un módulo prendido.
+  def falta_para_funcionar(key)
+    case key.to_s
+    when 'whatsapp' then twilio_configurado?  ? nil : 'Falta cargar la cuenta de Twilio (SID, token y número).'
+    when 'mailer'   then smtp_configured?     ? nil : 'Falta cargar el SMTP del club.'
+    when 'iot'      then iot_listo?           ? nil : 'Todavía no hay ningún dispositivo dando señales.'
+    when 'ia'       then ENV['ANTHROPIC_API_KEY'].present? ? nil : 'Falta ANTHROPIC_API_KEY en el entorno de la plataforma.'
+    when 'eventos'  then feature?('bar')      ? nil : 'Necesita el Buffet activo.'
+    end
+  end
+
+  # El IoT está listo cuando hay por dónde entren datos: hardware propio dado de alta o la
+  # cuenta de Pulse Grow cargada.
+  def iot_listo? = pulse_configurado? || dispositivos.any?
+
+  # Los tres estados que el super admin necesita distinguir de un vistazo:
+  #   :andando       → prendido y funcionando
+  #   :falta_config  → prendido, pero le falta algo y NO hace nada todavía
+  #   :apagado       → no contratado
+  #   :en_construccion → no existe todavía
+  def estado_modulo(key)
+    return :en_construccion if en_construccion?(key)
+    return :apagado         unless feature?(key)
+    falta_para_funcionar(key) ? :falta_config : :andando
   end
 
   # ¿Este add-on está terminado? El super admin lo usa para advertir antes de activarlo.

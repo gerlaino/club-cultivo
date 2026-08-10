@@ -6,11 +6,23 @@ class SuperAdmin::UsersController < SuperAdmin::BaseController
 
   def create
     club = Club.find(params[:user][:club_id])
-    user = club.users.build(user_params)
-    user.password = params[:user][:password].presence || '123456Aa'
+
+    # El plan también limita los usuarios: crearlos desde el panel de plataforma se salteaba
+    # el límite que sí se aplica cuando los crea el club (ver club_users_controller).
+    enforcer = PlanEnforcer.new(club)
+    unless enforcer.puede_crear_usuario?
+      info = enforcer.info
+      return render json: PlanEnforcer.error_limite('usuarios', info[:limites][:usuarios]),
+                    status: :payment_required
+    end
+
+    user     = club.users.build(user_params)
+    password = params[:user][:password].presence || Club::PASSWORD_DEFAULT
+    user.password = password
 
     if user.save
-      render json: serialize_user(user), status: :created
+      # En claro: es temporal y hay que poder dictársela a quien va a usarla.
+      render json: serialize_user(user).merge(password_inicial: password), status: :created
     else
       render json: { errors: user.errors.full_messages }, status: :unprocessable_entity
     end

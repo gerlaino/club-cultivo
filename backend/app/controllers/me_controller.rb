@@ -9,6 +9,24 @@ class MeController < ApplicationController
     # avatar_url no es columna: es la URL del adjunto ActiveStorage. Con `only:` se
     # ignoraba, por eso el ícono nunca recibía el avatar tras /me ni refreshUser.
     data['avatar_url'] = u.avatar.attached? ? url_for(u.avatar) : nil
+
+    # Modo observador: el super admin está viendo un club ajeno en solo lectura. El frontend lo
+    # necesita para montar el shell del club en vez del de plataforma y para mostrar el cartel
+    # permanente — sin eso, la sesión se ve idéntica a estar adentro de verdad.
+    #
+    # `club_id` ya viene enmascarado con el club observado (ver User#club_id): es a propósito,
+    # es el club contra el que trabaja el request.
+    if u.modo_observador?
+      club = u.observando_club
+      data['observando'] = {
+        club_id:            club&.id,
+        club_nombre:        club&.name,
+        expires_at:         u.observer_expires_at,
+        solo_lectura:       true,
+        sin_acceso_clinico: true,
+      }
+    end
+
     if u.dispensador?
       data['dispensario_sede_id'] =
         u.sedes_asignadas.activas.first&.id ||

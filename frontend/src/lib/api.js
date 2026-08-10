@@ -583,6 +583,9 @@ export const setFotoPortadaLote = (loteId, fotoId) => api.patch(`/lotes/${loteId
 export const getSuperAdminStats  = ()             => api.get('/super_admin/stats')
 // Sin params no trae los eliminados: verlos mezclados con los activos era lo que hacía
 // pensar que borrar un club no hacía nada.
+// Qué se puede vender (planes, suites, add-ons, incluidos, en construcción, roles del alta).
+// Sale del backend para que las pantallas no repitan la lista a mano y se desincronicen.
+export const getSuperAdminCatalogo = ()           => api.get('/super_admin/catalogo')
 export const listSuperAdminClubs = (params = {})  => api.get('/super_admin/clubs', { params })
 export const getSuperAdminClub   = (id)           => api.get(`/super_admin/clubs/${id}`)
 export const createSuperAdminClub = (payload)     => api.post('/super_admin/clubs', payload)

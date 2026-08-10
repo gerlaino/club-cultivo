@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_08_021000) do
+ActiveRecord::Schema[7.2].define(version: 2026_08_10_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -411,7 +411,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_08_021000) do
     t.string "country"
     t.string "timezone"
     t.string "theme_primary"
-    t.string "plan", default: "semilla", null: false
+    t.string "plan", default: "basico", null: false
     t.date "plan_activo_hasta"
     t.boolean "plan_trial", default: true, null: false
     t.jsonb "limites_custom", default: {}

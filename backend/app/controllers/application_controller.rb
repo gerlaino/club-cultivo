@@ -13,6 +13,7 @@ class ApplicationController < ActionController::API
   before_action :check_rol_habilitado!
   before_action :block_auditor_writes!
   before_action :block_observer_writes!
+  before_action :block_observer_clinico!
 
   # ── Gating por módulo ─────────────────────────────────────────────────────
   #
@@ -23,16 +24,26 @@ class ApplicationController < ActionController::API
   #
   # `super_admin` pasa siempre: administra la plataforma, no opera un club.
   def require_feature!(clave)
-    return if current_user&.super_admin?
+    # El super admin pasa siempre: administra la plataforma, no opera un club. Pero cuando
+    # está OBSERVANDO uno, tiene que ver exactamente lo que ve ese club — si pasara de largo
+    # vería módulos que el club no compró y la observación dejaría de servir para entender qué
+    # tiene delante el cliente.
+    return if current_user&.super_admin? && !current_user.modo_observador?
 
     club = current_user&.club
     return if club&.addon_disponible?(clave) || club&.suite?(clave)
 
-    meta   = Club::ADDONS[clave.to_s] || Club::SUITES[clave.to_s] || {}
+    meta   = Club::ADDONS[clave.to_s] || Club::SUITES[clave.to_s] ||
+             Club::INCLUIDOS_META[clave.to_s] || Club::EN_CONSTRUCCION[clave.to_s] || {}
     nombre = meta[:label] || clave.to_s.humanize
 
-    detalle = if Club::ADDONS_INCOMPLETOS.include?(clave.to_s)
+    detalle = if Club::EN_CONSTRUCCION.key?(clave.to_s)
+                'Este módulo todavía está en construcción.'
+              elsif Club::ADDONS_INCOMPLETOS.include?(clave.to_s)
                 'Este módulo todavía no está disponible.'
+              elsif (suite = Club::INCLUIDOS_EN_SUITE[clave.to_s])
+                # Viene con la suite: lo que falta no es el módulo, es lo que lo contiene.
+                "Tu club no tiene la suite #{Club::SUITES.dig(suite, :label)}, que es la que lo incluye."
               else
                 'Tu club no tiene este módulo habilitado.'
               end
@@ -107,6 +118,30 @@ class ApplicationController < ActionController::API
     render json: { error: "Modo solo observación — escritura no permitida" }, status: :forbidden
   end
 
+  # Rutas cuyo contenido es información de SALUD de pacientes: turnos con motivo de consulta,
+  # fichas, indicaciones médicas.
+  RUTAS_CLINICAS = ['/api/medico/', '/api/indicaciones'].freeze
+
+  # El observador ve cómo opera el club, no la salud de sus pacientes.
+  #
+  # Son datos de terceros que no son del club ni nuestros (Ley 25.326 art. 8: datos sensibles),
+  # y nadie los cedió para que los mire quien administra la plataforma. Hace falta un candado
+  # propio porque los guards del namespace médico dejan pasar a `super_admin` a propósito —
+  # para el soporte real, con la cuenta de plataforma, no para una sesión de observación.
+  #
+  # La historia clínica de la ficha del paciente ya queda afuera por otra vía: la allowlist de
+  # PacientePolicy::ROLES_CLINICA no incluye a super_admin.
+  def block_observer_clinico!
+    return unless current_user&.super_admin?
+    return unless current_user.modo_observador?
+    return unless RUTAS_CLINICAS.any? { |p| request.path.start_with?(p) }
+
+    render json: {
+      error: 'La observación no incluye datos clínicos de pacientes.',
+      observador_sin_acceso_clinico: true,
+    }, status: :forbidden
+  end
+
   def require_admin_for_write!
     unless current_user&.admin? || current_user&.super_admin?
       render json: { error: "No autorizado" }, status: :forbidden
@@ -120,9 +155,17 @@ class ApplicationController < ActionController::API
   def set_tenant_from_current_user
     return unless respond_to?(:current_user, true)
     user = current_user
-    # Sin usuario (público / login) o super_admin (cross-club a propósito) → sin tenant.
-    # Esos contextos fijan el scope ellos mismos (without_tenant / with_tenant explícito).
-    return if user.nil? || user.super_admin?
+    return if user.nil?
+
+    # Super admin observando un club: el tenant del request ES el club observado. Sin esto el
+    # observador entraba sin tenant y, con require_tenant=true (TEN-01c), no podía leer nada.
+    # Es seguro: `block_observer_writes!` ya rechaza todo lo que no sea una lectura.
+    if user.super_admin?
+      set_current_tenant(user.observando_club) if user.modo_observador?
+      # Super admin fuera del modo observador: cross-club a propósito, sin tenant. Esos
+      # contextos fijan el scope ellos mismos (without_tenant / with_tenant explícito).
+      return
+    end
 
     club = user.club_id && user.club
     if club

@@ -60,10 +60,12 @@ class BaresController < ApplicationController
     render json: { error: 'Bar no encontrado' }, status: :not_found
   end
 
+  # Usa el gating común en vez de uno propio: así el club observado por un super admin también
+  # queda cubierto y el 403 llega con el mismo formato que el resto (`requiere_modulo`), que es
+  # el que el frontend sabe leer. La versión anterior además reventaba con 500 si el usuario no
+  # tenía club — el caso del super admin.
   def require_feature_bar!
-    return if current_user.club.feature?(:bar)
-
-    render json: { error: 'El bar no está habilitado para este club.' }, status: :forbidden
+    require_feature!(:bar)
   end
 
   ROLES_OPERADOR = %w[admin supervisor dispensador].freeze

@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub, suspenderClub, reactivarClub, provisionarWhatsappClub, desconectarWhatsappClub, provisionarPulse } from '../../lib/api.js'
+import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub, suspenderClub, reactivarClub, provisionarWhatsappClub, desconectarWhatsappClub, provisionarPulse, getSuperAdminCatalogo } from '../../lib/api.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
 import { ArrowLeft, Pencil, Trash2, RotateCcw, Sparkles, UserPlus, Check, X, Save, Mail, Zap, Users, Info, CreditCard, PauseCircle, PlayCircle } from 'lucide-vue-next'
@@ -70,6 +70,13 @@ const CONFIGURABLES = { ia: true, iot: true, whatsapp: true }
 
 const addonsActivos = computed(() => addons.value.filter(a => featuresForm.value[a.clave]))
 
+// Prendido no es lo mismo que andando. El backend calcula el estado real de cada módulo
+// (`andando` / `falta_config` / `apagado`) mirando si tiene lo que necesita para funcionar:
+// el WhatsApp sin Twilio y el Correo sin SMTP quedan prendidos sin hacer nada.
+const modulosAMedias = computed(() =>
+  [...addons.value, ...incluidos.value].filter(m => m.estado === 'falta_config')
+)
+
 const pulseKey    = ref('')
 const savingPulse = ref(false)
 
@@ -117,20 +124,23 @@ const FEATURE_META = {}
 // se contradigan cuando se agrega o completa un módulo.
 const suites = ref([])
 const addons = ref([])
+// Los que vienen dentro de una suite (sin interruptor) y los que todavía no existen.
+const incluidos      = ref([])
+const enConstruccion = ref([])
 const ADDON_ICO = {
   bar: '🍺', eventos: '🎉', medico: '🩺', iot: '📡', ia: '🤖',
-  mailer: '✉️', whatsapp: '💬', web_publica: '🌐', ariccame: '📋',
+  mailer: '✉️', whatsapp: '💬', ariccame: '📋',
 }
 const iaActiva = computed(() => featuresForm.value.ia === true)
 
+// Dos planes: el plan dice CUÁNTO, nunca QUÉ. Los límites salen del catálogo del backend —
+// duplicarlos acá era garantía de que la pantalla dijera un número y el sistema aplicara otro.
 const PLAN_META = {
-  semilla:    { label: 'Semilla',    color: '#64748b', bg: '#f1f5f9' },
-  brote:      { label: 'Brote',      color: '#15803d', bg: '#dcfce7' },
-  cosecha:    { label: 'Cosecha',    color: '#0369a1', bg: '#dbeafe' },
-  federacion: { label: 'Federación', color: '#7c3aed', bg: '#ede9fe' },
+  basico: { label: 'Básico', color: '#15803d', bg: '#dcfce7' },
+  total:  { label: 'Total',  color: '#7c3aed', bg: '#ede9fe' },
 }
-const PLANES = Object.entries(PLAN_META).map(([v, m]) => ({ value: v, ...m }))
-function planMeta(p) { return PLAN_META[p] || PLAN_META.semilla }
+const PLANES = ref([])
+function planMeta(p) { return PLAN_META[p] || PLAN_META.basico }
 
 const ROLES = ['admin', 'medico', 'cultivador', 'supervisor', 'abogado', 'auditor', 'dispensador', 'manicura', 'delivery']
 const ROLE_META = {
@@ -161,11 +171,11 @@ async function cargar() {
       twilio_auth_token:    '',
       twilio_whatsapp_from: data.twilio_whatsapp_from || '',
     }
-    const features = { ...(data.features || {}) }
-    if (features.web_publica === undefined) features.web_publica = data.web_activa || false
-    featuresForm.value = features
-    suites.value = data.suites || []
-    addons.value = data.addons || []
+    featuresForm.value    = { ...(data.features || {}) }
+    suites.value          = data.suites || []
+    addons.value          = data.addons || []
+    incluidos.value       = data.incluidos || []
+    enConstruccion.value  = data.en_construccion || []
     iaTier.value       = data.ia_tier        || 'basico'
     iaLimiteHora.value = data.ia_limite_hora || 20
   } finally {
@@ -320,9 +330,13 @@ async function guardarFeatures() {
       features:       featuresForm.value,
       ia_tier:        iaTier.value,
       ia_limite_hora: iaLimiteHora.value,
-      web_activa:     featuresForm.value.web_publica === true,
     })
-    club.value = { ...club.value, ...data }
+    club.value           = { ...club.value, ...data }
+    // El backend recalcula el estado real de cada módulo (prendido ≠ andando): se relee de la
+    // respuesta en vez de asumir que quedó como lo dejó el formulario.
+    addons.value         = data.addons || addons.value
+    incluidos.value      = data.incluidos || incluidos.value
+    enConstruccion.value = data.en_construccion || enConstruccion.value
     featuresSuccess.value = true
     setTimeout(() => { featuresSuccess.value = false }, 3000)
   } finally {
@@ -357,7 +371,15 @@ async function desconectarWa() {
   }
 }
 
-onMounted(cargar)
+onMounted(async () => {
+  await cargar()
+  // Los planes con sus límites salen del backend, para que el modal muestre exactamente los
+  // topes que después se aplican.
+  try {
+    const { data } = await getSuperAdminCatalogo()
+    PLANES.value = (data.planes || []).map(p => ({ value: p.clave, ...planMeta(p.clave), ...p }))
+  } catch { /* el modal cae a los dos planes conocidos si el catálogo no responde */ }
+})
 </script>
 
 <template>
@@ -598,7 +620,50 @@ onMounted(cargar)
             </label>
           </div>
 
+          <!-- Lo que entra con la suite. Sin interruptor: no hay nada que decidir. -->
+          <template v-if="incluidos.length">
+            <div class="scd__divider"><span>Ya incluido en la suite</span></div>
+            <div class="scd__incluidos">
+              <div
+                v-for="inc in incluidos" :key="inc.clave"
+                class="scd__incluido"
+                :class="{ 'scd__incluido--off': !inc.activo }"
+              >
+                <span class="scd__feat-ico">{{ ADDON_ICO[inc.clave] || '🧩' }}</span>
+                <div>
+                  <div class="scd__feat-name">
+                    {{ inc.label }}
+                    <span v-if="inc.estado === 'falta_config'"
+                          class="scd__feat-badge scd__feat-badge--cfg">no funciona todavía</span>
+                  </div>
+                  <div class="scd__feat-desc">
+                    <template v-if="inc.activo">Viene con {{ inc.incluido_en_label }}</template>
+                    <template v-else>Necesita la suite {{ inc.incluido_en_label }}</template>
+                  </div>
+                  <div v-if="inc.falta" class="scd__feat-req scd__feat-req--warn">{{ inc.falta }}</div>
+                </div>
+              </div>
+            </div>
+          </template>
+
           <div class="scd__divider"><span>Módulos adicionales</span></div>
+
+          <!-- Lo que está prendido y NO hace nada. Va arriba de los interruptores porque es lo
+               que hay que resolver: prenderlos y mostrar una demo que no funciona es peor que
+               no haberlos ofrecido. -->
+          <div v-if="modulosAMedias.length" class="scd__amedias">
+            <div class="scd__amedias-title">
+              {{ modulosAMedias.length }}
+              módulo{{ modulosAMedias.length === 1 ? '' : 's' }}
+              prendido{{ modulosAMedias.length === 1 ? '' : 's' }} que todavía no
+              funciona{{ modulosAMedias.length === 1 ? '' : 'n' }}
+            </div>
+            <ul class="scd__amedias-list">
+              <li v-for="m in modulosAMedias" :key="m.clave">
+                <strong>{{ m.label }}</strong> — {{ m.falta }}
+              </li>
+            </ul>
+          </div>
 
           <!-- Cada add-on con su configuración ADENTRO. Antes los toggles estaban acá y sus
                paneles (IA, WhatsApp, Pulse) al pie de la página: se activaba algo y la
@@ -615,13 +680,18 @@ onMounted(cargar)
                   <div class="scd__feat-name">
                     {{ a.label }}
                     <span v-if="a.incompleto" class="scd__feat-badge">incompleto</span>
-                    <span v-if="featuresForm[a.clave] && CONFIGURABLES[a.clave]"
-                          class="scd__feat-badge scd__feat-badge--cfg">requiere configuración</span>
+                    <!-- El estado REAL, no el interruptor: lo calcula el backend mirando si el
+                         módulo tiene lo que necesita para funcionar. -->
+                    <span v-if="a.estado === 'andando'" class="scd__feat-badge scd__feat-badge--ok">andando</span>
+                    <span v-else-if="a.estado === 'falta_config'"
+                          class="scd__feat-badge scd__feat-badge--cfg">no funciona todavía</span>
                   </div>
                   <div class="scd__feat-desc">{{ a.desc }}</div>
-                  <!-- De qué depende para funcionar DE VERDAD. Prenderlo sin esto deja al club
-                       creyendo que tiene algo que no va a pasar. -->
-                  <div v-if="a.requiere" class="scd__feat-req" :class="{ 'scd__feat-req--warn': a.incompleto }">
+                  <!-- Qué le falta AHORA a este club, que es distinto de qué necesita el módulo
+                       en general. Prenderlo sin esto deja al club creyendo que tiene algo que
+                       no va a pasar. -->
+                  <div v-if="a.falta" class="scd__feat-req scd__feat-req--warn">{{ a.falta }}</div>
+                  <div v-else-if="a.requiere && !featuresForm[a.clave]" class="scd__feat-req">
                     {{ a.requiere }}
                   </div>
                 </div>
@@ -697,6 +767,20 @@ onMounted(cargar)
             </div>
           </div>
 
+          <!-- Lo que todavía no existe. Se lista para que nadie lo prometa creyendo que está. -->
+          <template v-if="enConstruccion.length">
+            <div class="scd__divider"><span>Todavía no disponible</span></div>
+            <div class="scd__construccion">
+              <div v-for="e in enConstruccion" :key="e.clave" class="scd__constr-item">
+                <div>
+                  <div class="scd__feat-name">{{ e.label }}</div>
+                  <div class="scd__feat-desc">{{ e.desc }}</div>
+                </div>
+                <span class="scd__constr-badge">En construcción</span>
+              </div>
+            </div>
+          </template>
+
         </div>
       </div>
 
@@ -719,9 +803,21 @@ onMounted(cargar)
                   :class="{ 'scd__plan-opt--active': planForm.plan === p.value }"
                   :style="planForm.plan === p.value ? { borderColor: p.color, background: p.bg, color: p.color } : {}"
                   @click="planForm.plan = p.value">
-                  {{ p.label }}
+                  <strong class="scd__plan-opt-name">{{ p.label }}</strong>
+                  <!-- Los topes a la vista: elegir un plan sin verlos es elegir a ciegas. -->
+                  <span v-if="p.resumen" class="scd__plan-opt-limites">{{ p.resumen.join(' · ') }}</span>
                 </button>
               </div>
+              <!-- Lo que el club ya tiene, para saber si el plan nuevo le queda chico. -->
+              <p v-if="club.plan_info" class="scd__hint" style="margin-top:.5rem">
+                Hoy usa:
+                {{ club.plan_info.uso.sedes }} sedes ·
+                {{ club.plan_info.uso.salas }} salas ·
+                {{ club.plan_info.uso.lotes }} lotes ·
+                {{ club.plan_info.uso.plantas }} plantas ·
+                {{ club.plan_info.uso.pacientes }} pacientes ·
+                {{ club.plan_info.uso.usuarios }} usuarios
+              </p>
               <div class="scd__field" style="margin-top:1rem">
                 <label class="scd__lbl">Vigente hasta</label>
                 <AppDatePicker v-model="planForm.plan_activo_hasta" />
@@ -770,7 +866,10 @@ onMounted(cargar)
                 </div>
                 <div class="scd__field">
                   <label class="scd__lbl">Contraseña inicial</label>
-                  <input v-model="userForm.password" type="password" autocomplete="new-password" class="scd__input" />
+                  <!-- Visible: es temporal y hay que poder dictársela a quien va a usarla.
+                       Detrás de puntitos había que acordarse de lo que uno acababa de tipear. -->
+                  <input v-model="userForm.password" type="text" autocomplete="off" spellcheck="false"
+                         class="scd__input scd__input--mono" />
                 </div>
                 <div class="scd__field">
                   <label class="scd__lbl">Rol</label>
@@ -976,7 +1075,41 @@ onMounted(cargar)
 .scd__cfg-row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
 .scd__cfg-row .scd__input { flex: 1; min-width: 180px; }
 .scd__cfg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .5rem; }
-.scd__feat-badge--cfg { background: #dbeafe; color: #0369a1; }
+.scd__feat-badge--cfg { background: #fef3c7; color: #b45309; }
+.scd__feat-badge--ok  { background: #dcfce7; color: #15803d; }
+
+/* Ya incluido en la suite — sin interruptor, porque no hay nada que decidir */
+.scd__incluidos { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap: .5rem; }
+.scd__incluido {
+  display: flex; align-items: flex-start; gap: .6rem;
+  padding: .75rem .875rem; border: 1px dashed var(--c-slate-300);
+  border-radius: 10px; background: #f0fdf4;
+}
+.scd__incluido--off { background: var(--c-slate-50); opacity: .7; }
+
+/* Prendido y sin funcionar: lo que hay que resolver antes de mostrarle el club a nadie */
+.scd__amedias {
+  border: 1px solid #fcd34d; background: #fffbeb;
+  border-radius: 10px; padding: .75rem .875rem; margin-bottom: .875rem;
+}
+.scd__amedias-title { font-size: .78rem; font-weight: 800; color: #b45309; margin-bottom: .35rem; }
+.scd__amedias-list { margin: 0; padding-left: 1.1rem; display: grid; gap: .2rem; }
+.scd__amedias-list li { font-size: .74rem; color: #92400e; line-height: 1.4; }
+
+/* Todavía no disponible */
+.scd__construccion { display: grid; gap: .5rem; }
+.scd__constr-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: .75rem .875rem; border: 1px solid var(--c-slate-200);
+  border-radius: 10px; background: var(--c-slate-50);
+}
+.scd__constr-badge {
+  flex-shrink: 0; font-size: .62rem; font-weight: 800; text-transform: uppercase;
+  letter-spacing: .05em; color: var(--c-slate-500); background: var(--c-slate-200);
+  padding: .2rem .45rem; border-radius: 5px;
+}
+
+.scd__input--mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .02em; }
 
 /* Suscripción */
 .scd__susc-suites { display: flex; flex-wrap: wrap; gap: .35rem; }
@@ -1092,6 +1225,8 @@ onMounted(cargar)
 .scd__modal-body { padding: 1.1rem 1.35rem; display: flex; flex-direction: column; gap: .875rem; }
 .scd__modal-ft { display: flex; justify-content: flex-end; gap: .65rem; padding: .875rem 1.35rem; border-top: 1px solid var(--c-slate-100); }
 .scd__planes { display: grid; grid-template-columns: repeat(2,1fr); gap: .4rem; }
-.scd__plan-opt { padding: .55rem .75rem; border: 1.5px solid var(--c-slate-200); border-radius: 8px; background: var(--c-slate-50); font-size: .8rem; font-weight: 600; cursor: pointer; transition: all .15s; text-align: left; color: var(--c-slate-600); }
+.scd__plan-opt { padding: .625rem .75rem; border: 1.5px solid var(--c-slate-200); border-radius: 8px; background: var(--c-slate-50); font-size: .8rem; font-weight: 600; cursor: pointer; transition: all .15s; text-align: left; color: var(--c-slate-600); display: grid; gap: .25rem; }
 .scd__plan-opt:hover { border-color: var(--c-slate-400); }
+.scd__plan-opt-name { font-size: .85rem; font-weight: 800; }
+.scd__plan-opt-limites { font-size: .66rem; font-weight: 500; line-height: 1.4; opacity: .8; }
 </style>

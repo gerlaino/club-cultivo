@@ -11,9 +11,12 @@ RSpec.describe 'Gating por módulo', type: :request do
     club.update_columns(features: hash)
   end
 
-  describe 'módulo médico apagado' do
+  # El módulo médico ya no se apaga por separado: viene DENTRO de la suite de Producción y
+  # dispensa, porque vive de la ficha del paciente. Un club que no la tiene —sólo Cultivo— no
+  # tiene pacientes, así que no tiene médico.
+  describe 'club sin la suite que incluye al módulo médico' do
     before do
-      features!('cultivo' => true, 'produccion_dispensa' => true, 'medico' => false)
+      features!('cultivo' => true, 'produccion_dispensa' => false)
     end
 
     # Se prueba con el ADMIN y no con el médico: desde el gating de roles, un médico en un
@@ -31,6 +34,8 @@ RSpec.describe 'Gating por módulo', type: :request do
       expect(body['requiere_modulo']).to be(true)
       expect(body['modulo']).to eq('medico')
       expect(body['error']).to match(/Módulo médico/i)
+      # Y dice dónde está el problema de verdad: le falta la suite, no el módulo.
+      expect(body['error']).to match(/Producción y dispensa/i)
     end
 
     it 'al médico lo frena antes, en el login' do
@@ -42,28 +47,38 @@ RSpec.describe 'Gating por módulo', type: :request do
     end
   end
 
-  describe 'módulo médico prendido' do
-    it 'deja pasar' do
-      features!('cultivo' => true, 'produccion_dispensa' => true, 'medico' => true)
+  describe 'club con la suite de Producción y dispensa' do
+    # Sin tildar nada: el módulo médico VIENE con la suite. Que hiciera falta acordarse de
+    # prenderlo aparte era lo que dejaba clubes con media ficha de paciente.
+    it 'tiene el módulo médico sin que nadie lo prenda' do
+      features!('cultivo' => true, 'produccion_dispensa' => true)
       sign_in_as(medico)
 
       get '/api/medico/pacientes'
 
       expect(response).to have_http_status(:ok)
+      expect(club.reload.feature?(:medico)).to be(true)
+      expect(club.feature?(:mailer)).to be(true)
+    end
+
+    # No se guarda como bandera: se deriva. Si se guardara, podría contradecir a su suite.
+    it 'no guarda el módulo incluido como una feature suelta' do
+      features!('cultivo' => true, 'produccion_dispensa' => true)
+
+      expect(club.reload.features).not_to have_key('medico')
+      expect(club.features_expandidas['medico']).to be(true)
     end
   end
 
   describe 'módulos incompletos' do
-    # ARICCAME simula el envío y la web pública no está deployada: vienen APAGADOS y
-    # el panel advierte qué les falta, pero se pueden prender a conciencia.
+    # ARICCAME simula el envío: viene APAGADO y el panel advierte qué le falta, pero se puede
+    # prender a conciencia.
     it 'no vienen activados por defecto en un club nuevo' do
       expect(Club::FEATURES_POR_DEFECTO).not_to have_key('ariccame')
-      expect(Club::FEATURES_POR_DEFECTO).not_to have_key('web_publica')
     end
 
     it 'quedan marcados como incompletos, con el motivo a la vista' do
       expect(club.addon_incompleto?(:ariccame)).to be(true)
-      expect(club.addon_incompleto?(:web_publica)).to be(true)
       expect(club.addon_incompleto?(:eventos)).to be(true)
       expect(Club::ADDONS['ariccame'][:requiere]).to match(/INCOMPLETO/)
     end
@@ -82,6 +97,58 @@ RSpec.describe 'Gating por módulo', type: :request do
 
     it 'el que está terminado no aparece como incompleto' do
       expect(club.addon_incompleto?(:bar)).to be(false)
+    end
+  end
+
+  # Distinto de "incompleto": lo que está EN CONSTRUCCIÓN no existe todavía, así que no se
+  # puede prender ni por la API. Prometerle al club algo que no está es peor que no ofrecerlo.
+  describe 'módulos en construcción' do
+    it 'la vista del paciente no está disponible para nadie' do
+      expect(Club::EN_CONSTRUCCION).to have_key('vista_paciente')
+      expect(club.feature?(:vista_paciente)).to be(false)
+      expect(club.estado_modulo(:vista_paciente)).to eq(:en_construccion)
+    end
+
+    it 'no se habilita ni forzando la bandera a mano' do
+      features!('vista_paciente' => true)
+
+      expect(club.reload.feature?(:vista_paciente)).to be(false)
+    end
+
+    it 'no es una feature editable por el super admin' do
+      expect(Club::FEATURES_EDITABLES).not_to include('vista_paciente')
+    end
+  end
+
+  # Prender el interruptor no es lo mismo que funcionar: el WhatsApp sin Twilio y el Correo sin
+  # SMTP quedan prendidos y no hacen nada. El panel tiene que poder decir la diferencia.
+  describe 'estado real de un módulo' do
+    it 'un módulo prendido al que le falta configuración no cuenta como andando' do
+      features!('cultivo' => true, 'produccion_dispensa' => true, 'whatsapp' => true)
+
+      club.reload
+      expect(club.feature?(:whatsapp)).to be(true)
+      expect(club.estado_modulo(:whatsapp)).to eq(:falta_config)
+      expect(club.falta_para_funcionar(:whatsapp)).to match(/Twilio/i)
+    end
+
+    it 'un módulo sin dependencias externas anda apenas se prende' do
+      features!('cultivo' => true, 'produccion_dispensa' => true, 'bar' => true)
+
+      expect(club.reload.estado_modulo(:bar)).to eq(:andando)
+      expect(club.falta_para_funcionar(:bar)).to be_nil
+    end
+
+    it 'un módulo apagado es apagado, no "le falta configuración"' do
+      features!('cultivo' => true)
+
+      expect(club.reload.estado_modulo(:whatsapp)).to eq(:apagado)
+    end
+
+    it 'los eventos avisan que dependen del Buffet' do
+      features!('cultivo' => true, 'produccion_dispensa' => true, 'eventos' => true, 'bar' => false)
+
+      expect(club.reload.falta_para_funcionar(:eventos)).to match(/Buffet/i)
     end
   end
 

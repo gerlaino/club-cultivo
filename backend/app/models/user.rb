@@ -152,13 +152,64 @@ class User < ApplicationRecord
     sedes.empty? ? scope.pluck(:id) : scope.where(sede_id: sedes).pluck(:id)
   end
 
+  # ── Modo observador ───────────────────────────────────────────────────────
+  #
+  # El super admin entra a un club y lo ve entero, como lo ve su admin, sin poder tocar nada.
+  # La mitad de "no tocar nada" ya estaba (`block_observer_writes!` rechaza todo verbo que no
+  # sea GET); lo que faltaba era la mitad de "ver": el super admin no tiene club propio, así
+  # que los ~370 puntos donde los controllers scopean por `current_user.club_id` le devolvían
+  # nil y no veía absolutamente nada.
+  #
+  # En vez de tocar esos 370 puntos, el club efectivo se resuelve acá: mientras el modo está
+  # activo, `club` y `club_id` responden el club observado. Es seguro porque sólo aplica a un
+  # super_admin (nadie más puede tener `observer_club_id`) y porque la escritura ya está
+  # bloqueada, así que ningún dato puede terminar guardado contra el club equivocado.
+  #
+  # OJO: es un override de lectura. La persistencia de la columna NO cambia — Active Record
+  # escribe por `write_attribute`, y `club_id_original` deja a mano el valor real.
+  # SUSPENDIDO (10-ago-2026). Poner en `true` lo reactiva entero.
+  #
+  # Está construido a medias y entrar a medias es peor que no entrar: el observador pasa el
+  # gating por módulo pero después lo frenan los guards de ROL de cada controller (26
+  # controllers con allowlists, 63 guards `require_*`), así que vería la app salpicada de
+  # secciones vacías y 403. Si eso pasa mientras un club está trabajando, el club lo nota.
+  #
+  # Para terminarlo hace falta darle ROL EFECTIVO de admin del club observado —enmascarar
+  # `User#role`, que es el enum de auth— y eso es una decisión aparte.
+  #
+  # Con la bandera apagada todo el modo queda inerte de una sola vez: sin club efectivo, sin
+  # tenant, sin bloqueos de escritura, sin candado clínico y sin nada en /me. El sistema se
+  # comporta exactamente como antes de construirlo.
+  OBSERVADOR_HABILITADO = false
+
   def observando_club
-    return nil unless observer_club_id.present? && observer_expires_at&.future?
+    return nil unless modo_observador?
     Club.find_by(id: observer_club_id)
   end
 
   def modo_observador?
+    return false unless OBSERVADOR_HABILITADO
+
     observer_club_id.present? && observer_expires_at&.future?
+  end
+
+  # El club real del usuario, sin la máscara del observador. Lo usa todo lo que necesita saber
+  # quién es de verdad (auth, auditoría, el propio panel de plataforma).
+  def club_id_original = read_attribute(:club_id)
+
+  def club_original
+    return nil if club_id_original.blank?
+    Club.find_by(id: club_id_original)
+  end
+
+  def club_id
+    return observer_club_id if modo_observador?
+    super
+  end
+
+  def club
+    return observando_club if modo_observador?
+    super
   end
 
   private
