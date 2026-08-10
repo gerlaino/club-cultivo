@@ -100,7 +100,9 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.sai { padding: 1.75rem 2rem 3rem; max-width: 1000px; }
+/* Con max-width y sin `margin: 0 auto` la pantalla queda pegada a la izquierda (misma
+   convención que el resto de las vistas). */
+.sai { padding: 1.75rem 2rem 3rem; max-width: 1000px; margin: 0 auto; }
 .sai__title { font-size: 1.6rem; font-weight: 800; color: var(--c-slate-900); margin: 0 0 1.5rem; letter-spacing: -.03em; }
 
 .sai__cargando { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 4rem 0; color: var(--c-slate-500); font-size: .85rem; }

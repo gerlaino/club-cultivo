@@ -205,7 +205,10 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.sad { padding: 1.75rem 2rem 3rem; max-width: 1180px; }
+/* `margin: 0 auto` va SIEMPRE con el max-width: sin él la pantalla queda con el ancho
+   limitado pero pegada a la izquierda, y en un monitor ancho parece rota. Es la misma
+   convención del resto de las vistas (AnaliticaView, CosechadoView, DispositivosView…). */
+.sad { padding: 1.75rem 2rem 3rem; max-width: 1180px; margin: 0 auto; }
 
 .sad__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
 .sad__title { font-size: 1.6rem; font-weight: 800; color: var(--c-slate-900); margin: 0; letter-spacing: -.03em; }
