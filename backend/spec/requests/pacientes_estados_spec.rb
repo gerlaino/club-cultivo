@@ -150,14 +150,18 @@ RSpec.describe 'Pacientes — activo/inactivo y estados REPROCANN', type: :reque
   # ══════════════════════════════════════════════════════════════════════
   # BLOQUE C — Los informes tienen que cerrar
   # ══════════════════════════════════════════════════════════════════════
+  # El informe REPROCANN declara la población REGISTRADA ante el organismo: los pacientes sin
+  # trámite iniciado no entran (son un pendiente interno, se informan aparte). Y no corta por
+  # sede: un paciente es del club, no de una sede — lo que se agrupaba era la sede de su última
+  # dispensación, una dimensión que no existe en el modelo.
   describe 'C. Informe REPROCANN' do
     before { sign_in_as(admin) }
 
     def informe = (get('/api/informes/reprocann'); json)
 
     it 'CASO 15 — el total NO cuenta a los pacientes dados de baja' do
-      paciente!(reprocann_vencimiento: 6.months.from_now.to_date)
-      paciente!(es_paciente: false, reprocann_vencimiento: 6.months.from_now.to_date)
+      paciente!(reprocann_numero: 'R-15', reprocann_vencimiento: 6.months.from_now.to_date)
+      paciente!(es_paciente: false, reprocann_numero: 'R-15b', reprocann_vencimiento: 6.months.from_now.to_date)
 
       expect(informe['total_pacientes']).to eq(1)
     end
@@ -200,28 +204,9 @@ RSpec.describe 'Pacientes — activo/inactivo y estados REPROCANN', type: :reque
     end
 
     # El informe es de PACIENTES Y SEDE: nada de cultivo, que vive en Producción y Sedes.
-    it 'CASO 20a — agrupa a los pacientes por la sede donde se atienden' do
-      sede  = create(:sede, club: club, created_by: admin, tipo: 'mixta')
-      stock = create(:stock, club: club, sede: sede, cantidad: 500)
-      p     = paciente!(reprocann_numero: 'R-1', reprocann_vencimiento: 8.months.from_now.to_date)
-      Dispensacion.create!(paciente: p, user: admin, stock: stock, cantidad: 5,
-                           fecha_dispensacion: Time.zone.today)
-
-      fila = informe['por_sede'].find { |r| r['sede'] == sede.nombre }
-
-      expect(fila['total']).to eq(1)
-      expect(fila['vigentes']).to eq(1)
-    end
 
     # La etiqueta dejó de ser "Sin dispensaciones" a secas: en una columna titulada "Sede" se
     # leía como si el club tuviera una sede con ese nombre.
-    it 'CASO 20b — quien nunca dispensó no se pierde: cae en su propia fila, al final' do
-      paciente!
-
-      sedes = informe['por_sede'].map { |r| r['sede'] }
-      expect(sedes).to include('(todavía sin dispensaciones)')
-      expect(sedes.last).to eq('(todavía sin dispensaciones)')   # siempre al final
-    end
 
     it 'CASO 20c — el informe no trae nada de cultivo' do
       paciente!
@@ -261,7 +246,7 @@ RSpec.describe 'Pacientes — activo/inactivo y estados REPROCANN', type: :reque
       otro = create(:club)
       otro_admin = create(:user, :admin, club: otro)
       ajeno = ActsAsTenant.with_tenant(otro) { create(:paciente, club: otro, created_by: otro_admin) }
-      paciente!
+      paciente!(reprocann_numero: 'R-20')   # con registro: el informe sólo cuenta a los registrados
 
       expect(ajeno.club_id).to eq(otro.id)
       expect(informe['total_pacientes']).to eq(1)

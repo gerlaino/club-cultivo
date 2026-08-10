@@ -40,17 +40,19 @@ RSpec.describe 'Informes — los totales tienen que cerrar', type: :request do
       expect(json['lotes_activos']).to eq(json['total_lotes'] - 1)
     end
 
-    # Los gramos del encabezado se filtran por período y los del desglose no: dos números
-    # con el mismo nombre que no coinciden es exactamente lo que hace desconfiar de un informe.
-    it 'los gramos del desglose respetan el mismo período que el total' do
-      l = lote!(estado: 'floracion')
-      Pesada.create!(lote: l, registrado_por: admin, fase_origen: 'cosecha',
-                     fase_destino: 'finalizado', peso_curado_g: 500, registrado_at: 8.months.ago)
+    # El encabezado habla del PERÍODO y la tabla de abajo habla del PRESENTE: son dos marcos
+    # temporales distintos y ahora está dicho en la pantalla. Antes la tabla traía una columna
+    # "Gramos" filtrada por período, así que un lote curado el mes pasado aparecía con 0 g al
+    # lado — y el informe se contradecía consigo mismo.
+    it 'el KPI es del período y el desglose muestra el rendimiento acumulado' do
+      l = lote!(estado: 'curado')
+      l.update_columns(rendimiento_real_g: 500, updated_at: 8.months.ago)
 
       get '/api/informes/produccion', params: { periodo: 'mes_actual' }
 
-      expect(json['gramos_producidos']).to eq(0.0)
-      expect(json['por_estado'].sum { |e| e['gramos'] }).to eq(0.0)
+      expect(json['gramos_producidos']).to eq(0.0)   # no se cosechó nada este mes
+      fila = json['por_estado'].find { |e| e['estado'] == 'curado' }
+      expect(fila['rendimiento']).to eq(500.0)       # pero el lote tiene su rendimiento
     end
   end
 

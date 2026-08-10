@@ -34,10 +34,13 @@ class InformesController < ApplicationController
   # Un informe se define una sola vez (KPIs + tablas) y de esa definición salen la respuesta
   # JSON, el PDF y el Excel. Antes el PDF era una captura de pantalla con html2canvas y el
   # Excel no existía.
+  # `resena`: en una o dos frases, qué pregunta contesta este informe y con qué criterio está
+  # armado. Un informe que no dice de qué habla obliga a adivinar a partir de los números —y con
+  # dos informes que cortan el mismo dato distinto, adivinar termina en "esto no coincide".
   def responder_informe(titulo:, datos:, kpis:, secciones:, nombre:, periodo: nil, nota: nil,
-                        exige_declaracion_inase: false)
+                        resena: nil, exige_declaracion_inase: false)
     respond_to do |format|
-      format.json { render json: datos }
+      format.json { render json: datos.merge(resena: resena) }
       format.pdf do
         next if exige_declaracion_inase && bloquear_descarga_si_falta_declarar!
 
@@ -97,8 +100,10 @@ class InformesController < ApplicationController
     por_estado = Lote::ESTADOS.filter_map do |e|
       next if (lotes_e = lotes_por_estado[e].to_i).zero?
 
+      # Rendimiento ACUMULADO de los lotes que hoy están en ese estado (sin filtro de fecha:
+      # la tabla habla del presente, no del período).
       { estado: e, lotes: lotes_e, plantas: plantas_por_estado[e].to_i,
-        gramos: gramos_del_periodo(club, desde, hasta, estado: e) }
+        rendimiento: club.lotes.where(estado: e).sum(:rendimiento_real_g).to_f.round(1) }
     end
 
     # El informe de Sedes era este mismo dato partido en otra pantalla: plantas y flor por
@@ -127,19 +132,26 @@ class InformesController < ApplicationController
 
     responder_informe(
       titulo: 'Informe de producción', nombre: 'informe_produccion',
+      resena: 'Cuánto produjo el club y cómo viene el cultivo. Arriba, lo cosechado en el período elegido; abajo, la foto de HOY: qué lotes y plantas hay en cada estado ahora mismo, con el rendimiento acumulado de cada uno.',
       datos: datos, periodo: etiqueta_periodo(desde, hasta),
       kpis: [
         { label: 'Lotes totales',   valor: total_lotes },
         { label: 'Lotes activos',   valor: lotes_activos, tono: :ok },
         { label: 'Cosechados',      valor: lotes_cosechados },
-        { label: 'Gramos del período', valor: gramos_producidos.round(1) },
+        { label: 'Cosechado en el período', valor: gramos_producidos.round(1) },
         { label: 'Plantas en pie',  valor: plantas_totales },
       ],
       secciones: [
         {
-          titulo: 'Por estado del lote',
-          headers: ['Estado', 'Lotes', 'Plantas', 'Gramos'],
-          rows: por_estado.map { |e| [e[:estado].to_s.tr('_', ' ').capitalize, e[:lotes], e[:plantas], e[:gramos]] },
+          # LA FOTO DE HOY, no del período: estos lotes están en ese estado AHORA. Antes esta
+          # tabla traía una columna "Gramos" filtrada por el período elegido, así que un lote
+          # curado el mes pasado aparecía con 0 g al lado —dos marcos temporales en la misma
+          # pantalla, y el de abajo contradecía al de arriba—. Los gramos del período están en
+          # el KPI y en su propia sección; acá va el rendimiento acumulado de cada lote, que es
+          # lo que ese lote realmente tiene.
+          titulo: 'Hoy en el cultivo',
+          headers: ['Estado', 'Lotes', 'Plantas', 'Rendimiento acumulado'],
+          rows: por_estado.map { |e| [e[:estado].to_s.tr('_', ' ').capitalize, e[:lotes], e[:plantas], e[:rendimiento]] },
           formatos: [:texto, :numero, :numero, :numero],
           totales: [1, 2, 3],
           aligns: { 1 => :right, 2 => :right, 3 => :right },
@@ -174,11 +186,20 @@ class InformesController < ApplicationController
     # pero quien abre este informe (admin o auditor del club) ya puede ver la ficha entera del
     # paciente: la inicial no protegía nada y volvía el informe ilegible — con dos "G.L." no
     # se sabe de quién se habla ni se puede cruzar con nada.
-    resumen = disps.includes(:paciente).group_by(&:paciente_id).map do |_, ds|
+    # Con qué se lo identifica y QUÉ se le entregó. Sólo el nombre y los gramos no alcanza
+    # para cruzar este informe con producción ni para acreditar a nadie: el DNI parcial
+    # desambigua homónimos y la genética/forma es lo que permite seguir el producto.
+    resumen = disps.includes(:paciente, stock: :lote).group_by(&:paciente_id).map do |_, ds|
       p = ds.first.paciente
+      formas    = ds.filter_map { |d| d.stock&.forma_producto }.uniq
+      geneticas = ds.filter_map { |d| d.genetica_nombre.presence || d.stock&.genetica&.nombre ||
+                                      d.stock&.lote&.genetica&.nombre }.uniq
       {
         paciente:     p.nombre_completo,
+        dni_ultimos_3: p.dni_normalizado.to_s.last(3),
         iniciales:    "#{p.nombre[0]}.#{p.apellido[0]}.",   # se mantiene por compatibilidad
+        geneticas:    geneticas,
+        formas:       formas,
         cantidad:     ds.size,
         total_gramos: ds.sum { |d| d.cantidad.to_f }.round(2),
         ultima_fecha: ds.max_by(&:fecha_dispensacion)&.fecha_dispensacion,
@@ -195,6 +216,7 @@ class InformesController < ApplicationController
 
     responder_informe(
       titulo: 'Informe de dispensaciones', nombre: 'informe_dispensaciones',
+      resena: 'Qué salió del club y hacia quién, en el período elegido. Una fila por paciente, con el DNI parcial para identificarlo sin ambigüedad y la genética y forma de lo que retiró — que es lo que permite cruzar este informe con producción.',
       datos: datos, periodo: etiqueta_periodo(desde, hasta),
       kpis: [
         { label: 'Entregas',           valor: total },
@@ -204,11 +226,16 @@ class InformesController < ApplicationController
       ],
       secciones: [{
         titulo: 'Detalle por paciente',
-        headers: ['Paciente', 'Entregas', 'Gramos', 'Última entrega'],
-        rows: resumen.map { |r| [r[:paciente], r[:cantidad], r[:total_gramos], fmt_fecha(r[:ultima_fecha])] },
-        formatos: [:texto, :numero, :numero, :texto],
-        totales: [1, 2],
-        aligns: { 1 => :right, 2 => :right },
+        headers: ['Paciente', 'DNI', 'Genética', 'Producto', 'Entregas', 'Gramos', 'Última entrega'],
+        rows: resumen.map { |r|
+          [r[:paciente], "***#{r[:dni_ultimos_3]}",
+           r[:geneticas].any? ? r[:geneticas].join(', ') : '—',
+           r[:formas].map { |f| f.to_s.tr('_', ' ') }.join(', ').presence || '—',
+           r[:cantidad], r[:total_gramos], fmt_fecha(r[:ultima_fecha])]
+        },
+        formatos: [:texto, :texto, :texto, :texto, :numero, :numero, :texto],
+        totales: [4, 5],
+        aligns: { 4 => :right, 5 => :right },
       }],
       nota: 'Contiene datos personales de pacientes: tratar como información sensible.',
     )
@@ -246,6 +273,7 @@ class InformesController < ApplicationController
 
     responder_informe(
       titulo: 'Informe de sedes', nombre: 'informe_sedes', datos: datos,
+      resena: 'Cómo está repartido el cultivo entre las sedes: salas, plantas en pie y flor seca disponible en cada una.',
       kpis: [
         { label: 'Sedes',    valor: sedes.count },
         { label: 'Activas',  valor: sedes_activas, tono: :ok },
@@ -318,6 +346,7 @@ class InformesController < ApplicationController
 
     responder_informe(
       titulo: 'Informe de cumplimiento', nombre: 'informe_cumplimiento',
+      resena: 'Qué tan al día está la población de pacientes con su REPROCANN y qué alertas hay abiertas.',
       datos: datos, periodo: etiqueta_periodo(desde, hasta),
       kpis: [
         { label: 'Tasa de cumplimiento', valor: "#{tasa}%", tono: tasa >= 90 ? :ok : :warn },
@@ -383,6 +412,7 @@ class InformesController < ApplicationController
 
     responder_informe(
       titulo: 'Plan vs. real', nombre: 'informe_plan_vs_real', datos: datos,
+      resena: 'Qué se propuso cada lote y qué consiguió: plantas y gramos objetivo contra los reales, con el desvío entre ambos.',
       kpis: [
         { label: 'Lotes con objetivo', valor: lotes_con_obj.count },
         { label: 'Ya cerrados',        valor: lotes_cerrados.count },
@@ -498,6 +528,7 @@ class InformesController < ApplicationController
 
     responder_informe(
       titulo: 'Informe INASE — variedades', nombre: 'informe_inase', datos: datos,
+      resena: 'Las variedades que el club cultiva y con cuál acredita cada una ante el INASE. Una fila por variedad inscripta: si el club la cultiva bajo otro nombre, ese nombre figura en «Se cultiva como». Al pie, lo que todavía no se puede acreditar.',
       kpis: [
         { label: 'Variedades',    valor: filas.size },
         { label: 'Inscriptas',    valor: registradas, tono: :ok },
@@ -538,9 +569,22 @@ class InformesController < ApplicationController
 
   # Datos del informe REPROCANN — compartidos por la respuesta JSON y el PDF
   def reprocann_data(club)
-    # El informe es sobre la población ACTIVA del club: alguien dado de baja no se le
-    # informa a nadie ni cuenta para la tasa de cumplimiento.
-    pacientes = Paciente.for_club(club.id).where(es_paciente: true)
+    # Este informe le habla AL ORGANISMO: declara la población registrada en REPROCANN. Por eso
+    # sólo entran los pacientes que tienen registro —vigente, vencido o en trámite—. Que existan
+    # pacientes sin REPROCANN es un pendiente interno del club, no algo que se presenta: eso se
+    # gestiona desde Pacientes, donde además se puede hacer algo al respecto.
+    #
+    # Antes entraban todos, así que el total del informe no coincidía con nada y la tasa de
+    # cumplimiento se calculaba contra una población que incluía a quienes ni siquiera iniciaron
+    # el trámite.
+    activos   = Paciente.for_club(club.id).where(es_paciente: true)
+    # "Tiene registro" = tiene número, o su estado dice algo distinto de `sin_registro` (que es
+    # el default de la columna: el paciente que nunca inició el trámite).
+    pacientes = activos.where.not(reprocann_numero: [nil, ''])
+                       .or(activos.where.not(reprocann_estado: [nil, '', 'sin_registro']))
+
+    # Los que quedaron afuera se informan como un pendiente, con su número, no escondidos.
+    sin_registro = activos.count - pacientes.count
 
     # Una sola clasificación para todo: los conteos son el histograma de la misma
     # categoría que se muestra en la lista, así el total cierra siempre.
@@ -571,7 +615,11 @@ class InformesController < ApplicationController
       pendientes:             conteos['pendiente'],
       sin_reprocann:          conteos['sin_reprocann'],
       lista_anonimizada:      lista,
-      por_sede:               reprocann_por_sede(club, pacientes),
+      # Sin corte por sede: un PACIENTE NO TIENE SEDE — es del club. Lo que había agrupaba por
+      # la sede de su última dispensación, una dimensión inventada que además dejaba a los que
+      # nunca dispensaron en una fila fantasma. La actividad por sede es otra pregunta y vive
+      # en el informe de dispensaciones.
+      pacientes_sin_registro: sin_registro,
       dispensaciones:         reprocann_dispensaciones(club, pacientes),
       # El informe de Cumplimiento era esto mismo con otro título: sus cuatro KPIs salían de
       # los conteos que ya se calculan acá arriba. Vive adentro de REPROCANN, que es de lo que
@@ -635,52 +683,11 @@ class InformesController < ApplicationController
   #
   # Es lo único no-clínico que el informe agrega más allá de los pacientes: nada de cultivo,
   # que vive en los informes de Producción y Sedes.
-  # Los pacientes se agrupan por la sede de su ÚLTIMA dispensación. Los que nunca dispensaron
-  # no tienen sede que mostrar y van juntos al final, con una etiqueta que no se confunda con
-  # el nombre de una sede.
-  SIN_SEDE_LABEL = '(todavía sin dispensaciones)'.freeze
-
-  def reprocann_por_sede(club, pacientes)
-    ids = pacientes.pluck(:id)
-    return [] if ids.empty?
-
-    # Última dispensación de cada paciente, y de qué sede salió.
-    ultima_sede = Dispensacion.no_canceladas
-                              .where(paciente_id: ids)
-                              .joins(stock: :sede)
-                              .where(sedes: { club_id: club.id })
-                              .order(:paciente_id, fecha_dispensacion: :desc, id: :desc)
-                              .pluck(:paciente_id, 'sedes.id', 'sedes.nombre')
-                              .each_with_object({}) { |(pid, sid, snom), h| h[pid] ||= [sid, snom] }
-
-    datos = pacientes.pluck(:id, :reprocann_estado, :reprocann_numero, :reprocann_vencimiento)
-    agrupado = Hash.new { |h, k| h[k] = Hash.new(0) }
-
-    datos.each do |pid, estado, numero, venc|
-      _sid, nombre = ultima_sede[pid]
-      cat = Paciente.reprocann_categoria(estado: estado, numero: numero, vencimiento: venc)
-      # OJO con la etiqueta: esta fila NO es una sede, son los pacientes que todavía no
-      # dispensaron nunca. Decía "Sin dispensaciones" a secas en una columna titulada "Sede",
-      # así que se leía como si el club tuviera una sede con ese nombre.
-      agrupado[nombre || SIN_SEDE_LABEL][cat] += 1
-    end
-
-    ordenado = agrupado.sort_by { |sede, _| [sede == SIN_SEDE_LABEL ? 1 : 0, sede.to_s] }
-    ordenado.map do |sede, cats|
-      {
-        sede:      sede,
-        total:     cats.values.sum,
-        vigentes:  cats['vigente'],
-        por_vencer: cats['por_vencer'],
-        vencidos:  cats['vencido'],
-        pendientes: cats['pendiente'],
-        sin_reprocann: cats['sin_reprocann'],
-      }
-    end.sort_by { |r| -r[:total] }
-  end
-
+  # Se perdió al sacar el corte por sede (estaba en ese rango de líneas) y la exportación a
+  # Excel del informe REPROCANN se caía con NameError.
   ESTADO_REPROCANN_LABEL = {
     'vigente'                 => 'Vigente',
+    'vigente_sin_vencimiento' => 'Vigente sin vencimiento',
     'por_vencer'              => 'Por vencer (hasta 30 días)',
     'vencido'                 => 'Vencido',
     'pendiente'               => 'Pendiente de aprobación',

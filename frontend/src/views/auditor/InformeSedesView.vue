@@ -21,6 +21,9 @@
     <div v-if="loading" class="inf__loading">Cargando…</div>
 
     <div v-else-if="data" ref="hoja" class="inf__hoja">
+      <!-- Qué contesta este informe. Sin esto hay que deducirlo de los números, y
+           dos informes que cortan el mismo dato distinto parecen contradecirse. -->
+      <p v-if="data.resena" class="inf__resena">{{ data.resena }}</p>
       <div class="inf__kpis">
         <div class="inf__kpi">
           <span class="inf__kpi-valor">{{ data.total_sedes }}</span>
@@ -94,6 +97,11 @@ onMounted(cargar)
 .inf__title { font-size: var(--fs-20); font-weight: 700; color: var(--c-ink-900); display: flex; align-items: center; gap: var(--sp-2); margin: 0; }
 .inf__periodo { background: var(--c-ink-50); border: 1.5px solid var(--c-ink-200); border-radius: var(--r-md); padding: 6px 12px; font-size: var(--fs-14); color: var(--c-ink-900); }
 .inf__loading { color: var(--c-ink-500); padding: var(--sp-8); text-align: center; }
+.inf__resena {
+  margin: 0 0 var(--sp-4); padding: .7rem .9rem;
+  background: var(--c-slate-50); border-left: 3px solid var(--c-slate-300); border-radius: 0 8px 8px 0;
+  font-size: var(--fs-13); color: var(--c-slate-600); line-height: 1.55; max-width: 80ch;
+}
 .inf__kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-6); }
 .inf__kpi { background: var(--c-paper); border: 1px solid var(--c-ink-100); border-radius: var(--r-lg); padding: var(--sp-4); text-align: center; }
 .inf__kpi-valor { display: block; font-size: var(--fs-28); font-weight: 800; color: var(--c-ink-900); line-height: 1; }

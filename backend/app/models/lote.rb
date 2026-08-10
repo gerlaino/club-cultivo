@@ -24,9 +24,14 @@ class Lote < ApplicationRecord
   # El propagador tiene su propio clima —humedad, temperatura— pero NO su propia luz: la
   # incubadora recibe la de la sala, y enraizando hace falta más tiempo de luz, no menos.
   # Por eso el enraizado tampoco entra en una sala de floración.
+  #
+  # `madre` y `clon` son sub-tipos de vegetativo —una planta madre vive en vegetativo
+  # permanente y un clon enraíza—, así que ambos admiten lotes en enraizado y vegetativo. Sin
+  # `madre` en la lista no se podía crear un lote en la sala de madres, que es justamente
+  # donde nacen los esquejes del club.
   KINDS_SALA_POR_ESTADO = {
-    'enraizado'  => %w[vegetativo mixta clon],
-    'vegetativo' => %w[vegetativo mixta clon],
+    'enraizado'  => %w[vegetativo mixta clon madre],
+    'vegetativo' => %w[vegetativo mixta clon madre],
     'floracion'  => %w[floracion mixta],
   }.freeze
 

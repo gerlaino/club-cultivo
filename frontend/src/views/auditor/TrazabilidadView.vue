@@ -158,6 +158,33 @@
         </div>
       </div>
 
+      <!-- EL BALANCE. Es la cuenta que un auditor hace de cabeza y que el informe no cerraba:
+           entró tanto, salió tanto al paciente, queda tanto — y lo que no cuadra tiene nombre
+           (merma, descarte, lo que se consumió para elaborar un derivado). Dejarlo implícito
+           era dejar el hueco a la vista sin explicarlo. -->
+      <div class="trz__balance">
+        <div class="trz__bal-item">
+          <span class="trz__bal-lbl">Producido</span>
+          <span class="trz__bal-val">{{ data.totales.gramos_producidos }} g</span>
+        </div>
+        <span class="trz__bal-op">−</span>
+        <div class="trz__bal-item">
+          <span class="trz__bal-lbl">Dispensado</span>
+          <span class="trz__bal-val">{{ data.totales.gramos_dispensados }} g</span>
+          <span class="trz__bal-pct">{{ data.totales.pct_dispensado }}%</span>
+        </div>
+        <span class="trz__bal-op">−</span>
+        <div class="trz__bal-item" :class="{ 'trz__bal-item--alerta': data.totales.otras_salidas_g > 0 }">
+          <span class="trz__bal-lbl">Merma y otras salidas</span>
+          <span class="trz__bal-val">{{ data.totales.otras_salidas_g }} g</span>
+        </div>
+        <span class="trz__bal-op">=</span>
+        <div class="trz__bal-item trz__bal-item--total">
+          <span class="trz__bal-lbl">En stock</span>
+          <span class="trz__bal-val">{{ data.totales.cantidad_disponible_g }} g</span>
+        </div>
+      </div>
+
       <!-- Cadena -->
       <div class="trz__chain-divider">
         <span><i class="bi bi-link-45deg"></i> CADENA DE CUSTODIA</span>
@@ -652,6 +679,20 @@ const formatDate = d => d
 .trz__kpi--purple { border-color: #e9d5ff; } .trz__kpi--purple .trz__kpi-val { color: #7c3aed; }
 
 /* Chain divider */
+.trz__balance {
+  display: flex; align-items: center; flex-wrap: wrap; gap: .5rem 1rem;
+  background: #fff; border: 1px solid var(--c-slate-200); border-radius: 12px;
+  padding: .9rem 1.1rem; margin-bottom: 1rem;
+}
+.trz__bal-item { display: flex; flex-direction: column; gap: .1rem; min-width: 92px; }
+.trz__bal-lbl { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--c-slate-400); }
+.trz__bal-val { font-size: 1rem; font-weight: 800; color: var(--c-slate-900); }
+.trz__bal-pct { font-size: .68rem; color: var(--c-slate-500); }
+/* Lo que salió sin pasar por el mostrador: no es un error, pero es lo que hay que poder
+   explicar si alguien pregunta. */
+.trz__bal-item--alerta .trz__bal-val { color: #b45309; }
+.trz__bal-item--total .trz__bal-val { color: #15803d; }
+.trz__bal-op { font-size: 1.05rem; font-weight: 700; color: var(--c-slate-300); }
 .trz__chain-divider {
   display: flex; align-items: center; gap: .75rem;
   font-size: .65rem; font-weight: 700; color: var(--c-slate-400);

@@ -30,10 +30,12 @@ class ReprocannDocument < BaseDocument
       { label: "Vencen ≤30 días", valor: @data[:vencen_30d],            tono: :warn },
       { label: "Vencidos",        valor: @data[:vencidos],              tono: :crit },
       { label: "Trámite pendiente", valor: @data[:pendientes],          tono: :warn },
-      { label: "Sin REPROCANN",   valor: @data[:sin_reprocann] },
     ])
 
-    por_sede(pdf)
+    # Sin corte por sede: un paciente es del club, no de una sede. Lo que había agrupaba por la
+    # sede de su última dispensación —una dimensión que no existe en el modelo— y dejaba a los
+    # que nunca dispensaron en una fila que parecía una sede llamada "sin dispensaciones".
+    pendiente_interno(pdf)
 
     titulo_seccion(pdf, "Nómina de pacientes")
     detalle(pdf)
@@ -44,36 +46,23 @@ class ReprocannDocument < BaseDocument
   # Anchos de las seis columnas numéricas; la de la sede se lleva lo que sobra.
   COLS_CONTEO = [50, 68, 48, 68, 58, 58].freeze
 
-  # El paciente no tiene sede propia: se atiende donde dispensa.
-  def por_sede(pdf)
-    filas = @data[:por_sede] || []
-    return if filas.empty?
-
-    titulo_seccion(pdf, "Pacientes por sede de atención")
-    # Encabezados abreviados: con los nombres completos las siete columnas piden 534pt y el
-    # ancho útil del A4 es 487. La referencia de qué significa cada una va debajo.
-    styled_table(pdf,
-      ["Sede", "Pac.", "Vigentes", "≤30d", "Vencidos", "Trámite", "S/REPRO"],
-      filas.map { |r|
-        [r[:sede].to_s, r[:total].to_s, r[:vigentes].to_s, r[:por_vencer].to_s,
-         r[:vencidos].to_s, r[:pendientes].to_s, r[:sin_reprocann].to_s]
-      },
-      # `styled_table` necesita anchos explícitos (Prawn no acepta nil) y que sumen EXACTAMENTE
-      # el ancho del marco. Las columnas de conteo son fijas y la de la sede absorbe el resto,
-      # así no hay que reajustar números a mano si cambian los márgenes.
-      col_widths: { 0 => pdf.bounds.width - COLS_CONTEO.sum,
-                    **COLS_CONTEO.each_with_index.to_h { |w, i| [i + 1, w] } },
-      aligns:     { 1 => :right, 2 => :right, 3 => :right, 4 => :right, 5 => :right, 6 => :right })
+  # Los pacientes sin registro no entran en la nómina —este documento declara la población
+  # REGISTRADA— pero tampoco se ocultan: se informa cuántos son, que es lo que el club tiene
+  # pendiente de resolver.
+  def pendiente_interno(pdf)
+    sin_registro = @data[:pacientes_sin_registro].to_i
+    return if sin_registro.zero?
 
     pdf.move_down 4
     pdf.fill_color GRAY
     pdf.font(SANS) do
-      pdf.text "Pac. = pacientes activos · ≤30d = vencen dentro de 30 días · " \
-               "Trámite = pendiente de aprobación · S/REPRO = sin REPROCANN", size: 7
+      pdf.text "El club tiene además #{sin_registro} paciente#{'s' if sin_registro != 1} activo" \
+               "#{'s' if sin_registro != 1} sin REPROCANN iniciado, que no integran esta nómina.",
+               size: 8
     end
     pdf.fill_color INK
+    pdf.move_down 6
   end
-
   def detalle(pdf)
     lista = @data[:lista_anonimizada] || []
     if lista.empty?

@@ -21,6 +21,9 @@
     <div v-if="loading" class="inf__loading">Cargando…</div>
 
     <div v-else-if="data">
+      <!-- Qué contesta este informe. Sin esto hay que deducirlo de los números, y
+           dos informes que cortan el mismo dato distinto parecen contradecirse. -->
+      <p v-if="data.resena" class="inf__resena">{{ data.resena }}</p>
       <div class="inf__kpis">
         <div class="inf__kpi">
           <span class="inf__kpi-valor">{{ data.total_pacientes }}</span>
@@ -41,10 +44,6 @@
         <div v-if="data.pendientes" class="inf__kpi inf__kpi--warn">
           <span class="inf__kpi-valor">{{ data.pendientes }}</span>
           <span class="inf__kpi-label">Trámite pendiente</span>
-        </div>
-        <div class="inf__kpi">
-          <span class="inf__kpi-valor">{{ data.sin_reprocann }}</span>
-          <span class="inf__kpi-label">Sin REPROCANN</span>
         </div>
       </div>
 
@@ -71,37 +70,16 @@
         </div>
       </div>
 
-      <!-- El paciente no tiene sede propia: se atiende donde dispensa. -->
-      <div v-if="data.por_sede?.length" class="inf__section">
-        <!-- El corte es por la sede de la ÚLTIMA dispensación de cada paciente. Decir sólo
-             "Por sede de atención" hacía que la fila de los que nunca dispensaron pareciera
-             una sede más, y que el total no cerrara con el informe de dispensaciones —que
-             cuenta otra cosa: entregas del período, no pacientes—. -->
-        <h2 class="inf__section-title">Por sede de la última dispensación</h2>
-        <p class="inf__section-hint">
-          Cada paciente cuenta en la sede donde retiró por última vez. Los que todavía no
-          dispensaron van agrupados al final.
-        </p>
-        <table class="inf__table">
-          <thead>
-            <tr>
-              <th>Sede</th><th>Pacientes</th><th>Vigentes</th><th>Vencen ≤30d</th>
-              <th>Vencidos</th><th>En trámite</th><th>Sin REPROCANN</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="r in data.por_sede" :key="r.sede">
-              <td>{{ r.sede }}</td>
-              <td>{{ r.total }}</td>
-              <td>{{ r.vigentes }}</td>
-              <td>{{ r.por_vencer }}</td>
-              <td>{{ r.vencidos }}</td>
-              <td>{{ r.pendientes }}</td>
-              <td>{{ r.sin_reprocann }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <!-- Sin corte por sede: un PACIENTE ES DEL CLUB, no de una sede. Lo que había agrupaba
+           por la sede de su última dispensación, una dimensión inventada que dejaba a los que
+           nunca retiraron en una fila que parecía una sede. La actividad por sede es otra
+           pregunta y vive en el informe de dispensaciones. -->
+      <p v-if="data.pacientes_sin_registro" class="inf__pendiente">
+        El club tiene además <strong>{{ data.pacientes_sin_registro }}</strong>
+        paciente{{ data.pacientes_sin_registro === 1 ? '' : 's' }} activo{{ data.pacientes_sin_registro === 1 ? '' : 's' }}
+        sin REPROCANN iniciado. No integran esta nómina —declara la población registrada— y se
+        gestionan desde <RouterLink to="/pacientes">Pacientes</RouterLink>.
+      </p>
 
       <div class="inf__section">
         <h2 class="inf__section-title">Nómina de pacientes (vigentes y por vencer)</h2>
@@ -123,6 +101,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { RouterLink } from 'vue-router'
 import { FileCheck, FileDown, Sheet } from 'lucide-vue-next'
 import api from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
@@ -179,6 +158,11 @@ onMounted(cargar)
 .inf__title { font-size: var(--fs-20); font-weight: 700; color: var(--c-ink-900); display: flex; align-items: center; gap: var(--sp-2); margin: 0; }
 .inf__periodo { background: var(--c-ink-50); border: 1.5px solid var(--c-ink-200); border-radius: var(--r-md); padding: 6px 12px; font-size: var(--fs-14); color: var(--c-ink-900); }
 .inf__loading { color: var(--c-ink-500); padding: var(--sp-8); text-align: center; }
+.inf__resena {
+  margin: 0 0 var(--sp-4); padding: .7rem .9rem;
+  background: var(--c-slate-50); border-left: 3px solid var(--c-slate-300); border-radius: 0 8px 8px 0;
+  font-size: var(--fs-13); color: var(--c-slate-600); line-height: 1.55; max-width: 80ch;
+}
 .inf__kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-6); }
 .inf__kpi { background: var(--c-paper); border: 1px solid var(--c-ink-100); border-radius: var(--r-lg); padding: var(--sp-4); text-align: center; }
 .inf__kpi-valor { display: block; font-size: var(--fs-28); font-weight: 800; color: var(--c-ink-900); line-height: 1; }
@@ -189,6 +173,12 @@ onMounted(cargar)
 .inf__section-title { font-size: var(--fs-16); font-weight: 700; color: var(--c-ink-900); margin-bottom: var(--sp-3); }
 /* Qué está contando la tabla: sin esto, dos informes que cuentan cosas distintas parecen
    contradecirse (uno cuenta pacientes, el otro entregas del período). */
+.inf__pendiente {
+  margin: 0 0 var(--sp-5); padding: .7rem .9rem; border-radius: 8px;
+  background: #fffbeb; border: 1px solid #fef3c7;
+  font-size: var(--fs-13); color: #92400e; line-height: 1.5;
+}
+.inf__pendiente a { color: #92400e; font-weight: 700; }
 .inf__section-hint { margin: calc(var(--sp-3) * -1) 0 var(--sp-3); font-size: var(--fs-12); color: var(--c-ink-500); line-height: 1.5; }
 .inf__table { width: 100%; border-collapse: collapse; font-size: var(--fs-14); }
 .inf__table th { text-align: left; padding: var(--sp-2) var(--sp-3); background: var(--c-ink-50); font-weight: 600; color: var(--c-ink-600); border-bottom: 1px solid var(--c-ink-100); }

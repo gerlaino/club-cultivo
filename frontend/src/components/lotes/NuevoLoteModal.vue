@@ -26,6 +26,27 @@
             </button>
           </div>
 
+          <!-- EL ESTADO VA PRIMERO, y después la sala. Las salas ofrecidas dependen de en qué
+               fase está el lote —uno en floración no entra en una sala de vegetativo—, así que
+               elegir la sala antes obligaba a volver atrás cuando la lista cambiaba debajo. -->
+          <template v-if="tipoCreacion === 'existente'">
+            <div class="nlm__field">
+              <label class="nlm__label">¿Cómo inició este lote?</label>
+              <div class="nlm__pills">
+                <button type="button" class="nlm__pill" :class="{ 'nlm__pill--active': form.origen === 'semilla' }" @click="setOrigen('semilla')">🌱 Semilla</button>
+                <button type="button" class="nlm__pill" :class="{ 'nlm__pill--active': form.origen === 'esqueje' }" @click="setOrigen('esqueje')">🪴 Esqueje</button>
+              </div>
+            </div>
+
+            <div class="nlm__field">
+              <label class="nlm__label">Estado actual del lote <span class="nlm__req">*</span></label>
+              <select class="nlm__input" v-model="heredadoEstado">
+                <option v-for="e in estadosHeredadoPermitidos" :key="e.value" :value="e.value">{{ e.label }}</option>
+              </select>
+              <span class="nlm__hint">Define en qué salas puede entrar.</span>
+            </div>
+          </template>
+
           <!-- Lote cosechado: no va a una sala de cultivo, se ubica por sede y se ve en Cosecha -->
           <div v-if="esCosechado" class="nlm__field">
             <label class="nlm__label">Sede <span class="nlm__req">*</span></label>
@@ -79,21 +100,6 @@
           <div class="nlm__grid">
             <!-- ── LOTE EXISTENTE (heredado) ── -->
             <template v-if="tipoCreacion === 'existente'">
-              <div class="nlm__field nlm__field--full">
-                <label class="nlm__label">¿Cómo inició este lote?</label>
-                <div class="nlm__pills">
-                  <button type="button" class="nlm__pill" :class="{ 'nlm__pill--active': form.origen === 'semilla' }" @click="setOrigen('semilla')">🌱 Semilla</button>
-                  <button type="button" class="nlm__pill" :class="{ 'nlm__pill--active': form.origen === 'esqueje' }" @click="setOrigen('esqueje')">🪴 Esqueje</button>
-                </div>
-              </div>
-
-              <div class="nlm__field nlm__field--full">
-                <label class="nlm__label">Estado actual del lote</label>
-                <select class="nlm__input" v-model="heredadoEstado">
-                  <option v-for="e in estadosHeredadoPermitidos" :key="e.value" :value="e.value">{{ e.label }}</option>
-                </select>
-              </div>
-
               <!-- Los días van en su propio bloque con `key` por estado: se reportó que al elegir
                    el estado no aparecían todos los campos hasta clickear afuera y volver. No pude
                    reproducirlo en test; el key fuerza un remontaje limpio del grupo, que hace que
@@ -318,9 +324,13 @@ const heredadoDias   = ref({ semilla_esqueje: 0, vegetativo: 0, floracion: 0, co
 // Espejo de `Lote::KINDS_SALA_POR_ESTADO` (backend). Lo que manda es el FOTOPERIODO de la
 // sala: enraizando y en vegetativo hace falta 18/6, así que ninguno de los dos entra en una
 // sala de floración (12/12).
+// Espeja Lote::KINDS_SALA_POR_ESTADO. `madre` y `clon` son sub-tipos de vegetativo —una planta
+// madre vive en vegetativo permanente, un clon enraíza— así que admiten lotes en enraizado y
+// vegetativo. Faltaba `madre`: no se podía crear un lote en la sala de madres, que es de donde
+// salen los esquejes del club.
 const KINDS_POR_ESTADO = {
-  enraizado:  ['vegetativo', 'mixta', 'clon'],
-  vegetativo: ['vegetativo', 'mixta', 'clon'],
+  enraizado:  ['vegetativo', 'mixta', 'clon', 'madre'],
+  vegetativo: ['vegetativo', 'mixta', 'clon', 'madre'],
   floracion:  ['floracion',  'mixta'],
 }
 

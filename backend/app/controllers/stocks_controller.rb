@@ -467,11 +467,21 @@ class StocksController < ApplicationController
       } : nil,
       plantas:        plantas,
       dispensaciones: dispensaciones,
+      # EL BALANCE, que es lo que un auditor va a preguntar: entró tanto, salió tanto, queda
+      # tanto — ¿y la diferencia? Sin esto la trazabilidad mostraba la cadena pero no cerraba
+      # la cuenta, y el hueco entre lo producido y lo dispensado quedaba invisible.
       totales: {
         plantas_origen:       plantas.size,
         dispensaciones_count: dispensaciones.size,
+        gramos_producidos:    cantidad_inicial,
         gramos_dispensados:   gramos_dispensados,
         cantidad_disponible_g: cantidad_disponible,
+        # Lo que salió sin ser una dispensación: mermas, descartes, ajustes y lo que se consumió
+        # para elaborar derivados. Se deduce del balance, así que incluye cualquier salida que
+        # no haya pasado por el mostrador.
+        otras_salidas_g:      (cantidad_inicial - gramos_dispensados - cantidad_disponible).round(2),
+        # Qué proporción del lote llegó efectivamente al paciente.
+        pct_dispensado:       cantidad_inicial.positive? ? ((gramos_dispensados / cantidad_inicial) * 100).round(1) : 0,
       },
     }
 

@@ -14,6 +14,9 @@
 
     <template v-else-if="data">
       <div ref="hoja" class="inf__hoja">
+        <!-- Qué contesta este informe. Sin esto hay que deducirlo de los números, y
+             dos informes que cortan el mismo dato distinto parecen contradecirse. -->
+        <p v-if="data.resena" class="inf__resena">{{ data.resena }}</p>
         <div class="inf__kpis">
           <div class="inf__kpi">
             <span class="inf__kpi-valor">{{ data.total_geneticas }}</span>
@@ -49,27 +52,29 @@
           <table class="inf__table">
             <thead>
               <tr>
-                <th>Variedad</th><th>Se cultiva como</th><th>INASE</th><th>N° registro</th><th>Categoría</th>
-                <th>Criador</th><th class="inf__num">Lotes</th><th class="inf__num">Plantas</th><th class="inf__num">Gramos</th>
+                <th>Variedad</th><th>Se cultiva como</th><th>INASE</th><th>N° registro</th>
+                <th class="inf__num">Lotes</th><th class="inf__num">Plantas</th><th class="inf__num">Gramos</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="g in data.geneticas" :key="g.id">
-                <td><strong>{{ g.nombre }}</strong><span v-if="g.tipo" class="inf__tipo"> · {{ g.tipo }}</span></td>
-                <!-- El nombre real del club, cuando se declaró contra otra variedad: hace
-                     auditable la traducción sin salir del informe. -->
-                <td>{{ g.declarada ? g.nombre_propio : '—' }}</td>
+              <!-- UNA FILA POR VARIEDAD ACREDITABLE, no por genética del club: si veinte
+                   genéticas propias se declaran contra TROPICANA WFC, listarlas sueltas daba
+                   veinte filas con el mismo nombre y parecía un error de datos. Los nombres
+                   propios van juntos en "Se cultiva como". -->
+              <tr v-for="g in (data.agrupadas || [])" :key="g.nombre">
+                <td><strong>{{ g.nombre }}</strong></td>
+                <td>{{ g.propios?.length ? g.propios.join(', ') : '—' }}</td>
                 <td>
-                  <span class="inf__badge" :class="badgeInase(g)">{{ etiquetaInase(g) }}</span>
+                  <span class="inf__badge" :class="g.numero ? 'inf__badge--ok' : 'inf__badge--no'">
+                    {{ g.propios?.length ? '✓ Declarada' : (g.numero ? '✓ Inscripta' : 'Sin acreditar') }}
+                  </span>
                 </td>
-                <td>{{ g.numero_registro_inase || '—' }}</td>
-                <td>{{ categoriaLabel(g.categoria_inase) }}</td>
-                <td>{{ g.criador || '—' }}</td>
+                <td>{{ g.numero || '—' }}</td>
                 <td class="inf__num">{{ g.lotes }}</td>
                 <td class="inf__num">{{ g.plantas }}</td>
-                <td class="inf__num">{{ formatGramos(g.gramos_producidos) }}</td>
+                <td class="inf__num">{{ formatGramos(g.gramos) }}</td>
               </tr>
-              <tr v-if="!data.geneticas.length"><td colspan="9" class="inf__empty">Sin genéticas cargadas.</td></tr>
+              <tr v-if="!(data.agrupadas || []).length"><td colspan="7" class="inf__empty">Sin genéticas cargadas.</td></tr>
             </tbody>
           </table>
         </div>
@@ -141,6 +146,11 @@ onMounted(cargar)
 .inf__pdf:disabled { opacity: .5; cursor: not-allowed; }
 .inf__loading { color: var(--c-ink-500); padding: var(--sp-8); text-align: center; }
 .inf__hoja { background: #fff; }
+.inf__resena {
+  margin: 0 0 var(--sp-4); padding: .7rem .9rem;
+  background: var(--c-slate-50); border-left: 3px solid var(--c-slate-300); border-radius: 0 8px 8px 0;
+  font-size: var(--fs-13); color: var(--c-slate-600); line-height: 1.55; max-width: 80ch;
+}
 .inf__kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-6); }
 .inf__kpi { background: var(--c-paper); border: 1px solid var(--c-ink-100); border-radius: var(--r-lg); padding: var(--sp-4); text-align: center; }
 .inf__kpi-valor { display: block; font-size: var(--fs-28); font-weight: 800; color: var(--c-ink-900); line-height: 1; }
