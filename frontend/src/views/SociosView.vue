@@ -91,23 +91,47 @@ function iniciales(s) {
   return ((s.nombre?.[0] || '') + (s.apellido?.[0] || '')).toUpperCase()
 }
 
+// ── El estado del padrón ─────────────────────────────────────────────────────────
+// Los conteos se hacen sobre LA NÓMINA (los que están en tratamiento), no sobre todas las
+// fichas: alguien dado de baja no cuenta como paciente del club. Antes "Total" los sumaba a
+// todos, así que el número no coincidía con nada y quedaba inflado.
+//
+// Esto vive acá y no en Informes a propósito: es la pantalla desde la que después hay que
+// ACTUAR sobre cada paciente, y cada KPI es además el filtro que lo aísla.
+const DIAS_INACTIVO = 90
+
+const nomina = computed(() => store.items.filter(s => s.es_paciente))
+
+const diasDesdeUltima = (s) => {
+  const f = s.ultima_dispensacion?.fecha || s.ultima_dispensacion
+  if (!f) return null
+  return Math.floor((Date.now() - new Date(f).getTime()) / 86400000)
+}
+// "No viene hace tiempo": tiene tratamiento abierto pero hace más de tres meses que no retira.
+// El que nunca dispensó no entra: ese es un alta reciente, no un abandono.
+const esInactivo = (s) => {
+  const d = diasDesdeUltima(s)
+  return d !== null && d > DIAS_INACTIVO
+}
+
 const kpis = computed(() => {
-  const items = store.items
-  const hoy   = new Date()
-  const en30  = new Date(hoy.getTime() + 30 * 86400000)
+  const enNomina = nomina.value
   return {
-    total:    items.length,
-    activos:  items.filter(s => s.es_paciente).length,
-    vencidos: items.filter(s => reprocannCategoria(s) === 'vencido').length,
-    proximos: items.filter(s => reprocannCategoria(s) === 'por_vencer').length,
-    pendientes: items.filter(s => reprocannCategoria(s) === 'pendiente').length,
-    sin_rep:  items.filter(s => reprocannCategoria(s) === 'sin_reprocann').length,
+    total:      enNomina.length,                                   // la nómina, no las fichas
+    baja:       store.items.length - enNomina.length,              // fuera de tratamiento
+    vencidos:   enNomina.filter(s => reprocannCategoria(s) === 'vencido').length,
+    proximos:   enNomina.filter(s => reprocannCategoria(s) === 'por_vencer').length,
+    pendientes: enNomina.filter(s => reprocannCategoria(s) === 'pendiente').length,
+    sin_rep:    enNomina.filter(s => reprocannCategoria(s) === 'sin_reprocann').length,
+    inactivos:  enNomina.filter(esInactivo).length,
   }
 })
 
 const filtrados = computed(() => {
-  let list = store.items
-  if (filterEstado.value === 'activos')  list = list.filter(s => s.es_paciente)
+  // Por defecto se ve LA NÓMINA. Los dados de baja tienen su propio filtro: están, pero no
+  // ensucian el día a día ni los conteos.
+  let list = filterEstado.value === 'baja' ? store.items.filter(s => !s.es_paciente) : nomina.value
+  if (filterEstado.value === 'inactivos') list = list.filter(esInactivo)
   if (filterEstado.value === 'vencidos')   list = list.filter(s => reprocannCategoria(s) === 'vencido')
   if (filterEstado.value === 'proximos')   list = list.filter(s => reprocannCategoria(s) === 'por_vencer')
   if (filterEstado.value === 'pendientes') list = list.filter(s => reprocannCategoria(s) === 'pendiente')
@@ -178,11 +202,13 @@ async function exportarCSV() {
     <div class="sv__kpis">
       <button class="sv__kpi" :class="{ 'sv__kpi--active': filterEstado === 'todos' }" @click="filterEstado = 'todos'">
         <div class="sv__kpi-val">{{ kpis.total }}</div>
-        <div class="sv__kpi-lbl">Total</div>
+        <div class="sv__kpi-lbl">En la nómina</div>
       </button>
-      <button class="sv__kpi sv__kpi--ok" :class="{ 'sv__kpi--active': filterEstado === 'activos' }" @click="filterEstado = 'activos'">
-        <div class="sv__kpi-val">{{ kpis.activos }}</div>
-        <div class="sv__kpi-lbl">En tratamiento</div>
+      <!-- No viene hace más de tres meses: tiene tratamiento abierto pero dejó de retirar. Es
+           lo único de esta pantalla sobre lo que hay que hacer algo hoy. -->
+      <button v-if="kpis.inactivos" class="sv__kpi sv__kpi--warn" :class="{ 'sv__kpi--active': filterEstado === 'inactivos' }" @click="filterEstado = 'inactivos'">
+        <div class="sv__kpi-val">{{ kpis.inactivos }}</div>
+        <div class="sv__kpi-lbl">Sin retirar +90d</div>
       </button>
       <button class="sv__kpi sv__kpi--warn" :class="{ 'sv__kpi--active': filterEstado === 'proximos' }" @click="filterEstado = 'proximos'">
         <div class="sv__kpi-val">{{ kpis.proximos }}</div>
@@ -200,7 +226,17 @@ async function exportarCSV() {
         <div class="sv__kpi-val">{{ kpis.sin_rep }}</div>
         <div class="sv__kpi-lbl">Sin REPROCANN</div>
       </button>
+      <!-- Fuera de tratamiento: no cuentan como pacientes del club, pero siguen estando. -->
+      <button v-if="kpis.baja" class="sv__kpi sv__kpi--gray" :class="{ 'sv__kpi--active': filterEstado === 'baja' }" @click="filterEstado = 'baja'">
+        <div class="sv__kpi-val">{{ kpis.baja }}</div>
+        <div class="sv__kpi-lbl">Dados de baja</div>
+      </button>
     </div>
+
+    <p class="sv__resena">
+      Los números cuentan <strong>la nómina</strong>: los pacientes en tratamiento. Los dados de
+      baja quedan fuera del padrón y de los conteos. Cada tarjeta filtra la lista.
+    </p>
 
     <!-- Búsqueda -->
     <div class="sv__toolbar">
@@ -350,6 +386,7 @@ async function exportarCSV() {
 .sv__title { font-size: 2rem; font-weight: 800; color: #0f172a; margin: 0 0 .2rem; letter-spacing: -.04em; line-height: 1; }
 .sv__sub { font-size: .83rem; color: #94a3b8; margin: 0; }
 
+.sv__resena { margin: -.4rem 0 1rem; font-size: .78rem; color: var(--c-slate-500); line-height: 1.5; max-width: 78ch; }
 .sv__kpis { display: grid; grid-template-columns: repeat(5,1fr); gap: .75rem; margin-bottom: 1.5rem; }
 @media (max-width: 900px) { .sv__kpis { grid-template-columns: repeat(3,1fr); } }
 @media (max-width: 640px) { .sv__kpis { grid-template-columns: repeat(2,1fr); } }

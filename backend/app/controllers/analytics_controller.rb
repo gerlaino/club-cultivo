@@ -487,6 +487,9 @@ class AnalyticsController < ApplicationController
         genetica_id:    l.genetica_id,
         propagacion:    propagacion_dias,
         vegetativo_puro: veg_puro_dias,
+        # De dónde vino la planta. Un esqueje y una semilla NO enraízan igual, así que los días
+        # de enraizado sólo se leen bien sabiendo contra qué origen compararlos.
+        origen:         l.origen,
         **dias,
       }
     end
@@ -505,11 +508,21 @@ class AnalyticsController < ApplicationController
       prop_vals = cs.filter_map { |c| c[:propagacion] }
       veg_puro_vals = cs.filter_map { |c| c[:vegetativo_puro] }
 
+      # Mezcla de orígenes de los lotes promediados: "3 de semilla · 9 de esqueje". Sin esto,
+      # un promedio de enraizado alto puede ser una genética lenta o simplemente que ese mes se
+      # trabajó con esquejes, y no hay forma de distinguirlo.
+      origenes = cs.filter_map { |c| c[:origen] }.tally
+
       {
         genetica_id:     gid,
         nombre:          g.nombre,
         lotes_con_datos: cs.size,
+        # `propagacion` es el ENRAIZADO: etapa propia, no una sub-fase del vegetativo. Estaba
+        # calculada pero la tabla no la mostraba, así que ese tiempo quedaba invisible.
+        enraizado:       prop_vals.any? ? (prop_vals.sum / prop_vals.size).round(1) : nil,
         propagacion:     prop_vals.any? ? (prop_vals.sum / prop_vals.size).round(1) : nil,
+        origenes:        origenes,
+        origen_label:    origenes.map { |o, n| "#{n} de #{o}" }.join(' · ').presence,
         vegetativo_puro: veg_puro_vals.any? ? (veg_puro_vals.sum / veg_puro_vals.size).round(1) : nil,
         **promedios,
       }

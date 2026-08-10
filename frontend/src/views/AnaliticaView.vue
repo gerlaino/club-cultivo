@@ -109,10 +109,10 @@ function exportCsvGeneticas() {
 }
 
 function exportCsvCiclos() {
-  const headers = ['Genética','Lotes con datos','Vegetativo total (d)','Propagación (d)','Vegetativo puro (d)','Floración (d)','Cosecha (d)','Manicura (d)','Curado (d)','Total (d)']
+  const headers = ['Genética','Lotes con datos','Enraizado (d)','Origen','Vegetativo (d)','Floración (d)','Cosecha (d)','Manicura (d)','Curado (d)','Total (d)']
   const rows = [headers, ...ciclos.value.map(c => [
     c.nombre, c.lotes_con_datos,
-    c.vegetativo ?? '', c.propagacion ?? '', c.vegetativo_puro ?? '',
+    c.enraizado ?? c.propagacion ?? '', c.origen_label ?? '', c.vegetativo_puro ?? c.vegetativo ?? '',
     c.floracion ?? '', c.cosecha ?? '', c.secado ?? '', c.curado ?? '',
     totalCiclo(c),
   ])]
@@ -176,11 +176,15 @@ function barPct(val) { return val != null ? Math.min((val / maxRendimiento.value
 
 // ── Ciclos ───────────────────────────────────────────────────────
 const ciclos = computed(() => dataProd.value?.ciclos ?? [])
-const FASES_CICLO = ['vegetativo', 'floracion', 'cosecha', 'curado']
+// El ENRAIZADO entra en el total: es tiempo de cultivo real, y dejarlo afuera hacía que el
+// "total" fuera menor que la suma de lo que se ve en la fila. `enraizado` y `propagacion` son
+// el mismo dato (el segundo es el nombre viejo, se acepta por compatibilidad).
+const FASES_CICLO = ['enraizado', 'vegetativo', 'floracion', 'cosecha', 'curado']
 function totalCiclo(c) {
   // Number(): los días por fase pueden venir como string (decimal de Rails) y el +
   // concatenaría en vez de sumar, rompiendo el .toFixed.
-  return Math.round(FASES_CICLO.reduce((s, f) => s + Number(c[f] ?? 0), 0))
+  const dias = (f) => Number((f === 'enraizado' ? (c.enraizado ?? c.propagacion) : c[f]) ?? 0)
+  return Math.round(FASES_CICLO.reduce((s, f) => s + dias(f), 0))
 }
 
 // ── Pérdidas ─────────────────────────────────────────────────────
@@ -537,6 +541,12 @@ function bucketColor(desv) {
               <tr>
                 <th>Genética</th>
                 <th class="an__th-r">Lotes</th>
+                <!-- El ENRAIZADO es una etapa propia, no una sub-fase del vegetativo: estaba
+                     como letra chica adentro de la columna de al lado, que es justo donde peor
+                     se lee. Y va con el origen, porque un esqueje y una semilla no enraízan
+                     igual — sin eso, un promedio alto puede ser la genética o puede ser que ese
+                     mes se trabajó con esquejes, y no hay forma de saberlo. -->
+                <th class="an__th-r">Enraizado</th>
                 <th class="an__th-r">Vegetativo</th>
                 <th class="an__th-r">Floración</th>
                 <th class="an__th-r">Cosecha</th>
@@ -550,11 +560,13 @@ function bucketColor(desv) {
                 <td class="an__td-bold">{{ c.nombre }}</td>
                 <td class="an__td-r an__td-muted">{{ c.lotes_con_datos }}</td>
                 <td class="an__td-r">
-                  <span class="an__fase-chip an__fase-chip--veg">{{ fmtDias(c.vegetativo) }}</span>
-                  <div v-if="c.propagacion != null" class="an__veg-detalle">
-                    <span class="an__veg-sub">🪴 {{ fmtDias(c.propagacion) }} prop.</span>
-                    <span class="an__veg-sub">🍃 {{ fmtDias(c.vegetativo_puro) }} veg.</span>
+                  <span class="an__fase-chip an__fase-chip--enr">{{ fmtDias(c.enraizado ?? c.propagacion) }}</span>
+                  <div v-if="c.origen_label" class="an__veg-detalle">
+                    <span class="an__veg-sub">{{ c.origen_label }}</span>
                   </div>
+                </td>
+                <td class="an__td-r">
+                  <span class="an__fase-chip an__fase-chip--veg">{{ fmtDias(c.vegetativo_puro ?? c.vegetativo) }}</span>
                 </td>
                 <td class="an__td-r"><span class="an__fase-chip an__fase-chip--flo">{{ fmtDias(c.floracion) }}</span></td>
                 <td class="an__td-r"><span class="an__fase-chip an__fase-chip--cos">{{ fmtDias(c.cosecha) }}</span></td>
@@ -1294,6 +1306,8 @@ function bucketColor(desv) {
 
 /* Ciclos — chips por fase */
 .an__fase-chip { display: inline-block; padding: .15em .55em; border-radius: 6px; font-size: .75rem; font-weight: 600; }
+/* El enraizado tiene su color: es una etapa aparte del vegetativo. */
+.an__fase-chip--enr { background: #e0f2fe; color: #0369a1; }
 .an__fase-chip--veg { background: rgba(21,128,61,.1); color: #15803d; }
 .an__fase-chip--flo { background: rgba(217,119,6,.1); color: #b45309; }
 .an__fase-chip--cos { background: rgba(91,100,115,.1); color: #475569; }
