@@ -88,10 +88,10 @@ onMounted(async () => {
     <div class="sac__header">
       <div>
         <div class="sac__eyebrow">Gestión global</div>
-        <h1 class="sac__title">Clubs</h1>
+        <h1 class="sac__title">Organizaciones</h1>
       </div>
       <button class="sac__btn-primary" @click="router.push({ name: 'sa-club-nuevo' })">
-        <i class="bi bi-plus-lg"></i> Nuevo club
+        <i class="bi bi-plus-lg"></i> Nueva organización
       </button>
     </div>
 
@@ -125,12 +125,12 @@ onMounted(async () => {
 
     <div v-else-if="!filtrados.length" class="sac__empty">
       <i class="bi bi-building-slash sac__empty-icon"></i>
-      <p>Sin clubs que coincidan con la búsqueda</p>
+      <p>Sin organizaciones que coincidan con la búsqueda</p>
     </div>
 
     <div v-else class="sac__list">
       <div class="sac__list-header">
-        <span>Club</span>
+        <span>Organización</span>
         <span>Contacto</span>
         <span>Plan</span>
         <span>Métricas</span>
@@ -193,7 +193,7 @@ onMounted(async () => {
     </div>
 
     <div v-if="filtrados.length" class="sac__footer">
-      {{ filtrados.length }} club{{ filtrados.length !== 1 ? 's' : '' }}
+      {{ filtrados.length }} {{ filtrados.length === 1 ? "organización" : "organizaciones" }}
     </div>
 
   </div>

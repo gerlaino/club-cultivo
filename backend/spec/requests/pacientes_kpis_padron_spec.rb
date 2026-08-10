@@ -35,12 +35,12 @@ RSpec.describe 'GET /api/pacientes — KPIs del padrón', type: :request do
     end
 
     it 'cuenta un vencido que quedó fuera de la primera página' do
-      # Los 5 sanos se crean primero; el vencido queda último y el orden por defecto es
-      # created_at DESC... así que se pide explícitamente la página que NO lo contiene.
-      5.times { paciente(reprocann_numero: 'RC-ok', reprocann_estado: 'activo', reprocann_vencimiento: hoy + 1.year) }
-      paciente(reprocann_numero: 'RC-vencido', reprocann_estado: 'activo', reprocann_vencimiento: hoy - 10.days)
+      # El apellido lo manda al final del alfabético (que es el orden por defecto), así que
+      # queda garantizado fuera de la página 1 sin depender de en qué orden se crearon.
+      5.times { |i| paciente(apellido: "Aaa#{i}", reprocann_numero: 'RC-ok', reprocann_estado: 'activo', reprocann_vencimiento: hoy + 1.year) }
+      paciente(apellido: 'Zzz', reprocann_numero: 'RC-vencido', reprocann_estado: 'activo', reprocann_vencimiento: hoy - 10.days)
 
-      get '/api/pacientes', params: { limite: 2, pagina: 3 }
+      get '/api/pacientes', params: { limite: 2, pagina: 1 }
       body = JSON.parse(response.body)
 
       # En esa página el vencido no viene...

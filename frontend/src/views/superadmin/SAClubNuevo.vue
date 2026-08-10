@@ -140,13 +140,13 @@ async function handleSubmit() {
 
     <!-- Back -->
     <RouterLink :to="{ name: 'sa-clubs' }" class="cnv__back">
-      <ArrowLeft :size="14" :stroke-width="2" /> Clubs
+      <ArrowLeft :size="14" :stroke-width="2" /> Organizaciones
     </RouterLink>
 
     <!-- ══ SUCCESS ══ -->
     <div v-if="creado" class="cnv__success">
       <div class="cnv__success-check"><Check :size="28" :stroke-width="2.5" /></div>
-      <h2 class="cnv__success-title">Club creado</h2>
+      <h2 class="cnv__success-title">Organización creada</h2>
       <p class="cnv__success-sub">
         <strong>{{ creado.club.name }}</strong> está listo.
         Se {{ creado.usuarios.length === 1 ? 'creó' : 'crearon' }}
@@ -195,7 +195,7 @@ async function handleSubmit() {
 
       <!-- Header + stepper -->
       <div class="cnv__header">
-        <h1 class="cnv__title">Nuevo club</h1>
+        <h1 class="cnv__title">Nueva organización</h1>
         <div class="cnv__stepper">
           <div
             v-for="(nombre, i) in PASOS" :key="nombre"
@@ -217,7 +217,7 @@ async function handleSubmit() {
         <div class="cnv__panel-header">
           <div class="cnv__panel-ico"><Building2 :size="18" :stroke-width="1.75" /></div>
           <div>
-            <div class="cnv__panel-title">Identidad del club</div>
+            <div class="cnv__panel-title">Identidad de la organización</div>
             <div class="cnv__panel-sub">Datos de identificación y contacto</div>
           </div>
         </div>
@@ -227,7 +227,7 @@ async function handleSubmit() {
           </div>
           <div class="cnv__grid">
             <div class="cnv__field cnv__field--full">
-              <label class="cnv__label">Nombre del club <span class="cnv__req">*</span></label>
+              <label class="cnv__label">Nombre de la organización <span class="cnv__req">*</span></label>
               <input v-model.trim="form.name" class="cnv__input" :class="{ 'cnv__input--err': errores.name }"
                      placeholder="Club Medicinal del Sur" />
               <span v-if="errores.name" class="cnv__err">{{ errores.name }}</span>
@@ -314,7 +314,7 @@ async function handleSubmit() {
               <div class="cnv__toggle__track"><div class="cnv__toggle__thumb"></div></div>
               <div>
                 <div class="cnv__toggle__label">Período de prueba</div>
-                <div class="cnv__hint">Muestra el cartel "Trial" en el panel del club</div>
+                <div class="cnv__hint">Muestra el cartel "Trial" en el panel de la organización</div>
               </div>
             </label>
           </div>

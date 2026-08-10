@@ -41,7 +41,7 @@ class SalasController < ApplicationController
     enforcer = PlanEnforcer.new(current_user.club)
     unless enforcer.puede_crear_sala?
       info = enforcer.info
-      return render json: PlanEnforcer.error_limite('salas', info[:limites][:salas]), status: :payment_required
+      return render json: PlanEnforcer.error_limite('salas', info[:limites][:salas], plan: info[:label]), status: :payment_required
     end
 
     sala = current_user.club.salas.build(sala_params)

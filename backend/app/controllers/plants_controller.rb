@@ -76,7 +76,7 @@ class PlantsController < ApplicationController
     enforcer = PlanEnforcer.new(current_user.club)
     unless enforcer.puede_crear_planta?
       info = enforcer.info
-      return render json: PlanEnforcer.error_limite('plantas', info[:limites][:plantas]), status: :payment_required
+      return render json: PlanEnforcer.error_limite('plantas', info[:limites][:plantas], plan: info[:label]), status: :payment_required
     end
 
     lote = current_user.club.lotes.find(params[:plant][:lote_id])

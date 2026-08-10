@@ -422,7 +422,7 @@ onMounted(async () => {
       <div v-if="club.deleted_at" class="scd__deleted-banner">
         <Trash2 :size="16" :stroke-width="1.75" />
         <div>
-          <strong>Club eliminado</strong> — {{ formatDate(club.deleted_at) }}.
+          <strong>Organización eliminada</strong> — {{ formatDate(club.deleted_at) }}.
           Su nombre, los emails de sus usuarios y los DNI de sus pacientes quedaron libres.
         </div>
         <button class="scd__btn-restore" :disabled="saving" @click="restaurar">
@@ -433,7 +433,7 @@ onMounted(async () => {
       <!-- Banner suspendido -->
       <div v-else-if="club.activo === false" class="scd__susp-banner">
         <PauseCircle :size="16" :stroke-width="1.75" />
-        <div><strong>Club suspendido</strong> — sus usuarios no pueden iniciar sesión. Los datos están intactos.</div>
+        <div><strong>Organización suspendida</strong> — sus usuarios no pueden iniciar sesión. Los datos están intactos.</div>
         <button class="scd__btn-restore" :disabled="saving" @click="reactivar">
           <PlayCircle :size="13" :stroke-width="2" /> Reactivar
         </button>
@@ -442,7 +442,7 @@ onMounted(async () => {
       <!-- ── Header ── -->
       <div class="scd__hero">
         <RouterLink :to="{ name: 'sa-dashboard' }" class="scd__back">
-          <ArrowLeft :size="13" :stroke-width="2.5" /> Clubs
+          <ArrowLeft :size="13" :stroke-width="2.5" /> Organizaciones
         </RouterLink>
         <div class="scd__hero-body">
           <div class="scd__avatar" :class="{ 'scd__avatar--deleted': club.deleted_at }">
@@ -517,7 +517,7 @@ onMounted(async () => {
             <div v-if="infoError" class="scd__alert">{{ infoError }}</div>
             <div class="scd__info-grid">
               <div class="scd__field scd__field--full">
-                <label class="scd__lbl">Nombre del club <span style="color:#dc2626">*</span></label>
+                <label class="scd__lbl">Nombre de la organización <span style="color:#dc2626">*</span></label>
                 <input v-model.trim="infoForm.name" class="scd__input" placeholder="Club Cannábico del Sur" autofocus />
               </div>
               <div class="scd__field scd__field--full">
@@ -777,7 +777,7 @@ onMounted(async () => {
                   <span v-if="club.whatsapp_estado === 'conectado'" class="scd__ok-badge">Conectado</span>
                   <span v-else class="scd__warn-badge">Sin conectar</span>
                 </div>
-                <p class="scd__hint">El número y la cuenta son del club: los avisos salen desde ahí.</p>
+                <p class="scd__hint">El número y la cuenta son de la organización: los avisos salen desde ahí.</p>
                 <div class="scd__cfg-grid">
                   <input v-model.trim="waForm.twilio_account_sid" class="scd__input" placeholder="Account SID" />
                   <input v-model.trim="waForm.twilio_auth_token" type="password" class="scd__input"

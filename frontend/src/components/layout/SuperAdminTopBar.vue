@@ -73,7 +73,7 @@ const avatarOpen = ref(false)
 
 const tabs = [
   { name: 'sa-dashboard', label: 'Panel',    coincide: ['sa-dashboard'] },
-  { name: 'sa-clubs',     label: 'Clubes',   coincide: ['sa-clubs', 'sa-club-nuevo', 'sa-club-detail'] },
+  { name: 'sa-clubs',     label: 'Organizaciones',   coincide: ['sa-clubs', 'sa-club-nuevo', 'sa-club-detail'] },
   { name: 'sa-usuarios',  label: 'Usuarios', coincide: ['sa-usuarios'] },
   { name: 'sa-informes',  label: 'Informes', coincide: ['sa-informes'] },
 ]

@@ -12,7 +12,7 @@ class SuperAdmin::UsersController < SuperAdmin::BaseController
     enforcer = PlanEnforcer.new(club)
     unless enforcer.puede_crear_usuario?
       info = enforcer.info
-      return render json: PlanEnforcer.error_limite('usuarios', info[:limites][:usuarios]),
+      return render json: PlanEnforcer.error_limite('usuarios', info[:limites][:usuarios], plan: info[:label]),
                     status: :payment_required
     end
 

@@ -34,5 +34,9 @@ import SuperAdminTopBar from '../../components/layout/SuperAdminTopBar.vue'
   flex-shrink: 0;
 }
 
-.sa-main { flex: 1; min-width: 0; }
+/* El ancho y el centrado viven ACÁ, no en cada vista. Cuando cada pantalla se lo ponía sola,
+   dos se olvidaron el `margin: 0 auto` (quedaban con el ancho limitado pero pegadas a la
+   izquierda) y otras cuatro no declaraban ancho, así que el contenido saltaba de lugar al
+   cambiar de pestaña. Una vista que necesite ser más angosta se lo pone encima. */
+.sa-main { flex: 1; min-width: 0; width: 100%; max-width: 1180px; margin: 0 auto; }
 </style>

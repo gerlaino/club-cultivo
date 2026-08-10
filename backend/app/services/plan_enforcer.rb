@@ -103,9 +103,19 @@ class PlanEnforcer
     }
   end
 
-  def self.error_limite(recurso, limite)
-    msg = limite ? "Límite del plan alcanzado: tu plan permite #{limite} #{recurso} como máximo." \
-                 : "Tu plan no permite más #{recurso}."
-    { error: 'limite_plan', errors: [msg], mensaje: msg, upgrade: true }
+  # El mensaje que ve quien se choca contra el tope. Tiene que decir tres cosas —qué plan
+  # tenés, cuál es el tope y qué hacer— porque el usuario que lo lee no eligió el plan y no
+  # tiene forma de averiguarlo desde donde está parado. "Límite del plan alcanzado" a secas
+  # deja a alguien mirando un formulario que no guarda, sin saber si es un error o una regla.
+  def self.error_limite(recurso, limite, plan: nil)
+    plan_txt = plan.present? ? "El plan #{plan}" : 'Tu plan'
+    msg = if limite
+            "#{plan_txt} permite hasta #{limite} #{recurso}, y el club ya llegó a ese número. " \
+            'Para dar de alta más, hay que ampliar el plan: escribinos y lo cambiamos.'
+          else
+            "#{plan_txt} no incluye #{recurso}. Escribinos y lo habilitamos."
+          end
+    { error: 'limite_plan', errors: [msg], mensaje: msg, recurso: recurso.to_s, limite: limite,
+      plan: plan, upgrade: true }
   end
 end

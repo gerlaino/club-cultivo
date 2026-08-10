@@ -72,6 +72,18 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // Tope del plan alcanzado. Va acá y no en cada pantalla porque los límites se chocan desde
+    // MUCHOS lugares —alta de lote, de planta, de sala, de paciente, de usuario, de sede, y las
+    // versiones mobile de casi todos— y sólo cuatro vistas lo manejaban: en el resto el
+    // formulario no guardaba y no aparecía ninguna explicación. El backend ya manda el texto
+    // completo (qué plan, cuál es el tope, qué hacer); acá sólo se muestra.
+    // Las vistas que ya tienen su propio modal siguen funcionando: ellas capturan el 402 y
+    // muestran el suyo; este toast es el piso para todas las demás.
+    if (status === 402 && error?.response?.data?.error === 'limite_plan') {
+      const toast = useToast();
+      toast.error(error.response.data.mensaje || 'Límite del plan alcanzado.', { timeout: 9000 });
+    }
+
     if (status === 500) {
       const toast = useToast();
       toast.error('Error en el servidor. Intentá de nuevo en unos segundos.', { timeout: 5000 });

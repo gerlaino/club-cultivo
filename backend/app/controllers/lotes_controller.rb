@@ -84,7 +84,7 @@ class LotesController < ApplicationController
     enforcer = PlanEnforcer.new(current_user.club)
     unless enforcer.puede_crear_lote?
       info = enforcer.info
-      return render json: PlanEnforcer.error_limite('lotes', info[:limites][:lotes]), status: :payment_required
+      return render json: PlanEnforcer.error_limite('lotes', info[:limites][:lotes], plan: info[:label]), status: :payment_required
     end
 
     # Lote cosechado: no usa sala de cultivo. Viene con sede_id y se trackea por estado

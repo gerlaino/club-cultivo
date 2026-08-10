@@ -57,7 +57,7 @@ onMounted(async () => {
         </div>
 
         <div class="sai__bloque">
-          <div class="sai__bloque-title">Clubes</div>
+          <div class="sai__bloque-title">Organizaciones</div>
           <div class="sai__grid">
             <div class="sai__dato"><span class="sai__n">{{ clubes.operando }}</span><span class="sai__l">operando</span></div>
             <div class="sai__dato"><span class="sai__n">{{ clubes.suspendidos }}</span><span class="sai__l">suspendidos</span></div>
@@ -77,8 +77,8 @@ onMounted(async () => {
         </div>
 
         <div class="sai__bloque">
-          <div class="sai__bloque-title">Club promedio</div>
-          <p class="sai__nota">El promedio dice más que el total: así es un club mediano de la plataforma.</p>
+          <div class="sai__bloque-title">Organización promedio</div>
+          <p class="sai__nota">El promedio dice más que el total: así es una organización mediana de la plataforma.</p>
           <div class="sai__grid">
             <div class="sai__dato"><span class="sai__n">{{ promedio.pacientes }}</span><span class="sai__l">pacientes</span></div>
             <div class="sai__dato"><span class="sai__n">{{ promedio.lotes }}</span><span class="sai__l">lotes</span></div>
@@ -100,8 +100,8 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-/* Con max-width y sin `margin: 0 auto` la pantalla queda pegada a la izquierda (misma
-   convención que el resto de las vistas). */
+/* Más angosta que el resto a propósito (son listas, no tableros): el ancho base y el centrado
+   los pone `.sa-main`, esto lo achica encima. */
 .sai { padding: 1.75rem 2rem 3rem; max-width: 1000px; margin: 0 auto; }
 .sai__title { font-size: 1.6rem; font-weight: 800; color: var(--c-slate-900); margin: 0 0 1.5rem; letter-spacing: -.03em; }
 

@@ -38,8 +38,15 @@ class PacientesController < ApplicationController
     limit  = (params[:limite] || 20).to_i
     query  = params[:query].to_s.strip
     dni    = params[:dni].to_s.gsub(/\D/, "")
-    orden  = params[:orden].presence_in(%w[created_at nombre apellido]) || "created_at"
-    dir    = params[:dir].to_s.downcase == "asc" ? "asc" : "desc"
+    # El padrón se lee alfabéticamente: se entra a buscar a alguien, no a ver quién se cargó
+    # último. Con `created_at desc` la lista arrancaba por el alta más reciente y encontrar a
+    # una persona era recorrerla entera.
+    orden  = params[:orden].presence_in(%w[created_at nombre apellido]) || "apellido"
+    dir    = if params[:dir].present?
+               params[:dir].to_s.downcase == "asc" ? "asc" : "desc"
+             else
+               orden == "created_at" ? "desc" : "asc" # lo más nuevo primero; los nombres, de la A a la Z
+             end
 
     scope = policy_scope(Paciente)
 
@@ -59,7 +66,11 @@ class PacientesController < ApplicationController
     end
 
     total    = scope.count
-    pacientes = scope.order("#{orden} #{dir}")
+    # Alfabético de verdad: apellido y después nombre. Ordenar sólo por apellido deja a los
+    # homónimos en orden arbitrario, que en un padrón con varios "Casuso" se nota.
+    # `orden` sale de una allowlist y `dir` de un ternario: no hay interpolación de usuario.
+    orden_sql = orden == "apellido" ? "apellido #{dir}, nombre #{dir}" : "#{orden} #{dir}"
+    pacientes = scope.order(Arel.sql(orden_sql))
                      .offset((page - 1) * limit)
                      .limit(limit)
                      .to_a
@@ -197,7 +208,7 @@ class PacientesController < ApplicationController
     enforcer = PlanEnforcer.new(current_user.club)
     unless enforcer.puede_crear_paciente?
       info = enforcer.info
-      return render json: PlanEnforcer.error_limite('pacientes', info[:limites][:pacientes]), status: :payment_required
+      return render json: PlanEnforcer.error_limite('pacientes', info[:limites][:pacientes], plan: info[:label]), status: :payment_required
     end
 
     paciente = Paciente.new(paciente_params)

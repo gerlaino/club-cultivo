@@ -37,7 +37,7 @@ class ClubUsersController < ApplicationController
     enforcer = PlanEnforcer.new(current_user.club)
     unless enforcer.puede_crear_usuario?
       info = enforcer.info
-      return render json: PlanEnforcer.error_limite('usuarios', info[:limites][:usuarios]), status: :payment_required
+      return render json: PlanEnforcer.error_limite('usuarios', info[:limites][:usuarios], plan: info[:label]), status: :payment_required
     end
 
     # No se pueden dar de alta usuarios operativos hasta que el club tenga al

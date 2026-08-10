@@ -26,7 +26,7 @@ const pendientes = computed(() => {
   const p = []
   const add = (items, tono, texto) => (items || []).forEach(c => p.push({ ...c, tono, texto: texto(c) }))
 
-  add(susc.value.vencidos, 'rojo', () => 'El plan venció y el club sigue operando')
+  add(susc.value.vencidos, 'rojo', () => 'El plan venció y la organización sigue operando')
   add(atencion.value.sin_suites, 'rojo', () => 'Sin ninguna suite: entra pero no puede trabajar')
   add(atencion.value.modulos_a_medias, 'ambar', c => `${c.modulo_label}: ${c.falta}`)
   add(salud.value.iot_mudo, 'ambar', c => c.ultima_lectura
@@ -69,11 +69,11 @@ onMounted(async () => {
         <h1 class="sad__title">Panel</h1>
         <p class="sad__sub" v-if="pulso">
           {{ pulso.totales.clubes_operando }}
-          club{{ pulso.totales.clubes_operando === 1 ? '' : 'es' }} operando
+          {{ pulso.totales.clubes_operando === 1 ? "organización" : "organizaciones" }} operando
         </p>
       </div>
       <button class="sad__btn-primary" @click="router.push({ name: 'sa-club-nuevo' })">
-        <Plus :size="16" :stroke-width="2.5" /> Nuevo club
+        <Plus :size="16" :stroke-width="2.5" /> Nueva organización
       </button>
     </div>
 
@@ -145,7 +145,7 @@ onMounted(async () => {
             <span class="sad__section-title">En silencio</span>
             <span class="sad__section-count">{{ sinActividad.length }}</span>
           </div>
-          <div v-if="!sinActividad.length" class="sad__vacio">Todos los clubes tocaron algo hace poco.</div>
+          <div v-if="!sinActividad.length" class="sad__vacio">Todas las organizaciones tocaron algo hace poco.</div>
           <ul v-else class="sad__silencio">
             <li v-for="c in sinActividad" :key="c.id" @click="irAlClub(c.id)">
               <span class="sad__pend-club">{{ c.nombre }}</span>
@@ -176,7 +176,7 @@ onMounted(async () => {
             <span v-else class="sad__salud-v">Sin respuesta de la cola</span>
           </div>
           <div class="sad__salud-item" :class="{ 'sad__salud-item--mal': (salud.iot_mudo || []).length }">
-            <span class="sad__salud-l">Clubes con IoT reportando</span>
+            <span class="sad__salud-l">Organizaciones con IoT reportando</span>
             <span class="sad__salud-v">
               {{ (salud.iot_mudo || []).length }} sin señal
             </span>
@@ -205,10 +205,8 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-/* `margin: 0 auto` va SIEMPRE con el max-width: sin él la pantalla queda con el ancho
-   limitado pero pegada a la izquierda, y en un monitor ancho parece rota. Es la misma
-   convención del resto de las vistas (AnaliticaView, CosechadoView, DispositivosView…). */
-.sad { padding: 1.75rem 2rem 3rem; max-width: 1180px; margin: 0 auto; }
+/* El ancho y el centrado los pone `.sa-main` del shell, para todas las pantallas por igual. */
+.sad { padding: 1.75rem 2rem 3rem; }
 
 .sad__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
 .sad__title { font-size: 1.6rem; font-weight: 800; color: var(--c-slate-900); margin: 0; letter-spacing: -.03em; }

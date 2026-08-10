@@ -65,7 +65,7 @@ describe('Panel del super admin', () => {
     const w = mount(SADashboard, { global: { stubs } })
     await flushPromises()
 
-    expect(w.text()).toContain('3 clubes operando')
+    expect(w.text()).toContain('3 organizaciones operando')
   })
 
   // Lo único accionable va primero y junto: antes había que barrer la pantalla para saber si
@@ -75,7 +75,7 @@ describe('Panel del super admin', () => {
     await flushPromises()
 
     const texto = w.text()
-    expect(texto).toContain('El plan venció y el club sigue operando')
+    expect(texto).toContain('El plan venció y la organización sigue operando')
     expect(texto).toContain('Sin ninguna suite')
     expect(texto).toContain('Falta cargar la cuenta de Twilio.')
     expect(texto).toContain('nunca reportó una lectura')
