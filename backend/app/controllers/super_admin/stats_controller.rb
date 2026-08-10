@@ -36,6 +36,11 @@ class SuperAdmin::StatsController < SuperAdmin::BaseController
     }
   end
 
+  # GET /super_admin/pulso — lo que el dueño de la plataforma necesita ver al abrir.
+  def pulso
+    render json: SuperAdmin::Pulso.new.call
+  end
+
   def metricas
     inicio_mes = Time.zone.today.beginning_of_month
     reales     = Club.reales.pluck(:id)

@@ -1,5 +1,25 @@
 class Club < ApplicationRecord
   include RestorableInterface
+  include Auditable
+  # ALLOWLIST ESTRICTA: qué se le cambió al club y cuándo. Todo lo que se toca desde el panel de
+  # plataforma —el plan, los módulos, la suspensión, la baja— deja rastro, porque hasta ahora
+  # NADA lo dejaba: cuando un club reclamaba "yo no pedí que me cambien el plan" no había forma
+  # de saber quién ni cuándo. Con dos personas operando el panel, eso es una discusión sin árbitro.
+  #
+  # Nunca se auditan credenciales: smtp_pass, twilio_auth_token_enc, pulse_api_key_enc quedan
+  # fuera por no estar en esta lista, y una columna nueva tampoco se cuela sola.
+  auditar_solo :name, :legal_name, :email, :slug, :plan, :plan_activo_hasta, :plan_trial,
+               :features, :activo, :deleted_at, :demo, :ia_tier, :ia_limite_hora, :web_activa
+
+  # Se declaran para poder verificarlo en un test: que estén fuera no puede depender de que
+  # alguien se acuerde de mirar la allowlist de arriba.
+  CAMPOS_NUNCA_AUDITADOS = %w[
+    smtp_pass twilio_auth_token_enc pulse_api_key_enc twilio_account_sid
+  ].freeze
+
+  # El concern audita contra `club_id`; para el club, su club es él mismo.
+  def club_id = id
+
   belongs_to :deleted_by, class_name: "User", optional: true
   has_many :users
   has_many :salas,                dependent: :destroy

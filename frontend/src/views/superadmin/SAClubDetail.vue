@@ -3,10 +3,10 @@ import { ref, computed, onMounted } from 'vue'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub, suspenderClub, reactivarClub, provisionarWhatsappClub, desconectarWhatsappClub, provisionarPulse, getSuperAdminCatalogo } from '../../lib/api.js'
+import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub, suspenderClub, reactivarClub, provisionarWhatsappClub, desconectarWhatsappClub, provisionarPulse, getSuperAdminCatalogo, getHistorialClub } from '../../lib/api.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
-import { ArrowLeft, Pencil, Trash2, RotateCcw, Sparkles, UserPlus, Check, X, Save, Mail, Zap, Users, Info, CreditCard, PauseCircle, PlayCircle } from 'lucide-vue-next'
+import { ArrowLeft, Pencil, Trash2, RotateCcw, Sparkles, UserPlus, Check, X, Save, Mail, Zap, Users, Info, CreditCard, PauseCircle, PlayCircle, History } from 'lucide-vue-next'
 
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -73,6 +73,35 @@ const addonsActivos = computed(() => addons.value.filter(a => featuresForm.value
 // Prendido no es lo mismo que andando. El backend calcula el estado real de cada módulo
 // (`andando` / `falta_config` / `apagado`) mirando si tiene lo que necesita para funcionar:
 // el WhatsApp sin Twilio y el Correo sin SMTP quedan prendidos sin hacer nada.
+// ── Historial ──────────────────────────────────────────────────────────
+// A pedido, no al cargar: son hasta 100 registros y sólo se miran cuando hay una discusión.
+const historial = ref(null)
+
+const ACCION_LABEL = { crear: 'Alta', actualizar: 'Cambio', eliminar: 'Baja' }
+
+// Los campos del club en el idioma en que se habla de ellos, no el de la columna.
+const CAMPO_LABEL = {
+  plan: 'plan', plan_activo_hasta: 'vigencia', plan_trial: 'período de prueba',
+  features: 'módulos', activo: 'estado', deleted_at: 'baja', name: 'nombre',
+  legal_name: 'razón social', email: 'email', slug: 'slug', demo: 'club demo',
+  ia_tier: 'nivel de IA', ia_limite_hora: 'límite de IA', web_activa: 'web pública',
+}
+
+function resumirCambios(cambios) {
+  if (!cambios) return ''
+  return Object.keys(cambios).map(k => CAMPO_LABEL[k] || k).join(', ')
+}
+
+async function cargarHistorial() {
+  const { data } = await getHistorialClub(id)
+  historial.value = data
+}
+
+function formatDateTime(f) {
+  if (!f) return '—'
+  return new Date(f).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+
 const modulosAMedias = computed(() =>
   [...addons.value, ...incluidos.value].filter(m => m.estado === 'falta_config')
 )
@@ -784,6 +813,31 @@ onMounted(async () => {
         </div>
       </div>
 
+      <!-- Qué le hicimos NOSOTROS a este club. Es lo primero que se pregunta cuando reclaman
+           "yo no pedí que me cambien el plan": hasta ahora no había forma de saberlo. -->
+      <div class="scd__card">
+        <div class="scd__card-hd">
+          <History :size="14" :stroke-width="1.75" class="scd__card-ico" />
+          Historial
+          <button v-if="!historial" class="scd__btn-sm" style="margin-left:auto" @click="cargarHistorial">
+            Ver historial
+          </button>
+        </div>
+        <template v-if="historial">
+          <div v-if="!historial.length" class="scd__empty">
+            Todavía no se registró ningún cambio sobre este club.
+          </div>
+          <ul v-else class="scd__hist">
+            <li v-for="h in historial" :key="h.id" class="scd__hist-item">
+              <span class="scd__hist-fecha">{{ formatDateTime(h.fecha) }}</span>
+              <span class="scd__hist-accion" :class="`scd__hist-accion--${h.accion}`">{{ ACCION_LABEL[h.accion] || h.accion }}</span>
+              <span class="scd__hist-cambios">{{ resumirCambios(h.cambios) }}</span>
+              <span class="scd__hist-quien">{{ h.usuario?.nombre || h.usuario?.email || 'sistema' }}</span>
+            </li>
+          </ul>
+        </template>
+      </div>
+
       <!-- El correo lo configura el ADMIN del club (conecta su Gmail), no el super_admin. -->
 
       <!-- ── Modal plan ── -->
@@ -1110,6 +1164,28 @@ onMounted(async () => {
 }
 
 .scd__input--mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .02em; }
+
+/* Historial — qué le hicimos nosotros a este club */
+.scd__hist { list-style: none; margin: 0; padding: 0; display: grid; gap: .3rem; }
+.scd__hist-item {
+  display: grid; grid-template-columns: 110px 76px 1fr auto; gap: .6rem; align-items: baseline;
+  padding: .5rem .65rem; border-radius: 8px; background: var(--c-slate-50);
+  font-size: .76rem;
+}
+.scd__hist-fecha { color: var(--c-slate-400); font-variant-numeric: tabular-nums; }
+.scd__hist-accion {
+  font-size: .65rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
+  text-align: center; border-radius: 5px; padding: .12rem .3rem;
+  background: var(--c-slate-200); color: var(--c-slate-600);
+}
+.scd__hist-accion--crear   { background: #dcfce7; color: #15803d; }
+.scd__hist-accion--eliminar { background: #fee2e2; color: #b91c1c; }
+.scd__hist-cambios { color: var(--c-slate-700); }
+.scd__hist-quien   { color: var(--c-slate-400); font-size: .7rem; }
+
+@media (max-width: 700px) {
+  .scd__hist-item { grid-template-columns: 1fr; gap: .15rem; }
+}
 
 /* Suscripción */
 .scd__susc-suites { display: flex; flex-wrap: wrap; gap: .35rem; }

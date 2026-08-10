@@ -586,6 +586,12 @@ export const getSuperAdminStats  = ()             => api.get('/super_admin/stats
 // Qué se puede vender (planes, suites, add-ons, incluidos, en construcción, roles del alta).
 // Sale del backend para que las pantallas no repitan la lista a mano y se desincronicen.
 export const getSuperAdminCatalogo = ()           => api.get('/super_admin/catalogo')
+// El panel del dueño: vencimientos, módulos a medias, clubes en silencio y salud.
+export const getSuperAdminPulso    = ()           => api.get('/super_admin/pulso')
+// Qué le hicimos NOSOTROS a este club: plan, módulos, suspensión, baja.
+export const getHistorialClub      = (id)         => api.get(`/super_admin/clubs/${id}/historial`)
+// Los agregados de la plataforma (plantas, lotes, pacientes) viven acá, no en el panel.
+export const getInformePlataforma  = ()           => api.get('/super_admin/informes/plataforma')
 export const listSuperAdminClubs = (params = {})  => api.get('/super_admin/clubs', { params })
 export const getSuperAdminClub   = (id)           => api.get(`/super_admin/clubs/${id}`)
 export const createSuperAdminClub = (payload)     => api.post('/super_admin/clubs', payload)

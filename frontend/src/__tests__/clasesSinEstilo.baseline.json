@@ -310,9 +310,6 @@
  "views/superadmin/SAUsuarios.vue": [
   "sau__club"
  ],
- "views/superadmin/SuperAdminLayout.vue": [
-  "sa-user__info"
- ],
  "views/supervisor/SupervisorDashboard.vue": [
   "svd__header-text"
  ]

@@ -525,6 +525,7 @@ Rails.application.routes.draw do
           patch  :cambiar_plan
           post   :observar
           delete :detener_observacion
+          get    :historial
           patch  :restaurar
           patch  :suspender
           patch  :reactivar
@@ -537,6 +538,10 @@ Rails.application.routes.draw do
       get :stats,    to: 'stats#show'
       get :metricas, to: 'stats#metricas'
       get :catalogo, to: 'catalogo#show'
+      # El panel de quien vende la plataforma: vencimientos, módulos a medias, clubes en
+      # silencio y salud. Los agregados (plantas, lotes, pacientes) viven en informes.
+      get :pulso,    to: 'stats#pulso'
+      get 'informes/plataforma', to: 'informes#plataforma'
     end
   end
 

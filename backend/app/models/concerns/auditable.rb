@@ -52,6 +52,26 @@ module Auditable
   def registrar_auditoria(accion, cambios)
     return if accion == 'actualizar' && cambios.blank?
 
+    # `Auditoria` es acts_as_tenant y con require_tenant=true (TEN-01c) una escritura sin tenant
+    # fijado explota. Eso dejaba SIN RASTRO justo las acciones que más falta hacía registrar:
+    # las del super admin, que opera cross-club y corre sin tenant a propósito.
+    #
+    # Se fija el tenant SÓLO cuando no hay ninguno. Envolver siempre tenía un efecto lateral
+    # feo: `with_tenant`/`without_tenant` releen `current_tenant` —que incluye el `test_tenant`
+    # de los specs— y al salir lo escriben en `Current.current_tenant`, que no se limpia entre
+    # ejemplos; el spec siguiente heredaba un club cuya transacción ya se había revertido y
+    # fallaba con "Club es obligatorio".
+    if ActsAsTenant.current_tenant
+      crear_auditoria(accion, cambios)
+    else
+      ActsAsTenant.with_tenant(club_para_auditoria) { crear_auditoria(accion, cambios) }
+    end
+  rescue => e
+    # La auditoría nunca debe tumbar la operación de negocio
+    Rails.logger.error "[Auditable] No se pudo registrar auditoría de #{self.class.name}##{id}: #{e.message}"
+  end
+
+  def crear_auditoria(accion, cambios)
     Auditoria.create!(
       auditable_type: self.class.name,
       auditable_id:   id,
@@ -60,8 +80,11 @@ module Auditable
       accion:         accion,
       cambios:        cambios,
     )
-  rescue => e
-    # La auditoría nunca debe tumbar la operación de negocio
-    Rails.logger.error "[Auditable] No se pudo registrar auditoría de #{self.class.name}##{id}: #{e.message}"
+  end
+
+  # El club contra el que se guarda el rastro. Para el propio Club es él mismo, así se evita
+  # una consulta de más en el caso más común de este camino.
+  def club_para_auditoria
+    is_a?(Club) ? self : Club.find_by(id: club_id)
   end
 end

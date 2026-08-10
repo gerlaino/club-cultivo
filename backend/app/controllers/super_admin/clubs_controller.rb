@@ -1,5 +1,5 @@
 class SuperAdmin::ClubsController < SuperAdmin::BaseController
-  before_action :set_club, only: [:show, :update, :crear_usuarios_default, :cambiar_plan, :observar, :detener_observacion, :destroy, :restaurar, :suspender, :reactivar, :provisionar_pulse, :provisionar_whatsapp, :desconectar_whatsapp]
+  before_action :set_club, only: [:show, :update, :crear_usuarios_default, :cambiar_plan, :observar, :detener_observacion, :destroy, :restaurar, :suspender, :reactivar, :provisionar_pulse, :provisionar_whatsapp, :desconectar_whatsapp, :historial]
 
   # Los ELIMINADOS no se listan salvo que se los pida: verlos mezclados con los activos, sin
   # distinguirse, era lo que hacía pensar que borrar un club no hacía nada.
@@ -82,6 +82,26 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       observer_expires_at: DURACION_OBSERVACION.from_now
     )
     render json: estado_observacion, status: :created
+  end
+
+  # GET /super_admin/clubs/:id/historial — qué le hicimos nosotros a este club.
+  #
+  # Es lo primero que se pregunta cuando un club reclama: "yo no pedí que me cambien el plan",
+  # "¿por qué se me apagó el Buffet?". Sólo las acciones sobre el club (plan, módulos,
+  # suspensión, baja); lo que pasa DENTRO del club tiene su propia auditoría por usuario.
+  def historial
+    registros = Auditoria.where(auditable_type: 'Club', auditable_id: @club.id)
+                         .includes(:user).recientes.limit(100)
+
+    render json: registros.map { |a|
+      {
+        id:      a.id,
+        accion:  a.accion,
+        cambios: a.cambios,
+        fecha:   a.created_at,
+        usuario: a.user ? { id: a.user.id, email: a.user.email, nombre: a.user.nombre_completo } : nil,
+      }
+    }
   end
 
   def detener_observacion
