@@ -215,6 +215,8 @@ namespace :dispensaciones do
 
     ActsAsTenant.without_tenant do
       candidatas = Dispensacion.unscoped.where(medio_pago: 'mixto')
+      # Contar ANTES del loop: al corregirlas dejan de matchear el where y el total sale mal.
+      total      = candidatas.count
       corregidas = 0
       sin_datos  = 0
 
@@ -241,7 +243,7 @@ namespace :dispensaciones do
         corregidas += 1
       end
 
-      puts "\nMarcadas 'mixto': #{candidatas.count}"
+      puts "\nMarcadas 'mixto': #{total}"
       puts "Corregidas: #{corregidas}#{simular ? ' (simulado)' : ''}"
       puts "Sin cobros y sin contra entrega (se dejan como están): #{sin_datos}" if sin_datos.positive?
     end
