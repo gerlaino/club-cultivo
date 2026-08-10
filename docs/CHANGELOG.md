@@ -1,5 +1,37 @@
 # Changelog
 
+## Agosto 2026 (l) — los informes dicen a quién le hablan
+
+El problema no era que faltaran columnas: los informes estaban armados **por entidad** y no
+**por pregunta**, así que cada uno mostraba el conteo de su tabla y entre ellos daban números
+distintos del mismo dato sin explicar por qué. Se separaron tres lectores: el organismo (lo que
+se presenta), el dueño (análisis) y el que opera hoy (pendientes accionables).
+
+- **REPROCANN declara la población REGISTRADA.** Sólo entran los que tienen trámite —vigente,
+  vencido o en curso—; los que no lo iniciaron se informan aparte, porque son un pendiente
+  interno y no algo que se presenta. **Se sacó el corte por sede: un paciente es del club.** Lo
+  que agrupaba era la sede de su última dispensación, una dimensión que no existe en el modelo,
+  y por eso los que nunca retiraron caían en una fila que parecía una sede.
+- **Producción separa el período del presente.** Arriba lo cosechado en el período; abajo "Hoy
+  en el cultivo" con el rendimiento acumulado. Ese era el bug de los 0 g.
+- **Dispensaciones** suma DNI parcial, genética y forma: sin eso no se cruza con producción.
+- **Trazabilidad** suma el BALANCE (producido − dispensado − merma = en stock, con el % que
+  llegó al paciente). Mostraba la cadena pero no la cerraba.
+- **INASE** agrupa por variedad acreditable: veinte genéticas declaradas contra la misma
+  variedad daban veinte filas con el mismo nombre.
+- **Todos llevan una reseña** de una o dos frases: qué contestan y con qué criterio.
+
+**El padrón vive en Pacientes, no en Informes**, porque es la pantalla desde la que hay que
+actuar. Los conteos se hacen sobre la NÓMINA (los que están en tratamiento): los dados de baja
+no son pacientes del club y antes inflaban el total. Se suma "Sin retirar +90d".
+
+**El enraizado tiene columna propia en Analítica**, con el origen al lado (semilla / esqueje) —
+un esqueje y una semilla no enraízan igual— y ahora sí entra en el "Total cultivo".
+
+**Salas madre:** `madre` y `clon` son sub-tipos de vegetativo y faltaban en
+`KINDS_SALA_POR_ESTADO`, así que no se podía crear un lote en la sala de madres. Y en el alta,
+el estado va antes que la sala, porque las salas ofrecidas dependen de la fase.
+
 ## Agosto 2026 (k) — el modal contable reordenado y el design system por superficies
 
 **Nuevo movimiento se lee de arriba a abajo.** El problema no era el estilo: el único campo
