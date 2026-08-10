@@ -25,6 +25,13 @@ const showModal    = ref(false)
 const page         = ref(1)
 const perPage      = 50
 
+// El listado y sus filtros trabajan en memoria (cada tarjeta filtra la lista), así que hay que
+// traer el padrón entero: con el default del backend —20 por página— clickear "Sin REPROCANN"
+// filtraba sobre la primera página y no sobre el club. El techo evita que un club grande se
+// traiga todo de una; pasado ese punto la lista avisa y hay que ir al CSV o buscar.
+const LIMITE_PADRON = 500
+const cargar = (extra = {}) => store.fetch({ limite: LIMITE_PADRON, ...extra })
+
 const REPRO_URL = {
   vencen_pronto: 'proximos',
   vencidos: 'vencidos',
@@ -61,7 +68,7 @@ async function openDelete(s) {
 }
 
 async function doSearch() {
-  await store.fetch({ query: search.value.trim() })
+  await cargar({ query: search.value.trim() })
 }
 
 function onSearchInput() {
@@ -114,7 +121,11 @@ const esInactivo = (s) => {
   return d !== null && d > DIAS_INACTIVO
 }
 
-const kpis = computed(() => {
+// Los números los cuenta el BACKEND sobre todo el padrón (`meta.kpis`). Contarlos acá sobre
+// `store.items` era contar la página: con el listado paginado de a 20, un club de 38 pacientes
+// mostraba "20 en la nómina" y "0 REPROCANN vencido" teniendo vencidos más adelante.
+// El cálculo local queda de respaldo por si `meta.kpis` no viene.
+const kpisLocales = computed(() => {
   const enNomina = nomina.value
   return {
     total:      enNomina.length,                                   // la nómina, no las fichas
@@ -126,6 +137,13 @@ const kpis = computed(() => {
     inactivos:  enNomina.filter(esInactivo).length,
   }
 })
+
+const kpis = computed(() => store.kpis || kpisLocales.value)
+
+// Cuántas fichas quedaron fuera de lo cargado. Las tarjetas siguen diciendo la verdad (las
+// cuenta el servidor), pero la LISTA y sus filtros trabajan sobre lo que hay en memoria, así
+// que si el padrón no entra hay que decirlo en vez de mostrar un subconjunto en silencio.
+const sinCargar = computed(() => Math.max(0, (store.total || 0) - store.items.length))
 
 const filtrados = computed(() => {
   // Por defecto se ve LA NÓMINA. Los dados de baja tienen su propio filtro: están, pero no
@@ -152,7 +170,7 @@ const paginadosSv   = computed(() => filtrados.value.slice((page.value-1)*perPag
 watch(filtrados, () => { page.value = 1 })
 
 onMounted(async () => {
-  await store.fetch()
+  await cargar()
   if (route.query.editar) {
     const s = store.items.find(x => String(x.id) === String(route.query.editar))
     if (s) openEdit(s)
@@ -236,6 +254,14 @@ async function exportarCSV() {
     <p class="sv__resena">
       Los números cuentan <strong>la nómina</strong>: los pacientes en tratamiento. Los dados de
       baja quedan fuera del padrón y de los conteos. Cada tarjeta filtra la lista.
+    </p>
+
+    <!-- Las tarjetas cuentan todo el padrón; la lista trabaja con lo cargado. Si no entró
+         entero hay que decirlo: mostrar un subconjunto en silencio es peor que el número mal. -->
+    <p v-if="sinCargar" class="sv__resena sv__resena--aviso">
+      La lista muestra los primeros {{ store.items.length }} de {{ store.total }}. Los números de
+      arriba cuentan el padrón completo. Buscá por nombre o DNI para llegar al resto, o descargá
+      el CSV.
     </p>
 
     <!-- Búsqueda -->
@@ -372,7 +398,7 @@ async function exportarCSV() {
 
     <!-- Edición: el MISMO modal que se usa desde la ficha del paciente, para que los
          campos y las validaciones sean unos solos. -->
-    <SocioEditarModal v-if="editandoId" v-model:open="showModal" :socio-id="editandoId" @saved="store.fetch()" />
+    <SocioEditarModal v-if="editandoId" v-model:open="showModal" :socio-id="editandoId" @saved="cargar()" />
 
 
   </div>
@@ -387,6 +413,7 @@ async function exportarCSV() {
 .sv__sub { font-size: .83rem; color: var(--c-slate-400); margin: 0; }
 
 .sv__resena { margin: -.4rem 0 1rem; font-size: .78rem; color: var(--c-slate-500); line-height: 1.5; max-width: 78ch; }
+.sv__resena--aviso { color: var(--c-amber-700, #b45309); font-weight: 500; }
 .sv__kpis { display: grid; grid-template-columns: repeat(5,1fr); gap: .75rem; margin-bottom: 1.5rem; }
 @media (max-width: 900px) { .sv__kpis { grid-template-columns: repeat(3,1fr); } }
 @media (max-width: 640px) { .sv__kpis { grid-template-columns: repeat(2,1fr); } }

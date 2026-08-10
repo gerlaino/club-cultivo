@@ -77,7 +77,7 @@ class PacientesController < ApplicationController
 
     render json: {
       data: data,
-      meta: { pagina: page, limite: limit, total: total }
+      meta: { pagina: page, limite: limit, total: total, kpis: kpis_padron(scope) }
     }
   end
 
@@ -404,6 +404,45 @@ class PacientesController < ApplicationController
   end
 
   private
+
+  # Los contadores de la cabecera se cuentan sobre TODO el padrón, no sobre la página.
+  # Contarlos en el cliente sobre `store.items` hacía que un club de 38 pacientes mostrara
+  # "20 en la nómina" y "0 REPROCANN vencido" teniendo vencidos en la página 2 — el admin lee
+  # ese cero y se queda tranquilo. Mismo criterio que Medico::PacientesController#kpis.
+  #
+  # Espeja la PRECEDENCIA de `reprocannCategoria` (frontend/src/composables/useReprocann.js):
+  # primero el trámite pendiente, después la falta de certificado, y recién ahí la fecha. Si
+  # las dos se separan, la tarjeta y la lista que esa tarjeta filtra dejan de coincidir.
+  def kpis_padron(scope)
+    hoy    = Time.zone.today
+    nomina = scope.where(es_paciente: true)
+
+    resto = nomina.where.not(reprocann_estado: 'pendiente')
+    # `reprocann_numero` va cifrado (determinístico): admite IS NULL e igualdad, no LIKE.
+    # Se suma el estado 'sin_registro' porque una ficha puede quedar sin número cargado o con
+    # la baja declarada en el estado, y las dos cuentan como "sin REPROCANN".
+    sin_rep = resto.where(reprocann_numero: nil).or(resto.where(reprocann_estado: 'sin_registro'))
+    con_rep = resto.where.not(reprocann_numero: nil).where.not(reprocann_estado: 'sin_registro')
+
+    # "No viene hace tiempo": tratamiento abierto pero hace más de 90 días que no retira. El
+    # que nunca dispensó NO entra (es un alta reciente, no un abandono), y por eso se cuenta
+    # sobre las últimas dispensaciones y no sobre la nómina.
+    ultimas   = Dispensacion.no_canceladas
+                            .where(paciente_id: nomina.select(:id))
+                            .group(:paciente_id).maximum(:fecha_dispensacion)
+    inactivos = ultimas.count { |_id, fecha| fecha.present? && fecha < 90.days.ago.to_date }
+
+    {
+      total:      nomina.count,
+      baja:       scope.where(es_paciente: false).count,
+      pendientes: nomina.where(reprocann_estado: 'pendiente').count,
+      sin_rep:    sin_rep.count,
+      vencidos:   con_rep.where.not(reprocann_vencimiento: nil)
+                         .where(reprocann_vencimiento: ...hoy).count,
+      proximos:   con_rep.where(reprocann_vencimiento: hoy..(hoy + 30)).count,
+      inactivos:  inactivos,
+    }
+  end
 
   def campos_visibles
     return CAMPOS_NO_CLINICOS - CAMPOS_REPROCANN if current_user.dispensador?

@@ -7,6 +7,10 @@ import {
 export const usePacientesStore = defineStore("pacientes", {
   state: () => ({
     items: [],
+    // Los contadores del padrón los calcula el backend sobre TODO el club. Antes se derivaban
+    // de `items`, que es sólo la página cargada: un club de 38 mostraba "20 en la nómina".
+    kpis: null,
+    total: 0,
     current: null,
     loading: false,
     error: null,
@@ -30,6 +34,8 @@ export const usePacientesStore = defineStore("pacientes", {
       try {
         const { data } = await listPacientes(params)
         this.items = data?.data || data || []
+        this.kpis  = data?.meta?.kpis || null
+        this.total = data?.meta?.total ?? this.items.length
       } catch (e) {
         this.error = e?.response?.data?.error || e.message
       } finally {
