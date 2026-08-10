@@ -230,107 +230,67 @@ Cuando Germán plantee un problema o feature nueva antes de implementar:
 
 Suite 1239 ✓ + 58 vitest ✓. **Deploy: sumar `add_vendible_a_bar_venta_items` y `add_consumo_evento_a_provisiones_y_dispensas` al `db:migrate`.**
 
-## 📍 Dónde retomar (7-ago-2026, cierre b)
+## 📍 Dónde retomar (10-ago-2026) — SIGUIENTE: super_admin
 
-**1682 rspec + 313 vitest en verde.** Sin commitear (Germán no lo pidió).
+**1776 rspec + 873 vitest en verde.** Todo pusheado a `master` (`f3d1a6d`).
 
-**Antes de tocar producción:**
+> **Lo próximo es el rol super_admin**, y Germán avisó que no es sólo rediseño: hay que
+> conectar bien cosas y modificar otras. Arrancar por entender qué administra hoy y qué le
+> falta, antes de tocar.
+
+### Antes de tocar producción
+
 ```
-db:migrate      # add_leaf_temp_offset_a_salas, add_pulse_api_key_a_clubs, y las de julio
-bundle install  # gema nueva pdf-inspector (sólo test)
-rake suites:prender_iot_con_dispositivos      # ⚠️ JUNTO CON EL DEPLOY, ver abajo
-rake lotes:corregir_finalizados_con_stock     # lotes cerrados que aún tienen producto
-rake geneticas:declarar_por_nombre SIMULAR=1  # las que ya traen "- TROPICANA WFC" en el nombre
-rake geneticas:sin_declarar                   # (informativo) qué falta declarar ante el INASE
+bundle install
+bundle exec rails db:migrate
+
+bundle exec rake suites:prender_iot_con_dispositivos SIMULAR=1   # ⚠️ el crítico
+bundle exec rake lotes:corregir_finalizados_con_stock SIMULAR=1  # mirar los 6 del club 1
+bundle exec rake geneticas:declarar_por_nombre SIMULAR=1         # resuelve ~44 de un saque
+bundle exec rake dispensaciones:recalcular_medio_pago SIMULAR=1  # arrastre del "mixto"
+bundle exec rake geneticas:sin_declarar                          # informativo
 ```
 
-> Las migraciones nuevas de esta tanda: `add_fallido_at_a_dispensaciones` y
-> `add_declarada_como_a_geneticas`.
+Todos aceptan `SIMULAR=1`. **El de IoT no es opcional**: la ingesta de sensores exige el add-on
+`iot`, que ninguna migración escribe, así que sin correrlo todo club con hardware deja de
+recibir datos EN SILENCIO.
 
-### Declaración ante el INASE (ago-08)
+### Pendientes de Germán (no de código)
 
-Un club cultiva variedades no inscriptas y las **declara** contra una que sí lo está:
-`geneticas.declarada_como_id` apunta al catálogo GLOBAL de inscriptas (club_id NULL), que ya
-existía. Es opcional. `Genetica#nombre_declarado` / `#numero_inase_declarado` /
-`#acreditada_inase?` son la interfaz.
+- Cargar los `numero_registro_inase` de las 8 variedades del catálogo (hoy vacíos: la columna
+  "N° registro" del informe INASE sale en blanco aunque el vínculo funcione).
+- Declarar a mano las ~18 genéticas que no traen el par en el nombre.
+- Decisiones: **modelo de precios** y **medición de calls de IA**.
 
-**Regla: el nombre declarado se usa SÓLO en informes regulatorios** (INASE, trazabilidad,
-semestral). Las pantallas internas siguen mostrando el nombre real — el cultivador no
-reconoce sus lotes por el nombre del registro.
+### Deuda técnica conocida
 
-**El guard (`DeclaracionInaseGuard`) bloquea la DESCARGA, nunca la pantalla.** El informe INASE
-en pantalla es el que lista los pendientes: bloquearlo dejaría al club sin poder ver su propio
-problema. PDF/Excel de INASE, trazabilidad y semestral devuelven 422 con la lista.
+- **155 clases CSS sin estilo** en 81 archivos, congeladas en
+  `frontend/src/__tests__/clasesSinEstilo.baseline.json`. El test impide que la lista crezca y
+  falla si arreglás una sin sacarla del baseline. NO todas son bugs (hay nombres de
+  `<transition>` y marcadores semánticos): distinguirlas exige ver la pantalla renderizada.
 
-> ⚠️ **El rake de IoT no es opcional.** La ingesta de lecturas ahora exige el add-on `iot`, y
-> ese add-on NUNCA existió como bandera vieja: ninguna migración lo escribe, así que hoy
-> ningún club lo tiene salvo que lo hayan tildado a mano. Sin correr el rake, todo club con
-> hardware deja de recibir datos EN SILENCIO (el sensor postea, le contestan 403). El rake
-> prende `iot` a quien ya tenga dispositivos cargados; es idempotente y acepta `SIMULAR=1`.
+### Cómo quedaron los informes (decisiones, no detalles)
 
-### Bloque "módulo apagado" (#36, #37, #39) — cerrado
+Se ordenaron **por pregunta**, no por entidad, separando tres lectores: el organismo (lo que se
+presenta), el dueño (análisis) y el que opera hoy (pendientes accionables).
 
-La misma pregunta vista de tres lados: qué pasa cuando un club apaga un módulo.
-
-- **#37 Jobs.** Ninguno de los 13 miraba las suites: un club que apagaba un módulo seguía
-  recibiendo sus alertas, y `ReprocannVencimientoJob` le manda mail **al paciente**, no al
-  club. Ahora se recorre con `ApplicationJob#cada_club_con(:suite)`, que resuelve club
-  operativo + suite + tenant + rescue. `AlertaDetectorService` es mixto y filtra adentro
-  (4 detectores de cultivo / saldo de CC). La ingesta IoT se corta en el webhook.
-- **Tercera capa, que no estaba anotada:** `Club.activos` es `where(deleted_at: nil)` y **un
-  club suspendido lo pasaba** — o sea que hasta los 8 jobs que parecían correctos procesaban
-  clubes que dejaron de pagar. Scope nuevo `Club.operativos` (ni eliminado ni suspendido).
-- **#39 Rol huérfano.** `User::MODULOS_POR_ROL`: un cultivador sin suite Cultivo entraba y
-  recibía 403 en todo, sin saber por qué. Ahora lo frena el login con el módulo nombrado, y
-  `check_rol_habilitado!` cubre las sesiones ya abiertas (el interceptor del front lo saca
-  con el motivo). `admin`/`super_admin`/`auditor`/`abogado` nunca se bloquean. **El
-  dispensador requiere `produccion_dispensa` O `bar`**: también atiende el mostrador del
-  Buffet, y hay clubes con sólo Buffet.
-- **#36 Informes.** No hay informes persistidos: no existe modelo ni tabla, cada apertura los
-  recalcula sobre datos vivos. Así que "leer el histórico" es gratis y se deja **sin gating**
-  (un club que se dio de baja puede necesitar mostrarle papeles a un auditor); lo que se
-  apaga es la **emisión automática**, o sea `InformeSemestralJob`, el único que se manda solo.
-
-**Delivery (pedido de Germán):** el logout pasó del fondo del sidebar —que se esconde en
-mobile, y el delivery trabaja siempre desde el celular— al menú de usuario de la topbar, como
-el resto de los roles. Las tres listas del dashboard se pliegan, con contador, y la elección
-se recuerda; los fallidos arrancan cerrados (no puede hacer nada con ellos).
-
-**Bug preexistente encontrado de paso:** `Dispositivo has_many :lecturas_ambientales` sin
-`class_name` → Rails buscaba `LecturasAmbientale`. Borrar un sensor tiraba 500.
-
-### El ciclo del lote (ago-08)
-
-**`finalizado` significa una sola cosa: no queda nada del lote — ni flor ni derivados.** La regla
-vive en `Lote#stock_remanente` y la hacen cumplir dos cosas que antes no existían juntas: la
-validación `finalizado_exige_stock_agotado` y `finalizar_si_stock_agotado!`. Datos del caso:
-
-- Un lote **no cerraba al dispensarse**: `decrement!(:cantidad)` no cambia el estado del stock y
-  el callback escucha el cambio de estado. Ahora la dispensación llama a
-  `Stock#marcar_agotado_si_vacio!`.
-- **El evento de cierre necesita autor** (`lote_eventos.user_id` es NOT NULL) y nace en un callback
-  sin `current_user`: el autor viaja en `Stock#usuario_movimiento`. Si algún llamador nuevo no lo
-  informa, se avisa en el log y NO se cierra — no se rompe la transacción que lo llamó.
-- Al **elaborar un derivado**, el origen se marca agotado al final de la transacción: si se marcara
-  antes, el lote cerraría un instante antes de que el hash exista.
-- `LoteEvento#user` pasó a `optional: true` (la columna sigue NOT NULL: para eventos realmente sin
-  autor haría falta una migración, no hecha).
-
-**Pendientes que quedan (ago-08):** todo lo que estaba en manos del asistente se cerró — ver
-el CHANGELOG (j). Queda del lado de Germán: correr los rakes en prod, declarar a mano las
-genéticas sin sufijo, pasar los `numero_registro_inase`, y las decisiones de modelo de precios
-y medición de IA. Del lado técnico queda el REDISEÑO VISUAL del modal de nuevo movimiento (no
-acordado) y seguir #40 por las superficies que faltan (el super admin ya está).
-
-*(histórico)* **#38** auditoría de utilidad de los 8+ informes y **#40** barrido de design system — que no es un barrido: son 268 `.vue` con
-~11.800 hexadecimales, hay que acotarlo a una superficie. Más las decisiones de Germán:
-modelo de precios y medición de calls de IA.
+- **REPROCANN declara la población REGISTRADA**: sin los que no iniciaron trámite (se informan
+  aparte) y **sin corte por sede — un paciente es del club**, no de una sede.
+- **Producción** separa "del período" de "hoy en el cultivo".
+- **Trazabilidad** cierra el balance: producido − dispensado − merma = en stock.
+- **INASE** agrupa por variedad acreditable, no por genética del club.
+- **Pérdidas** es informe nuevo: plantas descartadas por motivo, merma, vencido en góndola.
+- **Todos llevan una reseña** de qué contestan: sin eso, dos informes que cortan el mismo dato
+  distinto parecen contradecirse.
+- **El padrón de pacientes vive en Pacientes**, no en Informes, y cuenta sobre LA NÓMINA.
 
 ### La lección que no hay que repetir
 
-**Un build que pasa no prueba que la pantalla funcione.** En esta sesión escribí el HTML de un
-modal con clases CSS que nunca creé: compiló perfecto y Germán lo siguió viendo roto. Y al
-gatear las suites verifiqué que el candado estuviera puesto, no que TODAS las puertas lo
+**Un build que pasa no prueba que la pantalla funcione.** Pasó tres veces: el modal contable
+sin estilos, los botones de "Método de aplicación" como `<button>` crudos, y el modal con
+clases CSS que nunca creé — todo compilaba perfecto. Ahora hay un test que barre el markup
+contra el `<style>` de cada componente, pero **si tocás una pantalla, verificala renderizada**.
+Y al gatear las suites verifiqué que el candado estuviera puesto, no que TODAS las puertas lo
 tuvieran — hay 23 componentes de navegación y sólo 3 miraban las features.
 
 **Si tocás una pantalla, verificala renderizada.**
