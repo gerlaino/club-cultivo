@@ -46,7 +46,7 @@
                 El responsable recibirá una notificación y podrá ver el lote en su panel.
               </template>
               <template v-else>
-                Sin responsable: el lote queda disponible para cualquier manicurador del club.
+                Sin responsable: el lote queda disponible para cualquier manicurador de la organización.
               </template>
             </p>
           </div>

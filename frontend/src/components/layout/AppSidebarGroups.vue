@@ -1,7 +1,7 @@
 <template>
   <aside class="sbg" :class="{ 'sbg--collapsed': collapsed }" :style="{ background: bgColor }">
 
-    <!-- Header: marca de plataforma (el club va en el topbar) -->
+    <!-- Header: marca de plataforma (la organización va en el topbar) -->
     <div class="sbg__brand">
       <img src="/logo-ce-icono.png" class="sbg__brand-logo" alt="Cultivo Espacial" />
       <span class="sbg__brand-name">Cultivo Espacial</span>

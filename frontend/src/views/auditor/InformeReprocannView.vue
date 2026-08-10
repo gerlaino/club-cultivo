@@ -75,7 +75,7 @@
            nunca retiraron en una fila que parecía una sede. La actividad por sede es otra
            pregunta y vive en el informe de dispensaciones. -->
       <p v-if="data.pacientes_sin_registro" class="inf__pendiente">
-        El club tiene además <strong>{{ data.pacientes_sin_registro }}</strong>
+        La organización tiene además <strong>{{ data.pacientes_sin_registro }}</strong>
         paciente{{ data.pacientes_sin_registro === 1 ? '' : 's' }} activo{{ data.pacientes_sin_registro === 1 ? '' : 's' }}
         sin REPROCANN iniciado. No integran esta nómina —declara la población registrada— y se
         gestionan desde <RouterLink to="/pacientes">Pacientes</RouterLink>.

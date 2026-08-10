@@ -164,7 +164,7 @@ const NAV = {
   // El admin en el celular NO administra: mira cómo va el día y desbloquea lo que traba a otros.
   // Lo de escritorio —contabilidad, informes, configuración— no se bloquea (si lo necesita abre
   // Chrome y tiene la app entera), simplemente no ocupa la barra.
-  // `feature`: de qué suite depende cada destino. Sin esto, un club de sólo cultivo veía
+  // `feature`: de qué suite depende cada destino. Sin esto, una organización de sólo cultivo veía
   // Dispensas y Pacientes en la barra, entraba, y el backend le devolvía 403: un menú que
   // no lleva a ningún lado.
   admin: { fab: true, items: [
@@ -188,7 +188,7 @@ const NAV = {
     { to: '/m/delivery/historial', icon: 'bi-clock-history', label: 'Historial' },
   ] },
   // El dispensador trabaja de pie con alguien enfrente: la primera pantalla es buscar y dispensar,
-  // no un dashboard. El Salón aparece solo si el club tiene el módulo activo — es el mismo puesto
+  // no un dashboard. El Salón aparece solo si la organización tiene el módulo activo — es el mismo puesto
   // físico, así que no tiene sentido mandarlo al escritorio para cobrar un café.
   // NO hay tab "Pacientes": la lista completa ya está en Dispensar, con buscador y escaneo del
   // carnet. Tenerla dos veces obligaba a decidir por cuál entrar para hacer lo mismo.
@@ -202,7 +202,7 @@ const NAV = {
 }
 NAV.supervisor = NAV.admin
 
-// Un destino se ofrece sólo si el club tiene lo que ese destino necesita. Misma regla que el
+// Un destino se ofrece sólo si la organización tiene lo que ese destino necesita. Misma regla que el
 // menú de escritorio (useNavContext), para que las dos superficies no se desincronicen.
 function tieneFeature(item) {
   return !item.feature || club.data?.features?.[item.feature] === true

@@ -80,7 +80,7 @@ async function imprimirEtiqueta() {
   if (!p?.codigo_qr || generandoEtiqueta.value) return
   generandoEtiqueta.value = true
   try {
-    if (!club.data) { try { await club.fetch() } catch { /* el club es opcional en la etiqueta */ } }
+    if (!club.data) { try { await club.fetch() } catch { /* la organización es opcional en la etiqueta */ } }
     const { jsPDF } = await import('jspdf')
     const qr = await generatePNG(qrPlantaUrl(), LAYOUT_PLANTA.qr)
     const doc = new jsPDF({ unit: 'mm', format: [LAYOUT_PLANTA.ancho, LAYOUT_PLANTA.alto], orientation: 'landscape' })

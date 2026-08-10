@@ -3,7 +3,7 @@
 
     <div>
       <h1 class="int__title">Integraciones</h1>
-      <p class="int__sub">Conectá tu club con servicios externos para automatizar notificaciones y flujos de trabajo</p>
+      <p class="int__sub">Conectá tu organización con servicios externos para automatizar notificaciones y flujos de trabajo</p>
     </div>
 
     <!-- WhatsApp Business -->
@@ -21,7 +21,7 @@
       <div class="int__section-header">
         <div>
           <div class="int__section-title">Webhooks salientes</div>
-          <div class="int__section-sub">Notificá sistemas externos cuando ocurren eventos en el club</div>
+          <div class="int__section-sub">Notificá sistemas externos cuando ocurren eventos en la organización</div>
         </div>
         <button class="int__btn-nuevo" @click="abrirFormNuevo">
           <Plus :size="16" :stroke-width="2" /> Nuevo webhook

@@ -8,7 +8,7 @@
           <h1 class="stk__title">Stock</h1>
           <span v-if="liveConectado" class="stk__live-dot">● en vivo</span>
         </div>
-        <p class="stk__sub">Inventario del club · asignación de sedes · stock externo</p>
+        <p class="stk__sub">Inventario de la organización · asignación de sedes · stock externo</p>
       </div>
       <div class="stk__header-actions">
         <!-- Umbral configurable -->
@@ -154,9 +154,9 @@
       <!-- ── Tab: Inventario ────────────────────────────────────── -->
       <div v-if="tabActiva === 'inventario'">
 
-        <!-- Filtro por sede (tabs): todo el club o una sede puntual -->
+        <!-- Filtro por sede (tabs): toda la organización o una sede puntual -->
         <div class="stk__sede-tabs">
-          <button class="stk__sede-tab" :class="{ 'is-on': invFiltros.sede_id === '' }" @click="invFiltros.sede_id = ''">🏢 Todo el club</button>
+          <button class="stk__sede-tab" :class="{ 'is-on': invFiltros.sede_id === '' }" @click="invFiltros.sede_id = ''">🏢 Toda la organización</button>
           <button v-for="s in sedes" :key="s.id" class="stk__sede-tab" :class="{ 'is-on': invFiltros.sede_id === String(s.id) }" @click="invFiltros.sede_id = String(s.id)">
             {{ s.nombre }}
           </button>
@@ -826,7 +826,7 @@ const invPage     = ref(1)
 const invPerPage  = ref(25)
 const invTotal    = ref(0)
 const invTotales  = ref({})
-// Filtro por sede LOCAL de esta vista (default '' = todo el club). No hay contexto global.
+// Filtro por sede LOCAL de esta vista (default '' = toda la organización). No hay contexto global.
 const invFiltros  = ref({ forma_producto: '', sede_id: '', fecha_desde: '', fecha_hasta: '' })
 
 const hayFiltrosInv = computed(() => Object.values(invFiltros.value).some(v => v))

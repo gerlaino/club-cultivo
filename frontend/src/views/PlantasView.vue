@@ -119,7 +119,7 @@ const etiquetas = useEtiquetasQR()
 const seleccionSinQR = computed(() => sel.seleccionados.value.filter(p => !p.codigo_qr).length)
 
 async function configEtiquetas() {
-  if (!club.data) { try { await club.fetch() } catch { /* el club es opcional en la etiqueta */ } }
+  if (!club.data) { try { await club.fetch() } catch { /* la organización es opcional en la etiqueta */ } }
   const clubName = club.name || ''
   return {
     items:   sel.seleccionados.value.filter(p => p.codigo_qr),

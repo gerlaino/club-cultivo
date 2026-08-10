@@ -199,7 +199,7 @@ async function confirmDelete(s) {
     <div class="slv__header">
       <div class="slv__header-left">
         <h1 class="slv__title">Salas de cultivo</h1>
-        <p class="slv__sub">Gestioná los espacios físicos del club</p>
+        <p class="slv__sub">Gestioná los espacios físicos de la organización</p>
       </div>
       <div style="display:flex;gap:.5rem;align-items:center;">
         <button class="slv__btn-outline" :class="{ 'slv__btn-outline--on': showComparativa }" @click="toggleComparativa">

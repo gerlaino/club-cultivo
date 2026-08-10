@@ -38,7 +38,7 @@
         </div>
 
         <div class="hd-foot">
-          <p>¿Necesitás más ayuda? Contactá al administrador del club.</p>
+          <p>¿Necesitás más ayuda? Contactá al administrador de la organización.</p>
         </div>
 
       </aside>
@@ -200,7 +200,7 @@ const CONTENT = {
       items: [
         { label: 'Solo lectura', text: 'El rol auditor puede ver todos los informes pero no puede modificar datos.' },
         { label: 'Tipos de informes', text: 'REPROCANN, producción, dispensaciones, sedes, cumplimiento, plan vs real, INASE y trazabilidad. Cada informe tiene filtros de fecha y descarga en PDF.' },
-        { label: 'Acceso por sede', text: 'Si tenés sedes asignadas, solo ves datos de esas sedes. Sin sedes asignadas, ves el club completo.' },
+        { label: 'Acceso por sede', text: 'Si tenés sedes asignadas, solo ves datos de esas sedes. Sin sedes asignadas, ves toda la organización.' },
       ]
     },
   ],
@@ -211,7 +211,7 @@ const FALLBACK = [
     title: 'Navegación',
     items: [
       { label: 'Mi perfil', text: 'Desde el menú de usuario (arriba a la derecha) podés editar tus datos personales.' },
-      { label: 'Soporte', text: 'Para cualquier consulta, contactá al administrador del club.' },
+      { label: 'Soporte', text: 'Para cualquier consulta, contactá al administrador de la organización.' },
     ]
   },
 ]

@@ -11,7 +11,7 @@
         <Menu :size="20" :stroke-width="1.75" />
       </button>
 
-      <!-- Identidad del club (tenant) -->
+      <!-- Identidad de la organización (tenant) -->
       <ClubBrand tone="role-manicura" />
 
       <!-- Breadcrumb -->

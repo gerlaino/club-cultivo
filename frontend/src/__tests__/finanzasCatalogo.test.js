@@ -123,7 +123,7 @@ describe('Contabilidad → Categorías', () => {
   })
 
   it('el plural roto de "Sectors" ya no está', () => {
-    expect(wrapper.text()).toContain('Sectores del club')
+    expect(wrapper.text()).toContain('Sectores de la organización')
     expect(wrapper.text()).not.toContain('Sectors')
   })
 })

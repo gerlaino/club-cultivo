@@ -3,7 +3,7 @@
     <header class="aud-home__head">
       <h1 class="aud-home__title">Reportes</h1>
       <p class="aud-home__sub">
-        Todos se descargan en PDF y Excel, con el membrete del club y los datos de la fecha
+        Todos se descargan en PDF y Excel, con el membrete de la organización y los datos de la fecha
         en que los generás.
       </p>
     </header>
@@ -50,9 +50,9 @@ const GRUPOS = [
   },
   {
     titulo: 'Operación',
-    desc: 'Cómo viene el club puertas adentro.',
+    desc: 'Cómo viene la organización puertas adentro.',
     informes: [
-      // Sedes se fusionó acá: era el mismo conteo de plantas partido por sede, y un club de
+      // Sedes se fusionó acá: era el mismo conteo de plantas partido por sede, y una organización de
       // una sola sede abría un informe de una fila.
       { to: '/auditor/produccion', icon: Sprout, label: 'Producción',
         desc: 'Lotes, plantas y gramos del período, con el desglose por sede.',

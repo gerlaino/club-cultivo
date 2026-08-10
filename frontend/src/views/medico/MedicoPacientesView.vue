@@ -304,7 +304,7 @@ function onSearch() {
 
 // Una sola fuente de verdad: el backend filtra, ordena, cuenta y pagina. Antes la lista se
 // filtraba dos veces (server-side con ?query y otra vez en el cliente) sobre un JSON que traía
-// TODOS los pacientes del club.
+// TODOS los pacientes de la organización.
 async function cargar({ reset = false } = {}) {
   if (reset) pagina.value = 1
   loading.value = true

@@ -5,7 +5,7 @@
     <div class="tv__header">
       <div class="tv__header-left">
         <h1 class="tv__title">Tareas</h1>
-        <p class="tv__desc">Asignación y seguimiento de tareas operativas del club</p>
+        <p class="tv__desc">Asignación y seguimiento de tareas operativas de la organización</p>
         <p class="tv__sub">{{ fechaHoy }} · {{ saludo }}</p>
       </div>
       <div class="tv__header-right">

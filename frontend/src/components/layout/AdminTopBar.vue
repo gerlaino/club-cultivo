@@ -7,7 +7,7 @@
         <Menu :size="20" :stroke-width="1.75" />
       </button>
 
-      <!-- Identidad del club (tenant) -->
+      <!-- Identidad de la organización (tenant) -->
       <div class="atb__club" :title="club.name">
         <img v-if="club.logoUrl" :src="club.logoUrl" class="atb__club-logo" :alt="club.name" />
         <DsAvatar v-else :name="club.name" tone="role-admin" size="md" />
@@ -162,7 +162,7 @@ const notifCount = computed(() => ambStore.alertasCount + internasNoLeidas.value
 // Grupo activo + tab activo para las sub-pestañas (badges del singleton del sidebar).
 const { badgeFor } = useNavContext()
 const activeGroup = computed(() => detectGroup(route.path))
-// Tabs visibles: oculta las que dependen de un feature flag apagado del club (insumos, bar…)
+// Tabs visibles: oculta las que dependen de un feature flag apagado de la organización (insumos, bar…)
 const visibleTabs = computed(() =>
   (activeGroup.value.tabs || []).filter(t => !t.feature || club.data?.features?.[t.feature])
 )
@@ -220,7 +220,7 @@ async function handleLogout() {
 .atb__hamburger:hover { background: var(--c-ink-100); color: var(--c-ink-900); }
 @media (max-width: 1023px) { .atb__hamburger { display: flex; } }
 
-/* Identidad del club */
+/* Identidad de la organización */
 .atb__club { display: flex; align-items: center; gap: var(--sp-2); flex-shrink: 0; min-width: 0; }
 .atb__club-logo {
   width: 36px; height: 36px; border-radius: var(--r-md);

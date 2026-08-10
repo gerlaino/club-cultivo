@@ -63,7 +63,7 @@ function formatDate(d) {
 // ── Restablecer contraseña ──────────────────────────────────────────────
 // "Me olvidé la contraseña" es lo que más se pide de esta pantalla y no había forma de
 // resolverlo: el endpoint existía sin estar enchufado a nada. La clave se muestra para poder
-// dictarla, porque el mail sólo sale si el club tiene el correo configurado.
+// dictarla, porque el mail sólo sale si la organización tiene el correo configurado.
 const reseteando  = ref(false)
 const credenciales = ref(null)
 
@@ -655,7 +655,7 @@ onMounted(async () => {
               <UsuarioSedesManager :user-id="userId" />
               <p class="ud__sede-note">
                 <i class="bi bi-info-circle"></i>
-                Sin sedes asignadas = accede a todo el club
+                Sin sedes asignadas = accede a toda la organización
               </p>
             </div>
           </div>
@@ -749,7 +749,7 @@ onMounted(async () => {
               </p>
               <p v-else class="ud__sede-note">
                 <i class="bi bi-info-circle"></i>
-                Sin sedes = acceso a todo el club
+                Sin sedes = acceso a toda la organización
               </p>
             </div>
           </div>

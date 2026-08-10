@@ -5,7 +5,7 @@
     <div class="wpv__header">
       <div>
         <h1 class="wpv__title">Web pública</h1>
-        <p class="wpv__subtitle">Gestioná el contenido de la web de tu club</p>
+        <p class="wpv__subtitle">Gestioná el contenido de la web de tu organización</p>
       </div>
       <a v-if="webUrl" :href="webUrl" target="_blank" class="wpv__preview-btn">
         <i class="bi bi-box-arrow-up-right"></i>
@@ -31,7 +31,7 @@
       <div class="wpv__section-header">
         <div>
           <h2 class="wpv__section-title">Variedades visibles en la web</h2>
-          <p class="wpv__section-sub">Activá las genéticas que querés mostrar en la web pública del club.</p>
+          <p class="wpv__section-sub">Activá las genéticas que querés mostrar en la web pública de la organización.</p>
         </div>
       </div>
       <div v-if="loadingGeneticas" class="wpv__loading"><DsSpinner :size="60" /></div>
@@ -75,7 +75,7 @@
         </button>
       </div>
       <div v-if="loadingNoticias" class="wpv__loading"><DsSpinner :size="60" /></div>
-      <EmptyState v-else-if="noticias.length === 0" icon="bi-newspaper" title="Sin noticias todavía" message="Creá la primera noticia para tu club." />
+      <EmptyState v-else-if="noticias.length === 0" icon="bi-newspaper" title="Sin noticias todavía" message="Creá la primera noticia para tu organización." />
       <div v-else class="wpv__cards-grid">
         <div v-for="n in noticias" :key="n.id" class="wpv__news-card">
           <div class="wpv__news-card-img" :style="n.cover_url ? `background-image:url(${n.cover_url})` : ''">
@@ -174,7 +174,7 @@
       </div>
       <div class="wpv__config-grid">
         <div class="wpv__config-field wpv__config-field--full">
-          <label class="wpv__label">Descripción del club</label>
+          <label class="wpv__label">Descripción de la organización</label>
           <textarea v-model="configForm.descripcion_web" class="wpv__textarea" rows="4"
                     placeholder="Contá quiénes son y qué hacen..."></textarea>
         </div>

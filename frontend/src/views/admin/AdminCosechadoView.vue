@@ -97,7 +97,7 @@
                 <DsSpinner :size="14" /> Cargando manicuradores…
               </div>
               <div v-else-if="!manicuradores.length" class="acs-modal__empty">
-                No hay usuarios con rol de manicura en el club.
+                No hay usuarios con rol de manicura en la organización.
               </div>
               <template v-else>
                 <label class="acs-label">Manicurador <span class="acs-req">*</span></label>

@@ -109,7 +109,7 @@ function onCuitInput() {
 function validate() {
   Object.keys(errors).forEach(k => { errors[k] = '' })
   let ok = true
-  if (!form.name.trim()) { errors.name = 'El nombre del club es obligatorio'; ok = false }
+  if (!form.name.trim()) { errors.name = 'El nombre de la organización es obligatorio'; ok = false }
   if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) { errors.email = 'Email inválido'; ok = false }
   if (form.phone && !/^[\d\s\+\-\(\)]{7,20}$/.test(form.phone)) { errors.phone = 'Teléfono inválido'; ok = false }
   if (form.website && !/^https?:\/\/.+\..+/.test(form.website)) { errors.website = 'Debe comenzar con https:// o http://'; ok = false }
@@ -144,7 +144,7 @@ function onLogoFile(e) {
 }
 
 async function removeLogo() {
-  const ok = await confirm({ title: '¿Quitar el logo del club?', message: 'El logo será eliminado permanentemente.', confirmText: 'Quitar logo' })
+  const ok = await confirm({ title: '¿Quitar el logo de la organización?', message: 'El logo será eliminado permanentemente.', confirmText: 'Quitar logo' })
   if (!ok) return
   try { await club.removeLogo(); logoPreview.value = null; showToast('success', 'Logo eliminado') }
   catch (_) { showToast('danger', club.error || 'Error al eliminar el logo') }
@@ -158,7 +158,7 @@ function showToast(type, msg) {
 
 async function conectarMiEmail() {
   if (!conectarForm.email || !conectarForm.app_password) {
-    showToast('danger', 'Ingresá el email del club y la contraseña de aplicación.')
+    showToast('danger', 'Ingresá el email de la organización y la contraseña de aplicación.')
     return
   }
   conectando.value = true
@@ -208,7 +208,7 @@ async function runTestSmtp() {
     <!-- Header sticky -->
     <div class="pv__header">
       <div>
-        <h1 class="pv__title">Preferencias del club</h1>
+        <h1 class="pv__title">Preferencias de la organización</h1>
         <p class="pv__sub">Identidad, contacto, domicilio legal y datos regulatorios</p>
       </div>
       <button class="pv__btn-save" :disabled="club.saving || pristine" @click="save">
@@ -234,7 +234,7 @@ async function runTestSmtp() {
         <div class="pv__card">
           <div class="pv__card-header">
             <div class="pv__card-icon" style="background:rgba(124,58,237,.1);color:#7c3aed"><i class="bi bi-palette"></i></div>
-            <div><div class="pv__card-title">Identidad visual</div><div class="pv__card-sub">Logo y nombre del club</div></div>
+            <div><div class="pv__card-title">Identidad visual</div><div class="pv__card-sub">Logo y nombre de la organización</div></div>
           </div>
           <div class="pv__card-body">
             <div class="pv__logo-wrap">
@@ -256,7 +256,7 @@ async function runTestSmtp() {
             </div>
 
             <div class="pv__field">
-              <label class="pv__label">Nombre del club <span class="pv__req">*</span></label>
+              <label class="pv__label">Nombre de la organización <span class="pv__req">*</span></label>
               <input class="pv__input" :class="{ 'pv__input--err': errors.name }" v-model.trim="form.name" @input="onChange" placeholder="Ej: Verde Esperanza" />
               <span v-if="errors.name" class="pv__err">{{ errors.name }}</span>
             </div>
@@ -289,7 +289,7 @@ async function runTestSmtp() {
         <div class="pv__card">
           <div class="pv__card-header">
             <div class="pv__card-icon" style="background:rgba(3,105,161,.1);color:#0369a1"><i class="bi bi-envelope"></i></div>
-            <div><div class="pv__card-title">Contacto</div><div class="pv__card-sub">Datos visibles para los socios del club</div></div>
+            <div><div class="pv__card-title">Contacto</div><div class="pv__card-sub">Datos visibles para los socios de la organización</div></div>
           </div>
           <div class="pv__card-body">
             <div class="pv__grid">
@@ -392,12 +392,12 @@ async function runTestSmtp() {
           </div>
         </div>
 
-        <!-- Correo del club -->
+        <!-- Correo de la organización -->
         <div class="pv__card pv__card--mt">
           <div class="pv__card-header">
             <div class="pv__card-icon" style="background:#f0fdf4;color:#15803d"><i class="bi bi-envelope-at"></i></div>
             <div>
-              <div class="pv__card-title">Correo del club</div>
+              <div class="pv__card-title">Correo de la organización</div>
               <div class="pv__card-sub">Desde dónde salen los mails a los socios</div>
             </div>
             <div class="pv__smtp-badge" :class="emailModo === 'propio' ? 'pv__smtp-badge--ok' : 'pv__smtp-badge--off'">
@@ -411,7 +411,7 @@ async function runTestSmtp() {
             <template v-if="emailModo === 'propio'">
               <div class="pv__infobox" style="background:#f0fdf4;border-color:#bbf7d0;color:#15803d">
                 <i class="bi bi-check-circle-fill"></i>
-                <span>Conectado. Los mails del club salen desde <strong>{{ emailRemitente }}</strong>.</span>
+                <span>Conectado. Los mails de la organización salen desde <strong>{{ emailRemitente }}</strong>.</span>
               </div>
               <div class="pv__smtp-actions">
                 <button class="pv__btn-outline" :disabled="smtpTesting" @click="runTestSmtp">
@@ -429,7 +429,7 @@ async function runTestSmtp() {
             <div v-else class="pv__connect">
               <div class="pv__infobox" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af">
                 <i class="bi bi-info-circle-fill"></i>
-                <span>Conectá el correo del club para poder mandarles mails a tus socios. Para Gmail necesitás una <strong>contraseña de aplicación</strong> (no tu contraseña normal):</span>
+                <span>Conectá el correo de la organización para poder mandarles mails a tus socios. Para Gmail necesitás una <strong>contraseña de aplicación</strong> (no tu contraseña normal):</span>
               </div>
               <ol class="pv__steps">
                 <li>Entrá a tu cuenta de Google → <strong>Seguridad</strong>.</li>
@@ -439,7 +439,7 @@ async function runTestSmtp() {
               </ol>
               <div class="pv__grid">
                 <div class="pv__field">
-                  <label class="pv__label">Email del club</label>
+                  <label class="pv__label">Email de la organización</label>
                   <input class="pv__input" type="email" v-model.trim="conectarForm.email" placeholder="miclub@gmail.com" autocomplete="off" />
                   <span class="pv__hint">Gmail, Outlook o Yahoo se detectan solos</span>
                 </div>

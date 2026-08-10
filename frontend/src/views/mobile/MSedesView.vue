@@ -2,7 +2,7 @@
   <div class="msv">
     <header class="msv__header">
       <h1 class="msv__title">Cultivo</h1>
-      <p class="msv__sub">Sedes del club</p>
+      <p class="msv__sub">Sedes de la organización</p>
     </header>
 
     <div v-if="loading" class="msv__loading">

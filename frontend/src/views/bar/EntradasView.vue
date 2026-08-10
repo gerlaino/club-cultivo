@@ -35,7 +35,7 @@ async function cargar() {
   catch (e) { toast.error(e?.response?.data?.error || 'No se pudo cargar') }
   finally { loading.value = false }
 }
-// El evento y el club no vienen en el payload de las entradas y el ticket los necesita (nombre,
+// El evento y la organización no vienen en el payload de las entradas y el ticket los necesita (nombre,
 // fecha, horario). Se piden en paralelo y son opcionales: sin ellos el ticket igual sale.
 onMounted(() => {
   cargar()

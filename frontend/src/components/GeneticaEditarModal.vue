@@ -175,7 +175,7 @@
               </select>
               <p class="gem-form__hint">
                 Los informes regulatorios (INASE, REPROCANN, trazabilidad y semestral) van a
-                nombrar esta genética con la variedad inscripta que elijas. Adentro del club
+                nombrar esta genética con la variedad inscripta que elijas. Adentro de la organización
                 se sigue llamando <strong>{{ form.nombre || 'como vos le pusiste' }}</strong>.
               </p>
             </div>
@@ -195,9 +195,9 @@
               <textarea v-model.trim="form.descripcion" class="gem-form__input gem-form__textarea" rows="3" placeholder="Características, efectos, sabor, aromas…"></textarea>
             </div>
 
-            <!-- Consejos del club -->
+            <!-- Consejos de la organización -->
             <div class="gem-form__field gem-form__field--full">
-              <label class="gem-form__label">Consejos del club <span class="gem-form__label-hint">👁 visible al paciente</span></label>
+              <label class="gem-form__label">Consejos de la organización <span class="gem-form__label-hint">👁 visible al paciente</span></label>
               <textarea v-model.trim="form.consejos_club" class="gem-form__input gem-form__textarea" rows="3" placeholder="Guardado ideal, qué hacer al recibir el producto, recomendaciones…"></textarea>
             </div>
 

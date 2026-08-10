@@ -78,7 +78,7 @@ const FORMA_EMOJI = {
 }
 
 // ── Primero la sede, después el stock de esa sede ────────────────────────────────
-// Un club con varias sedes mostraba todo el inventario junto en una sola lista, y quien
+// Una organización con varias sedes mostraba todo el inventario junto en una sola lista, y quien
 // dispensa tenía que acordarse de cuál era de su mostrador. Se elige la sede y la lista queda
 // acotada. Con UNA sola sede el paso no aparece: no hay nada que elegir.
 const conStock = computed(() => stocks.value.filter(s => s.cantidad > 0))
@@ -595,7 +595,7 @@ async function handleSubmit() {
           <!-- Stock -->
           <div v-if="!modoReserva" class="mnd__section-label">{{ esDispensaInmediata ? 'Agregar producto' : 'Stock a reservar' }} <span class="mnd__req">*</span></div>
           <div v-if="modoReserva"></div>
-          <!-- Paso 1: la sede. Sólo cuando hay más de una: si el club tiene una sola, elegirla
+          <!-- Paso 1: la sede. Sólo cuando hay más de una: si la organización tiene una sola, elegirla
                sería un clic de peaje y se selecciona sola. -->
           <div v-if="hayVariasSedes && !loadingStocks" class="mnd__sedes">
             <span class="mnd__sedes-lbl">¿De qué sede?</span>

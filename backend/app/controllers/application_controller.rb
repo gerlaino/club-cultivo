@@ -14,6 +14,7 @@ class ApplicationController < ActionController::API
   before_action :block_auditor_writes!
   before_action :block_observer_writes!
   before_action :block_observer_clinico!
+  before_action :block_super_admin_sin_contexto!
 
   # ── Gating por módulo ─────────────────────────────────────────────────────
   #
@@ -146,6 +147,30 @@ class ApplicationController < ActionController::API
     unless current_user&.admin? || current_user&.super_admin?
       render json: { error: "No autorizado" }, status: :forbidden
     end
+  end
+
+  # Un super_admin NO tiene club: `current_user.club` es nil y `set_tenant_from_current_user`
+  # sale sin fijar tenant. Si cae en un endpoint de organización —una pestaña vieja, un link
+  # pegado, la URL escrita a mano, o una llamada a la API— el controller revienta: hay 180 usos
+  # de `current_user.club.algo` fuera del panel de plataforma, y cualquiera de ellos es un
+  # NoMethodError sobre nil. Con require_tenant=true (TEN-01c) los que no revientan ahí lo hacen
+  # con NoTenantSet. En los dos casos el usuario ve un 500 pelado.
+  #
+  # Dejarlo pasar no es opción: no hay organización de la cual leer. Lo correcto es decirle que
+  # le falta el contexto y cómo conseguirlo. Cuando OBSERVA una organización sí hay tenant, así
+  # que ahí pasa de largo.
+  #
+  # Se saltea en lo que un super admin usa legítimamente: el panel de plataforma, su propio
+  # perfil, /me y el login (sin este skip, cerrar sesión le devolvería 409).
+  def block_super_admin_sin_contexto!
+    return unless current_user&.super_admin?
+    return if current_user.modo_observador?
+
+    render json: {
+      error: 'Esta pantalla es de una organización y estás en el panel de plataforma. ' \
+             'Abrí la organización desde el panel para ver sus datos.',
+      sin_contexto_de_club: true,
+    }, status: :conflict
   end
 
   # Multi-tenancy (TEN-01): fija el tenant del request a partir del usuario logueado.

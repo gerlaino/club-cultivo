@@ -1,5 +1,5 @@
 <script setup>
-// Catálogo de Finanzas — mapa por ÁREA: cada sector del club se despliega y muestra TODO lo suyo
+// Catálogo de Finanzas — mapa por ÁREA: cada sector de la organización se despliega y muestra TODO lo suyo
 // junto (sus categorías madre→sub y sus depósitos). El sector es el eje: tanto las categorías como
 // los depósitos responden a un sector. Los depósitos se ven acá (read-only) y se gestionan en el hub
 // "Depósito". Las categorías sin sector caen en el bucket "Sin sector" (así ninguna queda huérfana).
@@ -123,7 +123,7 @@ async function borrarUnidad(u) {
            de cuatro líneas fijo arriba es la confesión de que la pantalla no se lee sola, y lo
            paga todos los días el que ya sabe cómo funciona. -->
       <div class="cat-head">
-        <h2>Sectores del club</h2>
+        <h2>Sectores de la organización</h2>
         <div class="cat-head__acciones">
           <button class="lnk cat-ayuda-btn" @click="verAyuda = !verAyuda">
             <i class="bi bi-question-circle"></i> ¿Cómo funciona?
@@ -201,7 +201,7 @@ async function borrarUnidad(u) {
             <i class="bi acc-chev" :class="abierta(area.id) ? 'bi-chevron-down' : 'bi-chevron-right'"></i>
             <span class="dot" :style="{ background: area.color || '#cbd5e1' }"></span>
             <span class="acc-name">{{ area.nombre }}</span>
-            <!-- Igual que en las categorías: se marca lo que creó el club, que es la
+            <!-- Igual que en las categorías: se marca lo que creó la organización, que es la
                  excepción, no lo que trae el sistema, que es casi todo. -->
             <span v-if="!area.es_sistema" class="tag">propio</span>
             <span class="acc-sum">{{ nCatsDe(area.id) }} categorías · {{ depsDe(area.id).length }} depósito{{ depsDe(area.id).length !== 1 ? 's' : '' }}</span>

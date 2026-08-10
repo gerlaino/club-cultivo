@@ -148,7 +148,7 @@ onMounted(async () => {
     <div class="gv__header">
       <div>
         <h1 class="gv__title">Genéticas</h1>
-        <p class="gv__sub">Catálogo de genéticas del club</p>
+        <p class="gv__sub">Catálogo de genéticas de la organización</p>
       </div>
       <button v-if="canEdit" class="gv__btn-new" @click="openCreate">
         <i class="bi bi-plus-lg"></i> Nueva genética

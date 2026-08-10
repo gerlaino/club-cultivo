@@ -76,7 +76,7 @@
             />
           </div>
           <div v-if="data.genetica?.consejos_club" class="dqr__consejos">
-            <span class="dqr__consejos-lbl">💡 Consejos del club</span>
+            <span class="dqr__consejos-lbl">💡 Consejos de la organización</span>
             <p class="dqr__consejos-txt">{{ data.genetica.consejos_club }}</p>
           </div>
           <dl class="dqr__rows">
@@ -121,9 +121,9 @@
             <div class="dqr__row" v-if="data.genetica?.dificultad"><dt>Dificultad</dt><dd>{{ data.genetica.dificultad }}</dd></div>
           </dl>
 
-          <!-- Consejos del club -->
+          <!-- Consejos de la organización -->
           <div v-if="data.genetica?.consejos_club" class="dqr__consejos">
-            <span class="dqr__consejos-lbl">💡 Consejos del club</span>
+            <span class="dqr__consejos-lbl">💡 Consejos de la organización</span>
             <p class="dqr__consejos-txt">{{ data.genetica.consejos_club }}</p>
           </div>
 

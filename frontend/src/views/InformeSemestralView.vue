@@ -227,7 +227,7 @@ onMounted(() => cargar())
                 <div class="ir__section-num">1</div>
                 <div>
                   <div class="ir__section-title">Nómina de pacientes vinculados</div>
-                  <div class="ir__section-desc">Pacientes con autorización REPROCANN registrada en el club</div>
+                  <div class="ir__section-desc">Pacientes con autorización REPROCANN registrada en la organización</div>
                 </div>
                 <span class="ir__badge">{{ informe.pacientes.total }}</span>
               </div>

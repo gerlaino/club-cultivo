@@ -16,7 +16,7 @@
           <dd class="sus__spec-val sus__spec-val--green">Activo</dd>
         </div>
         <div class="sus__spec-row">
-          <dt class="sus__spec-key">Club</dt>
+          <dt class="sus__spec-key">Organización</dt>
           <dd class="sus__spec-val">{{ club.name }}</dd>
         </div>
       </dl>

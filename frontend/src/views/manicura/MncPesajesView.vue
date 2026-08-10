@@ -199,7 +199,7 @@ const pesajesConfirmadosCount = computed(() =>
 async function cargarLotes() {
   loadingLotes.value = true
   try {
-    // Todos los lotes en manicura del club: cualquier manicura puede pitchear en cualquiera.
+    // Todos los lotes en manicura de la organización: cualquier manicura puede pitchear en cualquiera.
     const { data } = await listLotes({ estado: 'en_manicura' })
     lotes.value = data || []
     if (lotes.value.length === 1 && !loteSeleccionado.value) {

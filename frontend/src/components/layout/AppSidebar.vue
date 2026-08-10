@@ -1,7 +1,7 @@
 <template>
   <aside class="sb" :class="{ 'sb--collapsed': collapsed }" :style="{ background: bgColor }">
 
-    <!-- Header: marca de plataforma (el club va en el topbar) -->
+    <!-- Header: marca de plataforma (la organización va en el topbar) -->
     <div class="sb__brand">
       <img src="/logo-ce-icono.png" class="sb__brand-logo" alt="Cultivo Espacial" />
       <span class="sb__brand-name">Cultivo Espacial</span>
@@ -38,7 +38,7 @@ import { useRoute } from 'vue-router'
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-vue-next'
 
 // Sidebar compartido por todos los roles (menos admin, que tiene grupos colapsables).
-// Maneja: header con logo+nombre del club, colapsar/expandir, e ítems de navegación.
+// Maneja: header con logo+nombre de la organización, colapsar/expandir, e ítems de navegación.
 // El logout NO vive acá — está en el botón de perfil del topbar.
 const props = defineProps({
   // [{ to, icon, label, badge?: number|Ref, hint? }]

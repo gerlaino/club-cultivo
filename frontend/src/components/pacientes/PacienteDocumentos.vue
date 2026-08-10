@@ -45,7 +45,7 @@ const templateError = ref(null)
 // Todo lo del paciente entra por acá. Antes lo clínico estaba partido en dos: el médico subía
 // desde una pantalla propia (modelo `Documento`, sin cifrado) y esos archivos no aparecían nunca
 // en la ficha del paciente, que lee `PatientDocument`. Los tipos que faltaban se sumaron acá.
-// Nada de tipos institucionales del club (estatuto, actas, reglamento): eso no es del paciente.
+// Nada de tipos institucionales de la organización (estatuto, actas, reglamento): eso no es del paciente.
 const TIPOS = [
   { value: 'reprocann',             label: 'Autorización REPROCANN',          icon: 'bi-patch-check-fill',     color: '#15803d' },
   { value: 'receta',                label: 'Receta',                          icon: 'bi-prescription2',        color: '#15803d' },

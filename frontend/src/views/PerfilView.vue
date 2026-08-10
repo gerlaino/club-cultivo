@@ -284,7 +284,7 @@ onMounted(fetchProfile)
               <div class="pfl__field">
                 <label class="pfl__label">Email personal</label>
                 <input v-model.trim="form.email_personal" type="email" class="pfl__input" placeholder="tu@gmail.com" />
-                <div class="pfl__hint">Tu mail real, donde el club puede contactarte.</div>
+                <div class="pfl__hint">Tu mail real, donde la organización puede contactarte.</div>
               </div>
             </div>
           </div>

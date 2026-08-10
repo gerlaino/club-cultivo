@@ -1,6 +1,9 @@
 class Users::SessionsController < Devise::SessionsController
   respond_to :json
 
+  # Sin esto, cerrar sesión como super admin devolvería 409 en vez de desloguear.
+  skip_before_action :block_super_admin_sin_contexto!, raise: false
+
   def create
     self.resource = warden.authenticate!(auth_options)
 

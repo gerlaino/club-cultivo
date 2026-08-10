@@ -106,7 +106,7 @@ async function borrarEvento() {
 }
 
 // ── Entradas ──────────────────────────────────────────────────
-// Arranca en "no cobro": en un club la cata gratis para socios es el caso normal, y recibir al
+// Arranca en "no cobro": en una organización la cata gratis para socios es el caso normal, y recibir al
 // usuario con "Sin tipos de entrada, creá el primero" le sugiere que le falta hacer algo.
 const cobraEntrada = ref(false)
 const tipoForm = ref(null)
@@ -134,7 +134,7 @@ function cupoPct(t) { return t.cupo ? Math.min(100, Math.round(t.vendidas / t.cu
 
 // ── Costos ────────────────────────────────────────────────────
 // El alta de servicios la dispara ahora la lista unificada (EventoProvision); el guardado sigue acá
-// porque un costo pagado asienta el egreso en el libro contable del club.
+// porque un costo pagado asienta el egreso en el libro contable de la organización.
 async function onCrearCosto(payload) {
   try { await store.crearCosto(barId, evId, payload); toast.success('Agregado a la lista') }
   catch { toast.error(store.saveError) }
@@ -265,7 +265,7 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
         <input v-model.number="tipoForm.cupo" type="number" min="1" class="inp inp--sm" placeholder="Cupo" />
         <div class="cform__actions"><button type="button" class="btn btn--sm" @click="tipoForm = null">Cancelar</button><button type="submit" class="btn btn--sm btn--primary" :disabled="store.saving">Guardar</button></div>
       </form>
-      <!-- Sin entradas cargadas, una pregunta en vez de un vacío. En un club lo normal es que la
+      <!-- Sin entradas cargadas, una pregunta en vez de un vacío. En una organización lo normal es que la
            cata sea gratis para socios: no tiene por qué recibirte "Creá el primero". -->
       <div v-if="!e.tipos_entrada?.length && !tipoForm" class="ed__cobra">
         <span>¿Cobrás entrada?</span>
@@ -343,7 +343,7 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
 
     <div class="callout">
       <span>🔗</span>
-      <p>Cada costo pagado y cada venta atribuida a este evento es un movimiento del libro. El resultado se arma solo, y también aparece en la contabilidad del club (unidad Bar, en la sede del bar).</p>
+      <p>Cada costo pagado y cada venta atribuida a este evento es un movimiento del libro. El resultado se arma solo, y también aparece en la contabilidad de la organización (unidad Bar, en la sede del bar).</p>
     </div>
   </div>
   <div v-else class="ed__loading">Cargando evento…</div>

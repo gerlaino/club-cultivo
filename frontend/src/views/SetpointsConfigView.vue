@@ -67,7 +67,7 @@
     <!-- Tab: Parámetros de alerta -->
     <section v-if="tabActivo === 'alertas'" class="spc__section">
       <p class="spc__section-desc">
-        Controlá cuándo el sistema genera alertas automáticas. Estos valores aplican a todos los lotes del club.
+        Controlá cuándo el sistema genera alertas automáticas. Estos valores aplican a todos los lotes de la organización.
       </p>
 
       <div v-if="loadingPrefs" class="spc__loading">Cargando…</div>
@@ -386,7 +386,7 @@ const configForm = ref({
   postcosecha_manicura_default_id: null,
 })
 
-// Manicuras del club — para elegir un default cuando hay varios (modo asignar_automatico).
+// Manicuras de la organización — para elegir un default cuando hay varios (modo asignar_automatico).
 const manicuras = ref([])
 async function cargarManicuras() {
   try {

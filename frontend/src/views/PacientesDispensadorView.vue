@@ -2,7 +2,7 @@
   <div class="pdv">
     <div class="pdv__toolbar">
       <h1 class="pdv__title">
-        Pacientes del club
+        Pacientes de la organización
         <span v-if="total" class="pdv__count">{{ total }}</span>
       </h1>
       <div class="pdv__search-wrap">

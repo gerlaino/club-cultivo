@@ -32,8 +32,8 @@ async function toggleOptIn() {
     await updatePreferences({ benchmark_opt_in: nuevo })
     data.value.opt_in = nuevo
     showToast('success', nuevo
-      ? 'Tu club ya contribuye al benchmark de la plataforma.'
-      : 'Tu club ya no comparte datos con el benchmark.')
+      ? 'Tu organización ya contribuye al benchmark de la plataforma.'
+      : 'Tu organización ya no comparte datos con el benchmark.')
     await load()
   } catch {
     showToast('danger', 'No se pudo actualizar la preferencia')
@@ -120,7 +120,7 @@ const metricas = computed(() => {
     <div class="bv__header">
       <div>
         <h1 class="bv__title">Benchmark de la plataforma</h1>
-        <p class="bv__sub">Compará las métricas de tu club con el promedio de clubes que optaron por compartir datos</p>
+        <p class="bv__sub">Compará las métricas de tu organización con el promedio de organizaciones que optaron por compartir datos</p>
       </div>
 
       <button
@@ -156,7 +156,7 @@ const metricas = computed(() => {
       <div v-if="!optIn" class="bv__banner">
         <i class="bi bi-info-circle-fill"></i>
         <div>
-          <strong>Tu club no está participando en el benchmark.</strong>
+          <strong>Tu organización no está participando en el benchmark.</strong>
           Los datos de la plataforma son visibles pero tus datos no contribuyen al promedio.
           Activá la participación para contribuir y mejorar la precisión del benchmark.
         </div>
@@ -168,7 +168,7 @@ const metricas = computed(() => {
       </div>
       <div v-else class="bv__plat-info bv__plat-info--empty">
         <i class="bi bi-hourglass-split"></i>
-        <span>Aún no hay clubes participando en el benchmark. Sé el primero en activarlo.</span>
+        <span>Aún no hay organizaciones participando en el benchmark. Sé el primero en activarlo.</span>
       </div>
 
       <div class="bv__grid" v-if="miClub">
@@ -177,7 +177,7 @@ const metricas = computed(() => {
           <div class="bv__card-row">
             <div class="bv__card-mi">
               <div class="bv__card-val">{{ m.miVal ?? '—' }}</div>
-              <div class="bv__card-sub">Tu club</div>
+              <div class="bv__card-sub">Tu organización</div>
             </div>
             <div class="bv__card-sep"></div>
             <div class="bv__card-plat">

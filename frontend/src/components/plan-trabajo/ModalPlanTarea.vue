@@ -102,7 +102,7 @@ function serializarDescripcion(tipo, extras) {
   return lineas.join('\n')
 }
 
-// ── Usuarios del club ────────────────────────────────────────────
+// ── Usuarios de la organización ────────────────────────────────────────────
 const usuarios = ref([])
 onMounted(async () => {
   try {

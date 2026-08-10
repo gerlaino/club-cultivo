@@ -2,6 +2,9 @@ module Public
   class BaseController < ApplicationController
     # No requiere autenticación
     skip_before_action :authenticate_user!, raise: false
+    # Público: el club se resuelve por token/slug, no por el del usuario. Un super admin
+    # logueado abriendo un carnet o un pasaporte no tiene por qué recibir el aviso de contexto.
+    skip_before_action :block_super_admin_sin_contexto!, raise: false
 
     # Blindaje de tenant (prep TEN-01c). Cada controller público declara cómo resuelve
     # su tenant:

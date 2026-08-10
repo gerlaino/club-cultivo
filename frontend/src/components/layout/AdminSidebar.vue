@@ -1,7 +1,7 @@
 <template>
   <aside class="asb" :class="{ 'asb--collapsed': collapsed }">
 
-    <!-- Marca de la plataforma (el club va en el topbar) -->
+    <!-- Marca de la plataforma (la organización va en el topbar) -->
     <RouterLink to="/" class="asb__brand" title="Cultivo Espacial">
       <img src="/logo-ce-icono.png" class="asb__brand-logo" alt="Cultivo Espacial" />
       <span class="asb__brand-name">Cultivo Espacial</span>
@@ -57,7 +57,7 @@ const ICONS = {
   config:    Settings,
 }
 
-// Grupos visibles: oculta los que dependen de un feature flag apagado del club (ej. Salón).
+// Grupos visibles: oculta los que dependen de un feature flag apagado de la organización (ej. Salón).
 const visibleGroups = computed(() =>
   NAV_GROUPS.filter(g => !g.feature || club.data?.features?.[g.feature])
 )

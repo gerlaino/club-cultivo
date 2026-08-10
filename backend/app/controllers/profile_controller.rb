@@ -1,6 +1,8 @@
 # app/controllers/profile_controller.rb
 class ProfileController < ApplicationController
   before_action :authenticate_user!
+  # Su propio perfil no pertenece a ninguna organización: lo edita también el super admin.
+  skip_before_action :block_super_admin_sin_contexto!
 
   def show
     render json: { data: serialize_user(current_user) }

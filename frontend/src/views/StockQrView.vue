@@ -8,7 +8,7 @@
     <h1 class="sqr-forbidden__title">Sin permisos</h1>
     <p class="sqr-forbidden__desc">
       Esta sección es exclusiva para administradores y supervisores.
-      Si creés que es un error, contactá al administrador del club.
+      Si creés que es un error, contactá al administrador de la organización.
     </p>
     <RouterLink to="/" class="sqr-forbidden__btn">
       <i class="bi bi-arrow-left"></i> Ir al inicio
@@ -50,7 +50,7 @@
       <!-- Card profesional -->
       <div v-else-if="stock" class="sqr-card">
 
-        <!-- Header del club -->
+        <!-- Header de la organización -->
         <div class="sqr-card__header">
           <div class="sqr-card__header-logo-box">
             <img v-if="stock.club?.logo" :src="stock.club.logo" :alt="stock.club.nombre" class="sqr-card__header-logo" />

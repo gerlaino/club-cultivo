@@ -411,7 +411,7 @@ watch(seccionActiva, (val) => {
               {{ d.ultima_lectura_at ? `Última lectura ${fmtDesde(d.ultima_lectura_at)}` : 'Todavía no mandó ninguna lectura' }}
             </span>
           </div>
-          <RouterLink to="/dispositivos" class="sav__sensor-link">Administrar sensores del club →</RouterLink>
+          <RouterLink to="/dispositivos" class="sav__sensor-link">Administrar sensores de la organización →</RouterLink>
         </template>
 
         <div v-else class="sav__sensor-vacio">

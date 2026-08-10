@@ -18,7 +18,7 @@
       </div>
       <div class="gp__error-icon">🌿</div>
       <h2 class="gp__error-title">Variedad no disponible</h2>
-      <p class="gp__error-desc">Esta variedad no está publicada por el club o no existe.</p>
+      <p class="gp__error-desc">Esta variedad no está publicada por la organización o no existe.</p>
     </div>
 
     <!-- Contenido -->
@@ -130,7 +130,7 @@
       <!-- Footer -->
       <footer class="gp__footer">
         <p class="gp__footer-text">Información proporcionada por <strong>{{ clubNombre }}</strong></p>
-        <a href="/" class="gp__footer-link">Conocé más sobre el club →</a>
+        <a href="/" class="gp__footer-link">Conocé más sobre la organización →</a>
       </footer>
 
     </div>

@@ -46,7 +46,7 @@ const TABS = computed(() => {
     { key: 'resumen', label: 'Resumen', to: `/bar/${props.barId}/panel`,   gestion: true },
     { key: 'vender',  label: 'Vender',  to: `/bar/${props.barId}/vender`,   gestion: false },
     { key: 'stock',   label: 'Stock',   to: `/bar/${props.barId}/stock`,    gestion: false },
-    // Eventos es un add-on aparte: si el club no lo tiene, no se ofrece la pestaña (y el
+    // Eventos es un add-on aparte: si la organización no lo tiene, no se ofrece la pestaña (y el
     // backend además devuelve 403 si alguien entra por la URL).
     { key: 'eventos', label: 'Eventos', to: `/bar/${props.barId}/eventos`,  gestion: true, modulo: 'eventos' },
   ]

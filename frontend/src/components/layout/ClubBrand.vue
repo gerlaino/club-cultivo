@@ -1,5 +1,5 @@
 <template>
-  <!-- Identidad del club (tenant) para el topbar. La marca de plataforma vive en el sidebar. -->
+  <!-- Identidad de la organización (tenant) para el topbar. La marca de plataforma vive en el sidebar. -->
   <div class="club-brand" :title="club.name">
     <img v-if="club.logoUrl" :src="club.logoUrl" class="club-brand__logo" :alt="club.name" />
     <DsAvatar v-else :name="club.name" :tone="tone" size="md" />
@@ -13,7 +13,7 @@ import { useClubStore } from '../../stores/club.js'
 import DsAvatar from '../../design-system/components/Avatar.vue'
 
 defineProps({
-  // tono del avatar fallback cuando el club no tiene logo cargado
+  // tono del avatar fallback cuando la organización no tiene logo cargado
   tone: { type: String, default: 'ink-500' },
 })
 

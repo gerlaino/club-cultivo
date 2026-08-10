@@ -257,7 +257,7 @@ function tieneActividad(sede) {
       <!-- Empty -->
       <div v-else-if="!sedes.length" class="agri-empty">
         <i class="bi bi-building-slash agri-empty__icon"></i>
-        <p>No tenés sedes asignadas. Contactá al administrador del club.</p>
+        <p>No tenés sedes asignadas. Contactá al administrador de la organización.</p>
       </div>
 
       <!-- Sedes cockpit -->
@@ -421,7 +421,7 @@ function tieneActividad(sede) {
         <div class="page-header__left">
           <h1 class="page-title">Sedes</h1>
           <p class="page-subtitle">
-            Domicilios de producción y dispensarios del club
+            Domicilios de producción y dispensarios de la organización
             <span class="plan-badge" :style="{ background: planColor?.bg, color: planColor?.text }">
               {{ planLabel }}
             </span>
@@ -490,7 +490,7 @@ function tieneActividad(sede) {
       <div v-else-if="!sedes.length" class="empty-state">
         <div class="empty-state__icon">🏢</div>
         <h3 class="empty-state__title">Sin sedes registradas</h3>
-        <p class="empty-state__desc">Registrá la primera sede del club para comenzar a organizar la producción.</p>
+        <p class="empty-state__desc">Registrá la primera sede de la organización para comenzar a organizar la producción.</p>
         <button v-if="canEdit" class="btn-primary-action" @click="openCreate">
           <i class="bi bi-plus-lg"></i>Nueva sede
         </button>

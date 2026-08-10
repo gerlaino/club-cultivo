@@ -3,6 +3,9 @@ module SuperAdmin
     before_action :authenticate_user!
     before_action :require_super_admin!
 
+    # Este ES el panel de plataforma: acá el super admin trabaja sin club a propósito.
+    skip_before_action :block_super_admin_sin_contexto!
+
     # El super_admin opera cross-club a propósito (set_tenant lo deja sin tenant). Con
     # require_tenant=true (TEN-01c) un query a un modelo tenant explotaría; lo corremos
     # explícitamente sin tenant. Hoy es no-op (ya venía sin tenant). El scoping por club

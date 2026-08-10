@@ -27,7 +27,7 @@ const perPage      = 50
 
 // El listado y sus filtros trabajan en memoria (cada tarjeta filtra la lista), así que hay que
 // traer el padrón entero: con el default del backend —20 por página— clickear "Sin REPROCANN"
-// filtraba sobre la primera página y no sobre el club. El techo evita que un club grande se
+// filtraba sobre la primera página y no sobre la organización. El techo evita que una organización grande se
 // traiga todo de una; pasado ese punto la lista avisa y hay que ir al CSV o buscar.
 const LIMITE_PADRON = 500
 const cargar = (extra = {}) => store.fetch({ limite: LIMITE_PADRON, ...extra })
@@ -100,7 +100,7 @@ function iniciales(s) {
 
 // ── El estado del padrón ─────────────────────────────────────────────────────────
 // Los conteos se hacen sobre LA NÓMINA (los que están en tratamiento), no sobre todas las
-// fichas: alguien dado de baja no cuenta como paciente del club. Antes "Total" los sumaba a
+// fichas: alguien dado de baja no cuenta como paciente de la organización. Antes "Total" los sumaba a
 // todos, así que el número no coincidía con nada y quedaba inflado.
 //
 // Esto vive acá y no en Informes a propósito: es la pantalla desde la que después hay que
@@ -122,7 +122,7 @@ const esInactivo = (s) => {
 }
 
 // Los números los cuenta el BACKEND sobre todo el padrón (`meta.kpis`). Contarlos acá sobre
-// `store.items` era contar la página: con el listado paginado de a 20, un club de 38 pacientes
+// `store.items` era contar la página: con el listado paginado de a 20, una organización de 38 pacientes
 // mostraba "20 en la nómina" y "0 REPROCANN vencido" teniendo vencidos más adelante.
 // El cálculo local queda de respaldo por si `meta.kpis` no viene.
 const kpisLocales = computed(() => {
@@ -244,7 +244,7 @@ async function exportarCSV() {
         <div class="sv__kpi-val">{{ kpis.sin_rep }}</div>
         <div class="sv__kpi-lbl">Sin REPROCANN</div>
       </button>
-      <!-- Fuera de tratamiento: no cuentan como pacientes del club, pero siguen estando. -->
+      <!-- Fuera de tratamiento: no cuentan como pacientes de la organización, pero siguen estando. -->
       <button v-if="kpis.baja" class="sv__kpi sv__kpi--gray" :class="{ 'sv__kpi--active': filterEstado === 'baja' }" @click="filterEstado = 'baja'">
         <div class="sv__kpi-val">{{ kpis.baja }}</div>
         <div class="sv__kpi-lbl">Dados de baja</div>
@@ -292,7 +292,7 @@ async function exportarCSV() {
       v-else-if="!filtrados.length"
       icon="bi-people"
       :title="search || filterEstado !== 'todos' ? 'Sin resultados' : 'Sin pacientes registrados'"
-      :message="search ? 'Probá con otro término' : filterEstado !== 'todos' ? 'No hay pacientes en este filtro' : 'Registrá el primer paciente del club'"
+      :message="search ? 'Probá con otro término' : filterEstado !== 'todos' ? 'No hay pacientes en este filtro' : 'Registrá el primer paciente de la organización'"
     >
       <template #actions>
         <button v-if="!search && canEdit && filterEstado === 'todos'" class="sv__btn-primary" @click="router.push({ name: 'paciente-nuevo' })">

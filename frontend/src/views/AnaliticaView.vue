@@ -1098,11 +1098,11 @@ function bucketColor(desv) {
         </div>
 
         <template v-else>
-          <!-- KPIs del club -->
+          <!-- KPIs de la organización -->
           <div class="an__kpis" style="margin-bottom:1.25rem">
             <div class="an__kpi an__kpi--green">
               <span class="an__kpi-val">{{ fmtArs(cpgTotal?.costo_por_gramo) }}<small style="font-size:.6em;font-weight:600"> /g</small></span>
-              <span class="an__kpi-lbl">Costo por gramo — club</span>
+              <span class="an__kpi-lbl">Costo por gramo — organización</span>
             </div>
             <div class="an__kpi">
               <span class="an__kpi-val">{{ fmtG(cpgTotal?.gramos_producidos) }}</span>

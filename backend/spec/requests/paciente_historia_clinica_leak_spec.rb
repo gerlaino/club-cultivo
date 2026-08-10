@@ -57,11 +57,20 @@ RSpec.describe 'Pacientes — no filtrar historia clínica a roles no clínicos'
       end
     end
 
-    it 'super_admin (rol de plataforma) queda bloqueado por ROL, aun en el mismo club' do
+    it 'super_admin (rol de plataforma) queda bloqueado, aun en el mismo club' do
       super_admin = create(:user, club: club, role: 'super_admin')
       sign_in_as(super_admin)
       get "/pacientes/#{paciente.id}", headers: auth_headers, as: :json
-      expect(response).to have_http_status(:forbidden)
+
+      # Lo que importa es que NO llegue a la ficha. Hoy corta antes que el chequeo de rol:
+      # el super admin no tiene organización en contexto (`block_super_admin_sin_contexto!`),
+      # así que responde 409 en vez de 403. Se afirma la propiedad —bloqueado y sin un solo
+      # campo clínico— y no el código, para que el spec siga protegiendo lo mismo si mañana
+      # cambia cuál de los dos guards llega primero.
+      expect(response).not_to have_http_status(:ok)
+      cuerpo = response.body.to_s
+      CAMPOS_CLINICOS.each { |campo| expect(cuerpo).not_to include(campo) }
+      expect(cuerpo).not_to include('Epilepsia refractaria')
     end
   end
 

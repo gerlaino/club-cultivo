@@ -695,7 +695,7 @@ onUnmounted(() => {
           <!-- P&L del lote: solo admin/supervisor -->
           <LotePLCard v-if="canAdmin" :lote-id="id" class="ld__card--mt" />
 
-          <!-- Análisis IA — solo si el club tiene IA habilitada -->
+          <!-- Análisis IA — solo si la organización tiene IA habilitada -->
           <LoteIACard v-if="club.data?.features?.ia_analisis && canAdmin" :lote-id="id" class="ld__card--mt" />
 
         </div>
@@ -748,7 +748,7 @@ onUnmounted(() => {
             <div v-if="transicionError" class="ld__alert">{{ transicionError }}</div>
 
                         <!-- Cuántas prendieron. Va vacío a propósito, con "prendieron todas" al lado: si
-                 viniera prellenado con el total, el que va rápido confirma sin mirar y el club
+                 viniera prellenado con el total, el que va rápido confirma sin mirar y la organización
                  queda con 100% de prendimiento falso para siempre. -->
             <div v-if="lote?.estado === 'enraizado'" class="ld__field">
               <label class="ld__label">¿Cuántas prendieron? <span style="color:#dc2626">*</span></label>

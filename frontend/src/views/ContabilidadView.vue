@@ -96,7 +96,7 @@ const { confirm } = useConfirm()
 const toast = useToast()
 
 const vistaActiva    = ref("dashboard")
-const dashboardSede  = ref(null) // filtro de sede LOCAL del dashboard (null = todo el club)
+const dashboardSede  = ref(null) // filtro de sede LOCAL del dashboard (null = toda la organización)
 
 // El resultado por sector sólo tiene sentido si hay DOS O MÁS sectores con movimientos: con
 // uno solo repite el total de arriba, y "Sin sector" no es un sector — es la bolsa de lo que
@@ -285,7 +285,7 @@ const filtroQ         = ref("")
 const filtroTipo      = ref("")
 const filtroCategoria = ref("")
 const filtroSede      = ref("")
-// El SECTOR (unidad de negocio) es la agrupación que el club creó para leer su plata por línea
+// El SECTOR (unidad de negocio) es la agrupación que la organización creó para leer su plata por línea
 // de negocio: "todo lo del Buffet", "todo lo de Cultivo". El backend ya sabía filtrar por él;
 // el libro no lo ofrecía, así que la jerarquía no servía para nada acá.
 const filtroSector    = ref("")
@@ -610,7 +610,7 @@ onMounted(async () => {
           Mostrando datos de
           <strong>{{ sedes.find(s => s.id === dashboardSede)?.nombre }}</strong>
           <button class="cv__dash-context-clear" @click="cambiarSedeDashboard(null)">
-            Ver todo el club <i class="bi bi-x"></i>
+            Ver toda la organización <i class="bi bi-x"></i>
           </button>
         </div>
 
@@ -777,7 +777,7 @@ onMounted(async () => {
           </div>
         </div>
 
-        <!-- Balance por sede (solo vista consolidada del club) -->
+        <!-- Balance por sede (solo vista consolidada de la organización) -->
         <div v-if="!dashboardSede && store.dashboard?.por_sede?.length" class="cv__card cv__card--mt">
           <div class="cv__card-header">
             <span class="cv__card-title">

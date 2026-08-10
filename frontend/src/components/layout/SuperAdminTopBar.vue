@@ -2,7 +2,7 @@
   <header class="satb">
     <div class="satb__inner">
 
-      <!-- Identidad: acá se administra LA PLATAFORMA, no un club -->
+      <!-- Identidad: acá se administra LA PLATAFORMA, no una organización -->
       <div class="satb__brand">
         <DsAvatar name="Cultivo Espacial" tone="role-superadmin" size="md" />
         <div class="satb__brand-txt">
@@ -78,8 +78,8 @@ const tabs = [
   { name: 'sa-informes',  label: 'Informes', coincide: ['sa-informes'] },
 ]
 
-// La ficha y el alta de un club son parte de "Clubes": si sólo se comparara la ruta exacta, la
-// pestaña se apagaba al entrar a un club y no se sabía dónde estabas parado.
+// La ficha y el alta de una organización son parte de "Clubes": si sólo se comparara la ruta exacta, la
+// pestaña se apagaba al entrar a una organización y no se sabía dónde estabas parado.
 function esActiva(t) { return t.coincide.includes(route.name) }
 
 async function doLogout() {

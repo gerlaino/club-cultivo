@@ -282,7 +282,7 @@ onMounted(async () => {
     geneticas.value = res.data || []
   } catch { /* genéticas no críticas */ }
 
-  // Todas las salas del club: son los destinos posibles para mover lotes (incluso de otra sede).
+  // Todas las salas de la organización: son los destinos posibles para mover lotes (incluso de otra sede).
   if (!salas.items.length) { try { await salas.fetch() } catch { /* destino opcional */ } }
 
   if (canSeeAmbiente.value) cargarAmbienteMini()

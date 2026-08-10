@@ -336,7 +336,7 @@ onMounted(async () => {
           <ul class="pnv__info-list">
             <li>El <strong>ID de la planta</strong> se genera automáticamente para garantizar trazabilidad</li>
             <li>El <strong>código QR</strong> también se genera solo y podés imprimirlo después</li>
-            <li>Las <strong>genéticas</strong> disponibles son las que el club habilitó para cultivo</li>
+            <li>Las <strong>genéticas</strong> disponibles son las que la organización habilitó para cultivo</li>
             <li>Podés cambiar el estado desde el detalle de la planta</li>
           </ul>
         </div>

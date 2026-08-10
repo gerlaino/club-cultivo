@@ -168,9 +168,9 @@ const nombreUsuario = auth.user?.first_name || ''
 
           <div class="ob__card">
             <div class="ob__card-eyebrow">Tu primera sede</div>
-            <h2 class="ob__card-title">¿Dónde opera el club?</h2>
+            <h2 class="ob__card-title">¿Dónde opera la organización?</h2>
             <p class="ob__card-desc">
-              Una sede es el domicilio físico donde funciona el club.
+              Una sede es el domicilio físico donde funciona la organización.
               Podés agregar más después.
             </p>
 

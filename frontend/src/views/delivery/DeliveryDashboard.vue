@@ -174,7 +174,7 @@ function toggleTodos() {
   }
 }
 
-// ── Reordenar (solo si la ruta NO está fijada por el club) ──────────────────
+// ── Reordenar (solo si la ruta NO está fijada por la organización) ──────────────────
 const guardandoOrden = ref(false)
 async function persistirOrdenDelivery(lista) {
   guardandoOrden.value = true
@@ -415,7 +415,7 @@ onMounted(load)
       <!-- Nada que hacer: que se note, en vez de dejar una pantalla con listas vacías. -->
       <div v-else class="dlv__foco dlv__foco--vacio">
         <div class="dlv__foco-nombre">No tenés entregas pendientes</div>
-        <div class="dlv__foco-dir">Cuando el club te asigne un paquete, aparece acá.</div>
+        <div class="dlv__foco-dir">Cuando la organización te asigne un paquete, aparece acá.</div>
       </div>
 
 
@@ -471,10 +471,10 @@ onMounted(load)
         <div class="dlv__empty-sub">Cuando te asignen dispensaciones aparecerán acá</div>
       </div>
 
-      <!-- Aviso de orden fijado por el club -->
+      <!-- Aviso de orden fijado por la organización -->
       <div v-if="rutaBloqueada" class="dlv__ruta-fija">
         <i class="bi bi-lock-fill"></i>
-        El club fijó el <strong>orden de entrega</strong> — respetá la secuencia (número a la izquierda de cada paquete).
+        La organización fijó el <strong>orden de entrega</strong> — respetá la secuencia (número a la izquierda de cada paquete).
       </div>
 
       <!-- Pendientes -->
@@ -500,7 +500,7 @@ onMounted(load)
               :checked="selected.has(p.id)"
               @change="toggleSelect(p.id)"
             />
-            <!-- Reordenar (solo si el club no fijó el orden) -->
+            <!-- Reordenar (solo si la organización no fijó el orden) -->
             <div v-if="!rutaBloqueada && pendientes.length > 1" class="dlv__orden-ctrl" @click.stop>
               <button class="dlv__orden-btn" :disabled="guardandoOrden" title="Subir" @click.stop="moverArriba(p)"><i class="bi bi-chevron-up"></i></button>
               <button class="dlv__orden-btn" :disabled="guardandoOrden" title="Bajar" @click.stop="moverAbajo(p)"><i class="bi bi-chevron-down"></i></button>
@@ -719,7 +719,7 @@ onMounted(load)
       <!-- Nada que hacer: que se note, en vez de dejar una pantalla con listas vacías. -->
       <div v-else class="dlv__foco dlv__foco--vacio">
         <div class="dlv__foco-nombre">No tenés entregas pendientes</div>
-        <div class="dlv__foco-dir">Cuando el club te asigne un paquete, aparece acá.</div>
+        <div class="dlv__foco-dir">Cuando la organización te asigne un paquete, aparece acá.</div>
       </div>
 Cubierto ✓</template>
               </div>

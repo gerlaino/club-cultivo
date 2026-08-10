@@ -152,7 +152,7 @@ onMounted(async () => {
     <div class="dv__header">
       <div>
         <h1 class="dv__title">📁 Documentos</h1>
-        <p class="dv__subtitle">Gestión documental del club</p>
+        <p class="dv__subtitle">Gestión documental de la organización</p>
       </div>
       <button v-if="puedeSubir" class="dv__btn-primary" @click="abrirModal">
         <i class="bi bi-file-earmark-arrow-up"></i> Subir documento

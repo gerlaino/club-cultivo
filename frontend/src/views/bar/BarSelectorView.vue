@@ -1,5 +1,5 @@
 <script setup>
-// Selector de bar (Capa 1): lista los bares del club (uno por sede social/mixta) con su
+// Selector de bar (Capa 1): lista los bares de la organización (uno por sede social/mixta) con su
 // resultado del mes. Estilo alineado a ContabilidadView.
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'

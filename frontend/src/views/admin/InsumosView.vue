@@ -35,7 +35,7 @@ const depositoActivoId = ref(null)
 // El hub muestra TODOS los depósitos (panorama). Los que tienen otro dueño se ven read-only:
 // Salón (se opera desde el bar) y Dispensación (su stock viene de cosecha/manicura).
 // Multi-sede: los depósitos son por sede. Si hay una sede elegida, mostramos solo los suyos
-// (+ los custom club-wide sin sede); con "Todo el club" se ven todos, con la sede en la etiqueta.
+// (+ los custom club-wide sin sede); con "Toda la organización" se ven todos, con la sede en la etiqueta.
 const TABS = computed(() => {
   if (sedeFiltro.value == null) return depositos.value
   return depositos.value.filter(d => d.sede_id === sedeFiltro.value || d.sede_id == null)
@@ -56,7 +56,7 @@ const esCultivo      = computed(() => depositoActivo.value?.familia === 'insumo'
 const esSoloLectura  = computed(() => esSalon.value || esDispensacion.value)
 const HINTS = {
   insumo:         'Fertilizantes, sustrato… se consumen imputando el costo al lote.',
-  insumo_general: 'Insumos del club (limpieza, administración). Se consumen como gasto.',
+  insumo_general: 'Insumos de la organización (limpieza, administración). Se consumen como gasto.',
   mercaderia:     'Mercadería vendible: stock con costo, valorizado y alertas de reposición.',
 }
 const depositoHint = computed(() =>
@@ -82,10 +82,10 @@ const categoriasDelTab = computed(() => {
   return out
 })
 
-// El depósito es transversal a la sede. Filtro LOCAL de productos por sede (null = todo el club).
+// El depósito es transversal a la sede. Filtro LOCAL de productos por sede (null = toda la organización).
 const sedeFiltro = ref(null)
 // Las sedes salen del store; si no llegaron (falló listSedes o el rol no las lista), se derivan de
-// los propios depósitos. Sin esto el club se veía como mono-sede: sin filtro y con los tabs por
+// los propios depósitos. Sin esto la organización se veía como mono-sede: sin filtro y con los tabs por
 // sede sin etiqueta, o sea "duplicados".
 const sedesOpciones = computed(() => {
   if (sede.sedes.length) return sede.sedes
@@ -429,7 +429,7 @@ async function revertirCompra(compra) {
       </div>
       <div class="dp__head-right">
         <select v-if="multiSede" v-model="sedeFiltro" class="dp__sede-filtro">
-          <option :value="null">🏢 Todo el club</option>
+          <option :value="null">🏢 Toda la organización</option>
           <option v-for="s in sedesOpciones" :key="s.id" :value="s.id">{{ s.nombre }}</option>
         </select>
         <!-- Los productos NUEVOS entran por Contabilidad → Nuevo Movimiento (ahí elegís el depósito).
@@ -599,7 +599,7 @@ async function revertirCompra(compra) {
         </div>
         <label v-if="multiSede" class="fld">Sede
           <select v-model="entradaForm.sede_id" class="inp">
-            <option :value="null">🏢 Pool del club</option>
+            <option :value="null">🏢 Pool de la organización</option>
             <option v-for="s in sedesOpciones" :key="s.id" :value="s.id">{{ s.nombre }}</option>
           </select>
         </label>
@@ -717,7 +717,7 @@ async function revertirCompra(compra) {
         <h3 class="modal__title">Registrar consumo — {{ consumoForm.insumo.nombre }}</h3>
         <p class="modal__hint">
           Disponible {{ consumoForm.insumo.stock_actual }} {{ consumoForm.insumo.unidad_medida }}.
-          {{ esCultivo ? 'Se imputa el costo a los lotes elegidos.' : 'Se descuenta del depósito como gasto general del club.' }}
+          {{ esCultivo ? 'Se imputa el costo a los lotes elegidos.' : 'Se descuenta del depósito como gasto general de la organización.' }}
         </p>
         <label class="fld">Cantidad usada<input v-model.number="consumoForm.cantidad" type="number" min="0" step="any" class="inp" /></label>
 

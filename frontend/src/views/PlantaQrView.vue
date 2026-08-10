@@ -104,7 +104,7 @@
       <div class="qr__body qr__body--center">
         <div class="qr__err-ico">🔒</div>
         <div class="qr__err-title">Acceso restringido</div>
-        <div class="qr__err-desc">No tenés permisos para ver el detalle de esta planta. Contactá al administrador de <strong>{{ clubNombre || 'tu club' }}</strong>.</div>
+        <div class="qr__err-desc">No tenés permisos para ver el detalle de esta planta. Contactá al administrador de <strong>{{ clubNombre || 'tu organización' }}</strong>.</div>
         <button class="qr__btn-secondary" @click="irAlDashboard">Ir al inicio</button>
       </div>
       <div class="qr__footer"><span class="qr__footer-dot"></span> {{ clubNombre }}</div>

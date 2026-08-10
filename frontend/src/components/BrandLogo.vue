@@ -31,7 +31,7 @@ function onImgError() {
   broken.value = true
 }
 
-// Nombre visible del club (o genérico)
+// Nombre visible de la organización (o genérico)
 const name = computed(() => club.name || "Cultivo Espacial")
 </script>
 
@@ -55,7 +55,7 @@ const name = computed(() => club.name || "Cultivo Espacial")
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary, #2e7d32) 25%, transparent);
 }
 
-/* Nombre del club */
+/* Nombre de la organización */
 .brand-name {
   font-size: 1.05rem;
 }

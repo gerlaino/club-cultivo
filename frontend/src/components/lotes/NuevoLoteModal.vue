@@ -61,7 +61,7 @@
           <!-- Selector de sala (solo cuando no viene fija y no es cosechado) -->
           <template v-else-if="!sala">
             <!-- La sede va PRIMERO y es obligatoria cuando hay más de una: la sala se elige
-                 dentro de ella, no de una lista con las salas de todo el club mezcladas. -->
+                 dentro de ella, no de una lista con las salas de toda la organización mezcladas. -->
             <div v-if="sedesDeSalas.length > 1" class="nlm__field">
               <label class="nlm__label">Sede <span class="nlm__req">*</span></label>
               <select class="nlm__input" :class="{ 'nlm__input--err': faltaElegirSede && errors.sala_id }"
@@ -327,7 +327,7 @@ const heredadoDias   = ref({ semilla_esqueje: 0, vegetativo: 0, floracion: 0, co
 // Espeja Lote::KINDS_SALA_POR_ESTADO. `madre` y `clon` son sub-tipos de vegetativo —una planta
 // madre vive en vegetativo permanente, un clon enraíza— así que admiten lotes en enraizado y
 // vegetativo. Faltaba `madre`: no se podía crear un lote en la sala de madres, que es de donde
-// salen los esquejes del club.
+// salen los esquejes de la organización.
 const KINDS_POR_ESTADO = {
   enraizado:  ['vegetativo', 'mixta', 'clon', 'madre'],
   vegetativo: ['vegetativo', 'mixta', 'clon', 'madre'],
@@ -359,7 +359,7 @@ const sedesDeSalas = computed(() => {
 })
 const faltaElegirSede = computed(() => sedesDeSalas.value.length > 1 && !sedeFiltro.value)
 
-// Filtro por sede del selector de salas: en un club con varias sedes, la lista completa de
+// Filtro por sede del selector de salas: en una organización con varias sedes, la lista completa de
 // salas no dice nada hasta que sabés de qué sede es cada una.
 const sedeFiltro = ref('')
 watch([estadoObjetivo, sedeFiltro], () => {

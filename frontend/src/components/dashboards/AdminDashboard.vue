@@ -45,8 +45,8 @@ function fmtHaceAmb(medidoAt) {
 const dispensacionesHoy      = ref([])
 const ejecutivo              = ref(null)
 const loading                = ref(true)
-// Saber si el club ya tiene sedes es UN request. El resto del dashboard son ocho más, y
-// hasta que terminaban todos se veía el shell del admin con un spinner: para un club nuevo,
+// Saber si la organización ya tiene sedes es UN request. El resto del dashboard son ocho más, y
+// hasta que terminaban todos se veía el shell del admin con un spinner: para una organización nueva,
 // un segundo de una app que todavía no puede usar antes de que aparezca la bienvenida.
 // Se decide primero, se carga después.
 const setupListo             = ref(false)
@@ -405,7 +405,7 @@ watch(() => contable.value?.mes_actual?.por_semana, (data) => {
 const todayISO = new Date().toISOString().slice(0, 10)
 
 onMounted(async () => {
-  // Etapa 1: ¿el club está configurado? Si no, el wizard entra sin esperar nada más.
+  // Etapa 1: ¿la organización está configurado? Si no, el wizard entra sin esperar nada más.
   try {
     const { data } = await listSedes()
     sedes.value = data || []

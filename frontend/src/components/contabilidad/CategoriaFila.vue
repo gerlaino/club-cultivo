@@ -9,7 +9,7 @@
 //     filas, "Editar Desactivar Editar Desactivar…" ocupaba media pantalla y competía con lo
 //     único que importa, que es el nombre.
 //   · Se marca lo PROPIO, no lo del sistema. Casi todo el catálogo es del sistema: ponerle un
-//     badge a cada fila es ruido en veinte filas para no decir nada. Lo que el club creó es la
+//     badge a cada fila es ruido en veinte filas para no decir nada. Lo que la organización creó es la
 //     excepción y es lo que conviene poder encontrar de un vistazo.
 import { ref } from 'vue'
 import DsDropdown from '../../design-system/components/Dropdown.vue'

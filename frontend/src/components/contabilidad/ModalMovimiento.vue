@@ -127,7 +127,7 @@ function abrirCat()  { catOpen.value = true; catQuery.value = ''; crearCat.value
 function elegirCat(c) {
   // La categoría YA SABE si es plata que entra o que sale: si elegiste una de ingreso estando
   // en egreso, manda ella. Antes había que acertar el tipo primero para que apareciera en la
-  // lista, y el club creó las categorías justamente para no tener que pensar en eso.
+  // lista, y la organización creó las categorías justamente para no tener que pensar en eso.
   if (c.tipo && c.tipo !== form.value.tipo) form.value.tipo = c.tipo
 
   form.value.categoria_contable_id = c.id
@@ -145,7 +145,7 @@ function elegirCat(c) {
 // inventario—. Una principal creada desde acá nace con `comportamiento: general`, o sea que NO
 // stockea: es un gasto y nada más. Conectarla a un inventario sigue siendo cosa de Configuración,
 // porque es la clase de decisión cuyo error se descubre tarde. Pero antes esto no se podía crear
-// de ninguna manera desde el modal, y como el catálogo arranca vacío, un club nuevo que quería
+// de ninguna manera desde el modal, y como el catálogo arranca vacío, una organización nueva que quería
 // anotar su primer gasto se encontraba con el botón deshabilitado y sin explicación.
 const catsNuevas  = ref([])
 const areasNuevas = ref([])
@@ -165,7 +165,7 @@ const AREA_TIPOS = [
 const madresDelTipo = computed(() => props.categorias.filter(m => m.tipo === form.value.tipo))
 
 // `parent_id: null` = categoría principal. Antes sólo se podían crear subcategorías, con lo
-// cual un club sin categorías madre —que es como arranca todo club, el catálogo no se siembra—
+// cual una organización sin categorías madre —que es como arranca todo club, el catálogo no se siembra—
 // tenía el botón deshabilitado y no había forma de salir del paso desde acá.
 function abrirCrearCat() {
   errorCrear.value = ''
@@ -775,7 +775,7 @@ const titulo = computed(() => {
                 <label class="mv-fld mv-fld--grow">
                   <span class="mv-lbl">Tarjeta / responsable <span class="mv-opt">(opcional)</span></span>
                   <input type="text" class="mv-inp" v-model.trim="form.responsable"
-                         placeholder="Ej: Tarjeta del club" />
+                         placeholder="Ej: Tarjeta de la organización" />
                 </label>
                 <p class="mv-hint mv-hint--full">
                   <template v-if="cuotaMonto">

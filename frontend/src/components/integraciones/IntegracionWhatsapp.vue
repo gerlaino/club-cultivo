@@ -68,7 +68,7 @@
             <p class="iwa__pane-text">
               Twilio es el servicio que usaremos para enviar mensajes de WhatsApp.
               La creación de cuenta es gratuita y el costo por mensaje es muy bajo (fracciones de centavo).
-              <strong>Cada club tiene su propia cuenta</strong> — los mensajes van desde tu número, con el nombre de tu club.
+              <strong>Cada organización tiene su propia cuenta</strong> — los mensajes van desde tu número, con el nombre de tu organización.
             </p>
             <div class="iwa__step-actions">
               <a href="https://www.twilio.com/try-twilio" target="_blank" rel="noopener" class="iwa__btn-primary">

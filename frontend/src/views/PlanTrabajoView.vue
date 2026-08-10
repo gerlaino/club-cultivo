@@ -133,7 +133,7 @@ function toggleHistorialApl() {
 const OBJETIVO_LABEL = { Lote: 'Lote', Sala: 'Sala' }
 
 function describirObjetivo(a) {
-  if (!a.objetivo_tipo) return 'Todo el club'
+  if (!a.objetivo_tipo) return 'Toda la organización'
   const tipo = OBJETIVO_LABEL[a.objetivo_tipo] || a.objetivo_tipo
   return a.objetivo_nombre ? `${tipo} · ${a.objetivo_nombre}` : tipo
 }
@@ -291,7 +291,7 @@ onMounted(() => {
       <div class="ptv__apl-hdr">
         <div>
           <h2 class="ptv__apl-title">Planes aplicados</h2>
-          <p class="ptv__subtitle">Aplicaciones de plantillas sobre lotes, salas o el club</p>
+          <p class="ptv__subtitle">Aplicaciones de plantillas sobre lotes, salas o la organización</p>
         </div>
         <button class="ptv__btn-secondary" @click="toggleHistorialApl">
           {{ verHistorialApl ? 'Ver solo activos' : 'Ver historial' }}

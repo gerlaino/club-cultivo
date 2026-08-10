@@ -18,7 +18,7 @@ const BASE_LINKS = [
   { to: '/stock',     icon: Boxes,         label: 'Stock' },
 ]
 
-// El bar aparece solo si el club lo tiene habilitado.
+// El bar aparece solo si la organización lo tiene habilitado.
 const links = computed(() =>
   club.data?.features?.bar
     ? [...BASE_LINKS, { to: '/bar', icon: Beer, label: 'Buffet' }]

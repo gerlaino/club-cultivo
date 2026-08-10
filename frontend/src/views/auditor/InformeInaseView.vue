@@ -26,7 +26,7 @@
             <span class="inf__kpi-valor">{{ data.registradas_inase }}</span>
             <span class="inf__kpi-label">Inscriptas</span>
           </div>
-          <!-- Declaradas: no están inscriptas, pero el club las presenta contra una que sí
+          <!-- Declaradas: no están inscriptas, pero la organización las presenta contra una que sí
                lo está. Cuentan como acreditadas; sólo las que no tienen ninguna de las dos
                cosas son un pendiente. -->
           <div class="inf__kpi inf__kpi--ok">
@@ -48,7 +48,7 @@
         </div>
 
         <div class="inf__section">
-          <h2 class="inf__section-title">Variedades del club y su producción</h2>
+          <h2 class="inf__section-title">Variedades de la organización y su producción</h2>
           <table class="inf__table">
             <thead>
               <tr>
@@ -57,7 +57,7 @@
               </tr>
             </thead>
             <tbody>
-              <!-- UNA FILA POR VARIEDAD ACREDITABLE, no por genética del club: si veinte
+              <!-- UNA FILA POR VARIEDAD ACREDITABLE, no por genética de la organización: si veinte
                    genéticas propias se declaran contra TROPICANA WFC, listarlas sueltas daba
                    veinte filas con el mismo nombre y parecía un error de datos. Los nombres
                    propios van juntos en "Se cultiva como". -->
@@ -79,7 +79,7 @@
           </table>
         </div>
 
-        <!-- Lo único accionable del informe: lo que el club cultiva y todavía no puede
+        <!-- Lo único accionable del informe: lo que la organización cultiva y todavía no puede
              acreditar, ni por registro propio ni declarándolo. -->
         <div v-if="data.pendientes?.length" class="inf__section">
           <h2 class="inf__section-title">Sin acreditar — hay que declararlas contra una variedad inscripta</h2>

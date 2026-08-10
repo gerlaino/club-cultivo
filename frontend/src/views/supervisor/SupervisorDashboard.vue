@@ -29,7 +29,7 @@
           <i class="bi bi-exclamation-triangle-fill svd__warn-icon"></i>
           <div>
             <strong>No tenés sedes asignadas.</strong>
-            <span> Contactá al administrador del club para que te asigne una sede.</span>
+            <span> Contactá al administrador de la organización para que te asigne una sede.</span>
           </div>
         </div>
         <div v-else class="svd__sedes-grid">

@@ -1,7 +1,7 @@
 <template>
   <div class="abg-home">
     <h1 class="abg-home__title">Portal Legal</h1>
-    <p class="abg-home__sub">Gestión de documentación legal del club.</p>
+    <p class="abg-home__sub">Gestión de documentación legal de la organización.</p>
     <div class="abg-home__cards">
       <RouterLink to="/abogado/documentos" class="abg-card">
         <Files :size="28" :stroke-width="1.5" />

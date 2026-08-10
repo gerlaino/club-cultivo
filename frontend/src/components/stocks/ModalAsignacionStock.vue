@@ -104,7 +104,7 @@ function decidirDespues() {
               >
                 <input type="radio" :name="`stock-${stock.id}`" value="club" v-model="seleccion[stock.id]" />
                 <div class="mas__opcion-body">
-                  <span class="mas__opcion-nombre">📦 Pool del club</span>
+                  <span class="mas__opcion-nombre">📦 Pool de la organización</span>
                   <span class="mas__opcion-tipo">Para envíos a domicilio</span>
                 </div>
               </label>

@@ -358,7 +358,7 @@ onMounted(async () => {
                 </div>
                 <div class="ld__action-body">
                   <div class="ld__action-label">Libro contable</div>
-                  <div class="ld__action-hint">Ingresos y egresos del club</div>
+                  <div class="ld__action-hint">Ingresos y egresos de la organización</div>
                 </div>
                 <i class="bi bi-arrow-right ld__action-arrow"></i>
               </RouterLink>
@@ -388,7 +388,7 @@ onMounted(async () => {
                 </div>
                 <div class="ld__action-body">
                   <div class="ld__action-label">Documentos</div>
-                  <div class="ld__action-hint">Archivos legales del club</div>
+                  <div class="ld__action-hint">Archivos legales de la organización</div>
                 </div>
                 <i class="bi bi-arrow-right ld__action-arrow"></i>
               </RouterLink>

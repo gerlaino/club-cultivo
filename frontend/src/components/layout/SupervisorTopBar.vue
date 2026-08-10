@@ -2,7 +2,7 @@
   <header class="ctb">
     <div class="ctb__inner">
 
-      <!-- Identidad del club (tenant) -->
+      <!-- Identidad de la organización (tenant) -->
       <ClubBrand tone="role-supervisor" />
 
       <!-- Breadcrumb -->

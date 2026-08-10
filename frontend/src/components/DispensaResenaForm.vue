@@ -1,7 +1,7 @@
 <script setup>
 // Reseña del paciente sobre un producto del pasaporte de dispensa. Estrellas (general) +
 // sabor/aroma/efecto (opcionales) + comentario. Autorizada por token de dispensa + DNI.
-// Feedback interno del club. Una por (dispensa, genética), editable.
+// Feedback interno de la organización. Una por (dispensa, genética), editable.
 import { reactive, ref } from 'vue'
 import axios from 'axios'
 

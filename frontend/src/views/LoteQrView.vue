@@ -62,7 +62,7 @@ onMounted(async () => {
       error.value = {
         icon: '❓',
         titulo: 'QR no reconocido',
-        mensaje: 'Este código QR no corresponde a ningún lote de tu club.',
+        mensaje: 'Este código QR no corresponde a ningún lote de tu organización.',
       }
     } else {
       error.value = {

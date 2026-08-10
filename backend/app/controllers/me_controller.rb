@@ -1,5 +1,7 @@
 class MeController < ApplicationController
   before_action :authenticate_user!
+  # Quién soy: lo consulta cualquier rol, incluido el super admin al arrancar la app.
+  skip_before_action :block_super_admin_sin_contexto!
 
   def show
     u = current_user

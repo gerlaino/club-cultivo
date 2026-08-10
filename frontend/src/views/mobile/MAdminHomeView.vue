@@ -17,9 +17,9 @@
       <span><strong>{{ reprocannVencidos }}</strong> REPROCANN {{ reprocannVencidos === 1 ? 'vencido' : 'vencidos' }}</span>
     </div>
 
-    <!-- Pulso del club -->
+    <!-- Pulso de la organización -->
     <section class="mah__section">
-      <h2 class="mah__section-title">Pulso del club</h2>
+      <h2 class="mah__section-title">Pulso de la organización</h2>
       <div class="mah__pulse">
         <RouterLink to="/m/admin/tareas" class="mah__stat">
           <span class="mah__stat-ico" style="background:#e0f2fe;color:var(--c-sky-600)"><i class="bi bi-check2-square"></i></span>
@@ -127,7 +127,7 @@ onMounted(async () => {
   cargarDiaComercial()
 })
 
-// Va aparte y sin bloquear: si el club no usa dispensación o delivery, la sección directamente no
+// Va aparte y sin bloquear: si la organización no usa dispensación o delivery, la sección directamente no
 // aparece en vez de mostrar ceros.
 async function cargarDiaComercial() {
   // Una sola llamada: /analytics/dispensador ya trae el resumen del día y las reservas por

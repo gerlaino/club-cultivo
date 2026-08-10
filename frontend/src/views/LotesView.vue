@@ -176,7 +176,7 @@ const sel = useSeleccion(computed(() => store.items), sorted);
 const etiquetas = useEtiquetasQR();
 
 async function configEtiquetas() {
-  if (!club.data) { try { await club.fetch() } catch { /* el club es opcional en la etiqueta */ } }
+  if (!club.data) { try { await club.fetch() } catch { /* la organización es opcional en la etiqueta */ } }
   return {
     items:   sel.seleccionados.value.filter(l => l.codigo_qr),
     urlDe:   (l) => `${window.location.origin}/l/${l.codigo_qr}`,

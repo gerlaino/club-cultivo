@@ -154,7 +154,7 @@ async function aplicar() {
                 @click="objetivoTipo = ''"
               >
                 <i class="bi bi-building"></i>
-                <span>Todo el club</span>
+                <span>Toda la organización</span>
               </button>
               <button
                 class="apm__obj-btn"

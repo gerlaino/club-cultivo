@@ -224,7 +224,7 @@ async function removeOne(u) {
     <div class="uv__header">
       <div class="uv__header-left">
         <h1 class="uv__title">Equipo</h1>
-        <p class="uv__sub">{{ store.items.length }} miembro{{ store.items.length !== 1 ? 's' : '' }} del club</p>
+        <p class="uv__sub">{{ store.items.length }} miembro{{ store.items.length !== 1 ? 's' : '' }} de la organización</p>
       </div>
       <div class="uv__header-right">
         <div class="uv__search">
@@ -410,7 +410,7 @@ async function removeOne(u) {
                 </label>
 
                 <div v-if="todasLasSedes.length === 0" class="uv__sedes-empty">
-                  <i class="bi bi-building-dash"></i> No hay sedes configuradas en el club.
+                  <i class="bi bi-building-dash"></i> No hay sedes configuradas en la organización.
                 </div>
                 <div v-else class="uv__sedes-list">
                   <label
@@ -481,7 +481,7 @@ async function removeOne(u) {
             <i class="bi bi-envelope-check"></i> También se las mandamos por mail.
           </p>
           <p v-else class="uv-cred__mail uv-cred__mail--off">
-            <i class="bi bi-envelope-slash"></i> El club no tiene correo configurado, así que el mail no salió: pasáselas vos.
+            <i class="bi bi-envelope-slash"></i> La organización no tiene correo configurado, así que el mail no salió: pasáselas vos.
           </p>
           <div class="uv-cred__acts">
             <button class="uv__btn-secondary" @click="copiarCredenciales">
