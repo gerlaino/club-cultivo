@@ -231,6 +231,16 @@ function medioPagoLabel(m) {
   const L = { efectivo: 'Efectivo', transferencia: 'Transf.', debito: 'Débito', credito: 'Crédito', cuenta_corriente: 'Cta. cte.', no_abona: 'No abona', credito_gramos: 'Gramos', mixto: 'Mixto', regalo: 'Regalo' }
   return L[m] || m || '—'
 }
+// Qué decir en el badge de pago. No siempre es el medio: si es contra entrega y todavía
+// queda saldo, lo que corresponde informar es que el cobro está pendiente en la calle.
+function pagoBadge(d) {
+  const pendiente = Number(d.saldo_pendiente ?? 0) > 0
+  if (d.cobrar_en_entrega && pendiente) {
+    return { texto: 'Contra entrega', clase: 'hd__pago--amber' }
+  }
+  return { texto: medioPagoLabel(d.medio_pago), clase: medioPagoClass(d.medio_pago) }
+}
+
 function medioPagoClass(m) {
   const C = { efectivo: 'hd__pago--verde', transferencia: 'hd__pago--azul', debito: 'hd__pago--azul', credito: 'hd__pago--morado', cuenta_corriente: 'hd__pago--amber', no_abona: 'hd__pago--gris', credito_gramos: 'hd__pago--morado', mixto: 'hd__pago--azul', regalo: 'hd__pago--morado' }
   return C[m] || 'hd__pago--gris'
@@ -520,7 +530,10 @@ const FORMAS = [
                 </td>
                 <td class="hd__td-num hd__td-monto" data-col="Monto">{{ formatARS(d.aporte_socio_ars) }}</td>
                 <td class="hd__td-pago" data-col="Pago">
-                  <span class="hd__pago-badge" :class="medioPagoClass(d.medio_pago)">{{ medioPagoLabel(d.medio_pago) }}</span>
+                  <!-- Mientras el delivery no cobró, no hay medio de pago que mostrar: lo que
+                       hay es una entrega pendiente de cobro. Poner "Efectivo" o "Mixto" ahí es
+                       afirmar algo que todavía no pasó. -->
+                  <span class="hd__pago-badge" :class="pagoBadge(d).clase">{{ pagoBadge(d).texto }}</span>
                 </td>
                 <td class="hd__td-user">{{ d.usuario?.nombre ?? '—' }}</td>
                 <td class="hd__td-envio">

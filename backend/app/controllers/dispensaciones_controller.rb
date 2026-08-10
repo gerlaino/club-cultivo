@@ -148,7 +148,16 @@ class DispensacionesController < ApplicationController
       if @dispensacion.aporte_socio_ars.to_d <= 0
         return render json: { error: 'El aporte del socio debe ser mayor a $0. Verificá que el stock tenga precio configurado.' }, status: :unprocessable_entity
       end
-      @dispensacion.medio_pago = 'mixto'   # placeholder; se afina según los cobros
+      # OJO con el placeholder: "mixto" significa que se pagó de DOS FORMAS distintas. Si nada
+      # lo afina después, queda mintiendo — y eso es exactamente lo que pasa en CONTRA ENTREGA:
+      # ahí no se cobra nada al crear la dispensa (`aplicar_lineas_cobro!` no corre), así que no
+      # hay cobros de los cuales deducir el medio y el placeholder se convertía en el valor
+      # final. Toda entrega a domicilio nacía marcada "mixto", aunque el delivery después
+      # cobrara todo en efectivo.
+      #
+      # Se arranca con el medio que el mostrador informó (o efectivo, que es el caso normal de
+      # una entrega a domicilio) y `afinar_medio_pago!` lo corrige cuando existan los cobros.
+      @dispensacion.medio_pago = medio_pago_inicial(lineas_cobro)
       begin
         ActiveRecord::Base.transaction do
           @dispensacion.save!
@@ -834,6 +843,18 @@ class DispensacionesController < ApplicationController
       descripcion:    "Reversa dispensación ##{dispensacion.id} (gramos)",
       created_by:     current_user,
     )
+  end
+
+  # Con qué medio nace una dispensa que todavía no tiene cobros registrados. Nunca 'mixto':
+  # eso se decide DESPUÉS, mirando los cobros reales (ver `afinar_medio_pago!`).
+  def medio_pago_inicial(lineas_cobro)
+    medios = lineas_cobro.map { |c| c[:medio] }.uniq
+    return medios.first if medios.size == 1
+
+    informado = params.dig(:dispensacion, :medio_pago).presence
+    return informado if informado.present? && Dispensacion::MEDIOS_PAGO.include?(informado) && informado != 'mixto'
+
+    'efectivo'
   end
 
   def serialize_dispensacion_delivery(d) = DispensacionSerializer.serialize_delivery(d)

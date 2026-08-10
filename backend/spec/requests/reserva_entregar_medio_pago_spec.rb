@@ -98,3 +98,78 @@ RSpec.describe 'Entregar una reserva — el medio de pago', type: :request do
     end
   end
 end
+
+# El mismo placeholder 'mixto' vivía en la creación normal de dispensaciones, no sólo en las
+# reservas. En CONTRA ENTREGA no se cobra nada al crear —el delivery cobra después— así que no
+# hay cobros de los que deducir el medio, y el placeholder terminaba siendo el valor final:
+# toda entrega a domicilio nacía marcada "mixto".
+RSpec.describe 'Contra entrega — el medio de pago', type: :request do
+  let(:club)        { create(:club) }
+  let(:admin)       { create(:user, :admin, club: club) }
+  let(:dispensador) { create(:user, :dispensador, club: club) }
+  let(:sede)        { create(:sede, club: club, created_by: admin) }
+  let(:lote)        { create(:lote, club: club) }
+  let(:paciente)    { create(:paciente, club: club, created_by: admin) }
+  let(:stock) do
+    create(:stock, club: club, sede: sede, lote: lote, cantidad: 500,
+                   estado: 'asignado', precio_sugerido_ars: 100)
+  end
+
+  before { sign_in_as(dispensador) }
+
+  def dispensar(extra = {})
+    post "/api/pacientes/#{paciente.id}/dispensaciones",
+         params: { dispensacion: { stock_id: stock.id, cantidad: 5, con_envio: true,
+                                   envio_calle: 'Rivadavia', envio_altura: '5066',
+                                   contacto_nombre: paciente.nombre_completo }.merge(extra) },
+         as: :json
+  end
+
+  it 'una entrega a cobrar en el domicilio NO nace como "mixto"' do
+    dispensar(cobrar_en_entrega: true)
+
+    expect(response).to have_http_status(:created), response.body
+    expect(Dispensacion.last.medio_pago).not_to eq('mixto')
+  end
+
+  it 'respeta el medio que informó el mostrador' do
+    dispensar(cobrar_en_entrega: true, medio_pago: 'transferencia')
+
+    expect(Dispensacion.last.medio_pago).to eq('transferencia')
+  end
+
+  it 'sin medio informado, asume efectivo — que es el caso normal de una entrega' do
+    dispensar(cobrar_en_entrega: true)
+
+    expect(Dispensacion.last.medio_pago).to eq('efectivo')
+  end
+
+  it 'cobrado todo en un medio al crear, queda ese medio' do
+    dispensar(cobros: [{ medio: 'transferencia', monto: 500 }])
+
+    expect(response).to have_http_status(:created), response.body
+    expect(Dispensacion.last.medio_pago).to eq('transferencia')
+  end
+
+  # "Mixto" tiene que seguir significando lo que significa.
+  it 'cobrado en dos medios distintos, ahí sí es mixto' do
+    dispensar(cobros: [{ medio: 'efectivo', monto: 300 },
+                       { medio: 'transferencia', monto: 200 }])
+
+    expect(response).to have_http_status(:created), response.body
+    expect(Dispensacion.last.medio_pago).to eq('mixto')
+  end
+
+  it 'cuando el delivery cobra, el medio pasa a ser el que cobró de verdad' do
+    dispensar(cobrar_en_entrega: true)
+    d = Dispensacion.last
+    d.update_columns(delivery_id: create(:user, :delivery, club: club).id, estado_envio: 'en_viaje')
+
+    sign_in_as(admin)
+    patch "/api/dispensaciones/#{d.id}/entregar",
+          params: { cobros: [{ medio: 'efectivo', monto: 500 }] }, as: :json
+
+    expect(response).to have_http_status(:ok), response.body
+    expect(d.reload.medio_pago).to eq('efectivo')
+  end
+end
