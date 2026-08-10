@@ -1,0 +1,319 @@
+{
+ "components/GraficosLote.vue": [
+  "gl__grid"
+ ],
+ "components/OnboardingWizard.vue": [
+  "ob__btn-skip--light",
+  "ob__toggle-info"
+ ],
+ "components/TurnoDetallePanel.vue": [
+  "tdp__item--full"
+ ],
+ "components/UsuarioSalasManager.vue": [
+  "usm__sala--spinner",
+  "usm__sala-nombre"
+ ],
+ "components/cultivador/SalaCard.vue": [
+  "sc__ultima"
+ ],
+ "components/dashboards/CultivadorDashboard.vue": [
+  "cvd__panel-tipo",
+  "cvd__sem-tarea--"
+ ],
+ "components/dashboards/DispensadorDashboard.vue": [
+  "dd__greeting",
+  "dd__reserva-main"
+ ],
+ "components/integraciones/IntegracionWhatsappSimple.vue": [
+  "iws__head-txt"
+ ],
+ "components/layout/MobileShell.vue": [
+  "msh__nav--fab"
+ ],
+ "components/lotes/NuevoLoteModal.vue": [
+  "nlm__madre-opt-nombre"
+ ],
+ "components/lotes/registro/RegistroLoteModal.vue": [
+  "rls__paso",
+  "rls__paso--detalle",
+  "rls__paso--sel"
+ ],
+ "components/medico/MedicoCalendarioWidget.vue": [
+  "cw__day--pasado",
+  "cw__det-est"
+ ],
+ "components/pacientes/Dispensaciones.vue": [
+  "dv__reserva-info"
+ ],
+ "components/pacientes/PacienteDocumentos.vue": [
+  "pd__dropzone-empty",
+  "pd__header-left"
+ ],
+ "components/pacientes/SocioTabCuentaCorriente.vue": [
+  "scc__estado-block--deuda"
+ ],
+ "components/pacientes/SocioTabTimeline.vue": [
+  "stl__body"
+ ],
+ "components/plan-trabajo/ImportarCSVModal.vue": [
+  "icm__resultado-info"
+ ],
+ "components/plan-trabajo/NuevoPlanModal.vue": [
+  "npm__tipo-lbl"
+ ],
+ "components/plants/RegistroPlantaModal.vue": [
+  "rps__paso",
+  "rps__paso--detalle"
+ ],
+ "components/salas/ModalCargarLote.vue": [
+  "mcl__lote-date",
+  "mcl__lote-estado",
+  "mcl__lote-plantas",
+  "mcl__lote-sala"
+ ],
+ "components/salas/RegistroSalaModal.vue": [
+  "rls__paso",
+  "rls__paso--detalle",
+  "rls__paso--sel"
+ ],
+ "components/ui/Breadcrumb.vue": [
+  "bc__item",
+  "bc__item--current"
+ ],
+ "design-system/components/Stat.vue": [
+  "ds-stat__delta-arrow"
+ ],
+ "views/AriccameView.vue": [
+  "ar__modal-json",
+  "bi-arrow-repeat ar__spin"
+ ],
+ "views/CarnetPublicoView.vue": [
+  "cp__foot-item",
+  "cp__identity"
+ ],
+ "views/ContabilidadView.vue": [
+  "cv__header-left",
+  "cv__mov-tipo",
+  "cv__tr"
+ ],
+ "views/CosechadoView.vue": [
+  "cv__header-left",
+  "cv__td--genetica",
+  "cv__th--genetica",
+  "cv__th--lote"
+ ],
+ "views/DispensacionDetalleView.vue": [
+  "dd__item-main"
+ ],
+ "views/GeneticaDetalleView.vue": [
+  "gdv__col-aside",
+  "gdv__col-main"
+ ],
+ "views/GeneticasView.vue": [
+  "gen-table__row"
+ ],
+ "views/HistorialCultivadorView.vue": [
+  "hcv__td--fecha",
+  "hcv__td--tipo",
+  "hcv__th--desc"
+ ],
+ "views/HistorialDispensacionesView.vue": [
+  "hd__detalle-prod",
+  "hd__search-ico",
+  "hd__td-pago",
+  "hd__td-producto"
+ ],
+ "views/InformeSemestralView.vue": [
+  "ir__controls-left",
+  "ir__gen-info",
+  "ir__pie-firma",
+  "ir__portada-club"
+ ],
+ "views/IntegracionesView.vue": [
+  "int__check-label",
+  "int__log-info"
+ ],
+ "views/LandingView.vue": [
+  "ld__final"
+ ],
+ "views/LoteDetailView.vue": [
+  "ld__hero-left",
+  "ld__main"
+ ],
+ "views/LotesView.vue": [
+  "lv-num--muted",
+  "lv-table__row",
+  "lv__kpi--active-neutral"
+ ],
+ "views/PerfilView.vue": [
+  "pfl__aside",
+  "pfl__main"
+ ],
+ "views/PlantaDetailView.vue": [
+  "pd__bc-sep",
+  "pd__hero-left",
+  "pd__main"
+ ],
+ "views/ReservasView.vue": [
+  "rsv__filters"
+ ],
+ "views/SalaAmbienteView.vue": [
+  "sav__hero-left"
+ ],
+ "views/SalaDetailView.vue": [
+  "sd__hero-left",
+  "sd__main"
+ ],
+ "views/SalasView.vue": [
+  "slv__header-left",
+  "slv__kpi-body"
+ ],
+ "views/SedeDetailView.vue": [
+  "sdv__col-main"
+ ],
+ "views/SedesView.vue": [
+  "agri-header__left",
+  "agri-kpi--fase",
+  "agri-sede--activa",
+  "kpi-card__body",
+  "page-header__left",
+  "sede-card__stat--stock",
+  "tipo-btn--active"
+ ],
+ "views/SocioDetailView.vue": [
+  "sd__hero-info",
+  "sd__tab-content"
+ ],
+ "views/SociosView.vue": [
+  "sv-table__row"
+ ],
+ "views/StockDispensadorView.vue": [
+  "sdv__filters"
+ ],
+ "views/StockQrView.vue": [
+  "sqr-card__body--center",
+  "sqr-producto__info"
+ ],
+ "views/TareasView.vue": [
+  "sem__tarea--",
+  "tv__header-left"
+ ],
+ "views/UsuarioDetail.vue": [
+  "ud__role-edit"
+ ],
+ "views/UsuariosView.vue": [
+  "uv__header-left"
+ ],
+ "views/WebPublicaView.vue": [
+  "wpv__section"
+ ],
+ "views/admin/AdminPesajesManicuraView.vue": [
+  "apm-cont--new"
+ ],
+ "views/admin/AdminStockDetailView.vue": [
+  "sd__hero-info",
+  "sd__hint",
+  "sd__input--unidad",
+  "sd__input-pre",
+  "sd__label-opt"
+ ],
+ "views/admin/AdminStocksPendientesView.vue": [
+  "stk__kpi--error",
+  "stk__kpi-body"
+ ],
+ "views/auditor/InformeCumplimientoView.vue": [
+  "inf__hoja",
+  "inf__section"
+ ],
+ "views/auditor/InformeDispensacionesView.vue": [
+  "inf__hoja",
+  "inf__section"
+ ],
+ "views/auditor/InformeInaseView.vue": [
+  "inf__section"
+ ],
+ "views/auditor/InformePlanVsRealView.vue": [
+  "inf__hoja",
+  "inf__section"
+ ],
+ "views/auditor/InformeProduccionView.vue": [
+  "inf__hoja",
+  "inf__section"
+ ],
+ "views/auditor/InformeReprocannView.vue": [
+  "inf__section"
+ ],
+ "views/auditor/InformeSedesView.vue": [
+  "inf__hoja",
+  "inf__section"
+ ],
+ "views/auditor/TrazabilidadView.vue": [
+  "trz__report"
+ ],
+ "views/bar/BarNav.vue": [
+  "bn__id"
+ ],
+ "views/bar/BarPanelView.vue": [
+  "sp__sueltas"
+ ],
+ "views/bar/BarPosView.vue": [
+  "cv__pos-catalog"
+ ],
+ "views/bar/BarSelectorView.vue": [
+  "cv__card",
+  "cv__header-left",
+  "cv__header-right"
+ ],
+ "views/bar/EventoBarDetailView.vue": [
+  "ttrow__main"
+ ],
+ "views/bar/EventosBarView.vue": [
+  "evrow__main"
+ ],
+ "views/manicura/MncLoteDetailView.vue": [
+  "mnl__section"
+ ],
+ "views/manicura/MncPesajesView.vue": [
+  "mpv__header",
+  "mpv__historial"
+ ],
+ "views/mobile/MDeliveryHistorialView.vue": [
+  "mdh__fecha"
+ ],
+ "views/mobile/MDispensarView.vue": [
+  "mdis__card-ultima",
+  "mdis__ultimas"
+ ],
+ "views/mobile/MSalaMobileDetail.vue": [
+  "msal__count"
+ ],
+ "views/mobile/MTareasView.vue": [
+  "mta__atrasada",
+  "mta__bulk",
+  "mta__bulk-ok",
+  "mta__bulk-todas",
+  "mta__card--atrasada",
+  "mta__sala",
+  "mta__sel-box",
+  "mta__sel-box--on",
+  "mta__sel-toggle",
+  "mta__tipo-emoji",
+  "mta__topbar-acciones"
+ ],
+ "views/superadmin/SAClubDetail.vue": [
+  "scd__card--info",
+  "scd__plan-opt--active"
+ ],
+ "views/superadmin/SAClubs.vue": [
+  "sac__plan-filter--active"
+ ],
+ "views/superadmin/SAUsuarios.vue": [
+  "sau__club"
+ ],
+ "views/superadmin/SuperAdminLayout.vue": [
+  "sa-user__info"
+ ],
+ "views/supervisor/SupervisorDashboard.vue": [
+  "svd__header-text"
+ ]
+}

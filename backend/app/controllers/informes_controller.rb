@@ -444,6 +444,22 @@ class InformesController < ApplicationController
     # ni por declaración. Es la única fila accionable del informe.
     pendientes  = filas.reject { |f| f[:acreditada] }
 
+    # UNA FILA POR VARIEDAD ACREDITABLE, no por genética del club. Si veinte genéticas propias
+    # se declaran contra TROPICANA WFC, listarlas por separado da veinte filas con el mismo
+    # nombre —parece un error de datos— y encima al organismo le importa cuánto se cultivó de
+    # esa variedad, no cómo la llama el club puertas adentro. Los nombres propios van juntos en
+    # "Se cultiva como", que es lo que hace auditable la traducción.
+    agrupadas = filas.group_by { |g| g[:nombre] }.map do |nombre, gs|
+      {
+        nombre:   nombre,
+        numero:   gs.filter_map { |g| g[:numero_registro_inase] }.first,
+        propios:  gs.select { |g| g[:declarada] }.map { |g| g[:nombre_propio] },
+        lotes:    gs.sum { |g| g[:lotes] },
+        plantas:  gs.sum { |g| g[:plantas] },
+        gramos:   gs.sum { |g| g[:gramos_producidos] }.round(1),
+      }
+    end.sort_by { |g| g[:nombre].to_s }
+
     datos = {
       total_geneticas:   filas.size,
       registradas_inase: registradas,
@@ -453,18 +469,17 @@ class InformesController < ApplicationController
       gramos_totales:    filas.sum { |f| f[:gramos_producidos] }.round(1),
       lotes_totales:     filas.sum { |f| f[:lotes] },
       geneticas:         filas,
+      agrupadas:         agrupadas,
       pendientes:        pendientes,
     }
 
     secciones = [{
       titulo: 'Variedades cultivadas',
       headers: ['Variedad', 'N° INASE', 'Se cultiva como', 'Lotes', 'Plantas', 'Gramos'],
-      rows: filas.map { |g|
-        [g[:nombre], g[:numero_registro_inase].presence || 'Sin registrar',
-         # La columna que hace auditable la traducción: contra qué nombre real corresponde
-         # cada variedad declarada. En blanco cuando el nombre no cambió.
-         g[:declarada] ? g[:nombre_propio] : '—',
-         g[:lotes], g[:plantas], g[:gramos_producidos]]
+      rows: agrupadas.map { |g|
+        [g[:nombre], g[:numero].presence || 'Sin registrar',
+         g[:propios].any? ? g[:propios].join(', ') : '—',
+         g[:lotes], g[:plantas], g[:gramos]]
       },
       formatos: [:texto, :texto, :texto, :numero, :numero, :numero],
       totales: [3, 4, 5],

@@ -101,4 +101,24 @@ const METODOS = [
 .rf__toggle-track--on .rf__toggle-thumb { transform: translateX(18px); }
 .rf__toggle-label { font-size: var(--fs-14); font-weight: 500; color: var(--c-ink-700); user-select: none; }
 .rf__fertilizacion { background: var(--c-leaf-50, #F4F8F5); border: 1px solid var(--c-leaf-100, #E8F0EB); border-radius: var(--r-lg); padding: var(--sp-3); margin-bottom: var(--sp-3); }
+
+/* Estas tres nunca se escribieron: los botones de método de aplicación salían con el borde
+   crudo del navegador, cuadrados y pegados, en medio de un formulario con todo lo demás
+   estilado. Compilaba perfecto — por eso ahora hay un test que barre el markup contra el
+   <style> de cada componente. */
+.rf__wrap { display: block; }
+.rf__radios { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.rf__radio-btn {
+  display: inline-flex; align-items: center; gap: .35rem;
+  padding: .45rem .8rem; cursor: pointer;
+  background: #fff; border: 1.5px solid var(--c-ink-300, #D1D5DB);
+  border-radius: var(--r-md, 6px);
+  font-size: var(--fs-14); font-weight: 500; color: var(--c-ink-700);
+  transition: all .15s;
+}
+.rf__radio-btn:hover { border-color: var(--brand-primary, #1b5e20); background: var(--c-leaf-50, #F4F8F5); }
+.rf__radio-btn--sel {
+  background: var(--brand-primary, #1b5e20); border-color: var(--brand-primary, #1b5e20);
+  color: #fff; font-weight: 600;
+}
 </style>
