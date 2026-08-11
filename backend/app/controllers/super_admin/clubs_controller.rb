@@ -43,8 +43,14 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
   end
 
   def update
-    if @club.update(club_params)
-      render json: serialize_club_detail(@club)
+    attrs = club_params.to_h
+    # Apagar un módulo no lo corta en el momento: se programa para el fin del período pago. Se
+    # resuelve acá y no en el modelo porque es una decisión del panel de plataforma — una
+    # migración de datos o un rake que necesite apagar algo ya sigue escribiendo `features`.
+    bajas = attrs.key?('features') ? aplicar_bajas_programadas(attrs['features']) : []
+
+    if @club.update(attrs)
+      render json: serialize_club_detail(@club.reload).merge(bajas_programadas: bajas)
     else
       render json: { errors: @club.errors.full_messages }, status: :unprocessable_entity
     end
@@ -241,6 +247,33 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     (enviadas || {}).to_h.slice(*Club::FEATURES_EDITABLES)
   end
 
+  # Traduce "apagá esto" a "esto termina el <fecha>", y devuelve qué quedó programado para
+  # poder decírselo a quien lo apagó.
+  #
+  # MUTA `enviadas` a propósito: el módulo que se da de baja tiene que seguir guardado en `true`
+  # hasta que venza, o la organización perdería el acceso hoy mismo — que es exactamente lo que
+  # se está evitando. Prenderlo de nuevo antes del vencimiento cancela la baja.
+  def aplicar_bajas_programadas(enviadas)
+    programadas = []
+
+    Club::FEATURES_EDITABLES.each do |clave|
+      next unless enviadas.key?(clave)
+
+      quiere_apagar = enviadas[clave].to_s != 'true'
+
+      if quiere_apagar && @club.features[clave] == true
+        hasta = @club.fin_de_periodo
+        @club.programar_baja_modulo!(clave, hasta: hasta)
+        enviadas[clave] = true # sigue andando hasta la fecha
+        programadas << { modulo: clave, label: Club::ADDONS.dig(clave, :label) || clave, hasta: hasta.to_s }
+      elsif !quiere_apagar && @club.baja_programada?(clave)
+        @club.cancelar_baja_modulo!(clave)
+      end
+    end
+
+    programadas
+  end
+
   def serialize_club(c)
     {
       id:               c.id,
@@ -321,6 +354,9 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       smtp_from:       c.smtp_from,
       smtp_from_name:  c.smtp_from_name,
       features:        c.features,
+      # Módulos dados de baja que siguen andando hasta su fecha. El panel lo muestra para que no
+      # parezca que la baja no se guardó.
+      features_baja:   c.features_baja,
       pulse_configurado: c.pulse_configurado?,
       suites:          Club::SUITES.map { |k, v| { clave: k, label: v[:label], desc: v[:desc], activa: c.suite?(k) } },
       addons:          Club::ADDONS.map { |k, v|

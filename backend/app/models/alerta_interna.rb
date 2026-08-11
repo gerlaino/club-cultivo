@@ -7,7 +7,7 @@ class AlertaInterna < ApplicationRecord
   belongs_to :lote, optional: true
 
   TIPOS_OPERATIVOS = %w[
-    paciente_creado_por_dispensador paciente_pendiente_aprobacion documento_vencido reprocann_vencido reprocann_por_vencer
+    paciente_creado_por_dispensador paciente_pendiente_aprobacion modulo_dado_de_baja documento_vencido reprocann_vencido reprocann_por_vencer
     indicacion_vencida indicacion_por_vencer
     manicura_asignada manicura_devuelta manicura_aprobacion_pendiente manicura_aprobada manicura_rechazada manicura_eliminada manicura_reabierta
     stock_bajo stock_vencimiento saldo_cc_bajo saldo_gramos_bajo

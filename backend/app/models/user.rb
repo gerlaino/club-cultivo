@@ -61,7 +61,11 @@ class User < ApplicationRecord
     # (caja de turno, ventas, stock del salón). Un club que compró sólo el Buffet tiene
     # dispensadores que trabajan todos los días, así que `bar` alcanza para dejarlo entrar.
     'dispensador' => %w[produccion_dispensa bar],
-    'delivery'    => %w[produccion_dispensa],
+    # El repartidor depende del módulo DELIVERY, no de la suite entera. Apuntaba a
+    # `produccion_dispensa` de cuando delivery no era un módulo aparte, y con eso dar de baja
+    # Delivery no deshabilitaba a nadie: los repartidores seguían entrando a una sección que ya
+    # no estaba contratada. (Delivery a su vez exige la suite, así que no se pierde nada.)
+    'delivery'    => %w[delivery],
     'paciente'    => %w[produccion_dispensa],
     'medico'      => %w[medico],
   }.freeze

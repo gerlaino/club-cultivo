@@ -9,6 +9,13 @@ Sidekiq.configure_server do |config|
         'cron'  => '0 * * * *',
         'class' => 'JwtDenylistCleanupJob'
       },
+      'aplicar_bajas_modulos' => {
+        # Temprano, antes de que la organización arranque el día: el módulo se apaga sin que
+        # nadie esté a mitad de una operación.
+        'cron'  => '5 5 * * *',
+        'class' => 'AplicarBajasModulosJob',
+        'description' => 'Apaga los módulos cuya baja programada ya venció y ordena lo que dejan colgando'
+      },
       'reprocann_vencimiento' => {
         'cron'  => '0 8 * * *',
         'class' => 'ReprocannVencimientoJob',

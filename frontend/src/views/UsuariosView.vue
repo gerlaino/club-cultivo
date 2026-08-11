@@ -3,6 +3,7 @@ import { ref, computed, onMounted, watch } from "vue"
 import { useRouter } from "vue-router"
 import { useUsuariosStore } from "../stores/usuarios"
 import { useAuthStore } from "../stores/auth"
+import { useClubStore } from '../stores/club.js'
 import { listSalas, listSedes, asignarSedeAUsuario } from '../lib/api.js'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
@@ -10,6 +11,7 @@ import DsSpinner from '../design-system/components/Spinner.vue'
 import { rolesParaAlta, rolInfo, rolEstilo, rolColor, rolBg, rolPideSede, rolHintSede } from '../lib/roles.js'
 
 const store           = useUsuariosStore()
+const club            = useClubStore()
 const auth            = useAuthStore()
 const toast           = useToast()
 const { confirm }     = useConfirm()
@@ -42,7 +44,14 @@ onMounted(() => store.fetch())
 // ── Roles ─────────────────────────────────────────────────────────────────
 // Sólo los roles que se ofrecen al crear a alguien: supervisor, abogado y auditor quedan fuera
 // (el backend también los rechaza, ver Club::ROLES_ALTA).
-const ROLES = rolesParaAlta()
+//
+// Y `delivery` sólo si la organización tiene el módulo: sin él, dar de alta a un repartidor
+// crearía a alguien que después no puede entrar — el login lo rebota y nadie entiende por qué.
+const MODULO_POR_ROL = { delivery: 'delivery' }
+const ROLES = computed(() => rolesParaAlta().filter(r => {
+  const modulo = MODULO_POR_ROL[r.value]
+  return !modulo || club.data?.features?.[modulo] === true
+}))
 
 function getRoleInfo(role) { return rolInfo(role) }
 function roleStyle(role)   { return rolEstilo(role) }

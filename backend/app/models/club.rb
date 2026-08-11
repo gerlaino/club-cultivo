@@ -103,6 +103,16 @@ class Club < ApplicationRecord
   # puede es crear uno nuevo desde la pantalla.
   ROLES_ALTA_CLUB = (ROLES_ALTA + %w[delivery]).freeze
 
+  # Roles cuya oferta depende de un módulo contratado. `delivery` no lo necesita toda
+  # organización: sin el módulo, ofrecerlo sería dar de alta a alguien que después no puede
+  # entrar — `check_rol_habilitado!` lo rebota en el login y nadie entiende por qué.
+  MODULO_POR_ROL_OPCIONAL = { 'delivery' => 'delivery' }.freeze
+
+  # Los roles que ESTA organización puede dar de alta hoy, según lo que tenga contratado.
+  def roles_para_alta(base = ROLES_ALTA_CLUB)
+    base.reject { |rol| (m = MODULO_POR_ROL_OPCIONAL[rol]) && !feature?(m) }
+  end
+
   ROLES_META = {
     'admin'       => { label: 'Admin',       desc: 'Acceso total al panel de la organización' },
     'medico'      => { label: 'Médico',      desc: 'Turnos, historia clínica e indicaciones' },
@@ -251,6 +261,7 @@ class Club < ApplicationRecord
     'eventos'  => { label: 'Eventos',        desc: 'Fiestas y catas: provisión desde depósitos, entradas y rendición.', requiere: 'El Buffet tiene que estar activo.' },
     'iot'      => { label: 'Ambiente / IoT', desc: 'Sensores, lecturas automáticas y reglas.',           requiere: 'Hardware de la organización (Sonoff u otro) o importación por CSV.' },
     'ia'       => { label: 'Asistente IA',   desc: 'Análisis de lote, plan de trabajo y registro por voz.', requiere: 'ANTHROPIC_API_KEY en el entorno.' },
+    'delivery' => { label: 'Delivery',       desc: 'Reparto a domicilio: paquetes, rutas, firma de entrega y cobro contra-entrega.', requiere: 'La suite de Producción y dispensa tiene que estar activa.' },
     'whatsapp' => { label: 'WhatsApp',       desc: 'Avisos de entrega por WhatsApp.',                    requiere: 'Cuenta de Twilio de la organización (SID, token y número).' },
     'ariccame' => { label: 'ARICCAME',       desc: 'Reporte regulatorio de dispensaciones y stock.',     requiere: 'INCOMPLETO: la integración está simulada, no transmite de verdad.' },
   }.freeze
@@ -301,6 +312,10 @@ class Club < ApplicationRecord
     'cultivo'             => true,
     'produccion_dispensa' => true,
     'bar'                 => true,
+    # Delivery viene prendido por el mismo criterio que el Buffet: funciona sin nada de afuera y
+    # el alta deja destildarlo. Una organización que no reparte simplemente no da de alta
+    # repartidores; una que sí, no tiene que pedir que se lo habiliten.
+    'delivery'            => true,
   }.freeze
 
   # Features tal como las ve el frontend: las guardadas MÁS las claves viejas derivadas.
@@ -343,6 +358,10 @@ class Club < ApplicationRecord
     k = key.to_s
     # Lo que todavía no existe no está habilitado para nadie, tenga lo que tenga guardado.
     return false if EN_CONSTRUCCION.key?(k)
+    # Dado de baja y con el plazo ya cumplido: se apaga aunque la bandera siga guardada. El job
+    # que las limpia corre una vez por día, así que entre el vencimiento y la corrida hay una
+    # ventana — acá se cierra, para que nadie siga usando un módulo que ya terminó.
+    return false if baja_cumplida?(k)
     return true  if features[k] == true
     return true  if incluido_por_suite?(k)
 
@@ -351,6 +370,48 @@ class Club < ApplicationRecord
 
   def addon_disponible?(key)
     feature?(key)
+  end
+
+  # ── Baja de un módulo: se programa, no se corta ─────────────────────────────
+  #
+  # La organización paga por período. Apagarle un módulo el día que se decide la baja es cobrarle
+  # el mes y no prestárselo, así que la baja fija una FECHA y hasta ahí sigue andando igual.
+  #
+  # `plan_activo_hasta` manda cuando está cargado: es la fecha real hasta la que pagó. Sin eso,
+  # el fin del mes en curso es la aproximación razonable.
+  def baja_programada_para(key)
+    f = features_baja[key.to_s]
+    f && Date.parse(f.to_s)
+  rescue ArgumentError
+    nil
+  end
+
+  def baja_programada?(key) = baja_programada_para(key).present?
+
+  def baja_cumplida?(key)
+    fecha = baja_programada_para(key)
+    fecha.present? && fecha < Time.zone.today
+  end
+
+  def fin_de_periodo
+    plan_activo_hasta.presence || Time.zone.today.end_of_month
+  end
+
+  def programar_baja_modulo!(key, hasta: nil)
+    k = key.to_s
+    return false unless features[k] == true
+
+    update!(features_baja: features_baja.merge(k => (hasta || fin_de_periodo).to_s))
+  end
+
+  # Se arrepintió antes de que venza: vuelve a quedar como si nada.
+  def cancelar_baja_modulo!(key)
+    update!(features_baja: features_baja.except(key.to_s))
+  end
+
+  # Módulos cuya baja ya venció y hay que apagar de verdad.
+  def bajas_vencidas
+    features_baja.keys.select { |k| baja_cumplida?(k) }
   end
 
   # ── ¿Este módulo ANDA de verdad? ──────────────────────────────────────────

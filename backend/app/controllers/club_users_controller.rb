@@ -48,9 +48,16 @@ class ClubUsersController < ApplicationController
     # Sólo los roles que la pantalla ofrece. No alcanza con sacarlos del formulario: el endpoint
     # acepta lo que le manden, y un rol no ofrecido entraría igual por la API. Mismo criterio que
     # el alta de club (`Club::ROLES_ALTA`).
-    unless Club::ROLES_ALTA_CLUB.include?(nuevo_rol)
-      return render json: { errors: ["El rol #{nuevo_rol.presence || '(vacío)'} no se puede asignar desde acá."] },
-                    status: :unprocessable_entity
+    # `roles_para_alta` y no la constante: delivery sólo se ofrece si la organización tiene el
+    # módulo. Crear un repartidor sin Delivery daría de alta a alguien que no puede entrar.
+    unless current_user.club.roles_para_alta.include?(nuevo_rol)
+      motivo = if Club::ROLES_ALTA_CLUB.include?(nuevo_rol)
+                 "El módulo #{Club::ADDONS.dig(Club::MODULO_POR_ROL_OPCIONAL[nuevo_rol], :label) || nuevo_rol} " \
+                 'no está activo en esta organización.'
+               else
+                 "El rol #{nuevo_rol.presence || '(vacío)'} no se puede asignar desde acá."
+               end
+      return render json: { errors: [motivo] }, status: :unprocessable_entity
     end
 
     unless nuevo_rol == 'admin' || current_user.club.sedes.exists?

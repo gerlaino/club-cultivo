@@ -136,6 +136,9 @@ const savingWa  = ref(false)
 const waError   = ref(null)
 
 const featuresForm    = ref({})
+const featuresBaja    = ref({})
+const bajaProgramada  = (clave) => featuresBaja.value[clave] || null
+const fechaCorta      = (f) => new Date(String(f) + 'T00:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })
 const iaTier          = ref('basico')
 const iaLimiteHora    = ref(20)
 const savingFeatures  = ref(false)
@@ -202,6 +205,8 @@ async function cargar() {
       twilio_whatsapp_from: data.twilio_whatsapp_from || '',
     }
     featuresForm.value    = { ...(data.features || {}) }
+    // Módulos dados de baja que siguen andando hasta su fecha.
+    featuresBaja.value    = data.features_baja || {}
     suites.value          = data.suites || []
     addons.value          = data.addons || []
     incluidos.value       = data.incluidos || []
@@ -720,7 +725,12 @@ onMounted(async () => {
                   <!-- Qué le falta AHORA a este club, que es distinto de qué necesita el módulo
                        en general. Prenderlo sin esto deja al club creyendo que tiene algo que
                        no va a pasar. -->
-                  <div v-if="a.falta" class="scd__feat-req scd__feat-req--warn">{{ a.falta }}</div>
+                  <!-- Dado de baja pero todavía andando: la organización lo pagó hasta esa
+                       fecha. Se dice explícito o parecería que la baja no se guardó. -->
+                  <div v-if="bajaProgramada(a.clave)" class="scd__feat-req scd__feat-req--baja">
+                    Dado de baja — sigue andando hasta el {{ fechaCorta(bajaProgramada(a.clave)) }}
+                  </div>
+                  <div v-else-if="a.falta" class="scd__feat-req scd__feat-req--warn">{{ a.falta }}</div>
                   <div v-else-if="a.requiere && !featuresForm[a.clave]" class="scd__feat-req">
                     {{ a.requiere }}
                   </div>
@@ -1115,6 +1125,8 @@ onMounted(async () => {
 }
 .scd__feat-req { font-size: 11px; color: var(--c-slate-500); margin-top: 3px; line-height: 1.4; }
 .scd__feat-req--warn { color: #b45309; }
+/* Baja programada: azul y no ámbar — no es un problema a resolver, es una fecha acordada. */
+.scd__feat-req--baja { color: #0369a1; font-weight: 600; }
 .scd__feat-toggle--warn { border-color: #fcd34d; }
 .scd__feat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: .4rem; }
 

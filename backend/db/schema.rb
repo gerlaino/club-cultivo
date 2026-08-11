@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_11_140000) do
+ActiveRecord::Schema[7.2].define(version: 2026_08_11_160000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -450,6 +450,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_11_140000) do
     t.string "whatsapp_numero"
     t.boolean "demo", default: false, null: false
     t.text "pulse_api_key_enc"
+    t.jsonb "features_baja", default: {}, null: false
     t.index ["benchmark_opt_in"], name: "index_clubs_on_benchmark_opt_in"
     t.index ["deleted_at"], name: "index_clubs_on_deleted_at"
     t.index ["deleted_by_id"], name: "index_clubs_on_deleted_by_id"
