@@ -48,6 +48,18 @@ class SedesController < ApplicationController
       return render json: { error: 'Limite de sedes alcanzado para tu plan', upgrade: true },
                     status: :payment_required
     end
+    # El tipo de sede tiene que existir en la operación de la organización: una que sólo contrató
+    # Cultivo no atiende pacientes (no le sirve una social ni una mixta) y una de sólo Producción
+    # y dispensa no tiene salas. Va acá y no en el modelo: en este proyecto el gateo por suite
+    # vive en los controllers, y como validación volvía inguardable una sede que ya existía
+    # cuando la organización daba de baja una suite.
+    faltantes = Sede.suites_faltantes(current_user.club, sede_params[:tipo])
+    if faltantes.any?
+      nombres = faltantes.map { |s| Club::SUITES.dig(s, :label) }.compact.to_sentence
+      return render json: { errors: ["Una sede de este tipo necesita #{nombres}, que tu organización no tiene contratada."] },
+                    status: :unprocessable_entity
+    end
+
     sede = current_user.club.sedes.build(sede_params)
     sede.created_by = current_user
     if sede.save

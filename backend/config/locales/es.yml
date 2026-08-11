@@ -67,6 +67,23 @@ es:
         too_long:
           one: "es demasiado largo (máximo 1 caracter)"
           other: "es demasiado largo (máximo %{count} caracteres)"
+        # Faltaban las de números y el usuario veía el error CRUDO de i18n en pantalla:
+        # "Cantidad Translation missing. Options considered were: - es.activerecord.errors…".
+        not_a_number: "tiene que ser un número"
+        not_an_integer: "tiene que ser un número entero"
+        greater_than: "tiene que ser mayor que %{count}"
+        greater_than_or_equal_to: "tiene que ser mayor o igual que %{count}"
+        less_than: "tiene que ser menor que %{count}"
+        less_than_or_equal_to: "tiene que ser menor o igual que %{count}"
+        equal_to: "tiene que ser igual a %{count}"
+        other_than: "tiene que ser distinto de %{count}"
+        odd: "tiene que ser impar"
+        even: "tiene que ser par"
+        inclusion: "no está en la lista"
+        exclusion: "no está disponible"
+        confirmation: "no coincide"
+        present: "tiene que estar vacío"
+        accepted: "hay que aceptarlo"
       models:
         dispensacion:
           attributes:

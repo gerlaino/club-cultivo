@@ -6,6 +6,8 @@ import { listSedes, createSede, updateSede, deleteSede,
 import { useAuthStore } from '../stores/auth.js'
 import { usePermissions } from '../composables/usePermissions.js'
 import { usePlan } from '../composables/usePlan.js'
+import { useClubStore } from '../stores/club.js'
+import { tiposDeSedeDisponibles } from '../lib/tiposSede.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 
@@ -82,6 +84,15 @@ const TIPO_META = {
   mixta:      { label: 'Mixta',       icon: 'bi-arrow-left-right', color: '#7c3aed', bg: 'rgba(124,58,237,.1)' },
 }
 function tipoMeta(tipo) { return TIPO_META[tipo] || TIPO_META.produccion }
+
+// `TIPO_META` describe TODOS los tipos —hace falta para pintar una sede vieja de un tipo que
+// hoy la organización ya no podría crear—; esto es lo que se OFRECE al dar de alta. Misma
+// fuente que el onboarding y que la validación del backend.
+const clubStore = useClubStore()
+const tiposOfrecidos = computed(() => {
+  const habilitados = tiposDeSedeDisponibles(clubStore.data?.features)
+  return Object.fromEntries(Object.entries(TIPO_META).filter(([k]) => habilitados.includes(k)))
+})
 function cicloMeta(ciclo) { return CICLO_META[ciclo] || CICLO_META.vegetativo }
 const KIND_LABEL = {
   vegetativo: 'Vegetativo', floracion: 'Floración', mixta: 'Mixta',
@@ -91,7 +102,7 @@ const KIND_LABEL = {
 function kindLabel(k) { return KIND_LABEL[k] || k || '' }
 
 function emptyForm() {
-  return { nombre: '', tipo: 'produccion', direccion: '', ciudad: '',
+  return { nombre: '', tipo: Object.keys(tiposOfrecidos.value)[0] || 'produccion', direccion: '', ciudad: '',
     provincia: '', declarada_reprocann: false, notas: '' }
 }
 const form       = ref(emptyForm())
@@ -585,7 +596,7 @@ function tieneActividad(sede) {
               <div class="form-group form-group--full">
                 <label class="form-label">Tipo de sede</label>
                 <div class="tipo-selector">
-                  <button v-for="(meta, key) in TIPO_META" :key="key" type="button" class="tipo-btn"
+                  <button v-for="(meta, key) in tiposOfrecidos" :key="key" type="button" class="tipo-btn"
                           :class="{ 'tipo-btn--active': form.tipo === key }"
                           :style="form.tipo === key ? { background: meta.color, borderColor: meta.color, color: '#fff' } : {}"
                           @click="form.tipo = key">

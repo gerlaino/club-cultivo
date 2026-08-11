@@ -1,10 +1,11 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { createSede, createSala } from '../lib/api.js'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { useClubStore } from '../stores/club'
+import { tiposDeSedeDisponibles } from '../lib/tiposSede.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
-import BrandLogo from './BrandLogo.vue'
 
 const props = defineProps({
   checking: { type: Boolean, default: false },
@@ -12,6 +13,7 @@ const props = defineProps({
 
 const router = useRouter()
 const auth   = useAuthStore()
+const club   = useClubStore()
 const emit   = defineEmits(['completado'])
 
 const paso   = ref(1)
@@ -27,7 +29,7 @@ const sede = ref({
   declarada_reprocann: false,
 })
 
-const TIPOS = [
+const TIPOS_TODOS = [
   {
     key: 'produccion',
     label: 'Producción',
@@ -47,6 +49,27 @@ const TIPOS = [
     icon: `<svg width="22" height="22" viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="11" cy="11" r="9" stroke="currentColor" stroke-width="1.5"/><path d="M11 2v18M2 11h18" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`,
   },
 ]
+
+// Sólo los tipos que la organización PUEDE tener. Una que contrató nada más Cultivo no atiende
+// pacientes, así que una sede social o mixta no le sirve —y el backend se la rechaza—; una de
+// sólo Producción y dispensa no tiene salas, así que tampoco una de producción. Ofrecer las
+// tres siempre era mandarla a un error que no puede resolver.
+const TIPOS = computed(() => {
+  const habilitados = tiposDeSedeDisponibles(club.data?.features)
+  return TIPOS_TODOS.filter(t => habilitados.includes(t.key))
+})
+
+// Sin la suite de Cultivo no hay salas: el paso se saltea entero. Pedirle una sala de
+// vegetativo a un dispensario es pedirle algo que no existe en su operación.
+const tieneCultivo = computed(() => club.data?.features?.cultivo === true)
+
+onMounted(async () => {
+  if (!club.data) await club.fetch()
+  // Si su único tipo posible no es el que viene por defecto, se acomoda solo.
+  if (!TIPOS.value.some(t => t.key === sede.value.tipo)) {
+    sede.value.tipo = TIPOS.value[0]?.key || 'produccion'
+  }
+})
 
 const nombreInvalido    = ref(false)
 const salaNombreInvalido = ref(false)
@@ -77,7 +100,8 @@ async function crearSede() {
   try {
     const res    = await createSede(sede.value)
     sedeIdCreada = res.data?.id
-    paso.value   = 3
+    // Sin Cultivo no hay salas que crear: se va derecho al final.
+    paso.value   = tieneCultivo.value ? 3 : 4
   } catch (e) {
     error.value = e.response?.data?.errors?.join(', ') || 'Error al crear la sede. Intentá de nuevo.'
     paso.value = 1
@@ -131,9 +155,14 @@ const nombreUsuario = auth.user?.first_name || ''
       <div class="ob__bg-orb ob__bg-orb--3"></div>
     </div>
 
-    <!-- Logo superior -->
+    <!-- Logo de la PLATAFORMA, no el de la organización.
+         `BrandLogo` muestra el logo y el nombre del club, y acá los dos están mal: la
+         organización todavía no subió su logo —recién está entrando por primera vez— así que
+         caía en el puntito gris, y quien le da la bienvenida en esta pantalla es Cultivo
+         Espacial. Su marca propia la va a ver en todo el resto de la app. -->
     <div class="ob__logo">
-      <BrandLogo class="ob__brand-logo" />
+      <img src="/logo-ce-redondo.png" alt="" class="ob__logo-img" />
+      <strong class="ob__logo-nombre">Cultivo Espacial</strong>
     </div>
 
     <!-- Estado: verificando setup -->
@@ -514,6 +543,9 @@ const nombreUsuario = auth.user?.first_name || ''
   z-index: 1;
   align-self: flex-start;
 }
+.ob__logo-img { width: 34px; height: 34px; border-radius: 50%; object-fit: cover; }
+.ob__logo-nombre { font-size: .95rem; font-weight: 700; color: rgba(255,255,255,.92); letter-spacing: -.01em; }
+
 /* BrandLogo en contexto oscuro */
 .ob__brand-logo :deep(.brand-name) {
   color: rgba(255,255,255,0.75);

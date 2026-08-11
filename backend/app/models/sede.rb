@@ -17,8 +17,26 @@ class Sede < ApplicationRecord
     'mixta'      => 'Mixta',
   }.freeze
 
+  # Qué suite habilita cada tipo de sede. Una sede de producción son salas, lotes y plantas
+  # (suite Cultivo); una social es atención de pacientes y dispensaciones (Producción y
+  # dispensa). La mixta es las dos cosas y necesita las dos.
+  SUITES_POR_TIPO = {
+    'produccion' => %w[cultivo],
+    'social'     => %w[produccion_dispensa],
+    'mixta'      => %w[cultivo produccion_dispensa],
+  }.freeze
+
   validates :nombre, presence: true
   validates :tipo,   inclusion: { in: TIPOS }
+  # Sólo al CREAR. Una organización puede dar de baja una suite y quedarse con sedes de un tipo
+  # que hoy no podría crear; volverlas inguardables le impediría hasta corregirles la dirección.
+
+  # Los tipos que ESTA organización puede crear hoy. Fuente única: la usan el modelo, el
+  # onboarding y el alta de sedes. Con las dos puertas mirando listas distintas, una terminaba
+  # ofreciendo lo que la otra rechazaba.
+  def self.tipos_disponibles(club)
+    TIPOS.select { |tipo| SUITES_POR_TIPO[tipo].all? { |s| club&.suite?(s) } }
+  end
 
   default_scope { where(deleted_at: nil) }
 
@@ -40,5 +58,13 @@ class Sede < ApplicationRecord
 
   def es_social?
     %w[social mixta].include?(tipo)
+  end
+
+  # Qué suites le faltan a la organización para poder tener una sede de este tipo. Vacío = puede.
+  # Lo consulta el controller al dar de alta; no es una validación del modelo porque el gateo por
+  # suite en este proyecto vive en los controllers (`require_feature!`), y ponerlo en el modelo
+  # volvía inguardables las sedes de las organizaciones que dieron de baja una suite.
+  def self.suites_faltantes(club, tipo)
+    SUITES_POR_TIPO.fetch(tipo.to_s, []).reject { |s| club&.suite?(s) }
   end
 end
