@@ -1,10 +1,10 @@
 <%= @club.name %>
 <%= '=' * @club.name.length %>
 
-<%= @mail_enviado.asunto %>
+<%= @asunto %>
 
 <%= @cuerpo %>
 
 ---
 Enviado por: <%= @remitente.nombre_completo %> · <%= @club.name %>
-Para: <%= @paciente.nombre_completo %> (<%= @mail_enviado.email_destino %>)
+Para: <%= @destinatario.presence || @destino %><%= " (#{@destino})" if @destinatario.present? %>

@@ -181,6 +181,12 @@ export const fetchPlantillasMail  = () => api.get("/plantillas_mail");
 export const crearPlantillaMail   = (payload) => api.post("/plantillas_mail", { plantilla_mail: payload });
 export const updatePlantillaMail  = (id, payload) => api.patch(`/plantillas_mail/${id}`, { plantilla_mail: payload });
 export const borrarPlantillaMail  = (id) => api.delete(`/plantillas_mail/${id}`);
+
+// Envíos masivos. El backend arma UN destinatario por persona y manda de a uno: acá se manda
+// la lista, nunca una cadena de direcciones.
+export const fetchEnviosMasivos = () => api.get("/envios_masivos");
+export const crearEnvioMasivo   = (payload) => api.post("/envios_masivos", payload);
+export const getEnvioMasivo     = (id) => api.get(`/envios_masivos/${id}`);
 export const updateTwilio      = (payload) => api.patch("/preferences/update_twilio", payload);
 export const destroyTwilio     = () => api.delete("/preferences/destroy_twilio");
 export const testTwilio        = () => api.post("/preferences/test_twilio");

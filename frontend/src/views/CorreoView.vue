@@ -11,6 +11,7 @@ import { useClubStore } from '../stores/club'
 import { useConfirm } from '../composables/useConfirm.js'
 import { useToast } from '../composables/useToast.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import EnvioMasivo from '../components/correo/EnvioMasivo.vue'
 import {
   testSmtp, conectarEmail, desconectarEmail,
   fetchPlantillasMail, crearPlantillaMail, updatePlantillaMail, borrarPlantillaMail,
@@ -318,6 +319,20 @@ onMounted(async () => {
       </div>
     </section>
 
+    <!-- Enviar ───────────────────────────────────────────────── -->
+    <section v-if="conectado" class="cv__card">
+      <header class="cv__card-head">
+        <div class="cv__card-ico cv__card-ico--envio"><i class="bi bi-send"></i></div>
+        <div class="cv__card-titles">
+          <h2 class="cv__card-title">Enviar un mail</h2>
+          <p class="cv__card-sub">A varios pacientes o a direcciones sueltas — cada uno recibe el suyo</p>
+        </div>
+      </header>
+      <div class="cv__card-body">
+        <EnvioMasivo :plantillas="plantillas" :organizacion="club.data?.name || ''" />
+      </div>
+    </section>
+
     </template>
 
     <!-- Editor ──────────────────────────────────────────────── -->
@@ -400,6 +415,7 @@ onMounted(async () => {
 .cv__card-head { display: flex; align-items: center; gap: .875rem; padding: 1rem 1.25rem; border-bottom: 1px solid var(--c-slate-100); }
 .cv__card-ico { width: 38px; height: 38px; flex-shrink: 0; display: grid; place-items: center; border-radius: 9px; background: #f0fdf4; color: #15803d; font-size: 1.05rem; }
 .cv__card-ico--alt { background: #eff6ff; color: #1d4ed8; }
+.cv__card-ico--envio { background: #fef3c7; color: #b45309; }
 .cv__card-titles { flex: 1; min-width: 0; }
 .cv__card-title { margin: 0; font-size: .95rem; font-weight: 700; color: var(--c-slate-900); }
 .cv__card-sub { margin: .1rem 0 0; font-size: .78rem; color: var(--c-slate-500); }

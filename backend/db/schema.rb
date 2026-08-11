@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_11_180100) do
+ActiveRecord::Schema[7.2].define(version: 2026_08_11_190000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -777,6 +777,32 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_11_180100) do
     t.index ["subido_por_id"], name: "index_documentos_on_subido_por_id"
     t.index ["tipo"], name: "index_documentos_on_tipo"
     t.index ["user_id"], name: "index_documentos_on_user_id"
+  end
+
+  create_table "envios_masivos", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "user_id", null: false
+    t.bigint "plantilla_mail_id"
+    t.string "asunto", null: false
+    t.text "cuerpo", null: false
+    t.string "destino", default: "pacientes", null: false
+    t.string "estado", default: "pendiente", null: false
+    t.jsonb "destinatarios", default: [], null: false
+    t.jsonb "resultados", default: [], null: false
+    t.integer "total", default: 0, null: false
+    t.integer "enviados", default: 0, null: false
+    t.integer "fallidos", default: 0, null: false
+    t.datetime "comenzado_at"
+    t.datetime "terminado_at"
+    t.datetime "deleted_at"
+    t.bigint "deleted_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "created_at"], name: "index_envios_masivos_on_club_id_and_created_at"
+    t.index ["club_id"], name: "index_envios_masivos_on_club_id"
+    t.index ["deleted_at"], name: "index_envios_masivos_on_deleted_at"
+    t.index ["plantilla_mail_id"], name: "index_envios_masivos_on_plantilla_mail_id"
+    t.index ["user_id"], name: "index_envios_masivos_on_user_id"
   end
 
   create_table "evento_bar_costos", force: :cascade do |t|
@@ -2277,6 +2303,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_11_180100) do
   add_foreign_key "documentos", "users"
   add_foreign_key "documentos", "users", column: "deleted_by_id"
   add_foreign_key "documentos", "users", column: "subido_por_id"
+  add_foreign_key "envios_masivos", "clubs"
+  add_foreign_key "envios_masivos", "plantillas_mail", column: "plantilla_mail_id"
+  add_foreign_key "envios_masivos", "users"
   add_foreign_key "evento_bar_costos", "clubs"
   add_foreign_key "evento_bar_costos", "eventos_bar", column: "evento_bar_id"
   add_foreign_key "evento_bar_costos", "movimientos_contables", column: "movimiento_contable_id"

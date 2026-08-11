@@ -22,7 +22,7 @@
   <div class="wrapper">
     <div class="header">
       <p class="header-club">🌿 <%= @club.name %></p>
-      <p class="header-title"><%= @mail_enviado.asunto %></p>
+      <p class="header-title"><%= @asunto %></p>
     </div>
 
     <div class="body">
@@ -40,7 +40,7 @@
 
     <div class="footer">
       <%= @club.name %> · Plataforma de gestión de clubes cannábicos<br/>
-      Este mensaje fue enviado a <%= @paciente.nombre_completo %> (<%= @mail_enviado.email_destino %>).
+      Este mensaje fue enviado a <%= @destinatario.presence || @destino %><%= " (#{@destino})" if @destinatario.present? %>.
     </div>
   </div>
 </body>

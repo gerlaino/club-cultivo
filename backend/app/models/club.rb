@@ -52,6 +52,7 @@ class Club < ApplicationRecord
   has_many :plants,               through: :lotes
   has_many :notas,           dependent: :destroy
   has_many :plantillas_mail, class_name: 'PlantillaMail', dependent: :destroy
+  has_many :envios_masivos,  class_name: 'EnvioMasivo',  dependent: :destroy
   has_many :dispositivos,    dependent: :destroy
   has_many :reglas_ambientales, class_name: 'ReglaAmbiental', dependent: :destroy
   has_many :alertas,          dependent: :destroy

@@ -235,6 +235,7 @@ Rails.application.routes.draw do
 
     # Plantillas de correo de la organización (módulo Correo electrónico).
     resources :plantillas_mail, only: [:index, :create, :update, :destroy]
+    resources :envios_masivos,  only: [:index, :create, :show]
 
     # Alias deprecado — mantenido por compatibilidad
     resources :socios, controller: 'pacientes', as: :socios_legacy do
