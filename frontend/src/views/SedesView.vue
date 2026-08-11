@@ -141,7 +141,17 @@ onMounted(async () => {
   } finally { loading.value = false }
 })
 
+// ¿Llegó al tope de sedes de su plan? `limites.sedes` es null en el plan Total.
+const topeSedes = computed(() =>
+  !!limites.value?.sedes && (uso.value?.sedes || 0) >= limites.value.sedes)
+
 function openCreate() {
+  // El tope se avisa ACÁ, al tocar el botón, y no después de llenar el formulario. El backend
+  // ya lo rechazaba con un 402, pero el usuario se enteraba recién al apretar Guardar: cargaba
+  // nombre, tipo y dirección para que le dijeran que no podía. El botón queda visible a
+  // propósito —esconderlo no explica nada— y abre el cartel que dice cuál es el tope y qué hacer.
+  if (topeSedes.value) { showUpgrade.value = true; return }
+
   editingId.value  = null
   form.value       = emptyForm()
   formErrors.value = {}
@@ -438,8 +448,11 @@ function tieneActividad(sede) {
             </span>
           </p>
         </div>
-        <button v-if="canEdit" class="btn-primary-action" @click="openCreate">
-          <i class="bi bi-plus-lg"></i>
+        <button v-if="canEdit" class="btn-primary-action"
+                :class="{ 'btn-primary-action--tope': topeSedes }"
+                :title="topeSedes ? 'Llegaste al tope de sedes de tu plan' : ''"
+                @click="openCreate">
+          <i :class="topeSedes ? 'bi bi-lock-fill' : 'bi bi-plus-lg'"></i>
           Nueva sede
         </button>
       </div>
@@ -456,6 +469,10 @@ function tieneActividad(sede) {
                :style="{ width: `${Math.min(100, ((uso?.sedes||0)/limites.sedes)*100)}%` }">
           </div>
         </div>
+        <!-- Dicho antes de que apriete nada: la barra roja sola no explica qué hacer. -->
+        <p v-if="topeSedes" class="plan-usage__tope">
+          Llegaste al tope de sedes del plan {{ planLabel }}. Para sumar otra, escribinos.
+        </p>
       </div>
 
       <!-- KPIs -->
@@ -1163,6 +1180,11 @@ function tieneActividad(sede) {
 .plan-usage__info { display: flex; justify-content: space-between; margin-bottom: .4rem; font-size: .8rem; }
 .plan-usage__label { color: var(--c-slate-500); }
 .plan-usage__count { font-weight: 600; color: var(--c-slate-900); }
+.plan-usage__tope { margin: .5rem 0 0; font-size: .78rem; color: #b45309; line-height: 1.5; }
+/* Al tope el botón sigue ahí pero deja de parecer la acción principal: no está roto, hace otra
+   cosa —abre el cartel que explica el límite—. */
+.btn-primary-action--tope { background: var(--c-slate-400); }
+.btn-primary-action--tope:hover { background: var(--c-slate-500); transform: none; }
 .plan-usage__bar { height: 4px; background: var(--c-slate-200); border-radius: 999px; overflow: hidden; }
 .plan-usage__fill { height: 100%; background: #16a34a; border-radius: 999px; transition: width .4s ease; }
 .plan-usage__fill--danger { background: #dc2626; }
