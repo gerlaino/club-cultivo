@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 
 // Dos cosas del alta de un movimiento:
-//   · el TOTAL es el hecho (lo que dice el ticket) y la cantidad lo describe; el precio por
-//     unidad es la CUENTA que sale de dividirlos, no un campo que se tipea. Antes eran tres
-//     inputs ligados y tocar la cantidad te reescribía el total que acababas de cargar;
-//   · la categoría, que ya sabe si es plata que entra o que sale, acomoda el formulario en vez
-//     de exigir que uno acierte el tipo antes para que aparezca en la lista.
+//   · el cuerpo registra PLATA. Cuántos kilos entraron es una pregunta de inventario y se hace
+//     una sola vez, en DestinoStock, que es donde el dato se guarda;
+//   · el flujo y la categoría COEXISTEN: cualquiera de los dos puede ofrecer el depósito y
+//     ninguno lo impone, porque un gasto puede pertenecer a una categoría con sector y no
+//     entrar a ningún inventario (una limpieza contratada, por ejemplo).
 vi.mock('../lib/api.js', () => ({
   createCategoriaContable: vi.fn(), createUnidadNegocio: vi.fn(),
 }))
@@ -21,7 +21,7 @@ const CATEGORIAS = [
     unidad_negocio: { id: 7, nombre: 'Cultivo' }, subcategorias: [] },
 ]
 
-describe('Nuevo movimiento — el total manda, y la categoría que manda', () => {
+describe('Nuevo movimiento — la plata acá, el inventario allá', () => {
   let wrapper
 
   beforeEach(async () => {
@@ -42,49 +42,37 @@ describe('Nuevo movimiento — el total manda, y la categoría que manda', () =>
     await wrapper.vm.$nextTick()
   })
 
-  const campos = () => wrapper.findAll('.mv-cant input')
-
-  it('la cantidad se carga, el precio por unidad NO: es un resultado, no un input', () => {
-    expect(wrapper.find('.mv-cant').exists()).toBe(true)
-    // Un solo input de texto (cantidad); la unidad es un select y el unitario, texto calculado.
-    expect(campos()).toHaveLength(1)
-    expect(wrapper.find('.mv-cant select').exists()).toBe(true)
+  // La cantidad y el precio por unidad NO se preguntan en el cuerpo del movimiento: viven en
+  // "¿Entra al inventario?" (DestinoStock), que es el único lugar donde el dato se GUARDA,
+  // contra el insumo y con su costo. Tenerlos en los dos lados obligaba a cargarlos dos veces
+  // y el que valía era el de abajo.
+  it('el cuerpo del movimiento no pide cantidad: eso es del inventario', () => {
+    expect(wrapper.find('.mv-cant').exists()).toBe(false)
   })
 
-  it('$120.000 por 30 kilos son $4.000 el kilo', async () => {
-    await wrapper.find('.mv-monto-inp').setValue('120.000')
-    await campos()[0].setValue('30')
+  // Un alquiler, un sueldo o una limpieza contratada no tienen cantidad. Que el bloque de
+  // depósito aparezca o no lo decide el flujo o la categoría, nunca un campo suelto.
+  it('un gasto que no entra a inventario no muestra el bloque de depósito', async () => {
+    wrapper.vm.form.categoria_contable_id = null
+    wrapper.vm.flujo = { key: 'gasto', tipo: 'egreso', pideDestino: false }
+    await wrapper.vm.$nextTick()
 
-    expect(wrapper.vm.form.monto_ars).toBe(120000)
-    expect(wrapper.find('.mv-cant-total').text()).toContain('4.000')
+    expect(wrapper.vm.pideDestino).toBe(false)
   })
 
-  // Lo que se rompía antes: con tres campos ligados, tocar la cantidad recalculaba el total y
-  // te pisaba el número del ticket. El total es el hecho y no lo mueve nadie.
-  it('cargar la cantidad NO toca el total', async () => {
-    await wrapper.find('.mv-monto-inp').setValue('7500')
-    await campos()[0].setValue('3')
+  // El espejo del bug: "Compré algo" declara `pideDestino: true`, pero el bloque se mostraba
+  // sólo si la CATEGORÍA stockeaba. Con una categoría de comportamiento general, la compra no
+  // podía entrar a ningún depósito aunque el flujo dijera que sí.
+  it('el flujo de compra ofrece depósito aunque la categoría no stockee', async () => {
+    wrapper.vm.flujo = { key: 'compra', tipo: 'egreso', pideDestino: true }
+    wrapper.vm.form.categoria_contable_id = 2   // "Venta de flor": comportamiento general
+    await wrapper.vm.$nextTick()
 
-    expect(wrapper.vm.form.monto_ars).toBe(7500)
+    expect(wrapper.vm.pideDestinoCat).toBe(false)   // la categoría no lo pide…
+    expect(wrapper.vm.pideDestino).toBe(true)       // …y el depósito se ofrece igual
   })
 
-  // Los campos usan el formato de acá: la coma es el decimal y el punto separa miles
-  // (`parseMonto`). 8,33 / 2,5 = 3,332 → 3,33, porque son pesos y no un tercio de centavo.
-  it('redondea el unitario a dos decimales: son pesos', async () => {
-    await wrapper.find('.mv-monto-inp').setValue('8,33')
-    await campos()[0].setValue('2,5')
-
-    expect(wrapper.find('.mv-cant-total').text()).toContain('3,33')
-  })
-
-  it('sin cantidad no inventa un precio por unidad', async () => {
-    await wrapper.find('.mv-monto-inp').setValue('1200')
-
-    expect(wrapper.vm.unitarioCalculado).toBeNull()
-    expect(wrapper.find('.mv-cant-total').text()).toContain('—')
-  })
-
-  it('sin cantidad, el modal sigue funcionando como antes', async () => {
+  it('el total es el hecho y lo escribe una persona: nadie se lo pisa', async () => {
     await wrapper.find('.mv-monto-inp').setValue('1200')
 
     expect(wrapper.vm.form.monto_ars).toBe(1200)

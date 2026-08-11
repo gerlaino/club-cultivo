@@ -14,7 +14,7 @@ import { createCategoriaContable, createUnidadNegocio } from '../../lib/api.js'
 import {
   flowDe, hoyLocal, fmtARS, fmtMiles, parseMonto,
   destinoVacio, destinoEstado, destinoPayload, esDepositoSalon,
-  validarMovimiento, esValido, UNIDADES_INSUMO } from './movimientoFlows.js'
+  validarMovimiento, esValido } from './movimientoFlows.js'
 
 const props = defineProps({
   modelValue:       { type: Boolean, default: false },
@@ -60,8 +60,6 @@ function formVacio(tipo = 'egreso') {
     categoria_contable_id: null,
     descripcion: '',
     monto_ars: null,
-    // Sólo describe la compra para calcular el precio por unidad; el backend no lo persiste.
-    unidad_medida: 'unidad',
     fecha: hoyLocal(),           // local: en UTC, pasadas las 21hs, se guardaba con fecha de mañana
     sede_id: null,
     unidad_negocio_id: null,
@@ -244,6 +242,8 @@ const muestraPaciente     = computed(() => pacienteObligatorio.value || catActua
 const COMPORTAMIENTOS_CON_STOCK = ['insumo', 'insumo_general', 'mercaderia']
 const pideDestinoCat = computed(() =>
   COMPORTAMIENTOS_CON_STOCK.includes(catActual.value?.comportamiento))
+// Cualquiera de los dos alcanza para OFRECER el depósito; ninguno obliga a usarlo.
+const pideDestino = computed(() => !!flujo.value?.pideDestino || pideDestinoCat.value)
 
 // El sector ya no se elige: sale de la categoría y se muestra como dato.
 const areaDeLaCategoria = computed(() => catActual.value?.areaNombre || null)
@@ -295,34 +295,12 @@ const resumenExtras = computed(() => {
 // el segundo dato, y el precio por kilo no es un hecho sino una cuenta. Con tres campos
 // editables además había que adivinar cuál mandaba, y tocar la cantidad te reescribía el total
 // que acababas de tipear.
-const cantidadTexto = ref('')
-
-const numDe = (txt) => parseMonto(txt).monto
-const unidadLabel = computed(() => form.value.unidad_medida || 'unidad')
-
-// Precio por unidad: total ÷ cantidad. Vacío si falta alguno de los dos.
-const unitarioCalculado = computed(() => {
-  const cant  = numDe(cantidadTexto.value)
-  const total = numDe(montoTexto.value)
-  if (!(cant > 0 && total > 0)) return null
-  return fmtMiles(redondear(total / cant))
-})
-
 function onMonto(e) {
   const { texto, monto } = parseMonto(e.target.value)
   montoTexto.value = texto
   form.value.monto_ars = monto
   if (monto > 0) delete errores.value.monto_ars
 }
-
-function onCantidad(e) {
-  cantidadTexto.value = parseMonto(e.target.value).texto
-}
-
-// El unitario es una división del total por la cantidad: dos decimales y a otra cosa. (Ya no
-// hace falta multiplicar plata en centavos enteros: el total lo tipea una persona, no sale de
-// una multiplicación, así que el error de punto flotante que se cuidaba acá no puede ocurrir.)
-const redondear = (n) => Math.round(n * 100) / 100
 
 // ─── Validez (una sola fuente para el botón y el submit) ────────────────────────
 const ctxValidacion = computed(() => ({
@@ -448,8 +426,6 @@ watch(() => props.modelValue, (abierto) => {
       notas:       m.notas || '',
     }
     montoTexto.value = fmtMiles(m.monto_ars)
-    // Un movimiento guardado no trae cantidad: la fila queda vacía y el total, como estaba.
-    cantidadTexto.value = ''
     paso.value = 'form'
     return
   }
@@ -662,27 +638,11 @@ const titulo = computed(() => {
               </label>
             </div>
 
-            <!-- Cuánto entró, y el precio por unidad que sale de dividir. El monto de arriba es
-                 el total del ticket y no lo pisa nadie: acá sólo se declara la cantidad. -->
-            <div class="mv-cant">
-              <label class="mv-fld">
-                <span class="mv-lbl">Cantidad <span class="mv-opt">opcional</span></span>
-                <input type="text" inputmode="decimal" class="mv-inp"
-                       :value="cantidadTexto" @input="onCantidad" placeholder="1000" />
-              </label>
-              <label class="mv-fld">
-                <span class="mv-lbl">Unidad</span>
-                <select class="mv-inp" v-model="form.unidad_medida">
-                  <option v-for="u in UNIDADES_INSUMO" :key="u" :value="u">{{ u }}</option>
-                </select>
-              </label>
-              <div class="mv-cant-calc">
-                <span class="mv-lbl">Precio por {{ unidadLabel }}</span>
-                <span class="mv-cant-total" :class="{ 'is-calc': !!unitarioCalculado }">
-                  {{ unitarioCalculado ? `$${unitarioCalculado}` : '—' }}
-                </span>
-              </div>
-            </div>
+            <!-- La cantidad y el precio por unidad NO se preguntan acá: viven en "¿Entra al
+                 inventario?" (DestinoStock), que es el único lugar donde el dato se GUARDA —con
+                 su costo, contra el insumo—. Preguntarlos también acá arriba obligaba a
+                 cargarlos dos veces y el bueno era el de abajo. Y un gasto que no entra a
+                 ningún depósito —un alquiler, una limpieza contratada— no tiene cantidad. -->
 
             <!-- Paciente (aportes) -->
             <div v-if="muestraPaciente" class="mv-fld mv-combo-wrap">
@@ -713,9 +673,13 @@ const titulo = computed(() => {
               </p>
             </div>
 
-            <!-- Destino del stock (compras) -->
+            <!-- Destino del stock. Aparece si el flujo O la categoría lo sugieren, y adentro
+                 siempre está "No, es solo un gasto": la categoría PROPONE el depósito, no lo
+                 impone. Con `v-if="pideDestinoCat"` a secas, elegir "Compré algo" con una
+                 categoría de comportamiento general no ofrecía ningún depósito y la compra no
+                 podía entrar a inventario aunque el flujo dijera que sí. -->
             <DestinoStock
-              v-if="pideDestinoCat"
+              v-if="pideDestino"
               v-model="destino"
               :depositos="depositos" :insumos="insumos" :bares="bares"
               :monto="form.monto_ars" :errores="errores"
@@ -977,18 +941,7 @@ const titulo = computed(() => {
 .mv-main { display: flex; gap: var(--sp-4); align-items: flex-start; flex-wrap: wrap; }
 
 /* Cantidad × unitario = total. La fila se lee como la cuenta que es. */
-.mv-cant { display: flex; align-items: flex-end; gap: var(--sp-2); flex-wrap: wrap; margin-top: var(--sp-3); }
-.mv-cant .mv-fld { flex: 0 0 120px; }
-/* Se fue `.mv-cant-op` (los signos × y = de los tres campos ligados). El precio por unidad ya
-   no es un input sino un valor calculado, y va con su propia etiqueta para que se lea como
-   resultado y no como algo que se puede escribir. */
-.mv-cant-calc { display: flex; flex-direction: column; gap: 4px; padding-bottom: 2px; }
-.mv-cant-total {
-  padding-bottom: 8px; font-size: var(--fs-15); font-weight: 700; color: var(--c-ink-700);
-  min-width: 90px;
-}
-/* Cuando el total lo calculó la app y no lo tipeó nadie, se nota. */
-.mv-cant-total.is-calc { color: var(--acc); }
+/* La fila de cantidad se fue entera: el dato vive en DestinoStock, que es donde se guarda. */
 .mv-fld { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .mv-fld--desc  { flex: 1 1 260px; }
 .mv-fld--monto { flex: 0 0 190px; }
