@@ -80,21 +80,27 @@ describe('Nuevo movimiento — la plata acá, el inventario allá', () => {
   })
 
   describe('la categoría define si entró o salió plata', () => {
-    it('elegir una de ingreso estando en egreso da vuelta el tipo', async () => {
+    // El tipo lo elige la persona arriba y NO se lo cambia nada por debajo. Que la categoría lo
+    // diera vuelta "para ayudar" hacía que un egreso se guardara como ingreso sin que nadie lo
+    // pidiera; ahora una del otro tipo directamente no llega hasta acá, y si llegara se ignora.
+    it('una categoría del otro tipo no cambia el signo del movimiento', async () => {
       wrapper.vm.form.tipo = 'egreso'
 
       wrapper.vm.elegirCat({ id: 2, tipo: 'ingreso', clave: 'otro', label: 'Venta de flor' })
 
-      expect(wrapper.vm.form.tipo).toBe('ingreso')
-      expect(wrapper.vm.form.categoria_contable_id).toBe(2)
+      expect(wrapper.vm.form.tipo).toBe('egreso')
+      expect(wrapper.vm.form.categoria_contable_id).toBeNull()
     })
 
-    it('buscar encuentra categorías del otro tipo, que antes no aparecían', async () => {
+    // Buscar tampoco cruza el tipo: "Venta de flor" es de ingresos y no aparece mientras se
+    // esté cargando un egreso, por más que el texto coincida.
+    it('buscar no trae categorías del otro tipo', async () => {
       wrapper.vm.form.tipo = 'egreso'
       wrapper.vm.catQuery = 'venta'
       await wrapper.vm.$nextTick()
 
-      expect(wrapper.vm.catsFiltradas.map((c) => c.label)).toContain('Venta de flor')
+      expect(wrapper.vm.catsFiltradas.map((c) => c.label)).not.toContain('Venta de flor')
+      expect(wrapper.vm.catsFiltradas.every((c) => c.tipo === 'egreso')).toBe(true)
     })
 
     it('sin búsqueda, la lista muestra las del tipo actual', async () => {

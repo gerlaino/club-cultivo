@@ -113,21 +113,24 @@ const catActual   = computed(() => catsSelectables.value.find(c => c.id === form
 const catOpen  = ref(false)
 const catQuery = ref('')
 const catInput = ref(null)
-// Al BUSCAR se mira todo el catálogo, no sólo el del tipo elegido: si escribís "venta" estando
-// en "Salió plata", encontrarla y que el formulario se acomode solo es mejor que no encontrar
-// nada y tener que deducir que primero había que tocar otro botón. Sin búsqueda, la lista
-// muestra las del tipo actual, que es lo esperable.
+// La lista muestra SÓLO las del tipo elegido, también al buscar.
+//
+// Antes la búsqueda miraba todo el catálogo y elegir una del otro tipo daba vuelta el
+// formulario "para ayudar". En la práctica era una trampa: estabas cargando un egreso, escribías
+// tres letras, aparecía una categoría de ingresos con nombre parecido y el movimiento se
+// guardaba del lado que no era. Si estás registrando plata que sale, sólo se ofrecen categorías
+// de egresos; para la otra, se cambia arriba y se ve el catálogo del otro lado.
 const catsFiltradas = computed(() => {
   const q = catQuery.value.trim().toLowerCase()
   if (!q) return catsDelTipo.value
-  return catsSelectables.value.filter(c => c.label.toLowerCase().includes(q))
+  return catsDelTipo.value.filter(c => c.label.toLowerCase().includes(q))
 })
 function abrirCat()  { catOpen.value = true; catQuery.value = ''; crearCat.value = null; nextTick(() => catInput.value?.focus()) }
 function elegirCat(c) {
-  // La categoría YA SABE si es plata que entra o que sale: si elegiste una de ingreso estando
-  // en egreso, manda ella. Antes había que acertar el tipo primero para que apareciera en la
-  // lista, y la organización creó las categorías justamente para no tener que pensar en eso.
-  if (c.tipo && c.tipo !== form.value.tipo) form.value.tipo = c.tipo
+  // Ya no se da vuelta el tipo: la lista sólo ofrece categorías del tipo elegido, así que una
+  // del otro lado no puede llegar hasta acá. (Si llegara —una recién creada, un estado viejo—,
+  // se ignora en vez de cambiarle el signo al movimiento por debajo.)
+  if (c.tipo && c.tipo !== form.value.tipo) return
 
   form.value.categoria_contable_id = c.id
   if (!['aporte_socio', 'dispensacion'].includes(c.clave)) form.value.paciente_id = null
