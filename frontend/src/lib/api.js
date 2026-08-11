@@ -682,6 +682,9 @@ export const addPlantFoto       = (plantId, formData) => api.post(`/plants/${pla
 export const removePlantFoto    = (plantId, blobId)   => api.delete(`/plants/${plantId}/fotos/${blobId}`)
 export const registrarPesoPlanta      = (plantId, payload) => api.post(`/plants/${plantId}/registrar_peso`, payload)
 
+// Datos del QR (planta y stock). Van bajo /api —el baseURL ya lo agrega— porque las rutas
+// /p y /s a nivel root son PÁGINAS del SPA: si la API las ocupara, escanear con la cámara
+// devolvería JSON en vez de abrir la pantalla.
 export const getPlantaByQR = (codigoQr) => api.get(`/p/${codigoQr}`)
 // Resuelve una planta por QR vía la instancia api autenticada (igual que getLotePorQR).
 export const getPlantaPorQR = (codigoQr) => api.get(`/plants/por_qr/${codigoQr}`)

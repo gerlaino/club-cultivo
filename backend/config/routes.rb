@@ -7,13 +7,16 @@ Rails.application.routes.draw do
   # responde 404 — por eso el health check de Render debe apuntar a /up, no a /.
   root to: "application#spa_fallback"
 
-  # QR público — sin prefijo /api para que los links de QR funcionen siempre
-  get "/p/:codigo_qr",   to: "public/plantas#show_qr",   defaults: { format: :json }
-  get "/s/:codigo_qr",   to: "public/stocks#show_qr",    defaults: { format: :json }
-  # OJO: el carnet (/c/:token) y el pasaporte de dispensa (/d/:token) son PÁGINAS del SPA.
-  # Sus DATOS se sirven bajo /api (ver scope abajo), NO a nivel root. A nivel root
-  # colisionarían con la navegación del browser a la página (mismo origen → el backend
-  # devolvería JSON en vez de servir el HTML del SPA, y la página no cargaría).
+  # OJO: /p/:codigo_qr (planta), /s/:codigo_qr (stock), /c/:token (carnet) y /d/:token
+  # (pasaporte) son PÁGINAS del SPA. Sus DATOS se sirven bajo /api (ver el scope de abajo),
+  # NUNCA a nivel root.
+  #
+  # /p y /s SÍ estaban acá arriba y por eso el QR de una planta no abría nada: el QR codifica
+  # `${window.location.origin}/p/<codigo>` y en producción el SPA sale del MISMO origen que la
+  # API, así que al escanear con la cámara el router de Rails se comía la navegación y
+  # respondía JSON — el HTML del SPA no llegaba a cargarse nunca.
+  # El comentario que advertía justo esto ya estaba escrito para /c y /d; a /p y /s no se les
+  # había aplicado.
 
   # Web pública del club (accedida desde el sitio web externo del club)
   namespace :public, defaults: { format: :json } do
@@ -37,6 +40,11 @@ Rails.application.routes.draw do
     # Carnet público (datos). La página vive en la SPA en /c/:token y consume esto.
     # Bajo /api para no chocar con la navegación de la SPA (ídem pasaporte de dispensa).
     get  'c/:token',     to: 'public/carnets#show'
+
+    # Datos del QR de planta y de stock. El frontend ya los pedía acá —`api` tiene baseURL
+    # `/api`—, así que el de stock además devolvía 404: la ruta sólo existía en root.
+    get  'p/:codigo_qr', to: 'public/plantas#show_qr'
+    get  's/:codigo_qr', to: 'public/stocks#show_qr'
 
     # Pasaporte público de dispensa (datos). La página vive en la SPA en /d/:token y
     # consume estos endpoints. Bajo /api para no chocar con la navegación de la SPA.
