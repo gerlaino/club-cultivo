@@ -70,6 +70,9 @@ class Tarea < ApplicationRecord
   def cancelada?   = estado == 'cancelada'
   def activa?      = pendiente? || en_progreso?
   def vencida?     = fecha_programada&.past? && activa?
+  # Programada para después de hoy. Una tarea sin fecha NO es futura: es "cuando se pueda",
+  # y esas se completan cualquier día.
+  def programada_a_futuro? = fecha_programada.present? && fecha_programada > Time.zone.today
 
   # Horas reales disponibles para aplicar al lote
   def tiene_horas_para_lote?

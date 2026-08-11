@@ -1,6 +1,17 @@
 class TareasController < ApplicationController
   PENDIENTES_LIMIT = 100
 
+  # El calendario no se adelanta. Si el trabajo se hizo antes de lo programado, se registra como
+  # lo que fue —una tarea hecha HOY— y la programada se cancela cuando llegue su día, con la
+  # observación. Así la fecha de cada registro sigue siendo la fecha real en que se trabajó.
+  #
+  # Vive en el backend y no sólo en la UI porque hay varias pantallas que completan tareas
+  # (la semana del teléfono, el listado de escritorio, el bloque de tareas del lote) y cada una
+  # traía su propio criterio: la del lote dejaba marcar una futura tocándola a mano.
+  MSG_TAREA_FUTURA = 'Esa tarea está programada para más adelante y todavía no se puede dar por ' \
+                     'hecha. Si el trabajo ya se hizo, cargá una tarea de hoy describiéndolo y ' \
+                     'cancelá la programada cuando llegue su día.'.freeze
+
   before_action :authenticate_user!
   before_action :check_tareas_role!
   before_action :set_club
@@ -146,6 +157,10 @@ class TareasController < ApplicationController
       return render json: { error: "No se puede completar una tarea #{@tarea.estado}" }, status: :unprocessable_entity
     end
 
+    if @tarea.programada_a_futuro?
+      return render json: { error: MSG_TAREA_FUTURA }, status: :unprocessable_entity
+    end
+
     horas = params[:horas_reales]&.to_f
     notas = params[:notas_completado]
 
@@ -176,9 +191,15 @@ class TareasController < ApplicationController
       return render json: { error: 'Seleccioná al menos una tarea' }, status: :unprocessable_entity
     end
 
+    # Una tarea de mañana no se completa hoy — ni de a una ni en tanda. El registro retroactivo
+    # es para ponerse al día con lo atrasado, no para adelantar el calendario.
+    seleccionadas = @club.tareas.where(id: ids, estado: %w[pendiente en_progreso])
+    if seleccionadas.where('fecha_programada > ?', Time.zone.today).exists?
+      return render json: { error: MSG_TAREA_FUTURA }, status: :unprocessable_entity
+    end
+
     ahora = Time.current
-    completadas = @club.tareas
-      .where(id: ids, estado: %w[pendiente en_progreso])
+    completadas = seleccionadas
       .update_all(estado: 'completada', fecha_completada: ahora, updated_at: ahora)
 
     render json: { completadas: completadas }

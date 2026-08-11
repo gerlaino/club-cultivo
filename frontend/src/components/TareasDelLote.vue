@@ -318,8 +318,13 @@ const modoSeleccion = ref(false)
 const seleccion     = ref([])          // ids de tareas seleccionadas
 const aplicandoBulk = ref(false)
 
+// Una tarea programada para más adelante no se puede dar por hecha — mismo criterio que la
+// semana del teléfono y que el backend, que ahora lo rechaza. Antes esto sólo excluía las
+// futuras de "seleccionar todas" y dejaba marcarlas tocándolas de a una, que era la puerta por
+// la que se colaban. Sin fecha NO es futura: esas se completan cualquier día.
 function esSeleccionable(t) {
-  return ['pendiente', 'en_progreso'].includes(t.estado)
+  if (!['pendiente', 'en_progreso'].includes(t.estado)) return false
+  return !t.fecha_programada || t.fecha_programada <= hoyISO
 }
 function isSel(id) {
   return seleccion.value.includes(id)
@@ -343,12 +348,9 @@ function salirSeleccion() {
   seleccion.value = []
 }
 function seleccionarTodasPendientes() {
-  // Registro retroactivo: solo tareas hasta HOY (o sin fecha). Las futuras NO se
-  // autoseleccionan — si querés marcar una futura, la tocás a mano.
-  const hoy = hoyISO
-  seleccion.value = tareas.value
-    .filter(t => esSeleccionable(t) && (!t.fecha_programada || t.fecha_programada <= hoy))
-    .map(t => t.id)
+  // Registro retroactivo: para ponerse al día con lo atrasado. `esSeleccionable` ya deja
+  // afuera las futuras.
+  seleccion.value = tareas.value.filter(esSeleccionable).map(t => t.id)
 }
 async function marcarRealizadas() {
   if (!seleccion.value.length) return
