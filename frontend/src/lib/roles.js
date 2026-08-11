@@ -110,6 +110,18 @@ export const ROLES = [
 
 const POR_VALOR = Object.fromEntries(ROLES.map(r => [r.value, r]))
 
+// Los roles que se OFRECEN al dar de alta a alguien. `ROLES` sigue teniendo los nueve porque se
+// usa para mostrar el rol de un usuario que ya existe; esto es sólo la lista de alta.
+//
+// Quedan afuera supervisor, abogado y auditor: son casos puntuales que hoy no se ofrecen (y el
+// backend los rechaza — ver `Club::ROLES_ALTA`). Un usuario que ya los tenga se sigue viendo
+// normal; lo que no se puede es crear uno nuevo desde la pantalla.
+export const ROLES_ALTA = ['admin', 'medico', 'cultivador', 'dispensador', 'manicura', 'delivery']
+
+export function rolesParaAlta() {
+  return ROLES.filter(r => ROLES_ALTA.includes(r.value))
+}
+
 export function rolInfo(valor) {
   return POR_VALOR[valor] || { value: valor, label: valor, icon: 'bi-person', desc: '', permisos: [] }
 }

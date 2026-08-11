@@ -53,7 +53,8 @@
         class="mta__card"
         :class="[`mta__card--${t.prioridad}`, {
           'mta__card--futura': esFutura(t) && t.estado !== 'completada',
-          'mta__card--atrasada': t._atrasada,
+          'mta__card--atrasada': t._atrasada && t.estado !== 'completada',
+          'mta__card--completada': t.estado === 'completada',
         }]"
         @click="modoSeleccion ? alternarTarea(t) : abrirCompletarSheet(t)"
       >
@@ -66,7 +67,8 @@
         <div class="mta__card-body">
           <div class="mta__card-titulo">{{ t.titulo }}</div>
           <div class="mta__card-meta">
-            <span v-if="t._atrasada" class="mta__atrasada">⏰ Atrasada</span>
+            <!-- Una tarea hecha ya no está atrasada: mostrar las dos cosas juntas se contradice. -->
+            <span v-if="t._atrasada && t.estado !== 'completada'" class="mta__atrasada">⏰ Atrasada</span>
             <span v-if="t.sala?.nombre" class="mta__sala">{{ t.sala.nombre }}</span>
             <span v-if="t.estado === 'completada'" class="mta__completada-badge">✓ Completada</span>
             <span v-else-if="esFutura(t)" class="mta__prog-badge"><i class="bi bi-clock"></i> Programada</span>
@@ -458,6 +460,17 @@ onMounted(async () => {
 .mta__done-icon { color: #16a34a; padding: .75rem; font-size: 1rem; flex-shrink: 0; }
 .mta__lock-icon { color: var(--c-slate-300); padding: .75rem; font-size: .95rem; flex-shrink: 0; }
 .mta__card--futura { opacity: .62; }
+
+/* Una tarea hecha tiene que VERSE hecha. Antes el único indicio era el badge "✓ Completada" en
+   la línea de abajo: marcabas las cuatro del día y la pantalla quedaba igual que antes, así que
+   parecía que no se había guardado nada. */
+.mta__card--completada { opacity: .55; background: var(--c-slate-50); }
+.mta__card--completada .mta__card-titulo {
+  text-decoration: line-through;
+  text-decoration-color: var(--c-slate-400);
+  color: var(--c-slate-500);
+  font-weight: 500;
+}
 .mta__prog-badge { color: var(--c-slate-400); font-weight: 600; display: inline-flex; align-items: center; gap: .25rem; }
 
 /* ── Sheets ── */

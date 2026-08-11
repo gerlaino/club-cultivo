@@ -44,6 +44,15 @@ class ClubUsersController < ApplicationController
     # menos una sede: esos roles se asignan a sedes/salas y, sin sede, loguearían
     # a una app vacía (inconsistencia de onboarding). El admin sí puede crearse.
     nuevo_rol = params.dig(:user, :role).to_s
+
+    # Sólo los roles que la pantalla ofrece. No alcanza con sacarlos del formulario: el endpoint
+    # acepta lo que le manden, y un rol no ofrecido entraría igual por la API. Mismo criterio que
+    # el alta de club (`Club::ROLES_ALTA`).
+    unless Club::ROLES_ALTA_CLUB.include?(nuevo_rol)
+      return render json: { errors: ["El rol #{nuevo_rol.presence || '(vacío)'} no se puede asignar desde acá."] },
+                    status: :unprocessable_entity
+    end
+
     unless nuevo_rol == 'admin' || current_user.club.sedes.exists?
       return render json: { errors: ['Creá al menos una sede antes de dar de alta usuarios operativos.'] }, status: :unprocessable_entity
     end

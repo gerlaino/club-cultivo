@@ -67,8 +67,19 @@ async function openDelete(s) {
   } catch {}
 }
 
+// Un DNI NO se manda al servidor: `dni_normalizado` va cifrado determinístico, así que la base
+// sólo resuelve igualdad exacta. Tipeando "900000…" el servidor devolvía vacío en cada tecla y
+// parecía que el buscador no encontraba nada — hasta escribir el último dígito.
+//
+// Como el padrón ya está cargado (ver LIMITE_PADRON), el filtro por DNI se hace en memoria, que
+// además permite parciales. La búsqueda por nombre sí va al servidor: ahí LIKE funciona y cubre
+// el caso de una organización con más pacientes de los que entran en una carga.
+const esBusquedaPorDni = (q) => /^[\d.\s-]+$/.test(q)
+
 async function doSearch() {
-  await cargar({ query: search.value.trim() })
+  const q = search.value.trim()
+  // Con DNI se recarga sin `query` para tener el padrón completo sobre el cual filtrar.
+  await cargar(q && !esBusquedaPorDni(q) ? { query: q } : {})
 }
 
 function onSearchInput() {
@@ -156,9 +167,12 @@ const filtrados = computed(() => {
   if (filterEstado.value === 'sin_rep')    list = list.filter(s => reprocannCategoria(s) === 'sin_reprocann')
   if (search.value.trim()) {
     const q = search.value.toLowerCase()
+    // El DNI se compara sin puntos ni espacios de los dos lados: se escribe "90.000.027" y se
+    // guarda "90000027".
+    const qDni = q.replace(/[^\d]/g, '')
     list = list.filter(s =>
       (s.nombre + ' ' + s.apellido).toLowerCase().includes(q) ||
-      s.dni?.toLowerCase().includes(q) ||
+      (qDni && String(s.dni || '').replace(/[^\d]/g, '').includes(qDni)) ||
       s.email?.toLowerCase().includes(q)
     )
   }

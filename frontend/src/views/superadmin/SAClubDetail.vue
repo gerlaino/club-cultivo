@@ -171,7 +171,8 @@ const PLAN_META = {
 const PLANES = ref([])
 function planMeta(p) { return PLAN_META[p] || PLAN_META.basico }
 
-const ROLES = ['admin', 'medico', 'cultivador', 'supervisor', 'abogado', 'auditor', 'dispensador', 'manicura', 'delivery']
+// Mismos roles que ofrece el alta del club y que acepta el backend (Club::ROLES_ALTA + delivery).
+const ROLES = ['admin', 'medico', 'cultivador', 'dispensador', 'manicura', 'delivery']
 const ROLE_META = {
   admin:       { label: 'Admin',       color: '#0f172a', bg: '#f1f5f9' },
   medico:      { label: 'Médico',      color: '#0369a1', bg: '#dbeafe' },

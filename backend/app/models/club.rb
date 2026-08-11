@@ -96,6 +96,13 @@ class Club < ApplicationRecord
   # llenaba la pantalla de opciones que nadie tilda.
   ROLES_ALTA = %w[admin medico cultivador dispensador manicura].freeze
 
+  # Los que un admin puede crear desde **Configuración → Equipo**, ya con el club andando. Suma
+  # `delivery` a los del alta —un club que empieza a repartir necesita darlo de alta él mismo—,
+  # y sigue dejando afuera supervisor, abogado y auditor: son casos puntuales que hoy no se
+  # ofrecen. Un usuario que ya tenga uno de esos roles sigue funcionando normal; lo que no se
+  # puede es crear uno nuevo desde la pantalla.
+  ROLES_ALTA_CLUB = (ROLES_ALTA + %w[delivery]).freeze
+
   ROLES_META = {
     'admin'       => { label: 'Admin',       desc: 'Acceso total al panel de la organización' },
     'medico'      => { label: 'Médico',      desc: 'Turnos, historia clínica e indicaciones' },

@@ -469,7 +469,7 @@ async function handleSubmit() {
             </div>
           </div>
           <p class="cnv__hint" style="margin-top:.75rem">
-            Los demás roles (supervisor, abogado, auditor, delivery) se crean después desde la ficha del club.
+            Los demás roles se crean después desde la ficha de la organización.
           </p>
 
           <div v-if="error" class="cnv__alert" style="margin-top:1.25rem">{{ error }}</div>

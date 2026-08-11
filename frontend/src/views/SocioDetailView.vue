@@ -18,6 +18,7 @@ import {
 } from 'lucide-vue-next'
 import DsDropdown from '../design-system/components/Dropdown.vue'
 import { REPROCANN_ESTADOS } from '../composables/useSocioEditar.js'
+import { reprocannCategoria, reprocannDias } from '../composables/useReprocann.js'
 import { useToast } from '../composables/useToast.js'
 import DsSpinner               from '../design-system/components/Spinner.vue'
 import SocioTabTimeline        from '../components/pacientes/SocioTabTimeline.vue'
@@ -220,17 +221,34 @@ function edad(fn) {
   return Math.floor((Date.now() - safeDate(fn).getTime()) / (1000 * 60 * 60 * 24 * 365.25))
 }
 
+// El ESTADO manda sobre la fecha — la misma regla que ya centraliza `reprocannCategoria`.
+//
+// Antes esto arrancaba con `if (!reprocann_vencimiento) return null`, y un trámite PENDIENTE no
+// tiene vencimiento por definición: caía en el `v-else` de la plantilla, que dice
+// "Sin REPROCANN". Justo lo contrario de lo que pasa — sin REPROCANN es que ni siquiera se
+// inició el trámite, y acá hay uno presentado esperando resolución.
 const reprocannStatus = computed(() => {
-  if (!s.value?.reprocann_vencimiento) return null
-  const estado = s.value?.reprocann_estado_efectivo || s.value?.reprocann_estado
-  const days = Math.floor((safeDate(s.value.reprocann_vencimiento) - new Date()) / 86400000)
-  if (days < 0) {
-    // Vencido pero con trámite de renovación en curso → ámbar, no rojo
-    if (estado === 'pendiente') return { label: 'Vencido — trámite pendiente', color: '#b45309', bg: 'rgba(180,83,9,.12)', key: 'pendiente' }
-    return { label: 'Vencido', color: '#dc2626', bg: 'rgba(220,38,38,.1)', key: 'danger' }
+  if (!s.value) return null
+  const cat  = reprocannCategoria(s.value)
+  const days = reprocannDias(s.value)
+
+  switch (cat) {
+    case 'sin_reprocann':
+      return null // no hay nada que informar: la plantilla muestra "Sin REPROCANN"
+    case 'pendiente':
+      // Con fecha vencida además, se aclara: hay renovación en curso, por eso ámbar y no rojo.
+      return days !== null && days < 0
+        ? { label: 'Vencido — trámite pendiente', color: '#b45309', bg: 'rgba(180,83,9,.12)', key: 'pendiente' }
+        : { label: 'Trámite pendiente',           color: '#b45309', bg: 'rgba(180,83,9,.12)', key: 'pendiente' }
+    case 'vencido':
+      return { label: 'Vencido', color: '#dc2626', bg: 'rgba(220,38,38,.1)', key: 'danger' }
+    case 'por_vencer':
+      return { label: `Vence en ${days} días`, color: '#d97706', bg: 'rgba(217,119,6,.1)', key: 'warning' }
+    default: // vigente, con o sin fecha cargada
+      return days === null
+        ? { label: 'Vigente', color: '#15803d', bg: 'rgba(21,128,61,.1)', key: 'success' }
+        : { label: `Vigente — ${days} días restantes`, color: '#15803d', bg: 'rgba(21,128,61,.1)', key: 'success' }
   }
-  if (days <= 30) return { label: `Vence en ${days} días`,           color: '#d97706', bg: 'rgba(217,119,6,.1)',  key: 'warning' }
-  return               { label: `Vigente — ${days} días restantes`, color: '#15803d', bg: 'rgba(21,128,61,.1)',  key: 'success' }
 })
 
 const AVATAR_COLORS = ['#1b5e20','#0369a1','#7c3aed','#b45309','#0891b2','#dc2626','#15803d']

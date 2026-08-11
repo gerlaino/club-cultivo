@@ -7,7 +7,7 @@ import { listSalas, listSedes, asignarSedeAUsuario } from '../lib/api.js'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
-import { ROLES as ROLES_DS, rolInfo, rolEstilo, rolColor, rolBg, rolPideSede, rolHintSede } from '../lib/roles.js'
+import { rolesParaAlta, rolInfo, rolEstilo, rolColor, rolBg, rolPideSede, rolHintSede } from '../lib/roles.js'
 
 const store           = useUsuariosStore()
 const auth            = useAuthStore()
@@ -40,7 +40,9 @@ const pagedUsers = computed(() => {
 onMounted(() => store.fetch())
 
 // ── Roles ─────────────────────────────────────────────────────────────────
-const ROLES = ROLES_DS
+// Sólo los roles que se ofrecen al crear a alguien: supervisor, abogado y auditor quedan fuera
+// (el backend también los rechaza, ver Club::ROLES_ALTA).
+const ROLES = rolesParaAlta()
 
 function getRoleInfo(role) { return rolInfo(role) }
 function roleStyle(role)   { return rolEstilo(role) }

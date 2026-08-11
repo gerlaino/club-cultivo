@@ -75,7 +75,7 @@
                   Domicilio del paciente <span class="sem__opt">dirección del paciente · entrega por defecto</span>
                 </label>
                 <div class="sem__domicilio-grid">
-                  <input v-model.trim="editForm.domicilio_calle"  class="sem__input" type="text" placeholder="Calle *" style="grid-column: span 2" />
+                  <input v-model.trim="editForm.domicilio_calle"  class="sem__input" type="text" placeholder="Calle" style="grid-column: span 2" />
                   <input v-model.trim="editForm.domicilio_altura" class="sem__input" type="text" placeholder="Altura" />
                   <input v-model.trim="editForm.domicilio_piso"   class="sem__input" type="text" placeholder="Piso" />
                   <input v-model.trim="editForm.domicilio_depto"  class="sem__input" type="text" placeholder="Depto" />

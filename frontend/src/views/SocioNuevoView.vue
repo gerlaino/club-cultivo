@@ -70,7 +70,8 @@ function validate() {
   if (!form.value.fecha_nacimiento) e.fecha_nacimiento = 'Requerida'
   if (form.value.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.value.email))
     e.email = 'Email inválido'
-  if (!form.value.domicilio_calle.trim()) e.domicilio_calle = 'Requerida'
+  // El domicilio NO frena el alta: en el mostrador se anota a la persona con lo que tiene a mano
+  // y la dirección aparece después. Donde sí hace falta es al despachar un envío, y ahí se pide.
   formErrors.value = e
   return !Object.keys(e).length
 }
@@ -184,7 +185,7 @@ async function handleSubmit() {
 
         <div class="snv__grid snv__grid--2">
           <div class="snv__field">
-            <label class="snv__label">Calle <span class="snv__req">*</span></label>
+            <label class="snv__label">Calle</label>
             <input v-model.trim="form.domicilio_calle" class="snv__input" :class="{ 'snv__input--err': formErrors.domicilio_calle }" placeholder="Ej: Av. Corrientes" />
             <span v-if="formErrors.domicilio_calle" class="snv__err">{{ formErrors.domicilio_calle }}</span>
           </div>
