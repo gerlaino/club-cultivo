@@ -20,23 +20,52 @@ const susc     = computed(() => pulso.value?.suscripciones || {})
 const atencion = computed(() => pulso.value?.atencion || {})
 const salud    = computed(() => pulso.value?.salud || {})
 
-// Lo que hay que resolver hoy, junto y ordenado por cuánto duele. Repartido en tarjetas
-// separadas obligaba a barrer la pantalla para saber si había algo que hacer.
+// Lo que hay que resolver hoy, junto y ordenado por cuánto duele.
+//
+// Antes cada fila decía sólo qué PASA ("Correo al paciente: falta cargar el SMTP") y había que
+// deducir qué hacer con eso. Ahora cada una lleva su ACCIÓN en el botón: quien abre el panel a
+// la mañana tiene que poder bajar la lista sin interpretar nada.
+//
+// El orden es por plata: primero lo que ya se está perdiendo (plan vencido, organización que
+// entra y no puede trabajar), después lo que se paga y no funciona, y al final lo que avisa
+// con tiempo.
+const GRUPOS = [
+  { clave: 'perdiendo', titulo: 'Se está perdiendo plata', tono: 'rojo' },
+  { clave: 'roto',      titulo: 'Paga y no le funciona',   tono: 'ambar' },
+  { clave: 'avisar',    titulo: 'Avisar con tiempo',       tono: 'azul' },
+]
+
 const pendientes = computed(() => {
   const p = []
-  const add = (items, tono, texto) => (items || []).forEach(c => p.push({ ...c, tono, texto: texto(c) }))
+  const add = (items, grupo, texto, accion) =>
+    (items || []).forEach(c => p.push({ ...c, grupo, texto: texto(c), accion }))
 
-  add(susc.value.vencidos, 'rojo', () => 'El plan venció y la organización sigue operando')
-  add(atencion.value.sin_suites, 'rojo', () => 'Sin ninguna suite: entra pero no puede trabajar')
-  add(atencion.value.modulos_a_medias, 'ambar', c => `${c.modulo_label}: ${c.falta}`)
-  add(salud.value.iot_mudo, 'ambar', c => c.ultima_lectura
-    ? 'Paga IoT y sus sondas no reportan desde hace más de dos días'
-    : 'Paga IoT y nunca reportó una lectura')
-  add(susc.value.vencen_7, 'azul', c => `Vence el ${fecha(c.plan_activo_hasta)}`)
-  add(atencion.value.suspendidos, 'gris', () => 'Suspendido: es plata que no entra')
+  add(susc.value.vencidos, 'perdiendo',
+    () => 'El plan venció y sigue operando', 'Cobrar y renovar')
+  add(atencion.value.sin_suites, 'perdiendo',
+    () => 'Sin ninguna suite: entra pero no puede trabajar', 'Asignar suite')
+  add(atencion.value.suspendidos, 'perdiendo',
+    () => 'Suspendida: es plata que no entra', 'Reactivar')
+
+  add(atencion.value.modulos_a_medias, 'roto',
+    c => `${c.modulo_label}: ${c.falta}`, 'Completar configuración')
+  add(salud.value.iot_mudo, 'roto',
+    c => c.ultima_lectura
+      ? 'Paga IoT y sus sondas no reportan hace más de dos días'
+      : 'Paga IoT y nunca reportó una lectura',
+    'Revisar sensores')
+
+  add(susc.value.vencen_7, 'avisar',
+    c => `Vence el ${fecha(c.plan_activo_hasta)}`, 'Renovar')
 
   return p
 })
+
+// Se muestran sólo los grupos con algo adentro: un encabezado vacío es ruido.
+const gruposConPendientes = computed(() =>
+  GRUPOS.map(g => ({ ...g, items: pendientes.value.filter(p => p.grupo === g.clave) }))
+        .filter(g => g.items.length)
+)
 
 const sinActividad = computed(() => pulso.value?.sin_actividad || [])
 const adopcion     = computed(() => (pulso.value?.adopcion || []).filter(a => a.tienen > 0))
@@ -93,17 +122,26 @@ onMounted(async () => {
         <div v-if="!pendientes.length" class="sad__vacio">
           Nada pendiente. Ningún plan vencido, ningún módulo prendido a medias.
         </div>
-        <ul v-else class="sad__pend-list">
-          <li
-            v-for="(p, i) in pendientes" :key="`${p.id}-${p.modulo || i}`"
-            class="sad__pend" :class="`sad__pend--${p.tono}`"
-            @click="irAlClub(p.id)"
-          >
-            <span class="sad__pend-club">{{ p.nombre }}</span>
-            <span class="sad__pend-txt">{{ p.texto }}</span>
-            <span v-if="p.trial" class="sad__chip">trial</span>
-          </li>
-        </ul>
+        <template v-else>
+          <div v-for="g in gruposConPendientes" :key="g.clave" class="sad__grupo">
+            <div class="sad__grupo-title" :class="`sad__grupo-title--${g.tono}`">
+              {{ g.titulo }} <span class="sad__grupo-n">{{ g.items.length }}</span>
+            </div>
+            <ul class="sad__pend-list">
+              <li
+                v-for="(p, i) in g.items" :key="`${p.id}-${p.modulo || i}`"
+                class="sad__pend" :class="`sad__pend--${g.tono}`"
+                @click="irAlClub(p.id)"
+              >
+                <span class="sad__pend-club">{{ p.nombre }}</span>
+                <span class="sad__pend-txt">{{ p.texto }}</span>
+                <span v-if="p.trial" class="sad__chip">trial</span>
+                <!-- La acción, no sólo el síntoma: se baja la lista sin interpretar nada. -->
+                <span class="sad__pend-accion">{{ p.accion }} →</span>
+              </li>
+            </ul>
+          </div>
+        </template>
       </section>
 
       <div class="sad__cols">
@@ -175,12 +213,9 @@ onMounted(async () => {
             </span>
             <span v-else class="sad__salud-v">Sin respuesta de la cola</span>
           </div>
-          <div class="sad__salud-item" :class="{ 'sad__salud-item--mal': (salud.iot_mudo || []).length }">
-            <span class="sad__salud-l">Organizaciones con IoT reportando</span>
-            <span class="sad__salud-v">
-              {{ (salud.iot_mudo || []).length }} sin señal
-            </span>
-          </div>
+          <!-- El IoT mudo NO va acá: ya está arriba, en la cola, con la organización y el botón
+               para resolverlo. Repetirlo como "3 sin señal" agregaba un número que no lleva a
+               ningún lado y hacía parecer que eran dos problemas distintos. -->
         </div>
       </section>
 
@@ -255,6 +290,30 @@ onMounted(async () => {
 .sad__pend--gris  { border-left-color: var(--c-slate-400); }
 .sad__pend-club { font-size: .82rem; font-weight: 700; color: var(--c-slate-900); }
 .sad__pend-txt  { font-size: .76rem; color: var(--c-slate-600); }
+
+/* Encabezado por urgencia: dice POR QUÉ el bloque está donde está. Sin esto, el color de la
+   franja era la única pista y había que saber qué significaba cada uno. */
+.sad__grupo { margin-bottom: .9rem; }
+.sad__grupo:last-child { margin-bottom: 0; }
+.sad__grupo-title {
+  display: flex; align-items: center; gap: .4rem;
+  font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em;
+  margin-bottom: .4rem; color: var(--c-slate-500);
+}
+.sad__grupo-title--rojo  { color: #b91c1c; }
+.sad__grupo-title--ambar { color: #b45309; }
+.sad__grupo-title--azul  { color: #0369a1; }
+.sad__grupo-n {
+  font-weight: 700; font-size: .66rem; color: var(--c-slate-500);
+  background: var(--c-slate-100); border-radius: 20px; padding: .05rem .4rem;
+}
+
+/* La acción, alineada a la derecha: se lee la columna entera de un barrido. */
+.sad__pend-accion {
+  margin-left: auto; font-size: .72rem; font-weight: 700; color: var(--c-slate-700);
+  white-space: nowrap;
+}
+.sad__pend:hover .sad__pend-accion { color: var(--c-slate-900); }
 .sad__chip {
   font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em;
   background: var(--c-slate-200); color: var(--c-slate-600); border-radius: 5px; padding: .1rem .35rem;

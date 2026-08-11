@@ -75,10 +75,42 @@ describe('Panel del super admin', () => {
     await flushPromises()
 
     const texto = w.text()
-    expect(texto).toContain('El plan venció y la organización sigue operando')
+    expect(texto).toContain('El plan venció y sigue operando')
     expect(texto).toContain('Sin ninguna suite')
     expect(texto).toContain('Falta cargar la cuenta de Twilio.')
     expect(texto).toContain('nunca reportó una lectura')
+  })
+
+  // Cada fila tiene que decir QUÉ HACER, no sólo qué pasa: es la diferencia entre una lista de
+  // avisos y una cola de trabajo que se puede bajar sin interpretar nada.
+  it('cada pendiente lleva su acción', async () => {
+    const w = mount(SADashboard, { global: { stubs } })
+    await flushPromises()
+
+    const texto = w.text()
+    expect(texto).toContain('Cobrar y renovar')      // plan vencido
+    expect(texto).toContain('Asignar suite')         // sin suites
+    expect(texto).toContain('Completar configuración') // módulo prendido a medias
+    expect(texto).toContain('Revisar sensores')      // IoT mudo
+  })
+
+  it('agrupa por urgencia, empezando por lo que cuesta plata', async () => {
+    const w = mount(SADashboard, { global: { stubs } })
+    await flushPromises()
+
+    const texto = w.text()
+    expect(texto).toContain('Se está perdiendo plata')
+    expect(texto).toContain('Paga y no le funciona')
+    // Lo que cuesta plata va ANTES de lo que sólo hay que avisar.
+    expect(texto.indexOf('Se está perdiendo plata')).toBeLessThan(texto.indexOf('Paga y no le funciona'))
+  })
+
+  it('no repite el IoT mudo en Salud: ya está en la cola, con su acción', async () => {
+    const w = mount(SADashboard, { global: { stubs } })
+    await flushPromises()
+
+    // "3 sin señal" era un número que no llevaba a ningún lado y parecía otro problema.
+    expect(w.text()).not.toContain('sin señal')
   })
 
   it('nombra el módulo que está prendido y no funciona', async () => {
