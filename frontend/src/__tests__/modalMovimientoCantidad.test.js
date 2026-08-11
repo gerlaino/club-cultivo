@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 
-// Dos cosas que el modal no hacía y el club sí necesita:
-//   · cargar "1000 etiquetas a $5" sin sacar la calculadora, y que el precio POR UNIDAD quede
-//     registrado (es el dato que después dice si una compra fue cara o barata);
-//   · que la categoría, que ya sabe si es plata que entra o que sale, acomode el formulario en
-//     vez de exigir que uno acierte el tipo antes para que aparezca en la lista.
+// Dos cosas del alta de un movimiento:
+//   · el TOTAL es el hecho (lo que dice el ticket) y la cantidad lo describe; el precio por
+//     unidad es la CUENTA que sale de dividirlos, no un campo que se tipea. Antes eran tres
+//     inputs ligados y tocar la cantidad te reescribía el total que acababas de cargar;
+//   · la categoría, que ya sabe si es plata que entra o que sale, acomoda el formulario en vez
+//     de exigir que uno acierte el tipo antes para que aparezca en la lista.
 vi.mock('../lib/api.js', () => ({
   createCategoriaContable: vi.fn(), createUnidadNegocio: vi.fn(),
 }))
@@ -20,7 +21,7 @@ const CATEGORIAS = [
     unidad_negocio: { id: 7, nombre: 'Cultivo' }, subcategorias: [] },
 ]
 
-describe('Nuevo movimiento — cantidad × precio, y la categoría que manda', () => {
+describe('Nuevo movimiento — el total manda, y la categoría que manda', () => {
   let wrapper
 
   beforeEach(async () => {
@@ -43,48 +44,44 @@ describe('Nuevo movimiento — cantidad × precio, y la categoría que manda', (
 
   const campos = () => wrapper.findAll('.mv-cant input')
 
-  it('la fila cantidad × precio existe en el formulario', () => {
+  it('la cantidad se carga, el precio por unidad NO: es un resultado, no un input', () => {
     expect(wrapper.find('.mv-cant').exists()).toBe(true)
-    expect(campos()).toHaveLength(2)
+    // Un solo input de texto (cantidad); la unidad es un select y el unitario, texto calculado.
+    expect(campos()).toHaveLength(1)
+    expect(wrapper.find('.mv-cant select').exists()).toBe(true)
   })
 
-  it('1000 × $5 da $5.000 sin tener que calcularlo', async () => {
-    await campos()[0].setValue('1000')
-    await campos()[1].setValue('5')
+  it('$120.000 por 30 kilos son $4.000 el kilo', async () => {
+    await wrapper.find('.mv-monto-inp').setValue('120.000')
+    await campos()[0].setValue('30')
 
-    expect(wrapper.vm.form.monto_ars).toBe(5000)
-    expect(wrapper.find('.mv-cant-total').text()).toContain('5.000')
+    expect(wrapper.vm.form.monto_ars).toBe(120000)
+    expect(wrapper.find('.mv-cant-total').text()).toContain('4.000')
   })
 
-  // Al revés: el que sabe el total y la cantidad quiere ver cuánto le salió cada una.
-  it('escribir el total con una cantidad cargada deduce el precio unitario', async () => {
-    await campos()[0].setValue('1000')
-    await wrapper.find('.mv-monto-inp').setValue('5000')
-
-    expect(wrapper.vm.form.monto_ars).toBe(5000)
-    expect(campos()[1].element.value).toBe('5')
-  })
-
-  it('el total escrito a mano no se pisa solo', async () => {
+  // Lo que se rompía antes: con tres campos ligados, tocar la cantidad recalculaba el total y
+  // te pisaba el número del ticket. El total es el hecho y no lo mueve nadie.
+  it('cargar la cantidad NO toca el total', async () => {
     await wrapper.find('.mv-monto-inp').setValue('7500')
+    await campos()[0].setValue('3')
 
     expect(wrapper.vm.form.monto_ars).toBe(7500)
   })
 
   // Los campos usan el formato de acá: la coma es el decimal y el punto separa miles
-  // (`parseMonto`). 2,5 × 3,33 = 8,325 → 8,33, porque son pesos y no medio centavo.
-  it('redondea a dos decimales: son pesos', async () => {
+  // (`parseMonto`). 8,33 / 2,5 = 3,332 → 3,33, porque son pesos y no un tercio de centavo.
+  it('redondea el unitario a dos decimales: son pesos', async () => {
+    await wrapper.find('.mv-monto-inp').setValue('8,33')
     await campos()[0].setValue('2,5')
-    await campos()[1].setValue('3,33')
 
-    expect(wrapper.vm.form.monto_ars).toBe(8.33)
+    expect(wrapper.find('.mv-cant-total').text()).toContain('3,33')
   })
 
-  it('acepta precios con centavos', async () => {
-    await campos()[0].setValue('10')
-    await campos()[1].setValue('1.250,50')
+  it('sin cantidad no inventa un precio por unidad', async () => {
+    await wrapper.find('.mv-monto-inp').setValue('1200')
 
-    expect(wrapper.vm.form.monto_ars).toBe(12505)
+    expect(wrapper.vm.unitarioCalculado).toBeNull()
+    expect(wrapper.find('.mv-cant-total').text()).toContain('—')
   })
 
   it('sin cantidad, el modal sigue funcionando como antes', async () => {

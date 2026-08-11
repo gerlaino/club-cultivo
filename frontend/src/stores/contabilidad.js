@@ -14,7 +14,8 @@ export const useContabilidadStore = defineStore("contabilidad", {
   state: () => ({
     items:       [],
     totales:     { ingresos: 0, egresos: 0, balance: 0, count: 0 },
-    pagination:  { page: 1, per_page: 50, total: 0, total_pages: 1 },
+    // 10 por página: con 50 la tabla del libro se hacía larga y la página, pesada.
+    pagination:  { page: 1, per_page: 10, total: 0, total_pages: 1 },
     loading:     false,
     error:       null,
 
@@ -37,7 +38,7 @@ export const useContabilidadStore = defineStore("contabilidad", {
       desde:     "",
       hasta:     "",
       page:      1,
-      per_page:  50,
+      per_page:  10,
     },
   }),
 
@@ -168,7 +169,7 @@ export const useContabilidadStore = defineStore("contabilidad", {
 
     resetFiltros() {
       this.filtros = { tipo: "", categoria: "", sede_id: "", lote_id: "",
-        desde: "", hasta: "", page: 1, per_page: 50 };
+        desde: "", hasta: "", page: 1, per_page: 10 };
     },
   },
 });

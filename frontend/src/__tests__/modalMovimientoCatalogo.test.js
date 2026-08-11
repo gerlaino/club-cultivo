@@ -93,11 +93,38 @@ describe('crear categoría desde el alta de movimiento', () => {
     expect(w.vm.errorCrear).toBeTruthy()
   })
 
+  // El sector NO es opcional: sin él la categoría nace huérfana y todos sus movimientos caen en
+  // "Sin sector" en el balance por área, o sea plata que no es de ninguna parte.
+  it('una categoría principal sin sector no se crea', async () => {
+    const w = await irAlForm(montar(), 'gasto')
+    w.vm.catQuery = 'Insumos'
+    w.vm.abrirCrearCat()
+    w.vm.crearCat.unidad_negocio_id = null
+    await w.vm.confirmarCrearCat()
+
+    expect(createCategoriaContable).not.toHaveBeenCalled()
+    expect(w.vm.errorCrear).toMatch(/sector/i)
+  })
+
+  // La subcategoría sí puede ir sin sector propio: lo hereda de su madre.
+  it('una subcategoría no pide sector: lo hereda de la madre', async () => {
+    createCategoriaContable.mockResolvedValue({ data: { id: 99, nombre: 'Fertilizante', tipo: 'egreso' } })
+    const w = await irAlForm(montar(), 'gasto')
+    w.vm.abrirCrearCat()
+    w.vm.crearCat.nombre = 'Fertilizante'
+    w.vm.crearCat.parent_id = 1
+    w.vm.crearCat.unidad_negocio_id = null
+    await w.vm.confirmarCrearCat()
+
+    expect(createCategoriaContable).toHaveBeenCalled()
+  })
+
   it('si el back rechaza, muestra el error y no la da por creada', async () => {
     createCategoriaContable.mockRejectedValue({ response: { data: { errors: ['Nombre ya está en uso'] } } })
     const w = await irAlForm(montar(), 'gasto')
     w.vm.catQuery = 'Insumos'
     w.vm.abrirCrearCat()
+    w.vm.crearCat.unidad_negocio_id = 7   // con sector, para llegar a la llamada al backend
     await w.vm.confirmarCrearCat()
 
     expect(w.vm.errorCrear).toBe('Nombre ya está en uso')

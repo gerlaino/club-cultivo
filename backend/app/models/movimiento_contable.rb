@@ -98,6 +98,28 @@ class MovimientoContable < ApplicationRecord
     CATEGORIA_LABELS[categoria] || categoria
   end
 
+  # Categoría, subcategoría y ruta, por separado.
+  #
+  # El catálogo tiene dos niveles y un movimiento puede colgar de cualquiera de los dos. Cuando
+  # cuelga de una subcategoría, `categoria_contable.nombre` es el nombre de la SUB —"Kawsay"—, y
+  # mostrarlo como "la categoría" perdía la madre y confundía las dos cosas. Con estos tres la
+  # vista elige qué necesita en cada lugar y no vuelve a deducirlo por su cuenta.
+  def categoria_madre_nombre
+    return nil if categoria_contable.nil?
+
+    (categoria_contable.parent || categoria_contable).nombre
+  end
+
+  def subcategoria_nombre
+    categoria_contable&.parent_id ? categoria_contable.nombre : nil
+  end
+
+  def categoria_ruta
+    return nil if categoria_contable.nil?
+
+    [categoria_madre_nombre, subcategoria_nombre].compact.join(' › ')
+  end
+
   def tipo_label
     { "egreso" => "Egreso", "ingreso" => "Ingreso",
       "recupero_costo" => "Recupero de costo", "ajuste" => "Ajuste" }[tipo] || tipo

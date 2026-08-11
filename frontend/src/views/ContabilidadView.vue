@@ -348,6 +348,10 @@ async function openCreate({ flujo = '', deposito = null } = {}) {
   flujoInicial.value      = flujo
   depositoInicial.value   = deposito
   showModal.value = true
+  // El catálogo se relee SIEMPRE al abrir. Se cargaba una sola vez al montar la pantalla, así
+  // que si creabas una categoría en la solapa Categorías y venías acá, no estaba: había que
+  // refrescar el navegador para poder usarla. Es una request chica contra una lista corta.
+  recargarCatalogo()
   if (!pacientes.value.length) {
     const { data } = await listPacientes({ per_page: 500 })
     const arr = Array.isArray(data) ? data : (Array.isArray(data.data) ? data.data : [])
@@ -572,7 +576,10 @@ onMounted(async () => {
     </div>
 
     <!-- Categorías: configuración contable integrada al hub -->
-    <div v-if="vistaActiva === 'categorias'" class="cv__embed"><FinanzasCatalogoView /></div>
+    <!-- `@cambio`: la solapa está embebida y su catálogo es el MISMO que usa el modal de
+         Nuevo movimiento. Sin avisar, creabas una categoría acá y el modal seguía con la lista
+         vieja hasta refrescar el navegador. -->
+    <div v-if="vistaActiva === 'categorias'" class="cv__embed"><FinanzasCatalogoView @cambio="recargarCatalogo" /></div>
 
     <!-- ══════════════ DASHBOARD ══════════════ -->
     <div v-if="vistaActiva === 'dashboard'">
@@ -864,30 +871,54 @@ onMounted(async () => {
           <div v-if="!ultimosFiltrados.length" class="cv__empty-sm">
             {{ busquedaDash ? 'Sin resultados para "' + busquedaDash + '"' : 'Sin movimientos todavía' }}
           </div>
-          <div v-else class="cv__movs">
-            <div v-for="m in ultimosFiltrados" :key="m.id" class="cv__mov">
-              <div class="cv__mov-fecha">{{ m.fecha }}</div>
-              <div class="cv__mov-tipo">
-                <span class="cv__tipo-pill" :style="{ background: tipoMeta(m.tipo).bg, color: tipoMeta(m.tipo).color }">
-                  {{ tipoMeta(m.tipo).label }}
-                </span>
-              </div>
-              <div class="cv__mov-desc cv__mov-desc--link" @click="abrirDetalle(m)" title="Ver detalle">{{ m.descripcion }}<i class="bi bi-info-circle cv__mov-info"></i></div>
-              <div class="cv__mov-cat">{{ catLabel(m.categoria) }}</div>
-              <div class="cv__mov-monto" :style="{ color: tipoMeta(m.tipo).color }">{{ fmt(m.monto_ars) }}</div>
-              <div class="cv__mov-actions">
-                <template v-if="canEdit && !esAutomatico(m) && !esCerrado(m)">
-                  <button class="cv__icon-btn" @click="openEdit(m)" title="Editar">
-                    <i class="bi bi-pencil"></i>
-                  </button>
-                  <button class="cv__icon-btn cv__icon-btn--danger" @click="confirmDelete(m)" title="Eliminar">
-                    <i class="bi bi-trash"></i>
-                  </button>
-                </template>
-                <i v-else-if="esCerrado(m)" class="bi bi-lock-fill cv__auto-icon" title="Período cerrado — movimiento inmutable"></i>
-                <i v-else-if="esAutomatico(m)" class="bi bi-link-45deg cv__auto-icon" title="Generado por una dispensación — se corrige desde la dispensación"></i>
-              </div>
-            </div>
+          <!-- Tabla, no una lista de divs: son los mismos datos que el libro y leerlos en
+               columnas alineadas —sobre todo los montos— es lo que permite compararlos.
+               Categoría, subcategoría, sector y depósito son las cuatro que faltaban: sin
+               ellas no se podía saber de dónde salió ni a qué inventario entró un gasto. -->
+          <div v-else class="cv__table-wrap">
+            <table class="cv__table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Descripción</th>
+                  <th>Categoría</th>
+                  <th>Subcategoría</th>
+                  <th>Sector</th>
+                  <th>Depósito</th>
+                  <th class="cv__th-right">Monto ARS</th>
+                  <th v-if="canEdit"></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="m in ultimosFiltrados" :key="m.id" class="cv__tr">
+                  <td class="cv__td-fecha">{{ m.fecha }}</td>
+                  <td>
+                    <div class="cv__desc-cell cv__desc-cell--link" @click="abrirDetalle(m)" title="Ver detalle">
+                      <span class="cv__tipo-pill cv__tipo-pill--sm" :style="{ background: tipoMeta(m.tipo).bg, color: tipoMeta(m.tipo).color }">
+                        {{ tipoMeta(m.tipo).label }}
+                      </span>
+                      <span class="cv__desc-text">{{ m.descripcion }}</span>
+                      <i class="bi bi-info-circle cv__mov-info"></i>
+                    </div>
+                  </td>
+                  <td class="cv__td-muted">{{ m.categoria_madre || catLabel(m.categoria) }}</td>
+                  <td class="cv__td-muted">{{ m.subcategoria || '—' }}</td>
+                  <td class="cv__td-muted">{{ m.unidad_negocio?.nombre || 'Sin sector' }}</td>
+                  <td class="cv__td-muted">{{ m.deposito?.nombre || 'Sin depósito' }}</td>
+                  <td class="cv__td-right cv__td-bold" :style="{ color: tipoMeta(m.tipo).color }">{{ fmt(m.monto_ars) }}</td>
+                  <td v-if="canEdit">
+                    <div class="cv__row-actions">
+                      <template v-if="!esAutomatico(m) && !esCerrado(m)">
+                        <button class="cv__icon-btn" @click="openEdit(m)" title="Editar"><i class="bi bi-pencil"></i></button>
+                        <button class="cv__icon-btn cv__icon-btn--danger" @click="confirmDelete(m)" title="Eliminar"><i class="bi bi-trash"></i></button>
+                      </template>
+                      <i v-else-if="esCerrado(m)" class="bi bi-lock-fill cv__auto-icon" title="Período cerrado — movimiento inmutable"></i>
+                      <i v-else class="bi bi-link-45deg cv__auto-icon" title="Generado por una dispensación — se corrige desde la dispensación"></i>
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
 
@@ -963,6 +994,9 @@ onMounted(async () => {
               <th>Fecha</th>
               <th>Descripción</th>
               <th>Categoría</th>
+              <th>Subcategoría</th>
+              <th>Sector</th>
+              <th>Depósito</th>
               <th>Sede</th>
               <th class="cv__th-right">Monto ARS</th>
               <th>Estado</th>
@@ -980,7 +1014,10 @@ onMounted(async () => {
                   <span class="cv__desc-text">{{ m.descripcion }}</span>
                 </div>
               </td>
-              <td class="cv__td-muted">{{ catLabel(m.categoria) }}</td>
+              <td class="cv__td-muted">{{ m.categoria_madre || catLabel(m.categoria) }}</td>
+              <td class="cv__td-muted">{{ m.subcategoria || '—' }}</td>
+              <td class="cv__td-muted">{{ m.unidad_negocio?.nombre || 'Sin sector' }}</td>
+              <td class="cv__td-muted">{{ m.deposito?.nombre || 'Sin depósito' }}</td>
               <td class="cv__td-muted">{{ m.sede?.nombre || '—' }}</td>
               <td class="cv__td-right cv__td-bold" :style="{ color: tipoMeta(m.tipo).color }">{{ fmt(m.monto_ars) }}</td>
               <td>
@@ -1066,8 +1103,14 @@ onMounted(async () => {
         </div>
         <p class="cv__dlg-desc">{{ detalleMov.descripcion }}</p>
         <dl class="cv__dlg-dl">
-          <dt>Categoría</dt><dd>{{ detalleMov.categoria_label || catLabel(detalleMov.categoria) }}</dd>
-          <dt v-if="detalleMov.unidad_negocio">Unidad</dt><dd v-if="detalleMov.unidad_negocio">{{ detalleMov.unidad_negocio.nombre }}</dd>
+          <!-- Categoría y subcategoría van SEPARADAS. Antes se mostraba `categoria_label`, que
+               para un movimiento colgado de una subcategoría era el nombre de la SUB ("Kawsay")
+               bajo el rótulo "Categoría": la madre no aparecía en ninguna parte y el rótulo
+               mentía. "Unidad" además era jerga: en toda la app se llama Sector. -->
+          <dt>Categoría</dt><dd>{{ detalleMov.categoria_madre || catLabel(detalleMov.categoria) }}</dd>
+          <dt v-if="detalleMov.subcategoria">Subcategoría</dt><dd v-if="detalleMov.subcategoria">{{ detalleMov.subcategoria }}</dd>
+          <dt>Sector</dt><dd>{{ detalleMov.unidad_negocio?.nombre || 'Sin sector' }}</dd>
+          <dt>Depósito</dt><dd>{{ detalleMov.deposito?.nombre || 'Sin depósito' }}</dd>
           <dt v-if="detalleMov.sede">Sede</dt><dd v-if="detalleMov.sede">{{ detalleMov.sede.nombre }}</dd>
           <dt>Fecha</dt><dd>{{ detalleMov.fecha }}</dd>
           <dt v-if="detalleMov.proveedor">Proveedor</dt><dd v-if="detalleMov.proveedor">{{ detalleMov.proveedor }}</dd>
@@ -1267,19 +1310,14 @@ onMounted(async () => {
 .cv__search-x { position: absolute; right: .5rem; color: var(--c-slate-400); cursor: pointer; font-size: .9rem; display: flex; align-items: center; }
 .cv__search-x:hover { color: var(--c-slate-900); }
 
-.cv__movs { display: flex; flex-direction: column; }
-/* La última columna medía 36px y adentro van DOS botones de 28px: se desbordaban encima del
-   monto y se leía "$ 120.00🖉". Ahora la columna reserva el ancho que ocupan de verdad. */
-.cv__mov { display: grid; grid-template-columns: 90px 80px 1fr 140px 110px 76px; align-items: center; gap: .5rem; padding: .75rem 1.25rem; border-bottom: 1px solid var(--c-slate-50); transition: background .1s; }
-.cv__mov:last-child { border-bottom: none; }
-.cv__mov:hover { background: #fafbfc; }
-@media (max-width: 900px) { .cv__mov { grid-template-columns: 1fr; } }
-.cv__mov-fecha { font-size: .72rem; color: var(--c-slate-400); font-family: monospace; }
-.cv__mov-desc { font-size: .82rem; color: var(--c-slate-900); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cv__mov-desc--link { cursor: pointer; }
-.cv__mov-desc--link:hover { color: #1b5e20; text-decoration: underline; }
+/* Los "últimos movimientos" pasaron de ser una grilla de divs a la MISMA tabla del libro
+   diario. Con dos maquetados distintos para los mismos datos, cada columna nueva había que
+   agregarla dos veces y las anchuras nunca coincidían. Se fueron `.cv__movs` y `.cv__mov*`;
+   queda el ícono de "ver detalle", que la tabla también usa. */
 .cv__mov-info { margin-left: .35rem; color: var(--c-slate-300); font-size: .78rem; }
-.cv__mov-desc--link:hover .cv__mov-info { color: #1b5e20; }
+.cv__desc-cell--link { cursor: pointer; }
+.cv__desc-cell--link:hover .cv__desc-text { color: #1b5e20; text-decoration: underline; }
+.cv__desc-cell--link:hover .cv__mov-info { color: #1b5e20; }
 
 /* Modal detalle de movimiento */
 .cv__ov { position: fixed; inset: 0; background: rgb(15 23 42 / .5); backdrop-filter: blur(2px); display: grid; place-items: center; z-index: 1100; padding: 1rem; }
@@ -1294,9 +1332,6 @@ onMounted(async () => {
 .cv__dlg-dl dd { font-size: .84rem; color: var(--c-slate-900); font-weight: 600; margin: 0; text-align: right; text-transform: capitalize; }
 .cv__dlg-link { display: inline-flex; align-items: center; gap: .4rem; background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; border-radius: 9px; padding: .55rem .9rem; font-size: .84rem; font-weight: 700; text-decoration: none; }
 .cv__dlg-link:hover { background: #dcfce7; }
-.cv__mov-cat { font-size: .75rem; color: var(--c-slate-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cv__mov-monto { font-size: .875rem; font-weight: 700; text-align: right; letter-spacing: -.02em; }
-.cv__mov-actions { display: flex; justify-content: flex-end; gap: .25rem; }
 
 .cv__cat-list { display: flex; flex-direction: column; }
 .cv__cat-item { display: flex; align-items: center; justify-content: space-between; padding: .65rem 1.25rem; border-bottom: 1px solid var(--c-slate-50); }

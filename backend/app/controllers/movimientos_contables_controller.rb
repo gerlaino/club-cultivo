@@ -573,13 +573,33 @@ class MovimientosContablesController < ApplicationController
     (@bares_por_sede ||= current_user.club.bares.pluck(:sede_id, :id).to_h)[sede_id]
   end
 
+  # El depósito no es una columna del movimiento: se llega por la compra de insumo que generó.
+  # `@depositos_por_movimiento` lo precarga de una para el listado (si no, es un N+1 por fila).
+  def deposito_de(m)
+    @depositos_por_movimiento ||= begin
+      compras = InsumoCompra.where.not(movimiento_contable_id: nil).includes(insumo: :deposito)
+      compras.each_with_object({}) do |c, acc|
+        dep = c.insumo&.deposito
+        acc[c.movimiento_contable_id] = { id: dep.id, nombre: dep.nombre } if dep
+      end
+    end
+    @depositos_por_movimiento[m.id]
+  end
+
   def serialize(m)
     {
       id:                   m.id,
       tipo:                 m.tipo,
       tipo_label:           m.tipo_label,
       categoria:            m.categoria,
-      categoria_label:      m.categoria_contable&.nombre || m.categoria_label,
+      # `categoria_label` mostraba el nombre de la categoría contable a secas, así que para una
+      # SUBcategoría decía "Kawsay" bajo el rótulo "Categoría" — el nombre de la subcategoría
+      # presentado como si fuera la categoría, y sin la madre por ningún lado.
+      # Ahora van los tres datos por separado, y el que quiera la ruta usa `categoria_ruta`.
+      categoria_label:      m.categoria_ruta || m.categoria_label,
+      categoria_madre:      m.categoria_madre_nombre,
+      subcategoria:         m.subcategoria_nombre,
+      categoria_ruta:       m.categoria_ruta,
       categoria_contable_id: m.categoria_contable_id,
       es_bar:               m.categoria == 'bar',
       bar_id:               m.categoria == 'bar' ? bar_id_por_sede(m.sede_id) : nil,
@@ -595,6 +615,10 @@ class MovimientosContablesController < ApplicationController
       medio_pago:           m.medio_pago,
       notas:                m.notas,
       sede:                 m.sede ? { id: m.sede.id, nombre: m.sede.nombre } : nil,
+      # A qué depósito entró la compra, para el listado. Sale por la compra de insumo que el
+      # alta creó; un gasto común no entra a ningún inventario y devuelve nil (la vista muestra
+      # "Sin depósito", que es un dato, no un hueco).
+      deposito:             deposito_de(m),
       lote:                 m.lote ? { id: m.lote.id, codigo: m.lote.codigo } : nil,
       dispensacion_id:      m.dispensacion_id,
       paciente_id:          m.paciente_id,
@@ -645,10 +669,29 @@ class MovimientosContablesController < ApplicationController
         .sort_by { |r| -r[:balance] }
   end
 
+  # Agrupa por la categoría EDITABLE, no por el string legacy `categoria`.
+  #
+  # Agrupar por el string mostraba "Otro" para casi todo: `sincronizar_desde_categoria_contable`
+  # lo completa con `clave_efectiva` y cae en 'otro' para cualquier categoría que la organización
+  # creó ella misma —o sea, todas las suyas—. El panel decía "Otro $120.000" mientras el listado
+  # de abajo, que sí lee la categoría contable, mostraba "Fertilizantes › Kawsay".
+  #
+  # Se agrupa por la MADRE: en un panel de un mes, "Fertilizantes" es la línea que se lee; el
+  # desglose por subcategoría es otra pregunta y vive en el libro diario.
   def resumen_por_categoria(scope)
-    scope.group(:categoria, :tipo)
+    cats = CategoriaContable.with_deleted
+                            .where(id: scope.distinct.pluck(:categoria_contable_id).compact)
+                            .index_by(&:id)
+
+    scope.group(:categoria_contable_id, :categoria, :tipo)
          .sum(:monto_ars)
-         .map { |(cat, tipo), total| { categoria: cat, tipo: tipo, total: total.to_f } }
+         .each_with_object(Hash.new(0.0)) do |((cat_id, legacy, tipo), total), acc|
+           cat    = cats[cat_id]
+           madre  = cat&.parent || cat
+           nombre = madre&.nombre || MovimientoContable::CATEGORIA_LABELS[legacy] || legacy
+           acc[[nombre, tipo]] += total.to_f
+         end
+         .map { |(nombre, tipo), total| { categoria: nombre, tipo: tipo, total: total } }
          .sort_by { |r| -r[:total] }
   end
 

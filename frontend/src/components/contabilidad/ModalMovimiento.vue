@@ -14,8 +14,7 @@ import { createCategoriaContable, createUnidadNegocio } from '../../lib/api.js'
 import {
   flowDe, hoyLocal, fmtARS, fmtMiles, parseMonto,
   destinoVacio, destinoEstado, destinoPayload, esDepositoSalon,
-  validarMovimiento, esValido,
-} from './movimientoFlows.js'
+  validarMovimiento, esValido, UNIDADES_INSUMO } from './movimientoFlows.js'
 
 const props = defineProps({
   modelValue:       { type: Boolean, default: false },
@@ -61,6 +60,8 @@ function formVacio(tipo = 'egreso') {
     categoria_contable_id: null,
     descripcion: '',
     monto_ars: null,
+    // Sólo describe la compra para calcular el precio por unidad; el backend no lo persiste.
+    unidad_medida: 'unidad',
     fecha: hoyLocal(),           // local: en UTC, pasadas las 21hs, se guardaba con fecha de mañana
     sede_id: null,
     unidad_negocio_id: null,
@@ -182,6 +183,11 @@ function abrirCrearCat() {
 async function confirmarCrearCat() {
   const f = crearCat.value
   if (!f?.nombre?.trim()) { errorCrear.value = 'Poné un nombre'; return }
+  // Una subcategoría hereda el sector de su madre; una categoría principal tiene que traerlo.
+  if (!f.parent_id && !f.unidad_negocio_id) {
+    errorCrear.value = 'Elegí a qué sector pertenece, o creá uno.'
+    return
+  }
   creando.value = true; errorCrear.value = ''
   try {
     const { data } = await createCategoriaContable({
@@ -280,56 +286,42 @@ const resumenExtras = computed(() => {
 // Los tres están ligados: el usuario completa dos y el tercero sale solo. Cuál se recalcula
 // depende de cuál acaba de tocar — si escribís el total a mano, no queremos que la cantidad
 // se lo pise; si escribís cantidad y unitario, el total es una consecuencia.
+// Se cargan el TOTAL y la CANTIDAD; el precio unitario es el dato DERIVADO y se muestra
+// calculado, no se tipea.
+//
+// Antes eran tres campos ligados entre sí —completabas dos y el tercero se calculaba—, y el
+// total podía terminar siendo el resultado de una multiplicación en vez del número del ticket.
+// Eso está al revés: lo que de verdad pasó es que salieron $120.000; cuántos kilos entraron es
+// el segundo dato, y el precio por kilo no es un hecho sino una cuenta. Con tres campos
+// editables además había que adivinar cuál mandaba, y tocar la cantidad te reescribía el total
+// que acababas de tipear.
 const cantidadTexto = ref('')
-const unitarioTexto = ref('')
-const totalCalculado = ref(false)   // el total salió de cantidad × unitario, no lo tipeó nadie
 
 const numDe = (txt) => parseMonto(txt).monto
+const unidadLabel = computed(() => form.value.unidad_medida || 'unidad')
+
+// Precio por unidad: total ÷ cantidad. Vacío si falta alguno de los dos.
+const unitarioCalculado = computed(() => {
+  const cant  = numDe(cantidadTexto.value)
+  const total = numDe(montoTexto.value)
+  if (!(cant > 0 && total > 0)) return null
+  return fmtMiles(redondear(total / cant))
+})
 
 function onMonto(e) {
   const { texto, monto } = parseMonto(e.target.value)
   montoTexto.value = texto
   form.value.monto_ars = monto
-  totalCalculado.value = false
-  // El total mandado a mano manda: se recalcula el unitario, que es el dato derivado.
-  const cant = numDe(cantidadTexto.value)
-  unitarioTexto.value = cant > 0 && monto > 0 ? fmtMiles(redondear(monto / cant)) : unitarioTexto.value
   if (monto > 0) delete errores.value.monto_ars
 }
 
 function onCantidad(e) {
   cantidadTexto.value = parseMonto(e.target.value).texto
-  recalcularTotal()
 }
 
-function onUnitario(e) {
-  unitarioTexto.value = parseMonto(e.target.value).texto
-  recalcularTotal()
-}
-
-function recalcularTotal() {
-  const cant = numDe(cantidadTexto.value)
-  const uni  = numDe(unitarioTexto.value)
-  if (!(cant > 0 && uni > 0)) return
-
-  const total = multiplicarPlata(cant, uni)
-  montoTexto.value = fmtMiles(total)
-  form.value.monto_ars = total
-  totalCalculado.value = true
-  delete errores.value.monto_ars
-}
-
-// Cantidad × precio, en CENTAVOS ENTEROS.
-//
-// No es preciosismo: 2,5 × 3,33 debería dar 8,33, pero en punto flotante el producto ya nace
-// como 8.32499999999999928, así que redondearlo —con Math.round, con toFixed o sumándole
-// EPSILON, da igual— devuelve 8,32. Un centavo por movimiento, siempre para el mismo lado,
-// es la clase de diferencia que después no cierra contra el banco. Pasando el precio a
-// centavos enteros primero, la cuenta es exacta.
-const multiplicarPlata = (cantidad, unitario) =>
-  Math.round(cantidad * Math.round(unitario * 100)) / 100
-
-// El unitario derivado del total sí es una división: dos decimales y a otra cosa.
+// El unitario es una división del total por la cantidad: dos decimales y a otra cosa. (Ya no
+// hace falta multiplicar plata en centavos enteros: el total lo tipea una persona, no sale de
+// una multiplicación, así que el error de punto flotante que se cuidaba acá no puede ocurrir.)
 const redondear = (n) => Math.round(n * 100) / 100
 
 // ─── Validez (una sola fuente para el botón y el submit) ────────────────────────
@@ -458,8 +450,6 @@ watch(() => props.modelValue, (abierto) => {
     montoTexto.value = fmtMiles(m.monto_ars)
     // Un movimiento guardado no trae cantidad: la fila queda vacía y el total, como estaba.
     cantidadTexto.value = ''
-    unitarioTexto.value = ''
-    totalCalculado.value = false
     paso.value = 'form'
     return
   }
@@ -601,9 +591,15 @@ const titulo = computed(() => {
                          después todos los movimientos de esta categoría la heredan. -->
                     <template v-if="!crearCat.parent_id">
                       <label v-if="!crearArea" class="mv-fld">
-                        <span class="mv-lbl">Sector <span class="mv-opt">(opcional)</span></span>
-                        <select class="mv-inp" v-model.number="crearCat.unidad_negocio_id">
-                          <option :value="null">— Sin sector —</option>
+                        <!-- El sector dejó de ser opcional. Con "— Sin sector —" de opción por
+                             defecto, la categoría nacía huérfana y TODOS sus movimientos caían
+                             en "Sin sector" en el balance por área: el panel mostraba plata que
+                             no era de ninguna parte. Si la organización todavía no definió
+                             sectores, se elige uno general o se crea acá mismo. -->
+                        <span class="mv-lbl">Sector <span class="mv-req">*</span></span>
+                        <select class="mv-inp" v-model.number="crearCat.unidad_negocio_id"
+                                :class="{ 'mv-inp--err': errorCrear && !crearCat.unidad_negocio_id }">
+                          <option :value="null" disabled>Elegí un sector</option>
                           <option v-for="u in areasDisponibles" :key="u.id" :value="u.id">{{ u.nombre }}</option>
                         </select>
                         <button type="button" class="mv-inline-new" @click.prevent="abrirCrearArea">
@@ -666,27 +662,26 @@ const titulo = computed(() => {
               </label>
             </div>
 
-            <!-- Cantidad × precio unitario = total.
-                 Los tres campos están ligados: completás dos y el que falta se calcula. Antes
-                 sólo se podía cargar el total, así que "1000 etiquetas a $5" había que hacerlo
-                 con la calculadora, y el precio por unidad —que es lo que después dice si una
-                 compra fue cara o barata— no quedaba registrado en ningún lado. -->
+            <!-- Cuánto entró, y el precio por unidad que sale de dividir. El monto de arriba es
+                 el total del ticket y no lo pisa nadie: acá sólo se declara la cantidad. -->
             <div class="mv-cant">
               <label class="mv-fld">
                 <span class="mv-lbl">Cantidad <span class="mv-opt">opcional</span></span>
                 <input type="text" inputmode="decimal" class="mv-inp"
                        :value="cantidadTexto" @input="onCantidad" placeholder="1000" />
               </label>
-              <span class="mv-cant-op">×</span>
               <label class="mv-fld">
-                <span class="mv-lbl">Precio c/u</span>
-                <input type="text" inputmode="decimal" class="mv-inp"
-                       :value="unitarioTexto" @input="onUnitario" placeholder="$0" />
+                <span class="mv-lbl">Unidad</span>
+                <select class="mv-inp" v-model="form.unidad_medida">
+                  <option v-for="u in UNIDADES_INSUMO" :key="u" :value="u">{{ u }}</option>
+                </select>
               </label>
-              <span class="mv-cant-op">=</span>
-              <span class="mv-cant-total" :class="{ 'is-calc': totalCalculado }">
-                {{ montoTexto ? `$${montoTexto}` : '—' }}
-              </span>
+              <div class="mv-cant-calc">
+                <span class="mv-lbl">Precio por {{ unidadLabel }}</span>
+                <span class="mv-cant-total" :class="{ 'is-calc': !!unitarioCalculado }">
+                  {{ unitarioCalculado ? `$${unitarioCalculado}` : '—' }}
+                </span>
+              </div>
             </div>
 
             <!-- Paciente (aportes) -->
@@ -984,7 +979,10 @@ const titulo = computed(() => {
 /* Cantidad × unitario = total. La fila se lee como la cuenta que es. */
 .mv-cant { display: flex; align-items: flex-end; gap: var(--sp-2); flex-wrap: wrap; margin-top: var(--sp-3); }
 .mv-cant .mv-fld { flex: 0 0 120px; }
-.mv-cant-op { padding-bottom: 10px; color: var(--c-ink-400); font-weight: 600; }
+/* Se fue `.mv-cant-op` (los signos × y = de los tres campos ligados). El precio por unidad ya
+   no es un input sino un valor calculado, y va con su propia etiqueta para que se lea como
+   resultado y no como algo que se puede escribir. */
+.mv-cant-calc { display: flex; flex-direction: column; gap: 4px; padding-bottom: 2px; }
 .mv-cant-total {
   padding-bottom: 8px; font-size: var(--fs-15); font-weight: 700; color: var(--c-ink-700);
   min-width: 90px;

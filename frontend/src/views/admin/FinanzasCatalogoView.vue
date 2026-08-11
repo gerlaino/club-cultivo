@@ -4,6 +4,12 @@
 // los depósitos responden a un sector. Los depósitos se ven acá (read-only) y se gestionan en el hub
 // "Depósito". Las categorías sin sector caen en el bucket "Sin sector" (así ninguna queda huérfana).
 import { ref, reactive, computed, onMounted } from 'vue'
+import CategoriaForm from '../../components/contabilidad/CategoriaForm.vue'
+
+// La pantalla se embebe dentro de Contabilidad, que tiene SU propia copia del catálogo para el
+// modal de Nuevo movimiento. Sin este aviso, creabas una categoría acá y el modal seguía con la
+// lista vieja hasta refrescar el navegador.
+const emit = defineEmits(['cambio'])
 import { useCatalogoFinanzasStore } from '../../stores/catalogoFinanzas.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
@@ -45,16 +51,28 @@ const familiaLabel = (d) => FAMILIA_LABEL[d.familia] || d.familia || 'general'
 const catForm = ref(null)
 // El tipo viene de la columna desde la que se apretó "+ Categoría": si estás mirando los
 // ingresos, la nueva nace como ingreso y no hay que acordarse de cambiar el select.
+// `slot` marca EN QUÉ columna se abrió el formulario, para renderizarlo ahí y no arriba de
+// todo. `sectorFijo` recuerda que el sector ya lo decidió el lugar del que salió el alta.
+function slotDe(areaId, tipo) { return `${areaId ?? 'sin'}:${tipo}` }
+
 function nuevaMadre(area = null, tipo = 'egreso') {
   catForm.value = { parent_id: null, nombre: '', tipo, unidad_negocio_id: area?.id ?? null,
-                    color: area?.color || COLORES[0], areaNombre: area?.nombre }
+                    color: area?.color || COLORES[0], areaNombre: area?.nombre,
+                    slot: slotDe(area?.id, tipo), sectorFijo: !!area }
 }
-function nuevaSub(madre) { catForm.value = { parent_id: madre.id, nombre: '', tipo: madre.tipo, madreNombre: madre.nombre } }
+function nuevaSub(madre) {
+  catForm.value = { parent_id: madre.id, nombre: '', tipo: madre.tipo, madreNombre: madre.nombre,
+                    slot: slotDe(madre.unidad_negocio_id, madre.tipo) }
+}
 function editar(c, madre = null) {
+  const areaId = madre?.unidad_negocio_id ?? c.unidad_negocio_id
   catForm.value = {
     id: c.id, parent_id: c.parent_id, nombre: c.nombre, tipo: c.tipo,
     unidad_negocio_id: c.unidad_negocio_id, color: c.color || COLORES[0],
     es_sistema: c.es_sistema, madreNombre: madre?.nombre,
+    // Editar abre el formulario donde está la categoría, no arriba. Al editar el sector SÍ se
+    // puede cambiar: mover una categoría de sector es una operación legítima.
+    slot: slotDe(areaId, c.tipo), sectorFijo: false,
   }
 }
 const esMadreForm = computed(() => catForm.value && !catForm.value.parent_id)
@@ -65,14 +83,28 @@ async function guardarCat() {
   const payload = { nombre: f.nombre.trim(), tipo: f.tipo, parent_id: f.parent_id }
   if (esMadreForm.value) { payload.unidad_negocio_id = f.unidad_negocio_id; payload.color = f.color }
   try {
+    let creada = null
     if (f.id) await store.actualizarCategoria(f.id, payload)
-    else      await store.crearCategoria(payload)
-    toast.success('Categoría guardada'); catForm.value = null
+    else      creada = await store.crearCategoria(payload)
+    emit('cambio')
+
+    // Recién creada una categoría MADRE, lo que sigue casi siempre es colgarle su primera
+    // subcategoría. Antes había que guardar, salir, volver a entrar y recién ahí aparecía el
+    // "+ Sub". Ahora el formulario queda abierto, ya apuntando a ella.
+    if (!f.id && creada?.id && !f.parent_id) {
+      toast.success(`"${creada.nombre}" creada — agregale una subcategoría o cancelá`)
+      nuevaSub({ ...creada, unidad_negocio_id: payload.unidad_negocio_id })
+      return
+    }
+
+    toast.success('Categoría guardada')
+    catForm.value = null
   } catch { toast.error(store.saveError) }
 }
 async function toggleActiva(c) {
   try {
     await store.actualizarCategoria(c.id, { activa: !c.activa })
+    emit('cambio')
     toast.success(c.activa ? 'Categoría desactivada' : 'Categoría reactivada')
   } catch { toast.error(store.saveError || 'No se pudo actualizar') }
 }
@@ -83,7 +115,7 @@ async function borrarCat(c) {
     variant: 'danger', confirmText: 'Eliminar',
   })
   if (!ok) return
-  try { await store.eliminarCategoria(c.id); toast.success('Categoría eliminada') }
+  try { await store.eliminarCategoria(c.id); emit('cambio'); toast.success('Categoría eliminada') }
   catch (e) { toast.error(e?.response?.data?.error || 'No se pudo eliminar') }
 }
 
@@ -105,6 +137,7 @@ async function guardarUnidad() {
       await cargarDepositos()
     }
     uniForm.value = null
+    emit('cambio')
   } catch { toast.error(store.saveError) }
 }
 async function borrarUnidad(u) {
@@ -165,34 +198,8 @@ async function borrarUnidad(u) {
         <div class="cat-form__actions"><button type="button" class="btn" @click="uniForm = null">Cancelar</button><button type="submit" class="btn btn--primary" :disabled="store.saving">Guardar</button></div>
       </form>
 
-      <!-- Form CATEGORÍA (al crear/editar) -->
-      <form v-if="catForm" class="cat-form" @submit.prevent="guardarCat">
-        <div class="cat-form__title">
-          {{ catForm.id ? 'Editar' : 'Nueva' }} {{ catForm.parent_id ? 'subcategoría' : 'categoría madre' }}
-          <span v-if="catForm.parent_id" class="cat-form__sub">de <b>{{ catForm.madreNombre }}</b></span>
-          <span v-else-if="catForm.areaNombre" class="cat-form__sub">en <b>{{ catForm.areaNombre }}</b></span>
-        </div>
-        <label class="fld">Nombre
-          <input v-model.trim="catForm.nombre" class="inp" :placeholder="catForm.parent_id ? 'Ej: Fertilizante' : 'Ej: Insumos'" maxlength="50" />
-        </label>
-        <template v-if="esMadreForm">
-          <div class="fld-row">
-            <label class="fld">Tipo
-              <select v-model="catForm.tipo" class="inp"><option value="egreso">Egreso (gasto)</option><option value="ingreso">Ingreso</option></select>
-            </label>
-            <label class="fld">Sector
-              <select v-model="catForm.unidad_negocio_id" class="inp">
-                <option :value="null">— Sin sector —</option>
-                <option v-for="u in store.unidadesActivas" :key="u.id" :value="u.id">{{ u.nombre }}</option>
-              </select>
-            </label>
-          </div>
-          <div class="fld"><span>Color</span>
-            <div class="swatches"><button v-for="c in COLORES" :key="c" type="button" class="sw" :class="{ 'sw--on': catForm.color === c }" :style="{ background: c }" @click="catForm.color = c"></button></div>
-          </div>
-        </template>
-        <div class="cat-form__actions"><button type="button" class="btn" @click="catForm = null">Cancelar</button><button type="submit" class="btn btn--primary" :disabled="store.saving">Guardar</button></div>
-      </form>
+      <!-- El formulario de categoría YA NO vive acá arriba: se renderiza dentro de la columna
+           del sector desde la que se apretó "+ Categoría". Ver `<CategoriaForm>` más abajo. -->
 
       <!-- Acordeón de sectores -->
       <div class="acc">
@@ -237,9 +244,19 @@ async function borrarUnidad(u) {
                 <p v-if="!catsDe(area.id, tipo).length" class="cat-col__vacio">
                   Sin {{ tipo === 'ingreso' ? 'ingresos' : 'egresos' }} todavía.
                 </p>
-                <button class="lnk cat-col__add" @click="nuevaMadre(area, tipo)">
+                <button v-if="catForm?.slot !== slotDe(area.id, tipo)" class="lnk cat-col__add" @click="nuevaMadre(area, tipo)">
                   <i class="bi bi-plus-lg"></i> Categoría
                 </button>
+                <CategoriaForm
+                  v-else
+                  v-model="catForm"
+                  :unidades="store.unidadesActivas"
+                  :colores="COLORES"
+                  :guardando="store.saving"
+                  :sector-fijo="!!catForm.sectorFijo"
+                  @guardar="guardarCat"
+                  @cancelar="catForm = null"
+                />
               </section>
             </div>
 
@@ -290,6 +307,16 @@ async function borrarUnidad(u) {
                     @borrar="borrarCat(m)"
                   />
                 </template>
+                <CategoriaForm
+                  v-if="catForm?.slot === slotDe(null, tipo)"
+                  v-model="catForm"
+                  :unidades="store.unidadesActivas"
+                  :colores="COLORES"
+                  :guardando="store.saving"
+                  :sector-fijo="false"
+                  @guardar="guardarCat"
+                  @cancelar="catForm = null"
+                />
               </section>
             </div>
           </div>
