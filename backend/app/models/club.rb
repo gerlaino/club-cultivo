@@ -385,10 +385,16 @@ class Club < ApplicationRecord
     ADDONS_INCOMPLETOS.include?(key.to_s)
   end
 
+  # Dos topes con propósitos distintos:
+  #
+  # `limite_hora` es una protección contra ráfagas (un bucle, un botón trabado). `limite_mes` es
+  # el tope que se VENDE: el costo de la IA se acumula por mes, no por hora, y lo paga la
+  # organización. Sin el mensual el add-on no tiene techo — una organización con 2.000 llamadas
+  # al mes cuesta ~US$60 y estaría pagando lo mismo que una de 200.
   IA_TIERS = {
-    'basico'     => { label: 'Básico',     limite_hora: 20,  color: '#64748b' },
-    'pro'        => { label: 'Pro',        limite_hora: 60,  color: '#0891b2' },
-    'enterprise' => { label: 'Enterprise', limite_hora: 200, color: '#7c3aed' },
+    'basico'     => { label: 'Básico',     limite_hora: 20,  limite_mes:    500, color: '#64748b' },
+    'pro'        => { label: 'Pro',        limite_hora: 60,  limite_mes:  2_000, color: '#0891b2' },
+    'enterprise' => { label: 'Enterprise', limite_hora: 200, limite_mes: 10_000, color: '#7c3aed' },
   }.freeze
 
   def ia_config
@@ -398,6 +404,8 @@ class Club < ApplicationRecord
   def ia_limite_efectivo
     ia_limite_hora.positive? ? ia_limite_hora : ia_config[:limite_hora]
   end
+
+  def ia_limite_mes = ia_config[:limite_mes]
 
   def smtp_configured?
     smtp_host.present? && smtp_user.present? && smtp_pass.present?

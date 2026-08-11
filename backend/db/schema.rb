@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_10_130000) do
+ActiveRecord::Schema[7.2].define(version: 2026_08_11_020000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -959,6 +959,24 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_10_130000) do
     t.index ["deleted_at"], name: "index_geneticas_on_deleted_at"
     t.index ["deleted_by_id"], name: "index_geneticas_on_deleted_by_id"
     t.index ["numero_registro_inase"], name: "idx_geneticas_numero_inase", unique: true, where: "(numero_registro_inase IS NOT NULL)"
+  end
+
+  create_table "ia_llamadas", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "user_id"
+    t.string "funcion", null: false
+    t.string "modelo", null: false
+    t.integer "input_tokens", default: 0, null: false
+    t.integer "output_tokens", default: 0, null: false
+    t.decimal "costo_usd", precision: 12, scale: 6, default: "0.0", null: false
+    t.boolean "ok", default: true, null: false
+    t.string "error_clase"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "created_at"], name: "index_ia_llamadas_on_club_id_and_created_at"
+    t.index ["club_id", "funcion"], name: "index_ia_llamadas_on_club_id_and_funcion"
+    t.index ["club_id"], name: "index_ia_llamadas_on_club_id"
+    t.index ["user_id"], name: "index_ia_llamadas_on_user_id"
   end
 
   create_table "indicacion_medicas", force: :cascade do |t|
@@ -2260,6 +2278,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_10_130000) do
   add_foreign_key "geneticas", "clubs"
   add_foreign_key "geneticas", "geneticas", column: "declarada_como_id"
   add_foreign_key "geneticas", "users", column: "deleted_by_id"
+  add_foreign_key "ia_llamadas", "clubs"
+  add_foreign_key "ia_llamadas", "users"
   add_foreign_key "indicacion_medicas", "pacientes"
   add_foreign_key "indicacion_medicas", "users"
   add_foreign_key "indicacion_medicas", "users", column: "deleted_by_id"

@@ -2,6 +2,8 @@ class AnalisisLoteService
   require 'net/http'
   require 'json'
 
+  MODELO = 'claude-sonnet-4-6'.freeze
+
   def initialize(lote, usuario)
     @lote    = lote
     @usuario = usuario
@@ -120,13 +122,14 @@ class AnalisisLoteService
     req['x-api-key']         = api_key
     req['anthropic-version'] = '2023-06-01'
     req.body = {
-      model:      'claude-sonnet-4-6',
+      model:      MODELO,
       max_tokens: 1500,
       messages:   [{ role: 'user', content: prompt }]
     }.to_json
 
     res  = http.request(req)
     body = JSON.parse(res.body)
+    registrar_uso(body, ok: res.code.to_i == 200)
 
     return { error: "IA: #{body.dig('error', 'message')}" } if res.code.to_i != 200
 
@@ -135,7 +138,19 @@ class AnalisisLoteService
       tokens: body.dig('usage', 'output_tokens'),
     }
   rescue => e
+    registrar_uso(nil, ok: false, error_clase: e.class.name)
     { error: e.message }
+  end
+
+  # `analisis_ia.tokens_usados` ya guardaba los tokens de SALIDA de este análisis, pero sólo de
+  # este: no servía para saber cuánto consume la organización en total ni cuánto costó (le falta
+  # la entrada, que es la mayor parte). El registro en IaLlamada es el consolidado de las cinco
+  # funciones que llaman a la API.
+  def registrar_uso(body, ok: true, error_clase: nil)
+    entrada, salida = Ia::Uso.tokens_de(body)
+    Ia::Uso.registrar(club: @club, user: @usuario, funcion: :analisis_lote,
+                      modelo: MODELO, input_tokens: entrada, output_tokens: salida,
+                      ok: ok, error_clase: error_clase)
   end
 
   def serializar(a)

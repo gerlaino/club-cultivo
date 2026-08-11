@@ -1,6 +1,7 @@
 class PlanTrabajoIaService
   TIPOS_VALIDOS    = %w[riego poda medicion limpieza cosecha trasplante inspeccion otro].freeze
   PRIORIDADES_VALIDAS = %w[baja normal alta urgente].freeze
+  MODELO              = "claude-sonnet-4-6".freeze
 
   def initialize(archivo, club)
     @archivo  = archivo
@@ -198,13 +199,14 @@ class PlanTrabajoIaService
     request["x-api-key"]         = ENV["ANTHROPIC_API_KEY"]
     request["anthropic-version"] = "2023-06-01"
     request.body = {
-      model:      "claude-sonnet-4-6",
+      model:      MODELO,
       max_tokens: 4096,
       messages:   [{ role: "user", content: prompt }],
     }.to_json
 
     response = http.request(request)
     body     = JSON.parse(response.body)
+    registrar_uso(body, ok: response.code.to_i == 200)
 
     if response.code.to_i != 200
       Rails.logger.error "PlanTrabajoIaService Claude error: #{body['error']&.dig('message')}"
@@ -219,7 +221,17 @@ class PlanTrabajoIaService
     { error: "La IA no devolvió un formato válido. Probá con un CSV estructurado." }
   rescue => e
     Rails.logger.error "PlanTrabajoIaService llamar_claude error: #{e.message}"
+    registrar_uso(nil, ok: false, error_clase: e.class.name)
     { error: "Error de conexión con el servicio de IA." }
+  end
+
+  # Sin usuario: el plan se genera desde un archivo subido y el service no recibe quién lo hizo.
+  # El consumo igual es de la organización, que es lo que se factura.
+  def registrar_uso(body, ok: true, error_clase: nil)
+    entrada, salida = Ia::Uso.tokens_de(body)
+    Ia::Uso.registrar(club: @club, funcion: :plan_trabajo, modelo: MODELO,
+                      input_tokens: entrada, output_tokens: salida,
+                      ok: ok, error_clase: error_clase)
   end
 
   # ── Modo CSV simple (fallback sin IA) ─────────────────────────

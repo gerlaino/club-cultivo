@@ -99,7 +99,11 @@ class AsistenteController < BaseController
     estado_nuevo:  enraizado | vegetativo | floracion | cosecha | secado | curado | finalizado
   PROMPT
 
-  LIMITE_LLAMADAS_POR_HORA = 20
+  # El modelo que usa el asistente, en un solo lugar: se registra en cada llamada para poder
+  # costear el consumo (`IaLlamada::PRECIOS`), y estaba escrito a mano en dos funciones.
+  # (`LIMITE_LLAMADAS_POR_HORA` vivía acá y no lo usaba nadie: el tope real sale del tier del
+  # club — ver Ia::Uso.)
+  MODELO_ASISTENTE = 'claude-sonnet-4-6'.freeze
 
   # POST /asistente/parsear
   def parsear
@@ -109,7 +113,9 @@ class AsistenteController < BaseController
     contexto = params[:contexto]
 
     return render json: { error: 'Texto vacío' }, status: :unprocessable_entity if texto.blank?
-    return render json: { error: 'Límite de uso alcanzado. Volvé en unos minutos.' }, status: :too_many_requests if rate_limited?
+    if (msg = limite_ia)
+      return render json: { error: msg, limite_ia: true }, status: :too_many_requests
+    end
 
     es_cultivador  = current_user.cultivador?
     sesion         = ConversacionAsistente.de_hoy(current_user)
@@ -135,7 +141,9 @@ class AsistenteController < BaseController
     contexto = params[:contexto]
 
     return render json: { error: 'Texto vacío' }, status: :unprocessable_entity if texto.blank?
-    return render json: { error: 'Límite de uso alcanzado. Volvé en unos minutos.' }, status: :too_many_requests if rate_limited?
+    if (msg = limite_ia)
+      return render json: { error: msg, limite_ia: true }, status: :too_many_requests
+    end
 
     sesion  = ConversacionAsistente.de_hoy(current_user)
     prompt  = construir_prompt_consulta(contexto) + sesion.historial_para_prompt
@@ -153,7 +161,9 @@ class AsistenteController < BaseController
   def analizar_lote
     return render json: { error: 'No tenés permiso para usar análisis IA.' }, status: :forbidden unless current_user.admin? || current_user.supervisor?
     return render json: { error: 'El análisis de IA no está disponible para este club.' }, status: :forbidden unless current_user.club.feature?(:ia_analisis)
-    return render json: { error: 'Límite de uso alcanzado. Volvé en unos minutos.' }, status: :too_many_requests if rate_limited?
+    if (msg = limite_ia)
+      return render json: { error: msg, limite_ia: true }, status: :too_many_requests
+    end
 
     lote = current_user.club.lotes.find_by(id: params[:lote_id])
     return render json: { error: 'Lote no encontrado' }, status: :not_found unless lote
@@ -270,15 +280,19 @@ class AsistenteController < BaseController
     { id: a.id, contenido: a.contenido, tokens_usados: a.tokens_usados, created_at: a.created_at }
   end
 
-  def rate_limited?
-    limite = current_user.club.ia_limite_efectivo
-    key    = "asistente:user:#{current_user.id}:#{Time.current.strftime('%Y%m%d%H')}"
-    redis  = Redis.new(url: ENV.fetch('REDIS_URL', 'redis://localhost:6379/0'))
-    count  = redis.incr(key)
-    redis.expire(key, 3600) if count == 1
-    count > limite
-  rescue
-    false
+  # El tope y el registro viven en Ia::Uso. Antes esto contaba por USUARIO y por hora, mientras
+  # el límite es de la organización: cinco usuarios en tier básico daban 100 llamadas/hora en vez
+  # de 20. Ahora el mensual (que es el que se vende) se cuenta contra la base y el horario queda
+  # como freno de ráfaga, por club.
+  def limite_ia
+    Ia::Uso.limite_alcanzado(current_user.club, current_user)
+  end
+
+  def registrar_uso(funcion, modelo, body, ok: true, error_clase: nil)
+    entrada, salida = Ia::Uso.tokens_de(body)
+    Ia::Uso.registrar(club: current_user.club, user: current_user, funcion: funcion,
+                      modelo: modelo, input_tokens: entrada, output_tokens: salida,
+                      ok: ok, error_clase: error_clase)
   end
 
   def construir_prompt(contexto, es_cultivador)
@@ -522,10 +536,12 @@ class AsistenteController < BaseController
 
     response = http.request(request)
     body     = JSON.parse(response.body)
+    registrar_uso(:asistente_consultar, MODELO_ASISTENTE, body, ok: response.code.to_i == 200)
     return { error: "IA: #{body.dig('error', 'message')}" } if response.code.to_i != 200
 
     { texto: body.dig('content', 0, 'text').to_s.strip }
   rescue => e
+    registrar_uso(:asistente_consultar, MODELO_ASISTENTE, nil, ok: false, error_clase: e.class.name)
     { error: e.message }
   end
 
@@ -552,6 +568,7 @@ class AsistenteController < BaseController
 
     response = http.request(request)
     body     = JSON.parse(response.body)
+    registrar_uso(:asistente_parsear, MODELO_ASISTENTE, body, ok: response.code.to_i == 200)
 
     if response.code.to_i != 200
       return { error: "Error de IA: #{body['error']&.dig('message') || response.code}" }

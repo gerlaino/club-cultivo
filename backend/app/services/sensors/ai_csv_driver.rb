@@ -16,6 +16,8 @@ module Sensors
       'humedad_sustrato'     => '%',
     }.freeze
 
+    MODELO = 'claude-haiku-4-5-20251001'.freeze
+
     class CsvParseError < StandardError; end
 
     def initialize(sala, registrado_por)
@@ -134,13 +136,18 @@ module Sensors
       req['x-api-key']         = api_key
       req['anthropic-version'] = '2023-06-01'
       req.body = {
-        model:      'claude-haiku-4-5-20251001',
+        model:      MODELO,
         max_tokens: 512,
         messages:   [{ role: 'user', content: prompt }],
       }.to_json
 
       response = http.request(req)
       body     = JSON.parse(response.body)
+
+      entrada, salida = Ia::Uso.tokens_de(body)
+      Ia::Uso.registrar(club: @sala.club, user: @registrado_por, funcion: :csv_import,
+                        modelo: MODELO, input_tokens: entrada, output_tokens: salida,
+                        ok: response.code.to_i == 200)
 
       raise CsvParseError, "IA error #{response.code}: #{body.dig('error', 'message')}" if response.code.to_i != 200
 
