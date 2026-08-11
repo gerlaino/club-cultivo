@@ -130,31 +130,69 @@ function md(texto) {
   return out.join('\n')
 }
 
+// Verde de marca, el mismo `theme_color` del manifest.
+const VERDE = '#0F2A1E'
+const HOJA  = '#40684c'
+
+// El logo va embebido en base64: así el PDF no depende de rutas locales ni de que
+// wkhtmltopdf pueda leer el archivo en el momento de generar.
+const LOGO = (() => {
+  const p = path.join(RAIZ, 'frontend/public/logo-ce-redondo.png')
+  return fs.existsSync(p) ? `data:image/png;base64,${fs.readFileSync(p).toString('base64')}` : null
+})()
+
 const CSS = `
-  @page { margin: 20mm 16mm; }
-  body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; color: #16211b;
-         font-size: 10.5pt; line-height: 1.55; }
-  .portada { page-break-after: always; padding-top: 55mm; }
-  .portada h1 { font-size: 30pt; margin: 0 0 .2em; letter-spacing: -.02em; }
-  .portada .rol { font-size: 15pt; color: #40684c; font-weight: 700; margin: 0 0 1.2em; }
-  .portada .bajada { font-size: 11pt; color: #55605a; max-width: 105mm; }
-  .portada .pie { margin-top: 22mm; font-size: 8.5pt; color: #8b9186; }
-  h2 { font-size: 15pt; margin: 1.6em 0 .5em; padding-bottom: .25em;
-       border-bottom: 2px solid #40684c; page-break-after: avoid; }
-  h3 { font-size: 11.5pt; margin: 1.3em 0 .35em; color: #1d3327; page-break-after: avoid; }
-  h4 { font-size: 10.5pt; margin: 1em 0 .3em; color: #40684c; page-break-after: avoid; }
-  p, li { orphans: 3; widows: 3; }
-  ul, ol { padding-left: 1.15em; }
-  li { margin-bottom: .2em; }
-  code { background: #eef1ee; padding: .1em .3em; border-radius: 3px; font-size: 9pt; }
-  blockquote { margin: .7em 0; padding: .5em .8em; background: #f4f7f4;
-               border-left: 3px solid #40684c; color: #3c4a41; }
-  table { border-collapse: collapse; width: 100%; margin: .7em 0; font-size: 9.5pt;
-          page-break-inside: avoid; }
-  th, td { border: 1px solid #d7dcd8; padding: .35em .5em; text-align: left; vertical-align: top; }
-  th { background: #f4f7f4; }
+  @page { margin: 22mm 18mm; }
+  body { font-family: "DejaVu Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+         color: #16211b; font-size: 10.5pt; line-height: 1.6; }
+
+  /* ── Portada ──────────────────────────────────────────────────────────────
+     Ocupa la página entera con el color de marca. Antes era texto plano alineado
+     a la izquierda sobre blanco: parecía un borrador, no un manual que se entrega. */
+  .portada { page-break-after: always; text-align: center; padding-top: 34mm; }
+  .portada .logo { width: 42mm; height: 42mm; margin-bottom: 12mm; }
+  .portada .marca { font-size: 27pt; font-weight: 700; letter-spacing: .06em;
+                    text-transform: uppercase; color: ${VERDE}; margin: 0 0 3mm; }
+  .portada .linea { width: 26mm; height: 3px; background: ${HOJA}; margin: 0 auto 9mm; }
+  .portada .kicker { font-size: 9.5pt; letter-spacing: .22em; text-transform: uppercase;
+                     color: #8b9186; margin: 0 0 2mm; }
+  .portada .rol { font-size: 21pt; font-weight: 700; color: ${VERDE}; margin: 0 0 7mm; }
+  .portada .bajada { font-size: 11.5pt; color: #55605a; max-width: 110mm;
+                     margin: 0 auto; line-height: 1.5; }
+  .portada .pie { margin-top: 30mm; font-size: 8.5pt; color: #9aa39c; }
+
+  /* ── Índice ─────────────────────────────────────────────────────────────── */
   .indice { page-break-after: always; }
-  .indice li { margin-bottom: .3em; }
+  .indice h2 { margin-top: 0; }
+  .indice ol { list-style: none; padding: 0; margin: 0; counter-reset: mod; }
+  .indice > ol > li { counter-increment: mod; margin-bottom: 5mm; }
+  .indice .mod { font-weight: 700; color: ${VERDE}; font-size: 11.5pt; }
+  .indice .mod::before { content: counter(mod) ". "; color: ${HOJA}; }
+  .indice ul { list-style: none; padding-left: 7mm; margin: 1.5mm 0 0; }
+  .indice ul li { color: #55605a; font-size: 10pt; margin-bottom: 1mm; }
+
+  /* ── Cuerpo ─────────────────────────────────────────────────────────────── */
+  h2 { font-size: 16pt; color: ${VERDE}; margin: 0 0 6mm; padding: 3mm 0 3mm 4mm;
+       border-left: 5px solid ${HOJA}; background: #f4f7f4; page-break-after: avoid; }
+  .modulo { page-break-before: always; }
+  .modulo:first-of-type { page-break-before: avoid; }
+  h3 { font-size: 12.5pt; color: ${VERDE}; margin: 7mm 0 2mm; page-break-after: avoid; }
+  h3 + p, h3 + ol, h3 + ul { margin-top: 0; }
+  h4 { font-size: 10.5pt; color: ${HOJA}; margin: 5mm 0 1.5mm; page-break-after: avoid; }
+  p { margin: 0 0 3mm; orphans: 3; widows: 3; }
+  ul, ol { padding-left: 6mm; margin: 0 0 3mm; }
+  li { margin-bottom: 1.5mm; orphans: 2; widows: 2; }
+  strong { color: ${VERDE}; }
+  code { background: #eef1ee; padding: .1em .35em; border-radius: 3px;
+         font-family: "DejaVu Sans Mono", monospace; font-size: 8.5pt; }
+  blockquote { margin: 4mm 0; padding: 3mm 4mm; background: #f4f7f4;
+               border-left: 4px solid ${HOJA}; color: #3c4a41; page-break-inside: avoid; }
+  blockquote p:last-child { margin-bottom: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 4mm 0; font-size: 9.5pt;
+          page-break-inside: avoid; }
+  th, td { border: 1px solid #d7dcd8; padding: 2mm 2.5mm; text-align: left; vertical-align: top; }
+  th { background: ${VERDE}; color: #fff; font-weight: 700; }
+  tr:nth-child(even) td { background: #fafbfa; }
 `
 
 function compilar(rol, tareas, fecha) {
@@ -175,23 +213,31 @@ function compilar(rol, tareas, fecha) {
     m.tareas.push(t)
   }
 
+  // Cada módulo arranca en página nueva: un manual se consulta salteado, no se lee de corrido.
   const cuerpo = modulos.map(m =>
-    `<h2>${m.nombre}</h2>\n` + m.tareas.map(t => `<h3>${t.titulo}</h3>\n${md(t.cuerpo)}`).join('\n')
+    `<div class="modulo"><h2>${m.nombre}</h2>\n` +
+    m.tareas.map(t => `<h3>${t.titulo}</h3>\n${md(t.cuerpo)}`).join('\n') +
+    `</div>`
   ).join('\n')
 
   const indice = modulos.map(m =>
-    `<li><strong>${m.nombre}</strong><ul>${m.tareas.map(t => `<li>${t.titulo}</li>`).join('')}</ul></li>`
+    `<li><span class="mod">${m.nombre}</span><ul>${m.tareas.map(t => `<li>${t.titulo}</li>`).join('')}</ul></li>`
   ).join('')
+
+  const logo = LOGO ? `<img class="logo" src="${LOGO}" alt="">` : ''
 
   return `<!doctype html><html lang="es"><head><meta charset="utf-8">
 <title>Manual de ${meta.titulo} — Cultivo Espacial</title><style>${CSS}</style></head><body>
 <div class="portada">
-  <h1>Cultivo Espacial</h1>
-  <p class="rol">Manual de ${meta.titulo}</p>
+  ${logo}
+  <p class="marca">Cultivo Espacial</p>
+  <div class="linea"></div>
+  <p class="kicker">Manual de uso</p>
+  <p class="rol">${meta.titulo}</p>
   <p class="bajada">${meta.bajada}</p>
   <p class="pie">Actualizado el ${fecha}</p>
 </div>
-<div class="indice"><h2>Contenido</h2><ul>${indice}</ul></div>
+<div class="indice"><h2>Contenido</h2><ol>${indice}</ol></div>
 ${cuerpo}
 </body></html>`
 }
@@ -230,7 +276,9 @@ for (const rol of objetivo) {
   const html = compilar(rol, tareas, fecha)
   if (!html) { console.log(`· ${rol}: sin tareas todavía`); continue }
 
-  const htmlPath = path.join(SALIDA, `manual-${rol}.html`)
+  // El HTML es un intermedio, no un entregable: va a /tmp para que `dist/` tenga sólo PDFs.
+  // Antes quedaba al lado del PDF y parecía que cada manual estaba duplicado.
+  const htmlPath = path.join(require('os').tmpdir(), `manual-${rol}.html`)
   const pdfPath  = path.join(SALIDA, `manual-${rol}.pdf`)
   fs.writeFileSync(htmlPath, html)
 
