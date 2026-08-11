@@ -1,0 +1,3 @@
+
+# Los manuales se generan con `npm run manuales` — la fuente son las tareas en tareas/
+dist/

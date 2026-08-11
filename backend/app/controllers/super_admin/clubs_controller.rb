@@ -262,6 +262,8 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       deleted_at:       c.deleted_at,
       activo:           c.activo,
       estado:           estado_de(c),
+      salud:            salud_de(c),
+      salud_label:      SALUD[salud_de(c)],
       # Qué contrató: la lista se ordena por suites, no por el plan viejo.
       features:         c.features_expandidas,
     }
@@ -277,6 +279,32 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     return 'eliminado'  if c.deleted_at.present?
     return 'suspendido' unless c.activo?
     'activo'
+  end
+
+  # Cómo le está yendo, en UNA palabra. `estado_de` dice si la cuenta está viva; esto dice si
+  # necesita algo — que es la pregunta con la que se abre la lista. Antes había que cruzar
+  # cuatro columnas (plan, vencimiento, suites, módulos) para deducirlo organización por
+  # organización.
+  #
+  # El orden es el mismo que la cola del panel: primero lo que cuesta plata.
+  SALUD = {
+    'vencida'    => 'Plan vencido',
+    'sin_suites' => 'Sin suites',
+    'a_medias'   => 'Módulos a medias',
+    'ok'         => 'Operando',
+  }.freeze
+
+  def salud_de(c)
+    return nil if c.deleted_at.present? || !c.activo? # ahí manda el estado administrativo
+
+    return 'vencida'    if c.plan_activo_hasta.present? && c.plan_activo_hasta < Time.zone.today
+    return 'sin_suites' if Club::SUITES.keys.none? { |s| c.suite?(s) }
+
+    # Prendido ≠ andando: es la misma pregunta que responde `estado_modulo` en la ficha.
+    a_medias = (Club::ADDONS.keys + Club::INCLUIDOS_EN_SUITE.keys).any? do |m|
+      c.feature?(m) && c.falta_para_funcionar(m).present?
+    end
+    a_medias ? 'a_medias' : 'ok'
   end
 
   def serialize_club_detail(c)

@@ -24,6 +24,16 @@ const ESTADO_META = {
   eliminado:  { label: 'Eliminado',  color: '#b91c1c', bg: '#fee2e2' },
 }
 
+// Cómo le va, en una palabra. `estado` dice si la cuenta está viva; esto dice si necesita algo,
+// que es la pregunta con la que se abre esta lista. Antes había que cruzar plan, vencimiento,
+// suites y módulos a ojo, fila por fila. "Operando" no se muestra: lo normal no necesita
+// etiqueta — sólo se marca lo que pide atención.
+const SALUD_META = {
+  vencida:    { label: 'Plan vencido',      color: '#b91c1c', bg: '#fee2e2' },
+  sin_suites: { label: 'Sin suites',        color: '#b91c1c', bg: '#fee2e2' },
+  a_medias:   { label: 'Módulos a medias',  color: '#b45309', bg: '#fffbeb' },
+}
+
 // Ya no se vende por "planes" (Semilla/Brote/Cosecha/Federación) sino por SUITES: Cultivo y
 // Producción/Dispensa, más add-ons. Lo que importa de un club en la lista es qué contrató,
 // no en qué escalón de una tabla de precios vieja quedó.
@@ -154,6 +164,10 @@ onMounted(async () => {
                     :style="{ background: ESTADO_META[c.estado].bg, color: ESTADO_META[c.estado].color }">
                 <component :is="c.estado === 'eliminado' ? Trash2 : PauseCircle" :size="10" :stroke-width="2.5" />
                 {{ ESTADO_META[c.estado].label }}
+              </span>
+              <span v-else-if="SALUD_META[c.salud]" class="sac__estado"
+                    :style="{ background: SALUD_META[c.salud].bg, color: SALUD_META[c.salud].color }">
+                {{ SALUD_META[c.salud].label }}
               </span>
             </div>
             <div class="sac__slug">{{ c.slug }}</div>
