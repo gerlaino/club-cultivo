@@ -16,7 +16,7 @@ module Public
       unless total_clubes >= 3
         return render json: {
           disponible: false,
-          razon: 'Se necesitan al menos 3 clubes participantes para publicar datos de benchmark.',
+          razon: 'Se necesitan al menos 3 organizaciones participantes para publicar datos de benchmark.',
           clubes_participantes: total_clubes,
         }
       end
@@ -63,7 +63,7 @@ module Public
           dispensaciones_mes:        dispens_count,
           geneticas_distintas:       geneticas_distintas,
         },
-        nota: 'Datos agregados y anonimizados. Ningún club es identificable individualmente.',
+        nota: 'Datos agregados y anonimizados. Ninguna organización es identificable individualmente.',
       }
     end
 

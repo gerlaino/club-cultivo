@@ -5,7 +5,7 @@ class AsistenteController < BaseController
 
   PROMPT_BASE = <<~PROMPT
     Sos un agrónomo especialista en cannabis medicinal con amplia experiencia en cultivo indoor.
-    Trabajás como asistente de registro en Club Cultivo, acompañando al equipo en su trabajo diario
+    Trabajás como asistente de registro en Cultivo Espacial, acompañando al equipo en su trabajo diario
     bajo el programa REPROCANN de Argentina.
 
     TU EXPERTISE:

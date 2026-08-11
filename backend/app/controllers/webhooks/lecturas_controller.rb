@@ -28,13 +28,13 @@ module Webhooks
         render json: { error: 'Unauthorized' }, status: :unauthorized and return
       end
 
-      # El club puede haber apagado IoT (o haberse dado de baja) sin que nadie desenchufe el
+      # La organización puede haber apagado IoT (o haberse dado de baja) sin que nadie desenchufe el
       # sensor: el hardware sigue posteando. Se rechaza acá y no se ingiere nada — aceptar y
-      # descartar en silencio dejaría al club generando lecturas, reglas y alertas de un
+      # descartar en silencio dejaría a la organización generando lecturas, reglas y alertas de un
       # módulo que no tiene. 403 explícito para que el dispositivo no lo tome por caída.
       club = @dispositivo.club
       unless club&.activo? && !club.eliminado? && club.feature?(:iot)
-        render json: { error: 'Ambiente / IoT no está habilitado para este club' },
+        render json: { error: 'Ambiente / IoT no está habilitado para esta organización' },
                status: :forbidden and return
       end
 

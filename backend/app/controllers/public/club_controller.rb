@@ -3,7 +3,7 @@ module Public
     def show
       club = current_club
 
-      return render json: { error: 'Club no encontrado' }, status: :not_found unless club
+      return render json: { error: 'Organización no encontrada' }, status: :not_found unless club
 
       render json: {
         id: club.id,

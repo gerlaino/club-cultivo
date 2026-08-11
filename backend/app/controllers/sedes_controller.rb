@@ -5,8 +5,8 @@ class SedesController < ApplicationController
   before_action :set_sede, only: [:show, :update, :destroy]
 
   def index
-    # SIN ASIGNACIÓN = VE TODO. La asignación de sedes es un recorte opcional: un club chico no
-    # asigna nada y su cultivador tiene que ver el club entero. Antes, cultivador y supervisor sin
+    # SIN ASIGNACIÓN = VE TODO. La asignación de sedes es un recorte opcional: una organización chico no
+    # asigna nada y su cultivador tiene que ver la organización entero. Antes, cultivador y supervisor sin
     # sedes veían una pantalla vacía con "Sin sedes asignadas" —parecía un problema de permisos
     # cuando en realidad nadie había recortado nada—. El dispensador ya tenía este fallback.
     todas     = current_user.club.sedes.activas
@@ -70,7 +70,7 @@ class SedesController < ApplicationController
 
   def destroy
     if current_user.club.sedes.count <= 1
-      return render json: { error: 'No se puede eliminar la única sede del club' }, status: :unprocessable_entity
+      return render json: { error: 'No se puede eliminar la única sede de la organización' }, status: :unprocessable_entity
     end
     @sede.soft_delete!
     head :no_content

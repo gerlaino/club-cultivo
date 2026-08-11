@@ -112,7 +112,7 @@ class PreferencesController < ApplicationController
     remitente = @club.email_from
     settings  = @club.smtp_settings
     asunto    = "✓ Prueba de correo — #{@club.name}"
-    cuerpo    = "Este es un correo de prueba enviado desde Club Cultivo para verificar el correo del club #{@club.name}."
+    cuerpo    = "Este es un correo de prueba enviado desde Cultivo Espacial para verificar el correo de la organización #{@club.name}."
     metodo, opts_envio = Rails.env.test? ? [:test, {}] : [:smtp, settings]
     Mail.deliver do
       from    remitente
@@ -127,7 +127,7 @@ class PreferencesController < ApplicationController
     render json: { error: "Error de conexión SMTP: #{e.message}" }, status: :unprocessable_entity
   end
 
-  # PATCH /preferences/conectar_email — el club conecta su propia casilla. Solo carga email +
+  # PATCH /preferences/conectar_email — la organización conecta su propia casilla. Solo carga email +
   # contraseña de aplicación (+ nombre opcional); el servidor/puerto se autodetectan del dominio.
   # Verifica la conexión ANTES de guardar (manda un mail de confirmación al admin).
   def conectar_email
@@ -136,7 +136,7 @@ class PreferencesController < ApplicationController
     email    = params[:email].to_s.strip
     password = params[:app_password].to_s.strip
     nombre   = params[:from_name].to_s.strip.presence || @club.name
-    return render json: { error: 'Ingresá el email del club.' }, status: :unprocessable_entity if email.blank?
+    return render json: { error: 'Ingresá el email de la organización.' }, status: :unprocessable_entity if email.blank?
     return render json: { error: 'Ingresá la contraseña de aplicación.' }, status: :unprocessable_entity if password.blank?
 
     proveedor = Club.smtp_provider_for(email)
@@ -156,7 +156,7 @@ class PreferencesController < ApplicationController
         from    "#{nombre} <#{email}>"
         to      destino
         subject "✓ Correo conectado — #{nombre}"
-        body    "Tu casilla quedó conectada a Club Cultivo. Desde ahora los correos del club salen desde acá."
+        body    "Tu casilla quedó conectada a Cultivo Espacial. Desde ahora los correos de la organización salen desde acá."
         delivery_method metodo, opts_envio
       end
     rescue => e

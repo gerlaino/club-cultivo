@@ -48,7 +48,7 @@ module Clubs
 
     def call
       if Club.unscoped.exists?(slug: @slug)
-        raise ArgumentError, "Ya existe un club con el slug '#{@slug}'. Borralo antes de regenerarlo."
+        raise ArgumentError, "Ya existe una organización con el slug '#{@slug}'. Borralo antes de regenerarlo."
       end
 
       club = nil

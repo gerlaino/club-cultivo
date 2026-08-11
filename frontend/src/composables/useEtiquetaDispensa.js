@@ -22,7 +22,7 @@ export function useEtiquetaDispensa() {
     try {
       const url   = `${window.location.origin}/d/${d.token}`
       const qr    = await generatePNG(url, { width: 240, margin: 1, color: { dark: '#0F2A1E', light: '#ffffff' } })
-      const clubN = club.data?.name || 'Club Cultivo'
+      const clubN = club.data?.name || 'Cultivo Espacial'
       const logo  = club.data?.logo_url || ''
       const fecha = fmtFecha(d.fecha_dispensacion)
       const esMulti = d.multi_stock && Array.isArray(d.items) && d.items.length > 1

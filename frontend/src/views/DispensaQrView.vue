@@ -7,7 +7,7 @@
         <img v-if="club?.logo" :src="club.logo" class="dqr__logo" alt="" />
         <div v-else class="dqr__logo dqr__logo--ph"><i class="bi bi-flower1"></i></div>
         <div class="dqr__head-txt">
-          <span class="dqr__club">{{ club?.nombre || 'Club Cultivo' }}</span>
+          <span class="dqr__club">{{ club?.nombre || 'Cultivo Espacial' }}</span>
           <span class="dqr__head-sub">Pasaporte de producto</span>
         </div>
       </header>

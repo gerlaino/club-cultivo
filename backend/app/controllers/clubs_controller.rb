@@ -6,7 +6,7 @@ class ClubsController < ApplicationController
   def create
     # evitamos duplicar club por usuario
     if current_user.club.present?
-      render json: { errors: ["Ya tenés un club asignado"] }, status: :unprocessable_entity
+      render json: { errors: ["Ya tenés una organización asignada"] }, status: :unprocessable_entity
       return
     end
 
@@ -29,7 +29,7 @@ class ClubsController < ApplicationController
     club.logo.attach(params[:logo]) if params[:logo].present?
 
     if club.save
-      # vinculá al usuario actual con este club
+      # vinculá al usuario actual con esta organización
       current_user.update!(club: club)
       render json: { data: club_payload(club) }, status: :created
     else

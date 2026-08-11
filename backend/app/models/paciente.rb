@@ -4,7 +4,7 @@ class Paciente < ApplicationRecord
   # ALLOWLIST estricto: solo campos NO cifrados y no clínicos. Auditar dni/email/telefono/
   # reprocann_numero o cualquier campo clínico escribiría el valor DESCIFRADO en el rastro y
   # rompería el cifrado at-rest (ENC-01) + la privacidad de la historia clínica (fix AZ).
-  # Lo valioso y seguro: identidad básica + vencimiento/estado REPROCANN (los críticos del club).
+  # Lo valioso y seguro: identidad básica + vencimiento/estado REPROCANN (los críticos de la organización).
   auditar_solo :nombre, :apellido, :fecha_nacimiento, :reprocann_vencimiento, :reprocann_estado
   acts_as_paranoid
   belongs_to :club
@@ -53,9 +53,9 @@ class Paciente < ApplicationRecord
   after_create_commit :dispatch_webhook
 
   validates :nombre, :apellido, :dni, :dni_normalizado, :fecha_nacimiento, presence: true
-  # Unicidad global (no por club) — requisito REPROCANN: un DNI no puede estar en dos clubes a la vez.
+  # Unicidad global (no por club) — requisito REPROCANN: un DNI no puede estar en dos organizaciones a la vez.
   validates :dni_normalizado,
-    uniqueness: { message: "ya está registrado en el sistema. Bajo REPROCANN, un DNI no puede pertenecer a dos clubes simultáneamente." },
+    uniqueness: { message: "ya está registrado en el sistema. Bajo REPROCANN, un DNI no puede pertenecer a dos organizaciones simultáneamente." },
     format:     { with: /\A\d{7,9}\z/, message: "debe tener 7 a 9 dígitos" }
   validate :fecha_nacimiento_pasada
 

@@ -1,18 +1,18 @@
 module Clubs
-  # Copia el CULTIVO de un club a un club nuevo: sedes, salas, genéticas, lotes con sus plantas y
-  # toda su historia. Sirve para tener un club de prueba con datos reales de cultivo sin arrastrar
+  # Copia el CULTIVO de una organización a una organización nueva: sedes, salas, genéticas, lotes con sus plantas y
+  # toda su historia. Sirve para tener una organización de prueba con datos reales de cultivo sin arrastrar
   # lo comercial, lo contable ni lo médico.
   #
   # QUÉ NO SE COPIA, a propósito: tareas, auditorías, alertas (se regeneran solas), contabilidad,
   # depósitos, pacientes y cuentas corrientes, dispensaciones, reservas, bar, insumos, jornadas,
   # turnos y mails. Nada de eso hace falta para ver funcionar el cultivo, y los pacientes además son
-  # datos personales que no tienen por qué viajar a un club de prueba.
+  # datos personales que no tienen por qué viajar a una organización de prueba.
   #
   # TRES CAMPOS SON ÚNICOS A NIVEL BASE, no por club, así que se REGENERAN en el destino:
   # `lotes.codigo_qr`, `lotes.codigo_qr_cosecha`, `plants.codigo_qr` y `stocks.codigo_qr`. Copiarlos
   # tal cual revienta contra el índice único.
   #
-  # LOS USUARIOS NO SE COPIAN: `users.email` es único global. Se crea un admin en el club destino y
+  # LOS USUARIOS NO SE COPIAN: `users.email` es único global. Se crea un admin en la organización destino y
   # todo lo que apuntaba a una persona (eventos, registros, pesajes) queda a su nombre.
   class Clonar
     Result = Struct.new(:club, :resumen, keyword_init: true)
@@ -33,7 +33,7 @@ module Clubs
 
     def call
       if Club.unscoped.exists?(slug: @slug)
-        raise ArgumentError, "Ya existe un club con el slug '#{@slug}'. Elegí otro o borrá el anterior."
+        raise ArgumentError, "Ya existe una organización con el slug '#{@slug}'. Elegí otro o borrá el anterior."
       end
 
       datos = leer_origen
@@ -72,7 +72,7 @@ module Clubs
     private
 
     # Se lee TODO antes de escribir: una vez fijado el tenant destino, las queries devolverían los
-    # registros del club nuevo y no habría de dónde copiar.
+    # registros de la organización nueva y no habría de dónde copiar.
     def leer_origen
       ActsAsTenant.without_tenant do
         id = @origen.id
@@ -98,7 +98,7 @@ module Clubs
     def crear_club
       attrs = @origen.attributes.except('id', 'created_at', 'updated_at', 'slug', 'name',
                                         'deleted_at', 'deleted_by_id')
-      # Sin tenant: al crear un club corre `crear_geneticas_default!`, que consulta las genéticas
+      # Sin tenant: al crear una organización corre `crear_geneticas_default!`, que consulta las genéticas
       # GLOBALES (club_id nil). Con un tenant fijado esa query no las vería, y sin ninguno explota
       # por `require_tenant`.
       ActsAsTenant.without_tenant { Club.create!(attrs.merge('name' => @nombre, 'slug' => @slug)) }
@@ -111,7 +111,7 @@ module Clubs
       ).tap { @resumen[:usuarios] += 1 }
     end
 
-    # `dup` no alcanza: hay que limpiar las claves del club viejo y todo lo que apunte a personas
+    # `dup` no alcanza: hay que limpiar las claves de la organización viejo y todo lo que apunte a personas
     # que no viajan.
     def clonar_attrs(registro, salvo: [])
       registro.attributes.except('id', 'created_at', 'updated_at', 'deleted_by_id', *salvo)
@@ -122,7 +122,7 @@ module Clubs
     # Es la pieza central de este service, y no es una optimización: los callbacks de estos modelos
     # están hechos para datos NUEVOS —propagar una lectura ambiental, generar un QR, disparar un
     # webhook de avance de fase— y acá se está copiando HISTORIA, donde ninguno corresponde. Peor:
-    # varios resuelven el club o la sala a través de una asociación (`lote.sala_id`), y el
+    # varios resuelven la organización o la sala a través de una asociación (`lote.sala_id`), y el
     # `default_scope` de Lote/Plant/Sala esconde los soft-deleted, así que para cualquier hijo de un
     # padre borrado la asociación devuelve nil y el callback explota. Un solo lote borrado con
     # plantas tumbaba la copia entera.
@@ -267,7 +267,7 @@ module Clubs
                          'sala_id' => @map[:salas][l.sala_id],
                          'lote_id' => @map[:lotes][l.lote_id],
                          'dispositivo_id' => nil,
-                         # El registro de origen quedó en el club viejo: se corta el puntero en vez
+                         # El registro de origen quedó en la organización viejo: se corta el puntero en vez
                          # de apuntar a un id ajeno.
                          'origen_record_id' => nil)
         next unless attrs['sala_id']

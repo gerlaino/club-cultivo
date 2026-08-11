@@ -2,7 +2,7 @@
   <div class="sus">
     <div class="sus__header">
       <h1 class="sus__title">Suscripción</h1>
-      <p class="sus__subtitle">Estado y detalle de tu plan en Club Cultivo.</p>
+      <p class="sus__subtitle">Estado y detalle de tu plan en Cultivo Espacial.</p>
     </div>
 
     <div class="sus__plan-card">
@@ -26,7 +26,7 @@
       <span class="sus__contact-ico">💬</span>
       <div>
         <p class="sus__contact-title">¿Necesitás cambiar tu plan?</p>
-        <p class="sus__contact-desc">Contactá al equipo de Club Cultivo para actualizar, ajustar o cancelar tu suscripción.</p>
+        <p class="sus__contact-desc">Contactá al equipo de Cultivo Espacial para actualizar, ajustar o cancelar tu suscripción.</p>
       </div>
     </div>
   </div>

@@ -32,7 +32,7 @@ class ReprocannDocument < BaseDocument
       { label: "Trámite pendiente", valor: @data[:pendientes],          tono: :warn },
     ])
 
-    # Sin corte por sede: un paciente es del club, no de una sede. Lo que había agrupaba por la
+    # Sin corte por sede: un paciente es de la organización, no de una sede. Lo que había agrupaba por la
     # sede de su última dispensación —una dimensión que no existe en el modelo— y dejaba a los
     # que nunca dispensaron en una fila que parecía una sede llamada "sin dispensaciones".
     pendiente_interno(pdf)
@@ -47,7 +47,7 @@ class ReprocannDocument < BaseDocument
   COLS_CONTEO = [50, 68, 48, 68, 58, 58].freeze
 
   # Los pacientes sin registro no entran en la nómina —este documento declara la población
-  # REGISTRADA— pero tampoco se ocultan: se informa cuántos son, que es lo que el club tiene
+  # REGISTRADA— pero tampoco se ocultan: se informa cuántos son, que es lo que la organización tiene
   # pendiente de resolver.
   def pendiente_interno(pdf)
     sin_registro = @data[:pacientes_sin_registro].to_i
@@ -56,7 +56,7 @@ class ReprocannDocument < BaseDocument
     pdf.move_down 4
     pdf.fill_color GRAY
     pdf.font(SANS) do
-      pdf.text "El club tiene además #{sin_registro} paciente#{'s' if sin_registro != 1} activo" \
+      pdf.text "La organización tiene además #{sin_registro} paciente#{'s' if sin_registro != 1} activo" \
                "#{'s' if sin_registro != 1} sin REPROCANN iniciado, que no integran esta nómina.",
                size: 8
     end
@@ -97,6 +97,6 @@ class ReprocannDocument < BaseDocument
     )
 
     nota_pie(pdf, "DATOS ANONIMIZADOS conforme a la Ley 25.326 de Protección de Datos Personales. " \
-                  "Se listan hasta 200 socios. Basado en el padrón vigente del club al momento de emisión.")
+                  "Se listan hasta 200 socios. Basado en el padrón vigente de la organización al momento de emisión.")
   end
 end

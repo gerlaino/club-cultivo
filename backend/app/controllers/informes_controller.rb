@@ -78,7 +78,7 @@ class InformesController < ApplicationController
     # Los gramos del período salen del RENDIMIENTO DEL LOTE, que es lo que llena el flujo de
     # manicura al cerrar el curado (`Lote#check_and_finalize_manicura!`). Antes se sumaban
     # `Pesada.peso_curado_g` con `fase_destino: 'finalizado'`: una tabla que en la práctica
-    # está vacía —el club pesa por PesajeManicura, no por Pesada— así que el informe mostraba
+    # está vacía —la organización pesa por PesajeManicura, no por Pesada— así que el informe mostraba
     # "0 gramos producidos" con veinte lotes curados a la vista.
     #
     # La fecha del lote es la de su paso a curado (cuando el producto existe); si ese evento
@@ -132,7 +132,7 @@ class InformesController < ApplicationController
 
     responder_informe(
       titulo: 'Informe de producción', nombre: 'informe_produccion',
-      resena: 'Cuánto produjo el club y cómo viene el cultivo. Arriba, lo cosechado en el período elegido; abajo, la foto de HOY: qué lotes y plantas hay en cada estado ahora mismo, con el rendimiento acumulado de cada uno.',
+      resena: 'Cuánto produjo la organización y cómo viene el cultivo. Arriba, lo cosechado en el período elegido; abajo, la foto de HOY: qué lotes y plantas hay en cada estado ahora mismo, con el rendimiento acumulado de cada uno.',
       datos: datos, periodo: etiqueta_periodo(desde, hasta),
       kpis: [
         { label: 'Lotes totales',   valor: total_lotes },
@@ -163,7 +163,7 @@ class InformesController < ApplicationController
           formatos: [:texto, :numero, :numero, :numero],
           totales: [1, 2, 3],
           aligns: { 1 => :right, 2 => :right, 3 => :right },
-          vacio: 'El club todavía no tiene sedes cargadas.',
+          vacio: 'La organización todavía no tiene sedes cargadas.',
         },
       ],
     )
@@ -183,7 +183,7 @@ class InformesController < ApplicationController
     promedio = total.positive? ? (gramos / total).round(2) : 0
 
     # Nombre y apellido completos. Estaba con iniciales "para no exponer datos personales",
-    # pero quien abre este informe (admin o auditor del club) ya puede ver la ficha entera del
+    # pero quien abre este informe (admin o auditor de la organización) ya puede ver la ficha entera del
     # paciente: la inicial no protegía nada y volvía el informe ilegible — con dos "G.L." no
     # se sabe de quién se habla ni se puede cruzar con nada.
     # Con qué se lo identifica y QUÉ se le entregó. Sólo el nombre y los gramos no alcanza
@@ -216,7 +216,7 @@ class InformesController < ApplicationController
 
     responder_informe(
       titulo: 'Informe de dispensaciones', nombre: 'informe_dispensaciones',
-      resena: 'Qué salió del club y hacia quién, en el período elegido. Una fila por paciente, con el DNI parcial para identificarlo sin ambigüedad y la genética y forma de lo que retiró — que es lo que permite cruzar este informe con producción.',
+      resena: 'Qué salió de la organización y hacia quién, en el período elegido. Una fila por paciente, con el DNI parcial para identificarlo sin ambigüedad y la genética y forma de lo que retiró — que es lo que permite cruzar este informe con producción.',
       datos: datos, periodo: etiqueta_periodo(desde, hasta),
       kpis: [
         { label: 'Entregas',           valor: total },
@@ -432,11 +432,11 @@ class InformesController < ApplicationController
     )
   end
 
-  # INASE — Registro de variedades del club + trazabilidad a producción.
+  # INASE — Registro de variedades de la organización + trazabilidad a producción.
   # Liga cada genética (con su dato INASE) con lo que realmente produjo: lotes,
   # plantas y gramos. Es el informe regulatorio de variedades cultivadas.
   # Qué se perdió, y por qué. Ningún informe lo decía: producción cuenta lo que salió bien y
-  # trazabilidad cierra el balance de UN producto, pero el club no tenía dónde ver cuánto se
+  # trazabilidad cierra el balance de UN producto, pero la organización no tenía dónde ver cuánto se
   # cayó en total. Para quien audita es de lo primero que se pregunta; para el dueño es plata.
   def perdidas
     club = current_user.club
@@ -495,7 +495,7 @@ class InformesController < ApplicationController
 
     responder_informe(
       titulo: 'Informe de pérdidas', nombre: 'informe_perdidas',
-      resena: 'Qué se perdió el club en el período y por qué: plantas que no llegaron a cosecha ' \
+      resena: 'Qué se perdió la organización en el período y por qué: plantas que no llegaron a cosecha ' \
               'con su motivo, y producto que salió del inventario sin ser una dispensación ' \
               '(merma, ajustes en menos). El stock vencido todavía no es pérdida, pero lo va a ser.',
       datos: datos, periodo: etiqueta_periodo(desde, hasta),
@@ -521,7 +521,7 @@ class InformesController < ApplicationController
     filas = geneticas.includes(:declarada_como).map do |g|
       {
         id:                    g.id,
-        # `nombre` es el que usa el club puertas adentro; `nombre_declarado` es el que se
+        # `nombre` es el que usa la organización puertas adentro; `nombre_declarado` es el que se
         # presenta ante el organismo. Un club cultiva "Northern Lights" y la declara contra
         # una variedad inscripta: el informe tiene que decir la inscripta.
         nombre:                g.nombre_declarado,
@@ -544,14 +544,14 @@ class InformesController < ApplicationController
 
     registradas = filas.count { |f| f[:registrada_inase] }
     declaradas  = filas.count { |f| f[:declarada] }
-    # Lo que le falta al club: lo que cultiva sin poder acreditarlo, ni por registro propio
+    # Lo que le falta a la organización: lo que cultiva sin poder acreditarlo, ni por registro propio
     # ni por declaración. Es la única fila accionable del informe.
     pendientes  = filas.reject { |f| f[:acreditada] }
 
-    # UNA FILA POR VARIEDAD ACREDITABLE, no por genética del club. Si veinte genéticas propias
+    # UNA FILA POR VARIEDAD ACREDITABLE, no por genética de la organización. Si veinte genéticas propias
     # se declaran contra TROPICANA WFC, listarlas por separado da veinte filas con el mismo
     # nombre —parece un error de datos— y encima al organismo le importa cuánto se cultivó de
-    # esa variedad, no cómo la llama el club puertas adentro. Los nombres propios van juntos en
+    # esa variedad, no cómo la llama la organización puertas adentro. Los nombres propios van juntos en
     # "Se cultiva como", que es lo que hace auditable la traducción.
     agrupadas = filas.group_by { |g| g[:nombre] }.map do |nombre, gs|
       {
@@ -602,7 +602,7 @@ class InformesController < ApplicationController
 
     responder_informe(
       titulo: 'Informe INASE — variedades', nombre: 'informe_inase', datos: datos,
-      resena: 'Las variedades que el club cultiva y con cuál acredita cada una ante el INASE. Una fila por variedad inscripta: si el club la cultiva bajo otro nombre, ese nombre figura en «Se cultiva como». Al pie, lo que todavía no se puede acreditar.',
+      resena: 'Las variedades que la organización cultiva y con cuál acredita cada una ante el INASE. Una fila por variedad inscripta: si la organización la cultiva bajo otro nombre, ese nombre figura en «Se cultiva como». Al pie, lo que todavía no se puede acreditar.',
       kpis: [
         { label: 'Variedades',    valor: filas.size },
         { label: 'Inscriptas',    valor: registradas, tono: :ok },
@@ -610,7 +610,7 @@ class InformesController < ApplicationController
         { label: 'Sin acreditar', valor: pendientes.size, tono: pendientes.any? ? :warn : :ok },
       ],
       secciones: secciones,
-      nota: 'Las variedades que el club no tiene inscriptas se presentan declaradas contra ' \
+      nota: 'Las variedades que la organización no tiene inscriptas se presentan declaradas contra ' \
             'una variedad del registro INASE. La columna "Se cultiva como" deja ver el par.',
       # La pantalla se abre siempre —es la que lista los pendientes—; el archivo que se
       # presenta ante el organismo, no, mientras haya variedades sin acreditar.
@@ -645,7 +645,7 @@ class InformesController < ApplicationController
   def reprocann_data(club)
     # Este informe le habla AL ORGANISMO: declara la población registrada en REPROCANN. Por eso
     # sólo entran los pacientes que tienen registro —vigente, vencido o en trámite—. Que existan
-    # pacientes sin REPROCANN es un pendiente interno del club, no algo que se presenta: eso se
+    # pacientes sin REPROCANN es un pendiente interno de la organización, no algo que se presenta: eso se
     # gestiona desde Pacientes, donde además se puede hacer algo al respecto.
     #
     # Antes entraban todos, así que el total del informe no coincidía con nada y la tasa de
@@ -689,7 +689,7 @@ class InformesController < ApplicationController
       pendientes:             conteos['pendiente'],
       sin_reprocann:          conteos['sin_reprocann'],
       lista_anonimizada:      lista,
-      # Sin corte por sede: un PACIENTE NO TIENE SEDE — es del club. Lo que había agrupaba por
+      # Sin corte por sede: un PACIENTE NO TIENE SEDE — es de la organización. Lo que había agrupaba por
       # la sede de su última dispensación, una dimensión inventada que además dejaba a los que
       # nunca dispensaron en una fila fantasma. La actividad por sede es otra pregunta y vive
       # en el informe de dispensaciones.

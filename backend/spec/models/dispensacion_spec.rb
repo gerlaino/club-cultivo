@@ -271,7 +271,7 @@ RSpec.describe Dispensacion, type: :model do
       paciente.update!(es_paciente: false)
       d = nueva_dispensacion
       expect(d).not_to be_valid
-      expect(d.errors[:base]).to include('El socio no está activo en el club')
+      expect(d.errors[:base]).to include('El socio no está activo en la organización')
     end
 
     it 'solo aplica on: :create (no bloquea update de dispensa existente)' do

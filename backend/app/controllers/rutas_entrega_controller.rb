@@ -28,9 +28,9 @@ class RutasEntregaController < ApplicationController
     ids   = Array(params[:orden]).map(&:to_i).uniq
     ruta  = RutaEntrega.para(club: current_user.club, delivery_id: delivery_id, fecha: fecha)
 
-    # Si la ruta está fijada por el club, el repartidor no puede reordenarla.
+    # Si la ruta está fijada por la organización, el repartidor no puede reordenarla.
     if ruta.bloqueada && !es_staff
-      return render json: { error: 'La ruta fue fijada por el club — no se puede reordenar' }, status: :forbidden
+      return render json: { error: 'La ruta fue fijada por la organización — no se puede reordenar' }, status: :forbidden
     end
 
     ActiveRecord::Base.transaction do

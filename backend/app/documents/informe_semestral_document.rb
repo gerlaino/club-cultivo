@@ -1,6 +1,6 @@
 # Informe semestral REPROCANN en PDF.
 #
-# Es el documento regulatorio más completo del club: identifica al establecimiento, lista la
+# Es el documento regulatorio más completo de la organización: identifica al establecimiento, lista la
 # nómina de pacientes con su certificado y resume producción y dispensaciones del semestre.
 # Se generaba con html2canvas —una foto de la pantalla— y por eso salía sin texto
 # seleccionable, cortado y con la calidad atada al zoom del navegador.
@@ -76,7 +76,7 @@ class InformeSemestralDocument < BaseDocument
     nomina = Array(p[:nomina])
     titulo_seccion(pdf, "Nómina")
     if nomina.empty?
-      vacio(pdf, "El club no tiene pacientes registrados en el período.")
+      vacio(pdf, "La organización no tiene pacientes registrados en el período.")
       return
     end
 

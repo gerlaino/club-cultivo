@@ -93,7 +93,7 @@ class PacientesController < ApplicationController
   end
 
   # GET /pacientes/por_carnet/:token
-  # Escanear el carnet del paciente en el mostrador: devuelve a quién pertenece, dentro del club.
+  # Escanear el carnet del paciente en el mostrador: devuelve a quién pertenece, dentro de la organización.
   # Un token de otro club no resuelve — el scope ya lo impide.
   def por_carnet
     paciente = policy_scope(Paciente).find_by(carnet_token: params[:token])
@@ -193,7 +193,7 @@ class PacientesController < ApplicationController
     eventos << {
       tipo: 'alta',
       fecha: @paciente.created_at,
-      descripcion: "Alta como paciente del club",
+      descripcion: "Alta como paciente de la organización",
       id: nil
     }
 
@@ -365,7 +365,7 @@ class PacientesController < ApplicationController
     end
 
     unless current_user.club.smtp_configured?
-      return render json: { error: 'El club no tiene servidor de correo configurado. Configuralo en Preferencias → Correo.' }, status: :unprocessable_entity
+      return render json: { error: 'La organización no tiene servidor de correo configurado. Configuralo en Preferencias → Correo.' }, status: :unprocessable_entity
     end
 
     tipo   = params.dig(:mail, :tipo).presence_in(MailEnviado::TIPOS) || 'personalizado'
@@ -417,7 +417,7 @@ class PacientesController < ApplicationController
   private
 
   # Los contadores de la cabecera se cuentan sobre TODO el padrón, no sobre la página.
-  # Contarlos en el cliente sobre `store.items` hacía que un club de 38 pacientes mostrara
+  # Contarlos en el cliente sobre `store.items` hacía que una organización de 38 pacientes mostrara
   # "20 en la nómina" y "0 REPROCANN vencido" teniendo vencidos en la página 2 — el admin lee
   # ese cero y se queda tranquilo. Mismo criterio que Medico::PacientesController#kpis.
   #

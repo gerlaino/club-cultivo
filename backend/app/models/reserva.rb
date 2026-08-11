@@ -69,7 +69,7 @@ class Reserva < ApplicationRecord
   def stock_pertenece_al_club
     return unless stock && paciente
     unless stock.club_id == paciente.club_id || stock.sede&.club_id == paciente.club_id
-      errors.add(:stock, 'no pertenece al club')
+      errors.add(:stock, 'no pertenece a la organización')
     end
     errors.add(:stock, 'no está habilitado para dispensa') if stock.persisted? && !stock.apto_dispensa?
   end
@@ -89,6 +89,6 @@ class Reserva < ApplicationRecord
 
   def paciente_activo
     return unless paciente
-    errors.add(:base, 'El socio no está activo en el club') unless paciente.es_paciente?
+    errors.add(:base, 'El socio no está activo en la organización') unless paciente.es_paciente?
   end
 end

@@ -20,14 +20,14 @@ class ApplicationController < ActionController::API
   #
   #   require_feature! :bar          → en un before_action del controller
   #
-  # Devuelve 403 DE VERDAD. Esconder el botón en el frontend no es gating: el club puede
+  # Devuelve 403 DE VERDAD. Esconder el botón en el frontend no es gating: la organización puede
   # entrar por la API igual, y hasta ahora era lo único que había para 10 de los 13 flags.
   #
-  # `super_admin` pasa siempre: administra la plataforma, no opera un club.
+  # `super_admin` pasa siempre: administra la plataforma, no opera una organización.
   def require_feature!(clave)
-    # El super admin pasa siempre: administra la plataforma, no opera un club. Pero cuando
-    # está OBSERVANDO uno, tiene que ver exactamente lo que ve ese club — si pasara de largo
-    # vería módulos que el club no compró y la observación dejaría de servir para entender qué
+    # El super admin pasa siempre: administra la plataforma, no opera una organización. Pero cuando
+    # está OBSERVANDO una, tiene que ver exactamente lo que ve esa organización — si pasara de largo
+    # vería módulos que la organización no compró y la observación dejaría de servir para entender qué
     # tiene delante el cliente.
     return if current_user&.super_admin? && !current_user.modo_observador?
 
@@ -44,9 +44,9 @@ class ApplicationController < ActionController::API
                 'Este módulo todavía no está disponible.'
               elsif (suite = Club::INCLUIDOS_EN_SUITE[clave.to_s])
                 # Viene con la suite: lo que falta no es el módulo, es lo que lo contiene.
-                "Tu club no tiene la suite #{Club::SUITES.dig(suite, :label)}, que es la que lo incluye."
+                "Tu organización no tiene la suite #{Club::SUITES.dig(suite, :label)}, que es la que lo incluye."
               else
-                'Tu club no tiene este módulo habilitado.'
+                'Tu organización no tiene este módulo habilitado.'
               end
 
     render json: { error: "#{nombre}: #{detalle}", modulo: clave.to_s, requiere_modulo: true },
@@ -72,22 +72,22 @@ class ApplicationController < ActionController::API
 
   # Un club ELIMINADO o SUSPENDIDO no opera. Vivía en BaseController, que sólo heredan una
   # decena de controllers (médico y públicos): los otros ~87 cuelgan de acá, así que eliminar
-  # un club no le impedía seguir usando casi toda la API.
+  # una organización no le impedía seguir usando casi toda la API.
   def check_club_activo!
     return if current_user&.super_admin?
     return unless current_user&.club_id.present?
 
     club = current_user.club
     if club.nil? || club.eliminado?
-      render json: { error: 'Este club fue eliminado. Contactate con soporte.' }, status: :forbidden
+      render json: { error: 'Esta organización fue eliminada. Contactate con soporte.' }, status: :forbidden
     elsif club.suspendido?
-      # `activo` existía en la tabla y no lo miraba nadie: suspender un club no lo suspendía.
-      render json: { error: 'Este club está suspendido. Contactate con soporte para reactivarlo.',
+      # `activo` existía en la tabla y no lo miraba nadie: suspender una organización no la suspendía.
+      render json: { error: 'Esta organización está suspendida. Contactate con soporte para reactivarla.',
                      club_suspendido: true }, status: :forbidden
     end
   end
 
-  # El club apagó la suite de la que vive este rol. El login ya lo rechaza con el mismo
+  # La organización apagó la suite de la que vive este rol. El login ya lo rechaza con el mismo
   # mensaje, pero esto cubre las sesiones ABIERTAS: si el admin apaga Cultivo al mediodía, el
   # cultivador que estaba adentro tiene que enterarse, no ver 403 sueltos en cada pantalla.
   def check_rol_habilitado!
@@ -99,8 +99,8 @@ class ApplicationController < ActionController::API
   end
 
   def mensaje_rol_deshabilitado(user)
-    "Tu club no tiene activo el módulo #{user.modulo_faltante_label}, que es el que usa tu " \
-      "rol (#{user.role.humanize}). Hablá con el administrador del club."
+    "Tu organización no tiene activo el módulo #{user.modulo_faltante_label}, que es el que usa tu " \
+      "rol (#{user.role.humanize}). Hablá con el administrador de la organización."
   end
 
   def block_auditor_writes!
@@ -123,9 +123,9 @@ class ApplicationController < ActionController::API
   # fichas, indicaciones médicas.
   RUTAS_CLINICAS = ['/api/medico/', '/api/indicaciones'].freeze
 
-  # El observador ve cómo opera el club, no la salud de sus pacientes.
+  # El observador ve cómo opera la organización, no la salud de sus pacientes.
   #
-  # Son datos de terceros que no son del club ni nuestros (Ley 25.326 art. 8: datos sensibles),
+  # Son datos de terceros que no son de la organización ni nuestros (Ley 25.326 art. 8: datos sensibles),
   # y nadie los cedió para que los mire quien administra la plataforma. Hace falta un candado
   # propio porque los guards del namespace médico dejan pasar a `super_admin` a propósito —
   # para el soporte real, con la cuenta de plataforma, no para una sesión de observación.
@@ -182,7 +182,7 @@ class ApplicationController < ActionController::API
     user = current_user
     return if user.nil?
 
-    # Super admin observando un club: el tenant del request ES el club observado. Sin esto el
+    # Super admin observando una organización: el tenant del request ES la organización observado. Sin esto el
     # observador entraba sin tenant y, con require_tenant=true (TEN-01c), no podía leer nada.
     # Es seguro: `block_observer_writes!` ya rechaza todo lo que no sea una lectura.
     if user.super_admin?
@@ -200,11 +200,11 @@ class ApplicationController < ActionController::API
       # (TEN-01c) cualquier query explotaría; bloqueamos ruidoso en vez de seguir con
       # tenant nil y arriesgar una fuga entre clubes.
       Rails.logger.error("[TEN] user##{user.id} sin club resoluble (club_id=#{user.club_id.inspect})")
-      render json: { error: 'Tu cuenta no tiene un club asignado. Contactá al administrador.' }, status: :forbidden
+      render json: { error: 'Tu cuenta no tiene una organización asignada. Contactá al administrador.' }, status: :forbidden
     end
   rescue StandardError => e
     Rails.logger.error("[TEN] Error fijando el tenant para user##{current_user&.id}: #{e.class} #{e.message}")
-    render json: { error: 'No se pudo resolver el club de la sesión.' }, status: :internal_server_error
+    render json: { error: 'No se pudo resolver la organización de la sesión.' }, status: :internal_server_error
   end
 
   # Expone el usuario del request a la capa de modelos (concern Auditable)

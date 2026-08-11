@@ -1,6 +1,6 @@
 class PlanEnforcer
-  # El plan dice CUÁNTO, nunca QUÉ. Qué módulos tiene un club se decide aparte, en
-  # `Club::SUITES` / `Club::ADDONS`: mezclar las dos cosas era lo que hacía que un club
+  # El plan dice CUÁNTO, nunca QUÉ. Qué módulos tiene una organización se decide aparte, en
+  # `Club::SUITES` / `Club::ADDONS`: mezclar las dos cosas era lo que hacía que una organización
   # "federación" quedara sin límites y sin poder hacer nada.
   #
   # `nil` = sin límite.
@@ -12,7 +12,7 @@ class PlanEnforcer
   PLAN_POR_DEFECTO = 'basico'.freeze
 
   # Los cuatro planes viejos, mapeados a los dos nuevos. La migración de datos reescribe la
-  # columna, pero un club con el valor viejo (una copia vieja, un seed) no puede quedar sin
+  # columna, pero una organización con el valor viejo (una copia vieja, un seed) no puede quedar sin
   # límites por accidente: cae al que le corresponde en vez de a `PLANES[nil]`.
   PLANES_LEGACY = {
     'semilla'    => 'basico',
@@ -42,11 +42,11 @@ class PlanEnforcer
     @club.sedes.activas.count < @limite[:sedes]
   end
 
-  # Sin este límite, un club de una sola sede podía abrir salas sin techo: el plan medía el
+  # Sin este límite, una organización de una sola sede podía abrir salas sin techo: el plan medía el
   # continente y no el contenido.
   #
   # Cuenta las salas que EXISTEN, no las que están en uso: una sala en mantenimiento sigue
-  # siendo del club y vuelve mañana. Contar sólo `activas` habría dejado abrir salas sin techo
+  # siendo de la organización y vuelve mañana. Contar sólo `activas` habría dejado abrir salas sin techo
   # poniéndolas todas en mantenimiento. Sólo la sala cerrada —dada de baja— libera lugar.
   def puede_crear_sala?
     return true if @limite[:salas].nil?
@@ -110,7 +110,7 @@ class PlanEnforcer
   def self.error_limite(recurso, limite, plan: nil)
     plan_txt = plan.present? ? "El plan #{plan}" : 'Tu plan'
     msg = if limite
-            "#{plan_txt} permite hasta #{limite} #{recurso}, y el club ya llegó a ese número. " \
+            "#{plan_txt} permite hasta #{limite} #{recurso}, y la organización ya llegó a ese número. " \
             'Para dar de alta más, hay que ampliar el plan: escribinos y lo cambiamos.'
           else
             "#{plan_txt} no incluye #{recurso}. Escribinos y lo habilitamos."

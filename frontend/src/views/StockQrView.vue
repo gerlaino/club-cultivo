@@ -30,7 +30,7 @@
         <div class="sqr-card__header">
           <div class="sqr-card__header-logo-box">🌿</div>
           <div>
-            <div class="sqr-card__header-club">Club Cultivo</div>
+            <div class="sqr-card__header-club">Cultivo Espacial</div>
             <div class="sqr-card__header-sub">Verificación de producto</div>
           </div>
         </div>

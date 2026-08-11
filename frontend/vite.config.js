@@ -30,7 +30,9 @@ export default defineConfig({
         // había colado acá: al instalar la PWA, el celular sugería ese nombre para el ícono.
         name:             'Cultivo Espacial',
         short_name:       'Cultivo Espacial',
-        description:      'Gestión integral de clubes de cannabis — REPROCANN',
+        // Mismo encuadre que la landing: el producto es para toda organización que cultiva, y
+        // REPROCANN es una salida de la data, no la identidad del producto.
+        description:      'Gestión integral para organizaciones que cultivan cannabis',
         lang:             'es',
         theme_color:      '#0F2A1E',
         background_color: '#0F2A1E',
@@ -38,17 +40,19 @@ export default defineConfig({
         orientation:      'portrait',
         scope:            '/',
         start_url:        '/m',
+        // El logo REAL. Hasta acá el manifest apuntaba a `icons/*.svg`, que eran placeholders
+        // generados en marzo por `icons/gen_icons.cjs`: un cuadrado verde con un emoji 🌿 como
+        // texto. `index.html` ya usaba el logo bueno para el favicon y el apple-touch-icon, así
+        // que la pestaña se veía bien y el ícono de la app instalada seguía siendo el provisorio
+        // — que es justo el que se ve en el escritorio y en el cajón de aplicaciones.
+        //
+        // PNG y no SVG a propósito: Chrome de escritorio elige mal entre íconos SVG al instalar.
+        //
+        // Falta el `maskable` (Android le aplica una máscara y recorta): necesita el logo con
+        // zona segura, o sea reencuadrado con margen sobre el fondo oscuro de marca. Sin esa
+        // versión es mejor no declararlo que declarar uno que se vea cortado.
         icons: [
-          { src: 'icons/icon-72x72.svg',       sizes: '72x72',   type: 'image/svg+xml' },
-          { src: 'icons/icon-96x96.svg',       sizes: '96x96',   type: 'image/svg+xml' },
-          { src: 'icons/icon-128x128.svg',     sizes: '128x128', type: 'image/svg+xml' },
-          { src: 'icons/icon-144x144.svg',     sizes: '144x144', type: 'image/svg+xml' },
-          { src: 'icons/icon-152x152.svg',     sizes: '152x152', type: 'image/svg+xml' },
-          { src: 'icons/icon-192x192.svg',     sizes: '192x192', type: 'image/svg+xml' },
-          { src: 'icons/icon-384x384.svg',     sizes: '384x384', type: 'image/svg+xml' },
-          { src: 'icons/icon-512x512.svg',     sizes: '512x512', type: 'image/svg+xml' },
-          { src: 'icons/maskable-192x192.svg', sizes: '192x192', type: 'image/svg+xml', purpose: 'maskable' },
-          { src: 'icons/maskable-512x512.svg', sizes: '512x512', type: 'image/svg+xml', purpose: 'maskable' },
+          { src: 'logo-ce-redondo.png', sizes: '500x500', type: 'image/png', purpose: 'any' },
         ],
       },
       injectManifest: {

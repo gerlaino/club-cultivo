@@ -67,7 +67,7 @@ class PapeleraController < ApplicationController
 
     ActsAsTenant.without_tenant do
       record = entry.model.find_soft_deleted(params[:id])
-      return render json: { error: 'No pertenece a tu club' }, status: :forbidden unless del_club?(record)
+      return render json: { error: 'No pertenece a tu organización' }, status: :forbidden unless del_club?(record)
 
       if entry.restorer_class
         res = entry.restorer_class.call(record, usuario: current_user)
@@ -93,7 +93,7 @@ class PapeleraController < ApplicationController
     Restore::Catalog.top_level # agregados restaurables; los dependientes vuelven con su padre
   end
 
-  # Relación de borrados de un modelo, scopeada al club y al rango de fechas. nil si no aplica.
+  # Relación de borrados de un modelo, scopeada a la organización y al rango de fechas. nil si no aplica.
   def scope_para(model, desde:, hasta:)
     rel = model.soft_deleted_records
     rel = rel.where(club_id: @club.id) if model.column_names.include?('club_id')

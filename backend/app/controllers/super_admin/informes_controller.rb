@@ -5,7 +5,7 @@
 # números no sirven —no es su cultivo—, pero como informe sí: dicen qué tamaño tiene la
 # plataforma y son la semilla del benchmarking del sector.
 #
-# Siempre sobre clubes REALES: un club demo tiene cientos de dispensaciones inventadas y, de
+# Siempre sobre clubes REALES: una organización demo tiene cientos de dispensaciones inventadas y, de
 # cara al benchmarking, mete en el promedio números que nunca existieron.
 class SuperAdmin::InformesController < SuperAdmin::BaseController
   # GET /super_admin/informes/plataforma
@@ -13,7 +13,7 @@ class SuperAdmin::InformesController < SuperAdmin::BaseController
     ids = Club.reales.pluck(:id)
 
     render json: {
-      reseña: 'Qué tamaño tiene la plataforma hoy. Cuenta sólo clubes reales: los clubes ' \
+      reseña: 'Qué tamaño tiene la plataforma hoy. Cuenta sólo organizaciones reales: las ' \
               'demo tienen datos inventados y ensucian cualquier promedio.',
       clubes: {
         total:       ids.size,
@@ -32,7 +32,7 @@ class SuperAdmin::InformesController < SuperAdmin::BaseController
       },
       dispensacion_mes: dispensacion_mes(ids),
       por_plan:         Club.reales.activos.group(:plan).count,
-      # El promedio dice más que el total: un club mediano cultiva N lotes y atiende M pacientes.
+      # El promedio dice más que el total: una organización mediano cultiva N lotes y atiende M pacientes.
       promedio_por_club: promedio_por_club(ids),
     }
   end

@@ -175,14 +175,14 @@ class Dispensacion < ApplicationRecord
 
   def paciente_activo_como_socio
     return unless paciente
-    errors.add(:base, 'El socio no está activo en el club') unless paciente.es_paciente?
+    errors.add(:base, 'El socio no está activo en la organización') unless paciente.es_paciente?
   end
 
   def stock_pertenece_al_club
     return unless stock && paciente
     club_id = paciente.club_id
     unless stock.club_id == club_id || stock.sede&.club_id == club_id
-      errors.add(:stock, 'no pertenece al club')
+      errors.add(:stock, 'no pertenece a la organización')
     end
     errors.add(:stock, 'no está habilitado para dispensa') if stock.persisted? && !stock.apto_dispensa?
   end
@@ -218,7 +218,7 @@ class Dispensacion < ApplicationRecord
     self.cantidad    = ls.sum { |l| l.cantidad.to_d }
   end
 
-  # Valida cada línea contra el estado actual: stock existente, del club, y con disponible
+  # Valida cada línea contra el estado actual: stock existente, de la organización, y con disponible
   # suficiente (agrupando por stock para sumar líneas que repiten el mismo inventario).
   def lineas_validas
     lineas_nuevas.group_by(&:stock_id).each do |_sid, ls|

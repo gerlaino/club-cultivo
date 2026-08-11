@@ -132,8 +132,8 @@ class PlanTrabajoIaService
     usuarios_str = @usuarios.map { |u| "#{u.id}: #{u.first_name} #{u.last_name}" }.join(", ")
 
     prompt = <<~PROMPT
-      Sos un asistente que interpreta planes de trabajo para un club de cultivo de cannabis.
-      Usuarios disponibles en el club (id: nombre completo): #{usuarios_str.presence || "ninguno registrado"}
+      Sos un asistente que interpreta planes de trabajo para una organización de cultivo de cannabis.
+      Usuarios disponibles en la organización (id: nombre completo): #{usuarios_str.presence || "ninguno registrado"}
 
       Dado el siguiente texto, extraé todas las tareas de trabajo que describe.
       Para cada tarea devolvé un objeto JSON con estos campos exactos:
@@ -169,7 +169,7 @@ class PlanTrabajoIaService
 
     ambiguas_extra = dudosas.map do |t|
       motivo = if t["responsable_id"].blank? && t["responsable_nombre"].present?
-                 "Persona '#{t["responsable_nombre"]}' no encontrada en el club"
+                 "Persona '#{t["responsable_nombre"]}' no encontrada en la organización"
                else
                  "Datos insuficientes para confirmar automáticamente"
                end
@@ -278,7 +278,7 @@ class PlanTrabajoIaService
 
       if usuario.nil? && persona_nombre.present?
         ambiguas << {
-          "descripcion" => "Persona '#{persona_nombre}' no encontrada en el club",
+          "descripcion" => "Persona '#{persona_nombre}' no encontrada en la organización",
           "sugerencia"  => "Asignala manualmente antes de publicar",
           "tarea"       => tarea,
         }

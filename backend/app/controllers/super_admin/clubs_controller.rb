@@ -2,7 +2,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
   before_action :set_club, only: [:show, :update, :crear_usuarios_default, :cambiar_plan, :observar, :detener_observacion, :destroy, :restaurar, :suspender, :reactivar, :provisionar_pulse, :provisionar_whatsapp, :desconectar_whatsapp, :historial]
 
   # Los ELIMINADOS no se listan salvo que se los pida: verlos mezclados con los activos, sin
-  # distinguirse, era lo que hacía pensar que borrar un club no hacía nada.
+  # distinguirse, era lo que hacía pensar que borrar una organización no hacía nada.
   def index
     clubs = Club.unscoped.includes(:users, :pacientes).order(:created_at)
     clubs = clubs.where(deleted_at: nil) unless ActiveModel::Type::Boolean.new.cast(params[:eliminados])
@@ -16,7 +16,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
   def create
     attrs = club_params.to_h
     # Un club nuevo nace con las suites y los add-ons terminados, salvo que el alta mande otra
-    # cosa: crearlo con features vacío significaría, con el gating real, un club que no puede
+    # cosa: crearlo con features vacío significaría, con el gating real, una organización que no puede
     # hacer nada.
     attrs['features'] = Club::FEATURES_POR_DEFECTO.merge(attrs['features'] || {})
     # El plan no viaja en `club_params` (ver el comentario ahí), pero el alta sí lo elige.
@@ -33,7 +33,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
         club:     serialize_club_detail(club),
         usuarios: usuarios.map { |u| { id: u.id, email: u.email, role: u.role } },
         # La contraseña se devuelve EN CLARO y a propósito: es temporal, la fija quien da de
-        # alta y hay que poder dictársela al club. Ocultarla detrás de puntitos obligaba a
+        # alta y hay que poder dictársela a la organización. Ocultarla detrás de puntitos obligaba a
         # acordarse de lo que uno mismo acababa de tipear.
         password_inicial: password,
       }, status: :created
@@ -56,19 +56,19 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     render json: { usuarios: usuarios.map { |u| { id: u.id, email: u.email, role: u.role } } }
   end
 
-  # POST /super_admin/clubs/:id/observar — "Ingresar al club".
+  # POST /super_admin/clubs/:id/observar — "Ingresar a la organización".
   #
-  # A partir de acá el super admin navega la app como la ve el club, en SOLO LECTURA: el club
+  # A partir de acá el super admin navega la app como la ve la organización, en SOLO LECTURA: la organización
   # efectivo del request pasa a ser éste (ver User#club) y `block_observer_writes!` rechaza
   # cualquier escritura. Los datos clínicos quedan afuera (`block_observer_clinico!`).
   #
-  # Dura una hora, no quince minutos: entrar a entender qué le pasa a un club lleva más que
+  # Dura una hora, no quince minutos: entrar a entender qué le pasa a una organización lleva más que
   # eso, y que se corte a la mitad de una revisión obliga a empezar de nuevo.
   DURACION_OBSERVACION = 1.hour
 
   def observar
     # SUSPENDIDO: ver User::OBSERVADOR_HABILITADO. No alcanza con no ponerle botón —el endpoint
-    # se puede llamar igual—, y entrar a medias a un club que está trabajando se nota.
+    # se puede llamar igual—, y entrar a medias a una organización que está trabajando se nota.
     unless User::OBSERVADOR_HABILITADO
       return render json: {
         error: 'El modo observador está suspendido.',
@@ -84,11 +84,11 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     render json: estado_observacion, status: :created
   end
 
-  # GET /super_admin/clubs/:id/historial — qué le hicimos nosotros a este club.
+  # GET /super_admin/clubs/:id/historial — qué le hicimos nosotros a esta organización.
   #
-  # Es lo primero que se pregunta cuando un club reclama: "yo no pedí que me cambien el plan",
-  # "¿por qué se me apagó el Buffet?". Sólo las acciones sobre el club (plan, módulos,
-  # suspensión, baja); lo que pasa DENTRO del club tiene su propia auditoría por usuario.
+  # Es lo primero que se pregunta cuando una organización reclama: "yo no pedí que me cambien el plan",
+  # "¿por qué se me apagó el Buffet?". Sólo las acciones sobre la organización (plan, módulos,
+  # suspensión, baja); lo que pasa DENTRO de la organización tiene su propia auditoría por usuario.
   def historial
     registros = Auditoria.where(auditable_type: 'Club', auditable_id: @club.id)
                          .includes(:user).recientes.limit(100)
@@ -132,7 +132,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
 
   # PATCH /super_admin/clubs/:id/provisionar_pulse
   # La API key de Pulse Grow la carga el super admin al activar el add-on de ambiente/IoT: es
-  # la credencial de un servicio externo, no algo que el club deba pegar en una pantalla.
+  # la credencial de un servicio externo, no algo que la organización deba pegar en una pantalla.
   def provisionar_pulse
     key = params[:pulse_api_key].to_s.strip
     if key.blank?
@@ -170,7 +170,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
   end
 
   # PATCH /super_admin/clubs/:id/provisionar_whatsapp — el super_admin carga las credenciales
-  # de Twilio del club (lo que el admin no debe tocar). Al quedar completo, el estado pasa a
+  # de Twilio de la organización (lo que el admin no debe tocar). Al quedar completo, el estado pasa a
   # 'conectado' automáticamente.
   def provisionar_whatsapp
     sid    = params[:twilio_account_sid].to_s.strip
@@ -214,7 +214,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
   def set_club
     @club = Club.unscoped.find(params[:id])
   rescue ActiveRecord::RecordNotFound
-    render json: { error: 'Club no encontrado' }, status: :not_found
+    render json: { error: 'Organización no encontrada' }, status: :not_found
   end
 
   # El plan (CUÁNTO) y los módulos (QUÉ) son dos decisiones distintas y viajan por caminos
@@ -299,7 +299,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
         { clave: k, label: v[:label], desc: v[:desc], requiere: v[:requiere],
           incompleto: c.addon_incompleto?(k), activo: c.feature?(k) }.merge(estado_modulo(c, k))
       },
-      # Los que vienen dentro de una suite: se muestran para que se sepa qué tiene el club,
+      # Los que vienen dentro de una suite: se muestran para que se sepa qué tiene la organización,
       # pero sin interruptor — se prenden y se apagan con la suite que los contiene.
       incluidos:       Club::INCLUIDOS_EN_SUITE.map { |k, suite|
         meta = Club::INCLUIDOS_META[k]
