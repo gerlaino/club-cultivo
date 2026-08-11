@@ -12,7 +12,8 @@ import { usePlan } from "./composables/usePlan";
 import Avatar from "./components/Avatar.vue";
 import BrandLogo from "./components/BrandLogo.vue";
 import PlanBadge from "./components/PlanBadge.vue";
-import ToastProvider from "./components/ui/ToastProvider.vue";
+import ToastProvider from "./components/ui/ToastProvider.vue"
+import OrganizacionSuspendida from './components/OrganizacionSuspendida.vue';
 import ConfirmDialog from "./components/ui/ConfirmDialog.vue";
 import OfflineIndicator from "./components/ui/OfflineIndicator.vue";
 import { useOfflineSync } from "./composables/useOfflineSync.js";
@@ -180,6 +181,9 @@ onMounted(async () => {
 </script>
 
 <template>
+  <!-- Tapa todo: con la organización suspendida el backend 403-ea la API entera y cualquier
+       pantalla que quede debajo sólo puede mostrar huecos. -->
+  <OrganizacionSuspendida v-if="auth.clubSuspendido" />
   <ToastProvider />
   <ConfirmDialog />
   <OfflineIndicator />

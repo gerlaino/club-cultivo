@@ -32,6 +32,10 @@ export const useAuthStore = defineStore("auth", {
     // Mientras cerramos sesión, los 401 de requests en vuelo NO deben capturar la
     // ruta actual como ?redirect (si no, el próximo usuario cae en la página del anterior).
     loggingOut: false,
+    // La organización fue suspendida. El backend 403-ea TODO, así que la app queda inservible:
+    // en vez de una sucesión de pantallas vacías y errores sueltos, se muestra un cartel que
+    // explica qué pasó. Lo prende el interceptor de axios.
+    clubSuspendido: false,
   }),
   getters: {
     isAuthenticated: (s) => !!s.user,

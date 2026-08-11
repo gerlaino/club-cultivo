@@ -178,13 +178,10 @@ const nombreUsuario = auth.user?.first_name || ''
         <div v-if="paso === 1" class="ob__panel" key="paso1">
 
           <div class="ob__welcome">
+            <!-- El logo de Cultivo Espacial. Antes había un SVG dibujado a mano —una hoja con
+                 una flecha adentro— que no era el logo de nada y no se entendía qué era. -->
             <div class="ob__leaf">
-              <svg viewBox="0 0 60 60" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <circle cx="30" cy="30" r="30" fill="rgba(255,255,255,0.12)"/>
-                <path d="M30 10C30 10 14 22 14 34a16 16 0 0032 0c0-12-16-24-16-24z" fill="white" opacity="0.85"/>
-                <path d="M30 50V32" stroke="white" stroke-width="2" stroke-linecap="round"/>
-                <path d="M24 38l6-6 6 6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
+              <img src="/logo-ce-redondo.png" alt="Cultivo Espacial" class="ob__leaf-img" />
             </div>
             <h1 class="ob__title">
               Bienvenido{{ nombreUsuario ? `, ${nombreUsuario}` : '' }}
@@ -596,13 +593,24 @@ const nombreUsuario = auth.user?.first_name || ''
   padding-top: 0;
 }
 .ob__leaf {
-  width: 72px; height: 72px;
+  width: 84px; height: 84px;
   margin: 0 auto 1.5rem;
   animation: leaf-float 4s ease-in-out infinite;
+}
+/* Un halo suave detrás, para que el logo no quede pegado al fondo oscuro. */
+.ob__leaf-img {
+  width: 100%; height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 0 0 6px rgba(255,255,255,.06), 0 12px 32px rgba(0,0,0,.28);
 }
 @keyframes leaf-float {
   0%, 100% { transform: translateY(0) rotate(-2deg); }
   50%       { transform: translateY(-10px) rotate(2deg); }
+}
+/* Quien pidió menos movimiento no tiene por qué ver el logo flotando. */
+@media (prefers-reduced-motion: reduce) {
+  .ob__leaf { animation: none; }
 }
 .ob__title {
   font-size: 2rem;

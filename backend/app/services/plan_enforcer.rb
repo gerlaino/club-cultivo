@@ -39,7 +39,7 @@ class PlanEnforcer
 
   def puede_crear_sede?
     return true if @limite[:sedes].nil?
-    @club.sedes.activas.count < @limite[:sedes]
+    sedes_vigentes < @limite[:sedes]
   end
 
   # Sin este límite, una organización de una sola sede podía abrir salas sin techo: el plan medía el
@@ -92,9 +92,15 @@ class PlanEnforcer
 
   def salas_vigentes = @club.salas.where.not(state: 'cerrada').count
 
+  # Cuenta las sedes que EXISTEN, no las que están en uso — el mismo criterio que las salas, que
+  # ya lo tenía. Con `activas` alcanzaba con desactivar la sede para liberar el cupo y crear
+  # otra: una organización del plan Básico podía tener las sedes que quisiera creando, apagando
+  # y volviendo a prender. Sólo borrarla libera lugar.
+  def sedes_vigentes = @club.sedes.count
+
   def uso
     {
-      sedes:     @club.sedes.activas.count,
+      sedes:     sedes_vigentes,
       salas:     salas_vigentes,
       lotes:     @club.lotes.count,
       plantas:   Plant.joins(:lote).where(lotes: { club_id: @club.id }).count,

@@ -72,6 +72,18 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // Organización SUSPENDIDA. El backend responde 403 a todo, así que no alcanza con avisar en
+    // la pantalla donde pasó: la app entera dejó de funcionar. Se levanta un cartel a pantalla
+    // completa que dice qué pasó, a quién escribirle y —lo que más importa— que los datos están
+    // guardados. Un 403 pelado le hace creer al club que perdió su información.
+    if (status === 403 && error?.response?.data?.club_suspendido) {
+      try {
+        const { useAuthStore } = await import("../stores/auth");
+        useAuthStore().clubSuspendido = true;
+      } catch {}
+      return Promise.reject(error);
+    }
+
     // Tope del plan alcanzado. Va acá y no en cada pantalla porque los límites se chocan desde
     // MUCHOS lugares —alta de lote, de planta, de sala, de paciente, de usuario, de sede, y las
     // versiones mobile de casi todos— y sólo cuatro vistas lo manejaban: en el resto el
