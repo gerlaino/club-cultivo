@@ -277,10 +277,14 @@ Un `super_admin` **sin** observar que pega a un endpoint de club revienta con **
 
 ### Antes de tocar producción
 
-```
-bundle install
-bundle exec rails db:migrate
+**Las migraciones NO son un pendiente: se corren solas al deployar.** `bin/render-build.sh`
+hace `bundle install`, `npm ci`, build del front y `rails db:migrate` como Build Command de
+Render, con `set -o errexit` (si una migración falla, falla el deploy entero). No volver a
+listar "pendiente `db:migrate`" al cerrar un bloque.
 
+**Los rakes SÍ son manuales** — corren a mano, una sola vez, y ninguno se dispara al deployar:
+
+```
 bundle exec rake suites:prender_iot_con_dispositivos SIMULAR=1   # ⚠️ el crítico
 bundle exec rake lotes:corregir_finalizados_con_stock SIMULAR=1  # mirar los 6 del club 1
 bundle exec rake geneticas:declarar_por_nombre SIMULAR=1         # resuelve ~44 de un saque

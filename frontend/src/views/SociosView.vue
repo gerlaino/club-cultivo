@@ -95,9 +95,21 @@ function safeDate(d) {
 
 const reprocannStatus = reprocannBadge
 
+// "Apellido, Nombre" — el orden con que se busca en una lista alfabética. Si falta alguno de
+// los dos no se deja la coma colgando: hay pacientes cargados con un solo campo.
+function nombreListado(s) {
+  const ap = (s?.apellido || '').trim()
+  const no = (s?.nombre   || '').trim()
+  if (!ap) return no || '—'
+  if (!no) return ap
+  return `${ap}, ${no}`
+}
+
+// Numérico y no "20 de mar de 2029": son dos columnas de fechas una al lado de la otra, y en
+// columna se comparan mejor alineadas y cortas. La fecha en prosa queda para la ficha.
 function formatDate(d) {
   if (!d) return '—'
-  return safeDate(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
+  return safeDate(d).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
 function edad(fn) {
@@ -328,6 +340,21 @@ async function exportarCSV() {
     <!-- Tabla -->
     <div v-else class="sv__table-wrap">
       <table class="sv-table">
+        <!-- Anchos declarados con `table-layout: fixed`: el navegador reparte el sobrante entre
+             las columnas SIN ancho, y acá la única es Paciente. Así el nombre se queda con el
+             espacio libre en vez de que se lo lleve el email, que es lo que pasaba. -->
+        <colgroup>
+          <col class="sv-col--ind" />
+          <col />
+          <col class="sv-col--dni" />
+          <col class="sv-col--edad" />
+          <col class="sv-col--estado" />
+          <col class="sv-col--rep" />
+          <col class="sv-col--vence" />
+          <col class="sv-col--ultima" />
+          <col class="sv-col--email" />
+          <col v-if="canEdit" class="sv-col--acc" />
+        </colgroup>
         <thead>
           <tr>
             <th></th>
@@ -336,6 +363,7 @@ async function exportarCSV() {
             <th>Edad</th>
             <th>Estado</th>
             <th>REPROCANN</th>
+            <th>Vence</th>
             <th>Última dispensa</th>
             <th>Email</th>
             <th v-if="canEdit"></th>
@@ -364,7 +392,9 @@ async function exportarCSV() {
               ></div>
             </td>
             <td>
-              <div class="sv-pac-nombre">{{ s.nombre }} {{ s.apellido }}</div>
+              <!-- "Apellido, Nombre": la lista se ordena por apellido, así que es el apellido
+                   lo que hay que poder recorrer con la vista para encontrar a alguien. -->
+              <div class="sv-pac-nombre">{{ nombreListado(s) }}</div>
             </td>
             <td><span class="sv-mono">{{ s.dni }}</span></td>
             <td>
@@ -379,19 +409,26 @@ async function exportarCSV() {
                 {{ s.es_paciente ? 'Activo' : 'Inactivo' }}
               </span>
             </td>
+            <!-- El estado y la fecha van en columnas separadas: apilados en una sola, el badge
+                 y el vencimiento competían por el mismo ancho y ninguno se leía.
+                 El badge sale de `reprocannStatus`, NO de que haya fecha: un trámite pendiente
+                 todavía no tiene certificado ni vencimiento, y preguntando por la fecha caía en
+                 "Sin REPROCANN" — justo lo contrario de lo que pasa. (Mismo bug que ya se había
+                 corregido en la ficha del paciente; en la lista había quedado.) -->
             <td>
-              <template v-if="s.reprocann_vencimiento">
-                <span class="sv-rep-badge"
-                  :class="{
-                    'sv-rep--danger':  reprocannStatus(s)?.level === 'danger',
-                    'sv-rep--warning': reprocannStatus(s)?.level === 'warning',
-                    'sv-rep--caution': reprocannStatus(s)?.level === 'caution',
-                    'sv-rep--ok':      reprocannStatus(s)?.level === 'ok',
-                  }"
-                >{{ reprocannStatus(s)?.label }}</span>
-                <div class="sv-rep-fecha">{{ formatDate(s.reprocann_vencimiento) }}</div>
-              </template>
-              <span v-else class="sv-empty">Sin REPROCANN</span>
+              <span v-if="reprocannStatus(s)" class="sv-rep-badge"
+                :class="{
+                  'sv-rep--danger':  reprocannStatus(s)?.level === 'danger',
+                  'sv-rep--warning': reprocannStatus(s)?.level === 'warning',
+                  'sv-rep--caution': reprocannStatus(s)?.level === 'caution',
+                  'sv-rep--ok':      reprocannStatus(s)?.level === 'ok',
+                }"
+              >{{ reprocannStatus(s)?.label }}</span>
+              <span v-else class="sv-empty">Sin registro</span>
+            </td>
+            <td>
+              <span v-if="s.reprocann_vencimiento" class="sv-rep-fecha">{{ formatDate(s.reprocann_vencimiento) }}</span>
+              <span v-else class="sv-empty">—</span>
             </td>
             <td>
               <span v-if="s.ultima_dispensacion" class="sv-ultima">{{ formatDate(s.ultima_dispensacion) }}</span>
@@ -432,7 +469,9 @@ async function exportarCSV() {
 </template>
 
 <style scoped>
-.sv { padding: 2rem 1.5rem; max-width: 1000px; margin: 0 auto; }
+/* 1200 es el ancho de las otras vistas de listado (Plantas, Genéticas, Sedes). Pacientes
+   había quedado en 1000 y por eso las columnas se pisaban teniendo pantalla de sobra. */
+.sv { padding: 2rem 1.5rem; max-width: 1200px; margin: 0 auto; }
 @media (max-width: 768px) { .sv { padding: 1.25rem 1rem; } }
 
 .sv__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; flex-wrap: wrap; }
@@ -479,7 +518,20 @@ async function exportarCSV() {
 
 /* ── Tabla ───────────────────────────────────────── */
 .sv__table-wrap { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; }
-.sv-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+.sv-table { width: 100%; border-collapse: collapse; font-size: .875rem; table-layout: fixed; }
+/* Los anchos van acá y no en el markup. Paciente NO tiene ancho a propósito: con
+   `table-layout: fixed` es la única que se queda con lo que sobra. */
+.sv-col--ind    { width: 8px; }
+.sv-col--dni    { width: 92px; }
+.sv-col--edad   { width: 56px; }
+.sv-col--estado { width: 96px; }
+.sv-col--rep    { width: 112px; }
+.sv-col--vence  { width: 104px; }
+.sv-col--ultima { width: 144px; }
+/* El email era el que se comía el sobrante. Ancho fijo y lo que no entra se corta con "…";
+   la dirección completa se ve en la ficha, acá alcanza para reconocerla. */
+.sv-col--email  { width: 176px; }
+.sv-col--acc    { width: 72px; }
 .sv-table thead th { padding: 10px 12px; text-align: left; font-weight: 600; color: #6b7280; border-bottom: 2px solid #e5e7eb; white-space: nowrap; background: #fafafa; }
 .sv-table tbody tr { border-bottom: 1px solid #f3f4f6; transition: background .1s; cursor: pointer; }
 .sv-table tbody tr:last-child { border-bottom: none; }
@@ -506,14 +558,15 @@ async function exportarCSV() {
 .sv-mono  { font-family: monospace; font-size: .82rem; color: #374151; }
 .sv-edad  { font-size: .82rem; color: var(--c-slate-500); }
 .sv-empty { color: var(--c-slate-300); font-size: .82rem; }
-.sv-email-cell { font-size: .82rem; color: var(--c-slate-500); }
+.sv-email-cell { display: block; font-size: .82rem; color: var(--c-slate-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .sv-rep-badge { display: inline-block; font-size: .72rem; font-weight: 800; padding: 2px 8px; border-radius: 5px; }
 .sv-rep--danger  { background: #fef2f2; color: #dc2626; }
 .sv-rep--warning { background: #fffbeb; color: #b45309; }
 .sv-rep--caution { background: #eff6ff; color: #0369a1; }
 .sv-rep--ok      { background: #f0fdf4; color: #15803d; }
-.sv-rep-fecha { font-size: .7rem; color: var(--c-slate-400); margin-top: .15rem; }
+/* En su propia columna ya no es un pie de badge: sube a tamaño de dato legible. */
+.sv-rep-fecha { font-size: .8rem; color: var(--c-slate-500); white-space: nowrap; }
 
 .sv-actions { display: flex; align-items: center; gap: .25rem; opacity: 0; transition: opacity .15s; }
 .sv-table tbody tr:hover .sv-actions { opacity: 1; }
