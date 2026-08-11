@@ -233,6 +233,9 @@ Rails.application.routes.draw do
     end
     resources :paciente_notas, only: [:destroy]
 
+    # Plantillas de correo de la organización (módulo Correo electrónico).
+    resources :plantillas_mail, only: [:index, :create, :update, :destroy]
+
     # Alias deprecado — mantenido por compatibilidad
     resources :socios, controller: 'pacientes', as: :socios_legacy do
       resources :notas,        controller: "paciente_notas",    only: [:index, :create]

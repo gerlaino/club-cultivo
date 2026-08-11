@@ -6,6 +6,7 @@ import { useRoute } from 'vue-router'
 const props = defineProps({ backPath: { type: String, default: '/pacientes' } })
 import { usePacientesStore } from '../stores/pacientes'
 import { useAuthStore } from '../stores/auth'
+import { useClubStore } from '../stores/club'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import IndicacionesMedicas from '../components/pacientes/IndicacionesMedicas.vue'
 import Dispensaciones from '../components/pacientes/Dispensaciones.vue'
@@ -39,6 +40,7 @@ const loading   = ref(true)
 const error     = ref(null)
 const activeTab = ref(auth.user?.role === 'dispensador' ? 'dispensaciones' : 'info')
 
+const club       = useClubStore()
 const canEdit    = computed(() => ['admin', 'medico', 'super_admin'].includes(auth.user?.role))
 const s          = computed(() => store.current)
 const edadSocio  = computed(() => s.value ? edad(s.value.fecha_nacimiento) : null)
@@ -65,12 +67,23 @@ const pendienteAprobacion = computed(() => !!s.value && !s.value.aprobado_at)
 const puedeAprobar        = computed(() => isAdmin.value || isMedico.value)
 const aprobando           = ref(false)
 
+// La bienvenida de un alta de mostrador sale ACÁ, no cuando la cargaron: recién al aprobarla
+// la persona es paciente de la organización.
+const mandarBienvenida = ref(false)
+const puedeMandarBienvenida = computed(() =>
+  puedeAprobar.value && club.data?.features?.mailer === true && !!s.value?.email
+)
+
 async function aprobarAlta() {
   aprobando.value = true
   try {
-    await aprobarPaciente(s.value.id)
+    const { data } = await aprobarPaciente(s.value.id, {
+      enviarBienvenida: puedeMandarBienvenida.value && mandarBienvenida.value,
+    })
     await store.fetchOne(s.value.id)
     toast.success('Paciente aprobado — ya puede recibir dispensaciones')
+    // El alta se aprobó igual; si el mail no salió es un aviso aparte, no un error del alta.
+    if (data?.aviso) toast.warning(data.aviso)
   } catch (e) {
     toast.error(e?.response?.data?.error || 'No se pudo aprobar el alta')
   } finally {
@@ -401,10 +414,16 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
           dispensaciones ni reservas hasta que se apruebe el alta.
           <template v-if="!puedeAprobar"> Pedíselo a un administrador o al médico.</template>
         </div>
-        <button v-if="puedeAprobar" class="sd__btn-aprobar" :disabled="aprobando" @click="aprobarAlta">
-          <Check :size="14" :stroke-width="3" />
-          {{ aprobando ? 'Aprobando…' : 'Aprobar alta' }}
-        </button>
+        <div v-if="puedeAprobar" class="sd__alerta-acc">
+          <label v-if="puedeMandarBienvenida" class="sd__alerta-check">
+            <input type="checkbox" v-model="mandarBienvenida" />
+            <span>Enviar mail de bienvenida</span>
+          </label>
+          <button class="sd__btn-aprobar" :disabled="aprobando" @click="aprobarAlta">
+            <Check :size="14" :stroke-width="3" />
+            {{ aprobando ? 'Aprobando…' : 'Aprobar alta' }}
+          </button>
+        </div>
       </div>
 
       <!-- Tabs: primarias inline + resto en "Más" -->
@@ -827,6 +846,11 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 }
 .sd__btn-aprobar:hover:not(:disabled) { background: #92400e; }
 .sd__btn-aprobar:disabled { opacity: .6; cursor: default; }
+/* El tilde va PEGADO al botón y no suelto en la franja: es una opción de esa acción, no un
+   ajuste del paciente. En pantalla angosta se apila arriba del botón. */
+.sd__alerta-acc { display: flex; align-items: center; gap: .75rem; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+.sd__alerta-check { display: inline-flex; align-items: center; gap: .35rem; font-size: .78rem; font-weight: 600; color: #78350f; cursor: pointer; white-space: nowrap; }
+.sd__alerta-check input { cursor: pointer; accent-color: #b45309; }
 
 /* Tabs */
 .sd__tabs { display: flex; gap: .25rem; border-bottom: 2px solid var(--c-slate-200); margin-bottom: 1.5rem; flex-wrap: wrap; }

@@ -55,6 +55,7 @@ module Restore
       { key: 'documento',           model_name: 'Documento',          label: 'Documento',           group: 'Socios' },
       { key: 'evento',              model_name: 'Evento',             label: 'Evento',              group: 'Socios' },
       { key: 'mail_enviado',        model_name: 'MailEnviado',        label: 'Correo enviado',      group: 'Socios', descriptor: ->(r) { r.try(:asunto).presence || "Correo ##{r.id}" } },
+      { key: 'plantilla_mail',      model_name: 'PlantillaMail',      label: 'Plantilla de correo', group: 'Socios', descriptor: ->(r) { r.try(:nombre).presence || "Plantilla ##{r.id}" }, search: %i[nombre asunto] },
       { key: 'cuenta_corriente',    model_name: 'CuentaCorriente',    label: 'Cuenta corriente',    group: 'Socios' },
 
       # --- Médico --------------------------------------------------------------

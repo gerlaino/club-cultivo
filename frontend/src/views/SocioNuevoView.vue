@@ -2,8 +2,9 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePacientesStore } from '../stores/pacientes'
+import { useAuthStore } from '../stores/auth'
+import { useToast } from '../composables/useToast.js'
 import { useClubStore } from '../stores/club'
-import { enviarMailPaciente } from '../lib/api.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 
@@ -11,7 +12,17 @@ const router = useRouter()
 const store  = usePacientesStore()
 const club   = useClubStore()
 
+const auth = useAuthStore()
+const { warning: toastWarn } = useToast()
 const sendWelcomeMail = ref(false)
+
+// El checkbox es sólo para quien ADMITE. El mostrador (dispensador, supervisor) carga un alta
+// que queda pendiente: darle la bienvenida a alguien que todavía puede no ser admitido sería
+// anunciarle algo que no pasó. Esa bienvenida sale al aprobar, desde la ficha.
+// Y hace falta el módulo de correo: sin él no hay plantilla ni casilla.
+const puedeMandarBienvenida = computed(() =>
+  ['admin', 'medico'].includes(auth.user?.role) && club.data?.features?.mailer === true
+)
 const formError       = ref(null)
 const formErrors      = ref({})
 const todayISO        = new Date().toLocaleDateString('en-CA') // yyyy-mm-dd local
@@ -82,16 +93,13 @@ async function handleSubmit() {
   try {
     const payload = { ...form.value }
     Object.keys(payload).forEach(k => { if (payload[k] === '') delete payload[k] })
-    const socio = await store.create(payload)
-
-    if (sendWelcomeMail.value && socio.email) {
-      const clubNombre = club.data?.name || ''
-      await enviarMailPaciente(socio.id, {
-        tipo:   'bienvenida',
-        asunto: `Bienvenido/a a ${clubNombre}`,
-        cuerpo: `Hola ${socio.nombre},\n\nTe damos la bienvenida como paciente de ${clubNombre}.\n\nEstamos a tu disposición para cualquier consulta.\n\nSaludos,`,
-      }).catch(() => {})
-    }
+    // El mail viaja EN el alta, no como un segundo request. Antes se mandaba después con el
+    // texto escrito acá a mano y un `.catch(() => {})` que se comía cualquier error: si Gmail
+    // rechazaba, nadie se enteraba. Ahora el cuerpo sale de la plantilla de la organización
+    // —editable en Configuración → Correo electrónico— y el backend devuelve un `aviso` si no
+    // pudo mandarlo.
+    const { paciente: socio, aviso } = await store.create(payload, { enviarBienvenida: puedeMandarBienvenida.value && sendWelcomeMail.value })
+    if (aviso) toastWarn(aviso)
 
     router.push({ name: 'paciente-detail', params: { id: socio.id } })
   } catch (e) {
@@ -319,7 +327,7 @@ async function handleSubmit() {
       </div>
 
       <!-- ── Mail de bienvenida ── -->
-      <label class="snv__welcome-mail" :class="{ 'snv__welcome-mail--disabled': !form.email }">
+      <label v-if="puedeMandarBienvenida" class="snv__welcome-mail" :class="{ 'snv__welcome-mail--disabled': !form.email }">
         <div class="snv__welcome-mail-check">
           <input v-model="sendWelcomeMail" type="checkbox" class="snv__welcome-mail-input" :disabled="!form.email" />
           <div class="snv__welcome-mail-box">

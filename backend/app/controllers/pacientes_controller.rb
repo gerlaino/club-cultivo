@@ -3,6 +3,11 @@ class PacientesController < ApplicationController
   before_action -> { require_feature!(:produccion_dispensa) }
   before_action :check_pacientes_role!
   before_action :set_paciente, only: [:show, :update, :destroy, :timeline, :subir_reprocann, :eliminar_reprocann, :enviar_mail, :mails_enviados, :aprobar]
+  # Hasta ahora `mailer` era una etiqueta que no controlaba nada: no había un solo
+  # `require_feature!` ni chequeo en el frontend, así que el flag se podía apagar y los mails
+  # seguían saliendo. Ahora que se vende aparte, la barrera va acá — el candado en el backend,
+  # no sólo escondiendo el botón.
+  before_action -> { require_feature!(:mailer) }, only: [:enviar_mail, :mails_enviados]
   before_action :require_export_role!, only: [:export_csv]
   before_action :require_criticos_role!, only: [:criticos]
   before_action :normalize_paciente_params, only: [:create, :update]
@@ -235,7 +240,11 @@ class PacientesController < ApplicationController
 
     if paciente.save
       avisar_alta_pendiente(paciente) if paciente.pendiente_aprobacion?
-      render json: { data: paciente_json(paciente) }, status: :created
+      # Sólo sale acá si el alta ya quedó aprobada (admin o médico). La cargada desde el
+      # mostrador todavía no es paciente de la organización: darle la bienvenida antes de que
+      # alguien la admita sería anunciarle algo que puede no pasar. Esa sale al aprobar.
+      aviso = enviar_bienvenida(paciente) unless paciente.pendiente_aprobacion?
+      render json: { data: paciente_json(paciente), aviso: aviso }.compact, status: :created
     else
       render json: { errors: paciente.errors.full_messages }, status: :unprocessable_entity
     end
@@ -253,7 +262,8 @@ class PacientesController < ApplicationController
     end
 
     @paciente.aprobar!(current_user)
-    render json: { data: paciente_json(@paciente) }
+    aviso = enviar_bienvenida(@paciente)
+    render json: { data: paciente_json(@paciente), aviso: aviso }.compact
   end
 
   def update
@@ -386,48 +396,25 @@ class PacientesController < ApplicationController
       return render json: { error: 'No autorizado' }, status: :forbidden
     end
 
-    unless @paciente.email.present?
-      return render json: { error: 'El paciente no tiene email registrado' }, status: :unprocessable_entity
-    end
+    # El asunto y el cuerpo llegan YA resueltos desde la vista previa: lo que el usuario vio en
+    # pantalla es exactamente lo que se manda. `plantilla_mail_id` queda sólo como rastro de con
+    # cuál se armó, para el historial.
+    plantilla = if (pid = params.dig(:mail, :plantilla_mail_id)).present?
+                  current_user.club.plantillas_mail.find_by(id: pid)
+                end
 
-    unless current_user.club.smtp_configured?
-      return render json: { error: 'La organización no tiene servidor de correo configurado. Configuralo en Preferencias → Correo.' }, status: :unprocessable_entity
-    end
-
-    tipo   = params.dig(:mail, :tipo).presence_in(MailEnviado::TIPOS) || 'personalizado'
-    asunto = params.dig(:mail, :asunto).to_s.strip
-    cuerpo = params.dig(:mail, :cuerpo).to_s.strip
-
-    if asunto.blank? || cuerpo.blank?
-      return render json: { error: 'El asunto y el cuerpo son obligatorios' }, status: :unprocessable_entity
-    end
-
-    mail_record = MailEnviado.new(
-      paciente:      @paciente,
-      user:          current_user,
-      club:          current_user.club,
-      asunto:        asunto,
-      cuerpo:        cuerpo,
-      tipo:          tipo,
-      email_destino: @paciente.email,
-      enviado_at:    Time.current
+    resultado = Correo::EnviarAPaciente.call(
+      paciente:  @paciente,
+      usuario:   current_user,
+      asunto:    params.dig(:mail, :asunto),
+      cuerpo:    params.dig(:mail, :cuerpo),
+      tipo:      params.dig(:mail, :tipo).presence_in(MailEnviado::TIPOS) || 'personalizado',
+      plantilla: plantilla
     )
 
-    unless mail_record.save
-      return render json: { errors: mail_record.errors.full_messages }, status: :unprocessable_entity
-    end
+    return render json: { error: resultado.error }, status: :unprocessable_entity unless resultado.ok?
 
-    # Envío SINCRÓNICO: es una acción manual que necesita feedback inmediato. Si falla (Gmail
-    # rechaza, app-password mal, etc.), el usuario ve el error en el acto en vez de un "enviado"
-    # falso (deliver_later lo mandaba a Sidekiq y el error quedaba oculto en el worker).
-    begin
-      PacienteMailer.mensaje(mail_enviado: mail_record).deliver_now
-    rescue => e
-      mail_record.destroy
-      return render json: { error: "No se pudo enviar el correo: #{e.message}" }, status: :unprocessable_entity
-    end
-
-    render json: serialize_mail(mail_record), status: :created
+    render json: serialize_mail(resultado.mail), status: :created
   end
 
   # GET /pacientes/:id/mails_enviados
@@ -436,7 +423,7 @@ class PacientesController < ApplicationController
       return render json: { error: 'No autorizado' }, status: :forbidden
     end
 
-    mails = @paciente.mails_enviados.recientes.limit(50).includes(:user)
+    mails = @paciente.mails_enviados.recientes.limit(50).includes(:user, :plantilla_mail)
     render json: mails.map { |m| serialize_mail(m) }
   end
 
@@ -503,7 +490,10 @@ class PacientesController < ApplicationController
       tipo:          m.tipo,
       email_destino: m.email_destino,
       enviado_at:    m.enviado_at,
-      remitente:     m.user.nombre_completo
+      remitente:     m.user.nombre_completo,
+      # Con qué plantilla salió, para el badge del historial. Nil si fue escrito libre o si es
+      # de antes de que las plantillas existieran; ahí el frontend cae en `tipo`.
+      plantilla_nombre: m.plantilla_mail&.nombre
     }
   end
 
@@ -604,5 +594,36 @@ class PacientesController < ApplicationController
         contexto:         { paciente_id: paciente.id, creado_por_id: current_user.id }
       )
     end
+  end
+
+  # Manda la plantilla de bienvenida si quien está operando lo pidió. Devuelve un aviso para
+  # mostrar, o nil.
+  #
+  # Tres candados, y el orden importa:
+  #   1. El rol. Que el dispensador no vea el checkbox es UI; la barrera es esta línea. Un
+  #      alta de mostrador la anuncia quien la admite, no quien la carga.
+  #   2. El módulo. Sin el add-on de correo el parámetro se ignora en silencio.
+  #   3. Que exista una plantilla de bienvenida activa. Si el admin la borró, no hay qué mandar.
+  #
+  # Nunca hace fallar la operación: el paciente quedó dado de alta o aprobado igual, y que Gmail
+  # rechace la contraseña no puede deshacer eso. El problema se informa como aviso.
+  def enviar_bienvenida(paciente)
+    return unless ActiveModel::Type::Boolean.new.cast(params[:enviar_bienvenida])
+    return unless Paciente::ROLES_APRUEBAN.include?(current_user.role)
+    return unless current_user.club.feature?('mailer')
+
+    plantilla = current_user.club.plantillas_mail.activas.find_by(bienvenida: true)
+    return 'No hay una plantilla de bienvenida activa: el paciente se dio de alta sin mail.' unless plantilla
+
+    resultado = Correo::EnviarAPaciente.call(
+      paciente:  paciente,
+      usuario:   current_user,
+      asunto:    plantilla.asunto_para(paciente),
+      cuerpo:    plantilla.cuerpo_para(paciente),
+      tipo:      'bienvenida',
+      plantilla: plantilla
+    )
+
+    resultado.ok? ? nil : "El paciente se guardó, pero el mail de bienvenida no salió: #{resultado.error}"
   end
 end

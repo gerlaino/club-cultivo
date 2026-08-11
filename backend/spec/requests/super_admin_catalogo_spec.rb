@@ -43,10 +43,11 @@ RSpec.describe 'SuperAdmin catálogo', type: :request do
       c = catalogo
 
       expect(c['suites'].map  { |s| s['clave'] }).to contain_exactly('cultivo', 'produccion_dispensa')
-      expect(c['addons'].map  { |a| a['clave'] }).to include('bar', 'iot', 'ia', 'whatsapp')
-      # Médico y correo ya no son add-ons: vienen dentro de una suite.
-      expect(c['addons'].map  { |a| a['clave'] }).not_to include('medico', 'mailer')
-      expect(c['incluidos'].map { |i| i['clave'] }).to contain_exactly('medico', 'mailer')
+      expect(c['addons'].map  { |a| a['clave'] }).to include('bar', 'iot', 'ia', 'whatsapp', 'mailer')
+      # El médico no es add-on: viene dentro de la suite. El correo SÍ pasó a serlo cuando dejó
+      # de ser "mandar un mail desde la ficha" y se volvió un espacio propio que se vende.
+      expect(c['addons'].map  { |a| a['clave'] }).not_to include('medico')
+      expect(c['incluidos'].map { |i| i['clave'] }).to contain_exactly('medico')
       expect(c['en_construccion'].map { |e| e['clave'] }).to include('vista_paciente')
     end
 

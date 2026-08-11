@@ -3,6 +3,10 @@ class PreferencesController < ApplicationController
   before_action :authenticate_user!
   before_action :require_club_user!
   before_action :set_club
+  # Conectar y probar la casilla es parte del módulo de correo, no de las preferencias
+  # generales: sin el add-on no hay dónde configurar nada.
+  before_action -> { require_feature!(:mailer) },
+                only: [:test_smtp, :conectar_email, :desconectar_email]
 
   def show
     render json: serialize(@club)

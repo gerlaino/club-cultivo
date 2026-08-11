@@ -51,6 +51,7 @@ class Club < ApplicationRecord
   has_many :patient_documents,    through: :pacientes
   has_many :plants,               through: :lotes
   has_many :notas,           dependent: :destroy
+  has_many :plantillas_mail, class_name: 'PlantillaMail', dependent: :destroy
   has_many :dispositivos,    dependent: :destroy
   has_many :reglas_ambientales, class_name: 'ReglaAmbiental', dependent: :destroy
   has_many :alertas,          dependent: :destroy
@@ -243,14 +244,16 @@ class Club < ApplicationRecord
   # del paciente, así que un club de sólo Cultivo —que no tiene pacientes— no los ve nunca.
   # Poder apagarlos era una perilla que no le servía a nadie y que, olvidada, dejaba al club
   # con media ficha.
+  # `mailer` SALIÓ de acá y pasó a ADDONS. Cuando era "mandar un mail desde la ficha" no tenía
+  # sentido venderlo aparte; ahora es un espacio propio —casilla, plantillas y envíos— y sí. El
+  # movimiento va con backfill en la migración: derivado, lo tenía toda organización con la
+  # suite, y sin backfill se quedaban todas sin correo el día del deploy.
   INCLUIDOS_EN_SUITE = {
     'medico' => 'produccion_dispensa',
-    'mailer' => 'produccion_dispensa',
   }.freeze
 
   INCLUIDOS_META = {
-    'medico' => { label: 'Módulo médico',      desc: 'Turnos, historia clínica e indicaciones.', requiere: nil },
-    'mailer' => { label: 'Correo al paciente', desc: 'Mails desde la ficha, con historial.',     requiere: 'SMTP de la organización cargado en Preferencias.' },
+    'medico' => { label: 'Módulo médico', desc: 'Turnos, historia clínica e indicaciones.', requiere: nil },
   }.freeze
 
   # Add-ons: se suman a una suite y SÍ se venden por separado. `requiere` documenta de qué
@@ -262,6 +265,7 @@ class Club < ApplicationRecord
     'iot'      => { label: 'Ambiente / IoT', desc: 'Sensores, lecturas automáticas y reglas.',           requiere: 'Hardware de la organización (Sonoff u otro) o importación por CSV.' },
     'ia'       => { label: 'Asistente IA',   desc: 'Análisis de lote, plan de trabajo y registro por voz.', requiere: 'ANTHROPIC_API_KEY en el entorno.' },
     'delivery' => { label: 'Delivery',       desc: 'Reparto a domicilio: paquetes, rutas, firma de entrega y cobro contra-entrega.', requiere: 'La suite de Producción y dispensa tiene que estar activa.' },
+    'mailer'   => { label: 'Correo electrónico', desc: 'Casilla propia, plantillas de mail y envíos a los pacientes.', requiere: 'Casilla de la organización conectada en Preferencias → Correo electrónico.' },
     'whatsapp' => { label: 'WhatsApp',       desc: 'Avisos de entrega por WhatsApp.',                    requiere: 'Cuenta de Twilio de la organización (SID, token y número).' },
     'ariccame' => { label: 'ARICCAME',       desc: 'Reporte regulatorio de dispensaciones y stock.',     requiere: 'INCOMPLETO: la integración está simulada, no transmite de verdad.' },
   }.freeze
@@ -316,6 +320,11 @@ class Club < ApplicationRecord
     # el alta deja destildarlo. Una organización que no reparte simplemente no da de alta
     # repartidores; una que sí, no tiene que pedir que se lo habiliten.
     'delivery'            => true,
+    # Correo nace prendido por el mismo motivo: hasta ayer lo tenía toda organización con la
+    # suite (era derivado), y hacer que ahora haya que acordarse de tildarlo es justo el olvido
+    # que deja al cliente con media ficha. Que sea contratable significa que se puede DAR DE
+    # BAJA, no que haya que pedirlo.
+    'mailer'              => true,
   }.freeze
 
   # Features tal como las ve el frontend: las guardadas MÁS las claves viejas derivadas.

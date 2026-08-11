@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_11_160000) do
+ActiveRecord::Schema[7.2].define(version: 2026_08_11_180100) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1248,11 +1248,13 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_11_160000) do
     t.datetime "updated_at", null: false
     t.datetime "deleted_at"
     t.bigint "deleted_by_id"
+    t.bigint "plantilla_mail_id"
     t.index ["club_id"], name: "index_mails_enviados_on_club_id"
     t.index ["deleted_at"], name: "index_mails_enviados_on_deleted_at"
     t.index ["deleted_by_id"], name: "index_mails_enviados_on_deleted_by_id"
     t.index ["paciente_id", "enviado_at"], name: "index_mails_enviados_on_paciente_id_and_enviado_at"
     t.index ["paciente_id"], name: "index_mails_enviados_on_paciente_id"
+    t.index ["plantilla_mail_id"], name: "index_mails_enviados_on_plantilla_mail_id"
     t.index ["user_id"], name: "index_mails_enviados_on_user_id"
   end
 
@@ -1599,6 +1601,25 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_11_160000) do
     t.index ["occurred_at"], name: "index_plant_activities_on_occurred_at"
     t.index ["plant_id"], name: "index_plant_activities_on_plant_id"
     t.index ["user_id"], name: "index_plant_activities_on_user_id"
+  end
+
+  create_table "plantillas_mail", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.string "nombre", null: false
+    t.string "asunto", null: false
+    t.text "cuerpo", null: false
+    t.boolean "activa", default: true, null: false
+    t.boolean "bienvenida", default: false, null: false
+    t.bigint "creada_por_id"
+    t.datetime "deleted_at"
+    t.bigint "deleted_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "nombre"], name: "index_plantillas_mail_nombre_unico", unique: true, where: "(deleted_at IS NULL)"
+    t.index ["club_id"], name: "index_plantillas_mail_on_club_id"
+    t.index ["club_id"], name: "index_plantillas_mail_una_bienvenida", unique: true, where: "((bienvenida = true) AND (deleted_at IS NULL))"
+    t.index ["creada_por_id"], name: "index_plantillas_mail_on_creada_por_id"
+    t.index ["deleted_at"], name: "index_plantillas_mail_on_deleted_at"
   end
 
   create_table "plants", force: :cascade do |t|
@@ -2326,6 +2347,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_11_160000) do
   add_foreign_key "lotes", "users", column: "manicurador_id"
   add_foreign_key "mails_enviados", "clubs"
   add_foreign_key "mails_enviados", "pacientes"
+  add_foreign_key "mails_enviados", "plantillas_mail", column: "plantilla_mail_id"
   add_foreign_key "mails_enviados", "users"
   add_foreign_key "mails_enviados", "users", column: "deleted_by_id"
   add_foreign_key "movimientos_contables", "categorias_contables", column: "categoria_contable_id"
@@ -2385,6 +2407,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_11_160000) do
   add_foreign_key "plant_activities", "plants"
   add_foreign_key "plant_activities", "users"
   add_foreign_key "plant_activities", "users", column: "deleted_by_id"
+  add_foreign_key "plantillas_mail", "clubs"
+  add_foreign_key "plantillas_mail", "users", column: "creada_por_id"
   add_foreign_key "plants", "clubs"
   add_foreign_key "plants", "lotes"
   add_foreign_key "plants", "users", column: "deleted_by_id"

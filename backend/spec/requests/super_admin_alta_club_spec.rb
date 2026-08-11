@@ -60,7 +60,6 @@ RSpec.describe 'SuperAdmin alta de club', type: :request do
 
       expect(club.features).not_to have_key('medico')
       expect(club.feature?(:medico)).to be(true)
-      expect(club.feature?(:mailer)).to be(true)
     end
 
     it 'ignora un módulo en construcción aunque lo manden por la API' do

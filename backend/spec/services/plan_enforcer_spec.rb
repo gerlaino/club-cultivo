@@ -165,7 +165,17 @@ RSpec.describe PlanEnforcer do
                              features: { 'cultivo' => true, 'produccion_dispensa' => true })
 
       expect(basico.feature?(:medico)).to be(true)
-      expect(basico.feature?(:mailer)).to be(true)
+    end
+
+    # El correo dejó de ser derivado y pasó a add-on contratable, así que acá NO alcanza con
+    # tener la suite: hay que tenerlo prendido. Lo que el plan sigue sin tocar es CUÁLES módulos
+    # se tienen — eso lo deciden las suites y los add-ons, no básico contra total.
+    it 'el correo ya no viene con la suite: es un add-on que se prende' do
+      basico = create(:club, plan: 'basico',
+                             features: { 'cultivo' => true, 'produccion_dispensa' => true })
+
+      expect(basico.feature?(:mailer)).to be(false)
+      expect(create(:club, plan: 'basico').feature?(:mailer)).to be(true) # nace prendido
     end
   end
 end

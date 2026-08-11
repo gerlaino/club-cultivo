@@ -4,7 +4,6 @@ import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useClubStore } from '../stores/club'
 import Avatar from '../components/Avatar.vue'
 import { useConfirm } from '../composables/useConfirm.js'
-import { testSmtp, conectarEmail, desconectarEmail } from '../lib/api.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 
 const club  = useClubStore()
@@ -14,12 +13,6 @@ const logoPreview = ref(null)
 let toastTimer = null
 const { confirm } = useConfirm()
 
-// Email — cada club conecta SU casilla (email + contraseña de aplicación). Sin correo, no manda.
-const emailModo      = ref('sin_configurar')  // 'propio' | 'sin_configurar'
-const emailRemitente = ref('')
-const conectarForm = reactive({ email: '', app_password: '', from_name: '' })
-const conectando = ref(false)
-const smtpTesting = ref(false)
 
 const TIPOS_ORGANIZACION = [
   { value: 'asociacion_civil',  label: 'Asociación Civil' },
@@ -90,9 +83,6 @@ function loadFromStore() {
     tipo_organizacion:           club.data.tipo_organizacion           || '',
   })
   logoPreview.value = club.data.logo_url || null
-  emailModo.value      = club.data.email_modo || 'sin_configurar'
-  emailRemitente.value = club.data.email_remitente || ''
-  conectarForm.email = ''; conectarForm.app_password = ''; conectarForm.from_name = ''
   pristine.value = true
 }
 
@@ -156,50 +146,6 @@ function showToast(type, msg) {
   toastTimer = setTimeout(() => { toast.value = null }, 5000)
 }
 
-async function conectarMiEmail() {
-  if (!conectarForm.email || !conectarForm.app_password) {
-    showToast('danger', 'Ingresá el email de la organización y la contraseña de aplicación.')
-    return
-  }
-  conectando.value = true
-  try {
-    await conectarEmail({ ...conectarForm })
-    await club.fetch()  // dispara loadFromStore por el watch
-    showToast('success', 'Correo conectado — ya mandás desde tu casilla ✓')
-  } catch (e) {
-    showToast('danger', e?.response?.data?.error || 'No se pudo conectar')
-  } finally {
-    conectando.value = false
-  }
-}
-
-async function desconectarMiEmail() {
-  const ok = await confirm({
-    title: '¿Volver al correo de la plataforma?',
-    message: 'Tus mails dejarán de salir desde tu casilla y volverán a salir desde la plataforma (con tu email de contacto como respuesta).',
-    confirmText: 'Desconectar',
-  })
-  if (!ok) return
-  try {
-    await desconectarEmail()
-    await club.fetch()
-    showToast('success', 'Volviste al correo de la plataforma')
-  } catch (e) {
-    showToast('danger', e?.response?.data?.error || 'Error al desconectar')
-  }
-}
-
-async function runTestSmtp() {
-  smtpTesting.value = true
-  try {
-    const { data } = await testSmtp()
-    showToast('success', `Mail de prueba enviado a ${data.enviado_a}`)
-  } catch (e) {
-    showToast('danger', e?.response?.data?.error || 'Error al enviar mail de prueba')
-  } finally {
-    smtpTesting.value = false
-  }
-}
 </script>
 
 <template>
@@ -392,76 +338,21 @@ async function runTestSmtp() {
           </div>
         </div>
 
-        <!-- Correo de la organización -->
+        <!-- El correo se mudó a Configuración → Correo electrónico. Estaba acá mezclado con el
+             nombre y el logo, y ahora es un módulo aparte con su propia casilla y sus
+             plantillas: dejar media configuración en dos pantallas era garantía de confusión. -->
         <div class="pv__card pv__card--mt">
           <div class="pv__card-header">
             <div class="pv__card-icon" style="background:#f0fdf4;color:#15803d"><i class="bi bi-envelope-at"></i></div>
             <div>
-              <div class="pv__card-title">Correo de la organización</div>
-              <div class="pv__card-sub">Desde dónde salen los mails a los socios</div>
-            </div>
-            <div class="pv__smtp-badge" :class="emailModo === 'propio' ? 'pv__smtp-badge--ok' : 'pv__smtp-badge--off'">
-              <i :class="emailModo === 'propio' ? 'bi bi-check-circle-fill' : 'bi bi-x-circle-fill'"></i>
-              {{ emailModo === 'propio' ? 'Conectado' : 'Sin configurar' }}
+              <div class="pv__card-title">Correo electrónico</div>
+              <div class="pv__card-sub">La casilla de la organización y las plantillas de mail</div>
             </div>
           </div>
           <div class="pv__card-body">
-
-            <!-- Conectado -->
-            <template v-if="emailModo === 'propio'">
-              <div class="pv__infobox" style="background:#f0fdf4;border-color:#bbf7d0;color:#15803d">
-                <i class="bi bi-check-circle-fill"></i>
-                <span>Conectado. Los mails de la organización salen desde <strong>{{ emailRemitente }}</strong>.</span>
-              </div>
-              <div class="pv__smtp-actions">
-                <button class="pv__btn-outline" :disabled="smtpTesting" @click="runTestSmtp">
-                  <DsSpinner v-if="smtpTesting" :size="15" />
-                  <i v-else class="bi bi-send"></i>
-                  {{ smtpTesting ? 'Enviando…' : 'Enviar mail de prueba' }}
-                </button>
-                <button class="pv__btn-danger-ghost" @click="desconectarMiEmail">
-                  <i class="bi bi-box-arrow-left"></i> Desconectar
-                </button>
-              </div>
-            </template>
-
-            <!-- Sin configurar: conectar el correo -->
-            <div v-else class="pv__connect">
-              <div class="pv__infobox" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af">
-                <i class="bi bi-info-circle-fill"></i>
-                <span>Conectá el correo de la organización para poder mandarles mails a tus socios. Para Gmail necesitás una <strong>contraseña de aplicación</strong> (no tu contraseña normal):</span>
-              </div>
-              <ol class="pv__steps">
-                <li>Entrá a tu cuenta de Google → <strong>Seguridad</strong>.</li>
-                <li>Activá la <strong>Verificación en 2 pasos</strong> (si no la tenés).</li>
-                <li>Abrí <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">myaccount.google.com/apppasswords</a> y creá una <strong>contraseña de aplicación</strong>.</li>
-                <li>Copiá las <strong>16 letras</strong> y pegalas abajo.</li>
-              </ol>
-              <div class="pv__grid">
-                <div class="pv__field">
-                  <label class="pv__label">Email de la organización</label>
-                  <input class="pv__input" type="email" v-model.trim="conectarForm.email" placeholder="miclub@gmail.com" autocomplete="off" />
-                  <span class="pv__hint">Gmail, Outlook o Yahoo se detectan solos</span>
-                </div>
-                <div class="pv__field">
-                  <label class="pv__label">Contraseña de aplicación</label>
-                  <input class="pv__input" type="password" v-model.trim="conectarForm.app_password" placeholder="16 caracteres" autocomplete="new-password" />
-                </div>
-                <div class="pv__field pv__field--full">
-                  <label class="pv__label">Nombre para mostrar <span style="font-weight:400;color:#94a3b8">(opcional)</span></label>
-                  <input class="pv__input" v-model.trim="conectarForm.from_name" :placeholder="form.name || 'Mi Club'" />
-                  <span class="pv__hint">Lo que ve el socio como remitente</span>
-                </div>
-              </div>
-              <div class="pv__smtp-actions">
-                <button class="pv__btn-save" :disabled="conectando" @click="conectarMiEmail">
-                  <DsSpinner v-if="conectando" :size="15" />
-                  <i v-else class="bi bi-plug"></i>
-                  {{ conectando ? 'Conectando…' : 'Probar y conectar' }}
-                </button>
-              </div>
-            </div>
-
+            <router-link to="/configuracion/correo" class="pv__btn-outline pv__link-modulo">
+              <i class="bi bi-arrow-right-short"></i> Ir a Correo electrónico
+            </router-link>
           </div>
         </div>
 
@@ -595,17 +486,9 @@ async function runTestSmtp() {
 .pv-toast-enter-active, .pv-toast-leave-active { transition: all .3s; }
 .pv-toast-enter-from, .pv-toast-leave-to { opacity: 0; transform: translateY(-8px); }
 
-.pv__smtp-badge {
-  margin-left: auto; display: inline-flex; align-items: center; gap: .35rem;
-  font-size: .72rem; font-weight: 700; padding: .25rem .7rem; border-radius: 999px;
-}
-.pv__smtp-badge--ok  { background: #dcfce7; color: #15803d; }
-.pv__smtp-badge--off { background: var(--c-slate-100); color: var(--c-slate-500); }
-
-.pv__smtp-actions { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
-.pv__connect { display: flex; flex-direction: column; gap: 1rem; }
-.pv__connect a { color: #2563eb; font-weight: 600; }
-.pv__steps { margin: 0; padding-left: 1.25rem; display: flex; flex-direction: column; gap: .4rem; font-size: .82rem; color: var(--c-slate-600); line-height: 1.45; }
-.pv__steps li::marker { color: #16a34a; font-weight: 700; }
+/* Los estilos del SMTP se fueron con la card a CorreoView. El enlace a la pantalla nueva reusa
+   `.pv__btn-outline`, que ya existía más arriba: sólo le hace falta no venir subrayado y no
+   estirarse a todo el ancho de la card, que es flex-column. */
+.pv__link-modulo { align-self: flex-start; text-decoration: none; }
 </style>
 

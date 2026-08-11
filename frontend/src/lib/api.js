@@ -174,6 +174,13 @@ export const updatePreferences = (payload) => api.put("/preferences", { club: pa
 export const testSmtp          = () => api.post("/preferences/test_smtp");
 export const conectarEmail     = (payload) => api.patch("/preferences/conectar_email", payload);
 export const desconectarEmail  = () => api.delete("/preferences/desconectar_email");
+
+// Plantillas de correo de la organización (módulo Correo electrónico). El index siembra las de
+// fábrica la primera vez, así que la pantalla nunca aparece vacía.
+export const fetchPlantillasMail  = () => api.get("/plantillas_mail");
+export const crearPlantillaMail   = (payload) => api.post("/plantillas_mail", { plantilla_mail: payload });
+export const updatePlantillaMail  = (id, payload) => api.patch(`/plantillas_mail/${id}`, { plantilla_mail: payload });
+export const borrarPlantillaMail  = (id) => api.delete(`/plantillas_mail/${id}`);
 export const updateTwilio      = (payload) => api.patch("/preferences/update_twilio", payload);
 export const destroyTwilio     = () => api.delete("/preferences/destroy_twilio");
 export const testTwilio        = () => api.post("/preferences/test_twilio");
@@ -190,9 +197,13 @@ export const getPacientePorCarnet = (token) => api.get(`/pacientes/por_carnet/${
 export const listPacientes         = (params = {}) => api.get("/pacientes", { params });
 export const getPacientesCriticos  = () => api.get("/pacientes/criticos");
 export const getPaciente           = (id) => api.get(`/pacientes/${id}`);
-export const createPaciente     = (payload) => api.post("/pacientes", { paciente: payload });
+// `enviar_bienvenida` va al lado de `paciente`, no adentro: no es un campo de la persona sino
+// una instrucción sobre el alta. El backend igual ignora el parámetro si el rol no puede aprobar.
+export const createPaciente     = (payload, { enviarBienvenida = false } = {}) =>
+  api.post("/pacientes", { paciente: payload, enviar_bienvenida: enviarBienvenida });
 // Admitir a alguien cargado desde el mostrador. Sólo admin y médico (lo valida el backend).
-export const aprobarPaciente    = (id)      => api.post(`/pacientes/${id}/aprobar`);
+export const aprobarPaciente    = (id, { enviarBienvenida = false } = {}) =>
+  api.post(`/pacientes/${id}/aprobar`, { enviar_bienvenida: enviarBienvenida });
 export const updatePaciente     = (id, payload) => api.put(`/pacientes/${id}`, { paciente: payload });
 export const deletePaciente     = (id) => api.delete(`/pacientes/${id}`);
 export const getPacienteTimeline  = (id) => api.get(`/pacientes/${id}/timeline`)

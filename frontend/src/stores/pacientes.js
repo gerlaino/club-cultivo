@@ -57,13 +57,16 @@ export const usePacientesStore = defineStore("pacientes", {
       }
     },
 
-    async create(payload) {
+    // Devuelve `{ paciente, aviso }`. El `aviso` es para lo que salió distinto de lo pedido sin
+    // que el alta falle — típicamente que el mail de bienvenida no pudo salir. El paciente se
+    // creó igual, así que no es un error: es algo que el usuario tiene que saber.
+    async create(payload, { enviarBienvenida = false } = {}) {
       this.saving = true; this.error = null
       try {
-        const { data } = await createPaciente(payload)
+        const { data } = await createPaciente(payload, { enviarBienvenida })
         const paciente = data?.data || data
         this.items = [paciente, ...this.items]
-        return paciente
+        return { paciente, aviso: data?.aviso || null }
       } catch (e) {
         this.error = e?.response?.data?.errors?.join(", ") || e.message
         throw e

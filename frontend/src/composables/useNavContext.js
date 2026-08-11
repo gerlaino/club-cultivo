@@ -88,6 +88,9 @@ export const NAV_GROUPS = [
     tabs: [
       { to: '/configuracion', label: 'General' },
       { to: '/configuracion/suscripcion', label: 'Suscripción' },
+      // Correo tiene su propio espacio: la casilla de la organización y las plantillas de mail.
+      // Es un add-on, así que se cae del menú si la organización no lo tiene contratado.
+      { to: '/configuracion/correo', label: 'Correo electrónico', feature: 'mailer' },
       { to: '/usuarios', label: 'Equipo' },
       // Sedes NO va acá: tiene su propia entrada en el menú lateral (es un cockpit operativo, no
       // una pantalla de ajustes). Duplicarla hacía que el mismo destino se viera en dos lugares.

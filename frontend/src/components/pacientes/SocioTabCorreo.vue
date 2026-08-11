@@ -20,16 +20,21 @@
         <span v-else class="sc__to-missing">sin email</span>
       </div>
 
+      <!-- Las plantillas son las de la organización, editables en Configuración → Correo
+           electrónico. Antes eran cuatro fijas escritas en el frontend. -->
       <div class="sc__templates">
         <button
-          v-for="tpl in MAIL_TEMPLATES"
-          :key="tpl.key"
           class="sc__tpl-chip"
-          :class="{ 'sc__tpl-chip--active': mailTemplate === tpl.key }"
-          @click="applyMailTemplate(tpl.key)"
-        >
-          {{ tpl.icon }} {{ tpl.label }}
-        </button>
+          :class="{ 'sc__tpl-chip--active': mailPlantilla === null }"
+          @click="aplicarPlantilla(null)"
+        >✏️ Escribir libre</button>
+        <button
+          v-for="tpl in plantillas"
+          :key="tpl.id"
+          class="sc__tpl-chip"
+          :class="{ 'sc__tpl-chip--active': mailPlantilla === tpl.id }"
+          @click="aplicarPlantilla(tpl.id)"
+        >{{ tpl.nombre }}</button>
       </div>
 
       <div v-if="mailPreview" class="sc__preview">
@@ -88,7 +93,8 @@
             </div>
           </div>
           <div class="sc__item-tipo">
-            <span class="sc__tipo-badge">{{ MAIL_TEMPLATES.find(t => t.key === m.tipo)?.icon || '📧' }} {{ m.tipo }}</span>
+            <!-- El nombre de la plantilla con la que salió; si fue libre, el tipo crudo. -->
+            <span class="sc__tipo-badge">{{ m.plantilla_nombre || m.tipo }}</span>
           </div>
         </div>
       </div>
@@ -100,7 +106,7 @@
 import { computed, onMounted } from 'vue'
 import { AlertTriangle, Mail } from 'lucide-vue-next'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { useSocioCorreo, MAIL_TEMPLATES } from '../../composables/useSocioCorreo.js'
+import { useSocioCorreo } from '../../composables/useSocioCorreo.js'
 
 const props = defineProps({
   socioId: { type: Number, required: true },
@@ -109,11 +115,11 @@ const props = defineProps({
 defineEmits(['open-edit'])
 
 const {
-  mailHistory, mailLoading, mailSending, mailPreview, mailTemplate, mailForm,
-  applyMailTemplate, loadMailHistory, submitMail,
+  mailHistory, mailLoading, mailSending, mailPreview, mailPlantilla, mailForm, plantillas,
+  aplicarPlantilla, cargarPlantillas, loadMailHistory, submitMail,
 } = useSocioCorreo(props.socioId, { s: computed(() => props.socio) })
 
-onMounted(() => loadMailHistory())
+onMounted(() => { loadMailHistory(); cargarPlantillas() })
 
 function formatDateTime(d) {
   if (!d) return '—'

@@ -5,6 +5,9 @@ class MailEnviado < ApplicationRecord
   belongs_to :paciente
   belongs_to :user
   belongs_to :club
+  # Con qué plantilla salió. Opcional: los mails libres no usan ninguna, y los enviados antes de
+  # que las plantillas fueran editables tampoco tienen.
+  belongs_to :plantilla_mail, optional: true
   acts_as_tenant(:club)
 
   TIPOS = %w[bienvenida reprocann disponibilidad personalizado].freeze

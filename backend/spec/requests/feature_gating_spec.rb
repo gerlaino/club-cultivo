@@ -58,7 +58,6 @@ RSpec.describe 'Gating por módulo', type: :request do
 
       expect(response).to have_http_status(:ok)
       expect(club.reload.feature?(:medico)).to be(true)
-      expect(club.feature?(:mailer)).to be(true)
     end
 
     # No se guarda como bandera: se deriva. Si se guardara, podría contradecir a su suite.
