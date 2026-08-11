@@ -97,7 +97,7 @@ class Club < ApplicationRecord
   ROLES_ALTA = %w[admin medico cultivador dispensador manicura].freeze
 
   ROLES_META = {
-    'admin'       => { label: 'Admin',       desc: 'Acceso total al panel del club' },
+    'admin'       => { label: 'Admin',       desc: 'Acceso total al panel de la organización' },
     'medico'      => { label: 'Médico',      desc: 'Turnos, historia clínica e indicaciones' },
     'cultivador'  => { label: 'Cultivador',  desc: 'Salas, lotes y plantas' },
     'dispensador' => { label: 'Dispensador', desc: 'Entregas y dispensaciones' },
@@ -233,7 +233,7 @@ class Club < ApplicationRecord
 
   INCLUIDOS_META = {
     'medico' => { label: 'Módulo médico',      desc: 'Turnos, historia clínica e indicaciones.', requiere: nil },
-    'mailer' => { label: 'Correo al paciente', desc: 'Mails desde la ficha, con historial.',     requiere: 'SMTP del club cargado en Preferencias.' },
+    'mailer' => { label: 'Correo al paciente', desc: 'Mails desde la ficha, con historial.',     requiere: 'SMTP de la organización cargado en Preferencias.' },
   }.freeze
 
   # Add-ons: se suman a una suite y SÍ se venden por separado. `requiere` documenta de qué
@@ -242,9 +242,9 @@ class Club < ApplicationRecord
   ADDONS = {
     'bar'      => { label: 'Buffet',         desc: 'Punto de venta, caja de turno y stock del salón.',   requiere: nil },
     'eventos'  => { label: 'Eventos',        desc: 'Fiestas y catas: provisión desde depósitos, entradas y rendición.', requiere: 'El Buffet tiene que estar activo.' },
-    'iot'      => { label: 'Ambiente / IoT', desc: 'Sensores, lecturas automáticas y reglas.',           requiere: 'Hardware del club (Sonoff u otro) o importación por CSV.' },
+    'iot'      => { label: 'Ambiente / IoT', desc: 'Sensores, lecturas automáticas y reglas.',           requiere: 'Hardware de la organización (Sonoff u otro) o importación por CSV.' },
     'ia'       => { label: 'Asistente IA',   desc: 'Análisis de lote, plan de trabajo y registro por voz.', requiere: 'ANTHROPIC_API_KEY en el entorno.' },
-    'whatsapp' => { label: 'WhatsApp',       desc: 'Avisos de entrega por WhatsApp.',                    requiere: 'Cuenta de Twilio del club (SID, token y número).' },
+    'whatsapp' => { label: 'WhatsApp',       desc: 'Avisos de entrega por WhatsApp.',                    requiere: 'Cuenta de Twilio de la organización (SID, token y número).' },
     'ariccame' => { label: 'ARICCAME',       desc: 'Reporte regulatorio de dispensaciones y stock.',     requiere: 'INCOMPLETO: la integración está simulada, no transmite de verdad.' },
   }.freeze
 
@@ -254,7 +254,7 @@ class Club < ApplicationRecord
   EN_CONSTRUCCION = {
     'vista_paciente' => {
       label: 'Vista del paciente',
-      desc:  'Qué ve el paciente cuando entra: su carnet, sus dispensaciones y el sitio del club.',
+      desc:  'Qué ve el paciente cuando entra: su carnet, sus dispensaciones y el sitio de la organización.',
       requiere: 'En construcción — todavía no se puede activar.',
     },
   }.freeze
@@ -358,7 +358,7 @@ class Club < ApplicationRecord
   def falta_para_funcionar(key)
     case key.to_s
     when 'whatsapp' then twilio_configurado?  ? nil : 'Falta cargar la cuenta de Twilio (SID, token y número).'
-    when 'mailer'   then smtp_configured?     ? nil : 'Falta cargar el SMTP del club.'
+    when 'mailer'   then smtp_configured?     ? nil : 'Falta cargar el SMTP de la organización.'
     when 'iot'      then iot_listo?           ? nil : 'Todavía no hay ningún dispositivo dando señales.'
     when 'ia'       then ENV['ANTHROPIC_API_KEY'].present? ? nil : 'Falta ANTHROPIC_API_KEY en el entorno de la plataforma.'
     when 'eventos'  then feature?('bar')      ? nil : 'Necesita el Buffet activo.'
