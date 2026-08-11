@@ -57,6 +57,9 @@ export const FLOWS = {
     titulo: 'Compré algo',
     resumen: 'Insumos, mercadería, algo que entra al club',
     tipo: 'egreso',
+    // Con qué se clasifica el movimiento si no se elige categoría del catálogo (la columna
+    // legacy `categoria` es NOT NULL y sólo acepta `MovimientoContable::CATEGORIAS`).
+    claveLegacy: 'insumo',
     pideDestino: true,      // qué entró, cuánto y a qué depósito
     pidePaciente: false,
     labelDescripcion: 'Qué se compró',
@@ -70,6 +73,7 @@ export const FLOWS = {
     titulo: 'Cobré un aporte',
     resumen: 'Aporte de un paciente: acredita su cuenta corriente',
     tipo: 'ingreso',
+    claveLegacy: 'aporte_socio',
     pideDestino: false,
     pidePaciente: true,
     clavePreferida: 'aporte_socio', // preselecciona la categoría si existe
@@ -84,6 +88,7 @@ export const FLOWS = {
     titulo: 'Pagué un gasto',
     resumen: 'Alquiler, servicios, impuestos, sueldos',
     tipo: 'egreso',
+    claveLegacy: 'otro',
     pideDestino: false,
     pidePaciente: false,
     labelDescripcion: 'Qué se pagó',
@@ -97,6 +102,7 @@ export const FLOWS = {
     titulo: 'Otro ingreso',
     resumen: 'Cualquier plata que entra y no es un aporte',
     tipo: 'ingreso',
+    claveLegacy: 'otro',
     pideDestino: false,
     pidePaciente: false,
     labelDescripcion: 'De qué es el ingreso',
@@ -194,7 +200,11 @@ export function costoUnitario(monto, cantidad) {
 export function validarMovimiento(form, ctx = {}) {
   const e = {}
 
-  if (!form.categoria_contable_id)      e.categoria   = 'Elegí una categoría'
+  // La categoría NO es obligatoria. Es el atajo que completa tipo, sector y depósito de una,
+  // pero el flujo (compra / aporte / gasto / ingreso) alcanza para registrar el movimiento: una
+  // organización que todavía no armó su catálogo tiene que poder anotar lo que gastó. Sin
+  // categoría el movimiento queda como gasto del club, sin sector; imputarlo a una sede es otra
+  // cosa y pasa después, al consumir del depósito.
   if (!form.descripcion?.trim())        e.descripcion = 'Poné una descripción'
   if (!(Number(form.monto_ars) > 0))    e.monto_ars   = 'Ingresá un monto'
   if (!form.fecha)                      e.fecha       = 'Elegí la fecha'

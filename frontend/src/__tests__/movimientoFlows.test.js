@@ -140,9 +140,17 @@ describe('validarMovimiento', () => {
     expect(esValido(validarMovimiento(valido))).toBe(true)
   })
 
-  it('pide categoría, descripción, monto y fecha', () => {
+  it('pide descripción, monto y fecha', () => {
     const e = validarMovimiento({ descripcion: '   ', monto_ars: 0, fecha: '' })
-    expect(Object.keys(e).sort()).toEqual(['categoria', 'descripcion', 'fecha', 'monto_ars'])
+    expect(Object.keys(e).sort()).toEqual(['descripcion', 'fecha', 'monto_ars'])
+  })
+
+  // La categoría es el ATAJO —completa tipo, sector y depósito de una— pero no la puerta: con
+  // el flujo (compra / gasto / aporte / ingreso) alcanza para registrar. Una organización que
+  // todavía no armó su catálogo tiene que poder anotar lo que gastó.
+  it('sin categoría se puede registrar igual', () => {
+    const sinCat = { ...valido, categoria_contable_id: null }
+    expect(esValido(validarMovimiento(sinCat))).toBe(true)
   })
 
   it('monto 0 o negativo no pasa', () => {

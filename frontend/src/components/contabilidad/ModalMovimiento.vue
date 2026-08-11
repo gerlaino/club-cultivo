@@ -386,11 +386,15 @@ function submit() {
 
   const payload = {
     ...form.value,
-    categoria: catActual.value?.clave || 'otro',
+    // Sin categoría del catálogo, clasifica el flujo. 'otro' es el último recurso, no el
+    // primero: un gasto y una compra no son lo mismo en el libro.
+    categoria: catActual.value?.clave || flujo.value?.claveLegacy || 'otro',
     medio_pago: esCuotas.value ? 'en_cuotas' : form.value.medio_pago,
   }
   delete payload.plan
-  const dst = pideDestinoCat.value ? destinoPayload(destino.value, depositoSel.value) : null
+  // Con `pideDestinoCat` acá, una compra por el flujo mostraba el bloque de depósito y después
+  // TIRABA el destino al guardar: el asiento entraba y el stock no se movía, en silencio.
+  const dst = pideDestino.value ? destinoPayload(destino.value, depositoSel.value) : null
   if (dst) payload.destino = dst
   emit('guardado', payload)
 }
@@ -511,7 +515,7 @@ const titulo = computed(() => {
                    si va a aparecer bien en un informe. Va destacada, no como un campo más
                    en la lista. -->
               <div class="mv-fld mv-combo-wrap mv-fld--clave">
-                <span class="mv-lbl">Categoría <span class="mv-req">*</span></span>
+                <span class="mv-lbl">Categoría <span class="mv-opt">(opcional)</span></span>
                 <button type="button" class="mv-combo" :class="{ 'mv-combo--err': errores.categoria }"
                         @click="catOpen ? catOpen = false : abrirCat()">
                   <span v-if="catActual" class="mv-combo-val">{{ catActual.label }}</span>
