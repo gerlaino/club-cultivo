@@ -103,7 +103,13 @@
                 </label>
               </div>
             </div>
-            <div v-if="editError" class="sem__error">{{ editError }}</div>
+          </div>
+          <!-- El error va FUERA del cuerpo scrolleable, pegado a los botones: adentro quedaba al
+               final de un formulario largo y, con el modal scrolleado arriba, no se veía —
+               parecía que "Guardar" no hacía nada. -->
+          <div v-if="editError" class="sem__error">
+            <AlertCircle :size="15" :stroke-width="2.5" class="sem__error-ico" />
+            <span>{{ editError }}</span>
           </div>
           <div class="sem__footer">
             <button class="sem__btn-ghost" :disabled="editSaving" @click="emit('update:open', false)">Cancelar</button>
@@ -121,7 +127,7 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
-import { X, Save } from 'lucide-vue-next'
+import { X, Save, AlertCircle } from 'lucide-vue-next'
 import { useSocioEditar, REPROCANN_ESTADOS } from '../../composables/useSocioEditar.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { usePacientesStore } from '../../stores/pacientes'
@@ -193,7 +199,14 @@ details[open] .sem__envio-sum::before { content: '− '; }
 .sem__input--limit { max-width: 140px; }
 .sem__limit-unit { font-size: .8rem; font-weight: 600; color: var(--c-slate-500); white-space: nowrap; }
 .sem__hint { font-size: .72rem; color: var(--c-slate-400); margin-top: .2rem; display: block; }
-.sem__error { margin-top: .875rem; padding: .75rem 1rem; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; font-size: .8rem; color: #dc2626; }
+/* Pegado al pie y sin margen superior: es una franja del modal, no un párrafo más del
+   formulario. Con el icono se lee como error de un vistazo. */
+.sem__error {
+  display: flex; align-items: flex-start; gap: .5rem;
+  padding: .75rem 1.25rem; background: #fef2f2; border-top: 1px solid #fecaca;
+  font-size: .82rem; font-weight: 500; color: #b91c1c; line-height: 1.45;
+}
+.sem__error-ico { flex-shrink: 0; margin-top: .1rem; }
 .sem__footer { display: flex; justify-content: flex-end; gap: .75rem; padding: 1.25rem 1.5rem; border-top: 1px solid var(--c-slate-100); position: sticky; bottom: 0; background: #fff; }
 .sem__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .6rem 1.1rem; border-radius: 9px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: background .15s; }
 .sem__btn-primary:hover:not(:disabled) { background: #144a18; }

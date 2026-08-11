@@ -54,11 +54,10 @@ export function useSocioEditar(socioIdRef) {
   }
 
   async function saveEdit() {
+    // El domicilio NO frena la edición, igual que no frena el alta: se anota a la persona con lo
+    // que hay y la dirección aparece después. Donde sí hace falta es al despachar un envío, y
+    // ahí se pide. (Se sacó del alta y quedó acá, que es otra validación distinta.)
     editError.value = null
-    if (!editForm.value.domicilio_calle?.trim()) {
-      editError.value = 'La calle del domicilio del paciente es requerida'
-      return
-    }
     editSaving.value = true
     try {
       const id = socioIdActual()

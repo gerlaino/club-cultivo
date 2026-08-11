@@ -174,7 +174,9 @@ const NAV = {
     { to: '/m/admin/tareas',  icon: 'bi-check2-square', label: 'Tareas'  },
     { to: '/m/historial',     icon: 'bi-clock-history', label: 'Dispensas', feature: 'produccion_dispensa' },
     { to: '/m/pacientes',     icon: 'bi-people',        label: 'Pacientes', feature: 'produccion_dispensa' },
-    { to: '/m/plantas',       icon: 'bi-flower1',       label: 'Plantas',   feature: 'cultivo' },
+    // Sin "Plantas": el mismo criterio que en el cultivador, que es quien las trabaja —a una
+    // planta se llega escaneando su QR o desde su lote, no de una lista de todas. Para el admin
+    // en el celular tiene todavía menos sentido: no registra plantas, mira cómo va el día.
   ] },
   manicura: { items: [
     { to: '/m/manicura/pesar',      icon: 'bi-scissors',        label: 'Por pesar',  feature: 'cultivo' },
