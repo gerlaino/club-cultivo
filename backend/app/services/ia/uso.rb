@@ -15,15 +15,19 @@ module Ia
 
     # Guarda la llamada. NUNCA levanta: si falla el registro, la funcionalidad tiene que seguir
     # andando — perder una fila de consumo es malo, romperle el asistente al cultivador es peor.
-    def registrar(club:, funcion:, modelo:, user: nil, input_tokens: 0, output_tokens: 0,
-                  ok: true, error_clase: nil)
+    def registrar(club:, funcion:, modelo:, user: nil, tokens: {}, ok: true, error_clase: nil)
       return if club.nil?
+
+      t = TOKENS_VACIOS.merge(tokens || {})
 
       IaLlamada.create!(
         club: club, user: user, funcion: funcion.to_s, modelo: modelo.to_s,
-        input_tokens: input_tokens.to_i, output_tokens: output_tokens.to_i,
-        costo_usd: IaLlamada.costo_de(modelo: modelo.to_s, input_tokens: input_tokens,
-                                      output_tokens: output_tokens),
+        input_tokens: t[:input], output_tokens: t[:output],
+        cache_creation_tokens: t[:cache_creation], cache_read_tokens: t[:cache_read],
+        costo_usd: IaLlamada.costo_de(
+          modelo: modelo.to_s, input_tokens: t[:input], output_tokens: t[:output],
+          cache_creation_tokens: t[:cache_creation], cache_read_tokens: t[:cache_read]
+        ),
         ok: ok, error_clase: error_clase
       )
     rescue StandardError => e
@@ -31,14 +35,23 @@ module Ia
       nil
     end
 
-    # Extrae los tokens de la respuesta de la API de Anthropic. El body trae
-    # `usage: { input_tokens:, output_tokens: }`; si cambiara de forma, devolvemos ceros en vez
-    # de romper la llamada que ya salió bien.
+    TOKENS_VACIOS = { input: 0, output: 0, cache_creation: 0, cache_read: 0 }.freeze
+
+    # Extrae los tokens del `usage` de la respuesta. Con caché de prompt la entrada viene
+    # partida en tres —a precio lleno, escrita en caché y leída de caché—, y cada una cuesta
+    # distinto. Si el body cambiara de forma devolvemos ceros en vez de romper una llamada que
+    # ya salió bien.
     def tokens_de(body)
       u = body.is_a?(Hash) ? (body['usage'] || body[:usage]) : nil
-      return [0, 0] unless u.is_a?(Hash)
+      return TOKENS_VACIOS.dup unless u.is_a?(Hash)
 
-      [(u['input_tokens'] || u[:input_tokens]).to_i, (u['output_tokens'] || u[:output_tokens]).to_i]
+      leer = ->(k) { (u[k.to_s] || u[k.to_sym]).to_i }
+      {
+        input:          leer.call(:input_tokens),
+        output:         leer.call(:output_tokens),
+        cache_creation: leer.call(:cache_creation_input_tokens),
+        cache_read:     leer.call(:cache_read_input_tokens),
+      }
     end
 
     # ¿Se pasó del tope? Devuelve nil si puede seguir, o el mensaje a mostrar si no.
@@ -78,12 +91,18 @@ module Ia
 
     # Resumen para el panel: cuánto va del mes y cuánto costó.
     def resumen_mes(club, fecha = Time.zone.today)
-      base = IaLlamada.where(club_id: club.id).del_mes(fecha)
+      base    = IaLlamada.where(club_id: club.id).del_mes(fecha)
+      leidos  = base.sum(:cache_read_tokens)
+      entrada = base.sum(:input_tokens) + base.sum(:cache_creation_tokens) + leidos
+
       {
         llamadas:   base.count,
         tope:       club.ia_limite_mes,
-        tokens:     base.sum(:input_tokens) + base.sum(:output_tokens),
+        tokens:     entrada + base.sum(:output_tokens),
         costo_usd:  base.sum(:costo_usd).to_f.round(2),
+        # Qué porcentaje de la entrada se sirvió de caché. Si esto es 0 con el asistente en uso,
+        # el caché no está funcionando y hay que buscar qué invalida el prefijo.
+        cache_hit:  entrada.positive? ? (leidos * 100.0 / entrada).round(1) : 0.0,
         por_funcion: base.group(:funcion).count,
       }
     end

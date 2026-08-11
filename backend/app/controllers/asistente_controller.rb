@@ -103,6 +103,12 @@ class AsistenteController < BaseController
   # costear el consumo (`IaLlamada::PRECIOS`), y estaba escrito a mano en dos funciones.
   # (`LIMITE_LLAMADAS_POR_HORA` vivía acá y no lo usaba nadie: el tope real sale del tier del
   # club — ver Ia::Uso.)
+  #
+  # Pasar a Haiku sería ~3× más barato en entrada y en salida, y es el próximo ahorro grande
+  # después del caché. NO se cambia acá a ciegas: interpretar un dictado con jerga de cultivo y
+  # devolver JSON válido es justo donde se nota un modelo más chico, y el costo de equivocarse
+  # es un registro mal cargado en la planta de alguien. Con `ia_llamadas` ya se puede comparar
+  # con dictados reales; recién ahí se cambia esta línea.
   MODELO_ASISTENTE = 'claude-sonnet-4-6'.freeze
 
   # POST /asistente/parsear
@@ -117,10 +123,10 @@ class AsistenteController < BaseController
       return render json: { error: msg, limite_ia: true }, status: :too_many_requests
     end
 
-    es_cultivador  = current_user.cultivador?
-    sesion         = ConversacionAsistente.de_hoy(current_user)
-    prompt_sistema = construir_prompt(contexto, es_cultivador) + sesion.historial_para_prompt
-    resultado      = llamar_claude(texto, prompt_sistema)
+    es_cultivador     = current_user.cultivador?
+    sesion            = ConversacionAsistente.de_hoy(current_user)
+    estable, variable = construir_prompt(contexto, es_cultivador)
+    resultado         = llamar_claude(texto, estable, variable + sesion.historial_para_prompt)
 
     if resultado[:error]
       render json: { error: resultado[:error] }, status: :unprocessable_entity
@@ -289,16 +295,30 @@ class AsistenteController < BaseController
   end
 
   def registrar_uso(funcion, modelo, body, ok: true, error_clase: nil)
-    entrada, salida = Ia::Uso.tokens_de(body)
     Ia::Uso.registrar(club: current_user.club, user: current_user, funcion: funcion,
-                      modelo: modelo, input_tokens: entrada, output_tokens: salida,
+                      modelo: modelo, tokens: Ia::Uso.tokens_de(body),
                       ok: ok, error_clase: error_clase)
   end
 
+  # Devuelve el prompt PARTIDO EN DOS, porque de eso depende el caché.
+  #
+  # El caché de prompt es un match de prefijo: se cobra 0,1× lo que se lee de caché, pero
+  # cualquier byte distinto antes del corte lo invalida entero. `PROMPT_BASE` + el bloque de rol
+  # son idénticos en cada dictado de cada cultivador (~1.400 tokens que hoy se pagan enteros,
+  # una y otra vez); el contexto del cultivo y el historial cambian en cada llamada y por eso
+  # van DESPUÉS del corte.
+  #
+  # Ojo si se toca `PROMPT_BASE`: el mínimo cacheable de Sonnet 4.6 son 1024 tokens. Si el
+  # bloque estable queda por debajo, el caché deja de funcionar **en silencio** — no hay error,
+  # sólo `cache_read_tokens` en 0. Por eso se registra el hit ratio.
   def construir_prompt(contexto, es_cultivador)
-    PROMPT_BASE.dup + permisos_rol(es_cultivador) + contexto_rico(contexto)
+    [PROMPT_BASE + permisos_rol(es_cultivador), contexto_rico(contexto)]
   end
 
+  # Este NO se cachea, a diferencia del de `parsear`: su parte estable son tres líneas (~60
+  # tokens) y el mínimo cacheable de Sonnet 4.6 son 1024. Poner un `cache_control` acá no
+  # ahorraría nada — la API simplemente no cachearía, sin avisar. Si algún día esta base crece
+  # por encima del mínimo, conviene partirla como se hizo en `construir_prompt`.
   def construir_prompt_consulta(contexto)
     base = <<~PROMPT
       Sos un agrónomo especialista en cannabis medicinal. Respondés preguntas del equipo de cultivo
@@ -545,7 +565,17 @@ class AsistenteController < BaseController
     { error: e.message }
   end
 
-  def llamar_claude(texto, prompt_sistema)
+  # `system` va como ARRAY de bloques y no como string: es la única forma de marcar dónde corta
+  # el caché. El primer bloque (fijo) lleva `cache_control`; el segundo (contexto + historial)
+  # queda afuera porque cambia en cada llamada.
+  def bloques_system(estable, variable)
+    bloques = [{ type: 'text', text: estable, cache_control: { type: 'ephemeral' } }]
+    # Un bloque de texto vacío es un 400: sólo se agrega si hay algo que mandar.
+    bloques << { type: 'text', text: variable } if variable.present?
+    bloques
+  end
+
+  def llamar_claude(texto, estable, variable)
     api_key = ENV['ANTHROPIC_API_KEY']
     return { error: 'API key de IA no configurada' } if api_key.blank?
 
@@ -560,9 +590,9 @@ class AsistenteController < BaseController
     request['anthropic-version'] = '2023-06-01'
 
     request.body = {
-      model:      'claude-sonnet-4-6',
+      model:      MODELO_ASISTENTE,
       max_tokens: 1000,
-      system:     prompt_sistema,
+      system:     bloques_system(estable, variable),
       messages:   [{ role: 'user', content: "Reporte del cultivador: \"#{texto}\"" }]
     }.to_json
 

@@ -144,9 +144,8 @@ module Sensors
       response = http.request(req)
       body     = JSON.parse(response.body)
 
-      entrada, salida = Ia::Uso.tokens_de(body)
       Ia::Uso.registrar(club: @sala.club, user: @registrado_por, funcion: :csv_import,
-                        modelo: MODELO, input_tokens: entrada, output_tokens: salida,
+                        modelo: MODELO, tokens: Ia::Uso.tokens_de(body),
                         ok: response.code.to_i == 200)
 
       raise CsvParseError, "IA error #{response.code}: #{body.dig('error', 'message')}" if response.code.to_i != 200

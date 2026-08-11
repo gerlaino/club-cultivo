@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_11_020000) do
+ActiveRecord::Schema[7.2].define(version: 2026_08_11_030000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -973,6 +973,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_11_020000) do
     t.string "error_clase"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.integer "cache_creation_tokens", default: 0, null: false
+    t.integer "cache_read_tokens", default: 0, null: false
     t.index ["club_id", "created_at"], name: "index_ia_llamadas_on_club_id_and_created_at"
     t.index ["club_id", "funcion"], name: "index_ia_llamadas_on_club_id_and_funcion"
     t.index ["club_id"], name: "index_ia_llamadas_on_club_id"

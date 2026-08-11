@@ -40,10 +40,29 @@ class IaLlamada < ApplicationRecord
   scope :del_mes,    ->(fecha = Time.zone.today) { where(created_at: fecha.all_month) }
   scope :exitosas,   -> { where(ok: true) }
 
-  def self.costo_de(modelo:, input_tokens:, output_tokens:)
+  # Multiplicadores del caché de prompt, sobre el precio de entrada del modelo: escribir cuesta
+  # 1,25× y leer 0,1×. Ese 0,1 es de dónde sale el ahorro — el bloque fijo del prompt del
+  # asistente son ~1.400 tokens que hoy se pagan enteros en cada dictado.
+  CACHE_ESCRITURA = 1.25
+  CACHE_LECTURA   = 0.10
+
+  def self.costo_de(modelo:, input_tokens:, output_tokens:, cache_creation_tokens: 0, cache_read_tokens: 0)
     p = PRECIOS[modelo] || PRECIO_POR_DEFECTO
-    ((input_tokens.to_i * p[:entrada]) + (output_tokens.to_i * p[:salida])) / 1_000_000.0
+    entrada = (input_tokens.to_i * p[:entrada]) +
+              (cache_creation_tokens.to_i * p[:entrada] * CACHE_ESCRITURA) +
+              (cache_read_tokens.to_i     * p[:entrada] * CACHE_LECTURA)
+    (entrada + (output_tokens.to_i * p[:salida])) / 1_000_000.0
   end
 
-  def tokens = input_tokens.to_i + output_tokens.to_i
+  def tokens
+    input_tokens.to_i + output_tokens.to_i + cache_creation_tokens.to_i + cache_read_tokens.to_i
+  end
+
+  # Cuánto de la entrada vino de caché. Es la métrica para saber si el caché está funcionando:
+  # si queda en 0 request tras request, algo está invalidando el prefijo.
+  def cache_hit_ratio
+    entrada = input_tokens.to_i + cache_creation_tokens.to_i + cache_read_tokens.to_i
+    return 0.0 if entrada.zero?
+    (cache_read_tokens.to_i * 100.0 / entrada).round(1)
+  end
 end

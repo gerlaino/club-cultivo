@@ -228,9 +228,8 @@ class PlanTrabajoIaService
   # Sin usuario: el plan se genera desde un archivo subido y el service no recibe quién lo hizo.
   # El consumo igual es de la organización, que es lo que se factura.
   def registrar_uso(body, ok: true, error_clase: nil)
-    entrada, salida = Ia::Uso.tokens_de(body)
     Ia::Uso.registrar(club: @club, funcion: :plan_trabajo, modelo: MODELO,
-                      input_tokens: entrada, output_tokens: salida,
+                      tokens: Ia::Uso.tokens_de(body),
                       ok: ok, error_clase: error_clase)
   end
 

@@ -16,7 +16,7 @@ RSpec.describe Ia::Uso do
     it 'guarda la llamada con su costo congelado' do
       described_class.registrar(club: club, user: admin, funcion: :asistente_parsear,
                                 modelo: 'claude-sonnet-4-6',
-                                input_tokens: 1_000_000, output_tokens: 1_000_000)
+                                tokens: { input: 1_000_000, output: 1_000_000 })
 
       llamada = IaLlamada.last
       expect(llamada.funcion).to eq('asistente_parsear')
@@ -26,9 +26,9 @@ RSpec.describe Ia::Uso do
 
     it 'cobra Haiku más barato que Sonnet con los mismos tokens' do
       described_class.registrar(club: club, funcion: :csv_import, modelo: 'claude-haiku-4-5-20251001',
-                                input_tokens: 1_000_000, output_tokens: 0)
+                                tokens: { input: 1_000_000 })
       described_class.registrar(club: club, funcion: :asistente_parsear, modelo: 'claude-sonnet-4-6',
-                                input_tokens: 1_000_000, output_tokens: 0)
+                                tokens: { input: 1_000_000 })
 
       haiku, sonnet = IaLlamada.order(:id).to_a
       expect(haiku.costo_usd).to be < sonnet.costo_usd
@@ -36,7 +36,7 @@ RSpec.describe Ia::Uso do
 
     it 'un modelo desconocido se cobra al precio más caro, no a cero' do
       described_class.registrar(club: club, funcion: :plan_trabajo, modelo: 'modelo-nuevo-2027',
-                                input_tokens: 1_000_000, output_tokens: 0)
+                                tokens: { input: 1_000_000 })
 
       # Cobrar de menos pasa desapercibido y factura mal; de más se nota y se corrige.
       expect(IaLlamada.last.costo_usd.to_f).to be > 0
@@ -60,15 +60,48 @@ RSpec.describe Ia::Uso do
   end
 
   describe '.tokens_de' do
-    it 'lee los tokens del cuerpo de la respuesta' do
-      expect(described_class.tokens_de('usage' => { 'input_tokens' => 10, 'output_tokens' => 3 }))
-        .to eq([10, 3])
+    it 'lee los tokens del cuerpo de la respuesta, incluidos los de caché' do
+      leidos = described_class.tokens_de(
+        'usage' => { 'input_tokens' => 10, 'output_tokens' => 3,
+                     'cache_creation_input_tokens' => 1400, 'cache_read_input_tokens' => 0 }
+      )
+
+      expect(leidos).to eq(input: 10, output: 3, cache_creation: 1400, cache_read: 0)
     end
 
     it 'devuelve ceros si la respuesta no tiene la forma esperada' do
       # La llamada ya salió bien; no vale romperla porque cambió el shape del body.
-      expect(described_class.tokens_de(nil)).to eq([0, 0])
-      expect(described_class.tokens_de('otra_cosa' => 1)).to eq([0, 0])
+      expect(described_class.tokens_de(nil)).to eq(input: 0, output: 0, cache_creation: 0, cache_read: 0)
+      expect(described_class.tokens_de('otra_cosa' => 1)).to eq(input: 0, output: 0, cache_creation: 0, cache_read: 0)
+    end
+  end
+
+  # El caché es la optimización principal del asistente: el bloque fijo del prompt son ~1.400
+  # tokens que se repiten en cada dictado. Estos casos fijan la aritmética del ahorro.
+  describe 'costo con caché de prompt' do
+    it 'leer de caché cuesta la décima parte que procesar la misma entrada' do
+      lleno   = IaLlamada.costo_de(modelo: 'claude-sonnet-4-6', input_tokens: 1_000_000, output_tokens: 0)
+      cacheado = IaLlamada.costo_de(modelo: 'claude-sonnet-4-6', input_tokens: 0, output_tokens: 0,
+                                    cache_read_tokens: 1_000_000)
+
+      expect(cacheado).to be_within(0.01).of(lleno * 0.1)
+    end
+
+    it 'escribir el caché cuesta 1,25× — se paga una vez y se amortiza' do
+      lleno    = IaLlamada.costo_de(modelo: 'claude-sonnet-4-6', input_tokens: 1_000_000, output_tokens: 0)
+      escritura = IaLlamada.costo_de(modelo: 'claude-sonnet-4-6', input_tokens: 0, output_tokens: 0,
+                                     cache_creation_tokens: 1_000_000)
+
+      expect(escritura).to be_within(0.01).of(lleno * 1.25)
+    end
+
+    it 'informa qué porcentaje de la entrada se sirvió de caché' do
+      described_class.registrar(club: club, funcion: :asistente_parsear, modelo: 'claude-sonnet-4-6',
+                                tokens: { input: 100, cache_read: 900 })
+
+      # Si esto queda en 0 con el asistente en uso, algo está invalidando el prefijo.
+      expect(IaLlamada.last.cache_hit_ratio).to eq(90.0)
+      expect(described_class.resumen_mes(club)[:cache_hit]).to eq(90.0)
     end
   end
 
@@ -111,9 +144,9 @@ RSpec.describe Ia::Uso do
   describe '.resumen_mes' do
     it 'suma llamadas, tokens y costo, y desglosa por función' do
       described_class.registrar(club: club, funcion: :asistente_parsear, modelo: 'claude-sonnet-4-6',
-                                input_tokens: 1_000_000, output_tokens: 0)
+                                tokens: { input: 1_000_000 })
       described_class.registrar(club: club, funcion: :analisis_lote, modelo: 'claude-sonnet-4-6',
-                                input_tokens: 1_000_000, output_tokens: 0)
+                                tokens: { input: 1_000_000 })
 
       r = described_class.resumen_mes(club)
       expect(r[:llamadas]).to eq(2)

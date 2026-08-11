@@ -147,9 +147,8 @@ class AnalisisLoteService
   # la entrada, que es la mayor parte). El registro en IaLlamada es el consolidado de las cinco
   # funciones que llaman a la API.
   def registrar_uso(body, ok: true, error_clase: nil)
-    entrada, salida = Ia::Uso.tokens_de(body)
     Ia::Uso.registrar(club: @club, user: @usuario, funcion: :analisis_lote,
-                      modelo: MODELO, input_tokens: entrada, output_tokens: salida,
+                      modelo: MODELO, tokens: Ia::Uso.tokens_de(body),
                       ok: ok, error_clase: error_clase)
   end
 
