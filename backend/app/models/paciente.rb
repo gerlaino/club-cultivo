@@ -12,6 +12,7 @@ class Paciente < ApplicationRecord
   belongs_to :created_by, class_name: "User"
   belongs_to :updated_by, class_name: "User", optional: true
   belongs_to :deleted_by, class_name: "User", optional: true
+  belongs_to :aprobado_por, class_name: "User", optional: true
 
   has_many :notas, class_name: "PacienteNota", dependent: :destroy
   has_many :indicacion_medicas, dependent: :destroy
@@ -62,6 +63,33 @@ class Paciente < ApplicationRecord
   scope :for_club,          ->(club_id) { where(club_id: club_id) }
   scope :con_seguimiento,   -> { where(con_seguimiento_medico: true) }
   scope :sin_seguimiento,   -> { where(con_seguimiento_medico: false) }
+
+  # ── Admisión ────────────────────────────────────────────────────────────────
+  # Un paciente cargado desde el mostrador existe pero todavía no fue admitido. Puede editarse
+  # y completarse; lo que NO puede es recibir producto hasta que admin o médico lo aprueben.
+  scope :aprobados,             -> { where.not(aprobado_at: nil) }
+  scope :pendientes_aprobacion, -> { where(aprobado_at: nil) }
+
+  # Quiénes pueden CREAR (queda pendiente si no puede aprobar) y quiénes APROBAR.
+  # El supervisor puede crear igual que el dispensador: los dos atienden el mostrador, y que uno
+  # pudiera y el otro no era una incoherencia, no una regla.
+  ROLES_CREAN   = %w[admin medico supervisor dispensador].freeze
+  ROLES_APRUEBAN = %w[admin medico].freeze
+
+  # Un alta nace APROBADA salvo que venga del mostrador. La excepción es el mostrador, no la
+  # regla: las importaciones de padrón, los seeds, la migración de una organización y el alta de
+  # admin/médico son admisiones válidas. Con el default al revés, importar 300 pacientes los
+  # dejaría a todos sin poder retirar hasta aprobarlos de a uno.
+  attr_accessor :desde_mostrador
+  before_validation :aprobar_salvo_mostrador, on: :create
+
+  def aprobado?  = aprobado_at.present?
+  def pendiente_aprobacion? = aprobado_at.nil?
+
+  def aprobar!(usuario)
+    return false if aprobado?
+    update!(aprobado_at: Time.current, aprobado_por: usuario, updated_by: usuario)
+  end
 
   scope :reprocann_por_vencer, -> {
     where('reprocann_vencimiento IS NOT NULL')
@@ -160,6 +188,10 @@ class Paciente < ApplicationRecord
       email:    email,
       telefono: telefono,
     })
+  end
+
+  def aprobar_salvo_mostrador
+    self.aprobado_at ||= Time.current unless desde_mostrador
   end
 
   def normalize_dni!

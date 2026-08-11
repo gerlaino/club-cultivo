@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_11_030000) do
+ActiveRecord::Schema[7.2].define(version: 2026_08_11_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1395,8 +1395,11 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_11_030000) do
     t.string "envio_depto"
     t.string "envio_barrio"
     t.string "envio_ciudad"
+    t.datetime "aprobado_at"
+    t.bigint "aprobado_por_id"
     t.index "lower((apellido)::text)", name: "index_socios_on_lower_apellido"
     t.index "lower((nombre)::text)", name: "index_socios_on_lower_nombre"
+    t.index ["aprobado_at"], name: "index_pacientes_on_aprobado_at"
     t.index ["carnet_token"], name: "index_pacientes_on_carnet_token", unique: true
     t.index ["club_id"], name: "index_pacientes_on_club_id"
     t.index ["created_at"], name: "index_pacientes_on_created_at"
@@ -2345,6 +2348,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_11_030000) do
   add_foreign_key "paciente_notas", "users", column: "created_by_id"
   add_foreign_key "paciente_notas", "users", column: "deleted_by_id"
   add_foreign_key "pacientes", "clubs"
+  add_foreign_key "pacientes", "users", column: "aprobado_por_id"
   add_foreign_key "pacientes", "users", column: "created_by_id"
   add_foreign_key "pacientes", "users", column: "deleted_by_id"
   add_foreign_key "pacientes", "users", column: "updated_by_id"

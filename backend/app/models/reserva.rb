@@ -90,5 +90,12 @@ class Reserva < ApplicationRecord
   def paciente_activo
     return unless paciente
     errors.add(:base, 'El socio no está activo en la organización') unless paciente.es_paciente?
+
+    # Una reserva aparta stock y termina en una entrega: si el paciente todavía no está admitido,
+    # bloquear producto a su nombre es adelantarse a una decisión que no se tomó.
+    return if paciente.aprobado?
+
+    errors.add(:base, "#{paciente.nombre_completo} está pendiente de aprobación: " \
+                      'no se le puede reservar producto hasta que lo apruebe un administrador o el médico.')
   end
 end

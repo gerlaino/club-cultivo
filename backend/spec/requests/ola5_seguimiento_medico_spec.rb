@@ -64,17 +64,20 @@ RSpec.describe 'Ola 5 — con_seguimiento_medico', type: :request do
       expect(JSON.parse(response.body)['data']['con_seguimiento_medico']).to be false
     end
 
-    it 'crea AlertaInterna para admin al crear paciente' do
+    # El aviso cambió de contenido y de destinatarios: antes era informativo ("creó un paciente
+    # sin seguimiento médico") y sólo al admin. Ahora el alta del mostrador queda PENDIENTE DE
+    # APROBACIÓN, así que el aviso describe algo que hay que hacer y va a los dos roles que
+    # pueden hacerlo. Ver spec/requests/paciente_aprobacion_spec.rb.
+    it 'avisa a quienes pueden aprobar el alta que hizo el dispensador' do
       expect {
         post '/pacientes',
              params: { paciente: { nombre: 'Pedro', apellido: 'Gil', dni: '44333222', fecha_nacimiento: '1988-08-10' } },
              headers: auth_headers, as: :json
-      }.to change(AlertaInterna, :count).by(1)
+      }.to change(AlertaInterna, :count).by(2)
 
-      alerta = AlertaInterna.last
-      expect(alerta.tipo).to eq('paciente_creado_por_dispensador')
-      expect(alerta.destinada_a_role).to eq('admin')
-      expect(alerta.club_id).to eq(club.id)
+      alertas = AlertaInterna.where(tipo: 'paciente_pendiente_aprobacion')
+      expect(alertas.pluck(:destinada_a_role)).to match_array(%w[admin medico])
+      expect(alertas.pluck(:club_id).uniq).to eq([club.id])
     end
   end
 

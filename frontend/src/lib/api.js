@@ -191,6 +191,8 @@ export const listPacientes         = (params = {}) => api.get("/pacientes", { pa
 export const getPacientesCriticos  = () => api.get("/pacientes/criticos");
 export const getPaciente           = (id) => api.get(`/pacientes/${id}`);
 export const createPaciente     = (payload) => api.post("/pacientes", { paciente: payload });
+// Admitir a alguien cargado desde el mostrador. Sólo admin y médico (lo valida el backend).
+export const aprobarPaciente    = (id)      => api.post(`/pacientes/${id}/aprobar`);
 export const updatePaciente     = (id, payload) => api.put(`/pacientes/${id}`, { paciente: payload });
 export const deletePaciente     = (id) => api.delete(`/pacientes/${id}`);
 export const getPacienteTimeline  = (id) => api.get(`/pacientes/${id}/timeline`)

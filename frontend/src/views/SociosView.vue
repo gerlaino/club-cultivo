@@ -146,6 +146,7 @@ const kpisLocales = computed(() => {
     pendientes: enNomina.filter(s => reprocannCategoria(s) === 'pendiente').length,
     sin_rep:    enNomina.filter(s => reprocannCategoria(s) === 'sin_reprocann').length,
     inactivos:  enNomina.filter(esInactivo).length,
+    pendientes_aprobacion: enNomina.filter(s => !s.aprobado_at).length,
   }
 })
 
@@ -165,6 +166,7 @@ const filtrados = computed(() => {
   if (filterEstado.value === 'proximos')   list = list.filter(s => reprocannCategoria(s) === 'por_vencer')
   if (filterEstado.value === 'pendientes') list = list.filter(s => reprocannCategoria(s) === 'pendiente')
   if (filterEstado.value === 'sin_rep')    list = list.filter(s => reprocannCategoria(s) === 'sin_reprocann')
+  if (filterEstado.value === 'pend_aprobacion') list = list.filter(s => !s.aprobado_at)
   if (search.value.trim()) {
     const q = search.value.toLowerCase()
     // El DNI se compara sin puntos ni espacios de los dos lados: se escribe "90.000.027" y se
@@ -257,6 +259,14 @@ async function exportarCSV() {
       <button class="sv__kpi sv__kpi--gray" :class="{ 'sv__kpi--active': filterEstado === 'sin_rep' }" @click="filterEstado = 'sin_rep'">
         <div class="sv__kpi-val">{{ kpis.sin_rep }}</div>
         <div class="sv__kpi-lbl">Sin REPROCANN</div>
+      </button>
+      <!-- Cargados en el mostrador y sin admitir. Va con acento propio y no en gris: cada uno es
+           alguien que hoy NO puede retirar, y depende de que alguien lo apruebe. -->
+      <button v-if="kpis.pendientes_aprobacion" class="sv__kpi sv__kpi--warn"
+              :class="{ 'sv__kpi--active': filterEstado === 'pend_aprobacion' }"
+              @click="filterEstado = 'pend_aprobacion'">
+        <div class="sv__kpi-val">{{ kpis.pendientes_aprobacion }}</div>
+        <div class="sv__kpi-lbl">Esperan aprobación</div>
       </button>
       <!-- Fuera de tratamiento: no cuentan como pacientes de la organización, pero siguen estando. -->
       <button v-if="kpis.baja" class="sv__kpi sv__kpi--gray" :class="{ 'sv__kpi--active': filterEstado === 'baja' }" @click="filterEstado = 'baja'">
@@ -362,7 +372,10 @@ async function exportarCSV() {
               <span v-else class="sv-empty">—</span>
             </td>
             <td>
-              <span class="sv-estado" :class="s.es_paciente ? 'sv-estado--on' : 'sv-estado--off'">
+              <!-- Pendiente de admisión gana sobre activo/inactivo: es la información que
+                   cambia lo que se puede hacer con esa persona hoy. -->
+              <span v-if="!s.aprobado_at" class="sv-estado sv-estado--pend">Sin aprobar</span>
+              <span v-else class="sv-estado" :class="s.es_paciente ? 'sv-estado--on' : 'sv-estado--off'">
                 {{ s.es_paciente ? 'Activo' : 'Inactivo' }}
               </span>
             </td>
@@ -488,6 +501,8 @@ async function exportarCSV() {
 .sv-estado { display: inline-block; font-size: .7rem; font-weight: 700; padding: .15em .55em; border-radius: 999px; white-space: nowrap; }
 .sv-estado--on  { background: #f0fdf4; color: #15803d; }
 .sv-estado--off { background: var(--c-slate-100); color: var(--c-slate-500); }
+/* Ámbar, el mismo tono que el KPI: es algo que espera una acción, no un estado estable. */
+.sv-estado--pend { background: #fffbeb; color: #b45309; }
 .sv-mono  { font-family: monospace; font-size: .82rem; color: #374151; }
 .sv-edad  { font-size: .82rem; color: var(--c-slate-500); }
 .sv-empty { color: var(--c-slate-300); font-size: .82rem; }

@@ -17,6 +17,9 @@ const props = defineProps({
   saldoCc:          { type: Number,  default: null },
   limiteCc:         { type: Number,  default: null },
   descuentoPorcentaje: { type: Number,  default: 0 },
+  // Alta cargada en el mostrador y sin admitir: el backend rechaza dispensa y reserva, así que
+  // acá se deshabilitan los botones en vez de dejar abrir un modal que va a fallar al confirmar.
+  pendienteAprobacion: { type: Boolean, default: false },
 })
 
 const emit = defineEmits(['dispensacion-creada'])
@@ -42,8 +45,10 @@ const editTarget = ref(null)
 
 // Dispensar (inmediato + entregar reservas): admin/dispensador/supervisor.
 // Crear/editar reservas: solo admin/supervisor (el dispensador las ve y las pasa a dispensa).
-const canDispensar = computed(() => ['admin', 'dispensador', 'supervisor', 'super_admin'].includes(auth.user?.role))
-const canReservar  = computed(() => ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role))
+const tieneRolDispensar = computed(() => ['admin', 'dispensador', 'supervisor', 'super_admin'].includes(auth.user?.role))
+const tieneRolReservar  = computed(() => ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role))
+const canDispensar = computed(() => tieneRolDispensar.value && !props.pendienteAprobacion)
+const canReservar  = computed(() => tieneRolReservar.value  && !props.pendienteAprobacion)
 const canDelete = computed(() => ['admin', 'dispensador', 'super_admin'].includes(auth.user?.role))
 const canEdit   = computed(() => ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role))
 
@@ -166,6 +171,12 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
         </div>
       </div>
       <div class="dv__header-actions">
+        <!-- Sin el motivo, los botones simplemente desaparecen y parece un error de permisos.
+             Se muestra sólo a quien SÍ tiene el rol: al resto no le falta nada. -->
+        <span v-if="pendienteAprobacion && (tieneRolDispensar || tieneRolReservar)" class="dv__bloqueado">
+          <i class="bi bi-lock"></i>
+          Pendiente de aprobación: no se le puede dispensar todavía
+        </span>
         <button v-if="canReservar" class="dv__btn-ghost" @click="openCreate('reserva')">
           <i class="bi bi-bookmark-star"></i> Reservar
         </button>
@@ -372,6 +383,11 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
 
 /* Buttons */
 .dv__header-actions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.dv__bloqueado {
+  display: inline-flex; align-items: center; gap: .35rem;
+  background: #fffbeb; color: #b45309; border: 1px solid #fde68a;
+  border-radius: 8px; padding: .4rem .7rem; font-size: .76rem; font-weight: 600;
+}
 .dv__btn-primary { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .6rem 1.1rem; border-radius: 9px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: background .15s; white-space: nowrap; }
 .dv__btn-primary:hover:not(:disabled) { background: #144a18; }
 .dv__btn-primary:disabled { opacity: .5; cursor: not-allowed; }

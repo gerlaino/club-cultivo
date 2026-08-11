@@ -1,6 +1,6 @@
 ---
 titulo: Dar de alta un paciente
-roles: [admin, medico, dispensador]
+roles: [admin, medico, dispensador, supervisor]
 modulo: Pacientes
 orden: 10
 ---
@@ -26,3 +26,12 @@ dos a la vez. Hablalo con la administración antes de insistir.
 El sistema cruza el estado con la fecha: un certificado **activo cuyo vencimiento ya pasó** se
 muestra como **vencido**, aunque nadie lo haya cambiado a mano. Un trámite **en trámite** no se
 pisa aunque esté vencido — significa que hay una renovación en curso.
+
+### Si lo cargás desde el mostrador
+Cuando el alta la hace el **dispensador** o el **supervisor**, la ficha queda **pendiente de
+aprobación**: existe y se puede completar, pero esa persona **no puede recibir dispensaciones ni
+reservas** hasta que un administrador o el médico la apruebe. Es una decisión de admisión, no una
+operación de mostrador.
+
+El aviso les llega solo. Mientras tanto, la ficha se ve con la etiqueta **Pendiente de
+aprobación**.

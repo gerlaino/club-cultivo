@@ -2,7 +2,7 @@ class PacientesController < ApplicationController
   before_action :authenticate_user!
   before_action -> { require_feature!(:produccion_dispensa) }
   before_action :check_pacientes_role!
-  before_action :set_paciente, only: [:show, :update, :destroy, :timeline, :subir_reprocann, :eliminar_reprocann, :enviar_mail, :mails_enviados]
+  before_action :set_paciente, only: [:show, :update, :destroy, :timeline, :subir_reprocann, :eliminar_reprocann, :enviar_mail, :mails_enviados, :aprobar]
   before_action :require_export_role!, only: [:export_csv]
   before_action :require_criticos_role!, only: [:criticos]
   before_action :normalize_paciente_params, only: [:create, :update]
@@ -14,6 +14,7 @@ class PacientesController < ApplicationController
     id club_id nombre apellido dni dni_normalizado fecha_nacimiento es_paciente
     email telefono reprocann_numero reprocann_vencimiento reprocann_estado
     con_seguimiento_medico limite_dispensacion_mensual_g descuento_porcentaje carnet_token
+    aprobado_at
     domicilio_calle domicilio_altura domicilio_piso domicilio_depto domicilio_barrio domicilio_ciudad
     envio_calle envio_altura envio_piso envio_depto envio_barrio envio_ciudad
     created_at updated_at
@@ -201,7 +202,7 @@ class PacientesController < ApplicationController
   end
 
   def create
-    unless current_user.admin? || current_user.medico? || current_user.dispensador?
+    unless Paciente::ROLES_CREAN.include?(current_user.role)
       return render json: { error: 'No autorizado' }, status: :forbidden
     end
 
@@ -222,12 +223,37 @@ class PacientesController < ApplicationController
       paciente.con_seguimiento_medico = true
     end
 
+    # Quien puede aprobar, aprueba en el mismo acto: para admin y médico dar de alta ES admitir,
+    # y pedirles un segundo click sobre su propia alta sería burocracia sin sentido. El
+    # mostrador (dispensador, supervisor) carga la solicitud y queda pendiente — el modelo pone
+    # la fecha de aprobación salvo que se lo marque así.
+    if Paciente::ROLES_APRUEBAN.include?(current_user.role)
+      paciente.aprobado_por = current_user
+    else
+      paciente.desde_mostrador = true
+    end
+
     if paciente.save
-      crear_alerta_dispensador(paciente) if current_user.dispensador?
-      render json: { data: paciente }, status: :created
+      avisar_alta_pendiente(paciente) if paciente.pendiente_aprobacion?
+      render json: { data: paciente_json(paciente) }, status: :created
     else
       render json: { errors: paciente.errors.full_messages }, status: :unprocessable_entity
     end
+  end
+
+  # POST /pacientes/:id/aprobar — admitir a alguien cargado desde el mostrador.
+  def aprobar
+    unless Paciente::ROLES_APRUEBAN.include?(current_user.role)
+      return render json: { error: 'Sólo un administrador o el médico puede aprobar un alta.' },
+                    status: :forbidden
+    end
+
+    if @paciente.aprobado?
+      return render json: { error: 'Este paciente ya estaba aprobado.' }, status: :unprocessable_entity
+    end
+
+    @paciente.aprobar!(current_user)
+    render json: { data: paciente_json(@paciente) }
   end
 
   def update
@@ -446,6 +472,9 @@ class PacientesController < ApplicationController
     {
       total:      nomina.count,
       baja:       scope.where(es_paciente: false).count,
+      # Cargados desde el mostrador y todavía sin admitir. Van aparte porque no es un problema
+      # del REPROCANN sino del alta, y porque cada uno es alguien que hoy NO puede retirar.
+      pendientes_aprobacion: nomina.pendientes_aprobacion.count,
       pendientes: nomina.where(reprocann_estado: 'pendiente').count,
       sin_rep:    sin_rep.count,
       vencidos:   con_rep.where.not(reprocann_vencimiento: nil)
@@ -550,15 +579,30 @@ class PacientesController < ApplicationController
     end
   end
 
-  def crear_alerta_dispensador(paciente)
-    AlertaInterna.create!(
-      club_id:          current_user.club_id,
-      tipo:             'paciente_creado_por_dispensador',
-      mensaje:          "Dispensador #{current_user.nombre_completo} creó al paciente #{paciente.nombre_completo} sin seguimiento médico",
-      severidad:        'info',
-      creada_por:       current_user,
-      destinada_a_role: 'admin',
-      contexto:         { paciente_id: paciente.id, dispensador_id: current_user.id }
-    )
+  # Serialización de una ficha para create/aprobar: la misma allowlist que el resto, sin datos
+  # clínicos. Antes `create` devolvía el modelo entero — todos los campos, incluidos los cifrados
+  # que se descifran al serializar.
+  def paciente_json(paciente)
+    paciente.as_json(only: campos_visibles, methods: [:nombre_completo])
+  end
+
+  # El alta quedó pendiente: alguien tiene que aprobarla para que esa persona pueda retirar.
+  #
+  # Reemplaza al aviso viejo ("creó un paciente sin seguimiento médico"), que era informativo y
+  # se diluía entre otras alertas. Ahora describe algo que hay que HACER, va en severidad
+  # `warning` y llega también al médico, que es quien además puede aprobarla.
+  def avisar_alta_pendiente(paciente)
+    Paciente::ROLES_APRUEBAN.each do |rol|
+      AlertaInterna.create!(
+        club_id:          current_user.club_id,
+        tipo:             'paciente_pendiente_aprobacion',
+        mensaje:          "#{current_user.nombre_completo} cargó a #{paciente.nombre_completo} desde el mostrador. " \
+                          'Está pendiente de aprobación y no puede recibir dispensaciones hasta que lo apruebes.',
+        severidad:        'warning',
+        creada_por:       current_user,
+        destinada_a_role: rol,
+        contexto:         { paciente_id: paciente.id, creado_por_id: current_user.id }
+      )
+    end
   end
 end

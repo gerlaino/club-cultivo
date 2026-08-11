@@ -176,6 +176,14 @@ class Dispensacion < ApplicationRecord
   def paciente_activo_como_socio
     return unless paciente
     errors.add(:base, 'El socio no está activo en la organización') unless paciente.es_paciente?
+
+    # Un paciente cargado en el mostrador todavía no está admitido. Se valida acá y no sólo en
+    # la pantalla porque es el punto por el que pasa TODA entrega —el modal, la conversión de
+    # una reserva, la API— y dejarlo en la UI sería tener la regla dibujada, no aplicada.
+    return if paciente.aprobado?
+
+    errors.add(:base, "#{paciente.nombre_completo} está pendiente de aprobación: " \
+                      'un administrador o el médico tiene que aprobarlo antes de dispensarle.')
   end
 
   def stock_pertenece_al_club

@@ -7,7 +7,7 @@ class AlertaInterna < ApplicationRecord
   belongs_to :lote, optional: true
 
   TIPOS_OPERATIVOS = %w[
-    paciente_creado_por_dispensador documento_vencido reprocann_vencido reprocann_por_vencer
+    paciente_creado_por_dispensador paciente_pendiente_aprobacion documento_vencido reprocann_vencido reprocann_por_vencer
     indicacion_vencida indicacion_por_vencer
     manicura_asignada manicura_devuelta manicura_aprobacion_pendiente manicura_aprobada manicura_rechazada manicura_eliminada manicura_reabierta
     stock_bajo stock_vencimiento saldo_cc_bajo saldo_gramos_bajo
@@ -60,7 +60,7 @@ class AlertaInterna < ApplicationRecord
     'reprocann_vencido' => 'paciente', 'reprocann_por_vencer' => 'paciente',
     'documento_vencido' => 'paciente', 'saldo_cc_bajo' => 'paciente', 'saldo_gramos_bajo' => 'paciente',
     'indicacion_vencida' => 'paciente', 'indicacion_por_vencer' => 'paciente',
-    'paciente_creado_por_dispensador' => 'paciente',
+    'paciente_creado_por_dispensador' => 'paciente', 'paciente_pendiente_aprobacion' => 'paciente',
     'delivery_entregado' => 'delivery', 'delivery_fallido' => 'delivery',
   }.freeze
 

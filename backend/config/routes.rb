@@ -196,6 +196,10 @@ Rails.application.routes.draw do
         # carnet anonimizado a propósito; el dispensador está autenticado y necesita la ficha.
         get 'por_carnet/:token', action: :por_carnet
       end
+      # Admitir a alguien cargado desde el mostrador. Sólo admin y médico (ver Paciente).
+      member do
+        post :aprobar
+      end
       resources :notas,        controller: "paciente_notas",    only: [:index, :create]
       resources :indicaciones, controller: "indicacion_medica", only: [:index, :create]
       resources :dispensaciones, only: [:index, :create]

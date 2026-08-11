@@ -10,7 +10,7 @@ import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import IndicacionesMedicas from '../components/pacientes/IndicacionesMedicas.vue'
 import Dispensaciones from '../components/pacientes/Dispensaciones.vue'
 import PatientDocuments from '../components/pacientes/PacienteDocumentos.vue'
-import { getPacienteTimeline, getPacienteTurnos, updateAdminTurno, deleteAdminTurno, updatePaciente } from '../lib/api.js'
+import { getPacienteTimeline, getPacienteTurnos, updateAdminTurno, deleteAdminTurno, updatePaciente, aprobarPaciente } from '../lib/api.js'
 import {
   User, ShieldCheck, Pill, BookOpen, FileText, ClipboardList, Clock,
   Pencil, AlertTriangle, Info, Wallet, CreditCard, Mail, CalendarPlus,
@@ -56,6 +56,27 @@ const agendarTurnoOpen = ref(false)
 const isAdmin    = computed(() => ['admin', 'super_admin'].includes(auth.user?.role))
 const isMedico   = computed(() => auth.user?.role === 'medico')
 const canAgendar = computed(() => isAdmin.value || isMedico.value)
+
+// ── Admisión ──────────────────────────────────────────────────────────────────
+// Una ficha cargada en el mostrador existe pero todavía no fue admitida: se puede completar,
+// pero no recibir dispensaciones ni reservas. Aprobar es de admin y médico (lo valida el
+// backend; acá sólo se decide a quién se le muestra el botón).
+const pendienteAprobacion = computed(() => !!s.value && !s.value.aprobado_at)
+const puedeAprobar        = computed(() => isAdmin.value || isMedico.value)
+const aprobando           = ref(false)
+
+async function aprobarAlta() {
+  aprobando.value = true
+  try {
+    await aprobarPaciente(s.value.id)
+    await store.fetchOne(s.value.id)
+    toast.success('Paciente aprobado — ya puede recibir dispensaciones')
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo aprobar el alta')
+  } finally {
+    aprobando.value = false
+  }
+}
 const toast   = useToast()
 
 const ccRefreshKey = ref(0)
@@ -339,6 +360,9 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
                 {{ reprocannStatus.label }}
               </span>
               <span v-else class="sd__repro-badge sd__repro-badge--none">Sin REPROCANN</span>
+              <span v-if="pendienteAprobacion" class="sd__repro-badge sd__repro-badge--pend">
+                Pendiente de aprobación
+              </span>
               <span v-if="s.es_paciente" class="sd__status-badge sd__status-badge--active">En tratamiento</span>
               <span v-else class="sd__status-badge">Inactivo</span>
             </div>
@@ -366,6 +390,21 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
       <div v-else-if="reprocannStatus?.key === 'warning'" class="sd__alerta sd__alerta--warning">
         <AlertTriangle :size="16" />
         <div><strong>REPROCANN por vencer</strong> — El certificado vence el {{ formatDate(s.reprocann_vencimiento) }}.</div>
+      </div>
+
+      <!-- Alta cargada en el mostrador y todavía sin admitir. Va arriba de las tabs porque
+           condiciona todo lo demás: se puede completar la ficha, pero no entregarle nada. -->
+      <div v-if="pendienteAprobacion" class="sd__alerta sd__alerta--pend">
+        <UserCheck :size="16" />
+        <div class="sd__alerta-txt">
+          <strong>Pendiente de aprobación</strong> — Se cargó desde el mostrador. No puede recibir
+          dispensaciones ni reservas hasta que se apruebe el alta.
+          <template v-if="!puedeAprobar"> Pedíselo a un administrador o al médico.</template>
+        </div>
+        <button v-if="puedeAprobar" class="sd__btn-aprobar" :disabled="aprobando" @click="aprobarAlta">
+          <Check :size="14" :stroke-width="3" />
+          {{ aprobando ? 'Aprobando…' : 'Aprobar alta' }}
+        </button>
       </div>
 
       <!-- Tabs: primarias inline + resto en "Más" -->
@@ -541,6 +580,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
             :saldo-cc="s?.saldo_cc ?? null"
             :limite-cc="s?.limite_cc ?? null"
             :descuento-porcentaje="Number(s?.descuento_porcentaje ?? 0)"
+            :pendiente-aprobacion="pendienteAprobacion"
             @dispensacion-creada="onDispensacionCreada"
           />
         </div>
@@ -766,6 +806,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 .sd__hero-badges { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 .sd__repro-badge { font-size: .72rem; font-weight: 700; padding: .25em .75em; border-radius: 999px; }
 .sd__repro-badge--none { background: rgba(100,116,139,.1); color: var(--c-slate-500); }
+.sd__repro-badge--pend { background: rgba(180,83,9,.12); color: #b45309; }
 .sd__status-badge { font-size: .7rem; font-weight: 600; padding: .22em .65em; border-radius: 6px; background: var(--c-slate-100); color: var(--c-slate-500); }
 .sd__status-badge--active { background: rgba(21,128,61,.1); color: #15803d; }
 
@@ -773,6 +814,19 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 .sd__alerta { display: flex; align-items: flex-start; gap: .75rem; padding: .875rem 1.1rem; border-radius: 12px; font-size: .875rem; margin-bottom: 1.25rem; }
 .sd__alerta--danger { background: #fef2f2; border: 1px solid #fecaca; color: #7f1d1d; }
 .sd__alerta--warning { background: #fffbeb; border: 1px solid #fde68a; color: #78350f; }
+
+/* Admisión pendiente: mismo ámbar que el resto de "esto espera algo", pero con el botón que lo
+   resuelve dentro de la misma franja — el aviso y la acción no deberían estar separados. */
+.sd__alerta--pend { background: #fffbeb; border: 1px solid #fde68a; color: #78350f; align-items: center; }
+.sd__alerta-txt { flex: 1; }
+.sd__btn-aprobar {
+  display: inline-flex; align-items: center; gap: .35rem; flex-shrink: 0;
+  background: #b45309; color: #fff; border: none; border-radius: 8px;
+  padding: .5rem .9rem; font-size: .8rem; font-weight: 700; cursor: pointer;
+  transition: background .15s;
+}
+.sd__btn-aprobar:hover:not(:disabled) { background: #92400e; }
+.sd__btn-aprobar:disabled { opacity: .6; cursor: default; }
 
 /* Tabs */
 .sd__tabs { display: flex; gap: .25rem; border-bottom: 2px solid var(--c-slate-200); margin-bottom: 1.5rem; flex-wrap: wrap; }
