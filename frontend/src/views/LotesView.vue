@@ -86,6 +86,22 @@ const SALA_POST = { cosecha: "Cosechado", en_manicura: "En manicura", curado: "C
 function salaCelda(l)    { return l.sala_id ? salaName(l.sala_id) : (SALA_POST[l.estado] || "—"); }
 function diasDesdeInicio(d) { return d ? Math.floor((Date.now() - new Date(d)) / 86_400_000) : null; }
 
+// dd/mm/aa: la columna va al lado de los días y se compara de un vistazo, no se lee en prosa.
+// `T00:00:00` fuerza hora LOCAL: sin eso, un `2026-08-11` se parsea como UTC y en Argentina
+// (UTC−3) se muestra el día anterior.
+function fechaCorta(d) {
+  if (!d) return '—'
+  const f = /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(`${d}T00:00:00`) : new Date(d)
+  return f.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })
+}
+
+// La línea de tiempo del lote, para el tooltip del badge de estado.
+function historialTitle(l) {
+  const h = l.historial_estados || []
+  if (!h.length) return `Desde ${fechaCorta(l.fecha_estado_actual)}`
+  return h.map(e => `${em(e.estado).label}: ${fechaCorta(e.fecha)}`).join('\n')
+}
+
 // ---------- Stats ----------
 const stats = computed(() => {
   const all = store.items;
@@ -479,6 +495,8 @@ async function exportarCSV() {
             </th>
             <th>Maceta</th>
             <th title="Días en la fase actual">En fase</th>
+            <!-- "12d en fase" solo no dice nada: hay que poder ver desde cuándo. -->
+            <th title="Fecha en que entró a la fase actual">Desde</th>
             <th class="lv-th--sort" @click="sortBy = sortBy === 'fecha_asc' ? 'fecha_desc' : 'fecha_asc'"
                 title="Días totales desde el inicio del lote">
               Total <span class="lv-sort-icon">{{ sortBy.startsWith('fecha') ? (sortBy === 'fecha_asc' ? '↑' : '↓') : '↕' }}</span>
@@ -503,7 +521,11 @@ async function exportarCSV() {
               />
             </td>
             <td data-label="Estado">
-              <span class="lv-badge" :style="{ background: em(l.estado).bg, color: em(l.estado).text }">
+              <!-- El historial va en el `title` y no en columnas: son siete estadíos y en la
+                   mayoría de las filas estarían casi todos vacíos. Acá está a un hover, sin
+                   ensanchar una tabla que ya tiene diez columnas. -->
+              <span class="lv-badge" :style="{ background: em(l.estado).bg, color: em(l.estado).text }"
+                    :title="historialTitle(l)">
                 {{ em(l.estado).icon }} {{ em(l.estado).label }}
               </span>
             </td>
@@ -534,6 +556,10 @@ async function exportarCSV() {
                 <span v-if="diasNivel(l)" class="lv-dias-dot" :class="`lv-dias-dot--${diasNivel(l)}`" :title="diasTitle(l)"></span>
                 {{ l.dias_en_estado }}d
               </span>
+              <span v-else class="lv-empty">—</span>
+            </td>
+            <td data-label="Desde">
+              <span v-if="l.fecha_estado_actual" class="lv-num lv-num--muted">{{ fechaCorta(l.fecha_estado_actual) }}</span>
               <span v-else class="lv-empty">—</span>
             </td>
             <td data-label="Total">

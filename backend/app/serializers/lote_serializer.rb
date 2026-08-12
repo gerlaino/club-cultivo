@@ -43,6 +43,22 @@ class LoteSerializer
     fecha_estado_actual = ev_estado_actual&.registrado_en&.to_date || lote.start_date
     dias_en_estado   = fecha_estado_actual ? (Date.current - fecha_estado_actual).to_i : nil
 
+    # La línea de tiempo del lote: cuándo entró a cada estadío.
+    #
+    # Se toma la ÚLTIMA entrada a cada estado, no la primera, por el mismo motivo que
+    # `fecha_estado_actual`: si un lote se avanzó por error y volvió atrás, lo que interesa es
+    # desde cuándo está donde está. Con la primera, un lote que rebotó mostraría una fecha en la
+    # que efectivamente ya no estaba en esa fase.
+    #
+    # OJO: `dias_floracion` de más arriba SÍ usa la primera entrada, y está bien —mide cuánto
+    # duró la floración completa, que es otra pregunta—. No unificar las dos.
+    historial_estados = eventos
+      .select { |e| e.tipo == 'cambio_estado' && e.estado_nuevo.present? && e.registrado_en.present? }
+      .group_by(&:estado_nuevo)
+      .transform_values { |evs| evs.max_by(&:registrado_en).registrado_en.to_date }
+      .map { |estado, fecha| { estado: estado, fecha: fecha } }
+      .sort_by { |h| h[:fecha] }
+
     result = {
       id:                   lote.id,
       club_id:              lote.club_id,
@@ -85,6 +101,10 @@ class LoteSerializer
       genetica:           lote.genetica ? { id: lote.genetica.id, nombre: lote.genetica.nombre, tipo: lote.genetica.tipo, registrada_inase: lote.genetica.registrada_inase } : nil,
       dias_desde_inicio:  lote.dias_desde_inicio,
       dias_en_estado:     dias_en_estado,
+      # Desde cuándo está en el estado actual. Sale del MISMO cálculo que `dias_en_estado`, así
+      # que la fecha y los días de la tabla no pueden contradecirse.
+      fecha_estado_actual: fecha_estado_actual,
+      historial_estados:   historial_estados,
       # Panorama completo: "45 días de ciclo + 12 enraizando". Las métricas usan dias_ciclo.
       dias_enraizado:     dias_enraizado,
       dias_ciclo:         dias_ciclo,
