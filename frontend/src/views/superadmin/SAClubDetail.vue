@@ -3,10 +3,11 @@ import { ref, computed, onMounted } from 'vue'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub, suspenderClub, reactivarClub, provisionarWhatsappClub, desconectarWhatsappClub, provisionarPulse, getSuperAdminCatalogo, getHistorialClub } from '../../lib/api.js'
+import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub, suspenderClub, reactivarClub, getSuperAdminCatalogo, getHistorialClub } from '../../lib/api.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
-import { ArrowLeft, Pencil, Trash2, RotateCcw, Sparkles, UserPlus, Check, X, Save, Mail, Zap, Users, Info, CreditCard, PauseCircle, PlayCircle, History } from 'lucide-vue-next'
+import SAModulos from './SAModulos.vue'
+import { ArrowLeft, Pencil, Trash2, RotateCcw, Sparkles, UserPlus, Check, X, Users, Info, CreditCard, PauseCircle, PlayCircle, History } from 'lucide-vue-next'
 
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -22,7 +23,7 @@ const error   = ref(null)
 const showPlanModal = ref(false)
 const showUserModal = ref(false)
 const planForm = ref({ plan: '', plan_activo_hasta: '', trial: false })
-const userForm = ref({ first_name: '', last_name: '', email: '', password: '123456Aa', role: 'cultivador' })
+const userForm = ref({ first_name: '', last_name: '', email: '', email_personal: '', password: '123456Aa', role: 'cultivador' })
 const userError = ref(null)
 
 const editingInfo  = ref(false)
@@ -63,16 +64,22 @@ async function guardarInfo() {
   }
 }
 
-// WhatsApp (provisión Twilio — solo super_admin)
-// ── Pulse Grow ────────────────────────────────────────────────────────────────
-// Los add-ons que necesitan que alguien cargue algo para funcionar de verdad.
-const CONFIGURABLES = { ia: true, iot: true, whatsapp: true }
+// Qué tiene contratado hoy, para el resumen de la tarjeta de Suscripción. Los interruptores y
+// su configuración viven en <SAModulos>: acá sólo se lee lo que ya está guardado.
+const suitesActivas = computed(() =>
+  (club.value?.suites || []).filter(s => club.value?.features?.[s.clave] === true)
+)
+const addonsActivos = computed(() =>
+  (club.value?.addons || []).filter(a => club.value?.features?.[a.clave] === true)
+)
 
-const addonsActivos = computed(() => addons.value.filter(a => featuresForm.value[a.clave]))
+// El componente de módulos devuelve la organización entera ya recalculada por el backend
+// (prendido ≠ andando), así que se reemplaza y no se hace merge: un merge dejaría vivos los
+// `estado` viejos de la respuesta anterior.
+function onModulosActualizados(data) {
+  club.value = { ...club.value, ...data }
+}
 
-// Prendido no es lo mismo que andando. El backend calcula el estado real de cada módulo
-// (`andando` / `falta_config` / `apagado`) mirando si tiene lo que necesita para funcionar:
-// el WhatsApp sin Twilio y el Correo sin SMTP quedan prendidos sin hacer nada.
 // ── Historial ──────────────────────────────────────────────────────────
 // A pedido, no al cargar: son hasta 100 registros y sólo se miran cuando hay una discusión.
 const historial = ref(null)
@@ -101,69 +108,6 @@ function formatDateTime(f) {
   if (!f) return '—'
   return new Date(f).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
-
-const modulosAMedias = computed(() =>
-  [...addons.value, ...incluidos.value].filter(m => m.estado === 'falta_config')
-)
-
-const pulseKey    = ref('')
-const savingPulse = ref(false)
-
-async function guardarPulse() {
-  if (!pulseKey.value) { toast.error('Pegá la API key primero'); return }
-  savingPulse.value = true
-  try {
-    const { data } = await provisionarPulse(id, pulseKey.value)
-    club.value = data
-    pulseKey.value = ''
-    toast.success('API key guardada. Los sensores del club ya pueden leerse.')
-  } catch (e) {
-    toast.error(e?.response?.data?.error || 'No se pudo guardar')
-  } finally { savingPulse.value = false }
-}
-
-async function borrarPulse() {
-  savingPulse.value = true
-  try {
-    const { data } = await provisionarPulse(id, '')
-    club.value = data
-    toast.success('API key quitada')
-  } finally { savingPulse.value = false }
-}
-
-const waForm    = ref({ twilio_account_sid: '', twilio_auth_token: '', twilio_whatsapp_from: '' })
-const savingWa  = ref(false)
-const waError   = ref(null)
-
-const featuresForm    = ref({})
-const featuresBaja    = ref({})
-const bajaProgramada  = (clave) => featuresBaja.value[clave] || null
-const fechaCorta      = (f) => new Date(String(f) + 'T00:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })
-const iaTier          = ref('basico')
-const iaLimiteHora    = ref(20)
-const savingFeatures  = ref(false)
-const featuresSuccess = ref(false)
-
-const IA_TIERS = [
-  { value: 'basico',     label: 'Básico',     desc: '20 calls/h · Solo registro por voz',        color: '#64748b' },
-  { value: 'pro',        label: 'Pro',        desc: '60 calls/h · Voz + alertas proactivas',      color: '#0891b2' },
-  { value: 'enterprise', label: 'Enterprise', desc: '200 calls/h · Voz + alertas + predicciones', color: '#7c3aed' },
-]
-// El catálogo real lo manda el backend (suites/addons). Esto sólo queda para el ícono de
-// las claves viejas que puedan seguir guardadas en algún club.
-const FEATURE_META = {}
-// El catálogo lo manda el backend (Club::SUITES / Club::ADDONS): así no hay dos listas que
-// se contradigan cuando se agrega o completa un módulo.
-const suites = ref([])
-const addons = ref([])
-// Los que vienen dentro de una suite (sin interruptor) y los que todavía no existen.
-const incluidos      = ref([])
-const enConstruccion = ref([])
-const ADDON_ICO = {
-  bar: '🍺', eventos: '🎉', medico: '🩺', iot: '📡', ia: '🤖',
-  mailer: '✉️', whatsapp: '💬', ariccame: '📋',
-}
-const iaActiva = computed(() => featuresForm.value.ia === true)
 
 // Dos planes: el plan dice CUÁNTO, nunca QUÉ. Los límites salen del catálogo del backend —
 // duplicarlos acá era garantía de que la pantalla dijera un número y el sistema aplicara otro.
@@ -198,21 +142,10 @@ function formatDate(d) {
 async function cargar() {
   try {
     const { data } = await getSuperAdminClub(id)
+    // Todo lo de módulos (suites, add-ons, incluidos, bajas, IA, Twilio, Pulse) sale de acá y
+    // lo consume <SAModulos> por prop: antes se copiaba a ocho refs locales que había que
+    // volver a sincronizar a mano después de cada guardado.
     club.value = data
-    waForm.value = {
-      twilio_account_sid:   data.twilio_account_sid   || '',
-      twilio_auth_token:    '',
-      twilio_whatsapp_from: data.twilio_whatsapp_from || '',
-    }
-    featuresForm.value    = { ...(data.features || {}) }
-    // Módulos dados de baja que siguen andando hasta su fecha.
-    featuresBaja.value    = data.features_baja || {}
-    suites.value          = data.suites || []
-    addons.value          = data.addons || []
-    incluidos.value       = data.incluidos || []
-    enConstruccion.value  = data.en_construccion || []
-    iaTier.value       = data.ia_tier        || 'basico'
-    iaLimiteHora.value = data.ia_limite_hora || 20
   } finally {
     loading.value = false
   }
@@ -228,7 +161,7 @@ function abrirPlanModal() {
 }
 
 function abrirUserModal() {
-  userForm.value = { first_name: '', last_name: '', email: '', password: '123456Aa', role: 'cultivador' }
+  userForm.value = { first_name: '', last_name: '', email: '', email_personal: '', password: '123456Aa', role: 'cultivador' }
   userError.value = null
   showUserModal.value = true
 }
@@ -354,55 +287,6 @@ async function restaurar() {
     toast.error(e?.response?.data?.error || 'Error al restaurar')
   } finally {
     saving.value = false
-  }
-}
-
-async function guardarFeatures() {
-  savingFeatures.value = true
-  featuresSuccess.value = false
-  try {
-    const { data } = await updateSuperAdminClub(id, {
-      features:       featuresForm.value,
-      ia_tier:        iaTier.value,
-      ia_limite_hora: iaLimiteHora.value,
-    })
-    club.value           = { ...club.value, ...data }
-    // El backend recalcula el estado real de cada módulo (prendido ≠ andando): se relee de la
-    // respuesta en vez de asumir que quedó como lo dejó el formulario.
-    addons.value         = data.addons || addons.value
-    incluidos.value      = data.incluidos || incluidos.value
-    enConstruccion.value = data.en_construccion || enConstruccion.value
-    featuresSuccess.value = true
-    setTimeout(() => { featuresSuccess.value = false }, 3000)
-  } finally {
-    savingFeatures.value = false
-  }
-}
-
-async function provisionarWa() {
-  savingWa.value = true
-  waError.value  = null
-  try {
-    const payload = { ...waForm.value }
-    if (!payload.twilio_auth_token) delete payload.twilio_auth_token
-    const { data } = await provisionarWhatsappClub(id, payload)
-    club.value = { ...club.value, ...data }
-    waForm.value.twilio_auth_token = ''
-    toast.success('WhatsApp provisionado — el club queda conectado')
-  } catch (e) {
-    waError.value = e?.response?.data?.error || 'Error al provisionar'
-  } finally {
-    savingWa.value = false
-  }
-}
-
-async function desconectarWa() {
-  try {
-    const { data } = await desconectarWhatsappClub(id)
-    club.value = { ...club.value, ...data }
-    toast.success('WhatsApp desconectado')
-  } catch (e) {
-    toast.error(e?.response?.data?.error || 'Error')
   }
 }
 
@@ -585,11 +469,11 @@ onMounted(async () => {
                  (Semilla/Brote/Cosecha/Federación). Se activan en Funcionalidades. -->
             <div class="scd__plan-body">
               <div class="scd__susc-suites">
-                <span v-for="s in suites.filter(x => featuresForm[x.clave])" :key="s.clave"
+                <span v-for="s in suitesActivas" :key="s.clave"
                       class="scd__plan-pill scd__plan-pill--lg scd__susc-pill">
                   {{ s.label }}
                 </span>
-                <span v-if="!suites.some(x => featuresForm[x.clave])" class="scd__plan-pill scd__plan-pill--lg scd__susc-pill--none">
+                <span v-if="!suitesActivas.length" class="scd__plan-pill scd__plan-pill--lg scd__susc-pill--none">
                   Sin suites contratadas
                 </span>
               </div>
@@ -631,197 +515,12 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- ── Funcionalidades ── -->
+      <!-- ── Módulos ──
+           La sección vive en su propio componente y cada interruptor se guarda solo: acá había
+           un "Guardar" arriba de todo que se perdía de vista al bajar, así que se tildaban tres
+           módulos, se cambiaba de pestaña y no se había guardado ninguno. -->
       <div class="scd__card">
-        <div class="scd__card-hd">
-          <Zap :size="14" :stroke-width="1.75" class="scd__card-ico scd__card-ico--purple" /> Funcionalidades
-          <span v-if="featuresSuccess" class="scd__saved-badge"><Check :size="11" :stroke-width="3" /> Guardado</span>
-          <button class="scd__btn-sm scd__btn-primary" :disabled="savingFeatures" @click="guardarFeatures" style="margin-left:auto">
-            <DsSpinner v-if="savingFeatures" :size="13" />
-            <Save v-else :size="13" :stroke-width="1.75" />
-            {{ savingFeatures ? 'Guardando…' : 'Guardar' }}
-          </button>
-        </div>
-        <div class="scd__feat-body">
-          <!-- Las SUITES son lo que se vende: un club compra una, la otra o las dos. -->
-          <div class="scd__suites">
-            <label v-for="s in suites" :key="s.clave" class="scd__suite" :class="{ 'scd__suite--on': featuresForm[s.clave] }">
-              <input v-model="featuresForm[s.clave]" type="checkbox" class="scd__chk" />
-              <div class="scd__suite-txt">
-                <div class="scd__suite-name">{{ s.label }}</div>
-                <div class="scd__suite-desc">{{ s.desc }}</div>
-              </div>
-              <div class="scd__track"><div class="scd__thumb"></div></div>
-            </label>
-          </div>
-
-          <!-- Lo que entra con la suite. Sin interruptor: no hay nada que decidir. -->
-          <template v-if="incluidos.length">
-            <div class="scd__divider"><span>Ya incluido en la suite</span></div>
-            <div class="scd__incluidos">
-              <div
-                v-for="inc in incluidos" :key="inc.clave"
-                class="scd__incluido"
-                :class="{ 'scd__incluido--off': !inc.activo }"
-              >
-                <span class="scd__feat-ico">{{ ADDON_ICO[inc.clave] || '🧩' }}</span>
-                <div>
-                  <div class="scd__feat-name">
-                    {{ inc.label }}
-                    <span v-if="inc.estado === 'falta_config'"
-                          class="scd__feat-badge scd__feat-badge--cfg">no funciona todavía</span>
-                  </div>
-                  <div class="scd__feat-desc">
-                    <template v-if="inc.activo">Viene con {{ inc.incluido_en_label }}</template>
-                    <template v-else>Necesita la suite {{ inc.incluido_en_label }}</template>
-                  </div>
-                  <div v-if="inc.falta" class="scd__feat-req scd__feat-req--warn">{{ inc.falta }}</div>
-                </div>
-              </div>
-            </div>
-          </template>
-
-          <div class="scd__divider"><span>Módulos adicionales</span></div>
-
-          <!-- Lo que está prendido y NO hace nada. Va arriba de los interruptores porque es lo
-               que hay que resolver: prenderlos y mostrar una demo que no funciona es peor que
-               no haberlos ofrecido. -->
-          <div v-if="modulosAMedias.length" class="scd__amedias">
-            <div class="scd__amedias-title">
-              {{ modulosAMedias.length }}
-              módulo{{ modulosAMedias.length === 1 ? '' : 's' }}
-              prendido{{ modulosAMedias.length === 1 ? '' : 's' }} que todavía no
-              funciona{{ modulosAMedias.length === 1 ? '' : 'n' }}
-            </div>
-            <ul class="scd__amedias-list">
-              <li v-for="m in modulosAMedias" :key="m.clave">
-                <strong>{{ m.label }}</strong> — {{ m.falta }}
-              </li>
-            </ul>
-          </div>
-
-          <!-- Cada add-on con su configuración ADENTRO. Antes los toggles estaban acá y sus
-               paneles (IA, WhatsApp, Pulse) al pie de la página: se activaba algo y la
-               consecuencia aparecía tres pantallazos abajo, sin conexión visible. -->
-          <div class="scd__addons">
-            <div
-              v-for="a in addons" :key="a.clave"
-              class="scd__addon"
-              :class="{ 'scd__addon--on': featuresForm[a.clave], 'scd__addon--warn': a.incompleto }"
-            >
-              <label class="scd__addon-hd">
-                <span class="scd__feat-ico">{{ ADDON_ICO[a.clave] || '🧩' }}</span>
-                <div class="scd__addon-txt">
-                  <div class="scd__feat-name">
-                    {{ a.label }}
-                    <span v-if="a.incompleto" class="scd__feat-badge">incompleto</span>
-                    <!-- El estado REAL, no el interruptor: lo calcula el backend mirando si el
-                         módulo tiene lo que necesita para funcionar. -->
-                    <span v-if="a.estado === 'andando'" class="scd__feat-badge scd__feat-badge--ok">andando</span>
-                    <span v-else-if="a.estado === 'falta_config'"
-                          class="scd__feat-badge scd__feat-badge--cfg">no funciona todavía</span>
-                  </div>
-                  <div class="scd__feat-desc">{{ a.desc }}</div>
-                  <!-- Qué le falta AHORA a este club, que es distinto de qué necesita el módulo
-                       en general. Prenderlo sin esto deja al club creyendo que tiene algo que
-                       no va a pasar. -->
-                  <!-- Dado de baja pero todavía andando: la organización lo pagó hasta esa
-                       fecha. Se dice explícito o parecería que la baja no se guardó. -->
-                  <div v-if="bajaProgramada(a.clave)" class="scd__feat-req scd__feat-req--baja">
-                    Dado de baja — sigue andando hasta el {{ fechaCorta(bajaProgramada(a.clave)) }}
-                  </div>
-                  <div v-else-if="a.falta" class="scd__feat-req scd__feat-req--warn">{{ a.falta }}</div>
-                  <div v-else-if="a.requiere && !featuresForm[a.clave]" class="scd__feat-req">
-                    {{ a.requiere }}
-                  </div>
-                </div>
-                <input v-model="featuresForm[a.clave]" type="checkbox" class="scd__chk" />
-                <div class="scd__track"><div class="scd__thumb"></div></div>
-              </label>
-
-              <!-- IA -->
-              <div v-if="a.clave === 'ia' && featuresForm.ia" class="scd__addon-cfg">
-                <div class="scd__ia-tiers">
-                  <button v-for="tier in IA_TIERS" :key="tier.value" type="button"
-                    class="scd__ia-tier"
-                    :class="{ 'scd__ia-tier--active': iaTier === tier.value }"
-                    :style="iaTier === tier.value ? { borderColor: tier.color, background: tier.color + '12', color: tier.color } : {}"
-                    @click="iaTier = tier.value; iaLimiteHora = [20,60,200][IA_TIERS.findIndex(t=>t.value===tier.value)]"
-                  >
-                    <strong>{{ tier.label }}</strong><span>{{ tier.desc }}</span>
-                  </button>
-                </div>
-                <div class="scd__ia-limit">
-                  <label class="scd__lbl">Límite de llamadas por hora</label>
-                  <input v-model.number="iaLimiteHora" type="number" min="1" max="500" class="scd__input scd__input--sm" />
-                  <span class="scd__hint">Sobreescribe el límite del tier. Se guarda con el botón de arriba.</span>
-                </div>
-              </div>
-
-              <!-- Ambiente / IoT: la API key de Pulse -->
-              <div v-if="a.clave === 'iot' && featuresForm.iot" class="scd__addon-cfg">
-                <div class="scd__cfg-hd">
-                  <span>API key de Pulse Grow</span>
-                  <span v-if="club.pulse_configurado" class="scd__ok-badge">Configurada</span>
-                  <span v-else class="scd__warn-badge">Falta</span>
-                </div>
-                <p class="scd__hint">
-                  Con una sola key se leen todos los sensores del club. Se saca de
-                  <strong>pulsegrow.com → Settings → API</strong>.
-                </p>
-                <div class="scd__cfg-row">
-                  <input v-model.trim="pulseKey" type="password" class="scd__input"
-                         :placeholder="club.pulse_configurado ? '•••••••• (vacío = no cambiar)' : 'Pegá la API key'" />
-                  <button class="scd__btn-sm scd__btn-secondary" :disabled="savingPulse" @click="guardarPulse">
-                    {{ savingPulse ? 'Guardando…' : 'Guardar' }}
-                  </button>
-                  <button v-if="club.pulse_configurado" class="scd__btn-sm scd__btn-danger" :disabled="savingPulse" @click="borrarPulse">
-                    Quitar
-                  </button>
-                </div>
-              </div>
-
-              <!-- WhatsApp: las credenciales de Twilio -->
-              <div v-if="a.clave === 'whatsapp' && featuresForm.whatsapp" class="scd__addon-cfg">
-                <div class="scd__cfg-hd">
-                  <span>Cuenta de Twilio</span>
-                  <span v-if="club.whatsapp_estado === 'conectado'" class="scd__ok-badge">Conectado</span>
-                  <span v-else class="scd__warn-badge">Sin conectar</span>
-                </div>
-                <p class="scd__hint">El número y la cuenta son de la organización: los avisos salen desde ahí.</p>
-                <div class="scd__cfg-grid">
-                  <input v-model.trim="waForm.twilio_account_sid" class="scd__input" placeholder="Account SID" />
-                  <input v-model.trim="waForm.twilio_auth_token" type="password" class="scd__input"
-                         :placeholder="club.whatsapp_estado === 'conectado' ? '•••••••• (vacío = no cambiar)' : 'Auth Token'" />
-                  <input v-model.trim="waForm.twilio_whatsapp_from" class="scd__input" placeholder="+54911..." />
-                </div>
-                <div class="scd__cfg-row">
-                  <button class="scd__btn-sm scd__btn-secondary" :disabled="savingWa" @click="guardarWhatsapp">
-                    {{ savingWa ? 'Guardando…' : 'Guardar credenciales' }}
-                  </button>
-                  <button v-if="club.whatsapp_estado === 'conectado'" class="scd__btn-sm scd__btn-danger" @click="desconectarWhatsapp">
-                    Desconectar
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Lo que todavía no existe. Se lista para que nadie lo prometa creyendo que está. -->
-          <template v-if="enConstruccion.length">
-            <div class="scd__divider"><span>Todavía no disponible</span></div>
-            <div class="scd__construccion">
-              <div v-for="e in enConstruccion" :key="e.clave" class="scd__constr-item">
-                <div>
-                  <div class="scd__feat-name">{{ e.label }}</div>
-                  <div class="scd__feat-desc">{{ e.desc }}</div>
-                </div>
-                <span class="scd__constr-badge">En construcción</span>
-              </div>
-            </div>
-          </template>
-
-        </div>
+        <SAModulos :club="club" @actualizado="onModulosActualizados" />
       </div>
 
       <!-- Qué le hicimos NOSOTROS a este club. Es lo primero que se pregunta cuando reclaman
@@ -925,9 +624,22 @@ onMounted(async () => {
                   <label class="scd__lbl">Apellido</label>
                   <input v-model.trim="userForm.last_name" class="scd__input" placeholder="García" />
                 </div>
+                <!-- Dos cosas distintas, que este modal confundía en un solo campo: `email` es
+                     el IDENTIFICADOR DE LOGIN (puede ser inventado) y `email_personal` es el
+                     mail real de la persona. La pantalla de usuarios del club ya los separaba;
+                     acá seguía pidiendo "Email" a secas y lo guardaba como login, así que el
+                     mail real quedaba sin cargar y los avisos rebotaban. -->
                 <div class="scd__field scd__field--full">
-                  <label class="scd__lbl">Email <span style="color:#dc2626">*</span></label>
-                  <input v-model.trim="userForm.email" type="email" class="scd__input" placeholder="juan@club.com" />
+                  <label class="scd__lbl">Usuario de ingreso <span style="color:#dc2626">*</span></label>
+                  <input v-model.trim="userForm.email" type="email" class="scd__input"
+                         placeholder="rol@nombreorganizacion.com" autocomplete="off" />
+                  <span class="scd__hint">Es con lo que se loguea. Puede ser inventado: no necesita ser un mail real.</span>
+                </div>
+                <div class="scd__field scd__field--full">
+                  <label class="scd__lbl">Email personal <span style="font-weight:400;color:#94a3b8">(opcional)</span></label>
+                  <input v-model.trim="userForm.email_personal" type="email" class="scd__input"
+                         placeholder="persona@gmail.com" autocomplete="off" />
+                  <span class="scd__hint">El mail REAL de la persona, al que le llegan los avisos.</span>
                 </div>
                 <div class="scd__field">
                   <label class="scd__lbl">Contraseña inicial</label>
@@ -1046,7 +758,6 @@ onMounted(async () => {
   min-height: 44px;
 }
 .scd__card-ico { color: #1b5e20; flex-shrink: 0; }
-.scd__card-ico--purple { color: #7c3aed; }
 .scd__card-ico--orange { color: #ea580c; }
 .scd__count { font-size: .72rem; font-weight: 700; background: var(--c-slate-100); color: var(--c-slate-500); padding: .1em .55em; border-radius: 6px; }
 .scd__link-btn {
@@ -1100,81 +811,8 @@ onMounted(async () => {
 .scd__user-email { font-size: .68rem; color: var(--c-slate-400); font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .scd__role-pill { font-size: .65rem; font-weight: 700; padding: .18em .55em; border-radius: 5px; white-space: nowrap; flex-shrink: 0; }
 
-/* Features */
-.scd__feat-body { padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
-/* Suites: lo que se vende, con más peso visual que los add-ons.
-   Estaban con la paleta del tema OSCURO (texto casi blanco, bordes translúcidos) dentro de
-   una card de fondo CLARO: el nombre de cada suite era ilegible. Todo el bloque va en la
-   misma paleta que el resto de la ficha. */
-.scd__suites { display: flex; flex-direction: column; gap: 10px; margin-bottom: 4px; }
-.scd__suite {
-  display: flex; align-items: center; gap: 14px; cursor: pointer;
-  padding: 14px 16px; border-radius: 12px;
-  border: 1.5px solid var(--c-slate-200); background: var(--c-slate-50);
-  transition: border-color .15s, background .15s;
-}
-.scd__suite:hover { border-color: var(--c-slate-300); }
-.scd__suite--on { border-color: #86efac; background: #f0fdf4; }
-.scd__suite-txt { flex: 1; }
-.scd__suite-name { font-size: 15px; font-weight: 700; color: var(--c-slate-900); }
-.scd__suite-desc { font-size: 12px; color: var(--c-slate-500); margin-top: 2px; line-height: 1.45; }
-.scd__feat-badge {
-  margin-left: 6px; font-size: 10px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .04em; padding: 1px 6px; border-radius: 4px;
-  background: #fef3c7; color: #92400e;
-}
-.scd__feat-req { font-size: 11px; color: var(--c-slate-500); margin-top: 3px; line-height: 1.4; }
-.scd__feat-req--warn { color: #b45309; }
-/* Baja programada: azul y no ámbar — no es un problema a resolver, es una fecha acordada. */
-.scd__feat-req--baja { color: #0369a1; font-weight: 600; }
-.scd__feat-toggle--warn { border-color: #fcd34d; }
-.scd__feat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px,1fr)); gap: .4rem; }
-
-/* Add-ons: cada uno con su configuración adentro */
-.scd__addons { display: flex; flex-direction: column; gap: .5rem; }
-.scd__addon { border: 1.5px solid var(--c-slate-200); border-radius: 10px; background: var(--c-slate-50); overflow: hidden; transition: border-color .15s, background .15s; }
-.scd__addon--on { border-color: #86efac; background: #fff; }
-.scd__addon--warn { border-color: #fcd34d; }
-.scd__addon-hd { display: flex; align-items: center; gap: .65rem; padding: .7rem .9rem; cursor: pointer; user-select: none; }
-.scd__addon-txt { flex: 1; min-width: 0; }
-.scd__addon-cfg { border-top: 1px solid var(--c-slate-200); background: var(--c-slate-50); padding: .9rem; display: flex; flex-direction: column; gap: .6rem; }
-.scd__cfg-hd { display: flex; align-items: center; gap: .5rem; font-size: .78rem; font-weight: 700; color: var(--c-slate-900); }
-.scd__cfg-row { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
-.scd__cfg-row .scd__input { flex: 1; min-width: 180px; }
-.scd__cfg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .5rem; }
-.scd__feat-badge--cfg { background: #fef3c7; color: #b45309; }
-.scd__feat-badge--ok  { background: #dcfce7; color: #15803d; }
-
-/* Ya incluido en la suite — sin interruptor, porque no hay nada que decidir */
-.scd__incluidos { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap: .5rem; }
-.scd__incluido {
-  display: flex; align-items: flex-start; gap: .6rem;
-  padding: .75rem .875rem; border: 1px dashed var(--c-slate-300);
-  border-radius: 10px; background: #f0fdf4;
-}
-.scd__incluido--off { background: var(--c-slate-50); opacity: .7; }
-
-/* Prendido y sin funcionar: lo que hay que resolver antes de mostrarle el club a nadie */
-.scd__amedias {
-  border: 1px solid #fcd34d; background: #fffbeb;
-  border-radius: 10px; padding: .75rem .875rem; margin-bottom: .875rem;
-}
-.scd__amedias-title { font-size: .78rem; font-weight: 800; color: #b45309; margin-bottom: .35rem; }
-.scd__amedias-list { margin: 0; padding-left: 1.1rem; display: grid; gap: .2rem; }
-.scd__amedias-list li { font-size: .74rem; color: #92400e; line-height: 1.4; }
-
-/* Todavía no disponible */
-.scd__construccion { display: grid; gap: .5rem; }
-.scd__constr-item {
-  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
-  padding: .75rem .875rem; border: 1px solid var(--c-slate-200);
-  border-radius: 10px; background: var(--c-slate-50);
-}
-.scd__constr-badge {
-  flex-shrink: 0; font-size: .62rem; font-weight: 800; text-transform: uppercase;
-  letter-spacing: .05em; color: var(--c-slate-500); background: var(--c-slate-200);
-  padding: .2rem .45rem; border-radius: 5px;
-}
+/* Los estilos de los módulos (suites, add-ons, incluidos, en construcción y sus paneles de
+   configuración) se fueron con el markup a SAModulos.vue. */
 
 .scd__input--mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .02em; }
 
@@ -1205,33 +843,6 @@ onMounted(async () => {
 .scd__susc-pill { background: #dcfce7; color: #15803d; }
 .scd__susc-pill--none { background: var(--c-slate-100); color: var(--c-slate-400); }
 .scd__susc-addons { font-size: .72rem; color: var(--c-slate-500); margin: .5rem 0 0; line-height: 1.45; }
-.scd__feat-toggle {
-  display: flex; align-items: center; gap: .65rem; padding: .65rem .875rem;
-  border-radius: 10px; border: 1.5px solid var(--c-slate-200); background: var(--c-slate-50);
-  cursor: pointer; transition: border-color .15s, background .15s; user-select: none;
-}
-.scd__feat-toggle--on { border-color: #bbf7d0; background: #f0fdf4; }
-.scd__feat-left { display: flex; align-items: center; gap: .55rem; flex: 1; min-width: 0; }
-.scd__feat-ico  { font-size: .9rem; flex-shrink: 0; }
-.scd__feat-name { font-size: .78rem; font-weight: 700; color: var(--c-slate-900); }
-.scd__feat-desc { font-size: .68rem; color: var(--c-slate-500); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.scd__divider {
-  display: flex; align-items: center; gap: .75rem;
-  color: var(--c-slate-400); font-size: .68rem; font-weight: 700;
-  text-transform: uppercase; letter-spacing: .06em;
-}
-.scd__divider::before, .scd__divider::after { content: ''; flex: 1; height: 1px; background: var(--c-slate-200); }
-.scd__ia-tiers { display: flex; flex-direction: column; gap: .4rem; }
-.scd__ia-tier {
-  display: flex; flex-direction: column; gap: .1rem; align-items: flex-start;
-  padding: .6rem .875rem; border-radius: 8px; border: 1.5px solid var(--c-slate-200);
-  background: var(--c-slate-50); cursor: pointer; text-align: left; transition: all .15s;
-}
-.scd__ia-tier strong { font-size: .82rem; }
-.scd__ia-tier span   { font-size: .7rem; color: var(--c-slate-500); }
-.scd__ia-tier--active span { color: inherit; opacity: .8; }
-.scd__ia-tier:hover { border-color: var(--c-slate-400); }
-.scd__ia-limit { display: flex; flex-direction: column; gap: .3rem; max-width: 200px; }
 
 /* Toggle (checkbox) */
 .scd__chk { display: none; }
@@ -1251,11 +862,6 @@ onMounted(async () => {
 @media (max-width: 580px) { .scd__smtp-grid { grid-template-columns: 1fr; } }
 .scd__smtp-footer { display: flex; justify-content: flex-end; margin-top: 1rem; }
 
-/* Badges */
-.scd__ok-badge   { font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; background: #dcfce7; color: #15803d; padding: .2em .65em; border-radius: 6px; }
-.scd__warn-badge { font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; background: #fef3c7; color: #b45309; padding: .2em .65em; border-radius: 6px; }
-.scd__saved-badge { display: inline-flex; align-items: center; gap: .25rem; font-size: .65rem; font-weight: 700; background: #dcfce7; color: #15803d; padding: .2em .65em; border-radius: 6px; }
-
 /* Form primitives */
 .scd__field { display: flex; flex-direction: column; gap: .3rem; }
 .scd__field--full { grid-column: 1 / -1; }
@@ -1267,7 +873,6 @@ onMounted(async () => {
   width: 100%; box-sizing: border-box; transition: border .15s;
 }
 .scd__input:focus { outline: none; border-color: #1b5e20; box-shadow: 0 0 0 3px rgba(27,94,32,.08); background: #fff; }
-.scd__input--sm { width: 100%; }
 .scd__alert { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .65rem .875rem; border-radius: 8px; font-size: .82rem; }
 .scd__grid { display: grid; grid-template-columns: 1fr 1fr; gap: .875rem; }
 

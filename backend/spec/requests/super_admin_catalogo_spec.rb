@@ -65,6 +65,26 @@ RSpec.describe 'SuperAdmin catálogo', type: :request do
       expect(ariccame['requiere']).to be_present
     end
 
+    # Los tramos de IA estaban escritos a mano en el template del panel, con los topes POR HORA
+    # copiados en un array (`[20,60,200]`). Cambiar un tramo acá dejaba a la pantalla mostrando
+    # y guardando el número viejo: la misma duplicación que ya había pasado con los módulos.
+    it 'devuelve los tramos de IA con sus dos topes' do
+      tiers = catalogo['ia_tiers']
+
+      expect(tiers.map { |t| t['clave'] }).to eq(%w[basico pro enterprise])
+      expect(tiers).to all(include('label' => be_present, 'limite_hora' => be_present,
+                                   'limite_mes' => be_present))
+    end
+
+    # Lo que se COBRA es el mensual: el horario es freno de ráfaga. Si el catálogo no lo
+    # mandara, el panel volvería a mostrar el que menos importa.
+    it 'los tramos coinciden con los del modelo, que es donde se aplican' do
+      basico = catalogo['ia_tiers'].find { |t| t['clave'] == 'basico' }
+
+      expect(basico['limite_mes']).to  eq(Club::IA_TIERS['basico'][:limite_mes])
+      expect(basico['limite_hora']).to eq(Club::IA_TIERS['basico'][:limite_hora])
+    end
+
     # Supervisor, abogado y auditor existen, pero no son parte del arranque de un club.
     it 'ofrece sólo los roles del alta' do
       roles = catalogo['roles_alta'].map { |r| r['clave'] }

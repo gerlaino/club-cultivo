@@ -378,6 +378,15 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       plan_info:       PlanEnforcer.new(c).info,
       ia_tier:         c.ia_tier,
       ia_limite_hora:  c.ia_limite_hora,
+      # Cuánto lleva consumido este mes. Se medía desde el 11-ago y no se veía en ningún lado:
+      # se podía fijar el tope sin poder mirar contra qué. Sólo se calcula si tiene el add-on —
+      # son seis sumas sobre `ia_llamadas` y no tiene sentido pagarlas para una organización
+      # que no usa IA.
+      #
+      # `with_tenant` es obligatorio: el super admin NO tiene tenant fijado (no opera ninguna
+      # organización) y `IaLlamada` es tenant con `require_tenant=true`, así que sin esto la
+      # ficha entera revienta con NoTenantSet. El bloque restaura el tenant anterior al salir.
+      ia_uso:          c.feature?('ia') ? ActsAsTenant.with_tenant(c) { Ia::Uso.resumen_mes(c) } : nil,
       whatsapp_estado:      c.whatsapp_estado,
       whatsapp_numero:      c.whatsapp_numero,
       twilio_configurado:   c.twilio_configurado?,

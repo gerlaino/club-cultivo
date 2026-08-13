@@ -46,18 +46,23 @@ class SuperAdmin::UsersController < SuperAdmin::BaseController
 
   private
 
+  # `email` es el identificador de LOGIN y `email_personal` el mail real de la persona (ver
+  # `User#email_notificacion`). El alta desde el panel sólo aceptaba el primero, así que un
+  # usuario creado desde acá nacía sin dirección a la que escribirle: los avisos salían al
+  # login, que puede ser inventado, y rebotaban.
   def user_params
-    params.require(:user).permit(:email, :first_name, :last_name, :role)
+    params.require(:user).permit(:email, :email_personal, :first_name, :last_name, :role)
   end
 
   def user_params_update
-    params.require(:user).permit(:email, :first_name, :last_name, :role, :password)
+    params.require(:user).permit(:email, :email_personal, :first_name, :last_name, :role, :password)
   end
 
   def serialize_user(u)
     {
       id:         u.id,
       email:      u.email,
+      email_personal: u.email_personal,
       role:       u.role,
       first_name: u.first_name,
       last_name:  u.last_name,

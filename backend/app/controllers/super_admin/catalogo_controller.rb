@@ -36,6 +36,13 @@ class SuperAdmin::CatalogoController < SuperAdmin::BaseController
       },
       roles_alta: Club::ROLES_ALTA.map { |r| { clave: r, label: Club::ROLES_META.dig(r, :label),
                                                desc: Club::ROLES_META.dig(r, :desc) } },
+      # Los tramos de IA con sus DOS topes. El panel los duplicaba a mano (`[20,60,200]` escrito
+      # en el template), así que cambiar un tramo acá dejaba a la pantalla escribiendo el valor
+      # viejo: la misma duplicación que ya había pasado con la lista de módulos.
+      ia_tiers: Club::IA_TIERS.map { |clave, t|
+        { clave: clave, label: t[:label], limite_hora: t[:limite_hora],
+          limite_mes: t[:limite_mes], color: t[:color] }
+      },
       password_default: Club::PASSWORD_DEFAULT,
     }
   end
