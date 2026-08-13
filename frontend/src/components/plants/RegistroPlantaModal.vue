@@ -263,7 +263,7 @@ watch(() => props.modelValue, (open) => {
 })
 
 const fechaHoy = new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })
-const voiceEnabled = computed(() => club.data?.features?.ia_voz)
+const voiceEnabled = computed(() => club.data?.features?.ia)
 const contextoAsistente = computed(() => props.planta ? {
   tipo: 'planta', planta_id: props.planta.id,
   planta_nombre: props.planta.nombre || props.planta.codigo_qr,

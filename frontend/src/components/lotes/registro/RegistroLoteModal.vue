@@ -232,7 +232,7 @@ watch(() => props.modelValue, (open) => {
 
 const fechaHoy = new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })
 
-const voiceEnabled = computed(() => club.data?.features?.ia_voz)
+const voiceEnabled = computed(() => club.data?.features?.ia)
 const contextoAsistente = computed(() => {
   if (!props.lote) return null
   return {

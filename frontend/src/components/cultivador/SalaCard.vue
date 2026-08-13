@@ -54,7 +54,7 @@
         Ver detalle
         <ChevronRight :size="14" :stroke-width="1.75" />
       </RouterLink>
-      <div v-if="club.data?.features?.ia_voz" class="sc__av-wrap" title="Registrar por voz (IA)">
+      <div v-if="club.data?.features?.ia" class="sc__av-wrap" title="Registrar por voz (IA)">
         <AsistenteVoz :mini="true" :contexto="contextoSala" />
       </div>
       <button class="sc__btn sc__btn--secondary" @click.prevent="$emit('registrar-lectura', sala)">

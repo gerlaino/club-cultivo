@@ -340,6 +340,11 @@ class Club < ApplicationRecord
     INCLUIDOS_EN_SUITE.each { |modulo, suite| base[modulo] = true if base[suite] == true }
     FEATURES_LEGACY.each do |viejo, nuevo|
       base[viejo] = true if base[nuevo] == true
+      # Y al revés: una organización con la clave VIEJA guardada tiene la capacidad nueva. Sin
+      # esto, `feature?('ia')` decía true (lo deriva de `ia_voz`) mientras esta lista decía
+      # false, así que el backend dejaba pasar y la pantalla escondía el botón — el módulo
+      # quedaba contratado e invisible, que es la peor de las dos respuestas.
+      base[nuevo] = true if base[viejo] == true && !EN_CONSTRUCCION.key?(nuevo)
     end
     base
   end

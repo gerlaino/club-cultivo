@@ -696,7 +696,7 @@ onUnmounted(() => {
           <LotePLCard v-if="canAdmin" :lote-id="id" class="ld__card--mt" />
 
           <!-- Análisis IA — solo si la organización tiene IA habilitada -->
-          <LoteIACard v-if="club.data?.features?.ia_analisis && canAdmin" :lote-id="id" class="ld__card--mt" />
+          <LoteIACard v-if="club.data?.features?.ia && canAdmin" :lote-id="id" class="ld__card--mt" />
 
         </div>
       </div>

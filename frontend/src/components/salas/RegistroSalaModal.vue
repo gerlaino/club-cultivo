@@ -151,7 +151,7 @@ const emit = defineEmits(['update:modelValue', 'saved'])
 const toast = useToast()
 const club  = useClubStore()
 
-const voiceEnabled     = computed(() => club.data?.features?.ia_voz)
+const voiceEnabled     = computed(() => club.data?.features?.ia)
 const contextoAsistente = computed(() => props.sala ? {
   tipo:        'sala',
   sala_id:     props.sala.id,

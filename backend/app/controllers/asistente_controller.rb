@@ -1,4 +1,11 @@
 class AsistenteController < BaseController
+  # El módulo se chequea UNA vez, acá. Cada acción repetía además
+  # `club.feature?(:ia_voz)` / `feature?(:ia_analisis)` —las claves VIEJAS— y eso rompía el
+  # registro por voz para toda organización moderna: `feature?` resuelve el nombre nuevo hacia
+  # los viejos (`ia` ⇒ `ia_voz`), pero no al revés, así que con `ia: true` guardado daba **false**
+  # y el endpoint respondía "no está disponible para este club". El botón sí se veía, porque la
+  # pantalla lee `features_expandidas`, que sí lo deriva: prendido en el panel, prendido en el
+  # menú y rechazado al dictar.
   before_action -> { require_feature!(:ia) }
   require 'net/http'
   require 'json'
@@ -113,8 +120,6 @@ class AsistenteController < BaseController
 
   # POST /asistente/parsear
   def parsear
-    return render json: { error: 'El registro por voz no está disponible para este club.' }, status: :forbidden unless current_user.club.feature?(:ia_voz)
-
     texto    = params[:texto].to_s.strip
     contexto = params[:contexto]
 
@@ -141,8 +146,6 @@ class AsistenteController < BaseController
 
   # POST /asistente/consultar
   def consultar
-    return render json: { error: 'El registro por voz no está disponible para este club.' }, status: :forbidden unless current_user.club.feature?(:ia_voz)
-
     texto    = params[:texto].to_s.strip
     contexto = params[:contexto]
 
@@ -166,7 +169,6 @@ class AsistenteController < BaseController
   # POST /asistente/analizar_lote
   def analizar_lote
     return render json: { error: 'No tenés permiso para usar análisis IA.' }, status: :forbidden unless current_user.admin? || current_user.supervisor?
-    return render json: { error: 'El análisis de IA no está disponible para este club.' }, status: :forbidden unless current_user.club.feature?(:ia_analisis)
     if (msg = limite_ia)
       return render json: { error: msg, limite_ia: true }, status: :too_many_requests
     end
@@ -212,8 +214,6 @@ class AsistenteController < BaseController
 
   # POST /asistente/ejecutar
   def ejecutar
-    return render json: { error: 'El registro por voz no está disponible para este club.' }, status: :forbidden unless current_user.club.feature?(:ia_voz)
-
     acciones = params[:acciones] || []
     return render json: { error: 'Demasiadas acciones en una sola llamada (máx: 15)' }, status: :unprocessable_entity if acciones.size > 15
 
