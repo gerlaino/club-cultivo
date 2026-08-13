@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { useAuthStore }   from "../stores/auth";
+import { useClubStore }   from "../stores/club";
 import { usePermissions } from "../composables/usePermissions";
 import { useToast }       from "../composables/useToast";
 import { usePWA }         from "../composables/usePWA";
@@ -1033,7 +1034,56 @@ export function puedeEntrar(role, path) {
   return permitidos.some(p => path === p || (p !== '/' && path.startsWith(p + '/')) || (p === '/' && path === '/'))
 }
 
-export { ROLE_ALLOWED_PREFIX, ROLE_HOME, MOBILE_ROLES, MOBILE_HOME }
+// ── Qué módulo necesita cada sección ────────────────────────────────────────────
+//
+// Por PREFIJO y en una sola tabla, no ruta por ruta: son 151 rutas y marcar cada una en su
+// `meta` es acordarse en cada alta. Gana el prefijo más largo, así /bar/eventos pide Eventos
+// y no sólo el Buffet.
+//
+// Sólo se listan los módulos que se CONTRATAN y se dan de baja. Las secciones transversales
+// (dashboard, perfil, sedes, tareas, reportes, configuración) no llevan bandera: son de toda
+// organización y colgarlas de una suite ya hizo desaparecer secciones que hacían falta.
+const FEATURE_POR_PREFIJO = [
+  ['/salas',                'cultivo'],
+  ['/lotes',                'cultivo'],
+  ['/plantas',              'cultivo'],
+  ['/geneticas',            'cultivo'],
+  ['/cosechado',            'cultivo'],
+  ['/admin/cosechado',      'cultivo'],
+  ['/admin/pesajes-manicura', 'cultivo'],
+  ['/pacientes',            'produccion_dispensa'],
+  ['/socios',               'produccion_dispensa'],
+  ['/historial',            'produccion_dispensa'],
+  ['/reservas',             'produccion_dispensa'],
+  ['/bar',                  'bar'],
+  ['/bar/eventos',          'eventos'],
+  ['/delivery',             'delivery'],
+  ['/entregas',             'delivery'],
+  ['/dispositivos',         'iot'],
+  ['/reglas-ambientales',   'iot'],
+  ['/configuracion/correo', 'mailer'],
+  ['/ariccame',             'ariccame'],
+]
+
+const MODULO_LABEL = {
+  cultivo: 'La suite de Cultivo', produccion_dispensa: 'La suite de Producción y dispensa',
+  bar: 'El Buffet', eventos: 'Eventos', delivery: 'Delivery', iot: 'Ambiente / IoT',
+  mailer: 'Correo electrónico', ariccame: 'ARICCAME',
+}
+
+// Qué módulo exige esta ruta, o null si no exige ninguno. Exportada para poder verificar la
+// tabla sin montar el router.
+export function moduloRequerido(path) {
+  let mejor = null, largo = -1
+  for (const [prefijo, feature] of FEATURE_POR_PREFIJO) {
+    if ((path === prefijo || path.startsWith(prefijo + '/')) && prefijo.length > largo) {
+      mejor = feature; largo = prefijo.length
+    }
+  }
+  return mejor
+}
+
+export { ROLE_ALLOWED_PREFIX, ROLE_HOME, MOBILE_ROLES, MOBILE_HOME, MODULO_LABEL }
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
@@ -1118,6 +1168,24 @@ router.beforeEach(async (to) => {
       useToast().warning(
         `No tenés acceso a esa sección con tu rol (${role}). ` +
         'Si creés que deberías tenerlo, pedíselo a un administrador del club.'
+      )
+      return ROLE_HOME[role] || '/'
+    }
+  }
+
+  // Módulo no contratado: el menú ya esconde la sección, pero la URL seguía entrando.
+  // Escribir /ariccame a mano abría la pantalla y recién ahí el backend contestaba 403, así
+  // que se veía un cascarón vacío con un error suelto en vez de una explicación.
+  const moduloFaltante = moduloRequerido(to.path)
+  if (auth.isAuthenticated && !to.meta.public && moduloFaltante) {
+    const club = useClubStore()
+    // Sólo se bloquea con las features YA cargadas: si todavía no llegó `/preferences` no se
+    // puede afirmar que falte nada, y rebotar por una carrera de carga es peor que dejar pasar
+    // (el backend sigue siendo la barrera real).
+    if (club.data?.features && club.data.features[moduloFaltante] !== true) {
+      useToast().warning(
+        `${MODULO_LABEL[moduloFaltante] || 'Ese módulo'} no está contratado por tu organización. ` +
+        'Escribinos si querés activarlo.'
       )
       return ROLE_HOME[role] || '/'
     }

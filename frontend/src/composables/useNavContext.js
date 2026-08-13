@@ -51,10 +51,15 @@ export const NAV_GROUPS = [
     key: 'deposito', label: 'Depósito', to: '/insumos', tabs: [],
   },
   {
-    key: 'comercial', label: 'Comercial', to: '/contabilidad',
+    // Reservas y cuenta corriente son de la suite de dispensa: una organización de sólo Cultivo
+    // veía el grupo entero y entraba a pantallas que el backend le rechaza. Contabilidad queda
+    // adentro por ser su destino principal — no tiene bandera propia, así que una organización
+    // de sólo Cultivo llega a sus números por Reportes.
+    key: 'comercial', label: 'Comercial', to: '/contabilidad', feature: 'produccion_dispensa',
     tabs: [
       { to: '/reservas', label: 'Reservas' },
-      { to: '/delivery/despachos', label: 'Despachos' },
+      // Despachos es Delivery, que desde el 11-ago se contrata aparte.
+      { to: '/delivery/despachos', label: 'Despachos', feature: 'delivery' },
       { to: '/contabilidad', label: 'Contabilidad' },
     ],
   },
