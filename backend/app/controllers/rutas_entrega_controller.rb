@@ -1,6 +1,10 @@
 class RutasEntregaController < ApplicationController
   before_action :authenticate_user!
   before_action -> { require_feature!(:produccion_dispensa) }
+  # Una ruta de reparto es Delivery, no la suite entera. Cuando Delivery pasó a ser un add-on
+  # (11-ago) se gateó el ROL pero no los endpoints: con el módulo apagado, un admin —que no
+  # depende del rol— seguía armando rutas de un módulo que la organización no tiene contratado.
+  before_action -> { require_feature!(:delivery) }
   before_action :require_admin_o_supervisor!, only: [:bloqueo]
 
   # GET /rutas_entrega?delivery_id=&fecha=

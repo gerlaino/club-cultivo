@@ -115,6 +115,7 @@ class Dispensacion < ApplicationRecord
   # update. Si no, marcar 'entregado'/'fallido' (que re-guarda) podía romper con 422
   # cuando un despacho viejo tenía algún campo de envío vacío.
   validate  :delivery_fields_presentes, on: :create, if: :con_envio?
+  validate  :delivery_contratado,       on: :create, if: :con_envio?
 
   # Una dispensación cancelada conserva su registro e historia, pero NO cuenta como
   # dispensada (se revirtió stock y plata). Excluila de todo agregado de cantidad/conteo.
@@ -184,6 +185,18 @@ class Dispensacion < ApplicationRecord
 
     errors.add(:base, "#{paciente.nombre_completo} está pendiente de aprobación: " \
                       'un administrador o el médico tiene que aprobarlo antes de dispensarle.')
+  end
+
+  # Despachar exige tener Delivery contratado. Va en el modelo por el mismo motivo que la
+  # aprobación del paciente: es el punto por el que pasa toda dispensa con envío, y el candado
+  # del controller sólo cubre las pantallas de reparto — el envío se marca al CREAR la
+  # dispensación, que es un endpoint de la suite. Sin esto, apagar Delivery dejaba el checkbox
+  # "con envío" funcionando y generando paquetes que nadie puede repartir.
+  def delivery_contratado
+    club = paciente&.club
+    return if club.nil? || club.feature?('delivery')
+
+    errors.add(:base, 'El módulo Delivery no está contratado: la dispensación no puede salir con envío.')
   end
 
   def stock_pertenece_al_club

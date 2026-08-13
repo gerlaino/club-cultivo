@@ -81,9 +81,17 @@ RSpec.describe 'Baja programada del módulo Delivery', type: :request do
       d
     end
 
-    before { club.programar_baja_modulo!('delivery', hasta: Date.current - 1.day) }
+    # El orden es el de la vida real y acá importa: los repartos se cargaron MIENTRAS el módulo
+    # estaba contratado y la baja vence después. Al revés no existen — `Dispensacion` rechaza al
+    # CREAR una dispensa con envío sin Delivery contratado —, que es justo lo que se busca: lo
+    # que se termina de repartir es lo que ya estaba en la calle, no lo que se cargue después.
+    def vencer_baja!
+      club.programar_baja_modulo!('delivery', hasta: Date.current - 1.day)
+    end
 
     it 'apaga la bandera y limpia la baja' do
+      vencer_baja!
+
       AplicarBajasModulosJob.new.perform
 
       expect(club.reload.features['delivery']).to be_nil
@@ -92,6 +100,7 @@ RSpec.describe 'Baja programada del módulo Delivery', type: :request do
 
     it 'suelta los repartos que todavía no salieron' do
       pendiente = envio('pendiente')
+      vencer_baja!
 
       AplicarBajasModulosJob.new.perform
 
@@ -100,6 +109,7 @@ RSpec.describe 'Baja programada del módulo Delivery', type: :request do
 
     it 'NO toca lo que ya está en viaje: se termina lo que arrancó' do
       en_viaje = envio('en_viaje')
+      vencer_baja!
 
       AplicarBajasModulosJob.new.perform
 
@@ -108,6 +118,7 @@ RSpec.describe 'Baja programada del módulo Delivery', type: :request do
 
     it 'avisa al admin que quedaron entregas sin responsable' do
       envio('pendiente')
+      vencer_baja!
 
       expect { AplicarBajasModulosJob.new.perform }
         .to change { AlertaInterna.where(tipo: 'modulo_dado_de_baja').count }.by(1)

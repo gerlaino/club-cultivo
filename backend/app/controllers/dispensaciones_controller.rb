@@ -10,6 +10,14 @@ class DispensacionesController < ApplicationController
   before_action :authenticate_user!
 
   before_action -> { require_feature!(:produccion_dispensa) }
+  # Las acciones de reparto exigen el add-on Delivery, no sólo la suite.
+  #
+  # `entregar` y `reportar_fallo` quedan AFUERA a propósito: son los cierres. Si una baja de
+  # Delivery vence con paquetes en viaje, hay que poder registrar cómo terminaron — es la misma
+  # decisión que ya tomó `AplicarBajasModulosJob`, que suelta los pendientes y no toca lo que
+  # está en la calle. Bloquear el cierre dejaría esos envíos colgados para siempre.
+  before_action -> { require_feature!(:delivery) },
+                only: [:mis_paquetes, :mi_historial, :iniciar_viaje, :reprogramar, :entregadores]
   before_action :require_dispensaciones_role!
   before_action :require_dispensador_o_admin, except: [:index, :show, :iniciar_viaje, :entregar, :reportar_fallo, :cancelar_entrega, :mis_paquetes, :mi_historial, :export_csv, :entregadores]
   before_action :set_paciente,     only: [:create]
