@@ -28,13 +28,21 @@ class NotificacionDeliveryService
   def enviar(mensaje)
     telefono = @d.contacto_telefono.presence || @d.paciente&.telefono.presence
 
-    if @club&.twilio_configurado? && telefono.present?
+    # El add-on manda, no las credenciales. Sin este chequeo, una organización a la que se le
+    # apagó WhatsApp seguía mandando mensajes —y pagándolos— mientras el Twilio siguiera
+    # cargado: el interruptor del panel no controlaba nada. Cuando está apagado el aviso sale
+    # por mail, que es el canal de siempre, en vez de perderse.
+    if whatsapp_habilitado? && telefono.present?
       enviar_whatsapp(mensaje, telefono)
     else
       enviar_email(mensaje)
     end
   rescue => e
     Rails.logger.error("[NotificacionDelivery] Error: #{e.message}")
+  end
+
+  def whatsapp_habilitado?
+    @club&.feature?('whatsapp') && @club.twilio_configurado?
   end
 
   def enviar_whatsapp(mensaje, telefono)
