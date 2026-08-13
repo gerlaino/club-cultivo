@@ -1,5 +1,223 @@
 # Changelog
 
+## Agosto 2026 (p) — lo que se contrata, aplicado de punta a punta
+
+El bloque anterior convirtió Delivery, Correo e IA en módulos que se venden y se dan de baja.
+Este cierra la otra mitad: que **prender y apagar cambie algo de verdad** en las tres capas —la
+pantalla, la URL y la API—, porque un interruptor que no controla nada es peor que no tenerlo.
+
+**El registro por voz estaba roto para toda organización moderna, y el botón se veía igual.**
+`features` guarda la clave nueva (`ia`) y cada acción del asistente chequeaba además la vieja
+(`ia_voz`). `feature?` resuelve viejo ⇒ nuevo, **no al revés**, así que devolvía false y el
+endpoint contestaba "no está disponible para este club" mientras la pantalla mostraba el botón:
+`features_expandidas` —lo que lee el frontend— sí lo derivaba. **Prendido en el panel, prendido
+en el menú y rechazado al dictar**, que es la peor de las tres combinaciones porque parece un
+error de la persona. Ahora `features_expandidas` deriva en los DOS sentidos (menos lo que está
+en construcción, que no se enciende por la puerta de atrás) y el módulo se chequea **una sola
+vez, en un `before_action`**: las cuatro acciones repetían el suyo con la clave equivocada.
+
+**Delivery: se gateó el rol y se olvidaron los endpoints.** El repartidor no podía entrar, pero
+el admin no depende del rol — seguía armando rutas y marcando envíos de un módulo que la
+organización no tiene contratado. Ahora lo piden `rutas_entrega` y las acciones de reparto. **La
+excepción es el punto importante:** `entregar` y `reportar_fallo` quedan afuera. Con el módulo
+apagado el repartidor no puede ni loguearse, así que si el cierre también estuviera bloqueado no
+quedaría **nadie** que pudiera registrar cómo terminó un paquete que ya está en la calle: se
+quedarían abiertos para siempre. Es la misma decisión que ya tomaba `AplicarBajasModulosJob`, que
+suelta lo pendiente y no toca lo que está en viaje. Y el candado de verdad va en el modelo: el
+envío se marca al CREAR la dispensación, que es un endpoint de la suite, así que sin
+`Dispensacion#delivery_contratado` apagar Delivery dejaba el checkbox "con envío" funcionando y
+generando paquetes que nadie puede repartir. Es `on: :create`: lo que ya existe se sigue pudiendo
+cerrar.
+
+**WhatsApp: el interruptor manda, no las credenciales.** El servicio elegía el canal mirando
+sólo si Twilio estaba cargado, así que a una organización a la que se le apagaba el add-on le
+seguían saliendo —y cobrándose— los mensajes. Apagado, el aviso sale por mail, que es el canal
+de siempre, en vez de perderse.
+
+**La URL entraba aunque el menú escondiera la sección.** Escribir `/ariccame` a mano abría la
+pantalla y recién ahí el backend contestaba 403: se veía un cascarón vacío con un error suelto.
+El router ahora resuelve **qué módulo exige cada sección por PREFIJO, en una sola tabla** —son
+151 rutas y marcar cada una en su `meta` es acordarse en cada alta—, gana el prefijo más largo
+(`/bar/eventos` pide Eventos, no sólo el Buffet) y las secciones transversales no llevan bandera
+a propósito. Sólo bloquea con las features ya cargadas: rebotar por una carrera de arranque sería
+peor que dejar pasar, porque el backend sigue siendo la barrera real. En el menú, **Comercial**
+pasa a depender de la suite de dispensa y **Despachos** de Delivery.
+
+**Los módulos del super admin salen de la ficha y tienen pantalla propia** (`SAModulos`), y
+cambia la mecánica: **cada interruptor se guarda solo**. Había un "Guardar" arriba de una lista
+larga — se tildaban tres módulos, se cambiaba de pestaña y no se había guardado ninguno.
+Confirmar dos veces una decisión de una sola cosa no la hace más segura, la hace más fácil de
+perder; lo único que pregunta antes es la **baja**, que tiene consecuencias y una fecha que hay
+que leer. **La IA queda con un solo control:** había dos perillas y la que estaba a la vista era
+la que menos importa (el tope por hora), cuando lo que se cobra es el mensual. Y **se ve el
+consumo del mes** —llamadas contra tope, costo, hit ratio del caché y apertura por función—: se
+medía desde el 11-ago y no se exponía en ningún lado, así que se fijaba el tope sin poder mirar
+contra qué. Los tramos ahora los manda `GET /super_admin/catalogo`: estaban copiados a mano en el
+template, la misma duplicación que ya había pasado con la lista de módulos. Y el alta de usuarios
+del panel acepta **`email_personal`**: confundía el identificador de login con el mail real de la
+persona, así que el usuario nacía sin dirección a la que escribirle y los avisos rebotaban.
+
+**Cierre: 2029+ rspec ✓ · 1264 vitest ✓.** Los tests nuevos incluyen el que faltaba de la tabla
+de rutas, el de la pantalla de módulos **montada** (no compilada) y el del canal de WhatsApp sin
+stubear a Twilio.
+
+---
+
+## Agosto 2026 (o) — organizaciones, el correo como módulo y la IA que se puede cobrar
+
+**Club → Organización en todo el texto visible** (76 archivos entre frontend, backend, informes
+y mailers). El producto no es sólo para clubes: también para investigación y producción. Se
+cambia lo que se LEE; identificadores, rutas, clases CSS, stores, el modelo `Club` y `club_id`
+quedan igual — misma regla que Socio → Paciente. Lo caro del rename es la concordancia (club es
+masculino, organización femenino). De paso: **"Club Cultivo" es el nombre del REPOSITORIO, no
+del producto** — el producto es **Cultivo Espacial**, y estaba mal en 15 archivos que ve el
+usuario, incluidos los pies de todos los mailers y el prompt del asistente.
+
+**El super admin ya no revienta fuera de su panel.** Es el único rol sin club: `current_user.club`
+es nil y el tenant queda sin fijar, así que cualquier endpoint de organización —una pestaña
+vieja, un link pegado— moría con un 500 pelado (hay 180 usos de `current_user.club.algo` fuera
+del panel). Ahora `block_super_admin_sin_contexto!` responde **409 diciendo qué falta y cómo
+conseguirlo**: abrir la organización desde el panel. Observando sí hay tenant, así que pasa de
+largo.
+
+**Cuánto IA consume cada organización, y un tope que se pueda cobrar.** No había forma de
+contestar "cuánto consumió esta organización en julio": el rate limit vivía en Redis con TTL de
+una hora y el consumo no se guardaba. `ia_llamadas` guarda cada llamada con organización,
+persona, función, modelo, tokens y **el costo congelado** —los precios por millón cambian y un
+informe de julio tiene que seguir diciendo lo que costó julio—; un modelo que no esté en la tabla
+de precios se cobra al más caro conocido, porque cobrar de menos pasa desapercibido. Registran
+las cinco funciones (asistente parsear y consultar, análisis de lote, plan de trabajo, mapeo de
+CSV), también las fallidas, que cuestan igual.
+
+Con eso se cerraron **tres bugs del rate limit**: contaba por USUARIO cuando el límite es de la
+organización (cinco personas en básico daban 100 llamadas/hora en vez de 20); sólo lo chequeaba
+el asistente, así que análisis de lote, plan de trabajo e importación de CSV eran ilimitados; y
+`rescue false` dejaba de aplicar el límite en silencio si Redis se caía. Ahora **manda el tope
+MENSUAL**, que se cuenta contra la base y no depende de Redis; el horario queda como freno de
+ráfaga.
+
+**Caché de prompt en el asistente.** El bloque fijo son ~1.400 tokens idénticos en cada dictado
+de cada cultivador y se pagaban enteros todas las veces: el 90% del volumen de IA. `system` pasa
+a ser un array de dos bloques —el fijo con `cache_control`, que se lee a 0,1×, y el contexto
+después del corte—. `consultar` queda como estaba a propósito: su parte estable son ~60 tokens
+contra un mínimo cacheable de 1024, y el marcador ahí no ahorraría nada. Para poder medirlo,
+`costo_de` aprendió a sumar los tokens escritos y leídos de caché, y `resumen_mes` informa el
+**hit ratio**: si queda en 0 con el asistente en uso, algo está invalidando el prefijo.
+
+**El panel del super admin pasa de lista de avisos a cola de trabajo.** No faltaba información:
+faltaba que cada fila dijera qué hacer. Ahora cada pendiente lleva su acción —Cobrar y renovar ·
+Asignar suite · Completar configuración · Revisar sensores— y se agrupa por urgencia con el
+motivo escrito: **Se está perdiendo plata** · **Paga y no le funciona** · **Avisar con tiempo**.
+El orden es por plata, no por tipo de problema.
+
+**Delivery y Correo pasan a ser módulos contratables**, y con ellos aparece la baja que respeta
+lo pagado. `delivery` era un rol suelto: toda organización con Producción y dispensa podía
+repartir. **Una baja no corta el servicio: fija una fecha** (`features_baja` guarda hasta cuándo
+sigue andando; volver a prenderlo antes la cancela). Cuando llega, `AplicarBajasModulosJob` apaga
+la bandera y **deja ordenado lo que el módulo dejaba colgando**: en Delivery suelta los repartos
+que no salieron y avisa al admin, pero **lo que está EN VIAJE no se toca** —cortarlo dejaría al
+repartidor con producto y sin poder registrar la entrega—. Las dos migraciones llevan backfill
+obligatorio: sin él, el día del deploy las organizaciones que ya usaban el módulo se quedaban sin
+él.
+
+**El correo tiene pantalla propia y plantillas de cada organización.** Sale de Configuración →
+General, donde estaba mezclado con el nombre y el logo, y pasa a su solapa: primero la casilla,
+después las plantillas, porque sin casilla conectada las plantillas no sirven — y la pantalla lo
+dice en vez de ofrecer un editor que no manda. Eran cuatro textos hardcodeados en el frontend
+mientras el backend validaba sus NOMBRES: la plantilla de un lado y su validación del otro. Las
+variables `{{nombre}}` se resuelven por `gsub` contra una **lista blanca cerrada, nunca ERB**: es
+texto de usuario y evaluarlo sería ejecución de código en el servidor (hay un test que le mete
+`<%= User.first.email %>` y verifica que salga literal). La bienvenida ahora viaja EN el alta y
+sale **cuando corresponde**: admin y médico en el acto; el mostrador, recién al aprobar.
+
+**Envíos masivos, con una regla que ordena todo: un mail por destinatario.** La selección
+múltiple es de la interfaz; el backend arma un destinatario por persona. Con todos juntos en el
+`To:` —o en BCC— cada paciente recibiría el padrón completo: nombre y mail de todos los demás.
+Es una fuga de datos de salud (Ley 25.326) y no se puede deshacer; hay un test que verifica que
+cada mensaje entregado tenga exactamente UNA dirección. **Tope diario propio de 450**, por debajo
+de los ~500 de Gmail: pasarse no nos afecta a nosotros, le **suspenden la casilla al cliente** —
+y con ella se cae hasta el mail de bienvenida. Se chequea ANTES de crear el envío, nunca a mitad
+de camino. Quien no tiene dirección queda afuera **con nombre y apellido**: un contador de "3
+salteados" no sirve; saber a quién llamar por teléfono, sí.
+
+**El alta desde el mostrador pasa a ser una solicitud, no una admisión.** Verificar el REPROCANN
+contra el certificado y el consentimiento de datos de salud no es trabajo de mostrador con la
+persona esperando adelante — pero tampoco se puede mandar de vuelta a quien llega. El dispensador
+y el supervisor cargan la ficha y queda **pendiente**: existe, se completa, y no recibe
+dispensaciones ni reservas hasta que admin o médico la aprueben. **El bloqueo vive en los modelos**
+(`Dispensacion` y `Reserva`), que es por donde pasa toda entrega. El default se invirtió a
+propósito: un alta nace aprobada salvo que venga del mostrador — al revés, importar un padrón de
+300 los dejaba a todos sin poder retirar.
+
+**Contabilidad: el total manda.** El precio por unidad es una cuenta, no un campo — eran tres
+inputs ligados y había que adivinar cuál mandaba. Ahora total + cantidad + unidad, y el unitario
+se muestra calculado. **"Por categoría" mostraba "Otro" para todo** porque agrupaba por el string
+legacy; ahora agrupa por la categoría real, sumando las subcategorías dentro de su madre. **La
+categoría es el atajo, no la puerta**: nunca fue obligatoria en el backend y el frontend la
+exigía igual, así que ahora los flujos y el catálogo coexisten de verdad. Y **el tipo lo elige la
+persona**: estando en "Salió plata" sólo se ofrecen egresos, también al buscar — antes elegir una
+del otro tipo daba vuelta el formulario "para ayudar", y un egreso terminaba guardado como
+ingreso sin aviso. El sector deja de ser opcional al crear una categoría madre: con "sin sector"
+por defecto, la plata caía en un limbo del balance por área.
+
+**El onboarding y las sedes se alinean con las suites contratadas.** Una organización de sólo
+Cultivo no atiende pacientes (no le sirve una sede social) y una de sólo dispensa no tiene salas:
+ofrecer los tres tipos siempre era mandarla a un error que no puede resolver. La regla vive en
+`Sede::SUITES_POR_TIPO` y la aplica el **controller, no el modelo** —como validación volvía
+inguardable una sede que ya existía si se daba de baja una suite—. Sin Cultivo, el paso de la
+sala se saltea entero.
+
+**El tope de sedes no se esquiva apagando una, y ahora se avisa antes.** `puede_crear_sede?`
+contaba las activas: en el plan Básico se podían tener todas las que quisieras creando, apagando
+y volviendo a prender. Ahora cuenta las que EXISTEN, igual que las salas. Y el aviso llegaba
+después de llenar el formulario: ahora "Nueva sede" chequea el tope al tocarlo y explica el
+límite — el botón queda visible con candado, porque esconderlo no explica nada. **Una
+organización suspendida veía 403 pelados**: el backend mandaba el motivo y nadie lo miraba. Ahora
+hay un cartel a pantalla completa que dice qué pasó, a quién escribirle y —lo que más importa—
+**que la información está resguardada**.
+
+**Una tarea de mañana no se completa hoy — ahora en serio.** La regla existía sólo en la interfaz
+y con criterio distinto por pantalla; el backend no validaba nada, ni en `completar` ni en
+`completar_masivo` (que hace `update_all`). Estaba escondida, no aplicada. En la tanda se rechaza
+el lote entero si hay una sola futura: filtrarla en silencio la dejaría sin hacer y sin que nadie
+se entere.
+
+**El QR de planta abría una pantalla vacía.** `PlantaQrView` hacía `usePWA()` sin haberlo
+importado nunca: el setup explotaba y no se renderizaba una línea. **El build no lo caza** — Vite
+no sabe si es un global del navegador o un olvido. Va con un test que barre 322 archivos y
+verifica que todo `useAlgo(` que coincida con un composable o store del proyecto esté importado;
+encontró **dos más** (`LoteQrView` igual de roto y `MScanView`, que es la pantalla desde la que se
+llega a las otras dos). Y de paso la colisión de rutas que el propio `routes.rb` advertía: `/p` y
+`/s` existían a nivel root y se comían la navegación del SPA devolviendo JSON; los datos pasan a
+`/api`, que es de donde el frontend YA los pedía. Efecto colateral: el QR de stock, que devolvía
+404, quedó arreglado.
+
+**En la tabla de lotes, desde cuándo está en la fase.** "12d" solo no dice nada: se suma la
+columna **Desde** y la línea de tiempo completa en el tooltip del badge. La fecha sale del MISMO
+cálculo que `dias_en_estado`, con un test que verifica que no se contradigan. Se toma la ÚLTIMA
+entrada a cada estado, no la primera: si un lote se avanzó por error y volvió, importa desde
+cuándo está DONDE ESTÁ. `dias_floracion` sigue usando la primera y está bien — mide otra cosa.
+
+**La lista de pacientes se lee:** "Apellido, Nombre" (la lista se ordena por apellido, así que es
+lo que se recorre con la vista), REPROCANN partido en estado y "Vence", `table-layout: fixed` con
+`<colgroup>` para que el email deje de comerse el sobrante. Y el badge salía de
+`reprocann_vencimiento`, así que un trámite **pendiente** caía en "Sin REPROCANN": el mismo bug
+que ya se había corregido en la ficha.
+
+**Varios de uso diario:** el domicilio dejó de frenar la edición (la validación estaba duplicada
+y se sacó de un solo lado), el error de guardado pasa a una franja fija arriba de los botones —al
+final del cuerpo scrolleable no se veía y "Guardar" parecía no hacer nada—, el admin en el celular
+ya no ve "Plantas" en el menú, y los **manuales de usuario** dejaron de parecer un borrador. **El
+ícono de la PWA era un placeholder de marzo** (un cuadrado verde con un emoji 🌿): el manifest
+usa el logo real en PNG, porque Chrome de escritorio elige mal entre íconos SVG al instalar.
+
+**Rake nuevo:** `pacientes:normalizar_nombres` — capitalización de las cargas masivas ("Martin
+Ezequiel BLANCO" → "Blanco"). No inventa acentos y respeta partículas y apóstrofos. `SIMULAR=1`.
+
+**Cierre: 2029 rspec ✓ (0 fallas) · 1220 vitest ✓ · build limpio.**
+
+---
+
 ## Agosto 2026 (n) — el panel de plataforma: el plan mide, las suites habilitan
 
 **Dos planes en vez de cuatro, y el plan dice CUÁNTO, nunca QUÉ.** Convivían dos sistemas que

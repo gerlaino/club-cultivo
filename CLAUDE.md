@@ -1,19 +1,21 @@
-# CLAUDE.md — Club Cultivo App
+# CLAUDE.md — Cultivo Espacial (repo `club-cultivo`)
 
-> Briefing de sesión. Refleja el estado real del código a junio 2026 — si encontrás una contradicción entre este archivo y el código, el código manda y este archivo debe actualizarse.
+> Briefing de sesión. Refleja el estado real del código a agosto 2026 — si encontrás una contradicción entre este archivo y el código, el código manda y este archivo debe actualizarse.
 
 ---
 
 ## 🌿 ¿Qué es este proyecto?
 
-**Club Cultivo** es una plataforma SaaS B2B para la gestión integral de clubes de cannabis (contexto legal argentino: REPROCANN, ARICCAME).
+**Cultivo Espacial** es una plataforma SaaS B2B para la gestión integral de organizaciones de cannabis (contexto legal argentino: REPROCANN, ARICCAME).
+
+> **"Club Cultivo" es el nombre del REPOSITORIO, no del producto.** El producto se llama **Cultivo Espacial** y así tiene que aparecer en todo texto visible (mailers, prompt del asistente, encabezados). Se coló en 15 archivos y se corrigió en agosto 2026 — no volver a escribirlo en pantalla.
 
 > **Quién es quién, que se confundía en el código:** **REPROCANN** es el registro del programa de cannabis, lo emite el **Ministerio de Salud de la Nación** y habilita el cultivo para uso medicinal. **ARICCAME** es la agencia que regula la industria (Ley 27.669). **ANMAT** regula medicamentos y no interviene en ninguno de los dos: decir "REPROCANN de ANMAT" es un error.
-No es un club: es la **herramienta que usan los clubes** para operar.
+No es un club: es la **herramienta que usan las organizaciones** para operar — clubes, pero también producción e investigación (por eso el rename de agosto: ver Idioma del código).
 
-Cada club suscripto es un tenant aislado por `club_id` y gestiona: socios/pacientes, cultivo, post-cosecha, stock, dispensaciones, delivery, módulo médico con turnos, contabilidad, ambiente/IoT, analítica e informes de cumplimiento.
+Cada organización suscripta es un tenant aislado por `club_id` y gestiona: socios/pacientes, cultivo, post-cosecha, stock, dispensaciones, delivery, módulo médico con turnos, contabilidad, ambiente/IoT, analítica e informes de cumplimiento.
 
-**Visión a largo plazo:** la plataforma más completa del mundo para cannabis cultivado en clubes. Data agregada de todos los clubes para modelos predictivos, optimización genética y automatización del grow room.
+**Visión a largo plazo:** la plataforma más completa del mundo para cannabis cultivado en clubes. Data agregada de todas las organizaciones para modelos predictivos, optimización genética y automatización del grow room.
 
 ---
 
@@ -78,6 +80,8 @@ Convención: **dominio del negocio en castellano** (`Dispensacion`, `Paciente`, 
 
 **Legacy en inglés que NO se renombra sin pedido explícito:** `Plant`, `PlantActivity`, `Stock`, `PatientDocument`, `DocumentTemplate`, `User`. Conviven con sus equivalentes castellanos en rutas/UI. Código nuevo de dominio: siempre castellano.
 
+**Club → Organización (agosto 2026), misma regla que Socio → Paciente.** El texto VISIBLE dice "organización" en toda la app (frontend, backend, informes, mailers, PDF). Identificadores, rutas, clases CSS, stores, el modelo `Club`, `club_id` y los comentarios quedan como están. Cuidado con la concordancia al escribir texto nuevo: club es masculino y organización femenino ("toda la organización", "cada organización", plural sin acento: organizaciones).
+
 Nota: "Socio" y "Paciente" son el mismo concepto — el modelo es `Paciente`. **La UI visible usa "Paciente"** (unificado julio 2026; antes había un mix "Socios"/"Pacientes"). El código legacy sigue diciendo `socio` en identificadores que NO se ven (rutas `/socios`, componentes `SocioDetailView`/`SocioTab*`, permisos `['socios','index']`, campos `aporte_socio_ars`, roles `socio`); eso no se renombra. Regla: **texto visible → "Paciente"**; identificadores/campos existentes → se dejan. No crear modelos/controllers nuevos con "socio".
 
 ---
@@ -86,22 +90,33 @@ Nota: "Socio" y "Paciente" son el mismo concepto — el modelo es `Paciente`. **
 
 Ninguno se considera cerrado; todos son candidatos a revisión.
 
-1. **Socios/Pacientes** — alta, REPROCANN (número, vencimiento, renovaciones, críticos), documentos con firma digital, cuenta corriente, notas, mailer con historial.
+1. **Socios/Pacientes** — alta, REPROCANN (número, vencimiento, renovaciones, críticos), documentos con firma digital, cuenta corriente, notas, mailer con historial. **El alta desde el mostrador (dispensador/supervisor) queda PENDIENTE de aprobación**: existe y se completa, pero no recibe dispensaciones ni reservas hasta que admin o médico la aprueben. El bloqueo vive en los modelos `Dispensacion` y `Reserva`, no en la UI. Un alta nace **aprobada** salvo que venga del mostrador (al revés, una importación de padrón dejaba a todos sin poder retirar).
 2. **Módulo médico** — turnos, disponibilidad, check-ins, fichas, indicaciones médicas, prescripción PDF.
 3. **Cultivo** — genéticas, lotes (estados/fases), plantas con QR, pesadas, plan de trabajo (+ generación IA), tareas (recurrentes + automáticas por fase), fotos, análisis de laboratorio.
 4. **Manicura / post-cosecha** — pesajes, flujo de aprobación admin, curado, stocks de manicura.
 5. **Stock** — por sede, movimientos, QR/etiquetas, aprobaciones pendientes.
 6. **Dispensaciones** — **multi-stock**: una dispensa abarca varias líneas (`DispensacionItem`); UI = carrito en `ModalNuevaDispensacion` (abierto desde la ficha del socio y el historial; la vista `/dispensar` se eliminó). Medios de pago (efectivo/transferencia/cuenta corriente/no abona/contra-entrega), validación de crédito, descuento sobre el total, reservas (apartar stock a futuro, **fecha ≥ mañana**), CSV. **Edición multi-ítem** (cantidad + precio por línea) con reconciliación de stock/cc; **precio manual por ítem** (admin/sup). (`limite_dispensacion_mensual_g` existe en el schema pero **no es una feature en uso** — ver Dominio.)
-7. **Delivery** — paquetes, estados (pendiente/en viaje/entregado/fallido), firma de entrega, reprogramación.
+7. **Delivery** — paquetes, estados (pendiente/en viaje/entregado/fallido), firma de entrega, reprogramación. **Es un add-on contratable** (antes era un rol suelto): sin el módulo activo, el rol `delivery` no se ofrece ni se acepta, `rutas_entrega` y las acciones de reparto devuelven 403, y `Dispensacion` rechaza al CREAR una dispensa con envío. **`entregar` y `reportar_fallo` quedan SIN gatear a propósito** — ver "Lo que NO hay que romper".
 8. **Ambiente / IoT** — dispositivos con webhook token, lecturas, reglas y alertas, setpoints por fase, VPD, drivers (Sonoff, CSV manual, CSV-IA).
 9. **Contabilidad** — movimientos contables, costos por lote, P&L.
 10. **Analítica e informes** — genéticas/ciclos/pérdidas/comparativa, benchmark, informe semestral, informes auditor (REPROCANN, producción, cumplimiento, plan vs real, trazabilidad).
 11. **ARICCAME** — reporte de dispensaciones y stock (feature flag por club). La transmisión está SIMULADA: no envía nada de verdad.
-12. **Super admin** — panel de plataforma (vencimientos, módulos prendidos que no funcionan, clubes en silencio, salud), clubes, **dos planes** (`PlanEnforcer`: básico/total, sólo límites), catálogo de módulos, informes de plataforma, historial por club. **El modo observador está SUSPENDIDO** (`User::OBSERVADOR_HABILITADO = false`).
+12. **Super admin** — panel de plataforma como **cola de trabajo** (cada pendiente con su acción, agrupado por urgencia: se está perdiendo plata · paga y no le funciona · avisar con tiempo), organizaciones, **dos planes** (`PlanEnforcer`: básico/total, sólo límites), catálogo de módulos (`GET /super_admin/catalogo`), informes de plataforma, historial por organización. **El modo observador está SUSPENDIDO** (`User::OBSERVADOR_HABILITADO = false`). Un super_admin sin contexto que pega a un endpoint de organización recibe **409 explicando qué falta** (`block_super_admin_sin_contexto!`), no un 500.
 13. **Notificaciones** — push web, ActionCable, alertas internas por rol.
-14. **Web pública del club** + carnets digitales.
+14. **Web pública del club** + carnets digitales. (En el catálogo comercial figura como "Vista del paciente" y está **EN CONSTRUCCIÓN**: no se activa ni por API.)
 15. **App móvil** (Capacitor) — cultivador y manicura principalmente; vistas bajo `/m`.
-16. **Asistente IA por voz** — parsear/ejecutar comandos.
+16. **Asistente IA por voz** — parsear/ejecutar comandos. **Todo el consumo se mide y se cobra**: ver "IA" abajo.
+17. **Correo electrónico** — **add-on contratable** (`mailer`, con `require_feature!` real). Pantalla propia en Configuración → Correo: casilla SMTP de la organización + **plantillas que edita su admin** (variables `{{nombre}}` por lista blanca con `gsub`, **nunca ERB**). Bienvenida al alta (admin/médico en el acto; mostrador al aprobar) y **envíos masivos** (`EnvioMasivo` + `EnvioMasivoJob`): **un mail por destinatario, jamás un `To:` múltiple ni BCC** — juntos, cada paciente recibiría el padrón completo (fuga de datos de salud, Ley 25.326). Tope propio de 450/día (`Correo::CupoDiario`), por debajo de los ~500 de Gmail: pasarse **suspende la casilla del cliente**. Se chequea ANTES de crear el envío.
+
+### IA — medición y topes
+
+Toda llamada a la API queda en `ia_llamadas` (organización, persona, función, modelo, tokens y **costo congelado**; también las fallidas). Registran las cinco funciones: asistente parsear/consultar, análisis de lote, plan de trabajo y mapeo de CSV. `Ia::Uso` es la puerta única: `registrar`, `limite_alcanzado`, `resumen_mes`.
+
+- **Manda el tope MENSUAL** (`Club::IA_TIERS[:limite_mes]`: 500 / 2.000 / 10.000 según tier), que se cuenta contra la base y no depende de Redis. El horario es sólo freno de ráfaga, **por organización** (contaba por usuario: cinco personas daban 5× el límite).
+- **`club.ia_limite_hora` sobrescribe el horario del tier** cuando es > 0. El mensual **no tiene override**.
+- El asistente usa **caché de prompt**: `system` es un array de dos bloques y el fijo lleva `cache_control`. Un byte distinto antes del corte invalida todo. `resumen_mes[:cache_hit]` es el chivato: si queda en 0 con el asistente en uso, algo rompió el prefijo.
+- **El consumo se ve** (13-ago): `Ia::Uso.resumen_mes` sale en la ficha del super admin (`ia_uso`, sólo si la organización tiene el add-on) y lo muestra `SAModulos`. Va envuelto en `ActsAsTenant.with_tenant`: el super admin no tiene tenant fijado e `IaLlamada` es tenant con `require_tenant=true`, así que sin eso revienta la ficha entera.
+- **El módulo se llama `ia`.** `ia_voz` e `ia_analisis` son las claves VIEJAS y no se chequean más por acción: el candado es un `require_feature!(:ia)` en el controller. `features_expandidas` deriva en los dos sentidos (vieja ⇒ nueva y nueva ⇒ vieja); chequear la vieja con la nueva guardada daba false y dejaba el botón visible y el dictado rechazado.
 
 ---
 
@@ -112,10 +127,10 @@ Ninguno se considera cerrado; todos son candidatos a revisión.
 | `super_admin` | Plataforma: clubes, planes, métricas globales, modo observador |
 | `admin` | Todo dentro de su club |
 | `cultivador` | Plantas, lotes, salas asignadas (por sede), ambiente, plan de trabajo |
-| `supervisor` | Lectura de cultivo + gestión de tareas; **dispensa** y **gestiona reservas** (crear/editar/cancelar); **ve** (no edita) historia clínica |
+| `supervisor` | Lectura de cultivo + gestión de tareas; **dispensa** y **gestiona reservas** (crear/editar/cancelar); **ve** (no edita) historia clínica; **crea pacientes** (quedan pendientes de aprobación) |
 | `manicura` | Post-cosecha: pesajes e inventario de los lotes `en_manicura` que el admin le asigna (trabaja por estado del lote, no por sala). **Provisorio:** si el lote tiene manicura asignado, **solo esa persona** registra el peso (ni admin ni otro manicura); el peso va por el flujo de pesaje, no por `plants#update` |
-| `dispensador` | Dispensaciones, stock por sede, socios (lectura); **convierte reservas a dispensa** (Entregar), pero NO las crea ni gestiona |
-| `delivery` | Paquetes asignados: iniciar viaje, entregar, reportar fallo |
+| `dispensador` | Dispensaciones, stock por sede, socios (lectura); **convierte reservas a dispensa** (Entregar), pero NO las crea ni gestiona; **crea pacientes** (quedan pendientes de aprobación, y ninguno de los dos aprueba) |
+| `delivery` | Paquetes asignados: iniciar viaje, entregar, reportar fallo. **Sólo existe si el add-on Delivery está activo** |
 | `medico` | Pacientes, indicaciones, turnos, documentos clínicos |
 | `abogado` | Socios (lectura), informes legales/REPROCANN |
 | `auditor` | **Solo lectura global** (bloqueado a nivel `ApplicationController`) |
@@ -230,22 +245,42 @@ Cuando Germán plantee un problema o feature nueva antes de implementar:
 
 Suite 1239 ✓ + 58 vitest ✓. **Deploy: sumar `add_vendible_a_bar_venta_items` y `add_consumo_evento_a_provisiones_y_dispensas` al `db:migrate`.**
 
-## 📍 Dónde retomar (10-ago-2026) — super_admin HECHO
+## 📍 Dónde retomar (13-ago-2026)
 
-**1871 rspec (25 pending) + 889 vitest en verde.** Commiteado en `master`, sin pushear.
+**2058 rspec (0 fallas, 26 pending del observador suspendido) + 1264 vitest + build limpio.**
+Los bloques del 11 y del 12-ago están en `docs/CHANGELOG.md` como "Agosto 2026 (o)" y "(p)".
+
+**El bloque (p) cierra el gateo de módulos de punta a punta:** el asistente de voz volvió a
+andar (chequeaba la clave vieja), Delivery se aplica en la API y en el modelo, el interruptor de
+WhatsApp manda sobre las credenciales de Twilio, el router rebota las URLs de módulos no
+contratados por una tabla de prefijos (`moduloRequerido`), y los módulos del super admin tienen
+pantalla propia (`SAModulos`) donde **cada interruptor se guarda solo** y se ve el consumo de IA
+del mes.
 
 ### El modelo comercial, que cambió de raíz
 
 **Dos planes, y el plan dice CUÁNTO, nunca QUÉ.** `PlanEnforcer::PLANES` = `basico` / `total`,
-con seis límites (sedes, salas, lotes, plantas, pacientes, usuarios). Qué puede hacer un club lo
-deciden las suites, y no se cruzan. Los cuatro planes viejos siguen mapeados en `PLANES_LEGACY`
-por si aparece uno guardado.
+con seis límites (sedes, salas, lotes, plantas, pacientes, usuarios). Qué puede hacer una
+organización lo deciden las suites, y no se cruzan. Los cuatro planes viejos siguen mapeados en
+`PLANES_LEGACY` por si aparece uno guardado.
+
+**Los límites cuentan lo que EXISTE, no lo activo.** Sedes y salas: apagar una no libera cupo
+(se creaba, se apagaba y se creaba otra). El `uso` que ve el super admin cuenta igual que el
+tope — si contaran distinto, el panel diría "1 de 1" con tres sedes cargadas.
 
 **Los módulos viven en tres cajones** (`Club`): `SUITES` contratables · `INCLUIDOS_EN_SUITE`
-(médico y correo, dentro de Producción y dispensa, derivados y NO guardados) · `ADDONS` ·
-`EN_CONSTRUCCION` (Vista del paciente, no activable ni por API). **`Club#estado_modulo` es la
-pieza clave**: prendido ≠ andando, y devuelve `andando` / `falta_config` / `apagado` con
-`falta_para_funcionar` explicando qué le falta a ESE club.
+(**sólo el médico**; el correo salió a `ADDONS` el 11-ago) · `ADDONS` (incluye ahora **Delivery
+y Correo**) · `EN_CONSTRUCCION` (Vista del paciente, no activable ni por API).
+**`Club#estado_modulo` es la pieza clave**: prendido ≠ andando, y devuelve `andando` /
+`falta_config` / `apagado` con `falta_para_funcionar` explicando qué le falta a ESA organización.
+
+**Dar de baja un módulo NO lo corta en el acto: fija una fecha.** `features_baja` guarda hasta
+cuándo sigue andando (`plan_activo_hasta`, o fin de mes); `feature?` la respeta y devuelve false
+apenas pasa, sin esperar al job. `AplicarBajasModulosJob` apaga la bandera **y ordena lo que el
+módulo dejaba colgando** — en Delivery suelta los repartos que no salieron y avisa al admin,
+pero **lo que está EN VIAJE no se toca**. Toda migración que mueva un módulo de cajón necesita
+**backfill**: al ser derivado, `feature?` daba true sin nada escrito, y sin el UPDATE el día del
+deploy se quedan todos sin el módulo.
 
 **El catálogo de qué se vende sale de `GET /super_admin/catalogo`.** No volver a duplicar la
 lista de módulos en las vistas: ya había tres copias que se contradecían.
@@ -260,19 +295,35 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   saltan solos y vuelven al prender la bandera.
 - **`Auditable` fija el tenant sólo cuando no hay ninguno.** Envolver siempre contaminaba
   `Current.current_tenant` entre ejemplos y el spec siguiente heredaba un club revertido.
-
-### Bug preexistente conocido (no del bloque)
-
-Un `super_admin` **sin** observar que pega a un endpoint de club revienta con **500**:
-`current_user.club` es nil y varios controllers hacen `current_user.club.algo` sin protegerse.
+- **Un mail por destinatario, siempre.** Ni `To:` múltiple ni BCC en ningún envío: con todos
+  juntos, cada paciente recibe el padrón completo de la organización. Hay un spec que verifica
+  que cada mensaje entregado tenga UNA sola dirección. El texto se resuelve POR destinatario.
+- **Las plantillas de correo se interpolan con `gsub` contra lista blanca, NUNCA con ERB.** Es
+  texto que escribe un usuario: evaluarlo es ejecución de código en el servidor.
+- **El gateo por suite vive en los CONTROLLERS, no en los modelos.** Como validación de modelo
+  vuelve inguardable un registro que ya existía cuando se da de baja una suite (no se podría ni
+  corregir la dirección de una sede) y rompe los fixtures con features acotadas.
+- **El backend valida lo que la UI esconde.** Tareas futuras, roles del alta, aprobación de
+  pacientes: si la regla vive sólo en la pantalla, está escondida y no aplicada — por API se
+  saltea siempre, y `completar_masivo` hace `update_all`.
+- **Cerrar un reparto NO se gatea por módulo.** `entregar` y `reportar_fallo` quedan fuera del
+  `require_feature!(:delivery)`: con el módulo apagado el repartidor no puede ni loguearse
+  (`check_rol_habilitado!`), así que si el cierre también estuviera bloqueado no quedaría NADIE
+  que pudiera registrar cómo terminó un paquete que ya salió — quedan abiertos para siempre.
+  Los cierra el admin. Misma lógica que `AplicarBajasModulosJob`, que no toca lo que está en
+  viaje. Por eso `Dispensacion#delivery_contratado` es `on: :create`.
+- **Un módulo se pide por su clave NUEVA y en un solo lugar.** Chequear la vieja (`ia_voz`) con
+  la nueva guardada (`ia`) daba false: `feature?` resuelve viejo ⇒ nuevo, no al revés. Rompía el
+  registro por voz de toda organización moderna con el botón a la vista.
 
 ### Pendientes de Germán
 
-- **Su socio tiene que dar de alta un club sin ayuda**, y anotar dónde se traba. Es la prueba
-  que vale más que todo lo demás.
-- Decisiones: **modelo de precios** (sin eso no hay MRR real: `mrr` y `churn_30d` siguen en 0) y
-  **medición de calls de IA** (`ia_limite_hora` se aplica pero no se mide).
-- Un **segundo nivel de super_admin** (rol comercial sin borrar clubes ni ver datos de
+- **Su socio tiene que dar de alta una organización sin ayuda**, y anotar dónde se traba. Es la
+  prueba que vale más que todo lo demás.
+- Decisión: **modelo de precios** — sin eso no hay MRR real (`mrr` y `churn_30d` siguen en 0).
+  (La medición de IA está hecha —`ia_llamadas` + `Ia::Uso`, 11-ago— y desde el 13-ago **se ve**
+  en la ficha del super admin.)
+- Un **segundo nivel de super_admin** (rol comercial sin borrar organizaciones ni ver datos de
   pacientes): hoy es todo o nada. Toca el enum de roles, no se hizo.
 
 ### Antes de tocar producción
@@ -282,26 +333,27 @@ hace `bundle install`, `npm ci`, build del front y `rails db:migrate` como Build
 Render, con `set -o errexit` (si una migración falla, falla el deploy entero). No volver a
 listar "pendiente `db:migrate`" al cerrar un bloque.
 
-**Los rakes SÍ son manuales** — corren a mano, una sola vez, y ninguno se dispara al deployar:
+**Los rakes SÍ son manuales** — corren a mano, una sola vez, y ninguno se dispara al deployar.
+**Sin correr al 12-ago, ninguno urgente:**
 
 ```
-bundle exec rake suites:prender_iot_con_dispositivos SIMULAR=1   # ⚠️ el crítico
 bundle exec rake lotes:corregir_finalizados_con_stock SIMULAR=1  # mirar los 6 del club 1
 bundle exec rake geneticas:declarar_por_nombre SIMULAR=1         # resuelve ~44 de un saque
-bundle exec rake dispensaciones:recalcular_medio_pago SIMULAR=1  # arrastre del "mixto"
 bundle exec rake geneticas:sin_declarar                          # informativo
+bundle exec rake pacientes:normalizar_nombres SIMULAR=1          # capitalización de cargas masivas
 ```
 
-Todos aceptan `SIMULAR=1`. **El de IoT no es opcional**: la ingesta de sensores exige el add-on
-`iot`, que ninguna migración escribe, así que sin correrlo todo club con hardware deja de
-recibir datos EN SILENCIO.
+Todos aceptan `SIMULAR=1`. **Ya corridos el 10-ago, no repetir:**
+`suites:prender_iot_con_dispositivos` (dio "nada que hacer" — todas las organizaciones con
+dispositivos ya tenían el add-on) y `dispensaciones:recalcular_medio_pago` (5 mixtas, 4
+corregidas a `efectivo`; era una etiqueta, no movió plata).
 
 ### Pendientes de Germán (no de código)
 
 - Cargar los `numero_registro_inase` de las 8 variedades del catálogo (hoy vacíos: la columna
   "N° registro" del informe INASE sale en blanco aunque el vínculo funcione).
 - Declarar a mano las ~18 genéticas que no traen el par en el nombre.
-- Decisiones: **modelo de precios** y **medición de calls de IA**.
+- Decisión: **modelo de precios**.
 
 ### Deuda técnica conocida
 
@@ -327,15 +379,22 @@ presenta), el dueño (análisis) y el que opera hoy (pendientes accionables).
 
 ### La lección que no hay que repetir
 
-**Un build que pasa no prueba que la pantalla funcione.** Pasó tres veces: el modal contable
-sin estilos, los botones de "Método de aplicación" como `<button>` crudos, y el modal con
-clases CSS que nunca creé — todo compilaba perfecto. Ahora hay un test que barre el markup
-contra el `<style>` de cada componente, pero **si tocás una pantalla, verificala renderizada**.
-Y al gatear las suites verifiqué que el candado estuviera puesto, no que TODAS las puertas lo
-tuvieran — hay 23 componentes de navegación y sólo 3 miraban las features.
+**Un build que pasa no prueba que la pantalla funcione.** Pasó cuatro veces: el modal contable
+sin estilos, los botones de "Método de aplicación" como `<button>` crudos, el modal con clases
+CSS que nunca creé, y **`PlantaQrView` llamando a `usePWA()` sin importarlo** — Vite no sabe si
+es un global del navegador o un olvido, así que compila feliz y la pantalla explota en
+producción cuando alguien escanea un QR. Hay dos tests que barren esto (clases CSS contra el
+`<style>` del componente; `useAlgo(` contra sus imports en 322 archivos), pero **si tocás una
+pantalla, verificala renderizada**.
+
+**Verificar que el candado esté puesto no es verificar que TODAS las puertas lo tengan.** Al
+gatear las suites había 23 componentes de navegación y sólo 3 miraban las features; con el tope
+de sedes el backend rechazaba pero el botón seguía invitando a llenar el formulario entero.
 
 **Si tocás una pantalla, verificala renderizada.**
 
 ---
 
-*Historial hasta 2026-07-28. Cambios julio (ver `docs/CHANGELOG.md`): **etiquetas QR en tanda y en PDF** (`lib/pdfEtiquetas.js` es fuente única; lote 93×60mm 3/fila en A4 apaisada, banderita de planta 160×26mm plegable; jsPDF lazy — dep nueva `jspdf`). Fix seguridad AZ (historia clínica en pacientes#show), backups Postgres→R2, KPIs de stock, edición multi-ítem + cuotas contables, candado de manicura asignada, guía de usuarios (`docs/GUIA_USUARIOS.md`). **Rediseño del Salón COMPLETO (B1–B6):** sub-nav compartida, Stock unificado, Vender = lista+buscador, Resumen liviano, caja de turno con confirmación entre roles, eventos por fases, Depósito→solapa Salón read-only. **Audit log (historial por usuario):** infra `Auditoria`+`Auditable`; Fase 1 (Lote/Plant/Stock/Dispensación) + Fase 2 (Paciente/User/Reserva con allowlist estricto — NUNCA campos encriptados/clínicos) + endpoint + tab en UsuarioDetail. **Código de barras** en productos del bar (lector físico + cámara `@zxing/browser` + scan-to-create). **Comprobante NO fiscal** al cobrar. **Multi-sede: los depósitos son de una SEDE** (`Deposito.sede_id`; `SembrarDepositos` siembra por sede + sede-ifica lo legacy); transferencia entre depósitos; edge case sede-divergente prevenido (el depósito fija la sede del movimiento). **Dashboard área × sede** (`resumen_por_unidad` con desglose por sede). **`vendible`/"no vender"** en mercadería del bar (dispensador solo ve lo vendible; alta desde Nuevo Movimiento; Stock del salón edición-only). **Deploy prod pendiente:** `db:migrate` (incl. `add_sede_a_depositos`, `add_vendible_a_bar_productos`, `add_codigo_barras_a_bar_productos`, caja/horario, `unicidad_depositos_de_sistema` —deduplica y después crea el índice único—) + `npm ci` (deps `@zxing/browser`, `jspdf`). Mantener actualizado: al cerrar un bloque, actualizar "Módulos existentes" acá y `docs/CHANGELOG.md`.*
+*Historial hasta 2026-07-28. Cambios julio (ver `docs/CHANGELOG.md`): **etiquetas QR en tanda y en PDF** (`lib/pdfEtiquetas.js` es fuente única; lote 93×60mm 3/fila en A4 apaisada, banderita de planta 160×26mm plegable; jsPDF lazy — dep nueva `jspdf`). Fix seguridad AZ (historia clínica en pacientes#show), backups Postgres→R2, KPIs de stock, edición multi-ítem + cuotas contables, candado de manicura asignada, guía de usuarios (`docs/GUIA_USUARIOS.md`). **Rediseño del Salón COMPLETO (B1–B6):** sub-nav compartida, Stock unificado, Vender = lista+buscador, Resumen liviano, caja de turno con confirmación entre roles, eventos por fases, Depósito→solapa Salón read-only. **Audit log (historial por usuario):** infra `Auditoria`+`Auditable`; Fase 1 (Lote/Plant/Stock/Dispensación) + Fase 2 (Paciente/User/Reserva con allowlist estricto — NUNCA campos encriptados/clínicos) + endpoint + tab en UsuarioDetail. **Código de barras** en productos del bar (lector físico + cámara `@zxing/browser` + scan-to-create). **Comprobante NO fiscal** al cobrar. **Multi-sede: los depósitos son de una SEDE** (`Deposito.sede_id`; `SembrarDepositos` siembra por sede + sede-ifica lo legacy); transferencia entre depósitos; edge case sede-divergente prevenido (el depósito fija la sede del movimiento). **Dashboard área × sede** (`resumen_por_unidad` con desglose por sede). **`vendible`/"no vender"** en mercadería del bar (dispensador solo ve lo vendible; alta desde Nuevo Movimiento; Stock del salón edición-only). Migraciones y `npm ci` los corre solo `bin/render-build.sh` en el deploy (deps nuevas de julio: `@zxing/browser`, `jspdf`) — no listarlos como pendiente. Mantener actualizado: al cerrar un bloque, actualizar "Módulos existentes" acá y `docs/CHANGELOG.md`.*
+
+*Agosto 2026 (ver `docs/CHANGELOG.md`, entradas (g) a (o)): informes reordenados por pregunta, INASE, pérdidas, panel de super admin y modelo comercial de dos planes, **Club → Organización** en texto visible, **medición y tope de IA** (`ia_llamadas` + `Ia::Uso` + caché de prompt), **Correo y Delivery como add-ons** con baja programada, **correo con plantillas por organización y envíos masivos**, **alta desde el mostrador pendiente de aprobación**, contabilidad (el total manda, categorías reales, flujos y catálogo coexistiendo), onboarding y sedes alineados con las suites, y el fix del QR de planta con su test de composables sin importar.*
