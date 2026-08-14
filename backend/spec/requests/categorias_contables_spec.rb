@@ -25,18 +25,22 @@ RSpec.describe 'Categorías contables', type: :request do
       expect(club.unidades_negocio).to exist
     end
 
-    it 'el árbol-guía (opt-in) tiene madres con subcategorías que heredan comportamiento' do
+    # UN SOLO NIVEL: la categoría lleva su sector y su destino de stock, sin escalón intermedio.
+    it 'las categorías son de un nivel y saben si entran a un depósito' do
       sembrar_arbol!
       get '/categorias_contables', headers: auth_headers, as: :json
-      body   = JSON.parse(response.body)
-      insumos = body.find { |c| c['comportamiento'] == 'insumo' }
-      fert    = insumos['subcategorias'].find { |s| s['nombre'] == 'Fertilizante' }
-      expect(fert['clave_efectiva']).to eq('insumo')
+      body = JSON.parse(response.body)
+
+      expect(body.map { |c| c['parent_id'] }.compact).to be_empty
+      fert = body.find { |c| c['nombre'] == 'Fertilizante' }
+      expect(fert['va_a_deposito']).to be(true)
+      expect(fert['familia_deposito']).to eq('cultivo')
+
       aporte = body.find { |c| c['clave_efectiva'] == 'aporte_socio' }
       expect(aporte).to include('tipo' => 'ingreso', 'es_sistema' => true)
     end
 
-    it 'una subcategoría insumo deriva el string legacy en el movimiento' do
+    it 'una categoría de insumo deriva el string legacy en el movimiento' do
       sembrar_arbol!
       fert = club.categorias_contables.find_by(nombre: 'Fertilizante')
       mov = club.movimientos_contables.create!(created_by: admin, tipo: 'egreso',
@@ -82,7 +86,7 @@ RSpec.describe 'Categorías contables', type: :request do
 
     it 'no permite borrar una categoría de sistema' do
       sembrar_arbol! # las de sistema solo existen si se siembra el árbol-guía
-      cat = club.categorias_contables.find_by(clave_sistema: 'insumo')
+      cat = club.categorias_contables.find_by(clave_sistema: 'alquiler')
       delete "/categorias_contables/#{cat.id}", headers: auth_headers, as: :json
       expect(response).to have_http_status(:unprocessable_entity)
       expect(cat.reload).to be_present

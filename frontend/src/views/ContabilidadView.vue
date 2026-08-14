@@ -7,6 +7,7 @@ import { useAuthStore }         from "../stores/auth"
 import api, { listSedes, listLotes, listPacientes, cerrarPeriodoContable, reabrirPeriodoContable, createCompraCuotas, listComprasCuotas, listUnidadesNegocio, listInsumos, listBares, listCategoriasContables, listDepositos, registrarPagoMovimiento } from "../lib/api"
 import { useConfirm }           from "../composables/useConfirm.js"
 import { useToast }             from "../composables/useToast.js"
+import ModalIngreso from '../components/contabilidad/ModalIngreso.vue'
 import ModalMovimiento from "../components/contabilidad/ModalMovimiento.vue"
 import EditarCompraCuotasModal from "../components/contabilidad/EditarCompraCuotasModal.vue"
 import DsSpinner from '../design-system/components/Spinner.vue'
@@ -327,6 +328,28 @@ const route  = useRoute()
 const router = useRouter()
 
 const showModal        = ref(false)
+// Puerta aparte para el ingreso EXCEPCIONAL (subvención, donación, venta de un bien). Lo
+// rutinario que entra —pago de paciente, recupero, buffet— se registra solo desde su pantalla:
+// volver a cargarlo acá lo contaría dos veces.
+const showIngreso      = ref(false)
+const guardandoIngreso = ref(false)
+const errorIngreso     = ref('')
+
+async function guardarIngreso(payload) {
+  guardandoIngreso.value = true
+  errorIngreso.value = ''
+  try {
+    await store.create(payload)
+    showIngreso.value = false
+    toast.success('Ingreso registrado')
+    if (vistaActiva.value === 'dashboard') await store.fetchDashboard(dashboardSede.value)
+  } catch (e) {
+    errorIngreso.value = e?.response?.data?.errors?.join(' · ')
+      || e?.response?.data?.error || store.saveError || 'No se pudo registrar el ingreso'
+  } finally {
+    guardandoIngreso.value = false
+  }
+}
 const editingMovimiento = ref(null)
 // El modal delega el guardado: el padre await-ea la API y le devuelve el estado. Sin esto el botón
 // se re-habilitaba al instante y un doble click cargaba el movimiento dos veces.
@@ -552,6 +575,13 @@ onMounted(async () => {
         </button>
         <button class="cv__btn-ghost" @click="exportar('csv')" title="Texto plano, para procesar en otra herramienta">
           <i class="bi bi-download"></i> CSV
+        </button>
+        <!-- Dos puertas, porque son dos cosas distintas: "Nuevo movimiento" registra plata que
+             SALE; lo que entra de forma excepcional tiene su formulario corto (cinco campos, sin
+             inventario ni cuotas). Lo que entra todos los días no se carga por ninguna de las
+             dos: se registra solo desde la cuenta corriente, la dispensación o el mostrador. -->
+        <button v-if="canEdit" class="cv__btn-ghost" @click="showIngreso = true">
+          <i class="bi bi-arrow-down-left"></i> Registrar ingreso
         </button>
         <button v-if="canEdit" class="cv__btn-primary" @click="openCreate">
           <i class="bi bi-plus-lg"></i> Nuevo movimiento
@@ -1067,6 +1097,13 @@ onMounted(async () => {
     </div>
 
     <!-- ══════════════ MODAL CREAR/EDITAR ══════════════ -->
+    <ModalIngreso
+      v-model="showIngreso"
+      :sedes="sedes" :unidades="unidades"
+      :guardando="guardandoIngreso" :error="errorIngreso"
+      @guardado="guardarIngreso"
+    />
+
     <ModalMovimiento
       v-model="showModal"
       :pacientes="pacientes"

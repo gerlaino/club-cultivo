@@ -207,11 +207,13 @@ export function costoUnitario(monto, cantidad) {
 export function validarMovimiento(form, ctx = {}) {
   const e = {}
 
-  // La categoría NO es obligatoria. Es el atajo que completa tipo, sector y depósito de una,
-  // pero el flujo (compra / aporte / gasto / ingreso) alcanza para registrar el movimiento: una
-  // organización que todavía no armó su catálogo tiene que poder anotar lo que gastó. Sin
-  // categoría el movimiento queda como gasto del club, sin sector; imputarlo a una sede es otra
-  // cosa y pasa después, al consumir del depósito.
+  // LA CATEGORÍA MANDA, así que es obligatoria. De ella salen el sector y si la compra entra a
+  // un depósito (y a cuál): sin categoría, el formulario tendría que volver a preguntar las tres
+  // cosas y el gasto terminaría sin sector, invisible en el resultado de toda área.
+  //
+  // Era opcional porque el catálogo arrancaba vacío. Ya no: la organización nace con una lista
+  // de categorías sembrada, así que cargar es ELEGIR.
+  if (!ctx.categoriaOpcional && !form.categoria_contable_id) e.categoria = 'Elegí una categoría'
   if (!form.descripcion?.trim())        e.descripcion = 'Poné una descripción'
   if (!(Number(form.monto_ars) > 0))    e.monto_ars   = 'Ingresá un monto'
   if (!form.fecha)                      e.fecha       = 'Elegí la fecha'

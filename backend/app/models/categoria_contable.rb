@@ -50,7 +50,23 @@ class CategoriaContable < ApplicationRecord
   def unidad_efectiva       = unidad_negocio || parent&.unidad_negocio
   def sede_efectiva         = sede || parent&.sede
   def sede_id_efectiva      = sede_id || parent&.sede_id
-  def clave_efectiva        = clave_sistema.presence || parent&.clave_sistema
+  # Clave legacy (la columna `categoria`, string, que todavía dispara el costeo por lote y el
+  # aporte a cuenta corriente). Con el catálogo de un solo nivel, varias categorías comparten
+  # naturaleza —Fertilizante, Sustrato y Macetas son todas 'insumo'— y NO pueden compartir
+  # `clave_sistema` (la siembra busca por esa clave y las colapsaría en una sola fila). Así que
+  # cuando no hay clave propia, se deriva del comportamiento, que es justo lo que distingue a un
+  # insumo de un gasto común.
+  CLAVE_POR_COMPORTAMIENTO = {
+    'insumo'         => 'insumo',
+    'insumo_general' => 'insumo',
+    'mercaderia'     => 'bar',
+  }.freeze
+
+  def clave_efectiva
+    clave_sistema.presence ||
+      parent&.clave_sistema ||
+      CLAVE_POR_COMPORTAMIENTO[comportamiento_efectivo]
+  end
   def comportamiento_efectivo
     comportamiento != 'general' ? comportamiento : (parent&.comportamiento || 'general')
   end

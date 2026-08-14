@@ -11,13 +11,12 @@ vi.mock('../lib/api.js', () => ({
   createCategoriaContable: vi.fn(), createUnidadNegocio: vi.fn(),
 }))
 
+// UN SOLO NIVEL: sector → categoría (las subcategorías se eliminaron en ago-2026).
+// "Fertilizante" entra al depósito de Cultivo; "Alquiler" es puro gasto del mismo sector.
 const CATEGORIAS = [
-  {
-    id: 1, nombre: 'Insumos', tipo: 'egreso', comportamiento_efectivo: 'insumo',
-    unidad_negocio: { id: 7, nombre: 'Cultivo' },
-    subcategorias: [{ id: 11, nombre: 'Fertilizante', tipo: 'egreso', comportamiento_efectivo: 'insumo' }],
-  },
-  { id: 2, nombre: 'Venta de flor', tipo: 'ingreso', comportamiento_efectivo: 'general',
+  { id: 1, nombre: 'Fertilizante', tipo: 'egreso', comportamiento_efectivo: 'insumo',
+    unidad_negocio: { id: 7, nombre: 'Cultivo' }, subcategorias: [] },
+  { id: 2, nombre: 'Alquiler', tipo: 'egreso', comportamiento_efectivo: 'general',
     unidad_negocio: { id: 7, nombre: 'Cultivo' }, subcategorias: [] },
 ]
 
@@ -48,11 +47,30 @@ describe('Nuevo movimiento — la plata acá, el inventario allá', () => {
   // por lo tanto sin costo unitario, que es el número con el que se compara un proveedor contra
   // otro. Ahora la cantidad es del MOVIMIENTO y el bloque de depósito la refleja: se sigue
   // cargando en un solo lugar, que era el motivo de la regla vieja, pero ese lugar es el cuerpo.
-  it('el cuerpo del movimiento pide cantidad y unidad', () => {
+  // Elegir una categoría que entra al depósito (Insumos, comportamiento 'insumo').
+  const conCategoriaQueStockea = async () => {
+    wrapper.vm.form.categoria_contable_id = 1
+    await wrapper.vm.$nextTick()
+  }
+
+  // CAMBIO DE CRITERIO (Germán, ago-2026): la cantidad se pregunta cuando hay algo que contar,
+  // o sea cuando la categoría entra a un depósito. Para pagar la luz no hay nada que contar, y
+  // preguntarlo igual era una de las doce decisiones que hacían el alta poco natural.
+  it('pide cantidad y unidad cuando la compra entra al depósito', async () => {
+    await conCategoriaQueStockea()
+
     expect(wrapper.find('.mv-cant').exists()).toBe(true)
   })
 
-  it('y con el monto calcula el precio por unidad', async () => {
+  it('y no las pide para un gasto que no stockea', async () => {
+    wrapper.vm.form.categoria_contable_id = 2   // "Venta de flor": comportamiento general
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('.mv-cant').exists()).toBe(false)
+  })
+
+  it('con el monto calcula el precio por unidad', async () => {
+    await conCategoriaQueStockea()
     await wrapper.find('.mv-monto-inp').setValue('1200')
     wrapper.vm.form.cantidad = 4
     await wrapper.vm.$nextTick()
@@ -61,14 +79,12 @@ describe('Nuevo movimiento — la plata acá, el inventario allá', () => {
     expect(wrapper.find('.mv-cant-uni').text()).toContain('300')
   })
 
-  // Sigue siendo opcional: un alquiler no se compra por unidades.
-  it('sin cantidad no hay unitario y el movimiento se guarda igual', async () => {
+  // Dentro de una compra la cantidad sigue siendo opcional hasta que se elige el depósito.
+  it('sin cantidad no hay unitario', async () => {
+    await conCategoriaQueStockea()
     await wrapper.find('.mv-monto-inp').setValue('1200')
-    wrapper.vm.form.descripcion = 'Alquiler julio'
-    await wrapper.vm.$nextTick()
 
     expect(wrapper.vm.unitario).toBeNull()
-    expect(wrapper.vm.puedeGuardar).toBe(true)
   })
 
   // Un alquiler, un sueldo o una limpieza contratada no tienen cantidad. Que el bloque de
@@ -280,25 +296,32 @@ describe('Nuevo movimiento — crear una categoría', () => {
       return [...wrapper.element.querySelectorAll('*')].indexOf(el)
     }
 
-    it('la plata va antes que la imputación: monto → cantidad → pago → sector', () => {
-      const monto  = posDe('.mv-monto')
-      const cant   = posDe('.mv-cant')
-      const sector = posDe('.mv-imputacion')
+    it('la categoría va primero y la plata después: categoría → monto → cantidad', async () => {
+      wrapper.vm.form.categoria_contable_id = 1
+      await wrapper.vm.$nextTick()
 
-      expect(monto).toBeGreaterThan(-1)
+      const cat   = posDe('.mv-fld--clave')
+      const monto = posDe('.mv-monto')
+      const cant  = posDe('.mv-cant')
+
+      expect(cat).toBeGreaterThan(-1)
+      expect(monto).toBeGreaterThan(cat)
       expect(cant).toBeGreaterThan(monto)
-      expect(sector).toBeGreaterThan(cant)
     })
 
-    it('el sector NO está adentro del acordeón de comprobante y notas', () => {
-      const extra = wrapper.element.querySelector('.mv-extra')
-      expect(extra?.querySelector('.mv-imputacion')).toBeFalsy()
-      expect(wrapper.element.querySelector('.mv-imputacion')).toBeTruthy()
+    // El sector no se pregunta más: lo trae la categoría, y se muestra como consecuencia
+    // debajo de ella.
+    it('el sector se muestra como eco de la categoría, no como campo', async () => {
+      wrapper.vm.form.categoria_contable_id = 1
+      await wrapper.vm.$nextTick()
+
+      expect(wrapper.element.querySelector('.mv-cat-eco').textContent).toContain('Cultivo')
     })
 
-    // Antes sólo aparecía si el flujo o la categoría lo sugerían, así que una compra cargada
-    // como "gasto" no tenía forma de entrar al inventario.
-    it('"¿entra al inventario?" está siempre a la vista', () => {
+    it('el depósito aparece cuando la categoría stockea', async () => {
+      wrapper.vm.form.categoria_contable_id = 1
+      await wrapper.vm.$nextTick()
+
       expect(wrapper.element.textContent).toMatch(/entra al inventario/i)
     })
   })

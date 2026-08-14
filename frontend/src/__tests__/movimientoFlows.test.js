@@ -140,17 +140,28 @@ describe('validarMovimiento', () => {
     expect(esValido(validarMovimiento(valido))).toBe(true)
   })
 
-  it('pide descripción, monto y fecha', () => {
+  it('pide categoría, descripción, monto y fecha', () => {
     const e = validarMovimiento({ descripcion: '   ', monto_ars: 0, fecha: '' })
-    expect(Object.keys(e).sort()).toEqual(['descripcion', 'fecha', 'monto_ars'])
+    expect(Object.keys(e).sort()).toEqual(['categoria', 'descripcion', 'fecha', 'monto_ars'])
   })
 
-  // La categoría es el ATAJO —completa tipo, sector y depósito de una— pero no la puerta: con
-  // el flujo (compra / gasto / aporte / ingreso) alcanza para registrar. Una organización que
-  // todavía no armó su catálogo tiene que poder anotar lo que gastó.
-  it('sin categoría se puede registrar igual', () => {
+  // CAMBIO DE CRITERIO (Germán, ago-2026): LA CATEGORÍA MANDA, así que es obligatoria. De ella
+  // salen el sector y si la compra entra a un depósito (y a cuál). Sin categoría el formulario
+  // tendría que volver a preguntar las tres cosas, y el gasto terminaría sin sector: invisible
+  // en el resultado de cualquier área.
+  //
+  // Era opcional porque el catálogo arrancaba vacío; ahora la organización nace con una lista
+  // sembrada, así que cargar es ELEGIR.
+  it('sin categoría no se registra', () => {
     const sinCat = { ...valido, categoria_contable_id: null }
-    expect(esValido(validarMovimiento(sinCat))).toBe(true)
+    expect(validarMovimiento(sinCat).categoria).toBeTruthy()
+  })
+
+  // La excepción, para no dejar sin salida a lo que no pasa por el formulario (por ejemplo, un
+  // alta automática): el contexto puede declarar que la categoría no aplica.
+  it('salvo que el contexto diga que no aplica', () => {
+    const sinCat = { ...valido, categoria_contable_id: null }
+    expect(esValido(validarMovimiento(sinCat, { categoriaOpcional: true }))).toBe(true)
   })
 
   it('monto 0 o negativo no pasa', () => {

@@ -23,10 +23,13 @@ RSpec.describe Finanzas::SembrarCatalogo do
     expect(cats.where(tipo: 'ingreso').count).to be > 0
   end
 
-  it 'cubre los gastos de todo club: insumos, servicios, personal' do
+  # UN SOLO NIVEL: las categorías son los nombres CONCRETOS que se eligen al cargar. Antes había
+  # un escalón agrupador (Insumos › Fertilizante) y los nombres útiles eran las hojas; filtrar por
+  # "Insumos" no decía nada.
+  it 'cubre los gastos de todo club, con nombres que sirven para elegir' do
     nombres = cats.pluck(:nombre).map(&:downcase)
 
-    expect(nombres).to include('insumos', 'servicios', 'personal')
+    expect(nombres).to include('fertilizante', 'electricidad', 'sueldos', 'alquiler')
   end
 
   it 'y de dónde entra la plata de un club de cannabis' do
@@ -35,13 +38,9 @@ RSpec.describe Finanzas::SembrarCatalogo do
     expect(nombres).to include('aportes de socios')
   end
 
-  # Las madres agrupan y las subcategorías son lo que se elige al cargar: sin subcategorías,
-  # filtrar por "Insumos" no dice nada.
-  it 'las categorías tienen subcategorías, que es lo que se elige al cargar' do
-    madres = cats.where(parent_id: nil)
-
-    expect(madres.count).to be > 0
-    expect(cats.where.not(parent_id: nil).count).to be > 0
+  it 'y ninguna tiene subcategorías: el catálogo es de un solo nivel' do
+    expect(cats.count).to be > 0
+    expect(cats.where.not(parent_id: nil).count).to eq(0)
   end
 
   # El `comportamiento` es lo que decide si una compra entra al depósito. Sin eso puesto, el
@@ -52,10 +51,13 @@ RSpec.describe Finanzas::SembrarCatalogo do
     expect(con_stock.count).to be > 0
   end
 
+  # De acá sale todo lo demás en el alta: el sector imputa el P&L y el comportamiento decide si
+  # la compra entra a un depósito. Una categoría sin sector deja el gasto invisible en el
+  # resultado de toda área.
   it 'cada categoría cuelga de un sector, que es lo que arma el P&L' do
-    con_sector = cats.where(parent_id: nil).where.not(unidad_negocio_id: nil)
+    sin_sector = cats.where(unidad_negocio_id: nil).pluck(:nombre)
 
-    expect(con_sector.count).to be > 0
+    expect(sin_sector).to eq([])
   end
 
   # Sembrar dos veces no puede duplicar: el catálogo se re-asegura cuando alguien entra a

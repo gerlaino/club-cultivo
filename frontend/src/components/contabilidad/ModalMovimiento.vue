@@ -380,6 +380,9 @@ function submit() {
 
   const payload = {
     ...form.value,
+    // El sector lo trae la categoría: se manda derivado para que el movimiento quede imputado
+    // sin depender de que el formulario tuviera el campo a la vista.
+    unidad_negocio_id: catActual.value?.area ?? form.value.unidad_negocio_id,
     // Sin categoría del catálogo, clasifica el flujo. 'otro' es el último recurso, no el
     // primero: un gasto y una compra no son lo mismo en el libro.
     categoria: catActual.value?.clave || flujo.value?.claveLegacy || 'otro',
@@ -521,7 +524,7 @@ const titulo = computed(() => {
                    si va a aparecer bien en un informe. Va destacada, no como un campo más
                    en la lista. -->
               <div class="mv-fld mv-combo-wrap mv-fld--clave">
-                <span class="mv-lbl">Categoría <span class="mv-opt">(opcional)</span></span>
+                <span class="mv-lbl">Categoría <span class="mv-req">*</span></span>
                 <button type="button" class="mv-combo" :class="{ 'mv-combo--err': errores.categoria }"
                         @click="catOpen ? catOpen = false : abrirCat()">
                   <span v-if="catActual" class="mv-combo-val">{{ catActual.label }}</span>
@@ -606,6 +609,15 @@ const titulo = computed(() => {
                   </div>
                 </div>
                 <span v-if="errores.categoria" class="mv-err">{{ errores.categoria }}</span>
+                <!-- Lo que la categoría acaba de decidir, dicho en una línea: a qué sector imputa
+                     y si la compra entra a un depósito. Son consecuencias, no preguntas. -->
+                <p v-if="catActual" class="mv-cat-eco">
+                  <i class="bi bi-diagram-3"></i>
+                  <span v-if="areaDeLaCategoria"><strong>{{ areaDeLaCategoria }}</strong></span>
+                  <span v-else class="mv-opt">Sin sector</span>
+                  <span v-if="pideDestinoCat" class="mv-cat-eco-tag">entra al depósito</span>
+                  <span v-else class="mv-opt">· no va a depósito</span>
+                </p>
               </div>
 
 
@@ -636,7 +648,10 @@ const titulo = computed(() => {
                  otro. Ahora es del movimiento y el bloque de depósito lo REUSA: sigue habiendo un
                  solo lugar donde se carga, que era el motivo por el que estaba abajo. Opcional:
                  un alquiler no tiene cantidad y el campo se deja vacío. -->
-            <div class="mv-cant">
+            <!-- Cantidad y unidad aparecen SÓLO si la categoría entra a un depósito: para pagar
+                 la luz no hay nada que contar, y preguntarlo igual es de las cosas que hacían
+                 caminar por doce decisiones para registrar un gasto de una línea. -->
+            <div v-if="pideDestinoCat" class="mv-cant">
               <label class="mv-fld mv-fld--sm">
                 <span class="mv-lbl">Cantidad <span class="mv-opt">(opcional)</span></span>
                 <input type="number" min="0" step="0.001" class="mv-inp"
@@ -750,19 +765,11 @@ const titulo = computed(() => {
                  —un gasto sin sector no aparece en el resultado de ninguna área— y "¿entra al
                  depósito?" decide si la compra mueve inventario: son decisiones del movimiento,
                  no papeleo. Van a la vista, siempre. -->
-            <div class="mv-imputacion">
-              <label v-if="sectoresOfrecidos.length" class="mv-fld">
-                <span class="mv-lbl">
-                  Sector
-                  <span v-if="catActual && areaDeLaCategoria" class="mv-opt">(lo trae la categoría)</span>
-                </span>
-                <select class="mv-inp" v-model="form.unidad_negocio_id" :disabled="!!(catActual && areaDeLaCategoria)">
-                  <option :value="null">— Sin sector —</option>
-                  <option v-for="u in sectoresOfrecidos" :key="u.id" :value="u.id">{{ u.nombre }}</option>
-                </select>
-              </label>
-
-              <label v-if="multiSede" class="mv-fld">
+            <!-- El SECTOR no se pregunta: lo trae la categoría (ver el eco debajo de ella). La
+                 SEDE sí, y sólo si la organización tiene más de una: es física, y la categoría
+                 no puede saber en cuál se hizo el gasto. -->
+            <div v-if="multiSede" class="mv-imputacion">
+              <label class="mv-fld">
                 <span class="mv-lbl">
                   Sede <span v-if="depositoSel?.sede_id" class="mv-opt">(la fija el depósito)</span>
                 </span>
@@ -779,6 +786,7 @@ const titulo = computed(() => {
                  la primera opción es "No, es solo un gasto", así que decir que no cuesta un
                  click y queda explícito en la pantalla. -->
             <DestinoStock
+              v-if="pideDestinoCat"
               v-model="destino"
               :depositos="depositos" :insumos="insumos" :bares="bares"
               :monto="form.monto_ars" :cantidad="form.cantidad" :errores="errores"

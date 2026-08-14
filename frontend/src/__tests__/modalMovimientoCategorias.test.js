@@ -159,17 +159,15 @@ describe('ModalMovimiento — un solo formulario', () => {
     w.unmount()
   })
 
-  // CAMBIO DE CRITERIO (Germán, ago-2026): el sector es un campo VISIBLE del movimiento, no un
-  // eco escondido. Estaba dentro del acordeón "Comprobante, proveedor y notas" —donde va lo que
-  // se toca una de cada veinte veces— y es el eje del P&L: un gasto sin sector no aparece en el
-  // resultado de ninguna área. Cuando la categoría ya lo trae, el campo lo muestra y se bloquea,
-  // para que se vea qué quedó imputado sin dejar cambiarlo por accidente.
-  it('el sector se ve, y con categoría lo trae ella', async () => {
+  // CAMBIO DE CRITERIO (Germán, ago-2026): el sector ya no se pregunta — LO TRAE LA CATEGORÍA,
+  // que pasó a ser obligatoria. Se muestra como consecuencia, en una línea debajo de ella, junto
+  // con si la compra entra a un depósito. Preguntarlo aparte era pedir dos veces lo mismo y
+  // dejaba la puerta abierta a que se contradijeran.
+  it('el sector sale de la categoría y se muestra debajo', async () => {
     const CATS = [{
-      id: 1, nombre: 'Insumos', tipo: 'egreso', comportamiento_efectivo: 'insumo',
+      id: 1, nombre: 'Fertilizante', tipo: 'egreso', comportamiento_efectivo: 'insumo',
       unidad_negocio: { id: 3, nombre: 'Cultivo' }, subcategorias: [],
     }]
-    // El club tiene sus sectores cargados: sin eso el campo no se dibuja (no hay qué elegir).
     const w = await abrir({ categorias: CATS, unidades: [{ id: 3, nombre: 'Cultivo' }] })
 
     w.vm.form.categoria_contable_id = 1
@@ -177,11 +175,10 @@ describe('ModalMovimiento — un solo formulario', () => {
 
     expect(w.vm.areaDeLaCategoria).toBe('Cultivo')
 
-    // El campo está a la vista (no adentro del acordeón) y bloqueado: lo decidió la categoría.
-    const sector = [...document.body.querySelectorAll('select')]
-      .find(sel => [...sel.options].some(o => /Sin sector/i.test(o.textContent)))
-    expect(sector, 'el select de sector tiene que estar en pantalla').toBeTruthy()
-    expect(sector.disabled).toBe(true)
+    const eco = document.body.querySelector('.mv-cat-eco')
+    expect(eco, 'el eco de la categoría tiene que estar en pantalla').toBeTruthy()
+    expect(eco.textContent).toContain('Cultivo')
+    expect(eco.textContent).toMatch(/dep[óo]sito/i)
     w.unmount()
   })
 

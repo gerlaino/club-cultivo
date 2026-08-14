@@ -60,77 +60,71 @@ module Finanzas
       result
     end
 
+    # UN SOLO NIVEL: sector → categoría. Antes había un escalón intermedio (Insumos › Fertilizante)
+    # que había que entender antes de poder anotar un gasto, y los nombres útiles eran las hojas.
+    # Ahora las hojas SON las categorías, cada una con su sector y con su destino de stock.
+    #
+    # Cada categoría es lo que después maneja el alta del movimiento: de acá salen el sector y si
+    # la compra entra a un depósito (y a cuál, vía el sector). Por eso vale la pena que el club
+    # arranque con una lista razonable en vez de un combo vacío: cargar es ELEGIR, y los informes
+    # tienen datos consistentes desde el primer día.
     def sembrar_arbol
       cultivo = @unidades['cultivo']
       disp    = @unidades['dispensario']
       admin   = @unidades['administracion']
+      otro    = @unidades['otro']
 
-      # ── Egresos ──────────────────────────────────────────────
-      insumos = madre('Insumos', 'egreso', cultivo, comportamiento: 'insumo', clave: 'insumo')
-      sub(insumos, 'Fertilizante')
-      sub(insumos, 'Sustrato')
-      sub(insumos, 'Macetas')
-      sub(insumos, 'Semillas')
-      sub(insumos, 'Sanidad vegetal')
+      # ── Egresos de cultivo: lo que entra al depósito de Cultivo ──
+      %w[Fertilizante Sustrato Macetas Semillas].each { |n| cat(n, 'egreso', cultivo, comportamiento: 'insumo') }
+      cat('Sanidad vegetal', 'egreso', cultivo, comportamiento: 'insumo')
 
-      servicios = madre('Servicios', 'egreso', cultivo)
-      sub(servicios, 'Electricidad', clave: 'electricidad')
-      sub(servicios, 'Agua',         clave: 'agua')
+      # Servicios del cuarto: no stockean.
+      cat('Electricidad', 'egreso', cultivo, clave: 'electricidad')
+      cat('Agua',         'egreso', cultivo, clave: 'agua')
 
-      personal = madre('Personal', 'egreso', admin, clave: 'sueldo')
-      sub(personal, 'Sueldos')
-      sub(personal, 'Honorarios', clave: 'honorario')
+      # ── Egresos de la organización ──
+      cat('Sueldos',        'egreso', admin, clave: 'sueldo')
+      cat('Honorarios',     'egreso', admin, clave: 'honorario')
+      cat('Alquiler',       'egreso', admin, clave: 'alquiler')
+      cat('Mantenimiento',  'egreso', admin, clave: 'mantenimiento')
+      cat('Seguro',         'egreso', admin, clave: 'seguro')
+      cat('Administrativo', 'egreso', admin, clave: 'admin')
 
-      operacion = madre('Operación', 'egreso', admin)
-      sub(operacion, 'Alquiler',       clave: 'alquiler')
-      sub(operacion, 'Mantenimiento',  clave: 'mantenimiento')
-      sub(operacion, 'Seguro',         clave: 'seguro')
-      sub(operacion, 'Administrativo', clave: 'admin')
+      # Insumos generales: van al depósito General de la sede.
+      %w[Limpieza Descartables].each { |n| cat(n, 'egreso', admin, comportamiento: 'insumo_general') }
+      cat('Librería / Oficina', 'egreso', admin, comportamiento: 'insumo_general')
 
-      # Insumos generales del club (se stockean en el depósito general de la sede).
-      generales = madre('Insumos generales', 'egreso', admin, comportamiento: 'insumo_general')
-      sub(generales, 'Limpieza')
-      sub(generales, 'Descartables')
-      sub(generales, 'Librería / Oficina')
-
-      madre('Otro', 'egreso', nil, clave: 'otro')
+      cat('Otro', 'egreso', otro, clave: 'otro')
 
       # ── Ingresos ─────────────────────────────────────────────
-      madre('Aportes de socios',     'ingreso', disp,  clave: 'aporte_socio')
-      madre('Recupero dispensación', 'ingreso', disp,  clave: 'dispensacion')
-      madre('Subvenciones',          'ingreso', admin, clave: 'subvencion')
+      # No se cargan por "Nuevo movimiento" (ver el modal): las crea el sistema desde la cuenta
+      # corriente y la dispensación, o el alta de ingreso excepcional.
+      cat('Aportes de socios',     'ingreso', disp,  clave: 'aporte_socio')
+      cat('Recupero dispensación', 'ingreso', disp,  clave: 'dispensacion')
+      cat('Subvenciones',          'ingreso', admin, clave: 'subvencion')
+      cat('Donaciones',            'ingreso', admin)
+      cat('Venta de un bien',      'ingreso', otro)
 
-      # ── Bar (si el feature está activo) ──────────────────────
+      # ── Buffet (si el add-on está activo) ──
       if @club.feature?(:bar) && @unidades['bar']
-        madre('Mercadería bar', 'egreso', @unidades['bar'], comportamiento: 'mercaderia')
-        madre('Venta bar',      'ingreso', @unidades['bar'])
+        cat('Mercadería buffet', 'egreso',  @unidades['bar'], comportamiento: 'mercaderia')
+        cat('Venta buffet',      'ingreso', @unidades['bar'])
       end
     end
 
-    # Categoría madre (nivel 1). Si trae `clave`, reutiliza la fila plana existente (siembra vieja)
-    # y la promueve a madre — así conserva el vínculo con los movimientos. Idempotente.
-    def madre(nombre, tipo, unidad, comportamiento: 'general', clave: nil)
-      cat = buscar(clave: clave, nombre: nombre, parent_id: nil)
-      cat.assign_attributes(nombre: nombre, tipo: tipo, unidad_negocio: unidad, parent_id: nil,
-                            comportamiento: comportamiento, es_sistema: true)
-      cat.clave_sistema ||= clave
-      cat.activa = true if cat.new_record?
-      cat.save!
-      cat
+    # Categoría de primer (y único) nivel. Si trae `clave`, reutiliza la fila existente —así
+    # conserva el vínculo con los movimientos ya cargados— y la sube a nivel raíz si estaba
+    # colgando de una madre.
+    def cat(nombre, tipo, unidad, comportamiento: 'general', clave: nil)
+      registro = buscar(clave: clave, nombre: nombre, parent_id: nil)
+      registro.assign_attributes(nombre: nombre, tipo: tipo, unidad_negocio: unidad,
+                                 parent_id: nil, comportamiento: comportamiento, es_sistema: true)
+      registro.clave_sistema ||= clave
+      registro.activa = true if registro.new_record?
+      registro.save!
+      registro
     end
 
-    # Subcategoría (nivel 2) bajo `madre`. Hereda tipo/comportamiento/unidad de la madre.
-    def sub(madre, nombre, clave: nil)
-      cat = buscar(clave: clave, nombre: nombre, parent_id: madre.id)
-      cat.assign_attributes(nombre: nombre, tipo: madre.tipo, parent: madre, es_sistema: true)
-      cat.clave_sistema ||= clave
-      cat.activa = true if cat.new_record?
-      cat.save!
-      cat
-    end
-
-    # Reutiliza por clave_sistema (fila existente aunque haya cambiado de nombre/lugar); si no,
-    # por nombre + nivel. Evita duplicados al re-sembrar y al actualizar catálogos viejos.
     def buscar(clave:, nombre:, parent_id:)
       return @club.categorias_contables.find_or_initialize_by(clave_sistema: clave) if clave.present?
 
