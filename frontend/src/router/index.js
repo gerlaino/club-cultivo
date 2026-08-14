@@ -1006,6 +1006,17 @@ const ROLE_HOME = {
 // un botón que rebota es peor que un botón que no está.
 const COMUNES = ['/perfil', '/mis-horas', '/login', '/bienvenida']
 
+// Las pantallas que se abren ESCANEANDO una etiqueta: planta, stock y lote. No son una sección
+// del menú —se llega por la cámara o desde la ficha de al lado, así que no hay forma de "no
+// ofrecerlas"— y quien trabaja con etiquetas pegadas las necesita. Los datos sensibles los sigue
+// gateando el backend: la vista pública del QR trae lo mínimo y el resto exige sesión y permiso.
+//
+// Sin esto, el manicura que tocaba una planta para registrar su peso comía "no tenés acceso":
+// el detalle del lote lo manda a /p/<qr> y ese prefijo no estaba en ninguna matriz.
+// Sin la barra final: `puedeEntrar` compara con `prefijo + '/'`, así que '/p' cubre /p/<qr> y
+// no se pisa con /pacientes ni /salas.
+const ETIQUETAS = ['/p', '/s', '/l']
+
 const ROLE_ALLOWED_PREFIX = {
   super_admin: ['/super-admin', ...COMUNES],
   auditor:     ['/auditor',  ...COMUNES],
@@ -1016,23 +1027,24 @@ const ROLE_ALLOWED_PREFIX = {
   // Cultivo: salas, lotes, plantas y lo que rodea al trabajo diario del cuarto.
   cultivador: ['/', '/salas', '/lotes', '/plantas', '/geneticas', '/tareas', '/plan-trabajo',
                '/historial-cultivador', '/cosechado', '/dispositivos', '/reglas-ambientales',
-               '/m', ...COMUNES],
+               '/m', ...ETIQUETAS, ...COMUNES],
 
   // Supervisa el cultivo de sus sedes y además dispensa.
   supervisor: ['/', '/salas', '/lotes', '/plantas', '/geneticas', '/tareas', '/plan-trabajo',
                '/historial-cultivador', '/cosechado', '/dispositivos', '/reglas-ambientales',
                '/pacientes', '/socios', '/historial', '/admin/stock', '/insumos', '/sedes',
-               '/analitica', '/reservas', '/m', ...COMUNES],
+               '/analitica', '/reservas', '/m', ...ETIQUETAS, ...COMUNES],
 
   // Post-cosecha: pesa los lotes que le asignan. `/mnc` es SU sección y además donde aterriza
   // al entrar (ver el beforeEnter de "/"): sin ella el guard lo devolvía a "/", que lo volvía a
   // mandar a /mnc, y el login terminaba sin ir a ningún lado.
-  manicura:   ['/', '/mnc', '/cosechado', '/lotes', '/plantas', '/tareas', '/m', ...COMUNES],
+  manicura:   ['/', '/mnc', '/cosechado', '/lotes', '/plantas', '/tareas', '/m',
+               ...ETIQUETAS, ...COMUNES],
 
   // Mostrador: dispensa, cobra y consulta stock. `/stock` es la pantalla de stock del
   // dispensador (la de admin es `/admin/stock`): son dos rutas distintas y le hacen falta las dos.
   dispensador: ['/', '/pacientes', '/socios', '/historial', '/stock', '/admin/stock', '/insumos',
-                '/reservas', '/bar', '/entregas', '/m', ...COMUNES],
+                '/reservas', '/bar', '/entregas', '/m', ...ETIQUETAS, ...COMUNES],
 
   // El paciente sólo ve lo suyo (todavía sin portal propio: ver tarea del login de paciente).
   paciente:   ['/', ...COMUNES],

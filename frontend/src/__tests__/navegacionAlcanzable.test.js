@@ -52,6 +52,31 @@ describe('cada rol puede abrir lo que su navegación le ofrece', () => {
     })
   }
 
+  // Las pantallas que se abren escaneando una etiqueta (o tocando la planta en la ficha del
+  // lote). No están en ningún menú —se llega por la cámara o desde la ficha de al lado— así que
+  // no hay forma de "no ofrecerlas": si el rol no puede abrirlas, el botón rebota.
+  //
+  // El caso real: el manicura tocaba una planta para registrar su peso y le decía que no tenía
+  // permisos, porque el detalle del lote lo manda a /p/<codigo_qr>.
+  describe('las pantallas de etiqueta (QR)', () => {
+    const OPERATIVOS = ['cultivador', 'supervisor', 'manicura', 'dispensador']
+    const ETIQUETAS  = { planta: '/p/ABC123', stock: '/s/XYZ789', lote: '/l/L-26-001' }
+
+    for (const rol of OPERATIVOS) {
+      for (const [que, ruta] of Object.entries(ETIQUETAS)) {
+        it(`${rol} puede abrir la etiqueta de ${que}`, () => {
+          expect(puedeEntrar(rol, ruta)).toBe(true)
+        })
+      }
+    }
+
+    // El prefijo corto no puede abrir de más: '/p' no es '/pacientes' ni '/perfil'.
+    it('el prefijo de etiqueta no le abre otras secciones al manicura', () => {
+      expect(puedeEntrar('manicura', '/pacientes')).toBe(false)
+      expect(puedeEntrar('manicura', '/salas')).toBe(false)
+    })
+  })
+
   // Lo más caro de todo: si el rol no puede entrar a donde aterriza, no entra a NINGÚN lado.
   // El guard lo devuelve al origen, que lo vuelve a mandar al mismo lugar.
   describe('el aterrizaje del login', () => {
