@@ -995,7 +995,16 @@ const ROLE_HOME = {
 // vive bajo /m) y si la matriz no lo admite, lo rebota — y el guard lo vuelve a empujar. Es
 // un loop infinito que se ve como "queda cargando y no entra". Le pasaba al delivery en cada
 // login desde la app instalada.
-const COMUNES = ['/perfil', '/login', '/bienvenida']
+// Estas listas se escriben MIRANDO LA NAVEGACIÓN REAL de cada rol (su barra lateral y a dónde
+// aterriza al entrar), no de memoria. Escritas de memoria se olvidaron las secciones propias de
+// media app: el manicura no podía entrar a la suya —que además es donde aterriza al loguearse,
+// así que quedaba en un ida y vuelta contra el guard y ni siquiera llegaba a entrar—, el
+// cultivador no podía abrir "Mis horas" desde su propio botón, el dispensador no podía abrir
+// "Stock" ni "Reservas" y el supervisor no podía ver Analítica.
+//
+// Hay un test que recorre los sidebars y verifica que todo link que un rol VE, lo pueda abrir:
+// un botón que rebota es peor que un botón que no está.
+const COMUNES = ['/perfil', '/mis-horas', '/login', '/bienvenida']
 
 const ROLE_ALLOWED_PREFIX = {
   super_admin: ['/super-admin', ...COMUNES],
@@ -1013,14 +1022,17 @@ const ROLE_ALLOWED_PREFIX = {
   supervisor: ['/', '/salas', '/lotes', '/plantas', '/geneticas', '/tareas', '/plan-trabajo',
                '/historial-cultivador', '/cosechado', '/dispositivos', '/reglas-ambientales',
                '/pacientes', '/socios', '/historial', '/admin/stock', '/insumos', '/sedes',
-               '/m', ...COMUNES],
+               '/analitica', '/reservas', '/m', ...COMUNES],
 
-  // Post-cosecha: pesa los lotes que le asignan.
-  manicura:   ['/', '/cosechado', '/lotes', '/plantas', '/tareas', '/m', ...COMUNES],
+  // Post-cosecha: pesa los lotes que le asignan. `/mnc` es SU sección y además donde aterriza
+  // al entrar (ver el beforeEnter de "/"): sin ella el guard lo devolvía a "/", que lo volvía a
+  // mandar a /mnc, y el login terminaba sin ir a ningún lado.
+  manicura:   ['/', '/mnc', '/cosechado', '/lotes', '/plantas', '/tareas', '/m', ...COMUNES],
 
-  // Mostrador: dispensa, cobra y consulta stock.
-  dispensador: ['/', '/pacientes', '/socios', '/historial', '/admin/stock', '/insumos',
-                '/bar', '/entregas', '/m', ...COMUNES],
+  // Mostrador: dispensa, cobra y consulta stock. `/stock` es la pantalla de stock del
+  // dispensador (la de admin es `/admin/stock`): son dos rutas distintas y le hacen falta las dos.
+  dispensador: ['/', '/pacientes', '/socios', '/historial', '/stock', '/admin/stock', '/insumos',
+                '/reservas', '/bar', '/entregas', '/m', ...COMUNES],
 
   // El paciente sólo ve lo suyo (todavía sin portal propio: ver tarea del login de paciente).
   paciente:   ['/', ...COMUNES],
