@@ -44,6 +44,10 @@ class SalasController < ApplicationController
       return render json: PlanEnforcer.error_limite('salas', info[:limites][:salas], plan: info[:label]), status: :payment_required
     end
 
+    if (msg = kind_no_creable(sala_params[:kind]))
+      return render json: { error: msg }, status: :unprocessable_entity
+    end
+
     sala = current_user.club.salas.build(sala_params)
     sala.created_by = current_user
 
@@ -57,6 +61,13 @@ class SalasController < ApplicationController
   def update
     kind_antes = @sala.kind
     kind_nuevo = sala_params[:kind]
+
+    # Tampoco por edición: una sala de vegetativo no se "convierte" en sala de manicura. Se
+    # permite guardar una que YA sea de proceso (quedan de la época en que se auto-creaban):
+    # si no, no se le podría ni corregir el nombre.
+    if kind_nuevo.present? && kind_nuevo != kind_antes && (msg = kind_no_creable(kind_nuevo))
+      return render json: { error: msg }, status: :unprocessable_entity
+    end
 
     # Cambiar la fase de la sala ARRASTRA a sus lotes: pasar una sala de floración a vegetativo
     # revegeta todo lo que esté florando adentro y les reinicia el contador de días de fase.
@@ -198,6 +209,8 @@ class SalasController < ApplicationController
         r.club          = current_user.club
         r.registrado_en = Time.current
         r.fuente        = 'manual'
+        # El punto de medición ('incubadora') lo pone el modelo a partir del estado del lote:
+        # todos estos están enraizando. Ver RegistroAmbiental#punto_segun_estado_del_lote.
         r.save!
         count += 1
       end
@@ -288,6 +301,23 @@ class SalasController < ApplicationController
   end
 
   private
+
+  # Las salas son SOLO de cultivo. Manicura y cosecha son etapas por las que pasa el LOTE
+  # (`en_manicura`, `cosecha`), no lugares que alguien tenga que dar de alta: `asignar_manicurador!`
+  # no crea ninguna sala. Quedaron salas así de cuando se auto-creaban ("Cosecha · Sede"), por eso
+  # el kind sigue siendo válido para las existentes — lo que se cierra es la puerta de crear una nueva.
+  # La pantalla ya no las ofrece; esto es para que tampoco entren por la API.
+  ETAPAS_NO_SALA = { 'manicura' => 'La manicura', 'cosecha' => 'La cosecha', 'curado' => 'El curado' }.freeze
+
+  def kind_no_creable(kind)
+    return nil if kind.blank?
+
+    etapa = ETAPAS_NO_SALA[kind.to_s]
+    return nil unless etapa
+
+    "#{etapa} es una etapa del lote, no una sala: no hace falta crearla. " \
+      'Las salas son de vegetativo o floración.'
+  end
 
   def set_sala
     scope = current_user.club.salas
@@ -488,6 +518,9 @@ class SalasController < ApplicationController
       lotes_historial:,
       historial_kpis:,
       ambiente_actual: ambiente_actual(s),
+      # El clima del propagador va aparte, nunca mezclado con el del cuarto: son dos aires
+      # distintos con dos objetivos distintos. Es nil cuando la sala no tiene nada enraizando.
+      ambiente_incubadora: ambiente_actual(s, punto: 'incubadora'),
     )
   end
 
@@ -496,17 +529,20 @@ class SalasController < ApplicationController
   # Va siempre con `registrado_en` y de qué lote salió: sin sensores conectados este dato puede ser
   # de hace una semana, y mostrarlo pelado te haría creer que es de ahora. Un dato ambiental viejo
   # sin fecha es peor que no tener dato.
-  def ambiente_actual(sala)
+  # `punto`: 'sala' (el aire del cuarto, lo que el KPI llama ambiente) o 'incubadora' (el
+  # propagador de los lotes enraizando, que tiene su propio clima). Sin separarlos, el KPI de la
+  # sala mostraba los 28 °C / 90 % de adentro de la bandeja como si fueran los del cuarto.
+  def ambiente_actual(sala, punto: 'sala')
     # FUENTE PRIMARIA: `LecturaAmbiental`, que guarda `sala_id` AL MOMENTO de medir. `RegistroAmbiental`
     # cuelga del lote y no sabe dónde se midió: al mover un lote de cuarto, sus registros viejos se le
     # atribuían a la sala NUEVA. Una sala sin actividad terminaba mostrando el aire de otra.
-    ult = LecturaAmbiental.where(sala_id: sala.id, tipo: %w[temperatura humedad])
+    ult = LecturaAmbiental.where(sala_id: sala.id, punto_medicion: punto, tipo: %w[temperatura humedad])
                           .order(medido_at: :desc).first
 
     if ult
       # Los valores del MISMO momento: una temperatura de hoy con una humedad de anteayer no
       # describen el mismo aire, y el VPD que sale de mezclarlas es inventado.
-      hermanas = LecturaAmbiental.where(sala_id: sala.id, medido_at: ult.medido_at)
+      hermanas = LecturaAmbiental.where(sala_id: sala.id, punto_medicion: punto, medido_at: ult.medido_at)
       temp = hermanas.find { |l| l.tipo == 'temperatura' }&.valor&.to_f
       hum  = hermanas.find { |l| l.tipo == 'humedad' }&.valor&.to_f
       return {
@@ -517,6 +553,7 @@ class SalasController < ApplicationController
         registrado_en: ult.medido_at,
         lote_codigo:   Lote.find_by(id: ult.lote_id)&.codigo,
         fuente:        ult.fuente,
+        punto:         punto,
       }
     end
 

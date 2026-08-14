@@ -17,14 +17,14 @@
         <div class="imm__body">
           <div v-if="error" class="imm__alert">{{ error }}</div>
 
-          <!-- Info sala destino -->
+          <!-- Qué pasa al confirmar. Antes decía "se creará una sala de manicura en <sede>":
+               ya no se crea ninguna sala —la manicura se trabaja por ESTADO del lote— así que
+               anunciaba algo que no iba a pasar, y la persona la buscaba después en Salas. -->
           <div class="imm__sala-info">
             <Scissors :size="13" :stroke-width="2" />
-            <span v-if="salaManiucuraExistente">
-              Se usará <strong>{{ salaManiucuraExistente.nombre }}</strong>
-            </span>
-            <span v-else>
-              Se creará una sala de manicura en <strong>{{ lote?.sala?.sede?.nombre || 'la sede actual' }}</strong>
+            <span>
+              El lote pasa a <strong>En manicura</strong> y se sigue desde la sección Manicura.
+              No cambia de sala.
             </span>
           </div>
 
@@ -96,18 +96,17 @@
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { Scissors, X } from 'lucide-vue-next'
 import { listUsers, asignarManicurador } from '../../lib/api.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { useToast } from '../../composables/useToast.js'
 
 const props = defineProps({
-  modelValue:   { type: Boolean, required: true },
-  lote:         { type: Object,  default: null },
-  salasDestino: { type: Array,   default: () => [] },
+  modelValue: { type: Boolean, required: true },
+  lote:       { type: Object,  default: null },
 })
-const emit = defineEmits(['update:modelValue', 'avanzado', 'sala-creada'])
+const emit = defineEmits(['update:modelValue', 'avanzado'])
 
 const toast = useToast()
 const form  = ref({ responsable_id: null, peso_humedo_g: null, notas: '' })
@@ -115,15 +114,6 @@ const error          = ref(null)
 const saving         = ref(false)
 const usuarios       = ref([])
 const loadingUsuarios = ref(false)
-
-// Sala de manicura ya existente en la misma sede del lote
-const salaManiucuraExistente = computed(() => {
-  const sedeId = props.lote?.sala?.sede?.id
-  if (!sedeId) return props.salasDestino.find(s => s.kind === 'manicura') || null
-  return props.salasDestino.find(
-    s => s.kind === 'manicura' && (s.sede_id === sedeId || s.sede?.id === sedeId)
-  ) || null
-})
 
 const ROLE_LABELS = { manicura: 'Manicura', admin: 'Admin', supervisor: 'Supervisor' }
 const roleLabel = (r) => ROLE_LABELS[r] || r

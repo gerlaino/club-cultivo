@@ -157,6 +157,14 @@ const showEdit   = ref(false);
 const editForm   = ref({ id: null, nombre: '', state: 'activa', kind: '', notes: '', sede_id: null });
 const editErrors = ref({});
 
+// Tipos que ya no se pueden elegir pero que existen en salas viejas (se auto-creaban al cosechar).
+const LABEL_KIND     = { manicura: 'Manicura', cosecha: 'Cosecha', curado: 'Curado', mixta: 'Mixta', madre: 'Madre', clon: 'Clon' };
+const KINDS_EDITABLES = ['vegetativo', 'floracion'];
+const kindHeredado    = computed(() => {
+  const k = editForm.value.kind;
+  return k && !KINDS_EDITABLES.includes(k) ? k : null;
+});
+
 function startEdit(s) {
   editForm.value = {
     id: s.id, nombre: s.nombre || '', state: s.state || 'activa',
@@ -484,10 +492,17 @@ async function confirmDelete(s) {
                 </div>
                 <div class="slv__field">
                   <label class="slv__label">Tipo</label>
+                  <!-- Sólo cultivo: manicura y cosecha son etapas del LOTE, no salas. El backend
+                       rechaza convertir una sala a esos tipos, así que ofrecerlos era invitar a un
+                       error. La opción bloqueada de abajo es para las salas de proceso que quedaron
+                       de cuando se auto-creaban: sin ella el select se ve vacío y quien edita el
+                       nombre no entiende qué tipo tiene, o lo pisa sin querer. -->
                   <select class="slv__input" v-model="editForm.kind">
                     <option value="vegetativo">Vegetativo</option>
                     <option value="floracion">Floración</option>
-                    <option value="manicura">Manicura</option>
+                    <option v-if="kindHeredado" :value="kindHeredado" disabled>
+                      {{ LABEL_KIND[kindHeredado] || kindHeredado }} (tipo antiguo)
+                    </option>
                   </select>
                 </div>
               </div>

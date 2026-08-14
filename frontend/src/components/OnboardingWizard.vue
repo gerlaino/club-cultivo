@@ -79,10 +79,14 @@ let   sedeIdCreada      = null
 
 const sala = ref({ nombre: '', kind: 'vegetativo' })
 
+// Las salas son SOLO de cultivo, igual que en ModalCrearSala. La manicura se trabaja por
+// ESTADO del lote (`en_manicura`), no en una sala que alguien tenga que crear: la sala de
+// manicura la genera sola la app al iniciar la manicura de un lote, en la sede que corresponde.
+// Ofrecerla acá —en la primera sala de una organización nueva— era pedirle a alguien que todavía
+// no cargó una planta que decida algo que no existe hasta después de la cosecha.
 const TIPOS_SALA = [
   { key: 'vegetativo', emoji: '🌿', label: 'Vegetativo' },
   { key: 'floracion',  emoji: '🌸', label: 'Floración'  },
-  { key: 'manicura',   emoji: '✂️', label: 'Manicura'   },
 ]
 
 async function avanzar() {

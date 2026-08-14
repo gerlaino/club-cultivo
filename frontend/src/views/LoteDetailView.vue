@@ -964,9 +964,7 @@ onUnmounted(() => {
     <IniciarManicuraModal
       v-model="showIniciarManicuraModal"
       :lote="lote"
-      :salas-destino="lote?.salas_destino || []"
       @avanzado="onManicuraIniciada"
-      @sala-creada="(s) => { if (lotes.current) lotes.current = { ...lotes.current, salas_destino: [...(lotes.current.salas_destino || []), s] } }"
     />
 
     <!-- ══ Modal Completar Manicura ══ -->
