@@ -32,6 +32,40 @@ RSpec.describe 'GET /informes/inase', type: :request do
     expect(lemon['gramos_producidos']).to eq(750.0)
   end
 
+  # Germán: "aparecen genéticas que no tengo... figuran las eliminadas". Eliminar una genética
+  # es `activa: false` (no se borra: puede tener lotes colgando), y el informe leía todas.
+  describe 'genéticas archivadas' do
+    before { sign_in_as(admin) }
+
+    def nombres
+      get '/informes/inase', headers: auth_headers
+      JSON.parse(response.body)['geneticas'].map { |g| g['nombre'] }
+    end
+
+    it 'no declara una que se archivó sin haber llegado a cultivarse' do
+      gen_no.update!(activa: false)
+
+      expect(nombres).not_to include('Casera')
+    end
+
+    # El otro extremo sería igual de malo: lo cultivado hay que declararlo aunque después se
+    # archive, o el informe no cuadra contra las plantas y los gramos que sí figuran.
+    it 'sí declara una archivada que tuvo cultivo' do
+      create(:lote, club: club, sala: sala, genetica: gen_no, plants_count: 8, estado: 'vegetativo')
+      gen_no.update!(activa: false)
+
+      expect(nombres).to include('Casera')
+    end
+
+    it 'la archivada sin cultivo tampoco cuenta en el total' do
+      gen_reg   # la que queda en pie
+      gen_no.update!(activa: false)
+
+      get '/informes/inase', headers: auth_headers
+      expect(JSON.parse(response.body)['total_geneticas']).to eq(1)
+    end
+  end
+
   it 'requiere rol auditor o admin' do
     sign_in_as(create(:user, :cultivador, club: club))
     get '/informes/inase', headers: auth_headers

@@ -510,9 +510,21 @@ class InformesController < ApplicationController
   end
 
   def inase
-    club      = current_user.club
-    geneticas = club.geneticas.order(:nombre)
-    lotes     = club.lotes
+    club  = current_user.club
+    lotes = club.lotes
+
+    # Qué genéticas se declaran: las que la organización TIENE, más las que archivó pero llegó a
+    # cultivar.
+    #
+    # Leía `club.geneticas` a secas y listaba también las archivadas —"eliminar" una genética es
+    # `activa: false`, no un borrado—, así que el informe declaraba ante el organismo variedades
+    # que la organización ya no trabaja. Filtrar sólo por activas sería el error opuesto: lo que
+    # se cultivó en el período hay que declararlo aunque después se haya archivado, o el informe
+    # deja de cuadrar contra las plantas y los gramos que sí figuran.
+    cultivadas = lotes.where.not(genetica_id: nil).distinct.pluck(:genetica_id)
+    geneticas  = club.geneticas.where(activa: true)
+                     .or(club.geneticas.where(id: cultivadas))
+                     .order(:nombre)
 
     lotes_por_gen   = lotes.group(:genetica_id).count
     plantas_por_gen = lotes.group(:genetica_id).sum(:plants_count)
