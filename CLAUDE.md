@@ -245,10 +245,30 @@ Cuando Germán plantee un problema o feature nueva antes de implementar:
 
 Suite 1239 ✓ + 58 vitest ✓. **Deploy: sumar `add_vendible_a_bar_venta_items` y `add_consumo_evento_a_provisiones_y_dispensas` al `db:migrate`.**
 
-## 📍 Dónde retomar (13-ago-2026)
+## 📍 Dónde retomar (14-ago-2026)
 
-**2058 rspec (0 fallas, 26 pending del observador suspendido) + 1264 vitest + build limpio.**
-Los bloques del 11 y del 12-ago están en `docs/CHANGELOG.md` como "Agosto 2026 (o)" y "(p)".
+**2115 rspec (0 fallas, 26 pending del observador suspendido) + 1275 vitest + build limpio.**
+Los bloques de agosto están en `docs/CHANGELOG.md` hasta "Agosto 2026 (q)".
+
+**El bloque (q) son ocho correcciones de datos que la app decía mal** (ver el CHANGELOG). Tres
+reglas de dominio quedaron fijadas ahí y conviene no volver a romperlas:
+
+- **PONER EN MACETA ES PRENDER.** Enraizado ⇔ sin maceta. Vive en
+  `Lote#prender_al_ponerlo_en_maceta` y cubre las cuatro puertas (alta heredada, desprender,
+  trasplante, edición). **No es una validación**: como validación volvía inguardable un lote que
+  ya estaba en ese estado, y hay que poder corregirlo.
+- **Dónde se midió el ambiente se DERIVA del estado del lote**, no se pregunta: un lote
+  `enraizado` está adentro del propagador. `punto_medicion` separa el aire del cuarto del aire
+  del domo en el KPI, en el VPD automático y en el evaluador de reglas.
+- **El DNI de un paciente es único POR ORGANIZACIÓN, no en la plataforma.** La regla del REPROCANN
+  es del trámite, no de nuestra base. Y el mensaje de error no puede delatar que ese DNI existe
+  en otra organización.
+
+Además: la **trazabilidad** de un stock sale del pesaje por planta (`PesajeManicura`) y declara
+`atribucion` cuando cae a nivel de lote; el **informe INASE** incluye las genéticas archivadas que
+llegaron a cultivarse; las **salas son sólo de cultivo** (manicura y cosecha son etapas del lote,
+y el backend lo valida); y el **movimiento contable** guarda cantidad y unidad, de donde sale el
+costo unitario.
 
 **El bloque (p) cierra el gateo de módulos de punta a punta:** el asistente de voz volvió a
 andar (chequeaba la clave vieja), Delivery se aplica en la API y en el modelo, el interruptor de

@@ -1,5 +1,83 @@
 # Changelog
 
+## Agosto 2026 (q) — ocho cosas que el sistema decía mal
+
+Un bloque de correcciones sobre datos que la app mostraba o guardaba de una forma que no se
+correspondía con lo que había pasado de verdad. No hay feature nueva: hay ocho lugares donde el
+registro y la realidad se habían separado.
+
+**Un DNI no puede ser único en toda la plataforma.** Se había leído el requisito del REPROCANN
+—una persona se registra con UN cultivador a la vez— como si fuera una restricción de nuestra
+base. No lo es, y traía tres problemas: quien se iba de una organización y entraba a otra no se
+podía dar de alta hasta que la primera lo borrara (hacer depender el alta de un cliente de que
+otro cliente haga algo, sin forma de pedírselo ni de saber a quién); el mensaje de error
+**confirmaba que ese DNI existe en OTRA organización**, que es un dato de salud de alguien que no
+es su paciente; y con `acts_as_paranoid` el registro borrado seguía ocupando el índice, así que
+ni borrándolo se liberaba. Ahora es único por organización, con índice parcial sobre los no
+borrados. La regla del organismo sigue existiendo donde corresponde: en el trámite, que lo
+controla quien ve el padrón completo.
+
+**El informe INASE declaraba variedades que la organización ya no trabaja.** "Eliminar" una
+genética es `activa: false` —no se borra, puede tener lotes colgando— y el informe las leía todas.
+Ahora declara las activas **más las archivadas que llegaron a cultivarse**: filtrar sólo por
+activas era el error opuesto, y dejaba el informe sin cuadrar contra las plantas y los gramos que
+sí figuran.
+
+**El KPI de la sala mostraba el clima de la incubadora.** El registro ambiental cuelga del LOTE y
+se propaga con el `sala_id`; un lote enraizando se mide **adentro del propagador** —28 °C y 90 %,
+que es su objetivo— y eso salía publicado como el aire del cuarto. Peor: las reglas ambientales de
+la sala se evaluaban contra ese número, así que la alerta de humedad alta saltaba cada vez que
+alguien registraba un enraizado. Ahora hay un punto de medición (sala / incubadora) que **se
+deriva del estado del lote**, no se pregunta en ningún formulario: dónde se midió es dónde está la
+planta. El cuarto y el domo tienen su propio KPI, y el VPD automático ya no cruza la temperatura
+de uno con la humedad del otro.
+
+**La trazabilidad de un frasco listaba las diez plantas del lote.** Trazar es decir de qué plantas
+salió ESTE frasco, no qué plantas tuvo el lote. Se leía sólo el vínculo del flujo viejo
+(`Pesada`), así que un stock nacido del flujo de manicura —por donde entra hoy toda la flor seca—
+no encontraba nada y caía a "todas las plantas del lote", **descartadas incluidas**: plantas que
+no produjeron un gramo, presentadas como origen del producto. Ahora sale del pesaje por planta,
+con lo que aportó cada una; cuando no hay pesaje individual se dice explícitamente que la
+atribución es a nivel de lote; y las descartadas van aparte, con su motivo, para que la resta
+cierre a la vista.
+
+**Poner en maceta es prender.** Enraizado ⇔ sin maceta: el que enraíza vive en taco o bandeja. La
+mitad de la regla ya existía (pasar a vegetativo exige indicar la maceta); faltaba la vuelta, y
+quedaban lotes "enraizando" con maceta de 5 L. El caso que lo destapó: separar 5 plantas de un
+lote enraizando poniéndolas en maceta de 0,5 L —que es exactamente el acto de prenderlas y
+trasplantarlas— dejaba el lote hijo en enraizado. Ahora la regla vive en el modelo y cubre las
+cuatro puertas (alta heredada, desprender, trasplante, edición), arrastra a las plantas y deja su
+evento de fase. **No es una validación:** como validación volvía inguardable un lote que ya estaba
+mal, y hay que poder corregirlo.
+
+**El modal de editar lote pedía cosas que no son del lote.** Los días objetivo por fase son de la
+**genética** —una Lemon florece lo que florece— y editarlos por lote era la puerta para que dos
+lotes de la misma variedad tuvieran objetivos distintos sin razón; ahora se muestran y se editan
+donde viven. Las fechas de inicio por fase se ofrecen **sólo hasta la fase actual**: un lote
+enraizando no tiene fecha de floración, y el campo invitaba a inventar historia hacia adelante.
+
+**Las salas son sólo de cultivo.** Manicura y cosecha son etapas del LOTE, no lugares que alguien
+tenga que dar de alta. El alta de escritorio ya no las ofrecía, pero el onboarding —la primera
+sala de una organización nueva— seguía ofreciendo Manicura, el modal de editar también, y el
+backend no validaba nada: por API entraba cualquiera. Las salas de proceso que quedaron de cuando
+se auto-creaban conservan su tipo en una opción bloqueada, para que editarles el nombre no se las
+pise.
+
+**Contabilidad: cuánto se compró.** La cantidad vivía sólo adentro del bloque de inventario, así
+que un gasto que no entra a ningún depósito —diez horas de electricista, tres análisis de
+laboratorio— no tenía dónde decirlo y se quedaba sin **costo unitario**, que es el número con el
+que se compara un proveedor contra otro. Ahora cantidad y unidad son del movimiento y el bloque de
+depósito las refleja: se siguen cargando en un solo lugar, que era el motivo de la regla anterior,
+pero ese lugar es el cuerpo. Además la categoría puede acotarse a una **sede**, "¿va a depósito?"
+se pregunta en castellano en vez de pedir un "comportamiento" (y **a cuál** lo decide el sector,
+que ya tiene el suyo: una decisión menos que no puede contradecir a la otra), y los sectores se
+marcan según el pack contratado —se informan, no se filtran: sus movimientos históricos siguen
+existiendo y su columna del P&L tiene que seguir cuadrando—.
+
+Suite: 2115 rspec + 1275 vitest + build limpio. Migraciones nuevas:
+`dni_unico_por_organizacion`, `punto_de_medicion_ambiental`,
+`cantidad_en_movimiento_y_sede_en_categoria`.
+
 ## Agosto 2026 (p) — lo que se contrata, aplicado de punta a punta
 
 El bloque anterior convirtió Delivery, Correo e IA en módulos que se venden y se dan de baja.

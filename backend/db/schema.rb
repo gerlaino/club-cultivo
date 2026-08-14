@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_11_190000) do
+ActiveRecord::Schema[7.2].define(version: 2026_08_14_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -354,11 +354,13 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_11_190000) do
     t.datetime "updated_at", null: false
     t.bigint "parent_id"
     t.string "comportamiento", default: "general", null: false
+    t.bigint "sede_id"
     t.index ["club_id", "clave_sistema"], name: "index_categorias_contables_on_club_id_and_clave_sistema"
     t.index ["club_id", "tipo"], name: "index_categorias_contables_on_club_id_and_tipo"
     t.index ["club_id"], name: "index_categorias_contables_on_club_id"
     t.index ["deleted_at"], name: "index_categorias_contables_on_deleted_at"
     t.index ["parent_id"], name: "index_categorias_contables_on_parent_id"
+    t.index ["sede_id"], name: "index_categorias_contables_on_sede_id"
     t.index ["unidad_negocio_id"], name: "index_categorias_contables_on_unidad_negocio_id"
   end
 
@@ -1144,11 +1146,13 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_11_190000) do
     t.bigint "origen_record_id"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "punto_medicion", default: "sala", null: false
     t.index ["club_id", "medido_at"], name: "idx_la_club_medido"
     t.index ["dispositivo_id", "tipo", "medido_at"], name: "idx_la_idempotencia", unique: true, where: "(dispositivo_id IS NOT NULL)"
     t.index ["dispositivo_id"], name: "index_lecturas_ambientales_on_dispositivo_id"
     t.index ["lote_id"], name: "index_lecturas_ambientales_on_lote_id"
     t.index ["origen_record_type", "origen_record_id"], name: "idx_la_origen", where: "(origen_record_id IS NOT NULL)"
+    t.index ["sala_id", "punto_medicion", "tipo", "medido_at"], name: "index_lecturas_sala_punto_tipo_medido"
     t.index ["sala_id", "tipo", "medido_at"], name: "idx_la_sala_tipo_medido"
     t.index ["sala_id"], name: "index_lecturas_ambientales_on_sala_id"
   end
@@ -1311,6 +1315,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_11_190000) do
     t.bigint "categoria_contable_id"
     t.bigint "unidad_negocio_id"
     t.bigint "evento_bar_id"
+    t.decimal "cantidad", precision: 12, scale: 3
+    t.string "unidad"
     t.index ["categoria_contable_id"], name: "index_movimientos_contables_on_categoria_contable_id"
     t.index ["club_id", "fecha"], name: "index_movimientos_contables_on_club_id_and_fecha"
     t.index ["club_id", "tipo"], name: "index_movimientos_contables_on_club_id_and_tipo"
@@ -1430,10 +1436,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_11_190000) do
     t.index "lower((nombre)::text)", name: "index_socios_on_lower_nombre"
     t.index ["aprobado_at"], name: "index_pacientes_on_aprobado_at"
     t.index ["carnet_token"], name: "index_pacientes_on_carnet_token", unique: true
+    t.index ["club_id", "dni_normalizado"], name: "index_pacientes_on_club_id_and_dni_normalizado", unique: true, where: "(deleted_at IS NULL)"
     t.index ["club_id"], name: "index_pacientes_on_club_id"
     t.index ["created_at"], name: "index_pacientes_on_created_at"
     t.index ["deleted_at"], name: "index_pacientes_on_deleted_at"
-    t.index ["dni_normalizado"], name: "index_pacientes_on_dni_normalizado", unique: true
   end
 
   create_table "patient_documents", force: :cascade do |t|
@@ -1732,6 +1738,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_11_190000) do
     t.text "notas_fertilizacion"
     t.jsonb "tareas_realizadas", default: [], null: false
     t.string "producto_enraizante"
+    t.string "punto_medicion", default: "sala", null: false
     t.index ["club_id"], name: "index_registros_ambientales_on_club_id"
     t.index ["lote_id"], name: "index_registros_ambientales_on_lote_id"
     t.index ["registrado_en"], name: "index_registros_ambientales_on_registrado_en"
@@ -2247,6 +2254,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_11_190000) do
   add_foreign_key "caja_turnos", "users", column: "cierre_solicitado_por_id"
   add_foreign_key "categorias_contables", "categorias_contables", column: "parent_id"
   add_foreign_key "categorias_contables", "clubs"
+  add_foreign_key "categorias_contables", "sedes"
   add_foreign_key "categorias_contables", "unidades_negocio", column: "unidad_negocio_id"
   add_foreign_key "categorias_producto", "clubs"
   add_foreign_key "check_ins", "clubs"
