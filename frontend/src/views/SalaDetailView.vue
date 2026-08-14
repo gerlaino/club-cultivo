@@ -440,8 +440,7 @@ function haceCuanto(iso) {
   const d = Math.round(h / 24)
   return d === 1 ? 'ayer' : `hace ${d} días`
 }
-const amb = computed(() => {
-  const a = sala.value?.ambiente_actual
+function lectura(a) {
   if (!a || (a.temperatura == null && a.humedad == null)) return null
   const horas = (Date.now() - new Date(a.registrado_en).getTime()) / 3600000
   return {
@@ -450,7 +449,17 @@ const amb = computed(() => {
     viejo: horas > 24,                       // más de un día: se marca, no es "el ambiente de ahora"
     vpdNivel: a.vpd != null ? nivelVpd(a.vpd) : null,
   }
-})
+}
+const amb = computed(() => lectura(sala.value?.ambiente_actual))
+
+// El clima del PROPAGADOR, aparte del cuarto: adentro del domo la sala marca 60% y hay 90%. El
+// backend ya no los mezcla (antes el KPI de la sala mostraba este dato como si fuera el del
+// cuarto). Aparece solo si hay algo enraizando.
+//
+// A propósito SIN el semáforo de VPD: la escala de `nivelVpd` es la del cuarto, y un esqueje sin
+// raíz quiere justo lo que ahí figura como "muy bajo" — pintarlo de rojo diría lo contrario de
+// lo que hay que hacer.
+const ambIncubadora = computed(() => lectura(sala.value?.ambiente_incubadora))
 
 const ESTADO_META = {
   semilla:    { label:"Semilla",  color:"#64748b", emoji:"🌱" },
@@ -929,6 +938,22 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                     :title="amb.vpdNivel.ayuda">VPD {{ amb.vpd }} kPa</span>
             </div>
             <div class="sd__kpi-sub">{{ amb.hace }}<span v-if="amb.lote_codigo"> · {{ amb.lote_codigo }}</span></div>
+          </div>
+        </div>
+
+        <!-- Incubadora / bandeja: su propio KPI. Es otro aire, no una segunda medición del mismo. -->
+        <div v-if="ambIncubadora" class="sd__kpi sd__kpi--amb sd__kpi--incubadora"
+             :class="{ 'sd__kpi--viejo': ambIncubadora.viejo }">
+          <div class="sd__kpi-icon">🫙</div>
+          <div class="sd__kpi-body">
+            <div class="sd__kpi-value">
+              <span v-if="ambIncubadora.temperatura != null">{{ ambIncubadora.temperatura }}°</span>
+              <span v-if="ambIncubadora.humedad != null" class="sd__amb-hum">{{ ambIncubadora.humedad }}%</span>
+            </div>
+            <div class="sd__kpi-label">Incubadora</div>
+            <div class="sd__kpi-sub">
+              {{ ambIncubadora.hace }}<span v-if="ambIncubadora.lote_codigo"> · {{ ambIncubadora.lote_codigo }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -1562,6 +1587,8 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 
 /* Ambiente actual */
 .sd__kpi--amb .sd__kpi-value { display: flex; align-items: baseline; gap: 8px; }
+/* Se distingue del ambiente del cuarto de un vistazo: son dos aires, no dos lecturas. */
+.sd__kpi--incubadora { border-color: #a5f3fc; background: #ecfeff; }
 .sd__amb-hum { font-size: .62em; color: var(--c-slate-500); font-weight: 600; }
 .sd__kpi--viejo .sd__kpi-value { color: var(--c-slate-400); }
 .sd__amb-vpd { font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 999px; margin-left: 6px; cursor: help; }

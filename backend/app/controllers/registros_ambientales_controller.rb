@@ -79,6 +79,7 @@ class RegistrosAmbientalesController < ApplicationController
       plagas_observadas:    r.plagas_observadas,
       observaciones:        r.observaciones,
       fuente:               r.fuente,
+      punto_medicion:       r.punto_medicion,
       tareas_realizadas:    r.tareas_realizadas || [],
       nombre_archivo_csv:   r.nombre_archivo_csv,
       tiene_csv:            r.archivo_csv.attached?,

@@ -21,8 +21,13 @@ module Ambiente
 
     def evaluar(regla)
       # Ignore backfill-sourced readings to avoid historical false alerts
+      #
+      # Sólo el aire del CUARTO: las reglas y los setpoints son de la sala. Adentro de una
+      # incubadora el 90 % de humedad es el objetivo, no una emergencia — evaluarlas contra la
+      # regla del cuarto disparaba la alerta cada vez que alguien registraba un enraizado.
       lecturas = LecturaAmbiental
         .de_sala(@sala.id)
+        .del_cuarto
         .del_tipo(regla.tipo_lectura)
         .no_backfill
         .ultimas_n_minutos(regla.duracion_minutos)

@@ -8,6 +8,11 @@ class RegistroAmbiental < ApplicationRecord
 
   has_one_attached :archivo_csv
 
+  # Dónde se tomó la medición. Un lote enraizando vive dentro del propagador, que tiene su
+  # propio clima: 28 °C y 90 % adentro de la incubadora es el objetivo, y en el cuarto sería
+  # una emergencia. Sin distinguirlos, el KPI de la sala mostraba el aire de la incubadora.
+  PUNTOS_MEDICION = %w[sala incubadora].freeze
+
   ESTADOS   = %w[excelente bueno regular malo critico].freeze
   ESPECTROS = %w[veg bloom auto mixto].freeze
   FASES     = %w[crecimiento floracion engorde lavado].freeze
@@ -19,6 +24,7 @@ class RegistroAmbiental < ApplicationRecord
   TAREAS    = %w[riego nutricion poda defoliacion scrog_lst revision_plagas limpieza_sala ajuste_luz registro_ambiental].freeze
 
   validates :registrado_en,  presence: true
+  validates :punto_medicion, inclusion: { in: PUNTOS_MEDICION }
   validates :estado_general, inclusion: { in: ESTADOS }, allow_blank: true
   validates :fuente,         inclusion: { in: FUENTES }, allow_blank: true
   validates :producto_enraizante, inclusion: { in: ENRAIZANTES }, allow_blank: true
@@ -31,6 +37,7 @@ class RegistroAmbiental < ApplicationRecord
   validates :horas_luz,      numericality: { greater_than_or_equal_to: 0, less_than_or_equal_to: 24 }, allow_nil: true
   validates :ppfd,           numericality: { greater_than_or_equal_to: 0 }, allow_nil: true
 
+  before_validation :punto_segun_estado_del_lote, on: :create
   before_save  :calcular_vpd
   after_save   :propagar_a_lecturas_ambientales
 
@@ -52,6 +59,17 @@ class RegistroAmbiental < ApplicationRecord
 
   private
 
+  # Un lote ENRAIZANDO vive adentro del propagador: su ambiente es el del domo, no el del cuarto.
+  # No es una preferencia de quien carga el dato, es dónde está físicamente la planta — por eso se
+  # deriva acá y no se pide en cada formulario. `registrar_sala` ya excluye a los enraizando por la
+  # misma razón; esto cierra las otras puertas (el registro de UN lote, el asistente por voz, seeds).
+  #
+  # Al avanzar de fase el lote sale del domo, pero sus registros viejos conservan el punto que
+  # tenían: son historia de dónde se midió, no del estado actual.
+  def punto_segun_estado_del_lote
+    self.punto_medicion = lote&.estado == 'enraizado' ? 'incubadora' : 'sala'
+  end
+
   def propagar_a_lecturas_ambientales
     sala_id = lote.sala_id
     return unless sala_id.present?
@@ -67,13 +85,16 @@ class RegistroAmbiental < ApplicationRecord
         tipo:               tipo
       )
       lectura.assign_attributes(
-        club_id:   club_id,
-        sala_id:   sala_id,
-        lote_id:   lote_id,
-        valor:     valor,
-        unidad:    AmbienteTipos::TIPOS_CANONICOS[tipo],
-        fuente:    'manual',
-        medido_at: registrado_en
+        club_id:        club_id,
+        sala_id:        sala_id,
+        lote_id:        lote_id,
+        valor:          valor,
+        unidad:         AmbienteTipos::TIPOS_CANONICOS[tipo],
+        fuente:         'manual',
+        # Viaja con la lectura: sin esto el punto se pierde en la propagación, que es donde el
+        # dato deja de estar atado al lote y pasa a ser "el ambiente de la sala".
+        punto_medicion: punto_medicion,
+        medido_at:      registrado_en
       )
       lectura.save!
       propagadas += 1
