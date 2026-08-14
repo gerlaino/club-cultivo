@@ -32,6 +32,10 @@
             <th class="sdv__th-num">Comprometido</th>
             <th class="sdv__th-num">P. sugerido</th>
             <th>Vencimiento</th>
+            <!-- Lo que se escribió al ingresar el producto. El alta ya lo llama "observaciones"
+                 (se guarda en `descripcion`) y la API siempre lo mandó: se cargaba y no se leía
+                 en ningún lado. -->
+            <th class="sdv__th-obs">Observaciones</th>
             <th></th>
           </tr>
         </thead>
@@ -66,6 +70,10 @@
                 {{ badgeVencimiento(s) }}
               </span>
               <span v-else-if="s.fecha_vencimiento_est" class="sdv__none">{{ fmtFecha(s.fecha_vencimiento_est) }}</span>
+              <span v-else class="sdv__none">—</span>
+            </td>
+            <td class="sdv__td-obs" data-col="Observaciones">
+              <span v-if="s.descripcion" :title="s.descripcion">{{ s.descripcion }}</span>
               <span v-else class="sdv__none">—</span>
             </td>
             <td class="sdv__td-etiqueta" data-col="Etiqueta">
@@ -236,6 +244,12 @@ function mostrarInicial(s) {
 .sdv__td-mono  { font-family: var(--font-mono); font-size: var(--fs-13); color: var(--c-ink-700); }
 .sdv__td-bajo  { color: var(--c-rust-600); font-weight: 700; }
 .sdv__none     { color: var(--c-ink-300); font-size: var(--fs-13); }
+/* Observaciones: texto libre, así que se acota y el resto se lee en el tooltip. Sin tope, un
+   comentario largo empuja las columnas de cantidad fuera de la pantalla. */
+.sdv__th-obs, .sdv__td-obs {
+  font-size: var(--fs-13); color: var(--c-ink-600);
+  max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 
 /* Badges */
 .sdv__badge-reservado {
@@ -268,6 +282,8 @@ function mostrarInicial(s) {
   /* En mobile, info secundaria oculta para no saturar */
   .sdv__th-ing, .sdv__td-ing { display: none; }
   .sdv__forma-sub { display: none; }
+  /* En la tarjeta de mobile el texto largo entra completo: no hay columnas que empujar. */
+  .sdv__td-obs { max-width: none; white-space: normal; }
 }
 .sdv__td-etiqueta { width: 36px; text-align: center; }
 .sdv__etiqueta-link { font-size: 1rem; text-decoration: none; cursor: pointer; }
