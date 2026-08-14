@@ -17,7 +17,12 @@ class TareasController < ApplicationController
   before_action :set_club
   before_action :set_tarea, only: [:show, :update, :destroy, :completar, :iniciar, :cancelar, :cancelar_serie]
   before_action :authorize_create!, only: [:create]
-  before_action :authorize_manage!, only: [:update, :destroy, :completar_masivo]
+  # `completar_masivo` NO está acá: completar una tarea es hacer el trabajo, no gestionarlo, y de
+  # a una ya lo puede cualquiera que llegue al controller (ver `completar`). Que la misma acción
+  # se permitiera de a una y se rechazara en tanda dejaba al manicura tildando su tarea asignada
+  # y comiéndose un 403 — con el botón a la vista. El alcance se acota adentro de la acción: quien
+  # no gestiona sólo completa LAS SUYAS.
+  before_action :authorize_manage!, only: [:update, :destroy]
 
   # GET /api/v1/tareas
   # Soporta filtros: estado, asignada_a_id, sala_id, lote_id, tipo, fecha_desde, fecha_hasta, scope
@@ -198,9 +203,22 @@ class TareasController < ApplicationController
       return render json: { error: MSG_TAREA_FUTURA }, status: :unprocessable_entity
     end
 
+    # Quien no gestiona tareas sólo cierra las SUYAS. Esto es un `update_all`: sin el filtro, un
+    # id ajeno metido en la lista cerraría la tarea de otro sin pasar por ninguna validación.
+    unless puede_gestionar_tareas?
+      seleccionadas = seleccionadas.where(asignada_a_id: current_user.id)
+    end
+
     ahora = Time.current
     completadas = seleccionadas
       .update_all(estado: 'completada', fecha_completada: ahora, updated_at: ahora)
+
+    # Cero completadas con tareas pedidas no es un éxito silencioso: o ya estaban cerradas o son
+    # de otra persona. Sin este mensaje el botón parece no hacer nada.
+    if completadas.zero?
+      return render json: { error: 'Ninguna de esas tareas se puede completar: ya están cerradas o están asignadas a otra persona.' },
+                    status: :unprocessable_entity
+    end
 
     render json: { completadas: completadas }
   end
@@ -298,8 +316,14 @@ class TareasController < ApplicationController
     end
   end
 
+  # Gestionar = editar, borrar y cerrar tareas de CUALQUIERA. Hacer el trabajo (completar la
+  # propia) no entra acá.
+  def puede_gestionar_tareas?
+    current_user.admin? || current_user.cultivador? || current_user.supervisor?
+  end
+
   def authorize_manage!
-    unless current_user.admin? || current_user.cultivador? || current_user.supervisor?
+    unless puede_gestionar_tareas?
       render json: { error: 'Sin permiso para modificar esta tarea' }, status: :forbidden
     end
   end
