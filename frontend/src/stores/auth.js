@@ -13,7 +13,46 @@ const BOOTSTRAP_TIMEOUT_MS = 8000;
 
 // Techo duro del login: pasado esto, el botón vuelve a estar disponible aunque la request
 // siga en vuelo. Un spinner que no termina nunca es peor que un reintento.
-const LOGIN_TIMEOUT_MS = 15000;
+// Por encima del timeout del propio request de login (45 s, ver `signIn` en lib/api.js): es una
+// red de seguridad para que el botón no quede trabado si algo más se cuelga, no un plazo que
+// deba ganarle a la request. Antes eran 15 s y cortaba ANTES que el request, dejando el
+// formulario liberado mientras el login seguía en vuelo.
+const LOGIN_TIMEOUT_MS = 50000;
+
+// Cuándo contarle al usuario que la espera es normal (servidor despertando).
+const AVISO_DEMORA_MS = 6000;
+
+/**
+ * Por qué no se pudo entrar, en castellano y accionable.
+ *
+ * Antes el `else` final caía en `e.message`, que para un timeout de axios es literalmente
+ * "timeout of 10000ms exceeded": el texto interno de una librería, en inglés, mostrado como si
+ * fuera una explicación. Y un error de transporte (sin `response`) no tiene ni eso.
+ *
+ * La regla: SIEMPRE devuelve un texto. Un login que falla sin decir nada deja al usuario
+ * mirando un botón gris sin saber si se equivocó él, si se cayó el servidor o si tiene que
+ * esperar.
+ */
+export function mensajeDeErrorDeLogin(e) {
+  const status = e?.response?.status;
+  const data   = e?.response?.data;
+
+  if (status === 401) return "Email o contraseña incorrectos.";
+  // El backend ya explica cuál módulo falta o por qué está suspendida la organización.
+  if (data?.modulo_rol_apagado || data?.club_suspendido) return data.error;
+  if (status === 403) return data?.error || "Tu usuario no tiene permiso para entrar.";
+  if (status === 422) return data?.error || "Revisá los datos e intentá de nuevo.";
+  if (status >= 500)  return "El servidor tuvo un problema. Probá de nuevo en unos segundos.";
+
+  // Sin respuesta: o cortó la conexión, o el servidor tardó más que el timeout. Se distinguen
+  // porque la acción que corresponde es distinta (revisar internet vs. volver a intentar).
+  if (e?.code === "ECONNABORTED" || /timeout/i.test(e?.message || "")) {
+    return "El servidor está tardando en responder. Esperá unos segundos y probá de nuevo.";
+  }
+  if (!e?.response) return "No pudimos conectar con el servidor. Revisá tu conexión e intentá de nuevo.";
+
+  return data?.error || "No pudimos iniciar sesión. Probá de nuevo.";
+}
 
 // Generación de la sesión. Login y logout la incrementan. Un /me que salió ANTES de ese
 // cambio ya no puede escribir el estado cuando vuelve: si no, el 401 tardío del arranque
@@ -27,6 +66,10 @@ export const useAuthStore = defineStore("auth", {
     user: null,
     loading: false,
     error: null,
+    // Aviso NEUTRO mientras el login está en vuelo (no es un error): sirve para el caso del
+    // servidor dormido, donde la espera es larga y legítima. Sin esto, la única señal es un
+    // spinner, y un spinner largo sin texto se lee como "se colgó".
+    aviso: null,
     redirectTo: null,
     bootstrapped: false,
     // Mientras cerramos sesión, los 401 de requests en vuelo NO deben capturar la
@@ -95,14 +138,28 @@ export const useAuthStore = defineStore("auth", {
       ]);
     },
 
-    async login(email, password, redirect = null) {
+    // `conservarError`: en un reintento automático NO se borra el mensaje anterior. Se borraba
+    // siempre, así que entre el "Reintentando…" y la respuesta el formulario quedaba mudo: un
+    // spinner sin una línea de texto, que es exactamente lo que parece un cuelgue.
+    async login(email, password, redirect = null, { conservarError = false } = {}) {
       authEpoch++;           // invalida cualquier /me en vuelo del arranque
       bootstrapPromise = null;
       this.loading = true;
       // Red de seguridad: si algo se cuelga, el botón se libera igual. Preferimos que el
       // usuario pueda reintentar antes que dejarlo mirando un spinner eterno.
-      const destrabar = setTimeout(() => { this.loading = false; }, LOGIN_TIMEOUT_MS);
-      this.error = null;
+      const destrabar = setTimeout(() => {
+        this.loading = false;
+        // Y con una explicación: liberar el botón en silencio deja la pantalla igual que antes
+        // de apretarlo, como si el click no hubiera existido.
+        if (!this.error) this.error = "El servidor está tardando en responder. Probá de nuevo.";
+      }, LOGIN_TIMEOUT_MS);
+      // A los pocos segundos se cuenta qué está pasando. El backend puede estar dormido y tardar
+      // bastante en despertar: la espera es normal, pero hay que decirlo.
+      const avisar = setTimeout(() => {
+        if (this.loading) this.aviso = "El servidor estaba en reposo y está arrancando. Puede tardar unos segundos.";
+      }, AVISO_DEMORA_MS);
+      this.aviso = null;
+      if (!conservarError) this.error = null;
       this.loggingOut = false;
       try {
         await signIn(email, password);
@@ -141,18 +198,14 @@ export const useAuthStore = defineStore("auth", {
           router.push(roleHome ? { path: roleHome } : { name: "dashboard" });
         }
       } catch (e) {
-        if (e?.response?.status === 401) {
-          this.error = "Credenciales inválidas";
-        } else if (e?.response?.data?.modulo_rol_apagado) {
-          // Usuario y contraseña estaban bien: lo que falta es el módulo. El mensaje del
-          // backend nombra cuál, así que se muestra tal cual.
-          this.error = e.response.data.error;
-        } else {
-          this.error = e?.message || "Error al iniciar sesión";
-        }
+        // Una sola función decide el texto (ver `mensajeDeErrorDeLogin`), para que ningún camino
+        // termine mostrando el mensaje interno de axios en inglés.
+        this.error = mensajeDeErrorDeLogin(e);
         throw e;
       } finally {
         clearTimeout(destrabar);
+        clearTimeout(avisar);
+        this.aviso = null;
         this.loading = false;
       }
     },

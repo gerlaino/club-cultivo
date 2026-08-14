@@ -1,0 +1,47 @@
+# Mensajes de Devise en castellano.
+#
+# La app corre con `default_locale = :es` pero sólo existía `devise.en.yml`, así que TODO lo que
+# dice Devise salía como "Translation missing: es.devise.failure.invalid" — en desarrollo tal cual,
+# y en producción en inglés (ahí `i18n.fallbacks` tapa el agujero). Ese texto es lo que devuelve
+# la API cuando alguien se equivoca la contraseña: la web lo reemplaza por su propio mensaje, pero
+# la app móvil y cualquier otro consumidor muestran lo que llega.
+#
+# `authentication_keys` es "Email": el ingreso es por email, no hay nombre de usuario.
+es:
+  devise:
+    failure:
+      already_authenticated: "Ya tenés la sesión iniciada."
+      inactive: "Tu cuenta todavía no está activada."
+      invalid: "Email o contraseña incorrectos."
+      locked: "Tu cuenta está bloqueada."
+      last_attempt: "Te queda un intento antes de que se bloquee la cuenta."
+      not_found_in_database: "Email o contraseña incorrectos."
+      timeout: "Tu sesión venció. Iniciá sesión de nuevo para continuar."
+      unauthenticated: "Necesitás iniciar sesión para continuar."
+      unconfirmed: "Tenés que confirmar tu email antes de continuar."
+    sessions:
+      signed_in: "Sesión iniciada."
+      signed_out: "Sesión cerrada."
+      already_signed_out: "Sesión cerrada."
+    passwords:
+      no_token: "No se puede entrar a esta página sin venir desde el mail de recuperación. Si viniste desde ahí, revisá que hayas usado el enlace completo."
+      send_instructions: "En unos minutos vas a recibir un mail con las instrucciones para cambiar tu contraseña."
+      send_paranoid_instructions: "Si ese email está registrado, en unos minutos vas a recibir un enlace para recuperar tu contraseña."
+      updated: "Tu contraseña se cambió. Ya tenés la sesión iniciada."
+      updated_not_active: "Tu contraseña se cambió."
+    registrations:
+      signed_up: "¡Bienvenido! Tu cuenta se creó correctamente."
+      updated: "Tu cuenta se actualizó."
+      destroyed: "Tu cuenta se dio de baja."
+      signed_up_but_inactive: "Tu cuenta se creó, pero todavía no está activada."
+      signed_up_but_locked: "Tu cuenta se creó, pero está bloqueada."
+    unlocks:
+      send_instructions: "En unos minutos vas a recibir un mail con las instrucciones para desbloquear tu cuenta."
+      unlocked: "Tu cuenta se desbloqueó. Ya podés iniciar sesión."
+    mailer:
+      reset_password_instructions:
+        subject: "Cambiar tu contraseña"
+      unlock_instructions:
+        subject: "Desbloquear tu cuenta"
+      confirmation_instructions:
+        subject: "Confirmar tu cuenta"

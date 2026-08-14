@@ -137,6 +137,9 @@ describe('bootstrap de sesión', () => {
     await enCurso.catch(() => {})
 
     expect(auth.loading).toBe(false)
-    expect(auth.error).toBe('Credenciales inválidas')
+    // El texto exacto lo decide `mensajeDeErrorDeLogin` (ver loginErrores.test.js): acá lo que
+    // importa es que al soltar el botón SIEMPRE quede un mensaje. Soltarlo en silencio deja la
+    // pantalla igual que antes de apretarlo.
+    expect(auth.error).toMatch(/contraseña incorrectos/i)
   })
 })

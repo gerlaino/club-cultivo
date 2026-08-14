@@ -106,7 +106,12 @@ api.interceptors.response.use(
 );
 
 // -------- Auth --------
-export const signIn  = (email, password) => api.post("/users/sign_in", { user: { email, password } });
+// El login tiene su propio techo, más alto que los 10 s de todo lo demás: es el ÚNICO request
+// que puede pegarle a un backend dormido. En Render, despertar el servicio tarda decenas de
+// segundos, y con el timeout general el intento moría antes de que el servidor llegara a
+// contestar — se veía como "se colgó el login" cuando en realidad estaba arrancando.
+export const signIn  = (email, password) =>
+  api.post("/users/sign_in", { user: { email, password } }, { timeout: 45000 });
 export const signOut = () => api.delete("/users/sign_out");
 export const me               = () => api.get("/me");
 

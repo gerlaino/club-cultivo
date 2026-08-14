@@ -113,6 +113,15 @@
               </div>
             </div>
 
+            <!-- Espera larga pero normal (servidor despertando). No es un error: va en gris,
+                 no en rojo, y sólo aparece si no hay un error de verdad que mostrar. -->
+            <Transition name="err">
+              <div v-if="auth.aviso && !auth.error" class="lv__aviso">
+                <DsSpinner :size="13" />
+                {{ auth.aviso }}
+              </div>
+            </Transition>
+
             <Transition name="err">
               <div v-if="auth.error" class="lv__error">
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -186,8 +195,8 @@ function esErrorDeConexion(e) {
   return !status || status >= 500
 }
 
-async function intentarLogin() {
-  await auth.login(email.value, password.value, route.query.redirect || null)
+async function intentarLogin(opciones = {}) {
+  await auth.login(email.value, password.value, route.query.redirect || null, opciones)
 }
 
 async function onSubmit() {
@@ -197,16 +206,23 @@ async function onSubmit() {
   try {
     await intentarLogin()
   } catch (e) {
-    if (esErrorDeConexion(e)) {
-      auth.error = 'Hubo un problema al conectar. Reintentando…'
-      retrying.value = true
-      setTimeout(async () => {
+    // Sólo se reintenta lo que puede andar la próxima vez: un servidor dormido o una conexión
+    // que cortó. Una contraseña equivocada no mejora sola, y su mensaje ya está puesto.
+    if (!esErrorDeConexion(e)) return
+
+    auth.error = 'El servidor no respondió. Reintentando…'
+    retrying.value = true
+    setTimeout(async () => {
+      try {
+        // `conservarError`: sin esto el reintento borraba el "Reintentando…" y dejaba el
+        // formulario mudo con el botón girando — lo que se ve como un cuelgue.
+        await intentarLogin({ conservarError: true })
+      } catch (_) {
+        // El mensaje definitivo lo puso el store. Nunca se queda sin uno.
+      } finally {
         retrying.value = false
-        try {
-          await intentarLogin()
-        } catch (_) {}
-      }, 2000)
-    }
+      }
+    }, 2000)
   }
 }
 </script>
@@ -360,6 +376,8 @@ async function onSubmit() {
 .lv__eye:hover { color: var(--c-slate-600); }
 
 .lv__error { display: flex; align-items: center; gap: .4rem; background: var(--c-rust-100, #FEE2E2); border: 1px solid #fecaca; color: var(--c-rust-600, #DC2626); padding: .55rem .8rem; border-radius: 9px; font-size: .78rem; font-weight: 500; }
+/* Mismo lugar y forma que el error, en gris: es información, no una falla. */
+.lv__aviso { display: flex; align-items: center; gap: .45rem; background: var(--c-slate-50); border: 1px solid var(--c-slate-200); color: var(--c-slate-500); padding: .55rem .8rem; border-radius: 9px; font-size: .76rem; font-weight: 500; }
 .err-enter-active,.err-leave-active { transition: all .2s; }
 .err-enter-from,.err-leave-to { opacity:0; transform:translateY(-4px); }
 
