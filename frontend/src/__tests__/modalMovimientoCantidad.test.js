@@ -264,4 +264,39 @@ describe('Nuevo movimiento — crear una categoría', () => {
   it('la caja de crear se distingue de la lista de resultados', () => {
     expect(wrapper.find('.mv-newbox-tit').text()).toContain('Nueva categoría')
   })
+
+  // AC (Germán): el alta tiene que seguir SU orden, y las decisiones no pueden quedar escondidas
+  // adentro del acordeón de comprobante/notas. El sector es el eje del P&L y "¿entra al
+  // depósito?" decide si la compra mueve inventario: ninguna de las dos es papeleo.
+  describe('el orden de la pantalla', () => {
+    /** Posición en el DOM de cada bloque, para comparar cuál va antes. */
+    const posDe = (sel) => {
+      const el = wrapper.element.querySelector(sel)
+      if (!el) return -1
+      return [...wrapper.element.querySelectorAll('*')].indexOf(el)
+    }
+
+    it('la plata va antes que la imputación: monto → cantidad → pago → sector', () => {
+      const monto  = posDe('.mv-monto')
+      const cant   = posDe('.mv-cant')
+      const sector = posDe('.mv-imputacion')
+
+      expect(monto).toBeGreaterThan(-1)
+      expect(cant).toBeGreaterThan(monto)
+      expect(sector).toBeGreaterThan(cant)
+    })
+
+    it('el sector NO está adentro del acordeón de comprobante y notas', () => {
+      const extra = wrapper.element.querySelector('.mv-extra')
+      expect(extra?.querySelector('.mv-imputacion')).toBeFalsy()
+      expect(wrapper.element.querySelector('.mv-imputacion')).toBeTruthy()
+    })
+
+    // Antes sólo aparecía si el flujo o la categoría lo sugerían, así que una compra cargada
+    // como "gasto" no tenía forma de entrar al inventario.
+    it('"¿entra al inventario?" está siempre a la vista', () => {
+      expect(wrapper.element.textContent).toMatch(/entra al inventario/i)
+    })
+  })
+
 })

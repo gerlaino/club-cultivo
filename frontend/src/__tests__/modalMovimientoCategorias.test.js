@@ -156,21 +156,29 @@ describe('ModalMovimiento — un solo formulario', () => {
     w.unmount()
   })
 
-  // El área dejó de ser un campo del movimiento: la define la categoría.
-  it('el sector no se elige por movimiento', async () => {
+  // CAMBIO DE CRITERIO (Germán, ago-2026): el sector es un campo VISIBLE del movimiento, no un
+  // eco escondido. Estaba dentro del acordeón "Comprobante, proveedor y notas" —donde va lo que
+  // se toca una de cada veinte veces— y es el eje del P&L: un gasto sin sector no aparece en el
+  // resultado de ninguna área. Cuando la categoría ya lo trae, el campo lo muestra y se bloquea,
+  // para que se vea qué quedó imputado sin dejar cambiarlo por accidente.
+  it('el sector se ve, y con categoría lo trae ella', async () => {
     const CATS = [{
       id: 1, nombre: 'Insumos', tipo: 'egreso', comportamiento_efectivo: 'insumo',
       unidad_negocio: { id: 3, nombre: 'Cultivo' }, subcategorias: [],
     }]
-    const w = await abrir({ categorias: CATS })
+    // El club tiene sus sectores cargados: sin eso el campo no se dibuja (no hay qué elegir).
+    const w = await abrir({ categorias: CATS, unidades: [{ id: 3, nombre: 'Cultivo' }] })
 
     w.vm.form.categoria_contable_id = 1
     await new Promise(r => setTimeout(r, 0))
 
     expect(w.vm.areaDeLaCategoria).toBe('Cultivo')
-    // El sector se muestra como ECO de la categoría, pegado a ella, no como un campo más de
-    // la lista: es la consecuencia de lo que se acaba de elegir.
-    expect(document.body.textContent).toContain('Cultivo')
+
+    // El campo está a la vista (no adentro del acordeón) y bloqueado: lo decidió la categoría.
+    const sector = [...document.body.querySelectorAll('select')]
+      .find(sel => [...sel.options].some(o => /Sin sector/i.test(o.textContent)))
+    expect(sector, 'el select de sector tiene que estar en pantalla').toBeTruthy()
+    expect(sector.disabled).toBe(true)
     w.unmount()
   })
 
@@ -180,7 +188,8 @@ describe('ModalMovimiento — un solo formulario', () => {
       { id: 1, nombre: 'Insumos',  tipo: 'egreso', comportamiento_efectivo: 'insumo',  subcategorias: [] },
       { id: 2, nombre: 'Alquiler', tipo: 'egreso', comportamiento_efectivo: 'general', subcategorias: [] },
     ]
-    const w = await abrir({ categorias: CATS })
+    // El club tiene sus sectores cargados: sin eso el campo no se dibuja (no hay qué elegir).
+    const w = await abrir({ categorias: CATS, unidades: [{ id: 3, nombre: 'Cultivo' }] })
 
     w.vm.form.categoria_contable_id = 1
     await new Promise(r => setTimeout(r, 0))

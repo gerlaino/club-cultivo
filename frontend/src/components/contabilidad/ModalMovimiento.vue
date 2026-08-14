@@ -258,6 +258,9 @@ const COMPORTAMIENTOS_CON_STOCK = ['insumo', 'insumo_general', 'mercaderia']
 const pideDestinoCat = computed(() =>
   COMPORTAMIENTOS_CON_STOCK.includes(catActual.value?.comportamiento))
 // Cualquiera de los dos alcanza para OFRECER el depósito; ninguno obliga a usarlo.
+// Si el flujo o la categoría SUGIEREN que la compra entra a un depósito. Ya no decide si el
+// bloque se muestra (se muestra siempre): se usa para preseleccionar y para el eco de la
+// categoría.
 const pideDestino = computed(() => !!flujo.value?.pideDestino || pideDestinoCat.value)
 
 // El sector ya no se elige: sale de la categoría y se muestra como dato.
@@ -321,7 +324,9 @@ function onMonto(e) {
 const ctxValidacion = computed(() => ({
   pacienteObligatorio: pacienteObligatorio.value,
   esCuotas: esCuotas.value,
-  pideDestino: pideDestinoCat.value,
+  // El bloque de depósito está SIEMPRE a la vista, así que lo que se valida es haberlo
+  // empezado a completar, no qué flujo se eligió arriba.
+  pideDestino: true,
   // La cantidad del destino es la del movimiento: se carga una sola vez, arriba.
   destino: { ...destinoEstado(destino.value, depositoSel.value), cantidad: form.value.cantidad },
 }))
@@ -720,21 +725,6 @@ const titulo = computed(() => {
               </p>
             </div>
 
-            <!-- Destino del stock. Aparece si el flujo O la categoría lo sugieren, y adentro
-                 siempre está "No, es solo un gasto": la categoría PROPONE el depósito, no lo
-                 impone. Con `v-if="pideDestinoCat"` a secas, elegir "Compré algo" con una
-                 categoría de comportamiento general no ofrecía ningún depósito y la compra no
-                 podía entrar a inventario aunque el flujo dijera que sí. -->
-            <DestinoStock
-              v-if="pideDestino"
-              v-model="destino"
-              :depositos="depositos" :insumos="insumos" :bares="bares"
-              :monto="form.monto_ars" :cantidad="form.cantidad" :errores="errores"
-            />
-            <span v-if="errores.destino_item || errores.destino_cantidad" class="mv-err">
-              {{ errores.destino_item || errores.destino_cantidad }}
-            </span>
-
             <!-- Cuándo + estado de pago -->
             <div class="mv-row">
               <label class="mv-fld mv-fld--fecha">
@@ -793,15 +783,24 @@ const titulo = computed(() => {
               </div>
             </div>
 
-            <!-- Comprobante y notas: se tocan una de cada veinte veces y ocupaban media
-                 pantalla. Plegados, y el resumen del pie dice si hay algo cargado adentro. -->
-            <details class="mv-extra">
-              <summary class="mv-extra-sum">
-                <i class="bi bi-chevron-right mv-extra-chev"></i>
-                Comprobante, proveedor y notas
-                <span v-if="resumenExtras" class="mv-extra-tag">{{ resumenExtras }}</span>
-              </summary>
-              <div class="mv-extra-body">
+            <!-- ── A qué SECTOR imputa, y si entra al depósito ──────────────────────────
+                 Estaba metido adentro del acordeón "Comprobante, proveedor y notas", que es
+                 donde va lo que se toca una de cada veinte veces. El sector es el eje del P&L
+                 —un gasto sin sector no aparece en el resultado de ninguna área— y "¿entra al
+                 depósito?" decide si la compra mueve inventario: son decisiones del movimiento,
+                 no papeleo. Van a la vista, siempre. -->
+            <div class="mv-imputacion">
+              <label v-if="sectoresOfrecidos.length" class="mv-fld">
+                <span class="mv-lbl">
+                  Sector
+                  <span v-if="catActual && areaDeLaCategoria" class="mv-opt">(lo trae la categoría)</span>
+                </span>
+                <select class="mv-inp" v-model="form.unidad_negocio_id" :disabled="!!(catActual && areaDeLaCategoria)">
+                  <option :value="null">— Sin sector —</option>
+                  <option v-for="u in sectoresOfrecidos" :key="u.id" :value="u.id">{{ u.nombre }}</option>
+                </select>
+              </label>
+
               <label v-if="multiSede" class="mv-fld">
                 <span class="mv-lbl">
                   Sede <span v-if="depositoSel?.sede_id" class="mv-opt">(la fija el depósito)</span>
@@ -811,32 +810,31 @@ const titulo = computed(() => {
                   <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
                 </select>
               </label>
+            </div>
 
-              <!-- Sin categoría, el sector se elige a mano: es el eje del P&L, y un gasto sin
-                   sector cae en "Sin sector" y no aparece en el resultado de ningún área. Con
-                   categoría no se pregunta —ella ya lo trae— y se muestra el eco de abajo.
-                   Sólo se ofrecen los sectores cuyo pack contrató la organización: los demás
-                   siguen existiendo para el historial, pero no para clasificar algo nuevo. -->
-              <label v-if="!catActual && sectoresOfrecidos.length" class="mv-fld">
-                <span class="mv-lbl">Sector <span class="mv-opt">(opcional)</span></span>
-                <select class="mv-inp" v-model="form.unidad_negocio_id">
-                  <option :value="null">— Sin sector —</option>
-                  <option v-for="u in sectoresOfrecidos" :key="u.id" :value="u.id">{{ u.nombre }}</option>
-                </select>
-              </label>
+            <!-- Destino del stock. SIEMPRE visible: si entra o no al depósito es una decisión
+                 del movimiento, y esconderla detrás del flujo elegido hacía que una compra
+                 cargada desde "Pagué un gasto" no tuviera forma de entrar al inventario. Adentro
+                 la primera opción es "No, es solo un gasto", así que decir que no cuesta un
+                 click y queda explícito en la pantalla. -->
+            <DestinoStock
+              v-model="destino"
+              :depositos="depositos" :insumos="insumos" :bares="bares"
+              :monto="form.monto_ars" :cantidad="form.cantidad" :errores="errores"
+            />
+            <span v-if="errores.destino_item || errores.destino_cantidad" class="mv-err">
+              {{ errores.destino_item || errores.destino_cantidad }}
+            </span>
 
-              <!-- El eco de lo que la categoría acaba de decidir: a qué sector imputa y si
-                   lo comprado entra a un inventario. Va pegado a la categoría, que es lo que
-                   lo produce, y no como un campo más de la lista. -->
-              <p v-if="catActual" class="mv-cat-eco">
-                <i class="bi bi-diagram-3"></i>
-                <strong v-if="areaDeLaCategoria">{{ areaDeLaCategoria }}</strong>
-                <span v-else class="mv-opt">Sin sector</span>
-                <span v-if="pideDestinoCat" class="mv-cat-eco-tag">entra al inventario</span>
-              </p>
-
-              <hr class="mv-rail-sep" />
-
+            <!-- Comprobante y notas: se tocan una de cada veinte veces y ocupaban media
+                 pantalla. Plegados, y el resumen del pie dice si hay algo cargado adentro. -->
+            <details class="mv-extra">
+              <summary class="mv-extra-sum">
+                <i class="bi bi-chevron-right mv-extra-chev"></i>
+                Comprobante, proveedor y notas
+                <span v-if="resumenExtras" class="mv-extra-tag">{{ resumenExtras }}</span>
+              </summary>
+              <div class="mv-extra-body">
               <label class="mv-fld">
                 <span class="mv-lbl">Proveedor / origen</span>
                 <input type="text" class="mv-inp" v-model.trim="form.proveedor" placeholder="Edenor, farmacia…" />
@@ -1026,6 +1024,8 @@ const titulo = computed(() => {
 .mv-ta { height: auto; padding: 10px 12px; resize: vertical; line-height: var(--lh-base); }
 
 /* Monto */
+.mv-imputacion { display: flex; gap: var(--sp-3); flex-wrap: wrap; }
+.mv-imputacion .mv-fld { flex: 1 1 200px; }
 .mv-cant { display: flex; gap: var(--sp-3); flex-wrap: wrap; align-items: flex-end; }
 .mv-cant-uni { margin: 0 0 .35rem; font-size: var(--fs-13); color: var(--c-ink-600); }
 .mv-monto {
