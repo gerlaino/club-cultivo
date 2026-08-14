@@ -77,6 +77,59 @@ describe('cada rol puede abrir lo que su navegación le ofrece', () => {
     })
   })
 
+  // Los dos candados del frontend tienen que decir lo mismo. Una ruta cuyo `beforeEnter` deja
+  // pasar a un rol, y una matriz que lo rebota antes de llegar, es una contradicción: gana la
+  // matriz (corre primero, global) y el permiso escrito en la ruta no existe en la práctica.
+  //
+  // Así aparecieron /mnc (manicura), /stock y /reservas (dispensador) y /admin/pesajes-manicura
+  // (supervisor): la ruta decía que sí y la matriz decía que no.
+  describe('la matriz y los permisos de cada ruta no se contradicen', () => {
+    const src = leer('router/index.js')
+
+    /** Rutas con lista EXPLÍCITA de quiénes pueden (`if (!['a','b'].includes(role)) …`). */
+    function rutasConAllowList() {
+      const re = /path:\s*'([^']+)'([\s\S]*?)(?=\n\s{2,4}\{\n\s*(?:\/\/[^\n]*\n\s*)*path:|\nconst |\n\];)/g
+      const out = []
+      for (const m of src.matchAll(re)) {
+        const [, path, chunk] = m
+        for (const g of chunk.matchAll(/if\s*\(\s*!\s*\[([^\]]*)\]\.includes\(\s*(?:auth\.user\?\.role|role)\s*\)/g)) {
+          out.push({ path, roles: [...g[1].matchAll(/'([a-z_]+)'/g)].map(x => x[1]) })
+        }
+      }
+      return out
+    }
+
+    it('encuentra rutas con lista de roles (si no, el test no está mirando nada)', () => {
+      expect(rutasConAllowList().length).toBeGreaterThan(5)
+    })
+
+    it('ningún rol tiene permiso en la ruta y prohibición en la matriz', () => {
+      // Excepciones conscientes, con su razón:
+      const ESPERADAS = [
+        // El super admin vive en /super-admin y no entra a las pantallas de una organización
+        // (ver `block_super_admin_sin_contexto!`): que la papelera lo nombre es un resto viejo.
+        'super_admin → /admin/papelera',
+        // Sale del hijo `despachos`, que nombra a supervisor; el path que se ve acá es el del
+        // padre. El padre /delivery sólo deja pasar admin y delivery, así que el supervisor no
+        // llega a despachos aunque el hijo lo nombre — y el repartidor tampoco, porque el hijo
+        // no lo nombra a él: en los hechos despachos es de admin. Es una decisión comercial
+        // pendiente (Delivery es add-on pago), no un olvido de la matriz: para resolverla hay
+        // que tocar el padre Y la matriz, no sólo esta lista.
+        'supervisor → /delivery',
+      ]
+
+      const choques = []
+      for (const { path, roles } of rutasConAllowList()) {
+        for (const rol of roles) {
+          const concreta = path.replace(/:[a-zA-Z_]+/g, '1')
+          if (!puedeEntrar(rol, concreta)) choques.push(`${rol} → ${concreta}`)
+        }
+      }
+
+      expect(choques.filter(c => !ESPERADAS.includes(c))).toEqual([])
+    })
+  })
+
   // Lo más caro de todo: si el rol no puede entrar a donde aterriza, no entra a NINGÚN lado.
   // El guard lo devuelve al origen, que lo vuelve a mandar al mismo lugar.
   describe('el aterrizaje del login', () => {

@@ -1032,8 +1032,8 @@ const ROLE_ALLOWED_PREFIX = {
   // Supervisa el cultivo de sus sedes y además dispensa.
   supervisor: ['/', '/salas', '/lotes', '/plantas', '/geneticas', '/tareas', '/plan-trabajo',
                '/historial-cultivador', '/cosechado', '/dispositivos', '/reglas-ambientales',
-               '/pacientes', '/socios', '/historial', '/admin/stock', '/insumos', '/sedes',
-               '/analitica', '/reservas', '/m', ...ETIQUETAS, ...COMUNES],
+               '/pacientes', '/socios', '/historial', '/admin/stock', '/admin/pesajes-manicura',
+               '/insumos', '/sedes', '/analitica', '/reservas', '/m', ...ETIQUETAS, ...COMUNES],
 
   // Post-cosecha: pesa los lotes que le asignan. `/mnc` es SU sección y además donde aterriza
   // al entrar (ver el beforeEnter de "/"): sin ella el guard lo devolvía a "/", que lo volvía a
