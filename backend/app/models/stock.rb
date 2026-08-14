@@ -13,6 +13,12 @@ class Stock < ApplicationRecord
   belongs_to :genetica, optional: true
   belongs_to :producido_desde_stock, class_name: 'Stock', optional: true
 
+  # Los pesajes de manicura que llenaron este contenedor. El vínculo fino stock ↔ planta vive
+  # acá (`pesaje.pesadas_plantas`): la trazabilidad lo leía sólo por `pesada` —el flujo viejo—,
+  # no encontraba nada y caía a "todas las plantas del lote".
+  # `class_name` explícito: Rails infiere 'PesajesManicura' del nombre de la asociación (el
+  # singular de "manicura" no existe) y revienta al tocarla. Mismo caso que :pesadas_plantas.
+  has_many :pesajes_manicura, class_name: 'PesajeManicura', dependent: :nullify
   has_many :stock_movimientos, dependent: :destroy
   has_many :dispensaciones, class_name: 'Dispensacion', dependent: :nullify
   has_many :reservas, dependent: :nullify

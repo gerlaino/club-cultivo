@@ -256,12 +256,32 @@
               </div>
             </div>
 
-            <!-- Plantas individuales -->
+            <!-- Plantas individuales.
+                 El rótulo dice QUÉ es esta lista: "de estas plantas salió este frasco" (hay
+                 pesaje por planta) o "las plantas vivas del lote" (no lo hay). Se leían como lo
+                 primero siempre, así que un frasco que salió de dos plantas mostraba las diez
+                 del lote. -->
             <div v-if="data.plantas?.length" class="trz__plantas">
-              <span class="trz__plantas-lbl">{{ data.plantas.length }} plantas</span>
+              <span class="trz__plantas-lbl">
+                {{ data.plantas.length }} {{ data.atribucion === 'planta' ? 'plantas pesadas a este stock' : 'plantas del lote' }}
+              </span>
+              <span v-if="data.atribucion === 'lote'" class="trz__plantas-nota">
+                Sin pesaje planta por planta: el origen se acredita a nivel de lote, no como medición individual.
+              </span>
               <div class="trz__plantas-chips">
                 <span v-for="p in data.plantas" :key="p.id" class="trz__planta-chip">
-                  {{ p.codigo_qr || `#${p.id}` }}{{ p.peso_g ? ` · ${p.peso_g}g` : '' }}
+                  {{ p.codigo_qr || `#${p.id}` }}{{ p.peso_g ? ` · ${p.peso_g}g` : '' }}{{ p.promedio ? ' (prom.)' : '' }}
+                </span>
+              </div>
+            </div>
+
+            <!-- Descartadas: no produjeron nada, pero sin ellas la cuenta de plantas del lote no
+                 cierra y el hueco parece un error del informe. -->
+            <div v-if="data.plantas_descartadas?.length" class="trz__plantas">
+              <span class="trz__plantas-lbl">{{ data.plantas_descartadas.length }} descartadas · no produjeron</span>
+              <div class="trz__plantas-chips">
+                <span v-for="p in data.plantas_descartadas" :key="p.id" class="trz__planta-chip trz__planta-chip--descartada">
+                  {{ p.codigo_qr || `#${p.id}` }}{{ p.motivo_descarte ? ` · ${motivoLabel(p.motivo_descarte)}` : '' }}
                 </span>
               </div>
             </div>
@@ -394,6 +414,13 @@ const FASE_ICONS = {
   semilla: '🌰', esqueje: '🌱', germinacion: '🌱', vegetativo: '🌿', floracion: '🌸',
   cosecha: '🌾', en_manicura: '✂️', curado: '🫙', finalizado: '✅',
 }
+// Plant::MOTIVOS_DESCARTE. Importa la diferencia: no es lo mismo una planta que no prendió que
+// una descartada por error humano — leído desde afuera, el motivo es media explicación del hueco.
+const MOTIVO_DESCARTE_LABELS = {
+  no_prendio: 'No prendió', plaga: 'Plaga', enfermedad: 'Enfermedad', macho: 'Macho',
+  hermafrodita: 'Hermafrodita', estres: 'Estrés', rotura: 'Rotura', otro: 'Otro',
+}
+const motivoLabel = (m) => MOTIVO_DESCARTE_LABELS[m] || m
 
 const query       = ref('')
 const loading     = ref(false)
@@ -771,6 +798,9 @@ const formatDate = d => d
   background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d;
   font-size: .68rem; padding: .1em .5em; border-radius: 5px; font-family: monospace; font-weight: 600;
 }
+/* Las descartadas se leen distinto de las que produjeron: en gris, no en verde. */
+.trz__planta-chip--descartada { background: var(--c-slate-50); border-color: var(--c-slate-200); color: var(--c-slate-500); }
+.trz__plantas-nota { font-size: .66rem; color: var(--c-slate-500); line-height: 1.35; }
 
 /* Arrow */
 .trz__arrow { text-align: center; color: var(--c-slate-400); font-size: 1.25rem; padding: .3rem 0; line-height: 1; }

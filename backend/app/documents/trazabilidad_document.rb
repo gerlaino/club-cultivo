@@ -78,11 +78,45 @@ class TrazabilidadDocument < BaseDocument
       return
     end
 
+    # Un auditor lee esta tabla como "de estas plantas salió este frasco". Cuando no hay pesaje
+    # por planta eso NO es lo que dice el dato, y el documento tiene que decirlo antes de la
+    # tabla, no dejar que se lea de más.
+    if @d[:atribucion] == 'lote'
+      nota(pdf, "Sin pesaje planta por planta: son las plantas vivas del lote de origen, no una " \
+                "medición individual. El peso figura a nivel de lote.")
+    end
+
     styled_table(pdf, ["Planta (QR)", "Origen", "Peso"],
-                 ps.map { |p| [p[:codigo_qr].to_s, p[:origen].to_s.capitalize, "#{p[:peso_g] || '—'} g"] },
+                 ps.map { |p| [p[:codigo_qr].to_s, p[:origen].to_s.capitalize,
+                               "#{p[:peso_g] || '—'} g#{p[:promedio] ? ' (prom.)' : ''}"] },
                  col_widths: { 0 => pdf.bounds.width - 220, 1 => 110, 2 => 110 },
                  aligns: { 2 => :right })
     pdf.move_down 8
+
+    descartadas(pdf)
+  end
+
+  # Las plantas que no llegaron a producir, con el motivo. Sin esto, el que compara la cantidad
+  # de plantas del lote contra esta tabla ve un hueco sin explicación — y un hueco sin explicar,
+  # en un informe de trazabilidad, es exactamente lo que un auditor pregunta.
+  def descartadas(pdf)
+    ds = Array(@d[:plantas_descartadas])
+    return if ds.empty?
+
+    titulo_seccion(pdf, "Plantas descartadas del lote")
+    nota(pdf, "No produjeron: no son origen de este producto. Se listan para que la cuenta de " \
+              "plantas del lote cierre.")
+    styled_table(pdf, ["Planta (QR)", "Motivo"],
+                 ds.map { |p| [p[:codigo_qr].to_s, p[:motivo_descarte].to_s.tr("_", " ").capitalize.presence || "—"] },
+                 col_widths: { 0 => pdf.bounds.width - 220, 1 => 220 })
+    pdf.move_down 8
+  end
+
+  def nota(pdf, texto)
+    pdf.fill_color GRAY
+    pdf.font(SANS) { pdf.text texto, size: 7.5 }
+    pdf.fill_color INK
+    pdf.move_down 4
   end
 
   def entregas(pdf)

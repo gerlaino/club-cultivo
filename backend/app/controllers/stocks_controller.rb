@@ -395,18 +395,57 @@ class StocksController < ApplicationController
     # Pesada origen
     pesada = s.pesada
 
-    # Plantas de origen. El linkeo fino es via la pesada (qué plantas se pesaron a este
-    # stock); pero la flor seca no siempre queda atada a una pesada con pesadas_plantas.
-    # En ese caso, para producción propia, las plantas de origen son las del lote.
-    plantas = []
-    if pesada
-      plantas = pesada.pesadas_plantas.includes(:plant).map do |pp|
-        { id: pp.plant_id, codigo_qr: pp.plant&.codigo_qr, origen: pp.plant&.origen, peso_g: pp.peso_g&.to_f }
+    # ── Plantas de origen ─────────────────────────────────────────────────────────────────
+    #
+    # Trazar es decir DE QUÉ PLANTAS salió ESTE frasco, no qué plantas tuvo el lote. Se leía
+    # sólo `pesada.pesadas_plantas` —el flujo viejo—, así que un stock nacido del flujo de
+    # manicura (`PesajeManicura`, que es por donde entra hoy toda la flor seca) no encontraba
+    # nada y caía a "todas las plantas del lote": diez plantas listadas como origen de un frasco
+    # que salió de dos, con las descartadas adentro. El registro decía una cosa y el informe otra.
+    #
+    # `atribucion` explicita cuál de las dos cosas se está mostrando, porque no valen lo mismo:
+    #   planta → cada planta con el peso que aportó a este stock (trazabilidad de verdad)
+    #   lote   → no hay pesaje por planta; lo único cierto es de qué lote vino
+    # El peso que vale es el SECO: es el que se convirtió en stock. El húmedo queda de respaldo
+    # para los pesajes que sólo registraron eso. (`peso_g` no existe en `pesadas_plantas` — la
+    # rama vieja lo leía igual y habría reventado la primera vez que un stock tuviera pesada.)
+    peso_por_planta = ->(pp) { (pp.peso_seco_g || pp.peso_humedo_g)&.to_f }
+
+    pesadas_plantas = PesadaPlanta.includes(:plant)
+                                  .where(pesaje_manicura_id: s.pesajes_manicura.select(:id))
+                                  .to_a
+    pesadas_plantas += pesada.pesadas_plantas.includes(:plant).to_a if pesada
+
+    if pesadas_plantas.any?
+      atribucion = 'planta'
+      # Una planta puede aparecer en más de un pesaje del mismo contenedor (se pesa en tandas):
+      # va una sola vez, con la suma de lo que aportó.
+      plantas = pesadas_plantas.group_by(&:plant_id).map do |plant_id, filas|
+        planta = filas.first.plant
+        pesos  = filas.filter_map(&peso_por_planta)
+        { id: plant_id, codigo_qr: planta&.codigo_qr, origen: planta&.origen,
+          peso_g: pesos.any? ? pesos.sum.round(2) : nil,
+          # Peso repartido en partes iguales, no medido planta por planta: se declara para que
+          # nadie lea como medición lo que fue un promedio.
+          promedio: filas.any?(&:es_promedio) }
       end
+    elsif lote
+      atribucion = 'lote'
+      # Sin descartadas: una planta que se descartó por error humano o que murió no produjo
+      # nada — listarla como origen de un frasco es afirmar lo contrario de lo que pasó. Van
+      # aparte, en `plantas_descartadas`, que es donde explican el hueco del balance.
+      plantas = lote.plants.where.not(state: 'descartada')
+                    .map { |p| { id: p.id, codigo_qr: p.codigo_qr, origen: p.origen, peso_g: nil } }
+    else
+      atribucion = nil
+      plantas    = []
     end
-    if plantas.empty? && lote
-      plantas = lote.plants.map { |p| { id: p.id, codigo_qr: p.codigo_qr, origen: p.origen, peso_g: nil } }
-    end
+
+    # Las descartadas del lote, con el motivo. No son origen de nada, pero sin ellas el lector
+    # cuenta las plantas del lote, las compara con las de acá y no entiende la diferencia.
+    descartadas = lote ? lote.plants.where(state: 'descartada').map { |p|
+      { id: p.id, codigo_qr: p.codigo_qr, motivo_descarte: p.motivo_descarte }
+    } : []
 
     # Dispensaciones
     dispensaciones = s.dispensaciones.includes(:paciente).order(created_at: :desc).limit(100).map do |d|
@@ -465,13 +504,20 @@ class StocksController < ApplicationController
         registrado_at:  pesada.registrado_at,
         plantas_count:  plantas.size,
       } : nil,
-      plantas:        plantas,
+      plantas:             plantas,
+      # 'planta' = de estas plantas salió este frasco, con su peso. 'lote' = no hay pesaje por
+      # planta; lo único cierto es el lote. Quien lee tiene que saber cuál de las dos está viendo.
+      atribucion:          atribucion,
+      plantas_descartadas: descartadas,
       dispensaciones: dispensaciones,
       # EL BALANCE, que es lo que un auditor va a preguntar: entró tanto, salió tanto, queda
       # tanto — ¿y la diferencia? Sin esto la trazabilidad mostraba la cadena pero no cerraba
       # la cuenta, y el hueco entre lo producido y lo dispensado quedaba invisible.
       totales: {
         plantas_origen:       plantas.size,
+        # Las que no llegaron a producir. Van al lado del origen para que la resta cierre a
+        # simple vista: el lote tenía tantas, produjeron estas, se descartaron aquellas.
+        plantas_descartadas:  descartadas.size,
         dispensaciones_count: dispensaciones.size,
         gramos_producidos:    cantidad_inicial,
         gramos_dispensados:   gramos_dispensados,
