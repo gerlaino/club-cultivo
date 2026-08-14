@@ -58,9 +58,37 @@ RSpec.describe Paciente, type: :model do
         expect(p.dni_normalizado).to eq('12345678')
       end
 
-      it 'es único por dni_normalizado' do
+      it 'no se repite dentro de la misma organización' do
         create_paciente(dni: '12345678')
         expect(build_paciente(dni: '12.345.678')).not_to be_valid
+      end
+
+      # La unicidad era GLOBAL, leyendo el requisito del REPROCANN como si fuera una restricción
+      # de nuestra base. Quien se iba de una organización y entraba a otra quedaba sin poder
+      # darse de alta hasta que la primera lo borrara —algo que nadie tiene forma de pedir— y el
+      # error filtraba que ese DNI existía en otra organización.
+      it 'la misma persona puede ser paciente de dos organizaciones' do
+        create_paciente(dni: '12345678')
+
+        otro_club = create(:club)
+        # La validación corre DENTRO del tenant de la otra organización, como en un request
+        # real (ApplicationController lo fija desde current_user.club). No es un detalle del
+        # spec: `acts_as_tenant` acota la consulta de unicidad al tenant vigente, así que
+        # validar con otro fijado contesta sobre la organización equivocada.
+        ActsAsTenant.with_tenant(otro_club) do
+          otro = build(:paciente, club: otro_club, dni: '12345678',
+                                  created_by: create(:user, :admin, club: otro_club))
+
+          expect(otro).to be_valid
+        end
+      end
+
+      # Con acts_as_paranoid el registro borrado sigue en la tabla: sin índice parcial, ni
+      # siquiera dar de baja al paciente liberaba su DNI.
+      it 'dar de baja a un paciente libera su DNI en la organización' do
+        create_paciente(dni: '12345678').destroy
+
+        expect(build_paciente(dni: '12345678')).to be_valid
       end
     end
   end

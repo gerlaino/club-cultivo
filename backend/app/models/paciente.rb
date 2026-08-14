@@ -54,9 +54,18 @@ class Paciente < ApplicationRecord
   after_create_commit :dispatch_webhook
 
   validates :nombre, :apellido, :dni, :dni_normalizado, :fecha_nacimiento, presence: true
-  # Unicidad global (no por club) — requisito REPROCANN: un DNI no puede estar en dos organizaciones a la vez.
+  # Unicidad DENTRO de la organización, no en toda la plataforma.
+  #
+  # Era global, leyendo el requisito del REPROCANN (una persona se registra con UN cultivador a
+  # la vez) como si fuera una restricción de nuestra base. No lo es: quien se va de una
+  # organización y entra a otra quedaba sin poder darse de alta hasta que la primera lo borrara
+  # —algo que nadie tiene forma de pedir—, y el error de alta filtraba que ese DNI existe en
+  # OTRA organización, que es un dato de salud de alguien que no es su paciente.
+  #
+  # El scope explícito no es redundante con acts_as_tenant: en consola, rakes y jobs la query
+  # corre sin tenant fijado y sin esto compararía contra toda la plataforma.
   validates :dni_normalizado,
-    uniqueness: { message: "ya está registrado en el sistema. Bajo REPROCANN, un DNI no puede pertenecer a dos organizaciones simultáneamente." },
+    uniqueness: { scope: :club_id, message: "ya está registrado en esta organización." },
     format:     { with: /\A\d{7,9}\z/, message: "debe tener 7 a 9 dígitos" }
   validate :fecha_nacimiento_pasada
 

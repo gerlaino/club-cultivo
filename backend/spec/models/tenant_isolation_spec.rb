@@ -37,12 +37,25 @@ RSpec.describe 'Multi-tenancy (acts_as_tenant)', type: :model do
     end
   end
 
-  describe 'uniqueness GLOBAL de DNI (REPROCANN)' do
-    it 'rechaza un DNI ya registrado en otro club aun con tenant fijado' do
+  # El DNI era único en TODA la plataforma: se había leído el requisito del REPROCANN —una
+  # persona se registra con UN cultivador a la vez— como si fuera una restricción de nuestra
+  # base. Dejaba el alta de un cliente colgada de que otro cliente borrara al paciente, y el
+  # error delataba que ese DNI existe en otra organización. Ahora es único POR organización.
+  describe 'uniqueness de DNI por organización' do
+    it 'la misma persona puede ser paciente de dos organizaciones' do
       ActsAsTenant.with_tenant(club_a) { create(:paciente, club: club_a, dni: '40555666', created_by: admin_a) }
 
       ActsAsTenant.with_tenant(club_b) do
-        dup = build(:paciente, club: club_b, dni: '40555666', created_by: admin_b)
+        otro = build(:paciente, club: club_b, dni: '40555666', created_by: admin_b)
+        expect(otro).to be_valid
+      end
+    end
+
+    it 'y dentro de la misma organización sigue sin poder repetirse' do
+      ActsAsTenant.with_tenant(club_a) do
+        create(:paciente, club: club_a, dni: '40555666', created_by: admin_a)
+
+        dup = build(:paciente, club: club_a, dni: '40.555.666', created_by: admin_a)
         expect(dup).not_to be_valid
         expect(dup.errors[:dni_normalizado]).to be_present
       end
