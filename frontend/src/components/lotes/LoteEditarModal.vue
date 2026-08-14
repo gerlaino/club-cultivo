@@ -72,16 +72,25 @@
               </select>
             </div>
 
+            <!-- Maceta y estado son la misma cosa dicha de dos formas: el que enraíza vive en
+                 bandeja y no tiene maceta; ponerlo en maceta ES prenderlo. Por eso enraizado
+                 ofrece "Bandeja" y elegir litros avisa que el lote pasa a vegetativo (el backend
+                 lo hace igual, venga de acá, del trasplante o de un desprendimiento). -->
             <div class="lem__field">
               <label class="lem__label">Tamaño de maceta</label>
               <select class="lem__input" v-model="editLoteForm.tamanio_maceta">
-                <option value="">Sin especificar</option>
+                <option v-if="enraizando" value="">🌱 Bandeja de enraizado</option>
+                <option v-else value="">Sin especificar</option>
+                <option value="0.335">0,335 L</option>
                 <option value="0.5">0,5 L</option>
                 <option value="1">1 litro</option><option value="3">3 litros</option>
                 <option value="5">5 litros</option><option value="7">7 litros</option>
                 <option value="10">10 litros</option><option value="12">12 litros</option>
-                <option value="15">15 litros</option>
+                <option value="15">15 litros</option><option value="20">20 litros</option>
               </select>
+              <span v-if="pasaAVegetativo" class="lem__hint lem__hint--warn">
+                Al ponerlo en maceta el lote pasa a <strong>Vegetativo</strong>: prendió.
+              </span>
             </div>
 
             <div class="lem__field">
@@ -93,20 +102,16 @@
               </select>
             </div>
 
-            <div class="lem__field">
-              <label class="lem__label">Días de vegetativo <span class="lem__opt">objetivo</span></label>
-              <input type="number" min="1" max="365" step="1" class="lem__input"
-                     v-model.number="editLoteForm.dias_vegetativo_objetivo" placeholder="Ej: 30" />
-            </div>
-            <div class="lem__field">
-              <label class="lem__label">Días de floración <span class="lem__opt">objetivo</span></label>
-              <input type="number" min="1" max="365" step="1" class="lem__input"
-                     v-model.number="editLoteForm.dias_floracion_objetivo" placeholder="Ej: 63" />
-            </div>
-            <div class="lem__field">
-              <label class="lem__label">Días de cosecha <span class="lem__opt">objetivo</span></label>
-              <input type="number" min="1" max="365" step="1" class="lem__input"
-                     v-model.number="editLoteForm.dias_cosecha_objetivo" placeholder="Ej: 14" />
+            <!-- Los días objetivo por fase son de la GENÉTICA, no del lote: una Lemon florece lo
+                 que florece. Se muestran para poder mirarlos, y se editan donde viven. -->
+            <div class="lem__field lem__field--full lem__objetivos">
+              <span class="lem__label">Días objetivo por fase</span>
+              <span class="lem__objetivos-vals">
+                Vegetativo {{ objetivos.vegetativo || '—' }} · Floración {{ objetivos.floracion || '—' }} · Cosecha {{ objetivos.cosecha || '—' }}
+              </span>
+              <span class="lem__hint">
+                Se definen en la genética{{ geneticaElegida ? ` (${geneticaElegida.nombre})` : '' }}, no por lote.
+              </span>
             </div>
 
             <div class="lem__field lem__field--full">
@@ -116,22 +121,25 @@
             </div>
           </div>
 
-          <!-- Estado e historia: fechas de inicio de cada fase -->
+          <!-- Fechas de inicio por fase, SÓLO hasta la fase actual: siempre para atrás. Un lote
+               enraizando no tiene fecha de floración —todavía no floró—, y ofrecer el campo
+               invitaba a inventar historia hacia adelante. La fase que se elija arriba manda:
+               al cambiar el estado aparecen o desaparecen los tramos que corresponden. -->
           <div class="lem__seccion-titulo">📅 Fechas de inicio por fase</div>
           <div class="lem__grid">
             <div class="lem__field">
-              <label class="lem__label">Inicio <span class="lem__opt">germinación / esqueje</span></label>
+              <label class="lem__label">Inicio <span class="lem__opt">enraizado</span></label>
               <AppDatePicker v-model="editLoteForm.start_date" />
             </div>
-            <div class="lem__field">
+            <div v-if="faseAlcanzada('vegetativo')" class="lem__field">
               <label class="lem__label">Inicio vegetativo</label>
               <AppDatePicker v-model="editLoteForm.fecha_vegetativo" />
             </div>
-            <div class="lem__field">
+            <div v-if="faseAlcanzada('floracion')" class="lem__field">
               <label class="lem__label">Inicio floración</label>
               <AppDatePicker v-model="editLoteForm.fecha_floracion" />
             </div>
-            <div class="lem__field">
+            <div v-if="faseAlcanzada('cosecha')" class="lem__field">
               <label class="lem__label">Cosechado</label>
               <AppDatePicker v-model="editLoteForm.fecha_cosecha" />
             </div>
@@ -177,6 +185,30 @@ const cantidadCambiada = computed(() =>
   Number(editLoteForm.value.plants_count) !== Number(props.lote?.plants_count)
 )
 
+// Orden real del ciclo. Una fase se puede fechar si el lote la ALCANZÓ: sirve para corregir
+// historia, nunca para escribirla hacia adelante.
+const ORDEN_FASES = ['enraizado', 'vegetativo', 'floracion', 'cosecha', 'en_manicura', 'curado', 'finalizado']
+const faseAlcanzada = (fase) =>
+  ORDEN_FASES.indexOf(editLoteForm.value.estado) >= ORDEN_FASES.indexOf(fase)
+
+const enraizando = computed(() => editLoteForm.value.estado === 'enraizado')
+// Elegir litros estando enraizado = prendió. El backend hace la promoción; acá se avisa antes
+// de guardar para que no sea una sorpresa.
+const pasaAVegetativo = computed(() => enraizando.value && !!editLoteForm.value.tamanio_maceta)
+
+// Los días objetivo salen de la genética elegida (el lote sólo guarda su copia congelada).
+const geneticaElegida = computed(() =>
+  geneticas.value.find(g => String(g.id) === String(editLoteForm.value.genetica_id)) || null
+)
+const objetivos = computed(() => {
+  const g = geneticaElegida.value
+  return {
+    vegetativo: g?.dias_vegetativo_objetivo ?? props.lote?.dias_vegetativo_objetivo,
+    floracion:  g?.tiempo_floracion         ?? props.lote?.dias_floracion_objetivo,
+    cosecha:    g?.dias_cosecha_objetivo    ?? props.lote?.dias_cosecha_objetivo,
+  }
+})
+
 // Si el lote ya está en un estado post-cosecha, lo mostramos para no perderlo
 // (pero las opciones editables son las fases de cultivo).
 const ESTADOS_EXTRA = computed(() => {
@@ -217,6 +249,9 @@ async function doSave() {
 .lem__input--ro { opacity: .75; cursor: default; background: var(--c-slate-50); font-family: monospace; }
 .lem__textarea { resize: vertical; }
 .lem__hint { font-size: .72rem; color: var(--c-slate-400); }
+.lem__hint--warn { color: #b45309; font-weight: 600; }
+.lem__objetivos { gap: .2rem; background: var(--c-slate-50); border-radius: 9px; padding: .55rem .7rem; }
+.lem__objetivos-vals { font-size: .82rem; font-weight: 700; color: var(--c-slate-900); }
 .lem__warn { display: flex; gap: .5rem; align-items: flex-start; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 9px; padding: .6rem .8rem; font-size: .78rem; line-height: 1.4; margin: .85rem 0; }
 .lem__warn i { margin-top: 1px; flex-shrink: 0; }
 .lem__seccion-titulo { font-size: .8rem; font-weight: 800; color: var(--c-slate-900); margin: 1.1rem 0 .6rem; padding-top: .9rem; border-top: 1px solid var(--c-slate-100); }

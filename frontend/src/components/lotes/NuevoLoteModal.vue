@@ -484,7 +484,10 @@ function validate() {
 
 async function crear() {
   if (tipoCreacion.value === 'existente') {
-    form.value.estado = (heredadoEstado.value === 'germinacion' && form.value.origen === 'esqueje') ? 'esqueje' : heredadoEstado.value
+    // El origen (semilla/esqueje) es un eje APARTE del estado: los dos arrancan enraizando. Acá
+    // quedaba la regla vieja, que con origen esqueje mandaba el estado 'esqueje' —que ya no
+    // existe en Lote::ESTADOS— y el backend lo rechazaba.
+    form.value.estado = heredadoEstado.value
   }
   const e = validate()
   errors.value = e; apiError.value = null
@@ -544,7 +547,7 @@ watch(() => props.show, async (open) => {
     sedes.value = (data || []).filter(s => ['produccion', 'mixta'].includes(s.tipo))
     if (sedes.value.length === 1) sedeId.value = sedes.value[0].id
   }).catch(() => { sedes.value = [] })
-  heredadoEstado.value = estadosHeredadoPermitidos.value[0]?.value ?? 'germinacion'
+  heredadoEstado.value = estadosHeredadoPermitidos.value[0]?.value ?? 'enraizado'
   heredadoDias.value  = { semilla_esqueje: 0, vegetativo: 0, floracion: 0, cosecha: 0 }
   plantasMadre.value  = []
   proximoCodigo.value = ''
@@ -564,7 +567,7 @@ watch(salaId, () => {
     form.value.estado = f.estado
     form.value.origen = f.origen
   }
-  heredadoEstado.value = estadosHeredadoPermitidos.value[0]?.value ?? 'germinacion'
+  heredadoEstado.value = estadosHeredadoPermitidos.value[0]?.value ?? 'enraizado'
 })
 </script>
 

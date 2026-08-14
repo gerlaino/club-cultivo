@@ -33,9 +33,11 @@ export function useLoteEditar(loteId) {
       genetica_id:       l.genetica?.id      || '',
       grow_type:         l.grow_type         || '',
       light_type:        l.light_type        || '',
-      dias_vegetativo_objetivo: l.dias_vegetativo_objetivo ?? '',
-      dias_floracion_objetivo:  l.dias_floracion_objetivo  ?? '',
-      dias_cosecha_objetivo:    l.dias_cosecha_objetivo    ?? '',
+      // Los días objetivo NO se editan acá: son de la GENÉTICA (una Lemon florece lo que florece,
+      // no lo que decida un lote). El lote guarda su copia como foto del momento en que se creó
+      // —cambiar la genética después no puede reescribir la historia de un ciclo ya corrido— y el
+      // backend la hereda solo. Editarlos por lote era la puerta para que dos lotes de la misma
+      // variedad tuvieran objetivos distintos sin ninguna razón.
       // El backend serializa decimal(4,1) como "5.0"; el <select> usa "5". Normalizar para que matchee.
       tamanio_maceta:    l.tamanio_maceta != null && l.tamanio_maceta !== '' ? String(parseFloat(l.tamanio_maceta)) : '',
       notes:             l.notes             || '',
@@ -52,9 +54,7 @@ export function useLoteEditar(loteId) {
       const { codigo, fecha_vegetativo, fecha_floracion, fecha_cosecha, ...rest } = editLoteForm.value
       const payload = {
         ...rest,
-        dias_vegetativo_objetivo: Number(rest.dias_vegetativo_objetivo) || null,
-        dias_floracion_objetivo:  Number(rest.dias_floracion_objetivo)  || null,
-        dias_cosecha_objetivo:    Number(rest.dias_cosecha_objetivo)    || null,
+        // '' = bandeja de enraizado (el que enraíza no tiene maceta). Va como null, no como 0.
         tamanio_maceta:    rest.tamanio_maceta || null,
       }
       if (!payload.genetica_id) delete payload.genetica_id
