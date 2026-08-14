@@ -86,13 +86,15 @@ RSpec.describe 'Contabilidad: cantidad del movimiento y sede de la categoría', 
       expect(crear_categoria['sede_id']).to be_nil
     end
 
-    # La sede se hereda igual que el sector: una subcategoría es de la sede de su madre.
-    it 'la subcategoría hereda la sede de la madre' do
+    # Un solo nivel: SECTOR → CATEGORÍA. Las subcategorías agregaban un tercer escalón que había
+    # que entender antes de poder anotar un gasto. Las que ya existen siguen andando; nuevas no.
+    it 'no se crean subcategorías' do
       madre_id = crear_categoria(sede_id: sede.id)['id']
 
-      sub = crear_categoria({ nombre: 'Maceta 5 L', parent_id: madre_id, unidad_negocio_id: nil })
+      crear_categoria({ nombre: 'Maceta 5 L', parent_id: madre_id })
 
-      expect(sub['sede_id']).to eq(sede.id)
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)['error']).to match(/subcategor/i)
     end
   end
 

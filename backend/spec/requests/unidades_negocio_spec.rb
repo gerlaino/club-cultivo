@@ -26,42 +26,40 @@ RSpec.describe 'Unidades de negocio', type: :request do
   describe 'POST /unidades_negocio' do
     before { sign_in_as(admin) }
 
-    it 'crea una unidad propia' do
+    # CAMBIO DE CRITERIO (Germán, ago-2026): LOS SECTORES SON CINCO Y NO SE CREAN
+    # (UnidadNegocio::CANONICOS). Cada sector propio arrastraba su depósito, así que aparecían
+    # varios depósitos para el mismo sector y no había forma de saber cuál era el bueno.
+    it 'no deja crear sectores propios' do
       expect {
         post '/unidades_negocio',
              params: { unidad_negocio: { nombre: 'Eventos', tipo: 'social' } },
              headers: auth_headers, as: :json
-      }.to change { club.unidades_negocio.count }.by(1)
-      expect(response).to have_http_status(:created)
-    end
+      }.not_to change { club.unidades_negocio.count }
 
-    it 'acepta un tipo libre (es solo una etiqueta agrupadora)' do
-      post '/unidades_negocio',
-           params: { unidad_negocio: { nombre: 'Merch', tipo: 'merchandising' } },
-           headers: auth_headers, as: :json
-      expect(response).to have_http_status(:created)
-      expect(JSON.parse(response.body)['tipo']).to eq('merchandising')
-    end
-
-    it 'rechaza un área sin nombre' do
-      post '/unidades_negocio',
-           params: { unidad_negocio: { nombre: '', tipo: 'general' } },
-           headers: auth_headers, as: :json
       expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)['error']).to match(/fijos/i)
     end
 
-    it 'con crear_deposito crea también un depósito para el área' do
+    it 'y por lo tanto tampoco crea depósitos sueltos' do
       expect {
         post '/unidades_negocio',
              params: { unidad_negocio: { nombre: 'Eventos', tipo: 'social' }, crear_deposito: true },
              headers: auth_headers, as: :json
-      }.to change { club.depositos.count }.by(1)
-      expect(response).to have_http_status(:created)
-      area = club.unidades_negocio.find_by(nombre: 'Eventos')
-      dep  = club.depositos.find_by(unidad_negocio_id: area.id)
-      expect(dep.nombre).to eq('Eventos')
-      expect(dep.es_sistema).to be(false)
+      }.not_to change { club.depositos.count }
     end
+
+    # Se siguen pudiendo renombrar y desactivar: lo que se cierra es inventar sectores nuevos.
+    it 'pero sí se puede renombrar uno existente' do
+      ActsAsTenant.with_tenant(club) { Finanzas::SembrarCatalogo.new(club).call }
+      sector = ActsAsTenant.with_tenant(club) { club.unidades_negocio.find_by(tipo: 'cultivo') }
+
+      patch "/unidades_negocio/#{sector.id}",
+            params: { unidad_negocio: { nombre: 'Cultivo Norte' } }, headers: auth_headers, as: :json
+
+      expect(response).to have_http_status(:ok), response.body
+      expect(sector.reload.nombre).to eq('Cultivo Norte')
+    end
+
   end
 
   describe 'DELETE /unidades_negocio/:id' do

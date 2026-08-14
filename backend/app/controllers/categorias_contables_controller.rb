@@ -17,7 +17,16 @@ class CategoriasContablesController < ApplicationController
   end
 
   # POST /categorias_contables
+  #
+  # Un solo nivel: SECTOR → CATEGORÍA. Las subcategorías agregaban un tercer escalón que había que
+  # entender antes de poder anotar un gasto, y la mitad de la app las trataba como categorías.
+  # Las que ya existen se siguen usando y editando; nuevas no se crean.
   def create
+    if params.dig(:categoria_contable, :parent_id).present?
+      return render json: { error: 'Las categorías no tienen subcategorías: creá una categoría del sector que corresponda.' },
+                    status: :unprocessable_entity
+    end
+
     categoria = current_user.club.categorias_contables.build(categoria_params)
     aplicar_va_a_deposito(categoria)
     if categoria.save

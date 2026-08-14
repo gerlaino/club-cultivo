@@ -53,11 +53,14 @@ module Finanzas
     end
 
     # Qué depósitos del sistema le tocan a cada sede según su tipo.
+    # UN depósito por SECTOR, y los sectores de una sede dependen de SU TIPO (ver
+    # UnidadNegocio::TIPOS_POR_SEDE). Una sede de producción no dispensa ni tiene buffet.
     def claves_de(sede)
       claves = ['general']                                # todas las sedes
       claves << 'cultivo'      if sede.es_produccion?     # producción / mixta
       claves << 'dispensacion' if sede.es_social?         # social / mixta
       claves << 'salon'        if sede.es_social? && @club.feature?(:bar)
+      claves << 'otro'                                    # todas: lo que no es de ningún área
       claves
     end
 

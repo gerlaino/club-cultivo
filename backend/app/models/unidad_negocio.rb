@@ -14,10 +14,32 @@ class UnidadNegocio < ApplicationRecord
   has_many :categorias_contables,  class_name: 'CategoriaContable', dependent: :nullify
   has_many :movimientos_contables, class_name: 'MovimientoContable', dependent: :nullify
 
-  # Tipos "conocidos" con semántica propia (bar/social gatean por feature, y los de sistema
-  # emparejan con su depósito). El club puede crear áreas con un tipo libre además de estos:
-  # es solo una etiqueta agrupadora, así que no se valida contra la lista.
-  TIPOS = %w[cultivo dispensario bar social administracion general].freeze
+  # Tipos "conocidos" con semántica propia. `social` y `general` quedan sólo por compatibilidad
+  # con filas viejas: los que se siembran hoy son los cinco de CANONICOS.
+  TIPOS = %w[cultivo dispensario bar social administracion general otro].freeze
+
+  # LOS SECTORES SON ESTOS CINCO Y NO MÁS. Antes el admin podía crear los suyos, y con cada área
+  # nueva aparecía otro depósito: terminabas con varios depósitos por sector y sin saber cuál era
+  # el bueno. Un sector es un área de la organización —hay cinco— no una etiqueta libre.
+  #
+  # 'administracion' es el tipo histórico de "General": se conserva para no reescribir las filas
+  # existentes ni el mapeo de depósitos (`Deposito::AREA_TIPO_POR_CLAVE`).
+  CANONICOS = {
+    'administracion' => 'General',
+    'cultivo'        => 'Cultivo',
+    'dispensario'    => 'Dispensario',
+    'bar'            => 'Buffet',
+    'otro'           => 'Otro',
+  }.freeze
+
+  # Qué sectores tiene cada sede SEGÚN SU TIPO. Una sede de producción no dispensa ni tiene
+  # buffet, así que ofrecerle esos sectores es invitar a imputar un gasto a un área que ahí no
+  # existe. General y Otro están en todas: toda sede tiene gastos que no son de ningún área.
+  TIPOS_POR_SEDE = {
+    'produccion' => %w[administracion cultivo otro],
+    'social'     => %w[administracion dispensario bar otro],
+    'mixta'      => %w[administracion cultivo dispensario bar otro],
+  }.freeze
 
   validates :nombre, presence: true
   validates :tipo,   presence: true
@@ -42,5 +64,16 @@ class UnidadNegocio < ApplicationRecord
     return true if pack.nil?
 
     club.feature?(pack)
+  end
+
+  # ¿Este sector existe en esta sede? Un sector desconocido (fila vieja) se deja pasar: esconder
+  # datos históricos es peor que mostrar un área de más.
+  def aplica_a_sede?(sede)
+    return true if sede.nil?
+
+    tipos = TIPOS_POR_SEDE[sede.tipo]
+    return true if tipos.nil? || !CANONICOS.key?(tipo)
+
+    tipos.include?(tipo)
   end
 end

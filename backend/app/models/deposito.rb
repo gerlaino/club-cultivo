@@ -19,14 +19,18 @@ class Deposito < ApplicationRecord
     'general'      => 'administracion',
     'salon'        => 'bar',
     'dispensacion' => 'dispensario',
+    'otro'         => 'otro',
   }.freeze
 
   # Depósitos de sistema y su nombre por defecto. Dispensación aloja la flor/derivados (fase 3).
+  # UN depósito por SECTOR y por SEDE. Los cinco sectores (ver UnidadNegocio::CANONICOS) tienen
+  # el suyo; cuáles se siembran en cada sede depende del tipo de sede.
   CLAVES_SISTEMA = {
     'cultivo'      => 'Cultivo',
     'general'      => 'General',
     'salon'        => 'Salón',
     'dispensacion' => 'Dispensación',
+    'otro'         => 'Otro',
   }.freeze
 
   # Familia contable/operativa que deriva del depósito (reemplaza al viejo "comportamiento").
@@ -36,6 +40,7 @@ class Deposito < ApplicationRecord
     'general'      => 'insumo_general',
     'salon'        => 'mercaderia',
     'dispensacion' => 'mercaderia',
+    'otro'         => 'insumo_general',
   }.freeze
 
   validates :nombre, presence: true
@@ -45,6 +50,17 @@ class Deposito < ApplicationRecord
   # `index_depositos_sistema_unico` (una validación no protege de una race, y la siembra corre
   # desde un before_action: dos requests simultáneos duplicaban los depósitos del club).
   validates :clave_sistema, uniqueness: { scope: %i[club_id sede_id] }, allow_nil: true
+  # UN depósito por sector y por sede. Sin esto, cada área nueva sumaba otro depósito al mismo
+  # sector y no había forma de saber cuál era el bueno: el alta de una compra ofrecía tres
+  # "Cultivo" y el stock terminaba repartido entre ellos.
+  #
+  # Sólo frena los NUEVOS: si una organización ya quedó con duplicados, se siguen pudiendo
+  # guardar y corregir (una validación no puede volver inguardable lo que ya existe).
+  validates :unidad_negocio_id,
+            uniqueness: { scope: %i[club_id sede_id],
+                          conditions: -> { where(deleted_at: nil) },
+                          message: 'ya tiene un depósito en esta sede' },
+            allow_nil: true, on: :create
 
   scope :activos,   -> { where(activo: true) }
   scope :ordenados, -> { order(:orden, :nombre) }

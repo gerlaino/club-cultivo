@@ -15,16 +15,16 @@ class UnidadesNegocioController < ApplicationController
   end
 
   # POST /unidades_negocio
-  # Con `crear_deposito: true` (sibling del payload), además del área se crea un depósito propio
-  # para ella (mismo nombre). Después el admin puede sumarle más depósitos a esa misma área.
+  #
+  # LOS SECTORES SON CINCO Y NO SE CREAN (ver UnidadNegocio::CANONICOS). Se sembraban tres y el
+  # admin podía agregar los suyos, cada uno con su depósito: así aparecían varios depósitos para
+  # el mismo sector y no había forma de saber cuál era el bueno. Los cinco los siembra
+  # `Finanzas::SembrarCatalogo` y se pueden renombrar o desactivar, no crear.
   def create
-    unidad = current_user.club.unidades_negocio.build(unidad_params)
-    if unidad.save
-      deposito = crear_deposito_para(unidad) if ActiveModel::Type::Boolean.new.cast(params[:crear_deposito])
-      render json: serialize(unidad).merge(deposito_creado: deposito&.nombre), status: :created
-    else
-      render json: { errors: unidad.errors.full_messages }, status: :unprocessable_entity
-    end
+    render json: {
+      error: 'Los sectores son fijos: General, Cultivo, Dispensario, Buffet y Otro. ' \
+             'Podés renombrarlos o desactivarlos, pero no crear otros.',
+    }, status: :unprocessable_entity
   end
 
   # PATCH /unidades_negocio/:id
@@ -55,15 +55,6 @@ class UnidadesNegocioController < ApplicationController
     @unidad = current_user.club.unidades_negocio.find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Unidad no encontrada' }, status: :not_found
-  end
-
-  # Crea un depósito propio (no de sistema) para el área recién creada. Si falla (raro), no
-  # rompe el alta del área: el admin siempre puede crear el depósito a mano después.
-  def crear_deposito_para(unidad)
-    current_user.club.depositos.create!(nombre: unidad.nombre, unidad_negocio: unidad,
-                                        es_sistema: false, activo: true)
-  rescue ActiveRecord::RecordInvalid
-    nil
   end
 
   def asegurar_catalogo

@@ -6,12 +6,10 @@ module Finanzas
   #
   #   Finanzas::SembrarCatalogo.new(club).call
   class SembrarCatalogo
-    UNIDADES = {
-      'cultivo'        => 'Cultivo',
-      'dispensario'    => 'Dispensario',
-      'administracion' => 'General', # área transversal/administrativa del club (nombre visible "General")
-    }.freeze
-    UNIDADES_BAR = { 'bar' => 'Bar' }.freeze
+    # Los cinco sectores y nada más (UnidadNegocio::CANONICOS). Antes eran tres + Bar, y el admin
+    # podía crear los suyos: cada área nueva arrastraba otro depósito al mismo sector.
+    UNIDADES     = UnidadNegocio::CANONICOS.except('bar').freeze
+    UNIDADES_BAR = { 'bar' => UnidadNegocio::CANONICOS['bar'] }.freeze
 
     def initialize(club)
       @club = club

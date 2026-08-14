@@ -134,28 +134,23 @@ describe('crear categoría desde el alta de movimiento', () => {
   })
 })
 
-describe('crear área desde el alta de movimiento', () => {
-  beforeEach(() => { createUnidadNegocio.mockReset() })
+// CAMBIO DE CRITERIO (Germán, ago-2026): los sectores son CINCO y no se crean.
+// Cada sector nuevo arrastraba su propio depósito, así que aparecían varios depósitos para el
+// mismo sector y no había forma de saber cuál era el bueno. Ahora los siembra la app
+// (UnidadNegocio::CANONICOS) y desde el alta sólo se eligen.
+describe('los sectores no se crean desde el alta', () => {
+  it('no hay botón para crear un sector', async () => {
+    await irAlForm(montar(), 'gasto')
 
-  it('la crea y la deja elegida', async () => {
-    createUnidadNegocio.mockResolvedValue({ data: { id: 77, nombre: 'Eventos', tipo: 'social' } })
-    const w = await irAlForm(montar(), 'gasto')
-    w.vm.abrirCrearArea()
-    w.vm.crearArea.nombre = 'Eventos'
-    w.vm.crearArea.tipo   = 'social'
-    await w.vm.confirmarCrearArea()
-
-    expect(createUnidadNegocio).toHaveBeenCalledWith({ nombre: 'Eventos', tipo: 'social' })
-    expect(w.vm.form.unidad_negocio_id).toBe(77)
-    expect(w.vm.areasDisponibles.map(u => u.nombre)).toEqual(['Cultivo', 'Eventos'])
-    expect(w.emitted('catalogo-actualizado')).toHaveLength(1)
+    const boton = [...document.body.querySelectorAll('button')]
+      .find(b => /crear un sector/i.test(b.textContent))
+    expect(boton).toBeFalsy()
   })
 
-  // El área SÍ tiene tipo obligatorio en el back (UnidadNegocio valida presence), por eso el
-  // formulario arranca con uno puesto en vez de dejarlo vacío y comerse un 422.
-  it('arranca con un tipo válido puesto', async () => {
+  it('y el modal ya no sabe crearlos', async () => {
     const w = await irAlForm(montar(), 'gasto')
-    w.vm.abrirCrearArea()
-    expect(w.vm.AREA_TIPOS.map(t => t.value)).toContain(w.vm.crearArea.tipo)
+
+    expect(w.vm.abrirCrearArea).toBeUndefined()
+    expect(createUnidadNegocio).not.toHaveBeenCalled()
   })
 })

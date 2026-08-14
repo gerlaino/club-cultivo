@@ -84,23 +84,21 @@ describe('ModalMovimiento — crear categorías', () => {
     wrapper.unmount()
   })
 
-  // El SECTOR ya no se elige por movimiento: se define al crear la categoría, que es el único
-  // lugar donde tiene sentido decidirlo. (Sector > categoría > subcategoría.)
-  it('el tipo de sector se ofrece con nombres legibles, no con la clave cruda', async () => {
+  // Al crear una categoría hay que decir de qué SECTOR es: se elige de los cinco que existen,
+  // con su nombre, nunca escribiendo uno nuevo ni viendo la clave interna.
+  it('la categoría nueva pide sector, y lo ofrece por nombre', async () => {
     const wrapper = await montar([])
     await abrirComboCategoria()
     ;[...document.body.querySelectorAll('button')]
       .find(b => b.textContent.includes('Crear una categoría')).click()
     await new Promise(r => setTimeout(r, 0))
 
-    const nuevaArea = [...document.body.querySelectorAll('button')]
-      .find(b => b.textContent.includes('Crear un sector'))
-    nuevaArea.click()
-    await new Promise(r => setTimeout(r, 0))
-
-    const opciones = [...document.body.querySelectorAll('option')].map(o => o.textContent)
-    expect(opciones).toContain('Buffet')
+    const opciones = [...document.body.querySelectorAll('option')].map(o => o.textContent.trim())
+    expect(opciones).toContain('Cultivo')
     expect(opciones).not.toContain('administracion')
+    // Y no hay forma de inventar uno.
+    expect([...document.body.querySelectorAll('button')]
+      .find(b => /crear un sector/i.test(b.textContent))).toBeFalsy()
     wrapper.unmount()
   })
 })

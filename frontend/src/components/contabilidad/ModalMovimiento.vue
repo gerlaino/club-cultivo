@@ -10,7 +10,7 @@ import AppDatePicker from '../ui/AppDatePicker.vue'
 import DestinoStock from './DestinoStock.vue'
 import MovimientosFijos from './MovimientosFijos.vue'
 import { useModalEscape } from '../../composables/useModalEscape.js'
-import { createCategoriaContable, createUnidadNegocio } from '../../lib/api.js'
+import { createCategoriaContable } from '../../lib/api.js'
 import {
   flowDe, hoyLocal, fmtARS, fmtMiles, parseMonto, costoUnitario, UNIDADES,
   destinoVacio, destinoEstado, destinoPayload, esDepositoSalon,
@@ -164,18 +164,9 @@ function elegirCat(c) {
 const catsNuevas  = ref([])
 const areasNuevas = ref([])
 const crearCat    = ref(null)   // { nombre, parent_id } mientras se está creando
-const crearArea   = ref(null)   // { nombre, tipo }
 const creando     = ref(false)
 const errorCrear  = ref('')
 
-const AREA_TIPOS = [
-  { value: 'cultivo',        label: 'Cultivo' },
-  { value: 'dispensario',    label: 'Dispensario' },
-  { value: 'bar',            label: 'Buffet' },
-  { value: 'social',         label: 'Social / eventos' },
-  { value: 'administracion', label: 'Administración' },
-  { value: 'general',        label: 'General' },
-]
 const madresDelTipo = computed(() => props.categorias.filter(m => m.tipo === form.value.tipo))
 
 // `parent_id: null` = categoría principal. Antes sólo se podían crear subcategorías, con lo
@@ -229,22 +220,6 @@ const areasDisponibles = computed(() => {
   for (const n of areasNuevas.value) if (!out.some(u => u.id === n.id)) out.push(n)
   return out
 })
-function abrirCrearArea() { errorCrear.value = ''; crearArea.value = { nombre: '', tipo: 'general' } }
-async function confirmarCrearArea() {
-  const f = crearArea.value
-  if (!f?.nombre?.trim()) { errorCrear.value = 'Poné un nombre'; return }
-  creando.value = true; errorCrear.value = ''
-  try {
-    const { data } = await createUnidadNegocio({ nombre: f.nombre.trim(), tipo: f.tipo })
-    areasNuevas.value.push({ id: data.id, nombre: data.nombre, tipo: data.tipo })
-    if (crearCat.value) crearCat.value.unidad_negocio_id = data.id
-    else form.value.unidad_negocio_id = data.id
-    crearArea.value = null
-    emit('catalogo-actualizado')
-  } catch (e) {
-    errorCrear.value = e?.response?.data?.errors?.join(', ') || 'No se pudo crear el sector'
-  } finally { creando.value = false }
-}
 
 // El paciente aparece cuando la categoría lo pide, o cuando el flujo es un aporte.
 const pacienteObligatorio = computed(() => catActual.value?.clave === 'aporte_socio' || flujo.value?.pidePaciente)
@@ -344,7 +319,7 @@ function elegirFlujo(key) {
   montoTexto.value = ''
   destino.value = destinoVacio()
   errores.value = {}
-  crearCat.value = null; crearArea.value = null; errorCrear.value = ''
+  crearCat.value = null; errorCrear.value = ''
 
   // Categoría sugerida por el flujo (el aporte de socio tiene clave propia).
   if (f.clavePreferida) {
@@ -377,7 +352,7 @@ function abrirLibre(tipo = 'egreso') {
   montoTexto.value = ''
   destino.value = destinoVacio()
   errores.value = {}
-  crearCat.value = null; crearArea.value = null; errorCrear.value = ''
+  crearCat.value = null; errorCrear.value = ''
   if (props.depositoInicial) destino.value = { ...destinoVacio(), deposito_id: props.depositoInicial }
   paso.value = 'form'
 }
@@ -432,7 +407,7 @@ watch(() => props.modelValue, (abierto) => {
   if (!abierto) return
   errores.value = {}
   catsNuevas.value = []; areasNuevas.value = []
-  crearCat.value = null; crearArea.value = null; errorCrear.value = ''
+  crearCat.value = null; errorCrear.value = ''
 
   if (props.movimientoEditar) {
     const m = props.movimientoEditar
@@ -596,44 +571,22 @@ const titulo = computed(() => {
                     <!-- El sector ya no se elige por movimiento: se define acá, una sola vez, y
                          después todos los movimientos de esta categoría la heredan. -->
                     <template v-if="!crearCat.parent_id">
-                      <label v-if="!crearArea" class="mv-fld">
-                        <!-- El sector dejó de ser opcional. Con "— Sin sector —" de opción por
-                             defecto, la categoría nacía huérfana y TODOS sus movimientos caían
-                             en "Sin sector" en el balance por área: el panel mostraba plata que
-                             no era de ninguna parte. Si la organización todavía no definió
-                             sectores, se elige uno general o se crea acá mismo. -->
+                      <!-- El sector NO se crea: son cinco (General, Cultivo, Dispensario,
+                           Buffet y Otro) y los siembra la app. Cada sector nuevo arrastraba su
+                           propio depósito, y así aparecían varios depósitos para el mismo sector
+                           sin saber cuál era el bueno. -->
+                      <label class="mv-fld">
                         <span class="mv-lbl">Sector <span class="mv-req">*</span></span>
                         <select class="mv-inp" v-model.number="crearCat.unidad_negocio_id"
                                 :class="{ 'mv-inp--err': errorCrear && !crearCat.unidad_negocio_id }">
                           <option :value="null" disabled>Elegí un sector</option>
                           <option v-for="u in areasDisponibles" :key="u.id" :value="u.id">{{ u.nombre }}</option>
                         </select>
-                        <button type="button" class="mv-inline-new" @click.prevent="abrirCrearArea">
-                          <i class="bi bi-plus-lg"></i> Crear un sector
-                        </button>
                       </label>
-                      <div v-else class="mv-newbox mv-newbox--flat">
-                        <label class="mv-fld">
-                          <span class="mv-lbl">Nombre del sector</span>
-                          <input v-model.trim="crearArea.nombre" type="text" class="mv-inp" placeholder="Ej: Eventos" />
-                        </label>
-                        <label class="mv-fld">
-                          <span class="mv-lbl">Tipo</span>
-                          <select class="mv-inp" v-model="crearArea.tipo">
-                            <option v-for="t in AREA_TIPOS" :key="t.value" :value="t.value">{{ t.label }}</option>
-                          </select>
-                        </label>
-                        <div class="mv-newbox-acts">
-                          <button type="button" class="mv-btn-ghost mv-btn-ghost--sm" @click="crearArea = null">Cancelar</button>
-                          <button type="button" class="mv-btn mv-btn--sm" :disabled="creando" @click="confirmarCrearArea">
-                            {{ creando ? 'Creando…' : 'Crear y usar' }}
-                          </button>
-                        </div>
-                      </div>
                     </template>
                     <p v-if="!crearCat.parent_id" class="mv-newbox-hint">
                       <template v-if="!madresDelTipo.length">Va a ser la primera categoría de {{ esEgreso ? 'egresos' : 'ingresos' }}.</template>
-                      <template v-else>Después vas a poder colgarle subcategorías.</template>
+                      <template v-else>Va a quedar en {{ areasDisponibles.find(u => u.id === crearCat.unidad_negocio_id)?.nombre || 'el sector elegido' }}.</template>
                     </p>
                     <p v-if="errorCrear" class="mv-err">{{ errorCrear }}</p>
                     <div class="mv-newbox-acts">
