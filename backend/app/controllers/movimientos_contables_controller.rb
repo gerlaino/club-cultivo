@@ -389,6 +389,10 @@ class MovimientosContablesController < ApplicationController
       :descripcion, :monto_ars, :fecha,
       :sede_id, :lote_id, :dispensacion_id, :paciente_id,
       :comprobante_numero, :comprobante_tipo, :proveedor,
+      # Cuánto y de qué: de acá sale el costo unitario. Es del movimiento y no del inventario,
+      # porque un gasto que no entra a ningún depósito también se compra por cantidad
+      # (10 horas de electricista, 3 análisis de laboratorio).
+      :cantidad, :unidad,
       :pagado, :medio_pago, :notas
     )
   end
@@ -607,6 +611,11 @@ class MovimientosContablesController < ApplicationController
       unidad_negocio:       m.unidad_negocio ? { id: m.unidad_negocio.id, nombre: m.unidad_negocio.nombre, tipo: m.unidad_negocio.tipo } : nil,
       descripcion:          m.descripcion,
       monto_ars:            m.monto_ars.to_f,
+      cantidad:             m.cantidad&.to_f,
+      unidad:               m.unidad,
+      # Calculado, nunca guardado: si se guardara, corregir el monto o la cantidad dejaría un
+      # unitario viejo que no se corresponde con ninguno de los dos.
+      costo_unitario_ars:   m.costo_unitario_ars&.to_f,
       fecha:                m.fecha,
       comprobante_numero:   m.comprobante_numero,
       comprobante_tipo:     m.comprobante_tipo,

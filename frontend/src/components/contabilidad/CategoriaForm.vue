@@ -8,9 +8,11 @@
 import { computed } from 'vue'
 
 const props = defineProps({
-  // { id?, parent_id, nombre, tipo, unidad_negocio_id, color, madreNombre?, areaNombre? }
+  // { id?, parent_id, nombre, tipo, unidad_negocio_id, sede_id, va_a_deposito, color, madreNombre?, areaNombre? }
   modelValue: { type: Object, required: true },
   unidades:   { type: Array,  default: () => [] },
+  // Sedes de la organización. Sin elegir ninguna, la categoría vale para todas.
+  sedes:      { type: Array,  default: () => [] },
   colores:    { type: Array,  default: () => [] },
   guardando:  { type: Boolean, default: false },
   // Cuando el alta salió de la columna de un sector, el sector YA está decidido: mostrarlo como
@@ -25,6 +27,14 @@ const f = computed({
 })
 
 const esMadre = computed(() => !f.value.parent_id)
+
+// Un sector tiene su depósito: elegido el sector, no hay una segunda decisión. Se nombra en el
+// texto del switch para que se vea a dónde va a parar la compra antes de tildarlo.
+const DEPOSITO_POR_TIPO_SECTOR = { cultivo: 'de Cultivo', bar: 'del Salón', social: 'del Salón' }
+const depositoDelSector = computed(() => {
+  const u = props.unidades.find(x => String(x.id) === String(f.value.unidad_negocio_id))
+  return DEPOSITO_POR_TIPO_SECTOR[u?.tipo] || 'General'
+})
 const titulo  = computed(() => {
   const que = f.value.parent_id ? 'subcategoría' : 'categoría'
   return `${f.value.id ? 'Editar' : 'Nueva'} ${que}`
@@ -63,6 +73,25 @@ const titulo  = computed(() => {
           </select>
         </label>
       </div>
+      <div class="fld-row">
+        <!-- La sede es física y el sector es analítico: son ejes distintos. Sin sede, la
+             categoría vale para toda la organización, que es como venían todas. -->
+        <label class="fld">Sede
+          <select v-model="f.sede_id" class="inp">
+            <option :value="null">— Todas las sedes —</option>
+            <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+          </select>
+        </label>
+        <!-- A QUÉ depósito va no se pregunta: lo decide el sector (uno por sector). Acá sólo se
+             dice SI la compra entra a un inventario o es puro gasto. -->
+        <label class="fld">Al comprar
+          <label class="cf__chk">
+            <input type="checkbox" v-model="f.va_a_deposito" />
+            <span>Entra al depósito {{ depositoDelSector }}</span>
+          </label>
+        </label>
+      </div>
+
       <div class="fld"><span>Color</span>
         <div class="swatches">
           <button v-for="c in colores" :key="c" type="button" class="sw"
@@ -86,6 +115,7 @@ const titulo  = computed(() => {
 /* El sector, cuando ya está decidido: se lee, no se toca. */
 .cf__fijo { padding: .45rem .6rem; background: #fff; border: 1.5px solid var(--c-slate-200); border-radius: 8px; font-size: .82rem; color: var(--c-slate-500); }
 .cf__actions { display: flex; justify-content: flex-end; gap: .5rem; }
+.cf__chk { display: flex; align-items: center; gap: .4rem; padding: .45rem .6rem; background: #fff; border: 1.5px solid var(--c-slate-200); border-radius: 8px; font-size: .78rem; font-weight: 400; color: var(--c-slate-600); cursor: pointer; }
 
 .fld { display: flex; flex-direction: column; gap: .25rem; font-size: .75rem; font-weight: 600; color: var(--c-slate-600); }
 .fld-row { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; }

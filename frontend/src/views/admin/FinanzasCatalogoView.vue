@@ -13,7 +13,7 @@ const emit = defineEmits(['cambio'])
 import { useCatalogoFinanzasStore } from '../../stores/catalogoFinanzas.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
-import { listDepositos } from '../../lib/api.js'
+import { listDepositos, listSedes } from '../../lib/api.js'
 import CategoriaFila from '../../components/contabilidad/CategoriaFila.vue'
 
 const store = useCatalogoFinanzasStore()
@@ -26,7 +26,10 @@ const FAMILIA_LABEL = { insumo: 'insumos de cultivo', insumo_general: 'insumos g
 
 const depositos = ref([])
 async function cargarDepositos() { try { depositos.value = (await listDepositos()).data || [] } catch { depositos.value = [] } }
-onMounted(async () => { await store.fetchAll(); await cargarDepositos() })
+// Para poder acotar una categoría a una sede (nulo = toda la organización).
+const sedes = ref([])
+async function cargarSedes() { try { sedes.value = (await listSedes()).data || [] } catch { sedes.value = [] } }
+onMounted(async () => { await store.fetchAll(); await cargarDepositos(); await cargarSedes() })
 
 // La explicación de la pantalla, a demanda: ver `cat-ayuda` en el template.
 const verAyuda = ref(false)
@@ -57,6 +60,7 @@ function slotDe(areaId, tipo) { return `${areaId ?? 'sin'}:${tipo}` }
 
 function nuevaMadre(area = null, tipo = 'egreso') {
   catForm.value = { parent_id: null, nombre: '', tipo, unidad_negocio_id: area?.id ?? null,
+                    sede_id: null, va_a_deposito: false,
                     color: area?.color || COLORES[0], areaNombre: area?.nombre,
                     slot: slotDe(area?.id, tipo), sectorFijo: !!area }
 }
@@ -69,6 +73,7 @@ function editar(c, madre = null) {
   catForm.value = {
     id: c.id, parent_id: c.parent_id, nombre: c.nombre, tipo: c.tipo,
     unidad_negocio_id: c.unidad_negocio_id, color: c.color || COLORES[0],
+    sede_id: c.sede_id ?? null, va_a_deposito: !!c.va_a_deposito,
     es_sistema: c.es_sistema, madreNombre: madre?.nombre,
     // Editar abre el formulario donde está la categoría, no arriba. Al editar el sector SÍ se
     // puede cambiar: mover una categoría de sector es una operación legítima.
@@ -81,7 +86,15 @@ async function guardarCat() {
   const f = catForm.value
   if (!f.nombre?.trim()) { toast.warning('Poné un nombre'); return }
   const payload = { nombre: f.nombre.trim(), tipo: f.tipo, parent_id: f.parent_id }
-  if (esMadreForm.value) { payload.unidad_negocio_id = f.unidad_negocio_id; payload.color = f.color }
+  if (esMadreForm.value) {
+    payload.unidad_negocio_id = f.unidad_negocio_id
+    payload.color = f.color
+    // Nulo = la categoría vale para toda la organización.
+    payload.sede_id = f.sede_id ?? null
+    // Va aparte del objeto `categoria_contable`: el backend lo traduce a `comportamiento`
+    // usando el sector, que es quien sabe a qué depósito corresponde.
+    payload.va_a_deposito = !!f.va_a_deposito
+  }
   try {
     let creada = null
     if (f.id) await store.actualizarCategoria(f.id, payload)
@@ -251,6 +264,7 @@ async function borrarUnidad(u) {
                   v-else
                   v-model="catForm"
                   :unidades="store.unidadesActivas"
+                  :sedes="sedes"
                   :colores="COLORES"
                   :guardando="store.saving"
                   :sector-fijo="!!catForm.sectorFijo"
@@ -311,6 +325,7 @@ async function borrarUnidad(u) {
                   v-if="catForm?.slot === slotDe(null, tipo)"
                   v-model="catForm"
                   :unidades="store.unidadesActivas"
+                  :sedes="sedes"
                   :colores="COLORES"
                   :guardando="store.saving"
                   :sector-fijo="false"

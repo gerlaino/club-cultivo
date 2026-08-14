@@ -25,11 +25,22 @@ class UnidadNegocio < ApplicationRecord
   scope :activas,    -> { where(activa: true) }
   scope :ordenadas,  -> { order(:orden, :nombre) }
 
-  # Las unidades ligadas a un feature flag del club sólo aplican si está activo.
-  # bar/social dependen de feature?(:bar); el resto siempre disponibles.
-  def disponible_para?(club)
-    return club.feature?(:bar) if %w[bar social].include?(tipo)
+  # Qué pack hace falta para que un sector tenga sentido. Un sector "Cultivo" en una
+  # organización que sólo compró dispensa no tiene con qué llenarse: ofrecerlo es invitar a
+  # clasificar gastos contra un área que no existe.
+  #
+  # General / Administración / Otro no dependen de nada: toda organización tiene gastos.
+  PACK_REQUERIDO = {
+    'cultivo'     => :cultivo,
+    'dispensario' => :produccion_dispensa,
+    'bar'         => :bar,
+    'social'      => :bar,
+  }.freeze
 
-    true
+  def disponible_para?(club)
+    pack = PACK_REQUERIDO[tipo]
+    return true if pack.nil?
+
+    club.feature?(pack)
   end
 end

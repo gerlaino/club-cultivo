@@ -13,6 +13,10 @@ class CategoriaContable < ApplicationRecord
 
   belongs_to :club
   belongs_to :unidad_negocio, optional: true
+  # De qué SEDE es la categoría. Nulo = de toda la organización, que es como se comportaban todas
+  # hasta que existió esta columna. El sector (unidad de negocio) es el eje analítico y atraviesa
+  # las sedes; la sede es física, y hay categorías que sólo tienen sentido en una.
+  belongs_to :sede, optional: true
   belongs_to :parent, class_name: 'CategoriaContable', optional: true
   has_many :subcategorias, class_name: 'CategoriaContable', foreign_key: :parent_id, dependent: :destroy
   has_many :movimientos_contables, class_name: 'MovimientoContable', foreign_key: :categoria_contable_id, dependent: :nullify
@@ -44,6 +48,8 @@ class CategoriaContable < ApplicationRecord
 
   # Valores efectivos (propios o heredados de la madre) — lo que usa el movimiento.
   def unidad_efectiva       = unidad_negocio || parent&.unidad_negocio
+  def sede_efectiva         = sede || parent&.sede
+  def sede_id_efectiva      = sede_id || parent&.sede_id
   def clave_efectiva        = clave_sistema.presence || parent&.clave_sistema
   def comportamiento_efectivo
     comportamiento != 'general' ? comportamiento : (parent&.comportamiento || 'general')
@@ -51,6 +57,25 @@ class CategoriaContable < ApplicationRecord
 
   # Depósito destino según el comportamiento: 'cultivo' | 'general' | 'salon' | nil.
   def familia_deposito = FAMILIA_DEPOSITO[comportamiento_efectivo]
+
+  # ¿Una compra con esta categoría entra a un inventario? Es la pregunta que hace el formulario;
+  # la respuesta ya vive en `comportamiento` y no se guarda por duplicado.
+  def va_a_deposito? = comportamiento_efectivo != 'general'
+
+  # A qué depósito va, DERIVADO DEL SECTOR: un sector tiene su depósito, así que una vez elegido
+  # el sector no hay una segunda decisión que tomar. Antes había que elegir el "comportamiento"
+  # —una palabra que no significa nada para quien carga una compra— y podía contradecir al sector.
+  COMPORTAMIENTO_POR_TIPO_SECTOR = {
+    'cultivo' => 'insumo',
+    'bar'     => 'mercaderia',
+    'social'  => 'mercaderia',
+  }.freeze
+
+  def self.comportamiento_para(unidad_negocio, va_a_deposito)
+    return 'general' unless va_a_deposito
+
+    COMPORTAMIENTO_POR_TIPO_SECTOR[unidad_negocio&.tipo] || 'insumo_general'
+  end
 
   # Tipo de insumo (cultivo/general) para las categorías que van a un depósito de insumos.
   def tipo_insumo = { 'cultivo' => 'cultivo', 'general' => 'general' }[familia_deposito]

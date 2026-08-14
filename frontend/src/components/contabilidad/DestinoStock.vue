@@ -12,6 +12,10 @@ const props = defineProps({
   insumos:    { type: Array,   default: () => [] },
   bares:      { type: Array,   default: () => [] },
   monto:      { type: Number,  default: null },   // para el costo unitario
+  // La cantidad se carga UNA vez, arriba, en el cuerpo del movimiento: acá se muestra para que
+  // se vea qué va a entrar, pero no se vuelve a pedir. Un gasto sin depósito también la usa
+  // (10 horas de electricista tienen precio por hora y no entran a ningún inventario).
+  cantidad:   { type: Number,  default: null },
   errores:    { type: Object,  default: () => ({}) },
 })
 const emit = defineEmits(['update:modelValue'])
@@ -54,10 +58,9 @@ function elegirDeposito(id) {
     insumo_id: '', nombre: '', unidad_medida: 'unidad',
     bar_id: '', bar_producto_id: '', precio_ars: null, no_vender: false,
   })
-  if (mismo) set({ cantidad: null })
 }
 
-const unitario = computed(() => costoUnitario(props.monto, d.value.cantidad))
+const unitario = computed(() => costoUnitario(props.monto, props.cantidad))
 const unidadItem = computed(() => {
   if (esSalon.value) return 'u'
   const ins = insumosDelDeposito.value.find(i => String(i.id) === String(d.value.insumo_id))
@@ -104,13 +107,14 @@ const unidadItem = computed(() => {
               </option>
             </select>
           </label>
-          <label class="dst__fld dst__fld--sm">
+          <div class="dst__fld dst__fld--sm">
             <span class="dst__lbl">Cantidad</span>
-            <input type="number" min="0" step="any" class="dst__inp"
-                   :class="{ 'dst__inp--err': errores.destino_cantidad }"
-                   :value="d.cantidad" @input="set({ cantidad: $event.target.value === '' ? null : Number($event.target.value) })"
-                   placeholder="0" />
-          </label>
+            <!-- Se carga arriba, con el monto: acá se refleja. Preguntarla dos veces dejaba dos
+                 números distintos y ganaba el de abajo sin que nadie lo supiera. -->
+            <div class="dst__ro" :class="{ 'dst__ro--err': errores.destino_cantidad }">
+              {{ cantidad ?? '—' }}
+            </div>
+          </div>
         </div>
 
         <div v-if="!d.insumo_id" class="dst__row">
@@ -140,13 +144,14 @@ const unidadItem = computed(() => {
               <option v-for="b in baresDeLaSede" :key="b.id" :value="b.id">{{ b.nombre }}</option>
             </select>
           </label>
-          <label class="dst__fld dst__fld--sm">
+          <div class="dst__fld dst__fld--sm">
             <span class="dst__lbl">Cantidad</span>
-            <input type="number" min="0" step="any" class="dst__inp"
-                   :class="{ 'dst__inp--err': errores.destino_cantidad }"
-                   :value="d.cantidad" @input="set({ cantidad: $event.target.value === '' ? null : Number($event.target.value) })"
-                   placeholder="0" />
-          </label>
+            <!-- Se carga arriba, con el monto: acá se refleja. Preguntarla dos veces dejaba dos
+                 números distintos y ganaba el de abajo sin que nadie lo supiera. -->
+            <div class="dst__ro" :class="{ 'dst__ro--err': errores.destino_cantidad }">
+              {{ cantidad ?? '—' }}
+            </div>
+          </div>
         </div>
 
         <label v-if="d.bar_id" class="dst__fld">
@@ -182,7 +187,7 @@ const unidadItem = computed(() => {
       <p class="dst__hint">
         <template v-if="unitario">
           Costo unitario: <strong>{{ fmtARS(unitario) }}</strong> por {{ unidadItem }}.
-          Sube el stock {{ d.cantidad }} y se recalcula el costo promedio.
+          Sube el stock {{ cantidad }} y se recalcula el costo promedio.
         </template>
         <template v-else>
           El monto de la compra es el costo total: al dividirlo por la cantidad sale el costo unitario.
@@ -229,6 +234,8 @@ const unidadItem = computed(() => {
   outline: none; transition: border-color var(--t-fast); width: 100%;
 }
 .dst__inp:focus { border-color: var(--c-leaf-600); }
+.dst__ro { padding: .45rem .6rem; background: var(--c-slate-50); border: 1.5px dashed var(--c-slate-200); border-radius: 8px; font-size: .82rem; color: var(--c-slate-600); }
+.dst__ro--err { border-color: var(--c-rust-600); color: var(--c-rust-600); }
 .dst__inp--err { border-color: var(--c-rust-600); }
 .dst__chk { display: flex; align-items: flex-start; gap: var(--sp-2); font-size: var(--fs-13); color: var(--c-ink-700); cursor: pointer; }
 .dst__chk small { color: var(--c-ink-500); }

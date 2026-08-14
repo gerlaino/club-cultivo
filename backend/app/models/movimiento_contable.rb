@@ -73,6 +73,9 @@ class MovimientoContable < ApplicationRecord
             numericality: { greater_than: 0 }
   validates :fecha,       presence: true
   validates :medio_pago,  inclusion: { in: MEDIOS_PAGO }, allow_blank: true
+  # La cantidad es opcional (no todo gasto se compra por unidades), pero si viene tiene que ser
+  # positiva: un 0 haría explotar el costo unitario y un negativo lo daría al revés.
+  validates :cantidad,    numericality: { greater_than: 0 }, allow_nil: true
   # Las cuotas futuras de una compra financiada SÍ pueden tener fecha futura (vencen adelante).
   validate  :fecha_no_futura, unless: :cuota?
   validate  :periodo_no_cerrado, on: [:create, :update]
@@ -123,6 +126,19 @@ class MovimientoContable < ApplicationRecord
   def tipo_label
     { "egreso" => "Egreso", "ingreso" => "Ingreso",
       "recupero_costo" => "Recupero de costo", "ajuste" => "Ajuste" }[tipo] || tipo
+  end
+
+  # Unidades en las que se compra. `unidad` es libre en la base a propósito (el club puede
+  # escribir "bandeja"), esta lista es la que ofrece el formulario.
+  UNIDADES = %w[unidad litro mililitro kilogramo gramo bolsa metro hora servicio otro].freeze
+
+  # El precio por unidad, DERIVADO: el monto es el total y la cantidad es cuánto entró. Es el
+  # número que sirve para comparar proveedores y el que después alimenta el costo por lote.
+  # No se guarda: un unitario persistido queda desfasado apenas se corrige el monto.
+  def costo_unitario_ars
+    return nil unless cantidad.to_d.positive? && monto_ars.present?
+
+    (monto_ars.to_d / cantidad.to_d).round(2)
   end
 
   def es_egreso?

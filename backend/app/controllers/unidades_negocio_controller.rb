@@ -97,6 +97,11 @@ class UnidadesNegocioController < ApplicationController
       activa:     u.activa,
       orden:      u.orden,
       es_sistema: u.es_sistema,
+      # ¿La organización contrató el pack que le da sentido a este sector? Se informa, NO se
+      # filtra: un sector que quedó sin pack sigue teniendo movimientos históricos y su columna
+      # en el P&L tiene que seguir cuadrando. Lo que cambia es que no se ofrece para clasificar
+      # nada nuevo.
+      disponible: u.disponible_para?(current_user.club),
     }
   end
 end

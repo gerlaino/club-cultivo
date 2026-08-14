@@ -148,6 +148,13 @@ export function destinoVacio() {
 
 export const UNIDADES_INSUMO = ['unidad', 'litro', 'mililitro', 'kilogramo', 'gramo', 'bolsa', 'metro', 'otro']
 
+/**
+ * Unidades del MOVIMIENTO (MovimientoContable::UNIDADES). Son las de inventario más las que sólo
+ * tienen sentido para un gasto: se contratan 10 horas de electricista o 3 análisis de laboratorio,
+ * y ninguno de los dos entra a un depósito, pero los dos tienen precio por unidad.
+ */
+export const UNIDADES = [...UNIDADES_INSUMO.filter(u => u !== 'otro'), 'hora', 'servicio', 'otro']
+
 /** El depósito Salón guarda productos del bar (no insumos): otra entrada. */
 export function esDepositoSalon(deposito) {
   return deposito?.clave_sistema === 'salon' || deposito?.familia === 'mercaderia'
@@ -209,6 +216,10 @@ export function validarMovimiento(form, ctx = {}) {
   if (!(Number(form.monto_ars) > 0))    e.monto_ars   = 'Ingresá un monto'
   if (!form.fecha)                      e.fecha       = 'Elegí la fecha'
   if (ctx.pacienteObligatorio && !form.paciente_id) e.paciente_id = 'Elegí el paciente'
+  // Opcional, pero si se carga tiene que ser positiva: un 0 hace explotar el costo unitario.
+  if (form.cantidad !== null && form.cantidad !== undefined && form.cantidad !== '' && !(Number(form.cantidad) > 0)) {
+    e.cantidad = 'La cantidad tiene que ser mayor a 0'
+  }
   if (ctx.esCuotas && !(Number(form.cuotas_total) >= 2)) e.cuotas_total = 'Mínimo 2 cuotas'
 
   // El destino es opcional (una compra puede ser puro gasto), pero a medio llenar no: si eligió
@@ -216,7 +227,9 @@ export function validarMovimiento(form, ctx = {}) {
   // que es justo el silencio que hacía perder mercadería.
   if (ctx.pideDestino && ctx.destino?.iniciado) {
     if (!ctx.destino.itemOk)              e.destino_item     = 'Elegí o nombrá qué entró'
-    if (!(Number(ctx.destino.cantidad) > 0)) e.destino_cantidad = 'Indicá la cantidad'
+    // La cantidad es la del movimiento (se carga arriba, con el monto). Si la compra entra a un
+    // depósito deja de ser opcional: sin ella el asiento se guarda y el stock no se mueve.
+    if (!(Number(ctx.destino.cantidad) > 0)) e.destino_cantidad = 'Indicá la cantidad para que entre al depósito'
   }
 
   return e

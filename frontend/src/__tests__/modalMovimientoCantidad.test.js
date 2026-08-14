@@ -42,12 +42,33 @@ describe('Nuevo movimiento — la plata acá, el inventario allá', () => {
     await wrapper.vm.$nextTick()
   })
 
-  // La cantidad y el precio por unidad NO se preguntan en el cuerpo del movimiento: viven en
-  // "¿Entra al inventario?" (DestinoStock), que es el único lugar donde el dato se GUARDA,
-  // contra el insumo y con su costo. Tenerlos en los dos lados obligaba a cargarlos dos veces
-  // y el que valía era el de abajo.
-  it('el cuerpo del movimiento no pide cantidad: eso es del inventario', () => {
-    expect(wrapper.find('.mv-cant').exists()).toBe(false)
+  // CAMBIO DE CRITERIO (ago-2026). Antes la cantidad vivía SÓLO en "¿Entra al inventario?"
+  // (DestinoStock), para no pedirla dos veces. El problema: un gasto que no entra a ningún
+  // depósito —10 horas de electricista, 3 análisis de laboratorio— se quedaba sin cantidad y
+  // por lo tanto sin costo unitario, que es el número con el que se compara un proveedor contra
+  // otro. Ahora la cantidad es del MOVIMIENTO y el bloque de depósito la refleja: se sigue
+  // cargando en un solo lugar, que era el motivo de la regla vieja, pero ese lugar es el cuerpo.
+  it('el cuerpo del movimiento pide cantidad y unidad', () => {
+    expect(wrapper.find('.mv-cant').exists()).toBe(true)
+  })
+
+  it('y con el monto calcula el precio por unidad', async () => {
+    await wrapper.find('.mv-monto-inp').setValue('1200')
+    wrapper.vm.form.cantidad = 4
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.vm.unitario).toBe(300)
+    expect(wrapper.find('.mv-cant-uni').text()).toContain('300')
+  })
+
+  // Sigue siendo opcional: un alquiler no se compra por unidades.
+  it('sin cantidad no hay unitario y el movimiento se guarda igual', async () => {
+    await wrapper.find('.mv-monto-inp').setValue('1200')
+    wrapper.vm.form.descripcion = 'Alquiler julio'
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.vm.unitario).toBeNull()
+    expect(wrapper.vm.puedeGuardar).toBe(true)
   })
 
   // Un alquiler, un sueldo o una limpieza contratada no tienen cantidad. Que el bloque de

@@ -12,7 +12,7 @@ import MovimientosFijos from './MovimientosFijos.vue'
 import { useModalEscape } from '../../composables/useModalEscape.js'
 import { createCategoriaContable, createUnidadNegocio } from '../../lib/api.js'
 import {
-  flowDe, hoyLocal, fmtARS, fmtMiles, parseMonto,
+  flowDe, hoyLocal, fmtARS, fmtMiles, parseMonto, costoUnitario, UNIDADES,
   destinoVacio, destinoEstado, destinoPayload, esDepositoSalon,
   validarMovimiento, esValido } from './movimientoFlows.js'
 
@@ -73,6 +73,9 @@ function formVacio(tipo = 'egreso') {
     plan: 'unico',               // 'unico' | 'cuotas' — plan de pago, NO medio de pago
     cuotas_total: 6,
     responsable: '',
+    // Cuánto entró y en qué unidad: de acá sale el costo unitario. Opcional.
+    cantidad: null,
+    unidad: 'unidad',
     notas: '',
   }
 }
@@ -80,6 +83,15 @@ const form = ref(formVacio())
 
 const editando = computed(() => !!props.movimientoEditar)
 const esCuotas = computed(() => form.value.plan === 'cuotas' && form.value.tipo === 'egreso' && !editando.value)
+
+// Precio por unidad, en vivo mientras se carga: es el número que sirve para comparar proveedores.
+const unitario = computed(() => costoUnitario(form.value.monto_ars, form.value.cantidad))
+
+// Los sectores que la organización puede usar hoy. `disponible` lo calcula el backend contra los
+// packs contratados; si el payload es viejo y no lo trae, se ofrece (no esconder por las dudas).
+const sectoresOfrecidos = computed(() =>
+  props.unidades.filter(u => u.disponible !== false && u.activa !== false)
+)
 
 // ─── Categorías ─────────────────────────────────────────────────────────────────
 // Lista plana desde el árbol: subcategorías (hoja) + madres sin hijas. `area` = unidad de negocio
@@ -310,7 +322,8 @@ const ctxValidacion = computed(() => ({
   pacienteObligatorio: pacienteObligatorio.value,
   esCuotas: esCuotas.value,
   pideDestino: pideDestinoCat.value,
-  destino: { ...destinoEstado(destino.value, depositoSel.value), cantidad: destino.value.cantidad },
+  // La cantidad del destino es la del movimiento: se carga una sola vez, arriba.
+  destino: { ...destinoEstado(destino.value, depositoSel.value), cantidad: form.value.cantidad },
 }))
 const erroresActuales = computed(() => validarMovimiento(form.value, ctxValidacion.value))
 const puedeGuardar    = computed(() => esValido(erroresActuales.value) && !props.guardando)
@@ -394,7 +407,10 @@ function submit() {
   delete payload.plan
   // Con `pideDestinoCat` acá, una compra por el flujo mostraba el bloque de depósito y después
   // TIRABA el destino al guardar: el asiento entraba y el stock no se movía, en silencio.
-  const dst = pideDestino.value ? destinoPayload(destino.value, depositoSel.value) : null
+  // El destino usa la cantidad del movimiento: es el mismo dato, cargado una sola vez arriba.
+  const dst = pideDestino.value
+    ? destinoPayload({ ...destino.value, cantidad: form.value.cantidad }, depositoSel.value)
+    : null
   if (dst) payload.destino = dst
   emit('guardado', payload)
 }
@@ -430,6 +446,8 @@ watch(() => props.modelValue, (abierto) => {
       proveedor:   m.proveedor || '',
       pagado:      !!m.pagado,
       medio_pago:  m.medio_pago || 'efectivo',
+      cantidad:    m.cantidad ?? null,
+      unidad:      m.unidad || 'unidad',
       notas:       m.notas || '',
     }
     montoTexto.value = fmtMiles(m.monto_ars)
@@ -645,11 +663,33 @@ const titulo = computed(() => {
               </label>
             </div>
 
-            <!-- La cantidad y el precio por unidad NO se preguntan acá: viven en "¿Entra al
-                 inventario?" (DestinoStock), que es el único lugar donde el dato se GUARDA —con
-                 su costo, contra el insumo—. Preguntarlos también acá arriba obligaba a
-                 cargarlos dos veces y el bueno era el de abajo. Y un gasto que no entra a
-                 ningún depósito —un alquiler, una limpieza contratada— no tiene cantidad. -->
+            <!-- CUÁNTO se compró, y de eso sale el precio por unidad.
+                 Vivía sólo adentro de "¿Entra al inventario?", así que un gasto que no entra a
+                 ningún depósito no tenía dónde decir "100.000 por 10 horas de electricista" y se
+                 quedaba sin unitario, que es el número con el que se compara un proveedor contra
+                 otro. Ahora es del movimiento y el bloque de depósito lo REUSA: sigue habiendo un
+                 solo lugar donde se carga, que era el motivo por el que estaba abajo. Opcional:
+                 un alquiler no tiene cantidad y el campo se deja vacío. -->
+            <div class="mv-cant">
+              <label class="mv-fld mv-fld--sm">
+                <span class="mv-lbl">Cantidad <span class="mv-opt">(opcional)</span></span>
+                <input type="number" min="0" step="0.001" class="mv-inp"
+                       :class="{ 'mv-inp--err': errores.cantidad }"
+                       :value="form.cantidad"
+                       @input="form.cantidad = $event.target.value === '' ? null : Number($event.target.value)"
+                       placeholder="0" />
+              </label>
+              <label class="mv-fld mv-fld--sm">
+                <span class="mv-lbl">Unidad</span>
+                <select class="mv-inp" v-model="form.unidad">
+                  <option v-for="u in UNIDADES" :key="u" :value="u">{{ u }}</option>
+                </select>
+              </label>
+              <p v-if="unitario" class="mv-cant-uni">
+                <strong>{{ fmtARS(unitario) }}</strong> por {{ form.unidad }}
+              </p>
+              <span v-if="errores.cantidad" class="mv-err">{{ errores.cantidad }}</span>
+            </div>
 
             <!-- Paciente (aportes) -->
             <div v-if="muestraPaciente" class="mv-fld mv-combo-wrap">
@@ -689,7 +729,7 @@ const titulo = computed(() => {
               v-if="pideDestino"
               v-model="destino"
               :depositos="depositos" :insumos="insumos" :bares="bares"
-              :monto="form.monto_ars" :errores="errores"
+              :monto="form.monto_ars" :cantidad="form.cantidad" :errores="errores"
             />
             <span v-if="errores.destino_item || errores.destino_cantidad" class="mv-err">
               {{ errores.destino_item || errores.destino_cantidad }}
@@ -735,7 +775,7 @@ const titulo = computed(() => {
               <div v-if="esCuotas" class="mv-cuotas">
                 <label class="mv-fld mv-fld--sm">
                   <span class="mv-lbl">Cuotas</span>
-                  <input type="number" min="2" max="120" step="1" class="mv-inp"
+                  <input type="number" min="2" max="100" step="1" class="mv-inp"
                          :class="{ 'mv-inp--err': errores.cuotas_total }" v-model.number="form.cuotas_total" />
                 </label>
                 <label class="mv-fld mv-fld--grow">
@@ -769,6 +809,19 @@ const titulo = computed(() => {
                 <select class="mv-inp" v-model="form.sede_id" :disabled="!!depositoSel?.sede_id">
                   <option :value="null">— Sin sede —</option>
                   <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+                </select>
+              </label>
+
+              <!-- Sin categoría, el sector se elige a mano: es el eje del P&L, y un gasto sin
+                   sector cae en "Sin sector" y no aparece en el resultado de ningún área. Con
+                   categoría no se pregunta —ella ya lo trae— y se muestra el eco de abajo.
+                   Sólo se ofrecen los sectores cuyo pack contrató la organización: los demás
+                   siguen existiendo para el historial, pero no para clasificar algo nuevo. -->
+              <label v-if="!catActual && sectoresOfrecidos.length" class="mv-fld">
+                <span class="mv-lbl">Sector <span class="mv-opt">(opcional)</span></span>
+                <select class="mv-inp" v-model="form.unidad_negocio_id">
+                  <option :value="null">— Sin sector —</option>
+                  <option v-for="u in sectoresOfrecidos" :key="u.id" :value="u.id">{{ u.nombre }}</option>
                 </select>
               </label>
 
@@ -973,6 +1026,8 @@ const titulo = computed(() => {
 .mv-ta { height: auto; padding: 10px 12px; resize: vertical; line-height: var(--lh-base); }
 
 /* Monto */
+.mv-cant { display: flex; gap: var(--sp-3); flex-wrap: wrap; align-items: flex-end; }
+.mv-cant-uni { margin: 0 0 .35rem; font-size: var(--fs-13); color: var(--c-ink-600); }
 .mv-monto {
   display: flex; align-items: center; height: 44px; padding: 0 12px;
   border: 1.5px solid var(--c-ink-300); border-radius: var(--r-md);

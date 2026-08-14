@@ -19,6 +19,7 @@ class CategoriasContablesController < ApplicationController
   # POST /categorias_contables
   def create
     categoria = current_user.club.categorias_contables.build(categoria_params)
+    aplicar_va_a_deposito(categoria)
     if categoria.save
       render json: serialize(categoria), status: :created
     else
@@ -28,7 +29,9 @@ class CategoriasContablesController < ApplicationController
 
   # PATCH /categorias_contables/:id
   def update
-    if @categoria.update(categoria_params)
+    @categoria.assign_attributes(categoria_params)
+    aplicar_va_a_deposito(@categoria)
+    if @categoria.save
       render json: serialize(@categoria)
     else
       render json: { errors: @categoria.errors.full_messages }, status: :unprocessable_entity
@@ -80,9 +83,24 @@ class CategoriasContablesController < ApplicationController
     club.unidades_negocio.exists?
   end
 
+  # El formulario pregunta "¿va a depósito?" (sí/no) y el SECTOR decide a cuál. Se traduce a
+  # `comportamiento`, que sigue siendo la única columna que lo guarda. Si el cliente no manda el
+  # switch (una edición que sólo cambia el nombre), no se toca nada.
+  def aplicar_va_a_deposito(categoria)
+    # Se acepta suelto o dentro del objeto: el cliente manda todo el formulario anidado bajo
+    # `categoria_contable`, y no es un campo del modelo como para meterlo en el permit.
+    crudo = params[:va_a_deposito]
+    crudo = params.dig(:categoria_contable, :va_a_deposito) if crudo.nil?
+    return if crudo.nil?
+
+    va = ActiveModel::Type::Boolean.new.cast(crudo)
+    categoria.comportamiento = CategoriaContable.comportamiento_para(categoria.unidad_efectiva, va)
+  end
+
   def categoria_params
     params.require(:categoria_contable).permit(
-      :nombre, :tipo, :color, :unidad_negocio_id, :orden, :activa, :parent_id, :comportamiento
+      # `sede_id` nulo = la categoría vale para toda la organización (como venían todas).
+      :nombre, :tipo, :color, :unidad_negocio_id, :sede_id, :orden, :activa, :parent_id, :comportamiento
     )
   end
 
@@ -113,6 +131,12 @@ class CategoriasContablesController < ApplicationController
       orden:             c.orden,
       unidad_negocio_id: c.unidad_negocio_id,
       unidad_negocio:    c.unidad_efectiva ? { id: c.unidad_efectiva.id, nombre: c.unidad_efectiva.nombre, tipo: c.unidad_efectiva.tipo } : nil,
+      sede_id:           c.sede_id_efectiva,
+      sede:              c.sede_efectiva ? { id: c.sede_efectiva.id, nombre: c.sede_efectiva.nombre } : nil,
+      # Si una compra con esta categoría entra a un inventario, y a cuál. No es una columna
+      # aparte: lo dice `comportamiento` (ver CategoriaContable::FAMILIA_DEPOSITO).
+      va_a_deposito:     c.va_a_deposito?,
+      familia_deposito:  c.familia_deposito,
     }
     base[:subcategorias] = c.subcategorias.ordenadas.map { |s| serialize(s) } if con_subcategorias
     base
