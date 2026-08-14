@@ -196,9 +196,13 @@ describe('Nuevo movimiento — el formulario reordenado', () => {
 
   it('las etiquetas dejaron de ser un interrogatorio', () => {
     const texto = wrapper.text()
-    const preguntas = (texto.match(/¿/g) || []).length
 
-    expect(preguntas).toBeLessThanOrEqual(1)   // sólo el link de "los que se repiten"
+    // Las únicas dos preguntas que quedan, y las dos son a propósito: el atajo de los gastos
+    // que se repiten, y la decisión de si la compra entra al inventario (que desde ago-2026
+    // está siempre a la vista). El resto son etiquetas: Fecha, Estado del pago, Sector.
+    const preguntas = (texto.match(/¿[^?]*\?/g) || [])
+    expect(preguntas.every(p => /se repiten|entra al inventario/i.test(p)), preguntas.join(' | ')).toBe(true)
+
     expect(texto).toContain('Fecha')
     expect(texto).toContain('Estado del pago')
   })

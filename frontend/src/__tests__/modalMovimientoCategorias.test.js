@@ -131,12 +131,17 @@ describe('ModalMovimiento — un solo formulario', () => {
     w.unmount()
   })
 
-  it('lo primero es si la plata salió o entró', async () => {
+  // CAMBIO DE CRITERIO (Germán, ago-2026): acá SÓLO se registra plata que sale. La que entra ya
+  // tiene su puerta —el pago de un paciente se registra en su cuenta corriente, que crea el
+  // movimiento sola; el recupero sale de la dispensación; lo del buffet, del mostrador— y
+  // cargarla otra vez a mano la contaría dos veces.
+  it('acá sólo sale plata, y dice dónde se registra la que entra', async () => {
     const w = await abrir()
 
     const txt = document.body.textContent
     expect(txt).toContain('Salió plata')
-    expect(txt).toContain('Entró plata')
+    expect(txt).not.toContain('Entró plata')
+    expect(txt).toMatch(/cuenta corriente/i)
     w.unmount()
   })
 

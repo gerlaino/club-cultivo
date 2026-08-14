@@ -57,10 +57,15 @@ class UnidadesNegocioController < ApplicationController
     render json: { error: 'Unidad no encontrada' }, status: :not_found
   end
 
+  # Mismo criterio que en categorías: al día = están los cinco sectores que le corresponden a
+  # esta organización, no "alguno". Si no, una sembrada antes nunca recibe un sector nuevo.
   def asegurar_catalogo
-    return if current_user.club.unidades_negocio.exists?
+    club = current_user.club
+    esperados = UnidadNegocio::CANONICOS.keys
+    esperados -= ['bar'] unless club.feature?(:bar)
+    return if (esperados - club.unidades_negocio.pluck(:tipo)).empty?
 
-    Finanzas::SembrarCatalogo.new(current_user.club).call
+    Finanzas::SembrarCatalogo.new(club).call
   end
 
   def unidad_params

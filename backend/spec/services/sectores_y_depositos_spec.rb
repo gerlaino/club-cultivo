@@ -40,6 +40,40 @@ RSpec.describe 'Sectores y sus depósitos', type: :request do
       expect(JSON.parse(response.body)['error']).to match(/fijos/i)
     end
 
+    # El caso que se vio en pantalla: a una organización sembrada ANTES le faltaba "Otro", porque
+    # la siembra sólo corría si no había ningún sector. Un sector agregado después no llegaba nunca.
+    it 'una organización ya sembrada recibe los que le faltan' do
+      ActsAsTenant.with_tenant(club) do
+        club.unidades_negocio.create!(nombre: 'Cultivo', tipo: 'cultivo', es_sistema: true)
+      end
+      sign_in_as(admin)
+
+      get '/unidades_negocio', headers: auth_headers
+
+      nombres = JSON.parse(response.body).map { |u| u['nombre'] }
+      expect(nombres).to include('Otro', 'General', 'Dispensario')
+    end
+
+    # "Bar" era el nombre viejo del sector; el producto lo llama Buffet.
+    it 'renombra el "Bar" viejo a Buffet' do
+      ActsAsTenant.with_tenant(club) do
+        club.unidades_negocio.create!(nombre: 'Bar', tipo: 'bar', es_sistema: true)
+        Finanzas::SembrarCatalogo.new(club).call
+
+        expect(club.unidades_negocio.find_by(tipo: 'bar').nombre).to eq('Buffet')
+      end
+    end
+
+    # Pero si la organización le puso su propio nombre, no se lo pisa.
+    it 'y respeta el nombre que le haya puesto la organización' do
+      ActsAsTenant.with_tenant(club) do
+        club.unidades_negocio.create!(nombre: 'Cultivo Norte', tipo: 'cultivo', es_sistema: true)
+        Finanzas::SembrarCatalogo.new(club).call
+
+        expect(club.unidades_negocio.where(tipo: 'cultivo').pluck(:nombre)).to eq(['Cultivo Norte'])
+      end
+    end
+
     # El Buffet es un add-on: sin contratarlo no tiene sentido tener el sector.
     it 'el Buffet sólo aparece si está contratado' do
       sin_bar = create(:club, features: { 'cultivo' => true })

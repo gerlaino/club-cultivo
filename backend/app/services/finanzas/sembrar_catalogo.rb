@@ -36,13 +36,26 @@ module Finanzas
 
     private
 
+    # Nombres viejos que se renombran solos al pasar a los sectores canónicos. Sólo pisa el
+    # nombre si sigue siendo el default anterior: si la organización lo renombró, se respeta.
+    RENOMBRES = { 'bar' => { 'Bar' => 'Buffet' } }.freeze
+
     def sembrar_unidades
       defs = UNIDADES.dup
       defs.merge!(UNIDADES_BAR) if @club.feature?(:bar)
       result = {}
       defs.each_with_index do |(tipo, nombre), i|
-        result[tipo] = @club.unidades_negocio.create_with(nombre: nombre, orden: i, es_sistema: true, activa: true)
-                            .find_or_create_by!(tipo: tipo, nombre: nombre)
+        # Se busca POR TIPO, no por (tipo, nombre). Buscando por los dos, una organización que
+        # renombró su sector se llevaba uno nuevo con el nombre viejo en la próxima siembra: dos
+        # "Cultivo" y dos depósitos para el mismo sector.
+        unidad = @club.unidades_negocio
+                      .create_with(nombre: nombre, orden: i, es_sistema: true, activa: true)
+                      .find_or_create_by!(tipo: tipo)
+
+        if (nuevo = RENOMBRES.dig(tipo, unidad.nombre))
+          unidad.update!(nombre: nuevo)
+        end
+        result[tipo] = unidad
       end
       result
     end

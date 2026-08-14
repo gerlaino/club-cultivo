@@ -85,11 +85,17 @@ class CategoriasContablesController < ApplicationController
     Finanzas::SembrarCatalogo.new(current_user.club).call
   end
 
-  # El catálogo está al día si ya tiene hojas Y las familias que hoy espera la app.
-  # Solo garantizamos las ÁREAS (unidades de negocio). El árbol de categorías NO se auto-siembra:
-  # el club arranca en limpio y el usuario crea las suyas.
+  # El catálogo está al día si están LOS CINCO SECTORES (los que correspondan a sus packs), no
+  # sólo "alguno". Con `exists?` a secas, una organización sembrada antes no recibía nunca un
+  # sector agregado después: por eso a los clubes viejos les faltaba "Otro" en el selector.
+  #
+  # Solo garantizamos los SECTORES. El árbol de categorías NO se auto-siembra: el club arranca
+  # en limpio y crea las suyas.
   def catalogo_al_dia?(club)
-    club.unidades_negocio.exists?
+    esperados = UnidadNegocio::CANONICOS.keys
+    esperados -= ['bar'] unless club.feature?(:bar)
+
+    (esperados - club.unidades_negocio.pluck(:tipo)).empty?
   end
 
   # El formulario pregunta "¿va a depósito?" (sí/no) y el SECTOR decide a cuál. Se traduce a

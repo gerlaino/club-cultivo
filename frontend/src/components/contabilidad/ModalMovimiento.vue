@@ -346,6 +346,7 @@ const FLUJO_LIBRE = {
   cta: 'Guardar movimiento',
 }
 
+// Sin parámetro: desde acá sólo se registran egresos (ver el bloque del tipo en el template).
 function abrirLibre(tipo = 'egreso') {
   flujo.value = FLUJO_LIBRE
   form.value = formVacio(tipo)
@@ -492,15 +493,22 @@ const titulo = computed(() => {
           <div v-else class="mv-body mv-body--unica">
             <div class="mv-col mv-col--hecho">
 
-            <div v-if="!editando" class="mv-tipo">
-              <button type="button" class="mv-tipo-btn" :class="{ 'mv-tipo-btn--on': esEgreso }"
-                      @click="setTipo('egreso')">
+            <!-- ACÁ SÓLO SE REGISTRA PLATA QUE SALE.
+                 La que entra ya tiene su puerta, y cargarla otra vez a mano la contaría dos
+                 veces: el pago de un paciente se registra en su cuenta corriente (que crea el
+                 movimiento sola), el recupero sale de la dispensación y lo del buffet, del
+                 mostrador. Un ingreso tampoco entra a ningún inventario ni tiene costo unitario,
+                 así que la mitad de este formulario no le aplicaba.
+                 Al EDITAR un movimiento de ingreso ya existente, el formulario sigue andando: lo
+                 que se cierra es crear uno nuevo desde acá. -->
+            <div v-if="!editando" class="mv-tipo mv-tipo--solo-egreso">
+              <span class="mv-tipo-btn mv-tipo-btn--on">
                 <i class="bi bi-arrow-up-right"></i> Salió plata
-              </button>
-              <button type="button" class="mv-tipo-btn mv-tipo-btn--in" :class="{ 'mv-tipo-btn--on': !esEgreso }"
-                      @click="setTipo('ingreso')">
-                <i class="bi bi-arrow-down-left"></i> Entró plata
-              </button>
+              </span>
+              <p class="mv-tipo-nota">
+                Si entró plata: el pago de un paciente se registra en su
+                <strong>cuenta corriente</strong>; lo del buffet, en el mostrador.
+              </p>
             </div>
 
             <!-- La CATEGORÍA arriba de todo. Es el único campo obligatorio del formulario y
@@ -918,6 +926,10 @@ const titulo = computed(() => {
 .mv-tipo-btn:hover { border-color: var(--c-slate-300); background: var(--c-slate-50); }
 .mv-tipo-btn--on { border-color: #b91c1c; background: #fef2f2; color: #b91c1c; }
 .mv-tipo-btn--in.mv-tipo-btn--on { border-color: #15803d; background: #f0fdf4; color: #15803d; }
+/* Un solo estado posible: se muestra como rótulo, no como algo elegible. */
+.mv-tipo--solo-egreso { display: flex; align-items: center; gap: var(--sp-3); flex-wrap: wrap; }
+.mv-tipo--solo-egreso .mv-tipo-btn { cursor: default; }
+.mv-tipo-nota { margin: 0; font-size: var(--fs-12); color: var(--c-ink-500); line-height: 1.4; flex: 1 1 240px; }
 
 /* Los fijos del mes: un acceso discreto, no un botón que compita con Guardar. */
 .mv-fijos-link { padding: 0 var(--sp-5, 1.25rem) var(--sp-3, .75rem); }
