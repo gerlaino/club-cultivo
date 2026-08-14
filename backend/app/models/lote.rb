@@ -101,6 +101,23 @@ class Lote < ApplicationRecord
   # de guardar (hay que poder corregirlo).
   validate :finalizado_exige_stock_agotado, if: -> { estado_changed? && estado == 'finalizado' }
 
+  # PONER EN MACETA ES PRENDER. Enraizado ⇔ sin maceta: el que enraíza vive en taco o bandeja,
+  # por eso `maceta_al_prender` exige una maceta al pasar a vegetativo. La vuelta faltaba, y
+  # dejaba estados imposibles: se desprendían 5 plantas de un lote enraizando, se las ponía en
+  # maceta de 0,5 L —o sea, prendieron y se trasplantaron— y el lote hijo nacía "enraizado" con
+  # maceta. Lo mismo con un trasplante registrado sobre un lote que seguía enraizando.
+  #
+  # Va en el modelo y no en cada puerta porque son cuatro (alta heredada, desprender, trasplante,
+  # edición) y alcanzaba con olvidarse de una.
+  #
+  # No toca los lotes que YA están en ese estado contradictorio: sólo actúa cuando la maceta se
+  # asigna en este guardado. Un registro viejo mal no puede quedar imposible de corregir.
+  before_validation :prender_al_ponerlo_en_maceta
+  after_save        :registrar_prendido_por_maceta, if: -> { @prendio_por_maceta }
+  # Quién puso el lote en maceta, para los caminos que no vienen de un request (servicios,
+  # rakes). En un request alcanza con `Current.user`.
+  attr_accessor :actor_del_prendido
+
   before_create :generar_codigo
   before_create :generar_codigo_qr
   after_commit  :dispatch_webhook_avance,  on: [:create, :update]
@@ -570,6 +587,43 @@ class Lote < ApplicationRecord
   def maceta_al_prender
     return if tamanio_maceta.present?
     errors.add(:tamanio_maceta, 'es obligatorio al pasar a vegetativo: el esqueje que prendió va a maceta')
+  end
+
+  # Ver el comentario del callback. `new_record?` entra a propósito: es el caso del lote hijo de
+  # un desprendimiento, que nace con la maceta que se le indicó en el momento de separarlo.
+  def prender_al_ponerlo_en_maceta
+    return unless estado == 'enraizado' && tamanio_maceta.present?
+    return unless new_record? || tamanio_maceta_changed?
+
+    self.estado = 'vegetativo'
+    # Sólo se anota en la historia si es un lote que YA existía: en uno nuevo no hubo transición,
+    # nació así.
+    @prendio_por_maceta = !new_record?
+  end
+
+  def registrar_prendido_por_maceta
+    @prendio_por_maceta = false
+    # Las plantas van con el lote: si no, quedan "enraizando" adentro de uno en vegetativo. El
+    # controller de edición ya sincroniza, pero el trasplante escribe la maceta directo sobre el
+    # modelo y no pasa por ahí.
+    plants.where.not(state: %w[descartada cosechado]).update_all(state: 'vegetativo')
+
+    # `lote_eventos.user_id` es NOT NULL en la base (el `optional: true` del modelo se queda
+    # corto), así que sin autor no hay evento. En un request siempre lo hay —`Current.user` lo
+    # fija ApplicationController— y los servicios lo pasan a mano; queda afuera sólo consola y
+    # seeds. El cambio de fase se aplica igual: mejor sin la línea de historia que sin la regla.
+    usuario = actor_del_prendido || Current.user
+    return if usuario.nil?
+
+    lote_eventos.create!(
+      tipo:            'cambio_estado',
+      estado_anterior: 'enraizado',
+      estado_nuevo:    'vegetativo',
+      descripcion:     "Prendió: pasó a maceta de #{tamanio_maceta.to_f} L",
+      user:            usuario,
+      club:            club,
+      registrado_en:   Time.current,
+    )
   end
 
   def generar_codigo_qr

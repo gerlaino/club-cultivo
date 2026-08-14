@@ -48,6 +48,12 @@ module Lotes
         hijo = crear_hijo(vivas.count, elegidas.size)
         copiar_linea_de_tiempo(hijo)
         Plant.where(id: elegidas.map(&:id)).update_all(lote_id: hijo.id, updated_at: Time.current)
+        # Separar un lote enraizando poniendo las plantas en maceta ES prenderlas: el hijo nace en
+        # vegetativo (ver Lote#prender_al_ponerlo_en_maceta) y las plantas tienen que ir con él, o
+        # quedan "enraizando" adentro de un lote en vegetativo.
+        if hijo.estado != @lote.estado && (plant_state = Lote::FASE_A_PLANT_STATE[hijo.estado])
+          Plant.where(id: elegidas.map(&:id)).update_all(state: plant_state, updated_at: Time.current)
+        end
         recontar!(hijo)
         recontar!(@lote)
         registrar_eventos(hijo, elegidas.size)
@@ -168,6 +174,17 @@ module Lotes
                      "#{hijo.costo_heredado_ars.to_d.positive? ? " · se lleva $#{hijo.costo_heredado_ars.to_f} de costo" : ''}",
         user: @usuario, club: @lote.club, registrado_en: Time.current,
       )
+
+      # `copiar_linea_de_tiempo` trae la historia del padre, que llega hasta el enraizado. Si al
+      # ponerlas en maceta el hijo prendió, ese salto es SUYO y arranca hoy: sin el evento, su
+      # fecha de inicio de vegetativo cae a `start_date` y la analítica le cuenta días de más.
+      if hijo.estado != @lote.estado
+        hijo.lote_eventos.create!(
+          tipo: 'cambio_estado', estado_anterior: @lote.estado, estado_nuevo: hijo.estado,
+          descripcion: "Prendió al separarse: pasó a maceta de #{hijo.tamanio_maceta.to_f} L",
+          user: @usuario, club: @lote.club, registrado_en: Time.current,
+        )
+      end
     end
 
     def recalcular_costos(hijo)

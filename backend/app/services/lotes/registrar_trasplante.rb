@@ -58,7 +58,13 @@ module Lotes
         )
 
         # Solo actualizamos la "maceta actual" si el lote sigue en cultivo.
-        @lote.update!(tamanio_maceta: @destino) unless ESTADOS_POST_COSECHA.include?(@lote.estado)
+        # Si venía enraizando, sacarlo de la bandeja a maceta lo pasa a vegetativo: es el mismo
+        # acto físico que "prender" (ver Lote#prender_al_ponerlo_en_maceta). El actor va explícito
+        # porque el evento que lo registra necesita autor y acá no hay request garantizado.
+        unless ESTADOS_POST_COSECHA.include?(@lote.estado)
+          @lote.actor_del_prendido = @usuario
+          @lote.update!(tamanio_maceta: @destino)
+        end
       end
       Result.new(ok: true)
     rescue => e
