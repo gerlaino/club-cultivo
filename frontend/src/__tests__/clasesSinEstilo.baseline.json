@@ -211,7 +211,6 @@
   ],
   "views/admin/AdminStockDetailView.vue": [
     "sd__hero-info",
-    "sd__hint",
     "sd__input--unidad",
     "sd__input-pre",
     "sd__label-opt"

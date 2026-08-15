@@ -649,21 +649,33 @@
               <div v-if="descartarError" class="stk__alert">{{ descartarError }}</div>
               <div class="stk__descarte-warn">
                 <i class="bi bi-exclamation-triangle-fill"></i>
-                Esta acción marcará el stock como <strong>agotado</strong> y registrará una merma de <strong>{{ descartarTarget?.cantidad }}g</strong>. No se puede revertir.
+                Esta acción cierra el stock: lo deja en <strong>agotado</strong> y descuenta
+                <strong>{{ descartarTarget?.cantidad }}g</strong>. No se puede revertir.
               </div>
               <div class="stk__form-grid">
+                <!-- QUÉ PASÓ, tipificado: sólo "destruido" cuenta como pérdida. Era texto libre
+                     y todo se anotaba como merma, así que una entrega quedaba declarada como
+                     producto destruido. -->
                 <div class="stk__field stk__field--full">
-                  <label class="stk__label">Motivo del descarte <span class="stk__req">*</span></label>
-                  <textarea class="stk__input stk__textarea" rows="3" v-model="descartarForm.motivo" placeholder="Ej: vencimiento, contaminación, pérdida irreversible…"></textarea>
+                  <label class="stk__label">¿Qué pasó con el stock? <span class="stk__req">*</span></label>
+                  <select class="stk__input" v-model="descartarForm.motivo">
+                    <option value="" disabled>Elegí una opción</option>
+                    <option v-for="m in MOTIVOS_FINALIZACION" :key="m.value" :value="m.value">{{ m.label }}</option>
+                  </select>
+                  <p v-if="descartarForm.motivo" class="stk__hint-motivo">{{ ayudaDe(descartarForm.motivo) }}</p>
+                </div>
+                <div class="stk__field stk__field--full">
+                  <label class="stk__label">Detalle <span class="stk__label-opt">(opcional)</span></label>
+                  <textarea class="stk__input stk__textarea" rows="2" v-model="descartarForm.detalle" placeholder="A quién, número de remito, lo que sirva para encontrarlo después…"></textarea>
                 </div>
               </div>
             </div>
             <div class="stk__modal-ft">
               <button type="button" class="stk__btn-ghost" @click="closeDescartar">Cancelar</button>
-              <button class="stk__btn-danger" :disabled="descartando || !descartarForm.motivo.trim()" @click="ejecutarDescartar">
+              <button class="stk__btn-danger" :disabled="descartando || !descartarForm.motivo" @click="ejecutarDescartar">
                 <DsSpinner v-if="descartando" :size="12" />
-                <i v-else class="bi bi-trash"></i>
-                Descartar {{ descartarTarget?.cantidad }}g
+                <i v-else class="bi bi-check2-square"></i>
+                Finalizar {{ descartarTarget?.cantidad }}g
               </button>
             </div>
           </div>
@@ -730,6 +742,7 @@ import {
 
 const router = useRouter()
 import { useToast } from '../../composables/useToast.js'
+import { MOTIVOS_FINALIZACION, ayudaDe } from '../../composables/useStockFinalizacion.js'
 import { useStockChannel } from '../../composables/useStockChannel.js'
 
 const toast = useToast()
@@ -1217,13 +1230,13 @@ async function ejecutarAjustar() {
 // ── Descartar ──────────────────────────────────────────────────────────────────
 const showDescartar   = ref(false)
 const descartarTarget = ref(null)
-const descartarForm   = ref({ motivo: '' })
+const descartarForm   = ref({ motivo: '', detalle: '' })
 const descartarError  = ref(null)
 const descartando     = ref(false)
 
 function openDescartar(s) {
   descartarTarget.value = s
-  descartarForm.value   = { motivo: '' }
+  descartarForm.value   = { motivo: '', detalle: '' }
   descartarError.value  = null
   showDescartar.value   = true
 }
@@ -1231,11 +1244,11 @@ function closeDescartar() { showDescartar.value = false }
 
 async function ejecutarDescartar() {
   descartarError.value = null
-  const motivo = descartarForm.value.motivo.trim()
-  if (!motivo) { descartarError.value = 'El motivo es obligatorio'; return }
+  const motivo = descartarForm.value.motivo
+  if (!motivo) { descartarError.value = 'Elegí qué pasó con el stock'; return }
   descartando.value = true
   try {
-    await descartarStock(descartarTarget.value.id, { motivo })
+    await descartarStock(descartarTarget.value.id, { motivo, detalle: (descartarForm.value.detalle || '').trim() })
     closeDescartar()
     const [rPend] = await Promise.all([listStocksPendientes()])
     pendientes.value = rPend.data || []
@@ -1530,6 +1543,8 @@ function formatDate(dateStr) {
 .stk__inv-td-cepa { font-style: italic; color: var(--c-slate-600); }
 /* Texto libre: se acota y el resto se lee en el tooltip. Sin tope, un comentario largo
    empuja las columnas de cantidad fuera de la pantalla. */
+.stk__hint-motivo { margin: .2rem 0 0; font-size: .74rem; color: var(--c-slate-500); }
+.stk__label-opt { color: var(--c-slate-400); font-weight: 400; }
 .stk__inv-td-obs { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--c-slate-500); font-size: .78rem; }
 .stk__inv-td-mono { font-family: var(--font-mono, monospace); font-size: .8rem; color: var(--c-slate-600); }
 .stk__inv-td-fecha { white-space: nowrap; color: var(--c-slate-500); }

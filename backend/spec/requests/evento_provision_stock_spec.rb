@@ -123,12 +123,20 @@ RSpec.describe 'Provisión de eventos con Stock', type: :request do
       expect(evento.reload.costo_mercaderia).to eq(0)
     end
 
-    # Las únicas salidas de stock hacia afuera del club son la dispensación (con su socio) y el
-    # consumo interno de un evento (declarado y trazado). No hay una puerta "venta".
-    it 'no existe una salida de stock por venta' do
+    # LA REGLA DE ORO SIGUE: por el MOSTRADOR, lo trazable sale sólo por dispensación (con su
+    # paciente) o como consumo interno de un evento (declarado y trazado). El POS no vende Stock.
+    #
+    # Lo que cambió (ago-2026) es que existe un cierre MANUAL del stock, de admin, que pide qué
+    # pasó: `salida` para lo que se fue entero —entregado a otra organización, vendido, regalado,
+    # uso interno— y `merma` sólo para lo destruido. Nació porque una organización que sólo
+    # produce no tenía ninguna salida legítima: descartaba, y eso declaraba destruido producto
+    # que estaba intacto en otro lado.
+    it 'el mostrador no puede vender stock trazable' do
       expect(StockMovimiento::TIPOS).to contain_exactly(
-        'produccion', 'transferencia', 'dispensacion', 'ajuste', 'merma', 'consumo_evento'
+        'produccion', 'transferencia', 'dispensacion', 'ajuste', 'merma', 'salida', 'consumo_evento'
       )
+      # No hay tipo "venta": una venta del POS mueve productos del bar, nunca Stock.
+      expect(StockMovimiento::TIPOS).not_to include('venta')
     end
   end
 

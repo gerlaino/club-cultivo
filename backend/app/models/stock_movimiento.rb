@@ -12,7 +12,11 @@ class StockMovimiento < ApplicationRecord
   # muestra), por `consumo_evento`. Tipo propio y no `merma` a propósito: no es lo mismo
   # «se consumió en el aniversario» que «se pudrió», y en un informe hay que poder distinguirlo.
   # El apartado para un evento NO genera movimiento: bloquea sin descontar.
-  TIPOS = %w[produccion transferencia dispensacion ajuste merma consumo_evento].freeze
+  # `salida` es producto que SE FUE ENTERO de la organización: entregado a otro club, vendido o
+  # regalado. NO es merma. Distinguirlos importa: el informe de Pérdidas cuenta `merma`, así que
+  # anotar una entrega como merma declara destruido algo que está intacto en otro lado — y para
+  # un auditor, producto que "se perdió" sin explicación es peor que producto que salió.
+  TIPOS = %w[produccion transferencia dispensacion ajuste merma salida consumo_evento].freeze
 
   validates :tipo,   inclusion: { in: TIPOS }
   validates :gramos, numericality: { other_than: 0 }

@@ -329,18 +329,33 @@ class StocksController < ApplicationController
 
   # POST /stocks/:id/descartar
   # Body: { motivo: string }
+  # POST /stocks/:id/descartar  { motivo: 'entregado'|'vendido'|…, detalle: 'texto' }
+  #
+  # Cierra el stock: lo lleva a cero y lo marca agotado (y con eso el lote se finaliza, si era el
+  # último). Lo que cambió es que ahora pide QUÉ FUE, tipificado.
+  #
+  # Antes todo se anotaba como `merma`, así que entregarle producto a otra organización quedaba
+  # declarado como destruido: el informe de Pérdidas lo contaba y la trazabilidad mostraba gramos
+  # que desaparecieron sin explicación. Sólo `destruido` es pérdida; el resto es una salida — el
+  # producto existe, está en otro lado.
   def descartar
-    motivo = params[:motivo].to_s.strip
-    return render json: { error: 'El motivo es obligatorio para descartar stock' }, status: :unprocessable_entity if motivo.blank?
+    motivo  = params[:motivo].to_s.strip
+    detalle = params[:detalle].to_s.strip
+
+    unless Stock::MOTIVOS_FINALIZACION.key?(motivo)
+      return render json: { error: "Elegí qué pasó con el stock: #{Stock::MOTIVOS_FINALIZACION.values.join(', ')}." },
+                    status: :unprocessable_entity
+    end
     return render json: { error: 'El stock ya está agotado' }, status: :unprocessable_entity if @stock.agotado?
 
-    gramos_descartados = @stock.cantidad.to_f
+    gramos_finalizados = @stock.cantidad.to_f
+    etiqueta = Stock::MOTIVOS_FINALIZACION[motivo]
     ActiveRecord::Base.transaction do
       @stock.stock_movimientos.create!(
-        tipo:    'merma',
-        gramos:  -gramos_descartados,
+        tipo:    Stock.tipo_movimiento_para(motivo),
+        gramos:  -gramos_finalizados,
         usuario: current_user,
-        notas:   "[FINALIZADO] #{motivo}",
+        notas:   ["[FINALIZADO]", etiqueta, detalle.presence].compact.join(' · '),
       )
       @stock.usuario_movimiento = current_user
       @stock.update!(cantidad: 0, estado: 'agotado')

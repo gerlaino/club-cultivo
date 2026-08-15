@@ -81,10 +81,32 @@
               <span v-if="faltaElegirSede" class="nlm__hint">
                 Elegí una sede para ver sus salas.
               </span>
-              <span v-else-if="!salasOfrecidas.length" class="nlm__hint">
-                No hay salas de {{ estadoObjetivo === 'floracion' ? 'floración' : 'vegetativo' }}
-                {{ sedeFiltro ? 'en esa sede' : 'disponibles' }}.
-              </span>
+              <!-- Sin sala compatible, el cartel era un diagnóstico sin salida ("no hay salas
+                   de floración disponibles") y te dejaba trabado a mitad del alta. La sala se
+                   crea acá mismo: el TIPO ya lo sabemos —es el que pide el estado elegido— así
+                   que lo único que falta es el nombre. -->
+              <template v-else-if="!salasOfrecidas.length">
+                <span v-if="!crearSalaAbierto" class="nlm__hint">
+                  No hay salas de {{ kindNecesarioLabel }}{{ sedeFiltro ? ' en esa sede' : '' }}.
+                  <button type="button" class="nlm__link" @click="crearSalaAbierto = true">
+                    Crear una
+                  </button>
+                </span>
+                <div v-else class="nlm__crear-sala">
+                  <input v-model.trim="nombreSalaNueva" type="text" class="nlm__input"
+                         :placeholder="`Nombre de la sala de ${kindNecesarioLabel}`"
+                         maxlength="60" @keydown.enter.prevent="crearSalaInline" />
+                  <div class="nlm__crear-sala-acts">
+                    <button type="button" class="nlm__btn-ghost nlm__btn-ghost--sm"
+                            @click="crearSalaAbierto = false">Cancelar</button>
+                    <button type="button" class="nlm__btn nlm__btn--sm"
+                            :disabled="creandoSala || !nombreSalaNueva" @click="crearSalaInline">
+                      {{ creandoSala ? 'Creando…' : 'Crear y usar' }}
+                    </button>
+                  </div>
+                  <span v-if="errorSalaNueva" class="nlm__err">{{ errorSalaNueva }}</span>
+                </div>
+              </template>
               <span v-else class="nlm__hint">
                 Sólo salas donde un lote en {{ estadoObjetivo === 'floracion' ? 'floración' : 'vegetativo' }} puede estar.
               </span>
@@ -268,7 +290,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useLotesStore } from '../../stores/lotes'
-import { getLoteProximoCodigo, listGeneticas, listPlants, createLoteHeredado, createLoteCosechadoEnSede, listSedes } from '../../lib/api.js'
+import { getLoteProximoCodigo, listGeneticas, listPlants, createLoteHeredado, createLoteCosechadoEnSede, listSedes, createSala } from '../../lib/api.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
 
@@ -347,7 +369,9 @@ const salasOfrecidas = computed(() => {
   if (faltaElegirSede.value) return []
 
   const permitidos = KINDS_POR_ESTADO[estadoObjetivo.value] || []
-  return (props.salas || []).filter(s => {
+  // Las creadas recién viven en local hasta que el padre recargue: si no, la sala que acabás de
+  // crear no aparece en el combo y parece que no se creó.
+  return [...(props.salas || []), ...salasCreadas.value].filter(s => {
     const okKind = permitidos.includes(s.kind)
     const okSede = !sedeFiltro.value || String(s.sede?.id ?? s.sede_id) === String(sedeFiltro.value)
     return okKind && okSede
@@ -367,6 +391,41 @@ const sedeFiltro = ref('')
 watch([estadoObjetivo, sedeFiltro], () => {
   if (salaId.value && !salasOfrecidas.value.some(s => s.id === salaId.value)) salaId.value = ''
 })
+// ── Crear la sala que falta, sin salir del alta ──────────────────────────────
+// El tipo NO se pregunta: sale del estado elegido (enraizado/vegetativo → sala de vegetativo;
+// floración → sala de floración). Preguntarlo sería pedir dos veces la misma decisión.
+const crearSalaAbierto = ref(false)
+const nombreSalaNueva  = ref('')
+const creandoSala      = ref(false)
+const errorSalaNueva   = ref('')
+const salasCreadas     = ref([])
+
+const kindNecesario = computed(() => (estadoObjetivo.value === 'floracion' ? 'floracion' : 'vegetativo'))
+const kindNecesarioLabel = computed(() => (kindNecesario.value === 'floracion' ? 'floración' : 'vegetativo'))
+
+async function crearSalaInline() {
+  const nombre = nombreSalaNueva.value.trim()
+  if (!nombre) return
+  const sede_id = sedeFiltro.value || sedesDeSalas.value[0]?.id || sedes.value[0]?.id
+  if (!sede_id) { errorSalaNueva.value = 'Elegí una sede primero'; return }
+
+  creandoSala.value = true
+  errorSalaNueva.value = ''
+  try {
+    const { data } = await createSala({ nombre, kind: kindNecesario.value, sede_id })
+    // Se suma a la lista local: el padre recarga sus salas después del alta, pero la sala recién
+    // creada tiene que poder elegirse YA, sin cerrar el modal.
+    salasCreadas.value.push({ ...data, sede_id })
+    salaId.value = data.id
+    crearSalaAbierto.value = false
+    nombreSalaNueva.value = ''
+  } catch (e) {
+    errorSalaNueva.value = e?.response?.data?.error || e?.response?.data?.errors?.[0] || 'No se pudo crear la sala'
+  } finally {
+    creandoSala.value = false
+  }
+}
+
 const geneticas      = ref([])
 const plantasMadre   = ref([])
 const loadingMadres  = ref(false)
@@ -619,6 +678,16 @@ watch(salaId, () => {
 
 .nlm__link { color: #15803d; font-weight: 600; }
 .nlm__err { font-size: .72rem; color: #dc2626; }
+
+/* Crear la sala que falta, sin salir del alta. */
+.nlm__link { background: none; border: none; padding: 0; font: inherit; color: #15803d; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.nlm__crear-sala { display: flex; flex-direction: column; gap: .4rem; margin-top: .35rem; padding: .6rem; background: var(--c-slate-50); border: 1px dashed var(--c-slate-300); border-radius: 9px; }
+.nlm__crear-sala-acts { display: flex; justify-content: flex-end; gap: .4rem; }
+.nlm__btn { background: #15803d; color: #fff; border: none; border-radius: 8px; padding: .4rem .8rem; font-size: .8rem; font-weight: 700; cursor: pointer; }
+.nlm__btn:disabled { opacity: .55; cursor: not-allowed; }
+.nlm__btn--sm { padding: .32rem .7rem; font-size: .76rem; }
+.nlm__btn-ghost { background: none; border: 1.5px solid var(--c-slate-300); color: var(--c-slate-500); border-radius: 8px; padding: .4rem .8rem; font-size: .8rem; font-weight: 700; cursor: pointer; }
+.nlm__btn-ghost--sm { padding: .32rem .7rem; font-size: .76rem; }
 .nlm__pills { display: flex; gap: .5rem; }
 .nlm__pill { flex: 1; padding: .5rem; border: 1.5px solid var(--c-slate-200); background: var(--c-slate-50); border-radius: 9px; font-size: .82rem; font-weight: 700; color: var(--c-slate-600); cursor: pointer; transition: all .15s; }
 .nlm__pill--active { border-color: #15803d; background: #f0fdf4; color: #15803d; }

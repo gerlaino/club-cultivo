@@ -386,8 +386,16 @@
               </div>
               <div class="sd__form-grid">
                 <div class="sd__field sd__field--full">
-                  <label class="sd__label">Motivo <span class="sd__req">*</span></label>
-                  <textarea class="sd__input sd__textarea" rows="3" v-model="descartarForm.motivo" placeholder="Ej: se terminó, vencimiento, contaminación, pérdida…"></textarea>
+                  <!-- QUÉ PASÓ, tipificado. Era texto libre y todo se anotaba como merma, así que
+                       entregarle producto a otra organización quedaba declarado como destruido. -->
+                  <label class="sd__label">¿Qué pasó con el stock? <span class="sd__req">*</span></label>
+                  <select class="sd__input" v-model="descartarForm.motivo">
+                    <option value="" disabled>Elegí una opción</option>
+                    <option v-for="m in MOTIVOS_FINALIZACION" :key="m.value" :value="m.value">{{ m.label }}</option>
+                  </select>
+                  <p v-if="descartarForm.motivo" class="sd__hint">{{ ayudaDe(descartarForm.motivo) }}</p>
+                  <label class="sd__label">Detalle <span class="sd__opt">(opcional)</span></label>
+                  <textarea class="sd__input sd__textarea" rows="2" v-model="descartarForm.detalle" placeholder="A quién, número de remito, lo que sirva para encontrarlo después…"></textarea>
                 </div>
               </div>
             </div>
@@ -570,6 +578,7 @@ import {
   listPesajesManicura, reajustarPesoPesajeManicura,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import { MOTIVOS_FINALIZACION, ayudaDe } from '../../composables/useStockFinalizacion.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useQRCode } from '../../composables/useQRCode.js'
 
@@ -767,17 +776,17 @@ async function ejecutarAjustar() {
 
 // ── Descartar ──────────────────────────────────────────────────────────────────
 const showDescartar  = ref(false)
-const descartarForm  = ref({ motivo: '' })
+const descartarForm  = ref({ motivo: '', detalle: '' })
 const descartarError = ref(null)
 const descartando    = ref(false)
 
 async function ejecutarDescartar() {
   descartarError.value = null
-  const motivo = descartarForm.value.motivo.trim()
-  if (!motivo) { descartarError.value = 'El motivo es obligatorio'; return }
+  const motivo = descartarForm.value.motivo
+  if (!motivo) { descartarError.value = 'Elegí qué pasó con el stock'; return }
   descartando.value = true
   try {
-    await descartarStock(stock.value.id, { motivo })
+    await descartarStock(stock.value.id, { motivo, detalle: descartarForm.value.detalle.trim() })
     toast.success('Stock finalizado')
     router.push('/admin/stock')
   } catch (e) {
@@ -1002,6 +1011,9 @@ function badgeVencLabel(s) {
 .sd__field--full { grid-column: 1 / -1; }
 .sd__label     { font-size: .7rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
 .sd__req       { color: #ef4444; }
+.sd__opt       { color: var(--c-slate-400); font-weight: 400; }
+/* La ayuda del motivo elegido: dice si cuenta como pérdida o es una salida. */
+.sd__hint      { margin: .2rem 0 .6rem; font-size: .75rem; color: var(--c-slate-500); }
 .sd__input     { background: var(--c-slate-50); border: 1.5px solid var(--c-slate-200); border-radius: 7px; padding: .5rem .75rem; font-size: .875rem; color: var(--c-slate-900); width: 100%; box-sizing: border-box; font-family: inherit; transition: border .15s; }
 .sd__input:focus { outline: none; border-color: #1b5e20; background: #fff; }
 .sd__textarea  { resize: vertical; min-height: 60px; }

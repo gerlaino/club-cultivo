@@ -31,6 +31,28 @@ class Stock < ApplicationRecord
   UNIDADES         = %w[g ml un].freeze
   CATEGORIAS_EXTERNA = %w[merch bebida insumo otros].freeze
   ESTADOS          = %w[pendiente_asignacion asignado agotado].freeze
+
+  # Cómo se cierra un stock que no se va a dispensar. El admin lo decide y lo dice: cada motivo
+  # deja un movimiento distinto, y sólo `destruido` cuenta como PÉRDIDA.
+  #
+  # Existe porque una organización que sólo produce no tiene salida legítima: su única opción era
+  # descartar, que lo anotaba como merma y declaraba destruido producto que se entregó entero. Y
+  # como el lote se finaliza cuando su stock llega a cero, sin esta puerta sus lotes quedaban
+  # abiertos para siempre y la trazabilidad nunca cerraba el balance.
+  MOTIVOS_FINALIZACION = {
+    'entregado'   => 'Entregado a otra organización',
+    'vendido'     => 'Vendido',
+    'regalado'    => 'Regalado',
+    'uso_interno' => 'Uso interno',
+    'destruido'   => 'Destruido / descartado',
+  }.freeze
+
+  # El único que es pérdida de verdad. El resto son salidas: el producto existe, está en otro lado.
+  MOTIVOS_PERDIDA = %w[destruido].freeze
+
+  def self.tipo_movimiento_para(motivo)
+    MOTIVOS_PERDIDA.include?(motivo) ? 'merma' : 'salida'
+  end
   # Para qué está habilitado el stock: dispensar a pacientes, usarse como materia prima de
   # producción (manufacturar derivados), ambas, o ninguna (apartado / cuarentena / testeo).
   DISPONIBILIDADES = %w[dispensa produccion ambas ninguna].freeze
