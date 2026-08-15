@@ -286,3 +286,40 @@ describe('NuevoLoteModal — el estado que admite la sala', () => {
     expect(w.vm.motivoEstadoAcotado).toMatch(/sólo puede estar en floración/i)
   })
 })
+
+// La tabla de estados por tipo de sala la manda el BACKEND en /me. Estaba duplicada en el modal
+// y las dos copias se sincronizaban a mano: mientras no coincidieron, la pantalla ofrecía
+// estados que el alta después rechazaba con un 422.
+describe('NuevoLoteModal — la regla viene del backend', () => {
+  const montarConReglas = async (reglas, sala) => {
+    setActivePinia(createPinia())
+    const { useAuthStore } = await import('../stores/auth.js')
+    useAuthStore().user = { id: 1, role: 'admin', reglas_cultivo: reglas }
+
+    const w = mount(NuevoLoteModal, {
+      props: { show: false, salas: [], sala },
+      global: { stubs: { Teleport: true, AppDatePicker: true, DsSpinner: true } },
+    })
+    await w.setProps({ show: true })
+    await new Promise(r => setTimeout(r, 0))
+    return w
+  }
+
+  it('usa la tabla que llegó en /me, no una copia propia', async () => {
+    // Una tabla INVENTADA: si el modal tuviera su copia hardcodeada, la ignoraría.
+    const w = await montarConReglas(
+      { kinds_sala_por_estado: { enraizado: ['invernadero'], vegetativo: ['invernadero'], floracion: ['invernadero'] } },
+      { id: 1, nombre: 'Rara', kind: 'invernadero' },
+    )
+
+    expect(w.vm.estadosHeredadoPermitidos.map(e => e.value)).toEqual(['enraizado', 'vegetativo', 'floracion'])
+  })
+
+  // Durante un deploy puede llegar un /me sin la clave: mejor ofrecer de más y que el backend
+  // rechace, que dejar el combo vacío y trabar el alta.
+  it('si no llegó, cae a la tabla local y sigue andando', async () => {
+    const w = await montarConReglas({}, { id: 1, nombre: 'Flora', kind: 'floracion' })
+
+    expect(w.vm.estadosHeredadoPermitidos.map(e => e.value)).toEqual(['floracion'])
+  })
+})

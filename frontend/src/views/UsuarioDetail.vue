@@ -76,7 +76,7 @@ async function resetearPassword() {
   if (!ok) return
   reseteando.value = true
   try {
-    const { data } = await resetUserPassword(id)
+    const { data } = await resetUserPassword(userId)
     credenciales.value = data
   } catch (e) {
     toast.error(e?.response?.data?.error || 'No se pudo restablecer la contraseña')

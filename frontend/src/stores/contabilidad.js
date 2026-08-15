@@ -8,6 +8,7 @@ import {
   updateMovimiento,
   deleteMovimiento,
   exportMovimientosCSV,
+  exportMovimientosXLSX,
 } from "../lib/api";
 
 export const useContabilidadStore = defineStore("contabilidad", {

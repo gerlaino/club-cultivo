@@ -134,8 +134,9 @@ watch(() => props.modelValue, (isOpen) => {
   if (isOpen) {
     if (!salasStore.items.length) salasStore.fetch()
     if (props.salaIdInicial) {
+      // Alcanza con fijar la sala: la pantalla es reactiva sobre `salaId`. Acá se llamaba a
+      // `onSalaChange()`, que no existe — abrir la hoja desde una sala tiraba ReferenceError.
       salaId.value = String(props.salaIdInicial)
-      onSalaChange()
     }
   }
 })

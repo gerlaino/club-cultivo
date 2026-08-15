@@ -415,7 +415,9 @@ watch(() => props.modelValue, (abierto) => {
 
   if (props.movimientoEditar) {
     const m = props.movimientoEditar
-    flujo.value = FLOWS[m.tipo === 'ingreso' ? 'ingreso' : 'gasto']
+    // Un solo formulario desde el rediseño: `FLOWS` ya no existe y esta línea tiraba
+    // ReferenceError al abrir CUALQUIER movimiento para editarlo.
+    flujo.value = FLUJO_LIBRE
     form.value = {
       ...formVacio(m.tipo === 'ingreso' ? 'ingreso' : 'egreso'),
       categoria_contable_id: m.categoria_contable_id || null,

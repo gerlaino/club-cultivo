@@ -34,6 +34,15 @@ class MeController < ApplicationController
         u.sedes_asignadas.activas.first&.id ||
         u.club&.sedes&.activas&.where(tipo: %w[social mixta])&.order(:id)&.first&.id
     end
+    # Reglas de dominio que el frontend necesita para no dejar elegir combinaciones que el
+    # backend después rechaza. Viajan acá —y no en una copia hardcodeada en el front— porque
+    # tenerlas dos veces es tenerlas mal: hasta que se sincronizaron a mano, el modal ofrecía
+    # "Enraizado" en una sala de floración y el alta moría con un 422.
+    #
+    # Va en /me a propósito: el router espera este request antes de montar cualquier pantalla,
+    # así que la regla siempre está antes de que se pueda abrir un formulario.
+    data['reglas_cultivo'] = { 'kinds_sala_por_estado' => Lote::KINDS_SALA_POR_ESTADO }
+
     render json: data
   end
 end

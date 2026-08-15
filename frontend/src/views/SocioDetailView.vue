@@ -277,12 +277,12 @@ const reprocannStatus = computed(() => {
     case 'vencido':
       return { label: 'Vencido', color: '#dc2626', bg: 'rgba(220,38,38,.1)', key: 'danger' }
     case 'por_vencer':
-      return { label: `Vence en ${reprocannPlazo(socio.value)}`, color: '#d97706', bg: 'rgba(217,119,6,.1)', key: 'warning' }
+      return { label: `Vence en ${reprocannPlazo(s.value)}`, color: '#d97706', bg: 'rgba(217,119,6,.1)', key: 'warning' }
     default: // vigente, con o sin fecha cargada
       return days === null
         ? { label: 'Vigente', color: '#15803d', bg: 'rgba(21,128,61,.1)', key: 'success' }
         // "947 días restantes" no le dice nada a nadie: va en años y meses.
-        : { label: `Vigente — faltan ${reprocannPlazo(socio.value)}`, color: '#15803d', bg: 'rgba(21,128,61,.1)', key: 'success' }
+        : { label: `Vigente — faltan ${reprocannPlazo(s.value)}`, color: '#15803d', bg: 'rgba(21,128,61,.1)', key: 'success' }
   }
 })
 

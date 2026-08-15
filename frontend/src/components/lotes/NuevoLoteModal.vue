@@ -290,6 +290,7 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { useLotesStore } from '../../stores/lotes'
+import { useAuthStore } from '../../stores/auth'
 import { getLoteProximoCodigo, listGeneticas, listPlants, createLoteHeredado, createLoteCosechadoEnSede, listSedes, createSala } from '../../lib/api.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
@@ -348,15 +349,20 @@ const heredadoDias   = ref({ semilla_esqueje: 0, vegetativo: 0, floracion: 0, co
 // Espejo de `Lote::KINDS_SALA_POR_ESTADO` (backend). Lo que manda es el FOTOPERIODO de la
 // sala: enraizando y en vegetativo hace falta 18/6, así que ninguno de los dos entra en una
 // sala de floración (12/12).
-// Espeja Lote::KINDS_SALA_POR_ESTADO. `madre` y `clon` son sub-tipos de vegetativo —una planta
-// madre vive en vegetativo permanente, un clon enraíza— así que admiten lotes en enraizado y
-// vegetativo. Faltaba `madre`: no se podía crear un lote en la sala de madres, que es de donde
-// salen los esquejes de la organización.
-const KINDS_POR_ESTADO = {
+// La tabla la manda el BACKEND en /me (`reglas_cultivo.kinds_sala_por_estado`, ver
+// Lote::KINDS_SALA_POR_ESTADO). Estaba duplicada acá y las dos copias se sincronizaban a mano:
+// mientras no coincidieron, el modal ofrecía estados que el alta después rechazaba con un 422.
+//
+// El fallback es la misma tabla, por si /me viniera sin la clave (backend viejo durante un
+// deploy): mejor ofrecer de más y que el backend rechace, que dejar el combo vacío y trabar el alta.
+const KINDS_POR_ESTADO_FALLBACK = {
   enraizado:  ['vegetativo', 'mixta', 'clon', 'madre'],
   vegetativo: ['vegetativo', 'mixta', 'clon', 'madre'],
   floracion:  ['floracion',  'mixta'],
 }
+const KINDS_POR_ESTADO = computed(() =>
+  useAuthStore().user?.reglas_cultivo?.kinds_sala_por_estado || KINDS_POR_ESTADO_FALLBACK
+)
 
 const estadoObjetivo = computed(() =>
   tipoCreacion.value === 'existente' ? heredadoEstado.value : 'enraizado')
@@ -368,7 +374,7 @@ const estadoObjetivo = computed(() =>
 const salasOfrecidas = computed(() => {
   if (faltaElegirSede.value) return []
 
-  const permitidos = KINDS_POR_ESTADO[estadoObjetivo.value] || []
+  const permitidos = KINDS_POR_ESTADO.value[estadoObjetivo.value] || []
   // Las creadas recién viven en local hasta que el padre recargue: si no, la sala que acabás de
   // crear no aparece en el combo y parece que no se creó.
   return [...(props.salas || []), ...salasCreadas.value].filter(s => {
@@ -456,7 +462,7 @@ const estadosHeredadoPermitidos = computed(() => {
   const kind = props.sala?.kind
   if (!kind) return ESTADOS_HEREDADO
 
-  return ESTADOS_HEREDADO.filter(e => (KINDS_POR_ESTADO[e.value] || []).includes(kind))
+  return ESTADOS_HEREDADO.filter(e => (KINDS_POR_ESTADO.value[e.value] || []).includes(kind))
 })
 
 // Por qué la lista está acotada, dicho en la pantalla: si no, parece que faltan opciones.
