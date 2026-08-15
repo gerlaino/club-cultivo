@@ -707,7 +707,7 @@ class StocksController < ApplicationController
   end
 
   ROLES_LECTURA_STOCK   = %w[admin supervisor dispensador manicura].freeze
-  ROLES_ESCRITURA_STOCK = %w[admin supervisor manicura].freeze
+  ROLES_ESCRITURA_STOCK = %w[admin supervisor].freeze
   ROLES_AUDITOR_LECTURA = %w[admin auditor supervisor].freeze
 
   def require_lectura_stock!

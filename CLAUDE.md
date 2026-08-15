@@ -250,9 +250,8 @@ Suite 1239 ✓ + 58 vitest ✓. **Deploy: sumar `add_vendible_a_bar_venta_items`
 **2145 rspec (0 fallas, 26 pending del observador suspendido) + 1348 vitest + build limpio.**
 Los bloques de agosto están en `docs/CHANGELOG.md` hasta "Agosto 2026 (r)".
 
-**PENDIENTE OPERATIVO: correr `rake categorias:aplanar` en producción** (con `SIMULAR=1`
-primero). El catálogo de un solo nivel ya está deployado; hasta que corra, prod sigue con las
-subcategorías viejas conviviendo con las nuevas.
+**`rake categorias:aplanar` YA CORRIÓ en producción (15-ago).** No repetir: es idempotente pero
+no tiene nada que hacer. El catálogo quedó de un solo nivel.
 
 ### La lección de los bloques (q) y (r)
 
@@ -371,13 +370,6 @@ listar "pendiente `db:migrate`" al cerrar un bloque.
 
 **Los rakes SÍ son manuales** — corren a mano, una sola vez, y ninguno se dispara al deployar.
 
-**PENDIENTE Y SÍ IMPORTA (15-ago):** el catálogo de un solo nivel ya está deployado, pero hasta
-que corra esto prod sigue con las subcategorías viejas conviviendo con las nuevas.
-
-```
-bundle exec rake categorias:aplanar SIMULAR=1                    # promueve subs y retira madres vacías
-```
-
 **Sin correr desde el 12-ago, ninguno urgente:**
 
 ```
@@ -387,7 +379,9 @@ bundle exec rake geneticas:sin_declarar                          # informativo
 bundle exec rake pacientes:normalizar_nombres SIMULAR=1          # capitalización de cargas masivas
 ```
 
-Todos aceptan `SIMULAR=1`. **Ya corridos el 10-ago, no repetir:**
+Todos aceptan `SIMULAR=1`. **Ya corridos, no repetir:** `categorias:aplanar` (15-ago: aplanó el
+catálogo contable, promoviendo las subcategorías a categorías con su sector y sus movimientos), y
+del 10-ago:
 `suites:prender_iot_con_dispositivos` (dio "nada que hacer" — todas las organizaciones con
 dispositivos ya tenían el add-on) y `dispensaciones:recalcular_medio_pago` (5 mixtas, 4
 corregidas a `efectivo`; era una etiqueta, no movió plata).
