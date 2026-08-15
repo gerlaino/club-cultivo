@@ -198,6 +198,9 @@
                   <th>Lote</th>
                   <th>Sede</th>
                   <th>Ingresó</th>
+                  <!-- Lo que se escribió al cargar el producto ("observaciones" en el alta, se
+                       guarda en `descripcion`). Se cargaba y no se leía en ningún lado. -->
+                  <th>Observaciones</th>
                   <th class="stk__inv-num">Cantidad inicial</th>
                   <th class="stk__inv-num">Actual</th>
                 </tr>
@@ -222,6 +225,10 @@
                   </td>
                   <td>{{ s.sede?.nombre || 'Sin asignar' }}</td>
                   <td class="stk__inv-td-fecha">{{ formatDate(s.created_at) }}</td>
+                  <td class="stk__inv-td-obs" :title="s.descripcion || ''">
+                    <span v-if="s.descripcion">{{ s.descripcion }}</span>
+                    <span v-else class="stk__inv-td-mono">—</span>
+                  </td>
                   <td class="stk__inv-num stk__inv-td-cosechado">
                     {{ s.cantidad_inicial != null ? s.cantidad_inicial.toFixed(1) + (s.unidad || 'g') : '—' }}
                   </td>
@@ -1521,6 +1528,9 @@ function formatDate(dateStr) {
 @keyframes stkRowFlash { 0% { background: #dcfce7; } 100% { background: transparent; } }
 .stk__inv-td-tipo { font-weight: 600; color: var(--c-slate-900); white-space: nowrap; }
 .stk__inv-td-cepa { font-style: italic; color: var(--c-slate-600); }
+/* Texto libre: se acota y el resto se lee en el tooltip. Sin tope, un comentario largo
+   empuja las columnas de cantidad fuera de la pantalla. */
+.stk__inv-td-obs { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--c-slate-500); font-size: .78rem; }
 .stk__inv-td-mono { font-family: var(--font-mono, monospace); font-size: .8rem; color: var(--c-slate-600); }
 .stk__inv-td-fecha { white-space: nowrap; color: var(--c-slate-500); }
 .stk__inv-td-cosechado { color: var(--c-slate-500); font-weight: 600; white-space: nowrap; }

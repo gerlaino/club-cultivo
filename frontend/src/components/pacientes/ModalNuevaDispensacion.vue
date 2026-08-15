@@ -635,6 +635,12 @@ async function handleSubmit() {
                 <span v-if="fmtFecha(s.fecha_elaboracion || s.created_at)" class="mnd__stock-fecha">
                   {{ fmtFecha(s.fecha_elaboracion || s.created_at) }}
                 </span>
+                <!-- Lo que se anotó al cargar el producto. Quien dispensa lo necesita acá: es
+                     donde se distingue un frasco de otro que en la lista se ven iguales (misma
+                     forma, misma genética, misma fecha). -->
+                <span v-if="s.descripcion" class="mnd__stock-obs" :title="s.descripcion">
+                  {{ s.descripcion }}
+                </span>
               </span>
               <span class="mnd__stock-right">
                 <span class="mnd__stock-disp">{{ s.cantidad }}{{ s.unidad }}</span>
@@ -1023,6 +1029,7 @@ async function handleSubmit() {
 .mnd__stock-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .1rem; }
 .mnd__stock-nombre { font-size: .82rem; font-weight: 700; color: var(--c-slate-900); }
 .mnd__stock-gen { font-size: .72rem; color: var(--c-slate-500); font-style: italic; }
+.mnd__stock-obs { font-size: .7rem; color: var(--c-slate-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .mnd__stock-fecha { font-size: .68rem; color: var(--c-slate-400); display: flex; align-items: center; gap: .25rem; }
 .mnd__stock-right { display: flex; flex-direction: column; align-items: flex-end; gap: .1rem; flex-shrink: 0; }
 .mnd__stock-disp  { font-size: .8rem; font-weight: 700; color: #1b5e20; font-family: monospace; }
