@@ -61,6 +61,18 @@ describe('ningún menú ofrece lo que el club no contrató', () => {
     expect(sedes.feature).toBeUndefined()
   })
 
+  // Javier, probando: "desde Depósito se puede acceder al módulo de contabilidad siendo que
+  // este no se muestra en el panel lateral". Contabilidad vivía adentro del grupo Comercial,
+  // gateado por la suite de dispensa, pero NO tiene bandera propia ni la pide el router: toda
+  // organización tiene gastos. Resultado: escondida en el menú y accesible desde Depósito
+  // ("＋ Comprar"), que es transversal.
+  it('Contabilidad está en el menú de toda organización, contrate lo que contrate', () => {
+    const grupo = NAV_GROUPS.find(g => g.to === '/contabilidad')
+
+    expect(grupo, 'Contabilidad tiene que estar en el menú').toBeTruthy()
+    expect(grupo.feature, 'no depende de ninguna suite: todo club tiene gastos').toBeUndefined()
+  })
+
   it('el dashboard y la configuración siempre están', () => {
     for (const key of ['dashboard', 'config']) {
       expect(NAV_GROUPS.find(g => g.key === key)?.feature).toBeUndefined()

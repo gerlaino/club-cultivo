@@ -40,10 +40,12 @@
 
             <div class="nlm__field">
               <label class="nlm__label">Estado actual del lote <span class="nlm__req">*</span></label>
-              <select class="nlm__input" v-model="heredadoEstado">
+              <select class="nlm__input" v-model="heredadoEstado"
+                      :disabled="estadosHeredadoPermitidos.length === 1">
                 <option v-for="e in estadosHeredadoPermitidos" :key="e.value" :value="e.value">{{ e.label }}</option>
               </select>
-              <span class="nlm__hint">Define en qué salas puede entrar.</span>
+              <span v-if="motivoEstadoAcotado" class="nlm__hint">{{ motivoEstadoAcotado }}</span>
+              <span v-else class="nlm__hint">Define en qué salas puede entrar.</span>
             </div>
           </template>
 
@@ -378,16 +380,32 @@ function toggleLoteColapso(loteId) {
   madreColapsados.value = s
 }
 
-// Los estados creables son los del ciclo previo a stock: germinación/plántula
-// (o esqueje según el origen), vegetativo, floración y cosechado (un lote ya
-// cosechado se carga y queda pendiente de manicura). Nunca secado/finalizado.
-const estadosHeredadoPermitidos = computed(() =>
-  ESTADOS_HEREDADO.map(e =>
-    e.value === 'enraizado'
-      ? { ...e, label: 'Enraizado' }
-      : e
-  )
-)
+// Los estados creables son los del ciclo previo a stock: enraizado, vegetativo, floración y
+// cosechado (un lote ya cosechado se carga y queda pendiente de manicura). Nunca secado/finalizado.
+//
+// PERO si el alta salió de ADENTRO de una sala, la sala manda: en una de floración el lote
+// existente está en floración y no hay otra opción; en una de vegetativo puede estar enraizando o
+// en vegetativo, nada más. El backend ya lo rechaza (`Lote#sala_admite_el_estado`, 422), así que
+// ofrecer los cuatro estados era invitar a un error evitable: elegías Enraizado en una sala de
+// floración, apretabas Crear y recién ahí te enterabas.
+//
+// Sin sala fija (alta desde la solapa Lotes) el orden es al revés y se mantiene: primero el
+// estado, y las salas se filtran por él.
+// 'cosecha' queda afuera cuando hay sala: un lote cosechado no vive en una sala de cultivo, se
+// ubica por sede.
+const estadosHeredadoPermitidos = computed(() => {
+  const kind = props.sala?.kind
+  if (!kind) return ESTADOS_HEREDADO
+
+  return ESTADOS_HEREDADO.filter(e => (KINDS_POR_ESTADO[e.value] || []).includes(kind))
+})
+
+// Por qué la lista está acotada, dicho en la pantalla: si no, parece que faltan opciones.
+const motivoEstadoAcotado = computed(() => {
+  if (!props.sala?.kind || estadosHeredadoPermitidos.value.length > 1) return ''
+  const unico = estadosHeredadoPermitidos.value[0]?.label?.toLowerCase()
+  return `Esta sala es de ${props.sala.kind}: un lote acá sólo puede estar en ${unico}.`
+})
 const mostrarOrigenSelector = computed(() => {
   const k = effectiveSala.value?.kind
   return !k || KINDS_CON_ORIGEN.includes(k)

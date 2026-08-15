@@ -295,7 +295,13 @@ function showToast(type, msg) {
           <div class="pv__card-body">
             <div class="pv__infobox">
               <i class="bi bi-info-circle-fill"></i>
-              Estos datos aparecen en el informe semestral que se presenta ante el Ministerio de Salud. Podés completarlos después del onboarding, no bloquean ninguna funcionalidad.
+              <!-- Decía "el informe semestral que se presenta ante el Ministerio de Salud", que
+                   se lee como si la plataforma presentara los informes, y sólo ante Salud. La
+                   app los GENERA; presentarlos es de la organización. Y no hay un único
+                   organismo: REPROCANN es del Ministerio de Salud, ARICCAME es otro —y su
+                   transmisión todavía está simulada, así que prometer que enviamos algo sería
+                   directamente falso. -->
+              Estos datos salen impresos en el informe semestral de REPROCANN, que presenta la organización. Podés completarlos después del onboarding: no bloquean ninguna funcionalidad.
             </div>
             <div class="pv__grid">
               <div class="pv__field">

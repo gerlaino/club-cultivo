@@ -229,3 +229,60 @@ describe('Nuevo lote — la sala sale de la sede elegida', () => {
     expect(w.vm.salasOfrecidas.map((s) => s.id)).toEqual([1])
   })
 })
+
+// Javier, probando: en una sala de FLORACIÓN el modal dejaba elegir "Enraizado" como estado
+// actual del lote. El backend lo rechaza (`Lote#sala_admite_el_estado`, 422 con el motivo), así
+// que la pantalla te dejaba llegar hasta "Crear lote" para enterarte recién ahí.
+//
+// La sala manda: en una de floración el lote existente está en floración y no hay otra opción;
+// en una de vegetativo puede estar enraizando o en vegetativo.
+describe('NuevoLoteModal — el estado que admite la sala', () => {
+  const montar = async (sala) => {
+    setActivePinia(createPinia())
+    const w = mount(NuevoLoteModal, {
+      props: { show: false, salas: [], sala },
+      global: { stubs: { Teleport: true, AppDatePicker: true, DsSpinner: true } },
+    })
+    await w.setProps({ show: true })
+    await new Promise(r => setTimeout(r, 0))
+    return w
+  }
+
+  const estados = (w) => w.vm.estadosHeredadoPermitidos.map(e => e.value)
+
+  it('en una sala de floración, el lote sólo puede estar en floración', async () => {
+    const w = await montar({ id: 1, nombre: 'Flora 1', kind: 'floracion' })
+
+    expect(estados(w)).toEqual(['floracion'])
+    expect(w.vm.heredadoEstado).toBe('floracion')
+  })
+
+  it('en una de vegetativo, enraizado o vegetativo — nunca floración', async () => {
+    const w = await montar({ id: 2, nombre: 'Vege 1', kind: 'vegetativo' })
+
+    expect(estados(w)).toEqual(['enraizado', 'vegetativo'])
+    expect(estados(w)).not.toContain('floracion')
+  })
+
+  // Un lote cosechado no vive en una sala de cultivo: se ubica por sede.
+  it('con sala fija no se ofrece "cosechado"', async () => {
+    const w = await montar({ id: 3, nombre: 'Mixta', kind: 'mixta' })
+
+    expect(estados(w)).not.toContain('cosecha')
+  })
+
+  // Sin sala (alta desde la solapa Lotes) el orden es al revés: primero el estado y después se
+  // filtran las salas. Ahí sí se ofrecen los cuatro.
+  it('sin sala fija se ofrecen todos, porque la sala se elige después', async () => {
+    const w = await montar(null)
+
+    expect(estados(w)).toEqual(['enraizado', 'vegetativo', 'floracion', 'cosecha'])
+  })
+
+  // Si hay una sola opción no es una elección: se muestra explicada, no como un combo abierto.
+  it('con una sola opción, dice por qué', async () => {
+    const w = await montar({ id: 1, nombre: 'Flora 1', kind: 'floracion' })
+
+    expect(w.vm.motivoEstadoAcotado).toMatch(/sólo puede estar en floración/i)
+  })
+})
