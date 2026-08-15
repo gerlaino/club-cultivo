@@ -1,5 +1,105 @@
 # Changelog
 
+## Agosto 2026 (r) — el manicura no podía trabajar, y el contable no se entendía
+
+Dos días de probar la app con alguien que no la escribió. Casi todo lo que apareció es de la
+misma familia: **una regla escrita en dos lugares que dejaron de coincidir**.
+
+### El manicura no podía ni entrar
+
+Al loguearse, "/" lo manda a `/mnc/pendientes` (desde abril). Pero la matriz de prefijos por rol
+—agregada en agosto— no incluía `/mnc`, así que el guard lo devolvía a "/", que lo volvía a
+mandar a /mnc: un ida y vuelta que Vue Router aborta, dejando la app en el formulario de login.
+**El backend autenticaba perfecto**: en los logs se ve `sign_in` 200, `/me` 200, `/preferences`
+200 y después nada, porque ninguna pantalla llegó a montarse.
+
+Aterrizar en un lugar prohibido es el peor caso de esa matriz: no te deja entrar a ningún lado.
+El resto son botones que rebotan, y también estaban rotos —`/mis-horas` del cultivador, `/stock`
+y `/reservas` del dispensador, `/analitica` del supervisor— porque la matriz se escribió de
+memoria. **El test que la cubría repetía la misma lista de memoria**, por eso pasaba en verde.
+El nuevo lee los sidebars reales y verifica dos cosas: que ningún link que un rol VE lo rebote,
+y que su aterrizaje no esté prohibido.
+
+Después, en la misma sesión: **tocar una planta para pesarla** decía "no tenés acceso" (las
+pantallas de etiqueta —`/p`, `/s`, `/l`— no estaban en ninguna matriz, y no son una sección del
+menú: se llega por la cámara o desde la ficha de al lado). Y **completar su propia tarea** daba
+403: `completar_masivo` estaba en el mismo guard que editar y borrar, pero completar de a UNA no
+lo está. Completar una tarea es hacer el trabajo, no gestionarlo; lo que se acota es el alcance
+—quien no gestiona cierra sólo las suyas—, que además no es cosmético: la acción es un
+`update_all`.
+
+**Sin esperar el próximo reporte**, se cruzó la matriz contra las listas de roles que declara cada
+ruta. Aparecieron tres contradicciones más; una se arregló y dos quedaron documentadas con su
+razón (el super admin no entra a pantallas de organización; `/delivery/despachos` es una decisión
+comercial pendiente).
+
+### El módulo contable, rediseñado alrededor de la categoría
+
+El alta hacía las mismas doce preguntas para pagar la luz que para comprar fertilizante. Son dos
+cosas distintas, y **el propio modelo ya lo resolvía**: la categoría lleva sector, tipo y si va a
+depósito. Ahora es obligatoria, va primera, y de ella sale todo lo demás — el sector se muestra
+como consecuencia y cantidad, unidad y depósito aparecen sólo si la categoría stockea. Pagar la
+luz quedó en cuatro campos.
+
+Para que eso funcione, el catálogo pasó a **un solo nivel**: las hojas eran los nombres útiles
+(Fertilizante, Electricidad, Sueldos) y las madres agrupaban sin clasificar. `rake
+categorias:aplanar` PROMUEVE las subcategorías existentes con su sector, su destino y sus
+movimientos, y retira las madres vacías — borrarlas hubiera dejado al club con "Insumos".
+
+**Los sectores son cinco y no se crean** (General, Cultivo, Dispensario, Buffet, Otro), y hay **un
+depósito por sector y por sede**, según el tipo de sede. Antes cualquiera creaba un área y cada
+una arrastraba su depósito: aparecían tres "Cultivo" y el stock quedaba repartido sin saber cuál
+era el bueno.
+
+**"Entró plata" se fue del alta.** La que entra ya tiene su puerta y cargarla otra vez la contaría
+dos veces: el pago de un paciente se registra en su cuenta corriente (que crea el movimiento
+sola), el recupero sale de la dispensación y lo del buffet, del mostrador. Lo excepcional
+—subvención, donación, venta de un bien— tiene ahora su propio formulario de cinco campos.
+
+También: `cantidad` y `unidad` en el movimiento (de ahí sale el costo unitario, que antes sólo
+existía si la compra entraba a un depósito), `sede` en la categoría, y Contabilidad pasó a ser
+grupo de primer nivel — vivía adentro de "Comercial", gateado por la suite de dispensa, así que
+una organización de sólo Cultivo no la veía en el menú pero llegaba desde Depósito.
+
+### Salida no es merma
+
+Un club que sólo contrató producción no tiene a quién dispensarle: su única salida era descartar,
+y eso lo anotaba como merma. Entregarle producto a otra organización quedaba declarado como
+producto **destruido** — el informe de Pérdidas lo contaba y la trazabilidad mostraba gramos
+desaparecidos sin explicación, que para un auditor es peor que una pérdida declarada. Y como el
+lote se finaliza cuando su stock llega a cero, sin salida legítima sus lotes quedaban abiertos
+para siempre.
+
+Ahora el cierre pregunta qué pasó: entregado, vendido, regalado, uso interno o destruido. Sólo el
+último deja `merma`. **La regla de oro no cambia**: por el mostrador, lo trazable sale sólo por
+dispensación o consumo declarado de un evento.
+
+### Una variable que no existe no puede llegar a producción
+
+"ReferenceError: socio is not defined" al abrir la ficha de un paciente. Tercera vez que pasa lo
+mismo: Vite no sabe si un identificador suelto es un global del navegador o un olvido, así que
+compila feliz y la pantalla explota al abrirse.
+
+**La red ya existía** —ESLint lo marca con `no-undef`— y nadie la corría. Ahora corre como test, y
+al prenderla aparecieron cuatro bugs vivos: editar cualquier movimiento contable, abrir la hoja de
+lectura ambiental desde una sala, exportar a Excel y restablecer la contraseña de un usuario.
+Ninguno estaba reportado.
+
+De paso, la tabla de estados por tipo de sala pasó a viajar en `/me`: estaba escrita dos veces y
+las copias se sincronizaban a mano.
+
+### Lo chico que se nota
+
+El estado del lote se acota al tipo de sala (en una de floración sólo hay floración) y **la sala
+que falta se crea desde el alta**, pidiendo sólo el nombre. Las observaciones del stock aparecen
+en Inventario y en la dispensación —donde dos frascos idénticos sólo se distinguen por eso—. El
+vencimiento se dice "2 años y 7 meses" en vez de "947 días restantes". Y el cartel del informe
+semestral dejó de sugerir que la plataforma presenta los informes ante el Ministerio de Salud: los
+genera, los presenta la organización, y ARICCAME sigue simulado.
+
+Suite: 2145 rspec + 1348 vitest + build limpio. **Manual: `rake categorias:aplanar`** (con
+`SIMULAR=1` primero).
+
 ## Agosto 2026 (q) — ocho cosas que el sistema decía mal
 
 Un bloque de correcciones sobre datos que la app mostraba o guardaba de una forma que no se

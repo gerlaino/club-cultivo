@@ -245,37 +245,53 @@ Cuando Germán plantee un problema o feature nueva antes de implementar:
 
 Suite 1239 ✓ + 58 vitest ✓. **Deploy: sumar `add_vendible_a_bar_venta_items` y `add_consumo_evento_a_provisiones_y_dispensas` al `db:migrate`.**
 
-## 📍 Dónde retomar (14-ago-2026)
+## 📍 Dónde retomar (15-ago-2026)
 
-**2115 rspec (0 fallas, 26 pending del observador suspendido) + 1275 vitest + build limpio.**
-Los bloques de agosto están en `docs/CHANGELOG.md` hasta "Agosto 2026 (q)".
+**2145 rspec (0 fallas, 26 pending del observador suspendido) + 1348 vitest + build limpio.**
+Los bloques de agosto están en `docs/CHANGELOG.md` hasta "Agosto 2026 (r)".
 
-**El bloque (q) son ocho correcciones de datos que la app decía mal** (ver el CHANGELOG). Tres
-reglas de dominio quedaron fijadas ahí y conviene no volver a romperlas:
+**PENDIENTE OPERATIVO: correr `rake categorias:aplanar` en producción** (con `SIMULAR=1`
+primero). El catálogo de un solo nivel ya está deployado; hasta que corra, prod sigue con las
+subcategorías viejas conviviendo con las nuevas.
 
-- **PONER EN MACETA ES PRENDER.** Enraizado ⇔ sin maceta. Vive en
-  `Lote#prender_al_ponerlo_en_maceta` y cubre las cuatro puertas (alta heredada, desprender,
-  trasplante, edición). **No es una validación**: como validación volvía inguardable un lote que
-  ya estaba en ese estado, y hay que poder corregirlo.
-- **Dónde se midió el ambiente se DERIVA del estado del lote**, no se pregunta: un lote
-  `enraizado` está adentro del propagador. `punto_medicion` separa el aire del cuarto del aire
-  del domo en el KPI, en el VPD automático y en el evaluador de reglas.
-- **El DNI de un paciente es único POR ORGANIZACIÓN, no en la plataforma.** La regla del REPROCANN
-  es del trámite, no de nuestra base. Y el mensaje de error no puede delatar que ese DNI existe
-  en otra organización.
+### La lección de los bloques (q) y (r)
 
-Además: la **trazabilidad** de un stock sale del pesaje por planta (`PesajeManicura`) y declara
-`atribucion` cuando cae a nivel de lote; el **informe INASE** incluye las genéticas archivadas que
-llegaron a cultivarse; las **salas son sólo de cultivo** (manicura y cosecha son etapas del lote,
-y el backend lo valida); y el **movimiento contable** guarda cantidad y unidad, de donde sale el
-costo unitario.
+Casi todo lo que apareció probando con alguien que no escribió la app fue **la misma regla
+escrita en dos lugares que dejaron de coincidir**. Vale como criterio antes de agregar nada:
 
-**El bloque (p) cierra el gateo de módulos de punta a punta:** el asistente de voz volvió a
-andar (chequeaba la clave vieja), Delivery se aplica en la API y en el modelo, el interruptor de
-WhatsApp manda sobre las credenciales de Twilio, el router rebota las URLs de módulos no
-contratados por una tabla de prefijos (`moduloRequerido`), y los módulos del super admin tienen
-pantalla propia (`SAModulos`) donde **cada interruptor se guarda solo** y se ve el consumo de IA
-del mes.
+- **Si una regla vive en dos lados, ya está mal.** La matriz de rutas por rol contra los guards
+  de cada ruta; el estado del lote contra el tipo de sala; el permiso de completar una tarea de
+  a una contra en tanda. Cada divergencia se ve como "la pantalla te deja y el backend te
+  rechaza", que es el peor error posible: parece culpa del usuario.
+- **Un test que repite la lista de memoria no prueba nada.** El de rutas por rol pasaba en verde
+  con el login del manicura roto, porque afirmaba la misma lista equivocada que el código.
+  Los tests nuevos leen la fuente real (los sidebars, el router, ESLint sobre `src`).
+- **Aterrizar en un lugar prohibido no es "un botón que rebota": es no poder entrar.** El guard
+  devuelve al origen, el origen vuelve a mandar al mismo lado y Vue Router aborta.
+- **`no-undef` corre como test** (`variablesInexistentes.test.js`). Vite compila una variable
+  inexistente sin chistar; la pantalla explota al abrirse. Ya pasó tres veces.
+
+### Reglas de dominio que quedaron fijadas
+
+- **PONER EN MACETA ES PRENDER.** Enraizado ⇔ sin maceta, en `Lote#prender_al_ponerlo_en_maceta`,
+  cubriendo alta heredada, desprender, trasplante y edición. **No es una validación**: como
+  validación volvía inguardable un lote que ya estaba así.
+- **El estado del lote y el tipo de sala son la misma verdad.** La tabla vive en
+  `Lote::KINDS_SALA_POR_ESTADO` y **viaja al front en `/me`** (`reglas_cultivo`). No volver a
+  copiarla.
+- **Dónde se midió el ambiente se DERIVA del estado del lote** (`enraizado` ⇒ incubadora).
+- **El DNI es único POR ORGANIZACIÓN.** La regla del REPROCANN es del trámite, no de la base.
+- **SALIDA ≠ MERMA.** Cerrar un stock pregunta qué pasó; sólo `destruido` es pérdida. La regla de
+  oro sigue: por el mostrador, lo trazable sale sólo por dispensación o consumo de evento.
+
+### El módulo contable, como quedó
+
+**SECTOR → CATEGORÍA, un solo nivel.** Cinco sectores fijos (General, Cultivo, Dispensario,
+Buffet, Otro) que **no se crean**, y **un depósito por sector y por sede**, según el tipo de sede.
+La CATEGORÍA manda el alta: es obligatoria, va primera, y de ella salen el sector y si la compra
+entra a un depósito. **Por "Nuevo movimiento" sólo sale plata**: lo que entra tiene su puerta
+(cuenta corriente del paciente, dispensación, mostrador) y lo excepcional tiene su formulario de
+cinco campos.
 
 ### El modelo comercial, que cambió de raíz
 
@@ -354,7 +370,15 @@ Render, con `set -o errexit` (si una migración falla, falla el deploy entero). 
 listar "pendiente `db:migrate`" al cerrar un bloque.
 
 **Los rakes SÍ son manuales** — corren a mano, una sola vez, y ninguno se dispara al deployar.
-**Sin correr al 12-ago, ninguno urgente:**
+
+**PENDIENTE Y SÍ IMPORTA (15-ago):** el catálogo de un solo nivel ya está deployado, pero hasta
+que corra esto prod sigue con las subcategorías viejas conviviendo con las nuevas.
+
+```
+bundle exec rake categorias:aplanar SIMULAR=1                    # promueve subs y retira madres vacías
+```
+
+**Sin correr desde el 12-ago, ninguno urgente:**
 
 ```
 bundle exec rake lotes:corregir_finalizados_con_stock SIMULAR=1  # mirar los 6 del club 1
