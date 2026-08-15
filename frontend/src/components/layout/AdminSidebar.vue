@@ -35,6 +35,7 @@ import { useRoute } from 'vue-router'
 import {
   LayoutDashboard, Sprout, Users, Factory, ShoppingCart,
   CheckSquare, BarChart3, Settings, PanelLeftClose, PanelLeftOpen, Wine, Building2, Warehouse,
+  Calculator,
 } from 'lucide-vue-next'
 import { NAV_GROUPS, detectGroup, useNavContext } from '../../composables/useNavContext.js'
 import { useClubStore } from '../../stores/club.js'
@@ -50,6 +51,9 @@ const ICONS = {
   pacientes: Users,
   produccion: Factory,
   deposito:  Warehouse,
+  // Contabilidad salió del grupo Comercial y pasó a ser de primer nivel: sin su ícono quedaba
+  // como el único renglón desnudo del menú.
+  contabilidad: Calculator,
   comercial: ShoppingCart,
   salon:     Wine,
   tareas:    CheckSquare,

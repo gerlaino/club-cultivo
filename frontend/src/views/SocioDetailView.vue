@@ -19,7 +19,7 @@ import {
 } from 'lucide-vue-next'
 import DsDropdown from '../design-system/components/Dropdown.vue'
 import { REPROCANN_ESTADOS } from '../composables/useSocioEditar.js'
-import { reprocannCategoria, reprocannDias } from '../composables/useReprocann.js'
+import { reprocannCategoria, reprocannDias, reprocannPlazo } from '../composables/useReprocann.js'
 import { useToast } from '../composables/useToast.js'
 import DsSpinner               from '../design-system/components/Spinner.vue'
 import SocioTabTimeline        from '../components/pacientes/SocioTabTimeline.vue'
@@ -277,11 +277,12 @@ const reprocannStatus = computed(() => {
     case 'vencido':
       return { label: 'Vencido', color: '#dc2626', bg: 'rgba(220,38,38,.1)', key: 'danger' }
     case 'por_vencer':
-      return { label: `Vence en ${days} días`, color: '#d97706', bg: 'rgba(217,119,6,.1)', key: 'warning' }
+      return { label: `Vence en ${reprocannPlazo(socio.value)}`, color: '#d97706', bg: 'rgba(217,119,6,.1)', key: 'warning' }
     default: // vigente, con o sin fecha cargada
       return days === null
         ? { label: 'Vigente', color: '#15803d', bg: 'rgba(21,128,61,.1)', key: 'success' }
-        : { label: `Vigente — ${days} días restantes`, color: '#15803d', bg: 'rgba(21,128,61,.1)', key: 'success' }
+        // "947 días restantes" no le dice nada a nadie: va en años y meses.
+        : { label: `Vigente — faltan ${reprocannPlazo(socio.value)}`, color: '#15803d', bg: 'rgba(21,128,61,.1)', key: 'success' }
   }
 })
 

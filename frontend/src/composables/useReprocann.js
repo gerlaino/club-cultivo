@@ -15,6 +15,50 @@ export function reprocannDias(p) {
   return Math.floor((safeDate(p.reprocann_vencimiento) - new Date()) / 86400000)
 }
 
+/**
+ * Cuánto falta, dicho como lo diría una persona: "2 años y 7 meses", "3 meses y 12 días",
+ * "12 días". Antes se mostraba el total de días —"947 días restantes"— y nadie sabe cuánto es
+ * eso sin hacer la cuenta.
+ *
+ * Se calcula con el CALENDARIO, no dividiendo días por 30: los meses no miden lo mismo, y un
+ * vencimiento que cae el mismo día de otro mes tiene que decir "3 meses justos", no "3 meses
+ * y 2 días".
+ */
+export function desglosarPlazo(desde, hasta) {
+  let anios = hasta.getFullYear() - desde.getFullYear()
+  let meses = hasta.getMonth() - desde.getMonth()
+  let dias  = hasta.getDate() - desde.getDate()
+
+  if (dias < 0) {
+    // Pedirle días prestados al mes anterior al vencimiento (que es el que se está cursando).
+    meses -= 1
+    dias += new Date(hasta.getFullYear(), hasta.getMonth(), 0).getDate()
+  }
+  if (meses < 0) { anios -= 1; meses += 12 }
+
+  return { anios, meses, dias }
+}
+
+/** "2 años y 7 meses" · "3 meses y 12 días" · "12 días" · "hoy". Omite lo que sea cero. */
+export function formatearPlazo(desde, hasta) {
+  const { anios, meses, dias } = desglosarPlazo(desde, hasta)
+  const partes = []
+  if (anios > 0) partes.push(`${anios} ${anios === 1 ? 'año' : 'años'}`)
+  if (meses > 0) partes.push(`${meses} ${meses === 1 ? 'mes' : 'meses'}`)
+  // Los días se omiten cuando ya hay años: "2 años, 7 meses y 3 días" es más ruido que dato.
+  if (dias > 0 && anios === 0) partes.push(`${dias} ${dias === 1 ? 'día' : 'días'}`)
+
+  if (!partes.length) return 'hoy'
+  if (partes.length === 1) return partes[0]
+  return `${partes.slice(0, -1).join(', ')} y ${partes[partes.length - 1]}`
+}
+
+/** Lo que falta para el vencimiento del REPROCANN de este paciente. */
+export function reprocannPlazo(p, hoy = new Date()) {
+  if (!p?.reprocann_vencimiento) return null
+  return formatearPlazo(hoy, safeDate(p.reprocann_vencimiento))
+}
+
 // Las cinco categorías son mutuamente excluyentes y cubren todos los casos, así los
 // contadores de los filtros suman el total.
 export function reprocannCategoria(p) {

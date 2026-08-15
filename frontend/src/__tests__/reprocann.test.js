@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { reprocannCategoria, reprocannBadge } from '../composables/useReprocann.js'
+import { reprocannCategoria, reprocannBadge, formatearPlazo } from '../composables/useReprocann.js'
 
 const enDias = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10)
 
@@ -61,5 +61,43 @@ describe('clasificación REPROCANN', () => {
       (acc, c) => acc + poblacion.filter(p => reprocannCategoria(p) === c).length, 0)
 
     expect(suma).toBe(poblacion.length)
+  })
+})
+
+// AC (Germán): "947 días restantes la verdad es feo y muy poco intuitivo de cuánto falta".
+// El plazo se dice como lo diría una persona: años y meses, meses y días, o días.
+describe('cuánto falta, en castellano', () => {
+  const el = (iso) => new Date(iso + 'T00:00:00')
+
+  it('más de un año: años y meses', () => {
+    expect(formatearPlazo(el('2026-08-15'), el('2029-03-15'))).toBe('2 años y 7 meses')
+  })
+
+  // Con años, los días son ruido: nadie planifica un vencimiento a dos años por el día exacto.
+  it('con años no agrega los días', () => {
+    expect(formatearPlazo(el('2026-08-15'), el('2029-03-18'))).toBe('2 años y 7 meses')
+  })
+
+  it('menos de un año: meses y días', () => {
+    expect(formatearPlazo(el('2026-08-15'), el('2026-11-27'))).toBe('3 meses y 12 días')
+  })
+
+  it('menos de un mes: sólo días', () => {
+    expect(formatearPlazo(el('2026-08-15'), el('2026-08-27'))).toBe('12 días')
+  })
+
+  it('el singular no dice "1 años"', () => {
+    expect(formatearPlazo(el('2026-08-15'), el('2027-09-16'))).toBe('1 año y 1 mes')
+    expect(formatearPlazo(el('2026-08-15'), el('2026-08-16'))).toBe('1 día')
+  })
+
+  // Los meses no miden lo mismo: dividir días por 30 daría "3 meses y 2 días" acá.
+  it('el mismo día de otro mes son meses justos', () => {
+    expect(formatearPlazo(el('2026-08-15'), el('2026-11-15'))).toBe('3 meses')
+    expect(formatearPlazo(el('2026-01-31'), el('2026-02-28'))).toBe('28 días')
+  })
+
+  it('vence hoy', () => {
+    expect(formatearPlazo(el('2026-08-15'), el('2026-08-15'))).toBe('hoy')
   })
 })
