@@ -61,6 +61,23 @@ existía si la compra entraba a un depósito), `sede` en la categoría, y Contab
 grupo de primer nivel — vivía adentro de "Comercial", gateado por la suite de dispensa, así que
 una organización de sólo Cultivo no la veía en el menú pero llegaba desde Depósito.
 
+### Los gastos que se repiten se definen una vez
+
+La luz, el alquiler, el contador: todos los meses el mismo formulario tipeado de nuevo. Ahora hay
+una solapa al lado de Categorías donde se dan de alta como **entidad**, y arriba del alta de
+movimiento un buscador que al elegir uno rellena categoría, sector, sede, monto, cantidad,
+unidad, medio de pago y proveedor. La fecha no: el gasto es de hoy, no del día que se definió.
+
+La primera versión fue una casilla "es frecuente" sobre un movimiento ya cargado, y se descartó
+el mismo día: así no se puede dar de alta "Luz" antes de la primera factura, ni corregir el monto
+de referencia sin cargar un gasto de verdad. La casilla se sacó entera, columna incluida — dos
+formas de decir lo mismo es exactamente lo que veníamos limpiando.
+
+**El monto es una referencia, no una promesa.** La luz es fija todos los meses salvo en el monto,
+que es justo lo que cambia. Nada se asienta solo: con inflación, un movimiento automático es un
+dato falso. Y borrar un molde no toca los movimientos que se cargaron con él, que son movimientos
+comunes.
+
 ### Salida no es merma
 
 Un club que sólo contrató producción no tiene a quién dispensarle: su única salida era descartar,
@@ -97,7 +114,7 @@ vencimiento se dice "2 años y 7 meses" en vez de "947 días restantes". Y el ca
 semestral dejó de sugerir que la plataforma presenta los informes ante el Ministerio de Salud: los
 genera, los presenta la organización, y ARICCAME sigue simulado.
 
-Suite: 2145 rspec + 1348 vitest + build limpio. **Manual: `rake categorias:aplanar`** (con
+Suite: 2197 rspec + 1359 vitest + build limpio. **Manual: `rake categorias:aplanar`** (con
 `SIMULAR=1` primero).
 
 ## Agosto 2026 (q) — ocho cosas que el sistema decía mal
