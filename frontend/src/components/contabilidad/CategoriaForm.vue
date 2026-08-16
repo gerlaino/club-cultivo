@@ -56,12 +56,12 @@ const titulo  = computed(() => {
 
     <template v-if="esMadre">
       <div class="fld-row">
-        <label class="fld">Tipo
-          <select v-model="f.tipo" class="inp">
-            <option value="egreso">Egreso (gasto)</option>
-            <option value="ingreso">Ingreso</option>
-          </select>
-        </label>
+        <!-- LAS CATEGORÍAS SON DE GASTOS. La plata que entra no se clasifica a mano porque no se
+             carga a mano: la venta la registra el Buffet, la dispensación su pantalla, y lo
+             excepcional entra por "Registrar ingreso" — cada uno crea su categoría solo. -->
+        <div class="fld">Tipo
+          <div class="cf__fijo">Egreso (gasto)</div>
+        </div>
         <!-- Con el sector fijado se muestra como dato, no como campo. -->
         <div v-if="sectorFijo" class="fld">Sector
           <div class="cf__fijo">{{ f.areaNombre || 'Sin sector' }}</div>

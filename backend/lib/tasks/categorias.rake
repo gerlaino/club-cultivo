@@ -77,4 +77,66 @@ namespace :categorias do
     puts "#{simular ? 'Se retirarían' : 'Retiradas'}:   #{retiradas} categorías vacías"
     puts '(SIMULAR=1 no escribió nada)' if simular
   end
+
+  desc 'Borra las categorías precargadas que nadie usó y renombra la "Venta bar" vieja'
+  task limpiar_precargadas: :environment do
+    simular = ENV['SIMULAR'].present?
+    clubes  = ENV['CLUB_ID'].present? ? Club.where(id: ENV['CLUB_ID']) : Club.all
+
+    puts simular ? '— SIMULACRO: no se escribe nada —' : '— Ejecutando —'
+
+    borradas = 0
+    con_uso  = 0
+    renombradas = 0
+
+    clubes.find_each do |club|
+      ActsAsTenant.with_tenant(club) do
+        # "Venta bar" es el nombre viejo de la categoría que crea sola la venta del Buffet. Se
+        # renombra en vez de borrarse: tiene las ventas colgando.
+        vieja = CategoriaContable.find_by(nombre: 'Venta bar')
+        if vieja
+          nueva = CategoriaContable.where(nombre: 'Venta buffet').where.not(id: vieja.id).first
+          if nueva
+            # Existen las dos: las ventas viejas pasan a la nueva y la vieja se retira.
+            puts "  ~ #{club.name}: 'Venta bar' y 'Venta buffet' conviven — se unifican"
+            unless simular
+              MovimientoContable.where(categoria_contable_id: vieja.id).update_all(categoria_contable_id: nueva.id, updated_at: Time.current)
+              vieja.destroy
+            end
+          else
+            puts "  ~ #{club.name}: 'Venta bar' → 'Venta buffet'"
+            vieja.update!(nombre: 'Venta buffet') unless simular
+          end
+          renombradas += 1
+        end
+
+        # Las precargadas: las sembraba la app y no se podían borrar (`es_sistema`). Ahora las
+        # categorías las crea el admin. Se van SÓLO las que nadie usó — una con movimientos es
+        # historia de la organización, no ruido nuestro.
+        CategoriaContable.where(es_sistema: true).find_each do |cat|
+          # La de la venta del Buffet la sigue creando el sistema: no se toca. Y "Venta bar" ya
+          # pasó por el renombre de arriba — en el simulacro todavía se llama así, por eso se la
+          # saltea también: si no, el simulacro la informaría como borrada y no lo va a estar.
+          next if ['Venta buffet', 'Venta bar'].include?(cat.nombre)
+
+          usada = MovimientoContable.where(categoria_contable_id: cat.id).exists? ||
+                  Insumo.where(categoria_contable_id: cat.id).exists?
+
+          if usada
+            puts "  = #{club.name}: \"#{cat.nombre}\" se queda (tiene movimientos)"
+            con_uso += 1
+          else
+            puts "  × #{club.name}: \"#{cat.nombre}\""
+            borradas += 1
+            cat.destroy unless simular
+          end
+        end
+      end
+    end
+
+    puts "\n#{simular ? 'Se borrarían' : 'Borradas'}: #{borradas} categorías precargadas sin uso"
+    puts "Se quedan por tener movimientos: #{con_uso}"
+    puts "Categorías de venta del Buffet renombradas/unificadas: #{renombradas}"
+    puts '(SIMULAR=1 no escribió nada)' if simular
+  end
 end

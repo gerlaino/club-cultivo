@@ -48,9 +48,12 @@ class BarVenta < ApplicationRecord
 
   private
 
+  # La categoría de la venta la crea el sistema, no el admin: los ingresos no se cargan a mano
+  # (ver CategoriasContablesController#create). "Venta bar" era el nombre viejo — el producto lo
+  # llama Buffet desde julio— y quedaba conviviendo con "Venta buffet" en el mismo sector.
   def categoria_venta_bar(unidad)
     club.categorias_contables.create_with(tipo: 'ingreso', unidad_negocio: unidad, es_sistema: true)
-        .find_or_create_by!(nombre: 'Venta bar')
+        .find_or_create_by!(nombre: 'Venta buffet')
   end
 
   def revertir_efectos

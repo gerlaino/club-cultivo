@@ -14,14 +14,13 @@ RSpec.describe 'Categorías contables', type: :request do
   describe 'GET /categorias_contables' do
     before { sign_in_as(admin) }
 
-    # El club arranca CON categorías. Antes arrancaba en limpio y el primer gasto se cargaba
-    # contra un combo vacío: había que inventar una taxonomía en el momento, cada uno la
-    # inventaba distinta, y después no se podía filtrar ni sacar un informe que cerrara.
-    it 'el club arranca con categorías para elegir, no con un combo vacío' do
+    # Lo predeterminado son los SECTORES; las categorías las crea el admin. Una lista ajena que
+    # además no se podía borrar ocupaba el selector con cosas que la organización no usa.
+    it 'el club arranca con sus sectores y sin categorías' do
       get '/categorias_contables', headers: auth_headers, as: :json
 
       expect(response).to have_http_status(:ok)
-      expect(JSON.parse(response.body)).not_to be_empty
+      expect(JSON.parse(response.body)).to be_empty
       expect(club.unidades_negocio).to exist
     end
 
@@ -136,6 +135,49 @@ RSpec.describe 'Categorías contables', type: :request do
       get '/categorias_contables', headers: auth_headers, as: :json
       ids = JSON.parse(response.body).map { |c| c['id'] }
       expect(ids).not_to include(ajena.id)
+    end
+  end
+
+  # Decisión de Germán (16-ago-2026): "no podemos permitir crear categorías de tipo ingreso, ya
+  # que los únicos ingresos que tenemos son excepcionales, del buffet o dispensa".
+  #
+  # La plata que entra no se clasifica a mano porque no se carga a mano: la venta la registra el
+  # mostrador del Buffet, la dispensación su propia pantalla, y lo excepcional entra por
+  # "Registrar ingreso". Cada uno crea su categoría solo. Dejar crearlas a mano invita a cargar
+  # dos veces la misma plata.
+  describe 'las categorías son de gastos' do
+    before { sign_in_as(admin) }
+
+    it 'no deja crear una de ingreso' do
+      expect {
+        post '/categorias_contables',
+             params: { categoria_contable: { nombre: 'Venta de merch', tipo: 'ingreso' } },
+             headers: auth_headers, as: :json
+      }.not_to change(CategoriaContable, :count)
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)['error']).to match(/Registrar ingreso/i)
+    end
+
+    it 'y sí una de egreso' do
+      post '/categorias_contables',
+           params: { categoria_contable: { nombre: 'Fertilizante', tipo: 'egreso' } },
+           headers: auth_headers, as: :json
+
+      expect(response).to have_http_status(:created), response.body
+    end
+
+    # Las que crea el SISTEMA para un ingreso automático siguen existiendo: la venta del Buffet
+    # arma la suya al registrarse. Lo que se cierra es la puerta manual.
+    it 'pero el sistema sí crea la suya al vender en el Buffet' do
+      unidad = club.unidades_negocio.create!(nombre: 'Buffet', tipo: 'bar')
+      cat = ActsAsTenant.with_tenant(club) do
+        club.categorias_contables.create_with(tipo: 'ingreso', unidad_negocio: unidad, es_sistema: true)
+            .find_or_create_by!(nombre: 'Venta buffet')
+      end
+
+      expect(cat).to be_persisted
+      expect(cat.tipo).to eq('ingreso')
     end
   end
 end

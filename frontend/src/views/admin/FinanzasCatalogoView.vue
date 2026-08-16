@@ -255,13 +255,24 @@ async function borrarUnidad(u) {
                 </template>
 
                 <p v-if="!catsDe(area.id, tipo).length" class="cat-col__vacio">
-                  Sin {{ tipo === 'ingreso' ? 'ingresos' : 'egresos' }} todavía.
+                  <template v-if="tipo === 'ingreso'">
+                    Los ingresos no se cargan acá: se registran donde pasan.
+                  </template>
+                  <template v-else>Sin egresos todavía. Creá los que uses.</template>
                 </p>
-                <button v-if="catForm?.slot !== slotDe(area.id, tipo)" class="lnk cat-col__add" @click="nuevaMadre(area, tipo)">
+                <!-- Sólo egresos. La plata que entra no se clasifica a mano porque no se carga a
+                     mano: la venta la registra el Buffet, la dispensación su pantalla y lo
+                     excepcional "Registrar ingreso" — y cada uno crea su categoría solo. El
+                     backend además lo rechaza, así que ofrecer el botón era invitar a un 422. -->
+                <button v-if="tipo === 'egreso' && catForm?.slot !== slotDe(area.id, tipo)"
+                        class="lnk cat-col__add" @click="nuevaMadre(area, tipo)">
                   <i class="bi bi-plus-lg"></i> Categoría
                 </button>
+                <!-- Condición EXPLÍCITA, no `v-else` del botón de arriba: eran un par if/else y
+                     al condicionar el botón por tipo, el else se disparaba en la columna de
+                     ingresos —donde no hay formulario abierto— y reventaba leyendo `catForm`. -->
                 <CategoriaForm
-                  v-else
+                  v-if="catForm?.slot === slotDe(area.id, tipo)"
                   v-model="catForm"
                   :unidades="store.unidadesActivas"
                   :sedes="sedes"

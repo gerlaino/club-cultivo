@@ -27,6 +27,17 @@ class CategoriasContablesController < ApplicationController
                     status: :unprocessable_entity
     end
 
+    # LAS CATEGORÍAS SON DE EGRESO. Los ingresos no se clasifican a mano porque no se cargan a
+    # mano: la venta del buffet la registra el mostrador, la dispensación su propia pantalla y
+    # lo excepcional entra por "Registrar ingreso". Cada uno crea su categoría solo. Dejar crear
+    # categorías de ingreso invita a cargar dos veces la misma plata.
+    if params.dig(:categoria_contable, :tipo).to_s == 'ingreso'
+      return render json: {
+        error: 'Las categorías son de gastos. La plata que entra se registra donde pasa: la venta ' \
+               'en el Buffet, la dispensación en su pantalla, y lo excepcional en "Registrar ingreso".',
+      }, status: :unprocessable_entity
+    end
+
     categoria = current_user.club.categorias_contables.build(categoria_params)
     aplicar_va_a_deposito(categoria)
     if categoria.save
