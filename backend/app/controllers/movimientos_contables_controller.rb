@@ -1,7 +1,7 @@
 # backend/app/controllers/movimientos_contables_controller.rb
 class MovimientosContablesController < ApplicationController
   before_action :authenticate_user!
-  before_action :require_lectura,   only: [:index, :show, :dashboard, :export_csv, :recurrentes]
+  before_action :require_lectura,   only: [:index, :show, :dashboard, :export_csv, :recurrentes, :frecuentes]
   before_action :require_escritura, only: [:create, :update, :destroy, :cerrar_periodo, :reabrir_periodo, :registrar_pago]
   before_action :set_movimiento,    only: [:show, :update, :destroy, :registrar_pago]
 
@@ -153,6 +153,45 @@ class MovimientosContablesController < ApplicationController
   # quedándonos con los grupos que aparecen en 2+ meses distintos. Se excluye todo lo que ya tiene
   # automatismo propio (dispensación, ventas del salón, cuotas de una compra financiada): eso no se
   # carga a mano y no es un gasto fijo.
+  # GET /movimientos_contables/frecuentes
+  #
+  # Los que el admin marcó con la casilla "es frecuente", para volver a cargarlos sin tipearlos.
+  # Uno por descripción: si la luz se cargó ocho veces, interesa la última —tiene el monto más
+  # cercano a lo que va a salir hoy— y no ocho renglones iguales en el buscador.
+  #
+  # Es distinto de `recurrentes`, que ADIVINA mirando el historial. Adivinar sirve para proponer;
+  # esto sirve para buscar, y funciona desde la primera vez que se carga el gasto.
+  def frecuentes
+    movs = current_user.club.movimientos_contables
+                       .includes(:categoria_contable, :sede, :unidad_negocio)
+                       .where(frecuente: true)
+                       .order(fecha: :desc, id: :desc)
+                       .limit(200)
+
+    vistos = {}
+    movs.each do |m|
+      clave = m.descripcion.to_s.strip.downcase
+      vistos[clave] ||= m
+    end
+
+    render json: vistos.values.map { |m|
+      {
+        id:                    m.id,
+        descripcion:           m.descripcion,
+        monto_ars:             m.monto_ars.to_f,
+        cantidad:              m.cantidad&.to_f,
+        unidad:                m.unidad,
+        categoria_contable_id: m.categoria_contable_id,
+        categoria_label:       m.categoria_contable&.nombre,
+        unidad_negocio_id:     m.unidad_negocio_id,
+        sede_id:               m.sede_id,
+        medio_pago:            m.medio_pago,
+        proveedor:             m.proveedor,
+        ultima_vez:            m.fecha,
+      }
+    }
+  end
+
   def recurrentes
     mes   = mes_param
     desde = (mes - 6.months).beginning_of_month
@@ -393,6 +432,9 @@ class MovimientosContablesController < ApplicationController
       # porque un gasto que no entra a ningún depósito también se compra por cantidad
       # (10 horas de electricista, 3 análisis de laboratorio).
       :cantidad, :unidad,
+      # Lo marca el admin con una casilla: es un gasto que va a repetir, y quiere volver a
+      # cargarlo desde el buscador de arriba sin tipearlo.
+      :frecuente,
       :pagado, :medio_pago, :notas
     )
   end
@@ -613,6 +655,7 @@ class MovimientosContablesController < ApplicationController
       monto_ars:            m.monto_ars.to_f,
       cantidad:             m.cantidad&.to_f,
       unidad:               m.unidad,
+      frecuente:            m.frecuente,
       # Calculado, nunca guardado: si se guardara, corregir el monto o la cantidad dejaría un
       # unitario viejo que no se corresponde con ninguno de los dos.
       costo_unitario_ars:   m.costo_unitario_ars&.to_f,

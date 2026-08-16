@@ -396,6 +396,7 @@ Rails.application.routes.draw do
       collection do
         get :dashboard
         get :recurrentes   # gastos fijos detectados del historial (alquiler, impuestos, servicios)
+        get :frecuentes    # los que el admin marcó como frecuentes, para volver a cargarlos
         get :export_csv
         post :cerrar_periodo    # congela movimientos hasta una fecha (solo admin)
         post :reabrir_periodo   # retrocede/levanta el cierre (solo admin, auditado)

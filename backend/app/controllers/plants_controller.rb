@@ -362,7 +362,7 @@ class PlantsController < ApplicationController
         estado: plant.lote.estado,
         sala:   plant.lote.sala ? { id: plant.lote.sala.id, nombre: plant.lote.sala.nombre } : nil,
       },
-      genetica:      g ? { id: g.id, nombre: g.nombre, tipo: g.tipo } : nil,
+      genetica:      g ? { id: g.id, nombre: g.nombre, nombre_visible: g.nombre_visible, tipo: g.tipo } : nil,
       created_at:    plant.created_at,
       dias_en_fase:  dias_en_fase(plant),
     }

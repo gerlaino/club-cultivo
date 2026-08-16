@@ -132,7 +132,7 @@ async function configEtiquetas() {
     datosDe: (p, qr) => ({
       qrDataUrl: qr,
       nombre:    p.nombre || p.codigo_qr,
-      genetica:  p.genetica?.nombre,
+      genetica:  p.genetica?.nombre_visible || p.genetica?.nombre,
       lote:      p.lote?.codigo,
       inicio:    p.lote?.start_date,
       clubName,

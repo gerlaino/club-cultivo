@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_14_130000) do
+ActiveRecord::Schema[7.2].define(version: 2026_08_16_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1317,8 +1317,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_14_130000) do
     t.bigint "evento_bar_id"
     t.decimal "cantidad", precision: 12, scale: 3
     t.string "unidad"
+    t.boolean "frecuente", default: false, null: false
     t.index ["categoria_contable_id"], name: "index_movimientos_contables_on_categoria_contable_id"
     t.index ["club_id", "fecha"], name: "index_movimientos_contables_on_club_id_and_fecha"
+    t.index ["club_id", "frecuente", "fecha"], name: "index_movimientos_frecuentes", where: "frecuente"
     t.index ["club_id", "tipo"], name: "index_movimientos_contables_on_club_id_and_tipo"
     t.index ["club_id"], name: "index_movimientos_contables_on_club_id"
     t.index ["compra_cuotas_id"], name: "index_movimientos_contables_on_compra_cuotas_id"

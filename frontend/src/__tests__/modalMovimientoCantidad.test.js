@@ -7,8 +7,10 @@ import { mount } from '@vue/test-utils'
 //   · el flujo y la categoría COEXISTEN: cualquiera de los dos puede ofrecer el depósito y
 //     ninguno lo impone, porque un gasto puede pertenecer a una categoría con sector y no
 //     entrar a ningún inventario (una limpieza contratada, por ejemplo).
+const listMovimientosFrecuentes = vi.fn(() => Promise.resolve({ data: [] }))
 vi.mock('../lib/api.js', () => ({
   createCategoriaContable: vi.fn(), createUnidadNegocio: vi.fn(),
+  listMovimientosFrecuentes: (...a) => listMovimientosFrecuentes(...a),
 }))
 
 // UN SOLO NIVEL: sector → categoría (las subcategorías se eliminaron en ago-2026).
@@ -53,20 +55,21 @@ describe('Nuevo movimiento — la plata acá, el inventario allá', () => {
     await wrapper.vm.$nextTick()
   }
 
-  // CAMBIO DE CRITERIO (Germán, ago-2026): la cantidad se pregunta cuando hay algo que contar,
-  // o sea cuando la categoría entra a un depósito. Para pagar la luz no hay nada que contar, y
-  // preguntarlo igual era una de las doce decisiones que hacían el alta poco natural.
-  it('pide cantidad y unidad cuando la compra entra al depósito', async () => {
+  // La cantidad está SIEMPRE y es opcional. Estuvo un rato condicionada a que la categoría
+  // entrara a un depósito —"para pagar la luz no hay nada que contar"— hasta que apareció el
+  // caso real: dos cajones de gaseosa para el buffet, con una categoría que no stockea. Se
+  // cuentan cosas que no van a ningún inventario, y sin cantidad no hay costo unitario.
+  it('pide cantidad y unidad para una compra que entra al depósito', async () => {
     await conCategoriaQueStockea()
 
     expect(wrapper.find('.mv-cant').exists()).toBe(true)
   })
 
-  it('y no las pide para un gasto que no stockea', async () => {
-    wrapper.vm.form.categoria_contable_id = 2   // "Venta de flor": comportamiento general
+  it('y también para un gasto que no stockea', async () => {
+    wrapper.vm.form.categoria_contable_id = 2   // "Alquiler": no va a depósito
     await wrapper.vm.$nextTick()
 
-    expect(wrapper.find('.mv-cant').exists()).toBe(false)
+    expect(wrapper.find('.mv-cant').exists()).toBe(true)
   })
 
   it('con el monto calcula el precio por unidad', async () => {
@@ -326,4 +329,99 @@ describe('Nuevo movimiento — crear una categoría', () => {
     })
   })
 
+})
+
+// AC (Germán): el link a los "fijos detectados" se reemplaza por una casilla que marca ESTE gasto
+// como frecuente, y arriba de todo un buscador para volver a cargar uno sin tipearlo.
+describe('Nuevo movimiento — gastos frecuentes', () => {
+  let wrapper
+
+  const FRECUENTES = [
+    { id: 1, descripcion: 'Luz de julio', monto_ars: 85000, cantidad: null, unidad: 'unidad',
+      categoria_contable_id: 2, categoria_label: 'Alquiler', unidad_negocio_id: 7,
+      sede_id: 3, medio_pago: 'transferencia', proveedor: 'Edenor' },
+    { id: 2, descripcion: 'Gaseosa', monto_ars: 100000, cantidad: 12, unidad: 'unidad',
+      categoria_contable_id: 1, categoria_label: 'Fertilizante', unidad_negocio_id: 7,
+      sede_id: 3, medio_pago: 'efectivo', proveedor: null },
+  ]
+
+  const montar = async (frecuentes = FRECUENTES) => {
+    listMovimientosFrecuentes.mockResolvedValue({ data: frecuentes })
+    const { default: Modal } = await import('../components/contabilidad/ModalMovimiento.vue')
+    const w = mount(Modal, {
+      props: {
+        modelValue: false, categorias: CATEGORIAS, sedes: [{ id: 3, nombre: 'Finca Norte' }],
+        unidades: [{ id: 7, nombre: 'Cultivo' }], depositos: [], bares: [], insumos: [], pacientes: [],
+      },
+      global: { stubs: { Teleport: true, AppDatePicker: true } },
+    })
+    await w.setProps({ modelValue: true })
+    await new Promise(r => setTimeout(r, 0))
+    return w
+  }
+
+  it('ofrece el atajo cuando hay frecuentes cargados', async () => {
+    wrapper = await montar()
+
+    expect(wrapper.find('.mv-frec').exists()).toBe(true)
+    expect(wrapper.find('.mv-frec-toggle').text()).toContain('2')
+  })
+
+  // Sin ninguno marcado el atajo sería una caja vacía que ocupa la parte de arriba del formulario.
+  it('y no lo ofrece si no hay ninguno', async () => {
+    wrapper = await montar([])
+
+    expect(wrapper.find('.mv-frec').exists()).toBe(false)
+  })
+
+  it('el buscador filtra por texto', async () => {
+    wrapper = await montar()
+    wrapper.vm.frecQuery = 'gase'
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.vm.frecuentesFiltrados.map(f => f.descripcion)).toEqual(['Gaseosa'])
+  })
+
+  // El punto del atajo: elegir uno deja el formulario listo para revisar el monto y guardar.
+  it('elegir uno rellena el formulario con lo guardado', async () => {
+    wrapper = await montar()
+
+    wrapper.vm.usarFrecuente(FRECUENTES[1])
+    await wrapper.vm.$nextTick()
+
+    const f = wrapper.vm.form
+    expect(f.descripcion).toBe('Gaseosa')
+    expect(f.monto_ars).toBe(100000)
+    expect(f.cantidad).toBe(12)
+    expect(f.categoria_contable_id).toBe(1)
+    expect(f.medio_pago).toBe('efectivo')
+    // Queda marcado: si lo cargás desde acá, es frecuente.
+    expect(f.frecuente).toBe(true)
+  })
+
+  // La fecha NO se copia: el gasto es de hoy, no del día que se cargó la vez pasada.
+  it('pero no copia la fecha', async () => {
+    wrapper = await montar()
+    const hoy = wrapper.vm.form.fecha
+
+    wrapper.vm.usarFrecuente(FRECUENTES[0])
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.vm.form.fecha).toBe(hoy)
+  })
+
+  it('la casilla marca este gasto como frecuente', async () => {
+    wrapper = await montar()
+
+    expect(wrapper.find('.mv-frec-check').exists()).toBe(true)
+    expect(wrapper.vm.form.frecuente).toBe(false)
+  })
+
+  // Se reemplazó el link a los "fijos detectados": adivinar del historial sirve para proponer,
+  // pero el alquiler recién aparecía después de dos meses cargándolo a mano.
+  it('ya no está el link de "los que se repiten todos los meses"', async () => {
+    wrapper = await montar()
+
+    expect(wrapper.text()).not.toContain('se repiten todos los meses')
+  })
 })

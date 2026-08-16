@@ -98,7 +98,10 @@ class LoteSerializer
       sistema_hidro:             lote.sistema_hidro,
       sustrato_especifico:       lote.sustrato_especifico,
       genetica_id:        lote.genetica_id,
-      genetica:           lote.genetica ? { id: lote.genetica.id, nombre: lote.genetica.nombre, tipo: lote.genetica.tipo, registrada_inase: lote.genetica.registrada_inase } : nil,
+      # `nombre_visible` lleva la variedad declarada entre paréntesis: es lo que va en etiquetas
+      # y pantallas internas. En los informes regulatorios se usa `nombre_declarado`, que es sólo
+      # el del INASE.
+      genetica:           lote.genetica ? { id: lote.genetica.id, nombre: lote.genetica.nombre, nombre_visible: lote.genetica.nombre_visible, tipo: lote.genetica.tipo, registrada_inase: lote.genetica.registrada_inase } : nil,
       dias_desde_inicio:  lote.dias_desde_inicio,
       dias_en_estado:     dias_en_estado,
       # Desde cuándo está en el estado actual. Sale del MISMO cálculo que `dias_en_estado`, así

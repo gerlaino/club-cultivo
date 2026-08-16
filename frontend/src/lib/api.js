@@ -402,6 +402,8 @@ export const deleteMovimiento       = (id)           => api.delete(`/movimientos
 // estaba asentado desde que se compró; lo que cambia es su estado de pago.
 export const registrarPagoMovimiento = (id, payload = {}) =>
   api.patch(`/movimientos_contables/${id}/registrar_pago`, payload)
+// Los que el admin marcó como frecuentes, para volver a cargarlos sin tipearlos.
+export const listMovimientosFrecuentes = ()          => api.get('/movimientos_contables/frecuentes')
 export const exportMovimientosCSV   = (params = {})  => api.get('/movimientos_contables/export_csv', { params, responseType: 'blob' })
 // Excel con tipos reales, totales y filtros: el CSV plano no se podía trabajar sin rearmarlo.
 export const exportMovimientosXLSX  = (params = {})  => api.get('/movimientos_contables/export_csv.xlsx', { params, responseType: 'blob' })

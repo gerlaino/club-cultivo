@@ -157,6 +157,8 @@ class GeneticasController < ApplicationController
       club_id:                genetica.club_id,
       global:                 genetica.global,
       nombre:                 genetica.nombre,
+      # Con la variedad declarada entre paréntesis, para etiquetas y pantallas internas.
+      nombre_visible:         genetica.nombre_visible,
       slug:                   genetica.slug,
       tipo:                   genetica.tipo,
       thc:                    genetica.thc,
@@ -260,6 +262,8 @@ class GeneticasController < ApplicationController
       club_id:                genetica.club_id,
       global:                 genetica.global,
       nombre:                 genetica.nombre,
+      # Con la variedad declarada entre paréntesis, para etiquetas y pantallas internas.
+      nombre_visible:         genetica.nombre_visible,
       slug:                   genetica.slug,
       tipo:                   genetica.tipo,
       thc:                    genetica.thc,

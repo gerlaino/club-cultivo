@@ -74,7 +74,7 @@ async function descargarQR() {
     dibujarEtiquetaLote(doc, 0, 0, {
       qrDataUrl: qr,
       codigo:    l.codigo,
-      genetica:  l.genetica?.nombre || l.strain,
+      genetica:  l.genetica?.nombre_visible || l.genetica?.nombre || l.strain,
       estado:    em(l.estado).label,
       inicio:    l.start_date,
       plantas:   l.plants_count ?? 0,

@@ -10,7 +10,7 @@ import AppDatePicker from '../ui/AppDatePicker.vue'
 import DestinoStock from './DestinoStock.vue'
 import MovimientosFijos from './MovimientosFijos.vue'
 import { useModalEscape } from '../../composables/useModalEscape.js'
-import { createCategoriaContable } from '../../lib/api.js'
+import { createCategoriaContable, listMovimientosFrecuentes } from '../../lib/api.js'
 import {
   flowDe, hoyLocal, fmtARS, fmtMiles, parseMonto, costoUnitario, UNIDADES,
   destinoVacio, destinoEstado, destinoPayload, esDepositoSalon,
@@ -76,6 +76,8 @@ function formVacio(tipo = 'egreso') {
     // Cuánto entró y en qué unidad: de acá sale el costo unitario. Opcional.
     cantidad: null,
     unidad: 'unidad',
+    // Lo marca la persona: es un gasto que va a repetir y quiere volver a cargarlo del buscador.
+    frecuente: false,
     notas: '',
   }
 }
@@ -83,6 +85,48 @@ const form = ref(formVacio())
 
 const editando = computed(() => !!props.movimientoEditar)
 const esCuotas = computed(() => form.value.plan === 'cuotas' && form.value.tipo === 'egreso' && !editando.value)
+
+// ─── Gastos frecuentes ──────────────────────────────────────────────────────────
+// Los que la persona marcó. Es distinto de los "recurrentes", que los ADIVINA el backend del
+// historial: adivinar sirve para proponer, pero el alquiler recién aparece después de dos meses
+// cargándolo a mano, y lo que se paga cada dos meses no aparece nunca.
+const frecuentes  = ref([])
+const frecOpen    = ref(false)
+const frecQuery   = ref('')
+const frecInput   = ref(null)
+
+const frecuentesFiltrados = computed(() => {
+  const q = frecQuery.value.trim().toLowerCase()
+  if (!q) return frecuentes.value
+  return frecuentes.value.filter(f =>
+    f.descripcion?.toLowerCase().includes(q) || f.categoria_label?.toLowerCase().includes(q)
+  )
+})
+
+async function cargarFrecuentes() {
+  try { frecuentes.value = (await listMovimientosFrecuentes()).data || [] } catch { frecuentes.value = [] }
+}
+
+// Rellena con lo guardado la última vez. La FECHA no se copia —el gasto es de hoy— y el monto sí,
+// porque es el dato más cercano a lo que va a salir ahora; se revisa antes de guardar.
+function usarFrecuente(f) {
+  form.value = {
+    ...form.value,
+    descripcion:           f.descripcion,
+    monto_ars:             f.monto_ars,
+    cantidad:              f.cantidad,
+    unidad:                f.unidad || 'unidad',
+    categoria_contable_id: f.categoria_contable_id,
+    unidad_negocio_id:     f.unidad_negocio_id,
+    sede_id:               f.sede_id,
+    medio_pago:            f.medio_pago || 'efectivo',
+    proveedor:             f.proveedor || '',
+    frecuente:             true,
+  }
+  montoTexto.value = fmtMiles(f.monto_ars)
+  frecOpen.value = false
+  frecQuery.value = ''
+}
 
 // Precio por unidad, en vivo mientras se carga: es el número que sirve para comparar proveedores.
 const unitario = computed(() => costoUnitario(form.value.monto_ars, form.value.cantidad))
@@ -412,6 +456,8 @@ watch(() => props.modelValue, (abierto) => {
   errores.value = {}
   catsNuevas.value = []; areasNuevas.value = []
   crearCat.value = null; errorCrear.value = ''
+  frecOpen.value = false; frecQuery.value = ''
+  cargarFrecuentes()
 
   if (props.movimientoEditar) {
     const m = props.movimientoEditar
@@ -514,6 +560,33 @@ const titulo = computed(() => {
                 Si entró plata: el pago de un paciente se registra en su
                 <strong>cuenta corriente</strong>; lo del buffet, en el mostrador.
               </p>
+            </div>
+
+            <!-- Los frecuentes, ANTES que nada: si este gasto ya se cargó otras veces, no hay
+                 que volver a completar el formulario — se elige y queda listo para revisar el
+                 monto. Sólo aparece si hay alguno marcado. -->
+            <div v-if="!editando && frecuentes.length" class="mv-frec">
+              <button type="button" class="mv-frec-toggle" @click="frecOpen = !frecOpen">
+                <i class="bi bi-arrow-repeat"></i>
+                Cargar uno frecuente
+                <span class="mv-frec-count">{{ frecuentes.length }}</span>
+                <i class="bi" :class="frecOpen ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+              </button>
+              <div v-if="frecOpen" class="mv-frec-panel">
+                <input ref="frecInput" v-model="frecQuery" type="text" class="mv-inp"
+                       placeholder="Buscar: luz, alquiler, gaseosa…" autocomplete="off" />
+                <div class="mv-frec-list">
+                  <button v-for="f in frecuentesFiltrados" :key="f.id" type="button"
+                          class="mv-frec-opt" @click="usarFrecuente(f)">
+                    <span class="mv-frec-desc">{{ f.descripcion }}</span>
+                    <span class="mv-frec-meta">
+                      <span v-if="f.categoria_label">{{ f.categoria_label }}</span>
+                      <strong>{{ fmtARS(f.monto_ars) }}</strong>
+                    </span>
+                  </button>
+                  <p v-if="!frecuentesFiltrados.length" class="mv-frec-vacio">Sin resultados</p>
+                </div>
+              </div>
             </div>
 
             <!-- La CATEGORÍA arriba de todo. Es el único campo obligatorio del formulario y
@@ -650,10 +723,14 @@ const titulo = computed(() => {
                  otro. Ahora es del movimiento y el bloque de depósito lo REUSA: sigue habiendo un
                  solo lugar donde se carga, que era el motivo por el que estaba abajo. Opcional:
                  un alquiler no tiene cantidad y el campo se deja vacío. -->
-            <!-- Cantidad y unidad aparecen SÓLO si la categoría entra a un depósito: para pagar
-                 la luz no hay nada que contar, y preguntarlo igual es de las cosas que hacían
-                 caminar por doce decisiones para registrar un gasto de una línea. -->
-            <div v-if="pideDestinoCat" class="mv-cant">
+            <!-- SIEMPRE visible, y opcional.
+                 Estuvo un rato condicionada a que la categoría entrara a un depósito, con la idea
+                 de que para pagar la luz no hay nada que contar. En la práctica se contán cosas
+                 que no van a ningún inventario: dos cajones de gaseosa, diez horas de
+                 electricista, tres análisis de laboratorio. Sin cantidad no hay costo unitario,
+                 que es el número con el que se compara un proveedor contra otro.
+                 Vacía no molesta: es una línea que se saltea. -->
+            <div class="mv-cant">
               <label class="mv-fld mv-fld--sm">
                 <span class="mv-lbl">Cantidad <span class="mv-opt">(opcional)</span></span>
                 <input type="number" min="0" step="0.001" class="mv-inp"
@@ -834,12 +911,17 @@ const titulo = computed(() => {
 
           </div>
 
-          <!-- Footer -->
-          <div v-if="paso === 'form' && !editando" class="mv-fijos-link">
-            <button type="button" class="mv-linkbtn" @click="elegirFlujo('fijos')">
-              <i class="bi bi-arrow-repeat"></i> ¿Es uno de los que se repiten todos los meses?
-            </button>
-          </div>
+          <!-- Marcarlo como frecuente. Antes acá había un link a la pantalla de gastos fijos
+               DETECTADOS del historial: adivinar sirve para proponer, pero el alquiler recién
+               aparecía después de dos meses cargándolo a mano. La marca es del usuario, que
+               sabe desde el primer día cuáles va a repetir, y habilita el buscador de arriba. -->
+          <label v-if="paso === 'form' && !editando" class="mv-frec-check">
+            <input type="checkbox" v-model="form.frecuente" />
+            <span>
+              <strong>Es un gasto frecuente</strong>
+              <small>Lo vas a encontrar arriba para volver a cargarlo sin tipearlo.</small>
+            </span>
+          </label>
 
           <footer v-if="paso === 'form'" class="mv-ftr">
             <p v-if="errorGuardado" class="mv-ftr-err"><i class="bi bi-exclamation-triangle-fill"></i> {{ errorGuardado }}</p>
@@ -1001,6 +1083,30 @@ const titulo = computed(() => {
 /* Monto */
 .mv-imputacion { display: flex; gap: var(--sp-3); flex-wrap: wrap; }
 .mv-imputacion .mv-fld { flex: 1 1 200px; }
+/* Gastos frecuentes: el atajo va arriba de todo, plegado. */
+.mv-frec { margin-bottom: var(--sp-3); }
+.mv-frec-toggle {
+  display: flex; align-items: center; gap: .45rem; width: 100%;
+  background: var(--c-slate-50); border: 1.5px dashed var(--c-slate-300); border-radius: 10px;
+  padding: .55rem .7rem; font-size: var(--fs-13); font-weight: 700; color: var(--c-ink-600);
+  cursor: pointer; font-family: inherit;
+}
+.mv-frec-count { background: var(--c-ink-100); border-radius: 999px; padding: 0 .45em; font-size: var(--fs-12); }
+.mv-frec-toggle .bi-chevron-up, .mv-frec-toggle .bi-chevron-down { margin-left: auto; }
+.mv-frec-panel { margin-top: .4rem; border: 1.5px solid var(--c-slate-200); border-radius: 10px; padding: .5rem; background: #fff; }
+.mv-frec-list { max-height: 220px; overflow-y: auto; margin-top: .4rem; display: flex; flex-direction: column; gap: .2rem; }
+.mv-frec-opt {
+  display: flex; flex-direction: column; gap: .1rem; text-align: left; width: 100%;
+  background: none; border: none; border-radius: 8px; padding: .4rem .5rem; cursor: pointer; font-family: inherit;
+}
+.mv-frec-opt:hover { background: var(--c-slate-50); }
+.mv-frec-desc { font-size: var(--fs-13); font-weight: 600; color: var(--c-ink-800); }
+.mv-frec-meta { display: flex; gap: .5rem; font-size: var(--fs-12); color: var(--c-ink-500); }
+.mv-frec-vacio { margin: .4rem; font-size: var(--fs-12); color: var(--c-ink-400); }
+/* La casilla que lo marca, al pie del formulario. */
+.mv-frec-check { display: flex; align-items: flex-start; gap: .5rem; padding: .6rem .2rem 0; cursor: pointer; }
+.mv-frec-check span { display: flex; flex-direction: column; font-size: var(--fs-13); color: var(--c-ink-700); }
+.mv-frec-check small { color: var(--c-ink-500); font-size: var(--fs-12); }
 .mv-cant { display: flex; gap: var(--sp-3); flex-wrap: wrap; align-items: flex-end; }
 .mv-cant-uni { margin: 0 0 .35rem; font-size: var(--fs-13); color: var(--c-ink-600); }
 .mv-monto {

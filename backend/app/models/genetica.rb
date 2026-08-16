@@ -77,6 +77,21 @@ class Genetica < ApplicationRecord
     declarada_como&.nombre.presence || nombre
   end
 
+  # Cómo se nombra PUERTAS ADENTRO: el nombre con el que trabaja la organización, y entre
+  # paréntesis la variedad contra la que declara. Es lo que va en etiquetas e informes internos.
+  #
+  # El separador NO es "x": en cannabis `A x B` significa un CRUCE, así que "CELOSA 10 x Blue
+  # Sherbet" se leería como que la planta es hija de esas dos —lo contrario de lo que dice—.
+  # Y el propio va primero porque es el que la gente usa todos los días; el acreditable es el
+  # dato de respaldo.
+  #
+  # Ojo: en los informes REGULATORIOS va `nombre_declarado` (sólo el del INASE), no éste.
+  def nombre_visible
+    return nombre unless declarada_como
+
+    "#{nombre} (#{declarada_como.nombre})"
+  end
+
   # El número que le corresponde ante el organismo: el propio si está inscripta, el de la
   # variedad contra la que se declara si no.
   def numero_inase_declarado
