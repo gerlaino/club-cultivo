@@ -7,6 +7,7 @@ import { useAuthStore }         from "../stores/auth"
 import api, { listSedes, listLotes, listPacientes, cerrarPeriodoContable, reabrirPeriodoContable, createCompraCuotas, listComprasCuotas, listUnidadesNegocio, listInsumos, listBares, listCategoriasContables, listDepositos, registrarPagoMovimiento } from "../lib/api"
 import { useConfirm }           from "../composables/useConfirm.js"
 import { useToast }             from "../composables/useToast.js"
+import GastosRecurrentesView from './admin/GastosRecurrentesView.vue'
 import ModalIngreso from '../components/contabilidad/ModalIngreso.vue'
 import ModalMovimiento from "../components/contabilidad/ModalMovimiento.vue"
 import EditarCompraCuotasModal from "../components/contabilidad/EditarCompraCuotasModal.vue"
@@ -603,6 +604,11 @@ onMounted(async () => {
       <button class="cv__tab" :class="{ 'cv__tab--active': vistaActiva === 'categorias' }" @click="vistaActiva = 'categorias'">
         <i class="bi bi-tags"></i> Categorías
       </button>
+      <!-- Al lado de Categorías porque es la misma clase de configuración: cómo se clasifica y
+           cómo se carga la plata. Los moldes de acá alimentan el buscador de Nuevo movimiento. -->
+      <button class="cv__tab" :class="{ 'cv__tab--active': vistaActiva === 'recurrentes' }" @click="vistaActiva = 'recurrentes'">
+        <i class="bi bi-arrow-repeat"></i> Recurrentes
+      </button>
     </div>
 
     <!-- Categorías: configuración contable integrada al hub -->
@@ -610,6 +616,7 @@ onMounted(async () => {
          Nuevo movimiento. Sin avisar, creabas una categoría acá y el modal seguía con la lista
          vieja hasta refrescar el navegador. -->
     <div v-if="vistaActiva === 'categorias'" class="cv__embed"><FinanzasCatalogoView @cambio="recargarCatalogo" /></div>
+    <div v-if="vistaActiva === 'recurrentes'" class="cv__embed"><GastosRecurrentesView /></div>
 
     <!-- ══════════════ DASHBOARD ══════════════ -->
     <div v-if="vistaActiva === 'dashboard'">

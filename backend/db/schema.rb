@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_16_120000) do
+ActiveRecord::Schema[7.2].define(version: 2026_08_16_130000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -949,6 +949,34 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_16_120000) do
     t.index ["deleted_by_id"], name: "index_eventos_bar_on_deleted_by_id"
   end
 
+  create_table "gastos_recurrentes", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.string "nombre", null: false
+    t.text "descripcion"
+    t.bigint "categoria_contable_id"
+    t.bigint "sede_id"
+    t.bigint "unidad_negocio_id"
+    t.decimal "monto_ars", precision: 12, scale: 2
+    t.decimal "cantidad", precision: 12, scale: 3
+    t.string "unidad"
+    t.string "medio_pago"
+    t.string "proveedor"
+    t.boolean "activo", default: true, null: false
+    t.integer "orden", default: 0, null: false
+    t.bigint "created_by_id"
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["categoria_contable_id"], name: "index_gastos_recurrentes_on_categoria_contable_id"
+    t.index ["club_id", "activo", "orden"], name: "index_gastos_recurrentes_on_club_id_and_activo_and_orden"
+    t.index ["club_id", "nombre"], name: "index_gastos_recurrentes_nombre_unico", unique: true, where: "(deleted_at IS NULL)"
+    t.index ["club_id"], name: "index_gastos_recurrentes_on_club_id"
+    t.index ["created_by_id"], name: "index_gastos_recurrentes_on_created_by_id"
+    t.index ["deleted_at"], name: "index_gastos_recurrentes_on_deleted_at"
+    t.index ["sede_id"], name: "index_gastos_recurrentes_on_sede_id"
+    t.index ["unidad_negocio_id"], name: "index_gastos_recurrentes_on_unidad_negocio_id"
+  end
+
   create_table "geneticas", force: :cascade do |t|
     t.bigint "club_id"
     t.string "nombre", null: false
@@ -1317,10 +1345,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_16_120000) do
     t.bigint "evento_bar_id"
     t.decimal "cantidad", precision: 12, scale: 3
     t.string "unidad"
-    t.boolean "frecuente", default: false, null: false
     t.index ["categoria_contable_id"], name: "index_movimientos_contables_on_categoria_contable_id"
     t.index ["club_id", "fecha"], name: "index_movimientos_contables_on_club_id_and_fecha"
-    t.index ["club_id", "frecuente", "fecha"], name: "index_movimientos_frecuentes", where: "frecuente"
     t.index ["club_id", "tipo"], name: "index_movimientos_contables_on_club_id_and_tipo"
     t.index ["club_id"], name: "index_movimientos_contables_on_club_id"
     t.index ["compra_cuotas_id"], name: "index_movimientos_contables_on_compra_cuotas_id"
@@ -2341,6 +2367,11 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_16_120000) do
   add_foreign_key "eventos_bar", "bares"
   add_foreign_key "eventos_bar", "clubs"
   add_foreign_key "eventos_bar", "users", column: "deleted_by_id"
+  add_foreign_key "gastos_recurrentes", "categorias_contables", column: "categoria_contable_id"
+  add_foreign_key "gastos_recurrentes", "clubs"
+  add_foreign_key "gastos_recurrentes", "sedes"
+  add_foreign_key "gastos_recurrentes", "unidades_negocio", column: "unidad_negocio_id"
+  add_foreign_key "gastos_recurrentes", "users", column: "created_by_id"
   add_foreign_key "geneticas", "clubs"
   add_foreign_key "geneticas", "geneticas", column: "declarada_como_id"
   add_foreign_key "geneticas", "users", column: "deleted_by_id"

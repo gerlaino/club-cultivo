@@ -10,7 +10,7 @@ import AppDatePicker from '../ui/AppDatePicker.vue'
 import DestinoStock from './DestinoStock.vue'
 import MovimientosFijos from './MovimientosFijos.vue'
 import { useModalEscape } from '../../composables/useModalEscape.js'
-import { createCategoriaContable, listMovimientosFrecuentes } from '../../lib/api.js'
+import { createCategoriaContable, listGastosRecurrentes } from '../../lib/api.js'
 import {
   flowDe, hoyLocal, fmtARS, fmtMiles, parseMonto, costoUnitario, UNIDADES,
   destinoVacio, destinoEstado, destinoPayload, esDepositoSalon,
@@ -76,8 +76,6 @@ function formVacio(tipo = 'egreso') {
     // Cuánto entró y en qué unidad: de acá sale el costo unitario. Opcional.
     cantidad: null,
     unidad: 'unidad',
-    // Lo marca la persona: es un gasto que va a repetir y quiere volver a cargarlo del buscador.
-    frecuente: false,
     notas: '',
   }
 }
@@ -86,10 +84,9 @@ const form = ref(formVacio())
 const editando = computed(() => !!props.movimientoEditar)
 const esCuotas = computed(() => form.value.plan === 'cuotas' && form.value.tipo === 'egreso' && !editando.value)
 
-// ─── Gastos frecuentes ──────────────────────────────────────────────────────────
-// Los que la persona marcó. Es distinto de los "recurrentes", que los ADIVINA el backend del
-// historial: adivinar sirve para proponer, pero el alquiler recién aparece después de dos meses
-// cargándolo a mano, y lo que se paga cada dos meses no aparece nunca.
+// ─── Gastos recurrentes ─────────────────────────────────────────────────────────
+// Moldes que el admin define en su solapa (Contabilidad → Recurrentes). Elegir uno deja el
+// formulario listo; el monto viene puesto y se corrige, que es justo lo que cambia mes a mes.
 const frecuentes  = ref([])
 const frecOpen    = ref(false)
 const frecQuery   = ref('')
@@ -99,12 +96,14 @@ const frecuentesFiltrados = computed(() => {
   const q = frecQuery.value.trim().toLowerCase()
   if (!q) return frecuentes.value
   return frecuentes.value.filter(f =>
-    f.descripcion?.toLowerCase().includes(q) || f.categoria_label?.toLowerCase().includes(q)
+    f.nombre?.toLowerCase().includes(q) ||
+    f.descripcion?.toLowerCase().includes(q) ||
+    f.categoria_label?.toLowerCase().includes(q)
   )
 })
 
 async function cargarFrecuentes() {
-  try { frecuentes.value = (await listMovimientosFrecuentes()).data || [] } catch { frecuentes.value = [] }
+  try { frecuentes.value = (await listGastosRecurrentes({ activos: 'true' })).data || [] } catch { frecuentes.value = [] }
 }
 
 // Rellena con lo guardado la última vez. La FECHA no se copia —el gasto es de hoy— y el monto sí,
@@ -112,7 +111,9 @@ async function cargarFrecuentes() {
 function usarFrecuente(f) {
   form.value = {
     ...form.value,
-    descripcion:           f.descripcion,
+    // El molde tiene nombre ("Luz") y opcionalmente un detalle más largo; si no lo trae, el
+    // nombre alcanza como descripción del movimiento.
+    descripcion:           f.descripcion?.trim() || f.nombre,
     monto_ars:             f.monto_ars,
     cantidad:              f.cantidad,
     unidad:                f.unidad || 'unidad',
@@ -121,7 +122,6 @@ function usarFrecuente(f) {
     sede_id:               f.sede_id,
     medio_pago:            f.medio_pago || 'efectivo',
     proveedor:             f.proveedor || '',
-    frecuente:             true,
   }
   montoTexto.value = fmtMiles(f.monto_ars)
   frecOpen.value = false
@@ -568,17 +568,17 @@ const titulo = computed(() => {
             <div v-if="!editando && frecuentes.length" class="mv-frec">
               <button type="button" class="mv-frec-toggle" @click="frecOpen = !frecOpen">
                 <i class="bi bi-arrow-repeat"></i>
-                Cargar uno frecuente
+                Cargar un gasto recurrente
                 <span class="mv-frec-count">{{ frecuentes.length }}</span>
                 <i class="bi" :class="frecOpen ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
               </button>
               <div v-if="frecOpen" class="mv-frec-panel">
                 <input ref="frecInput" v-model="frecQuery" type="text" class="mv-inp"
-                       placeholder="Buscar: luz, alquiler, gaseosa…" autocomplete="off" />
+                       placeholder="Buscar: luz, alquiler, contador…" autocomplete="off" />
                 <div class="mv-frec-list">
                   <button v-for="f in frecuentesFiltrados" :key="f.id" type="button"
                           class="mv-frec-opt" @click="usarFrecuente(f)">
-                    <span class="mv-frec-desc">{{ f.descripcion }}</span>
+                    <span class="mv-frec-desc">{{ f.nombre }}</span>
                     <span class="mv-frec-meta">
                       <span v-if="f.categoria_label">{{ f.categoria_label }}</span>
                       <strong>{{ fmtARS(f.monto_ars) }}</strong>
@@ -911,17 +911,11 @@ const titulo = computed(() => {
 
           </div>
 
-          <!-- Marcarlo como frecuente. Antes acá había un link a la pantalla de gastos fijos
-               DETECTADOS del historial: adivinar sirve para proponer, pero el alquiler recién
-               aparecía después de dos meses cargándolo a mano. La marca es del usuario, que
-               sabe desde el primer día cuáles va a repetir, y habilita el buscador de arriba. -->
-          <label v-if="paso === 'form' && !editando" class="mv-frec-check">
-            <input type="checkbox" v-model="form.frecuente" />
-            <span>
-              <strong>Es un gasto frecuente</strong>
-              <small>Lo vas a encontrar arriba para volver a cargarlo sin tipearlo.</small>
-            </span>
-          </label>
+          <!-- Los gastos recurrentes se definen en su propia solapa (Contabilidad → Recurrentes)
+               y se eligen desde el buscador de arriba. Acá había una casilla que marcaba ESTE
+               movimiento como frecuente: marcar el movimiento no deja curar la lista —no se puede
+               dar de alta "Luz" antes de la primera factura, ni corregir el monto de referencia
+               sin cargar un gasto de verdad— así que el molde pasó a ser una entidad propia. -->
 
           <footer v-if="paso === 'form'" class="mv-ftr">
             <p v-if="errorGuardado" class="mv-ftr-err"><i class="bi bi-exclamation-triangle-fill"></i> {{ errorGuardado }}</p>

@@ -396,7 +396,6 @@ Rails.application.routes.draw do
       collection do
         get :dashboard
         get :recurrentes   # gastos fijos detectados del historial (alquiler, impuestos, servicios)
-        get :frecuentes    # los que el admin marcó como frecuentes, para volver a cargarlos
         get :export_csv
         post :cerrar_periodo    # congela movimientos hasta una fecha (solo admin)
         post :reabrir_periodo   # retrocede/levanta el cierre (solo admin, auditado)
@@ -410,6 +409,8 @@ Rails.application.routes.draw do
 
     # Finanzas — catálogo editable (Bloque 1)
     resources :categorias_contables, only: [:index, :create, :update, :destroy]
+    # Moldes de los gastos que se repiten: se definen acá y se eligen al cargar un movimiento.
+    resources :gastos_recurrentes, only: [:index, :create, :update, :destroy]
     resources :unidades_negocio,     only: [:index, :create, :update, :destroy]
     resources :categorias_producto,  only: [:index, :create, :update, :destroy]
 

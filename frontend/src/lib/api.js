@@ -402,8 +402,11 @@ export const deleteMovimiento       = (id)           => api.delete(`/movimientos
 // estaba asentado desde que se compró; lo que cambia es su estado de pago.
 export const registrarPagoMovimiento = (id, payload = {}) =>
   api.patch(`/movimientos_contables/${id}/registrar_pago`, payload)
-// Los que el admin marcó como frecuentes, para volver a cargarlos sin tipearlos.
-export const listMovimientosFrecuentes = ()          => api.get('/movimientos_contables/frecuentes')
+// Gastos recurrentes: los moldes que se definen en su solapa y se eligen al cargar un movimiento.
+export const listGastosRecurrentes   = (params = {}) => api.get('/gastos_recurrentes', { params })
+export const createGastoRecurrente   = (payload)     => api.post('/gastos_recurrentes', { gasto_recurrente: payload })
+export const updateGastoRecurrente   = (id, payload) => api.put(`/gastos_recurrentes/${id}`, { gasto_recurrente: payload })
+export const deleteGastoRecurrente   = (id)          => api.delete(`/gastos_recurrentes/${id}`)
 export const exportMovimientosCSV   = (params = {})  => api.get('/movimientos_contables/export_csv', { params, responseType: 'blob' })
 // Excel con tipos reales, totales y filtros: el CSV plano no se podía trabajar sin rearmarlo.
 export const exportMovimientosXLSX  = (params = {})  => api.get('/movimientos_contables/export_csv.xlsx', { params, responseType: 'blob' })
