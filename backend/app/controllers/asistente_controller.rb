@@ -37,13 +37,13 @@ class AsistenteController < BaseController
     - Post-cosecha: secado 18–21°C / 45–55% HR / 7–14 días; curado en frascos; manicure
 
     TU MISIÓN:
-    Interpretar el reporte oral del cultivador y generar acciones estructuradas en JSON.
+    Interpretar el reporte oral de quien dicta y generar acciones estructuradas en JSON.
     Usás el contexto actual del cultivo —con los valores reales de la planta y el lote— para
-    interpretar correctamente, incluso cuando el cultivador es breve o impreciso.
+    interpretar correctamente, incluso cuando quien dicta es breve o impreciso.
 
     PRINCIPIOS:
     - Registrar solo lo que se menciona. Nunca inventar valores.
-    - Si el cultivador no menciona un campo, no lo incluyas: el sistema preserva el valor anterior.
+    - Si no se menciona un campo, no lo incluyas: el sistema preserva el valor anterior.
     - Observaciones morfológicas (altura, copas, color) y actividades físicas (riego, poda) son eventos
       distintos: si aparecen en la misma frase, generá DOS acciones separadas.
     - "Riegué" sin nutrientes → tareas_realizadas: ["riego"], fertilizacion: false
@@ -407,7 +407,7 @@ class AsistenteController < BaseController
       "- NO puede avanzar el ciclo desde 'curado' o 'finalizado' (eso lo hace el manicuro/admin).\n"
     else
       "\nROL: Este usuario es ADMIN/SUPERVISOR con permisos completos.\n" \
-      "- Puede generar avance_ciclo cuando el cultivador lo mencione explícitamente.\n"
+      "- Puede generar avance_ciclo cuando se lo mencione explícitamente.\n"
     end
   end
 
@@ -436,7 +436,7 @@ class AsistenteController < BaseController
     ctx += "Semana #{semanas_desde(lote.start_date)} desde inicio del lote\n" if lote.start_date
     ctx += "\n"
 
-    ctx += "ESTADO ACTUAL (no incluir estos campos si el cultivador no los menciona):\n"
+    ctx += "ESTADO ACTUAL (no incluir estos campos si no se los menciona):\n"
     ctx += "  Altura: #{planta.altura_actual ? "#{planta.altura_actual} cm" : 'no registrada'}\n"
     ctx += "  Copas: #{planta.num_colas || 'no registrado'}\n"
     ctx += "  Salud: #{planta.estado_salud || 'no evaluada'}\n"
@@ -479,7 +479,7 @@ class AsistenteController < BaseController
 
     ctx += "INSTRUCCIONES ESTRUCTURALES:\n"
     ctx += "  - planta_nombre = '#{planta.nombre}'\n"
-    ctx += "  - Si el cultivador menciona actividades físicas además de observar la planta\n"
+    ctx += "  - Si se mencionan actividades físicas además de observar la planta\n"
     ctx += "    → generar también registro_ambiental para el lote '#{lote.codigo}'.\n"
     ctx += "═════════════════════════════════════\n"
     ctx
@@ -664,7 +664,11 @@ class AsistenteController < BaseController
       model:      MODELO_ASISTENTE,
       max_tokens: 1000,
       system:     bloques_system(estable, variable),
-      messages:   [{ role: 'user', content: "Reporte del cultivador: \"#{texto}\"" }]
+      # "Reporte de campo" y no "del cultivador": el prompt decía cultivador en todos lados y el
+      # modelo lo repetía en el resumen, así que un admin dictando leía "el cultivador registró".
+      # Desde que el asistente lo usan admin, cultivador y supervisor, el texto es neutro. (El
+      # ROL sí se le dice, en `permisos_rol`, que es donde sirve: define qué puede hacer.)
+      messages:   [{ role: 'user', content: "Reporte de campo: \"#{texto}\"" }]
     }.to_json
 
     response = http.request(request)

@@ -849,9 +849,12 @@ function metaAccion(accion) {
    es que quede escondida. */
 .av__cerrar { margin-top:8px; padding:8px 10px; background:#f8fdf8; border:1px solid #d4e6d4; border-radius:8px; display:flex; flex-direction:column; gap:5px; }
 .av__cerrar-label { display:flex; align-items:center; gap:5px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#60725d; }
-.av__cerrar-item { display:flex; align-items:center; gap:7px; font-size:12.5px; color:#1a2e1b; cursor:pointer; }
-.av__cerrar-item input { cursor:pointer; flex-shrink:0; margin:0; }
-.av__cerrar-titulo { flex:1; min-width:0; }
+/* `flex-start` y no `center`: en el teléfono el título de la tarea entra en dos líneas y con
+   centrado el casillero queda flotando al medio del texto. El casillero se alinea con la primera
+   línea, que es donde el dedo lo busca. */
+.av__cerrar-item { display:flex; align-items:flex-start; gap:7px; font-size:12.5px; color:#1a2e1b; cursor:pointer; line-height:1.35; }
+.av__cerrar-item input { cursor:pointer; flex-shrink:0; margin:2px 0 0; }
+.av__cerrar-titulo { flex:1; min-width:0; overflow-wrap:anywhere; }
 .av__cerrar-quien { font-size:11px; color:var(--c-slate-400); flex-shrink:0; }
 .av__accion-titulo { font-size:14px; color:#1a2e1b; line-height:1.4; margin-bottom:3px; }
 .av__accion-ref { display:inline-block; background:#f0fdf4; color:#1b5e20; font-size:11px; font-weight:600; padding:1px 7px; border-radius:4px; margin-right:6px; }
