@@ -110,12 +110,22 @@ class Tarea < ApplicationRecord
     update!(horas_aplicadas_al_lote: true)
   end
 
-  # Cierra automáticamente tareas pendientes cuando se guarda un registro ambiental.
-  # es_privilegiado: admin/supervisor pueden cerrar tareas de cualquier cultivador.
-  # Devuelve array con títulos de las tareas cerradas.
-  def self.cerrar_por_registro!(tareas_realizadas:, usuario:, es_privilegiado:, lote: nil, sala: nil)
+  # Las tareas que un registro por voz DARÍA por hechas. Devuelve candidatas: no cierra nada.
+  #
+  # Antes esto cerraba solo, en tanda y DESPUÉS de guardar: el cultivador decía "regué" y se
+  # completaban todas las tareas de riego del lote o de la sala sin que llegara a ver cuáles,
+  # enterándose por una línea de texto cuando ya estaba hecho. Con tres riegos pendientes se
+  # cerraban los tres. Y para admin y supervisor cerraba además las de otra gente. Deshacerlo era
+  # ir a Tareas y reabrirlas de a una.
+  #
+  # El matching sigue siendo determinístico —por tipo de tarea, no por criterio del modelo—: el
+  # modelo sólo entiende que dijiste "regué", la lista la arma la base. Quién dictó elige cuáles
+  # cierra, antes de guardar.
+  #
+  # es_privilegiado: admin/supervisor ven también las tareas de otra gente.
+  def self.candidatas_por_registro(tareas_realizadas:, usuario:, es_privilegiado:, lote: nil, sala: nil)
     tipos = Array(tareas_realizadas).filter_map { |tr| TAREAS_REALIZADAS_MAP[tr] }.uniq
-    return [] if tipos.empty?
+    return none if tipos.empty?
 
     scope = activas.where(tipo: tipos)
 
@@ -123,20 +133,32 @@ class Tarea < ApplicationRecord
       scope = scope.where(lote_id: lote.id)
     elsif sala
       lote_ids = sala.lotes.where.not(estado: 'finalizado').pluck(:id)
-      return [] if lote_ids.empty?
+      return none if lote_ids.empty?
       scope = scope.where('sala_id = ? OR lote_id IN (?)', sala.id, lote_ids)
     else
-      return []
+      return none
     end
 
+    es_privilegiado ? scope : scope.where(asignada_a_id: usuario.id)
+  end
+
+  # Cierra exactamente las que la persona confirmó en la pantalla de revisión. Nunca elige por su
+  # cuenta.
+  #
+  # Los ids se vuelven a filtrar por organización y por permiso aunque vengan de `candidatas`: lo
+  # que llega es un POST y por ahí puede venir cualquier id. La regla no puede vivir sólo en la
+  # pantalla que armó la lista.
+  def self.cerrar_confirmadas!(ids:, usuario:, es_privilegiado:, club:)
+    ids = Array(ids).map(&:to_i).reject(&:zero?)
+    return [] if ids.empty?
+
+    scope = del_club(club.id).activas.where(id: ids)
     scope = scope.where(asignada_a_id: usuario.id) unless es_privilegiado
 
-    cerradas = []
-    scope.find_each do |t|
-      t.update!(estado: 'completada', notas_completado: 'Completada automáticamente por registro de voz')
-      cerradas << t.titulo
+    scope.map do |t|
+      t.update!(estado: 'completada', notas_completado: 'Completada por registro de voz')
+      t.titulo
     end
-    cerradas
   end
 
   def en_serie? = parent_tarea_id.present? || tareas_hijas.exists?

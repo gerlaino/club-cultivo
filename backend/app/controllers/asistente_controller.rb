@@ -150,6 +150,7 @@ class AsistenteController < BaseController
       if es_cultivador && resultado['acciones']
         resultado['acciones'] = resultado['acciones'].reject { |a| (a['tipo'] || a[:tipo]) == 'tarea' }
       end
+      anotar_tareas_a_cerrar!(resultado['acciones'], contexto)
       sesion.agregar_intercambio(texto, resultado['resumen'].to_s) rescue nil
       render json: resultado
     end
@@ -298,13 +299,54 @@ class AsistenteController < BaseController
     render json: { error: 'Tu rol no tiene acceso al asistente de IA' }, status: :forbidden
   end
 
-  def cerrar_tareas_por_registro(datos, lote: nil, sala: nil)
-    Tarea.cerrar_por_registro!(
-      tareas_realizadas: Array(datos['tareas_realizadas']),
-      usuario:           current_user,
-      es_privilegiado:   current_user.admin? || current_user.supervisor?,
-      lote:              lote,
-      sala:              sala
+  # Después de que el modelo interpreta, la BASE arma la lista concreta de tareas que ese
+  # registro daría por hechas —con id y título— para que se vean y se puedan destildar antes de
+  # guardar. El modelo no elige tareas: sólo entiende que dijiste "regué".
+  def anotar_tareas_a_cerrar!(acciones, contexto)
+    club         = current_user.club
+    privilegiado = current_user.admin? || current_user.supervisor?
+
+    Array(acciones).each do |accion|
+      datos = accion['datos'] || accion[:datos]
+      next unless datos.is_a?(Hash) && Array(datos['tareas_realizadas']).any?
+
+      lote = sala = nil
+      case accion['tipo'] || accion[:tipo]
+      when 'registro_ambiental'
+        codigo = accion['lote_codigo'] || accion[:lote_codigo]
+        lote   = club.lotes.find_by(codigo: codigo) if codigo.present?
+      when 'registro_ambiental_sala'
+        sala_id = contexto&.dig('sala_id') || contexto&.dig(:sala_id)
+        sala    = club.salas.find_by(id: sala_id) if sala_id.present?
+      end
+      next unless lote || sala
+
+      candidatas = Tarea.candidatas_por_registro(
+        tareas_realizadas: datos['tareas_realizadas'], usuario: current_user,
+        es_privilegiado: privilegiado, lote: lote, sala: sala
+      )
+
+      datos['tareas_a_cerrar'] = candidatas.map do |t|
+        {
+          'id'               => t.id,
+          'titulo'           => t.titulo,
+          'asignada_a'       => t.asignada_a&.nombre_completo,
+          'fecha_programada' => t.fecha_programada,
+        }
+      end
+    end
+  rescue StandardError => e
+    # Quedarse sin la lista no puede impedir registrar: sin ella no se cierra ninguna tarea, que
+    # es el lado seguro del error.
+    Rails.logger.warn("[asistente] no se pudieron listar tareas a cerrar: #{e.class} #{e.message}")
+  end
+
+  def cerrar_tareas_por_registro(datos)
+    Tarea.cerrar_confirmadas!(
+      ids:             datos['tareas_cerrar_ids'],
+      usuario:         current_user,
+      es_privilegiado: current_user.admin? || current_user.supervisor?,
+      club:            current_user.club
     )
   rescue => e
     Rails.logger.warn "Auto-close tareas failed: #{e.message}"
@@ -676,7 +718,7 @@ class AsistenteController < BaseController
 
     registro = lote.registros_ambientales.build(campos)
     if registro.save
-      tareas_cerradas = cerrar_tareas_por_registro(datos, lote: lote)
+      tareas_cerradas = cerrar_tareas_por_registro(datos)
       msg = "Registro ambiental guardado en #{lote.codigo}"
       msg += " · #{tareas_cerradas.size} tarea#{'s' if tareas_cerradas.size != 1} completada#{'s' if tareas_cerradas.size != 1}: #{tareas_cerradas.join(', ')}" if tareas_cerradas.any?
       { ok: true, mensaje: msg }
@@ -723,7 +765,7 @@ class AsistenteController < BaseController
     end
 
     if creados > 0
-      tareas_cerradas = cerrar_tareas_por_registro(datos, sala: sala)
+      tareas_cerradas = cerrar_tareas_por_registro(datos)
       msg = "Registro ambiental guardado en #{creados} lote#{'s' if creados != 1} de #{sala.nombre}"
       msg += " (falló: #{fallidos.join(', ')})" if fallidos.any?
       msg += " · #{tareas_cerradas.size} tarea#{'s' if tareas_cerradas.size != 1} completada#{'s' if tareas_cerradas.size != 1}: #{tareas_cerradas.join(', ')}" if tareas_cerradas.any?

@@ -153,6 +153,22 @@
                     </div>
                     <div class="av__accion-meta">{{ metaAccion(accion) }}</div>
 
+                    <!-- Qué tareas da por hechas este registro. Va SIEMPRE a la vista, no detrás
+                         de "Editar": antes se cerraban solas, en tanda y después de guardar, y
+                         quien dictaba se enteraba por una línea de texto cuando ya estaba hecho.
+                         Deshacerlo es ir a Tareas y reabrirlas de a una. -->
+                    <div v-if="accion.datos?.tareas_a_cerrar?.length" class="av__cerrar">
+                      <div class="av__cerrar-label">
+                        <i class="bi bi-check2-square"></i>
+                        Se dan por hechas
+                      </div>
+                      <label v-for="t in accion.datos.tareas_a_cerrar" :key="t.id" class="av__cerrar-item">
+                        <input type="checkbox" :value="t.id" v-model="accion.datos.tareas_cerrar_ids" />
+                        <span class="av__cerrar-titulo">{{ t.titulo }}</span>
+                        <span v-if="t.asignada_a" class="av__cerrar-quien">{{ t.asignada_a }}</span>
+                      </label>
+                    </div>
+
                     <!-- Editor inline -->
                     <div v-if="accion._expandido" class="av__editor">
                       <template v-if="accion.tipo === 'registro_ambiental' || accion.tipo === 'registro_ambiental_sala'">
@@ -559,7 +575,15 @@ async function parsearConIA() {
     if (props.contexto) payload.contexto = props.contexto
     const { data } = await api.post('/asistente/parsear', payload)
     resumen.value  = data.resumen || ''
-    acciones.value = (data.acciones || []).map(a => ({ ...a, _expandido: false }))
+    // Las tareas a cerrar vienen tildadas: el caso normal es que el registro efectivamente las
+    // completa. Lo que cambia respecto de antes es que ahora se ven y se pueden destildar.
+    acciones.value = (data.acciones || []).map(a => ({
+      ...a,
+      _expandido: false,
+      datos: a.datos
+        ? { ...a.datos, tareas_cerrar_ids: (a.datos.tareas_a_cerrar || []).map(t => t.id) }
+        : a.datos,
+    }))
     paso.value     = 'revisar'
     hablar((resumen.value || 'Listo') + '. ¿Confirmás?')
   } catch (e) {
@@ -819,6 +843,16 @@ function metaAccion(accion) {
 .av__accion--registro_ambiental_sala .av__accion-tipo { color:#0369a1; }
 .av__accion--nota_sala .av__accion-tipo,.av__accion--nota_lote .av__accion-tipo { color:#3730a3; }
 .av__sala-badge { font-size:11px; color:#0369a1; background:#e0f2fe; border-radius:6px; padding:4px 10px; margin-bottom:10px; display:inline-block; }
+
+/* ── Tareas que el registro da por hechas ──────────────────────────
+   Discreto pero legible: es una consecuencia del registro, no el registro. Lo que no puede pasar
+   es que quede escondida. */
+.av__cerrar { margin-top:8px; padding:8px 10px; background:#f8fdf8; border:1px solid #d4e6d4; border-radius:8px; display:flex; flex-direction:column; gap:5px; }
+.av__cerrar-label { display:flex; align-items:center; gap:5px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:#60725d; }
+.av__cerrar-item { display:flex; align-items:center; gap:7px; font-size:12.5px; color:#1a2e1b; cursor:pointer; }
+.av__cerrar-item input { cursor:pointer; flex-shrink:0; margin:0; }
+.av__cerrar-titulo { flex:1; min-width:0; }
+.av__cerrar-quien { font-size:11px; color:var(--c-slate-400); flex-shrink:0; }
 .av__accion-titulo { font-size:14px; color:#1a2e1b; line-height:1.4; margin-bottom:3px; }
 .av__accion-ref { display:inline-block; background:#f0fdf4; color:#1b5e20; font-size:11px; font-weight:600; padding:1px 7px; border-radius:4px; margin-right:6px; }
 .av__accion-meta { font-size:12px; color:var(--c-slate-400); }
