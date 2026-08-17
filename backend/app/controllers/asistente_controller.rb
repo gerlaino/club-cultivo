@@ -154,6 +154,7 @@ class AsistenteController < BaseController
         resultado['acciones'] = resultado['acciones'].reject { |a| (a['tipo'] || a[:tipo]) == 'tarea' }
       end
       anotar_tareas_a_cerrar!(resultado['acciones'], contexto)
+      resultado['correccion_id'] = registrar_propuesta(texto, resultado['acciones'])
       sesion.agregar_intercambio(texto, resultado['resumen'].to_s) rescue nil
       render json: resultado
     end
@@ -280,6 +281,11 @@ class AsistenteController < BaseController
       end
     end
 
+    # Se registra lo QUE SE MANDÓ a ejecutar, no lo que salió bien: la corrección la hizo la
+    # persona antes de guardar, y un error de la base al escribir no dice nada sobre si el modelo
+    # había entendido.
+    registrar_confirmacion(params[:correccion_id], acciones)
+
     render json: {
       ejecutadas:      resultados.count,
       errores:         errores.count,
@@ -329,6 +335,11 @@ class AsistenteController < BaseController
         es_privilegiado: privilegiado, lote: lote, sala: sala
       )
 
+      # El tildado por defecto lo pone el backend, no la pantalla: así lo que se guarda como
+      # propuesta es exactamente lo que se ejecuta si nadie toca nada, y "hubo corrección"
+      # significa de verdad que alguien metió mano.
+      datos['tareas_cerrar_ids'] = candidatas.map(&:id)
+
       datos['tareas_a_cerrar'] = candidatas.map do |t|
         {
           'id'               => t.id,
@@ -345,6 +356,32 @@ class AsistenteController < BaseController
     # Quedarse sin la lista no puede impedir registrar: sin ella no se cierra ninguna tarea, que
     # es el lado seguro del error.
     Rails.logger.warn("[asistente] no se pudieron listar tareas a cerrar: #{e.class} #{e.message}")
+  end
+
+  # Guarda lo que el modelo propuso, para después poder compararlo con lo que la persona guardó.
+  # Se hace al PARSEAR: un dictado que se propuso y nadie usó también es señal.
+  #
+  # Nunca levanta. Perder una fila de medición es molesto; romperle el dictado a alguien que está
+  # en el grow room con las manos mojadas es grave.
+  def registrar_propuesta(texto, acciones)
+    AsistenteCorreccion.create!(
+      club: current_user.club, user: current_user,
+      texto: texto, propuesto: { 'acciones' => Array(acciones) }
+    ).id
+  rescue StandardError => e
+    Rails.logger.warn("[asistente] no se pudo registrar la propuesta: #{e.class} #{e.message}")
+    nil
+  end
+
+  # Cierra el círculo: qué se guardó finalmente. `hubo_correccion` lo calcula el modelo, no el
+  # cliente — es la métrica y no puede depender de que la pantalla la mande bien.
+  def registrar_confirmacion(correccion_id, acciones)
+    return if correccion_id.blank?
+
+    AsistenteCorreccion.find_by(id: correccion_id, club_id: current_user.club_id)
+                       &.confirmar!(Array(acciones))
+  rescue StandardError => e
+    Rails.logger.warn("[asistente] no se pudo registrar la confirmación: #{e.class} #{e.message}")
   end
 
   def cerrar_tareas_por_registro(datos)

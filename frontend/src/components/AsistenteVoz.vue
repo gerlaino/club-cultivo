@@ -405,6 +405,8 @@ const transcripcion         = ref('')
 const editandoTranscripcion = ref(false)
 const resumen               = ref('')
 const acciones              = ref([])
+// Ata el dictado con lo que se guarda, para poder medir después cuánto hubo que corregir.
+const correccionId          = ref(null)
 const resultados            = ref([])
 const erroresEjecucion      = ref([])
 const errorVoz              = ref(null)
@@ -580,15 +582,11 @@ async function parsearConIA() {
     if (props.contexto) payload.contexto = props.contexto
     const { data } = await api.post('/asistente/parsear', payload)
     resumen.value  = data.resumen || ''
-    // Las tareas a cerrar vienen tildadas: el caso normal es que el registro efectivamente las
-    // completa. Lo que cambia respecto de antes es que ahora se ven y se pueden destildar.
-    acciones.value = (data.acciones || []).map(a => ({
-      ...a,
-      _expandido: false,
-      datos: a.datos
-        ? { ...a.datos, tareas_cerrar_ids: (a.datos.tareas_a_cerrar || []).map(t => t.id) }
-        : a.datos,
-    }))
+    // Las tareas vienen tildadas DESDE EL BACKEND (`tareas_cerrar_ids`): el caso normal es que
+    // el registro efectivamente las completa, y así lo que se mide como "propuesta" es lo mismo
+    // que se ejecuta si nadie toca nada. Acá sólo se muestran y se dejan destildar.
+    acciones.value = (data.acciones || []).map(a => ({ ...a, _expandido: false }))
+    correccionId.value = data.correccion_id || null
     paso.value     = 'revisar'
     hablar((resumen.value || 'Listo') + '. ¿Confirmás?')
   } catch (e) {
@@ -616,7 +614,7 @@ async function ejecutarAcciones() {
   ejecutando.value = true
   try {
     const accionesLimpias = acciones.value.map(({ _expandido, ...a }) => a)
-    const payload = { acciones: accionesLimpias }
+    const payload = { acciones: accionesLimpias, correccion_id: correccionId.value }
     if (props.contexto) payload.contexto = props.contexto
     const { data } = await api.post('/asistente/ejecutar', payload)
     resultados.value       = data.resultados       || []

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_16_130000) do
+ActiveRecord::Schema[7.2].define(version: 2026_08_17_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -175,6 +175,21 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_16_130000) do
     t.index ["dispensacion_id"], name: "index_ariccame_registros_on_dispensacion_id"
     t.index ["estado"], name: "index_ariccame_registros_on_estado"
     t.index ["stock_id"], name: "index_ariccame_registros_on_stock_id"
+  end
+
+  create_table "asistente_correcciones", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "user_id", null: false
+    t.text "texto", null: false
+    t.jsonb "propuesto", default: {}, null: false
+    t.jsonb "confirmado", default: {}, null: false
+    t.boolean "hubo_correccion"
+    t.datetime "ejecutado_en"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "created_at"], name: "index_asistente_correcciones_on_club_id_and_created_at"
+    t.index ["club_id"], name: "index_asistente_correcciones_on_club_id"
+    t.index ["user_id"], name: "index_asistente_correcciones_on_user_id"
   end
 
   create_table "auditorias", force: :cascade do |t|
@@ -2245,6 +2260,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_16_130000) do
   add_foreign_key "ariccame_registros", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "ariccame_registros", "stocks"
   add_foreign_key "ariccame_registros", "users", column: "deleted_by_id"
+  add_foreign_key "asistente_correcciones", "clubs"
+  add_foreign_key "asistente_correcciones", "users"
   add_foreign_key "auditorias", "clubs"
   add_foreign_key "auditorias", "users"
   add_foreign_key "bar_productos", "bares"
