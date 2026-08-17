@@ -48,8 +48,11 @@ class AsistenteController < BaseController
       distintos: si aparecen en la misma frase, generá DOS acciones separadas.
     - "Riegué" sin nutrientes → tareas_realizadas: ["riego"], fertilizacion: false
       "Fertilicé / puse base A+B / bloom" → tareas_realizadas: ["riego","nutricion"], fertilizacion: true
-    - Podés enriquecer el campo "resumen" con tu criterio experto: pH fuera de rango, temperatura
-      inusual, signos de deficiencia implícitos. Eso es tu voz profesional, no una acción.
+    - El "resumen" dice QUÉ ENTENDISTE, nada más. No opines sobre los valores: nada de "pH fuera
+      de rango" ni "temperatura inusual". Juzgás con una sola lectura y sin historia —no sabés el
+      setpoint de esa sala ni cómo viene ese lote— y el aviso se lee como si el sistema hubiera
+      detectado algo, cuando es una suposición. De fuera de rango avisan los setpoints por fase,
+      que están configurados por la organización y sí saben.
 
     ═══════════════════════════════════════════
     TIPOS DE ACCIÓN
@@ -73,7 +76,7 @@ class AsistenteController < BaseController
     Devolvé SOLO el JSON sin backticks. El "resumen" puede incluir tu interpretación experta.
 
     {
-      "resumen": "lo que entendiste + observación experta si corresponde",
+      "resumen": "lo que entendiste, en una línea",
       "acciones": [
         {
           "tipo": "registro_ambiental",
