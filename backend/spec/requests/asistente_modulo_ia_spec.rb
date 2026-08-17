@@ -90,7 +90,16 @@ RSpec.describe 'Asistente: el módulo de IA', type: :request do
   # Con el tope en llamadas era un problema chico; contando créditos es un problema de plata: un
   # paciente curioso le come el cupo del mes a la organización.
   describe 'quién puede gastar crédito de IA' do
-    let(:club) { create(:club, features: { 'cultivo' => true, 'ia' => true }) }
+    # Una organización con TODO contratado, a propósito. Cada rol exige su propio módulo para
+    # poder siquiera entrar (`User::MODULOS_POR_ROL`), así que con un club mínimo los roles
+    # rechazados ni llegarían al asistente y el candado quedaría sin probar. Acá el dispensador,
+    # el médico y el repartidor trabajan todos los días — y aun así no pueden dictar.
+    let(:club) do
+      create(:club, features: {
+               'cultivo' => true, 'ia' => true, 'produccion_dispensa' => true,
+               'bar' => true, 'medico' => true, 'delivery' => true
+             })
+    end
 
     %w[admin cultivador supervisor].each do |rol|
       it "el #{rol} puede dictar" do
@@ -101,12 +110,12 @@ RSpec.describe 'Asistente: el módulo de IA', type: :request do
       end
     end
 
-    %w[dispensador medico paciente delivery abogado].each do |rol|
-      it "el #{rol} NO puede, aunque la organización tenga el módulo" do
+    %w[dispensador medico paciente delivery abogado manicura].each do |rol|
+      it "el #{rol} NO puede, aunque su rol esté habilitado y el módulo activo" do
         sign_in_as(create(:user, club: club, role: rol))
         dictar!
 
-        expect(response).to have_http_status(:forbidden)
+        expect(response).to have_http_status(:forbidden), "#{rol} pudo dictar: #{response.body}"
       end
     end
   end
