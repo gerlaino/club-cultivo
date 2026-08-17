@@ -1,7 +1,7 @@
 class PlanTrabajoIaService
   TIPOS_VALIDOS    = %w[riego poda medicion limpieza cosecha trasplante inspeccion otro].freeze
   PRIORIDADES_VALIDAS = %w[baja normal alta urgente].freeze
-  MODELO              = "claude-sonnet-4-6".freeze
+  MODELO              = Ia::Modelos::RAZONA
 
   def initialize(archivo, club)
     @archivo  = archivo

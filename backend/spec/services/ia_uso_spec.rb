@@ -105,39 +105,132 @@ RSpec.describe Ia::Uso do
     end
   end
 
+  # El tope se cuenta en CRÉDITOS, no en llamadas. Contar llamadas medía mal: una importación de
+  # plan de trabajo paga hasta 4.096 tokens de salida y un mapeo de CSV 512 — ocho veces menos
+  # por el mismo cupo.
+  describe Ia::Modelos do
+    it 'todo modelo que usamos tiene su precio cargado' do
+      # Sin esto, agregar un modelo nuevo lo cobra al precio por defecto sin que nada falle y la
+      # facturación queda mal en silencio.
+      sin_precio = Ia::Modelos::TODOS.reject { |m| IaLlamada::PRECIOS.key?(m) }
+
+      expect(sin_precio).to be_empty, "sin precio en IaLlamada::PRECIOS: #{sin_precio.join(', ')}"
+    end
+  end
+
+  describe 'créditos' do
+    it 'una llamada cara consume más créditos que una barata' do
+      # Esta es la razón entera del cambio: con el conteo por llamadas las dos valían lo mismo.
+      barata = IaLlamada.creditos_de(IaLlamada.costo_de(modelo: Ia::Modelos::RAPIDO,
+                                                       input_tokens: 0, output_tokens: 512))
+      cara   = IaLlamada.creditos_de(IaLlamada.costo_de(modelo: Ia::Modelos::RAZONA,
+                                                       input_tokens: 0, output_tokens: 4_096))
+
+      expect(cara).to be > barata
+    end
+
+    it 'una llamada que costó algo nunca sale gratis' do
+      # Redondeo siempre para arriba: el error de redondeo queda de nuestro lado.
+      minima = IaLlamada.creditos_de(0.0001)
+      expect(minima).to eq(1)
+    end
+
+    it 'una llamada sin costo no consume crédito' do
+      expect(IaLlamada.creditos_de(0)).to eq(0)
+    end
+  end
+
   describe '.limite_alcanzado' do
-    before { club.update!(ia_tier: 'basico') } # 500/mes
+    before { club.update!(ia_tier: 'basico') } # 500 créditos/mes
 
     it 'deja pasar por debajo del tope' do
       expect(described_class.limite_alcanzado(club, admin)).to be_nil
     end
 
-    it 'corta al llegar al tope mensual y dice cuándo se renueva' do
+    it 'corta al gastar los créditos del mes y dice cuándo se renuevan' do
       allow(club).to receive(:ia_limite_mes).and_return(2)
-      2.times { described_class.registrar(club: club, funcion: :asistente_parsear, modelo: 'm') }
+      described_class.registrar(club: club, funcion: :asistente_parsear, modelo: Ia::Modelos::RAZONA,
+                                tokens: { output: 1_000 }) # US$0,015 → 2 créditos
 
       msg = described_class.limite_alcanzado(club, admin)
       expect(msg).to include('2')
       expect(msg).to include('día 1')
     end
 
+    it 'las llamadas FALLIDAS no le descuentan cupo al cliente' do
+      # Una mala tarde de la API no la puede pagar la organización: se registra para verla, pero
+      # no consume. Antes se contaba el mes entero sin mirar `ok`.
+      allow(club).to receive(:ia_limite_mes).and_return(2)
+      described_class.registrar(club: club, funcion: :asistente_parsear, modelo: Ia::Modelos::RAZONA,
+                                ok: false, error_clase: 'Net::ReadTimeout',
+                                tokens: { output: 100_000 }) # gastaría de sobra si contara
+
+      expect(described_class.limite_alcanzado(club, admin)).to be_nil
+    end
+
     it 'el tope es de la ORGANIZACIÓN, no de cada usuario' do
       allow(club).to receive(:ia_limite_mes).and_return(2)
       otro = create(:user, :cultivador, club: club)
-      2.times { described_class.registrar(club: club, user: admin, funcion: :asistente_parsear, modelo: 'm') }
+      described_class.registrar(club: club, user: admin, funcion: :asistente_parsear,
+                                modelo: Ia::Modelos::RAZONA, tokens: { output: 1_000 })
 
       # El consumo lo gastó `admin`; `otro` NO arranca de cero — es el bug que se está cerrando.
-      expect(described_class.limite_alcanzado(club, otro)).to include('tope')
+      expect(described_class.limite_alcanzado(club, otro)).to include('créditos')
     end
 
     it 'no cuenta el consumo de otra organización' do
       allow(club).to receive(:ia_limite_mes).and_return(2)
       otro_club = create(:club)
       ActsAsTenant.with_tenant(otro_club) do
-        5.times { described_class.registrar(club: otro_club, funcion: :asistente_parsear, modelo: 'm') }
+        5.times do
+          described_class.registrar(club: otro_club, funcion: :asistente_parsear,
+                                    modelo: Ia::Modelos::RAZONA, tokens: { output: 1_000 })
+        end
       end
 
       expect(described_class.limite_alcanzado(club, admin)).to be_nil
+    end
+  end
+
+  # Lo que ve el admin en el medidor. Sale de la misma fuente que el tope a propósito: si
+  # contaran distinto, la pantalla diría "te quedan 40" con el dictado ya rechazado.
+  describe '.consumo' do
+    before { allow(club).to receive(:ia_limite_mes).and_return(100) }
+
+    it 'informa cuánto queda y en qué porcentaje va' do
+      described_class.registrar(club: club, funcion: :asistente_parsear, modelo: Ia::Modelos::RAZONA,
+                                tokens: { output: 10_000 }) # US$0,15 → 15 créditos
+
+      c = described_class.consumo(club)
+      expect(c[:creditos]).to eq(15)
+      expect(c[:restantes]).to eq(85)
+      expect(c[:porcentaje]).to eq(15)
+      expect(c[:agotado]).to be(false)
+    end
+
+    it 'avisa a partir del 80%, antes de chocar' do
+      # Enterarse al chocar es el peor momento: la persona ya está trabajando.
+      expect(described_class.consumo(club)[:avisar]).to be(false)
+
+      described_class.registrar(club: club, funcion: :asistente_parsear, modelo: Ia::Modelos::RAZONA,
+                                tokens: { output: 55_000 }) # US$0,825 → 83 créditos
+
+      expect(described_class.consumo(club)[:avisar]).to be(true)
+    end
+
+    it 'nunca informa restantes en negativo ni más de 100%' do
+      described_class.registrar(club: club, funcion: :asistente_parsear, modelo: Ia::Modelos::RAZONA,
+                                tokens: { output: 500_000 }) # muy por encima del tope
+
+      c = described_class.consumo(club)
+      expect(c[:restantes]).to eq(0)
+      expect(c[:porcentaje]).to eq(100)
+      expect(c[:agotado]).to be(true)
+    end
+
+    it 'dice cuántos días faltan para que se renueve' do
+      viaja = Date.new(2026, 8, 20)
+      expect(described_class.consumo(club, viaja)[:dias_restantes]).to eq(12)
     end
   end
 
@@ -153,6 +246,26 @@ RSpec.describe Ia::Uso do
       expect(r[:tokens]).to eq(2_000_000)
       expect(r[:costo_usd]).to be_within(0.01).of(6.0)
       expect(r[:por_funcion]).to eq('asistente_parsear' => 1, 'analisis_lote' => 1)
+    end
+
+    it 'muestra créditos junto al costo: uno es lo que compra el cliente, el otro lo que sale' do
+      # Los dos en la misma pantalla es lo que deja ver si el add-on se vende por debajo del costo.
+      described_class.registrar(club: club, funcion: :asistente_parsear, modelo: Ia::Modelos::RAZONA,
+                                tokens: { output: 10_000 }) # US$0,15 → 15 créditos
+
+      r = described_class.resumen_mes(club)
+      expect(r[:creditos]).to eq(15)
+      expect(r[:costo_usd]).to be_within(0.01).of(0.15)
+    end
+
+    it 'cuenta la llamada fallida pero no su crédito' do
+      # Se ve que pasó —para poder investigarla— sin que se la cobremos a la organización.
+      described_class.registrar(club: club, funcion: :asistente_parsear, modelo: Ia::Modelos::RAZONA,
+                                ok: false, tokens: { output: 10_000 })
+
+      r = described_class.resumen_mes(club)
+      expect(r[:llamadas]).to eq(1)
+      expect(r[:creditos]).to eq(0)
     end
   end
 end

@@ -79,6 +79,7 @@ Rails.application.routes.draw do
       resource :benchmark, only: [:show], controller: :benchmark  # público, datos anonimizados y agregados
     end
 
+    get  '/asistente/consumo',       to: 'asistente#consumo'
     post '/asistente/parsear',       to: 'asistente#parsear'
     post '/asistente/ejecutar',      to: 'asistente#ejecutar'
     post '/asistente/consultar',     to: 'asistente#consultar'

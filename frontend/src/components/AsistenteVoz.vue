@@ -27,6 +27,19 @@
               <button class="av__close" @click="cerrar"><i class="bi bi-x-lg"></i></button>
             </div>
 
+            <!-- El medidor va acá, donde se gasta. En una pantalla de configuración no lo mira
+                 nadie, y la idea es que se sepa cuánto queda ANTES de quedarse sin, no al
+                 chocar. Sólo aparece si el backend contestó: si falla, se dicta igual. -->
+            <div v-if="creditos" class="av__creditos" :class="{ 'av__creditos--aviso': creditos.avisar }">
+              <div class="av__creditos-barra">
+                <div class="av__creditos-usado" :style="{ width: `${creditos.porcentaje}%` }"></div>
+              </div>
+              <span class="av__creditos-texto">
+                {{ creditos.restantes }} de {{ creditos.tope }} créditos ·
+                {{ creditos.dias_restantes }} {{ creditos.dias_restantes === 1 ? 'día' : 'días' }} para que se renueven
+              </span>
+            </div>
+
             <div v-if="contexto" class="av__ctx-bar">
               <span v-if="contexto.lote_codigo"   class="av__ctx-chip av__ctx-chip--lote">🌿 {{ contexto.lote_codigo }}</span>
               <span v-if="contexto.sala_nombre"   class="av__ctx-chip av__ctx-chip--sala">📍 {{ contexto.sala_nombre }}</span>
@@ -334,7 +347,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import api from '../lib/api'
+import api, { consumoIA } from '../lib/api'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import { useReconocimientoVoz } from '../composables/useReconocimientoVoz.js'
 
@@ -441,7 +454,22 @@ const ejemplosContexto = computed(() => {
   return [{ icono: '💧', texto: 'Regué el lote con EC 1.4 pH 6.2' }]
 })
 
-function abrir() { abierto.value = true }
+// Cuántos créditos de IA le quedan a la organización este mes. Null = no se pudo pedir, y
+// entonces el medidor no se muestra: quedarse sin medidor no puede impedir registrar.
+const creditos = ref(null)
+
+async function refrescarCreditos() {
+  try {
+    creditos.value = (await consumoIA()).data
+  } catch {
+    creditos.value = null
+  }
+}
+
+function abrir() {
+  abierto.value = true
+  refrescarCreditos()
+}
 
 // Instancias contextuales (sala, lote) ignoran el evento global — solo abren via su propio trigger.
 // El check es runtime (no en onMounted) para evitar edge-cases de timing con computed props.
@@ -545,6 +573,9 @@ async function parsearConIA() {
     }
   } finally {
     procesando.value = false
+    // Se refresca también cuando falló: una llamada rechazada por tope tiene que dejar el
+    // medidor en cero, no en el número de antes.
+    refrescarCreditos()
   }
 }
 
@@ -601,7 +632,10 @@ async function enviarConsulta() {
     if (status === 403) errorVoz.value = e?.response?.data?.error || 'IA no disponible en tu plan.'
     else if (status === 429) errorVoz.value = 'Límite de uso alcanzado. Volvé en unos minutos.'
     else errorVoz.value = e?.response?.data?.error || 'Error al consultar IA'
-  } finally { consultandoIA.value = false }
+  } finally {
+    consultandoIA.value = false
+    refrescarCreditos()
+  }
 }
 
 function labelTipo(tipo) {
@@ -705,6 +739,17 @@ function metaAccion(accion) {
 .av__ctx-chip--sala    { background:#dbeafe; color:#1e40af; }
 .av__ctx-chip--plantas { background:#fef3c7; color:#92400e; }
 .av__ctx-chip--planta  { background:#fce7f3; color:#9d174d; }
+
+/* ── Medidor de créditos ───────────────────────────────────────────
+   Discreto a propósito: un número que sólo baja y grita da miedo, y termina en que nadie usa el
+   asistente. Se vuelve ámbar recién en el 80%, que es cuando enterarse sirve de algo. */
+.av__creditos { display:flex; flex-direction:column; gap:5px; padding:8px 24px 10px; border-bottom:1px solid #e8f5e9; }
+.av__creditos-barra { height:4px; border-radius:2px; background:#e8f5e9; overflow:hidden; }
+.av__creditos-usado { height:100%; border-radius:2px; background:#1b5e20; transition:width .3s ease; }
+.av__creditos-texto { font-size:11px; color:#6b8f71; }
+.av__creditos--aviso .av__creditos-barra { background:#fef3c7; }
+.av__creditos--aviso .av__creditos-usado { background:#b45309; }
+.av__creditos--aviso .av__creditos-texto { color:#92400e; font-weight:600; }
 
 .av__body { padding:20px 24px 24px; }
 .av__idle { text-align:center; padding:1rem 0 .5rem; }

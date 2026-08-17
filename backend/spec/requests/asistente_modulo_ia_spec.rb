@@ -82,6 +82,35 @@ RSpec.describe 'Asistente: el módulo de IA', type: :request do
     end
   end
 
+  # El módulo prendido NO alcanza: además hay que tener un rol que use IA. El asistente no tenía
+  # control de rol —sólo estar logueado y el feature— así que por API le podía pegar cualquiera
+  # de la organización. La pantalla no se lo ofrece a nadie más, pero la regla viviendo sólo en
+  # la pantalla está escondida, no aplicada.
+  #
+  # Con el tope en llamadas era un problema chico; contando créditos es un problema de plata: un
+  # paciente curioso le come el cupo del mes a la organización.
+  describe 'quién puede gastar crédito de IA' do
+    let(:club) { create(:club, features: { 'cultivo' => true, 'ia' => true }) }
+
+    %w[admin cultivador supervisor].each do |rol|
+      it "el #{rol} puede dictar" do
+        sign_in_as(create(:user, club: club, role: rol))
+        dictar!
+
+        expect(response).to have_http_status(:ok), response.body
+      end
+    end
+
+    %w[dispensador medico paciente delivery abogado].each do |rol|
+      it "el #{rol} NO puede, aunque la organización tenga el módulo" do
+        sign_in_as(create(:user, club: club, role: rol))
+        dictar!
+
+        expect(response).to have_http_status(:forbidden)
+      end
+    end
+  end
+
   # Lo que todavía no existe no se enciende por la puerta de atrás: `web_publica` es la clave
   # vieja de `vista_paciente`, que está EN CONSTRUCCIÓN.
   describe 'un módulo en construcción con la clave vieja guardada' do

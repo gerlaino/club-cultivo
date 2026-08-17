@@ -7,8 +7,19 @@ class AsistenteController < BaseController
   # pantalla lee `features_expandidas`, que sí lo deriva: prendido en el panel, prendido en el
   # menú y rechazado al dictar.
   before_action -> { require_feature!(:ia) }
+  before_action :require_rol_con_ia!
   require 'net/http'
   require 'json'
+
+  # Quién puede gastar crédito de IA. El asistente NO tenía control de rol: alcanzaba con estar
+  # logueado y que la organización tuviera el módulo prendido, así que por API le podían pegar el
+  # dispensador, el abogado, el médico, el repartidor y el paciente. Ninguno lo ve en su pantalla
+  # —de nuevo la regla viviendo sólo en la UI— pero el endpoint estaba abierto.
+  #
+  # Con el tope contado en llamadas era un problema chico. Contando créditos es un problema de
+  # PLATA: un paciente curioso le come el cupo del mes a la organización, y el admin ve el
+  # medidor bajar sin poder hacer nada al respecto.
+  ROLES_CON_IA = %w[admin cultivador supervisor].freeze
 
   PROMPT_BASE = <<~PROMPT
     Sos un agrónomo especialista en cannabis medicinal con amplia experiencia en cultivo indoor.
@@ -116,7 +127,7 @@ class AsistenteController < BaseController
   # devolver JSON válido es justo donde se nota un modelo más chico, y el costo de equivocarse
   # es un registro mal cargado en la planta de alguien. Con `ia_llamadas` ya se puede comparar
   # con dictados reales; recién ahí se cambia esta línea.
-  MODELO_ASISTENTE = 'claude-sonnet-4-6'.freeze
+  MODELO_ASISTENTE = Ia::Modelos::RAZONA
 
   # POST /asistente/parsear
   def parsear
@@ -198,6 +209,15 @@ class AsistenteController < BaseController
   end
 
   # GET /asistente/historial_analisis?lote_id=X
+  # El medidor. Sale de la misma fuente que el tope (`Ia::Uso.consumo`) a propósito: si la
+  # pantalla contara por su cuenta, un día diría "te quedan 40" con el dictado ya rechazado.
+  #
+  # Es un endpoint aparte y no un campo de `/me` porque el número cambia con cada dictado, y en
+  # `/me` —que se pide una vez al entrar— quedaría viejo toda la sesión.
+  def consumo
+    render json: Ia::Uso.consumo(current_user.club)
+  end
+
   def historial_analisis
     return render json: { error: 'No tenés permiso para usar análisis IA.' }, status: :forbidden unless current_user.admin? || current_user.supervisor?
     lote = current_user.club.lotes.find_by(id: params[:lote_id])
@@ -268,6 +288,15 @@ class AsistenteController < BaseController
   end
 
   private
+
+  # Ver `ROLES_CON_IA` arriba. El super_admin entra porque necesita poder probar el asistente de
+  # una organización sin tener que crearse un usuario admin adentro.
+  def require_rol_con_ia!
+    return if current_user.super_admin?
+    return if ROLES_CON_IA.include?(current_user.role.to_s)
+
+    render json: { error: 'Tu rol no tiene acceso al asistente de IA' }, status: :forbidden
+  end
 
   def cerrar_tareas_por_registro(datos, lote: nil, sala: nil)
     Tarea.cerrar_por_registro!(
@@ -548,7 +577,7 @@ class AsistenteController < BaseController
     request['x-api-key']         = api_key
     request['anthropic-version'] = '2023-06-01'
     request.body = {
-      model:      'claude-sonnet-4-6',
+      model:      MODELO_ASISTENTE,
       max_tokens: 1000,
       system:     prompt_sistema,
       messages:   [{ role: 'user', content: texto }]

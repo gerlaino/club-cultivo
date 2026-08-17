@@ -22,10 +22,13 @@ class IaLlamada < ApplicationRecord
   # USD por millón de tokens, por modelo. Se usa sólo para calcular el costo AL INSERTAR — una
   # vez guardado, `costo_usd` no se recalcula: si mañana cambia el precio, los registros viejos
   # tienen que seguir diciendo lo que costaron entonces.
+  #
+  # Las claves salen de `Ia::Modelos` a propósito: agregar un modelo sin su precio lo haría
+  # cobrar al precio por defecto sin que nada falle.
   PRECIOS = {
-    'claude-sonnet-4-6'          => { entrada: 3.0, salida: 15.0 },
-    'claude-haiku-4-5-20251001'  => { entrada: 1.0, salida:  5.0 },
-    'claude-haiku-4-5'           => { entrada: 1.0, salida:  5.0 },
+    Ia::Modelos::RAZONA => { entrada: 3.0, salida: 15.0 },
+    Ia::Modelos::RAPIDO => { entrada: 1.0, salida:  5.0 },
+    'claude-haiku-4-5'  => { entrada: 1.0, salida:  5.0 }, # alias sin fecha, por si aparece guardado
   }.freeze
 
   # Modelo desconocido (uno nuevo que todavía no está en la tabla): se cobra al precio más caro
@@ -53,6 +56,32 @@ class IaLlamada < ApplicationRecord
               (cache_read_tokens.to_i     * p[:entrada] * CACHE_LECTURA)
     (entrada + (output_tokens.to_i * p[:salida])) / 1_000_000.0
   end
+
+  # ── Créditos ────────────────────────────────────────────────────────────────────────────
+  #
+  # Lo que ve la organización. Es el costo real convertido a una unidad propia, NO un número
+  # aparte: si se tipeara en otro lado, un día dejaría de coincidir con lo que de verdad se
+  # gasta y estaríamos vendiendo por debajo del costo sin enterarnos.
+  #
+  # Por qué créditos y no dólares: distintas funciones cuestan muy distinto (una importación de
+  # plan de trabajo paga hasta 4.096 tokens de salida, un mapeo de CSV 512 — ocho veces menos),
+  # así que contar "consultas" mide mal. Y mostrar dólares le expondría el costo al cliente.
+  #
+  # El valor está elegido para que un dictado ≈ 1 crédito, que es la unidad con la que la
+  # persona piensa. Un dictado típico: ~1.400 tokens de prompt fijo leídos de caché (US$0,0004)
+  # + ~600 de contexto (US$0,0018) + ~400 de salida (US$0,006) ≈ US$0,008.
+  USD_POR_CREDITO = 0.01
+
+  # Se redondea SIEMPRE para arriba: una llamada que costó algo nunca puede salir gratis, y el
+  # error de redondeo tiene que quedar de nuestro lado, no del que factura.
+  def self.creditos_de(costo_usd)
+    c = costo_usd.to_f
+    return 0 if c <= 0
+
+    [(c / USD_POR_CREDITO).ceil, 1].max
+  end
+
+  def creditos = self.class.creditos_de(costo_usd)
 
   def tokens
     input_tokens.to_i + output_tokens.to_i + cache_creation_tokens.to_i + cache_read_tokens.to_i

@@ -2,7 +2,7 @@ class AnalisisLoteService
   require 'net/http'
   require 'json'
 
-  MODELO = 'claude-sonnet-4-6'.freeze
+  MODELO = Ia::Modelos::RAZONA
 
   def initialize(lote, usuario)
     @lote    = lote

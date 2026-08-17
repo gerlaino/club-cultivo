@@ -789,6 +789,9 @@ export const marcarAlertaInterna      = (id)          => api.patch(`/alertas_int
 export const marcarTodasAlertasLeidas = ()            => api.patch('/alertas_internas/marcar_todas_leidas')
 
 // ── Asistente IA ──────────────────────────────────────────────────────────────
+// El medidor de créditos. Se pide aparte de `/me` porque cambia con cada dictado: en `/me`, que
+// se pide una vez al entrar, quedaría viejo toda la sesión.
+export const consumoIA         = ()                 => api.get('/asistente/consumo')
 export const parsearAsistente  = (texto, contexto)  => api.post('/asistente/parsear',       { texto, contexto })
 export const ejecutarAsistente = (acciones, contexto) => api.post('/asistente/ejecutar',    { acciones, contexto })
 export const consultarAsistente = (texto, contexto) => api.post('/asistente/consultar',     { texto, contexto })

@@ -62,14 +62,49 @@ module Ia
     def limite_alcanzado(club, user)
       return nil if club.nil?
 
-      usadas_mes = IaLlamada.where(club_id: club.id).del_mes.count
-      tope_mes   = club.ia_limite_mes.to_i
-      if tope_mes.positive? && usadas_mes >= tope_mes
-        return "La organización llegó al tope de #{tope_mes} consultas de IA de este mes. " \
-               'Se renueva el día 1; para ampliarlo, escribinos.'
+      c = consumo(club)
+      if c[:agotado]
+        return "La organización usó los #{c[:tope]} créditos de IA de este mes. " \
+               'Se renuevan el día 1; para ampliarlos, escribinos.'
       end
 
       excedio_hora?(club, user) ? 'Muchas consultas seguidas. Probá de nuevo en unos minutos.' : nil
+    end
+
+    # Lo que consumió la organización este mes, en créditos. Es la fuente única: la usan el tope,
+    # el medidor que ve el admin y la ficha del super admin. Si contaran distinto, la pantalla
+    # diría "te quedan 40" con el dictado ya rechazado.
+    #
+    # Sólo cuentan las EXITOSAS. Antes se contaba el mes entero sin mirar `ok`, así que una mala
+    # tarde de la API le comía el cupo al cliente y le mostraba "llegaste al tope" por un
+    # problema que no era suyo.
+    def consumo(club, fecha = Time.zone.today)
+      tope   = club.ia_limite_mes.to_i
+      usados = creditos_del_mes(club, fecha)
+      resto  = [tope - usados, 0].max
+      pct    = tope.positive? ? [(usados * 100.0 / tope).round, 100].min : 0
+
+      {
+        creditos:       usados,
+        tope:           tope,
+        restantes:      resto,
+        porcentaje:     pct,
+        dias_restantes: (fecha.end_of_month - fecha).to_i + 1,
+        agotado:        tope.positive? && usados >= tope,
+        # A partir del 80% se avisa. Enterarse al chocar es el peor momento posible: la persona
+        # está trabajando y el cartel llega cuando ya no puede hacer nada.
+        avisar:         tope.positive? && pct >= 80,
+      }
+    end
+
+    # El redondeo hacia arriba es POR LLAMADA, así que hay que sumar crédito por crédito y no
+    # convertir el costo total: convertir el total perdería el redondeo de cada una. Se traen
+    # sólo los costos (una consulta, una columna) y la fórmula queda en un solo lugar,
+    # `IaLlamada.creditos_de`.
+    def creditos_del_mes(club, fecha = Time.zone.today)
+      IaLlamada.where(club_id: club.id).del_mes(fecha).exitosas
+               .pluck(:costo_usd)
+               .sum { |costo| IaLlamada.creditos_de(costo) }
     end
 
     # Ráfaga: por CLUB y por hora. Si Redis no responde no se puede afirmar que se excedió, así
@@ -95,9 +130,16 @@ module Ia
       leidos  = base.sum(:cache_read_tokens)
       entrada = base.sum(:input_tokens) + base.sum(:cache_creation_tokens) + leidos
 
+      c = consumo(club, fecha)
+
       {
         llamadas:   base.count,
-        tope:       club.ia_limite_mes,
+        # Los créditos son lo que ve y compra la organización; el costo en dólares es lo que nos
+        # cuesta a nosotros. Los dos juntos, en la misma pantalla, es lo que deja ver si el
+        # add-on se está vendiendo por encima o por debajo del costo.
+        creditos:   c[:creditos],
+        restantes:  c[:restantes],
+        tope:       c[:tope],
         tokens:     entrada + base.sum(:output_tokens),
         costo_usd:  base.sum(:costo_usd).to_f.round(2),
         # Qué porcentaje de la entrada se sirvió de caché. Si esto es 0 con el asistente en uso,

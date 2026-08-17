@@ -16,7 +16,7 @@ module Sensors
       'humedad_sustrato'     => '%',
     }.freeze
 
-    MODELO = 'claude-haiku-4-5-20251001'.freeze
+    MODELO = Ia::Modelos::RAPIDO
 
     class CsvParseError < StandardError; end
 

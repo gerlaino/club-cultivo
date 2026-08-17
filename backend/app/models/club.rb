@@ -471,10 +471,15 @@ class Club < ApplicationRecord
 
   # Dos topes con propósitos distintos:
   #
-  # `limite_hora` es una protección contra ráfagas (un bucle, un botón trabado). `limite_mes` es
-  # el tope que se VENDE: el costo de la IA se acumula por mes, no por hora, y lo paga la
-  # organización. Sin el mensual el add-on no tiene techo — una organización con 2.000 llamadas
-  # al mes cuesta ~US$60 y estaría pagando lo mismo que una de 200.
+  # `limite_hora` es una protección contra ráfagas (un bucle, un botón trabado) y se cuenta en
+  # LLAMADAS, que para eso alcanza. `limite_mes` es el tope que se VENDE y se cuenta en
+  # **créditos** (`IaLlamada::USD_POR_CREDITO`), no en llamadas.
+  #
+  # Contaba llamadas y medía mal: una importación de plan de trabajo paga hasta 4.096 tokens de
+  # salida y un mapeo de CSV 512 — ocho veces menos por el mismo cupo. Una organización que sólo
+  # importa CSV consumía su tope sin costarnos casi nada y otra que vive del plan de trabajo nos
+  # costaba ocho veces más por lo mismo. Los números no cambiaron al pasar a créditos porque
+  # están elegidos para que un dictado ≈ 1 crédito: 500 créditos siguen siendo ~500 dictados.
   IA_TIERS = {
     'basico'     => { label: 'Básico',     limite_hora: 20,  limite_mes:    500, color: '#64748b' },
     'pro'        => { label: 'Pro',        limite_hora: 60,  limite_mes:  2_000, color: '#0891b2' },
