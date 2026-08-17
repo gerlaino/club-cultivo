@@ -129,10 +129,7 @@
             <div class="d-flex justify-content-between align-items-center mb-1">
               <label class="form-label fw-semibold small mb-0">Notas</label>
               <!-- Botón de voz -->
-              <VoiceInput
-                :contexto="contextoVoz"
-                @campos-detectados="onVozDetectada"
-              />
+              <VoiceInput @campos-detectados="onVozDetectada" />
             </div>
             <textarea
               v-model="form.description"
@@ -241,18 +238,6 @@ const placeholderDescripcion = computed(() => {
     note:          'Observación o novedad...',
   }
   return placeholders[form.value.activity_type] || 'Notas opcionales...'
-})
-
-const contextoVoz = computed(() => {
-  const tipo = form.value.activity_type
-  const map = {
-    watering:      'registro de riego: litros, pH, observaciones',
-    fertilization: 'registro de fertilización: producto, dosis, observaciones',
-    measurement:   'medición: pH, EC, temperatura en °C, humedad en %, altura en cm, horas de luz',
-    pruning:       'registro de poda: tipo de poda, observaciones',
-    note:          'nota o novedad sobre la planta',
-  }
-  return map[tipo] || 'actividad de cultivo: tipo, descripción, observaciones'
 })
 
 function formVacio() {

@@ -12,6 +12,10 @@ export default mergeConfig(
       // timeout de a uno y la suite salía roja al azar. No miden performance: darles aire es
       // más honesto que perseguir un verde intermitente.
       testTimeout: 20_000,
+      // Un worker por core deja la máquina sin aire cuando uno de los tests es una pasada de
+      // ESLint sobre todo `src`: los demás se quedan sin CPU y mueren por timeout. Con un core
+      // libre el suite es estable.
+      maxWorkers: 6,
       exclude: [...configDefaults.exclude, 'e2e/**'],
       root: fileURLToPath(new URL('./', import.meta.url)),
     },

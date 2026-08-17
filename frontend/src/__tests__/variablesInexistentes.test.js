@@ -15,7 +15,14 @@ import { ESLint } from 'eslint'
 // meterlas de golpe volvería el test un muro rojo que nadie lee. Esta es la que rompe pantallas.
 describe('ninguna variable usada existe sólo en la imaginación', () => {
   it('no hay identificadores sin declarar (no-undef)', async () => {
-    const eslint = new ESLint({ cwd: process.cwd() })
+    // Con caché: la pasada completa sobre `src` es cara y este archivo corre en paralelo con el
+    // resto de la suite. Sin caché saturaba la máquina y los OTROS tests se caían por timeout,
+    // uno distinto en cada corrida — un suite que falla al azar deja de leerse.
+    const eslint = new ESLint({
+      cwd: process.cwd(),
+      cache: true,
+      cacheLocation: 'node_modules/.cache/eslint-no-undef',
+    })
     const resultados = await eslint.lintFiles(['src'])
 
     const errores = resultados.flatMap(r =>
@@ -25,5 +32,8 @@ describe('ninguna variable usada existe sólo en la imaginación', () => {
     )
 
     expect(errores, errores.join('\n')).toEqual([])
-  }, 120_000)
+    // Timeout largo a propósito: en frío esto lintea `src` entero mientras el resto de la suite
+    // corre en paralelo, y tarda bastante más que solo. Cortarlo antes lo volvía un test que
+    // fallaba por lento, no por encontrar algo — el peor tipo de rojo.
+  }, 600_000)
 })

@@ -60,7 +60,7 @@
                 <div class="av__waves">
                   <div v-for="i in 9" :key="i" class="av__wave" :style="{ animationDelay: `${i * 0.09}s` }"></div>
                 </div>
-                <div class="av__rec-label">Escuchando… hablá con libertad</div>
+                <div class="av__rec-label">Escuchando… tocá el botón cuando termines</div>
                 <div v-if="transcripcionInterim" class="av__interim">"{{ transcripcionInterim }}"</div>
               </div>
 
@@ -78,16 +78,23 @@
                 <i class="bi bi-exclamation-triangle"></i> {{ errorVoz }}
               </div>
 
+              <!-- El dictado del navegador depende de un servicio remoto que puede fallar o
+                   estar bloqueado. Que falle no puede dejar sin registrar: se escribe a mano y
+                   la IA lo interpreta igual. El micrófono del teclado del teléfono es del
+                   sistema operativo y anda incluso cuando el del navegador no. -->
+              <div v-if="errorVoz && !escuchando" class="av__manual">
+                <label class="av__manual-label" for="av-manual">Escribilo o dictalo con el teclado</label>
+                <textarea id="av-manual" class="av__manual-input" v-model="transcripcion" rows="3"
+                  placeholder="Regué con dos pulsos, EC 1.8, pH 6.2…"></textarea>
+              </div>
+
               <div class="av__controles">
                 <button v-if="!procesando"
                   class="av__btn-ptt"
                   :class="{ 'av__btn-ptt--rec': escuchando }"
-                  @pointerdown.prevent="pulsarMicrofono"
-                  @pointerup.prevent="soltarMicrofono"
-                  @pointerleave="soltarMicrofono"
-                  @contextmenu.prevent>
+                  @click="alternarMicrofono">
                   <i :class="escuchando ? 'bi bi-stop-circle-fill' : 'bi bi-mic-fill'"></i>
-                  <span>{{ escuchando ? 'Sueltá para procesar' : (transcripcion ? 'Volver a grabar' : 'Mantené presionado') }}</span>
+                  <span>{{ escuchando ? 'Tocá para terminar' : (transcripcion ? 'Volver a grabar' : 'Tocá y hablá') }}</span>
                 </button>
                 <div v-if="procesando" class="av__procesando">
                   <DsSpinner :size="28" />
@@ -95,7 +102,7 @@
                 </div>
               </div>
 
-              <div v-if="transcripcion && !escuchando && !procesando" class="av__procesar-directo">
+              <div v-if="transcripcion.trim() && !escuchando && !procesando" class="av__procesar-directo">
                 <button class="av__btn-procesar" @click="parsearConIA">
                   <i class="bi bi-cpu"></i> Procesar
                 </button>
@@ -326,9 +333,10 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import api from '../lib/api'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import { useReconocimientoVoz } from '../composables/useReconocimientoVoz.js'
 
 const props = defineProps({
   contexto: { type: Object, default: null },
@@ -357,19 +365,16 @@ const emit = defineEmits(['registrado'])
 const abierto               = ref(false)
 const modo                  = ref('registro')
 const paso                  = ref('escuchar')
-const escuchando            = ref(false)
 const procesando            = ref(false)
 const ejecutando            = ref(false)
 const transcripcion         = ref('')
-const transcripcionInterim  = ref('')
 const editandoTranscripcion = ref(false)
 const resumen               = ref('')
 const acciones              = ref([])
 const resultados            = ref([])
 const erroresEjecucion      = ref([])
 const errorVoz              = ref(null)
-let recognition = null
-const muteTTS   = ref(false)
+const muteTTS               = ref(false)
 
 // Consulta mode
 const consultaTexto     = ref('')
@@ -455,84 +460,68 @@ onUnmounted(() => {
   document.removeEventListener('keydown', avEscapeHandler, true)
 })
 
+// Un solo dictado para todo el panel: registro y consulta comparten motor y comparten el
+// mismo cartel de error. Antes eran dos copias del mismo setup que trataban distinto los
+// mismos casos de borde.
+const voz = useReconocimientoVoz({
+  alTerminar: (dicho, porPedido) => {
+    if (modo.value === 'consulta') {
+      consultaTexto.value = dicho
+      // La pregunta se manda sólo si la persona dio por terminado el dictado. Si el servicio
+      // cortó solo en una pausa, se deja escrita: mandar media pregunta gasta una llamada de IA
+      // (que se mide y se cobra) para una respuesta que no sirve.
+      if (porPedido) enviarConsulta()
+    } else {
+      transcripcion.value = dicho
+      // Mismo criterio que la consulta: sólo se procesa si la persona dio por terminado. Cuando
+      // el motor se rinde solo (se quedó sin reintentos, o se cayó la red a mitad de frase) lo
+      // dictado queda escrito y a la vista con el botón "Procesar" al lado. Mandarlo igual
+      // gastaría una llamada de IA —que se mide y se cobra— para registrar media frase, y el
+      // registro malo después hay que borrarlo a mano.
+      if (porPedido) parsearConIA()
+    }
+  },
+})
+const escuchando           = voz.escuchando
+const transcripcionInterim = voz.interim
+
+// El motor avisa cuando termina, no cuando se le pide parar: `stop()` es asíncrono y el motivo
+// real recién se conoce en `onend`. Leerlo justo después de cortar traía siempre null.
+watch(voz.error, (e) => { if (e) errorVoz.value = e })
+
 function cerrar() {
-  if (recognition) recognition.stop()
+  voz.cancelar()
   window.speechSynthesis?.cancel()
   abierto.value = false
   resetear()
 }
 
 function resetear() {
-  paso.value = 'escuchar'; escuchando.value = false; procesando.value = false
-  ejecutando.value = false; transcripcion.value = ''; transcripcionInterim.value = ''
+  voz.cancelar(); voz.limpiar()
+  paso.value = 'escuchar'; procesando.value = false
+  ejecutando.value = false; transcripcion.value = ''
   editandoTranscripcion.value = false; resumen.value = ''; acciones.value = []
   resultados.value = []; erroresEjecucion.value = []; errorVoz.value = null
 }
 
-const esMovil = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-
-const MENSAJE_ERROR_VOZ = {
-  'not-allowed':         'No diste permiso al micrófono. Habilitalo para este sitio en los ajustes del navegador y volvé a intentar.',
-  'service-not-allowed': 'El navegador bloqueó el reconocimiento de voz. En la PWA instalada suele fallar: probá desde Chrome.',
-  'audio-capture':       'No se detectó micrófono.',
-  'network':             'El reconocimiento de voz necesita internet y no pudo conectarse.',
-  'aborted':             'Se interrumpió la grabación.',
+async function iniciarGrabacion() {
+  errorVoz.value = null
+  editandoTranscripcion.value = false
+  if (modo.value === 'registro') transcripcion.value = ''
+  voz.limpiar()
+  await voz.iniciar()
 }
 
-let textoAcumulado = ''
+function detenerGrabacion() { voz.detener() }
 
-function iniciarGrabacion() {
-  errorVoz.value = null; transcripcion.value = ''; transcripcionInterim.value = ''; editandoTranscripcion.value = false
-  textoAcumulado = ''
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-  if (!SR) { errorVoz.value = 'Tu browser no soporta reconocimiento de voz. Usá Chrome.'; return }
-  recognition = new SR()
-  recognition.lang = 'es-AR'
-  // `continuous` NO es confiable en Chrome Android: la sesión se corta sola en cada pausa y
-  // dispara errores en medio del dictado. En el teléfono va de a un tramo, y se acumula lo
-  // dicho entre tramos (ver `textoAcumulado`).
-  recognition.continuous = !esMovil()
-  recognition.interimResults = true
-  recognition.onstart  = () => { escuchando.value = true }
-  recognition.onresult = (e) => {
-    let final = '', interim = ''
-    for (let i = 0; i < e.results.length; i++) {
-      if (e.results[i].isFinal) final += e.results[i][0].transcript
-      else interim += e.results[i][0].transcript
-    }
-    // En móvil cada tramo llega como una sesión nueva: se suma a lo ya dictado en vez de
-    // pisarlo, si no sólo quedaría la última frase.
-    if (final) {
-      transcripcion.value = recognition.continuous
-        ? final
-        : [textoAcumulado, final].filter(Boolean).join(' ').trim()
-      textoAcumulado = transcripcion.value
-    }
-    transcripcionInterim.value = interim
-  }
-  // Mensajes que dicen qué hacer. "Error de micrófono: not-allowed" no le sirve a nadie.
-  recognition.onerror = (e) => {
-    if (e.error === 'no-speech') return
-    errorVoz.value = MENSAJE_ERROR_VOZ[e.error] || `No se pudo escuchar (${e.error}).`
-    escuchando.value = false
-  }
-  recognition.onend = () => { escuchando.value = false; transcripcionInterim.value = '' }
-  recognition.start()
-}
-
-function detenerGrabacion() {
-  if (!recognition) return
-  escuchando.value = false; transcripcionInterim.value = ''
-  // Override onend to check transcript AFTER final results are delivered (stop() is async)
-  recognition.onend = () => {
-    transcripcionInterim.value = ''
-    if (!transcripcion.value.trim()) {
-      errorVoz.value = 'No escuché nada. Intentá de nuevo.'
-    } else {
-      parsearConIA()
-    }
-  }
-  recognition.stop()
+// Un toque para arrancar y otro para parar. Era "mantené presionado" con `pointerleave`: el
+// dedo se corría unos píxeles mientras hablabas y la grabación se cortaba sola, y un toque
+// corto soltaba antes de que el servicio llegara a escuchar. Las dos cosas terminaban en una
+// transcripción vacía sin ninguna explicación.
+function alternarMicrofono() {
+  if (procesando.value) return
+  if (escuchando.value) detenerGrabacion()
+  else                  iniciarGrabacion()
 }
 
 async function parsearConIA() {
@@ -596,45 +585,8 @@ function hablar(texto) {
   window.speechSynthesis.speak(utt)
 }
 
-function pulsarMicrofono() {
-  if (procesando.value) return
-  iniciarGrabacion()
-}
-
-function soltarMicrofono() {
-  if (!escuchando.value) return
-  detenerGrabacion()
-}
-
-function iniciarGrabacionConsulta() {
-  errorVoz.value = null
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition
-  if (!SR) { errorVoz.value = 'Tu browser no soporta voz. Usá Chrome.'; return }
-  recognition = new SR()
-  recognition.lang = 'es-AR'
-  // `continuous` NO es confiable en Chrome Android: la sesión se corta sola en cada pausa y
-  // dispara errores en medio del dictado. En el teléfono va de a un tramo, y se acumula lo
-  // dicho entre tramos (ver `textoAcumulado`).
-  recognition.continuous = !esMovil()
-  recognition.interimResults = true
-  recognition.onstart = () => { escuchando.value = true }
-  recognition.onresult = (e) => {
-    let final = ''
-    for (let i = 0; i < e.results.length; i++) {
-      if (e.results[i].isFinal) final += e.results[i][0].transcript
-    }
-    if (final) consultaTexto.value = final
-  }
-  recognition.onerror = (e) => { if (e.error !== 'no-speech') errorVoz.value = `Error: ${e.error}`; escuchando.value = false }
-  recognition.onend  = () => { escuchando.value = false }
-  recognition.start()
-}
-
-function detenerGrabacionConsulta() {
-  if (!recognition) return
-  recognition.onend = () => { escuchando.value = false; if (consultaTexto.value.trim()) enviarConsulta() }
-  recognition.stop()
-}
+function iniciarGrabacionConsulta() { iniciarGrabacion() }
+function detenerGrabacionConsulta()  { detenerGrabacion() }
 
 async function enviarConsulta() {
   if (!consultaTexto.value.trim()) return
@@ -780,6 +732,10 @@ function metaAccion(accion) {
 .av__transcript-edit { display:inline-flex; align-items:center; gap:4px; margin-top:8px; background:none; border:none; font-size:12px; color:#4a7c59; cursor:pointer; padding:0; }
 .av__transcript-edit:hover { color:#1b5e20; text-decoration:underline; }
 
+.av__manual { display:flex; flex-direction:column; gap:.35rem; margin-bottom:1rem; }
+.av__manual-label { font-size:11px; font-weight:700; color:#60725d; text-transform:uppercase; letter-spacing:.05em; }
+.av__manual-input { width:100%; box-sizing:border-box; border:1.5px solid #c8e6c9; border-radius:10px; padding:.6rem .75rem; font-size:13px; font-family:inherit; resize:vertical; background:#f8fdf8; color:#1a2e1b; }
+.av__manual-input:focus { outline:none; border-color:#1b5e20; background:#fff; }
 .av__error { background:#fef2f2; color:#dc2626; border-radius:8px; padding:10px 14px; font-size:13px; margin-bottom:1rem; display:flex; align-items:center; gap:7px; }
 .av__controles { display:flex; justify-content:center; margin-top:1rem; }
 .av__btn-grabar { display:flex; align-items:center; gap:9px; background:linear-gradient(135deg,#1b5e20,#2e7d32); color:#e8f5e9; border:none; padding:14px 36px; border-radius:12px; font-size:15px; font-weight:500; cursor:pointer; box-shadow:0 4px 14px #1b5e2035; }

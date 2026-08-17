@@ -6,11 +6,10 @@
       class="btn-voice"
       :class="{
         'btn-voice--recording': estado === 'grabando',
-        'btn-voice--processing': estado === 'procesando',
         'btn-voice--error': estado === 'error'
       }"
       @click="toggleGrabacion"
-      :disabled="estado === 'procesando' || !soportado"
+      :disabled="!soportado"
       :title="tooltipTexto"
     >
       <span v-if="estado === 'idle'">
@@ -18,23 +17,24 @@
       </span>
       <span v-else-if="estado === 'grabando'" class="d-flex align-items-center gap-2">
         <span class="pulse-dot"></span>
-        <span class="small">Escuchando...</span>
+        <span class="small">Tocá para terminar</span>
         <i class="bi bi-stop-fill"></i>
-      </span>
-      <span v-else-if="estado === 'procesando'" class="d-flex align-items-center gap-2">
-        <DsSpinner :size="14" />
-        <span class="small">Procesando...</span>
       </span>
       <span v-else-if="estado === 'error'">
         <i class="bi bi-mic-mute-fill"></i>
       </span>
     </button>
 
-    <!-- Texto transcripto (preview) -->
-    <div v-if="transcripcion" class="voice-preview">
+    <!-- Lo dictado, en vivo. Mientras grabás se muestra también el tramo que el servicio todavía
+         está corrigiendo: sin eso el botón dice "Tocá para terminar" y en pantalla no pasa nada,
+         que es justo la sensación de "no me escucha" que hubo que sacar. -->
+    <div v-if="transcripcion || interim" class="voice-preview">
       <i class="bi bi-quote me-1 text-muted"></i>
       <span class="small text-muted fst-italic">{{ transcripcion }}</span>
-      <button type="button" class="btn btn-sm btn-link p-0 ms-2 text-danger" @click="limpiar">
+      <span v-if="interim" class="small fst-italic voice-preview__interim">{{ interim }}</span>
+      <!-- Borrar a mitad de la grabación no tiene sentido: lo que se dicte después vuelve a
+           llenarlo igual. -->
+      <button v-if="!escuchando" type="button" class="btn btn-sm btn-link p-0 ms-2 text-danger" @click="limpiar">
         <i class="bi bi-x"></i>
       </button>
     </div>
@@ -52,167 +52,58 @@
 </template>
 
 <script setup>
-import { ref, computed, onUnmounted } from 'vue'
-import { logger } from '../utils/logger.js'
-import DsSpinner from '../design-system/components/Spinner.vue'
+// Dictado para el campo de notas de una actividad. NO llama a la IA.
+//
+// Llamaba a `https://api.anthropic.com/v1/messages` derecho desde el navegador, sin ninguna
+// credencial: la respuesta era un 401 que caía en el `catch`, y de ahí salía la transcripción
+// cruda. O sea que el parseo "con IA" nunca corrió una sola vez — lo único que este botón hizo
+// siempre fue pasar el texto dictado al campo de notas, que es exactamente lo que hace ahora.
+//
+// Aparte de no funcionar, esa llamada esquivaba la medición: toda consulta a la IA tiene que
+// quedar en `ia_llamadas` con su costo, y para eso pasa por el backend. Si algún día este botón
+// necesita interpretar lo dictado, va por `/asistente/parsear`, no por el navegador.
+import { computed, onUnmounted } from 'vue'
+import { useReconocimientoVoz } from '../composables/useReconocimientoVoz.js'
 
 const props = defineProps({
-  // Contexto que se le pasa a Claude para entender qué campos llenar
-  // Ej: "formulario de planta: nombre, genética, estado, notas"
-  contexto: { type: String, required: true },
-  // Idioma (es-AR por defecto)
-  idioma: { type: String, default: 'es-AR' }
+  idioma: { type: String, default: 'es-AR' },
 })
 
 const emit = defineEmits([
-  'campos-detectados',  // { nombre, genetica, estado, etc. } — campos parseados por IA
-  'transcripcion'       // texto crudo transcripto
+  'campos-detectados',  // { _transcripcion } — lo dictado, para que el formulario lo ubique
+  'transcripcion',      // texto crudo
 ])
 
-// ── State ──────────────────────────────────────────────
-const estado       = ref('idle') // idle | grabando | procesando | error
-const transcripcion = ref('')
-const errorMsg     = ref('')
-let recognition    = null
+const voz = useReconocimientoVoz({
+  idioma: props.idioma,
+  alTerminar: (dicho) => {
+    emit('transcripcion', dicho)
+    emit('campos-detectados', { _transcripcion: dicho })
+  },
+})
 
-// ── Support check ──────────────────────────────────────
-const soportado = computed(() =>
-  'webkitSpeechRecognition' in window || 'SpeechRecognition' in window
-)
+const { escuchando, texto: transcripcion, interim, error: errorMsg, soportado } = voz
+
+const estado = computed(() => {
+  if (escuchando.value) return 'grabando'
+  if (errorMsg.value)   return 'error'
+  return 'idle'
+})
 
 const tooltipTexto = computed(() => {
-  if (!soportado.value) return 'Voz no soportada en este navegador'
-  if (estado.value === 'idle') return 'Dictar con voz'
-  if (estado.value === 'grabando') return 'Click para detener'
-  return ''
+  if (!soportado.value)          return 'Voz no soportada en este navegador'
+  if (estado.value === 'grabando') return 'Tocá para terminar'
+  return 'Dictar con voz'
 })
 
-// ── Grabación ──────────────────────────────────────────
 function toggleGrabacion() {
-  if (estado.value === 'grabando') {
-    detener()
-  } else {
-    iniciar()
-  }
+  if (escuchando.value) voz.detener()
+  else                  voz.iniciar()
 }
 
-function iniciar() {
-  errorMsg.value    = ''
-  transcripcion.value = ''
+function limpiar() { voz.limpiar() }
 
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition
-  recognition = new SpeechRecognition()
-  recognition.lang           = props.idioma
-  recognition.continuous     = false
-  recognition.interimResults = true
-  recognition.maxAlternatives = 1
-
-  recognition.onstart = () => { estado.value = 'grabando' }
-
-  recognition.onresult = (event) => {
-    const result = event.results[event.results.length - 1]
-    transcripcion.value = result[0].transcript
-  }
-
-  recognition.onend = () => {
-    if (estado.value === 'grabando') {
-      // Terminó por silencio natural
-      if (transcripcion.value) {
-        procesarConIA(transcripcion.value)
-      } else {
-        estado.value = 'idle'
-      }
-    }
-  }
-
-  recognition.onerror = (event) => {
-    estado.value = 'error'
-    errorMsg.value = event.error === 'not-allowed'
-      ? 'Permiso de micrófono denegado'
-      : event.error === 'no-speech'
-        ? 'No se detectó voz, intentá de nuevo'
-        : `Error: ${event.error}`
-    setTimeout(() => { estado.value = 'idle'; errorMsg.value = '' }, 3000)
-  }
-
-  recognition.start()
-}
-
-function detener() {
-  if (recognition) {
-    recognition.stop()
-    estado.value = 'procesando'
-    if (transcripcion.value) {
-      procesarConIA(transcripcion.value)
-    } else {
-      estado.value = 'idle'
-    }
-  }
-}
-
-// ── Parseo con Claude API ──────────────────────────────
-async function procesarConIA(texto) {
-  estado.value = 'procesando'
-  emit('transcripcion', texto)
-
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{
-          role: 'user',
-          content: `Sos un asistente que extrae datos de texto hablado para un formulario de gestión de clubes cannábicos medicinales en Argentina.
-
-CONTEXTO DEL FORMULARIO: ${props.contexto}
-
-TEXTO DICTADO POR EL USUARIO: "${texto}"
-
-Extraé los datos mencionados y devolvé SOLO un objeto JSON válido con los campos que puedas identificar del contexto. Si un campo no se menciona, no lo incluyas. Usa null solo si el usuario explícitamente dice que no tiene ese dato.
-
-Ejemplos de interpretación:
-- "planta uno, genética OG Kush, está en vegetativo" → {"nombre": "Planta 1", "genetica": "OG Kush", "state": "vegetativo"}
-- "riego hoy, usé dos litros de agua, ph siete punto dos" → {"tipo": "riego", "descripcion": "2 litros, pH 7.2", "fecha": "hoy"}
-- "nueva tarea, poda de la sala norte, para mañana, alta prioridad" → {"titulo": "Poda sala norte", "tipo": "poda", "prioridad": "alta"}
-
-Responde SOLO con el JSON, sin texto adicional, sin backticks.`
-        }]
-      })
-    })
-
-    const data = await response.json()
-    const textoRespuesta = data.content?.[0]?.text?.trim() || '{}'
-
-    let campos = {}
-    try {
-      campos = JSON.parse(textoRespuesta)
-    } catch {
-      // Si no puede parsear, al menos devuelve la transcripción
-      campos = { _transcripcion: texto }
-    }
-
-    emit('campos-detectados', campos)
-    estado.value = 'idle'
-
-  } catch (e) {
-    logger.error('Error procesando voz con IA:', e)
-    // Aunque falle la IA, emitir la transcripción cruda
-    emit('campos-detectados', { _transcripcion: texto })
-    estado.value = 'idle'
-  }
-}
-
-function limpiar() {
-  transcripcion.value = ''
-  errorMsg.value = ''
-  estado.value = 'idle'
-}
-
-onUnmounted(() => {
-  if (recognition) recognition.abort()
-})
+onUnmounted(() => voz.cancelar())
 </script>
 
 <style scoped>
@@ -250,12 +141,6 @@ onUnmounted(() => {
   animation: pulse-border 1.5s ease-in-out infinite;
 }
 
-.btn-voice--processing {
-  border-color: #fd7e14;
-  color: #fd7e14;
-  background: rgba(253,126,20,0.08);
-}
-
 .btn-voice--error {
   border-color: #dc3545;
   color: #dc3545;
@@ -288,6 +173,13 @@ onUnmounted(() => {
   border: 1px solid rgba(13,110,253,0.2);
   border-radius: 8px;
   max-width: 100%;
+}
+
+/* Lo que el servicio todavía está corrigiendo: se ve, pero más apagado que lo ya confirmado. */
+.voice-preview__interim {
+  color: var(--bs-secondary-color);
+  opacity: 0.55;
+  margin-left: 4px;
 }
 
 .voice-error {
