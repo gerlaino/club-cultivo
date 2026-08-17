@@ -223,6 +223,30 @@ class AsistenteController < BaseController
     render json: Ia::Uso.consumo(current_user.club)
   end
 
+  # POST /asistente/chat — el chatbot del admin.
+  #
+  # Sólo admin: es el único que ve la organización entera, y las consultas devuelven datos de
+  # cultivo y producción de toda la casa. El resto de los roles usa el dictado, no esto.
+  def chat
+    return render json: { error: 'El chatbot es solo para administradores' }, status: :forbidden unless
+      current_user.admin? || current_user.super_admin?
+
+    texto = params[:texto].to_s.strip
+    return render json: { error: 'Preguntá algo' }, status: :unprocessable_entity if texto.blank?
+
+    if (msg = limite_ia)
+      return render json: { error: msg, limite_ia: true }, status: :too_many_requests
+    end
+
+    resultado = Ia::Chatbot.new(current_user.club, current_user).preguntar(texto)
+
+    if resultado[:error]
+      render json: { error: resultado[:error] }, status: :unprocessable_entity
+    else
+      render json: resultado
+    end
+  end
+
   def historial_analisis
     return render json: { error: 'No tenés permiso para usar análisis IA.' }, status: :forbidden unless current_user.admin? || current_user.supervisor?
     lote = current_user.club.lotes.find_by(id: params[:lote_id])

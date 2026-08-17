@@ -80,6 +80,7 @@ Rails.application.routes.draw do
     end
 
     get  '/asistente/consumo',       to: 'asistente#consumo'
+    post '/asistente/chat',          to: 'asistente#chat'
     post '/asistente/parsear',       to: 'asistente#parsear'
     post '/asistente/ejecutar',      to: 'asistente#ejecutar'
     post '/asistente/consultar',     to: 'asistente#consultar'

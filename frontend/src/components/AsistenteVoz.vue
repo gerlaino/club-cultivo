@@ -348,14 +348,26 @@
               <div v-if="consultaRespuesta" class="av__consulta-respuesta">
                 <div class="av__consulta-resp-label"><i class="bi bi-robot"></i> Agrónomo IA</div>
                 <div class="av__consulta-resp-body">{{ consultaRespuesta }}</div>
-                <button class="av__consulta-nueva" @click="consultaTexto = ''; consultaRespuesta = ''">
+                <!-- De dónde salió el dato. Una respuesta que no se puede auditar no se puede discutir. -->
+                <div v-if="consultasUsadas.length" class="av__consulta-fuentes">
+                  <i class="bi bi-database"></i>
+                  Consultó: {{ consultasUsadas.join(', ').replaceAll('_', ' ') }}
+                </div>
+                <button class="av__consulta-nueva" @click="consultaTexto = ''; consultaRespuesta = ''; consultasUsadas = []">
                   <i class="bi bi-arrow-counterclockwise"></i> Nueva pregunta
                 </button>
               </div>
               <div v-if="!consultaRespuesta && !consultandoIA && !errorVoz" class="av__consulta-idle">
-                <div class="av__consulta-ej">💬 ¿Cómo viene el lote? ¿Debería ajustar el EC?</div>
-                <div class="av__consulta-ej">🔬 ¿Hay señales de deficiencia en estas mediciones?</div>
-                <div class="av__consulta-ej">📅 ¿Cuándo convendría pasar a floración?</div>
+                <template v-if="esAdmin">
+                  <div class="av__consulta-ej">📦 ¿Voy a tener producto el mes que viene?</div>
+                  <div class="av__consulta-ej">🌿 ¿Qué genética me rinde mejor?</div>
+                  <div class="av__consulta-ej">⏱️ ¿Cuál me ocupa menos la sala?</div>
+                </template>
+                <template v-else>
+                  <div class="av__consulta-ej">💬 ¿Cómo viene el lote? ¿Debería ajustar el EC?</div>
+                  <div class="av__consulta-ej">🔬 ¿Hay señales de deficiencia en estas mediciones?</div>
+                  <div class="av__consulta-ej">📅 ¿Cuándo convendría pasar a floración?</div>
+                </template>
               </div>
             </div>
 
@@ -368,7 +380,8 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import api, { consumoIA } from '../lib/api'
+import api, { consumoIA, chatAsistente } from '../lib/api'
+import { useAuthStore } from '../stores/auth'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import { useReconocimientoVoz } from '../composables/useReconocimientoVoz.js'
 
@@ -416,6 +429,10 @@ const muteTTS               = ref(false)
 const consultaTexto     = ref('')
 const consultaRespuesta = ref('')
 const consultandoIA     = ref(false)
+// Qué datos miró para contestar: se muestran para que la respuesta se pueda auditar.
+const consultasUsadas   = ref([])
+const auth              = useAuthStore()
+const esAdmin           = computed(() => auth.user?.role === 'admin' || auth.user?.role === 'super_admin')
 
 const consultaPlaceholder = computed(() => {
   if (!props.contexto) return '¿Qué querés saber del cultivo?'
@@ -650,10 +667,18 @@ async function enviarConsulta() {
   if (!consultaTexto.value.trim()) return
   consultandoIA.value = true; errorVoz.value = null; consultaRespuesta.value = ''
   try {
-    const payload = { texto: consultaTexto.value }
-    if (props.contexto) payload.contexto = props.contexto
-    const { data } = await api.post('/asistente/consultar', payload)
-    consultaRespuesta.value = data.respuesta || ''
+    // El admin pregunta sobre SU organización y el backend contesta consultando la base. El
+    // resto de los roles sigue con el agrónomo genérico, que no mira datos.
+    if (esAdmin.value) {
+      const { data } = await chatAsistente(consultaTexto.value)
+      consultaRespuesta.value = data.texto || ''
+      consultasUsadas.value   = data.consultas || []
+    } else {
+      const payload = { texto: consultaTexto.value }
+      if (props.contexto) payload.contexto = props.contexto
+      const { data } = await api.post('/asistente/consultar', payload)
+      consultaRespuesta.value = data.respuesta || ''
+    }
   } catch (e) {
     const status = e?.response?.status
     if (status === 403) errorVoz.value = e?.response?.data?.error || 'IA no disponible en tu plan.'
@@ -738,6 +763,7 @@ function metaAccion(accion) {
 .av__consulta-nueva:hover { background:#f0fdf4; }
 .av__consulta-idle { display:flex; flex-direction:column; gap:.4rem; }
 .av__consulta-ej { font-size:.8rem; color:var(--c-slate-400); font-style:italic; padding:.15rem 0; }
+.av__consulta-fuentes { display:flex; align-items:center; gap:.35rem; font-size:.72rem; color:var(--c-slate-400); }
 
 .av { display: inline-block; }
 .av__trigger { display:flex; align-items:center; gap:8px; background:linear-gradient(135deg,#1b5e20,#2e7d32); color:#e8f5e9; border:none; padding:8px 16px; border-radius:9px; font-size:13px; font-weight:500; cursor:pointer; transition:opacity .2s; box-shadow:0 2px 8px #1b5e2030; }
