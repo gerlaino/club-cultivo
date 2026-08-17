@@ -1,6 +1,7 @@
 <template>
   <div class="av">
-    <button class="av__trigger" :class="{ 'av__trigger--activo': abierto, 'av__trigger--mini': mini }" @click="abrir">
+    <button class="av__trigger" :class="{ 'av__trigger--activo': abierto, 'av__trigger--mini': mini }"
+            :title="triggerLabel" @click="abrir">
       <span v-if="!mini" class="av__trigger-dot" :class="{ 'av__trigger-dot--pulse': escuchando }"></span>
       <i v-if="mini" class="bi bi-mic-fill"></i>
       <span v-if="!mini">{{ triggerLabel }}</span>
@@ -444,7 +445,9 @@ const consultaPlaceholder = computed(() => {
 })
 
 const triggerLabel = computed(() => {
-  if (!props.contexto) return 'Registrar sesión'
+  // Desde la barra del admin no se registra nada: se pregunta. Decir "Registrar sesión" ahí
+  // manda a la persona al lado equivocado del panel.
+  if (!props.contexto) return esAdmin.value ? 'Preguntar sobre la organización' : 'Registrar sesión'
   const t = props.contexto.tipo
   if (t === 'lote')   return '🎙️ Registrar por voz'
   if (t === 'planta') return '🎙️ Observación por voz'
@@ -508,6 +511,9 @@ async function refrescarCreditos() {
 
 function abrir() {
   abierto.value = true
+  // El admin que lo abre desde la barra viene a preguntar, no a dictar: sin contexto de cultivo
+  // no hay nada que registrar. Con contexto (sala, lote, planta) arranca en registro como antes.
+  if (!props.contexto && esAdmin.value) modo.value = 'consulta'
   refrescarCreditos()
 }
 

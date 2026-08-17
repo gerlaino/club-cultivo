@@ -31,6 +31,12 @@
       <!-- Right actions -->
       <div class="atb__right">
 
+        <!-- Preguntarle a la organización. Va acá y no adentro de un modal de cultivo: el
+             asistente sólo estaba montado en los modales de sala, lote y planta, así que el
+             admin no tenía forma de llegar sin abrir un registro de cultivo que no iba a abrir.
+             Sin contexto se abre en modo consulta, que es a lo que viene el admin. -->
+        <AsistenteVoz v-if="club.data?.features?.ia" :mini="true" class="atb__ia" />
+
         <!-- Help -->
         <button class="atb__icon-btn" @click="openHelp" aria-label="Ayuda" title="Ayuda">
           <HelpCircle :size="20" :stroke-width="1.75" />
@@ -114,6 +120,7 @@ import DsAvatar           from '../../design-system/components/Avatar.vue'
 import { Bell, BellRing, BellOff, Menu, HelpCircle } from 'lucide-vue-next'
 import { usePushNotifications } from '../../composables/usePushNotifications.js'
 import HelpDrawer         from '../HelpDrawer.vue'
+import AsistenteVoz       from '../AsistenteVoz.vue'
 import NotificationDrawer from '../ui/NotificationDrawer.vue'
 
 const emit = defineEmits(['toggle-drawer'])
@@ -282,6 +289,7 @@ async function handleLogout() {
 .atb__icon-btn:hover { background: var(--c-ink-100); color: var(--c-ink-900); }
 .atb__icon-btn--alerta { border-color: #fca5a5; background: var(--c-rust-100); color: var(--c-rust-600); }
 
+.atb__ia { display: inline-flex; align-items: center; }
 .atb__help-dot {
   position: absolute;
   top: 4px; right: 4px;
