@@ -30,6 +30,13 @@ class Tarea < ApplicationRecord
     'limpieza_sala'   => 'limpieza',
     'ajuste_luz'      => 'ajuste_luz',
   }.freeze
+  # Una tarea sin lote NI sala es de toda la organización — "limpieza general", sin lugar
+  # asignado. No entraba en ninguna rama de `candidatas_por_registro`, así que decías "hice la
+  # limpieza", el modelo lo entendía perfecto y la tarea igual quedaba abierta: no aparecía ni
+  # para destildar. Ahora entra siempre como candidata, y la pantalla la marca para que se vea
+  # que no es de esta sala antes de darla por hecha.
+  SIN_UBICACION = '(tareas.lote_id IS NULL AND tareas.sala_id IS NULL)'.freeze
+
   PRIORIDADES = %w[baja normal alta urgente].freeze
   FRECUENCIAS = %w[diaria semanal quincenal mensual].freeze
 
@@ -130,11 +137,12 @@ class Tarea < ApplicationRecord
     scope = activas.where(tipo: tipos)
 
     if lote
-      scope = scope.where(lote_id: lote.id)
+      scope = scope.where("tareas.lote_id = ? OR #{SIN_UBICACION}", lote.id)
     elsif sala
       lote_ids = sala.lotes.where.not(estado: 'finalizado').pluck(:id)
-      return none if lote_ids.empty?
-      scope = scope.where('sala_id = ? OR lote_id IN (?)', sala.id, lote_ids)
+      scope = scope.where(
+        "tareas.sala_id = ? OR tareas.lote_id IN (?) OR #{SIN_UBICACION}", sala.id, lote_ids
+      )
     else
       return none
     end

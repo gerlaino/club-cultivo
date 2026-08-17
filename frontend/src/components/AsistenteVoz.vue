@@ -164,7 +164,12 @@
                       </div>
                       <label v-for="t in accion.datos.tareas_a_cerrar" :key="t.id" class="av__cerrar-item">
                         <input type="checkbox" :value="t.id" v-model="accion.datos.tareas_cerrar_ids" />
-                        <span class="av__cerrar-titulo">{{ t.titulo }}</span>
+                        <span class="av__cerrar-titulo">
+                          {{ t.titulo }}
+                          <!-- No es de esta sala: darla por hecha porque limpiaste acá puede no
+                               corresponder, así que se avisa antes de tildarla. -->
+                          <span v-if="t.toda_la_org" class="av__cerrar-org">toda la organización</span>
+                        </span>
                         <span v-if="t.asignada_a" class="av__cerrar-quien">{{ t.asignada_a }}</span>
                       </label>
                     </div>
@@ -856,6 +861,7 @@ function metaAccion(accion) {
 .av__cerrar-item input { cursor:pointer; flex-shrink:0; margin:2px 0 0; }
 .av__cerrar-titulo { flex:1; min-width:0; overflow-wrap:anywhere; }
 .av__cerrar-quien { font-size:11px; color:var(--c-slate-400); flex-shrink:0; }
+.av__cerrar-org { display:inline-block; margin-left:5px; font-size:10px; font-weight:600; color:#0369a1; background:#e0f2fe; border-radius:4px; padding:1px 6px; white-space:nowrap; }
 .av__accion-titulo { font-size:14px; color:#1a2e1b; line-height:1.4; margin-bottom:3px; }
 .av__accion-ref { display:inline-block; background:#f0fdf4; color:#1b5e20; font-size:11px; font-weight:600; padding:1px 7px; border-radius:4px; margin-right:6px; }
 .av__accion-meta { font-size:12px; color:var(--c-slate-400); }

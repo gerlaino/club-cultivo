@@ -59,6 +59,27 @@ RSpec.describe Tarea, 'cierre por dictado' do
       expect(candidatas(['riego'], usuario: admin, privilegiado: true)).to include(del_otro)
     end
 
+    # "Limpieza general" no tiene lugar asignado: es del club entero. No entraba en ninguna rama,
+    # así que decías "hice la limpieza", el modelo lo entendía bien y la tarea quedaba abierta
+    # igual — ni siquiera aparecía para destildar.
+    it 'propone también las tareas sin lote ni sala, que son de toda la organización' do
+      general = Tarea.create!(club: club, creada_por: admin, asignada_a: cultivador,
+                              titulo: 'Limpieza general', tipo: 'limpieza',
+                              estado: 'pendiente', prioridad: 'normal')
+
+      por_lote = described_class.candidatas_por_registro(
+        tareas_realizadas: ['limpieza_sala'], usuario: cultivador,
+        es_privilegiado: false, lote: lote
+      )
+      por_sala = described_class.candidatas_por_registro(
+        tareas_realizadas: ['limpieza_sala'], usuario: cultivador,
+        es_privilegiado: false, sala: sala
+      )
+
+      expect(por_lote).to include(general)
+      expect(por_sala).to include(general)
+    end
+
     it 'no propone las que ya estaban completadas' do
       tarea!(tipo: 'riego', estado: 'completada')
 

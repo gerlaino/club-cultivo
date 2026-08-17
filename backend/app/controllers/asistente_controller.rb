@@ -335,6 +335,9 @@ class AsistenteController < BaseController
           'titulo'           => t.titulo,
           'asignada_a'       => t.asignada_a&.nombre_completo,
           'fecha_programada' => t.fecha_programada,
+          # Sin lote ni sala = de toda la organización. Se marca porque no es de este lugar, y
+          # darla por hecha porque limpiaste una sala puede no corresponder.
+          'toda_la_org'      => t.lote_id.nil? && t.sala_id.nil?,
         }
       end
     end
