@@ -238,7 +238,8 @@ class AsistenteController < BaseController
       return render json: { error: msg, limite_ia: true }, status: :too_many_requests
     end
 
-    resultado = Ia::Chatbot.new(current_user.club, current_user).preguntar(texto)
+    historial = Array(params[:historial]).map { |t| t.respond_to?(:to_unsafe_h) ? t.to_unsafe_h : t }
+    resultado = Ia::Chatbot.new(current_user.club, current_user).preguntar(texto, historial: historial)
 
     if resultado[:error]
       render json: { error: resultado[:error] }, status: :unprocessable_entity

@@ -18,12 +18,14 @@ module Ia
           descripcion: 'Qué se va a cosechar y cuántos gramos se esperan de los lotes que están ' \
                        'hoy en floración o en post-cosecha. Usala para "¿voy a tener producto?", ' \
                        '"¿cuándo cosecho?", "¿cuánto va a salir?".',
+          repreguntas: ['¿Qué genética me rinde mejor?', '¿Cuál me ocupa menos la sala?'],
         },
         'rendimiento_por_genetica' => {
           clase: RendimientoPorGenetica,
           descripcion: 'Cuánto rindió realmente cada genética en esta organización: gramos por ' \
                        'planta y gramos por planta por semana de ciclo. Usala para "¿qué ' \
                        'genética conviene?", "¿cuál rinde más?", "¿qué planto?".',
+          repreguntas: ['¿Cuál me ocupa menos la sala?', '¿Voy a tener producto el mes que viene?'],
         },
       }.freeze
 
@@ -38,6 +40,16 @@ module Ia
             input_schema: { type: 'object', properties: {}, required: [] },
           }
         end
+      end
+
+      # Qué más se puede preguntar después de esta respuesta.
+      #
+      # Son fijas por consulta y no las inventa el modelo, a propósito: cada botón tiene que caer
+      # en algo que el sistema efectivamente puede contestar. Una sugerencia que después no se
+      # puede responder es peor que no sugerir nada — el problema de estas herramientas no es que
+      # contesten mal, es que no se sabe qué saben contestar.
+      def repreguntas(claves)
+        Array(claves).flat_map { |c| DISPONIBLES.dig(c.to_s, :repreguntas).to_a }.uniq
       end
 
       # Corre una consulta por su clave. Devuelve nil si el modelo inventó un nombre — no se

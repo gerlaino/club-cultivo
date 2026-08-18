@@ -796,7 +796,7 @@ export const parsearAsistente  = (texto, contexto)  => api.post('/asistente/pars
 export const ejecutarAsistente = (acciones, contexto) => api.post('/asistente/ejecutar',    { acciones, contexto })
 export const consultarAsistente = (texto, contexto) => api.post('/asistente/consultar',     { texto, contexto })
 // El chatbot del admin: contesta con los datos de la organización, no de memoria.
-export const chatAsistente     = (texto)            => api.post('/asistente/chat',         { texto })
+export const chatAsistente     = (texto, historial = []) => api.post('/asistente/chat',    { texto, historial })
 export const analizarLote          = (lote_id) => api.post('/asistente/analizar_lote',       { lote_id })
 export const getHistorialAnalisis  = (lote_id) => api.get('/asistente/historial_analisis',  { params: { lote_id } })
 

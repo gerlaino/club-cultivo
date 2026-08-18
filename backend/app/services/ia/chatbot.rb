@@ -49,12 +49,22 @@ module Ia
       @user = user
     end
 
-    # Devuelve { texto: } o { error: }.
-    def preguntar(texto)
+    # Cuántas vueltas de ida y vuelta se recuerdan.
+    #
+    # Corta a propósito: lo caro de una conversación es reenviar todo lo hablado en CADA vuelta,
+    # y el hilo largo es justo la parte que nadie relee. Con esto alcanza para "¿y en la sala 3?",
+    # que es el 90% de las repreguntas reales, sin que el crédito se vaya en historia muerta.
+    MEMORIA = 4
+
+    # Devuelve { texto:, consultas:, repreguntas: } o { error: }.
+    #
+    # `historial` son los turnos previos [{rol:, texto:}] que manda la pantalla. Se recortan acá y
+    # no allá: el tope es una decisión de costo, no de interfaz.
+    def preguntar(texto, historial: [])
       api_key = ENV['ANTHROPIC_API_KEY']
       return { error: 'IA no configurada' } if api_key.blank?
 
-      mensajes = [{ role: 'user', content: texto }]
+      mensajes = previos(historial) + [{ role: 'user', content: texto }]
       consultadas = []
 
       MAX_VUELTAS.times do
@@ -63,7 +73,11 @@ module Ia
 
         usos = cuerpo['content'].to_a.select { |b| b['type'] == 'tool_use' }
         if usos.empty?
-          return { texto: texto_de(cuerpo), consultas: consultadas }
+          return {
+            texto:       texto_de(cuerpo),
+            consultas:   consultadas,
+            repreguntas: Consultas::Registro.repreguntas(consultadas),
+          }
         end
 
         mensajes << { role: 'assistant', content: cuerpo['content'] }
@@ -77,6 +91,19 @@ module Ia
     private
 
     attr_reader :club, :user
+
+    # Sólo texto plano: los bloques de herramienta de vueltas anteriores no se reenvían. Sin eso,
+    # cada repregunta arrastraría los resultados completos de todas las consultas previas y una
+    # charla de cuatro turnos costaría varias veces lo que cuesta la primera.
+    def previos(historial)
+      Array(historial).last(MEMORIA).filter_map do |t|
+        rol   = (t[:rol] || t['rol']).to_s
+        texto = (t[:texto] || t['texto']).to_s.strip
+        next if texto.blank? || !%w[user assistant].include?(rol)
+
+        { role: rol, content: texto }
+      end
+    end
 
     def resultado_de(uso, consultadas)
       consultadas << uso['name']
