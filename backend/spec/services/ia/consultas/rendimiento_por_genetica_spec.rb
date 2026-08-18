@@ -122,6 +122,34 @@ RSpec.describe Ia::Consultas::RendimientoPorGenetica do
     end
   end
 
+  # En producción, la fecha de cosecha estaba cargada en 4 de 10 lotes: vive en cada PLANTA, y un
+  # lote sin registros de planta individuales no tiene dónde guardarla. La pesada de cosecha, en
+  # cambio, se crea siempre.
+  context 'cuando el lote no tiene plantas cargadas' do
+    let!(:critical) { genetica!('Critical') }
+    let!(:northern) { genetica!('Northern') }
+
+    before do
+      3.times do
+        lote = create(:lote, club: club, genetica: critical, start_date: 12.weeks.ago.to_date,
+                             rendimiento_real_g: 4_500, plants_count: 10, plants_count_cosechadas: 10)
+        # Sin un solo `Plant`, como pasa con los lotes cargados en bloque.
+        lote.pesadas.create!(fase_origen: 'floracion', fase_destino: 'cosecha',
+                             registrado_por: create(:user, :cultivador, club: club),
+                             registrado_at: Time.current)
+      end
+      3.times { lote_cosechado!(northern, gramos: 3_000, semanas: 10) }
+    end
+
+    it 'saca el ciclo de la PESADA de cosecha, que siempre existe' do
+      fila = resultado.datos[:geneticas].find { |g| g[:genetica] == 'Critical' }
+
+      expect(fila[:lotes_con_ciclo]).to eq(3)
+      expect(fila[:semanas_ciclo]).to eq(12.0)
+      expect(fila[:g_por_planta_por_semana]).to eq(37.5)
+    end
+  end
+
   context 'cuando el ciclo lo sostiene un solo lote' do
     let!(:critical) { genetica!('Critical') }
     let!(:northern) { genetica!('Northern') }

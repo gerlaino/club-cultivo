@@ -95,6 +95,14 @@ module Public
         vencimiento: stock&.fecha_vencimiento_est,
         genetica:    gen_payload,
         genetica_id: gen_live&.id,
+        # Qué recibió la planta de la que salió esto. Es lo que convierte el pasaporte de
+        # "confiá en nosotros" a "acá está": es cannabis MEDICINAL, y quien lo consume tiene
+        # derecho a saber si le aplicaron un fungicida y con qué carencia.
+        #
+        # Se muestra sólo lo que le importa al paciente —tratamientos, con qué se nutrió y el
+        # análisis de laboratorio— y NO el detalle operativo (43 riegos, 3 podas), que es de la
+        # organización y acá sería ruido.
+        cultivo:     cultivo_pasaporte(stock&.lote),
         mi_resena:   resena_json(disp, gen_live&.id),
         items:       items_pasaporte(disp, snap),
         club: club ? {
@@ -134,6 +142,30 @@ module Public
     end
 
     # La reseña propia del paciente para (esta dispensa, esta genética), o nil.
+    # Lo del cultivo que le sirve a un paciente, no al auditor.
+    def cultivo_pasaporte(lote)
+      return nil if lote.nil?
+
+      resumen = Lotes::ResumenAplicaciones.new(lote).call
+      labs    = lote.analisis_laboratorio.order(fecha_analisis: :desc).limit(1).map do |a|
+        { fecha: a.fecha_analisis, laboratorio: a.laboratorio,
+          thc_pct: a.thc_pct&.to_f, cbd_pct: a.cbd_pct&.to_f, cbg_pct: a.cbg_pct&.to_f,
+          terpenos: a.terpenos_principales }
+      end
+
+      nutricion = resumen.dig(:nutricion, :productos) || []
+
+      # Si no hay NADA que contar, se devuelve nil y la pantalla no dibuja una sección vacía que
+      # sugiera que falta información.
+      return nil if resumen[:fitosanitarios].empty? && nutricion.empty? && labs.empty?
+
+      {
+        fitosanitarios: resumen[:fitosanitarios],
+        nutricion:      nutricion,
+        analisis:       labs.first,
+      }
+    end
+
     def resena_json(disp, genetica_id)
       return nil unless genetica_id
       r = ResenaProducto.find_by(dispensacion_id: disp.id, genetica_id: genetica_id)

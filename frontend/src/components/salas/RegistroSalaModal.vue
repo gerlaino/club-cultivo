@@ -70,6 +70,27 @@
                   {{ meta.emoji }} {{ key }}
                 </button>
               </div>
+
+              <!-- Qué se APLICÓ contra la plaga, aparte de qué se vio.
+                   Va separado de la nutrición a propósito: esto es un producto medicinal y quien
+                   lo consume tiene derecho a distinguir un fungicida de un fertilizante. Antes
+                   terminaba suelto entre las notas de fertilización, mezclado con el bloom.
+                   Aparece sólo si se observó algo: pedirlo siempre es ruido. -->
+              <template v-if="formData.plagas_observadas && formData.plagas_observadas !== 'ninguna'">
+                <div class="rls__seccion-titulo" style="margin-top: var(--sp-4)">¿Se aplicó algo?</div>
+                <div class="rls__fito">
+                  <input v-model="formData.fitosanitario" class="rls__input"
+                         placeholder="Producto aplicado (ej: azufre micronizado)" />
+                  <input v-model="formData.fitosanitario_motivo" class="rls__input"
+                         placeholder="Contra qué (ej: oidio)" />
+                  <input v-model.number="formData.carencia_dias" type="number" min="0"
+                         class="rls__input" placeholder="Días de carencia" />
+                  <p class="rls__fito-nota">
+                    La carencia son los días que hay que esperar antes de cosechar. Queda en la
+                    trazabilidad del producto.
+                  </p>
+                </div>
+              </template>
             </div>
 
             <!-- PASO 2: Formularios por acción -->
@@ -192,6 +213,9 @@ function emptyFormData() {
   return {
     estado_general:    'bueno',
     plagas_observadas: 'ninguna',
+    fitosanitario: '',
+    fitosanitario_motivo: '',
+    carencia_dias: null,
     observaciones:     '',
     riego:      { ph: null, ph_runoff: null, ec: null, volumen: null, fertilizo: false, producto: '', dosis: null, semana_nutricion: null, metodo_nutricion: '', observaciones: '' },
     poda:       { tipos: [], intensidad: '', plantas_intervenidas: null, observaciones: '' },
@@ -232,6 +256,13 @@ function buildPayload() {
     estado_general:    fd.estado_general,
     plagas_observadas: fd.plagas_observadas,
     observaciones:     fd.observaciones,
+    // Sólo si se cargó: un string vacío escribiría "se aplicó nada", que no es lo mismo que no
+    // haber aplicado.
+    ...(fd.fitosanitario ? {
+      fitosanitario:        fd.fitosanitario,
+      fitosanitario_motivo: fd.fitosanitario_motivo || null,
+      carencia_dias:        fd.carencia_dias || null,
+    } : {}),
     tareas_realizadas: [],
   }
   const extra = []
@@ -419,6 +450,15 @@ async function guardar() {
 .rls__accion-icon { font-size: 1.6rem; line-height: 1; }
 .rls__accion-label { font-size: .72rem; font-weight: 700; color: var(--c-ink-700); text-align: center; white-space: nowrap; }
 .rls__accion-card--sel .rls__accion-label { color: var(--brand-primary); }
+.rls__fito { display: flex; flex-direction: column; gap: var(--sp-2); }
+.rls__input {
+  width: 100%; box-sizing: border-box;
+  border: 1.5px solid var(--c-ink-100); border-radius: var(--r-md);
+  padding: .5rem .7rem; font-size: var(--fs-13); font-family: inherit;
+  background: var(--c-paper); color: var(--c-ink-900);
+}
+.rls__input:focus { outline: none; border-color: #1b5e20; }
+.rls__fito-nota { margin: 0; font-size: var(--fs-12); color: var(--c-ink-500); line-height: 1.4; }
 .rls__seccion-titulo {
   font-size: .72rem; font-weight: 800; color: var(--c-leaf-600, #3F6452);
   text-transform: uppercase; letter-spacing: .06em;

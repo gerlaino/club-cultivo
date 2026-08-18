@@ -46,6 +46,10 @@ class AsistenteController < BaseController
     - Si no se menciona un campo, no lo incluyas: el sistema preserva el valor anterior.
     - Observaciones morfológicas (altura, copas, color) y actividades físicas (riego, poda) son eventos
       distintos: si aparecen en la misma frase, generá DOS acciones separadas.
+    - Un TRATAMIENTO no es nutrición: "le puse azufre por el oidio" va en `fitosanitario` +
+      `fitosanitario_motivo`, NUNCA en `notas_fertilizacion`. Es un producto medicinal y quien lo
+      consume tiene derecho a distinguir un fungicida de un fertilizante. Si mencionan días de
+      carencia o "no cosechar por X días", va en `carencia_dias`.
     - "Riegué" sin nutrientes → tareas_realizadas: ["riego"], fertilizacion: false
       "Fertilicé / puse base A+B / bloom" → tareas_realizadas: ["riego","nutricion"], fertilizacion: true
     - El "resumen" dice QUÉ ENTENDISTE, nada más. No opines sobre los valores: nada de "pH fuera
@@ -89,6 +93,7 @@ class AsistenteController < BaseController
             "co2": 900, "ppfd": 600, "horas_luz": 18,
             "temperatura_sustrato": 22, "ph_runoff": 6.4,
             "estado_general": "bueno", "plagas_observadas": "ninguna",
+            "fitosanitario": "azufre micronizado", "fitosanitario_motivo": "oidio", "carencia_dias": 14,
             "observaciones": "texto libre"
           }
         },
@@ -670,6 +675,9 @@ class AsistenteController < BaseController
       notas_fertilizacion:  datos['notas_fertilizacion'],
       estado_general:       datos['estado_general'],
       plagas_observadas:    datos['plagas_observadas'],
+      fitosanitario:        datos['fitosanitario'],
+      fitosanitario_motivo: datos['fitosanitario_motivo'],
+      carencia_dias:        datos['carencia_dias'],
       observaciones:        datos['observaciones'],
       fuente:               'asistente_voz',
       user:                 current_user,
@@ -711,6 +719,9 @@ class AsistenteController < BaseController
       notas_fertilizacion:  datos['notas_fertilizacion'],
       estado_general:       datos['estado_general'],
       plagas_observadas:    datos['plagas_observadas'],
+      fitosanitario:        datos['fitosanitario'],
+      fitosanitario_motivo: datos['fitosanitario_motivo'],
+      carencia_dias:        datos['carencia_dias'],
       observaciones:        datos['observaciones'],
       fuente:               'asistente_voz',
       user:                 current_user,

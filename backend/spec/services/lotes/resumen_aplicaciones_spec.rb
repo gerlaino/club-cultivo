@@ -68,6 +68,26 @@ RSpec.describe Lotes::ResumenAplicaciones do
     end
   end
 
+  describe 'el detalle' do
+    it 'va aparte del resumen, para el que necesite ver registro por registro' do
+      registro!(dias_atras: 5, tareas_realizadas: %w[riego], ph: 6.2)
+      registro!(dias_atras: 1, fitosanitario: 'Azufre')
+
+      expect(resumen[:detalle].size).to eq(2)
+      # Más nuevo primero: un auditor mira lo último que se hizo, no lo primero.
+      expect(resumen[:detalle].first[:fitosanitario]).to eq('Azufre')
+    end
+
+    it 'no manda los campos vacíos: una tabla de guiones se lee peor' do
+      registro!(dias_atras: 1, tareas_realizadas: %w[riego])
+
+      fila = resumen[:detalle].first
+      expect(fila).not_to have_key(:fitosanitario)
+      expect(fila).not_to have_key(:ph)
+      expect(fila[:actividades]).to eq(['riego'])
+    end
+  end
+
   it 'una plaga informa desde cuándo y hasta cuándo se vio' do
     # Una plaga que aparece una vez no es lo mismo que una que estuvo seis semanas.
     registro!(dias_atras: 30, plagas_observadas: 'trips')

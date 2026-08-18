@@ -336,6 +336,31 @@
               </div>
             </div>
 
+            <!-- El log completo, PLEGADO. Un auditor puede necesitar registro por registro, pero
+                 abrirlo por defecto convierte el informe en sesenta filas que nadie lee. -->
+            <div v-if="data.aplicaciones.detalle?.length" class="trz__detalle">
+              <button type="button" class="trz__detalle-btn" @click="detalleAbierto = !detalleAbierto">
+                <i :class="detalleAbierto ? 'bi bi-chevron-down' : 'bi bi-chevron-right'"></i>
+                Ver los {{ data.aplicaciones.detalle.length }} registros uno por uno
+              </button>
+              <div v-if="detalleAbierto" class="trz__detalle-lista">
+                <div v-for="(r, i) in data.aplicaciones.detalle" :key="i" class="trz__detalle-row">
+                  <span class="trz__detalle-fecha">{{ fecha(r.fecha) }}</span>
+                  <span class="trz__detalle-cuerpo">
+                    <span v-if="r.actividades?.length">{{ r.actividades.map(actividadLabel).join(', ') }}</span>
+                    <span v-if="r.fertilizacion"> · {{ r.fertilizacion }}</span>
+                    <span v-if="r.fitosanitario" class="trz__detalle-fito"> · {{ r.fitosanitario }}</span>
+                    <span v-if="r.plagas"> · plaga: {{ r.plagas }}</span>
+                    <span v-if="r.ph != null"> · pH {{ r.ph }}</span>
+                    <span v-if="r.ec != null"> · EC {{ r.ec }}</span>
+                    <span v-if="r.temperatura != null"> · {{ r.temperatura }}°C</span>
+                    <span v-if="r.humedad != null"> · {{ r.humedad }}% HR</span>
+                    <span v-if="r.observaciones"> · {{ r.observaciones }}</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
             <!-- Medido, no declarado: es lo más fuerte que se le puede mostrar a un paciente. -->
             <div v-if="data.analisis_laboratorio?.length" class="trz__lab">
               <div class="trz__fito-tit">🔬 Análisis de laboratorio</div>
@@ -502,6 +527,8 @@ const error       = ref(null)
 const data        = ref(null)
 const stocksList  = ref([])
 const autoVisible = ref(false)
+// El log detallado arranca plegado: se abre a pedido, no por defecto.
+const detalleAbierto = ref(false)
 
 const hoy = new Date().toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 
@@ -818,6 +845,14 @@ const formatDate = d => d
 .trz__fito-tit { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-bottom: .3rem; }
 .trz__fito-row { font-size: .82rem; line-height: 1.5; }
 .trz__fields--mt { margin-top: .75rem; }
+.trz__detalle { margin-top: .75rem; }
+.trz__detalle-btn { background: none; border: none; padding: 0; cursor: pointer; font-size: .78rem; color: #5b21b6; display: flex; align-items: center; gap: .35rem; font-family: inherit; }
+.trz__detalle-btn:hover { text-decoration: underline; }
+.trz__detalle-lista { margin-top: .5rem; display: flex; flex-direction: column; gap: .3rem; max-height: 340px; overflow-y: auto; }
+.trz__detalle-row { display: flex; gap: .6rem; font-size: .78rem; line-height: 1.45; padding-bottom: .3rem; border-bottom: 1px solid rgba(0,0,0,.05); }
+.trz__detalle-fecha { flex-shrink: 0; opacity: .6; font-variant-numeric: tabular-nums; }
+.trz__detalle-cuerpo { min-width: 0; overflow-wrap: anywhere; }
+.trz__detalle-fito { color: #b91c1c; font-weight: 600; }
 .trz__node--dispens { border-color: #bae6fd; }
 
 .trz__node-head {

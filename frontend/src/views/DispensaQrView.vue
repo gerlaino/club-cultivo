@@ -69,6 +69,41 @@
               <span class="dqr__terp-val">{{ it.genetica.terpenos }}</span>
             </div>
             <div v-if="it.lote" class="dqr__prod-lote"><span>Lote</span> <span class="dqr__mono">{{ it.lote }}</span></div>
+
+            <!-- Cómo se cultivó ESTO.
+                 Es cannabis medicinal: quien lo consume tiene derecho a saber si le aplicaron un
+                 fungicida y con qué carencia. Se muestra lo que le importa al paciente —el
+                 tratamiento, con qué se nutrió y el análisis— y no el detalle operativo (43
+                 riegos, 3 podas), que es de la organización y acá sería ruido. -->
+            <div v-if="data.cultivo" class="dqr__cultivo">
+              <div class="dqr__cultivo-tit">Cómo se cultivó</div>
+
+              <!-- Primero lo sanitario: es lo que alguien inmunodeprimido necesita saber. -->
+              <div v-if="data.cultivo.fitosanitarios?.length" class="dqr__fito">
+                <div v-for="(f, i) in data.cultivo.fitosanitarios" :key="i" class="dqr__fito-row">
+                  Se aplicó <strong>{{ f.producto }}</strong><span v-if="f.motivo"> contra {{ f.motivo }}</span><span v-if="f.fecha"> el {{ fmtFecha(f.fecha) }}</span><span v-if="f.carencia_dias">, con {{ f.carencia_dias }} días de carencia</span>.
+                </div>
+              </div>
+              <div v-else class="dqr__fito dqr__fito--limpio">
+                No se le aplicó ningún tratamiento fitosanitario.
+              </div>
+
+              <div v-if="data.cultivo.nutricion?.length" class="dqr__cultivo-row">
+                <span class="dqr__cultivo-lbl">Nutrición</span>
+                <span>{{ data.cultivo.nutricion.join(' · ') }}</span>
+              </div>
+
+              <!-- Medido, no declarado por el criador. -->
+              <div v-if="data.cultivo.analisis" class="dqr__cultivo-lab">
+                <span class="dqr__cultivo-lbl">Análisis de laboratorio</span>
+                <span>
+                  <template v-if="data.cultivo.analisis.thc_pct != null">THC {{ data.cultivo.analisis.thc_pct }}%</template>
+                  <template v-if="data.cultivo.analisis.cbd_pct != null"> · CBD {{ data.cultivo.analisis.cbd_pct }}%</template>
+                  <template v-if="data.cultivo.analisis.laboratorio"> · {{ data.cultivo.analisis.laboratorio }}</template>
+                  <template v-if="data.cultivo.analisis.fecha"> · {{ fmtFecha(data.cultivo.analisis.fecha) }}</template>
+                </span>
+              </div>
+            </div>
             <DispensaResenaForm
               v-if="it.genetica_id"
               :base="base" :token="token" :dni="dni"
@@ -276,6 +311,15 @@ onMounted(async () => {
 .dqr__prod-nombre { font-family: var(--font-display, sans-serif); font-size: 1.2rem; font-weight: 700; color: var(--c-ink-900, #1a1d1f); margin: .35rem 0 .1rem; }
 .dqr__prod-forma { font-size: .8rem; color: var(--c-ink-500, #6b7280); margin: 0; }
 .dqr__cannab--sm .dqr__cannab-val { font-size: 1.2rem; }
+.dqr__cultivo { margin-top: .85rem; padding-top: .85rem; border-top: 1px solid rgba(0,0,0,.07); display: flex; flex-direction: column; gap: .5rem; }
+.dqr__cultivo-tit { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; opacity: .55; }
+.dqr__cultivo-row, .dqr__cultivo-lab { display: flex; flex-direction: column; gap: .1rem; font-size: .84rem; line-height: 1.45; }
+.dqr__cultivo-lbl { font-size: .7rem; text-transform: uppercase; letter-spacing: .05em; opacity: .5; }
+/* El tratamiento se destaca; la ausencia de tratamiento también se dice, porque el silencio
+   deja la duda y acá la respuesta "no se le aplicó nada" es información. */
+.dqr__fito { font-size: .84rem; line-height: 1.5; background: rgba(220,38,38,.07); border-radius: 8px; padding: .5rem .7rem; }
+.dqr__fito--limpio { background: rgba(45,138,107,.09); }
+.dqr__fito-row + .dqr__fito-row { margin-top: .3rem; }
 .dqr__prod-lote { display: flex; align-items: center; justify-content: space-between; margin-top: .7rem; padding-top: .6rem; border-top: 1px solid var(--c-leaf-100, #e8f0eb); font-size: .8rem; color: var(--c-ink-500, #6b7280); }
 .dqr__prod-lote .dqr__mono { font-weight: 600; color: var(--c-ink-900, #1a1d1f); }
 

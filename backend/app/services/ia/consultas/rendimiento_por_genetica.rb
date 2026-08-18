@@ -85,7 +85,7 @@ module Ia
       def agrupar
         club.lotes.where.not(rendimiento_real_g: nil)
             .where.not(genetica_id: nil)
-            .includes(:genetica)
+            .includes(:genetica, :pesadas)
             .group_by(&:genetica_id)
             .filter_map { |_id, lotes| fila(lotes) }
       end
@@ -118,17 +118,31 @@ module Ia
         }
       end
 
-      # Ciclo REAL: del arranque del lote a la última planta cosechada. Si un lote no tiene esas
-      # fechas queda afuera del promedio en vez de rellenarse con el objetivo — mezclar plan y
-      # real en un mismo número es exactamente lo que hace que después nadie confíe en el dato.
+      # Ciclo REAL: del arranque del lote a su cosecha. Si un lote no tiene esas fechas queda
+      # afuera del promedio en vez de rellenarse con el objetivo — mezclar plan y real en un
+      # mismo número es lo que hace que después nadie confíe en el dato.
       def duraciones_reales(lotes)
         lotes.filter_map do |lote|
-          fin = lote.plants.maximum(:fecha_cosecha)
+          fin = fecha_cosecha(lote)
           next if fin.blank? || lote.start_date.blank?
 
           dias = (fin.to_date - lote.start_date.to_date).to_i
           dias.positive? ? dias / 7.0 : nil
         end
+      end
+
+      # La PESADA manda, y las plantas son el respaldo.
+      #
+      # Leía sólo `plants.fecha_cosecha` y en producción eso estaba en 4 de 10 lotes cosechados:
+      # la fecha vive en cada planta, y un lote cargado sin registros de planta individuales no
+      # tiene dónde guardarla. En cambio TODA cosecha crea una pesada con `fase_destino: cosecha`
+      # y su `registrado_at` (`LotesController#cosechar_plantas`), exista o no la planta.
+      #
+      # Se toma la PRIMERA: un lote con varias pasadas cosecha en tandas, y lo que cierra el ciclo
+      # de cultivo es cuándo se empezó a cosechar, no cuándo se levantó la última rezagada.
+      def fecha_cosecha(lote)
+        lote.pesadas.where(fase_destino: 'cosecha').minimum(:registrado_at) ||
+          lote.plants.maximum(:fecha_cosecha)
       end
     end
   end

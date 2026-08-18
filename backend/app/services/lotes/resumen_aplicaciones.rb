@@ -29,6 +29,10 @@ module Lotes
         # bloom en una misma lista es exactamente lo que no puede pasar.
         fitosanitarios: fitosanitarios(registros),
         plagas:        plagas(registros),
+        # El log completo, para el que lo pida. Va aparte del resumen y la pantalla lo muestra
+        # plegado: un auditor puede necesitar ver registro por registro, pero abrirlo por defecto
+        # convierte el informe en sesenta filas que nadie lee.
+        detalle:       detalle(registros),
       }
     end
 
@@ -36,7 +40,27 @@ module Lotes
 
     attr_reader :lote
 
-    def vacio = { registros: 0, actividades: {}, nutricion: {}, fitosanitarios: [], plagas: [] }
+    def vacio = { registros: 0, actividades: {}, nutricion: {}, fitosanitarios: [], plagas: [], detalle: [] }
+
+    # Un registro por fila, con lo que efectivamente se anotó. Los campos vacíos NO viajan: una
+    # tabla llena de guiones es más difícil de leer que una con menos columnas.
+    def detalle(registros)
+      registros.reverse.map do |r|
+        {
+          fecha:          r.registrado_en,
+          actividades:    Array(r.tareas_realizadas),
+          ph:             r.ph&.to_f,
+          ec:             r.ec&.to_f,
+          temperatura:    r.temperatura&.to_f,
+          humedad:        r.humedad&.to_f,
+          fertilizacion:  r.notas_fertilizacion.presence,
+          fitosanitario:  r.fitosanitario.presence,
+          plagas:         (r.plagas_observadas if r.plagas_observadas.present? && r.plagas_observadas != 'ninguna'),
+          observaciones:  r.observaciones.presence,
+          fuente:         r.fuente,
+        }.compact
+      end
+    end
 
     # Cuántas veces se hizo cada cosa. Sale del array `tareas_realizadas` de cada registro.
     def actividades(registros)

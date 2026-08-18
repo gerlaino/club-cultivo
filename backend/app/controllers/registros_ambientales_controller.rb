@@ -54,6 +54,10 @@ class RegistrosAmbientalesController < ApplicationController
       :ml_nutrientes_litro, :notas_nutricion,
       :fertilizacion, :notas_fertilizacion,
       :estado_general, :plagas_observadas,
+      # Qué se aplicó contra la plaga, aparte de qué se vio. Va separado de las notas de
+      # fertilización a propósito: en un producto medicinal, un fungicida y el bloom no pueden
+      # terminar en el mismo campo de texto.
+      :fitosanitario, :fitosanitario_motivo, :carencia_dias,
       :observaciones, :fuente, :registrado_en,
       tareas_realizadas: []
     )
@@ -77,6 +81,9 @@ class RegistrosAmbientalesController < ApplicationController
       notas_fertilizacion:  r.notas_fertilizacion,
       estado_general:       r.estado_general,
       plagas_observadas:    r.plagas_observadas,
+      fitosanitario:        r.fitosanitario,
+      fitosanitario_motivo: r.fitosanitario_motivo,
+      carencia_dias:        r.carencia_dias,
       observaciones:        r.observaciones,
       fuente:               r.fuente,
       punto_medicion:       r.punto_medicion,
