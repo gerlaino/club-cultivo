@@ -127,6 +127,8 @@ async function elegirTier(tier) {
 }
 
 const iaUso = computed(() => props.club.ia_uso)
+// Qué preguntas puede contestar el chatbot con los datos que la organización tiene cargados.
+const chatbotListo = computed(() => props.club.chatbot_listo || [])
 const iaPorcentaje = computed(() => {
   const u = iaUso.value
   if (!u?.tope) return 0
@@ -315,6 +317,23 @@ onMounted(async () => {
           </div>
         </div>
 
+        <!-- Qué va a poder contestar el chatbot en ESTA organización.
+             No bloquea el toggle a propósito: con bloqueo duro no se podría prender ni para
+             probar, y una organización sin datos hoy los tiene el mes que viene — el toggle
+             quedaría muerto hasta que alguien note que ya se puede. Decir QUÉ va a poder hacer
+             es más útil que un sí/no que no explica nada. -->
+        <div v-if="a.clave === 'chatbot' && chatbotListo.length" class="sam__cfg">
+          <div class="sam__cfg-hd">Con los datos de hoy va a poder contestar</div>
+          <div v-for="c in chatbotListo" :key="c.pregunta" class="sam__cap">
+            <span class="sam__cap-icon" :class="c.puede ? 'sam__cap-icon--si' : 'sam__cap-icon--no'">
+              {{ c.puede ? '✓' : '·' }}
+            </span>
+            <span :class="{ 'sam__cap--no': !c.puede }">
+              {{ c.pregunta }}<template v-if="!c.puede"> — {{ c.falta }}</template>
+            </span>
+          </div>
+        </div>
+
         <!-- IoT: la API key de Pulse -->
         <div v-if="a.clave === 'iot' && features.iot" class="sam__cfg">
           <div class="sam__cfg-hd">
@@ -496,6 +515,11 @@ onMounted(async () => {
 .sam__uso-meta { display: flex; gap: .4rem; font-size: .7rem; color: var(--c-slate-500); }
 .sam__uso-fn { display: flex; flex-wrap: wrap; gap: .6rem; font-size: .7rem; color: var(--c-slate-500); }
 .sam__uso-fn-n { opacity: .6; }
+.sam__cap { display: flex; align-items: flex-start; gap: .45rem; font-size: .74rem; color: var(--c-slate-600); line-height: 1.45; padding: .1rem 0; }
+.sam__cap-icon { flex-shrink: 0; font-weight: 700; width: .8rem; }
+.sam__cap-icon--si { color: #2D8A6B; }
+.sam__cap-icon--no { color: var(--c-slate-300); }
+.sam__cap--no { color: var(--c-slate-400); }
 .sam__uso-fn strong { color: var(--c-slate-900); }
 
 /* En construcción */

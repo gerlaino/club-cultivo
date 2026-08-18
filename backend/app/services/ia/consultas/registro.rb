@@ -25,7 +25,21 @@ module Ia
           descripcion: 'Cuánto rindió realmente cada genética en esta organización: gramos por ' \
                        'planta y gramos por planta por semana de ciclo. Usala para "¿qué ' \
                        'genética conviene?", "¿cuál rinde más?", "¿qué planto?".',
-          repreguntas: ['¿Cuál me ocupa menos la sala?', '¿Voy a tener producto el mes que viene?'],
+          repreguntas: ['¿Cuál me ocupa menos la sala?', '¿Cuánto me cuesta el gramo?'],
+        },
+        'perdidas_por_motivo' => {
+          clase: PerdidasPorMotivo,
+          descripcion: 'Cuántas plantas se descartan y por qué (no prendió, plaga, enfermedad, ' \
+                       'macho, estrés…), en total y por genética. Usala para "¿qué se me muere?", ' \
+                       '"¿por qué pierdo plantas?", "¿qué genética aguanta menos?".',
+          repreguntas: ['¿Qué genética me rinde mejor?', '¿Cuánto me cuesta el gramo?'],
+        },
+        'costo_por_genetica' => {
+          clase: CostoPorGenetica,
+          descripcion: 'Cuánto cuesta el gramo producido, por genética, sobre los lotes que ' \
+                       'tienen el costo cargado. Usala para "¿cuánto me cuesta el gramo?", ' \
+                       '"¿qué genética me sale más barata?", "¿cuánto cobro?".',
+          repreguntas: ['¿Qué genética me rinde mejor?', '¿Qué se me muere y por qué?'],
         },
       }.freeze
 

@@ -450,7 +450,41 @@ class Club < ApplicationRecord
     when 'iot'      then iot_listo?           ? nil : 'Todavía no hay ningún dispositivo dando señales.'
     when 'ia'       then ENV['ANTHROPIC_API_KEY'].present? ? nil : 'Falta ANTHROPIC_API_KEY en el entorno de la plataforma.'
     when 'eventos'  then feature?('bar')      ? nil : 'Necesita el Buffet activo.'
+    when 'chatbot'  then feature?('ia')        ? nil : 'Necesita el Asistente IA activo.'
     end
+  end
+
+  # Qué va a poder contestar el chatbot en ESTA organización, según los datos que tenga cargados.
+  #
+  # No bloquea el toggle a propósito. Un bloqueo duro tiene dos problemas: no se podría prender
+  # para probarlo ni en una demo, y una organización sin datos hoy los tiene el mes que viene —
+  # el toggle quedaría muerto hasta que alguien note que ya se puede, y nadie va a estar mirando.
+  # Es la misma política que `ADDONS_INCOMPLETOS`: avisar qué falta, no cerrar la puerta.
+  #
+  # Los umbrales son los de las consultas (`Ia::Consultas::*::MINIMO_*`) y se leen de ahí para no
+  # tener los mismos números escritos en dos lados.
+  def chatbot_capacidades
+    cosechados = lotes.where.not(rendimiento_real_g: nil)
+    por_gen    = cosechados.where.not(genetica_id: nil).group(:genetica_id).count
+    con_minimo = por_gen.count { |_id, n| n >= Ia::Consultas::RendimientoPorGenetica::MINIMO_LOTES }
+
+    [
+      { pregunta: 'Qué se va a cosechar',
+        puede:    lotes.where(estado: Ia::Consultas::ProduccionProxima::EN_CURSO).any?,
+        falta:    'No hay lotes en floración ni en post-cosecha ahora mismo.' },
+      { pregunta: 'Qué genética rinde mejor',
+        puede:    con_minimo.positive?,
+        falta:    "Ninguna genética llega a #{Ia::Consultas::RendimientoPorGenetica::MINIMO_LOTES} " \
+                  "lotes cosechados (la que más tiene: #{por_gen.values.max || 0})." },
+      { pregunta: 'Qué se muere y por qué',
+        puede:    plants.count >= Ia::Consultas::PerdidasPorMotivo::MINIMO_PLANTAS,
+        falta:    "Hacen falta #{Ia::Consultas::PerdidasPorMotivo::MINIMO_PLANTAS} plantas " \
+                  "registradas para que un porcentaje signifique algo (hay #{plants.count})." },
+      { pregunta: 'Cuánto cuesta el gramo',
+        puede:    costo_lotes.where.not(costo_por_gramo: nil).count >= Ia::Consultas::CostoPorGenetica::MINIMO_LOTES,
+        falta:    "Hay #{costo_lotes.where.not(costo_por_gramo: nil).count} lotes con el costo " \
+                  "cargado; hacen falta #{Ia::Consultas::CostoPorGenetica::MINIMO_LOTES}." },
+    ]
   end
 
   # El IoT está listo cuando hay por dónde entren datos: hardware propio dado de alta o la

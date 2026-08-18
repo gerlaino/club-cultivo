@@ -387,6 +387,10 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       # organización) y `IaLlamada` es tenant con `require_tenant=true`, así que sin esto la
       # ficha entera revienta con NoTenantSet. El bloque restaura el tenant anterior al salir.
       ia_uso:          c.feature?('ia') ? ActsAsTenant.with_tenant(c) { Ia::Uso.resumen_mes(c) } : nil,
+      # Qué va a poder contestar el chatbot en esta organización. Se manda SIEMPRE, prendido o
+      # no: es justamente lo que hay que mirar ANTES de prenderlo. Envuelto en el tenant como
+      # `ia_uso` — el super admin no tiene tenant fijado y los modelos de dominio lo exigen.
+      chatbot_listo:   ActsAsTenant.with_tenant(c) { c.chatbot_capacidades },
       whatsapp_estado:      c.whatsapp_estado,
       whatsapp_numero:      c.whatsapp_numero,
       twilio_configurado:   c.twilio_configurado?,
