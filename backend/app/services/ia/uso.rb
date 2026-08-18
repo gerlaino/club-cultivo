@@ -145,7 +145,18 @@ module Ia
         # Qué porcentaje de la entrada se sirvió de caché. Si esto es 0 con el asistente en uso,
         # el caché no está funcionando y hay que buscar qué invalida el prefijo.
         cache_hit:  entrada.positive? ? (leidos * 100.0 / entrada).round(1) : 0.0,
+        # Con etiqueta legible y en CRÉDITOS además de en cantidad: si una función se usa poco
+        # pero cuesta ocho veces más que otra, contando llamadas no se ve.
         por_funcion: base.group(:funcion).count,
+        desglose:    base.group(:funcion).count.map { |fn, n|
+          {
+            funcion:  fn,
+            label:    IaLlamada.etiqueta(fn),
+            llamadas: n,
+            creditos: base.where(funcion: fn).exitosas.pluck(:costo_usd)
+                          .sum { |costo| IaLlamada.creditos_de(costo) },
+          }
+        }.sort_by { |d| -d[:creditos] },
       }
     end
   end

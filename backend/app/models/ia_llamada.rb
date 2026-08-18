@@ -14,10 +14,28 @@ class IaLlamada < ApplicationRecord
   FUNCIONES = %w[
     asistente_parsear
     asistente_consultar
+    chatbot
     analisis_lote
     plan_trabajo
     csv_import
   ].freeze
+
+  # Cómo se llama cada función en pantalla. Sin esto el panel muestra la clave cruda
+  # (`asistente_parsear`), que no le dice nada a quien lo lee.
+  #
+  # `chatbot` va aparte de `asistente_consultar` a propósito: los dos "consultan", pero uno mira
+  # los datos de la organización y el otro es el agrónomo genérico. Mezclados en una sola fila no
+  # se puede saber cuál se está usando ni cuál conviene apagar.
+  ETIQUETAS = {
+    'asistente_parsear'   => 'Registro por voz',
+    'asistente_consultar' => 'Consulta al agrónomo',
+    'chatbot'             => 'Chatbot del admin',
+    'analisis_lote'       => 'Análisis de lote',
+    'plan_trabajo'        => 'Importar plan de trabajo',
+    'csv_import'          => 'Importar CSV de sensores',
+  }.freeze
+
+  def self.etiqueta(funcion) = ETIQUETAS[funcion.to_s] || funcion.to_s.humanize
 
   # USD por millón de tokens, por modelo. Se usa sólo para calcular el costo AL INSERTAR — una
   # vez guardado, `costo_usd` no se recalcula: si mañana cambia el precio, los registros viejos

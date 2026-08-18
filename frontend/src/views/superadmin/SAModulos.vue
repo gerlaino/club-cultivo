@@ -118,7 +118,7 @@ async function elegirTier(tier) {
   try {
     const { data } = await updateSuperAdminClub(props.club.id, { ia_tier: tier.clave, ia_limite_hora: 0 })
     emit('actualizado', data)
-    toast.success(`Asistente IA: plan ${tier.label} (${tier.limite_mes.toLocaleString('es-AR')} consultas por mes).`)
+    toast.success(`Asistente IA: plan ${tier.label} (${tier.limite_mes.toLocaleString('es-AR')} créditos por mes).`)
   } catch {
     toast.error('No se pudo cambiar el plan de IA')
   } finally {
@@ -130,14 +130,10 @@ const iaUso = computed(() => props.club.ia_uso)
 const iaPorcentaje = computed(() => {
   const u = iaUso.value
   if (!u?.tope) return 0
-  return Math.min(100, Math.round((u.llamadas / u.tope) * 100))
+  // Contra créditos, que es la unidad del tope. Con `llamadas` la barra podía marcar 30% y el
+  // dictado salir rechazado.
+  return Math.min(100, Math.round((u.creditos / u.tope) * 100))
 })
-// Las funciones, en el idioma en que se habla de ellas.
-const FUNCION_LABEL = {
-  asistente_parsear: 'Registro por voz', asistente_consultar: 'Consultas',
-  analisis_lote: 'Análisis de lote', plan_trabajo: 'Plan de trabajo', csv_map: 'Importar CSV',
-}
-
 // ── Pulse Grow (IoT) ────────────────────────────────────────────────────────────
 const pulseKey    = ref('')
 const savingPulse = ref(false)
@@ -279,7 +275,7 @@ onMounted(async () => {
                     class="sam__tier" :class="{ 'sam__tier--on': (club.ia_tier || 'basico') === t.clave }"
                     @click="elegirTier(t)">
               <strong>{{ t.label }}</strong>
-              <span>{{ t.limite_mes.toLocaleString('es-AR') }} consultas por mes</span>
+              <span>{{ t.limite_mes.toLocaleString('es-AR') }} créditos por mes</span>
             </button>
           </div>
 
@@ -288,7 +284,11 @@ onMounted(async () => {
           <div v-if="iaUso" class="sam__uso">
             <div class="sam__uso-hd">
               <span>Este mes</span>
-              <strong>{{ iaUso.llamadas }} de {{ (iaUso.tope || 0).toLocaleString('es-AR') }} consultas</strong>
+              <!-- CRÉDITOS, no llamadas: el tope se cuenta en créditos desde que una importación
+                   de plan de trabajo dejó de valer lo mismo que un mapeo de CSV. Mostraba
+                   `llamadas` contra un tope de créditos —dos unidades en la misma barra— y la
+                   organización se podía quedar sin IA en un número distinto al que veía acá. -->
+              <strong>{{ iaUso.creditos }} de {{ (iaUso.tope || 0).toLocaleString('es-AR') }} créditos</strong>
             </div>
             <div class="sam__bar">
               <div class="sam__bar-fill" :class="{ 'sam__bar-fill--alto': iaPorcentaje >= 80 }"
@@ -300,10 +300,16 @@ onMounted(async () => {
               <!-- Si el hit ratio cae a 0 con el asistente en uso, algo rompió el caché del
                    prompt: es la única forma de enterarse, porque no falla, sale más caro. -->
               <span>Caché: {{ iaUso.cache_hit }}%</span>
+              <span>·</span>
+              <span>{{ iaUso.llamadas }} llamada{{ iaUso.llamadas === 1 ? '' : 's' }} a la API</span>
             </div>
-            <div v-if="Object.keys(iaUso.por_funcion || {}).length" class="sam__uso-fn">
-              <span v-for="(n, fn) in iaUso.por_funcion" :key="fn">
-                {{ FUNCION_LABEL[fn] || fn }}: <strong>{{ n }}</strong>
+            <!-- En créditos y no en cantidad: una función puede usarse poco y costar ocho veces
+                 más que otra, y contando llamadas eso no se ve. Las etiquetas salen del backend
+                 para no tener la lista de funciones escrita en dos lados. -->
+            <div v-if="(iaUso.desglose || []).length" class="sam__uso-fn">
+              <span v-for="d in iaUso.desglose" :key="d.funcion">
+                {{ d.label }}: <strong>{{ d.creditos }}</strong>
+                <span class="sam__uso-fn-n">({{ d.llamadas }})</span>
               </span>
             </div>
           </div>
@@ -489,6 +495,7 @@ onMounted(async () => {
 .sam__bar-fill--alto { background: #b45309; }
 .sam__uso-meta { display: flex; gap: .4rem; font-size: .7rem; color: var(--c-slate-500); }
 .sam__uso-fn { display: flex; flex-wrap: wrap; gap: .6rem; font-size: .7rem; color: var(--c-slate-500); }
+.sam__uso-fn-n { opacity: .6; }
 .sam__uso-fn strong { color: var(--c-slate-900); }
 
 /* En construcción */

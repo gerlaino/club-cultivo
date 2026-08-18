@@ -47,8 +47,14 @@ describe('SAModulos', () => {
     ],
     incluidos: [{ clave: 'medico', label: 'Módulo médico', incluido_en: 'produccion_dispensa' }],
     en_construccion: [{ clave: 'vista_paciente', label: 'Vista del paciente' }],
-    ia_uso: { llamadas: 143, tope: 500, costo_usd: 4.21, cache_hit: 88.5,
-              por_funcion: { asistente_parsear: 120, analisis_lote: 23 } },
+    // El tope se cuenta en CRÉDITOS; `llamadas` es informativo. Van distintos a propósito en el
+    // fixture: si la pantalla mezclara las unidades, estos números lo delatan.
+    ia_uso: { llamadas: 143, creditos: 210, restantes: 290, tope: 500, costo_usd: 4.21,
+              cache_hit: 88.5,
+              desglose: [
+                { funcion: 'asistente_parsear', label: 'Registro por voz',   llamadas: 120, creditos: 150 },
+                { funcion: 'chatbot',           label: 'Chatbot del admin',  llamadas: 23,  creditos: 60 },
+              ] },
   }
 
   const montar = () => mount(SAModulos, {
@@ -102,26 +108,41 @@ describe('SAModulos', () => {
     expect(w.text()).toContain('Falta cargar la API key de Pulse')
   })
 
-  it('muestra el consumo de IA del mes contra su tope', () => {
+  it('mide el consumo en CRÉDITOS, que es la unidad del tope', () => {
+    // Mostraba `llamadas` contra un tope de créditos: dos unidades en la misma barra, y la
+    // organización se podía quedar sin IA en un número distinto al que veía acá.
     const w = montar()
 
-    expect(w.text()).toContain('143 de 500 consultas')
+    expect(w.text()).toContain('210 de 500 créditos')
+    expect(w.text()).not.toContain('143 de 500')
     expect(w.text()).toContain('US$ 4.21')
     expect(w.text()).toContain('Caché: 88.5%')
-    expect(w.text()).toContain('Registro por voz: 120')
   })
 
-  it('la barra de consumo refleja el porcentaje usado', () => {
+  it('las llamadas a la API se ven, pero como dato aparte del tope', () => {
+    // Una pregunta al chatbot son varios pedidos a la API: el número sirve para entender el
+    // costo, pero no es contra lo que se mide el cupo.
+    expect(montar().text()).toContain('143 llamadas a la API')
+  })
+
+  it('el desglose por función va en créditos: una puede usarse poco y costar mucho más', () => {
+    const w = montar()
+
+    expect(w.text()).toContain('Registro por voz: 150')
+    expect(w.text()).toContain('Chatbot del admin: 60')
+  })
+
+  it('la barra de consumo refleja los créditos usados, no las llamadas', () => {
     const barra = montar().find('.sam__bar-fill')
 
-    expect(barra.attributes('style')).toContain('width: 29%')   // 143/500
+    expect(barra.attributes('style')).toContain('width: 42%')   // 210/500, no 143/500
   })
 
   it('los tramos de IA salen del catálogo del backend, no de una copia local', async () => {
     const w = montar()
     await new Promise(r => setTimeout(r, 0))
 
-    expect(w.text()).toContain('2.000 consultas por mes')       // el tramo Pro, tal como lo manda
+    expect(w.text()).toContain('2.000 créditos por mes')        // el tramo Pro, tal como lo manda
     expect(w.findAll('.sam__tier')).toHaveLength(3)
   })
 

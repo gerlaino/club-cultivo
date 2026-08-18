@@ -139,14 +139,17 @@ module Ia
       res  = http.request(req)
       body = JSON.parse(res.body)
 
-      Uso.registrar(club: club, user: user, funcion: :asistente_consultar, modelo: MODELO,
+      # Cada VUELTA se registra por separado: pregunta → consulta → respuesta son dos pedidos
+      # a la API y los dos se pagan. Contar una sola escondería la mitad del costo real. Lo que sí
+      # cambia es la etiqueta: va como `chatbot` y no mezclado con el agrónomo genérico.
+      Uso.registrar(club: club, user: user, funcion: :chatbot, modelo: MODELO,
                     tokens: Uso.tokens_de(body), ok: res.code.to_i == 200)
 
       return { error: body.dig('error', 'message') || 'Error de IA' } if res.code.to_i != 200
 
       body
     rescue StandardError => e
-      Uso.registrar(club: club, user: user, funcion: :asistente_consultar, modelo: MODELO,
+      Uso.registrar(club: club, user: user, funcion: :chatbot, modelo: MODELO,
                     ok: false, error_clase: e.class.name)
       { error: e.message }
     end
