@@ -33,7 +33,7 @@
                variedad. Tienen su propia sección abajo. -->
           <div class="inf__kpi" :class="data.sin_acreditar ? 'inf__kpi--warn' : 'inf__kpi--ok'">
             <span class="inf__kpi-valor">{{ data.sin_acreditar }}</span>
-            <span class="inf__kpi-label">Genéticas sin acreditar</span>
+            <span class="inf__kpi-label">Sin acreditar</span>
           </div>
           <div class="inf__kpi">
             <span class="inf__kpi-valor">{{ data.lotes_totales }}</span>
@@ -50,7 +50,7 @@
           <table class="inf__table">
             <thead>
               <tr>
-                <th>Variedad</th>
+                <th>Variedad</th><th>Obtentor</th>
                 <th class="inf__num">Lotes</th><th class="inf__num">Plantas</th><th class="inf__num">Gramos</th>
               </tr>
             </thead>
@@ -63,11 +63,14 @@
                    audita en la pantalla de Genéticas, que es donde se declara cada una. -->
               <tr v-for="g in (data.agrupadas || [])" :key="g.nombre">
                 <td><strong>{{ g.nombre }}</strong></td>
+                <!-- Quién obtuvo la variedad: es parte del registro del INASE y sí es dato de
+                     ellos, a diferencia del "N° de registro" que no existe. -->
+                <td class="inf__obtentor">{{ g.criador || '—' }}</td>
                 <td class="inf__num">{{ g.lotes }}</td>
                 <td class="inf__num">{{ g.plantas }}</td>
                 <td class="inf__num">{{ formatGramos(g.gramos) }}</td>
               </tr>
-              <tr v-if="!(data.agrupadas || []).length"><td colspan="4" class="inf__empty">Ninguna variedad acreditada todavía.</td></tr>
+              <tr v-if="!(data.agrupadas || []).length"><td colspan="5" class="inf__empty">Ninguna variedad acreditada todavía.</td></tr>
             </tbody>
           </table>
         </div>
@@ -144,17 +147,23 @@ onMounted(cargar)
   background: var(--c-slate-50); border-left: 3px solid var(--c-slate-300); border-radius: 0 8px 8px 0;
   font-size: var(--fs-13); color: var(--c-slate-600); line-height: 1.55; max-width: 80ch;
 }
-.inf__kpis { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-6); }
+.inf__kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-6); max-width: 720px; }
 .inf__kpi { background: var(--c-paper); border: 1px solid var(--c-ink-100); border-radius: var(--r-lg); padding: var(--sp-4); text-align: center; }
 .inf__kpi-valor { display: block; font-size: var(--fs-28); font-weight: 800; color: var(--c-ink-900); line-height: 1; }
-.inf__kpi-label { display: block; font-size: var(--fs-12); color: var(--c-ink-500); margin-top: var(--sp-1); }
+.inf__kpi-label { display: block; font-size: var(--fs-12); color: var(--c-ink-500); margin-top: var(--sp-1); text-wrap: balance; }
 .inf__kpi--ok .inf__kpi-valor   { color: #2D8A6B; }
 .inf__kpi--warn .inf__kpi-valor { color: #b45309; }
 .inf__section-title { font-size: var(--fs-16); font-weight: 700; color: var(--c-ink-900); margin-bottom: var(--sp-3); }
 .inf__table { width: 100%; border-collapse: collapse; font-size: var(--fs-13); }
 .inf__table th { text-align: left; padding: var(--sp-2) var(--sp-3); background: var(--c-ink-50); font-weight: 600; color: var(--c-ink-600); border-bottom: 1px solid var(--c-ink-100); }
 .inf__table td { padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--c-ink-50); color: var(--c-ink-800); }
-.inf__num { text-align: right; }
+.inf__num { text-align: right; width: 1%; white-space: nowrap; }
+/* La primera columna se come el espacio sobrante, así los números quedan juntos a la derecha en
+   vez de repartidos por todo el ancho. Al sacar tres columnas del informe la tabla había quedado
+   con metros de aire entre el nombre de la variedad y sus totales. */
+.inf__table th:first-child, .inf__table td:first-child { width: auto; }
+.inf__obtentor { color: var(--c-ink-500); }
+.inf__table td.inf__num { font-variant-numeric: tabular-nums; }
 .inf__tipo { color: var(--c-ink-400); font-weight: 400; }
 .inf__empty { text-align: center; color: var(--c-ink-400); padding: var(--sp-6); }
 .inf__badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: var(--fs-11); font-weight: 600; }

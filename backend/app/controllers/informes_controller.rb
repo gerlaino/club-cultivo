@@ -546,6 +546,10 @@ class InformesController < ApplicationController
         categoria_inase:       g.categoria_inase,
         fecha_registro_inase:  g.fecha_registro_inase,
         criador:               g.criador,
+        # El del criador de la VARIEDAD contra la que acredita, que es el que va al informe: si
+        # el club cultiva "Amarillo" y lo declara como TROPICANA WFC, el obtentor es el de
+        # Tropicana, no el que le puso el nombre de fantasía.
+        criador_variedad:      (g.declarada_como&.criador || g.criador),
         thc:                   g.thc&.to_f,
         cbd:                   g.cbd&.to_f,
         lotes:                 lotes_por_gen[g.id] || 0,
@@ -574,6 +578,10 @@ class InformesController < ApplicationController
                      .group_by { |g| g[:nombre] }.map do |nombre, gs|
       {
         nombre:   nombre,
+        # Quién obtuvo la variedad. Es dato del registro del INASE —a diferencia del "N° de
+        # registro", que no existe— y es lo que permite identificarla sin ambigüedad ante el
+        # organismo. Sale de la variedad ACREDITANTE, no de la genética del club.
+        criador:  gs.filter_map { |g| g[:criador_variedad] }.first,
         lotes:    gs.sum { |g| g[:lotes] },
         plantas:  gs.sum { |g| g[:plantas] },
         gramos:   gs.sum { |g| g[:gramos_producidos] }.round(1),
@@ -600,11 +608,11 @@ class InformesController < ApplicationController
 
     secciones = [{
       titulo: 'Variedades cultivadas',
-      headers: ['Variedad', 'Lotes', 'Plantas', 'Gramos'],
-      rows: agrupadas.map { |g| [g[:nombre], g[:lotes], g[:plantas], g[:gramos]] },
-      formatos: [:texto, :numero, :numero, :numero],
-      totales: [1, 2, 3],
-      aligns: { 1 => :right, 2 => :right, 3 => :right },
+      headers: ['Variedad', 'Obtentor', 'Lotes', 'Plantas', 'Gramos'],
+      rows: agrupadas.map { |g| [g[:nombre], g[:criador].presence || '—', g[:lotes], g[:plantas], g[:gramos]] },
+      formatos: [:texto, :texto, :numero, :numero, :numero],
+      totales: [2, 3, 4],
+      aligns: { 2 => :right, 3 => :right, 4 => :right },
     }]
 
     if pendientes.any?

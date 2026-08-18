@@ -84,6 +84,15 @@ RSpec.describe 'Informe INASE con variedades declaradas', type: :request do
     expect(informe['agrupadas'].map { |v| v['nombre'] }).not_to include('Critical Kush')
   end
 
+  it 'informa el obtentor de la VARIEDAD, no el de la genética propia' do
+    # Si el club cultiva "Northern Lights" y lo declara como ANANDA001, ante el INASE el obtentor
+    # es el de ANANDA001 — no el que le puso el nombre de fantasía puertas adentro.
+    inscripta.update!(criador: 'Anandamida Organic S.A.S.')
+    declarada.update!(criador: 'El club')
+
+    expect(informe['agrupadas'].first['criador']).to eq('Anandamida Organic S.A.S.')
+  end
+
   it 'el informe NO expone con qué nombre cultiva la organización' do
     # Esto se presenta ante el INASE: cómo llama a sus genéticas puertas adentro es asunto suyo.
     # El par se audita en la pantalla de Genéticas.

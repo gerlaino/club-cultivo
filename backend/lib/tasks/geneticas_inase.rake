@@ -12,8 +12,9 @@
 # aparte es la resolución que la inscribió. Por eso `numero_registro_inase` queda en nil acá y en
 # las otras ocho: pedirlo era pedir un dato que no existe.
 #
-# El criador de CAT3 tampoco figura en las fuentes públicas, así que queda vacío en vez de
-# inventado. Se completa a mano cuando aparezca.
+# Lo que SÍ se pudo confirmar de CAT3 va cargado; lo que no (perfil de THC/CBD, tipo) queda
+# vacío en vez de inventado. En un catálogo regulatorio un campo en blanco es mejor que un dato
+# que alguien supuso.
 namespace :geneticas do
   desc 'Carga en el catálogo global del INASE las variedades que falten (SIMULAR=1 para ver sin escribir)'
   task inase_faltantes: :environment do
@@ -21,12 +22,19 @@ namespace :geneticas do
 
     faltantes = [
       {
-        nombre:           'CAT3',
-        tipo:             nil,   # no publicado
-        criador:          nil,   # no publicado
-        origen:           'Argentina',
-        descripcion:      'Una de las dos primeras variedades nacionales de Cannabis sativa L. ' \
-                          'inscriptas en el Registro Nacional de Cultivares (Res. INASE 84 y 85/2022).',
+        nombre:      'CAT3',
+        tipo:        nil,  # el perfil no está publicado
+        thc:         nil,
+        cbd:         nil,
+        criador:     'Daniel Loza / Cultivo en Familia',
+        origen:      'La Plata, Argentina',
+        descripcion: 'CAT3 (Cepa Argentina Terapéutica 3). Una de las dos primeras variedades ' \
+                     'nacionales de Cannabis sativa L. inscriptas en el Registro Nacional de ' \
+                     'Cultivares, por las Resoluciones INASE 84 y 85 de 2022, junto con EVA. ' \
+                     'Obtenida de los cultivos de Daniel Loza y las asociaciones platenses ' \
+                     'Jardín del Unicornio y Cultivo en Familia, y caracterizada por la Facultad ' \
+                     'de Ciencias Exactas de la UNLP. Forma parte de un proyecto que incluye ' \
+                     'también CAT1 y CAT2.',
       },
     ]
 
@@ -38,9 +46,25 @@ namespace :geneticas do
       faltantes.each do |datos|
         # Se busca sobre TODAS las genéticas, no sólo las globales: si alguna organización cargó
         # una con ese nombre, crear la global igual rompería el índice único de slug por club.
-        ya_esta = Genetica.unscoped.where(club_id: nil).exists?(nombre: datos[:nombre])
-        if ya_esta
-          puts "  = #{datos[:nombre]} ya está en el catálogo"
+        # Si ya está, se completan los campos que estén VACÍOS y no se pisa lo cargado a mano:
+        # la primera corrida la creó sin criador ni descripción, y una tarea que sólo sabe crear
+        # deja ese agujero para siempre.
+        # Se busca con `unscoped` para ver también las borradas (el borrado es blando): si una
+        # variedad del catálogo quedó marcada como eliminada, crearla de nuevo chocaría contra el
+        # índice único de slug y además dejaría dos. Se restaura la que hay.
+        existente = Genetica.unscoped.where(club_id: nil).find_by(nombre: datos[:nombre])
+        if existente
+          faltan = datos.reject { |campo, valor| valor.nil? || existente[campo].present? }
+          faltan[:deleted_at] = nil if existente.deleted_at.present?
+
+          if faltan.empty?
+            puts "  = #{datos[:nombre]} ya está completa"
+          elsif simular
+            puts "  ~ #{datos[:nombre]} se completaría: #{faltan.keys.join(', ')} (simulación)"
+          else
+            existente.update_columns(faltan)
+            puts "  ~ #{datos[:nombre]} completada: #{faltan.keys.join(', ')}"
+          end
           next
         end
 
