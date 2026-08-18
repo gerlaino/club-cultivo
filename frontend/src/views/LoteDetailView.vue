@@ -27,7 +27,6 @@ import LotePlanVsReal       from '../components/lotes/LotePlanVsReal.vue'
 import LoteFotosSection     from '../components/lotes/LoteFotosSection.vue'
 import LoteEditarModal      from '../components/lotes/LoteEditarModal.vue'
 import LotePLCard           from '../components/lotes/LotePLCard.vue'
-import LoteIACard           from '../components/lotes/LoteIACard.vue'
 import DsBanner from '../design-system/components/Banner.vue'
 import IniciarManicuraModal   from '../components/lotes/IniciarManicuraModal.vue'
 import CompletarManicuraModal  from '../components/lotes/CompletarManicuraModal.vue'
@@ -696,7 +695,6 @@ onUnmounted(() => {
           <LotePLCard v-if="canAdmin" :lote-id="id" class="ld__card--mt" />
 
           <!-- Análisis IA — solo si la organización tiene IA habilitada -->
-          <LoteIACard v-if="club.data?.features?.ia && canAdmin" :lote-id="id" class="ld__card--mt" />
 
         </div>
       </div>

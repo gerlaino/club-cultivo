@@ -52,7 +52,6 @@ class Lote < ApplicationRecord
   has_many :pesajes_manicura,      class_name: 'PesajeManicura', dependent: :destroy
   has_many_attached :fotos
   has_many :notas,      as: :noteable,              dependent: :destroy
-  has_many :analisis_ia, class_name: 'AnalisisIa', dependent: :destroy
   # class_name explícito: el nombre ya es "singular", Rails no lo inferiría bien.
   has_many :analisis_laboratorio, class_name: 'AnalisisLaboratorio', dependent: :destroy
 

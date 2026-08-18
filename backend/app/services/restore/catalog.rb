@@ -46,7 +46,6 @@ module Restore
       { key: 'plan_trabajo',        model_name: 'PlanTrabajo',        label: 'Plan de trabajo',     group: 'Cultivo' },
       { key: 'tarea',               model_name: 'Tarea',              label: 'Tarea',               group: 'Cultivo' },
       { key: 'analisis_laboratorio',model_name: 'AnalisisLaboratorio',label: 'Análisis de laboratorio', group: 'Cultivo' },
-      { key: 'analisis_ia',         model_name: 'AnalisisIa',         label: 'Análisis IA',         group: 'Cultivo' },
 
       # --- Socios / Pacientes --------------------------------------------------
       { key: 'paciente',            model_name: 'Paciente',           label: 'Socio / Paciente',    group: 'Socios', descriptor: NOMBRE_PACIENTE, search: %i[nombre apellido dni email] },

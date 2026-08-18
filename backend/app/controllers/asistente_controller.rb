@@ -160,60 +160,6 @@ class AsistenteController < BaseController
     end
   end
 
-  # POST /asistente/consultar
-  def consultar
-    texto    = params[:texto].to_s.strip
-    contexto = params[:contexto]
-
-    return render json: { error: 'Texto vacío' }, status: :unprocessable_entity if texto.blank?
-    if (msg = limite_ia)
-      return render json: { error: msg, limite_ia: true }, status: :too_many_requests
-    end
-
-    sesion  = ConversacionAsistente.de_hoy(current_user)
-    prompt  = construir_prompt_consulta(contexto) + sesion.historial_para_prompt
-    result  = llamar_claude_libre(texto, prompt)
-
-    if result[:error]
-      render json: { error: result[:error] }, status: :unprocessable_entity
-    else
-      sesion.agregar_intercambio(texto, result[:texto].truncate(150)) rescue nil
-      render json: { respuesta: result[:texto] }
-    end
-  end
-
-  # POST /asistente/analizar_lote
-  def analizar_lote
-    return render json: { error: 'No tenés permiso para usar análisis IA.' }, status: :forbidden unless current_user.admin? || current_user.supervisor?
-    if (msg = limite_ia)
-      return render json: { error: msg, limite_ia: true }, status: :too_many_requests
-    end
-
-    lote = current_user.club.lotes.find_by(id: params[:lote_id])
-    return render json: { error: 'Lote no encontrado' }, status: :not_found unless lote
-
-    reciente = lote.analisis_ia.where('created_at > ?', 4.hours.ago).order(created_at: :desc).first
-    if reciente
-      return render json: serializar_analisis(reciente).merge(
-        cached:         true,
-        cooldown_hasta: (reciente.created_at + 4.hours).iso8601
-      )
-    end
-
-    resultado = AnalisisLoteService.new(lote, current_user).analizar!
-
-    if resultado[:error]
-      render json: { error: resultado[:error] }, status: :unprocessable_entity
-    else
-      a = resultado[:analisis_obj] || lote.analisis_ia.order(created_at: :desc).first
-      render json: serializar_analisis(a).merge(
-        cached:         false,
-        cooldown_hasta: (a.created_at + 4.hours).iso8601
-      )
-    end
-  end
-
-  # GET /asistente/historial_analisis?lote_id=X
   # El medidor. Sale de la misma fuente que el tope (`Ia::Uso.consumo`) a propósito: si la
   # pantalla contara por su cuenta, un día diría "te quedan 40" con el dictado ya rechazado.
   #
@@ -251,20 +197,6 @@ class AsistenteController < BaseController
     else
       render json: resultado
     end
-  end
-
-  def historial_analisis
-    return render json: { error: 'No tenés permiso para usar análisis IA.' }, status: :forbidden unless current_user.admin? || current_user.supervisor?
-    lote = current_user.club.lotes.find_by(id: params[:lote_id])
-    return render json: { error: 'Lote no encontrado' }, status: :not_found unless lote
-
-    analisis = lote.analisis_ia.order(created_at: :desc).limit(3)
-    reciente = analisis.first
-    cooldown_hasta = reciente ? (reciente.created_at + 4.hours).iso8601 : nil
-    render json: {
-      analisis:       analisis.map { |a| serializar_analisis(a) },
-      cooldown_hasta: cooldown_hasta
-    }
   end
 
   # POST /asistente/ejecutar
@@ -426,10 +358,6 @@ class AsistenteController < BaseController
     []
   end
 
-  def serializar_analisis(a)
-    { id: a.id, contenido: a.contenido, tokens_usados: a.tokens_usados, created_at: a.created_at }
-  end
-
   # El tope y el registro viven en Ia::Uso. Antes esto contaba por USUARIO y por hora, mientras
   # el límite es de la organización: cinco usuarios en tier básico daban 100 llamadas/hora en vez
   # de 20. Ahora el mensual (que es el que se vende) se cuenta contra la base y el horario queda
@@ -457,19 +385,6 @@ class AsistenteController < BaseController
   # sólo `cache_read_tokens` en 0. Por eso se registra el hit ratio.
   def construir_prompt(contexto, es_cultivador)
     [PROMPT_BASE + permisos_rol(es_cultivador), contexto_rico(contexto)]
-  end
-
-  # Este NO se cachea, a diferencia del de `parsear`: su parte estable son tres líneas (~60
-  # tokens) y el mínimo cacheable de Sonnet 4.6 son 1024. Poner un `cache_control` acá no
-  # ahorraría nada — la API simplemente no cachearía, sin avisar. Si algún día esta base crece
-  # por encima del mínimo, conviene partirla como se hizo en `construir_prompt`.
-  def construir_prompt_consulta(contexto)
-    base = <<~PROMPT
-      Sos un agrónomo especialista en cannabis medicinal. Respondés preguntas del equipo de cultivo
-      de forma clara, directa y útil. Podés analizar datos, identificar tendencias, y dar recomendaciones.
-      Respondés en español. Usá markdown si mejora la claridad. No generes JSON.
-    PROMPT
-    base + permisos_rol(current_user.cultivador?) + contexto_rico(contexto)
   end
 
   def permisos_rol(es_cultivador)
@@ -676,37 +591,6 @@ class AsistenteController < BaseController
     end
 
     accion
-  end
-
-  def llamar_claude_libre(texto, prompt_sistema)
-    api_key = ENV['ANTHROPIC_API_KEY']
-    return { error: 'API key de IA no configurada' } if api_key.blank?
-
-    uri  = URI('https://api.anthropic.com/v1/messages')
-    http = Net::HTTP.new(uri.host, uri.port)
-    http.use_ssl      = true
-    http.read_timeout = 45
-
-    request = Net::HTTP::Post.new(uri)
-    request['Content-Type']      = 'application/json'
-    request['x-api-key']         = api_key
-    request['anthropic-version'] = '2023-06-01'
-    request.body = {
-      model:      MODELO_ASISTENTE,
-      max_tokens: 1000,
-      system:     prompt_sistema,
-      messages:   [{ role: 'user', content: texto }]
-    }.to_json
-
-    response = http.request(request)
-    body     = JSON.parse(response.body)
-    registrar_uso(:asistente_consultar, MODELO_ASISTENTE, body, ok: response.code.to_i == 200)
-    return { error: "IA: #{body.dig('error', 'message')}" } if response.code.to_i != 200
-
-    { texto: body.dig('content', 0, 'text').to_s.strip }
-  rescue => e
-    registrar_uso(:asistente_consultar, MODELO_ASISTENTE, nil, ok: false, error_clase: e.class.name)
-    { error: e.message }
   end
 
   # `system` va como ARRAY de bloques y no como string: es la única forma de marcar dónde corta
