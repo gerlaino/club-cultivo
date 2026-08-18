@@ -120,6 +120,33 @@ RSpec.describe 'Asistente: el módulo de IA', type: :request do
     end
   end
 
+  # El chatbot es un módulo APARTE de `ia`, no una función suya: una organización puede querer que
+  # su equipo registre hablando sin abrirle a nadie una ventana que consulta la base entera.
+  describe 'el chatbot del admin' do
+    def preguntar!
+      post '/api/asistente/chat', params: { texto: '¿qué genética rinde mejor?' }, as: :json
+    end
+
+    it 'con IA pero SIN el módulo chatbot, no contesta y dice cuál falta' do
+      club = create(:club, features: { 'cultivo' => true, 'ia' => true })
+      sign_in_as(create(:user, club: club, role: 'admin'))
+
+      preguntar!
+
+      expect(response).to have_http_status(:forbidden)
+      expect(JSON.parse(response.body)['modulo']).to eq('chatbot')
+    end
+
+    it 'con el módulo activo, el cultivador tampoco entra: es del admin' do
+      club = create(:club, features: { 'cultivo' => true, 'ia' => true, 'chatbot' => true })
+      sign_in_as(create(:user, club: club, role: 'cultivador'))
+
+      preguntar!
+
+      expect(response).to have_http_status(:forbidden)
+    end
+  end
+
   # Lo que todavía no existe no se enciende por la puerta de atrás: `web_publica` es la clave
   # vieja de `vista_paciente`, que está EN CONSTRUCCIÓN.
   describe 'un módulo en construcción con la clave vieja guardada' do

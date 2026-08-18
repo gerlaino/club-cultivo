@@ -13,7 +13,7 @@ module Ia
       EN_CURSO = %w[floracion cosecha secado curado].freeze
 
       def resolver(dias: 60, **)
-        lotes = club.lotes.where(estado: EN_CURSO).includes(:genetica, :sala)
+        lotes = club.lotes.where(estado: EN_CURSO).includes(:genetica, :sala, :lote_eventos)
         return insuficiente('no hay lotes en floración ni en post-cosecha ahora mismo') if lotes.empty?
 
         filas = lotes.map { |lote| fila(lote) }
@@ -37,6 +37,11 @@ module Ia
           genetica:           lote.genetica&.nombre,
           sala:               lote.sala&.nombre,
           estado:             lote.estado,
+          # Hace cuánto está en esa fase. Faltaba, y el chatbot contestaba "no tengo los días en
+          # floración" mientras la tabla de lotes lo mostraba en pantalla.
+          dias_en_fase:       lote.dias_en_estado,
+          en_fase_desde:      lote.fecha_estado_actual,
+          dias_desde_inicio:  lote.dias_desde_inicio,
           plantas:            (lote.plants_count_cosechadas || lote.plants_count).to_i,
           dias_para_cosecha:  dias_para_cosecha(lote),
           gramos_estimados:   estimado,

@@ -175,6 +175,25 @@ class Lote < ApplicationRecord
     (Time.zone.today - start_date).to_i
   end
 
+  # Desde cuándo está en el estado en el que está.
+  #
+  # Se toma la ÚLTIMA entrada a ese estado y no la primera: si un lote se avanzó por error y
+  # volvió atrás, lo que interesa es desde cuándo está donde está. Si nunca cambió de estado
+  # (se creó ya en vegetativo, por ejemplo), vale el arranque del lote.
+  #
+  # Vive acá y no en el serializer porque lo miran dos lugares —la tabla de lotes y el chatbot— y
+  # ya pasó: el chatbot decía "no tengo los días en floración" mientras la tabla mostraba "3d".
+  def fecha_estado_actual
+    ultimo = lote_eventos.select { |e| e.tipo == 'cambio_estado' && e.estado_nuevo == estado }
+                         .max_by(&:registrado_en)
+    ultimo&.registrado_en&.to_date || start_date
+  end
+
+  def dias_en_estado
+    desde = fecha_estado_actual
+    desde ? (Time.zone.today - desde).to_i : nil
+  end
+
   # ── Los tres relojes del lote ──────────────────────────────────────────────
   # El ciclo se cuenta DESDE QUE ENTRA A VEGETATIVO, no desde el esqueje. En el domo la planta no
   # crece: gasta reservas en emitir raíz y ni siquiera come (por eso su registro no tiene EC ni pH).

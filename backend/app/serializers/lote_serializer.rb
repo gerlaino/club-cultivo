@@ -39,6 +39,9 @@ class LoteSerializer
 
     # Días en el estado actual: desde el último cambio a este estado (o desde el
     # inicio del lote si nunca cambió de estado, ej. creado en vegetativo/semilla).
+    # El cálculo vive en el modelo (`Lote#fecha_estado_actual`): lo miran esta tabla y el chatbot,
+    # y con dos copias se contradecían — el chatbot decía "no tengo los días en floración"
+    # mientras acá se mostraba "3d". Se reusan los eventos ya precargados para no re-consultar.
     ev_estado_actual = eventos.select { |e| e.tipo == 'cambio_estado' && e.estado_nuevo == lote.estado }.max_by(&:registrado_en)
     fecha_estado_actual = ev_estado_actual&.registrado_en&.to_date || lote.start_date
     dias_en_estado   = fecha_estado_actual ? (Date.current - fecha_estado_actual).to_i : nil

@@ -266,6 +266,10 @@ class Club < ApplicationRecord
     'eventos'  => { label: 'Eventos',        desc: 'Fiestas y catas: provisión desde depósitos, entradas y rendición.', requiere: 'El Buffet tiene que estar activo.' },
     'iot'      => { label: 'Ambiente / IoT', desc: 'Sensores, lecturas automáticas y reglas.',           requiere: 'Hardware de la organización (Sonoff u otro) o importación por CSV.' },
     'ia'       => { label: 'Asistente IA',   desc: 'Análisis de lote, plan de trabajo y registro por voz.', requiere: 'ANTHROPIC_API_KEY en el entorno.' },
+    # Va aparte de `ia` a propósito: el dictado por voz y el chatbot se venden distinto y se
+    # prueban distinto. Una organización puede querer que su equipo registre hablando sin abrirle
+    # a nadie una ventana que consulta la base entera.
+    'chatbot'  => { label: 'Chatbot del admin', desc: 'El admin pregunta sobre su organización y el sistema contesta con sus propios datos.', requiere: 'El Asistente IA tiene que estar activo. EN PRUEBA: contesta pocas preguntas todavía.' },
     'delivery' => { label: 'Delivery',       desc: 'Reparto a domicilio: paquetes, rutas, firma de entrega y cobro contra-entrega.', requiere: 'La suite de Producción y dispensa tiene que estar activa.' },
     'mailer'   => { label: 'Correo electrónico', desc: 'Casilla propia, plantillas de mail y envíos a los pacientes.', requiere: 'Casilla de la organización conectada en Preferencias → Correo electrónico.' },
     'whatsapp' => { label: 'WhatsApp',       desc: 'Avisos de entrega por WhatsApp.',                    requiere: 'Cuenta de Twilio de la organización (SID, token y número).' },
@@ -286,7 +290,7 @@ class Club < ApplicationRecord
   # Add-ons que funcionan a medias: vienen apagados por defecto y el super admin muestra la
   # advertencia de `requiere` antes de dejar activarlos. No se bloquean por completo —eso
   # dejaría su código inalcanzable— pero nadie los prende sin enterarse de qué les falta.
-  ADDONS_INCOMPLETOS = %w[ariccame eventos].freeze
+  ADDONS_INCOMPLETOS = %w[ariccame eventos chatbot].freeze
 
   # Se mantiene para compatibilidad: hay clubes con las claves viejas guardadas en `features`.
   AVAILABLE_FEATURES = (SUITES.keys + ADDONS.keys + INCLUIDOS_EN_SUITE.keys).freeze

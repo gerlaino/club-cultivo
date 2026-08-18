@@ -228,6 +228,11 @@ class AsistenteController < BaseController
   # Sólo admin: es el único que ve la organización entera, y las consultas devuelven datos de
   # cultivo y producción de toda la casa. El resto de los roles usa el dictado, no esto.
   def chat
+    # Módulo aparte de `ia`: una organización puede querer que su equipo registre hablando sin
+    # abrirle a nadie una ventana que consulta la base entera. Lo prende el super admin.
+    return render json: { error: 'El chatbot no está activo en tu organización', requiere_modulo: true, modulo: 'chatbot' },
+                  status: :forbidden unless current_user.club&.feature?(:chatbot)
+
     return render json: { error: 'El chatbot es solo para administradores' }, status: :forbidden unless
       current_user.admin? || current_user.super_admin?
 

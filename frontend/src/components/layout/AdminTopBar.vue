@@ -34,7 +34,7 @@
         <!-- Preguntarle a la organización. Cajón lateral y no el modal del dictado: ese está
              hecho para el cultivador con el teléfono, y acá taparía justo los datos contra los
              que se quiere contrastar la respuesta. -->
-        <button v-if="club.data?.features?.ia" class="atb__icon-btn" @click="chatOpen = true"
+        <button v-if="club.data?.features?.chatbot" class="atb__icon-btn" @click="chatOpen = true"
                 aria-label="Preguntale a tu organización" title="Preguntale a tu organización">
           <Sparkles :size="20" :stroke-width="1.75" />
         </button>
