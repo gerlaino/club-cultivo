@@ -473,9 +473,11 @@ class Club < ApplicationRecord
         puede:    lotes.where(estado: Ia::Consultas::ProduccionProxima::EN_CURSO).any?,
         falta:    'No hay lotes en floración ni en post-cosecha ahora mismo.' },
       { pregunta: 'Qué genética rinde mejor',
-        puede:    con_minimo.positive?,
-        falta:    "Ninguna genética llega a #{Ia::Consultas::RendimientoPorGenetica::MINIMO_LOTES} " \
-                  "lotes cosechados (la que más tiene: #{por_gen.values.max || 0})." },
+        # Hacen falta DOS que lleguen al mínimo: con una sola no hay con qué compararla.
+        puede:    con_minimo >= Ia::Consultas::RendimientoPorGenetica::MINIMO_COMPARABLES,
+        falta:    "#{con_minimo} genética(s) llegan a #{Ia::Consultas::RendimientoPorGenetica::MINIMO_LOTES} " \
+                  "lotes cosechados y hacen falta #{Ia::Consultas::RendimientoPorGenetica::MINIMO_COMPARABLES} " \
+                  "para poder compararlas (la que más tiene: #{por_gen.values.max || 0} lotes)." },
       { pregunta: 'Qué se muere y por qué',
         puede:    plants.count >= Ia::Consultas::PerdidasPorMotivo::MINIMO_PLANTAS,
         falta:    "Hacen falta #{Ia::Consultas::PerdidasPorMotivo::MINIMO_PLANTAS} plantas " \
