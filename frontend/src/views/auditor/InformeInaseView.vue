@@ -18,24 +18,29 @@
              dos informes que cortan el mismo dato distinto parecen contradecirse. -->
         <p v-if="data.resena" class="inf__resena">{{ data.resena }}</p>
         <div class="inf__kpis">
+          <!-- Los KPIs van en la MISMA unidad que la tabla: la variedad del INASE. Contaban
+               genéticas propias mientras la tabla agrupaba por variedad, así que un club con 24
+               genéticas declaradas contra TROPICANA WFC leía "24 genéticas" arriba de UNA fila.
+               Los tres primeros cierran: variedades = con N° + falta N°. -->
           <div class="inf__kpi">
-            <span class="inf__kpi-valor">{{ data.total_geneticas }}</span>
-            <span class="inf__kpi-label">Genéticas</span>
+            <span class="inf__kpi-valor">{{ data.total_variedades }}</span>
+            <span class="inf__kpi-label">Variedades</span>
           </div>
           <div class="inf__kpi inf__kpi--ok">
-            <span class="inf__kpi-valor">{{ data.registradas_inase }}</span>
-            <span class="inf__kpi-label">Inscriptas</span>
+            <span class="inf__kpi-valor">{{ data.con_registro }}</span>
+            <span class="inf__kpi-label">Con N° registro</span>
           </div>
-          <!-- Declaradas: no están inscriptas, pero la organización las presenta contra una que sí
-               lo está. Cuentan como acreditadas; sólo las que no tienen ninguna de las dos
-               cosas son un pendiente. -->
-          <div class="inf__kpi inf__kpi--ok">
-            <span class="inf__kpi-valor">{{ data.declaradas ?? 0 }}</span>
-            <span class="inf__kpi-label">Declaradas</span>
+          <!-- Lo accionable del encabezado: la variedad acredita, pero le falta cargar el número
+               del INASE — es lo que sale en blanco en la columna "N° registro". -->
+          <div class="inf__kpi" :class="data.falta_registro ? 'inf__kpi--warn' : 'inf__kpi--ok'">
+            <span class="inf__kpi-valor">{{ data.falta_registro }}</span>
+            <span class="inf__kpi-label">Falta N° registro</span>
           </div>
-          <div class="inf__kpi" :class="data.sin_registrar ? 'inf__kpi--warn' : 'inf__kpi--ok'">
-            <span class="inf__kpi-valor">{{ data.sin_registrar }}</span>
-            <span class="inf__kpi-label">Sin acreditar</span>
+          <!-- El único que va en genéticas propias, y a propósito: son las que todavía NO son una
+               variedad. Tienen su propia sección abajo. -->
+          <div class="inf__kpi" :class="data.sin_acreditar ? 'inf__kpi--warn' : 'inf__kpi--ok'">
+            <span class="inf__kpi-valor">{{ data.sin_acreditar }}</span>
+            <span class="inf__kpi-label">Genéticas sin acreditar</span>
           </div>
           <div class="inf__kpi">
             <span class="inf__kpi-valor">{{ data.lotes_totales }}</span>
@@ -48,33 +53,32 @@
         </div>
 
         <div class="inf__section">
-          <h2 class="inf__section-title">Variedades de la organización y su producción</h2>
+          <h2 class="inf__section-title">Variedades acreditadas y su producción</h2>
           <table class="inf__table">
             <thead>
               <tr>
-                <th>Variedad</th><th>Se cultiva como</th><th>INASE</th><th>N° registro</th>
+                <th>Variedad</th><th>N° registro INASE</th>
                 <th class="inf__num">Lotes</th><th class="inf__num">Plantas</th><th class="inf__num">Gramos</th>
               </tr>
             </thead>
             <tbody>
               <!-- UNA FILA POR VARIEDAD ACREDITABLE, no por genética de la organización: si veinte
                    genéticas propias se declaran contra TROPICANA WFC, listarlas sueltas daba
-                   veinte filas con el mismo nombre y parecía un error de datos. Los nombres
-                   propios van juntos en "Se cultiva como". -->
+                   veinte filas con el mismo nombre y parecía un error de datos.
+                   Y los nombres propios NO se muestran: esto se presenta ante el INASE, y cómo la
+                   organización llama a sus genéticas puertas adentro es asunto suyo. El par se
+                   audita en la pantalla de Genéticas, que es donde se declara cada una. -->
               <tr v-for="g in (data.agrupadas || [])" :key="g.nombre">
                 <td><strong>{{ g.nombre }}</strong></td>
-                <td>{{ g.propios?.length ? g.propios.join(', ') : '—' }}</td>
                 <td>
-                  <span class="inf__badge" :class="g.numero ? 'inf__badge--ok' : 'inf__badge--no'">
-                    {{ g.propios?.length ? '✓ Declarada' : (g.numero ? '✓ Inscripta' : 'Sin acreditar') }}
-                  </span>
+                  <span v-if="g.numero">{{ g.numero }}</span>
+                  <span v-else class="inf__badge inf__badge--no">Falta cargar</span>
                 </td>
-                <td>{{ g.numero || '—' }}</td>
                 <td class="inf__num">{{ g.lotes }}</td>
                 <td class="inf__num">{{ g.plantas }}</td>
                 <td class="inf__num">{{ formatGramos(g.gramos) }}</td>
               </tr>
-              <tr v-if="!(data.agrupadas || []).length"><td colspan="7" class="inf__empty">Sin genéticas cargadas.</td></tr>
+              <tr v-if="!(data.agrupadas || []).length"><td colspan="5" class="inf__empty">Ninguna variedad acreditada todavía.</td></tr>
             </tbody>
           </table>
         </div>

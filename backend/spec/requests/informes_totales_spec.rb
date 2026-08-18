@@ -86,9 +86,12 @@ RSpec.describe 'Informes — los totales tienen que cerrar', type: :request do
 
       get '/api/informes/inase'
 
-      expect(json['total_geneticas']).to eq(json['geneticas'].size)
-      expect(json['lotes_totales']).to eq(json['geneticas'].sum { |g| g['lotes'] })
-      expect(json['registradas_inase'] + json['sin_registrar']).to eq(json['total_geneticas'])
+      # El total tiene que cerrar contra LA TABLA QUE SE MUESTRA, que es la de variedades. Antes
+      # cerraba contra las genéticas propias mientras la tabla agrupaba por variedad: los dos
+      # números eran correctos por separado y se contradecían en pantalla.
+      expect(json['total_variedades']).to eq(json['agrupadas'].size)
+      expect(json['lotes_totales']).to eq(json['agrupadas'].sum { |v| v['lotes'] })
+      expect(json['con_registro'] + json['falta_registro']).to eq(json['total_variedades'])
     end
   end
 

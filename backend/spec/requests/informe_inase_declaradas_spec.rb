@@ -48,21 +48,57 @@ RSpec.describe 'Informe INASE con variedades declaradas', type: :request do
     expect(fila['acreditada']).to be(false)
   end
 
-  it 'cuenta declaradas e inscriptas por separado, y sólo lo no acreditado como pendiente' do
+  it 'los KPIs cuentan VARIEDADES, en la misma unidad que la tabla' do
+    # El bug: contaban genéticas propias mientras la tabla agrupa por variedad, así que un club
+    # con 24 genéticas declaradas contra una sola variedad leía "24 genéticas" arriba de UNA fila.
     datos = informe
 
-    expect(datos['declaradas']).to eq(1)
-    expect(datos['sin_registrar']).to eq(1)
+    # Una sola variedad acreditable (ANANDA001), aunque haya dos genéticas propias cargadas.
+    expect(datos['total_variedades']).to eq(1)
+    expect(datos['agrupadas'].size).to eq(datos['total_variedades'])
+    expect(datos['agrupadas'].map { |v| v['nombre'] }).to eq(['ANANDA001'])
+  end
+
+  it 'los tres primeros KPIs cierran: variedades = con N° + falta N°' do
+    datos = informe
+
+    expect(datos['con_registro'] + datos['falta_registro']).to eq(datos['total_variedades'])
+    expect(datos['con_registro']).to eq(1) # ANANDA001 tiene INASE-12345
+    expect(datos['falta_registro']).to eq(0)
+  end
+
+  it 'lo no acreditado se cuenta en genéticas propias y va aparte' do
+    # Es la excepción de unidad, a propósito: justamente NO son una variedad todavía.
+    datos = informe
+
+    expect(datos['sin_acreditar']).to eq(1)
     expect(datos['pendientes'].map { |g| g['nombre_propio'] }).to eq(['Critical Kush'])
   end
 
-  it 'declarar una genética la saca de los pendientes' do
-    expect(informe['sin_registrar']).to eq(1)
+  it 'una genética sin acreditar NO se cuela en la tabla haciéndose pasar por variedad' do
+    # Entraba: al agrupar por `nombre_declarado`, la no declarada caía en su propio nombre y
+    # aparecía como una variedad del INASE que no existe.
+    expect(informe['agrupadas'].map { |v| v['nombre'] }).not_to include('Critical Kush')
+  end
+
+  it 'el informe NO expone con qué nombre cultiva la organización' do
+    # Esto se presenta ante el INASE: cómo llama a sus genéticas puertas adentro es asunto suyo.
+    # El par se audita en la pantalla de Genéticas.
+    variedad = informe['agrupadas'].first
+
+    expect(variedad).not_to have_key('propios')
+    expect(variedad.to_s).not_to include('Northern Lights')
+  end
+
+  it 'declarar una genética la saca de los pendientes y no agrega una variedad nueva' do
+    expect(informe['sin_acreditar']).to eq(1)
 
     pendiente.update!(declarada_como: inscripta)
+    datos = informe
 
-    expect(informe['sin_registrar']).to eq(0)
-    expect(informe['pendientes']).to be_empty
-    expect(informe['declaradas']).to eq(2)
+    expect(datos['sin_acreditar']).to eq(0)
+    expect(datos['pendientes']).to be_empty
+    # Las dos genéticas acreditan contra la MISMA variedad: sigue habiendo una sola fila.
+    expect(datos['total_variedades']).to eq(1)
   end
 end

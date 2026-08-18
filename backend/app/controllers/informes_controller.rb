@@ -554,52 +554,64 @@ class InformesController < ApplicationController
       }
     end
 
-    registradas = filas.count { |f| f[:registrada_inase] }
-    declaradas  = filas.count { |f| f[:declarada] }
     # Lo que le falta a la organización: lo que cultiva sin poder acreditarlo, ni por registro propio
     # ni por declaración. Es la única fila accionable del informe.
     pendientes  = filas.reject { |f| f[:acreditada] }
 
-    # UNA FILA POR VARIEDAD ACREDITABLE, no por genética de la organización. Si veinte genéticas propias
-    # se declaran contra TROPICANA WFC, listarlas por separado da veinte filas con el mismo
-    # nombre —parece un error de datos— y encima al organismo le importa cuánto se cultivó de
-    # esa variedad, no cómo la llama la organización puertas adentro. Los nombres propios van juntos en
-    # "Se cultiva como", que es lo que hace auditable la traducción.
-    agrupadas = filas.group_by { |g| g[:nombre] }.map do |nombre, gs|
+    # UNA FILA POR VARIEDAD ACREDITABLE, no por genética de la organización. Si veinte genéticas
+    # propias se declaran contra TROPICANA WFC, listarlas por separado da veinte filas con el
+    # mismo nombre —parece un error de datos— y al organismo le importa cuánto se cultivó de esa
+    # variedad, no cómo la llama la organización puertas adentro.
+    #
+    # Por eso mismo los nombres propios NO viajan: este informe se presenta ante el INASE, y cómo
+    # la organización llama a sus genéticas es asunto suyo. La traducción se audita en la pantalla
+    # de Genéticas, que es donde se declara cada una.
+    #
+    # Y se agrupan sólo las ACREDITADAS: una genética sin declarar no es una variedad, y entraba
+    # igual a la tabla haciéndose pasar por una (su `nombre_declarado` cae en su propio nombre).
+    # Las que no se pueden acreditar tienen su propia sección, que es la accionable.
+    agrupadas = filas.select { |f| f[:acreditada] }
+                     .group_by { |g| g[:nombre] }.map do |nombre, gs|
       {
         nombre:   nombre,
         numero:   gs.filter_map { |g| g[:numero_registro_inase] }.first,
-        propios:  gs.select { |g| g[:declarada] }.map { |g| g[:nombre_propio] },
         lotes:    gs.sum { |g| g[:lotes] },
         plantas:  gs.sum { |g| g[:plantas] },
         gramos:   gs.sum { |g| g[:gramos_producidos] }.round(1),
       }
     end.sort_by { |g| g[:nombre].to_s }
 
+    # LOS KPIs VAN EN LA MISMA UNIDAD QUE LA TABLA: la variedad acreditable.
+    #
+    # Contaban genéticas propias mientras la tabla agrupaba por variedad, así que un club con 24
+    # genéticas declaradas contra TROPICANA WFC leía "24 genéticas" arriba de UNA sola fila. Dos
+    # unidades distintas en la misma pantalla, y ninguna manera de saber cuál mirar.
+    #
+    # `sin_acreditar` es la excepción y va en genéticas propias a propósito: son justamente las
+    # que NO son una variedad todavía, y tienen su propia sección abajo.
     datos = {
-      total_geneticas:   filas.size,
-      registradas_inase: registradas,
-      declaradas:        declaradas,
-      acreditadas:       registradas + declaradas,
-      sin_registrar:     pendientes.size,
-      gramos_totales:    filas.sum { |f| f[:gramos_producidos] }.round(1),
-      lotes_totales:     filas.sum { |f| f[:lotes] },
-      geneticas:         filas,
-      agrupadas:         agrupadas,
-      pendientes:        pendientes,
+      total_variedades: agrupadas.size,
+      con_registro:     agrupadas.count { |v| v[:numero].present? },
+      # La fila accionable del encabezado: variedades que se acreditan pero a las que les falta
+      # cargar el N° del INASE, que es lo que sale en blanco en la columna "N° registro".
+      falta_registro:   agrupadas.count { |v| v[:numero].blank? },
+      sin_acreditar:    pendientes.size,
+      gramos_totales:   agrupadas.sum { |v| v[:gramos] }.round(1),
+      lotes_totales:    agrupadas.sum { |v| v[:lotes] },
+      geneticas:        filas,
+      agrupadas:        agrupadas,
+      pendientes:       pendientes,
     }
 
     secciones = [{
       titulo: 'Variedades cultivadas',
-      headers: ['Variedad', 'N° INASE', 'Se cultiva como', 'Lotes', 'Plantas', 'Gramos'],
+      headers: ['Variedad', 'N° INASE', 'Lotes', 'Plantas', 'Gramos'],
       rows: agrupadas.map { |g|
-        [g[:nombre], g[:numero].presence || 'Sin registrar',
-         g[:propios].any? ? g[:propios].join(', ') : '—',
-         g[:lotes], g[:plantas], g[:gramos]]
+        [g[:nombre], g[:numero].presence || 'Falta cargar', g[:lotes], g[:plantas], g[:gramos]]
       },
-      formatos: [:texto, :texto, :texto, :numero, :numero, :numero],
-      totales: [3, 4, 5],
-      aligns: { 3 => :right, 4 => :right, 5 => :right },
+      formatos: [:texto, :texto, :numero, :numero, :numero],
+      totales: [2, 3, 4],
+      aligns: { 2 => :right, 3 => :right, 4 => :right },
     }]
 
     if pendientes.any?
@@ -614,16 +626,17 @@ class InformesController < ApplicationController
 
     responder_informe(
       titulo: 'Informe INASE — variedades', nombre: 'informe_inase', datos: datos,
-      resena: 'Las variedades que la organización cultiva y con cuál acredita cada una ante el INASE. Una fila por variedad inscripta: si la organización la cultiva bajo otro nombre, ese nombre figura en «Se cultiva como». Al pie, lo que todavía no se puede acreditar.',
+      resena: 'Las variedades del registro INASE con las que la organización acredita lo que cultiva, y cuánto produjo de cada una. Una fila por variedad. Al pie, lo que todavía no se puede acreditar.',
       kpis: [
-        { label: 'Variedades',    valor: filas.size },
-        { label: 'Inscriptas',    valor: registradas, tono: :ok },
-        { label: 'Declaradas',    valor: declaradas,  tono: :ok },
-        { label: 'Sin acreditar', valor: pendientes.size, tono: pendientes.any? ? :warn : :ok },
+        { label: 'Variedades',      valor: datos[:total_variedades] },
+        { label: 'Con N° registro', valor: datos[:con_registro], tono: :ok },
+        { label: 'Falta N°',        valor: datos[:falta_registro], tono: datos[:falta_registro].positive? ? :warn : :ok },
+        { label: 'Sin acreditar',   valor: pendientes.size, tono: pendientes.any? ? :warn : :ok },
       ],
       secciones: secciones,
-      nota: 'Las variedades que la organización no tiene inscriptas se presentan declaradas contra ' \
-            'una variedad del registro INASE. La columna "Se cultiva como" deja ver el par.',
+      nota: 'Cada variedad de esta tabla acredita una o más genéticas de la organización. Con qué ' \
+            'nombre las cultiva puertas adentro es asunto suyo y no se informa acá: el par se ' \
+            'audita en la pantalla de Genéticas.',
       # La pantalla se abre siempre —es la que lista los pendientes—; el archivo que se
       # presenta ante el organismo, no, mientras haya variedades sin acreditar.
       exige_declaracion_inase: true,

@@ -20,9 +20,13 @@ RSpec.describe 'GET /informes/inase', type: :request do
     expect(response).to have_http_status(:ok)
     body = JSON.parse(response.body)
 
-    expect(body['total_geneticas']).to eq(2)
-    expect(body['registradas_inase']).to eq(1)
-    expect(body['sin_registrar']).to eq(1)
+    # Los KPIs cuentan VARIEDADES acreditables, en la misma unidad que la tabla. `Lemon` está
+    # inscripta y es una; `Casera` no acredita nada todavía, así que no es una variedad — cuenta
+    # aparte, en genéticas sin acreditar.
+    expect(body['total_variedades']).to eq(1)
+    expect(body['con_registro']).to eq(1)
+    expect(body['falta_registro']).to eq(0)
+    expect(body['sin_acreditar']).to eq(1)
 
     lemon = body['geneticas'].find { |g| g['nombre'] == 'Lemon' }
     expect(lemon['registrada_inase']).to be(true)
@@ -62,7 +66,10 @@ RSpec.describe 'GET /informes/inase', type: :request do
       gen_no.update!(activa: false)
 
       get '/informes/inase', headers: auth_headers
-      expect(JSON.parse(response.body)['total_geneticas']).to eq(1)
+      # Queda `Lemon`, que está inscripta: una variedad y ninguna genética sin acreditar.
+      body = JSON.parse(response.body)
+      expect(body['total_variedades']).to eq(1)
+      expect(body['sin_acreditar']).to eq(0)
     end
   end
 
