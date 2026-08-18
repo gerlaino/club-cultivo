@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_17_140000) do
+ActiveRecord::Schema[7.2].define(version: 2026_08_18_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -83,25 +83,6 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_17_140000) do
     t.index ["club_id", "leida_at"], name: "index_alertas_internas_on_club_id_and_leida_at"
     t.index ["club_id"], name: "index_alertas_internas_on_club_id"
     t.index ["lote_id"], name: "index_alertas_internas_on_lote_id"
-  end
-
-  create_table "analisis_ia", force: :cascade do |t|
-    t.bigint "club_id", null: false
-    t.bigint "lote_id"
-    t.bigint "user_id", null: false
-    t.string "tipo", null: false
-    t.text "contenido", null: false
-    t.integer "tokens_usados"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.datetime "deleted_at"
-    t.bigint "deleted_by_id"
-    t.index ["club_id"], name: "index_analisis_ia_on_club_id"
-    t.index ["deleted_at"], name: "index_analisis_ia_on_deleted_at"
-    t.index ["deleted_by_id"], name: "index_analisis_ia_on_deleted_by_id"
-    t.index ["lote_id", "created_at"], name: "index_analisis_ia_on_lote_id_and_created_at"
-    t.index ["lote_id"], name: "index_analisis_ia_on_lote_id"
-    t.index ["user_id"], name: "index_analisis_ia_on_user_id"
   end
 
   create_table "analisis_laboratorio", force: :cascade do |t|
@@ -1782,6 +1763,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_17_140000) do
     t.jsonb "tareas_realizadas", default: [], null: false
     t.string "producto_enraizante"
     t.string "punto_medicion", default: "sala", null: false
+    t.string "fitosanitario"
+    t.string "fitosanitario_motivo"
+    t.integer "carencia_dias"
     t.index ["club_id"], name: "index_registros_ambientales_on_club_id"
     t.index ["lote_id"], name: "index_registros_ambientales_on_lote_id"
     t.index ["registrado_en"], name: "index_registros_ambientales_on_registrado_en"
@@ -2245,10 +2229,6 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_17_140000) do
   add_foreign_key "alertas_internas", "clubs"
   add_foreign_key "alertas_internas", "lotes"
   add_foreign_key "alertas_internas", "users", column: "creada_por_id"
-  add_foreign_key "analisis_ia", "clubs"
-  add_foreign_key "analisis_ia", "lotes"
-  add_foreign_key "analisis_ia", "users"
-  add_foreign_key "analisis_ia", "users", column: "deleted_by_id"
   add_foreign_key "analisis_laboratorio", "geneticas"
   add_foreign_key "analisis_laboratorio", "lotes"
   add_foreign_key "analisis_laboratorio", "users", column: "deleted_by_id"

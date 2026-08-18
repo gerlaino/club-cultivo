@@ -290,6 +290,68 @@
 
         <div class="trz__arrow"><i class="bi bi-arrow-down"></i></div>
 
+        <!-- Nodo 3: QUÉ SE LE APLICÓ.
+             La cadena decía de qué plantas salió el frasco y no qué recibieron esas plantas. Los
+             datos estaban todos en los registros ambientales y no los mostraba nadie.
+             Es un RESUMEN, no un log: sesenta riegos uno abajo del otro no los lee nadie. Lo que
+             contesta "¿qué le pusieron a esto?" es la lista de productos y cuántas veces. -->
+        <div v-if="data.aplicaciones?.registros" class="trz__node trz__node--aplic">
+          <div class="trz__node-head">
+            <span class="trz__node-badge trz__node-badge--aplic">🧪 QUÉ SE LE APLICÓ</span>
+            <span class="trz__node-code">{{ data.aplicaciones.registros }} registros</span>
+          </div>
+          <div class="trz__node-body">
+
+            <!-- Lo sanitario PRIMERO y aparte de la nutrición: en un producto medicinal es el
+                 dato más sensible que hay, y mezclarlo con el bloom es lo que no puede pasar. -->
+            <div v-if="data.aplicaciones.fitosanitarios?.length" class="trz__fito">
+              <div class="trz__fito-tit">⚠️ Aplicaciones fitosanitarias</div>
+              <div v-for="(f, i) in data.aplicaciones.fitosanitarios" :key="i" class="trz__fito-row">
+                <strong>{{ f.producto }}</strong>
+                <span v-if="f.motivo"> · contra {{ f.motivo }}</span>
+                <span v-if="f.fecha"> · {{ fecha(f.fecha) }}</span>
+                <span v-if="f.carencia_dias"> · carencia {{ f.carencia_dias }} días</span>
+              </div>
+            </div>
+
+            <div class="trz__fields">
+              <div class="trz__field" v-if="data.aplicaciones.nutricion?.productos?.length">
+                <span class="trz__field-lbl">Nutrición ({{ data.aplicaciones.nutricion.veces }} aplicaciones)</span>
+                <span class="trz__field-val">{{ data.aplicaciones.nutricion.productos.join(' · ') }}</span>
+              </div>
+              <div class="trz__field" v-if="data.aplicaciones.nutricion?.enraizantes?.length">
+                <span class="trz__field-lbl">Enraizante</span>
+                <span class="trz__field-val">{{ data.aplicaciones.nutricion.enraizantes.join(' · ') }}</span>
+              </div>
+              <div class="trz__field" v-for="(n, act) in data.aplicaciones.actividades" :key="act">
+                <span class="trz__field-lbl">{{ actividadLabel(act) }}</span>
+                <span class="trz__field-val">{{ n }}</span>
+              </div>
+            </div>
+
+            <div v-if="data.aplicaciones.plagas?.length" class="trz__fields trz__fields--mt">
+              <div class="trz__field" v-for="(p, i) in data.aplicaciones.plagas" :key="i">
+                <span class="trz__field-lbl">Plaga observada</span>
+                <span class="trz__field-val">{{ p.plaga }} ({{ p.veces }}×)</span>
+              </div>
+            </div>
+
+            <!-- Medido, no declarado: es lo más fuerte que se le puede mostrar a un paciente. -->
+            <div v-if="data.analisis_laboratorio?.length" class="trz__lab">
+              <div class="trz__fito-tit">🔬 Análisis de laboratorio</div>
+              <div v-for="(a, i) in data.analisis_laboratorio" :key="i" class="trz__fito-row">
+                <span v-if="a.thc_pct != null">THC {{ a.thc_pct }}%</span>
+                <span v-if="a.cbd_pct != null"> · CBD {{ a.cbd_pct }}%</span>
+                <span v-if="a.cbg_pct != null"> · CBG {{ a.cbg_pct }}%</span>
+                <span v-if="a.laboratorio"> · {{ a.laboratorio }}</span>
+                <span v-if="a.fecha"> · {{ fecha(a.fecha) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="trz__arrow"><i class="bi bi-arrow-down"></i></div>
+
         <!-- Nodo 3: STOCK -->
         <div class="trz__node trz__node--stock">
           <div class="trz__node-head">
@@ -421,6 +483,17 @@ const MOTIVO_DESCARTE_LABELS = {
   hermafrodita: 'Hermafrodita', estres: 'Estrés', rotura: 'Rotura', otro: 'Otro',
 }
 const motivoLabel = (m) => MOTIVO_DESCARTE_LABELS[m] || m
+
+// Cómo se llaman las tareas en el idioma en que se habla de ellas: en la base son claves
+// (`limpieza_sala`, `scrog_lst`) y en un informe que lee un auditor eso no dice nada.
+const ACTIVIDAD_LABELS = {
+  riego: 'Riegos', nutricion: 'Fertilizaciones', poda: 'Podas', defoliacion: 'Defoliaciones',
+  scrog_lst: 'SCROG / LST', revision_plagas: 'Revisiones de plaga',
+  limpieza_sala: 'Limpiezas', ajuste_luz: 'Ajustes de luz',
+}
+const actividadLabel = (a) => ACTIVIDAD_LABELS[a] || String(a).replaceAll('_', ' ')
+
+const fecha = (f) => (f ? new Date(f).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '')
 
 const query       = ref('')
 const loading     = ref(false)
@@ -738,6 +811,13 @@ const formatDate = d => d
 .trz__node--origen { border-color: #d1fae5; }
 .trz__node--lote   { border-color: #bbf7d0; }
 .trz__node--stock  { border-color: #fde68a; }
+.trz__node--aplic  { border-color: #ddd6fe; }
+.trz__node-badge--aplic { background: #ede9fe; color: #5b21b6; }
+.trz__fito { background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; padding: .6rem .8rem; margin-bottom: .75rem; }
+.trz__lab  { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: .6rem .8rem; margin-top: .75rem; }
+.trz__fito-tit { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-bottom: .3rem; }
+.trz__fito-row { font-size: .82rem; line-height: 1.5; }
+.trz__fields--mt { margin-top: .75rem; }
 .trz__node--dispens { border-color: #bae6fd; }
 
 .trz__node-head {

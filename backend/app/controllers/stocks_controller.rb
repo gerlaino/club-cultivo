@@ -512,6 +512,22 @@ class StocksController < ApplicationController
                                     declarada: lote.genetica.declarada_como.present?,
                                     numero_registro_inase: lote.genetica.numero_inase_declarado } : nil,
       } : nil,
+      # QUÉ SE LE APLICÓ, que es la otra mitad de trazar. La cadena de origen decía de qué plantas
+      # salió el frasco; esto dice qué recibieron esas plantas. Todo estaba guardado en
+      # `registros_ambientales` y no lo mostraba nadie.
+      aplicaciones: Lotes::ResumenAplicaciones.new(lote).call,
+      # El dato más fuerte que se le puede mostrar a un paciente: THC y CBD MEDIDOS, no los que
+      # declara el criador. Estaban en su tabla, fuera de la trazabilidad.
+      analisis_laboratorio: lote ? lote.analisis_laboratorio.order(fecha_analisis: :desc).map { |a|
+        {
+          fecha:       a.fecha_analisis,
+          laboratorio: a.laboratorio,
+          thc_pct:     a.thc_pct&.to_f,
+          cbd_pct:     a.cbd_pct&.to_f,
+          cbg_pct:     a.cbg_pct&.to_f,
+          terpenos:    a.terpenos_principales,
+        }
+      } : [],
       pesada: pesada ? {
         id:             pesada.id,
         fase_destino:   pesada.fase_destino,
