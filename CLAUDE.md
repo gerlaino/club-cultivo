@@ -377,7 +377,12 @@ bundle exec rake lotes:corregir_finalizados_con_stock SIMULAR=1  # mirar los 6 d
 bundle exec rake geneticas:declarar_por_nombre SIMULAR=1         # resuelve ~44 de un saque
 bundle exec rake geneticas:sin_declarar                          # informativo
 bundle exec rake pacientes:normalizar_nombres SIMULAR=1          # capitalización de cargas masivas
+bundle exec rake geneticas:inase_faltantes SIMULAR=1             # PENDIENTE EN PROD: suma CAT3 al catálogo
 ```
+
+**`geneticas:inase_faltantes` hay que correrlo en producción** (ya corrió en dev): completa el
+catálogo GLOBAL del INASE, que estaba en 8 y son 9 — faltaba CAT3, una de las dos primeras
+variedades nacionales inscriptas (Res. INASE 84 y 85/2022). Es idempotente.
 
 Todos aceptan `SIMULAR=1`. **Ya corridos, no repetir:** `categorias:aplanar` (15-ago: aplanó el
 catálogo contable, promoviendo las subcategorías a categorías con su sector y sus movimientos), y
@@ -388,8 +393,14 @@ corregidas a `efectivo`; era una etiqueta, no movió plata).
 
 ### Pendientes de Germán (no de código)
 
-- Cargar los `numero_registro_inase` de las 8 variedades del catálogo (hoy vacíos: la columna
-  "N° registro" del informe INASE sale en blanco aunque el vínculo funcione).
+- ~~Cargar los `numero_registro_inase` de las 8 variedades del catálogo~~ — **no existe ese dato.**
+  El INASE identifica cada variedad por su NOMBRE en el Catálogo Nacional de Cultivares y no le
+  asigna un número propio; lo que consta aparte es la RESOLUCIÓN que la inscribió (las de 2022
+  son la 2, 3, 27, 28, 55 y las 84/85 de las dos primeras). La columna y el KPI "Falta N°" se
+  sacaron del informe: era un pendiente imposible de cerrar, y un aviso que nunca se apaga
+  entrena a ignorar todos los demás. Si algún día se consigue el par variedad↔resolución, ESO es
+  lo que vale la pena mostrar. **El catálogo global quedó completo en 9** (`rake
+  geneticas:inase_faltantes` sumó CAT3, que faltaba).
 - Declarar a mano las ~18 genéticas que no traen el par en el nombre.
 - Decisión: **modelo de precios**.
 

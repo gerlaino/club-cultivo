@@ -91,7 +91,7 @@ RSpec.describe 'Informes — los totales tienen que cerrar', type: :request do
       # números eran correctos por separado y se contradecían en pantalla.
       expect(json['total_variedades']).to eq(json['agrupadas'].size)
       expect(json['lotes_totales']).to eq(json['agrupadas'].sum { |v| v['lotes'] })
-      expect(json['con_registro'] + json['falta_registro']).to eq(json['total_variedades'])
+      expect(json['total_variedades']).to eq(json['agrupadas'].size)
     end
   end
 

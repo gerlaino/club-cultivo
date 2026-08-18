@@ -59,12 +59,15 @@ RSpec.describe 'Informe INASE con variedades declaradas', type: :request do
     expect(datos['agrupadas'].map { |v| v['nombre'] }).to eq(['ANANDA001'])
   end
 
-  it 'los tres primeros KPIs cierran: variedades = con N° + falta N°' do
+  it 'NO pide un número de registro por variedad, porque el INASE no lo asigna' do
+    # Lo que identifica a cada variedad es su NOMBRE en el Catálogo Nacional de Cultivares; lo
+    # que consta aparte es la resolución que la inscribió. El informe llegó a mostrar una columna
+    # "N° registro" que quedaba en blanco para siempre: un pendiente imposible de cerrar, que es
+    # lo que entrena a la gente a ignorar los avisos.
     datos = informe
 
-    expect(datos['con_registro'] + datos['falta_registro']).to eq(datos['total_variedades'])
-    expect(datos['con_registro']).to eq(1) # ANANDA001 tiene INASE-12345
-    expect(datos['falta_registro']).to eq(0)
+    expect(datos).not_to have_key('falta_registro')
+    expect(datos['agrupadas'].first).not_to have_key('numero')
   end
 
   it 'lo no acreditado se cuenta en genéticas propias y va aparte' do

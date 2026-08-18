@@ -21,20 +21,13 @@
           <!-- Los KPIs van en la MISMA unidad que la tabla: la variedad del INASE. Contaban
                genéticas propias mientras la tabla agrupaba por variedad, así que un club con 24
                genéticas declaradas contra TROPICANA WFC leía "24 genéticas" arriba de UNA fila.
-               Los tres primeros cierran: variedades = con N° + falta N°. -->
+               No hay columna ni contador de "N° de registro": el INASE identifica cada variedad
+               por su NOMBRE en el Catálogo Nacional de Cultivares y no le asigna un número
+               propio. Pedirlo dejaba un pendiente imposible de cerrar, que es lo que entrena a
+               la gente a ignorar los avisos del informe. -->
           <div class="inf__kpi">
             <span class="inf__kpi-valor">{{ data.total_variedades }}</span>
             <span class="inf__kpi-label">Variedades</span>
-          </div>
-          <div class="inf__kpi inf__kpi--ok">
-            <span class="inf__kpi-valor">{{ data.con_registro }}</span>
-            <span class="inf__kpi-label">Con N° registro</span>
-          </div>
-          <!-- Lo accionable del encabezado: la variedad acredita, pero le falta cargar el número
-               del INASE — es lo que sale en blanco en la columna "N° registro". -->
-          <div class="inf__kpi" :class="data.falta_registro ? 'inf__kpi--warn' : 'inf__kpi--ok'">
-            <span class="inf__kpi-valor">{{ data.falta_registro }}</span>
-            <span class="inf__kpi-label">Falta N° registro</span>
           </div>
           <!-- El único que va en genéticas propias, y a propósito: son las que todavía NO son una
                variedad. Tienen su propia sección abajo. -->
@@ -57,7 +50,7 @@
           <table class="inf__table">
             <thead>
               <tr>
-                <th>Variedad</th><th>N° registro INASE</th>
+                <th>Variedad</th>
                 <th class="inf__num">Lotes</th><th class="inf__num">Plantas</th><th class="inf__num">Gramos</th>
               </tr>
             </thead>
@@ -70,15 +63,11 @@
                    audita en la pantalla de Genéticas, que es donde se declara cada una. -->
               <tr v-for="g in (data.agrupadas || [])" :key="g.nombre">
                 <td><strong>{{ g.nombre }}</strong></td>
-                <td>
-                  <span v-if="g.numero">{{ g.numero }}</span>
-                  <span v-else class="inf__badge inf__badge--no">Falta cargar</span>
-                </td>
                 <td class="inf__num">{{ g.lotes }}</td>
                 <td class="inf__num">{{ g.plantas }}</td>
                 <td class="inf__num">{{ formatGramos(g.gramos) }}</td>
               </tr>
-              <tr v-if="!(data.agrupadas || []).length"><td colspan="5" class="inf__empty">Ninguna variedad acreditada todavía.</td></tr>
+              <tr v-if="!(data.agrupadas || []).length"><td colspan="4" class="inf__empty">Ninguna variedad acreditada todavía.</td></tr>
             </tbody>
           </table>
         </div>

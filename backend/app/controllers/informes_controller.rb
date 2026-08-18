@@ -574,7 +574,6 @@ class InformesController < ApplicationController
                      .group_by { |g| g[:nombre] }.map do |nombre, gs|
       {
         nombre:   nombre,
-        numero:   gs.filter_map { |g| g[:numero_registro_inase] }.first,
         lotes:    gs.sum { |g| g[:lotes] },
         plantas:  gs.sum { |g| g[:plantas] },
         gramos:   gs.sum { |g| g[:gramos_producidos] }.round(1),
@@ -591,10 +590,6 @@ class InformesController < ApplicationController
     # que NO son una variedad todavía, y tienen su propia sección abajo.
     datos = {
       total_variedades: agrupadas.size,
-      con_registro:     agrupadas.count { |v| v[:numero].present? },
-      # La fila accionable del encabezado: variedades que se acreditan pero a las que les falta
-      # cargar el N° del INASE, que es lo que sale en blanco en la columna "N° registro".
-      falta_registro:   agrupadas.count { |v| v[:numero].blank? },
       sin_acreditar:    pendientes.size,
       gramos_totales:   agrupadas.sum { |v| v[:gramos] }.round(1),
       lotes_totales:    agrupadas.sum { |v| v[:lotes] },
@@ -605,13 +600,11 @@ class InformesController < ApplicationController
 
     secciones = [{
       titulo: 'Variedades cultivadas',
-      headers: ['Variedad', 'N° INASE', 'Lotes', 'Plantas', 'Gramos'],
-      rows: agrupadas.map { |g|
-        [g[:nombre], g[:numero].presence || 'Falta cargar', g[:lotes], g[:plantas], g[:gramos]]
-      },
-      formatos: [:texto, :texto, :numero, :numero, :numero],
-      totales: [2, 3, 4],
-      aligns: { 2 => :right, 3 => :right, 4 => :right },
+      headers: ['Variedad', 'Lotes', 'Plantas', 'Gramos'],
+      rows: agrupadas.map { |g| [g[:nombre], g[:lotes], g[:plantas], g[:gramos]] },
+      formatos: [:texto, :numero, :numero, :numero],
+      totales: [1, 2, 3],
+      aligns: { 1 => :right, 2 => :right, 3 => :right },
     }]
 
     if pendientes.any?
@@ -628,15 +621,15 @@ class InformesController < ApplicationController
       titulo: 'Informe INASE — variedades', nombre: 'informe_inase', datos: datos,
       resena: 'Las variedades del registro INASE con las que la organización acredita lo que cultiva, y cuánto produjo de cada una. Una fila por variedad. Al pie, lo que todavía no se puede acreditar.',
       kpis: [
-        { label: 'Variedades',      valor: datos[:total_variedades] },
-        { label: 'Con N° registro', valor: datos[:con_registro], tono: :ok },
-        { label: 'Falta N°',        valor: datos[:falta_registro], tono: datos[:falta_registro].positive? ? :warn : :ok },
-        { label: 'Sin acreditar',   valor: pendientes.size, tono: pendientes.any? ? :warn : :ok },
+        { label: 'Variedades',    valor: datos[:total_variedades] },
+        { label: 'Sin acreditar', valor: pendientes.size, tono: pendientes.any? ? :warn : :ok },
+        { label: 'Lotes',         valor: datos[:lotes_totales] },
       ],
       secciones: secciones,
       nota: 'Cada variedad de esta tabla acredita una o más genéticas de la organización. Con qué ' \
             'nombre las cultiva puertas adentro es asunto suyo y no se informa acá: el par se ' \
-            'audita en la pantalla de Genéticas.',
+            'audita en la pantalla de Genéticas. La variedad se identifica por su NOMBRE en el ' \
+            'Catálogo Nacional de Cultivares — el INASE no asigna un número por variedad.',
       # La pantalla se abre siempre —es la que lista los pendientes—; el archivo que se
       # presenta ante el organismo, no, mientras haya variedades sin acreditar.
       exige_declaracion_inase: true,

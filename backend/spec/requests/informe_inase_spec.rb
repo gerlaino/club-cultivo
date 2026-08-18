@@ -24,8 +24,6 @@ RSpec.describe 'GET /informes/inase', type: :request do
     # inscripta y es una; `Casera` no acredita nada todavía, así que no es una variedad — cuenta
     # aparte, en genéticas sin acreditar.
     expect(body['total_variedades']).to eq(1)
-    expect(body['con_registro']).to eq(1)
-    expect(body['falta_registro']).to eq(0)
     expect(body['sin_acreditar']).to eq(1)
 
     lemon = body['geneticas'].find { |g| g['nombre'] == 'Lemon' }
