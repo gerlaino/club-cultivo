@@ -120,3 +120,53 @@ RSpec.describe Genetica, 'declaración ante el INASE' do
     end
   end
 end
+
+# Una variedad BORRADA del catálogo del INASE no puede seguir ofreciéndose ni aceptándose.
+#
+# `declarables` y la validación usan `unscoped` para escapar del scope de tenant —el catálogo es
+# global— y de paso se llevaban puesto el `default_scope` de `acts_as_paranoid`: la variedad
+# borrada seguía en el selector, y por API se la podía declarar igual.
+RSpec.describe Genetica, 'variedades borradas del catálogo' do
+  let(:club) { create(:club) }
+
+  around { |ex| ActsAsTenant.with_tenant(club) { ex.run } }
+
+  let!(:vigente) do
+    ActsAsTenant.without_tenant do
+      Genetica.create!(nombre: 'VIGENTE01', global: true, club_id: nil, registrada_inase: true)
+    end
+  end
+
+  let!(:borrada) do
+    ActsAsTenant.without_tenant do
+      g = Genetica.create!(nombre: 'BORRADA01', global: true, club_id: nil, registrada_inase: true)
+      g.destroy # borrado blando
+      g
+    end
+  end
+
+  it 'no se ofrece en el selector de declaración' do
+    expect(described_class.declarables).to include(vigente)
+    expect(described_class.declarables).not_to include(borrada)
+  end
+
+  it 'no se puede declarar contra ella, aunque se mande el id a mano' do
+    propia = create(:genetica, club: club, nombre: 'Propia', registrada_inase: false)
+
+    propia.declarada_como_id = borrada.id
+
+    expect(propia).not_to be_valid
+    expect(propia.errors[:declarada_como].join).to include('eliminada')
+  end
+
+  # La trampa que ya mordió en este proyecto: una validación que mira el estado ACTUAL de otra
+  # cosa vuelve inguardable un registro que era válido cuando se creó.
+  it 'una genética que YA la declaraba sigue siendo editable' do
+    propia = create(:genetica, club: club, nombre: 'Vieja', registrada_inase: false)
+    propia.update_columns(declarada_como_id: borrada.id) # se declaró cuando la variedad existía
+
+    propia.reload.nombre = 'Vieja corregida'
+
+    expect(propia).to be_valid, propia.errors.full_messages.join(', ')
+  end
+end

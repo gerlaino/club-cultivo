@@ -26,7 +26,12 @@ class Genetica < ApplicationRecord
   scope :registradas,      -> { where(registrada_inase: true) }
   scope :sin_declarar,     -> { where(registrada_inase: [false, nil], declarada_como_id: nil) }
   # El catálogo que se le ofrece al club para declarar: las variedades inscriptas de verdad.
-  scope :declarables,      -> { unscoped.where(club_id: nil, registrada_inase: true).order(:nombre) }
+  #
+  # `unscoped` está para escapar del scope de tenant —el catálogo es global, sin `club_id`— pero
+  # se llevaba puesto de paso el `default_scope` de `acts_as_paranoid`, así que una variedad
+  # BORRADA del catálogo seguía apareciendo en el selector. El filtro de borrados se repone a
+  # mano; el de tenant sigue afuera, que es lo que se quería saltear.
+  scope :declarables,      -> { unscoped.where(club_id: nil, registrada_inase: true, deleted_at: nil).order(:nombre) }
 
   CATEGORIAS_INASE = %w[semilla_feminizada semilla_regular material_vegetativo hibrido].freeze
 
@@ -118,11 +123,17 @@ class Genetica < ApplicationRecord
       return
     end
 
+    # `unscoped` por lo mismo que en `declarables`: el destino es global y hay tenant fijado.
     destino = Genetica.unscoped.find_by(id: declarada_como_id)
     if destino.nil?
       errors.add(:declarada_como, 'no existe')
     elsif !destino.registrada_inase?
       errors.add(:declarada_como, 'tiene que ser una variedad inscripta en el INASE')
+    elsif destino.deleted_at.present? && declarada_como_id_changed?
+      # Sólo al CAMBIAR la declaración. Si se valida siempre, una variedad borrada después vuelve
+      # inguardable a toda genética que la declaraba: no se podría ni corregirle una falta de
+      # ortografía al nombre, que es justamente lo que haría falta para poder redeclararla.
+      errors.add(:declarada_como, 'fue eliminada del catálogo del INASE')
     end
   end
 
