@@ -57,12 +57,23 @@
       </RouterLink>
     </div>
   </SheetBottom>
+
+  <!-- El asistente que abre el botón de arriba.
+       El botón despachaba `abrir-asistente-voz` y NO LO ESCUCHABA NADIE: las únicas instancias
+       montadas son las de los modales de sala, lote y planta, y todas tienen contexto, así que
+       ignoran el evento (`abrirDesdeEvento` sólo abre las que no lo tienen). El botón del
+       cultivador no hacía nada.
+       Va acá, al lado del botón que lo dispara, para que la relación se vea. `sin-trigger`
+       porque el botón ya existe con el estilo de la nav. -->
+  <AsistenteVoz v-if="club.data?.features?.ia" :sin-trigger="true" />
 </template>
 
 <script setup>
 import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 import SheetBottom          from './SheetBottom.vue'
+import AsistenteVoz         from '../AsistenteVoz.vue'
+import { useClubStore }      from '../../stores/club.js'
 import RegistrarLecturaSheet from './RegistrarLecturaSheet.vue'
 import {
   Home, LayoutGrid, Plus, Mic, MoreHorizontal, PackageCheck,
@@ -70,6 +81,7 @@ import {
 } from 'lucide-vue-next'
 
 const route   = useRoute()
+const club    = useClubStore()
 
 const lecturaOpen = ref(false)
 const masOpen     = ref(false)

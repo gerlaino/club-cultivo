@@ -1,6 +1,10 @@
 <template>
   <div class="av">
-    <button class="av__trigger" :class="{ 'av__trigger--activo': abierto, 'av__trigger--mini': mini }"
+    <!-- `sinTrigger`: el panel se monta sin botón propio y sólo se abre por el evento global.
+         Lo usa la barra del cultivador, que ya tiene su botón de asistente con el estilo de la
+         nav y no quiere otro al lado. -->
+    <button v-if="!sinTrigger" class="av__trigger"
+            :class="{ 'av__trigger--activo': abierto, 'av__trigger--mini': mini }"
             :title="triggerLabel" @click="abrir">
       <span v-if="!mini" class="av__trigger-dot" :class="{ 'av__trigger-dot--pulse': escuchando }"></span>
       <i v-if="mini" class="bi bi-mic-fill"></i>
@@ -325,8 +329,10 @@ import DsSpinner from '../design-system/components/Spinner.vue'
 import { useReconocimientoVoz } from '../composables/useReconocimientoVoz.js'
 
 const props = defineProps({
-  contexto: { type: Object, default: null },
-  mini:     { type: Boolean, default: false }
+  contexto:   { type: Object,  default: null },
+  mini:       { type: Boolean, default: false },
+  // Sin botón propio: se abre sólo por el evento `abrir-asistente-voz`.
+  sinTrigger: { type: Boolean, default: false },
 })
 
 const TAREAS_OPCIONES = [
