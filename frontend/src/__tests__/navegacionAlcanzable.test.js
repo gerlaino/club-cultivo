@@ -133,20 +133,23 @@ describe('cada rol puede abrir lo que su navegación le ofrece', () => {
   // Lo más caro de todo: si el rol no puede entrar a donde aterriza, no entra a NINGÚN lado.
   // El guard lo devuelve al origen, que lo vuelve a mandar al mismo lugar.
   describe('el aterrizaje del login', () => {
-    // Salida del `beforeEnter` de "/" (router/index.js). Es la primera pantalla tras entrar.
-    const ATERRIZAJE = {
-      manicura:    '/mnc/pendientes',
-      auditor:     '/auditor',
-      medico:      '/medico',
-      abogado:     '/abogado',
-      delivery:    '/delivery',
-      super_admin: '/super-admin',
-      // Los que se quedan en el dashboard.
-      cultivador:  '/',
-      supervisor:  '/',
-      dispensador: '/',
-      paciente:    '/',
+    // LEÍDO del `beforeEnter` de "/" en el router, no copiado a mano. Una lista escrita acá se
+    // desincroniza en silencio y el test pasa en verde afirmando lo mismo que el código dejó de
+    // hacer: exactamente lo que dejó al manicura sin poder entrar.
+    const ROUTER = leer('router/index.js')
+    const ATERRIZAJE = Object.fromEntries(
+      [...ROUTER.matchAll(/role === '(\w+)'\)\s*return '([^']+)'/g)].map(m => [m[1], m[2]])
+    )
+
+    // Los roles con matriz que NO tienen redirección se quedan en el dashboard.
+    for (const rol of ['cultivador', 'supervisor', 'dispensador']) {
+      if (!ATERRIZAJE[rol]) ATERRIZAJE[rol] = '/'
     }
+
+    it('la lista sale del router y no de una copia: si no, no prueba nada', () => {
+      expect(Object.keys(ATERRIZAJE).length).toBeGreaterThanOrEqual(9)
+      expect(ATERRIZAJE.manicura).toBe('/mnc/pendientes')
+    })
 
     for (const [rol, destino] of Object.entries(ATERRIZAJE)) {
       it(`${rol} puede entrar a ${destino}`, () => {

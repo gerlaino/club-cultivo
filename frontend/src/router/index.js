@@ -70,6 +70,7 @@ const routes = [
       if (auth.user?.role === 'abogado')     return '/abogado'
       if (auth.user?.role === 'manicura')    return '/mnc/pendientes'
       if (auth.user?.role === 'delivery')    return '/delivery'
+      if (auth.user?.role === 'paciente')    return '/portal'
     },
   },
 
@@ -1002,6 +1003,9 @@ const ROLE_HOME = {
   medico:      '/medico',
   abogado:     '/abogado',
   delivery:    '/delivery',
+  // Sin esto el paciente caía en "/", que es el TABLERO DE LA ORGANIZACIÓN: producción,
+  // dispensaciones del día, plata. Su casa es su portal.
+  paciente:    '/portal',
 }
 
 // A dónde puede entrar cada rol ESCRIBIENDO LA URL. Sin esto, un cultivador que tipea
@@ -1066,8 +1070,10 @@ const ROLE_ALLOWED_PREFIX = {
   dispensador: ['/', '/pacientes', '/socios', '/historial', '/stock', '/admin/stock', '/insumos',
                 '/reservas', '/bar', '/entregas', '/m', ...ETIQUETAS, ...COMUNES],
 
-  // El paciente sólo ve lo suyo y el portal que le arma su organización.
-  paciente:   ['/', '/portal', ...COMUNES],
+  // El paciente sólo ve lo suyo y el portal que le arma su organización. No lleva `COMUNES`
+  // como los demás: ahí adentro está `/mis-horas`, que es la planilla de quien TRABAJA en la
+  // organización. Y no lleva "/" a propósito — es el tablero de la organización.
+  paciente:   ['/portal', '/perfil', '/login', '/bienvenida'],
 }
 
 // Decisión pura, exportada para poder verificarla sin montar el router: ¿este rol puede
