@@ -230,7 +230,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     permitidos = params.require(:club).permit(
       :name, :legal_name, :email, :phone, :website,
       :address, :city, :state, :country, :timezone,
-      :plan_activo_hasta, :plan_trial, :web_activa,
+      :plan_activo_hasta, :plan_trial, :vista_paciente_activa,
       :smtp_host, :smtp_port, :smtp_user, :smtp_pass,
       :smtp_from, :smtp_from_name,
       :ia_tier, :ia_limite_hora,
@@ -346,7 +346,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       address:        c.address,
       timezone:       c.timezone,
       usuarios:       c.users.map { |u| { id: u.id, email: u.email, role: u.role, nombre: u.nombre_completo } },
-      web_activa:      c.web_activa,
+      vista_paciente_activa:      c.vista_paciente_activa,
       smtp_configured: c.smtp_configured?,
       smtp_host:       c.smtp_host,
       smtp_port:       c.smtp_port || 587,

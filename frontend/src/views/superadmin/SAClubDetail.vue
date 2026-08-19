@@ -91,7 +91,7 @@ const CAMPO_LABEL = {
   plan: 'plan', plan_activo_hasta: 'vigencia', plan_trial: 'período de prueba',
   features: 'módulos', activo: 'estado', deleted_at: 'baja', name: 'nombre',
   legal_name: 'razón social', email: 'email', slug: 'slug', demo: 'club demo',
-  ia_tier: 'nivel de IA', ia_limite_hora: 'límite de IA', web_activa: 'web pública',
+  ia_tier: 'nivel de IA', ia_limite_hora: 'límite de IA', vista_paciente_activa: 'web pública',
 }
 
 function resumirCambios(cambios) {

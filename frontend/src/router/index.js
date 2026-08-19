@@ -695,12 +695,35 @@ const routes = [
     ],
   },
 
+  // ── Portal del paciente ─────────────────────────────────────────────────────
+  //
+  // Lo que la organización le muestra a sus miembros: catálogo, novedades, eventos, galería.
+  // Vivía en `web-publica/`, un proyecto Vite aparte y SIN LOGIN que resolvía el club con
+  // `Club.first`: la web multi-club nunca funcionó y cualquiera leía el catálogo de la
+  // organización #1. Ahora entra por acá, con sesión, y el club sale del usuario.
+  //
+  // Lo público de la plataforma es /bienvenida, no la vitrina de un club.
   {
-    path: '/g/:slug',
-    name: 'genetica-publica',
-    component: () => import('../views/GeneticaPublicaView.vue'),
-    meta: { public: true, fullscreen: true },
+    path: '/portal',
+    component: () => import('../views/portal/PortalShell.vue'),
+    meta: { requiresAuth: true, fullscreen: true },
+    children: [
+      // El home del portal es el tablero del paciente y se construye aparte. Hasta entonces
+      // entra por el catálogo, que es lo que más se mira.
+      { path: '', redirect: '/portal/geneticas' },
+      { path: 'geneticas',      name: 'portal-geneticas', component: () => import('../views/portal/PortalGeneticasView.vue') },
+      { path: 'geneticas/:id',  name: 'portal-genetica',  component: () => import('../views/portal/PortalGeneticaDetailView.vue') },
+      { path: 'noticias',       name: 'portal-noticias',  component: () => import('../views/portal/PortalNoticiasView.vue') },
+      { path: 'noticias/:id',   name: 'portal-noticia',   component: () => import('../views/portal/PortalNoticiaDetailView.vue') },
+      { path: 'eventos',        name: 'portal-eventos',   component: () => import('../views/portal/PortalEventosView.vue') },
+      { path: 'eventos/:id',    name: 'portal-evento',    component: () => import('../views/portal/PortalEventoDetailView.vue') },
+      { path: 'galeria',        name: 'portal-galeria',   component: () => import('../views/portal/PortalGaleriaView.vue') },
+      { path: 'contacto',       name: 'portal-contacto',  component: () => import('../views/portal/PortalContactoView.vue') },
+    ],
   },
+
+  // La ficha pública de una variedad dejó de ser pública: es la misma del portal, con sesión.
+  { path: '/g/:slug', redirect: to => `/portal/geneticas/${to.params.slug}` },
 
   {
     path: '/p/:codigo_qr',
@@ -1046,8 +1069,8 @@ const ROLE_ALLOWED_PREFIX = {
   dispensador: ['/', '/pacientes', '/socios', '/historial', '/stock', '/admin/stock', '/insumos',
                 '/reservas', '/bar', '/entregas', '/m', ...ETIQUETAS, ...COMUNES],
 
-  // El paciente sólo ve lo suyo (todavía sin portal propio: ver tarea del login de paciente).
-  paciente:   ['/', ...COMUNES],
+  // El paciente sólo ve lo suyo y el portal que le arma su organización.
+  paciente:   ['/', '/portal', ...COMUNES],
 }
 
 // Decisión pura, exportada para poder verificarla sin montar el router: ¿este rol puede
@@ -1087,6 +1110,7 @@ const FEATURE_POR_PREFIJO = [
   ['/reglas-ambientales',   'iot'],
   ['/configuracion/correo', 'mailer'],
   ['/ariccame',             'ariccame'],
+  ['/portal',               'vista_paciente'],
 ]
 
 const MODULO_LABEL = {

@@ -23,14 +23,24 @@ RSpec.describe 'Blindaje de tenant — contextos públicos y cross-club', type: 
     end
   end
 
-  describe 'GET /public/club (modo club, corre con el tenant de current_club)' do
-    it 'devuelve los datos del club sin romper por el wrapping de tenant' do
-      club = create(:club, name: 'Club Público Test')
+  # Lo que la organización le muestra a sus miembros DEJÓ de ser público. Servía siempre
+  # `Club.first` —la web multi-club nunca funcionó— y cualquiera leía el catálogo entero sabiendo
+  # la URL. Ahora el club sale del usuario logueado.
+  describe 'el contenido de la organización ya no es público' do
+    it 'sin login no se llega al catálogo, las novedades ni los eventos' do
+      create(:club, name: 'Club Público Test')
 
-      get '/public/club'
+      %w[/api/portal/club /api/portal/geneticas /api/portal/noticias
+         /api/portal/eventos /api/portal/galeria].each do |ruta|
+        get ruta
+        expect(response).not_to have_http_status(:ok), "#{ruta} contestó sin login"
+      end
+    end
 
-      expect(response).to have_http_status(:ok)
-      expect(JSON.parse(response.body)['name']).to eq('Club Público Test')
+    it 'la vieja ruta pública del club ya no existe' do
+      # No devuelve 404 sino el index.html de la SPA: /public/* dejó de ser API y cae al fallback.
+      expect(Rails.application.routes.recognize_path('/public/club'))
+        .to include(controller: 'application', action: 'spa_fallback')
     end
   end
 

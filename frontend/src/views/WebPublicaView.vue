@@ -44,7 +44,7 @@
           <span>Visible web</span>
         </div>
         <div v-for="g in geneticas" :key="g.id" class="wpv__table-row"
-             :class="{ 'wpv__table-row--active': g.visible_web }">
+             :class="{ 'wpv__table-row--active': g.visible_paciente }">
           <div class="wpv__genetica-name">
             <span class="wpv__genetica-nombre">{{ g.nombre }}</span>
             <span v-if="g.registrada_inase" class="wpv__inase-badge">INASE</span>
@@ -57,7 +57,7 @@
             </span>
           </div>
           <div class="wpv__toggle-col">
-            <button class="wpv__toggle" :class="{ 'wpv__toggle--on': g.visible_web }"
+            <button class="wpv__toggle" :class="{ 'wpv__toggle--on': g.visible_paciente }"
                     @click="toggleVisibleWeb(g)" :disabled="savingId === g.id">
               <span class="wpv__toggle-thumb"></span>
             </button>
@@ -197,20 +197,20 @@
         </div>
         <div class="wpv__config-field wpv__config-field--full">
           <label class="wpv__label">Estado de la web</label>
-          <div class="wpv__web-status-card" :class="{ 'wpv__web-status-card--on': configForm.web_activa }">
+          <div class="wpv__web-status-card" :class="{ 'wpv__web-status-card--on': configForm.vista_paciente_activa }">
             <div class="wpv__web-status-info">
-              <div class="wpv__web-status-dot" :class="{ 'wpv__web-status-dot--on': configForm.web_activa }"></div>
+              <div class="wpv__web-status-dot" :class="{ 'wpv__web-status-dot--on': configForm.vista_paciente_activa }"></div>
               <div>
                 <div class="wpv__web-status-label">
-                  {{ configForm.web_activa ? 'Web activa y visible al público' : 'Web desactivada' }}
+                  {{ configForm.vista_paciente_activa ? 'Web activa y visible al público' : 'Web desactivada' }}
                 </div>
                 <div class="wpv__web-status-sub">
-                  {{ configForm.web_activa ? 'Los visitantes pueden ver tu sitio web.' : 'Tu sitio no es accesible públicamente.' }}
+                  {{ configForm.vista_paciente_activa ? 'Los visitantes pueden ver tu sitio web.' : 'Tu sitio no es accesible públicamente.' }}
                 </div>
               </div>
             </div>
-            <button class="wpv__toggle" :class="{ 'wpv__toggle--on': configForm.web_activa }"
-                    @click="configForm.web_activa = !configForm.web_activa">
+            <button class="wpv__toggle" :class="{ 'wpv__toggle--on': configForm.vista_paciente_activa }"
+                    @click="configForm.vista_paciente_activa = !configForm.vista_paciente_activa">
               <span class="wpv__toggle-thumb"></span>
             </button>
           </div>
@@ -458,7 +458,7 @@ const eventoImgFile    = ref(null)
 const eventoImgInput   = ref(null)
 const formEvento       = ref({ id: null, titulo: '', descripcion: '', fecha_inicio: '', fecha_fin: '', lugar: '', activo: true })
 
-const configForm   = ref({ descripcion_web: '', whatsapp: '', instagram_url: '', facebook_url: '', horarios_atencion: '', web_activa: false })
+const configForm   = ref({ descripcion_web: '', whatsapp: '', instagram_url: '', facebook_url: '', horarios_atencion: '', vista_paciente_activa: false })
 const savingConfig = ref(false)
 const configSaved  = ref(false)
 
@@ -531,8 +531,8 @@ function onDropEvento(e) {
 async function toggleVisibleWeb(g) {
   savingId.value = g.id
   try {
-    const { data } = await api.patch(`/geneticas/${g.id}`, { genetica: { visible_web: !g.visible_web } })
-    g.visible_web = data.visible_web
+    const { data } = await api.patch(`/geneticas/${g.id}`, { genetica: { visible_paciente: !g.visible_paciente } })
+    g.visible_paciente = data.visible_paciente
   } catch (e) { logger.error(e) }
   finally { savingId.value = null }
 }
@@ -658,7 +658,7 @@ onMounted(async () => {
       instagram_url:     data.instagram_url      || '',
       facebook_url:      data.facebook_url       || '',
       horarios_atencion: data.horarios_atencion  || '',
-      web_activa:        data.web_activa         || false,
+      vista_paciente_activa:        data.vista_paciente_activa         || false,
     }
   } catch (e) { logger.error(e) }
 })

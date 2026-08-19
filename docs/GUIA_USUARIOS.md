@@ -87,10 +87,10 @@ qué módulos tiene contratado el club, y recién después de su rol.
 | `ia` | Asistente IA | `ANTHROPIC_API_KEY` en el entorno |
 | `mailer` | Correo al paciente | SMTP del club cargado en Preferencias |
 | `whatsapp` | WhatsApp | Cuenta de Twilio del club |
-| `web_publica` | Web pública | ⚠️ **incompleto**: el sitio no está deployado |
-| `ariccame` | ARICCAME | ⚠️ **incompleto**: la integración con ANMAT está simulada |
+| `vista_paciente` | Portal del paciente | ⚠️ **en construcción**: falta el login por DNI del paciente |
+| `ariccame` | ARICCAME | ⚠️ **incompleto**: la transmisión está simulada, no envía nada |
 
-`web_publica`, `ariccame` y `eventos` están en `ADDONS_INCOMPLETOS`: vienen apagados y el super
+`ariccame`, `eventos` y `chatbot` están en `ADDONS_INCOMPLETOS`: vienen apagados y el super
 admin muestra la advertencia antes de dejar activarlos.
 
 **Un club nuevo nace con:** las dos suites + `bar` + `medico`. Los que dependen de algo externo

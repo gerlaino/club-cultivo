@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_18_120000) do
+ActiveRecord::Schema[7.2].define(version: 2026_08_19_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -419,7 +419,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_18_120000) do
     t.string "numero_resolucion_reprocann"
     t.date "fecha_resolucion_reprocann"
     t.string "tipo_organizacion"
-    t.boolean "web_activa", default: false, null: false
+    t.boolean "vista_paciente_activa", default: false, null: false
     t.text "descripcion_web"
     t.string "instagram_url"
     t.string "facebook_url"
@@ -992,7 +992,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_18_120000) do
     t.boolean "registrada_inase"
     t.string "criador"
     t.string "terpenos"
-    t.boolean "visible_web", default: false, null: false
+    t.boolean "visible_paciente", default: false, null: false
     t.string "slug", null: false
     t.boolean "global", default: false, null: false
     t.string "numero_registro_inase"

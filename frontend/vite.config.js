@@ -1,5 +1,6 @@
 import { defineConfig } from "vite"
 import { execSync } from "node:child_process"
+import { fileURLToPath, URL } from "node:url"
 
 // Identificador del build: qué commit está corriendo. Sin esto no hay forma de saber si lo que
 // ves en pantalla es la última versión o una cacheada — y se pierde tiempo discutiendo si un
@@ -61,6 +62,13 @@ export default defineConfig({
 
     })
   ],
+  // `jsconfig.json` declara `@/*` desde marzo y el editor lo resolvía, pero Vite no: un import
+  // con `@/` compilaba en el IDE y reventaba el build. Es la misma regla escrita en dos lados.
+  resolve: {
+    alias: {
+      "@": fileURLToPath(new URL("./src", import.meta.url)),
+    },
+  },
   build: {
     rollupOptions: {
       output: {

@@ -19,12 +19,10 @@ Rails.application.routes.draw do
   # había aplicado.
 
   # Web pública del club (accedida desde el sitio web externo del club)
+  # Lo único que queda SIN login del club: el QR de una planta, que se escanea en la sala.
+  # El catálogo, las novedades, los eventos y la galería se mudaron a `paciente/` —ahora piden
+  # cuenta— porque servían siempre `Club.first` y cualquiera los leía sabiendo la URL.
   namespace :public, defaults: { format: :json } do
-    resource :club, only: [:show], controller: 'club'
-    resources :geneticas, only: [:index, :show]
-    resources :noticias, only: [:index, :show]
-    resources :eventos, only: [:index, :show]
-    resources :galeria, only: [:index], controller: 'galeria'
     get '/plantas/:codigo_qr', to: 'plantas#show_qr'
   end
 
@@ -77,6 +75,16 @@ Rails.application.routes.draw do
     resource :benchmark, only: [:show], controller: :benchmark  # solo super_admin, uso interno de plataforma
     namespace :public do
       resource :benchmark, only: [:show], controller: :benchmark  # público, datos anonimizados y agregados
+    end
+
+    # Área del paciente: lo que la organización le muestra a sus miembros. Autenticado y
+    # gateado por el módulo `vista_paciente` (ver Paciente::BaseController).
+    namespace :portal do
+      resource  :club,      only: [:show], controller: 'club'
+      resources :geneticas, only: [:index, :show]
+      resources :noticias,  only: [:index, :show]
+      resources :eventos,   only: [:index, :show]
+      resources :galeria,   only: [:index], controller: 'galeria'
     end
 
     get  '/asistente/consumo',       to: 'asistente#consumo'

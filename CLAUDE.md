@@ -37,7 +37,6 @@ Opinás con criterio. Si algo está mal diseñado, lo decís. Si hay una mejor f
 | Auth | Devise + devise-jwt (JWT en cookie httpOnly), Pundit (parcial) |
 | Frontend web | Vue 3 + Vite + Pinia 3 + Vue Router, Bootstrap 5, Chart.js, PWA |
 | App móvil | Capacitor + Vue (carpeta `mobile/`, Android) |
-| Web pública | SPA separada en `web-publica/` |
 | Base de datos | PostgreSQL (~42+ tablas), paranoia para soft-delete (parcial) |
 | Jobs | Sidekiq + sidekiq-cron |
 | Tiempo real | ActionCable (stocks, ambiente, alertas internas) |
@@ -61,14 +60,14 @@ club-cultivo/
 ├── frontend/           # Vue 3 SPA (operadores del club)
 │   └── src/
 │       ├── views/         # + subcarpetas por rol: admin/, medico/, auditor/, abogado/,
-│       │                  #   manicura/, delivery/, mobile/ (/m), superadmin/, supervisor/
+│       │                  #   manicura/, delivery/, mobile/ (/m), superadmin/, supervisor/,
+│       │                  #   portal/ (lo que ve el paciente, en /portal)
 │       ├── components/    # + dashboards/, ui/, design-system tokens
 │       ├── stores/        # Pinia (auth, club, lotes, plants, socios, …)
 │       ├── composables/   # usePermissions, usePlan, useToast, useNavContext, …
 │       ├── lib/api.js     # instancia Axios única + todas las llamadas API
 │       └── router/        # guards por rol (ROLE_ALLOWED_PREFIX, ROLE_HOME, modo PWA)
 ├── mobile/             # Capacitor (Android) — reusa vistas /m del frontend
-├── web-publica/        # sitio público por club
 └── docs/               # ARCHITECTURE, CHANGELOG, ROADMAP, SECURITY, informes
 ```
 
@@ -103,7 +102,7 @@ Ninguno se considera cerrado; todos son candidatos a revisión.
 11. **ARICCAME** — reporte de dispensaciones y stock (feature flag por club). La transmisión está SIMULADA: no envía nada de verdad.
 12. **Super admin** — panel de plataforma como **cola de trabajo** (cada pendiente con su acción, agrupado por urgencia: se está perdiendo plata · paga y no le funciona · avisar con tiempo), organizaciones, **dos planes** (`PlanEnforcer`: básico/total, sólo límites), catálogo de módulos (`GET /super_admin/catalogo`), informes de plataforma, historial por organización. **El modo observador está SUSPENDIDO** (`User::OBSERVADOR_HABILITADO = false`). Un super_admin sin contexto que pega a un endpoint de organización recibe **409 explicando qué falta** (`block_super_admin_sin_contexto!`), no un 500.
 13. **Notificaciones** — push web, ActionCable, alertas internas por rol.
-14. **Web pública del club** + carnets digitales. (En el catálogo comercial figura como "Vista del paciente" y está **EN CONSTRUCCIÓN**: no se activa ni por API.)
+14. **Portal del paciente** (`vista_paciente`) + carnets digitales. Lo que la organización le muestra a sus miembros —catálogo, novedades, eventos, galería, contacto— vive en `/portal` DENTRO del frontend y **detrás del login**. Antes era `web-publica/`, un Vite aparte sin sesión cuyo backend resolvía el club con `Club.first`: la web multi-club nunca funcionó y servía siempre el catálogo de la organización #1. **No hay vitrina pública de un club**: lo público de la plataforma es `/bienvenida`. Siguen sin login, a propósito, el carnet (`/c/:token`) y el pasaporte de dispensa (`/d/:token`), que son links que la persona entrega. Falta el login por DNI del paciente y su tablero (en curso).
 15. **App móvil** (Capacitor) — cultivador y manicura principalmente; vistas bajo `/m`.
 16. **Asistente IA por voz** — parsear/ejecutar comandos. **Todo el consumo se mide y se cobra**: ver "IA" abajo.
 17. **Correo electrónico** — **add-on contratable** (`mailer`, con `require_feature!` real). Pantalla propia en Configuración → Correo: casilla SMTP de la organización + **plantillas que edita su admin** (variables `{{nombre}}` por lista blanca con `gsub`, **nunca ERB**). Bienvenida al alta (admin/médico en el acto; mostrador al aprobar) y **envíos masivos** (`EnvioMasivo` + `EnvioMasivoJob`): **un mail por destinatario, jamás un `To:` múltiple ni BCC** — juntos, cada paciente recibiría el padrón completo (fuga de datos de salud, Ley 25.326). Tope propio de 450/día (`Correo::CupoDiario`), por debajo de los ~500 de Gmail: pasarse **suspende la casilla del cliente**. Se chequea ANTES de crear el envío.

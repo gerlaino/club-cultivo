@@ -45,7 +45,7 @@ class Genetica < ApplicationRecord
 
   scope :activas,      -> { where(activa: true) }
   scope :disponibles,  -> { where(disponible: true) }
-  scope :visibles_web, -> { activas.where(visible_web: true) }
+  scope :visibles_paciente, -> { activas.where(visible_paciente: true) }
 
   # Rendimiento real de la cepa: promedio de TODAS las plantas cosechadas con peso seco
   # (no solo "selección" — eso daba info incompleta y vacío si nadie marcaba ninguna).

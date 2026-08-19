@@ -9,7 +9,7 @@ class Club < ApplicationRecord
   # Nunca se auditan credenciales: smtp_pass, twilio_auth_token_enc, pulse_api_key_enc quedan
   # fuera por no estar en esta lista, y una columna nueva tampoco se cuela sola.
   auditar_solo :name, :legal_name, :email, :slug, :plan, :plan_activo_hasta, :plan_trial,
-               :features, :activo, :deleted_at, :demo, :ia_tier, :ia_limite_hora, :web_activa
+               :features, :activo, :deleted_at, :demo, :ia_tier, :ia_limite_hora, :vista_paciente_activa
 
   # Se declaran para poder verificarlo en un test: que estén fuera no puede depender de que
   # alguien se acuerde de mirar la allowlist de arriba.

@@ -100,7 +100,7 @@ module Clubs
           plan: 'arbol', plan_trial: false,
           # TODAS las features prendidas: es una vidriera, tiene que poder mostrarse entero.
           features: Club::AVAILABLE_FEATURES.index_with(true),
-          web_activa: true,
+          vista_paciente_activa: true,
         )
       end
     end

@@ -147,7 +147,7 @@ class GeneticasController < ApplicationController
       :origen, :tiempo_floracion, :dias_vegetativo_objetivo, :dias_cosecha_objetivo, :rendimiento,
       :altura, :dificultad, :activa, :disponible,
       :registrada_inase, :numero_registro_inase, :fecha_registro_inase, :categoria_inase,
-      :criador, :terpenos, :visible_web, :declarada_como_id
+      :criador, :terpenos, :visible_paciente, :declarada_como_id
     )
   end
 
@@ -181,7 +181,7 @@ class GeneticasController < ApplicationController
       acreditada_inase:       genetica.acreditada_inase?,
       criador:                genetica.criador,
       terpenos:               genetica.terpenos,
-      visible_web:            genetica.visible_web,
+      visible_paciente:            genetica.visible_paciente,
       foto_url:               foto_url(genetica),
       plantas_count:          plantas_count(genetica, club),
     }
@@ -285,7 +285,7 @@ class GeneticasController < ApplicationController
       categoria_inase:        genetica.categoria_inase,
       criador:                genetica.criador,
       terpenos:               genetica.terpenos,
-      visible_web:            genetica.visible_web,
+      visible_paciente:            genetica.visible_paciente,
       fotos:            genetica.fotos.attached? ? genetica.fotos.map { |f| { id: f.id, url: url_for(f) } } : [],
       plantas_count:    plantas_count(genetica, club),
       lotes_historicos: lotes_data,
