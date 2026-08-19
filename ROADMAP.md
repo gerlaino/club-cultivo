@@ -1,4 +1,4 @@
-# ROADMAP — Club Cultivo
+# ROADMAP — Cultivo Espacial
 **Fecha:** 2026-05-10  
 **Horizonte:** 24 semanas (6 meses)  
 **Objetivo estratégico:** Ser el único sistema ALL-IN-ONE que combine trazabilidad de cultivo completa + módulo médico REPROCANN + compliance ARICCAME/ANMAT en Argentina.
@@ -7,7 +7,7 @@
 
 ## RESUMEN EJECUTIVO
 
-Club Cultivo es un sistema en estado **avanzado y sorprendentemente completo** para su etapa. El stack es moderno (Rails 7.2 + Vue 3 + Pinia), el schema está bien normalizado (42 tablas), y se han implementado módulos que la competencia directa (Araucann) simplemente no tiene: módulo médico REPROCANN, indicaciones terapéuticas, firma digital de documentos, delivery con trazabilidad de envío, cuenta corriente en gramos, y rol médico con dashboard propio.
+Cultivo Espacial es un sistema en estado **avanzado y sorprendentemente completo** para su etapa. El stack es moderno (Rails 7.2 + Vue 3 + Pinia), el schema está bien normalizado (42 tablas), y se han implementado módulos que la competencia directa (Araucann) simplemente no tiene: módulo médico REPROCANN, indicaciones terapéuticas, firma digital de documentos, delivery con trazabilidad de envío, cuenta corriente en gramos, y rol médico con dashboard propio.
 
 La cadena de cultivo vegetativo→floración→cosecha→secado→curado→manicura→stock está completamente modelada con bitácora de eventos, pesadas por planta, aprobaciones y QR por planta. El módulo de ambiente IoT es sofisticado: sensores via webhook, reglas configurable, alertas automáticas, setpoints por fase y genética.
 
@@ -40,10 +40,10 @@ Un bug en cualquier controller puede exponer datos de otro club. Con el crecimie
 ## BRECHAS COMPETITIVAS 🟡
 
 ### BComp-1: Asistente IA básico
-Araucann tiene "Araucanio", un asistente IA integrado. Club Cultivo tiene los endpoints y el componente VoiceInput pero sin un modelo de lenguaje conectado de forma robusta.
+Araucann tiene "Araucanio", un asistente IA integrado. Cultivo Espacial tiene los endpoints y el componente VoiceInput pero sin un modelo de lenguaje conectado de forma robusta.
 
 ### BComp-2: Plan vs Real no sistematizado
-Araucann permite comparar la planificación del lote (plantas objetivo, rendimiento esperado, fechas) vs lo que realmente ocurrió. Club Cultivo tiene `plants_count` en lotes pero sin comparación ni reportes.
+Araucann permite comparar la planificación del lote (plantas objetivo, rendimiento esperado, fechas) vs lo que realmente ocurrió. Cultivo Espacial tiene `plants_count` en lotes pero sin comparación ni reportes.
 
 ### BComp-3: QR en productos / stocks
 Las plantas tienen QR pero los productos finales (stocks) no. Araucann permite escanear el envase de producto y ver su origen completo.
@@ -177,7 +177,7 @@ Los campos `camera_stream_url` y `camera_snapshot_url` existen en `salas` pero n
 ---
 
 ### FASE 3 — Diferenciación total (semanas 13-24)
-**Meta:** Construir las funcionalidades únicas que consoliden a Club Cultivo como plataforma insustituible.
+**Meta:** Construir las funcionalidades únicas que consoliden a Cultivo Espacial como plataforma insustituible.
 
 - [ ] **TICKET-020: Carnet digital de socio** | Complejidad: M | Archivos: `frontend/src/views/`, `app/controllers/`
   - QR único por socio/paciente con información mínima necesaria
@@ -275,7 +275,7 @@ Los campos `camera_stream_url` y `camera_snapshot_url` existen en `salas` pero n
 ## POSICIÓN ESTRATÉGICA FINAL
 
 ```
-NOSOTROS (Club Cultivo)          ARAUCANN
+NOSOTROS (Cultivo Espacial)          ARAUCANN
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ✅ Módulo médico REPROCANN        ❌
 ✅ Indicaciones terapéuticas      ❌

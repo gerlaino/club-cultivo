@@ -1,4 +1,4 @@
-# Club Cultivo — Documento de Plataforma
+# Cultivo Espacial — Documento de Plataforma
 
 > Versión: junio 2026  
 > Audiencia: equipo fundador, inversores, nuevos colaboradores técnicos  
@@ -8,7 +8,7 @@
 
 ## 1. Visión y filosofía del producto
 
-Club Cultivo es una plataforma SaaS B2B diseñada para la **gestión integral de clubes de cannabis**. No es un club: es la herramienta operativa que los clubes usan para funcionar. Cada club suscripto opera dentro de un espacio completamente aislado (multi-tenancy), con sus propios datos, usuarios y configuración.
+Cultivo Espacial es una plataforma SaaS B2B diseñada para la **gestión integral de clubes de cannabis**. No es un club: es la herramienta operativa que los clubes usan para funcionar. Cada club suscripto opera dentro de un espacio completamente aislado (multi-tenancy), con sus propios datos, usuarios y configuración.
 
 La propuesta de valor es clara: reemplazar hojas de cálculo, sistemas artesanales y procesos manuales por una plataforma unificada que cubra el ciclo completo del producto — desde la semilla hasta la dispensación al socio — con trazabilidad total, cumplimiento regulatorio y datos accionables.
 
@@ -583,7 +583,7 @@ El módulo de configuración del club para el administrador.
 ### 4.20 Super Admin — Gestión de la Plataforma
 
 **Qué es**  
-El panel exclusivo de Passare (la empresa detrás de Club Cultivo) para administrar todos los clubs suscriptos a la plataforma.
+El panel exclusivo del titular de la plataforma para administrar todos los clubs suscriptos.
 
 **Funcionalidad actual**  
 - Lista de todos los clubs con estado de suscripción.  
@@ -692,7 +692,7 @@ La infraestructura de sensores ya existe. El siguiente paso es cerrar el loop de
 
 - **Benchmarking sectorial**: comparativa anonimizada de rendimiento, eficiencia y costos entre clubs suscriptos. El club ve cómo está posicionado respecto al promedio sectorial.  
 - **API pública para investigación**: datos agregados y anonimizados disponibles para universidades y centros de investigación.  
-- **Modelos de ML entrenados con datos reales**: el activo diferencial de la plataforma — ningún modelo de cannabis cultivado en clubes tiene acceso a la escala de datos que Club Cultivo puede acumular.
+- **Modelos de ML entrenados con datos reales**: el activo diferencial de la plataforma — ningún modelo de cannabis cultivado en clubes tiene acceso a la escala de datos que Cultivo Espacial puede acumular.
 
 ---
 

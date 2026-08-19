@@ -1,4 +1,4 @@
-# Guía de usuarios y flujos — Club Cultivo
+# Guía de usuarios y flujos — Cultivo Espacial
 
 > Documento de referencia para armar los manuales. Refleja el estado real del código a
 > **7 de agosto de 2026** (HEAD `8e05ebf`). Si algo contradice al código, manda el código.

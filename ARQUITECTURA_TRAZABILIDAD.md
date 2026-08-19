@@ -1,4 +1,4 @@
-# ARQUITECTURA DE TRAZABILIDAD — Club Cultivo
+# ARQUITECTURA DE TRAZABILIDAD — Cultivo Espacial
 **Fecha:** 2026-05-10  
 **Versión del schema analizado:** 2026_05_09_000001
 

@@ -30,3 +30,8 @@ frontend/dist
 frontend/.vite
 frontend/.eslintcache
 frontend/.cache
+
+# Paquete de depósito DNDA: salida derivada, se regenera con
+# deposito_dnda/generar_deposito.py. Pesa ~57 MB y el README lleva
+# datos personales del titular.
+deposito_dnda/

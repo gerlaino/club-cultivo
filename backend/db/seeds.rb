@@ -1,5 +1,5 @@
 # ============================================================
-# SEEDS — Club Cultivo · Dataset completo para testing UI/UX
+# SEEDS — Cultivo Espacial · Dataset completo para testing UI/UX
 # ============================================================
 puts "🌱 Iniciando seeds..."
 

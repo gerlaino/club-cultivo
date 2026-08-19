@@ -1,4 +1,4 @@
-# Informe de ingeniería — Club Cultivo
+# Informe de ingeniería — Cultivo Espacial
 **Fecha:** 2026-06-12 · **Autor:** Claude (revisión de código estática, sin ejecutar la app)
 **Alcance:** backend completo (controllers, modelos, services), frontend (estructura, router, flujo de dispensación), tests, documentación. Complementa la `AUDITORIA_SISTEMA.md` de mayo 2026 (que sigue siendo válida en trazabilidad y schema) — acá me enfoco en lo que esa auditoría no cubrió: calidad de implementación, seguridad de tenancy/autorización y deuda estructural.
 

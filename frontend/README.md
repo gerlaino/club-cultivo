@@ -1,6 +1,6 @@
-# Club Cultivo — Frontend
+# Cultivo Espacial — Frontend
 
-Vue 3 SPA for the Club Cultivo platform: B2B SaaS for managing cannabis clubs (REPROCANN, Argentina).
+Vue 3 SPA for the Cultivo Espacial platform: B2B SaaS for managing cannabis clubs (REPROCANN, Argentina).
 
 ## Stack
 

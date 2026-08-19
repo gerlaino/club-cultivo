@@ -1,4 +1,4 @@
-# Design System — Club Cultivo
+# Design System — Cultivo Espacial
 
 ## Íconos
 

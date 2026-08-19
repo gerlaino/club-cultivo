@@ -1,4 +1,4 @@
-# AUDITORÍA DEL SISTEMA — Club Cultivo
+# AUDITORÍA DEL SISTEMA — Cultivo Espacial
 **Fecha:** 2026-05-10  
 **Auditor:** Claude (arquitecto técnico)  
 **Stack:** Rails 7.2 + Vue 3 + PostgreSQL  

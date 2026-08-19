@@ -1,4 +1,4 @@
-# Architecture — Club Cultivo
+# Architecture — Cultivo Espacial
 
 ## Overview
 

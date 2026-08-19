@@ -1,4 +1,4 @@
-# SECURITY_AUDIT.md — Cultivo Espacial / Club Cultivo
+# SECURITY_AUDIT.md — Cultivo Espacial
 
 **Tipo:** Relevamiento de seguridad profundo, **READ-ONLY** (no se modificó código de la app).
 **Fecha:** 2026-06-25

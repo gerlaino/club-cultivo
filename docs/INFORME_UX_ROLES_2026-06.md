@@ -1,4 +1,4 @@
-# Informe UX/UI por rol — Club Cultivo
+# Informe UX/UI por rol — Cultivo Espacial
 **Fecha:** 2026-06-12 · **Autor:** Claude
 **Método:** lectura del código de las ~75 vistas, router, composables y flujos — **no ejecuté la app**. Donde opino "como usuario" estoy infiriendo la experiencia desde el código; lo marco cuando la confianza es baja. Para validar esto en serio, el siguiente paso natural es una sesión conmigo ejecutando la app rol por rol (`/run`).
 
