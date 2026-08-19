@@ -7,6 +7,7 @@ import { useToast } from '../composables/useToast.js'
 import { useClubStore } from '../stores/club'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
+import CredencialesNuevas from '../components/ui/CredencialesNuevas.vue'
 
 const router = useRouter()
 const store  = usePacientesStore()
@@ -23,6 +24,14 @@ const sendWelcomeMail = ref(false)
 const puedeMandarBienvenida = computed(() =>
   ['admin', 'medico'].includes(auth.user?.role) && club.data?.features?.mailer === true
 )
+// La cuenta del portal recién creada, y a dónde ir cuando el admin termine de anotarla.
+const credenciales = ref(null)
+const irA          = ref(null)
+function cerrarCredenciales() {
+  credenciales.value = null
+  if (irA.value) router.push(irA.value)
+}
+
 const formError       = ref(null)
 const formErrors      = ref({})
 const todayISO        = new Date().toLocaleDateString('en-CA') // yyyy-mm-dd local
@@ -98,8 +107,18 @@ async function handleSubmit() {
     // rechazaba, nadie se enteraba. Ahora el cuerpo sale de la plantilla de la organización
     // —editable en Configuración → Correo electrónico— y el backend devuelve un `aviso` si no
     // pudo mandarlo.
-    const { paciente: socio, aviso } = await store.create(payload, { enviarBienvenida: puedeMandarBienvenida.value && sendWelcomeMail.value })
+    const { paciente: socio, aviso, acceso } = await store.create(payload, { enviarBienvenida: puedeMandarBienvenida.value && sendWelcomeMail.value })
     if (aviso) toastWarn(aviso)
+
+    // La cuenta del portal se muestra ANTES de navegar: la contraseña no se puede volver a ver,
+    // así que irse de la pantalla sin haberla pasado la pierde. Si la organización no tiene el
+    // módulo, no viene nada y el alta sigue de largo como siempre.
+    if (acceso?.password_inicial) {
+      credenciales.value = { ...acceso, nombre: `${form.value.nombre} ${form.value.apellido}`.trim() }
+      irA.value = { name: 'paciente-detail', params: { id: socio.id } }
+      return
+    }
+    if (acceso?.error) toastWarn(`El paciente se creó, pero su cuenta del portal no: ${acceso.error}`)
 
     router.push({ name: 'paciente-detail', params: { id: socio.id } })
   } catch (e) {
@@ -114,6 +133,8 @@ async function handleSubmit() {
 
 <template>
   <div class="snv">
+
+    <CredencialesNuevas :datos="credenciales" @cerrar="cerrarCredenciales" />
 
     <div class="snv__header">
       <RouterLink to="/pacientes" class="snv__back">

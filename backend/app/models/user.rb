@@ -66,7 +66,10 @@ class User < ApplicationRecord
     # Delivery no deshabilitaba a nadie: los repartidores seguían entrando a una sección que ya
     # no estaba contratada. (Delivery a su vez exige la suite, así que no se pierde nada.)
     'delivery'    => %w[delivery],
-    'paciente'    => %w[produccion_dispensa],
+    # El paciente entra por su PORTAL y no tiene otro lado donde ir: sin ese módulo no hay nada
+    # que mostrarle, así que tampoco puede loguearse. Misma lógica que el repartidor, que depende
+    # del módulo Delivery y no de la suite entera.
+    'paciente'    => %w[vista_paciente],
     'medico'      => %w[medico],
   }.freeze
 

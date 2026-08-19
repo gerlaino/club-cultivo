@@ -244,7 +244,8 @@ class PacientesController < ApplicationController
       # mostrador todavía no es paciente de la organización: darle la bienvenida antes de que
       # alguien la admita sería anunciarle algo que puede no pasar. Esa sale al aprobar.
       aviso = enviar_bienvenida(paciente) unless paciente.pendiente_aprobacion?
-      render json: { data: paciente_json(paciente), aviso: aviso }.compact, status: :created
+      acceso = crear_acceso(paciente) unless paciente.pendiente_aprobacion?
+      render json: { data: paciente_json(paciente), aviso: aviso, acceso: acceso }.compact, status: :created
     else
       render json: { errors: paciente.errors.full_messages }, status: :unprocessable_entity
     end
@@ -262,8 +263,9 @@ class PacientesController < ApplicationController
     end
 
     @paciente.aprobar!(current_user)
-    aviso = enviar_bienvenida(@paciente)
-    render json: { data: paciente_json(@paciente), aviso: aviso }.compact
+    aviso  = enviar_bienvenida(@paciente)
+    acceso = crear_acceso(@paciente)
+    render json: { data: paciente_json(@paciente), aviso: aviso, acceso: acceso }.compact
   end
 
   def update
@@ -594,6 +596,22 @@ class PacientesController < ApplicationController
         contexto:         { paciente_id: paciente.id, creado_por_id: current_user.id }
       )
     end
+  end
+
+  # La cuenta del portal nace cuando el paciente queda ADMITIDO, igual que el mail de bienvenida:
+  # una solicitud cargada en el mostrador que todavía nadie aprobó no es paciente de la
+  # organización, y darle acceso antes sería dejarlo entrar a algo que puede no pasar.
+  #
+  # Devuelve las credenciales para que quien dio el alta se las pase en mano. Nunca hace fallar la
+  # operación: el paciente quedó dado de alta igual, y sin cuenta se le crea después.
+  def crear_acceso(paciente)
+    return unless current_user.club.feature?(:vista_paciente)
+
+    resultado = Pacientes::Acceso.crear!(paciente)
+    return { error: resultado.error } unless resultado.ok?
+    return if resultado.password_inicial.blank? # ya tenía cuenta
+
+    { email: resultado.user.email, password_inicial: resultado.password_inicial }
   end
 
   # Manda la plantilla de bienvenida si quien está operando lo pidió. Devuelve un aviso para

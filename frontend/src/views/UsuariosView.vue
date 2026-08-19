@@ -8,6 +8,7 @@ import { listSalas, listSedes, asignarSedeAUsuario } from '../lib/api.js'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import CredencialesNuevas from '../components/ui/CredencialesNuevas.vue'
 import { rolesParaAlta, rolInfo, rolEstilo, rolColor, rolBg, rolPideSede, rolHintSede } from '../lib/roles.js'
 
 const store           = useUsuariosStore()
@@ -69,12 +70,6 @@ function getAvatarColor(user) { return AVATAR_COLORS[(user.id || 0) % AVATAR_COL
 // Credenciales del usuario recién creado: se muestran una vez y no se pueden recuperar
 // después (para eso está "Restablecer contraseña" en su ficha).
 const credencialesNuevas = ref(null)
-async function copiarCredenciales() {
-  const c = credencialesNuevas.value
-  await navigator.clipboard.writeText(`Usuario: ${c.email}\nContraseña: ${c.password_inicial}`)
-  toast.success('Copiado')
-}
-
 // ── Modal ─────────────────────────────────────────────────────────────────
 const showModal  = ref(false)
 const editing    = ref(false)
@@ -470,39 +465,7 @@ async function removeOne(u) {
                 </div>
               
     <!-- Credenciales del alta: en pantalla hasta que el admin las haya pasado. -->
-    <Teleport to="body">
-      <div v-if="credencialesNuevas" class="uv-cred-ov" @click.self="credencialesNuevas = null">
-        <div class="uv-cred">
-          <div class="uv-cred__head">
-            <i class="bi bi-check-circle-fill"></i>
-            <div>
-              <h3 class="uv-cred__title">{{ credencialesNuevas.nombre }} ya puede entrar</h3>
-              <p class="uv-cred__sub">Pasale estos datos. La contraseña no se puede volver a ver.</p>
-            </div>
-          </div>
-          <div class="uv-cred__row">
-            <span class="uv-cred__lbl">Usuario</span>
-            <code class="uv-cred__val">{{ credencialesNuevas.email }}</code>
-          </div>
-          <div class="uv-cred__row">
-            <span class="uv-cred__lbl">Contraseña</span>
-            <code class="uv-cred__val uv-cred__val--big">{{ credencialesNuevas.password_inicial }}</code>
-          </div>
-          <p v-if="credencialesNuevas.mail_enviado" class="uv-cred__mail">
-            <i class="bi bi-envelope-check"></i> También se las mandamos por mail.
-          </p>
-          <p v-else class="uv-cred__mail uv-cred__mail--off">
-            <i class="bi bi-envelope-slash"></i> La organización no tiene correo configurado, así que el mail no salió: pasáselas vos.
-          </p>
-          <div class="uv-cred__acts">
-            <button class="uv__btn-secondary" @click="copiarCredenciales">
-              <i class="bi bi-clipboard"></i> Copiar
-            </button>
-            <button class="uv__btn-primary" @click="credencialesNuevas = null">Listo</button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <CredencialesNuevas :datos="credencialesNuevas" @cerrar="credencialesNuevas = null" />
 </template>
 
             </div>
@@ -595,19 +558,6 @@ async function removeOne(u) {
 .uv__btn-secondary:hover { border-color: var(--c-slate-300); background: var(--c-slate-50); }
 
 /* Credenciales del alta */
-.uv-cred-ov { position: fixed; inset: 0; background: rgba(15,23,42,.5); display: flex; align-items: center; justify-content: center; z-index: 1200; padding: 1rem; }
-.uv-cred { background: #fff; border-radius: 16px; max-width: 460px; width: 100%; padding: 1.5rem; box-shadow: 0 24px 64px rgba(0,0,0,.2); }
-.uv-cred__head { display: flex; gap: .75rem; align-items: flex-start; margin-bottom: 1.25rem; }
-.uv-cred__head > i { color: #15803d; font-size: 1.5rem; flex-shrink: 0; }
-.uv-cred__title { font-size: 1.05rem; font-weight: 800; color: var(--c-slate-900); margin: 0 0 .15rem; }
-.uv-cred__sub { font-size: .8rem; color: var(--c-slate-500); margin: 0; }
-.uv-cred__row { display: flex; align-items: center; gap: .75rem; margin-bottom: .5rem; }
-.uv-cred__lbl { font-size: .7rem; color: var(--c-slate-500); width: 82px; flex-shrink: 0; text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
-.uv-cred__val { font-family: monospace; font-size: .9rem; background: var(--c-slate-50); border: 1px solid var(--c-slate-200); border-radius: 7px; padding: .35rem .65rem; color: var(--c-slate-900); user-select: all; flex: 1; }
-.uv-cred__val--big { font-size: 1.1rem; font-weight: 700; letter-spacing: .05em; }
-.uv-cred__mail { font-size: .78rem; color: #15803d; margin: .9rem 0 0; display: flex; align-items: center; gap: .4rem; }
-.uv-cred__mail--off { color: #92400e; }
-.uv-cred__acts { display: flex; gap: .6rem; justify-content: flex-end; margin-top: 1.35rem; }
 .uv__btn-ghost { background: #fff; color: var(--c-slate-500); border: 1.5px solid var(--c-slate-200); padding: .65rem 1.1rem; border-radius: 10px; font-size: .875rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: .4rem; }
 .uv__btn-ghost:hover { background: var(--c-slate-50); color: var(--c-slate-900); }
 

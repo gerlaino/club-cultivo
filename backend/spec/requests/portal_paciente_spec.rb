@@ -62,15 +62,28 @@ RSpec.describe 'Portal del paciente', type: :request do
     end
   end
 
+  # Sin el módulo el candado cae un escalón ANTES que en los demás roles: el paciente no tiene
+  # otro lado donde ir, así que `check_rol_habilitado!` no lo deja ni loguearse. Es lo mismo que
+  # le pasa al repartidor cuando la organización da de baja Delivery.
   describe 'sin el módulo contratado' do
     let(:club) { create(:club, features: { 'produccion_dispensa' => true }) }
 
-    before { sign_in_as(paciente) }
+    it 'el paciente no puede ni entrar, y se le dice qué falta' do
+      post '/api/users/sign_in',
+           params: { user: { email: paciente.email, password: 'password123' } }, as: :json
 
-    it 'no se llega: es lo que la organización paga' do
+      expect(response).not_to have_http_status(:ok)
+      expect(response.body).to include('Portal del paciente')
+    end
+
+    it 'y con la sesión de antes tampoco se llega al contenido' do
+      club.update!(features: club.features.merge('vista_paciente' => true))
+      sign_in_as(paciente)
+      club.update!(features: club.features.merge('vista_paciente' => false))
+
       RUTAS.each do |ruta|
         entrar(ruta)
-        expect(response).to have_http_status(:forbidden), "#{ruta} contestó #{response.status} sin el módulo"
+        expect(response).not_to have_http_status(:ok), "#{ruta} contestó 200 sin el módulo"
       end
     end
   end

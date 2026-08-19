@@ -14,6 +14,10 @@ class Paciente < ApplicationRecord
   belongs_to :deleted_by, class_name: "User", optional: true
   belongs_to :aprobado_por, class_name: "User", optional: true
 
+  # La cuenta con la que entra a su portal. Opcional: los pacientes que ya existían no tienen, y
+  # una organización sin el módulo no necesita crearlas. Ver `Pacientes::Acceso`.
+  belongs_to :user, optional: true
+
   has_many :notas, class_name: "PacienteNota", dependent: :destroy
   has_many :indicacion_medicas, dependent: :destroy
   has_many :dispensaciones, class_name: 'Dispensacion', dependent: :destroy

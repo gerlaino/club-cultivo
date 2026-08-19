@@ -100,22 +100,34 @@ RSpec.describe 'Gating por módulo', type: :request do
   end
 
   # Distinto de "incompleto": lo que está EN CONSTRUCCIÓN no existe todavía, así que no se
-  # puede prender ni por la API. Prometerle al club algo que no está es peor que no ofrecerlo.
+  # puede prender ni por la API. Prometerle a la organización algo que no está es peor que no
+  # ofrecerlo.
+  #
+  # El cajón está VACÍO hoy —`vista_paciente` salió a ADDONS cuando el paciente pudo entrar— así
+  # que el mecanismo se prueba con un módulo inventado. Es a propósito: atado a la clave que
+  # estuviera adentro, el spec se caía cada vez que un módulo se terminaba, y lo que hay que
+  # sostener es el mecanismo, no la lista.
   describe 'módulos en construcción' do
-    it 'la vista del paciente no está disponible para nadie' do
-      expect(Club::EN_CONSTRUCCION).to have_key('vista_paciente')
-      expect(club.feature?(:vista_paciente)).to be(false)
-      expect(club.estado_modulo(:vista_paciente)).to eq(:en_construccion)
+    let(:en_obra) { 'modulo_de_prueba' }
+
+    before do
+      stub_const('Club::EN_CONSTRUCCION',
+                 { en_obra => { label: 'Módulo de prueba', desc: 'x', requiere: 'En construcción.' } })
+    end
+
+    it 'no está disponible para nadie' do
+      expect(club.feature?(en_obra)).to be(false)
+      expect(club.estado_modulo(en_obra)).to eq(:en_construccion)
     end
 
     it 'no se habilita ni forzando la bandera a mano' do
-      features!('vista_paciente' => true)
+      features!(en_obra => true)
 
-      expect(club.reload.feature?(:vista_paciente)).to be(false)
+      expect(club.reload.feature?(en_obra)).to be(false)
     end
 
     it 'no es una feature editable por el super admin' do
-      expect(Club::FEATURES_EDITABLES).not_to include('vista_paciente')
+      expect(Club::FEATURES_EDITABLES).not_to include(en_obra)
     end
   end
 

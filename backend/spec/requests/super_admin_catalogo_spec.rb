@@ -43,12 +43,15 @@ RSpec.describe 'SuperAdmin catálogo', type: :request do
       c = catalogo
 
       expect(c['suites'].map  { |s| s['clave'] }).to contain_exactly('cultivo', 'produccion_dispensa')
-      expect(c['addons'].map  { |a| a['clave'] }).to include('bar', 'iot', 'ia', 'whatsapp', 'mailer')
+      expect(c['addons'].map  { |a| a['clave'] }).to include('bar', 'iot', 'ia', 'whatsapp', 'mailer', 'vista_paciente')
       # El médico no es add-on: viene dentro de la suite. El correo SÍ pasó a serlo cuando dejó
       # de ser "mandar un mail desde la ficha" y se volvió un espacio propio que se vende.
       expect(c['addons'].map  { |a| a['clave'] }).not_to include('medico')
       expect(c['incluidos'].map { |i| i['clave'] }).to contain_exactly('medico')
-      expect(c['en_construccion'].map { |e| e['clave'] }).to include('vista_paciente')
+      # El cajón de "en construcción" está vacío hoy: `vista_paciente` salió a add-on cuando el
+      # paciente pudo entrar. Que el catálogo lo siga informando (aunque vacío) es lo que hace
+      # que el panel no se rompa el día que entre el próximo.
+      expect(c).to have_key('en_construccion')
     end
 
     it 'dice de qué suite depende cada módulo incluido' do

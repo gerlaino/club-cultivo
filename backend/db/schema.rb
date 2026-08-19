@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_19_120000) do
+ActiveRecord::Schema[7.2].define(version: 2026_08_19_150000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1456,6 +1456,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_19_120000) do
     t.string "envio_ciudad"
     t.datetime "aprobado_at"
     t.bigint "aprobado_por_id"
+    t.bigint "user_id"
     t.index "lower((apellido)::text)", name: "index_socios_on_lower_apellido"
     t.index "lower((nombre)::text)", name: "index_socios_on_lower_nombre"
     t.index ["aprobado_at"], name: "index_pacientes_on_aprobado_at"
@@ -1464,6 +1465,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_19_120000) do
     t.index ["club_id"], name: "index_pacientes_on_club_id"
     t.index ["created_at"], name: "index_pacientes_on_created_at"
     t.index ["deleted_at"], name: "index_pacientes_on_deleted_at"
+    t.index ["user_id"], name: "index_pacientes_on_user_id", unique: true
   end
 
   create_table "patient_documents", force: :cascade do |t|
@@ -2438,6 +2440,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_19_120000) do
   add_foreign_key "paciente_notas", "users", column: "created_by_id"
   add_foreign_key "paciente_notas", "users", column: "deleted_by_id"
   add_foreign_key "pacientes", "clubs"
+  add_foreign_key "pacientes", "users"
   add_foreign_key "pacientes", "users", column: "aprobado_por_id"
   add_foreign_key "pacientes", "users", column: "created_by_id"
   add_foreign_key "pacientes", "users", column: "deleted_by_id"

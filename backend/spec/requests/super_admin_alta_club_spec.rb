@@ -62,20 +62,29 @@ RSpec.describe 'SuperAdmin alta de club', type: :request do
       expect(club.feature?(:medico)).to be(true)
     end
 
+    # Con un módulo inventado y no con la clave que esté en el cajón: el cajón se vacía cada vez
+    # que un módulo se termina, y lo que hay que sostener es que lo de adentro no se pueda prender.
     it 'ignora un módulo en construcción aunque lo manden por la API' do
-      body = alta(club: { features: { 'cultivo' => true, 'vista_paciente' => true } })
+      stub_const('Club::EN_CONSTRUCCION',
+                 { 'modulo_de_prueba' => { label: 'Módulo de prueba', desc: 'x', requiere: 'En construcción.' } })
+
+      body = alta(club: { features: { 'cultivo' => true, 'modulo_de_prueba' => true } })
       club = Club.find(body['club']['id'])
 
-      expect(club.features).not_to have_key('vista_paciente')
-      expect(club.feature?(:vista_paciente)).to be(false)
+      expect(club.features).not_to have_key('modulo_de_prueba')
+      expect(club.feature?('modulo_de_prueba')).to be(false)
     end
 
-    it 'la ficha separa los tres cajones' do
+    it 'la ficha separa los cajones' do
+      stub_const('Club::EN_CONSTRUCCION',
+                 { 'modulo_de_prueba' => { label: 'Módulo de prueba', desc: 'x', requiere: 'En construcción.' } })
+
       body = alta
 
       expect(body['club']['suites'].map  { |s| s['clave'] }).to include('cultivo')
       expect(body['club']['incluidos'].map { |i| i['clave'] }).to include('medico')
-      expect(body['club']['en_construccion'].map { |e| e['clave'] }).to include('vista_paciente')
+      expect(body['club']['addons'].map { |a| a['clave'] }).to include('vista_paciente')
+      expect(body['club']['en_construccion'].map { |e| e['clave'] }).to include('modulo_de_prueba')
     end
 
     # Prendido no es lo mismo que andando: el panel tiene que poder decir la diferencia.

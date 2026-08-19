@@ -274,30 +274,27 @@ class Club < ApplicationRecord
     'mailer'   => { label: 'Correo electrónico', desc: 'Casilla propia, plantillas de mail y envíos a los pacientes.', requiere: 'Casilla de la organización conectada en Preferencias → Correo electrónico.' },
     'whatsapp' => { label: 'WhatsApp',       desc: 'Avisos de entrega por WhatsApp.',                    requiere: 'Cuenta de Twilio de la organización (SID, token y número).' },
     'ariccame' => { label: 'ARICCAME',       desc: 'Reporte regulatorio de dispensaciones y stock.',     requiere: 'INCOMPLETO: la integración está simulada, no transmite de verdad.' },
-  }.freeze
-
-  # Módulos que TODAVÍA NO EXISTEN. Se listan para que el super admin sepa que vienen, pero no
-  # se pueden activar: prenderlos no haría nada y prometerle al club algo que no está es peor
-  # que no ofrecerlo. Distinto de ADDONS_INCOMPLETOS, que funcionan a medias y sólo avisan.
-  EN_CONSTRUCCION = {
     # Un solo nombre en todos lados: "Portal del paciente". La pantalla donde el admin lo
     # configura se llamaba "Sitio web", el módulo "Vista del paciente" y el proyecto
     # "web-publica" — tres nombres para lo mismo, y nadie sabía si eran una cosa o tres.
     #
     # Es un add-on de verdad: una organización de investigación no tiene pacientes a quienes
-    # mostrarles nada. Pasa a ADDONS cuando el paciente pueda entrar con su documento; hasta
-    # entonces se podría contratar algo a lo que nadie puede loguearse.
-    'vista_paciente' => {
-      label: 'Portal del paciente',
-      desc:  'Lo que ve el paciente cuando entra: su carnet, sus dispensaciones, y el catálogo, las novedades y los eventos que publica la organización.',
-      requiere: 'En construcción — falta el ingreso del paciente con su documento.',
-    },
+    # mostrarles nada, y no tiene por qué pagarlo.
+    'vista_paciente' => { label: 'Portal del paciente', desc: 'Lo que ve el paciente cuando entra: el catálogo, las novedades y los eventos que publica la organización. Cada paciente que se da de alta recibe su cuenta.', requiere: 'INCOMPLETO: falta su tablero (carnet y dispensaciones).' },
   }.freeze
+
+  # Módulos que TODAVÍA NO EXISTEN. Se listan para que el super admin sepa que vienen, pero no
+  # se pueden activar: prenderlos no haría nada y prometerle al club algo que no está es peor
+  # que no ofrecerlo. Distinto de ADDONS_INCOMPLETOS, que funcionan a medias y sólo avisan.
+  # Vacío hoy, y el cajón se queda: es el lugar donde poner un módulo que ya tiene código pero
+  # todavía no se puede vender. `feature?` devuelve false para lo que esté acá, tenga lo que
+  # tenga guardado, así que sirve para escribir un módulo entero sin que se filtre a nadie.
+  EN_CONSTRUCCION = {}.freeze
 
   # Add-ons que funcionan a medias: vienen apagados por defecto y el super admin muestra la
   # advertencia de `requiere` antes de dejar activarlos. No se bloquean por completo —eso
   # dejaría su código inalcanzable— pero nadie los prende sin enterarse de qué les falta.
-  ADDONS_INCOMPLETOS = %w[ariccame eventos chatbot].freeze
+  ADDONS_INCOMPLETOS = %w[ariccame eventos chatbot vista_paciente].freeze
 
   # Se mantiene para compatibilidad: hay clubes con las claves viejas guardadas en `features`.
   AVAILABLE_FEATURES = (SUITES.keys + ADDONS.keys + INCLUIDOS_EN_SUITE.keys).freeze
@@ -318,7 +315,10 @@ class Club < ApplicationRecord
     'multi_sede'       => 'cultivo',
     'insumos'          => 'cultivo',
     'alertas'          => 'cultivo',
-    'web_publica'      => 'vista_paciente',
+    # `web_publica` NO se mapea a `vista_paciente` a propósito. Era la clave de algo que nunca se
+    # vendió ni funcionó, y ahora el Portal del paciente es un add-on que se cobra: dejar la
+    # equivalencia sería una puerta de atrás por la que una organización se lo lleva gratis
+    # porque alguien probó una bandera en 2026. Se pide por su clave nueva y por ninguna otra.
   }.freeze
 
   # Con qué nace un club nuevo: las dos suites y el Buffet, que funciona sin nada de afuera.

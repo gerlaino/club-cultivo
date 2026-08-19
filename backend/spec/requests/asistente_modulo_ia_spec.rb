@@ -97,7 +97,7 @@ RSpec.describe 'Asistente: el módulo de IA', type: :request do
     let(:club) do
       create(:club, features: {
                'cultivo' => true, 'ia' => true, 'produccion_dispensa' => true,
-               'bar' => true, 'medico' => true, 'delivery' => true
+               'bar' => true, 'medico' => true, 'delivery' => true, 'vista_paciente' => true
              })
     end
 
@@ -147,12 +147,14 @@ RSpec.describe 'Asistente: el módulo de IA', type: :request do
     end
   end
 
-  # Lo que todavía no existe no se enciende por la puerta de atrás: `web_publica` es la clave
-  # vieja de `vista_paciente`, que está EN CONSTRUCCIÓN.
-  describe 'un módulo en construcción con la clave vieja guardada' do
+  # El Portal del paciente se pide por su clave nueva y por ninguna otra. `web_publica` era la
+  # bandera de algo que nunca se vendió ni funcionó; ahora el portal se cobra, y dejar la
+  # equivalencia sería una puerta de atrás por la que una organización se lo lleva gratis porque
+  # alguien probó una bandera vieja.
+  describe 'la bandera vieja de la web pública' do
     let(:club) { create(:club, features: { 'cultivo' => true, 'web_publica' => true }) }
 
-    it 'sigue apagado' do
+    it 'no enciende el Portal del paciente' do
       expect(club.feature?('vista_paciente')).to be(false)
       expect(club.features_expandidas['vista_paciente']).not_to be(true)
     end
