@@ -1,161 +1,102 @@
 <template>
-  <div class="ev">
+  <div class="pe">
+    <PortalCabecera titulo="Eventos" bajada="Talleres, charlas y actividades de la organización." />
 
-    <section class="ev__hero">
-      <div class="ev__hero-inner">
-        <h1 class="ev__hero-title">Eventos <span class="ev__hero-accent">del club</span></h1>
-        <p class="ev__hero-sub">Talleres, charlas y actividades. Participá de nuestra comunidad.</p>
+    <div v-if="cargando" class="pe__cargando"><DsSpinner :size="32" /></div>
+
+    <template v-else>
+      <div class="pe__tabs" role="tablist">
+        <button class="pe__tab" :class="{ 'pe__tab--on': !pasados }" role="tab"
+                :aria-selected="!pasados" @click="ver(false)">Próximos</button>
+        <button class="pe__tab" :class="{ 'pe__tab--on': pasados }" role="tab"
+                :aria-selected="pasados" @click="ver(true)">Anteriores</button>
       </div>
-    </section>
 
-    <section class="ev__section">
-      <div class="ev__container">
+      <PortalVacio v-if="!eventos.length"
+                   :titulo="pasados ? 'No hay eventos anteriores' : 'No hay eventos próximos'"
+                   :texto="pasados ? 'Todavía no pasó ninguno.' : 'Cuando tu organización programe algo, lo vas a ver acá.'" />
 
-        <div v-if="loading" class="ev__loading"><div class="ev__spinner"></div></div>
-
-        <div v-else-if="eventos.length === 0" class="ev__empty">
-          <i class="bi bi-calendar-x" style="font-size:3rem;opacity:.3;display:block;margin-bottom:1rem"></i>
-          No hay eventos próximos por el momento.
-        </div>
-
-        <div v-else class="ev__lista">
-          <div v-for="e in eventos" :key="e.id" class="ev__card">
-
-            <div class="ev__card-fecha">
-              <div class="ev__dia">{{ getDia(e.fecha_inicio) }}</div>
-              <div class="ev__mes">{{ getMes(e.fecha_inicio) }}</div>
-              <div class="ev__anio">{{ getAnio(e.fecha_inicio) }}</div>
-            </div>
-
-            <div class="ev__card-img" v-if="e.imagen_url">
-              <img :src="e.imagen_url" :alt="e.titulo" />
-            </div>
-            <div class="ev__card-img ev__card-img--placeholder" v-else>
-              <i class="bi bi-calendar-event"></i>
-            </div>
-
-            <div class="ev__card-body">
-              <h2 class="ev__card-titulo">{{ e.titulo }}</h2>
-              <div class="ev__card-meta">
-                <span v-if="e.lugar"><i class="bi bi-geo-alt"></i> {{ e.lugar }}</span>
-                <span><i class="bi bi-clock"></i> {{ getHora(e.fecha_inicio) }}</span>
-                <span v-if="e.fecha_fin"><i class="bi bi-arrow-right"></i> {{ getHora(e.fecha_fin) }}</span>
-              </div>
-              <p v-if="e.descripcion" class="ev__card-desc">{{ e.descripcion }}</p>
-            </div>
-
-            <div class="ev__card-cta">
-              <RouterLink to="/portal/contacto" class="ev__inscribirse-btn">
-                Anotarme <i class="bi bi-arrow-right"></i>
-              </RouterLink>
-            </div>
-
-          </div>
-        </div>
-
-      </div>
-    </section>
-
+      <ul v-else class="pe__lista">
+        <li v-for="e in eventos" :key="e.id">
+          <RouterLink :to="`/portal/eventos/${e.id}`" class="pe__i">
+            <span class="pe__f">
+              <span class="pe__f-d">{{ dia(e.fecha_inicio) }}</span>
+              <span class="pe__f-m">{{ mes(e.fecha_inicio) }}</span>
+            </span>
+            <span class="pe__c">
+              <span class="pe__t">{{ e.titulo }}</span>
+              <span class="pe__m">
+                <Clock :size="12" :stroke-width="1.75" /> {{ hora(e.fecha_inicio) }}
+                <template v-if="e.lugar">
+                  <MapPin :size="12" :stroke-width="1.75" /> {{ e.lugar }}
+                </template>
+              </span>
+            </span>
+            <img v-if="e.imagenes_urls?.length" :src="e.imagenes_urls[0]" :alt="e.titulo" class="pe__foto" loading="lazy" />
+          </RouterLink>
+        </li>
+      </ul>
+    </template>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import publicApi from '@/lib/portalApi'
+import { Clock, MapPin } from 'lucide-vue-next'
+import { getPortalEventos } from '@/lib/portalApi'
+import PortalCabecera from '@/components/portal/PortalCabecera.vue'
+import PortalVacio from '@/components/portal/PortalVacio.vue'
+import DsSpinner from '@/design-system/components/Spinner.vue'
 
-const eventos = ref([])
-const loading = ref(true)
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
 
-function getDia(f)  { return f ? new Date(f).getDate() : '' }
-function getMes(f)  { return f ? new Date(f).toLocaleDateString('es-AR', { month: 'short' }).toUpperCase() : '' }
-function getAnio(f) { return f ? new Date(f).getFullYear() : '' }
-function getHora(f) { return f ? new Date(f).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '' }
+const eventos  = ref([])
+const cargando = ref(true)
+const pasados  = ref(false)
 
-onMounted(async () => {
-  try { eventos.value = await publicApi.getEventos() }
-  catch (e) { console.error(e) }
-  finally { loading.value = false }
-})
+const dia  = (f) => (f ? new Date(f).getDate() : '')
+const mes  = (f) => (f ? MESES[new Date(f).getMonth()] : '')
+const hora = (f) => (f ? new Date(f).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '')
+
+async function ver(anteriores) {
+  pasados.value = anteriores
+  cargando.value = true
+  try { eventos.value = await getPortalEventos(anteriores) } catch { eventos.value = [] }
+  finally { cargando.value = false }
+}
+
+onMounted(() => ver(false))
 </script>
 
 <style scoped>
-.ev { min-height: 100vh; background: #f0fdf4; }
+.pe { max-width: var(--p-ancho); margin: 0 auto; padding: var(--sp-6) var(--sp-4) var(--sp-12); }
+.pe__cargando { display: flex; justify-content: center; padding: var(--sp-12); }
 
-.ev__hero { background: #060f07; padding: 5rem 2rem 4rem; position: relative; overflow: hidden; }
-.ev__hero::before {
-  content: ''; position: absolute; inset: 0;
-  background: radial-gradient(ellipse at 50% 50%, #1b5e2018 0%, transparent 65%);
+.pe__tabs { display: flex; gap: var(--sp-2); margin-bottom: var(--sp-5); }
+.pe__tab {
+  border: 1px solid var(--p-linea); background: none; color: var(--p-suave);
+  font-size: var(--fs-13); padding: var(--sp-1) var(--sp-4);
+  border-radius: var(--r-pill); cursor: pointer; transition: all var(--t-fast);
 }
-.ev__hero-inner { max-width: 1200px; margin: 0 auto; position: relative; z-index: 1; }
-.ev__hero-title { color: #f0fdf4; font-size: 40px; font-weight: 500; margin-bottom: 1rem; }
-.ev__hero-accent { color: #66bb6a; }
-.ev__hero-sub { color: #81c784; font-size: 16px; opacity: .8; margin: 0; }
+.pe__tab--on { background: var(--p-marca); border-color: var(--p-marca); color: #fff; }
 
-.ev__section { padding: 3.5rem 0; }
-.ev__container { max-width: 1200px; margin: 0 auto; padding: 0 2rem; }
-
-.ev__loading { display: flex; justify-content: center; padding: 4rem; }
-.ev__spinner {
-  width: 32px; height: 32px; border: 2px solid #d4edda; border-top-color: #1b5e20;
-  border-radius: 50%; animation: spin .7s linear infinite;
+.pe__lista { list-style: none; margin: 0; padding: 0; }
+.pe__i {
+  display: flex; gap: var(--sp-4); align-items: center;
+  padding: var(--sp-4) 0; text-decoration: none; color: inherit;
+  border-bottom: 1px solid var(--p-linea);
 }
-@keyframes spin { to { transform: rotate(360deg); } }
-.ev__empty { text-align: center; color: #4a7c59; padding: 4rem; font-size: 15px; }
-
-.ev__lista { display: flex; flex-direction: column; gap: 16px; }
-.ev__card {
-  background: white; border: 1px solid #d4edda; border-radius: 18px;
-  display: flex; gap: 0; overflow: hidden;
-  transition: box-shadow .2s;
-}
-.ev__card:hover { box-shadow: 0 8px 32px #1b5e2012; }
-
-.ev__card-fecha {
-  background: linear-gradient(180deg, #1b5e20, #2e7d32);
-  padding: 1.5rem 1.25rem; text-align: center; min-width: 90px;
+.pe__lista li:last-child .pe__i { border-bottom: 0; }
+.pe__f {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  flex-shrink: 0;
+  width: 52px; flex: 0 0 auto; background: var(--p-marca-suave);
+  border-radius: var(--p-radio-sm); padding: var(--sp-2) 0;
 }
-.ev__dia { color: #e8f5e9; font-size: 36px; font-weight: 700; line-height: 1; }
-.ev__mes { color: #a5d6a7; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; margin-top: 4px; }
-.ev__anio { color: #4a7c59; font-size: 11px; margin-top: 2px; }
-
-.ev__card-img {
-  width: 180px; flex-shrink: 0; overflow: hidden;
-  background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
-}
-.ev__card-img img { width: 100%; height: 100%; object-fit: cover; }
-.ev__card-img--placeholder {
-  display: flex; align-items: center; justify-content: center; font-size: 2.5rem; opacity: .3;
-}
-
-.ev__card-body { padding: 1.5rem 1.75rem; flex: 1; }
-.ev__card-titulo { font-size: 20px; font-weight: 600; color: #1a2e1b; margin-bottom: .75rem; line-height: 1.3; }
-.ev__card-meta {
-  display: flex; gap: 16px; font-size: 13px; color: #4a7c59;
-  margin-bottom: 1rem; flex-wrap: wrap;
-}
-.ev__card-meta span { display: flex; align-items: center; gap: 5px; }
-.ev__card-desc { font-size: 14px; color: #4a7c59; line-height: 1.65; margin: 0; }
-
-.ev__card-cta {
-  padding: 1.5rem; display: flex; align-items: center; flex-shrink: 0;
-}
-.ev__inscribirse-btn {
-  display: flex; align-items: center; gap: 7px;
-  background: linear-gradient(135deg, #1b5e20, #2e7d32);
-  color: #e8f5e9; padding: 11px 20px; border-radius: 10px;
-  font-size: 13px; text-decoration: none; white-space: nowrap;
-  transition: opacity .2s; box-shadow: 0 2px 8px #1b5e2030;
-}
-.ev__inscribirse-btn:hover { opacity: .88; color: #e8f5e9; }
-
-@media (max-width: 768px) {
-  .ev__card { flex-direction: column; }
-  .ev__card-fecha { flex-direction: row; gap: 10px; padding: 1rem 1.5rem; min-width: unset; }
-  .ev__dia { font-size: 26px; }
-  .ev__card-img { width: 100%; height: 180px; }
-  .ev__card-cta { padding: 0 1.5rem 1.5rem; }
-  .ev__hero-title { font-size: 28px; }
-}
+.pe__f-d { font-family: var(--p-display); font-size: var(--fs-18); font-weight: 700; color: var(--p-marca-fuerte); line-height: 1; }
+.pe__f-m { font-size: var(--fs-12); text-transform: uppercase; letter-spacing: .06em; color: var(--p-tenue); }
+.pe__c { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.pe__t { font-weight: 600; }
+.pe__m { display: flex; align-items: center; gap: var(--sp-1); flex-wrap: wrap; font-size: var(--fs-13); color: var(--p-tenue); }
+.pe__foto { width: 68px; height: 52px; object-fit: cover; border-radius: var(--p-radio-sm); flex: 0 0 auto; }
+.pe__i:hover .pe__t { text-decoration: underline; text-underline-offset: 3px; }
 </style>

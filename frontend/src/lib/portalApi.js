@@ -22,6 +22,8 @@ export const getPortalGaleria   = ()            => api.get('/portal/galeria').th
 export const getPortalHistorial = ()            => api.get('/portal/historial').then(datos)
 // Su cuenta corriente, si la organización se la abrió. Devuelve `{ tiene: false }` si no.
 export const getPortalCuentaCorriente = ()      => api.get('/portal/cuenta_corriente').then(datos)
+// Lo que hay que decirle ANTES de que scrollee: alimenta la franja de arriba.
+export const getPortalMiEstado  = ()            => api.get('/portal/mi_estado').then(datos)
 
 // Compatibilidad con las vistas mudadas, que llamaban `publicApi.getGeneticas()`.
 export default {
@@ -35,4 +37,5 @@ export default {
   getGaleria:   getPortalGaleria,
   getHistorial: getPortalHistorial,
   getCuentaCorriente: getPortalCuentaCorriente,
+  getMiEstado: getPortalMiEstado,
 }

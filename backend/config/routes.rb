@@ -90,6 +90,8 @@ Rails.application.routes.draw do
       # Su cuenta corriente, sólo si la organización se la abrió. Hoy es lectura; más adelante
       # acredita saldo desde acá.
       resource  :cuenta_corriente, only: [:show], controller: 'cuenta_corriente'
+      # Lo que hay que decirle antes de que scrollee: la franja de arriba.
+      resource  :mi_estado, only: [:show], controller: 'mi_estado'
     end
 
     get  '/asistente/consumo',       to: 'asistente#consumo'

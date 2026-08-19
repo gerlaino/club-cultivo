@@ -7,6 +7,9 @@ import App from "./App.vue";
 // fonts loaded via index.html <link> tags (avoids Vite @import url() issues)
 import "./design-system/tokens.css";
 import "./design-system/reset.css";
+// Capa del portal del paciente: su paleta sale de los tokens de arriba y del color de cada
+// organización. Va después de `tokens.css` porque los usa.
+import "./design-system/portal.css";
 
 // Bootstrap CSS & Icons
 import "bootstrap/dist/css/bootstrap.min.css";

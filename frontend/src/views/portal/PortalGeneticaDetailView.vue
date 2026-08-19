@@ -1,174 +1,116 @@
 <template>
-  <div class="gp">
+  <article class="pgd">
+    <div v-if="estado === 'cargando'" class="pgd__cargando"><DsSpinner :size="32" /></div>
 
-    <!-- Loading -->
-    <div v-if="estado === 'cargando'" class="gp__loading">
-      <div class="gp__brand">
-        <span class="gp__brand-dot"></span>
-        <span class="gp__brand-name">{{ clubNombre }}</span>
+    <PortalVacio v-else-if="estado === 'no_encontrada'"
+                 titulo="Esta variedad no está disponible"
+                 texto="Puede que tu organización la haya sacado del catálogo."
+                 hacia-a="/portal/geneticas" hacia-txt="Ver el catálogo" />
+
+    <template v-else>
+      <PortalCabecera :titulo="gen.nombre" volver-a="/portal/geneticas" volver-txt="Variedades" />
+
+      <div class="pgd__chips">
+        <span v-if="gen.tipo" class="pgd__chip">{{ TIPOS[gen.tipo] || gen.tipo }}</span>
+        <span v-if="gen.registrada_inase" class="pgd__chip pgd__chip--inase">
+          <BadgeCheck :size="12" :stroke-width="2" /> INASE
+        </span>
       </div>
-      <DsSpinner :size="36" />
-    </div>
 
-    <!-- No encontrada / no publicada -->
-    <div v-else-if="estado === 'no_encontrada'" class="gp__error">
-      <div class="gp__error-icon">🌿</div>
-      <h2 class="gp__error-title">Variedad no disponible</h2>
-      <p class="gp__error-desc">Esta variedad no está publicada por la organización o no existe.</p>
-    </div>
+      <p v-if="gen.criador" class="pgd__criador">
+        {{ gen.criador }}<template v-if="gen.origen"> · {{ gen.origen }}</template>
+      </p>
 
-    <!-- Contenido -->
-    <div v-else-if="gen" class="gp__page">
-
-      <!-- Hero -->
-      <div class="gp__hero" :style="{ '--tipo-color': tipoColor }">
-        <div class="gp__hero-inner">
-          <div class="gp__badges">
-            <span class="gp__badge gp__badge--tipo">{{ tipoLabel }}</span>
-            <span v-if="gen.registrada_inase" class="gp__badge gp__badge--inase">🏛️ INASE</span>
-          </div>
-          <h1 class="gp__nombre">{{ gen.nombre }}</h1>
-          <div v-if="gen.criador" class="gp__criador">
-            <i class="bi bi-person-fill"></i> {{ gen.criador }}
-            <span v-if="gen.origen" class="gp__origen"> · {{ gen.origen }}</span>
-          </div>
+      <!-- Fotos: la primera grande, el resto en tira. Es una planta; se mira antes de leerse. -->
+      <div v-if="gen.fotos_urls?.length" class="pgd__fotos">
+        <img :src="gen.fotos_urls[0]" :alt="gen.nombre" class="pgd__foto-1" />
+        <div v-if="gen.fotos_urls.length > 1" class="pgd__tira">
+          <img v-for="(f, i) in gen.fotos_urls.slice(1)" :key="i" :src="f" :alt="gen.nombre" loading="lazy" />
         </div>
       </div>
 
-      <!-- Fotos carousel -->
-      <div v-if="gen.fotos_urls?.length" class="gp__carousel">
-        <div class="gp__carousel-track">
-          <div
-            v-for="(foto, i) in gen.fotos_urls"
-            :key="i"
-            class="gp__carousel-slide"
-          >
-            <img :src="foto" :alt="`${gen.nombre} foto ${i + 1}`" class="gp__carousel-img" loading="lazy" />
-          </div>
+      <!-- Cannabinoides: es lo primero que mira un paciente. -->
+      <div class="pgd__cann">
+        <div class="pgd__c">
+          <span class="pgd__c-l">THC</span>
+          <span class="pgd__c-v">{{ gen.thc != null ? gen.thc + '%' : '—' }}</span>
+          <span v-if="gen.thc != null" class="pgd__barra">
+            <span class="pgd__barra-f" :style="{ width: pct(gen.thc) }"></span>
+          </span>
         </div>
-        <div v-if="gen.fotos_urls.length > 1" class="gp__carousel-dots">
-          <span v-for="(_, i) in gen.fotos_urls" :key="i" class="gp__carousel-dot"></span>
-        </div>
-      </div>
-
-      <!-- THC / CBD -->
-      <div class="gp__section">
-        <div class="gp__cannabinoids">
-          <div class="gp__cannabinoid">
-            <div class="gp__cannabinoid-label">THC</div>
-            <div class="gp__cannabinoid-value">
-              {{ gen.thc != null ? gen.thc + '%' : '—' }}
-            </div>
-            <div v-if="gen.thc != null" class="gp__cannabinoid-bar">
-              <div class="gp__cannabinoid-fill" :style="{ width: Math.min(gen.thc, 30) / 30 * 100 + '%', background: '#e53935' }"></div>
-            </div>
-          </div>
-          <div class="gp__cannabinoid">
-            <div class="gp__cannabinoid-label">CBD</div>
-            <div class="gp__cannabinoid-value">
-              {{ gen.cbd != null ? gen.cbd + '%' : '—' }}
-            </div>
-            <div v-if="gen.cbd != null" class="gp__cannabinoid-bar">
-              <div class="gp__cannabinoid-fill" :style="{ width: Math.min(gen.cbd, 30) / 30 * 100 + '%', background: '#1b5e20' }"></div>
-            </div>
-          </div>
+        <div class="pgd__c">
+          <span class="pgd__c-l">CBD</span>
+          <span class="pgd__c-v">{{ gen.cbd != null ? gen.cbd + '%' : '—' }}</span>
+          <span v-if="gen.cbd != null" class="pgd__barra">
+            <span class="pgd__barra-f pgd__barra-f--cbd" :style="{ width: pct(gen.cbd) }"></span>
+          </span>
         </div>
       </div>
 
-      <!-- Perfil terpénico -->
-      <div v-if="terpenos.length" class="gp__section">
-        <h3 class="gp__section-title">Perfil terpénico</h3>
-        <div class="gp__chips">
-          <span v-for="t in terpenos" :key="t" class="gp__chip">{{ t }}</span>
+      <section v-if="terpenos.length" class="pgd__sec">
+        <h2 class="pgd__sec-t">Perfil terpénico</h2>
+        <div class="pgd__terps">
+          <span v-for="t in terpenos" :key="t" class="pgd__terp">{{ t }}</span>
         </div>
-      </div>
+      </section>
 
-      <!-- Descripción -->
-      <div v-if="gen.descripcion" class="gp__section">
-        <h3 class="gp__section-title">Descripción</h3>
-        <p class="gp__descripcion">{{ gen.descripcion }}</p>
-      </div>
+      <section v-if="gen.descripcion" class="pgd__sec">
+        <h2 class="pgd__sec-t">Sobre esta variedad</h2>
+        <p class="pgd__desc">{{ gen.descripcion }}</p>
+      </section>
 
-      <!-- Datos de cultivo -->
-      <div class="gp__section">
-        <h3 class="gp__section-title">Datos de cultivo</h3>
-        <div class="gp__datos">
-          <div v-if="gen.tiempo_floracion" class="gp__dato">
-            <span class="gp__dato-icon">🌸</span>
-            <div>
-              <div class="gp__dato-label">Floración</div>
-              <div class="gp__dato-val">{{ gen.tiempo_floracion }} días</div>
-            </div>
+      <section v-if="datosCultivo.length" class="pgd__sec">
+        <h2 class="pgd__sec-t">Cómo se cultiva</h2>
+        <dl class="pgd__datos">
+          <div v-for="d in datosCultivo" :key="d.l" class="pgd__dato">
+            <dt>{{ d.l }}</dt>
+            <dd>{{ d.v }}</dd>
           </div>
-          <div v-if="gen.dificultad" class="gp__dato">
-            <span class="gp__dato-icon">{{ difIcon }}</span>
-            <div>
-              <div class="gp__dato-label">Dificultad</div>
-              <div class="gp__dato-val">{{ difLabel }}</div>
-            </div>
-          </div>
-          <div v-if="gen.origen" class="gp__dato">
-            <span class="gp__dato-icon">🌍</span>
-            <div>
-              <div class="gp__dato-label">Origen</div>
-              <div class="gp__dato-val">{{ gen.origen }}</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="gp__volver">
-        <RouterLink to="/portal/geneticas" class="gp__volver-link">← Volver al catálogo</RouterLink>
-      </div>
-
-    </div>
-  </div>
+        </dl>
+      </section>
+    </template>
+  </article>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import publicApi from '@/lib/portalApi'
+import { BadgeCheck } from 'lucide-vue-next'
+import { getPortalGenetica } from '@/lib/portalApi'
+import PortalCabecera from '@/components/portal/PortalCabecera.vue'
+import PortalVacio from '@/components/portal/PortalVacio.vue'
 import DsSpinner from '@/design-system/components/Spinner.vue'
 
 const route = useRoute()
-// El backend acepta id o slug: los enlaces del catálogo mandan el id y el QR viejo, el slug.
-const slug  = route.params.id
+// El backend acepta id o slug: los enlaces del catálogo mandan el id y los QR viejos, el slug.
+const idOSlug = route.params.id
 
-const estado     = ref('cargando')
-const gen        = ref(null)
-const clubNombre = ref('Cultivo Espacial')
+const TIPOS = { indica: 'Índica', sativa: 'Sativa', hibrida: 'Híbrida', ruderalis: 'Ruderalis' }
+const DIF   = { facil: 'Fácil', media: 'Media', dificil: 'Difícil' }
 
-const TIPO_META = {
-  indica:    { label: 'Índica',    color: '#6f42c1' },
-  sativa:    { label: 'Sativa',    color: '#198754' },
-  hibrida:   { label: 'Híbrida',   color: '#fd7e14' },
-  ruderalis: { label: 'Ruderalis', color: '#0dcaf0' },
-}
-const DIFICULTAD = {
-  facil:   { label: 'Fácil',   icon: '🟢' },
-  media:   { label: 'Media',   icon: '🟡' },
-  dificil: { label: 'Difícil', icon: '🔴' },
-}
+const gen    = ref(null)
+const estado = ref('cargando')
 
-const tipoLabel  = computed(() => TIPO_META[gen.value?.tipo]?.label || gen.value?.tipo || '—')
-const tipoColor  = computed(() => TIPO_META[gen.value?.tipo]?.color || '#6c757d')
-const difLabel   = computed(() => DIFICULTAD[gen.value?.dificultad]?.label || gen.value?.dificultad || '—')
-const difIcon    = computed(() => DIFICULTAD[gen.value?.dificultad]?.icon || '⚪')
-const terpenos   = computed(() =>
-  gen.value?.terpenos
-    ? gen.value.terpenos.split(',').map(t => t.trim()).filter(Boolean)
-    : []
+// El tope de 30% no es arbitrario: por encima de eso no hay flor, así que la barra llena
+// significa "de lo más alto que se ve" y no "el máximo teórico".
+const pct = (v) => `${Math.min(Number(v), 30) / 30 * 100}%`
+
+const terpenos = computed(() =>
+  gen.value?.terpenos ? gen.value.terpenos.split(',').map(t => t.trim()).filter(Boolean) : []
 )
+
+const datosCultivo = computed(() => {
+  const g = gen.value || {}
+  return [
+    g.tiempo_floracion && { l: 'Floración', v: `${g.tiempo_floracion} días` },
+    g.dificultad       && { l: 'Dificultad', v: DIF[g.dificultad] || g.dificultad },
+    g.origen           && { l: 'Origen', v: g.origen },
+  ].filter(Boolean)
+})
 
 onMounted(async () => {
   try {
-    const club = await publicApi.getClub()
-    if (club?.name) clubNombre.value = club.name
-  } catch { /* el nombre es decorativo: si falla, la ficha se muestra igual */ }
-
-  try {
-    gen.value = await publicApi.getGenetica(slug)
+    gen.value = await getPortalGenetica(idOSlug)
     estado.value = 'ok'
   } catch {
     estado.value = 'no_encontrada'
@@ -177,169 +119,46 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.gp {
-  min-height: 60vh;
-  background: #f8faf8;
-  font-family: system-ui, -apple-system, sans-serif;
-  font-size: 16px;
-}
+.pgd { max-width: 620px; margin: 0 auto; padding: var(--sp-6) var(--sp-4) var(--sp-12); }
+.pgd__cargando { display: flex; justify-content: center; padding: var(--sp-12); }
 
-/* Loading */
-.gp__loading {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2rem;
+.pgd__chips { display: flex; flex-wrap: wrap; gap: var(--sp-2); margin: calc(var(--sp-6) * -1 + var(--sp-2)) 0 var(--sp-2); }
+.pgd__chip {
+  display: inline-flex; align-items: center; gap: var(--sp-1);
+  font-size: var(--fs-12); font-weight: 600;
+  background: var(--p-marca-suave); color: var(--p-marca-fuerte);
+  padding: 2px var(--sp-3); border-radius: var(--r-pill);
 }
-/* Brand */
-.gp__brand, .gp__brand--top {
-  display: flex; align-items: center; gap: .5rem;
-}
-.gp__brand-dot {
-  width: .75rem; height: .75rem;
-  border-radius: 50%;
-  background: #1b5e20;
-  flex-shrink: 0;
-  box-shadow: 0 0 0 3px rgba(27,94,32,.2);
-}
-.gp__brand-name { font-weight: 600; font-size: .9rem; color: #1b5e20; }
+.pgd__chip--inase { background: var(--p-marca-fuerte); color: #fff; letter-spacing: .05em; }
+.pgd__criador { color: var(--p-suave); margin: 0 0 var(--sp-5); }
 
-/* Error */
-.gp__error {
-  min-height: 100vh;
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  gap: 1rem; padding: 2rem; text-align: center;
-}
-.gp__error-icon { font-size: 3rem; }
-.gp__error-title { font-size: 1.25rem; font-weight: 700; color: #1a2e1a; margin: 0; }
-.gp__error-desc { color: #6c757d; margin: 0; max-width: 280px; }
+.pgd__fotos { margin-bottom: var(--sp-6); }
+.pgd__foto-1 { width: 100%; border-radius: var(--p-radio); display: block; }
+.pgd__tira { display: flex; gap: var(--sp-2); margin-top: var(--sp-2); overflow-x: auto; }
+.pgd__tira img { width: 92px; height: 92px; object-fit: cover; border-radius: var(--p-radio-sm); flex: 0 0 auto; }
 
-/* Hero */
-.gp__hero {
-  background: linear-gradient(160deg, #1b5e20 0%, #2e7d32 60%, color-mix(in srgb, var(--tipo-color, #2e7d32) 30%, #1b5e20) 100%);
-  padding: 2rem 1.25rem 2.5rem;
-}
-.gp__hero-inner { max-width: 600px; }
-.gp__badges { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: .75rem; }
-.gp__badge {
-  display: inline-flex; align-items: center; gap: .25rem;
-  padding: .25rem .65rem; border-radius: 999px; font-size: .75rem; font-weight: 700;
-}
-.gp__badge--tipo {
-  background: rgba(255,255,255,.2); color: #fff; border: 1px solid rgba(255,255,255,.3);
-}
-.gp__badge--inase {
-  background: #ffd600; color: #1a2e1a; border: none;
-}
-.gp__nombre {
-  font-size: clamp(1.75rem, 6vw, 2.5rem);
-  font-weight: 800; color: #fff; margin: 0 0 .5rem; line-height: 1.15;
-  letter-spacing: -.02em;
-}
-.gp__criador { color: rgba(255,255,255,.75); font-size: .875rem; }
-.gp__origen { color: rgba(255,255,255,.6); }
+.pgd__cann { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); margin-bottom: var(--sp-8); }
+.pgd__c { background: var(--p-hundido); border-radius: var(--p-radio); padding: var(--sp-4); }
+.pgd__c-l { display: block; font-size: var(--fs-12); letter-spacing: .1em; color: var(--p-tenue); }
+.pgd__c-v { display: block; font-family: var(--p-display); font-size: var(--fs-24); font-weight: 700; line-height: 1.1; }
+.pgd__barra { display: block; height: 5px; background: var(--p-linea); border-radius: var(--r-pill); margin-top: var(--sp-2); overflow: hidden; }
+.pgd__barra-f { display: block; height: 100%; background: var(--p-marca); border-radius: var(--r-pill); }
+.pgd__barra-f--cbd { background: var(--p-marca-linea); }
 
-/* Carousel */
-.gp__carousel {
-  background: #000;
-  overflow: hidden;
+.pgd__sec { margin-bottom: var(--sp-6); }
+.pgd__sec-t {
+  font-family: var(--p-display); font-size: var(--fs-16); font-weight: 600; margin: 0 0 var(--sp-3);
+  border-bottom: 1px solid var(--p-linea); padding-bottom: var(--sp-2);
 }
-.gp__carousel-track {
-  display: flex;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
+.pgd__terps { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
+.pgd__terp {
+  font-size: var(--fs-13); background: var(--p-hundido); color: var(--p-suave);
+  padding: var(--sp-1) var(--sp-3); border-radius: var(--r-pill);
 }
-.gp__carousel-track::-webkit-scrollbar { display: none; }
-.gp__carousel-slide {
-  flex: 0 0 100%;
-  scroll-snap-align: start;
-  aspect-ratio: 4/3;
-  max-height: 320px;
-}
-.gp__carousel-img {
-  width: 100%; height: 100%; object-fit: cover;
-}
-.gp__carousel-dots {
-  display: flex; justify-content: center; gap: .4rem;
-  padding: .5rem; background: #000;
-}
-.gp__carousel-dot {
-  width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.4);
-}
+.pgd__desc { margin: 0; line-height: var(--lh-loose); white-space: pre-line; }
 
-/* Sections */
-.gp__section {
-  padding: 1.25rem 1rem;
-  border-bottom: 1px solid rgba(0,0,0,.06);
-}
-.gp__section-title {
-  font-size: .7rem; font-weight: 700; letter-spacing: .08em;
-  text-transform: uppercase; color: #6c757d; margin: 0 0 .875rem;
-}
-
-/* Cannabinoids */
-.gp__cannabinoids { display: flex; gap: 1.5rem; }
-.gp__cannabinoid { flex: 1; }
-.gp__cannabinoid-label {
-  font-size: .7rem; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .06em; color: #6c757d; margin-bottom: .25rem;
-}
-.gp__cannabinoid-value {
-  font-size: 1.75rem; font-weight: 800; color: #1a2e1a; line-height: 1;
-  margin-bottom: .5rem;
-}
-.gp__cannabinoid-bar {
-  height: 6px; background: rgba(0,0,0,.08); border-radius: 3px; overflow: hidden;
-}
-.gp__cannabinoid-fill {
-  height: 100%; border-radius: 3px; transition: width .5s ease;
-}
-
-/* Terpenos */
-.gp__chips { display: flex; flex-wrap: wrap; gap: .5rem; }
-.gp__chip {
-  padding: .3rem .75rem; background: rgba(27,94,32,.1);
-  color: #1b5e20; border-radius: 999px; font-size: .8rem; font-weight: 600;
-  border: 1px solid rgba(27,94,32,.2);
-}
-
-/* Descripción */
-.gp__descripcion {
-  color: #3a3a3a; line-height: 1.65; margin: 0; font-size: .95rem;
-}
-
-/* Datos cultivo */
-.gp__datos { display: flex; flex-wrap: wrap; gap: .75rem; }
-.gp__dato {
-  display: flex; align-items: center; gap: .75rem;
-  background: #fff; border: 1px solid rgba(0,0,0,.06);
-  border-radius: .75rem; padding: .75rem 1rem;
-  flex: 1; min-width: 140px;
-}
-.gp__dato-icon { font-size: 1.5rem; flex-shrink: 0; }
-.gp__dato-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .06em; color: #6c757d; }
-.gp__dato-val { font-size: .95rem; font-weight: 600; color: #1a2e1a; }
-
-/* Volver */
-.gp__volver {
-  padding: 1.5rem 1rem 2.5rem;
-  text-align: center;
-  background: #f0f4f0;
-}
-.gp__volver-link {
-  color: #1b5e20; font-weight: 600; font-size: .9rem; text-decoration: none;
-}
-.gp__volver-link:hover { text-decoration: underline; }
-
-/* Desktop */
-@media (min-width: 600px) {
-  .gp__page { max-width: 600px; margin: 0 auto; box-shadow: 0 0 40px rgba(0,0,0,.08); }
-  .gp__hero { padding: 2.5rem 2rem 3rem; }
-  .gp__section { padding: 1.5rem 2rem; }
-  .gp__volver { padding: 2rem; }
-}
+.pgd__datos { margin: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
+.pgd__dato { display: flex; gap: var(--sp-4); align-items: baseline; }
+.pgd__dato dt { font-size: var(--fs-13); color: var(--p-tenue); width: 92px; flex: 0 0 auto; }
+.pgd__dato dd { margin: 0; font-weight: 500; }
 </style>

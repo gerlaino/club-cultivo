@@ -1,251 +1,86 @@
 <template>
-  <div class="evento-detail">
-    <div v-if="loading" class="loading">
-      <div class="spinner-border text-success" role="status">
-        <span class="visually-hidden">Cargando...</span>
-      </div>
-    </div>
+  <article class="ped">
+    <div v-if="cargando" class="ped__cargando"><DsSpinner :size="32" /></div>
 
-    <div v-else-if="error" class="container py-5">
-      <div class="alert alert-danger">{{ error }}</div>
-      <RouterLink to="/portal/eventos" class="btn btn-success">
-        <i class="bi bi-arrow-left"></i> Volver a Eventos
-      </RouterLink>
-    </div>
+    <PortalVacio v-else-if="!evento"
+                 titulo="No encontramos este evento"
+                 texto="Puede que ya no esté activo."
+                 hacia-a="/portal/eventos" hacia-txt="Ver todos los eventos" />
 
-    <div v-else class="container py-5">
-      <nav aria-label="breadcrumb" class="mb-4">
-        <ol class="breadcrumb">
-          <li class="breadcrumb-item"><RouterLink to="/portal">Inicio</RouterLink></li>
-          <li class="breadcrumb-item"><RouterLink to="/portal/eventos">Eventos</RouterLink></li>
-          <li class="breadcrumb-item active">{{ evento.titulo }}</li>
-        </ol>
-      </nav>
+    <template v-else>
+      <PortalCabecera :titulo="evento.titulo" volver-a="/portal/eventos" volver-txt="Eventos" />
 
-      <div class="row">
-        <!-- Imágenes -->
-        <div class="col-lg-6 mb-4">
-          <div v-if="evento.imagenes_urls.length > 0">
-            <div class="imagen-principal mb-3">
-              <img :src="currentImage" :alt="evento.titulo" class="img-fluid rounded shadow">
-            </div>
-
-            <!-- Miniaturas -->
-            <div v-if="evento.imagenes_urls.length > 1" class="d-flex gap-2 mt-3">
-              <div
-                  v-for="(imagen, index) in evento.imagenes_urls"
-                  :key="index"
-                  class="thumbnail"
-                  :class="{ active: currentImage === imagen }"
-                  @click="currentImage = imagen"
-              >
-                <img :src="imagen" :alt="`${evento.titulo} ${index + 1}`" class="img-fluid rounded">
-              </div>
-            </div>
-          </div>
-          <div v-else class="imagen-principal bg-light d-flex align-items-center justify-content-center rounded shadow">
-            <i class="bi bi-calendar-event text-muted" style="font-size: 5rem;"></i>
-          </div>
+      <dl class="ped__datos">
+        <div class="ped__dato">
+          <dt><CalendarDays :size="14" :stroke-width="1.75" /> Cuándo</dt>
+          <dd>{{ fechaLarga(evento.fecha_inicio) }} · {{ hora(evento.fecha_inicio) }}<template v-if="evento.fecha_fin"> a {{ hora(evento.fecha_fin) }}</template></dd>
         </div>
-
-        <!-- Información -->
-        <div class="col-lg-6">
-          <h1 class="mb-4">{{ evento.titulo }}</h1>
-
-          <!-- Fecha y hora -->
-          <div class="card border-success mb-4">
-            <div class="card-body">
-              <h5 class="text-success mb-3">
-                <i class="bi bi-calendar-check"></i> Fecha y Hora
-              </h5>
-
-              <div class="mb-3">
-                <strong>Fecha:</strong>
-                <p class="mb-0">{{ formatFecha(evento.fecha_inicio) }}</p>
-              </div>
-
-              <div class="mb-3">
-                <strong>Horario:</strong>
-                <p class="mb-0">
-                  {{ formatHora(evento.fecha_inicio) }}
-                  <span v-if="evento.fecha_fin">
-                    - {{ formatHora(evento.fecha_fin) }}
-                  </span>
-                </p>
-              </div>
-
-              <div v-if="evento.lugar">
-                <strong>Lugar:</strong>
-                <p class="mb-0">
-                  <i class="bi bi-geo-alt-fill text-success"></i>
-                  {{ evento.lugar }}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <!-- Descripción -->
-          <div v-if="evento.descripcion" class="mb-4">
-            <h5 class="text-success mb-3">Descripción</h5>
-            <div class="evento-descripcion">
-              <p v-for="(parrafo, index) in formatDescripcion(evento.descripcion)" :key="index">
-                {{ parrafo }}
-              </p>
-            </div>
-          </div>
-
-          <!-- Estado -->
-          <div class="alert mb-4" :class="esPasado(evento.fecha_inicio) ? 'alert-secondary' : 'alert-info'">
-            <i class="bi" :class="esPasado(evento.fecha_inicio) ? 'bi-clock-history' : 'bi-info-circle'"></i>
-            {{ esPasado(evento.fecha_inicio) ? 'Este evento ya finalizó' : 'Evento próximo - Anotá la fecha' }}
-          </div>
-
-          <!-- Compartir -->
-          <div class="mb-4">
-            <h6 class="mb-3">Compartir evento</h6>
-            <div class="d-flex gap-2">
-              <button class="btn btn-sm btn-outline-primary" @click="compartir('facebook')">
-                <i class="bi bi-facebook"></i>
-              </button>
-              <button class="btn btn-sm btn-outline-info" @click="compartir('twitter')">
-                <i class="bi bi-twitter"></i>
-              </button>
-              <button class="btn btn-sm btn-outline-success" @click="compartir('whatsapp')">
-                <i class="bi bi-whatsapp"></i>
-              </button>
-              <button class="btn btn-sm btn-outline-secondary" @click="copiarLink">
-                <i class="bi bi-link-45deg"></i>
-              </button>
-            </div>
-          </div>
+        <div v-if="evento.lugar" class="ped__dato">
+          <dt><MapPin :size="14" :stroke-width="1.75" /> Dónde</dt>
+          <dd>{{ evento.lugar }}</dd>
         </div>
+      </dl>
+
+      <div v-if="evento.imagenes_urls?.length" class="ped__fotos">
+        <img v-for="(f, i) in evento.imagenes_urls" :key="i" :src="f" :alt="evento.titulo" loading="lazy" />
       </div>
 
-      <!-- Botón volver -->
-      <div class="mt-5">
-        <RouterLink to="/portal/eventos" class="btn btn-outline-success">
-          <i class="bi bi-arrow-left"></i> Volver a Eventos
-        </RouterLink>
-      </div>
-    </div>
-  </div>
+      <div v-if="evento.descripcion" class="ped__cuerpo">{{ evento.descripcion }}</div>
+
+      <p class="ped__anotarse">
+        ¿Querés participar? Avisale a tu organización desde
+        <RouterLink to="/portal/contacto">Contacto</RouterLink>.
+      </p>
+    </template>
+  </article>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import publicApi from '@/lib/portalApi'
+import { CalendarDays, MapPin } from 'lucide-vue-next'
+import { getPortalEvento } from '@/lib/portalApi'
+import PortalCabecera from '@/components/portal/PortalCabecera.vue'
+import PortalVacio from '@/components/portal/PortalVacio.vue'
+import DsSpinner from '@/design-system/components/Spinner.vue'
 
 const route = useRoute()
-const evento = ref({})
-const currentImage = ref(null)
-const loading = ref(true)
-const error = ref(null)
+const evento   = ref(null)
+const cargando = ref(true)
 
-function formatFecha(dateString) {
-  const date = new Date(dateString)
-  return date.toLocaleDateString('es-AR', {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
-}
-
-function formatHora(dateString) {
-  const date = new Date(dateString)
-  return date.toLocaleTimeString('es-AR', {
-    hour: '2-digit',
-    minute: '2-digit'
-  })
-}
-
-function formatDescripcion(descripcion) {
-  if (!descripcion) return []
-  return descripcion.split('\n').filter(p => p.trim().length > 0)
-}
-
-function esPasado(fechaInicio) {
-  return new Date(fechaInicio) < new Date()
-}
-
-function compartir(red) {
-  const url = window.location.href
-  const titulo = evento.value.titulo
-
-  const urls = {
-    facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
-    twitter: `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(titulo)}`,
-    whatsapp: `https://wa.me/?text=${encodeURIComponent(titulo + ' ' + url)}`
-  }
-
-  if (urls[red]) {
-    window.open(urls[red], '_blank', 'width=600,height=400')
-  }
-}
-
-function copiarLink() {
-  navigator.clipboard.writeText(window.location.href).then(() => {
-    alert('Link copiado al portapapeles')
-  })
-}
+const fechaLarga = (f) => (f ? new Date(f).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }) : '')
+const hora       = (f) => (f ? new Date(f).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '')
 
 onMounted(async () => {
-  try {
-    evento.value = await publicApi.getEvento(route.params.id)
-    if (evento.value.imagenes_urls.length > 0) {
-      currentImage.value = evento.value.imagenes_urls[0]
-    }
-  } catch (err) {
-    console.error('Error cargando evento:', err)
-    error.value = 'No se pudo cargar el evento. Por favor, intenta de nuevo.'
-  } finally {
-    loading.value = false
-  }
+  try { evento.value = await getPortalEvento(route.params.id) } catch { /* queda el vacío */ }
+  finally { cargando.value = false }
 })
 </script>
 
 <style scoped>
-.imagen-principal {
-  height: 400px;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+.ped { max-width: 620px; margin: 0 auto; padding: var(--sp-6) var(--sp-4) var(--sp-12); }
+.ped__cargando { display: flex; justify-content: center; padding: var(--sp-12); }
 
-.imagen-principal img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+.ped__datos { margin: 0 0 var(--sp-6); display: flex; flex-direction: column; gap: var(--sp-3); }
+.ped__dato { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); align-items: baseline; }
+.ped__dato dt {
+  display: flex; align-items: center; gap: var(--sp-1);
+  font-size: var(--fs-12); text-transform: uppercase; letter-spacing: .08em;
+  color: var(--p-tenue); width: 96px; flex: 0 0 auto;
 }
+.ped__dato dd { margin: 0; font-weight: 500; }
 
-.thumbnail {
-  width: 80px;
-  height: 80px;
-  cursor: pointer;
-  opacity: 0.6;
-  transition: opacity 0.2s;
-  border: 2px solid transparent;
-}
+.ped__fotos { display: grid; gap: var(--sp-2); margin-bottom: var(--sp-6); }
+.ped__fotos img { width: 100%; border-radius: var(--p-radio); display: block; }
 
-.thumbnail:hover {
-  opacity: 1;
-}
+.ped__cuerpo { white-space: pre-line; font-size: var(--fs-16); line-height: var(--lh-loose); }
 
-.thumbnail.active {
-  opacity: 1;
-  border-color: #198754;
+.ped__anotarse {
+  margin: var(--sp-8) 0 0; padding: var(--sp-4);
+  background: var(--p-marca-suave); border-radius: var(--p-radio);
+  font-size: var(--fs-14); color: var(--p-suave);
 }
+.ped__anotarse a { color: var(--p-marca); font-weight: 600; }
 
-.thumbnail img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.evento-descripcion p {
-  line-height: 1.8;
-  margin-bottom: 1rem;
-}
+@media (min-width: 640px) { .ped__fotos { grid-template-columns: 1fr 1fr; } }
 </style>

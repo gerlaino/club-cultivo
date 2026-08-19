@@ -97,40 +97,40 @@ async function cambiar() {
 <style scoped>
 .pcv { max-width: 520px; margin: 0 auto; padding: 2rem 1.25rem 3rem; }
 .pcv__hd { margin-bottom: 1.75rem; }
-.pcv__title { font-size: 1.5rem; font-weight: 800; color: #1a2e1a; margin: 0 0 .25rem; }
-.pcv__sub { color: #6b8f71; font-size: .9rem; margin: 0; }
+.pcv__title { font-size: 1.5rem; font-weight: 800; color: var(--p-tinta); margin: 0 0 .25rem; }
+.pcv__sub { color: var(--p-suave); font-size: .9rem; margin: 0; }
 
 .pcv__bloque {
-  border: 1px solid #e4ece6; border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem;
+  border: 1px solid var(--p-linea); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem;
   background: #fff;
 }
-.pcv__h2 { font-size: 1rem; font-weight: 700; color: #1a2e1a; margin: 0 0 .35rem; }
+.pcv__h2 { font-size: 1rem; font-weight: 700; color: var(--p-tinta); margin: 0 0 .35rem; }
 
 .pcv__dato { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
 .pcv__lbl {
-  font-size: .7rem; color: #6b8f71; text-transform: uppercase; letter-spacing: .04em; font-weight: 700;
+  font-size: .7rem; color: var(--p-suave); text-transform: uppercase; letter-spacing: .04em; font-weight: 700;
 }
 .pcv__val {
-  font-family: monospace; font-size: .88rem; background: #f4f8f5; border: 1px solid #e4ece6;
-  border-radius: 7px; padding: .3rem .6rem; user-select: all; color: #1a2e1a;
+  font-family: monospace; font-size: .88rem; background: var(--p-hundido); border: 1px solid var(--p-linea);
+  border-radius: 7px; padding: .3rem .6rem; user-select: all; color: var(--p-tinta);
 }
-.pcv__nota { font-size: .82rem; color: #6b8f71; margin: .8rem 0 0; line-height: 1.55; }
+.pcv__nota { font-size: .82rem; color: var(--p-suave); margin: .8rem 0 0; line-height: 1.55; }
 
 .pcv__form { display: flex; flex-direction: column; gap: .9rem; margin-top: 1.1rem; }
 .pcv__campo { display: flex; flex-direction: column; gap: .3rem; }
-.pcv__campo-lbl { font-size: .82rem; font-weight: 600; color: #1a2e1a; }
+.pcv__campo-lbl { font-size: .82rem; font-weight: 600; color: var(--p-tinta); }
 .pcv__input {
-  border: 1px solid #d7e2da; border-radius: 8px; padding: .55rem .7rem; font-size: .92rem;
-  background: #fff; color: #1a2e1a;
+  border: 1px solid var(--p-linea); border-radius: 8px; padding: .55rem .7rem; font-size: .92rem;
+  background: #fff; color: var(--p-tinta);
 }
-.pcv__input:focus { outline: 2px solid #6dbe8a; outline-offset: 1px; border-color: #6dbe8a; }
-.pcv__hint { font-size: .75rem; color: #6b8f71; }
-.pcv__error { color: #b91c1c; font-size: .85rem; margin: 0; }
+.pcv__input:focus { outline: 2px solid var(--p-marca-linea); outline-offset: 1px; border-color: var(--p-marca-linea); }
+.pcv__hint { font-size: .75rem; color: var(--p-suave); }
+.pcv__error { color: var(--p-urgente); font-size: .85rem; margin: 0; }
 
 .pcv__btn {
-  align-self: flex-start; background: #1b5e20; color: #fff; border: none;
+  align-self: flex-start; background: var(--p-marca); color: #fff; border: none;
   border-radius: 8px; padding: .55rem 1.1rem; font-size: .9rem; font-weight: 600; cursor: pointer;
 }
-.pcv__btn:hover:not(:disabled) { background: #14501a; }
+.pcv__btn:hover:not(:disabled) { background: var(--p-marca-fuerte); }
 .pcv__btn:disabled { opacity: .5; cursor: default; }
 </style>

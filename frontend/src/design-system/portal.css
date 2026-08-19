@@ -1,0 +1,51 @@
+/* ─────────────────────────────────────────────────────────────
+   Portal del paciente — capa de tokens
+
+   El portal NO puede usar los tokens del panel de administración tal cual: esos son de una app de
+   trabajo, densa y de alto contraste, que se usa sentado ocho horas. El portal se usa parado, en el
+   colectivo, yendo a retirar. Pero tampoco puede tener hex sueltos, que es lo que tenía: 13
+   pantallas, cero tokens y ocho verdes distintos —cuatro de ellos queriendo ser el mismo.
+
+   Esta capa define la paleta del portal EN FUNCIÓN de los tokens del DS. No hay ningún color nuevo
+   acá que no salga de `tokens.css` o del color que eligió la organización.
+
+   `--p-marca` la pisa `PortalShell` con el `theme_primary` de cada organización: es la única
+   pantalla del producto donde ese color tiene sentido —el paciente lo asocia con SU club, no con
+   nosotros— y hasta hoy no lo leía nadie.
+───────────────────────────────────────────────────────────── */
+
+.portal {
+  /* Color de la organización. El fallback es el verde del DS. */
+  --p-marca:        var(--c-leaf-800);
+  --p-marca-fuerte: var(--c-leaf-900);
+  --p-marca-suave:  var(--c-leaf-100);
+  --p-marca-linea:  var(--c-leaf-300);
+
+  /* Superficies. Más aire y menos contraste que el panel: se lee de pie y a la intemperie. */
+  --p-fondo:   var(--c-paper);
+  --p-papel:   #ffffff;
+  --p-hundido: var(--c-leaf-50);
+  --p-linea:   var(--c-leaf-100);
+
+  /* Tinta */
+  --p-tinta:   var(--c-leaf-900);
+  --p-suave:   var(--c-leaf-600);
+  --p-tenue:   var(--c-leaf-500);
+
+  /* Semánticos: los del DS, sin inventar */
+  --p-atencion:      var(--c-amber-500);
+  --p-atencion-bg:   var(--c-amber-100);
+  --p-urgente:       var(--c-rust-600);
+  --p-urgente-bg:    var(--c-rust-100);
+  --p-ok:            var(--c-leaf-600);
+
+  /* Tipografía: display para lo que se LEE, ui para lo que se OPERA. Es lo que separa el
+     boletín de una tabla. */
+  --p-display: var(--font-display);
+  --p-ui:      var(--font-ui);
+
+  /* Ritmo. El portal respira más que el panel: menos cosas por pantalla. */
+  --p-ancho:   680px;   /* medida de lectura, no de tablero */
+  --p-radio:   var(--r-xl);
+  --p-radio-sm: var(--r-lg);
+}
