@@ -96,7 +96,19 @@ class User < ApplicationRecord
     requeridos = modulos_requeridos
     return true if requeridos.empty? || club.nil?
 
+    # El paciente además necesita que la organización tenga el portal ABIERTO. Contratado y
+    # abierto son dos cosas: el admin lo cierra desde Configuración → Portal del paciente para
+    # terminar de cargarlo, o para bajarlo sin dar de baja el add-on. Cerrado, no entra —que es
+    # justamente lo que ese interruptor prometía y no cumplía.
+    return club.portal_paciente_disponible? if paciente?
+
     requeridos.any? { |clave| club.feature?(clave) }
+  end
+
+  # Está contratado pero la organización lo cerró. Se distingue del módulo apagado porque el
+  # mensaje que corresponde es otro: no hay nada que contratar, hay que abrirlo.
+  def portal_cerrado_por_la_organizacion?
+    paciente? && club.present? && club.feature?(:vista_paciente) && !club.vista_paciente_activa?
   end
 
   # Cómo se llama, en castellano, el módulo que le falta al club para que este rol trabaje.

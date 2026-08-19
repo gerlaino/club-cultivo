@@ -109,6 +109,13 @@ class ApplicationController < ActionController::API
   end
 
   def mensaje_rol_deshabilitado(user)
+    # El portal contratado pero CERRADO por la organización tiene su propio mensaje: decirle
+    # "no tienen el módulo" a alguien cuya organización sí lo tiene manda a pedir algo que ya
+    # está comprado, y el admin no encuentra qué prender.
+    if user.respond_to?(:portal_cerrado_por_la_organizacion?) && user.portal_cerrado_por_la_organizacion?
+      return 'Tu organización tiene el portal de pacientes cerrado por ahora. Hablá con ellos.'
+    end
+
     "Tu organización no tiene activo el módulo #{user.modulo_faltante_label}, que es el que usa tu " \
       "rol (#{user.role.humanize}). Hablá con el administrador de la organización."
   end

@@ -9,7 +9,7 @@ RSpec.describe 'La cuenta del paciente', type: :request do
   include AuthHelpers
 
   let(:club) do
-    create(:club, name: 'Mi Organización',
+    create(:club, name: 'Mi Organización', vista_paciente_activa: true,
                   features: { 'cultivo' => true, 'produccion_dispensa' => true, 'vista_paciente' => true })
   end
   let(:admin) { create(:user, :admin, club: club) }
@@ -89,7 +89,8 @@ RSpec.describe 'La baja del acceso del paciente', type: :request do
   include AuthHelpers
 
   let(:club) do
-    create(:club, features: { 'produccion_dispensa' => true, 'vista_paciente' => true })
+    create(:club, vista_paciente_activa: true,
+                  features: { 'produccion_dispensa' => true, 'vista_paciente' => true })
   end
   let(:paciente) { ActsAsTenant.with_tenant(club) { create(:paciente, club: club) } }
   # La cuenta real que crea el alta, con la clave del helper para poder loguearla: la que genera

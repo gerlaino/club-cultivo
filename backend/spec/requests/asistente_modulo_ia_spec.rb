@@ -94,8 +94,10 @@ RSpec.describe 'Asistente: el módulo de IA', type: :request do
     # poder siquiera entrar (`User::MODULOS_POR_ROL`), así que con un club mínimo los roles
     # rechazados ni llegarían al asistente y el candado quedaría sin probar. Acá el dispensador,
     # el médico y el repartidor trabajan todos los días — y aun así no pueden dictar.
+    # El portal ABIERTO además de contratado: si no, el paciente no llega ni a loguearse y el
+    # candado de IA —que es lo que este spec prueba— quedaría sin evaluarse.
     let(:club) do
-      create(:club, features: {
+      create(:club, vista_paciente_activa: true, features: {
                'cultivo' => true, 'ia' => true, 'produccion_dispensa' => true,
                'bar' => true, 'medico' => true, 'delivery' => true, 'vista_paciente' => true
              })

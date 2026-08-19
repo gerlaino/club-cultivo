@@ -20,6 +20,13 @@ export const NAV_GROUPS = [
     tabs: [],
   },
   {
+    // Equipo — grupo primario. Vivía como pestaña de Configuración, y no es una: dar de alta a
+    // alguien, cambiarle el rol o ver sus horas es gestión de personas, se hace seguido y se
+    // busca por su nombre. Su ruta (/usuarios) ya era de primer nivel; la pestaña sólo la
+    // escondía adentro de ocho.
+    key: 'equipo', label: 'Equipo', to: '/usuarios', tabs: [],
+  },
+  {
     key: 'cultivo', label: 'Cultivo', to: '/salas', feature: 'cultivo',
     tabs: [
       { to: '/salas', label: 'Salas' },
@@ -97,16 +104,20 @@ export const NAV_GROUPS = [
     key: 'config', label: 'Configuración', to: '/configuracion',
     tabs: [
       { to: '/configuracion', label: 'General' },
-      { to: '/configuracion/suscripcion', label: 'Suscripción' },
       // Correo tiene su propio espacio: la casilla de la organización y las plantillas de mail.
       // Es un add-on, así que se cae del menú si la organización no lo tiene contratado.
       { to: '/configuracion/correo', label: 'Correo electrónico', feature: 'mailer' },
-      { to: '/usuarios', label: 'Equipo' },
       // Sedes NO va acá: tiene su propia entrada en el menú lateral (es un cockpit operativo, no
       // una pantalla de ajustes). Duplicarla hacía que el mismo destino se viera en dos lugares.
-      { to: '/alertas-configuracion', label: 'Configuración de alertas' },
+      // Equipo TAMPOCO: gestionar personas no es configurar la app, ya tenía ruta propia
+      // (/usuarios) y acá sólo se listaba. Ahora es un grupo primario del menú lateral.
       { to: '/configuracion/portal', label: 'Portal del paciente', feature: 'vista_paciente' },
-      { to: '/integraciones', label: 'Integraciones' },
+      // "Configuración de alertas" dentro de Configuración: la palabra repetida no ayudaba a
+      // encontrarla. Se llega desde General, igual que Correo.
+      //
+      // Integraciones quedó siendo la pantalla de WhatsApp —los webhooks salieron de la vista del
+      // admin— así que se cae del menú si no está contratado, como cualquier add-on.
+      { to: '/integraciones', label: 'Integraciones', feature: 'whatsapp' },
       { to: '/configuracion/papelera', label: 'Papelera' },
     ],
   },

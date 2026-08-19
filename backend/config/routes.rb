@@ -92,6 +92,8 @@ Rails.application.routes.draw do
       resource  :cuenta_corriente, only: [:show], controller: 'cuenta_corriente'
       # Lo que hay que decirle antes de que scrollee: la franja de arriba.
       resource  :mi_estado, only: [:show], controller: 'mi_estado'
+      # Lo clínico suyo: cuándo es su turno y qué le indicaron. Lista blanca campo por campo.
+      resource  :mi_salud,  only: [:show], controller: 'mi_salud'
     end
 
     get  '/asistente/consumo',       to: 'asistente#consumo'

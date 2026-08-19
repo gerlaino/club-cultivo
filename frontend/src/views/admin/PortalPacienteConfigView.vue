@@ -61,7 +61,7 @@
     <!-- TAB: NOTICIAS -->
     <div v-if="activeTab === 'noticias'" class="wpv__section">
       <div class="wpv__section-header">
-        <h2 class="wpv__section-title">Noticias</h2>
+        <h2 class="wpv__section-title">Novedades</h2>
         <button class="wpv__add-btn" @click="abrirModalNoticia()">
           <i class="bi bi-plus-lg"></i> Nueva noticia
         </button>
@@ -162,9 +162,32 @@
     <!-- TAB: CONFIGURACIÓN -->
     <div v-if="activeTab === 'config'" class="wpv__section">
       <div class="wpv__section-header">
-        <h2 class="wpv__section-title">Configuración de la web</h2>
+        <h2 class="wpv__section-title">Configuración del portal</h2>
+        <p class="wpv__section-sub">Abrilo o cerralo, y contá quiénes son y cómo contactarlos.</p>
       </div>
       <div class="wpv__config-grid">
+        <div class="wpv__config-field wpv__config-field--full">
+          <label class="wpv__label">Estado del portal</label>
+          <div class="wpv__web-status-card" :class="{ 'wpv__web-status-card--on': configForm.vista_paciente_activa }">
+            <div class="wpv__web-status-info">
+              <div class="wpv__web-status-dot" :class="{ 'wpv__web-status-dot--on': configForm.vista_paciente_activa }"></div>
+              <div>
+                <div class="wpv__web-status-label">
+                  {{ configForm.vista_paciente_activa ? 'Portal abierto' : 'Portal cerrado' }}
+                </div>
+                <div class="wpv__web-status-sub">
+                  {{ configForm.vista_paciente_activa
+                     ? 'Tus pacientes entran con su cuenta y ven su credencial, sus turnos y lo que publiques acá.'
+                     : 'Tus pacientes NO pueden entrar. Al intentarlo les avisa que su organización lo tiene cerrado.' }}
+                </div>
+              </div>
+            </div>
+            <button class="wpv__toggle" :class="{ 'wpv__toggle--on': configForm.vista_paciente_activa }"
+                    @click="configForm.vista_paciente_activa = !configForm.vista_paciente_activa">
+              <span class="wpv__toggle-thumb"></span>
+            </button>
+          </div>
+        </div>
         <div class="wpv__config-field wpv__config-field--full">
           <label class="wpv__label">Descripción de la organización</label>
           <textarea v-model="configForm.descripcion_web" class="wpv__textarea" rows="4"
@@ -186,26 +209,6 @@
           <label class="wpv__label">Horarios de atención</label>
           <textarea v-model="configForm.horarios_atencion" class="wpv__textarea" rows="3"
                     placeholder="Lunes a viernes 10-18hs..."></textarea>
-        </div>
-        <div class="wpv__config-field wpv__config-field--full">
-          <label class="wpv__label">Estado del portal</label>
-          <div class="wpv__web-status-card" :class="{ 'wpv__web-status-card--on': configForm.vista_paciente_activa }">
-            <div class="wpv__web-status-info">
-              <div class="wpv__web-status-dot" :class="{ 'wpv__web-status-dot--on': configForm.vista_paciente_activa }"></div>
-              <div>
-                <div class="wpv__web-status-label">
-                  {{ configForm.vista_paciente_activa ? 'Portal abierto' : 'Portal cerrado' }}
-                </div>
-                <div class="wpv__web-status-sub">
-                  {{ configForm.vista_paciente_activa ? 'Tus pacientes ven esta sección al entrar con su cuenta.' : 'Tus pacientes no ven esta sección.' }}
-                </div>
-              </div>
-            </div>
-            <button class="wpv__toggle" :class="{ 'wpv__toggle--on': configForm.vista_paciente_activa }"
-                    @click="configForm.vista_paciente_activa = !configForm.vista_paciente_activa">
-              <span class="wpv__toggle-thumb"></span>
-            </button>
-          </div>
         </div>
       </div>
       <div class="wpv__config-footer">
@@ -413,12 +416,18 @@ import DsSpinner from '../../design-system/components/Spinner.vue'
 const { confirm } = useConfirm()
 const clubStore = useClubStore()
 const { data: club } = storeToRefs(clubStore)
-const activeTab = ref('geneticas')
+const activeTab = ref('config')
+// La configuración va PRIMERO: si el portal está cerrado, publicar variedades no sirve de nada.
+// Estaba última y se llamaba "Configuración" a secas, dentro de una sección que ya se llama
+// Configuración — el admin no encontraba dónde se abría el portal.
+//
+// "Novedades" y no "Noticias": es como se llama en el portal que ve el paciente. Dos nombres para
+// la misma cosa es lo que ya costó caro en otras pantallas.
 const tabs = [
-  { key: 'geneticas', label: 'Variedades',   icon: 'bi-diagram-3'      },
-  { key: 'noticias',  label: 'Noticias',      icon: 'bi-newspaper'      },
-  { key: 'eventos',   label: 'Eventos',       icon: 'bi-calendar-event' },
-  { key: 'config',    label: 'Configuración', icon: 'bi-gear'           },
+  { key: 'config',    label: 'Configuración del portal', icon: 'bi-gear'           },
+  { key: 'geneticas', label: 'Variedades',               icon: 'bi-diagram-3'      },
+  { key: 'noticias',  label: 'Novedades',                icon: 'bi-newspaper'      },
+  { key: 'eventos',   label: 'Eventos',                  icon: 'bi-calendar-event' },
 ]
 
 const geneticas        = ref([])

@@ -1,12 +1,30 @@
 <script setup>
-import { onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useClubStore } from '../stores/club'
 import Avatar from '../components/Avatar.vue'
 import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import { usePlan } from '../composables/usePlan.js'
 
 const club  = useClubStore()
+
+// El plan real: dos planes (Básico / Total) y seis topes. Sale de `GET /plan`, que ya existía.
+const { fetchPlan, planLabel, esTrial, limites, uso } = usePlan()
+
+const RECURSOS = [
+  { clave: 'sedes',     label: 'Sedes' },
+  { clave: 'salas',     label: 'Salas' },
+  { clave: 'lotes',     label: 'Lotes' },
+  { clave: 'plantas',   label: 'Plantas' },
+  { clave: 'pacientes', label: 'Pacientes' },
+  { clave: 'usuarios',  label: 'Usuarios' },
+]
+
+// Sólo lo que tiene tope. En el plan Total los seis son `null` y la lista queda vacía.
+const topes = computed(() => RECURSOS
+  .filter(r => limites.value[r.clave] != null)
+  .map(r => ({ ...r, tope: limites.value[r.clave], usado: uso.value[r.clave] || 0 })))
 const toast = ref(null)
 const pristine = ref(true)
 const logoPreview = ref(null)
@@ -61,6 +79,9 @@ const errors = reactive({
 onMounted(async () => {
   if (!club.data) await club.fetch().catch(() => {})
   loadFromStore()
+  // El plan no bloquea la pantalla: si falla, la tarjeta muestra el default y el resto se edita
+  // igual. `usePlan` cachea, así que esto no es una llamada por visita.
+  fetchPlan()
 })
 watch(() => club.data, loadFromStore)
 
@@ -226,6 +247,45 @@ function showToast(type, msg) {
             </div>
           </div>
         </div>
+
+        <!-- Tu plan. Era una PESTAÑA propia ("Suscripción") con dos datos y el plan calculado a
+             ojo: miraba `features.ia` y `features.benchmark` y devolvía "Premium IA / Pro /
+             Standard", que son los planes VIEJOS —hoy son dos, Básico y Total— y encima decía
+             "acceso completo a todas las funcionalidades", que con las suites es falso. Una
+             pestaña entera para dos líneas equivocadas.
+             Acá dice el plan de verdad y contra qué se mide, que es lo único accionable: cuando
+             el tope se acerca, el admin lo ve antes de que un alta le rebote. -->
+        <div class="pv__card pv__card--mt">
+          <div class="pv__card-header">
+            <div class="pv__card-icon" style="background:rgba(21,128,61,.1);color:#15803d"><i class="bi bi-award"></i></div>
+            <div>
+              <div class="pv__card-title">Tu plan</div>
+              <div class="pv__card-sub">Qué tenés contratado y cuánto te queda</div>
+            </div>
+          </div>
+          <div class="pv__card-body">
+            <div class="pv__plan-nombre">
+              {{ planLabel }}
+              <span v-if="esTrial" class="pv__plan-trial">Prueba</span>
+            </div>
+
+            <!-- Sólo los recursos CON tope. En el plan Total no hay ninguno y la lista no se
+                 dibuja: una fila "Sedes 3 de ∞" no le dice nada a nadie. -->
+            <ul v-if="topes.length" class="pv__plan-topes">
+              <li v-for="t in topes" :key="t.clave" class="pv__plan-tope">
+                <span class="pv__plan-tope-k">{{ t.label }}</span>
+                <span class="pv__plan-tope-v" :class="{ 'pv__plan-tope-v--lleno': t.usado >= t.tope }">
+                  {{ t.usado }} de {{ t.tope }}
+                </span>
+              </li>
+            </ul>
+            <p v-else class="pv__plan-sintope">Sin topes: podés cargar lo que necesites.</p>
+
+            <p class="pv__plan-contacto">
+              Para cambiar de plan o sumar módulos, escribinos.
+            </p>
+          </div>
+        </div>
       </div>
 
       <!-- Main derecho -->
@@ -344,6 +404,25 @@ function showToast(type, msg) {
           </div>
         </div>
 
+        <!-- Alertas: era una pestaña llamada "Configuración de alertas" DENTRO de Configuración.
+             La palabra repetida no ayudaba a encontrarla y ocupaba lugar en un topbar de ocho.
+             Es una pantalla de 500 líneas con sus propias solapas, así que no se fusiona: se
+             señaliza desde acá, igual que Correo. -->
+        <div class="pv__card pv__card--mt">
+          <div class="pv__card-header">
+            <div class="pv__card-icon" style="background:rgba(180,83,9,.1);color:#b45309"><i class="bi bi-bell"></i></div>
+            <div>
+              <div class="pv__card-title">Alertas</div>
+              <div class="pv__card-sub">Setpoints por fase y cuándo avisarte de stock, REPROCANN y ambiente</div>
+            </div>
+          </div>
+          <div class="pv__card-body">
+            <router-link to="/configuracion/alertas" class="pv__btn-outline pv__link-modulo">
+              <i class="bi bi-arrow-right-short"></i> Ir a Alertas
+            </router-link>
+          </div>
+        </div>
+
         <!-- El correo se mudó a Configuración → Correo electrónico. Estaba acá mezclado con el
              nombre y el logo, y ahora es un módulo aparte con su propia casilla y sus
              plantillas: dejar media configuración en dos pantallas era garantía de confusión. -->
@@ -378,6 +457,33 @@ function showToast(type, msg) {
 </template>
 
 <style scoped>
+/* ── Tu plan ── */
+.pv__plan-nombre {
+  display: flex; align-items: center; gap: var(--sp-2);
+  font-size: var(--fs-20); font-weight: 700; color: var(--c-slate-900); letter-spacing: -.02em;
+}
+.pv__plan-trial {
+  font-size: var(--fs-12); font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  background: var(--c-amber-100); color: var(--c-amber-500);
+  padding: 2px var(--sp-2); border-radius: var(--r-pill);
+}
+.pv__plan-topes { list-style: none; margin: var(--sp-4) 0 0; padding: 0; }
+.pv__plan-tope {
+  display: flex; justify-content: space-between; align-items: baseline; gap: var(--sp-4);
+  padding: var(--sp-2) 0; border-bottom: 1px solid var(--c-slate-50); font-size: var(--fs-13);
+}
+.pv__plan-topes li:last-child { border-bottom: 0; }
+.pv__plan-tope-k { color: var(--c-slate-500); }
+.pv__plan-tope-v { font-weight: 600; color: var(--c-slate-900); font-variant-numeric: tabular-nums; }
+/* Lleno no es un error, pero es lo único accionable: el próximo alta va a rebotar. */
+.pv__plan-tope-v--lleno { color: var(--c-rust-600); }
+.pv__plan-sintope { margin: var(--sp-3) 0 0; font-size: var(--fs-13); color: var(--c-slate-500); }
+.pv__plan-contacto {
+  margin: var(--sp-4) 0 0; padding-top: var(--sp-3);
+  border-top: 1px solid var(--c-slate-50);
+  font-size: var(--fs-12); color: var(--c-slate-400); line-height: var(--lh-base);
+}
+
 .pv { max-width: 1100px; margin: 0 auto; padding: 0 0 3rem; }
 
 .pv__header {

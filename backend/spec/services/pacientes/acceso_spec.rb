@@ -7,7 +7,8 @@ require 'rails_helper'
 # (`juan.perez@...`), así que cualquiera que conozca a un paciente de la organización lo arma
 # solo; con una clave común entraría a su historia clínica y a sus dispensaciones.
 RSpec.describe Pacientes::Acceso do
-  let(:club) { create(:club, name: 'Mi Organización', features: { 'produccion_dispensa' => true, 'vista_paciente' => true }) }
+  let(:club) { create(:club, name: 'Mi Organización', vista_paciente_activa: true,
+                 features: { 'produccion_dispensa' => true, 'vista_paciente' => true }) }
 
   around { |ex| ActsAsTenant.with_tenant(club) { ex.run } }
 

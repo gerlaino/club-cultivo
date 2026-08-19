@@ -21,8 +21,11 @@ export function usePlan() {
     }
   }
 
-  const plan      = computed(() => planData.value?.plan      || 'semilla')
-  const planLabel = computed(() => planData.value?.label     || 'Semilla')
+  // Los defaults eran 'semilla'/'Semilla', que son los planes VIEJOS: hoy son dos, `basico` y
+  // `total` (PlanEnforcer::PLANES). Mientras la llamada estaba en vuelo la pantalla mostraba un
+  // plan que no existe.
+  const plan      = computed(() => planData.value?.plan      || 'basico')
+  const planLabel = computed(() => planData.value?.label     || 'Básico')
   const esTrial   = computed(() => planData.value?.trial     || false)
   const limites   = computed(() => planData.value?.limites   || {})
   const uso       = computed(() => planData.value?.uso       || {})
@@ -39,13 +42,17 @@ export function usePlan() {
     return Math.min(100, Math.round(((uso.value[recurso] || 0) / limite) * 100))
   }
 
+  // Los cuatro planes viejos siguen mapeados por si aparece uno guardado (igual que
+  // `PlanEnforcer::PLANES_LEGACY`), pero los que se pintan hoy son dos.
   const PLAN_COLORS = {
+    basico:     { bg: '#e8f5e9', text: '#2e7d32', border: '#a5d6a7' },
+    total:      { bg: '#f3e5f5', text: '#6a1b9a', border: '#ce93d8' },
     semilla:    { bg: '#e8f5e9', text: '#2e7d32', border: '#a5d6a7' },
     brote:      { bg: '#e3f2fd', text: '#1565c0', border: '#90caf9' },
     cosecha:    { bg: '#fff8e1', text: '#f57f17', border: '#ffe082' },
     federacion: { bg: '#f3e5f5', text: '#6a1b9a', border: '#ce93d8' },
   }
-  const planColor = computed(() => PLAN_COLORS[plan.value] || PLAN_COLORS.semilla)
+  const planColor = computed(() => PLAN_COLORS[plan.value] || PLAN_COLORS.basico)
 
   return {
     planData, loading,

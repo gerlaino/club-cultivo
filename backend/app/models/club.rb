@@ -411,6 +411,23 @@ class Club < ApplicationRecord
     FEATURES_LEGACY_INVERSO.fetch(k, []).any? { |viejo| features[viejo] == true }
   end
 
+  # ¿El portal del paciente está DISPONIBLE hoy para esta organización?
+  #
+  # Son dos llaves distintas y las dos tienen que estar puestas:
+  #
+  #   `feature?(:vista_paciente)` — lo CONTRATADO. Lo prende y lo apaga el super admin.
+  #   `vista_paciente_activa`     — el interruptor de la ORGANIZACIÓN, en Configuración → Portal.
+  #                                 Es su forma de cerrarlo mientras lo termina de cargar, o de
+  #                                 bajarlo sin dar de baja el add-on.
+  #
+  # Vive acá y en un solo lugar a propósito: lo preguntan el login (`User#rol_habilitado?`) y el
+  # área de pacientes (`Portal::BaseController`). Hasta hoy el interruptor no lo leía NADIE —se
+  # guardaba, se mostraba en pantalla y no hacía nada—, que es la peor versión de "la regla vive
+  # en dos lugares": vivía en cero.
+  def portal_paciente_disponible?
+    feature?(:vista_paciente) && vista_paciente_activa?
+  end
+
   def addon_disponible?(key)
     feature?(key)
   end

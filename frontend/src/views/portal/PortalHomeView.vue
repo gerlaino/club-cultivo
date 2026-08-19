@@ -1,99 +1,94 @@
 <template>
-  <div class="ph">
+  <div class="pmi">
 
-    <!-- Lo que la organización cuenta de sí misma -->
-    <header v-if="club?.descripcion" class="ph__intro">
-      <p class="ph__intro-txt">{{ club.descripcion }}</p>
-    </header>
-
-    <div v-if="cargando" class="ph__cargando"><DsSpinner :size="32" /></div>
+    <div v-if="cargando" class="pmi__cargando"><DsSpinner :size="32" /></div>
 
     <template v-else>
-      <!-- ── La portada: la última novedad, tratada como si importara ── -->
-      <article v-if="portada" class="ph__portada">
-        <RouterLink :to="`/portal/noticias/${portada.id}`" class="ph__portada-link">
-          <div v-if="portada.cover_url" class="ph__portada-foto" :style="`background-image:url(${portada.cover_url})`"></div>
-          <div class="ph__portada-txt">
-            <span class="ph__kicker">Novedades · {{ fechaLarga(portada.publicada_at) }}</span>
-            <h1 class="ph__portada-t">{{ portada.titulo }}</h1>
-            <p v-if="portada.preview" class="ph__portada-b">{{ portada.preview }}</p>
-            <span class="ph__leer">Leer <ArrowRight :size="14" :stroke-width="1.75" /></span>
-          </div>
+      <!-- ── A · La credencial ──────────────────────────────────────────────
+           Lo primero, sin título arriba: no necesita que le expliquen qué es. -->
+      <PortalCredencial v-if="credencial" :credencial="credencial" />
+
+      <p class="pmi__hola" v-else>
+        Hola{{ credencial?.nombre ? `, ${credencial.nombre}` : '' }}. Tu organización todavía no
+        terminó de cargar tu ficha.
+      </p>
+
+      <!-- ── B · Lo mío ─────────────────────────────────────────────────── -->
+      <section class="pmi__sec">
+        <h2 class="pmi__sec-t">Lo mío</h2>
+
+        <!-- Turno. Lo primero porque es lo único con hora. -->
+        <RouterLink v-if="turno" to="/portal/mi-salud" class="pmi__ficha">
+          <span class="pmi__ico"><CalendarClock :size="18" :stroke-width="1.75" /></span>
+          <span class="pmi__ficha-c">
+            <span class="pmi__ficha-l">Próximo turno</span>
+            <span class="pmi__ficha-v">{{ fechaHora(turno.fecha_hora) }}</span>
+            <span class="pmi__ficha-b">
+              {{ turno.tipo_label }}<template v-if="turno.medico"> · {{ turno.medico }}</template>
+            </span>
+          </span>
+          <ChevronRight :size="16" :stroke-width="1.75" class="pmi__chev" />
         </RouterLink>
-      </article>
 
-      <!-- ── Lo que viene ── -->
-      <section v-if="eventos.length" class="ph__sec">
-        <div class="ph__sec-hd">
-          <h2 class="ph__sec-t">Lo que viene</h2>
-          <RouterLink to="/portal/eventos" class="ph__mas">Ver todos</RouterLink>
-        </div>
-        <ul class="ph__agenda">
-          <li v-for="e in eventos.slice(0, 3)" :key="e.id">
-            <RouterLink :to="`/portal/eventos/${e.id}`" class="ph__ev">
-              <span class="ph__ev-f">{{ diaSemana(e.fecha_inicio) }} {{ dia(e.fecha_inicio) }}</span>
-              <span class="ph__ev-c">
-                <span class="ph__ev-t">{{ e.titulo }}</span>
-                <span class="ph__ev-m">{{ hora(e.fecha_inicio) }}<template v-if="e.lugar"> · {{ e.lugar }}</template></span>
-              </span>
-            </RouterLink>
-          </li>
-        </ul>
+        <!-- Indicación médica vigente. -->
+        <RouterLink v-if="indicacion" to="/portal/mi-salud" class="pmi__ficha">
+          <span class="pmi__ico" :class="{ 'pmi__ico--alerta': indicacion.vencida || indicacion.por_vencer }">
+            <ClipboardList :size="18" :stroke-width="1.75" />
+          </span>
+          <span class="pmi__ficha-c">
+            <span class="pmi__ficha-l">Mi indicación</span>
+            <span class="pmi__ficha-v">{{ indicacion.dosificacion }}</span>
+            <span class="pmi__ficha-b">{{ vigenciaIndicacion }}</span>
+          </span>
+          <ChevronRight :size="16" :stroke-width="1.75" class="pmi__chev" />
+        </RouterLink>
+
+        <!-- Cuenta corriente, sólo si la organización se la abrió. -->
+        <RouterLink v-if="cc?.tiene" to="/portal/cuenta-corriente" class="pmi__ficha">
+          <span class="pmi__ico" :class="{ 'pmi__ico--alerta': cc.debe > 0 }">
+            <Wallet :size="18" :stroke-width="1.75" />
+          </span>
+          <span class="pmi__ficha-c">
+            <span class="pmi__ficha-l">Mi cuenta</span>
+            <span class="pmi__ficha-v">{{ cc.debe > 0 ? `Debés ${pesos(cc.debe)}` : `Tenés ${pesos(cc.saldo)} a favor` }}</span>
+            <span class="pmi__ficha-b">Ver los movimientos</span>
+          </span>
+          <ChevronRight :size="16" :stroke-width="1.75" class="pmi__chev" />
+        </RouterLink>
+
+        <!-- Último retiro. Siempre está, aunque sea para decir que no retiró nunca. -->
+        <RouterLink to="/portal/historial" class="pmi__ficha">
+          <span class="pmi__ico"><PackageCheck :size="18" :stroke-width="1.75" /></span>
+          <span class="pmi__ficha-c">
+            <span class="pmi__ficha-l">Mis retiros</span>
+            <span class="pmi__ficha-v">
+              {{ ultimoRetiro ? `Último: ${fechaCorta(ultimoRetiro.fecha)}` : 'Todavía no retiraste nada' }}
+            </span>
+            <span v-if="ultimoRetiro" class="pmi__ficha-b">{{ resumenRetiro }}</span>
+          </span>
+          <ChevronRight :size="16" :stroke-width="1.75" class="pmi__chev" />
+        </RouterLink>
       </section>
 
-      <!-- ── Más novedades (la portada ya se mostró) ── -->
-      <section v-if="masNoticias.length" class="ph__sec">
-        <div class="ph__sec-hd">
-          <h2 class="ph__sec-t">Más novedades</h2>
-          <RouterLink to="/portal/noticias" class="ph__mas">Ver todas</RouterLink>
+      <!-- ── C · Del club ────────────────────────────────────────────────
+           El boletín en dos renglones. Todo lo demás está en su sección. -->
+      <section v-if="destacado || evento" class="pmi__sec">
+        <div class="pmi__sec-hd">
+          <h2 class="pmi__sec-t">Del club</h2>
+          <RouterLink to="/portal/del-club" class="pmi__mas">Ver todo</RouterLink>
         </div>
-        <ul class="ph__notas">
-          <li v-for="n in masNoticias" :key="n.id">
-            <RouterLink :to="`/portal/noticias/${n.id}`" class="ph__nota">
-              <span class="ph__nota-f">{{ fechaCorta(n.publicada_at) }}</span>
-              <span class="ph__nota-t">{{ n.titulo }}</span>
-            </RouterLink>
-          </li>
-        </ul>
-      </section>
 
-      <!-- ── El catálogo ── -->
-      <section v-if="geneticas.length" class="ph__sec">
-        <div class="ph__sec-hd">
-          <h2 class="ph__sec-t">En el catálogo</h2>
-          <RouterLink to="/portal/geneticas" class="ph__mas">Ver todo</RouterLink>
-        </div>
-        <ul class="ph__vars">
-          <li v-for="g in geneticas.slice(0, 4)" :key="g.id">
-            <RouterLink :to="`/portal/geneticas/${g.id}`" class="ph__var">
-              <span class="ph__var-f">
-                <img v-if="g.fotos_urls?.length" :src="g.fotos_urls[0]" :alt="g.nombre" loading="lazy" />
-                <LeafHerbarium v-else :size="26" class="ph__var-sinfoto" />
-                <span v-if="g.registrada_inase" class="ph__var-inase">INASE</span>
-              </span>
-              <span class="ph__var-n">{{ g.nombre }}</span>
-              <span class="ph__var-d">
-                <template v-if="g.tipo">{{ TIPOS[g.tipo] || g.tipo }}</template>
-                <template v-if="g.thc != null"> · THC {{ g.thc }}%</template>
-              </span>
-            </RouterLink>
-          </li>
-        </ul>
-      </section>
+        <RouterLink v-if="evento" :to="`/portal/eventos/${evento.id}`" class="pmi__nota">
+          <span class="pmi__nota-k">Próximo evento</span>
+          <span class="pmi__nota-t">{{ evento.titulo }}</span>
+          <span class="pmi__nota-b">{{ fechaHora(evento.fecha_inicio) }}<template v-if="evento.lugar"> · {{ evento.lugar }}</template></span>
+        </RouterLink>
 
-      <!-- ── Cuando la organización todavía no publicó nada ──
-           No es un hueco: se ofrece lo que SÍ existe siempre. -->
-      <section v-if="sinPublicar" class="ph__nada">
-        <LeafHerbarium :size="40" class="ph__nada-ico" />
-        <h2 class="ph__nada-t">Todavía no hay nada publicado</h2>
-        <p class="ph__nada-b">
-          Cuando {{ club?.name || 'tu organización' }} cargue novedades, eventos o variedades, los
-          vas a ver acá. Mientras tanto:
-        </p>
-        <div class="ph__nada-acts">
-          <RouterLink to="/portal/historial" class="ph__nada-bt">Ver mis retiros</RouterLink>
-          <RouterLink to="/portal/contacto" class="ph__nada-bt ph__nada-bt--sec">Datos de contacto</RouterLink>
-        </div>
+        <RouterLink v-if="destacado" :to="`/portal/noticias/${destacado.id}`" class="pmi__nota">
+          <span class="pmi__nota-k">Novedades</span>
+          <span class="pmi__nota-t">{{ destacado.titulo }}</span>
+          <span v-if="destacado.preview" class="pmi__nota-b">{{ destacado.preview }}</span>
+        </RouterLink>
       </section>
     </template>
 
@@ -101,176 +96,155 @@
 </template>
 
 <script setup>
-// El inicio del portal es LO QUE LA ORGANIZACIÓN PUBLICA, tratado como si valiera algo: la última
-// novedad va como portada, con su foto y su titular. Una organización que se toma el trabajo de
-// escribir algo tiene que verlo tratado así — es lo que hace que lo siga escribiendo.
+// EL INICIO DEL PORTAL ES EL ESTADO DEL PACIENTE.
 //
-// Después, en orden: lo que VIENE (es lo único que caduca), el resto de las novedades, y el
-// catálogo. Lo del paciente —retiros, cuenta— vive en la barra: entra a mirar qué hay de nuevo, no
-// a revisar lo que ya hizo. Lo que no puede esperar al scroll está en la franja de arriba.
+// Hasta acá el inicio era el boletín de la organización —portada de novedades, agenda, catálogo—
+// con este razonamiento: "entra a mirar qué hay de nuevo, no a revisar lo que ya hizo". El
+// razonamiento tenía un error: trata lo del paciente como PASADO. Casi nada de lo suyo lo es. El
+// REPROCANN vigente, el próximo turno, la indicación vigente y el saldo son presente y futuro, y
+// son las cuatro cosas que un paciente entra a preguntar. Y hay un problema práctico encima: el
+// boletín está VACÍO en cualquier organización que no publique —que son casi todas, casi todas las
+// semanas—. Su estado no está vacío nunca.
+//
+// Así que el orden es: quién soy y si puedo retirar (la credencial) · lo mío que viene (turno,
+// indicación, cuenta, retiros) · lo que publica el club, en dos renglones y con "ver todo".
+//
+// El boletín no se perdió: es `/portal/del-club`, la misma pantalla, con su entrada en la barra.
 import { ref, computed, onMounted } from 'vue'
-import { storeToRefs } from 'pinia'
-import { ArrowRight } from 'lucide-vue-next'
-import { getPortalEventos, getPortalNoticias, getPortalGeneticas } from '@/lib/portalApi'
-import { usePortalClubStore } from '@/stores/portalClub'
-import LeafHerbarium from '@/design-system/icons/LeafHerbarium.vue'
+import { CalendarClock, ClipboardList, Wallet, PackageCheck, ChevronRight } from 'lucide-vue-next'
+import {
+  getPortalMiEstado, getPortalMiSalud, getPortalCuentaCorriente,
+  getPortalHistorial, getPortalNoticias, getPortalEventos,
+} from '@/lib/portalApi'
+import PortalCredencial from '@/components/portal/PortalCredencial.vue'
 import DsSpinner from '@/design-system/components/Spinner.vue'
 
-const { club } = storeToRefs(usePortalClubStore())
+const cargando   = ref(true)
+const credencial = ref(null)
+const turno      = ref(null)
+const indicacion = ref(null)
+const cc         = ref(null)
+const retiros    = ref([])
+const noticias   = ref([])
+const eventos    = ref([])
 
-const eventos   = ref([])
-const noticias  = ref([])
-const geneticas = ref([])
-const cargando  = ref(true)
+const ultimoRetiro = computed(() => retiros.value[0] || null)
+const destacado    = computed(() => noticias.value[0] || null)
+const evento       = computed(() => eventos.value[0] || null)
 
-const portada     = computed(() => noticias.value[0] || null)
-const masNoticias = computed(() => noticias.value.slice(1, 4))
-const sinPublicar = computed(() => !eventos.value.length && !noticias.value.length && !geneticas.value.length)
+const resumenRetiro = computed(() => {
+  const r = ultimoRetiro.value
+  if (!r) return ''
+  const nombres = (r.items || []).map(i => i.genetica).filter(Boolean)
+  const gramos  = r.gramos ? `${r.gramos} g` : ''
+  const que = nombres.length > 1 ? `${nombres[0]} y ${nombres.length - 1} más` : nombres[0] || ''
+  return [gramos, que].filter(Boolean).join(' · ')
+})
 
-const TIPOS = { indica: 'Índica', sativa: 'Sativa', hibrida: 'Híbrida', ruderalis: 'Ruderalis' }
-const DIAS  = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']
+const vigenciaIndicacion = computed(() => {
+  const i = indicacion.value
+  if (!i) return ''
+  if (i.vencida)    return `Venció el ${fechaCorta(i.fecha_vencimiento)}. Pedí una nueva.`
+  if (i.por_vencer) return `Vence el ${fechaCorta(i.fecha_vencimiento)}`
+  return i.medico ? `Indicada por ${i.medico}` : 'Vigente'
+})
 
 const d = (f) => new Date(f)
-const dia        = (f) => (f ? d(f).getDate() : '')
-const diaSemana  = (f) => (f ? DIAS[d(f).getDay()].toUpperCase() : '')
-const hora       = (f) => (f ? d(f).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '')
-const fechaLarga = (f) => (f ? d(f).toLocaleDateString('es-AR', { day: 'numeric', month: 'long' }) : '')
 const fechaCorta = (f) => (f ? d(f).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }) : '')
+const fechaHora  = (f) => (f
+  ? d(f).toLocaleString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })
+  : '')
+const pesos = (n) => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0)
 
 onMounted(async () => {
-  // Las tres en paralelo, y ninguna hace caer a las otras: si la organización no cargó eventos,
-  // las novedades salen igual.
-  const [ev, no, ge] = await Promise.allSettled([
-    getPortalEventos(), getPortalNoticias(), getPortalGeneticas(),
+  // Seis llamadas y ninguna hace caer a las otras: sin módulo médico no hay turno, y el resto de
+  // la pantalla tiene que salir igual.
+  const [est, sal, cta, his, not, eve] = await Promise.allSettled([
+    getPortalMiEstado(), getPortalMiSalud(), getPortalCuentaCorriente(),
+    getPortalHistorial(), getPortalNoticias(), getPortalEventos(),
   ])
-  if (ev.status === 'fulfilled') eventos.value   = ev.value || []
-  if (no.status === 'fulfilled') noticias.value  = no.value || []
-  if (ge.status === 'fulfilled') geneticas.value = ge.value || []
+
+  if (est.status === 'fulfilled') credencial.value = est.value?.credencial || null
+  if (sal.status === 'fulfilled') {
+    turno.value      = sal.value?.proximo_turno || null
+    indicacion.value = sal.value?.indicacion || null
+  }
+  if (cta.status === 'fulfilled') cc.value       = cta.value || null
+  if (his.status === 'fulfilled') retiros.value  = his.value || []
+  if (not.status === 'fulfilled') noticias.value = not.value || []
+  if (eve.status === 'fulfilled') eventos.value  = eve.value || []
+
   cargando.value = false
 })
 </script>
 
 <style scoped>
 /* Mobile-first: se diseña a 360 y se ensancha. El resto de la app es al revés porque se usa
-   sentado en el club; esto se usa parado, yendo a retirar. */
-.ph { max-width: var(--p-ancho); margin: 0 auto; padding: var(--sp-6) var(--sp-4) var(--sp-12); }
+   sentado en el club; esto se usa parado, en la puerta. */
+.pmi { max-width: var(--p-ancho); margin: 0 auto; padding: var(--sp-6) var(--sp-4) var(--sp-12); }
+.pmi__cargando { display: flex; justify-content: center; padding: var(--sp-12); }
+.pmi__hola { color: var(--p-suave); line-height: var(--lh-base); margin: 0 0 var(--sp-8); }
 
-.ph__intro { margin-bottom: var(--sp-6); }
-.ph__intro-txt {
+.pmi__sec { margin-top: var(--sp-10); }
+.pmi__sec-hd { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-4); }
+.pmi__sec-t {
   font-family: var(--p-display);
-  font-size: var(--fs-18); line-height: var(--lh-base); color: var(--p-suave); margin: 0;
+  font-size: var(--fs-18); font-weight: 600; margin: 0 0 var(--sp-3); letter-spacing: -.01em;
 }
+.pmi__sec-hd .pmi__sec-t { margin-bottom: var(--sp-3); }
+.pmi__mas { font-size: var(--fs-13); font-weight: 600; color: var(--p-marca); text-decoration: none; white-space: nowrap; }
+.pmi__mas:hover { text-decoration: underline; }
 
-.ph__cargando { display: flex; justify-content: center; padding: var(--sp-12); }
+/* Las fichas de "lo mío": una línea por pregunta, todas iguales, todas tocables entera. */
+.pmi__ficha {
+  display: flex; align-items: center; gap: var(--sp-4);
+  padding: var(--sp-4); margin-bottom: var(--sp-2);
+  background: var(--p-papel); border: 1px solid var(--p-linea);
+  border-radius: var(--p-radio-sm);
+  text-decoration: none; color: inherit;
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
+}
+.pmi__ficha:hover { border-color: var(--p-marca-linea); box-shadow: var(--sh-1); }
 
-/* ── Portada ── */
-.ph__portada { margin-bottom: var(--sp-10); }
-.ph__portada-link { display: block; text-decoration: none; color: inherit; }
-.ph__portada-foto {
-  aspect-ratio: 16 / 9;
-  background: var(--p-marca-suave) center/cover no-repeat;
-  border-radius: var(--p-radio);
-  margin-bottom: var(--sp-4);
+.pmi__ico {
+  width: 38px; height: 38px; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--p-marca-suave); color: var(--p-marca); border-radius: var(--r-pill);
 }
-.ph__portada-txt { min-width: 0; }
-.ph__kicker {
-  display: block;
-  font-size: var(--fs-12); letter-spacing: .12em; text-transform: uppercase;
-  color: var(--p-tenue); margin-bottom: var(--sp-2);
-}
-.ph__portada-t {
-  font-family: var(--p-display);
-  font-size: var(--fs-24); line-height: var(--lh-tight); font-weight: 600;
-  letter-spacing: -.02em; margin: 0 0 var(--sp-2); text-wrap: balance;
-}
-.ph__portada-b { color: var(--p-suave); margin: 0 0 var(--sp-3); line-height: var(--lh-base); }
-.ph__leer {
-  display: inline-flex; align-items: center; gap: var(--sp-1);
-  font-size: var(--fs-14); font-weight: 600; color: var(--p-marca);
-}
-.ph__portada-link:hover .ph__portada-t { text-decoration: underline; text-underline-offset: 3px; }
+.pmi__ico--alerta { background: var(--p-atencion-bg); color: var(--p-atencion); }
 
-/* ── Secciones ── */
-.ph__sec { margin-bottom: var(--sp-10); }
-.ph__sec-hd {
-  display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-4);
-  border-bottom: 1px solid var(--p-linea); padding-bottom: var(--sp-2); margin-bottom: var(--sp-3);
+.pmi__ficha-c { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.pmi__ficha-l {
+  font-size: var(--fs-12); text-transform: uppercase; letter-spacing: .08em; color: var(--p-tenue);
 }
-.ph__sec-t {
-  font-family: var(--p-display);
-  font-size: var(--fs-18); font-weight: 600; margin: 0; letter-spacing: -.01em;
+.pmi__ficha-v {
+  font-weight: 600; line-height: var(--lh-tight);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.ph__mas { font-size: var(--fs-13); font-weight: 600; color: var(--p-marca); text-decoration: none; white-space: nowrap; }
-.ph__mas:hover { text-decoration: underline; }
+.pmi__ficha-b {
+  font-size: var(--fs-13); color: var(--p-suave); line-height: var(--lh-base);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.pmi__chev { color: var(--p-tenue); flex: 0 0 auto; }
 
-ul { list-style: none; margin: 0; padding: 0; }
-
-/* Agenda */
-.ph__ev {
-  display: flex; gap: var(--sp-4); align-items: baseline;
+/* Del club: texto, sin foto. La foto está en la sección; acá compite con la credencial. */
+.pmi__nota {
+  display: flex; flex-direction: column; gap: 2px;
   padding: var(--sp-3) 0; text-decoration: none; color: inherit;
   border-bottom: 1px dotted var(--p-linea);
 }
-.ph__agenda li:last-child .ph__ev { border-bottom: 0; }
-.ph__ev-f {
-  font-family: var(--font-mono); font-size: var(--fs-12); font-weight: 600;
-  color: var(--p-marca); width: 66px; flex: 0 0 auto; letter-spacing: .02em;
+.pmi__sec .pmi__nota:last-child { border-bottom: 0; }
+.pmi__nota-k {
+  font-size: var(--fs-12); text-transform: uppercase; letter-spacing: .08em; color: var(--p-tenue);
 }
-.ph__ev-c { display: flex; flex-direction: column; min-width: 0; }
-.ph__ev-t { font-weight: 600; }
-.ph__ev-m { font-size: var(--fs-13); color: var(--p-tenue); }
-.ph__ev:hover .ph__ev-t { text-decoration: underline; text-underline-offset: 3px; }
-
-/* Notas */
-.ph__nota {
-  display: flex; gap: var(--sp-4); align-items: baseline;
-  padding: var(--sp-3) 0; text-decoration: none; color: inherit;
-  border-bottom: 1px dotted var(--p-linea);
+.pmi__nota-t { font-weight: 600; }
+.pmi__nota-b {
+  font-size: var(--fs-13); color: var(--p-suave); line-height: var(--lh-base);
+  display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
-.ph__notas li:last-child .ph__nota { border-bottom: 0; }
-.ph__nota-f {
-  font-family: var(--font-mono); font-size: var(--fs-12); color: var(--p-tenue);
-  width: 66px; flex: 0 0 auto;
-}
-.ph__nota-t { font-weight: 500; }
-.ph__nota:hover .ph__nota-t { text-decoration: underline; text-underline-offset: 3px; }
-
-/* Catálogo */
-.ph__vars { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-4); }
-.ph__var { display: block; text-decoration: none; color: inherit; }
-.ph__var-f {
-  position: relative; display: flex; align-items: center; justify-content: center;
-  aspect-ratio: 4 / 3; background: var(--p-marca-suave);
-  border-radius: var(--p-radio-sm); overflow: hidden; margin-bottom: var(--sp-2);
-}
-.ph__var-f img { width: 100%; height: 100%; object-fit: cover; }
-.ph__var-sinfoto { color: var(--p-marca-linea); }
-.ph__var-inase {
-  position: absolute; top: var(--sp-2); left: var(--sp-2);
-  background: var(--p-marca-fuerte); color: #fff;
-  font-size: 10px; font-weight: 700; letter-spacing: .06em;
-  padding: 2px var(--sp-2); border-radius: var(--r-pill);
-}
-.ph__var-n { display: block; font-weight: 600; font-size: var(--fs-14); }
-.ph__var-d { display: block; font-size: var(--fs-12); color: var(--p-tenue); }
-.ph__var:hover .ph__var-n { text-decoration: underline; text-underline-offset: 3px; }
-
-/* Nada publicado */
-.ph__nada { text-align: center; padding: var(--sp-12) var(--sp-4); }
-.ph__nada-ico { color: var(--p-marca-linea); margin-bottom: var(--sp-3); }
-.ph__nada-t { font-family: var(--p-display); font-size: var(--fs-20); font-weight: 600; margin: 0 0 var(--sp-2); }
-.ph__nada-b { color: var(--p-suave); margin: 0 auto var(--sp-5); max-width: 40ch; }
-.ph__nada-acts { display: flex; flex-wrap: wrap; gap: var(--sp-2); justify-content: center; }
-.ph__nada-bt {
-  text-decoration: none; font-size: var(--fs-14); font-weight: 600;
-  background: var(--p-marca); color: #fff;
-  padding: var(--sp-2) var(--sp-5); border-radius: var(--r-pill);
-}
-.ph__nada-bt--sec { background: none; color: var(--p-marca); border: 1px solid var(--p-marca-linea); }
+.pmi__nota:hover .pmi__nota-t { text-decoration: underline; text-underline-offset: 3px; }
 
 @media (min-width: 640px) {
-  .ph { padding: var(--sp-10) var(--sp-4) var(--sp-12); }
-  .ph__portada-t { font-size: var(--fs-32); }
-  .ph__vars { grid-template-columns: repeat(4, 1fr); }
+  .pmi { padding: var(--sp-10) var(--sp-4) var(--sp-12); }
 }
 </style>

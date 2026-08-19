@@ -450,17 +450,10 @@ const routes = [
       else next("/");
     },
   },
-  {
-    path: "/alertas-configuracion",
-    name: "alertas-configuracion",
-    component: () => import("../views/SetpointsConfigView.vue"),
-    meta: { requiresAuth: true },
-    beforeEnter: (to, from, next) => {
-      const auth = useAuthStore();
-      if (auth.user?.role === "admin") next();
-      else next("/");
-    },
-  },
+  // Se llamaba /alertas-configuracion y colgaba de la raíz. Ahora vive bajo /configuracion, que
+  // es lo que hace que el menú lateral resalte Configuración estando adentro: `detectGroup` va por
+  // prefijo de ruta, y con la pestaña sacada esta pantalla caía en Dashboard.
+  { path: "/alertas-configuracion", redirect: "/configuracion/alertas" },
   {
     path: "/configuracion",
     component: () => import("../views/ConfiguracionView.vue"),
@@ -473,11 +466,19 @@ const routes = [
     children: [
       { path: '',           redirect: '/configuracion/club' },
       { path: 'club',       name: 'config-club',        component: () => import("../views/PreferenciasView.vue") },
-      { path: 'sedes',      name: 'config-sedes',       component: () => import("../views/SedesView.vue") },
-      { path: 'equipo',     name: 'config-equipo',      component: () => import("../views/UsuariosView.vue") },
-      { path: 'suscripcion',name: 'config-suscripcion', component: () => import("../views/SuscripcionTabView.vue") },
+      // Sedes y Equipo eran DUPLICADOS: la misma pantalla montada en dos rutas (/sedes y
+      // /usuarios son las canónicas, y son las que usa el menú). Nadie enlazaba estas dos, así
+      // que sólo se llegaba escribiendo la URL — y encima el menú lateral no resaltaba nada.
+      // Redirigen en vez de borrarse por si alguien tiene el enlace guardado.
+      { path: 'sedes',  redirect: '/sedes' },
+      { path: 'equipo', redirect: '/usuarios' },
+      // Suscripción dejó de ser una pestaña: eran dos datos, y el plan lo calculaba a ojo con
+      // `features.ia`/`features.benchmark` devolviendo los nombres de los planes VIEJOS. Ahora es
+      // una tarjeta en General, con el plan real y los topes contra el uso.
+      { path: 'suscripcion', redirect: '/configuracion' },
       { path: 'correo',     name: 'config-correo',      component: () => import("../views/CorreoView.vue") },
       { path: 'portal',     name: 'config-portal',      component: () => import("../views/admin/PortalPacienteConfigView.vue") },
+      { path: 'alertas',    name: 'alertas-configuracion', component: () => import("../views/SetpointsConfigView.vue") },
       { path: 'papelera',   name: 'config-papelera',    component: () => import("../views/admin/PapeleraView.vue") },
     ],
   },
@@ -706,11 +707,17 @@ const routes = [
     component: () => import('../views/portal/PortalShell.vue'),
     meta: { requiresAuth: true, fullscreen: true },
     children: [
-      // El inicio es LO QUE LA ORGANIZACIÓN PUBLICA: eventos, novedades y catálogo — justo lo que
-      // su admin configura. Lo del paciente (retiros, cuenta corriente) está en la barra: entra a
-      // mirar qué hay de nuevo, no a revisar lo que ya hizo.
+      // EL INICIO ES EL ESTADO DEL PACIENTE: su credencial con el REPROCANN, su próximo turno, su
+      // indicación, su cuenta y su último retiro. Era el boletín de la organización, que se mudó
+      // entero a /portal/del-club: el boletín está vacío en cualquier organización que no publique,
+      // y lo suyo no está vacío nunca.
       { path: '', name: 'portal-inicio', component: () => import('../views/portal/PortalHomeView.vue') },
+      // Lo clínico: turnos e indicación médica. El módulo médico existía y el portal no lo leía.
+      { path: 'mi-salud',       name: 'portal-mi-salud',  component: () => import('../views/portal/PortalMiSaludView.vue') },
       { path: 'historial',      name: 'portal-historial', component: () => import('../views/portal/PortalHistorialView.vue') },
+      // Lo que publica la organización, todo junto: era el inicio y son cinco entradas de la barra
+      // colapsadas en una. Un portal de salud tiene pocas secciones.
+      { path: 'del-club',       name: 'portal-del-club',  component: () => import('../views/portal/PortalDelClubView.vue') },
       { path: 'geneticas',      name: 'portal-geneticas', component: () => import('../views/portal/PortalGeneticasView.vue') },
       { path: 'geneticas/:id',  name: 'portal-genetica',  component: () => import('../views/portal/PortalGeneticaDetailView.vue') },
       { path: 'noticias',       name: 'portal-noticias',  component: () => import('../views/portal/PortalNoticiasView.vue') },
@@ -718,7 +725,9 @@ const routes = [
       { path: 'eventos',        name: 'portal-eventos',   component: () => import('../views/portal/PortalEventosView.vue') },
       { path: 'eventos/:id',    name: 'portal-evento',    component: () => import('../views/portal/PortalEventoDetailView.vue') },
       { path: 'galeria',        name: 'portal-galeria',   component: () => import('../views/portal/PortalGaleriaView.vue') },
-      { path: 'contacto',       name: 'portal-contacto',  component: () => import('../views/portal/PortalContactoView.vue') },
+      // `contacto` era una sección con un formulario de "Envianos un mensaje" que no mandaba nada.
+      // Son cuatro datos y viven en el pie, visibles desde todas las pantallas.
+      { path: 'contacto',       redirect: '/portal' },
       // Su cuenta: el usuario a la vista y el cambio de contraseña. Vive DENTRO del portal —
       // `/perfil` está en el shell de administración y un paciente ahí ve una app que no es la suya.
       { path: 'cuenta',         name: 'portal-cuenta',    component: () => import('../views/portal/PortalCuentaView.vue') },
@@ -1121,6 +1130,9 @@ const FEATURE_POR_PREFIJO = [
   ['/reglas-ambientales',   'iot'],
   ['/configuracion/correo', 'mailer'],
   ['/ariccame',             'ariccame'],
+  // Integraciones quedó siendo la pantalla de WhatsApp, que es un add-on: sin contratarlo no hay
+  // nada que configurar ahí. Los webhooks salieron de la vista del admin (ver IntegracionesView).
+  ['/integraciones',        'whatsapp'],
   ['/portal',               'vista_paciente'],
   ['/configuracion/portal', 'vista_paciente'],
 ]

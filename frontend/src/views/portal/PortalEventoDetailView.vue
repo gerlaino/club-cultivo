@@ -27,17 +27,21 @@
 
       <div v-if="evento.descripcion" class="ped__cuerpo">{{ evento.descripcion }}</div>
 
+      <!-- Anotarse no se hace por el portal: el cupo y la lista los maneja la organización. En
+           vez de mandarlo a una pantalla de contacto se le da el link que marca o escribe. -->
       <p class="ped__anotarse">
-        ¿Querés participar? Avisale a tu organización desde
-        <RouterLink to="/portal/contacto">Contacto</RouterLink>.
+        ¿Querés participar? Avisale a tu organización<template v-if="comoAvisar">
+          por <a :href="comoAvisar.href">{{ comoAvisar.txt }}</a></template>.
       </p>
     </template>
   </article>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
+import { storeToRefs } from 'pinia'
+import { usePortalClubStore } from '@/stores/portalClub'
 import { CalendarDays, MapPin } from 'lucide-vue-next'
 import { getPortalEvento } from '@/lib/portalApi'
 import PortalCabecera from '@/components/portal/PortalCabecera.vue'
@@ -47,6 +51,17 @@ import DsSpinner from '@/design-system/components/Spinner.vue'
 const route = useRoute()
 const evento   = ref(null)
 const cargando = ref(true)
+
+// WhatsApp primero, después teléfono, después mail: es el orden en que la gente avisa. Si la
+// organización no cargó ninguno, la frase sale igual sin el enlace.
+const { club } = storeToRefs(usePortalClubStore())
+const comoAvisar = computed(() => {
+  const c = club.value || {}
+  if (c.whatsapp) return { txt: 'WhatsApp', href: `https://wa.me/${String(c.whatsapp).replace(/\D/g, '')}` }
+  if (c.phone)    return { txt: c.phone,    href: `tel:${c.phone}` }
+  if (c.email)    return { txt: c.email,    href: `mailto:${c.email}` }
+  return null
+})
 
 const fechaLarga = (f) => (f ? new Date(f).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }) : '')
 const hora       = (f) => (f ? new Date(f).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '')

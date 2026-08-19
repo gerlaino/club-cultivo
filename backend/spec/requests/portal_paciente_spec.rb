@@ -13,7 +13,8 @@ RSpec.describe 'Portal del paciente', type: :request do
   # (`check_rol_habilitado!`), y sin eso el spec daría 401 y parecería que el candado del portal
   # funciona cuando en realidad nunca llegó a evaluarse.
   let(:club) do
-    create(:club, features: { 'cultivo' => true, 'produccion_dispensa' => true, 'vista_paciente' => true })
+    create(:club, vista_paciente_activa: true,
+                  features: { 'cultivo' => true, 'produccion_dispensa' => true, 'vista_paciente' => true })
   end
   let(:paciente) { create(:user, :paciente, club: club) }
 
@@ -45,7 +46,7 @@ RSpec.describe 'Portal del paciente', type: :request do
         create(:genetica, club: club, nombre: 'Publicada', visible_paciente: true)
         create(:genetica, club: club, nombre: 'Guardada',  visible_paciente: false)
       end
-      otro = create(:club, features: { 'vista_paciente' => true })
+      otro = create(:club, vista_paciente_activa: true, features: { 'vista_paciente' => true })
       ActsAsTenant.with_tenant(otro) { create(:genetica, club: otro, nombre: 'Ajena', visible_paciente: true) }
 
       entrar('geneticas')
@@ -66,7 +67,9 @@ RSpec.describe 'Portal del paciente', type: :request do
   # otro lado donde ir, así que `check_rol_habilitado!` no lo deja ni loguearse. Es lo mismo que
   # le pasa al repartidor cuando la organización da de baja Delivery.
   describe 'sin el módulo contratado' do
-    let(:club) { create(:club, features: { 'produccion_dispensa' => true }) }
+    # El portal ABIERTO pero el add-on sin contratar: son dos llaves distintas y acá falta la del
+    # super admin. Con las dos apagadas no se distinguiría cuál de las dos lo frenó.
+    let(:club) { create(:club, vista_paciente_activa: true, features: { 'produccion_dispensa' => true }) }
 
     it 'el paciente no puede ni entrar, y se le dice qué falta' do
       post '/api/users/sign_in',
@@ -109,7 +112,8 @@ RSpec.describe 'Portal — el historial del paciente', type: :request do
   include AuthHelpers
 
   let(:club) do
-    create(:club, features: { 'produccion_dispensa' => true, 'vista_paciente' => true })
+    create(:club, vista_paciente_activa: true,
+                  features: { 'produccion_dispensa' => true, 'vista_paciente' => true })
   end
 
   let(:admin) { create(:user, :admin, club: club) }

@@ -22,8 +22,11 @@ export const getPortalGaleria   = ()            => api.get('/portal/galeria').th
 export const getPortalHistorial = ()            => api.get('/portal/historial').then(datos)
 // Su cuenta corriente, si la organización se la abrió. Devuelve `{ tiene: false }` si no.
 export const getPortalCuentaCorriente = ()      => api.get('/portal/cuenta_corriente').then(datos)
-// Lo que hay que decirle ANTES de que scrollee: alimenta la franja de arriba.
+// Su credencial y lo que hay que decirle antes de que scrollee: alimenta el inicio y la franja.
 export const getPortalMiEstado  = ()            => api.get('/portal/mi_estado').then(datos)
+// Lo clínico suyo: próximo turno e indicación vigente. Devuelve `{ tiene_modulo: false }` si la
+// organización no tiene el módulo médico.
+export const getPortalMiSalud   = ()            => api.get('/portal/mi_salud').then(datos)
 
 // Compatibilidad con las vistas mudadas, que llamaban `publicApi.getGeneticas()`.
 export default {
@@ -38,4 +41,5 @@ export default {
   getHistorial: getPortalHistorial,
   getCuentaCorriente: getPortalCuentaCorriente,
   getMiEstado: getPortalMiEstado,
+  getMiSalud: getPortalMiSalud,
 }

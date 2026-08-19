@@ -7,6 +7,10 @@ module Portal
   # del funcionamiento de la organización.
   class HistorialController < BaseController
     def index
+      # Sin ficha no hay historial. Pasa con una cuenta creada a mano o con la ficha borrada: sin
+      # esto era un 500 en la pantalla de inicio, que ahora pide este endpoint siempre.
+      return render json: { data: [] } if ficha.nil?
+
       dispensas = ficha.dispensaciones
                        .includes(items: { stock: :genetica })
                        .order(fecha_dispensacion: :desc, id: :desc)

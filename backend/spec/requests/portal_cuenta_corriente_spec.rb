@@ -8,7 +8,8 @@ RSpec.describe 'Portal — cuenta corriente del paciente', type: :request do
   include AuthHelpers
 
   let(:club) do
-    create(:club, features: { 'produccion_dispensa' => true, 'vista_paciente' => true })
+    create(:club, vista_paciente_activa: true,
+                  features: { 'produccion_dispensa' => true, 'vista_paciente' => true })
   end
   let(:admin)    { create(:user, :admin, club: club) }
   let(:paciente) { ActsAsTenant.with_tenant(club) { create(:paciente, club: club, created_by: admin) } }

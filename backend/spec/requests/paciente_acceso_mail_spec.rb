@@ -9,7 +9,7 @@ RSpec.describe 'La contraseña del paciente, por mail', type: :request do
   include AuthHelpers
 
   let(:club) do
-    create(:club, name: 'Mi Organización',
+    create(:club, name: 'Mi Organización', vista_paciente_activa: true,
                   features: { 'produccion_dispensa' => true, 'vista_paciente' => true, 'mailer' => true },
                   smtp_host: 'smtp.gmail.com', smtp_port: 587, smtp_user: 'club@gmail.com',
                   smtp_pass: 'x', smtp_from: 'club@gmail.com')

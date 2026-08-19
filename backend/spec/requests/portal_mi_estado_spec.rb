@@ -8,7 +8,8 @@ require 'rails_helper'
 RSpec.describe 'Portal — lo que hay que avisarle al paciente', type: :request do
   include AuthHelpers
 
-  let(:club) { create(:club, features: { 'produccion_dispensa' => true, 'vista_paciente' => true }) }
+  let(:club) { create(:club, vista_paciente_activa: true,
+                  features: { 'produccion_dispensa' => true, 'vista_paciente' => true }) }
   let(:admin) { create(:user, :admin, club: club) }
 
   def paciente!(**attrs)
@@ -87,5 +88,48 @@ RSpec.describe 'Portal — lo que hay que avisarle al paciente', type: :request 
                                   reprocann_vencimiento: 1.year.from_now.to_date))
 
     expect(datos['carnet_token']).to be_present
+  end
+
+  # ── La credencial ────────────────────────────────────────────────────────────────────────────
+  #
+  # Es lo primero del inicio y lo que el paciente muestra en la puerta. Hasta hoy vivía sólo en
+  # `/c/:token` —un link que le mandaron una vez— y el portal no la mostraba en ningún lado.
+  describe 'la credencial' do
+    it 'trae sus datos completos: acá está detrás de SU login, no es el carnet que reparte' do
+      c = entrar_como(paciente!(nombre: 'Juan', apellido: 'Gómez', dni: '30111222',
+                                reprocann_estado: 'activo', reprocann_numero: 'RP-9',
+                                reprocann_vencimiento: 8.months.from_now.to_date))['credencial']
+
+      # El endpoint público `/c/:token` manda "G." a propósito y ningún documento: es un link que
+      # la persona entrega. Este es su portal y ve lo suyo entero.
+      expect(c['apellido']).to eq('Gómez')
+      expect(c['dni']).to eq('30111222')
+      expect(c['reprocann_numero']).to eq('RP-9')
+      expect(c['habilitado']).to be(true)
+    end
+
+    # Que la tarjeta del paciente y el informe del auditor no puedan discrepar es el punto de
+    # reusar `Paciente.reprocann_categoria` en vez de recalcular acá.
+    it 'clasifica igual que el informe REPROCANN' do
+      vigente = entrar_como(paciente!(reprocann_estado: 'activo', reprocann_numero: 'RP-1',
+                                      reprocann_vencimiento: 6.months.from_now.to_date))
+      expect(vigente['credencial']['reprocann_categoria']).to eq('vigente')
+
+      vencido = entrar_como(paciente!(dni: '38222111', reprocann_estado: 'activo', reprocann_numero: 'RP-2',
+                                      reprocann_vencimiento: 3.days.ago.to_date))
+      expect(vencido['credencial']['reprocann_categoria']).to eq('vencido')
+      expect(vencido['credencial']['habilitado']).to be(false)
+
+      cerca = entrar_como(paciente!(dni: '38222333', reprocann_estado: 'activo', reprocann_numero: 'RP-3',
+                                    reprocann_vencimiento: 10.days.from_now.to_date))
+      expect(cerca['credencial']['reprocann_categoria']).to eq('por_vencer')
+      expect(cerca['credencial']['dias_para_vencer']).to eq(10)
+    end
+
+    it 'trae el token del carnet: es el QR que le escanean en la puerta' do
+      p = paciente!(reprocann_estado: 'activo', reprocann_numero: 'RP-1')
+
+      expect(entrar_como(p)['credencial']['carnet_token']).to eq(p.reload.carnet_token)
+    end
   end
 end

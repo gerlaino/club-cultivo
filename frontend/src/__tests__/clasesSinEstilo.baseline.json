@@ -128,10 +128,6 @@
     "ir__pie-firma",
     "ir__portada-club"
   ],
-  "views/IntegracionesView.vue": [
-    "int__check-label",
-    "int__log-info"
-  ],
   "views/LandingView.vue": [
     "ld__final"
   ],

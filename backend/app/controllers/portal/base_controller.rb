@@ -18,10 +18,21 @@ module Portal
     # —parece bien y no lo está: el 403 dice "no te alcanza el permiso" cuando lo que falta es
     # entrar, y `current_club` se resuelve sobre un usuario que no existe.
     before_action :authenticate_user!
-    before_action -> { require_feature!(:vista_paciente) }
+    before_action :require_portal_abierto!
     before_action :require_acceso_paciente!
 
     private
+
+    # Contratado Y abierto. La regla vive en `Club#portal_paciente_disponible?` y la comparte con
+    # el login (`User#rol_habilitado?`): el paciente ya no llega hasta acá con el portal cerrado,
+    # pero esta es la barrera de verdad —el login es la explicación en la puerta— y cubre el rato
+    # entre que el admin lo cierra y el paciente vuelve a pedir algo con la sesión abierta.
+    def require_portal_abierto!
+      return if current_club&.portal_paciente_disponible?
+
+      render json: { error: 'El portal de pacientes no está disponible en esta organización' },
+             status: :forbidden
+    end
 
     # Sólo el paciente. El admin que quiera ver cómo le queda esto a su gente se da de alta un
     # paciente de prueba y entra con él: es la única forma de ver lo mismo que ellos. Dejarlo

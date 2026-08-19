@@ -9,7 +9,7 @@ RSpec.describe 'La cuenta del portal, desde la ficha', type: :request do
   include AuthHelpers
 
   let(:club) do
-    create(:club, name: 'Mi Organización',
+    create(:club, name: 'Mi Organización', vista_paciente_activa: true,
                   features: { 'produccion_dispensa' => true, 'vista_paciente' => true })
   end
   let(:admin)    { create(:user, :admin, club: club) }

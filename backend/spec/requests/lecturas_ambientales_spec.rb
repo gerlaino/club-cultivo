@@ -3,7 +3,7 @@ require 'rails_helper'
 RSpec.describe 'LecturasAmbientales', type: :request do
   # Con el Portal del paciente contratado: el rol `paciente` necesita ese módulo para poder
   # loguearse, y sin él el ejemplo de abajo daría 401 en vez de probar que no ve las lecturas.
-  let(:club)       { create(:club, features: Club::FEATURES_POR_DEFECTO.merge('vista_paciente' => true)) }
+  let(:club)       { create(:club, vista_paciente_activa: true, features: Club::FEATURES_POR_DEFECTO.merge('vista_paciente' => true)) }
   let(:sala)       { create(:sala, club: club) }
   let(:admin)      { create(:user, :admin, club: club) }
   let(:cultivador) { create(:user, :cultivador, club: club) }

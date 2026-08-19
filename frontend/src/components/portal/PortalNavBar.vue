@@ -9,9 +9,9 @@
 
       <!-- Escritorio -->
       <nav class="pnb__nav" aria-label="Secciones">
-        <RouterLink v-for="l in DE_LA_ORG" :key="l.to" :to="l.to" class="pnb__link">{{ l.txt }}</RouterLink>
+        <RouterLink v-for="l in conCuenta" :key="l.to" :to="l.to" class="pnb__link">{{ l.txt }}</RouterLink>
         <span class="pnb__sep" aria-hidden="true"></span>
-        <RouterLink v-for="l in mias" :key="l.to" :to="l.to" class="pnb__link">{{ l.txt }}</RouterLink>
+        <RouterLink v-for="l in DEL_CLUB" :key="l.to" :to="l.to" class="pnb__link">{{ l.txt }}</RouterLink>
       </nav>
 
       <button class="pnb__ham" :aria-expanded="abierto" aria-label="Menú" @click="abierto = !abierto">
@@ -22,20 +22,27 @@
 
     <!-- Teléfono -->
     <nav v-if="abierto" class="pnb__movil" aria-label="Secciones">
-      <RouterLink v-for="l in DE_LA_ORG" :key="l.to" :to="l.to" class="pnb__mlink" @click="abierto = false">{{ l.txt }}</RouterLink>
+      <RouterLink v-for="l in conCuenta" :key="l.to" :to="l.to" class="pnb__mlink" @click="abierto = false">{{ l.txt }}</RouterLink>
       <div class="pnb__msep"></div>
-      <RouterLink v-for="l in mias" :key="l.to" :to="l.to" class="pnb__mlink" @click="abierto = false">{{ l.txt }}</RouterLink>
+      <RouterLink v-for="l in DEL_CLUB" :key="l.to" :to="l.to" class="pnb__mlink" @click="abierto = false">{{ l.txt }}</RouterLink>
+      <RouterLink to="/portal/cuenta" class="pnb__mlink" @click="abierto = false">Mis datos</RouterLink>
       <button class="pnb__msalir" @click="salir">Cerrar sesión</button>
     </nav>
   </header>
 </template>
 
 <script setup>
-// La barra separa dos cosas que no son lo mismo: lo que PUBLICA la organización y lo que es DEL
-// paciente. Sin esa línea en el medio, "Eventos" y "Mis retiros" parecen la misma clase de cosa.
+// La barra separa dos cosas que no son lo mismo: lo que es DEL PACIENTE y lo que PUBLICA la
+// organización. Sin esa línea en el medio, "Eventos" y "Mis retiros" parecen la misma clase de
+// cosa.
 //
-// "Cuenta corriente" aparece sólo si la organización se la abrió: a quien paga siempre al contado,
-// una sección con saldo cero le hace creer que debe algo.
+// Eran ocho entradas —cinco de ellas del boletín— y ahora son cuatro o cinco: lo suyo suelto, y
+// todo el boletín detrás de "Del club". Un portal de salud tiene pocas secciones; ocho links en la
+// barra hacen que ninguno se lea.
+//
+// "Mi cuenta" aparece sólo si la organización le abrió cuenta corriente: a quien paga siempre al
+// contado, una sección con saldo cero le hace creer que debe algo. Sus datos y su contraseña viven
+// en /portal/cuenta, que llega desde el menú del teléfono y desde el pie: se entra una vez.
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { storeToRefs } from 'pinia'
@@ -51,19 +58,19 @@ const { club } = storeToRefs(usePortalClubStore())
 const abierto = ref(false)
 const tieneCC = ref(false)
 
-const DE_LA_ORG = [
+// Lo suyo primero, y "Del club" al final: es el mismo orden que el inicio.
+const MIAS = [
   { to: '/portal',           txt: 'Inicio' },
-  { to: '/portal/geneticas', txt: 'Variedades' },
-  { to: '/portal/noticias',  txt: 'Novedades' },
-  { to: '/portal/eventos',   txt: 'Eventos' },
-  { to: '/portal/contacto',  txt: 'Contacto' },
+  { to: '/portal/mi-salud',  txt: 'Mi salud' },
+  { to: '/portal/historial', txt: 'Mis retiros' },
 ]
 
-const mias = computed(() => [
-  { to: '/portal/historial', txt: 'Mis retiros' },
-  ...(tieneCC.value ? [{ to: '/portal/cuenta-corriente', txt: 'Cuenta corriente' }] : []),
-  { to: '/portal/cuenta',    txt: 'Mi cuenta' },
+const conCuenta = computed(() => [
+  ...MIAS,
+  ...(tieneCC.value ? [{ to: '/portal/cuenta-corriente', txt: 'Mi cuenta' }] : []),
 ])
+
+const DEL_CLUB = [{ to: '/portal/del-club', txt: 'Del club' }]
 
 onMounted(async () => {
   try {
