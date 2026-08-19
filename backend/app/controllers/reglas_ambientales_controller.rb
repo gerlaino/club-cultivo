@@ -1,5 +1,9 @@
 class ReglasAmbientalesController < ApplicationController
   before_action :authenticate_user!
+  # La pantalla ya lo escondía sin el módulo (`FEATURE_POR_PREFIJO` del router) y el backend no:
+  # por API una organización sin IoT creaba reglas igual. La regla vivía en un solo lado, que es
+  # el que se saltea.
+  before_action -> { require_feature!(:iot) }
   before_action :require_admin!
   before_action :set_regla, only: [:show, :update, :destroy]
 

@@ -1,7 +1,8 @@
 require 'rails_helper'
 
 RSpec.describe 'ReglasAmbientales', type: :request do
-  let(:club)       { create(:club) }
+  # Con IoT: las reglas de ambiente son de ese módulo (ver `reglas_ambientales_modulo_spec`).
+  let(:club)       { create(:club, features: Club::FEATURES_POR_DEFECTO.merge('iot' => true)) }
   let(:sala)       { create(:sala, club: club) }
   let(:admin)      { create(:user, :admin, club: club) }
   let(:cultivador) { create(:user, :cultivador, club: club) }
