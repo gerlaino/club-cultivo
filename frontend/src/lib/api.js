@@ -247,6 +247,10 @@ export const updateReprocannRenovacion   = (pacienteId, id, payload) => api.put(
 export const deleteReprocannRenovacion   = (pacienteId, id) => api.delete(`/pacientes/${pacienteId}/reprocann_renovaciones/${id}`)
 
 export const listPacienteNotas  = (pacienteId) => api.get(`/pacientes/${pacienteId}/notas`);
+// Su cuenta del portal: crearla (los pacientes de antes no tienen) y darle una contraseña nueva.
+export const crearAccesoPaciente       = (id) => api.post(`/pacientes/${id}/acceso`)
+export const restablecerAccesoPaciente = (id) => api.post(`/pacientes/${id}/acceso/restablecer`)
+
 export const createPacienteNota = (pacienteId, c) => api.post(`/pacientes/${pacienteId}/notas`, { nota: { contenido: c } });
 export const deletePacienteNota = (notaId) => api.delete(`/paciente_notas/${notaId}`);
 // deprecated aliases

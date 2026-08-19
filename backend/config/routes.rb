@@ -216,6 +216,10 @@ Rails.application.routes.draw do
       # Admitir a alguien cargado desde el mostrador. Sólo admin y médico (ver Paciente).
       member do
         post :aprobar
+        # Su cuenta del portal: crearla (los pacientes de antes no tienen) y darle una contraseña
+        # nueva cuando la pierde. Mismo par que ya existe para el equipo.
+        post 'acceso',             action: :crear_acceso_portal
+        post 'acceso/restablecer', action: :restablecer_acceso_portal
       end
       resources :notas,        controller: "paciente_notas",    only: [:index, :create]
       resources :indicaciones, controller: "indicacion_medica", only: [:index, :create]

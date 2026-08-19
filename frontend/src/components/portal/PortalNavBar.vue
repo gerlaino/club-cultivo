@@ -18,6 +18,8 @@
         <RouterLink to="/portal/noticias" class="nav__link">Noticias</RouterLink>
         <RouterLink to="/portal/eventos" class="nav__link">Eventos</RouterLink>
         <RouterLink to="/portal/contacto" class="nav__link">Contacto</RouterLink>
+        <RouterLink to="/portal/cuenta" class="nav__link">Mi cuenta</RouterLink>
+        <button class="nav__salir" @click="salir">Salir</button>
       </div>
 
 
@@ -32,14 +34,27 @@
       <RouterLink to="/portal/noticias" class="nav__mobile-link" @click="open = false">Noticias</RouterLink>
       <RouterLink to="/portal/eventos" class="nav__mobile-link" @click="open = false">Eventos</RouterLink>
       <RouterLink to="/portal/contacto" class="nav__mobile-link" @click="open = false">Contacto</RouterLink>
+      <RouterLink to="/portal/cuenta" class="nav__mobile-link" @click="open = false">Mi cuenta</RouterLink>
+      <button class="nav__mobile-salir" @click="salir">Cerrar sesión</button>
     </div>
   </nav>
 </template>
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { usePortalClubStore } from '@/stores/portalClub'
+import { useAuthStore } from '@/stores/auth'
 import { storeToRefs } from 'pinia'
+
+const router = useRouter()
+
+// Sin esto el paciente no tenía cómo salir: el portal no comparte la barra de la organización,
+// que es donde vive el botón de cerrar sesión del resto de la app.
+async function salir() {
+  await useAuthStore().logOut()
+  router.push('/login')
+}
 
 const store = usePortalClubStore()
 store.fetchClub()
@@ -93,6 +108,16 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
 }
 .nav__link:hover { color: #e8f0e8; background: rgba(109,190,138,0.07); }
 .nav__link.router-link-active { color: #6dbe8a; background: rgba(109,190,138,0.08); }
+.nav__salir {
+  border: 1px solid rgba(109,190,138,0.2); background: none; color: rgba(180,200,183,0.7);
+  border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; margin-left: 4px;
+}
+.nav__salir:hover { color: #e8f0e8; border-color: rgba(109,190,138,0.4); }
+.nav__mobile-salir {
+  display: block; width: 100%; text-align: left; border: none; background: none;
+  color: rgba(180,200,183,0.5); font-size: 15px; padding: 12px 0; cursor: pointer;
+}
+.nav__mobile-salir:hover { color: #e8f0e8; }
 
 .nav__cta {
   background: rgba(109,190,138,0.1); border: 1px solid rgba(109,190,138,0.22);

@@ -15,7 +15,7 @@ import { getPacienteTimeline, getPacienteTurnos, updateAdminTurno, deleteAdminTu
 import {
   User, ShieldCheck, Pill, BookOpen, FileText, ClipboardList, Clock,
   Pencil, AlertTriangle, Info, Wallet, CreditCard, Mail, CalendarPlus,
-  CalendarDays, UserCheck, RotateCcw, X, ChevronDown, Check, MoreHorizontal, FileHeart
+  CalendarDays, UserCheck, RotateCcw, X, ChevronDown, Check, MoreHorizontal, FileHeart, KeyRound
 } from 'lucide-vue-next'
 import DsDropdown from '../design-system/components/Dropdown.vue'
 import { REPROCANN_ESTADOS } from '../composables/useSocioEditar.js'
@@ -27,6 +27,7 @@ import SocioTabCuentaCorriente from '../components/pacientes/SocioTabCuentaCorri
 import SocioTabCorreo          from '../components/pacientes/SocioTabCorreo.vue'
 import SocioTabHistoria        from '../components/pacientes/SocioTabHistoria.vue'
 import SocioTabNotas           from '../components/pacientes/SocioTabNotas.vue'
+import SocioTabPortal          from '../components/pacientes/SocioTabPortal.vue'
 import SocioEditarModal          from '../components/pacientes/SocioEditarModal.vue'
 import ModalAgendarTurnoMedico  from '../components/pacientes/ModalAgendarTurnoMedico.vue'
 import TurnoDetallePanel        from '../components/TurnoDetallePanel.vue'
@@ -301,6 +302,8 @@ const ALL_TABS = [
   { key: 'documentos',       label: 'Documentos',        icon: FileText,      roles: ['admin', 'medico', 'auditor', 'abogado'] },
   { key: 'timeline',         label: 'Timeline',          icon: Clock,         roles: ['admin', 'medico'] },
   { key: 'correo',           label: 'Correo',            icon: Mail,          roles: ['admin', 'supervisor'] },
+  // Su cuenta del portal. Sólo aparece si la organización tiene el módulo (ver TABS).
+  { key: 'portal',           label: 'Acceso al portal',  icon: KeyRound,      roles: ['admin', 'medico'] },
 ]
 
 
@@ -308,7 +311,13 @@ const TABS = computed(() => {
   const role = auth.user?.role
   // El dispensador entra a la ficha solo para dispensar: ve únicamente esa tab.
   if (role === 'dispensador') return ALL_TABS.filter(t => t.key === 'dispensaciones')
-  return ALL_TABS.filter(t => !t.roles || t.roles.includes(role))
+
+  return ALL_TABS.filter(t => {
+    if (t.roles && !t.roles.includes(role)) return false
+    // Sin el módulo no hay portal del que hablar: la tab no existe, no aparece vacía.
+    if (t.key === 'portal') return s.value?.acceso?.modulo === true
+    return true
+  })
 })
 
 // P1: tabs primarias (alta frecuencia) visibles; el resto va a un menú "Más".
@@ -765,6 +774,12 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
       <!-- ── Tab: Correo ── -->
       <div v-if="tabVisible('correo') && activeTab === 'correo'" class="sd__tab-content">
         <SocioTabCorreo :socio-id="socioId" :socio="s" @open-edit="editarOpen = true" />
+      </div>
+
+      <!-- ── Tab: Acceso al portal ── -->
+      <div v-if="tabVisible('portal') && activeTab === 'portal'" class="sd__tab-content">
+        <SocioTabPortal :socio-id="socioId" :nombre="s.nombre_completo" :acceso="s.acceso"
+                        @actualizado="store.fetchOne(socioId)" />
       </div>
 
     </template>

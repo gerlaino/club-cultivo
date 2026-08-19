@@ -719,6 +719,9 @@ const routes = [
       { path: 'eventos/:id',    name: 'portal-evento',    component: () => import('../views/portal/PortalEventoDetailView.vue') },
       { path: 'galeria',        name: 'portal-galeria',   component: () => import('../views/portal/PortalGaleriaView.vue') },
       { path: 'contacto',       name: 'portal-contacto',  component: () => import('../views/portal/PortalContactoView.vue') },
+      // Su cuenta: el usuario a la vista y el cambio de contraseña. Vive DENTRO del portal —
+      // `/perfil` está en el shell de administración y un paciente ahí ve una app que no es la suya.
+      { path: 'cuenta',         name: 'portal-cuenta',    component: () => import('../views/portal/PortalCuentaView.vue') },
     ],
   },
 

@@ -2,7 +2,8 @@ class PacientesController < ApplicationController
   before_action :authenticate_user!
   before_action -> { require_feature!(:produccion_dispensa) }
   before_action :check_pacientes_role!
-  before_action :set_paciente, only: [:show, :update, :destroy, :timeline, :subir_reprocann, :eliminar_reprocann, :enviar_mail, :mails_enviados, :aprobar]
+  before_action :set_paciente, only: [:show, :update, :destroy, :timeline, :subir_reprocann, :eliminar_reprocann, :enviar_mail, :mails_enviados, :aprobar,
+                                          :crear_acceso_portal, :restablecer_acceso_portal]
   # Hasta ahora `mailer` era una etiqueta que no controlaba nada: no había un solo
   # `require_feature!` ni chequeo en el frontend, así que el flag se podía apagar y los mails
   # seguían saliendo. Ahora que se vende aparte, la barrera va acá — el candado en el backend,
@@ -131,7 +132,44 @@ class PacientesController < ApplicationController
       forma_producto: ultima.stock&.forma_producto,
     } : nil
 
+    json['acceso'] = acceso_json(@paciente)
+
     render json: { data: json }
+  end
+
+  # POST /pacientes/:id/acceso — crearle la cuenta del portal a alguien que no la tiene.
+  #
+  # Hace falta porque el alta sólo la crea de ahora en más: todos los pacientes cargados antes de
+  # que existiera el portal no tienen ninguna, y sin esto no habría forma de dárselas más que
+  # borrarlos y volverlos a cargar.
+  def crear_acceso_portal
+    return unless autorizado_para_acceso?
+
+    resultado = Pacientes::Acceso.crear!(@paciente)
+    return render json: { errors: [resultado.error] }, status: :unprocessable_entity unless resultado.ok?
+
+    if resultado.password_inicial.blank?
+      return render json: { errors: ['Este paciente ya tiene cuenta. Usá "Restablecer contraseña".'] },
+                    status: :unprocessable_entity
+    end
+
+    render json: { data: acceso_json(@paciente.reload),
+                   credenciales: { email: resultado.user.email, password_inicial: resultado.password_inicial } },
+           status: :created
+  end
+
+  # POST /pacientes/:id/acceso/restablecer — contraseña nueva.
+  #
+  # La inicial se muestra UNA vez y no se guarda en claro en ningún lado, así que "me la olvidé"
+  # se resuelve generando otra. Es lo mismo que ya existe para el equipo.
+  def restablecer_acceso_portal
+    return unless autorizado_para_acceso?
+
+    resultado = Pacientes::Acceso.restablecer!(@paciente)
+    return render json: { errors: [resultado.error] }, status: :unprocessable_entity unless resultado.ok?
+
+    render json: { data: acceso_json(@paciente.reload),
+                   credenciales: { email: resultado.user.email, password_inicial: resultado.password_inicial } }
   end
 
   def subir_reprocann
@@ -576,6 +614,41 @@ class PacientesController < ApplicationController
   # que se descifran al serializar.
   def paciente_json(paciente)
     paciente.as_json(only: campos_visibles, methods: [:nombre_completo])
+  end
+
+  # Su cuenta del portal, para poder verla en la ficha. Sin esto la contraseña inicial se mostraba
+  # una vez al dar el alta y después no había NINGÚN lugar donde ver siquiera cuál era el usuario.
+  #
+  # `activo` es el mismo interruptor que ya le impide dispensar: si el paciente está desactivado,
+  # la cuenta existe pero no entra, y la ficha tiene que decirlo o parece que el portal se rompió.
+  def acceso_json(paciente)
+    return { modulo: false } unless current_user.club.feature?(:vista_paciente)
+
+    user = paciente.user
+    {
+      modulo:      true,
+      tiene:       user.present?,
+      email:       user&.email,
+      activo:      paciente.es_paciente?,
+      # Cómo le quedaría el usuario si se le crea: se muestra antes de crear la cuenta.
+      sugerido:    user ? nil : Pacientes::Acceso.previsualizar(paciente),
+      puede_gestionar: Paciente::ROLES_APRUEBAN.include?(current_user.role),
+    }
+  end
+
+  # La cuenta la maneja quien admite pacientes. El mostrador crea altas pero no reparte accesos:
+  # es la misma línea que ya separa cargar una solicitud de aprobarla.
+  def autorizado_para_acceso?
+    unless current_user.club.feature?(:vista_paciente)
+      render json: { errors: ['Tu organización no tiene el Portal del paciente.'] }, status: :forbidden
+      return false
+    end
+    unless Paciente::ROLES_APRUEBAN.include?(current_user.role)
+      render json: { errors: ['Sólo un administrador o el médico puede gestionar el acceso al portal.'] },
+             status: :forbidden
+      return false
+    end
+    true
   end
 
   # El alta quedó pendiente: alguien tiene que aprobarla para que esa persona pueda retirar.

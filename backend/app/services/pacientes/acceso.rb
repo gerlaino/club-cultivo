@@ -18,6 +18,14 @@ module Pacientes
 
     def self.crear!(paciente) = new(paciente).crear!
 
+    # Le da una contraseña nueva a quien ya tiene cuenta. Es la única forma de recuperarla: la
+    # inicial se muestra una vez y no se guarda en claro en ningún lado.
+    def self.restablecer!(paciente) = new(paciente).restablecer!
+
+    # Cómo se vería su usuario si se le creara la cuenta. Sirve para mostrarlo ANTES de crearla,
+    # así quien la crea sabe qué le va a quedar.
+    def self.previsualizar(paciente) = email_base(paciente, paciente.club)
+
     def initialize(paciente)
       @paciente = paciente
       @club     = paciente.club
@@ -42,6 +50,15 @@ module Pacientes
       return Resultado.new(error: user.errors.full_messages.to_sentence) unless user.save
 
       @paciente.update_column(:user_id, user.id)
+      Resultado.new(user: user, password_inicial: password)
+    end
+
+    def restablecer!
+      user = @paciente.user
+      return Resultado.new(error: 'Este paciente todavía no tiene cuenta.') if user.nil?
+
+      password = User.password_temporal
+      user.update!(password: password, password_confirmation: password)
       Resultado.new(user: user, password_inicial: password)
     end
 
