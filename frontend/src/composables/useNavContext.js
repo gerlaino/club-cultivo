@@ -105,7 +105,7 @@ export const NAV_GROUPS = [
       // Sedes NO va acá: tiene su propia entrada en el menú lateral (es un cockpit operativo, no
       // una pantalla de ajustes). Duplicarla hacía que el mismo destino se viera en dos lugares.
       { to: '/alertas-configuracion', label: 'Configuración de alertas' },
-      { to: '/web', label: 'Sitio web' },
+      { to: '/configuracion/portal', label: 'Portal del paciente', feature: 'vista_paciente' },
       { to: '/integraciones', label: 'Integraciones' },
       { to: '/configuracion/papelera', label: 'Papelera' },
     ],

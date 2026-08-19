@@ -9,7 +9,12 @@ require 'rails_helper'
 RSpec.describe 'Portal del paciente', type: :request do
   include AuthHelpers
 
-  let(:club)     { create(:club, features: { 'produccion_dispensa' => true, 'vista_paciente' => true }) }
+  # Con todos los módulos: los roles que se prueban abajo necesitan el suyo para poder loguearse
+  # (`check_rol_habilitado!`), y sin eso el spec daría 401 y parecería que el candado del portal
+  # funciona cuando en realidad nunca llegó a evaluarse.
+  let(:club) do
+    create(:club, features: { 'cultivo' => true, 'produccion_dispensa' => true, 'vista_paciente' => true })
+  end
   let(:paciente) { create(:user, :paciente, club: club) }
 
   RUTAS = %w[club geneticas noticias eventos galeria].freeze
@@ -70,20 +75,18 @@ RSpec.describe 'Portal del paciente', type: :request do
     end
   end
 
-  # No es una sección de operación: quien atiende el mostrador o cultiva no entra acá.
+  # No es una sección de operación, y tampoco una previsualización: es el área DEL paciente.
+  # El admin que quiera ver cómo le queda se da de alta un paciente de prueba.
   describe 'con otro rol de la organización' do
-    it 'el dispensador no entra' do
-      sign_in_as(create(:user, :dispensador, club: club))
-      entrar('geneticas')
+    # El super admin no aparece acá: `block_super_admin_sin_contexto!` lo frena antes, con un 409
+    # que explica qué le falta. Sumarlo a esta lista probaría ese guard, no éste.
+    %i[dispensador admin cultivador medico].each do |rol|
+      it "el #{rol} no entra" do
+        sign_in_as(create(:user, rol, club: club))
+        entrar('geneticas')
 
-      expect(response).to have_http_status(:forbidden)
-    end
-
-    it 'el admin sí: necesita ver lo que va a ver su gente antes de prenderlo' do
-      sign_in_as(create(:user, :admin, club: club))
-      entrar('geneticas')
-
-      expect(response).to have_http_status(:ok), response.body
+        expect(response).to have_http_status(:forbidden)
+      end
     end
   end
 end

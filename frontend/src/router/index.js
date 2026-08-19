@@ -476,6 +476,7 @@ const routes = [
       { path: 'equipo',     name: 'config-equipo',      component: () => import("../views/UsuariosView.vue") },
       { path: 'suscripcion',name: 'config-suscripcion', component: () => import("../views/SuscripcionTabView.vue") },
       { path: 'correo',     name: 'config-correo',      component: () => import("../views/CorreoView.vue") },
+      { path: 'portal',     name: 'config-portal',      component: () => import("../views/admin/PortalPacienteConfigView.vue") },
       { path: 'papelera',   name: 'config-papelera',    component: () => import("../views/admin/PapeleraView.vue") },
     ],
   },
@@ -517,13 +518,9 @@ const routes = [
     },
   },
 
-  // Web publica
-  {
-    path: '/web',
-    name: 'web-publica-panel',
-    component: () => import('../views/WebPublicaView.vue'),
-    meta: { requiresAuth: true },
-  },
+  // Se llamaba "Sitio web" y vivía suelto en /web. Es la configuración del portal del paciente
+  // y ahora vive con las demás, en Configuración. El redirect queda por los enlaces viejos.
+  { path: '/web', redirect: '/configuracion/portal' },
 
   // Informe REPROCANN
   {
@@ -1111,6 +1108,7 @@ const FEATURE_POR_PREFIJO = [
   ['/configuracion/correo', 'mailer'],
   ['/ariccame',             'ariccame'],
   ['/portal',               'vista_paciente'],
+  ['/configuracion/portal', 'vista_paciente'],
 ]
 
 const MODULO_LABEL = {

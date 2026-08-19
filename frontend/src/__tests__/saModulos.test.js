@@ -46,7 +46,7 @@ describe('SAModulos', () => {
         falta: 'Falta cargar la API key de Pulse' },
     ],
     incluidos: [{ clave: 'medico', label: 'Módulo médico', incluido_en: 'produccion_dispensa' }],
-    en_construccion: [{ clave: 'vista_paciente', label: 'Vista del paciente' }],
+    en_construccion: [{ clave: 'vista_paciente', label: 'Portal del paciente' }],
     // El tope se cuenta en CRÉDITOS; `llamadas` es informativo. Van distintos a propósito en el
     // fixture: si la pantalla mezclara las unidades, estos números lo delatan.
     ia_uso: { llamadas: 143, creditos: 210, restantes: 290, tope: 500, costo_usd: 4.21,
@@ -154,7 +154,7 @@ describe('SAModulos', () => {
   it('lo que está en construcción se lista, para que nadie lo prometa', () => {
     const w = montar()
 
-    expect(w.text()).toContain('Vista del paciente')
+    expect(w.text()).toContain('Portal del paciente')
     expect(w.text()).toContain('en construcción')
   })
 })

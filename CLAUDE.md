@@ -304,7 +304,7 @@ tope — si contaran distinto, el panel diría "1 de 1" con tres sedes cargadas.
 
 **Los módulos viven en tres cajones** (`Club`): `SUITES` contratables · `INCLUIDOS_EN_SUITE`
 (**sólo el médico**; el correo salió a `ADDONS` el 11-ago) · `ADDONS` (incluye ahora **Delivery
-y Correo**) · `EN_CONSTRUCCION` (Vista del paciente, no activable ni por API).
+y Correo**) · `EN_CONSTRUCCION` (Portal del paciente, no activable ni por API hasta que el paciente pueda entrar).
 **`Club#estado_modulo` es la pieza clave**: prendido ≠ andando, y devuelve `andando` /
 `falta_config` / `apagado` con `falta_para_funcionar` explicando qué le falta a ESA organización.
 

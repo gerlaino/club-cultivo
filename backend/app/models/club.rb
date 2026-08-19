@@ -280,10 +280,17 @@ class Club < ApplicationRecord
   # se pueden activar: prenderlos no haría nada y prometerle al club algo que no está es peor
   # que no ofrecerlo. Distinto de ADDONS_INCOMPLETOS, que funcionan a medias y sólo avisan.
   EN_CONSTRUCCION = {
+    # Un solo nombre en todos lados: "Portal del paciente". La pantalla donde el admin lo
+    # configura se llamaba "Sitio web", el módulo "Vista del paciente" y el proyecto
+    # "web-publica" — tres nombres para lo mismo, y nadie sabía si eran una cosa o tres.
+    #
+    # Es un add-on de verdad: una organización de investigación no tiene pacientes a quienes
+    # mostrarles nada. Pasa a ADDONS cuando el paciente pueda entrar con su documento; hasta
+    # entonces se podría contratar algo a lo que nadie puede loguearse.
     'vista_paciente' => {
-      label: 'Vista del paciente',
-      desc:  'Qué ve el paciente cuando entra: su carnet, sus dispensaciones y el sitio de la organización.',
-      requiere: 'En construcción — todavía no se puede activar.',
+      label: 'Portal del paciente',
+      desc:  'Lo que ve el paciente cuando entra: su carnet, sus dispensaciones, y el catálogo, las novedades y los eventos que publica la organización.',
+      requiere: 'En construcción — falta el ingreso del paciente con su documento.',
     },
   }.freeze
 

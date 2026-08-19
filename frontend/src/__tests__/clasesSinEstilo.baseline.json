@@ -203,9 +203,6 @@
   "views/UsuariosView.vue": [
     "uv__header-left"
   ],
-  "views/WebPublicaView.vue": [
-    "wpv__section"
-  ],
   "views/admin/AdminPesajesManicuraView.vue": [
     "apm-cont--new"
   ],

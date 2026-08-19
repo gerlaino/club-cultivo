@@ -4,17 +4,9 @@
     <!-- Header -->
     <div class="wpv__header">
       <div>
-        <h1 class="wpv__title">Web pública</h1>
-        <p class="wpv__subtitle">Gestioná el contenido de la web de tu organización</p>
+        <h1 class="wpv__title">Portal del paciente</h1>
+        <p class="wpv__subtitle">Qué ve tu gente cuando entra: variedades, novedades y eventos</p>
       </div>
-      <a v-if="webUrl" :href="webUrl" target="_blank" class="wpv__preview-btn">
-        <i class="bi bi-box-arrow-up-right"></i>
-        Ver web
-      </a>
-      <span v-else class="wpv__preview-btn wpv__preview-btn--disabled" title="Configurá VITE_PUBLIC_WEB_URL en el deploy">
-        <i class="bi bi-box-arrow-up-right"></i>
-        Ver web
-      </span>
     </div>
 
     <!-- Tabs -->
@@ -30,8 +22,8 @@
     <div v-if="activeTab === 'geneticas'" class="wpv__section">
       <div class="wpv__section-header">
         <div>
-          <h2 class="wpv__section-title">Variedades visibles en la web</h2>
-          <p class="wpv__section-sub">Activá las genéticas que querés mostrar en la web pública de la organización.</p>
+          <h2 class="wpv__section-title">Variedades que ve el paciente</h2>
+          <p class="wpv__section-sub">Activá las genéticas que querés mostrarle a tu gente en su portal.</p>
         </div>
       </div>
       <div v-if="loadingGeneticas" class="wpv__loading"><DsSpinner :size="60" /></div>
@@ -41,7 +33,7 @@
           <span>Tipo</span>
           <span>THC / CBD</span>
           <span>Disp. cultivo</span>
-          <span>Visible web</span>
+          <span>La ve el paciente</span>
         </div>
         <div v-for="g in geneticas" :key="g.id" class="wpv__table-row"
              :class="{ 'wpv__table-row--active': g.visible_paciente }">
@@ -58,7 +50,7 @@
           </div>
           <div class="wpv__toggle-col">
             <button class="wpv__toggle" :class="{ 'wpv__toggle--on': g.visible_paciente }"
-                    @click="toggleVisibleWeb(g)" :disabled="savingId === g.id">
+                    @click="toggleVisiblePaciente(g)" :disabled="savingId === g.id">
               <span class="wpv__toggle-thumb"></span>
             </button>
           </div>
@@ -196,16 +188,16 @@
                     placeholder="Lunes a viernes 10-18hs..."></textarea>
         </div>
         <div class="wpv__config-field wpv__config-field--full">
-          <label class="wpv__label">Estado de la web</label>
+          <label class="wpv__label">Estado del portal</label>
           <div class="wpv__web-status-card" :class="{ 'wpv__web-status-card--on': configForm.vista_paciente_activa }">
             <div class="wpv__web-status-info">
               <div class="wpv__web-status-dot" :class="{ 'wpv__web-status-dot--on': configForm.vista_paciente_activa }"></div>
               <div>
                 <div class="wpv__web-status-label">
-                  {{ configForm.vista_paciente_activa ? 'Web activa y visible al público' : 'Web desactivada' }}
+                  {{ configForm.vista_paciente_activa ? 'Portal abierto' : 'Portal cerrado' }}
                 </div>
                 <div class="wpv__web-status-sub">
-                  {{ configForm.vista_paciente_activa ? 'Los visitantes pueden ver tu sitio web.' : 'Tu sitio no es accesible públicamente.' }}
+                  {{ configForm.vista_paciente_activa ? 'Tus pacientes ven esta sección al entrar con su cuenta.' : 'Tus pacientes no ven esta sección.' }}
                 </div>
               </div>
             </div>
@@ -265,7 +257,7 @@
                       <div>
                         <div class="wpv__label" style="margin-bottom:0">Publicar noticia</div>
                         <div style="font-size:12px;color:#6b8f71">
-                          {{ formNoticia.publicada ? 'Visible en la web pública' : 'Guardada como borrador' }}
+                          {{ formNoticia.publicada ? 'La ve el paciente' : 'Guardada como borrador' }}
                         </div>
                       </div>
                     </div>
@@ -361,7 +353,7 @@
                       <div>
                         <div class="wpv__label" style="margin-bottom:0">Evento activo</div>
                         <div style="font-size:12px;color:#6b8f71">
-                          {{ formEvento.activo ? 'Visible en la web pública' : 'Oculto para los visitantes' }}
+                          {{ formEvento.activo ? 'La ve el paciente' : 'No la ve el paciente' }}
                         </div>
                       </div>
                     </div>
@@ -410,24 +402,17 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { logger } from '../utils/logger.js'
-import { useClubStore } from '../stores/club'
+import { logger } from '../../utils/logger.js'
+import { useClubStore } from '../../stores/club'
 import { storeToRefs } from 'pinia'
-import api from '../lib/api'
-import { useConfirm } from '../composables/useConfirm.js'
-import EmptyState from '../components/ui/EmptyState.vue'
-import DsSpinner from '../design-system/components/Spinner.vue'
+import api from '../../lib/api'
+import { useConfirm } from '../../composables/useConfirm.js'
+import EmptyState from '../../components/ui/EmptyState.vue'
+import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const { confirm } = useConfirm()
 const clubStore = useClubStore()
 const { data: club } = storeToRefs(clubStore)
-const webUrl = computed(() => {
-  if (import.meta.env.VITE_PUBLIC_WEB_URL) return import.meta.env.VITE_PUBLIC_WEB_URL
-  const slug = club.value?.slug
-  if (slug) return `https://${slug}.clubcultivo.app`
-  return null
-})
-
 const activeTab = ref('geneticas')
 const tabs = [
   { key: 'geneticas', label: 'Variedades',   icon: 'bi-diagram-3'      },
@@ -528,7 +513,7 @@ function onDropEvento(e) {
   eventoImgPreview.value = URL.createObjectURL(file)
 }
 
-async function toggleVisibleWeb(g) {
+async function toggleVisiblePaciente(g) {
   savingId.value = g.id
   try {
     const { data } = await api.patch(`/geneticas/${g.id}`, { genetica: { visible_paciente: !g.visible_paciente } })
@@ -690,6 +675,7 @@ onMounted(async () => {
 .wpv__tab:hover { color: #1b5e20; }
 .wpv__tab--active { color: #1b5e20; font-weight: 500; border-bottom-color: #1b5e20; }
 
+.wpv__section { padding-bottom: 2rem; }
 .wpv__section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
 .wpv__section-title { font-size: 16px; font-weight: 600; color: #1a2e1b; margin-bottom: 4px; }
 .wpv__section-sub { font-size: 13px; color: #6b8f71; margin: 0; }

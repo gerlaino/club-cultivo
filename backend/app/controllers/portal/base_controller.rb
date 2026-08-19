@@ -23,12 +23,13 @@ module Portal
 
     private
 
-    # El paciente ve lo suyo; el admin entra para poder PREVISUALIZAR lo que va a ver su gente
-    # antes de prenderlo. Nadie más: esto no es una vista de operación.
-    ROLES = %w[paciente admin].freeze
+    # Sólo el paciente. El admin que quiera ver cómo le queda esto a su gente se da de alta un
+    # paciente de prueba y entra con él: es la única forma de ver lo mismo que ellos. Dejarlo
+    # entrar con su propio usuario mostraba una previsualización parecida pero no igual —y una
+    # previsualización que miente es peor que no tenerla.
+    ROLES = %w[paciente].freeze
 
     def require_acceso_paciente!
-      return if current_user.super_admin?
       return if ROLES.include?(current_user.role.to_s)
 
       render json: { error: 'Esta sección es del área de pacientes' }, status: :forbidden
