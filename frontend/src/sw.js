@@ -1,6 +1,6 @@
-import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching'
+import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from 'workbox-precaching'
 import { clientsClaim } from 'workbox-core'
-import { registerRoute } from 'workbox-routing'
+import { registerRoute, NavigationRoute } from 'workbox-routing'
 import { NetworkFirst } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
 import { CacheableResponsePlugin } from 'workbox-cacheable-response'
@@ -21,6 +21,25 @@ clientsClaim()
 // navegador siempre lo pide a la red y el nombre cambia en el mismo deploy.
 precacheAndRoute(self.__WB_MANIFEST.filter((e) => !/manifest\.webmanifest$/.test(e.url)))
 cleanupOutdatedCaches()
+
+// ── Navegación: el shell sale del caché ───────────────────────────────────────
+//
+// Sin esto la PWA instalada NO ABRÍA sin internet. El motivo: `precacheAndRoute` guarda
+// `index.html`, pero una navegación a /m, /lotes o /mnc/pendientes no matchea esa entrada —
+// workbox prueba `/m.html` y `/m/index.html`, que no existen— así que salía a la red y moría en la
+// pantalla de error del navegador. Y `start_url` del manifest es `/m`: abrir la app instalada sin
+// señal mostraba el dinosaurio de Chrome, ni siquiera la app diciendo que no hay conexión.
+//
+// En producción esto lo resuelve el servidor (`get '*path' => spa_fallback` en routes.rb). Offline
+// no hay servidor, y es justamente cuando hace falta.
+//
+// El denylist son las rutas que NO sirve la SPA: la API, los adjuntos de ActiveStorage —abrir un
+// PDF de prescripción es una navegación—, el panel de Sidekiq, el cable y el health check. Sin
+// excluirlas, offline se les devolvería el HTML de la app en vez de fallar, que es peor: parece
+// que anduvo.
+registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html'), {
+  denylist: [/^\/api\//, /^\/rails\//, /^\/sidekiq/, /^\/cable/, /^\/up$/],
+}))
 
 // Network-first para la API.
 // VITE_API_URL puede ser absoluta (https://api…) o relativa (/api, mismo origen).

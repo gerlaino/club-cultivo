@@ -343,10 +343,11 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { ChevronLeft, Scissors, Leaf, Scale, Send, X, RefreshCw, RotateCw, Package, Plus, CheckCircle, Undo2, Trash2 } from 'lucide-vue-next'
 import {
-  getLote, listPlants, createPesajeManicura, registrarDirectoManicura, listStocks, listSedes,
+  getLote, listPlants, registrarDirectoManicura, listStocks, listSedes,
   listPesajesManicura, enviarPesajeManicura, deletePesajeManicura, reabrirPesajeManicura,
   devolverManicura, reevaluarManicura,
 } from '../../lib/api.js'
+import { registrarPesajeManicuraOffline } from '../../lib/offlineApi.js'
 import { useToast } from '../../composables/useToast.js'
 import { useManicuraJornada } from '../../composables/useManicuraJornada.js'
 import { useConfirm } from '../../composables/useConfirm.js'
@@ -662,7 +663,12 @@ async function submitBatch() {
   savingBatch.value = true
   modalError.value  = ''
   try {
-    const res = await registrarConJornada(id, (extra) => createPesajeManicura(id, {
+    // Offline-aware: la manicura está parada frente a la balanza y ya pesó. Sin cola, un corte de
+    // señal devolvía "Error al registrar" y el número sólo sobrevivía mientras no cerrara el modal.
+    // El pesaje NO genera stock —queda esperando que el admin lo confirme—, así que encolarlo es
+    // seguro: esa confirmación es la red que atrapa un duplicado. Distinto de dispensar, que sí
+    // mueve stock y por eso quedó afuera.
+    const res = await registrarConJornada(id, (extra) => registrarPesajeManicuraOffline(id, {
       plant_ids:    batchSelIds.value,
       peso_total_g: batchForm.value.peso_seco_g,
       notas:        batchForm.value.notas || undefined,
@@ -670,7 +676,8 @@ async function submitBatch() {
       ...extra,
     }))
     if (!res) return // la manicura canceló → dejar el modal abierto
-    toast.success(`Lote ${lote.value.codigo} — pesaje enviado a confirmar`)
+    if (res.queued) toast.warning(`Sin señal — pesaje guardado en el teléfono, se envía solo al reconectar`)
+    else            toast.success(`Lote ${lote.value.codigo} — pesaje enviado a confirmar`)
     cerrarModal()
     await cargar()
   } catch (e) {

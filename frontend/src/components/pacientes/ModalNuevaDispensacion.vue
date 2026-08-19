@@ -5,8 +5,7 @@ import { useToast } from '../../composables/useToast.js'
 import { useAuthStore } from '../../stores/auth.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
-import { createReserva, entregarReserva, listStocks, listEntregadores } from '../../lib/api.js'
-import { dispensarOffline } from '../../lib/offlineApi.js'
+import { createDispensacion, createReserva, entregarReserva, listStocks, listEntregadores } from '../../lib/api.js'
 
 const props = defineProps({
   modelValue:     { type: Boolean, required: true },
@@ -528,14 +527,19 @@ async function handleSubmit() {
       payload.contacto_telefono = form.value.contacto_telefono || undefined
       payload.notas_envio       = form.value.notas_envio || undefined
     }
-    const res = await dispensarOffline(props.socioId, payload)
+    await createDispensacion(props.socioId, payload)
     cerrar()
-    toast[res?.queued ? 'warning' : 'success'](
-      res?.queued ? 'Dispensación guardada localmente — se enviará al reconectarse.' : 'Dispensación registrada'
-    )
+    toast.success('Dispensación registrada')
     emit('saved')
   } catch (e) {
-    const msg = e.response?.data?.errors?.[0] || e.response?.data?.error || 'Error al guardar'
+    // SIN CONEXIÓN NO SE DISPENSA. Antes se encolaba y se le decía "guardada localmente — se
+    // enviará al reconectarse", descontando el stock de una caché local que puede estar vieja: dos
+    // dispensadores sin señal entregaban el mismo gramo y el sobregiro aparecía recién al
+    // reconectar, con la mercadería ya afuera. Es la única escritura de la app que mueve stock y
+    // plata a la vez, así que se prefiere no poder dispensar antes que dispensar mal.
+    const msg = !e.response
+      ? 'Sin conexión: la dispensación NO se registró. Esperá a tener señal y volvé a intentar.'
+      : (e.response?.data?.errors?.[0] || e.response?.data?.error || 'Error al guardar')
     formError.value = msg
     toast.error(msg)
   } finally { saving.value = false }

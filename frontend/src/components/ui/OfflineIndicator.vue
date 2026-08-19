@@ -1,11 +1,32 @@
 <script setup>
+// El cartel de "sin conexión". Decía **"los registros se guardan localmente"**, y eso es cierto
+// sólo para TRES cosas: dispensar, registrar ambiente y las entregas del repartidor. Para todo lo
+// demás —el pesaje del manicura, una tarea, la edición de un lote— es falso: la request falla y no
+// queda nada. Un manicura sin señal leía esa promesa, cargaba el pesaje, le fallaba y se iba
+// pensando que había quedado guardado.
+//
+// Por eso el cartel **dejó de prometer**. Dice dos cosas que siempre son verdad: que no hay
+// conexión, y cuántas cosas hay esperando irse. Qué se guarda y qué no lo dice cada pantalla, que
+// es la única que lo sabe: el modal de dispensación avisa "guardada localmente", el repartidor ve
+// su contador. Una lista de excepciones acá arriba sería la misma regla escrita en dos lugares, y
+// se desincronizaría con el primer flujo que se sume o se saque.
+//
+// Cuenta las DOS colas: la genérica (`syncQueue`, que llena `lib/offlineApi.js`) y la de entregas,
+// que vive en su propio localStorage. Contando sólo la primera, el repartidor no veía nada fuera
+// de su pantalla.
+import { computed } from 'vue'
 import { useNetwork } from '../../composables/useNetwork.js'
 import { useOfflineSync } from '../../composables/useOfflineSync.js'
+import { useEntregasOffline } from '../../composables/useEntregasOffline.js'
 import { useSyncQueueStore } from '../../stores/syncQueue.js'
 
-const { isOnline }       = useNetwork()
+const { isOnline }              = useNetwork()
 const { syncing, procesarCola } = useOfflineSync()
-const queue              = useSyncQueueStore()
+const queue                     = useSyncQueueStore()
+const { pendientes: entregas }  = useEntregasOffline()
+
+// Lo que existe de verdad esperando irse al servidor.
+const guardados = computed(() => queue.total + entregas.value.length)
 </script>
 
 <template>
@@ -13,17 +34,20 @@ const queue              = useSyncQueueStore()
   <Transition name="oi-slide">
     <div v-if="!isOnline" class="oi oi--offline">
       <i class="bi bi-wifi-off"></i>
-      <span>Sin conexión — los registros se guardan localmente</span>
+      <span v-if="guardados">
+        Sin conexión — {{ guardados }} sin enviar, se mandan solos al volver la señal
+      </span>
+      <span v-else>Sin conexión</span>
     </div>
   </Transition>
 
   <!-- Con conexión y hay pendientes -->
   <Transition name="oi-slide">
-    <div v-if="isOnline && queue.total > 0" class="oi oi--pending">
+    <div v-if="isOnline && guardados > 0" class="oi oi--pending">
       <i v-if="!syncing" class="bi bi-arrow-repeat"></i>
       <span v-if="!syncing" class="oi-spin"><i class="bi bi-arrow-clockwise"></i></span>
       <span>
-        {{ syncing ? 'Sincronizando…' : `${queue.total} pendiente${queue.total > 1 ? 's' : ''}` }}
+        {{ syncing ? 'Sincronizando…' : `${guardados} sin enviar` }}
       </span>
       <button v-if="!syncing && queue.fallidos.length" class="oi__retry" @click="procesarCola">
         Reintentar
