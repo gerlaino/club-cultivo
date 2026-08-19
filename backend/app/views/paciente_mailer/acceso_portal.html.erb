@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; margin: 0; padding: 0; color: #0f172a; }
+    .wrapper { max-width: 600px; margin: 32px auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+    .header { background: #1b5e20; padding: 28px 32px; }
+    .header-club { color: #a5d6a7; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; margin: 0 0 6px; }
+    .header-title { color: #fff; font-size: 20px; font-weight: 700; margin: 0; line-height: 1.3; }
+    .body { padding: 32px; font-size: 15px; color: #334155; line-height: 1.7; }
+    .cred { background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 10px; padding: 18px 20px; margin: 22px 0; }
+    .cred-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .07em; color: #64748b; font-weight: 700; margin-bottom: 2px; }
+    .cred-val { font-family: 'SFMono-Regular', Menlo, Consolas, monospace; font-size: 16px; color: #0f172a; word-break: break-all; }
+    .cred-val--big { font-size: 20px; font-weight: 700; letter-spacing: .04em; }
+    .cred + .cred { margin-top: 0; }
+    .btn { display: inline-block; background: #1b5e20; color: #fff !important; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 15px; }
+    .nota { font-size: 13px; color: #64748b; line-height: 1.6; margin-top: 26px; }
+    .footer { background: #f8fafc; padding: 16px 32px; text-align: center; font-size: 12px; color: #94a3b8; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <p class="header-club">🌿 <%= @club.name %></p>
+      <p class="header-title"><%= @nueva ? 'Tu nueva contraseña' : 'Ya podés entrar' %></p>
+    </div>
+
+    <div class="body">
+      <p>Hola <%= @paciente.nombre %>,</p>
+
+      <% if @nueva %>
+        <p>Generamos una contraseña nueva para tu cuenta. La anterior dejó de funcionar.</p>
+      <% else %>
+        <p>
+          Te creamos una cuenta para que puedas entrar y ver lo tuyo: tus retiros, las novedades
+          y los eventos de <%= @club.name %>.
+        </p>
+      <% end %>
+
+      <div class="cred">
+        <div class="cred-lbl">Usuario</div>
+        <div class="cred-val"><%= @usuario %></div>
+      </div>
+      <div class="cred">
+        <div class="cred-lbl">Contraseña</div>
+        <div class="cred-val cred-val--big"><%= @password %></div>
+      </div>
+
+      <p><a href="<%= @portal_url %>" class="btn">Entrar</a></p>
+
+      <p class="nota">
+        Es una contraseña temporal: cuando entres, cambiala por una tuya desde
+        <strong>Mi cuenta</strong>. Si no pediste esto, avisale a <%= @club.name %>.
+      </p>
+    </div>
+
+    <div class="footer">
+      <%= @club.name %>
+    </div>
+  </div>
+</body>
+</html>

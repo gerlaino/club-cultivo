@@ -25,8 +25,13 @@
         El paciente está desactivado en la organización, así que su cuenta no entra al portal.
         Se reactiva desde <strong>Datos</strong>, con el mismo interruptor que le permite retirar.
       </p>
-      <p v-else class="stp__nota">
-        La contraseña no se puede consultar: se muestra una sola vez. Si la perdió, generá una nueva.
+      <p v-else-if="acceso.mail_posible" class="stp__nota">
+        La contraseña no se guarda en ningún lado. Si la perdió, generá una nueva: le llega por mail
+        y también te la mostramos acá para pasársela.
+      </p>
+      <p v-else class="stp__nota stp__nota--warn">
+        La contraseña no se guarda en ningún lado, y a este paciente <strong>no se la podemos mandar
+        por mail</strong>: {{ acceso.mail_falta }} Si la perdió, generá una nueva y pasásela vos.
       </p>
 
       <div v-if="acceso.puede_gestionar" class="stp__acts">
@@ -42,6 +47,10 @@
       <p class="stp__nota">
         Todavía no tiene cuenta. La reciben los pacientes que se dan de alta desde que existe el
         portal; a los de antes hay que crearla acá.
+      </p>
+      <p v-if="acceso && !acceso.mail_posible" class="stp__nota stp__nota--warn">
+        La contraseña <strong>no se le va a poder mandar por mail</strong>: {{ acceso.mail_falta }}
+        Vas a tener que pasársela vos, y se muestra una sola vez.
       </p>
       <div v-if="acceso?.sugerido" class="stp__dato">
         <span class="stp__lbl">Le quedaría</span>

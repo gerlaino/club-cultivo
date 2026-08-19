@@ -1,0 +1,19 @@
+Hola <%= @paciente.nombre %>,
+
+<% if @nueva -%>
+Generamos una contraseña nueva para tu cuenta. La anterior dejó de funcionar.
+<% else -%>
+Te creamos una cuenta para que puedas entrar y ver lo tuyo: tus retiros, las novedades
+y los eventos de <%= @club.name %>.
+<% end -%>
+
+Usuario:    <%= @usuario %>
+Contraseña: <%= @password %>
+
+Entrá acá: <%= @portal_url %>
+
+Es una contraseña temporal: cuando entres, cambiala por una tuya desde "Mi cuenta".
+Si no pediste esto, avisale a <%= @club.name %>.
+
+--
+<%= @club.name %>

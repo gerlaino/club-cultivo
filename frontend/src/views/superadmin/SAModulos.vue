@@ -117,21 +117,30 @@ async function apagar(modulo) {
   const ok = await confirm({
     title: `Dar de baja ${modulo.label}`,
     message: 'No se corta hoy: sigue andando hasta el final del período que la organización ya pagó, ' +
-             'y después se apaga solo. Podés volver a prenderlo antes de esa fecha y la baja se cancela.',
-    confirmText: 'Dar de baja',
+             'y después se apaga solo. Podés volver a prenderlo antes de esa fecha y la baja se cancela.\n\n' +
+             'Si necesitás cortarlo AHORA —una organización que se va, una prueba, un módulo prendido ' +
+             'por error— usá "Cortar ahora".',
+    confirmText: 'Dar de baja al fin del período',
+    neutralText: 'Cortar ahora',
     variant: 'danger',
   })
   if (!ok) return
-  return guardar({ ...features.value, [modulo.clave]: false }, modulo, 'baja')
+
+  // El diálogo resuelve 'neutral' cuando se eligió la tercera opción.
+  const inmediata = ok === 'neutral'
+  return guardar({ ...features.value, [modulo.clave]: false }, modulo, inmediata ? 'cortado' : 'baja',
+                 { corteInmediato: inmediata })
 }
 
-async function guardar(featuresNuevas, modulo, accion) {
+async function guardar(featuresNuevas, modulo, accion, opciones = {}) {
   guardando.value = modulo.clave
   try {
-    const { data } = await updateSuperAdminClub(props.club.id, { features: featuresNuevas })
+    const { data } = await updateSuperAdminClub(props.club.id, { features: featuresNuevas }, opciones)
     emit('actualizado', data)
     const baja = (data.bajas_programadas || [])[0]
-    if (baja) {
+    if (baja?.inmediata) {
+      toast.success(`${modulo.label} quedó apagado.`)
+    } else if (baja) {
       toast.success(`${modulo.label} sigue andando hasta el ${fechaCorta(baja.hasta)}.`)
     } else if (accion === 'baja cancelada') {
       toast.success(`${modulo.label}: baja cancelada, sigue como estaba.`)

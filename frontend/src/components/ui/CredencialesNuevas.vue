@@ -22,7 +22,7 @@
         </p>
         <p v-else-if="datos.mail_enviado === false" class="cred__mail cred__mail--off">
           <i class="bi bi-envelope-slash"></i>
-          La organización no tiene correo configurado, así que el mail no salió: pasáselas vos.
+          El mail no salió, así que <strong>pasáselas vos</strong>: es la única copia.
         </p>
         <p v-else class="cred__mail cred__mail--off">
           <i class="bi bi-telephone"></i> Se dicta por teléfono sin equívocos: no lleva ceros ni eles.

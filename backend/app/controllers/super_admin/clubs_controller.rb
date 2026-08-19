@@ -259,8 +259,13 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
   # MUTA `enviadas` a propósito: el módulo que se da de baja tiene que seguir guardado en `true`
   # hasta que venza, o la organización perdería el acceso hoy mismo — que es exactamente lo que
   # se está evitando. Prenderlo de nuevo antes del vencimiento cancela la baja.
+  #
+  # `corte_inmediato` salta la fecha y lo apaga AHORA. Hace falta para las bajas que no son
+  # comerciales: una organización que se va, una prueba que hay que revertir, un módulo prendido
+  # por error. Sin eso, el único camino era esperar a fin de mes o editar la base a mano.
   def aplicar_bajas_programadas(enviadas)
     programadas = []
+    ahora = corte_inmediato?
 
     Club::FEATURES_EDITABLES.each do |clave|
       next unless enviadas.key?(clave)
@@ -268,16 +273,30 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       quiere_apagar = enviadas[clave].to_s != 'true'
 
       if quiere_apagar && @club.features[clave] == true
-        hasta = @club.fin_de_periodo
-        @club.programar_baja_modulo!(clave, hasta: hasta)
-        enviadas[clave] = true # sigue andando hasta la fecha
-        programadas << { modulo: clave, label: Club::ADDONS.dig(clave, :label) || clave, hasta: hasta.to_s }
+        if ahora
+          # Se apaga de verdad: la bandera queda en false y no queda baja pendiente que después
+          # confunda al panel diciendo "sigue andando hasta…" de algo que ya está cortado.
+          @club.cancelar_baja_modulo!(clave)
+          programadas << { modulo: clave, label: Club::ADDONS.dig(clave, :label) || clave,
+                           hasta: Time.zone.today.to_s, inmediata: true }
+        else
+          hasta = @club.fin_de_periodo
+          @club.programar_baja_modulo!(clave, hasta: hasta)
+          enviadas[clave] = true # sigue andando hasta la fecha
+          programadas << { modulo: clave, label: Club::ADDONS.dig(clave, :label) || clave, hasta: hasta.to_s }
+        end
       elsif !quiere_apagar && @club.baja_programada?(clave)
         @club.cancelar_baja_modulo!(clave)
       end
     end
 
     programadas
+  end
+
+  # Lo pide la pantalla explícitamente. Nunca es el comportamiento por defecto: cortar un módulo
+  # que la organización ya pagó es cobrarle el mes y no prestárselo.
+  def corte_inmediato?
+    ActiveModel::Type::Boolean.new.cast(params[:corte_inmediato]).present?
   end
 
   def serialize_club(c)

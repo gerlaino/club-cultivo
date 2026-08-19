@@ -100,7 +100,8 @@ describe('SAModulos', () => {
     // empezó a tocar otro interruptor sin que nada lo dijera.
     await filaDe(w, 'Ambiente / IoT').find('.sam__switch').trigger('click')
 
-    expect(updateSuperAdminClub).toHaveBeenCalledWith(3, { features: expect.objectContaining({ iot: true }) })
+    // El tercer argumento son las opciones del guardado (corte inmediato); prender no las usa.
+    expect(updateSuperAdminClub).toHaveBeenCalledWith(3, { features: expect.objectContaining({ iot: true }) }, {})
     expect(confirmar).not.toHaveBeenCalled()   // prender no pregunta: no tiene consecuencias
   })
 
@@ -205,5 +206,42 @@ describe('SAModulos — los adicionales van con su pack', () => {
     const w = montarModulos({ features: { produccion_dispensa: true } })
 
     expect(w.text()).toContain('Cultivo no está contratado')
+  })
+})
+
+// AC: el super admin tiene que poder cortar un módulo AHORA, más allá de la fecha del período.
+// La baja programada es lo correcto para una baja comercial y no sirve para lo demás: una
+// organización que se va, una prueba, un módulo prendido por error.
+describe('SAModulos — cortar un módulo ahora', () => {
+  beforeEach(() => { updateSuperAdminClub.mockClear(); confirmar.mockClear() })
+
+  it('apagar ofrece las dos: al fin del período, o cortar ahora', async () => {
+    const w = montarModulos()
+    await filaDe(w, 'Asistente IA').find('.sam__switch').trigger('click')
+
+    expect(confirmar).toHaveBeenCalledWith(expect.objectContaining({ neutralText: 'Cortar ahora' }))
+  })
+
+  it('eligiendo "cortar ahora" lo manda como corte inmediato', async () => {
+    confirmar.mockResolvedValueOnce('neutral')
+    const w = montarModulos()
+
+    await filaDe(w, 'Asistente IA').find('.sam__switch').trigger('click')
+    await Promise.resolve(); await Promise.resolve()
+
+    expect(updateSuperAdminClub).toHaveBeenCalledWith(
+      3, { features: expect.objectContaining({ ia: false }) }, { corteInmediato: true }
+    )
+  })
+
+  it('eligiendo la baja normal NO manda el corte inmediato', async () => {
+    const w = montarModulos()
+
+    await filaDe(w, 'Asistente IA').find('.sam__switch').trigger('click')
+    await Promise.resolve(); await Promise.resolve()
+
+    expect(updateSuperAdminClub).toHaveBeenCalledWith(
+      3, { features: expect.objectContaining({ ia: false }) }, { corteInmediato: false }
+    )
   })
 })

@@ -12,7 +12,7 @@ module Pacientes
   # que conozca a un paciente de la organización lo deduce, y con una clave común entraría a su
   # historia clínica y a sus dispensaciones. La cambia el paciente desde su perfil; el usuario no.
   class Acceso
-    Resultado = Struct.new(:user, :password_inicial, :error, keyword_init: true) do
+    Resultado = Struct.new(:user, :password_inicial, :error, :mail, keyword_init: true) do
       def ok? = error.nil?
     end
 
@@ -25,6 +25,40 @@ module Pacientes
     # Cómo se vería su usuario si se le creara la cuenta. Sirve para mostrarlo ANTES de crearla,
     # así quien la crea sabe qué le va a quedar.
     def self.previsualizar(paciente) = email_base(paciente, paciente.club)
+
+    # Le manda la contraseña por mail, si se puede.
+    #
+    # Es la vía práctica: mostrarla una sola vez en pantalla obliga a quien la creó a anotarla y a
+    # hacérsela llegar por su cuenta, y con veinte pacientes eso no pasa. La pantalla la sigue
+    # mostrando igual —es la única salida cuando el paciente no tiene mail o la organización no
+    # tiene casilla.
+    #
+    # Devuelve `true` / `false` / `nil` (no se intentó), que es lo que la pantalla necesita para
+    # decir "también se lo mandamos" o "pasásela vos".
+    #
+    # La contraseña NO queda en el historial de correo: el registro dice que se le mandó el
+    # acceso, no cuál es. Guardarla en claro en `mails_enviados.cuerpo` sería peor que no mandar
+    # nada.
+    def self.enviar_por_mail(paciente, password, remitente:, nueva: false)
+      club = paciente.club
+      return nil unless club.feature?('mailer')
+      return false if paciente.email.blank? || !club.smtp_configured?
+
+      PacienteMailer.acceso_portal(paciente: paciente, password: password, club: club,
+                                   remitente: remitente, nueva: nueva).deliver_now
+
+      MailEnviado.create(
+        paciente: paciente, user: remitente, club: club,
+        asunto: nueva ? 'Tu nueva contraseña' : 'Tu acceso al portal',
+        # Sin la contraseña, a propósito.
+        cuerpo: "Se le envió su usuario (#{paciente.user&.email}) y una contraseña para entrar al portal.",
+        tipo: 'acceso_portal', email_destino: paciente.email, enviado_at: Time.current
+      )
+      true
+    rescue => e
+      Rails.logger.warn("[acceso paciente] no se pudo enviar el mail: #{e.message}")
+      false
+    end
 
     def initialize(paciente)
       @paciente = paciente

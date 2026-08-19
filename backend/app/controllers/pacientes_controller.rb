@@ -153,8 +153,11 @@ class PacientesController < ApplicationController
                     status: :unprocessable_entity
     end
 
+    enviado = Pacientes::Acceso.enviar_por_mail(@paciente, resultado.password_inicial, remitente: current_user)
+
     render json: { data: acceso_json(@paciente.reload),
-                   credenciales: { email: resultado.user.email, password_inicial: resultado.password_inicial } },
+                   credenciales: { email: resultado.user.email, password_inicial: resultado.password_inicial,
+                                   mail_enviado: enviado } },
            status: :created
   end
 
@@ -168,8 +171,12 @@ class PacientesController < ApplicationController
     resultado = Pacientes::Acceso.restablecer!(@paciente)
     return render json: { errors: [resultado.error] }, status: :unprocessable_entity unless resultado.ok?
 
+    enviado = Pacientes::Acceso.enviar_por_mail(@paciente, resultado.password_inicial,
+                                                remitente: current_user, nueva: true)
+
     render json: { data: acceso_json(@paciente.reload),
-                   credenciales: { email: resultado.user.email, password_inicial: resultado.password_inicial } }
+                   credenciales: { email: resultado.user.email, password_inicial: resultado.password_inicial,
+                                   mail_enviado: enviado } }
   end
 
   def subir_reprocann
@@ -633,7 +640,21 @@ class PacientesController < ApplicationController
       # Cómo le quedaría el usuario si se le crea: se muestra antes de crear la cuenta.
       sugerido:    user ? nil : Pacientes::Acceso.previsualizar(paciente),
       puede_gestionar: Paciente::ROLES_APRUEBAN.include?(current_user.role),
+      # ¿Se le puede mandar la contraseña por mail? Hacen falta las tres cosas, y si falta alguna
+      # la pantalla tiene que decir cuál ANTES de crear la cuenta — no después, cuando quien la
+      # creó ya cerró el cartel con la única copia de la contraseña.
+      mail_posible:    current_user.club.feature?('mailer') && current_user.club.smtp_configured? && paciente.email.present?,
+      mail_falta:      motivo_sin_mail(paciente),
     }
+  end
+
+  # Qué le falta para poder mandarle la contraseña por mail. `nil` si se puede.
+  def motivo_sin_mail(paciente)
+    return 'Tu organización no tiene el módulo Correo electrónico.' unless current_user.club.feature?('mailer')
+    return 'Tu organización no tiene su casilla conectada (Configuración → Correo electrónico).' unless current_user.club.smtp_configured?
+    return 'El paciente no tiene mail cargado.' if paciente.email.blank?
+
+    nil
   end
 
   # La cuenta la maneja quien admite pacientes. El mostrador crea altas pero no reparte accesos:
@@ -684,7 +705,8 @@ class PacientesController < ApplicationController
     return { error: resultado.error } unless resultado.ok?
     return if resultado.password_inicial.blank? # ya tenía cuenta
 
-    { email: resultado.user.email, password_inicial: resultado.password_inicial }
+    enviado = Pacientes::Acceso.enviar_por_mail(paciente, resultado.password_inicial, remitente: current_user)
+    { email: resultado.user.email, password_inicial: resultado.password_inicial, mail_enviado: enviado }
   end
 
   # Manda la plantilla de bienvenida si quien está operando lo pidió. Devuelve un aviso para

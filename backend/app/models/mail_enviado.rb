@@ -10,7 +10,7 @@ class MailEnviado < ApplicationRecord
   belongs_to :plantilla_mail, optional: true
   acts_as_tenant(:club)
 
-  TIPOS = %w[bienvenida reprocann disponibilidad personalizado].freeze
+  TIPOS = %w[bienvenida reprocann disponibilidad personalizado acceso_portal].freeze
 
   validates :asunto,        presence: true
   validates :cuerpo,        presence: true

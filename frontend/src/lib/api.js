@@ -652,7 +652,10 @@ export const getInformePlataforma  = ()           => api.get('/super_admin/infor
 export const listSuperAdminClubs = (params = {})  => api.get('/super_admin/clubs', { params })
 export const getSuperAdminClub   = (id)           => api.get(`/super_admin/clubs/${id}`)
 export const createSuperAdminClub = (payload)     => api.post('/super_admin/clubs', payload)
-export const updateSuperAdminClub = (id, payload) => api.put(`/super_admin/clubs/${id}`, { club: payload })
+// `corteInmediato` salta la fecha del período y apaga el módulo AHORA. Va fuera de `club` porque
+// no es un atributo de la organización: es cómo se aplica ESTE cambio.
+export const updateSuperAdminClub = (id, payload, { corteInmediato = false } = {}) =>
+  api.put(`/super_admin/clubs/${id}`, { club: payload, ...(corteInmediato ? { corte_inmediato: true } : {}) })
 export const cambiarPlanClub     = (id, payload)  => api.patch(`/super_admin/clubs/${id}/cambiar_plan`, payload)
 export const crearUsuariosDefault = (id)          => api.post(`/super_admin/clubs/${id}/crear_usuarios_default`)
 export const eliminarClub        = (id)           => api.delete(`/super_admin/clubs/${id}`)
