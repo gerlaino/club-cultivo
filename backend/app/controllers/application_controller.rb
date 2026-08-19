@@ -92,6 +92,16 @@ class ApplicationController < ActionController::API
   # cultivador que estaba adentro tiene que enterarse, no ver 403 sueltos en cada pantalla.
   def check_rol_habilitado!
     return if current_user.nil? || current_user.super_admin?
+
+    # El paciente entra mientras esté ACTIVO en la organización. Es la forma que tiene la
+    # organización de darle de baja el acceso el día que deja el tratamiento: se lo desactiva en
+    # su ficha —lo mismo que ya le impide dispensar y reservar— y deja de poder entrar. Sin esto
+    # había que acordarse de borrarle el usuario aparte, y nadie se acuerda.
+    if current_user.paciente? && !current_user.paciente_activo?
+      return render json: { error: 'Tu cuenta está dada de baja en la organización. Hablá con ellos para reactivarla.' },
+                    status: :forbidden
+    end
+
     return if current_user.rol_habilitado?
 
     render json: { error: mensaje_rol_deshabilitado(current_user), modulo_rol_apagado: true },

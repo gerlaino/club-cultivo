@@ -103,3 +103,67 @@ RSpec.describe 'Portal del paciente', type: :request do
     end
   end
 end
+
+# AC: el paciente ve SU historial y sólo el suyo. Es lo primero que va a buscar al entrar.
+RSpec.describe 'Portal — el historial del paciente', type: :request do
+  include AuthHelpers
+
+  let(:club) do
+    create(:club, features: { 'produccion_dispensa' => true, 'vista_paciente' => true })
+  end
+
+  let(:admin) { create(:user, :admin, club: club) }
+  let(:sede)  { create(:sede, club: club, created_by: admin) }
+  let(:sala)  { create(:sala, club: club, sede: sede, created_by: admin) }
+  let(:lote)  { create(:lote, club: club, sala: sala) }
+  let(:stock) do
+    Stock.create!(sede: sede, lote: lote, origen: 'lote', forma_producto: 'flor_seca',
+                  unidad: 'g', cantidad: 500, precio_sugerido_ars: 10)
+  end
+
+  def dispensar!(paciente)
+    Dispensacion.create!(paciente: paciente, user: admin, stock: stock, sede: sede,
+                         cantidad: 3, medio_pago: 'efectivo',
+                         fecha_dispensacion: Time.zone.today, aporte_socio_ars: 30)
+  end
+
+  def con_cuenta(paciente)
+    ActsAsTenant.with_tenant(club) do
+      user = Pacientes::Acceso.crear!(paciente).user
+      user.update!(password: AuthHelpers::DEFAULT_PASSWORD, password_confirmation: AuthHelpers::DEFAULT_PASSWORD)
+      user
+    end
+  end
+
+  it 'devuelve sólo sus dispensaciones, no las de otro paciente de la misma organización' do
+    mias, ajenas, yo = ActsAsTenant.with_tenant(club) do
+      yo   = create(:paciente, club: club, nombre: 'Yo',   apellido: 'Mismo',   created_by: admin)
+      otro = create(:paciente, club: club, nombre: 'Otro', apellido: 'Distinto', created_by: admin)
+      [dispensar!(yo), dispensar!(otro), yo]
+    end
+
+    sign_in_as(con_cuenta(yo))
+    get '/api/portal/historial'
+
+    expect(response).to have_http_status(:ok), response.body
+    ids = JSON.parse(response.body)['data'].map { |d| d['id'] }
+    expect(ids).to eq([mias.id])
+    expect(ids).not_to include(ajenas.id)
+  end
+
+  # Los datos internos no salen por acá: el precio de costo, quién dispensó y las notas son de
+  # la organización, no del paciente.
+  it 'no expone el costo ni quién dispensó' do
+    yo = ActsAsTenant.with_tenant(club) do
+      paciente = create(:paciente, club: club, created_by: admin)
+      dispensar!(paciente)
+      paciente
+    end
+
+    sign_in_as(con_cuenta(yo))
+    get '/api/portal/historial'
+
+    fila = JSON.parse(response.body)['data'].first
+    expect(fila.keys).to contain_exactly('id', 'fecha', 'token', 'gramos', 'total', 'items')
+  end
+end

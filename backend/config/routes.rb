@@ -85,6 +85,8 @@ Rails.application.routes.draw do
       resources :noticias,  only: [:index, :show]
       resources :eventos,   only: [:index, :show]
       resources :galeria,   only: [:index], controller: 'galeria'
+      # Lo suyo: qué retiró y cuándo. Es lo primero que va a buscar al entrar.
+      resources :historial, only: [:index], controller: 'historial'
     end
 
     get  '/asistente/consumo',       to: 'asistente#consumo'

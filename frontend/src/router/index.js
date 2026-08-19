@@ -706,9 +706,11 @@ const routes = [
     component: () => import('../views/portal/PortalShell.vue'),
     meta: { requiresAuth: true, fullscreen: true },
     children: [
-      // El home del portal es el tablero del paciente y se construye aparte. Hasta entonces
-      // entra por el catálogo, que es lo que más se mira.
-      { path: '', redirect: '/portal/geneticas' },
+      // El tablero con el carnet y el estado del REPROCANN se construye aparte; por ahora la
+      // casa del paciente es su historial de retiros.
+      // Lo primero que busca al entrar es lo suyo, no el catálogo.
+      { path: '', redirect: '/portal/historial' },
+      { path: 'historial',      name: 'portal-historial', component: () => import('../views/portal/PortalHistorialView.vue') },
       { path: 'geneticas',      name: 'portal-geneticas', component: () => import('../views/portal/PortalGeneticasView.vue') },
       { path: 'geneticas/:id',  name: 'portal-genetica',  component: () => import('../views/portal/PortalGeneticaDetailView.vue') },
       { path: 'noticias',       name: 'portal-noticias',  component: () => import('../views/portal/PortalNoticiasView.vue') },

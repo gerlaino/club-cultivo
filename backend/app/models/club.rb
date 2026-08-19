@@ -258,30 +258,46 @@ class Club < ApplicationRecord
     'medico' => { label: 'Módulo médico', desc: 'Turnos, historia clínica e indicaciones.', requiere: nil },
   }.freeze
 
-  # Add-ons: se suman a una suite y SÍ se venden por separado. `requiere` documenta de qué
-  # dependen para funcionar DE VERDAD —no alcanza con prenderlos—, y el super admin lo muestra
-  # antes de dejar activarlos.
+  # Add-ons: se suman a una suite y SÍ se venden por separado.
+  #
+  #   `pack`     — a QUÉ suite le sirve. Sin esto la pantalla del super admin era una lista plana
+  #                de diez cosas y no se entendía para qué era cada una: el Buffet extiende la
+  #                dispensa, el IoT extiende el cultivo. `nil` = transversal, sirve a las dos.
+  #   `requiere` — de qué depende para funcionar DE VERDAD. Prenderlo no alcanza.
   ADDONS = {
-    'bar'      => { label: 'Buffet',         desc: 'Punto de venta, caja de turno y stock del salón.',   requiere: nil },
-    'eventos'  => { label: 'Eventos',        desc: 'Fiestas y catas: provisión desde depósitos, entradas y rendición.', requiere: 'El Buffet tiene que estar activo.' },
-    'iot'      => { label: 'Ambiente / IoT', desc: 'Sensores, lecturas automáticas y reglas.',           requiere: 'Hardware de la organización (Sonoff u otro) o importación por CSV.' },
-    'ia'       => { label: 'Asistente IA',   desc: 'Análisis de lote, plan de trabajo y registro por voz.', requiere: 'ANTHROPIC_API_KEY en el entorno.' },
+    'bar'      => { label: 'Buffet',         pack: 'produccion_dispensa', desc: 'Punto de venta, caja de turno y stock del salón.',   requiere: 'EN CONSTRUCCIÓN: se puede prender para probarlo, todavía no para vender.' },
+    'eventos'  => { label: 'Eventos',        pack: 'produccion_dispensa', desc: 'Fiestas y catas: provisión desde depósitos, entradas y rendición.', requiere: 'El Buffet tiene que estar activo.' },
+    'delivery' => { label: 'Delivery',       pack: 'produccion_dispensa', desc: 'Reparto a domicilio: paquetes, rutas, firma de entrega y cobro contra-entrega.', requiere: 'La suite de Producción y dispensa tiene que estar activa.' },
+    'mailer'   => { label: 'Correo electrónico', pack: 'produccion_dispensa', desc: 'Casilla propia, plantillas de mail y envíos a los pacientes.', requiere: 'Casilla de la organización conectada en Configuración → Correo electrónico.' },
+    'vista_paciente' => { label: 'Portal del paciente', pack: 'produccion_dispensa', desc: 'Lo que ve el paciente cuando entra: el catálogo, las novedades y los eventos que publica la organización. Cada paciente que se da de alta recibe su cuenta.', requiere: 'INCOMPLETO: falta su tablero (carnet y dispensaciones).' },
+    'whatsapp' => { label: 'WhatsApp',       pack: 'produccion_dispensa', desc: 'Avisos de entrega por WhatsApp.',                    requiere: 'Cuenta de Twilio de la organización (SID, token y número).' },
+    'ariccame' => { label: 'ARICCAME',       pack: 'produccion_dispensa', desc: 'Reporte regulatorio de dispensaciones y stock.',     requiere: 'La integración está simulada: no transmite nada.' },
+
+    'iot'      => { label: 'Ambiente / IoT', pack: 'cultivo', desc: 'Sensores, lecturas automáticas y reglas.',           requiere: 'Hardware de la organización (Sonoff u otro) o importación por CSV.' },
+
+    # Transversales: sirven a las dos suites, y con las dos contratadas rinden más que con una.
+    'ia'       => { label: 'Asistente IA',   pack: nil, desc: 'Registro por voz de salas, lotes y plantas, plan de trabajo y lectura de CSV.', requiere: 'ANTHROPIC_API_KEY en el entorno.' },
     # Va aparte de `ia` a propósito: el dictado por voz y el chatbot se venden distinto y se
     # prueban distinto. Una organización puede querer que su equipo registre hablando sin abrirle
     # a nadie una ventana que consulta la base entera.
-    'chatbot'  => { label: 'Chatbot del admin', desc: 'El admin pregunta sobre su organización y el sistema contesta con sus propios datos.', requiere: 'El Asistente IA tiene que estar activo. EN PRUEBA: contesta pocas preguntas todavía.' },
-    'delivery' => { label: 'Delivery',       desc: 'Reparto a domicilio: paquetes, rutas, firma de entrega y cobro contra-entrega.', requiere: 'La suite de Producción y dispensa tiene que estar activa.' },
-    'mailer'   => { label: 'Correo electrónico', desc: 'Casilla propia, plantillas de mail y envíos a los pacientes.', requiere: 'Casilla de la organización conectada en Preferencias → Correo electrónico.' },
-    'whatsapp' => { label: 'WhatsApp',       desc: 'Avisos de entrega por WhatsApp.',                    requiere: 'Cuenta de Twilio de la organización (SID, token y número).' },
-    'ariccame' => { label: 'ARICCAME',       desc: 'Reporte regulatorio de dispensaciones y stock.',     requiere: 'INCOMPLETO: la integración está simulada, no transmite de verdad.' },
-    # Un solo nombre en todos lados: "Portal del paciente". La pantalla donde el admin lo
-    # configura se llamaba "Sitio web", el módulo "Vista del paciente" y el proyecto
-    # "web-publica" — tres nombres para lo mismo, y nadie sabía si eran una cosa o tres.
-    #
-    # Es un add-on de verdad: una organización de investigación no tiene pacientes a quienes
-    # mostrarles nada, y no tiene por qué pagarlo.
-    'vista_paciente' => { label: 'Portal del paciente', desc: 'Lo que ve el paciente cuando entra: el catálogo, las novedades y los eventos que publica la organización. Cada paciente que se da de alta recibe su cuenta.', requiere: 'INCOMPLETO: falta su tablero (carnet y dispensaciones).' },
+    'chatbot'  => { label: 'Chatbot del admin', pack: nil, desc: 'El admin pregunta sobre su organización y el sistema contesta con sus propios datos. Contesta sobre lo que la organización tenga contratado: con Cultivo, rendimiento y producción; con Producción y dispensa, costos y pérdidas.', requiere: 'El Asistente IA tiene que estar activo. EN PRUEBA: contesta pocas preguntas todavía.' },
   }.freeze
+
+  # A qué suite le sirve cada add-on. `nil` = a las dos.
+  def self.pack_de_addon(clave) = ADDONS.dig(clave.to_s, :pack)
+
+  # Add-ons que NO se pueden prender, ni siquiera para probar: no funcionan y prenderlos sólo
+  # genera una expectativa que después hay que explicar. La pantalla los muestra apagados y con
+  # el motivo, y la API los rechaza — el candado no puede vivir sólo en el toggle.
+  #
+  # Están acá y no en EN_CONSTRUCCION porque su código SÍ existe y se prueba: sacarlos del
+  # catálogo dejaría sus specs sin forma de armar un club que los tenga.
+  ADDONS_BLOQUEADOS = {
+    'whatsapp' => 'Falta dar de alta la cuenta de Twilio de la plataforma.',
+    'ariccame' => 'La transmisión está simulada: no le llega nada al organismo.',
+  }.freeze
+
+  def self.addon_bloqueado?(clave) = ADDONS_BLOQUEADOS.key?(clave.to_s)
 
   # Módulos que TODAVÍA NO EXISTEN. Se listan para que el super admin sepa que vienen, pero no
   # se pueden activar: prenderlos no haría nada y prometerle al club algo que no está es peor
@@ -294,7 +310,7 @@ class Club < ApplicationRecord
   # Add-ons que funcionan a medias: vienen apagados por defecto y el super admin muestra la
   # advertencia de `requiere` antes de dejar activarlos. No se bloquean por completo —eso
   # dejaría su código inalcanzable— pero nadie los prende sin enterarse de qué les falta.
-  ADDONS_INCOMPLETOS = %w[ariccame eventos chatbot vista_paciente].freeze
+  ADDONS_INCOMPLETOS = %w[bar eventos chatbot vista_paciente].freeze
 
   # Se mantiene para compatibilidad: hay clubes con las claves viejas guardadas en `features`.
   AVAILABLE_FEATURES = (SUITES.keys + ADDONS.keys + INCLUIDOS_EN_SUITE.keys).freeze
@@ -404,8 +420,13 @@ class Club < ApplicationRecord
   # La organización paga por período. Apagarle un módulo el día que se decide la baja es cobrarle
   # el mes y no prestárselo, así que la baja fija una FECHA y hasta ahí sigue andando igual.
   #
-  # `plan_activo_hasta` manda cuando está cargado: es la fecha real hasta la que pagó. Sin eso,
-  # el fin del mes en curso es la aproximación razonable.
+  # El período es MENSUAL: la baja cae a fin del mes en curso. `plan_activo_hasta` NO es el fin
+  # del período — es cuándo se le vence la suscripción entera, y suele estar cargada a un año o
+  # más. Tomándola como fin de período, dar de baja un módulo en agosto de 2026 decía "sigue
+  # andando hasta el 26 de febrero de 2028": año y medio de un módulo que el cliente ya canceló.
+  #
+  # Sí funciona como TECHO: si la suscripción vence antes que el fin de mes, el módulo no puede
+  # sobrevivirla.
   def baja_programada_para(key)
     f = features_baja[key.to_s]
     f && Date.parse(f.to_s)
@@ -421,7 +442,10 @@ class Club < ApplicationRecord
   end
 
   def fin_de_periodo
-    plan_activo_hasta.presence || Time.zone.today.end_of_month
+    fin_de_mes = Time.zone.today.end_of_month
+    return fin_de_mes if plan_activo_hasta.blank?
+
+    [fin_de_mes, plan_activo_hasta].min
   end
 
   def programar_baja_modulo!(key, hasta: nil)

@@ -13,7 +13,7 @@
       </RouterLink>
 
       <div class="nav__links">
-        <RouterLink to="/portal" class="nav__link">Inicio</RouterLink>
+        <RouterLink to="/portal/historial" class="nav__link">Mis retiros</RouterLink>
         <RouterLink to="/portal/geneticas" class="nav__link">Variedades</RouterLink>
         <RouterLink to="/portal/noticias" class="nav__link">Noticias</RouterLink>
         <RouterLink to="/portal/eventos" class="nav__link">Eventos</RouterLink>
@@ -27,7 +27,7 @@
     </div>
 
     <div class="nav__mobile" :class="{ 'nav__mobile--open': open }">
-      <RouterLink to="/portal" class="nav__mobile-link" @click="open = false">Inicio</RouterLink>
+      <RouterLink to="/portal/historial" class="nav__mobile-link" @click="open = false">Mis retiros</RouterLink>
       <RouterLink to="/portal/geneticas" class="nav__mobile-link" @click="open = false">Variedades</RouterLink>
       <RouterLink to="/portal/noticias" class="nav__mobile-link" @click="open = false">Noticias</RouterLink>
       <RouterLink to="/portal/eventos" class="nav__mobile-link" @click="open = false">Eventos</RouterLink>

@@ -8,8 +8,14 @@ require 'rails_helper'
 # los repartos que todavía no salieron se sueltan. Lo que ya está EN VIAJE se termina: cortarlo
 # dejaría al repartidor con producto de la organización y sin poder registrar la entrega.
 RSpec.describe 'Baja programada del módulo Delivery', type: :request do
+  # El 10 de agosto: quedan 21 días de mes, y la suscripción vence dentro de un año — que es lo
+  # normal. Fijar el día importa: la regla es sobre el CALENDARIO, y corrida un 30 daba lo mismo
+  # con la fórmula vieja que con la nueva.
+  before { travel_to(Date.new(2026, 8, 10)) }
+  after  { travel_back }
+
   let(:club) do
-    create(:club, plan_activo_hasta: Date.current + 12.days,
+    create(:club, plan_activo_hasta: Date.new(2027, 2, 26),
                   features: { 'produccion_dispensa' => true, 'delivery' => true })
   end
   let(:super_admin) { create(:user, :super_admin, club: nil) }
@@ -19,12 +25,23 @@ RSpec.describe 'Baja programada del módulo Delivery', type: :request do
   describe 'programar la baja' do
     before { sign_in_as(super_admin) }
 
-    it 'no lo apaga hoy: lo deja andando hasta el fin del período pago' do
+    it 'no lo apaga hoy: lo deja andando hasta que termina el mes que ya pagó' do
       patch "/api/super_admin/clubs/#{club.id}", params: { club: { features: { 'delivery' => false } } }
 
       expect(response).to have_http_status(:ok)
       expect(club.reload.feature?(:delivery)).to be(true), 'se cortó el módulo que ya estaba pagado'
-      expect(club.baja_programada_para('delivery')).to eq(Date.current + 12.days)
+      expect(club.baja_programada_para('delivery')).to eq(Date.new(2026, 8, 31))
+    end
+
+    # El bug: `plan_activo_hasta` no es el fin del período, es cuándo se vence la suscripción
+    # entera, y está cargada a un año o más. Tomándola como fin de período, dar de baja el Buffet
+    # un 19 de agosto de 2026 decía "sigue andando hasta el 26 de febrero" — de 2027. Año y medio
+    # de un módulo cancelado.
+    it 'no arrastra la baja hasta el vencimiento de la suscripción' do
+      patch "/api/super_admin/clubs/#{club.id}", params: { club: { features: { 'delivery' => false } } }
+
+      expect(club.reload.baja_programada_para('delivery')).not_to eq(Date.new(2027, 2, 26))
+      expect(club.baja_programada_para('delivery')).to be < Date.new(2026, 9, 1)
     end
 
     it 'informa hasta cuándo, para poder decírselo a la organización' do
@@ -32,14 +49,22 @@ RSpec.describe 'Baja programada del módulo Delivery', type: :request do
 
       baja = JSON.parse(response.body)['bajas_programadas'].first
       expect(baja['modulo']).to eq('delivery')
-      expect(baja['hasta']).to eq((Date.current + 12.days).to_s)
+      expect(baja['hasta']).to eq('2026-08-31')
     end
 
-    it 'sin fecha de plan, corta a fin de mes' do
+    it 'sin fecha de plan, corta a fin de mes igual' do
       club.update!(plan_activo_hasta: nil)
       patch "/api/super_admin/clubs/#{club.id}", params: { club: { features: { 'delivery' => false } } }
 
-      expect(club.reload.baja_programada_para('delivery')).to eq(Date.current.end_of_month)
+      expect(club.reload.baja_programada_para('delivery')).to eq(Date.new(2026, 8, 31))
+    end
+
+    # La suscripción sí es un TECHO: un módulo no puede sobrevivir a la cuenta que lo paga.
+    it 'si la suscripción vence antes que el mes, manda la suscripción' do
+      club.update!(plan_activo_hasta: Date.new(2026, 8, 20))
+      patch "/api/super_admin/clubs/#{club.id}", params: { club: { features: { 'delivery' => false } } }
+
+      expect(club.reload.baja_programada_para('delivery')).to eq(Date.new(2026, 8, 20))
     end
 
     it 'volver a prenderlo antes del vencimiento cancela la baja' do

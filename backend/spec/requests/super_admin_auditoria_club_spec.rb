@@ -28,12 +28,12 @@ RSpec.describe 'Auditoría de club', type: :request do
 
   it 'registra el módulo que se prendió' do
     patch "/api/super_admin/clubs/#{club.id}",
-          params: { club: { features: { 'cultivo' => true, 'produccion_dispensa' => true, 'ariccame' => true } } },
+          params: { club: { features: { 'cultivo' => true, 'produccion_dispensa' => true, 'delivery' => true } } },
           as: :json
 
     a = auditorias(accion: 'actualizar').last
     expect(a.cambios).to have_key('features')
-    expect(a.cambios['features'].last['ariccame']).to be(true)
+    expect(a.cambios['features'].last['delivery']).to be(true)
   end
 
   it 'registra la suspensión y la reactivación' do

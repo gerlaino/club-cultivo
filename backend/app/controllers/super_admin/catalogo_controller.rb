@@ -23,6 +23,8 @@ class SuperAdmin::CatalogoController < SuperAdmin::BaseController
       suites: Club::SUITES.map { |k, v| { clave: k, label: v[:label], desc: v[:desc] } },
       addons: Club::ADDONS.map { |k, v|
         { clave: k, label: v[:label], desc: v[:desc], requiere: v[:requiere],
+          pack: v[:pack], pack_label: v[:pack] && Club::SUITES.dig(v[:pack], :label),
+          bloqueado: Club.addon_bloqueado?(k), motivo_bloqueo: Club::ADDONS_BLOQUEADOS[k],
           incompleto: Club::ADDONS_INCOMPLETOS.include?(k) }
       },
       # Vienen dentro de una suite: se muestran para que se sepa qué entra, sin interruptor.

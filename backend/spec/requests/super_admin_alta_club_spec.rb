@@ -89,12 +89,13 @@ RSpec.describe 'SuperAdmin alta de club', type: :request do
 
     # Prendido no es lo mismo que andando: el panel tiene que poder decir la diferencia.
     it 'informa el estado real de cada módulo' do
-      body = alta(club: { features: { 'cultivo' => true, 'produccion_dispensa' => true, 'whatsapp' => true } })
+      # `mailer` en lugar de `whatsapp`: WhatsApp pasó a los bloqueados y ya no se puede prender.
+      body = alta(club: { features: { 'cultivo' => true, 'produccion_dispensa' => true, 'mailer' => true } })
 
-      whatsapp = body['club']['addons'].find { |a| a['clave'] == 'whatsapp' }
-      expect(whatsapp['activo']).to be(true)
-      expect(whatsapp['estado']).to eq('falta_config')
-      expect(whatsapp['falta']).to  match(/Twilio/i)
+      correo = body['club']['addons'].find { |a| a['clave'] == 'mailer' }
+      expect(correo['activo']).to be(true)
+      expect(correo['estado']).to eq('falta_config')
+      expect(correo['falta']).to be_present
 
       bar = body['club']['addons'].find { |a| a['clave'] == 'bar' }
       expect(bar['estado']).to eq('andando')

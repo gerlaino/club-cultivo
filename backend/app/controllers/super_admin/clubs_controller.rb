@@ -244,7 +244,13 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
   # incluidos en una suite se derivan de ella, y los que están en construcción no existen:
   # aceptarlos sería guardar un `true` que nadie lee y que después contradice a la pantalla.
   def features_editables(enviadas)
-    (enviadas || {}).to_h.slice(*Club::FEATURES_EDITABLES)
+    permitidas = (enviadas || {}).to_h.slice(*Club::FEATURES_EDITABLES)
+
+    # Los bloqueados no se prenden ni por la API. El candado no puede vivir sólo en el toggle:
+    # por acá se saltea siempre, y son justamente los dos que no funcionan (WhatsApp sin cuenta
+    # de Twilio de la plataforma, y ARICCAME que no le transmite nada al organismo). Apagarlos sí
+    # se acepta, para poder limpiar una organización que los tenga guardados.
+    permitidas.reject { |clave, valor| valor == true && Club.addon_bloqueado?(clave) }
   end
 
   # Traduce "apagá esto" a "esto termina el <fecha>", y devuelve qué quedó programado para
@@ -361,6 +367,10 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       suites:          Club::SUITES.map { |k, v| { clave: k, label: v[:label], desc: v[:desc], activa: c.suite?(k) } },
       addons:          Club::ADDONS.map { |k, v|
         { clave: k, label: v[:label], desc: v[:desc], requiere: v[:requiere],
+          # A qué suite le sirve. Sin esto la pantalla era una lista plana de diez cosas y no se
+          # entendía para qué era cada una.
+          pack: v[:pack], pack_label: v[:pack] && Club::SUITES.dig(v[:pack], :label),
+          bloqueado: Club.addon_bloqueado?(k), motivo_bloqueo: Club::ADDONS_BLOQUEADOS[k],
           incompleto: c.addon_incompleto?(k), activo: c.feature?(k) }.merge(estado_modulo(c, k))
       },
       # Los que vienen dentro de una suite: se muestran para que se sepa qué tiene la organización,

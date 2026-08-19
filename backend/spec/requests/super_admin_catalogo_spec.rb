@@ -62,10 +62,17 @@ RSpec.describe 'SuperAdmin catálogo', type: :request do
     end
 
     it 'marca los add-ons incompletos con el motivo' do
+      buffet = catalogo['addons'].find { |a| a['clave'] == 'bar' }
+
+      expect(buffet['incompleto']).to be(true)
+      expect(buffet['requiere']).to be_present
+    end
+
+    it 'marca los bloqueados, que no se pueden prender ni para probar' do
       ariccame = catalogo['addons'].find { |a| a['clave'] == 'ariccame' }
 
-      expect(ariccame['incompleto']).to be(true)
-      expect(ariccame['requiere']).to be_present
+      expect(ariccame['bloqueado']).to be(true)
+      expect(ariccame['motivo_bloqueo']).to be_present
     end
 
     # Los tramos de IA estaban escritos a mano en el template del panel, con los topes POR HORA

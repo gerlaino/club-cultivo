@@ -18,6 +18,8 @@ export const getPortalEventos   = (pasados = false) =>
   api.get('/portal/eventos', { params: pasados ? { pasados: true } : {} }).then(datos)
 export const getPortalEvento    = (id)          => api.get(`/portal/eventos/${id}`).then(datos)
 export const getPortalGaleria   = ()            => api.get('/portal/galeria').then(datos)
+// Lo suyo: qué retiró y cuándo.
+export const getPortalHistorial = ()            => api.get('/portal/historial').then(datos)
 
 // Compatibilidad con las vistas mudadas, que llamaban `publicApi.getGeneticas()`.
 export default {
@@ -29,4 +31,5 @@ export default {
   getEventos:   getPortalEventos,
   getEvento:    getPortalEvento,
   getGaleria:   getPortalGaleria,
+  getHistorial: getPortalHistorial,
 }

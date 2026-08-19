@@ -75,6 +75,22 @@ class User < ApplicationRecord
 
   def modulos_requeridos = MODULOS_POR_ROL.fetch(role.to_s, [])
 
+  # La ficha del paciente al que pertenece esta cuenta. Uno a uno: la crea `Pacientes::Acceso`.
+  has_one :paciente, dependent: :nullify
+
+  # ¿Sigue activo en la organización? Es lo que habilita su ingreso al portal, y lo maneja la
+  # organización desde la ficha: el mismo interruptor que ya le impide dispensar y reservar.
+  #
+  # Sin ficha no bloquea. La cuenta la crea `Pacientes::Acceso` a partir de una ficha, así que
+  # esto sólo pasa con cuentas sueltas de antes; bloquearlas dejaría afuera a gente que hoy entra
+  # y nadie sabría por qué. La ficha BORRADA sí bloquea: eso es una baja.
+  def paciente_activo?
+    ficha = ActsAsTenant.without_tenant { Paciente.unscoped.find_by(user_id: id) }
+    return true if ficha.nil?
+
+    ficha.deleted_at.nil? && ficha.es_paciente?
+  end
+
   # ¿Este usuario puede operar hoy? Sin club (super_admin) o sin módulo asociado al rol, sí.
   def rol_habilitado?
     requeridos = modulos_requeridos

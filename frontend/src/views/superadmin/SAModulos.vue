@@ -50,6 +50,38 @@ const activos = computed(() =>
   [...suites.value, ...addons.value].filter(m => features.value[m.clave] === true).length
 )
 
+// Los adicionales van DEBAJO del pack al que le sirven, no en una lista plana de diez.
+// La pantalla la usan dos personas y una de ellas no vive adentro de la app: "Buffet" y
+// "Ambiente / IoT" uno al lado del otro no dicen para qué es cada uno ni qué hay que tener
+// contratado para que sirvan. El `pack` lo manda el backend (`Club::ADDONS`), no se decide acá.
+function addonsDe(packClave) {
+  return addons.value.filter(a => a.pack === packClave)
+}
+const addonsTransversales = computed(() => addons.value.filter(a => !a.pack))
+
+// Un grupo por pack, en el mismo orden que los packs, y los transversales al final. Se arma acá
+// y no en el template para poder decir además si el pack está contratado: un adicional de
+// Cultivo en una organización sin Cultivo se puede prender y no hace nada.
+const addonsAgrupados = computed(() => {
+  const grupos = suites.value
+    .map(s => ({
+      titulo:    `Adicionales de ${s.label}`,
+      sinPack:   !features.value[s.clave],
+      packLabel: s.label,
+      items:     addonsDe(s.clave),
+    }))
+    .filter(g => g.items.length)
+
+  if (addonsTransversales.value.length) {
+    grupos.push({
+      titulo:  'Sirven a los dos packs',
+      sinPack: false,
+      items:   addonsTransversales.value,
+    })
+  }
+  return grupos
+})
+
 // Los módulos que vienen dentro de una suite se muestran como una línea DEBAJO de ella, no como
 // tarjetas aparte: no son una decisión, son parte de lo que ya se compró.
 function incluidosDe(suiteClave) {
@@ -63,6 +95,12 @@ function fechaCorta(f) {
 
 // ── Prender / apagar ────────────────────────────────────────────────────────────
 async function alternar(modulo) {
+  // Bloqueado: no se prende ni para probar. El backend lo rechaza igual —el candado no vive en
+  // el toggle— pero un interruptor que se mueve y vuelve solo parece un error de la app.
+  if (modulo.bloqueado && features.value[modulo.clave] !== true) {
+    toast.warning(`${modulo.label} todavía no se puede activar. ${modulo.motivo_bloqueo || ''}`.trim())
+    return
+  }
   const prendido = features.value[modulo.clave] === true
   if (prendido) return apagar(modulo)
   return guardar({ ...features.value, [modulo.clave]: true }, modulo, 'prendido')
@@ -237,11 +275,14 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- ── Add-ons ── -->
-    <div class="sam__group">
-      <div class="sam__group-lbl">Módulos adicionales</div>
-      <div v-for="a in addons" :key="a.clave" class="sam__addon"
-           :class="{ 'sam__addon--on': features[a.clave] }">
+    <!-- ── Adicionales, agrupados por el pack al que le sirven ── -->
+    <div class="sam__group" v-for="g in addonsAgrupados" :key="g.titulo">
+      <div class="sam__group-lbl">{{ g.titulo }}</div>
+      <div v-if="g.sinPack" class="sam__group-nota">
+        {{ g.packLabel }} no está contratado: prender esto no va a hacer nada.
+      </div>
+      <div v-for="a in g.items" :key="a.clave" class="sam__addon"
+           :class="{ 'sam__addon--on': features[a.clave], 'sam__addon--off': a.bloqueado }">
 
         <div class="sam__row">
           <span class="sam__ico">{{ ICONO[a.clave] || '🧩' }}</span>
@@ -250,19 +291,23 @@ onMounted(async () => {
               {{ a.label }}
               <span v-if="features[a.clave] && ESTADO[a.estado]"
                     class="sam__badge" :class="ESTADO[a.estado].clase">{{ ESTADO[a.estado].txt }}</span>
-              <span v-if="a.incompleto" class="sam__badge sam__badge--obra">incompleto</span>
+              <span v-if="a.bloqueado" class="sam__badge sam__badge--off">no disponible</span>
+              <span v-else-if="a.incompleto" class="sam__badge sam__badge--obra">en construcción</span>
             </div>
             <div class="sam__desc">{{ a.desc }}</div>
             <!-- Qué le falta a ESTA organización, que es distinto de qué necesita el módulo. -->
             <div v-if="bajas[a.clave]" class="sam__baja">
               Dado de baja — sigue andando hasta el {{ fechaCorta(bajas[a.clave]) }}
             </div>
+            <div v-else-if="a.bloqueado" class="sam__falta">{{ a.motivo_bloqueo }}</div>
             <div v-else-if="a.falta" class="sam__falta">{{ a.falta }}</div>
             <div v-else-if="a.requiere && !features[a.clave]" class="sam__desc sam__desc--req">{{ a.requiere }}</div>
           </div>
           <DsSpinner v-if="guardando === a.clave" :size="16" />
-          <button v-else class="sam__switch" :class="{ 'sam__switch--on': features[a.clave] }"
+          <button v-else class="sam__switch"
+                  :class="{ 'sam__switch--on': features[a.clave], 'sam__switch--off': a.bloqueado && !features[a.clave] }"
                   type="button" role="switch" :aria-checked="!!features[a.clave]"
+                  :disabled="a.bloqueado && !features[a.clave]"
                   :aria-label="a.label" @click="alternar(a)">
             <span class="sam__knob"></span>
           </button>
@@ -410,6 +455,11 @@ onMounted(async () => {
   color: var(--c-slate-400);
 }
 
+.sam__group-nota {
+  font-size: .74rem; color: #92400e; background: #fffbeb;
+  border: 1px solid #fde68a; border-radius: 8px; padding: .45rem .65rem;
+}
+
 /* Fila común */
 .sam__row { display: flex; align-items: flex-start; gap: .7rem; padding: .8rem .9rem; }
 .sam__ico { font-size: 1.05rem; line-height: 1.3; flex-shrink: 0; }
@@ -437,6 +487,8 @@ onMounted(async () => {
   background: var(--c-slate-50); overflow: hidden; transition: border-color .15s, background .15s;
 }
 .sam__addon--on { border-color: #86efac; background: #fff; }
+/* Bloqueado: se ve, se entiende por qué, y no se puede tocar. */
+.sam__addon--off { opacity: .62; }
 
 /* Interruptor: botón de verdad, no un label con checkbox escondido — así lo alcanza el
    teclado y anuncia su estado. */
@@ -446,6 +498,7 @@ onMounted(async () => {
   transition: background .2s; padding: 0; margin-top: 2px;
 }
 .sam__switch--on { background: #15803d; }
+.sam__switch--off { cursor: not-allowed; opacity: .5; }
 .sam__knob {
   position: absolute; width: 16px; height: 16px; background: #fff; border-radius: 50%;
   top: 3px; left: 3px; transition: left .2s; box-shadow: 0 1px 2px rgba(0,0,0,.25);
@@ -461,6 +514,7 @@ onMounted(async () => {
 .sam__badge--ok   { background: #dcfce7; color: #15803d; }
 .sam__badge--warn { background: #fef3c7; color: #b45309; }
 .sam__badge--obra { background: var(--c-slate-100); color: var(--c-slate-500); }
+.sam__badge--off { background: var(--c-slate-200); color: var(--c-slate-600); }
 
 /* Configuración inline */
 .sam__cfg {

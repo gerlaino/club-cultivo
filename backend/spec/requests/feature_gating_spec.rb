@@ -77,9 +77,19 @@ RSpec.describe 'Gating por módulo', type: :request do
     end
 
     it 'quedan marcados como incompletos, con el motivo a la vista' do
-      expect(club.addon_incompleto?(:ariccame)).to be(true)
-      expect(club.addon_incompleto?(:eventos)).to be(true)
-      expect(Club::ADDONS['ariccame'][:requiere]).to match(/INCOMPLETO/)
+      Club::ADDONS_INCOMPLETOS.each do |clave|
+        expect(club.addon_incompleto?(clave)).to be(true), "#{clave} no se informa como incompleto"
+        expect(Club::ADDONS.dig(clave, :requiere)).to be_present, "#{clave} no dice qué le falta"
+      end
+    end
+
+    # Distinto de incompleto: estos NO se pueden prender ni para probar, porque no funcionan de
+    # verdad. El panel los muestra apagados y con el motivo.
+    it 'los bloqueados dicen por qué lo están' do
+      Club::ADDONS_BLOQUEADOS.each do |clave, motivo|
+        expect(Club.addon_bloqueado?(clave)).to be(true)
+        expect(motivo).to be_present
+      end
     end
 
     # Eventos existe y funciona, pero todavía no está pulido: se prende cuando lo esté.
@@ -95,7 +105,8 @@ RSpec.describe 'Gating por módulo', type: :request do
     end
 
     it 'el que está terminado no aparece como incompleto' do
-      expect(club.addon_incompleto?(:bar)).to be(false)
+      expect(club.addon_incompleto?(:delivery)).to be(false)
+      expect(club.addon_incompleto?(:mailer)).to be(false)
     end
   end
 

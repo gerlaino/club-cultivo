@@ -81,3 +81,64 @@ RSpec.describe 'La cuenta del paciente', type: :request do
     end
   end
 end
+
+# AC: el acceso al portal se corta desactivando al paciente en su ficha. Es el mismo interruptor
+# que ya le impide dispensar y reservar — la organización no tiene que acordarse de ir a borrarle
+# el usuario por otro lado, porque nadie se acuerda.
+RSpec.describe 'La baja del acceso del paciente', type: :request do
+  include AuthHelpers
+
+  let(:club) do
+    create(:club, features: { 'produccion_dispensa' => true, 'vista_paciente' => true })
+  end
+  let(:paciente) { ActsAsTenant.with_tenant(club) { create(:paciente, club: club) } }
+  # La cuenta real que crea el alta, con la clave del helper para poder loguearla: la que genera
+  # el servicio es al azar a propósito.
+  let(:cuenta) do
+    ActsAsTenant.with_tenant(club) do
+      user = Pacientes::Acceso.crear!(paciente).user
+      user.update!(password: AuthHelpers::DEFAULT_PASSWORD, password_confirmation: AuthHelpers::DEFAULT_PASSWORD)
+      user
+    end
+  end
+
+  def entrar = get '/api/portal/geneticas'
+
+  it 'mientras está activo, entra' do
+    sign_in_as(cuenta)
+    entrar
+
+    expect(response).to have_http_status(:ok), response.body
+  end
+
+  it 'desactivado en la ficha, deja de entrar y se le explica' do
+    sign_in_as(cuenta)
+    paciente.update_column(:es_paciente, false)
+
+    entrar
+
+    expect(response).to have_http_status(:forbidden)
+    expect(JSON.parse(response.body)['error']).to include('dada de baja')
+  end
+
+  it 'borrada la ficha, tampoco' do
+    sign_in_as(cuenta)
+    paciente.update_column(:deleted_at, Time.current)
+
+    entrar
+
+    expect(response).to have_http_status(:forbidden)
+  end
+
+  it 'reactivado, vuelve a entrar sin que nadie le toque la cuenta' do
+    sign_in_as(cuenta)
+    paciente.update_column(:es_paciente, false)
+    entrar
+    expect(response).to have_http_status(:forbidden)
+
+    paciente.update_column(:es_paciente, true)
+    entrar
+
+    expect(response).to have_http_status(:ok), response.body
+  end
+end
