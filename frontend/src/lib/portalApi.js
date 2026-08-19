@@ -20,6 +20,8 @@ export const getPortalEvento    = (id)          => api.get(`/portal/eventos/${id
 export const getPortalGaleria   = ()            => api.get('/portal/galeria').then(datos)
 // Lo suyo: qué retiró y cuándo.
 export const getPortalHistorial = ()            => api.get('/portal/historial').then(datos)
+// Su cuenta corriente, si la organización se la abrió. Devuelve `{ tiene: false }` si no.
+export const getPortalCuentaCorriente = ()      => api.get('/portal/cuenta_corriente').then(datos)
 
 // Compatibilidad con las vistas mudadas, que llamaban `publicApi.getGeneticas()`.
 export default {
@@ -32,4 +34,5 @@ export default {
   getEvento:    getPortalEvento,
   getGaleria:   getPortalGaleria,
   getHistorial: getPortalHistorial,
+  getCuentaCorriente: getPortalCuentaCorriente,
 }

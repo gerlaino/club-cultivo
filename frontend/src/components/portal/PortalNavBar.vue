@@ -18,6 +18,7 @@
         <RouterLink to="/portal/noticias" class="nav__link">Noticias</RouterLink>
         <RouterLink to="/portal/eventos" class="nav__link">Eventos</RouterLink>
         <RouterLink to="/portal/contacto" class="nav__link">Contacto</RouterLink>
+        <RouterLink v-if="tieneCC" to="/portal/cuenta-corriente" class="nav__link">Cuenta corriente</RouterLink>
         <RouterLink to="/portal/cuenta" class="nav__link">Mi cuenta</RouterLink>
         <button class="nav__salir" @click="salir">Salir</button>
       </div>
@@ -34,6 +35,7 @@
       <RouterLink to="/portal/noticias" class="nav__mobile-link" @click="open = false">Noticias</RouterLink>
       <RouterLink to="/portal/eventos" class="nav__mobile-link" @click="open = false">Eventos</RouterLink>
       <RouterLink to="/portal/contacto" class="nav__mobile-link" @click="open = false">Contacto</RouterLink>
+      <RouterLink v-if="tieneCC" to="/portal/cuenta-corriente" class="nav__mobile-link" @click="open = false">Cuenta corriente</RouterLink>
       <RouterLink to="/portal/cuenta" class="nav__mobile-link" @click="open = false">Mi cuenta</RouterLink>
       <button class="nav__mobile-salir" @click="salir">Cerrar sesión</button>
     </div>
@@ -44,6 +46,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePortalClubStore } from '@/stores/portalClub'
+import { getPortalCuentaCorriente } from '@/lib/portalApi'
 import { useAuthStore } from '@/stores/auth'
 import { storeToRefs } from 'pinia'
 
@@ -55,6 +58,15 @@ async function salir() {
   await useAuthStore().logOut()
   router.push('/login')
 }
+
+// ¿Tiene cuenta corriente abierta? El enlace aparece sólo si sí: a quien paga siempre al contado,
+// una sección "Cuenta corriente" con saldo cero le hace creer que debe algo.
+const tieneCC = ref(false)
+onMounted(async () => {
+  try {
+    tieneCC.value = (await getPortalCuentaCorriente())?.tiene === true
+  } catch { /* si falla, no se ofrece: mejor que un enlace que lleva a un error */ }
+})
 
 const store = usePortalClubStore()
 store.fetchClub()

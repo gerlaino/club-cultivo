@@ -722,6 +722,9 @@ const routes = [
       // Su cuenta: el usuario a la vista y el cambio de contraseña. Vive DENTRO del portal —
       // `/perfil` está en el shell de administración y un paciente ahí ve una app que no es la suya.
       { path: 'cuenta',         name: 'portal-cuenta',    component: () => import('../views/portal/PortalCuentaView.vue') },
+      // Su saldo con la organización. El enlace en la barra sólo aparece si tiene cuenta abierta;
+      // la ruta existe igual y contesta "no tenés cuenta" — esconder la pantalla NO es gatearla.
+      { path: 'cuenta-corriente', name: 'portal-cc',      component: () => import('../views/portal/PortalCuentaCorrienteView.vue') },
     ],
   },
 

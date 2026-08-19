@@ -87,6 +87,9 @@ Rails.application.routes.draw do
       resources :galeria,   only: [:index], controller: 'galeria'
       # Lo suyo: qué retiró y cuándo. Es lo primero que va a buscar al entrar.
       resources :historial, only: [:index], controller: 'historial'
+      # Su cuenta corriente, sólo si la organización se la abrió. Hoy es lectura; más adelante
+      # acredita saldo desde acá.
+      resource  :cuenta_corriente, only: [:show], controller: 'cuenta_corriente'
     end
 
     get  '/asistente/consumo',       to: 'asistente#consumo'
