@@ -13,11 +13,13 @@
       </RouterLink>
 
       <div class="nav__links">
-        <RouterLink to="/portal/historial" class="nav__link">Mis retiros</RouterLink>
+        <RouterLink to="/portal" class="nav__link">Inicio</RouterLink>
         <RouterLink to="/portal/geneticas" class="nav__link">Variedades</RouterLink>
         <RouterLink to="/portal/noticias" class="nav__link">Noticias</RouterLink>
         <RouterLink to="/portal/eventos" class="nav__link">Eventos</RouterLink>
         <RouterLink to="/portal/contacto" class="nav__link">Contacto</RouterLink>
+        <span class="nav__sep" aria-hidden="true"></span>
+        <RouterLink to="/portal/historial" class="nav__link">Mis retiros</RouterLink>
         <RouterLink v-if="tieneCC" to="/portal/cuenta-corriente" class="nav__link">Cuenta corriente</RouterLink>
         <RouterLink to="/portal/cuenta" class="nav__link">Mi cuenta</RouterLink>
         <button class="nav__salir" @click="salir">Salir</button>
@@ -30,11 +32,12 @@
     </div>
 
     <div class="nav__mobile" :class="{ 'nav__mobile--open': open }">
-      <RouterLink to="/portal/historial" class="nav__mobile-link" @click="open = false">Mis retiros</RouterLink>
+      <RouterLink to="/portal" class="nav__mobile-link" @click="open = false">Inicio</RouterLink>
       <RouterLink to="/portal/geneticas" class="nav__mobile-link" @click="open = false">Variedades</RouterLink>
       <RouterLink to="/portal/noticias" class="nav__mobile-link" @click="open = false">Noticias</RouterLink>
       <RouterLink to="/portal/eventos" class="nav__mobile-link" @click="open = false">Eventos</RouterLink>
       <RouterLink to="/portal/contacto" class="nav__mobile-link" @click="open = false">Contacto</RouterLink>
+      <RouterLink to="/portal/historial" class="nav__mobile-link" @click="open = false">Mis retiros</RouterLink>
       <RouterLink v-if="tieneCC" to="/portal/cuenta-corriente" class="nav__mobile-link" @click="open = false">Cuenta corriente</RouterLink>
       <RouterLink to="/portal/cuenta" class="nav__mobile-link" @click="open = false">Mi cuenta</RouterLink>
       <button class="nav__mobile-salir" @click="salir">Cerrar sesión</button>
@@ -120,6 +123,7 @@ onUnmounted(() => window.removeEventListener('scroll', onScroll))
 }
 .nav__link:hover { color: #e8f0e8; background: rgba(109,190,138,0.07); }
 .nav__link.router-link-active { color: #6dbe8a; background: rgba(109,190,138,0.08); }
+.nav__sep { width: 1px; height: 18px; background: rgba(109,190,138,0.18); margin: 0 4px; }
 .nav__salir {
   border: 1px solid rgba(109,190,138,0.2); background: none; color: rgba(180,200,183,0.7);
   border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; margin-left: 4px;
