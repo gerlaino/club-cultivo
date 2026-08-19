@@ -1,5 +1,144 @@
 # Changelog
 
+## Agosto 2026 (s) — el portal se vuelve clínico, y las perillas que no hacían nada
+
+Tres perillas de esta app estaban conectadas a nada: el interruptor "Portal abierto / cerrado",
+el cartel de "sin conexión" y la cola de sincronización. Las tres se veían, las tres prometían
+algo, ninguna cumplía. Es una familia distinta de la del bloque (r) —allá una regla vivía en dos
+lugares que dejaron de coincidir; acá **vivía en cero**— y es peor, porque una regla contradictoria
+se nota y una promesa vacía no.
+
+### El inicio del portal es el ESTADO DEL PACIENTE, no el boletín del club
+
+El portal se había rediseñado como boletín —portada de novedades, agenda, catálogo— con este
+razonamiento escrito en el código: *"entra a mirar qué hay de nuevo, no a revisar lo que ya hizo"*.
+
+**El razonamiento tenía un error**: trata lo del paciente como PASADO, y casi nada lo es. El
+REPROCANN vigente, el próximo turno, la indicación vigente y el saldo son presente y futuro, y son
+las cuatro cosas que un paciente entra a preguntar. Encima el boletín está **vacío** en cualquier
+organización que no publique —que son casi todas, casi todas las semanas—; su estado no está vacío
+nunca.
+
+El orden quedó: **credencial · lo mío · del club**. El boletín no se perdió: es `/portal/del-club`,
+la misma pantalla, con su entrada en la barra.
+
+- **La credencial** (`PortalCredencial`) es la pieza central: nombre, DNI, número de socio y el
+  REPROCANN como semáforo con la fecha. A pantalla completa con QR, porque es lo único del producto
+  que se usa **parado, en la puerta**. Vivía sólo en `/c/:token` —un link que le mandaron una vez— y
+  el portal no la mostraba en ningún lado. Vencido, la tarjeta entera cambia de color: es el único
+  estado que impide retirar, y con un puntito distinto no se ve.
+- **El estado del REPROCANN vive EN la credencial**, no en una franja aparte: es la misma pregunta
+  (¿puede retirar?) y separarla obligaba a leer dos cosas en dos lugares. `PortalAvisos` se quedó
+  sólo con lo urgente; lo de "vence en 20 días" lo dice la credencial tres centímetros más abajo,
+  con la fecha. Una franja que aparece casi siempre se deja de leer a la semana.
+- **`/portal/mi-salud`**: turnos e indicación médica. El módulo médico existía desde hace meses y el
+  portal no lo leía: el paciente llamaba para saber cuándo era su turno. Se arma con **lista blanca
+  campo por campo, nunca `as_json`** — `Turno#notas_post` son las notas del médico para el médico y
+  no salen jamás (hay spec que verifica que el texto no aparezca en el body). Los campos de
+  `IndicacionMedica` están encriptados y sí se sirven: son suyos y los pide él.
+- **Contacto murió como sección**: eran cuatro datos y un formulario de "Envianos un mensaje" que no
+  mandaba nada a ningún lado. Bajaron al pie —que **no mostraba teléfono ni mail**—. De paso, en
+  escritorio no había ninguna forma de cerrar sesión.
+- La barra bajó de ocho entradas a cuatro o cinco.
+
+### "Portal cerrado" no cerraba nada
+
+`clubs.vista_paciente_activa` existía, se editaba en Configuración → Portal del paciente, se
+guardaba y viajaba en `/preferences`. **No lo leía nadie.** El admin lo apagaba, la pantalla le
+decía "Portal cerrado · Tus pacientes no ven esta sección", y sus pacientes entraban igual.
+
+Ahora es **`Club#portal_paciente_disponible?` = contratado Y abierto**, en un solo lugar, y la
+preguntan `User#rol_habilitado?` (el login) y `Portal::BaseController` (la sesión que ya estaba
+abierta cuando el admin lo cerró). El mensaje distingue **"lo tienen cerrado"** de **"no tienen el
+módulo"**: mandar a contratar lo que ya está comprado deja al admin buscando un botón que no existe.
+
+**Con migración de backfill.** La columna nació con `default: false`, así que sin escribir el valor
+que la realidad ya tenía, el día del deploy toda organización con el add-on y el interruptor sin
+tocar se quedaba sin pacientes. Es la misma regla que ya costó un susto con los módulos derivados:
+cuando un flag pasa a leerse, hay que backfillearlo.
+
+Corolario para los tests: **toda spec que contrate `vista_paciente` tiene que pasar
+`vista_paciente_activa: true`**. Son dos llaves. Se corrigieron ocho.
+
+### Configuración se cortaba en pantalla
+
+Ocho pestañas, y tres no eran configuración:
+
+- **Suscripción** eran dos datos, y calculaba el plan mirando `features.ia`/`features.benchmark`
+  devolviendo **"Premium IA / Pro / Standard"** — los planes VIEJOS; hoy son Básico y Total — más un
+  "acceso completo a todas las funcionalidades" que con suites es falso. Ahora es una tarjeta en
+  General con el plan real y los seis topes contra el uso, en rojo el que está lleno, que es lo
+  único accionable. (`usePlan` también defaulteaba a `'semilla'`.)
+- **Equipo** pasó al menú lateral: gestionar personas no es configurar la app, y su ruta
+  (`/usuarios`) ya era de primer nivel — la pestaña sólo la escondía entre ocho.
+- **Alertas** pasó a una tarjeta en General, y **su ruta se mudó bajo `/configuracion`**: colgada de
+  la raíz y sin pestaña quedaba sin ninguna puerta, y `detectGroup` hacía resaltar *Dashboard*
+  mientras estabas adentro.
+
+**Los webhooks salieron de la vista del admin.** No están rotos —`Dispensacion`, `Paciente` y `Lote`
+disparan de verdad vía `WebhookDispatcher`, con jobs y registro de entregas— pero configurar uno
+pide una URL de destino que sólo existe si el club ya tiene otro programa corriendo, y quien la
+consigue es un desarrollador. La maquinaria queda entera; el día que un cliente pida "mandame las
+dispensaciones a mi sistema contable", está y anda. **Integraciones pasó a ser la pantalla de
+WhatsApp**, gateada por su add-on: se mostraba siempre, y el candado estaba puesto sólo en
+`NotificacionDeliveryService`, así que se cargaban las credenciales de Twilio y no salía nada.
+
+Y aparecieron dos **rutas duplicadas sin ninguna puerta**: `/configuracion/sedes` y
+`/configuracion/equipo` montaban la misma pantalla que `/sedes` y `/usuarios`. Se llegaba sólo
+escribiendo la URL. Redirigen a las canónicas.
+
+### Sin internet
+
+- **La PWA instalada no abría.** `precacheAndRoute` guarda `index.html`, pero una navegación a `/m`
+  —que es el `start_url` del manifest— no matchea esa entrada: workbox prueba `/m.html` y
+  `/m/index.html`, que no existen, sale a la red y muere en el dinosaurio de Chrome. Se agregó
+  `NavigationRoute` con fallback al shell y denylist para `/api`, `/rails`, `/sidekiq`, `/cable` y
+  `/up`. En producción esto lo tapaba el `spa_fallback` de Rails; **offline no hay servidor, que es
+  justo cuando hace falta**.
+- **Las URLs de la cola llevaban `/api`, y el `baseURL` de axios también.** El reintento pegaba a
+  `/api/api/lotes/...` → 404. Y un 404 tiene `response`, así que `procesarCola` lo tomaba como error
+  de validación y lo marcaba FALLIDO en vez de reintentar. **Nada de lo encolado llegó nunca al
+  servidor**: los registros de ambiente cargados sin señal se perdieron, y lo único que se vio fue
+  "no pudieron sincronizarse".
+- **El cartel dejó de prometer.** Decía "los registros se guardan localmente" y eso valía para tres
+  flujos y para ninguno más. Ahora dice lo que siempre es verdad —que no hay conexión, y cuántas
+  cosas esperan irse— y cuenta las dos colas. Qué se guarda y qué no lo dice cada pantalla, que es
+  la única que lo sabe.
+
+**Qué se guarda sin señal, que es una decisión de dominio y quedó escrita en `lib/offlineApi.js`:**
+
+| | |
+|---|---|
+| Ambiente | **SÍ** — no mueve stock ni plata |
+| Pesaje del manicura | **SÍ** (nuevo) — está frente a la balanza y ya pesó; no genera stock, espera la confirmación del admin |
+| Entrega del repartidor | **SÍ**, en su propia cola — lo que se pierde es la FIRMA, y la persona ya se fue |
+| Dispensar | **NO** (se sacó) — descontaba de una caché que puede estar vieja: dos dispensadores sin señal entregan el mismo gramo |
+| `registrar_directo` del manicura | **NO** — genera stock en el acto |
+
+El pesaje encolado se reintenta con `force_new`: un 409 `needs_choice` ("¿seguir la jornada anterior
+o empezar una nueva?") no se le puede preguntar a nadie desde una cola que corre sola, y como tiene
+`response` la cola lo marcaría fallido y perdería el pesaje. Abrir una jornada nueva es la salida
+sin pérdida — el admin confirma dos en vez de una.
+
+**Queda sabido y sin resolver:** si la request llegó al servidor pero se perdió la respuesta, el
+item se reenvía y duplica. Le pasa a cualquier cola at-least-once. Para el pesaje el daño está
+acotado porque el admin ve dos jornadas y confirma una; la solución de fondo es una clave de
+idempotencia, que toca esquema y no se hizo.
+
+### Los tests leen la fuente, no la memoria
+
+Es la lección del bloque (r) aplicada: el test de rutas por rol pasaba en verde con el login del
+manicura roto porque repetía la misma lista equivocada que el código.
+
+- `portalPaciente.test.js` (24) **monta las pantallas** y afirma el texto que lee el paciente. El
+  build compila una variable inexistente sin chistar y la pantalla explota recién al abrirse.
+- `configuracionAdmin.test.js` (13) lee `useNavContext` y el router y exige que **toda ruta de
+  `/configuracion` tenga pestaña, enlace o redirect**. Fue el que encontró las duplicadas.
+- `sinConexion.test.js` (11) fija la política de qué se encola: si alguien mueve un flujo de cajón,
+  falla y tiene que venir a decir por qué.
+
+**2381 rspec · 1518 vitest · build limpio.**
+
 ## Agosto 2026 (r) — el manicura no podía trabajar, y el contable no se entendía
 
 Dos días de probar la app con alguien que no la escribió. Casi todo lo que apareció es de la

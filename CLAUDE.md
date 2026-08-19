@@ -102,7 +102,12 @@ Ninguno se considera cerrado; todos son candidatos a revisión.
 11. **ARICCAME** — reporte de dispensaciones y stock (feature flag por club). La transmisión está SIMULADA: no envía nada de verdad.
 12. **Super admin** — panel de plataforma como **cola de trabajo** (cada pendiente con su acción, agrupado por urgencia: se está perdiendo plata · paga y no le funciona · avisar con tiempo), organizaciones, **dos planes** (`PlanEnforcer`: básico/total, sólo límites), catálogo de módulos (`GET /super_admin/catalogo`), informes de plataforma, historial por organización. **El modo observador está SUSPENDIDO** (`User::OBSERVADOR_HABILITADO = false`). Un super_admin sin contexto que pega a un endpoint de organización recibe **409 explicando qué falta** (`block_super_admin_sin_contexto!`), no un 500.
 13. **Notificaciones** — push web, ActionCable, alertas internas por rol.
-14. **Portal del paciente** (`vista_paciente`, **add-on**) + carnets digitales. Cada paciente que se da de alta recibe su **cuenta** (`Pacientes::Acceso`): usuario `nombre.apellido@organizacion.paciente` y contraseña generada por paciente y dictable — nunca una fija, que acá sería fatal porque el usuario se deduce del nombre. La cuenta nace cuando el paciente queda ADMITIDO (mostrador: al aprobar), igual que el mail de bienvenida. **Sin el módulo el paciente no puede ni loguearse** (`User::MODULOS_POR_ROL`), como el repartidor sin Delivery. Lo que la organización le muestra a sus miembros —catálogo, novedades, eventos, galería, contacto— vive en `/portal` DENTRO del frontend y **detrás del login**. **El portal tiene su propia capa de tokens**, `design-system/portal.css`: define `--p-*` EN FUNCIÓN de los del DS, y `PortalShell` pisa las de marca con el `theme_primary` de cada organización —el único lugar del producto donde ese color tiene sentido, y no lo leía nadie. `portalTokens.test.js` barre las 13 pantallas y falla ante cualquier hex a mano o `bi-*`: **el baseline es CERO y tiene que quedarse en cero**. Es mobile-first, al revés que el resto de la app. **El INICIO del portal es lo que la organización PUBLICA** (eventos primero, que son lo único que caduca; después novedades y catálogo): es la contracara de lo que su admin configura en Configuración → Portal del paciente. Lo del paciente —sus retiros, su cuenta corriente, su cuenta— va en la barra, separado: entra a mirar qué hay de nuevo, no a revisar lo que ya hizo. Lo que NO puede esperar al scroll va en la franja de arriba (`PortalAvisos` + `GET /portal/mi_estado`), que **sólo se dibuja si hay algo que decir** —REPROCANN vencido o a menos de 30 días, saldo pendiente—: una franja que dice algo siempre se deja de leer a la semana. Antes era `web-publica/`, un Vite aparte sin sesión cuyo backend resolvía el club con `Club.first`: la web multi-club nunca funcionó y servía siempre el catálogo de la organización #1. **No hay vitrina pública de un club**: lo público de la plataforma es `/bienvenida`. Siguen sin login, a propósito, el carnet (`/c/:token`) y el pasaporte de dispensa (`/d/:token`), que son links que la persona entrega. **La contraseña le llega por mail** (`PacienteMailer#acceso_portal`, mail FIJO — no plantilla editable: si alguien borra la variable, el paciente recibe algo que no sirve). Necesita el módulo `mailer` + casilla conectada + mail del paciente; si falta alguna, la ficha lo dice ANTES de crear la cuenta y la contraseña se muestra en pantalla como única salida. **No queda en el historial de correo**: el registro dice que se le mandó el acceso, no cuál es. La cuenta se GESTIONA desde la ficha del paciente (tab "Acceso al portal", admin/médico): se ve el usuario, se crea la de los pacientes viejos —que no tienen— y se genera una contraseña nueva. El paciente ve **su cuenta corriente** en `/portal/cuenta-corriente`, y el enlace aparece SÓLO si la organización se la abrió —a quien paga al contado, una sección con saldo cero le hace creer que debe algo. El saldo interno arranca en 0 y va a negativo con el uso del crédito: en el portal se traduce a "debés" / "tenés a favor". Ve su usuario y cambia su contraseña en `/portal/cuenta`, DENTRO del portal: `/perfil` vive en el shell de administración y ahí ve una app que no es la suya. Falta su tablero —carnet y estado del REPROCANN— y por eso el add-on está en `ADDONS_INCOMPLETOS`. **El QR de dispensa con DNI (`/d/:token`) es aparte y sigue igual**: es de la persona, no del portal, y tiene que andar aunque no tenga cuenta.
+14. **Portal del paciente** (`vista_paciente`, **add-on**) + carnets digitales. Cada paciente que se da de alta recibe su **cuenta** (`Pacientes::Acceso`): usuario `nombre.apellido@organizacion.paciente` y contraseña generada por paciente y dictable — nunca una fija, que acá sería fatal porque el usuario se deduce del nombre. La cuenta nace cuando el paciente queda ADMITIDO. **Sin el módulo el paciente no puede ni loguearse** (`User::MODULOS_POR_ROL`), como el repartidor sin Delivery.
+    **Son DOS llaves y hacen falta las dos:** el add-on CONTRATADO (lo prende el super admin) y el portal ABIERTO (`clubs.vista_paciente_activa`, el interruptor de la organización en Configuración → Portal del paciente). La regla vive en **`Club#portal_paciente_disponible?`** y la preguntan el login (`User#rol_habilitado?`) y `Portal::BaseController` — cerrado, el paciente no entra ni con la sesión abierta. El interruptor existía desde antes y **no lo leía nadie**: se guardaba, se mostraba y no hacía nada. Toda spec que contrate `vista_paciente` tiene que pasar `vista_paciente_activa: true`.
+    **EL INICIO ES EL ESTADO DEL PACIENTE, no el boletín.** En orden: su **credencial** (nombre, DNI, número de socio y el REPROCANN como semáforo; a pantalla completa con QR, porque es lo único del producto que se usa PARADO, en la puerta) · **lo suyo** (próximo turno, indicación vigente, cuenta corriente, último retiro) · **del club** en dos renglones. El boletín —novedades, eventos, catálogo, galería— vive entero en `/portal/del-club`: se movió porque está VACÍO en cualquier organización que no publique, que son casi todas casi todas las semanas, y el estado del paciente no está vacío nunca. **El estado del REPROCANN va DENTRO de la credencial**, no en una franja aparte: es la misma pregunta (¿puede retirar?). `PortalAvisos` se quedó sólo con lo urgente.
+    **`/portal/mi-salud`** es lo clínico: turnos e indicación médica. Se arma con **lista blanca campo por campo, NUNCA `as_json`** — `Turno#notas_post` son las notas del médico para el médico y no salen jamás; los campos encriptados de `IndicacionMedica` sí, porque son suyos. **No hay sección Contacto**: eran cuatro datos y un formulario que no mandaba nada, y viven en el pie.
+    **El portal tiene su propia capa de tokens**, `design-system/portal.css`: define `--p-*` EN FUNCIÓN de los del DS, y `PortalShell` pisa las de marca con el `theme_primary` de cada organización. `portalTokens.test.js` barre las pantallas y falla ante cualquier hex a mano o `bi-*`: **el baseline es CERO y tiene que quedarse en cero**. Es mobile-first, al revés que el resto de la app.
+    **La contraseña le llega por mail** (`PacienteMailer#acceso_portal`, mail FIJO — no plantilla editable). Necesita el módulo `mailer` + casilla conectada + mail del paciente; si falta alguna, la ficha lo dice ANTES de crear la cuenta y la contraseña se muestra en pantalla. **No queda en el historial de correo**: el registro dice que se le mandó el acceso, no cuál es. La cuenta se GESTIONA desde la ficha del paciente (tab "Acceso al portal", admin/médico). El paciente ve su cuenta corriente en `/portal/cuenta-corriente`, y el enlace aparece SÓLO si la organización se la abrió. Ve su usuario y cambia su contraseña en `/portal/cuenta`, DENTRO del portal. Siguen sin login, a propósito, el carnet (`/c/:token`) y el pasaporte de dispensa (`/d/:token`), que son links que la persona entrega. **No hay vitrina pública de un club**: lo público de la plataforma es `/bienvenida`; `web-publica/` se retiró (era un Vite aparte sin sesión cuyo backend resolvía el club con `Club.first`).
 15. **App móvil** (Capacitor) — cultivador y manicura principalmente; vistas bajo `/m`.
 16. **Asistente IA por voz** — parsear/ejecutar comandos. **Todo el consumo se mide y se cobra**: ver "IA" abajo.
 17. **Correo electrónico** — **add-on contratable** (`mailer`, con `require_feature!` real). Pantalla propia en Configuración → Correo: casilla SMTP de la organización + **plantillas que edita su admin** (variables `{{nombre}}` por lista blanca con `gsub`, **nunca ERB**). Bienvenida al alta (admin/médico en el acto; mostrador al aprobar) y **envíos masivos** (`EnvioMasivo` + `EnvioMasivoJob`): **un mail por destinatario, jamás un `To:` múltiple ni BCC** — juntos, cada paciente recibiría el padrón completo (fuga de datos de salud, Ley 25.326). Tope propio de 450/día (`Correo::CupoDiario`), por debajo de los ~500 de Gmail: pasarse **suspende la casilla del cliente**. Se chequea ANTES de crear el envío.
@@ -244,10 +249,23 @@ Cuando Germán plantee un problema o feature nueva antes de implementar:
 
 Suite 1239 ✓ + 58 vitest ✓. **Deploy: sumar `add_vendible_a_bar_venta_items` y `add_consumo_evento_a_provisiones_y_dispensas` al `db:migrate`.**
 
-## 📍 Dónde retomar (15-ago-2026)
+## 📍 Dónde retomar (19-ago-2026)
 
-**2145 rspec (0 fallas, 26 pending del observador suspendido) + 1348 vitest + build limpio.**
-Los bloques de agosto están en `docs/CHANGELOG.md` hasta "Agosto 2026 (r)".
+**2381 rspec (0 fallas, 26 pending del observador suspendido) + 1518 vitest + build limpio.**
+Los bloques de agosto están en `docs/CHANGELOG.md` hasta "Agosto 2026 (s)".
+
+**Pendiente de documentar:** el bloque (s) cubre el portal clínico, el gate del portal, la limpieza
+de Configuración y lo de sin-conexión. **Sigue sin entrada en el CHANGELOG lo del 17 y 18 de
+agosto** —chatbot del admin, medición de IA en créditos, informe INASE, trazabilidad de
+aplicaciones—, que son de otras sesiones.
+
+**Dos decisiones abiertas, las dos comerciales:**
+- `vista_paciente` sigue en `Club::ADDONS_INCOMPLETOS` con el texto "falta su tablero (carnet y
+  dispensaciones)". Eso ya está hecho: falta decidir si se saca del cajón y se vende.
+- La clave de idempotencia para la cola offline. Si la request llegó al servidor pero se perdió la
+  respuesta, el item se reenvía y duplica (le pasa a cualquier cola at-least-once). Para el pesaje
+  del manicura el daño está acotado —el admin ve dos jornadas y confirma una—, pero la solución de
+  fondo toca esquema y por eso no se hizo.
 
 **`rake categorias:aplanar` YA CORRIÓ en producción (15-ago).** No repetir: es idempotente pero
 no tiene nada que hacer. El catálogo quedó de un solo nivel.
@@ -346,6 +364,29 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   que pudiera registrar cómo terminó un paquete que ya salió — quedan abiertos para siempre.
   Los cierra el admin. Misma lógica que `AplicarBajasModulosJob`, que no toca lo que está en
   viaje. Por eso `Dispensacion#delivery_contratado` es `on: :create`.
+- **El portal del paciente necesita DOS llaves: contratado Y abierto.** `Club#portal_paciente_disponible?`
+  es el único lugar donde vive, y la preguntan el login y `Portal::BaseController`. El interruptor
+  `vista_paciente_activa` existió meses **sin que lo leyera nadie**: se guardaba, se mostraba en
+  pantalla y el paciente entraba igual. Toda spec que contrate `vista_paciente` tiene que pasar
+  `vista_paciente_activa: true`.
+- **Lo clínico del paciente se serializa con LISTA BLANCA campo por campo, nunca `as_json`.**
+  `Turno#notas_post` son las notas del médico PARA EL MÉDICO y no salen jamás. Los campos
+  encriptados de `IndicacionMedica` sí se le sirven al paciente: son suyos y los pide él. Con
+  `as_json`, una columna nueva se filtra sola.
+- **SIN SEÑAL NO SE DISPENSA.** Es la única escritura que mueve stock y plata a la vez, y encolarla
+  descontaba de una caché local que puede estar vieja: dos dispensadores sin señal entregaban el
+  mismo gramo y el sobregiro aparecía al reconectar, con la mercadería ya afuera. Lo que SÍ se
+  encola: ambiente, el pesaje del manicura (no genera stock, espera confirmación del admin) y la
+  entrega del repartidor (que tiene cola propia: lo que se pierde ahí es la FIRMA). La lista vive
+  en `lib/offlineApi.js` y `sinConexion.test.js` la fija.
+- **Las URLs que se encolan van SIN `/api`:** el `baseURL` de axios ya lo trae. Con el prefijo, el
+  reintento pegaba a `/api/api/...` → 404, y como un 404 tiene `response` la cola lo marcaba
+  FALLIDO en vez de reintentar. Nada de lo encolado llegó nunca al servidor.
+- **El service worker necesita `NavigationRoute`.** Sin él la PWA instalada NO ABRE sin internet:
+  `start_url` es `/m` y esa navegación no matchea la entrada `index.html` del precache. En
+  producción lo tapa el `spa_fallback` de Rails; offline no hay servidor, que es justo cuando hace
+  falta. `/me` sigue SIN cachearse a propósito (servido del caché, tras un logout devolvía el
+  usuario viejo).
 - **Un módulo se pide por su clave NUEVA y en un solo lugar.** Chequear la vieja (`ia_voz`) con
   la nueva guardada (`ia`) daba false: `feature?` resuelve viejo ⇒ nuevo, no al revés. Rompía el
   registro por voz de toda organización moderna con el botón a la vista.
