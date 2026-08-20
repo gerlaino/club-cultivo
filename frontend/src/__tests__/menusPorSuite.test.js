@@ -1,4 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { resolve, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 vi.mock('../stores/auth', () => ({ useAuthStore: () => ({ user: null }) }))
 vi.mock('../composables/useToast', () => ({ useToast: () => ({ warning: vi.fn() }) }))
@@ -77,5 +80,38 @@ describe('ningún menú ofrece lo que el club no contrató', () => {
     for (const key of ['dashboard', 'config']) {
       expect(NAV_GROUPS.find(g => g.key === key)?.feature).toBeUndefined()
     }
+  })
+})
+
+// AC: todo grupo del menú lateral tiene su ícono.
+//
+// Ya pasó DOS veces: Contabilidad y Equipo salieron a primer nivel y quedaron como el único
+// renglón desnudo del menú, porque el ícono se declara en `AdminSidebar` y el grupo en
+// `useNavContext` — dos archivos que hay que acordarse de tocar juntos. Esto lo verifica solo.
+describe('Los íconos del menú lateral', () => {
+  const sidebar = readFileSync(
+    resolve(dirname(fileURLToPath(import.meta.url)), '../components/layout/AdminSidebar.vue'),
+    'utf8',
+  )
+
+  /** Las claves del mapa ICONS del sidebar. */
+  const conIcono = new Set(
+    [...sidebar.slice(sidebar.indexOf('const ICONS'), sidebar.indexOf('\n}', sidebar.indexOf('const ICONS')))
+      .matchAll(/^\s*([a-z_]+):\s*[A-Z]/gm)].map(m => m[1]),
+  )
+
+  for (const grupo of NAV_GROUPS) {
+    it(`${grupo.key} tiene ícono`, () => {
+      expect(conIcono.has(grupo.key), `agregá "${grupo.key}" al mapa ICONS de AdminSidebar.vue`).toBe(true)
+    })
+  }
+
+  // Dos renglones con el mismo dibujo se leen como la misma cosa. Pacientes ya usa `Users`, así
+  // que Equipo NO puede usarlo.
+  it('ningún ícono se repite entre grupos', () => {
+    const usados = [...sidebar.slice(sidebar.indexOf('const ICONS'), sidebar.indexOf('\n}', sidebar.indexOf('const ICONS')))
+      .matchAll(/^\s*[a-z_]+:\s*([A-Za-z]+),?$/gm)].map(m => m[1])
+
+    expect(new Set(usados).size, `íconos repetidos: ${usados.join(', ')}`).toBe(usados.length)
   })
 })

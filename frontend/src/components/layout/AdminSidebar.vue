@@ -35,7 +35,7 @@ import { useRoute } from 'vue-router'
 import {
   LayoutDashboard, Sprout, Users, Factory, ShoppingCart,
   CheckSquare, BarChart3, Settings, PanelLeftClose, PanelLeftOpen, Wine, Building2, Warehouse,
-  Calculator,
+  Calculator, UserCog,
 } from 'lucide-vue-next'
 import { NAV_GROUPS, detectGroup, useNavContext } from '../../composables/useNavContext.js'
 import { useClubStore } from '../../stores/club.js'
@@ -47,12 +47,17 @@ const { collapsed, toggleCollapse, refreshBadges, badgeFor } = useNavContext()
 const ICONS = {
   dashboard: LayoutDashboard,
   sedes:     Building2,
+  // Equipo salió de las pestañas de Configuración y pasó a ser de primer nivel. `UserCog` y no
+  // `Users`, que ya es Pacientes: dos renglones con el mismo ícono se leen como lo mismo. Y acá
+  // se administran personas —altas, roles, horas—, que es justo lo que sugiere el engranaje.
+  equipo:    UserCog,
   cultivo:   Sprout,
   pacientes: Users,
   produccion: Factory,
   deposito:  Warehouse,
   // Contabilidad salió del grupo Comercial y pasó a ser de primer nivel: sin su ícono quedaba
-  // como el único renglón desnudo del menú.
+  // como el único renglón desnudo del menú. Pasó DOS veces (Contabilidad y Equipo), así que ahora
+  // hay un test que exige un ícono por grupo — ver `iconosDelMenu` en menusPorSuite.test.js.
   contabilidad: Calculator,
   comercial: ShoppingCart,
   salon:     Wine,

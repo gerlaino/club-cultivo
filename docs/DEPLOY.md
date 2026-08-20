@@ -97,11 +97,32 @@ dosificación, vía de administración, observaciones y DNI.
 `BACKUP_BUCKET`, `DATABASE_URL`, y credenciales: usa `BACKUP_S3_ACCESS_KEY_ID` /
 `BACKUP_S3_SECRET_ACCESS_KEY` si existen, y si no cae en las de la app (`S3_*`).
 
-**En Render, un Cron Job NO hereda las variables del web service.** Hay que cargárselas. Esa es la
-causa más probable de que `db-backup-diario` venga fallando. El rake aborta con un mensaje claro
-(`✗ Falta la variable BACKUP_BUCKET`), así que el log dice exactamente qué falta.
+**En Render, un Cron Job NO hereda las variables del web service.** Hay que cargárselas una por una.
 
-También necesita `pg_dump` en el PATH y de una versión compatible con el servidor.
+> **La causa por la que falló 13 días ya está arreglada, y era nuestra, no de Render.** El log
+> decía `Falta ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY` — una clave que el backup **no usa**. Pasaba
+> porque el `Rakefile` hace `require_relative "config/application"`, y la verificación de esas
+> claves estaba suelta en el cuerpo de la clase: se disparaba con CUALQUIER rake, incluidos los
+> escritos a propósito sin `:environment`. Ahora es un `initializer`, que se ejecuta recién cuando
+> la app arranca de verdad.
+>
+> **El cron NO debe tener las claves de cifrado**, y eso no es una concesión: produce un dump con
+> los datos cifrados adentro. Darle además las llaves sería guardar la caja fuerte y la llave en el
+> mismo lugar.
+
+Variables que el cron **sí** necesita:
+
+```
+DATABASE_URL                     ← la de producción
+BACKUP_BUCKET
+BACKUP_S3_ACCESS_KEY_ID          (o S3_ACCESS_KEY_ID)
+BACKUP_S3_SECRET_ACCESS_KEY      (o S3_SECRET_ACCESS_KEY)
+S3_ENDPOINT                      ← R2: https://<account_id>.r2.cloudflarestorage.com
+S3_REGION=auto
+```
+
+También necesita `pg_dump` en el PATH y de una versión compatible con el servidor. Después de
+cargarlas, correr el job a mano ("Trigger Run") y verificar con `rake backup:list`.
 
 ---
 
@@ -145,8 +166,9 @@ Antes de promover a producción, mirar en preproducción:
 
 ## 6. Deudas conocidas de infraestructura
 
-1. **`db-backup-diario` falla desde el 7-ago.** Es lo más urgente de todo lo que hay acá: son
-   **13+ días sin respaldo de la base de producción**. Empezar por el log del cron.
+1. **`db-backup-diario` falló desde el 7-ago: 13+ días sin respaldo de la base de producción.**
+   La causa está arreglada en el código (ver §3.3); falta **cargarle las variables al cron y
+   dispararlo a mano** para confirmar que sube el dump.
 2. **Cuatro servicios muertos** (`club-cultivo-stg*`, `club-cultivo-staging*`) de dos intentos de
    staging. Borrarlos: ocupan lugar y hacen imposible saber cuál es cuál. Antes, verificar si
    `club-cultivo-staging-db` tiene algo que valga la pena.

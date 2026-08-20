@@ -53,15 +53,31 @@ module App
     # Las claves viajan por ENV: credentials.yml.enc está gitignored (per-entorno),
     # así que no sirve para propagar claves a prod. Mismo patrón que DEVISE_JWT_SECRET_KEY.
     # Sin claves la app NO arranca — no hay fallback silencioso.
-    %w[
-      ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY
-      ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY
-      ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT
-    ].each do |var|
-      next if ENV[var].present?
-      raise "Falta #{var}: la app no arranca sin las claves de cifrado at-rest " \
-            "(datos sensibles de salud). No hay fallback. Definila en backend/.env (dev) " \
-            "o en las env vars del deploy (prod)."
+    #
+    # Va como INITIALIZER y no suelto en el cuerpo de la clase, y la diferencia importa: un
+    # initializer se REGISTRA al definir la clase pero se EJECUTA recién en
+    # `Rails.application.initialize!`, o sea sólo cuando la app arranca de verdad.
+    #
+    # Suelto en el cuerpo se disparaba con el simple `require_relative "config/application"` del
+    # Rakefile, es decir en CUALQUIER tarea de rake. Eso rompía `rake backup:create`, que está
+    # escrita a propósito SIN depender de `:environment` porque sólo necesita `pg_dump` y las
+    # credenciales de S3. Resultado: **el backup diario de producción falló durante 13 días**
+    # pidiendo unas claves que no usa para nada.
+    #
+    # Y que no las tenga es lo correcto: el backup produce un dump con los datos cifrados adentro.
+    # Darle además las claves para descifrarlos sería guardar la caja fuerte y la llave en el
+    # mismo lugar.
+    initializer 'cultivo.verificar_claves_de_cifrado', before: :load_config_initializers do
+      %w[
+        ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY
+        ACTIVE_RECORD_ENCRYPTION_DETERMINISTIC_KEY
+        ACTIVE_RECORD_ENCRYPTION_KEY_DERIVATION_SALT
+      ].each do |var|
+        next if ENV[var].present?
+        raise "Falta #{var}: la app no arranca sin las claves de cifrado at-rest " \
+              "(datos sensibles de salud). No hay fallback. Definila en backend/.env (dev) " \
+              "o en las env vars del deploy (prod)."
+      end
     end
 
     config.active_record.encryption.primary_key         = ENV["ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY"]
