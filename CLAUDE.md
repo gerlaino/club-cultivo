@@ -428,6 +428,12 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 
 ### Antes de tocar producción
 
+**La infraestructura está documentada en `docs/DEPLOY.md`** (20-ago): qué es cada servicio de
+Render —incluido que **`cultivo-staging-api` ES PRODUCCIÓN**, el nombre quedó de cuando se levantó
+apurado—, las 25+ variables de entorno con qué se rompe si falta cada una, y qué NUNCA se comparte
+entre ambientes. `render.yaml` declara **sólo preproducción** a propósito: aplicar un blueprint
+sobre servicios de producción configurados a mano es cómo se rompió la última vez.
+
 **Las migraciones NO son un pendiente: se corren solas al deployar.** `bin/render-build.sh`
 hace `bundle install`, `npm ci`, build del front y `rails db:migrate` como Build Command de
 Render, con `set -o errexit` (si una migración falla, falla el deploy entero). No volver a
