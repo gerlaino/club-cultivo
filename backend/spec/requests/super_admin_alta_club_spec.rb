@@ -132,10 +132,15 @@ RSpec.describe 'SuperAdmin alta de club', type: :request do
       expect(User.find_by(email: body['usuarios'].first['email']).valid_password?('ClaveDelClub1')).to be(true)
     end
 
-    it 'sin contraseña explícita devuelve la que usó por defecto' do
+    # Antes caía en `Club::PASSWORD_DEFAULT`, que sin la variable de entorno era '123456Aa' para
+    # TODA la plataforma. Ahora se genera una y se devuelve para dictarla.
+    it 'sin contraseña explícita genera una temporal y la devuelve' do
       body = alta
 
-      expect(body['password_inicial']).to eq(Club::PASSWORD_DEFAULT)
+      expect(body['password_inicial']).to be_present
+      expect(body['password_inicial']).not_to eq('123456Aa')
+      expect(User.find_by(email: body['usuarios'].first['email'])
+                 .valid_password?(body['password_inicial'])).to be(true)
     end
   end
 end

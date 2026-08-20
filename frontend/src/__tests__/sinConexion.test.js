@@ -205,3 +205,59 @@ describe('La cola distingue "ya estaba hecho" de "falló"', () => {
     expect(queue.fallidos.length).toBe(0)
   })
 })
+
+// AC: lo que se guardó sin señal no se borra solo.
+describe('La cola no descarta trabajo por vieja', () => {
+  beforeEach(() => { setActivePinia(createPinia()); localStorage.clear(); vi.resetModules() })
+
+  // Había un TTL de 48 h "para evitar entradas huérfanas". Entradas huérfanas no existen:
+  // `marcarEnviado` BORRA el item, así que todo lo que sobrevive es trabajo real sin enviar. El TTL
+  // sólo podía borrar eso, y lo hacía en silencio al cargar. Caso concreto: la manicura pesa un
+  // viernes en un galpón sin señal y no abre la app hasta el lunes.
+  it('un pendiente de hace cuatro días sigue estando', async () => {
+    const hace4dias = new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString()
+    localStorage.setItem('cc_sync_queue', JSON.stringify([{
+      id: 'x', tipo: 'pesaje_manicura', url: '/lotes/1/pesajes_manicura',
+      method: 'POST', payload: { peso_total_g: 100 },
+      timestamp: hace4dias, attempts: 0, status: 'pendiente',
+    }]))
+
+    const { useSyncQueueStore } = await import('../stores/syncQueue.js')
+
+    expect(useSyncQueueStore().pendientes.length).toBe(1)
+  })
+
+  it('sólo se va cuando el servidor lo confirma o alguien lo borra', async () => {
+    const { useSyncQueueStore } = await import('../stores/syncQueue.js')
+    const queue = useSyncQueueStore()
+    const item = queue.encolar('pesaje_manicura', { url: '/lotes/1/pesajes_manicura', payload: {} })
+
+    queue.marcarEnviado(item.id)
+
+    expect(queue.total).toBe(0)
+  })
+})
+
+// AC: el panel de plataforma no reparte una contraseña conocida.
+describe('El alta de usuarios del super admin', () => {
+  // Venía precargada con '123456Aa', la misma para toda la plataforma: sabiendo el email de
+  // cualquiera se entraba. Ahora el campo arranca vacío y el backend genera una temporal.
+  it('no precarga ninguna contraseña en el formulario', () => {
+    // Se mira el VALOR INICIAL, no si la clave vieja aparece en el archivo: un comentario que
+    // explique de dónde venimos es documentación, no una credencial.
+    for (const v of ['views/superadmin/SAUsuarios.vue', 'views/superadmin/SAClubDetail.vue']) {
+      const inicializaciones = [...leer(v).matchAll(/password:\s*'([^']*)'/g)].map(m => m[1])
+
+      expect(inicializaciones.length, `${v}: no se encontró el campo password`).toBeGreaterThan(0)
+      for (const valor of inicializaciones) {
+        expect(valor, `${v} arranca con la contraseña "${valor}" precargada`).toBe('')
+      }
+    }
+  })
+
+  // Si no se muestra, nadie puede dictarla y el alta queda inservible.
+  it('muestra la generada para poder dictarla', () => {
+    expect(leer('views/superadmin/SAUsuarios.vue')).toContain('password_inicial')
+    expect(leer('views/superadmin/SAClubDetail.vue')).toContain('password_inicial')
+  })
+})

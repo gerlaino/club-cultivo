@@ -56,12 +56,15 @@ def crear_club(name:, plan:, users_data:)
     plan:       plan,
     plan_trial: false,
     )
+  # Una temporal generada, no una fija escrita acá: esto corre contra PRODUCCIÓN. Se imprime al
+  # final para poder dictarla.
+  password_inicial = User.password_temporal
   users_data.each do |u|
     User.create!(
       club:                  club,
       email:                 u[:email],
-      password:              '123456Aa',
-      password_confirmation: '123456Aa',
+      password:              password_inicial,
+      password_confirmation: password_inicial,
       role:                  u[:role],
       first_name:            u[:first_name],
       last_name:             u[:last_name],
@@ -127,4 +130,4 @@ crear_club(
   ]
 )
 
-puts "\nSEED COMPLETADO - Contrasena: 123456Aa"
+puts "\nSEED COMPLETADO - Contrasena (anotala, no se vuelve a mostrar): #{password_inicial}"

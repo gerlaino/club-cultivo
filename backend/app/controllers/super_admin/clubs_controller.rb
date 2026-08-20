@@ -26,7 +26,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       # Sólo los roles que el alta ofrece. No alcanza con sacarlos de la pantalla: el endpoint
       # acepta lo que le manden y un rol no ofrecido entraría igual por la API.
       roles    = (Array(params[:roles_a_crear]).map(&:to_s) & Club::ROLES_ALTA).presence || Club::ROLES_DEFAULT
-      password = params[:password_inicial].presence || Club::PASSWORD_DEFAULT
+      password = params[:password_inicial].presence || User.password_temporal
       usuarios = club.crear_usuarios_default!(roles: roles, password: password)
       club.crear_geneticas_default!
       render json: {

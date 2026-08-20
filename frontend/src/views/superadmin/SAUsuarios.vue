@@ -19,7 +19,13 @@ const filterRole = ref('todos')
 
 const showCreate = ref(false)
 const createError = ref(null)
-const form = ref({ email: '', first_name: '', last_name: '', role: 'admin', club_id: '', password: '123456Aa' })
+// El campo arranca VACÍO. Venía precargado con '123456Aa', la misma clave para toda la plataforma:
+// sabiendo el email de cualquiera se entraba. Ahora, si se deja vacío, el backend genera una
+// temporal y dictable, y se muestra acá abajo una sola vez.
+const form = ref({ email: '', first_name: '', last_name: '', role: 'admin', club_id: '', password: '' })
+// La contraseña del último usuario creado, para poder dictarla. El endpoint la devuelve en claro a
+// propósito: es temporal y Devise pide cambiarla al entrar.
+const passwordCreada = ref(null)
 
 function formatDate(d) {
   if (!d) return '—'
@@ -64,8 +70,9 @@ async function handleCreate() {
   try {
     const { data } = await createSuperAdminUser(form.value)
     users.value.unshift(data)
+    passwordCreada.value = { email: data.email, password: data.password_inicial }
     showCreate.value = false
-    form.value = { email: '', first_name: '', last_name: '', role: 'admin', club_id: '', password: '123456Aa' }
+    form.value = { email: '', first_name: '', last_name: '', role: 'admin', club_id: '', password: '' }
   } catch (e) {
     createError.value = e?.response?.data?.errors?.join(', ') || 'Error al crear usuario'
   } finally {
@@ -95,6 +102,21 @@ onMounted(cargar)
       </div>
       <button class="sau__btn-primary" @click="showCreate = true">
         <i class="bi bi-person-plus"></i> Nuevo usuario
+      </button>
+    </div>
+
+    <!-- La contraseña del recién creado. Se muestra UNA vez y hay que anotarla: no queda guardada
+         en ningún lado en claro. Antes no hacía falta mostrarla porque era siempre la misma para
+         toda la plataforma, que es exactamente el problema que esto resuelve. -->
+    <div v-if="passwordCreada" class="sau__pass">
+      <i class="bi bi-key"></i>
+      <span>
+        <strong>{{ passwordCreada.email }}</strong> — contraseña temporal:
+        <code class="sau__pass-code">{{ passwordCreada.password }}</code>
+        · dictásela ahora, no se vuelve a mostrar.
+      </span>
+      <button class="sau__pass-x" aria-label="Cerrar" @click="passwordCreada = null">
+        <i class="bi bi-x-lg"></i>
       </button>
     </div>
 
@@ -190,8 +212,12 @@ onMounted(cargar)
               </div>
               <div class="sau__field sau__field--full">
                 <label class="sau__label">Contraseña inicial</label>
-                <input v-model="form.password" type="password" autocomplete="new-password" class="sau__input" />
-                <span style="font-size:.72rem;color:#94a3b8">El usuario deberá cambiarla al ingresar</span>
+                <input v-model="form.password" type="text" autocomplete="off" spellcheck="false"
+                       placeholder="Dejalo vacío y se genera una" class="sau__input" />
+                <span style="font-size:.72rem;color:#94a3b8">
+                  Si lo dejás vacío se genera una temporal y te la mostramos para dictarla. El
+                  usuario debe cambiarla al ingresar.
+                </span>
               </div>
             </div>
           </div>
@@ -211,6 +237,24 @@ onMounted(cargar)
 </template>
 
 <style scoped>
+.sau__pass {
+  display: flex; align-items: center; gap: .6rem;
+  background: var(--c-amber-100); color: var(--c-slate-900);
+  border: 1px solid var(--c-amber-500);
+  border-radius: 10px; padding: .7rem 1rem; margin-bottom: 1rem;
+  font-size: .82rem;
+}
+.sau__pass-code {
+  font-family: var(--font-mono); font-weight: 700; font-size: .9rem;
+  background: #fff; padding: .1rem .45rem; border-radius: 6px;
+  user-select: all;
+}
+.sau__pass-x {
+  margin-left: auto; background: none; border: 0; cursor: pointer;
+  color: var(--c-slate-500); display: flex; padding: .2rem;
+}
+.sau__pass-x:hover { color: var(--c-slate-900); }
+
 .sau { padding: 2rem 2.5rem 3rem; }
 .sau__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; }
 .sau__eyebrow { font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--c-slate-400); margin-bottom: .35rem; }

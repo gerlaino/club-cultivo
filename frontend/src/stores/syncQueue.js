@@ -2,17 +2,25 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
 const STORAGE_KEY = 'cc_sync_queue'
-const TTL_MS = 48 * 60 * 60 * 1000 // 48h — evita acumulación de entradas huérfanas
 
+/**
+ * NO HAY TTL, y sacarlo fue un arreglo, no un descuido.
+ *
+ * Había uno de 48 h "para evitar acumulación de entradas huérfanas". El problema es que entradas
+ * huérfanas no existen: `marcarEnviado` BORRA el item, así que todo lo que sobrevive acá está
+ * `pendiente` o `fallido` — o sea, trabajo real que todavía no llegó al servidor. El TTL sólo podía
+ * borrar eso, y lo borraba **en silencio**, reescribiendo el localStorage al cargar.
+ *
+ * El caso concreto: la manicura pesa un viernes a la tarde en un galpón sin señal y no vuelve a
+ * abrir la app hasta el lunes. El pesaje desaparecía y nadie se enteraba — justo lo que la cola
+ * venía a proteger.
+ *
+ * Se descarta sólo por dos vías, las dos deliberadas: el servidor lo confirma, o alguien lo elimina
+ * a mano.
+ */
 function load() {
   try {
-    const now  = Date.now()
-    const all  = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
-    const valid = all.filter(i => !i.timestamp || now - new Date(i.timestamp).getTime() < TTL_MS)
-    if (valid.length < all.length) {
-      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(valid)) } catch {}
-    }
-    return valid
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
   } catch { return [] }
 }
 function persist(items) {

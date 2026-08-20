@@ -45,7 +45,9 @@ class SuperAdmin::CatalogoController < SuperAdmin::BaseController
         { clave: clave, label: t[:label], limite_hora: t[:limite_hora],
           limite_mes: t[:limite_mes], color: t[:color] }
       },
-      password_default: Club::PASSWORD_DEFAULT,
+      # `password_default` NO viaja más: era la credencial fija de la plataforma, y el panel la
+      # usaba para precargar el campo del formulario. Ahora cada alta genera la suya y el endpoint
+      # de creación la devuelve en `password_inicial` para dictarla.
     }
   end
 

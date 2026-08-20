@@ -23,7 +23,7 @@ const error   = ref(null)
 const showPlanModal = ref(false)
 const showUserModal = ref(false)
 const planForm = ref({ plan: '', plan_activo_hasta: '', trial: false })
-const userForm = ref({ first_name: '', last_name: '', email: '', email_personal: '', password: '123456Aa', role: 'cultivador' })
+const userForm = ref({ first_name: '', last_name: '', email: '', email_personal: '', password: '', role: 'cultivador' })
 const userError = ref(null)
 
 const editingInfo  = ref(false)
@@ -161,7 +161,7 @@ function abrirPlanModal() {
 }
 
 function abrirUserModal() {
-  userForm.value = { first_name: '', last_name: '', email: '', email_personal: '', password: '123456Aa', role: 'cultivador' }
+  userForm.value = { first_name: '', last_name: '', email: '', email_personal: '', password: '', role: 'cultivador' }
   userError.value = null
   showUserModal.value = true
 }
@@ -190,10 +190,12 @@ async function crearUsuario() {
   saving.value = true
   userError.value = null
   try {
-    await createSuperAdminUser({ ...userForm.value, club_id: id })
+    const { data } = await createSuperAdminUser({ ...userForm.value, club_id: id })
     await cargar()
     showUserModal.value = false
-    toast.success('Usuario creado')
+    // La contraseña se muestra UNA vez: si se dejó el campo vacío, la generó el backend y nadie
+    // más la sabe. Antes no hacía falta mostrarla porque era la misma para toda la plataforma.
+    toast.success(`Usuario creado — contraseña temporal: ${data.password_inicial}`, { timeout: 20000 })
   } catch (e) {
     userError.value = e?.response?.data?.errors?.join(', ') || 'Error al crear el usuario'
   } finally {
@@ -643,10 +645,14 @@ onMounted(async () => {
                 </div>
                 <div class="scd__field">
                   <label class="scd__lbl">Contraseña inicial</label>
-                  <!-- Visible: es temporal y hay que poder dictársela a quien va a usarla.
-                       Detrás de puntitos había que acordarse de lo que uno acababa de tipear. -->
+                  <!-- Visible y VACÍA por defecto. Venía precargada con la misma clave para toda la
+                       plataforma; ahora, en blanco, el backend genera una temporal y dictable y se
+                       muestra al crear. Sigue en texto plano a propósito: es temporal y hay que
+                       poder dictársela a quien va a usarla. -->
                   <input v-model="userForm.password" type="text" autocomplete="off" spellcheck="false"
+                         placeholder="Dejalo vacío y se genera una"
                          class="scd__input scd__input--mono" />
+                  <span class="scd__hint">Se muestra una sola vez al crear. La persona la cambia al entrar.</span>
                 </div>
                 <div class="scd__field">
                   <label class="scd__lbl">Rol</label>

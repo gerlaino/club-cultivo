@@ -35,3 +35,7 @@ frontend/.cache
 # deposito_dnda/generar_deposito.py. Pesa ~57 MB y el README lleva
 # datos personales del titular.
 deposito_dnda/
+
+# Cookie jars de curl. Tuvieron una sesión REAL de staging commiteada: nunca más.
+cookies.txt
+*.cookies.txt

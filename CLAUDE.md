@@ -249,19 +249,25 @@ Cuando Germán plantee un problema o feature nueva antes de implementar:
 
 Suite 1239 ✓ + 58 vitest ✓. **Deploy: sumar `add_vendible_a_bar_venta_items` y `add_consumo_evento_a_provisiones_y_dispensas` al `db:migrate`.**
 
-## 📍 Dónde retomar (19-ago-2026)
+## 📍 Dónde retomar (20-ago-2026)
 
-**2381 rspec (0 fallas, 26 pending del observador suspendido) + 1518 vitest + build limpio.**
-Los bloques de agosto están en `docs/CHANGELOG.md` hasta "Agosto 2026 (s)".
+**2395 rspec (0 fallas, 26 pending del observador suspendido) + 1525 vitest + build limpio.**
+Los bloques de agosto están en `docs/CHANGELOG.md` hasta "Agosto 2026 (t)".
 
-**Pendiente de documentar:** el bloque (s) cubre el portal clínico, el gate del portal, la limpieza
-de Configuración y lo de sin-conexión. **Sigue sin entrada en el CHANGELOG lo del 17 y 18 de
-agosto** —chatbot del admin, medición de IA en créditos, informe INASE, trazabilidad de
-aplicaciones—, que son de otras sesiones.
+**Pendiente de documentar:** **sigue sin entrada en el CHANGELOG lo del 17 y 18 de agosto**
+—chatbot del admin, medición de IA en créditos, informe INASE, trazabilidad de aplicaciones—, que
+son de otras sesiones. Los bloques (s) y (t) cubren todo lo del 19 y el 20.
 
-**Una decisión abierta, comercial:** `vista_paciente` sigue en `Club::ADDONS_INCOMPLETOS` con el
-texto "falta su tablero (carnet y dispensaciones)". Eso ya está hecho: falta decidir si se saca del
-cajón y se vende.
+**PENDIENTE DE INFRAESTRUCTURA, no de código:** `backend/cookies.txt` y `frontend/cookies.txt`
+tenían commiteada una cookie de sesión REAL de staging. Se borraron y se ignoran, pero **el valor
+sigue en el historial de git y la sesión sigue viva**: hay que rotar el secreto en Render. Y
+`rake seguridad:usuarios_con_password_default` encuentra a los usuarios que quedaron con la clave
+vieja (`123456Aa`): hay que correrlo y forzarles el cambio.
+
+**El portal del paciente YA SE VENDE** (20-ago): salió de `Club::ADDONS_INCOMPLETOS`. El tablero
+que le faltaba —credencial, estado del REPROCANN, turnos, indicación y retiros— está hecho, y lo
+único que depende de la organización es cuánto publique, que no es un módulo a medias. El cajón
+queda con `bar`, `eventos` y `chatbot`.
 
 **Lo de la idempotencia de la cola quedó CERRADO sin tocar esquema:** la planta es la clave natural
 del pesaje (se pesa una sola vez), así que un reintento no puede duplicar; lo que faltaba era que
@@ -379,6 +385,17 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   encola: ambiente, el pesaje del manicura (no genera stock, espera confirmación del admin) y la
   entrega del repartidor (que tiene cola propia: lo que se pierde ahí es la FIRMA). La lista vive
   en `lib/offlineApi.js` y `sinConexion.test.js` la fija.
+- **NO HAY CONTRASEÑA POR DEFECTO.** `Club::PASSWORD_DEFAULT` (`123456Aa`, con override por ENV que
+  nadie puso) se eliminó el 20-ago: era una credencial fija en código de producción, y el formulario
+  del super admin la traía PRECARGADA, así que sabiendo el email de cualquiera se entraba a su club.
+  Cada alta genera la suya con `User.password_temporal` —dictable por teléfono— y el endpoint la
+  devuelve en claro **a propósito**, porque hay que poder dictarla; la pantalla la muestra una vez.
+  El único lugar donde la clave vieja sigue escrita es `rake seguridad:usuarios_con_password_default`,
+  que es el que encuentra a los que quedaron con ella: **los usuarios creados ANTES la conservan**.
+- **La cola offline NO tiene TTL, y sacarlo fue un arreglo.** Había uno de 48 h "contra entradas
+  huérfanas", pero huérfanas no existen: `marcarEnviado` borra el item, así que todo lo que sobrevive
+  es trabajo sin enviar. El TTL sólo podía borrar eso, en silencio, al cargar — la manicura que pesaba
+  un viernes sin señal y volvía el lunes perdía el pesaje sin enterarse.
 - **La PLANTA es la clave de idempotencia del pesaje de manicura**, y por eso no hace falta ninguna
   columna de idempotencia: `distribuir_resto!` sólo toca plantas sin peso, así que un reintento no
   puede duplicar. Cuando el reintento encuentra todo pesado, el backend contesta 422 con
@@ -425,14 +442,10 @@ bundle exec rake lotes:corregir_finalizados_con_stock SIMULAR=1  # mirar los 6 d
 bundle exec rake geneticas:declarar_por_nombre SIMULAR=1         # resuelve ~44 de un saque
 bundle exec rake geneticas:sin_declarar                          # informativo
 bundle exec rake pacientes:normalizar_nombres SIMULAR=1          # capitalización de cargas masivas
-bundle exec rake geneticas:inase_faltantes SIMULAR=1             # PENDIENTE EN PROD: suma CAT3 al catálogo
 ```
 
-**`geneticas:inase_faltantes` hay que correrlo en producción** (ya corrió en dev): completa el
-catálogo GLOBAL del INASE, que estaba en 8 y son 9 — faltaba CAT3, una de las dos primeras
-variedades nacionales inscriptas (Res. INASE 84 y 85/2022). Es idempotente.
-
-Todos aceptan `SIMULAR=1`. **Ya corridos, no repetir:** `categorias:aplanar` (15-ago: aplanó el
+Todos aceptan `SIMULAR=1`. **Ya corridos, no repetir:** `geneticas:inase_faltantes` (20-ago: completó
+el catálogo GLOBAL del INASE de 8 a 9 sumando CAT3), `categorias:aplanar` (15-ago: aplanó el
 catálogo contable, promoviendo las subcategorías a categorías con su sector y sus movimientos), y
 del 10-ago:
 `suites:prender_iot_con_dispositivos` (dio "nada que hacer" — todas las organizaciones con

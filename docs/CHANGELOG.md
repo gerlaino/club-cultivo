@@ -1,5 +1,66 @@
 # Changelog
 
+## Agosto 2026 (t) — la credencial que repartíamos sin querer
+
+Todo lo de acá salió del escaneo previo al depósito en la DNDA. No es una familia de errores de
+diseño como los bloques anteriores: son **cosas que quedaron adentro del repo y de la app sin que
+nadie las eligiera**, que es una forma distinta de deuda y se encuentra mirando, no razonando.
+
+### No hay contraseña por defecto
+
+`Club::PASSWORD_DEFAULT = ENV.fetch('CLUB_DEFAULT_PASSWORD', '123456Aa')`. La variable de entorno no
+estaba puesta en ningún lado, así que el fallback **era** la contraseña: todo usuario creado desde el
+panel de plataforma nacía con `123456Aa`.
+
+Y no era sólo un fallback teórico. El formulario del super admin la traía **precargada en el campo**
+(`SAUsuarios.vue`, `SAClubDetail.vue`), y el endpoint `GET /super_admin/catalogo` la **publicaba**
+como `password_default` para que la pantalla pudiera hacerlo. O sea: nadie la elegía, todos la
+recibían, y sabiendo el email de cualquier persona se entraba a su organización.
+
+Lo llamativo es que la solución ya estaba escrita: `User.password_temporal` existe desde hace meses
+para el "restablecer" y arma una clave **dictable por teléfono** (sin 0/O ni 1/l/I, con guiones que
+separan los bloques). Sólo que el alta no la usaba.
+
+Ahora cada alta genera la suya, el campo arranca **vacío** con un "dejalo vacío y se genera una", y
+la generada se muestra **una vez** para poder dictarla — en un cartel en Usuarios, en un toast largo
+en la ficha de la organización. Que se devuelva en claro sigue siendo a propósito: es temporal y
+Devise pide cambiarla al entrar.
+
+**Los usuarios creados ANTES la conservan.** `rake seguridad:usuarios_con_password_default` es el
+único lugar donde la clave vieja sigue escrita, justamente porque es el que los encuentra. Hay que
+correrlo y forzarles el cambio.
+
+### Una sesión real estaba commiteada
+
+`backend/cookies.txt` y `frontend/cookies.txt`: dos cookie jars de curl, en formato Netscape, con
+una cookie `HttpOnly` de `cultivo-staging-api.onrender.com`. No el nombre de la cookie — **el
+valor**. Se borraron y entraron al `.gitignore`, junto con `backend/config/routes.rbprintf`, tres
+líneas de basura de un `printf` mal tipeado que estaban trackeadas desde vaya a saber cuándo.
+
+Borrarlos **no revoca nada**: el valor sigue en el historial de git y la sesión sigue viva hasta que
+se rote el secreto en Render. Eso es una acción de infraestructura, no de código.
+
+### La cola offline se comía el trabajo a las 48 horas
+
+Tenía un TTL "para evitar acumulación de entradas huérfanas". El problema es que entradas huérfanas
+**no existen**: `marcarEnviado` borra el item, así que todo lo que sobrevive en el localStorage está
+`pendiente` o `fallido` — trabajo real que todavía no llegó al servidor.
+
+El TTL sólo podía borrar eso, y lo borraba **en silencio**, reescribiendo el localStorage al cargar.
+El caso concreto: la manicura pesa un viernes a la tarde en un galpón sin señal y no vuelve a abrir
+la app hasta el lunes. El pesaje desaparecía y nadie se enteraba — justo lo que la cola venía a
+proteger, y a los tres días de haberla construido. Se sacó: ahora sólo se descarta cuando el
+servidor confirma o cuando alguien lo elimina a mano.
+
+### El portal del paciente se puede vender
+
+Sale de `Club::ADDONS_INCOMPLETOS`. El tablero que le faltaba —credencial, estado del REPROCANN,
+turnos, indicación y retiros— se hizo en el bloque (s). Lo que queda depende de cada organización:
+cuántas novedades y eventos publique. Eso no es un módulo a medias, y su `requiere` ahora lo dice
+así en vez de anunciar que está incompleto. El cajón queda con `bar`, `eventos` y `chatbot`.
+
+**2395 rspec · 1525 vitest · build limpio.**
+
 ## Agosto 2026 (s) — el portal se vuelve clínico, y las perillas que no hacían nada
 
 Tres perillas de esta app estaban conectadas a nada: el interruptor "Portal abierto / cerrado",

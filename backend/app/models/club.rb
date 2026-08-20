@@ -128,7 +128,14 @@ class Club < ApplicationRecord
     'delivery'    => { label: 'Delivery',    desc: 'Reparto de paquetes' },
   }.freeze
 
-  PASSWORD_DEFAULT = ENV.fetch('CLUB_DEFAULT_PASSWORD', '123456Aa').freeze
+  # NO HAY CONTRASEÑA POR DEFECTO. Había una —`123456Aa`, con override por ENV— y era una
+  # credencial fija en código de producción: si `CLUB_DEFAULT_PASSWORD` no estaba puesta en el
+  # entorno (no lo estaba), TODO usuario creado desde el panel de plataforma nacía con esa clave,
+  # y el formulario del super admin encima la traía precargada. Sabiendo el email se entraba.
+  #
+  # Ahora cada alta genera la suya con `User.password_temporal`, que ya existía y arma una clave
+  # DICTABLE por teléfono (sin 0/O ni 1/l/I). Quien da de alta la ve en pantalla una vez —el
+  # endpoint la devuelve en claro a propósito— y Devise pide cambiarla al entrar.
 
   GENETICAS_INASE = [
     {
@@ -197,7 +204,11 @@ class Club < ApplicationRecord
     },
   ].freeze
 
-  def crear_usuarios_default!(roles: ROLES_DEFAULT, password: PASSWORD_DEFAULT)
+  # `password` en nil ⇒ se genera una temporal para el lote de usuarios. Es UNA sola para todos
+  # los que se crean en el mismo acto porque se dictan juntos al armar la organización; cada
+  # persona la cambia al entrar.
+  def crear_usuarios_default!(roles: ROLES_DEFAULT, password: nil)
+    password ||= User.password_temporal
     roles.select { |r| ROLES_VALIDOS_CLUB.include?(r) }.map do |rol|
       email = "#{rol}@#{slug}.com"
       next if User.exists?(email: email)
@@ -269,7 +280,7 @@ class Club < ApplicationRecord
     'eventos'  => { label: 'Eventos',        pack: 'produccion_dispensa', desc: 'Fiestas y catas: provisión desde depósitos, entradas y rendición.', requiere: 'El Buffet tiene que estar activo.' },
     'delivery' => { label: 'Delivery',       pack: 'produccion_dispensa', desc: 'Reparto a domicilio: paquetes, rutas, firma de entrega y cobro contra-entrega.', requiere: 'La suite de Producción y dispensa tiene que estar activa.' },
     'mailer'   => { label: 'Correo electrónico', pack: 'produccion_dispensa', desc: 'Casilla propia, plantillas de mail y envíos a los pacientes.', requiere: 'Casilla de la organización conectada en Configuración → Correo electrónico.' },
-    'vista_paciente' => { label: 'Portal del paciente', pack: 'produccion_dispensa', desc: 'Lo que ve el paciente cuando entra: el catálogo, las novedades y los eventos que publica la organización. Cada paciente que se da de alta recibe su cuenta.', requiere: 'INCOMPLETO: falta su tablero (carnet y dispensaciones).' },
+    'vista_paciente' => { label: 'Portal del paciente', pack: 'produccion_dispensa', desc: 'Su credencial digital con el estado del REPROCANN, sus turnos e indicación médica, sus retiros y su cuenta corriente — más el catálogo, las novedades y los eventos que publique la organización. Cada paciente que se da de alta recibe su cuenta.', requiere: 'Que la organización cargue lo suyo: sin novedades ni eventos, el paciente igual ve su credencial y lo suyo.' },
     'whatsapp' => { label: 'WhatsApp',       pack: 'produccion_dispensa', desc: 'Avisos de entrega por WhatsApp.',                    requiere: 'Cuenta de Twilio de la organización (SID, token y número).' },
     'ariccame' => { label: 'ARICCAME',       pack: 'produccion_dispensa', desc: 'Reporte regulatorio de dispensaciones y stock.',     requiere: 'La integración está simulada: no transmite nada.' },
 
@@ -310,7 +321,10 @@ class Club < ApplicationRecord
   # Add-ons que funcionan a medias: vienen apagados por defecto y el super admin muestra la
   # advertencia de `requiere` antes de dejar activarlos. No se bloquean por completo —eso
   # dejaría su código inalcanzable— pero nadie los prende sin enterarse de qué les falta.
-  ADDONS_INCOMPLETOS = %w[bar eventos chatbot vista_paciente].freeze
+  # `vista_paciente` salió del cajón el 20-ago: el tablero del paciente que le faltaba —credencial,
+  # estado del REPROCANN, turnos, indicación y retiros— está hecho. Lo único que depende de la
+  # organización es cuánto publique, y eso no es un módulo a medias.
+  ADDONS_INCOMPLETOS = %w[bar eventos chatbot].freeze
 
   # Se mantiene para compatibilidad: hay clubes con las claves viejas guardadas en `features`.
   AVAILABLE_FEATURES = (SUITES.keys + ADDONS.keys + INCLUIDOS_EN_SUITE.keys).freeze

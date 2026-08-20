@@ -17,7 +17,9 @@ class SuperAdmin::UsersController < SuperAdmin::BaseController
     end
 
     user     = club.users.build(user_params)
-    password = params[:user][:password].presence || Club::PASSWORD_DEFAULT
+    # Sin contraseña escrita, se genera una temporal y dictable. Antes caía en una FIJA para toda
+    # la plataforma, que además venía precargada en el formulario.
+    password = params[:user][:password].presence || User.password_temporal
     user.password = password
 
     if user.save
