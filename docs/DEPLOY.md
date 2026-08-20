@@ -110,19 +110,40 @@ dosificación, vía de administración, observaciones y DNI.
 > los datos cifrados adentro. Darle además las llaves sería guardar la caja fuerte y la llave en el
 > mismo lugar.
 
-Variables que el cron **sí** necesita:
+### De dónde sale cada valor
 
-```
-DATABASE_URL                     ← la de producción
-BACKUP_BUCKET
-BACKUP_S3_ACCESS_KEY_ID          (o S3_ACCESS_KEY_ID)
-BACKUP_S3_SECRET_ACCESS_KEY      (o S3_SECRET_ACCESS_KEY)
-S3_ENDPOINT                      ← R2: https://<account_id>.r2.cloudflarestorage.com
-S3_REGION=auto
-```
+Son **cinco**, y **tres se copian tal cual** del web service de producción — la app ya usa el mismo
+R2 para las fotos y los PDFs.
 
-También necesita `pg_dump` en el PATH y de una versión compatible con el servidor. Después de
-cargarlas, correr el job a mano ("Trigger Run") y verificar con `rake backup:list`.
+| Variable | De dónde | ¿Nueva? |
+|---|---|---|
+| `DATABASE_URL` | Render → la base de producción → **Internal Database URL** | copiar |
+| `BACKUP_BUCKET` | Cloudflare → R2 → nombre del bucket de backups | **sí** |
+| `S3_ENDPOINT` | Render → `cultivo-staging-api` → Environment → copiar | copiar |
+| `S3_ACCESS_KEY_ID` | ídem | copiar |
+| `S3_SECRET_ACCESS_KEY` | ídem | copiar |
+
+`S3_REGION` **no hace falta**: el código ya usa `auto`, que es lo que corresponde en R2.
+
+Las credenciales caen en `S3_*` si no existen `BACKUP_S3_*`. Reusar las de la app funciona y es lo
+más rápido para empezar; lo ideal después es un token de R2 **dedicado** y limitado al bucket de
+backups, para que una filtración del backup no dé acceso a los documentos clínicos ni al revés.
+
+Sobre el bucket: mejor uno separado del de la app. Si hay uno solo, funciona igual — los dumps van
+bajo el prefijo `postgres/` — pero quedan mezclados con los archivos de pacientes.
+
+`DATABASE_URL` interna vs externa: si el cron corre en la misma región que la base (Oregon), va la
+**interna**, que no sale a internet. La externa funciona pero expone la base.
+
+También necesita `pg_dump` en el PATH y de una versión compatible con el servidor.
+
+### Verificar que quedó andando
+
+1. Cargar las variables → **Trigger Run** a mano (no esperar al horario).
+2. El log tiene que decir `✓ Backup subido: postgres/club_cultivo_<fecha>.dump`.
+3. Confirmar que el archivo está: `rake backup:list` desde el Shell del servicio.
+4. Un backup que nunca se restauró no es un backup: probar `rake 'backup:restore[<key>]'`
+   contra **preproducción**, nunca contra producción.
 
 ---
 

@@ -10,7 +10,7 @@
 # Requisitos del entorno donde corren:
 #   - pg_dump / pg_restore (postgresql-client) en el PATH.
 #   - Gema aws-sdk-s3 (ya está en el Gemfile).
-#   - Variables de entorno (ver docs/backups.md).
+#   - Variables de entorno (ver docs/DEPLOY.md §3.3 — de dónde sale cada valor).
 #
 # Tareas:
 #   rake backup:create                    # cron diario: dump + subida + retención
