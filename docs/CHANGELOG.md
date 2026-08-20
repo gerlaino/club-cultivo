@@ -120,10 +120,14 @@ o empezar una nueva?") no se le puede preguntar a nadie desde una cola que corre
 `response` la cola lo marcaría fallido y perdería el pesaje. Abrir una jornada nueva es la salida
 sin pérdida — el admin confirma dos en vez de una.
 
-**Queda sabido y sin resolver:** si la request llegó al servidor pero se perdió la respuesta, el
-item se reenvía y duplica. Le pasa a cualquier cola at-least-once. Para el pesaje el daño está
-acotado porque el admin ve dos jornadas y confirma una; la solución de fondo es una clave de
-idempotencia, que toca esquema y no se hizo.
+**Sobre reenviar dos veces:** el pesaje **ya era idempotente y no nos habíamos dado cuenta**. La
+PLANTA es la clave natural —`distribuir_resto!` sólo toca las que no tienen peso—, así que un
+reintento no puede duplicar nada y no hace falta ninguna columna nueva. Lo que faltaba era
+**decirlo**: el 422 que devolvía era idéntico a un error de validación, la cola lo marcaba FALLIDO
+y la manicura leía "no pudo sincronizarse" sobre un pesaje que sí había entrado. Si a partir de ese
+aviso lo volvía a cargar, ahí sí quedaban dos jornadas. Ahora el backend contesta
+**`ya_registrado: true`** y la cola lo da por enviado, sin ruido. El `raise` va dentro de la
+transacción, así que tampoco queda una jornada vacía por reintento.
 
 ### Los tests leen la fuente, no la memoria
 

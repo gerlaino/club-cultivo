@@ -259,13 +259,13 @@ de Configuración y lo de sin-conexión. **Sigue sin entrada en el CHANGELOG lo 
 agosto** —chatbot del admin, medición de IA en créditos, informe INASE, trazabilidad de
 aplicaciones—, que son de otras sesiones.
 
-**Dos decisiones abiertas, las dos comerciales:**
-- `vista_paciente` sigue en `Club::ADDONS_INCOMPLETOS` con el texto "falta su tablero (carnet y
-  dispensaciones)". Eso ya está hecho: falta decidir si se saca del cajón y se vende.
-- La clave de idempotencia para la cola offline. Si la request llegó al servidor pero se perdió la
-  respuesta, el item se reenvía y duplica (le pasa a cualquier cola at-least-once). Para el pesaje
-  del manicura el daño está acotado —el admin ve dos jornadas y confirma una—, pero la solución de
-  fondo toca esquema y por eso no se hizo.
+**Una decisión abierta, comercial:** `vista_paciente` sigue en `Club::ADDONS_INCOMPLETOS` con el
+texto "falta su tablero (carnet y dispensaciones)". Eso ya está hecho: falta decidir si se saca del
+cajón y se vende.
+
+**Lo de la idempotencia de la cola quedó CERRADO sin tocar esquema:** la planta es la clave natural
+del pesaje (se pesa una sola vez), así que un reintento no puede duplicar; lo que faltaba era que
+el backend lo dijera, y ahora contesta `ya_registrado: true`. Ver "Lo que NO hay que romper".
 
 **`rake categorias:aplanar` YA CORRIÓ en producción (15-ago).** No repetir: es idempotente pero
 no tiene nada que hacer. El catálogo quedó de un solo nivel.
@@ -379,6 +379,14 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   encola: ambiente, el pesaje del manicura (no genera stock, espera confirmación del admin) y la
   entrega del repartidor (que tiene cola propia: lo que se pierde ahí es la FIRMA). La lista vive
   en `lib/offlineApi.js` y `sinConexion.test.js` la fija.
+- **La PLANTA es la clave de idempotencia del pesaje de manicura**, y por eso no hace falta ninguna
+  columna de idempotencia: `distribuir_resto!` sólo toca plantas sin peso, así que un reintento no
+  puede duplicar. Cuando el reintento encuentra todo pesado, el backend contesta 422 con
+  **`ya_registrado: true`** y la cola lo da por ENVIADO. Sin esa bandera era indistinguible de un
+  error de validación: la manicura leía "no pudo sincronizarse" sobre un pesaje que sí había
+  entrado, y si lo volvía a cargar ahí sí quedaban dos jornadas. El pesaje encolado se reintenta
+  con `force_new` porque el 409 `needs_choice` no se le puede preguntar a nadie desde una cola que
+  corre sola.
 - **Las URLs que se encolan van SIN `/api`:** el `baseURL` de axios ya lo trae. Con el prefijo, el
   reintento pegaba a `/api/api/...` → 404, y como un 404 tiene `response` la cola lo marcaba
   FALLIDO en vez de reintentar. Nada de lo encolado llegó nunca al servidor.

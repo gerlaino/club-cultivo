@@ -143,3 +143,65 @@ describe('Las URLs de la cola', () => {
     }
   })
 })
+
+// El reintento de un pesaje que YA había entrado. La planta es la clave de idempotencia natural
+// —se pesa una sola vez— así que el backend no puede duplicar; lo que faltaba era que lo DIJERA,
+// porque desde la cola un 422 "ya estaba pesado" es idéntico a un 422 de validación.
+describe('La cola distingue "ya estaba hecho" de "falló"', () => {
+  const request = vi.fn()
+  const toast   = { success: vi.fn(), warning: vi.fn() }
+
+  beforeEach(() => {
+    vi.resetModules()
+    vi.clearAllMocks()
+    setActivePinia(createPinia())
+    localStorage.clear()
+    vi.doMock('../lib/api.js', () => ({ default: { request } }))
+    vi.doMock('../composables/useToast.js', () => ({ useToast: () => toast }))
+  })
+
+  async function correrCola(item) {
+    const { useSyncQueueStore } = await import('../stores/syncQueue.js')
+    const { useOfflineSync }    = await import('../composables/useOfflineSync.js')
+    const queue = useSyncQueueStore()
+    queue.encolar(item.tipo, { url: item.url, payload: item.payload })
+    await useOfflineSync().procesarCola()
+    return queue
+  }
+
+  const PESAJE = {
+    tipo: 'pesaje_manicura',
+    url: '/lotes/1/pesajes_manicura',
+    payload: { plant_ids: [1, 2], peso_total_g: 100, enviar: true, force_new: true },
+  }
+
+  // Lo que veía la manicura antes: "no pudo sincronizarse", sobre un pesaje que SÍ había entrado.
+  // Si a partir de ese aviso lo volvía a cargar, ahí sí quedaban dos jornadas.
+  it('un 422 con ya_registrado se da por enviado, no por fallido', async () => {
+    request.mockRejectedValue({ response: { status: 422, data: { ya_registrado: true } } })
+
+    const queue = await correrCola(PESAJE)
+
+    expect(queue.fallidos.length).toBe(0)
+    expect(queue.total).toBe(0)
+    expect(toast.warning).not.toHaveBeenCalled()
+  })
+
+  it('un 422 común sigue siendo un fallo: no se lo traga en silencio', async () => {
+    request.mockRejectedValue({ response: { status: 422, data: { error: 'Peso inválido' } } })
+
+    const queue = await correrCola(PESAJE)
+
+    expect(queue.fallidos.length).toBe(1)
+  })
+
+  // Sin respuesta es sin señal: se conserva para el próximo intento, no se descarta.
+  it('un error de red deja el item pendiente', async () => {
+    request.mockRejectedValue({})
+
+    const queue = await correrCola(PESAJE)
+
+    expect(queue.pendientes.length).toBe(1)
+    expect(queue.fallidos.length).toBe(0)
+  })
+})

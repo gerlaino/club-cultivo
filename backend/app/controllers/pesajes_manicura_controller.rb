@@ -1,6 +1,15 @@
 class PesajesManicuraController < ApplicationController
   include ManicuraJornadaGuard
 
+  # El pesaje que se mandó sin señal y se reintenta cuando vuelve, cuando resulta que la primera
+  # request SÍ había llegado y lo que se perdió fue la respuesta.
+  #
+  # No es un error de validación aunque viaje como 422: el trabajo está hecho. Se distingue con
+  # `ya_registrado: true` para que la cola offline del front lo dé por enviado en vez de marcarlo
+  # FALLIDO — que es lo que hacía, avisándole a la manicura de una falla inexistente y mandándola a
+  # volver a cargar un pesaje que ya estaba. Ahí sí terminaba en dos jornadas.
+  class YaRegistrado < StandardError; end
+
   before_action :authenticate_user!
 
   before_action -> { require_feature!(:cultivo) }
@@ -84,12 +93,24 @@ class PesajesManicuraController < ApplicationController
         # (plant_ids) o, si no se seleccionaron, entre las primeras N sin pesar (plantas_count).
         n = distribuir_resto!(pesaje, params[:peso_total_g].to_d,
                               count: params[:plantas_count].to_i, solo_ids: params[:plant_ids])
-        raise ArgumentError, 'No hay plantas sin pesar entre las seleccionadas' if n.zero?
+        if n.zero?
+          # La PLANTA es la clave de idempotencia natural de este flujo: se pesa una sola vez, y
+          # `distribuir_resto!` sólo toca las que no tienen peso. Si las seleccionadas ya lo tienen,
+          # este pesaje ya se aplicó — no hay nada que reintentar ni nada que reportar.
+          raise YaRegistrado if plantas_ya_pesadas?(params[:plant_ids])
+
+          raise ArgumentError, 'No hay plantas sin pesar entre las seleccionadas'
+        end
         pesaje.enviar! if enviar_ya
       end
     end
 
     render json: PesajeManicuraSerializer.serialize(pesaje.reload, include_plantas: true), status: :created
+  rescue YaRegistrado
+    # El `raise` va dentro de la transacción, así que la jornada que se acababa de crear se
+    # revierte: no queda una jornada vacía por cada reintento.
+    render json: { error: 'Estas plantas ya tienen peso registrado', ya_registrado: true },
+           status: :unprocessable_entity
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   rescue ArgumentError, RuntimeError => e
@@ -275,6 +296,18 @@ class PesajesManicuraController < ApplicationController
   # pesada por planta con es_promedio: true y le setea el peso_seco. Devuelve cuántas tocó.
   # `solo_ids` (opcional): limita el reparto a esas plantas puntuales (selección explícita
   # del usuario). Si no viene, cae al comportamiento por `count` (primeras N sin pesar).
+  # ¿Las plantas que se pidieron pesar YA tienen peso? Se exige que las ids existan en el lote: si
+  # alguna no pertenece, no es un pesaje repetido sino un pedido inválido, y ese sí es un error.
+  def plantas_ya_pesadas?(ids)
+    ids = Array(ids).compact.uniq
+    return false if ids.blank?
+
+    plantas = @lote.plants.where(id: ids)
+    return false unless plantas.count == ids.size
+
+    plantas.where('peso_seco IS NULL OR peso_seco <= 0').none?
+  end
+
   def distribuir_resto!(pesaje, peso_total, count: nil, solo_ids: nil, excluir_ids: [])
     return 0 if peso_total <= 0
     restantes = pesaje.lote.plants.where.not(id: excluir_ids)

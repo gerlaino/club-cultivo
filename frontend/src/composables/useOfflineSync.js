@@ -27,6 +27,19 @@ export function useOfflineSync() {
       } catch (e) {
         // Error de red → mantener para el próximo intento
         if (!e.response) break
+
+        // "Esto ya estaba hecho" NO es una falla, aunque viaje como 422: significa que la primera
+        // request sí llegó y lo que se perdió fue la respuesta. El backend lo marca explícitamente
+        // (`ya_registrado`) porque desde acá es indistinguible de un error de validación real.
+        //
+        // Sin esto, la manicura que pesó sin señal veía "no pudo sincronizarse" cuando su pesaje
+        // había entrado, y volvía a cargarlo: ahí sí terminaba en dos jornadas.
+        if (e.response?.data?.ya_registrado) {
+          queue.marcarEnviado(item.id)
+          ok++
+          continue
+        }
+
         // Error de validación → no tiene caso reintentar, marcar fallido
         queue.marcarFallido(item.id)
         fail++
