@@ -2,6 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import { setActivePinia, createPinia } from 'pinia'
+import { readFileSync, readdirSync } from 'node:fs'
+import { resolve, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const SRC  = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const leer = (rel) => readFileSync(resolve(SRC, rel), 'utf8')
 
 // AC: el portal del paciente es un portal CLÍNICO. Lo primero que ve es si puede retirar, y
 // después lo suyo que viene; el boletín de la organización va al final.
@@ -162,7 +168,9 @@ describe('El inicio del portal', () => {
 
     expect(w.text()).toContain('Lo mío')
     expect(w.text()).toContain('Mis retiros')
-    expect(w.text()).not.toContain('Del club')
+    // Se mira el ENCABEZADO de sección, no el texto suelto: "Mi organización" es además el
+    // respaldo del nombre del club cuando la ficha todavía no cargó.
+    expect(w.findAll('.pmi__sec-t').map(h => h.text())).not.toContain('Mi organización')
   })
 
   it('con novedades las resume abajo, con un enlace a la sección', async () => {
@@ -171,9 +179,9 @@ describe('El inicio del portal', () => {
     const w = montar(PortalHomeView)
     await flushPromises()
 
-    expect(w.text()).toContain('Del club')
+    expect(w.findAll('.pmi__sec-t').map(h => h.text())).toContain('Mi organización')
     expect(w.text()).toContain('Cosecha de agosto')
-    expect(w.find('a[href="/portal/del-club"]').exists()).toBe(true)
+    expect(w.find('a[href="/portal/organizacion"]').exists()).toBe(true)
   })
 })
 
@@ -236,7 +244,7 @@ describe('Mi salud', () => {
   })
 })
 
-describe('Del club — el boletín, que dejó de ser el inicio', () => {
+describe('Mi organización — el boletín, que dejó de ser el inicio', () => {
   it('sigue entero: portada, agenda y catálogo', async () => {
     api.getPortalNoticias.mockResolvedValue([{ id: 7, titulo: 'Cosecha de agosto', preview: 'Ya está.' }])
     api.getPortalEventos.mockResolvedValue([{ id: 3, titulo: 'Cata de terpenos', fecha_inicio: '2026-09-10T20:00:00Z' }])
@@ -266,7 +274,7 @@ describe('La barra y el pie', () => {
     await flushPromises()
 
     const links = w.findAll('.pnb__nav .pnb__link').map(a => a.text())
-    expect(links).toEqual(['Inicio', 'Mi salud', 'Mis retiros', 'Del club'])
+    expect(links).toEqual(['Inicio', 'Mi salud', 'Mis retiros', 'Mi organización'])
   })
 
   it('la barra ofrece la cuenta sólo si la organización se la abrió', async () => {
@@ -334,4 +342,29 @@ describe('La franja de avisos', () => {
     expect(w.find('.pav').exists()).toBe(true)
     expect(w.text()).toContain('vencido')
   })
+})
+
+// AC: el texto que VE el paciente dice "organización", nunca "club".
+//
+// Es la convención del proyecto desde el rename de agosto: los identificadores, rutas y clases CSS
+// pueden seguir diciendo club (el modelo se llama `Club`), pero nada que se lea en pantalla. Se
+// coló igual en la sección nueva del portal, que se llamaba "Del club" en cinco lugares.
+describe('El portal dice organización, no club', () => {
+  const archivos = ['views/portal', 'components/portal'].flatMap(d =>
+    readdirSync(resolve(SRC, d)).filter(f => f.endsWith('.vue')).map(f => [`${d}/${f}`, leer(`${d}/${f}`)]))
+
+  for (const [ruta, src] of archivos) {
+    it(`${ruta} no muestra la palabra club`, () => {
+      const template = src.slice(0, src.indexOf('<script'))
+      // Sólo texto entre etiquetas y valores de atributos que se leen; `club.name`, `pcr__club` y
+      // demás identificadores no cuentan — la regla es sobre lo VISIBLE.
+      const visible = template
+        .replace(/\{\{[^}]*\}\}/g, '')          // interpolaciones: son datos, no texto nuestro
+        .replace(/\sclass="[^"]*"/g, '')         // clases CSS
+        .replace(/\s:[a-z-]+="[^"]*"/g, '')      // props ligadas
+        .replace(/<[^>]+>/g, ' ')                // el resto de las etiquetas
+
+      expect(visible, `${ruta} dice "club" en texto visible`).not.toMatch(/\bclubs?\b/i)
+    })
+  }
 })

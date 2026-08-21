@@ -1,6 +1,6 @@
 <template>
   <div class="ph">
-    <PortalCabecera titulo="Del club" bajada="Lo que publica tu organización." />
+    <PortalCabecera titulo="Mi organización" bajada="Lo que publica y lo que tiene disponible." />
 
     <!-- Lo que la organización cuenta de sí misma -->
     <header v-if="club?.descripcion" class="ph__intro">

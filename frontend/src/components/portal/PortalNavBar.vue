@@ -11,7 +11,7 @@
       <nav class="pnb__nav" aria-label="Secciones">
         <RouterLink v-for="l in conCuenta" :key="l.to" :to="l.to" class="pnb__link">{{ l.txt }}</RouterLink>
         <span class="pnb__sep" aria-hidden="true"></span>
-        <RouterLink v-for="l in DEL_CLUB" :key="l.to" :to="l.to" class="pnb__link">{{ l.txt }}</RouterLink>
+        <RouterLink v-for="l in DE_LA_ORG" :key="l.to" :to="l.to" class="pnb__link">{{ l.txt }}</RouterLink>
       </nav>
 
       <button class="pnb__ham" :aria-expanded="abierto" aria-label="Menú" @click="abierto = !abierto">
@@ -24,7 +24,7 @@
     <nav v-if="abierto" class="pnb__movil" aria-label="Secciones">
       <RouterLink v-for="l in conCuenta" :key="l.to" :to="l.to" class="pnb__mlink" @click="abierto = false">{{ l.txt }}</RouterLink>
       <div class="pnb__msep"></div>
-      <RouterLink v-for="l in DEL_CLUB" :key="l.to" :to="l.to" class="pnb__mlink" @click="abierto = false">{{ l.txt }}</RouterLink>
+      <RouterLink v-for="l in DE_LA_ORG" :key="l.to" :to="l.to" class="pnb__mlink" @click="abierto = false">{{ l.txt }}</RouterLink>
       <RouterLink to="/portal/cuenta" class="pnb__mlink" @click="abierto = false">Mis datos</RouterLink>
       <button class="pnb__msalir" @click="salir">Cerrar sesión</button>
     </nav>
@@ -37,7 +37,7 @@
 // cosa.
 //
 // Eran ocho entradas —cinco de ellas del boletín— y ahora son cuatro o cinco: lo suyo suelto, y
-// todo el boletín detrás de "Del club". Un portal de salud tiene pocas secciones; ocho links en la
+// todo el boletín detrás de "Mi organización". Un portal de salud tiene pocas secciones; ocho links en la
 // barra hacen que ninguno se lea.
 //
 // "Mi cuenta" aparece sólo si la organización le abrió cuenta corriente: a quien paga siempre al
@@ -58,7 +58,7 @@ const { club } = storeToRefs(usePortalClubStore())
 const abierto = ref(false)
 const tieneCC = ref(false)
 
-// Lo suyo primero, y "Del club" al final: es el mismo orden que el inicio.
+// Lo suyo primero, y la organización al final: es el mismo orden que el inicio.
 const MIAS = [
   { to: '/portal',           txt: 'Inicio' },
   { to: '/portal/mi-salud',  txt: 'Mi salud' },
@@ -70,7 +70,7 @@ const conCuenta = computed(() => [
   ...(tieneCC.value ? [{ to: '/portal/cuenta-corriente', txt: 'Mi cuenta' }] : []),
 ])
 
-const DEL_CLUB = [{ to: '/portal/del-club', txt: 'Del club' }]
+const DE_LA_ORG = [{ to: '/portal/organizacion', txt: 'Mi organización' }]
 
 onMounted(async () => {
   try {

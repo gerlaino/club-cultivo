@@ -70,12 +70,12 @@
         </RouterLink>
       </section>
 
-      <!-- ── C · Del club ────────────────────────────────────────────────
+      <!-- ── C · Mi organización ─────────────────────────────────────────
            El boletín en dos renglones. Todo lo demás está en su sección. -->
       <section v-if="destacado || evento" class="pmi__sec">
         <div class="pmi__sec-hd">
-          <h2 class="pmi__sec-t">Del club</h2>
-          <RouterLink to="/portal/del-club" class="pmi__mas">Ver todo</RouterLink>
+          <h2 class="pmi__sec-t">Mi organización</h2>
+          <RouterLink to="/portal/organizacion" class="pmi__mas">Ver todo</RouterLink>
         </div>
 
         <RouterLink v-if="evento" :to="`/portal/eventos/${evento.id}`" class="pmi__nota">
@@ -109,7 +109,7 @@
 // Así que el orden es: quién soy y si puedo retirar (la credencial) · lo mío que viene (turno,
 // indicación, cuenta, retiros) · lo que publica el club, en dos renglones y con "ver todo".
 //
-// El boletín no se perdió: es `/portal/del-club`, la misma pantalla, con su entrada en la barra.
+// El boletín no se perdió: es `/portal/organizacion`, la misma pantalla, con su entrada en la barra.
 import { ref, computed, onMounted } from 'vue'
 import { CalendarClock, ClipboardList, Wallet, PackageCheck, ChevronRight } from 'lucide-vue-next'
 import {
@@ -227,7 +227,7 @@ onMounted(async () => {
 }
 .pmi__chev { color: var(--p-tenue); flex: 0 0 auto; }
 
-/* Del club: texto, sin foto. La foto está en la sección; acá compite con la credencial. */
+/* Mi organización: texto, sin foto. La foto está en la sección; acá compite con la credencial. */
 .pmi__nota {
   display: flex; flex-direction: column; gap: 2px;
   padding: var(--sp-3) 0; text-decoration: none; color: inherit;

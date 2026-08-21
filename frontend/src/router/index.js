@@ -709,7 +709,7 @@ const routes = [
     children: [
       // EL INICIO ES EL ESTADO DEL PACIENTE: su credencial con el REPROCANN, su próximo turno, su
       // indicación, su cuenta y su último retiro. Era el boletín de la organización, que se mudó
-      // entero a /portal/del-club: el boletín está vacío en cualquier organización que no publique,
+      // entero a /portal/organizacion: el boletín está vacío en cualquier organización que no publique,
       // y lo suyo no está vacío nunca.
       { path: '', name: 'portal-inicio', component: () => import('../views/portal/PortalHomeView.vue') },
       // Lo clínico: turnos e indicación médica. El módulo médico existía y el portal no lo leía.
@@ -717,7 +717,10 @@ const routes = [
       { path: 'historial',      name: 'portal-historial', component: () => import('../views/portal/PortalHistorialView.vue') },
       // Lo que publica la organización, todo junto: era el inicio y son cinco entradas de la barra
       // colapsadas en una. Un portal de salud tiene pocas secciones.
-      { path: 'del-club',       name: 'portal-del-club',  component: () => import('../views/portal/PortalDelClubView.vue') },
+      // "club" no va en texto visible (convención del proyecto: se dice "organización"), y la
+      // ruta acompaña. El redirect es por si alguien alcanzó a copiarse el enlace de ayer.
+      { path: 'organizacion',   name: 'portal-organizacion', component: () => import('../views/portal/PortalDelClubView.vue') },
+      { path: 'del-club',       redirect: '/portal/organizacion' },
       { path: 'geneticas',      name: 'portal-geneticas', component: () => import('../views/portal/PortalGeneticasView.vue') },
       { path: 'geneticas/:id',  name: 'portal-genetica',  component: () => import('../views/portal/PortalGeneticaDetailView.vue') },
       { path: 'noticias',       name: 'portal-noticias',  component: () => import('../views/portal/PortalNoticiasView.vue') },

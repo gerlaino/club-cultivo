@@ -19,8 +19,8 @@
 
       <p v-if="club?.horarios_atencion" class="pfo__horarios">{{ club.horarios_atencion }}</p>
 
-      <nav class="pfo__nav" aria-label="Del club">
-        <RouterLink to="/portal/del-club" class="pfo__link">Del club</RouterLink>
+      <nav class="pfo__nav" aria-label="Mi organización">
+        <RouterLink to="/portal/organizacion" class="pfo__link">Mi organización</RouterLink>
         <RouterLink to="/portal/geneticas" class="pfo__link">Variedades</RouterLink>
         <RouterLink to="/portal/noticias" class="pfo__link">Novedades</RouterLink>
         <RouterLink to="/portal/eventos" class="pfo__link">Eventos</RouterLink>
