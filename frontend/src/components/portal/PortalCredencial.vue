@@ -1,5 +1,5 @@
 <template>
-  <section class="pcr" :class="`pcr--${cat}`">
+  <section class="pcr" :class="[`pcr--${estado.clave}`, { 'pcr--bloqueado': !c.puede_retirar }]">
     <!-- La tarjeta. Tocarla la abre a pantalla completa: es lo que se muestra en la puerta. -->
     <button class="pcr__card" type="button" @click="abierta = true">
       <span class="pcr__top">
@@ -16,8 +16,16 @@
 
       <span class="pcr__estado">
         <span class="pcr__punto" aria-hidden="true"></span>
-        <span class="pcr__estado-t">{{ ESTADOS[cat].titulo }}</span>
-        <span class="pcr__estado-b">{{ detalle }}</span>
+        <span class="pcr__estado-t">{{ estado.titulo }}</span>
+        <span class="pcr__estado-b">{{ estado.detalle }}</span>
+      </span>
+
+      <!-- El REPROCANN es un dato SUYO, no el que decide si puede retirar. Se muestra igual —con
+           su fecha y su color— porque renovarlo lleva semanas y es lo único que el portal le
+           avisa a tiempo. -->
+      <span v-if="reprocann" class="pcr__rep" :class="`pcr__rep--${reprocann.nivel}`">
+        <span class="pcr__rep-k">REPROCANN</span>
+        <span class="pcr__rep-v">{{ reprocann.texto }}</span>
       </span>
 
       <span class="pcr__ver"><Maximize2 :size="13" :stroke-width="2" /> Mostrar</span>
@@ -43,9 +51,12 @@
             <DsSpinner v-else :size="28" />
           </div>
 
-          <p class="pcr__full-estado" :class="`pcr__full-estado--${cat}`">{{ ESTADOS[cat].titulo }}</p>
-          <p class="pcr__full-detalle">{{ detalle }}</p>
-          <p v-if="c.reprocann_numero" class="pcr__full-rep">REPROCANN {{ c.reprocann_numero }}</p>
+          <p class="pcr__full-estado" :class="`pcr__full-estado--${estado.clave}`">{{ estado.titulo }}</p>
+          <p class="pcr__full-detalle">{{ estado.detalle }}</p>
+          <p v-if="reprocann" class="pcr__full-rep">
+            REPROCANN<template v-if="c.reprocann_numero"> {{ c.reprocann_numero }}</template>
+            · {{ reprocann.texto }}
+          </p>
         </div>
       </div>
     </Teleport>
@@ -58,10 +69,10 @@
 // Hasta hoy esto vivía sólo en `/c/:token` —un link que le mandan y que probablemente perdió— y el
 // portal no la mostraba en ningún lado. Ahora es lo primero del inicio.
 //
-// El estado del REPROCANN vive ACÁ y no en una franja aparte, que es donde estaba. Motivo: es el
-// mismo dato que el que atiende va a mirar cuando le muestre la tarjeta, y separarlo obligaba a
-// leer dos cosas en dos lugares para contestar una sola pregunta —¿puede retirar?—. La franja de
-// arriba se quedó sólo con lo urgente.
+// La tarjeta contesta UNA pregunta —¿puede retirar?— y la contesta con lo que el sistema exige de
+// verdad. Debajo, como dato aparte, va el REPROCANN con su fecha: es su trámite, tarda semanas en
+// renovarse, y el portal es lo único que se lo avisa antes de que venza. La franja de arriba se
+// quedó sólo con lo urgente.
 //
 // El QR se genera contra el mismo `/c/:token` público: el que atiende lo escanea y ve la ficha
 // anonimizada sin que el paciente tenga que tener nada instalado.
@@ -82,33 +93,64 @@ const qr = ref(null)
 
 const c = computed(() => props.credencial)
 
-// Las cinco categorías son las MISMAS del informe REPROCANN, y las manda el backend. Que la
-// tarjeta del paciente y el informe del auditor no puedan discrepar es el punto.
-const ESTADOS = {
-  vigente:       { titulo: 'Podés retirar' },
-  por_vencer:    { titulo: 'Se te vence pronto' },
-  vencido:       { titulo: 'No podés retirar' },
-  pendiente:     { titulo: 'Trámite en curso' },
-  sin_reprocann: { titulo: 'Sin REPROCANN' },
+// ── ¿Puede retirar? ────────────────────────────────────────────────────────────────────────
+//
+// Lo contesta el BACKEND (`credencial.puede_retirar`), y sale de lo que `Dispensacion` valida de
+// verdad: que la persona esté activa en la organización y aprobada. El REPROCANN no participa.
+//
+// Antes esto se calculaba acá a partir del REPROCANN, y mentía en los dos sentidos: al vencido le
+// decía "no podés retirar" cuando sí podía, y a uno vigente pero dado de baja o pendiente de
+// aprobación le decía que sí, y lo rebotaban en la puerta. La segunda es peor: lo hace viajar al
+// vicio. Es el mismo error de siempre —la regla escrita en dos lugares— con la agravante de que
+// acá el otro lugar era el que manda.
+const MOTIVOS = {
+  baja:      { titulo: 'Tu cuenta está dada de baja',
+               detalle: 'Hablá con tu organización para reactivarla.' },
+  pendiente: { titulo: 'Todavía no estás habilitado',
+               detalle: 'Tu alta está esperando que la aprueben. Hablá con tu organización.' },
 }
 
-const cat = computed(() => (ESTADOS[c.value?.reprocann_categoria] ? c.value.reprocann_categoria : 'sin_reprocann'))
+const estado = computed(() => {
+  if (c.value?.puede_retirar) {
+    return { clave: 'ok', titulo: 'Podés retirar', detalle: 'Tu cuenta está activa y aprobada.' }
+  }
+  const m = MOTIVOS[c.value?.motivo_bloqueo] || MOTIVOS.pendiente
+  return { clave: 'bloqueado', ...m }
+})
 
-// La bajada dice la FECHA, no sólo el estado: "vence el 3 de septiembre" es accionable, "vigente"
-// no. Con el vencimiento cerca se agrega cuántos días faltan, que es lo que hace levantar el
-// teléfono.
-const detalle = computed(() => {
+// ── El REPROCANN, como dato propio ─────────────────────────────────────────────────────────
+//
+// Ya no decide nada, pero se muestra igual y con color: renovarlo lleva semanas, es SU trámite, y
+// es lo único que el portal le avisa antes de que pase. Dice la FECHA y no sólo el estado —
+// "vence el 3 de septiembre" es accionable, "vigente" no.
+const REPROCANN = {
+  vigente:       { nivel: 'ok' },
+  por_vencer:    { nivel: 'atencion' },
+  vencido:       { nivel: 'urgente' },
+  pendiente:     { nivel: 'atencion' },
+  sin_reprocann: { nivel: 'atencion' },
+}
+
+const reprocann = computed(() => {
+  const cat  = c.value?.reprocann_categoria
+  const meta = REPROCANN[cat]
+  if (!meta) return null
+
   const dias  = c.value?.dias_para_vencer
   const vence = c.value?.reprocann_vencimiento
   const f = vence
     ? new Date(vence).toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
     : null
 
-  if (cat.value === 'vencido')       return f ? `Venció el ${f}. Renovalo para poder retirar.` : 'Renovalo para poder retirar.'
-  if (cat.value === 'por_vencer')    return `Vence el ${f}${dias > 0 ? ` · faltan ${dias} ${dias === 1 ? 'día' : 'días'}` : ' · vence hoy'}. El trámite tarda, empezalo ya.`
-  if (cat.value === 'pendiente')     return 'Tu organización cargó el trámite. Todavía no tenés certificado.'
-  if (cat.value === 'sin_reprocann') return 'Hablá con tu organización para iniciar el trámite.'
-  return f ? `REPROCANN vigente hasta el ${f}.` : 'REPROCANN vigente.'
+  const texto = {
+    vigente:       f ? `Vigente hasta el ${f}` : 'Vigente',
+    por_vencer:    `Vence el ${f}${dias > 0 ? ` · faltan ${dias} ${dias === 1 ? 'día' : 'días'}` : ' · vence hoy'}`,
+    vencido:       f ? `Venció el ${f} · renovalo` : 'Vencido · renovalo',
+    pendiente:     'Trámite en curso',
+    sin_reprocann: 'Sin cargar · hablá con tu organización',
+  }[cat]
+
+  return { ...meta, texto }
 })
 
 // El QR se arma sólo cuando se abre la pantalla completa: es la única vez que se ve, y cargar la
@@ -169,15 +211,28 @@ watch(abierta, async (v) => {
   line-height: var(--lh-base);
 }
 
-.pcr--vigente       .pcr__punto { background: var(--p-ok); }
-.pcr--por_vencer    .pcr__punto { background: var(--p-atencion); }
-.pcr--vencido       .pcr__punto { background: var(--p-urgente); }
-.pcr--pendiente     .pcr__punto { background: var(--p-atencion); }
-.pcr--sin_reprocann .pcr__punto { background: var(--p-atencion); }
+.pcr--ok        .pcr__punto { background: var(--p-ok); }
+.pcr--bloqueado .pcr__punto { background: var(--p-urgente); }
 
-/* Vencido: la tarjeta entera cambia de color. Es el único estado que impide retirar, y si se ve
-   igual que "vigente" con un puntito distinto, no se ve. */
-.pcr--vencido .pcr__card { background: var(--p-urgente); }
+/* No poder retirar cambia la tarjeta ENTERA de color. Es lo único que le impide llevarse su
+   medicación, y con un puntito distinto no se ve. */
+.pcr--bloqueado .pcr__card { background: var(--p-urgente); }
+
+/* ── El REPROCANN, debajo de la línea ── */
+.pcr__rep {
+  display: flex; align-items: baseline; gap: var(--sp-2); flex-wrap: wrap;
+  margin-top: var(--sp-3); padding-top: var(--sp-3);
+  border-top: 1px solid rgb(255 255 255 / .12);
+  font-size: var(--fs-13);
+}
+.pcr__rep-k {
+  font-size: var(--fs-12); letter-spacing: .08em; text-transform: uppercase;
+  color: rgb(255 255 255 / .5);
+}
+.pcr__rep-v { color: rgb(255 255 255 / .8); }
+/* Vencido o por vencer se marcan, pero sin gritar: no impiden retirar. */
+.pcr__rep--atencion .pcr__rep-v { color: var(--p-atencion); font-weight: 600; }
+.pcr__rep--urgente  .pcr__rep-v { color: #fff; font-weight: 600; }
 
 .pcr__ver {
   position: absolute; top: var(--sp-4); right: var(--sp-4);
@@ -216,11 +271,8 @@ watch(abierta, async (v) => {
 .pcr__full-qr img { width: 220px; height: 220px; }
 
 .pcr__full-estado { font-size: var(--fs-18); font-weight: 600; margin: 0; }
-.pcr__full-estado--vigente { color: var(--p-ok); }
-.pcr__full-estado--vencido { color: var(--p-urgente); }
-.pcr__full-estado--por_vencer,
-.pcr__full-estado--pendiente,
-.pcr__full-estado--sin_reprocann { color: var(--p-atencion); }
+.pcr__full-estado--ok        { color: var(--p-ok); }
+.pcr__full-estado--bloqueado { color: var(--p-urgente); }
 .pcr__full-detalle { color: var(--p-suave); font-size: var(--fs-14); margin: var(--sp-1) 0 0; line-height: var(--lh-base); }
 .pcr__full-rep { font-family: var(--font-mono); font-size: var(--fs-13); color: var(--p-tenue); margin: var(--sp-3) 0 0; }
 </style>

@@ -48,9 +48,12 @@ const montar = (comp, props = {}) =>
 
 const CREDENCIAL = {
   nombre: 'Juan', apellido: 'Gómez', dni: '30111222', numero_socio: 42,
-  carnet_token: 'tok-abc', reprocann_numero: 'RP-9',
-  reprocann_vencimiento: '2027-03-10', reprocann_categoria: 'vigente',
-  dias_para_vencer: 200, habilitado: true,
+  carnet_token: 'tok-abc',
+  // Lo que decide si puede retirar. Sale de lo que valida `Dispensacion`: activa y aprobada.
+  puede_retirar: true, motivo_bloqueo: null,
+  // El REPROCANN es un dato SUYO y no participa de esa decisión.
+  reprocann_numero: 'RP-9', reprocann_vencimiento: '2027-03-10',
+  reprocann_categoria: 'vigente', dias_para_vencer: 200,
 }
 
 beforeEach(() => {
@@ -78,44 +81,80 @@ describe('La credencial', () => {
     expect(w.text()).toContain('42')
   })
 
-  // Lo que el paciente vino a saber no es "vigente": es si puede retirar. El texto lo dice así.
-  it('con el REPROCANN vigente dice que puede retirar, y hasta cuándo', () => {
+  // Lo que el paciente vino a saber es si puede retirar. Lo contesta el estado de su cuenta.
+  it('activo y aprobado, dice que puede retirar', () => {
     const w = montar(PortalCredencial, { credencial: CREDENCIAL })
 
     expect(w.text()).toContain('Podés retirar')
-    expect(w.text()).toContain('10 de marzo de 2027')
   })
 
-  it('vencido lo dice con lo que le cambia, no con la palabra "vencido" sola', () => {
+  // EL BUG QUE ESTO ARREGLA. `Dispensacion` valida dos cosas sobre la persona —activa y
+  // aprobada— y el REPROCANN no está entre ellas. La credencial lo usaba igual para contestar,
+  // así que a un paciente vigente pero dado de baja le decía que sí y lo rebotaban en la puerta.
+  it('dado de baja NO puede retirar, aunque el REPROCANN esté vigente', () => {
     const w = montar(PortalCredencial, {
-      credencial: { ...CREDENCIAL, reprocann_categoria: 'vencido', habilitado: false,
+      credencial: { ...CREDENCIAL, puede_retirar: false, motivo_bloqueo: 'baja' },
+    })
+
+    expect(w.text()).toContain('dada de baja')
+    expect(w.text()).not.toContain('Podés retirar')
+    expect(w.find('.pcr').classes()).toContain('pcr--bloqueado')
+  })
+
+  it('pendiente de aprobación tampoco, y dice qué falta', () => {
+    const w = montar(PortalCredencial, {
+      credencial: { ...CREDENCIAL, puede_retirar: false, motivo_bloqueo: 'pendiente' },
+    })
+
+    expect(w.text()).toContain('esperando que la aprueben')
+    expect(w.find('.pcr').classes()).toContain('pcr--bloqueado')
+  })
+
+  // El otro lado del mismo bug: con el REPROCANN vencido SÍ puede retirar, porque nada lo
+  // impide. Decirle que no lo dejaba en la casa sin necesidad.
+  it('con el REPROCANN vencido igual puede retirar: nada lo bloquea hoy', () => {
+    const w = montar(PortalCredencial, {
+      credencial: { ...CREDENCIAL, reprocann_categoria: 'vencido',
                     reprocann_vencimiento: '2026-07-01', dias_para_vencer: -49 },
     })
 
-    expect(w.text()).toContain('No podés retirar')
-    expect(w.text()).toContain('Renovalo')
-    // La tarjeta entera cambia de color: es el único estado que impide retirar, y con un puntito
-    // distinto no se ve.
-    expect(w.find('.pcr').classes()).toContain('pcr--vencido')
+    expect(w.text()).toContain('Podés retirar')
+    expect(w.find('.pcr').classes()).not.toContain('pcr--bloqueado')
   })
 
-  it('por vencer dice cuántos días faltan: es lo que hace arrancar el trámite', () => {
-    const w = montar(PortalCredencial, {
-      credencial: { ...CREDENCIAL, reprocann_categoria: 'por_vencer', dias_para_vencer: 12 },
+  describe('el REPROCANN, como dato aparte', () => {
+    it('vigente muestra hasta cuándo', () => {
+      const w = montar(PortalCredencial, { credencial: CREDENCIAL })
+
+      expect(w.find('.pcr__rep').text()).toContain('10 de marzo de 2027')
     })
 
-    expect(w.text()).toContain('Se te vence pronto')
-    expect(w.text()).toContain('faltan 12 días')
-  })
+    // Es lo único que el portal le avisa ANTES de que pase, y renovarlo lleva semanas.
+    it('por vencer dice cuántos días faltan', () => {
+      const w = montar(PortalCredencial, {
+        credencial: { ...CREDENCIAL, reprocann_categoria: 'por_vencer', dias_para_vencer: 12 },
+      })
 
-  it('sin REPROCANN no se rompe: manda a hablar con la organización', () => {
-    const w = montar(PortalCredencial, {
-      credencial: { ...CREDENCIAL, reprocann_categoria: 'sin_reprocann', reprocann_numero: null,
-                    reprocann_vencimiento: null, dias_para_vencer: null, habilitado: false },
+      expect(w.find('.pcr__rep').text()).toContain('faltan 12 días')
     })
 
-    expect(w.text()).toContain('Sin REPROCANN')
-    expect(w.text()).toContain('Hablá con tu organización')
+    it('vencido dice que lo renueve', () => {
+      const w = montar(PortalCredencial, {
+        credencial: { ...CREDENCIAL, reprocann_categoria: 'vencido',
+                      reprocann_vencimiento: '2026-07-01' },
+      })
+
+      expect(w.find('.pcr__rep').text()).toContain('renovalo')
+    })
+
+    it('sin trámite iniciado lo dice sin romper', () => {
+      const w = montar(PortalCredencial, {
+        credencial: { ...CREDENCIAL, reprocann_categoria: 'sin_reprocann', reprocann_numero: null,
+                      reprocann_vencimiento: null, dias_para_vencer: null },
+      })
+
+      expect(w.find('.pcr__rep').text()).toContain('Sin cargar')
+    })
   })
 })
 

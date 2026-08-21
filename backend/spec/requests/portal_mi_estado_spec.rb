@@ -95,6 +95,70 @@ RSpec.describe 'Portal — lo que hay que avisarle al paciente', type: :request 
   # Es lo primero del inicio y lo que el paciente muestra en la puerta. Hasta hoy vivía sólo en
   # `/c/:token` —un link que le mandaron una vez— y el portal no la mostraba en ningún lado.
   describe 'la credencial' do
+    # ¿Puede retirar? Lo contesta lo que `Dispensacion` valida DE VERDAD sobre la persona: que
+    # esté activa en la organización y aprobada. El REPROCANN no está entre esas validaciones.
+    #
+    # La credencial lo usaba igual para contestar, y mentía en los dos sentidos: al vencido le
+    # decía que no podía cuando sí podía, y a uno vigente pero dado de baja le decía que sí y lo
+    # rebotaban en la puerta. Estos cuatro casos son la matriz entera.
+    describe '¿puede retirar?' do
+      it 'activo y aprobado: sí' do
+        c = entrar_como(paciente!(reprocann_estado: 'activo', reprocann_numero: 'RP-1'))['credencial']
+
+        expect(c['puede_retirar']).to be(true)
+        expect(c['motivo_bloqueo']).to be_nil
+      end
+
+      it 'con el REPROCANN vencido: SÍ, porque hoy nada lo bloquea' do
+        c = entrar_como(paciente!(reprocann_estado: 'activo', reprocann_numero: 'RP-2',
+                                  reprocann_vencimiento: 40.days.ago.to_date))['credencial']
+
+        expect(c['puede_retirar']).to be(true)
+        expect(c['reprocann_categoria']).to eq('vencido')
+      end
+
+      # Al dado de baja no le llega a aparecer la credencial: `check_rol_habilitado!` lo frena en
+      # el login y en cada request, así que ni entra. El caso queda contemplado igual en
+      # `motivo_bloqueo` porque `puede_retirar` espeja las validaciones de `Dispensacion` una a
+      # una, y `es_paciente?` es una de ellas — pero la barrera de verdad es anterior.
+      it 'dado de baja no entra al portal siquiera' do
+        ficha = paciente!(reprocann_estado: 'activo', reprocann_numero: 'RP-3',
+                          reprocann_vencimiento: 8.months.from_now.to_date)
+        user = ActsAsTenant.with_tenant(club) do
+          u = Pacientes::Acceso.crear!(ficha).user
+          u.update!(password: AuthHelpers::DEFAULT_PASSWORD, password_confirmation: AuthHelpers::DEFAULT_PASSWORD)
+          ficha.update!(es_paciente: false)
+          u
+        end
+
+        post '/api/users/sign_in',
+             params: { user: { email: user.email, password: AuthHelpers::DEFAULT_PASSWORD } }, as: :json
+
+        expect(response).to have_http_status(:forbidden)
+        expect(response.body).to include('dada de baja')
+      end
+
+      it 'pendiente de aprobación: no, y lo distingue de una baja' do
+        ficha = paciente!(reprocann_estado: 'activo', reprocann_numero: 'RP-4')
+        ActsAsTenant.with_tenant(club) { ficha.update!(aprobado_at: nil) }
+
+        c = entrar_como(ficha)['credencial']
+
+        expect(c['puede_retirar']).to be(false)
+        expect(c['motivo_bloqueo']).to eq('pendiente')
+      end
+
+      # Si mañana el REPROCANN pasa a bloquear, el cambio va en `Dispensacion` y la credencial lo
+      # refleja sola. Este test es el que avisa que hay que venir a actualizar el de arriba.
+      it 'el backend NO exige REPROCANN para dispensar: si esto cambia, la credencial también' do
+        validaciones = Dispensacion.validators.grep(ActiveModel::Validations::WithValidator)
+                                   .flat_map { |v| Array(v.options[:with]) }
+
+        expect(Dispensacion.instance_methods(false).grep(/reprocann/)).to be_empty
+        expect(validaciones.map(&:to_s).grep(/reprocann/)).to be_empty
+      end
+    end
+
     it 'trae sus datos completos: acá está detrás de SU login, no es el carnet que reparte' do
       c = entrar_como(paciente!(nombre: 'Juan', apellido: 'Gómez', dni: '30111222',
                                 reprocann_estado: 'activo', reprocann_numero: 'RP-9',
@@ -105,7 +169,6 @@ RSpec.describe 'Portal — lo que hay que avisarle al paciente', type: :request 
       expect(c['apellido']).to eq('Gómez')
       expect(c['dni']).to eq('30111222')
       expect(c['reprocann_numero']).to eq('RP-9')
-      expect(c['habilitado']).to be(true)
     end
 
     # Que la tarjeta del paciente y el informe del auditor no puedan discrepar es el punto de
@@ -118,7 +181,6 @@ RSpec.describe 'Portal — lo que hay que avisarle al paciente', type: :request 
       vencido = entrar_como(paciente!(dni: '38222111', reprocann_estado: 'activo', reprocann_numero: 'RP-2',
                                       reprocann_vencimiento: 3.days.ago.to_date))
       expect(vencido['credencial']['reprocann_categoria']).to eq('vencido')
-      expect(vencido['credencial']['habilitado']).to be(false)
 
       cerca = entrar_como(paciente!(dni: '38222333', reprocann_estado: 'activo', reprocann_numero: 'RP-3',
                                     reprocann_vencimiento: 10.days.from_now.to_date))

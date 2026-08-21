@@ -44,6 +44,25 @@ module Portal
         numero_socio:          ficha.id,
         miembro_desde:         ficha.created_at.to_date,
         carnet_token:          ficha.carnet_token,
+
+        # ── ¿Puede retirar? ──────────────────────────────────────────────────────────────────
+        # Sale de lo que el sistema EXIGE de verdad, no de lo que parecería razonable exigir.
+        # Las validaciones de `Dispensacion` son exactamente dos sobre la persona —está activa en
+        # la organización, y está aprobada— y **el REPROCANN no aparece en ninguna**.
+        #
+        # Hasta acá la credencial usaba el REPROCANN para contestar esta pregunta, y por eso
+        # mentía en los dos sentidos: al vencido le decía "no podés retirar" cuando sí podía, y a
+        # uno vigente pero dado de baja o pendiente de aprobación le decía que sí cuando lo iban a
+        # rebotar en la puerta. La segunda es la peor: lo hace viajar al vicio.
+        #
+        # Si algún día el REPROCANN pasa a bloquear, el cambio va en `Dispensacion` —que es el
+        # único lugar por el que pasa toda entrega— y esto lo refleja solo.
+        puede_retirar:         ficha.es_paciente? && ficha.aprobado?,
+        motivo_bloqueo:        motivo_bloqueo,
+
+        # ── El REPROCANN, como dato propio ───────────────────────────────────────────────────
+        # Se sigue mostrando con su fecha y su color: es SU trámite, le importa, y renovarlo lleva
+        # semanas. Lo que ya no hace es decidir si puede retirar.
         reprocann_numero:      ficha.reprocann_numero,
         reprocann_vencimiento: ficha.reprocann_vencimiento,
         # La MISMA categoría que usa el informe REPROCANN. Que la tarjeta del paciente y el
@@ -54,8 +73,15 @@ module Portal
           vencimiento: ficha.reprocann_vencimiento,
         ),
         dias_para_vencer:      dias_para_vencer,
-        habilitado:            ficha.reprocann_estado_efectivo.to_s == 'activo',
       }
+    end
+
+    # Por qué no puede retirar, en el orden en que se resuelve: una baja no se arregla aprobando.
+    def motivo_bloqueo
+      return 'baja'      unless ficha.es_paciente?
+      return 'pendiente' unless ficha.aprobado?
+
+      nil
     end
 
     def dias_para_vencer
