@@ -118,11 +118,6 @@ class ClubUsersController < ApplicationController
       return render json: { errors: ['No podés eliminarte a vos mismo.'] }, status: :unprocessable_entity
     end
 
-    # opcional: impedir borrar super_admin si quien borra no es super_admin
-    if @user.role == 'super_admin' && !current_user.admin?
-      return render json: { errors: ['No autorizado para eliminar a un super_admin.'] }, status: :forbidden
-    end
-
     @user.destroy!
     head :no_content
   end
