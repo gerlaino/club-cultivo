@@ -156,9 +156,8 @@ El motivo dejó de ser teórico: apareció **una cookie de sesión real commitea
 era de un solo ambiente, el daño quedó acotado ahí. Con secretos compartidos, cualquier filtración
 de un ambiente de prueba es una filtración de la app en vivo.
 
-**Consecuencia deliberada:** con claves de cifrado distintas, **preproducción no puede leer un
-backup de producción**. Está bien que sea así — datos de pacientes reales no van a un ambiente de
-pruebas. Para volumen realista: `rake club:demo`.
+**Consecuencia deliberada:** con claves de cifrado distintas, preproducción no puede leer los
+campos cifrados de un dump de producción tal cual. Por eso el clon se anonimiza en SQL — ver §8.
 
 ---
 
@@ -218,3 +217,66 @@ Antes de promover a producción, mirar en preproducción:
 con ningún servicio existente, así que el blueprint sólo puede crear cosas nuevas. Producción sigue
 administrada a mano hasta que se decida adoptarla acá, y esa es una migración aparte y deliberada
 — no un efecto colateral.
+
+---
+
+## 8. Datos realistas en preproducción, sin datos de personas reales
+
+Con datos inventados no aparecen los bugs que importan: los que aparecen son los de **volumen** y
+los de **datos raros** —el paciente con dos REPROCANN, el lote con la fase mal, el nombre con
+apóstrofe— y nada de eso lo genera un seed.
+
+Entonces se clona producción y se anonimiza:
+
+```bash
+# 1. Traer el dump más reciente
+rake backup:list
+rake 'backup:restore[postgres/club_cultivo_<fecha>.dump]'   # ← con RESTORE_DATABASE_URL apuntando a PREPROD
+
+# 2. Ver qué tocaría, sin tocar nada
+rake preprod:anonimizar SIMULAR=1
+
+# 3. Hacerlo (el nombre de la base se tipea a mano, a propósito)
+rake preprod:anonimizar CONFIRMO_BASE=cultivo_pre
+```
+
+### Qué hace, en orden
+
+**Primero corta los canales, después anonimiza.** El orden importa: si algo falla en el medio,
+falla con preproducción ya incapaz de contactar a nadie.
+
+Una copia de producción no trae sólo datos: trae **canales abiertos a personas reales**. Esto es lo
+más peligroso y lo que menos se mira.
+
+| Qué hereda | Qué podría pasar |
+|---|---|
+| `clubs.smtp_pass` | Preproducción manda mails **desde la casilla real de la organización**, a las casillas reales de sus pacientes |
+| `clubs.twilio_auth_token_enc` | Manda WhatsApp de verdad |
+| `webhooks.url` + `secret` | Le pega al sistema externo real del cliente |
+| `push_subscriptions` | Le vibra el teléfono a un paciente real |
+
+Después reemplaza la identidad —nombres, DNI, mails, teléfonos, domicilios de entrega y la firma de
+recepción— y vacía el texto libre: notas clínicas, motivos y notas de turno, observaciones,
+reseñas, el contenido de `auditorias.cambios` (que guarda los campos viejos tal como estaban) y los
+campos cifrados de `indicacion_medicas`.
+
+**Lo que NO toca**, porque es justamente lo que hace aparecer los bugs: fechas, cantidades, pesos,
+códigos de lote, stock, movimientos contables, relaciones y volumen.
+
+El reemplazo es **determinístico a partir del id** —el mismo paciente es siempre `Paciente N214`—
+así que un bug que se reproduce hoy se sigue reproduciendo mañana y se puede hablar de "el 214"
+entre dos corridas del clon.
+
+### Por qué se puede confiar
+
+`spec/tasks/preprod_anonimizar_spec.rb` **barre la base entera** —todas las tablas, todas las
+columnas de texto y jsonb— buscando rastros de la persona de prueba. Si alguien agrega mañana una
+columna con un teléfono adentro y no actualiza el anonimizador, ese test falla.
+
+### Dos cosas para tener presentes
+
+- **Las contraseñas no se tocan.** Los usuarios del clon quedan con el hash de producción, así que
+  para entrar hay que resetear la que se vaya a usar. Cambiarlas a todas por una fija sería
+  reintroducir el problema que se acaba de sacar de raíz.
+- **No es un botón, es una rutina.** Cada corrida es un `pg_restore` completo que deja
+  preproducción inutilizable un rato. Es algo de una vez por mes, no de todos los días.
