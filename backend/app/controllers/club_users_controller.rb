@@ -6,7 +6,7 @@ class ClubUsersController < ApplicationController
   # GET /usuarios
   def index
     q   = params[:query].to_s.strip.downcase
-    rel = User.where(club_id: current_user.club_id)
+    rel = User.where(club_id: current_user.club_id).del_equipo
 
     if q.present?
       rel = rel.where(
@@ -307,7 +307,10 @@ class ClubUsersController < ApplicationController
   end
 
   def set_user
-    @user = User.where(club_id: current_user.club_id).find(params[:id])
+    # `del_equipo`: por acá no se toca la cuenta de un paciente. Sin el scope, un admin podía
+    # editarla, resetearle la clave o BORRARLA desde los endpoints de equipo, dejando el
+    # `paciente.user_id` colgado. Esa cuenta se gestiona desde la ficha del paciente.
+    @user = User.where(club_id: current_user.club_id).del_equipo.find(params[:id])
   end
 
   # ── Auditoría (rastro read-only) ──────────────────────────────

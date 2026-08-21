@@ -74,7 +74,7 @@ class SuperAdmin::StatsController < SuperAdmin::BaseController
       plan_activo_hasta: c.plan_activo_hasta,
       # Para que en la lista se vea cuál es un club de demostración y cuál opera de verdad.
       demo:             c.demo,
-      usuarios_count:   c.users.count,
+      usuarios_count:   c.users.del_equipo.count,
       pacientes_count:  c.pacientes.count,
       lotes_count:      c.lotes.count,
       created_at:       c.created_at,

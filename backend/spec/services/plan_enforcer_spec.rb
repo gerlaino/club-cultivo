@@ -132,6 +132,34 @@ RSpec.describe PlanEnforcer do
     end
   end
 
+  # El cupo de usuarios es del EQUIPO. El paciente tiene cuenta para su portal y ya gasta su
+  # propio límite (`pacientes`): contándolo también acá se cobraba dos veces, y un club Básico
+  # con el portal vendido se quedaba sin poder dar de alta empleados al quinto paciente.
+  describe 'límite de usuarios' do
+    it 'no cuenta las cuentas de portal de los pacientes' do
+      tope = described_class::PLANES['basico'][:usuarios]
+      (tope + 3).times { create(:user, club: club, role: 'paciente') }
+      create(:user, club: club, role: 'cultivador')
+
+      enforcer = described_class.new(club.reload)
+      expect(enforcer.puede_crear_usuario?).to be(true)
+    end
+
+    it 'el uso que se informa cuenta igual que el tope' do
+      create(:user, club: club, role: 'paciente')
+      create(:user, club: club, role: 'cultivador')
+
+      expect(described_class.new(club.reload).info[:uso][:usuarios]).to eq(1)
+    end
+
+    it 'sigue frenando cuando el equipo llega al tope' do
+      tope = described_class::PLANES['basico'][:usuarios]
+      tope.times { create(:user, club: club, role: 'cultivador') }
+
+      expect(described_class.new(club.reload).puede_crear_usuario?).to be(false)
+    end
+  end
+
   describe '#info' do
     it 'informa los seis límites y el uso de cada uno' do
       info = described_class.new(club).info

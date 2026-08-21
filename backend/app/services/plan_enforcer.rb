@@ -74,9 +74,12 @@ class PlanEnforcer
     @club.pacientes.count < @limite[:pacientes]
   end
 
+  # `del_equipo`: el cupo es del EQUIPO. Los pacientes tienen cuenta para su portal y ya
+  # gastan su propio límite (`pacientes`); contándolos acá se cobraban dos veces y un club
+  # Básico se quedaba sin poder dar de alta empleados al quinto paciente con portal.
   def puede_crear_usuario?
     return true if @limite[:usuarios].nil?
-    @club.users.count < @limite[:usuarios]
+    @club.users.del_equipo.count < @limite[:usuarios]
   end
 
   def info
@@ -105,7 +108,7 @@ class PlanEnforcer
       lotes:     @club.lotes.count,
       plantas:   Plant.joins(:lote).where(lotes: { club_id: @club.id }).count,
       pacientes: @club.pacientes.count,
-      usuarios:  @club.users.count,
+      usuarios:  @club.users.del_equipo.count,
     }
   end
 

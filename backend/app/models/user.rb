@@ -43,6 +43,18 @@ class User < ApplicationRecord
   validates :role,  presence: true
   validates :email, presence: true, uniqueness: true
 
+  # ── El paciente NO es parte del equipo ────────────────────────────────────
+  #
+  # Tiene un `User` porque necesita entrar a SU portal, no porque trabaje en la organización.
+  # Contarlo como usuario del club rompía tres cosas a la vez: la pantalla de Equipo mostraba
+  # el padrón entero, el cupo de usuarios del plan se llenaba con pacientes (que además ya
+  # tienen su propio límite: se cobraban dos veces) y el panel del super admin informaba un
+  # equipo de 63 personas donde había 3.
+  #
+  # Su cuenta se gestiona desde la ficha del paciente (`Pacientes::Acceso`), nunca desde los
+  # endpoints de equipo.
+  scope :del_equipo, -> { where.not(role: 'paciente') }
+
   # ── Roles que dependen de un módulo ───────────────────────────────────────
   #
   # Un cultivador en un club que apagó la suite Cultivo no tiene NADA que hacer: entraba

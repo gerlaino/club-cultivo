@@ -313,7 +313,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       plan:             c.plan,
       plan_trial:       c.plan_trial,
       plan_activo_hasta: c.plan_activo_hasta,
-      usuarios_count:   c.users.count,
+      usuarios_count:   c.users.del_equipo.count,
       pacientes_count:  c.pacientes.count,
       lotes_count:      c.lotes.count,
       created_at:       c.created_at,

@@ -6,7 +6,9 @@ class PlanTrabajoIaService
   def initialize(archivo, club)
     @archivo  = archivo
     @club     = club
-    @usuarios = club.users.select(:id, :first_name, :last_name, :email)
+    # `del_equipo`: son los candidatos a responsable de una tarea. Sin el scope, la IA podía
+    # asignarle el riego a un paciente con cuenta del portal.
+    @usuarios = club.users.del_equipo.select(:id, :first_name, :last_name, :email)
   end
 
   def interpretar
