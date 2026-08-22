@@ -19,6 +19,10 @@ class ClubUsersController < ApplicationController
       rel = rel.where(role: Array(params[:roles]))
     elsif params[:role].present?
       rel = rel.where(role: params[:role])
+    else
+      # Sin filtro explícito esto es el listado de "equipo": el paciente tiene su propia
+      # ficha y no es personal de la organización, aunque comparta la tabla `users`.
+      rel = rel.where.not(role: 'paciente')
     end
 
     users = rel.order("created_at DESC")
