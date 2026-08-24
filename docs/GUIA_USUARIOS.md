@@ -131,8 +131,10 @@ add-ons— y se filtra por eso: las dos suites, solo Cultivo, solo Dispensa.
   clínica; cerrar períodos contables; gestionar equipo y sedes; configurar ambiente/alertas;
   restaurar desde la Papelera.
 - **Equipo (rehecho):** al dar de alta, la **contraseña la genera el backend** —distinta para cada
-  usuario— y viene armada para **dictarse por teléfono**: sin `0/O` ni `1/l/I`, en bloques
-  (`BiTc-XnPb-5447`). Queda en pantalla, no en un toast que se va solo. Hay botón de
+  usuario— y viene armada para **dictarse por teléfono**: sin `0/O` ni `1/l/I`. En pantalla se
+  muestra agrupada en bloques (`BiTc XnPb 5447`) para leerla más fácil, pero el guion que separa
+  los bloques es sólo visual: la contraseña real no lo tiene y no hay que tipearlo. Queda en
+  pantalla, no en un toast que se va solo. Hay botón de
   **restablecer contraseña** en la ficha del usuario: la genera, la muestra e informa si el mail
   salió o no. **Un fallo de SMTP ya no tumba un alta.**
 - **NO puede:** cosas de plataforma (planes globales, otros clubes) — eso es del super_admin.

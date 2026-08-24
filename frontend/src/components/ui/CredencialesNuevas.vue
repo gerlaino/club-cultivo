@@ -15,7 +15,9 @@
         </div>
         <div class="cred__row">
           <span class="cred__lbl">Contraseña</span>
-          <code class="cred__val cred__val--big">{{ datos.password_inicial }}</code>
+          <code class="cred__val cred__val--big cred__pw">
+            <span v-for="(bloque, i) in passwordBloques" :key="i" class="cred__pw-bloque">{{ bloque }}</span>
+          </code>
         </div>
         <p v-if="datos.mail_enviado === true" class="cred__mail">
           <i class="bi bi-envelope-check"></i> También se las mandamos por mail.
@@ -27,6 +29,7 @@
         <p v-else class="cred__mail cred__mail--off">
           <i class="bi bi-telephone"></i> Se dicta por teléfono sin equívocos: no lleva ceros ni eles.
         </p>
+        <p class="cred__hint">Los guiones son sólo para leerla agrupada: no van al escribirla.</p>
         <div class="cred__acts">
           <button class="cred__btn" @click="copiar">
             <i class="bi bi-clipboard"></i> Copiar
@@ -43,6 +46,7 @@
 // "Restablecer contraseña" en la ficha. Vive acá y no dentro de una pantalla porque son dos las
 // que dan de alta gente que después entra —el equipo y los pacientes— y la misma regla escrita
 // en dos lados es exactamente lo que se nos viene rompiendo.
+import { computed } from 'vue'
 import { useToast } from '../../composables/useToast'
 
 const props = defineProps({
@@ -51,6 +55,14 @@ const props = defineProps({
 })
 const emit = defineEmits(['cerrar'])
 const toast = useToast()
+
+// El guion entre bloques es sólo visual (se dibuja con CSS ::after, no es texto): agrupa de a 4
+// para que se lea/dicte más fácil, pero no forma parte de la contraseña real — ni al copiarla con
+// el botón ni al seleccionarla a mano queda un guion de más.
+const passwordBloques = computed(() => {
+  const pw = props.datos?.password_inicial || ''
+  return pw.match(/.{1,4}/g) || [pw]
+})
 
 async function copiar() {
   await navigator.clipboard.writeText(
@@ -73,8 +85,11 @@ function cerrar() { emit('cerrar') }
 .cred__lbl { font-size: .7rem; color: var(--c-slate-500); width: 82px; flex-shrink: 0; text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
 .cred__val { font-family: monospace; font-size: .9rem; background: var(--c-slate-50); border: 1px solid var(--c-slate-200); border-radius: 7px; padding: .35rem .65rem; color: var(--c-slate-900); user-select: all; flex: 1; }
 .cred__val--big { font-size: 1.1rem; font-weight: 700; letter-spacing: .05em; }
+.cred__pw { display: inline-flex; }
+.cred__pw-bloque:not(:last-child)::after { content: '-'; opacity: .45; padding: 0 .05em; font-weight: 400; }
 .cred__mail { font-size: .78rem; color: #15803d; margin: .9rem 0 0; display: flex; align-items: center; gap: .4rem; }
 .cred__mail--off { color: #92400e; }
+.cred__hint { font-size: .72rem; color: var(--c-slate-500); margin: .5rem 0 0; }
 .cred__acts { display: flex; gap: .6rem; justify-content: flex-end; margin-top: 1.35rem; }
 .cred__btn {
   padding: .5rem 1rem; border-radius: 8px; font-size: .85rem; font-weight: 600; cursor: pointer;
