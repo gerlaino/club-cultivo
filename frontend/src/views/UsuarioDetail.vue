@@ -8,6 +8,7 @@ import UsuarioSedesManager  from '../components/UsuarioSedesManager.vue'
 import MedicoCalendarioWidget from '../components/medico/MedicoCalendarioWidget.vue'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import Paginator from '../components/ui/Paginator.vue'
+import CredencialesNuevas from '../components/ui/CredencialesNuevas.vue'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
@@ -77,18 +78,12 @@ async function resetearPassword() {
   reseteando.value = true
   try {
     const { data } = await resetUserPassword(userId)
-    credenciales.value = data
+    credenciales.value = { ...data, nombre: u.value?.first_name || u.value?.email }
   } catch (e) {
     toast.error(e?.response?.data?.error || 'No se pudo restablecer la contraseña')
   } finally {
     reseteando.value = false
   }
-}
-
-async function copiarCredenciales() {
-  const c = credenciales.value
-  await navigator.clipboard.writeText(`Usuario: ${c.email}\nContraseña: ${c.password_inicial}`)
-  toast.success('Copiado')
 }
 
 // ── Editar info personal ────────────────────────────────────────────────
@@ -325,6 +320,8 @@ onMounted(async () => {
   <div class="ud">
 
     <Breadcrumb :items="[{ label: 'Equipo', to: { name: 'usuarios' } }, { label: u ? `${u.first_name} ${u.last_name}` : `Usuario #${userId}` }]" />
+
+    <CredencialesNuevas :datos="credenciales" @cerrar="credenciales = null" />
 
     <div v-if="loading" class="ud__loading"><DsSpinner /></div>
     <div v-else-if="error" class="ud__error">{{ error }}</div>
@@ -866,17 +863,6 @@ onMounted(async () => {
 }
 
 /* Hero actions */
-.ud__cred { margin-top: 1rem; background: #f0fdf4; border: 1px solid #86efac; border-radius: 12px; padding: 1rem 1.15rem; }
-.ud__cred-head { display: flex; align-items: center; gap: .5rem; font-size: .85rem; color: #15803d; margin-bottom: .75rem; flex-wrap: wrap; }
-.ud__cred-mail { font-size: .72rem; color: #15803d; background: #dcfce7; padding: .1em .5em; border-radius: 999px; font-weight: 700; }
-.ud__cred-mail--off { color: #92400e; background: #fef3c7; }
-.ud__cred-row { display: flex; align-items: center; gap: .75rem; margin-bottom: .4rem; }
-.ud__cred-lbl { font-size: .72rem; color: var(--c-slate-500); width: 80px; flex-shrink: 0; text-transform: uppercase; letter-spacing: .04em; font-weight: 700; }
-.ud__cred-val { font-family: monospace; font-size: .9rem; background: #fff; border: 1px solid #bbf7d0; border-radius: 6px; padding: .3rem .6rem; color: var(--c-slate-900); user-select: all; }
-.ud__cred-val--big { font-size: 1.05rem; font-weight: 700; letter-spacing: .04em; }
-.ud__cred-acts { display: flex; gap: .5rem; align-items: center; margin-top: .85rem; }
-.ud__cred-close { background: none; border: none; color: #15803d; font-size: .8rem; font-weight: 600; cursor: pointer; text-decoration: underline; }
-.ud__cred-hint { font-size: .72rem; color: var(--c-slate-500); margin: .6rem 0 0; }
 .ud__hero-actions { display: flex; gap: .6rem; margin-left: auto; align-self: flex-start; }
 
 /* Hero strip */
