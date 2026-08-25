@@ -34,7 +34,10 @@ class PacienteMailer < ApplicationMailer
     @usuario   = paciente.user&.email
     @password  = password
     @nueva     = nueva
-    @portal_url = "#{ENV.fetch('FRONTEND_URL', 'https://app.cultivoespacial.com')}/portal"
+    # `App.base_url` y no un default escrito a mano: acá decía `https://app.cultivoespacial.com`,
+    # un SUBDOMINIO, cuando la dirección elegida para la app es la raíz. Es el mail donde el
+    # paciente recibe su contraseña — el link tiene que llevarlo a algún lado.
+    @portal_url = "#{App.base_url}/portal"
 
     asunto = nueva ? "Tu nueva contraseña de #{club.name}" : "Tu acceso a #{club.name}"
     mail_para_club(club, to: paciente.email, subject: asunto)

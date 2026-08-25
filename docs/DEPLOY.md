@@ -92,6 +92,25 @@ dosificación, vía de administración, observaciones y DNI.
 | `EXTRA_CORS_ORIGINS` | Orígenes extra, separados por coma (para la transición de dominio) |
 | `ARICCAME_SIMULAR` | En cualquier ambiente que no sea producción debe ser `true` |
 
+### 3.4 Desde dónde se acepta una conexión
+
+`App.origenes_permitidos` (en `config/application.rb`) es la **fuente única**: la consumen CORS
+(`config/initializers/cors.rb`) y el handshake de ActionCable (`config/environments/production.rb`).
+La lista es `App::HOSTS_PROPIOS` + `FRONTEND_URL` + `EXTRA_CORS_ORIGINS`.
+
+**Los hosts propios se SUMAN, no se reemplazan.** Estaba escrita dos veces y las dos copias
+anotaban `club-cultivo-1.onrender.com` —el static viejo— sin anotar `cultivo-staging-api`, que es
+donde la app corre de verdad. Al mover `FRONTEND_URL` al dominio propio, el host de Render salía de
+la lista, y a todo el que siguiera entrando por ahí mientras el DNS propaga se le cortaba el tiempo
+real **sin un error a la vista**: la pantalla se queda quieta.
+
+`spec/config/origenes_permitidos_spec.rb` fija esto, incluido el caso de la transición.
+
+Para armar links fuera de un request (mails, jobs, PDFs) se usa **`App.base_url`**: `FRONTEND_URL`,
+y si no está, `https://` + `APP_HOST`. El mailer del portal del paciente tenía escrito a mano
+`https://app.cultivoespacial.com` —un subdominio, cuando la dirección elegida es la raíz— y es
+justo el mail donde la persona recibe su contraseña.
+
 ### 3.3 Sólo para el cron de backup
 
 `BACKUP_BUCKET`, `DATABASE_URL`, y credenciales: usa `BACKUP_S3_ACCESS_KEY_ID` /
@@ -197,9 +216,13 @@ Antes de promover a producción, mirar en preproducción:
    que motivó la migración. Confirmar a dónde apunta el dominio antes de borrarlo.
 4. **El dominio `cultivoespacial.com` no está configurado.** La decisión tomada: la raíz apunta al
    **web service**, no al static. Al hacerlo hay que setear `FRONTEND_URL` y `APP_HOST`, o el
-   tiempo real se cae en silencio.
+   tiempo real se cae en silencio. **Del lado del código ya está listo** — ver §3.4.
 5. **Rotar `SECRET_KEY_BASE` de producción**, por la cookie que estuvo commiteada. Desloguea a
    todos, que es justamente lo que se busca.
+5b. **Simplificar la cookie de sesión, DESPUÉS del dominio.** `config/initializers/session_store.rb`
+   usa `same_site: :none` + `partitioned: true`, que era necesario cuando el SPA salía de otro
+   origen. Hoy es todo same-origin y alcanza `:lax`. No se toca junto con el dominio: mover
+   cookies y host el mismo día es cómo se rompe el login.
 6. **Renombrar `cultivo-staging-api`** a algo que diga que es producción — después del dominio.
 
 ---

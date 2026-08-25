@@ -19,6 +19,47 @@ require "action_cable/engine"
 Bundler.require(*Rails.groups)
 
 module App
+  # ── Desde dónde se acepta una conexión ────────────────────────────────────────
+  #
+  # Es la misma lista para dos cosas: CORS (`config/initializers/cors.rb`) y el handshake de
+  # ActionCable (`config/environments/production.rb`). Vive ACÁ y en un solo lugar porque estaba
+  # escrita dos veces y las dos copias dejaron de coincidir.
+  #
+  # Y las dos anotaban `club-cultivo-1.onrender.com` —el sitio VIEJO— sin anotar el servidor donde
+  # la app corre de verdad. Eso importa el día que se mueve el dominio: al pasar `FRONTEND_URL` a
+  # `cultivoespacial.com`, el host de Render salía de la lista, y a todo el que siguiera entrando
+  # por ahí —durante las horas que tarda el DNS en propagarse— se le cortaba el tiempo real SIN UN
+  # ERROR A LA VISTA. La pantalla se queda quieta y parece que no pasa nada.
+  #
+  # Por eso los hosts propios se SUMAN, no se reemplazan: durante la transición conviven los dos.
+  HOSTS_PROPIOS = [
+    'https://cultivo-staging-api.onrender.com', # producción — el nombre engaña, no es staging
+    'https://club-cultivo-1.onrender.com',      # el static legacy, mientras siga en pie
+  ].freeze
+
+  def self.origenes_permitidos
+    [
+      *HOSTS_PROPIOS,
+      ENV['FRONTEND_URL'],
+      *ENV['EXTRA_CORS_ORIGINS'].to_s.split(','),
+    ].compact.map(&:strip).reject(&:empty?).uniq
+  end
+
+  # La dirección de la app para armar links FUERA de un request (mails, jobs, PDFs).
+  #
+  # `FRONTEND_URL` manda; si no está, se arma con `APP_HOST`, que es el que ya usa
+  # `config/initializers/default_url_options.rb`. Antes el mailer del portal tenía escrito a mano
+  # `https://app.cultivoespacial.com` como respaldo: un SUBDOMINIO, cuando la dirección elegida es
+  # la raíz. Es el mail donde el paciente recibe su contraseña, así que ese link tiene que llevar
+  # a algún lado.
+  def self.base_url
+    frontend = ENV['FRONTEND_URL'].to_s.strip
+    return frontend unless frontend.empty?
+
+    host = ENV['APP_HOST'].to_s.strip
+    host.empty? ? 'http://localhost:3001' : "https://#{host}"
+  end
+
   class Application < Rails::Application
     config.middleware.use ActionDispatch::Cookies
     config.middleware.use ActionDispatch::Session::CookieStore, key: "_club_session"
