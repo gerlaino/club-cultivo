@@ -111,6 +111,69 @@ const stocksDisponibles = computed(() =>
     : conStock.value.filter(s => sedeElegida.value === undefined || (s.sede?.id ?? null) === sedeElegida.value)
 )
 
+// ── Buscar y ordenar dentro de la sede ───────────────────────────────────────────
+// Con muchas variedades abiertas a la vez la lista se vuelve un scroll largo, y quien dispensa
+// busca una cosa concreta: la genética que le pidieron. El orden por defecto es alfabético por
+// genética porque es lo que se busca; lo demás se ordena tocando la columna.
+const busquedaStock = ref('')
+const ordenStock    = ref({ campo: 'genetica', dir: 'asc' })
+
+const COLUMNAS = [
+  { campo: 'producto',  label: 'Producto' },
+  { campo: 'genetica',  label: 'Genética' },
+  { campo: 'fecha',     label: 'Fecha' },
+  { campo: 'precio',    label: 'Precio',   num: true },
+  // Última contra el borde: es el número que se mira de un golpe de vista antes de elegir.
+  { campo: 'disponible', label: 'Disp.',   num: true },
+]
+
+const generica = (s) => s.genetica?.nombre || s.lote?.genetica?.nombre || ''
+
+// El valor por el que se ordena cada columna. Las de texto se comparan en minúscula para que
+// "blue sherbet" no quede después de "ZKKW"; las numéricas, como número.
+function valorOrden(s, campo) {
+  switch (campo) {
+    case 'producto':   return (FORMA_LABEL[s.forma_producto] || s.forma_producto || '').toLowerCase()
+    case 'genetica':   return generica(s).toLowerCase()
+    case 'fecha':      return s.fecha_elaboracion || s.created_at || ''
+    case 'precio':     return Number(s.precio_sugerido_ars) || 0
+    case 'disponible': return Number(s.cantidad) || 0
+    default:           return ''
+  }
+}
+
+function ordenarPor(campo) {
+  const o = ordenStock.value
+  ordenStock.value = { campo, dir: o.campo === campo && o.dir === 'asc' ? 'desc' : 'asc' }
+}
+
+// Lo que finalmente se pinta: la sede elegida, filtrado por el buscador y ordenado.
+const stocksVisibles = computed(() => {
+  const term = busquedaStock.value.trim().toLowerCase()
+  const lista = term
+    ? stocksDisponibles.value.filter(s => [
+        FORMA_LABEL[s.forma_producto] || s.forma_producto,
+        generica(s), s.descripcion, s.lote?.codigo, s.numero_lote_producto,
+      ].some(v => (v || '').toLowerCase().includes(term)))
+    : [...stocksDisponibles.value]
+
+  const { campo, dir } = ordenStock.value
+  const signo = dir === 'asc' ? 1 : -1
+  return lista.sort((a, b) => {
+    const va = valorOrden(a, campo), vb = valorOrden(b, campo)
+    if (va < vb) return -1 * signo
+    if (va > vb) return 1 * signo
+    // Empate: alfabético por genética, para que el orden no baile entre renders.
+    return generica(a).localeCompare(generica(b))
+  })
+})
+
+// Cambiar de sede o de búsqueda no puede dejar seleccionado algo que ya no se ve.
+watch(stocksVisibles, (lista) => {
+  if (form.value.stock_id && !lista.some(s => s.id === form.value.stock_id)) form.value.stock_id = null
+})
+
+
 // ── Cuenta corriente ARS ───────────────────────────────────────────────────────
 const tieneCc  = computed(() => props.limiteCc !== null && props.limiteCc > 0)
 const ccMargen = computed(() => (props.saldoCc ?? 0) + (props.limiteCc ?? 0))
@@ -624,40 +687,107 @@ async function handleSubmit() {
           <div v-else-if="!loadingStocks && !stocksDisponibles.length" class="mnd__warn-box">
             <i class="bi bi-exclamation-triangle"></i> Sin stock disponible{{ hayVariasSedes ? ' en esta sede' : '' }}
           </div>
-          <div v-else class="mnd__stock-list">
-            <button
-              v-for="s in stocksDisponibles" :key="s.id"
-              type="button"
-              class="mnd__stock-row"
-              :class="{ 'mnd__stock-row--active': form.stock_id === s.id }"
-              @click="form.stock_id = s.id"
-            >
-              <span class="mnd__stock-emoji">{{ FORMA_EMOJI[s.forma_producto] || '📦' }}</span>
-              <span class="mnd__stock-info">
-                <span class="mnd__stock-nombre">{{ FORMA_LABEL[s.forma_producto] || s.forma_producto }}</span>
-                <span v-if="s.genetica?.nombre || s.lote?.genetica?.nombre" class="mnd__stock-gen">{{ s.genetica?.nombre || s.lote.genetica.nombre }}</span>
-                <span v-if="fmtFecha(s.fecha_elaboracion || s.created_at)" class="mnd__stock-fecha">
-                  {{ fmtFecha(s.fecha_elaboracion || s.created_at) }}
+          <template v-else>
+            <!-- El buscador filtra por producto, genética, observación o lote: quien dispensa
+                 busca lo que le pidieron por su nombre, no por dónde cayó en la lista. -->
+            <div class="mnd__buscador">
+              <i class="bi bi-search"></i>
+              <input v-model="busquedaStock" type="search" class="mnd__buscador-input"
+                     placeholder="Buscar variedad, producto u observación…" />
+              <span v-if="busquedaStock" class="mnd__buscador-n">{{ stocksVisibles.length }}</span>
+            </div>
+
+            <div v-if="!stocksVisibles.length" class="mnd__warn-box">
+              <i class="bi bi-search"></i> Nada coincide con “{{ busquedaStock }}”
+            </div>
+
+            <!-- ESCRITORIO: tabla. Las columnas alineadas dejan comparar fecha, precio y
+                 disponible entre filas, que es lo que no se podía con los datos en línea. -->
+            <div v-else class="mnd__tabla-wrap">
+              <table class="mnd__tabla">
+                <thead>
+                  <tr>
+                    <th class="mnd__th-sel"><span class="mnd__sr">Elegir</span></th>
+                    <th v-for="c in COLUMNAS" :key="c.campo"
+                        :class="['mnd__th', c.num ? 'mnd__th--num' : '', ordenStock.campo === c.campo ? 'mnd__th--activa' : '']"
+                        :aria-sort="ordenStock.campo === c.campo ? (ordenStock.dir === 'asc' ? 'ascending' : 'descending') : 'none'">
+                      <button type="button" class="mnd__th-btn" @click="ordenarPor(c.campo)">
+                        {{ c.label }}
+                        <i v-if="ordenStock.campo === c.campo"
+                           :class="ordenStock.dir === 'asc' ? 'bi bi-caret-up-fill' : 'bi bi-caret-down-fill'"></i>
+                      </button>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="s in stocksVisibles" :key="s.id"
+                      class="mnd__tr" :class="{ 'mnd__tr--active': form.stock_id === s.id }"
+                      @click="form.stock_id = s.id">
+                    <!-- Radio de verdad y no un div con @click: la selección con teclado y el
+                         lector de pantalla salen gratis, como salían con el botón de antes. -->
+                    <td class="mnd__td-sel">
+                      <input type="radio" name="mnd-stock" class="mnd__radio"
+                             :value="s.id" :checked="form.stock_id === s.id"
+                             @change="form.stock_id = s.id" />
+                    </td>
+                    <td class="mnd__td-prod">
+                      <span class="mnd__td-emoji">{{ FORMA_EMOJI[s.forma_producto] || '📦' }}</span>
+                      {{ FORMA_LABEL[s.forma_producto] || s.forma_producto }}
+                    </td>
+                    <td class="mnd__td-gen">
+                      <span class="mnd__td-gen-nombre">{{ generica(s) || '—' }}</span>
+                      <!-- Lo que se anotó al cargar el producto: es donde se distingue un frasco
+                           de otro que en la tabla se ven en todo iguales. -->
+                      <span v-if="s.descripcion" class="mnd__td-obs" :title="s.descripcion">{{ s.descripcion }}</span>
+                    </td>
+                    <td class="mnd__td-fecha">{{ fmtFecha(s.fecha_elaboracion || s.created_at) || '—' }}</td>
+                    <td class="mnd__td-precio">
+                      <template v-if="s.precio_sugerido_ars">{{ fmt(s.precio_sugerido_ars) }}<span class="mnd__td-un">/{{ s.unidad || 'g' }}</span></template>
+                      <template v-else>—</template>
+                    </td>
+                    <td class="mnd__td-disp">
+                      <span class="mnd__td-disp-n">{{ s.cantidad }}{{ s.unidad }}</span>
+                      <span v-for="a in (s.apartados_evento || [])" :key="a.evento_id" class="mnd__td-evento"
+                            :title="`Apartado para el evento ${a.evento_nombre}`">🎉 {{ a.cantidad }}{{ s.unidad }}</span>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- CELULAR: la tabla no entra en un teléfono. Misma info, apilada. -->
+            <div v-if="stocksVisibles.length" class="mnd__stock-list">
+              <button
+                v-for="s in stocksVisibles" :key="s.id"
+                type="button"
+                class="mnd__stock-row"
+                :class="{ 'mnd__stock-row--active': form.stock_id === s.id }"
+                @click="form.stock_id = s.id"
+              >
+                <span class="mnd__stock-emoji">{{ FORMA_EMOJI[s.forma_producto] || '📦' }}</span>
+                <span class="mnd__stock-info">
+                  <span class="mnd__stock-nombre">{{ FORMA_LABEL[s.forma_producto] || s.forma_producto }}</span>
+                  <span v-if="generica(s)" class="mnd__stock-gen">{{ generica(s) }}</span>
+                  <span v-if="fmtFecha(s.fecha_elaboracion || s.created_at)" class="mnd__stock-fecha">
+                    {{ fmtFecha(s.fecha_elaboracion || s.created_at) }}
+                  </span>
+                  <span v-if="s.descripcion" class="mnd__stock-obs" :title="s.descripcion">
+                    {{ s.descripcion }}
+                  </span>
                 </span>
-                <!-- Lo que se anotó al cargar el producto. Quien dispensa lo necesita acá: es
-                     donde se distingue un frasco de otro que en la lista se ven iguales (misma
-                     forma, misma genética, misma fecha). -->
-                <span v-if="s.descripcion" class="mnd__stock-obs" :title="s.descripcion">
-                  {{ s.descripcion }}
+                <span class="mnd__stock-right">
+                  <span class="mnd__stock-disp">{{ s.cantidad }}{{ s.unidad }}</span>
+                  <span v-for="a in (s.apartados_evento || [])" :key="a.evento_id" class="mnd__stock-evento" :title="`Apartado para el evento ${a.evento_nombre}`">
+                    🎉 {{ a.cantidad }}{{ s.unidad }}
+                  </span>
+                  <span v-if="s.precio_sugerido_ars" class="mnd__stock-precio">
+                    {{ fmt(s.precio_sugerido_ars) }}/{{ s.unidad || 'g' }}
+                  </span>
                 </span>
-              </span>
-              <span class="mnd__stock-right">
-                <span class="mnd__stock-disp">{{ s.cantidad }}{{ s.unidad }}</span>
-                <span v-for="a in (s.apartados_evento || [])" :key="a.evento_id" class="mnd__stock-evento" :title="`Apartado para el evento ${a.evento_nombre}`">
-                  🎉 {{ a.cantidad }}{{ s.unidad }}
-                </span>
-                <span v-if="s.precio_sugerido_ars" class="mnd__stock-precio">
-                  {{ fmt(s.precio_sugerido_ars) }}/{{ s.unidad || 'g' }}
-                </span>
-              </span>
-              <span class="mnd__stock-check" v-if="form.stock_id === s.id"><i class="bi bi-check-circle-fill"></i></span>
-            </button>
-          </div>
+                <span class="mnd__stock-check" v-if="form.stock_id === s.id"><i class="bi bi-check-circle-fill"></i></span>
+              </button>
+            </div>
+          </template>
 
           <!-- Origen: stock libre o lo apartado para un evento EN CURSO -->
           <div v-if="!modoReserva && apartadosDelStock.length" class="mnd__evento-box">
@@ -1025,7 +1155,54 @@ async function handleSubmit() {
 
 /* Stock */
 .mnd__section-label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .05em; }
-.mnd__stock-list { display: flex; flex-direction: column; gap: .35rem; max-height: 220px; overflow-y: auto; }
+/* ── Selector de producto: tabla en escritorio, tarjetas en el teléfono ────────────
+   Son dos markups de la MISMA lista, no dos fuentes de verdad: los dos leen
+   `stocksVisibles` y escriben `form.stock_id`. El swap es puro CSS. */
+.mnd__buscador { position: relative; display: flex; align-items: center; margin-bottom: .5rem; }
+.mnd__buscador > .bi-search { position: absolute; left: .6rem; color: var(--c-slate-400); font-size: .8rem; pointer-events: none; }
+.mnd__buscador-input { width: 100%; padding: .45rem .6rem .45rem 1.9rem; border: 1.5px solid var(--c-slate-200); border-radius: 9px; font-size: .8rem; background: #fff; }
+.mnd__buscador-input:focus { outline: none; border-color: #1b5e20; }
+.mnd__buscador-n { position: absolute; right: .55rem; font-size: .68rem; font-weight: 700; color: var(--c-slate-500); background: var(--c-slate-100); border-radius: 999px; padding: .1rem .4rem; }
+
+.mnd__sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.mnd__tabla-wrap { max-height: 260px; overflow: auto; border: 1.5px solid var(--c-slate-200); border-radius: 10px; }
+.mnd__tabla { width: 100%; border-collapse: collapse; font-size: .78rem; }
+.mnd__tabla thead th { position: sticky; top: 0; z-index: 1; background: var(--c-slate-50); border-bottom: 1.5px solid var(--c-slate-200); padding: 0; white-space: nowrap; }
+.mnd__th { text-align: left; }
+.mnd__th--num { text-align: right; }
+.mnd__th-sel { width: 30px; }
+.mnd__th-btn { width: 100%; background: none; border: none; cursor: pointer; padding: .45rem .5rem; font-size: .66rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: var(--c-slate-500); display: flex; align-items: center; gap: .25rem; }
+.mnd__th--num .mnd__th-btn { justify-content: flex-end; }
+.mnd__th-btn:hover { color: #1b5e20; }
+.mnd__th--activa .mnd__th-btn { color: #1b5e20; }
+
+.mnd__tr { cursor: pointer; border-bottom: 1px solid var(--c-slate-100); }
+.mnd__tr:last-child { border-bottom: none; }
+.mnd__tr:hover { background: #f0fdf4; }
+.mnd__tr--active { background: #f0fdf4; box-shadow: inset 3px 0 0 #1b5e20; }
+.mnd__tabla td { padding: .45rem .5rem; vertical-align: middle; }
+.mnd__td-sel { width: 30px; text-align: center; }
+.mnd__radio { accent-color: #1b5e20; cursor: pointer; }
+.mnd__td-prod { font-weight: 700; color: var(--c-slate-900); white-space: nowrap; }
+.mnd__td-emoji { margin-right: .2rem; }
+.mnd__td-gen { min-width: 0; }
+.mnd__td-gen-nombre { display: block; color: var(--c-slate-700); }
+.mnd__td-obs { display: block; font-size: .68rem; color: var(--c-slate-400); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 190px; }
+.mnd__td-fecha { color: var(--c-slate-500); font-size: .72rem; white-space: nowrap; }
+.mnd__td-precio { text-align: right; font-family: monospace; color: var(--c-slate-600); white-space: nowrap; }
+.mnd__td-un { color: var(--c-slate-400); }
+/* Última contra el borde: el número que se mira de un golpe de vista. */
+.mnd__td-disp { text-align: right; white-space: nowrap; }
+.mnd__td-disp-n { font-family: monospace; font-weight: 800; color: #1b5e20; }
+.mnd__td-evento { display: block; font-size: .64rem; color: #b45309; }
+
+/* Debajo de 720px no hay ancho para cinco columnas: manda la tarjeta. */
+.mnd__stock-list { display: none; flex-direction: column; gap: .35rem; max-height: 220px; overflow-y: auto; }
+@media (max-width: 720px) {
+  .mnd__tabla-wrap { display: none; }
+  .mnd__stock-list { display: flex; }
+}
 .mnd__stock-row { display: flex; align-items: center; gap: .75rem; padding: .6rem .875rem; border-radius: 10px; border: 1.5px solid var(--c-slate-200); background: #fafbfc; cursor: pointer; text-align: left; transition: all .12s; width: 100%; }
 .mnd__stock-row:hover { border-color: #86efac; background: #f0fdf4; }
 .mnd__stock-row--active { border-color: #1b5e20; background: #f0fdf4; }
