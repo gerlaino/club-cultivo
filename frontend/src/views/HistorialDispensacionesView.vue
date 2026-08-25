@@ -70,15 +70,23 @@ function abrirFiltrarSocio() {
 async function buscarPacientes() {
   loadingPacientes.value = true
   try {
-    const p = {}
-    if (buscaPaciente.value.trim()) p.q = buscaPaciente.value.trim()
+    // El backend lee `query`, no `q`: con el nombre equivocado el filtro se descarta en
+    // silencio y vuelve la primera página entera, que se ve como "la búsqueda no anda".
+    // Y sin `limite` son 20, así que buscar a alguien de la M para abajo no lo encontraba.
+    const p = { limite: 100, orden: 'apellido', dir: 'asc' }
+    if (buscaPaciente.value.trim()) p.query = buscaPaciente.value.trim()
     const { data } = await listPacientes(p)
     pacientesLista.value = data.data ?? data.pacientes ?? []
   } catch { pacientesLista.value = [] }
   finally { loadingPacientes.value = false }
 }
 
-watch(buscaPaciente, () => buscarPacientes())
+// Un request por tecla: "fede" son cuatro. Mismo respiro que la vista del dispensador.
+let buscaTimeout = null
+watch(buscaPaciente, () => {
+  clearTimeout(buscaTimeout)
+  buscaTimeout = setTimeout(() => buscarPacientes(), 300)
+})
 
 async function seleccionarPacienteModal(paciente) {
   if (modoModal.value === 'filtrar') {

@@ -377,7 +377,7 @@ async function openCreate({ flujo = '', deposito = null } = {}) {
   // refrescar el navegador para poder usarla. Es una request chica contra una lista corta.
   recargarCatalogo()
   if (!pacientes.value.length) {
-    const { data } = await listPacientes({ per_page: 500 })
+    const { data } = await listPacientes({ limite: 500 })
     const arr = Array.isArray(data) ? data : (Array.isArray(data.data) ? data.data : [])
     pacientes.value = arr.map(p => ({
       id: p.id,
@@ -407,7 +407,7 @@ async function openEdit(m) {
   depositoInicial.value   = null
   showModal.value = true
   if (!pacientes.value.length) {
-    const { data } = await listPacientes({ per_page: 500 })
+    const { data } = await listPacientes({ limite: 500 })
     const arr = Array.isArray(data) ? data : (Array.isArray(data.data) ? data.data : [])
     pacientes.value = arr.map(p => ({
       id: p.id,
