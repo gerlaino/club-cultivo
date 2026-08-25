@@ -186,7 +186,10 @@ const esNoAbona         = computed(() => form.value.medio_pago === 'no_abona')
 // más/menos porque no hay dónde acreditar/debitar la diferencia).
 const aporteBloqueado = computed(() => !tieneCc.value && !esMedioCredito.value)
 // Panel de crédito: visible a quien dispensa cuando elige cuenta corriente; admin/sup siempre.
-const mostrarPanelCredito = computed(() => !form.value.es_regalo && tieneCc.value && (esMedioCredito.value || puedeVerCredito.value))
+const usaCredito = computed(() => pagoDividido.value
+  ? (lineasPago.value.some(l => l.medio === 'cuenta_corriente' && Number(l.monto) > 0) || restoPago.value > 0.009)
+  : esMedioCredito.value)
+const mostrarPanelCredito = computed(() => !form.value.es_regalo && tieneCc.value && (usaCredito.value || puedeVerCredito.value))
 
 const margenPos = computed(() => Math.max(0, ccMargen.value))
 // Cuenta corriente: el crédito cubre lo que puede; la diferencia se cobra ahora.
@@ -319,6 +322,68 @@ const precioUnitarioManual = ref(null)
 
 // "Contra entrega" como medio de pago = el delivery cobra al entregar. Requiere envío.
 const cobraDelivery = computed(() => form.value.medio_pago === 'contra_entrega')
+
+// ── Pago dividido ────────────────────────────────────────────────────────────────
+// El backend ya sabía cobrar una dispensa en varias partes: la tabla `cobros` guarda N líneas
+// (medio + monto) y `afinar_medio_pago!` marca la dispensa como `mixto` cuando hay más de un
+// medio. Lo usaban las entregas del delivery. Lo que faltaba era la pantalla: el mostrador
+// mandaba una sola línea sacada de un `<select>`, así que la mitad en efectivo y la mitad en
+// cuenta corriente no se podía cobrar aunque el modelo lo soportara.
+const MEDIOS_COBRO = [
+  { valor: 'efectivo',         label: 'Efectivo' },
+  { valor: 'transferencia',    label: 'Transferencia' },
+  { valor: 'cuenta_corriente', label: 'Cuenta corriente' },
+]
+const pagoDividido = ref(false)
+const lineasPago   = ref([])
+
+// Dividir sólo aplica a una dispensa que se cobra ACÁ y AHORA: un regalo no se cobra, la seña
+// de una reserva es un pago único, y contra entrega lo cobra el repartidor en la puerta.
+const puedeDividirPago = computed(() =>
+  !form.value.es_regalo && !form.value.es_reserva && !modoReserva.value && !cobraDelivery.value)
+
+const totalAsignado = computed(() =>
+  lineasPago.value.reduce((a, l) => a + (Number(l.monto) || 0), 0))
+
+// Lo que falta asignar. El backend lo manda solo a cuenta corriente, así que hay que decirlo
+// en pantalla: si no, el paciente se va debiendo plata que nadie escribió en ningún lado.
+const restoPago = computed(() =>
+  Math.round(((Number(precioFinal.value) || 0) - totalAsignado.value) * 100) / 100)
+const excedentePago = computed(() => Math.max(0, -restoPago.value))
+
+// Un medio por línea: repetirlo no significa nada y sólo confunde el desglose.
+const mediosLibres = computed(() => MEDIOS_COBRO.filter(m =>
+  !lineasPago.value.some(l => l.medio === m.valor) &&
+  (m.valor !== 'cuenta_corriente' || tieneCc.value)))
+
+function activarPagoDividido() {
+  // Arranca con lo que ya estaba elegido y el total puesto: dividir es partir algo que ya existe.
+  const primero = MEDIOS_COBRO.some(m => m.valor === form.value.medio_pago) ? form.value.medio_pago : 'efectivo'
+  lineasPago.value = [{ medio: primero, monto: Number(precioFinal.value) || null }]
+  pagoDividido.value = true
+  agregarLineaPago()
+}
+
+function agregarLineaPago() {
+  const libre = mediosLibres.value[0]
+  if (!libre) return
+  // La línea nueva propone lo que falta: es el caso normal ("el resto en transferencia").
+  lineasPago.value.push({ medio: libre.valor, monto: restoPago.value > 0 ? restoPago.value : null })
+}
+
+function quitarLineaPago(i) {
+  lineasPago.value.splice(i, 1)
+  if (!lineasPago.value.length) pagoDividido.value = false
+}
+
+function cancelarPagoDividido() {
+  pagoDividido.value = false
+  lineasPago.value = []
+}
+
+// Si deja de aplicar (pasa a regalo, a reserva o a contra entrega) se apaga solo: si no, quedaría
+// un desglose invisible que igual se manda.
+watch(puedeDividirPago, (puede) => { if (!puede) cancelarPagoDividido() })
 watch(() => form.value.medio_pago, (val) => { if (val === 'contra_entrega') form.value.con_envio = true })
 watch(() => form.value.con_envio, (val) => {
   if (val) cargarDeliveryUsers()
@@ -542,6 +607,23 @@ async function handleSubmit() {
   }
 
 
+  if (pagoDividido.value) {
+    const lineas = lineasPago.value.filter(l => Number(l.monto) > 0)
+    if (!lineas.length) { formError.value = 'Cargá al menos un monto, o volvé a un solo medio de pago'; saving.value = false; return }
+    // Lo que falte lo manda el backend a cuenta corriente. Sin cuenta corriente no hay dónde
+    // dejarlo y la dispensa se rechazaría del otro lado: mejor decirlo acá.
+    if (restoPago.value > 0.009 && !tieneCc.value) {
+      formError.value = `Faltan ${fmt(restoPago.value)} por asignar y el paciente no tiene cuenta corriente donde dejarlos.`
+      saving.value = false; return
+    }
+    const enCc = lineas.filter(l => l.medio === 'cuenta_corriente').reduce((a, l) => a + Number(l.monto), 0)
+      + (restoPago.value > 0 ? restoPago.value : 0)
+    if (enCc > 0 && enCc > ccMargen.value + 0.009) {
+      formError.value = `A cuenta corriente van ${fmt(enCc)} y el crédito disponible es ${fmt(ccMargen.value)}.`
+      saving.value = false; return
+    }
+  }
+
   if (form.value.con_envio) {
     if (!form.value.delivery_id) { formError.value = 'Seleccioná un delivery para asignar el envío'; saving.value = false; return }
     if (!form.value.usar_domicilio_paciente) {
@@ -569,9 +651,15 @@ async function handleSubmit() {
       }),
       fecha_dispensacion: form.value.fecha_dispensacion,
       observaciones: form.value.observaciones || undefined,
-      medio_pago: (form.value.es_regalo || cobraDelivery.value) ? undefined : form.value.medio_pago, con_envio: form.value.con_envio,
+      // Con pago dividido manda `cobros` y el backend deduce el medio (`mixto` si hay varios).
+      medio_pago: (form.value.es_regalo || cobraDelivery.value || pagoDividido.value) ? undefined : form.value.medio_pago, con_envio: form.value.con_envio,
       // Descuento de la dispensa (puntual). El del paciente lo aplica el server desde la ficha.
       descuento_dispensa_pct: descDispensaPct.value,
+    }
+    if (pagoDividido.value) {
+      payload.cobros = lineasPago.value
+        .filter(l => Number(l.monto) > 0)
+        .map(l => ({ medio: l.medio, monto: Number(l.monto).toFixed(2) }))
     }
     if (form.value.es_regalo) payload.es_regalo = true
     // El total lo calcula el server (descuento paciente + dispensa). Solo admin/supervisor
@@ -975,7 +1063,7 @@ async function handleSubmit() {
               <AppDatePicker v-if="form.es_reserva" v-model="form.fecha_entrega_estimada" :min="tomorrow" />
               <AppDatePicker v-else v-model="form.fecha_dispensacion" :max="today" />
             </div>
-            <div v-if="!form.es_regalo" class="mnd__field">
+            <div v-if="!form.es_regalo && !pagoDividido" class="mnd__field">
               <label class="mnd__label">{{ modoReserva ? 'Medio de pago del resto' : (form.es_reserva ? 'Medio de pago de la seña' : 'Medio de pago') }}</label>
               <select v-model="form.medio_pago" class="mnd__input">
                 <option value="efectivo">Efectivo</option>
@@ -984,6 +1072,58 @@ async function handleSubmit() {
                 <option v-if="!form.es_reserva" value="cuenta_corriente" :disabled="!tieneCc">Cuenta corriente{{ !tieneCc ? ' (sin límite configurado)' : '' }}</option>
                 <option v-if="!form.es_reserva" value="contra_entrega">Contra entrega (cobra el delivery)</option>
               </select>
+              <button v-if="puedeDividirPago" type="button" class="mnd__dividir-btn" @click="activarPagoDividido">
+                <i class="bi bi-scissors"></i> Pagar de varias formas
+              </button>
+            </div>
+          </div>
+
+          <!-- Pago dividido: una dispensa cobrada en varias partes. Cada línea es un `Cobro`. -->
+          <div v-if="pagoDividido" class="mnd__pagos">
+            <div class="mnd__pagos-hd">
+              <span class="mnd__pagos-title"><i class="bi bi-scissors"></i> Cómo se paga</span>
+              <span class="mnd__pagos-total">Total {{ fmt(precioFinal) }}</span>
+            </div>
+
+            <div v-for="(l, i) in lineasPago" :key="i" class="mnd__pago-linea">
+              <select v-model="l.medio" class="mnd__input mnd__pago-medio">
+                <option v-for="m in MEDIOS_COBRO" :key="m.valor" :value="m.valor"
+                        :disabled="m.valor !== l.medio && (lineasPago.some(o => o.medio === m.valor) || (m.valor === 'cuenta_corriente' && !tieneCc))">
+                  {{ m.label }}
+                </option>
+              </select>
+              <div class="mnd__input-suffix-wrap mnd__pago-monto">
+                <span class="mnd__input-prefix">$</span>
+                <input v-model.number="l.monto" type="number" min="0" step="1"
+                       class="mnd__input mnd__input--with-prefix" placeholder="0" />
+              </div>
+              <button type="button" class="mnd__pago-x" aria-label="Quitar" @click="quitarLineaPago(i)">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+
+            <div class="mnd__pagos-ft">
+              <button type="button" class="mnd__pago-add" :disabled="!mediosLibres.length" @click="agregarLineaPago">
+                <i class="bi bi-plus-lg"></i> Agregar medio
+              </button>
+              <button type="button" class="mnd__pago-cancel" @click="cancelarPagoDividido">Volver a un solo medio</button>
+            </div>
+
+            <!-- Lo que falta NO se pierde: el backend lo manda a cuenta corriente. Decirlo acá es
+                 la diferencia entre una decisión y una sorpresa a fin de mes. -->
+            <div v-if="restoPago > 0.009" class="mnd__pagos-resto" :class="{ 'mnd__pagos-resto--mal': !tieneCc }">
+              <template v-if="tieneCc">
+                Faltan <strong>{{ fmt(restoPago) }}</strong> — se le cargan a la cuenta corriente.
+              </template>
+              <template v-else>
+                Faltan <strong>{{ fmt(restoPago) }}</strong> y el paciente no tiene cuenta corriente: asigná el total.
+              </template>
+            </div>
+            <div v-else-if="excedentePago > 0.009" class="mnd__pagos-resto">
+              Paga <strong>{{ fmt(excedentePago) }}</strong> de más — le queda a favor en su cuenta corriente.
+            </div>
+            <div v-else class="mnd__pagos-resto mnd__pagos-resto--ok">
+              <i class="bi bi-check-circle-fill"></i> Cubre el total exacto.
             </div>
           </div>
 
@@ -1165,6 +1305,32 @@ async function handleSubmit() {
 
 /* Stock */
 .mnd__section-label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .05em; }
+/* ── Pago dividido ────────────────────────────────────────────────────────────── */
+.mnd__dividir-btn { margin-top: .4rem; background: none; border: none; padding: 0; cursor: pointer; font-size: .74rem; font-weight: 700; color: #1b5e20; display: flex; align-items: center; gap: .3rem; }
+.mnd__dividir-btn:hover { text-decoration: underline; }
+
+.mnd__pagos { border: 1.5px solid var(--c-slate-200); border-radius: 12px; padding: .75rem; background: var(--c-slate-50); display: flex; flex-direction: column; gap: .5rem; }
+.mnd__pagos-hd { display: flex; align-items: center; justify-content: space-between; }
+.mnd__pagos-title { font-size: .78rem; font-weight: 800; color: var(--c-slate-700); display: flex; align-items: center; gap: .35rem; }
+.mnd__pagos-total { font-size: .78rem; font-weight: 800; color: var(--c-slate-900); font-family: monospace; }
+
+.mnd__pago-linea { display: flex; align-items: center; gap: .4rem; }
+.mnd__pago-medio { flex: 1 1 auto; min-width: 0; }
+.mnd__pago-monto { flex: 0 0 130px; }
+.mnd__pago-x { flex-shrink: 0; width: 26px; height: 26px; border: none; border-radius: 7px; background: var(--c-slate-100); color: var(--c-slate-500); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: .7rem; }
+.mnd__pago-x:hover { background: #fee2e2; color: #b91c1c; }
+
+.mnd__pagos-ft { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.mnd__pago-add { background: none; border: 1.5px dashed var(--c-slate-300); border-radius: 8px; padding: .3rem .6rem; cursor: pointer; font-size: .74rem; font-weight: 700; color: #1b5e20; display: flex; align-items: center; gap: .25rem; }
+.mnd__pago-add:disabled { opacity: .4; cursor: not-allowed; color: var(--c-slate-400); }
+.mnd__pago-cancel { background: none; border: none; padding: 0; cursor: pointer; font-size: .72rem; color: var(--c-slate-500); text-decoration: underline; }
+
+.mnd__pagos-resto { font-size: .74rem; color: var(--c-slate-600); border-top: 1px solid var(--c-slate-200); padding-top: .5rem; display: flex; align-items: center; gap: .3rem; }
+.mnd__pagos-resto strong { color: var(--c-slate-900); font-family: monospace; }
+.mnd__pagos-resto--ok { color: #15803d; }
+.mnd__pagos-resto--mal { color: #b91c1c; }
+.mnd__pagos-resto--mal strong { color: #b91c1c; }
+
 /* ── Selector de producto: tabla en escritorio, tarjetas en el teléfono ────────────
    Son dos markups de la MISMA lista, no dos fuentes de verdad: los dos leen
    `stocksVisibles` y escriben `form.stock_id`. El swap es puro CSS. */
