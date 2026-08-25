@@ -7,6 +7,12 @@ class StocksController < ApplicationController
   before_action :require_admin_o_supervisor!,   only: [:show_by_qr, :destroy]
   before_action :set_stock, only: [:asignar, :show, :trazabilidad, :update, :ajuste, :descartar, :producir, :movimientos, :destroy]
 
+  # Sin variedad, un stock entra al inventario sin decir QUÉ es, y mirando el registro después no
+  # hay forma de saberlo: la dispensación, la etiqueta y la trazabilidad quedan con un hueco que
+  # nadie puede completar de memoria tres meses más tarde.
+  SIN_GENETICA   = 'Elegí la variedad / genética del stock.'.freeze
+  GENETICA_AJENA = 'Esa variedad no es de esta organización.'.freeze
+
   # GET /stocks?sede_id=&canal=regulatorio|social&incluir_pendientes=true
   # GET /sedes/:sede_id/stocks
   def index
@@ -174,6 +180,13 @@ class StocksController < ApplicationController
     @stock.sede  = sede_for_stock
     @stock.club  = current_user.club
 
+    # Cuando el stock sale de un lote la variedad ya la sabemos: se completa sola en vez de
+    # hacerle elegir de nuevo algo que el lote ya dice.
+    @stock.genetica_id ||= @stock.lote&.genetica_id
+
+    return render json: { errors: [SIN_GENETICA] }, status: :unprocessable_entity if @stock.genetica_id.blank?
+    return render json: { errors: [GENETICA_AJENA] }, status: :unprocessable_entity unless genetica_del_club?(@stock.genetica_id)
+
     if @stock.save
       render json: serialize_stock(@stock), status: :created
     else
@@ -196,6 +209,13 @@ class StocksController < ApplicationController
     # el form de edición manda cantidad siempre, aunque el input no esté visible para lote).
     if attrs.key?(:cantidad) && @stock.origen != 'compra_externa' && attrs[:cantidad].to_f != @stock.cantidad.to_f
       return render json: { error: 'La cantidad de un stock de lote se cambia con "Ajustar gramos", no editando acá.' }, status: :unprocessable_entity
+    end
+
+    # Acá la genética NO es obligatoria, al revés que en el alta: los stocks viejos entraron sin
+    # ella y esta pantalla es justamente donde se les completa. Exigirla los volvería inguardables
+    # — no se podría ni corregirles el precio sin antes adivinarles la variedad.
+    if attrs[:genetica_id].present? && !genetica_del_club?(attrs[:genetica_id])
+      return render json: { errors: [GENETICA_AJENA] }, status: :unprocessable_entity
     end
 
     # El inicial es solo el registro de lo que ingresó: editarlo NO toca el actual (que lo
@@ -644,8 +664,17 @@ class StocksController < ApplicationController
   def stock_update_params
     params.require(:stock).permit(
       :cantidad, :cantidad_inicial, :costo_unitario_ars, :precio_sugerido_ars, :descripcion, :proveedor,
-      :disponibilidad
+      :disponibilidad, :genetica_id
     )
+  end
+
+  # La genética llega como id suelto desde el form. `acts_as_tenant` ya filtra, pero el scoping a
+  # mano sigue siendo la barrera primaria del proyecto: sin esto se le puede pegar a la genética de
+  # otra organización por API y el nombre de una variedad ajena aparece en el inventario propio.
+  # El catálogo GLOBAL del INASE (`club_id` nil) es válido para todos, por eso la segunda rama.
+  def genetica_del_club?(id)
+    current_user.club.geneticas.exists?(id: id) ||
+      Genetica.unscoped.exists?(id: id, club_id: nil, deleted_at: nil)
   end
 
   def stock_params

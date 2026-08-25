@@ -347,9 +347,9 @@
                   </select>
                 </div>
                 <div class="stk__field">
-                  <label class="stk__label">Variedad / Genética <span class="stk__opt">opcional</span></label>
-                  <select class="stk__input" v-model="crearForm.genetica_id">
-                    <option :value="null">— Sin especificar —</option>
+                  <label class="stk__label">Variedad / Genética <span class="stk__req">*</span></label>
+                  <select class="stk__input" v-model="crearForm.genetica_id" required>
+                    <option :value="null">— Elegir variedad —</option>
                     <option v-for="g in geneticas" :key="g.id" :value="g.id">{{ g.nombre }}</option>
                   </select>
                 </div>
@@ -421,6 +421,13 @@
                 <div v-if="editandoStock?.origen === 'compra_externa'" class="stk__field">
                   <label class="stk__label">Proveedor</label>
                   <input type="text" class="stk__input" v-model.trim="editarForm.proveedor" placeholder="Nombre del proveedor" />
+                </div>
+                <div class="stk__field">
+                  <label class="stk__label">Variedad / Genética</label>
+                  <select class="stk__input" v-model="editarForm.genetica_id">
+                    <option :value="null">— Sin especificar —</option>
+                    <option v-for="g in geneticas" :key="g.id" :value="g.id">{{ g.nombre }}</option>
+                  </select>
                 </div>
                 <div class="stk__field stk__field--full">
                   <label class="stk__label">Disponible para</label>
@@ -939,7 +946,7 @@ const editarForm      = ref({ cantidad: null, precio_sugerido_ars: null, costo_u
 const savingEditar    = ref(false)
 const editarError     = ref(null)
 
-function abrirEditar(s) {
+async function abrirEditar(s) {
   editandoStock.value = s
   editarForm.value = {
     cantidad:            parseFloat(s.cantidad),
@@ -948,9 +955,11 @@ function abrirEditar(s) {
     descripcion:         s.descripcion || '',
     proveedor:           s.proveedor   || '',
     disponibilidad:      s.disponibilidad || 'ambas',
+    genetica_id:         s.genetica?.id || null,
   }
   editarError.value = null
   showEditarModal.value = true
+  await cargarGeneticas()
 }
 
 async function guardarEditar() {
@@ -964,6 +973,7 @@ async function guardarEditar() {
     if (f.descripcion)                 payload.descripcion         = f.descripcion
     if (f.proveedor)                   payload.proveedor           = f.proveedor
     if (f.disponibilidad)              payload.disponibilidad      = f.disponibilidad
+    if (f.genetica_id)                 payload.genetica_id         = Number(f.genetica_id)
     await updateStock(editandoStock.value.id, payload)
     showEditarModal.value = false
     await cargarInventario()
@@ -996,16 +1006,19 @@ const emptyForm = () => ({
 })
 const crearForm = ref(emptyForm())
 
+async function cargarGeneticas() {
+  if (geneticas.value.length) return
+  try {
+    const { data } = await listGeneticas({ solo_club: true })
+    geneticas.value = data || []
+  } catch {}
+}
+
 async function openCrear() {
   crearForm.value = emptyForm()
   crearError.value = null
   showCrear.value = true
-  if (!geneticas.value.length) {
-    try {
-      const { data } = await listGeneticas({ solo_club: true })
-      geneticas.value = data || []
-    } catch {}
-  }
+  await cargarGeneticas()
 }
 function closeCrear() { showCrear.value = false }
 
@@ -1019,6 +1032,9 @@ async function guardarStock() {
   }
   if (!crearForm.value.sede_id) {
     crearError.value = 'La sede es obligatoria'; return
+  }
+  if (!crearForm.value.genetica_id) {
+    crearError.value = 'Elegí la variedad / genética del stock'; return
   }
   creando.value = true
   try {

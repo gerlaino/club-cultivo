@@ -68,11 +68,15 @@ RSpec.describe 'Tipo de sede según las suites', type: :request do
            params: { sede: { nombre: 'Dispensario', tipo: 'social' } }
       sede_id = JSON.parse(response.body).dig('data', 'id') || JSON.parse(response.body)['id']
 
+      # La variedad es obligatoria al dar de alta stock, así que va también acá: sin ella el
+      # stock entra al inventario sin decir qué es.
+      genetica = ActsAsTenant.with_tenant(club) { create(:genetica, club: club) }
+
       expect {
         post '/stocks', headers: auth_headers, as: :json, params: {
           stock: { descripcion: 'Flor comprada a tercero', forma_producto: 'externo',
                    cantidad: 500, origen: 'compra_externa', proveedor: 'Tercero SRL',
-                   sede_id: sede_id }
+                   sede_id: sede_id, genetica_id: genetica.id }
         }
       }.to change { Stock.count }.by(1)
 

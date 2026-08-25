@@ -140,6 +140,13 @@
                   <input type="text" class="sd__input" v-model.trim="editForm.proveedor" />
                 </div>
                 <div class="sd__field">
+                  <label class="sd__label">Variedad / Genética</label>
+                  <select class="sd__input" v-model="editForm.genetica_id">
+                    <option :value="null">— Sin especificar —</option>
+                    <option v-for="g in geneticas" :key="g.id" :value="g.id">{{ g.nombre }}</option>
+                  </select>
+                </div>
+                <div class="sd__field">
                   <label class="sd__label">Disponible para</label>
                   <select class="sd__input" v-model="editForm.disponibilidad">
                     <option value="ambas">Dispensa y producción</option>
@@ -575,7 +582,7 @@ import DsSpinner from '../../design-system/components/Spinner.vue'
 import {
   getStock, updateStock, asignarStock, ajustarStock, descartarStock, deleteStock,
   getStockMovimientos, listSedes, producirStock,
-  listPesajesManicura, reajustarPesoPesajeManicura,
+  listPesajesManicura, reajustarPesoPesajeManicura, listGeneticas,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { MOTIVOS_FINALIZACION, ayudaDe } from '../../composables/useStockFinalizacion.js'
@@ -665,6 +672,17 @@ const editando  = ref(false)
 const saving    = ref(false)
 const editError = ref(null)
 const editForm  = ref({})
+const geneticas = ref([])
+
+// El selector de variedad se llena recien al abrir la edicion: la ficha se mira mucho mas veces
+// de las que se edita, y no vale pedirle el catalogo entero al backend en cada visita.
+async function cargarGeneticas() {
+  if (geneticas.value.length) return
+  try {
+    const { data } = await listGeneticas({ solo_club: true })
+    geneticas.value = data || []
+  } catch {}
+}
 
 // La cantidad inicial solo se edita en stock externo; en uno de lote viene del pesaje.
 const esExterno = computed(() => stock.value?.origen === 'compra_externa')
@@ -712,9 +730,11 @@ function startEdit() {
     proveedor:   stock.value.proveedor   || '',
     descripcion: stock.value.descripcion || '',
     disponibilidad: stock.value.disponibilidad || 'ambas',
+    genetica_id: stock.value.genetica?.id || null,
   }
   editError.value = null
   editando.value  = true
+  cargarGeneticas()
 }
 function cancelEdit() { editando.value = false }
 
@@ -730,6 +750,7 @@ async function guardarEdit() {
     if (f.proveedor)                   payload.proveedor           = f.proveedor
     if (f.descripcion)                 payload.descripcion         = f.descripcion
     if (f.disponibilidad)              payload.disponibilidad      = f.disponibilidad
+    if (f.genetica_id)                 payload.genetica_id         = Number(f.genetica_id)
     await updateStock(stock.value.id, payload)
     await recargar()
     editando.value = false
