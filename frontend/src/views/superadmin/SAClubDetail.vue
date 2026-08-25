@@ -3,11 +3,11 @@ import { ref, computed, onMounted } from 'vue'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub, suspenderClub, reactivarClub, getSuperAdminCatalogo, getHistorialClub } from '../../lib/api.js'
+import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub, suspenderClub, reactivarClub, getSuperAdminCatalogo, getHistorialClub, resetSuperAdminUserPassword } from '../../lib/api.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
 import SAModulos from './SAModulos.vue'
-import { ArrowLeft, Pencil, Trash2, RotateCcw, Sparkles, UserPlus, Check, X, Users, Info, CreditCard, PauseCircle, PlayCircle, History } from 'lucide-vue-next'
+import { ArrowLeft, Pencil, Trash2, RotateCcw, Sparkles, UserPlus, Check, X, Users, Info, CreditCard, PauseCircle, PlayCircle, History, KeyRound } from 'lucide-vue-next'
 
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -24,6 +24,51 @@ const showPlanModal = ref(false)
 const showUserModal = ref(false)
 const planForm = ref({ plan: '', plan_activo_hasta: '', trial: false })
 const userForm = ref({ first_name: '', last_name: '', email: '', email_personal: '', password: '', role: 'cultivador' })
+
+// ── Restablecer la contraseña de un usuario ──────────────────────────────────
+//
+// El caso que siempre termina acá: el único admin de una organización pierde su clave. La
+// pantalla de login todavía no ofrece "olvidé mi contraseña", así que no tiene cómo resolverlo
+// solo, y desde el panel no había ninguna salida: había que crear un segundo admin para resetear
+// desde adentro, o meter mano en la consola.
+//
+// No se recupera nada: las contraseñas se guardan hasheadas y no hay forma de leerlas. Se genera
+// una NUEVA, dictable por teléfono, y se muestra una vez para poder pasársela.
+const reseteando        = ref(null)
+const passwordReseteada = ref(null)
+const passwordCopiada   = ref(false)
+
+async function resetearPassword(u) {
+  const ok = await confirm({
+    title: `Restablecer la contraseña de ${u.email}`,
+    message: 'Se genera una contraseña nueva y te la mostramos para que se la dictes. ' +
+             'La actual deja de funcionar en el acto: si la persona la tenía guardada en el ' +
+             'navegador, no va a poder entrar hasta que use la nueva.',
+    confirmText: 'Restablecer',
+    variant: 'danger',
+  })
+  if (!ok) return
+
+  reseteando.value = u.id
+  try {
+    const { data } = await resetSuperAdminUserPassword(u.id)
+    passwordReseteada.value = data
+    passwordCopiada.value = false
+    toast.success(`Contraseña nueva para ${data.email}. Anotala antes de cerrar el cartel.`)
+  } catch (e) {
+    toast.error(e?.response?.data?.errors?.join(', ') || 'No se pudo restablecer la contraseña')
+  } finally {
+    reseteando.value = null
+  }
+}
+
+async function copiarPassword(valor) {
+  try {
+    await navigator.clipboard.writeText(valor)
+    passwordCopiada.value = true
+    setTimeout(() => { passwordCopiada.value = false }, 1800)
+  } catch { /* sin portapapeles: queda visible igual, que es lo que importa */ }
+}
 const userError = ref(null)
 
 const editingInfo  = ref(false)
@@ -502,6 +547,24 @@ onMounted(async () => {
             <UserPlus :size="13" :stroke-width="1.75" /> Crear
           </button>
         </div>
+        <!-- Se muestra UNA vez y hay que anotarla: no queda guardada en claro en ningún lado. -->
+        <div v-if="passwordReseteada" class="scd__pass">
+          <KeyRound :size="14" :stroke-width="2" class="scd__pass-ico" />
+          <div class="scd__pass-txt">
+            <strong>{{ passwordReseteada.email }}</strong>
+            <code>{{ passwordReseteada.password }}</code>
+            <span>
+              Dictásela ahora, no se vuelve a mostrar.
+              <template v-if="passwordReseteada.mail_enviado">También le llegó por mail.</template>
+              <template v-else>La organización no tiene correo configurado, así que por mail no le llega.</template>
+            </span>
+          </div>
+          <button class="scd__pass-copy" @click="copiarPassword(passwordReseteada.password)">
+            {{ passwordCopiada ? 'Copiada' : 'Copiar' }}
+          </button>
+          <button class="scd__pass-x" aria-label="Cerrar" @click="passwordReseteada = null">✕</button>
+        </div>
+
         <div v-if="!club.usuarios?.length" class="scd__empty">Sin usuarios creados</div>
         <div v-else class="scd__users">
           <div v-for="u in club.usuarios" :key="u.id" class="scd__user-row">
@@ -513,6 +576,15 @@ onMounted(async () => {
             <span class="scd__role-pill" :style="{ background: roleMeta(u.role).bg, color: roleMeta(u.role).color }">
               {{ roleMeta(u.role).label }}
             </span>
+            <!-- El caso que SIEMPRE llega acá: "perdí la contraseña del admin". Hasta hoy no
+                 había salida desde el panel — había que crear un segundo admin y resetear desde
+                 adentro, o meter mano en la consola. -->
+            <button class="scd__user-key" :disabled="reseteando === u.id"
+                    :title="`Restablecer la contraseña de ${u.email}`"
+                    @click="resetearPassword(u)">
+              <DsSpinner v-if="reseteando === u.id" :size="12" />
+              <KeyRound v-else :size="13" :stroke-width="1.75" />
+            </button>
           </div>
         </div>
       </div>
@@ -815,6 +887,43 @@ onMounted(async () => {
 .scd__user-info { flex: 1; min-width: 0; }
 .scd__user-name  { font-size: .8rem; font-weight: 600; color: var(--c-slate-900); }
 .scd__user-email { font-size: .68rem; color: var(--c-slate-400); font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Restablecer contraseña: discreto, pero SIEMPRE visible. No va escondido detrás del hover
+   como el de borrar — es lo que se viene a buscar cuando alguien no puede entrar. */
+.scd__user-key {
+  width: 28px; height: 28px; flex-shrink: 0;
+  border: 1px solid var(--c-slate-200); border-radius: 7px;
+  background: var(--c-slate-50); color: var(--c-slate-500);
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  transition: all .15s;
+}
+.scd__user-key:hover:not(:disabled) { background: #fff7ed; color: #b45309; border-color: #fed7aa; }
+.scd__user-key:disabled { opacity: .5; cursor: not-allowed; }
+
+/* La contraseña nueva. Se muestra una vez y hay que anotarla. */
+.scd__pass {
+  display: flex; align-items: flex-start; gap: .6rem;
+  margin: .75rem 1.1rem; padding: .75rem .9rem;
+  background: var(--c-amber-100); border: 1px solid var(--c-amber-500); border-radius: 10px;
+}
+.scd__pass-ico { color: #b45309; flex-shrink: 0; margin-top: .15rem; }
+.scd__pass-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .2rem; font-size: .78rem; }
+.scd__pass-txt strong { color: var(--c-slate-900); font-weight: 600; }
+.scd__pass-txt code {
+  font-family: var(--font-mono); font-weight: 700; font-size: .95rem;
+  background: #fff; padding: .15rem .5rem; border-radius: 6px; user-select: all;
+  align-self: flex-start; color: var(--c-slate-900);
+}
+.scd__pass-txt span { color: var(--c-slate-600); font-size: .72rem; }
+.scd__pass-copy {
+  flex-shrink: 0; font-size: .72rem; font-weight: 600;
+  background: #fff; border: 1px solid var(--c-amber-500); color: #b45309;
+  border-radius: 7px; padding: .3rem .6rem; cursor: pointer;
+}
+.scd__pass-x {
+  flex-shrink: 0; background: none; border: 0; cursor: pointer;
+  color: var(--c-slate-500); font-size: .8rem; padding: .2rem;
+}
 .scd__role-pill { font-size: .65rem; font-weight: 700; padding: .18em .55em; border-radius: 5px; white-space: nowrap; flex-shrink: 0; }
 
 /* Los estilos de los módulos (suites, add-ons, incluidos, en construcción y sus paneles de

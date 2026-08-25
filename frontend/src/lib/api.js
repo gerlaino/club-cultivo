@@ -676,6 +676,9 @@ export const listSuperAdminUsers = ()             => api.get('/super_admin/users
 export const createSuperAdminUser = (payload)     => api.post('/super_admin/users', { user: payload })
 export const updateSuperAdminUser = (id, payload) => api.put(`/super_admin/users/${id}`, { user: payload })
 export const deleteSuperAdminUser = (id)          => api.delete(`/super_admin/users/${id}`)
+// "Perdí la contraseña del admin de esa organización". No recupera nada —las contraseñas se
+// guardan hasheadas— : genera una nueva, dictable, y la devuelve en claro para poder pasársela.
+export const resetSuperAdminUserPassword = (id)   => api.post(`/super_admin/users/${id}/reset_password`)
 
 // -------- NOTICIAS --------
 export const listNoticias  = (params = {}) => api.get('/noticias', { params })

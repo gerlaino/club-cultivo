@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { listSuperAdminUsers, listSuperAdminClubs, createSuperAdminUser, deleteSuperAdminUser } from '../../lib/api.js'
+import { listSuperAdminUsers, listSuperAdminClubs, createSuperAdminUser, deleteSuperAdminUser, resetSuperAdminUserPassword } from '../../lib/api.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { ROLES as ALL_ROLES, roleMeta } from '../../constants/roles.js'
 
@@ -98,6 +98,36 @@ async function handleCreate() {
   }
 }
 
+// Restablecer la contraseña de alguien. El caso que siempre termina en el panel de plataforma:
+// el único admin de una organización pierde su clave y la pantalla de login todavía no ofrece
+// "olvidé mi contraseña", así que no tiene cómo resolverlo solo.
+//
+// No se recupera nada —las contraseñas se guardan hasheadas—: se genera una nueva, dictable, y
+// se muestra una vez para poder pasársela.
+const reseteando = ref(null)
+
+async function handleReset(u) {
+  const ok = await confirm({
+    title: `Restablecer la contraseña de ${u.email}?`,
+    message: 'Se genera una nueva y te la mostramos para dictarla. La actual deja de funcionar ' +
+             'en el acto: si la persona la tenía guardada en el navegador, no va a poder entrar ' +
+             'hasta que use la nueva.',
+    confirmText: 'Restablecer',
+    variant: 'danger',
+  })
+  if (!ok) return
+
+  reseteando.value = u.id
+  try {
+    const { data } = await resetSuperAdminUserPassword(u.id)
+    passwordCreada.value = { email: data.email, password: data.password_inicial }
+  } catch {
+    createError.value = 'No se pudo restablecer la contraseña'
+  } finally {
+    reseteando.value = null
+  }
+}
+
 async function handleDelete(u) {
   const ok = await confirm({ title: `¿Eliminar a ${u.email}?`, message: 'Esta acción no se puede deshacer.', confirmText: 'Eliminar' })
   if (!ok) return
@@ -131,7 +161,7 @@ onMounted(cargar)
       <span>
         <strong>{{ passwordCreada.email }}</strong> — contraseña temporal:
         <code class="sau__pass-code">{{ passwordCreada.password }}</code>
-        · dictásela ahora, no se vuelve a mostrar.
+        · dictásela ahora, no se vuelve a mostrar. La anterior ya no sirve.
       </span>
       <button class="sau__pass-x" aria-label="Cerrar" @click="passwordCreada = null">
         <i class="bi bi-x-lg"></i>
@@ -189,6 +219,13 @@ onMounted(cargar)
         </div>
         <div class="sau__date">{{ formatDate(u.created_at) }}</div>
         <div class="sau__actions">
+          <!-- SIEMPRE visible, al revés que el de borrar: es lo que se viene a buscar acá
+               cuando alguien no puede entrar. -->
+          <button class="sau__key-btn" :disabled="reseteando === u.id"
+                  :title="`Restablecer la contraseña de ${u.email}`" @click="handleReset(u)">
+            <DsSpinner v-if="reseteando === u.id" :size="12" />
+            <i v-else class="bi bi-key"></i>
+          </button>
           <button class="sau__delete-btn" @click="handleDelete(u)" title="Eliminar">
             <i class="bi bi-trash"></i>
           </button>
@@ -312,8 +349,8 @@ onMounted(cargar)
 .sau__loading { display: flex; justify-content: center; align-items: center; padding: 4rem; }
 
 .sau__list { background: #fff; border: 1px solid var(--c-slate-200); border-radius: 14px; overflow: hidden; }
-.sau__list-header { display: grid; grid-template-columns: 2fr 1.5fr 1fr 100px 50px; padding: .65rem 1.1rem; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--c-slate-400); border-bottom: 1px solid var(--c-slate-100); background: #fafbfc; }
-.sau__row { display: grid; grid-template-columns: 2fr 1.5fr 1fr 100px 50px; align-items: center; padding: .75rem 1.1rem; border-bottom: 1px solid var(--c-slate-50); transition: background .12s; }
+.sau__list-header { display: grid; grid-template-columns: 2fr 1.5fr 1fr 100px 76px; padding: .65rem 1.1rem; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--c-slate-400); border-bottom: 1px solid var(--c-slate-100); background: #fafbfc; }
+.sau__row { display: grid; grid-template-columns: 2fr 1.5fr 1fr 100px 76px; align-items: center; padding: .75rem 1.1rem; border-bottom: 1px solid var(--c-slate-50); transition: background .12s; }
 .sau__row:last-child { border-bottom: none; }
 .sau__row:hover { background: #fafbfc; }
 
@@ -326,7 +363,15 @@ onMounted(cargar)
 .sau__no-club { font-size: .78rem; color: var(--c-slate-300); }
 .sau__role-badge { font-size: .68rem; font-weight: 700; padding: .2em .55em; border-radius: 5px; }
 .sau__date { font-size: .75rem; color: var(--c-slate-400); }
-.sau__actions { display: flex; justify-content: flex-end; }
+.sau__actions { display: flex; justify-content: flex-end; gap: .35rem; }
+.sau__key-btn {
+  width: 28px; height: 28px; border-radius: 7px;
+  border: 1px solid var(--c-slate-200); background: var(--c-slate-50); color: var(--c-slate-500);
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  font-size: .8rem; transition: all .15s;
+}
+.sau__key-btn:hover:not(:disabled) { background: #fff7ed; color: #b45309; border-color: #fed7aa; }
+.sau__key-btn:disabled { opacity: .5; cursor: not-allowed; }
 .sau__delete-btn { width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--c-slate-200); background: var(--c-slate-50); color: var(--c-slate-400); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: .8rem; transition: all .15s; opacity: 0; }
 .sau__row:hover .sau__delete-btn { opacity: 1; }
 .sau__delete-btn:hover { background: #fef2f2; color: #dc2626; border-color: #fecaca; }

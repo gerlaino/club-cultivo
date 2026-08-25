@@ -55,6 +55,30 @@ class SuperAdmin::UsersController < SuperAdmin::BaseController
     end
   end
 
+  # POST /super_admin/users/:id/reset_password — "perdí la contraseña del admin".
+  #
+  # Es el caso que llega SIEMPRE al panel de plataforma: el único admin de una organización pierde
+  # su clave y no tiene cómo recuperarla solo (la pantalla de login todavía no ofrece "olvidé mi
+  # contraseña"). Hasta hoy la única salida era crear un segundo admin y resetear desde adentro,
+  # o meter mano en la consola.
+  #
+  # No se "recupera" nada: las contraseñas se guardan hasheadas y no hay forma de leerlas. Se
+  # genera una NUEVA, dictable por teléfono, y se devuelve en claro a propósito — es temporal y
+  # hay que poder pasársela a la persona por el canal que sea. Devise pide cambiarla al entrar.
+  #
+  # Mismo comportamiento que el reset del lado del club (`ClubUsersController#reset_password`):
+  # una sola forma de resetear, no dos que se parecen.
+  def reset_password
+    user = User.find(params[:id])
+    nueva = User.password_temporal
+    user.update!(password: nueva, password_confirmation: nueva)
+
+    render json: {
+      id: user.id, email: user.email, password_inicial: nueva,
+      mail_enviado: enviar_instrucciones(user),
+    }
+  end
+
   def destroy
     user = User.find(params[:id])
     return render json: { error: 'No podés eliminar un super_admin' }, status: :forbidden if user.super_admin?
@@ -68,6 +92,19 @@ class SuperAdmin::UsersController < SuperAdmin::BaseController
   # `User#email_notificacion`). El alta desde el panel sólo aceptaba el primero, así que un
   # usuario creado desde acá nacía sin dirección a la que escribirle: los avisos salían al
   # login, que puede ser inventado, y rebotaban.
+  # Devuelve si el mail salió de verdad. Un fallo de SMTP no puede tumbar el reset: la clave ya
+  # cambió y quien lo hizo la tiene en pantalla para dictarla. La mayoría de las organizaciones no
+  # tiene el correo configurado, así que ésta es la vía normal, no la excepción.
+  def enviar_instrucciones(user)
+    return false unless user.club&.smtp_configured?
+
+    user.send_reset_password_instructions
+    true
+  rescue StandardError => e
+    Rails.logger.warn("[super_admin] no se pudo enviar el mail a #{user.email}: #{e.message}")
+    false
+  end
+
   def user_params
     params.require(:user).permit(:email, :email_personal, :first_name, :last_name, :role)
   end

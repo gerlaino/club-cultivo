@@ -575,7 +575,11 @@ Rails.application.routes.draw do
           post   :ia_recarga
         end
       end
-      resources :users, only: [:index, :create, :update, :destroy]
+      resources :users, only: [:index, :create, :update, :destroy] do
+        # "Perdí la contraseña del admin de esa organización". Era el único caso sin salida desde
+        # el panel: había que crear un segundo admin o meter mano en la consola.
+        member { post :reset_password }
+      end
       get :stats,    to: 'stats#show'
       get :metricas, to: 'stats#metricas'
       get :catalogo, to: 'catalogo#show'
