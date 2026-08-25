@@ -241,23 +241,46 @@ describe('La cola no descarta trabajo por vieja', () => {
 // AC: el panel de plataforma no reparte una contraseña conocida.
 describe('El alta de usuarios del super admin', () => {
   // Venía precargada con '123456Aa', la misma para toda la plataforma: sabiendo el email de
-  // cualquiera se entraba. Ahora el campo arranca vacío y el backend genera una temporal.
-  it('no precarga ninguna contraseña en el formulario', () => {
-    // Se mira el VALOR INICIAL, no si la clave vieja aparece en el archivo: un comentario que
-    // explique de dónde venimos es documentación, no una credencial.
+  // cualquiera se entraba. Después el campo pasó a arrancar vacío, y ahora NO EXISTE: la
+  // contraseña la genera siempre el backend.
+  //
+  // El test afirmaba que el campo existía y estaba vacío, así que sacarlo lo ponía en rojo
+  // cumpliendo mejor el requerimiento. Lo que importa es que el super admin no pueda ELEGIRLA
+  // —escribirla a mano tienta con poner siempre la misma, que es de donde vino la default—,
+  // y eso se verifica por la ausencia del input, no por su valor inicial.
+  it('no deja escribir la contraseña: la genera el backend', () => {
     for (const v of ['views/superadmin/SAUsuarios.vue', 'views/superadmin/SAClubDetail.vue']) {
-      const inicializaciones = [...leer(v).matchAll(/password:\s*'([^']*)'/g)].map(m => m[1])
+      const fuente = leer(v)
 
-      expect(inicializaciones.length, `${v}: no se encontró el campo password`).toBeGreaterThan(0)
-      for (const valor of inicializaciones) {
-        expect(valor, `${v} arranca con la contraseña "${valor}" precargada`).toBe('')
-      }
+      expect(fuente, `${v}: hay un input de contraseña en el formulario`)
+        .not.toMatch(/v-model[^"']*\bpassword\b(?!_inicial)/)
+      expect([...fuente.matchAll(/\bpassword:\s*'([^']*)'/g)].map(m => m[1]),
+        `${v}: quedó un campo password en el form`).toEqual([])
     }
   })
 
   // Si no se muestra, nadie puede dictarla y el alta queda inservible.
+  //
+  // Ojo con lo que afirma: "el archivo menciona password_inicial" NO alcanzaba. El cartel de
+  // SAClubDetail leía `.password` —que el backend no manda— mientras el toast del alta sí usaba
+  // `password_inicial`, así que el archivo lo contenía y el test pasaba en verde con el renglón
+  // vacío y el botón Copiar copiando "undefined". Las dos respuestas del backend (alta y reset)
+  // llaman al campo `password_inicial`: cualquier otro `.password` es la clave equivocada.
   it('muestra la generada para poder dictarla', () => {
-    expect(leer('views/superadmin/SAUsuarios.vue')).toContain('password_inicial')
-    expect(leer('views/superadmin/SAClubDetail.vue')).toContain('password_inicial')
+    // Sin sacar los comentarios, este mismo test se dispara con el comentario que EXPLICA el
+    // bug. Es la misma trampa que ya estaba anotada arriba: documentar de dónde venimos no
+    // puede contar como código.
+    const sinComentarios = (txt) => txt
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '')
+
+    for (const v of ['views/superadmin/SAUsuarios.vue', 'views/superadmin/SAClubDetail.vue']) {
+      const fuente = leer(v)
+
+      expect(fuente, `${v}: no muestra la contraseña generada`).toContain('password_inicial')
+      expect(sinComentarios(fuente), `${v}: lee una clave que el backend no manda`)
+        .not.toMatch(/\.password\b(?!_inicial)/)
+    }
   })
 })

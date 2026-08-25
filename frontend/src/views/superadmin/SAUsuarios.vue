@@ -30,7 +30,7 @@ const createError = ref(null)
 // El campo arranca VACÍO. Venía precargado con '123456Aa', la misma clave para toda la plataforma:
 // sabiendo el email de cualquiera se entraba. Ahora, si se deja vacío, el backend genera una
 // temporal y dictable, y se muestra acá abajo una sola vez.
-const form = ref({ email: '', first_name: '', last_name: '', role: 'admin', club_id: '', password: '' })
+const form = ref({ email: '', first_name: '', last_name: '', role: 'admin', club_id: '' })
 // La contraseña del último usuario creado, para poder dictarla. El endpoint la devuelve en claro a
 // propósito: es temporal y Devise pide cambiarla al entrar.
 const passwordCreada = ref(null)
@@ -88,9 +88,9 @@ async function handleCreate() {
   try {
     const { data } = await createSuperAdminUser(form.value)
     users.value.unshift(data)
-    passwordCreada.value = { email: data.email, password: data.password_inicial }
+    passwordCreada.value = { email: data.email, password_inicial: data.password_inicial }
     showCreate.value = false
-    form.value = { email: '', first_name: '', last_name: '', role: 'admin', club_id: '', password: '' }
+    form.value = { email: '', first_name: '', last_name: '', role: 'admin', club_id: '' }
   } catch (e) {
     createError.value = e?.response?.data?.errors?.join(', ') || 'Error al crear usuario'
   } finally {
@@ -120,7 +120,7 @@ async function handleReset(u) {
   reseteando.value = u.id
   try {
     const { data } = await resetSuperAdminUserPassword(u.id)
-    passwordCreada.value = { email: data.email, password: data.password_inicial }
+    passwordCreada.value = { email: data.email, password_inicial: data.password_inicial }
   } catch {
     createError.value = 'No se pudo restablecer la contraseña'
   } finally {
@@ -160,7 +160,7 @@ onMounted(cargar)
       <i class="bi bi-key"></i>
       <span>
         <strong>{{ passwordCreada.email }}</strong> — contraseña temporal:
-        <code class="sau__pass-code">{{ passwordCreada.password }}</code>
+        <code class="sau__pass-code">{{ passwordCreada.password_inicial }}</code>
         · dictásela ahora, no se vuelve a mostrar. La anterior ya no sirve.
       </span>
       <button class="sau__pass-x" aria-label="Cerrar" @click="passwordCreada = null">
@@ -288,15 +288,6 @@ onMounted(cargar)
                   <option value="">Seleccioná un club…</option>
                   <option v-for="c in clubs" :key="c.id" :value="c.id">{{ c.name }}</option>
                 </select>
-              </div>
-              <div class="sau__field sau__field--full">
-                <label class="sau__label">Contraseña inicial</label>
-                <input v-model="form.password" type="text" autocomplete="off" spellcheck="false"
-                       placeholder="Dejalo vacío y se genera una" class="sau__input" />
-                <span style="font-size:.72rem;color:#94a3b8">
-                  Si lo dejás vacío se genera una temporal y te la mostramos para dictarla. El
-                  usuario debe cambiarla al ingresar.
-                </span>
               </div>
             </div>
           </div>

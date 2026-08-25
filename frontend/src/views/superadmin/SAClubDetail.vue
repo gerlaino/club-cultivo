@@ -23,7 +23,7 @@ const error   = ref(null)
 const showPlanModal = ref(false)
 const showUserModal = ref(false)
 const planForm = ref({ plan: '', plan_activo_hasta: '', trial: false })
-const userForm = ref({ first_name: '', last_name: '', email: '', email_personal: '', password: '', role: 'cultivador' })
+const userForm = ref({ first_name: '', last_name: '', email: '', email_personal: '', role: 'cultivador' })
 
 // ── Restablecer la contraseña de un usuario ──────────────────────────────────
 //
@@ -35,7 +35,8 @@ const userForm = ref({ first_name: '', last_name: '', email: '', email_personal:
 // No se recupera nada: las contraseñas se guardan hasheadas y no hay forma de leerlas. Se genera
 // una NUEVA, dictable por teléfono, y se muestra una vez para poder pasársela.
 const reseteando        = ref(null)
-const passwordReseteada = ref(null)
+// { email, password_inicial, mail_enviado?, motivo: 'alta' | 'reset' }
+const passwordNueva = ref(null)
 const passwordCopiada   = ref(false)
 
 async function resetearPassword(u) {
@@ -52,7 +53,7 @@ async function resetearPassword(u) {
   reseteando.value = u.id
   try {
     const { data } = await resetSuperAdminUserPassword(u.id)
-    passwordReseteada.value = data
+    passwordNueva.value = { ...data, motivo: 'reset' }
     passwordCopiada.value = false
     toast.success(`Contraseña nueva para ${data.email}. Anotala antes de cerrar el cartel.`)
   } catch (e) {
@@ -206,7 +207,7 @@ function abrirPlanModal() {
 }
 
 function abrirUserModal() {
-  userForm.value = { first_name: '', last_name: '', email: '', email_personal: '', password: '', role: 'cultivador' }
+  userForm.value = { first_name: '', last_name: '', email: '', email_personal: '', role: 'cultivador' }
   userError.value = null
   showUserModal.value = true
 }
@@ -238,9 +239,11 @@ async function crearUsuario() {
     const { data } = await createSuperAdminUser({ ...userForm.value, club_id: id })
     await cargar()
     showUserModal.value = false
-    // La contraseña se muestra UNA vez: si se dejó el campo vacío, la generó el backend y nadie
-    // más la sabe. Antes no hacía falta mostrarla porque era la misma para toda la plataforma.
-    toast.success(`Usuario creado — contraseña temporal: ${data.password_inicial}`, { timeout: 20000 })
+    // La contraseña va al CARTEL, no a un toast: se muestra una sola vez y nadie más la sabe,
+    // así que no puede vivir en algo que se cierra solo a los segundos y no se puede copiar.
+    passwordNueva.value = { ...data, motivo: 'alta' }
+    passwordCopiada.value = false
+    toast.success('Usuario creado. Anotá la contraseña antes de cerrar el cartel.')
   } catch (e) {
     userError.value = e?.response?.data?.errors?.join(', ') || 'Error al crear el usuario'
   } finally {
@@ -547,22 +550,31 @@ onMounted(async () => {
             <UserPlus :size="13" :stroke-width="1.75" /> Crear
           </button>
         </div>
-        <!-- Se muestra UNA vez y hay que anotarla: no queda guardada en claro en ningún lado. -->
-        <div v-if="passwordReseteada" class="scd__pass">
+        <!-- Se muestra UNA vez y hay que anotarla: no queda guardada en claro en ningún lado.
+             El campo del backend se llama `password_inicial` en las DOS respuestas (alta y
+             reset). Acá se leía `.password`, que no existe: el renglón salía vacío y el botón
+             Copiar copiaba "undefined". -->
+        <div v-if="passwordNueva" class="scd__pass">
           <KeyRound :size="14" :stroke-width="2" class="scd__pass-ico" />
           <div class="scd__pass-txt">
-            <strong>{{ passwordReseteada.email }}</strong>
-            <code>{{ passwordReseteada.password }}</code>
+            <strong>{{ passwordNueva.email }}</strong>
+            <code>{{ passwordNueva.password_inicial }}</code>
             <span>
-              Dictásela ahora, no se vuelve a mostrar.
-              <template v-if="passwordReseteada.mail_enviado">También le llegó por mail.</template>
-              <template v-else>La organización no tiene correo configurado, así que por mail no le llega.</template>
+              <template v-if="passwordNueva.motivo === 'alta'">
+                Se generó sola. Dictásela ahora: no se vuelve a mostrar, y desde el panel se
+                cambia con el botón de la llave.
+              </template>
+              <template v-else>
+                Dictásela ahora, no se vuelve a mostrar. La anterior ya no sirve.
+                <template v-if="passwordNueva.mail_enviado">También le llegó por mail.</template>
+                <template v-else>La organización no tiene correo configurado, así que por mail no le llega.</template>
+              </template>
             </span>
           </div>
-          <button class="scd__pass-copy" @click="copiarPassword(passwordReseteada.password)">
+          <button class="scd__pass-copy" @click="copiarPassword(passwordNueva.password_inicial)">
             {{ passwordCopiada ? 'Copiada' : 'Copiar' }}
           </button>
-          <button class="scd__pass-x" aria-label="Cerrar" @click="passwordReseteada = null">✕</button>
+          <button class="scd__pass-x" aria-label="Cerrar" @click="passwordNueva = null">✕</button>
         </div>
 
         <div v-if="!club.usuarios?.length" class="scd__empty">Sin usuarios creados</div>
@@ -715,17 +727,10 @@ onMounted(async () => {
                          placeholder="persona@gmail.com" autocomplete="off" />
                   <span class="scd__hint">El mail REAL de la persona, al que le llegan los avisos.</span>
                 </div>
-                <div class="scd__field">
-                  <label class="scd__lbl">Contraseña inicial</label>
-                  <!-- Visible y VACÍA por defecto. Venía precargada con la misma clave para toda la
-                       plataforma; ahora, en blanco, el backend genera una temporal y dictable y se
-                       muestra al crear. Sigue en texto plano a propósito: es temporal y hay que
-                       poder dictársela a quien va a usarla. -->
-                  <input v-model="userForm.password" type="text" autocomplete="off" spellcheck="false"
-                         placeholder="Dejalo vacío y se genera una"
-                         class="scd__input scd__input--mono" />
-                  <span class="scd__hint">Se muestra una sola vez al crear. La persona la cambia al entrar.</span>
-                </div>
+                <!-- La contraseña NO se escribe acá: la genera el backend y se muestra en el
+                     cartel al crear. Escribirla a mano tienta con poner siempre la misma, que es
+                     de donde venía `PASSWORD_DEFAULT`; y el campo vacío no se entendía —parecía
+                     obligatorio y en blanco—. Para cambiarla después está el botón de la llave. -->
                 <div class="scd__field">
                   <label class="scd__lbl">Rol</label>
                   <select v-model="userForm.role" class="scd__input">
