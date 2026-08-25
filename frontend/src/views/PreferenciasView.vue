@@ -9,16 +9,17 @@ import { usePlan } from '../composables/usePlan.js'
 
 const club  = useClubStore()
 
-// El plan real: dos planes (Básico / Total) y seis topes. Sale de `GET /plan`, que ya existía.
-const { fetchPlan, planLabel, esTrial, limites, uso } = usePlan()
+// El plan real: dos planes (Básico / Total). Sale de `GET /plan`, que ya existía.
+const { fetchPlan, planLabel, esTrial, limites, uso, usuariosPorRol } = usePlan()
 
+// `usuarios` salió de la lista: dejó de ser un número. El cupo es UNO DE CADA ROL en el plan
+// Básico, y eso no se puede dibujar como una barra de "3 de 5" — se dice con palabras, abajo.
 const RECURSOS = [
   { clave: 'sedes',     label: 'Sedes' },
   { clave: 'salas',     label: 'Salas' },
   { clave: 'lotes',     label: 'Lotes' },
   { clave: 'plantas',   label: 'Plantas' },
   { clave: 'pacientes', label: 'Pacientes' },
-  { clave: 'usuarios',  label: 'Usuarios' },
 ]
 
 // Sólo lo que tiene tope. En el plan Total los seis son `null` y la lista queda vacía.
@@ -280,6 +281,13 @@ function showToast(type, msg) {
               </li>
             </ul>
             <p v-else class="pv__plan-sintope">Sin topes: podés cargar lo que necesites.</p>
+
+            <!-- El cupo de usuarios no es un número: es uno de cada rol. Como barra decía "3 de
+                 5", que no explica por qué el alta rebota al segundo cultivador teniendo lugar. -->
+            <p v-if="usuariosPorRol" class="pv__plan-sintope">
+              Equipo: {{ usuariosPorRol === 1 ? 'un usuario de cada rol' : `${usuariosPorRol} usuarios por rol` }}.
+              Los admins no tienen tope.
+            </p>
 
             <p class="pv__plan-contacto">
               Para cambiar de plan o sumar módulos, escribinos.

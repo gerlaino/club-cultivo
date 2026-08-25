@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_19_210000) do
+ActiveRecord::Schema[7.2].define(version: 2026_08_25_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1032,6 +1032,19 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_19_210000) do
     t.index ["club_id", "funcion"], name: "index_ia_llamadas_on_club_id_and_funcion"
     t.index ["club_id"], name: "index_ia_llamadas_on_club_id"
     t.index ["user_id"], name: "index_ia_llamadas_on_user_id"
+  end
+
+  create_table "ia_recargas", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "user_id"
+    t.integer "creditos", null: false
+    t.date "mes", null: false
+    t.string "nota"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "mes"], name: "index_ia_recargas_on_club_id_and_mes"
+    t.index ["club_id"], name: "index_ia_recargas_on_club_id"
+    t.index ["user_id"], name: "index_ia_recargas_on_user_id"
   end
 
   create_table "indicacion_medicas", force: :cascade do |t|
@@ -2376,6 +2389,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_19_210000) do
   add_foreign_key "geneticas", "users", column: "deleted_by_id"
   add_foreign_key "ia_llamadas", "clubs"
   add_foreign_key "ia_llamadas", "users"
+  add_foreign_key "ia_recargas", "clubs"
+  add_foreign_key "ia_recargas", "users"
   add_foreign_key "indicacion_medicas", "pacientes"
   add_foreign_key "indicacion_medicas", "users"
   add_foreign_key "indicacion_medicas", "users", column: "deleted_by_id"

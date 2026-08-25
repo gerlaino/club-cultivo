@@ -27,13 +27,25 @@ RSpec.describe 'Auditoría de club', type: :request do
   end
 
   it 'registra el módulo que se prendió' do
+    # `iot` NO viene de fábrica, así que prenderlo es un cambio de verdad. Antes acá se mandaban
+    # tres claves que el club ya tenía y el cambio se registraba igual, porque el controller
+    # REEMPLAZABA el mapa entero: mandar tres apagaba las otras dos sin que nadie lo pidiera.
     patch "/api/super_admin/clubs/#{club.id}",
-          params: { club: { features: { 'cultivo' => true, 'produccion_dispensa' => true, 'delivery' => true } } },
-          as: :json
+          params: { club: { features: { 'iot' => true } } }, as: :json
 
     a = auditorias(accion: 'actualizar').last
     expect(a.cambios).to have_key('features')
-    expect(a.cambios['features'].last['delivery']).to be(true)
+    expect(a.cambios['features'].last['iot']).to be(true)
+  end
+
+  # Lo que NO se manda no se apaga. Con el reemplazo entero, un llamador que mandara una sola
+  # clave dejaba a la organización sin el resto de sus módulos.
+  it 'un cambio parcial no apaga lo que no se mencionó' do
+    patch "/api/super_admin/clubs/#{club.id}",
+          params: { club: { features: { 'iot' => true } } }, as: :json
+
+    expect(club.reload.feature?('cultivo')).to be(true)
+    expect(club.feature?('mailer')).to be(true)
   end
 
   it 'registra la suspensión y la reactivación' do

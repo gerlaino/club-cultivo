@@ -79,7 +79,9 @@ module Ia
     # tarde de la API le comía el cupo al cliente y le mostraba "llegaste al tope" por un
     # problema que no era suyo.
     def consumo(club, fecha = Time.zone.today)
-      tope   = club.ia_limite_mes.to_i
+      base   = club.ia_config[:limite_mes].to_i
+      extra  = club.ia_creditos_extra(fecha).to_i
+      tope   = base + extra
       usados = creditos_del_mes(club, fecha)
       resto  = [tope - usados, 0].max
       pct    = tope.positive? ? [(usados * 100.0 / tope).round, 100].min : 0
@@ -87,6 +89,12 @@ module Ia
       {
         creditos:       usados,
         tope:           tope,
+        # Separados porque se cobran distinto: `base` viene con el plan y `extra` se factura
+        # aparte. `extra_usado` es EL número de la factura — cuánto del paquete comprado se
+        # consumió de verdad. Sin él sólo se sabe cuánto se le vendió, no cuánto usó.
+        base:           base,
+        extra:          extra,
+        extra_usado:    [usados - base, 0].max,
         restantes:      resto,
         porcentaje:     pct,
         dias_restantes: (fecha.end_of_month - fecha).to_i + 1,
@@ -140,6 +148,9 @@ module Ia
         creditos:   c[:creditos],
         restantes:  c[:restantes],
         tope:       c[:tope],
+        base:       c[:base],
+        extra:      c[:extra],
+        extra_usado: c[:extra_usado],
         tokens:     entrada + base.sum(:output_tokens),
         costo_usd:  base.sum(:costo_usd).to_f.round(2),
         # Qué porcentaje de la entrada se sirvió de caché. Si esto es 0 con el asistente en uso,

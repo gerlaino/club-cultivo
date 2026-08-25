@@ -28,11 +28,19 @@ RSpec.describe PlanEnforcer do
       end
     end
 
-    it 'el básico limita los seis recursos' do
-      described_class::RECURSOS.each do |recurso|
+    # `lotes` NO se limita: el lote es una unidad de organización, no de capacidad, y ponerle
+    # tope empuja a meter todo en un lote gigante — que rompe la trazabilidad. Lo que mide la
+    # capacidad real del cultivo son las plantas. `usuarios` tampoco: pasó a ser uno por rol.
+    it 'el básico limita sedes, salas, plantas y pacientes' do
+      %i[sedes salas plantas pacientes].each do |recurso|
         expect(described_class::PLANES['basico'][recurso]).to be_a(Integer),
                                                               "el plan básico debería limitar #{recurso}"
       end
+    end
+
+    it 'el básico NO limita los lotes' do
+      expect(described_class::PLANES['basico'][:lotes]).to be_nil
+      expect(described_class.new(club).puede_crear_lote?).to be(true)
     end
   end
 
@@ -117,7 +125,7 @@ RSpec.describe PlanEnforcer do
       expect(enforcer.puede_crear_lote?).to     be(true)
       expect(enforcer.puede_crear_planta?).to   be(true)
       expect(enforcer.puede_crear_paciente?).to be(true)
-      expect(enforcer.puede_crear_usuario?).to  be(true)
+      expect(enforcer.puede_crear_usuario?('cultivador')).to be(true)
     end
   end
 
@@ -132,17 +140,32 @@ RSpec.describe PlanEnforcer do
     end
   end
 
-  # El cupo de usuarios es del EQUIPO. El paciente tiene cuenta para su portal y ya gasta su
-  # propio límite (`pacientes`): contándolo también acá se cobraba dos veces, y un club Básico
-  # con el portal vendido se quedaba sin poder dar de alta empleados al quinto paciente.
+  # El cupo de usuarios es del EQUIPO y va POR ROL. Un número global ("5 usuarios") no se puede
+  # vender ni explicar, y dejaba dar de alta cinco cultivadores y ningún dispensador.
+  #
+  # El paciente tiene cuenta para su portal y ya gasta su propio límite (`pacientes`):
+  # contándolo también acá se cobraba dos veces.
   describe 'límite de usuarios' do
-    it 'no cuenta las cuentas de portal de los pacientes' do
-      tope = described_class::PLANES['basico'][:usuarios]
-      (tope + 3).times { create(:user, club: club, role: 'paciente') }
+    it 'el básico deja UNO de cada rol' do
       create(:user, club: club, role: 'cultivador')
 
       enforcer = described_class.new(club.reload)
-      expect(enforcer.puede_crear_usuario?).to be(true)
+      expect(enforcer.puede_crear_usuario?('cultivador')).to be(false)
+      # El cupo es por rol: que esté lleno el de cultivador no toca al de dispensador.
+      expect(enforcer.puede_crear_usuario?('dispensador')).to be(true)
+    end
+
+    it 'el total no limita ningún rol' do
+      total = create(:club, plan: 'total')
+      3.times { create(:user, club: total, role: 'cultivador') }
+
+      expect(described_class.new(total.reload).puede_crear_usuario?('cultivador')).to be(true)
+    end
+
+    it 'no cuenta las cuentas de portal de los pacientes' do
+      5.times { create(:user, club: club, role: 'paciente') }
+
+      expect(described_class.new(club.reload).puede_crear_usuario?('cultivador')).to be(true)
     end
 
     it 'el uso que se informa cuenta igual que el tope' do
@@ -152,11 +175,9 @@ RSpec.describe PlanEnforcer do
       expect(described_class.new(club.reload).info[:uso][:usuarios]).to eq(1)
     end
 
-    it 'sigue frenando cuando el equipo llega al tope' do
-      tope = described_class::PLANES['basico'][:usuarios]
-      tope.times { create(:user, club: club, role: 'cultivador') }
-
-      expect(described_class.new(club.reload).puede_crear_usuario?).to be(false)
+    it 'informa cuántos permite por rol' do
+      expect(described_class.new(club).info[:usuarios_por_rol]).to eq(1)
+      expect(described_class.new(create(:club, plan: 'total')).info[:usuarios_por_rol]).to be_nil
     end
   end
 

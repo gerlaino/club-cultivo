@@ -666,6 +666,10 @@ export const restaurarClub       = (id)           => api.patch(`/super_admin/clu
 export const provisionarPulse    = (id, key)      => api.patch(`/super_admin/clubs/${id}/provisionar_pulse`, { pulse_api_key: key })
 export const suspenderClub       = (id)           => api.patch(`/super_admin/clubs/${id}/suspender`)
 export const reactivarClub       = (id)           => api.patch(`/super_admin/clubs/${id}/reactivar`)
+// Créditos de IA vendidos por fuera del plan. Es una VENTA, no una configuración: aplican al
+// mes en curso, no se acumulan y quedan registrados para poder facturarlos.
+export const recargarIa          = (id, creditos, nota) =>
+  api.post(`/super_admin/clubs/${id}/ia_recarga`, { creditos, nota })
 export const provisionarWhatsappClub = (id, payload) => api.patch(`/super_admin/clubs/${id}/provisionar_whatsapp`, payload)
 export const desconectarWhatsappClub = (id)          => api.delete(`/super_admin/clubs/${id}/desconectar_whatsapp`)
 export const listSuperAdminUsers = ()             => api.get('/super_admin/users')

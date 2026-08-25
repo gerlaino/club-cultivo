@@ -29,10 +29,12 @@ RSpec.describe 'Equipo — credenciales', type: :request do
 
     # El frontend mandaba '123456Aa' para TODOS: cada usuario de cada club nacía con la
     # misma clave conocida.
+    # Dos ROLES distintos a propósito: el plan Básico incluye uno de cada rol, así que dos
+    # cultivadores rebotan por cupo antes de llegar a la contraseña, que es lo que se prueba acá.
     it 'cada usuario nace con una contraseña distinta' do
-      crear!(email: 'uno@club.com')
+      crear!(email: 'uno@club.com', rol: 'cultivador')
       una = json['credenciales']['password_inicial']
-      crear!(email: 'dos@club.com')
+      crear!(email: 'dos@club.com', rol: 'dispensador')
       otra = json['credenciales']['password_inicial']
 
       expect(una).not_to eq(otra)

@@ -28,6 +28,9 @@ export function usePlan() {
   const planLabel = computed(() => planData.value?.label     || 'Básico')
   const esTrial   = computed(() => planData.value?.trial     || false)
   const limites   = computed(() => planData.value?.limites   || {})
+  // El cupo de usuarios dejó de ser un número y pasó a ser "uno de cada rol": viaja aparte de
+  // `limites` porque no se puede dibujar como una barra de uso.
+  const usuariosPorRol = computed(() => planData.value?.usuarios_por_rol ?? null)
   const uso       = computed(() => planData.value?.uso       || {})
 
   function puedeCrear(recurso) {
@@ -56,7 +59,7 @@ export function usePlan() {
 
   return {
     planData, loading,
-    plan, planLabel, esTrial, limites, uso,
+    plan, planLabel, esTrial, limites, uso, usuariosPorRol,
     puedeCrear, porcentajeUso, planColor,
     fetchPlan,
   }

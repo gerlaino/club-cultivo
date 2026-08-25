@@ -1,5 +1,5 @@
 class SuperAdmin::ClubsController < SuperAdmin::BaseController
-  before_action :set_club, only: [:show, :update, :crear_usuarios_default, :cambiar_plan, :observar, :detener_observacion, :destroy, :restaurar, :suspender, :reactivar, :provisionar_pulse, :provisionar_whatsapp, :desconectar_whatsapp, :historial]
+  before_action :set_club, only: [:show, :update, :crear_usuarios_default, :cambiar_plan, :observar, :detener_observacion, :destroy, :restaurar, :suspender, :reactivar, :provisionar_pulse, :provisionar_whatsapp, :desconectar_whatsapp, :historial, :ia_recarga]
 
   # Los ELIMINADOS no se listan salvo que se los pida: verlos mezclados con los activos, sin
   # distinguirse, era lo que hacía pensar que borrar una organización no hacía nada.
@@ -18,14 +18,17 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     # Un club nuevo nace con las suites y los add-ons terminados, salvo que el alta mande otra
     # cosa: crearlo con features vacío significaría, con el gating real, una organización que no puede
     # hacer nada.
-    attrs['features'] = Club::FEATURES_POR_DEFECTO.merge(attrs['features'] || {})
+    attrs['features'] = sin_addons_huerfanos(Club::FEATURES_POR_DEFECTO.merge(attrs['features'] || {}))
     # El plan no viaja en `club_params` (ver el comentario ahí), pero el alta sí lo elige.
     attrs['plan'] = PlanEnforcer.normalizar(params.dig(:club, :plan))
     club = Club.new(attrs)
     if club.save
       # Sólo los roles que el alta ofrece. No alcanza con sacarlos de la pantalla: el endpoint
       # acepta lo que le manden y un rol no ofrecido entraría igual por la API.
-      roles    = (Array(params[:roles_a_crear]).map(&:to_s) & Club::ROLES_ALTA).presence || Club::ROLES_DEFAULT
+      # …y sólo los que le sirven a lo que acaba de contratar: un cultivador en una organización
+      # sin Cultivo loguea a una app sin una sola pantalla.
+      roles    = (Array(params[:roles_a_crear]).map(&:to_s) & club.roles_para_alta(Club::ROLES_ALTA))
+                 .presence || Club::ROLES_DEFAULT
       password = params[:password_inicial].presence || User.password_temporal
       usuarios = club.crear_usuarios_default!(roles: roles, password: password)
       club.crear_geneticas_default!
@@ -47,13 +50,41 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     # Apagar un módulo no lo corta en el momento: se programa para el fin del período pago. Se
     # resuelve acá y no en el modelo porque es una decisión del panel de plataforma — una
     # migración de datos o un rake que necesite apagar algo ya sigue escribiendo `features`.
+    # El panel manda el mapa entero, pero un llamador que mande sólo una clave no tiene por qué
+    # apagarle el resto: se resuelve contra lo que la organización ya tiene.
+    attrs['features'] = @club.features.merge(attrs['features']) if attrs.key?('features')
     bajas = attrs.key?('features') ? aplicar_bajas_programadas(attrs['features']) : []
+    # DESPUÉS de las bajas, no antes: una suite dada de baja sigue guardada en `true` hasta su
+    # fecha y sus adicionales tienen que seguir andando con ella. Corriendo esto primero, dar de
+    # baja Producción y dispensa cortaba hoy mismo el Delivery que la organización ya pagó.
+    attrs['features'] = sin_addons_huerfanos(attrs['features']) if attrs.key?('features')
 
     if @club.update(attrs)
       render json: serialize_club_detail(@club.reload).merge(bajas_programadas: bajas)
     else
       render json: { errors: @club.errors.full_messages }, status: :unprocessable_entity
     end
+  end
+
+  # POST /super_admin/clubs/:id/ia_recarga — venderle créditos de IA por fuera del plan.
+  #
+  # Aplican al mes en curso y no se acumulan: lo que no se usó, se perdió. Es la única forma de
+  # que "créditos extra" sea algo que se pueda cobrar todos los meses en vez de un saldo que
+  # crece solo y que nadie sabe cuándo se consumió.
+  def ia_recarga
+    creditos = params[:creditos].to_i
+    if creditos <= 0
+      return render json: { errors: ['Poné cuántos créditos le vendiste.'] }, status: :unprocessable_entity
+    end
+
+    # `IaRecarga` es tenant con `require_tenant=true` y el super admin no tiene ninguna
+    # organización fijada: sin esto, crear la recarga revienta con NoTenantSet.
+    ActsAsTenant.with_tenant(@club) do
+      IaRecarga.create!(club: @club, user: current_user, creditos: creditos,
+                        mes: Time.zone.today, nota: params[:nota].presence)
+    end
+
+    render json: serialize_club_detail(@club.reload), status: :created
   end
 
   def crear_usuarios_default
@@ -233,7 +264,9 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       :plan_activo_hasta, :plan_trial, :vista_paciente_activa,
       :smtp_host, :smtp_port, :smtp_user, :smtp_pass,
       :smtp_from, :smtp_from_name,
-      :ia_tier, :ia_limite_hora,
+      # `ia_tier` ya no se acepta: el tramo sale del PLAN (ver `Club::IA_TIERS`). Lo que se
+      # vende aparte son créditos, y eso entra por `ia_recarga`, no por el update general.
+      :ia_limite_hora,
       features: {}
     )
     permitidos[:features] = features_editables(permitidos[:features]) if permitidos.key?(:features)
@@ -251,6 +284,20 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     # de Twilio de la plataforma, y ARICCAME que no le transmite nada al organismo). Apagarlos sí
     # se acepta, para poder limpiar una organización que los tenga guardados.
     permitidas.reject { |clave, valor| valor == true && Club.addon_bloqueado?(clave) }
+  end
+
+  # Un adicional prendido sin su suite es un módulo contratado que no hace NADA: el catálogo lo
+  # dejaba guardar (Delivery sin Producción y dispensa, IoT sin Cultivo) y el `requiere` lo
+  # decía en letra chica que nadie lee. La organización lo ve prendido, entra, y no encuentra
+  # una sola pantalla — y el candado no puede vivir sólo en el toggle, porque por la API se
+  # saltea siempre.
+  #
+  # Apagar siempre se acepta: hay que poder limpiar una organización que los tenga guardados.
+  def sin_addons_huerfanos(features)
+    features.to_h.reject do |clave, valor|
+      pack = Club.pack_de_addon(clave)
+      valor == true && pack.present? && features[pack] != true
+    end
   end
 
   # Traduce "apagá esto" a "esto termina el <fecha>", y devuelve qué quedó programado para
@@ -405,8 +452,19 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
         { clave: k, label: v[:label], desc: v[:desc], requiere: v[:requiere], activo: false }
       },
       plan_info:       PlanEnforcer.new(c).info,
-      ia_tier:         c.ia_tier,
       ia_limite_hora:  c.ia_limite_hora,
+      # El tramo de IA sale del plan: se manda ya resuelto para que la pantalla no vuelva a
+      # deducirlo por su cuenta (era justo la copia que se desincronizaba).
+      ia_tramo:        { clave: PlanEnforcer.normalizar(c.plan), label: c.ia_config[:label],
+                         limite_mes: c.ia_config[:limite_mes] },
+      # Lo que se le vendió aparte ESTE mes, para poder facturarlo. Con quién la cargó: cuando
+      # una organización pregunta "¿quién me autorizó esto?", tiene que haber una respuesta.
+      ia_recargas:     ActsAsTenant.with_tenant(c) {
+        c.ia_recargas.del_mes.recientes.includes(:user).map { |r|
+          { id: r.id, creditos: r.creditos, nota: r.nota, fecha: r.created_at,
+            usuario: r.user&.email }
+        }
+      },
       # Cuánto lleva consumido este mes. Se medía desde el 11-ago y no se veía en ningún lado:
       # se podía fijar el tope sin poder mirar contra qué. Sólo se calcula si tiene el add-on —
       # son seis sumas sobre `ia_llamadas` y no tiene sentido pagarlas para una organización

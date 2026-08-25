@@ -9,13 +9,7 @@ vi.mock('../lib/api.js', () => ({
   provisionarPulse:       vi.fn(() => Promise.resolve({ data: {} })),
   provisionarWhatsappClub: vi.fn(() => Promise.resolve({ data: {} })),
   desconectarWhatsappClub: vi.fn(() => Promise.resolve({ data: {} })),
-  getSuperAdminCatalogo:  vi.fn(() => Promise.resolve({ data: {
-    ia_tiers: [
-      { clave: 'basico',     label: 'Básico',     limite_hora: 20,  limite_mes: 500 },
-      { clave: 'pro',        label: 'Pro',        limite_hora: 60,  limite_mes: 2000 },
-      { clave: 'enterprise', label: 'Enterprise', limite_hora: 200, limite_mes: 10000 },
-    ],
-  } })),
+  recargarIa:              vi.fn(() => Promise.resolve({ data: {} })),
 }))
 vi.mock('../composables/useConfirm.js', () => ({ useConfirm: () => ({ confirm: confirmar }) }))
 vi.mock('../composables/useToast.js', () => ({
@@ -29,7 +23,11 @@ const SAModulos = (await import('../views/superadmin/SAModulos.vue')).default
 // que la pantalla funcione — este test la MONTA con el payload que manda el backend.
 const club = {
   id: 3,
-  ia_tier: 'basico',
+  // El tramo de IA sale del PLAN y el backend lo manda ya resuelto: era una perilla aparte
+  // (`ia_tier`) que podía quedar en Básico con el plan en Total.
+  ia_tramo: { clave: 'basico', label: 'Básico', limite_mes: 500 },
+  ia_recargas: [{ id: 1, creditos: 300, nota: 'Campaña', fecha: '2026-08-20T10:00:00Z',
+                  usuario: 'super@cultivoespacial.com' }],
   pulse_configurado: false,
   whatsapp_estado: 'sin_configurar',
   features: { cultivo: true, produccion_dispensa: true, ia: true, delivery: false, iot: false },
@@ -152,12 +150,25 @@ describe('SAModulos', () => {
     expect(barra.attributes('style')).toContain('width: 42%')   // 210/500, no 143/500
   })
 
-  it('los tramos de IA salen del catálogo del backend, no de una copia local', async () => {
+  // El tramo dejó de elegirse: viene con el plan. Eran tres botones y la misma organización
+  // podía tener plan Total con la IA en Básico — la misma decisión escrita en dos lugares.
+  it('el tramo de IA se muestra, no se elige', async () => {
     const w = montar()
     await new Promise(r => setTimeout(r, 0))
 
-    expect(w.text()).toContain('2.000 créditos por mes')        // el tramo Pro, tal como lo manda
-    expect(w.findAll('.sam__tier')).toHaveLength(3)
+    expect(w.text()).toContain('Viene con el plan Básico')
+    expect(w.text()).toContain('500 créditos por mes')
+    expect(w.findAll('.sam__tier')).toHaveLength(0)
+  })
+
+  // Lo que sí se decide es venderle créditos por fuera: es una VENTA y hay que poder facturarla,
+  // así que cada una queda con su fecha, su motivo y quién la cargó.
+  it('las recargas de créditos se listan con quién las cargó', () => {
+    const w = montar()
+
+    expect(w.text()).toContain('+300')
+    expect(w.text()).toContain('Campaña')
+    expect(w.text()).toContain('super@cultivoespacial.com')
   })
 
   it('la configuración de un módulo apagado no se muestra: no hay nada que configurar', () => {

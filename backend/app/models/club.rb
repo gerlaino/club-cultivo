@@ -68,6 +68,7 @@ class Club < ApplicationRecord
   has_many :webhooks,           dependent: :destroy
   has_many :turnos,             dependent: :destroy
   has_many :check_ins,          dependent: :destroy
+  has_many :ia_recargas,        class_name: 'IaRecarga', dependent: :destroy
 
   has_one_attached :logo
 
@@ -106,14 +107,45 @@ class Club < ApplicationRecord
   # puede es crear uno nuevo desde la pantalla.
   ROLES_ALTA_CLUB = (ROLES_ALTA + %w[delivery]).freeze
 
-  # Roles cuya oferta depende de un módulo contratado. `delivery` no lo necesita toda
-  # organización: sin el módulo, ofrecerlo sería dar de alta a alguien que después no puede
-  # entrar — `check_rol_habilitado!` lo rebota en el login y nadie entiende por qué.
-  MODULO_POR_ROL_OPCIONAL = { 'delivery' => 'delivery' }.freeze
+  # De qué módulo depende cada rol. Sin el módulo, ofrecer el rol es dar de alta a alguien que
+  # después no puede entrar: `check_rol_habilitado!` lo rebota en el login y nadie entiende por
+  # qué — ni la persona, ni el admin que la creó, ni nosotros al recibir el reclamo.
+  #
+  # Empezó cubriendo sólo `delivery` y le faltaba lo más común: una organización que compró
+  # únicamente Producción y dispensa podía dar de alta un cultivador, que loguea a una app sin
+  # una sola pantalla. La regla es la misma para todos, así que la lista también.
+  #
+  # `admin`, `supervisor`, `abogado` y `auditor` no están: son transversales y funcionan con
+  # cualquier suite.
+  MODULO_POR_ROL = {
+    'cultivador'  => 'cultivo',
+    'manicura'    => 'cultivo',
+    'dispensador' => 'produccion_dispensa',
+    'medico'      => 'produccion_dispensa',
+    'delivery'    => 'delivery',
+  }.freeze
+
+  # Se mantiene el nombre viejo: lo usa el mensaje de error del alta de usuarios.
+  MODULO_POR_ROL_OPCIONAL = MODULO_POR_ROL
+
+  # El nombre visible de un módulo, venga de donde venga (suite, add-on o incluido). Antes cada
+  # mensaje lo buscaba sólo en `ADDONS` y, para un rol que depende de una suite, imprimía la
+  # clave cruda ("produccion_dispensa no está activo").
+  def self.label_modulo(clave)
+    k = clave.to_s
+    SUITES.dig(k, :label) || ADDONS.dig(k, :label) || INCLUIDOS_META.dig(k, :label) || k
+  end
+
+  # Qué módulo le falta a esta organización para poder tener este rol, o nil si lo puede tener.
+  def modulo_faltante_para_rol(rol)
+    modulo = MODULO_POR_ROL[rol.to_s]
+    return nil if modulo.blank? || feature?(modulo)
+    modulo
+  end
 
   # Los roles que ESTA organización puede dar de alta hoy, según lo que tenga contratado.
   def roles_para_alta(base = ROLES_ALTA_CLUB)
-    base.reject { |rol| (m = MODULO_POR_ROL_OPCIONAL[rol]) && !feature?(m) }
+    base.reject { |rol| modulo_faltante_para_rol(rol) }
   end
 
   ROLES_META = {
@@ -582,21 +614,40 @@ class Club < ApplicationRecord
   # importa CSV consumía su tope sin costarnos casi nada y otra que vive del plan de trabajo nos
   # costaba ocho veces más por lo mismo. Los números no cambiaron al pasar a créditos porque
   # están elegidos para que un dictado ≈ 1 crédito: 500 créditos siguen siendo ~500 dictados.
+  # DOS TRAMOS, y salen DEL PLAN. Eran tres (básico/pro/enterprise) elegibles a mano en una
+  # perilla propia, así que la misma organización podía tener el plan Total y la IA en Básico:
+  # la misma decisión escrita en dos lugares que dejan de coincidir, sin que nadie se entere
+  # hasta que el cliente reclama. Ahora el plan manda y no hay nada que sincronizar.
+  #
+  # Lo que sí se decide aparte es el EXTRA: créditos que se venden por fuera y se cobran aparte
+  # (`IaRecarga`). Ésa es una venta, no una configuración.
+  #
+  # `ia_tier` sigue en la tabla y en la auditoría, pero ya no lo lee nadie: la columna se queda
+  # para no perder el historial de lo que se le había puesto a cada organización.
   IA_TIERS = {
-    'basico'     => { label: 'Básico',     limite_hora: 20,  limite_mes:    500, color: '#64748b' },
-    'pro'        => { label: 'Pro',        limite_hora: 60,  limite_mes:  2_000, color: '#0891b2' },
-    'enterprise' => { label: 'Enterprise', limite_hora: 200, limite_mes: 10_000, color: '#7c3aed' },
+    'basico' => { label: 'Básico', limite_hora: 20, limite_mes:   500, color: '#64748b' },
+    'total'  => { label: 'Total',  limite_hora: 60, limite_mes: 2_000, color: '#0891b2' },
   }.freeze
 
   def ia_config
-    IA_TIERS[ia_tier] || IA_TIERS['basico']
+    IA_TIERS[PlanEnforcer.normalizar(plan)] || IA_TIERS['basico']
   end
 
   def ia_limite_efectivo
     ia_limite_hora.positive? ? ia_limite_hora : ia_config[:limite_hora]
   end
 
-  def ia_limite_mes = ia_config[:limite_mes]
+  # El tope del mes: lo que trae el plan más lo que se le vendió aparte para ESTE mes.
+  def ia_limite_mes(fecha = Time.zone.today) = ia_config[:limite_mes] + ia_creditos_extra(fecha)
+
+  # Créditos comprados por fuera del plan, sólo los de este mes: no se acumulan.
+  #
+  # `with_tenant` porque `IaRecarga` es tenant con `require_tenant=true` y esto se consulta
+  # también desde el panel de plataforma, donde el super admin no tiene ninguna organización
+  # fijada. El bloque restaura el tenant anterior al salir.
+  def ia_creditos_extra(fecha = Time.zone.today)
+    ActsAsTenant.with_tenant(self) { IaRecarga.total_del_mes(self, fecha) }
+  end
 
   def smtp_configured?
     smtp_host.present? && smtp_user.present? && smtp_pass.present?

@@ -141,14 +141,14 @@ RSpec.describe Ia::Uso do
   end
 
   describe '.limite_alcanzado' do
-    before { club.update!(ia_tier: 'basico') } # 500 créditos/mes
+    before { club.update!(plan: 'basico') } # 500 créditos/mes: el tramo de IA sale del PLAN
 
     it 'deja pasar por debajo del tope' do
       expect(described_class.limite_alcanzado(club, admin)).to be_nil
     end
 
     it 'corta al gastar los créditos del mes y dice cuándo se renuevan' do
-      allow(club).to receive(:ia_limite_mes).and_return(2)
+      allow(club).to receive(:ia_config).and_return(Club::IA_TIERS['basico'].merge(limite_mes: 2))
       described_class.registrar(club: club, funcion: :asistente_parsear, modelo: Ia::Modelos::RAZONA,
                                 tokens: { output: 1_000 }) # US$0,015 → 2 créditos
 
@@ -160,7 +160,7 @@ RSpec.describe Ia::Uso do
     it 'las llamadas FALLIDAS no le descuentan cupo al cliente' do
       # Una mala tarde de la API no la puede pagar la organización: se registra para verla, pero
       # no consume. Antes se contaba el mes entero sin mirar `ok`.
-      allow(club).to receive(:ia_limite_mes).and_return(2)
+      allow(club).to receive(:ia_config).and_return(Club::IA_TIERS['basico'].merge(limite_mes: 2))
       described_class.registrar(club: club, funcion: :asistente_parsear, modelo: Ia::Modelos::RAZONA,
                                 ok: false, error_clase: 'Net::ReadTimeout',
                                 tokens: { output: 100_000 }) # gastaría de sobra si contara
@@ -169,7 +169,7 @@ RSpec.describe Ia::Uso do
     end
 
     it 'el tope es de la ORGANIZACIÓN, no de cada usuario' do
-      allow(club).to receive(:ia_limite_mes).and_return(2)
+      allow(club).to receive(:ia_config).and_return(Club::IA_TIERS['basico'].merge(limite_mes: 2))
       otro = create(:user, :cultivador, club: club)
       described_class.registrar(club: club, user: admin, funcion: :asistente_parsear,
                                 modelo: Ia::Modelos::RAZONA, tokens: { output: 1_000 })
@@ -179,7 +179,7 @@ RSpec.describe Ia::Uso do
     end
 
     it 'no cuenta el consumo de otra organización' do
-      allow(club).to receive(:ia_limite_mes).and_return(2)
+      allow(club).to receive(:ia_config).and_return(Club::IA_TIERS['basico'].merge(limite_mes: 2))
       otro_club = create(:club)
       ActsAsTenant.with_tenant(otro_club) do
         5.times do
@@ -192,10 +192,58 @@ RSpec.describe Ia::Uso do
     end
   end
 
+  # AC (25-ago): el tramo de IA sale DEL PLAN y lo que se vende aparte son créditos, que
+  # aplican a un mes y no se acumulan.
+  describe 'créditos extra' do
+    it 'el tramo lo fija el plan, no una perilla suelta' do
+      expect(create(:club, plan: 'basico').ia_limite_mes).to eq(Club::IA_TIERS['basico'][:limite_mes])
+      expect(create(:club, plan: 'total').ia_limite_mes).to  eq(Club::IA_TIERS['total'][:limite_mes])
+    end
+
+    it 'una recarga le sube el tope de ESTE mes' do
+      base = club.ia_limite_mes
+      IaRecarga.create!(club: club, creditos: 300, mes: Time.zone.today)
+
+      expect(club.ia_limite_mes).to eq(base + 300)
+      expect(described_class.consumo(club)[:extra]).to eq(300)
+    end
+
+    # No se acumulan: lo que no se usó, se perdió. Si el mes pasado siguiera sumando, "créditos
+    # extra" sería un saldo que crece solo y no algo que se cobra todos los meses.
+    it 'la recarga del mes pasado no cuenta' do
+      base = club.ia_limite_mes
+      IaRecarga.create!(club: club, creditos: 300, mes: 1.month.ago.to_date)
+
+      expect(club.ia_limite_mes).to eq(base)
+    end
+
+    # El número de la factura: cuánto del paquete comprado se consumió de verdad. Sin esto sólo
+    # se sabe cuánto se le vendió.
+    it 'informa cuánto del extra se consumió, no sólo cuánto se vendió' do
+      allow(club).to receive(:ia_config).and_return(Club::IA_TIERS['basico'].merge(limite_mes: 10))
+      IaRecarga.create!(club: club, creditos: 100, mes: Time.zone.today)
+      described_class.registrar(club: club, funcion: :asistente_parsear, modelo: Ia::Modelos::RAZONA,
+                                tokens: { output: 10_000 }) # US$0,15 → 15 créditos
+
+      c = described_class.consumo(club)
+      expect(c[:tope]).to        eq(110)
+      expect(c[:creditos]).to    eq(15)
+      expect(c[:extra_usado]).to eq(5)   # 15 consumidos − 10 que traía el plan
+    end
+
+    it 'sin pasarse de lo que trae el plan, no se consumió nada del extra' do
+      IaRecarga.create!(club: club, creditos: 100, mes: Time.zone.today)
+      described_class.registrar(club: club, funcion: :asistente_parsear, modelo: Ia::Modelos::RAZONA,
+                                tokens: { output: 10_000 })
+
+      expect(described_class.consumo(club)[:extra_usado]).to eq(0)
+    end
+  end
+
   # Lo que ve el admin en el medidor. Sale de la misma fuente que el tope a propósito: si
   # contaran distinto, la pantalla diría "te quedan 40" con el dictado ya rechazado.
   describe '.consumo' do
-    before { allow(club).to receive(:ia_limite_mes).and_return(100) }
+    before { allow(club).to receive(:ia_config).and_return(Club::IA_TIERS['basico'].merge(limite_mes: 100)) }
 
     it 'informa cuánto queda y en qué porcentaje va' do
       described_class.registrar(club: club, funcion: :asistente_parsear, modelo: Ia::Modelos::RAZONA,

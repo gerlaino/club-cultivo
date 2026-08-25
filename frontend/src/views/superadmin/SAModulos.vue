@@ -10,7 +10,7 @@
  */
 import { ref, computed } from 'vue'
 import { updateSuperAdminClub, provisionarPulse, provisionarWhatsappClub,
-         desconectarWhatsappClub, getSuperAdminCatalogo } from '../../lib/api.js'
+         desconectarWhatsappClub, recargarIa } from '../../lib/api.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
@@ -25,7 +25,6 @@ const { confirm } = useConfirm()
 const toast = useToast()
 
 const guardando = ref(null)   // clave del módulo que se está guardando
-const iaTiers   = ref([])
 
 const ICONO = {
   cultivo: '🌱', produccion_dispensa: '⚖️',
@@ -154,23 +153,37 @@ async function guardar(featuresNuevas, modulo, accion, opciones = {}) {
   }
 }
 
-// ── IA: un solo control ─────────────────────────────────────────────────────────
+// ── IA: el tramo sale del PLAN, y lo único que se decide acá es el extra ────────
 //
-// Había dos perillas —el tramo y un "límite por hora" que lo sobrescribía— y la que estaba a la
-// vista era la que menos importa: lo que se COBRA es el tope mensual. Ahora se elige el tramo y
-// listo; al elegirlo se limpia el override horario (0 = usar el del tramo) para que no quede un
-// número viejo aplicándose sin que nadie lo vea.
-async function elegirTier(tier) {
-  guardando.value = 'ia'
+// Había tres tramos elegibles a mano (básico/pro/enterprise) en una perilla propia, así que la
+// misma organización podía tener el plan Total y la IA en Básico: la misma decisión escrita en
+// dos lugares que dejan de coincidir, y nadie se entera hasta que el cliente reclama. Ahora son
+// dos y salen del plan.
+//
+// Lo que sí se decide es vender créditos por fuera. Eso es una VENTA —se cobra aparte— así que
+// deja una fila con fecha, cuántos y quién la cargó: sin eso, a fin de mes se factura de memoria.
+const recargando = ref(false)
+const nuevaRecarga = ref({ creditos: '', nota: '' })
+
+async function cargarCreditos() {
+  const creditos = Number(nuevaRecarga.value.creditos)
+  if (!creditos || creditos <= 0) { toast.error('Poné cuántos créditos le vendiste'); return }
+  recargando.value = true
   try {
-    const { data } = await updateSuperAdminClub(props.club.id, { ia_tier: tier.clave, ia_limite_hora: 0 })
+    const { data } = await recargarIa(props.club.id, creditos, nuevaRecarga.value.nota)
     emit('actualizado', data)
-    toast.success(`Asistente IA: plan ${tier.label} (${tier.limite_mes.toLocaleString('es-AR')} créditos por mes).`)
-  } catch {
-    toast.error('No se pudo cambiar el plan de IA')
+    nuevaRecarga.value = { creditos: '', nota: '' }
+    toast.success(`${creditos.toLocaleString('es-AR')} créditos cargados para este mes.`)
+  } catch (e) {
+    toast.error(e?.response?.data?.errors?.join(', ') || 'No se pudieron cargar los créditos')
   } finally {
-    guardando.value = null
+    recargando.value = false
   }
+}
+
+function fechaHora(f) {
+  if (!f) return ''
+  return new Date(f).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' })
 }
 
 const iaUso = computed(() => props.club.ia_uso)
@@ -243,10 +256,8 @@ onMounted(async () => {
     twilio_auth_token:    '',
     twilio_whatsapp_from: props.club.twilio_whatsapp_from || '',
   }
-  try {
-    const { data } = await getSuperAdminCatalogo()
-    iaTiers.value = data.ia_tiers || []
-  } catch { /* sin catálogo no se ofrecen tramos; el que tiene guardado sigue aplicando */ }
+  // El catálogo ya no hace falta acá: el tramo de IA viene resuelto en la ficha del club
+  // (`ia_tramo`) porque sale del plan, y los módulos los manda el propio `club`.
 })
 </script>
 
@@ -326,13 +337,34 @@ onMounted(async () => {
 
         <!-- IA: el tramo y lo que va consumido -->
         <div v-if="a.clave === 'ia' && features.ia" class="sam__cfg">
-          <div class="sam__tiers">
-            <button v-for="t in iaTiers" :key="t.clave" type="button"
-                    class="sam__tier" :class="{ 'sam__tier--on': (club.ia_tier || 'basico') === t.clave }"
-                    @click="elegirTier(t)">
-              <strong>{{ t.label }}</strong>
-              <span>{{ t.limite_mes.toLocaleString('es-AR') }} créditos por mes</span>
+          <!-- El tramo no se elige: viene con el plan. Se muestra para saber contra qué mide. -->
+          <div class="sam__tramo">
+            <span class="sam__tramo-lbl">Viene con el plan {{ club.ia_tramo?.label }}</span>
+            <strong>{{ (club.ia_tramo?.limite_mes || 0).toLocaleString('es-AR') }} créditos por mes</strong>
+          </div>
+
+          <!-- Créditos vendidos aparte. Aplican a ESTE mes y no se acumulan. -->
+          <div class="sam__cfg-hd" style="margin-top:.9rem">Créditos extra</div>
+          <p class="sam__hint">
+            Se suman al tope de este mes y no se acumulan: lo que no se usa, se pierde. Se cobran
+            aparte, así que quedan registrados con fecha y con quién los cargó.
+          </p>
+          <div class="sam__recarga">
+            <input v-model="nuevaRecarga.creditos" type="number" min="1" class="sam__input sam__input--num"
+                   placeholder="Créditos" />
+            <input v-model="nuevaRecarga.nota" class="sam__input" placeholder="Para qué (opcional)" />
+            <button type="button" class="sam__btn" :disabled="recargando" @click="cargarCreditos">
+              <DsSpinner v-if="recargando" :size="13" />
+              <span v-else>Cargar</span>
             </button>
+          </div>
+          <div v-if="(club.ia_recargas || []).length" class="sam__recargas">
+            <div v-for="r in club.ia_recargas" :key="r.id" class="sam__recarga-item">
+              <strong>+{{ r.creditos.toLocaleString('es-AR') }}</strong>
+              <span>{{ fechaHora(r.fecha) }}</span>
+              <span v-if="r.nota" class="sam__recarga-nota">{{ r.nota }}</span>
+              <span class="sam__recarga-quien">{{ r.usuario }}</span>
+            </div>
           </div>
 
           <!-- Cuánto va del mes. Se medía desde el 11-ago y no se veía en ninguna pantalla:
@@ -351,6 +383,16 @@ onMounted(async () => {
                    :style="{ width: iaPorcentaje + '%' }"></div>
             </div>
             <div class="sam__uso-meta">
+              <!-- Lo que se factura: cuánto del paquete comprado se consumió DE VERDAD. Sin
+                   esto sólo se sabe cuánto se le vendió, no cuánto usó. -->
+              <template v-if="iaUso.extra">
+                <span>Del plan: <strong>{{ iaUso.base }}</strong></span>
+                <span>·</span>
+                <span>Extra vendido: <strong>{{ iaUso.extra }}</strong></span>
+                <span>·</span>
+                <span class="sam__extra-usado">Extra consumido: <strong>{{ iaUso.extra_usado }}</strong></span>
+                <span>·</span>
+              </template>
               <span>Costo: US$ {{ iaUso.costo_usd }}</span>
               <span>·</span>
               <!-- Si el hit ratio cae a 0 con el asistente en uso, algo rompió el caché del
@@ -554,6 +596,28 @@ onMounted(async () => {
 .sam__btn--danger:hover { background: #fef2f2; }
 
 /* IA: tramos */
+/* El tramo de IA ya no se elige: viene con el plan y se muestra. */
+.sam__tramo {
+  display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+  padding: .6rem .8rem; border: 1px solid var(--c-slate-200); border-radius: 10px;
+  background: var(--c-slate-50);
+}
+.sam__tramo-lbl { font-size: .72rem; color: var(--c-slate-500); font-weight: 600; }
+.sam__tramo strong { font-size: .82rem; color: var(--c-slate-900); }
+
+/* Vender créditos por fuera del plan. */
+.sam__recarga { display: flex; gap: .4rem; margin-top: .5rem; }
+.sam__input--num { max-width: 110px; }
+.sam__recargas { margin-top: .55rem; display: flex; flex-direction: column; gap: .25rem; }
+.sam__recarga-item {
+  display: flex; align-items: baseline; gap: .5rem; font-size: .72rem; color: var(--c-slate-500);
+  padding: .3rem .55rem; background: var(--c-slate-50); border-radius: 7px;
+}
+.sam__recarga-item strong { color: #15803d; font-size: .78rem; }
+.sam__recarga-nota { color: var(--c-slate-600); font-style: italic; }
+.sam__recarga-quien { margin-left: auto; font-family: var(--font-mono); font-size: .66rem; }
+.sam__extra-usado strong { color: #b45309; }
+
 .sam__tiers { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .5rem; }
 .sam__tier {
   display: flex; flex-direction: column; gap: 2px; text-align: left;

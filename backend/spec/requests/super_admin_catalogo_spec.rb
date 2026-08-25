@@ -24,16 +24,22 @@ RSpec.describe 'SuperAdmin catálogo', type: :request do
 
       basico = planes.find { |p| p['clave'] == 'basico' }
       expect(basico['limites']['salas']).to    eq(3)
-      expect(basico['limites']['plantas']).to  eq(200)
+      expect(basico['limites']['plantas']).to  eq(450)
+      # Los lotes NO se limitan: el lote organiza, no mide capacidad.
+      expect(basico['limites']['lotes']).to    be_nil
+      # El de usuarios no es un número: es uno de cada rol, y viaja aparte para poder decirlo
+      # con palabras en vez de con una barra que no significa nada.
+      expect(basico['usuarios_por_rol']).to    eq(1)
 
       total = planes.find { |p| p['clave'] == 'total' }
       expect(total['limites'].values).to all(be_nil)
+      expect(total['usuarios_por_rol']).to be_nil
     end
 
     it 'arma el resumen del plan para que el frontend no invente el vocabulario' do
       basico = catalogo['planes'].find { |p| p['clave'] == 'basico' }
 
-      expect(basico['resumen']).to include('1 sedes', '3 salas', '200 plantas')
+      expect(basico['resumen']).to include('1 sedes', '3 salas', '450 plantas')
 
       total = catalogo['planes'].find { |p| p['clave'] == 'total' }
       expect(total['resumen']).to all(match(/sin límite/))
@@ -81,9 +87,33 @@ RSpec.describe 'SuperAdmin catálogo', type: :request do
     it 'devuelve los tramos de IA con sus dos topes' do
       tiers = catalogo['ia_tiers']
 
-      expect(tiers.map { |t| t['clave'] }).to eq(%w[basico pro enterprise])
+      # DOS, y con la clave del plan: el tramo de IA sale del plan y no de una perilla aparte,
+      # que era la misma decisión escrita en dos lugares que dejaban de coincidir.
+      expect(tiers.map { |t| t['clave'] }).to eq(%w[basico total])
       expect(tiers).to all(include('label' => be_present, 'limite_hora' => be_present,
                                    'limite_mes' => be_present))
+    end
+
+    # El alta elige los MÓDULOS antes que el plan, así que puede mostrar sólo los topes que
+    # aplican: nombrarle salas y plantas a una organización que no compró Cultivo es la mitad de
+    # la tarjeta en ruido, y desde ahí no hay forma de saber cuáles cuentan.
+    it 'dice a qué suite le importa cada tope' do
+      recursos = catalogo['planes'].find { |p| p['clave'] == 'basico' }['recursos']
+      por_clave = recursos.to_h { |r| [r['clave'], r['suite']] }
+
+      expect(por_clave['plantas']).to   eq('cultivo')
+      expect(por_clave['pacientes']).to eq('produccion_dispensa')
+      expect(por_clave['sedes']).to     be_nil   # le importa a cualquiera
+    end
+
+    # Un cultivador en una organización sin Cultivo loguea a una app sin una sola pantalla, y
+    # el que lo descubre es el cliente.
+    it 'dice de qué módulo depende cada rol del alta' do
+      roles = catalogo['roles_alta'].to_h { |r| [r['clave'], r['requiere_modulo']] }
+
+      expect(roles['cultivador']).to  eq('cultivo')
+      expect(roles['dispensador']).to eq('produccion_dispensa')
+      expect(roles['admin']).to       be_nil   # transversal
     end
 
     # Lo que se COBRA es el mensual: el horario es freno de ráfaga. Si el catálogo no lo

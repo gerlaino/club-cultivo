@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { listSuperAdminUsers, listSuperAdminClubs, createSuperAdminUser, deleteSuperAdminUser } from '../../lib/api.js'
 import { useConfirm } from '../../composables/useConfirm.js'
@@ -16,6 +16,14 @@ const saving  = ref(false)
 const search  = ref('')
 const filterClub = ref('todos')
 const filterRole = ref('todos')
+
+// ── Paginación ────────────────────────────────────────────────────────────────
+//
+// La lista era completa y sin cortar: con la plataforma creciendo, entrar a Usuarios significa
+// scrollear cientos de filas para ver las tres que importan, que son las últimas. El backend ya
+// las manda con los ÚLTIMOS ARRIBA; acá se muestran de a 10.
+const POR_PAGINA = 10
+const pagina = ref(1)
 
 const showCreate = ref(false)
 const createError = ref(null)
@@ -49,6 +57,16 @@ const filtrados = computed(() => {
   }
   return list
 })
+
+const totalPaginas = computed(() => Math.max(1, Math.ceil(filtrados.value.length / POR_PAGINA)))
+const pagina1 = computed(() => (pagina.value - 1) * POR_PAGINA)
+const visibles = computed(() => filtrados.value.slice(pagina1.value, pagina1.value + POR_PAGINA))
+
+// Al filtrar hay que volver a la primera página: si estabas en la 7 y el buscador deja 12
+// resultados, la tabla quedaba VACÍA y parecía que la búsqueda no encontró nada.
+watch([search, filterClub, filterRole], () => { pagina.value = 1 })
+
+function irA(p) { pagina.value = Math.min(Math.max(1, p), totalPaginas.value) }
 
 async function cargar() {
   const [usersRes, clubsRes] = await Promise.all([
@@ -130,6 +148,12 @@ onMounted(cargar)
         <option value="todos">Todos los roles</option>
         <option v-for="r in ROLES" :key="r" :value="r">{{ roleMeta(r).label }}</option>
       </select>
+      <!-- El filtro por organización existía en el código y no estaba en la pantalla: se
+           declaraba, se usaba para filtrar y no había forma de tocarlo. -->
+      <select v-model="filterClub" class="sau__select">
+        <option value="todos">Todas las organizaciones</option>
+        <option v-for="c in clubs" :key="c.id" :value="c.id">{{ c.name }}</option>
+      </select>
     </div>
 
     <div v-if="loading" class="sau__loading">
@@ -144,7 +168,7 @@ onMounted(cargar)
         <span>Registrado</span>
         <span></span>
       </div>
-      <div v-for="u in filtrados" :key="u.id" class="sau__row">
+      <div v-for="u in visibles" :key="u.id" class="sau__row">
         <div class="sau__user-cell">
           <div class="sau__avatar">{{ (u.first_name?.[0] || u.email?.[0] || '?').toUpperCase() }}</div>
           <div>
@@ -172,7 +196,25 @@ onMounted(cargar)
       </div>
     </div>
 
-    <div v-if="filtrados.length" class="sau__footer">{{ filtrados.length }} usuario{{ filtrados.length !== 1 ? 's' : '' }}</div>
+    <div v-if="!loading && !filtrados.length" class="sau__vacio">
+      No hay usuarios que coincidan con lo que buscaste.
+    </div>
+
+    <div v-if="filtrados.length" class="sau__footer">
+      <span class="sau__footer-count">
+        {{ pagina1 + 1 }}–{{ Math.min(pagina1 + POR_PAGINA, filtrados.length) }}
+        de {{ filtrados.length }} usuario{{ filtrados.length !== 1 ? 's' : '' }}
+      </span>
+      <div v-if="totalPaginas > 1" class="sau__pager">
+        <button class="sau__pager-btn" :disabled="pagina === 1" @click="irA(pagina - 1)">
+          <i class="bi bi-chevron-left"></i>
+        </button>
+        <span class="sau__pager-pos">{{ pagina }} / {{ totalPaginas }}</span>
+        <button class="sau__pager-btn" :disabled="pagina === totalPaginas" @click="irA(pagina + 1)">
+          <i class="bi bi-chevron-right"></i>
+        </button>
+      </div>
+    </div>
 
     <!-- Modal crear usuario -->
     <Teleport to="body">
@@ -289,7 +331,24 @@ onMounted(cargar)
 .sau__row:hover .sau__delete-btn { opacity: 1; }
 .sau__delete-btn:hover { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
 
-.sau__footer { text-align: right; font-size: .75rem; color: var(--c-slate-400); margin-top: .75rem; }
+.sau__footer {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  font-size: .75rem; color: var(--c-slate-400); margin-top: .75rem;
+}
+.sau__footer-count { margin-left: auto; }
+.sau__pager { display: flex; align-items: center; gap: .35rem; }
+.sau__pager-btn {
+  width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--c-slate-200);
+  background: #fff; color: var(--c-slate-600); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; font-size: .75rem;
+}
+.sau__pager-btn:hover:not(:disabled) { background: var(--c-slate-50); }
+.sau__pager-btn:disabled { opacity: .4; cursor: not-allowed; }
+.sau__pager-pos { font-variant-numeric: tabular-nums; font-weight: 600; color: var(--c-slate-500); }
+.sau__vacio {
+  text-align: center; padding: 2.5rem 1rem; font-size: .85rem; color: var(--c-slate-400);
+  background: #fff; border: 1px solid var(--c-slate-200); border-radius: 14px;
+}
 
 /* Modal */
 .sau__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 1060; padding: 1rem; backdrop-filter: blur(3px); }

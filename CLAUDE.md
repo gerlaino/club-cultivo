@@ -125,8 +125,17 @@ Ninguno se considera cerrado; todos son candidatos a revisión.
 
 Toda llamada a la API queda en `ia_llamadas` (organización, persona, función, modelo, tokens y **costo congelado**; también las fallidas). Registran las cinco funciones: asistente parsear/consultar, análisis de lote, plan de trabajo y mapeo de CSV. `Ia::Uso` es la puerta única: `registrar`, `limite_alcanzado`, `resumen_mes`.
 
-- **Manda el tope MENSUAL** (`Club::IA_TIERS[:limite_mes]`: 500 / 2.000 / 10.000 según tier), que se cuenta contra la base y no depende de Redis. El horario es sólo freno de ráfaga, **por organización** (contaba por usuario: cinco personas daban 5× el límite).
-- **`club.ia_limite_hora` sobrescribe el horario del tier** cuando es > 0. El mensual **no tiene override**.
+- **Manda el tope MENSUAL y SALE DEL PLAN** (`Club::IA_TIERS`: Básico 500 / Total 2.000), que se
+  cuenta contra la base y no depende de Redis. Eran TRES tramos elegibles a mano y la misma
+  organización podía tener plan Total con la IA en Básico: la misma decisión en dos lugares.
+  **`ia_tier` sigue en la tabla y en la auditoría pero NO LO LEE NADIE.** El horario es sólo freno
+  de ráfaga, **por organización** (contaba por usuario: cinco personas daban 5× el límite).
+- **Lo que se vende aparte son CRÉDITOS** (`IaRecarga`, 25-ago): una fila por venta con fecha,
+  cuántos, para qué y quién la cargó. Aplican al mes en curso y **no se acumulan** — con un número
+  suelto en `clubs` habría que ponerlo en cero el día 1 a mano, y a fin de mes se facturaría de
+  memoria. `resumen_mes` informa `base` / `extra` / **`extra_usado`**, que es el número que se
+  factura. Se cargan desde `POST /super_admin/clubs/:id/ia_recarga`.
+- **`club.ia_limite_hora` sobrescribe el horario del tramo** cuando es > 0. El mensual **no tiene override**.
 - El asistente usa **caché de prompt**: `system` es un array de dos bloques y el fijo lleva `cache_control`. Un byte distinto antes del corte invalida todo. `resumen_mes[:cache_hit]` es el chivato: si queda en 0 con el asistente en uso, algo rompió el prefijo.
 - **El consumo se ve** (13-ago): `Ia::Uso.resumen_mes` sale en la ficha del super admin (`ia_uso`, sólo si la organización tiene el add-on) y lo muestra `SAModulos`. Va envuelto en `ActsAsTenant.with_tenant`: el super admin no tiene tenant fijado e `IaLlamada` es tenant con `require_tenant=true`, así que sin eso revienta la ficha entera.
 - **El módulo se llama `ia`.** `ia_voz` e `ia_analisis` son las claves VIEJAS y no se chequean más por acción: el candado es un `require_feature!(:ia)` en el controller. `features_expandidas` deriva en los dos sentidos (vieja ⇒ nueva y nueva ⇒ vieja); chequear la vieja con la nueva guardada daba false y dejaba el botón visible y el dictado rechazado.
@@ -258,10 +267,16 @@ Cuando Germán plantee un problema o feature nueva antes de implementar:
 
 Suite 1239 ✓ + 58 vitest ✓. **Deploy: sumar `add_vendible_a_bar_venta_items` y `add_consumo_evento_a_provisiones_y_dispensas` al `db:migrate`.**
 
-## 📍 Dónde retomar (20-ago-2026)
+## 📍 Dónde retomar (25-ago-2026)
 
-**2395 rspec (0 fallas, 26 pending del observador suspendido) + 1525 vitest + build limpio.**
-Los bloques de agosto están en `docs/CHANGELOG.md` hasta "Agosto 2026 (t)".
+**El alta de organizaciones se rediseñó para que la use alguien que no escribió la app** (bloque
+(u) del CHANGELOG): módulos antes que el plan, adicionales agrupados por la suite que extienden,
+paso de resumen, topes del Básico nuevos, usuarios por rol, IA de dos tramos derivados del plan y
+créditos extra con rastro (`ia_recargas`). **La prueba con el socio es lo que sigue**: anotar dónde
+se traba.
+
+**2448 rspec (0 fallas, 26 pending del observador suspendido) + 1574 vitest + build limpio.**
+Los bloques de agosto están en `docs/CHANGELOG.md` hasta "Agosto 2026 (u)".
 
 **Pendiente de documentar:** **sigue sin entrada en el CHANGELOG lo del 17 y 18 de agosto**
 —chatbot del admin, medición de IA en créditos, informe INASE, trazabilidad de aplicaciones—, que
@@ -326,10 +341,23 @@ cinco campos.
 
 ### El modelo comercial, que cambió de raíz
 
-**Dos planes, y el plan dice CUÁNTO, nunca QUÉ.** `PlanEnforcer::PLANES` = `basico` / `total`,
-con seis límites (sedes, salas, lotes, plantas, pacientes, usuarios). Qué puede hacer una
-organización lo deciden las suites, y no se cruzan. Los cuatro planes viejos siguen mapeados en
-`PLANES_LEGACY` por si aparece uno guardado.
+**Dos planes, y el plan dice CUÁNTO, nunca QUÉ.** `PlanEnforcer::PLANES` = `basico` / `total`.
+Qué puede hacer una organización lo deciden las suites, y no se cruzan. Los cuatro planes viejos
+siguen mapeados en `PLANES_LEGACY` por si aparece uno guardado.
+
+**El Básico son `1 sede · 3 salas · lotes SIN LÍMITE · 450 plantas · 50 pacientes`** (25-ago).
+- **Los lotes no se limitan a propósito**: el lote es una unidad de ORGANIZACIÓN, no de capacidad.
+  Ponerle tope empuja a meter todo en un lote gigante para no chocarlo, y eso rompe la
+  trazabilidad, que es el activo del producto. La capacidad real la miden las plantas.
+- **Los usuarios no son un número: es UNO DE CADA ROL** (`usuarios_por_rol`). "5 usuarios" no se
+  vende ni se explica, y dejaba dar de alta cinco cultivadores y ningún dispensador. En Total no
+  hay tope. **El `admin` queda FUERA del cupo** (`PlanEnforcer::ROLES_SIN_TOPE`): no es un puesto
+  de trabajo, es quien contrata —dos socios más veces de las que es uno solo— y con tope de uno,
+  el día que el único admin se va hay que meter mano en la base para devolver el control.
+- **Qué roles puede tener depende de los MÓDULOS** (`Club::MODULO_POR_ROL`): cultivador y manicura
+  piden Cultivo; dispensador y médico, Producción y dispensa; delivery, su add-on. Antes esto
+  cubría sólo a `delivery`. Un cultivador en una organización sin Cultivo loguea a una app sin una
+  sola pantalla, y el que lo descubre es el cliente.
 
 **Los límites cuentan lo que EXISTE, no lo activo.** Sedes y salas: apagar una no libera cupo
 (se creaba, se apagaba y se creaba otra). El `uso` que ve el super admin cuenta igual que el
@@ -379,6 +407,19 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   que pudiera registrar cómo terminó un paquete que ya salió — quedan abiertos para siempre.
   Los cierra el admin. Misma lógica que `AplicarBajasModulosJob`, que no toca lo que está en
   viaje. Por eso `Dispensacion#delivery_contratado` es `on: :create`.
+- **Un adicional no se prende sin su suite** (`sin_addons_huerfanos`, 25-ago). Delivery sin
+  Producción y dispensa o IoT sin Cultivo dejaban un módulo CONTRATADO que no hacía nada, y el
+  aviso vivía en el campo `requiere`, en letra chica. El candado va en el controller porque por la
+  API se saltea siempre, y corre **DESPUÉS de las bajas programadas**: al revés, dar de baja una
+  suite le cortaba hoy mismo los adicionales que la organización ya pagó.
+- **Lo que el alta muestra prendido tiene que ser lo que se crea.** `SAClubNuevo` tenía su propia
+  lista de defaults y el backend mergeaba `FEATURES_POR_DEFECTO` encima: mostraba Delivery y Correo
+  apagados y la organización nacía con los dos. Los defaults salen de `GET /super_admin/catalogo`
+  y el wizard manda **todas** las claves, también las apagadas — una ausente reaparece prendida.
+- **En el alta, primero los MÓDULOS y después el PLAN.** El plan es una consecuencia: recién
+  sabiendo qué compró se pueden mostrar los topes que aplican (`PlanEnforcer::RECURSO_SUITE`) y
+  ofrecer los roles que van a poder entrar. Los pasos son Identidad → Módulos → Plan → Acceso →
+  Resumen, y el resumen existe porque antes se creaba a ciegas.
 - **El portal del paciente necesita DOS llaves: contratado Y abierto.** `Club#portal_paciente_disponible?`
   es el único lugar donde vive, y la preguntan el login y `Portal::BaseController`. El interruptor
   `vista_paciente_activa` existió meses **sin que lo leyera nadie**: se guardaba, se mostraba en

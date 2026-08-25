@@ -570,6 +570,9 @@ Rails.application.routes.draw do
           patch  :provisionar_whatsapp
           patch  :provisionar_pulse
           delete :desconectar_whatsapp
+          # Créditos de IA vendidos por fuera del plan. Es una VENTA, no una configuración:
+          # va por su propia puerta y deja una fila para poder facturarla.
+          post   :ia_recarga
         end
       end
       resources :users, only: [:index, :create, :update, :destroy]

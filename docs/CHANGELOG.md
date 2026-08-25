@@ -1,5 +1,93 @@
 # Changelog
 
+## Agosto 2026 (u) — el plan es una consecuencia, no una pregunta
+
+El alta de una organización la va a usar alguien que no escribió la app. Mirándola con esos ojos,
+casi todo lo que apareció es la misma familia: **la pantalla preguntaba en un orden que no es el
+del negocio, y decía cosas que el backend después no cumplía.**
+
+### Los módulos van antes que el plan
+
+El wizard preguntaba Identidad → **Plan** → Módulos → Acceso. Con ese orden, el paso del plan le
+mostraba a cualquiera los seis topes — "3 salas · 450 plantas · 50 pacientes" — sin saber todavía si
+esa organización compró Cultivo. La mitad de la tarjeta era ruido y no había forma de saber cuál
+mitad.
+
+Ahora es **Identidad → Módulos → Plan → Acceso → Resumen**, y cada paso usa lo que decidió el
+anterior:
+
+- El **plan** muestra sólo los topes que aplican a lo contratado (`PlanEnforcer::RECURSO_SUITE`
+  dice a qué suite le importa cada uno, y viaja en el catálogo).
+- El **acceso** ofrece sólo los roles que van a poder entrar (`Club::MODULO_POR_ROL`).
+- El **resumen** es nuevo: hasta ahora se creaba a ciegas. Nunca se veía junto qué contrató, contra
+  qué topes y con qué usuarios.
+
+### Cada adicional, debajo de la suite que extiende
+
+Eran diez tarjetas en una grilla plana: "Buffet" al lado de "Ambiente / IoT" no dice para qué es
+cada uno ni qué hay que tener contratado para que sirva. El dato ya estaba —`Club::ADDONS[x][:pack]`,
+que la ficha del club ya usaba— y el wizard lo ignoraba. Ahora hay un grupo por suite, uno para los
+transversales (IA, chatbot), y el módulo médico va **adentro** del grupo de su suite con candado en
+vez de en una sección "Ya incluido" aparte: no es una categoría, es una fila más de lo que se compró.
+
+### Un adicional sin su suite ya no se puede prender
+
+Se podía guardar Delivery sin Producción y dispensa, o IoT sin Cultivo: quedaba un módulo
+**contratado que no hacía nada**, y el aviso vivía en el campo `requiere`, en letra chica. El
+candado va en el backend (`sin_addons_huerfanos` en `SuperAdmin::ClubsController`) porque por la API
+se saltea siempre, y corre **después** de las bajas programadas — al revés, dar de baja una suite le
+cortaba hoy mismo los adicionales que la organización ya había pagado.
+
+### El wizard mostraba módulos apagados que nacían prendidos
+
+`SAClubNuevo.vue` tenía su propia lista de qué viene de fábrica (`{cultivo, produccion_dispensa,
+bar}`) y el backend mergeaba `Club::FEATURES_POR_DEFECTO` encima, que además trae **Delivery y
+Correo**. La pantalla los mostraba apagados y la organización nacía con los dos prendidos. Ahora los
+defaults salen del catálogo y el wizard manda **todas** las claves, también las apagadas: una clave
+ausente se completa con el default del backend y reaparece prendida.
+
+### Los topes del plan Básico
+
+`1 sede · 3 salas · lotes sin límite · 450 plantas · 50 pacientes`.
+
+**Los lotes dejaron de limitarse.** El lote es una unidad de *organización*, no de capacidad:
+ponerle tope empuja a meter todo en un lote gigante para no chocarlo, y eso rompe la trazabilidad,
+que es el activo del producto. Lo que mide la capacidad real del cultivo son las plantas.
+
+**Los usuarios dejaron de ser un número.** "5 usuarios" no se puede vender ni explicar, y dejaba dar
+de alta cinco cultivadores y ningún dispensador. Ahora el Básico incluye **uno de cada rol** y el
+Total no limita. Dos consecuencias:
+
+- **El admin queda fuera del cupo.** No es un puesto de trabajo: es quien contrata, y son dos socios
+  más veces de las que es uno solo. Con tope de uno, el día que el único admin se va hay que meter
+  mano en la base para devolverle el control a alguien.
+- **Qué roles puede tener depende de los módulos.** `Club::MODULO_POR_ROL` generaliza lo que antes
+  cubría sólo a `delivery`: cultivador y manicura piden Cultivo, dispensador y médico piden
+  Producción y dispensa. Un cultivador en una organización sin Cultivo loguea a una app sin una sola
+  pantalla, y el que lo descubre es el cliente.
+
+### La IA: dos tramos que salen del plan, y créditos que se venden
+
+Eran tres tramos (básico/pro/enterprise) elegibles a mano en una perilla propia, así que la misma
+organización podía tener el plan **Total** y la IA en **Básico**: la misma decisión escrita en dos
+lugares que dejan de coincidir, sin que nadie se entere hasta que el cliente reclama. Ahora son dos
+—Básico 500 / Total 2.000 créditos— y **salen del plan**. `ia_tier` queda en la tabla y en la
+auditoría, pero no lo lee nadie.
+
+Lo que sí se decide aparte es vender créditos por fuera, que es lo que se cobra: **`ia_recargas`**,
+una fila por venta con fecha, cuántos, para qué y quién la cargó. Aplican al mes en curso y **no se
+acumulan** — con un número suelto en `clubs` habría que acordarse de ponerlo en cero el día 1 o los
+créditos quedarían regalados, y a fin de mes se facturaría de memoria. La ficha del super admin
+muestra ahora `del plan / extra vendido / **extra consumido**`, que es el número que se factura.
+
+### Usuarios: los últimos arriba, de a diez
+
+El listado del panel salía ordenado por club y rol, así que el usuario recién creado caía en el
+medio y había que buscarlo. Ahora es `created_at DESC`, paginado de a 10, con el filtro por
+organización que **existía en el código y no estaba en la pantalla** (se declaraba, se usaba para
+filtrar y no había forma de tocarlo) y con reset de página al filtrar — si estabas en la página 7 y
+el buscador dejaba 12 resultados, la tabla quedaba vacía y parecía que no había encontrado nada.
+
 ## Agosto 2026 (t) — la credencial que repartíamos sin querer
 
 Todo lo de acá salió del escaneo previo al depósito en la DNDA. No es una familia de errores de

@@ -38,16 +38,20 @@ class ClubUsersController < ApplicationController
 
   # POST /usuarios
   def create
-    enforcer = PlanEnforcer.new(current_user.club)
-    unless enforcer.puede_crear_usuario?
-      info = enforcer.info
-      return render json: PlanEnforcer.error_limite('usuarios', info[:limites][:usuarios], plan: info[:label]), status: :payment_required
-    end
-
     # No se pueden dar de alta usuarios operativos hasta que el club tenga al
     # menos una sede: esos roles se asignan a sedes/salas y, sin sede, loguearían
     # a una app vacía (inconsistencia de onboarding). El admin sí puede crearse.
     nuevo_rol = params.dig(:user, :role).to_s
+
+    # El cupo es POR ROL, así que hay que saber cuál antes de preguntarlo. En Básico va uno de
+    # cada uno; en Total, los que necesite.
+    enforcer = PlanEnforcer.new(current_user.club)
+    unless enforcer.puede_crear_usuario?(nuevo_rol)
+      info = enforcer.info
+      return render json: PlanEnforcer.error_limite_rol(nuevo_rol, plan: info[:label],
+                                                        tope: enforcer.usuarios_por_rol),
+                    status: :payment_required
+    end
 
     # Sólo los roles que la pantalla ofrece. No alcanza con sacarlos del formulario: el endpoint
     # acepta lo que le manden, y un rol no ofrecido entraría igual por la API. Mismo criterio que
@@ -55,9 +59,10 @@ class ClubUsersController < ApplicationController
     # `roles_para_alta` y no la constante: delivery sólo se ofrece si la organización tiene el
     # módulo. Crear un repartidor sin Delivery daría de alta a alguien que no puede entrar.
     unless current_user.club.roles_para_alta.include?(nuevo_rol)
-      motivo = if Club::ROLES_ALTA_CLUB.include?(nuevo_rol)
-                 "El módulo #{Club::ADDONS.dig(Club::MODULO_POR_ROL_OPCIONAL[nuevo_rol], :label) || nuevo_rol} " \
-                 'no está activo en esta organización.'
+      faltante = current_user.club.modulo_faltante_para_rol(nuevo_rol)
+      motivo = if faltante
+                 "#{Club::ROLES_META.dig(nuevo_rol, :label) || nuevo_rol} necesita el módulo " \
+                 "#{Club.label_modulo(faltante)}, que no está activo en esta organización."
                else
                  "El rol #{nuevo_rol.presence || '(vacío)'} no se puede asignar desde acá."
                end

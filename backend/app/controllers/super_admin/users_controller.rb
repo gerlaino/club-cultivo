@@ -1,18 +1,34 @@
 class SuperAdmin::UsersController < SuperAdmin::BaseController
   def index
-    users = User.where.not(role: 'super_admin').includes(:club).order(:club_id, :role)
+    # Los ÚLTIMOS arriba. Ordenado por club y rol, el usuario que acabás de crear caía en el
+    # medio de la lista y había que buscarlo: en el panel de plataforma lo que se mira es lo
+    # que acaba de pasar, no el padrón histórico.
+    users = User.where.not(role: 'super_admin').includes(:club).order(created_at: :desc)
     render json: users.map { |u| serialize_user(u) }
   end
 
   def create
     club = Club.find(params[:user][:club_id])
 
+    rol = params.dig(:user, :role).to_s
+
+    # El rol tiene que servirle a lo que la organización contrató. Crear un cultivador en una
+    # organización sin la suite de Cultivo da de alta a alguien que loguea a una app sin una
+    # sola pantalla — y el que lo nota es el cliente, no nosotros.
+    if (faltante = club.modulo_faltante_para_rol(rol))
+      return render json: { errors: ["#{Club::ROLES_META.dig(rol, :label) || rol} necesita el módulo " \
+                                     "#{Club.label_modulo(faltante)}, que esta organización no tiene activo."] },
+                    status: :unprocessable_entity
+    end
+
     # El plan también limita los usuarios: crearlos desde el panel de plataforma se salteaba
-    # el límite que sí se aplica cuando los crea el club (ver club_users_controller).
+    # el límite que sí se aplica cuando los crea el club (ver club_users_controller). El cupo
+    # es por ROL desde que "5 usuarios" dejó de significar algo.
     enforcer = PlanEnforcer.new(club)
-    unless enforcer.puede_crear_usuario?
+    unless enforcer.puede_crear_usuario?(rol)
       info = enforcer.info
-      return render json: PlanEnforcer.error_limite('usuarios', info[:limites][:usuarios], plan: info[:label]),
+      return render json: PlanEnforcer.error_limite_rol(rol, plan: info[:label],
+                                                        tope: enforcer.usuarios_por_rol),
                     status: :payment_required
     end
 
