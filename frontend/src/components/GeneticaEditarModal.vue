@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="showModal" class="gem-overlay" @click.self="showModal = false">
+    <div v-modal="() => showModal = false" v-if="showModal" class="gem-overlay" @click.self="showModal = false">
       <div class="gem-modal">
         <div class="gem-modal__header">
           <div>

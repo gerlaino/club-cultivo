@@ -62,7 +62,7 @@ async function descargar() {
 
 <template>
   <Teleport to="body">
-    <div class="ecm__overlay" @click.self="$emit('close')">
+    <div v-modal="() => $emit('close')" class="ecm__overlay" @click.self="$emit('close')">
       <div class="ecm__panel">
 
         <!-- Header -->

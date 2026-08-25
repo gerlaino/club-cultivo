@@ -69,7 +69,7 @@ const escena = computed(() => {
 </script>
 
 <template>
-  <div class="cs__ov" @click.self="emit('close')">
+  <div v-modal="() => emit('close')" class="cs__ov" @click.self="emit('close')">
     <div class="cs">
       <div class="cs__head">
         <h3 class="cs__title">Caja del turno</h3>

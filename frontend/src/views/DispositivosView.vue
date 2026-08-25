@@ -172,7 +172,7 @@ function cancelar() {
 
     <!-- Datos de conexión del sensor recién creado. El token se ve UNA sola vez. -->
     <Teleport to="body">
-      <div v-if="conexion" class="dv-cx-ov" @click.self="conexion = null">
+      <div v-modal="() => conexion = null" v-if="conexion" class="dv-cx-ov" @click.self="conexion = null">
         <div class="dv-cx">
           <h3 class="dv-cx__title">{{ conexion.nombre }} está listo</h3>
           <p class="dv-cx__sub">

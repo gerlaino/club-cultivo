@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="modelValue" class="rls__overlay">
+    <div v-modal="() => $emit('update:modelValue', false)" v-if="modelValue" class="rls__overlay">
       <div class="rls__modal">
 
         <!-- Header -->

@@ -1138,7 +1138,7 @@ onMounted(async () => {
     />
 
     <!-- Detalle informativo de un movimiento -->
-    <div v-if="detalleMov" class="cv__ov" @click.self="detalleMov = null">
+    <div v-modal="() => detalleMov = null" v-if="detalleMov" class="cv__ov" @click.self="detalleMov = null">
       <div class="cv__dlg">
         <div class="cv__dlg-head">
           <span class="cv__tipo-pill" :style="{ background: tipoMeta(detalleMov.tipo).bg, color: tipoMeta(detalleMov.tipo).color }">{{ tipoMeta(detalleMov.tipo).label }}</span>

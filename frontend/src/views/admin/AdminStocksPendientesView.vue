@@ -306,7 +306,7 @@
     <!-- ── Modal: Agregar stock externo ──────────────────────────── -->
     <Teleport to="body">
       <Transition name="stk-fade">
-        <div v-if="showCrear" class="stk__overlay" @click.self="closeCrear">
+        <div v-modal="closeCrear" v-if="showCrear" class="stk__overlay" @click.self="closeCrear">
           <div class="stk__modal">
             <div class="stk__modal-hd">
               <div class="stk__modal-ico"><i class="bi bi-box-seam"></i></div>
@@ -390,7 +390,7 @@
     <!-- ── Modal: Editar stock ───────────────────────────────────────────── -->
     <Teleport to="body">
       <Transition name="stk-fade">
-        <div v-if="showEditarModal" class="stk__overlay" @click.self="showEditarModal = false">
+        <div v-modal="() => showEditarModal = false" v-if="showEditarModal" class="stk__overlay" @click.self="showEditarModal = false">
           <div class="stk__modal">
             <div class="stk__modal-hd">
               <div class="stk__modal-ico"><i class="bi bi-pencil"></i></div>
@@ -457,7 +457,7 @@
     <!-- ── Modal: Repartir stock ───────────────────────────────────────── -->
     <Teleport to="body">
       <Transition name="stk-fade">
-        <div v-if="showRepartir" class="stk__overlay" @click.self="closeRepartir">
+        <div v-modal="closeRepartir" v-if="showRepartir" class="stk__overlay" @click.self="closeRepartir">
           <div class="stk__modal">
             <div class="stk__modal-hd">
               <div class="stk__modal-ico"><i class="bi bi-arrows-angle-expand"></i></div>
@@ -507,7 +507,7 @@
     <!-- ── Modal: Procesar derivado ────────────────────────────────────── -->
     <Teleport to="body">
       <Transition name="stk-fade">
-        <div v-if="showProcesar" class="stk__overlay" @click.self="closeProcesar">
+        <div v-modal="closeProcesar" v-if="showProcesar" class="stk__overlay" @click.self="closeProcesar">
           <div class="stk__modal">
             <div class="stk__modal-hd">
               <div class="stk__modal-ico stk__modal-ico--amber"><i class="bi bi-arrow-right-square"></i></div>
@@ -577,7 +577,7 @@
     <!-- ── Modal: Ajustar stock ────────────────────────────────────── -->
     <Teleport to="body">
       <Transition name="stk-fade">
-        <div v-if="showAjustar" class="stk__overlay" @click.self="closeAjustar">
+        <div v-modal="closeAjustar" v-if="showAjustar" class="stk__overlay" @click.self="closeAjustar">
           <div class="stk__modal">
             <div class="stk__modal-hd">
               <div class="stk__modal-ico"><i class="bi bi-sliders"></i></div>
@@ -642,7 +642,7 @@
     <!-- ── Modal: Descartar stock ──────────────────────────────────── -->
     <Teleport to="body">
       <Transition name="stk-fade">
-        <div v-if="showDescartar" class="stk__overlay" @click.self="closeDescartar">
+        <div v-modal="closeDescartar" v-if="showDescartar" class="stk__overlay" @click.self="closeDescartar">
           <div class="stk__modal">
             <div class="stk__modal-hd">
               <div class="stk__modal-ico stk__modal-ico--danger"><i class="bi bi-trash"></i></div>
@@ -693,7 +693,7 @@
     <!-- ── Modal: Movimientos ──────────────────────────────────────── -->
     <Teleport to="body">
       <Transition name="stk-fade">
-        <div v-if="showMovimientos" class="stk__overlay" @click.self="closeMovimientos">
+        <div v-modal="closeMovimientos" v-if="showMovimientos" class="stk__overlay" @click.self="closeMovimientos">
           <div class="stk__modal stk__modal--wide">
             <div class="stk__modal-hd">
               <div class="stk__modal-ico"><i class="bi bi-clock-history"></i></div>

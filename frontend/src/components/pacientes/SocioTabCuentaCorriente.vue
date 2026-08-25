@@ -125,7 +125,7 @@
 
     <!-- Modal registrar pago -->
     <Teleport to="body">
-      <div v-if="pagoOpen" class="scc__modal-overlay" @click.self="pagoOpen = false">
+      <div v-modal="() => pagoOpen = false" v-if="pagoOpen" class="scc__modal-overlay" @click.self="pagoOpen = false">
         <div class="scc__modal">
           <h3 class="scc__modal-title">Registrar pago</h3>
           <p v-if="ccDeudaActual > 0" class="scc__modal-deuda">

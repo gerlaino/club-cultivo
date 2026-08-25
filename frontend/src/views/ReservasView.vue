@@ -86,7 +86,7 @@
 
     <!-- Modal editar -->
     <Teleport to="body">
-      <div v-if="showEdit" class="rsv__overlay">
+      <div v-modal="() => showEdit = false" v-if="showEdit" class="rsv__overlay">
         <div class="rsv__modal">
           <div class="rsv__modal-head">
             <h3>Editar reserva</h3>

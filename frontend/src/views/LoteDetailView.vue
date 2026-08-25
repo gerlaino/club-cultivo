@@ -729,7 +729,7 @@ onUnmounted(() => {
 
     <!-- ══ Modal Avanzar Fase ══ -->
     <Teleport to="body">
-      <div v-if="showTransicionModal" class="ld__overlay">
+      <div v-modal="() => showTransicionModal = false" v-if="showTransicionModal" class="ld__overlay">
         <div class="ld__modal" style="max-width:440px">
           <div class="ld__modal-header">
             <div>
@@ -817,7 +817,7 @@ onUnmounted(() => {
 
     <!-- ══ Modal Cosecha (cultivador) ══ -->
     <Teleport to="body">
-      <div v-if="showCosechaModal" class="ld__overlay">
+      <div v-modal="() => showCosechaModal = false" v-if="showCosechaModal" class="ld__overlay">
         <div class="ld__modal" style="max-width:420px">
           <div class="ld__modal-header">
             <div>
@@ -880,7 +880,7 @@ onUnmounted(() => {
 
     <!-- ══ Modal Avanzar Fase (cultivador) — confirmar sala destino ══ -->
     <Teleport to="body">
-      <div v-if="showAvanzarSalaModal" class="ld__overlay">
+      <div v-modal="() => showAvanzarSalaModal = false" v-if="showAvanzarSalaModal" class="ld__overlay">
         <div class="ld__modal" style="max-width:400px">
           <div class="ld__modal-header">
             <div>

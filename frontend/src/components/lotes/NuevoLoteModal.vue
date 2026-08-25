@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="show" class="nlm__overlay" @click.self="$emit('close')">
+    <div v-modal="() => $emit('close')" v-if="show" class="nlm__overlay" @click.self="$emit('close')">
       <div class="nlm__modal">
         <div class="nlm__header">
           <div>

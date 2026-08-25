@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="mct-fade">
-      <div v-if="show" class="mct__overlay">
+      <div v-modal="cerrar" v-if="show" class="mct__overlay">
         <div class="mct__modal" role="dialog" aria-modal="true">
 
           <div class="mct__header">
@@ -95,7 +95,6 @@
 <script setup>
 import { ref, watch, computed } from 'vue'
 import { useTareasStore } from '../stores/tareas.js'
-import { useModalEscape } from '../composables/useModalEscape.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 
 const props = defineProps({
@@ -125,7 +124,6 @@ watch(() => props.tarea, (val) => {
   }
 })
 
-useModalEscape(() => cerrar())
 
 function cerrar() {
   if (!guardando.value) emit('cerrar')

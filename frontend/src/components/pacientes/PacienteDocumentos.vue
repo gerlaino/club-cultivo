@@ -356,7 +356,7 @@ const showArchivados = ref(false)
 
     <!-- ══ MODAL SUBIR ARCHIVO ══ -->
     <Teleport to="body">
-      <div v-if="showUpload" class="pd__overlay">
+      <div v-modal="() => showUpload=false" v-if="showUpload" class="pd__overlay">
         <div class="pd__modal">
           <div class="pd__modal-header">
             <div>
@@ -434,7 +434,7 @@ const showArchivados = ref(false)
 
     <!-- ══ MODAL TEMPLATE ══ -->
     <Teleport to="body">
-      <div v-if="showTemplate" class="pd__overlay">
+      <div v-modal="() => showTemplate=false" v-if="showTemplate" class="pd__overlay">
         <div class="pd__modal">
           <div class="pd__modal-header">
             <div>

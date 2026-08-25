@@ -326,7 +326,7 @@ async function transmitirPendientes() {
     <!-- Modal detalle -->
     <Teleport to="body">
       <Transition name="ar-modal">
-        <div v-if="detalle" class="ar__modal-overlay" @click.self="detalle = null">
+        <div v-modal="() => detalle = null" v-if="detalle" class="ar__modal-overlay" @click.self="detalle = null">
           <div class="ar__modal">
             <div class="ar__modal-head">
               <div class="ar__modal-head-left">

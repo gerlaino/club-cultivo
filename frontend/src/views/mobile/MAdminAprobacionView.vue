@@ -53,7 +53,7 @@
 
     <!-- Sheet: Confirmar -->
     <Transition name="maa-sheet">
-      <div v-if="sheetConfirmar" class="maa__overlay" @click.self="cerrarConfirmacion">
+      <div v-modal="cerrarConfirmacion" v-if="sheetConfirmar" class="maa__overlay" @click.self="cerrarConfirmacion">
         <div class="maa__sheet">
           <div class="maa__sheet-handle"></div>
           <div class="maa__sheet-header">

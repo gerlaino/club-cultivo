@@ -1,13 +1,11 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { listSedes, asignarStock } from '../../lib/api.js'
-import { useModalEscape } from '../../composables/useModalEscape.js'
 
 const props = defineProps({
   stocks: { type: Array, required: true },  // array de stocks pendientes
 })
 const emit = defineEmits(['close', 'asignado'])
-useModalEscape(() => emit('close'))
 
 const sedes      = ref([])
 const seleccion  = ref({})   // { stockId: sedeId | 'club' | null }
@@ -65,7 +63,7 @@ function decidirDespues() {
 
 <template>
   <Teleport to="body">
-    <div class="mas__overlay" @click.self="decidirDespues">
+    <div v-modal="decidirDespues" class="mas__overlay" @click.self="decidirDespues">
       <div class="mas__modal">
         <div class="mas__header">
           <div>

@@ -596,7 +596,7 @@ function tieneActividad(sede) {
     <!-- ═══════ MODALES (compartidos) ═══════ -->
 
     <Teleport to="body">
-      <div v-if="showModal" class="modal-overlay" @click.self="showModal=false">
+      <div v-modal="() => showModal=false" v-if="showModal" class="modal-overlay" @click.self="showModal=false">
         <div class="modal-panel modal-panel--lg">
           <div class="modal-panel__header">
             <h2 class="modal-panel__title">{{ editingId ? 'Editar sede' : 'Nueva sede' }}</h2>
@@ -661,7 +661,7 @@ function tieneActividad(sede) {
     </Teleport>
 
     <Teleport to="body">
-      <div v-if="showInventario && sedeActiva" class="modal-overlay" @click.self="showInventario=false">
+      <div v-modal="() => showInventario=false" v-if="showInventario && sedeActiva" class="modal-overlay" @click.self="showInventario=false">
         <div class="modal-panel modal-panel--lg">
           <div class="modal-panel__header">
             <div>
@@ -711,7 +711,7 @@ function tieneActividad(sede) {
     </Teleport>
 
     <Teleport to="body">
-      <div v-if="showUpgrade" class="modal-overlay" @click.self="showUpgrade=false">
+      <div v-modal="() => showUpgrade=false" v-if="showUpgrade" class="modal-overlay" @click.self="showUpgrade=false">
         <div class="modal-panel modal-panel--sm modal-panel--center">
           <button class="modal-panel__close modal-panel__close--abs" @click="showUpgrade=false"><i class="bi bi-x-lg"></i></button>
           <div class="upgrade-body">

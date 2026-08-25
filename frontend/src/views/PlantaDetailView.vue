@@ -946,7 +946,7 @@ onMounted(async () => {
 
     <!-- ══ Modal Registro de Planta ══ -->
     <Teleport to="body">
-      <div v-if="showModal" class="pd__overlay">
+      <div v-modal="() => showModal = false" v-if="showModal" class="pd__overlay">
         <div class="pd__modal">
           <div class="pd__modal-header">
             <div>
@@ -1045,7 +1045,7 @@ onMounted(async () => {
 
     <!-- ══ Modal Medición Sensor ══ -->
     <Teleport to="body">
-      <div v-if="showMedicionModal" class="pd__overlay">
+      <div v-modal="() => showMedicionModal = false" v-if="showMedicionModal" class="pd__overlay">
         <div class="pd__modal">
           <div class="pd__modal-header">
             <div>
@@ -1158,7 +1158,7 @@ onMounted(async () => {
 
     <!-- ══ Modal Trasplante ══ -->
     <Teleport to="body">
-      <div v-if="showTrasplanteModal" class="pd__overlay">
+      <div v-modal="() => showTrasplanteModal = false" v-if="showTrasplanteModal" class="pd__overlay">
         <div class="pd__modal">
           <div class="pd__modal-header">
             <div>
@@ -1218,7 +1218,7 @@ onMounted(async () => {
 
     <!-- ══ Modal subir foto ══ -->
     <Teleport to="body">
-      <div v-if="showFotoUploadModal" class="pd__overlay">
+      <div v-modal="cancelarSubidaFoto" v-if="showFotoUploadModal" class="pd__overlay">
         <div class="pd__modal pd__modal--foto">
           <div class="pd__modal-header">
             <div>
@@ -1274,7 +1274,7 @@ onMounted(async () => {
 
     <!-- ══ Modal Editar Planta ══ -->
     <Teleport to="body">
-      <div v-if="showEditarPlanta" class="pd__overlay">
+      <div v-modal="() => showEditarPlanta = false" v-if="showEditarPlanta" class="pd__overlay">
         <div class="pd__modal" style="max-width:440px">
           <div class="pd__modal-header">
             <div>
@@ -1332,7 +1332,7 @@ onMounted(async () => {
 
     <!-- Descartar planta: pide motivo (obligatorio) -->
     <Teleport to="body">
-      <div v-if="descartarOpen" class="pd__overlay" @click.self="descartarOpen = false">
+      <div v-modal="() => descartarOpen = false" v-if="descartarOpen" class="pd__overlay" @click.self="descartarOpen = false">
         <div class="pd__modal" style="max-width: 440px">
           <div class="pd__modal-header">
             <div>

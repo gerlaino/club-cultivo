@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="open" class="lem__overlay" @click.self="emit('update:open', false)">
+    <div v-modal="() => emit('update:open', false)" v-if="open" class="lem__overlay" @click.self="emit('update:open', false)">
       <div class="lem__modal">
         <div class="lem__header">
           <div>

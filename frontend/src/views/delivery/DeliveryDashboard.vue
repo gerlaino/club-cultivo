@@ -633,7 +633,7 @@ onMounted(load)
 
     <!-- ── Modal Entrega ── -->
     <Teleport to="body">
-      <div v-if="modalEntregar" class="dlv__overlay" @click.self="modalEntregar = null">
+      <div v-modal="() => modalEntregar = null" v-if="modalEntregar" class="dlv__overlay" @click.self="modalEntregar = null">
         <div class="dlv__modal">
           <div class="dlv__modal-header">
             <CheckCircle2 :size="18" :stroke-width="2" style="color:#15803d" />
@@ -785,7 +785,7 @@ Cubierto ✓</template>
 
     <!-- ── Modal Fallo ── -->
     <Teleport to="body">
-      <div v-if="modalFallo" class="dlv__overlay" @click.self="modalFallo = null">
+      <div v-modal="() => modalFallo = null" v-if="modalFallo" class="dlv__overlay" @click.self="modalFallo = null">
         <div class="dlv__modal">
           <div class="dlv__modal-header">
             <XCircle :size="18" :stroke-width="2" style="color:#dc2626" />

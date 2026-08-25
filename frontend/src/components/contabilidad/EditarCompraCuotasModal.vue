@@ -109,7 +109,7 @@ async function guardar() {
 
 <template>
   <Teleport to="body">
-    <div v-if="modelValue" class="ecc__overlay" @click.self="emit('update:modelValue', false)">
+    <div v-modal="() => emit('update:modelValue', false)" v-if="modelValue" class="ecc__overlay" @click.self="emit('update:modelValue', false)">
       <div class="ecc__card">
         <div class="ecc__hd">
           <h3 class="ecc__title">Editar compra en cuotas</h3>

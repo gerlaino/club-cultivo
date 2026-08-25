@@ -348,7 +348,7 @@ const fechaHora = (d) => {
     <TicketVenta v-if="ticketVenta" :ticket="ticketVenta" :bar="barNombre" :club="clubStore.name" :logo="clubStore.logoUrl" @close="ticketVenta = null" />
 
     <!-- Historial de ventas: reimprimir comprobante -->
-    <div v-if="showHistorial" class="cv__ov" @click.self="showHistorial = false">
+    <div v-modal="() => showHistorial = false" v-if="showHistorial" class="cv__ov" @click.self="showHistorial = false">
       <div class="cv__hist">
         <div class="cv__hist-head">
           <h3>Últimas ventas</h3>
@@ -377,7 +377,7 @@ const fechaHora = (d) => {
     </div>
 
     <!-- Scan-to-create: producto nuevo con el código ya cargado (admin) -->
-    <div v-if="crearForm" class="cv__ov" @click.self="crearForm = null">
+    <div v-modal="() => crearForm = null" v-if="crearForm" class="cv__ov" @click.self="crearForm = null">
       <div class="cv__modal">
         <h3 class="cv__modal-title">Producto nuevo</h3>
         <p class="cv__modal-hint">Ese código no estaba registrado. Cargalo una vez y queda para escanear siempre.</p>
@@ -401,7 +401,7 @@ const fechaHora = (d) => {
     </div>
 
     <!-- Precio de venta de un ítem de otro depósito que no lo tiene cargado (solo gestión) -->
-    <div v-if="precioForm" class="cv__ov" @click.self="precioForm = null">
+    <div v-modal="() => precioForm = null" v-if="precioForm" class="cv__ov" @click.self="precioForm = null">
       <div class="cv__modal">
         <h3 class="cv__modal-title">Precio de venta</h3>
         <p class="cv__modal-hint">

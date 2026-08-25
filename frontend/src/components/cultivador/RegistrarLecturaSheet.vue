@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="rls-modal">
-      <div v-if="open" class="rls__overlay" @click.self="open = false">
+      <div v-modal="() => open = false" v-if="open" class="rls__overlay" @click.self="open = false">
         <div class="rls__modal">
 
           <!-- Header -->

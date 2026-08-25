@@ -9,7 +9,6 @@ import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
 import DestinoStock from './DestinoStock.vue'
 import MovimientosFijos from './MovimientosFijos.vue'
-import { useModalEscape } from '../../composables/useModalEscape.js'
 import { createCategoriaContable, listGastosRecurrentes } from '../../lib/api.js'
 import {
   flowDe, hoyLocal, fmtARS, fmtMiles, parseMonto, costoUnitario, UNIDADES,
@@ -412,7 +411,6 @@ function setTipo(tipo) {
 }
 
 function cerrar() { emit('update:modelValue', false) }
-useModalEscape(() => { if (props.modelValue) cerrar() })
 
 // ─── Submit ─────────────────────────────────────────────────────────────────────
 // El padre es quien await-ea la API: se le pasa el payload y él controla `guardando`/`errorGuardado`.
@@ -520,7 +518,7 @@ const titulo = computed(() => {
 <template>
   <Teleport to="body">
     <Transition name="mv-fade">
-      <div v-if="modelValue" class="mv-ov">
+      <div v-modal="cerrar" v-if="modelValue" class="mv-ov">
         <div class="mv-dlg" role="dialog" aria-modal="true" aria-labelledby="mv-title"
              :class="{ 'mv-dlg--out': esEgreso, 'mv-dlg--in': !esEgreso, 'mv-dlg--wide': paso === 'form' }">
 

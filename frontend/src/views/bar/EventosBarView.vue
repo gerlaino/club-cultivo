@@ -65,7 +65,7 @@ function fechaTxt(f) {
     </header>
 
     <!-- Alta mínima por modal: lo esencial para crear el evento; el resto se completa adentro. -->
-    <div v-if="form" class="ev__ov" @click.self="form = null">
+    <div v-modal="() => form = null" v-if="form" class="ev__ov" @click.self="form = null">
       <form class="ev__modal" @submit.prevent="guardar">
         <h3 class="ev__modal-title">Nuevo evento</h3>
         <p class="ev__modal-hint">Con esto alcanza para arrancar. Entradas, costos y provisión se cargan dentro del evento.</p>

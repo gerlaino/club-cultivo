@@ -257,7 +257,7 @@ onMounted(load)
 
     <!-- ===== MODAL CREAR / EDITAR ===== -->
     <Teleport to="body">
-      <div v-if="showModal" class="dtv-modal-overlay" @click.self="showModal=false">
+      <div v-modal="() => showModal=false" v-if="showModal" class="dtv-modal-overlay" @click.self="showModal=false">
         <div class="dtv-modal">
           <div class="dtv-modal__header">
             <h5 class="dtv-modal__title">{{ editingId ? 'Editar template' : 'Nuevo template' }}</h5>

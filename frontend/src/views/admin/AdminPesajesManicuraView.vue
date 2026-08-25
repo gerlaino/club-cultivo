@@ -152,7 +152,7 @@
     <!-- Modal confirmar -->
     <Teleport to="body">
       <Transition name="apm-fade">
-        <div v-if="modalOpen" class="apm-overlay" @click.self="cerrarModal">
+        <div v-modal="cerrarModal" v-if="modalOpen" class="apm-overlay" @click.self="cerrarModal">
           <div class="apm-modal">
             <div class="apm-modal__hd">
               <div class="apm-modal__ico"><CheckCircle :size="18" :stroke-width="1.75" /></div>

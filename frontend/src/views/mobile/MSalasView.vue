@@ -40,7 +40,7 @@
     </div>
 
     <Teleport to="body">
-      <div v-if="showCrear" class="ms__overlay" @click.self="showCrear = false">
+      <div v-modal="() => showCrear = false" v-if="showCrear" class="ms__overlay" @click.self="showCrear = false">
         <div class="ms__sheet">
           <ModalCrearSala @created="onCreado" @close="showCrear = false" />
         </div>

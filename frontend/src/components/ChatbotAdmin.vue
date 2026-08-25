@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <transition name="cba-fade">
-      <div v-if="modelValue" class="cba-backdrop" @click="cerrar"></div>
+      <div v-modal="cerrar" v-if="modelValue" class="cba-backdrop" @click="cerrar"></div>
     </transition>
 
     <transition name="cba-slide">

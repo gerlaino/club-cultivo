@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="npm__overlay">
+    <div v-modal="() => $emit('close')" class="npm__overlay">
       <div class="npm__panel">
 
         <!-- Header -->

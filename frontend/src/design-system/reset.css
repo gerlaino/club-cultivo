@@ -32,3 +32,18 @@ img, svg, video {
   background: var(--c-paper);
   line-height: var(--lh-base);
 }
+
+/* ── Los <input type="number"> van sin flechitas ───────────────────────────────
+   Las flechas de subir/bajar están al lado del campo y se tocan sin querer: en una
+   dispensa eso cambia gramos o pesos por un click de más, y el error queda escrito
+   en el stock y en la cuenta corriente sin que nadie lo note. El número se escribe.
+   El teclado numérico del celular sigue apareciendo: el `type` no cambia. */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}

@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="modelValue" class="lhm__overlay" @click.self="cerrar">
+    <div v-modal="cerrar" v-if="modelValue" class="lhm__overlay" @click.self="cerrar">
       <div class="lhm__modal">
         <div class="lhm__head">
           <h3>📜 Historial del lote</h3>

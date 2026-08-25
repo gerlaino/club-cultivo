@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="ept__overlay">
+    <div v-modal="() => $emit('close')" class="ept__overlay">
       <div class="ept__panel">
         <div class="ept__header">
           <div class="ept__header-ico"><i class="bi bi-pencil-square"></i></div>

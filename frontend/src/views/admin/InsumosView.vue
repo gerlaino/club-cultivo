@@ -555,7 +555,7 @@ async function revertirCompra(compra) {
     </template>
 
     <!-- Modal ENTRADA (compra con costo → egreso) -->
-    <div v-if="entradaForm" class="ov" @click.self="entradaForm = null">
+    <div v-modal="() => entradaForm = null" v-if="entradaForm" class="ov" @click.self="entradaForm = null">
       <div class="dpdlg dpdlg--wide">
         <h3 class="modal__title">Reponer stock</h3>
         <p class="modal__hint">Registrás una reposición con su costo. Se suma al depósito y genera el <b>egreso contable</b>. Para un producto <b>nuevo</b>, compralo desde Contabilidad → Nuevo movimiento.</p>
@@ -609,7 +609,7 @@ async function revertirCompra(compra) {
     </div>
 
     <!-- Modal RECONTEO -->
-    <div v-if="reconteoForm" class="ov" @click.self="reconteoForm = null">
+    <div v-modal="() => reconteoForm = null" v-if="reconteoForm" class="ov" @click.self="reconteoForm = null">
       <div class="dpdlg">
         <h3 class="modal__title">Reconteo — {{ reconteoForm.insumo.nombre }}</h3>
         <p class="modal__hint">El sistema tiene <b>{{ reconteoForm.insumo.stock_actual }} {{ reconteoForm.insumo.unidad_medida }}</b>. Poné cuánto contaste físicamente y elegí por qué no coincide.</p>
@@ -638,7 +638,7 @@ async function revertirCompra(compra) {
     </div>
 
     <!-- Modal HISTORIAL -->
-    <div v-if="hist" class="ov" @click.self="hist = null">
+    <div v-modal="() => hist = null" v-if="hist" class="ov" @click.self="hist = null">
       <div class="dpdlg dpdlg--wide">
         <h3 class="modal__title">Historial — {{ hist.insumo.nombre }}</h3>
         <p class="modal__hint">Stock actual: <b>{{ hist.insumo.stock_actual }} {{ hist.insumo.unidad_medida }}</b>. Revertir una compra descuenta su stock y borra el asiento contable (solo si no se consumió/transfirió).</p>
@@ -674,7 +674,7 @@ async function revertirCompra(compra) {
     </div>
 
     <!-- Modal EDITAR -->
-    <div v-if="editForm" class="ov" @click.self="editForm = null">
+    <div v-modal="() => editForm = null" v-if="editForm" class="ov" @click.self="editForm = null">
       <div class="dpdlg">
         <h3 class="modal__title">Editar insumo</h3>
         <p class="modal__hint">Cambiá el nombre, la categoría o el mínimo. El stock no se toca acá (para eso está Reconteo y Transferir).</p>
@@ -694,7 +694,7 @@ async function revertirCompra(compra) {
     </div>
 
     <!-- Modal TRANSFERIR -->
-    <div v-if="transferForm" class="ov" @click.self="transferForm = null">
+    <div v-modal="() => transferForm = null" v-if="transferForm" class="ov" @click.self="transferForm = null">
       <div class="dpdlg">
         <h3 class="modal__title">Transferir — {{ transferForm.insumo.nombre }}</h3>
         <p class="modal__hint">Reclasifica stock a otro depósito. El costo viaja con la mercadería; <b>no genera un nuevo egreso</b> (la plata ya salió al comprar).</p>
@@ -712,7 +712,7 @@ async function revertirCompra(compra) {
     </div>
 
     <!-- Modal CONSUMIR -->
-    <div v-if="consumoForm" class="ov" @click.self="consumoForm = null">
+    <div v-modal="() => consumoForm = null" v-if="consumoForm" class="ov" @click.self="consumoForm = null">
       <div class="dpdlg dpdlg--wide">
         <h3 class="modal__title">Registrar consumo — {{ consumoForm.insumo.nombre }}</h3>
         <p class="modal__hint">
@@ -744,7 +744,7 @@ async function revertirCompra(compra) {
     </div>
 
     <!-- Modal NUEVO DEPÓSITO -->
-    <div v-if="depoForm" class="ov" @click.self="depoForm = null">
+    <div v-modal="() => depoForm = null" v-if="depoForm" class="ov" @click.self="depoForm = null">
       <div class="dpdlg">
         <h3 class="modal__title">Nuevo depósito</h3>
         <p class="modal__hint">Un depósito propio para agrupar tu mercadería (ej: Merchandising, Insumos de oficina). Los productos que cargues acá se consumen como gasto general.</p>
@@ -760,7 +760,7 @@ async function revertirCompra(compra) {
     </div>
 
     <!-- Modal GESTIONAR DEPÓSITO -->
-    <div v-if="depoEdit" class="ov" @click.self="depoEdit = null">
+    <div v-modal="() => depoEdit = null" v-if="depoEdit" class="ov" @click.self="depoEdit = null">
       <div class="dpdlg">
         <h3 class="modal__title">Gestionar depósito</h3>
         <label class="fld">Nombre<input v-model.trim="depoEdit.nombre" class="inp" maxlength="40" v-focus @keydown.enter.prevent="guardarDeposito" /></label>

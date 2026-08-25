@@ -378,6 +378,9 @@ const precioFinal = computed(() => {
 watch(precioFinal, (val) => { if (val != null) form.value.aporte_socio_ars = Math.round(val) })
 // Al quedar bloqueado (socio sin CC), forzar el aporte al total exacto.
 watch(aporteBloqueado, (locked) => { if (locked && precioFinal.value != null) form.value.aporte_socio_ars = Math.round(precioFinal.value) })
+// Al pasar a cuenta corriente el campo se esconde: si venía editado a mano, ese número quedaría
+// escondido y sin forma de corregirlo. Lo que se financia es el total.
+watch(esCuentaCorriente, (cc) => { if (cc && precioFinal.value != null) form.value.aporte_socio_ars = Math.round(precioFinal.value) })
 
 watch(() => props.modelValue, (open) => {
   if (open) {
@@ -611,7 +614,9 @@ async function handleSubmit() {
 
 <template>
   <Teleport to="body">
-    <div v-if="modelValue" class="mnd__overlay">
+    <!-- El carrito son divs, no campos, así que el chequeo genérico de "escribió algo" no lo ve:
+         se pierde igual y hay que avisar antes de cerrar con ESC. -->
+    <div v-modal="{ cerrar, sucio: () => items.length > 0 }" v-if="modelValue" class="mnd__overlay">
       <div class="mnd__modal">
 
         <div class="mnd__modal-header">
@@ -921,8 +926,13 @@ async function handleSubmit() {
               <!-- Dispensador: solo el total final (sin desglose ni descuento del paciente) -->
               <div v-else class="mnd__precio-row mnd__precio-row--total"><span>Total a cobrar</span><span>{{ fmt(precioFinal) }}</span></div>
             </div>
-            <!-- Override del aporte: solo admin/supervisor -->
-            <div v-if="puedeEditarAporte" class="mnd__field">
+            <!-- Override del aporte: solo admin/supervisor.
+                 En CUENTA CORRIENTE no se muestra: el paciente no está aportando nada en este
+                 momento, está usando su crédito. El campo decía "Aporte del paciente $8.000"
+                 sobre una entrega que la persona no paga, y eso se lee como que sí pagó. El
+                 monto se sigue calculando igual —el asiento contable no cambia—; lo que se ve
+                 en su lugar es el panel de crédito, que lo dice como es: "se carga al crédito". -->
+            <div v-if="puedeEditarAporte && !esCuentaCorriente" class="mnd__field">
               <label class="mnd__label">Aporte del paciente
                 <span class="mnd__opt">{{ aporteBloqueado ? 'ARS — fijo al total (socio sin cuenta corriente)' : 'ARS — editable' }}</span>
               </label>

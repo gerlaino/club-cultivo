@@ -128,7 +128,7 @@
 
     <!-- Modal completar tarea normal -->
     <Teleport to="body">
-      <div v-if="tareaCompletando && !esRegistroLote(tareaCompletando)" class="tl__overlay">
+      <div v-modal="() => tareaCompletando = null" v-if="tareaCompletando && !esRegistroLote(tareaCompletando)" class="tl__overlay">
         <div class="tl__modal">
           <div class="tl__modal-header">
             <h3 class="tl__modal-title">Completar tarea</h3>
@@ -161,7 +161,7 @@
 
     <!-- Modal completar tarea de tipo registro_lote -->
     <Teleport to="body">
-      <div v-if="tareaCompletando && esRegistroLote(tareaCompletando)" class="tl__overlay">
+      <div v-modal="() => tareaCompletando = null" v-if="tareaCompletando && esRegistroLote(tareaCompletando)" class="tl__overlay">
         <div class="tl__modal tl__modal--wide">
           <div class="tl__modal-header">
             <div>

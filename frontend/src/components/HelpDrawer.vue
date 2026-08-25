@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="hd-fade">
-      <div v-if="modelValue" class="hd-overlay" @click="close" />
+      <div v-modal="close" v-if="modelValue" class="hd-overlay" @click="close" />
     </Transition>
     <Transition name="hd-slide">
       <aside v-if="modelValue" class="hd-drawer" role="dialog" aria-modal="true" aria-label="Ayuda rápida">

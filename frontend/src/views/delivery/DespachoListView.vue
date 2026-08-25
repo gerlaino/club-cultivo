@@ -874,7 +874,7 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
 
     <!-- Modal completar entrega (admin) -->
     <Teleport to="body">
-      <div v-if="entregaModal.open" class="dsp__overlay" @click.self="entregaModal.open = false">
+      <div v-modal="() => entregaModal.open = false" v-if="entregaModal.open" class="dsp__overlay" @click.self="entregaModal.open = false">
         <div class="dsp__modal">
           <h3 class="dsp__modal-title">Completar entrega</h3>
           <p class="dsp__modal-sub">{{ entregaModal.codigo }} · {{ entregaModal.paciente }}</p>
@@ -916,7 +916,7 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
 
     <!-- Modal cancelar entrega (admin) -->
     <Teleport to="body">
-      <div v-if="cancelarModal.open" class="dsp__overlay" @click.self="cancelarModal.open = false">
+      <div v-modal="() => cancelarModal.open = false" v-if="cancelarModal.open" class="dsp__overlay" @click.self="cancelarModal.open = false">
         <div class="dsp__modal">
           <h3 class="dsp__modal-title">Cancelar entrega</h3>
           <p class="dsp__modal-sub">{{ cancelarModal.codigo }} · {{ cancelarModal.paciente }}</p>
@@ -938,7 +938,7 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
 
     <!-- Modal reportar fallo (admin) -->
     <Teleport to="body">
-      <div v-if="falloModal.open" class="dsp__overlay" @click.self="falloModal.open = false">
+      <div v-modal="() => falloModal.open = false" v-if="falloModal.open" class="dsp__overlay" @click.self="falloModal.open = false">
         <div class="dsp__modal">
           <h3 class="dsp__modal-title">Reportar fallo de entrega</h3>
           <p class="dsp__modal-sub">{{ falloModal.codigo }} · {{ falloModal.paciente }}</p>

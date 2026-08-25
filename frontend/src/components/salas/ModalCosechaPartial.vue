@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="mcp-overlay">
+    <div v-modal="() => $emit('cerrar')" class="mcp-overlay">
       <div class="mcp-panel">
 
         <div class="mcp-header">

@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="sb-backdrop">
-      <div v-if="modelValue" class="sb__backdrop" @click="close" />
+      <div v-modal="close" v-if="modelValue" class="sb__backdrop" @click="close" />
     </Transition>
     <Transition name="sb-sheet">
       <div

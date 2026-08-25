@@ -80,7 +80,7 @@
     <!-- Modal asignación -->
     <Teleport to="body">
       <Transition name="acs-fade">
-        <div v-if="modalLote" class="acs-overlay" @click.self="cerrarModal">
+        <div v-modal="cerrarModal" v-if="modalLote" class="acs-overlay" @click.self="cerrarModal">
           <div class="acs-modal">
 
             <div class="acs-modal__header">

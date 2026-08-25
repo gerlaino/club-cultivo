@@ -31,7 +31,7 @@
     </template>
 
     <!-- Modal subir documento -->
-    <div v-if="modalAbierto" class="abd__overlay" @click.self="modalAbierto = false">
+    <div v-modal="() => modalAbierto = false" v-if="modalAbierto" class="abd__overlay" @click.self="modalAbierto = false">
       <div class="abd__modal">
         <h2 class="abd__modal-title">Subir documento legal</h2>
         <div class="abd__form-group">

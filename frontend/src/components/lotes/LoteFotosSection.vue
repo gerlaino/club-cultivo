@@ -52,7 +52,7 @@
 
   <!-- Upload modal -->
   <Teleport to="body">
-    <div v-if="showFotoUploadModal" class="lfs__overlay">
+    <div v-modal="cancelarSubidaFoto" v-if="showFotoUploadModal" class="lfs__overlay">
       <div class="lfs__modal">
         <div class="lfs__modal-header">
           <div>

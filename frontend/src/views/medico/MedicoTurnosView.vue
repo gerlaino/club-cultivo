@@ -446,7 +446,7 @@ onUnmounted(() => clearInterval(tickInterval))
     <!-- ── Modal: Crear turno ── -->
     <Teleport to="body">
       <Transition name="modal">
-        <div v-if="showCrear" class="tv__overlay" @click.self="showCrear = false">
+        <div v-modal="() => showCrear = false" v-if="showCrear" class="tv__overlay" @click.self="showCrear = false">
           <div class="tv__modal">
             <div class="tv__modal-header">
               <h3 class="tv__modal-title"><Calendar :size="16" /> Nueva cita</h3>

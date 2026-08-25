@@ -288,7 +288,7 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
     <!-- Teleportados a body, como el resto de la app -->
     <Teleport to="body">
     <!-- Modal editar datos básicos -->
-    <div v-if="editForm" class="ov" @click.self="editForm = null">
+    <div v-modal="() => editForm = null" v-if="editForm" class="ov" @click.self="editForm = null">
       <div class="modal modal--wide">
         <h3>Editar evento</h3>
         <label class="fld2">Nombre<input v-model.trim="editForm.nombre" class="inp" maxlength="80" /></label>
@@ -305,7 +305,7 @@ const tareasPendientes = computed(() => (e.value?.tareas || []).filter(t => !t.h
     </div>
 
     <!-- Modal vender -->
-    <div v-if="venderPara" class="ov" @click.self="venderPara = null">
+    <div v-modal="() => venderPara = null" v-if="venderPara" class="ov" @click.self="venderPara = null">
       <div class="modal">
         <h3>Vender — {{ venderPara.nombre }}</h3>
         <p class="modal__hint">{{ fmt(venderPara.precio_ars) }} c/u<span v-if="venderPara.disponibles != null"> · quedan {{ venderPara.disponibles }}</span></p>

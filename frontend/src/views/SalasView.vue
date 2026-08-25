@@ -469,7 +469,7 @@ async function confirmDelete(s) {
     <!-- Modal Editar -->
     <Teleport to="body">
       <Transition name="slv-modal">
-        <div v-if="showEdit" class="slv__modal-overlay">
+        <div v-modal="() => showEdit = false" v-if="showEdit" class="slv__modal-overlay">
           <div class="slv__modal">
             <div class="slv__modal-header">
               <h3 class="slv__modal-title">Editar sala</h3>

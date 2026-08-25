@@ -1,14 +1,12 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { listLotes, cargarLoteEnSala } from '../../lib/api.js'
-import { useModalEscape } from '../../composables/useModalEscape.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const props = defineProps({
   sala: { type: Object, required: true },
 })
 const emit = defineEmits(['loaded', 'close'])
-useModalEscape(() => emit('close'))
 
 // Qué estado de lote acepta cada tipo de sala
 const CONFIG = {
@@ -53,7 +51,7 @@ async function confirmar() {
 
 <template>
   <Teleport to="body">
-    <div class="mcl__overlay">
+    <div v-modal="() => $emit('close')" class="mcl__overlay">
       <div class="mcl__panel">
 
         <!-- Header -->

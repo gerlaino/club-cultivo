@@ -170,7 +170,7 @@ async function guardar() {
 
 <template>
   <Teleport to="body">
-    <div class="ep__overlay" @click.self="$emit('close')">
+    <div v-modal="() => $emit('close')" class="ep__overlay" @click.self="$emit('close')">
       <div class="ep__panel">
 
         <!-- Header -->

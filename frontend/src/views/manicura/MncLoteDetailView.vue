@@ -175,7 +175,7 @@
     <!-- Modal batch pesaje -->
     <Teleport to="body">
       <Transition name="mnl-fade">
-        <div v-if="modalOpen" class="mnl-overlay" @click.self="cerrarModal">
+        <div v-modal="cerrarModal" v-if="modalOpen" class="mnl-overlay" @click.self="cerrarModal">
           <div class="mnl-modal" :class="{ 'mnl-modal--wide': esAdmin }">
             <div class="mnl-modal__hd">
               <div class="mnl-modal__ico"><Scale :size="18" :stroke-width="1.75" /></div>
@@ -300,7 +300,7 @@
     <!-- Modal devolver a cosecha -->
     <Teleport to="body">
       <Transition name="mnl-fade">
-        <div v-if="devolverOpen" class="mnl-overlay" @click.self="devolverOpen = false">
+        <div v-modal="() => devolverOpen = false" v-if="devolverOpen" class="mnl-overlay" @click.self="devolverOpen = false">
           <div class="mnl-modal">
             <div class="mnl-modal__hd">
               <div class="mnl-modal__ico mnl-modal__ico--warn"><Undo2 :size="18" :stroke-width="1.75" /></div>

@@ -215,7 +215,7 @@ onMounted(async () => {
       <!-- Mobile drawer overlay -->
       <Teleport to="body">
         <Transition name="admin-drawer">
-          <div v-if="adminDrawerOpen" class="admin-drawer-overlay" @click.self="adminDrawerOpen = false">
+          <div v-modal="() => adminDrawerOpen = false" v-if="adminDrawerOpen" class="admin-drawer-overlay" @click.self="adminDrawerOpen = false">
             <div class="admin-drawer">
               <AdminSidebar />
             </div>
@@ -241,7 +241,7 @@ onMounted(async () => {
       <!-- Drawer overlay tablet (768-1023px) -->
       <Teleport to="body">
         <Transition name="cvd-drawer">
-          <div v-if="cvdDrawerOpen" class="cvd-drawer-overlay" @click.self="cvdDrawerOpen = false">
+          <div v-modal="() => cvdDrawerOpen = false" v-if="cvdDrawerOpen" class="cvd-drawer-overlay" @click.self="cvdDrawerOpen = false">
             <div class="cvd-drawer">
               <CultivadorSidebar />
             </div>
@@ -265,7 +265,7 @@ onMounted(async () => {
       <!-- Mobile drawer overlay -->
       <Teleport to="body">
         <Transition name="svr-drawer">
-          <div v-if="svrDrawerOpen" class="svr-drawer-overlay" @click.self="svrDrawerOpen = false">
+          <div v-modal="() => svrDrawerOpen = false" v-if="svrDrawerOpen" class="svr-drawer-overlay" @click.self="svrDrawerOpen = false">
             <div class="svr-drawer">
               <SupervisorSidebar />
             </div>
@@ -289,7 +289,7 @@ onMounted(async () => {
       <!-- Mobile drawer overlay -->
       <Teleport to="body">
         <Transition name="dpv-drawer">
-          <div v-if="dpvDrawerOpen" class="dpv-drawer-overlay" @click.self="dpvDrawerOpen = false">
+          <div v-modal="() => dpvDrawerOpen = false" v-if="dpvDrawerOpen" class="dpv-drawer-overlay" @click.self="dpvDrawerOpen = false">
             <div class="dpv-drawer">
               <DispensadorSidebar />
             </div>
@@ -313,7 +313,7 @@ onMounted(async () => {
       <!-- Mobile drawer overlay -->
       <Teleport to="body">
         <Transition name="mnc-drawer">
-          <div v-if="mncDrawerOpen" class="mnc-drawer-overlay" @click.self="mncDrawerOpen = false">
+          <div v-modal="() => mncDrawerOpen = false" v-if="mncDrawerOpen" class="mnc-drawer-overlay" @click.self="mncDrawerOpen = false">
             <div class="mnc-drawer">
               <ManicuraSidebar />
             </div>
@@ -336,7 +336,7 @@ onMounted(async () => {
       </div>
       <Teleport to="body">
         <Transition name="med-drawer">
-          <div v-if="medDrawerOpen" class="med-drawer-overlay" @click.self="medDrawerOpen = false">
+          <div v-modal="() => medDrawerOpen = false" v-if="medDrawerOpen" class="med-drawer-overlay" @click.self="medDrawerOpen = false">
             <div class="med-drawer">
               <MedicoSidebar @logout="doLogout" />
             </div>
@@ -359,7 +359,7 @@ onMounted(async () => {
       </div>
       <Teleport to="body">
         <Transition name="abg-drawer">
-          <div v-if="abgDrawerOpen" class="abg-drawer-overlay" @click.self="abgDrawerOpen = false">
+          <div v-modal="() => abgDrawerOpen = false" v-if="abgDrawerOpen" class="abg-drawer-overlay" @click.self="abgDrawerOpen = false">
             <div class="abg-drawer">
               <AbogadoSidebar @logout="doLogout" />
             </div>
@@ -382,7 +382,7 @@ onMounted(async () => {
       </div>
       <Teleport to="body">
         <Transition name="aud-drawer">
-          <div v-if="audDrawerOpen" class="aud-drawer-overlay" @click.self="audDrawerOpen = false">
+          <div v-modal="() => audDrawerOpen = false" v-if="audDrawerOpen" class="aud-drawer-overlay" @click.self="audDrawerOpen = false">
             <div class="aud-drawer">
               <AuditorSidebar @logout="doLogout" />
             </div>
@@ -405,7 +405,7 @@ onMounted(async () => {
       </div>
       <Teleport to="body">
         <Transition name="dlv-drawer">
-          <div v-if="dlvDrawerOpen" class="dlv-drawer-overlay" @click.self="dlvDrawerOpen = false">
+          <div v-modal="() => dlvDrawerOpen = false" v-if="dlvDrawerOpen" class="dlv-drawer-overlay" @click.self="dlvDrawerOpen = false">
             <div class="dlv-drawer">
               <DeliverySidebar />
             </div>

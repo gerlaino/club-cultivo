@@ -164,7 +164,7 @@
 
     <!-- Modal nuevo/edición setpoint -->
     <Teleport to="body">
-      <div v-if="modalOpen" class="spc__modal-overlay" @click.self="cerrarModal">
+      <div v-modal="cerrarModal" v-if="modalOpen" class="spc__modal-overlay" @click.self="cerrarModal">
         <div class="spc__modal">
           <div class="spc__modal-header">
             <h3 class="spc__modal-title">{{ editandoSp ? 'Editar umbral' : 'Nuevo umbral ambiental' }}</h3>

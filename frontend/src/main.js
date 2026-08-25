@@ -1,4 +1,5 @@
 import { createApp } from "vue";
+import { vModal } from "./directives/modal.js";
 import { createPinia } from "pinia";
 import router from "./router";
 import App from "./App.vue";
@@ -76,6 +77,17 @@ app.directive('click-outside', {
 // Montamos YA. NO bloquear el render esperando /api/me: si el backend está
 // despertando (free tier) o /me tarda, bloquear acá dejaba la pantalla en negro
 // (la app nunca montaba). El router (ensureBootstrapped) maneja la sesión por ruta.
+// Foco al primer campo, ESC para salir y el Tab atrapado adentro: en el overlay de cada modal.
+app.directive('modal', vModal);
+
+// La rueda del mouse sobre un campo numérico ENFOCADO le cambia el valor, y pasa al scrollear
+// un formulario largo: el número se mueve solo y queda escrito en stock o en plata. Se saca el
+// foco en vez de bloquear la rueda, así la página sigue scrolleando normal.
+document.addEventListener('wheel', (e) => {
+  const el = document.activeElement
+  if (el === e.target && el?.tagName === 'INPUT' && el.type === 'number') el.blur()
+}, { passive: true })
+
 app.mount("#app");
 
 // Bootstrap en segundo plano (sesión + preferencias del club).

@@ -115,7 +115,7 @@ function irFicha() {
 
 <template>
   <Teleport to="body">
-    <div class="tdp__overlay" @click.self="emit('close')">
+    <div v-modal="() => emit('close')" class="tdp__overlay" @click.self="emit('close')">
       <div class="tdp__panel">
 
         <!-- Header -->

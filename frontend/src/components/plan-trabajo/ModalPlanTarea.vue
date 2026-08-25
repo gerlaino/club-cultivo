@@ -186,7 +186,7 @@ function guardar() {
 
 <template>
   <Teleport to="body">
-    <div class="mpt__overlay">
+    <div v-modal="() => $emit('close')" class="mpt__overlay">
       <div class="mpt__panel">
 
         <!-- Header -->

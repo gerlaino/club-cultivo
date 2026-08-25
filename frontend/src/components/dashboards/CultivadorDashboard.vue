@@ -329,7 +329,7 @@
 
   <!-- Qué lotes están listos para avanzar, y a cuál ir -->
   <Teleport to="body">
-    <div v-if="showListosModal" class="cvd__ov" @click.self="showListosModal = false">
+    <div v-modal="() => showListosModal = false" v-if="showListosModal" class="cvd__ov" @click.self="showListosModal = false">
       <div class="cvd__listos">
         <div class="cvd__listos-head">
           <h3 class="cvd__listos-title">Listos para avanzar</h3>

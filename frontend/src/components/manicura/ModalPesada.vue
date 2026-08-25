@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="mp-fade">
-      <div v-if="modelValue" class="mp-overlay">
+      <div v-modal="() => $emit('update:modelValue', false)" v-if="modelValue" class="mp-overlay">
         <div class="mp-modal" role="dialog" aria-modal="true">
 
           <div class="mp-header">
@@ -88,7 +88,6 @@
 import { ref, computed, watch } from 'vue'
 import { Scale, X, AlertCircle } from 'lucide-vue-next'
 import { createPesada } from '../../lib/api.js'
-import { useModalEscape } from '../../composables/useModalEscape.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const props = defineProps({
@@ -96,7 +95,6 @@ const props = defineProps({
   lote: Object,
 })
 const emit = defineEmits(['update:modelValue', 'saved'])
-useModalEscape(() => emit('update:modelValue', false))
 
 // Derivar fase_origen / fase_destino / label y campo de peso según estado del lote
 const FASE_CONFIG = {

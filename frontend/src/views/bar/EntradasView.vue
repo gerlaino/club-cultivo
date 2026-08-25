@@ -145,7 +145,7 @@ async function anular(e) {
          que renderizaba los overlays inline, con el modal quedando a merced del contexto de
          apilamiento del contenedor (velo visible, caja no). -->
     <Teleport to="body">
-    <div v-if="qrModal" class="ov" @click.self="qrModal = null">
+    <div v-modal="() => qrModal = null" v-if="qrModal" class="ov" @click.self="qrModal = null">
       <div class="modal">
         <h3>Entrada</h3>
         <p class="modal__hint">{{ qrModal.entrada.comprador || qrModal.entrada.tipo }} · {{ qrModal.entrada.tipo }}</p>

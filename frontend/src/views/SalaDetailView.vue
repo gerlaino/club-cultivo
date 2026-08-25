@@ -1332,7 +1332,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 
     <!-- Modal cambiar fase (vege ↔ flora) -->
     <Teleport to="body">
-      <div v-if="showCambiarFaseModal" class="sd__overlay">
+      <div v-modal="() => showCambiarFaseModal = false" v-if="showCambiarFaseModal" class="sd__overlay">
         <div class="sd__modal" style="max-width:420px">
           <div class="sd__modal-header">
             <div>
@@ -1423,7 +1423,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 
     <!-- Modal Editar Sala -->
     <Teleport to="body">
-      <div v-if="showEditSala" class="sd__overlay">
+      <div v-modal="() => showEditSala = false" v-if="showEditSala" class="sd__overlay">
         <div class="sd__modal">
           <div class="sd__modal-header">
             <div>
@@ -1477,7 +1477,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 
     <!-- Modal upgrade plan -->
     <Teleport to="body">
-      <div v-if="showUpgrade" class="sd__overlay">
+      <div v-modal="() => showUpgrade = false" v-if="showUpgrade" class="sd__overlay">
         <div class="sd__modal" style="max-width:380px;text-align:center;padding:2rem">
           <div style="font-size:3rem;margin-bottom:.75rem">🚀</div>
           <h3 class="sd__modal-title" style="margin-bottom:.5rem">Límite del plan alcanzado</h3>

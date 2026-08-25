@@ -2,7 +2,7 @@
   <div class="msc">
     <video ref="videoEl" class="msc__video" playsinline muted></video>
 
-    <div class="msc__overlay">
+    <div v-modal="salir" class="msc__overlay">
       <header class="msc__top">
         <button class="msc__icon" @click="salir" aria-label="Cerrar"><i class="bi bi-x-lg"></i></button>
         <span class="msc__title">Escanear QR</span>

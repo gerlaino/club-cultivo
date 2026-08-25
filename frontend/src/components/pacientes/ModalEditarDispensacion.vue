@@ -138,7 +138,7 @@ async function handleSubmit() {
 
 <template>
   <Teleport to="body">
-    <div v-if="modelValue && dispensacion" class="med__overlay">
+    <div v-modal="cerrar" v-if="modelValue && dispensacion" class="med__overlay">
       <div class="med__modal">
 
         <div class="med__modal-header">

@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
 
-vi.mock('../composables/useModalEscape.js', () => ({ useModalEscape: vi.fn() }))
 
 const ModalIngreso = (await import('../components/contabilidad/ModalIngreso.vue')).default
 

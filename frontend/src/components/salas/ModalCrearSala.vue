@@ -2,7 +2,6 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useSalasStore } from '../../stores/salas'
 import { listSedes } from '../../lib/api'
-import { useModalEscape } from '../../composables/useModalEscape.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 
 const props = defineProps({
@@ -10,7 +9,6 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['created', 'close'])
-useModalEscape(() => emit('close'))
 
 const salas = useSalasStore()
 const sedes = ref([])
@@ -72,7 +70,7 @@ onMounted(async () => {
 
 <template>
   <Teleport to="body">
-    <div class="mcr__overlay" >
+    <div v-modal="() => $emit('close')" class="mcr__overlay" >
       <div class="mcr__panel">
 
         <!-- Header -->

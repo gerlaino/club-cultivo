@@ -112,7 +112,7 @@
 
     <!-- Modal Crear/Editar -->
     <Teleport to="body">
-      <div v-if="showModal" class="im__overlay" @click.self="showModal = false">
+      <div v-modal="() => showModal = false" v-if="showModal" class="im__overlay" @click.self="showModal = false">
         <div class="im__modal">
           <div class="im__modal-header">
             <h2 class="im__modal-title">{{ editingId ? 'Editar' : 'Nueva' }} Indicación Médica</h2>
@@ -179,7 +179,7 @@
 
     <!-- Modal confirmar desactivar -->
     <Teleport to="body">
-      <div v-if="deleteConfirm" class="im__overlay" @click.self="deleteConfirm = null">
+      <div v-modal="() => deleteConfirm = null" v-if="deleteConfirm" class="im__overlay" @click.self="deleteConfirm = null">
         <div class="im__modal" style="max-width:440px">
           <div class="im__modal-header">
             <h2 class="im__modal-title">Confirmar desactivación</h2>

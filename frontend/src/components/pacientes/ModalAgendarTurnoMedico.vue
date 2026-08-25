@@ -287,7 +287,7 @@ onMounted(async () => {
 
 <template>
   <Teleport to="body">
-    <div class="atm__overlay" @click.self="$emit('close')">
+    <div v-modal="() => $emit('close')" class="atm__overlay" @click.self="$emit('close')">
       <div class="atm__modal">
 
         <!-- Header -->

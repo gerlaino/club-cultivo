@@ -333,7 +333,7 @@ const FORMAS = [
     <!-- Modal: buscar paciente (nueva dispensación o filtro) -->
     <Teleport to="body">
       <Transition name="hd-modal">
-        <div v-if="showBuscarPaciente" class="hd__modal-overlay" @click.self="showBuscarPaciente = false">
+        <div v-modal="() => showBuscarPaciente = false" v-if="showBuscarPaciente" class="hd__modal-overlay" @click.self="showBuscarPaciente = false">
           <div class="hd__modal-box hd__modal-box--narrow">
             <div class="hd__modal-header">
               <h2 class="hd__modal-title">

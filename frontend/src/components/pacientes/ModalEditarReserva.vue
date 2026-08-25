@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="modelValue && reserva" class="mre__overlay">
+    <div v-modal="cerrar" v-if="modelValue && reserva" class="mre__overlay">
       <div class="mre__modal">
         <div class="mre__head">
           <h3>Editar reserva</h3>

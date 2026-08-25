@@ -88,7 +88,7 @@ function descargarTemplate() {
 
 <template>
   <Teleport to="body">
-    <div class="icm__overlay" @click.self="$emit('close')">
+    <div v-modal="() => $emit('close')" class="icm__overlay" @click.self="$emit('close')">
       <div class="icm__panel">
 
         <!-- Header -->

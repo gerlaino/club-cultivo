@@ -13,7 +13,7 @@
 
     <Teleport to="body">
       <transition name="av-modal">
-        <div v-if="abierto" class="av__backdrop" @click.self="cerrar">
+        <div v-modal="cerrar" v-if="abierto" class="av__backdrop" @click.self="cerrar">
           <div class="av__panel">
 
             <div class="av__header">

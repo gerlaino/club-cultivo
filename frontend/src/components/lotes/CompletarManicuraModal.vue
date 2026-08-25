@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="modelValue" class="cmm__overlay" @mousedown.self="cerrar">
+    <div v-modal="cerrar" v-if="modelValue" class="cmm__overlay" @mousedown.self="cerrar">
       <div class="cmm__panel">
 
         <div class="cmm__header">

@@ -255,7 +255,7 @@ onMounted(cargar)
 
     <!-- Modal crear usuario -->
     <Teleport to="body">
-      <div v-if="showCreate" class="sau__overlay" @click.self="showCreate = false">
+      <div v-modal="() => showCreate = false" v-if="showCreate" class="sau__overlay" @click.self="showCreate = false">
         <div class="sau__modal">
           <div class="sau__modal-header">
             <h3 class="sau__modal-title">Nuevo usuario</h3>

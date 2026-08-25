@@ -264,7 +264,7 @@ onMounted(async () => {
 
     <!-- Modal subir documento -->
     <Teleport to="body">
-      <div v-if="showModal" class="dv__overlay" @click.self="showModal = false">
+      <div v-modal="() => showModal = false" v-if="showModal" class="dv__overlay" @click.self="showModal = false">
         <div class="dv__modal">
           <div class="dv__modal-header">
             <div>

@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="apm__overlay" @mousedown.self="$emit('close')">
+    <div v-modal="() => $emit('close')" class="apm__overlay" @mousedown.self="$emit('close')">
       <div class="apm__modal">
 
         <!-- Header -->

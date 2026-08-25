@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="modelValue" class="dsp__overlay" @click.self="cerrar">
+    <div v-modal="cerrar" v-if="modelValue" class="dsp__overlay" @click.self="cerrar">
       <div class="dsp__modal">
         <div class="dsp__head">
           <div>

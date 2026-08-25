@@ -638,7 +638,7 @@ onMounted(async () => {
 
       <!-- ── Modal plan ── -->
       <Teleport to="body">
-        <div v-if="showPlanModal" class="scd__overlay" @click.self="showPlanModal = false">
+        <div v-modal="() => showPlanModal = false" v-if="showPlanModal" class="scd__overlay" @click.self="showPlanModal = false">
           <div class="scd__modal">
             <div class="scd__modal-hd">
               <span class="scd__modal-title">Cambiar plan — {{ club.name }}</span>
@@ -693,7 +693,7 @@ onMounted(async () => {
 
       <!-- ── Modal usuario ── -->
       <Teleport to="body">
-        <div v-if="showUserModal" class="scd__overlay" @click.self="showUserModal = false">
+        <div v-modal="() => showUserModal = false" v-if="showUserModal" class="scd__overlay" @click.self="showUserModal = false">
           <div class="scd__modal">
             <div class="scd__modal-hd">
               <span class="scd__modal-title">Nuevo usuario — {{ club.name }}</span>

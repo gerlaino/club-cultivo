@@ -138,7 +138,7 @@
 
     <!-- Modal: Nuevo Paciente -->
     <Teleport to="body">
-      <div v-if="showModal" class="mpv__overlay" @click.self="showModal = false">
+      <div v-modal="() => showModal = false" v-if="showModal" class="mpv__overlay" @click.self="showModal = false">
         <div class="mpv__modal">
           <div class="mpv__modal-header">
             <h2 class="mpv__modal-title">Nuevo Paciente</h2>

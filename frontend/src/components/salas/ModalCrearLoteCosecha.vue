@@ -1,7 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { createLoteHeredado, listGeneticas, listPlants, getLoteProximoCodigo } from '../../lib/api.js'
-import { useModalEscape } from '../../composables/useModalEscape.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
 
@@ -9,7 +8,6 @@ const props = defineProps({
   sala: { type: Object, required: true },
 })
 const emit = defineEmits(['created', 'close'])
-useModalEscape(() => emit('close'))
 
 // ── Wizard state ───────────────────────────────────────────
 const paso = ref(1)
@@ -194,7 +192,7 @@ async function crear() {
 
 <template>
   <Teleport to="body">
-    <div class="clc__overlay">
+    <div v-modal="() => $emit('close')" class="clc__overlay">
       <div class="clc__panel">
 
         <!-- Header -->

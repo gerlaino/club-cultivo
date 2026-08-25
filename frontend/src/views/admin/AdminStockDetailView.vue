@@ -319,7 +319,7 @@
     <!-- ── Modal: Ajustar ────────────────────────────────────────────── -->
     <Teleport to="body">
       <Transition name="sd-fade">
-        <div v-if="showAjustar" class="sd__overlay" @click.self="showAjustar = false">
+        <div v-modal="() => showAjustar = false" v-if="showAjustar" class="sd__overlay" @click.self="showAjustar = false">
           <div class="sd__modal">
             <div class="sd__modal-hd">
               <div class="sd__modal-ico"><i class="bi bi-sliders"></i></div>
@@ -375,7 +375,7 @@
     <!-- ── Modal: Descartar ──────────────────────────────────────────── -->
     <Teleport to="body">
       <Transition name="sd-fade">
-        <div v-if="showDescartar" class="sd__overlay" @click.self="showDescartar = false">
+        <div v-modal="() => showDescartar = false" v-if="showDescartar" class="sd__overlay" @click.self="showDescartar = false">
           <div class="sd__modal">
             <div class="sd__modal-hd">
               <div class="sd__modal-ico sd__modal-ico--danger"><i class="bi bi-flag"></i></div>
@@ -422,7 +422,7 @@
     <!-- ── Modal: Repartir ───────────────────────────────────────────── -->
     <Teleport to="body">
       <Transition name="sd-fade">
-        <div v-if="showRepartir" class="sd__overlay" @click.self="showRepartir = false">
+        <div v-modal="() => showRepartir = false" v-if="showRepartir" class="sd__overlay" @click.self="showRepartir = false">
           <div class="sd__modal">
             <div class="sd__modal-hd">
               <div class="sd__modal-ico"><i class="bi bi-arrows-angle-expand"></i></div>
@@ -469,7 +469,7 @@
     <!-- ── Modal: Procesar derivado ──────────────────────────────────── -->
     <Teleport to="body">
       <Transition name="sd-fade">
-        <div v-if="showProcesar" class="sd__overlay" @click.self="showProcesar = false">
+        <div v-modal="() => showProcesar = false" v-if="showProcesar" class="sd__overlay" @click.self="showProcesar = false">
           <div class="sd__modal">
             <div class="sd__modal-hd">
               <div class="sd__modal-ico sd__modal-ico--amber"><i class="bi bi-arrow-right-square"></i></div>
@@ -542,7 +542,7 @@
     <!-- Modal reajustar peso de pesaje (corrige la cantidad inicial de un stock de lote) -->
     <Teleport to="body">
       <Transition name="sd-fade">
-        <div v-if="showReajustePesaje" class="sd__overlay" @click.self="showReajustePesaje = false">
+        <div v-modal="() => showReajustePesaje = false" v-if="showReajustePesaje" class="sd__overlay" @click.self="showReajustePesaje = false">
           <div class="sd__modal">
             <div class="sd__modal-hd">
               <div class="sd__modal-ico"><i class="bi bi-pencil"></i></div>

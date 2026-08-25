@@ -306,7 +306,7 @@ async function confirmarCierre(finalizar) {
     <Teleport to="body">
 
     <!-- Qué estoy agregando: una sola puerta para mercadería y servicios -->
-    <div v-if="queAgrego === 'elegir'" class="ov" @click.self="queAgrego = null">
+    <div v-modal="() => queAgrego = null" v-if="queAgrego === 'elegir'" class="ov" @click.self="queAgrego = null">
       <div class="modal">
         <h3 class="modal__title">¿Qué estás sumando?</h3>
         <div class="pv__pick">
@@ -324,7 +324,7 @@ async function confirmarCierre(finalizar) {
     </div>
 
     <!-- Alta de servicio -->
-    <div v-if="costoForm" class="ov" @click.self="costoForm = null">
+    <div v-modal="() => costoForm = null" v-if="costoForm" class="ov" @click.self="costoForm = null">
       <div class="modal">
         <h3 class="modal__title">Servicio contratado</h3>
         <p class="modal__hint">Cuando lo marques pagado, se asienta como egreso del evento en el libro contable.</p>
@@ -340,7 +340,7 @@ async function confirmarCierre(finalizar) {
     </div>
 
     <!-- Modal agregar: buscador unificado -->
-    <div v-if="addOpen" class="ov" @click.self="cerrarAdd">
+    <div v-modal="cerrarAdd" v-if="addOpen" class="ov" @click.self="cerrarAdd">
       <div class="modal">
         <h3 class="modal__title">Agregar a la provisión</h3>
         <p class="modal__hint">Buscá en todos los depósitos: salón, cultivo, general y dispensario.</p>
@@ -373,7 +373,7 @@ async function confirmarCierre(finalizar) {
     </div>
 
     <!-- Modal comprar faltante (salón) -->
-    <div v-if="compraForm" class="ov" @click.self="compraForm = null">
+    <div v-modal="() => compraForm = null" v-if="compraForm" class="ov" @click.self="compraForm = null">
       <div class="modal">
         <h3 class="modal__title">Comprar — {{ compraForm.prov.nombre }}</h3>
         <p class="modal__hint">Entra al depósito del salón (con costo). Después podés reservarlo para el evento.</p>
@@ -385,7 +385,7 @@ async function confirmarCierre(finalizar) {
 
     <!-- Modal cierre / reconciliación -->
     <!-- Rendición: los tres destinos a la vista, pero un solo número para cargar -->
-    <div v-if="cierreForm" class="ov" @click.self="cierreForm = null">
+    <div v-modal="() => cierreForm = null" v-if="cierreForm" class="ov" @click.self="cierreForm = null">
       <div class="modal modal--rend">
         <h3 class="modal__title">Rendición del evento</h3>
         <p class="modal__hint">

@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <Transition name="sem-modal">
-      <div v-if="open" class="sem__overlay" @click.self="emit('update:open', false)">
+      <div v-modal="() => emit('update:open', false)" v-if="open" class="sem__overlay" @click.self="emit('update:open', false)">
         <div class="sem__modal">
           <div class="sem__header">
             <h2 class="sem__title">Editar paciente</h2>

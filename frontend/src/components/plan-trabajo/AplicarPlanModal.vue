@@ -120,7 +120,7 @@ async function aplicar() {
 
 <template>
   <Teleport to="body">
-    <div class="apm__overlay" @click.self="$emit('close')">
+    <div v-modal="() => $emit('close')" class="apm__overlay" @click.self="$emit('close')">
       <div class="apm__panel">
 
         <!-- Header -->

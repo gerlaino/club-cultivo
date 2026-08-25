@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="datos" class="cred-ov" @click.self="cerrar">
+    <div v-modal="cerrar" v-if="datos" class="cred-ov" @click.self="cerrar">
       <div class="cred">
         <div class="cred__head">
           <i class="bi bi-check-circle-fill"></i>

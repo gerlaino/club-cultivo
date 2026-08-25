@@ -207,7 +207,7 @@ async function borrarCat(c) {
          a merced del contexto de apilamiento del contenedor. -->
     <Teleport to="body">
     <!-- Modal Comprar -->
-    <div v-if="compraForm" class="ov" @click.self="compraForm = null">
+    <div v-modal="() => compraForm = null" v-if="compraForm" class="ov" @click.self="compraForm = null">
       <div class="dlg">
         <h3 class="dlg__title">Comprar — {{ compraForm.prod.nombre }}</h3>
         <p class="dlg__hint">Suma stock al salón con su costo, recalcula el costo promedio y genera el <b>egreso contable</b>.</p>
@@ -220,7 +220,7 @@ async function borrarCat(c) {
     </div>
 
     <!-- Modal Categorías -->
-    <div v-if="catMgr" class="ov" @click.self="catMgr = null">
+    <div v-modal="() => catMgr = null" v-if="catMgr" class="ov" @click.self="catMgr = null">
       <div class="dlg">
         <h3 class="dlg__title">Categorías de producto</h3>
         <p class="dlg__hint">Con estas se agrupan y filtran los productos del salón.</p>
@@ -246,7 +246,7 @@ async function borrarCat(c) {
 
     <!-- Asignar/corregir el código de barras, sin abrir el resto de la ficha -->
     <Teleport to="body">
-      <div v-if="codigoProd" class="bs__ov" @click.self="codigoProd = null">
+      <div v-modal="() => codigoProd = null" v-if="codigoProd" class="bs__ov" @click.self="codigoProd = null">
         <div class="bs__cb">
           <h3 class="bs__cb-tit">Código de barras</h3>
           <p class="bs__cb-prod">{{ codigoProd.nombre }}</p>

@@ -11,7 +11,6 @@
 // no se paga en cuotas: la mitad del formulario de egreso no le aplica.
 import { ref, computed, watch } from 'vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
-import { useModalEscape } from '../../composables/useModalEscape.js'
 import { hoyLocal, fmtMiles, parseMonto } from './movimientoFlows.js'
 
 const props = defineProps({
@@ -87,7 +86,6 @@ function guardar() {
 }
 
 function cerrar() { emit('update:modelValue', false) }
-useModalEscape(() => { if (props.modelValue) cerrar() })
 
 watch(() => props.modelValue, (abierto) => {
   if (!abierto) return
@@ -99,7 +97,7 @@ watch(() => props.modelValue, (abierto) => {
 
 <template>
   <Teleport to="body">
-    <div v-if="modelValue" class="mi__overlay" @click.self="cerrar">
+    <div v-modal="cerrar" v-if="modelValue" class="mi__overlay" @click.self="cerrar">
       <div class="mi__modal">
         <div class="mi__head">
           <h3 class="mi__title">Registrar ingreso</h3>

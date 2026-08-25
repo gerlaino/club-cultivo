@@ -53,7 +53,7 @@
 
     <!-- Sheet crear lote -->
     <Teleport to="body">
-      <div v-if="showCrear" class="ml__overlay" @click.self="showCrear = false">
+      <div v-modal="() => showCrear = false" v-if="showCrear" class="ml__overlay" @click.self="showCrear = false">
         <div class="ml__sheet">
           <div class="ml__sheet-handle"></div>
           <div class="ml__sheet-header">

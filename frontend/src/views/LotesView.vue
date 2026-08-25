@@ -596,7 +596,7 @@ async function exportarCSV() {
 
     <!-- MODAL Editar -->
     <Teleport to="body">
-      <div v-if="showEdit" class="lm-overlay">
+      <div v-modal="() => showEdit = false" v-if="showEdit" class="lm-overlay">
         <div class="lm-modal">
           <div class="lm-modal__header">
             <div>

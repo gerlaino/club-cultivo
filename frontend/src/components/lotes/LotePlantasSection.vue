@@ -211,7 +211,7 @@
 
     <!-- Modal: Agregar planta -->
     <Teleport to="body">
-      <div v-if="showAddPlanta" class="lps__overlay">
+      <div v-modal="() => showAddPlanta = false" v-if="showAddPlanta" class="lps__overlay">
         <div class="lps__modal">
           <div class="lps__modal-header">
             <div>

@@ -337,7 +337,7 @@ onMounted(async () => {
 
     <!-- Editor ──────────────────────────────────────────────── -->
     <Teleport to="body">
-      <div v-if="editando" class="cv__overlay" @click.self="cerrar">
+      <div v-modal="cerrar" v-if="editando" class="cv__overlay" @click.self="cerrar">
         <div class="cv__modal">
           <header class="cv__modal-head">
             <h3 class="cv__modal-title">{{ editando.id ? 'Editar plantilla' : 'Nueva plantilla' }}</h3>

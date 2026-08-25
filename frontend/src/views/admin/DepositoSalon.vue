@@ -93,7 +93,7 @@ const TIPO_MOV = {
     </template>
 
     <!-- Modal movimientos (solo lectura) -->
-    <div v-if="movsForm" class="ov" @click.self="movsForm = null">
+    <div v-modal="() => movsForm = null" v-if="movsForm" class="ov" @click.self="movsForm = null">
       <div class="dpdlg dpdlg--wide">
         <h3 class="modal__title">Movimientos — {{ movsForm.nombre }}</h3>
         <div v-if="!movs.length" class="ds__empty">Sin movimientos todavía.</div>

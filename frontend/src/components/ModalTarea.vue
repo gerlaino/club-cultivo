@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div v-if="show" class="mt-overlay">
+    <div v-modal="() => $emit('cerrar')" v-if="show" class="mt-overlay">
       <div class="mt-panel">
 
         <!-- Header -->
@@ -275,7 +275,6 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { useModalEscape } from '../composables/useModalEscape.js'
 import { useAuthStore } from '../stores/auth'
 import { useTareasStore } from '../stores/tareas'
 import { formatFechaCorta, formatFechaLarga } from '../utils/fecha.js'
@@ -291,7 +290,6 @@ const props = defineProps({
   usuarios:     { type: Array,   default: () => [] },
 })
 const emit = defineEmits(['guardada', 'cerrar'])
-useModalEscape(() => emit('cerrar'))
 
 const authStore   = useAuthStore()
 const tareasStore = useTareasStore()

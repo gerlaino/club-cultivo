@@ -3,7 +3,7 @@
 
     <!-- Backdrop -->
     <Transition name="nd-fade">
-      <div
+      <div v-modal="close"
         v-if="modelValue"
         class="nd-backdrop"
         @click="close"

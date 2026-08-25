@@ -326,7 +326,7 @@ async function removeOne(u) {
 
     <!-- ── MODAL ── -->
     <Teleport to="body">
-      <div v-if="showModal" class="uv__overlay" @click.self="closeModal">
+      <div v-modal="closeModal" v-if="showModal" class="uv__overlay" @click.self="closeModal">
         <div class="uv__modal">
 
           <!-- Header -->
