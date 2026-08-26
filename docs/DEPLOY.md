@@ -152,6 +152,22 @@ el backup abortaba diciendo que faltaba una variable que estaba puesta con otro 
 Lo mismo con el bucket: `BACKUP_BUCKET` → `S3_BUCKET` → `AWS_BUCKET`. Uno dedicado sigue siendo lo
 mejor, pero un backup mezclado bajo el prefijo `postgres/` es mejor que ningún backup.
 
+> **Ojo: hoy el destino NO es R2, es AWS S3.** Producción está configurada con `AWS_BUCKET`,
+> `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` y `AWS_REGION`, y **no tiene `S3_ENDPOINT`** — sin
+> endpoint el SDK habla con S3 de verdad. Esta sección decía R2 porque así se había planeado.
+>
+> Importa por la REGIÓN: `auto` es un valor de R2 y S3 no lo entiende. El código lo usa como
+> default sólo cuando hay endpoint; sin endpoint exige una región real y la busca en
+> `BACKUP_S3_REGION` → `S3_REGION` → `AWS_REGION`.
+
+### Por qué el cron falla pidiendo una clave de cifrado
+
+Si el log dice `Falta ACTIVE_RECORD_ENCRYPTION_PRIMARY_KEY`, **no le des las claves**: el arreglo
+ya está en el código —el chequeo es un `initializer` y no se dispara con un rake sin
+`:environment`— y lo que pasa es que **el Cron Job corre una versión vieja**. En Render un cron
+tiene su propio deploy y no se actualiza con el del web service. La salida es redeployarlo, no
+aflojar la regla.
+
 Las credenciales caen en `S3_*` si no existen `BACKUP_S3_*`. Reusar las de la app funciona y es lo
 más rápido para empezar; lo ideal después es un token de R2 **dedicado** y limitado al bucket de
 backups, para que una filtración del backup no dé acceso a los documentos clínicos ni al revés.

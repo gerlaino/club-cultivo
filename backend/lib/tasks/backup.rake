@@ -68,7 +68,13 @@ module ClubBackup
       # alcance, que es de donde salen estas diferencias.
       access_key_id:     env_first("BACKUP_S3_ACCESS_KEY_ID", "S3_ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID"),
       secret_access_key: env_first("BACKUP_S3_SECRET_ACCESS_KEY", "S3_SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY"),
-      region:            (ENV["S3_REGION"].to_s.strip.empty? ? "auto" : ENV["S3_REGION"].strip),
+      # `auto` es un valor de R2 y S3 no lo entiende. Sólo se usa como default cuando HAY endpoint
+      # —o sea, cuando el destino es R2 o compatible—; sin endpoint el destino es AWS S3 de verdad
+      # y hace falta una región real, que sale de las mismas variables que usa la app.
+      #
+      # La app lee `AWS_REGION` y esto leía sólo `S3_REGION`: producción está configurada con las
+      # `AWS_*`, así que el cron tenía puesta una `S3_REGION` que no servía para nada.
+      region:            region_para(endpoint),
       # R2: los checksums nuevos del SDK rompen la firma ("AuthorizationHeaderMalformed").
       request_checksum_calculation: "when_required",
       response_checksum_validation: "when_required",
@@ -78,6 +84,23 @@ module ClubBackup
       opts[:force_path_style] = true
     end
     Aws::S3::Client.new(opts)
+  end
+
+  def region_para(endpoint)
+    v = env_first_opcional("BACKUP_S3_REGION", "S3_REGION", "AWS_REGION")
+    return v unless v.empty?
+    # Sin endpoint el destino es AWS S3: adivinar la región da un error críptico de firma, así
+    # que mejor decir qué falta.
+    abort "✗ Falta la región del bucket (AWS_REGION o S3_REGION)." if endpoint.to_s.strip.empty?
+    "auto"
+  end
+
+  def env_first_opcional(*keys)
+    keys.each do |k|
+      v = ENV[k].to_s.strip
+      return v unless v.empty?
+    end
+    ""
   end
 
   def tmp_dir
