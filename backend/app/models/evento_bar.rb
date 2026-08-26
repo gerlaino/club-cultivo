@@ -50,7 +50,9 @@ class EventoBar < ApplicationRecord
   # depósito): es la atribución al evento de lo que costó lo que se vendió/consumió. Sin él, el
   # resultado exagera la ganancia.
   def resultado
-    ingresos = movimientos_contables.where(tipo: %w[ingreso recupero_costo]).sum(:monto_ars).to_d
+    # Sólo lo COBRADO: una dispensa del evento a cuenta corriente no es plata que entró, y
+    # contarla daba un evento rentable con la plata todavía afuera.
+    ingresos = movimientos_contables.where(tipo: %w[ingreso recupero_costo], pagado: true).sum(:monto_ars).to_d
     egresos  = movimientos_contables.where(tipo: 'egreso').sum(:monto_ars).to_d
     cogs     = costo_mercaderia.to_d
     {

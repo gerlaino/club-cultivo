@@ -105,7 +105,7 @@ const dashboardSede  = ref(null) // filtro de sede LOCAL del dashboard (null = t
 // nadie clasificó. Por eso no cuenta para decidir si el bloque se muestra, pero sí se avisa
 // cuánta plata quedó ahí, que es lo accionable.
 const sectoresConMovimiento = computed(() =>
-  (store.dashboard?.por_unidad || []).filter(u => u.id != null && (u.ingresos || u.egresos))
+  (store.dashboard?.por_unidad || []).filter(u => u.id != null && (u.ingresos || u.egresos || u.a_cobrar))
 )
 const sectoresComparables = computed(() => sectoresConMovimiento.value.length >= 2)
 const sinSectorMonto = computed(() => {
@@ -803,6 +803,12 @@ onMounted(async () => {
                 </span>
                 <span class="cv__unidad-nums">
                   <span class="cv__unidad-in">+{{ fmt(u.ingresos) }}</span>
+                  <!-- Lo entregado que todavía no se cobró (cuenta corriente). No suma al
+                       balance —la plata no está— pero tampoco se esconde: sin esto, una entrega
+                       a cuenta desaparecía del panel como si nunca hubiera ocurrido. -->
+                  <span v-if="u.a_cobrar" class="cv__unidad-deuda" title="Entregado y todavía sin cobrar (cuenta corriente)">
+                    ~{{ fmt(u.a_cobrar) }}
+                  </span>
                   <span class="cv__unidad-out">−{{ fmt(u.egresos) }}</span>
                   <strong class="cv__unidad-bal" :class="u.balance >= 0 ? 'is-pos' : 'is-neg'">{{ fmt(u.balance) }}</strong>
                 </span>
@@ -1652,6 +1658,7 @@ onMounted(async () => {
 .cv__unidad-name { font-weight: 550; color: #1f2a24; font-size: .9rem; }
 .cv__unidad-nums { display: flex; align-items: baseline; gap: 14px; font-variant-numeric: tabular-nums; }
 .cv__unidad-in  { color: #2f6b3d; font-size: .82rem; }
+.cv__unidad-deuda { color: #b45309; font-variant-numeric: tabular-nums; }
 .cv__unidad-out { color: #b23b2e; font-size: .82rem; }
 .cv__unidad-bal { font-size: .95rem; min-width: 90px; text-align: right; }
 .cv__unidad-bal.is-pos { color: #2f6b3d; }

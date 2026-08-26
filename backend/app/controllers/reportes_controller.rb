@@ -67,9 +67,11 @@ class ReportesController < ApplicationController
 
   def por_unidad(club, movs)
     unidades = club.unidades_negocio.index_by(&:id)
-    movs.group(:unidad_negocio_id, :tipo).sum(:monto_ars).each_with_object({}) do |((uid, tipo), total), acc|
-      row = acc[uid] ||= { id: uid, nombre: (uid && unidades[uid]&.nombre) || 'Sin unidad', ingresos: 0.0, egresos: 0.0, balance: 0.0 }
-      if %w[ingreso recupero_costo].include?(tipo) then row[:ingresos] += total.to_f
+    # Por `pagado` también: un ingreso a cuenta corriente no es plata que entró, y sumarlo acá
+    # infla el resultado con lo que el paciente todavía debe. Va aparte, no se descarta.
+    movs.group(:unidad_negocio_id, :tipo, :pagado).sum(:monto_ars).each_with_object({}) do |((uid, tipo, pagado), total), acc|
+      row = acc[uid] ||= { id: uid, nombre: (uid && unidades[uid]&.nombre) || 'Sin unidad', ingresos: 0.0, egresos: 0.0, a_cobrar: 0.0, balance: 0.0 }
+      if %w[ingreso recupero_costo].include?(tipo) then row[pagado ? :ingresos : :a_cobrar] += total.to_f
       elsif tipo == 'egreso' then row[:egresos] += total.to_f end
       row[:balance] = (row[:ingresos] - row[:egresos]).round(2)
     end.values.sort_by { |r| -r[:balance] }

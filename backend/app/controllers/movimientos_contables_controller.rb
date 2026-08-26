@@ -659,15 +659,26 @@ class MovimientosContablesController < ApplicationController
     unidades = current_user.club.unidades_negocio.index_by(&:id)
     sedes    = current_user.club.sedes.index_by(&:id)
     acc = {}
-    scope.group(:unidad_negocio_id, :sede_id, :tipo).sum(:monto_ars).each do |(uid, sede_id, tipo), total|
+    # Se agrupa TAMBIÉN por `pagado`: un ingreso sin cobrar no es plata que entró.
+    #
+    # Una dispensación a cuenta corriente crea su asiento con `pagado: false` —correcto: la
+    # entrega ocurrió y queda registrada— pero esta suma lo metía en `ingresos` igual, así que el
+    # P&L mostraba plata que todavía nadie pagó. `MovimientoContable.ingresos` ya excluía lo no
+    # cobrado; acá se agrupaba por `tipo` a mano y se salteaba el scope.
+    #
+    # No se descarta: va a `a_cobrar`, porque esconderlo haría parecer que la venta no existió.
+    # Los EGRESOS siguen contándose estén pagados o no, igual que el scope `egresos`: se reconoce
+    # lo que se debe y sólo lo que se cobró. Es la convención conservadora del proyecto.
+    scope.group(:unidad_negocio_id, :sede_id, :tipo, :pagado).sum(:monto_ars).each do |(uid, sede_id, tipo, pagado), total|
       u   = uid && unidades[uid]
       row = acc[uid] ||= { id: uid, nombre: u&.nombre || 'Sin unidad', tipo: u&.tipo,
-                           ingresos: 0.0, egresos: 0.0, balance: 0.0, sedes: {} }
+                           ingresos: 0.0, egresos: 0.0, a_cobrar: 0.0, balance: 0.0, sedes: {} }
       s    = sede_id && sedes[sede_id]
       srow = row[:sedes][sede_id || 0] ||= { id: sede_id, nombre: s&.nombre || 'Sin sede',
-                                             ingresos: 0.0, egresos: 0.0, balance: 0.0 }
+                                             ingresos: 0.0, egresos: 0.0, a_cobrar: 0.0, balance: 0.0 }
       if %w[ingreso recupero_costo].include?(tipo)
-        row[:ingresos] += total.to_f; srow[:ingresos] += total.to_f
+        destino = pagado ? :ingresos : :a_cobrar
+        row[destino] += total.to_f; srow[destino] += total.to_f
       elsif tipo == 'egreso'
         row[:egresos] += total.to_f; srow[:egresos] += total.to_f
       end
