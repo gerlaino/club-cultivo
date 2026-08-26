@@ -427,6 +427,11 @@ Rails.application.routes.draw do
       end
     end
 
+    # Lo que cada persona sacó del cajón y no cerró. Vive aparte del libro porque la pregunta es
+    # otra: no "qué gastó la organización" sino "quién tiene plata nuestra".
+    get  'retiros_caja',            to: 'retiros_caja#index'
+    post 'retiros_caja/:id/saldar', to: 'retiros_caja#saldar'
+
     resources :movimientos_contables, only: [:index, :show, :create, :update, :destroy] do
       collection do
         get :dashboard

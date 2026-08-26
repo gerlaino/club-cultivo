@@ -4,7 +4,7 @@ import { useRoute, useRouter } from "vue-router"
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useContabilidadStore } from "../stores/contabilidad"
 import { useAuthStore }         from "../stores/auth"
-import api, { listSedes, listLotes, listPacientes, cerrarPeriodoContable, reabrirPeriodoContable, createCompraCuotas, listComprasCuotas, listUnidadesNegocio, listInsumos, listBares, listCategoriasContables, listDepositos, registrarPagoMovimiento } from "../lib/api"
+import api, { listSedes, listLotes, listPacientes, cerrarPeriodoContable, reabrirPeriodoContable, createCompraCuotas, listComprasCuotas, listUnidadesNegocio, listInsumos, listBares, listCategoriasContables, listDepositos, registrarPagoMovimiento , listRetirosCaja, saldarRetiroCaja } from "../lib/api"
 import { useConfirm }           from "../composables/useConfirm.js"
 import { useToast }             from "../composables/useToast.js"
 import GastosRecurrentesView from './admin/GastosRecurrentesView.vue'
@@ -98,6 +98,73 @@ const { confirm } = useConfirm()
 const toast = useToast()
 
 const vistaActiva    = ref("dashboard")
+
+// ── Retiros de caja ──────────────────────────────────────────────────────────
+// Plata que salió del cajón a nombre de alguien y todavía no se cerró. El retiro nace NEUTRO: al
+// sacarla no se sabe si la devuelve, trae la factura o se la descuentan, y es el CIERRE el que
+// define qué fue contablemente. El saldo de cada uno sale de sumar sus abiertos, no se guarda.
+const retiros = ref({ por_persona: [], saldados: [], total_abierto: 0 })
+const totalRetiros = computed(() => retiros.value?.total_abierto || 0)
+
+const FORMAS = [
+  { valor: 'devuelto',    label: 'Devolvió la plata',      hint: 'Vuelve al cajón. No genera gasto.' },
+  { valor: 'comprobante', label: 'Trajo comprobante',      hint: 'Se convierte en un gasto real, con su categoría.' },
+  { valor: 'sueldo',      label: 'Se descuenta del sueldo', hint: 'Genera un egreso de sueldo.' },
+]
+const FORMA_LABEL = { devuelto: 'devolvió', comprobante: 'rindió comprobante', sueldo: 'a cuenta de sueldo' }
+// Las que tienen sentido para algo que se compró con la plata del cajón.
+const CATEGORIAS_GASTO = {
+  insumo: 'Insumo', mantenimiento: 'Mantenimiento', admin: 'Gasto administrativo',
+  honorario: 'Honorario', seguro: 'Seguro', electricidad: 'Electricidad', agua: 'Agua',
+  alquiler: 'Alquiler', otro: 'Otro',
+}
+
+const saldando       = ref(null)
+const formaSaldo     = ref('devuelto')
+const categoriaSaldo = ref(null)
+const notasSaldo     = ref('')
+const errorSaldo     = ref(null)
+const guardandoSaldo = ref(false)
+
+async function cargarRetiros() {
+  try {
+    const { data } = await listRetirosCaja()
+    retiros.value = data || { por_persona: [], saldados: [], total_abierto: 0 }
+  } catch { /* el tab queda vacío; el resto de Contabilidad no depende de esto */ }
+}
+
+function irARetiros() {
+  vistaActiva.value = 'retiros'
+  cargarRetiros()
+}
+
+function abrirSaldar(r) {
+  saldando.value = r
+  formaSaldo.value = 'devuelto'
+  categoriaSaldo.value = null
+  notasSaldo.value = ''
+  errorSaldo.value = null
+}
+
+async function confirmarSaldar() {
+  guardandoSaldo.value = true
+  errorSaldo.value = null
+  try {
+    await saldarRetiroCaja(saldando.value.id, {
+      forma: formaSaldo.value,
+      categoria: categoriaSaldo.value || undefined,
+      notas: notasSaldo.value || undefined,
+    })
+    saldando.value = null
+    await cargarRetiros()
+    // El cierre puede haber generado un egreso: el libro y el tablero cambian.
+    await store.fetchDashboard?.()
+    toast.success('Retiro saldado')
+  } catch (e) {
+    errorSaldo.value = e?.response?.data?.error || 'No se pudo saldar'
+  } finally { guardandoSaldo.value = false }
+}
+
 const dashboardSede  = ref(null) // filtro de sede LOCAL del dashboard (null = toda la organización)
 
 // El resultado por sector sólo tiene sentido si hay DOS O MÁS sectores con movimientos: con
@@ -609,7 +676,81 @@ onMounted(async () => {
       <button class="cv__tab" :class="{ 'cv__tab--active': vistaActiva === 'recurrentes' }" @click="vistaActiva = 'recurrentes'">
         <i class="bi bi-arrow-repeat"></i> Recurrentes
       </button>
+      <!-- Aparte del libro porque la pregunta es otra: no "qué gastó la organización" sino
+           "quién tiene plata nuestra". Con el badge, porque es plata afuera. -->
+      <button class="cv__tab" :class="{ 'cv__tab--active': vistaActiva === 'retiros' }" @click="irARetiros">
+        <i class="bi bi-person-badge"></i> Retiros
+        <span v-if="totalRetiros" class="cv__tab-badge">{{ fmt(totalRetiros) }}</span>
+      </button>
     </div>
+
+    <!-- ── RETIROS DE CAJA ────────────────────────────────────────────────────
+         El saldo de cada persona NO se guarda: sale de sumar sus retiros abiertos. Una sola
+         fuente de verdad en vez de un saldo que hay que mantener coincidiendo. -->
+    <section v-if="vistaActiva === 'retiros'" class="cv__retiros">
+      <p v-if="!retiros.por_persona?.length" class="cv__retiros-vacio">
+        Nadie tiene plata de la caja pendiente de rendir.
+      </p>
+
+      <div v-for="p in retiros.por_persona" :key="p.user_id ?? 'sin'" class="cv__ret-persona">
+        <div class="cv__ret-hd">
+          <span class="cv__ret-nombre">{{ p.nombre }}</span>
+          <span class="cv__ret-debe">debe {{ fmt(p.debe) }}</span>
+        </div>
+        <div v-for="r in p.retiros" :key="r.id" class="cv__ret-item">
+          <span class="cv__ret-fecha">{{ fmtFechaCorta(r.fecha) }}</span>
+          <span class="cv__ret-monto">{{ fmt(r.monto_ars) }}</span>
+          <span class="cv__ret-desc">{{ r.descripcion }}</span>
+          <button class="cv__ret-btn" @click="abrirSaldar(r)">Saldar</button>
+        </div>
+      </div>
+
+      <div v-if="retiros.saldados?.length" class="cv__ret-saldados">
+        <span class="cv__ret-saldados-t">Cerrados recientemente</span>
+        <div v-for="r in retiros.saldados" :key="r.id" class="cv__ret-item cv__ret-item--cerrado">
+          <span class="cv__ret-fecha">{{ fmtFechaCorta(r.fecha) }}</span>
+          <span class="cv__ret-monto">{{ fmt(r.monto_ars) }}</span>
+          <span class="cv__ret-desc">
+            {{ r.retirado_por }} — {{ FORMA_LABEL[r.saldado_como] || r.saldado_como }}
+            <template v-if="r.resultado?.categoria_label"> · {{ r.resultado.categoria_label }}</template>
+          </span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Saldar: acá se decide qué FUE el retiro contablemente. Al retirar no se sabía. -->
+    <Teleport to="body">
+      <div v-modal="() => saldando = null" v-if="saldando" class="cv__overlay" @click.self="saldando = null">
+        <div class="cv__modal cv__modal--sm">
+          <div class="cv__modal-hd">
+            <h3 class="cv__modal-title">Saldar {{ fmt(saldando.monto_ars) }} de {{ saldando.retirado_por }}</h3>
+            <button class="cv__modal-x" @click="saldando = null">✕</button>
+          </div>
+          <div class="cv__modal-body">
+            <label v-for="f in FORMAS" :key="f.valor" class="cv__ret-forma"
+                   :class="{ 'cv__ret-forma--on': formaSaldo === f.valor }">
+              <input type="radio" :value="f.valor" v-model="formaSaldo" />
+              <span><strong>{{ f.label }}</strong><small>{{ f.hint }}</small></span>
+            </label>
+
+            <div v-if="formaSaldo === 'comprobante'" class="cv__ret-extra">
+              <label class="cv__lbl">Categoría del gasto</label>
+              <select v-model="categoriaSaldo" class="cv__input">
+                <option :value="null">— Elegir —</option>
+                <option v-for="(label, clave) in CATEGORIAS_GASTO" :key="clave" :value="clave">{{ label }}</option>
+              </select>
+              <input v-model.trim="notasSaldo" class="cv__input" placeholder="Qué se compró" />
+            </div>
+
+            <p v-if="errorSaldo" class="cv__ret-error">{{ errorSaldo }}</p>
+          </div>
+          <div class="cv__modal-ft">
+            <button class="cv__btn-ghost" @click="saldando = null">Cancelar</button>
+            <button class="cv__btn-primary" :disabled="guardandoSaldo" @click="confirmarSaldar">Saldar</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- Categorías: configuración contable integrada al hub -->
     <!-- `@cambio`: la solapa está embebida y su catálogo es el MISMO que usa el modal de
@@ -1658,6 +1799,42 @@ onMounted(async () => {
 .cv__unidad-name { font-weight: 550; color: #1f2a24; font-size: .9rem; }
 .cv__unidad-nums { display: flex; align-items: baseline; gap: 14px; font-variant-numeric: tabular-nums; }
 .cv__unidad-in  { color: #2f6b3d; font-size: .82rem; }
+/* Modal del hub contable. El archivo no tenía uno propio —usa componentes para los grandes—
+   pero saldar un retiro es una decisión de tres opciones: no amerita un componente aparte. */
+.cv__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 1050; padding: 1rem; backdrop-filter: blur(3px); }
+.cv__modal { background: #fff; border-radius: 16px; width: 100%; max-width: 560px; max-height: 92vh; overflow-y: auto; box-shadow: 0 24px 64px rgba(0,0,0,.18); display: flex; flex-direction: column; }
+.cv__modal--sm { max-width: 460px; }
+.cv__modal-hd { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.15rem .8rem; border-bottom: 1px solid var(--c-slate-100); }
+.cv__modal-title { font-size: .95rem; font-weight: 800; margin: 0; flex: 1; }
+.cv__modal-x { background: var(--c-slate-100); border: none; width: 28px; height: 28px; border-radius: 7px; cursor: pointer; color: var(--c-slate-500); }
+.cv__modal-body { padding: 1rem 1.15rem; display: flex; flex-direction: column; }
+.cv__modal-ft { display: flex; justify-content: flex-end; gap: .5rem; padding: .8rem 1.15rem 1rem; border-top: 1px solid var(--c-slate-100); }
+.cv__lbl { font-size: .76rem; font-weight: 700; color: var(--c-slate-600); }
+.cv__input { padding: .45rem .6rem; border: 1.5px solid var(--c-slate-200); border-radius: 9px; font-size: .85rem; width: 100%; }
+.cv__input:focus { outline: none; border-color: #1b5e20; }
+.cv__tab-badge { margin-left: .35rem; font-size: .68rem; font-weight: 800; color: #b45309; background: #fef3c7; border-radius: 999px; padding: 0 .4rem; }
+.cv__retiros { display: flex; flex-direction: column; gap: 1rem; }
+.cv__retiros-vacio { color: var(--c-slate-500); font-size: .88rem; }
+.cv__ret-persona { border: 1px solid var(--c-slate-200); border-radius: 12px; background: #fff; overflow: hidden; }
+.cv__ret-hd { display: flex; align-items: baseline; gap: .5rem; padding: .7rem .9rem; border-bottom: 1px solid var(--c-slate-100); }
+.cv__ret-nombre { font-weight: 800; font-size: .9rem; }
+.cv__ret-debe { margin-left: auto; font-weight: 800; color: #b45309; font-variant-numeric: tabular-nums; }
+.cv__ret-item { display: flex; align-items: center; gap: .6rem; padding: .55rem .9rem; border-bottom: 1px solid var(--c-slate-100); font-size: .84rem; }
+.cv__ret-item:last-child { border-bottom: none; }
+.cv__ret-item--cerrado { opacity: .7; }
+.cv__ret-fecha { color: var(--c-slate-500); font-size: .78rem; white-space: nowrap; }
+.cv__ret-monto { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cv__ret-desc { color: var(--c-slate-600); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cv__ret-btn { background: #1b5e20; color: #fff; border: none; border-radius: 8px; padding: .25rem .7rem; font-size: .78rem; font-weight: 700; cursor: pointer; }
+.cv__ret-saldados { border-top: 1px solid var(--c-slate-200); padding-top: .6rem; }
+.cv__ret-saldados-t { font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: var(--c-slate-500); display: block; margin-bottom: .3rem; }
+.cv__ret-forma { display: flex; align-items: flex-start; gap: .5rem; border: 1.5px solid var(--c-slate-200); border-radius: 10px; padding: .55rem .7rem; cursor: pointer; margin-bottom: .4rem; }
+.cv__ret-forma--on { border-color: #1b5e20; background: #f0fdf4; }
+.cv__ret-forma span { display: flex; flex-direction: column; }
+.cv__ret-forma strong { font-size: .86rem; }
+.cv__ret-forma small { font-size: .74rem; color: var(--c-slate-500); }
+.cv__ret-extra { display: flex; flex-direction: column; gap: .4rem; margin-top: .5rem; }
+.cv__ret-error { color: #b91c1c; font-size: .8rem; margin: .4rem 0 0; }
 .cv__unidad-deuda { color: #b45309; font-variant-numeric: tabular-nums; }
 .cv__unidad-out { color: #b23b2e; font-size: .82rem; }
 .cv__unidad-bal { font-size: .95rem; min-width: 90px; text-align: right; }

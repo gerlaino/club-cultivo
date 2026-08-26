@@ -495,6 +495,11 @@ export const anularCajaMostrador        = (sedeId, id, payload) => api.post(`/se
 export const salidaCajaMostrador        = (sedeId, id, payload) => api.post(`/sedes/${sedeId}/caja/${id}/salida`, payload)
 export const responsablesCaja           = (sedeId)          => api.get(`/sedes/${sedeId}/caja/responsables`)
 
+// Plata que salió del cajón a nombre de alguien y no se cerró. Vive aparte del libro porque la
+// pregunta es otra: no "qué gastó la organización" sino "quién tiene plata nuestra".
+export const listRetirosCaja  = ()               => api.get('/retiros_caja')
+export const saldarRetiroCaja = (id, payload)    => api.post(`/retiros_caja/${id}/saldar`, payload)
+
 // ── Bar · caja de turno (apertura / cierre con arqueo) ─────────────────────────
 export const getCajaActual      = (barId)          => api.get(`/bares/${barId}/cajas/actual`)
 export const listCajas          = (barId)          => api.get(`/bares/${barId}/cajas`)

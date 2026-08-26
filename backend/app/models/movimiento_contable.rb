@@ -13,6 +13,17 @@ class MovimientoContable < ApplicationRecord
   # el admin puede anotar el retiro que hizo otro. Sin esto, "anotámelos a mí" queda anotado a
   # quien tipeó.
   belongs_to :retirado_por, class_name: 'User', optional: true
+  belongs_to :saldado_por,  class_name: 'User', optional: true
+  # Ida y vuelta entre el retiro y lo que lo cerró: desde el retiro se llega al egreso que
+  # generó, y desde el egreso se llega al retiro que lo originó.
+  belongs_to :salda_a, class_name: 'MovimientoContable', optional: true
+  has_one    :saldado_con, class_name: 'MovimientoContable', foreign_key: :salda_a_id,
+             inverse_of: :salda_a, dependent: :nullify
+
+  # Retiros que todavía nadie cerró. El saldo de una persona es la suma de los suyos: no se
+  # guarda en ningún lado, así no hay dos datos que mantener coincidiendo.
+  scope :retiros,          -> { where(categoria: 'retiro_caja') }
+  scope :retiros_abiertos, -> { retiros.where(saldado_at: nil) }
 
   # Un retiro SIEMPRE tiene dueño, y ese dueño responde por la plata: sólo admin o supervisor.
   # Va en el modelo y no sólo en el controller porque es una regla del dato, no de una pantalla:
@@ -46,7 +57,7 @@ class MovimientoContable < ApplicationRecord
   CATEGORIAS = %w[
     insumo electricidad agua alquiler sueldo mantenimiento
     honorario seguro admin aporte_socio dispensacion subvencion bar
-    salida_caja retiro_caja diferencia_caja otro
+    salida_caja retiro_caja devolucion_caja diferencia_caja otro
   ].freeze
 
   CATEGORIA_LABELS = {
@@ -67,6 +78,7 @@ class MovimientoContable < ApplicationRecord
     # turno; `diferencia_caja` es lo que no apareció (o sobró) al arquear.
     "salida_caja"     => "Gasto pagado con la caja",
     "retiro_caja"     => "Retiro de caja",
+    "devolucion_caja" => "Devolución de retiro",
     "diferencia_caja" => "Diferencia de caja",
     "otro"          => "Otro",
   }.freeze
