@@ -17,7 +17,14 @@ module Dispensario
     before_action -> { require_feature!(:produccion_dispensa) }
     before_action :set_sede
     before_action :require_operador, only: [:actual, :confirmar_apertura, :solicitar_cierre]
+    before_action :require_gestion,  only: [:responsables]
     before_action :require_gestion,  only: [:index, :abrir, :cerrar, :confirmar_cierre, :salida, :anular]
+
+    # GET /sedes/:sede_id/caja/responsables — a quién se le puede atribuir un retiro
+    def responsables
+      users = current_user.club.users.where(role: MovimientoContable::ROLES_RETIRO).order(:first_name)
+      render json: users.map { |u| { id: u.id, nombre: u.nombre_completo, rol: u.role } }
+    end
 
     # GET /sedes/:sede_id/caja/actual — la caja activa del mostrador, o null
     def actual
@@ -101,6 +108,19 @@ module Dispensario
       return render json: { error: 'Escribí para qué se saca la plata.' }, status: :unprocessable_entity if motivo.blank?
       return render json: { error: 'Indicá si es un gasto o un retiro.' }, status: :unprocessable_entity if clase.nil?
 
+      # Un retiro siempre queda a nombre de alguien, y ese alguien responde por la plata: admin o
+      # supervisor. Por defecto, quien lo está registrando —el caso normal es que se la lleve él—
+      # pero se puede anotar a otro: el admin registrando lo que retiró el supervisor.
+      retirado_por = nil
+      if clase[:categoria] == 'retiro_caja'
+        retirado_por = if params[:retirado_por_id].present?
+          current_user.club.users.find_by(id: params[:retirado_por_id])
+        else
+          current_user
+        end
+        return render json: { error: 'Elegí a quién se le atribuye el retiro.' }, status: :unprocessable_entity if retirado_por.nil?
+      end
+
       con_caja do |caja|
         raise ArgumentError, 'La caja no está abierta' unless caja.abierta?
         if monto > caja.efectivo_esperado_ars.to_d
@@ -109,7 +129,7 @@ module Dispensario
 
         caja.movimientos_contables.create!(
           club: current_user.club, sede_id: caja.sede_id, created_by: current_user,
-          tipo: clase[:tipo], categoria: clase[:categoria],
+          tipo: clase[:tipo], categoria: clase[:categoria], retirado_por: retirado_por,
           descripcion: "#{clase[:prefijo]} — #{motivo}",
           monto_ars: monto, fecha: Time.zone.today,
           pagado: true, medio_pago: 'efectivo', comprobante_tipo: 'sin_comprobante',
@@ -188,7 +208,7 @@ module Dispensario
         total_efectivo_ars:     caja.total_efectivo_ars,
         total_digital_ars:      caja.total_digital_ars,
         total_salidas_ars:      caja.total_salidas_ars,
-        salidas:                caja.salidas.order(:created_at).map { |m| { id: m.id, monto_ars: m.monto_ars.to_f, descripcion: m.descripcion, clase: m.categoria == 'retiro_caja' ? 'retiro' : 'gasto', quien: m.created_by&.nombre_completo } },
+        salidas:                caja.salidas.order(:created_at).map { |m| { id: m.id, monto_ars: m.monto_ars.to_f, descripcion: m.descripcion, clase: m.categoria == 'retiro_caja' ? 'retiro' : 'gasto', quien: (m.retirado_por || m.created_by)&.nombre_completo } },
         efectivo_esperado_ars:  caja.efectivo_esperado_ars,
         efectivo_declarado_ars: caja.efectivo_declarado_ars&.to_f,
         diferencia_ars:         caja.diferencia_ars,

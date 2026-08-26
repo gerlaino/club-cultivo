@@ -493,6 +493,7 @@ export const confirmarCierreMostrador   = (sedeId, id)          => api.post(`/se
 export const cerrarCajaMostrador        = (sedeId, id, payload) => api.post(`/sedes/${sedeId}/caja/${id}/cerrar`, payload)
 export const anularCajaMostrador        = (sedeId, id, payload) => api.post(`/sedes/${sedeId}/caja/${id}/anular`, payload)
 export const salidaCajaMostrador        = (sedeId, id, payload) => api.post(`/sedes/${sedeId}/caja/${id}/salida`, payload)
+export const responsablesCaja           = (sedeId)          => api.get(`/sedes/${sedeId}/caja/responsables`)
 
 // ── Bar · caja de turno (apertura / cierre con arqueo) ─────────────────────────
 export const getCajaActual      = (barId)          => api.get(`/bares/${barId}/cajas/actual`)

@@ -416,6 +416,7 @@ Rails.application.routes.draw do
       scope module: :dispensario do
         get  'caja',        to: 'cajas#index'
         get  'caja/actual', to: 'cajas#actual'
+        get  'caja/responsables', to: 'cajas#responsables'
         post 'caja/abrir',  to: 'cajas#abrir'
         post 'caja/:id/confirmar_apertura', to: 'cajas#confirmar_apertura'
         post 'caja/:id/solicitar_cierre',   to: 'cajas#solicitar_cierre'

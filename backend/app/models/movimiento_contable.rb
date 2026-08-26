@@ -9,6 +9,15 @@ class MovimientoContable < ApplicationRecord
   # El turno de caja que lo generó, si salió de ahí: una salida de efectivo o la diferencia
   # del arqueo. Permite volver del libro a la caja que lo explica.
   belongs_to :caja_turno, optional: true
+  # A QUIÉN se le atribuye un retiro de caja. No es `created_by`: ese dice quién lo registró, y
+  # el admin puede anotar el retiro que hizo otro. Sin esto, "anotámelos a mí" queda anotado a
+  # quien tipeó.
+  belongs_to :retirado_por, class_name: 'User', optional: true
+
+  # Un retiro SIEMPRE tiene dueño, y ese dueño responde por la plata: sólo admin o supervisor.
+  # Va en el modelo y no sólo en el controller porque es una regla del dato, no de una pantalla:
+  # por API se saltea siempre.
+  validate :retiro_con_dueno_responsable, if: -> { categoria == 'retiro_caja' }
   acts_as_tenant(:club)
   belongs_to :sede,         optional: true
   belongs_to :lote,         optional: true
@@ -170,6 +179,20 @@ class MovimientoContable < ApplicationRecord
   end
 
   private
+
+  ROLES_RETIRO = %w[admin supervisor].freeze
+
+  def retiro_con_dueno_responsable
+    if retirado_por.nil?
+      errors.add(:retirado_por, 'es obligatorio en un retiro de caja: la plata queda a nombre de alguien')
+      return
+    end
+
+    errors.add(:retirado_por, 'tiene que ser de esta organización') if retirado_por.club_id != club_id
+    return if ROLES_RETIRO.include?(retirado_por.role)
+
+    errors.add(:retirado_por, 'sólo un administrador o supervisor puede retirar de la caja')
+  end
 
   # Deriva el string legacy `categoria` y la unidad de negocio desde la categoría editable.
   # No pisa valores ya seteados: un movimiento de sistema (dispensación, cuota) que trae su

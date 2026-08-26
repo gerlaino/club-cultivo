@@ -80,7 +80,8 @@
       <input v-model.trim="observaciones" type="text" class="cjm-input cjm-obs"
              placeholder="Observaciones — ej: turno mañana" />
 
-      <button v-if="puedeGestionarCaja" type="button" class="cjm-link" @click="mostrarSalida = !mostrarSalida">
+      <button v-if="puedeGestionarCaja" type="button" class="cjm-link"
+              @click="mostrarSalida = !mostrarSalida; mostrarSalida && cargarResponsables()">
         {{ mostrarSalida ? 'Cancelar' : 'Sacar efectivo de la caja' }}
       </button>
       <div v-if="mostrarSalida && puedeGestionarCaja" class="cjm-salida-form">
@@ -102,8 +103,18 @@
             <input v-model.number="salidaMonto" type="number" min="0" step="1" class="cjm-input" placeholder="0" />
           </div>
           <input v-model.trim="salidaMotivo" type="text" class="cjm-input"
-                 :placeholder="salidaClase === 'retiro' ? 'Quién se la lleva' : 'En qué se gastó'" />
+                 :placeholder="salidaClase === 'retiro' ? 'Para qué' : 'En qué se gastó'" />
           <button class="cjm-btn" :disabled="guardandoCaja" @click="sacarEfectivo">Registrar</button>
+        </div>
+        <!-- Un retiro SIEMPRE queda a nombre de alguien, y ese alguien responde por la plata:
+             sólo admin o supervisor. Por defecto quien lo registra, porque el caso normal es que
+             se la lleve él; pero el admin puede anotar lo que retiró el supervisor. -->
+        <div v-if="salidaClase === 'retiro'" class="cjm-cerrar">
+          <label class="cjm-label">Queda a nombre de</label>
+          <select v-model="salidaResponsable" class="cjm-input">
+            <option :value="null">— Yo —</option>
+            <option v-for="r in responsables" :key="r.id" :value="r.id">{{ r.nombre }}</option>
+          </select>
         </div>
       </div>
     </template>
@@ -145,6 +156,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import {
   getCajaMostrador, abrirCajaMostrador, confirmarAperturaMostrador,
   solicitarCierreMostrador, confirmarCierreMostrador, anularCajaMostrador, salidaCajaMostrador,
+  responsablesCaja,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
@@ -176,6 +188,8 @@ const salidaMotivo    = ref('')
 // Por defecto RETIRO: es el caso frecuente ("dame plata de la caja") y el que no debe tocar el
 // resultado. Si el default fuera gasto, cada retiro mal marcado bajaría la ganancia del mes.
 const salidaClase     = ref('retiro')
+const salidaResponsable = ref(null)
+const responsables    = ref([])
 
 const sede = computed(() => props.sede)
 const puedeGestionarCaja = computed(() => props.puedeGestionar)
@@ -190,6 +204,16 @@ const estadoCaja = computed(() => {
   if (caja.value.estado === 'pendiente_cierre') return 'pendiente'
   return caja.value.apertura_confirmada ? 'andando' : 'sin-confirmar'
 })
+
+// Se piden recién al abrir el formulario de salida: es una acción excepcional y no vale pedir
+// la lista en cada visita a la tarjeta.
+async function cargarResponsables() {
+  if (responsables.value.length || !sede.value) return
+  try {
+    const { data } = await responsablesCaja(sede.value.id)
+    responsables.value = data || []
+  } catch { responsables.value = [] }
+}
 
 async function cargarCaja() {
   if (!sede.value) { cargandoCaja.value = false; caja.value = null; return }
@@ -239,6 +263,7 @@ const anular = () => conCaja(
 const sacarEfectivo = () => conCaja(
   () => salidaCajaMostrador(sede.value.id, caja.value.id, {
     monto_ars: Number(salidaMonto.value) || 0, motivo: salidaMotivo.value, clase: salidaClase.value,
+    retirado_por_id: salidaResponsable.value || undefined,
   }),
   'Salida registrada').then(() => { mostrarSalida.value = false; salidaMonto.value = null; salidaMotivo.value = '' })
 

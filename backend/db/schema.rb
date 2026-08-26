@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_26_040000) do
+ActiveRecord::Schema[7.2].define(version: 2026_08_26_060000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1360,6 +1360,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_26_040000) do
     t.decimal "cantidad", precision: 12, scale: 3
     t.string "unidad"
     t.bigint "caja_turno_id"
+    t.bigint "retirado_por_id"
     t.index ["caja_turno_id"], name: "index_movimientos_contables_on_caja_turno_id"
     t.index ["categoria_contable_id"], name: "index_movimientos_contables_on_categoria_contable_id"
     t.index ["club_id", "fecha"], name: "index_movimientos_contables_on_club_id_and_fecha"
@@ -1373,6 +1374,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_26_040000) do
     t.index ["fecha"], name: "index_movimientos_contables_on_fecha"
     t.index ["lote_id"], name: "index_movimientos_contables_on_lote_id"
     t.index ["paciente_id"], name: "index_movimientos_contables_on_paciente_id"
+    t.index ["retirado_por_id"], name: "index_movimientos_contables_on_retirado_por_id"
     t.index ["sede_id", "fecha"], name: "index_movimientos_contables_on_sede_id_and_fecha"
     t.index ["sede_id"], name: "index_movimientos_contables_on_sede_id"
     t.index ["unidad_negocio_id"], name: "index_movimientos_contables_on_unidad_negocio_id"
@@ -2454,6 +2456,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_26_040000) do
   add_foreign_key "movimientos_contables", "unidades_negocio", column: "unidad_negocio_id"
   add_foreign_key "movimientos_contables", "users", column: "created_by_id"
   add_foreign_key "movimientos_contables", "users", column: "deleted_by_id"
+  add_foreign_key "movimientos_contables", "users", column: "retirado_por_id"
   add_foreign_key "notas", "clubs"
   add_foreign_key "notas", "users"
   add_foreign_key "notas", "users", column: "deleted_by_id"
