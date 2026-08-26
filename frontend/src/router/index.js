@@ -1087,8 +1087,11 @@ const ROLE_ALLOWED_PREFIX = {
 
   // Mostrador: dispensa, cobra y consulta stock. `/stock` es la pantalla de stock del
   // dispensador (la de admin es `/admin/stock`): son dos rutas distintas y le hacen falta las dos.
+  // `/tareas` faltaba acá aunque la matriz de permisos ya le da `tareas: ['index','show']`: la
+  // misma regla escrita en dos lados y desalineada, que se ve como "la pantalla te deja y el
+  // router te rebota".
   dispensador: ['/', '/pacientes', '/socios', '/historial', '/stock', '/admin/stock', '/insumos',
-                '/reservas', '/bar', '/entregas', '/m', ...ETIQUETAS, ...COMUNES],
+                '/reservas', '/bar', '/entregas', '/tareas', '/m', ...ETIQUETAS, ...COMUNES],
 
   // El paciente sólo ve lo suyo y el portal que le arma su organización. No lleva `COMUNES`
   // como los demás: ahí adentro está `/mis-horas`, que es la planilla de quien TRABAJA en la

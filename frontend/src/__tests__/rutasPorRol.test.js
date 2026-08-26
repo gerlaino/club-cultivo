@@ -106,3 +106,51 @@ describe('acceso por URL directa', () => {
     })
   })
 })
+
+// El bloque de arriba es una lista de PROHIBIDOS: atrapa "entra donde no debería", nunca lo
+// contrario. Por eso se coló que el dispensador tuviera `tareas: ['index','show']` en la matriz
+// de permisos y `/tareas` NO estuviera en sus prefijos de ruta: el permiso decía que sí, el
+// router lo rebotaba, y ningún test comparaba las dos listas.
+//
+// Es la forma más cara del bug en este proyecto —"la pantalla te deja y el router te rechaza"—
+// porque parece culpa del usuario. Este bloque cruza las dos fuentes.
+describe('lo que la matriz de permisos concede, el router lo deja abrir', () => {
+  // Sólo los recursos que tienen UNA dirección, la misma para todos los roles.
+  //
+  // La primera versión mapeaba también socios, dispensaciones, lotes, plantas y sedes, y devolvía
+  // 11 "divergencias" que no lo eran: el médico llega a sus pacientes por /medico/pacientes y el
+  // auditor por /auditor/…, así que el permiso `socios` con /pacientes cerrado es correcto. Un
+  // test que falla por el motivo equivocado hace tanto daño como uno que pasa por el equivocado:
+  // se aprende a ignorarlo.
+  //
+  // Si mañana otro recurso pasa a tener una única pantalla compartida, va acá.
+  const RUTA_DEL_RECURSO = {
+    tareas: '/tareas',
+  }
+
+  // Divergencias conocidas y todavía SIN decidir. No se arreglan de prepo porque no está claro
+  // cuál de las dos listas tiene razón:
+  //
+  //   medico/tareas — la matriz le da `tareas: ['index','show']` y el router le cierra /tareas.
+  //     O el permiso quedó viejo (las tareas son de cultivo y el médico trabaja con turnos), o
+  //     falta el prefijo. Lo decide Germán; mientras tanto queda acá para que se vea.
+  const PENDIENTES_DE_DECIDIR = ["medico: puede 'tareas' pero el router le cierra /tareas"]
+
+  it('cada recurso con index tiene una ruta que ese rol puede abrir', async () => {
+    // El archivo mockea usePermissions para poder importar el router sin arrastrar la sesión;
+    // la matriz hay que traerla del módulo REAL, o el test se compara contra el mock.
+    const { PERMISSIONS } = await vi.importActual('../composables/usePermissions.js')
+    const faltantes = []
+
+    for (const [rol, recursos] of Object.entries(PERMISSIONS ?? {})) {
+      if (rol === 'admin' || rol === 'super_admin') continue
+      for (const [recurso, acciones] of Object.entries(recursos)) {
+        const ruta = RUTA_DEL_RECURSO[recurso]
+        if (!ruta || !acciones.includes('index')) continue
+        if (!puedeEntrar(rol, ruta)) faltantes.push(`${rol}: puede '${recurso}' pero el router le cierra ${ruta}`)
+      }
+    }
+
+    expect(faltantes).toEqual(PENDIENTES_DE_DECIDIR)
+  })
+})

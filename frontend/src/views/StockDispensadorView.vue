@@ -48,19 +48,19 @@
                   {{ s.regulatorio ? 'Propio' : 'Externo' }}
                 </span>
               </div>
-              <span v-if="s.numero_lote_producto" class="sdv__forma-sub">{{ s.numero_lote_producto }}</span>
+              <span v-if="s.numero_lote_producto" class="sdv__codigo">{{ s.numero_lote_producto }}</span>
             </td>
             <td class="sdv__td-cepa" data-col="Genética">{{ s.genetica?.nombre ?? s.lote?.genetica?.nombre ?? '—' }}</td>
             <td class="sdv__td-mono" data-col="Lote">{{ s.lote_codigo ?? s.lote?.codigo ?? '—' }}</td>
             <td data-col="Sede">{{ s.sede?.nombre ?? '—' }}</td>
             <td class="sdv__td-ing" data-col="Ingresó">{{ fmtIngreso(s.created_at) }}</td>
             <td class="sdv__td-num" data-col="Disponible" :class="{ 'sdv__td-bajo': s.cantidad_disponible_real < 5 }">
-              <div>{{ s.cantidad_disponible_real?.toFixed(1) ?? s.cantidad }}{{ s.unidad }}</div>
-              <span v-if="mostrarInicial(s)" class="sdv__td-inicial">de {{ s.cantidad_inicial?.toFixed(1) }}{{ s.unidad }}</span>
+              <div class="sdv__cant">{{ fmtCant(s.cantidad_disponible_real ?? s.cantidad) }}<span class="sdv__unidad">{{ s.unidad }}</span></div>
+              <span v-if="mostrarInicial(s)" class="sdv__td-inicial">de {{ fmtCant(s.cantidad_inicial) }}{{ s.unidad }}</span>
             </td>
             <td class="sdv__td-num" data-col="Comprometido">
               <span v-if="s.gramos_reservados > 0" class="sdv__badge-reservado" :title="`${s.gramos_reservados}g comprometidos en delivery`">
-                −{{ s.gramos_reservados?.toFixed(1) }}g
+                −{{ fmtCant(s.gramos_reservados) }}g
               </span>
               <span v-else class="sdv__none">—</span>
             </td>
@@ -173,6 +173,14 @@ const fmtIngreso = (d) => d
   : '—'
 
 // Mostramos "de Xg" solo si ya se consumió algo (inicial > disponible real).
+// 200 en vez de 200.0, pero 82.5 conserva su decimal: el ".0" colgando de cada número era la
+// mitad de la sensación de planilla vieja.
+function fmtCant(n) {
+  if (n == null) return '—'
+  const v = Number(n)
+  return Number.isInteger(v) ? v.toLocaleString('es-AR') : v.toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })
+}
+
 function mostrarInicial(s) {
   const ini = s.cantidad_inicial
   if (ini == null) return false
@@ -225,23 +233,25 @@ function mostrarInicial(s) {
   letter-spacing: .04em;
   color: var(--c-ink-500);
   padding: var(--sp-3);
-  background: var(--c-ink-100);
-  border-bottom: 2px solid var(--c-ink-300);
+  background: transparent;
+  border-bottom: 1px solid var(--c-ink-200);
 }
 .sdv__table td { padding: var(--sp-3); border-bottom: 1px solid var(--c-ink-100); color: var(--c-ink-900); vertical-align: middle; }
 .sdv__table tr:last-child td { border-bottom: none; }
 .sdv__table tr:hover td { background: var(--c-leaf-50); }
-.sdv__th-num, .sdv__td-num { text-align: right; }
+.sdv__th-num, .sdv__td-num { text-align: right; font-variant-numeric: tabular-nums; }
+.sdv__cant { font-weight: 600; font-size: var(--fs-15); color: var(--c-ink-900); }
+.sdv__unidad { font-size: var(--fs-12); font-weight: 500; color: var(--c-ink-500); margin-left: 1px; }
 .sdv__td-forma { font-weight: 600; }
 .sdv__forma-main { display: flex; align-items: center; gap: var(--sp-2); }
-.sdv__forma-sub { font-family: var(--font-mono); font-size: var(--fs-11); font-weight: 400; color: var(--c-ink-400); }
+.sdv__codigo { display: inline-block; margin-top: .2rem; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .02em; color: var(--c-ink-500); background: var(--c-ink-100); padding: .05rem .35rem; border-radius: 4px; }
 .sdv__chip { font-size: .62rem; font-weight: 700; padding: .1rem .4rem; border-radius: 99px; text-transform: uppercase; letter-spacing: .03em; }
 .sdv__chip--propio  { background: #dcfce7; color: #15803d; }
 .sdv__chip--externo { background: #e0e7ff; color: #4338ca; }
 .sdv__th-ing, .sdv__td-ing { font-size: var(--fs-13); color: var(--c-ink-500); white-space: nowrap; }
 .sdv__td-inicial { display: block; font-size: var(--fs-11); color: var(--c-ink-400); font-weight: 400; }
-.sdv__td-cepa  { font-size: var(--fs-13); color: var(--c-ink-600); font-style: italic; }
-.sdv__td-mono  { font-family: var(--font-mono); font-size: var(--fs-13); color: var(--c-ink-700); }
+.sdv__td-cepa  { font-size: var(--fs-13); color: var(--c-ink-800); font-weight: 500; }
+.sdv__td-mono  { font-size: var(--fs-13); color: var(--c-ink-600); }
 .sdv__td-bajo  { color: var(--c-rust-600); font-weight: 700; }
 .sdv__none     { color: var(--c-ink-300); font-size: var(--fs-13); }
 /* Observaciones: texto libre, así que se acota y el resto se lee en el tooltip. Sin tope, un

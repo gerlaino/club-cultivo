@@ -3,7 +3,16 @@ class SuperAdmin::UsersController < SuperAdmin::BaseController
     # Los ÚLTIMOS arriba. Ordenado por club y rol, el usuario que acabás de crear caía en el
     # medio de la lista y había que buscarlo: en el panel de plataforma lo que se mira es lo
     # que acaba de pasar, no el padrón histórico.
-    users = User.where.not(role: 'super_admin').includes(:club).order(created_at: :desc)
+    # `del_equipo` saca las cuentas de PACIENTE. Comparten tabla con el staff, así que sin el
+    # scope aparecen mezcladas con el equipo de cada organización: el listado de plataforma
+    # mostraba 49 pacientes de Mitocondria donde hay 6 personas trabajando, y va a empeorar con
+    # cada club que cargue su padrón.
+    #
+    # El listado de equipo del club ya usaba el scope; éste se pasó por alto. La cuenta de un
+    # paciente se gestiona SÓLO desde su ficha (`Pacientes::Acceso`), que es donde está el
+    # restablecer que corresponde: por acá se le podía cambiar la contraseña sin que su ficha se
+    # enterara.
+    users = User.where.not(role: 'super_admin').del_equipo.includes(:club).order(created_at: :desc)
     render json: users.map { |u| serialize_user(u) }
   end
 

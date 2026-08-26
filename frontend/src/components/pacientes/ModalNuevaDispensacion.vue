@@ -39,6 +39,8 @@ const esAdminoSup = computed(() =>
 const puedeVerCredito       = esAdminoSup
 const puedeEditarAporte     = esAdminoSup
 const puedeVerDescPaciente  = esAdminoSup
+// Cargar una entrega con fecha de otro día es una tarea de quien administra, no del mostrador.
+const puedeFecharAtras      = esAdminoSup
 // Reservas: solo admin/supervisor. El dispensador no ve el toggle de reserva.
 const puedeReservar         = esAdminoSup
 
@@ -228,6 +230,13 @@ const excederiaStock = computed(() => {
 
 const fmt = n => n == null ? '—' :
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(n)
+
+const fmtFechaLarga = (iso) => {
+  if (!iso) return '—'
+  const d = new Date(`${iso}T00:00:00`)
+  const t = d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
+  return t.charAt(0).toUpperCase() + t.slice(1)
+}
 
 const fmtFecha = (d) => {
   if (!d) return null
@@ -1059,9 +1068,18 @@ async function handleSubmit() {
           <div class="mnd__form-row">
             <div class="mnd__field">
               <label class="mnd__label" v-if="form.es_reserva">Fecha de entrega estimada <span class="mnd__req">*</span></label>
+              <label class="mnd__label" v-else-if="puedeFecharAtras">
+                Fecha <span class="mnd__opt">podés cargar una entrega de otro día</span>
+              </label>
               <label class="mnd__label" v-else>Fecha</label>
               <AppDatePicker v-if="form.es_reserva" v-model="form.fecha_entrega_estimada" :min="tomorrow" />
-              <AppDatePicker v-else v-model="form.fecha_dispensacion" :max="today" />
+              <!-- El dispensador entrega EN EL MOMENTO: la fecha es hoy y no se toca. Editable
+                   se presta a que un click distraído asiente la venta en otro día, y eso mueve
+                   stock y plata a un período que a lo mejor ya está cerrado. Quien administra sí
+                   carga en diferido —las de ayer, las que quedaron sin registrar— y para eso el
+                   campo se abre y lo dice. -->
+              <AppDatePicker v-else-if="puedeFecharAtras" v-model="form.fecha_dispensacion" :max="today" />
+              <div v-else class="mnd__fecha-fija">{{ fmtFechaLarga(form.fecha_dispensacion) }}</div>
             </div>
             <div v-if="!form.es_regalo && !pagoDividido" class="mnd__field">
               <label class="mnd__label">{{ modoReserva ? 'Medio de pago del resto' : (form.es_reserva ? 'Medio de pago de la seña' : 'Medio de pago') }}</label>
@@ -1306,6 +1324,7 @@ async function handleSubmit() {
 /* Stock */
 .mnd__section-label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .05em; }
 /* ── Pago dividido ────────────────────────────────────────────────────────────── */
+.mnd__fecha-fija { padding: .5rem .7rem; border: 1.5px solid var(--c-slate-200); border-radius: 9px; background: var(--c-slate-50); font-size: .82rem; color: var(--c-slate-600); }
 .mnd__dividir-btn { margin-top: .4rem; background: none; border: none; padding: 0; cursor: pointer; font-size: .74rem; font-weight: 700; color: #1b5e20; display: flex; align-items: center; gap: .3rem; }
 .mnd__dividir-btn:hover { text-decoration: underline; }
 

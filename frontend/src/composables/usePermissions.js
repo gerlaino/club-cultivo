@@ -1,103 +1,107 @@
 import { computed } from 'vue'
 import { useAuthStore } from '../stores/auth'
 
+// La matriz vive AFUERA de la función a propósito: es un dato, no depende de la sesión, y así
+// puede cruzarse con los prefijos de ruta del router sin montar nada. Las dos listas dicen lo
+// mismo y se desalineaban en silencio.
+export const PERMISSIONS = {
+  admin: { all: true },
+
+  medico: {
+    socios: ['index', 'show', 'create', 'update'],
+    socio_notas: ['index', 'create', 'destroy'],
+    indicaciones: ['index', 'show', 'create', 'update'],
+    dispensaciones: ['index', 'show'],
+    tareas: ['index', 'show'],
+    reportes_medicos: ['index', 'show'],
+    documentos: ['index', 'show', 'create', 'update', 'delete'],
+  },
+
+  supervisor: {
+    salas: ['index', 'show'],
+    lotes: ['index', 'show'],
+    plantas: ['index', 'show'],
+    plant_activities: ['index', 'show'],
+    sedes: ['index', 'show'],
+    geneticas: ['index', 'show'],
+    tareas: ['index', 'show', 'create', 'update', 'destroy'],
+  },
+
+  cultivador: {
+    plantas: ['index', 'show', 'create', 'update', 'destroy'],
+    plant_activities: ['index', 'create', 'destroy'],
+    lotes: ['index', 'show', 'create', 'update', 'destroy'],
+    salas: ['index', 'show', 'create', 'update', 'destroy'],
+    geneticas: ['index', 'show'],
+    plan_trabajo: ['index', 'show', 'create', 'update'],
+    tareas: ['index', 'show', 'create', 'update', 'destroy'],
+    reportes_cultivo: ['index', 'show'],
+    mediciones: ['index', 'create'],
+    ambiente: ['index', 'show'],
+    lecturas_ambientales: ['index', 'show', 'create'],
+    registros_ambientales: ['index', 'create', 'destroy'],
+    setpoints_fase: ['index', 'show'],
+    alertas: ['index', 'show'],
+  },
+
+  abogado: {
+    // Solo documentos del club — sin acceso clínico ni productivo
+    documentos: ['index', 'show', 'create'],
+  },
+
+  auditor: {
+    // Solo lectura absoluta
+    read_only: true,
+    informes_reprocann: ['index', 'show'],
+    reportes_oficiales: ['index', 'show'],
+    trazabilidad: ['index', 'show'],
+    plantas: ['index', 'show'],
+    lotes: ['index', 'show'],
+    socios: ['index', 'show'],
+    movimientos_contables: ['index', 'show'],
+    informe_semestral: ['show'],
+    documentos: ['index', 'show'],
+  },
+
+  dispensador: {
+    socios: ['index', 'show'],
+    dispensaciones: ['index', 'show', 'create'],
+    sedes: ['index', 'show'],
+    tareas: ['index', 'show'],
+    // Sin acceso a notas, indicaciones ni documentos del paciente
+  },
+
+  manicura: {
+    lotes: ['index', 'show'],
+    plantas: ['index', 'show', 'update'],
+    geneticas: ['index', 'show'],
+    sedes: ['index', 'show'],
+    tareas: ['index', 'show'],
+    manicura: ['access'],
+  },
+
+  paciente: {
+    mi_perfil: ['show', 'update'],
+    mis_dispensaciones: ['index', 'show'],
+    eventos: ['index', 'show'],
+  },
+
+  delivery: {
+    // Sin acceso a listado general de pacientes — solo via pedido asignado (futuro)
+    dispensaciones: ['index', 'show'],
+    sedes: ['index', 'show'],
+  },
+
+  socio: {
+    mi_perfil: ['show', 'update'],
+    mis_dispensaciones: ['index', 'show'],
+    eventos: ['index', 'show'],
+  },
+}
+
 export function usePermissions() {
   const auth = useAuthStore()
 
-  const PERMISSIONS = {
-    admin: { all: true },
-
-    medico: {
-      socios: ['index', 'show', 'create', 'update'],
-      socio_notas: ['index', 'create', 'destroy'],
-      indicaciones: ['index', 'show', 'create', 'update'],
-      dispensaciones: ['index', 'show'],
-      tareas: ['index', 'show'],
-      reportes_medicos: ['index', 'show'],
-      documentos: ['index', 'show', 'create', 'update', 'delete'],
-    },
-
-    supervisor: {
-      salas: ['index', 'show'],
-      lotes: ['index', 'show'],
-      plantas: ['index', 'show'],
-      plant_activities: ['index', 'show'],
-      sedes: ['index', 'show'],
-      geneticas: ['index', 'show'],
-      tareas: ['index', 'show', 'create', 'update', 'destroy'],
-    },
-
-    cultivador: {
-      plantas: ['index', 'show', 'create', 'update', 'destroy'],
-      plant_activities: ['index', 'create', 'destroy'],
-      lotes: ['index', 'show', 'create', 'update', 'destroy'],
-      salas: ['index', 'show', 'create', 'update', 'destroy'],
-      geneticas: ['index', 'show'],
-      plan_trabajo: ['index', 'show', 'create', 'update'],
-      tareas: ['index', 'show', 'create', 'update', 'destroy'],
-      reportes_cultivo: ['index', 'show'],
-      mediciones: ['index', 'create'],
-      ambiente: ['index', 'show'],
-      lecturas_ambientales: ['index', 'show', 'create'],
-      registros_ambientales: ['index', 'create', 'destroy'],
-      setpoints_fase: ['index', 'show'],
-      alertas: ['index', 'show'],
-    },
-
-    abogado: {
-      // Solo documentos del club — sin acceso clínico ni productivo
-      documentos: ['index', 'show', 'create'],
-    },
-
-    auditor: {
-      // Solo lectura absoluta
-      read_only: true,
-      informes_reprocann: ['index', 'show'],
-      reportes_oficiales: ['index', 'show'],
-      trazabilidad: ['index', 'show'],
-      plantas: ['index', 'show'],
-      lotes: ['index', 'show'],
-      socios: ['index', 'show'],
-      movimientos_contables: ['index', 'show'],
-      informe_semestral: ['show'],
-      documentos: ['index', 'show'],
-    },
-
-    dispensador: {
-      socios: ['index', 'show'],
-      dispensaciones: ['index', 'show', 'create'],
-      sedes: ['index', 'show'],
-      tareas: ['index', 'show'],
-      // Sin acceso a notas, indicaciones ni documentos del paciente
-    },
-
-    manicura: {
-      lotes: ['index', 'show'],
-      plantas: ['index', 'show', 'update'],
-      geneticas: ['index', 'show'],
-      sedes: ['index', 'show'],
-      tareas: ['index', 'show'],
-      manicura: ['access'],
-    },
-
-    paciente: {
-      mi_perfil: ['show', 'update'],
-      mis_dispensaciones: ['index', 'show'],
-      eventos: ['index', 'show'],
-    },
-
-    delivery: {
-      // Sin acceso a listado general de pacientes — solo via pedido asignado (futuro)
-      dispensaciones: ['index', 'show'],
-      sedes: ['index', 'show'],
-    },
-
-    socio: {
-      mi_perfil: ['show', 'update'],
-      mis_dispensaciones: ['index', 'show'],
-      eventos: ['index', 'show'],
-    },
-  }
 
   const userRole = computed(() => auth.user?.role)
 
