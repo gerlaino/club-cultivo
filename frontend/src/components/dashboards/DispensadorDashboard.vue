@@ -38,7 +38,9 @@
         <div class="dd__kpi-val">{{ loading ? '…' : (analytics?.resumen?.dispensaciones_mes ?? '—') }}</div>
         <div class="dd__kpi-sub">{{ loading ? '' : `${formatG(analytics?.resumen?.gramos_mes)}` }}</div>
       </div>
-      <div class="dd__kpi-card" :class="{ 'dd__kpi-card--warn': reprocannAlerta }">
+      <!-- El estado del REPROCANN es del PADRÓN entero: una pregunta de quien administra, no de
+           quien entrega. El backend no se lo manda al dispensador. -->
+      <div v-if="verTodo" class="dd__kpi-card" :class="{ 'dd__kpi-card--warn': reprocannAlerta }">
         <div class="dd__kpi-label">REPROCANN</div>
         <div class="dd__kpi-val">{{ loading ? '…' : ((analytics?.reprocann?.vencidos ?? 0) + (analytics?.reprocann?.por_vencer ?? 0)) }}</div>
         <div class="dd__kpi-sub dd__kpi-sub--warn" v-if="!loading && reprocannAlerta">
@@ -110,7 +112,7 @@
 
     <!-- Top pacientes del mes -->
     <div class="dd__section">
-      <h2 class="dd__section-title">Top pacientes — mes actual</h2>
+      <h2 class="dd__section-title">{{ verTodo ? 'Top pacientes — mes actual' : 'Mis pacientes — mes actual' }}</h2>
       <div v-if="loading" class="dd__table-wrap">
         <div class="dd__skeleton" v-for="n in 5" :key="n" style="height:36px;margin-bottom:4px;" />
       </div>
@@ -121,7 +123,9 @@
             <tr>
               <th>#</th>
               <th>Paciente</th>
-              <th>DNI</th>
+              <!-- Los 4 dígitos del DNI sólo van en el tablero de quien administra: en el
+                   mostrador la persona está enfrente y no ayudan a reconocer a nadie. -->
+              <th v-if="verTodo">DNI</th>
               <th class="dd__th-r">Dispensaciones</th>
               <th class="dd__th-r">Total gramos</th>
             </tr>
@@ -130,7 +134,7 @@
             <tr v-for="(p, i) in analytics.top_pacientes" :key="i">
               <td class="dd__td-rank">{{ i + 1 }}</td>
               <td class="dd__td-name">{{ p.paciente || p.iniciales }}</td>
-              <td class="dd__td-mono">…{{ p.dni_last4 }}</td>
+              <td v-if="verTodo" class="dd__td-mono">…{{ p.dni_last4 }}</td>
               <td class="dd__td-r">{{ p.dispens_count }}</td>
               <td class="dd__td-r dd__td-bold">{{ formatG(p.total_g) }}</td>
             </tr>
@@ -191,6 +195,11 @@ const hoy     = new Date()
 const fechaHoy = (() => { const s = hoy.toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }); return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() })()
 const fechaParam = hoy.toISOString().slice(0, 10)
 
+// El alcance lo dice el BACKEND (`alcance`), no el rol leído en el front: si la pantalla lo
+// decidiera por su cuenta, un día mostraría una columna que el payload ya no trae — o peor,
+// escondería algo que sí está viajando y daría por resuelta una fuga que sigue abierta.
+const verTodo = computed(() => analytics.value?.alcance === 'club')
+
 const reprocannAlerta = computed(() => {
   const r = analytics.value?.reprocann
   return r && (r.vencidos > 0 || r.por_vencer > 0)
@@ -224,6 +233,7 @@ onMounted(async () => {
   try {
     const [aRes, dRes] = await Promise.all([
       getAnalyticsDispensador(),
+      // Sin `alcance`, el backend le devuelve las suyas al dispensador y todas al admin.
       listDispensacionesFecha({ fecha: fechaParam }),
     ])
     analytics.value      = aRes.data

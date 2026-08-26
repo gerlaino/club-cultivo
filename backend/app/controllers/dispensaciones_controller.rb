@@ -55,6 +55,7 @@ class DispensacionesController < ApplicationController
         .joins(stock: :sede)
         .where(sedes: { club_id: current_user.club_id })
         .includes(:user, :paciente, :sede, { stock: :lote }, { items: { stock: :lote } })
+      scope = acotar_historial(scope)
       scope = apply_dispensacion_filters(scope)
       if params[:desde].present? || params[:hasta].present?
         desde = params[:desde].present? ? Date.parse(params[:desde]) : nil
@@ -855,6 +856,24 @@ class DispensacionesController < ApplicationController
 
   # Con qué medio nace una dispensa que todavía no tiene cobros registrados. Nunca 'mixto':
   # eso se decide DESPUÉS, mirando los cobros reales (ver `afinar_medio_pago!`).
+  # Alcance del historial. El dispensador abre en LO SUYO: el listado le mostraba todas las
+  # entregas de la organización, con el paciente y el monto de cada una, y para trabajar le
+  # alcanza con las que hizo él.
+  #
+  # Puede pasar a ver las de su sede con `alcance=sede`, porque si un paciente vuelve y pregunta
+  # por lo que le entregó un compañero, el que está en el mostrador tiene que poder contestarle.
+  # Quien administra sigue viendo todo: es su trabajo.
+  ALCANCES_HISTORIAL = %w[mias sede].freeze
+
+  def acotar_historial(scope)
+    return scope if %w[admin supervisor super_admin].include?(current_user.role)
+
+    case params[:alcance].to_s.presence_in(ALCANCES_HISTORIAL) || 'mias'
+    when 'sede' then scope.where(sedes: { id: current_user.sedes_visibles_ids })
+    else             scope.where(user_id: current_user.id)
+    end
+  end
+
   def medio_pago_inicial(lineas_cobro)
     medios = lineas_cobro.map { |c| c[:medio] }.uniq
     return medios.first if medios.size == 1

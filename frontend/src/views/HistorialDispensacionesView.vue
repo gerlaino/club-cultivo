@@ -20,6 +20,13 @@ const { imprimirEtiqueta } = useEtiquetaDispensa()
 const canEdit   = computed(() => ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role))
 const canDelete = computed(() => ['admin', 'super_admin'].includes(auth.user?.role))
 
+// Quien administra ve la organización entera y no tiene toggle. El dispensador abre en LO SUYO:
+// el listado le mostraba todas las entregas del club con paciente y monto, y para trabajar le
+// alcanza con las que hizo él. Puede pasar a las de su sede porque si un paciente vuelve y
+// pregunta por lo que le entregó un compañero, tiene que poder contestarle sin llamar a nadie.
+const verTodoElClub = computed(() => ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role))
+const alcance = ref('mias')
+
 // Edit modal
 const editModal  = ref(false)
 const editTarget = ref(null)
@@ -194,6 +201,7 @@ function buildParams() {
   if (filtroMedioPago.value) p.medio_pago   = filtroMedioPago.value
   if (filtroForma.value)     p.forma_producto = filtroForma.value
   if (filtroSocio.value)     p.paciente_id  = filtroSocio.value.id
+  if (!verTodoElClub.value)  p.alcance      = alcance.value
   return p
 }
 
@@ -207,7 +215,7 @@ async function cargar() {
   finally { loading.value = false }
 }
 
-watch([desde, hasta, filtroSede, filtroMedioPago, filtroForma, filtroSocio], () => {
+watch([desde, hasta, filtroSede, filtroMedioPago, filtroForma, filtroSocio, alcance], () => {
   if (!desde.value || !hasta.value || desde.value > hasta.value) return
   cargar()
 }, { immediate: true })
@@ -314,6 +322,13 @@ const FORMAS = [
       <div>
         <h1 class="hd__title">Dispensaciones</h1>
         <p class="hd__sub">Consultá y exportá el historial del período seleccionado</p>
+        <!-- Sólo para quien NO ve todo el club: elegir entre lo suyo y lo de su mostrador. -->
+        <div v-if="!verTodoElClub" class="hd__alcance" role="group" aria-label="Alcance del historial">
+          <button type="button" class="hd__alcance-btn" :class="{ 'hd__alcance-btn--on': alcance === 'mias' }"
+                  @click="alcance = 'mias'">Las mías</button>
+          <button type="button" class="hd__alcance-btn" :class="{ 'hd__alcance-btn--on': alcance === 'sede' }"
+                  @click="alcance = 'sede'">Las de mi sede</button>
+        </div>
       </div>
       <div class="hd__top-actions">
         <button class="hd__btn-nueva" @click="abrirNuevaDispensacion">
@@ -633,6 +648,11 @@ const FORMAS = [
   margin: 0 0 2px;
 }
 .hd__sub { font-size: var(--fs-13); color: var(--c-ink-400); margin: 0; }
+.hd__alcance { display: inline-flex; margin-top: .5rem; border: 1.5px solid var(--c-slate-200); border-radius: 999px; overflow: hidden; background: #fff; }
+.hd__alcance-btn { border: none; background: none; padding: .25rem .75rem; font-size: .74rem; font-weight: 700; color: var(--c-slate-500); cursor: pointer; }
+.hd__alcance-btn:hover { color: var(--c-slate-700); }
+.hd__alcance-btn--on { background: #1b5e20; color: #fff; }
+.hd__alcance-btn--on:hover { color: #fff; }
 .hd__top-actions { display: flex; align-items: center; gap: var(--sp-2); }
 .hd__btn-refresh {
   background: var(--c-paper);

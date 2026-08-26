@@ -159,12 +159,117 @@ class AnalyticsController < ApplicationController
 
   # GET /api/analytics/dispensador
   # Para: dispensador, admin
+  # El inicio del mostrador. Lo miran el admin y el dispensador, y NO pueden ver lo mismo:
+  #
+  # El dispensador recibía el tablero completo de la organización — el ranking de consumo del mes
+  # con nombre y apellido de cada paciente, cuántos del padrón tienen el REPROCANN vencido, el
+  # volumen del club por día. Un ranking de consumo de cannabis con nombre es dato de salud
+  # (Ley 25.326) y no es algo que necesite quien atiende el mostrador: para entregar le alcanza
+  # con su caja, su stock y sus reservas.
+  #
+  # Había un comentario en `top_pacientes` justificando el nombre completo con que "quien mira la
+  # analítica ya tiene acceso a la ficha del paciente". Es cierto del admin, pero el guard de este
+  # endpoint deja entrar también al dispensador, así que el argumento no lo cubría.
   def dispensador
     club = current_user.club
-    data = Rails.cache.fetch("analytics/dispensador/#{club.id}/#{Time.zone.today}", expires_in: 10.minutes) do
-      calcular_dispensador(club)
+    # ⚠️ La clave incluye al USUARIO. Era sólo por club y por fecha: al personalizar el contenido,
+    # el primer dispensador que entrara le serviría SUS datos a todos los demás del club.
+    clave = "analytics/dispensador/#{club.id}/#{current_user.id}/#{alcance_dispensador}/#{Time.zone.today}"
+    data = Rails.cache.fetch(clave, expires_in: 10.minutes) do
+      if alcance_dispensador == 'propio'
+        calcular_dispensador_propio(club, current_user)
+      else
+        calcular_dispensador(club)
+      end
     end
     render json: data
+  end
+
+  # Quién ve todo y quién ve lo suyo. El admin (y el super_admin) siguen viendo la organización
+  # entera: es su trabajo. El resto ve su mostrador.
+  def alcance_dispensador
+    %w[admin super_admin].include?(current_user.role) ? 'club' : 'propio'
+  end
+
+  # El tablero acotado: lo que ESTE usuario hizo, y el stock y las reservas de SU sede.
+  #
+  # No es el mismo payload con menos filas: hay bloques que directamente no van. El estado del
+  # REPROCANN del padrón, el volumen del club y las entregas de delivery abiertas son preguntas
+  # de quien administra, no de quien entrega.
+  def calcular_dispensador_propio(club, usuario)
+    hoy           = Time.zone.today
+    inicio_semana = hoy.beginning_of_week
+    inicio_mes    = hoy.beginning_of_month
+    sedes_ids     = usuario.sedes_visibles_ids
+
+    mias = Dispensacion.no_canceladas.joins(stock: :sede)
+                       .where(sedes: { club_id: club.id })
+                       .where(user_id: usuario.id)
+
+    stocks = Stock.joins(:sede)
+                  .where(sedes: { club_id: club.id, id: sedes_ids })
+                  .disponibles.asignados.includes(:lote)
+
+    umbral = club.umbral_stock_g.to_f
+    stocks_data = stocks.group_by(&:forma_producto).map do |forma, ss|
+      total = ss.sum { |s| s.cantidad.to_f }
+      { forma: forma, cantidad_g: total.round(2), alerta: forma == 'flor_seca' && total < umbral }
+    end.sort_by { |s| s[:cantidad_g] }
+
+    # Sus pacientes del mes. Sin los dígitos del DNI: en el mostrador no ayudan a reconocer a
+    # nadie —la persona está enfrente— y son un dato identificatorio que no hace falta servir.
+    top_pacientes = mias
+      .where(fecha_dispensacion: inicio_mes..hoy)
+      .includes(:paciente)
+      .group(:paciente_id)
+      .select('paciente_id, SUM(dispensaciones.cantidad) AS total_g, COUNT(*) AS dispens_count')
+      .order('total_g DESC')
+      .limit(10)
+      .map { |r| { paciente: r.paciente&.nombre_completo, total_g: r.total_g.to_f.round(2),
+                   dispens_count: r.dispens_count } }
+
+    # Una reserva la prepara quien está atendiendo, no necesariamente quien la tomó: el corte
+    # es por SEDE, no por persona.
+    reservas_scope = Reserva.where(club_id: club.id).pendientes
+                            .joins(:stock).where(stocks: { sede_id: sedes_ids })
+    por_preparar = reservas_scope.where('fecha_entrega_estimada <= ?', hoy)
+                                 .includes(:paciente, :stock).order(fecha_entrega_estimada: :asc)
+
+    {
+      alcance: 'propio',
+      resumen: {
+        dispensaciones_hoy:    mias.where(fecha_dispensacion: hoy..hoy).count,
+        gramos_hoy:            mias.where(fecha_dispensacion: hoy..hoy).sum(:cantidad).to_f.round(2),
+        dispensaciones_semana: mias.where(fecha_dispensacion: inicio_semana..hoy).count,
+        gramos_semana:         mias.where(fecha_dispensacion: inicio_semana..hoy).sum(:cantidad).to_f.round(2),
+        dispensaciones_mes:    mias.where(fecha_dispensacion: inicio_mes..hoy).count,
+        gramos_mes:            mias.where(fecha_dispensacion: inicio_mes..hoy).sum(:cantidad).to_f.round(2),
+      },
+      stocks:        stocks_data,
+      top_pacientes: top_pacientes,
+      por_dia:       (6.days.ago.to_date..hoy).map { |d|
+        { fecha: d.strftime('%d/%m'), count: mias.where(fecha_dispensacion: d).count }
+      },
+      reservas: {
+        hoy:      por_preparar.where(fecha_entrega_estimada: hoy).count,
+        vencidas: por_preparar.where('fecha_entrega_estimada < ?', hoy).count,
+        total:    por_preparar.count,
+        lista:    por_preparar.limit(20).map { |r| serializar_reserva_por_preparar(r, hoy) },
+      },
+    }
+  end
+
+  def serializar_reserva_por_preparar(r, hoy)
+    {
+      id:             r.id,
+      paciente:       r.paciente ? "#{r.paciente.nombre} #{r.paciente.apellido}".strip : '—',
+      fecha:          r.fecha_entrega_estimada,
+      vencida:        r.fecha_entrega_estimada < hoy,
+      forma_producto: r.stock&.forma_producto,
+      cantidad:       r.cantidad.to_f,
+      sena_ars:       r.sena_ars.to_f,
+      resta_ars:      r.aporte_restante_ars.to_f,
+    }
   end
 
   def calcular_dispensador(club)
@@ -243,6 +348,7 @@ class AnalyticsController < ApplicationController
     end
 
     {
+      alcance: 'club',
       resumen: {
         dispensaciones_hoy:    disps_hoy.count,
         gramos_hoy:            disps_hoy.sum(:cantidad).to_f.round(2),
