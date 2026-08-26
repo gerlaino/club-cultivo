@@ -1,5 +1,10 @@
 <template>
   <div class="mdis">
+    <!-- La caja, arriba de todo: sin caja abierta el mostrador no arrancó, y en la tablet ésta
+         es la pantalla donde aterriza. Va en modo COMPACTO — con el turno andando se colapsa a
+         un renglón para no empujar el buscador, que es lo primero que se usa. -->
+    <CajaMostradorCard v-if="sedeMostrador" :sede="sedeMostrador" :puede-gestionar="puedeGestionarCaja" compacto />
+
     <!-- Buscar es LO PRIMERO: el dispensador está de pie con alguien enfrente, no navegando. -->
     <div class="mdis__search-wrap">
       <input
@@ -98,10 +103,18 @@ import { formaLabel, formatARS } from '../../lib/formatters.js'
 import SheetBottom from '../../components/cultivador/SheetBottom.vue'
 import ModalNuevaDispensacion from '../../components/pacientes/ModalNuevaDispensacion.vue'
 import { useToast } from '../../composables/useToast.js'
+import { useAuthStore } from '../../stores/auth.js'
+import CajaMostradorCard from '../../components/dashboards/CajaMostradorCard.vue'
 
 const router = useRouter()
 const route  = useRoute()
 const toast  = useToast()
+const auth   = useAuthStore()
+
+// `/me` ya trae el mostrador del dispensador: no hace falta un request extra en la pantalla que
+// más se abre en el turno.
+const sedeMostrador = computed(() => auth.user?.dispensario_sede ?? null)
+const puedeGestionarCaja = computed(() => ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role))
 
 const query     = ref('')
 const loading   = ref(false)

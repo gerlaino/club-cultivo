@@ -6,6 +6,10 @@
       <p class="mah__date">{{ fechaLarga }}</p>
     </header>
 
+    <!-- La caja del mostrador: el admin la abre desde la tablet con el fondo del día, y quien
+         atiende la confirma desde su pantalla. Va arriba porque es lo que traba el arranque. -->
+    <CajaMostradorCard v-if="sedeMostrador" :sede="sedeMostrador" :puede-gestionar="true" />
+
     <!-- Banner de atención (solo si hay algo urgente) -->
     <RouterLink v-if="aprobaciones > 0" to="/m/admin/aprobar" class="mah__banner mah__banner--amber">
       <i class="bi bi-patch-exclamation"></i>
@@ -81,6 +85,7 @@ import { useAuthStore } from '../../stores/auth'
 import { useStatsStore } from '../../stores/stats.js'
 import { getTareasDashboard, listPesajesManicuraAdmin, listStocksPendientes,
          getAnalyticsDispensador } from '../../lib/api.js'
+import CajaMostradorCard from '../../components/dashboards/CajaMostradorCard.vue'
 
 const auth  = useAuthStore()
 const stats = useStatsStore()
@@ -109,6 +114,7 @@ const aprobaciones = ref(0)
 const reservasHoy      = ref(0)
 const reservasVencidas = ref(0)
 const entregasHoy      = ref(0)
+const sedeMostrador    = ref(null)
 const dispensasHoy     = ref(0)
 
 onMounted(async () => {
@@ -138,6 +144,7 @@ async function cargarDiaComercial() {
     reservasHoy.value      = data?.reservas?.hoy ?? 0
     reservasVencidas.value = data?.reservas?.vencidas ?? 0
     entregasHoy.value      = data?.entregas_hoy ?? 0
+    sedeMostrador.value    = data?.sede_mostrador ?? null
   } catch {}
 }
 </script>

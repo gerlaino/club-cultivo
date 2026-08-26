@@ -199,6 +199,7 @@ const NAV = {
     { to: '/m/reservas',  icon: 'bi-bookmark-check', label: 'Reservas',  feature: 'produccion_dispensa' },
     { to: '/m/stock',     icon: 'bi-boxes',          label: 'Stock' },
     { to: '/m/historial', icon: 'bi-clock-history',  label: 'Historial', feature: 'produccion_dispensa' },
+    { to: '/m/tareas',    icon: 'bi-check2-square',  label: 'Tareas' },
     { to: '/m/horas',     icon: 'bi-stopwatch',      label: 'Mis horas' },
   ] },
 }

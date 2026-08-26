@@ -4,11 +4,19 @@
        declarando el fondo y quien atiende confirma que ese fondo está — los dos pasos existen
        para que ninguno quede solo respondiendo por una diferencia de arqueo. -->
   <section v-if="sede" class="cjm" :class="`cjm--${estadoCaja}`">
-    <div class="cjm-hd">
+    <div v-if="!colapsada" class="cjm-hd">
       <span class="cjm-title"><i class="bi bi-cash-stack"></i> Caja del turno</span>
       <span class="cjm-sede">{{ sede.nombre }}</span>
     </div>
 
+    <!-- Renglón compacto: la caja está andando y no pide nada. Se toca para ver el arqueo. -->
+    <button v-if="colapsada" type="button" class="cjm-mini" @click="expandido = true">
+      <span class="cjm-mini-ok"><i class="bi bi-check-circle-fill"></i> En turno</span>
+      <span class="cjm-mini-num">{{ fmtARS(caja.efectivo_esperado_ars) }} esperados</span>
+      <i class="bi bi-chevron-down"></i>
+    </button>
+
+    <template v-else>
     <div v-if="cargandoCaja" class="cjm-msg">Cargando…</div>
 
     <!-- Sin caja: el mostrador no abrió -->
@@ -71,6 +79,7 @@
     </template>
 
     <p v-if="errorCaja" class="cjm-error">{{ errorCaja }}</p>
+    </template>
   </section>
 </template>
 
@@ -94,7 +103,13 @@ import { useToast } from '../../composables/useToast.js'
 const props = defineProps({
   sede: { type: Object, default: null },          // { id, nombre }
   puedeGestionar: { type: Boolean, default: false },
+  // En la pantalla de dispensar, con la caja YA andando, la tarjeta entera empuja el buscador
+  // fuera de la vista — y buscar es lo primero que hace quien está de pie con alguien enfrente.
+  // Andando se colapsa a un renglón; cuando pide acción (abrir, confirmar, cerrar) se abre sola.
+  compacto: { type: Boolean, default: false },
 })
+
+const expandido = ref(false)
 
 const toast = useToast()
 const caja            = ref(null)
@@ -106,6 +121,11 @@ const efectivoContado = ref(null)
 
 const sede = computed(() => props.sede)
 const puedeGestionarCaja = computed(() => props.puedeGestionar)
+
+// Sólo se colapsa si NO hay nada que hacer. Abrir, confirmar el fondo y confirmar el cierre son
+// acciones: esas se muestran siempre, aunque la tarjeta esté en modo compacto.
+const colapsada = computed(() =>
+  props.compacto && !expandido.value && estadoCaja.value === 'andando')
 
 const estadoCaja = computed(() => {
   if (!caja.value) return 'sin-abrir'
@@ -167,6 +187,9 @@ defineExpose({ caja, cargarCaja })
 .cjm--sin-confirmar { border-color: #f59e0b; background: #fffbeb; }
 .cjm--pendiente    { border-color: #f59e0b; background: #fffbeb; }
 .cjm--andando      { border-color: #86efac; }
+.cjm-mini { width: 100%; display: flex; align-items: center; gap: .5rem; background: none; border: none; padding: 0; cursor: pointer; font: inherit; color: var(--c-ink-600); }
+.cjm-mini-ok { font-weight: 700; font-size: var(--fs-13); color: #15803d; display: flex; align-items: center; gap: .3rem; }
+.cjm-mini-num { margin-left: auto; font-size: var(--fs-13); font-variant-numeric: tabular-nums; }
 .cjm-hd { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
 .cjm-title { font-weight: 800; font-size: var(--fs-14); color: var(--c-ink-900); display: flex; align-items: center; gap: .4rem; }
 .cjm-sede { font-size: var(--fs-12); color: var(--c-ink-500); }

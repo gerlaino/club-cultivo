@@ -30,9 +30,12 @@ class MeController < ApplicationController
     end
 
     if u.dispensador?
-      data['dispensario_sede_id'] =
-        u.sedes_asignadas.activas.first&.id ||
-        u.club&.sedes&.activas&.where(tipo: %w[social mixta])&.order(:id)&.first&.id
+      sede_mostrador = u.sedes_asignadas.activas.first ||
+                       u.club&.sedes&.activas&.where(tipo: %w[social mixta])&.order(:id)&.first
+      data['dispensario_sede_id'] = sede_mostrador&.id
+      # Con el nombre: la tarjeta de caja lo muestra y la PWA no tiene de dónde sacarlo sin
+      # pedir el listado de sedes entero en la pantalla que más se usa.
+      data['dispensario_sede'] = sede_mostrador && { 'id' => sede_mostrador.id, 'nombre' => sede_mostrador.nombre }
     end
     # Reglas de dominio que el frontend necesita para no dejar elegir combinaciones que el
     # backend después rechaza. Viajan acá —y no en una copia hardcodeada en el front— porque

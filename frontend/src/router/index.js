@@ -967,6 +967,9 @@ const routes = [
       { path: 'dispensar', component: () => import('../views/mobile/MDispensarView.vue') },
       { path: 'reservas',  component: () => import('../views/mobile/MReservasView.vue') },
       { path: 'stock',     component: () => import('../views/StockDispensadorView.vue') },
+      // Sus tareas asignadas. Misma vista que usan cultivador, manicura y admin en la PWA: la
+      // tarea no cambia según quién la mire.
+      { path: 'tareas',    component: () => import('../views/mobile/MTareasView.vue') },
 
       // Las MISMAS vistas de la web, montadas dentro del shell. La PWA no recorta lo que el rol
       // puede hacer: cambia el envoltorio (bottom nav, tablas como tarjetas), no el contenido.
