@@ -75,19 +75,31 @@ module Dispensario
       end
     end
 
-    # POST /sedes/:sede_id/caja/:id/salida { monto_ars, motivo }
+    # Sacar efectivo del cajón. Son DOS hechos distintos y hay que elegir cuál:
     #
-    # Sacar efectivo del cajón durante el turno: un retiro, un flete, una compra. Deja su egreso
-    # en contabilidad y se resta de lo esperado. Sin esto, cualquier salida se lee después como
-    # faltante de arqueo y no hay dónde explicarla.
+    #   gasto  → el club GASTÓ esa plata (un flete, una compra). Egreso: baja el resultado.
+    #   retiro → la plata salió del cajón pero sigue siendo del club, o quedó a nombre de
+    #            alguien. "Dame $100.000 de la caja, anotámelos a mí" NO es un gasto: asentarlo
+    #            como egreso infla los gastos por plata que nadie gastó. Va como `ajuste`, que
+    #            queda afuera de los scopes de ingresos y egresos.
+    #
+    # Las dos restan del arqueo: en las dos, la plata no está en el cajón.
+    CLASES_SALIDA = {
+      'gasto'  => { tipo: 'egreso',  categoria: 'salida_caja', prefijo: 'Gasto pagado con la caja' },
+      'retiro' => { tipo: 'ajuste',  categoria: 'retiro_caja', prefijo: 'Retiro de caja' },
+    }.freeze
+
+    # POST /sedes/:sede_id/caja/:id/salida { monto_ars, motivo, clase: gasto|retiro }
     #
     # Lo hace administración, no el mostrador: es plata que sale y alguien tiene que responder.
     def salida
       monto  = params[:monto_ars].to_d
       motivo = params[:motivo].to_s.strip
+      clase  = CLASES_SALIDA[params[:clase].to_s.presence || 'retiro']
 
       return render json: { error: 'El monto debe ser mayor a $0.' }, status: :unprocessable_entity if monto <= 0
       return render json: { error: 'Escribí para qué se saca la plata.' }, status: :unprocessable_entity if motivo.blank?
+      return render json: { error: 'Indicá si es un gasto o un retiro.' }, status: :unprocessable_entity if clase.nil?
 
       con_caja do |caja|
         raise ArgumentError, 'La caja no está abierta' unless caja.abierta?
@@ -97,8 +109,8 @@ module Dispensario
 
         caja.movimientos_contables.create!(
           club: current_user.club, sede_id: caja.sede_id, created_by: current_user,
-          tipo: 'egreso', categoria: 'salida_caja',
-          descripcion: "Salida de caja — #{motivo}",
+          tipo: clase[:tipo], categoria: clase[:categoria],
+          descripcion: "#{clase[:prefijo]} — #{motivo}",
           monto_ars: monto, fecha: Time.zone.today,
           pagado: true, medio_pago: 'efectivo', comprobante_tipo: 'sin_comprobante',
         )
@@ -176,7 +188,7 @@ module Dispensario
         total_efectivo_ars:     caja.total_efectivo_ars,
         total_digital_ars:      caja.total_digital_ars,
         total_salidas_ars:      caja.total_salidas_ars,
-        salidas:                caja.salidas.order(:created_at).map { |m| { id: m.id, monto_ars: m.monto_ars.to_f, descripcion: m.descripcion } },
+        salidas:                caja.salidas.order(:created_at).map { |m| { id: m.id, monto_ars: m.monto_ars.to_f, descripcion: m.descripcion, clase: m.categoria == 'retiro_caja' ? 'retiro' : 'gasto', quien: m.created_by&.nombre_completo } },
         efectivo_esperado_ars:  caja.efectivo_esperado_ars,
         efectivo_declarado_ars: caja.efectivo_declarado_ars&.to_f,
         diferencia_ars:         caja.diferencia_ars,

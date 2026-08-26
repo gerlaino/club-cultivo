@@ -37,7 +37,7 @@ class MovimientoContable < ApplicationRecord
   CATEGORIAS = %w[
     insumo electricidad agua alquiler sueldo mantenimiento
     honorario seguro admin aporte_socio dispensacion subvencion bar
-    salida_caja diferencia_caja otro
+    salida_caja retiro_caja diferencia_caja otro
   ].freeze
 
   CATEGORIA_LABELS = {
@@ -56,7 +56,8 @@ class MovimientoContable < ApplicationRecord
     "subvencion"    => "Subvención / Donación",
     # De la caja de turno del mostrador. `salida_caja` es plata que salió del cajón durante el
     # turno; `diferencia_caja` es lo que no apareció (o sobró) al arquear.
-    "salida_caja"     => "Salida de caja",
+    "salida_caja"     => "Gasto pagado con la caja",
+    "retiro_caja"     => "Retiro de caja",
     "diferencia_caja" => "Diferencia de caja",
     "otro"          => "Otro",
   }.freeze

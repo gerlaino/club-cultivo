@@ -59,7 +59,9 @@
       <div v-if="caja.salidas?.length" class="cjm-salidas">
         <span class="cjm-salidas-t">Salidas del turno</span>
         <span v-for="sa in caja.salidas" :key="sa.id" class="cjm-salida">
+          <span class="cjm-salida-tag" :class="`cjm-salida-tag--${sa.clase}`">{{ sa.clase }}</span>
           −{{ fmtARS(sa.monto_ars) }} · {{ sa.descripcion }}
+          <template v-if="sa.quien"> · {{ sa.quien }}</template>
         </span>
       </div>
 
@@ -81,13 +83,28 @@
       <button v-if="puedeGestionarCaja" type="button" class="cjm-link" @click="mostrarSalida = !mostrarSalida">
         {{ mostrarSalida ? 'Cancelar' : 'Sacar efectivo de la caja' }}
       </button>
-      <div v-if="mostrarSalida && puedeGestionarCaja" class="cjm-cerrar">
-        <div class="cjm-input-wrap">
-          <span class="cjm-prefix">$</span>
-          <input v-model.number="salidaMonto" type="number" min="0" step="1" class="cjm-input" placeholder="0" />
+      <div v-if="mostrarSalida && puedeGestionarCaja" class="cjm-salida-form">
+        <!-- La distinción NO es cosmética: un retiro asentado como gasto infla los gastos y baja
+             el resultado por plata que el club todavía tiene. -->
+        <div class="cjm-clases">
+          <label class="cjm-clase" :class="{ 'cjm-clase--on': salidaClase === 'retiro' }">
+            <input type="radio" value="retiro" v-model="salidaClase" />
+            <span><strong>Retiro</strong><small>Sale del cajón pero sigue siendo del club</small></span>
+          </label>
+          <label class="cjm-clase" :class="{ 'cjm-clase--on': salidaClase === 'gasto' }">
+            <input type="radio" value="gasto" v-model="salidaClase" />
+            <span><strong>Gasto</strong><small>Se gastó: baja el resultado</small></span>
+          </label>
         </div>
-        <input v-model.trim="salidaMotivo" type="text" class="cjm-input" placeholder="Para qué" />
-        <button class="cjm-btn" :disabled="guardandoCaja" @click="sacarEfectivo">Registrar salida</button>
+        <div class="cjm-cerrar">
+          <div class="cjm-input-wrap">
+            <span class="cjm-prefix">$</span>
+            <input v-model.number="salidaMonto" type="number" min="0" step="1" class="cjm-input" placeholder="0" />
+          </div>
+          <input v-model.trim="salidaMotivo" type="text" class="cjm-input"
+                 :placeholder="salidaClase === 'retiro' ? 'Quién se la lleva' : 'En qué se gastó'" />
+          <button class="cjm-btn" :disabled="guardandoCaja" @click="sacarEfectivo">Registrar</button>
+        </div>
       </div>
     </template>
 
@@ -156,6 +173,9 @@ const observaciones   = ref('')
 const mostrarSalida   = ref(false)
 const salidaMonto     = ref(null)
 const salidaMotivo    = ref('')
+// Por defecto RETIRO: es el caso frecuente ("dame plata de la caja") y el que no debe tocar el
+// resultado. Si el default fuera gasto, cada retiro mal marcado bajaría la ganancia del mes.
+const salidaClase     = ref('retiro')
 
 const sede = computed(() => props.sede)
 const puedeGestionarCaja = computed(() => props.puedeGestionar)
@@ -218,7 +238,7 @@ const anular = () => conCaja(
 
 const sacarEfectivo = () => conCaja(
   () => salidaCajaMostrador(sede.value.id, caja.value.id, {
-    monto_ars: Number(salidaMonto.value) || 0, motivo: salidaMotivo.value,
+    monto_ars: Number(salidaMonto.value) || 0, motivo: salidaMotivo.value, clase: salidaClase.value,
   }),
   'Salida registrada').then(() => { mostrarSalida.value = false; salidaMonto.value = null; salidaMotivo.value = '' })
 
@@ -241,6 +261,16 @@ defineExpose({ caja, cargarCaja })
 .cjm--pendiente    { border-color: #f59e0b; background: #fffbeb; }
 .cjm--andando      { border-color: #86efac; }
 .cjm-obs { width: 100%; }
+.cjm-salida-form { display: flex; flex-direction: column; gap: var(--sp-2); border-top: 1px solid var(--c-ink-100); padding-top: var(--sp-2); }
+.cjm-clases { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
+.cjm-clase { flex: 1 1 160px; display: flex; align-items: flex-start; gap: .4rem; border: 1.5px solid var(--c-ink-200); border-radius: 9px; padding: .4rem .6rem; cursor: pointer; }
+.cjm-clase--on { border-color: #1b5e20; background: #f0fdf4; }
+.cjm-clase span { display: flex; flex-direction: column; }
+.cjm-clase strong { font-size: var(--fs-13); }
+.cjm-clase small { font-size: var(--fs-11); color: var(--c-ink-500); line-height: 1.3; }
+.cjm-salida-tag { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 0 .3rem; border-radius: 4px; margin-right: .2rem; }
+.cjm-salida-tag--retiro { background: #e0e7ff; color: #4338ca; }
+.cjm-salida-tag--gasto { background: #fee2e2; color: #b91c1c; }
 .cjm-link { background: none; border: none; padding: 0; cursor: pointer; font-size: var(--fs-12); color: var(--c-ink-500); text-decoration: underline; align-self: flex-start; }
 .cjm-link:hover { color: #b91c1c; }
 .cjm-salidas { display: flex; flex-direction: column; gap: .15rem; border-top: 1px solid var(--c-ink-100); padding-top: var(--sp-2); }

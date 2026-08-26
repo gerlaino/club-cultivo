@@ -83,13 +83,22 @@ class CajaTurno < ApplicationRecord
                     : bar_ventas.where(medio_pago: 'efectivo').sum(:total_ars).to_f
   end
 
-  # Efectivo que se sacó del cajón en el turno: un retiro, un flete, una compra. Sin esto,
-  # cualquier salida se lee después como faltante y no hay dónde explicarla.
+  # Efectivo que se sacó del cajón en el turno. Son DOS cosas distintas y la diferencia es
+  # contable, no cosmética:
   #
-  # `salida_caja` es la marca; se excluye la diferencia de arqueo, que se asienta al cerrar y
-  # no es plata que salió del cajón durante el turno sino lo que no apareció al contarlo.
+  #   salida_caja (egreso) — un GASTO pagado con la plata del cajón: un flete, una compra. El
+  #     club gastó esa plata: baja el resultado.
+  #   retiro_caja (ajuste) — la plata SALIÓ del cajón pero sigue siendo del club, o quedó a
+  #     nombre de alguien. "Dame $100.000 de la caja, anotámelos a mí" no es un gasto: asentarlo
+  #     como egreso infla los gastos y baja el resultado por plata que nadie gastó. Va como
+  #     `ajuste`, que queda afuera de los scopes `ingresos` y `egresos`.
+  #
+  # Las dos restan del esperado: en las dos, la plata no está en el cajón.
+  #
+  # Se excluye la diferencia de arqueo, que se asienta al cerrar y no es plata que salió durante
+  # el turno sino lo que no apareció al contarlo.
   def salidas
-    movimientos_contables.where(tipo: 'egreso', categoria: 'salida_caja')
+    movimientos_contables.where(categoria: %w[salida_caja retiro_caja])
   end
 
   def total_salidas_ars = salidas.sum(:monto_ars).to_f
