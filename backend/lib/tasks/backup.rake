@@ -28,9 +28,14 @@ module ClubBackup
 
   module_function
 
+  # Un bucket dedicado es lo ideal —así una filtración del backup no da acceso a los documentos
+  # clínicos ni al revés— pero si no hay, se usa el de la app: los dumps van bajo el prefijo
+  # `postgres/` y quedan separados de los archivos. Mejor un backup mezclado que ningún backup.
   def bucket
     v = ENV["BACKUP_BUCKET"].to_s.strip
-    abort "✗ Falta la variable BACKUP_BUCKET (nombre del bucket R2 de backups)." if v.empty?
+    v = ENV["S3_BUCKET"].to_s.strip if v.empty?
+    v = ENV["AWS_BUCKET"].to_s.strip if v.empty?
+    abort "✗ Falta BACKUP_BUCKET (o S3_BUCKET): el nombre del bucket donde guardar los dumps." if v.empty?
     v
   end
 
@@ -55,8 +60,14 @@ module ClubBackup
     endpoint = ENV["S3_ENDPOINT"].to_s.strip
     opts = {
       # Credenciales dedicadas de backup si existen; si no, las mismas del app storage.
-      access_key_id:     env_first("BACKUP_S3_ACCESS_KEY_ID", "S3_ACCESS_KEY_ID"),
-      secret_access_key: env_first("BACKUP_S3_SECRET_ACCESS_KEY", "S3_SECRET_ACCESS_KEY"),
+      # Las mismas alternativas que acepta `storage.yml`, incluidas las `AWS_*`.
+      #
+      # La app cae en `AWS_ACCESS_KEY_ID` cuando no hay `S3_ACCESS_KEY_ID`, y el backup no: con
+      # producción configurada así, las fotos subían y el backup abortaba diciendo que faltaba una
+      # variable que sí estaba, con otro nombre. La misma regla escrita en dos lados con distinto
+      # alcance, que es de donde salen estas diferencias.
+      access_key_id:     env_first("BACKUP_S3_ACCESS_KEY_ID", "S3_ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID"),
+      secret_access_key: env_first("BACKUP_S3_SECRET_ACCESS_KEY", "S3_SECRET_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY"),
       region:            (ENV["S3_REGION"].to_s.strip.empty? ? "auto" : ENV["S3_REGION"].strip),
       # R2: los checksums nuevos del SDK rompen la firma ("AuthorizationHeaderMalformed").
       request_checksum_calculation: "when_required",

@@ -144,6 +144,14 @@ R2 para las fotos y los PDFs.
 
 `S3_REGION` **no hace falta**: el código ya usa `auto`, que es lo que corresponde en R2.
 
+**Las credenciales se buscan con los mismos alternativos que `storage.yml`**, `AWS_*` incluidas:
+`BACKUP_S3_ACCESS_KEY_ID` → `S3_ACCESS_KEY_ID` → `AWS_ACCESS_KEY_ID`. Antes el backup sólo miraba
+las dos primeras y la app sí caía en `AWS_*`: con producción configurada así, las fotos subían y
+el backup abortaba diciendo que faltaba una variable que estaba puesta con otro nombre.
+
+Lo mismo con el bucket: `BACKUP_BUCKET` → `S3_BUCKET` → `AWS_BUCKET`. Uno dedicado sigue siendo lo
+mejor, pero un backup mezclado bajo el prefijo `postgres/` es mejor que ningún backup.
+
 Las credenciales caen en `S3_*` si no existen `BACKUP_S3_*`. Reusar las de la app funciona y es lo
 más rápido para empezar; lo ideal después es un token de R2 **dedicado** y limitado al bucket de
 backups, para que una filtración del backup no dé acceso a los documentos clínicos ni al revés.
