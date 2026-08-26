@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_25_120000) do
+ActiveRecord::Schema[7.2].define(version: 2026_08_26_020000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -309,7 +309,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_25_120000) do
 
   create_table "caja_turnos", force: :cascade do |t|
     t.bigint "club_id", null: false
-    t.bigint "bar_id", null: false
+    t.bigint "bar_id"
     t.bigint "sede_id", null: false
     t.bigint "abierta_por_id", null: false
     t.bigint "cerrada_por_id"
@@ -325,6 +325,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_25_120000) do
     t.datetime "apertura_confirmada_at"
     t.bigint "cierre_solicitado_por_id"
     t.datetime "cierre_solicitado_at"
+    t.string "punto_type"
+    t.bigint "punto_id"
     t.index ["abierta_por_id"], name: "index_caja_turnos_on_abierta_por_id"
     t.index ["apertura_confirmada_por_id"], name: "index_caja_turnos_on_apertura_confirmada_por_id"
     t.index ["bar_id"], name: "index_caja_turnos_activa_por_bar", unique: true, where: "((estado)::text = ANY (ARRAY['abierta'::text, 'pendiente_cierre'::text]))"
@@ -332,6 +334,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_25_120000) do
     t.index ["cerrada_por_id"], name: "index_caja_turnos_on_cerrada_por_id"
     t.index ["cierre_solicitado_por_id"], name: "index_caja_turnos_on_cierre_solicitado_por_id"
     t.index ["club_id"], name: "index_caja_turnos_on_club_id"
+    t.index ["punto_type", "punto_id"], name: "index_caja_turnos_activa_por_punto", unique: true, where: "((estado)::text = ANY ((ARRAY['abierta'::character varying, 'pendiente_cierre'::character varying])::text[]))"
     t.index ["sede_id"], name: "index_caja_turnos_on_sede_id"
   end
 
@@ -473,6 +476,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_25_120000) do
     t.datetime "rendido_at"
     t.datetime "deleted_at"
     t.bigint "deleted_by_id"
+    t.bigint "caja_turno_id"
+    t.index ["caja_turno_id"], name: "index_cobros_on_caja_turno_id"
     t.index ["club_id", "created_at"], name: "index_cobros_on_club_id_and_created_at"
     t.index ["club_id"], name: "index_cobros_on_club_id"
     t.index ["created_by_id", "rendido"], name: "index_cobros_on_created_by_id_and_rendido"
@@ -2302,6 +2307,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_25_120000) do
   add_foreign_key "check_ins", "pacientes"
   add_foreign_key "check_ins", "users", column: "deleted_by_id"
   add_foreign_key "clubs", "users", column: "deleted_by_id"
+  add_foreign_key "cobros", "caja_turnos"
   add_foreign_key "cobros", "clubs"
   add_foreign_key "cobros", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "cobros", "users", column: "created_by_id"

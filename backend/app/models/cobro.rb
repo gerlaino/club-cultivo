@@ -13,6 +13,10 @@ class Cobro < ApplicationRecord
   belongs_to :club
   acts_as_tenant(:club)
   belongs_to :created_by, class_name: 'User'
+  # La caja del mostrador donde se cobró, si había una abierta. Es el equivalente de
+  # `bar_ventas.caja_turno_id`: permite arquear sumando lo del turno en vez de adivinar por
+  # ventana de tiempo. Opcional: sin caja abierta se cobra igual, la caja es control, no requisito.
+  belongs_to :caja_turno, optional: true
 
   # Comprobante de la transferencia (foto que sube el delivery/admin). Opcional.
   has_one_attached :comprobante

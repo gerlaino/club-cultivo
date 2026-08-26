@@ -410,6 +410,18 @@ Rails.application.routes.draw do
     resources :sedes do
       collection { get :resumen_financiero }
       resources :stocks, only: [:index]
+
+      # La caja del MOSTRADOR de la sede. Misma mecánica que la del buffet y mismo modelo, pero
+      # es una caja aparte: cada punto de venta abre, arquea y cierra la suya.
+      scope module: :dispensario do
+        get  'caja',        to: 'cajas#index'
+        get  'caja/actual', to: 'cajas#actual'
+        post 'caja/abrir',  to: 'cajas#abrir'
+        post 'caja/:id/confirmar_apertura', to: 'cajas#confirmar_apertura'
+        post 'caja/:id/solicitar_cierre',   to: 'cajas#solicitar_cierre'
+        post 'caja/:id/confirmar_cierre',   to: 'cajas#confirmar_cierre'
+        post 'caja/:id/cerrar',             to: 'cajas#cerrar'
+      end
     end
 
     resources :movimientos_contables, only: [:index, :show, :create, :update, :destroy] do

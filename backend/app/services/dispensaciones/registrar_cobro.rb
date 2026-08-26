@@ -45,6 +45,12 @@ module Dispensaciones
           notas:      @notas,
           # Efectivo de entrega: queda en tránsito (se asienta al recibir la caja).
           rendido:    !diferido_a_rendicion?,
+          # Engancha el cobro a la caja abierta del mostrador, igual que una venta del bar. Es lo
+          # que permite arquear sumando lo cobrado en el turno en vez de adivinar por ventana de
+          # tiempo, que se rompe apenas alguien abre tarde o cierra al otro día. Si no hay caja
+          # abierta el cobro se registra igual: la caja es una herramienta de control, no un
+          # requisito para entregar.
+          caja_turno: caja_abierta,
         )
         cobro.comprobante.attach(@comprobante) if @comprobante.present?
         # El asiento del efectivo de entrega se difiere hasta la recepción de caja.
@@ -71,6 +77,20 @@ module Dispensaciones
         return 'Crédito insuficiente: el monto a dejar en cuenta supera el cupo disponible del socio.' unless cc.puede_dispensar?(@monto)
       end
       nil
+    end
+
+    # La caja abierta del mostrador donde se está cobrando. Sin sede no hay mostrador.
+    def caja_abierta
+      sede = @dispensacion.sede || @dispensacion.stock&.sede
+      return nil if sede.nil?
+
+      # `unscoped` + club_id explícito, y NO `without_tenant`: este servicio también corre desde
+      # la entrega del repartidor y desde Contabilidad, donde no hay tenant fijado, así que con
+      # `require_tenant` la query tal cual revienta. Pero `without_tenant` toca estado GLOBAL —lo
+      # pone en nil y lo restaura— y eso se filtra entre ejemplos: la spec siguiente hereda el
+      # tenant cambiado y falla en su propio setup, lejos de acá. `unscoped` es local a la query.
+      CajaTurno.unscoped.where(club_id: @club.id, punto_type: 'Sede', punto_id: sede.id,
+                               estado: 'abierta').first
     end
 
     def cuenta_corriente

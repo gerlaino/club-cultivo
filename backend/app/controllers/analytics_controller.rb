@@ -237,6 +237,10 @@ class AnalyticsController < ApplicationController
 
     {
       alcance: 'propio',
+      # El mostrador cuya caja le corresponde. Con varias sedes asignadas se toma la primera:
+      # una persona atiende un mostrador por turno, y elegir cuál es una pregunta que hoy nadie
+      # se hace. Si algún día se turnan entre sedes, acá va el selector.
+      sede_mostrador: (Sede.where(id: sedes_ids).order(:nombre).first&.then { |x| { id: x.id, nombre: x.nombre } }),
       resumen: {
         dispensaciones_hoy:    mias.where(fecha_dispensacion: hoy..hoy).count,
         gramos_hoy:            mias.where(fecha_dispensacion: hoy..hoy).sum(:cantidad).to_f.round(2),
@@ -349,6 +353,7 @@ class AnalyticsController < ApplicationController
 
     {
       alcance: 'club',
+      sede_mostrador: (club.sedes.order(:nombre).first&.then { |x| { id: x.id, nombre: x.nombre } }),
       resumen: {
         dispensaciones_hoy:    disps_hoy.count,
         gramos_hoy:            disps_hoy.sum(:cantidad).to_f.round(2),

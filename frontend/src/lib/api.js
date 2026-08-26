@@ -481,6 +481,17 @@ export const listBarVentas      = (barId)          => api.get(`/bares/${barId}/v
 export const listVendiblesBar   = (barId, params = {}) => api.get(`/bares/${barId}/vendibles`, { params })
 export const deleteBarVenta     = (barId, id)      => api.delete(`/bares/${barId}/ventas/${id}`)
 
+// ── Mostrador de dispensa · caja de turno ─────────────────────────────────────
+// Mismo flujo y mismo modelo que la del bar (`CajaTurno` apunta a un punto de venta), pero es
+// una caja APARTE: cada punto abre, arquea y cierra la suya y la plata no se mezcla.
+export const getCajaMostrador        = (sedeId)          => api.get(`/sedes/${sedeId}/caja/actual`)
+export const listCajasMostrador      = (sedeId)          => api.get(`/sedes/${sedeId}/caja`)
+export const abrirCajaMostrador      = (sedeId, payload) => api.post(`/sedes/${sedeId}/caja/abrir`, payload)
+export const confirmarAperturaMostrador = (sedeId, id)          => api.post(`/sedes/${sedeId}/caja/${id}/confirmar_apertura`)
+export const solicitarCierreMostrador   = (sedeId, id, payload) => api.post(`/sedes/${sedeId}/caja/${id}/solicitar_cierre`, payload)
+export const confirmarCierreMostrador   = (sedeId, id)          => api.post(`/sedes/${sedeId}/caja/${id}/confirmar_cierre`)
+export const cerrarCajaMostrador        = (sedeId, id, payload) => api.post(`/sedes/${sedeId}/caja/${id}/cerrar`, payload)
+
 // ── Bar · caja de turno (apertura / cierre con arqueo) ─────────────────────────
 export const getCajaActual      = (barId)          => api.get(`/bares/${barId}/cajas/actual`)
 export const listCajas          = (barId)          => api.get(`/bares/${barId}/cajas`)

@@ -128,14 +128,6 @@ describe('lo que la matriz de permisos concede, el router lo deja abrir', () => 
     tareas: '/tareas',
   }
 
-  // Divergencias conocidas y todavía SIN decidir. No se arreglan de prepo porque no está claro
-  // cuál de las dos listas tiene razón:
-  //
-  //   medico/tareas — la matriz le da `tareas: ['index','show']` y el router le cierra /tareas.
-  //     O el permiso quedó viejo (las tareas son de cultivo y el médico trabaja con turnos), o
-  //     falta el prefijo. Lo decide Germán; mientras tanto queda acá para que se vea.
-  const PENDIENTES_DE_DECIDIR = ["medico: puede 'tareas' pero el router le cierra /tareas"]
-
   it('cada recurso con index tiene una ruta que ese rol puede abrir', async () => {
     // El archivo mockea usePermissions para poder importar el router sin arrastrar la sesión;
     // la matriz hay que traerla del módulo REAL, o el test se compara contra el mock.
@@ -151,6 +143,6 @@ describe('lo que la matriz de permisos concede, el router lo deja abrir', () => 
       }
     }
 
-    expect(faltantes).toEqual(PENDIENTES_DE_DECIDIR)
+    expect(faltantes).toEqual([])
   })
 })

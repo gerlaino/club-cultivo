@@ -26,6 +26,7 @@ module Bar
 
       caja = @bar.caja_turnos.build(
         club: current_user.club, sede: @bar.sede, abierta_por: current_user,
+        punto: @bar,   # el dueño de la caja; `bar_id` queda por compatibilidad
         monto_inicial_ars: params[:monto_inicial_ars].to_d, abierta_at: Time.current
       )
       if caja.save

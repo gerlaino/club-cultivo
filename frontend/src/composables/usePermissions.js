@@ -12,7 +12,6 @@ export const PERMISSIONS = {
     socio_notas: ['index', 'create', 'destroy'],
     indicaciones: ['index', 'show', 'create', 'update'],
     dispensaciones: ['index', 'show'],
-    tareas: ['index', 'show'],
     reportes_medicos: ['index', 'show'],
     documentos: ['index', 'show', 'create', 'update', 'delete'],
   },
