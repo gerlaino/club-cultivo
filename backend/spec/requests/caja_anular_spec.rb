@@ -95,6 +95,23 @@ RSpec.describe 'Anular una caja abierta por error', type: :request do
     end
   end
 
+  # No se muestra en pantalla —una apertura anulada no es un turno y no tiene nada que contar—
+  # pero el rastro tiene que existir para poder dárselo al cliente si lo pide.
+  it 'queda en el audit log quién la anuló, aunque no se muestre en ningún lado' do
+    caja = abrir!
+
+    anular!(caja['id'], motivo: 'me equivoqué de sede')
+
+    rastro = ActsAsTenant.without_tenant do
+      Auditoria.where(club_id: club.id, auditable_type: 'CajaTurno', auditable_id: caja['id'])
+               .order(:created_at).last
+    end
+
+    expect(rastro).to be_present
+    expect(rastro.user_id).to eq(admin.id)
+    expect(rastro.cambios.to_s).to include('anulada')
+  end
+
   it 'el dispensador no puede anularla: la abre y la deshace quien responde por la plata' do
     caja = abrir!
 

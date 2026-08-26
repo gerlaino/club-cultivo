@@ -64,21 +64,17 @@ const sedeDispensa = computed(() => ['social', 'mixta'].includes(sede.value?.tip
 
 // Historial de turnos. Cerrados y anulados: el que se anuló también dice quién y por qué.
 const historialCaja    = ref([])
-const anuladasCaja     = ref([])
 const verHistorialCaja = ref(false)
-const verAnuladas      = ref(false)
 const cajaRef          = ref(null)
 
 async function cargarHistorialCaja() {
   if (!sedeDispensa.value || !sede.value?.id) return
   try {
     const { data } = await listCajasMostrador(sede.value.id)
-    // Una caja ANULADA no operó: no es un "turno anterior", es una apertura que se deshizo.
-    // Mezclarlas con los turnos reales llena el historial de ruido —sobre todo mientras se
-    // prueba— y esconde los cierres que sí importan. Se guardan igual: el registro de que
-    // alguien abrió y deshizo no se borra, sólo se muestra aparte.
+    // SÓLO los cierres. Una caja anulada no operó: no es un turno y no tiene nada que contar,
+    // así que en pantalla es ruido puro. El rastro de quién la anuló queda en el audit log
+    // (`CajaTurno` es Auditable), que es de donde se saca si algún día hace falta.
     historialCaja.value = (data || []).filter(c => c.estado === 'cerrada')
-    anuladasCaja.value  = (data || []).filter(c => c.estado === 'anulada')
   } catch { historialCaja.value = [] }
 }
 
@@ -243,8 +239,7 @@ onMounted(async () => {
           <div v-for="c in historialCaja" :key="c.id" class="sdv__caja-item">
             <div class="sdv__caja-l1">
               <span class="sdv__caja-fecha">{{ fmtFechaCaja(c.abierta_at) }}</span>
-              <span v-if="c.estado === 'anulada'" class="sdv__caja-anulada">Anulada</span>
-              <span v-else-if="c.diferencia_ars" class="sdv__caja-dif"
+              <span v-if="c.diferencia_ars" class="sdv__caja-dif"
                     :class="{ 'sdv__caja-dif--mal': c.diferencia_ars < 0 }">
                 {{ c.diferencia_ars < 0 ? 'faltaron' : 'sobraron' }} ${{ Math.abs(c.diferencia_ars).toLocaleString('es-AR') }}
               </span>
@@ -255,35 +250,10 @@ onMounted(async () => {
               <template v-if="c.apertura_confirmada_por"> · confirmó <strong>{{ c.apertura_confirmada_por }}</strong></template>
               <template v-if="c.cierre_solicitado_por"> · contó <strong>{{ c.cierre_solicitado_por }}</strong></template>
               <template v-if="c.cerrada_por">
-                · {{ c.estado === 'anulada' ? 'anuló' : 'cerró' }} <strong>{{ c.cerrada_por }}</strong>
+                · cerró <strong>{{ c.cerrada_por }}</strong>
               </template>
             </div>
-            <!-- Sin el motivo por defecto: el badge ya dice "Anulada" y repetirlo abajo no
-                 agrega nada. Un motivo escrito por alguien sí. -->
-            <div v-if="c.notas && c.notas !== 'Anulada'" class="sdv__caja-notas">{{ c.notas }}</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Las aperturas deshechas: no operaron, pero el registro de que alguien abrió y anuló no
-           se borra. Plegadas, porque no son parte del trabajo del día. -->
-      <div v-if="sedeDispensa && anuladasCaja.length" class="sdv__cajas">
-        <button type="button" class="sdv__cajas-hd" @click="verAnuladas = !verAnuladas">
-          <i :class="['bi', verAnuladas ? 'bi-caret-down-fill' : 'bi-caret-right-fill']"></i>
-          Aperturas anuladas
-          <span class="sdv__cajas-n">{{ anuladasCaja.length }}</span>
-        </button>
-        <div v-if="verAnuladas" class="sdv__cajas-list">
-          <div v-for="c in anuladasCaja" :key="c.id" class="sdv__caja-item">
-            <div class="sdv__caja-l1">
-              <span class="sdv__caja-fecha">{{ fmtFechaCaja(c.abierta_at) }}</span>
-              <span class="sdv__caja-anulada">Anulada</span>
-            </div>
-            <div class="sdv__caja-l2">
-              Abrió <strong>{{ c.abierta_por || '—' }}</strong>
-              <template v-if="c.cerrada_por"> · anuló <strong>{{ c.cerrada_por }}</strong></template>
-            </div>
-            <div v-if="c.notas && c.notas !== 'Anulada'" class="sdv__caja-notas">{{ c.notas }}</div>
+            <div v-if="c.notas" class="sdv__caja-notas">{{ c.notas }}</div>
           </div>
         </div>
       </div>
@@ -435,7 +405,6 @@ onMounted(async () => {
 .sdv__caja-ok { font-size: var(--fs-12); color: #15803d; }
 .sdv__caja-dif { font-size: var(--fs-12); color: #b45309; font-weight: 700; font-variant-numeric: tabular-nums; }
 .sdv__caja-dif--mal { color: #b91c1c; }
-.sdv__caja-anulada { font-size: var(--fs-12); color: var(--c-ink-400); font-style: italic; }
 .sdv__caja-l2 { font-size: var(--fs-12); color: var(--c-ink-500); }
 .sdv__caja-l2 strong { color: var(--c-ink-700); font-weight: 600; }
 .sdv__caja-notas { font-size: var(--fs-12); color: var(--c-ink-600); font-style: italic; }

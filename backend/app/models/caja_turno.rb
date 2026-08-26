@@ -14,6 +14,18 @@
 class CajaTurno < ApplicationRecord
   acts_as_tenant(:club)
 
+  # La caja se audita porque es plata: quién abrió con cuánto, quién confirmó el fondo, quién
+  # contó, quién cerró y quién ANULÓ. Las aperturas anuladas no se muestran en pantalla —no
+  # operaron, no son un turno— pero el rastro de quién las deshizo tiene que existir para poder
+  # dárselo al cliente si lo pide.
+  #
+  # Allowlist y no denylist: si mañana aparece una columna nueva, entra al rastro sólo si alguien
+  # la agrega acá a propósito.
+  include Auditable
+  auditar_solo :estado, :monto_inicial_ars, :efectivo_declarado_ars, :notas,
+               :abierta_por_id, :apertura_confirmada_por_id, :cierre_solicitado_por_id,
+               :cerrada_por_id
+
   belongs_to :club
   # El dueño de la caja. `bar` queda por compatibilidad —lo usan las consultas del Salón y
   # `Barra#caja_abierta`— y es NULL en una caja de mostrador.
