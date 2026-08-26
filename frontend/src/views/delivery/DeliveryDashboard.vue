@@ -633,7 +633,14 @@ onMounted(load)
 
     <!-- ── Modal Entrega ── -->
     <Teleport to="body">
-      <div v-modal="() => modalEntregar = null" v-if="modalEntregar" class="dlv__overlay" @click.self="modalEntregar = null">
+      <!-- `sucio` explícito: la FIRMA se dibuja en un canvas y eso no dispara `input`, así que el
+           chequeo genérico de la directiva no la ve y ESC cerraría el modal en silencio. La firma
+           no se puede volver a pedir: para cuando alguien se da cuenta, la persona ya se fue. -->
+      <!-- Y SIN `@click.self`: cerrar al tocar afuera es la otra puerta, y por ahí la directiva
+           no pasa. Los modales pesados del proyecto (dispensar, editar) tampoco lo tienen, por
+           esto mismo. Se cierra con la ✕ o con ESC, que sí pregunta. -->
+      <div v-modal="{ cerrar: () => modalEntregar = null, sucio: () => !!firmaData || Number(cobroEfectivo) > 0 || Number(cobroTransf) > 0 }"
+           v-if="modalEntregar" class="dlv__overlay">
         <div class="dlv__modal">
           <div class="dlv__modal-header">
             <CheckCircle2 :size="18" :stroke-width="2" style="color:#15803d" />

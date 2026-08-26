@@ -23,9 +23,14 @@ module Dispensaciones
       total = 0.to_d
       cant  = 0
       ActiveRecord::Base.transaction do
+        # La caja del mostrador donde se recibe la plata. Se resuelve UNA vez: todos los cobros
+        # de esta rendición entran juntos al mismo turno.
+        caja = caja_de_recepcion
         cobros.each do |c|
           asentar!(c)
-          c.update!(rendido: true, rendido_at: Time.current)
+          # Recién ahora el efectivo está en el cajón: acá es donde se engancha a la caja, no
+          # cuando el repartidor lo cobró en la puerta.
+          c.update!(rendido: true, rendido_at: Time.current, caja_turno: caja)
           total += c.monto_ars
           cant  += 1
         end
@@ -36,6 +41,13 @@ module Dispensaciones
     end
 
     private
+
+    # `unscoped` y no `without_tenant`: este servicio corre desde el panel del admin, y
+    # `without_tenant` toca estado global y se filtra entre ejemplos.
+    def caja_de_recepcion
+      CajaTurno.unscoped.where(club_id: @club.id, punto_type: 'Sede', estado: 'abierta')
+               .order(abierta_at: :desc).first
+    end
 
     def asentar!(cobro)
       d    = cobro.dispensacion

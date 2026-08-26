@@ -8,6 +8,10 @@ import { createPinia, setActivePinia } from 'pinia'
 // Un build limpio no prueba que la pantalla ande: acá se MONTA el inicio con la API respondiendo
 // y se recorre el flujo entero. Ya pasó cuatro veces en este proyecto que algo compilara perfecto
 // y explotara al abrirse.
+//
+// La tarjeta es `CajaMostradorCard`, compartida con el tablero del admin —que es donde la caja se
+// ABRE—. Se monta a través del inicio del dispensador a propósito: así el test cubre también que
+// el dashboard le pase bien la sede y el permiso, que es donde se rompería.
 
 const analytics = {
   alcance: 'propio',
@@ -54,19 +58,19 @@ describe('Inicio del dispensador — la caja del turno', () => {
   it('sin caja abierta lo dice, y al dispensador no le ofrece abrirla', async () => {
     const w = await montar('dispensador')
 
-    expect(w.find('.dd__caja').exists()).toBe(true)
+    expect(w.find('.cjm').exists()).toBe(true)
     expect(w.text()).toContain('La caja todavía no se abrió')
     // Quien declara el fondo es quien responde por él: el botón es de administración.
-    expect(w.find('.dd__caja-abrir').exists()).toBe(false)
+    expect(w.find('.cjm-abrir').exists()).toBe(false)
     expect(w.text()).toContain('La abre administración')
   })
 
   it('el admin sí puede abrirla, con su fondo', async () => {
     const w = await montar('admin')
 
-    expect(w.find('.dd__caja-abrir').exists()).toBe(true)
-    await w.find('.dd__caja-input').setValue(10000)
-    await w.find('.dd__caja-btn').trigger('click')
+    expect(w.find('.cjm-abrir').exists()).toBe(true)
+    await w.find('.cjm-input').setValue(10000)
+    await w.find('.cjm-btn').trigger('click')
 
     expect(abrirCajaMostrador).toHaveBeenCalledWith(10, { monto_inicial_ars: 10000 })
   })
@@ -78,7 +82,7 @@ describe('Inicio del dispensador — la caja del turno', () => {
     expect(w.text()).toContain('Vera Admin')
     expect(w.text()).toContain('Confirmo que está el fondo')
 
-    await w.find('.dd__caja-btn').trigger('click')
+    await w.find('.cjm-btn').trigger('click')
     expect(confirmarAperturaMostrador).toHaveBeenCalledWith(10, 7)
   })
 
@@ -89,11 +93,11 @@ describe('Inicio del dispensador — la caja del turno', () => {
     }
     const w = await montar('dispensador')
 
-    const nums = w.find('.dd__caja-nums').text()
+    const nums = w.find('.cjm-nums').text()
     expect(nums).toContain('esperado en caja')
 
-    await w.find('.dd__caja-input').setValue(13500)
-    await w.find('.dd__caja-btn').trigger('click')
+    await w.find('.cjm-input').setValue(13500)
+    await w.find('.cjm-btn').trigger('click')
 
     expect(solicitarCierreMostrador).toHaveBeenCalledWith(10, 7, { efectivo_declarado_ars: 13500 })
   })
@@ -108,7 +112,7 @@ describe('Inicio del dispensador — la caja del turno', () => {
     expect(w.text()).toContain('Ana Mostrador')
     expect(w.text()).toContain('Faltan')
     expect(w.text()).toContain('Esperando que administración')
-    expect(w.find('.dd__caja-btn').exists()).toBe(false)
+    expect(w.find('.cjm-btn').exists()).toBe(false)
   })
 
   // Sin sede no hay mostrador que abrir: el bloque no se dibuja en vez de romperse.
@@ -117,7 +121,7 @@ describe('Inicio del dispensador — la caja del turno', () => {
     analytics.sede_mostrador = null
     const w = await montar('dispensador')
 
-    expect(w.find('.dd__caja').exists()).toBe(false)
+    expect(w.find('.cjm').exists()).toBe(false)
     analytics.sede_mostrador = original
   })
 })

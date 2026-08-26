@@ -12,6 +12,7 @@ import { useClubStore }  from '../../stores/club.js'
 import { useStatsStore } from '../../stores/stats.js'
 import { useTareasStore } from '../../stores/tareas.js'
 import OnboardingWizard  from '../OnboardingWizard.vue'
+import CajaMostradorCard from './CajaMostradorCard.vue'
 import DsSpinner         from '../../design-system/components/Spinner.vue'
 
 const router      = useRouter()
@@ -145,6 +146,20 @@ const proximaCosecha = computed(() => {
     .sort((a, b) => a.diff - b.diff)
   return candidatos[0] ?? null
 })
+
+// ── Caja del mostrador ───────────────────────────────────────────────────────
+// La abre el admin con el fondo del día y la confirma quien atiende. La tarjeta es la misma que
+// ve el dispensador en su inicio: dos vistas del mismo objeto, un solo componente.
+//
+// Con varias sedes elige cuál, porque cada mostrador tiene su caja y su arqueo. Con una sola no
+// hay nada que elegir y el selector no aparece.
+const sedeCaja = ref(null)
+const sedesParaCaja = computed(() => sedes.value || [])
+watch(sedesParaCaja, (lista) => {
+  if (sedeCaja.value || !lista.length) return
+  const sugerida = analyticsDisp.value?.sede_mostrador?.id
+  sedeCaja.value = lista.find(s => s.id === sugerida) || lista[0]
+}, { immediate: true })
 
 // ── Reservas para preparar (desde el analytics del dispensador) ──────────────
 const reservasHoy      = computed(() => analyticsDisp.value?.reservas?.hoy ?? 0)
@@ -465,6 +480,19 @@ async function onOnboardingCompletado() {
       <!-- ── ERRORES DE CARGA ───────────────────────────────────────────── -->
       <div v-if="erroresCarga.length" class="ad__error-banner">
         Algunos datos no pudieron cargarse: {{ erroresCarga.join(', ') }}. Recargá la página si el problema persiste.
+      </div>
+
+      <!-- ── CAJA DEL MOSTRADOR ──────────────────────────────────────────
+           Arriba de todo porque es lo primero del día: sin caja abierta, quien atiende no
+           puede arrancar y se queda esperando. -->
+      <div v-if="sedeCaja" class="ad__caja-wrap">
+        <label v-if="sedesParaCaja.length > 1" class="ad__caja-sede">
+          <span>Mostrador</span>
+          <select v-model="sedeCaja" class="ad__caja-select">
+            <option v-for="s in sedesParaCaja" :key="s.id" :value="s">{{ s.nombre }}</option>
+          </select>
+        </label>
+        <CajaMostradorCard :sede="sedeCaja" :puede-gestionar="true" />
       </div>
 
       <!-- ── HEADER ──────────────────────────────────────────────────────── -->
@@ -896,6 +924,9 @@ async function onOnboardingCompletado() {
 }
 
 /* ── Header ──────────────────────────────────────────────────────────────── */
+.ad__caja-wrap { margin-bottom: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-2); }
+.ad__caja-sede { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-12); font-weight: 700; color: var(--c-ink-600); }
+.ad__caja-select { padding: .25rem .5rem; border: 1.5px solid var(--c-ink-300); border-radius: 8px; font-size: var(--fs-13); }
 .ad__header {
   margin-bottom: 1.25rem;
 }

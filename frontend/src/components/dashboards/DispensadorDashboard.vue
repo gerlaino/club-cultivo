@@ -14,79 +14,9 @@
       </RouterLink>
     </div>
 
-    <!-- ── Caja del turno ──────────────────────────────────────────────────────
-         Lo primero de la jornada: sin caja abierta, el mostrador no arrancó. El admin la abre
-         declarando el fondo y quien atiende confirma que ese fondo está — los dos pasos existen
-         para que ninguno quede solo respondiendo por una diferencia de arqueo. -->
-    <section v-if="sedeMostrador" class="dd__caja" :class="`dd__caja--${estadoCaja}`">
-      <div class="dd__caja-hd">
-        <span class="dd__caja-title"><i class="bi bi-cash-stack"></i> Caja del turno</span>
-        <span class="dd__caja-sede">{{ sedeMostrador.nombre }}</span>
-      </div>
-
-      <div v-if="cargandoCaja" class="dd__caja-msg">Cargando…</div>
-
-      <!-- Sin caja: el mostrador no abrió -->
-      <template v-else-if="!caja">
-        <p class="dd__caja-msg">La caja todavía no se abrió.</p>
-        <div v-if="puedeGestionarCaja" class="dd__caja-abrir">
-          <label class="dd__caja-label">Fondo inicial</label>
-          <div class="dd__caja-input-wrap">
-            <span class="dd__caja-prefix">$</span>
-            <input v-model.number="fondoInicial" type="number" min="0" step="1" class="dd__caja-input" placeholder="0" />
-          </div>
-          <button class="dd__caja-btn" :disabled="guardandoCaja" @click="abrirCaja">Abrir caja</button>
-        </div>
-        <p v-else class="dd__caja-hint">La abre administración con el fondo del día.</p>
-      </template>
-
-      <!-- Abierta y sin confirmar: le toca a quien atiende -->
-      <template v-else-if="caja.estado === 'abierta' && !caja.apertura_confirmada">
-        <p class="dd__caja-msg">
-          {{ caja.abierta_por }} abrió con <strong>{{ fmtARS(caja.monto_inicial_ars) }}</strong> de fondo.
-        </p>
-        <button class="dd__caja-btn" :disabled="guardandoCaja" @click="confirmarApertura">
-          Confirmo que está el fondo
-        </button>
-      </template>
-
-      <!-- En marcha -->
-      <template v-else-if="caja.estado === 'abierta'">
-        <div class="dd__caja-nums">
-          <div><span class="dd__caja-n">{{ fmtARS(caja.monto_inicial_ars) }}</span><span class="dd__caja-l">fondo</span></div>
-          <div><span class="dd__caja-n">{{ fmtARS(caja.total_efectivo_ars) }}</span><span class="dd__caja-l">efectivo cobrado</span></div>
-          <div><span class="dd__caja-n">{{ fmtARS(caja.total_digital_ars) }}</span><span class="dd__caja-l">transferencias</span></div>
-          <div><span class="dd__caja-n dd__caja-n--fuerte">{{ fmtARS(caja.efectivo_esperado_ars) }}</span><span class="dd__caja-l">esperado en caja</span></div>
-        </div>
-        <div class="dd__caja-cerrar">
-          <label class="dd__caja-label">Efectivo contado</label>
-          <div class="dd__caja-input-wrap">
-            <span class="dd__caja-prefix">$</span>
-            <input v-model.number="efectivoContado" type="number" min="0" step="1" class="dd__caja-input" placeholder="0" />
-          </div>
-          <button class="dd__caja-btn" :disabled="guardandoCaja || efectivoContado == null" @click="enviarCierre">
-            Cerrar turno
-          </button>
-        </div>
-      </template>
-
-      <!-- Cierre enviado, esperando confirmación -->
-      <template v-else>
-        <p class="dd__caja-msg">
-          {{ caja.cierre_solicitado_por }} envió el cierre con <strong>{{ fmtARS(caja.efectivo_declarado_ars) }}</strong>.
-          <span v-if="caja.diferencia_ars" :class="caja.diferencia_ars < 0 ? 'dd__caja-falta' : 'dd__caja-sobra'">
-            {{ caja.diferencia_ars < 0 ? 'Faltan' : 'Sobran' }} {{ fmtARS(Math.abs(caja.diferencia_ars)) }}.
-          </span>
-          <span v-else>Cuadra exacto.</span>
-        </p>
-        <button v-if="puedeGestionarCaja" class="dd__caja-btn" :disabled="guardandoCaja" @click="confirmarCierre">
-          Confirmar cierre
-        </button>
-        <p v-else class="dd__caja-hint">Esperando que administración lo confirme.</p>
-      </template>
-
-      <p v-if="errorCaja" class="dd__caja-error">{{ errorCaja }}</p>
-    </section>
+    <!-- La caja vive en un componente: la misma tarjeta la usa el admin en su tablero, donde
+         la ABRE. Dos vistas del mismo objeto, un solo lugar donde arreglarla. -->
+    <CajaMostradorCard :sede="sedeMostrador" :puede-gestionar="puedeGestionarCaja" />
 
     <!-- Banner: reservas vencidas sin preparar -->
     <RouterLink v-if="!loading && reservasVencidas > 0" to="/reservas" class="dd__banner-alert">
@@ -275,13 +205,9 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useAuthStore }     from '../../stores/auth.js'
-import {
-  listDispensacionesFecha, getAnalyticsDispensador, getTareasSemana,
-  getCajaMostrador, abrirCajaMostrador, confirmarAperturaMostrador,
-  solicitarCierreMostrador, confirmarCierreMostrador,
-} from '../../lib/api.js'
+import { listDispensacionesFecha, getAnalyticsDispensador, getTareasSemana } from '../../lib/api.js'
+import CajaMostradorCard from './CajaMostradorCard.vue'
 import { useSemanaTareas } from '../../composables/useSemanaTareas.js'
-import { useToast } from '../../composables/useToast.js'
 import DsStat               from '../../design-system/components/Stat.vue'
 import { PackagePlus }      from 'lucide-vue-next'
 
@@ -291,63 +217,12 @@ const loading      = ref(true)
 const loadingDisps = ref(true)
 const analytics    = ref(null)
 const dispensaciones = ref([])
-const toast = useToast()
 
-// ── Caja del turno ───────────────────────────────────────────────────────────
-const caja           = ref(null)
-const cargandoCaja   = ref(true)
-const guardandoCaja  = ref(false)
-const errorCaja      = ref(null)
-const fondoInicial   = ref(null)
-const efectivoContado = ref(null)
-
+// La caja: qué mostrador y quién puede abrirla. Lo demás lo maneja la tarjeta.
 const sedeMostrador = computed(() => analytics.value?.sede_mostrador ?? null)
 // Abrir la caja y confirmar el cierre son de quien responde por la plata. El backend lo valida
 // igual: acá es sólo para no ofrecer un botón que va a rebotar.
 const puedeGestionarCaja = computed(() => ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role))
-const estadoCaja = computed(() => {
-  if (!caja.value) return 'sin-abrir'
-  if (caja.value.estado === 'pendiente_cierre') return 'pendiente'
-  return caja.value.apertura_confirmada ? 'andando' : 'sin-confirmar'
-})
-
-async function cargarCaja() {
-  if (!sedeMostrador.value) { cargandoCaja.value = false; return }
-  cargandoCaja.value = true
-  try {
-    const { data } = await getCajaMostrador(sedeMostrador.value.id)
-    caja.value = data.caja
-  } catch { caja.value = null }
-  finally { cargandoCaja.value = false }
-}
-
-async function conCaja(fn, ok) {
-  guardandoCaja.value = true
-  errorCaja.value = null
-  try {
-    await fn()
-    await cargarCaja()
-    toast.success(ok)
-  } catch (e) {
-    errorCaja.value = e?.response?.data?.error || e?.response?.data?.errors?.[0] || 'No se pudo'
-  } finally { guardandoCaja.value = false }
-}
-
-const abrirCaja = () => conCaja(
-  () => abrirCajaMostrador(sedeMostrador.value.id, { monto_inicial_ars: Number(fondoInicial.value) || 0 }),
-  'Caja abierta')
-
-const confirmarApertura = () => conCaja(
-  () => confirmarAperturaMostrador(sedeMostrador.value.id, caja.value.id),
-  'Fondo confirmado')
-
-const enviarCierre = () => conCaja(
-  () => solicitarCierreMostrador(sedeMostrador.value.id, caja.value.id, { efectivo_declarado_ars: Number(efectivoContado.value) || 0 }),
-  'Cierre enviado')
-
-const confirmarCierre = () => conCaja(
-  () => confirmarCierreMostrador(sedeMostrador.value.id, caja.value.id),
-  'Caja cerrada')
 
 // ── Mi semana ────────────────────────────────────────────────────────────────
 const semana = ref({ desde: null, hasta: null, dias: [] })
@@ -403,8 +278,6 @@ onMounted(async () => {
     ])
     analytics.value      = aRes.data
     dispensaciones.value = dRes.data.dispensaciones ?? []
-    // La caja depende de la sede, que la dice el payload del inicio: va después, no en paralelo.
-    await cargarCaja()
   } catch {
     // silenciar
   } finally {
@@ -421,36 +294,6 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* ── Caja del turno ────────────────────────────────────────────────────────────
-   Lo primero de la jornada, así que va arriba y con color de estado: sin abrir es neutro,
-   esperando confirmación llama, en marcha se calla. */
-.dd__caja { border: 1.5px solid var(--c-ink-200); border-radius: 14px; padding: var(--sp-4); background: #fff; margin-bottom: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-3); }
-.dd__caja--sin-abrir    { border-color: var(--c-ink-300); }
-.dd__caja--sin-confirmar { border-color: #f59e0b; background: #fffbeb; }
-.dd__caja--pendiente    { border-color: #f59e0b; background: #fffbeb; }
-.dd__caja--andando      { border-color: #86efac; }
-.dd__caja-hd { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
-.dd__caja-title { font-weight: 800; font-size: var(--fs-14); color: var(--c-ink-900); display: flex; align-items: center; gap: .4rem; }
-.dd__caja-sede { font-size: var(--fs-12); color: var(--c-ink-500); }
-.dd__caja-msg { margin: 0; font-size: var(--fs-13); color: var(--c-ink-700); }
-.dd__caja-hint { margin: 0; font-size: var(--fs-12); color: var(--c-ink-500); }
-.dd__caja-error { margin: 0; font-size: var(--fs-12); color: #b91c1c; }
-.dd__caja-abrir, .dd__caja-cerrar { display: flex; align-items: flex-end; gap: var(--sp-2); flex-wrap: wrap; }
-.dd__caja-label { font-size: var(--fs-12); font-weight: 700; color: var(--c-ink-600); display: block; margin-bottom: .2rem; }
-.dd__caja-input-wrap { position: relative; display: flex; align-items: center; }
-.dd__caja-prefix { position: absolute; left: .5rem; color: var(--c-ink-400); font-size: var(--fs-13); }
-.dd__caja-input { padding: .4rem .6rem .4rem 1.3rem; border: 1.5px solid var(--c-ink-300); border-radius: 8px; font-size: var(--fs-14); width: 130px; font-variant-numeric: tabular-nums; }
-.dd__caja-input:focus { outline: none; border-color: #1b5e20; }
-.dd__caja-btn { background: #1b5e20; color: #fff; border: none; border-radius: 8px; padding: .45rem .9rem; font-size: var(--fs-13); font-weight: 700; cursor: pointer; }
-.dd__caja-btn:disabled { opacity: .5; cursor: not-allowed; }
-.dd__caja-nums { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--sp-3); }
-.dd__caja-nums > div { display: flex; flex-direction: column; }
-.dd__caja-n { font-size: var(--fs-16); font-weight: 700; color: var(--c-ink-800); font-variant-numeric: tabular-nums; }
-.dd__caja-n--fuerte { color: #1b5e20; }
-.dd__caja-l { font-size: var(--fs-11); color: var(--c-ink-500); }
-.dd__caja-falta { color: #b91c1c; font-weight: 700; }
-.dd__caja-sobra { color: #b45309; font-weight: 700; }
-
 /* ── Mi semana ─────────────────────────────────────────────────────────────── */
 .dd__section-hd { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-2); }
 .dd__section-link { font-size: var(--fs-12); color: #1b5e20; text-decoration: none; font-weight: 600; }

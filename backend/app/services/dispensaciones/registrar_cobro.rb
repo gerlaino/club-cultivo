@@ -50,7 +50,7 @@ module Dispensaciones
           # tiempo, que se rompe apenas alguien abre tarde o cierra al otro día. Si no hay caja
           # abierta el cobro se registra igual: la caja es una herramienta de control, no un
           # requisito para entregar.
-          caja_turno: caja_abierta,
+          caja_turno: caja_del_mostrador,
         )
         cobro.comprobante.attach(@comprobante) if @comprobante.present?
         # El asiento del efectivo de entrega se difiere hasta la recepción de caja.
@@ -80,6 +80,17 @@ module Dispensaciones
     end
 
     # La caja abierta del mostrador donde se está cobrando. Sin sede no hay mostrador.
+    #
+    # El efectivo que cobra el REPARTIDOR en la puerta NO va acá: está en su bolsillo, no en el
+    # cajón, y engancharlo haría que el arqueo del mostrador esperara plata que no llegó todavía.
+    # Entra cuando se rinde la caja (`RecibirCajaDelivery`), que es cuando la plata aparece de
+    # verdad. Es la misma línea que ya trazaba `diferido_a_rendicion?` para el asiento contable.
+    def caja_del_mostrador
+      return nil if diferido_a_rendicion?
+
+      caja_abierta
+    end
+
     def caja_abierta
       sede = @dispensacion.sede || @dispensacion.stock&.sede
       return nil if sede.nil?
