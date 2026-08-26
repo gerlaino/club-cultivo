@@ -3,7 +3,7 @@ import { ref, computed, onMounted, onUnmounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useAuthStore } from "../stores/auth"
 import { useClubStore } from "../stores/club"
-import { getSede, listSalas, getSedeStocks, deleteSede } from "../lib/api"
+import { getSede, listSalas, getSedeStocks, deleteSede, listCajasMostrador } from "../lib/api"
 import ModalCrearSala    from '../components/salas/ModalCrearSala.vue'
 import CajaMostradorCard from '../components/dashboards/CajaMostradorCard.vue'
 import Breadcrumb         from '../components/ui/Breadcrumb.vue'
@@ -61,6 +61,24 @@ const tieneSalas = computed(() => ['produccion', 'mixta'].includes(sede.value?.t
 // Sólo las sedes que dispensan tienen mostrador y, por lo tanto, caja. Es la misma regla que ya
 // decide qué tipo de sede se puede crear según lo contratado (`Sede::SUITES_POR_TIPO`).
 const sedeDispensa = computed(() => ['social', 'mixta'].includes(sede.value?.tipo))
+
+// Historial de turnos. Cerrados y anulados: el que se anuló también dice quién y por qué.
+const historialCaja    = ref([])
+const verHistorialCaja = ref(false)
+const cajaRef          = ref(null)
+
+async function cargarHistorialCaja() {
+  if (!sedeDispensa.value || !sede.value?.id) return
+  try {
+    const { data } = await listCajasMostrador(sede.value.id)
+    historialCaja.value = (data || []).filter(c => c.estado === 'cerrada' || c.estado === 'anulada')
+  } catch { historialCaja.value = [] }
+}
+
+function fmtFechaCaja(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
 // Gramos y "stock bajo" = solo flor seca (los derivados son inventario con otra unidad).
 const florSeca   = computed(() => tiendaStocks.value.filter(s => s.forma_producto === 'flor_seca'))
 const stockTotal = computed(() => florSeca.value.reduce((a, s) => a + Number(s.cantidad || 0), 0))
@@ -147,6 +165,8 @@ onMounted(async () => {
     sede.value  = sedeRes.data
     salas.value = (salasRes.data || []).filter(s => s.sede?.id === sedeId)
     if (tieneInv.value) await loadTiendaStocks()
+    // Después de tener la sede: el historial depende de saber si dispensa.
+    cargarHistorialCaja()
   } catch (e) {
     error.value = "No se pudo cargar la sede."
   } finally {
@@ -201,8 +221,38 @@ onMounted(async () => {
       <!-- La caja del mostrador. Va acá y no en el tablero: se abre POR SEDE, y desde la sede no
            hay forma de confundirse de cuál. Sólo en las que dispensan — en una de producción no
            hay mostrador, y `Sede::SUITES_POR_TIPO` ya define cuáles son. -->
-      <CajaMostradorCard v-if="sedeDispensa" :sede="{ id: sede.id, nombre: sede.nombre }"
-                         :puede-gestionar="isAdmin" />
+      <CajaMostradorCard v-if="sedeDispensa" ref="cajaRef" :sede="{ id: sede.id, nombre: sede.nombre }"
+                         :puede-gestionar="isAdmin" @cambio="cargarHistorialCaja" />
+
+      <!-- Historial de turnos: quién abrió, quién confirmó el fondo, quién contó y quién cerró.
+           Una diferencia de arqueo sin nombres al lado no se puede revisar tres semanas después. -->
+      <div v-if="sedeDispensa && historialCaja.length" class="sdv__cajas">
+        <button type="button" class="sdv__cajas-hd" @click="verHistorialCaja = !verHistorialCaja">
+          <i :class="['bi', verHistorialCaja ? 'bi-caret-down-fill' : 'bi-caret-right-fill']"></i>
+          Turnos anteriores
+          <span class="sdv__cajas-n">{{ historialCaja.length }}</span>
+        </button>
+        <div v-if="verHistorialCaja" class="sdv__cajas-list">
+          <div v-for="c in historialCaja" :key="c.id" class="sdv__caja-item">
+            <div class="sdv__caja-l1">
+              <span class="sdv__caja-fecha">{{ fmtFechaCaja(c.abierta_at) }}</span>
+              <span v-if="c.estado === 'anulada'" class="sdv__caja-anulada">Anulada</span>
+              <span v-else-if="c.diferencia_ars" class="sdv__caja-dif"
+                    :class="{ 'sdv__caja-dif--mal': c.diferencia_ars < 0 }">
+                {{ c.diferencia_ars < 0 ? 'faltaron' : 'sobraron' }} ${{ Math.abs(c.diferencia_ars).toLocaleString('es-AR') }}
+              </span>
+              <span v-else class="sdv__caja-ok">cuadró</span>
+            </div>
+            <div class="sdv__caja-l2">
+              Abrió <strong>{{ c.abierta_por || '—' }}</strong>
+              <template v-if="c.apertura_confirmada_por"> · confirmó <strong>{{ c.apertura_confirmada_por }}</strong></template>
+              <template v-if="c.cierre_solicitado_por"> · contó <strong>{{ c.cierre_solicitado_por }}</strong></template>
+              <template v-if="c.cerrada_por"> · cerró <strong>{{ c.cerrada_por }}</strong></template>
+            </div>
+            <div v-if="c.notas" class="sdv__caja-notas">{{ c.notas }}</div>
+          </div>
+        </div>
+      </div>
 
       <div v-if="tieneSalas" class="sdv__kpis sdv__kpis--3">
         <div class="sdv__kpi"><div class="sdv__kpi-val">{{ kpis.total }}</div><div class="sdv__kpi-lbl">Salas totales</div></div>
@@ -338,6 +388,23 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+
+/* ── Historial de turnos de caja ────────────────────────────────────────────── */
+.sdv__cajas { border: 1px solid var(--c-ink-200); border-radius: 12px; background: #fff; margin-bottom: var(--sp-4); overflow: hidden; }
+.sdv__cajas-hd { width: 100%; display: flex; align-items: center; gap: var(--sp-2); background: none; border: none; padding: var(--sp-3); cursor: pointer; font: inherit; font-weight: 700; font-size: var(--fs-13); color: var(--c-ink-700); }
+.sdv__cajas-n { margin-left: auto; font-size: var(--fs-11); color: var(--c-ink-400); }
+.sdv__cajas-list { border-top: 1px solid var(--c-ink-100); }
+.sdv__caja-item { padding: var(--sp-3); border-bottom: 1px solid var(--c-ink-100); display: flex; flex-direction: column; gap: .15rem; }
+.sdv__caja-item:last-child { border-bottom: none; }
+.sdv__caja-l1 { display: flex; align-items: baseline; gap: var(--sp-2); }
+.sdv__caja-fecha { font-weight: 700; font-size: var(--fs-13); color: var(--c-ink-900); }
+.sdv__caja-ok { font-size: var(--fs-12); color: #15803d; }
+.sdv__caja-dif { font-size: var(--fs-12); color: #b45309; font-weight: 700; font-variant-numeric: tabular-nums; }
+.sdv__caja-dif--mal { color: #b91c1c; }
+.sdv__caja-anulada { font-size: var(--fs-12); color: var(--c-ink-400); font-style: italic; }
+.sdv__caja-l2 { font-size: var(--fs-12); color: var(--c-ink-500); }
+.sdv__caja-l2 strong { color: var(--c-ink-700); font-weight: 600; }
+.sdv__caja-notas { font-size: var(--fs-12); color: var(--c-ink-600); font-style: italic; }
 /* ══ ORIGINALES ══════════════════════════════════════════════════ */
 .sdv { padding: 1.75rem 1.75rem 3rem; max-width: 1200px; margin: 0 auto; }
 @media (max-width: 768px) { .sdv { padding: 1.25rem 1rem 2rem; } }

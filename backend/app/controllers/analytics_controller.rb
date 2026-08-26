@@ -182,7 +182,16 @@ class AnalyticsController < ApplicationController
         calcular_dispensador(club)
       end
     end
-    render json: data
+
+    # El estado de la caja va SIEMPRE fresco, fuera del caché.
+    #
+    # Es lo único de este tablero que cambia por una acción de otra persona y que hay que ver en
+    # el momento: el admin abría la caja, volvía al inicio y seguía diciendo "sin abrir" durante
+    # diez minutos. Un dato que miente sobre el estado de la plata no puede salir de un caché.
+    #
+    # El resto sí se cachea: son conteos del día que si llegan con unos minutos de atraso no
+    # cambian ninguna decisión.
+    render json: data.merge(cajas_por_sede: cajas_por_sede(club))
   end
 
   # Quién ve todo y quién ve lo suyo. El admin (y el super_admin) siguen viendo la organización
@@ -383,9 +392,6 @@ class AnalyticsController < ApplicationController
     {
       alcance: 'club',
       sede_mostrador: (club.sedes.order(:nombre).first&.then { |x| { id: x.id, nombre: x.nombre } }),
-      # Cómo está la caja de CADA mostrador. El admin no está parado en la sede: necesita ver a
-      # distancia si abrieron, si alguien confirmó el fondo y si quedó un cierre esperándolo.
-      cajas_por_sede: cajas_por_sede(club),
       resumen: {
         dispensaciones_hoy:    disps_hoy.count,
         gramos_hoy:            disps_hoy.sum(:cantidad).to_f.round(2),

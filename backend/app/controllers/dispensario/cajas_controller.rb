@@ -17,7 +17,7 @@ module Dispensario
     before_action -> { require_feature!(:produccion_dispensa) }
     before_action :set_sede
     before_action :require_operador, only: [:actual, :confirmar_apertura, :solicitar_cierre]
-    before_action :require_gestion,  only: [:index, :abrir, :cerrar, :confirmar_cierre, :salida]
+    before_action :require_gestion,  only: [:index, :abrir, :cerrar, :confirmar_cierre, :salida, :anular]
 
     # GET /sedes/:sede_id/caja/actual — la caja activa del mostrador, o null
     def actual
@@ -105,6 +105,17 @@ module Dispensario
       end
     end
 
+    # POST /sedes/:sede_id/caja/:id/anular { motivo? }
+    #
+    # Deshacer una apertura equivocada: mal monto, la sede que no era, se arrepintió. Sólo si la
+    # caja no tiene movimiento — con un cobro adentro la salida es el cierre con su arqueo.
+    #
+    # No es lo mismo que cerrar: cerrar con $0 contado generaría un faltante por todo el fondo, un
+    # egreso inventado en el libro. Anular no toca contabilidad porque abrir tampoco la tocó.
+    def anular
+      con_caja { |caja| caja.anular!(usuario: current_user, motivo: params[:motivo]) }
+    end
+
     private
 
     def set_sede
@@ -170,6 +181,7 @@ module Dispensario
         efectivo_declarado_ars: caja.efectivo_declarado_ars&.to_f,
         diferencia_ars:         caja.diferencia_ars,
         notas:                  caja.notas,
+        anulable:               caja.anulable?,
       }
     end
   end

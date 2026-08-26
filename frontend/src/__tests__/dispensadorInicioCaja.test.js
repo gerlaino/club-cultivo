@@ -26,6 +26,7 @@ const getCajaMostrador = vi.fn(() => Promise.resolve({ data: { caja: cajaActual 
 const abrirCajaMostrador = vi.fn(() => Promise.resolve({ data: {} }))
 const confirmarAperturaMostrador = vi.fn(() => Promise.resolve({ data: {} }))
 const solicitarCierreMostrador = vi.fn(() => Promise.resolve({ data: {} }))
+const anularCajaMostrador = vi.fn(() => Promise.resolve({ data: {} }))
 
 vi.mock('../lib/api.js', () => ({
   getAnalyticsDispensador: vi.fn(() => Promise.resolve({ data: analytics })),
@@ -36,6 +37,8 @@ vi.mock('../lib/api.js', () => ({
   confirmarAperturaMostrador: (...a) => confirmarAperturaMostrador(...a),
   solicitarCierreMostrador: (...a) => solicitarCierreMostrador(...a),
   confirmarCierreMostrador: vi.fn(() => Promise.resolve({ data: {} })),
+  anularCajaMostrador: (...a) => anularCajaMostrador(...a),
+  salidaCajaMostrador: vi.fn(() => Promise.resolve({ data: {} })),
 }))
 vi.mock('../composables/useToast.js', () => ({
   useToast: () => ({ success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() }),
@@ -113,6 +116,47 @@ describe('Inicio del dispensador — la caja del turno', () => {
     expect(w.text()).toContain('Faltan')
     expect(w.text()).toContain('Esperando que administración')
     expect(w.find('.cjm-btn').exists()).toBe(false)
+  })
+
+  // Se abrió por error y hay que deshacerlo. Cerrarla con $0 contado generaría un faltante por
+  // todo el fondo: un egreso inventado en el libro por una caja que nunca operó.
+  it('una caja recién abierta se puede anular, y sólo administración la anula', async () => {
+    cajaActual = { id: 7, estado: 'abierta', apertura_confirmada: false, monto_inicial_ars: 100000,
+                   abierta_por: 'Vera', anulable: true }
+
+    const delMostrador = await montar('dispensador')
+    expect(delMostrador.text()).not.toContain('anularla')
+
+    const w = await montar('admin')
+    const btn = w.findAll('.cjm-link').find((b) => b.text().includes('anularla'))
+    expect(btn).toBeTruthy()
+
+    await btn.trigger('click')
+    expect(anularCajaMostrador).toHaveBeenCalled()
+  })
+
+  // Con plata adentro la salida es el cierre con su arqueo, no la anulación.
+  it('con movimientos ya no ofrece anular', async () => {
+    cajaActual = { id: 7, estado: 'abierta', apertura_confirmada: false, monto_inicial_ars: 100000,
+                   abierta_por: 'Vera', anulable: false }
+    const w = await montar('admin')
+
+    expect(w.text()).not.toContain('anularla')
+  })
+
+  // "Turno mañana", "faltaron $500 porque se pagó un flete": sin esto, tres semanas después una
+  // diferencia no se puede revisar.
+  it('el cierre lleva observaciones', async () => {
+    cajaActual = { id: 7, estado: 'abierta', apertura_confirmada: true, monto_inicial_ars: 10000,
+                   total_efectivo_ars: 0, total_digital_ars: 0, efectivo_esperado_ars: 10000 }
+    const w = await montar('dispensador')
+
+    await w.find('.cjm-obs').setValue('turno mañana')
+    await w.find('.cjm-input').setValue(10000)
+    await w.findAll('.cjm-btn')[0].trigger('click')
+
+    expect(solicitarCierreMostrador).toHaveBeenCalledWith(10, 7,
+      expect.objectContaining({ notas: 'turno mañana' }))
   })
 
   // Sin sede no hay mostrador que abrir: el bloque no se dibuja en vez de romperse.

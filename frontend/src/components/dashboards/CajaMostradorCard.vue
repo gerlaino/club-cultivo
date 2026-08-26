@@ -41,6 +41,11 @@
       <button class="cjm-btn" :disabled="guardandoCaja" @click="confirmarApertura">
         Confirmo que está el fondo
       </button>
+      <!-- Se abrió por error: mal monto, la sede que no era. Anular NO es cerrar — cerrar con $0
+           contado generaría un faltante por todo el fondo, un egreso inventado en el libro. -->
+      <button v-if="puedeGestionarCaja && caja.anulable" type="button" class="cjm-link" @click="anular">
+        Se abrió por error, anularla
+      </button>
     </template>
 
     <!-- En marcha -->
@@ -51,6 +56,13 @@
         <div><span class="cjm-n">{{ fmtARS(caja.total_digital_ars) }}</span><span class="cjm-l">transferencias</span></div>
         <div><span class="cjm-n cjm-n--fuerte">{{ fmtARS(caja.efectivo_esperado_ars) }}</span><span class="cjm-l">esperado en caja</span></div>
       </div>
+      <div v-if="caja.salidas?.length" class="cjm-salidas">
+        <span class="cjm-salidas-t">Salidas del turno</span>
+        <span v-for="sa in caja.salidas" :key="sa.id" class="cjm-salida">
+          −{{ fmtARS(sa.monto_ars) }} · {{ sa.descripcion }}
+        </span>
+      </div>
+
       <div class="cjm-cerrar">
         <label class="cjm-label">Efectivo contado</label>
         <div class="cjm-input-wrap">
@@ -60,6 +72,22 @@
         <button class="cjm-btn" :disabled="guardandoCaja || efectivoContado == null" @click="enviarCierre">
           Cerrar turno
         </button>
+      </div>
+      <!-- Con qué turno se corresponde y qué pasó. Va al cierre y queda en el historial: dentro
+           de un mes, "faltaban $500" sin contexto no se puede revisar. -->
+      <input v-model.trim="observaciones" type="text" class="cjm-input cjm-obs"
+             placeholder="Observaciones — ej: turno mañana" />
+
+      <button v-if="puedeGestionarCaja" type="button" class="cjm-link" @click="mostrarSalida = !mostrarSalida">
+        {{ mostrarSalida ? 'Cancelar' : 'Sacar efectivo de la caja' }}
+      </button>
+      <div v-if="mostrarSalida && puedeGestionarCaja" class="cjm-cerrar">
+        <div class="cjm-input-wrap">
+          <span class="cjm-prefix">$</span>
+          <input v-model.number="salidaMonto" type="number" min="0" step="1" class="cjm-input" placeholder="0" />
+        </div>
+        <input v-model.trim="salidaMotivo" type="text" class="cjm-input" placeholder="Para qué" />
+        <button class="cjm-btn" :disabled="guardandoCaja" @click="sacarEfectivo">Registrar salida</button>
       </div>
     </template>
 
@@ -72,9 +100,12 @@
         </span>
         <span v-else>Cuadra exacto.</span>
       </p>
-      <button v-if="puedeGestionarCaja" class="cjm-btn" :disabled="guardandoCaja" @click="confirmarCierre">
-        Confirmar cierre
-      </button>
+      <template v-if="puedeGestionarCaja">
+        <!-- El motivo de la diferencia va al ASIENTO contable, no sólo al historial. -->
+        <input v-model.trim="observaciones" type="text" class="cjm-input cjm-obs"
+               :placeholder="caja.diferencia_ars ? 'A qué se debió la diferencia' : 'Observaciones (opcional)'" />
+        <button class="cjm-btn" :disabled="guardandoCaja" @click="confirmarCierre">Confirmar cierre</button>
+      </template>
       <p v-else class="cjm-hint">Esperando que administración lo confirme.</p>
     </template>
 
@@ -96,7 +127,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import {
   getCajaMostrador, abrirCajaMostrador, confirmarAperturaMostrador,
-  solicitarCierreMostrador, confirmarCierreMostrador,
+  solicitarCierreMostrador, confirmarCierreMostrador, anularCajaMostrador, salidaCajaMostrador,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
@@ -110,6 +141,9 @@ const props = defineProps({
 })
 
 const expandido = ref(false)
+// El historial de turnos vive afuera (en la ficha de la sede) y tiene que enterarse cuando esta
+// tarjeta cierra o anula: si no, el turno recién cerrado no aparece hasta recargar la página.
+const emit = defineEmits(['cambio'])
 
 const toast = useToast()
 const caja            = ref(null)
@@ -118,6 +152,10 @@ const guardandoCaja   = ref(false)
 const errorCaja       = ref(null)
 const fondoInicial    = ref(null)
 const efectivoContado = ref(null)
+const observaciones   = ref('')
+const mostrarSalida   = ref(false)
+const salidaMonto     = ref(null)
+const salidaMotivo    = ref('')
 
 const sede = computed(() => props.sede)
 const puedeGestionarCaja = computed(() => props.puedeGestionar)
@@ -149,6 +187,7 @@ async function conCaja(fn, ok) {
   try {
     await fn()
     await cargarCaja()
+    emit('cambio')
     toast.success(ok)
   } catch (e) {
     errorCaja.value = e?.response?.data?.error || e?.response?.data?.errors?.[0] || 'No se pudo'
@@ -163,11 +202,25 @@ const confirmarApertura = () => conCaja(
   () => confirmarAperturaMostrador(sede.value.id, caja.value.id), 'Fondo confirmado')
 
 const enviarCierre = () => conCaja(
-  () => solicitarCierreMostrador(sede.value.id, caja.value.id, { efectivo_declarado_ars: Number(efectivoContado.value) || 0 }),
+  () => solicitarCierreMostrador(sede.value.id, caja.value.id, {
+    efectivo_declarado_ars: Number(efectivoContado.value) || 0,
+    notas: observaciones.value || undefined,
+  }),
   'Cierre enviado')
 
 const confirmarCierre = () => conCaja(
-  () => confirmarCierreMostrador(sede.value.id, caja.value.id), 'Caja cerrada')
+  () => confirmarCierreMostrador(sede.value.id, caja.value.id, { notas: observaciones.value || undefined }),
+  'Caja cerrada')
+
+const anular = () => conCaja(
+  () => anularCajaMostrador(sede.value.id, caja.value.id, { motivo: observaciones.value || undefined }),
+  'Caja anulada')
+
+const sacarEfectivo = () => conCaja(
+  () => salidaCajaMostrador(sede.value.id, caja.value.id, {
+    monto_ars: Number(salidaMonto.value) || 0, motivo: salidaMotivo.value,
+  }),
+  'Salida registrada').then(() => { mostrarSalida.value = false; salidaMonto.value = null; salidaMotivo.value = '' })
 
 function fmtARS(n) { return '$' + (Number(n) || 0).toLocaleString('es-AR') }
 
@@ -187,6 +240,12 @@ defineExpose({ caja, cargarCaja })
 .cjm--sin-confirmar { border-color: #f59e0b; background: #fffbeb; }
 .cjm--pendiente    { border-color: #f59e0b; background: #fffbeb; }
 .cjm--andando      { border-color: #86efac; }
+.cjm-obs { width: 100%; }
+.cjm-link { background: none; border: none; padding: 0; cursor: pointer; font-size: var(--fs-12); color: var(--c-ink-500); text-decoration: underline; align-self: flex-start; }
+.cjm-link:hover { color: #b91c1c; }
+.cjm-salidas { display: flex; flex-direction: column; gap: .15rem; border-top: 1px solid var(--c-ink-100); padding-top: var(--sp-2); }
+.cjm-salidas-t { font-size: var(--fs-11); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--c-ink-500); }
+.cjm-salida { font-size: var(--fs-12); color: var(--c-ink-600); font-variant-numeric: tabular-nums; }
 .cjm-mini { width: 100%; display: flex; align-items: center; gap: .5rem; background: none; border: none; padding: 0; cursor: pointer; font: inherit; color: var(--c-ink-600); }
 .cjm-mini-ok { font-weight: 700; font-size: var(--fs-13); color: #15803d; display: flex; align-items: center; gap: .3rem; }
 .cjm-mini-num { margin-left: auto; font-size: var(--fs-13); font-variant-numeric: tabular-nums; }

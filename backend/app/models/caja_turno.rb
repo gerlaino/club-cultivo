@@ -33,8 +33,12 @@ class CajaTurno < ApplicationRecord
   # gastos recurrentes.
   has_many   :movimientos_contables, class_name: 'MovimientoContable', dependent: :nullify
 
-  # abierta → (dispensador confirma apertura) → pendiente_cierre (dispensador envía cierre) → cerrada
-  ESTADOS = %w[abierta pendiente_cierre cerrada].freeze
+  # abierta → (el operador confirma apertura) → pendiente_cierre (el operador envía cierre) → cerrada
+  #
+  # `anulada` es la salida para el error humano: se abrió la caja por equivocación —mal monto, la
+  # sede equivocada, se arrepintió— y hay que deshacerlo. NO es un cierre: cerrar con $0 contado
+  # generaría un faltante de arqueo por todo el fondo, un egreso inventado en el libro.
+  ESTADOS = %w[abierta pendiente_cierre cerrada anulada].freeze
 
   validates :estado, inclusion: { in: ESTADOS }
   validates :monto_inicial_ars, numericality: { greater_than_or_equal_to: 0 }
@@ -49,6 +53,13 @@ class CajaTurno < ApplicationRecord
   def pendiente_cierre? = estado == 'pendiente_cierre'
   def cerrada?         = estado == 'cerrada'
   def activa?          = %w[abierta pendiente_cierre].include?(estado)
+  def anulada?         = estado == 'anulada'
+
+  # Sólo se anula una caja SIN MOVIMIENTO. Con un cobro adentro ya pasó plata por ahí y la salida
+  # es el cierre con su arqueo: anularla borraría el turno de una plata que sí entró.
+  def anulable?
+    activa? && !cobros.exists? && !movimientos_contables.exists?
+  end
   def apertura_confirmada? = apertura_confirmada_at.present?
 
   # ¿Es la caja del mostrador de dispensa o la del buffet? Cambia de dónde sale lo cobrado.
@@ -144,6 +155,7 @@ class CajaTurno < ApplicationRecord
   # ensucian el libro.
   def asentar_diferencia!(usuario)
     dif = diferencia_ars
+    return if anulada?
     return if dif.nil? || dif.abs < 0.01
     return if movimientos_contables.where(categoria: 'diferencia_caja').exists?
 
@@ -162,6 +174,18 @@ class CajaTurno < ApplicationRecord
       medio_pago:       'efectivo',
       comprobante_tipo: 'sin_comprobante',
     )
+  end
+
+  # Deshacer una apertura equivocada. El fondo no se había asentado —abrir no genera asiento— así
+  # que no hay nada que revertir en contabilidad: la plata nunca se movió del libro.
+  def anular!(usuario:, motivo: nil)
+    raise ArgumentError, 'Esta caja ya está cerrada' unless activa?
+    unless anulable?
+      raise ArgumentError, 'Esta caja ya tiene movimientos: hay que cerrarla con su arqueo, no anularla'
+    end
+
+    update!(estado: 'anulada', cerrada_por: usuario, cerrada_at: Time.current,
+            notas: motivo.presence || 'Anulada')
   end
 
   private

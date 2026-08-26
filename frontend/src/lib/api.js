@@ -491,6 +491,8 @@ export const confirmarAperturaMostrador = (sedeId, id)          => api.post(`/se
 export const solicitarCierreMostrador   = (sedeId, id, payload) => api.post(`/sedes/${sedeId}/caja/${id}/solicitar_cierre`, payload)
 export const confirmarCierreMostrador   = (sedeId, id)          => api.post(`/sedes/${sedeId}/caja/${id}/confirmar_cierre`)
 export const cerrarCajaMostrador        = (sedeId, id, payload) => api.post(`/sedes/${sedeId}/caja/${id}/cerrar`, payload)
+export const anularCajaMostrador        = (sedeId, id, payload) => api.post(`/sedes/${sedeId}/caja/${id}/anular`, payload)
+export const salidaCajaMostrador        = (sedeId, id, payload) => api.post(`/sedes/${sedeId}/caja/${id}/salida`, payload)
 
 // ── Bar · caja de turno (apertura / cierre con arqueo) ─────────────────────────
 export const getCajaActual      = (barId)          => api.get(`/bares/${barId}/cajas/actual`)
