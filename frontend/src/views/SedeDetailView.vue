@@ -71,6 +71,10 @@ const cajaRef          = ref(null)
 // contar: el rastro de quién la anuló vive en el audit log, no en esta pantalla.
 const PAGINA_CAJAS = 10
 const paginaCaja   = ref(1)
+// Por fecha de APERTURA: es la que la persona recuerda ("el turno del martes"). Un turno que
+// arranca de noche y cierra pasada la medianoche se busca por el día en que se abrió.
+const desdeCaja    = ref('')
+const hastaCaja    = ref('')
 const totalCajas   = ref(0)
 const hayMasCajas  = computed(() => historialCaja.value.length < totalCajas.value)
 
@@ -79,6 +83,7 @@ async function cargarHistorialCaja({ acumular = false } = {}) {
   try {
     const { data } = await listCajasMostrador(sede.value.id, {
       pagina: acumular ? paginaCaja.value : 1, limite: PAGINA_CAJAS,
+      desde: desdeCaja.value || undefined, hasta: hastaCaja.value || undefined,
     })
     const cajas = data?.cajas || []
     historialCaja.value = acumular ? [...historialCaja.value, ...cajas] : cajas
@@ -86,6 +91,10 @@ async function cargarHistorialCaja({ acumular = false } = {}) {
     if (!acumular) paginaCaja.value = 1
   } catch { if (!acumular) historialCaja.value = [] }
 }
+
+// Al cambiar el filtro se vuelve a la primera página: seguir en la 3 de un resultado nuevo
+// muestra una lista vacía y parece que no hay nada.
+watch([desdeCaja, hastaCaja], () => cargarHistorialCaja())
 
 async function verMasCajas() {
   paginaCaja.value += 1
@@ -249,6 +258,12 @@ onMounted(async () => {
           Turnos anteriores
           <span class="sdv__cajas-n">{{ totalCajas }}</span>
         </button>
+        <div v-if="verHistorialCaja" class="sdv__cajas-filtro">
+          <label>Desde <input v-model="desdeCaja" type="date" class="sdv__cajas-fecha" /></label>
+          <label>Hasta <input v-model="hastaCaja" type="date" class="sdv__cajas-fecha" /></label>
+          <button v-if="desdeCaja || hastaCaja" type="button" class="sdv__cajas-limpiar"
+                  @click="desdeCaja = ''; hastaCaja = ''">Limpiar</button>
+        </div>
         <div v-if="verHistorialCaja" class="sdv__cajas-list">
           <div v-for="c in historialCaja" :key="c.id" class="sdv__caja-item">
             <div class="sdv__caja-l1">
@@ -422,6 +437,9 @@ onMounted(async () => {
 .sdv__caja-ok { font-size: var(--fs-12); color: #15803d; }
 .sdv__caja-dif { font-size: var(--fs-12); color: #b45309; font-weight: 700; font-variant-numeric: tabular-nums; }
 .sdv__caja-dif--mal { color: #b91c1c; }
+.sdv__cajas-filtro { display: flex; gap: var(--sp-3); align-items: center; flex-wrap: wrap; padding: 0 var(--sp-3) var(--sp-3); font-size: var(--fs-12); color: var(--c-ink-600); }
+.sdv__cajas-fecha { margin-left: .3rem; padding: .2rem .4rem; border: 1.5px solid var(--c-ink-200); border-radius: 7px; font-size: var(--fs-12); }
+.sdv__cajas-limpiar { background: none; border: none; padding: 0; cursor: pointer; font-size: var(--fs-12); color: var(--c-ink-500); text-decoration: underline; }
 .sdv__cajas-mas { width: 100%; background: none; border: none; border-top: 1px solid var(--c-ink-100); padding: var(--sp-3); cursor: pointer; font: inherit; font-size: var(--fs-12); font-weight: 700; color: #1b5e20; }
 .sdv__cajas-mas:hover { background: var(--c-leaf-50); }
 .sdv__caja-l2 { font-size: var(--fs-12); color: var(--c-ink-500); }

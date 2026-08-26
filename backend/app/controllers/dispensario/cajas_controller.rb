@@ -41,6 +41,10 @@ module Dispensario
     # problema. Ahora pagina y dice cuántas hay.
     def index
       escala  = cajas_de_la_sede.where(estado: 'cerrada')
+      # Por fecha de APERTURA, que es la que la persona recuerda: "el turno del martes". Un turno
+      # que arranca a la noche y cierra pasada la medianoche se busca por el día en que se abrió.
+      escala  = escala.where('abierta_at >= ?', Date.parse(params[:desde]).beginning_of_day) if params[:desde].present?
+      escala  = escala.where('abierta_at <= ?', Date.parse(params[:hasta]).end_of_day)       if params[:hasta].present?
       pagina  = [params[:pagina].to_i, 1].max
       limite  = [[(params[:limite] || 10).to_i, 1].max, 50].min
 
@@ -48,6 +52,8 @@ module Dispensario
         cajas: escala.recientes.offset((pagina - 1) * limite).limit(limite).map { |c| serialize(c) },
         meta:  { pagina: pagina, limite: limite, total: escala.count },
       }
+    rescue ArgumentError
+      render json: { error: 'Fecha inválida' }, status: :unprocessable_entity
     end
 
     # POST /sedes/:sede_id/caja/abrir { monto_inicial_ars } — admin/supervisor

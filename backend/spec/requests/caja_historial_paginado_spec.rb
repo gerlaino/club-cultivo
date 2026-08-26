@@ -89,6 +89,35 @@ RSpec.describe 'Historial de cierres de caja — paginado', type: :request do
     expect(historial(limite: 99_999)['meta']['limite']).to eq(50)
   end
 
+  describe 'filtro por fecha' do
+    # Por fecha de APERTURA: es la que la persona recuerda. Un turno que arranca de noche y
+    # cierra pasada la medianoche se busca por el día en que se abrió, no por el del cierre.
+    it 'acota al rango pedido' do
+      caja!(estado: 'cerrada', dias_atras: 1)
+      caja!(estado: 'cerrada', dias_atras: 10)
+      caja!(estado: 'cerrada', dias_atras: 40)
+
+      data = historial(desde: 15.days.ago.to_date.to_s, hasta: Time.zone.today.to_s)
+
+      expect(data['meta']['total']).to eq(2)
+    end
+
+    it 'incluye el día completo de los bordes' do
+      caja!(estado: 'cerrada', dias_atras: 3)
+
+      hoy = 3.days.ago.to_date.to_s
+      expect(historial(desde: hoy, hasta: hoy)['meta']['total']).to eq(1)
+    end
+
+    it 'una fecha inventada no rompe la pantalla' do
+      sign_in_as(admin)
+      get "/api/sedes/#{sede.id}/caja", headers: auth_headers, params: { desde: 'ayer nomás' }
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)['error']).to match(/fecha/i)
+    end
+  end
+
   it 'no muestra los cierres de otra sede' do
     otra = create(:sede, club: club, tipo: 'social', nombre: 'Otra')
     ActsAsTenant.with_tenant(club) do
