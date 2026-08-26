@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_26_020000) do
+ActiveRecord::Schema[7.2].define(version: 2026_08_26_040000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1359,6 +1359,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_26_020000) do
     t.bigint "evento_bar_id"
     t.decimal "cantidad", precision: 12, scale: 3
     t.string "unidad"
+    t.bigint "caja_turno_id"
+    t.index ["caja_turno_id"], name: "index_movimientos_contables_on_caja_turno_id"
     t.index ["categoria_contable_id"], name: "index_movimientos_contables_on_categoria_contable_id"
     t.index ["club_id", "fecha"], name: "index_movimientos_contables_on_club_id_and_fecha"
     t.index ["club_id", "tipo"], name: "index_movimientos_contables_on_club_id_and_tipo"
@@ -2440,6 +2442,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_26_020000) do
   add_foreign_key "mails_enviados", "plantillas_mail", column: "plantilla_mail_id"
   add_foreign_key "mails_enviados", "users"
   add_foreign_key "mails_enviados", "users", column: "deleted_by_id"
+  add_foreign_key "movimientos_contables", "caja_turnos"
   add_foreign_key "movimientos_contables", "categorias_contables", column: "categoria_contable_id"
   add_foreign_key "movimientos_contables", "clubs"
   add_foreign_key "movimientos_contables", "compras_cuotas", column: "compra_cuotas_id"

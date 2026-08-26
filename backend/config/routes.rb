@@ -421,6 +421,7 @@ Rails.application.routes.draw do
         post 'caja/:id/solicitar_cierre',   to: 'cajas#solicitar_cierre'
         post 'caja/:id/confirmar_cierre',   to: 'cajas#confirmar_cierre'
         post 'caja/:id/cerrar',             to: 'cajas#cerrar'
+        post 'caja/:id/salida',             to: 'cajas#salida'
       end
     end
 

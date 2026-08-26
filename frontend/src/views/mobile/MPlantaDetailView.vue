@@ -123,6 +123,14 @@ import { useToast }          from '../../composables/useToast'
 import RegistroPlantaModal   from '../../components/plants/RegistroPlantaModal.vue'
 
 const route  = useRoute()
+
+// El template lo llamaba y no existía: la pantalla reventaba apenas una planta tenía registro de
+// salud. Mismas etiquetas que la vista de escritorio (`SALUD_META`), que son los cinco valores
+// del enum.
+const SALUD_LABEL = {
+  excelente: 'Excelente', bueno: 'Bueno', regular: 'Regular', malo: 'Malo', critico: 'Crítico',
+}
+function saludLabel(s) { return SALUD_LABEL[s] || s || '—' }
 const router = useRouter()
 const toast  = useToast()
 const id    = Number(route.params.id)

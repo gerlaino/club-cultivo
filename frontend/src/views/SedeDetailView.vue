@@ -5,6 +5,7 @@ import { useAuthStore } from "../stores/auth"
 import { useClubStore } from "../stores/club"
 import { getSede, listSalas, getSedeStocks, deleteSede } from "../lib/api"
 import ModalCrearSala    from '../components/salas/ModalCrearSala.vue'
+import CajaMostradorCard from '../components/dashboards/CajaMostradorCard.vue'
 import Breadcrumb         from '../components/ui/Breadcrumb.vue'
 import EmptyState         from '../components/ui/EmptyState.vue'
 import ActionsDropdown    from '../components/ui/ActionsDropdown.vue'
@@ -56,6 +57,10 @@ const isAdmin        = computed(() => auth.user?.role === 'admin')
 
 const tieneInv   = computed(() => ['social', 'mixta'].includes(sede.value?.tipo))
 const tieneSalas = computed(() => ['produccion', 'mixta'].includes(sede.value?.tipo))
+
+// Sólo las sedes que dispensan tienen mostrador y, por lo tanto, caja. Es la misma regla que ya
+// decide qué tipo de sede se puede crear según lo contratado (`Sede::SUITES_POR_TIPO`).
+const sedeDispensa = computed(() => ['social', 'mixta'].includes(sede.value?.tipo))
 // Gramos y "stock bajo" = solo flor seca (los derivados son inventario con otra unidad).
 const florSeca   = computed(() => tiendaStocks.value.filter(s => s.forma_producto === 'flor_seca'))
 const stockTotal = computed(() => florSeca.value.reduce((a, s) => a + Number(s.cantidad || 0), 0))
@@ -192,6 +197,12 @@ onMounted(async () => {
           <ActionsDropdown v-if="isAdmin && sedeAcciones.length" :items="sedeAcciones" />
         </div>
       </div>
+
+      <!-- La caja del mostrador. Va acá y no en el tablero: se abre POR SEDE, y desde la sede no
+           hay forma de confundirse de cuál. Sólo en las que dispensan — en una de producción no
+           hay mostrador, y `Sede::SUITES_POR_TIPO` ya define cuáles son. -->
+      <CajaMostradorCard v-if="sedeDispensa" :sede="{ id: sede.id, nombre: sede.nombre }"
+                         :puede-gestionar="isAdmin" />
 
       <div v-if="tieneSalas" class="sdv__kpis sdv__kpis--3">
         <div class="sdv__kpi"><div class="sdv__kpi-val">{{ kpis.total }}</div><div class="sdv__kpi-lbl">Salas totales</div></div>

@@ -6,6 +6,9 @@ class MovimientoContable < ApplicationRecord
   self.table_name = "movimientos_contables"
 
   belongs_to :club
+  # El turno de caja que lo generó, si salió de ahí: una salida de efectivo o la diferencia
+  # del arqueo. Permite volver del libro a la caja que lo explica.
+  belongs_to :caja_turno, optional: true
   acts_as_tenant(:club)
   belongs_to :sede,         optional: true
   belongs_to :lote,         optional: true
@@ -33,7 +36,8 @@ class MovimientoContable < ApplicationRecord
 
   CATEGORIAS = %w[
     insumo electricidad agua alquiler sueldo mantenimiento
-    honorario seguro admin aporte_socio dispensacion subvencion bar otro
+    honorario seguro admin aporte_socio dispensacion subvencion bar
+    salida_caja diferencia_caja otro
   ].freeze
 
   CATEGORIA_LABELS = {
@@ -50,6 +54,10 @@ class MovimientoContable < ApplicationRecord
     "aporte_socio"  => "Aporte socio",
     "dispensacion"  => "Recupero dispensación",
     "subvencion"    => "Subvención / Donación",
+    # De la caja de turno del mostrador. `salida_caja` es plata que salió del cajón durante el
+    # turno; `diferencia_caja` es lo que no apareció (o sobró) al arquear.
+    "salida_caja"     => "Salida de caja",
+    "diferencia_caja" => "Diferencia de caja",
     "otro"          => "Otro",
   }.freeze
 

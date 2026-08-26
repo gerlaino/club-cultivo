@@ -12,7 +12,6 @@ import { useClubStore }  from '../../stores/club.js'
 import { useStatsStore } from '../../stores/stats.js'
 import { useTareasStore } from '../../stores/tareas.js'
 import OnboardingWizard  from '../OnboardingWizard.vue'
-import CajaMostradorCard from './CajaMostradorCard.vue'
 import DsSpinner         from '../../design-system/components/Spinner.vue'
 
 const router      = useRouter()
@@ -153,13 +152,18 @@ const proximaCosecha = computed(() => {
 //
 // Con varias sedes elige cuál, porque cada mostrador tiene su caja y su arqueo. Con una sola no
 // hay nada que elegir y el selector no aparece.
-const sedeCaja = ref(null)
-const sedesParaCaja = computed(() => sedes.value || [])
-watch(sedesParaCaja, (lista) => {
-  if (sedeCaja.value || !lista.length) return
-  const sugerida = analyticsDisp.value?.sede_mostrador?.id
-  sedeCaja.value = lista.find(s => s.id === sugerida) || lista[0]
-}, { immediate: true })
+// Se ABRE en la ficha de la sede: desde ahí no hay forma de confundirse de mostrador. Acá va el
+// ESTADO, que es lo que el admin necesita a distancia — y el atajo para ir a resolverlo.
+const ESTADO_CAJA = {
+  sin_abrir:        { texto: 'Sin abrir' },
+  sin_confirmar:    { texto: 'Falta que confirmen el fondo' },
+  abierta:          { texto: 'En turno' },
+  pendiente_cierre: { texto: 'Cierre para confirmar' },
+}
+const cajasPorSede = computed(() => analyticsDisp.value?.cajas_por_sede || [])
+// Lo que pide acción suya o del mostrador. "En turno" no cuenta: eso está andando.
+const cajasPendientes = computed(() =>
+  cajasPorSede.value.filter(c => c.estado !== 'abierta').length)
 
 // ── Reservas para preparar (desde el analytics del dispensador) ──────────────
 const reservasHoy      = computed(() => analyticsDisp.value?.reservas?.hoy ?? 0)
@@ -482,17 +486,29 @@ async function onOnboardingCompletado() {
         Algunos datos no pudieron cargarse: {{ erroresCarga.join(', ') }}. Recargá la página si el problema persiste.
       </div>
 
-      <!-- ── CAJA DEL MOSTRADOR ──────────────────────────────────────────
-           Arriba de todo porque es lo primero del día: sin caja abierta, quien atiende no
-           puede arrancar y se queda esperando. -->
-      <div v-if="sedeCaja" class="ad__caja-wrap">
-        <label v-if="sedesParaCaja.length > 1" class="ad__caja-sede">
-          <span>Mostrador</span>
-          <select v-model="sedeCaja" class="ad__caja-select">
-            <option v-for="s in sedesParaCaja" :key="s.id" :value="s">{{ s.nombre }}</option>
-          </select>
-        </label>
-        <CajaMostradorCard :sede="sedeCaja" :puede-gestionar="true" />
+      <!-- ── CAJAS DE LOS MOSTRADORES ─────────────────────────────────────
+           El admin no está parado en la sede: acá ve a distancia si abrieron, si alguien
+           confirmó el fondo y si quedó un cierre esperándolo. La caja se ABRE en la ficha de
+           la sede —una sola puerta para la misma acción—; esto es el estado y el atajo. -->
+      <div v-if="cajasPorSede.length" class="ad__cajas">
+        <div class="ad__cajas-hd">
+          <span class="ad__cajas-title"><i class="bi bi-cash-stack"></i> Cajas del día</span>
+          <span v-if="cajasPendientes" class="ad__cajas-badge">{{ cajasPendientes }} sin resolver</span>
+        </div>
+        <RouterLink
+          v-for="c in cajasPorSede" :key="c.sede_id"
+          :to="`/sedes/${c.sede_id}`"
+          class="ad__caja-row" :class="`ad__caja-row--${c.estado}`"
+        >
+          <span class="ad__caja-sede">{{ c.sede }}</span>
+          <span class="ad__caja-estado">{{ ESTADO_CAJA[c.estado]?.texto || c.estado }}</span>
+          <span v-if="c.estado === 'abierta'" class="ad__caja-monto">{{ fmtARSres(c.efectivo_esperado_ars) }} esperados</span>
+          <span v-else-if="c.estado === 'pendiente_cierre'" class="ad__caja-monto"
+                :class="{ 'ad__caja-monto--mal': c.diferencia_ars < 0 }">
+            {{ c.diferencia_ars ? (c.diferencia_ars < 0 ? 'faltan ' : 'sobran ') + fmtARSres(Math.abs(c.diferencia_ars)) : 'cuadra' }}
+          </span>
+          <i class="bi bi-chevron-right ad__caja-go"></i>
+        </RouterLink>
       </div>
 
       <!-- ── HEADER ──────────────────────────────────────────────────────── -->
@@ -924,9 +940,22 @@ async function onOnboardingCompletado() {
 }
 
 /* ── Header ──────────────────────────────────────────────────────────────── */
-.ad__caja-wrap { margin-bottom: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-2); }
-.ad__caja-sede { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-12); font-weight: 700; color: var(--c-ink-600); }
-.ad__caja-select { padding: .25rem .5rem; border: 1.5px solid var(--c-ink-300); border-radius: 8px; font-size: var(--fs-13); }
+.ad__cajas { margin-bottom: var(--sp-4); border: 1px solid var(--c-ink-200); border-radius: 12px; background: #fff; overflow: hidden; }
+.ad__cajas-hd { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-3); border-bottom: 1px solid var(--c-ink-100); }
+.ad__cajas-title { font-weight: 800; font-size: var(--fs-13); color: var(--c-ink-800); display: flex; align-items: center; gap: .35rem; }
+.ad__cajas-badge { margin-left: auto; font-size: var(--fs-11); font-weight: 700; color: #b45309; background: #fef3c7; border-radius: 999px; padding: .1rem .5rem; }
+.ad__caja-row { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3); border-bottom: 1px solid var(--c-ink-100); text-decoration: none; color: inherit; }
+.ad__caja-row:last-child { border-bottom: none; }
+.ad__caja-row:hover { background: var(--c-leaf-50); }
+.ad__caja-row--sin_abrir .ad__caja-estado,
+.ad__caja-row--sin_confirmar .ad__caja-estado,
+.ad__caja-row--pendiente_cierre .ad__caja-estado { color: #b45309; font-weight: 700; }
+.ad__caja-row--abierta .ad__caja-estado { color: #15803d; font-weight: 700; }
+.ad__caja-sede { font-weight: 700; font-size: var(--fs-14); color: var(--c-ink-900); }
+.ad__caja-estado { font-size: var(--fs-13); }
+.ad__caja-monto { margin-left: auto; font-size: var(--fs-13); color: var(--c-ink-500); font-variant-numeric: tabular-nums; }
+.ad__caja-monto--mal { color: #b91c1c; font-weight: 700; }
+.ad__caja-go { color: var(--c-ink-300); font-size: .8rem; }
 .ad__header {
   margin-bottom: 1.25rem;
 }

@@ -17,7 +17,7 @@ module Dispensario
     before_action -> { require_feature!(:produccion_dispensa) }
     before_action :set_sede
     before_action :require_operador, only: [:actual, :confirmar_apertura, :solicitar_cierre]
-    before_action :require_gestion,  only: [:index, :abrir, :cerrar, :confirmar_cierre]
+    before_action :require_gestion,  only: [:index, :abrir, :cerrar, :confirmar_cierre, :salida]
 
     # GET /sedes/:sede_id/caja/actual — la caja activa del mostrador, o null
     def actual
@@ -62,7 +62,9 @@ module Dispensario
 
     # POST /sedes/:sede_id/caja/:id/confirmar_cierre — admin/supervisor confirma lo que envió el operador
     def confirmar_cierre
-      con_caja { |caja| caja.cerrar!(cerrada_por: current_user) }
+      # `notas` acá es el motivo de la diferencia, y termina en el asiento: "faltante de caja —
+      # se pagó un flete sin registrar". Un faltante sin explicación no se puede revisar después.
+      con_caja { |caja| caja.cerrar!(cerrada_por: current_user, notas: params[:notas]) }
     end
 
     # POST /sedes/:sede_id/caja/:id/cerrar { efectivo_declarado_ars, notas? } — cierre directo
@@ -70,6 +72,36 @@ module Dispensario
       con_caja do |caja|
         caja.cerrar!(efectivo_declarado: params[:efectivo_declarado_ars].to_d,
                      cerrada_por: current_user, notas: params[:notas])
+      end
+    end
+
+    # POST /sedes/:sede_id/caja/:id/salida { monto_ars, motivo }
+    #
+    # Sacar efectivo del cajón durante el turno: un retiro, un flete, una compra. Deja su egreso
+    # en contabilidad y se resta de lo esperado. Sin esto, cualquier salida se lee después como
+    # faltante de arqueo y no hay dónde explicarla.
+    #
+    # Lo hace administración, no el mostrador: es plata que sale y alguien tiene que responder.
+    def salida
+      monto  = params[:monto_ars].to_d
+      motivo = params[:motivo].to_s.strip
+
+      return render json: { error: 'El monto debe ser mayor a $0.' }, status: :unprocessable_entity if monto <= 0
+      return render json: { error: 'Escribí para qué se saca la plata.' }, status: :unprocessable_entity if motivo.blank?
+
+      con_caja do |caja|
+        raise ArgumentError, 'La caja no está abierta' unless caja.abierta?
+        if monto > caja.efectivo_esperado_ars.to_d
+          raise ArgumentError, "No hay tanto efectivo en la caja: hay #{caja.efectivo_esperado_ars}."
+        end
+
+        caja.movimientos_contables.create!(
+          club: current_user.club, sede_id: caja.sede_id, created_by: current_user,
+          tipo: 'egreso', categoria: 'salida_caja',
+          descripcion: "Salida de caja — #{motivo}",
+          monto_ars: monto, fecha: Time.zone.today,
+          pagado: true, medio_pago: 'efectivo', comprobante_tipo: 'sin_comprobante',
+        )
       end
     end
 
@@ -132,6 +164,8 @@ module Dispensario
         total_cobrado_ars:      caja.total_ventas_ars,
         total_efectivo_ars:     caja.total_efectivo_ars,
         total_digital_ars:      caja.total_digital_ars,
+        total_salidas_ars:      caja.total_salidas_ars,
+        salidas:                caja.salidas.order(:created_at).map { |m| { id: m.id, monto_ars: m.monto_ars.to_f, descripcion: m.descripcion } },
         efectivo_esperado_ars:  caja.efectivo_esperado_ars,
         efectivo_declarado_ars: caja.efectivo_declarado_ars&.to_f,
         diferencia_ars:         caja.diferencia_ars,

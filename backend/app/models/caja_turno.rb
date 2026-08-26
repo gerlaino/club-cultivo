@@ -26,6 +26,12 @@ class CajaTurno < ApplicationRecord
   belongs_to :cierre_solicitado_por,   class_name: 'User', optional: true
   has_many   :bar_ventas, dependent: :nullify
   has_many   :cobros,     dependent: :nullify
+  # Lo que SALIÓ del cajón durante el turno y la diferencia del arqueo: son asientos normales
+  # —cuentan en el P&L como cualquier gasto— y además quedan atados al turno.
+  # `class_name` explícito: Rails singulariza "movimientos_contables" como "MovimientosContable"
+  # y no encuentra la clase. Es la misma trampa de los plurales compuestos que ya mordió en
+  # gastos recurrentes.
+  has_many   :movimientos_contables, class_name: 'MovimientoContable', dependent: :nullify
 
   # abierta → (dispensador confirma apertura) → pendiente_cierre (dispensador envía cierre) → cerrada
   ESTADOS = %w[abierta pendiente_cierre cerrada].freeze
@@ -66,13 +72,25 @@ class CajaTurno < ApplicationRecord
                     : bar_ventas.where(medio_pago: 'efectivo').sum(:total_ars).to_f
   end
 
+  # Efectivo que se sacó del cajón en el turno: un retiro, un flete, una compra. Sin esto,
+  # cualquier salida se lee después como faltante y no hay dónde explicarla.
+  #
+  # `salida_caja` es la marca; se excluye la diferencia de arqueo, que se asienta al cerrar y
+  # no es plata que salió del cajón durante el turno sino lo que no apareció al contarlo.
+  def salidas
+    movimientos_contables.where(tipo: 'egreso', categoria: 'salida_caja')
+  end
+
+  def total_salidas_ars = salidas.sum(:monto_ars).to_f
+
   def total_digital_ars
     (total_ventas_ars - total_efectivo_ars).round(2)
   end
 
-  # Efectivo que debería haber en la caja: fondo inicial + ventas cobradas en efectivo.
+  # Efectivo que debería haber en el cajón: el fondo, más lo cobrado en efectivo, menos lo que
+  # se sacó. Es la cuenta que hace quien arquea, escrita igual.
   def efectivo_esperado_ars
-    (monto_inicial_ars.to_d + total_efectivo_ars.to_d).to_f
+    (monto_inicial_ars.to_d + total_efectivo_ars.to_d - total_salidas_ars.to_d).to_f
   end
 
   # Diferencia de arqueo (contado − esperado). Solo tiene sentido con la caja cerrada.
@@ -112,7 +130,38 @@ class CajaTurno < ApplicationRecord
     attrs[:notas] = notas if notas.present?
     raise ArgumentError, 'Indicá el efectivo contado' if attrs[:efectivo_declarado_ars].nil? && efectivo_declarado_ars.nil?
 
-    update!(attrs)
+    ActiveRecord::Base.transaction do
+      update!(attrs)
+      asentar_diferencia!(cerrada_por)
+    end
+  end
+
+  # Un faltante de arqueo es una PÉRDIDA real del club y un sobrante es plata que apareció. Sin
+  # asiento, el P&L no se entera nunca de lo que se pierde en el mostrador: quedaba en el
+  # historial de cierres y ahí moría.
+  #
+  # Se asienta al cerrar, con el motivo que escribió quien cierra. Los centavos de redondeo no
+  # ensucian el libro.
+  def asentar_diferencia!(usuario)
+    dif = diferencia_ars
+    return if dif.nil? || dif.abs < 0.01
+    return if movimientos_contables.where(categoria: 'diferencia_caja').exists?
+
+    movimientos_contables.create!(
+      club:             club,
+      sede_id:          sede_id,
+      created_by:       usuario,
+      tipo:             dif.negative? ? 'egreso' : 'ingreso',
+      categoria:        'diferencia_caja',
+      descripcion:      "#{dif.negative? ? 'Faltante' : 'Sobrante'} de caja — #{sede&.nombre} " \
+                        "(turno del #{abierta_at&.to_date&.strftime('%d/%m/%Y')})" +
+                        (notas.present? ? " — #{notas}" : ''),
+      monto_ars:        dif.abs,
+      fecha:            (cerrada_at || Time.current).to_date,
+      pagado:           true,
+      medio_pago:       'efectivo',
+      comprobante_tipo: 'sin_comprobante',
+    )
   end
 
   private

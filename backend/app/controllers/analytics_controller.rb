@@ -196,6 +196,35 @@ class AnalyticsController < ApplicationController
   # No es el mismo payload con menos filas: hay bloques que directamente no van. El estado del
   # REPROCANN del padrón, el volumen del club y las entregas de delivery abiertas son preguntas
   # de quien administra, no de quien entrega.
+  # Estado de la caja de cada mostrador, para el tablero del admin.
+  #
+  # `Sede::SUITES_POR_TIPO` ya dice qué sede dispensa: `social` y `mixta`. Una de producción no
+  # tiene mostrador y ofrecerle una caja sería ruido — la regla no se reescribe acá.
+  def cajas_por_sede(club)
+    sedes = club.sedes.activas.where(tipo: %w[social mixta]).order(:nombre).to_a
+    return [] if sedes.empty?
+
+    activas = CajaTurno.where(club_id: club.id, punto_type: 'Sede', punto_id: sedes.map(&:id))
+                       .activas.includes(:abierta_por).index_by(&:punto_id)
+
+    sedes.map do |sede|
+      caja = activas[sede.id]
+      {
+        sede_id: sede.id,
+        sede:    sede.nombre,
+        # `sin_abrir` no es un estado de la caja: es la AUSENCIA de caja, y es justo lo que el
+        # admin necesita ver de un vistazo.
+        estado:  caja.nil? ? 'sin_abrir' : (caja.apertura_confirmada? ? caja.estado : 'sin_confirmar'),
+        caja_id:                caja&.id,
+        abierta_por:            caja&.abierta_por&.nombre_completo,
+        abierta_at:             caja&.abierta_at,
+        efectivo_esperado_ars:  caja&.efectivo_esperado_ars,
+        efectivo_declarado_ars: caja&.efectivo_declarado_ars&.to_f,
+        diferencia_ars:         caja&.diferencia_ars,
+      }
+    end
+  end
+
   def calcular_dispensador_propio(club, usuario)
     hoy           = Time.zone.today
     inicio_semana = hoy.beginning_of_week
@@ -354,6 +383,9 @@ class AnalyticsController < ApplicationController
     {
       alcance: 'club',
       sede_mostrador: (club.sedes.order(:nombre).first&.then { |x| { id: x.id, nombre: x.nombre } }),
+      # Cómo está la caja de CADA mostrador. El admin no está parado en la sede: necesita ver a
+      # distancia si abrieron, si alguien confirmó el fondo y si quedó un cierre esperándolo.
+      cajas_por_sede: cajas_por_sede(club),
       resumen: {
         dispensaciones_hoy:    disps_hoy.count,
         gramos_hoy:            disps_hoy.sum(:cantidad).to_f.round(2),
