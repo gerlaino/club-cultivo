@@ -64,14 +64,21 @@ const sedeDispensa = computed(() => ['social', 'mixta'].includes(sede.value?.tip
 
 // Historial de turnos. Cerrados y anulados: el que se anuló también dice quién y por qué.
 const historialCaja    = ref([])
+const anuladasCaja     = ref([])
 const verHistorialCaja = ref(false)
+const verAnuladas      = ref(false)
 const cajaRef          = ref(null)
 
 async function cargarHistorialCaja() {
   if (!sedeDispensa.value || !sede.value?.id) return
   try {
     const { data } = await listCajasMostrador(sede.value.id)
-    historialCaja.value = (data || []).filter(c => c.estado === 'cerrada' || c.estado === 'anulada')
+    // Una caja ANULADA no operó: no es un "turno anterior", es una apertura que se deshizo.
+    // Mezclarlas con los turnos reales llena el historial de ruido —sobre todo mientras se
+    // prueba— y esconde los cierres que sí importan. Se guardan igual: el registro de que
+    // alguien abrió y deshizo no se borra, sólo se muestra aparte.
+    historialCaja.value = (data || []).filter(c => c.estado === 'cerrada')
+    anuladasCaja.value  = (data || []).filter(c => c.estado === 'anulada')
   } catch { historialCaja.value = [] }
 }
 
@@ -247,9 +254,36 @@ onMounted(async () => {
               Abrió <strong>{{ c.abierta_por || '—' }}</strong>
               <template v-if="c.apertura_confirmada_por"> · confirmó <strong>{{ c.apertura_confirmada_por }}</strong></template>
               <template v-if="c.cierre_solicitado_por"> · contó <strong>{{ c.cierre_solicitado_por }}</strong></template>
-              <template v-if="c.cerrada_por"> · cerró <strong>{{ c.cerrada_por }}</strong></template>
+              <template v-if="c.cerrada_por">
+                · {{ c.estado === 'anulada' ? 'anuló' : 'cerró' }} <strong>{{ c.cerrada_por }}</strong>
+              </template>
             </div>
-            <div v-if="c.notas" class="sdv__caja-notas">{{ c.notas }}</div>
+            <!-- Sin el motivo por defecto: el badge ya dice "Anulada" y repetirlo abajo no
+                 agrega nada. Un motivo escrito por alguien sí. -->
+            <div v-if="c.notas && c.notas !== 'Anulada'" class="sdv__caja-notas">{{ c.notas }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Las aperturas deshechas: no operaron, pero el registro de que alguien abrió y anuló no
+           se borra. Plegadas, porque no son parte del trabajo del día. -->
+      <div v-if="sedeDispensa && anuladasCaja.length" class="sdv__cajas">
+        <button type="button" class="sdv__cajas-hd" @click="verAnuladas = !verAnuladas">
+          <i :class="['bi', verAnuladas ? 'bi-caret-down-fill' : 'bi-caret-right-fill']"></i>
+          Aperturas anuladas
+          <span class="sdv__cajas-n">{{ anuladasCaja.length }}</span>
+        </button>
+        <div v-if="verAnuladas" class="sdv__cajas-list">
+          <div v-for="c in anuladasCaja" :key="c.id" class="sdv__caja-item">
+            <div class="sdv__caja-l1">
+              <span class="sdv__caja-fecha">{{ fmtFechaCaja(c.abierta_at) }}</span>
+              <span class="sdv__caja-anulada">Anulada</span>
+            </div>
+            <div class="sdv__caja-l2">
+              Abrió <strong>{{ c.abierta_por || '—' }}</strong>
+              <template v-if="c.cerrada_por"> · anuló <strong>{{ c.cerrada_por }}</strong></template>
+            </div>
+            <div v-if="c.notas && c.notas !== 'Anulada'" class="sdv__caja-notas">{{ c.notas }}</div>
           </div>
         </div>
       </div>
