@@ -41,11 +41,6 @@
       <button class="cjm-btn" :disabled="guardandoCaja" @click="confirmarApertura">
         Confirmo que está el fondo
       </button>
-      <!-- Se abrió por error: mal monto, la sede que no era. Anular NO es cerrar — cerrar con $0
-           contado generaría un faltante por todo el fondo, un egreso inventado en el libro. -->
-      <button v-if="puedeGestionarCaja && caja.anulable" type="button" class="cjm-link" @click="anular">
-        Se abrió por error, anularla
-      </button>
     </template>
 
     <!-- En marcha -->
@@ -136,6 +131,14 @@
       </template>
       <p v-else class="cjm-hint">Esperando que administración lo confirme.</p>
     </template>
+
+    <!-- Anular vive AFUERA de las ramas de estado: se abrió por error y hay que poder deshacerlo
+         esté el fondo confirmado o no. Estaba sólo en la rama "falta confirmar" y desaparecía
+         apenas alguien confirmaba — que es justo cuando uno se da cuenta del error.
+         Anular NO es cerrar: cerrar con $0 contado generaría un faltante por todo el fondo. -->
+    <button v-if="puedeGestionarCaja && caja?.anulable" type="button" class="cjm-link" @click="anular">
+      Se abrió por error, anularla
+    </button>
 
     <p v-if="errorCaja" class="cjm-error">{{ errorCaja }}</p>
     </template>

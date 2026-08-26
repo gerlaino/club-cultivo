@@ -120,16 +120,25 @@ describe('Inicio del dispensador — la caja del turno', () => {
 
   // Se abrió por error y hay que deshacerlo. Cerrarla con $0 contado generaría un faltante por
   // todo el fondo: un egreso inventado en el libro por una caja que nunca operó.
-  it('una caja recién abierta se puede anular, y sólo administración la anula', async () => {
-    cajaActual = { id: 7, estado: 'abierta', apertura_confirmada: false, monto_inicial_ars: 100000,
-                   abierta_por: 'Vera', anulable: true }
+  //
+  // Se prueba en los DOS estados a propósito. La primera versión de este test miraba sólo la caja
+  // sin confirmar —que era donde yo había puesto el botón— y pasaba en verde mientras el botón
+  // desaparecía apenas alguien confirmaba el fondo, que es justo cuando uno se da cuenta del
+  // error. El AC es "se puede deshacer una caja abierta por error", no "en tal estado".
+  it.each([
+    ['sin confirmar el fondo', { apertura_confirmada: false }],
+    ['con el fondo confirmado', { apertura_confirmada: true, total_efectivo_ars: 0,
+                                  total_digital_ars: 0, efectivo_esperado_ars: 100000 }],
+  ])('se puede anular %s, y sólo la anula administración', async (_caso, extra) => {
+    cajaActual = { id: 7, estado: 'abierta', monto_inicial_ars: 100000, abierta_por: 'Vera',
+                   anulable: true, ...extra }
 
     const delMostrador = await montar('dispensador')
     expect(delMostrador.text()).not.toContain('anularla')
 
     const w = await montar('admin')
     const btn = w.findAll('.cjm-link').find((b) => b.text().includes('anularla'))
-    expect(btn).toBeTruthy()
+    expect(btn, 'el admin tiene que poder anularla en este estado').toBeTruthy()
 
     await btn.trigger('click')
     expect(anularCajaMostrador).toHaveBeenCalled()
