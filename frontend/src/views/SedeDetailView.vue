@@ -67,15 +67,29 @@ const historialCaja    = ref([])
 const verHistorialCaja = ref(false)
 const cajaRef          = ref(null)
 
-async function cargarHistorialCaja() {
+// El backend devuelve SÓLO los cierres, paginados. Una caja anulada no operó y no tiene nada que
+// contar: el rastro de quién la anuló vive en el audit log, no en esta pantalla.
+const PAGINA_CAJAS = 10
+const paginaCaja   = ref(1)
+const totalCajas   = ref(0)
+const hayMasCajas  = computed(() => historialCaja.value.length < totalCajas.value)
+
+async function cargarHistorialCaja({ acumular = false } = {}) {
   if (!sedeDispensa.value || !sede.value?.id) return
   try {
-    const { data } = await listCajasMostrador(sede.value.id)
-    // SÓLO los cierres. Una caja anulada no operó: no es un turno y no tiene nada que contar,
-    // así que en pantalla es ruido puro. El rastro de quién la anuló queda en el audit log
-    // (`CajaTurno` es Auditable), que es de donde se saca si algún día hace falta.
-    historialCaja.value = (data || []).filter(c => c.estado === 'cerrada')
-  } catch { historialCaja.value = [] }
+    const { data } = await listCajasMostrador(sede.value.id, {
+      pagina: acumular ? paginaCaja.value : 1, limite: PAGINA_CAJAS,
+    })
+    const cajas = data?.cajas || []
+    historialCaja.value = acumular ? [...historialCaja.value, ...cajas] : cajas
+    totalCajas.value = data?.meta?.total ?? cajas.length
+    if (!acumular) paginaCaja.value = 1
+  } catch { if (!acumular) historialCaja.value = [] }
+}
+
+async function verMasCajas() {
+  paginaCaja.value += 1
+  await cargarHistorialCaja({ acumular: true })
 }
 
 function fmtFechaCaja(iso) {
@@ -233,7 +247,7 @@ onMounted(async () => {
         <button type="button" class="sdv__cajas-hd" @click="verHistorialCaja = !verHistorialCaja">
           <i :class="['bi', verHistorialCaja ? 'bi-caret-down-fill' : 'bi-caret-right-fill']"></i>
           Turnos anteriores
-          <span class="sdv__cajas-n">{{ historialCaja.length }}</span>
+          <span class="sdv__cajas-n">{{ totalCajas }}</span>
         </button>
         <div v-if="verHistorialCaja" class="sdv__cajas-list">
           <div v-for="c in historialCaja" :key="c.id" class="sdv__caja-item">
@@ -255,6 +269,9 @@ onMounted(async () => {
             </div>
             <div v-if="c.notas" class="sdv__caja-notas">{{ c.notas }}</div>
           </div>
+          <button v-if="hayMasCajas" type="button" class="sdv__cajas-mas" @click="verMasCajas">
+            Ver turnos anteriores ({{ totalCajas - historialCaja.length }} más)
+          </button>
         </div>
       </div>
 
@@ -405,6 +422,8 @@ onMounted(async () => {
 .sdv__caja-ok { font-size: var(--fs-12); color: #15803d; }
 .sdv__caja-dif { font-size: var(--fs-12); color: #b45309; font-weight: 700; font-variant-numeric: tabular-nums; }
 .sdv__caja-dif--mal { color: #b91c1c; }
+.sdv__cajas-mas { width: 100%; background: none; border: none; border-top: 1px solid var(--c-ink-100); padding: var(--sp-3); cursor: pointer; font: inherit; font-size: var(--fs-12); font-weight: 700; color: #1b5e20; }
+.sdv__cajas-mas:hover { background: var(--c-leaf-50); }
 .sdv__caja-l2 { font-size: var(--fs-12); color: var(--c-ink-500); }
 .sdv__caja-l2 strong { color: var(--c-ink-700); font-weight: 600; }
 .sdv__caja-notas { font-size: var(--fs-12); color: var(--c-ink-600); font-style: italic; }

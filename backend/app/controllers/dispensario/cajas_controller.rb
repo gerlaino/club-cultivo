@@ -31,9 +31,23 @@ module Dispensario
       render json: { caja: serialize(caja_activa) }
     end
 
-    # GET /sedes/:sede_id/caja — historial de cierres
+    # GET /sedes/:sede_id/caja?pagina=1&limite=10 — historial de CIERRES
+    #
+    # Filtra por estado en SQL, no después. Antes traía las últimas 50 de cualquier estado y el
+    # front se quedaba con las cerradas: con 50 aperturas anuladas se veían CERO cierres, y a
+    # partir del turno 51 los viejos desaparecían sin que nada lo dijera.
+    #
+    # Con un turno por día, 50 son menos de dos meses: el tope se alcanza y el silencio es el
+    # problema. Ahora pagina y dice cuántas hay.
     def index
-      render json: cajas_de_la_sede.recientes.limit(50).map { |c| serialize(c) }
+      escala  = cajas_de_la_sede.where(estado: 'cerrada')
+      pagina  = [params[:pagina].to_i, 1].max
+      limite  = [[(params[:limite] || 10).to_i, 1].max, 50].min
+
+      render json: {
+        cajas: escala.recientes.offset((pagina - 1) * limite).limit(limite).map { |c| serialize(c) },
+        meta:  { pagina: pagina, limite: limite, total: escala.count },
+      }
     end
 
     # POST /sedes/:sede_id/caja/abrir { monto_inicial_ars } — admin/supervisor
