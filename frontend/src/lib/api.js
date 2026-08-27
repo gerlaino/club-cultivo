@@ -1,5 +1,6 @@
 import axios from "axios";
 import { useToast } from "../composables/useToast.js";
+import { anotarReload } from "../utils/reloadTrace.js";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:3001/api",
@@ -48,6 +49,10 @@ api.interceptors.response.use(
       const path = window.location.pathname;
       if (!esBootstrap && !loggingOut && !path.startsWith('/login')) {
         const retorno = encodeURIComponent(path + window.location.search);
+        // Qué request se comió el 401: el JWT dura 12 h y no se renueva, así que el primero en
+        // encontrarlo suele ser un poll de fondo (la campana late cada 60 s) y no algo que la
+        // persona haya tocado. Desde afuera se ve como que la app se refrescó sola.
+        anotarReload('http-401', { pedido: url });
         window.location.href = `/login?redirect=${retorno}`;
       }
     }
@@ -67,6 +72,7 @@ api.interceptors.response.use(
         auth.bootstrapped = true;
       } catch {}
       if (!window.location.pathname.startsWith('/login')) {
+        anotarReload('http-403-modulo-rol', { pedido: url });
         window.location.href = '/login';
       }
       return Promise.reject(error);

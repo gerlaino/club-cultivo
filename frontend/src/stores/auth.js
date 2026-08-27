@@ -234,7 +234,14 @@ export const useAuthStore = defineStore("auth", {
             await Promise.all(keys.map((k) => caches.delete(k)));
           } catch (_) {}
         }
-        try { localStorage.clear(); sessionStorage.clear(); } catch (_) {}
+        try {
+          // Las migas de `reloadTrace` sobreviven al logout: no llevan nada de la sesión (motivo,
+          // hora, ruta y build) y son la única evidencia del refresh de hace media hora. Si el
+          // clear se las lleva, cerrar sesión borra justo lo que se está investigando.
+          const migas = localStorage.getItem('ce_reload');
+          localStorage.clear(); sessionStorage.clear();
+          if (migas) localStorage.setItem('ce_reload', migas);
+        } catch (_) {}
         // Hard reload (con replace) limpia todos los stores de Pinia y evita volver
         // atrás a una pantalla autenticada. Cache-bust para saltear cualquier SW.
         window.location.replace('/login?loggedout=' + Date.now());

@@ -23,6 +23,10 @@ import {useAuthStore} from "./stores/auth.js";
 import {useClubStore} from "./stores/club.js";
 
 import { registerSW } from 'virtual:pwa-register'
+import { anotarReload, leerReloads } from './utils/reloadTrace.js'
+
+// Para leer desde la consola por qué se recargó sola la pantalla: `ceReloads()`.
+window.ceReloads = leerReloads
 
 // Nueva versión disponible → aplicar la actualización automáticamente.
 // (Antes mostraba un banner "Actualizar" que en mobile casi nadie tocaba, y los
@@ -56,6 +60,7 @@ let swRecargando = false
 navigator.serviceWorker?.addEventListener('controllerchange', () => {
   if (swRecargando) return
   swRecargando = true
+  anotarReload('sw-controllerchange')
   window.location.reload()
 })
 
