@@ -10,9 +10,24 @@ export function safeDate(d) {
   return /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(d + 'T00:00:00') : new Date(d)
 }
 
-export function reprocannDias(p) {
+/**
+ * Días de CALENDARIO que faltan para el vencimiento. 0 = vence hoy; negativo = ya venció.
+ *
+ * Se cuenta de medianoche a medianoche y NO restando milisegundos. El vencimiento llega como
+ * fecha sin hora (00:00) y `new Date()` trae la hora del día, así que la resta cruda perdía
+ * siempre un día: a las 13:00 de hoy, algo que vencía MAÑANA daba 10 horas y `floor` lo
+ * mostraba como "0d", y lo que vencía HOY daba -1 y se informaba como VENCIDO un día antes de
+ * tiempo. El backend (`Paciente.reprocann_categoria`) compara fechas peladas y decía lo
+ * contrario para el mismo paciente: la misma regla en dos lugares, corrida un día.
+ */
+export function reprocannDias(p, hoy = new Date()) {
   if (!p?.reprocann_vencimiento) return null
-  return Math.floor((safeDate(p.reprocann_vencimiento) - new Date()) / 86400000)
+  const v     = safeDate(p.reprocann_vencimiento)
+  const vence = new Date(v.getFullYear(), v.getMonth(), v.getDate())
+  const desde = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate())
+  // `round` y no `floor`: entre dos medianoches puede haber 23 o 25 horas si en el medio cambia
+  // el huso. Hoy en Argentina no pasa, pero la cuenta no tiene por qué depender de eso.
+  return Math.round((vence - desde) / 86400000)
 }
 
 /**
@@ -61,11 +76,11 @@ export function reprocannPlazo(p, hoy = new Date()) {
 
 // Las cinco categorías son mutuamente excluyentes y cubren todos los casos, así los
 // contadores de los filtros suman el total.
-export function reprocannCategoria(p) {
+export function reprocannCategoria(p, hoy = new Date()) {
   const estado = p?.reprocann_estado_efectivo || p?.reprocann_estado
   if (estado === 'pendiente') return 'pendiente'
   if (!p?.reprocann_numero)   return 'sin_reprocann'
-  const d = reprocannDias(p)
+  const d = reprocannDias(p, hoy)
   if (d === null) return 'vigente' // certificado sin fecha cargada: existe igual
   if (d < 0)  return 'vencido'
   if (d <= 30) return 'por_vencer'
@@ -81,12 +96,14 @@ const BADGES = {
 }
 
 // Badge corto para listados.
-export function reprocannBadge(p) {
-  const cat  = reprocannCategoria(p)
-  const days = reprocannDias(p)
+export function reprocannBadge(p, hoy = new Date()) {
+  const cat  = reprocannCategoria(p, hoy)
+  const days = reprocannDias(p, hoy)
   const base = BADGES[cat]
   if (!base) return null
-  if (cat === 'por_vencer') return { label: `${days}d`, level: 'warning', days, cat }
+  // "0d" no se lee como "vence hoy": se lee como "ya venció", que es lo contrario de lo que
+  // dice la categoría. El último día del certificado se escribe con todas las letras.
+  if (cat === 'por_vencer') return { label: days === 0 ? 'Hoy' : `${days}d`, level: 'warning', days, cat }
   if (cat === 'vigente' && days !== null && days <= 90) {
     return { label: `${days}d`, level: 'caution', days, cat }
   }

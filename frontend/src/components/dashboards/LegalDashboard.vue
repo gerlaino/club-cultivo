@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth.js'
 import { getContableDashboard, listPacientes, getInformeSemestral } from '../../lib/api.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
+import { reprocannCategoria, reprocannDias } from '../../composables/useReprocann.js'
 
 const router = useRouter()
 const auth   = useAuthStore()
@@ -43,32 +44,23 @@ function variacion(actual, anterior) {
   return ((actual - anterior) / Math.abs(anterior) * 100).toFixed(1)
 }
 
-// REPROCANN
-const reprocannKpis = computed(() => {
-  const hoy = new Date()
-  const en30 = new Date(hoy.getTime() + 30 * 86400000)
-  const en90 = new Date(hoy.getTime() + 90 * 86400000)
-  return {
-    total:    socios.value.length,
-    activos:  socios.value.filter(s => s.es_paciente).length,
-    vencidos: socios.value.filter(s => s.reprocann_vencimiento && new Date(s.reprocann_vencimiento) < hoy).length,
-    proximos: socios.value.filter(s => {
-      if (!s.reprocann_vencimiento) return false
-      const v = new Date(s.reprocann_vencimiento)
-      return v >= hoy && v <= en30
-    }).length,
-    sin_rep: socios.value.filter(s => !s.reprocann_numero).length,
-  }
-})
+// REPROCANN — la clasificación sale de `useReprocann`, que es la fuente única.
+//
+// Esta pantalla tenía su propia copia y decía otra cosa que la lista de Pacientes para el mismo
+// paciente: clasificaba mirando sólo la fecha (un trámite PENDIENTE contaba como vencido) y
+// parseaba con `new Date('2026-08-28')`, que es UTC — entre las 21:00 y la medianoche de
+// Argentina daba por vencido a quien vencía al día siguiente.
+const reprocannKpis = computed(() => ({
+  total:    socios.value.length,
+  activos:  socios.value.filter(s => s.es_paciente).length,
+  vencidos: socios.value.filter(s => reprocannCategoria(s) === 'vencido').length,
+  proximos: socios.value.filter(s => reprocannCategoria(s) === 'por_vencer').length,
+  sin_rep:  socios.value.filter(s => reprocannCategoria(s) === 'sin_reprocann').length,
+}))
 
 const sociosAlerta = computed(() =>
   socios.value
-    .map(s => ({
-      ...s,
-      dias: s.reprocann_vencimiento
-        ? Math.floor((new Date(s.reprocann_vencimiento) - new Date()) / 86400000)
-        : null
-    }))
+    .map(s => ({ ...s, dias: reprocannDias(s) }))
     .filter(s => s.dias !== null && s.dias <= 90)
     .sort((a, b) => a.dias - b.dias)
     .slice(0, 6)
@@ -325,7 +317,7 @@ onMounted(async () => {
                 </div>
                 <div class="ld__alert-badge"
                      :style="s.dias < 0 ? 'background:#fef2f2;color:#dc2626;border-color:#fecaca' : s.dias <= 30 ? 'background:#fffbeb;color:#b45309;border-color:#fde68a' : 'background:#eff6ff;color:#0369a1;border-color:#bfdbfe'">
-                  {{ s.dias < 0 ? 'Vencido' : `${s.dias}d` }}
+                  {{ s.dias < 0 ? 'Vencido' : s.dias === 0 ? 'Hoy' : `${s.dias}d` }}
                 </div>
               </RouterLink>
             </div>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { reprocannCategoria, reprocannBadge, formatearPlazo } from '../composables/useReprocann.js'
+import { reprocannCategoria, reprocannBadge, reprocannDias, formatearPlazo } from '../composables/useReprocann.js'
 
 const enDias = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10)
 
@@ -99,5 +99,44 @@ describe('cuánto falta, en castellano', () => {
 
   it('vence hoy', () => {
     expect(formatearPlazo(el('2026-08-15'), el('2026-08-15'))).toBe('hoy')
+  })
+})
+
+// AC (Germán, 27-ago): cuatro pacientes cuyo REPROCANN vencía el 28 aparecían en la lista como
+// "0d". "0d" se lee como VENCIDO, y no lo estaban: les quedaba un día.
+//
+// La cuenta va por calendario. La hora del día NO participa: el vencimiento es una fecha sin
+// hora, así que restar milisegundos contra `new Date()` perdía siempre un día. El límite que
+// importa es el mismo que usa el backend (`vencido if vencimiento < hoy`): el certificado vale
+// TODO su último día.
+describe('cuántos días faltan — por calendario, no por milisegundos', () => {
+  const hoy = new Date(2026, 7, 27, 13, 30) // 27-ago-2026 13:30, con hora del día
+  const pac = (vence) => ({ reprocann_estado: 'activo', reprocann_numero: 'R-1', reprocann_vencimiento: vence })
+
+  it('el que vence MAÑANA tiene 1 día, no 0', () => {
+    expect(reprocannDias(pac('2026-08-28'), hoy)).toBe(1)
+    expect(reprocannBadge(pac('2026-08-28'), hoy).label).toBe('1d')
+  })
+
+  it('el que vence HOY todavía no está vencido, y no dice "0d"', () => {
+    expect(reprocannDias(pac('2026-08-27'), hoy)).toBe(0)
+    expect(reprocannCategoria(pac('2026-08-27'), hoy)).toBe('por_vencer')
+    expect(reprocannBadge(pac('2026-08-27'), hoy).label).toBe('Hoy')
+  })
+
+  it('el que venció AYER sí está vencido', () => {
+    expect(reprocannDias(pac('2026-08-26'), hoy)).toBe(-1)
+    expect(reprocannCategoria(pac('2026-08-26'), hoy)).toBe('vencido')
+    expect(reprocannBadge(pac('2026-08-26'), hoy).label).toBe('Vencido')
+  })
+
+  it('la hora del día no mueve la cuenta: a las 00:01 falta lo mismo que a las 23:59', () => {
+    const p = pac('2026-09-10')
+    expect(reprocannDias(p, new Date(2026, 7, 27, 0, 1))).toBe(14)
+    expect(reprocannDias(p, new Date(2026, 7, 27, 23, 59))).toBe(14)
+  })
+
+  it('cruzar el fin de mes no descuenta un día de más', () => {
+    expect(reprocannDias(pac('2026-09-01'), new Date(2026, 7, 31, 18, 0))).toBe(1)
   })
 })
