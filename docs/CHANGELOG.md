@@ -110,6 +110,24 @@ corriendo"*, pero `efectivo_esperado_ars` **no la sumaba**: el turno cerraba con
 a lo devuelto. La intención estaba escrita y no implementada. Ahora hay `CajaTurno#ingresos`,
 simétrico de `salidas`, y las dos ignoran lo posterior al cierre.
 
+### Los cuatro huecos que quedaban
+
+- **La mesa se actualiza sola.** Si el admin baja producto desde su oficina, el que atiende lo ve
+  sin recargar — recargar es justo lo que nadie hace con alguien esperando enfrente. Se reusa el
+  canal del club en vez de abrir otro. **Y cada carga lleva número**: una tanda de cambios dispara
+  varias recargas, y sin ordenarlas la respuesta vieja aterriza última y la pantalla vuelve atrás.
+  Lo cazó el e2e, que vio 300 donde tenía que haber 297.
+- **Contar un producto sin cerrar el turno.** Cerrar y reabrir sigue siendo el arqueo completo,
+  pero con quince frascos son veinte minutos: ese control no se hace dos veces por día. Contar de
+  a uno cuesta treinta segundos, ajusta el inventario y corre el esperado del cierre para que a la
+  noche no se cuente dos veces lo mismo.
+- **La merma, sede por sede.** Es LA comparación que encuentra el cuello de botella: si en una se
+  pierde el triple que en otra con el mismo producto, el problema no es la merma.
+- **El aviso.** Sin umbral fijo, a propósito: un 3% puede ser normal fraccionando flor y un
+  escándalo en aceite, y lo que importa no es el número sino que CAMBIÓ. Se compara la semana
+  contra las ocho anteriores de esa organización, con pisos de historia y volumen, y como mucho
+  uno por semana.
+
 ### Pruebas de punta a punta en el navegador
 
 `frontend/e2e/` con Playwright, sobre una organización **aparte** (`slug: 'e2e'`, sembrada por

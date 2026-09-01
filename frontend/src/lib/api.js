@@ -504,6 +504,9 @@ export const getMostrador      = (sedeId)          => api.get(`/sedes/${sedeId}/
 export const abrirMostrador    = (sedeId, payload) => api.post(`/sedes/${sedeId}/mostrador/abrir`, payload)
 export const confirmarMostrador = (sedeId, payload) => api.post(`/sedes/${sedeId}/mostrador/confirmar`, payload)
 export const cargarMostrador   = (sedeId, payload) => api.post(`/sedes/${sedeId}/mostrador/cargar`, payload)
+// Contar UN producto sin cerrar el turno: con quince frascos, cerrar y reabrir son veinte
+// minutos y termina siendo el control que no se ejecuta.
+export const contarMostrador   = (sedeId, payload) => api.post(`/sedes/${sedeId}/mostrador/contar`, payload)
 export const devolverMostrador = (sedeId, payload) => api.post(`/sedes/${sedeId}/mostrador/devolver`, payload)
 export const cerrarMostrador   = (sedeId, payload) => api.post(`/sedes/${sedeId}/mostrador/cerrar`, payload)
 // Dónde se le va el producto a la organización. No es auditoría: la merma es inevitable y se

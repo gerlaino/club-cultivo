@@ -473,6 +473,18 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 - **Hay UNA sola forma de que la plata del repartidor entre al cajón** (`Rendiciones::Recibir`).
   `RecibirCajaDelivery` —la puerta vieja, para cuando el repartidor se fue sin rendir— crea la
   rendición y delega. Dos caminos distintos al mismo hecho es cómo dejan de coincidir.
+- **La mesa se actualiza sola** por el canal del club (`stocks_club_X`, evento
+  `mostrador_actualizado`), que ya existía — no se abre otro. Y **cada carga lleva número**: una
+  tanda de cambios dispara varias recargas y nada garantiza el orden de llegada; sin el guard, la
+  respuesta vieja aterriza última y la pantalla vuelve atrás, que se lee como "no se guardó".
+- **Contar de a uno** (`registrar_conteo!`) existe porque cerrar y reabrir con quince frascos son
+  veinte minutos: el control que cuesta eso no se hace, y el que no se hace no controla nada. A
+  diferencia de la corrección al RECIBIR —que reparte entre mesa y depósito— acá la diferencia SÍ
+  ajusta el inventario, y corre el esperado del cierre para no contarla dos veces.
+- **El aviso de merma NO tiene umbral fijo** (`MermaMostradorJob`): un 3% puede ser normal
+  fraccionando flor y un escándalo en aceite. Se compara la última semana contra las ocho
+  anteriores DE ESA organización, con pisos de historia y de volumen, y uno por semana como mucho
+  — repetirlo a diario es cómo se aprende a ignorarlo.
 - **EL ARQUEO NO MUESTRA LO ESPERADO HASTA QUE EL CONTEO ESTÉ ESCRITO.** Nadie pesa 297 g
   teniendo el 297 delante: con el número a la vista se escribe ese, el conteo es teatro y toda la
   merma que se mide da cero — o sea, el módulo entero deja de servir. Vale para los gramos y para

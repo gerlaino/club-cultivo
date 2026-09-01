@@ -10,7 +10,7 @@ class AlertaInterna < ApplicationRecord
     paciente_creado_por_dispensador paciente_pendiente_aprobacion modulo_dado_de_baja documento_vencido reprocann_vencido reprocann_por_vencer
     indicacion_vencida indicacion_por_vencer
     manicura_asignada manicura_devuelta manicura_aprobacion_pendiente manicura_aprobada manicura_rechazada manicura_eliminada manicura_reabierta
-    stock_bajo stock_vencimiento saldo_cc_bajo saldo_gramos_bajo
+    stock_bajo stock_vencimiento saldo_cc_bajo saldo_gramos_bajo merma_mostrador
     delivery_entregado delivery_fallido
     reserva_por_entregar reserva_vencida
     otro

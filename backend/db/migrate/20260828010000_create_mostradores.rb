@@ -36,14 +36,18 @@ class CreateMostradores < ActiveRecord::Migration[7.2]
     # tenga una caja apuntándole. Ese OR no es paranoia: si una caja quedó colgada de una sede
     # de producción, sin mostrador el repuntado de abajo la dejaría sin dueño y el modelo la
     # daría por inválida — incluida una que esté ABIERTA ahora mismo.
+    #
+    # El `deleted_at IS NULL` aplica SÓLO a la primera rama. Una sede dada de baja que tenga
+    # cajas viejas igual necesita su mostrador: si no, esas cajas no se repuntan, el guard de
+    # abajo salta y el deploy entero falla por un registro que nadie va a volver a mirar. Se le
+    # crea el mostrador y queda dado de baja igual que la sede.
     execute <<~SQL
-      INSERT INTO mostradores (club_id, sede_id, nombre, activo, created_at, updated_at)
-      SELECT s.club_id, s.id, 'Mostrador', true, NOW(), NOW()
+      INSERT INTO mostradores (club_id, sede_id, nombre, activo, deleted_at, created_at, updated_at)
+      SELECT s.club_id, s.id, 'Mostrador', s.deleted_at IS NULL, s.deleted_at, NOW(), NOW()
       FROM sedes s
-      WHERE s.deleted_at IS NULL
-        AND (s.tipo IN ('social', 'mixta')
-             OR EXISTS (SELECT 1 FROM caja_turnos c
-                        WHERE c.punto_type = 'Sede' AND c.punto_id = s.id))
+      WHERE (s.deleted_at IS NULL AND s.tipo IN ('social', 'mixta'))
+         OR EXISTS (SELECT 1 FROM caja_turnos c
+                    WHERE c.punto_type = 'Sede' AND c.punto_id = s.id)
     SQL
 
     # Repuntar las cajas del dispensario que ya existen: de la Sede al Mostrador de esa sede.
@@ -57,8 +61,17 @@ class CreateMostradores < ActiveRecord::Migration[7.2]
     # Si quedó una sola caja sin repuntar, el arqueo de ese club miente en silencio: los cobros
     # no se enganchan y el esperado sale mal. Preferimos que falle el deploy (bin/render-build.sh
     # corre con errexit) antes que dejar una caja rota en producción.
-    huerfanas = select_value("SELECT COUNT(*) FROM caja_turnos WHERE punto_type = 'Sede'").to_i
-    raise "Quedaron #{huerfanas} cajas apuntando a una Sede sin mostrador" if huerfanas.positive?
+    #
+    # Después del arreglo de arriba, sólo puede quedar una si apunta a una sede que ya NO EXISTE
+    # en la tabla. El detalle va en el mensaje para no salir a buscarlo con el deploy caído.
+    huerfanas = select_all(
+      "SELECT id, club_id, punto_id AS sede_id, estado FROM caja_turnos " \
+      "WHERE punto_type = 'Sede' ORDER BY id"
+    ).to_a
+    return if huerfanas.empty?
+
+    detalle = huerfanas.map { |c| "caja ##{c['id']} → sede ##{c['sede_id']} (#{c['estado']})" }
+    raise "Quedaron #{huerfanas.size} cajas apuntando a una Sede inexistente: #{detalle.join(', ')}"
   end
 
   def down

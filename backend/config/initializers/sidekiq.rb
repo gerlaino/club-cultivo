@@ -31,6 +31,11 @@ Sidekiq.configure_server do |config|
         'class' => 'StockBajoJob',
         'description' => 'Genera alertas de stock bajo (umbral configurable por club) para todos los clubes'
       },
+      'merma_mostrador' => {
+        'cron'  => '30 9 * * 1',
+        'class' => 'MermaMostradorJob',
+        'description' => 'Avisa si la merma del mostrador se sale del patrón de esa organización'
+      },
       'stock_vencimiento' => {
         'cron'  => '0 9 * * *',
         'class' => 'StockVencimientoJob',

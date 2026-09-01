@@ -40,9 +40,23 @@ class TurnoMostrador < ApplicationRecord
   # Listo para atender: abierto Y recibido por quien va a responder por la mercadería.
   def operativo? = abierto? && confirmado?
 
+  # Avisar que la mesa cambió. La pantalla del que atiende no se enteraba de que el admin le
+  # bajó producto desde su oficina hasta que recargaba — con el paquete ya sobre el mostrador.
+  after_commit :avisar_cambio
+
   def abierto? = estado == 'abierto'
   def cerrado? = estado == 'cerrado'
   def anulado? = estado == 'anulado'
 
   delegate :sede, :sede_id, to: :mostrador
+
+  # Se usa el canal del club, que ya existe: es la misma conexión y el mismo alcance. Un fallo
+  # de ActionCable no puede tumbar una apertura ni un cierre, así que va con rescue.
+  def avisar_cambio
+    ActionCable.server.broadcast("stocks_club_#{club_id}", {
+      tipo: 'mostrador_actualizado', mostrador_id: mostrador_id, sede_id: sede_id,
+    })
+  rescue => e
+    Rails.logger.warn "TurnoMostrador#avisar_cambio falló: #{e.message}"
+  end
 end

@@ -68,6 +68,7 @@ const getTurnoMostrador = vi.fn(() => Promise.resolve({
 }))
 const corregirTurnoMostrador = vi.fn(() => Promise.resolve({ data: {} }))
 const ingresoCajaMostrador  = vi.fn(() => Promise.resolve({ data: {} }))
+const contarMostrador       = vi.fn(() => Promise.resolve({ data: {} }))
 const salidaCajaMostrador   = vi.fn(() => Promise.resolve({ data: {} }))
 
 vi.mock('../lib/api.js', () => ({
@@ -81,6 +82,7 @@ vi.mock('../lib/api.js', () => ({
   revisarTurnoMostrador: (...a) => revisarTurnoMostrador(...a),
   getTurnoMostrador:    (...a) => getTurnoMostrador(...a),
   corregirTurnoMostrador: (...a) => corregirTurnoMostrador(...a),
+  contarMostrador:      (...a) => contarMostrador(...a),
   ingresoCajaMostrador: (...a) => ingresoCajaMostrador(...a),
   salidaCajaMostrador:  (...a) => salidaCajaMostrador(...a),
   listSedes:         vi.fn(() => Promise.resolve({ data: SEDES })),
@@ -475,6 +477,60 @@ describe('La pantalla del mostrador', () => {
     })
   })
 
+  // Cerrar y reabrir es el arqueo completo, pero con quince frascos son veinte minutos: el
+  // control que cuesta eso no se hace, y el que no se hace no controla nada.
+  describe('contar un producto sin cerrar el turno', () => {
+    beforeEach(() => {
+      respuesta = {
+        mostrador: { id: 1, nombre: 'Mostrador', sede: { id: 10, nombre: 'Central' } },
+        turno: TURNO, sugerido: [], disponibles: DISPONIBLES,
+      }
+    })
+
+    async function abrirConteo () {
+      const w = await montar()
+      await w.findAll('tbody tr')[0].findAll('.mst__btn--mini')[2].trigger('click')
+      return w
+    }
+
+    // Mismo criterio que el cierre: si ve el 155 antes de pesar, escribe 155.
+    it('NO muestra lo esperado hasta que el conteo está escrito', async () => {
+      const w = await abrirConteo()
+
+      expect(w.find('.mst__modal').text()).toContain('Contar Northern Lights')
+      expect(w.find('.mst__modal').text()).not.toContain('Tendría que haber')
+    })
+
+    it('y lo muestra con la diferencia una vez escrito', async () => {
+      const w = await abrirConteo()
+      await w.find('.mst__modal .mst__input').setValue(152)
+
+      expect(w.find('.mst__modal').text()).toContain('Tendría que haber')
+      expect(w.find('.mst__dif-caja').text()).toBe('Faltan 3 g')
+    })
+
+    it('con diferencia y sin motivo no registra', async () => {
+      const w = await abrirConteo()
+      await w.find('.mst__modal .mst__input').setValue(152)
+      await w.find('.mst__modal-acc .mst__btn--primary').trigger('click')
+      await flushPromises()
+
+      expect(contarMostrador).not.toHaveBeenCalled()
+    })
+
+    it('lo manda con el motivo', async () => {
+      const w = await abrirConteo()
+      await w.find('.mst__modal .mst__input').setValue(152)
+      await w.find('.mst__modal .mst__campo--motivo .mst__input').setValue('se cayó al piso')
+      await w.find('.mst__modal-acc .mst__btn--primary').trigger('click')
+      await flushPromises()
+
+      expect(contarMostrador).toHaveBeenCalledWith(10, {
+        item_id: 71, contado: 152, motivo: 'se cayó al piso',
+      })
+    })
+  })
+
   // El admin corrige la plata en cualquier momento, en los dos sentidos — igual que el stock.
   describe('mover plata durante el turno', () => {
     beforeEach(() => {
@@ -609,6 +665,33 @@ describe('La pantalla del mostrador', () => {
       await flushPromises()
 
       expect(corregirTurnoMostrador).not.toHaveBeenCalled()
+    })
+
+    // Comparar sedes es LA pregunta que encuentra el cuello de botella.
+    it('compara sede por sede cuando se piden todas', async () => {
+      getMermaMostrador.mockResolvedValueOnce({
+        data: {
+          ...MERMA,
+          por_sede: [
+            { sede_id: 10, sede: 'Central', turnos: 12, dispensado: 4200, faltante: 61, faltante_ars: 41000, merma_pct: 1.45 },
+            { sede_id: 12, sede: 'Norte',   turnos: 9,  dispensado: 3000, faltante: 15, faltante_ars: 9000,  merma_pct: 0.5 },
+          ],
+        },
+      })
+      const w = await verMerma()
+
+      expect(w.text()).toContain('Sede por sede')
+      const filas = w.findAll('tbody tr')
+      expect(filas[0].text()).toContain('Central')
+      expect(filas[0].text()).toContain('1.45%')
+      expect(filas[1].text()).toContain('Norte')
+    })
+
+    // Con una sola sede, compararla contra sí misma es una tabla de una fila que no dice nada.
+    it('con una sola sede no muestra la comparación', async () => {
+      const w = await verMerma()
+
+      expect(w.text()).not.toContain('Sede por sede')
     })
 
     it('sin turnos cerrados lo dice, en vez de mostrar ceros', async () => {

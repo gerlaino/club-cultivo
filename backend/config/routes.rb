@@ -431,6 +431,7 @@ Rails.application.routes.draw do
         get  'mostrador',          to: 'mostrador#actual'
         post 'mostrador/abrir',    to: 'mostrador#abrir'
         post 'mostrador/confirmar', to: 'mostrador#confirmar'
+        post 'mostrador/contar',   to: 'mostrador#contar'
         post 'mostrador/cargar',   to: 'mostrador#cargar'
         post 'mostrador/devolver', to: 'mostrador#devolver'
         post 'mostrador/cerrar',   to: 'mostrador#cerrar'

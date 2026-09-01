@@ -46,6 +46,11 @@
       <div class="mst__filtros">
         <label class="mst__campo-inline">Desde <input v-model="rango.desde" type="date" class="mst__input mst__input--fecha" /></label>
         <label class="mst__campo-inline">Hasta <input v-model="rango.hasta" type="date" class="mst__input mst__input--fecha" /></label>
+        <!-- Comparar sedes es LA pregunta que encuentra el cuello de botella: si en una se
+             pierde el triple que en otra con el mismo producto, el problema no es la merma. -->
+        <label v-if="sedes.length > 1" class="mst__campo-inline">
+          <input v-model="todasLasSedes" type="checkbox" /> Todas las sedes
+        </label>
         <button class="mst__btn mst__btn--ghost" @click="cargarMerma">Ver</button>
       </div>
 
@@ -69,6 +74,38 @@
             <span class="mst__kpi-lbl">turnos cerrados</span>
           </div>
         </div>
+
+        <template v-if="merma.por_sede?.length">
+          <h2 class="mst__seccion">Sede por sede</h2>
+          <p class="mst__seccion-sub">
+            Si en una se pierde el triple que en otra con el mismo producto, el problema no es la
+            merma: es algo de esa sede, y hasta que no se ponen al lado no se ve.
+          </p>
+          <div class="mst__table-wrap">
+            <table class="mst__table tabla-cards">
+              <thead>
+                <tr>
+                  <th>Sede</th>
+                  <th class="mst__th-num">Turnos</th>
+                  <th class="mst__th-num">Entregado</th>
+                  <th class="mst__th-num">Faltó</th>
+                  <th class="mst__th-num">%</th>
+                  <th class="mst__th-num">A costo</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="s in merma.por_sede" :key="s.sede_id">
+                  <td data-col="Sede"><div class="mst__prod">{{ s.sede }}</div></td>
+                  <td class="mst__td-num mst__td-mut" data-col="Turnos">{{ s.turnos }}</td>
+                  <td class="mst__td-num mst__td-mut" data-col="Entregado">{{ fmt(s.dispensado) }}</td>
+                  <td class="mst__td-num mst__td-mut" data-col="Faltó">{{ fmt(s.faltante) }}</td>
+                  <td class="mst__td-num" data-col="%"><span class="mst__pct">{{ s.merma_pct ?? '—' }}%</span></td>
+                  <td class="mst__td-num mst__td-mut" data-col="A costo">${{ fmt(s.faltante_ars) }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </template>
 
         <h2 class="mst__seccion">Por producto</h2>
         <p class="mst__seccion-sub">
@@ -328,6 +365,11 @@
                 <button class="mst__btn mst__btn--mini mst__btn--ghost" @click="abrirMover(it, 'devolucion')">
                   Devolver
                 </button>
+                <!-- Contar SÓLO este, sin cerrar el turno: con quince frascos, cerrar y reabrir
+                     son veinte minutos y nadie lo hace dos veces por día. -->
+                <button class="mst__btn mst__btn--mini mst__btn--ghost" @click="abrirConteo(it)">
+                  Contar
+                </button>
               </td>
             </tr>
           </tbody>
@@ -474,6 +516,37 @@
       </div>
     </div>
 
+    <!-- ── Contar un producto sin cerrar el turno ─────────────────────────────── -->
+    <div v-if="conteo" class="mst__modal-back" @click.self="conteo = null">
+      <div class="mst__modal">
+        <h3 class="mst__modal-title">Contar {{ conteo.item.etiqueta }}</h3>
+        <p class="mst__modal-sub">
+          Pesá lo que hay y escribilo. Recién ahí te muestro lo que tendría que haber —
+          si lo vieras antes, escribirías ese número.
+        </p>
+        <input v-model.number="conteo.contado" type="number" min="0" step="0.1"
+               class="mst__input" placeholder="Cuento" aria-label="Contado" />
+        <template v-if="difConteo !== null">
+          <p class="mst__caja-fila mst__caja-fila--total">
+            <span>Tendría que haber</span><b>{{ fmt(conteo.item.esperado) }} {{ conteo.item.unidad }}</b>
+          </p>
+          <p class="mst__dif-caja" :class="difConteo === 0 ? 'is-ok' : 'is-mal'">
+            {{ difConteo === 0 ? 'Cuadra'
+               : `${difConteo > 0 ? 'Sobran' : 'Faltan'} ${fmt(Math.abs(difConteo))} ${conteo.item.unidad}` }}
+          </p>
+        </template>
+        <label v-if="difConteo" class="mst__campo mst__campo--motivo">
+          <span class="mst__campo-lbl">Qué pasó</span>
+          <input v-model="conteo.motivo" type="text" class="mst__input" placeholder="Ej: se cayó al piso" />
+        </label>
+        <div class="mst__modal-acc">
+          <button class="mst__btn mst__btn--ghost" @click="conteo = null">Cancelar</button>
+          <button class="mst__btn mst__btn--primary" :disabled="guardando || difConteo === null"
+                  @click="confirmarConteo">Registrar</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ── Poner o sacar plata del cajón, con el turno andando ────────────────── -->
     <div v-if="plata" class="mst__modal-back" @click.self="plata = null">
       <div class="mst__modal">
@@ -544,9 +617,10 @@ import RendicionCajaCard from '../components/RendicionCajaCard.vue'
 import { getMostrador, abrirMostrador, confirmarMostrador, cargarMostrador, devolverMostrador,
          cerrarMostrador, getMermaMostrador, revisarTurnoMostrador,
          ingresoCajaMostrador, salidaCajaMostrador, getTurnoMostrador,
-         corregirTurnoMostrador } from '../lib/api.js'
+         corregirTurnoMostrador, contarMostrador } from '../lib/api.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useSedeStore } from '../stores/sede.js'
+import { useStockChannel } from '../composables/useStockChannel.js'
 import { useToast } from '../composables/useToast.js'
 
 const sedeStore = useSedeStore()
@@ -576,6 +650,13 @@ const efectivoRecepcion = ref(null)
 const motivoEfectivo = ref('')
 const plata = ref(null)
 const correccion = ref(null)
+const conteo     = ref(null)
+// Mismo criterio que el cierre: lo esperado no se muestra hasta que el conteo está escrito.
+const difConteo  = computed(() => {
+  const c = conteo.value
+  if (!c || c.contado === null || c.contado === '') return null
+  return Math.round((Number(c.contado) - c.item.esperado) * 1000) / 1000
+})
 const tab       = ref('hoy')
 const merma     = ref(null)
 const cargandoMerma = ref(false)
@@ -588,6 +669,7 @@ const sinRevisar = ref(0)
 // todavía no había cerrado nadie, y la solapa se veía vacía justo en el horario en que se cierra
 // el mostrador. El cliente no tiene por qué adivinar qué día es en el servidor.
 const rango     = ref({ desde: '', hasta: '' })
+const todasLasSedes = ref(false)
 
 // Tres momentos, no dos: cerrado · abierto pero sin recibir · andando. El del medio existe
 // porque cuando lo carga el admin hay una entrega, y hasta que el que atiende no la firma nadie
@@ -656,7 +738,9 @@ async function cargarMerma () {
   if (!sedeId.value) return
   cargandoMerma.value = true
   try {
-    const { data } = await getMermaMostrador(sedeId.value, rango.value)
+    const params = { ...rango.value }
+    if (todasLasSedes.value) params.todas = 1
+    const { data } = await getMermaMostrador(sedeId.value, params)
     merma.value = data
     sinRevisar.value = data.sin_revisar ?? 0
     // El backend contesta con el rango que efectivamente usó: los campos lo muestran.
@@ -711,12 +795,20 @@ async function revisar (t) {
   } catch { toast.error('No se pudo marcar como revisado.') }
 }
 
+// Cada carga lleva número. Con el tiempo real, una tanda de cambios dispara varias recargas y
+// nada garantiza que lleguen en orden: si la respuesta vieja aterriza última, la pantalla vuelve
+// a un estado anterior — se ve como si la corrección no se hubiera guardado.
+let cargaEnCurso = 0
+
 async function cargar () {
   if (!sedeId.value) { cargando.value = false; return }
+  const mia = ++cargaEnCurso
   cargando.value = true
   error.value = ''
   try {
     const { data } = await getMostrador(sedeId.value)
+    if (mia !== cargaEnCurso) return // llegó tarde: ya hay una carga más nueva
+
     turno.value       = data.turno
     sugerido.value    = data.sugerido || []
     disponibles.value = data.disponibles || []
@@ -739,9 +831,9 @@ async function cargar () {
     // obligatorio: es un número que viene puesto y que se corrige sólo si no coincide.
     if (!turno.value) borrador.value = sugerido.value.map(s => ({ ...s }))
   } catch (e) {
-    error.value = e?.response?.data?.error || 'No se pudo cargar el mostrador.'
+    if (mia === cargaEnCurso) error.value = e?.response?.data?.error || 'No se pudo cargar el mostrador.'
   } finally {
-    cargando.value = false
+    if (mia === cargaEnCurso) cargando.value = false
   }
 }
 
@@ -831,6 +923,27 @@ async function confirmar () {
   }
 }
 
+function abrirConteo (item) {
+  conteo.value = { item, contado: null, motivo: '' }
+}
+
+async function confirmarConteo () {
+  const c = conteo.value
+  if (difConteo.value && !c.motivo.trim()) return toast.error('Escribí qué pasó.')
+
+  guardando.value = true
+  try {
+    await contarMostrador(sedeId.value, {
+      item_id: c.item.id, contado: c.contado, motivo: c.motivo || undefined,
+    })
+    conteo.value = null
+    toast.success(difConteo.value ? 'Diferencia registrada' : 'Cuadra')
+    await cargar()
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo registrar el conteo.')
+  } finally { guardando.value = false }
+}
+
 function abrirPlata (tipo) {
   plata.value = { tipo, monto: null, motivo: '', clase: 'retiro' }
 }
@@ -902,8 +1015,23 @@ async function bajarNuevo () {
 
 onMounted(async () => {
   if (!sedeStore.loaded) await sedeStore.fetchSedes()
+  // No se llama a `cargar()` acá: fijar la sede dispara el watcher de abajo, que carga. Hacer
+  // las dos cosas mandaba DOS pedidos por cada apertura de la pantalla.
   sedeId.value = sedes.value[0]?.id ?? null
-  await cargar()
+})
+
+// La mesa se actualiza sola. Si el admin baja producto desde su oficina, el que atiende lo ve
+// sin recargar: recargar es justo lo que nadie hace cuando tiene a alguien esperando enfrente.
+// Sólo si el aviso es de ESTA sede — con dos sedes abiertas, recargar por la otra es ruido.
+// Y se agrupan: cargar la mesa emite un aviso por producto, y recargar una vez por cada uno
+// sería mandar cinco requests para pintar la misma pantalla.
+let recargaPendiente = null
+useStockChannel(null, (evento) => {
+  if (evento?.tipo !== 'mostrador_actualizado') return
+  if (evento.sede_id && evento.sede_id !== sedeId.value) return
+
+  clearTimeout(recargaPendiente)
+  recargaPendiente = setTimeout(cargar, 300)
 })
 
 // Cambiar de sede recarga: si no, se veía el mostrador de la sede anterior — y la merma de la
@@ -912,7 +1040,7 @@ watch(sedeId, async () => {
   merma.value = null
   await cargar()
   if (tab.value === 'merma') await cargarMerma()
-})
+}, { immediate: true })
 </script>
 
 <style scoped>

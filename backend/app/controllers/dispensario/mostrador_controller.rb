@@ -66,6 +66,23 @@ module Dispensario
       end
     end
 
+    # POST /sedes/:sede_id/mostrador/contar { item_id, contado, motivo }
+    #
+    # Contar UN producto sin cerrar el turno. Cerrar y reabrir es el arqueo completo, pero con
+    # quince frascos son veinte minutos y termina siendo el control que no se ejecuta.
+    def contar
+      con_turno do |turno|
+        item = turno.items.find_by(id: params[:item_id])
+        next Mostradores::MoverStock::Result.new(ok: false, error: 'Ese producto no está en el turno') if item.nil?
+
+        item.registrar_conteo!(contado: params[:contado], usuario: current_user,
+                               motivo: params[:motivo])
+        Mostradores::MoverStock::Result.new(ok: true, item: item)
+      end
+    rescue ArgumentError => e
+      render json: { error: e.message }, status: :unprocessable_entity
+    end
+
     # POST /sedes/:sede_id/mostrador/cargar { stock_id, cantidad, notas }
     #
     # Subir mercadería del depósito a la mesa con el turno ya abierto. Lo hace administración,
@@ -116,7 +133,10 @@ module Dispensario
     def merma
       return render json: { error: 'No autorizado' }, status: :forbidden unless gestiona?
 
-      render json: Mostradores::Merma.call(mostrador: @mostrador,
+      # `sede_id=todas` compara el club entero. La ruta sigue colgando de una sede porque es
+      # como se navega, pero la pregunta "¿dónde se pierde más?" no es de una sede sola.
+      objetivo = params[:todas].present? ? mostradores_del_club : @mostrador
+      render json: Mostradores::Merma.call(mostrador: objetivo,
                                            desde: params[:desde], hasta: params[:hasta])
     rescue ArgumentError, Date::Error
       render json: { error: 'Fecha inválida' }, status: :unprocessable_entity
@@ -204,6 +224,10 @@ module Dispensario
       ).select(:turno_mostrador_id)
 
       @mostrador.turno_mostradores.cerrados.where(revisado_at: nil, id: con_faltante).count
+    end
+
+    def mostradores_del_club
+      current_user.club.mostradores.activos.includes(:sede).to_a.presence || [@mostrador]
     end
 
     def fondo_sugerido

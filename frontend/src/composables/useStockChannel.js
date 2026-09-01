@@ -5,7 +5,13 @@ import { cableUrl } from '../lib/cable.js'
 let consumer      = null
 let instanceCount = 0
 
-export function useStockChannel(onStockActualizado) {
+// `onEvento` recibe TODOS los mensajes del canal, no sólo los de stock. Se agregó para el
+// mostrador: la mesa cambia cuando el admin baja producto desde su oficina, y sin esto el que
+// atiende no se enteraba hasta recargar — con el paquete ya sobre el mostrador.
+//
+// Se reusa este canal en vez de abrir otro: es el mismo club y la misma conexión, y una segunda
+// suscripción sobre el mismo consumer singleton es una fuente de fugas.
+export function useStockChannel(onStockActualizado, onEvento = null) {
   onMounted(() => {
     instanceCount++
     if (instanceCount > 1) return
@@ -13,9 +19,8 @@ export function useStockChannel(onStockActualizado) {
       consumer = createConsumer(cableUrl())
       consumer.subscriptions.create('StocksChannel', {
         received(data) {
-          if (data.tipo === 'stock_actualizado') {
-            onStockActualizado(data)
-          }
+          if (data.tipo === 'stock_actualizado') onStockActualizado?.(data)
+          onEvento?.(data)
         },
       })
     } catch (e) {

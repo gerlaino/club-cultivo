@@ -47,7 +47,19 @@ test('el día del mostrador, de punta a punta', async ({ page }) => {
   // La corrección quedó: la mesa arranca con lo que él contó, no con lo que declaró el admin.
   await expect(page.locator('.mst__mesa')).toHaveText('297')
 
-  // ── 3. Cierra contando, y el esperado no se ve hasta que escribe ───────────
+  // ── 3. Cuenta UN producto sin cerrar: con quince frascos, cerrar y reabrir son veinte
+  //       minutos, y el control que cuesta eso no se hace ─────────────────────
+  await page.locator('tbody tr').first().locator('.mst__btn--mini').nth(2).click()
+  await expect(page.locator('.mst__modal')).toContainText('Contar')
+  await expect(page.locator('.mst__modal')).not.toContainText('Tendría que haber')
+  await page.locator('.mst__modal .mst__input').first().fill('295')
+  await expect(page.locator('.mst__dif-caja')).toHaveText('Faltan 2 g')
+  await page.locator('.mst__modal .mst__campo--motivo .mst__input').fill('se cayó al piso')
+  await page.locator('.mst__modal-acc .mst__btn--primary').click()
+  // El conteo corre el esperado: a la noche no se cuenta dos veces la misma diferencia.
+  await expect(page.locator('.mst__mesa')).toHaveText('295', { timeout: 15_000 })
+
+  // ── 4. Cierra contando, y el esperado no se ve hasta que escribe ───────────
   await page.click('.mst__turno .mst__btn--primary')
   await expect(page.locator('.mst__modal')).toBeVisible()
 
@@ -56,17 +68,15 @@ test('el día del mostrador, de punta a punta', async ({ page }) => {
   await expect(page.locator('.mst__caja')).not.toContainText('Tendría que haber')
 
   await page.locator('.mst__conteo-row').first().locator('.mst__input--cant').fill('295')
-  await expect(page.locator('.mst__conteo-row').first()).toContainText('tendría que haber 297 g')
-  await expect(page.locator('.mst__modal .mst__dif').first()).toHaveText('-2 g')
-
-  await page.locator('.mst__campo--motivo .mst__input').fill('merma de fraccionamiento')
+  await expect(page.locator('.mst__conteo-row').first()).toContainText('tendría que haber 295 g')
+  await expect(page.locator('.mst__modal .mst__dif').first()).toHaveText('cuadra')
   await page.locator('.mst__caja .mst__input').first().fill('50000')
   await expect(page.locator('.mst__dif-caja')).toHaveText('Cuadra')
   await page.click('.mst__modal-acc .mst__btn--primary')
 
   await expect(page.locator('.mst__estado')).toHaveText(/Cerrado/, { timeout: 15_000 })
 
-  // ── 4. Mañana hereda lo de anoche ──────────────────────────────────────────
+  // ── 5. Mañana hereda lo de anoche ──────────────────────────────────────────
   await expect(page.locator('.mst__input--cant').first()).toHaveValue('295')
   await expect(page.getByText(/quedaron \$50\.000 en el cajón anoche/)).toBeVisible()
 

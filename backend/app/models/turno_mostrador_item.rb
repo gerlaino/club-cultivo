@@ -18,6 +18,10 @@ class TurnoMostradorItem < ApplicationRecord
 
   has_many :movimientos, class_name: 'TurnoMostradorMovimiento', dependent: :destroy
 
+  # Cada cambio de cantidad es un cambio de la mesa: lo que se repone, lo que se devuelve y lo
+  # que se dispensa. El aviso lo emite el turno, que es el que la pantalla mira.
+  after_commit { turno_mostrador&.avisar_cambio }
+
   validates :stock_id, uniqueness: { scope: :turno_mostrador_id }
 
   scope :en_turno_abierto, -> { joins(:turno_mostrador).where(turno_mostradores: { estado: 'abierto' }) }
@@ -74,6 +78,39 @@ class TurnoMostradorItem < ApplicationRecord
 
     update!(cantidad_dispensada: cantidad_dispensada.to_d - devolver)
     devolver
+  end
+
+  # Contar ESTE producto sin cerrar el turno.
+  #
+  # Cerrar y reabrir sigue siendo el arqueo completo, pero con quince frascos son veinte minutos:
+  # un control que cuesta eso no se hace dos veces por día, y el que no se hace no controla nada.
+  #
+  # Acá la diferencia SÍ es pérdida real —el producto estaba sobre la mesa y ya no está—, así que
+  # ajusta el inventario igual que el cierre. Y el esperado del cierre se corre con ella, para que
+  # a la noche no se cuente dos veces lo mismo.
+  def registrar_conteo!(contado:, usuario:, motivo: nil)
+    contado = contado.to_d
+    raise ArgumentError, 'La cantidad contada no puede ser negativa' if contado.negative?
+
+    dif = contado - esperado
+    return 0.to_d if dif.zero?
+    raise ArgumentError, "#{stock&.etiqueta}: hay diferencia, escribí el motivo" if motivo.blank?
+
+    transaction do
+      update!(cantidad_ajuste: cantidad_ajuste.to_d + dif)
+      movimientos.create!(club_id: club_id, usuario: usuario, tipo: 'conteo',
+                          cantidad: dif, notas: motivo)
+      stock.with_lock do
+        stock.update!(cantidad: [stock.cantidad.to_d + dif, 0].max)
+        stock.stock_movimientos.create!(
+          tipo: 'ajuste', gramos: dif, usuario: usuario, turno_mostrador: turno_mostrador,
+          notas: "Conteo del mostrador — #{dif.negative? ? 'faltante' : 'sobrante'} de " \
+                 "#{dif.abs.round(3).to_f} #{stock.unidad || 'g'} — #{motivo}"
+        )
+      end
+      stock.reload.marcar_agotado_si_vacio!(usuario: usuario)
+    end
+    dif
   end
 
   def imputar_dispensa!(cantidad)
