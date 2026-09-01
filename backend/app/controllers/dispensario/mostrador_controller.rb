@@ -276,11 +276,22 @@ module Dispensario
       anterior = @mostrador.turno_mostradores.cerrados.order(cerrado_at: :desc).first
       return [] if anterior.nil?
 
-      anterior.items.en_la_mesa.includes(:stock).filter_map do |it|
-        next if it.cantidad_cierre.to_d <= 0
-        next unless it.stock && it.stock.sede_id == @mostrador.sede_id
+      # Se sugiere sobre `disponibles`, no sobre los stocks sueltos: la pantalla dibuja UNA fila
+      # por producto disponible y le pone el número heredado. Si acá apareciera algo que no está
+      # en esa lista —un frasco que desde anoche se agotó o se fue de la sede— su número se
+      # cargaría sin fila donde verlo ni corregirlo, y el backend lo rechazaría al abrir.
+      libres = disponibles.index_by(&:id)
 
-        serialize_stock(it.stock).merge(cantidad: it.cantidad_cierre.to_f)
+      anterior.items.en_la_mesa.filter_map do |it|
+        next if it.cantidad_cierre.to_d <= 0
+
+        stock = libres[it.stock_id]
+        next if stock.nil?
+
+        # Y se ofrece como mucho lo que quedó libre: si anoche cerró con 20 y hoy hay 12, sugerir
+        # 20 es proponer algo que no se puede cumplir.
+        cantidad = [it.cantidad_cierre.to_d, stock.cantidad_disponible_real.to_d].min
+        serialize_stock(stock).merge(cantidad: cantidad.to_f)
       end
     end
 
@@ -288,6 +299,10 @@ module Dispensario
     # algo libre. `cantidad_disponible_real` ya descuenta lo reservado a un paciente y lo
     # apartado a un evento: eso está en el mismo frasco pero no es del mostrador.
     def disponibles
+      @disponibles ||= calcular_disponibles
+    end
+
+    def calcular_disponibles
       candidatos = current_user.club.stocks
                                .where(sede_id: @mostrador.sede_id, estado: 'asignado')
                                .para_dispensa.disponibles
@@ -316,6 +331,10 @@ module Dispensario
       'reponer'
     end
 
+    # Lo que hace falta para DECIDIR qué baja a la mesa, no sólo para identificarlo. Es la misma
+    # información que muestra el carrito de dispensa (`ModalNuevaDispensacion`): armar la mesa y
+    # dispensar de ella son la misma pregunta —qué hay, de qué lote, de cuándo y a cuánto— y
+    # contestarla con dos tablas distintas es cómo empiezan a contradecirse.
     def serialize_stock(stock)
       {
         stock_id:  stock.id,
@@ -324,6 +343,12 @@ module Dispensario
         forma:     stock.forma_producto,
         unidad:    stock.unidad,
         lote:      stock.lote&.codigo,
+        genetica:  stock.genetica&.nombre || stock.lote&.genetica&.nombre,
+        # Lo viejo sale primero: sin la fecha, el que arma la mesa no tiene con qué decidirlo.
+        fecha:     stock.fecha_elaboracion || stock.created_at&.to_date,
+        precio_ars: stock.precio_sugerido_ars&.to_f,
+        # Sólo para quien responde por la mercadería: cuánto vale lo que se pone sobre la mesa.
+        costo_ars:  (stock.costo_unitario_ars&.to_f if gestiona?),
         disponible: stock.cantidad_disponible_real.to_f,
       }
     end

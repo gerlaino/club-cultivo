@@ -87,57 +87,12 @@
         </span>
       </label>
 
-      <ul v-if="borrador.length" class="mst__draft">
-        <li v-for="(it, i) in borrador" :key="it.stock_id" class="mst__draft-row">
-          <div class="mst__draft-prod">
-            <span class="mst__draft-nombre">{{ it.etiqueta }}</span>
-            <span class="mst__draft-meta">
-              {{ it.numero }}<template v-if="it.lote"> · lote {{ it.lote }}</template>
-              · {{ fmt(it.disponible) }} {{ it.unidad }} libres
-            </span>
-          </div>
-          <div class="mst__draft-cant">
-            <input v-model.number="it.cantidad" type="number" min="0" step="0.1"
-                   class="mst__input mst__input--cant" :aria-label="`Cantidad de ${it.etiqueta}`" />
-            <span class="mst__draft-unidad">{{ it.unidad }}</span>
-          </div>
-          <button class="mst__icon-btn" title="Sacar de la lista" @click="borrador.splice(i, 1)">
-            <X :size="16" />
-          </button>
-        </li>
-      </ul>
-      <p v-else class="mst__vacio">Todavía no pusiste nada sobre la mesa.</p>
-
-      <!-- El producto Y cuánto, en el mismo gesto. Antes la cantidad aparecía recién en la fila
-           de abajo, después de agregar: se podía poner, pero no se veía — que para el que abre el
-           mostrador por primera vez es lo mismo que no poder. Y con el mostrador ya abierto,
-           "Bajar a la mesa" sí la pregunta en el acto: eran dos formas de hacer lo mismo. -->
-      <div class="mst__agregar">
-        <select v-model="aAgregar" class="mst__select">
-          <option value="">Agregar del depósito…</option>
-          <option v-for="s in agregables" :key="s.stock_id" :value="s.stock_id">
-            {{ s.etiqueta }} — {{ fmt(s.disponible) }} {{ s.unidad }} libres
-          </option>
-        </select>
-        <div class="mst__agregar-cant">
-          <input v-model.number="cantAAgregar" type="number" min="0" step="0.1"
-                 class="mst__input mst__input--cant" placeholder="Cuánto"
-                 aria-label="Cuánto baja a la mesa" @keyup.enter="agregarAlBorrador" />
-          <span class="mst__draft-unidad">{{ unidadAAgregar }}</span>
-        </div>
-        <button class="mst__btn mst__btn--ghost"
-                :disabled="!aAgregar || !(cantAAgregar > 0) || !!excedeDisponible"
-                @click="agregarAlBorrador">
-          Agregar
-        </button>
-      </div>
-      <p v-if="excedeDisponible" class="mst__aviso mst__aviso--warn">
-        En el depósito quedan {{ fmt(excedeDisponible.disponible) }} {{ excedeDisponible.unidad }}
-        de {{ excedeDisponible.etiqueta }}.
-      </p>
+      <TablaStock v-model="cantidades" :stocks="disponibles" :heredados="heredados"
+                  :muestra-costo="gestiona" />
 
       <div class="mst__acciones">
-        <button class="mst__btn mst__btn--primary" :disabled="guardando || !borrador.length" @click="abrir">
+        <button class="mst__btn mst__btn--primary"
+                :disabled="guardando || !hayElegidos || excedeAlgo" @click="abrir">
           {{ guardando ? 'Abriendo…' : 'Abrir mostrador' }}
         </button>
       </div>
@@ -302,13 +257,7 @@
       </div>
 
       <div class="mst__acciones mst__acciones--turno">
-        <select v-model="aAgregar" class="mst__select">
-          <option value="">Bajar otro producto del depósito…</option>
-          <option v-for="s in agregables" :key="s.stock_id" :value="s.stock_id">
-            {{ s.etiqueta }} — {{ fmt(s.disponible) }} {{ s.unidad }} libres
-          </option>
-        </select>
-        <button class="mst__btn mst__btn--ghost" :disabled="!aAgregar" @click="bajarNuevo">Bajar a la mesa</button>
+        <button class="mst__btn mst__btn--ghost" @click="abrirBajada">Bajar del depósito</button>
       </div>
     </template>
 
@@ -451,6 +400,26 @@
       </div>
     </div>
 
+    <!-- ── Bajar más del depósito con el turno andando ────────────────────────── -->
+    <div v-if="bajada" class="mst__modal-back" @click.self="bajada = null">
+      <div class="mst__modal mst__modal--ancho">
+        <h3 class="mst__modal-title">Bajar del depósito a la mesa</h3>
+        <p class="mst__modal-sub">
+          Lo que elijas se aparta para este mostrador: deja de estar disponible en el resto de la
+          app, pero no sale del inventario hasta que se dispensa.
+        </p>
+        <TablaStock v-model="bajada.cantidades" :stocks="agregables" :muestra-costo="gestiona" />
+        <div class="mst__modal-acc">
+          <button class="mst__btn mst__btn--ghost" @click="bajada = null">Cancelar</button>
+          <button class="mst__btn mst__btn--primary"
+                  :disabled="guardando || !Object.keys(bajada.cantidades).length || excedeBajada"
+                  @click="confirmarBajada">
+            {{ guardando ? 'Bajando…' : 'Bajar a la mesa' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- ── Reponer / devolver un producto que ya está en el turno ─────────────── -->
     <div v-if="mover" class="mst__modal-back" @click.self="mover = null">
       <div class="mst__modal">
@@ -493,6 +462,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { X, Undo2 } from 'lucide-vue-next'
 import RendicionCajaCard from '../components/RendicionCajaCard.vue'
+import TablaStock from '../components/mostrador/TablaStock.vue'
 import MostradorMerma from '../components/mostrador/MostradorMerma.vue'
 import MostradorTurnos from '../components/mostrador/MostradorTurnos.vue'
 import { getMostrador, abrirMostrador, confirmarMostrador, cargarMostrador, devolverMostrador,
@@ -513,17 +483,19 @@ const gestiona = computed(() => ['admin', 'supervisor', 'super_admin'].includes(
 
 const sedeId    = ref(null)
 const cargando  = ref(true)
+// Si ya se pintó una vez. Distingue "no hay nada todavía" de "estoy refrescando": lo segundo no
+// tiene que hacer desaparecer la pantalla.
+const cargado   = ref(false)
 const guardando = ref(false)
 const error     = ref('')
 const turno     = ref(null)
 const sugerido  = ref([])
 const disponibles = ref([])
-const borrador  = ref([])
+// Qué baja a la mesa: { stock_id: cantidad }. Vive acá y no en la tabla para que sobreviva al
+// buscador y al orden — si viviera adentro, filtrar borraría lo ya cargado.
+const cantidades = ref({})
+const bajada    = ref(null)
 const fondo     = ref(0)
-const aAgregar  = ref('')
-// Cuánto de eso baja a la mesa. Va acá y no en la fila de abajo: elegir el producto y decir
-// cuánto es UN gesto, y separarlos escondía la mitad.
-const cantAAgregar = ref(null)
 const mover     = ref(null)
 const cierre    = ref(null)
 const fondoSugerido = ref(null)
@@ -578,22 +550,20 @@ const difRecepcion = computed(() => {
   return Math.round((Number(efectivoRecepcion.value) - turno.value.caja.esperado_ars) * 100) / 100
 })
 
-const stockAAgregar = computed(() => disponibles.value.find(s => s.stock_id === aAgregar.value) || null)
-const unidadAAgregar = computed(() => stockAAgregar.value?.unidad || '')
-// No se puede bajar lo que no está. El backend lo rechaza igual, pero decirlo acá evita llenar
-// el formulario entero para que rebote al final.
-const excedeDisponible = computed(() => {
-  const s = stockAAgregar.value
-  if (!s || !(cantAAgregar.value > 0)) return null
-  return Number(cantAAgregar.value) > Number(s.disponible) ? s : null
-})
+const hayElegidos = computed(() => Object.keys(cantidades.value).length > 0)
+// Si alguna fila pide más de lo que hay libre. El botón NO puede quedar habilitado: dejar
+// apretar para que el backend rechace es el peor error posible — parece culpa del usuario.
+const excedeAlgo = computed(() =>
+  disponibles.value.some(s => Number(cantidades.value[s.stock_id] || 0) > Number(s.disponible))
+)
+// Lo que el cierre anterior dejó contado: va arriba de la tabla y con su número puesto.
+const heredados = computed(() => new Set(sugerido.value.map(s => s.stock_id)))
 
-// Lo que todavía no está en la lista: no tiene sentido ofrecer dos veces el mismo frasco.
+// Con el turno abierto, lo que todavía NO está sobre la mesa: lo que ya está se repone desde su
+// propia fila, y ofrecerlo dos veces es cómo se terminan cargando dos líneas del mismo frasco.
 const agregables = computed(() => {
-  const puestos = new Set(
-    abierto.value ? turno.value.items.map(i => i.stock_id) : borrador.value.map(i => i.stock_id)
-  )
-  return disponibles.value.filter(s => !puestos.has(s.stock_id))
+  const arriba = new Set((turno.value?.items || []).map(i => i.stock_id))
+  return disponibles.value.filter(s => !arriba.has(s.stock_id))
 })
 
 // Hay diferencia si algún conteo no coincide con lo esperado. El motivo se pide una sola vez
@@ -623,7 +593,10 @@ let cargaEnCurso = 0
 async function cargar () {
   if (!sedeId.value) { cargando.value = false; return }
   const mia = ++cargaEnCurso
-  cargando.value = true
+  // El esqueleto SÓLO la primera vez. Ponerlo en cada recarga desmonta la pantalla entera, y la
+  // mesa se recarga sola con cada aviso del canal: al que estaba escribiendo en el buscador o
+  // eligiendo qué bajar se le borraba lo tipeado sin que hubiera tocado nada. Lo cazó el e2e.
+  if (!cargado.value) cargando.value = true
   error.value = ''
   try {
     const { data } = await getMostrador(sedeId.value)
@@ -647,29 +620,24 @@ async function cargar () {
     efectivoRecepcion.value = (turno.value && !turno.value.confirmado)
       ? (turno.value.caja?.esperado_ars ?? null) : null
     if (!turno.value && fondo.value === 0 && data.fondo_sugerido != null) fondo.value = data.fondo_sugerido
-    // El borrador arranca con lo que dejó el cierre anterior, editable. No es un conteo
-    // obligatorio: es un número que viene puesto y que se corrige sólo si no coincide.
-    if (!turno.value) borrador.value = sugerido.value.map(s => ({ ...s }))
+    // La mesa arranca con lo que dejó el cierre anterior, editable. No es un conteo obligatorio:
+    // es un número que viene puesto y que se corrige sólo si no coincide.
+    if (!turno.value) {
+      cantidades.value = Object.fromEntries(sugerido.value.map(s => [s.stock_id, Number(s.cantidad)]))
+    }
   } catch (e) {
     if (mia === cargaEnCurso) error.value = e?.response?.data?.error || 'No se pudo cargar el mostrador.'
   } finally {
-    if (mia === cargaEnCurso) cargando.value = false
+    if (mia === cargaEnCurso) { cargando.value = false; cargado.value = true }
   }
 }
 
-function agregarAlBorrador () {
-  const s = disponibles.value.find(x => x.stock_id === aAgregar.value)
-  if (!s || !(cantAAgregar.value > 0) || excedeDisponible.value) return
-
-  borrador.value.push({ ...s, cantidad: cantAAgregar.value })
-  aAgregar.value = ''
-  cantAAgregar.value = null
-}
+const aItems = (mapa) => Object.entries(mapa)
+  .map(([stock_id, cantidad]) => ({ stock_id: Number(stock_id), cantidad }))
+  .filter(i => Number(i.cantidad) > 0)
 
 async function abrir () {
-  const items = borrador.value
-    .filter(i => Number(i.cantidad) > 0)
-    .map(i => ({ stock_id: i.stock_id, cantidad: i.cantidad }))
+  const items = aItems(cantidades.value)
   if (!items.length) return toast.error('Poné al menos un producto sobre la mesa.')
 
   guardando.value = true
@@ -832,11 +800,34 @@ async function confirmarCierre () {
   }
 }
 
-async function bajarNuevo () {
-  const s = disponibles.value.find(x => x.stock_id === aAgregar.value)
-  if (!s) return
-  aAgregar.value = ''
-  mover.value = { item: { ...s, id: null, esperado: 0, en_deposito: s.disponible }, tipo: 'carga', cantidad: null }
+const excedeBajada = computed(() => {
+  const c = bajada.value?.cantidades || {}
+  return agregables.value.some(s => Number(c[s.stock_id] || 0) > Number(s.disponible))
+})
+
+function abrirBajada () { bajada.value = { cantidades: {} } }
+
+// Bajar VARIOS de una: con el turno andando pasa que se acaban tres cosas juntas, y hacerlo de a
+// uno son tres modales. Se manda producto por producto porque cada carga deja su propio rastro
+// con autor y hora, y se recarga UNA vez al final.
+async function confirmarBajada () {
+  const items = aItems(bajada.value.cantidades)
+  if (!items.length) return
+
+  guardando.value = true
+  try {
+    for (const it of items) {
+      await cargarMostrador(sedeId.value, { stock_id: it.stock_id, cantidad: it.cantidad })
+    }
+    bajada.value = null
+    toast.success(items.length === 1 ? 'Bajado a la mesa' : `${items.length} productos sobre la mesa`)
+    await cargar()
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo bajar el stock.')
+    await cargar()
+  } finally {
+    guardando.value = false
+  }
 }
 
 onMounted(async () => {
@@ -862,7 +853,7 @@ useStockChannel(null, (evento) => {
 
 // Cambiar de sede recarga: si no, se veía el mostrador de la sede anterior. Las otras solapas
 // son componentes y miran `sedeId` por su cuenta.
-watch(sedeId, cargar, { immediate: true })
+watch(sedeId, () => { cargado.value = false; cantidades.value = {}; cargar() }, { immediate: true })
 </script>
 
 <style scoped>
@@ -963,9 +954,6 @@ watch(sedeId, cargar, { immediate: true })
 .mst__pie   { margin: 0; font-size: var(--fs-12); color: var(--c-ink-500); }
 /* El renglón que se va de la mesa: se ve tachado antes de confirmar, para poder arrepentirse. */
 .mst__draft-row.is-quitado .mst__draft-nombre { text-decoration: line-through; color: var(--c-ink-500); }
-.mst__agregar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
-.mst__agregar .mst__select { flex: 1; min-width: 220px; }
-.mst__agregar-cant { display: inline-flex; align-items: baseline; gap: 6px; }
 
 /* ── Turno abierto ──────────────────────────────────────────────────────────── */
 /* El turno y su acción, en una línea: el botón suelto debajo del nombre parecía de otra cosa. */
@@ -1028,7 +1016,6 @@ watch(sedeId, cargar, { immediate: true })
 /* ── Botones ────────────────────────────────────────────────────────────────── */
 .mst__acciones { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; }
 .mst__acciones--turno { margin-top: 14px; justify-content: space-between; }
-.mst__acciones--turno .mst__select { flex: 1; min-width: 220px; }
 
 .mst__btn {
   border-radius: 9px; padding: 10px 18px; font-size: var(--fs-14); font-weight: 600;

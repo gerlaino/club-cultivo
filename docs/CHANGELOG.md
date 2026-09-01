@@ -311,12 +311,35 @@ entrega de una **reserva** y lo apartado para un **evento**.
 Con el módulo andando, la última pasada fue mirar la pantalla como cada persona que la usa. Lo que
 apareció no eran bugs: eran **finales sin cerrar**.
 
-**Elegir el producto y CUÁNTO, en el mismo gesto.** La cantidad aparecía recién en la fila de
-abajo, después de apretar Agregar: se podía poner, pero no se veía — y para el que abre el
-mostrador por primera vez eso es lo mismo que no poder. Encima era **inconsistente con la propia
-pantalla**: con el mostrador ya abierto, "Bajar a la mesa" sí la pregunta en el acto. Ahora el
-número va al lado del selector, con la unidad de lo elegido, y no deja bajar más de lo que hay en
-el depósito.
+**Qué baja a la mesa se elige en una TABLA, no en un desplegable.** Un `<select>` con cuarenta
+frascos no deja ver nada, y elegir qué se pone sobre la mesa no es buscar un ítem: es **revisar el
+inventario y decidir** — de qué lote, de cuándo, cuánto queda libre y a cuánto se vende. Encima la
+cantidad aparecía recién en la fila de abajo, *después* de apretar Agregar: se podía poner, pero
+no se veía, que para el que abre el mostrador por primera vez es lo mismo que no poder.
+
+Es **la misma tabla con la que después se dispensa** (`ModalNuevaDispensacion`), y a propósito:
+armar la mesa y dispensar de ella son la misma pregunta, y contestarla con dos tablas distintas es
+cómo empiezan a contradecirse. Buscador por palabra, orden por cualquier columna, y el costo sólo
+para quien responde por la mercadería.
+
+Tres decisiones de diseño que valen más que la tabla:
+
+- **La cantidad ES la marca.** Se pensó con un tilde por fila, como en genéticas, pero ahí marcar
+  es un booleano y acá cada fila marcada necesita un número —y nunca es "todo": bajás 300 de
+  1.240—. Con tilde aparecía el estado sin sentido *marcado en 0* y eran dos gestos para uno.
+  Escribís un número, la fila se pinta; lo borrás, sale.
+- **Lo heredado va arriba de todo, ordene por lo que ordene**, con su número puesto y un chip
+  "venía de anoche". Es la propiedad más valiosa del módulo —el que abre no declara, corrige— y
+  perderla entre cuarenta filas sería perder la mitad.
+- **Nada de paginación.** El listado ya viaja completo, así que buscar y ordenar se hacen en el
+  cliente. Paginar traía el problema de verdad: cargás cantidades en la página 1, buscás, pasás a
+  la 2 — y si el borrador vive dentro de la tabla, se pierde. Vive en la pantalla, y hay un pie
+  fijo con `N productos · 215 g · 40 un · $X a costo` porque con buscador de por medio lo elegido
+  puede no estar a la vista.
+
+El mismo control reemplaza el "bajar otro producto" del turno abierto, que era otro selector y otro
+modal: ahora se bajan **varios de una** (con el turno andando se acaban tres cosas juntas, y de a
+uno son tres modales), cada uno con su rastro y una sola recarga al final.
 
 **Se probó una guía de "cómo funciona el día" y se sacó el mismo día.** El paso 1 decía *"se abre
 con lo que quedó contado anoche"* y la primera vez **no hay anoche**: al lado, la pantalla decía
@@ -372,6 +395,22 @@ la semana — que es justo cuando esto importa. Va `deliver_now` y no `deliver_l
 en un job, y encolar un mail desde adentro de otra cola sólo mueve el error de lugar — el `rescue`
 dejaba de proteger de lo único que falla de verdad acá, que es la casilla mal configurada.
 
+### El supervisor es administración, no "el que atiende"
+
+Estaba de los dos lados a la vez: administración para ver la merma (`gestiona?`) y para llevarse la
+recaudación (`ROLES_RETIRO`), pero "el que atiende" para dispensar — o sea, con turno abierto
+obligatorio y viendo **sólo** lo que había sobre la mesa. La misma persona cambiaba de rol según
+qué pantalla mirara.
+
+Ahora `User#atiende_mostrador?` es **el dispensador y nadie más**. Al dispensar, admin y supervisor
+ven todo el stock habilitado de su sede; el dispensador ve la mesa, y con el número de la mesa.
+Si el supervisor saca algo que está arriba, se imputa igual al turno: que no pase por el mostrador
+no significa que el mostrador lo ignore, o el arqueo de la noche le miente al que atendió.
+
+Vale la pena decir por qué está en un solo método: esa regla gobierna **dos cosas a la vez** —el
+catálogo que ofrece el carrito y la validación de `Dispensacion`—. Separadas, la pantalla ofrece
+algo que el backend rechaza, que es el peor error posible porque parece culpa del usuario.
+
 ### De paso, otra vez
 
 - **`ROLES_DEL_MOSTRADOR` vivía en `Dispensacion`**, que no es quien sabe qué hace cada rol. Pasó a
@@ -387,6 +426,13 @@ dejaba de proteger de lo único que falla de verdad acá, que es la casilla mal 
   pregunta el depósito a cada uno. Treinta turnos serían cientos de queries para una lista donde no
   se ve ni un producto.
 - **El e2e ahora dice "levantá `docker compose up`"** en vez de escupir un error de shell.
+- **El esqueleto de carga sólo va la PRIMERA vez.** Ponerlo en cada recarga desmonta la pantalla
+  entera, y la mesa se recarga sola con cada aviso del canal: al que estaba escribiendo en el
+  buscador se le borraba lo tipeado sin haber tocado nada. Lo cazó el e2e.
+- **No se sugiere al abrir lo que ya no está.** Si un frasco que anoche quedó sobre la mesa desde
+  entonces se agotó o se fue de la sede, su número se cargaba sin fila donde verlo ni corregirlo y
+  el backend lo rechazaba al abrir. Y se sugiere como mucho lo que quedó libre: si anoche cerró
+  con 20 y hoy hay 12, proponer 20 es proponer algo que no se puede cumplir.
 
 ### Esquema
 
@@ -395,7 +441,7 @@ dejaba de proteger de lo único que falla de verdad acá, que es la casilla mal 
 `cobros.rendicion_caja_id`. (`clubs.exigir_mostrador_abierto` se agregó y se sacó en el mismo
 bloque: el mostrador no es una opción.)
 
-**2746 rspec ✓ · 1746 vitest ✓ · build limpio · 6 pruebas de navegador ✓.**
+**2755 rspec ✓ · 1753 vitest ✓ · build limpio · 6 pruebas de navegador ✓.**
 
 ---
 

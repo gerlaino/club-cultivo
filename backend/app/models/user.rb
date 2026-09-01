@@ -193,16 +193,24 @@ class User < ApplicationRecord
   # ¿Le alcanza con ver lo de sus sedes, o ve todo el club?
   def limitado_por_sede? = sedes_ids_asignadas.any?
 
-  # ¿Esta persona ATIENDE el mostrador? Es quien pasa por la mesa: abre, recibe, dispensa de lo
-  # que hay arriba y cierra contando.
+  # ¿Esta persona ATIENDE el mostrador? Es quien pasa por la mesa: recibe lo que dejó el admin,
+  # dispensa ÚNICAMENTE de lo que hay arriba y cierra contando.
   #
   # Vive acá, sobre el enum de roles que ya existe, y no como una lista adentro de `Dispensacion`:
   # una constante de roles metida en un modelo de dominio es un cuarto mecanismo de permisos, y en
-  # este proyecto ya hay tres. El admin NO atiende — carga la mesa, la arquea y es el dueño de la
-  # mercadería.
-  ROLES_MOSTRADOR = %w[dispensador supervisor].freeze
-
-  def atiende_mostrador? = ROLES_MOSTRADOR.include?(role.to_s)
+  # este proyecto ya hay tres.
+  #
+  # **El SUPERVISOR no atiende, es administración**, igual que el admin: los dos cargan la mesa,
+  # la arquean, retiran la recaudación (`MovimientoContable::ROLES_RETIRO`) y miran la merma
+  # (`gestiona?`). Tenerlo del otro lado dejaba al supervisor siendo administración para ver la
+  # merma y para llevarse la plata, pero "el que atiende" para dispensar — la misma persona en
+  # dos lados según qué pantalla mirara. Al dispensar ve todo el stock habilitado de su sede, como
+  # el admin; el que ve sólo la mesa es el dispensador.
+  #
+  # Esto NO se puede escribir en dos lugares: gobierna a la vez el catálogo que ofrece el carrito
+  # (`StocksController#index`) y la validación de `Dispensacion`. Si se separaran, la pantalla
+  # ofrecería algo que el backend rechaza, que es el peor error posible — parece culpa del usuario.
+  def atiende_mostrador? = role.to_s == 'dispensador'
 
   def salas_ids_en_sedes_asignadas
     sedes = sedes_ids_asignadas

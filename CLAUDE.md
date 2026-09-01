@@ -106,6 +106,11 @@ Ninguno se considera cerrado; todos son candidatos a revisión.
     `StockMovimiento`; el rastro vive en el turno. El único movimiento es el **ajuste del cierre**.
     **Cerrar y volver a abrir ES el arqueo** — se puede hacer varias veces por día. No hay relevo
     con firma cruzada (ver "Lo que NO hay que romper").
+    **Qué baja a la mesa se elige en una TABLA** (`components/mostrador/TablaStock.vue`), la misma
+    con la que después se dispensa: buscador, orden por columna, y **la cantidad ES la marca** (no
+    hay tilde: un tilde daría el estado sin sentido "marcado en 0"). Lo heredado de anoche va
+    arriba de todo con su número puesto, ordene por lo que ordene. Sin paginación a propósito —
+    el listado viaja completo y paginar perdería lo cargado al cambiar de página.
     Cuatro solapas: **Hoy** · **Turnos** (los cerrados; administración ve todos, el que atiende ve
     LOS SUYOS — el filtro es del backend) · **Merma** y **Rendiciones**, sólo administración. La
     solapa de Merma hace DOS cosas y por eso están separadas: arriba la **lista de trabajo** (los
@@ -167,9 +172,9 @@ Toda llamada a la API queda en `ia_llamadas` (organización, persona, función, 
 | `super_admin` | Plataforma: clubes, planes, métricas globales, modo observador |
 | `admin` | Todo dentro de su club |
 | `cultivador` | Plantas, lotes, salas asignadas (por sede), ambiente, plan de trabajo |
-| `supervisor` | Lectura de cultivo + gestión de tareas; **dispensa** y **gestiona reservas** (crear/editar/cancelar); **ve** (no edita) historia clínica; **crea pacientes** (quedan pendientes de aprobación) |
+| `supervisor` | Lectura de cultivo + gestión de tareas; **dispensa** y **gestiona reservas** (crear/editar/cancelar); **ve** (no edita) historia clínica; **crea pacientes** (quedan pendientes de aprobación). **Es administración, no "el que atiende"**: dispensa del depósito entero, con o sin mostrador abierto |
 | `manicura` | Post-cosecha: pesajes e inventario de los lotes `en_manicura` que el admin le asigna (trabaja por estado del lote, no por sala). **Provisorio:** si el lote tiene manicura asignado, **solo esa persona** registra el peso (ni admin ni otro manicura); el peso va por el flujo de pesaje, no por `plants#update` |
-| `dispensador` | Dispensaciones, stock por sede, socios (lectura); **convierte reservas a dispensa** (Entregar), pero NO las crea ni gestiona; **crea pacientes** (quedan pendientes de aprobación, y ninguno de los dos aprueba) |
+| `dispensador` | Dispensaciones, stock por sede, socios (lectura); **convierte reservas a dispensa** (Entregar), pero NO las crea ni gestiona; **crea pacientes** (quedan pendientes de aprobación, y ninguno de los dos aprueba). **Es el único que pasa por el mostrador**: dispensa sólo lo que está sobre la mesa y con el número de la mesa |
 | `delivery` | Paquetes asignados: iniciar viaje, entregar, reportar fallo. **Sólo existe si el add-on Delivery está activo** |
 | `medico` | Pacientes, indicaciones, turnos, documentos clínicos |
 | `abogado` | Socios (lectura), informes legales/REPROCANN |
@@ -300,7 +305,7 @@ Suite 1239 ✓ + 58 vitest ✓. **Deploy: sumar `add_vendible_a_bar_venta_items`
 `Mostrador`, apertura con herencia, recepción del que atiende, cargar/devolver, cierre con los dos
 arqueos, fondo/retiro, Merma con su lista de trabajo, Turnos, y la rendición del repartidor de
 punta a punta —incluido **devolver lo que se había quedado** (`Rendiciones::SaldarACuenta`)—.
-**2746 rspec ✓ · 1746 vitest ✓ · build limpio · 6 pruebas de navegador ✓.**
+**2755 rspec ✓ · 1753 vitest ✓ · build limpio · 6 pruebas de navegador ✓.**
 
 **Sin correr, del bloque del mostrador:** nada. Las migraciones las corre solo el deploy.
 
@@ -453,11 +458,18 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   `ingreso_caja` y el saldo baja con un espejo `devolucion_a_cuenta`: **no es un ingreso del club**,
   esa plata siempre fue suya. Sin esto el saldo se acumulaba para siempre y no había forma de decir
   "ya la devolvió".
-- **El mostrador es de quien ATIENDE** (`User#atiende_mostrador?`: dispensador y
-  supervisor). El admin dispensa sin turno abierto: es el que carga la mesa y el dueño de la
-  mercadería. Y hay dos excepciones a "sólo lo que está sobre la mesa", las dos porque ya están
-  apartadas a nombre de alguien y por eso no pueden estar arriba: la entrega de una **reserva** y
-  lo apartado para un **evento**.
+- **El mostrador es de quien ATIENDE, y ese es el DISPENSADOR y nadie más**
+  (`User#atiende_mostrador?`). Admin y **supervisor** son administración: cargan la mesa, la
+  arquean, retiran la recaudación y dispensan del depósito entero con o sin turno abierto. El
+  supervisor estaba de los dos lados —administración para ver la merma y para llevarse la plata,
+  "el que atiende" para dispensar—, o sea la misma persona cambiando de rol según qué pantalla
+  mirara. Si administración saca algo que SÍ está arriba, se imputa igual al turno: que no pase
+  por el mostrador no significa que el mostrador lo ignore. **Esa regla gobierna dos cosas a la
+  vez** —el catálogo del carrito (`StocksController#index`) y la validación de `Dispensacion`— y
+  por eso vive en un solo método: separadas, la pantalla ofrece lo que el backend rechaza.
+  Y hay dos excepciones a "sólo lo que está sobre la mesa", las dos porque ya están apartadas a
+  nombre de alguien y por eso no pueden estar arriba: la entrega de una **reserva** y lo apartado
+  para un **evento**.
 - **El cierre del mostrador NO espera al admin.** Si quedara pendiente de su visto bueno, a las
   once de la noche el mostrador está bloqueado y el que abre mañana no arranca. El aval es
   asincrónico. Misma lógica que el cierre de un reparto.
@@ -717,6 +729,16 @@ presenta), el dueño (análisis) y el que opera hoy (pendientes accionables).
 - **El padrón de pacientes vive en Pacientes**, no en Informes, y cuenta sobre LA NÓMINA.
 
 ### La lección que no hay que repetir
+
+**Lo que no aclara, que no confunda.** Se probó una guía de "cómo funciona el día" arriba del
+mostrador y se sacó el mismo día: el paso 1 decía *"se abre con lo que quedó contado anoche"* y la
+primera vez **no hay anoche** — al lado, la pantalla decía "Elegí qué baja del depósito". Un cartel
+que se contradice con lo que la persona está mirando es peor que no tener cartel. La pantalla ya
+se explica sola en cada momento, que es donde sirve.
+
+**El botón NO puede quedar habilitado si el backend va a rechazar.** Pedir más de lo que hay libre
+se avisa en la fila Y deshabilita "Abrir mostrador". Dejar apretar para que rebote del otro lado es
+el peor error posible: parece culpa del usuario.
 
 **Un build que pasa no prueba que la pantalla funcione.** Pasó cuatro veces: el modal contable
 sin estilos, los botones de "Método de aplicación" como `<button>` crudos, el modal con clases

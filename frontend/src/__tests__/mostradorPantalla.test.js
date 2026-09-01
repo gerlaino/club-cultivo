@@ -15,9 +15,11 @@ const SEDES = [
 
 const DISPONIBLES = [
   { stock_id: 1, etiqueta: 'Northern Lights (flor seca)', numero: 'ST-26-0031', forma: 'flor_seca',
-    unidad: 'g', lote: 'L-26-002', disponible: 500 },
+    unidad: 'g', lote: 'L-26-002', genetica: 'Northern Lights', fecha: '2026-06-10',
+    precio_ars: 1200, costo_ars: 200, disponible: 500 },
   { stock_id: 2, etiqueta: 'Preroll', numero: 'ST-26-0061', forma: 'preroll',
-    unidad: 'un', lote: null, disponible: 120 },
+    unidad: 'un', lote: null, genetica: null, fecha: '2026-07-02',
+    precio_ars: 2500, costo_ars: 800, disponible: 120 },
 ]
 
 const TURNO = {
@@ -140,15 +142,26 @@ describe('La pantalla del mostrador', () => {
     // sólo si no coincide.
     it('viene precargado con lo que se contó en el cierre anterior', async () => {
       const w = await montar()
+      const filas = w.findAll('.tst__table tbody tr')
 
-      expect(w.text()).toContain('Northern Lights')
-      expect(w.find('.mst__draft-row .mst__input--cant').element.value).toBe('215')
+      expect(filas[0].text()).toContain('Northern Lights')
+      expect(filas[0].find('.tst__input').element.value).toBe('215')
+      // Y se ve por qué viene puesto: si no, parece un número que alguien declaró.
+      expect(filas[0].text()).toContain('venía de anoche')
+    })
+
+    // Perderlo entre cuarenta filas es perder la mitad del valor del módulo.
+    it('y lo heredado va arriba de todo, ordene por lo que ordene', async () => {
+      const w = await montar()
+      await w.findAll('.tst__th-btn')[0].trigger('click') // ordenar por producto
+
+      expect(w.findAll('.tst__table tbody tr')[0].text()).toContain('Northern Lights')
     })
 
     it('manda al backend lo que quedó en la lista, con el fondo de caja', async () => {
       const w = await montar()
       await w.find('.mst__input--fondo').setValue(50000)
-      await w.find('.mst__btn--primary').trigger('click')
+      await w.find('.mst__acciones .mst__btn--primary').trigger('click')
       await flushPromises()
 
       expect(abrirMostrador).toHaveBeenCalledWith(10, {
@@ -157,72 +170,94 @@ describe('La pantalla del mostrador', () => {
       })
     })
 
-    // El producto Y cuánto, en el mismo gesto. Antes la cantidad aparecía recién en la fila de
-    // abajo, después de agregar: se podía poner, pero no se veía — y para el que abre el
-    // mostrador por primera vez eso es lo mismo que no poder.
-    describe('elegir qué baja y cuánto', () => {
-      async function elegir (w, stockId, cantidad) {
-        await w.find('.mst__agregar select').setValue(stockId)
-        if (cantidad !== undefined) await w.find('.mst__agregar-cant input').setValue(cantidad)
-      }
+    // Elegir qué baja no es buscar un ítem: es revisar el inventario y decidir. Era un
+    // desplegable, donde no se veía ni el lote, ni la fecha, ni cuánto quedaba.
+    describe('la tabla de stock', () => {
+      const fila = (w, n) => w.findAll('.tst__table tbody tr')[n]
 
-      it('sin decir cuánto, no deja agregar', async () => {
+      it('lista todo el stock de la sede con lo que hace falta para decidir', async () => {
         const w = await montar()
-        await elegir(w, 2)
 
-        expect(w.find('.mst__agregar .mst__btn').attributes('disabled')).toBeDefined()
+        expect(w.findAll('.tst__table tbody tr')).toHaveLength(2)
+        expect(fila(w, 0).text()).toContain('L-26-002')      // lote
+        expect(fila(w, 0).text()).toContain('ST-26-0031')    // número
+        expect(fila(w, 0).text()).toContain('$1.200')        // precio
       })
 
-      it('con el producto y la cantidad, lo baja a la mesa', async () => {
+      // La CANTIDAD es la marca: un tilde aparte daría el estado sin sentido "marcado en 0".
+      it('escribir la cantidad es elegir el producto', async () => {
         const w = await montar()
-        await elegir(w, 2, 40)
-        await w.find('.mst__agregar .mst__btn').trigger('click')
+        await fila(w, 1).find('.tst__input').setValue(40)
 
-        const filas = w.findAll('.mst__draft-row')
-        expect(filas).toHaveLength(2)
-        expect(filas[1].text()).toContain('Preroll')
-        expect(filas[1].find('.mst__input--cant').element.value).toBe('40')
-      })
-
-      it('y muestra la unidad de lo que elegiste', async () => {
-        const w = await montar()
-        await elegir(w, 2, 40)
-
-        expect(w.find('.mst__agregar-cant .mst__draft-unidad').text()).toBe('un')
-      })
-
-      // El backend lo rechaza igual, pero decirlo acá evita llenar el formulario entero para que
-      // rebote al final.
-      it('no deja bajar más de lo que hay en el depósito', async () => {
-        const w = await montar()
-        await elegir(w, 2, 500) // hay 120
-
-        expect(w.text()).toContain('En el depósito quedan 120 un')
-        expect(w.find('.mst__agregar .mst__btn').attributes('disabled')).toBeDefined()
-      })
-
-      it('y lo que se agrega se puede corregir en la fila', async () => {
-        const w = await montar()
-        await elegir(w, 2, 40)
-        await w.find('.mst__agregar .mst__btn').trigger('click')
-        await w.findAll('.mst__draft-row')[1].find('.mst__input--cant').setValue(25)
+        expect(fila(w, 1).classes()).toContain('is-elegida')
         await w.find('.mst__acciones .mst__btn--primary').trigger('click')
         await flushPromises()
 
         expect(abrirMostrador).toHaveBeenCalledWith(10, {
           monto_inicial_ars: 0,
-          items: [{ stock_id: 1, cantidad: 215 }, { stock_id: 2, cantidad: 25 }],
+          items: [{ stock_id: 1, cantidad: 215 }, { stock_id: 2, cantidad: 40 }],
         })
       })
-    })
 
-    // Ofrecer dos veces el mismo frasco es cómo se termina cargando dos líneas del mismo stock.
-    it('no ofrece agregar lo que ya está en la lista', async () => {
-      const w = await montar()
-      const opciones = w.findAll('.mst__agregar option').map(o => o.text())
+      it('y borrarla lo saca', async () => {
+        const w = await montar()
+        await fila(w, 0).find('.tst__input').setValue('')
 
-      expect(opciones.some(t => t.includes('Preroll'))).toBe(true)
-      expect(opciones.some(t => t.includes('Northern'))).toBe(false)
+        expect(fila(w, 0).classes()).not.toContain('is-elegida')
+        expect(w.find('.mst__acciones .mst__btn--primary').attributes('disabled')).toBeDefined()
+      })
+
+      // El backend lo rechaza igual, pero decirlo en la fila evita llenar todo para que rebote.
+      it('avisa si se pide más de lo que hay libre', async () => {
+        const w = await montar()
+        await fila(w, 1).find('.tst__input').setValue(500) // hay 120
+
+        expect(fila(w, 1).text()).toContain('quedan 120')
+        expect(fila(w, 1).find('.tst__input').classes()).toContain('is-mal')
+        // Y no deja abrir: dejar apretar para que el backend rechace es el peor error posible.
+        expect(w.find('.mst__acciones .mst__btn--primary').attributes('disabled')).toBeDefined()
+      })
+
+      it('se busca por palabra', async () => {
+        const w = await montar()
+        await w.find('.tst__buscar').setValue('preroll')
+
+        const filas = w.findAll('.tst__table tbody tr')
+        expect(filas).toHaveLength(1)
+        expect(filas[0].text()).toContain('Preroll')
+      })
+
+      // Con el buscador de por medio, lo elegido puede no estar en pantalla: sin el resumen, el
+      // que filtra cree que perdió lo que ya había cargado.
+      it('y lo cargado sobrevive al buscador', async () => {
+        const w = await montar()
+        await fila(w, 1).find('.tst__input').setValue(40)
+        await w.find('.tst__buscar').setValue('northern')
+
+        expect(w.findAll('.tst__table tbody tr')).toHaveLength(1)
+        expect(w.find('.tst__pie').text()).toContain('2 productos')
+        expect(w.find('.tst__pie').text()).toContain('215 g · 40 un')
+      })
+
+      it('se ordena por columna, y al segundo click al revés', async () => {
+        respuesta = { ...respuesta, sugerido: [] } // sin heredados, el orden se ve limpio
+        const w = await montar()
+
+        await w.findAll('.tst__th-btn')[0].trigger('click')
+        expect(fila(w, 0).text()).toContain('Northern')
+        await w.findAll('.tst__th-btn')[0].trigger('click')
+        expect(fila(w, 0).text()).toContain('Preroll')
+      })
+
+      // Cuánto vale lo que se está por poner sobre la mesa. Sólo para quien responde por eso.
+      it('el costo es de administración', async () => {
+        useAuthStore().user = { id: 1, role: 'admin' }
+        const w = await montar()
+        expect(w.text()).toContain('Costo')
+
+        useAuthStore().user = { id: 2, role: 'dispensador' }
+        expect((await montar()).text()).not.toContain('Costo')
+      })
     })
 
     // Un selector con una sola opción es ruido: con una sede que dispensa no aparece.
@@ -310,6 +345,47 @@ describe('La pantalla del mostrador', () => {
       await flushPromises()
 
       expect(cargarMostrador).toHaveBeenCalledWith(10, { stock_id: 1, cantidad: 200 })
+    })
+
+    // Con el turno andando pasa que se acaban tres cosas juntas: de a uno son tres modales.
+    describe('bajar más del depósito', () => {
+      async function abrirBajada () {
+        const w = await montar()
+        await w.find('.mst__acciones--turno .mst__btn').trigger('click')
+        return w
+      }
+
+      // Lo que ya está arriba se repone desde su propia fila: ofrecerlo dos veces es cómo se
+      // terminan cargando dos líneas del mismo frasco.
+      it('sólo ofrece lo que NO está sobre la mesa', async () => {
+        respuesta = {
+          ...respuesta,
+          disponibles: [...DISPONIBLES, { stock_id: 9, etiqueta: 'Hash', numero: 'ST-9',
+                                          unidad: 'g', genetica: null, fecha: '2026-05-01',
+                                          precio_ars: 900, costo_ars: 300, disponible: 60 }],
+        }
+        const w = await abrirBajada()
+        const filas = w.findAll('.tst__table tbody tr')
+
+        expect(filas).toHaveLength(1)
+        expect(filas[0].text()).toContain('Hash')
+      })
+
+      it('baja varios de una y recarga al final', async () => {
+        respuesta = {
+          ...respuesta,
+          disponibles: [...DISPONIBLES, { stock_id: 9, etiqueta: 'Hash', numero: 'ST-9',
+                                          unidad: 'g', genetica: null, fecha: '2026-05-01',
+                                          precio_ars: 900, costo_ars: 300, disponible: 60 }],
+        }
+        const w = await abrirBajada()
+        await w.find('.tst__input').setValue(25)
+        await w.find('.mst__modal-acc .mst__btn--primary').trigger('click')
+        await flushPromises()
+
+        expect(cargarMostrador).toHaveBeenCalledWith(10, { stock_id: 9, cantidad: 25 })
+        expect(w.find('.mst__modal').exists()).toBe(false)
+      })
     })
 
     it('devuelve al depósito contra el backend', async () => {

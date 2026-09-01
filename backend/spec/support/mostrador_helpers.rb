@@ -1,8 +1,9 @@
 # Abrir el mostrador de una sede con todo su stock arriba.
 #
-# Los specs donde dispensa un DISPENSADOR o un SUPERVISOR lo necesitan por la misma razón que lo
-# necesita la persona real: se dispensa de lo que está sobre la mesa, no del depósito. Un spec
-# que dispensa sin abrir el mostrador estaría probando un camino que en producción no existe.
+# Los specs donde dispensa un DISPENSADOR lo necesitan por la misma razón que lo necesita la
+# persona real: él dispensa de lo que está sobre la mesa, no del depósito. Un spec que dispensa
+# sin abrir el mostrador estaría probando un camino que en producción no existe.
+# (El admin y el supervisor son administración: dispensan del depósito, con o sin turno abierto.)
 module MostradorHelpers
   # Deja el mostrador LISTO PARA ATENDER: abierto y recibido.
   #
@@ -25,7 +26,7 @@ module MostradorHelpers
         # persona), así que el receptor es otro: el que el spec indique, alguien del club que
         # atienda, o uno creado al vuelo.
         receptor = recibe ||
-                   sede.club.users.where(role: %w[dispensador supervisor]).where.not(id: usuario.id).first ||
+                   sede.club.users.where(role: 'dispensador').where.not(id: usuario.id).first ||
                    FactoryBot.create(:user, :dispensador, club: sede.club)
         conf = Mostradores::ConfirmarApertura.call(turno: turno, usuario: receptor)
         raise "No se pudo confirmar el mostrador: #{conf.error}" unless conf.ok?
