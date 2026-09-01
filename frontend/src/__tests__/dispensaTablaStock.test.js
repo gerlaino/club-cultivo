@@ -34,9 +34,11 @@ vi.mock('../composables/useToast.js', () => ({
 
 const PACIENTE = { id: 5, nombre_completo: 'Ana Gómez', cuenta_corriente: {} }
 
-async function montar(stocks = STOCKS) {
+async function montar(stocks = STOCKS, rol = 'admin') {
   listStocks.mockResolvedValue({ data: stocks })
   setActivePinia(createPinia())
+  const { useAuthStore } = await import('../stores/auth.js')
+  useAuthStore().user = { id: 1, role: rol }
   const { default: Modal } = await import('../components/pacientes/ModalNuevaDispensacion.vue')
   const w = mount(Modal, {
     props: { modelValue: true, paciente: PACIENTE, socioId: PACIENTE.id },
@@ -143,5 +145,36 @@ describe('Dispensar — la tabla de productos', () => {
     await w.find('.mnd__buscador-input').setValue('sherbet')
     expect(w.findAll('.mnd__stock-row')).toHaveLength(1)
     expect(w.findAll('.mnd__tr')).toHaveLength(1)
+  })
+})
+
+
+// "SIN STOCK DISPONIBLE" ES FALSO PARA EL QUE ATIENDE.
+//
+// El dispensador saca de la mesa, no del depósito. Con el mostrador cerrado el depósito está
+// lleno y la lista viene vacía: decirle que no hay stock lo manda a buscar un problema que no
+// existe, y a los cinco minutos llama por teléfono. Es el peor error posible — parece culpa suya.
+describe('Dispensar — la lista vacía dice por qué', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('al dispensador le dice que el mostrador está vacío, y dónde se arregla', async () => {
+    const w = await montar([], 'dispensador')
+
+    expect(w.find('.mnd__warn-box').text()).toContain('No hay nada sobre el mostrador')
+    expect(w.find('.mnd__warn-box').text()).toContain('Mostrador')
+    expect(w.text()).not.toContain('Sin stock disponible')
+  })
+
+  // Administración dispensa del depósito: para ella la lista vacía sí significa que no hay stock.
+  it('y a administración, que no hay stock', async () => {
+    const w = await montar([], 'admin')
+
+    expect(w.find('.mnd__warn-box').text()).toContain('Sin stock disponible')
+  })
+
+  it('lo mismo para el supervisor, que es administración', async () => {
+    const w = await montar([], 'supervisor')
+
+    expect(w.find('.mnd__warn-box').text()).toContain('Sin stock disponible')
   })
 })

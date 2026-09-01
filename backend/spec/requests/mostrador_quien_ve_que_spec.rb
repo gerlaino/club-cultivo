@@ -141,3 +141,58 @@ RSpec.describe 'Quién ve qué stock al dispensar', type: :request do
     end
   end
 end
+
+# EL MOSTRADOR DE OTRA SEDE NO SE TOCA.
+#
+# La pantalla sólo ofrece las sedes de la persona, pero la pantalla no es la regla: mandando otro
+# `sede_id` se abría, cargaba y cerraba el mostrador de una sede ajena. Es el mismo agujero que
+# ya se había tapado en el listado de stock — la asignación de sedes existe justamente para esto.
+RSpec.describe 'El mostrador de una sede que no es la mía', type: :request do
+  include AuthHelpers
+
+  let(:club)  { create(:club, features: { 'produccion_dispensa' => true }) }
+  let(:admin) { create(:user, :admin, club: club) }
+  let(:norte)  { create(:sede, club: club, tipo: 'social', nombre: 'Norte') }
+  let(:centro) { create(:sede, club: club, tipo: 'social', nombre: 'Centro') }
+
+  # Dana atiende SÓLO en Norte.
+  let(:dana) do
+    u = create(:user, :dispensador, club: club)
+    ActsAsTenant.with_tenant(club) { UserSede.create!(user: u, sede: norte) }
+    u
+  end
+
+  before { centro.mostrador! }
+
+  it 'no se puede ni mirar' do
+    sign_in_as(dana)
+    get "/api/sedes/#{centro.id}/mostrador", headers: auth_headers
+
+    expect(response).to have_http_status(:not_found)
+  end
+
+  it 'ni abrir' do
+    sign_in_as(dana)
+    post "/api/sedes/#{centro.id}/mostrador/abrir", headers: auth_headers,
+         params: { monto_inicial_ars: 0, items: [] }
+
+    expect(response).to have_http_status(:not_found)
+    expect(centro.mostrador.turno_abierto).to be_nil
+  end
+
+  it 'pero la suya sí' do
+    sign_in_as(dana)
+    get "/api/sedes/#{norte.id}/mostrador", headers: auth_headers
+
+    expect(response).to have_http_status(:ok)
+  end
+
+  # Quien no tiene ninguna asignada ve todas: organización de una sola sede, o un admin que no se
+  # asignó ninguna.
+  it 'y sin sedes asignadas se ven todas' do
+    sign_in_as(admin)
+    get "/api/sedes/#{centro.id}/mostrador", headers: auth_headers
+
+    expect(response).to have_http_status(:ok)
+  end
+end

@@ -30,6 +30,10 @@ const emit = defineEmits(['update:modelValue', 'saved'])
 const { confirm }     = useConfirm()
 const toast           = useToast()
 const auth            = useAuthStore()
+// Quién dispensa de la MESA y no del depósito. Se usa sólo para elegir el mensaje cuando la
+// lista viene vacía: la regla en sí la aplica el backend, y duplicarla acá sería el cuarto
+// mecanismo de permisos del proyecto.
+const dispensaDelMostrador = computed(() => auth.user?.role === 'dispensador')
 
 // admin/supervisor: ven el descuento del paciente, el desglose de precio,
 // pueden pisar el aporte a mano y ven siempre el crédito.
@@ -786,8 +790,20 @@ async function handleSubmit() {
           <div v-if="hayVariasSedes && sedeElegida === undefined" class="mnd__hint-box">
             <i class="bi bi-arrow-up"></i> Elegí una sede para ver su stock.
           </div>
+          <!-- "Sin stock disponible" es FALSO para el que atiende: el depósito está lleno, lo
+               que falta es que alguien haya puesto algo sobre la mesa. Decirle que no hay stock
+               lo manda a buscar un problema que no existe, y a los cinco minutos llama por
+               teléfono. Sólo cambia el TEXTO — la regla de qué puede dispensar vive entera en el
+               backend (`User#atiende_mostrador?`). -->
           <div v-else-if="!loadingStocks && !stocksDisponibles.length" class="mnd__warn-box">
-            <i class="bi bi-exclamation-triangle"></i> Sin stock disponible{{ hayVariasSedes ? ' en esta sede' : '' }}
+            <i class="bi bi-exclamation-triangle"></i>
+            <template v-if="dispensaDelMostrador">
+              No hay nada sobre el mostrador. Abrilo —o bajá lo que falte del depósito— desde
+              <b>Mostrador</b>.
+            </template>
+            <template v-else>
+              Sin stock disponible{{ hayVariasSedes ? ' en esta sede' : '' }}
+            </template>
           </div>
           <template v-else>
             <!-- El buscador filtra por producto, genética, observación o lote: quien dispensa

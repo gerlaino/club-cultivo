@@ -306,7 +306,7 @@ Suite 1239 ✓ + 58 vitest ✓. **Deploy: sumar `add_vendible_a_bar_venta_items`
 `Mostrador`, apertura con herencia, recepción del que atiende, cargar/devolver, cierre con los dos
 arqueos, fondo/retiro, Merma con su lista de trabajo, Turnos, y la rendición del repartidor de
 punta a punta —incluido **devolver lo que se había quedado** (`Rendiciones::SaldarACuenta`)—.
-**2755 rspec ✓ · 1755 vitest ✓ · build limpio · 6 pruebas de navegador ✓.**
+**2759 rspec ✓ · 1759 vitest ✓ · build limpio · 6 pruebas de navegador ✓.**
 
 **Sin correr, del bloque del mostrador:** nada. Las migraciones las corre solo el deploy.
 
@@ -452,6 +452,17 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   y por qué**: justo lo que se quería guardar. La fila se queda sin un solo número y el scope
   `TurnoMostradorItem.en_la_mesa` deja de listarla — *una fila sin ningún número es una fila donde
   nunca pasó nada*. Todo lo que recorra los ítems de un turno tiene que usar ese scope.
+- **EL MOSTRADOR DE OTRA SEDE NO SE TOCA.** `set_mostrador` y `CajasController#set_sede` filtran
+  por `current_user.sedes_visibles_ids`: sin eso, un dispensador de Norte abría y cerraba el
+  mostrador de Centro mandando otro `sede_id`. La pantalla sólo le ofrece las suyas, pero la
+  pantalla no es la regla. (Sin sedes asignadas se ven todas: organización de una sola sede.)
+- **"Sin stock disponible" es MENTIRA para el que atiende.** Con el mostrador cerrado, el
+  dispensador ve el carrito vacío y el depósito está lleno: el mensaje tiene que decir que no hay
+  nada sobre la mesa y dónde se arregla. Es el único lugar donde el frontend mira el rol para el
+  mostrador, y sólo elige el TEXTO — la regla vive entera en `User#atiende_mostrador?`.
+- **La mesa que nadie vino a recibir se desarma.** Quien la cargó puede cerrarla mientras siga sin
+  recibir: si no, en una organización sin dispensador queda esperando para siempre, con el stock
+  apartado, la caja abierta y ni un botón en pantalla.
 - **`Sede#mostrador` LEE y `Sede#mostrador!` CREA.** Estaban en el mismo método: un `GET` que
   escribe en la base es una sorpresa que se paga cara.
 - **Lo que el repartidor se quedó tiene que poder DEVOLVERSE** (`Rendiciones::SaldarACuenta`), y lo

@@ -177,6 +177,12 @@
           {{ guardando ? 'Confirmando…' : (hayCorreccion ? 'Corregir y recibir' : 'Confirmar y arrancar') }}
         </button>
       </div>
+      <!-- Quien la cargó también tiene que poder DESARMARLA. Si no, una mesa preparada para
+           alguien que hoy no vino queda esperando para siempre, con el stock apartado y la caja
+           abierta, y sin un solo botón en pantalla. Cierra por el camino de siempre: contando. -->
+      <div v-else class="mst__acciones">
+        <button class="mst__btn mst__btn--ghost" @click="abrirCierre">Cerrar el mostrador</button>
+      </div>
     </section>
 
     <!-- ══ ABIERTO Y RECIBIDO: operar ═════════════════════════════════════════ -->

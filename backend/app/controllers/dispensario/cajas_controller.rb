@@ -202,8 +202,12 @@ module Dispensario
 
     private
 
+    # Sólo las sedes de esta persona: sin el filtro, un dispensador de Norte abre y cierra la caja
+    # de Centro mandando otro `sede_id`. Mismo criterio que `MostradorController#set_mostrador` —
+    # son las dos puertas del mismo punto de venta.
     def set_sede
-      @sede      = current_user.club.sedes.find(params[:sede_id])
+      @sede      = current_user.club.sedes.where(id: current_user.sedes_visibles_ids)
+                               .find(params[:sede_id])
       # `mostrador!`: la caja del dispensario vive en el mostrador, y si la sede todavía no lo
       # tiene hay que crearlo — es la otra puerta legítima.
       @mostrador = @sede.mostrador!

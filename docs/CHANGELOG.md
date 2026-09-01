@@ -413,6 +413,24 @@ Vale la pena decir por qué está en un solo método: esa regla gobierna **dos c
 catálogo que ofrece el carrito y la validación de `Dispensacion`—. Separadas, la pantalla ofrece
 algo que el backend rechaza, que es el peor error posible porque parece culpa del usuario.
 
+### Lo que apareció repasando la pantalla rol por rol
+
+- **El mostrador de OTRA sede se podía operar mandando otro `sede_id`.** La pantalla sólo ofrece
+  las sedes de la persona, pero la pantalla no es la regla: un dispensador de Norte abría, cargaba
+  y cerraba el de Centro. Es el mismo agujero que ya se había tapado en el listado de stock, y la
+  asignación de sedes existe justamente para esto. Va en las **dos** puertas del punto de venta:
+  `MostradorController#set_mostrador` y `CajasController#set_sede`.
+- **"Sin stock disponible" era mentira para el que atiende.** Con el mostrador cerrado, el
+  dispensador abría el carrito y leía eso — mientras el depósito estaba lleno. Lo manda a buscar
+  un problema que no existe y a los cinco minutos llama por teléfono. Ahora dice *"No hay nada
+  sobre el mostrador. Abrilo —o bajá lo que falte del depósito— desde Mostrador"*.
+- **La mesa que nadie vino a recibir se podía desarmar.** Al pasar el supervisor a administración,
+  una mesa que abre él ya no nace confirmada: en una organización sin dispensador quedaba
+  esperando para siempre, con el stock apartado, la caja abierta y **ni un solo botón en
+  pantalla**. Quien la cargó puede cerrarla, por el camino de siempre.
+- **La tabla se lee en el teléfono** (`tabla-cards`): ocho columnas con scroll horizontal no se
+  leen parado frente a alguien, que es cómo se usa esta pantalla.
+
 ### De paso, otra vez
 
 - **`ROLES_DEL_MOSTRADOR` vivía en `Dispensacion`**, que no es quien sabe qué hace cada rol. Pasó a
@@ -446,7 +464,7 @@ algo que el backend rechaza, que es el peor error posible porque parece culpa de
 `cobros.rendicion_caja_id`. (`clubs.exigir_mostrador_abierto` se agregó y se sacó en el mismo
 bloque: el mostrador no es una opción.)
 
-**2755 rspec ✓ · 1755 vitest ✓ · build limpio · 6 pruebas de navegador ✓.**
+**2759 rspec ✓ · 1759 vitest ✓ · build limpio · 6 pruebas de navegador ✓.**
 
 ---
 

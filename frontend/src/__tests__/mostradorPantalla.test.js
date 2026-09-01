@@ -685,13 +685,25 @@ describe('La pantalla del mostrador', () => {
       })
     })
 
+    // Si no pudiera desarmarla, una mesa preparada para alguien que hoy no vino queda esperando
+    // para siempre —con el stock apartado y la caja abierta— y sin un solo botón en pantalla.
+    it('pero sí cerrarla: la mesa que nadie vino a recibir se desarma', async () => {
+      useAuthStore().user = { id: 99, role: 'supervisor' }
+      const w = await montar()
+      await w.find('.mst__acciones .mst__btn').trigger('click')
+
+      expect(w.find('.mst__modal-title').text()).toContain('Cerrar el mostrador')
+    })
+
     it('al que cargó la mesa no se le ofrece confirmarla', async () => {
       useAuthStore().user = { id: 99, role: 'admin' }
       const w = await montar()
 
       expect(w.text()).toContain('Esperando que lo reciban')
-      expect(w.find('.mst__acciones').exists()).toBe(false)
+      // Ni el formulario de recepción ni el botón de confirmar: lo único que se le ofrece es
+      // desarmarla, para que una mesa que nadie vino a recibir no quede esperando para siempre.
       expect(w.find('.mst__input--cant').exists()).toBe(false)
+      expect(w.findAll('.mst__acciones .mst__btn').map(b => b.text())).toEqual(['Cerrar el mostrador'])
     })
   })
 

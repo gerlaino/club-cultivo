@@ -211,8 +211,18 @@ module Dispensario
       render json: serialize_turno(turno.reload)
     end
 
+    # El mostrador de UNA sede, y sólo si es una de las suyas.
+    #
+    # Sin el filtro por sedes asignadas, un dispensador de la Finca Norte abre, carga y cierra el
+    # mostrador de Centro mandando otro `sede_id`: la pantalla no se lo ofrece, pero la pantalla
+    # no es la regla. Es el mismo agujero que ya se había tapado en el listado de stock, y la
+    # asignación de sedes existe justamente para esto.
+    #
+    # Quien no tiene ninguna asignada ve todas (organización de una sola sede, o un admin que no
+    # se asignó ninguna): `sedes_visibles_ids` ya resuelve las dos.
     def set_mostrador
-      sede       = current_user.club.sedes.find(params[:sede_id])
+      sede       = current_user.club.sedes.where(id: current_user.sedes_visibles_ids)
+                               .find(params[:sede_id])
       # `mostrador!` y no `mostrador`: acá SÍ corresponde crearlo — es la puerta de entrada al
       # mostrador de esa sede, y una organización que nunca lo abrió todavía no lo tiene.
       @mostrador = sede.mostrador!

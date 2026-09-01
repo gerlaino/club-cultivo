@@ -12,7 +12,10 @@
     <p v-else-if="!visibles.length" class="tst__vacio">Nada coincide con «{{ busqueda }}».</p>
 
     <div v-else class="tst__wrap">
-      <table class="tst__table">
+      <!-- `tabla-cards`: en el teléfono cada fila pasa a ser una tarjeta con la etiqueta de la
+           columna delante del dato (sale de los `data-col`). Ocho columnas con scroll horizontal
+           no se leen paradas frente a alguien, que es cómo se usa esta pantalla. -->
+      <table class="tst__table tabla-cards">
         <thead>
           <tr>
             <th v-for="c in columnas" :key="c.campo"
@@ -260,7 +263,11 @@ function limpiar () { emit('update:modelValue', {}) }
 }
 .tst__limpiar:hover { color: var(--c-rust-600); }
 
-@media (max-width: 720px) {
-  .tst__wrap { max-height: none; }
+@media (max-width: 767px) {
+  /* Ya son tarjetas: el alto fijo y el scroll propio sobran, y el sticky del encabezado no
+     aplica porque el encabezado no se muestra. */
+  .tst__wrap { max-height: none; border: 0; background: transparent; }
+  .tst__td-cant { white-space: normal; }
+  .tst__error { display: inline; margin-left: 6px; }
 }
 </style>
