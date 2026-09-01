@@ -76,8 +76,10 @@ RSpec.describe 'Caja del mostrador de dispensa', type: :request do
                                cantidad: 500, precio_sugerido_ars: 100)
         pac = create(:paciente, club: club)
         pac.create_cuenta_corriente!(club: club, saldo_disponible: 0, limite_credito: 50_000)
-        # El dispensador entrega de lo que está sobre la mesa, así que primero hay mostrador.
-        abrir_mostrador!(sede, usuario: ana)
+        # El dispensador entrega de lo que está sobre la mesa, así que primero hay mostrador. Y la
+        # PRIMERA carga la hace administración: él abre heredando el cierre anterior, y acá no hay
+        # ninguno todavía.
+        abrir_mostrador!(sede, usuario: admin, recibe: ana)
         disp = Dispensacion.create!(paciente: pac, user: ana, stock: stock, sede: sede, cantidad: 5,
                                     medio_pago: 'efectivo', aporte_socio_ars: 9_000,
                                     fecha_dispensacion: Time.zone.today)

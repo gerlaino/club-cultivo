@@ -256,6 +256,53 @@ describe('La pantalla del mostrador', () => {
         expect(fila(w, 0).text()).toContain('Preroll')
       })
 
+      // EL QUE ATIENDE ABRE CON LO QUE HEREDÓ Y NADA MÁS. Sumar de más es sacar del depósito, y
+      // eso lo hace quien responde por la mercadería — con el turno ya abierto y dejando rastro.
+      describe('cuando abre el que atiende', () => {
+        beforeEach(() => {
+          useAuthStore().user = { id: 2, role: 'dispensador' }
+          respuesta = {
+            ...respuesta,
+            apertura_heredada: true,
+            // El backend le ofrece SÓLO lo que heredó: el resto del depósito no se lista.
+            disponibles: [{ ...DISPONIBLES[0], cantidad: 215 }],
+          }
+        })
+
+        it('sólo ve lo que quedó del turno anterior', async () => {
+          const w = await montar()
+
+          expect(w.findAll('.tst__table tbody tr')).toHaveLength(1)
+          expect(w.text()).toContain('corregí para abajo')
+        })
+
+        it('puede corregir para abajo', async () => {
+          const w = await montar()
+          await fila(w, 0).find('.tst__input').setValue(200)
+
+          expect(fila(w, 0).text()).not.toContain('del turno anterior quedaron')
+          expect(w.find('.mst__acciones .mst__btn--primary').attributes('disabled')).toBeUndefined()
+        })
+
+        it('pero no para arriba: el techo es lo heredado, no el depósito', async () => {
+          const w = await montar()
+          await fila(w, 0).find('.tst__input').setValue(300) // hay 500 libres, pero heredó 215
+
+          expect(fila(w, 0).text()).toContain('del turno anterior quedaron 215')
+          expect(w.find('.mst__acciones .mst__btn--primary').attributes('disabled')).toBeDefined()
+        })
+
+        // Sin nada que heredar no tiene con qué abrir: la primera carga la hace el dueño de la
+        // mercadería. Una tabla vacía no explicaría por qué.
+        it('y sin nada que heredar, le dice que la carga administración', async () => {
+          respuesta = { ...respuesta, disponibles: [], sugerido: [] }
+          const w = await montar()
+
+          expect(w.text()).toContain('La mesa la carga administración')
+          expect(w.find('.tst__table').exists()).toBe(false)
+        })
+      })
+
       // Cuánto vale lo que se está por poner sobre la mesa. Sólo para quien responde por eso.
       it('el costo es de administración', async () => {
         useAuthStore().user = { id: 1, role: 'admin' }

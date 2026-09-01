@@ -256,13 +256,36 @@ RSpec.describe 'Recibir el mostrador', type: :request do
     end
   end
 
-  # Si lo abre el que va a atender, cargó la mesa él mismo: no hay entrega que firmar.
+  # Si lo abre el que va a atender, cargó la mesa él mismo: no hay entrega que firmar. Puede
+  # abrirla —el mostrador no tiene que depender de que haya un admin a las 8 de la mañana— pero
+  # sólo con lo que HEREDÓ del cierre anterior: traer algo del depósito es sacar mercadería, y eso
+  # lo hace quien responde por ella.
   describe 'cuando lo abre el propio dispensador' do
-    it 'queda confirmado en el acto' do
-      abrir!(como: ana)
+    before do
+      # Un turno anterior cerrado con 250: es lo que va a poder heredar.
+      abrir!(cantidad: 300)
+      turno = sede.mostrador!.turno_abierto
+      ActsAsTenant.with_tenant(club) do
+        Mostradores::ConfirmarApertura.call(turno: turno, usuario: ana)
+        Mostradores::CerrarTurno.call(turno: turno, usuario: ana, efectivo_contado_ars: 10_000,
+                                      conteos: [{ item_id: turno.items.first.id, contado: 250,
+                                                  motivo: 'conteo' }])
+      end
+    end
 
+    it 'queda confirmado en el acto' do
+      abrir!(cantidad: 250, como: ana)
+
+      expect(response).to have_http_status(:created)
       expect(sede.mostrador!.turno_abierto).to be_confirmado
       expect { dispensar!(10) }.not_to raise_error
+    end
+
+    it 'pero no puede traer del depósito lo que no venía' do
+      body = abrir!(cantidad: 300, como: ana) # heredó 250
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(body['error']).to match(/se puede corregir para abajo, no para arriba/i)
     end
   end
 end

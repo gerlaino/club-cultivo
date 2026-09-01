@@ -68,9 +68,7 @@
       <div class="mst__card-head">
         <h2 class="mst__card-title">Abrir el mostrador</h2>
         <p class="mst__card-sub">
-          {{ sugerido.length
-             ? 'Viene con lo que se contó en el cierre anterior. Corregí lo que no coincida.'
-             : 'Elegí qué baja del depósito a la mesa.' }}
+          {{ subtituloApertura }}
         </p>
       </div>
 
@@ -87,8 +85,15 @@
         </span>
       </label>
 
-      <TablaStock v-model="cantidades" :stocks="disponibles" :heredados="heredados"
-                  :muestra-costo="gestiona" />
+      <!-- Sin nada que heredar, el que atiende no tiene con qué abrir: la primera carga la hace
+           el dueño de la mercadería. Se lo decimos en vez de mostrarle una tabla vacía. -->
+      <p v-if="aperturaHeredada && !disponibles.length" class="mst__aviso mst__aviso--warn">
+        No hay nada del turno anterior. La mesa la carga administración: pedile que la deje
+        preparada y vas a poder recibirla acá.
+      </p>
+      <TablaStock v-else v-model="cantidades" :stocks="disponibles" :heredados="heredados"
+                  :muestra-costo="gestiona" :topes="topesApertura"
+                  :tope-texto="aperturaHeredada ? 'del turno anterior quedaron' : 'quedan'" />
 
       <div class="mst__acciones">
         <button class="mst__btn mst__btn--primary"
@@ -556,12 +561,36 @@ const difRecepcion = computed(() => {
   return Math.round((Number(efectivoRecepcion.value) - turno.value.caja.esperado_ars) * 100) / 100
 })
 
+// El que ATIENDE abre con lo que heredó y nada más: sumar de más o traer un producto que no
+// venía es sacar mercadería del depósito, y eso lo hace quien responde por ella. Lo aplica el
+// backend (`Mostradores::AbrirTurno`); acá sólo cambia lo que se ofrece y cómo se explica.
+const aperturaHeredada = ref(false)
+
+const subtituloApertura = computed(() => {
+  if (aperturaHeredada.value) {
+    return 'Viene con lo que se contó al cerrar el turno anterior. Si el frasco no da, corregí ' +
+           'para abajo: la diferencia queda con tu nombre. Lo que falte se baja del depósito con ' +
+           'el mostrador ya abierto.'
+  }
+  return sugerido.value.length
+    ? 'Viene con lo que se contó en el cierre anterior. Corregí lo que no coincida.'
+    : 'Elegí qué baja del depósito a la mesa.'
+})
+
 const hayElegidos = computed(() => Object.keys(cantidades.value).length > 0)
 // Si alguna fila pide más de lo que hay libre. El botón NO puede quedar habilitado: dejar
 // apretar para que el backend rechace es el peor error posible — parece culpa del usuario.
 const excedeAlgo = computed(() =>
-  disponibles.value.some(s => Number(cantidades.value[s.stock_id] || 0) > Number(s.disponible))
+  disponibles.value.some(s => Number(cantidades.value[s.stock_id] || 0) > techoDe(s))
 )
+// Cuánto se puede poner de cada producto: para administración, lo libre del depósito; para el
+// que atiende, lo que quedó del turno anterior — corregir para abajo, nunca para arriba.
+const topesApertura = computed(() => (
+  aperturaHeredada.value
+    ? Object.fromEntries(sugerido.value.map(s => [s.stock_id, Number(s.cantidad)]))
+    : null
+))
+const techoDe = (s) => (topesApertura.value ? Number(topesApertura.value[s.stock_id] ?? 0) : Number(s.disponible))
 // Lo que el cierre anterior dejó contado: va arriba de la tabla y con su número puesto.
 const heredados = computed(() => new Set(sugerido.value.map(s => s.stock_id)))
 
@@ -620,6 +649,7 @@ async function cargar () {
     sugerido.value    = data.sugerido || []
     disponibles.value = data.disponibles || []
     fondoSugerido.value = data.fondo_sugerido ?? null
+    aperturaHeredada.value = !!data.apertura_heredada
     sinRevisar.value = data.sin_revisar ?? 0
     // La recepción arranca con lo que declaró el admin: confirmar es un click, corregir es
     // cambiar el número. Vacío obligaría a recontar todo aunque esté bien.

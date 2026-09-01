@@ -151,7 +151,15 @@ class StocksController < ApplicationController
 
   # GET /stocks/:id
   def show
-    render json: { data: serialize_stock(@stock) }
+    cerradas = dispensaciones_en_periodo_cerrado
+    render json: {
+      data: serialize_stock(@stock).merge(
+        # Si se puede corregir QUÉ ES. La pantalla no tiene que ofrecer un selector que el backend
+        # va a rechazar, ni esconderlo sin decir por qué.
+        puede_cambiar_forma: cerradas.zero?,
+        dispensas_cerradas:  cerradas
+      ),
+    }
   end
 
   # GET /stocks/qr/:codigo_qr — para admin/supervisor al escanear un QR
@@ -234,6 +242,10 @@ class StocksController < ApplicationController
     # — no se podría ni corregirles el precio sin antes adivinarles la variedad.
     if attrs[:genetica_id].present? && !genetica_del_club?(attrs[:genetica_id])
       return render json: { errors: [GENETICA_AJENA] }, status: :unprocessable_entity
+    end
+
+    if (motivo = motivo_para_no_cambiar_forma(attrs))
+      return render json: { error: motivo }, status: :unprocessable_entity
     end
 
     # El inicial es solo el registro de lo que ingresó: editarlo NO toca el actual (que lo
@@ -694,8 +706,55 @@ class StocksController < ApplicationController
   def stock_update_params
     params.require(:stock).permit(
       :cantidad, :cantidad_inicial, :costo_unitario_ars, :precio_sugerido_ars, :descripcion, :proveedor,
-      :disponibilidad, :genetica_id
+      :disponibilidad, :genetica_id, :forma_producto, :unidad
     )
+  end
+
+  # QUÉ ES un producto se puede corregir. Un stock cargado como `prensado` porque todavía no
+  # existía `preroll` no puede quedar mal para siempre: la forma y su unidad son una etiqueta, y
+  # una etiqueta equivocada se arregla.
+  #
+  # LA SALVEDAD ES EL EJERCICIO CERRADO. Cambiar la unidad reinterpreta cantidades ya escritas —los
+  # 3 que salieron como gramos pasan a leerse como unidades— y esas salidas tienen su asiento. Si
+  # el período ya se cerró, eso es reescribir lo que se presentó: se deja como está y, si hay que
+  # corregirlo igual, primero se reabre el período.
+  #
+  # Sobre un período ABIERTO sí se permite: es exactamente el momento en que las correcciones
+  # todavía se hacen.
+  def motivo_para_no_cambiar_forma(attrs)
+    nueva_forma  = attrs[:forma_producto].presence
+    nueva_unidad = attrs[:unidad].presence
+    cambia = (nueva_forma && nueva_forma != @stock.forma_producto) ||
+             (nueva_unidad && nueva_unidad != @stock.unidad)
+    return nil unless cambia
+
+    if nueva_forma && !Stock::FORMAS_PRODUCTO.include?(nueva_forma)
+      return "«#{nueva_forma}» no es una forma de producto válida."
+    end
+
+    cerradas = dispensaciones_en_periodo_cerrado
+    return nil if cerradas.zero?
+
+    hasta = current_user.club.contabilidad_cerrada_hasta
+    "Este producto ya se dispensó #{cerradas} #{cerradas == 1 ? 'vez' : 'veces'} dentro de un " \
+      "período contable cerrado (hasta el #{I18n.l(hasta, format: :default)}). Cambiar qué es " \
+      "reinterpretaría cantidades ya asentadas: reabrí el período si hay que corregirlo igual."
+  end
+
+  # Las salidas de este stock que caen dentro del período cerrado. Cuenta las dos formas de
+  # dispensar: la vieja (`dispensaciones.stock_id`) y la multi-ítem (`DispensacionItem`).
+  def dispensaciones_en_periodo_cerrado
+    hasta = current_user.club.contabilidad_cerrada_hasta
+    return 0 if hasta.blank?
+
+    # UNA sola query con OR, y contando dispensaciones distintas: una dispensa de un solo producto
+    # queda escrita en los DOS lados —`dispensaciones.stock_id` y su ítem espejo—, así que sumar
+    # las dos cuentas la contaba dos veces.
+    Dispensacion.left_joins(:items)
+                .where(fecha_dispensacion: ..hasta)
+                .where('dispensaciones.stock_id = :id OR dispensacion_items.stock_id = :id',
+                       id: @stock.id)
+                .distinct.count(:id)
   end
 
   # La genética llega como id suelto desde el form. `acts_as_tenant` ya filtra, pero el scoping a

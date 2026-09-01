@@ -308,7 +308,7 @@ Suite 1239 ✓ + 58 vitest ✓. **Deploy: sumar `add_vendible_a_bar_venta_items`
 `Mostrador`, apertura con herencia, recepción del que atiende, cargar/devolver, cierre con los dos
 arqueos, fondo/retiro, Merma con su lista de trabajo, Turnos, y la rendición del repartidor de
 punta a punta —incluido **devolver lo que se había quedado** (`Rendiciones::SaldarACuenta`)—.
-**2759 rspec ✓ · 1759 vitest ✓ · build limpio · 7 pruebas de navegador ✓.**
+**2775 rspec ✓ · 1769 vitest ✓ · build limpio · 7 pruebas de navegador ✓.**
 
 **Sin correr, del bloque del mostrador:** nada. Las migraciones las corre solo el deploy.
 
@@ -454,6 +454,22 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   y por qué**: justo lo que se quería guardar. La fila se queda sin un solo número y el scope
   `TurnoMostradorItem.en_la_mesa` deja de listarla — *una fila sin ningún número es una fila donde
   nunca pasó nada*. Todo lo que recorra los ítems de un turno tiene que usar ese scope.
+- **QUÉ ES un producto se corrige, salvo con el EJERCICIO CERRADO.** `forma_producto` y `unidad`
+  son editables (un stock cargado como `prensado` porque no existía `preroll` no puede quedar mal
+  para siempre), pero si ese stock ya se dispensó dentro de un período contable cerrado
+  (`clubs.contabilidad_cerrada_hasta`) el cambio se rechaza: reinterpretaría cantidades ya
+  asentadas. Primero se reabre el período. **Se cuentan las DOS formas de dispensar** —
+  `dispensaciones.stock_id` y `DispensacionItem`— en una sola query con OR y contando
+  dispensaciones distintas: una dispensa de un producto queda escrita en los dos lados.
+- **EL QUE ATIENDE ABRE CON LO QUE HEREDÓ, Y NADA MÁS** (`AbrirTurno#validar_herencia!`). Puede
+  corregir para ABAJO —la diferencia queda con su nombre— pero no sumar de más ni traer un
+  producto que no venía: eso es sacar del depósito, y lo hace quien responde por la mercadería.
+  Sin esto la misma acción tenía dos tratos según la hora: bajar a media tarde queda marcado
+  `sin_supervision` y va a la bandeja del admin, pero hacerlo AL ABRIR no dejaba rastro. Si le
+  falta algo lo baja con el mostrador YA ABIERTO, que es la puerta que deja rastro. Sin nada que
+  heredar (el primer día) la mesa la carga administración, y la pantalla lo dice. **Ver** el
+  depósito no se toca: ya lo ve en su pantalla de Stock con más columnas, y taparlo en un lado
+  y dejarlo en el otro sería teatro.
 - **EL MOSTRADOR DE OTRA SEDE NO SE TOCA.** `set_mostrador` y `CajasController#set_sede` filtran
   por `current_user.sedes_visibles_ids`: sin eso, un dispensador de Norte abría y cerraba el
   mostrador de Centro mandando otro `sede_id`. La pantalla sólo le ofrece las suyas, pero la

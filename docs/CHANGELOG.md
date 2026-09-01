@@ -1,5 +1,32 @@
 # Changelog
 
+## Septiembre 2026 (w) — qué es un producto se puede corregir
+
+Un stock cargado como **`prensado` porque todavía no existía `preroll`** no se podía arreglar: la
+forma y la unidad no eran editables, así que un frasco quedaba mal etiquetado para siempre. Son una
+etiqueta, y una etiqueta equivocada se arregla — la unidad se deriva de la forma (un preroll se
+cuenta, el hash se pesa) pero queda editable, porque hay comestibles que se venden por gramo.
+
+**La salvedad es el EJERCICIO CERRADO.** Cambiar la unidad reinterpreta cantidades ya escritas —los
+3 que salieron como gramos pasan a leerse como unidades— y esas salidas tienen su asiento. Si el
+período contable ya se cerró (`clubs.contabilidad_cerrada_hasta`), eso es reescribir lo que se
+presentó: se rechaza, y el mensaje dice que primero hay que reabrir el período. Sobre un período
+**abierto** sí se permite, que es exactamente el momento en que las correcciones se hacen.
+
+- **Cuenta las dos formas de dispensar.** Una salida vive en `dispensaciones.stock_id` **o** en un
+  `DispensacionItem`; mirar sólo la primera dejaba cambiar un stock que el carrito ya había
+  dispensado dentro del período cerrado. Y es UNA query con OR contando dispensaciones distintas:
+  una dispensa de un solo producto queda escrita en los dos lados, así que sumar las dos cuentas la
+  contaba dos veces.
+- **El resto del producto se sigue editando** aunque el período esté cerrado: sólo se congela qué
+  es. Un stock que no se puede ni corregir de precio no le sirve a nadie.
+- **La pantalla se entera antes de ofrecerlo** (`puede_cambiar_forma` en el `show`): el selector
+  aparece deshabilitado **con el motivo**, no escondido. Esconderlo sin decir por qué se lee como
+  que la app está rota.
+- De paso, **`preroll` no tenía etiqueta ni ícono** en el detalle: se mostraba crudo, en minúscula.
+
+---
+
 ## Agosto 2026 (v) — el mostrador
 
 Hasta ahora una organización que dispensa abría la caja de plata y nada más. La mercadería salía
@@ -413,6 +440,31 @@ Vale la pena decir por qué está en un solo método: esa regla gobierna **dos c
 catálogo que ofrece el carrito y la validación de `Dispensacion`—. Separadas, la pantalla ofrece
 algo que el backend rechaza, que es el peor error posible porque parece culpa del usuario.
 
+### El que atiende abre con lo que heredó, y nada más
+
+La tabla nueva hizo evidente algo que ya estaba mal: al abrir, el dispensador podía poner sobre la
+mesa **cualquier cosa del depósito**, y eso **no quedaba marcado en ningún lado**. Bajar lo mismo a
+media tarde con "Bajar del depósito" sí se marca `sin_supervision` y va a la bandeja del admin: la
+misma acción tenía dos tratos según la hora, y el control era decorativo — el que atiende tenía la
+llave del depósito.
+
+Ahora hereda: puede corregir **para abajo** —contó menos de lo que decía el cierre anterior, y esa
+diferencia queda con su nombre— pero no sumar de más ni traer un producto que no venía. Si le falta
+algo, lo baja con el mostrador **ya abierto**, que es la puerta que deja rastro. Y el primer día,
+cuando no hay nada que heredar, la mesa la carga el dueño de la mercadería: la pantalla se lo dice
+en vez de mostrarle una tabla vacía.
+
+Se mantiene lo que importaba de la decisión original —**que el mostrador no dependa del admin para
+arrancar**, porque a las 8 de la mañana puede no haber ninguno—: abre él, y como lo abre quien
+atiende, nace confirmado.
+
+Va en `AbrirTurno`, no en la pantalla: por la API se saltea siempre. Lo que hace el frontend es
+ofrecerle sólo lo heredado y poner el techo por fila, para no invitarlo a llenar un formulario que
+el backend va a rechazar.
+
+*(Ver el depósito, en cambio, no se tocó: el dispensador ya lo ve en su pantalla de **Stock**, con
+más columnas que acá. Taparlo en un lado y dejarlo en el otro sería teatro.)*
+
 ### Lo que apareció repasando la pantalla rol por rol
 
 - **El mostrador de OTRA sede se podía operar mandando otro `sede_id`.** La pantalla sólo ofrece
@@ -469,7 +521,7 @@ algo que el backend rechaza, que es el peor error posible porque parece culpa de
 `cobros.rendicion_caja_id`. (`clubs.exigir_mostrador_abierto` se agregó y se sacó en el mismo
 bloque: el mostrador no es una opción.)
 
-**2759 rspec ✓ · 1759 vitest ✓ · build limpio · 7 pruebas de navegador ✓.**
+**2775 rspec ✓ · 1769 vitest ✓ · build limpio · 7 pruebas de navegador ✓.**
 
 ---
 

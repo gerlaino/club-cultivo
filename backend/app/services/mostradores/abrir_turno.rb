@@ -99,10 +99,41 @@ module Mostradores
       @mostrador.caja_turnos.cerradas.order(cerrada_at: :desc).first&.fondo_remanente_ars
     end
 
+    # EL QUE ATIENDE ABRE CON LO QUE HEREDÓ, Y NADA MÁS.
+    #
+    # Puede corregir hacia abajo —contó menos de lo que decía el cierre anterior, y esa diferencia
+    # queda con su nombre— pero no puede sumar de más ni traer un producto que no venía: eso es
+    # sacar mercadería del depósito, y el mostrador existe justamente para que eso lo haga quien
+    # responde por ella.
+    #
+    # Sin esto, la misma acción tenía dos tratos según la hora: bajar del depósito a media tarde
+    # queda marcado `sin_supervision` y va a la bandeja del admin, pero hacerlo AL ABRIR no dejaba
+    # rastro. El que atiende tenía la llave del depósito y el control era decorativo.
+    #
+    # Si necesita algo que no venía, lo baja con "Bajar del depósito" con el turno ya abierto —
+    # que es la puerta que sí deja rastro.
+    def validar_herencia!(stock, cantidad)
+      return unless @usuario.atiende_mostrador?
+
+      venia = heredado[stock.id].to_d
+      if venia <= 0
+        raise ArgumentError,
+              "#{stock.etiqueta} no venía del turno anterior: la carga administración, o bajalo " \
+              "del depósito con el mostrador ya abierto."
+      end
+      return if cantidad <= venia
+
+      raise ArgumentError,
+            "Del turno anterior quedaron #{venia.round(2)} #{stock.unidad || 'g'} de " \
+            "#{stock.etiqueta}: se puede corregir para abajo, no para arriba."
+    end
+
     def crear_item!(turno, attrs)
       stock    = buscar_stock!(attrs[:stock_id] || attrs['stock_id'])
       cantidad = (attrs[:cantidad] || attrs['cantidad']).to_d
       raise ArgumentError, "La cantidad de #{stock.etiqueta} tiene que ser mayor a 0" if cantidad <= 0
+
+      validar_herencia!(stock, cantidad)
 
       # El techo es el disponible LIBRE: lo reservado para un paciente y lo apartado para un
       # evento no se puede poner sobre la mesa, aunque esté en el mismo frasco.

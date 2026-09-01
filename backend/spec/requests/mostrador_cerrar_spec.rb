@@ -22,10 +22,18 @@ RSpec.describe 'Cerrar el mostrador', type: :request do
     end
   end
 
-  def abrir!(cantidad: 300, fondo: 50_000, como: ana)
+  # La mesa la CARGA administración y la recibe quien atiende: son los dos pasos de la vida real.
+  # El que atiende también puede abrirla, pero sólo heredando el cierre anterior — acá cada
+  # ejemplo arranca sin ningún turno previo, así que la primera carga es del dueño de la
+  # mercadería.
+  def abrir!(cantidad: 300, fondo: 50_000, como: admin, recibe: ana)
     sign_in_as(como)
     post "/api/sedes/#{sede.id}/mostrador/abrir", headers: auth_headers,
          params: { monto_inicial_ars: fondo, items: [{ stock_id: stock.id, cantidad: cantidad }] }
+    turno = sede.mostrador!.turno_abierto
+    return if turno.nil? || turno.confirmado? || recibe.nil?
+
+    ActsAsTenant.with_tenant(club) { Mostradores::ConfirmarApertura.call(turno: turno, usuario: recibe) }
   end
 
   def dispensar!(cantidad, medio: 'efectivo')

@@ -54,7 +54,7 @@
                      :aria-label="`Cuánto baja de ${s.etiqueta}`"
                      @input="escribir(s, $event.target.value)" />
               <span class="tst__unidad">{{ s.unidad }}</span>
-              <span v-if="excede(s)" class="tst__error">quedan {{ fmt(s.disponible) }}</span>
+              <span v-if="excede(s)" class="tst__error">{{ topeTexto }} {{ fmt(tope(s)) }}</span>
             </td>
           </tr>
         </tbody>
@@ -98,6 +98,11 @@ const props = defineProps({
   // el mostrador se cierra y se reabre varias veces por día, y a las tres de la tarde el turno
   // anterior fue hace dos horas.
   heredados:    { type: Set,    default: () => new Set() },
+  // Techo por producto: `{ stock_id: máximo }`. Sin esto el techo es lo libre del depósito, que
+  // es lo que aplica a administración. Al que ATIENDE, en cambio, el techo se lo pone lo que
+  // quedó del turno anterior: sumar de más sería sacar del depósito.
+  topes:        { type: Object, default: null },
+  topeTexto:    { type: String, default: 'quedan' },
   muestraCosto: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:modelValue'])
@@ -125,9 +130,10 @@ const fmt = (n) => Number(n ?? 0).toLocaleString('es-AR', { maximumFractionDigit
 const fecha = (f) => (f ? new Date(`${f}T12:00:00`).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—')
 
 const elegido = (s) => Number(cantidades.value[s.stock_id]) > 0
+const tope    = (s) => Number(props.topes ? (props.topes[s.stock_id] ?? 0) : s.disponible)
 // No se puede bajar lo que no está. El backend lo rechaza igual, pero decirlo en la fila evita
 // llenar el formulario entero para que rebote al final.
-const excede  = (s) => Number(cantidades.value[s.stock_id] || 0) > Number(s.disponible)
+const excede  = (s) => Number(cantidades.value[s.stock_id] || 0) > tope(s)
 
 const elegidos = computed(() => filas.value.filter(elegido))
 const totalCosto = computed(() =>

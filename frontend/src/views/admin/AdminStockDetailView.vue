@@ -113,8 +113,37 @@
             <template v-else>
               <div v-if="editError" class="sd__alert">{{ editError }}</div>
               <div class="sd__form-grid">
+                <!-- QUÉ ES. Un stock cargado como `prensado` porque todavía no existía `preroll`
+                     no puede quedar mal para siempre: la forma y su unidad son una etiqueta.
+                     La salvedad es el ejercicio cerrado — ahí cambiarla reinterpretaría
+                     cantidades ya asentadas, y el backend lo rechaza. -->
+                <div class="sd__field">
+                  <label class="sd__label">Producto</label>
+                  <select class="sd__input" v-model="editForm.forma_producto"
+                          :disabled="!puedeCambiarForma" @change="alCambiarForma">
+                    <option v-for="f in FORMAS_EDITABLES" :key="f.value" :value="f.value">{{ f.label }}</option>
+                  </select>
+                  <span v-if="!puedeCambiarForma" class="sd__hint">
+                    Ya se dispensó {{ stock.dispensas_cerradas }}
+                    {{ stock.dispensas_cerradas === 1 ? 'vez' : 'veces' }} dentro de un período
+                    contable cerrado. Cambiar qué es reinterpretaría cantidades ya asentadas:
+                    reabrí el período si hay que corregirlo igual.
+                  </span>
+                </div>
+                <div class="sd__field">
+                  <label class="sd__label">Se mide en</label>
+                  <select class="sd__input" v-model="editForm.unidad" :disabled="!puedeCambiarForma">
+                    <option value="g">gramos (g)</option>
+                    <option value="un">unidades (un)</option>
+                    <option value="ml">mililitros (ml)</option>
+                  </select>
+                  <span v-if="puedeCambiarForma && cambiaLaUnidad" class="sd__hint">
+                    Los {{ Number(stock.cantidad).toFixed(1) }} que hay pasan a leerse como
+                    {{ editForm.unidad }}. Si el número tampoco era ése, corregilo acá abajo.
+                  </span>
+                </div>
                 <div class="sd__field sd__field--full">
-                  <label class="sd__label">Cantidad inicial ({{ unidad }})</label>
+                  <label class="sd__label">Cantidad inicial ({{ editForm.unidad || unidad }})</label>
                   <input
                     v-if="esExterno"
                     type="number" min="0" step="0.01" class="sd__input"
@@ -128,11 +157,11 @@
                   </template>
                 </div>
                 <div class="sd__field">
-                  <label class="sd__label">Precio sugerido (ARS/g)</label>
+                  <label class="sd__label">Precio sugerido (ARS/{{ editForm.unidad || unidad }})</label>
                   <input type="number" min="0" step="0.01" class="sd__input" v-model.number="editForm.precio_sugerido_ars" placeholder="0.00" />
                 </div>
                 <div class="sd__field">
-                  <label class="sd__label">Costo unitario (ARS/g)</label>
+                  <label class="sd__label">Costo unitario (ARS/{{ editForm.unidad || unidad }})</label>
                   <input type="number" min="0" step="0.01" class="sd__input" v-model.number="editForm.costo_unitario_ars" placeholder="0.00" />
                 </div>
                 <div v-if="stock.origen === 'compra_externa'" class="sd__field">
@@ -584,6 +613,7 @@ import {
   getStockMovimientos, listSedes, producirStock,
   listPesajesManicura, reajustarPesoPesajeManicura, listGeneticas,
 } from '../../lib/api.js'
+import { unidadDe } from '../../lib/formatters.js'
 import { useToast } from '../../composables/useToast.js'
 import { MOTIVOS_FINALIZACION, ayudaDe } from '../../composables/useStockFinalizacion.js'
 import { useConfirm } from '../../composables/useConfirm.js'
@@ -722,6 +752,20 @@ async function guardarReajuste(pesaje) {
   }
 }
 
+// Si se puede corregir QUÉ ES. Lo decide el backend contando las dispensas que caen dentro del
+// período contable cerrado: acá sólo se refleja, para no ofrecer un selector que va a rebotar.
+const puedeCambiarForma = computed(() => stock.value?.puede_cambiar_forma !== false)
+const cambiaLaUnidad = computed(() =>
+  !!editForm.value.unidad && editForm.value.unidad !== stock.value?.unidad
+)
+
+// La unidad se deriva de la forma —un preroll se cuenta, el hash se pesa— pero queda editable:
+// hay comestibles que se venden por gramo y cápsulas por unidad, y adivinar mal sin dejar
+// corregir es peor que no adivinar.
+function alCambiarForma() {
+  editForm.value.unidad = unidadDe(editForm.value.forma_producto)
+}
+
 function startEdit() {
   editForm.value = {
     cantidad_inicial:    stock.value.cantidad_inicial != null ? Number(stock.value.cantidad_inicial) : null,
@@ -731,6 +775,8 @@ function startEdit() {
     descripcion: stock.value.descripcion || '',
     disponibilidad: stock.value.disponibilidad || 'ambas',
     genetica_id: stock.value.genetica?.id || null,
+    forma_producto: stock.value.forma_producto,
+    unidad:         stock.value.unidad || 'g',
   }
   editError.value = null
   editando.value  = true
@@ -751,6 +797,12 @@ async function guardarEdit() {
     if (f.descripcion)                 payload.descripcion         = f.descripcion
     if (f.disponibilidad)              payload.disponibilidad      = f.disponibilidad
     if (f.genetica_id)                 payload.genetica_id         = Number(f.genetica_id)
+    // Sólo si CAMBIÓ: mandarlo siempre haría que el backend evalúe la regla del período cerrado
+    // en cada guardado, y una corrección de precio rebotaría por algo que nadie tocó.
+    if (f.forma_producto && f.forma_producto !== stock.value.forma_producto) {
+      payload.forma_producto = f.forma_producto
+    }
+    if (f.unidad && f.unidad !== stock.value.unidad) payload.unidad = f.unidad
     await updateStock(stock.value.id, payload)
     await recargar()
     editando.value = false
@@ -867,6 +919,12 @@ const FORMAS_DERIVADO = [
   { value: 'otro', label: 'Otro' },
 ]
 
+// Todas las formas reales del catálogo, para CORREGIR qué es un producto ya cargado. `externo`
+// queda afuera: no es un producto, es de dónde vino, y ofrecerlo acá invita a marcar un frasco
+// como "externo" y perder qué es. Va acá abajo y no arriba porque reusa `FORMAS_DERIVADO`: en
+// `<script setup>` un `const` usado antes de su línea explota al montar, y el build no lo ve.
+const FORMAS_EDITABLES = [{ value: 'flor_seca', label: 'Flor seca' }, ...FORMAS_DERIVADO]
+
 function openProcesar() {
   procesarForm.value  = { gramos_consumir: null, forma_producto: 'aceite', cantidad_resultado: null, unidad: 'un', precio_sugerido_ars: null, observaciones: '' }
   procesarError.value = null
@@ -902,11 +960,11 @@ async function ejecutarProcesar() {
 const FORMA_MAP = {
   flor_seca: 'Flor seca', hash: 'Hash', aceite: 'Aceite', tintura: 'Tintura',
   crema: 'Crema', capsula: 'Cápsula', comestible: 'Comestible', prensado: 'Prensado',
-  otro: 'Otro', externo: 'Externo',
+  preroll: 'Preroll', otro: 'Otro', externo: 'Externo',
 }
 const FORMA_ICO = {
   flor_seca: '🌿', hash: '🪨', aceite: '💧', tintura: '🧪',
-  crema: '🫙', capsula: '💊', comestible: '🍬', prensado: '🟫',
+  crema: '🫙', capsula: '💊', comestible: '🍬', prensado: '🟫', preroll: '🚬',
   otro: '📦', externo: '📦',
 }
 const ORIGEN_MAP = { lote: 'Producción propia', derivado_lote: 'Derivado de lote', compra_externa: 'Compra externa' }

@@ -93,11 +93,90 @@ RSpec.describe 'Abrir el mostrador', type: :request do
   end
 
   describe 'el turno' do
-    it 'lo abre el que va a atender: no hace falta que esté el admin' do
-      abrir!(items: [{ stock_id: northern.id, cantidad: 100 }], como: ana)
+    # EL QUE ATIENDE ABRE CON LO QUE HEREDÓ, Y NADA MÁS. Que no dependa del admin es el punto
+    # —a las 8 de la mañana puede no haber ninguno—, pero el número de partida no lo elige él:
+    # lo hereda del cierre anterior y como mucho lo corrige para abajo.
+    it 'lo abre el que va a atender, heredando el cierre anterior' do
+      cerrar_con!(80)
+
+      abrir!(items: [{ stock_id: northern.id, cantidad: 80 }], como: ana)
 
       expect(response).to have_http_status(:created)
-      expect(JSON.parse(response.body)['abierto_por']).to eq(ana.nombre_completo)
+      body = JSON.parse(response.body)
+      expect(body['abierto_por']).to eq(ana.nombre_completo)
+      # Lo abrió quien atiende: no hay entrega que firmar, nace confirmado.
+      expect(body['confirmado']).to be(true)
+    end
+
+    it 'y puede corregir para abajo: el frasco no da y la diferencia queda con su nombre' do
+      cerrar_con!(80)
+
+      abrir!(items: [{ stock_id: northern.id, cantidad: 77 }], como: ana)
+
+      expect(response).to have_http_status(:created)
+      item = JSON.parse(response.body)['items'].first
+      expect(item['heredada']).to eq(80.0)
+      expect(item['diferencia_apertura']).to eq(-3.0)
+    end
+
+    # Sumar de más es sacar del depósito, y eso lo hace quien responde por la mercadería. Sin
+    # esta regla la misma acción tenía dos tratos según la hora: bajar a media tarde queda
+    # marcado `sin_supervision` y va a la bandeja del admin, pero hacerlo AL ABRIR no dejaba
+    # rastro — el que atiende tenía la llave del depósito.
+    it 'pero NO para arriba' do
+      cerrar_con!(80)
+
+      body = abrir!(items: [{ stock_id: northern.id, cantidad: 120 }], como: ana)
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(body['error']).to match(/se puede corregir para abajo, no para arriba/i)
+    end
+
+    it 'ni traer un producto que no venía' do
+      cerrar_con!(80)
+      otro = ActsAsTenant.with_tenant(club) do
+        create(:stock, club: club, sede: sede, lote: lote, forma_producto: 'hash', unidad: 'g',
+                       cantidad: 60, estado: 'asignado', disponibilidad: 'ambas')
+      end
+
+      body = abrir!(items: [{ stock_id: otro.id, cantidad: 10 }], como: ana)
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(body['error']).to match(/no venía del turno anterior/i)
+    end
+
+    # Y el primer día, cuando no hay nada que heredar, la mesa la carga el dueño de la mercadería.
+    it 'sin turno anterior, el que atiende no abre: la carga administración' do
+      body = abrir!(items: [{ stock_id: northern.id, cantidad: 100 }], como: ana)
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(body['error']).to match(/la carga administración/i)
+    end
+
+    it 'y la pantalla no le ofrece el depósito entero: sólo lo que heredó' do
+      cerrar_con!(80)
+      cuerpo = ver(ana)
+
+      expect(cuerpo['apertura_heredada']).to be(true)
+      expect(cuerpo['disponibles'].map { |s| s['stock_id'] }).to eq([northern.id])
+    end
+
+    it 'a administración sí' do
+      cerrar_con!(80)
+      cuerpo = ver(admin)
+
+      expect(cuerpo['apertura_heredada']).to be(false)
+    end
+
+    # Un turno cerrado con `cantidad` contada, para tener qué heredar.
+    def cerrar_con!(contado)
+      turno = abrir_mostrador!(sede, usuario: admin, recibe: ana)
+      ActsAsTenant.with_tenant(club) do
+        Mostradores::CerrarTurno.call(
+          turno: turno, usuario: ana, efectivo_contado_ars: 0,
+          conteos: turno.items.map { |i| { item_id: i.id, contado: contado, motivo: 'conteo' } }
+        )
+      end
     end
 
     it 'uno solo por mostrador' do

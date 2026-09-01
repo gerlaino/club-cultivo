@@ -34,7 +34,14 @@ module Dispensario
         sugerido:    turno ? [] : sugerido,
         # Siempre, no sólo al abrir: con el turno andando es de donde sale lo que se repone a
         # media tarde cuando se acaba algo y hay cola.
-        disponibles: disponibles.map { |s| serialize_stock(s) },
+        #
+        # PERO al ABRIR, el que atiende sólo ve lo que heredó: abrir con un producto que no venía
+        # es sacarlo del depósito, y eso lo hace quien responde por la mercadería. La regla la
+        # aplica `AbrirTurno` — acá se recorta lo que se OFRECE para no invitarlo a llenar un
+        # formulario que el backend va a rechazar.
+        disponibles: (para_abrir_heredado? ? sugerido : disponibles.map { |s| serialize_stock(s) }),
+        # Para que la pantalla lo explique en vez de mostrar una tabla corta sin decir por qué.
+        apertura_heredada: para_abrir_heredado?,
       }
     end
 
@@ -308,6 +315,13 @@ module Dispensario
     # Todo lo que se puede subir a la mesa: stock de esta sede habilitado para dispensa y con
     # algo libre. `cantidad_disponible_real` ya descuenta lo reservado a un paciente y lo
     # apartado a un evento: eso está en el mismo frasco pero no es del mostrador.
+    # ¿A esta persona, con el mostrador cerrado, se le ofrece sólo lo del turno anterior?
+    # Administración carga lo que quiera; el que atiende hereda. Con el turno YA abierto la
+    # respuesta es no: ahí baja del depósito por la puerta que deja rastro (`sin_supervision`).
+    def para_abrir_heredado?
+      @mostrador.turno_abierto.nil? && current_user.atiende_mostrador?
+    end
+
     def disponibles
       @disponibles ||= calcular_disponibles
     end
