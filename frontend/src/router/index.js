@@ -979,6 +979,21 @@ const routes = [
 
       // ── Dispensador ──
       { path: 'dispensar', component: () => import('../views/mobile/MDispensarView.vue') },
+      // El mostrador en el teléfono. REUSA la pantalla de escritorio en vez de escribir una
+      // segunda —igual que `/m/stock` e `/m/historial`—: son la misma mesa, y dos pantallas para
+      // el mismo hecho es cómo dejan de coincidir. Sin esto, el que atiende con el celular no
+      // podía ni recibir la mesa ni cerrar contando, que es la mitad de su día.
+      {
+        path: 'mostrador',
+        component: () => import('../views/MostradorView.vue'),
+        // El mismo guard que la ruta de escritorio: es la misma pantalla y la misma regla, y
+        // escribirla dos veces distintas es cómo dejan de coincidir.
+        beforeEnter: (to, from, next) => {
+          const auth = useAuthStore()
+          if (['admin', 'supervisor', 'dispensador'].includes(auth.user?.role)) next()
+          else next('/')
+        },
+      },
       { path: 'reservas',  component: () => import('../views/mobile/MReservasView.vue') },
       { path: 'stock',     component: () => import('../views/StockDispensadorView.vue') },
       // Sus tareas asignadas. Misma vista que usan cultivador, manicura y admin en la PWA: la
@@ -1137,6 +1152,7 @@ export function puedeEntrar(role, path) {
 // organización y colgarlas de una suite ya hizo desaparecer secciones que hacían falta.
 const FEATURE_POR_PREFIJO = [
   ['/mostrador',            'produccion_dispensa'],
+  ['/m/mostrador',          'produccion_dispensa'],
   ['/salas',                'cultivo'],
   ['/lotes',                'cultivo'],
   ['/plantas',              'cultivo'],

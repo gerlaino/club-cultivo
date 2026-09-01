@@ -430,6 +430,11 @@ algo que el backend rechaza, que es el peor error posible porque parece culpa de
   pantalla**. Quien la cargó puede cerrarla, por el camino de siempre.
 - **La tabla se lee en el teléfono** (`tabla-cards`): ocho columnas con scroll horizontal no se
   leen parado frente a alguien, que es cómo se usa esta pantalla.
+- **Y el mostrador ENTRA en la PWA** (`/m/mostrador`, en la barra de abajo del dispensador). Tenía
+  la caja de plata pero no la mesa: atendiendo con el celular no podía ni recibirla ni cerrar
+  contando, que es la mitad de su día. Reusa la MISMA pantalla en vez de escribir una segunda
+  —igual que `/m/stock` e `/m/historial`—, con el mismo guard de rol: dos pantallas para el mismo
+  hecho es cómo dejan de coincidir.
 
 ### De paso, otra vez
 
@@ -464,7 +469,7 @@ algo que el backend rechaza, que es el peor error posible porque parece culpa de
 `cobros.rendicion_caja_id`. (`clubs.exigir_mostrador_abierto` se agregó y se sacó en el mismo
 bloque: el mostrador no es una opción.)
 
-**2759 rspec ✓ · 1759 vitest ✓ · build limpio · 6 pruebas de navegador ✓.**
+**2759 rspec ✓ · 1759 vitest ✓ · build limpio · 7 pruebas de navegador ✓.**
 
 ---
 

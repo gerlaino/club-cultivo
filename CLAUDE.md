@@ -112,6 +112,8 @@ Ninguno se considera cerrado; todos son candidatos a revisión.
     arriba de todo con su número puesto y su chip "viene del turno anterior" —nunca "anoche": el
     mostrador se cierra y se reabre varias veces por día—, ordene por lo que ordene. Sin paginación a propósito —
     el listado viaja completo y paginar perdería lo cargado al cambiar de página.
+    Vive en `/mostrador` y en la PWA en **`/m/mostrador`**, que es la MISMA pantalla servida
+    dentro del envoltorio móvil (como `/m/stock`), con el mismo guard de rol.
     Cuatro solapas: **Hoy** · **Turnos** (los cerrados; administración ve todos, el que atiende ve
     LOS SUYOS — el filtro es del backend) · **Merma** y **Rendiciones**, sólo administración. La
     solapa de Merma hace DOS cosas y por eso están separadas: arriba la **lista de trabajo** (los
@@ -306,7 +308,7 @@ Suite 1239 ✓ + 58 vitest ✓. **Deploy: sumar `add_vendible_a_bar_venta_items`
 `Mostrador`, apertura con herencia, recepción del que atiende, cargar/devolver, cierre con los dos
 arqueos, fondo/retiro, Merma con su lista de trabajo, Turnos, y la rendición del repartidor de
 punta a punta —incluido **devolver lo que se había quedado** (`Rendiciones::SaldarACuenta`)—.
-**2759 rspec ✓ · 1759 vitest ✓ · build limpio · 6 pruebas de navegador ✓.**
+**2759 rspec ✓ · 1759 vitest ✓ · build limpio · 7 pruebas de navegador ✓.**
 
 **Sin correr, del bloque del mostrador:** nada. Las migraciones las corre solo el deploy.
 

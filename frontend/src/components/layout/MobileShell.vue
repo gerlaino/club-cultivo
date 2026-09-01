@@ -196,6 +196,9 @@ const NAV = {
   // carnet. Tenerla dos veces obligaba a decidir por cuál entrar para hacer lo mismo.
   dispensador: { items: [
     { to: '/m/dispensar', icon: 'bi-bag-plus',       label: 'Dispensar', feature: 'produccion_dispensa' },
+    // La MESA: recibirla, reponer, contar y cerrar. Es la mitad de su día y sólo estaba en el
+    // escritorio, así que atendiendo con el celular no podía ni arrancar el turno.
+    { to: '/m/mostrador', icon: 'bi-shop',           label: 'Mostrador', feature: 'produccion_dispensa' },
     { to: '/m/reservas',  icon: 'bi-bookmark-check', label: 'Reservas',  feature: 'produccion_dispensa' },
     { to: '/m/stock',     icon: 'bi-boxes',          label: 'Stock' },
     { to: '/m/historial', icon: 'bi-clock-history',  label: 'Historial', feature: 'produccion_dispensa' },

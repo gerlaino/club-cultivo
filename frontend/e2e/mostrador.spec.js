@@ -118,3 +118,37 @@ test('el dispensador ve sus turnos cerrados', async ({ page }) => {
 
   expect(errores, errores.join('\n')).toEqual([])
 })
+
+// EL MOSTRADOR EN EL TELÉFONO.
+//
+// El que atiende está de pie con alguien enfrente: si recibir la mesa y cerrar contando sólo
+// existieran en el escritorio, la mitad de su día quedaría fuera de la app que usa. Es la MISMA
+// pantalla —no una segunda versión— servida dentro del envoltorio móvil.
+test.describe('desde el celular', () => {
+  test.use({ viewport: { width: 390, height: 844 } })
+
+  test('el dispensador llega al mostrador desde la barra de abajo y lo abre', async ({ page }) => {
+    const errores = vigilarErrores(page)
+    await entrar(page, 'dispensador')
+    await page.goto('/m/dispensar')
+
+    await page.getByRole('link', { name: 'Mostrador' }).click()
+    await expect(page).toHaveURL(/\/m\/mostrador/)
+
+    // La tabla se lee como tarjetas, no con scroll horizontal.
+    await expect(page.locator('.tst__table tbody tr').first()).toBeVisible()
+    await expect(page.locator('.tst__table thead')).toBeHidden()
+
+    // Y puede abrirlo él mismo: lo que abre quien atiende nace confirmado, no hay entrega que
+    // firmar. Hereda lo que quedó contado en el cierre anterior.
+    const heredada = page.locator('.tst__table tbody tr').first()
+    await expect(heredada).toContainText('viene del turno anterior')
+    await expect(heredada.locator('.tst__input')).toHaveValue('295')
+    await page.click('.mst__acciones .mst__btn--primary')
+
+    await expect(page.locator('.mst__estado')).toHaveText(/Abierto/, { timeout: 15_000 })
+    await expect(page.getByRole('button', { name: 'Cerrar y contar' })).toBeVisible()
+
+    expect(errores, errores.join('\n')).toEqual([])
+  })
+})
