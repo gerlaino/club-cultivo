@@ -311,10 +311,18 @@ entrega de una **reserva** y lo apartado para un **evento**.
 Con el módulo andando, la última pasada fue mirar la pantalla como cada persona que la usa. Lo que
 apareció no eran bugs: eran **finales sin cerrar**.
 
-**El que atiende, la primera vez.** No tenía forma de saber qué es "recibir" ni por qué el sistema
-le pide contar dos veces. Ahora la pantalla lo explica en tres renglones —se abre, se recibe, se
-cierra— **una sola vez**: se cierra y no vuelve. Un cartel permanente sobre la pantalla que se usa
-cien veces por día es ruido.
+**Elegir el producto y CUÁNTO, en el mismo gesto.** La cantidad aparecía recién en la fila de
+abajo, después de apretar Agregar: se podía poner, pero no se veía — y para el que abre el
+mostrador por primera vez eso es lo mismo que no poder. Encima era **inconsistente con la propia
+pantalla**: con el mostrador ya abierto, "Bajar a la mesa" sí la pregunta en el acto. Ahora el
+número va al lado del selector, con la unidad de lo elegido, y no deja bajar más de lo que hay en
+el depósito.
+
+**Se probó una guía de "cómo funciona el día" y se sacó el mismo día.** El paso 1 decía *"se abre
+con lo que quedó contado anoche"* y la primera vez **no hay anoche**: al lado, la pantalla decía
+"Elegí qué baja del depósito". Un cartel que se contradice con lo que estás mirando es peor que no
+tener cartel. La regla que deja: **lo que no aclara, que no confunda** — y la pantalla ya se
+explica sola en cada momento, que es donde sirve.
 
 **El producto que directamente NO ESTÁ.** Al recibir sólo se podía corregir el número, y para un
 frasco que no está sobre la mesa eso significa dejarlo en **cero** toda la jornada, ocupando un
@@ -387,7 +395,7 @@ dejaba de proteger de lo único que falla de verdad acá, que es la casilla mal 
 `cobros.rendicion_caja_id`. (`clubs.exigir_mostrador_abierto` se agregó y se sacó en el mismo
 bloque: el mostrador no es una opción.)
 
-**2746 rspec ✓ · 1743 vitest ✓ · build limpio · 6 pruebas de navegador ✓.**
+**2746 rspec ✓ · 1746 vitest ✓ · build limpio · 6 pruebas de navegador ✓.**
 
 ---
 

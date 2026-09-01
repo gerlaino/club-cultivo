@@ -300,7 +300,7 @@ Suite 1239 ✓ + 58 vitest ✓. **Deploy: sumar `add_vendible_a_bar_venta_items`
 `Mostrador`, apertura con herencia, recepción del que atiende, cargar/devolver, cierre con los dos
 arqueos, fondo/retiro, Merma con su lista de trabajo, Turnos, y la rendición del repartidor de
 punta a punta —incluido **devolver lo que se había quedado** (`Rendiciones::SaldarACuenta`)—.
-**2746 rspec ✓ · 1743 vitest ✓ · build limpio · 6 pruebas de navegador ✓.**
+**2746 rspec ✓ · 1746 vitest ✓ · build limpio · 6 pruebas de navegador ✓.**
 
 **Sin correr, del bloque del mostrador:** nada. Las migraciones las corre solo el deploy.
 

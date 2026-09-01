@@ -142,7 +142,7 @@ describe('La pantalla del mostrador', () => {
       const w = await montar()
 
       expect(w.text()).toContain('Northern Lights')
-      expect(w.find('.mst__input--cant').element.value).toBe('215')
+      expect(w.find('.mst__draft-row .mst__input--cant').element.value).toBe('215')
     })
 
     it('manda al backend lo que quedó en la lista, con el fondo de caja', async () => {
@@ -154,6 +154,65 @@ describe('La pantalla del mostrador', () => {
       expect(abrirMostrador).toHaveBeenCalledWith(10, {
         monto_inicial_ars: 50000,
         items: [{ stock_id: 1, cantidad: 215 }],
+      })
+    })
+
+    // El producto Y cuánto, en el mismo gesto. Antes la cantidad aparecía recién en la fila de
+    // abajo, después de agregar: se podía poner, pero no se veía — y para el que abre el
+    // mostrador por primera vez eso es lo mismo que no poder.
+    describe('elegir qué baja y cuánto', () => {
+      async function elegir (w, stockId, cantidad) {
+        await w.find('.mst__agregar select').setValue(stockId)
+        if (cantidad !== undefined) await w.find('.mst__agregar-cant input').setValue(cantidad)
+      }
+
+      it('sin decir cuánto, no deja agregar', async () => {
+        const w = await montar()
+        await elegir(w, 2)
+
+        expect(w.find('.mst__agregar .mst__btn').attributes('disabled')).toBeDefined()
+      })
+
+      it('con el producto y la cantidad, lo baja a la mesa', async () => {
+        const w = await montar()
+        await elegir(w, 2, 40)
+        await w.find('.mst__agregar .mst__btn').trigger('click')
+
+        const filas = w.findAll('.mst__draft-row')
+        expect(filas).toHaveLength(2)
+        expect(filas[1].text()).toContain('Preroll')
+        expect(filas[1].find('.mst__input--cant').element.value).toBe('40')
+      })
+
+      it('y muestra la unidad de lo que elegiste', async () => {
+        const w = await montar()
+        await elegir(w, 2, 40)
+
+        expect(w.find('.mst__agregar-cant .mst__draft-unidad').text()).toBe('un')
+      })
+
+      // El backend lo rechaza igual, pero decirlo acá evita llenar el formulario entero para que
+      // rebote al final.
+      it('no deja bajar más de lo que hay en el depósito', async () => {
+        const w = await montar()
+        await elegir(w, 2, 500) // hay 120
+
+        expect(w.text()).toContain('En el depósito quedan 120 un')
+        expect(w.find('.mst__agregar .mst__btn').attributes('disabled')).toBeDefined()
+      })
+
+      it('y lo que se agrega se puede corregir en la fila', async () => {
+        const w = await montar()
+        await elegir(w, 2, 40)
+        await w.find('.mst__agregar .mst__btn').trigger('click')
+        await w.findAll('.mst__draft-row')[1].find('.mst__input--cant').setValue(25)
+        await w.find('.mst__acciones .mst__btn--primary').trigger('click')
+        await flushPromises()
+
+        expect(abrirMostrador).toHaveBeenCalledWith(10, {
+          monto_inicial_ars: 0,
+          items: [{ stock_id: 1, cantidad: 215 }, { stock_id: 2, cantidad: 25 }],
+        })
       })
     })
 
@@ -827,28 +886,6 @@ describe('La pantalla del mostrador', () => {
       const w = await verTurnos()
 
       expect(w.find('.trn__ok').text()).toBe('cuadró')
-    })
-  })
-
-  // ── La primera vez ─────────────────────────────────────────────────────────
-  describe('la guía de las tres partes del día', () => {
-    beforeEach(() => { localStorage.clear() })
-
-    it('se muestra la primera vez', async () => {
-      const w = await montar()
-
-      expect(w.find('.mst__guia').exists()).toBe(true)
-      expect(w.text()).toContain('Cómo funciona el día')
-      // Y el tono: una diferencia no es una falta.
-      expect(w.text()).toContain('no es una falta')
-    })
-
-    it('y no vuelve una vez que la cerraste', async () => {
-      const w = await montar()
-      await w.find('.mst__guia .mst__icon-btn').trigger('click')
-
-      expect(w.find('.mst__guia').exists()).toBe(false)
-      expect((await montar()).find('.mst__guia').exists()).toBe(false)
     })
   })
 

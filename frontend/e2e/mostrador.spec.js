@@ -21,9 +21,11 @@ test('el día del mostrador, de punta a punta', async ({ page }) => {
   await expect(page.locator('.mst__estado')).toHaveText(/Cerrado/)
 
   await page.fill('.mst__input--fondo', '50000')
+  // El producto y cuánto, en el mismo gesto.
   await elegirPorTexto(page, '.mst__agregar select', 'flor seca')
+  await page.fill('.mst__agregar-cant .mst__input--cant', '300')
   await page.click('.mst__agregar .mst__btn')
-  await page.fill('.mst__input--cant', '300')
+  await expect(page.locator('.mst__draft-row .mst__input--cant')).toHaveValue('300')
   await page.click('.mst__acciones .mst__btn--primary')
   await expect(page.locator('.mst__estado')).toHaveText(/Falta recibirlo/)
 
@@ -77,7 +79,7 @@ test('el día del mostrador, de punta a punta', async ({ page }) => {
   await expect(page.locator('.mst__estado')).toHaveText(/Cerrado/, { timeout: 15_000 })
 
   // ── 5. Mañana hereda lo de anoche ──────────────────────────────────────────
-  await expect(page.locator('.mst__input--cant').first()).toHaveValue('295')
+  await expect(page.locator('.mst__draft-row .mst__input--cant').first()).toHaveValue('295')
   await expect(page.getByText(/quedaron \$50\.000 en el cajón anoche/)).toBeVisible()
 
   expect(errores, errores.join('\n')).toEqual([])

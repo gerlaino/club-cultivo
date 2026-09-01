@@ -57,27 +57,6 @@
 
     <template v-else>
 
-    <!-- La primera vez que alguien abre esta pantalla no tiene idea de qué es "recibir" ni por
-         qué el sistema le pide contar dos veces. Se explica UNA vez, se cierra y no vuelve:
-         un cartel permanente sobre la pantalla que se usa cien veces por día es ruido. -->
-    <section v-if="mostrarGuia" class="mst__guia">
-      <div class="mst__guia-txt">
-        <h2 class="mst__guia-title">Cómo funciona el día</h2>
-        <ol class="mst__guia-pasos">
-          <li><b>Se abre</b> con lo que quedó contado anoche. Corregís lo que no coincida.</li>
-          <li><b>Se recibe</b>: si lo dejó otra persona, contás y confirmás. Recién ahí se dispensa.</li>
-          <li><b>Se cierra</b> contando lo que queda y la plata del cajón.</li>
-        </ol>
-        <p class="mst__guia-nota">
-          Una diferencia no es una falta: la merma existe siempre. Contarla sirve para que la
-          organización sepa cuánta hay y dónde.
-        </p>
-      </div>
-      <button class="mst__icon-btn" title="Entendido" @click="ocultarGuia">
-        <X :size="16" />
-      </button>
-    </section>
-
     <div v-if="cargando" class="mst__skel-wrap">
       <div v-for="n in 4" :key="n" class="mst__skel" />
     </div>
@@ -129,6 +108,10 @@
       </ul>
       <p v-else class="mst__vacio">Todavía no pusiste nada sobre la mesa.</p>
 
+      <!-- El producto Y cuánto, en el mismo gesto. Antes la cantidad aparecía recién en la fila
+           de abajo, después de agregar: se podía poner, pero no se veía — que para el que abre el
+           mostrador por primera vez es lo mismo que no poder. Y con el mostrador ya abierto,
+           "Bajar a la mesa" sí la pregunta en el acto: eran dos formas de hacer lo mismo. -->
       <div class="mst__agregar">
         <select v-model="aAgregar" class="mst__select">
           <option value="">Agregar del depósito…</option>
@@ -136,10 +119,22 @@
             {{ s.etiqueta }} — {{ fmt(s.disponible) }} {{ s.unidad }} libres
           </option>
         </select>
-        <button class="mst__btn mst__btn--ghost" :disabled="!aAgregar" @click="agregarAlBorrador">
+        <div class="mst__agregar-cant">
+          <input v-model.number="cantAAgregar" type="number" min="0" step="0.1"
+                 class="mst__input mst__input--cant" placeholder="Cuánto"
+                 aria-label="Cuánto baja a la mesa" @keyup.enter="agregarAlBorrador" />
+          <span class="mst__draft-unidad">{{ unidadAAgregar }}</span>
+        </div>
+        <button class="mst__btn mst__btn--ghost"
+                :disabled="!aAgregar || !(cantAAgregar > 0) || !!excedeDisponible"
+                @click="agregarAlBorrador">
           Agregar
         </button>
       </div>
+      <p v-if="excedeDisponible" class="mst__aviso mst__aviso--warn">
+        En el depósito quedan {{ fmt(excedeDisponible.disponible) }} {{ excedeDisponible.unidad }}
+        de {{ excedeDisponible.etiqueta }}.
+      </p>
 
       <div class="mst__acciones">
         <button class="mst__btn mst__btn--primary" :disabled="guardando || !borrador.length" @click="abrir">
@@ -526,6 +521,9 @@ const disponibles = ref([])
 const borrador  = ref([])
 const fondo     = ref(0)
 const aAgregar  = ref('')
+// Cuánto de eso baja a la mesa. Va acá y no en la fila de abajo: elegir el producto y decir
+// cuánto es UN gesto, y separarlos escondía la mitad.
+const cantAAgregar = ref(null)
 const mover     = ref(null)
 const cierre    = ref(null)
 const fondoSugerido = ref(null)
@@ -544,18 +542,6 @@ const difConteo  = computed(() => {
 const tab       = ref('hoy')
 // Viene con la carga principal: un aviso que sólo aparece cuando ya entraste a mirarlo no avisa.
 const sinRevisar = ref(0)
-
-// La explicación de las tres partes del día. Se muestra hasta que la cierran: un cartel
-// permanente sobre la pantalla que se usa cien veces por día es ruido, pero la primera vez nadie
-// sabe qué es "recibir" ni por qué le piden contar dos veces. Por usuario y por navegador — no
-// vale la pena una columna en la base para esto.
-const GUIA_KEY = 'mostrador:guia-vista'
-const guiaVista = ref(true)
-const mostrarGuia = computed(() => !guiaVista.value)
-function ocultarGuia () {
-  guiaVista.value = true
-  try { localStorage.setItem(GUIA_KEY, '1') } catch { /* modo incógnito: se muestra de nuevo */ }
-}
 
 // Tres momentos, no dos: cerrado · abierto pero sin recibir · andando. El del medio existe
 // porque cuando lo carga el admin hay una entrega, y hasta que el que atiende no la firma nadie
@@ -590,6 +576,16 @@ const hayCorreccion = computed(() =>
 const difRecepcion = computed(() => {
   if (!turno.value?.caja || efectivoRecepcion.value === null || efectivoRecepcion.value === '') return null
   return Math.round((Number(efectivoRecepcion.value) - turno.value.caja.esperado_ars) * 100) / 100
+})
+
+const stockAAgregar = computed(() => disponibles.value.find(s => s.stock_id === aAgregar.value) || null)
+const unidadAAgregar = computed(() => stockAAgregar.value?.unidad || '')
+// No se puede bajar lo que no está. El backend lo rechaza igual, pero decirlo acá evita llenar
+// el formulario entero para que rebote al final.
+const excedeDisponible = computed(() => {
+  const s = stockAAgregar.value
+  if (!s || !(cantAAgregar.value > 0)) return null
+  return Number(cantAAgregar.value) > Number(s.disponible) ? s : null
 })
 
 // Lo que todavía no está en la lista: no tiene sentido ofrecer dos veces el mismo frasco.
@@ -663,8 +659,11 @@ async function cargar () {
 
 function agregarAlBorrador () {
   const s = disponibles.value.find(x => x.stock_id === aAgregar.value)
-  if (s) borrador.value.push({ ...s, cantidad: null })
+  if (!s || !(cantAAgregar.value > 0) || excedeDisponible.value) return
+
+  borrador.value.push({ ...s, cantidad: cantAAgregar.value })
   aAgregar.value = ''
+  cantAAgregar.value = null
 }
 
 async function abrir () {
@@ -841,7 +840,6 @@ async function bajarNuevo () {
 }
 
 onMounted(async () => {
-  try { guiaVista.value = localStorage.getItem(GUIA_KEY) === '1' } catch { guiaVista.value = true }
   if (!sedeStore.loaded) await sedeStore.fetchSedes()
   // No se llama a `cargar()` acá: fijar la sede dispara el watcher de abajo, que carga. Hacer
   // las dos cosas mandaba DOS pedidos por cada apertura de la pantalla.
@@ -910,21 +908,6 @@ watch(sedeId, cargar, { immediate: true })
 /* Cargado por el admin y esperando que lo reciba el que atiende: ni una cosa ni la otra. */
 .mst__estado.is-sin_recibir { background: var(--c-amber-100); color: var(--c-amber-500); }
 
-/* ── La guía de las tres partes del día ─────────────────────────────────────── */
-.mst__guia {
-  display: flex; align-items: flex-start; gap: 12px;
-  background: var(--c-leaf-50); border: 1px solid var(--c-leaf-100);
-  border-radius: 14px; padding: 18px 20px; margin-bottom: 16px;
-}
-.mst__guia-txt   { flex: 1; min-width: 0; }
-.mst__guia-title {
-  font-family: var(--font-display); font-size: var(--fs-15, 15px); font-weight: 700;
-  color: var(--c-leaf-900); margin: 0 0 8px;
-}
-.mst__guia-pasos { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
-.mst__guia-pasos li { font-size: var(--fs-13); color: var(--c-ink-700); }
-.mst__guia-nota  { margin: 9px 0 0; font-size: var(--fs-12); color: var(--c-ink-500); max-width: 60ch; }
-
 /* ── Tarjeta de apertura ────────────────────────────────────────────────────── */
 .mst__card {
   background: #fff; border: 1px solid var(--c-slate-200); border-radius: 14px;
@@ -980,8 +963,9 @@ watch(sedeId, cargar, { immediate: true })
 .mst__pie   { margin: 0; font-size: var(--fs-12); color: var(--c-ink-500); }
 /* El renglón que se va de la mesa: se ve tachado antes de confirmar, para poder arrepentirse. */
 .mst__draft-row.is-quitado .mst__draft-nombre { text-decoration: line-through; color: var(--c-ink-500); }
-.mst__agregar { display: flex; gap: 10px; flex-wrap: wrap; }
+.mst__agregar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .mst__agregar .mst__select { flex: 1; min-width: 220px; }
+.mst__agregar-cant { display: inline-flex; align-items: baseline; gap: 6px; }
 
 /* ── Turno abierto ──────────────────────────────────────────────────────────── */
 /* El turno y su acción, en una línea: el botón suelto debajo del nombre parecía de otra cosa. */
