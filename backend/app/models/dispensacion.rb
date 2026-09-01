@@ -99,8 +99,8 @@ class Dispensacion < ApplicationRecord
   before_validation { self.fecha_dispensacion ||= Date.current }
   before_validation :sincronizar_mirror_desde_items, if: :lineas_explicitas?
   before_validation :componer_direccion_envio, if: :con_envio?
-  # Antes de validar y no en `before_create`: con `exigir_mostrador_abierto` prendido, que haya
-  # turno abierto ES una validación, y en before_create llegaría siempre en nil.
+  # Antes de validar y no en `before_create`: para el que atiende, que haya turno abierto ES una
+  # validación (`mostrador_abierto`), y en `before_create` el turno llegaría siempre en nil.
   before_validation :asignar_turno_mostrador, on: :create
   before_create     :generar_codigo_paquete, if: :con_envio?
   before_create     :capturar_snapshot_trazabilidad
@@ -508,8 +508,10 @@ class Dispensacion < ApplicationRecord
   def sede_del_mostrador = sede_id || stock&.sede_id
 
   # El turno abierto del mostrador de esa sede, si hay uno. No hay nada que elegir: es uno por
-  # mostrador. Sin turno abierto queda nil y la dispensa funciona como siempre — el mostrador es
-  # control, no un requisito para entregar (eso lo decide `exigir_mostrador_abierto`, en B2).
+  # mostrador. Sin turno abierto queda nil, y ahí manda quién dispensa: para administración la
+  # dispensa sigue de largo, y para el que atiende la frena `mostrador_abierto`. (Hubo un
+  # interruptor por organización, `exigir_mostrador_abierto`; se agregó y se sacó en el mismo
+  # bloque — el mostrador no es una opción, es dónde opera el dispensador.)
   #
   # `unscoped` + club_id explícito: una dispensa se crea también desde la entrega del repartidor
   # y desde el portal, donde el tenant no siempre está fijado, y `TurnoMostrador` es tenant con
