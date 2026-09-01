@@ -141,6 +141,8 @@ class ReservasController < ApplicationController
       observaciones:          "Entrega de reserva ##{@reserva.id}",
     )
     dispensacion.user = current_user
+    # Lo reservado ya está apartado a nombre del paciente: no pasa por la mesa del mostrador.
+    dispensacion.desde_reserva = true
 
     if con_envio
       dispensacion.delivery_id = params[:delivery_id]

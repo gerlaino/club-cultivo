@@ -75,6 +75,7 @@ const FORMA_LABELS = {
   aceite:      'Aceite',
   comestible:  'Comestible',
   topico:      'Tópico',
+  preroll:     'Preroll',
 }
 function formaLabel(f) { return FORMA_LABELS[f] || f || '—' }
 function formatDate(d) {

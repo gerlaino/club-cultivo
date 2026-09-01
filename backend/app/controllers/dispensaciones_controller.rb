@@ -447,20 +447,14 @@ class DispensacionesController < ApplicationController
       return render json: { error: 'Pertenece a un período contable cerrado y no puede cancelarse.' }, status: :unprocessable_entity
     end
     motivo = params[:motivo].presence
-    cc = @dispensacion.paciente.cuenta_corriente
-    ActiveRecord::Base.transaction do
-      revertir_gramos(@dispensacion)
-      revertir_cuenta_corriente(@dispensacion)
-      CuentaCorrienteMovimiento.where(dispensacion_id: @dispensacion.id).update_all(dispensacion_id: nil)
-      @dispensacion.movimientos_contables.destroy_all
-      @dispensacion.cobros.destroy_all          # los cobros (y sus comprobantes) se van con la cancelación
-      @dispensacion.send(:incrementar_stock)   # el producto vuelve al stock
-      registrar_evento_envio(@dispensacion, 'cancelado', motivo: motivo)
-      @dispensacion.update!(estado_envio: 'cancelada', historial_envio: @dispensacion.historial_envio)
-    end
+    registrar_evento_envio(@dispensacion, 'cancelado', motivo: motivo)
+    # La reversa vive en `Dispensaciones::Cancelar`: la usa también la rendición del repartidor
+    # cuando vuelve un paquete, y escribirla dos veces es cómo dejan de coincidir.
+    res = Dispensaciones::Cancelar.call(dispensacion: @dispensacion, usuario: current_user,
+                                        motivo: motivo, evento: false)
+    return render json: { errors: [res.error] }, status: :unprocessable_entity unless res.ok?
+
     render json: serialize_dispensacion_delivery(@dispensacion)
-  rescue => e
-    render json: { errors: [e.message] }, status: :unprocessable_entity
   end
 
   # GET /dispensaciones/export_csv

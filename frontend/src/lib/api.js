@@ -341,6 +341,16 @@ export const getUsuarioStats   = (id, params = {}) => api.get(`/usuarios/${id}/s
 export const getUsuarioAuditorias = (id, params = {}) => api.get(`/usuarios/${id}/auditorias`, { params });
 export const recibirCajaDelivery = (id) => api.post(`/usuarios/${id}/recibir_caja`);
 
+// ── Rendición de caja del repartidor ──────────────────────────────────────────
+// Él la inicia y elige a quién; el receptor CUENTA y recibe. La plata nunca queda en el aire: el
+// que cuenta es el que la tiene, y ese número entra al cajón. Si ajustó, queda pendiente la
+// conformidad del repartidor — constancia, no candado.
+export const listRendiciones      = ()            => api.get('/rendiciones')
+export const receptoresRendicion  = ()            => api.get('/rendiciones/receptores')
+export const crearRendicion       = (payload)     => api.post('/rendiciones', payload)
+export const recibirRendicion     = (id, payload) => api.post(`/rendiciones/${id}/recibir`, payload)
+export const conformarRendicion   = (id, payload) => api.post(`/rendiciones/${id}/conformar`, payload)
+
 // Convierte un path relativo de ActiveStorage (/rails/active_storage/...) en URL
 // absoluta contra el host de la API (front y API pueden estar en hosts distintos).
 export const assetUrl = (path) => {
@@ -487,6 +497,25 @@ export const listBarVentas      = (barId)          => api.get(`/bares/${barId}/v
 export const listVendiblesBar   = (barId, params = {}) => api.get(`/bares/${barId}/vendibles`, { params })
 export const deleteBarVenta     = (barId, id)      => api.delete(`/bares/${barId}/ventas/${id}`)
 
+// ── Mostrador de dispensa · la mercadería sobre la mesa ───────────────────────
+// El turno de STOCK del mostrador, hermano de la caja de plata: se abren y se cierran juntos
+// (un gesto, dos arqueos) pero son registros aparte. Lo cargado se APARTA, no se descuenta.
+export const getMostrador      = (sedeId)          => api.get(`/sedes/${sedeId}/mostrador`)
+export const abrirMostrador    = (sedeId, payload) => api.post(`/sedes/${sedeId}/mostrador/abrir`, payload)
+export const confirmarMostrador = (sedeId, payload) => api.post(`/sedes/${sedeId}/mostrador/confirmar`, payload)
+export const cargarMostrador   = (sedeId, payload) => api.post(`/sedes/${sedeId}/mostrador/cargar`, payload)
+export const devolverMostrador = (sedeId, payload) => api.post(`/sedes/${sedeId}/mostrador/devolver`, payload)
+export const cerrarMostrador   = (sedeId, payload) => api.post(`/sedes/${sedeId}/mostrador/cerrar`, payload)
+// Dónde se le va el producto a la organización. No es auditoría: la merma es inevitable y se
+// mide para encontrar el cuello de botella — qué producto y en qué momento.
+export const getMermaMostrador = (sedeId, params = {}) => api.get(`/sedes/${sedeId}/mostrador/merma`, { params })
+export const revisarTurnoMostrador = (sedeId, id) => api.post(`/sedes/${sedeId}/mostrador/turnos/${id}/revisar`)
+export const getTurnoMostrador     = (sedeId, id) => api.get(`/sedes/${sedeId}/mostrador/turnos/${id}`)
+// Arreglar un conteo mal cargado en un turno ya cerrado: es el único lugar del módulo donde un
+// dedazo ajusta el inventario real. No borra el movimiento viejo, asienta la diferencia.
+export const corregirTurnoMostrador = (sedeId, id, payload) =>
+  api.post(`/sedes/${sedeId}/mostrador/turnos/${id}/corregir`, payload)
+
 // ── Mostrador de dispensa · caja de turno ─────────────────────────────────────
 // Mismo flujo y mismo modelo que la del bar (`CajaTurno` apunta a un punto de venta), pero es
 // una caja APARTE: cada punto abre, arquea y cierra la suya y la plata no se mezcla.
@@ -499,6 +528,9 @@ export const confirmarCierreMostrador   = (sedeId, id)          => api.post(`/se
 export const cerrarCajaMostrador        = (sedeId, id, payload) => api.post(`/sedes/${sedeId}/caja/${id}/cerrar`, payload)
 export const anularCajaMostrador        = (sedeId, id, payload) => api.post(`/sedes/${sedeId}/caja/${id}/anular`, payload)
 export const salidaCajaMostrador        = (sedeId, id, payload) => api.post(`/sedes/${sedeId}/caja/${id}/salida`, payload)
+// El espejo de `salida`: plata que se PONE en el cajón (cambio, reponer el fondo, lo cobrado por
+// fuera). Va como ajuste: esa plata ya era del club, sólo cambió de lugar.
+export const ingresoCajaMostrador       = (sedeId, id, payload) => api.post(`/sedes/${sedeId}/caja/${id}/ingreso`, payload)
 export const responsablesCaja           = (sedeId)          => api.get(`/sedes/${sedeId}/caja/responsables`)
 
 // Plata que salió del cajón a nombre de alguien y no se cerró. Vive aparte del libro porque la

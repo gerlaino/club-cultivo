@@ -14,7 +14,8 @@ const error      = ref(null)
 
 const FORMA_LABEL = {
   flor_seca: 'Flor seca', hash: 'Hash', aceite: 'Aceite', tintura: 'Tintura',
-  crema: 'Crema', capsula: 'Cápsula', comestible: 'Comestible', prensado: 'Prensado', otro: 'Otro',
+  crema: 'Crema', capsula: 'Cápsula', comestible: 'Comestible', prensado: 'Prensado',
+  preroll: 'Preroll', otro: 'Otro',
 }
 
 const sedesSociales = computed(() =>

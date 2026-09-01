@@ -24,6 +24,9 @@ class Stock < ApplicationRecord
   has_many :reservas, dependent: :nullify
   # Provisiones de eventos del salón que apartan este stock (ver EventoBarProvision).
   has_many :provisiones_evento, class_name: 'EventoBarProvision', as: :provisionable, dependent: :destroy
+  # Los turnos de mostrador que tienen este stock sobre la mesa. Apartan igual que un evento:
+  # bloquean la cantidad sin descontarla.
+  has_many :items_mostrador, class_name: 'TurnoMostradorItem', dependent: :destroy
   has_many :derivados, class_name: 'Stock', foreign_key: :producido_desde_stock_id, dependent: :nullify
 
   ORIGENES         = %w[lote derivado_lote compra_externa].freeze
@@ -102,7 +105,52 @@ class Stock < ApplicationRecord
   def gramos_reservados
     envios   = dispensaciones.where(estado_envio: %w[pendiente en_viaje]).sum(:cantidad).to_f
     apartado = reservas.pendientes.sum(:cantidad).to_f
-    envios + apartado + apartado_para_eventos.to_f
+    envios + apartado + apartado_para_eventos.to_f + apartado_para_mostrador.to_f
+  end
+
+  # Cantidad que está SOBRE LA MESA de un mostrador con el turno abierto.
+  #
+  # Es la misma mecánica que el apartado de un evento —bloquea, no descuenta— con otro
+  # destinatario: mientras el mostrador la tiene cargada, nadie más la ve libre (ni una reserva
+  # de paciente ni la provisión de un evento). Se libera al cerrar el turno.
+  #
+  # Cargar el mostrador NO genera `StockMovimiento`: el gramo no salió de la organización ni
+  # cambió de sede, sigue siendo esta misma fila. Lo único que cambia es quién responde por él, y
+  # ese rastro vive en el turno.
+  def apartado_para_mostrador
+    return @apartado_mostrador_precargado if defined?(@apartado_mostrador_precargado)
+    return 0.to_d unless TurnoMostradorItem.table_exists?
+
+    items_mostrador.en_turno_abierto.saldo_total
+  end
+
+  # Una query para toda una lista, en vez de una por stock.
+  #
+  # `cantidad_disponible_real` se llama en bucles sobre listados enteros (el inventario, el
+  # carrito, el depósito): sin esto son 40 queries extra en una pantalla de 40 productos. El
+  # apartado de eventos ya suma en Ruby con su propio N+1 — no hacía falta sumar otro.
+  def self.precargar_apartado_mostrador(stocks)
+    lista = Array(stocks)
+    return lista if lista.empty? || !TurnoMostradorItem.table_exists?
+
+    saldos = TurnoMostradorItem.unscoped.en_turno_abierto
+                               .where(stock_id: lista.map(&:id))
+                               .group(:stock_id)
+                               .sum(Arel.sql(TurnoMostradorItem::SALDO_SQL))
+    lista.each { |s| s.instance_variable_set(:@apartado_mostrador_precargado, saldos[s.id].to_d) }
+    lista
+  end
+
+  # Lo que el mostrador de ESTA sede tiene apartado de este stock. Es el techo extra que puede
+  # usar una dispensa hecha desde ese mostrador: para el resto del mundo sigue bloqueado, pero
+  # para el mostrador que lo tiene cargado no es un bloqueo, es su stock.
+  def apartado_en_mostrador_de_sede(sede_id)
+    return 0.to_d if sede_id.blank? || !TurnoMostradorItem.table_exists?
+
+    items_mostrador.en_turno_abierto
+                   .joins(turno_mostrador: :mostrador)
+                   .where(mostradores: { sede_id: sede_id })
+                   .saldo_total
   end
 
   # Cantidad apartada por eventos del salón que todavía no se liberó (reservado − consumido).
@@ -154,7 +202,8 @@ class Stock < ApplicationRecord
     # dispensación (after_create :decrementar_stock). NO se vuelven a restar acá (eso era un
     # doble descuento que dejaba el disponible en ~0 tras una entrega grande). Solo restamos las
     # reservas (apartado), que comprometen stock SIN descontar el real, y lo apartado por eventos.
-    comprometido = reservas.pendientes.sum(:cantidad).to_f + apartado_para_eventos.to_f
+    comprometido = reservas.pendientes.sum(:cantidad).to_f + apartado_para_eventos.to_f +
+                   apartado_para_mostrador.to_f
     [cantidad.to_f - comprometido, 0].max
   end
 
@@ -259,7 +308,13 @@ class Stock < ApplicationRecord
       errors.add(:lote_id, 'es obligatorio para derivados')           if lote_id.blank?
       errors.add(:lote_origen_consumido_g, 'debe ser mayor a 0')     if lote_origen_consumido_g.to_d <= 0
       errors.add(:forma_producto, 'no puede ser flor_seca para derivados') if forma_producto == 'flor_seca'
-      if cantidad.to_d > lote_origen_consumido_g.to_d
+      # De 100 g de flor no pueden salir 120 g de hash: eso es materia que apareció de la nada.
+      #
+      # Pero la regla SÓLO vale cuando el resultado se mide en gramos. De 100 g salen 200 prerolls
+      # de medio gramo, o 400 cápsulas: el número es mayor y está perfecto, porque la unidad es
+      # otra. Comparar 200 unidades contra 100 gramos rechazaba el caso principal del preroll —y
+      # el mensaje de error hasta les decía "gramos" a los prerolls, que es la confusión de fondo.
+      if unidad == 'g' && cantidad.to_d > lote_origen_consumido_g.to_d
         errors.add(:cantidad, "no puede superar los gramos consumidos (#{lote_origen_consumido_g}g consumidos → #{cantidad}g resultado)")
       end
     when 'compra_externa'

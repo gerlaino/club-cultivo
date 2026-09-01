@@ -1,0 +1,88 @@
+import { test, expect } from '@playwright/test'
+import { entrar, vigilarErrores, elegirPorTexto, sembrar } from './helpers.js'
+
+// El día completo del mostrador, tal cual lo hace la gente: el admin carga la mesa, el que
+// atiende la recibe, dispensa y cierra contando.
+//
+// Es UNA sola prueba encadenada a propósito: cada paso depende del anterior, y partirla en casos
+// independientes obligaría a rehacer el estado en cada uno o a inventar atajos por API — que es
+// justo lo que estas pruebas existen para no hacer.
+test.describe.configure({ mode: 'serial' })
+
+// Arranca con el mostrador CERRADO y sin nada operativo.
+test.beforeAll(() => sembrar('seed'))
+
+test('el día del mostrador, de punta a punta', async ({ page }) => {
+  const errores = vigilarErrores(page)
+
+  // ── 1. El admin carga la mesa ──────────────────────────────────────────────
+  await entrar(page, 'admin')
+  await page.goto('/mostrador')
+  await expect(page.locator('.mst__estado')).toHaveText(/Cerrado/)
+
+  await page.fill('.mst__input--fondo', '50000')
+  await elegirPorTexto(page, '.mst__agregar select', 'flor seca')
+  await page.click('.mst__agregar .mst__btn')
+  await page.fill('.mst__input--cant', '300')
+  await page.click('.mst__acciones .mst__btn--primary')
+  await expect(page.locator('.mst__estado')).toHaveText(/Falta recibirlo/)
+
+  // Quien cargó la mesa no se la recibe a sí mismo: dos firmas de la misma persona no son
+  // ninguna. Ve lo que dejó y espera.
+  await expect(page.getByText('Esperando que lo reciban')).toBeVisible()
+  await expect(page.locator('.mst__acciones .mst__btn--primary')).toHaveCount(0)
+
+  // ── 2. El que atiende la recibe, corrigiendo ───────────────────────────────
+  await entrar(page, 'dispensador')
+  await page.goto('/mostrador')
+  await expect(page.getByText(/dejó esto sobre la mesa/)).toBeVisible()
+  await expect(page.locator('.mst__input--cant')).toHaveValue('300')
+
+  await page.fill('.mst__input--cant', '297')
+  await expect(page.locator('.mst__dif')).toHaveText('-3 g')
+  await page.locator('.mst__campo--motivo .mst__input').first().fill('faltaban 3 g')
+  await page.click('.mst__acciones .mst__btn--primary')
+  await expect(page.locator('.mst__estado')).toHaveText(/Abierto/)
+
+  // La corrección quedó: la mesa arranca con lo que él contó, no con lo que declaró el admin.
+  await expect(page.locator('.mst__mesa')).toHaveText('297')
+
+  // ── 3. Cierra contando, y el esperado no se ve hasta que escribe ───────────
+  await page.click('.mst__turno .mst__btn--primary')
+  await expect(page.locator('.mst__modal')).toBeVisible()
+
+  // Nadie pesa 297 g teniendo el 297 delante: con el número a la vista el arqueo es teatro.
+  await expect(page.locator('.mst__conteo-row').first()).not.toContainText('tendría que haber')
+  await expect(page.locator('.mst__caja')).not.toContainText('Tendría que haber')
+
+  await page.locator('.mst__conteo-row').first().locator('.mst__input--cant').fill('295')
+  await expect(page.locator('.mst__conteo-row').first()).toContainText('tendría que haber 297 g')
+  await expect(page.locator('.mst__modal .mst__dif').first()).toHaveText('-2 g')
+
+  await page.locator('.mst__campo--motivo .mst__input').fill('merma de fraccionamiento')
+  await page.locator('.mst__caja .mst__input').first().fill('50000')
+  await expect(page.locator('.mst__dif-caja')).toHaveText('Cuadra')
+  await page.click('.mst__modal-acc .mst__btn--primary')
+
+  await expect(page.locator('.mst__estado')).toHaveText(/Cerrado/, { timeout: 15_000 })
+
+  // ── 4. Mañana hereda lo de anoche ──────────────────────────────────────────
+  await expect(page.locator('.mst__input--cant').first()).toHaveValue('295')
+  await expect(page.getByText(/quedaron \$50\.000 en el cajón anoche/)).toBeVisible()
+
+  expect(errores, errores.join('\n')).toEqual([])
+})
+
+test('el admin ve la merma del turno que cerró', async ({ page }) => {
+  const errores = vigilarErrores(page)
+  await entrar(page, 'admin')
+  await page.goto('/mostrador')
+
+  await page.locator('.mst__tab', { hasText: 'Merma' }).click()
+  await expect(page.locator('.mst__kpi').first()).toBeVisible()
+  await expect(page.getByText('Por producto')).toBeVisible()
+  await expect(page.getByText('Turno por turno')).toBeVisible()
+  await expect(page.locator('tbody').first()).toContainText('E2E Kush')
+
+  expect(errores, errores.join('\n')).toEqual([])
+})

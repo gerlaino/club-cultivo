@@ -213,6 +213,10 @@ const fmtARS = (n) => '$' + (Number(n) || 0).toLocaleString('es-AR', { minimumFr
 const cajaEfectivo = computed(() => stats.value?.caja_delivery?.efectivo_en_mano || 0)
 const cajaCobros   = computed(() => stats.value?.caja_delivery?.cobros_pendientes || 0)
 const cajaEnViaje  = computed(() => stats.value?.caja_delivery?.en_viaje || 0)
+// Lo que se quedó al rendir la caja, acumulado. No es una pérdida del club: esa plata existe y
+// está con una persona — por eso se muestra como saldo y no como gasto.
+const aCuenta = computed(() => stats.value?.a_cuenta || { total_ars: 0, veces: 0, detalle: [] })
+const fmtFechaCorta = (f) => (f ? new Date(f).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) : '')
 
 async function recibirCaja() {
   if (cajaEfectivo.value <= 0) return
@@ -625,6 +629,26 @@ onMounted(async () => {
               </button>
             </div>
             <p class="udc__hint">Al recibir la caja, el efectivo se asienta en contabilidad como ingreso y se marca como rendido.</p>
+
+            <!-- Lo que se quedó al rendir, acumulado. Sin verlo junto, cada faltante parece un
+                 caso aislado y nadie nota que van seis meses seguidos. -->
+            <div v-if="aCuenta.veces" class="udc__acuenta">
+              <div class="udc__acuenta-hdr">
+                <span class="udc__acuenta-lbl">Tiene del club</span>
+                <span class="udc__acuenta-val">{{ fmtARS(aCuenta.total_ars) }}</span>
+              </div>
+              <p class="udc__acuenta-sub">
+                En {{ aCuenta.veces }} rendici{{ aCuenta.veces === 1 ? 'ón' : 'ones' }}. No es una
+                pérdida: esa plata está con él y se reclama.
+              </p>
+              <ul class="udc__acuenta-lista">
+                <li v-for="m in aCuenta.detalle" :key="m.id">
+                  <span class="udc__acuenta-fecha">{{ fmtFechaCorta(m.fecha) }}</span>
+                  <span class="udc__acuenta-monto">{{ fmtARS(m.monto_ars) }}</span>
+                  <span class="udc__acuenta-desc">{{ m.descripcion }}</span>
+                </li>
+              </ul>
+            </div>
           </div>
 
           <!-- Cultivador → Salas asignadas -->
@@ -899,6 +923,17 @@ onMounted(async () => {
 .udc__btn { display: inline-flex; align-items: center; gap: .4rem; background: #15803d; color: #fff; border: none; border-radius: 9px; padding: .6rem 1rem; font-size: .85rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .udc__btn:hover:not(:disabled) { background: #14532d; }
 .udc__btn:disabled { opacity: .45; cursor: not-allowed; }
+/* Lo que el repartidor tiene del club. Ámbar y no rojo: no es una pérdida, es un saldo. */
+.udc__acuenta { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(0,0,0,.06); }
+.udc__acuenta-hdr { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.udc__acuenta-lbl { font-size: .8rem; font-weight: 700; color: #92400e; }
+.udc__acuenta-val { font-size: 1.05rem; font-weight: 800; color: #92400e; font-variant-numeric: tabular-nums; }
+.udc__acuenta-sub { margin: 4px 0 8px; font-size: .75rem; color: #6b7280; }
+.udc__acuenta-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.udc__acuenta-lista li { display: flex; gap: 8px; font-size: .75rem; color: #4b5563; align-items: baseline; }
+.udc__acuenta-fecha { font-variant-numeric: tabular-nums; color: #9ca3af; flex-shrink: 0; }
+.udc__acuenta-monto { font-weight: 700; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.udc__acuenta-desc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .udc__hint { font-size: .72rem; color: var(--c-slate-400); padding: 0 1rem 1rem; margin: 0; line-height: 1.4; }
 .ud__card-hdr {
   display: flex; align-items: center; gap: .65rem;

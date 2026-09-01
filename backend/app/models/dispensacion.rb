@@ -90,9 +90,18 @@ class Dispensacion < ApplicationRecord
     limpia.presence || direccion_envio
   end
 
+  # Marca que esta dispensa nace de una reserva. Lo pone el controller de reservas: la
+  # mercadería reservada ya está apartada a nombre del paciente, así que NO está sobre la mesa
+  # —el mostrador sólo puede levantar lo libre— y exigirle que salga del turno haría imposible
+  # entregar una reserva.
+  attr_accessor :desde_reserva
+
   before_validation { self.fecha_dispensacion ||= Date.current }
   before_validation :sincronizar_mirror_desde_items, if: :lineas_explicitas?
   before_validation :componer_direccion_envio, if: :con_envio?
+  # Antes de validar y no en `before_create`: con `exigir_mostrador_abierto` prendido, que haya
+  # turno abierto ES una validación, y en before_create llegaría siempre en nil.
+  before_validation :asignar_turno_mostrador, on: :create
   before_create     :generar_codigo_paquete, if: :con_envio?
   before_create     :capturar_snapshot_trazabilidad
   before_create     :generar_token
@@ -107,6 +116,7 @@ class Dispensacion < ApplicationRecord
   validate  :stock_pertenece_al_club,    on: :create, unless: :lineas_explicitas?
   validate  :stock_disponible,           on: :create, unless: :lineas_explicitas?
   validate  :lineas_validas,             on: :create, if:     :lineas_explicitas?
+  validate  :mostrador_abierto,          on: :create
   validate  :limite_mensual_no_superado, on: :create
   validate  :credito_suficiente,        on: :create, if: -> { medio_pago == 'cuenta_corriente' }
   validate  :credito_no_abona,          on: :create, if: -> { medio_pago == 'no_abona' }
@@ -211,9 +221,10 @@ class Dispensacion < ApplicationRecord
   def stock_disponible
     return unless stock && cantidad.to_d > 0
     stock.with_lock do
-      if cantidad.to_d > stock.cantidad_disponible_real
+      disp = stock.cantidad_disponible_real.to_d + stock.apartado_en_mostrador_de_sede(sede_del_mostrador)
+      if cantidad.to_d > disp
         errors.add(:cantidad,
-          "supera el stock disponible (#{stock.cantidad_disponible_real.round(2)} #{stock.unidad || 'g'} disponibles)")
+          "supera el stock disponible (#{disp.round(2)} #{stock.unidad || 'g'} disponibles)")
       end
     end
   end
@@ -259,8 +270,12 @@ class Dispensacion < ApplicationRecord
       pedido = ls.sum { |l| l.cantidad.to_d }
       # Las líneas marcadas "desde el evento" pueden usar, además del disponible libre, lo que
       # ese evento tiene APARTADO de este stock (el apartado bloquea al resto, no al evento).
+      #
+      # Y lo mismo con el mostrador: lo que tiene sobre la mesa bloquea al resto del mundo, pero
+      # para él no es un bloqueo — es su stock, y de ahí dispensa.
       eventos = ls.map(&:evento_bar_id).compact.uniq
-      disp    = st.cantidad_disponible_real.to_d + eventos.sum { |ev| st.apartado_en_evento(ev) }
+      disp    = st.cantidad_disponible_real.to_d + eventos.sum { |ev| st.apartado_en_evento(ev) } +
+                st.apartado_en_mostrador_de_sede(sede_del_mostrador)
       if pedido > disp
         nombre = st.forma_producto.to_s.humanize
         errors.add(:base, "Stock insuficiente (#{nombre}): hay #{disp.round(2)}#{st.unidad || 'g'} y se piden #{pedido.to_f}#{st.unidad || 'g'}.")
@@ -342,6 +357,7 @@ class Dispensacion < ApplicationRecord
           ].compact.join(' · '),
         )
         imputar_a_apartado_evento(it)
+        imputar_a_mostrador(it)
         # Si con esta línea se fue el último gramo, el stock queda agotado — y ese es el
         # disparador de que el lote cierre su ciclo. `decrement!` solo baja la cantidad: sin
         # esta llamada el stock quedaba 'asignado' en cero y el lote nunca pasaba a
@@ -362,6 +378,153 @@ class Dispensacion < ApplicationRecord
     prov&.imputar_dispensa!(item.cantidad)
   end
 
+  # Si la línea salió de un mostrador con el turno abierto, se imputa a su ítem: el bloqueo se
+  # libera en la misma medida en que acá se descontó el stock real. Es el gemelo exacto de
+  # `imputar_a_apartado_evento`, y por el mismo motivo — sin esto habría doble descuento (baja
+  # `cantidad` Y sigue apartado) y el disponible caería el doble.
+  def imputar_a_mostrador(item)
+    return unless turno_mostrador_id && item.stock_id
+
+    TurnoMostradorItem.unscoped
+                      .find_by(turno_mostrador_id: turno_mostrador_id, stock_id: item.stock_id)
+                      &.imputar_dispensa!(item.cantidad)
+  end
+
+  # Sin mostrador abierto no se dispensa, cuando la organización lo exige.
+  #
+  # Va en el modelo y no sólo en la pantalla: por la API se saltea siempre, y esconder un botón
+  # no es aplicar una regla. `on: :create` para que no vuelva inguardable una dispensa vieja el
+  # día que se prende el interruptor.
+  #
+  # Se saltea si la sede no tiene mostrador (una de producción no atiende pacientes) y si no hay
+  # sede: una dispensa sin sede no puede quedar trabada por un mostrador que no existe.
+  def mostrador_abierto
+    return unless sede_dispensa?
+
+    if turno_mostrador_id.blank?
+      errors.add(:base, 'El mostrador está cerrado: abrilo antes de dispensar.')
+      return
+    end
+
+    # La recepción tiene que valer algo: si se pudiera atender sin confirmar, el arqueo del
+    # cierre compararía contra un número que nadie verificó y dejaría de medir la merma real.
+    unless TurnoMostrador.unscoped.where(id: turno_mostrador_id).pick(:confirmado_at)
+      errors.add(:base, 'Confirmá lo que hay en el mostrador antes de dispensar.')
+      return
+    end
+
+    fuera = lineas_fuera_del_mostrador
+    return if fuera.empty?
+
+    errors.add(:base, "No está sobre el mostrador: #{fuera.join(', ')}. Bajalo del depósito antes de dispensar.")
+  end
+
+  # ¿Esta dispensa sale de un mostrador? Por el TIPO de sede, no por la existencia de la fila
+  # `Mostrador`: se crea perezosamente, y si nadie hubiera entrado todavía a la pantalla no habría
+  # fila y el control se saltearía entero — existiría sin controlar nada.
+  #
+  # Sin sede no aplica: una dispensa que no sabe de dónde salió no puede quedar trabada por un
+  # mostrador que no existe.
+  # El mostrador es el control sobre quien ATIENDE, que es de lo que se trata delegarlo. El admin
+  # no pasa por él: es el que lo carga, el que lo arquea y el dueño de la mercadería — pedirle que
+  # abra un turno para registrar una dispensa vieja o corregir una carga es fricción sin control
+  # detrás. Si igual dispensa algo que está sobre la mesa, se imputa al ítem como cualquier otra,
+  # así el arqueo no le miente al que atiende.
+  ROLES_DEL_MOSTRADOR = %w[dispensador supervisor].freeze
+
+  def sede_dispensa?
+    return false unless user&.role.in?(ROLES_DEL_MOSTRADOR)
+    return false if sede_del_mostrador.blank? || club_id.blank?
+
+    Sede.unscoped.where(id: sede_del_mostrador, club_id: club_id).pick(:tipo).in?(%w[social mixta])
+  end
+
+  # Sólo se dispensa lo que está sobre la mesa. Sin esto el candado no cerraba: con el mostrador
+  # abierto y vacío se podía dispensar cualquier cosa del depósito por API, y la pantalla lo
+  # escondía nomás — que es la peor versión de una regla, la que sólo vive en el frontend.
+  #
+  # Dos excepciones, y las dos son mercadería que YA está apartada a nombre de alguien y por lo
+  # tanto no puede estar sobre la mesa (el mostrador sólo levanta lo libre):
+  #   • la entrega de una reserva  → `desde_reserva`
+  #   • lo apartado para un evento → `evento_bar_id` en la línea
+  def lineas_fuera_del_mostrador
+    return [] if desde_reserva
+
+    en_turno = TurnoMostradorItem.unscoped.where(turno_mostrador_id: turno_mostrador_id)
+                                 .pluck(:stock_id).to_set
+
+    lineas = lineas_explicitas? ? lineas_nuevas : [self]
+    lineas.reject { |l| l.respond_to?(:evento_bar_id) && l.evento_bar_id.present? }
+          .map(&:stock).compact.uniq
+          .reject { |st| en_turno.include?(st.id) }
+          .map { |st| st.etiqueta }
+  end
+
+  # El producto vuelve al stock — y si salió de una mesa que sigue abierta, vuelve A LA MESA.
+  #
+  # Sin esto, cancelar una dispensa devolvía el gramo al pozo pero el mostrador lo seguía dando
+  # por salido: el frasco vuelve a la mesa y a la noche el conteo da un SOBRANTE que el que
+  # atendió no puede explicar. Es el inverso exacto de `imputar_a_mostrador`, y faltaba.
+  def desimputar_del_mostrador(item)
+    return unless item.stock_id
+
+    # El turno del que SALIÓ, si sigue abierto: ahí la reversa es exacta —se deshace la
+    # imputación— y el frasco vuelve a la mesa como si nunca hubiera salido.
+    propio = TurnoMostradorItem.unscoped
+                               .find_by(turno_mostrador_id: turno_mostrador_id, stock_id: item.stock_id)
+    return if propio&.revertir_dispensa!(item.cantidad).to_d.positive?
+
+    subir_al_mostrador_abierto(item)
+  end
+
+  # El producto vuelve y su turno ya cerró (o salió de otro, o nunca pasó por la mesa): entra al
+  # mostrador que esté abierto AHORA, por esa cantidad.
+  #
+  # Si no, el gramo volvía al depósito y el que atiende no lo tenía para entregárselo al próximo
+  # que lo pidiera, aunque estuviera ahí adelante. Sube como reposición, con su rastro: no es un
+  # número que apareció solo.
+  def subir_al_mostrador_abierto(item)
+    return if sede_del_mostrador.blank? || club_id.blank?
+    return unless TurnoMostrador.table_exists?
+
+    turno = TurnoMostrador.unscoped.joins(:mostrador)
+                          .where(club_id: club_id, estado: 'abierto',
+                                 mostradores: { sede_id: sede_del_mostrador })
+                          .where.not(confirmado_at: nil).first
+    return if turno.nil?
+
+    ti = TurnoMostradorItem.unscoped.find_or_create_by!(
+      turno_mostrador_id: turno.id, stock_id: item.stock_id
+    ) { |n| n.club_id = club_id; n.cantidad_apertura = 0 }
+
+    ti.update!(cantidad_repuesta: ti.cantidad_repuesta.to_d + item.cantidad.to_d)
+    ti.movimientos.create!(club_id: club_id, usuario: user, tipo: 'carga',
+                           cantidad: item.cantidad,
+                           notas: "Volvió de la dispensación ##{id}")
+  end
+
+  # La sede cuyo mostrador atiende esta dispensa. La de la dispensa, y si no vino, la del stock.
+  def sede_del_mostrador = sede_id || stock&.sede_id
+
+  # El turno abierto del mostrador de esa sede, si hay uno. No hay nada que elegir: es uno por
+  # mostrador. Sin turno abierto queda nil y la dispensa funciona como siempre — el mostrador es
+  # control, no un requisito para entregar (eso lo decide `exigir_mostrador_abierto`, en B2).
+  #
+  # `unscoped` + club_id explícito: una dispensa se crea también desde la entrega del repartidor
+  # y desde el portal, donde el tenant no siempre está fijado, y `TurnoMostrador` es tenant con
+  # `require_tenant`.
+  def asignar_turno_mostrador
+    return if turno_mostrador_id.present?
+    return if club_id.blank? || sede_del_mostrador.blank?
+    return unless TurnoMostrador.table_exists?
+
+    self.turno_mostrador_id =
+      TurnoMostrador.unscoped.joins(:mostrador)
+                    .where(club_id: club_id, estado: 'abierto',
+                           mostradores: { sede_id: sede_del_mostrador })
+                    .pick(:id)
+  end
+
   # Revierte el stock de cada línea. Se llama en after_destroy: para entonces las líneas ya
   # están soft-borradas por la cascada (dependent: :destroy), así que se leen con with_deleted.
   def incrementar_stock
@@ -373,6 +536,7 @@ class Dispensacion < ApplicationRecord
         movs     = it.stock.stock_movimientos.where(tipo: 'dispensacion')
         borrados = movs.where(dispensacion_id: id).destroy_all
         movs.where("notas LIKE ?", "Dispensación ##{id} —%").destroy_all if borrados.empty?
+        desimputar_del_mostrador(it)
       end
     end
   end

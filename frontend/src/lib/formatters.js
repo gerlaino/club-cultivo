@@ -8,12 +8,29 @@ const FORMA_LABELS = {
   capsulas:   'Cápsulas',
   comestible: 'Comestible',
   prensado:   'Prensado',
+  preroll:    'Preroll',
   externo:    'Externo',
   otro:       'Otro',
 }
 
 export function formaLabel(f) {
   return FORMA_LABELS[f] || f || '—'
+}
+
+// En qué se cuenta cada forma de producto. Un preroll o una cápsula se cuentan por UNIDAD; un
+// aceite o una tintura, en mililitros. El alta de stock mandaba siempre `g`, así que crear 100
+// prerolls dejaba "100 g de preroll" — la lista tenía la opción y el registro salía inservible.
+const UNIDAD_POR_FORMA = {
+  preroll:    'un',
+  capsula:    'un',
+  capsulas:   'un',
+  comestible: 'un',
+  aceite:     'ml',
+  tintura:    'ml',
+}
+
+export function unidadDe(forma) {
+  return UNIDAD_POR_FORMA[forma] || 'g'
 }
 
 export function formatARS(n) {

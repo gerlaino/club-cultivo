@@ -28,3 +28,9 @@ coverage
 *.sw?
 
 *.tsbuildinfo
+
+# Playwright: capturas, trazas e informes de las corridas de e2e
+/test-results/
+/playwright-report/
+/blob-report/
+/.playwright/

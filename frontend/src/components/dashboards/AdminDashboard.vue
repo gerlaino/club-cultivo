@@ -160,10 +160,17 @@ const ESTADO_CAJA = {
   abierta:          { texto: 'En turno' },
   pendiente_cierre: { texto: 'Cierre para confirmar' },
 }
+// La MESA del mostrador, al lado de la caja: mismo punto de venta, misma pregunta.
+const ESTADO_MESA = {
+  sin_abrir:   'mostrador cerrado',
+  sin_recibir: 'mesa sin recibir',
+  abierto:     'atendiendo',
+}
 const cajasPorSede = computed(() => analyticsDisp.value?.cajas_por_sede || [])
-// Lo que pide acción suya o del mostrador. "En turno" no cuenta: eso está andando.
+// Lo que pide acción suya o del mostrador. "En turno" no cuenta: eso está andando. La mesa sin
+// abrir o sin recibir también cuenta: en las dos, esa sede no está atendiendo.
 const cajasPendientes = computed(() =>
-  cajasPorSede.value.filter(c => c.estado !== 'abierta').length)
+  cajasPorSede.value.filter(c => c.estado !== 'abierta' || c.mostrador?.estado !== 'abierto').length)
 
 // ── Reservas para preparar (desde el analytics del dispensador) ──────────────
 const reservasHoy      = computed(() => analyticsDisp.value?.reservas?.hoy ?? 0)
@@ -502,6 +509,13 @@ async function onOnboardingCompletado() {
         >
           <span class="ad__caja-sede">{{ c.sede }}</span>
           <span class="ad__caja-estado">{{ ESTADO_CAJA[c.estado]?.texto || c.estado }}</span>
+          <!-- El mostrador al lado de la caja: son el mismo punto de venta y la misma pregunta,
+               "¿está atendiendo?". Que la caja tuviera renglón y la mercadería no dejaba al
+               admin enterándose por un reclamo de que nadie abrió el mostrador. -->
+          <span class="ad__caja-mostrador" :class="`ad__caja-mostrador--${c.mostrador?.estado}`">
+            {{ ESTADO_MESA[c.mostrador?.estado] || '' }}
+            <template v-if="c.mostrador?.estado === 'abierto'">· {{ c.mostrador.productos }} en la mesa</template>
+          </span>
           <span v-if="c.estado === 'abierta'" class="ad__caja-monto">{{ fmtARSres(c.efectivo_esperado_ars) }} esperados</span>
           <span v-else-if="c.estado === 'pendiente_cierre'" class="ad__caja-monto"
                 :class="{ 'ad__caja-monto--mal': c.diferencia_ars < 0 }">
@@ -940,6 +954,10 @@ async function onOnboardingCompletado() {
 }
 
 /* ── Header ──────────────────────────────────────────────────────────────── */
+.ad__caja-mostrador { font-size: var(--fs-12); color: var(--c-ink-500); }
+.ad__caja-mostrador--sin_abrir   { color: var(--c-ink-500); }
+.ad__caja-mostrador--sin_recibir { color: var(--c-amber-500); font-weight: 700; }
+.ad__caja-mostrador--abierto     { color: var(--c-leaf-600); }
 .ad__cajas { margin-bottom: var(--sp-4); border: 1px solid var(--c-ink-200); border-radius: 12px; background: #fff; overflow: hidden; }
 .ad__cajas-hd { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-3); border-bottom: 1px solid var(--c-ink-100); }
 .ad__cajas-title { font-weight: 800; font-size: var(--fs-13); color: var(--c-ink-800); display: flex; align-items: center; gap: .35rem; }

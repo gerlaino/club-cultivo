@@ -2,6 +2,10 @@ class StockMovimiento < ApplicationRecord
   include Restorable
   belongs_to :stock
   belongs_to :dispensacion, optional: true
+  # El arqueo del mostrador del que salió este ajuste, si salió de uno. Es lo que le permite al
+  # informe de Pérdidas decir "esto se perdió en el mostrador" en vez de meterlo en la bolsa de
+  # los ajustes.
+  belongs_to :turno_mostrador, optional: true
   belongs_to :stock_resultante, class_name: 'Stock', optional: true # derivado producido por este mov.
   belongs_to :usuario, class_name: 'User'
   belongs_to :sede_origen,  class_name: 'Sede', optional: true
@@ -21,5 +25,7 @@ class StockMovimiento < ApplicationRecord
   validates :tipo,   inclusion: { in: TIPOS }
   validates :gramos, numericality: { other_than: 0 }
 
-  scope :recientes, -> { order(created_at: :desc) }
+  scope :recientes,      -> { order(created_at: :desc) }
+  scope :de_mostrador,   -> { where.not(turno_mostrador_id: nil) }
+  scope :sin_mostrador,  -> { where(turno_mostrador_id: nil) }
 end

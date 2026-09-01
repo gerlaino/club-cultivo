@@ -57,7 +57,8 @@ class MovimientoContable < ApplicationRecord
   CATEGORIAS = %w[
     insumo electricidad agua alquiler sueldo mantenimiento
     honorario seguro admin aporte_socio dispensacion subvencion bar
-    salida_caja retiro_caja devolucion_caja diferencia_caja otro
+    salida_caja retiro_caja devolucion_caja diferencia_caja ingreso_caja
+    a_cuenta_repartidor otro
   ].freeze
 
   CATEGORIA_LABELS = {
@@ -80,6 +81,15 @@ class MovimientoContable < ApplicationRecord
     "retiro_caja"     => "Retiro de caja",
     "devolucion_caja" => "Devolución de retiro",
     "diferencia_caja" => "Diferencia de caja",
+    # Plata que se PONE en el cajón sin ser una venta: traer cambio, reponer el fondo, dejar lo
+    # que se cobró por fuera. No es un ingreso del club —esa plata ya era suya— así que va como
+    # `ajuste`, igual que su espejo `retiro_caja`.
+    "ingreso_caja"    => "Ingreso a la caja",
+    # Lo que el repartidor cobró y no entregó: NO es una pérdida, esa plata existe y está con una
+    # persona. Va como `ajuste` (fuera de ingresos y egresos), igual que `retiro_caja`. Categoría
+    # propia porque en `retiro_caja` sólo puede figurar quien puede sacar del cajón —admin o
+    # supervisor— y acá el que la tiene es el repartidor.
+    "a_cuenta_repartidor" => "A cuenta del repartidor",
     "otro"          => "Otro",
   }.freeze
 

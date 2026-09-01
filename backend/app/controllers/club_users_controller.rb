@@ -246,6 +246,9 @@ class ClubUsersController < ApplicationController
       despachos: despachos,
       dispensaciones: dispensaciones,
       caja_delivery: caja_delivery,
+      # Lo que esta persona tiene del club y todavía no devolvió, acumulado. Sin verlo junto,
+      # cada faltante parece un caso aislado y nadie nota que van seis meses seguidos.
+      a_cuenta: a_cuenta_de(@user),
     }
   end
 
@@ -294,6 +297,23 @@ class ClubUsersController < ApplicationController
   end
 
   private
+
+  # Lo que se quedó al rendir la caja, rendición por rendición.
+  #
+  # NO es una pérdida del club: esa plata existe y está con una persona. Por eso se muestra como
+  # saldo acumulado y no como gasto — es algo que se reclama.
+  def a_cuenta_de(user)
+    movs = current_user.club.movimientos_contables
+                       .where(categoria: 'a_cuenta_repartidor', retirado_por_id: user.id)
+                       .order(fecha: :desc, id: :desc)
+    {
+      total_ars: movs.sum(:monto_ars).to_f,
+      veces:     movs.count,
+      detalle:   movs.limit(20).map do |m|
+        { id: m.id, fecha: m.fecha, monto_ars: m.monto_ars.to_f, descripcion: m.descripcion }
+      end,
+    }
+  end
 
   # Devuelve si el mail salió de verdad. Un fallo de SMTP no puede tumbar el alta: el usuario
   # ya está creado y el admin tiene la contraseña en pantalla.

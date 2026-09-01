@@ -45,6 +45,13 @@ export const NAV_GROUPS = [
     ],
   },
   {
+    // El MOSTRADOR: la mercadería sobre la mesa hoy. De primer nivel por el mismo motivo que
+    // Depósito — en una organización que dispensa se abre, se opera y se cierra todos los días.
+    // Enterrada como sub-pestaña, la pantalla que más se usa sería la más difícil de encontrar.
+    key: 'mostrador', label: 'Mostrador', to: '/mostrador', feature: 'produccion_dispensa',
+    tabs: [],
+  },
+  {
     key: 'produccion', label: 'Producción', to: '/admin/stock', feature: 'cultivo',
     tabs: [
       { to: '/admin/stock', label: 'Stock' },

@@ -15,7 +15,13 @@ class AsistenteCorreccion < ApplicationRecord
 
   validates :texto, presence: true
 
-  scope :del_mes,     ->(fecha = Time.zone.today) { where(created_at: fecha.all_month) }
+  # OJO con `all_month`: sobre una Date devuelve un rango de DATES, y comparado contra un
+  # timestamp corta a la medianoche del último día. El día 31 no contaba NADA de esa jornada —
+  # la precisión del asistente se medía sin la jornada entera. (`all_day` sobre una Date sí
+  # devuelve Times: ese no tiene el problema.)
+  scope :del_mes,     ->(fecha = Time.zone.today) {
+    where(created_at: fecha.beginning_of_month.beginning_of_day..fecha.end_of_month.end_of_day)
+  }
   scope :ejecutadas,  -> { where.not(ejecutado_en: nil) }
   scope :corregidas,  -> { where(hubo_correccion: true) }
   scope :recientes,   -> { order(created_at: :desc) }

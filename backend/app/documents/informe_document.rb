@@ -66,14 +66,21 @@ class InformeDocument < BaseDocument
   # Reparte el ancho disponible: la primera columna (la que lleva texto) se queda con el
   # sobrante y las demás van fijas. Calcularlo en runtime evita tener que reajustar números
   # a mano si cambian los márgenes.
+  # `col_min` deja que una sección pida un ancho mínimo para una columna concreta.
+  #
+  # Existe por el DNI: con el documento completo en los informes que se PRESENTAN, ocho dígitos
+  # en una tabla de siete columnas se partían en dos líneas ("301112 / 22"), y un número de
+  # documento cortado en algo que va a un organismo se puede leer mal. El sobrante sale de la
+  # primera columna, que es la de texto libre y tiene de dónde.
   def anchos(pdf, sec)
     return sec[:col_widths] if sec[:col_widths]
 
     n = sec[:headers].size
     return { 0 => pdf.bounds.width } if n == 1
 
-    fija = [(pdf.bounds.width * 0.62 / (n - 1)), 46].min
-    resto = pdf.bounds.width - fija * (n - 1)
-    { 0 => resto }.merge((1...n).to_h { |i| [i, fija] })
+    fija    = [(pdf.bounds.width * 0.62 / (n - 1)), 46].min
+    minimos = sec[:col_min] || {}
+    cols    = (1...n).to_h { |i| [i, [fija, minimos[i].to_f].max] }
+    { 0 => pdf.bounds.width - cols.values.sum }.merge(cols)
   end
 end

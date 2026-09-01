@@ -35,7 +35,7 @@ import { useRoute } from 'vue-router'
 import {
   LayoutDashboard, Sprout, Users, Factory, ShoppingCart,
   CheckSquare, BarChart3, Settings, PanelLeftClose, PanelLeftOpen, Wine, Building2, Warehouse,
-  Calculator, UserCog,
+  Calculator, UserCog, Store,
 } from 'lucide-vue-next'
 import { NAV_GROUPS, detectGroup, useNavContext } from '../../composables/useNavContext.js'
 import { useClubStore } from '../../stores/club.js'
@@ -46,6 +46,7 @@ const { collapsed, toggleCollapse, refreshBadges, badgeFor } = useNavContext()
 
 const ICONS = {
   dashboard: LayoutDashboard,
+  mostrador: Store,
   sedes:     Building2,
   // Equipo salió de las pestañas de Configuración y pasó a ser de primer nivel. `UserCog` y no
   // `Users`, que ya es Pacientes: dos renglones con el mismo ícono se leen como lo mismo. Y acá

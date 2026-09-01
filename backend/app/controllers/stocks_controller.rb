@@ -71,8 +71,26 @@ class StocksController < ApplicationController
     # de gestión/reporte no pasan el flag y siguen viendo todo el stock.
     stocks = stocks.select(&:apto_dispensa?) if params[:para_dispensa].present?
 
+    # Una query para todo el listado en vez de una por producto: abajo se serializa cada uno con
+    # `cantidad_disponible_real`, que pregunta por el apartado del mostrador.
+    Stock.precargar_apartado_mostrador(stocks)
+
+    # Y para quien ATIENDE, el carrito ofrece únicamente lo que está sobre la mesa del mostrador.
+    # Sin esto la pantalla le ofrecía todo el depósito y el backend después se lo rechazaba, que
+    # es el peor error posible: parece culpa del usuario.
+    if params[:para_dispensa].present? && Dispensacion::ROLES_DEL_MOSTRADOR.include?(current_user.role)
+      sobre_la_mesa = items_del_mostrador
+      stocks = stocks.select { |st| sobre_la_mesa.key?(st.id) }
+      return render json: stocks.map { |st|
+        # El disponible que ve es el del MOSTRADOR, no el del depósito: ofrecerle 1.240 g cuando
+        # sobre la mesa hay 155 es prometerle algo que no puede entregar.
+        serialize_stock(st).merge(cantidad_disponible_real: sobre_la_mesa[st.id].esperado.to_f)
+      }
+    end
+
     render json: stocks.map { |s| serialize_stock(s) }
   end
+
 
   # GET /stocks/inventario — tabla de inventario paginada y filtrable.
   # Filtros: forma_producto, sede_id ('pool' = stock del club sin sede), fecha_desde,
@@ -493,6 +511,8 @@ class StocksController < ApplicationController
         paciente:           d.paciente&.nombre_completo,
         paciente_iniciales: "#{d.paciente&.nombre&.[](0)}.#{d.paciente&.apellido&.[](0)}.",
         paciente_dni_last4: d.paciente&.dni_normalizado.to_s.last(4),
+        # Completo sólo para el PDF, que es lo que se presenta. La pantalla usa los últimos 4.
+        paciente_dni:       d.paciente&.dni_normalizado.to_s,
       }
     end
 
@@ -660,6 +680,14 @@ class StocksController < ApplicationController
   end
 
   private
+
+  # Los ítems de los turnos ABIERTOS de los mostradores que este usuario atiende, por stock.
+  def items_del_mostrador
+    TurnoMostradorItem.operativos
+                      .joins(turno_mostrador: :mostrador)
+                      .where(mostradores: { sede_id: current_user.sedes_visibles_ids })
+                      .index_by(&:stock_id)
+  end
 
   def stock_update_params
     params.require(:stock).permit(

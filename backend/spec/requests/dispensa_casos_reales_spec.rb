@@ -88,7 +88,9 @@ RSpec.describe 'Dispensación — casos reales', type: :request do
   end
 
   describe 'la cuenta corriente' do
-    before { sign_in_as(dispensador) }
+    # El dispensador entrega de lo que está sobre la mesa, así que el mostrador tiene que estar
+    # abierto: es el mismo paso que da la persona real antes de atender.
+    before { stock; abrir_mostrador!(sede, usuario: admin); sign_in_as(dispensador) }
 
     # El crédito NO es un tope duro, a propósito: cubre hasta donde llega y la diferencia se
     # cobra en el momento. Lo que sí tiene que pasar es que al crédito no le caiga MÁS de lo
@@ -136,6 +138,8 @@ RSpec.describe 'Dispensación — casos reales', type: :request do
     end
 
     it 'el supervisor sí dispensa' do
+      stock
+      abrir_mostrador!(sede, usuario: admin)
       sign_in_as(create(:user, :supervisor, club: club))
 
       dispensar(stock_id: stock.id, cantidad: 5, fecha_dispensacion: Time.zone.today)
@@ -164,7 +168,7 @@ RSpec.describe 'Dispensación — casos reales', type: :request do
   end
 
   describe 'el stock después de dispensar' do
-    before { sign_in_as(dispensador) }
+    before { stock; abrir_mostrador!(sede, usuario: admin); sign_in_as(dispensador) }
 
     it 'se descuenta exactamente lo entregado' do
       dispensar(stock_id: stock.id, cantidad: 15, fecha_dispensacion: Time.zone.today)

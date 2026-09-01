@@ -2,8 +2,8 @@ module Dispensario
   # Caja de turno del MOSTRADOR de dispensa, anidada bajo /sedes/:sede_id/caja.
   #
   # Es la misma mecánica que la del buffet y comparte el modelo (`CajaTurno` apunta a un punto de
-  # venta: una `Barra` o una `Sede`). Lo que NO comparte es la plata: son cajas independientes,
-  # cada una con su fondo, su arqueo y su cierre.
+  # venta: una `Barra` o un `Mostrador`). Lo que NO comparte es la plata: son cajas
+  # independientes, cada una con su fondo, su arqueo y su cierre.
   #
   # El flujo, tal cual lo pidió Germán: el admin la abre declarando el fondo → el dispensador
   # confirma que ese fondo está en el cajón → se opera → el dispensador cuenta y envía el cierre →
@@ -16,9 +16,12 @@ module Dispensario
     before_action :authenticate_user!
     before_action -> { require_feature!(:produccion_dispensa) }
     before_action :set_sede
-    before_action :require_operador, only: [:actual, :confirmar_apertura, :solicitar_cierre]
+    # `cerrar` es del OPERADOR, no de administración: el que atendió cuenta y cierra. Si el
+    # cierre dependiera de que haya un admin a las once de la noche, el mostrador queda bloqueado
+    # y el que abre mañana no puede arrancar. El aval del admin es asincrónico.
+    before_action :require_operador, only: [:actual, :confirmar_apertura, :solicitar_cierre, :cerrar]
     before_action :require_gestion,  only: [:responsables]
-    before_action :require_gestion,  only: [:index, :abrir, :cerrar, :confirmar_cierre, :salida, :anular]
+    before_action :require_gestion,  only: [:index, :abrir, :confirmar_cierre, :salida, :ingreso, :anular]
 
     # GET /sedes/:sede_id/caja/responsables — a quién se le puede atribuir un retiro
     def responsables
@@ -63,7 +66,7 @@ module Dispensario
       end
 
       caja = CajaTurno.new(
-        club: current_user.club, sede: @sede, punto: @sede, abierta_por: current_user,
+        club: current_user.club, sede: @sede, punto: @mostrador, abierta_por: current_user,
         monto_inicial_ars: params[:monto_inicial_ars].to_d, abierta_at: Time.current
       )
 
@@ -157,6 +160,35 @@ module Dispensario
       end
     end
 
+    # POST /sedes/:sede_id/caja/:id/ingreso { monto_ars, motivo }
+    #
+    # El espejo de `salida`: plata que se PONE en el cajón. Traer cambio, reponer el fondo, dejar
+    # lo que alguien cobró por fuera. No es un ingreso del club —esa plata ya era suya— así que va
+    # como `ajuste` y no toca el resultado.
+    #
+    # OJO: una dispensa cobrada en efectivo con la caja abierta YA entra sola (el cobro se engancha
+    # al turno). Esto es para la plata que llega por otro lado; usarlo para una dispensa la
+    # contaría dos veces.
+    def ingreso
+      monto  = params[:monto_ars].to_d
+      motivo = params[:motivo].to_s.strip
+
+      return render json: { error: 'El monto debe ser mayor a $0.' }, status: :unprocessable_entity if monto <= 0
+      return render json: { error: 'Escribí de dónde sale la plata.' }, status: :unprocessable_entity if motivo.blank?
+
+      con_caja do |caja|
+        raise ArgumentError, 'La caja no está abierta' unless caja.abierta?
+
+        caja.movimientos_contables.create!(
+          club: current_user.club, sede_id: caja.sede_id, created_by: current_user,
+          tipo: 'ajuste', categoria: 'ingreso_caja',
+          descripcion: "Ingreso a la caja — #{motivo}",
+          monto_ars: monto, fecha: Time.zone.today,
+          pagado: true, medio_pago: 'efectivo', comprobante_tipo: 'sin_comprobante'
+        )
+      end
+    end
+
     # POST /sedes/:sede_id/caja/:id/anular { motivo? }
     #
     # Deshacer una apertura equivocada: mal monto, la sede que no era, se arrepintió. Sólo si la
@@ -171,13 +203,20 @@ module Dispensario
     private
 
     def set_sede
-      @sede = current_user.club.sedes.find(params[:sede_id])
+      @sede      = current_user.club.sedes.find(params[:sede_id])
+      @mostrador = @sede.mostrador
+      return if @mostrador
+
+      render json: { error: 'Esta sede no dispensa: no tiene mostrador' }, status: :unprocessable_entity
     rescue ActiveRecord::RecordNotFound
       render json: { error: 'Sede no encontrada' }, status: :not_found
     end
 
+    # La ruta sigue colgando de la sede porque es como la piensa el usuario ("la caja de la
+    # sede Centro"), pero la caja es del MOSTRADOR de esa sede — el punto de venta del
+    # dispensario, hermano de la `Barra` del buffet.
     def cajas_de_la_sede
-      CajaTurno.where(club_id: current_user.club_id, punto_type: 'Sede', punto_id: @sede.id)
+      CajaTurno.where(club_id: current_user.club_id).del_mostrador(@mostrador.id)
     end
 
     def caja_activa = cajas_de_la_sede.activas.first
@@ -228,6 +267,8 @@ module Dispensario
         total_efectivo_ars:     caja.total_efectivo_ars,
         total_digital_ars:      caja.total_digital_ars,
         total_salidas_ars:      caja.total_salidas_ars,
+        total_ingresos_ars:     caja.total_ingresos_ars,
+        ingresos:               caja.ingresos.order(:created_at).map { |m| { id: m.id, monto_ars: m.monto_ars.to_f, descripcion: m.descripcion, quien: m.created_by&.nombre_completo } },
         salidas:                caja.salidas.order(:created_at).map { |m| { id: m.id, monto_ars: m.monto_ars.to_f, descripcion: m.descripcion, clase: m.categoria == 'retiro_caja' ? 'retiro' : 'gasto', quien: (m.retirado_por || m.created_by)&.nombre_completo } },
         efectivo_esperado_ars:  caja.efectivo_esperado_ars,
         efectivo_declarado_ars: caja.efectivo_declarado_ars&.to_f,

@@ -79,7 +79,8 @@ class ReprocannDocument < BaseDocument
       estado = p[:reprocann_estado].to_s
       rows << [
         p[:nombre_completo].presence || p[:iniciales].to_s,
-        p[:dni_ultimos_3].present? ? "***#{p[:dni_ultimos_3]}" : "—",
+        # El informe se PRESENTA ante la autoridad: con el documento tapado no acredita a nadie.
+        p[:dni].presence || (p[:dni_ultimos_3].present? ? "***#{p[:dni_ultimos_3]}" : "—"),
         ESTADO_LABEL[estado] || estado,
         venc,
       ]
@@ -87,7 +88,7 @@ class ReprocannDocument < BaseDocument
     end
 
     styled_table(pdf,
-      ["Paciente", "DNI (últ. 3)", "Estado", "Vencimiento"],
+      ["Paciente", "DNI", "Estado", "Vencimiento"],
       rows,
       aligns:        { 1 => :center, 3 => :center },
       mono:          [1, 3],

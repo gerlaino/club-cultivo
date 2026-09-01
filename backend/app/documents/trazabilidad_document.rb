@@ -4,10 +4,15 @@
 # se bajaba como una captura de pantalla. El documento reconstruye la cadena completa en el
 # orden en que se recorre: producto → genética → lote → plantas → entregas.
 #
-# Los pacientes van con nombre y apellido completos y el DNI parcial (últimos 4). Antes eran
-# sólo iniciales, con el argumento de no exponer datos: no protegía nada —quien abre este
-# informe ya puede ver la ficha completa de cada paciente— y dejaba una tabla ilegible, donde
-# dos "G.L." son indistinguibles y no se puede cruzar con ningún otro registro.
+# Los pacientes van con nombre, apellido y DNI COMPLETO. Antes eran sólo iniciales, con el
+# argumento de no exponer datos: no protegía nada —quien abre este informe ya puede ver la ficha
+# completa de cada paciente— y dejaba una tabla ilegible, donde dos "G.L." son indistinguibles y
+# no se puede cruzar con ningún otro registro.
+#
+# El documento completo va en lo que se DESCARGA, no en la pantalla: el PDF se presenta ante un
+# organismo o un auditor, y con el documento tapado no acredita a nadie. En pantalla siguen los
+# últimos cuatro, que alcanzan para desambiguar homónimos sin dejar el padrón a la vista de
+# cualquiera que pase por atrás.
 class TrazabilidadDocument < BaseDocument
   def initialize(club:, usuario:, datos:)
     @d = datos.deep_symbolize_keys
@@ -129,7 +134,8 @@ class TrazabilidadDocument < BaseDocument
 
     styled_table(pdf, ["Fecha", "Paciente", "DNI", "Cantidad"],
                  ds.map { |d| [fecha(d[:fecha]), (d[:paciente].presence || d[:paciente_iniciales]).to_s,
-                               "****#{d[:paciente_dni_last4]}", "#{d[:cantidad_g]} g"] },
+                               (d[:paciente_dni].presence || "****#{d[:paciente_dni_last4]}"),
+                               "#{d[:cantidad_g]} g"] },
                  col_widths: { 0 => 90, 1 => pdf.bounds.width - 310, 2 => 110, 3 => 110 },
                  aligns: { 3 => :right })
     pdf.move_down 6

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_26_080000) do
+ActiveRecord::Schema[7.2].define(version: 2026_08_31_020000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -477,6 +477,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_26_080000) do
     t.datetime "deleted_at"
     t.bigint "deleted_by_id"
     t.bigint "caja_turno_id"
+    t.bigint "rendicion_caja_id"
     t.index ["caja_turno_id"], name: "index_cobros_on_caja_turno_id"
     t.index ["club_id", "created_at"], name: "index_cobros_on_club_id_and_created_at"
     t.index ["club_id"], name: "index_cobros_on_club_id"
@@ -486,6 +487,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_26_080000) do
     t.index ["deleted_by_id"], name: "index_cobros_on_deleted_by_id"
     t.index ["dispensacion_id", "medio"], name: "index_cobros_on_dispensacion_id_and_medio"
     t.index ["dispensacion_id"], name: "index_cobros_on_dispensacion_id"
+    t.index ["rendicion_caja_id"], name: "index_cobros_on_rendicion_caja_id"
   end
 
   create_table "compras_cuotas", force: :cascade do |t|
@@ -673,6 +675,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_26_080000) do
     t.bigint "deleted_by_id"
     t.boolean "es_regalo", default: false, null: false
     t.datetime "fallido_at"
+    t.bigint "turno_mostrador_id"
     t.index ["ariccame_reportada"], name: "index_dispensaciones_on_ariccame_reportada", where: "(ariccame_reportada = false)"
     t.index ["codigo_paquete"], name: "index_dispensaciones_on_codigo_paquete", unique: true
     t.index ["deleted_at"], name: "index_dispensaciones_on_deleted_at"
@@ -688,6 +691,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_26_080000) do
     t.index ["sede_id"], name: "index_dispensaciones_on_sede_id"
     t.index ["stock_id"], name: "index_dispensaciones_on_stock_id"
     t.index ["token"], name: "index_dispensaciones_on_token", unique: true
+    t.index ["turno_mostrador_id"], name: "index_dispensaciones_on_turno_mostrador_id"
     t.index ["user_id"], name: "index_dispensaciones_on_user_id"
   end
 
@@ -1330,6 +1334,23 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_26_080000) do
     t.index ["user_id"], name: "index_mails_enviados_on_user_id"
   end
 
+  create_table "mostradores", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "sede_id", null: false
+    t.string "nombre", default: "Mostrador", null: false
+    t.boolean "activo", default: true, null: false
+    t.datetime "deleted_at"
+    t.bigint "deleted_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "sede_id", "nombre"], name: "index_mostradores_unico_por_nombre", unique: true, where: "(deleted_at IS NULL)"
+    t.index ["club_id", "sede_id"], name: "index_mostradores_on_club_id_and_sede_id"
+    t.index ["club_id"], name: "index_mostradores_on_club_id"
+    t.index ["deleted_at"], name: "index_mostradores_on_deleted_at"
+    t.index ["deleted_by_id"], name: "index_mostradores_on_deleted_by_id"
+    t.index ["sede_id"], name: "index_mostradores_on_sede_id"
+  end
+
   create_table "movimientos_contables", force: :cascade do |t|
     t.bigint "club_id", null: false
     t.bigint "sede_id"
@@ -1828,6 +1849,30 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_26_080000) do
     t.index ["sala_id"], name: "index_reglas_ambientales_on_sala_id"
   end
 
+  create_table "rendiciones_caja", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "delivery_id", null: false
+    t.bigint "receptor_id"
+    t.bigint "caja_turno_id"
+    t.string "estado", default: "pendiente", null: false
+    t.decimal "monto_declarado_ars", precision: 12, scale: 2, default: "0.0", null: false
+    t.decimal "monto_recibido_ars", precision: 12, scale: 2
+    t.string "motivo_ajuste"
+    t.boolean "conforme"
+    t.integer "cobros_count", default: 0, null: false
+    t.datetime "rendida_at"
+    t.datetime "recibida_at"
+    t.datetime "conformada_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["caja_turno_id"], name: "index_rendiciones_caja_on_caja_turno_id"
+    t.index ["club_id", "estado"], name: "index_rendiciones_caja_on_club_id_and_estado"
+    t.index ["club_id"], name: "index_rendiciones_caja_on_club_id"
+    t.index ["delivery_id"], name: "index_rendiciones_caja_on_delivery_id"
+    t.index ["delivery_id"], name: "index_rendiciones_caja_pendiente_por_delivery", unique: true, where: "((estado)::text = 'pendiente'::text)"
+    t.index ["receptor_id"], name: "index_rendiciones_caja_on_receptor_id"
+  end
+
   create_table "reprocann_renovaciones", force: :cascade do |t|
     t.bigint "paciente_id", null: false
     t.bigint "club_id", null: false
@@ -2027,6 +2072,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_26_080000) do
     t.datetime "deleted_at"
     t.bigint "deleted_by_id"
     t.bigint "stock_resultante_id"
+    t.bigint "turno_mostrador_id"
     t.index ["deleted_at"], name: "index_stock_movimientos_on_deleted_at"
     t.index ["deleted_by_id"], name: "index_stock_movimientos_on_deleted_by_id"
     t.index ["dispensacion_id"], name: "index_stock_movimientos_on_dispensacion_id"
@@ -2035,6 +2081,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_26_080000) do
     t.index ["stock_id"], name: "index_stock_movimientos_on_stock_id"
     t.index ["stock_resultante_id"], name: "index_stock_movimientos_on_stock_resultante_id"
     t.index ["tipo"], name: "index_stock_movimientos_on_tipo"
+    t.index ["turno_mostrador_id"], name: "index_stock_movimientos_on_turno_mostrador_id"
     t.index ["usuario_id"], name: "index_stock_movimientos_on_usuario_id"
   end
 
@@ -2131,6 +2178,71 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_26_080000) do
     t.index ["plan_tarea_id"], name: "index_tareas_on_plan_tarea_id"
     t.index ["plant_id"], name: "index_tareas_on_plant_id"
     t.index ["sala_id"], name: "index_tareas_on_sala_id"
+  end
+
+  create_table "turno_mostrador_items", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "turno_mostrador_id", null: false
+    t.bigint "stock_id", null: false
+    t.decimal "cantidad_heredada", precision: 10, scale: 3
+    t.decimal "cantidad_apertura", precision: 10, scale: 3, default: "0.0", null: false
+    t.decimal "cantidad_repuesta", precision: 10, scale: 3, default: "0.0", null: false
+    t.decimal "cantidad_devuelta", precision: 10, scale: 3, default: "0.0", null: false
+    t.decimal "cantidad_ajuste", precision: 10, scale: 3, default: "0.0", null: false
+    t.decimal "cantidad_dispensada", precision: 10, scale: 3, default: "0.0", null: false
+    t.decimal "cantidad_cierre", precision: 10, scale: 3
+    t.string "motivo_diferencia"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_turno_mostrador_items_on_club_id"
+    t.index ["stock_id"], name: "index_turno_mostrador_items_on_stock_id"
+    t.index ["turno_mostrador_id", "stock_id"], name: "index_turno_mostrador_items_unico_por_stock", unique: true
+    t.index ["turno_mostrador_id"], name: "index_turno_mostrador_items_on_turno_mostrador_id"
+  end
+
+  create_table "turno_mostrador_movimientos", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "turno_mostrador_item_id", null: false
+    t.bigint "usuario_id", null: false
+    t.string "tipo", null: false
+    t.decimal "cantidad", precision: 10, scale: 3, null: false
+    t.boolean "sin_supervision", default: false, null: false
+    t.string "notas"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_turno_mostrador_movimientos_on_club_id"
+    t.index ["turno_mostrador_item_id"], name: "index_tmm_on_item"
+    t.index ["usuario_id"], name: "index_turno_mostrador_movimientos_on_usuario_id"
+  end
+
+  create_table "turno_mostradores", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "mostrador_id", null: false
+    t.bigint "caja_turno_id"
+    t.bigint "turno_anterior_id"
+    t.string "estado", default: "abierto", null: false
+    t.bigint "abierto_por_id", null: false
+    t.datetime "abierto_at", null: false
+    t.bigint "cerrado_por_id"
+    t.datetime "cerrado_at"
+    t.bigint "revisado_por_id"
+    t.datetime "revisado_at"
+    t.string "notas_apertura"
+    t.string "notas_cierre"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.bigint "confirmado_por_id"
+    t.datetime "confirmado_at"
+    t.index ["abierto_por_id"], name: "index_turno_mostradores_on_abierto_por_id"
+    t.index ["caja_turno_id"], name: "index_turno_mostradores_on_caja_turno_id"
+    t.index ["cerrado_por_id"], name: "index_turno_mostradores_on_cerrado_por_id"
+    t.index ["club_id", "estado"], name: "index_turno_mostradores_on_club_id_and_estado"
+    t.index ["club_id"], name: "index_turno_mostradores_on_club_id"
+    t.index ["confirmado_por_id"], name: "index_turno_mostradores_on_confirmado_por_id"
+    t.index ["mostrador_id"], name: "index_turno_mostradores_abierto_por_mostrador", unique: true, where: "((estado)::text = 'abierto'::text)"
+    t.index ["mostrador_id"], name: "index_turno_mostradores_on_mostrador_id"
+    t.index ["revisado_por_id"], name: "index_turno_mostradores_on_revisado_por_id"
+    t.index ["turno_anterior_id"], name: "index_turno_mostradores_on_turno_anterior_id"
   end
 
   create_table "turnos", force: :cascade do |t|
@@ -2321,6 +2433,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_26_080000) do
   add_foreign_key "cobros", "caja_turnos"
   add_foreign_key "cobros", "clubs"
   add_foreign_key "cobros", "dispensaciones", column: "dispensacion_id"
+  add_foreign_key "cobros", "rendiciones_caja", column: "rendicion_caja_id"
   add_foreign_key "cobros", "users", column: "created_by_id"
   add_foreign_key "cobros", "users", column: "deleted_by_id"
   add_foreign_key "compras_cuotas", "clubs"
@@ -2351,6 +2464,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_26_080000) do
   add_foreign_key "dispensaciones", "rutas_entrega", column: "ruta_entrega_id"
   add_foreign_key "dispensaciones", "sedes"
   add_foreign_key "dispensaciones", "stocks", on_delete: :nullify
+  add_foreign_key "dispensaciones", "turno_mostradores"
   add_foreign_key "dispensaciones", "users"
   add_foreign_key "dispensaciones", "users", column: "deleted_by_id"
   add_foreign_key "dispensaciones", "users", column: "delivery_id"
@@ -2451,6 +2565,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_26_080000) do
   add_foreign_key "mails_enviados", "plantillas_mail", column: "plantilla_mail_id"
   add_foreign_key "mails_enviados", "users"
   add_foreign_key "mails_enviados", "users", column: "deleted_by_id"
+  add_foreign_key "mostradores", "clubs"
+  add_foreign_key "mostradores", "sedes"
+  add_foreign_key "mostradores", "users", column: "deleted_by_id"
   add_foreign_key "movimientos_contables", "caja_turnos"
   add_foreign_key "movimientos_contables", "categorias_contables", column: "categoria_contable_id"
   add_foreign_key "movimientos_contables", "clubs"
@@ -2525,6 +2642,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_26_080000) do
   add_foreign_key "registros_ambientales", "users"
   add_foreign_key "reglas_ambientales", "salas"
   add_foreign_key "reglas_ambientales", "users", column: "deleted_by_id"
+  add_foreign_key "rendiciones_caja", "caja_turnos"
+  add_foreign_key "rendiciones_caja", "clubs"
+  add_foreign_key "rendiciones_caja", "users", column: "delivery_id"
+  add_foreign_key "rendiciones_caja", "users", column: "receptor_id"
   add_foreign_key "reprocann_renovaciones", "clubs"
   add_foreign_key "reprocann_renovaciones", "pacientes"
   add_foreign_key "reprocann_renovaciones", "users", column: "deleted_by_id"
@@ -2559,6 +2680,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_26_080000) do
   add_foreign_key "stock_movimientos", "sedes", column: "sede_origen_id"
   add_foreign_key "stock_movimientos", "stocks"
   add_foreign_key "stock_movimientos", "stocks", column: "stock_resultante_id"
+  add_foreign_key "stock_movimientos", "turno_mostradores"
   add_foreign_key "stock_movimientos", "users", column: "deleted_by_id"
   add_foreign_key "stock_movimientos", "users", column: "usuario_id"
   add_foreign_key "stocks", "clubs"
@@ -2577,6 +2699,20 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_26_080000) do
   add_foreign_key "tareas", "users", column: "asignada_a_id"
   add_foreign_key "tareas", "users", column: "creada_por_id"
   add_foreign_key "tareas", "users", column: "deleted_by_id"
+  add_foreign_key "turno_mostrador_items", "clubs"
+  add_foreign_key "turno_mostrador_items", "stocks"
+  add_foreign_key "turno_mostrador_items", "turno_mostradores"
+  add_foreign_key "turno_mostrador_movimientos", "clubs"
+  add_foreign_key "turno_mostrador_movimientos", "turno_mostrador_items"
+  add_foreign_key "turno_mostrador_movimientos", "users", column: "usuario_id"
+  add_foreign_key "turno_mostradores", "caja_turnos"
+  add_foreign_key "turno_mostradores", "clubs"
+  add_foreign_key "turno_mostradores", "mostradores"
+  add_foreign_key "turno_mostradores", "turno_mostradores", column: "turno_anterior_id"
+  add_foreign_key "turno_mostradores", "users", column: "abierto_por_id"
+  add_foreign_key "turno_mostradores", "users", column: "cerrado_por_id"
+  add_foreign_key "turno_mostradores", "users", column: "confirmado_por_id"
+  add_foreign_key "turno_mostradores", "users", column: "revisado_por_id"
   add_foreign_key "turnos", "clubs"
   add_foreign_key "turnos", "pacientes"
   add_foreign_key "turnos", "users", column: "deleted_by_id"

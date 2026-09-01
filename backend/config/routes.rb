@@ -423,12 +423,35 @@ Rails.application.routes.draw do
         post 'caja/:id/confirmar_cierre',   to: 'cajas#confirmar_cierre'
         post 'caja/:id/cerrar',             to: 'cajas#cerrar'
         post 'caja/:id/salida',             to: 'cajas#salida'
+        post 'caja/:id/ingreso',            to: 'cajas#ingreso'
         post 'caja/:id/anular',             to: 'cajas#anular'
+
+        # El MOSTRADOR: la mercadería sobre la mesa. Se abre junto con la caja —un gesto, dos
+        # arqueos— pero es un registro aparte: el efectivo va al libro y los gramos al inventario.
+        get  'mostrador',          to: 'mostrador#actual'
+        post 'mostrador/abrir',    to: 'mostrador#abrir'
+        post 'mostrador/confirmar', to: 'mostrador#confirmar'
+        post 'mostrador/cargar',   to: 'mostrador#cargar'
+        post 'mostrador/devolver', to: 'mostrador#devolver'
+        post 'mostrador/cerrar',   to: 'mostrador#cerrar'
+        get  'mostrador/merma',    to: 'mostrador#merma'
+        get  'mostrador/turnos/:id',          to: 'mostrador#turno'
+        post 'mostrador/turnos/:id/revisar',  to: 'mostrador#revisar'
+        post 'mostrador/turnos/:id/corregir', to: 'mostrador#corregir'
       end
     end
 
     # Lo que cada persona sacó del cajón y no cerró. Vive aparte del libro porque la pregunta es
     # otra: no "qué gastó la organización" sino "quién tiene plata nuestra".
+    # La entrega de la recaudación del repartidor: la inicia él, la cuenta y recibe el otro.
+    resources :rendiciones, only: [:index, :create] do
+      collection { get :receptores }
+      member do
+        post :recibir
+        post :conformar
+      end
+    end
+
     get  'retiros_caja',            to: 'retiros_caja#index'
     post 'retiros_caja/:id/saldar', to: 'retiros_caja#saldar'
 

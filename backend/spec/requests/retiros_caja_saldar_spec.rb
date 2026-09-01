@@ -80,7 +80,7 @@ RSpec.describe 'Saldar un retiro de caja', type: :request do
     # La plata reaparece en el cajón HOY, no en el turno del retiro, que ya cerró su arqueo.
     it 'la espera el turno que está corriendo' do
       caja = ActsAsTenant.with_tenant(club) do
-        CajaTurno.create!(club: club, sede: sede, punto: sede, abierta_por: admin,
+        CajaTurno.create!(club: club, sede: sede, punto: sede.mostrador, abierta_por: admin,
                           monto_inicial_ars: 10_000, abierta_at: Time.current, estado: 'abierta')
       end
       mov = retiro!(monto: 100_000)
@@ -118,7 +118,7 @@ RSpec.describe 'Saldar un retiro de caja', type: :request do
     # El egreso NO vuelve a descontar del cajón: el retiro ya lo hizo en su turno.
     it 'el egreso no se engancha a ninguna caja' do
       ActsAsTenant.with_tenant(club) do
-        CajaTurno.create!(club: club, sede: sede, punto: sede, abierta_por: admin,
+        CajaTurno.create!(club: club, sede: sede, punto: sede.mostrador, abierta_por: admin,
                           monto_inicial_ars: 10_000, abierta_at: Time.current, estado: 'abierta')
       end
       mov = retiro!

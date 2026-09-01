@@ -10,11 +10,19 @@ class InformesController < ApplicationController
     'anio'         => -> { [Time.zone.today.beginning_of_year, Time.zone.today.end_of_year] },
   }.freeze
 
+  # EL DNI VA COMPLETO EN LO QUE SE DESCARGA Y PARCIAL EN LA PANTALLA.
+  #
+  # Son dos usos distintos: la pantalla la mira cualquiera que pase por atrás y con los últimos
+  # tres alcanza para desambiguar homónimos; el PDF y el Excel se PRESENTAN —ante el organismo, un
+  # auditor, un abogado— y un padrón con el documento tapado no acredita a nadie.
+  #
+  # El dato completo NO viaja en el JSON: si viajara, estaría en el navegador de cualquiera que
+  # abra el informe, se vea o no en pantalla. Se agrega recién al armar el archivo.
   def reprocann
     data = reprocann_data(current_user.club)
 
     respond_to do |format|
-      format.json { render json: data }
+      format.json { render json: sin_dni_completo(data) }
       format.pdf do
         pdf = ReprocannDocument.new(club: current_user.club, usuario: current_user, data: data).render
         send_data pdf,
@@ -196,6 +204,8 @@ class InformesController < ApplicationController
                                       d.stock&.lote&.genetica&.nombre }.uniq
       {
         paciente:     p.nombre_completo,
+        # Completo para el PDF y el Excel; abajo se saca del JSON de la pantalla.
+        dni:          p.dni_normalizado.to_s,
         dni_ultimos_3: p.dni_normalizado.to_s.last(3),
         iniciales:    "#{p.nombre[0]}.#{p.apellido[0]}.",   # se mantiene por compatibilidad
         geneticas:    geneticas,
@@ -211,7 +221,8 @@ class InformesController < ApplicationController
       gramos_dispensados:      gramos,
       pacientes_atendidos:     pax,
       promedio_por_dispensacion: promedio,
-      resumen_anonimizado:     resumen,
+      # Al navegador va sin el documento completo: la pantalla muestra los últimos tres.
+      resumen_anonimizado:     resumen.map { |r| r.except(:dni) },
     }
 
     responder_informe(
@@ -228,7 +239,7 @@ class InformesController < ApplicationController
         titulo: 'Detalle por paciente',
         headers: ['Paciente', 'DNI', 'Genética', 'Producto', 'Entregas', 'Gramos', 'Última entrega'],
         rows: resumen.map { |r|
-          [r[:paciente], "***#{r[:dni_ultimos_3]}",
+          [r[:paciente], r[:dni].presence || '—',
            r[:geneticas].any? ? r[:geneticas].join(', ') : '—',
            r[:formas].map { |f| f.to_s.tr('_', ' ') }.join(', ').presence || '—',
            r[:cantidad], r[:total_gramos], fmt_fecha(r[:ultima_fecha])]
@@ -236,6 +247,8 @@ class InformesController < ApplicationController
         formatos: [:texto, :texto, :texto, :texto, :numero, :numero, :texto],
         totales: [4, 5],
         aligns: { 4 => :right, 5 => :right },
+        # El documento completo no se puede partir en dos líneas: este informe se presenta.
+        col_min: { 1 => 62 },
       }],
       nota: 'Contiene datos personales de pacientes: tratar como información sensible.',
     )
@@ -457,7 +470,13 @@ class InformesController < ApplicationController
                             .where(sedes: { club_id: club.id })
                             .where(created_at: desde..hasta)
     merma_g  = movs.where(tipo: 'merma').sum(:gramos).to_f.abs.round(1)
-    ajuste_g = movs.where(tipo: 'ajuste').where('gramos < 0').sum(:gramos).to_f.abs.round(1)
+    negativos = movs.where(tipo: 'ajuste').where('gramos < 0')
+    # El arqueo del MOSTRADOR va aparte. Estaba dentro de "ajustes en menos" junto con cualquier
+    # otra corrección de inventario: el admin veía un número y no tenía forma de saber que era
+    # lo que se pierde atendiendo, que es lo único de esta lista sobre lo que puede hacer algo
+    # esta semana.
+    mostrador_g = negativos.de_mostrador.sum(:gramos).to_f.abs.round(1)
+    ajuste_g    = negativos.sin_mostrador.sum(:gramos).to_f.abs.round(1)
 
     # 3. STOCK VENCIDO que sigue en góndola: todavía no es pérdida contable, pero lo va a ser.
     vencido = Stock.where(club_id: club.id).where('cantidad > 0')
@@ -469,8 +488,9 @@ class InformesController < ApplicationController
       plantas_descartadas: descartadas.count,
       plantas_por_motivo:  por_motivo,
       merma_g:             merma_g,
+      merma_mostrador_g:   mostrador_g,
       ajustes_negativos_g: ajuste_g,
-      total_gramos:        (merma_g + ajuste_g).round(1),
+      total_gramos:        (merma_g + mostrador_g + ajuste_g).round(1),
       stock_vencido_g:     vencido_g,
       stock_vencido_items: vencido.count,
     }
@@ -487,7 +507,8 @@ class InformesController < ApplicationController
       titulo: 'Producto perdido',
       headers: ['Concepto', 'Gramos'],
       rows: [['Merma declarada', merma_g],
-             ['Ajustes de inventario en menos', ajuste_g],
+             ['Faltante en el arqueo del mostrador', mostrador_g],
+             ['Otros ajustes de inventario en menos', ajuste_g],
              ['Stock vencido todavía en góndola', vencido_g]],
       formatos: [:texto, :numero],
       aligns: { 1 => :right },
@@ -497,12 +518,16 @@ class InformesController < ApplicationController
       titulo: 'Informe de pérdidas', nombre: 'informe_perdidas',
       resena: 'Qué se perdió la organización en el período y por qué: plantas que no llegaron a cosecha ' \
               'con su motivo, y producto que salió del inventario sin ser una dispensación ' \
-              '(merma, ajustes en menos). El stock vencido todavía no es pérdida, pero lo va a ser.',
+              '(merma declarada, faltantes del arqueo del mostrador y otros ajustes en menos). ' \
+              'El faltante del mostrador es merma de atención —fraccionar, pesar— y es inevitable: ' \
+              'el detalle por producto y por turno está en Mostrador → Merma. ' \
+              'El stock vencido todavía no es pérdida, pero lo va a ser.',
       datos: datos, periodo: etiqueta_periodo(desde, hasta),
       kpis: [
         { label: 'Plantas descartadas', valor: descartadas.count, tono: descartadas.count.positive? ? :warn : :ok },
         { label: 'Merma', valor: merma_g },
-        { label: 'Ajustes en menos', valor: ajuste_g },
+        { label: 'Faltante del mostrador', valor: mostrador_g },
+        { label: 'Otros ajustes en menos', valor: ajuste_g },
         { label: 'Vencido en góndola', valor: vencido_g, tono: vencido_g.positive? ? :crit : :ok },
       ],
       secciones: secciones,
@@ -700,6 +725,8 @@ class InformesController < ApplicationController
         # tablero interno, no para acreditar una nómina.
         nombre_completo:       p.nombre_completo,
         iniciales:             "#{p.nombre[0]}.#{p.apellido[0]}.",
+        # Completo para el PDF y el Excel; `sin_dni_completo` lo saca del JSON de la pantalla.
+        dni:                   p.dni_normalizado.to_s,
         dni_ultimos_3:         p.dni_normalizado.to_s.last(3),
         dni_ultimos_4:         p.dni_normalizado.to_s.last(4),
         reprocann_estado:      p.reprocann_categoria,
@@ -799,7 +826,7 @@ class InformesController < ApplicationController
       venc = p[:reprocann_vencimiento].present? ? Date.parse(p[:reprocann_vencimiento].to_s).strftime('%d/%m/%Y') : '—'
       [
         p[:nombre_completo].presence || p[:iniciales].to_s,
-        p[:dni_ultimos_3].present? ? "***#{p[:dni_ultimos_3]}" : '—',
+        p[:dni].presence || '—',
         ESTADO_REPROCANN_LABEL[p[:reprocann_estado].to_s] || p[:reprocann_estado].to_s,
         venc,
       ]
@@ -807,7 +834,7 @@ class InformesController < ApplicationController
     XlsxExport.new(
       club:    club,
       titulo:  'Informe REPROCANN',
-      headers: ['Paciente', 'DNI (últ. 3)', 'Estado', 'Vencimiento'],
+      headers: ['Paciente', 'DNI', 'Estado', 'Vencimiento'],
       rows:    rows,
       anchos:  [14, 16, 28, 16],
     ).render
@@ -826,9 +853,27 @@ class InformesController < ApplicationController
     f.to_s
   end
 
+  # El borde de arriba llega hasta el FINAL del día, no hasta su medianoche.
+  #
+  # `end_of_month` devuelve una Date, y `where(created_at: desde..hasta)` la compara como
+  # `<= '2026-08-31 00:00:00'`: todo lo que pasó ESE día quedaba afuera. Durante el mes no se
+  # nota porque el borde está en el futuro; el día 31 el informe pierde la jornada entera — que
+  # es justo el día en que alguien cierra el mes y lo mira.
+  #
+  # Los cuatro informes que usan este rango filtran por `created_at`/`updated_at`, así que el
+  # arreglo va acá y no en cada query.
+  # Saca el DNI completo de lo que se manda al navegador. La pantalla usa `dni_ultimos_3`.
+  def sin_dni_completo(data)
+    lista = data[:lista_anonimizada] || data['lista_anonimizada']
+    return data if lista.blank?
+
+    data.merge(lista_anonimizada: lista.map { |p| p.except(:dni) })
+  end
+
   def periodo_rango
     periodo = params[:periodo].presence_in(PERIODO_RANGOS.keys) || 'mes_actual'
-    PERIODO_RANGOS[periodo].call
+    desde, hasta = PERIODO_RANGOS[periodo].call
+    [desde.to_date.beginning_of_day, hasta.to_date.end_of_day]
   end
 
   def require_auditor_o_admin!

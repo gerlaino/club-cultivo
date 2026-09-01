@@ -88,6 +88,7 @@ RSpec.describe 'Retiro de caja vs. gasto pagado con la caja', type: :request do
                      cantidad: 500, precio_sugerido_ars: 100)
     end
     caja # abre
+    abrir_mostrador!(sede, usuario: admin)
 
     ActsAsTenant.with_tenant(club) do
       [admin, ana].each do |quien|

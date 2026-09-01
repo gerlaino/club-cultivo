@@ -58,7 +58,13 @@ class IaLlamada < ApplicationRecord
   validates :modelo,  presence: true
 
   scope :recientes,  -> { order(created_at: :desc) }
-  scope :del_mes,    ->(fecha = Time.zone.today) { where(created_at: fecha.all_month) }
+  # OJO con `all_month`: sobre una Date devuelve un rango de DATES, y comparado contra un
+  # timestamp corta a la medianoche del último día. El día 31 no contaba NADA de esa jornada —
+  # el consumo salía de menos, el tope no se aplicaba y el cliente tenía créditos gratis un día
+  # por mes. (`all_day` sobre una Date sí devuelve Times: ese no tiene el problema.)
+  scope :del_mes,    ->(fecha = Time.zone.today) {
+    where(created_at: fecha.beginning_of_month.beginning_of_day..fecha.end_of_month.end_of_day)
+  }
   scope :exitosas,   -> { where(ok: true) }
 
   # Multiplicadores del caché de prompt, sobre el precio de entrada del modelo: escribir cuesta

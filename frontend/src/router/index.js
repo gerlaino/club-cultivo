@@ -835,6 +835,20 @@ const routes = [
       else next('/')
     },
   },
+  // El MOSTRADOR: lo que hay sobre la mesa hoy. Para una organización que sólo dispensa es LA
+  // pantalla — se abre a la mañana, se opera todo el día y se cierra a la noche. La abre el que
+  // atiende: que dependa del admin es lo que hace que nadie la use.
+  {
+    path: '/mostrador',
+    name: 'mostrador',
+    component: () => import('../views/MostradorView.vue'),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (['admin', 'supervisor', 'dispensador'].includes(auth.user?.role)) next()
+      else next('/')
+    },
+  },
   {
     path: '/stock',
     name: 'stock-dispensador',
@@ -1080,7 +1094,8 @@ const ROLE_ALLOWED_PREFIX = {
   supervisor: ['/', '/salas', '/lotes', '/plantas', '/geneticas', '/tareas', '/plan-trabajo',
                '/historial-cultivador', '/cosechado', '/dispositivos', '/reglas-ambientales',
                '/pacientes', '/socios', '/historial', '/admin/stock', '/admin/pesajes-manicura',
-               '/insumos', '/sedes', '/analitica', '/reservas', '/m', ...ETIQUETAS, ...COMUNES],
+               '/insumos', '/sedes', '/analitica', '/reservas', '/mostrador', '/m',
+               ...ETIQUETAS, ...COMUNES],
 
   // Post-cosecha: pesa los lotes que le asignan. `/mnc` es SU sección y además donde aterriza
   // al entrar (ver el beforeEnter de "/"): sin ella el guard lo devolvía a "/", que lo volvía a
@@ -1093,8 +1108,9 @@ const ROLE_ALLOWED_PREFIX = {
   // `/tareas` faltaba acá aunque la matriz de permisos ya le da `tareas: ['index','show']`: la
   // misma regla escrita en dos lados y desalineada, que se ve como "la pantalla te deja y el
   // router te rebota".
-  dispensador: ['/', '/pacientes', '/socios', '/historial', '/stock', '/admin/stock', '/insumos',
-                '/reservas', '/bar', '/entregas', '/tareas', '/m', ...ETIQUETAS, ...COMUNES],
+  dispensador: ['/', '/mostrador', '/pacientes', '/socios', '/historial', '/stock', '/admin/stock',
+                '/insumos', '/reservas', '/bar', '/entregas', '/tareas', '/m',
+                ...ETIQUETAS, ...COMUNES],
 
   // El paciente sólo ve lo suyo y el portal que le arma su organización. No lleva `COMUNES`
   // como los demás: ahí adentro está `/mis-horas`, que es la planilla de quien TRABAJA en la
@@ -1120,6 +1136,7 @@ export function puedeEntrar(role, path) {
 // (dashboard, perfil, sedes, tareas, reportes, configuración) no llevan bandera: son de toda
 // organización y colgarlas de una suite ya hizo desaparecer secciones que hacían falta.
 const FEATURE_POR_PREFIJO = [
+  ['/mostrador',            'produccion_dispensa'],
   ['/salas',                'cultivo'],
   ['/lotes',                'cultivo'],
   ['/plantas',              'cultivo'],

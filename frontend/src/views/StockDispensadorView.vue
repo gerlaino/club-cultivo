@@ -102,6 +102,7 @@ const FORMAS = [
   { value: 'capsula',    label: 'Cápsula' },
   { value: 'comestible', label: 'Comestible' },
   { value: 'prensado',   label: 'Prensado' },
+  { value: 'preroll',    label: 'Preroll' },
   { value: 'externo',    label: 'Externo' },
   { value: 'otro',       label: 'Otro' },
 ]

@@ -7,6 +7,7 @@ class Sede < ApplicationRecord
 
   has_many :salas,               dependent: :nullify
   has_many :stocks,              dependent: :restrict_with_error
+  has_many :mostradores,         dependent: :destroy
   has_many :user_sedes, class_name: 'UserSede', foreign_key: 'sede_id', dependent: :destroy
   has_many :usuarios_asignados, through: :user_sedes, source: :user
 
@@ -43,6 +44,23 @@ class Sede < ApplicationRecord
   scope :activas,     -> { where(activa: true) }
   scope :produccion,  -> { where(tipo: ['produccion', 'mixta']) }
   scope :social,      -> { where(tipo: ['social', 'mixta']) }
+
+  # El mostrador de esta sede, creándolo la primera vez que hace falta.
+  #
+  # Perezoso a propósito: una sede creada antes de esta feature, o por una vía que no pasa por
+  # el controller (una importación, un rake, el clonado de un club), quedaría sin mostrador y por
+  # lo tanto sin poder abrir caja. `find_or_create_by!` + el índice único aguantan la race — es
+  # la misma trampa que duplicó depósitos cuando dos requests simultáneos los sembraron.
+  def mostrador
+    existente = mostradores.activos.order(:id).first
+    return existente if existente
+    return nil unless es_social?
+
+    mostradores.create_with(club: club, activo: true).find_or_create_by!(nombre: 'Mostrador')
+  rescue ActiveRecord::RecordNotUnique
+    mostradores.reset
+    mostradores.activos.order(:id).first
+  end
 
   def soft_delete!
     update_column(:deleted_at, Time.current)

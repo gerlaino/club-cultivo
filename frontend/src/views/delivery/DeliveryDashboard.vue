@@ -3,6 +3,7 @@ import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { Package, Bike, CheckCircle2, XCircle, MapPin, Phone, User, FileText, ChevronRight, ChevronDown, Send, Route, Navigation, PenLine, Trash2, Lock, Check } from 'lucide-vue-next'
 import { getMisPaquetes, iniciarViaje, ordenarRuta } from '../../lib/api.js'
+import RendicionCajaCard from '../../components/RendicionCajaCard.vue'
 import { useEntregasOffline } from '../../composables/useEntregasOffline.js'
 import { useToast } from '../../composables/useToast.js'
 import { useAuthStore } from '../../stores/auth.js'
@@ -339,6 +340,9 @@ onMounted(load)
 
 <template>
   <div class="dlv">
+
+    <!-- La entrega de lo que cobró: la arranca él y elige a quién. -->
+    <RendicionCajaCard />
 
     <!-- Entregas guardadas sin señal. Se muestra para que el repartidor SEPA que algo todavía no
          llegó al servidor: en silencio parecería que se perdió. -->

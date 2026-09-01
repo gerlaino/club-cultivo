@@ -93,15 +93,7 @@ module Dispensaciones
 
     def caja_abierta
       sede = @dispensacion.sede || @dispensacion.stock&.sede
-      return nil if sede.nil?
-
-      # `unscoped` + club_id explícito, y NO `without_tenant`: este servicio también corre desde
-      # la entrega del repartidor y desde Contabilidad, donde no hay tenant fijado, así que con
-      # `require_tenant` la query tal cual revienta. Pero `without_tenant` toca estado GLOBAL —lo
-      # pone en nil y lo restaura— y eso se filtra entre ejemplos: la spec siguiente hereda el
-      # tenant cambiado y falla en su propio setup, lejos de acá. `unscoped` es local a la query.
-      CajaTurno.unscoped.where(club_id: @club.id, punto_type: 'Sede', punto_id: sede.id,
-                               estado: 'abierta').first
+      CajaTurno.abierta_en_sede(club_id: @club.id, sede_id: sede&.id)
     end
 
     def cuenta_corriente

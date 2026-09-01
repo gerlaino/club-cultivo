@@ -333,10 +333,12 @@
                   </select>
                 </div>
                 <div class="stk__field">
-                  <label class="stk__label">Cantidad (g) <span class="stk__req">*</span></label>
+                  <!-- La unidad la manda la forma del producto: un preroll se cuenta por unidad,
+                       un aceite en mililitros. Antes decía siempre "g" y guardaba "g". -->
+                  <label class="stk__label">Cantidad ({{ unidadCrear }}) <span class="stk__req">*</span></label>
                   <div class="stk__input-row">
                     <input type="number" min="0.1" step="0.1" class="stk__input" v-model="crearForm.cantidad" placeholder="0.0" required />
-                    <span class="stk__input-suf">g</span>
+                    <span class="stk__input-suf">{{ unidadCrear }}</span>
                   </div>
                 </div>
                 <div class="stk__field">
@@ -748,6 +750,7 @@ import {
 } from '../../lib/api.js'
 
 const router = useRouter()
+import { unidadDe } from '../../lib/formatters.js'
 import { useToast } from '../../composables/useToast.js'
 import { MOTIVOS_FINALIZACION, ayudaDe } from '../../composables/useStockFinalizacion.js'
 import { useStockChannel } from '../../composables/useStockChannel.js'
@@ -1042,7 +1045,7 @@ async function guardarStock() {
       origen: 'compra_externa',
       forma_producto: crearForm.value.forma_producto,
       cantidad:  Number(crearForm.value.cantidad),
-      unidad:    'g',
+      unidad:    unidadCrear.value,
       estado:    'asignado',
       proveedor: crearForm.value.proveedor,
       sede_id:   Number(crearForm.value.sede_id),
@@ -1111,6 +1114,7 @@ const FORMAS_DERIVADO = [
   { value: 'capsula',    label: 'Cápsula' },
   { value: 'comestible', label: 'Comestible' },
   { value: 'prensado',   label: 'Prensado' },
+  { value: 'preroll',    label: 'Preroll' },
   { value: 'otro',       label: 'Otro' },
 ]
 
@@ -1154,7 +1158,7 @@ async function ejecutarProcesar() {
       lote_origen_consumido_g: consumir,
       forma_producto:          procesarForm.value.forma_producto,
       cantidad:                resultado,
-      unidad:                  'g',
+      unidad:                  unidadDe(procesarForm.value.forma_producto),
       estado:                  'asignado',
       sede_id:                 Number(procesarForm.value.sede_id),
     })
@@ -1312,10 +1316,14 @@ const FORMAS = [
   { value: 'capsula',    label: 'Cápsula' },
   { value: 'comestible', label: 'Comestible' },
   { value: 'prensado',   label: 'Prensado' },
+  { value: 'preroll',    label: 'Preroll' },
   { value: 'externo',    label: 'Externo' },
   { value: 'otro',       label: 'Otro' },
 ]
 const FORMA_MAP = Object.fromEntries(FORMAS.map(f => [f.value, f.label]))
+// Lo que se guarda y lo que dice la etiqueta, del mismo lado: si la pantalla dice "g" y el
+// registro queda en unidades, el número no significa nada.
+const unidadCrear = computed(() => unidadDe(crearForm.value.forma_producto))
 function formaLabel(f) { return FORMA_MAP[f] || f || 'Stock' }
 
 function estadoLabel(e) {

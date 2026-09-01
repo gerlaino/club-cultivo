@@ -1,5 +1,303 @@
 # Changelog
 
+## Agosto 2026 (v) — el mostrador
+
+Hasta ahora una organización que dispensa abría la caja de plata y nada más. La mercadería salía
+del depósito sin que nadie declarara qué había sobre la mesa a la mañana ni qué quedaba a la
+noche, y la merma —que es inevitable— no se medía en ningún lado.
+
+**El mostrador es el punto de venta del dispensario**, hermano de la `Barra` del buffet. No es un
+módulo que se contrata ni un interruptor que se prende: **es dónde opera el dispensador**, y viene
+con la suite de Producción y dispensa.
+
+### La pieza que faltaba: `Mostrador`
+
+La caja del dispensario apuntaba a la **`Sede`** —no porque estuviera bien, sino porque no existía
+la entidad: `CajaTurno#de_dispensario?` preguntaba literalmente `punto_type == 'Sede'`—. Eso dejaba
+dos ideas distintas de "punto de venta" conviviendo y ninguna forma de decir "este stock está sobre
+la mesa de este mostrador".
+
+```
+Sede (social o mixta)
+ ├── Barra      → CajaTurno
+ └── Mostrador  → CajaTurno + TurnoMostrador (la mercadería)
+```
+
+Quién atiende cada mostrador **no necesitó tabla nueva**: `UserSede` ya asigna dispensadores a
+sedes, y el mostrador es de la sede.
+
+La migración repunta las cajas que ya existían y **falla el deploy** si quedara una sola sin dueño:
+una caja huérfana no tira error, sólo hace que el arqueo mienta. Y `punto_type: 'Sede'` estaba
+escrito a mano en **cinco archivos** más `de_dispensario?`; ninguno fallaba al quedar
+desactualizado, simplemente no encontraba caja y el cobro quedaba suelto. Todos pasan por
+`CajaTurno.abierta_en_sede`.
+
+### El stock se APARTA, no se descuenta
+
+Es la mecánica del apartado de un evento (`EventoBarProvision`) con otro destinatario: cargar el
+mostrador **bloquea** la cantidad, no la descuenta. La fila `Stock` sigue siendo una sola con su
+`ST-xx` y su QR, porque **lo trazable sale del inventario por dispensación y nunca por cambiar de
+mesa**. Descontar cerraría solo un lote cargado entero a la mesa y rompería el balance de
+trazabilidad (`producido − dispensado − merma = en stock`).
+
+Cargar y devolver **no generan `StockMovimiento`**: el rastro vive en el turno
+(`TurnoMostradorMovimiento`, con hora y autor). El único movimiento de stock que genera todo esto
+es el **ajuste del cierre**.
+
+Y el corolario que no se puede romper: si aparta pero la dispensa no imputa, el stock cargado se
+vuelve indispensable y el disponible cae el doble — el mismo bug que ya había pasado con los
+eventos. `Dispensacion#imputar_a_mostrador` es el gemelo exacto de `imputar_a_apartado_evento`.
+
+### El día, de punta a punta
+
+1. **El admin carga la mesa** — fondo de caja y qué stock, y cuánto, baja del depósito.
+2. **El que atiende lo recibe.** Ve lo que dejó el admin con los números ya puestos: confirmar es
+   un click, corregir es cambiar el número y escribir el motivo. **Hasta que no firma, no
+   dispensa** — ni por pantalla ni por API, y el carrito no le ofrece nada.
+3. **Atiende.** El carrito le ofrece **sólo lo de la mesa y con el número de la mesa**: si arriba
+   hay 300 g y en el depósito 1.240, ve 300.
+4. **Cierra.** Cuenta mercadería y efectivo, deja el fondo y sale el retiro. **Cierra en el acto**,
+   sin esperar al admin.
+5. **El próximo abre** con lo que quedó anoche, gramos y fondo, editable.
+
+**No hay relevo con firma cruzada.** Se descartó a propósito: ahí la misma persona cuenta dos veces
+lo que ella misma dejó y termina en un botón que nadie mira. Cerrar-y-reabrir **es** el arqueo, y
+se puede hacer varias veces por día. La recepción (paso 2) es otra cosa: son DOS personas, y sin
+ese punto de partida verificado la diferencia de la noche mezcla lo que se consumió atendiendo con
+lo que nunca estuvo sobre la mesa.
+
+### El agujero de la plata que no se veía
+
+El cierre pedía el efectivo contado y nada más. Si contabas $230.000 y mañana abrías con $50.000 de
+fondo, **los otros $180.000 no tenían ningún movimiento que dijera que salieron del cajón**. Ahora
+el cierre parte lo contado en el **fondo que queda** y el **retiro** de la recaudación, que sale
+como `retiro_caja` (un `ajuste`, no un egreso: esa plata sigue siendo del club) y con dueño. El
+fondo se **hereda**: el que abre no lo declara.
+
+Y una regla que ya existía frenó el diseño, con razón: **`MovimientoContable::ROLES_RETIRO` sólo
+deja que un admin o supervisor sea dueño de un retiro.** O sea, el dispensador cierra pero no se
+lleva la recaudación. Si cierra él y no hay a quién atribuirla, deja todo como fondo y la plata se
+queda en el cajón, que es donde está de verdad.
+
+**Bug arreglado en `CajaTurno#salidas`:** el retiro del cierre contaba como salida del turno, así
+que bajaba lo esperado y la diferencia de arqueo quedaba mal **para siempre** — un turno que cerró
+cuadrado aparecería después con un sobrante igual a lo que se llevaron. Ahora `salidas` ignora lo
+posterior al cierre.
+
+### La plata se recibe igual que la mercadería
+
+El que atiende confirma **los dos**: lo que hay sobre la mesa y lo que hay en el cajón. Si el
+efectivo no coincide, el fondo pasa a ser **lo contado** —es lo que hay— y la diferencia se asienta
+como `diferencia_caja` con quién la detectó y cuándo. Sin corregir el fondo, el cierre volvería a
+encontrar la misma diferencia y la contaría dos veces.
+
+A diferencia del stock, acá la diferencia **sí es una pérdida real**: los gramos que el admin
+declaró de más siguen en el depósito, pero los pesos que faltan no están en ningún lado.
+
+### La plata también entra al cajón, no sólo sale
+
+Había `salida_caja` (gasto) y `retiro_caja`, pero **ninguna forma de PONER plata**: traer cambio,
+reponer el fondo, dejar lo que alguien cobró por fuera. Nuevo `ingreso_caja`, espejo exacto de
+`retiro_caja` — va como `ajuste` porque esa plata ya era del club, sólo cambió de lugar, y
+asentarla como ingreso inflaría la facturación.
+
+(Una dispensa cobrada en efectivo con la caja abierta **ya entra sola**: el cobro se engancha al
+turno. Usar `ingreso_caja` para eso la contaría dos veces.)
+
+**Bug que esto destapó:** `devolucion_caja` —la plata que alguien devuelve de un retiro— se ataba
+a la caja abierta con el comentario *"la devolución la tiene que esperar el turno que está
+corriendo"*, pero `efectivo_esperado_ars` **no la sumaba**: el turno cerraba con un sobrante igual
+a lo devuelto. La intención estaba escrita y no implementada. Ahora hay `CajaTurno#ingresos`,
+simétrico de `salidas`, y las dos ignoran lo posterior al cierre.
+
+### Pruebas de punta a punta en el navegador
+
+`frontend/e2e/` con Playwright, sobre una organización **aparte** (`slug: 'e2e'`, sembrada por
+`rake e2e:seed`) — nunca sobre datos reales. Recorren el día del mostrador completo (cargar,
+recibir corrigiendo, cerrar contando, heredar) y la rendición entera (rendir, contar, ajustar,
+conformar, ver el historial y lo acumulado en la ficha).
+
+**Encontraron cuatro cosas que ni el build ni los tests unitarios iban a encontrar:**
+
+- **El rango de la merma se calculaba en el navegador con `toISOString()`, que da la fecha en
+  UTC.** Con el cliente en una zona y Rails en Buenos Aires, entre las 21:00 y las 00:00 la
+  solapa pedía un mañana donde todavía no había cerrado nadie y se veía vacía — justo en el
+  horario en que se cierra el mostrador. Ahora el rango por defecto lo pone el **backend**, en su
+  zona: el cliente no tiene por qué adivinar qué día es allá.
+- **Al recibir una rendición, la mesa no se actualizaba.** El producto que volvía entraba al
+  sistema y no aparecía en la pantalla del que lo acababa de recibir en la mano.
+- Y dos del andamiaje, que valen igual porque hacen que una prueba mienta: cambiar de usuario sin
+  limpiar la sesión (el caso seguía como el anterior y pasaba igual), y una petición en vuelo cuyo
+  `Set-Cookie` reponía la sesión después de limpiarla. `entrar()` ahora **verifica** con quién
+  quedó la sesión.
+
+### La rendición del repartidor, con las dos personas adentro
+
+Era unilateral: el que recibía apretaba un botón y el sistema daba por rendido todo lo que el
+repartidor había cobrado. Dos agujeros — **nadie contaba la plata** (si traía menos, el sistema no
+se enteraba) y el repartidor no tenía forma de dejar constancia de que la entregó.
+
+Ahora **la inicia él**: elige a quién le rinde, y el monto no lo escribe —es la suma de lo que ya
+cobró en cada puerta—. El receptor **cuenta** y recibe.
+
+**La plata nunca queda en el aire.** Es efectivo: el que cuenta es el que la tiene en la mano y ese
+número entra al cajón, siempre. No hay estado "en disputa" — dejaría plata que no está en ningún
+lado. Si el receptor ajustó, lo que queda pendiente es la **conformidad** del repartidor, que es
+constancia y no candado, y va a la bandeja del admin: una diferencia de efectivo se resuelve
+hablando, no con un estado.
+
+**Sólo se ajusta hacia abajo.** Si trae MÁS de lo que figura cobrado, es que un cobro no se cargó:
+ajustar acá lo taparía y esa dispensa quedaría figurando impaga para siempre.
+
+**Lo que no entregó no es una pérdida**: esa plata existe y está con una persona. Va como `ajuste`
+categoría `a_cuenta_repartidor` con su nombre, así que no baja el resultado — mismo criterio que
+`retiro_caja`. Y el ingreso se asienta **completo**: el paciente pagó esa plata, lo que falta no es
+menos venta.
+
+La puerta vieja (el admin recibe sin que el repartidor haya rendido) sigue andando y **delega en el
+mismo servicio**: dos caminos al mismo hecho es cómo dejan de coincidir.
+
+### La rendición también trae producto
+
+El repartidor no vuelve sólo con plata: vuelve con los paquetes que no pudo entregar. **Todos se
+desarman**, y no se elige — es una decisión de CALIDAD, no de inventario: un paquete que estuvo en
+la calle no se guarda armado esperando otro intento, y cuando se despache de nuevo se arma en el
+momento (para entonces puede haber cambiado hasta la forma de entrega, y pasar a buscarse por la
+organización).
+
+Su producto vuelve al stock y **sube a la mesa del mostrador abierto aunque ese frasco no estuviera
+arriba**: si no, el gramo volvía al depósito y el que atiende no lo tenía para entregárselo al
+próximo que lo pidiera, con el paquete ahí adelante. Cuando se despache de nuevo, es una dispensa
+nueva.
+
+`reprogramar` sigue existiendo para el reintento del MISMO viaje —falla a las 18 y vuelve a
+intentar a las 19 sin pasar por la base—: ahí el paquete nunca volvió.
+
+Para eso se extrajo `Dispensaciones::Cancelar` de `DispensacionesController#cancelar_entrega`: la
+reversa de stock, cuenta corriente y asientos ahora vive en un solo lugar. Escribirla dos veces es
+cómo dejan de coincidir a la primera corrección.
+
+### Lo que el repartidor tiene del club, acumulado
+
+En su ficha, al lado de la caja: cuánto se quedó en total y en cuántas rendiciones, con el detalle.
+Suelto, cada faltante parece un caso aislado y nadie nota que van seis meses seguidos. Se muestra
+como **saldo y no como gasto** —en ámbar, no en rojo—: esa plata existe, está con él y se reclama.
+
+### El arqueo no puede mostrar la respuesta antes de preguntar
+
+El cierre decía *"tendría que haber 297 g"* **arriba del campo donde se escribe lo contado**.
+Nadie pesa 297 g teniendo el 297 delante: se escribe ese número y listo. Con eso el conteo es
+teatro, la merma da cero siempre y el módulo entero deja de servir para lo único que se construyó.
+
+Ahora lo esperado aparece **después** de escribir el conteo, producto por producto, y lo mismo con
+el efectivo. En la RECEPCIÓN sí sigue viniendo precargado a propósito: ahí confirmar es un click y
+un número mal puesto sólo corre el punto de partida, no la medición.
+
+### Revertir una dispensa le devuelve el producto a la mesa
+
+`incrementar_stock` devolvía el gramo al pozo pero el mostrador lo seguía dando por salido: el
+frasco vuelve a la mesa y la noche cierra con un **sobrante** que el que atendió no puede
+explicar. Faltaba el inverso de `imputar_a_mostrador`, y sólo aplica con el turno abierto — si ya
+cerró, su arqueo se hizo con el producto afuera.
+
+(Un reparto **fallido** no devuelve el stock, y está bien: puede reprogramarse. Para devolverlo de
+verdad ya estaba `cancelar_entrega`.)
+
+### Lo que apareció al abrirla en el navegador
+
+Un build verde no prueba que la pantalla sirva. Abriéndola con datos reales apareció que **el
+admin podía confirmarse a sí mismo la mesa que acababa de cargar**: la firma de recepción quedaba
+decorativa, que es exactamente lo que queríamos evitar al descartar el relevo. Ahora quien carga
+no recibe —la validación está en el servicio y la pantalla ni le ofrece el formulario— y si abre
+el que atiende, nace confirmado.
+
+De paso, `loCargueYo` comparaba dos ids que pueden ser nil: sin exigir que existan,
+`undefined === undefined` daba true y **nadie** podría recibir la mesa nunca. Lo cazó un test.
+
+### Deshacer un conteo mal cargado
+
+Era el único lugar del módulo donde un dedazo destruía datos: 21 en vez de 215 cierra con un
+faltante de 194 g y **ajusta el inventario real**. La caja se podía anular; esto no tenía vuelta
+atrás. `Mostradores::CorregirCierre` **no borra el movimiento equivocado**: asienta la diferencia
+al lado. Borrar para tapar un error es peor que el error — el rastro de que alguien corrigió es
+justo lo que hay que poder mostrar después.
+
+### El bug de los rangos mensuales
+
+`Date#all_month` devuelve un rango de **Dates**. Comparado contra un `created_at`, el borde de
+arriba es la MEDIANOCHE del último día: **el día 31 no se contaba nada de esa jornada**. Durante
+el mes no se nota porque el borde está en el futuro.
+
+Mordía en dos lugares, los dos encontrados hoy —que es 31—: el **consumo de IA** (el tope no se
+aplicaba y el cliente tenía un día gratis por mes) y los **informes por período** (Pérdidas perdía
+el día entero, justo cuando alguien cierra el mes y lo mira). `Date#all_day` sí devuelve Times:
+ese no tiene el problema.
+
+### Dónde se le va el producto (solapa Merma)
+
+**La merma es inevitable y no es culpa de nadie.** Se mide para que la organización sepa cuánta hay,
+en qué producto y en qué momento — para encontrar el cuello de botella. El texto de la pantalla
+tiene que sonar así: una diferencia es un dato que se anota, no una falta que alguien explica.
+
+El número que manda es el **porcentaje sobre lo entregado**, no los gramos: 3,6 g sobre 85
+entregados es 4% y hay algo que mirar; los mismos 3,6 sobre 850 es 0,4% y es la balanza. Un ranking
+absoluto siempre encabeza con lo que más se vende y no dice nada.
+
+Además, si el que recibe **corrige seguido**, el cuello de botella no es la merma: es quien carga
+la mesa, que declara mal. Por eso las correcciones de recepción se cuentan por turno.
+
+El aviso de turnos sin mirar viaja en la carga principal de la pantalla, no en la solapa: uno que
+sólo aparece cuando ya fuiste a mirar no avisa nada.
+
+### El ajuste de arqueo NUNCA es merma
+
+La regla de oro sigue: lo trazable sale del inventario por dispensación. Un faltante de arqueo es
+una **corrección de conteo**, va como `ajuste` con motivo obligatorio, y se cuenta aparte de
+`merma` —que es lo que mira el informe de Pérdidas—. Anotarlo como merma declararía destruido
+producto que puede estar entero, y para un auditor eso es peor.
+
+Corregir **al recibir** tampoco toca el inventario: si el admin declaró 300 y hay 297, esos 3 g
+siguen en el depósito. Sólo se corrige el reparto entre mesa y depósito.
+
+### Quién pasa por el mostrador
+
+`Dispensacion::ROLES_DEL_MOSTRADOR` = `dispensador` y `supervisor`. **El admin no**: es el que
+carga la mesa, el que arquea y el dueño de la mercadería, y pedirle turno abierto para registrar
+una dispensa vieja es fricción sin control detrás. Si igual dispensa algo que está sobre la mesa,
+se imputa al ítem lo mismo, así el arqueo no le miente al que atiende.
+
+Dos excepciones a "sólo lo que está sobre la mesa", y las dos son mercadería **ya apartada a nombre
+de alguien** (y por eso no puede estar arriba, porque el mostrador sólo levanta lo libre): la
+entrega de una **reserva** y lo apartado para un **evento**.
+
+### De paso
+
+- **`recibir_caja_delivery` tomaba la caja abierta más reciente de CUALQUIER sede**, sin filtrar:
+  con dos sedes con caja abierta, el efectivo del repartidor caía en la que había abierto más tarde
+  — sobrante en una, faltante en la otra. Ahora entra en el mostrador del que la recibe, y si no hay
+  forma de saberlo se rinde igual sin turno: la plata entró al club y eso no puede depender de que
+  alguien haya abierto un mostrador.
+- **`preroll` no se podía crear.** Estaba en `Stock::FORMAS_PRODUCTO` desde siempre, pero faltaba en
+  el selector del alta y en el de "procesar flor seca en un derivado" — que es el caso principal,
+  porque un preroll sale de la flor propia. La lista de formas está copiada en 12 archivos.
+- **Y aunque estuviera en la lista, no entraba:** `Stock#validar_segun_origen` comparaba `cantidad`
+  contra `lote_origen_consumido_g` sin mirar la unidad. De 100 g salen 200 prerolls de medio gramo
+  o 400 cápsulas: el número es mayor porque **la unidad es otra**, y el sistema lo rechazaba
+  diciendo "200g resultado". La regla vale sólo cuando el derivado se mide en gramos.
+- **El inflector**: `mostrador` → `mostradors` en inglés rompía la tabla, la FK y la clase inferida
+  de `has_many :mostradores`. Se resolvió donde ya estaba resuelto para `bar`:
+  `config/initializers/inflections.rb`.
+
+### Esquema
+
+`mostradores`, `turno_mostradores`, `turno_mostrador_items`, `turno_mostrador_movimientos`, más
+`dispensaciones.turno_mostrador_id`. (`clubs.exigir_mostrador_abierto` se agregó y se sacó en el
+mismo bloque: el mostrador no es una opción.)
+
+**2653 rspec ✓ · 1680 vitest ✓ · build limpio.**
+
+---
+
 ## Agosto 2026 (u) — el plan es una consecuencia, no una pregunta
 
 El alta de una organización la va a usar alguien que no escribió la app. Mirándola con esos ojos,

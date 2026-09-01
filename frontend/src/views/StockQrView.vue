@@ -183,11 +183,11 @@ const stock  = ref(null)
 const FORMA_LABELS = {
   flor_seca: 'Flor seca', hash: 'Hash', aceite: 'Aceite',
   tintura: 'Tintura', crema: 'Crema', capsula: 'Cápsula',
-  comestible: 'Comestible', prensado: 'Prensado', otro: 'Otro',
+  comestible: 'Comestible', prensado: 'Prensado', preroll: 'Preroll', otro: 'Otro',
 }
 const FORMA_ICO = {
   flor_seca: '🌿', hash: '🪨', aceite: '💧', tintura: '🧪',
-  crema: '🫙', capsula: '💊', comestible: '🍬', prensado: '🟫', otro: '📦',
+  crema: '🫙', capsula: '💊', comestible: '🍬', prensado: '🟫', preroll: '🚬', otro: '📦',
 }
 
 function formaLabel(f) { return FORMA_LABELS[f] || f || '—' }

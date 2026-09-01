@@ -115,7 +115,7 @@ const itemsBajos = computed(() => florSeca.value.filter(s => Number(s.cantidad) 
 const tiendaStocks  = ref([])
 const loadingTienda = ref(false)
 
-const FORMA_LABELS = { flor_seca: '🌿 Flor seca', hash: '🟤 Hash', aceite: '🫙 Aceite', tintura: '💧 Tintura', topico: '🧴 Tópico', otro: '📦 Otro' }
+const FORMA_LABELS = { flor_seca: '🌿 Flor seca', hash: '🟤 Hash', aceite: '🫙 Aceite', tintura: '💧 Tintura', topico: '🧴 Tópico', preroll: '🚬 Preroll', otro: '📦 Otro' }
 const KIND_LABELS = { enraizado: 'Enraizado', vegetativo: 'Vegetativo', floracion: 'Floración', cosecha: 'Cosecha', curado: 'Curado', manicura: 'Manicura', mixta: 'Mixta', madre: 'Madre', madres: 'Madres' }
 function kindLabel(k) { return KIND_LABELS[k] || k || '' }
 

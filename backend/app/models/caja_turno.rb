@@ -1,5 +1,5 @@
-# Caja de turno de un PUNTO DE VENTA: una `Barra` (el buffet) o una `Sede` (su mostrador de
-# dispensa). Se abre con un fondo inicial y se cierra con un arqueo: el operador cuenta el
+# Caja de turno de un PUNTO DE VENTA: una `Barra` (el buffet) o un `Mostrador` (el del
+# dispensario). Se abre con un fondo inicial y se cierra con un arqueo: el operador cuenta el
 # efectivo y el sistema compara contra lo esperado (fondo + lo cobrado en efectivo en el turno).
 #
 # Son cajas INDEPENDIENTES: cada punto abre, arquea y cierra la suya y la plata nunca se mezcla.
@@ -7,8 +7,8 @@
 # operador envía el cierre y el admin lo confirma—, que ya estaba escrita y probada para el bar.
 #
 # De dónde sale lo cobrado depende del punto, y es la única diferencia real entre las dos:
-#   Barra → `bar_ventas` del turno
-#   Sede  → `cobros` de las dispensaciones del turno (efectivo y transferencia)
+#   Barra     → `bar_ventas` del turno
+#   Mostrador → `cobros` de las dispensaciones del turno (efectivo y transferencia)
 #
 # Una sola caja activa por punto (índice único parcial + validación).
 class CajaTurno < ApplicationRecord
@@ -52,6 +52,31 @@ class CajaTurno < ApplicationRecord
   # generaría un faltante de arqueo por todo el fondo, un egreso inventado en el libro.
   ESTADOS = %w[abierta pendiente_cierre cerrada anulada].freeze
 
+  # Dónde vive la caja del dispensario. Estaba escrito a mano como `punto_type: 'Sede'` en cinco
+  # archivos, y ninguno tiraba error al quedar desactualizado: simplemente no encontraban caja,
+  # el cobro quedaba suelto y el arqueo mentía en silencio. Ahora es una constante y dos scopes.
+  PUNTO_MOSTRADOR = 'Mostrador'.freeze
+
+  scope :de_mostradores, -> { where(punto_type: PUNTO_MOSTRADOR) }
+  scope :del_mostrador,  ->(m) { where(punto_type: PUNTO_MOSTRADOR, punto_id: m) }
+
+  # La caja abierta del mostrador de una sede. Es la MISMA pregunta que hacen el cobro de una
+  # dispensa, el saldado de un retiro y la rendición del repartidor, y cada uno la escribía por
+  # su cuenta.
+  #
+  # `unscoped` + club_id explícito, y NO `without_tenant`: estos llamadores corren desde la
+  # entrega del repartidor y desde Contabilidad, donde no hay tenant fijado, así que con
+  # `require_tenant` la query revienta. Pero `without_tenant` toca estado GLOBAL y se filtra
+  # entre ejemplos. `unscoped` es local a la query.
+  def self.abierta_en_sede(club_id:, sede_id:)
+    return nil if sede_id.nil?
+
+    mostradores = Mostrador.unscoped
+                           .where(club_id: club_id, sede_id: sede_id, deleted_at: nil)
+                           .select(:id)
+    unscoped.where(club_id: club_id, estado: 'abierta').del_mostrador(mostradores).first
+  end
+
   validates :estado, inclusion: { in: ESTADOS }
   validates :monto_inicial_ars, numericality: { greater_than_or_equal_to: 0 }
   validate  :una_activa_por_punto, on: :create
@@ -75,7 +100,7 @@ class CajaTurno < ApplicationRecord
   def apertura_confirmada? = apertura_confirmada_at.present?
 
   # ¿Es la caja del mostrador de dispensa o la del buffet? Cambia de dónde sale lo cobrado.
-  def de_dispensario? = punto_type == 'Sede'
+  def de_dispensario? = punto_type == PUNTO_MOSTRADOR
   def de_bar?         = punto_type == 'Barra'
 
   # Lo cobrado en el turno. En el buffet son las ventas del mostrador; en el dispensario, los
@@ -109,11 +134,33 @@ class CajaTurno < ApplicationRecord
   #
   # Se excluye la diferencia de arqueo, que se asienta al cerrar y no es plata que salió durante
   # el turno sino lo que no apareció al contarlo.
+  #
+  # Y se excluye lo posterior al CIERRE: el retiro de la recaudación se registra justo después
+  # del arqueo, y si contara como salida del turno bajaría lo esperado y la diferencia de arqueo
+  # quedaría mal para siempre — un turno que cerró cuadrado aparecería con un sobrante igual a lo
+  # que se llevaron. Lo de después del cierre no salió "durante": es la entrega de lo recaudado.
   def salidas
-    movimientos_contables.where(categoria: %w[salida_caja retiro_caja])
+    movs = movimientos_contables.where(categoria: %w[salida_caja retiro_caja])
+    cerrada_at.present? ? movs.where(movimientos_contables: { created_at: ...cerrada_at }) : movs
   end
 
   def total_salidas_ars = salidas.sum(:monto_ars).to_f
+
+  # Plata que ENTRÓ al cajón sin ser una venta: lo que alguien devolvió de un retiro
+  # (`devolucion_caja`) y lo que se puso a mano (`ingreso_caja`) — traer cambio, reponer el
+  # fondo, dejar lo cobrado por fuera.
+  #
+  # `saldar_retiro` ya ataba la devolución a la caja abierta con el comentario "la devolución la
+  # tiene que esperar el turno que está corriendo", pero el esperado no la sumaba: el turno
+  # cerraba con un sobrante igual a lo devuelto. La intención estaba escrita y no implementada.
+  #
+  # Mismo criterio que `salidas` con el cierre: lo posterior no es del turno.
+  def ingresos
+    movs = movimientos_contables.where(categoria: %w[devolucion_caja ingreso_caja])
+    cerrada_at.present? ? movs.where(movimientos_contables: { created_at: ...cerrada_at }) : movs
+  end
+
+  def total_ingresos_ars = ingresos.sum(:monto_ars).to_f
 
   def total_digital_ars
     (total_ventas_ars - total_efectivo_ars).round(2)
@@ -122,7 +169,25 @@ class CajaTurno < ApplicationRecord
   # Efectivo que debería haber en el cajón: el fondo, más lo cobrado en efectivo, menos lo que
   # se sacó. Es la cuenta que hace quien arquea, escrita igual.
   def efectivo_esperado_ars
-    (monto_inicial_ars.to_d + total_efectivo_ars.to_d - total_salidas_ars.to_d).to_f
+    (monto_inicial_ars.to_d + total_efectivo_ars.to_d +
+     total_ingresos_ars.to_d - total_salidas_ars.to_d).to_f
+  end
+
+  # Lo que QUEDÓ en el cajón después del arqueo: lo contado, menos lo que se retiró al cerrar.
+  #
+  # Es el fondo que hereda el turno siguiente. Que el que abre a la mañana tenga que declarar con
+  # cuánto arranca es justo lo que hace inútil el control: si el número lo pone él, puede poner
+  # cualquiera. Heredado, no elige — a lo sumo corrige, y esa corrección queda con su nombre.
+  #
+  # Los retiros de DURANTE el turno no cuentan acá: esa plata ya salió antes del arqueo y está
+  # descontada de lo esperado.
+  def fondo_remanente_ars
+    return nil unless cerrada? && efectivo_declarado_ars.present?
+
+    retirado = movimientos_contables.where(categoria: 'retiro_caja')
+                                    .where(movimientos_contables: { created_at: cerrada_at.. })
+                                    .sum(:monto_ars)
+    [(efectivo_declarado_ars.to_d - retirado.to_d), 0].max.to_f
   end
 
   # Diferencia de arqueo (contado − esperado). Solo tiene sentido con la caja cerrada.

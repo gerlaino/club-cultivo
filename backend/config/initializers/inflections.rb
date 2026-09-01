@@ -9,4 +9,9 @@
 # que esperan los controllers. (El modelo es `Barra` con table_name explícito, no se ve afectado.)
 ActiveSupport::Inflector.inflections(:en) do |inflect|
   inflect.irregular "bar", "bares"
+  # Sin esto el inflector inglés dice "mostradors": la tabla, la FK y la clase inferida de
+  # `has_many :mostradores` (que buscaba un modelo "Mostradore") salían todas mal. Es el mismo
+  # arreglo que ya estaba puesto para "bar", y evita tener que acordarse de `class_name` y
+  # `to_table` en cada asociación nueva. Aplica también a `turno_mostrador`.
+  inflect.irregular "mostrador", "mostradores"
 end

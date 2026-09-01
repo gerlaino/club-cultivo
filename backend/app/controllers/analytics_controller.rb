@@ -205,7 +205,11 @@ class AnalyticsController < ApplicationController
   # No es el mismo payload con menos filas: hay bloques que directamente no van. El estado del
   # REPROCANN del padrón, el volumen del club y las entregas de delivery abiertas son preguntas
   # de quien administra, no de quien entrega.
-  # Estado de la caja de cada mostrador, para el tablero del admin.
+  # Estado de la caja Y DE LA MESA de cada mostrador, para el tablero del admin.
+  #
+  # Van juntos a propósito: son el mismo punto de venta y la misma pregunta —"¿está atendiendo?"—.
+  # Que la caja tuviera tarjeta y la mercadería no dejaba al admin enterándose por un reclamo de
+  # que nadie había abierto el mostrador.
   #
   # `Sede::SUITES_POR_TIPO` ya dice qué sede dispensa: `social` y `mixta`. Una de producción no
   # tiene mostrador y ofrecerle una caja sería ruido — la regla no se reescribe acá.
@@ -213,14 +217,36 @@ class AnalyticsController < ApplicationController
     sedes = club.sedes.activas.where(tipo: %w[social mixta]).order(:nombre).to_a
     return [] if sedes.empty?
 
-    activas = CajaTurno.where(club_id: club.id, punto_type: 'Sede', punto_id: sedes.map(&:id))
-                       .activas.includes(:abierta_por).index_by(&:punto_id)
+    # La caja es del MOSTRADOR y el mostrador es de la sede: hay que dar el rodeo para poder
+    # seguir indexando por sede, que es como lo muestra el tablero.
+    mostradores = Mostrador.where(club_id: club.id, sede_id: sedes.map(&:id)).index_by(&:id)
+    activas = CajaTurno.where(club_id: club.id).del_mostrador(mostradores.keys)
+                       .activas.includes(:abierta_por)
+                       .index_by { |c| mostradores[c.punto_id]&.sede_id }
+
+    # El turno de mercadería abierto de cada mostrador, con cuántos productos tiene arriba. Una
+    # query para todas las sedes, no una por sede.
+    turnos = TurnoMostrador.where(club_id: club.id, mostrador_id: mostradores.keys)
+                           .abiertos.includes(:abierto_por, :confirmado_por)
+                           .index_by { |t| mostradores[t.mostrador_id]&.sede_id }
+    productos = TurnoMostradorItem.where(turno_mostrador_id: turnos.values.map(&:id))
+                                  .group(:turno_mostrador_id).count
 
     sedes.map do |sede|
-      caja = activas[sede.id]
+      caja  = activas[sede.id]
+      turno = turnos[sede.id]
       {
         sede_id: sede.id,
         sede:    sede.nombre,
+        # Tres estados, no dos: cargado por el admin y esperando que lo reciba el que atiende es
+        # un momento propio, y es justo donde se traba un arranque.
+        mostrador: {
+          estado:    turno.nil? ? 'sin_abrir' : (turno.confirmado? ? 'abierto' : 'sin_recibir'),
+          abierto_por: turno&.abierto_por&.nombre_completo,
+          atiende:   turno&.confirmado_por&.nombre_completo,
+          desde:     turno&.confirmado_at || turno&.abierto_at,
+          productos: turno ? productos[turno.id].to_i : 0,
+        },
         # `sin_abrir` no es un estado de la caja: es la AUSENCIA de caja, y es justo lo que el
         # admin necesita ver de un vistazo.
         estado:  caja.nil? ? 'sin_abrir' : (caja.apertura_confirmada? ? caja.estado : 'sin_confirmar'),

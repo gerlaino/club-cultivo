@@ -115,13 +115,8 @@ module Caja
 
     def motivo_original = @retiro.descripcion.to_s.sub(/\A[^—]*—\s*/, '')
 
-    # `unscoped` y no `without_tenant`: este servicio corre desde el panel del admin y
-    # `without_tenant` toca estado global, que se filtra entre ejemplos.
     def caja_abierta
-      return nil if @retiro.sede_id.nil?
-
-      CajaTurno.unscoped.where(club_id: @retiro.club_id, punto_type: 'Sede',
-                               punto_id: @retiro.sede_id, estado: 'abierta').first
+      CajaTurno.abierta_en_sede(club_id: @retiro.club_id, sede_id: @retiro.sede_id)
     end
   end
 end

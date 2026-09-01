@@ -41,6 +41,8 @@ class Club < ApplicationRecord
   has_many :insumo_compras,        class_name: 'InsumoCompra',       dependent: :destroy
   has_many :insumo_consumos,       class_name: 'InsumoConsumo',      dependent: :destroy
   has_many :bares,                 class_name: 'Barra',              dependent: :destroy
+  has_many :mostradores,                                             dependent: :destroy
+  has_many :rendiciones_caja, class_name: 'RendicionCaja',           dependent: :destroy
   has_many :bar_productos,         class_name: 'BarProducto',        dependent: :destroy
   has_many :bar_ventas,            class_name: 'BarVenta',           dependent: :destroy
   has_many :eventos_bar,           class_name: 'EventoBar',          dependent: :destroy

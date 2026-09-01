@@ -17,6 +17,9 @@ class Cobro < ApplicationRecord
   # `bar_ventas.caja_turno_id`: permite arquear sumando lo del turno en vez de adivinar por
   # ventana de tiempo. Opcional: sin caja abierta se cobra igual, la caja es control, no requisito.
   belongs_to :caja_turno, optional: true
+  # La entrega de recaudación en la que este cobro se rindió. Permite reconstruir qué entró en
+  # cada una sin adivinar por ventana de tiempo.
+  belongs_to :rendicion_caja, optional: true
 
   # Comprobante de la transferencia (foto que sube el delivery/admin). Opcional.
   has_one_attached :comprobante
