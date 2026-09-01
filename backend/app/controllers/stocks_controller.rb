@@ -73,12 +73,12 @@ class StocksController < ApplicationController
 
     # Una query para todo el listado en vez de una por producto: abajo se serializa cada uno con
     # `cantidad_disponible_real`, que pregunta por el apartado del mostrador.
-    Stock.precargar_apartado_mostrador(stocks)
+    Stock.precargar_apartados(stocks)
 
     # Y para quien ATIENDE, el carrito ofrece únicamente lo que está sobre la mesa del mostrador.
     # Sin esto la pantalla le ofrecía todo el depósito y el backend después se lo rechazaba, que
     # es el peor error posible: parece culpa del usuario.
-    if params[:para_dispensa].present? && Dispensacion::ROLES_DEL_MOSTRADOR.include?(current_user.role)
+    if params[:para_dispensa].present? && current_user.atiende_mostrador?
       sobre_la_mesa = items_del_mostrador
       stocks = stocks.select { |st| sobre_la_mesa.key?(st.id) }
       return render json: stocks.map { |st|
@@ -510,7 +510,9 @@ class StocksController < ApplicationController
         # dos iniciales no acreditan a nadie. El DNI sigue parcial (últimos cuatro).
         paciente:           d.paciente&.nombre_completo,
         paciente_iniciales: "#{d.paciente&.nombre&.[](0)}.#{d.paciente&.apellido&.[](0)}.",
-        paciente_dni_last4: d.paciente&.dni_normalizado.to_s.last(4),
+        # Últimos TRES, como el resto de los informes: dos criterios distintos para el mismo dato
+        # hacen que dos informes parezcan contradecirse.
+        paciente_dni_last3: d.paciente&.dni_normalizado.to_s.last(3),
         # Completo sólo para el PDF, que es lo que se presenta. La pantalla usa los últimos 4.
         paciente_dni:       d.paciente&.dni_normalizado.to_s,
       }

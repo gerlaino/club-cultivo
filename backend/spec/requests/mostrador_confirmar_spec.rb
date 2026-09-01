@@ -32,7 +32,7 @@ RSpec.describe 'Recibir el mostrador', type: :request do
     JSON.parse(response.body)
   end
 
-  def item = sede.mostrador.turno_abierto.items.first
+  def item = sede.mostrador!.turno_abierto.items.first
 
   def confirmar!(correcciones: [], como: ana)
     sign_in_as(como)
@@ -53,7 +53,7 @@ RSpec.describe 'Recibir el mostrador', type: :request do
     before { abrir! }
 
     it 'queda esperando que lo reciba quien atiende' do
-      expect(sede.mostrador.turno_abierto).not_to be_confirmado
+      expect(sede.mostrador!.turno_abierto).not_to be_confirmado
     end
 
     # La firma tiene que valer algo: si se pudiera atender sin recibir, al cierre el que atendió
@@ -86,7 +86,7 @@ RSpec.describe 'Recibir el mostrador', type: :request do
 
       expect(response).to have_http_status(:unprocessable_entity)
       expect(body['error']).to match(/quien vaya a atender/i)
-      expect(sede.mostrador.turno_abierto).not_to be_confirmado
+      expect(sede.mostrador!.turno_abierto).not_to be_confirmado
     end
 
     it 'no se confirma dos veces' do
@@ -126,7 +126,7 @@ RSpec.describe 'Recibir el mostrador', type: :request do
     it 'también se corrige en más, si el admin puso menos de lo que dejó' do
       confirmar!(correcciones: [{ item_id: item.id, contado: 320, motivo: 'había 20 más' }])
 
-      expect(sede.mostrador.turno_abierto.items.first.esperado.to_f).to eq(320.0)
+      expect(sede.mostrador!.turno_abierto.items.first.esperado.to_f).to eq(320.0)
     end
 
     it 'pero no se puede inventar lo que no hay en el depósito' do
@@ -162,7 +162,7 @@ RSpec.describe 'Recibir el mostrador', type: :request do
   describe 'la plata también se recibe' do
     before { abrir!(cantidad: 300) } # fondo declarado: $10.000
 
-    def caja = sede.mostrador.caja_abierta
+    def caja = sede.mostrador!.caja_abierta
 
     it 'si coincide, confirma sin asentar nada' do
       expect {
@@ -210,7 +210,7 @@ RSpec.describe 'Recibir el mostrador', type: :request do
 
       expect(response).to have_http_status(:unprocessable_entity)
       expect(JSON.parse(response.body)['error']).to match(/escribí el motivo/i)
-      expect(sede.mostrador.turno_abierto).not_to be_confirmado
+      expect(sede.mostrador!.turno_abierto).not_to be_confirmado
     end
   end
 
@@ -218,7 +218,7 @@ RSpec.describe 'Recibir el mostrador', type: :request do
   describe 'el admin mueve plata durante el turno' do
     before { abrir!(cantidad: 300) }
 
-    def caja = sede.mostrador.caja_abierta
+    def caja = sede.mostrador!.caja_abierta
 
     it 'pone plata en el cajón y el arqueo la espera' do
       sign_in_as(admin)
@@ -261,7 +261,7 @@ RSpec.describe 'Recibir el mostrador', type: :request do
     it 'queda confirmado en el acto' do
       abrir!(como: ana)
 
-      expect(sede.mostrador.turno_abierto).to be_confirmado
+      expect(sede.mostrador!.turno_abierto).to be_confirmado
       expect { dispensar!(10) }.not_to raise_error
     end
   end

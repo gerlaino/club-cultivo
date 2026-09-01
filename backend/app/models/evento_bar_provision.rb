@@ -36,6 +36,10 @@ class EventoBarProvision < ApplicationRecord
   # Cuánto sigue bloqueado por esta provisión (no descontado y no consumido todavía).
   def saldo_apartado = [cantidad_reservada.to_d - consumido_total, 0].max
 
+  # Lo mismo, escrito en SQL, para poder sumarlo de todas las provisiones de una tanda de stocks
+  # en UNA query. Ver `Stock.precargar_apartado_eventos`.
+  SALDO_SQL = 'GREATEST(cantidad_reservada - cantidad_consumida - cantidad_consumo_interno, 0)'.freeze
+
   # Faltante para comprar = lo previsto que todavía no se reservó y tampoco está en el depósito.
   def faltante = [cantidad_prevista.to_d - cantidad_reservada.to_d - stock_disponible, 0].max
 

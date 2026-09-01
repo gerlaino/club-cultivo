@@ -350,6 +350,8 @@ export const receptoresRendicion  = ()            => api.get('/rendiciones/recep
 export const crearRendicion       = (payload)     => api.post('/rendiciones', payload)
 export const recibirRendicion     = (id, payload) => api.post(`/rendiciones/${id}/recibir`, payload)
 export const conformarRendicion   = (id, payload) => api.post(`/rendiciones/${id}/conformar`, payload)
+// Lo que el repartidor se había quedado y devuelve después. "Rendir en partes" es esto.
+export const saldarACuenta        = (payload)     => api.post('/rendiciones/saldar', payload)
 
 // Convierte un path relativo de ActiveStorage (/rails/active_storage/...) en URL
 // absoluta contra el host de la API (front y API pueden estar en hosts distintos).
@@ -514,6 +516,8 @@ export const cerrarMostrador   = (sedeId, payload) => api.post(`/sedes/${sedeId}
 export const getMermaMostrador = (sedeId, params = {}) => api.get(`/sedes/${sedeId}/mostrador/merma`, { params })
 export const revisarTurnoMostrador = (sedeId, id) => api.post(`/sedes/${sedeId}/mostrador/turnos/${id}/revisar`)
 export const getTurnoMostrador     = (sedeId, id) => api.get(`/sedes/${sedeId}/mostrador/turnos/${id}`)
+// Los turnos ya cerrados: administración los ve todos, el que atiende ve LOS SUYOS.
+export const listTurnosMostrador   = (sedeId)     => api.get(`/sedes/${sedeId}/mostrador/turnos`)
 // Arreglar un conteo mal cargado en un turno ya cerrado: es el único lugar del módulo donde un
 // dedazo ajusta el inventario real. No borra el movimiento viejo, asienta la diferencia.
 export const corregirTurnoMostrador = (sedeId, id, payload) =>

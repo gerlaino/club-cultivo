@@ -25,7 +25,29 @@ class RendicionesController < ApplicationController
       # Lo que el admin tiene que mirar: se ajustó el monto y el repartidor no dijo si está de
       # acuerdo. No bloquea nada, pero alguien tiene que hablarlo.
       sin_conformar: base.sin_conformar.count,
+      # Lo que ESTA persona tiene del club. El repartidor no lo veía en ningún lado: si le
+      # anotaron $20.000, tenía que preguntar. Se lo mostramos donde ya mira sus rendiciones.
+      mi_saldo_ars: Rendiciones::SaldarACuenta.saldo_de(current_user.club, current_user).to_f,
     }
+  end
+
+  # POST /rendiciones/saldar { delivery_id, monto_ars, notas }
+  #
+  # El repartidor devuelve plata que se había quedado. "Rendir en partes" —entregar hoy la mitad y
+  # mañana el resto— es esto: se rinde todo, se recibe lo que trajo y lo que faltó se salda después.
+  def saldar
+    return render json: { error: 'No autorizado' }, status: :forbidden unless gestiona?
+
+    delivery = current_user.club.users.find_by(id: params[:delivery_id])
+    return render json: { error: 'No encontré a esa persona' }, status: :not_found if delivery.nil?
+
+    res = Rendiciones::SaldarACuenta.call(delivery: delivery, club: current_user.club,
+                                          receptor: current_user, monto: params[:monto_ars],
+                                          notas: params[:notas])
+    return render json: { error: res.error }, status: :unprocessable_entity unless res.ok?
+
+    render json: { saldado_ars: res.monto.to_f,
+                   saldo_ars: Rendiciones::SaldarACuenta.saldo_de(current_user.club, delivery).to_f }
   end
 
   # GET /rendiciones/receptores — a quién le puedo rendir
@@ -66,6 +88,8 @@ class RendicionesController < ApplicationController
   end
 
   private
+
+  def gestiona? = %w[admin supervisor super_admin].include?(current_user.role)
 
   def set_rendicion
     @rendicion = current_user.club.rendiciones_caja.find_by(id: params[:id])

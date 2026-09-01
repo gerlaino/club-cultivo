@@ -204,7 +204,9 @@ module Dispensario
 
     def set_sede
       @sede      = current_user.club.sedes.find(params[:sede_id])
-      @mostrador = @sede.mostrador
+      # `mostrador!`: la caja del dispensario vive en el mostrador, y si la sede todavía no lo
+      # tiene hay que crearlo — es la otra puerta legítima.
+      @mostrador = @sede.mostrador!
       return if @mostrador
 
       render json: { error: 'Esta sede no dispensa: no tiene mostrador' }, status: :unprocessable_entity

@@ -1,0 +1,12 @@
+La merma del mostrador cambió — <%= @club.name %><%= " · #{@sede}" if @sede.present? %>
+
+Esta semana la merma del mostrador está en <%= @pct %>% de lo entregado, contra
+<%= @pct_previo %>% de las últimas semanas. Son $<%= number_with_delimiter(@ars.to_i, delimiter: '.') %>
+a costo en la semana.
+
+Algo de merma siempre hay —fraccionar y pesar la producen—, así que esto no es un
+problema en sí: es que CAMBIÓ respecto de lo habitual de tu organización. En
+Mostrador → Merma está abierto por producto y por turno, que es donde se ve qué lo
+está moviendo.
+
+Cultivo Espacial · <%= @club.name %>

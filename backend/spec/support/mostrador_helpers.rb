@@ -15,7 +15,7 @@ module MostradorHelpers
         disp = s.cantidad_disponible_real.to_d
         { stock_id: s.id, cantidad: disp } if disp.positive?
       end
-      res = Mostradores::AbrirTurno.call(mostrador: sede.mostrador, usuario: usuario,
+      res = Mostradores::AbrirTurno.call(mostrador: sede.mostrador!, usuario: usuario,
                                         items: items, monto_inicial_ars: fondo)
       raise "No se pudo abrir el mostrador: #{res.error}" unless res.ok?
 

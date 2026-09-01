@@ -55,6 +55,27 @@ class MermaMostradorJob < ApplicationJob
         pct_semana: semana[:pct], pct_previo: anterior[:pct], faltante_ars: semana[:ars],
       }
     )
+
+    avisar_por_mail(club, mostrador, semana, anterior)
+  end
+
+  # La campana la mira quien entra a la app, y el admin de una organización chica puede no entrar
+  # en toda la semana — que es justo cuando esto importa. Si la organización no tiene el módulo de
+  # correo o no configuró su casilla, queda la alerta interna y listo: no es motivo para romper.
+  #
+  # Va `deliver_now` y no `deliver_later` porque esto YA corre en un job: encolar un mail desde
+  # adentro de otra cola sólo mueve el error de lugar, y el `rescue` de abajo dejaría de proteger
+  # de lo único que falla de verdad acá —la casilla del cliente mal configurada—, que ocurre al
+  # entregar y no al encolar.
+  def avisar_por_mail(club, mostrador, semana, anterior)
+    return unless club.feature?(:mailer)
+
+    NotificacionesMailer.merma_mostrador(
+      club: club, sede: mostrador.sede&.nombre,
+      pct: semana[:pct], pct_previo: anterior[:pct], ars: semana[:ars]
+    ).deliver_now
+  rescue => e
+    Rails.logger.warn "MermaMostradorJob: no se pudo mandar el mail — #{e.message}"
   end
 
   def medir(mostrador, desde, hasta)

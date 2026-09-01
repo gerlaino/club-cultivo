@@ -39,7 +39,7 @@ RSpec.describe 'Cerrar el mostrador', type: :request do
     end
   end
 
-  def item = sede.mostrador.turno_abierto.items.first
+  def item = sede.mostrador!.turno_abierto.items.first
 
   def cerrar!(contado:, motivo: nil, efectivo: nil, fondo: nil, como: ana)
     sign_in_as(como)
@@ -97,7 +97,7 @@ RSpec.describe 'Cerrar el mostrador', type: :request do
 
       expect(response).to have_http_status(:unprocessable_entity)
       expect(body['error']).to match(/escribí el motivo/i)
-      expect(sede.mostrador.turno_abierto).to be_present
+      expect(sede.mostrador!.turno_abierto).to be_present
     end
 
     # Contar sólo algunos ítems es un arqueo que no arquea: el que falta se arrastra al turno
@@ -136,7 +136,7 @@ RSpec.describe 'Cerrar el mostrador', type: :request do
       end
       dispensar!(50, medio: 'cuenta_corriente')
 
-      turno = sede.mostrador.turno_abierto
+      turno = sede.mostrador!.turno_abierto
       expect(turno.items.first.esperado.to_f).to eq(250.0)
       expect(turno.caja_turno.efectivo_esperado_ars).to eq(10_000.0) # sólo el fondo
     end

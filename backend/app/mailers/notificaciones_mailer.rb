@@ -99,4 +99,23 @@ class NotificacionesMailer < ApplicationMailer
       to:      admins.map(&:email_notificacion),
       subject: "[#{club.name}] Alerta: stock bajo en dispensario")
   end
+
+  # La merma del mostrador se salió del patrón de esta organización.
+  #
+  # NO acusa a nadie: la merma es inevitable y el mail dice "acá cambió algo, andá a mirar". El
+  # asunto lleva la sede porque con varias, saber cuál es la mitad del aviso.
+  def merma_mostrador(club:, sede:, pct:, pct_previo:, ars:)
+    @club       = club
+    @sede       = sede
+    @pct        = pct
+    @pct_previo = pct_previo
+    @ars        = ars
+
+    admins = club.users.where(role: 'admin').where.not(email: nil)
+    return if admins.none?
+
+    mail_para_club(@club,
+      to:      admins.map(&:email_notificacion),
+      subject: "[#{club.name}] La merma del mostrador de #{sede} subió a #{pct}%")
+  end
 end

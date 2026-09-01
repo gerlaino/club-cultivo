@@ -159,7 +159,29 @@ class Stock < ApplicationRecord
   # apartado bloquea la cantidad para que ninguna dispensa ni reserva de paciente la pise —
   # misma mecánica que una Reserva de paciente, con otro destinatario.
   def apartado_para_eventos
+    return @apartado_eventos_precargado if defined?(@apartado_eventos_precargado)
+
     provisiones_evento.sum(&:saldo_apartado)
+  end
+
+  # El hermano de `precargar_apartado_mostrador`, y por el mismo motivo: `cantidad_disponible_real`
+  # se llama en listados enteros y esta suma cargaba las provisiones de cada stock por separado —
+  # cuarenta productos en pantalla, cuarenta queries.
+  def self.precargar_apartado_eventos(stocks)
+    lista = Array(stocks)
+    return lista if lista.empty?
+
+    saldos = EventoBarProvision.unscoped
+                               .where(provisionable_type: 'Stock', provisionable_id: lista.map(&:id))
+                               .group(:provisionable_id)
+                               .sum(Arel.sql(EventoBarProvision::SALDO_SQL))
+    lista.each { |s| s.instance_variable_set(:@apartado_eventos_precargado, saldos[s.id].to_d) }
+    lista
+  end
+
+  # Las dos precargas juntas: lo que necesita cualquier listado que muestre disponibilidad.
+  def self.precargar_apartados(stocks)
+    precargar_apartado_eventos(precargar_apartado_mostrador(stocks))
   end
 
   # Provisiones vivas de eventos EN CURSO (los que están sucediendo ahora). Son las únicas de las

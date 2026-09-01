@@ -36,7 +36,7 @@ RSpec.describe 'La merma del mostrador', type: :request do
   def turno!(flor_carga:, flor_disp:, flor_contado:, preroll_carga:, preroll_disp:, preroll_contado:)
     ActsAsTenant.with_tenant(club) do
       res = Mostradores::AbrirTurno.call(
-        mostrador: sede.mostrador, usuario: admin, monto_inicial_ars: 0,
+        mostrador: sede.mostrador!, usuario: admin, monto_inicial_ars: 0,
         items: [{ stock_id: flor.id, cantidad: flor_carga }, { stock_id: preroll.id, cantidad: preroll_carga }]
       )
       turno = res.turno
@@ -134,7 +134,7 @@ RSpec.describe 'La merma del mostrador', type: :request do
     # mesa, que declara mal.
     it 'cuenta las correcciones de recepción' do
       ActsAsTenant.with_tenant(club) do
-        res = Mostradores::AbrirTurno.call(mostrador: sede.mostrador, usuario: admin,
+        res = Mostradores::AbrirTurno.call(mostrador: sede.mostrador!, usuario: admin,
                                            monto_inicial_ars: 0,
                                            items: [{ stock_id: flor.id, cantidad: 300 }])
         item = res.turno.items.first
@@ -257,7 +257,7 @@ RSpec.describe 'La merma del mostrador', type: :request do
       mov = StockMovimiento.de_mostrador.last
 
       expect(mov.turno_mostrador_id).to be_present
-      expect(mov.turno_mostrador.mostrador_id).to eq(sede.mostrador.id)
+      expect(mov.turno_mostrador.mostrador_id).to eq(sede.mostrador!.id)
     end
   end
 

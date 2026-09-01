@@ -304,13 +304,18 @@ class ClubUsersController < ApplicationController
   # saldo acumulado y no como gasto — es algo que se reclama.
   def a_cuenta_de(user)
     movs = current_user.club.movimientos_contables
-                       .where(categoria: 'a_cuenta_repartidor', retirado_por_id: user.id)
+                       .where(categoria: %w[a_cuenta_repartidor devolucion_a_cuenta],
+                              retirado_por_id: user.id)
                        .order(fecha: :desc, id: :desc)
     {
-      total_ars: movs.sum(:monto_ars).to_f,
-      veces:     movs.count,
+      # NETO: lo que se quedó menos lo que ya devolvió. Sin netear, alguien que devolvió todo
+      # seguía figurando debiendo, y el número dejaba de significar algo.
+      total_ars: Rendiciones::SaldarACuenta.saldo_de(current_user.club, user).to_f,
+      veces:     movs.where(categoria: 'a_cuenta_repartidor').count,
       detalle:   movs.limit(20).map do |m|
-        { id: m.id, fecha: m.fecha, monto_ars: m.monto_ars.to_f, descripcion: m.descripcion }
+        { id: m.id, fecha: m.fecha, descripcion: m.descripcion,
+          # Negativo lo que devolvió: en una lista de movimientos, el signo es la mitad del dato.
+          monto_ars: (m.categoria == 'devolucion_a_cuenta' ? -m.monto_ars : m.monto_ars).to_f }
       end,
     }
   end

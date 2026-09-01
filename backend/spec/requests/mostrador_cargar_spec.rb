@@ -34,7 +34,7 @@ RSpec.describe 'Cargar y devolver en el mostrador', type: :request do
   end
 
   def devolver!(cantidad, como: admin)
-    item = sede.mostrador.turno_abierto.items.first
+    item = sede.mostrador!.turno_abierto.items.first
     sign_in_as(como)
     post "/api/sedes/#{sede.id}/mostrador/devolver", headers: auth_headers,
          params: { item_id: item.id, cantidad: cantidad }

@@ -18,7 +18,7 @@ RSpec.describe 'Historial de cierres de caja — paginado', type: :request do
 
   def caja!(estado:, dias_atras: 0)
     ActsAsTenant.with_tenant(club) do
-      CajaTurno.create!(club: club, sede: sede, punto: sede.mostrador, abierta_por: admin,
+      CajaTurno.create!(club: club, sede: sede, punto: sede.mostrador!, abierta_por: admin,
                         monto_inicial_ars: 1_000, abierta_at: dias_atras.days.ago,
                         estado: estado, efectivo_declarado_ars: (1_000 if estado == 'cerrada'),
                         cerrada_at: (dias_atras.days.ago if estado != 'abierta'))
@@ -121,7 +121,7 @@ RSpec.describe 'Historial de cierres de caja — paginado', type: :request do
   it 'no muestra los cierres de otra sede' do
     otra = create(:sede, club: club, tipo: 'social', nombre: 'Otra')
     ActsAsTenant.with_tenant(club) do
-      CajaTurno.create!(club: club, sede: otra, punto: otra.mostrador, abierta_por: admin,
+      CajaTurno.create!(club: club, sede: otra, punto: otra.mostrador!, abierta_por: admin,
                         monto_inicial_ars: 1_000, abierta_at: 1.day.ago, estado: 'cerrada',
                         efectivo_declarado_ars: 1_000, cerrada_at: 1.day.ago)
     end

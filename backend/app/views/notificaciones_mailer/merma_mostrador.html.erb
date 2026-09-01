@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; margin: 0; padding: 0; color: #0f172a; }
+    .wrapper { max-width: 600px; margin: 32px auto; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+    /* Ámbar y no rojo: la merma es inevitable. Esto avisa que cambió algo, no que alguien
+       hizo algo mal — y el color es la mitad de ese mensaje. */
+    .header { background: #d97706; padding: 28px 32px; }
+    .header-title { color: #fff; font-size: 20px; font-weight: 700; margin: 0; }
+    .header-sub { color: #fde68a; font-size: 13px; margin: 4px 0 0; }
+    .body { padding: 28px 32px; }
+    .intro { font-size: 15px; color: #334155; margin-bottom: 20px; }
+    .nums { display: block; background: #fffbeb; border-radius: 10px; padding: 18px 20px; margin-bottom: 20px; }
+    .num { font-size: 28px; font-weight: 800; color: #92400e; margin: 0; }
+    .num-lbl { font-size: 13px; color: #78716c; margin: 2px 0 0; }
+    .nota { font-size: 13px; color: #64748b; line-height: 1.6; }
+    .footer { background: #f8fafc; padding: 16px 32px; text-align: center; font-size: 12px; color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <div class="header">
+      <p class="header-title">La merma del mostrador cambió</p>
+      <p class="header-sub"><%= @club.name %><%= " · #{@sede}" if @sede.present? %></p>
+    </div>
+    <div class="body">
+      <p class="intro">
+        Esta semana la merma del mostrador está en <strong><%= @pct %>%</strong> de lo entregado,
+        contra <strong><%= @pct_previo %>%</strong> de las últimas semanas.
+      </p>
+
+      <span class="nums">
+        <p class="num">$<%= number_with_delimiter(@ars.to_i, delimiter: '.') %></p>
+        <p class="num-lbl">a costo, en la semana</p>
+      </span>
+
+      <p class="nota">
+        Algo de merma siempre hay —fraccionar y pesar la producen— así que esto no es un problema
+        en sí: es que <strong>cambió</strong> respecto de lo habitual de tu organización. En
+        <em>Mostrador → Merma</em> está abierto por producto y por turno, que es donde se ve qué lo
+        está moviendo.
+      </p>
+    </div>
+    <div class="footer">Cultivo Espacial · <%= @club.name %></div>
+  </div>
+</body>
+</html>

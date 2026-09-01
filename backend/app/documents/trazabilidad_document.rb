@@ -134,7 +134,7 @@ class TrazabilidadDocument < BaseDocument
 
     styled_table(pdf, ["Fecha", "Paciente", "DNI", "Cantidad"],
                  ds.map { |d| [fecha(d[:fecha]), (d[:paciente].presence || d[:paciente_iniciales]).to_s,
-                               (d[:paciente_dni].presence || "****#{d[:paciente_dni_last4]}"),
+                               (d[:paciente_dni].presence || "***#{d[:paciente_dni_last3]}"),
                                "#{d[:cantidad_g]} g"] },
                  col_widths: { 0 => 90, 1 => pdf.bounds.width - 310, 2 => 110, 3 => 110 },
                  aligns: { 3 => :right })

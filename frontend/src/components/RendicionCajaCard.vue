@@ -41,6 +41,13 @@
 
     <!-- ══ REPARTIDOR: rendir lo que cobró ═══════════════════════════════════ -->
     <template v-else-if="soyRepartidor">
+      <!-- Lo que tiene del club y todavía no devolvió. No lo veía en ningún lado: si le
+           anotaron $20.000 tenía que preguntar, y así es como una diferencia chica se convierte
+           en una discusión. No es una deuda ni una pérdida: es plata suya que quedó con él. -->
+      <p v-if="miSaldo > 0" class="rnd__saldo">
+        Tenés <b>${{ fmt(miSaldo) }}</b> del club de rendiciones anteriores. Se descuenta cuando
+        los entregás.
+      </p>
       <div v-if="miPendiente" class="rnd__box rnd__box--espera">
         <div>
           <p class="rnd__titulo">Rendiste ${{ fmt(miPendiente.declarado_ars) }}</p>
@@ -155,6 +162,8 @@ const rendiciones = ref([])
 const receptores  = ref([])
 const receptorId  = ref('')
 const contado     = ref({})
+// Lo que ESTA persona tiene del club: el backend lo calcula para quien pregunta.
+const miSaldo     = ref(0)
 const motivo      = ref({})
 const guardando   = ref(false)
 
@@ -166,7 +175,7 @@ const cerradas      = computed(() => rendiciones.value.filter(r => r.estado === 
 const visible       = computed(() => {
   if (props.historial) return true
   return soyRepartidor.value
-    ? (receptores.value.length > 0 || !!miPendiente.value || !!miAjustada.value)
+    ? (receptores.value.length > 0 || !!miPendiente.value || !!miAjustada.value || miSaldo.value > 0)
     : porRecibir.value.length > 0
 })
 
@@ -185,6 +194,7 @@ async function cargar () {
   try {
     const { data } = await listRendiciones()
     rendiciones.value = data.rendiciones || []
+    miSaldo.value     = data.mi_saldo_ars || 0
   } catch { rendiciones.value = [] }
 }
 
@@ -253,6 +263,11 @@ onMounted(async () => {
 .rnd { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
 
 /* ── Historial ─────────────────────────────────────────────────────────────── */
+.rnd__saldo {
+  margin: 0 0 10px; padding: 11px 14px; border-radius: 10px;
+  background: #fef3c7; color: #92400e; font-size: .85rem;
+}
+.rnd__saldo b { font-variant-numeric: tabular-nums; }
 .rnd__vacio { margin: 0; font-size: var(--fs-14); color: var(--c-ink-500); }
 .rnd__tabla-wrap {
   background: #fff; border: 1px solid var(--c-slate-200); border-radius: 14px; overflow-x: auto;

@@ -106,6 +106,13 @@ Ninguno se considera cerrado; todos son candidatos a revisión.
     `StockMovimiento`; el rastro vive en el turno. El único movimiento es el **ajuste del cierre**.
     **Cerrar y volver a abrir ES el arqueo** — se puede hacer varias veces por día. No hay relevo
     con firma cruzada (ver "Lo que NO hay que romper").
+    Cuatro solapas: **Hoy** · **Turnos** (los cerrados; administración ve todos, el que atiende ve
+    LOS SUYOS — el filtro es del backend) · **Merma** y **Rendiciones**, sólo administración. La
+    solapa de Merma hace DOS cosas y por eso están separadas: arriba la **lista de trabajo** (los
+    turnos que piden una mirada, que se terminan) y abajo el análisis, que se consulta.
+    Un turno entra a esa lista por **tres** razones —faltante, corrección al recibir, o alguien
+    que bajó del depósito sin supervisión— y cada renglón dice cuál: un pendiente que no dice qué
+    mirar obliga a abrirlo para descubrir que no era nada.
 7. **Delivery** — paquetes, estados (pendiente/en viaje/entregado/fallido), firma de entrega, reprogramación. **Es un add-on contratable** (antes era un rol suelto): sin el módulo activo, el rol `delivery` no se ofrece ni se acepta, `rutas_entrega` y las acciones de reparto devuelven 403, y `Dispensacion` rechaza al CREAR una dispensa con envío. **`entregar` y `reportar_fallo` quedan SIN gatear a propósito** — ver "Lo que NO hay que romper".
 8. **Ambiente / IoT** — dispositivos con webhook token, lecturas, reglas y alertas, setpoints por fase, VPD, drivers (Sonoff, CSV manual, CSV-IA).
 9. **Contabilidad** — movimientos contables, costos por lote, P&L.
@@ -287,21 +294,19 @@ Cuando Germán plantee un problema o feature nueva antes de implementar:
 
 Suite 1239 ✓ + 58 vitest ✓. **Deploy: sumar `add_vendible_a_bar_venta_items` y `add_consumo_evento_a_provisiones_y_dispensas` al `db:migrate`.**
 
-## 📍 Dónde retomar (29-ago-2026)
+## 📍 Dónde retomar (1-sep-2026)
 
-**El MOSTRADOR está completo** (bloque (v) del CHANGELOG): entidad `Mostrador`, apertura con
-herencia, recepción del que atiende, cargar/devolver, cierre con los dos arqueos, fondo/retiro, y
-la solapa de Merma. **2653 rspec ✓ · 1680 vitest ✓ · build limpio.**
-
-**Lo que falta probar es la pantalla RENDERIZADA en el navegador.** Está montada en tests (33
-ejemplos de Vitest sobre `MostradorView.vue`) y los dos barredores del repo pasan, pero nadie la
-abrió todavía con datos reales.
+**El MOSTRADOR está completo y con los cabos atados** (bloque (v) del CHANGELOG): entidad
+`Mostrador`, apertura con herencia, recepción del que atiende, cargar/devolver, cierre con los dos
+arqueos, fondo/retiro, Merma con su lista de trabajo, Turnos, y la rendición del repartidor de
+punta a punta —incluido **devolver lo que se había quedado** (`Rendiciones::SaldarACuenta`)—.
+**2746 rspec ✓ · 1743 vitest ✓ · build limpio · 6 pruebas de navegador ✓.**
 
 **Sin correr, del bloque del mostrador:** nada. Las migraciones las corre solo el deploy.
 
 **Pendiente de decisión:** si el mostrador debe aplicarle también al **admin** (hoy no: ver
-`Dispensacion::ROLES_DEL_MOSTRADOR`). Y si la merma del mostrador tiene que alimentar el informe
-de **Pérdidas**, que hoy vive aparte.
+`User#atiende_mostrador?`). Y si la merma del mostrador tiene que alimentar el informe de
+**Pérdidas**, que hoy vive aparte.
 
 ---
 
@@ -434,7 +439,21 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   motivo obligatorio. El informe de Pérdidas cuenta `merma`: anotarlo ahí declararía destruido
   producto que puede estar entero. Corregir AL RECIBIR no toca el inventario en absoluto — lo que
   el admin declaró de más sigue en el depósito.
-- **El mostrador es de quien ATIENDE** (`Dispensacion::ROLES_DEL_MOSTRADOR`: dispensador y
+- **SACAR UN PRODUCTO DE LA MESA NO BORRA SU FILA.** Al recibir, lo que directamente no está se
+  saca (`quitar: true`) en vez de ponerse en cero — un renglón en cero es un pendiente eterno que
+  hay que volver a explicar cada vez que alguien mira. Pero **destruir el `TurnoMostradorItem` se
+  llevaba puesto, por `dependent: :destroy`, el movimiento que acababa de registrar quién lo sacó
+  y por qué**: justo lo que se quería guardar. La fila se queda sin un solo número y el scope
+  `TurnoMostradorItem.en_la_mesa` deja de listarla — *una fila sin ningún número es una fila donde
+  nunca pasó nada*. Todo lo que recorra los ítems de un turno tiene que usar ese scope.
+- **`Sede#mostrador` LEE y `Sede#mostrador!` CREA.** Estaban en el mismo método: un `GET` que
+  escribe en la base es una sorpresa que se paga cara.
+- **Lo que el repartidor se quedó tiene que poder DEVOLVERSE** (`Rendiciones::SaldarACuenta`), y lo
+  registra quien la recibe, nunca él — sería firmar su propio recibo. Entra al cajón como
+  `ingreso_caja` y el saldo baja con un espejo `devolucion_a_cuenta`: **no es un ingreso del club**,
+  esa plata siempre fue suya. Sin esto el saldo se acumulaba para siempre y no había forma de decir
+  "ya la devolvió".
+- **El mostrador es de quien ATIENDE** (`User#atiende_mostrador?`: dispensador y
   supervisor). El admin dispensa sin turno abierto: es el que carga la mesa y el dueño de la
   mercadería. Y hay dos excepciones a "sólo lo que está sobre la mesa", las dos porque ya están
   apartadas a nombre de alguien y por eso no pueden estar arriba: la entrega de una **reserva** y

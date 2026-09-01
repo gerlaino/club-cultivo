@@ -54,6 +54,18 @@ module Mostradores
                                    .includes(:stock).to_a
     end
 
+    # Los movimientos de todos los turnos del período, de UNA. Se piden dos cosas por turno
+    # —cuántas correcciones hubo al recibir y si alguien bajó del depósito sin supervisión— y
+    # preguntarlas turno por turno son dos queries por fila: un mes con sesenta turnos eran ciento
+    # veinte viajes a la base para pintar una tabla.
+    def movimientos_por_item
+      @movimientos_por_item ||= TurnoMostradorMovimiento
+                                .where(turno_mostrador_item_id: items.map(&:id))
+                                .to_a.group_by(&:turno_mostrador_item_id)
+    end
+
+    def movimientos_de(its) = its.flat_map { |i| movimientos_por_item[i.id] || [] }
+
     # Cuánto vale lo que no apareció. Sin esto la merma es un número de gramos que no se compara
     # con nada: en plata se puede poner al lado de cualquier otro gasto y decidir si vale la pena
     # hacer algo.
@@ -110,9 +122,11 @@ module Mostradores
           motivos:     its.filter_map(&:motivo_diferencia).uniq,
           # Lo que el que atendió corrigió al recibir: si aparece seguido, el que carga la mesa
           # está declarando mal y ese es el cuello de botella, no la merma.
-          correcciones: TurnoMostradorMovimiento.where(turno_mostrador_item_id: its.map(&:id))
-                                                .correcciones.count,
+          correcciones: movimientos_de(its).count { |m| m.tipo == 'correccion' },
           revisado:    t.revisado_at.present?,
+          # Por qué está en la lista de trabajo. Un renglón que no dice qué mirar obliga a
+          # abrirlo para descubrir que no era nada.
+          motivos_revision: motivos_revision(t, its),
         }
       end
     end
@@ -140,10 +154,21 @@ module Mostradores
       end.sort_by { |s| -(s[:merma_pct] || -1) }
     end
 
-    # Los turnos con diferencia que el admin todavía no miró. Es una lista de trabajo, no una
+    # Las TRES razones por las que un turno pide una mirada. Prometer una bandeja y contar sólo
+    # los faltantes deja las otras dos invisibles apenas cierra el turno.
+    def motivos_revision(_turno, its)
+      movs = movimientos_de(its)
+      razones = []
+      razones << 'faltante'        if its.any? { |i| i.diferencia_cierre.to_d.negative? }
+      razones << 'corregido'       if movs.any? { |m| m.tipo == 'correccion' }
+      razones << 'sin_supervision' if movs.any?(&:sin_supervision)
+      razones
+    end
+
+    # Los turnos que piden una mirada y el admin todavía no miró. Es una lista de trabajo, no una
     # lista de sospechosos: se marca revisado y se archiva.
     def sin_revisar
-      por_turno.select { |t| t[:revisado] == false && t[:faltante].positive? }.size
+      por_turno.count { |t| t[:revisado] == false && t[:motivos_revision].any? }
     end
   end
 end

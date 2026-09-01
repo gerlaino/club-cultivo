@@ -31,7 +31,7 @@ RSpec.describe 'El carrito ofrece lo que está sobre la mesa', type: :request do
   # El admin sube SÓLO la flor a la mesa, y Ana la recibe: los dos pasos reales.
   def abrir_mostrador_con_flor!
     ActsAsTenant.with_tenant(club) do
-      res = Mostradores::AbrirTurno.call(mostrador: sede.mostrador, usuario: admin,
+      res = Mostradores::AbrirTurno.call(mostrador: sede.mostrador!, usuario: admin,
                                          monto_inicial_ars: 0,
                                          items: [{ stock_id: flor.id, cantidad: 300 }])
       Mostradores::ConfirmarApertura.call(turno: res.turno, usuario: ana)

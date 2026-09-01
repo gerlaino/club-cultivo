@@ -19,7 +19,7 @@ RSpec.describe 'El efectivo del repartidor y la caja del mostrador', type: :requ
 
   let!(:caja) do
     ActsAsTenant.with_tenant(club) do
-      CajaTurno.create!(club: club, sede: sede, punto: sede.mostrador, abierta_por: admin,
+      CajaTurno.create!(club: club, sede: sede, punto: sede.mostrador!, abierta_por: admin,
                         monto_inicial_ars: 10_000, abierta_at: Time.current, estado: 'abierta')
     end
   end

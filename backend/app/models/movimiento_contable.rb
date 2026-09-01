@@ -58,7 +58,7 @@ class MovimientoContable < ApplicationRecord
     insumo electricidad agua alquiler sueldo mantenimiento
     honorario seguro admin aporte_socio dispensacion subvencion bar
     salida_caja retiro_caja devolucion_caja diferencia_caja ingreso_caja
-    a_cuenta_repartidor otro
+    a_cuenta_repartidor devolucion_a_cuenta otro
   ].freeze
 
   CATEGORIA_LABELS = {
@@ -90,6 +90,8 @@ class MovimientoContable < ApplicationRecord
     # propia porque en `retiro_caja` sólo puede figurar quien puede sacar del cajón —admin o
     # supervisor— y acá el que la tiene es el repartidor.
     "a_cuenta_repartidor" => "A cuenta del repartidor",
+    # El espejo: devolvió lo que se había quedado. Baja su saldo y entra al cajón.
+    "devolucion_a_cuenta" => "Devolución a cuenta",
     "otro"          => "Otro",
   }.freeze
 

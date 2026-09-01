@@ -51,15 +51,27 @@ class Sede < ApplicationRecord
   # el controller (una importación, un rake, el clonado de un club), quedaría sin mostrador y por
   # lo tanto sin poder abrir caja. `find_or_create_by!` + el índice único aguantan la race — es
   # la misma trampa que duplicó depósitos cuando dos requests simultáneos los sembraron.
-  def mostrador
-    existente = mostradores.activos.order(:id).first
+  # El mostrador de esta sede, SIN crearlo. Una lectura no escribe: `mostrador` se llama desde
+  # cada request de caja y de mostrador, y una creación escondida ahí adentro es una escritura
+  # que nadie ve en el log ni espera en un GET.
+  def mostrador = mostradores.activos.order(:id).first
+
+  # El mostrador, creándolo si la sede dispensa y todavía no lo tiene. Se llama desde donde SÍ
+  # corresponde escribir: al entrar a la pantalla del mostrador o a la de su caja.
+  #
+  # Perezoso a propósito: una sede creada antes de esta feature, o por una vía que no pasa por el
+  # controller (una importación, un rake, el clonado de un club), quedaría sin mostrador y por lo
+  # tanto sin poder abrir caja. `find_or_create_by!` + el índice único aguantan la race — es la
+  # misma trampa que duplicó depósitos cuando dos requests simultáneos los sembraron.
+  def mostrador!
+    existente = mostrador
     return existente if existente
     return nil unless es_social?
 
     mostradores.create_with(club: club, activo: true).find_or_create_by!(nombre: 'Mostrador')
   rescue ActiveRecord::RecordNotUnique
     mostradores.reset
-    mostradores.activos.order(:id).first
+    mostrador
   end
 
   def soft_delete!

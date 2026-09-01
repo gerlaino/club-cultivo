@@ -12,7 +12,7 @@ import CredencialesNuevas from '../components/ui/CredencialesNuevas.vue'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
-import { getUsuarioStats, getUsuarioAuditorias, recibirCajaDelivery, listJornadas, confirmarJornadas, reabrirJornadas, resetUserPassword } from '../lib/api.js'
+import { getUsuarioStats, getUsuarioAuditorias, recibirCajaDelivery, listJornadas, confirmarJornadas, reabrirJornadas, resetUserPassword, saldarACuenta } from '../lib/api.js'
 import { ROLES as ROLES_DS, rolInfo, rolColor, rolBg } from '../lib/roles.js'
 
 const route  = useRoute()
@@ -216,6 +216,22 @@ const cajaEnViaje  = computed(() => stats.value?.caja_delivery?.en_viaje || 0)
 // Lo que se quedó al rendir la caja, acumulado. No es una pérdida del club: esa plata existe y
 // está con una persona — por eso se muestra como saldo y no como gasto.
 const aCuenta = computed(() => stats.value?.a_cuenta || { total_ars: 0, veces: 0, detalle: [] })
+// Lo que el repartidor devuelve de lo que se había quedado.
+const saldar = ref({ monto: null, guardando: false })
+
+async function registrarDevolucion () {
+  saldar.value.guardando = true
+  try {
+    await saldarACuenta({ delivery_id: u.value.id, monto_ars: saldar.value.monto })
+    saldar.value.monto = null
+    toast.success('Devolución registrada')
+    await cargarStats()
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo registrar la devolución.')
+  } finally {
+    saldar.value.guardando = false
+  }
+}
 const fmtFechaCorta = (f) => (f ? new Date(f).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) : '')
 
 async function recibirCaja() {
@@ -648,6 +664,21 @@ onMounted(async () => {
                   <span class="udc__acuenta-desc">{{ m.descripcion }}</span>
                 </li>
               </ul>
+
+              <!-- Y cuando la trae, se salda. Sin esto lo que se quedó se acumulaba PARA SIEMPRE:
+                   no había forma de decir "ya la devolvió". "Rendir en partes" es exactamente
+                   esto — se rinde todo, se recibe lo que trajo, y el resto se salda después. -->
+              <div v-if="aCuenta.total_ars > 0" class="udc__saldar">
+                <input v-model.number="saldar.monto" type="number" min="0" step="100"
+                       class="udc__saldar-input" placeholder="Trajo…" aria-label="Monto que devuelve" />
+                <button class="udc__saldar-btn" :disabled="saldar.guardando || !saldar.monto"
+                        @click="registrarDevolucion">
+                  {{ saldar.guardando ? 'Registrando…' : 'Registrar devolución' }}
+                </button>
+              </div>
+              <p v-if="aCuenta.total_ars > 0" class="udc__saldar-hint">
+                Entra al cajón como efectivo. No es un ingreso del club: esa plata siempre fue suya.
+              </p>
             </div>
           </div>
 
@@ -934,6 +965,17 @@ onMounted(async () => {
 .udc__acuenta-fecha { font-variant-numeric: tabular-nums; color: #9ca3af; flex-shrink: 0; }
 .udc__acuenta-monto { font-weight: 700; font-variant-numeric: tabular-nums; flex-shrink: 0; }
 .udc__acuenta-desc { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.udc__saldar { display: flex; gap: 8px; margin-top: 10px; }
+.udc__saldar-input {
+  flex: 1; min-width: 0; border: 1px solid #d1d5db; border-radius: 8px;
+  padding: 7px 10px; font-size: .85rem; font-variant-numeric: tabular-nums;
+}
+.udc__saldar-btn {
+  border: 0; border-radius: 8px; padding: 7px 14px; font-size: .8rem; font-weight: 700;
+  background: #92400e; color: #fff; cursor: pointer; white-space: nowrap;
+}
+.udc__saldar-btn:disabled { opacity: .5; cursor: not-allowed; }
+.udc__saldar-hint { margin: 6px 0 0; font-size: .72rem; color: #6b7280; }
 .udc__hint { font-size: .72rem; color: var(--c-slate-400); padding: 0 1rem 1rem; margin: 0; line-height: 1.4; }
 .ud__card-hdr {
   display: flex; align-items: center; gap: .65rem;

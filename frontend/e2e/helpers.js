@@ -12,9 +12,21 @@ import { execSync } from 'node:child_process'
 // el escenario por API desde acá sería una segunda verdad sobre cómo se ve una organización.
 export function sembrar (...tareas) {
   const cmd = tareas.map(t => `bundle exec rake e2e:${t}`).join(' && ')
-  execSync(`docker compose exec -T backend sh -lc '${cmd}'`, {
-    cwd: new URL('../..', import.meta.url).pathname, stdio: 'pipe',
-  })
+  try {
+    execSync(`docker compose exec -T backend sh -lc '${cmd}'`, {
+      cwd: new URL('../..', import.meta.url).pathname, stdio: 'pipe',
+    })
+  } catch (e) {
+    // Sin el entorno arriba, `docker compose exec` falla con un error de shell que no dice nada
+    // de lo que pasa. La causa es siempre la misma y la solución también: la primera vez que
+    // alguien corre esto, el mensaje tiene que decírselo.
+    const salida = [e.stderr?.toString(), e.stdout?.toString()].filter(Boolean).join('\n').trim()
+    throw new Error(
+      'No se pudo sembrar el escenario en el backend.\n' +
+      'Estas pruebas necesitan el entorno andando: levantá `docker compose up` y volvé a correr.\n' +
+      (salida ? `\nLo que dijo docker:\n${salida}` : '')
+    )
+  }
 }
 
 // La API vive en otro puerto: el dev server de Vite no proxea, así que la verificación de sesión

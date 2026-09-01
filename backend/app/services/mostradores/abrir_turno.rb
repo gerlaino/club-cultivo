@@ -42,7 +42,7 @@ module Mostradores
         # Si lo abre el que va a atender, queda confirmado en el acto: cargó la mesa él mismo,
         # no hay entrega que firmar. La firma existe para cuando lo carga el admin y lo recibe
         # otro — ahí sí hay dos personas y una diferencia que puede ser de cualquiera de las dos.
-        recibe = Dispensacion::ROLES_DEL_MOSTRADOR.include?(@usuario.role)
+        recibe = @usuario.atiende_mostrador?
 
         turno = TurnoMostrador.create!(
           club: @club, mostrador: @mostrador, caja_turno: caja,
@@ -72,7 +72,7 @@ module Mostradores
       @heredado ||= begin
         return {} if ultimo_cerrado.nil?
 
-        ultimo_cerrado.items.each_with_object({}) do |it, acc|
+        ultimo_cerrado.items.en_la_mesa.each_with_object({}) do |it, acc|
           acc[it.stock_id] = it.cantidad_cierre
         end
       end

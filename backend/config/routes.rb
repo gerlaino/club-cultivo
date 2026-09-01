@@ -436,6 +436,7 @@ Rails.application.routes.draw do
         post 'mostrador/devolver', to: 'mostrador#devolver'
         post 'mostrador/cerrar',   to: 'mostrador#cerrar'
         get  'mostrador/merma',    to: 'mostrador#merma'
+        get  'mostrador/turnos',              to: 'mostrador#turnos'
         get  'mostrador/turnos/:id',          to: 'mostrador#turno'
         post 'mostrador/turnos/:id/revisar',  to: 'mostrador#revisar'
         post 'mostrador/turnos/:id/corregir', to: 'mostrador#corregir'
@@ -446,7 +447,10 @@ Rails.application.routes.draw do
     # otra: no "qué gastó la organización" sino "quién tiene plata nuestra".
     # La entrega de la recaudación del repartidor: la inicia él, la cuenta y recibe el otro.
     resources :rendiciones, only: [:index, :create] do
-      collection { get :receptores }
+      collection do
+        get  :receptores
+        post :saldar
+      end
       member do
         post :recibir
         post :conformar

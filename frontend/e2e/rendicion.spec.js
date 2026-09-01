@@ -98,3 +98,22 @@ test('el admin ve la rendición en el historial y lo acumulado en la ficha', asy
 
   expect(errores, errores.join('\n')).toEqual([])
 })
+
+// Y cuando trae el resto, se salda. Sin esto lo que se quedó se acumulaba PARA SIEMPRE: no había
+// forma de decir "ya la devolvió". Lo registra quien la recibe, nunca él.
+test('el admin registra la devolución y el saldo vuelve a cero', async ({ page }) => {
+  const errores = vigilarErrores(page)
+  await entrar(page, 'admin')
+
+  const id = await idDeUsuario(page, USUARIOS.delivery)
+  await page.goto(`/usuarios/${id}`)
+  await expect(page.locator('.udc__acuenta-val')).toContainText('20.000', { timeout: 15_000 })
+
+  await page.fill('.udc__saldar-input', '20000')
+  await page.click('.udc__saldar-btn')
+
+  // Saldado: la tarjeta de "tiene del club" desaparece porque ya no tiene nada.
+  await expect(page.locator('.udc__saldar')).toHaveCount(0, { timeout: 15_000 })
+
+  expect(errores, errores.join('\n')).toEqual([])
+})

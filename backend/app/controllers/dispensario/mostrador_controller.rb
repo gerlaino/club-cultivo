@@ -142,6 +142,21 @@ module Dispensario
       render json: { error: 'Fecha inválida' }, status: :unprocessable_entity
     end
 
+    # GET /sedes/:sede_id/mostrador/turnos — los turnos cerrados.
+    #
+    # Administración los ve todos; el que atiende, LOS SUYOS. Cerraba un turno y no tenía dónde
+    # mirarlo después: si al día siguiente le preguntan por una diferencia, no tiene con qué.
+    def turnos
+      escala = @mostrador.turno_mostradores.cerrados.includes(:cerrado_por, :confirmado_por)
+      escala = escala.where(confirmado_por_id: current_user.id) unless gestiona?
+
+      escala = escala.includes(:cerrado_por, :confirmado_por, :caja_turno, items: :stock)
+      render json: {
+        turnos: escala.order(cerrado_at: :desc).limit(30).map { |t| serialize_turno_resumen(t) },
+        gestiona: gestiona?,
+      }
+    end
+
     # GET /sedes/:sede_id/mostrador/turnos/:id — un turno cerrado, para poder corregir su conteo
     def turno
       return render json: { error: 'No autorizado' }, status: :forbidden unless gestiona?
@@ -198,7 +213,9 @@ module Dispensario
 
     def set_mostrador
       sede       = current_user.club.sedes.find(params[:sede_id])
-      @mostrador = sede.mostrador
+      # `mostrador!` y no `mostrador`: acá SÍ corresponde crearlo — es la puerta de entrada al
+      # mostrador de esa sede, y una organización que nunca lo abrió todavía no lo tiene.
+      @mostrador = sede.mostrador!
       return if @mostrador
 
       render json: { error: 'Esta sede no dispensa: no tiene mostrador' }, status: :unprocessable_entity
@@ -214,16 +231,35 @@ module Dispensario
       render json: { error: 'No autorizado' }, status: :forbidden
     end
 
-    # Un turno "con faltante" es uno donde se contó menos de lo esperado en algún producto. El
-    # esperado se recalcula en SQL para no traer los ítems a Ruby: esto corre en cada carga de la
-    # pantalla.
+    # Lo que el admin tiene que mirar. Son TRES cosas y no una: prometer una bandeja y contar
+    # sólo los faltantes deja las otras dos invisibles apenas cierra el turno.
+    #
+    #   · un cierre con faltante
+    #   · el que atiende corrigió lo que había declarado el admin
+    #   · alguien bajó mercadería del depósito sin un admin al lado
+    #
+    # El esperado se recalcula en SQL para no traer los ítems a Ruby: esto corre en cada carga.
     def turnos_sin_revisar
-      con_faltante = TurnoMostradorItem.where.not(cantidad_cierre: nil).where(
+      items = TurnoMostradorItem.where(turno_mostrador_id: turnos_cerrados_sin_revisar)
+
+      con_faltante = items.where.not(cantidad_cierre: nil).where(
         'cantidad_cierre < cantidad_apertura + cantidad_repuesta - cantidad_devuelta ' \
         '+ cantidad_ajuste - cantidad_dispensada'
       ).select(:turno_mostrador_id)
 
-      @mostrador.turno_mostradores.cerrados.where(revisado_at: nil, id: con_faltante).count
+      marcados = TurnoMostradorMovimiento
+                 .where(turno_mostrador_item_id: items.select(:id))
+                 .where("tipo = 'correccion' OR sin_supervision = TRUE")
+                 .joins(:turno_mostrador_item).select('turno_mostrador_items.turno_mostrador_id')
+
+      @mostrador.turno_mostradores.cerrados.where(revisado_at: nil)
+                .where(id: con_faltante).or(
+                  @mostrador.turno_mostradores.cerrados.where(revisado_at: nil).where(id: marcados)
+                ).count
+    end
+
+    def turnos_cerrados_sin_revisar
+      @mostrador.turno_mostradores.cerrados.where(revisado_at: nil).select(:id)
     end
 
     def mostradores_del_club
@@ -240,7 +276,7 @@ module Dispensario
       anterior = @mostrador.turno_mostradores.cerrados.order(cerrado_at: :desc).first
       return [] if anterior.nil?
 
-      anterior.items.includes(:stock).filter_map do |it|
+      anterior.items.en_la_mesa.includes(:stock).filter_map do |it|
         next if it.cantidad_cierre.to_d <= 0
         next unless it.stock && it.stock.sede_id == @mostrador.sede_id
 
@@ -256,7 +292,7 @@ module Dispensario
                                .where(sede_id: @mostrador.sede_id, estado: 'asignado')
                                .para_dispensa.disponibles
                                .includes(:lote, :genetica).to_a
-      Stock.precargar_apartado_mostrador(candidatos)
+      Stock.precargar_apartados(candidatos)
       candidatos.select { |s| s.cantidad_disponible_real.to_d.positive? }
     end
 
@@ -292,6 +328,34 @@ module Dispensario
       }
     end
 
+    # La lista de turnos cerrados. NO usa `serialize_turno`: ése arma la mesa entera producto por
+    # producto y pregunta el depósito de cada uno —treinta turnos serían cientos de queries para
+    # pintar una lista donde no se ve ni un solo producto—. Acá van los totales, y el detalle se
+    # abre al entrar a uno.
+    def serialize_turno_resumen(turno)
+      items = turno.items.select { |it| it.en_la_mesa? }
+      con_dif = items.count { |it| it.diferencia_cierre.to_d.nonzero? }
+      {
+        id:          turno.id,
+        abierto_at:  turno.abierto_at,
+        cerrado_at:  turno.cerrado_at,
+        cerrado_por: turno.cerrado_por&.nombre_completo,
+        atendio:     turno.confirmado_por&.nombre_completo,
+        revisado:    turno.revisado_at.present?,
+        productos:   items.size,
+        dispensado:  items.sum { |it| it.cantidad_dispensada.to_d }.to_f.round(2),
+        # Lo que faltó, en producto y en plata. En gramos no se compara con nada.
+        faltante:    items.sum { |it| [-it.diferencia_cierre.to_d, 0].max }.to_f.round(2),
+        faltante_ars: items.sum { |it|
+          [-it.diferencia_cierre.to_d, 0].max * it.stock&.costo_unitario_ars.to_d
+        }.to_f.round(2),
+        con_diferencia: con_dif,
+        # El arqueo de plata del mismo turno, sin abrirlo.
+        efectivo_contado_ars: turno.caja_turno&.efectivo_declarado_ars&.to_f,
+        diferencia_caja_ars:  turno.caja_turno&.diferencia_ars&.to_f,
+      }
+    end
+
     def serialize_turno(turno)
       return nil if turno.nil?
 
@@ -299,6 +363,9 @@ module Dispensario
         id:          turno.id,
         estado:      turno.estado,
         abierto_at:  turno.abierto_at,
+        cerrado_at:  turno.cerrado_at,
+        cerrado_por: turno.cerrado_por&.nombre_completo,
+        revisado:    turno.revisado_at.present?,
         abierto_por: turno.abierto_por&.nombre_completo,
         # Lo mira la pantalla para no ofrecerle a quien cargó la mesa que se la reciba él mismo.
         abierto_por_id: turno.abierto_por_id,
@@ -307,6 +374,9 @@ module Dispensario
         confirmado_por: turno.confirmado_por&.nombre_completo,
         confirmado_at:  turno.confirmado_at,
         caja_turno_id: turno.caja_turno_id,
+        # Cuánto vale lo que hay arriba, a costo. En gramos no se compara con nada: en plata se
+        # ve de un vistazo que sobre esa mesa hay medio sueldo.
+        valor_mesa_ars: turno.items.en_la_mesa.includes(:stock).sum { |it| it.esperado * it.stock&.costo_unitario_ars.to_d }.to_f.round(2),
         # El arqueo de plata del mismo turno. Va acá para que el cierre muestre los dos juntos:
         # es un gesto, aunque sean dos cuentas distintas.
         caja: turno.caja_turno && {
@@ -320,8 +390,8 @@ module Dispensario
         # Lo que el que abrió corrigió sobre lo que dejó el turno anterior. Es la diferencia que
         # el admin mira después: nadie la tuvo que contar dos veces, pero si alguien la tocó,
         # está.
-        hubo_correccion_apertura: turno.items.any? { |it| it.diferencia_apertura.to_d.nonzero? },
-        items: turno.items.includes(:stock).map do |it|
+        hubo_correccion_apertura: turno.items.en_la_mesa.any? { |it| it.diferencia_apertura.to_d.nonzero? },
+        items: turno.items.en_la_mesa.includes(:stock).map do |it|
           {
             id:        it.id,
             stock_id:  it.stock_id,
@@ -336,6 +406,8 @@ module Dispensario
             esperado:  it.esperado.to_f,
             contado:   it.cantidad_cierre&.to_f,
             diferencia_apertura: it.diferencia_apertura&.to_f,
+            diferencia_cierre:   it.diferencia_cierre&.to_f,
+            motivo:              it.motivo_diferencia,
             # Lo que corrigió el que recibió, sobre lo que había declarado el admin.
             correccion: it.cantidad_ajuste.to_d.nonzero?&.to_f,
             # Las otras dos columnas de la pantalla: con qué reponer, y a qué ritmo se va.

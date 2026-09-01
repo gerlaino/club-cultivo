@@ -306,13 +306,88 @@ entrega de una **reserva** y lo apartado para un **evento**.
   de `has_many :mostradores`. Se resolvió donde ya estaba resuelto para `bar`:
   `config/initializers/inflections.rb`.
 
+### Poniéndose en el lugar de cada uno
+
+Con el módulo andando, la última pasada fue mirar la pantalla como cada persona que la usa. Lo que
+apareció no eran bugs: eran **finales sin cerrar**.
+
+**El que atiende, la primera vez.** No tenía forma de saber qué es "recibir" ni por qué el sistema
+le pide contar dos veces. Ahora la pantalla lo explica en tres renglones —se abre, se recibe, se
+cierra— **una sola vez**: se cierra y no vuelve. Un cartel permanente sobre la pantalla que se usa
+cien veces por día es ruido.
+
+**El producto que directamente NO ESTÁ.** Al recibir sólo se podía corregir el número, y para un
+frasco que no está sobre la mesa eso significa dejarlo en **cero** toda la jornada, ocupando un
+renglón que hay que volver a explicar cada vez que alguien mira. Ahora se saca (`quitar: true`),
+con su motivo y con el nombre de quien lo sacó.
+
+La fila **no se borra**: borrarla se llevaba puesto, por `dependent: :destroy`, el movimiento que
+acababa de registrar quién lo sacó y por qué — o sea, se perdía justo lo que se quería guardar. Se
+queda sin un solo número y el scope `en_la_mesa` deja de listarla: *una fila sin ningún número es
+una fila donde nunca pasó nada*.
+
+**Sus turnos.** Cerraba y no tenía dónde mirarlo: si al día siguiente le preguntan por una
+diferencia, no tenía con qué. Nueva solapa **Turnos** — administración ve todos, el que atiende ve
+**los suyos**, y el filtro es del backend, no de la pantalla. Corregir el conteo sigue siendo de
+administración, porque ajusta el inventario real; a él la pantalla le dice a quién avisarle.
+
+**El repartidor no veía lo que tiene del club.** Si le anotaron $20.000 al rendir, tenía que
+preguntar — y así es como algo chico se convierte en una discusión. Ahora lo ve donde ya mira sus
+rendiciones (`mi_saldo_ars`).
+
+**Y no había forma de devolverlo.** Lo que se quedaba se acumulaba **para siempre**: no existía
+"ya la devolvió". `Rendiciones::SaldarACuenta` + el botón en su ficha. La plata entra al cajón como
+`ingreso_caja` y el saldo baja con un movimiento espejo — **no es un ingreso del club**: esa plata
+siempre fue suya, sólo estaba en el bolsillo de otro. Lo registra quien la recibe, nunca él: sería
+firmar su propio recibo. **"Rendir en partes" es exactamente esto**: se rinde todo, se recibe lo
+que trajo y el resto se salda después.
+
+**Cuánto vale lo que hay sobre la mesa.** En gramos no se compara con nada; en plata se ve de un
+vistazo que ahí arriba hay medio sueldo. A costo, y sólo para quien responde por eso.
+
+**"Contar" pasó a "Contar sólo este".** El botón estaba al lado de "Cerrar y contar" y no había
+forma de saber cuál era cuál.
+
+**La solapa de Merma hacía dos cosas.** Arriba va ahora la **lista de trabajo** —los turnos que
+piden una mirada, que se terminan— y abajo el análisis, que se consulta. Mezclada entre tres tablas
+de estudio, la lista no se hacía nunca.
+
+**Y la bandeja contaba una sola de las tres cosas que prometía.** Un turno pide una mirada por
+faltante, por corrección al recibir **o** porque alguien bajó del depósito sin supervisión; el
+contador miraba sólo la primera y las otras dos quedaban invisibles apenas cerraba el turno. Cada
+renglón dice ahora **por qué** está ahí: un pendiente que no dice qué mirar obliga a abrirlo para
+descubrir que no era nada.
+
+**El aviso de merma también sale por mail** (con el módulo de Correo y la casilla conectada). La
+campana la mira quien entra a la app, y el admin de una organización chica puede no entrar en toda
+la semana — que es justo cuando esto importa. Va `deliver_now` y no `deliver_later`: esto ya corre
+en un job, y encolar un mail desde adentro de otra cola sólo mueve el error de lugar — el `rescue`
+dejaba de proteger de lo único que falla de verdad acá, que es la casilla mal configurada.
+
+### De paso, otra vez
+
+- **`ROLES_DEL_MOSTRADOR` vivía en `Dispensacion`**, que no es quien sabe qué hace cada rol. Pasó a
+  `User#atiende_mostrador?`.
+- **`Sede#mostrador` creaba uno de prepo al leerlo.** Un `GET` que escribe en la base es una
+  sorpresa que se paga cara: quedó partido en `mostrador` (lee) y `mostrador!` (crea, y sólo si la
+  sede dispensa).
+- **Dos N+1 hermanos.** `Merma` preguntaba los movimientos **turno por turno** (un mes de sesenta
+  turnos eran ciento veinte viajes para pintar una tabla), y `apartado_para_eventos` cargaba las
+  provisiones de cada stock por separado en listados enteros — el gemelo del que ya se había
+  arreglado para el mostrador. Los dos suman ahora en una query (`Stock.precargar_apartados`).
+- **La lista de turnos no usa `serialize_turno`**: ése arma la mesa producto por producto y le
+  pregunta el depósito a cada uno. Treinta turnos serían cientos de queries para una lista donde no
+  se ve ni un producto.
+- **El e2e ahora dice "levantá `docker compose up`"** en vez de escupir un error de shell.
+
 ### Esquema
 
 `mostradores`, `turno_mostradores`, `turno_mostrador_items`, `turno_mostrador_movimientos`, más
-`dispensaciones.turno_mostrador_id`. (`clubs.exigir_mostrador_abierto` se agregó y se sacó en el
-mismo bloque: el mostrador no es una opción.)
+`dispensaciones.turno_mostrador_id`, `stock_movimientos.turno_mostrador_id`, `rendiciones_caja` y
+`cobros.rendicion_caja_id`. (`clubs.exigir_mostrador_abierto` se agregó y se sacó en el mismo
+bloque: el mostrador no es una opción.)
 
-**2653 rspec ✓ · 1680 vitest ✓ · build limpio.**
+**2746 rspec ✓ · 1743 vitest ✓ · build limpio · 6 pruebas de navegador ✓.**
 
 ---
 

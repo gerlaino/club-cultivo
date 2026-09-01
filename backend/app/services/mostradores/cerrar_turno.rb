@@ -64,14 +64,14 @@ module Mostradores
     # Se cuenta TODO lo que está sobre la mesa. Dejar contar sólo algunos ítems sería un arqueo
     # que no arquea: el que falta se arrastra al turno siguiente como si nada hubiera pasado.
     def validar_conteos
-      sin_contar = @turno.items.reject { |it| por_item[it.id] }
+      sin_contar = @turno.items.en_la_mesa.reject { |it| por_item[it.id] }
       return nil if sin_contar.empty?
 
       "Falta contar: #{sin_contar.map { |it| it.stock&.etiqueta }.compact.join(', ')}"
     end
 
     def aplicar_conteos!
-      @turno.items.each do |item|
+      @turno.items.en_la_mesa.each do |item|
         datos   = por_item[item.id]
         contado = (datos[:contado] || datos['contado']).to_d
         raise ArgumentError, "La cantidad contada no puede ser negativa" if contado.negative?

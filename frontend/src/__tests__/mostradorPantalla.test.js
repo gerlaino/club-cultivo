@@ -67,6 +67,16 @@ const getTurnoMostrador = vi.fn(() => Promise.resolve({
   data: { id: 91, items: [{ id: 71, etiqueta: 'Northern Lights (flor seca)', unidad: 'g', contado: 21 }] },
 }))
 const corregirTurnoMostrador = vi.fn(() => Promise.resolve({ data: {} }))
+const TURNOS_CERRADOS = {
+  gestiona: false,
+  turnos: [
+    { id: 91, abierto_at: '2026-08-28T09:00:00Z', cerrado_at: '2026-08-28T21:10:00Z',
+      cerrado_por: 'Ana Gómez', atendio: 'Ana Gómez', revisado: false, productos: 2,
+      dispensado: 350, faltante: 6, faltante_ars: 3000, con_diferencia: 1,
+      efectivo_contado_ars: 58500, diferencia_caja_ars: 0 },
+  ],
+}
+const listTurnosMostrador = vi.fn(() => Promise.resolve({ data: TURNOS_CERRADOS }))
 const ingresoCajaMostrador  = vi.fn(() => Promise.resolve({ data: {} }))
 const contarMostrador       = vi.fn(() => Promise.resolve({ data: {} }))
 const salidaCajaMostrador   = vi.fn(() => Promise.resolve({ data: {} }))
@@ -82,6 +92,7 @@ vi.mock('../lib/api.js', () => ({
   revisarTurnoMostrador: (...a) => revisarTurnoMostrador(...a),
   getTurnoMostrador:    (...a) => getTurnoMostrador(...a),
   corregirTurnoMostrador: (...a) => corregirTurnoMostrador(...a),
+  listTurnosMostrador:  (...a) => listTurnosMostrador(...a),
   contarMostrador:      (...a) => contarMostrador(...a),
   ingresoCajaMostrador: (...a) => ingresoCajaMostrador(...a),
   salidaCajaMostrador:  (...a) => salidaCajaMostrador(...a),
@@ -213,6 +224,23 @@ describe('La pantalla del mostrador', () => {
       const w = await montar()
 
       expect(w.findAll('tbody tr')[1].text()).toContain('Repuesto desde el mostrador')
+    })
+
+    // En gramos no se compara con nada; en plata se ve de un vistazo cuánto hay ahí arriba.
+    it('dice cuánto vale lo que está sobre la mesa, a costo', async () => {
+      useAuthStore().user = { id: 1, role: 'admin' }
+      respuesta = { ...respuesta, turno: { ...TURNO, valor_mesa_ars: 68000 } }
+      const w = await montar()
+
+      expect(w.find('.mst__valor-mesa').text()).toContain('$68.000')
+    })
+
+    it('y no se lo muestra al que atiende: no responde por eso', async () => {
+      useAuthStore().user = { id: 2, role: 'dispensador' }
+      respuesta = { ...respuesta, turno: { ...TURNO, valor_mesa_ars: 68000 } }
+      const w = await montar()
+
+      expect(w.find('.mst__valor-mesa').exists()).toBe(false)
     })
 
     it('repone un producto contra el backend', async () => {
@@ -467,6 +495,54 @@ describe('La pantalla del mostrador', () => {
 
     // Dos firmas de la misma persona no son ninguna: al que cargó la mesa no se le ofrece
     // recibirla, ve lo que dejó y espera.
+    // El producto que directamente NO ESTÁ. Ponerlo en cero lo dejaría sobre la mesa toda la
+    // jornada, en cero, pidiendo explicación cada vez que alguien mire la pantalla.
+    describe('un producto que no está sobre la mesa', () => {
+      async function quitarElPrimero (w) {
+        await w.findAll('.mst__draft-row')[0].find('.mst__icon-btn').trigger('click')
+      }
+
+      it('se saca, y se ve tachado antes de confirmar', async () => {
+        const w = await montar()
+        await quitarElPrimero(w)
+
+        const fila = w.findAll('.mst__draft-row')[0]
+        expect(fila.classes()).toContain('is-quitado')
+        expect(fila.text()).toContain('no está sobre la mesa — se saca')
+      })
+
+      it('se puede arrepentir', async () => {
+        const w = await montar()
+        await quitarElPrimero(w)
+        await quitarElPrimero(w)
+
+        expect(w.findAll('.mst__draft-row')[0].classes()).not.toContain('is-quitado')
+      })
+
+      it('pide el motivo, como cualquier corrección', async () => {
+        const w = await montar()
+        await quitarElPrimero(w)
+        await w.find('.mst__acciones .mst__btn--primary').trigger('click')
+        await flushPromises()
+
+        expect(confirmarMostrador).not.toHaveBeenCalled()
+      })
+
+      it('y se manda como quitar, no como cero', async () => {
+        const w = await montar()
+        await quitarElPrimero(w)
+        await w.find('.mst__campo--motivo .mst__input').setValue('nunca estuvo')
+        await w.find('.mst__acciones .mst__btn--primary').trigger('click')
+        await flushPromises()
+
+        expect(confirmarMostrador).toHaveBeenCalledWith(10, {
+          correcciones: [{ item_id: 71, motivo: 'nunca estuvo', quitar: true }],
+          efectivo_contado_ars: 58500,
+          motivo_efectivo: undefined,
+        })
+      })
+    })
+
     it('al que cargó la mesa no se le ofrece confirmarla', async () => {
       useAuthStore().user = { id: 99, role: 'admin' }
       const w = await montar()
@@ -585,16 +661,20 @@ describe('La pantalla del mostrador', () => {
 
     async function verMerma () {
       const w = await montar()
-      await w.findAll('.mst__tab')[1].trigger('click')
+      await w.findAll('.mst__tab').find(t => t.text().startsWith('Merma')).trigger('click')
       await flushPromises()
       return w
     }
 
+    // El que atiende SÍ ve sus turnos —cerraba uno y no tenía dónde mirarlo—, pero la merma es
+    // información de gestión: no es una pantalla para él, decide con lo que tiene sobre la mesa.
     it('el que atiende no la ve: es información de gestión' , async () => {
       useAuthStore().user = { id: 2, role: 'dispensador' }
       const w = await montar()
 
-      expect(w.find('.mst__tabs').exists()).toBe(false)
+      const solapas = w.findAll('.mst__tab').map(t => t.text())
+      expect(solapas.some(t => t.startsWith('Merma'))).toBe(false)
+      expect(solapas).toContain('Turnos')
     })
 
     // Sin entrar a la solapa: un aviso que sólo aparece cuando ya fuiste a mirar no avisa nada.
@@ -602,14 +682,14 @@ describe('La pantalla del mostrador', () => {
       const w = await montar()
 
       expect(getMermaMostrador).not.toHaveBeenCalled()
-      expect(w.findAll('.mst__tab')[1].find('.mst__tab-badge').text()).toBe('1')
+      expect(w.find('.mst__tab-badge').text()).toBe('1')
     })
 
     it('el número que manda es el porcentaje sobre lo entregado', async () => {
       const w = await verMerma()
 
-      expect(w.findAll('.mst__kpi-num')[0].text()).toBe('1.45%')
-      expect(w.findAll('.mst__kpi-num')[1].text()).toBe('$41.000')
+      expect(w.findAll('.mrm__kpi-num')[0].text()).toBe('1.45%')
+      expect(w.findAll('.mrm__kpi-num')[1].text()).toBe('$41.000')
     })
 
     // El punto del informe: lo que más se pierde en gramos no es el cuello de botella.
@@ -631,7 +711,7 @@ describe('La pantalla del mostrador', () => {
 
     it('marcar un turno como visto lo saca de la lista', async () => {
       const w = await verMerma()
-      await w.findAll('tbody .mst__btn--mini')[0].trigger('click')
+      await w.findAll('tbody .mrm__btn--mini')[0].trigger('click')
       await flushPromises()
 
       expect(revisarTurnoMostrador).toHaveBeenCalledWith(10, 91)
@@ -641,13 +721,13 @@ describe('La pantalla del mostrador', () => {
     // El único lugar del módulo donde un dedazo ajusta el inventario real: 21 en vez de 215.
     it('permite corregir un conteo mal cargado de un turno cerrado', async () => {
       const w = await verMerma()
-      await w.find('.mst__btn--corregir').trigger('click')
+      await w.find('.mrm__btn--corregir').trigger('click')
       await flushPromises()
 
       expect(w.text()).toContain('se había contado 21 g')
-      await w.find('.mst__modal .mst__input--cant').setValue(215)
-      await w.find('.mst__modal .mst__campo--motivo .mst__input').setValue('me comí un dígito')
-      await w.find('.mst__modal-acc .mst__btn--primary').trigger('click')
+      await w.find('.cc__input--cant').setValue(215)
+      await w.find('.cc__campo .cc__input').setValue('me comí un dígito')
+      await w.find('.cc__acc .cc__btn--primary').trigger('click')
       await flushPromises()
 
       expect(corregirTurnoMostrador).toHaveBeenCalledWith(10, 91, {
@@ -658,10 +738,10 @@ describe('La pantalla del mostrador', () => {
 
     it('corregir sin motivo no manda nada', async () => {
       const w = await verMerma()
-      await w.find('.mst__btn--corregir').trigger('click')
+      await w.find('.mrm__btn--corregir').trigger('click')
       await flushPromises()
-      await w.find('.mst__modal .mst__input--cant').setValue(215)
-      await w.find('.mst__modal-acc .mst__btn--primary').trigger('click')
+      await w.find('.cc__input--cant').setValue(215)
+      await w.find('.cc__acc .cc__btn--primary').trigger('click')
       await flushPromises()
 
       expect(corregirTurnoMostrador).not.toHaveBeenCalled()
@@ -701,6 +781,74 @@ describe('La pantalla del mostrador', () => {
       const w = await verMerma()
 
       expect(w.text()).toContain('Todavía no hay turnos cerrados')
+    })
+  })
+
+  // ── Los turnos que ya cerraron ─────────────────────────────────────────────
+  describe('la solapa de turnos', () => {
+    async function verTurnos () {
+      const w = await montar()
+      await w.findAll('.mst__tab').find(t => t.text() === 'Turnos').trigger('click')
+      await flushPromises()
+      return w
+    }
+
+    // Cerraba un turno y no tenía dónde mirarlo: si al día siguiente le preguntan por una
+    // diferencia, no tiene con qué.
+    it('el que atiende ve los suyos', async () => {
+      useAuthStore().user = { id: 2, role: 'dispensador' }
+      const w = await verTurnos()
+
+      expect(listTurnosMostrador).toHaveBeenCalledWith(10)
+      expect(w.text()).toContain('Los turnos que atendiste vos')
+      expect(w.find('.trn__table tbody tr').text()).toContain('Ana Gómez')
+    })
+
+    // Corregir un conteo ajusta el inventario real: eso es de administración.
+    it('y no puede corregir el conteo', async () => {
+      useAuthStore().user = { id: 2, role: 'dispensador' }
+      const w = await verTurnos()
+
+      expect(w.find('.trn__btn').exists()).toBe(false)
+      expect(w.text()).toContain('Avisale a administración')
+    })
+
+    it('administración sí', async () => {
+      listTurnosMostrador.mockResolvedValueOnce({ data: { ...TURNOS_CERRADOS, gestiona: true } })
+      const w = await verTurnos()
+
+      expect(w.find('.trn__btn').text()).toBe('Corregir conteo')
+    })
+
+    it('un turno que cuadró lo dice, en vez de un cero', async () => {
+      listTurnosMostrador.mockResolvedValueOnce({
+        data: { gestiona: false, turnos: [{ ...TURNOS_CERRADOS.turnos[0], faltante: 0, faltante_ars: 0 }] },
+      })
+      const w = await verTurnos()
+
+      expect(w.find('.trn__ok').text()).toBe('cuadró')
+    })
+  })
+
+  // ── La primera vez ─────────────────────────────────────────────────────────
+  describe('la guía de las tres partes del día', () => {
+    beforeEach(() => { localStorage.clear() })
+
+    it('se muestra la primera vez', async () => {
+      const w = await montar()
+
+      expect(w.find('.mst__guia').exists()).toBe(true)
+      expect(w.text()).toContain('Cómo funciona el día')
+      // Y el tono: una diferencia no es una falta.
+      expect(w.text()).toContain('no es una falta')
+    })
+
+    it('y no vuelve una vez que la cerraste', async () => {
+      const w = await montar()
+      await w.find('.mst__guia .mst__icon-btn').trigger('click')
+
+      expect(w.find('.mst__guia').exists()).toBe(false)
+      expect((await montar()).find('.mst__guia').exists()).toBe(false)
     })
   })
 

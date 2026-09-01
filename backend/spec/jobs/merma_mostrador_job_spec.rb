@@ -24,7 +24,7 @@ RSpec.describe MermaMostradorJob do
   def turno!(dispensado:, faltante:, cuando: Time.current)
     ActsAsTenant.with_tenant(club) do
       t = Mostradores::AbrirTurno.call(
-        mostrador: sede.mostrador, usuario: admin, monto_inicial_ars: 0,
+        mostrador: sede.mostrador!, usuario: admin, monto_inicial_ars: 0,
         items: [{ stock_id: stock.id, cantidad: dispensado + 100 }]
       ).turno
       Mostradores::ConfirmarApertura.call(turno: t, usuario: ana)
@@ -39,6 +39,15 @@ RSpec.describe MermaMostradorJob do
   end
 
   def alertas = AlertaInterna.unscoped.where(club_id: club.id, tipo: 'merma_mostrador')
+
+  # El mail sale de la casilla de la organización: sin el add-on Y sin casilla conectada no hay
+  # de dónde mandarlo, y `mail_para_club` no manda nada.
+  def conectar_casilla!
+    club.update!(features: club.features.merge('mailer' => true),
+                 smtp_host: 'smtp.gmail.com', smtp_port: 587, smtp_user: 'org@gmail.com',
+                 smtp_pass: 'app-pass', smtp_from: 'org@gmail.com', smtp_from_name: 'Org')
+    admin.update!(email: 'admin@org.com')
+  end
 
   describe 'cuando la merma se dispara' do
     before do
@@ -59,6 +68,36 @@ RSpec.describe MermaMostradorJob do
     end
 
     # Repetirlo todos los días es cómo se aprende a ignorarlo.
+    # La campana la mira quien entra a la app, y el admin de una organización chica puede no
+    # entrar en toda la semana — que es justo cuando esto importa.
+    it 'también manda el mail, si la organización tiene correo' do
+      conectar_casilla!
+
+      expect { described_class.new.perform }
+        .to change { ActionMailer::Base.deliveries.size }.by(1)
+
+      mail = ActionMailer::Base.deliveries.last
+      expect(mail.subject).to match(/merma/i)
+      expect(mail.body.encoded).to include('Centro')
+      # No acusa a nadie: la merma es inevitable y esto dice "andá a mirar".
+      expect(mail.body.encoded).not_to match(/robo|falta.{0,10}alguien|responsable/i)
+    end
+
+    it 'sin el módulo de correo, la alerta interna alcanza' do
+      expect { described_class.new.perform }
+        .to change { alertas.count }.by(1)
+      expect(ActionMailer::Base.deliveries).to be_empty
+    end
+
+    # Si la casilla del cliente está mal configurada, el aviso interno igual tiene que quedar:
+    # que no salga un mail no es motivo para perder la alerta.
+    it 'y si el mail no sale, no se lleva puesta la alerta' do
+      conectar_casilla!
+      allow(NotificacionesMailer).to receive(:merma_mostrador).and_raise(Net::SMTPAuthenticationError, 'no')
+
+      expect { described_class.new.perform }.to change { alertas.count }.by(1)
+    end
+
     it 'no lo repite al día siguiente' do
       described_class.new.perform
 

@@ -11,48 +11,55 @@ RSpec.describe 'El mostrador como punto de venta', type: :request do
   let(:admin) { create(:user, :admin, club: club) }
   let(:sede)  { create(:sede, club: club, tipo: 'social') }
 
+  # `mostrador` LEE y `mostrador!` crea si hace falta. Una lectura que escribe es una escritura
+  # que nadie ve en el log ni espera en un GET.
   describe 'Sede#mostrador' do
+    it 'leerlo no lo crea' do
+      expect { sede.mostrador }.not_to change { Mostrador.unscoped.where(sede_id: sede.id).count }
+      expect(sede.mostrador).to be_nil
+    end
+
     it 'lo crea la primera vez que hace falta' do
-      expect { sede.mostrador }.to change { Mostrador.unscoped.where(sede_id: sede.id).count }.from(0).to(1)
+      expect { sede.mostrador! }.to change { Mostrador.unscoped.where(sede_id: sede.id).count }.from(0).to(1)
     end
 
     # Perezoso pero idempotente: se lo llama desde cada request de caja, y sin esto una sede
     # terminaba con un mostrador por visita.
     it 'devuelve siempre el mismo, no uno nuevo por llamada' do
-      primero = sede.mostrador
+      primero = sede.mostrador!
       sede.mostradores.reset
 
-      expect(sede.mostrador.id).to eq(primero.id)
+      expect(sede.mostrador!.id).to eq(primero.id)
       expect(Mostrador.unscoped.where(sede_id: sede.id).count).to eq(1)
     end
 
     it 'una sede de producción no tiene mostrador: no atiende pacientes' do
       produccion = create(:sede, club: club, tipo: 'produccion')
 
-      expect(produccion.mostrador).to be_nil
+      expect(produccion.mostrador!).to be_nil
       expect(Mostrador.unscoped.where(sede_id: produccion.id).count).to eq(0)
     end
 
     # Sólo la CREACIÓN se restringe. Una sede que cambió de tipo no puede perder acceso a su
     # mostrador: ahí adentro hay turnos cerrados y plata.
     it 'una sede que ya tiene mostrador lo conserva aunque deje de ser social' do
-      mostrador = sede.mostrador
+      mostrador = sede.mostrador!
       sede.update_column(:tipo, 'produccion')
 
-      expect(sede.reload.mostrador.id).to eq(mostrador.id)
+      expect(sede.reload.mostrador!.id).to eq(mostrador.id)
     end
 
     it 'la sede mixta también dispensa' do
       mixta = create(:sede, club: club, tipo: 'mixta')
 
-      expect(mixta.mostrador).to be_present
+      expect(mixta.mostrador!).to be_present
     end
   end
 
   describe 'la caja se abre contra el mostrador' do
     it 'la caja del dispensario apunta al Mostrador, no a la Sede' do
       caja = ActsAsTenant.with_tenant(club) do
-        CajaTurno.create!(club: club, sede: sede, punto: sede.mostrador, abierta_por: admin,
+        CajaTurno.create!(club: club, sede: sede, punto: sede.mostrador!, abierta_por: admin,
                           monto_inicial_ars: 5_000, abierta_at: Time.current, estado: 'abierta')
       end
 
@@ -63,7 +70,7 @@ RSpec.describe 'El mostrador como punto de venta', type: :request do
 
     it 'CajaTurno.abierta_en_sede la encuentra por la sede, que es como la piensa el usuario' do
       caja = ActsAsTenant.with_tenant(club) do
-        CajaTurno.create!(club: club, sede: sede, punto: sede.mostrador, abierta_por: admin,
+        CajaTurno.create!(club: club, sede: sede, punto: sede.mostrador!, abierta_por: admin,
                           monto_inicial_ars: 5_000, abierta_at: Time.current, estado: 'abierta')
       end
 
@@ -72,7 +79,7 @@ RSpec.describe 'El mostrador como punto de venta', type: :request do
 
     it 'una caja cerrada no cuenta como abierta' do
       ActsAsTenant.with_tenant(club) do
-        CajaTurno.create!(club: club, sede: sede, punto: sede.mostrador, abierta_por: admin,
+        CajaTurno.create!(club: club, sede: sede, punto: sede.mostrador!, abierta_por: admin,
                           monto_inicial_ars: 5_000, abierta_at: 1.day.ago, estado: 'cerrada',
                           efectivo_declarado_ars: 5_000, cerrada_at: 1.day.ago)
       end
@@ -88,7 +95,7 @@ RSpec.describe 'El mostrador como punto de venta', type: :request do
       otro_admin = create(:user, :admin, club: otro)
       otra_sede  = create(:sede, club: otro, tipo: 'social')
       ActsAsTenant.with_tenant(otro) do
-        CajaTurno.create!(club: otro, sede: otra_sede, punto: otra_sede.mostrador,
+        CajaTurno.create!(club: otro, sede: otra_sede, punto: otra_sede.mostrador!,
                           abierta_por: otro_admin, monto_inicial_ars: 9_000,
                           abierta_at: Time.current, estado: 'abierta')
       end
@@ -108,7 +115,7 @@ RSpec.describe 'El mostrador como punto de venta', type: :request do
 
     def abrir_caja!(en_sede, hace:)
       ActsAsTenant.with_tenant(club) do
-        CajaTurno.create!(club: club, sede: en_sede, punto: en_sede.mostrador, abierta_por: admin,
+        CajaTurno.create!(club: club, sede: en_sede, punto: en_sede.mostrador!, abierta_por: admin,
                           monto_inicial_ars: 1_000, abierta_at: hace, estado: 'abierta')
       end
     end

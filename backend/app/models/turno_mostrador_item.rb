@@ -25,6 +25,22 @@ class TurnoMostradorItem < ApplicationRecord
   validates :stock_id, uniqueness: { scope: :turno_mostrador_id }
 
   scope :en_turno_abierto, -> { joins(:turno_mostrador).where(turno_mostradores: { estado: 'abierto' }) }
+  # Lo que hay que mostrar sobre la mesa. Un producto que el admin declaró y que al recibir NO
+  # ESTABA se pone en cero y deja de listarse: dejarlo en cero todo el día es un renglón que hay
+  # que volver a explicar cada vez que alguien mira la pantalla. La FILA NO SE BORRA —con ella se
+  # iría el movimiento que dice quién lo sacó y por qué, que es justo lo que se quiere guardar—:
+  # se reconoce porque no le quedó NINGÚN número, y una fila sin un solo número es una fila donde
+  # nunca pasó nada.
+  NADA_PASO = 'COALESCE(cantidad_heredada, 0) = 0 AND cantidad_apertura = 0 ' \
+              'AND cantidad_repuesta = 0 AND cantidad_devuelta = 0 ' \
+              'AND cantidad_ajuste = 0 AND cantidad_dispensada = 0'.freeze
+  scope :en_la_mesa, -> { where.not(Arel.sql(NADA_PASO)) }
+
+  # Lo mismo, en Ruby: para no volver a pegarle a la base cuando la colección ya está cargada.
+  def en_la_mesa?
+    [cantidad_heredada, cantidad_apertura, cantidad_repuesta,
+     cantidad_devuelta, cantidad_ajuste, cantidad_dispensada].any? { |c| c.to_d.nonzero? }
+  end
   # Lo que se puede ofrecer para dispensar: además de abierto, RECIBIDO por quien atiende.
   scope :operativos, -> { en_turno_abierto.where.not(turno_mostradores: { confirmado_at: nil }) }
 

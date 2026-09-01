@@ -120,7 +120,7 @@ RSpec.describe 'Abrir el mostrador', type: :request do
     # Dos cajas activas sobre el mismo cajón partirían el arqueo en dos por la misma plata.
     it 'si ya había una caja abierta la reusa en vez de abrir otra' do
       caja = ActsAsTenant.with_tenant(club) do
-        CajaTurno.create!(club: club, sede: sede, punto: sede.mostrador, abierta_por: admin,
+        CajaTurno.create!(club: club, sede: sede, punto: sede.mostrador!, abierta_por: admin,
                           monto_inicial_ars: 7_000, abierta_at: 1.hour.ago, estado: 'abierta')
       end
 
@@ -134,7 +134,7 @@ RSpec.describe 'Abrir el mostrador', type: :request do
   describe 'la herencia del cierre anterior' do
     let!(:anterior) do
       ActsAsTenant.with_tenant(club) do
-        t = TurnoMostrador.create!(club: club, mostrador: sede.mostrador, estado: 'cerrado',
+        t = TurnoMostrador.create!(club: club, mostrador: sede.mostrador!, estado: 'cerrado',
                                    abierto_por: ana, abierto_at: 1.day.ago,
                                    cerrado_por: ana, cerrado_at: 12.hours.ago)
         t.items.create!(club: club, stock: northern, cantidad_apertura: 300,
@@ -199,7 +199,7 @@ RSpec.describe 'Abrir el mostrador', type: :request do
     it 'lo imputa al ítem del turno, que es donde se ve qué salió de la mesa' do
       dispensar!(50)
 
-      item = sede.mostrador.turno_abierto.items.first
+      item = sede.mostrador!.turno_abierto.items.first
       expect(item.cantidad_dispensada.to_f).to eq(50.0)
       expect(item.esperado.to_f).to eq(250.0)
     end
@@ -207,7 +207,7 @@ RSpec.describe 'Abrir el mostrador', type: :request do
     it 'deja el turno anotado en la dispensa' do
       d = dispensar!(10)
 
-      expect(d.turno_mostrador_id).to eq(sede.mostrador.turno_abierto.id)
+      expect(d.turno_mostrador_id).to eq(sede.mostrador!.turno_abierto.id)
     end
 
     # Se puede dispensar TODO lo que está sobre la mesa: para el mostrador que lo cargó, lo

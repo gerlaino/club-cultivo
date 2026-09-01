@@ -430,10 +430,11 @@ class Dispensacion < ApplicationRecord
   # abra un turno para registrar una dispensa vieja o corregir una carga es fricción sin control
   # detrás. Si igual dispensa algo que está sobre la mesa, se imputa al ítem como cualquier otra,
   # así el arqueo no le miente al que atiende.
-  ROLES_DEL_MOSTRADOR = %w[dispensador supervisor].freeze
-
+  #
+  # Quién atiende lo sabe `User`, que es donde vive el enum de roles. Tenerlo acá era una lista de
+  # roles adentro de un modelo de dominio: un cuarto mecanismo de permisos.
   def sede_dispensa?
-    return false unless user&.role.in?(ROLES_DEL_MOSTRADOR)
+    return false unless user&.atiende_mostrador?
     return false if sede_del_mostrador.blank? || club_id.blank?
 
     Sede.unscoped.where(id: sede_del_mostrador, club_id: club_id).pick(:tipo).in?(%w[social mixta])

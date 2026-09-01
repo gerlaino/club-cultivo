@@ -89,10 +89,27 @@ test('el admin ve la merma del turno que cerró', async ({ page }) => {
   await page.goto('/mostrador')
 
   await page.locator('.mst__tab', { hasText: 'Merma' }).click()
-  await expect(page.locator('.mst__kpi').first()).toBeVisible()
+  await expect(page.locator('.mrm__kpi').first()).toBeVisible()
   await expect(page.getByText('Por producto')).toBeVisible()
   await expect(page.getByText('Turno por turno')).toBeVisible()
   await expect(page.locator('tbody').first()).toContainText('E2E Kush')
+  // La lista de trabajo va SEPARADA del análisis: es lo que se termina, no lo que se consulta.
+  await expect(page.getByRole('heading', { name: 'Cómo viene' })).toBeVisible()
+
+  expect(errores, errores.join('\n')).toEqual([])
+})
+
+// El que atiende cerraba su turno y no tenía dónde mirarlo: si al día siguiente le preguntan por
+// una diferencia, no tenía con qué. Ve LOS SUYOS — el filtro es del backend, no de la pantalla.
+test('el dispensador ve sus turnos cerrados', async ({ page }) => {
+  const errores = vigilarErrores(page)
+  await entrar(page, 'dispensador')
+  await page.goto('/mostrador')
+
+  await page.locator('.mst__tab', { hasText: 'Turnos' }).click()
+  await expect(page.locator('.trn__table tbody tr').first()).toBeVisible()
+  // Corregir un conteo ajusta el inventario real: eso es de administración.
+  await expect(page.getByRole('button', { name: 'Corregir conteo' })).toHaveCount(0)
 
   expect(errores, errores.join('\n')).toEqual([])
 })

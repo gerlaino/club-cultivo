@@ -21,15 +21,22 @@
          entra plata Y puede subir producto a la mesa, así que la pantalla se recarga. -->
     <RendicionCajaCard @recibida="cargar" />
 
-    <nav v-if="gestiona" class="mst__tabs">
+    <nav class="mst__tabs">
       <button class="mst__tab" :class="{ 'is-on': tab === 'hoy' }" @click="tab = 'hoy'">Hoy</button>
-      <button class="mst__tab" :class="{ 'is-on': tab === 'merma' }" @click="verMerma">
-        Merma
-        <span v-if="sinRevisar" class="mst__tab-badge">{{ sinRevisar }}</span>
+      <!-- Los turnos cerrados los ve TAMBIÉN el que atiende, con los suyos: cerraba y no tenía
+           dónde mirarlo si al día siguiente le preguntaban por una diferencia. -->
+      <button class="mst__tab" :class="{ 'is-on': tab === 'turnos' }" @click="tab = 'turnos'">
+        Turnos
       </button>
-      <button class="mst__tab" :class="{ 'is-on': tab === 'rendiciones' }" @click="tab = 'rendiciones'">
-        Rendiciones
-      </button>
+      <template v-if="gestiona">
+        <button class="mst__tab" :class="{ 'is-on': tab === 'merma' }" @click="tab = 'merma'">
+          Merma
+          <span v-if="sinRevisar" class="mst__tab-badge">{{ sinRevisar }}</span>
+        </button>
+        <button class="mst__tab" :class="{ 'is-on': tab === 'rendiciones' }" @click="tab = 'rendiciones'">
+          Rendiciones
+        </button>
+      </template>
     </nav>
 
     <!-- ══ RENDICIONES: lo que ya rindieron los repartidores ══════════════════ -->
@@ -42,144 +49,34 @@
     </template>
 
     <!-- ══ MERMA: dónde se le va el producto ══════════════════════════════════ -->
-    <template v-else-if="tab === 'merma'">
-      <div class="mst__filtros">
-        <label class="mst__campo-inline">Desde <input v-model="rango.desde" type="date" class="mst__input mst__input--fecha" /></label>
-        <label class="mst__campo-inline">Hasta <input v-model="rango.hasta" type="date" class="mst__input mst__input--fecha" /></label>
-        <!-- Comparar sedes es LA pregunta que encuentra el cuello de botella: si en una se
-             pierde el triple que en otra con el mismo producto, el problema no es la merma. -->
-        <label v-if="sedes.length > 1" class="mst__campo-inline">
-          <input v-model="todasLasSedes" type="checkbox" /> Todas las sedes
-        </label>
-        <button class="mst__btn mst__btn--ghost" @click="cargarMerma">Ver</button>
-      </div>
+    <MostradorMerma v-else-if="tab === 'merma'" :sede-id="sedeId" :varias-sedes="sedes.length > 1"
+                    @sin-revisar="sinRevisar = $event" />
 
-      <p v-if="cargandoMerma" class="mst__vacio">Calculando…</p>
-      <p v-else-if="!merma || !merma.resumen.turnos" class="mst__vacio">
-        Todavía no hay turnos cerrados en este período.
-      </p>
-
-      <template v-else>
-        <div class="mst__kpis">
-          <div class="mst__kpi">
-            <span class="mst__kpi-num">{{ merma.resumen.merma_pct ?? '—' }}<small>%</small></span>
-            <span class="mst__kpi-lbl">de lo entregado</span>
-          </div>
-          <div class="mst__kpi">
-            <span class="mst__kpi-num">${{ fmt(merma.resumen.faltante_ars) }}</span>
-            <span class="mst__kpi-lbl">a costo, en el período</span>
-          </div>
-          <div class="mst__kpi">
-            <span class="mst__kpi-num">{{ merma.resumen.turnos }}</span>
-            <span class="mst__kpi-lbl">turnos cerrados</span>
-          </div>
-        </div>
-
-        <template v-if="merma.por_sede?.length">
-          <h2 class="mst__seccion">Sede por sede</h2>
-          <p class="mst__seccion-sub">
-            Si en una se pierde el triple que en otra con el mismo producto, el problema no es la
-            merma: es algo de esa sede, y hasta que no se ponen al lado no se ve.
-          </p>
-          <div class="mst__table-wrap">
-            <table class="mst__table tabla-cards">
-              <thead>
-                <tr>
-                  <th>Sede</th>
-                  <th class="mst__th-num">Turnos</th>
-                  <th class="mst__th-num">Entregado</th>
-                  <th class="mst__th-num">Faltó</th>
-                  <th class="mst__th-num">%</th>
-                  <th class="mst__th-num">A costo</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="s in merma.por_sede" :key="s.sede_id">
-                  <td data-col="Sede"><div class="mst__prod">{{ s.sede }}</div></td>
-                  <td class="mst__td-num mst__td-mut" data-col="Turnos">{{ s.turnos }}</td>
-                  <td class="mst__td-num mst__td-mut" data-col="Entregado">{{ fmt(s.dispensado) }}</td>
-                  <td class="mst__td-num mst__td-mut" data-col="Faltó">{{ fmt(s.faltante) }}</td>
-                  <td class="mst__td-num" data-col="%"><span class="mst__pct">{{ s.merma_pct ?? '—' }}%</span></td>
-                  <td class="mst__td-num mst__td-mut" data-col="A costo">${{ fmt(s.faltante_ars) }}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </template>
-
-        <h2 class="mst__seccion">Por producto</h2>
-        <p class="mst__seccion-sub">
-          Ordenado por porcentaje, no por cantidad: lo que más se vende siempre encabeza un
-          ranking de gramos y eso no dice nada.
-        </p>
-        <div class="mst__table-wrap">
-          <table class="mst__table tabla-cards">
-            <thead>
-              <tr>
-                <th>Producto</th>
-                <th class="mst__th-num">Entregado</th>
-                <th class="mst__th-num">Faltó</th>
-                <th class="mst__th-num">%</th>
-                <th class="mst__th-num">A costo</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="p in merma.por_producto" :key="p.producto">
-                <td data-col="Producto"><div class="mst__prod">{{ p.producto }}</div></td>
-                <td class="mst__td-num mst__td-mut" data-col="Entregado">{{ fmt(p.dispensado) }} {{ p.unidad }}</td>
-                <td class="mst__td-num mst__td-mut" data-col="Faltó">{{ fmt(p.faltante) }} {{ p.unidad }}</td>
-                <td class="mst__td-num" data-col="%"><span class="mst__pct">{{ p.merma_pct ?? '—' }}%</span></td>
-                <td class="mst__td-num mst__td-mut" data-col="A costo">${{ fmt(p.faltante_ars) }}</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-
-        <h2 class="mst__seccion">Turno por turno</h2>
-        <div class="mst__table-wrap">
-          <table class="mst__table tabla-cards">
-            <thead>
-              <tr>
-                <th>Cerró</th>
-                <th class="mst__th-num">Entregado</th>
-                <th class="mst__th-num">Faltó</th>
-                <th>Motivo</th>
-                <th class="mst__th-acc"></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="t in merma.por_turno" :key="t.id">
-                <td data-col="Cerró">
-                  <div class="mst__prod">{{ fecha(t.cerrado_at) }}</div>
-                  <div class="mst__prod-meta">
-                    <span class="mst__td-mut">{{ t.cerrado_por }}</span>
-                    <span v-if="t.correcciones" class="mst__pill mst__pill--info">
-                      <!-- El plural de "corrección" PIERDE el acento: pegarle "es" da
-                           "correcciónes". Misma trampa que organización → organizaciones. -->
-                      {{ t.correcciones }} {{ t.correcciones > 1 ? 'correcciones' : 'corrección' }} al recibir
-                    </span>
-                  </div>
-                </td>
-                <td class="mst__td-num mst__td-mut" data-col="Entregado">{{ fmt(t.dispensado) }}</td>
-                <td class="mst__td-num" data-col="Faltó">
-                  <span class="mst__pct">{{ fmt(t.faltante) }}</span>
-                  <span class="mst__unidad">${{ fmt(t.faltante_ars) }}</span>
-                </td>
-                <td class="mst__td-mut" data-col="Motivo">{{ t.motivos.join(' · ') || '—' }}</td>
-                <td class="mst__td-acc" data-col="">
-                  <span v-if="t.revisado" class="mst__pill mst__pill--ok">Visto</span>
-                  <button v-else class="mst__btn mst__btn--mini" @click="revisar(t)">Ya lo miré</button>
-                  <button class="mst__btn mst__btn--mini mst__btn--ghost mst__btn--corregir"
-                          @click="abrirCorreccion(t)">Corregir conteo</button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </template>
-    </template>
+    <!-- ══ TURNOS: los que ya cerraron ════════════════════════════════════════ -->
+    <MostradorTurnos v-else-if="tab === 'turnos'" :sede-id="sedeId" />
 
     <template v-else>
+
+    <!-- La primera vez que alguien abre esta pantalla no tiene idea de qué es "recibir" ni por
+         qué el sistema le pide contar dos veces. Se explica UNA vez, se cierra y no vuelve:
+         un cartel permanente sobre la pantalla que se usa cien veces por día es ruido. -->
+    <section v-if="mostrarGuia" class="mst__guia">
+      <div class="mst__guia-txt">
+        <h2 class="mst__guia-title">Cómo funciona el día</h2>
+        <ol class="mst__guia-pasos">
+          <li><b>Se abre</b> con lo que quedó contado anoche. Corregís lo que no coincida.</li>
+          <li><b>Se recibe</b>: si lo dejó otra persona, contás y confirmás. Recién ahí se dispensa.</li>
+          <li><b>Se cierra</b> contando lo que queda y la plata del cajón.</li>
+        </ol>
+        <p class="mst__guia-nota">
+          Una diferencia no es una falta: la merma existe siempre. Contarla sirve para que la
+          organización sepa cuánta hay y dónde.
+        </p>
+      </div>
+      <button class="mst__icon-btn" title="Entendido" @click="ocultarGuia">
+        <X :size="16" />
+      </button>
+    </section>
 
     <div v-if="cargando" class="mst__skel-wrap">
       <div v-for="n in 4" :key="n" class="mst__skel" />
@@ -249,6 +146,13 @@
           {{ guardando ? 'Abriendo…' : 'Abrir mostrador' }}
         </button>
       </div>
+
+      <!-- Un dedazo en el cierre —21 en vez de 215— deja un faltante de 194 g que después nadie
+           entiende. El que cierra tiene que saber, en el momento, que eso se arregla y dónde. -->
+      <p v-if="huboTurnoAnterior" class="mst__pie">
+        ¿Se contó mal el cierre anterior? Se corrige desde <b>Turnos</b>, sin borrar nada: queda
+        asentada la diferencia.
+      </p>
     </section>
 
     <!-- ══ ABIERTO SIN RECIBIR: el admin lo cargó, falta que lo recibas ═══════ -->
@@ -265,18 +169,29 @@
       </div>
 
       <ul class="mst__draft">
-        <li v-for="r in recepcion" :key="r.item_id" class="mst__draft-row">
+        <li v-for="r in recepcion" :key="r.item_id" class="mst__draft-row"
+            :class="{ 'is-quitado': r.quitar }">
           <div class="mst__draft-prod">
             <span class="mst__draft-nombre">{{ r.etiqueta }}</span>
-            <span class="mst__draft-meta">dejó {{ fmt(r.esperado) }} {{ r.unidad }}</span>
+            <span class="mst__draft-meta">
+              {{ r.quitar ? 'no está sobre la mesa — se saca' : `dejó ${fmt(r.esperado)} ${r.unidad}` }}
+            </span>
           </div>
-          <div class="mst__draft-cant">
+          <div v-if="!r.quitar" class="mst__draft-cant">
             <input v-if="!loCargueYo" v-model.number="r.contado" type="number" min="0" step="0.1"
                    class="mst__input mst__input--cant" :aria-label="`Contado de ${r.etiqueta}`" />
             <span v-else class="mst__mesa">{{ fmt(r.esperado) }}</span>
             <span class="mst__draft-unidad">{{ r.unidad }}</span>
           </div>
-          <span v-if="!loCargueYo" class="mst__dif" :class="difClase(r)">{{ difTexto(r) }}</span>
+          <span v-if="!loCargueYo && !r.quitar" class="mst__dif" :class="difClase(r)">{{ difTexto(r) }}</span>
+          <!-- El producto que directamente NO ESTÁ se saca, no se pone en cero: un renglón en
+               cero es un pendiente que hay que volver a explicar cada vez que alguien mira. -->
+          <button v-if="!loCargueYo" class="mst__icon-btn"
+                  :title="r.quitar ? 'Volver a ponerlo' : 'No está sobre la mesa'"
+                  @click="r.quitar = !r.quitar">
+            <Undo2 v-if="r.quitar" :size="16" />
+            <X v-else :size="16" />
+          </button>
         </li>
       </ul>
 
@@ -323,7 +238,14 @@
           <span v-if="turno.confirmado_por && turno.confirmado_por !== turno.abierto_por"
                 class="mst__turno-desde">· lo dejó {{ turno.abierto_por }}</span>
         </div>
-        <button class="mst__btn mst__btn--primary" @click="abrirCierre">Cerrar y contar</button>
+        <div class="mst__turno-acc">
+          <!-- En gramos no se compara con nada; en plata se ve de un vistazo que sobre esa mesa
+               hay medio sueldo. Sólo para quien responde por eso. -->
+          <span v-if="gestiona && turno.valor_mesa_ars" class="mst__valor-mesa">
+            ${{ fmt(turno.valor_mesa_ars) }} sobre la mesa
+          </span>
+          <button class="mst__btn mst__btn--primary" @click="abrirCierre">Cerrar y contar</button>
+        </div>
       </section>
       <p v-if="turno.hubo_correccion_apertura" class="mst__aviso mst__aviso--warn">
         La apertura se corrigió sobre lo que dejó el turno anterior.
@@ -368,7 +290,7 @@
                 <!-- Contar SÓLO este, sin cerrar el turno: con quince frascos, cerrar y reabrir
                      son veinte minutos y nadie lo hace dos veces por día. -->
                 <button class="mst__btn mst__btn--mini mst__btn--ghost" @click="abrirConteo(it)">
-                  Contar
+                  Contar sólo este
                 </button>
               </td>
             </tr>
@@ -478,44 +400,6 @@
 
     </template>
 
-    <!-- ── Corregir un conteo mal cargado de un turno ya cerrado ──────────────── -->
-    <div v-if="correccion" class="mst__modal-back" @click.self="correccion = null">
-      <div class="mst__modal mst__modal--ancho">
-        <h3 class="mst__modal-title">Corregir el conteo</h3>
-        <p class="mst__modal-sub">
-          Turno del {{ fecha(correccion.cerrado_at) }}. Escribí lo que había de verdad: el
-          movimiento equivocado no se borra, se asienta la diferencia.
-        </p>
-
-        <div class="mst__conteo">
-          <div v-for="c in correccion.items" :key="c.item_id" class="mst__conteo-row">
-            <div class="mst__conteo-prod">
-              <span class="mst__draft-nombre">{{ c.etiqueta }}</span>
-              <span class="mst__draft-meta">se había contado {{ fmt(c.original) }} {{ c.unidad }}</span>
-            </div>
-            <div class="mst__conteo-cant">
-              <input v-model.number="c.contado" type="number" min="0" step="0.1"
-                     class="mst__input mst__input--cant" :aria-label="`Contado de ${c.etiqueta}`" />
-              <span class="mst__draft-unidad">{{ c.unidad }}</span>
-            </div>
-          </div>
-        </div>
-
-        <label class="mst__campo mst__campo--motivo">
-          <span class="mst__campo-lbl">Por qué se corrige</span>
-          <input v-model="correccion.motivo" type="text" class="mst__input"
-                 placeholder="Ej: se cargó 21 en vez de 215" />
-        </label>
-
-        <div class="mst__modal-acc">
-          <button class="mst__btn mst__btn--ghost" @click="correccion = null">Cancelar</button>
-          <button class="mst__btn mst__btn--primary" :disabled="guardando" @click="confirmarCorreccion">
-            Corregir
-          </button>
-        </div>
-      </div>
-    </div>
-
     <!-- ── Contar un producto sin cerrar el turno ─────────────────────────────── -->
     <div v-if="conteo" class="mst__modal-back" @click.self="conteo = null">
       <div class="mst__modal">
@@ -612,12 +496,13 @@
 // Lo que se carga se APARTA, no se descuenta: la fila Stock sigue siendo una sola. Ver
 // `Mostradores::AbrirTurno` en el backend.
 import { ref, computed, watch, onMounted } from 'vue'
-import { X } from 'lucide-vue-next'
+import { X, Undo2 } from 'lucide-vue-next'
 import RendicionCajaCard from '../components/RendicionCajaCard.vue'
+import MostradorMerma from '../components/mostrador/MostradorMerma.vue'
+import MostradorTurnos from '../components/mostrador/MostradorTurnos.vue'
 import { getMostrador, abrirMostrador, confirmarMostrador, cargarMostrador, devolverMostrador,
-         cerrarMostrador, getMermaMostrador, revisarTurnoMostrador,
-         ingresoCajaMostrador, salidaCajaMostrador, getTurnoMostrador,
-         corregirTurnoMostrador, contarMostrador } from '../lib/api.js'
+         cerrarMostrador, ingresoCajaMostrador, salidaCajaMostrador,
+         contarMostrador } from '../lib/api.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useSedeStore } from '../stores/sede.js'
 import { useStockChannel } from '../composables/useStockChannel.js'
@@ -649,7 +534,6 @@ const motivoRecepcion = ref('')
 const efectivoRecepcion = ref(null)
 const motivoEfectivo = ref('')
 const plata = ref(null)
-const correccion = ref(null)
 const conteo     = ref(null)
 // Mismo criterio que el cierre: lo esperado no se muestra hasta que el conteo está escrito.
 const difConteo  = computed(() => {
@@ -658,18 +542,20 @@ const difConteo  = computed(() => {
   return Math.round((Number(c.contado) - c.item.esperado) * 1000) / 1000
 })
 const tab       = ref('hoy')
-const merma     = ref(null)
-const cargandoMerma = ref(false)
 // Viene con la carga principal: un aviso que sólo aparece cuando ya entraste a mirarlo no avisa.
 const sinRevisar = ref(0)
-// El rango arranca VACÍO y lo completa el backend con el mes en curso en SU zona horaria.
-//
-// Antes lo calculaba acá con `toISOString()`, que da la fecha en UTC: con el navegador en una
-// zona y Rails en Buenos Aires, entre las 21:00 y las 00:00 el rango pedía un mañana donde
-// todavía no había cerrado nadie, y la solapa se veía vacía justo en el horario en que se cierra
-// el mostrador. El cliente no tiene por qué adivinar qué día es en el servidor.
-const rango     = ref({ desde: '', hasta: '' })
-const todasLasSedes = ref(false)
+
+// La explicación de las tres partes del día. Se muestra hasta que la cierran: un cartel
+// permanente sobre la pantalla que se usa cien veces por día es ruido, pero la primera vez nadie
+// sabe qué es "recibir" ni por qué le piden contar dos veces. Por usuario y por navegador — no
+// vale la pena una columna en la base para esto.
+const GUIA_KEY = 'mostrador:guia-vista'
+const guiaVista = ref(true)
+const mostrarGuia = computed(() => !guiaVista.value)
+function ocultarGuia () {
+  guiaVista.value = true
+  try { localStorage.setItem(GUIA_KEY, '1') } catch { /* modo incógnito: se muestra de nuevo */ }
+}
 
 // Tres momentos, no dos: cerrado · abierto pero sin recibir · andando. El del medio existe
 // porque cuando lo carga el admin hay una entrega, y hasta que el que atiende no la firma nadie
@@ -691,8 +577,13 @@ const loCargueYo = computed(() => {
   const quien = turno.value?.abierto_por_id
   return !!turno.value && !turno.value.confirmado && !!yo && !!quien && yo === quien
 })
+// Se cerró algo antes: sin eso, hablar de "corregir el cierre anterior" no significa nada.
+const huboTurnoAnterior = computed(() => sugerido.value.length > 0 || fondoSugerido.value !== null)
+// Sacar un producto de la mesa también es corregir lo que declaró el admin, y también pide
+// motivo: es la diferencia más grande que puede haber.
 const hayCorreccion = computed(() =>
-  recepcion.value.some(r => r.contado !== null && r.contado !== '' && Number(r.contado) !== r.esperado)
+  recepcion.value.some(r => r.quitar ||
+    (r.contado !== null && r.contado !== '' && Number(r.contado) !== r.esperado))
 )
 // Lo que falta o sobra en el cajón al recibirlo. A diferencia del stock —donde lo que el admin
 // declaró de más sigue en el depósito— acá la plata que falta no está en ningún lado.
@@ -727,73 +618,6 @@ const aRetirar = computed(() => {
 
 const fmt  = (n) => Number(n ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })
 const hora = (iso) => (iso ? new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '')
-const fecha = (iso) => (iso ? new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) : '')
-
-async function verMerma () {
-  tab.value = 'merma'
-  if (!merma.value) await cargarMerma()
-}
-
-async function cargarMerma () {
-  if (!sedeId.value) return
-  cargandoMerma.value = true
-  try {
-    const params = { ...rango.value }
-    if (todasLasSedes.value) params.todas = 1
-    const { data } = await getMermaMostrador(sedeId.value, params)
-    merma.value = data
-    sinRevisar.value = data.sin_revisar ?? 0
-    // El backend contesta con el rango que efectivamente usó: los campos lo muestran.
-    if (data.rango) rango.value = { desde: data.rango.desde, hasta: data.rango.hasta }
-  } catch (e) {
-    toast.error(e?.response?.data?.error || 'No se pudo calcular la merma.')
-  } finally {
-    cargandoMerma.value = false
-  }
-}
-
-// Es el único lugar del módulo donde un dedazo ajusta el inventario real: 21 en vez de 215
-// cierra con un faltante de 194 g. Hasta acá no tenía vuelta atrás.
-async function abrirCorreccion (t) {
-  try {
-    const { data } = await getTurnoMostrador(sedeId.value, t.id)
-    correccion.value = {
-      id: t.id, cerrado_at: t.cerrado_at, motivo: '',
-      items: data.items.map(it => ({
-        item_id: it.id, etiqueta: it.etiqueta, unidad: it.unidad,
-        original: it.contado, contado: it.contado,
-      })),
-    }
-  } catch { toast.error('No se pudo abrir el turno.') }
-}
-
-async function confirmarCorreccion () {
-  const c = correccion.value
-  if (!c.motivo.trim()) return toast.error('Escribí por qué se corrige el conteo.')
-  const conteos = c.items.filter(i => Number(i.contado) !== i.original)
-                         .map(i => ({ item_id: i.item_id, contado: i.contado }))
-  if (!conteos.length) return toast.error('No cambiaste ningún número.')
-
-  guardando.value = true
-  try {
-    await corregirTurnoMostrador(sedeId.value, c.id, { conteos, motivo: c.motivo })
-    correccion.value = null
-    toast.success('Conteo corregido')
-    await cargarMerma()
-  } catch (e) {
-    toast.error(e?.response?.data?.error || 'No se pudo corregir el conteo.')
-  } finally {
-    guardando.value = false
-  }
-}
-
-async function revisar (t) {
-  try {
-    await revisarTurnoMostrador(sedeId.value, t.id)
-    t.revisado = true
-    if (sinRevisar.value > 0) sinRevisar.value -= 1
-  } catch { toast.error('No se pudo marcar como revisado.') }
-}
 
 // Cada carga lleva número. Con el tiempo real, una tanda de cambios dispara varias recargas y
 // nada garantiza que lleguen en orden: si la respuesta vieja aterriza última, la pantalla vuelve
@@ -819,7 +643,7 @@ async function cargar () {
     recepcion.value = (turno.value && !turno.value.confirmado)
       ? turno.value.items.map(it => ({
           item_id: it.id, etiqueta: it.etiqueta, unidad: it.unidad,
-          esperado: it.esperado, contado: it.esperado,
+          esperado: it.esperado, contado: it.esperado, quitar: false,
         }))
       : []
     motivoRecepcion.value = ''
@@ -907,8 +731,11 @@ async function confirmar () {
   guardando.value = true
   try {
     const correcciones = recepcion.value
-      .filter(r => Number(r.contado) !== r.esperado)
-      .map(r => ({ item_id: r.item_id, contado: r.contado, motivo: motivoRecepcion.value }))
+      .filter(r => r.quitar || Number(r.contado) !== r.esperado)
+      .map(r => ({
+        item_id: r.item_id, motivo: motivoRecepcion.value,
+        ...(r.quitar ? { quitar: true } : { contado: r.contado }),
+      }))
     await confirmarMostrador(sedeId.value, {
       correcciones,
       efectivo_contado_ars: efectivoRecepcion.value,
@@ -1014,6 +841,7 @@ async function bajarNuevo () {
 }
 
 onMounted(async () => {
+  try { guiaVista.value = localStorage.getItem(GUIA_KEY) === '1' } catch { guiaVista.value = true }
   if (!sedeStore.loaded) await sedeStore.fetchSedes()
   // No se llama a `cargar()` acá: fijar la sede dispara el watcher de abajo, que carga. Hacer
   // las dos cosas mandaba DOS pedidos por cada apertura de la pantalla.
@@ -1034,13 +862,9 @@ useStockChannel(null, (evento) => {
   recargaPendiente = setTimeout(cargar, 300)
 })
 
-// Cambiar de sede recarga: si no, se veía el mostrador de la sede anterior — y la merma de la
-// sede anterior, que es peor porque son números que parecen de esta.
-watch(sedeId, async () => {
-  merma.value = null
-  await cargar()
-  if (tab.value === 'merma') await cargarMerma()
-}, { immediate: true })
+// Cambiar de sede recarga: si no, se veía el mostrador de la sede anterior. Las otras solapas
+// son componentes y miran `sedeId` por su cuenta.
+watch(sedeId, cargar, { immediate: true })
 </script>
 
 <style scoped>
@@ -1061,36 +885,6 @@ watch(sedeId, async () => {
   background: var(--c-amber-100); color: var(--c-amber-500);
   border-radius: 999px; padding: 1px 7px; font-size: var(--fs-12);
 }
-
-/* ── Merma ──────────────────────────────────────────────────────────────────── */
-.mst__filtros { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 18px; }
-.mst__campo-inline {
-  display: inline-flex; align-items: center; gap: 7px;
-  font-size: var(--fs-13); color: var(--c-ink-700);
-}
-.mst__input--fecha { width: auto; }
-
-.mst__kpis { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
-.mst__kpi {
-  flex: 1; min-width: 150px;
-  background: #fff; border: 1px solid var(--c-slate-200); border-radius: 12px; padding: 16px;
-  display: flex; flex-direction: column; gap: 3px;
-}
-.mst__kpi-num {
-  font-family: var(--font-mono); font-size: var(--fs-24, 24px);
-  font-weight: 700; color: var(--c-leaf-800);
-}
-.mst__kpi-num small { font-size: var(--fs-14); font-weight: 600; }
-.mst__kpi-lbl { font-size: var(--fs-12); color: var(--c-ink-500); }
-
-.mst__seccion {
-  font-family: var(--font-display); font-size: var(--fs-16); font-weight: 700;
-  color: var(--c-leaf-900); margin: 26px 0 2px;
-}
-.mst__seccion-sub { margin: 0 0 12px; font-size: var(--fs-13); color: var(--c-ink-500); max-width: 60ch; }
-
-.mst__pct { font-family: var(--font-mono); font-weight: 600; color: var(--c-ink-900); }
-.mst__pill--ok { background: var(--c-leaf-100); color: var(--c-leaf-700); }
 
 /* ── Encabezado ─────────────────────────────────────────────────────────────── */
 .mst__head {
@@ -1115,6 +909,21 @@ watch(sedeId, async () => {
 .mst__estado.is-cerrado     { background: var(--c-ink-100);   color: var(--c-ink-500); }
 /* Cargado por el admin y esperando que lo reciba el que atiende: ni una cosa ni la otra. */
 .mst__estado.is-sin_recibir { background: var(--c-amber-100); color: var(--c-amber-500); }
+
+/* ── La guía de las tres partes del día ─────────────────────────────────────── */
+.mst__guia {
+  display: flex; align-items: flex-start; gap: 12px;
+  background: var(--c-leaf-50); border: 1px solid var(--c-leaf-100);
+  border-radius: 14px; padding: 18px 20px; margin-bottom: 16px;
+}
+.mst__guia-txt   { flex: 1; min-width: 0; }
+.mst__guia-title {
+  font-family: var(--font-display); font-size: var(--fs-15, 15px); font-weight: 700;
+  color: var(--c-leaf-900); margin: 0 0 8px;
+}
+.mst__guia-pasos { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.mst__guia-pasos li { font-size: var(--fs-13); color: var(--c-ink-700); }
+.mst__guia-nota  { margin: 9px 0 0; font-size: var(--fs-12); color: var(--c-ink-500); max-width: 60ch; }
 
 /* ── Tarjeta de apertura ────────────────────────────────────────────────────── */
 .mst__card {
@@ -1167,6 +976,10 @@ watch(sedeId, async () => {
 .mst__icon-btn:hover { background: var(--c-ink-100); color: var(--c-rust-600); }
 
 .mst__vacio { margin: 0; font-size: var(--fs-14); color: var(--c-ink-500); }
+.mst__seccion-sub { margin: 0 0 12px; font-size: var(--fs-13); color: var(--c-ink-500); max-width: 60ch; }
+.mst__pie   { margin: 0; font-size: var(--fs-12); color: var(--c-ink-500); }
+/* El renglón que se va de la mesa: se ve tachado antes de confirmar, para poder arrepentirse. */
+.mst__draft-row.is-quitado .mst__draft-nombre { text-decoration: line-through; color: var(--c-ink-500); }
 .mst__agregar { display: flex; gap: 10px; flex-wrap: wrap; }
 .mst__agregar .mst__select { flex: 1; min-width: 220px; }
 
@@ -1179,6 +992,9 @@ watch(sedeId, async () => {
 .mst__turno-info { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
 .mst__turno-quien { font-size: var(--fs-14); font-weight: 600; color: var(--c-ink-900); }
 .mst__turno-desde { font-size: var(--fs-13); color: var(--c-ink-500); }
+.mst__turno-acc   { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+/* En gramos no se compara con nada; en plata se ve de un vistazo cuánto hay ahí arriba. */
+.mst__valor-mesa  { font-size: var(--fs-13); color: var(--c-ink-500); font-family: var(--font-mono); }
 
 .mst__table-wrap {
   background: #fff; border: 1px solid var(--c-slate-200);

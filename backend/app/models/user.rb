@@ -193,6 +193,17 @@ class User < ApplicationRecord
   # ¿Le alcanza con ver lo de sus sedes, o ve todo el club?
   def limitado_por_sede? = sedes_ids_asignadas.any?
 
+  # ¿Esta persona ATIENDE el mostrador? Es quien pasa por la mesa: abre, recibe, dispensa de lo
+  # que hay arriba y cierra contando.
+  #
+  # Vive acá, sobre el enum de roles que ya existe, y no como una lista adentro de `Dispensacion`:
+  # una constante de roles metida en un modelo de dominio es un cuarto mecanismo de permisos, y en
+  # este proyecto ya hay tres. El admin NO atiende — carga la mesa, la arquea y es el dueño de la
+  # mercadería.
+  ROLES_MOSTRADOR = %w[dispensador supervisor].freeze
+
+  def atiende_mostrador? = ROLES_MOSTRADOR.include?(role.to_s)
+
   def salas_ids_en_sedes_asignadas
     sedes = sedes_ids_asignadas
     scope = Sala.where(club_id: club_id)

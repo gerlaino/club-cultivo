@@ -20,7 +20,9 @@ module Mostradores
 
     def self.call(**kwargs) = new(**kwargs).call
 
-    # `correcciones`: [{ item_id:, contado:, motivo: }] — sólo las que hagan falta.
+    # `correcciones`: [{ item_id:, contado:, motivo:, quitar: }] — sólo las que hagan falta.
+    # `quitar: true` es para el producto que directamente NO ESTÁ: poner 0 lo dejaría en la mesa
+    # en cero todo el día, ocupando lugar y pidiendo explicación cada vez que alguien lo mire.
     # `efectivo_contado`: lo que hay de verdad en el cajón. Se recibe la mesa Y la plata.
     def initialize(turno:, usuario:, correcciones: [], efectivo_contado: nil, motivo_efectivo: nil, notas: nil)
       @turno   = turno
@@ -90,14 +92,30 @@ module Mostradores
       item = @turno.items.find_by(id: (datos[:item_id] || datos['item_id']))
       raise ArgumentError, 'Ese producto no está en el mostrador' if item.nil?
 
-      contado = (datos[:contado] || datos['contado']).to_d
+      motivo  = (datos[:motivo] || datos['motivo']).presence
+      quitar  = ActiveModel::Type::Boolean.new.cast(datos[:quitar] || datos['quitar'])
+      contado = quitar ? 0.to_d : (datos[:contado] || datos['contado']).to_d
       raise ArgumentError, 'La cantidad contada no puede ser negativa' if contado.negative?
 
       dif = contado - item.esperado
-      return if dif.zero?
+      return if dif.zero? && !quitar
 
-      motivo = (datos[:motivo] || datos['motivo']).presence
       raise ArgumentError, "#{item.stock&.etiqueta}: hay diferencia, escribí el motivo" if motivo.blank?
+
+      # El producto que no está se saca de la mesa, no se deja en cero: un renglón en cero es un
+      # pendiente eterno que hay que volver a explicar cada vez que alguien mira la pantalla.
+      #
+      # Sacarlo NO es borrar la fila. Borrarla se llevaba puesto, por `dependent: :destroy`, el
+      # movimiento que acababa de escribir quién lo sacó y por qué — o sea, se perdía exactamente
+      # lo que se quería guardar. La fila se queda sin un solo número y `en_la_mesa` deja de
+      # listarla.
+      if quitar
+        raise ArgumentError, "#{item.stock&.etiqueta}: ya está en cero" if item.esperado.zero?
+
+        item.movimientos.create!(club: @turno.club, usuario: @usuario, tipo: 'correccion',
+                                 cantidad: -item.esperado, notas: "No estaba sobre la mesa — #{motivo}")
+        return item.update!(cantidad_heredada: 0, cantidad_apertura: 0, cantidad_ajuste: 0)
+      end
 
       # Corregir en MÁS no puede inventar mercadería: el techo es lo que quede libre abajo.
       if dif.positive? && dif > item.stock.cantidad_disponible_real.to_d

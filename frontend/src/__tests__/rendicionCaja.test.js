@@ -9,7 +9,10 @@ import { createPinia, setActivePinia } from 'pinia'
 // no candado.
 
 let rendiciones = []
-const listRendiciones     = vi.fn(() => Promise.resolve({ data: { rendiciones, sin_conformar: 0 } }))
+let miSaldo = 0
+const listRendiciones     = vi.fn(() => Promise.resolve({
+  data: { rendiciones, sin_conformar: 0, mi_saldo_ars: miSaldo },
+}))
 const receptoresRendicion = vi.fn(() => Promise.resolve({ data: [{ id: 5, nombre: 'Germán', rol: 'admin' }] }))
 const crearRendicion      = vi.fn(() => Promise.resolve({ data: {} }))
 const recibirRendicion    = vi.fn(() => Promise.resolve({ data: {} }))
@@ -35,7 +38,7 @@ async function montar (rol, id = 1) {
   return w
 }
 
-beforeEach(() => { vi.clearAllMocks(); rendiciones = [] })
+beforeEach(() => { vi.clearAllMocks(); rendiciones = []; miSaldo = 0 })
 
 describe('El repartidor rinde', () => {
   it('elige a quién le da la plata; el monto no lo escribe él', async () => {
@@ -254,4 +257,36 @@ it('no se muestra si no hay nada que hacer', async () => {
   const w = await montar('admin', 5)
 
   expect(w.find('.rnd').exists()).toBe(false)
+})
+
+
+// LO QUE TIENE DEL CLUB Y TODAVÍA NO DEVOLVIÓ.
+//
+// Cuando rinde $100.000 y sobre la mesa aparecen $80.000, los $20.000 quedan a su nombre — y el
+// repartidor no lo veía en ningún lado: si le anotaron una diferencia, tenía que preguntar. Así
+// es como algo chico se convierte en una discusión.
+describe('Lo que el repartidor tiene del club', () => {
+  it('se lo dice, sin que tenga que preguntar', async () => {
+    miSaldo = 20000
+    const w = await montar('delivery')
+
+    expect(w.text()).toContain('Tenés $20.000 del club')
+    // No es una deuda ni una pérdida: es plata suya que quedó con él.
+    expect(w.text()).not.toMatch(/debé|deuda|debe/i)
+  })
+
+  it('sin saldo, no dice nada', async () => {
+    const w = await montar('delivery')
+
+    expect(w.find('.rnd__saldo').exists()).toBe(false)
+  })
+
+  // La tarjeta se escondía cuando no había nada que rendir, y con eso se escondía el saldo.
+  it('y la tarjeta aparece aunque no haya nada que rendir', async () => {
+    miSaldo = 20000
+    receptoresRendicion.mockResolvedValueOnce({ data: [] })
+    const w = await montar('delivery')
+
+    expect(w.find('.rnd').exists()).toBe(true)
+  })
 })

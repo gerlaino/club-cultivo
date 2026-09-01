@@ -457,7 +457,7 @@
                   <tr v-for="(d, i) in data.dispensaciones" :key="d.id">
                     <td class="trz__td-n">{{ i + 1 }}</td>
                     <td class="trz__td-bold">{{ d.paciente || d.paciente_iniciales }}</td>
-                    <td class="trz__td-mono">…{{ d.paciente_dni_last4 }}</td>
+                    <td class="trz__td-mono">***{{ d.paciente_dni_last3 }}</td>
                     <td class="trz__td-g">{{ d.cantidad_g }} g</td>
                     <td class="trz__td-fecha">{{ formatDate(d.fecha) }}</td>
                   </tr>
