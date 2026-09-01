@@ -78,7 +78,7 @@
         <span class="mst__fondo-lbl">
           Fondo de caja
           <em v-if="fondoSugerido !== null" class="mst__fondo-hint">
-            quedaron ${{ fmt(fondoSugerido) }} en el cajón anoche
+            quedaron ${{ fmt(fondoSugerido) }} del turno anterior
           </em>
         </span>
         <span class="mst__fondo-input">
@@ -591,7 +591,15 @@ const hora = (iso) => (iso ? new Date(iso).toLocaleTimeString('es-AR', { hour: '
 let cargaEnCurso = 0
 
 async function cargar () {
-  if (!sedeId.value) { cargando.value = false; return }
+  if (!sedeId.value) {
+    // Todavía no sabemos con qué sede trabajar: el watcher corre con `immediate` ANTES de que
+    // `onMounted` la fije. Mientras se resuelve seguimos "cargando" — si la pantalla se dibuja
+    // vacía y un instante después se rearma con los datos, lo que la persona haya empezado a
+    // escribir se pierde sin que haya tocado nada. Sólo se rinde cuando ya sabemos que no hay
+    // ninguna sede que dispense.
+    cargando.value = !sedeStore.loaded || sedes.value.length > 0
+    return
+  }
   const mia = ++cargaEnCurso
   // El esqueleto SÓLO la primera vez. Ponerlo en cada recarga desmonta la pantalla entera, y la
   // mesa se recarga sola con cada aviso del canal: al que estaba escribiendo en el buscador o

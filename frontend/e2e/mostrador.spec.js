@@ -82,8 +82,8 @@ test('el día del mostrador, de punta a punta', async ({ page }) => {
   // ── 5. Mañana hereda lo de anoche ──────────────────────────────────────────
   const heredada = page.locator('.tst__table tbody tr').first()
   await expect(heredada.locator('.tst__input')).toHaveValue('295')
-  await expect(heredada).toContainText('venía de anoche')
-  await expect(page.getByText(/quedaron \$50\.000 en el cajón anoche/)).toBeVisible()
+  await expect(heredada).toContainText('viene del turno anterior')
+  await expect(page.getByText(/quedaron \$50\.000 del turno anterior/)).toBeVisible()
 
   expect(errores, errores.join('\n')).toEqual([])
 })

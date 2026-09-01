@@ -101,6 +101,13 @@ vi.mock('../lib/api.js', () => ({
   listSedes:         vi.fn(() => Promise.resolve({ data: SEDES })),
 }))
 
+// El canal en vivo: la mesa se recarga sola cuando el admin baja producto desde su oficina. El
+// test se queda con el callback para poder disparar el aviso.
+let avisarDelCanal = () => {}
+vi.mock('../composables/useStockChannel.js', () => ({
+  useStockChannel: (_onStock, onEvento) => { avisarDelCanal = onEvento || (() => {}) },
+}))
+
 import MostradorView from '../views/MostradorView.vue'
 import { useSedeStore } from '../stores/sede.js'
 import { useAuthStore } from '../stores/auth.js'
@@ -147,7 +154,7 @@ describe('La pantalla del mostrador', () => {
       expect(filas[0].text()).toContain('Northern Lights')
       expect(filas[0].find('.tst__input').element.value).toBe('215')
       // Y se ve por qué viene puesto: si no, parece un número que alguien declaró.
-      expect(filas[0].text()).toContain('venía de anoche')
+      expect(filas[0].text()).toContain('viene del turno anterior')
     })
 
     // Perderlo entre cuarenta filas es perder la mitad del valor del módulo.
@@ -517,7 +524,7 @@ describe('La pantalla del mostrador', () => {
   })
 
   // El fondo se HEREDA: si el que abre pone el número, puede poner cualquiera.
-  it('al abrir, el fondo viene con lo que quedó en el cajón anoche', async () => {
+  it('al abrir, el fondo viene con lo que quedó en el cajón del turno anterior', async () => {
     respuesta = {
       mostrador: { id: 1, nombre: 'Mostrador', sede: { id: 10, nombre: 'Central' } },
       turno: null, fondo_sugerido: 50000, sugerido: [], disponibles: DISPONIBLES,
@@ -525,7 +532,7 @@ describe('La pantalla del mostrador', () => {
     const w = await montar()
 
     expect(w.find('.mst__input--fondo').element.value).toBe('50000')
-    expect(w.text()).toContain('quedaron $50.000 en el cajón anoche')
+    expect(w.text()).toContain('quedaron $50.000 del turno anterior')
   })
 
   describe('cargado por el admin y sin recibir', () => {
@@ -962,6 +969,40 @@ describe('La pantalla del mostrador', () => {
       const w = await verTurnos()
 
       expect(w.find('.trn__ok').text()).toBe('cuadró')
+    })
+  })
+
+  // La pantalla NO se dibuja hasta tener datos, y una recarga no la desmonta.
+  //
+  // El watcher de la sede corre con `immediate` ANTES de que `onMounted` la fije: si en esa
+  // ventana se pintara la pantalla vacía, un instante después se rearmaría con los datos y lo que
+  // la persona hubiera empezado a escribir —el buscador, una cantidad— se perdería sin que
+  // hubiera tocado nada. Lo cazó el e2e, dos veces.
+  describe('mientras carga', () => {
+    it('muestra el esqueleto, no una pantalla vacía que después se rearma', async () => {
+      const w = mount(MostradorView, { global: { stubs: { RouterLink: true } } })
+
+      expect(w.find('.mst__skel').exists()).toBe(true)
+      expect(w.find('.tst__buscar').exists()).toBe(false)
+    })
+
+    // Y con datos ya en pantalla, el aviso del canal la refresca SIN desmontarla: si la
+    // desmontara, al que está eligiendo qué bajar se le borra lo que escribió.
+    it('y el aviso del canal no desmonta lo que se está usando', async () => {
+      respuesta = {
+        mostrador: { id: 1, nombre: 'Mostrador', sede: { id: 10, nombre: 'Central' } },
+        turno: null, sugerido: [], disponibles: DISPONIBLES,
+      }
+      const w = await montar()
+      await w.find('.tst__buscar').setValue('preroll')
+
+      avisarDelCanal({ tipo: 'mostrador_actualizado', sede_id: 10 })
+      await new Promise(r => setTimeout(r, 350)) // el debounce de la recarga
+      await flushPromises()
+
+      expect(w.find('.mst__skel').exists()).toBe(false)
+      expect(w.find('.tst__buscar').element.value).toBe('preroll')
+      expect(getMostrador).toHaveBeenCalledTimes(2)
     })
   })
 

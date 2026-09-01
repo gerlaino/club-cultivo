@@ -329,8 +329,10 @@ Tres decisiones de diseño que valen más que la tabla:
   1.240—. Con tilde aparecía el estado sin sentido *marcado en 0* y eran dos gestos para uno.
   Escribís un número, la fila se pinta; lo borrás, sale.
 - **Lo heredado va arriba de todo, ordene por lo que ordene**, con su número puesto y un chip
-  "venía de anoche". Es la propiedad más valiosa del módulo —el que abre no declara, corrige— y
-  perderla entre cuarenta filas sería perder la mitad.
+  "viene del turno anterior". Es la propiedad más valiosa del módulo —el que abre no declara,
+  corrige— y perderla entre cuarenta filas sería perder la mitad. Dice *turno anterior* y nunca
+  *anoche*: el mostrador se cierra y se reabre varias veces por día, y a las tres de la tarde
+  "anoche" es directamente falso.
 - **Nada de paginación.** El listado ya viaja completo, así que buscar y ordenar se hacen en el
   cliente. Paginar traía el problema de verdad: cargás cantidades en la página 1, buscás, pasás a
   la 2 — y si el borrador vive dentro de la tabla, se pierde. Vive en la pantalla, y hay un pie
@@ -426,9 +428,12 @@ algo que el backend rechaza, que es el peor error posible porque parece culpa de
   pregunta el depósito a cada uno. Treinta turnos serían cientos de queries para una lista donde no
   se ve ni un producto.
 - **El e2e ahora dice "levantá `docker compose up`"** en vez de escupir un error de shell.
-- **El esqueleto de carga sólo va la PRIMERA vez.** Ponerlo en cada recarga desmonta la pantalla
-  entera, y la mesa se recarga sola con cada aviso del canal: al que estaba escribiendo en el
-  buscador se le borraba lo tipeado sin haber tocado nada. Lo cazó el e2e.
+- **La pantalla no se dibuja hasta tener datos, y refrescar no la desmonta.** Eran dos cosas: el
+  esqueleto se pintaba en CADA recarga (y la mesa se recarga sola con cada aviso del canal), y
+  además el watcher de la sede corre con `immediate` **antes** de que `onMounted` la fije, así que
+  había una ventana en la que la pantalla se dibujaba vacía y un instante después se rearmaba. En
+  las dos, lo que la persona hubiera empezado a escribir —el buscador, una cantidad— se perdía sin
+  que hubiera tocado nada. Lo cazó el e2e, dos veces.
 - **No se sugiere al abrir lo que ya no está.** Si un frasco que anoche quedó sobre la mesa desde
   entonces se agotó o se fue de la sede, su número se cargaba sin fila donde verlo ni corregirlo y
   el backend lo rechazaba al abrir. Y se sugiere como mucho lo que quedó libre: si anoche cerró
@@ -441,7 +446,7 @@ algo que el backend rechaza, que es el peor error posible porque parece culpa de
 `cobros.rendicion_caja_id`. (`clubs.exigir_mostrador_abierto` se agregó y se sacó en el mismo
 bloque: el mostrador no es una opción.)
 
-**2755 rspec ✓ · 1753 vitest ✓ · build limpio · 6 pruebas de navegador ✓.**
+**2755 rspec ✓ · 1755 vitest ✓ · build limpio · 6 pruebas de navegador ✓.**
 
 ---
 

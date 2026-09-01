@@ -109,7 +109,8 @@ Ninguno se considera cerrado; todos son candidatos a revisión.
     **Qué baja a la mesa se elige en una TABLA** (`components/mostrador/TablaStock.vue`), la misma
     con la que después se dispensa: buscador, orden por columna, y **la cantidad ES la marca** (no
     hay tilde: un tilde daría el estado sin sentido "marcado en 0"). Lo heredado de anoche va
-    arriba de todo con su número puesto, ordene por lo que ordene. Sin paginación a propósito —
+    arriba de todo con su número puesto y su chip "viene del turno anterior" —nunca "anoche": el
+    mostrador se cierra y se reabre varias veces por día—, ordene por lo que ordene. Sin paginación a propósito —
     el listado viaja completo y paginar perdería lo cargado al cambiar de página.
     Cuatro solapas: **Hoy** · **Turnos** (los cerrados; administración ve todos, el que atiende ve
     LOS SUYOS — el filtro es del backend) · **Merma** y **Rendiciones**, sólo administración. La
@@ -305,7 +306,7 @@ Suite 1239 ✓ + 58 vitest ✓. **Deploy: sumar `add_vendible_a_bar_venta_items`
 `Mostrador`, apertura con herencia, recepción del que atiende, cargar/devolver, cierre con los dos
 arqueos, fondo/retiro, Merma con su lista de trabajo, Turnos, y la rendición del repartidor de
 punta a punta —incluido **devolver lo que se había quedado** (`Rendiciones::SaldarACuenta`)—.
-**2755 rspec ✓ · 1753 vitest ✓ · build limpio · 6 pruebas de navegador ✓.**
+**2755 rspec ✓ · 1755 vitest ✓ · build limpio · 6 pruebas de navegador ✓.**
 
 **Sin correr, del bloque del mostrador:** nada. Las migraciones las corre solo el deploy.
 

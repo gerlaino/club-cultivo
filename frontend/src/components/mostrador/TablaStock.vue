@@ -34,7 +34,7 @@
               <div class="tst__prod">{{ s.etiqueta }}</div>
               <div class="tst__meta">
                 {{ s.numero }}
-                <span v-if="heredados.has(s.stock_id)" class="tst__pill">venía de anoche</span>
+                <span v-if="heredados.has(s.stock_id)" class="tst__pill">viene del turno anterior</span>
               </div>
             </td>
             <td class="tst__mut" data-col="Variedad">{{ s.genetica || '—' }}</td>
@@ -91,7 +91,9 @@ const props = defineProps({
   stocks:       { type: Array,  default: () => [] },
   // { stock_id: cantidad } — vive en el padre para que sobreviva al buscador y al orden.
   modelValue:   { type: Object, default: () => ({}) },
-  // Lo que dejó contado el cierre anterior: va arriba y con su número puesto.
+  // Lo que dejó contado el cierre anterior: va arriba y con su número puesto. Nunca "anoche":
+  // el mostrador se cierra y se reabre varias veces por día, y a las tres de la tarde el turno
+  // anterior fue hace dos horas.
   heredados:    { type: Set,    default: () => new Set() },
   muestraCosto: { type: Boolean, default: false },
 })
