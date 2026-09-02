@@ -250,7 +250,13 @@ class DispensacionesController < ApplicationController
           @dispensacion.descuento_dispensa_pct = desc_dispensa
           override_admin = (current_user.admin? || current_user.supervisor?) && attrs[:aporte_socio_ars].to_d > 0
 
-          @dispensacion.items.destroy_all
+          # Borrado DURO, no lógico. Las líneas superadas por una edición no son historia: son
+          # un estado intermedio de la misma dispensa. Dejarlas soft-borradas hacía que
+          # `incrementar_stock` (que lee `items.with_deleted`) devolviera al stock los gramos de
+          # TODAS las versiones anteriores: a partir de la segunda edición el stock quedaba
+          # inflado, con el historial de movimientos intacto — o sea, mintiendo en silencio.
+          # Mismo efecto al borrar o restaurar una dispensa ya editada.
+          @dispensacion.items.each(&:really_destroy!)
           @dispensacion.items.reload
           construir_items_multistock(@dispensacion, items_param, desc_total, override_admin)
           raise 'La dispensación debe tener al menos un producto' if @dispensacion.items.empty?

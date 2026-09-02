@@ -58,4 +58,55 @@ RSpec.describe 'PATCH /dispensaciones/:id — edición con reversa', type: :requ
       expect(d.reload.observaciones).to eq('nota')
     end
   end
+
+  # Editar DOS veces la misma dispensa era el agujero: la reversa leía `items.with_deleted` y
+  # devolvía al stock los gramos de todas las versiones anteriores, no los de la vigente. El
+  # spec de arriba edita UNA sola vez, que es justo el caso que funcionaba — por eso el bug pasó
+  # entero por la suite. Se prueba con `items`, que es lo que manda el modal real aunque sólo se
+  # toque la fecha.
+  context 'editar la misma dispensación varias veces' do
+    let(:payload) { { items: [{ stock_id: stock.id, cantidad: 10 }] } }
+
+    def editar(fecha)
+      patch "/dispensaciones/#{@d.id}",
+            params: { dispensacion: payload.merge(fecha_dispensacion: fecha.to_s) },
+            headers: auth_headers, as: :json
+      expect(response).to have_http_status(:ok)
+    end
+
+    before { @d = crear(medio_pago: 'efectivo') }   # stock 100 -> 90
+
+    it 'no infla el stock al editar sólo la fecha, una y otra vez' do
+      expect(stock.reload.cantidad.to_f).to eq(90.0)
+      editar(Time.zone.today - 1)
+      expect(stock.reload.cantidad.to_f).to eq(90.0)
+      editar(Time.zone.today - 2)
+      expect(stock.reload.cantidad.to_f).to eq(90.0)
+      editar(Time.zone.today - 3)
+      expect(stock.reload.cantidad.to_f).to eq(90.0)
+      expect(@d.reload.fecha_dispensacion).to eq(Time.zone.today - 3)
+    end
+
+    it 'deja UNA sola línea viva y un solo movimiento, sin fantasmas de ediciones previas' do
+      3.times { |i| editar(Time.zone.today - (i + 1)) }
+      expect(@d.items.count).to eq(1)
+      expect(@d.items.with_deleted.count).to eq(1)
+      expect(stock.stock_movimientos.where(tipo: 'dispensacion').count).to eq(1)
+    end
+
+    it 'devuelve al stock lo justo al borrar una dispensa que se editó varias veces' do
+      3.times { |i| editar(Time.zone.today - (i + 1)) }
+      @d.reload.destroy
+      expect(stock.reload.cantidad.to_f).to eq(100.0)
+    end
+
+    it 'reajusta bien la cantidad aunque venga de varias ediciones previas' do
+      2.times { |i| editar(Time.zone.today - (i + 1)) }
+      patch "/dispensaciones/#{@d.id}",
+            params: { dispensacion: { items: [{ stock_id: stock.id, cantidad: 25 }] } },
+            headers: auth_headers, as: :json
+      expect(response).to have_http_status(:ok)
+      expect(stock.reload.cantidad.to_f).to eq(75.0)   # 100 - 25
+    end
+  end
 end

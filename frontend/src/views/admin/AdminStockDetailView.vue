@@ -83,6 +83,21 @@
                   <span class="sd__data-lbl">Origen</span>
                   <span class="sd__data-val">{{ origenLabel(stock.origen) }}</span>
                 </div>
+                <!-- La variedad estaba sólo como chip en el encabezado ("MN"), que no se lee como
+                     un dato. Y la fecha de ingreso no estaba en ningún lado: para un stock externo
+                     (que no tiene lote) era lo único que decía de cuándo venía. -->
+                <div class="sd__data-item">
+                  <span class="sd__data-lbl">Variedad</span>
+                  <span class="sd__data-val">{{ stock.genetica_nombre || '—' }}</span>
+                </div>
+                <div v-if="stock.lote" class="sd__data-item">
+                  <span class="sd__data-lbl">Lote de cultivo</span>
+                  <span class="sd__data-val">{{ stock.lote.codigo }}</span>
+                </div>
+                <div class="sd__data-item">
+                  <span class="sd__data-lbl">Ingresó</span>
+                  <span class="sd__data-val">{{ formatDate(stock.created_at) }}</span>
+                </div>
                 <div class="sd__data-item">
                   <span class="sd__data-lbl">Precio sugerido</span>
                   <span class="sd__data-val">{{ stock.precio_sugerido_ars ? `$${Number(stock.precio_sugerido_ars).toFixed(2)}/g` : '—' }}</span>
@@ -225,7 +240,13 @@
                   <div class="sd__mov-notas">{{ m.notas || '—' }}</div>
                   <div class="sd__mov-meta">
                     <span v-if="m.usuario">{{ m.usuario.nombre }}</span>
-                    <span>{{ formatDate(m.created_at) }}</span>
+                    <!-- Para una dispensa manda SU fecha, no la del día en que se registró el
+                         movimiento: al cargar historia vieja (o al corregirle la fecha a una
+                         dispensa ya cargada) son distintas, y acá se leía siempre la del sistema.
+                         Cuando difieren se aclara cuándo se cargó, que si no parece un error. -->
+                    <span>{{ formatDate(m.fecha_dispensacion || m.created_at) }}</span>
+                    <span v-if="m.fecha_dispensacion && !mismoDia(m.fecha_dispensacion, m.created_at)"
+                          class="sd__mov-cargado">cargado el {{ formatDate(m.created_at) }}</span>
                     <span v-if="m.sede_destino">→ {{ m.sede_destino.nombre }}</span>
                   </div>
                 </div>
@@ -977,6 +998,14 @@ function origenLabel(o)   { return ORIGEN_MAP[o] || o }
 function estadoLabel(e)   { return ESTADO_MAP[e] || e }
 function movTipoLabel(t)  { return MOV_TIPO_MAP[t] || t }
 function formatDate(d)    { return d ? new Date(d).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—' }
+// Si la dispensa se cargó el mismo día que ocurrió, no hace falta aclarar nada. Se compara por
+// fecha local y no por timestamp: `fecha_dispensacion` es un día suelto y `created_at` un
+// instante, así que restarlos nunca da cero.
+function mismoDia(a, b) {
+  if (!a || !b) return true
+  const f = d => new Date(d).toLocaleDateString('es-AR')
+  return f(a) === f(b)
+}
 function badgeVencLabel(s) {
   const dias = s.dias_para_vencimiento
   if (dias == null) return ''
@@ -1196,6 +1225,7 @@ function badgeVencLabel(s) {
 .sd__mov-g--neg { color: #dc2626; }
 .sd__mov-notas { font-size: .78rem; color: #374151; word-break: break-word; margin-bottom: .2rem; }
 .sd__mov-meta  { display: flex; gap: .5rem; font-size: .68rem; color: var(--c-slate-400); flex-wrap: wrap; }
+.sd__mov-cargado { font-style: italic; opacity: .8; }
 
 /* ── Buttons ──────────────────────────────────────────────────────────────── */
 .sd__btn-primary {

@@ -192,6 +192,10 @@
             <table class="stk__inv-table">
               <thead>
                 <tr>
+                  <!-- El código va primero: es lo único que identifica una fila. Sin esto, tres
+                       compras externas de flor seca se veían como tres renglones idénticos y no
+                       había forma de saber cuál era cuál sin entrar a cada uno. -->
+                  <th>Código</th>
                   <th>Tipo</th>
                   <th>Origen</th>
                   <th>Genética</th>
@@ -211,6 +215,7 @@
                   class="stk__inv-trow" :class="{ 'stk__inv-trow--flash': flashIds.has(s.id) }"
                   @click="router.push(`/admin/stock/${s.id}`)"
                 >
+                  <td class="stk__inv-td-cod">{{ s.numero_lote_producto || '—' }}</td>
                   <td class="stk__inv-td-tipo">{{ formaLabel(s.forma_producto) }}</td>
                   <td>
                     <span class="stk__chip" :class="s.regulatorio ? 'stk__chip--propio' : 'stk__chip--ext'">
@@ -1563,6 +1568,7 @@ function formatDate(dateStr) {
 .stk__inv-trow:hover { background: #f6faf4; }
 .stk__inv-trow--flash { animation: stkRowFlash .6s ease-out; }
 @keyframes stkRowFlash { 0% { background: #dcfce7; } 100% { background: transparent; } }
+.stk__inv-td-cod  { font-family: var(--font-mono, monospace); font-size: .8rem; font-weight: 700; color: var(--c-slate-900); white-space: nowrap; }
 .stk__inv-td-tipo { font-weight: 600; color: var(--c-slate-900); white-space: nowrap; }
 .stk__inv-td-cepa { font-style: italic; color: var(--c-slate-600); }
 /* Texto libre: se acota y el resto se lee en el tooltip. Sin tope, un comentario largo
@@ -1576,7 +1582,8 @@ function formatDate(dateStr) {
 .stk__inv-td-actual { font-weight: 800; color: #15803d; white-space: nowrap; }
 .stk__inv-td-bajo { color: #dc2626 !important; }
 @media (max-width: 640px) {
-  .stk__inv-td-mono, .stk__inv-table th:nth-child(4) { display: none; }
+  /* 5, no 4: la columna Código se sumó adelante y corrió a Lote un lugar. */
+  .stk__inv-td-mono, .stk__inv-table th:nth-child(5) { display: none; }
 }
 .stk__inv-forma { font-size: .88rem; font-weight: 600; color: var(--c-slate-900); display: block; margin-bottom: .25rem; }
 .stk__inv-chips { display: flex; flex-wrap: wrap; gap: .25rem; }

@@ -430,7 +430,7 @@ class StocksController < ApplicationController
   # GET /stocks/:id/movimientos
   def movimientos
     movs = @stock.stock_movimientos
-                 .includes(:usuario, :sede_origen, :sede_destino)
+                 .includes(:usuario, :sede_origen, :sede_destino, :dispensacion)
                  .order(created_at: :desc)
                  .limit(200)
     render json: movs.map { |m|
@@ -443,6 +443,11 @@ class StocksController < ApplicationController
         sede_origen:     m.sede_origen  ? { id: m.sede_origen.id,  nombre: m.sede_origen.nombre  } : nil,
         sede_destino:    m.sede_destino ? { id: m.sede_destino.id, nombre: m.sede_destino.nombre } : nil,
         created_at:      m.created_at,
+        # La fecha que le importa al que mira: CUÁNDO se dispensó, no cuándo se registró el
+        # movimiento. Se separan porque son distintas cuando se carga historia vieja (o cuando se
+        # corrige la fecha de una dispensa ya cargada), y la pantalla mostraba sólo `created_at`
+        # — o sea, el día en que se tocó el sistema. Nula en todo lo que no es una dispensa.
+        fecha_dispensacion: m.dispensacion&.fecha_dispensacion,
       }
     }
   end
@@ -676,9 +681,23 @@ class StocksController < ApplicationController
         nuevo.es_split = true
         nuevo.save!
         @stock.decrement!(:cantidad, cantidad)
+        # La salida se anota en el stock de ORIGEN, que es donde faltaba. El destino registraba
+        # su entrada, así que el traslado estaba escrito en un solo lado: en el origen la
+        # cantidad bajaba sola, sin una línea que dijera adónde fue. Quien miraba ese historial
+        # veía el número caer sin explicación, y el balance de trazabilidad no cerraba.
+        # Las dos puntas nombran a la otra: desde cualquiera de las dos se sigue el rastro.
+        @stock.stock_movimientos.create!(
+          tipo:            'transferencia',
+          gramos:          -cantidad,
+          sede_origen_id:  @stock.sede_id,
+          sede_destino_id: sede.id,
+          usuario:         current_user,
+          notas:           "Fraccionado a #{nuevo.numero_lote_producto} · #{sede.nombre}",
+        )
         nuevo.stock_movimientos.create!(
           tipo:            'transferencia',
           gramos:          cantidad,
+          sede_origen_id:  @stock.sede_id,
           sede_destino_id: sede.id,
           usuario:         current_user,
           notas:           "Fraccionado desde #{@stock.numero_lote_producto}",

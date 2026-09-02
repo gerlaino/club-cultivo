@@ -530,6 +530,11 @@ class Dispensacion < ApplicationRecord
 
   # Revierte el stock de cada línea. Se llama en after_destroy: para entonces las líneas ya
   # están soft-borradas por la cascada (dependent: :destroy), así que se leen con with_deleted.
+  #
+  # OJO: esto asume que lo soft-borrado son SÓLO las líneas vivas que acaba de llevarse la
+  # cascada. Por eso la edición de una dispensa borra en duro sus líneas superadas
+  # (DispensacionesController#update): si quedaran soft-borradas, acá entrarían también las de
+  # ediciones anteriores y la reversa devolvería los mismos gramos una vez por versión.
   def incrementar_stock
     items.with_deleted.each do |it|
       next unless it.stock
