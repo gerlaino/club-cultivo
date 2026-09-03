@@ -264,17 +264,48 @@ class CajaTurno < ApplicationRecord
 
   # Deshacer una apertura equivocada. El fondo no se había asentado —abrir no genera asiento— así
   # que no hay nada que revertir en contabilidad: la plata nunca se movió del libro.
+  #
+  # EN EL DISPENSARIO, ABRIR ES UN SOLO GESTO QUE CREA DOS COSAS: la caja de plata y el turno de
+  # mercadería. Deshacerlo tiene que deshacer las dos. Anulando sólo la caja, el turno quedaba
+  # abierto apuntando a una caja anulada: el mostrador no se podía volver a abrir —dice que ya
+  # hay uno— ni cerrar —el cierre le pide el arqueo a una caja que ya no está—, o sea que la
+  # sede quedaba sin poder dispensar hasta meter mano en la base.
   def anular!(usuario:, motivo: nil)
     raise ArgumentError, 'Esta caja ya está cerrada' unless activa?
     unless anulable?
       raise ArgumentError, 'Esta caja ya tiene movimientos: hay que cerrarla con su arqueo, no anularla'
     end
 
-    update!(estado: 'anulada', cerrada_por: usuario, cerrada_at: Time.current,
-            notas: motivo.presence || 'Anulada')
+    transaction do
+      deshacer_turno_de_mostrador!
+      update!(estado: 'anulada', cerrada_por: usuario, cerrada_at: Time.current,
+              notas: motivo.presence || 'Anulada')
+    end
   end
 
   private
+
+  # El turno que abrió este mismo gesto. Se BORRA, no se cierra: nunca fue un turno —no dispensó
+  # nada— y dejarlo como cerrado lo metería en la lista de turnos y en el cálculo de merma con un
+  # arqueo que nadie hizo.
+  #
+  # Si ya se dispensó, no es una apertura equivocada: es una jornada que pasó, y se cierra con su
+  # arqueo como cualquier otra.
+  def deshacer_turno_de_mostrador!
+    turno = TurnoMostrador.unscoped.find_by(caja_turno_id: id)
+    return if turno.nil?
+
+    if Dispensacion.unscoped.where(turno_mostrador_id: turno.id).exists?
+      raise ArgumentError,
+            'Ya se dispensó en este turno: hay que cerrarlo con su arqueo, no anularlo'
+    end
+
+    # Los movimientos de la mesa se quedan huérfanos de turno a propósito: el conteo de apertura
+    # pasó de verdad —alguien miró y anotó— y ese rastro no se borra porque la caja se haya
+    # abierto por error. Sin esto, además, la clave foránea impediría borrar el turno.
+    MostradorMovimiento.unscoped.where(turno_mostrador_id: turno.id).update_all(turno_mostrador_id: nil)
+    turno.destroy!
+  end
 
   def una_activa_por_punto
     return unless %w[abierta pendiente_cierre].include?(estado)

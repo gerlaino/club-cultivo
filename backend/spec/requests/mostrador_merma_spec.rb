@@ -32,15 +32,18 @@ RSpec.describe 'La merma del mostrador', type: :request do
     end
   end
 
-  # Un turno completo: abrir, recibir, dispensar y cerrar contando.
+  # Un turno completo: administración carga la mesa, quien atiende abre contando, dispensa y
+  # cierra contando.
   def turno!(flor_carga:, flor_disp:, flor_contado:, preroll_carga:, preroll_disp:, preroll_contado:)
     ActsAsTenant.with_tenant(club) do
-      res = Mostradores::AbrirTurno.call(
-        mostrador: sede.mostrador!, usuario: admin, monto_inicial_ars: 0,
-        items: [{ stock_id: flor.id, cantidad: flor_carga }, { stock_id: preroll.id, cantidad: preroll_carga }]
+      mostrador = sede.mostrador!
+      Mostradores::Cargar.call(
+        mostrador: mostrador, usuario: admin, motivo: 'carga del día',
+        cambios: [{ stock_id: flor.id, cantidad: flor_carga },
+                  { stock_id: preroll.id, cantidad: preroll_carga }]
       )
-      turno = res.turno
-      Mostradores::ConfirmarApertura.call(turno: turno, usuario: ana)
+      turno = Mostradores::AbrirCaja.call(mostrador: mostrador, usuario: ana,
+                                          efectivo_contado_ars: 0).turno
 
       [[flor, flor_disp], [preroll, preroll_disp]].each do |st, cant|
         next if cant.zero?
@@ -49,12 +52,16 @@ RSpec.describe 'La merma del mostrador', type: :request do
                              fecha_dispensacion: Time.zone.today)
       end
 
-      conteos = turno.items.map do |it|
-        contado = it.stock_id == flor.id ? flor_contado : preroll_contado
-        { item_id: it.id, contado: contado, motivo: 'merma de fraccionamiento' }
-      end
-      Mostradores::CerrarTurno.call(turno: turno, usuario: ana, conteos: conteos,
-                                    efectivo_contado_ars: 0, fondo_siguiente_ars: 0)
+      Mostradores::CerrarCaja.call(
+        turno: turno, usuario: ana, efectivo_contado_ars: 0, fondo_siguiente_ars: 0,
+        conteos: [{ stock_id: flor.id, contado: flor_contado },
+                  { stock_id: preroll.id, contado: preroll_contado }],
+        notas: 'merma de fraccionamiento'
+      )
+      # La mesa se vacía para que cada turno del período arranque de cero y sean comparables.
+      Mostradores::Cargar.call(mostrador: mostrador, usuario: admin, motivo: 'cierre del día',
+                               cambios: [{ stock_id: flor.id, cantidad: 0 },
+                                         { stock_id: preroll.id, cantidad: 0 }])
       turno
     end
   end
@@ -108,13 +115,16 @@ RSpec.describe 'La merma del mostrador', type: :request do
   end
 
   describe 'por turno' do
-    it 'dice cuándo, quién cerró, quién lo había recibido y con qué motivo' do
+    # `atendio` es quien ABRIÓ contando la mesa: el arqueo del turno es suyo. Se llamaba
+    # `recibido_por` cuando había una recepción separada que firmar; ya no la hay — abrir es
+    # contar, en un solo gesto.
+    it 'dice cuándo, quién cerró, quién atendió y con qué motivo' do
       turno!(flor_carga: 300, flor_disp: 100, flor_contado: 197,
              preroll_carga: 10, preroll_disp: 0, preroll_contado: 10)
 
       t = merma['por_turno'].first
       expect(t['cerrado_por']).to eq(ana.nombre_completo)
-      expect(t['recibido_por']).to eq(ana.nombre_completo)
+      expect(t['atendio']).to eq(ana.nombre_completo)
       expect(t['faltante']).to eq(3.0)
       expect(t['motivos']).to include('merma de fraccionamiento')
       expect(t['revisado']).to be(false)
@@ -130,21 +140,21 @@ RSpec.describe 'La merma del mostrador', type: :request do
       expect(merma['por_turno'].first['faltante']).to eq(2.0) # el último
     end
 
-    # Si el que recibe corrige seguido, el cuello de botella no es la merma: es quien carga la
-    # mesa, que declara mal.
-    it 'cuenta las correcciones de recepción' do
+    # Si quien abre corrige seguido lo que decía la mesa, el cuello de botella no es la merma:
+    # es que la mesa se está declarando mal.
+    it 'cuenta las correcciones del conteo de apertura' do
       ActsAsTenant.with_tenant(club) do
-        res = Mostradores::AbrirTurno.call(mostrador: sede.mostrador!, usuario: admin,
-                                           monto_inicial_ars: 0,
-                                           items: [{ stock_id: flor.id, cantidad: 300 }])
-        item = res.turno.items.first
-        Mostradores::ConfirmarApertura.call(
-          turno: res.turno, usuario: ana,
-          correcciones: [{ item_id: item.id, contado: 297, motivo: 'faltaban 3' }]
-        )
-        Mostradores::CerrarTurno.call(turno: res.turno, usuario: ana,
-                                      conteos: [{ item_id: item.id, contado: 297 }],
-                                      efectivo_contado_ars: 0, fondo_siguiente_ars: 0)
+        mostrador = sede.mostrador!
+        Mostradores::Cargar.call(mostrador: mostrador, usuario: admin, motivo: 'carga',
+                                 cambios: [{ stock_id: flor.id, cantidad: 300 }])
+        # El admin declaró 300 y quien abre cuenta 297.
+        turno = Mostradores::AbrirCaja.call(
+          mostrador: mostrador, usuario: ana, efectivo_contado_ars: 0,
+          conteos: [{ stock_id: flor.id, contado: 297 }]
+        ).turno
+        Mostradores::CerrarCaja.call(turno: turno, usuario: ana,
+                                     conteos: [{ stock_id: flor.id, contado: 297 }],
+                                     efectivo_contado_ars: 0, fondo_siguiente_ars: 0)
       end
 
       expect(merma['por_turno'].first['correcciones']).to eq(1)

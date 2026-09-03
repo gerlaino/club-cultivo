@@ -227,10 +227,14 @@ class AnalyticsController < ApplicationController
     # El turno de mercadería abierto de cada mostrador, con cuántos productos tiene arriba. Una
     # query para todas las sedes, no una por sede.
     turnos = TurnoMostrador.where(club_id: club.id, mostrador_id: mostradores.keys)
-                           .abiertos.includes(:abierto_por, :confirmado_por)
+                           .abiertos.includes(:abierto_por)
                            .index_by { |t| mostradores[t.mostrador_id]&.sede_id }
-    productos = TurnoMostradorItem.where(turno_mostrador_id: turnos.values.map(&:id))
-                                  .group(:turno_mostrador_id).count
+    # Cuántos productos hay SOBRE LA MESA. Es del mostrador, no del turno: la mesa existe con la
+    # caja abierta y con la caja cerrada, porque el producto está físicamente ahí.
+    productos = MostradorItem.where(mostrador_id: mostradores.keys).where('cantidad > 0')
+                             .group(:mostrador_id).count
+
+    mostradores_por_sede = mostradores.values.index_by(&:sede_id).transform_values(&:id)
 
     sedes.map do |sede|
       caja  = activas[sede.id]
@@ -238,18 +242,19 @@ class AnalyticsController < ApplicationController
       {
         sede_id: sede.id,
         sede:    sede.nombre,
-        # Tres estados, no dos: cargado por el admin y esperando que lo reciba el que atiende es
-        # un momento propio, y es justo donde se traba un arranque.
+        # Tres estados, no dos: "hay mercadería arriba pero nadie abrió la caja" es un momento
+        # propio, y es justo donde se traba un arranque — el admin la dejó preparada y el que
+        # atiende todavía no llegó.
         mostrador: {
-          estado:    turno.nil? ? 'sin_abrir' : (turno.confirmado? ? 'abierto' : 'sin_recibir'),
+          estado:    estado_del_mostrador(turno, productos[mostradores_por_sede[sede.id]].to_i),
           abierto_por: turno&.abierto_por&.nombre_completo,
-          atiende:   turno&.confirmado_por&.nombre_completo,
-          desde:     turno&.confirmado_at || turno&.abierto_at,
-          productos: turno ? productos[turno.id].to_i : 0,
+          atiende:   turno&.abierto_por&.nombre_completo,
+          desde:     turno&.abierto_at,
+          productos: productos[mostradores_por_sede[sede.id]].to_i,
         },
         # `sin_abrir` no es un estado de la caja: es la AUSENCIA de caja, y es justo lo que el
         # admin necesita ver de un vistazo.
-        estado:  caja.nil? ? 'sin_abrir' : (caja.apertura_confirmada? ? caja.estado : 'sin_confirmar'),
+        estado:  estado_de_la_caja(caja),
         caja_id:                caja&.id,
         abierta_por:            caja&.abierta_por&.nombre_completo,
         abierta_at:             caja&.abierta_at,
@@ -258,6 +263,26 @@ class AnalyticsController < ApplicationController
         diferencia_ars:         caja&.diferencia_ars,
       }
     end
+  end
+
+  # `sin_abrir` = ni mercadería ni caja. `cargado` = la mesa está lista y falta que alguien abra
+  # la caja: es el estado donde se traba un arranque y por eso tiene nombre propio.
+  def estado_del_mostrador(turno, productos)
+    return 'abierto' if turno
+    return 'cargado' if productos.positive?
+
+    'sin_abrir'
+  end
+
+  # `sin_confirmar` es SOLO del buffet, donde el encargado declara el fondo y quien atiende lo
+  # confirma. En el dispensario esa ceremonia no existe — la caja se abre contando, en un solo
+  # gesto—, así que preguntarle `apertura_confirmada?` la dejaba `sin_confirmar` para siempre,
+  # esperando un paso que ya no le toca a nadie.
+  def estado_de_la_caja(caja)
+    return 'sin_abrir' if caja.nil?
+    return caja.estado if caja.de_dispensario?
+
+    caja.apertura_confirmada? ? caja.estado : 'sin_confirmar'
   end
 
   def calcular_dispensador_propio(club, usuario)

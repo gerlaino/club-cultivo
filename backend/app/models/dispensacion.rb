@@ -382,15 +382,40 @@ class Dispensacion < ApplicationRecord
   # libera en la misma medida en que acá se descontó el stock real. Es el gemelo exacto de
   # `imputar_a_apartado_evento`, y por el mismo motivo — sin esto habría doble descuento (baja
   # `cantidad` Y sigue apartado) y el disponible caería el doble.
+  # Lo dispensado BAJA DE LA MESA, y además se cuenta en el turno para su arqueo.
+  #
+  # Son dos cosas distintas: la mesa es el estado permanente (cuánto queda para el próximo
+  # paciente) y el turno es el arqueo de esta jornada. Si aparta y la dispensa no baja la mesa,
+  # el disponible cae el doble y el stock cargado se vuelve indispensable.
   def imputar_a_mostrador(item)
-    return unless turno_mostrador_id && item.stock_id
+    return unless item.stock_id
+
+    mi = mostrador_item_de(item.stock_id)
+    mi&.mover!(cantidad: -item.cantidad.to_d, tipo: 'dispensa', usuario: user,
+               turno: turno_mostrador_id && TurnoMostrador.unscoped.find_by(id: turno_mostrador_id))
+
+    return unless turno_mostrador_id
 
     TurnoMostradorItem.unscoped
                       .find_by(turno_mostrador_id: turno_mostrador_id, stock_id: item.stock_id)
                       &.imputar_dispensa!(item.cantidad)
   end
 
-  # Sin mostrador abierto no se dispensa, cuando la organización lo exige.
+  # El renglón de este producto sobre la mesa de la sede que atiende. Nil si no está: hay dos
+  # excepciones legítimas (una reserva, lo apartado de un evento) que no pasan por la mesa.
+  def mostrador_item_de(stock_id)
+    return nil if sede_del_mostrador.blank? || club_id.blank? || !MostradorItem.table_exists?
+
+    MostradorItem.unscoped.joins(:mostrador)
+                 .where(club_id: club_id, stock_id: stock_id,
+                        mostradores: { sede_id: sede_del_mostrador })
+                 .first
+  end
+
+  # SIN CAJA ABIERTA NO SE DISPENSA, y sólo se dispensa lo que está sobre la mesa.
+  #
+  # Le aplica a quien ATIENDE. Abrir el turno es contar lo que hay y la plata: sin eso no hay
+  # contra qué arquear a la noche, y el cobro en efectivo no tiene dónde caer.
   #
   # Va en el modelo y no sólo en la pantalla: por la API se saltea siempre, y esconder un botón
   # no es aplicar una regla. `on: :create` para que no vuelva inguardable una dispensa vieja el
@@ -402,14 +427,7 @@ class Dispensacion < ApplicationRecord
     return unless sede_dispensa?
 
     if turno_mostrador_id.blank?
-      errors.add(:base, 'El mostrador está cerrado: abrilo antes de dispensar.')
-      return
-    end
-
-    # La recepción tiene que valer algo: si se pudiera atender sin confirmar, el arqueo del
-    # cierre compararía contra un número que nadie verificó y dejaría de medir la merma real.
-    unless TurnoMostrador.unscoped.where(id: turno_mostrador_id).pick(:confirmado_at)
-      errors.add(:base, 'Confirmá lo que hay en el mostrador antes de dispensar.')
+      errors.add(:base, 'La caja del mostrador está cerrada: contá y abrila antes de dispensar.')
       return
     end
 
@@ -451,13 +469,17 @@ class Dispensacion < ApplicationRecord
   def lineas_fuera_del_mostrador
     return [] if desde_reserva
 
-    en_turno = TurnoMostradorItem.unscoped.where(turno_mostrador_id: turno_mostrador_id)
-                                 .pluck(:stock_id).to_set
+    # Lo que hay SOBRE LA MESA — el estado del mostrador, no lo que se contó al abrir. Si el
+    # admin bajó algo a media tarde, eso se puede dispensar aunque no estuviera a la mañana.
+    en_la_mesa = MostradorItem.unscoped.joins(:mostrador)
+                              .where(club_id: club_id, mostradores: { sede_id: sede_del_mostrador })
+                              .where('mostrador_items.cantidad > 0')
+                              .pluck(:stock_id).to_set
 
     lineas = lineas_explicitas? ? lineas_nuevas : [self]
     lineas.reject { |l| l.respond_to?(:evento_bar_id) && l.evento_bar_id.present? }
           .map(&:stock).compact.uniq
-          .reject { |st| en_turno.include?(st.id) }
+          .reject { |st| en_la_mesa.include?(st.id) }
           .map { |st| st.etiqueta }
   end
 
@@ -469,39 +491,45 @@ class Dispensacion < ApplicationRecord
   def desimputar_del_mostrador(item)
     return unless item.stock_id
 
-    # El turno del que SALIÓ, si sigue abierto: ahí la reversa es exacta —se deshace la
-    # imputación— y el frasco vuelve a la mesa como si nunca hubiera salido.
-    propio = TurnoMostradorItem.unscoped
-                               .find_by(turno_mostrador_id: turno_mostrador_id, stock_id: item.stock_id)
-    return if propio&.revertir_dispensa!(item.cantidad).to_d.positive?
+    subir_al_mostrador(item)
 
-    subir_al_mostrador_abierto(item)
+    # Y si el turno del que salió sigue abierto, se deshace también su imputación: su arqueo de
+    # esta noche tiene que comparar contra lo que realmente salió.
+    return unless turno_mostrador_id
+
+    TurnoMostradorItem.unscoped
+                      .find_by(turno_mostrador_id: turno_mostrador_id, stock_id: item.stock_id)
+                      &.revertir_dispensa!(item.cantidad)
   end
 
-  # El producto vuelve y su turno ya cerró (o salió de otro, o nunca pasó por la mesa): entra al
-  # mostrador que esté abierto AHORA, por esa cantidad.
+  # El producto vuelve. ¿A la mesa o al depósito?
   #
-  # Si no, el gramo volvía al depósito y el que atiende no lo tenía para entregárselo al próximo
-  # que lo pidiera, aunque estuviera ahí adelante. Sube como reposición, con su rastro: no es un
-  # número que apareció solo.
-  def subir_al_mostrador_abierto(item)
-    return if sede_del_mostrador.blank? || club_id.blank?
-    return unless TurnoMostrador.table_exists?
+  # A LA MESA en dos casos, y sólo en esos dos:
+  #
+  #   · el producto YA ESTÁ sobre la mesa — salió de ahí y vuelve ahí, esté quien esté;
+  #   · NO está, pero hay alguien atendiendo. Es el caso que motivó la regla: el paquete que el
+  #     repartidor no pudo entregar vuelve a las 19:00 y el que atiende lo tiene ahí adelante. Si
+  #     bajara al depósito, no podría dárselo al próximo que lo pida, con el frasco a la vista.
+  #
+  # AL DEPÓSITO en el resto. Un producto que nunca estuvo sobre la mesa, devuelto cuando no hay
+  # nadie atendiendo, no lo necesita nadie adelante: subirlo lo dejaría APARTADO sobre una mesa
+  # cerrada, o sea invisible como disponible en el depósito y esperando que alguien se dé cuenta
+  # de bajarlo. Es lo que pasaba cuando el admin cancelaba una dispensa suya a las diez de la
+  # mañana con el mostrador sin abrir.
+  def subir_al_mostrador(item)
+    return if sede_del_mostrador.blank? || club_id.blank? || !MostradorItem.table_exists?
 
-    turno = TurnoMostrador.unscoped.joins(:mostrador)
-                          .where(club_id: club_id, estado: 'abierto',
-                                 mostradores: { sede_id: sede_del_mostrador })
-                          .where.not(confirmado_at: nil).first
-    return if turno.nil?
+    mostrador = Mostrador.unscoped.where(club_id: club_id, sede_id: sede_del_mostrador, activo: true)
+                         .order(:id).first
+    return if mostrador.nil?
 
-    ti = TurnoMostradorItem.unscoped.find_or_create_by!(
-      turno_mostrador_id: turno.id, stock_id: item.stock_id
-    ) { |n| n.club_id = club_id; n.cantidad_apertura = 0 }
+    turno = mostrador.turno_abierto
+    ya_en_la_mesa = MostradorItem.unscoped.find_by(mostrador_id: mostrador.id, stock_id: item.stock_id)
+    return if ya_en_la_mesa.nil? && turno.nil?
 
-    ti.update!(cantidad_repuesta: ti.cantidad_repuesta.to_d + item.cantidad.to_d)
-    ti.movimientos.create!(club_id: club_id, usuario: user, tipo: 'carga',
-                           cantidad: item.cantidad,
-                           notas: "Volvió de la dispensación ##{id}")
+    mi = ya_en_la_mesa || ActsAsTenant.with_tenant(mostrador.club) { mostrador.item_de!(item.stock) }
+    mi.mover!(cantidad: item.cantidad.to_d, tipo: 'devolucion', usuario: user,
+              motivo: "Volvió de la dispensación ##{id}", turno: turno)
   end
 
   # La sede cuyo mostrador atiende esta dispensa. La de la dispensa, y si no vino, la del stock.

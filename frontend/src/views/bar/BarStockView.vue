@@ -83,7 +83,7 @@ async function guardarProd() {
   } catch { toast.error(store.saveError) }
 }
 async function borrar(p) {
-  if (!(await confirm({ title: 'Eliminar producto', message: `¿Eliminar "${p.nombre}"? Se recupera desde la papelera.`, variant: 'danger' }))) return
+  if (!(await confirm({ title: 'Eliminar producto', message: `¿Eliminar "${p.nombre}"? No se puede deshacer.`, variant: 'danger' }))) return
   try { await store.eliminarProducto(barId, p.id); toast.success('Producto eliminado') }
   catch { toast.error('No se pudo eliminar') }
 }

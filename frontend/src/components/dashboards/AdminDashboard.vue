@@ -162,9 +162,11 @@ const ESTADO_CAJA = {
 }
 // La MESA del mostrador, al lado de la caja: mismo punto de venta, misma pregunta.
 const ESTADO_MESA = {
-  sin_abrir:   'mostrador cerrado',
-  sin_recibir: 'mesa sin recibir',
-  abierto:     'atendiendo',
+  sin_abrir: 'mesa vacía',
+  // La mesa está lista y falta que alguien abra la caja: es donde se traba un arranque, y por
+  // eso tiene nombre propio en vez de caer en "cerrado".
+  cargado:   'mesa lista, sin abrir',
+  abierto:   'atendiendo',
 }
 const cajasPorSede = computed(() => analyticsDisp.value?.cajas_por_sede || [])
 // Lo que pide acción suya o del mostrador. "En turno" no cuenta: eso está andando. La mesa sin
@@ -956,7 +958,7 @@ async function onOnboardingCompletado() {
 /* ── Header ──────────────────────────────────────────────────────────────── */
 .ad__caja-mostrador { font-size: var(--fs-12); color: var(--c-ink-500); }
 .ad__caja-mostrador--sin_abrir   { color: var(--c-ink-500); }
-.ad__caja-mostrador--sin_recibir { color: var(--c-amber-500); font-weight: 700; }
+.ad__caja-mostrador--cargado { color: var(--c-amber-500); font-weight: 700; }
 .ad__caja-mostrador--abierto     { color: var(--c-leaf-600); }
 .ad__cajas { margin-bottom: var(--sp-4); border: 1px solid var(--c-ink-200); border-radius: 12px; background: #fff; overflow: hidden; }
 .ad__cajas-hd { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-3); border-bottom: 1px solid var(--c-ink-100); }

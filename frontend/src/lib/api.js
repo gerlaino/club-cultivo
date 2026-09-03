@@ -503,13 +503,16 @@ export const deleteBarVenta     = (barId, id)      => api.delete(`/bares/${barId
 // El turno de STOCK del mostrador, hermano de la caja de plata: se abren y se cierran juntos
 // (un gesto, dos arqueos) pero son registros aparte. Lo cargado se APARTA, no se descuenta.
 export const getMostrador      = (sedeId)          => api.get(`/sedes/${sedeId}/mostrador`)
+// ABRIR y CERRAR son el ARQUEO: quien atiende cuenta lo que hay sobre la mesa y la plata.
 export const abrirMostrador    = (sedeId, payload) => api.post(`/sedes/${sedeId}/mostrador/abrir`, payload)
-export const confirmarMostrador = (sedeId, payload) => api.post(`/sedes/${sedeId}/mostrador/confirmar`, payload)
+
+// CARGAR es la mesa: administración escribe cuánto tiene que haber de cada producto, con motivo.
+// (`confirmar` y `devolver` se fueron: la recepción separada era el mismo conteo pedido dos
+// veces, y devolver al depósito es escribir un número más chico en la misma tabla.)
 export const cargarMostrador   = (sedeId, payload) => api.post(`/sedes/${sedeId}/mostrador/cargar`, payload)
 // Contar UN producto sin cerrar el turno: con quince frascos, cerrar y reabrir son veinte
 // minutos y termina siendo el control que no se ejecuta.
 export const contarMostrador   = (sedeId, payload) => api.post(`/sedes/${sedeId}/mostrador/contar`, payload)
-export const devolverMostrador = (sedeId, payload) => api.post(`/sedes/${sedeId}/mostrador/devolver`, payload)
 export const cerrarMostrador   = (sedeId, payload) => api.post(`/sedes/${sedeId}/mostrador/cerrar`, payload)
 // Dónde se le va el producto a la organización. No es auditoría: la merma es inevitable y se
 // mide para encontrar el cuello de botella — qué producto y en qué momento.
@@ -528,11 +531,9 @@ export const corregirTurnoMostrador = (sedeId, id, payload) =>
 // una caja APARTE: cada punto abre, arquea y cierra la suya y la plata no se mezcla.
 export const getCajaMostrador        = (sedeId)          => api.get(`/sedes/${sedeId}/caja/actual`)
 export const listCajasMostrador      = (sedeId, params = {}) => api.get(`/sedes/${sedeId}/caja`, { params })
-export const abrirCajaMostrador      = (sedeId, payload) => api.post(`/sedes/${sedeId}/caja/abrir`, payload)
-export const confirmarAperturaMostrador = (sedeId, id)          => api.post(`/sedes/${sedeId}/caja/${id}/confirmar_apertura`)
-export const solicitarCierreMostrador   = (sedeId, id, payload) => api.post(`/sedes/${sedeId}/caja/${id}/solicitar_cierre`, payload)
-export const confirmarCierreMostrador   = (sedeId, id)          => api.post(`/sedes/${sedeId}/caja/${id}/confirmar_cierre`)
-export const cerrarCajaMostrador        = (sedeId, id, payload) => api.post(`/sedes/${sedeId}/caja/${id}/cerrar`, payload)
+// Abrir y cerrar la caja del dispensario NO tienen función propia: se hace con `abrirMostrador`
+// y `cerrarMostrador`, que en el mismo gesto cuentan la mercadería. Abrir declarando sólo un
+// fondo salteaba la mitad del arqueo.
 export const anularCajaMostrador        = (sedeId, id, payload) => api.post(`/sedes/${sedeId}/caja/${id}/anular`, payload)
 export const salidaCajaMostrador        = (sedeId, id, payload) => api.post(`/sedes/${sedeId}/caja/${id}/salida`, payload)
 // El espejo de `salida`: plata que se PONE en el cajón (cambio, reponer el fondo, lo cobrado por
@@ -838,9 +839,9 @@ export const getAriccameRegistro   = (id)          => api.get(`/ariccame_registr
 export const reenviarAriccame      = (id)          => api.post(`/ariccame_registros/${id}/reenviar`)
 export const transmitirPendientesAriccame = ()     => api.post('/ariccame_registros/transmitir_pendientes')
 
-// Papelera (historial de borrados / restauración)
-export const getPapelera        = (params = {})    => api.get('/papelera', { params })
-export const restaurarPapelera  = (tipo, id)       => api.post('/papelera/restaurar', { tipo, id })
+// La PAPELERA se retiró (sep-2026): restaurar re-aplicaba los efectos sobre el estado de HOY,
+// no sobre el de entonces. Deshacer algo que movió stock o plata es la reversa explícita
+// (`Dispensaciones::Cancelar`), no desenterrar la fila. Ver `docs/CHANGELOG.md`.
 
 // ── Público — QR stocks ───────────────────────────────────────────────────────
 export const getStockPublico  = (codigoQr) => axios.get(`/s/${codigoQr}`)

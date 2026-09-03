@@ -1,13 +1,18 @@
 require 'rails_helper'
 
-# Reponer la mesa con el turno andando, y devolver al depósito lo que sobra.
+# EL ADMIN GOBIERNA LA MESA, DESDE DONDE ESTÉ.
 #
-# Ninguna de las dos genera `StockMovimiento`: el gramo no salió de la organización ni cambió de
-# sede, sigue siendo la misma fila. Lo único que cambia es quién responde por él.
-RSpec.describe 'Cargar y devolver en el mostrador', type: :request do
+# Escribe cuánto tiene que haber de cada producto sobre el mostrador —el TOTAL, no el delta— y
+# guarda con un motivo. Puede hacerlo a las 7 de la mañana antes de que llegue nadie, o desde el
+# celular a media tarde porque se acabó algo. Ese es el punto entero del módulo: delegar tranquilo
+# y monitorear a distancia.
+#
+# Subir a la mesa APARTA, no descuenta. Y bajar NO es un retiro a nombre de nadie: el producto
+# sigue adentro de la organización, sólo vuelve al depósito.
+RSpec.describe 'Cargar la mesa del mostrador', type: :request do
   include AuthHelpers
 
-  let(:club)  { create(:club) }
+  let(:club)  { create(:club, features: { 'produccion_dispensa' => true }) }
   let(:admin) { create(:user, :admin, club: club) }
   let(:ana)   { create(:user, :dispensador, club: club) }
   let(:sede)  { create(:sede, club: club, tipo: 'social') }
@@ -16,151 +21,176 @@ RSpec.describe 'Cargar y devolver en el mostrador', type: :request do
   let!(:stock) do
     ActsAsTenant.with_tenant(club) do
       create(:stock, club: club, sede: sede, lote: lote, forma_producto: 'flor_seca', unidad: 'g',
-                     cantidad: 500, estado: 'asignado', disponibilidad: 'ambas', precio_sugerido_ars: 100)
+                     cantidad: 1_000, estado: 'asignado', disponibilidad: 'ambas', precio_sugerido_ars: 100)
     end
   end
 
-  def abrir!(cantidad: 300)
-    sign_in_as(admin)
-    post "/api/sedes/#{sede.id}/mostrador/abrir", headers: auth_headers,
-         params: { monto_inicial_ars: 1_000, items: [{ stock_id: stock.id, cantidad: cantidad }] }
-  end
-
-  def cargar!(cantidad, como: admin)
+  def cargar!(cantidad, sobre: stock, como: admin, motivo: 'carga del día')
     sign_in_as(como)
     post "/api/sedes/#{sede.id}/mostrador/cargar", headers: auth_headers,
-         params: { stock_id: stock.id, cantidad: cantidad }
+         params: { cambios: [{ stock_id: sobre.id, cantidad: cantidad }], motivo: motivo }
     JSON.parse(response.body)
   end
 
-  def devolver!(cantidad, como: admin)
-    item = sede.mostrador!.turno_abierto.items.first
-    sign_in_as(como)
-    post "/api/sedes/#{sede.id}/mostrador/devolver", headers: auth_headers,
-         params: { item_id: item.id, cantidad: cantidad }
-    JSON.parse(response.body)
-  end
+  def en_la_mesa(s = stock) = mesa_de(sede)[s.id]
 
-  describe 'cargar del depósito' do
-    before { abrir! }
-
-    it 'suma a lo que ya está sobre la mesa' do
-      body = cargar!(200)
-      item = body['items'].first
+  describe 'subir y bajar' do
+    it 'sube lo que se le indique, y queda apartado sin descontarse' do
+      cuerpo = cargar!(300)
 
       expect(response).to have_http_status(:ok)
-      expect(item['apertura']).to eq(300.0)
-      expect(item['repuesta']).to eq(200.0)
-      expect(item['esperado']).to eq(500.0)
-      # El apartado sube, pero la mercadería no se movió del inventario.
-      expect(stock.reload.cantidad.to_f).to eq(500.0)
-      expect(stock.apartado_para_mostrador.to_f).to eq(500.0)
-      expect(stock.cantidad_disponible_real.to_f).to eq(0.0)
+      expect(en_la_mesa).to eq(300.0)
+      expect(cuerpo['mesa'].first['mostrador']).to eq(300.0)
+      expect(stock.reload.cantidad.to_f).to eq(1_000.0)            # NO se descuenta
+      expect(stock.cantidad_disponible_real.to_f).to eq(700.0)     # sí se aparta
+    end
+
+    # Se escribe el TOTAL que tiene que quedar, no la diferencia: pedirle al usuario que calcule
+    # el delta es pedirle la cuenta que hace la máquina.
+    it 'el número que se manda es el total, no lo que se agrega' do
+      cargar!(300)
+      cargar!(500, motivo: 'reposición del mediodía')
+
+      expect(en_la_mesa).to eq(500.0)
+      expect(stock.reload.cantidad_disponible_real.to_f).to eq(500.0)
+    end
+
+    it 'y baja escribiendo un número más chico' do
+      cargar!(300)
+      cargar!(120, motivo: 'me llevo el resto al depósito')
+
+      expect(en_la_mesa).to eq(120.0)
+      expect(stock.reload.cantidad_disponible_real.to_f).to eq(880.0)
     end
 
     it 'no deja subir más de lo que queda libre en el depósito' do
-      body = cargar!(300) # quedan 200 libres
+      cuerpo = cargar!(5_000)
 
       expect(response).to have_http_status(:unprocessable_entity)
-      expect(body['error']).to match(/quedan 200/i)
+      expect(cuerpo['error']).to match(/No hay tanto/i)
+      expect(en_la_mesa).to be_nil
     end
 
-    # Un producto que no estaba sobre la mesa entra como ítem nuevo del mismo turno.
-    it 'un producto que no estaba entra como ítem nuevo' do
-      otro = ActsAsTenant.with_tenant(club) do
-        create(:stock, club: club, sede: sede, lote: lote, forma_producto: 'preroll', unidad: 'un',
-                       cantidad: 40, estado: 'asignado', disponibilidad: 'ambas')
-      end
+    # El gramo no salió de la organización ni cambió de sede: sigue siendo la misma fila, sólo
+    # cambia quién responde por él. Ese rastro vive en `MostradorMovimiento`, no en el inventario.
+    it 'cargar no deja movimiento de stock' do
+      expect { cargar!(300) }.not_to change { stock.stock_movimientos.count }
+    end
+  end
 
-      sign_in_as(admin)
-      post "/api/sedes/#{sede.id}/mostrador/cargar", headers: auth_headers,
-           params: { stock_id: otro.id, cantidad: 12 }
+  describe 'el rastro' do
+    # "Hay 300 g" sin historial es un número que apareció, y monitorear a distancia sin historial
+    # es mirar una foto.
+    it 'cada cambio queda con quién y por qué' do
+      cargar!(300, motivo: 'apertura del lunes')
 
-      expect(JSON.parse(response.body)['items'].size).to eq(2)
+      mov = MostradorMovimiento.unscoped.recientes.first
+      expect(mov.tipo).to eq('carga')
+      expect(mov.cantidad.to_f).to eq(300.0)
+      expect(mov.usuario_id).to eq(admin.id)
+      expect(mov.motivo).to eq('apertura del lunes')
     end
 
-    it 'cargar no deja movimiento de stock: el gramo no salió de la organización' do
-      expect { cargar!(50) }.not_to change { StockMovimiento.where(stock_id: stock.id).count }
+    it 'bajar queda como retiro de la mesa' do
+      cargar!(300)
+      cargar!(100, motivo: 'sobra')
+
+      expect(MostradorMovimiento.unscoped.recientes.first.tipo).to eq('retiro')
     end
 
-    # Si a las 8 de la noche no hay admin, bloquear al dispensador es mandar pacientes a casa.
-    # Se permite, se marca, y el admin lo ve.
-    it 'el dispensador puede cargar solo, y queda marcado' do
-      body = cargar!(50, como: ana)
+    it 'sin motivo no se toca la mesa' do
+      cuerpo = cargar!(300, motivo: nil)
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(cuerpo['error']).to match(/por qué/i)
+      expect(en_la_mesa).to be_nil
+    end
+  end
+
+  # La mesa la carga administración. Quien atiende nunca elige qué hay: cuenta lo que encuentra.
+  describe 'quién puede' do
+    it 'el dispensador no carga la mesa' do
+      cuerpo = cargar!(300, como: ana)
+
+      expect(response).to have_http_status(:forbidden)
+      expect(cuerpo['error']).to match(/administración/i)
+      expect(en_la_mesa).to be_nil
+    end
+
+    it 'el supervisor sí: es administración' do
+      cargar!(300, como: create(:user, :supervisor, club: club))
 
       expect(response).to have_http_status(:ok)
-      expect(body['items'].first['sin_supervision']).to be(true)
-      mov = TurnoMostradorMovimiento.unscoped.order(:id).last
-      expect(mov.usuario_id).to eq(ana.id)
-      expect(mov.tipo).to eq('carga')
-    end
-
-    it 'si carga el admin no queda marcado' do
-      body = cargar!(50, como: admin)
-
-      expect(body['items'].first['sin_supervision']).to be(false)
+      expect(en_la_mesa).to eq(300.0)
     end
   end
 
-  describe 'devolver al depósito' do
-    before { abrir! }
+  describe 'lo que no se puede subir' do
+    it 'stock de otra sede' do
+      otra  = create(:sede, club: club, tipo: 'social')
+      ajeno = ActsAsTenant.with_tenant(club) do
+        create(:stock, club: club, sede: otra, lote: lote, forma_producto: 'flor_seca',
+                       unidad: 'g', cantidad: 100, estado: 'asignado', disponibilidad: 'ambas')
+      end
 
-    it 'baja lo que hay sobre la mesa y libera el apartado' do
-      body = devolver!(100)
-
-      expect(body['items'].first['esperado']).to eq(200.0)
-      expect(stock.reload.apartado_para_mostrador.to_f).to eq(200.0)
-      expect(stock.cantidad_disponible_real.to_f).to eq(300.0)
-      expect(stock.cantidad.to_f).to eq(500.0)
-    end
-
-    it 'no se puede devolver más de lo que hay sobre la mesa' do
-      body = devolver!(400)
+      cuerpo = cargar!(50, sobre: ajeno)
 
       expect(response).to have_http_status(:unprocessable_entity)
-      expect(body['error']).to match(/hay 300/i)
+      expect(cuerpo['error']).to match(/no está asignado a esta sede/i)
+    end
+
+    it 'ni stock que no está habilitado para dispensa' do
+      solo_prod = ActsAsTenant.with_tenant(club) do
+        create(:stock, club: club, sede: sede, lote: lote, forma_producto: 'flor_seca',
+                       unidad: 'g', cantidad: 100, estado: 'asignado', disponibilidad: 'produccion')
+      end
+
+      cuerpo = cargar!(50, sobre: solo_prod)
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(cuerpo['error']).to match(/no está habilitado para dispensa/i)
     end
   end
 
+  # Se compara contra lo que llegó a haber en el turno, no contra un número fijo: 20 g quedando
+  # de 500 es distinto de 20 quedando de 25.
   describe 'las señales de la pantalla' do
-    def ver
-      sign_in_as(admin)
+    def mesa_json(como = admin)
+      sign_in_as(como)
       get "/api/sedes/#{sede.id}/mostrador", headers: auth_headers
-      JSON.parse(response.body)
+      JSON.parse(response.body)['mesa']
     end
 
     it 'avisa REPONER cuando queda poco arriba pero hay abajo' do
-      abrir!(cantidad: 100)
-      ActsAsTenant.with_tenant(club) do
-        Dispensacion.create!(paciente: create(:paciente, club: club), user: admin, stock: stock,
-                             sede: sede, cantidad: 85, medio_pago: 'efectivo',
-                             aporte_socio_ars: 1_000, fecha_dispensacion: Time.zone.today)
+      cargar!(300)
+      abrir = ActsAsTenant.with_tenant(club) do
+        Mostradores::AbrirCaja.call(mostrador: sede.mostrador!, usuario: ana, efectivo_contado_ars: 0)
       end
+      expect(abrir).to be_ok
+      cargar!(5, motivo: 'se dispensó casi todo')
 
-      item = ver['turno']['items'].first
-      expect(item['esperado']).to eq(15.0)
-      expect(item['en_deposito']).to eq(400.0)
-      expect(item['senal']).to eq('reponer')
+      expect(mesa_json.first['senal']).to eq('reponer')
     end
 
-    # La señal importante: no queda arriba y tampoco abajo. El club se quedó sin ese producto.
     it 'avisa SIN REPUESTO cuando no queda arriba ni abajo' do
-      abrir!(cantidad: 500) # todo el frasco sobre la mesa
+      cargar!(1_000)
       ActsAsTenant.with_tenant(club) do
-        Dispensacion.create!(paciente: create(:paciente, club: club), user: admin, stock: stock,
-                             sede: sede, cantidad: 480, medio_pago: 'efectivo',
-                             aporte_socio_ars: 1_000, fecha_dispensacion: Time.zone.today)
+        Mostradores::AbrirCaja.call(mostrador: sede.mostrador!, usuario: ana, efectivo_contado_ars: 0)
       end
+      cargar!(5, motivo: 'casi vacío')
+      # Todo lo demás salió del depósito por otra vía: no hay con qué reponer.
+      ActsAsTenant.with_tenant(club) { stock.update!(cantidad: 5) }
 
-      item = ver['turno']['items'].first
-      expect(item['en_deposito']).to eq(0.0)
-      expect(item['senal']).to eq('sin_repuesto')
+      expect(mesa_json.first['senal']).to eq('sin_repuesto')
     end
 
     it 'sin nada raro, ninguna señal' do
-      abrir!(cantidad: 300)
+      cargar!(300)
+      ActsAsTenant.with_tenant(club) do
+        Mostradores::AbrirCaja.call(mostrador: sede.mostrador!, usuario: ana, efectivo_contado_ars: 0)
+      end
 
-      expect(ver['turno']['items'].first['senal']).to be_nil
+      expect(mesa_json.first['senal']).to be_nil
     end
   end
 end

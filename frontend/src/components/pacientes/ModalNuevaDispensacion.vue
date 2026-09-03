@@ -797,9 +797,12 @@ async function handleSubmit() {
                backend (`User#atiende_mostrador?`). -->
           <div v-else-if="!loadingStocks && !stocksDisponibles.length" class="mnd__warn-box">
             <i class="bi bi-exclamation-triangle"></i>
+            <!-- Y le dice lo que SÍ puede hacer. Antes lo mandaba a "bajar lo que falte del
+                 depósito", que es justo lo único que no puede: la mesa la carga administración.
+                 Un cartel que propone una acción prohibida es peor que no tener cartel. -->
             <template v-if="dispensaDelMostrador">
-              No hay nada sobre el mostrador. Abrilo —o bajá lo que falte del depósito— desde
-              <b>Mostrador</b>.
+              No hay nada sobre la mesa. Si la caja está cerrada, abrila desde <b>Mostrador</b>;
+              si ya está abierta, pedile a administración que baje producto del depósito.
             </template>
             <template v-else>
               Sin stock disponible{{ hayVariasSedes ? ' en esta sede' : '' }}

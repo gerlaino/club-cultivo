@@ -63,330 +63,89 @@
 
     <p v-else-if="error" class="mst__aviso mst__aviso--error">{{ error }}</p>
 
-    <!-- ══ CERRADO: abrirlo ═══════════════════════════════════════════════════ -->
-    <section v-else-if="!abierto" class="mst__card">
-      <div class="mst__card-head">
-        <h2 class="mst__card-title">Abrir el mostrador</h2>
-        <p class="mst__card-sub">
-          {{ subtituloApertura }}
-        </p>
-      </div>
-
-      <label class="mst__fondo">
-        <span class="mst__fondo-lbl">
-          Fondo de caja
-          <em v-if="fondoSugerido !== null" class="mst__fondo-hint">
-            quedaron ${{ fmt(fondoSugerido) }} del turno anterior
-          </em>
-        </span>
-        <span class="mst__fondo-input">
-          <span class="mst__fondo-signo">$</span>
-          <input v-model.number="fondo" type="number" min="0" step="100" class="mst__input mst__input--fondo" />
-        </span>
-      </label>
-
-      <!-- Sin nada que heredar, el que atiende no tiene con qué abrir: la primera carga la hace
-           el dueño de la mercadería. Se lo decimos en vez de mostrarle una tabla vacía. -->
-      <p v-if="aperturaHeredada && !disponibles.length" class="mst__aviso mst__aviso--warn">
-        No hay nada del turno anterior. La mesa la carga administración: pedile que la deje
-        preparada y vas a poder recibirla acá.
-      </p>
-      <TablaStock v-else v-model="cantidades" :stocks="disponibles" :heredados="heredados"
-                  :muestra-costo="gestiona" :topes="topesApertura"
-                  :tope-texto="aperturaHeredada ? 'del turno anterior quedaron' : 'quedan'" />
-
-      <div class="mst__acciones">
-        <button class="mst__btn mst__btn--primary"
-                :disabled="guardando || !hayElegidos || excedeAlgo" @click="abrir">
-          {{ guardando ? 'Abriendo…' : 'Abrir mostrador' }}
-        </button>
-      </div>
-
-      <!-- Un dedazo en el cierre —21 en vez de 215— deja un faltante de 194 g que después nadie
-           entiende. El que cierra tiene que saber, en el momento, que eso se arregla y dónde. -->
-      <p v-if="huboTurnoAnterior" class="mst__pie">
-        ¿Se contó mal el cierre anterior? Se corrige desde <b>Turnos</b>, sin borrar nada: queda
-        asentada la diferencia.
-      </p>
-    </section>
-
-    <!-- ══ ABIERTO SIN RECIBIR: el admin lo cargó, falta que lo recibas ═══════ -->
-    <section v-else-if="!turno.confirmado" class="mst__card">
-      <div class="mst__card-head">
-        <h2 class="mst__card-title">
-          {{ loCargueYo ? 'Esperando que lo reciban' : `${turno.abierto_por} dejó esto sobre la mesa` }}
-        </h2>
-        <p class="mst__card-sub">
-          {{ loCargueYo
-             ? 'Lo tiene que revisar y confirmar quien vaya a atender: dos firmas de la misma persona no son ninguna.'
-             : 'Revisá que esté y confirmá. Si algo no coincide, corregí el número antes de arrancar.' }}
-        </p>
-      </div>
-
-      <ul class="mst__draft">
-        <li v-for="r in recepcion" :key="r.item_id" class="mst__draft-row"
-            :class="{ 'is-quitado': r.quitar }">
-          <div class="mst__draft-prod">
-            <span class="mst__draft-nombre">{{ r.etiqueta }}</span>
-            <span class="mst__draft-meta">
-              {{ r.quitar ? 'no está sobre la mesa — se saca' : `dejó ${fmt(r.esperado)} ${r.unidad}` }}
-            </span>
-          </div>
-          <div v-if="!r.quitar" class="mst__draft-cant">
-            <input v-if="!loCargueYo" v-model.number="r.contado" type="number" min="0" step="0.1"
-                   class="mst__input mst__input--cant" :aria-label="`Contado de ${r.etiqueta}`" />
-            <span v-else class="mst__mesa">{{ fmt(r.esperado) }}</span>
-            <span class="mst__draft-unidad">{{ r.unidad }}</span>
-          </div>
-          <span v-if="!loCargueYo && !r.quitar" class="mst__dif" :class="difClase(r)">{{ difTexto(r) }}</span>
-          <!-- El producto que directamente NO ESTÁ se saca, no se pone en cero: un renglón en
-               cero es un pendiente que hay que volver a explicar cada vez que alguien mira. -->
-          <button v-if="!loCargueYo" class="mst__icon-btn"
-                  :title="r.quitar ? 'Volver a ponerlo' : 'No está sobre la mesa'"
-                  @click="r.quitar = !r.quitar">
-            <Undo2 v-if="r.quitar" :size="16" />
-            <X v-else :size="16" />
-          </button>
-        </li>
-      </ul>
-
-      <label v-if="hayCorreccion" class="mst__campo mst__campo--motivo">
-        <span class="mst__campo-lbl">Motivo de la diferencia</span>
-        <input v-model="motivoRecepcion" type="text" class="mst__input"
-               placeholder="Ej: faltaban 3 g de Northern" />
-      </label>
-
-      <!-- La plata se recibe igual que la mercadería: los dos arqueos arrancan de un número
-           verificado, o el cierre no mide nada. -->
-      <div v-if="turno.caja" class="mst__caja">
-        <div class="mst__caja-fila mst__caja-fila--total">
-          <span>{{ loCargueYo ? 'Fondo que dejaste' : 'Tendría que haber en la caja' }}</span>
-          <b>${{ fmt(turno.caja.esperado_ars) }}</b>
-        </div>
-        <label v-if="!loCargueYo" class="mst__campo mst__campo--fila">
-          <span class="mst__campo-lbl">Cuento</span>
-          <input v-model.number="efectivoRecepcion" type="number" min="0" step="100"
-                 class="mst__input mst__input--fondo" />
-        </label>
-        <p v-if="!loCargueYo && difRecepcion !== null" class="mst__dif-caja" :class="difRecepcion === 0 ? 'is-ok' : 'is-mal'">
-          {{ difRecepcion === 0 ? 'Cuadra' : `${difRecepcion > 0 ? 'Sobran' : 'Faltan'} $${fmt(Math.abs(difRecepcion))}` }}
-        </p>
-        <label v-if="difRecepcion" class="mst__campo mst__campo--motivo">
-          <span class="mst__campo-lbl">Motivo de la diferencia en caja</span>
-          <input v-model="motivoEfectivo" type="text" class="mst__input" placeholder="Ej: faltaban $2.000" />
-        </label>
-      </div>
-
-      <div v-if="!loCargueYo" class="mst__acciones">
-        <button class="mst__btn mst__btn--primary" :disabled="guardando" @click="confirmar">
-          {{ guardando ? 'Confirmando…' : (hayCorreccion ? 'Corregir y recibir' : 'Confirmar y arrancar') }}
-        </button>
-      </div>
-      <!-- Quien la cargó también tiene que poder DESARMARLA. Si no, una mesa preparada para
-           alguien que hoy no vino queda esperando para siempre, con el stock apartado y la caja
-           abierta, y sin un solo botón en pantalla. Cierra por el camino de siempre: contando. -->
-      <div v-else class="mst__acciones">
-        <button class="mst__btn mst__btn--ghost" @click="abrirCierre">Cerrar el mostrador</button>
-      </div>
-    </section>
-
-    <!-- ══ ABIERTO Y RECIBIDO: operar ═════════════════════════════════════════ -->
     <template v-else>
+      <!-- ══ LA CAJA: quién la abrió y cómo viene ═══════════════════════════════ -->
       <section class="mst__turno">
         <div class="mst__turno-info">
-          <span class="mst__turno-quien">{{ turno.confirmado_por || turno.abierto_por }}</span>
-          <span class="mst__turno-desde">desde las {{ hora(turno.confirmado_at || turno.abierto_at) }}</span>
-          <span v-if="turno.confirmado_por && turno.confirmado_por !== turno.abierto_por"
-                class="mst__turno-desde">· lo dejó {{ turno.abierto_por }}</span>
+          <template v-if="turno">
+            <span class="mst__turno-quien">{{ turno.abierto_por }}</span>
+            <span class="mst__turno-desde">abrió a las {{ hora(turno.abierto_at) }}</span>
+            <!-- LO ESPERADO SÓLO PARA ADMINISTRACIÓN, que monitorea. A quien va a CONTAR no se
+                 le muestra: con el número a la vista se escribe ese, el conteo es teatro y toda
+                 la merma que se mide da cero. El modal lo revela recién después de escribir. -->
+            <span v-if="gestiona && turno.caja" class="mst__turno-desde">
+              · en caja tendría que haber <b>${{ fmt(turno.caja.esperado_ars) }}</b>
+            </span>
+          </template>
+          <span v-else class="mst__turno-desde">
+            La caja está cerrada. {{ mesa.length ? 'Hay mercadería sobre la mesa.' : 'La mesa está vacía.' }}
+          </span>
         </div>
         <div class="mst__turno-acc">
-          <!-- En gramos no se compara con nada; en plata se ve de un vistazo que sobre esa mesa
-               hay medio sueldo. Sólo para quien responde por eso. -->
-          <span v-if="gestiona && turno.valor_mesa_ars" class="mst__valor-mesa">
+          <span v-if="gestiona && turno?.valor_mesa_ars" class="mst__valor-mesa">
             ${{ fmt(turno.valor_mesa_ars) }} sobre la mesa
           </span>
-          <button class="mst__btn mst__btn--primary" @click="abrirCierre">Cerrar y contar</button>
+          <button v-if="turno" class="mst__btn mst__btn--primary" @click="conteo = 'cierre'">Cerrar caja</button>
+          <button v-else class="mst__btn mst__btn--primary" @click="conteo = 'apertura'">Abrir caja</button>
         </div>
       </section>
-      <p v-if="turno.hubo_correccion_apertura" class="mst__aviso mst__aviso--warn">
-        La apertura se corrigió sobre lo que dejó el turno anterior.
+
+      <p v-if="turno?.notas_apertura" class="mst__aviso mst__aviso--warn">
+        Al abrir: {{ turno.notas_apertura }}
       </p>
 
-      <div class="mst__table-wrap">
-        <table class="mst__table tabla-cards">
-          <thead>
-            <tr>
-              <th>Producto</th>
-              <th class="mst__th-num">En la mesa</th>
-              <th class="mst__th-num">Salió</th>
-              <th class="mst__th-num">En depósito</th>
-              <th class="mst__th-acc"></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="it in turno.items" :key="it.id" :class="{ 'is-alerta': it.senal === 'sin_repuesto' }">
-              <td data-col="Producto">
-                <div class="mst__prod">{{ it.etiqueta }}</div>
-                <div class="mst__prod-meta">
-                  <span v-if="it.senal === 'reponer'" class="mst__pill mst__pill--warn">Reponer</span>
-                  <span v-else-if="it.senal === 'sin_repuesto'" class="mst__pill mst__pill--danger">Sin repuesto</span>
-                  <span v-if="it.sin_supervision" class="mst__pill mst__pill--info">Repuesto desde el mostrador</span>
-                </div>
-              </td>
-              <td class="mst__td-num" data-col="En la mesa">
-                <span class="mst__mesa">{{ fmt(it.esperado) }}</span>
-                <span class="mst__unidad">{{ it.unidad }}</span>
-              </td>
-              <td class="mst__td-num mst__td-mut" data-col="Salió">
-                {{ it.dispensada > 0 ? `${fmt(it.dispensada)} ${it.unidad}` : '—' }}
-              </td>
-              <td class="mst__td-num mst__td-mut" data-col="En depósito">
-                {{ fmt(it.en_deposito) }} {{ it.unidad }}
-              </td>
-              <td class="mst__td-acc" data-col="">
-                <button class="mst__btn mst__btn--mini" @click="abrirMover(it, 'carga')">Reponer</button>
-                <button class="mst__btn mst__btn--mini mst__btn--ghost" @click="abrirMover(it, 'devolucion')">
-                  Devolver
-                </button>
-                <!-- Contar SÓLO este, sin cerrar el turno: con quince frascos, cerrar y reabrir
-                     son veinte minutos y nadie lo hace dos veces por día. -->
-                <button class="mst__btn mst__btn--mini mst__btn--ghost" @click="abrirConteo(it)">
-                  Contar sólo este
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- Lo que el admin tocó mientras la caja estaba abierta. Quien atiende lo tiene que ver o
+           cierra con un faltante que no es suyo y encima no lo puede explicar. -->
+      <div v-if="movimientosDelTurno.length" class="mst__movs">
+        <span class="mst__movs-lbl">Mientras la caja estuvo abierta</span>
+        <p v-for="(m, i) in movimientosDelTurno" :key="i" class="mst__mov">
+          <b>{{ m.usuario }}</b> {{ m.cantidad > 0 ? 'subió' : 'bajó' }}
+          {{ fmt(Math.abs(m.cantidad)) }} {{ m.unidad }} de {{ formaLabel(m.forma) }}
+          a las {{ hora(m.cuando) }}<template v-if="m.motivo"> — {{ m.motivo }}</template>
+        </p>
       </div>
 
-      <div v-if="gestiona && turno.caja" class="mst__caja-barra">
+      <!-- ══ LA MESA ═══════════════════════════════════════════════════════════
+           Para administración es editable: escribe cuánto tiene que haber de cada producto y
+           guarda con un motivo. Para quien atiende es de lectura — él nunca elige qué hay. -->
+      <div v-if="gestiona" class="mst__mesa-hd">
+        <h2 class="mst__seccion">Qué hay sobre la mesa</h2>
+        <p class="mst__seccion-sub">
+          Escribí cuánto de cada producto tiene que quedar disponible para dispensar. Podés subir
+          y bajar cuando quieras, desde donde estés.
+        </p>
+      </div>
+
+      <TablaMostrador v-model="cantidades" :stocks="tabla" :editable="gestiona"
+                      :muestra-costo="gestiona"
+                      :vacio-texto="gestiona ? 'No hay stock habilitado para dispensar en esta sede.'
+                                             : 'La mesa está vacía. La carga administración.'" />
+
+      <div v-if="gestiona && hayCambios" class="mst__guardar">
+        <input v-model="motivo" type="text" class="mst__input"
+               placeholder="Por qué se cambia la mesa — ej: reposición del mediodía" />
+        <button class="mst__btn mst__btn--primary" :disabled="guardando || !motivo.trim()"
+                @click="guardarMesa">
+          {{ guardando ? 'Guardando…' : 'Guardar cambios' }}
+        </button>
+      </div>
+
+      <div v-if="gestiona && turno?.caja" class="mst__caja-barra">
         <span class="mst__caja-barra-lbl">
           En la caja tendría que haber <b>${{ fmt(turno.caja.esperado_ars) }}</b>
         </span>
         <button class="mst__btn mst__btn--mini" @click="abrirPlata('ingreso')">Poner plata</button>
         <button class="mst__btn mst__btn--mini mst__btn--ghost" @click="abrirPlata('salida')">Sacar plata</button>
       </div>
-
-      <div class="mst__acciones mst__acciones--turno">
-        <button class="mst__btn mst__btn--ghost" @click="abrirBajada">Bajar del depósito</button>
-      </div>
+    </template>
     </template>
 
-    <!-- ══ CERRAR: los dos arqueos, en un gesto ═══════════════════════════════ -->
-    <div v-if="cierre" class="mst__modal-back" @click.self="cierre = null">
-      <div class="mst__modal mst__modal--ancho">
-        <h3 class="mst__modal-title">Cerrar el mostrador</h3>
-        <p class="mst__modal-sub">
-          Contá lo que queda y escribilo. Recién ahí te muestro lo que tendría que haber —
-          si lo vieras antes, escribirías ese número y el conteo no mediría nada.
-        </p>
+    <ModalConteo v-if="conteo" :mesa="mesa" :es-cierre="conteo === 'cierre'"
+                 :esperado-efectivo="esperadoEfectivo" :puede-retirar="gestiona"
+                 :guardando="guardando"
+                 @cerrar="conteo = null" @confirmar="confirmarConteo" />
 
-        <div class="mst__conteo">
-          <div v-for="c in cierre.conteos" :key="c.item_id" class="mst__conteo-row">
-            <div class="mst__conteo-prod">
-              <span class="mst__draft-nombre">{{ c.etiqueta }}</span>
-              <!-- Lo esperado NO se muestra hasta que el conteo está escrito: nadie pesa 297 g
-                   teniendo el 297 delante. Con el número a la vista, el arqueo es teatro y toda
-                   la merma que medimos da cero. -->
-              <span v-if="contado(c)" class="mst__draft-meta">
-                tendría que haber {{ fmt(c.esperado) }} {{ c.unidad }}
-              </span>
-            </div>
-            <div class="mst__conteo-cant">
-              <input v-model.number="c.contado" type="number" min="0" step="0.1"
-                     class="mst__input mst__input--cant" :aria-label="`Contado de ${c.etiqueta}`" />
-              <span class="mst__draft-unidad">{{ c.unidad }}</span>
-            </div>
-            <span class="mst__dif" :class="difClase(c)">{{ difTexto(c) }}</span>
-          </div>
-        </div>
-
-        <!-- Un faltante sin explicación no se puede revisar después: a los tres días nadie se
-             acuerda. Por eso el motivo aparece sólo cuando hace falta, y es obligatorio. -->
-        <label v-if="hayDiferencia" class="mst__campo mst__campo--motivo">
-          <span class="mst__campo-lbl">Motivo de la diferencia</span>
-          <input v-model="cierre.motivo" type="text" class="mst__input"
-                 placeholder="Ej: merma de fraccionamiento" />
-        </label>
-
-        <div v-if="turno?.caja" class="mst__caja">
-          <!-- Mismo criterio que los gramos: primero se cuenta, después se muestra contra qué. -->
-          <template v-if="cierre.efectivo !== null && cierre.efectivo !== ''">
-            <div class="mst__caja-fila">
-              <span>Fondo con el que abrió</span><b>${{ fmt(turno.caja.fondo_ars) }}</b>
-            </div>
-            <div class="mst__caja-fila">
-              <span>Cobrado en efectivo</span><b>${{ fmt(turno.caja.cobrado_efectivo_ars) }}</b>
-            </div>
-            <div class="mst__caja-fila mst__caja-fila--total">
-              <span>Tendría que haber</span><b>${{ fmt(turno.caja.esperado_ars) }}</b>
-            </div>
-          </template>
-
-          <label class="mst__campo mst__campo--fila">
-            <span class="mst__campo-lbl">Efectivo contado</span>
-            <input v-model.number="cierre.efectivo" type="number" min="0" step="100"
-                   class="mst__input mst__input--fondo" />
-          </label>
-          <p v-if="difCaja !== null" class="mst__dif-caja" :class="difCaja === 0 ? 'is-ok' : 'is-mal'">
-            {{ difCaja === 0 ? 'Cuadra' : `${difCaja > 0 ? 'Sobran' : 'Faltan'} $${fmt(Math.abs(difCaja))}` }}
-          </p>
-
-          <label class="mst__campo mst__campo--fila">
-            <span class="mst__campo-lbl">Dejo de fondo para mañana</span>
-            <input v-model.number="cierre.fondo" type="number" min="0" step="100"
-                   class="mst__input mst__input--fondo" />
-          </label>
-          <!-- El que atiende no se lleva la recaudación: eso queda a nombre de quien responde
-               por la plata. Sin nadie a quien atribuirlo, se deja todo como fondo. -->
-          <p v-if="aRetirar > 0" class="mst__retiro">
-            Se retiran <b>${{ fmt(aRetirar) }}</b> — quedan a tu nombre.
-          </p>
-        </div>
-
-        <div class="mst__modal-acc">
-          <button class="mst__btn mst__btn--ghost" @click="cierre = null">Cancelar</button>
-          <button class="mst__btn mst__btn--primary" :disabled="guardando" @click="confirmarCierre">
-            {{ guardando ? 'Cerrando…' : 'Cerrar mostrador' }}
-          </button>
-        </div>
-      </div>
-    </div>
-
-    </template>
-
-    <!-- ── Contar un producto sin cerrar el turno ─────────────────────────────── -->
-    <div v-if="conteo" class="mst__modal-back" @click.self="conteo = null">
-      <div class="mst__modal">
-        <h3 class="mst__modal-title">Contar {{ conteo.item.etiqueta }}</h3>
-        <p class="mst__modal-sub">
-          Pesá lo que hay y escribilo. Recién ahí te muestro lo que tendría que haber —
-          si lo vieras antes, escribirías ese número.
-        </p>
-        <input v-model.number="conteo.contado" type="number" min="0" step="0.1"
-               class="mst__input" placeholder="Cuento" aria-label="Contado" />
-        <template v-if="difConteo !== null">
-          <p class="mst__caja-fila mst__caja-fila--total">
-            <span>Tendría que haber</span><b>{{ fmt(conteo.item.esperado) }} {{ conteo.item.unidad }}</b>
-          </p>
-          <p class="mst__dif-caja" :class="difConteo === 0 ? 'is-ok' : 'is-mal'">
-            {{ difConteo === 0 ? 'Cuadra'
-               : `${difConteo > 0 ? 'Sobran' : 'Faltan'} ${fmt(Math.abs(difConteo))} ${conteo.item.unidad}` }}
-          </p>
-        </template>
-        <label v-if="difConteo" class="mst__campo mst__campo--motivo">
-          <span class="mst__campo-lbl">Qué pasó</span>
-          <input v-model="conteo.motivo" type="text" class="mst__input" placeholder="Ej: se cayó al piso" />
-        </label>
-        <div class="mst__modal-acc">
-          <button class="mst__btn mst__btn--ghost" @click="conteo = null">Cancelar</button>
-          <button class="mst__btn mst__btn--primary" :disabled="guardando || difConteo === null"
-                  @click="confirmarConteo">Registrar</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Poner o sacar plata del cajón, con el turno andando ────────────────── -->
+    <!-- ── Poner o sacar plata del cajón, con la caja abierta ─────────────────── -->
     <div v-if="plata" class="mst__modal-back" @click.self="plata = null">
       <div class="mst__modal">
         <h3 class="mst__modal-title">{{ plata.tipo === 'ingreso' ? 'Poner plata en el cajón' : 'Sacar plata del cajón' }}</h3>
@@ -410,75 +169,32 @@
         </div>
       </div>
     </div>
-
-    <!-- ── Bajar más del depósito con el turno andando ────────────────────────── -->
-    <div v-if="bajada" class="mst__modal-back" @click.self="bajada = null">
-      <div class="mst__modal mst__modal--ancho">
-        <h3 class="mst__modal-title">Bajar del depósito a la mesa</h3>
-        <p class="mst__modal-sub">
-          Lo que elijas se aparta para este mostrador: deja de estar disponible en el resto de la
-          app, pero no sale del inventario hasta que se dispensa.
-        </p>
-        <TablaStock v-model="bajada.cantidades" :stocks="agregables" :muestra-costo="gestiona" />
-        <div class="mst__modal-acc">
-          <button class="mst__btn mst__btn--ghost" @click="bajada = null">Cancelar</button>
-          <button class="mst__btn mst__btn--primary"
-                  :disabled="guardando || !Object.keys(bajada.cantidades).length || excedeBajada"
-                  @click="confirmarBajada">
-            {{ guardando ? 'Bajando…' : 'Bajar a la mesa' }}
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- ── Reponer / devolver un producto que ya está en el turno ─────────────── -->
-    <div v-if="mover" class="mst__modal-back" @click.self="mover = null">
-      <div class="mst__modal">
-        <h3 class="mst__modal-title">
-          {{ mover.tipo === 'carga' ? 'Reponer' : 'Devolver al depósito' }} — {{ mover.item.etiqueta }}
-        </h3>
-        <p class="mst__modal-sub">
-          {{ mover.tipo === 'carga'
-             ? `Hay ${fmt(mover.item.en_deposito)} ${mover.item.unidad} libres en el depósito.`
-             : `Hay ${fmt(mover.item.esperado)} ${mover.item.unidad} sobre la mesa.` }}
-        </p>
-        <input v-model.number="mover.cantidad" type="number" min="0" step="0.1"
-               class="mst__input" placeholder="Cantidad" aria-label="Cantidad" />
-        <div class="mst__modal-acc">
-          <button class="mst__btn mst__btn--ghost" @click="mover = null">Cancelar</button>
-          <button class="mst__btn mst__btn--primary" :disabled="guardando || !mover.cantidad" @click="confirmarMover">
-            Confirmar
-          </button>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
 <script setup>
-// El MOSTRADOR: la mercadería que está sobre la mesa hoy.
+// EL MOSTRADOR: qué hay sobre la mesa y cómo va la caja.
 //
-// Para una organización que sólo dispensa, es LA pantalla — se abre a la mañana, se opera todo
-// el día y se cierra a la noche. Por eso el estado va arriba y grande, y las tres columnas
-// (en la mesa / salió / en depósito) contestan la única pregunta que se hace el que la mira:
-// ¿alcanza hasta que cierre, o hay que bajar más?
+// Son DOS cosas separadas, de personas distintas:
+//   · QUÉ HAY sobre la mesa → lo decide administración, cuando quiera y desde donde esté. Es un
+//     estado permanente: sigue ahí con la caja cerrada, porque el producto está físicamente ahí.
+//   · LA CAJA               → la abre y la cierra quien atiende, contando lo que encuentra.
 //
-// NADA DE ESTO ES PARA SEÑALAR A NADIE. La merma existe y es inevitable: contar sirve para que
-// la organización sepa cuánta hay y dónde, y con eso encuentre sus cuellos de botella. El texto
-// de la pantalla tiene que sonar así — una diferencia es un dato que se anota, no una falta que
+// Atadas —abrir la caja ERA poner la mercadería— el admin no podía gobernar la mesa a distancia,
+// que es el punto entero del módulo: que pueda delegar tranquilo y monitorear sin estar ahí.
+//
+// NADA DE ESTO ES PARA SEÑALAR A NADIE. La merma existe y es inevitable: contar sirve para que la
+// organización sepa cuánta hay y dónde. Una diferencia es un dato que se anota, no una falta que
 // alguien tiene que explicar.
-//
-// Lo que se carga se APARTA, no se descuenta: la fila Stock sigue siendo una sola. Ver
-// `Mostradores::AbrirTurno` en el backend.
 import { ref, computed, watch, onMounted } from 'vue'
-import { X, Undo2 } from 'lucide-vue-next'
 import RendicionCajaCard from '../components/RendicionCajaCard.vue'
-import TablaStock from '../components/mostrador/TablaStock.vue'
 import MostradorMerma from '../components/mostrador/MostradorMerma.vue'
 import MostradorTurnos from '../components/mostrador/MostradorTurnos.vue'
-import { getMostrador, abrirMostrador, confirmarMostrador, cargarMostrador, devolverMostrador,
-         cerrarMostrador, ingresoCajaMostrador, salidaCajaMostrador,
-         contarMostrador } from '../lib/api.js'
+import TablaMostrador from '../components/mostrador/TablaMostrador.vue'
+import ModalConteo from '../components/mostrador/ModalConteo.vue'
+import { getMostrador, cargarMostrador, abrirMostrador, cerrarMostrador,
+         ingresoCajaMostrador, salidaCajaMostrador } from '../lib/api.js'
+import { formaLabel } from '../lib/formatters.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useSedeStore } from '../stores/sede.js'
 import { useStockChannel } from '../composables/useStockChannel.js'
@@ -488,157 +204,75 @@ const sedeStore = useSedeStore()
 const auth      = useAuthStore()
 const toast     = useToast()
 
-// La merma es información de GESTIÓN: el que atiende no la ve. No porque haya algo que
-// esconderle, sino porque no es una pantalla para él — decide con lo que tiene sobre la mesa.
+// La merma y las rendiciones son información de GESTIÓN, y la mesa la gobierna administración.
+// Quien atiende decide con lo que tiene sobre la mesa.
 const gestiona = computed(() => ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role))
 
 const sedeId    = ref(null)
 const cargando  = ref(true)
-// Si ya se pintó una vez. Distingue "no hay nada todavía" de "estoy refrescando": lo segundo no
-// tiene que hacer desaparecer la pantalla.
 const cargado   = ref(false)
 const guardando = ref(false)
 const error     = ref('')
 const turno     = ref(null)
-const sugerido  = ref([])
+const mesa      = ref([])
 const disponibles = ref([])
-// Qué baja a la mesa: { stock_id: cantidad }. Vive acá y no en la tabla para que sobreviva al
-// buscador y al orden — si viviera adentro, filtrar borraría lo ya cargado.
-const cantidades = ref({})
-const bajada    = ref(null)
-const fondo     = ref(0)
-const mover     = ref(null)
-const cierre    = ref(null)
 const fondoSugerido = ref(null)
-const recepcion = ref([])
-const motivoRecepcion = ref('')
-const efectivoRecepcion = ref(null)
-const motivoEfectivo = ref('')
-const plata = ref(null)
-const conteo     = ref(null)
-// Mismo criterio que el cierre: lo esperado no se muestra hasta que el conteo está escrito.
-const difConteo  = computed(() => {
-  const c = conteo.value
-  if (!c || c.contado === null || c.contado === '') return null
-  return Math.round((Number(c.contado) - c.item.esperado) * 1000) / 1000
-})
+const conteo    = ref(null)      // 'apertura' | 'cierre'
+const plata     = ref(null)
 const tab       = ref('hoy')
-// Viene con la carga principal: un aviso que sólo aparece cuando ya entraste a mirarlo no avisa.
 const sinRevisar = ref(0)
 
-// Tres momentos, no dos: cerrado · abierto pero sin recibir · andando. El del medio existe
-// porque cuando lo carga el admin hay una entrega, y hasta que el que atiende no la firma nadie
-// puede responder por lo que hay sobre la mesa.
-const ESTADO_LABEL = { cerrado: 'Cerrado', sin_recibir: 'Falta recibirlo', abierto: 'Abierto' }
+// Lo que va a quedar sobre la mesa: { stock_id: cantidad }. Vive acá y no en la tabla para
+// sobrevivir al buscador y al orden — si viviera adentro, filtrar borraría lo ya escrito.
+const cantidades = ref({})
+const motivo     = ref('')
 
-// Sólo las sedes que dispensan tienen mostrador: una de producción no atiende pacientes.
-const sedes    = computed(() => (sedeStore.sedes || []).filter(s => s.tipo === 'social' || s.tipo === 'mixta'))
-const abierto  = computed(() => !!turno.value)
-const estado   = computed(() =>
-  !turno.value ? 'cerrado' : (turno.value.confirmado ? 'abierto' : 'sin_recibir')
+const ESTADO_LABEL = { cerrado: 'Cerrado', abierto: 'Abierto' }
+
+const sedes   = computed(() => (sedeStore.sedes || []).filter(s => s.tipo === 'social' || s.tipo === 'mixta'))
+const estado  = computed(() => (turno.value ? 'abierto' : 'cerrado'))
+
+// Administración ve TODO el stock apto de la sede, con lo que hay en el depósito y lo que hay
+// sobre la mesa. Quien atiende ve sólo la mesa: él no elige qué hay.
+const tabla = computed(() => {
+  if (!gestiona.value) return mesa.value
+  const enMesa = new Map(mesa.value.map(m => [m.stock_id, m.mostrador]))
+  return disponibles.value.map(s => ({ ...s, mostrador: enMesa.get(s.stock_id) || 0 }))
+})
+
+const hayCambios = computed(() =>
+  tabla.value.some(s => {
+    const v = cantidades.value[s.stock_id]
+    return v !== undefined && Number(v) !== Number(s.mostrador || 0)
+  })
 )
-// Quien cargó la mesa no se la recibe a sí mismo: serían dos firmas de la misma persona, o sea
-// ninguna. Ve lo que dejó, y espera.
-// Los dos ids tienen que EXISTIR: sin el guard, `undefined === undefined` da true y todo el
-// mundo vería la pantalla de espera — nadie podría recibir la mesa nunca.
-const loCargueYo = computed(() => {
-  const yo = auth.user?.id
-  const quien = turno.value?.abierto_por_id
-  return !!turno.value && !turno.value.confirmado && !!yo && !!quien && yo === quien
-})
-// Se cerró algo antes: sin eso, hablar de "corregir el cierre anterior" no significa nada.
-const huboTurnoAnterior = computed(() => sugerido.value.length > 0 || fondoSugerido.value !== null)
-// Sacar un producto de la mesa también es corregir lo que declaró el admin, y también pide
-// motivo: es la diferencia más grande que puede haber.
-const hayCorreccion = computed(() =>
-  recepcion.value.some(r => r.quitar ||
-    (r.contado !== null && r.contado !== '' && Number(r.contado) !== r.esperado))
+
+const esperadoEfectivo = computed(() =>
+  turno.value?.caja?.esperado_ars ?? Number(fondoSugerido.value || 0)
 )
-// Lo que falta o sobra en el cajón al recibirlo. A diferencia del stock —donde lo que el admin
-// declaró de más sigue en el depósito— acá la plata que falta no está en ningún lado.
-const difRecepcion = computed(() => {
-  if (!turno.value?.caja || efectivoRecepcion.value === null || efectivoRecepcion.value === '') return null
-  return Math.round((Number(efectivoRecepcion.value) - turno.value.caja.esperado_ars) * 100) / 100
-})
 
-// El que ATIENDE abre con lo que heredó y nada más: sumar de más o traer un producto que no
-// venía es sacar mercadería del depósito, y eso lo hace quien responde por ella. Lo aplica el
-// backend (`Mostradores::AbrirTurno`); acá sólo cambia lo que se ofrece y cómo se explica.
-const aperturaHeredada = ref(false)
-
-const subtituloApertura = computed(() => {
-  if (aperturaHeredada.value) {
-    return 'Viene con lo que se contó al cerrar el turno anterior. Si el frasco no da, corregí ' +
-           'para abajo: la diferencia queda con tu nombre. Lo que falte se baja del depósito con ' +
-           'el mostrador ya abierto.'
-  }
-  return sugerido.value.length
-    ? 'Viene con lo que se contó en el cierre anterior. Corregí lo que no coincida.'
-    : 'Elegí qué baja del depósito a la mesa.'
-})
-
-const hayElegidos = computed(() => Object.keys(cantidades.value).length > 0)
-// Si alguna fila pide más de lo que hay libre. El botón NO puede quedar habilitado: dejar
-// apretar para que el backend rechace es el peor error posible — parece culpa del usuario.
-const excedeAlgo = computed(() =>
-  disponibles.value.some(s => Number(cantidades.value[s.stock_id] || 0) > techoDe(s))
+// Lo que administración tocó mientras la caja estaba abierta. Sin esto, quien atiende cierra con
+// un faltante que no es suyo y no lo puede explicar.
+const movimientosDelTurno = computed(() =>
+  mesa.value.flatMap(m => (m.movimientos_del_turno || [])
+    .filter(mv => mv.tipo !== 'ajuste')
+    .map(mv => ({ ...mv, forma: m.forma, unidad: m.unidad })))
 )
-// Cuánto se puede poner de cada producto: para administración, lo libre del depósito; para el
-// que atiende, lo que quedó del turno anterior — corregir para abajo, nunca para arriba.
-const topesApertura = computed(() => (
-  aperturaHeredada.value
-    ? Object.fromEntries(sugerido.value.map(s => [s.stock_id, Number(s.cantidad)]))
-    : null
-))
-const techoDe = (s) => (topesApertura.value ? Number(topesApertura.value[s.stock_id] ?? 0) : Number(s.disponible))
-// Lo que el cierre anterior dejó contado: va arriba de la tabla y con su número puesto.
-const heredados = computed(() => new Set(sugerido.value.map(s => s.stock_id)))
-
-// Con el turno abierto, lo que todavía NO está sobre la mesa: lo que ya está se repone desde su
-// propia fila, y ofrecerlo dos veces es cómo se terminan cargando dos líneas del mismo frasco.
-const agregables = computed(() => {
-  const arriba = new Set((turno.value?.items || []).map(i => i.stock_id))
-  return disponibles.value.filter(s => !arriba.has(s.stock_id))
-})
-
-// Hay diferencia si algún conteo no coincide con lo esperado. El motivo se pide una sola vez
-// para todo el cierre: es la misma explicación ("hoy la balanza redondeó") repetida por ítem.
-const hayDiferencia = computed(() =>
-  !!cierre.value?.conteos.some(c => c.contado !== null && c.contado !== '' && Number(c.contado) !== c.esperado)
-)
-const difCaja = computed(() => {
-  const c = cierre.value
-  if (!c || c.efectivo === null || c.efectivo === '') return null
-  return Math.round((Number(c.efectivo) - (turno.value?.caja?.esperado_ars ?? 0)) * 100) / 100
-})
-const aRetirar = computed(() => {
-  const c = cierre.value
-  if (!c) return 0
-  return Math.max(Number(c.efectivo || 0) - Number(c.fondo || 0), 0)
-})
 
 const fmt  = (n) => Number(n ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })
 const hora = (iso) => (iso ? new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '')
 
-// Cada carga lleva número. Con el tiempo real, una tanda de cambios dispara varias recargas y
-// nada garantiza que lleguen en orden: si la respuesta vieja aterriza última, la pantalla vuelve
-// a un estado anterior — se ve como si la corrección no se hubiera guardado.
 let cargaEnCurso = 0
 
 async function cargar () {
   if (!sedeId.value) {
     // Todavía no sabemos con qué sede trabajar: el watcher corre con `immediate` ANTES de que
-    // `onMounted` la fije. Mientras se resuelve seguimos "cargando" — si la pantalla se dibuja
-    // vacía y un instante después se rearma con los datos, lo que la persona haya empezado a
-    // escribir se pierde sin que haya tocado nada. Sólo se rinde cuando ya sabemos que no hay
-    // ninguna sede que dispense.
+    // `onMounted` la fije. Si la pantalla se dibujara vacía y un instante después se rearmara,
+    // lo que la persona haya empezado a escribir se pierde sin que haya tocado nada.
     cargando.value = !sedeStore.loaded || sedes.value.length > 0
     return
   }
   const mia = ++cargaEnCurso
-  // El esqueleto SÓLO la primera vez. Ponerlo en cada recarga desmonta la pantalla entera, y la
-  // mesa se recarga sola con cada aviso del canal: al que estaba escribiendo en el buscador o
-  // eligiendo qué bajar se le borraba lo tipeado sin que hubiera tocado nada. Lo cazó el e2e.
   if (!cargado.value) cargando.value = true
   error.value = ''
   try {
@@ -646,29 +280,13 @@ async function cargar () {
     if (mia !== cargaEnCurso) return // llegó tarde: ya hay una carga más nueva
 
     turno.value       = data.turno
-    sugerido.value    = data.sugerido || []
+    mesa.value        = data.mesa || []
     disponibles.value = data.disponibles || []
     fondoSugerido.value = data.fondo_sugerido ?? null
-    aperturaHeredada.value = !!data.apertura_heredada
-    sinRevisar.value = data.sin_revisar ?? 0
-    // La recepción arranca con lo que declaró el admin: confirmar es un click, corregir es
-    // cambiar el número. Vacío obligaría a recontar todo aunque esté bien.
-    recepcion.value = (turno.value && !turno.value.confirmado)
-      ? turno.value.items.map(it => ({
-          item_id: it.id, etiqueta: it.etiqueta, unidad: it.unidad,
-          esperado: it.esperado, contado: it.esperado, quitar: false,
-        }))
-      : []
-    motivoRecepcion.value = ''
-    motivoEfectivo.value = ''
-    efectivoRecepcion.value = (turno.value && !turno.value.confirmado)
-      ? (turno.value.caja?.esperado_ars ?? null) : null
-    if (!turno.value && fondo.value === 0 && data.fondo_sugerido != null) fondo.value = data.fondo_sugerido
-    // La mesa arranca con lo que dejó el cierre anterior, editable. No es un conteo obligatorio:
-    // es un número que viene puesto y que se corrige sólo si no coincide.
-    if (!turno.value) {
-      cantidades.value = Object.fromEntries(sugerido.value.map(s => [s.stock_id, Number(s.cantidad)]))
-    }
+    sinRevisar.value  = data.sin_revisar ?? 0
+    // La tabla arranca con lo que HAY: se corrige lo que haya que corregir, no se declara todo.
+    cantidades.value  = Object.fromEntries(tabla.value.map(s => [s.stock_id, Number(s.mostrador || 0)]))
+    motivo.value      = ''
   } catch (e) {
     if (mia === cargaEnCurso) error.value = e?.response?.data?.error || 'No se pudo cargar el mostrador.'
   } finally {
@@ -676,216 +294,66 @@ async function cargar () {
   }
 }
 
-const aItems = (mapa) => Object.entries(mapa)
-  .map(([stock_id, cantidad]) => ({ stock_id: Number(stock_id), cantidad }))
-  .filter(i => Number(i.cantidad) > 0)
-
-async function abrir () {
-  const items = aItems(cantidades.value)
-  if (!items.length) return toast.error('Poné al menos un producto sobre la mesa.')
+// Sólo lo que cambió: mandar la tabla entera haría que el backend evalúe productos que nadie tocó.
+async function guardarMesa () {
+  const cambios = tabla.value
+    .filter(s => cantidades.value[s.stock_id] !== undefined &&
+                 Number(cantidades.value[s.stock_id]) !== Number(s.mostrador || 0))
+    .map(s => ({ stock_id: s.stock_id, cantidad: Number(cantidades.value[s.stock_id]) }))
+  if (!cambios.length) return
 
   guardando.value = true
   try {
-    await abrirMostrador(sedeId.value, { monto_inicial_ars: fondo.value || 0, items })
-    toast.success('Mostrador abierto')
+    await cargarMostrador(sedeId.value, { cambios, motivo: motivo.value })
+    toast.success(cambios.length === 1 ? 'Mesa actualizada' : `${cambios.length} productos actualizados`)
     await cargar()
   } catch (e) {
-    toast.error(e?.response?.data?.error || 'No se pudo abrir el mostrador.')
-  } finally {
-    guardando.value = false
-  }
+    toast.error(e?.response?.data?.error || 'No se pudo actualizar la mesa.')
+  } finally { guardando.value = false }
 }
 
-function abrirMover (item, tipo) {
-  mover.value = { item, tipo, cantidad: null }
-}
-
-async function confirmarMover () {
-  const { item, tipo, cantidad } = mover.value
+async function confirmarConteo (payload) {
+  const esCierre = conteo.value === 'cierre'
   guardando.value = true
   try {
-    if (tipo === 'carga') await cargarMostrador(sedeId.value, { stock_id: item.stock_id, cantidad })
-    else                  await devolverMostrador(sedeId.value, { item_id: item.id, cantidad })
-    mover.value = null
-    toast.success(tipo === 'carga' ? 'Repuesto' : 'Devuelto al depósito')
-    await cargar()
-  } catch (e) {
-    toast.error(e?.response?.data?.error || 'No se pudo mover el stock.')
-  } finally {
-    guardando.value = false
-  }
-}
-
-// ¿Ya escribió el conteo de este producto? Hasta que no lo escriba, no se le muestra contra qué.
-const contado = (c) => c.contado !== null && c.contado !== ''
-
-function difTexto (c) {
-  if (c.contado === null || c.contado === '') return ''
-  const d = Math.round((Number(c.contado) - c.esperado) * 1000) / 1000
-  if (d === 0) return 'cuadra'
-  return `${d > 0 ? '+' : ''}${fmt(d)} ${c.unidad}`
-}
-// Una diferencia NO es un error: la merma es inevitable y el punto de contar es medirla. Se
-// destaca para que se vea, sin el rojo de "algo salió mal".
-function difClase (c) {
-  if (c.contado === null || c.contado === '') return ''
-  return Number(c.contado) === c.esperado ? 'is-ok' : 'is-dif'
-}
-
-async function confirmar () {
-  if (hayCorreccion.value && !motivoRecepcion.value.trim()) {
-    return toast.error('Escribí el motivo de la diferencia.')
-  }
-  if (difRecepcion.value && !motivoEfectivo.value.trim()) {
-    return toast.error('Escribí el motivo de la diferencia en caja.')
-  }
-  guardando.value = true
-  try {
-    const correcciones = recepcion.value
-      .filter(r => r.quitar || Number(r.contado) !== r.esperado)
-      .map(r => ({
-        item_id: r.item_id, motivo: motivoRecepcion.value,
-        ...(r.quitar ? { quitar: true } : { contado: r.contado }),
-      }))
-    await confirmarMostrador(sedeId.value, {
-      correcciones,
-      efectivo_contado_ars: efectivoRecepcion.value,
-      motivo_efectivo: motivoEfectivo.value || undefined,
-    })
-    toast.success(correcciones.length ? 'Recibido con corrección' : 'Mostrador recibido')
-    await cargar()
-  } catch (e) {
-    toast.error(e?.response?.data?.error || 'No se pudo confirmar el mostrador.')
-  } finally {
-    guardando.value = false
-  }
-}
-
-function abrirConteo (item) {
-  conteo.value = { item, contado: null, motivo: '' }
-}
-
-async function confirmarConteo () {
-  const c = conteo.value
-  if (difConteo.value && !c.motivo.trim()) return toast.error('Escribí qué pasó.')
-
-  guardando.value = true
-  try {
-    await contarMostrador(sedeId.value, {
-      item_id: c.item.id, contado: c.contado, motivo: c.motivo || undefined,
-    })
+    if (esCierre) await cerrarMostrador(sedeId.value, payload)
+    else          await abrirMostrador(sedeId.value, payload)
     conteo.value = null
-    toast.success(difConteo.value ? 'Diferencia registrada' : 'Cuadra')
+    toast.success(esCierre ? 'Caja cerrada' : 'Caja abierta')
     await cargar()
   } catch (e) {
     toast.error(e?.response?.data?.error || 'No se pudo registrar el conteo.')
   } finally { guardando.value = false }
 }
 
-function abrirPlata (tipo) {
-  plata.value = { tipo, monto: null, motivo: '', clase: 'retiro' }
-}
+function abrirPlata (tipo) { plata.value = { tipo, monto: null, motivo: '', clase: 'retiro' } }
 
 async function confirmarPlata () {
-  const { tipo, monto, motivo, clase } = plata.value
+  const { tipo, monto, motivo: mot, clase } = plata.value
   const cajaId = turno.value?.caja?.id
   if (!cajaId) return
   guardando.value = true
   try {
-    if (tipo === 'ingreso') await ingresoCajaMostrador(sedeId.value, cajaId, { monto_ars: monto, motivo })
-    else                    await salidaCajaMostrador(sedeId.value, cajaId, { monto_ars: monto, motivo, clase })
+    if (tipo === 'ingreso') await ingresoCajaMostrador(sedeId.value, cajaId, { monto_ars: monto, motivo: mot })
+    else                    await salidaCajaMostrador(sedeId.value, cajaId, { monto_ars: monto, motivo: mot, clase })
     plata.value = null
     toast.success(tipo === 'ingreso' ? 'Plata puesta en el cajón' : 'Plata sacada del cajón')
     await cargar()
   } catch (e) {
     toast.error(e?.response?.data?.error || 'No se pudo mover la plata.')
-  } finally {
-    guardando.value = false
-  }
-}
-
-function abrirCierre () {
-  cierre.value = {
-    motivo: '',
-    // El efectivo y el fondo arrancan VACÍOS a propósito: son un conteo, no un número que se
-    // acepta apretando enter.
-    efectivo: null,
-    fondo: null,
-    conteos: turno.value.items.map(it => ({
-      item_id: it.id, etiqueta: it.etiqueta, unidad: it.unidad, esperado: it.esperado, contado: null,
-    })),
-  }
-}
-
-async function confirmarCierre () {
-  const c = cierre.value
-  if (c.conteos.some(x => x.contado === null || x.contado === '')) {
-    return toast.error('Contá todo lo que está sobre la mesa.')
-  }
-  if (hayDiferencia.value && !c.motivo.trim()) {
-    return toast.error('Escribí el motivo de la diferencia.')
-  }
-
-  guardando.value = true
-  try {
-    await cerrarMostrador(sedeId.value, {
-      conteos: c.conteos.map(x => ({ item_id: x.item_id, contado: x.contado, motivo: c.motivo || undefined })),
-      efectivo_contado_ars: c.efectivo,
-      fondo_siguiente_ars:  c.fondo,
-      notas: c.motivo || undefined,
-    })
-    cierre.value = null
-    toast.success('Mostrador cerrado')
-    await cargar()
-  } catch (e) {
-    toast.error(e?.response?.data?.error || 'No se pudo cerrar el mostrador.')
-  } finally {
-    guardando.value = false
-  }
-}
-
-const excedeBajada = computed(() => {
-  const c = bajada.value?.cantidades || {}
-  return agregables.value.some(s => Number(c[s.stock_id] || 0) > Number(s.disponible))
-})
-
-function abrirBajada () { bajada.value = { cantidades: {} } }
-
-// Bajar VARIOS de una: con el turno andando pasa que se acaban tres cosas juntas, y hacerlo de a
-// uno son tres modales. Se manda producto por producto porque cada carga deja su propio rastro
-// con autor y hora, y se recarga UNA vez al final.
-async function confirmarBajada () {
-  const items = aItems(bajada.value.cantidades)
-  if (!items.length) return
-
-  guardando.value = true
-  try {
-    for (const it of items) {
-      await cargarMostrador(sedeId.value, { stock_id: it.stock_id, cantidad: it.cantidad })
-    }
-    bajada.value = null
-    toast.success(items.length === 1 ? 'Bajado a la mesa' : `${items.length} productos sobre la mesa`)
-    await cargar()
-  } catch (e) {
-    toast.error(e?.response?.data?.error || 'No se pudo bajar el stock.')
-    await cargar()
-  } finally {
-    guardando.value = false
-  }
+  } finally { guardando.value = false }
 }
 
 onMounted(async () => {
   if (!sedeStore.loaded) await sedeStore.fetchSedes()
-  // No se llama a `cargar()` acá: fijar la sede dispara el watcher de abajo, que carga. Hacer
-  // las dos cosas mandaba DOS pedidos por cada apertura de la pantalla.
+  // No se llama a `cargar()` acá: fijar la sede dispara el watcher, que carga. Hacer las dos
+  // cosas mandaba DOS pedidos por cada apertura de la pantalla.
   sedeId.value = sedes.value[0]?.id ?? null
 })
 
-// La mesa se actualiza sola. Si el admin baja producto desde su oficina, el que atiende lo ve
-// sin recargar: recargar es justo lo que nadie hace cuando tiene a alguien esperando enfrente.
-// Sólo si el aviso es de ESTA sede — con dos sedes abiertas, recargar por la otra es ruido.
-// Y se agrupan: cargar la mesa emite un aviso por producto, y recargar una vez por cada uno
-// sería mandar cinco requests para pintar la misma pantalla.
+// La mesa se actualiza sola: si administración baja producto desde su oficina, quien atiende lo
+// ve sin recargar — recargar es lo que nadie hace con alguien esperando enfrente. Y se agrupan:
+// una tanda de cambios emite un aviso por producto.
 let recargaPendiente = null
 useStockChannel(null, (evento) => {
   if (evento?.tipo !== 'mostrador_actualizado') return
@@ -895,13 +363,34 @@ useStockChannel(null, (evento) => {
   recargaPendiente = setTimeout(cargar, 300)
 })
 
-// Cambiar de sede recarga: si no, se veía el mostrador de la sede anterior. Las otras solapas
-// son componentes y miran `sedeId` por su cuenta.
 watch(sedeId, () => { cargado.value = false; cantidades.value = {}; cargar() }, { immediate: true })
 </script>
 
 <style scoped>
-.mst { padding: 20px 24px 48px; max-width: 1100px; }
+/* Centrada: tenía `max-width` sin `margin auto`, así que en una pantalla ancha quedaba pegada a
+   la izquierda con medio monitor vacío al lado. */
+.mst { padding: 20px 24px 48px; max-width: 1180px; margin: 0 auto; }
+
+/* ── La mesa ────────────────────────────────────────────────────────────────── */
+.mst__mesa-hd { margin-top: 6px; }
+.mst__seccion {
+  font-family: var(--font-display); font-size: var(--fs-16); font-weight: 700;
+  color: var(--c-leaf-900); margin: 0 0 2px;
+}
+.mst__guardar {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  background: var(--c-amber-100); border-radius: 11px; padding: 12px 16px;
+}
+.mst__guardar .mst__input { flex: 1; min-width: 240px; }
+
+/* Lo que administración tocó mientras la caja estaba abierta: quien atiende lo tiene que ver o
+   cierra con un faltante que no es suyo. */
+.mst__movs {
+  background: var(--c-sky-100); border-radius: 11px; padding: 12px 16px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.mst__movs-lbl { font-size: var(--fs-12); font-weight: 700; color: var(--c-sky-600); text-transform: uppercase; letter-spacing: .04em; }
+.mst__mov { margin: 0; font-size: var(--fs-13); color: var(--c-ink-700); }
 
 /* ── Solapas ────────────────────────────────────────────────────────────────── */
 .mst__tabs { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 1px solid var(--c-slate-200); }
@@ -940,8 +429,6 @@ watch(sedeId, () => { cargado.value = false; cantidades.value = {}; cargar() }, 
 .mst__estado-dot { width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
 .mst__estado.is-abierto     { background: var(--c-leaf-100);  color: var(--c-leaf-700); }
 .mst__estado.is-cerrado     { background: var(--c-ink-100);   color: var(--c-ink-500); }
-/* Cargado por el admin y esperando que lo reciba el que atiende: ni una cosa ni la otra. */
-.mst__estado.is-sin_recibir { background: var(--c-amber-100); color: var(--c-amber-500); }
 
 /* ── Tarjeta de apertura ────────────────────────────────────────────────────── */
 .mst__card {

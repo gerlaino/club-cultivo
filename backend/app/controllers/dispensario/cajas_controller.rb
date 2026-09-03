@@ -19,9 +19,10 @@ module Dispensario
     # `cerrar` es del OPERADOR, no de administración: el que atendió cuenta y cierra. Si el
     # cierre dependiera de que haya un admin a las once de la noche, el mostrador queda bloqueado
     # y el que abre mañana no puede arrancar. El aval del admin es asincrónico.
-    before_action :require_operador, only: [:actual, :confirmar_apertura, :solicitar_cierre, :cerrar]
-    before_action :require_gestion,  only: [:responsables]
-    before_action :require_gestion,  only: [:index, :abrir, :confirmar_cierre, :salida, :ingreso, :anular]
+    before_action :require_operador, only: [:actual]
+    # Mover plata y anular una caja abierta por error es de quien responde por ella. Abrir y
+    # cerrar ya no viven acá: pasan por el mostrador, que en el mismo gesto cuenta la mercadería.
+    before_action :require_gestion,  only: [:index, :responsables, :salida, :ingreso, :anular]
 
     # GET /sedes/:sede_id/caja/responsables — a quién se le puede atribuir un retiro
     def responsables
@@ -60,51 +61,6 @@ module Dispensario
     end
 
     # POST /sedes/:sede_id/caja/abrir { monto_inicial_ars } — admin/supervisor
-    def abrir
-      if caja_activa
-        return render json: { error: 'Ya hay una caja abierta en este mostrador' }, status: :unprocessable_entity
-      end
-
-      caja = CajaTurno.new(
-        club: current_user.club, sede: @sede, punto: @mostrador, abierta_por: current_user,
-        monto_inicial_ars: params[:monto_inicial_ars].to_d, abierta_at: Time.current
-      )
-
-      if caja.save
-        render json: serialize(caja), status: :created
-      else
-        render json: { errors: caja.errors.full_messages }, status: :unprocessable_entity
-      end
-    end
-
-    # POST /sedes/:sede_id/caja/:id/confirmar_apertura — el dispensador confirma que está el fondo
-    def confirmar_apertura
-      con_caja { |caja| caja.confirmar_apertura!(usuario: current_user) }
-    end
-
-    # POST /sedes/:sede_id/caja/:id/solicitar_cierre { efectivo_declarado_ars, notas? }
-    def solicitar_cierre
-      con_caja do |caja|
-        caja.solicitar_cierre!(efectivo_declarado: params[:efectivo_declarado_ars].to_d,
-                               solicitada_por: current_user, notas: params[:notas])
-      end
-    end
-
-    # POST /sedes/:sede_id/caja/:id/confirmar_cierre — admin/supervisor confirma lo que envió el operador
-    def confirmar_cierre
-      # `notas` acá es el motivo de la diferencia, y termina en el asiento: "faltante de caja —
-      # se pagó un flete sin registrar". Un faltante sin explicación no se puede revisar después.
-      con_caja { |caja| caja.cerrar!(cerrada_por: current_user, notas: params[:notas]) }
-    end
-
-    # POST /sedes/:sede_id/caja/:id/cerrar { efectivo_declarado_ars, notas? } — cierre directo
-    def cerrar
-      con_caja do |caja|
-        caja.cerrar!(efectivo_declarado: params[:efectivo_declarado_ars].to_d,
-                     cerrada_por: current_user, notas: params[:notas])
-      end
-    end
-
     # Sacar efectivo del cajón. Son DOS hechos distintos y hay que elegir cuál:
     #
     #   gasto  → el club GASTÓ esa plata (un flete, una compra). Egreso: baja el resultado.
@@ -119,9 +75,14 @@ module Dispensario
       'retiro' => { tipo: 'ajuste',  categoria: 'retiro_caja', prefijo: 'Retiro de caja' },
     }.freeze
 
-    # POST /sedes/:sede_id/caja/:id/salida { monto_ars, motivo, clase: gasto|retiro }
+    # `abrir`, `confirmar_apertura`, `solicitar_cierre`, `confirmar_cierre` y `cerrar` se fueron
+    # de acá: la caja del dispensario se abre y se cierra desde el MOSTRADOR, que en el mismo
+    # gesto cuenta la mercadería. Abrir declarando sólo un fondo salteaba la mitad del arqueo, y
+    # la ficha de la sede lo ofrecía como si fuera lo normal.
     #
-    # Lo hace administración, no el mostrador: es plata que sale y alguien tiene que responder.
+    # Lo que sí vive acá es lo que es de la caja y no del mostrador: mover plata (salida, ingreso)
+    # y anular una que se abrió por error.
+
     def salida
       monto  = params[:monto_ars].to_d
       motivo = params[:motivo].to_s.strip

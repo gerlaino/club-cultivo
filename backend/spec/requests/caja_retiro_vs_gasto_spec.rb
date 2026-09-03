@@ -21,8 +21,16 @@ RSpec.describe 'Retiro de caja vs. gasto pagado con la caja', type: :request do
 
   let(:caja) do
     sign_in_as(admin)
-    post "/api/sedes/#{sede.id}/caja/abrir", headers: auth_headers, params: { monto_inicial_ars: 200_000 }
-    JSON.parse(response.body)
+    # La caja del dispensario se abre desde el MOSTRADOR, que en el mismo gesto cuenta la
+    # mercadería: abrir declarando sólo un fondo salteaba la mitad del arqueo.
+    # Si ya hay una caja abierta en este mostrador se reusa: dos cajas activas sobre el mismo
+    # cajón partirían el arqueo en dos por la misma plata.
+    turno = ActsAsTenant.with_tenant(club) do
+      sede.mostrador!.turno_abierto ||
+        Mostradores::AbrirCaja.call(mostrador: sede.mostrador!, usuario: admin,
+                                    efectivo_contado_ars: 200_000).turno
+    end
+    { 'id' => turno.caja_turno_id }
   end
 
   def sacar!(clase:, monto: 100_000, motivo: 'se lo llevó el admin', como: admin)
@@ -87,8 +95,9 @@ RSpec.describe 'Retiro de caja vs. gasto pagado con la caja', type: :request do
       create(:stock, club: club, sede: sede, lote: lote, forma_producto: 'flor_seca',
                      cantidad: 500, precio_sugerido_ars: 100)
     end
-    caja # abre
-    abrir_mostrador!(sede, usuario: admin)
+    # `abrir_mostrador!` abre la caja y carga la mesa en un solo gesto: pedir `caja` además
+    # intentaría abrir una segunda sobre el mismo cajón.
+    abrir_mostrador!(sede, usuario: admin, fondo: 200_000)
 
     ActsAsTenant.with_tenant(club) do
       [admin, ana].each do |quien|
@@ -106,12 +115,19 @@ RSpec.describe 'Retiro de caja vs. gasto pagado con la caja', type: :request do
     expect(cuerpo['total_efectivo_ars']).to eq(40_000.0)
     expect(cuerpo['efectivo_esperado_ars']).to eq(140_000.0)
 
-    # Y al contar exactamente eso, no hay diferencia ni asiento inventado.
-    sign_in_as(admin)
-    post "/api/sedes/#{sede.id}/caja/#{caja['id']}/cerrar",
-         headers: auth_headers, params: { efectivo_declarado_ars: 140_000 }
+    # Y al contar exactamente eso, no hay diferencia ni asiento inventado. Se cierra desde el
+    # mostrador, que es la única puerta.
+    ActsAsTenant.with_tenant(club) do
+      mostrador = sede.mostrador!
+      # Se cuenta TODO lo que está sobre la mesa: un arqueo que deja algo sin contar no arquea.
+      conteos = mostrador.sobre_la_mesa.map { |mi| { stock_id: mi.stock_id, contado: mi.cantidad } }
+      res = Mostradores::CerrarCaja.call(turno: mostrador.turno_abierto, usuario: admin,
+                                         conteos: conteos, efectivo_contado_ars: 140_000,
+                                         fondo_siguiente_ars: 140_000)
+      raise "No cerró: #{res.error}" unless res.ok?
+    end
 
-    expect(JSON.parse(response.body)['diferencia_ars']).to eq(0.0)
+    expect(CajaTurno.find(caja['id']).diferencia_ars).to eq(0.0)
     expect(movs.where(categoria: 'diferencia_caja')).to be_empty
   end
 

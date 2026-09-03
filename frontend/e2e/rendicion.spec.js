@@ -60,7 +60,7 @@ test('la rendición del repartidor, de punta a punta', async ({ page }) => {
   // ── 4. El paquete que volvió está sobre la mesa ───────────────────────────
   // 100 que cargó el admin + los 25 que volvieron. Antes el gramo se iba al depósito y el que
   // atiende no lo tenía para el próximo que lo pidiera, con el paquete ahí adelante.
-  await expect(page.locator('.mst__mesa').first()).toHaveText('125')
+  await expect(page.locator('.tmo__mesa').first()).toHaveText('125')
 
   // ── 5. Beto deja constancia de si está de acuerdo ─────────────────────────
   await entrar(page, 'delivery')

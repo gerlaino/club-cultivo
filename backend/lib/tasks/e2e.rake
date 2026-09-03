@@ -103,11 +103,14 @@ namespace :e2e do
       CajaTurno.where(club_id: club.id).activas.find_each { |c| c.update!(estado: 'anulada') }
 
       disp = User.find_by(email: 'dispensador@e2e.test')
-      res  = Mostradores::AbrirTurno.call(mostrador: mostrador, usuario: admin,
-                                          monto_inicial_ars: 20_000,
-                                          items: [{ stock_id: stock.id, cantidad: 100 }])
-      abort "No se pudo abrir el mostrador: #{res.error}" unless res.ok?
-      Mostradores::ConfirmarApertura.call(turno: res.turno, usuario: disp)
+      # Los dos pasos reales, de las dos personas: administración carga la mesa y quien atiende
+      # abre la caja contando lo que encuentra.
+      car = Mostradores::Cargar.call(mostrador: mostrador, usuario: admin, motivo: 'carga del día',
+                                     cambios: [{ stock_id: stock.id, cantidad: 100 }])
+      abort "No se pudo cargar la mesa: #{car.error}" unless car.ok?
+      res = Mostradores::AbrirCaja.call(mostrador: mostrador, usuario: disp,
+                                        efectivo_contado_ars: 20_000)
+      abort "No se pudo abrir la caja: #{res.error}" unless res.ok?
 
       puts 'Beto cobró $100.000 en 2 entregas y trae 1 paquete de 25 g sin entregar'
       puts 'Mostrador abierto con 100 g y $20.000, recibido por Dana'
@@ -151,6 +154,9 @@ def limpiar_operativo_e2e!(club)
   DispensacionItem.unscoped.where(dispensacion_id: disps).delete_all
   Reserva.unscoped.where(ids).delete_all
   Dispensacion.unscoped.where(id: disps).delete_all
+  # La mesa y su historial: los movimientos cuelgan del ítem, así que van antes.
+  MostradorMovimiento.unscoped.where(ids).delete_all
+  MostradorItem.unscoped.where(ids).delete_all
   TurnoMostradorItem.unscoped.where(ids).delete_all
   TurnoMostrador.unscoped.where(ids).delete_all
   RendicionCaja.unscoped.where(ids).delete_all

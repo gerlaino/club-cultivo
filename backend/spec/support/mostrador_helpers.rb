@@ -1,37 +1,44 @@
-# Abrir el mostrador de una sede con todo su stock arriba.
+# Deja el mostrador LISTO PARA ATENDER: con mercadería sobre la mesa y la caja abierta.
+#
+# Son los dos pasos de la vida real, y son de personas distintas:
+#   · el ADMIN carga la mesa, cuando quiere y desde donde esté
+#   · quien ATIENDE cuenta lo que hay y abre la caja
 #
 # Los specs donde dispensa un DISPENSADOR lo necesitan por la misma razón que lo necesita la
-# persona real: él dispensa de lo que está sobre la mesa, no del depósito. Un spec que dispensa
-# sin abrir el mostrador estaría probando un camino que en producción no existe.
-# (El admin y el supervisor son administración: dispensan del depósito, con o sin turno abierto.)
+# persona real: él entrega de lo que está sobre la mesa y cobra en una caja abierta. Un spec que
+# dispensa sin esto estaría probando un camino que en producción no existe.
+# (El admin y el supervisor son administración: dispensan del depósito, con o sin caja abierta.)
 module MostradorHelpers
-  # Deja el mostrador LISTO PARA ATENDER: abierto y recibido.
-  #
-  # Son los dos pasos que da la gente real. Si lo abre un admin (`usuario`), alguien que atiende
-  # tiene que recibirlo (`recibe`): sin ese punto de partida verificado, el arqueo del cierre no
-  # mide nada. Si lo abre el propio dispensador, ya queda confirmado solo.
   def abrir_mostrador!(sede, usuario:, recibe: nil, fondo: 0)
     ActsAsTenant.with_tenant(sede.club) do
-      items = sede.club.stocks.where(sede_id: sede.id).select(&:apto_dispensa?).filter_map do |s|
+      mostrador = sede.mostrador!
+      cambios = sede.club.stocks.where(sede_id: sede.id).select(&:apto_dispensa?).filter_map do |s|
         disp = s.cantidad_disponible_real.to_d
         { stock_id: s.id, cantidad: disp } if disp.positive?
       end
-      res = Mostradores::AbrirTurno.call(mostrador: sede.mostrador!, usuario: usuario,
-                                        items: items, monto_inicial_ars: fondo)
-      raise "No se pudo abrir el mostrador: #{res.error}" unless res.ok?
 
-      turno = res.turno
-      unless turno.confirmado?
-        # Quien cargó la mesa no puede recibírsela a sí mismo (serían dos firmas de la misma
-        # persona), así que el receptor es otro: el que el spec indique, alguien del club que
-        # atienda, o uno creado al vuelo.
-        receptor = recibe ||
-                   sede.club.users.where(role: 'dispensador').where.not(id: usuario.id).first ||
-                   FactoryBot.create(:user, :dispensador, club: sede.club)
-        conf = Mostradores::ConfirmarApertura.call(turno: turno, usuario: receptor)
-        raise "No se pudo confirmar el mostrador: #{conf.error}" unless conf.ok?
+      if cambios.any?
+        res = Mostradores::Cargar.call(mostrador: mostrador, usuario: usuario, cambios: cambios,
+                                       motivo: 'carga inicial del spec')
+        raise "No se pudo cargar el mostrador: #{res.error}" unless res.ok?
       end
-      turno.reload
+
+      # Abre quien vaya a atender. Si el spec no lo dice, abre el mismo que cargó: en la vida
+      # real puede pasar (una organización de una sola persona) y el conteo de apertura vale
+      # igual — lo que no puede pasar es que nadie pueda abrir.
+      quien = recibe || usuario
+      res = Mostradores::AbrirCaja.call(mostrador: mostrador, usuario: quien,
+                                        efectivo_contado_ars: fondo)
+      raise "No se pudo abrir la caja del mostrador: #{res.error}" unless res.ok?
+
+      res.turno.reload
+    end
+  end
+
+  # Lo que hay sobre la mesa de una sede, por stock. Para afirmar sin reconstruirlo a mano.
+  def mesa_de(sede)
+    ActsAsTenant.with_tenant(sede.club) do
+      sede.mostrador!.sobre_la_mesa.each_with_object({}) { |mi, acc| acc[mi.stock_id] = mi.cantidad.to_f }
     end
   end
 end

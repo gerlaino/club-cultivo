@@ -1,5 +1,124 @@
 # Changelog
 
+## Septiembre 2026 (x) — la mesa deja de ser del turno
+
+El mostrador funcionaba, pero ataba dos cosas que son distintas y de personas distintas: **qué hay
+sobre la mesa** y **el arqueo de una jornada**. Abrir el turno ERA poner la mercadería, así que el
+admin no podía gobernar la mesa a distancia —que es el punto entero del módulo, poder delegar
+tranquilo— y cualquier cosa que volviera al mostrador a las once de la noche dependía de que
+hubiera un turno abierto para tener dónde caer.
+
+Ahora el mostrador tiene **contenido propio y permanente** (`MostradorItem`), y el turno se queda
+con lo suyo: contar al abrir y contar al cerrar.
+
+```
+Mostrador ──┬── MostradorItem      → qué hay AHORA, permanente. Es lo que se aparta.
+            │     └── MostradorMovimiento → cada subida y bajada, con quién y por qué
+            └── TurnoMostrador     → el ARQUEO de una jornada: lo contado al abrir y al cerrar
+```
+
+- **El apartado ya no depende del turno.** El producto está físicamente sobre esa mesa a las tres
+  de la tarde y a la medianoche. Antes se liberaba al cerrar: de noche el sistema lo daba por libre
+  y una reserva de paciente podía comprometerlo.
+- **`turno_mostrador_id` es opcional en el movimiento**, a propósito: el admin carga la mesa a las
+  siete de la mañana, cuando todavía no abrió nadie. Cuando SÍ hay turno queda atado a él, para que
+  el arqueo de esa noche sepa qué pasó mientras estaba abierto.
+- **Backfill en la migración**: sin él, el día del deploy toda organización con el mostrador
+  abierto amanece con la mesa vacía y el producto igualmente apartado.
+
+### La recepción separada desaparece: ABRIR ES CONTAR
+
+Eran dos verificaciones para el mismo hecho —el admin declaraba, quien atendía confirmaba— y la
+segunda era un botón que nadie miraba. Ahora quien va a atender **pesa lo que encuentra y cuenta la
+plata**, en un solo gesto, y eso es el punto de partida del arqueo.
+
+**No bloquea por diferencia.** Si lo que cuenta no coincide, pone lo que contó y abre: la
+diferencia queda anotada con su nombre y la ve el admin. Bloquearlo dejaría el mostrador cerrado a
+las ocho de la mañana esperando a alguien que no está, que es exactamente lo que este módulo existe
+para evitar.
+
+- **La mesa se corrige con lo contado** pero **NO toca el inventario**: acá todavía no se sabe si
+  faltó de verdad o si la mesa se cargó de más, y el producto puede estar en el depósito. El conteo
+  del CIERRE sí ajusta —el producto estaba arriba, se contó, y no está— y va como `ajuste` con
+  motivo, nunca como `merma`.
+- Se fueron `mostrador/confirmar` y `mostrador/devolver`: bajar al depósito es escribir un número
+  más chico en la tabla.
+
+### La caja del dispensario se abre y se cierra en UN solo lugar
+
+`POST /sedes/:id/caja/abrir` existía y sólo pedía un fondo: **abrir por ahí salteaba la mitad del
+arqueo**, porque no contaba la mercadería — y la ficha de la sede lo ofrecía como si fuera lo
+normal. Junto con `confirmar_apertura`, `solicitar_cierre`, `confirmar_cierre` y `cerrar`, se
+retiraron. En `cajas#*` queda lo que es de la caja y no del mostrador: mover plata y anular.
+
+- **`sin_confirmar` es del BUFFET, no del dispensario.** El tablero preguntaba
+  `apertura_confirmada?` a las dos cajas por igual: como en el dispensario ya nadie confirma nada,
+  toda caja del mostrador iba a quedar `sin_confirmar` para siempre, esperando un paso que no le
+  toca a nadie.
+- **Anular una caja abierta por error dejaba la sede sin poder dispensar.** Abrir es un gesto que
+  crea DOS cosas, y `anular!` sólo deshacía una: el turno quedaba abierto apuntando a una caja
+  anulada, y desde ahí el mostrador no se podía volver a abrir —decía que ya había uno— ni cerrar
+  —el cierre le pedía el arqueo a una caja que ya no estaba—. Ahora se deshacen las dos. El turno
+  se **borra**, no se cierra: nunca fue un turno, y dejarlo cerrado lo metería en la lista y en el
+  cálculo de merma con un arqueo que nadie hizo. Si ya se dispensó, no es una apertura equivocada:
+  se cierra con su arqueo. **La mesa no se toca** — es del mostrador y el producto sigue ahí.
+
+### Lo que vuelve: a la mesa o al depósito
+
+Revertir una dispensa empujaba producto a la mesa **siempre**. Con la mesa permanente eso significa
+que un admin que cancelaba una dispensa suya a las diez de la mañana, con el mostrador sin abrir,
+dejaba cien gramos **apartados sobre una mesa vacía**: invisibles como disponibles en el depósito,
+esperando que alguien se diera cuenta de bajarlos.
+
+Vuelve a la mesa en dos casos, y sólo en esos dos:
+
+- el producto **ya está** sobre la mesa — salió de ahí y vuelve ahí, esté quien esté;
+- **no está, pero hay alguien atendiendo**. Es el caso que motivó la regla: el paquete que el
+  repartidor no pudo entregar vuelve a las 19:00 y el que atiende lo tiene ahí adelante.
+
+En el resto vuelve al depósito, que es donde no molesta a nadie.
+
+### La papelera se retiró
+
+Restaurar re-aplicaba los efectos sobre el estado de **HOY**, no sobre el de entonces: traer de
+vuelta una dispensación de hace tres semanas le sacaba producto a la mesa del mostrador de hoy, y
+quien estaba atendiendo cerraba con un faltante que no era suyo y no podía explicar.
+
+Deshacer algo que movió stock o plata **no es desenterrar la fila**: es la reversa explícita que ya
+existe (`Dispensaciones::Cancelar`), que sabe revertir contra el estado actual y es la que usa la
+rendición del repartidor. El soft-delete sigue: los registros no se pierden, simplemente no hay un
+botón que los re-ejecute a ciegas. `Restore::*` y sus specs quedan en el repo por si vuelve acotada
+a lo **inerte** —una genética, una sala, una tarea—, que es donde restaurar es literalmente volver
+a poner la fila.
+
+### Lo que apareció mirando la pantalla, rol por rol
+
+- **El esperado del cajón se le mostraba a quien lo iba a contar.** El modal de conteo se cuida de
+  no revelarlo hasta que escribís, pero la pantalla de atrás decía *"en caja tendría que haber
+  $20.000"* todo el día, sin guard de rol. Con el número a la vista se escribe ese, el conteo es
+  teatro y toda la merma que se mide da cero. Ahora es sólo para administración, que monitorea.
+- **El cartel del carrito vacío le proponía al dispensador lo único que no puede hacer**: *"bajá lo
+  que falte del depósito"*. La mesa la carga administración. Un cartel que propone una acción
+  prohibida es peor que no tener cartel.
+- **Los tres motivos de la lista de trabajo se renombraron** al modelo nuevo: `sin_supervision` era
+  una bandera del modelo viejo y su chip salía **vacío**. Ahora son *faltó producto*, *se corrigió
+  al abrir* y *se movió la mesa durante el turno*.
+
+### Limpieza
+
+`Mostradores::AbrirTurno`, `CerrarTurno`, `ConfirmarApertura` y `MoverStock` se fueron; entraron
+`AbrirCaja`, `Cargar`, `CerrarCaja` y `Contar` — el conteo suelto vivía en el controller, que era
+el único de los cuatro sin service. El ajuste de inventario por conteo estaba escrito **dos veces**
+(cierre y conteo suelto) y ahora vive en `MostradorItem#ajustar_inventario!`.
+
+`TurnoMostradorMovimiento` quedó marcado como **histórico**: no se escribe más, pero la tabla tiene
+las filas de los turnos viejos. Darla de baja —junto con `cantidad_repuesta`, `cantidad_devuelta`,
+`cantidad_ajuste` y `cantidad_heredada`, que ya no escribe nadie— es una migración aparte.
+
+**2759 rspec ✓ · 1707 vitest ✓ · 7 pruebas de navegador ✓.**
+
+---
+
 ## Septiembre 2026 (w) — qué es un producto se puede corregir
 
 Un stock cargado como **`prensado` porque todavía no existía `preroll`** no se podía arreglar: la

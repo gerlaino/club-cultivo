@@ -157,12 +157,24 @@ describe('Dispensar — la tabla de productos', () => {
 describe('Dispensar — la lista vacía dice por qué', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('al dispensador le dice que el mostrador está vacío, y dónde se arregla', async () => {
+  it('al dispensador le dice que la mesa está vacía, y dónde se arregla', async () => {
     const w = await montar([], 'dispensador')
+    const aviso = w.find('.mnd__warn-box').text()
 
-    expect(w.find('.mnd__warn-box').text()).toContain('No hay nada sobre el mostrador')
-    expect(w.find('.mnd__warn-box').text()).toContain('Mostrador')
+    expect(aviso).toContain('sobre la mesa')
+    expect(aviso).toContain('Mostrador')
     expect(w.text()).not.toContain('Sin stock disponible')
+  })
+
+  // Y le propone SÓLO lo que puede hacer. La mesa la carga administración: mandarlo a bajar del
+  // depósito es invitarlo a una acción que el backend le rechaza, que es el mismo error de
+  // "la pantalla te deja y el backend te frena" con otro disfraz.
+  it('no lo manda a bajar producto del depósito, que es lo único que no puede hacer', async () => {
+    const w = await montar([], 'dispensador')
+    const aviso = w.find('.mnd__warn-box').text()
+
+    expect(aviso).toContain('administración')
+    expect(aviso).not.toMatch(/bajá lo que falte/i)
   })
 
   // Administración dispensa del depósito: para ella la lista vacía sí significa que no hay stock.

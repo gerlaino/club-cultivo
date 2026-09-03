@@ -404,8 +404,19 @@ Rails.application.routes.draw do
     end
 
     # Papelera — historial de borrados / restauración (admin + super_admin)
-    get  'papelera',            to: 'papelera#index'
-    post 'papelera/restaurar',  to: 'papelera#restaurar'
+    # LA PAPELERA SE RETIRÓ (sep-2026). Restaurar re-aplicaba los efectos sobre el estado de HOY,
+    # no sobre el de entonces: traer de vuelta una dispensación de hace tres semanas le sacaba
+    # producto a la mesa del mostrador de hoy, y quien estaba atendiendo cerraba con un faltante
+    # que no era suyo y no podía explicar.
+    #
+    # Deshacer algo que movió stock o plata NO es desenterrar la fila: es la reversa explícita
+    # que ya existe (`Dispensaciones::Cancelar`), que sabe revertir contra el estado actual y es
+    # la que usa la rendición del repartidor. El soft-delete sigue: los registros no se pierden,
+    # simplemente no hay un botón que los re-ejecute a ciegas.
+    #
+    # `Restore::*` y sus specs quedan en el repo: si vuelve, vuelve acotada a lo INERTE (una
+    # genética, una sala, una tarea), que es donde restaurar es literalmente volver a poner la
+    # fila. Ver `docs/CHANGELOG.md`.
 
     resources :sedes do
       collection { get :resumen_financiero }
@@ -417,11 +428,12 @@ Rails.application.routes.draw do
         get  'caja',        to: 'cajas#index'
         get  'caja/actual', to: 'cajas#actual'
         get  'caja/responsables', to: 'cajas#responsables'
-        post 'caja/abrir',  to: 'cajas#abrir'
-        post 'caja/:id/confirmar_apertura', to: 'cajas#confirmar_apertura'
-        post 'caja/:id/solicitar_cierre',   to: 'cajas#solicitar_cierre'
-        post 'caja/:id/confirmar_cierre',   to: 'cajas#confirmar_cierre'
-        post 'caja/:id/cerrar',             to: 'cajas#cerrar'
+        # ABRIR Y CERRAR LA CAJA DEL DISPENSARIO NO TIENEN PUERTA PROPIA, a propósito: se hace
+        # en `mostrador#abrir` y `mostrador#cerrar`, que además CUENTAN LA MERCADERÍA. Esta ruta
+        # existía y sólo pedía un fondo: abrir por acá salteaba la mitad del arqueo, y la
+        # pantalla de la sede lo ofrecía. Dos puertas al mismo hecho es cómo dejan de coincidir.
+        # (La ceremonia de confirmar apertura y cierre cruzado también se fue: era el mismo
+        # conteo pedido dos veces, con un botón que nadie miraba.)
         post 'caja/:id/salida',             to: 'cajas#salida'
         post 'caja/:id/ingreso',            to: 'cajas#ingreso'
         post 'caja/:id/anular',             to: 'cajas#anular'
@@ -429,11 +441,13 @@ Rails.application.routes.draw do
         # El MOSTRADOR: la mercadería sobre la mesa. Se abre junto con la caja —un gesto, dos
         # arqueos— pero es un registro aparte: el efectivo va al libro y los gramos al inventario.
         get  'mostrador',          to: 'mostrador#actual'
+        # ABRIR y CERRAR son el ARQUEO: quien atiende cuenta la mesa y la plata. CARGAR es la
+        # mesa: administración escribe cuánto tiene que haber de cada producto, con motivo.
+        # (`confirmar` se fue —la recepción separada era el mismo conteo pedido dos veces— y
+        # `devolver` también: bajar al depósito es escribir un número más chico en la tabla.)
         post 'mostrador/abrir',    to: 'mostrador#abrir'
-        post 'mostrador/confirmar', to: 'mostrador#confirmar'
-        post 'mostrador/contar',   to: 'mostrador#contar'
         post 'mostrador/cargar',   to: 'mostrador#cargar'
-        post 'mostrador/devolver', to: 'mostrador#devolver'
+        post 'mostrador/contar',   to: 'mostrador#contar'
         post 'mostrador/cerrar',   to: 'mostrador#cerrar'
         get  'mostrador/merma',    to: 'mostrador#merma'
         get  'mostrador/turnos',              to: 'mostrador#turnos'

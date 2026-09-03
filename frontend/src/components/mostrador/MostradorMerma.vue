@@ -35,7 +35,7 @@
           <li v-for="t in pendientes" :key="t.id" class="mrm__pendiente">
             <div class="mrm__pendiente-info">
               <span class="mrm__pendiente-quien">
-                {{ t.recibido_por || t.cerrado_por || 'Alguien' }}
+                {{ t.atendio || t.cerrado_por || 'Alguien' }}
                 <em class="mrm__pendiente-cuando">· {{ fecha(t.cerrado_at) }}</em>
               </span>
               <span class="mrm__pendiente-motivos">
@@ -157,7 +157,7 @@
                   <!-- El plural de "corrección" PIERDE el acento: pegarle "es" da
                        "correcciónes". Misma trampa que organización → organizaciones. -->
                   <span v-if="t.correcciones" class="mrm__pill mrm__pill--info">
-                    {{ t.correcciones }} {{ t.correcciones > 1 ? 'correcciones' : 'corrección' }} al recibir
+                    {{ t.correcciones }} {{ t.correcciones > 1 ? 'correcciones' : 'corrección' }} al abrir
                   </span>
                 </div>
               </td>
@@ -219,9 +219,12 @@ const corrigiendo   = ref(null)
 // el mostrador. El cliente no tiene por qué adivinar qué día es en el servidor.
 const rango = ref({ desde: '', hasta: '' })
 
-const MOTIVO = { faltante: 'Faltó producto', corregido: 'Se corrigió al recibir',
-                 sin_supervision: 'Se repuso sin supervisión' }
-const PILL   = { faltante: 'warn', corregido: 'info', sin_supervision: 'info' }
+// Las tres razones por las que un turno entra a la lista, con el nombre que usa la gente. Un
+// renglón que no dice qué mirar obliga a abrirlo para descubrir que no era nada — y una razón sin
+// etiqueta acá se dibuja como un chip vacío, que es peor todavía.
+const MOTIVO = { faltante: 'Faltó producto', corregido: 'Se corrigió al abrir',
+                 mesa_movida: 'Se movió la mesa durante el turno' }
+const PILL   = { faltante: 'warn', corregido: 'info', mesa_movida: 'info' }
 
 // Lo que todavía no miró nadie Y tiene algo para mirar.
 const pendientes = computed(() =>

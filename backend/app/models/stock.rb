@@ -26,7 +26,9 @@ class Stock < ApplicationRecord
   has_many :provisiones_evento, class_name: 'EventoBarProvision', as: :provisionable, dependent: :destroy
   # Los turnos de mostrador que tienen este stock sobre la mesa. Apartan igual que un evento:
   # bloquean la cantidad sin descontarla.
+  # El conteo de este producto en cada turno (historial de arqueos) y su renglón sobre la mesa.
   has_many :items_mostrador, class_name: 'TurnoMostradorItem', dependent: :destroy
+  has_many :mostrador_items, dependent: :destroy
   has_many :derivados, class_name: 'Stock', foreign_key: :producido_desde_stock_id, dependent: :nullify
 
   ORIGENES         = %w[lote derivado_lote compra_externa].freeze
@@ -108,20 +110,24 @@ class Stock < ApplicationRecord
     envios + apartado + apartado_para_eventos.to_f + apartado_para_mostrador.to_f
   end
 
-  # Cantidad que está SOBRE LA MESA de un mostrador con el turno abierto.
+  # Cantidad que está SOBRE LA MESA de un mostrador.
   #
   # Es la misma mecánica que el apartado de un evento —bloquea, no descuenta— con otro
-  # destinatario: mientras el mostrador la tiene cargada, nadie más la ve libre (ni una reserva
-  # de paciente ni la provisión de un evento). Se libera al cerrar el turno.
+  # destinatario: mientras el mostrador la tiene cargada, nadie más la ve libre (ni una reserva de
+  # paciente ni la provisión de un evento).
+  #
+  # NO depende de que haya un turno abierto: el producto está físicamente sobre esa mesa a las
+  # tres de la tarde y a la medianoche. Antes se liberaba al cerrar el turno, lo que significaba
+  # que de noche el sistema lo daba por libre y una reserva podía comprometerlo.
   #
   # Cargar el mostrador NO genera `StockMovimiento`: el gramo no salió de la organización ni
   # cambió de sede, sigue siendo esta misma fila. Lo único que cambia es quién responde por él, y
-  # ese rastro vive en el turno.
+  # ese rastro vive en `MostradorMovimiento`.
   def apartado_para_mostrador
     return @apartado_mostrador_precargado if defined?(@apartado_mostrador_precargado)
-    return 0.to_d unless TurnoMostradorItem.table_exists?
+    return 0.to_d unless MostradorItem.table_exists?
 
-    items_mostrador.en_turno_abierto.saldo_total
+    MostradorItem.unscoped.where(stock_id: id).sum(:cantidad).to_d
   end
 
   # Una query para toda una lista, en vez de una por stock.
@@ -131,12 +137,10 @@ class Stock < ApplicationRecord
   # apartado de eventos ya suma en Ruby con su propio N+1 — no hacía falta sumar otro.
   def self.precargar_apartado_mostrador(stocks)
     lista = Array(stocks)
-    return lista if lista.empty? || !TurnoMostradorItem.table_exists?
+    return lista if lista.empty? || !MostradorItem.table_exists?
 
-    saldos = TurnoMostradorItem.unscoped.en_turno_abierto
-                               .where(stock_id: lista.map(&:id))
-                               .group(:stock_id)
-                               .sum(Arel.sql(TurnoMostradorItem::SALDO_SQL))
+    saldos = MostradorItem.unscoped.where(stock_id: lista.map(&:id))
+                          .group(:stock_id).sum(:cantidad)
     lista.each { |s| s.instance_variable_set(:@apartado_mostrador_precargado, saldos[s.id].to_d) }
     lista
   end
@@ -145,12 +149,11 @@ class Stock < ApplicationRecord
   # usar una dispensa hecha desde ese mostrador: para el resto del mundo sigue bloqueado, pero
   # para el mostrador que lo tiene cargado no es un bloqueo, es su stock.
   def apartado_en_mostrador_de_sede(sede_id)
-    return 0.to_d if sede_id.blank? || !TurnoMostradorItem.table_exists?
+    return 0.to_d if sede_id.blank? || !MostradorItem.table_exists?
 
-    items_mostrador.en_turno_abierto
-                   .joins(turno_mostrador: :mostrador)
-                   .where(mostradores: { sede_id: sede_id })
-                   .saldo_total
+    MostradorItem.unscoped.where(stock_id: id)
+                 .joins(:mostrador).where(mostradores: { sede_id: sede_id })
+                 .sum(:cantidad).to_d
   end
 
   # Cantidad apartada por eventos del salón que todavía no se liberó (reservado − consumido).

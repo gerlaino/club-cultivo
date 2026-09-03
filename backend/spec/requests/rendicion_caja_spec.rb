@@ -236,18 +236,42 @@ RSpec.describe 'Rendir la caja del repartidor', type: :request do
       expect(stock.reload.cantidad.to_f).to eq(980.0) # 955 + los 25 que volvieron
     end
 
+    # Si el gramo volviera al depósito, quien atiende no lo tendría para entregárselo al próximo
+    # que lo pida, con el paquete ahí adelante. Sube a la mesa Y se le hace lugar si no estaba.
     it 'y SUBE A LA MESA aunque ese producto no estuviera arriba' do
-      turno = abrir_mostrador!(sede, usuario: admin, recibe: create(:user, :dispensador, club: club))
-      # La mesa arranca sin este stock: se lo saca a mano para que la prueba sea la de verdad.
-      ActsAsTenant.with_tenant(club) { turno.items.destroy_all }
+      abrir_mostrador!(sede, usuario: admin, recibe: create(:user, :dispensador, club: club))
+      # La mesa arranca sin este stock: se lo saca para que la prueba sea la de verdad.
+      ActsAsTenant.with_tenant(club) do
+        Mostradores::Cargar.call(mostrador: sede.mostrador!, usuario: admin, motivo: 'lo bajo',
+                                 cambios: [{ stock_id: stock.id, cantidad: 0 }])
+      end
+      expect(mesa_de(sede)[stock.id]).to be_nil
 
       id = rendir!['id']
       recibir!(id)
 
-      item = turno.reload.items.find_by(stock_id: stock.id)
-      expect(item).to be_present
-      expect(item.esperado.to_f).to eq(25.0)
-      expect(item.movimientos.cargas.last.notas).to match(/Volvió de la dispensación/)
+      expect(mesa_de(sede)[stock.id]).to eq(25.0)
+      mov = MostradorMovimiento.unscoped.recientes.first
+      expect(mov.tipo).to eq('devolucion')
+      expect(mov.motivo).to match(/Volvió de la dispensación/)
+    end
+
+    # Y el mostrador ya no depende de que haya alguien atendiendo: el paquete vuelve a las once
+    # de la noche y el producto queda sobre la mesa igual, listo para mañana.
+    it 'aunque la caja esté cerrada' do
+      turno = abrir_mostrador!(sede, usuario: admin, recibe: create(:user, :dispensador, club: club))
+      ActsAsTenant.with_tenant(club) do
+        Mostradores::Cargar.call(mostrador: sede.mostrador!, usuario: admin, motivo: 'lo bajo',
+                                 cambios: [{ stock_id: stock.id, cantidad: 0 }])
+        Mostradores::CerrarCaja.call(turno: turno, usuario: admin, efectivo_contado_ars: 0,
+                                     conteos: sede.mostrador!.sobre_la_mesa.map { |mi|
+                                       { stock_id: mi.stock_id, contado: mi.cantidad }
+                                     })
+      end
+
+      recibir!(rendir!['id'])
+
+      expect(mesa_de(sede)[stock.id]).to eq(25.0)
     end
 
     it 'sólo se desarman los del repartidor que rinde' do

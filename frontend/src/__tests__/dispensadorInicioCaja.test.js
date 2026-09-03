@@ -1,17 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
-// AC (Germán): "un arranque de caja, el admin abre la caja, el dispensador confirma, y se
-// arranca", en el Inicio del dispensador.
+// EL ESTADO DEL MOSTRADOR EN EL INICIO DEL DISPENSADOR.
 //
-// Un build limpio no prueba que la pantalla ande: acá se MONTA el inicio con la API respondiendo
-// y se recorre el flujo entero. Ya pasó cuatro veces en este proyecto que algo compilara perfecto
-// y explotara al abrirse.
+// La tarjeta era una SEGUNDA implementación del flujo entero —abrir con el fondo, confirmar el
+// fondo, enviar el cierre, confirmarlo— viviendo en la ficha de la sede y en dos tableros. Dos
+// puertas al mismo hecho es cómo dejan de coincidir, y encima ésta abría la caja **sin contar el
+// stock**: declaraba un fondo y listo, salteando la mitad del arqueo.
 //
-// La tarjeta es `CajaMostradorCard`, compartida con el tablero del admin —que es donde la caja se
-// ABRE—. Se monta a través del inicio del dispensador a propósito: así el test cubre también que
-// el dashboard le pase bien la sede y el permiso, que es donde se rompería.
+// Ahora informa y manda al Mostrador, que es donde el gesto está completo.
 
 const analytics = {
   alcance: 'propio',
@@ -21,160 +19,70 @@ const analytics = {
   reservas: { hoy: 0, vencidas: 0, total: 0, lista: [] },
 }
 
-let cajaActual = null
-const getCajaMostrador = vi.fn(() => Promise.resolve({ data: { caja: cajaActual } }))
-const abrirCajaMostrador = vi.fn(() => Promise.resolve({ data: {} }))
-const confirmarAperturaMostrador = vi.fn(() => Promise.resolve({ data: {} }))
-const solicitarCierreMostrador = vi.fn(() => Promise.resolve({ data: {} }))
-const anularCajaMostrador = vi.fn(() => Promise.resolve({ data: {} }))
+let respuesta = { mesa: [], turno: null }
+const getMostrador = vi.fn(() => Promise.resolve({ data: respuesta }))
 
 vi.mock('../lib/api.js', () => ({
   getAnalyticsDispensador: vi.fn(() => Promise.resolve({ data: analytics })),
   listDispensacionesFecha: vi.fn(() => Promise.resolve({ data: { dispensaciones: [] } })),
   getTareasSemana: vi.fn(() => Promise.resolve({ data: { desde: '2026-08-24', hasta: '2026-08-30', dias: [] } })),
-  getCajaMostrador: (...a) => getCajaMostrador(...a),
-  abrirCajaMostrador: (...a) => abrirCajaMostrador(...a),
-  confirmarAperturaMostrador: (...a) => confirmarAperturaMostrador(...a),
-  solicitarCierreMostrador: (...a) => solicitarCierreMostrador(...a),
-  confirmarCierreMostrador: vi.fn(() => Promise.resolve({ data: {} })),
-  anularCajaMostrador: (...a) => anularCajaMostrador(...a),
-  salidaCajaMostrador: vi.fn(() => Promise.resolve({ data: {} })),
+  getMostrador: (...a) => getMostrador(...a),
+  listRendiciones: vi.fn(() => Promise.resolve({ data: { rendiciones: [] } })),
+  receptoresRendicion: vi.fn(() => Promise.resolve({ data: [] })),
+  crearRendicion: vi.fn(), recibirRendicion: vi.fn(), conformarRendicion: vi.fn(),
 }))
 vi.mock('../composables/useToast.js', () => ({
   useToast: () => ({ success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() }),
 }))
 
-async function montar(rol = 'dispensador') {
+async function montar (rol = 'dispensador') {
   setActivePinia(createPinia())
   const { useAuthStore } = await import('../stores/auth.js')
-  useAuthStore().user = { id: 1, first_name: 'Ana', role: rol }
-
-  const { default: Dashboard } = await import('../components/dashboards/DispensadorDashboard.vue')
-  const w = mount(Dashboard, { global: { stubs: { RouterLink: { template: '<a><slot/></a>' }, DsStat: true } } })
-  for (let i = 0; i < 8; i++) await new Promise((r) => setTimeout(r, 0))
+  useAuthStore().user = { id: 2, role: rol }
+  const { default: Dash } = await import('../components/dashboards/DispensadorDashboard.vue')
+  const w = mount(Dash, { global: { stubs: { RouterLink: { template: '<a><slot/></a>' } } } })
+  await flushPromises(); await flushPromises()
   return w
 }
 
-describe('Inicio del dispensador — la caja del turno', () => {
-  beforeEach(() => { vi.clearAllMocks(); cajaActual = null })
+beforeEach(() => { vi.clearAllMocks(); respuesta = { mesa: [], turno: null } })
 
-  it('sin caja abierta lo dice, y al dispensador no le ofrece abrirla', async () => {
-    const w = await montar('dispensador')
+describe('El mostrador en el inicio del dispensador', () => {
+  it('con la mesa vacía, dice que hay que cargarla', async () => {
+    const w = await montar()
 
-    expect(w.find('.cjm').exists()).toBe(true)
-    expect(w.text()).toContain('La caja todavía no se abrió')
-    // Quien declara el fondo es quien responde por él: el botón es de administración.
-    expect(w.find('.cjm-abrir').exists()).toBe(false)
-    expect(w.text()).toContain('La abre administración')
+    expect(getMostrador).toHaveBeenCalledWith(10)
+    expect(w.find('.cjm').text()).toContain('La mesa está vacía')
   })
 
-  it('el admin sí puede abrirla, con su fondo', async () => {
-    const w = await montar('admin')
+  // Es el estado que más confunde: hay producto pero nadie abrió, así que no se puede dispensar.
+  it('con mercadería y sin caja abierta, lo dice', async () => {
+    respuesta = { mesa: [{ stock_id: 1, mostrador: 300 }], turno: null }
+    const w = await montar()
 
-    expect(w.find('.cjm-abrir').exists()).toBe(true)
-    await w.find('.cjm-input').setValue(10000)
-    await w.find('.cjm-btn').trigger('click')
-
-    expect(abrirCajaMostrador).toHaveBeenCalledWith(10, { monto_inicial_ars: 10000 })
+    expect(w.find('.cjm').text()).toContain('Hay mercadería sobre la mesa')
   })
 
-  it('abierta y sin confirmar, le pide al que atiende que confirme el fondo', async () => {
-    cajaActual = { id: 7, estado: 'abierta', apertura_confirmada: false, monto_inicial_ars: 10000, abierta_por: 'Vera Admin' }
-    const w = await montar('dispensador')
-
-    expect(w.text()).toContain('Vera Admin')
-    expect(w.text()).toContain('Confirmo que está el fondo')
-
-    await w.find('.cjm-btn').trigger('click')
-    expect(confirmarAperturaMostrador).toHaveBeenCalledWith(10, 7)
-  })
-
-  it('en marcha muestra el arqueo esperado y deja enviar el cierre', async () => {
-    cajaActual = {
-      id: 7, estado: 'abierta', apertura_confirmada: true, monto_inicial_ars: 10000,
-      total_efectivo_ars: 4000, total_digital_ars: 3000, efectivo_esperado_ars: 14000,
+  it('con la caja abierta, muestra quién y cuánto se espera', async () => {
+    respuesta = {
+      mesa: [{ stock_id: 1, mostrador: 300 }],
+      turno: { id: 7, abierto_por: 'Ana Gómez', abierto_at: '2026-09-02T12:00:00Z',
+               caja: { fondo_ars: 50000, cobrado_efectivo_ars: 8500, esperado_ars: 58500 } },
     }
-    const w = await montar('dispensador')
+    const w = await montar()
 
-    const nums = w.find('.cjm-nums').text()
-    expect(nums).toContain('esperado en caja')
-
-    await w.find('.cjm-input').setValue(13500)
-    await w.find('.cjm-btn').trigger('click')
-
-    expect(solicitarCierreMostrador).toHaveBeenCalledWith(10, 7, { efectivo_declarado_ars: 13500 })
+    const txt = w.find('.cjm').text()
+    expect(txt).toContain('Ana Gómez')
+    expect(txt).toContain('producto sobre la mesa')
+    expect(txt).toContain('58.500')
   })
 
-  it('con el cierre enviado, sólo administración lo confirma', async () => {
-    cajaActual = {
-      id: 7, estado: 'pendiente_cierre', apertura_confirmada: true, monto_inicial_ars: 10000,
-      efectivo_declarado_ars: 13500, diferencia_ars: -500, cierre_solicitado_por: 'Ana Mostrador',
-    }
-    const w = await montar('dispensador')
+  // UNA sola puerta: contar, abrir, cargar y cerrar pasan en Mostrador.
+  it('no abre ni cierra desde acá: manda al mostrador', async () => {
+    const w = await montar()
 
-    expect(w.text()).toContain('Ana Mostrador')
-    expect(w.text()).toContain('Faltan')
-    expect(w.text()).toContain('Esperando que administración')
-    expect(w.find('.cjm-btn').exists()).toBe(false)
-  })
-
-  // Se abrió por error y hay que deshacerlo. Cerrarla con $0 contado generaría un faltante por
-  // todo el fondo: un egreso inventado en el libro por una caja que nunca operó.
-  //
-  // Se prueba en los DOS estados a propósito. La primera versión de este test miraba sólo la caja
-  // sin confirmar —que era donde yo había puesto el botón— y pasaba en verde mientras el botón
-  // desaparecía apenas alguien confirmaba el fondo, que es justo cuando uno se da cuenta del
-  // error. El AC es "se puede deshacer una caja abierta por error", no "en tal estado".
-  it.each([
-    ['sin confirmar el fondo', { apertura_confirmada: false }],
-    ['con el fondo confirmado', { apertura_confirmada: true, total_efectivo_ars: 0,
-                                  total_digital_ars: 0, efectivo_esperado_ars: 100000 }],
-  ])('se puede anular %s, y sólo la anula administración', async (_caso, extra) => {
-    cajaActual = { id: 7, estado: 'abierta', monto_inicial_ars: 100000, abierta_por: 'Vera',
-                   anulable: true, ...extra }
-
-    const delMostrador = await montar('dispensador')
-    expect(delMostrador.text()).not.toContain('anularla')
-
-    const w = await montar('admin')
-    const btn = w.findAll('.cjm-link').find((b) => b.text().includes('anularla'))
-    expect(btn, 'el admin tiene que poder anularla en este estado').toBeTruthy()
-
-    await btn.trigger('click')
-    expect(anularCajaMostrador).toHaveBeenCalled()
-  })
-
-  // Con plata adentro la salida es el cierre con su arqueo, no la anulación.
-  it('con movimientos ya no ofrece anular', async () => {
-    cajaActual = { id: 7, estado: 'abierta', apertura_confirmada: false, monto_inicial_ars: 100000,
-                   abierta_por: 'Vera', anulable: false }
-    const w = await montar('admin')
-
-    expect(w.text()).not.toContain('anularla')
-  })
-
-  // "Turno mañana", "faltaron $500 porque se pagó un flete": sin esto, tres semanas después una
-  // diferencia no se puede revisar.
-  it('el cierre lleva observaciones', async () => {
-    cajaActual = { id: 7, estado: 'abierta', apertura_confirmada: true, monto_inicial_ars: 10000,
-                   total_efectivo_ars: 0, total_digital_ars: 0, efectivo_esperado_ars: 10000 }
-    const w = await montar('dispensador')
-
-    await w.find('.cjm-obs').setValue('turno mañana')
-    await w.find('.cjm-input').setValue(10000)
-    await w.findAll('.cjm-btn')[0].trigger('click')
-
-    expect(solicitarCierreMostrador).toHaveBeenCalledWith(10, 7,
-      expect.objectContaining({ notas: 'turno mañana' }))
-  })
-
-  // Sin sede no hay mostrador que abrir: el bloque no se dibuja en vez de romperse.
-  it('sin sede de mostrador, el bloque no aparece', async () => {
-    const original = analytics.sede_mostrador
-    analytics.sede_mostrador = null
-    const w = await montar('dispensador')
-
-    expect(w.find('.cjm').exists()).toBe(false)
-    analytics.sede_mostrador = original
+    expect(w.find('.cjm').text()).toContain('Ir al mostrador')
+    expect(w.text()).not.toContain('Abrir caja')
+    expect(w.text()).not.toContain('Fondo inicial')
   })
 })

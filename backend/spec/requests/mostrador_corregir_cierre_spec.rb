@@ -33,14 +33,13 @@ RSpec.describe 'Corregir el conteo de un turno cerrado', type: :request do
       Dispensacion.create!(paciente: paciente, user: ana, stock: stock, sede: sede, cantidad: 85,
                            medio_pago: 'efectivo', aporte_socio_ars: 8_500,
                            fecha_dispensacion: Time.zone.today)
-      item = t.items.first
-      Mostradores::CerrarTurno.call(turno: t, usuario: ana, efectivo_contado_ars: 8_500,
-                                    conteos: [{ item_id: item.id, contado: 21, motivo: 'conté mal' }])
+      Mostradores::CerrarCaja.call(turno: t, usuario: ana, efectivo_contado_ars: 8_500,
+                                   conteos: [{ stock_id: stock.id, contado: 21 }], notas: 'conté mal')
       t.reload
     end
   end
 
-  def item = turno.items.first
+  def item = turno.items.find_by(stock_id: stock.id)
 
   def corregir!(contado:, motivo: 'me comí un dígito', como: admin)
     sign_in_as(como)

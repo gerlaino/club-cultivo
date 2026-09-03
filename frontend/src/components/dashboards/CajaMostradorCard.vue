@@ -1,331 +1,132 @@
 <template>
-  <!-- ── Caja del turno ──────────────────────────────────────────────────────
-       Lo primero de la jornada: sin caja abierta, el mostrador no arrancó. El admin la abre
-       declarando el fondo y quien atiende confirma que ese fondo está — los dos pasos existen
-       para que ninguno quede solo respondiendo por una diferencia de arqueo. -->
-  <section v-if="sede" class="cjm" :class="`cjm--${estadoCaja}`">
-    <div v-if="!colapsada" class="cjm-hd">
-      <span class="cjm-title"><i class="bi bi-cash-stack"></i> Caja del turno</span>
+  <section v-if="sede" class="cjm" :class="`cjm--${estado}`">
+    <div class="cjm-hd">
+      <span class="cjm-title"><i class="bi bi-shop"></i> Mostrador</span>
       <span class="cjm-sede">{{ sede.nombre }}</span>
     </div>
 
-    <!-- Renglón compacto: la caja está andando y no pide nada. Se toca para ver el arqueo. -->
-    <button v-if="colapsada" type="button" class="cjm-mini" @click="expandido = true">
-      <span class="cjm-mini-ok"><i class="bi bi-check-circle-fill"></i> En turno</span>
-      <span class="cjm-mini-num">{{ fmtARS(caja.efectivo_esperado_ars) }} esperados</span>
-      <i class="bi bi-chevron-down"></i>
-    </button>
+    <p v-if="cargando" class="cjm-msg">Cargando…</p>
 
     <template v-else>
-    <div v-if="cargandoCaja" class="cjm-msg">Cargando…</div>
-
-    <!-- Sin caja: el mostrador no abrió -->
-    <template v-else-if="!caja">
-      <p class="cjm-msg">La caja todavía no se abrió.</p>
-      <div v-if="puedeGestionarCaja" class="cjm-abrir">
-        <label class="cjm-label">Fondo inicial</label>
-        <div class="cjm-input-wrap">
-          <span class="cjm-prefix">$</span>
-          <input v-model.number="fondoInicial" type="number" min="0" step="1" class="cjm-input" placeholder="0" />
+      <!-- En el teléfono, arriba del buscador de pacientes, el detalle empuja lo que se usa: se
+           muestra el estado en un renglón y el detalle está a un toque. -->
+      <div v-if="!compacto" class="cjm-nums">
+        <div>
+          <span class="cjm-n">{{ productos }}</span>
+          <span class="cjm-l">producto{{ productos === 1 ? '' : 's' }} sobre la mesa</span>
         </div>
-        <button class="cjm-btn" :disabled="guardandoCaja" @click="abrirCaja">Abrir caja</button>
-      </div>
-      <p v-else class="cjm-hint">La abre administración con el fondo del día.</p>
-    </template>
-
-    <!-- Abierta y sin confirmar: le toca a quien atiende -->
-    <template v-else-if="caja.estado === 'abierta' && !caja.apertura_confirmada">
-      <p class="cjm-msg">
-        {{ caja.abierta_por }} abrió con <strong>{{ fmtARS(caja.monto_inicial_ars) }}</strong> de fondo.
-      </p>
-      <button class="cjm-btn" :disabled="guardandoCaja" @click="confirmarApertura">
-        Confirmo que está el fondo
-      </button>
-    </template>
-
-    <!-- En marcha -->
-    <template v-else-if="caja.estado === 'abierta'">
-      <div class="cjm-nums">
-        <div><span class="cjm-n">{{ fmtARS(caja.monto_inicial_ars) }}</span><span class="cjm-l">fondo</span></div>
-        <div><span class="cjm-n">{{ fmtARS(caja.total_efectivo_ars) }}</span><span class="cjm-l">efectivo cobrado</span></div>
-        <div><span class="cjm-n">{{ fmtARS(caja.total_digital_ars) }}</span><span class="cjm-l">transferencias</span></div>
-        <div><span class="cjm-n cjm-n--fuerte">{{ fmtARS(caja.efectivo_esperado_ars) }}</span><span class="cjm-l">esperado en caja</span></div>
-      </div>
-      <div v-if="caja.salidas?.length" class="cjm-salidas">
-        <span class="cjm-salidas-t">Salidas del turno</span>
-        <span v-for="sa in caja.salidas" :key="sa.id" class="cjm-salida">
-          <span class="cjm-salida-tag" :class="`cjm-salida-tag--${sa.clase}`">{{ sa.clase }}</span>
-          −{{ fmtARS(sa.monto_ars) }} · {{ sa.descripcion }}
-          <template v-if="sa.quien"> · {{ sa.quien }}</template>
-        </span>
-      </div>
-
-      <div class="cjm-cerrar">
-        <label class="cjm-label">Efectivo contado</label>
-        <div class="cjm-input-wrap">
-          <span class="cjm-prefix">$</span>
-          <input v-model.number="efectivoContado" type="number" min="0" step="1" class="cjm-input" placeholder="0" />
-        </div>
-        <button class="cjm-btn" :disabled="guardandoCaja || efectivoContado == null" @click="enviarCierre">
-          Cerrar turno
-        </button>
-      </div>
-      <!-- Con qué turno se corresponde y qué pasó. Va al cierre y queda en el historial: dentro
-           de un mes, "faltaban $500" sin contexto no se puede revisar. -->
-      <input v-model.trim="observaciones" type="text" class="cjm-input cjm-obs"
-             placeholder="Observaciones — ej: turno mañana" />
-
-      <button v-if="puedeGestionarCaja" type="button" class="cjm-link"
-              @click="mostrarSalida = !mostrarSalida; mostrarSalida && cargarResponsables()">
-        {{ mostrarSalida ? 'Cancelar' : 'Sacar efectivo de la caja' }}
-      </button>
-      <div v-if="mostrarSalida && puedeGestionarCaja" class="cjm-salida-form">
-        <!-- La distinción NO es cosmética: un retiro asentado como gasto infla los gastos y baja
-             el resultado por plata que el club todavía tiene. -->
-        <div class="cjm-clases">
-          <label class="cjm-clase" :class="{ 'cjm-clase--on': salidaClase === 'retiro' }">
-            <input type="radio" value="retiro" v-model="salidaClase" />
-            <span><strong>Retiro</strong><small>Sale del cajón pero sigue siendo del club</small></span>
-          </label>
-          <label class="cjm-clase" :class="{ 'cjm-clase--on': salidaClase === 'gasto' }">
-            <input type="radio" value="gasto" v-model="salidaClase" />
-            <span><strong>Gasto</strong><small>Se gastó: baja el resultado</small></span>
-          </label>
-        </div>
-        <div class="cjm-cerrar">
-          <div class="cjm-input-wrap">
-            <span class="cjm-prefix">$</span>
-            <input v-model.number="salidaMonto" type="number" min="0" step="1" class="cjm-input" placeholder="0" />
+        <template v-if="caja">
+          <div>
+            <span class="cjm-n">{{ fmtARS(caja.fondo_ars) }}</span><span class="cjm-l">fondo</span>
           </div>
-          <input v-model.trim="salidaMotivo" type="text" class="cjm-input"
-                 :placeholder="salidaClase === 'retiro' ? 'Para qué' : 'En qué se gastó'" />
-          <button class="cjm-btn" :disabled="guardandoCaja" @click="sacarEfectivo">Registrar</button>
-        </div>
-        <!-- Un retiro SIEMPRE queda a nombre de alguien, y ese alguien responde por la plata:
-             sólo admin o supervisor. Por defecto quien lo registra, porque el caso normal es que
-             se la lleve él; pero el admin puede anotar lo que retiró el supervisor. -->
-        <div v-if="salidaClase === 'retiro'" class="cjm-cerrar">
-          <label class="cjm-label">Queda a nombre de</label>
-          <select v-model="salidaResponsable" class="cjm-input">
-            <option :value="null">— Yo —</option>
-            <option v-for="r in responsables" :key="r.id" :value="r.id">{{ r.nombre }}</option>
-          </select>
-        </div>
+          <div>
+            <span class="cjm-n">{{ fmtARS(caja.cobrado_efectivo_ars) }}</span>
+            <span class="cjm-l">efectivo cobrado</span>
+          </div>
+          <div>
+            <span class="cjm-n cjm-n--fuerte">{{ fmtARS(caja.esperado_ars) }}</span>
+            <span class="cjm-l">esperado en caja</span>
+          </div>
+        </template>
       </div>
-    </template>
 
-    <!-- Cierre enviado, esperando confirmación -->
-    <template v-else>
       <p class="cjm-msg">
-        {{ caja.cierre_solicitado_por }} envió el cierre con <strong>{{ fmtARS(caja.efectivo_declarado_ars) }}</strong>.
-        <span v-if="caja.diferencia_ars" :class="caja.diferencia_ars < 0 ? 'cjm-falta' : 'cjm-sobra'">
-          {{ caja.diferencia_ars < 0 ? 'Faltan' : 'Sobran' }} {{ fmtARS(Math.abs(caja.diferencia_ars)) }}.
-        </span>
-        <span v-else>Cuadra exacto.</span>
+        <template v-if="turno">
+          <strong>{{ turno.abierto_por }}</strong> abrió la caja a las {{ hora(turno.abierto_at) }}.
+        </template>
+        <template v-else-if="productos">
+          La caja está cerrada. Hay mercadería sobre la mesa esperando que alguien abra.
+        </template>
+        <template v-else>
+          La mesa está vacía. Cargala para que se pueda dispensar.
+        </template>
       </p>
-      <template v-if="puedeGestionarCaja">
-        <!-- El motivo de la diferencia va al ASIENTO contable, no sólo al historial. -->
-        <input v-model.trim="observaciones" type="text" class="cjm-input cjm-obs"
-               :placeholder="caja.diferencia_ars ? 'A qué se debió la diferencia' : 'Observaciones (opcional)'" />
-        <button class="cjm-btn" :disabled="guardandoCaja" @click="confirmarCierre">Confirmar cierre</button>
-      </template>
-      <p v-else class="cjm-hint">Esperando que administración lo confirme.</p>
+
+      <!-- UNA sola puerta. Esta tarjeta muestra cómo viene; contar, abrir, cargar y cerrar pasan
+           en el Mostrador, que es donde está el gesto completo. Tener acá un "abrir caja" que
+           sólo pide el fondo salteaba el conteo del stock, que es la mitad del arqueo. -->
+      <RouterLink class="cjm-link" to="/mostrador">Ir al mostrador →</RouterLink>
     </template>
 
-    <!-- Anular vive AFUERA de las ramas de estado: se abrió por error y hay que poder deshacerlo
-         esté el fondo confirmado o no. Estaba sólo en la rama "falta confirmar" y desaparecía
-         apenas alguien confirmaba — que es justo cuando uno se da cuenta del error.
-         Anular NO es cerrar: cerrar con $0 contado generaría un faltante por todo el fondo. -->
-    <button v-if="puedeGestionarCaja && caja?.anulable" type="button" class="cjm-link" @click="anular">
-      Se abrió por error, anularla
-    </button>
-
-    <p v-if="errorCaja" class="cjm-error">{{ errorCaja }}</p>
-    </template>
+    <p v-if="error" class="cjm-error">{{ error }}</p>
   </section>
 </template>
 
 <script setup>
-// La caja de turno del mostrador, como tarjeta.
+// EL MOSTRADOR DE UNA SEDE, COMO RESUMEN.
 //
-// Vive en un componente y no copiada en dos dashboards a propósito: la usan el admin (que la
-// ABRE con el fondo y confirma el cierre) y el dispensador (que confirma el fondo y envía el
-// cierre), y son dos vistas del MISMO objeto. Duplicarla es la forma más segura de que dentro de
-// dos meses una diga una cosa y la otra diga otra.
+// Antes era una segunda implementación del flujo entero —abrir con el fondo, confirmar el fondo,
+// enviar el cierre, confirmarlo— viviendo en la ficha de la sede y en dos tableros. Dos puertas
+// al mismo hecho es cómo dejan de coincidir, y encima ésta abría la caja **sin contar el stock**:
+// declaraba un fondo y listo, salteando la mitad del arqueo.
 //
-// El backend valida los permisos igual; `puedeGestionar` es sólo para no ofrecer un botón que va
-// a rebotar.
-import { ref, computed, watch, onMounted } from 'vue'
-import {
-  getCajaMostrador, abrirCajaMostrador, confirmarAperturaMostrador,
-  solicitarCierreMostrador, confirmarCierreMostrador, anularCajaMostrador, salidaCajaMostrador,
-  responsablesCaja,
-} from '../../lib/api.js'
-import { useToast } from '../../composables/useToast.js'
+// Ahora informa y manda a Mostrador, que es donde el gesto está completo.
+import { ref, computed, watch } from 'vue'
+import { RouterLink } from 'vue-router'
+import { getMostrador } from '../../lib/api.js'
+import { formatARS as fmtARS } from '../../lib/formatters.js'
 
 const props = defineProps({
-  sede: { type: Object, default: null },          // { id, nombre }
+  sede:     { type: Object, default: null },
+  // Quedó de cuando la tarjeta abría y cerraba la caja. Hoy no tiene acciones —todas viven en
+  // Mostrador— así que no cambia nada; se acepta para no romper a quien todavía lo pase.
   puedeGestionar: { type: Boolean, default: false },
-  // En la pantalla de dispensar, con la caja YA andando, la tarjeta entera empuja el buscador
-  // fuera de la vista — y buscar es lo primero que hace quien está de pie con alguien enfrente.
-  // Andando se colapsa a un renglón; cuando pide acción (abrir, confirmar, cerrar) se abre sola.
   compacto: { type: Boolean, default: false },
 })
 
-const expandido = ref(false)
-// El historial de turnos vive afuera (en la ficha de la sede) y tiene que enterarse cuando esta
-// tarjeta cierra o anula: si no, el turno recién cerrado no aparece hasta recargar la página.
-const emit = defineEmits(['cambio'])
+const cargando = ref(true)
+const error    = ref('')
+const mesa     = ref([])
+const turno    = ref(null)
 
-const toast = useToast()
-const caja            = ref(null)
-const cargandoCaja    = ref(true)
-const guardandoCaja   = ref(false)
-const errorCaja       = ref(null)
-const fondoInicial    = ref(null)
-const efectivoContado = ref(null)
-const observaciones   = ref('')
-const mostrarSalida   = ref(false)
-const salidaMonto     = ref(null)
-const salidaMotivo    = ref('')
-// Por defecto RETIRO: es el caso frecuente ("dame plata de la caja") y el que no debe tocar el
-// resultado. Si el default fuera gasto, cada retiro mal marcado bajaría la ganancia del mes.
-const salidaClase     = ref('retiro')
-const salidaResponsable = ref(null)
-const responsables    = ref([])
+const caja      = computed(() => turno.value?.caja || null)
+const productos = computed(() => mesa.value.length)
+const estado    = computed(() => (turno.value ? 'abierta' : productos.value ? 'cargado' : 'vacio'))
 
-const sede = computed(() => props.sede)
-const puedeGestionarCaja = computed(() => props.puedeGestionar)
+const hora = (iso) => (iso ? new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '')
 
-// Sólo se colapsa si NO hay nada que hacer. Abrir, confirmar el fondo y confirmar el cierre son
-// acciones: esas se muestran siempre, aunque la tarjeta esté en modo compacto.
-const colapsada = computed(() =>
-  props.compacto && !expandido.value && estadoCaja.value === 'andando')
-
-const estadoCaja = computed(() => {
-  if (!caja.value) return 'sin-abrir'
-  if (caja.value.estado === 'pendiente_cierre') return 'pendiente'
-  return caja.value.apertura_confirmada ? 'andando' : 'sin-confirmar'
-})
-
-// Se piden recién al abrir el formulario de salida: es una acción excepcional y no vale pedir
-// la lista en cada visita a la tarjeta.
-async function cargarResponsables() {
-  if (responsables.value.length || !sede.value) return
+async function cargar () {
+  if (!props.sede?.id) { cargando.value = false; return }
+  cargando.value = true
+  error.value = ''
   try {
-    const { data } = await responsablesCaja(sede.value.id)
-    responsables.value = data || []
-  } catch { responsables.value = [] }
-}
-
-async function cargarCaja() {
-  if (!sede.value) { cargandoCaja.value = false; caja.value = null; return }
-  cargandoCaja.value = true
-  try {
-    const { data } = await getCajaMostrador(sede.value.id)
-    caja.value = data.caja
-  } catch { caja.value = null }
-  finally { cargandoCaja.value = false }
-}
-
-async function conCaja(fn, ok) {
-  guardandoCaja.value = true
-  errorCaja.value = null
-  try {
-    await fn()
-    await cargarCaja()
-    emit('cambio')
-    toast.success(ok)
+    const { data } = await getMostrador(props.sede.id)
+    mesa.value  = data.mesa || []
+    turno.value = data.turno
   } catch (e) {
-    errorCaja.value = e?.response?.data?.error || e?.response?.data?.errors?.[0] || 'No se pudo'
-  } finally { guardandoCaja.value = false }
+    error.value = e?.response?.data?.error || 'No se pudo cargar el mostrador.'
+  } finally {
+    cargando.value = false
+  }
 }
 
-const abrirCaja = () => conCaja(
-  () => abrirCajaMostrador(sede.value.id, { monto_inicial_ars: Number(fondoInicial.value) || 0 }),
-  'Caja abierta')
-
-const confirmarApertura = () => conCaja(
-  () => confirmarAperturaMostrador(sede.value.id, caja.value.id), 'Fondo confirmado')
-
-const enviarCierre = () => conCaja(
-  () => solicitarCierreMostrador(sede.value.id, caja.value.id, {
-    efectivo_declarado_ars: Number(efectivoContado.value) || 0,
-    notas: observaciones.value || undefined,
-  }),
-  'Cierre enviado')
-
-const confirmarCierre = () => conCaja(
-  () => confirmarCierreMostrador(sede.value.id, caja.value.id, { notas: observaciones.value || undefined }),
-  'Caja cerrada')
-
-const anular = () => conCaja(
-  () => anularCajaMostrador(sede.value.id, caja.value.id, { motivo: observaciones.value || undefined }),
-  'Caja anulada')
-
-const sacarEfectivo = () => conCaja(
-  () => salidaCajaMostrador(sede.value.id, caja.value.id, {
-    monto_ars: Number(salidaMonto.value) || 0, motivo: salidaMotivo.value, clase: salidaClase.value,
-    retirado_por_id: salidaResponsable.value || undefined,
-  }),
-  'Salida registrada').then(() => { mostrarSalida.value = false; salidaMonto.value = null; salidaMotivo.value = '' })
-
-function fmtARS(n) { return '$' + (Number(n) || 0).toLocaleString('es-AR') }
-
-// Cambiar de sede recarga: si no, el admin veía la caja de la sede anterior.
-watch(() => props.sede?.id, cargarCaja)
-onMounted(cargarCaja)
-
-defineExpose({ caja, cargarCaja })
+watch(() => props.sede?.id, cargar, { immediate: true })
+defineExpose({ cargar })
 </script>
 
 <style scoped>
-/* ── Caja del turno ────────────────────────────────────────────────────────────
-   Lo primero de la jornada, así que va arriba y con color de estado: sin abrir es neutro,
-   esperando confirmación llama, en marcha se calla. */
-.cjm { border: 1.5px solid var(--c-ink-200); border-radius: 14px; padding: var(--sp-4); background: #fff; margin-bottom: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-3); }
-.cjm--sin-abrir    { border-color: var(--c-ink-300); }
-.cjm--sin-confirmar { border-color: #f59e0b; background: #fffbeb; }
-.cjm--pendiente    { border-color: #f59e0b; background: #fffbeb; }
-.cjm--andando      { border-color: #86efac; }
-.cjm-obs { width: 100%; }
-.cjm-salida-form { display: flex; flex-direction: column; gap: var(--sp-2); border-top: 1px solid var(--c-ink-100); padding-top: var(--sp-2); }
-.cjm-clases { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
-.cjm-clase { flex: 1 1 160px; display: flex; align-items: flex-start; gap: .4rem; border: 1.5px solid var(--c-ink-200); border-radius: 9px; padding: .4rem .6rem; cursor: pointer; }
-.cjm-clase--on { border-color: #1b5e20; background: #f0fdf4; }
-.cjm-clase span { display: flex; flex-direction: column; }
-.cjm-clase strong { font-size: var(--fs-13); }
-.cjm-clase small { font-size: var(--fs-11); color: var(--c-ink-500); line-height: 1.3; }
-.cjm-salida-tag { font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: 0 .3rem; border-radius: 4px; margin-right: .2rem; }
-.cjm-salida-tag--retiro { background: #e0e7ff; color: #4338ca; }
-.cjm-salida-tag--gasto { background: #fee2e2; color: #b91c1c; }
-.cjm-link { background: none; border: none; padding: 0; cursor: pointer; font-size: var(--fs-12); color: var(--c-ink-500); text-decoration: underline; align-self: flex-start; }
-.cjm-link:hover { color: #b91c1c; }
-.cjm-salidas { display: flex; flex-direction: column; gap: .15rem; border-top: 1px solid var(--c-ink-100); padding-top: var(--sp-2); }
-.cjm-salidas-t { font-size: var(--fs-11); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--c-ink-500); }
-.cjm-salida { font-size: var(--fs-12); color: var(--c-ink-600); font-variant-numeric: tabular-nums; }
-.cjm-mini { width: 100%; display: flex; align-items: center; gap: .5rem; background: none; border: none; padding: 0; cursor: pointer; font: inherit; color: var(--c-ink-600); }
-.cjm-mini-ok { font-weight: 700; font-size: var(--fs-13); color: #15803d; display: flex; align-items: center; gap: .3rem; }
-.cjm-mini-num { margin-left: auto; font-size: var(--fs-13); font-variant-numeric: tabular-nums; }
-.cjm-hd { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
-.cjm-title { font-weight: 800; font-size: var(--fs-14); color: var(--c-ink-900); display: flex; align-items: center; gap: .4rem; }
-.cjm-sede { font-size: var(--fs-12); color: var(--c-ink-500); }
-.cjm-msg { margin: 0; font-size: var(--fs-13); color: var(--c-ink-700); }
-.cjm-hint { margin: 0; font-size: var(--fs-12); color: var(--c-ink-500); }
-.cjm-error { margin: 0; font-size: var(--fs-12); color: #b91c1c; }
-.cjm-abrir, .cjm-cerrar { display: flex; align-items: flex-end; gap: var(--sp-2); flex-wrap: wrap; }
-.cjm-label { font-size: var(--fs-12); font-weight: 700; color: var(--c-ink-600); display: block; margin-bottom: .2rem; }
-.cjm-input-wrap { position: relative; display: flex; align-items: center; }
-.cjm-prefix { position: absolute; left: .5rem; color: var(--c-ink-400); font-size: var(--fs-13); }
-.cjm-input { padding: .4rem .6rem .4rem 1.3rem; border: 1.5px solid var(--c-ink-300); border-radius: 8px; font-size: var(--fs-14); width: 130px; font-variant-numeric: tabular-nums; }
-.cjm-input:focus { outline: none; border-color: #1b5e20; }
-.cjm-btn { background: #1b5e20; color: #fff; border: none; border-radius: 8px; padding: .45rem .9rem; font-size: var(--fs-13); font-weight: 700; cursor: pointer; }
-.cjm-btn:disabled { opacity: .5; cursor: not-allowed; }
-.cjm-nums { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--sp-3); }
+.cjm {
+  background: #fff; border: 1px solid var(--c-slate-200); border-radius: 14px;
+  padding: 18px 20px; display: flex; flex-direction: column; gap: 12px;
+}
+.cjm--abierta { border-left: 3px solid var(--c-leaf-600); }
+.cjm--cargado { border-left: 3px solid var(--c-amber-500); }
+
+.cjm-hd    { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.cjm-title { font-size: .95rem; font-weight: 700; color: var(--c-leaf-900); }
+.cjm-sede  { font-size: .78rem; color: var(--c-ink-500); }
+.cjm-msg   { margin: 0; font-size: .85rem; color: var(--c-ink-700); }
+.cjm-error { margin: 0; font-size: .8rem; color: var(--c-rust-600); }
+
+.cjm-nums  { display: flex; gap: 18px; flex-wrap: wrap; }
 .cjm-nums > div { display: flex; flex-direction: column; }
-.cjm-n { font-size: var(--fs-16); font-weight: 700; color: var(--c-ink-800); font-variant-numeric: tabular-nums; }
-.cjm-n--fuerte { color: #1b5e20; }
-.cjm-l { font-size: var(--fs-11); color: var(--c-ink-500); }
-.cjm-falta { color: #b91c1c; font-weight: 700; }
-.cjm-sobra { color: #b45309; font-weight: 700; }
+.cjm-n     { font-size: 1.05rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--c-ink-900); }
+.cjm-n--fuerte { color: var(--c-leaf-800); }
+.cjm-l     { font-size: .72rem; color: var(--c-ink-500); }
+
+.cjm-link  {
+  align-self: flex-start; font-size: .82rem; font-weight: 600;
+  color: var(--c-leaf-800); text-decoration: none;
+}
+.cjm-link:hover { text-decoration: underline; }
 </style>

@@ -27,24 +27,25 @@ RSpec.describe 'Contar un producto del mostrador', type: :request do
   end
 
   let!(:turno) { abrir_mostrador!(sede, usuario: admin, recibe: ana) }
-  def item = turno.items.first
+
+  # Lo que hay sobre la mesa de este producto, ahora.
+  def en_la_mesa = mesa_de(sede)[stock.id].to_d
 
   def contar!(contado, motivo: nil, como: ana)
     sign_in_as(como)
     post "/api/sedes/#{sede.id}/mostrador/contar", headers: auth_headers,
-         params: { item_id: item.id, contado: contado, motivo: motivo }.compact
+         params: { stock_id: stock.id, contado: contado, motivo: motivo }.compact
     JSON.parse(response.body)
   end
 
   it 'si cuadra, no pasa nada' do
-    expect { contar!(item.esperado) }
+    expect { contar!(en_la_mesa) }
       .not_to change { stock.reload.cantidad }
     expect(response).to have_http_status(:ok)
   end
 
   it 'un faltante ajusta el inventario, como el cierre' do
-    esperado = item.esperado
-    contar!(esperado - 3, motivo: 'se cayó al piso')
+    contar!(en_la_mesa - 3, motivo: 'se cayó al piso')
 
     expect(response).to have_http_status(:ok)
     expect(stock.reload.cantidad.to_f).to eq(497.0)
@@ -57,28 +58,29 @@ RSpec.describe 'Contar un producto del mostrador', type: :request do
   # Lo importante: el esperado del CIERRE se corre con el conteo, o a la noche se cuenta dos
   # veces la misma diferencia.
   it 'y el cierre de la noche ya no la vuelve a encontrar' do
-    esperado = item.esperado
+    esperado = en_la_mesa
     contar!(esperado - 3, motivo: 'se cayó al piso')
 
-    expect(item.reload.esperado).to eq(esperado - 3)
+    expect(en_la_mesa).to eq(esperado - 3)
 
     sign_in_as(ana)
     post "/api/sedes/#{sede.id}/mostrador/cerrar", headers: auth_headers,
-         params: { conteos: [{ item_id: item.id, contado: (esperado - 3).to_f }],
+         params: { conteos: [{ stock_id: stock.id, contado: (esperado - 3).to_f }],
                    efectivo_contado_ars: 0 }
 
     expect(response).to have_http_status(:ok)
-    expect(item.reload.diferencia_cierre.to_f).to eq(0.0)
+    item = turno.reload.items.find_by(stock_id: stock.id)
+    expect(item.cantidad_cierre.to_d - item.esperado_cierre.to_d).to eq(0)
   end
 
   it 'un sobrante también' do
-    contar!(item.esperado + 2, motivo: 'apareció')
+    contar!(en_la_mesa + 2, motivo: 'apareció')
 
     expect(stock.reload.cantidad.to_f).to eq(502.0)
   end
 
   it 'con diferencia y sin motivo no se registra' do
-    body = contar!(item.esperado - 3)
+    body = contar!(en_la_mesa - 3)
 
     expect(response).to have_http_status(:unprocessable_entity)
     expect(body['error']).to match(/escribí el motivo/i)
@@ -86,30 +88,32 @@ RSpec.describe 'Contar un producto del mostrador', type: :request do
   end
 
   it 'queda quién contó y cuándo' do
-    contar!(item.esperado - 1, motivo: 'merma')
+    contar!(en_la_mesa - 1, motivo: 'merma')
 
-    mov = TurnoMostradorMovimiento.unscoped.conteos.last
+    mov = MostradorMovimiento.unscoped.recientes.first
+    expect(mov.tipo).to eq('ajuste')
     expect(mov.usuario_id).to eq(ana.id)
     expect(mov.cantidad.to_f).to eq(-1.0)
-    expect(mov.notas).to eq('merma')
+    expect(mov.motivo).to match(/merma/)
   end
 
-  it 'no se cuenta un producto que no está en el turno' do
+  it 'no se cuenta un producto que no está sobre la mesa' do
     sign_in_as(ana)
     post "/api/sedes/#{sede.id}/mostrador/contar", headers: auth_headers,
-         params: { item_id: 999_999, contado: 10 }
+         params: { stock_id: 999_999, contado: 10 }
 
     expect(response).to have_http_status(:unprocessable_entity)
   end
 
-  it 'con el mostrador cerrado no se cuenta nada' do
+  # Contar sigue teniendo sentido con la caja cerrada: el producto está sobre la mesa igual, y
+  # administración puede querer verificarlo antes de que llegue nadie.
+  it 'se puede contar también con la caja cerrada' do
     ActsAsTenant.with_tenant(club) do
-      Mostradores::CerrarTurno.call(turno: turno, usuario: ana, efectivo_contado_ars: 0,
-                                    conteos: [{ item_id: item.id, contado: item.esperado }])
+      Mostradores::CerrarCaja.call(turno: turno, usuario: ana, efectivo_contado_ars: 0,
+                                   conteos: [{ stock_id: stock.id, contado: en_la_mesa }])
     end
 
-    body = contar!(10, motivo: 'x')
-    expect(response).to have_http_status(:unprocessable_entity)
-    expect(body['error']).to match(/cerrado/i)
+    contar!(en_la_mesa - 1, motivo: 'se cayó', como: admin)
+    expect(response).to have_http_status(:ok)
   end
 end

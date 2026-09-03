@@ -125,7 +125,6 @@ export const NAV_GROUPS = [
       // Integraciones quedó siendo la pantalla de WhatsApp —los webhooks salieron de la vista del
       // admin— así que se cae del menú si no está contratado, como cualquier add-on.
       { to: '/integraciones', label: 'Integraciones', feature: 'whatsapp' },
-      { to: '/configuracion/papelera', label: 'Papelera' },
     ],
   },
 ]

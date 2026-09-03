@@ -106,9 +106,6 @@ describe('cada rol puede abrir lo que su navegación le ofrece', () => {
     it('ningún rol tiene permiso en la ruta y prohibición en la matriz', () => {
       // Excepciones conscientes, con su razón:
       const ESPERADAS = [
-        // El super admin vive en /super-admin y no entra a las pantallas de una organización
-        // (ver `block_super_admin_sin_contexto!`): que la papelera lo nombre es un resto viejo.
-        'super_admin → /admin/papelera',
         // Sale del hijo `despachos`, que nombra a supervisor; el path que se ve acá es el del
         // padre. El padre /delivery sólo deja pasar admin y delivery, así que el supervisor no
         // llega a despachos aunque el hijo lo nombre — y el repartidor tampoco, porque el hijo

@@ -1,7 +1,13 @@
-# Cada carga desde el depósito y cada devolución durante un turno, con hora y autor.
+# HISTÓRICO. Ya no se escribe: lo reemplazó `MostradorMovimiento`.
 #
-# Sin esto, "se repuso" es un número que apareció y nadie sabe quién lo puso — que es justo lo
-# que hace inservible delegar el mostrador.
+# Registraba cada carga y cada devolución DE UN TURNO, cuando la mercadería vivía en el turno.
+# Desde que la mesa es del mostrador y es permanente, ese rastro es de la mesa y no de la jornada.
+#
+# La clase se queda porque la tabla todavía tiene las filas de los turnos viejos, y borrarlas es
+# tirar el historial de quién puso qué sobre la mesa antes del cambio. Darlas de baja —tabla y
+# clase— es una migración aparte, y una decisión de Germán.
+#
+# NO USAR EN CÓDIGO NUEVO.
 class TurnoMostradorMovimiento < ApplicationRecord
   acts_as_tenant(:club)
 

@@ -50,7 +50,7 @@ async function guardar() {
   } catch { toast.error(store.saveError) }
 }
 async function borrar(bar) {
-  if (!(await confirm({ title: 'Eliminar bar', message: `¿Eliminar "${bar.nombre}"? Se puede recuperar desde la papelera.`, variant: 'danger' }))) return
+  if (!(await confirm({ title: 'Eliminar bar', message: `¿Eliminar "${bar.nombre}"? No se puede deshacer.`, variant: 'danger' }))) return
   try { await store.eliminarBar(bar.id); toast.success('Bar eliminado') }
   catch (e) { toast.error(e?.response?.data?.error || 'No se pudo eliminar') }
 }

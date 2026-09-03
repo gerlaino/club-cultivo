@@ -20,6 +20,8 @@ class Mostrador < ApplicationRecord
 
   has_many :caja_turnos, as: :punto
   has_many :turno_mostradores, dependent: :destroy
+  # El contenido de la mesa: permanente, del mostrador y no del turno.
+  has_many :items, class_name: 'MostradorItem', dependent: :destroy
 
   validates :nombre, presence: true
   # Sólo al CREAR: una sede puede cambiar de tipo, y volver inguardable un mostrador que ya
@@ -40,6 +42,31 @@ class Mostrador < ApplicationRecord
     return nil unless TurnoMostrador.table_exists?
 
     turno_mostradores.abiertos.first
+  end
+
+  # Lo que hay sobre la mesa ahora. Cero filas no es lo mismo que "cerrado": el mostrador existe
+  # siempre, y puede estar vacío esperando que el admin lo cargue.
+  def sobre_la_mesa = items.con_stock.includes(:stock)
+
+  def vacio? = !items.con_stock.exists?
+
+  # El renglón de un producto, creándolo si hace falta. Es la puerta de entrada de todo lo que
+  # sube a la mesa: el admin cargando, un reparto que vuelve, una dispensa revertida.
+  def item_de!(stock)
+    items.create_with(club: club, cantidad: 0).find_or_create_by!(stock_id: stock.id)
+  rescue ActiveRecord::RecordNotUnique
+    items.reset
+    items.find_by!(stock_id: stock.id)
+  end
+
+  # La mesa cambió: que la pantalla de quien está atendiendo lo refleje sin recargar. Recargar es
+  # justo lo que nadie hace cuando tiene a alguien esperando enfrente.
+  def avisar_cambio
+    ActionCable.server.broadcast("stocks_club_#{club_id}", {
+      tipo: 'mostrador_actualizado', mostrador_id: id, sede_id: sede_id,
+    })
+  rescue => e
+    Rails.logger.warn "Mostrador#avisar_cambio falló: #{e.message}"
   end
 
   private

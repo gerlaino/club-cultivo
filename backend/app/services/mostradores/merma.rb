@@ -42,7 +42,7 @@ module Mostradores
     def turnos
       @turnos ||= begin
         rel = TurnoMostrador.where(mostrador_id: @mostradores.map(&:id))
-                            .cerrados.includes(:cerrado_por, :confirmado_por, mostrador: :sede)
+                            .cerrados.includes(:cerrado_por, :abierto_por, mostrador: :sede)
         rel = rel.where('cerrado_at >= ?', @desde.beginning_of_day) if @desde
         rel = rel.where('cerrado_at <= ?', @hasta.end_of_day)       if @hasta
         rel.order(cerrado_at: :desc).to_a
@@ -53,18 +53,6 @@ module Mostradores
       @items ||= TurnoMostradorItem.where(turno_mostrador_id: turnos.map(&:id))
                                    .includes(:stock).to_a
     end
-
-    # Los movimientos de todos los turnos del período, de UNA. Se piden dos cosas por turno
-    # —cuántas correcciones hubo al recibir y si alguien bajó del depósito sin supervisión— y
-    # preguntarlas turno por turno son dos queries por fila: un mes con sesenta turnos eran ciento
-    # veinte viajes a la base para pintar una tabla.
-    def movimientos_por_item
-      @movimientos_por_item ||= TurnoMostradorMovimiento
-                                .where(turno_mostrador_item_id: items.map(&:id))
-                                .to_a.group_by(&:turno_mostrador_item_id)
-    end
-
-    def movimientos_de(its) = its.flat_map { |i| movimientos_por_item[i.id] || [] }
 
     # Cuánto vale lo que no apareció. Sin esto la merma es un número de gramos que no se compara
     # con nada: en plata se puede poner al lado de cualquier otro gasto y decidir si vale la pena
@@ -115,14 +103,16 @@ module Mostradores
           id:          t.id,
           cerrado_at:  t.cerrado_at,
           cerrado_por: t.cerrado_por&.nombre_completo,
-          recibido_por: t.confirmado_por&.nombre_completo,
+          # Quien ABRIÓ es quien contó la mesa al arrancar y quien atendió con ella: el arqueo es
+          # suyo. Se llamaba `recibido_por` cuando había una recepción que firmar; ya no la hay.
+          atendio: t.abierto_por&.nombre_completo,
           dispensado:  its.sum { |i| i.cantidad_dispensada.to_d }.to_f.round(2),
           faltante:    faltante.to_f.round(3),
           faltante_ars: its.sum { |i| i.diferencia_cierre.to_d.negative? ? valor(i, i.diferencia_cierre) : 0 }.to_f.round(2),
           motivos:     its.filter_map(&:motivo_diferencia).uniq,
-          # Lo que el que atendió corrigió al recibir: si aparece seguido, el que carga la mesa
-          # está declarando mal y ese es el cuello de botella, no la merma.
-          correcciones: movimientos_de(its).count { |m| m.tipo == 'correccion' },
+          # Cuántas veces quien abrió corrigió lo que decía la mesa. Si aparece seguido, el
+          # cuello de botella no es la merma: es que la mesa se está declarando mal.
+          correcciones: its.count { |i| i.diferencia_apertura.to_d.nonzero? },
           revisado:    t.revisado_at.present?,
           # Por qué está en la lista de trabajo. Un renglón que no dice qué mirar obliga a
           # abrirlo para descubrir que no era nada.
@@ -156,13 +146,22 @@ module Mostradores
 
     # Las TRES razones por las que un turno pide una mirada. Prometer una bandeja y contar sólo
     # los faltantes deja las otras dos invisibles apenas cierra el turno.
-    def motivos_revision(_turno, its)
-      movs = movimientos_de(its)
+    def motivos_revision(turno, its)
       razones = []
-      razones << 'faltante'        if its.any? { |i| i.diferencia_cierre.to_d.negative? }
-      razones << 'corregido'       if movs.any? { |m| m.tipo == 'correccion' }
-      razones << 'sin_supervision' if movs.any?(&:sin_supervision)
+      razones << 'faltante'  if its.any? { |i| i.diferencia_cierre.to_d.negative? }
+      razones << 'corregido' if its.any? { |i| i.diferencia_apertura.to_d.nonzero? }
+      # Alguien movió la mesa mientras la caja estaba abierta: no es sospechoso por sí solo, pero
+      # explica una diferencia que si no aparece como merma de quien atendió.
+      razones << 'mesa_movida' if movimientos_del_turno(turno).any?
       razones
+    end
+
+    # Lo que administración subió o bajó de la mesa durante ese turno.
+    def movimientos_del_turno(turno)
+      @movs_por_turno ||= MostradorMovimiento
+                          .where(turno_mostrador_id: turnos.map(&:id), tipo: %w[carga retiro])
+                          .to_a.group_by(&:turno_mostrador_id)
+      @movs_por_turno[turno.id] || []
     end
 
     # Los turnos que piden una mirada y el admin todavía no miró. Es una lista de trabajo, no una

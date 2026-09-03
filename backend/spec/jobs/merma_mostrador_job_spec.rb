@@ -23,17 +23,24 @@ RSpec.describe MermaMostradorJob do
   # Un turno cerrado con lo dispensado y el faltante que se le indique, fechado cuando haga falta.
   def turno!(dispensado:, faltante:, cuando: Time.current)
     ActsAsTenant.with_tenant(club) do
-      t = Mostradores::AbrirTurno.call(
-        mostrador: sede.mostrador!, usuario: admin, monto_inicial_ars: 0,
-        items: [{ stock_id: stock.id, cantidad: dispensado + 100 }]
-      ).turno
-      Mostradores::ConfirmarApertura.call(turno: t, usuario: ana)
-      item = t.items.first
-      item.update!(cantidad_dispensada: dispensado)
-      Mostradores::CerrarTurno.call(turno: t, usuario: ana, efectivo_contado_ars: 0,
-                                    conteos: [{ item_id: item.id, contado: item.esperado - faltante,
-                                                motivo: 'merma' }])
+      mostrador = sede.mostrador!
+      Mostradores::Cargar.call(mostrador: mostrador, usuario: admin, motivo: 'carga',
+                               cambios: [{ stock_id: stock.id, cantidad: dispensado + 100 }])
+      t = Mostradores::AbrirCaja.call(mostrador: mostrador, usuario: ana,
+                                      efectivo_contado_ars: 0).turno
+      # Se simula la jornada: salió `dispensado` y al contar faltan `faltante`.
+      mi = mostrador.items.find_by(stock_id: stock.id)
+      mi.mover!(cantidad: -dispensado, tipo: 'dispensa', usuario: ana, turno: t)
+      t.items.find_by(stock_id: stock.id).imputar_dispensa!(dispensado)
+
+      Mostradores::CerrarCaja.call(turno: t, usuario: ana, efectivo_contado_ars: 0,
+                                   conteos: [{ stock_id: stock.id, contado: mi.reload.cantidad - faltante }],
+                                   notas: 'merma')
       t.reload.update_columns(cerrado_at: cuando)
+      # La mesa vuelve a cargarse en el próximo turno: cada uno arranca de cero para que los
+      # ocho turnos del patrón sean comparables.
+      Mostradores::Cargar.call(mostrador: mostrador, usuario: admin, motivo: 'reset',
+                               cambios: [{ stock_id: stock.id, cantidad: 0 }])
       t
     end
   end

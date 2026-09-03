@@ -479,7 +479,6 @@ const routes = [
       { path: 'correo',     name: 'config-correo',      component: () => import("../views/CorreoView.vue") },
       { path: 'portal',     name: 'config-portal',      component: () => import("../views/admin/PortalPacienteConfigView.vue") },
       { path: 'alertas',    name: 'alertas-configuracion', component: () => import("../views/SetpointsConfigView.vue") },
-      { path: 'papelera',   name: 'config-papelera',    component: () => import("../views/admin/PapeleraView.vue") },
     ],
   },
   {
@@ -568,18 +567,6 @@ const routes = [
     beforeEnter: (to, from, next) => {
       const auth = useAuthStore()
       if (auth.user?.role !== 'admin') return next('/')
-      next()
-    },
-  },
-
-  {
-    path: '/admin/papelera',
-    name: 'admin-papelera',
-    component: () => import('../views/admin/PapeleraView.vue'),
-    meta: { requiresAuth: true },
-    beforeEnter: (to, from, next) => {
-      const auth = useAuthStore()
-      if (!['admin', 'super_admin'].includes(auth.user?.role)) return next('/')
       next()
     },
   },

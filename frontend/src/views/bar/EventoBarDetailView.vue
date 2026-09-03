@@ -1,6 +1,6 @@
 <script setup>
 // Ficha de un evento (Capa 2): el centro de mando. P&L, break-even, presupuesto vs real,
-// costos/proveedores y tareas. Todo editable/borrable (y recuperable desde la papelera).
+// costos/proveedores y tareas. Todo editable y borrable.
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useEventosBarStore } from '../../stores/eventosBar.js'
@@ -100,7 +100,7 @@ async function guardarEdicion() {
   } catch { toast.error(store.saveError) }
 }
 async function borrarEvento() {
-  if (!(await confirm({ title: 'Eliminar evento', message: '¿Eliminar el evento? Se recupera desde la papelera.', variant: 'danger' }))) return
+  if (!(await confirm({ title: 'Eliminar evento', message: '¿Eliminar el evento? No se puede deshacer.', variant: 'danger' }))) return
   try { await store.eliminar(barId, evId); toast.success('Evento eliminado'); router.push(`/bar/${barId}/eventos`) }
   catch { toast.error('No se pudo eliminar') }
 }

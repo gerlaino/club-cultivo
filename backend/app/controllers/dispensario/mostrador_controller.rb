@@ -16,127 +16,97 @@ module Dispensario
 
     # GET /sedes/:sede_id/mostrador
     #
-    # El turno abierto si lo hay, y si no, con qué se abriría: lo que dejó el cierre anterior
-    # (`sugerido`) y todo lo que se puede subir a la mesa desde el depósito (`disponibles`).
+    # Lo que hay sobre la mesa —que existe con la caja abierta y con la caja cerrada—, el turno
+    # de caja si hay alguien atendiendo, y todo lo que se puede subir desde el depósito
+    # (`disponibles`).
     def actual
       turno = @mostrador.turno_abierto
       render json: {
         mostrador:   { id: @mostrador.id, nombre: @mostrador.nombre,
                        sede: { id: @mostrador.sede_id, nombre: @mostrador.sede&.nombre } },
+        # LO QUE HAY SOBRE LA MESA. Es el estado permanente del mostrador, no del turno: existe
+        # con la caja abierta y con la caja cerrada, porque el producto está físicamente ahí.
+        mesa:        mesa.map { |mi| serialize_item(mi) },
+        # El turno de caja, si hay uno abierto. Nil = nadie está atendiendo, y eso NO significa
+        # que la mesa esté vacía.
         turno:       serialize_turno(turno),
-        # Turnos cerrados con faltante que nadie miró. Viaja en la carga principal a propósito:
-        # si sólo apareciera al entrar a la solapa de Merma, el aviso no avisa nada — hay que
-        # verlo sin ir a buscarlo.
+        # Quién puede hacer qué, resuelto por el backend: la pantalla no tiene que deducirlo de
+        # tres campos ni repetir la matriz de permisos.
+        puedo:       { cargar: gestiona?, abrir: true, cerrar: turno.present? },
+        # Turnos cerrados con algo para mirar. Viaja en la carga principal a propósito: un aviso
+        # que sólo aparece cuando ya entraste a mirarlo no avisa nada.
         sin_revisar: gestiona? ? turnos_sin_revisar : 0,
-        # Con cuánto arrancaría la caja: lo que quedó anoche después de retirar la recaudación.
-        # Heredado, no declarado — si el número lo pone el que abre, puede poner cualquiera.
+        # Con cuánto arrancaría la caja: lo que quedó del turno anterior. Heredado, no declarado.
         fondo_sugerido: turno ? nil : fondo_sugerido,
-        sugerido:    turno ? [] : sugerido,
-        # Siempre, no sólo al abrir: con el turno andando es de donde sale lo que se repone a
-        # media tarde cuando se acaba algo y hay cola.
-        #
-        # PERO al ABRIR, el que atiende sólo ve lo que heredó: abrir con un producto que no venía
-        # es sacarlo del depósito, y eso lo hace quien responde por la mercadería. La regla la
-        # aplica `AbrirTurno` — acá se recorta lo que se OFRECE para no invitarlo a llenar un
-        # formulario que el backend va a rechazar.
-        disponibles: (para_abrir_heredado? ? sugerido : disponibles.map { |s| serialize_stock(s) }),
-        # Para que la pantalla lo explique en vez de mostrar una tabla corta sin decir por qué.
-        apertura_heredada: para_abrir_heredado?,
+        # Todo lo que se puede subir a la mesa desde el depósito de esta sede.
+        disponibles: disponibles.map { |s| serialize_stock(s) },
       }
     end
 
-    # POST /sedes/:sede_id/mostrador/abrir
-    #   { monto_inicial_ars, items: [{ stock_id, cantidad }], notas }
+    # POST /sedes/:sede_id/mostrador/cargar { cambios: [{ stock_id, cantidad }], motivo }
+    #
+    # El admin dice cuánto tiene que haber de cada producto sobre la mesa. `cantidad` es el TOTAL,
+    # no el delta: la pantalla es una tabla donde se escribe cuánto hay, y pedirle al usuario que
+    # calcule la diferencia sería pedirle la cuenta que hace la máquina.
+    def cargar
+      return render json: { error: 'La mesa la carga administración' }, status: :forbidden unless gestiona?
+
+      res = Mostradores::Cargar.call(mostrador: @mostrador, usuario: current_user,
+                                     cambios: params[:cambios] || [], motivo: params[:motivo])
+      return render json: { error: res.error }, status: :unprocessable_entity unless res.ok?
+
+      actual
+    end
+
+    # POST /sedes/:sede_id/mostrador/abrir { conteos: [{ stock_id, contado }], efectivo_contado_ars }
+    #
+    # Quien atiende pesa lo que hay, cuenta la plata y arranca. Si no coincide NO se lo bloquea:
+    # pone lo que contó y abre, y la diferencia queda anotada para el admin.
     def abrir
-      res = Mostradores::AbrirTurno.call(
+      res = Mostradores::AbrirCaja.call(
         mostrador: @mostrador, usuario: current_user,
-        items: params[:items] || [], notas: params[:notas],
-        monto_inicial_ars: params[:monto_inicial_ars]
+        conteos: params[:conteos] || [], efectivo_contado_ars: params[:efectivo_contado_ars],
+        notas: params[:notas]
       )
       return render json: { error: res.error }, status: :unprocessable_entity unless res.ok?
 
-      render json: serialize_turno(res.turno.reload), status: :created
-    end
-
-    # POST /sedes/:sede_id/mostrador/confirmar { correcciones: [{ item_id, contado, motivo }] }
-    #
-    # El que va a atender recibe lo que dejó el admin. Puede confirmarlo tal cual o corregirlo, y
-    # la corrección queda con su nombre. Hasta que no firma, no se dispensa: si se pudiera
-    # atender sin confirmar, al cierre respondería por lo que otro declaró y nadie miró.
-    def confirmar
-      con_turno do |turno|
-        Mostradores::ConfirmarApertura.call(turno: turno, usuario: current_user,
-                                            correcciones: params[:correcciones] || [],
-                                            efectivo_contado: params[:efectivo_contado_ars],
-                                            motivo_efectivo: params[:motivo_efectivo],
-                                            notas: params[:notas])
-      end
-    end
-
-    # POST /sedes/:sede_id/mostrador/contar { item_id, contado, motivo }
-    #
-    # Contar UN producto sin cerrar el turno. Cerrar y reabrir es el arqueo completo, pero con
-    # quince frascos son veinte minutos y termina siendo el control que no se ejecuta.
-    def contar
-      con_turno do |turno|
-        item = turno.items.find_by(id: params[:item_id])
-        next Mostradores::MoverStock::Result.new(ok: false, error: 'Ese producto no está en el turno') if item.nil?
-
-        item.registrar_conteo!(contado: params[:contado], usuario: current_user,
-                               motivo: params[:motivo])
-        Mostradores::MoverStock::Result.new(ok: true, item: item)
-      end
-    rescue ArgumentError => e
-      render json: { error: e.message }, status: :unprocessable_entity
-    end
-
-    # POST /sedes/:sede_id/mostrador/cargar { stock_id, cantidad, notas }
-    #
-    # Subir mercadería del depósito a la mesa con el turno ya abierto. Lo hace administración,
-    # pero un dispensador solo también puede: queda marcado como carga sin supervisión.
-    def cargar
-      stock = current_user.club.stocks.find_by(id: params[:stock_id])
-      con_turno do |turno|
-        Mostradores::MoverStock.cargar(turno: turno, usuario: current_user, stock: stock,
-                                       cantidad: params[:cantidad], notas: params[:notas])
-      end
-    end
-
-    # POST /sedes/:sede_id/mostrador/devolver { item_id, cantidad, notas }
-    def devolver
-      con_turno do |turno|
-        item = turno.items.find_by(id: params[:item_id])
-        next Mostradores::MoverStock::Result.new(ok: false, error: 'Ese producto no está en el turno') if item.nil?
-
-        Mostradores::MoverStock.devolver(turno: turno, usuario: current_user, item: item,
-                                         cantidad: params[:cantidad], notas: params[:notas])
-      end
+      render json: serialize_turno(res.turno), status: :created
     end
 
     # POST /sedes/:sede_id/mostrador/cerrar
-    #   { conteos: [{ item_id, contado, motivo }], efectivo_contado_ars,
-    #     fondo_siguiente_ars, retirado_por_id, notas }
-    #
-    # Cierra EN EL ACTO, sin esperar al admin: si el turno quedara pendiente de su visto bueno, a
-    # las once de la noche el mostrador está bloqueado y el que abre mañana no arranca. La
-    # diferencia queda para que la revise cuando aparezca.
+    #   { conteos: [{ stock_id, contado }], efectivo_contado_ars, fondo_siguiente_ars, notas }
     def cerrar
-      con_turno do |turno|
-        Mostradores::CerrarTurno.call(
-          turno: turno, usuario: current_user,
-          conteos: params[:conteos] || [],
-          efectivo_contado_ars: params[:efectivo_contado_ars],
-          fondo_siguiente_ars:  params[:fondo_siguiente_ars],
-          retirado_por: current_user.club.users.find_by(id: params[:retirado_por_id]),
-          notas: params[:notas]
-        )
-      end
+      turno = @mostrador.turno_abierto
+      return render json: { error: 'La caja del mostrador no está abierta' }, status: :unprocessable_entity if turno.nil?
+
+      res = Mostradores::CerrarCaja.call(
+        turno: turno, usuario: current_user, conteos: params[:conteos] || [],
+        efectivo_contado_ars: params[:efectivo_contado_ars],
+        fondo_siguiente_ars:  params[:fondo_siguiente_ars],
+        # El retiro de la recaudación queda a nombre de quien responde por ella. Si cierra quien
+        # atiende y no hay a quién atribuirlo, se deja todo como fondo.
+        retirado_por: (current_user if MovimientoContable::ROLES_RETIRO.include?(current_user.role)),
+        notas: params[:notas]
+      )
+      return render json: { error: res.error }, status: :unprocessable_entity unless res.ok?
+
+      render json: serialize_turno(res.turno)
     end
 
-    # GET /sedes/:sede_id/mostrador/merma?desde=&hasta=
+    # POST /sedes/:sede_id/mostrador/contar { stock_id, contado, motivo }
     #
-    # Dónde se le va el producto a la organización. No es una auditoría: la merma es inevitable y
-    # el punto de medirla es encontrar el cuello de botella — qué producto, en qué momento.
+    # Contar UN producto sin cerrar la caja. Cerrar y reabrir es el arqueo completo, pero con
+    # quince frascos son veinte minutos: el control que cuesta eso no se hace, y el que no se
+    # hace no controla nada.
+    def contar
+      res = Mostradores::Contar.call(mostrador: @mostrador, usuario: current_user,
+                                     stock_id: params[:stock_id], contado: params[:contado],
+                                     motivo: params[:motivo])
+      return render json: { error: res.error }, status: :unprocessable_entity unless res.ok?
+
+      actual
+    end
+
     def merma
       return render json: { error: 'No autorizado' }, status: :forbidden unless gestiona?
 
@@ -154,10 +124,12 @@ module Dispensario
     # Administración los ve todos; el que atiende, LOS SUYOS. Cerraba un turno y no tenía dónde
     # mirarlo después: si al día siguiente le preguntan por una diferencia, no tiene con qué.
     def turnos
-      escala = @mostrador.turno_mostradores.cerrados.includes(:cerrado_por, :confirmado_por)
-      escala = escala.where(confirmado_por_id: current_user.id) unless gestiona?
+      escala = @mostrador.turno_mostradores.cerrados
+      # Quien ATENDIÓ es quien abrió la caja contando: ése es su turno. Los de los demás no son
+      # asunto suyo, y el filtro es del backend — la pantalla no es la regla.
+      escala = escala.where(abierto_por_id: current_user.id) unless gestiona?
 
-      escala = escala.includes(:cerrado_por, :confirmado_por, :caja_turno, items: :stock)
+      escala = escala.includes(:cerrado_por, :abierto_por, :caja_turno, items: :stock)
       render json: {
         turnos: escala.order(cerrado_at: :desc).limit(30).map { |t| serialize_turno_resumen(t) },
         gestiona: gestiona?,
@@ -208,16 +180,47 @@ module Dispensario
 
     def gestiona? = %w[admin supervisor super_admin].include?(current_user.role)
 
-    def con_turno
-      turno = @mostrador.turno_abierto
-      return render json: { error: 'El mostrador está cerrado' }, status: :unprocessable_entity if turno.nil?
-
-      res = yield turno
-      return render json: { error: res.error }, status: :unprocessable_entity unless res.ok?
-
-      render json: serialize_turno(turno.reload)
+    # Lo que hay sobre la mesa, con lo que hace falta para decidir y para contar.
+    def mesa
+      @mesa ||= begin
+        items = @mostrador.sobre_la_mesa.to_a
+        Stock.precargar_apartados(items.map(&:stock).compact)
+        items
+      end
     end
 
+    def serialize_item(mi)
+      st = mi.stock
+      serialize_stock(st).merge(
+        item_id:  mi.id,
+        # Lo que hay sobre la mesa AHORA. Es contra esto que se cuenta al abrir y al cerrar.
+        mostrador: mi.cantidad.to_f,
+        senal:     senal(mi),
+        # Lo que pasó con este producto mientras la caja estuvo abierta: si el admin le sacó 200 g
+        # a las 15:40, quien atiende lo tiene que ver o cierra con un faltante que no es suyo.
+        movimientos_del_turno: movimientos_del_turno[mi.id]&.map { |m| serialize_movimiento(m) } || []
+      )
+    end
+
+    def movimientos_del_turno
+      @movimientos_del_turno ||= begin
+        turno = @mostrador.turno_abierto
+        if turno.nil?
+          {}
+        else
+          MostradorMovimiento.where(turno_mostrador_id: turno.id, tipo: %w[carga retiro ajuste])
+                             .includes(:usuario).recientes.group_by(&:mostrador_item_id)
+        end
+      end
+    end
+
+    def serialize_movimiento(m)
+      { tipo: m.tipo, cantidad: m.cantidad.to_f, motivo: m.motivo,
+        usuario: m.usuario&.nombre_completo, cuando: m.created_at }
+    end
+
+    # El producto se contó y no está: el inventario tiene que reflejarlo. `ajuste` con motivo,
+    # NUNCA `merma` — el informe de Pérdidas cuenta merma y esto puede estar entero.
     # El mostrador de UNA sede, y sólo si es una de las suyas.
     #
     # Sin el filtro por sedes asignadas, un dispensador de la Finca Norte abre, carga y cierra el
@@ -248,31 +251,28 @@ module Dispensario
       render json: { error: 'No autorizado' }, status: :forbidden
     end
 
-    # Lo que el admin tiene que mirar. Son TRES cosas y no una: prometer una bandeja y contar
+    # Los turnos que piden una mirada. Son TRES razones y no una: prometer una bandeja y contar
     # sólo los faltantes deja las otras dos invisibles apenas cierra el turno.
     #
-    #   · un cierre con faltante
-    #   · el que atiende corrigió lo que había declarado el admin
-    #   · alguien bajó mercadería del depósito sin un admin al lado
-    #
-    # El esperado se recalcula en SQL para no traer los ítems a Ruby: esto corre en cada carga.
+    #   · faltó producto al contar
+    #   · quien abrió corrigió lo que decía la mesa (si pasa seguido, la mesa se declara mal)
+    #   · administración movió la mesa durante el turno (la diferencia puede no ser de quien
+    #     atendió, y cargársela sería injusto)
     def turnos_sin_revisar
-      items = TurnoMostradorItem.where(turno_mostrador_id: turnos_cerrados_sin_revisar)
+      candidatos = @mostrador.turno_mostradores.cerrados.where(revisado_at: nil)
+      items = TurnoMostradorItem.where(turno_mostrador_id: candidatos.select(:id))
 
-      con_faltante = items.where.not(cantidad_cierre: nil).where(
-        'cantidad_cierre < cantidad_apertura + cantidad_repuesta - cantidad_devuelta ' \
-        '+ cantidad_ajuste - cantidad_dispensada'
-      ).select(:turno_mostrador_id)
+      con_faltante = items.where.not(cantidad_cierre: nil).where.not(esperado_cierre: nil)
+                          .where('cantidad_cierre < esperado_cierre').select(:turno_mostrador_id)
+      corregidos   = items.where.not(esperado_apertura: nil)
+                          .where('cantidad_apertura <> esperado_apertura').select(:turno_mostrador_id)
+      mesa_movida  = MostradorMovimiento.where(turno_mostrador_id: candidatos.select(:id),
+                                               tipo: %w[carga retiro]).select(:turno_mostrador_id)
 
-      marcados = TurnoMostradorMovimiento
-                 .where(turno_mostrador_item_id: items.select(:id))
-                 .where("tipo = 'correccion' OR sin_supervision = TRUE")
-                 .joins(:turno_mostrador_item).select('turno_mostrador_items.turno_mostrador_id')
-
-      @mostrador.turno_mostradores.cerrados.where(revisado_at: nil)
-                .where(id: con_faltante).or(
-                  @mostrador.turno_mostradores.cerrados.where(revisado_at: nil).where(id: marcados)
-                ).count
+      candidatos.where(id: con_faltante)
+                .or(candidatos.where(id: corregidos))
+                .or(candidatos.where(id: mesa_movida))
+                .count
     end
 
     def turnos_cerrados_sin_revisar
@@ -287,41 +287,9 @@ module Dispensario
       @mostrador.caja_turnos.cerradas.order(cerrada_at: :desc).first&.fondo_remanente_ars
     end
 
-    # Con qué se abre: lo que quedó contado en el cierre anterior. Los stocks que desde entonces
-    # se agotaron o se fueron de la sede no se ofrecen — se sugiere lo que todavía existe.
-    def sugerido
-      anterior = @mostrador.turno_mostradores.cerrados.order(cerrado_at: :desc).first
-      return [] if anterior.nil?
-
-      # Se sugiere sobre `disponibles`, no sobre los stocks sueltos: la pantalla dibuja UNA fila
-      # por producto disponible y le pone el número heredado. Si acá apareciera algo que no está
-      # en esa lista —un frasco que desde anoche se agotó o se fue de la sede— su número se
-      # cargaría sin fila donde verlo ni corregirlo, y el backend lo rechazaría al abrir.
-      libres = disponibles.index_by(&:id)
-
-      anterior.items.en_la_mesa.filter_map do |it|
-        next if it.cantidad_cierre.to_d <= 0
-
-        stock = libres[it.stock_id]
-        next if stock.nil?
-
-        # Y se ofrece como mucho lo que quedó libre: si anoche cerró con 20 y hoy hay 12, sugerir
-        # 20 es proponer algo que no se puede cumplir.
-        cantidad = [it.cantidad_cierre.to_d, stock.cantidad_disponible_real.to_d].min
-        serialize_stock(stock).merge(cantidad: cantidad.to_f)
-      end
-    end
-
     # Todo lo que se puede subir a la mesa: stock de esta sede habilitado para dispensa y con
     # algo libre. `cantidad_disponible_real` ya descuenta lo reservado a un paciente y lo
     # apartado a un evento: eso está en el mismo frasco pero no es del mostrador.
-    # ¿A esta persona, con el mostrador cerrado, se le ofrece sólo lo del turno anterior?
-    # Administración carga lo que quiera; el que atiende hereda. Con el turno YA abierto la
-    # respuesta es no: ahí baja del depósito por la puerta que deja rastro (`sin_supervision`).
-    def para_abrir_heredado?
-      @mostrador.turno_abierto.nil? && current_user.atiende_mostrador?
-    end
-
     def disponibles
       @disponibles ||= calcular_disponibles
     end
@@ -345,14 +313,28 @@ module Dispensario
     # antes de ver cómo trabajan es un aviso que después nadie mira.
     UMBRAL_REPONER = 0.25
 
-    def senal(item)
-      queda   = item.esperado.to_d
-      cargado = item.cantidad_apertura.to_d + item.cantidad_repuesta.to_d
+    # Se está por acabar. Se compara contra lo que se cargó en el turno —no contra un número
+    # fijo— porque 20 g quedando de 500 es distinto de 20 quedando de 25.
+    def senal(mi)
+      queda   = mi.cantidad.to_d
+      cargado = cargado_en_el_turno(mi)
       poco    = cargado.positive? ? queda <= cargado * UMBRAL_REPONER : queda.zero?
       return nil unless poco
-      return 'sin_repuesto' if item.stock&.cantidad_disponible_real.to_d <= 0
+      return 'sin_repuesto' if mi.stock&.cantidad_disponible_real.to_d <= 0
 
       'reponer'
+    end
+
+    # Cuánto llegó a haber de este producto durante el turno abierto: lo que se contó al abrir más
+    # lo que el admin subió después.
+    def cargado_en_el_turno(mi)
+      turno = @mostrador.turno_abierto
+      return mi.cantidad.to_d if turno.nil?
+
+      apertura = turno.items.detect { |i| i.stock_id == mi.stock_id }&.cantidad_apertura.to_d
+      subido   = (movimientos_del_turno[mi.id] || []).select { |m| m.cantidad.to_d.positive? }
+                                                     .sum { |m| m.cantidad.to_d }
+      apertura + subido
     end
 
     # Lo que hace falta para DECIDIR qué baja a la mesa, no sólo para identificarlo. Es la misma
@@ -382,14 +364,14 @@ module Dispensario
     # pintar una lista donde no se ve ni un solo producto—. Acá van los totales, y el detalle se
     # abre al entrar a uno.
     def serialize_turno_resumen(turno)
-      items = turno.items.select { |it| it.en_la_mesa? }
+      items   = turno.items.to_a
       con_dif = items.count { |it| it.diferencia_cierre.to_d.nonzero? }
       {
         id:          turno.id,
         abierto_at:  turno.abierto_at,
         cerrado_at:  turno.cerrado_at,
         cerrado_por: turno.cerrado_por&.nombre_completo,
-        atendio:     turno.confirmado_por&.nombre_completo,
+        atendio:     turno.abierto_por&.nombre_completo,
         revisado:    turno.revisado_at.present?,
         productos:   items.size,
         dispensado:  items.sum { |it| it.cantidad_dispensada.to_d }.to_f.round(2),
@@ -405,6 +387,8 @@ module Dispensario
       }
     end
 
+    # EL TURNO: quién abrió, con qué contó, y cómo va la caja. La mercadería ya NO vive acá —es
+    # del mostrador— así que esto se quedó con lo suyo: el arqueo.
     def serialize_turno(turno)
       return nil if turno.nil?
 
@@ -412,61 +396,47 @@ module Dispensario
         id:          turno.id,
         estado:      turno.estado,
         abierto_at:  turno.abierto_at,
+        abierto_por: turno.abierto_por&.nombre_completo,
+        abierto_por_id: turno.abierto_por_id,
         cerrado_at:  turno.cerrado_at,
         cerrado_por: turno.cerrado_por&.nombre_completo,
         revisado:    turno.revisado_at.present?,
-        abierto_por: turno.abierto_por&.nombre_completo,
-        # Lo mira la pantalla para no ofrecerle a quien cargó la mesa que se la reciba él mismo.
-        abierto_por_id: turno.abierto_por_id,
-        # Mientras esté en false, la pantalla pide la recepción y no deja atender.
-        confirmado:     turno.confirmado?,
-        confirmado_por: turno.confirmado_por&.nombre_completo,
-        confirmado_at:  turno.confirmado_at,
-        caja_turno_id: turno.caja_turno_id,
-        # Cuánto vale lo que hay arriba, a costo. En gramos no se compara con nada: en plata se
-        # ve de un vistazo que sobre esa mesa hay medio sueldo.
-        valor_mesa_ars: turno.items.en_la_mesa.includes(:stock).sum { |it| it.esperado * it.stock&.costo_unitario_ars.to_d }.to_f.round(2),
-        # El arqueo de plata del mismo turno. Va acá para que el cierre muestre los dos juntos:
-        # es un gesto, aunque sean dos cuentas distintas.
+        notas_apertura: turno.notas_apertura,
+        notas_cierre:   turno.notas_cierre,
+        caja_turno_id:  turno.caja_turno_id,
+        # Cuánto vale lo que hay sobre la mesa, a costo. En gramos no se compara con nada; en
+        # plata se ve de un vistazo que ahí arriba hay medio sueldo. Sólo para quien responde.
+        valor_mesa_ars: (gestiona? ? valor_de_la_mesa : nil),
+        # El arqueo de plata. Va con el turno para que el cierre muestre los dos juntos: es un
+        # gesto, aunque sean dos cuentas distintas.
         caja: turno.caja_turno && {
-          id:                 turno.caja_turno.id,
-          fondo_ars:          turno.caja_turno.monto_inicial_ars.to_f,
+          id:                   turno.caja_turno.id,
+          fondo_ars:            turno.caja_turno.monto_inicial_ars.to_f,
           cobrado_efectivo_ars: turno.caja_turno.total_efectivo_ars,
           cobrado_digital_ars:  turno.caja_turno.total_digital_ars,
-          salidas_ars:        turno.caja_turno.total_salidas_ars,
-          esperado_ars:       turno.caja_turno.efectivo_esperado_ars,
+          salidas_ars:          turno.caja_turno.total_salidas_ars,
+          esperado_ars:         turno.caja_turno.efectivo_esperado_ars,
+          contado_ars:          turno.caja_turno.efectivo_declarado_ars&.to_f,
+          diferencia_ars:       turno.caja_turno.diferencia_ars,
         },
-        # Lo que el que abrió corrigió sobre lo que dejó el turno anterior. Es la diferencia que
-        # el admin mira después: nadie la tuvo que contar dos veces, pero si alguien la tocó,
-        # está.
-        hubo_correccion_apertura: turno.items.en_la_mesa.any? { |it| it.diferencia_apertura.to_d.nonzero? },
-        items: turno.items.en_la_mesa.includes(:stock).map do |it|
+        # Lo que se contó al abrir contra lo que decía el sistema. Es lo que el admin mira
+        # después: si el que abrió corrigió algo, está.
+        conteo_apertura: turno.items.includes(:stock).map do |it|
           {
-            id:        it.id,
-            stock_id:  it.stock_id,
-            etiqueta:  it.stock&.etiqueta,
-            unidad:    it.stock&.unidad,
-            heredada:  it.cantidad_heredada&.to_f,
-            apertura:  it.cantidad_apertura.to_f,
-            repuesta:  it.cantidad_repuesta.to_f,
-            devuelta:  it.cantidad_devuelta.to_f,
+            stock_id: it.stock_id, etiqueta: it.stock&.etiqueta, unidad: it.stock&.unidad,
+            esperado: it.esperado_apertura&.to_f, contado: it.cantidad_apertura.to_f,
+            diferencia: it.esperado_apertura ? (it.cantidad_apertura.to_d - it.esperado_apertura.to_d).to_f : nil,
             dispensada: it.cantidad_dispensada.to_f,
-            # Lo que tiene que haber sobre la mesa ahora, y el techo de lo que se puede dispensar.
-            esperado:  it.esperado.to_f,
-            contado:   it.cantidad_cierre&.to_f,
-            diferencia_apertura: it.diferencia_apertura&.to_f,
-            diferencia_cierre:   it.diferencia_cierre&.to_f,
-            motivo:              it.motivo_diferencia,
-            # Lo que corrigió el que recibió, sobre lo que había declarado el admin.
-            correccion: it.cantidad_ajuste.to_d.nonzero?&.to_f,
-            # Las otras dos columnas de la pantalla: con qué reponer, y a qué ritmo se va.
-            # `cantidad_disponible_real` ya descuenta lo que está sobre esta misma mesa.
-            en_deposito: it.stock&.cantidad_disponible_real.to_f,
-            senal:       senal(it),
-            sin_supervision: it.movimientos.any?(&:sin_supervision),
+            esperado_cierre: it.esperado_cierre&.to_f,
+            contado_cierre:  it.cantidad_cierre&.to_f,
           }
         end,
       }
     end
+
+    def valor_de_la_mesa
+      mesa.sum { |mi| mi.cantidad.to_d * mi.stock&.costo_unitario_ars.to_d }.to_f.round(2)
+    end
+
   end
 end

@@ -52,7 +52,6 @@ describe('Las pestañas de Configuración', () => {
       '/configuracion/correo',
       '/configuracion/portal',
       '/integraciones',
-      '/configuracion/papelera',
     ])
   })
 

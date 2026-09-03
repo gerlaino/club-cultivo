@@ -26,14 +26,15 @@ RSpec.describe 'Cerrar el mostrador', type: :request do
   # El que atiende también puede abrirla, pero sólo heredando el cierre anterior — acá cada
   # ejemplo arranca sin ningún turno previo, así que la primera carga es del dueño de la
   # mercadería.
+  # Los dos pasos reales, de las dos personas: administración carga la mesa y quien atiende abre
+  # la caja contando lo que encuentra.
   def abrir!(cantidad: 300, fondo: 50_000, como: admin, recibe: ana)
-    sign_in_as(como)
-    post "/api/sedes/#{sede.id}/mostrador/abrir", headers: auth_headers,
-         params: { monto_inicial_ars: fondo, items: [{ stock_id: stock.id, cantidad: cantidad }] }
-    turno = sede.mostrador!.turno_abierto
-    return if turno.nil? || turno.confirmado? || recibe.nil?
-
-    ActsAsTenant.with_tenant(club) { Mostradores::ConfirmarApertura.call(turno: turno, usuario: recibe) }
+    ActsAsTenant.with_tenant(club) do
+      Mostradores::Cargar.call(mostrador: sede.mostrador!, usuario: como, motivo: 'carga del día',
+                               cambios: [{ stock_id: stock.id, cantidad: cantidad }])
+      Mostradores::AbrirCaja.call(mostrador: sede.mostrador!, usuario: recibe || como,
+                                  efectivo_contado_ars: fondo)
+    end
   end
 
   def dispensar!(cantidad, medio: 'efectivo')
@@ -47,13 +48,19 @@ RSpec.describe 'Cerrar el mostrador', type: :request do
     end
   end
 
-  def item = sede.mostrador!.turno_abierto.items.first
+  def item = sede.mostrador!.turno_abierto.items.find_by(stock_id: stock.id)
+  # El conteo de este producto en el último turno, ya cerrado.
+  def item_cerrado
+    sede.mostrador!.turno_mostradores.cerrados.order(cerrado_at: :desc).first
+        .items.find_by(stock_id: stock.id)
+  end
 
   def cerrar!(contado:, motivo: nil, efectivo: nil, fondo: nil, como: ana)
     sign_in_as(como)
     post "/api/sedes/#{sede.id}/mostrador/cerrar", headers: auth_headers,
-         params: { conteos: [{ item_id: item.id, contado: contado, motivo: motivo }.compact],
-                   efectivo_contado_ars: efectivo, fondo_siguiente_ars: fondo }
+         params: { conteos: [{ stock_id: stock.id, contado: contado }],
+                   efectivo_contado_ars: efectivo, fondo_siguiente_ars: fondo,
+                   notas: motivo }.compact
     JSON.parse(response.body)
   end
 
@@ -100,12 +107,17 @@ RSpec.describe 'Cerrar el mostrador', type: :request do
       expect(stock.stock_movimientos.where(tipo: 'merma').count).to eq(0)
     end
 
-    it 'con diferencia y sin motivo, no cierra' do
-      body = cerrar!(contado: 250)
+    # LA DIFERENCIA NO BLOQUEA. La merma es inevitable y no es culpa de nadie: se anota, la ve
+    # administración, y la caja cierra. Frenarlo dejaría el mostrador trabado a las once de la
+    # noche esperando a alguien que no está.
+    it 'con diferencia cierra igual, y queda anotada' do
+      cerrar!(contado: 250, efectivo: 50_000, motivo: 'merma de fraccionamiento')
 
-      expect(response).to have_http_status(:unprocessable_entity)
-      expect(body['error']).to match(/escribí el motivo/i)
-      expect(sede.mostrador!.turno_abierto).to be_present
+      expect(response).to have_http_status(:ok)
+      expect(sede.mostrador!.turno_abierto).to be_nil
+      it_ = item_cerrado
+      expect(it_.esperado_cierre.to_f).to eq(300.0)
+      expect(it_.cantidad_cierre.to_f).to eq(250.0)
     end
 
     # Contar sólo algunos ítems es un arqueo que no arquea: el que falta se arrastra al turno
@@ -117,7 +129,7 @@ RSpec.describe 'Cerrar el mostrador', type: :request do
       end
       sign_in_as(admin)
       post "/api/sedes/#{sede.id}/mostrador/cargar", headers: auth_headers,
-           params: { stock_id: otro.id, cantidad: 20 }
+           params: { cambios: [{ stock_id: otro.id, cantidad: 20 }], motivo: 'sumo prerolls' }
 
       body = cerrar!(contado: 300, efectivo: 50_000)
 
@@ -125,12 +137,17 @@ RSpec.describe 'Cerrar el mostrador', type: :request do
       expect(body['error']).to match(/falta contar/i)
     end
 
-    it 'al cerrar se libera el apartado y el stock vuelve a estar libre' do
+    # EL APARTADO NO SE SUELTA AL CERRAR, y ése era un bug: el producto sigue físicamente sobre
+    # la mesa hasta que administración lo baje. Antes se liberaba, así que entre que cerraba un
+    # turno y abría el siguiente el sistema lo daba por libre y una reserva podía comprometerlo.
+    it 'lo que queda sobre la mesa sigue apartado después de cerrar' do
       dispensar!(85)
       cerrar!(contado: 215, efectivo: 58_500)
 
-      expect(stock.reload.apartado_para_mostrador.to_f).to eq(0.0)
-      expect(stock.cantidad_disponible_real.to_f).to eq(415.0)
+      expect(stock.reload.apartado_para_mostrador.to_f).to eq(215.0)
+      expect(mesa_de(sede)[stock.id]).to eq(215.0)
+      # 415 en el depósito (de 500 salieron 85) menos los 215 que siguen arriba.
+      expect(stock.cantidad_disponible_real.to_f).to eq(200.0)
     end
   end
 
@@ -145,7 +162,7 @@ RSpec.describe 'Cerrar el mostrador', type: :request do
       dispensar!(50, medio: 'cuenta_corriente')
 
       turno = sede.mostrador!.turno_abierto
-      expect(turno.items.first.esperado.to_f).to eq(250.0)
+      expect(mesa_de(sede)[stock.id]).to eq(250.0)                   # el producto salió igual
       expect(turno.caja_turno.efectivo_esperado_ars).to eq(10_000.0) # sólo el fondo
     end
   end
@@ -229,12 +246,17 @@ RSpec.describe 'Cerrar el mostrador', type: :request do
       expect(turno.caja_turno.reload).to be_cerrada
     end
 
-    it 'cerrado, se puede volver a abrir: cerrar y reabrir ES el arqueo' do
-      cerrar!(contado: 300, efectivo: 50_000)
-      abrir!(cantidad: 300, fondo: nil)
+    # Cerrar y reabrir ES el arqueo, y sirve igual para el cambio de turno: cierra uno, y el que
+    # sigue abre contando lo que dice que hay. La mesa no se toca en el medio.
+    it 'cerrado, se puede volver a abrir' do
+      cerrar!(contado: 300, efectivo: 50_000, fondo: 50_000)
+      res = ActsAsTenant.with_tenant(club) do
+        Mostradores::AbrirCaja.call(mostrador: sede.mostrador!, usuario: ana, efectivo_contado_ars: 50_000)
+      end
 
-      expect(response).to have_http_status(:created)
-      expect(JSON.parse(response.body)['items'].first['heredada']).to eq(300.0)
+      expect(res).to be_ok
+      expect(res.turno.items.first.esperado_apertura.to_f).to eq(300.0)
+      expect(mesa_de(sede)[stock.id]).to eq(300.0)
     end
   end
 
@@ -242,7 +264,7 @@ RSpec.describe 'Cerrar el mostrador', type: :request do
   # abierto no dispensa, y sólo dispensa lo que está sobre la mesa.
   describe 'sin mostrador abierto no se dispensa' do
     it 'con el mostrador cerrado, rechaza' do
-      expect { dispensar!(10) }.to raise_error(ActiveRecord::RecordInvalid, /mostrador está cerrado/i)
+      expect { dispensar!(10) }.to raise_error(ActiveRecord::RecordInvalid, /caja del mostrador está cerrada/i)
     end
 
     it 'con el mostrador abierto, dispensa normal' do

@@ -1,7 +1,14 @@
-# Turno del mostrador: la caja de turno, pero con mercadería. Ver la migración
-# `CreateTurnosMostrador` para el porqué del diseño.
+# EL TURNO: el arqueo de una jornada de mostrador.
 #
-# Esqueleto de B0: la estructura y las relaciones. Abrir, operar y cerrar llegan en B1–B3.
+# Ya NO es el contenedor de la mercadería —eso es `MostradorItem`, permanente y del mostrador—.
+# Acá vive lo que se contó al abrir y lo que se contó al cerrar, con quién lo hizo.
+#
+# Abrir es CONTAR: quien atiende pesa lo que hay y cuenta la plata, y si no coincide con lo que
+# dice el sistema **no se lo bloquea** — pone lo que contó y arranca, y la diferencia queda
+# anotada. La "recepción" separada desapareció: era el mismo conteo pedido dos veces.
+#
+# Cerrar caja es el mismo gesto al revés, y sirve tanto para el arqueo del mediodía como para el
+# cambio de turno: cierra uno, abre el otro con lo que dice que hay.
 class TurnoMostrador < ApplicationRecord
   acts_as_tenant(:club)
 
@@ -12,7 +19,7 @@ class TurnoMostrador < ApplicationRecord
   # Allowlist: si mañana aparece una columna, entra al rastro sólo si alguien la agrega a
   # propósito.
   include Auditable
-  auditar_solo :estado, :abierto_por_id, :confirmado_por_id, :cerrado_por_id, :revisado_por_id,
+  auditar_solo :estado, :abierto_por_id, :cerrado_por_id, :revisado_por_id,
                :notas_apertura, :notas_cierre
 
   belongs_to :club
@@ -22,8 +29,6 @@ class TurnoMostrador < ApplicationRecord
   belongs_to :abierto_por,  class_name: 'User'
   belongs_to :cerrado_por,  class_name: 'User', optional: true
   belongs_to :revisado_por, class_name: 'User', optional: true
-  # Quien ATIENDE confirma que lo que declaró el admin está sobre la mesa.
-  belongs_to :confirmado_por, class_name: 'User', optional: true
 
   has_many :items, class_name: 'TurnoMostradorItem', dependent: :destroy
 
@@ -35,10 +40,9 @@ class TurnoMostrador < ApplicationRecord
   scope :cerrados,  -> { where(estado: 'cerrado') }
   scope :recientes, -> { order(abierto_at: :desc) }
 
-  def confirmado? = confirmado_at.present?
-
-  # Listo para atender: abierto Y recibido por quien va a responder por la mercadería.
-  def operativo? = abierto? && confirmado?
+  # Quedó de la recepción separada, que ya no existe: abrir ES contar. Se mantiene el campo para
+  # no perder el rastro de los turnos viejos, pero nada lo pregunta más.
+  def operativo? = abierto?
 
   # Avisar que la mesa cambió. La pantalla del que atiende no se enteraba de que el admin le
   # bajó producto desde su oficina hasta que recargaba — con el paquete ya sobre el mostrador.

@@ -20,8 +20,13 @@ RSpec.describe 'El retiro de caja queda a nombre de alguien', type: :request do
 
   let(:caja) do
     sign_in_as(admin)
-    post "/api/sedes/#{sede.id}/caja/abrir", headers: auth_headers, params: { monto_inicial_ars: 200_000 }
-    JSON.parse(response.body)
+    # La caja del dispensario se abre desde el MOSTRADOR, que en el mismo gesto cuenta la
+    # mercadería: abrir declarando sólo un fondo salteaba la mitad del arqueo.
+    turno = ActsAsTenant.with_tenant(club) do
+      Mostradores::AbrirCaja.call(mostrador: sede.mostrador!, usuario: admin,
+                                  efectivo_contado_ars: 200_000).turno
+    end
+    { 'id' => turno.caja_turno_id }
   end
 
   def retirar!(params = {})

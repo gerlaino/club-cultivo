@@ -84,7 +84,7 @@ class StocksController < ApplicationController
       return render json: stocks.map { |st|
         # El disponible que ve es el del MOSTRADOR, no el del depósito: ofrecerle 1.240 g cuando
         # sobre la mesa hay 155 es prometerle algo que no puede entregar.
-        serialize_stock(st).merge(cantidad_disponible_real: sobre_la_mesa[st.id].esperado.to_f)
+        serialize_stock(st).merge(cantidad_disponible_real: sobre_la_mesa[st.id].cantidad.to_f)
       }
     end
 
@@ -714,12 +714,15 @@ class StocksController < ApplicationController
 
   private
 
-  # Los ítems de los turnos ABIERTOS de los mostradores que este usuario atiende, por stock.
+  # LO QUE HAY SOBRE LA MESA de los mostradores que este usuario atiende, por stock.
+  #
+  # Es el estado del mostrador, no lo que se contó al abrir: si el admin bajó producto a media
+  # tarde, el que atiende lo puede entregar sin esperar a mañana.
   def items_del_mostrador
-    TurnoMostradorItem.operativos
-                      .joins(turno_mostrador: :mostrador)
-                      .where(mostradores: { sede_id: current_user.sedes_visibles_ids })
-                      .index_by(&:stock_id)
+    MostradorItem.con_stock
+                 .joins(:mostrador)
+                 .where(mostradores: { sede_id: current_user.sedes_visibles_ids })
+                 .index_by(&:stock_id)
   end
 
   def stock_update_params

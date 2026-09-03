@@ -198,7 +198,7 @@ const borrandoVenta = ref(null)
 async function eliminarVenta(v) {
   const ok = await confirm({
     title: `¿Eliminar la venta #${v.id}?`,
-    message: `Vuelve el stock al depósito y se saca del libro el ingreso de ${fmt(v.total_ars)}. La venta queda en la papelera.`,
+    message: `Vuelve el stock al depósito y se saca del libro el ingreso de ${fmt(v.total_ars)}. No se puede deshacer.`,
     confirmText: 'Eliminar venta',
   })
   if (!ok) return

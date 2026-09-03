@@ -37,14 +37,14 @@ RSpec.describe 'Quién ve qué stock al dispensar', type: :request do
   let!(:en_la_mesa)  { stock!(500) }
   let!(:en_deposito) { stock!(300) }
 
-  # La mesa lleva SÓLO uno de los dos, y no entero: 100 de los 500.
+  # La mesa lleva SÓLO uno de los dos, y no entero: 100 de los 500. La carga el admin; la caja
+  # la abre quien atiende, contando.
   let!(:turno) do
     ActsAsTenant.with_tenant(club) do
-      res = Mostradores::AbrirTurno.call(mostrador: sede.mostrador!, usuario: admin,
-                                         monto_inicial_ars: 0,
-                                         items: [{ stock_id: en_la_mesa.id, cantidad: 100 }])
-      Mostradores::ConfirmarApertura.call(turno: res.turno, usuario: ana)
-      res.turno
+      Mostradores::Cargar.call(mostrador: sede.mostrador!, usuario: admin, motivo: 'apertura',
+                               cambios: [{ stock_id: en_la_mesa.id, cantidad: 100 }])
+      Mostradores::AbrirCaja.call(mostrador: sede.mostrador!, usuario: ana,
+                                  efectivo_contado_ars: 0).turno
     end
   end
 
@@ -107,8 +107,8 @@ RSpec.describe 'Quién ve qué stock al dispensar', type: :request do
 
     it 'y también con el mostrador cerrado' do
       ActsAsTenant.with_tenant(club) do
-        Mostradores::CerrarTurno.call(turno: turno, usuario: ana, efectivo_contado_ars: 0,
-                                      conteos: turno.items.map { |i| { item_id: i.id, contado: i.esperado } })
+        Mostradores::CerrarCaja.call(turno: turno, usuario: ana, efectivo_contado_ars: 0,
+                                     conteos: [{ stock_id: en_la_mesa.id, contado: 100 }])
 
         d = Dispensacion.create!(paciente: paciente, user: supervisor, stock: en_deposito, sede: sede,
                                  cantidad: 5, medio_pago: 'efectivo', aporte_socio_ars: 500,
@@ -119,17 +119,15 @@ RSpec.describe 'Quién ve qué stock al dispensar', type: :request do
 
     # Que no pase por el mostrador no significa que el mostrador lo ignore: si saca algo que está
     # arriba, se imputa igual, o el arqueo de la noche le miente al que atendió.
-    it 'pero si saca algo que está sobre la mesa, se imputa al turno' do
-      item = turno.items.first
-
+    it 'pero si saca algo que está sobre la mesa, baja la mesa igual' do
       ActsAsTenant.with_tenant(club) do
         Dispensacion.create!(paciente: paciente, user: supervisor, stock: en_la_mesa, sede: sede,
                              cantidad: 10, medio_pago: 'efectivo', aporte_socio_ars: 1_000,
                              fecha_dispensacion: Time.zone.today)
       end
 
-      expect(item.reload.cantidad_dispensada.to_f).to eq(10.0)
-      expect(item.esperado.to_f).to eq(90.0)
+      expect(mesa_de(sede)[en_la_mesa.id]).to eq(90.0)
+      expect(turno.items.first.reload.cantidad_dispensada.to_f).to eq(10.0)
     end
   end
 

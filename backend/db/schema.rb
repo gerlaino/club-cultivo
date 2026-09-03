@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_08_31_020000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_02_010000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1334,6 +1334,36 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_31_020000) do
     t.index ["user_id"], name: "index_mails_enviados_on_user_id"
   end
 
+  create_table "mostrador_items", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "mostrador_id", null: false
+    t.bigint "stock_id", null: false
+    t.decimal "cantidad", precision: 10, scale: 3, default: "0.0", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_mostrador_items_on_club_id"
+    t.index ["mostrador_id", "stock_id"], name: "index_mostrador_items_unico_por_stock", unique: true
+    t.index ["mostrador_id"], name: "index_mostrador_items_on_mostrador_id"
+    t.index ["stock_id"], name: "index_mostrador_items_on_stock_id"
+  end
+
+  create_table "mostrador_movimientos", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "mostrador_item_id", null: false
+    t.bigint "usuario_id", null: false
+    t.bigint "turno_mostrador_id"
+    t.string "tipo", null: false
+    t.decimal "cantidad", precision: 10, scale: 3, null: false
+    t.string "motivo"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "created_at"], name: "index_mostrador_movimientos_on_club_id_and_created_at"
+    t.index ["club_id"], name: "index_mostrador_movimientos_on_club_id"
+    t.index ["mostrador_item_id"], name: "index_mostrador_movimientos_on_mostrador_item_id"
+    t.index ["turno_mostrador_id"], name: "index_mostrador_movimientos_on_turno_mostrador_id"
+    t.index ["usuario_id"], name: "index_mostrador_movimientos_on_usuario_id"
+  end
+
   create_table "mostradores", force: :cascade do |t|
     t.bigint "club_id", null: false
     t.bigint "sede_id", null: false
@@ -2194,6 +2224,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_31_020000) do
     t.string "motivo_diferencia"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.decimal "esperado_apertura", precision: 10, scale: 3
+    t.decimal "esperado_cierre", precision: 10, scale: 3
     t.index ["club_id"], name: "index_turno_mostrador_items_on_club_id"
     t.index ["stock_id"], name: "index_turno_mostrador_items_on_stock_id"
     t.index ["turno_mostrador_id", "stock_id"], name: "index_turno_mostrador_items_unico_por_stock", unique: true
@@ -2565,6 +2597,13 @@ ActiveRecord::Schema[7.2].define(version: 2026_08_31_020000) do
   add_foreign_key "mails_enviados", "plantillas_mail", column: "plantilla_mail_id"
   add_foreign_key "mails_enviados", "users"
   add_foreign_key "mails_enviados", "users", column: "deleted_by_id"
+  add_foreign_key "mostrador_items", "clubs"
+  add_foreign_key "mostrador_items", "mostradores"
+  add_foreign_key "mostrador_items", "stocks"
+  add_foreign_key "mostrador_movimientos", "clubs"
+  add_foreign_key "mostrador_movimientos", "mostrador_items"
+  add_foreign_key "mostrador_movimientos", "turno_mostradores"
+  add_foreign_key "mostrador_movimientos", "users", column: "usuario_id"
   add_foreign_key "mostradores", "clubs"
   add_foreign_key "mostradores", "sedes"
   add_foreign_key "mostradores", "users", column: "deleted_by_id"
