@@ -117,7 +117,7 @@
       </div>
 
       <TablaMostrador v-model="cantidades" :stocks="tabla" :editable="gestiona"
-                      :muestra-costo="gestiona"
+                      :muestra-costo="gestiona" :contando="!!conteo"
                       :vacio-texto="gestiona ? 'No hay stock habilitado para dispensar en esta sede.'
                                              : 'La mesa está vacía. La carga administración.'" />
 
@@ -143,6 +143,7 @@
     <ModalConteo v-if="conteo" :mesa="mesa" :es-cierre="conteo === 'cierre'"
                  :esperado-efectivo="esperadoEfectivo" :puede-retirar="gestiona"
                  :guardando="guardando"
+                 :fondo-obligatorio="conteo === 'apertura' && fondoSugerido == null"
                  @cerrar="conteo = null" @confirmar="confirmarConteo" />
 
     <!-- ── Poner o sacar plata del cajón, con la caja abierta ─────────────────── -->
@@ -187,6 +188,7 @@
 // organización sepa cuánta hay y dónde. Una diferencia es un dato que se anota, no una falta que
 // alguien tiene que explicar.
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import RendicionCajaCard from '../components/RendicionCajaCard.vue'
 import MostradorMerma from '../components/mostrador/MostradorMerma.vue'
 import MostradorTurnos from '../components/mostrador/MostradorTurnos.vue'
@@ -203,6 +205,7 @@ import { useToast } from '../composables/useToast.js'
 const sedeStore = useSedeStore()
 const auth      = useAuthStore()
 const toast     = useToast()
+const route     = useRoute()
 
 // La merma y las rendiciones son información de GESTIÓN, y la mesa la gobierna administración.
 // Quien atiende decide con lo que tiene sobre la mesa.
@@ -348,7 +351,15 @@ onMounted(async () => {
   if (!sedeStore.loaded) await sedeStore.fetchSedes()
   // No se llama a `cargar()` acá: fijar la sede dispara el watcher, que carga. Hacer las dos
   // cosas mandaba DOS pedidos por cada apertura de la pantalla.
-  sedeId.value = sedes.value[0]?.id ?? null
+  //
+  // `?sede=` es cómo se llega desde "Cajas del día" o desde la ficha de una sede: sin esto, el
+  // admin con varias sedes clickeaba "cómo está Norte" y aterrizaba en la primera de la lista,
+  // que podía no ser Norte. Sólo se respeta si es una sede propia — si viene una ajena o
+  // inválida, se cae a la primera como siempre.
+  const desdeUrl = Number(route.query.sede)
+  sedeId.value = (desdeUrl && sedes.value.some(s => s.id === desdeUrl))
+    ? desdeUrl
+    : sedes.value[0]?.id ?? null
 })
 
 // La mesa se actualiza sola: si administración baja producto desde su oficina, quien atiende lo

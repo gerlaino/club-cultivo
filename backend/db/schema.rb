@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_02_010000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_03_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -2214,11 +2214,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_02_010000) do
     t.bigint "club_id", null: false
     t.bigint "turno_mostrador_id", null: false
     t.bigint "stock_id", null: false
-    t.decimal "cantidad_heredada", precision: 10, scale: 3
     t.decimal "cantidad_apertura", precision: 10, scale: 3, default: "0.0", null: false
-    t.decimal "cantidad_repuesta", precision: 10, scale: 3, default: "0.0", null: false
-    t.decimal "cantidad_devuelta", precision: 10, scale: 3, default: "0.0", null: false
-    t.decimal "cantidad_ajuste", precision: 10, scale: 3, default: "0.0", null: false
     t.decimal "cantidad_dispensada", precision: 10, scale: 3, default: "0.0", null: false
     t.decimal "cantidad_cierre", precision: 10, scale: 3
     t.string "motivo_diferencia"
@@ -2230,21 +2226,6 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_02_010000) do
     t.index ["stock_id"], name: "index_turno_mostrador_items_on_stock_id"
     t.index ["turno_mostrador_id", "stock_id"], name: "index_turno_mostrador_items_unico_por_stock", unique: true
     t.index ["turno_mostrador_id"], name: "index_turno_mostrador_items_on_turno_mostrador_id"
-  end
-
-  create_table "turno_mostrador_movimientos", force: :cascade do |t|
-    t.bigint "club_id", null: false
-    t.bigint "turno_mostrador_item_id", null: false
-    t.bigint "usuario_id", null: false
-    t.string "tipo", null: false
-    t.decimal "cantidad", precision: 10, scale: 3, null: false
-    t.boolean "sin_supervision", default: false, null: false
-    t.string "notas"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["club_id"], name: "index_turno_mostrador_movimientos_on_club_id"
-    t.index ["turno_mostrador_item_id"], name: "index_tmm_on_item"
-    t.index ["usuario_id"], name: "index_turno_mostrador_movimientos_on_usuario_id"
   end
 
   create_table "turno_mostradores", force: :cascade do |t|
@@ -2741,9 +2722,6 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_02_010000) do
   add_foreign_key "turno_mostrador_items", "clubs"
   add_foreign_key "turno_mostrador_items", "stocks"
   add_foreign_key "turno_mostrador_items", "turno_mostradores"
-  add_foreign_key "turno_mostrador_movimientos", "clubs"
-  add_foreign_key "turno_mostrador_movimientos", "turno_mostrador_items"
-  add_foreign_key "turno_mostrador_movimientos", "users", column: "usuario_id"
   add_foreign_key "turno_mostradores", "caja_turnos"
   add_foreign_key "turno_mostradores", "clubs"
   add_foreign_key "turno_mostradores", "mostradores"

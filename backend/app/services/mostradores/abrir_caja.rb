@@ -116,12 +116,23 @@ module Mostradores
 
     # La caja de plata. Si ya hay una abierta se REUSA: dos cajas activas sobre el mismo cajón
     # parten el arqueo en dos por la misma plata.
+    #
+    # SIEMPRE HAY UNA. El botón no exige el campo —no bloquea por diferencia, ni siquiera por
+    # "no contaste"— porque casi siempre hay algo de dónde heredar: el fondo del último cierre.
+    # Pero el PRIMER día no hay ningún cierre anterior, y si tampoco se escribió nada, `fondo`
+    # da `nil`. Devolverlo así abría el turno igual —se puede dispensar— pero SIN caja: lo
+    # cobrado en efectivo no tendría dónde caer, y esa plata desaparecería del arqueo de esa
+    # noche sin que nadie se enterara hasta contarla. Mejor un error claro que un cajón que no
+    # existe.
     def caja
       abierta = @mostrador.caja_abierta
       return abierta if abierta
 
       fondo = @efectivo.nil? ? fondo_heredado : @efectivo.to_d
-      return nil if fondo.nil?
+      if fondo.nil?
+        raise ArgumentError,
+              'No hay ningún cierre anterior del que heredar el fondo: contá el efectivo del cajón.'
+      end
       raise ArgumentError, 'El efectivo contado no puede ser negativo' if fondo.negative?
 
       CajaTurno.create!(club: @club, sede: @mostrador.sede, punto: @mostrador,

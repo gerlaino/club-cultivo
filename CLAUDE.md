@@ -327,24 +327,21 @@ y permanente (`MostradorItem` + `MostradorMovimiento`) que gobierna administraci
 esté; el turno se quedó con el arqueo, y **abrir es contar**: la recepción separada desapareció,
 junto con `caja/abrir` y toda la ceremonia de confirmar apertura y cierre cruzado. **La papelera se
 retiró** (restaurar re-aplicaba efectos sobre el estado de HOY: le sacaba producto a la mesa de
-hoy). Se repasó **rol por rol** —admin, dispensador y repartidor— con la app corriendo.
-**2759 rspec ✓ · 1707 vitest ✓ · 7 pruebas de navegador ✓.**
+hoy). Se repasó **rol por rol** —admin, dispensador y repartidor— con la app corriendo, y una
+segunda pasada cerró los cinco pendientes que había dejado abiertos (ver bloque (y) del
+CHANGELOG): la migración de limpieza, los gramos ocultos detrás del modal de cierre, las tres
+razones de revisión unificadas en un solo lugar, el admin llegando directo al mostrador de una
+sede (`?sede=`), y un agujero real que apareció en el camino — el PRIMER día, sin ningún cierre
+anterior del que heredar el fondo, se podía abrir la caja sin contar nada y el turno quedaba SIN
+caja: lo cobrado en efectivo no tenía dónde caer. Ahora lo exige, y sólo ese día.
+**2761 rspec ✓ · 1707 vitest ✓ · 7 pruebas de navegador ✓.**
 
 **Sin correr:** nada. Las migraciones las corre solo el deploy.
 
 **Pendiente de decisión (mío, no de código):**
-- **Dar de baja `turno_mostrador_movimientos`** (tabla + modelo, hoy marcado como histórico) y las
-  columnas muertas de `turno_mostrador_items`: `cantidad_repuesta`, `cantidad_devuelta`,
-  `cantidad_ajuste`, `cantidad_heredada`. No las escribe nadie. Es una migración.
-- **Con el modal de cierre abierto, la tabla de atrás sigue mostrando los gramos de la mesa** — la
-  misma fuga que ya se tapó con el efectivo, pero acá la cantidad tiene que estar visible durante
-  el día porque es lo que la persona puede entregar. O se oculta esa columna sólo mientras se
-  cuenta, o se acepta.
-- **Las tres razones de "pide una mirada" están escritas dos veces**: en SQL en
-  `MostradorController#turnos_sin_revisar` (el badge) y en Ruby en `Mostradores::Merma` (la lista).
-  Hoy coinciden exactas. Es justo el patrón que en este proyecto siempre terminó divergiendo.
-- Si el mostrador debe aplicarle también al **admin** (hoy no: ver `User#atiende_mostrador?`), y si
-  la merma del mostrador tiene que alimentar el informe de **Pérdidas**, que hoy vive aparte.
+- Si el mostrador debe aplicarle también al **admin** para DISPENSAR (hoy no, ver
+  `User#atiende_mostrador?`) — esto es distinto de VER el mostrador de una sede, que ya andaba y
+  ahora además tiene atajo directo.
 
 ---
 

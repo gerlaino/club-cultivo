@@ -2,6 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
+// `MostradorView` lee `?sede=` para saber a qué sede llegar desde "Cajas del día": sin este
+// mock, `useRoute()` explota por falta de router en el árbol de montaje.
+vi.mock('vue-router', () => ({
+  useRoute: () => ({ query: {} }),
+}))
+
 // LA PANTALLA DEL MOSTRADOR, montada de verdad.
 //
 // Para una organización que sólo dispensa es LA pantalla del día, así que un build limpio no

@@ -1,5 +1,42 @@
 # Changelog
 
+## Septiembre 2026 (y) — el primer día sin fondo abría sin caja
+
+Segunda pasada sobre el bloque (x), cerrando lo que había quedado pendiente y lo que apareció
+probando los flujos por rol.
+
+**El agujero real: abrir sin nada que heredar, el primer día.** El dispensador puede abrir la caja
+sin escribir el efectivo contado — normalmente hereda el fondo del último cierre, y eso está bien.
+Pero el PRIMER día no hay ningún cierre anterior, y si tampoco escribe nada, el turno se abría
+**igual, pero sin ninguna caja atrás**: `TurnoMostrador#caja_turno` quedaba `nil`, y todo lo cobrado
+en efectivo durante ese turno no tenía dónde caer — no aparecía en ningún arqueo, y a la noche esa
+plata simplemente no estaba en ningún lado. `Mostradores::AbrirCaja` ahora lo rechaza con un mensaje
+claro, y el modal marca el campo como obligatorio **sólo en ese caso puntual** — el resto de los
+días sigue sin pedir nada, como corresponde a la regla de "no bloquea por diferencia".
+
+**Limpieza de esquema.** Se fue `turno_mostrador_movimientos` (tabla + modelo) y las cuatro columnas
+muertas de `turno_mostrador_items` (`cantidad_repuesta`, `cantidad_devuelta`, `cantidad_ajuste`,
+`cantidad_heredada`) — nada las escribía desde el bloque (x).
+
+**Las tres razones de "pide una mirada", unificadas.** Estaban escritas dos veces: en SQL en el
+controller (para el badge) y en Ruby en `Mostradores::Merma` (para la lista). Coincidían, pero es
+el patrón que en este proyecto siempre terminó divergiendo. `Mostradores::MotivosDeRevision` es
+ahora el único lugar que decide qué cuenta como pendiente.
+
+**El admin llega directo al mostrador de una sede.** Ya podía verlo —el selector con todas sus
+sedes andaba—, pero no había forma de llegar directo: la fila "Cajas del día" del tablero llevaba
+a la ficha de la sede, y desde ahí "Ir al mostrador" siempre aterrizaba en la primera sede de la
+lista, no en la que se estaba mirando. Con dos sedes, clickear "Norte" llevaba al mostrador de
+Centro. `MostradorView` ahora respeta `?sede=` en la URL.
+
+**Los gramos de la mesa, ocultos mientras se cuenta.** Con el modal de cierre abierto, la tabla de
+atrás seguía mostrando cuánto decía el sistema — la misma fuga que ya se había tapado para el
+efectivo, pero por el otro lado.
+
+2761 rspec ✓ · 1707 vitest ✓.
+
+---
+
 ## Septiembre 2026 (x) — la mesa deja de ser del turno
 
 El mostrador funcionaba, pero ataba dos cosas que son distintas y de personas distintas: **qué hay

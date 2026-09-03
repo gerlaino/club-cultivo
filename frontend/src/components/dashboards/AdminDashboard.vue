@@ -496,9 +496,10 @@ async function onOnboardingCompletado() {
       </div>
 
       <!-- ── CAJAS DE LOS MOSTRADORES ─────────────────────────────────────
-           El admin no está parado en la sede: acá ve a distancia si abrieron, si alguien
-           confirmó el fondo y si quedó un cierre esperándolo. La caja se ABRE en la ficha de
-           la sede —una sola puerta para la misma acción—; esto es el estado y el atajo. -->
+           El admin no está parado en la sede: acá ve a distancia si abrieron, si hay mesa
+           cargada esperando que alguien la abra y si quedó un cierre esperándolo. Va DIRECTO al
+           mostrador de esa sede (`?sede=`) — mandarlo primero a la ficha de la sede era un paso
+           de más para lo que esta fila ya está mostrando: el estado de ESE mostrador. -->
       <div v-if="cajasPorSede.length" class="ad__cajas">
         <div class="ad__cajas-hd">
           <span class="ad__cajas-title"><i class="bi bi-cash-stack"></i> Cajas del día</span>
@@ -506,7 +507,7 @@ async function onOnboardingCompletado() {
         </div>
         <RouterLink
           v-for="c in cajasPorSede" :key="c.sede_id"
-          :to="`/sedes/${c.sede_id}`"
+          :to="`/mostrador?sede=${c.sede_id}`"
           class="ad__caja-row" :class="`ad__caja-row--${c.estado}`"
         >
           <span class="ad__caja-sede">{{ c.sede }}</span>

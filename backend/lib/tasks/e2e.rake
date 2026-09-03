@@ -143,7 +143,6 @@ def limpiar_operativo_e2e!(club)
   disps = Dispensacion.unscoped.joins(:paciente).where(pacientes: ids).select(:id)
   stks  = Stock.unscoped.where(ids).select(:id)
 
-  TurnoMostradorMovimiento.unscoped.where(ids).delete_all
   StockMovimiento.unscoped.where(stock_id: stks).delete_all
   MovimientoContable.unscoped.where(ids).delete_all
   # `cuenta_corriente_movimientos` cuelga de la cuenta, no del club.

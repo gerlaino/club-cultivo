@@ -116,7 +116,7 @@ module Mostradores
           revisado:    t.revisado_at.present?,
           # Por qué está en la lista de trabajo. Un renglón que no dice qué mirar obliga a
           # abrirlo para descubrir que no era nada.
-          motivos_revision: motivos_revision(t, its),
+          motivos_revision: motivos_por_turno[t.id] || [],
         }
       end
     end
@@ -144,24 +144,10 @@ module Mostradores
       end.sort_by { |s| -(s[:merma_pct] || -1) }
     end
 
-    # Las TRES razones por las que un turno pide una mirada. Prometer una bandeja y contar sólo
-    # los faltantes deja las otras dos invisibles apenas cierra el turno.
-    def motivos_revision(turno, its)
-      razones = []
-      razones << 'faltante'  if its.any? { |i| i.diferencia_cierre.to_d.negative? }
-      razones << 'corregido' if its.any? { |i| i.diferencia_apertura.to_d.nonzero? }
-      # Alguien movió la mesa mientras la caja estaba abierta: no es sospechoso por sí solo, pero
-      # explica una diferencia que si no aparece como merma de quien atendió.
-      razones << 'mesa_movida' if movimientos_del_turno(turno).any?
-      razones
-    end
-
-    # Lo que administración subió o bajó de la mesa durante ese turno.
-    def movimientos_del_turno(turno)
-      @movs_por_turno ||= MostradorMovimiento
-                          .where(turno_mostrador_id: turnos.map(&:id), tipo: %w[carga retiro])
-                          .to_a.group_by(&:turno_mostrador_id)
-      @movs_por_turno[turno.id] || []
+    # Una sola consulta para todos los turnos del período — el mismo cálculo que usa el badge del
+    # controller. No se vuelve a decidir acá qué cuenta como "pide una mirada".
+    def motivos_por_turno
+      @motivos_por_turno ||= Mostradores::MotivosDeRevision.por_turno(TurnoMostrador.where(id: turnos.map(&:id)))
     end
 
     # Los turnos que piden una mirada y el admin todavía no miró. Es una lista de trabajo, no una

@@ -45,7 +45,7 @@
       <!-- UNA sola puerta. Esta tarjeta muestra cómo viene; contar, abrir, cargar y cerrar pasan
            en el Mostrador, que es donde está el gesto completo. Tener acá un "abrir caja" que
            sólo pide el fondo salteaba el conteo del stock, que es la mitad del arqueo. -->
-      <RouterLink class="cjm-link" to="/mostrador">Ir al mostrador →</RouterLink>
+      <RouterLink class="cjm-link" :to="`/mostrador?sede=${sede.id}`">Ir al mostrador →</RouterLink>
     </template>
 
     <p v-if="error" class="cjm-error">{{ error }}</p>

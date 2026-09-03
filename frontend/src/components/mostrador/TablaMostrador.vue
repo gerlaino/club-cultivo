@@ -51,7 +51,7 @@
                 <span v-if="excede(s)" class="tmo__error">quedan {{ fmt(s.disponible) }}</span>
               </template>
               <template v-else>
-                <span class="tmo__mesa">{{ fmt(s.mostrador) }}</span>
+                <span class="tmo__mesa">{{ contando ? '—' : fmt(s.mostrador) }}</span>
                 <span class="tmo__unidad">{{ s.unidad }}</span>
               </template>
             </td>
@@ -95,6 +95,10 @@ const props = defineProps({
   muestraCosto: { type: Boolean, default: false },
   tituloColumna:{ type: String,  default: 'Mostrador' },
   vacioTexto:   { type: String,  default: 'No hay stock habilitado para dispensar en esta sede.' },
+  // Con el modal de conteo abierto (solo en la vista de LECTURA — quien atiende, no quien
+  // edita la mesa), no se muestra cuánto dice el sistema. Misma regla que el efectivo esperado:
+  // con el número puesto al lado, se escribe ese y el conteo es teatro.
+  contando:     { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:modelValue'])
 

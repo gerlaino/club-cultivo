@@ -12,6 +12,13 @@
         La mesa está vacía. Podés abrir igual y que administración la cargue después.
       </div>
 
+      <!-- El único campo que SÍ hace falta: sin cierre anterior no hay de dónde heredar el
+           fondo, y sin él el turno abriría sin caja — lo cobrado en efectivo no tendría dónde
+           caer. No es un conteo contra algo esperado, es declarar con qué arranca el cajón. -->
+      <p v-if="fondoObligatorio" class="cnt__aviso-fondo">
+        Es la primera vez que se abre este mostrador: contá el efectivo del cajón para arrancar.
+      </p>
+
       <div class="cnt__lista">
         <div v-for="c in conteos" :key="c.stock_id" class="cnt__row">
           <div class="cnt__prod">
@@ -85,7 +92,7 @@
 
       <div class="cnt__acc">
         <button class="cnt__btn cnt__btn--ghost" @click="$emit('cerrar')">Cancelar</button>
-        <button class="cnt__btn cnt__btn--primary" :disabled="guardando" @click="confirmar">
+        <button class="cnt__btn cnt__btn--primary" :disabled="guardando || faltaFondo" @click="confirmar">
           {{ guardando ? 'Guardando…' : (esCierre ? 'Cerrar caja' : 'Abrir caja') }}
         </button>
       </div>
@@ -114,6 +121,12 @@ const props = defineProps({
   esperadoEfectivo: { type: Number, default: 0 },
   puedeRetirar: { type: Boolean, default: false },
   guardando:    { type: Boolean, default: false },
+  // Es la primera vez que se abre este mostrador: no hay ningún cierre anterior del que heredar
+  // el fondo. Sin esto escrito, el turno arranca IGUAL —no bloquea por diferencia— pero sin
+  // ninguna caja donde caiga lo cobrado en efectivo, que desaparece del arqueo sin que nadie se
+  // entere hasta la noche. Acá SÍ hace falta el número: no es un conteo, es declarar con qué
+  // arranca el cajón.
+  fondoObligatorio: { type: Boolean, default: false },
 })
 const emit = defineEmits(['cerrar', 'confirmar'])
 
@@ -127,6 +140,7 @@ const notas    = ref('')
 
 const fmt = (n) => Number(n ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })
 const escrito = (v) => v !== null && v !== '' && !Number.isNaN(Number(v))
+const faltaFondo = computed(() => props.fondoObligatorio && !escrito(efectivo.value))
 
 const hayAlgoContado = computed(() =>
   escrito(efectivo.value) || conteos.value.some(c => escrito(c.contado))
@@ -173,6 +187,7 @@ function confirmar () {
 .cnt__title { font-family: var(--font-display); font-size: var(--fs-18); font-weight: 700; color: var(--c-leaf-900); margin: 0; }
 .cnt__sub   { margin: 0; font-size: var(--fs-13); color: var(--c-ink-500); }
 .cnt__vacio { margin: 0; font-size: var(--fs-13); color: var(--c-ink-500); }
+.cnt__aviso-fondo { margin: 0; font-size: var(--fs-13); color: var(--c-amber-500); font-weight: 600; }
 
 .cnt__lista { display: flex; flex-direction: column; }
 .cnt__row {

@@ -126,6 +126,32 @@ RSpec.describe 'Abrir la caja del mostrador', type: :request do
       expect(response).to have_http_status(:unprocessable_entity)
       expect(cuerpo['error']).to match(/negativo/i)
     end
+
+    # EL PRIMER DÍA no hay ningún cierre anterior del que heredar el fondo. Si tampoco se cuenta
+    # nada, el turno abriría igual —no bloquea por diferencia— pero SIN caja: lo cobrado en
+    # efectivo no tendría dónde caer, y desaparecería del arqueo de esa noche sin que nadie se
+    # enterara hasta contar. Mejor un error claro que un cajón que no existe.
+    it 'el primer día, sin nada que heredar, exige contar el efectivo' do
+      cuerpo = abrir!(efectivo: nil)
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(cuerpo['error']).to match(/heredar el fondo/i)
+      expect(turno).to be_nil
+    end
+
+    it 'con algo que heredar, sí se puede abrir sin escribir nada' do
+      abrir!(efectivo: 10_000)
+      ActsAsTenant.with_tenant(club) do
+        Mostradores::CerrarCaja.call(turno: turno, usuario: ana, efectivo_contado_ars: 10_000,
+                                     fondo_siguiente_ars: 10_000,
+                                     conteos: [{ stock_id: stock.id, contado: 300 }])
+      end
+
+      cuerpo = abrir!(efectivo: nil, como: create(:user, :dispensador, club: club))
+
+      expect(response).to have_http_status(:created)
+      expect(cuerpo['caja']['fondo_ars']).to eq(10_000.0)
+    end
   end
 
   describe 'quién puede' do

@@ -251,28 +251,11 @@ module Dispensario
       render json: { error: 'No autorizado' }, status: :forbidden
     end
 
-    # Los turnos que piden una mirada. Son TRES razones y no una: prometer una bandeja y contar
-    # sólo los faltantes deja las otras dos invisibles apenas cierra el turno.
-    #
-    #   · faltó producto al contar
-    #   · quien abrió corrigió lo que decía la mesa (si pasa seguido, la mesa se declara mal)
-    #   · administración movió la mesa durante el turno (la diferencia puede no ser de quien
-    #     atendió, y cargársela sería injusto)
+    # El badge de la solapa Merma. Las razones viven en `Mostradores::MotivosDeRevision` — acá NO
+    # se decide qué cuenta como pendiente, sólo se cuenta.
     def turnos_sin_revisar
       candidatos = @mostrador.turno_mostradores.cerrados.where(revisado_at: nil)
-      items = TurnoMostradorItem.where(turno_mostrador_id: candidatos.select(:id))
-
-      con_faltante = items.where.not(cantidad_cierre: nil).where.not(esperado_cierre: nil)
-                          .where('cantidad_cierre < esperado_cierre').select(:turno_mostrador_id)
-      corregidos   = items.where.not(esperado_apertura: nil)
-                          .where('cantidad_apertura <> esperado_apertura').select(:turno_mostrador_id)
-      mesa_movida  = MostradorMovimiento.where(turno_mostrador_id: candidatos.select(:id),
-                                               tipo: %w[carga retiro]).select(:turno_mostrador_id)
-
-      candidatos.where(id: con_faltante)
-                .or(candidatos.where(id: corregidos))
-                .or(candidatos.where(id: mesa_movida))
-                .count
+      Mostradores::MotivosDeRevision.por_turno(candidatos).size
     end
 
     def turnos_cerrados_sin_revisar
