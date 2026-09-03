@@ -854,6 +854,13 @@ async function handleSubmit() {
                     <td class="mnd__td-prod">
                       <span class="mnd__td-emoji">{{ FORMA_EMOJI[s.forma_producto] || '📦' }}</span>
                       {{ FORMA_LABEL[s.forma_producto] || s.forma_producto }}
+                      <!-- Administración dispensa del depósito entero, no sólo de la mesa — pero
+                           si ESTE frasco está sobre alguna mesa, dispensarlo va a descontar de
+                           ahí. Sólo para quien ve el depósito completo: al dispensador ya se le
+                           filtró la lista a lo que está sobre la mesa, y el badge en cada fila
+                           no le diría nada nuevo. -->
+                      <span v-if="s.en_mostrador && !dispensaDelMostrador" class="mnd__td-mostrador"
+                            title="Está sobre la mesa del mostrador: se descuenta de ahí">🏪 Mostrador</span>
                     </td>
                     <td class="mnd__td-gen">
                       <span class="mnd__td-gen-nombre">{{ generica(s) || '—' }}</span>
@@ -887,7 +894,11 @@ async function handleSubmit() {
               >
                 <span class="mnd__stock-emoji">{{ FORMA_EMOJI[s.forma_producto] || '📦' }}</span>
                 <span class="mnd__stock-info">
-                  <span class="mnd__stock-nombre">{{ FORMA_LABEL[s.forma_producto] || s.forma_producto }}</span>
+                  <span class="mnd__stock-nombre">
+                    {{ FORMA_LABEL[s.forma_producto] || s.forma_producto }}
+                    <span v-if="s.en_mostrador && !dispensaDelMostrador" class="mnd__stock-mostrador"
+                          title="Está sobre la mesa del mostrador: se descuenta de ahí">🏪 Mostrador</span>
+                  </span>
                   <span v-if="generica(s)" class="mnd__stock-gen">{{ generica(s) }}</span>
                   <span v-if="fmtFecha(s.fecha_elaboracion || s.created_at)" class="mnd__stock-fecha">
                     {{ fmtFecha(s.fecha_elaboracion || s.created_at) }}
@@ -1410,6 +1421,7 @@ async function handleSubmit() {
 .mnd__td-disp { text-align: right; white-space: nowrap; }
 .mnd__td-disp-n { font-family: monospace; font-weight: 800; color: #1b5e20; }
 .mnd__td-evento { display: block; font-size: .64rem; color: #b45309; }
+.mnd__td-mostrador { display: inline-block; margin-left: 6px; font-size: .64rem; font-weight: 700; color: #1d4ed8; background: #dbeafe; border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
 
 /* Debajo de 720px no hay ancho para cinco columnas: manda la tarjeta. */
 .mnd__stock-list { display: none; flex-direction: column; gap: .35rem; max-height: 220px; overflow-y: auto; }
@@ -1430,6 +1442,7 @@ async function handleSubmit() {
 .mnd__stock-disp  { font-size: .8rem; font-weight: 700; color: #1b5e20; font-family: monospace; }
 .mnd__stock-precio { font-size: .7rem; color: var(--c-slate-500); font-family: monospace; white-space: nowrap; }
 .mnd__stock-evento { font-size: .66rem; color: #6d28d9; background: #ede9fe; border-radius: 999px; padding: 1px 7px; white-space: nowrap; font-weight: 700; }
+.mnd__stock-mostrador { display: inline-block; margin-left: 6px; font-size: .62rem; font-weight: 700; color: #1d4ed8; background: #dbeafe; border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
 .mnd__cart-evento { font-size: .62rem; color: #6d28d9; background: #ede9fe; border-radius: 999px; padding: 1px 6px; margin-left: .35rem; font-weight: 700; }
 .mnd__evento-box { background: #faf5ff; border: 1.5px solid #e9d5ff; border-radius: 10px; padding: .7rem .85rem; margin: .7rem 0; }
 .mnd__evento-title { font-size: .78rem; font-weight: 700; color: #6d28d9; display: flex; align-items: center; gap: .4rem; margin-bottom: .45rem; }

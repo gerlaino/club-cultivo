@@ -856,6 +856,11 @@ class StocksController < ApplicationController
       apartados_evento: s.apartados_en_curso.map { |p|
         { evento_id: p.evento_bar_id, evento_nombre: p.evento_bar&.nombre, cantidad: p.saldo_apartado.to_f }
       },
+      # Administración dispensa del depósito entero, no sólo de la mesa — pero si ESTE frasco
+      # está sobre alguna mesa, dispensarlo va a descontar de ahí. El carrito se lo dice con un
+      # badge para que no se entere recién cuando el que atiende cierra con un faltante que no
+      # esperaba.
+      en_mostrador: s.apartado_para_mostrador.to_f.positive?,
       dias_para_vencimiento:    s.dias_para_vencimiento,
       estado_vencimiento:       s.estado_vencimiento,
       created_at:               s.created_at,

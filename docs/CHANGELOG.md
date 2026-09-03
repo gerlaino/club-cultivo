@@ -1,5 +1,22 @@
 # Changelog
 
+## Septiembre 2026 (z) — un badge para saber de dónde va a descontar
+
+Administración dispensa del depósito entero, más allá de lo que haya sobre la mesa del
+mostrador — pero si el producto que elige está sobre alguna mesa, la dispensa **descuenta de
+ahí igual**, aunque no pase por el mostrador (`Dispensacion#imputar_a_mostrador` no distingue
+quién dispensa). Esa parte ya funcionaba; lo que faltaba era que quien elige lo supiera ANTES,
+no que el que atiende cerrara esa noche con un faltante que no esperaba.
+
+`StocksController#serialize_stock` suma `en_mostrador` (si el frasco está apartado en alguna
+mesa) y el carrito le pone un chip **🏪 Mostrador** al lado del producto — sólo para quien ve el
+depósito completo: al dispensador ya se le filtró la lista a lo que está sobre la mesa, y
+repetirle el badge en cada fila no diría nada nuevo.
+
+2763 rspec ✓ · 1709 vitest ✓.
+
+---
+
 ## Septiembre 2026 (y) — el primer día sin fondo abría sin caja
 
 Segunda pasada sobre el bloque (x), cerrando lo que había quedado pendiente y lo que apareció

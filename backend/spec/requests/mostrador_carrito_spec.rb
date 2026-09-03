@@ -82,4 +82,27 @@ RSpec.describe 'El carrito ofrece lo que está sobre la mesa', type: :request do
 
     expect(ids).to include(flor.id, preroll.id)
   end
+
+  # Al admin se le ofrece TODO, pero si dispensa lo que está arriba, va a descontar de la mesa
+  # igual que si lo hiciera el que atiende. El badge existe para que lo sepa ANTES de elegir, no
+  # para que se entere a la noche cuando el que atiende cierra con un faltante que no esperaba.
+  it 'le marca cuál de eso está sobre alguna mesa' do
+    abrir_mostrador_con_flor!
+
+    por_id = carrito(admin).index_by { |s| s['id'] }
+
+    expect(por_id[flor.id]['en_mostrador']).to be(true)
+    expect(por_id[preroll.id]['en_mostrador']).to be(false)
+  end
+
+  # `serialize_stock` no distingue quién pregunta: el campo viaja igual para los dos. Para el
+  # que atiende sale siempre `true` —ya ve sólo lo que está sobre la mesa, así que no podría ser
+  # otra cosa— y el frontend no dibuja el badge para su rol: repetirle con un chip lo que ya sabe
+  # por estar filtrado no agrega nada.
+  it 'al que atiende le sale siempre true: ya ve sólo lo que está sobre la mesa' do
+    abrir_mostrador_con_flor!
+
+    fila = carrito(ana).first
+    expect(fila['en_mostrador']).to be(true)
+  end
 end

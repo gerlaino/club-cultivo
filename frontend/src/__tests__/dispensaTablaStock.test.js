@@ -190,3 +190,36 @@ describe('Dispensar — la lista vacía dice por qué', () => {
     expect(w.find('.mnd__warn-box').text()).toContain('Sin stock disponible')
   })
 })
+
+// AC (Germán): administración dispensa del depósito entero, más allá de lo que haya en el
+// mostrador — pero si lo que elige está sobre la mesa, la dispensa va a descontar de ahí. Un
+// badge en la fila se lo dice ANTES de elegir, para que no se entere a la noche cuando el que
+// atiende cierra con un faltante que no esperaba.
+describe('Dispensar — el badge de Mostrador', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  const CON_MOSTRADOR = [
+    { id: 1, cantidad: 340, unidad: 'g', forma_producto: 'flor_seca', precio_sugerido_ars: 1800,
+      genetica: { id: 1, nombre: 'Lemon Cookie' }, sede: UNA_SEDE, en_mostrador: true },
+    { id: 2, cantidad: 120, unidad: 'g', forma_producto: 'flor_seca', precio_sugerido_ars: 2100,
+      genetica: { id: 2, nombre: 'Blue Sherbet' }, sede: UNA_SEDE, en_mostrador: false },
+  ]
+
+  it('a administración le marca cuál está sobre la mesa', async () => {
+    const w = await montar(CON_MOSTRADOR, 'admin')
+    const filas = w.findAll('.mnd__tr')
+
+    // Ordenada por genética: Blue Sherbet (sin badge) primero, Lemon Cookie (con badge) después.
+    expect(filas[0].find('.mnd__td-prod').text()).not.toContain('Mostrador')
+    expect(filas[1].find('.mnd__td-prod').text()).toContain('Mostrador')
+  })
+
+  // Al dispensador ya se le filtró la lista a lo que está sobre la mesa (lo resuelve el
+  // backend): cada fila trae `en_mostrador: true`, pero repetirlo en un badge por fila no le
+  // dice nada que no supiera ya por estar viendo sólo eso.
+  it('al dispensador no le muestra el badge, aunque el backend lo mande', async () => {
+    const w = await montar(CON_MOSTRADOR, 'dispensador')
+
+    expect(w.text()).not.toContain('Mostrador')
+  })
+})
