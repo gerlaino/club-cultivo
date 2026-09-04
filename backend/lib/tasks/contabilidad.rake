@@ -14,15 +14,35 @@
 #   bundle exec rake contabilidad:auditar DETALLE=1  # lista cada caso, no sólo el conteo
 require Rails.root.join('lib/auditoria_contable')
 
+# CLUB= acepta lo que uno tenga a mano: el slug, el id o un pedazo del nombre. El slug no se lo
+# sabe nadie de memoria —"Mitocondria ONG" es `mitocondria_ong`, o `mitocondria`, o vaya a saber—
+# y con la shell de producción abierta, fallar por eso es perder el viaje.
+def buscar_organizaciones(criterio)
+  return Club.order(:id) if criterio.blank?
+
+  criterio = criterio.strip
+  por_slug = Club.where(slug: criterio)
+  return por_slug if por_slug.exists?
+
+  if criterio.match?(/\A\d+\z/)
+    por_id = Club.where(id: criterio)
+    return por_id if por_id.exists?
+  end
+
+  Club.where('name ILIKE ?', "%#{criterio}%").order(:id)
+end
+
 namespace :contabilidad do
   desc 'Audita saldos, asientos y cobros buscando descuadres (sólo lectura)'
   task auditar: :environment do
-    clubes = if ENV['CLUB'].present?
-               Club.where(slug: ENV['CLUB'])
-             else
-               Club.all
-             end
-    abort "No encontré la organización #{ENV['CLUB']}" if clubes.empty?
+    clubes = buscar_organizaciones(ENV['CLUB'])
+    if clubes.empty?
+      # Nadie se acuerda del slug, y "no encontré" a secas obliga a ir a buscarlo a otra pantalla
+      # con la shell abierta. Si no está, que al menos diga cuáles hay.
+      puts "No encontré ninguna organización que coincida con «#{ENV['CLUB']}». Las que hay:"
+      Club.order(:id).each { |c| puts "  #{c.id}  #{c.name}  (slug: #{c.slug})" }
+      abort ''
+    end
 
     detalle  = ENV['DETALLE'].present?
     hallazgos = 0
