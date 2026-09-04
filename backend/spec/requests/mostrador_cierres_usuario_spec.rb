@@ -180,4 +180,63 @@ RSpec.describe 'Quién ve qué del mostrador', type: :request do
       expect(ver(ana)['puedo']['cargar']).to be(false)
     end
   end
+
+  # EL HISTORIAL SE MIRA DE A POCO Y SE PUEDE LLEVAR.
+  #
+  # Un mostrador con un año de arqueos son cientos de turnos: traerlos todos para mostrar veinte
+  # es hacer esperar a alguien que está atendiendo. Y lo que se le pasa al contador no se copia de
+  # una tabla en el navegador.
+  describe 'paginado y descarga del historial' do
+    def un_cierre! (usuario = ana)
+      cargar!(300, 10)
+      cerrar!(abrir!(usuario: usuario), 300, 10, usuario: usuario)
+    end
+
+    def pedir(como, params)
+      sign_in_as(como)
+      get "/api/sedes/#{sede.id}/mostrador/turnos", headers: auth_headers, params: params
+    end
+
+    before { 5.times { un_cierre! } }
+
+    it 'trae la página pedida y dice cuántas hay' do
+      pedir(admin, { por: 2 })
+      cuerpo = JSON.parse(response.body)
+
+      expect(cuerpo['turnos'].size).to eq(2)
+      expect(cuerpo['total']).to eq(5)
+      expect(cuerpo['paginas']).to eq(3)
+      expect(cuerpo['pagina']).to eq(1)
+    end
+
+    it 'la segunda página sigue donde quedó la primera' do
+      pedir(admin, { por: 2 })
+      primera = JSON.parse(response.body)['turnos'].map { |t| t['id'] }
+
+      pedir(admin, { por: 2, pagina: 2 })
+      segunda = JSON.parse(response.body)['turnos'].map { |t| t['id'] }
+
+      expect(segunda.size).to eq(2)
+      expect(segunda & primera).to be_empty
+    end
+
+    it 'lo baja entero en CSV, con una fila por cierre y sin paginar' do
+      pedir(admin, { formato: 'csv' })
+
+      expect(response.headers['Content-Type']).to include('text/csv')
+      expect(response.headers['Content-Disposition']).to include('arqueos-')
+      expect(response.body.lines.size).to eq(6)          # encabezado + los cinco
+      expect(response.body).to include('Efectivo contado')
+    end
+
+    # El que atiende ve LOS SUYOS, también al descargar: el filtro es del backend.
+    it 'la descarga respeta de quién es cada turno' do
+      otro = create(:user, :dispensador, club: club)
+      un_cierre!(otro)
+
+      pedir(otro, { formato: 'csv' })
+
+      expect(response.body.lines.size).to eq(2)          # encabezado + el suyo
+    end
+  end
 end

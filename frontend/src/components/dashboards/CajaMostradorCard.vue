@@ -51,7 +51,7 @@
       <!-- UNA sola puerta. Esta tarjeta muestra cómo viene; contar, abrir, cargar y cerrar pasan
            en el Mostrador, que es donde está el gesto completo. Tener acá un "abrir caja" que
            sólo pide el fondo salteaba el conteo del stock, que es la mitad del arqueo. -->
-      <RouterLink class="cjm-link" :to="`/mostrador?sede=${sede.id}`">Ir al mostrador →</RouterLink>
+      <RouterLink class="cjm-link" :to="destinoMostrador">Ir al mostrador →</RouterLink>
     </template>
 
     <p v-if="error" class="cjm-error">{{ error }}</p>
@@ -68,7 +68,7 @@
 //
 // Ahora informa y manda a Mostrador, que es donde el gesto está completo.
 import { ref, computed, watch } from 'vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { getMostrador } from '../../lib/api.js'
 import { formatARS as fmtARS } from '../../lib/formatters.js'
 
@@ -78,6 +78,21 @@ const props = defineProps({
   // QUÉ SE LE DICE a cada uno con la mesa vacía: administración la carga, quien atiende la pide.
   puedeGestionar: { type: Boolean, default: false },
   compacto: { type: Boolean, default: false },
+})
+
+// DENTRO DEL SHELL SE VA POR LA PUERTA DEL SHELL.
+//
+// La pantalla del mostrador es la misma en los dos lados, pero montada bajo `/m` conserva la
+// barra de abajo y el encabezado móvil. Con el link fijo a `/mostrador`, tocarlo desde el
+// teléfono te sacaba del envoltorio y aterrizabas en la versión de escritorio: sin barra, con
+// todo apretado arriba. (En la PWA instalada el guard lo corregía; en el navegador del celular
+// —que es como se prueba— no, porque ahí no hay nada que corregir: es una ruta válida.)
+// `useRoute` puede venir vacío si la tarjeta se monta fuera de un router (tests): sin ruta se
+// asume escritorio, que es el caso conservador.
+const route = useRoute()
+const destinoMostrador = computed(() => {
+  const base = (route?.path || '').startsWith('/m') ? '/m/mostrador' : '/mostrador'
+  return `${base}?sede=${props.sede?.id}`
 })
 
 const cargando = ref(true)

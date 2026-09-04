@@ -130,9 +130,25 @@ module Dispensario
       escala = escala.where(abierto_por_id: current_user.id) unless gestiona?
 
       escala = escala.includes(:cerrado_por, :abierto_por, :caja_turno, items: :stock)
+                     .order(cerrado_at: :desc)
+
+      # DESCARGA: el historial de arqueos es lo que se le muestra a un contador o a un socio, y
+      # eso no se hace leyendo una pantalla. Sin tope de páginas: se baja todo lo que haya.
+      return enviar_csv(escala) if params[:formato] == 'csv'
+
+      total  = escala.count
+      por    = (params[:por].presence || 20).to_i.clamp(1, 100)
+      pagina = [params[:pagina].to_i, 1].max
+
       render json: {
-        turnos: escala.order(cerrado_at: :desc).limit(30).map { |t| serialize_turno_resumen(t) },
+        turnos:   escala.offset((pagina - 1) * por).limit(por).map { |t| serialize_turno_resumen(t) },
         gestiona: gestiona?,
+        # Paginado en el backend y no cortando en el front: un mostrador con un año de arqueos son
+        # cientos de turnos, y traerlos todos para mostrar veinte es hacer esperar a alguien que
+        # está atendiendo.
+        pagina:   pagina,
+        paginas:  [(total / por.to_f).ceil, 1].max,
+        total:    total,
       }
     end
 
@@ -346,6 +362,34 @@ module Dispensario
     # producto y pregunta el depósito de cada uno —treinta turnos serían cientos de queries para
     # pintar una lista donde no se ve ni un solo producto—. Acá van los totales, y el detalle se
     # abre al entrar a uno.
+    # EL HISTORIAL DE ARQUEOS, PARA LLEVÁRSELO.
+    #
+    # Una fila por turno con lo mismo que muestra la pantalla: cuándo, quién, cuánto se entregó,
+    # qué faltó y cómo cerró la caja. Es lo que se le pasa al contador o se archiva, y eso no se
+    # hace copiando de una tabla en el navegador.
+    def enviar_csv(escala)
+      require 'csv'
+      filas = CSV.generate(col_sep: ';', encoding: 'UTF-8') do |csv|
+        csv << ['Fecha', 'Abrió', 'Cerró', 'Atendió', 'Cerrado por', 'Productos',
+                'Entregado', 'Faltó', 'Faltó ($)', 'Efectivo contado ($)', 'Diferencia caja ($)',
+                'Revisado']
+        escala.each do |t|
+          r = serialize_turno_resumen(t)
+          csv << [
+            t.cerrado_at&.to_date, hora_corta(t.abierto_at), hora_corta(t.cerrado_at),
+            r[:atendio], r[:cerrado_por], r[:productos], r[:dispensado], r[:faltante],
+            r[:faltante_ars], r[:efectivo_contado_ars], r[:diferencia_caja_ars],
+            r[:revisado] ? 'sí' : 'no',
+          ]
+        end
+      end
+
+      send_data "﻿#{filas}", type: 'text/csv; charset=utf-8',
+                filename: "arqueos-#{@mostrador.sede&.nombre.to_s.parameterize}-#{Time.zone.today}.csv"
+    end
+
+    def hora_corta(t) = t&.in_time_zone&.strftime('%H:%M')
+
     def serialize_turno_resumen(turno)
       items   = turno.items.to_a
       con_dif = items.count { |it| it.diferencia_cierre.to_d.nonzero? }

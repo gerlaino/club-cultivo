@@ -94,6 +94,10 @@ RSpec.describe 'El arqueo de un turno cerrado no cambia después', type: :model 
                                 abierta_at: Time.current)
       venta = create(:bar_venta, club: club, bar: barra, user: ana, caja_turno: caja,
                      total_ars: 5_000, medio_pago: 'efectivo')
+      # La venta ocurre ANTES del cierre. Creada en el mismo instante, el filtro por `cerrada_at`
+      # la dejaba adentro o afuera según el microsegundo: un test que falla una de cada tantas
+      # veces es peor que no tenerlo, porque enseña a re-correr en vez de mirar.
+      venta.update_columns(created_at: 5.minutes.ago)
 
       esperado = caja.efectivo_esperado_ars
       expect(esperado).to eq(15_000.0)

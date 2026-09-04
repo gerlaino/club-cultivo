@@ -76,8 +76,8 @@ import MostradorView from '../views/MostradorView.vue'
 import { useSedeStore } from '../stores/sede.js'
 import { useAuthStore } from '../stores/auth.js'
 
-async function montar (rol = 'admin') {
-  useAuthStore().user = { id: 1, role: rol }
+async function montar (rol = 'admin', extra = {}) {
+  useAuthStore().user = { id: 1, role: rol, ...extra }
   const w = mount(MostradorView, { global: { stubs: { RouterLink: true } } })
   await flushPromises()
   await flushPromises()
@@ -159,6 +159,57 @@ describe('La mesa, que gobierna administración', () => {
     expect(row.find('.cmm__antes').text()).toBe('120')
     expect(row.find('.cmm__ahora').text()).toContain('300')
     expect(row.find('.cmm__delta').text()).toContain('+180')
+  })
+
+  // BAJAR NO SIEMPRE ES "VUELVE AL DEPÓSITO": si se perdió, esos gramos tienen que salir del
+  // inventario. Devolverlos al depósito los deja contados como existentes y la pérdida no se
+  // mide en ningún lado.
+  describe('a dónde va lo que baja', () => {
+    beforeEach(() => { respuesta = { ...respuesta, mesa: [{ ...FLOR, mostrador: 300 }] } })
+
+    async function bajarA (w, cantidad) {
+      const flor = filas(w).find(f => f.text().includes('Northern'))
+      await flor.find('.tmo__input').setValue(cantidad)
+      await w.find('.mst__btn--guardar').trigger('click')
+    }
+
+    it('por defecto vuelve al depósito y no manda destino', async () => {
+      const w = await montar()
+      await bajarA(w, 120)
+      await w.find('.cmm__input').setValue('sobró de la mañana')
+      await w.find('.cmm__btn--primary').trigger('click')
+      await flushPromises()
+
+      expect(cargarMostrador).toHaveBeenCalledWith(10, {
+        cambios: [{ stock_id: 1, cantidad: 120, destino: 'deposito' }],
+        motivo: 'sobró de la mañana',
+      })
+    })
+
+    it('marcado como perdido, lo dice y avisa que sale del inventario', async () => {
+      const w = await montar()
+      await bajarA(w, 120)
+      await w.findAll('.cmm__chip--merma')[0].trigger('click')
+
+      expect(w.find('.cmm__aviso-merma').text()).toContain('sale del inventario')
+
+      await w.find('.cmm__input').setValue('se cayó el frasco')
+      await w.find('.cmm__btn--primary').trigger('click')
+      await flushPromises()
+
+      expect(cargarMostrador).toHaveBeenCalledWith(10, {
+        cambios: [{ stock_id: 1, cantidad: 120, destino: 'merma' }],
+        motivo: 'se cayó el frasco',
+      })
+    })
+
+    // Subir viene del depósito: no hay nada que declarar.
+    it('lo que SUBE no pregunta a dónde va', async () => {
+      const w = await montar()
+      await bajarA(w, 400)
+
+      expect(w.find('.cmm__destino').exists()).toBe(false)
+    })
   })
 
   // Bajar a cero NO borra la fila ni su historial: deja de listarse. Decirlo evita que parezca
@@ -486,6 +537,33 @@ describe('Mientras carga', () => {
     expect(w.find('.mst__skel').exists()).toBe(false)
     expect(w.find('.tmo__buscar').element.value).toBe('preroll')
     expect(getMostrador).toHaveBeenCalledTimes(2)
+  })
+})
+
+// QUIEN ATIENDE ABRE LA CAJA EN SU MOSTRADOR. Aterrizar en el de otra sede le muestra una mesa
+// vacía y ninguna caja abierta: la pantalla le dice que no hizo lo que acaba de hacer.
+describe('Con qué sede arranca la pantalla', () => {
+  const DOS_SEDES = [
+    { id: 10, nombre: 'Central', tipo: 'social' },
+    { id: 12, nombre: 'Norte',   tipo: 'social' },
+  ]
+
+  beforeEach(() => {
+    const sede = useSedeStore()
+    sede.sedes = DOS_SEDES
+    sede.loaded = true
+  })
+
+  it('la del usuario antes que la primera de la lista', async () => {
+    await montar('dispensador', { dispensario_sede: { id: 12, nombre: 'Norte' } })
+
+    expect(getMostrador).toHaveBeenCalledWith(12)
+  })
+
+  it('sin sede propia, la primera', async () => {
+    await montar('admin')
+
+    expect(getMostrador).toHaveBeenCalledWith(10)
   })
 })
 

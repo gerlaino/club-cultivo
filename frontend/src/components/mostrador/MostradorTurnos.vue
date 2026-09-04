@@ -1,13 +1,27 @@
 <template>
   <div class="trn">
-    <p class="trn__sub">
-      {{ gestiona
-         ? 'Todos los turnos cerrados de esta sede.'
-         : 'Los turnos que atendiste vos. Si mañana te preguntan por una diferencia, está acá.' }}
-    </p>
+    <div class="trn__hd">
+      <p class="trn__sub">
+        {{ gestiona
+           ? 'Cada cierre con su conteo y su arqueo, del más nuevo al más viejo.'
+           : 'Los turnos que atendiste vos. Si mañana te preguntan por una diferencia, está acá.' }}
+      </p>
+      <div class="trn__hd-acc">
+        <span v-if="total" class="trn__total">{{ total }} cierre{{ total === 1 ? '' : 's' }}</span>
+        <button v-if="total" class="trn__btn trn__btn--mini trn__btn--ghost"
+                :disabled="bajando" @click="descargar">
+          {{ bajando ? 'Preparando…' : 'Descargar CSV' }}
+        </button>
+      </div>
+    </div>
 
     <p v-if="cargando" class="trn__vacio">Buscando…</p>
-    <p v-else-if="!turnos.length" class="trn__vacio">Todavía no cerraste ningún turno acá.</p>
+    <!-- Cada uno con su vacío: al admin decirle "no cerraste ningún turno" es contarle algo que
+         no es suyo — él no atiende, mira los de los demás. -->
+    <p v-else-if="!turnos.length" class="trn__vacio">
+      {{ gestiona ? 'Todavía no cerró ningún turno en esta sede.'
+                  : 'Todavía no cerraste ningún turno acá.' }}
+    </p>
 
     <div v-else class="trn__table-wrap">
       <table class="trn__table tabla-cards">
@@ -58,6 +72,15 @@
       </table>
     </div>
 
+    <!-- Paginado: sólo aparece cuando hay más de una página, y dice en cuál está. -->
+    <div v-if="paginas > 1" class="trn__pag">
+      <button class="trn__btn trn__btn--mini trn__btn--ghost" :disabled="pagina === 1"
+              @click="irA(pagina - 1)">Anterior</button>
+      <span class="trn__pag-txt">Página {{ pagina }} de {{ paginas }}</span>
+      <button class="trn__btn trn__btn--mini trn__btn--ghost" :disabled="pagina === paginas"
+              @click="irA(pagina + 1)">Siguiente</button>
+    </div>
+
     <p v-if="!gestiona && turnos.length" class="trn__nota">
       ¿Contaste mal alguno? Avisale a administración: el conteo se corrige desde acá, sin borrar
       nada — se asienta la diferencia.
@@ -76,7 +99,7 @@
 // backend filtra, no la pantalla.
 import { ref, watch } from 'vue'
 import CorregirConteo from './CorregirConteo.vue'
-import { listTurnosMostrador } from '../../lib/api.js'
+import { listTurnosMostrador, descargarTurnosMostrador } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
 const props = defineProps({ sedeId: { type: Number, default: null } })
@@ -86,18 +109,26 @@ const turnos   = ref([])
 const gestiona = ref(false)
 const cargando = ref(false)
 const corrigiendo = ref(null)
+// Paginado del BACKEND: un mostrador con un año de arqueos son cientos de turnos, y traerlos
+// todos para mostrar veinte es hacer esperar a alguien que está atendiendo.
+const pagina   = ref(1)
+const paginas  = ref(1)
+const total    = ref(0)
+const bajando  = ref(false)
 
 const fmt = (n) => Number(n ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })
 const fecha = (iso) => (iso ? new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) : '')
-const hora  = (iso) => (iso ? new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '')
+const hora  = (iso) => (iso ? new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) : '')
 
 async function cargar () {
   if (!props.sedeId) return
   cargando.value = true
   try {
-    const { data } = await listTurnosMostrador(props.sedeId)
+    const { data } = await listTurnosMostrador(props.sedeId, { pagina: pagina.value })
     turnos.value   = data.turnos || []
     gestiona.value = !!data.gestiona
+    paginas.value  = data.paginas || 1
+    total.value    = data.total ?? turnos.value.length
   } catch (e) {
     toast.error(e?.response?.data?.error || 'No se pudieron cargar los turnos.')
   } finally {
@@ -105,11 +136,50 @@ async function cargar () {
   }
 }
 
-watch(() => props.sedeId, cargar, { immediate: true })
+function irA (n) {
+  if (n < 1 || n > paginas.value || n === pagina.value) return
+  pagina.value = n
+  cargar()
+}
+
+// Se arma el archivo en el backend y se baja acá. El nombre lo pone el servidor (sede + fecha):
+// tres archivos "arqueos.csv" en la carpeta de descargas no le sirven a nadie.
+async function descargar () {
+  bajando.value = true
+  try {
+    const res  = await descargarTurnosMostrador(props.sedeId)
+    const nombre = /filename="?([^"]+)"?/.exec(res.headers['content-disposition'] || '')?.[1]
+    const url  = URL.createObjectURL(new Blob([res.data], { type: 'text/csv;charset=utf-8' }))
+    const a    = document.createElement('a')
+    a.href = url
+    a.download = nombre || `arqueos-${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  } catch {
+    toast.error('No se pudo descargar el historial.')
+  } finally { bajando.value = false }
+}
+
+// Cambiar de sede vuelve a la primera página: quedarse en la 4 de un mostrador que tiene 2 es
+// mostrar una lista vacía sin explicar por qué.
+watch(() => props.sedeId, () => { pagina.value = 1; cargar() }, { immediate: true })
 </script>
 
 <style scoped>
-.trn__sub   { margin: 0 0 14px; font-size: var(--fs-13); color: var(--c-ink-500); max-width: 60ch; }
+.trn__hd {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 14px;
+}
+.trn__hd-acc { display: flex; align-items: center; gap: 10px; }
+.trn__total  { font-size: var(--fs-13); color: var(--c-ink-500); font-family: var(--font-mono); }
+.trn__sub   { margin: 0; font-size: var(--fs-13); color: var(--c-ink-500); max-width: 60ch; }
+
+.trn__pag {
+  display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 14px;
+}
+.trn__pag-txt { font-size: var(--fs-13); color: var(--c-ink-500); }
 .trn__vacio { margin: 0; font-size: var(--fs-14); color: var(--c-ink-500); }
 .trn__nota  { margin: 12px 0 0; font-size: var(--fs-13); color: var(--c-ink-500); max-width: 60ch; }
 

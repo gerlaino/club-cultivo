@@ -25,5 +25,17 @@ RSpec.configure do |config|
 
   config.after(:each) do
     ActsAsTenant.test_tenant = nil
+    # Y TAMBIÉN el current_tenant, que `with_tenant` puede dejar fijado.
+    #
+    # `with_tenant` guarda el tenant de entrada leyéndolo con el getter —que devuelve el
+    # `test_tenant` cuando no hay `current_tenant`— y al salir lo re-asigna como CURRENT. Así, un
+    # `with_tenant` dentro de un ejemplo convierte el test_tenant de ese ejemplo en un current
+    # explícito que este `after` no limpiaba: el ejemplo siguiente arrancaba con el club del
+    # anterior, ya revertido por la transacción, y sus fixtures fallaban con "Club es obligatorio"
+    # aunque le pasaran el club correcto (acts_as_tenant pisa el `club_id` con el del tenant).
+    #
+    # Se veía como una falla ajena y aleatoria —según el orden que le tocara al random— en specs
+    # que nadie había tocado. Es la misma clase de trampa que ya había mordido con `Auditable`.
+    ActsAsTenant.current_tenant = nil
   end
 end

@@ -65,26 +65,39 @@
 
     <template v-else>
       <!-- ══ LA CAJA: quién la abrió y cómo viene ═══════════════════════════════ -->
+      <!-- Cada dato con su etiqueta y su número, no una frase corrida: "abrió a las 14:02 · en
+           caja tendría que haber $150.000" y al otro lado "$784.920,5 sobre la mesa" obligaba a
+           leer un párrafo para encontrar dos cifras, y en el teléfono se apilaba en un bloque
+           ilegible. Son tres preguntas distintas y se contestan por separado. -->
       <section class="mst__turno">
-        <div class="mst__turno-info">
+        <div class="mst__turno-datos">
           <template v-if="turno">
-            <span class="mst__turno-quien">{{ turno.abierto_por }}</span>
-            <span class="mst__turno-desde">abrió a las {{ hora(turno.abierto_at) }}</span>
+            <div class="mst__dato">
+              <span class="mst__dato-lbl">Atiende</span>
+              <span class="mst__dato-val">{{ turno.abierto_por }}</span>
+              <span class="mst__dato-pie">desde las {{ hora(turno.abierto_at) }}</span>
+            </div>
             <!-- LO ESPERADO SÓLO PARA ADMINISTRACIÓN, que monitorea. A quien va a CONTAR no se
                  le muestra: con el número a la vista se escribe ese, el conteo es teatro y toda
                  la merma que se mide da cero. El modal lo revela recién después de escribir. -->
-            <span v-if="gestiona && turno.caja" class="mst__turno-desde">
-              · en caja tendría que haber <b>${{ fmt(turno.caja.esperado_ars) }}</b>
-            </span>
+            <div v-if="gestiona && turno.caja" class="mst__dato">
+              <span class="mst__dato-lbl">En caja tendría que haber</span>
+              <span class="mst__dato-val mst__dato-val--num">${{ pesos(turno.caja.esperado_ars) }}</span>
+            </div>
+            <div v-if="gestiona && turno.valor_mesa_ars" class="mst__dato">
+              <span class="mst__dato-lbl">Sobre la mesa</span>
+              <span class="mst__dato-val mst__dato-val--num">${{ pesos(turno.valor_mesa_ars) }}</span>
+            </div>
           </template>
-          <span v-else class="mst__turno-desde">
-            La caja está cerrada. {{ mesa.length ? 'Hay mercadería sobre la mesa.' : 'La mesa está vacía.' }}
-          </span>
+          <div v-else class="mst__dato">
+            <span class="mst__dato-val">La caja está cerrada</span>
+            <span class="mst__dato-pie">
+              {{ mesa.length ? 'Hay mercadería sobre la mesa esperando que alguien abra.'
+                             : 'La mesa está vacía.' }}
+            </span>
+          </div>
         </div>
         <div class="mst__turno-acc">
-          <span v-if="gestiona && turno?.valor_mesa_ars" class="mst__valor-mesa">
-            ${{ fmt(turno.valor_mesa_ars) }} sobre la mesa
-          </span>
           <button v-if="turno" class="mst__btn mst__btn--primary" @click="conteo = 'cierre'">Cerrar caja</button>
           <button v-else class="mst__btn mst__btn--primary" @click="conteo = 'apertura'">Abrir caja</button>
         </div>
@@ -100,8 +113,11 @@
         <span class="mst__movs-lbl">Mientras la caja estuvo abierta</span>
         <p v-for="(m, i) in movimientosDelTurno" :key="i" class="mst__mov">
           <b>{{ m.usuario }}</b> {{ m.cantidad > 0 ? 'subió' : 'bajó' }}
-          {{ fmt(Math.abs(m.cantidad)) }} {{ m.unidad }} de {{ formaLabel(m.forma) }}
-          a las {{ hora(m.cuando) }}<template v-if="m.motivo"> — {{ m.motivo }}</template>
+          <b class="mst__mov-num">{{ fmt(Math.abs(m.cantidad)) }} {{ m.unidad }}</b>
+          de {{ formaLabel(m.forma) }}<template v-if="m.motivo"> — {{ m.motivo }}</template>
+          <span class="mst__mov-hora">
+            {{ m.veces > 1 ? `${m.veces} cargas, última ` : '' }}{{ hora(m.cuando) }}
+          </span>
         </p>
       </div>
 
@@ -139,10 +155,10 @@
         </template>
       </TablaMostrador>
 
+      <!-- Sin repetir el esperado: ya está arriba, con su etiqueta. El mismo número dos veces en
+           una pantalla no informa el doble, hace dudar de cuál de los dos mira. -->
       <div v-if="gestiona && turno?.caja" class="mst__caja-barra">
-        <span class="mst__caja-barra-lbl">
-          En la caja tendría que haber <b>${{ fmt(turno.caja.esperado_ars) }}</b>
-        </span>
+        <span class="mst__caja-barra-lbl">Mover plata del cajón</span>
         <button class="mst__btn mst__btn--mini" @click="abrirPlata('ingreso')">Poner plata</button>
         <button class="mst__btn mst__btn--mini mst__btn--ghost" @click="abrirPlata('salida')">Sacar plata</button>
       </div>
@@ -296,14 +312,43 @@ const otrosIngresosEfectivo = computed(() => turno.value?.caja?.otros_ingresos_e
 
 // Lo que administración tocó mientras la caja estaba abierta. Sin esto, quien atiende cierra con
 // un faltante que no es suyo y no lo puede explicar.
-const movimientosDelTurno = computed(() =>
-  mesa.value.flatMap(m => (m.movimientos_del_turno || [])
-    .filter(mv => mv.tipo !== 'ajuste')
-    .map(mv => ({ ...mv, forma: m.forma, unidad: m.unidad })))
-)
+// AGRUPADOS por quién, qué producto y por qué. Cargar la mesa de a poco es lo normal —se sube
+// una variedad, después otra, después se completa— y sin agrupar salían cuatro renglones casi
+// idénticos ("subió 100 g de Flor seca a las 17:51", "subió 150 g de Flor seca a las 17:51"…)
+// que hay que leer uno por uno para entender que se cargaron 650 g. La pregunta de quien atiende
+// es CUÁNTO cambió lo suyo, no cuántas veces tocaron el botón.
+const movimientosDelTurno = computed(() => {
+  const porClave = new Map()
+
+  mesa.value.forEach(m => {
+    (m.movimientos_del_turno || [])
+      .filter(mv => mv.tipo !== 'ajuste')
+      .forEach(mv => {
+        const sentido = Number(mv.cantidad) > 0 ? 'sube' : 'baja'
+        const clave = [mv.usuario, m.forma, m.unidad, mv.motivo || '', sentido].join('|')
+        const previo = porClave.get(clave)
+
+        if (previo) {
+          previo.cantidad += Number(mv.cantidad)
+          previo.veces += 1
+          if (mv.cuando > previo.cuando) previo.cuando = mv.cuando
+        } else {
+          porClave.set(clave, {
+            usuario: mv.usuario, motivo: mv.motivo, cuando: mv.cuando,
+            cantidad: Number(mv.cantidad), forma: m.forma, unidad: m.unidad, veces: 1,
+          })
+        }
+      })
+  })
+
+  return [...porClave.values()].sort((a, b) => (a.cuando < b.cuando ? 1 : -1))
+})
 
 const fmt  = (n) => Number(n ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })
-const hora = (iso) => (iso ? new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '')
+// La plata va SIN decimales: "$784.920,5 sobre la mesa" es un número que nadie lee y que además
+// sugiere una precisión que no existe (sale de multiplicar gramos por precio).
+const pesos = (n) => Math.round(Number(n ?? 0)).toLocaleString('es-AR')
+const hora = (iso) => (iso ? new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) : '')
 
 let cargaEnCurso = 0
 
@@ -337,8 +382,15 @@ async function cargar () {
 }
 
 // Sólo lo que cambió: mandar la tabla entera haría que el backend evalúe productos que nadie tocó.
-async function guardarMesa ({ motivo }) {
-  const cambios = cambiosMesa.value.map(c => ({ stock_id: c.stock_id, cantidad: c.ahora }))
+//
+// `destino` viaja sólo en lo que BAJA ('deposito' o 'merma'): lo que se perdió sale del
+// inventario y lo demás vuelve al depósito. Subir nunca puede ser una pérdida.
+async function guardarMesa ({ motivo, destinos = {} }) {
+  const cambios = cambiosMesa.value.map(c => {
+    const linea = { stock_id: c.stock_id, cantidad: c.ahora }
+    if (destinos[c.stock_id]) linea.destino = destinos[c.stock_id]
+    return linea
+  })
   if (!cambios.length) return
 
   guardando.value = true
@@ -409,8 +461,14 @@ onMounted(async () => {
   // que podía no ser Norte. Sólo se respeta si es una sede propia — si viene una ajena o
   // inválida, se cae a la primera como siempre.
   const desdeUrl = Number(route.query.sede)
-  sedeId.value = (desdeUrl && sedes.value.some(s => s.id === desdeUrl))
-    ? desdeUrl
+  // Y si no vino por URL, LA SUYA antes que la primera de la lista: quien atiende abrió la caja
+  // en su mostrador, y aterrizar en el de otra sede le muestra una mesa vacía y ninguna caja
+  // abierta — o sea, la pantalla le dice que no hizo lo que acaba de hacer. `/me` ya trae cuál es
+  // (`dispensario_sede`), así que no hace falta preguntar nada.
+  const propia = auth.user?.dispensario_sede?.id ?? auth.user?.dispensario_sede_id
+  sedeId.value =
+    (desdeUrl && sedes.value.some(s => s.id === desdeUrl)) ? desdeUrl
+    : (propia && sedes.value.some(s => s.id === propia))   ? propia
     : sedes.value[0]?.id ?? null
 })
 
@@ -453,6 +511,8 @@ watch(sedeId, () => { cargado.value = false; cantidades.value = {}; cargar() }, 
 }
 .mst__movs-lbl { font-size: var(--fs-12); font-weight: 700; color: var(--c-sky-600); text-transform: uppercase; letter-spacing: .04em; }
 .mst__mov { margin: 0; font-size: var(--fs-13); color: var(--c-ink-700); }
+.mst__mov-num  { font-family: var(--font-mono); color: var(--c-ink-900); }
+.mst__mov-hora { color: var(--c-ink-500); font-size: var(--fs-12); margin-left: 4px; white-space: nowrap; }
 
 /* ── Solapas ────────────────────────────────────────────────────────────────── */
 .mst__tabs { display: flex; gap: 4px; margin-bottom: 18px; border-bottom: 1px solid var(--c-slate-200); }
@@ -549,17 +609,24 @@ watch(sedeId, () => { cargado.value = false; cantidades.value = {}; cargar() }, 
 .mst__draft-row.is-quitado .mst__draft-nombre { text-decoration: line-through; color: var(--c-ink-500); }
 
 /* ── Turno abierto ──────────────────────────────────────────────────────────── */
-/* El turno y su acción, en una línea: el botón suelto debajo del nombre parecía de otra cosa. */
+/* Cada dato con su etiqueta arriba y su número abajo. Antes era una frase corrida con dos cifras
+   adentro y una tercera del otro lado de la pantalla: para saber cuánto tenía que haber en la
+   caja había que leer un párrafo, y en el teléfono se apilaba todo. */
 .mst__turno {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; flex-wrap: wrap; margin-bottom: 14px;
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap; margin-bottom: 16px;
+  background: #fff; border: 1px solid var(--c-slate-200); border-radius: 12px; padding: 14px 16px;
 }
-.mst__turno-info { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.mst__turno-quien { font-size: var(--fs-14); font-weight: 600; color: var(--c-ink-900); }
-.mst__turno-desde { font-size: var(--fs-13); color: var(--c-ink-500); }
-.mst__turno-acc   { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-/* En gramos no se compara con nada; en plata se ve de un vistazo cuánto hay ahí arriba. */
-.mst__valor-mesa  { font-size: var(--fs-13); color: var(--c-ink-500); font-family: var(--font-mono); }
+.mst__turno-datos { display: flex; gap: 28px; flex-wrap: wrap; }
+.mst__dato { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.mst__dato-lbl {
+  font-size: var(--fs-12); color: var(--c-ink-500);
+  text-transform: uppercase; letter-spacing: .04em; font-weight: 600;
+}
+.mst__dato-val { font-size: var(--fs-16); font-weight: 700; color: var(--c-ink-900); }
+.mst__dato-val--num { font-family: var(--font-mono); color: var(--c-leaf-800); }
+.mst__dato-pie { font-size: var(--fs-12); color: var(--c-ink-500); }
+.mst__turno-acc { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 
 .mst__table-wrap {
   background: #fff; border: 1px solid var(--c-slate-200);
@@ -704,6 +771,16 @@ watch(sedeId, () => { cargado.value = false; cantidades.value = {}; cargar() }, 
 
 @media (max-width: 640px) {
   .mst { padding: 16px 14px 40px; }
+  /* En el teléfono los tres datos van uno abajo del otro y la acción ocupa el ancho: apretados
+     en fila quedan tres columnas de 90px con los números cortados. */
+  /* Una columna: en dos, "EN CAJA TENDRÍA QUE HABER" entra en tres renglones al lado de un
+     nombre y no se lee ninguno de los dos. */
+  .mst__turno { align-items: stretch; }
+  .mst__turno-datos { flex-direction: column; gap: 12px; width: 100%; }
+  .mst__dato { flex-direction: row; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .mst__dato-lbl { text-transform: none; letter-spacing: 0; font-weight: 500; }
+  .mst__dato-pie { display: none; }
+  .mst__turno-acc, .mst__turno-acc .mst__btn { width: 100%; }
   .mst__draft-row { flex-wrap: wrap; }
   .mst__acciones--turno { flex-direction: column; align-items: stretch; }
 }

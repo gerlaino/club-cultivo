@@ -35,6 +35,14 @@
             <button class="msh__menu-item msh__menu-item--danger" @click="doLogout">
               <i class="bi bi-box-arrow-right"></i> Cerrar sesión
             </button>
+
+            <!-- QUÉ VERSIÓN ESTÁ CORRIENDO ESTE TELÉFONO. El dato ya existía pero sólo se veía en
+                 el login, y en la PWA instalada la sesión dura meses: nadie vuelve a pasar por
+                 ahí. Sin esto, un "esto no anda" puede ser un bug o una versión de hace una
+                 semana servida por el service worker, y se pierde el viaje averiguándolo. -->
+            <div class="msh__menu-ver" :title="`Build ${BUILD} · ${BUILD_AT}`">
+              Versión {{ BUILD }} · {{ BUILD_AT }}
+            </div>
           </div>
         </div>
       </Transition>
@@ -132,6 +140,10 @@ const club   = useClubStore()
 const toast  = useToast()
 
 const role = computed(() => auth.user?.role || '')
+
+// Qué build está corriendo en ESTE dispositivo. Lo inyecta vite.config desde el commit.
+const BUILD    = __APP_BUILD__
+const BUILD_AT = __APP_BUILD_AT__
 
 const ROLE_LABELS = {
   admin: 'Administración', supervisor: 'Supervisión', cultivador: 'Cultivo',
@@ -329,6 +341,12 @@ onMounted(() => {
    (#1A3D2E, la misma base leaf que admin) y su tablero el mismo token. Acá era celeste, así que
    el mismo rol tenía dos identidades según el dispositivo — y el teléfono es donde más trabaja. */
 .msh--dispensador { --msh-accent: #2D7D46; --msh-top-bg: #0F2A1E; }
+
+/* Discreto: es un dato de diagnóstico, no algo que la persona necesite todos los días. */
+.msh__menu-ver {
+  padding: 10px 14px 2px; font-size: 11px; color: var(--c-ink-500, #6b7280);
+  font-family: var(--font-mono, monospace); text-align: center;
+}
 /* Red de seguridad: un rol sin acento propio dejaba el header SIN FONDO, y el botón de cerrar
    sesión —blanco— quedaba invisible sobre claro. Le pasó al dispensador al sumarlo al shell. */
 .msh { --msh-accent: #2D7D46; --msh-top-bg: #0F2A1E; }

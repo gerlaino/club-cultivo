@@ -112,6 +112,7 @@ class Dispensacion < ApplicationRecord
   validates :estado_envio,       inclusion: { in: ESTADOS_ENVIO }, allow_nil: true
   validates :medio_pago,         inclusion: { in: MEDIOS_PAGO }, allow_blank: true
   validate  :fecha_no_futura
+  validate  :fecha_no_anterior_al_producto
   validate  :paciente_activo_como_socio, on: :create
   validate  :stock_pertenece_al_club,    on: :create, unless: :lineas_explicitas?
   validate  :stock_disponible,           on: :create, unless: :lineas_explicitas?
@@ -182,6 +183,42 @@ class Dispensacion < ApplicationRecord
 
   def fecha_no_futura
     errors.add(:fecha_dispensacion, 'no puede ser futura') if fecha_dispensacion.present? && fecha_dispensacion > Time.zone.today
+  end
+
+  # NO SE PUEDE ENTREGAR ALGO QUE TODAVÍA NO EXISTÍA.
+  #
+  # Cargando historia vieja es fácil poner el 10 de agosto en una dispensa cuyo producto se
+  # elaboró el 15, y eso rompe todo lo que se apoya en la línea de tiempo: la trazabilidad (que
+  # es el activo del producto), el balance de producido − dispensado − merma, los informes de
+  # producción y lo que se le presenta a ARICCAME.
+  #
+  # Se compara contra `fecha_elaboracion` y NO contra `created_at`: cuándo se cargó al sistema es
+  # otra cosa —una carga retroactiva es legítima y bloquearla dejaría afuera justo el trabajo de
+  # poner la historia al día—. Si el stock no tiene fecha de elaboración, no hay contra qué
+  # comparar y no se valida.
+  #
+  # Sin atajo a propósito: el modal ofrece corregir la fecha de la dispensa (que es lo que pasa
+  # el 90% de las veces, un dedazo) o ir a corregir la del stock por su propia puerta. Cambiar la
+  # fecha del producto como efecto colateral de guardar una dispensa mueve su vencimiento, el
+  # orden con que sale del depósito y el rendimiento de su lote, y si vino de una pesada estaría
+  # falseando el dato del cultivo para tapar un error de tipeo.
+  def fecha_no_anterior_al_producto
+    return if fecha_dispensacion.blank?
+
+    stocks_de_la_dispensa.each do |st|
+      elaborada = st&.fecha_elaboracion
+      next if elaborada.blank? || fecha_dispensacion >= elaborada
+
+      errors.add(:base,
+                 "La dispensa es del #{I18n.l(fecha_dispensacion, format: '%d/%m/%Y')} y "                  "#{st.etiqueta} (#{st.numero_lote_producto || "ST-#{st.id}"}) recién existe "                  "desde el #{I18n.l(elaborada, format: '%d/%m/%Y')}")
+    end
+  end
+
+  # Los stocks que toca esta dispensa: sus líneas, y si todavía no hay, el legacy de la cabecera.
+  # Se usa `items` en memoria (no una query) para que valga también al crear, que es cuando la
+  # validación tiene que cortar.
+  def stocks_de_la_dispensa
+    ([stock] + items.map(&:stock)).compact.uniq
   end
 
   def paciente_activo_como_socio

@@ -25,10 +25,12 @@ RSpec.describe 'Cargar la mesa del mostrador', type: :request do
     end
   end
 
-  def cargar!(cantidad, sobre: stock, como: admin, motivo: 'carga del día')
+  def cargar!(cantidad, sobre: stock, como: admin, motivo: 'carga del día', destino: nil)
     sign_in_as(como)
+    cambio = { stock_id: sobre.id, cantidad: cantidad }
+    cambio[:destino] = destino if destino
     post "/api/sedes/#{sede.id}/mostrador/cargar", headers: auth_headers,
-         params: { cambios: [{ stock_id: sobre.id, cantidad: cantidad }], motivo: motivo }
+         params: { cambios: [cambio], motivo: motivo }
     JSON.parse(response.body)
   end
 
@@ -191,6 +193,60 @@ RSpec.describe 'Cargar la mesa del mostrador', type: :request do
       end
 
       expect(mesa_json.first['senal']).to be_nil
+    end
+  end
+
+  # BAJAR NO SIEMPRE ES "VUELVE AL DEPÓSITO".
+  #
+  # Si se bajan 12 g porque se perdieron y vuelven al depósito, esos gramos quedan contados como
+  # existentes: el inventario miente y la pérdida no se mide en ningún lado. Cada línea que baja
+  # dice a dónde va.
+  describe 'lo que baja: al depósito o a la merma' do
+    before { cargar!(300) }
+
+    it 'por defecto vuelve al depósito y el inventario no se toca' do
+      expect { cargar!(100, motivo: 'sobró de la mañana') }
+        .not_to change { stock.reload.cantidad.to_f }
+
+      expect(en_la_mesa).to eq(100.0)
+      expect(stock.cantidad_disponible_real.to_f).to eq(900.0)   # se libera lo apartado
+    end
+
+    it 'declarada MERMA, sale del inventario de verdad' do
+      cargar!(100, motivo: 'se cayó el frasco', destino: 'merma')
+
+      expect(response).to have_http_status(:ok)
+      expect(en_la_mesa).to eq(100.0)
+      expect(stock.reload.cantidad.to_f).to eq(800.0)            # 200 g que ya no existen
+    end
+
+    # El informe de Pérdidas cuenta `merma`. Un `ajuste` diría "no cuadró", que no es lo mismo que
+    # "se perdió" — y para un auditor la diferencia importa.
+    it 'y queda como merma, no como ajuste, con el motivo escrito' do
+      cargar!(100, motivo: 'se cayó el frasco', destino: 'merma')
+
+      mov = stock.stock_movimientos.reload.order(:id).last
+      expect(mov.tipo).to eq('merma')
+      expect(mov.gramos.to_f).to eq(-200.0)
+      expect(mov.notas).to include('se cayó el frasco')
+    end
+
+    it 'no deja declarar más merma que lo que existe' do
+      ActsAsTenant.with_tenant(club) { stock.update!(cantidad: 250) }
+
+      cuerpo = cargar!(0, motivo: 'todo perdido', destino: 'merma')
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(cuerpo['error']).to include('más merma que lo que hay')
+      expect(en_la_mesa).to eq(300.0)   # no se movió nada
+    end
+
+    # Subir nunca puede ser una pérdida: viene del depósito.
+    it 'al SUBIR ignora el destino' do
+      expect { cargar!(400, motivo: 'reposición', destino: 'merma') }
+        .not_to change { stock.reload.cantidad.to_f }
+
+      expect(en_la_mesa).to eq(400.0)
     end
   end
 end

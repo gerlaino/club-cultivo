@@ -42,8 +42,26 @@
             <span class="cmm__ahora">{{ fmt(c.ahora) }} {{ c.unidad }}</span>
           </div>
           <span class="cmm__delta">{{ c.sube ? '+' : '−' }}{{ fmt(Math.abs(c.ahora - c.antes)) }} {{ c.unidad }}</span>
+
+          <!-- A DÓNDE VA LO QUE BAJA. Sin esta pregunta, bajar 12 g porque se perdieron los
+               devolvía al depósito: quedaban contados como existentes y la pérdida no se medía
+               en ningún lado. Va por renglón porque mezclar es lo cotidiano — se reponen tres
+               productos y de paso se declara uno que se rompió. -->
+          <div v-if="!c.sube" class="cmm__destino">
+            <button type="button" class="cmm__chip cmm__chip--mini"
+                    :class="{ 'is-on': destino(c) === 'deposito' }"
+                    @click="elegirDestino(c, 'deposito')">Vuelve al depósito</button>
+            <button type="button" class="cmm__chip cmm__chip--mini cmm__chip--merma"
+                    :class="{ 'is-on': destino(c) === 'merma' }"
+                    @click="elegirDestino(c, 'merma')">Se perdió</button>
+          </div>
         </li>
       </ul>
+
+      <p v-if="hayMerma" class="cmm__aviso-merma">
+        Lo que marcaste como perdido <b>sale del inventario</b> y entra al informe de Pérdidas.
+        Lo demás vuelve al depósito y sigue disponible.
+      </p>
 
       <!-- El motivo va ACÁ y no antes de abrir: recién con los renglones a la vista se sabe qué
            escribir. Es obligatorio — "hay 300 g" sin por qué es un número que apareció. -->
@@ -55,7 +73,7 @@
         </div>
         <input ref="campoMotivo" v-model="motivo" type="text" class="cmm__input"
                placeholder="O escribilo con tus palabras" aria-label="Por qué se cambia la mesa"
-               @keyup.enter="puedeGuardar && $emit('confirmar', { motivo: motivo.trim() })" />
+               @keyup.enter="puedeGuardar && confirmar()" />
       </div>
 
       <p class="cmm__nota">
@@ -66,7 +84,7 @@
       <div class="cmm__acc">
         <button class="cmm__btn cmm__btn--ghost" @click="$emit('cerrar')">Cancelar</button>
         <button class="cmm__btn cmm__btn--primary" :disabled="!puedeGuardar"
-                @click="$emit('confirmar', { motivo: motivo.trim() })">
+                @click="confirmar">
           {{ guardando ? 'Guardando…' : 'Guardar cambios' }}
         </button>
       </div>
@@ -98,10 +116,13 @@ const props = defineProps({
   valorDespues: { type: Number, default: null },
   guardando: { type: Boolean, default: false },
 })
-defineEmits(['cerrar', 'confirmar'])
+const emit = defineEmits(['cerrar', 'confirmar'])
 
 const motivo      = ref('')
 const campoMotivo = ref(null)
+// A dónde va cada línea que BAJA: { stock_id: 'deposito' | 'merma' }. Por defecto al depósito,
+// que es el caso normal — declarar una pérdida tiene que ser un acto deliberado.
+const destinos    = ref({})
 
 const fmt = (n) => Number(n ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })
 
@@ -118,6 +139,7 @@ const ordenados = computed(() => [...suben.value, ...bajan.value])
 // reponiendo es ruido.
 const sugeridos = computed(() => {
   if (!bajan.value.length) return ['Reposición del turno', 'Carga de apertura', 'Se pidió del depósito']
+  if (hayMerma.value) return ['Se cayó y se perdió', 'Se fraccionó', 'Producto en mal estado']
   if (!suben.value.length) return ['Vuelve al depósito', 'Cierre de la jornada', 'Se lleva a otra sede']
   return ['Reposición del turno', 'Corrección de carga', 'Recambio de producto']
 })
@@ -126,6 +148,22 @@ const puedeGuardar = computed(() => !props.guardando && motivo.value.trim().leng
 
 function elegir (s) {
   motivo.value = motivo.value === s ? '' : s
+}
+
+const destino = (c) => destinos.value[c.stock_id] || 'deposito'
+const hayMerma = computed(() => bajan.value.some(c => destino(c) === 'merma'))
+
+function elegirDestino (c, valor) {
+  destinos.value = { ...destinos.value, [c.stock_id]: valor }
+}
+
+// El destino viaja SÓLO en las líneas que bajan: en una que sube no significa nada y el backend
+// lo ignora, pero mandarlo igual invita a leerlo mal el día que alguien mire el payload.
+function confirmar () {
+  emit('confirmar', {
+    motivo: motivo.value.trim(),
+    destinos: Object.fromEntries(bajan.value.map(c => [c.stock_id, destino(c)])),
+  })
 }
 
 // El motivo es el único campo: que el cursor ya esté ahí ahorra el click que separa mirar de
@@ -218,6 +256,22 @@ onMounted(() => campoMotivo.value?.focus())
 .cmm__input:focus { outline: 2px solid var(--c-leaf-300); outline-offset: 1px; border-color: var(--c-leaf-500); }
 
 .cmm__nota { margin: 0; font-size: var(--fs-12); color: var(--c-ink-500); }
+
+/* ── A dónde va lo que baja ─────────────────────────────────────────────────── */
+/* Ocupa la fila entera debajo del renglón: son dos opciones excluyentes y tienen que leerse
+   juntas, no apretadas contra el número. */
+.cmm__destino { flex-basis: 100%; display: flex; gap: 6px; padding-left: 26px; }
+.cmm__chip--mini { padding: 3px 10px; font-size: var(--fs-12); font-weight: 600; }
+/* La pérdida se marca en ámbar, nunca en rojo: la merma es inevitable y no es culpa de nadie. */
+.cmm__chip--merma.is-on {
+  background: var(--c-amber-100); border-color: var(--c-amber-500); color: var(--c-amber-500);
+}
+.cmm__aviso-merma {
+  margin: 0; padding: 10px 13px; border-radius: 9px;
+  background: var(--c-amber-100); color: var(--c-ink-700);
+  font-size: var(--fs-12); line-height: 1.5;
+}
+.cmm__aviso-merma b { color: var(--c-ink-900); }
 
 .cmm__acc { display: flex; gap: 10px; justify-content: flex-end; }
 .cmm__btn {

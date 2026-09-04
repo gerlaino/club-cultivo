@@ -84,8 +84,25 @@ module Dispensaciones
       @disp.paciente&.club || @usuario&.club
     end
 
+    # IDEMPOTENTE, como el débito de cuenta corriente de arriba.
+    #
+    # Este camino asienta UNA vez por dispensa y medio de pago —la mixta lleva dos, uno de
+    # crédito y uno de efectivo, y ahí termina—, así que un segundo asiento idéntico no es un
+    # cobro más: es la misma operación aplicada dos veces. Y esa es exactamente la forma que
+    # tomaría acá el bug que ya mordió en el stock, con el agravante de que un ingreso repetido
+    # no se ve: no falta nada, sobra, y el resultado del mes queda inflado en silencio.
+    #
+    # No se pone un índice único en la base a propósito: `Dispensaciones::RegistrarCobro` asienta
+    # por COBRO, y una dispensa puede tener dos cobros del mismo medio (pagó una parte hoy y otra
+    # mañana). Una restricción por (dispensación, categoría, medio) rechazaría ese caso legítimo,
+    # y romper un cobro parcial en producción es peor que el problema que evita.
     def asiento(monto, descripcion, pagado:, medio:)
       return if monto.to_d <= 0
+
+      medio_pago = medio || 'efectivo'
+      return if MovimientoContable.exists?(dispensacion_id: @disp.id, categoria: 'dispensacion',
+                                           medio_pago: medio_pago, monto_ars: monto)
+
       MovimientoContable.create!(
         club:             club,
         sede_id:          @disp.sede_id,
@@ -97,7 +114,7 @@ module Dispensaciones
         monto_ars:        monto,
         fecha:            @disp.fecha_dispensacion,
         pagado:           pagado,
-        medio_pago:       medio || 'efectivo',
+        medio_pago:       medio_pago,
         comprobante_tipo: 'sin_comprobante',
       )
     end

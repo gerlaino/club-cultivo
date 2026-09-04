@@ -263,6 +263,27 @@ async function cargarStocks() {
   finally { loadingStocks.value = false }
 }
 
+// LOS PRODUCTOS QUE NO EXISTÍAN EN ESA FECHA.
+//
+// El backend lo rechaza (`Dispensacion#fecha_no_anterior_al_producto`), pero enterarse al
+// confirmar es enterarse con el carrito lleno. Se compara contra la fecha de ELABORACIÓN: cuándo
+// se cargó al sistema es otra cosa, y una carga retroactiva es legítima.
+const productosPosteriores = computed(() => {
+  const fecha = form.value.es_reserva ? null : form.value.fecha_dispensacion
+  if (!fecha) return []
+
+  const enJuego = esDispensaInmediata.value
+    ? items.value.map(it => it.stock)
+    : [stockSeleccionado.value].filter(Boolean)
+
+  return enJuego.filter(s => s?.fecha_elaboracion && s.fecha_elaboracion > fecha)
+    .map(s => ({
+      id: s.id,
+      etiqueta: `${FORMA_LABEL[s.forma_producto] || s.forma_producto}${s.genetica?.nombre ? ` · ${s.genetica.nombre}` : ''}`,
+      fecha_elaboracion: s.fecha_elaboracion,
+    }))
+})
+
 // ¿HAY CAJA ABIERTA? Sin ella, quien atiende no puede dispensar: lo cobrado en efectivo no
 // tendría dónde caer, y `Dispensacion#mostrador_abierto` lo rechaza al confirmar.
 //
@@ -732,9 +753,21 @@ async function handleSubmit() {
     // dispensadores sin señal entregaban el mismo gramo y el sobregiro aparecía recién al
     // reconectar, con la mercadería ya afuera. Es la única escritura de la app que mueve stock y
     // plata a la vez, así que se prefiere no poder dispensar antes que dispensar mal.
-    const msg = !e.response
-      ? 'Sin conexión: la dispensación NO se registró. Esperá a tener señal y volvé a intentar.'
-      : (e.response?.data?.errors?.[0] || e.response?.data?.error || 'Error al guardar')
+    //
+    // Y "sin conexión" NO ES LO MISMO QUE "no contestó a tiempo". El pedido tiene 10 s de
+    // paciencia (`api.js`); si se agota, el request YA SALIÓ y no sabemos qué pasó del otro lado:
+    // la dispensa puede haber entrado perfecta. Decirle ahí "no se registró, volvé a intentar" es
+    // pedirle que duplique una venta —el mismo gramo afuera dos veces y el doble de plata en el
+    // arqueo—, y es el único lugar de la app donde una mentira piadosa cuesta inventario.
+    let msg
+    if (e.response) {
+      msg = e.response?.data?.errors?.[0] || e.response?.data?.error || 'Error al guardar'
+    } else if (e.code === 'ECONNABORTED' || navigator.onLine) {
+      msg = 'El servidor no respondió a tiempo. PUEDE haber quedado registrada: revisá el ' +
+            'historial del paciente antes de volver a cargarla.'
+    } else {
+      msg = 'Sin conexión: la dispensación NO se registró. Esperá a tener señal y volvé a intentar.'
+    }
     formError.value = msg
     toast.error(msg)
   } finally { saving.value = false }
@@ -1152,6 +1185,22 @@ async function handleSubmit() {
                    campo se abre y lo dice. -->
               <AppDatePicker v-else-if="puedeFecharAtras" v-model="form.fecha_dispensacion" :max="today" />
               <div v-else class="mnd__fecha-fija">{{ fmtFechaLarga(form.fecha_dispensacion) }}</div>
+
+              <!-- NO SE PUEDE ENTREGAR ALGO QUE TODAVÍA NO EXISTÍA. Cargando historia vieja es
+                   fácil poner una fecha anterior a la elaboración del producto, y eso rompe la
+                   trazabilidad y todos los informes que se apoyan en la línea de tiempo. Se
+                   avisa acá, al lado de la fecha, que es donde se arregla. -->
+              <div v-if="productosPosteriores.length" class="mnd__fecha-box">
+                <i class="bi bi-calendar-x"></i>
+                <span>
+                  <b>Esa fecha es anterior al producto.</b>
+                  <span v-for="p in productosPosteriores" :key="p.id" class="mnd__fecha-item">
+                    {{ p.etiqueta }} recién existe desde el {{ fmtFecha(p.fecha_elaboracion) }}.
+                  </span>
+                  Corregí la fecha de la dispensa, o la del producto desde <b>Depósito</b> si la
+                  que está cargada es la que está mal.
+                </span>
+              </div>
             </div>
             <div v-if="!form.es_regalo && !pagoDividido" class="mnd__field">
               <label class="mnd__label">{{ modoReserva ? 'Medio de pago del resto' : (form.es_reserva ? 'Medio de pago de la seña' : 'Medio de pago') }}</label>
@@ -1362,7 +1411,7 @@ async function handleSubmit() {
           <!-- Con la caja cerrada el backend rechaza la dispensa: dejar apretar para que rebote
                es el peor error posible, parece culpa del usuario. El aviso de arriba dice dónde
                se arregla. -->
-          <button class="mnd__btn-primary" :disabled="saving || cajaCerrada || (esDispensaInmediata ? !items.length : !form.stock_id) || (esDispensaInmediata && ccInsuficiente)" @click="handleSubmit">
+          <button class="mnd__btn-primary" :disabled="saving || cajaCerrada || productosPosteriores.length > 0 || (esDispensaInmediata ? !items.length : !form.stock_id) || (esDispensaInmediata && ccInsuficiente)" @click="handleSubmit">
             <DsSpinner v-if="saving" :size="14" />
             <i v-else class="bi" :class="form.es_reserva ? 'bi-bookmark-star' : 'bi-check-lg'"></i>
             {{ modoReserva ? 'Entregar reserva' : (form.es_reserva ? 'Crear reserva' : 'Registrar dispensación') }}
@@ -1524,6 +1573,17 @@ async function handleSubmit() {
 .mnd__caja-box b { color: var(--c-ink-900); }
 .mnd__caja-box .bi { color: var(--c-amber-500); margin-top: .1rem; }
 .mnd__caja-link { color: var(--c-leaf-800); font-weight: 700; text-decoration: underline; }
+
+/* La fecha imposible: es un dato mal escrito, no un reto. Ámbar, al lado del campo que se corrige. */
+.mnd__fecha-box {
+  margin-top: .5rem; padding: .55rem .75rem; border-radius: 9px;
+  background: var(--c-amber-100); border: 1px solid var(--c-amber-500);
+  font-size: .78rem; color: var(--c-ink-700); line-height: 1.45;
+  display: flex; align-items: flex-start; gap: .45rem;
+}
+.mnd__fecha-box b { color: var(--c-ink-900); }
+.mnd__fecha-box .bi { color: var(--c-amber-500); margin-top: .1rem; }
+.mnd__fecha-item { display: block; }
 
 /* Agregar item + carrito */
 .mnd__add-field { justify-content: flex-start; }

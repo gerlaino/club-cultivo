@@ -1,5 +1,75 @@
 # Changelog
 
+## Septiembre 2026 (ad) — el mostrador, sin bordes ásperos
+
+Tanda larga sobre el módulo entero: lo que faltaba de correctitud, lo que Germán encontró probando
+en el club, y la prolijidad de las pantallas — que en este producto no es cosmética, es la
+diferencia entre que el cliente lo use o lo abandone.
+
+**BAJAR DE LA MESA YA NO ES SIEMPRE "VUELVE AL DEPÓSITO".** Cada línea que baja dice a dónde va:
+al depósito (por defecto) o a MERMA. Antes, bajar 12 g porque se perdieron los devolvía al
+inventario: quedaban contados como existentes y la pérdida no se medía en ningún lado. La merma
+sale del stock de verdad, como `merma` y no como `ajuste` —el informe de Pérdidas cuenta merma— y
+no se puede declarar más de lo que hay. Va por renglón y no por tanda porque mezclar es lo
+cotidiano: se reponen tres productos y de paso se declara uno que se rompió.
+
+**NO SE PUEDE ENTREGAR ALGO QUE TODAVÍA NO EXISTÍA.** `Dispensacion` rechaza una fecha anterior a
+la elaboración del producto, con las dos fechas en el mensaje, y el carrito lo avisa al lado del
+campo que se corrige. **Sin atajo**: no se ofrece "cambiar la fecha del stock y seguir". Esa fecha
+manda el vencimiento, el orden con que sale del depósito y el rendimiento de su lote; moverla como
+efecto colateral de guardar una dispensa es falsear el dato del cultivo para tapar un dedazo. Se
+compara contra `fecha_elaboracion` y no contra `created_at`: una carga retroactiva es legítima.
+
+**EL ASIENTO CONTABLE ES IDEMPOTENTE**, como el débito de cuenta corriente que ya lo era. Un
+ingreso repetido no deja hueco que mirar —no falta una fila, sobra— y lo único que se ve es un mes
+más alto de lo que fue. No se puso un índice único en la base a propósito: `RegistrarCobro` asienta
+por cobro y una dispensa puede tener dos cobros del mismo medio (pagó una parte hoy y otra mañana);
+la restricción rechazaría ese caso legítimo.
+
+**"SIN CONEXIÓN" NO ES LO MISMO QUE "NO CONTESTÓ A TIEMPO".** Los dos llegan igual al frontend,
+pero el timeout significa que el pedido SALIÓ: la dispensa puede haber entrado perfecta. Decirle
+ahí "no se registró, volvé a intentar" es pedirle que duplique una venta. Ahora distingue y manda a
+mirar el historial antes de recargar.
+
+**Dos cosas que aparecieron probando en el club:**
+- **En el teléfono, "Ir al mostrador" te sacaba del envoltorio.** El link estaba fijo a
+  `/mostrador`; dentro del shell hay que ir por `/m/mostrador` o se aterriza en la versión de
+  escritorio, sin barra de abajo y con todo apretado arriba. (El guard de PWA sólo corrige la app
+  instalada; en el navegador del celular `/mostrador` es una ruta válida y no hay nada que
+  corregir.)
+- **La pantalla arrancaba en la primera sede de la lista, no en la tuya.** Quien atiende abría la
+  caja en su mostrador y al volver veía otra sede: mesa vacía y ninguna caja abierta, o sea la
+  pantalla diciéndole que no hizo lo que acababa de hacer. Ahora arranca en `dispensario_sede`.
+
+**Y la pantalla se limpió**, que era el reclamo de fondo. El encabezado del turno era una frase
+corrida con dos cifras adentro y una tercera del otro lado ("abrió a las 02:02 p. m. · en caja
+tendría que haber $150.000" … "$784.920,5 sobre la mesa"): ahora son tres datos con su etiqueta y
+su número, en una tarjeta, y en el teléfono uno debajo del otro. Los movimientos del turno se
+**agrupan** —cuatro cargas del mismo producto salían como cuatro renglones casi idénticos— y dicen
+"650 g en 4 cargas, última 17:51". La plata va sin decimales, la hora en 24 h, y el esperado dejó
+de repetirse dos veces en la misma pantalla.
+
+**La solapa Turnos es el historial de arqueos**: paginada en el backend (20 por página) y con
+**descarga en CSV** de todo, respetando de quién es cada turno. Es lo que se le pasa al contador, y
+eso no se hace copiando de una tabla en el navegador.
+
+**Y la PWA dice qué versión está corriendo**, en el menú de cuenta. El dato existía pero sólo se
+veía en el login, y con la sesión durando meses nadie vuelve a pasar por ahí: un "esto no anda"
+podía ser un bug o una versión de hace una semana servida por el service worker.
+
+**Y una trampa del harness de tests que mordió acá.** `ActsAsTenant.with_tenant` guarda el tenant
+de entrada leyéndolo con el getter —que devuelve el `test_tenant` cuando no hay `current_tenant`—
+y al salir lo re-asigna como CURRENT. Así, un `with_tenant` dentro de un ejemplo convertía el
+tenant de ese ejemplo en un current explícito que el `after(:each)` no limpiaba: el ejemplo
+siguiente arrancaba con el club del anterior, ya revertido, y sus fixtures fallaban con "Club es
+obligatorio" aunque le pasaran el club correcto. Se veía como once fallas ajenas y aleatorias
+—según el orden que le tocara al random— en specs que nadie había tocado. `spec/support/tenant.rb`
+ahora limpia los dos. Es la misma clase de trampa que ya había mordido con `Auditable`.
+
+2798 rspec ✓ · 1762 vitest ✓ · 7 pruebas de navegador ✓.
+
+---
+
 ## Septiembre 2026 (ac) — el arqueo que se movía solo, y con qué darse cuenta
 
 Germán preguntó si el descuadre que ya había mordido en el stock —una reversa que se aplicaba dos

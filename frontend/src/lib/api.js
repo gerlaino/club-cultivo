@@ -520,7 +520,11 @@ export const getMermaMostrador = (sedeId, params = {}) => api.get(`/sedes/${sede
 export const revisarTurnoMostrador = (sedeId, id) => api.post(`/sedes/${sedeId}/mostrador/turnos/${id}/revisar`)
 export const getTurnoMostrador     = (sedeId, id) => api.get(`/sedes/${sedeId}/mostrador/turnos/${id}`)
 // Los turnos ya cerrados: administración los ve todos, el que atiende ve LOS SUYOS.
-export const listTurnosMostrador   = (sedeId)     => api.get(`/sedes/${sedeId}/mostrador/turnos`)
+export const listTurnosMostrador   = (sedeId, params = {}) => api.get(`/sedes/${sedeId}/mostrador/turnos`, { params })
+// El historial de arqueos, para llevárselo: es lo que se le pasa al contador o se archiva, y eso
+// no se hace copiando de una tabla en el navegador.
+export const descargarTurnosMostrador = (sedeId) =>
+  api.get(`/sedes/${sedeId}/mostrador/turnos`, { params: { formato: 'csv' }, responseType: 'blob' })
 // Arreglar un conteo mal cargado en un turno ya cerrado: es el único lugar del módulo donde un
 // dedazo ajusta el inventario real. No borra el movimiento viejo, asienta la diferencia.
 export const corregirTurnoMostrador = (sedeId, id, payload) =>

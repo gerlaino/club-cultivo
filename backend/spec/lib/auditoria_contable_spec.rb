@@ -62,7 +62,13 @@ RSpec.describe AuditoriaContable do
   # mirar: sobra.
   it 'canta un asiento duplicado' do
     d = dispensar!(10)
-    ActsAsTenant.with_tenant(club) { Dispensaciones::AplicarEfectos.new(d, ana).crear_movimiento_contable }
+    # A mano y no repitiendo `crear_movimiento_contable`, que desde el arreglo es idempotente y
+    # ya no puede duplicar. Lo que se prueba acá es que la auditoría lo VEA si aparece por
+    # cualquier otro camino: es la red, no el candado.
+    ActsAsTenant.with_tenant(club) do
+      original = d.movimientos_contables.first
+      MovimientoContable.create!(original.attributes.except('id', 'created_at', 'updated_at'))
+    end
 
     expect(hallazgos).to eq(1)
   end

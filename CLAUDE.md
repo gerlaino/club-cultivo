@@ -487,6 +487,34 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   `Dispensacion#imputar_a_mostrador` es el gemelo exacto de `imputar_a_apartado_evento`. Hace DOS
   cosas y son distintas: baja la mesa (el estado permanente, lo que queda para el próximo
   paciente) y suma al contador del turno (el arqueo de esta jornada).
+- **BAJAR DE LA MESA NO ES SIEMPRE "VUELVE AL DEPÓSITO".** Cada línea que baja lleva `destino`:
+  `deposito` (por defecto, libera el apartado y el `Stock` queda entero) o `merma` (sale del
+  inventario con `StockMovimiento` tipo `merma`). Sin esa distinción, bajar 12 g porque se
+  perdieron los devolvía al depósito: quedaban contados como existentes y la pérdida no se medía
+  en ningún lado. **No choca con "el ajuste del arqueo NUNCA es merma"**: aquella regla existe
+  porque un CONTEO no sabe qué pasó (lo que falta puede estar en el depósito); acá lo declara una
+  persona. Subir nunca puede ser merma, y no se puede declarar más de lo que hay.
+- **NO SE PUEDE ENTREGAR ALGO QUE TODAVÍA NO EXISTÍA** (`Dispensacion#fecha_no_anterior_al_producto`).
+  Se compara contra `fecha_elaboracion` y NO contra `created_at`: una carga retroactiva es
+  legítima y bloquearla dejaría afuera el trabajo de poner la historia al día. **Sin atajo**: el
+  modal ofrece corregir la fecha de la dispensa o ir a corregir la del producto por su propia
+  puerta. Cambiar la del stock desde la dispensa mueve su vencimiento, su orden de salida del
+  depósito y el rendimiento de su lote — y si vino de una pesada, falsea el dato del cultivo.
+- **EL ASIENTO CONTABLE ES IDEMPOTENTE** (`AplicarEfectos#asiento`), como el débito de cuenta
+  corriente. Un ingreso repetido no deja hueco que mirar: no falta una fila, sobra. **Sin índice
+  único en la base a propósito**: `RegistrarCobro` asienta por COBRO y una dispensa puede tener
+  dos cobros del mismo medio (pagó una parte hoy y otra mañana).
+- **"SIN CONEXIÓN" NO ES "NO CONTESTÓ A TIEMPO".** Los dos llegan sin `response`, pero el timeout
+  significa que el pedido SALIÓ y la dispensa puede haber entrado. Decir ahí "no se registró,
+  volvé a intentar" es pedir que se duplique una venta: se avisa que PUEDE haber quedado y se
+  manda a mirar el historial.
+- **DENTRO DEL SHELL SE NAVEGA POR EL SHELL.** Un link fijo a `/mostrador` desde una pantalla `/m`
+  saca al usuario del envoltorio móvil y lo deja en la versión de escritorio, sin barra de abajo.
+  El guard de PWA sólo corrige la app INSTALADA; en el navegador del celular esa ruta es válida y
+  no hay nada que corregir. Los links de una tarjeta que vive en los dos lados miran `route.path`.
+- **LA PANTALLA DEL MOSTRADOR ARRANCA EN LA SEDE PROPIA** (`dispensario_sede`), no en la primera
+  de la lista: quien atiende abre la caja en su mostrador, y aterrizar en otra sede le muestra una
+  mesa vacía y ninguna caja abierta — la pantalla diciéndole que no hizo lo que acaba de hacer.
 - **LA MERMA ES INEVITABLE Y NO ES CULPA DE NADIE.** El mostrador se cuenta para que la
   organización sepa cuánta hay y dónde, y encuentre sus cuellos de botella — no para señalar a
   alguien. El texto visible tiene que sonar así: una diferencia es un dato que se anota, no una
