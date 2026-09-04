@@ -103,21 +103,55 @@ class CajaTurno < ApplicationRecord
   def de_dispensario? = punto_type == PUNTO_MOSTRADOR
   def de_bar?         = punto_type == 'Barra'
 
+  # ── LO QUE PASÓ POR EL CAJÓN DURANTE EL TURNO, MIRADO DESDE HOY ──────────────
+  #
+  # UN ARQUEO FIRMADO NO SE MUEVE DESPUÉS. Con la caja abierta esto es simplemente lo cobrado;
+  # con la caja CERRADA hay que congelarlo, porque el número se recalcula cada vez que alguien lo
+  # mira y ya no puede depender de lo que pase mañana.
+  #
+  # Cancelar hoy una dispensa de ayer soft-borra su cobro (`Dispensaciones::Cancelar`), y sin
+  # esto el turno de ayer —que cerró CUADRADO— pasaba a mostrar un sobrante igual a lo cancelado.
+  # Es la peor forma de un error contable: no hay nada que mirar que te delate, porque no falta
+  # una fila ni sobra un movimiento; el total simplemente cambió solo. Lo mismo en el buffet al
+  # deshacer una venta (`BarVenta` también es soft-delete).
+  #
+  # Es el mismo criterio que ya aplicaban `salidas`, `ingresos` y `otros_ingresos_efectivo`: lo
+  # posterior al cierre no es del turno. Sólo que ellos filtran lo que se CREÓ después y acá hay
+  # que atajar lo que se BORRÓ después — que desaparece de la asociación sin dejar rastro.
+  #
+  # Lo cancelado ANTES del cierre sí queda afuera: esa plata no estaba en el cajón al contarlo.
+  def cobros_del_arqueo
+    return cobros if cerrada_at.blank?
+
+    cobros.with_deleted
+          .where(created_at: ...cerrada_at)
+          .where('cobros.deleted_at IS NULL OR cobros.deleted_at >= ?', cerrada_at)
+  end
+
+  def ventas_del_arqueo
+    return bar_ventas if cerrada_at.blank?
+
+    bar_ventas.with_deleted
+              .where(created_at: ...cerrada_at)
+              .where('bar_ventas.deleted_at IS NULL OR bar_ventas.deleted_at >= ?', cerrada_at)
+  end
+
   # Lo cobrado en el turno. En el buffet son las ventas del mostrador; en el dispensario, los
   # cobros de las dispensaciones. La cuenta corriente NO entra: es una deuda que se registra,
   # no plata que entró al cajón, y sumarla haría que el arqueo diera faltante siempre.
   def total_ventas_ars
-    de_dispensario? ? cobros.where(medio: Cobro::MEDIOS_PAGADOS).sum(:monto_ars).to_f
-                    : bar_ventas.sum(:total_ars).to_f
+    de_dispensario? ? cobros_del_arqueo.where(medio: Cobro::MEDIOS_PAGADOS).sum(:monto_ars).to_f
+                    : ventas_del_arqueo.sum(:total_ars).to_f
   end
 
   def tickets
-    de_dispensario? ? cobros.select(:dispensacion_id).distinct.count : bar_ventas.count
+    de_dispensario? ? cobros_del_arqueo.select(:dispensacion_id).distinct.count
+                    : ventas_del_arqueo.count
   end
 
   def total_efectivo_ars
-    de_dispensario? ? cobros.where(medio: 'efectivo').sum(:monto_ars).to_f
-                    : bar_ventas.where(medio_pago: 'efectivo').sum(:total_ars).to_f
+    de_dispensario? ? cobros_del_arqueo.where(medio: 'efectivo').sum(:monto_ars).to_f
+                    : ventas_del_arqueo.where(medio_pago: 'efectivo').sum(:total_ars).to_f
   end
 
   # Plata que entró en efectivo SIN ser una dispensa: un pago de cuenta corriente o la seña de

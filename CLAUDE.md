@@ -672,6 +672,22 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   Ojo con la asimetría: los gramos que faltan **pueden estar en el depósito** (corregir no toca el
   inventario), pero los pesos que faltan **no están en ningún lado** (corregir sí asienta la
   pérdida).
+- **UN ARQUEO FIRMADO NO SE MUEVE DESPUÉS.** `efectivo_esperado_ars` se calcula EN VIVO cada vez
+  que alguien lo mira, también en un turno cerrado, así que todo lo que entra en esa cuenta tiene
+  que ignorar lo que pase después del cierre. `salidas`, `ingresos` y `otros_ingresos_efectivo` ya
+  lo hacían; **lo cobrado no**, y cancelar hoy una dispensa de ayer soft-borra su `Cobro`: el
+  turno que cerró cuadrado aparecía con un sobrante igual a lo cancelado. `cobros_del_arqueo` y
+  `ventas_del_arqueo` (el buffet tiene el mismo problema: `BarVenta` también es soft-delete)
+  cuentan lo que estaba en el cajón esa noche — incluyen lo anulado DESPUÉS y excluyen lo
+  cancelado ANTES, que no estaba a la hora de contar. Es la peor forma de un error contable: no
+  falta una fila ni sobra un movimiento, el total cambia solo.
+- **`rake contabilidad:auditar` es con lo que uno se da cuenta.** Sólo lee: saldos de cuenta
+  corriente contra su propio historial, lo asentado de cada dispensa contra lo cobrado, cobros
+  colgando de dispensas canceladas. **Sus tests verifican también el SILENCIO** —la dispensa mixta
+  lleva dos asientos y está bien, el efectivo sin rendir no tiene asiento a propósito— porque un
+  aviso que grita en falso entrena a ignorar todos los demás. Ojo con `where.not` sobre columnas
+  que admiten NULL: `estado_envio != 'cancelada'` es NULL para una dispensa sin envío y no
+  matchea, así que la auditoría revisaba sólo los repartos y daba verde sin haber mirado nada.
 - **Lo que se retira al cerrar la caja no cuenta como salida del turno** (`CajaTurno#salidas`
   ignora lo posterior a `cerrada_at`). Si contara, bajaría lo esperado y la diferencia de arqueo
   quedaría mal para siempre: un turno que cerró cuadrado aparecería con un sobrante igual a lo que
@@ -798,6 +814,14 @@ Render, con `set -o errexit` (si una migración falla, falla el deploy entero). 
 listar "pendiente `db:migrate`" al cerrar un bloque.
 
 **Los rakes SÍ son manuales** — corren a mano, una sola vez, y ninguno se dispara al deployar.
+
+**El de diagnóstico, que se puede correr cuando sea porque sólo lee:**
+
+```
+bundle exec rake contabilidad:auditar                # todas las organizaciones
+bundle exec rake contabilidad:auditar CLUB=slug      # una sola
+bundle exec rake contabilidad:auditar DETALLE=1      # cada caso, no sólo el conteo
+```
 
 **Sin correr desde el 12-ago, ninguno urgente:**
 

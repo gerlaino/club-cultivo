@@ -1,5 +1,46 @@
 # Changelog
 
+## Septiembre 2026 (ac) — el arqueo que se movía solo, y con qué darse cuenta
+
+Germán preguntó si el descuadre que ya había mordido en el stock —una reversa que se aplicaba dos
+veces al editar— podía estar pasando en contabilidad, "porque ahí no nos vamos a dar cuenta".
+Podía, y de una forma peor.
+
+**UN ARQUEO FIRMADO SE MOVÍA DESPUÉS.** `CajaTurno#efectivo_esperado_ars` se calcula en vivo cada
+vez que alguien lo mira, también en turnos ya cerrados. Sus componentes ignoran a propósito lo
+posterior al cierre (`salidas`, `ingresos` y `otros_ingresos_efectivo` filtran por `cerrada_at`)
+justamente para que la diferencia de arqueo no cambie — la regla estaba escrita para el retiro de
+la recaudación. **Lo cobrado había quedado afuera**: cancelar hoy una dispensa de ayer soft-borra
+su `Cobro`, y el turno que cerró CUADRADO pasaba a mostrar un sobrante igual a lo cancelado. Es la
+peor forma de un error contable: no falta una fila ni sobra un movimiento, el total cambió solo.
+El buffet tenía el mismo agujero (`BarVenta` también es soft-delete y una venta se deshace desde
+la venta).
+
+`cobros_del_arqueo` / `ventas_del_arqueo` congelan la foto: con la caja cerrada cuentan lo que
+estaba en el cajón esa noche —incluye lo anulado DESPUÉS, excluye lo cancelado ANTES—. Tres specs,
+uno de ellos para que el arreglo no se pase de largo e invente un faltante.
+
+**Y `rake contabilidad:auditar`, que es con lo que uno se da cuenta.** Sólo lee. Compara el saldo
+de cada cuenta corriente contra su propio historial, lo asentado de cada dispensa contra lo
+cobrado, y busca cobros colgando de dispensas canceladas. No arregla nada: decidir qué pasó con un
+descuadre es de una persona.
+
+Lo más instructivo fue afinarlo. Las primeras tres versiones gritaban en falso —la dispensa mixta
+que legítimamente lleva dos asientos, el efectivo que el repartidor todavía no rindió, el paquete
+contra-entrega que no cobró nada—, y un aviso que grita en falso entrena a ignorar todos los
+demás. Pero el peor error fue el opuesto: `where.not(estado_envio: 'cancelada')` **excluye los
+NULL en SQL**, y como una dispensa sin envío tiene ese campo en NULL, la auditoría miraba sólo las
+que tenían reparto y contestaba "todo bien" sin haber revisado casi nada. Sobre datos reales daba
+verde igual: lo encontraron los tests del propio auditor, que por eso verifican tanto que cante el
+descuadre como que se quede callado con lo legítimo.
+
+Sobre la base de desarrollo (que incluye una copia de Mitocondria) queda **un** hallazgo real: una
+dispensa de $25.000 del 31-08 que no dejó asiento, del lote de pruebas de reparto de esa noche.
+
+2778 rspec ✓.
+
+---
+
 ## Septiembre 2026 (ab) — los huecos del mostrador, mirando la pantalla
 
 Repaso del módulo rol por rol, con la app corriendo. Casi todo lo que apareció es la misma clase
