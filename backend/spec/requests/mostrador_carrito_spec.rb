@@ -58,11 +58,16 @@ RSpec.describe 'El carrito ofrece lo que está sobre la mesa', type: :request do
 
   # Ofrecerle 200 g del depósito cuando sobre la mesa hay 300 es prometerle algo que no puede
   # entregar — y al revés, esconderle lo que sí tiene.
+  # Se piden LOS DOS campos: el carrito muestra y valida contra `cantidad` —el frasco entero—,
+  # así que pisar sólo `cantidad_disponible_real` le mostraba "1.000 g" con 300 sobre la mesa y
+  # lo dejaba cargar 500 para que el backend se lo rechazara al confirmar, con el paciente
+  # enfrente. La regla estaba escrita acá y leída en otro campo allá.
   it 'el disponible que muestra es el de la mesa, no el del depósito' do
     abrir_mostrador_con_flor!
 
     fila = carrito(ana).first
     expect(fila['cantidad_disponible_real']).to eq(300.0)
+    expect(fila['cantidad']).to eq(300.0)
   end
 
   it 'baja a medida que se dispensa' do
@@ -74,6 +79,16 @@ RSpec.describe 'El carrito ofrece lo que está sobre la mesa', type: :request do
     end
 
     expect(carrito(ana).first['cantidad_disponible_real']).to eq(255.0)
+    expect(carrito(ana).first['cantidad']).to eq(255.0)
+  end
+
+  # Al admin NO se le pisa: dispensa del depósito entero, y mostrarle lo de la mesa le escondería
+  # lo que sí puede entregar.
+  it 'al admin le muestra el frasco entero, no lo que hay sobre la mesa' do
+    abrir_mostrador_con_flor!
+
+    fila = carrito(admin).find { |s| s['id'] == flor.id }
+    expect(fila['cantidad']).to eq(500.0)
   end
 
   # El admin no atiende el mostrador: es el que lo carga y lo arquea, y ve todo el depósito.

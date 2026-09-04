@@ -325,7 +325,10 @@ onMounted(() => {
 .msh--supervisor  { --msh-accent: #2D7D46; --msh-top-bg: #0F2A1E; }
 .msh--manicura    { --msh-accent: #8b5cf6; --msh-top-bg: #1c1028; }
 .msh--delivery    { --msh-accent: #ea580c; --msh-top-bg: #1c0a00; }
-.msh--dispensador { --msh-accent: #0ea5e9; --msh-top-bg: #072a3d; }
+/* El dispensador es VERDE, como en el escritorio: su sidebar usa `--c-role-dispensador`
+   (#1A3D2E, la misma base leaf que admin) y su tablero el mismo token. Acá era celeste, así que
+   el mismo rol tenía dos identidades según el dispositivo — y el teléfono es donde más trabaja. */
+.msh--dispensador { --msh-accent: #2D7D46; --msh-top-bg: #0F2A1E; }
 /* Red de seguridad: un rol sin acento propio dejaba el header SIN FONDO, y el botón de cerrar
    sesión —blanco— quedaba invisible sobre claro. Le pasó al dispensador al sumarlo al shell. */
 .msh { --msh-accent: #2D7D46; --msh-top-bg: #0F2A1E; }

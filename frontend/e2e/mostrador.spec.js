@@ -31,10 +31,14 @@ test('el día del mostrador, de punta a punta', async ({ page }) => {
 
   await flor.locator('.tmo__input').fill('300')
   await expect(page.locator('.tmo__pie')).toContainText('1 cambio sin guardar')
+  // El motivo se pide en el modal, con la lista de lo que cambia delante: escrito a ciegas
+  // terminaba diciendo "carga" en todos los renglones.
+  await page.click('.mst__btn--guardar')
+  await expect(page.locator('.cmm__row .cmm__ahora')).toContainText('300')
   // Un cambio de mesa sin motivo es un número que aparece: no se puede guardar.
-  await expect(page.locator('.mst__guardar .mst__btn')).toBeDisabled()
-  await page.fill('.mst__guardar .mst__input', 'carga del lunes')
-  await page.click('.mst__guardar .mst__btn')
+  await expect(page.locator('.cmm__btn--primary')).toBeDisabled()
+  await page.fill('.cmm__input', 'carga del lunes')
+  await page.click('.cmm__btn--primary')
   await expect(page.locator('.tmo__pie')).toHaveCount(0, { timeout: 15_000 })
   await expect(page.locator('.tmo__table tbody tr').first().locator('.tmo__input')).toHaveValue('300')
 
@@ -43,7 +47,8 @@ test('el día del mostrador, de punta a punta', async ({ page }) => {
   await page.goto('/mostrador')
   // Él ve la mesa, pero no la edita: nunca elige qué hay.
   await expect(page.locator('.tmo__mesa').first()).toHaveText('300')
-  await expect(page.locator('.mst__estado')).toHaveText(/Cerrado/)
+  // Lo que abre y cierra es LA CAJA: la mesa sigue teniendo los 300 g que se ven al lado.
+  await expect(page.locator('.mst__estado')).toHaveText(/Caja cerrada/)
   await expect(page.locator('.tmo__input')).toHaveCount(0)
 
   await page.click('.mst__turno-acc .mst__btn')          // Abrir caja
@@ -61,20 +66,33 @@ test('el día del mostrador, de punta a punta', async ({ page }) => {
   await expect(comp).toContainText('podés abrir igual')
   await page.locator('.cnt__acc .cnt__btn--primary').click()
 
-  await expect(page.locator('.mst__estado')).toHaveText(/Abierto/, { timeout: 15_000 })
+  await expect(page.locator('.mst__estado')).toHaveText(/Caja abierta/, { timeout: 15_000 })
   // La mesa pasa a tener lo que contó, y queda escrito qué pasó.
   await expect(page.locator('.tmo__mesa').first()).toHaveText('297')
   await expect(page.locator('.mst__aviso')).toContainText('contó 297')
 
-  // ── 3. Cierra contando, y ve la comparación ────────────────────────────────
+  // ── 3. Cuenta UN producto a mitad del turno, sin cerrar ────────────────────
+  // Cerrar y reabrir con quince frascos son veinte minutos: el control que cuesta eso no se hace.
+  await page.locator('.tmo__contar').first().click()
+  // Misma regla que el arqueo: lo esperado no aparece hasta que el conteo está escrito.
+  await expect(page.locator('.cti__comparacion')).toHaveCount(0)
+  await page.locator('.cti__input').first().fill('296')
+  await expect(page.locator('.cti__comp-dif')).toContainText('−1')
+  // Acá la diferencia SÍ ajusta el inventario, así que sin motivo no se puede registrar.
+  await expect(page.locator('.cti__btn--primary')).toBeDisabled()
+  await page.locator('.cti__input--texto').fill('se fraccionó para prerolls')
+  await page.locator('.cti__btn--primary').click()
+  await expect(page.locator('.tmo__mesa').first()).toHaveText('296', { timeout: 15_000 })
+
+  // ── 4. Cierra contando, y ve la comparación ────────────────────────────────
   await page.click('.mst__turno-acc .mst__btn')          // Cerrar caja
   await expect(page.locator('.cnt__comparacion')).toHaveCount(0)
   await page.locator('.cnt__cant .cnt__input').first().fill('295')
   await page.locator('.cnt__input--plata').first().fill('20000')
-  await expect(page.locator('.cnt__comparacion')).toContainText('−2')
+  await expect(page.locator('.cnt__comparacion')).toContainText('−1')
   await page.locator('.cnt__acc .cnt__btn--primary').click()
 
-  await expect(page.locator('.mst__estado')).toHaveText(/Cerrado/, { timeout: 15_000 })
+  await expect(page.locator('.mst__estado')).toHaveText(/Caja cerrada/, { timeout: 15_000 })
   // Y la mesa sigue teniendo lo que quedó: el producto está físicamente ahí aunque nadie atienda.
   await expect(page.locator('.tmo__mesa').first()).toHaveText('295')
 
@@ -125,7 +143,10 @@ test.describe('desde el celular', () => {
     await entrar(page, 'dispensador')
     await page.goto('/m/dispensar')
 
-    await page.getByRole('link', { name: 'Mostrador' }).click()
+    // Por la barra de abajo, no por el link de la tarjeta: son dos caminos al mismo lugar y hay
+    // que nombrar cuál se está probando (`getByRole` con el nombre suelto matchea los dos y el
+    // test moría con "strict mode violation", no con un fallo de la app).
+    await page.locator('.msh__tab', { hasText: 'Mostrador' }).click()
     await expect(page).toHaveURL(/\/m\/mostrador/)
 
     // La mesa quedó con los 295 g que dejó el turno anterior: es un estado permanente, sigue
@@ -141,7 +162,7 @@ test.describe('desde el celular', () => {
     await page.locator('.cnt__input--plata').first().fill('20000')
     await page.locator('.cnt__acc .cnt__btn--primary').click()
 
-    await expect(page.locator('.mst__estado')).toHaveText(/Abierto/, { timeout: 15_000 })
+    await expect(page.locator('.mst__estado')).toHaveText(/Caja abierta/, { timeout: 15_000 })
     await expect(page.getByRole('button', { name: 'Cerrar caja' })).toBeVisible()
 
     expect(errores, errores.join('\n')).toEqual([])

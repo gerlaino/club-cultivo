@@ -22,6 +22,8 @@ vi.mock('../lib/api.js', () => ({
   listStocks: (...a) => listStocks(...a),
   createDispensacion: (...a) => createDispensacion(...a),
   listEntregadores: vi.fn(() => Promise.resolve({ data: [] })),
+  // El carrito pregunta si hay caja abierta cuando lo abre quien atiende el mostrador.
+  getMostrador: vi.fn(() => Promise.resolve({ data: { mesa: [], turno: { id: 1 } } })),
   createReserva: vi.fn(), entregarReserva: vi.fn(),
 }))
 vi.mock('../composables/useToast.js', () => ({

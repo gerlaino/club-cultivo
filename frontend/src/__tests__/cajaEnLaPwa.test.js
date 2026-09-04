@@ -51,10 +51,16 @@ describe('El mostrador en la PWA', () => {
     expect(getMostrador).toHaveBeenCalledWith(10)
   })
 
-  it('con la mesa vacía dice que hay que cargarla', async () => {
+  // LA MESA LA CARGA ADMINISTRACIÓN. Decirle "cargala" a quien atiende es proponerle lo único
+  // que no puede hacer: un cartel que propone una acción prohibida es peor que no tener cartel,
+  // porque parece culpa suya. Le dice qué SÍ puede hacer: pedirla.
+  it('con la mesa vacía, a quien atiende le dice a quién pedirle', async () => {
     const w = await montar()
 
-    expect(w.find('.cjm').text()).toContain('La mesa está vacía')
+    const txt = w.find('.cjm').text()
+    expect(txt).toContain('La mesa está vacía')
+    expect(txt).toContain('La carga administración')
+    expect(txt).not.toContain('Cargala')
   })
 
   // El estado que más confunde: hay producto pero nadie abrió, así que no se puede dispensar.
@@ -94,5 +100,19 @@ describe('El mostrador en la PWA', () => {
 
     expect(w.find('.cjm').text()).toContain('Ir al mostrador')
     expect(w.text()).not.toContain('Abrir caja')
+  })
+
+  // La misma tarjeta la ve administración en la ficha de la sede y en su tablero. A ella sí le
+  // corresponde el gesto: es la que baja producto del depósito.
+  it('a administración, con la mesa vacía, sí le dice que la cargue', async () => {
+    setActivePinia(createPinia())
+    const { default: Card } = await import('../components/dashboards/CajaMostradorCard.vue')
+    const w = mount(Card, {
+      props: { sede: { id: 10, nombre: 'Central' }, puedeGestionar: true },
+      global: { stubs: { RouterLink: { template: '<a><slot/></a>' } } },
+    })
+    for (let i = 0; i < 4; i++) await new Promise((r) => setTimeout(r, 0))
+
+    expect(w.find('.cjm').text()).toContain('Cargala para que se pueda dispensar')
   })
 })

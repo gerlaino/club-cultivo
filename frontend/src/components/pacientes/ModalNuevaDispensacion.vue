@@ -5,7 +5,9 @@ import { useToast } from '../../composables/useToast.js'
 import { useAuthStore } from '../../stores/auth.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
-import { createDispensacion, createReserva, entregarReserva, listStocks, listEntregadores } from '../../lib/api.js'
+import { RouterLink } from 'vue-router'
+import { createDispensacion, createReserva, entregarReserva, listStocks, listEntregadores,
+         getMostrador } from '../../lib/api.js'
 
 const props = defineProps({
   modelValue:     { type: Boolean, required: true },
@@ -55,6 +57,9 @@ const esDispensaInmediata = computed(() => !modoReserva.value && !form.value.es_
 
 const stocks          = ref([])
 const loadingStocks   = ref(false)
+// La caja del mostrador de quien atiende: sin turno abierto el backend rechaza la dispensa, y
+// enterarse al confirmar es enterarse con el paciente enfrente.
+const cajaCerrada     = ref(false)
 const saving          = ref(false)
 const formError       = ref(null)
 const deliveryUsers   = ref([])
@@ -256,6 +261,28 @@ async function cargarStocks() {
     stocks.value = data || []
   } catch { stocks.value = [] }
   finally { loadingStocks.value = false }
+}
+
+// ¿HAY CAJA ABIERTA? Sin ella, quien atiende no puede dispensar: lo cobrado en efectivo no
+// tendría dónde caer, y `Dispensacion#mostrador_abierto` lo rechaza al confirmar.
+//
+// Pero la mesa es PERMANENTE —el producto está ahí con la caja abierta y cerrada—, así que el
+// carrito se llenaba igual: elegía el producto, la cantidad, el medio de pago, confirmaba… y
+// recién ahí rebotaba, con el paciente enfrente. La regla sigue viviendo entera en el backend;
+// esto es sólo mirar el estado para no ofrecer un camino que termina en un 422.
+async function cargarEstadoCaja () {
+  cajaCerrada.value = false
+  const sedeId = auth.user?.dispensario_sede?.id ?? auth.user?.dispensario_sede_id
+  if (!dispensaDelMostrador.value || !sedeId) return
+
+  try {
+    const { data } = await getMostrador(sedeId)
+    cajaCerrada.value = !data?.turno
+  } catch {
+    // Si no se pudo preguntar, no se bloquea: el backend sigue siendo el que decide, y trabar
+    // la dispensa por una consulta que falló sería peor que dejar que rebote.
+    cajaCerrada.value = false
+  }
 }
 
 // ── Carrito multi-item (dispensa inmediata) ──────────────────────────────────────
@@ -468,6 +495,7 @@ watch(() => props.modelValue, (open) => {
     formError.value = null
     deliveryUsers.value = []
     cargarStocks()
+    cargarEstadoCaja()
     // Modo entrega de reserva: pre-cargar producto/cantidad de la reserva.
     if (modoReserva.value) {
       form.value.es_reserva = false
@@ -764,6 +792,20 @@ async function handleSubmit() {
               </span>
             </div>
           </template>
+
+          <!-- LA CAJA CERRADA SE DICE ACÁ, NO AL CONFIRMAR. La mesa es permanente: el producto
+               está arriba con la caja abierta y cerrada, así que la lista se llenaba igual y el
+               rechazo llegaba al final, con el paciente enfrente. Es lo primero que se ve, antes
+               de elegir nada. -->
+          <div v-if="cajaCerrada" class="mnd__caja-box">
+            <i class="bi bi-lock"></i>
+            <span>
+              <b>La caja del mostrador está cerrada.</b>
+              Abrila en <RouterLink to="/mostrador" class="mnd__caja-link">Mostrador</RouterLink>
+              contando lo que hay sobre la mesa y la plata del cajón: hasta entonces lo que
+              cobres en efectivo no tiene dónde caer.
+            </span>
+          </div>
 
           <!-- Stock -->
           <div v-if="!modoReserva" class="mnd__section-label">{{ esDispensaInmediata ? 'Agregar producto' : 'Stock a reservar' }} <span class="mnd__req">*</span></div>
@@ -1317,7 +1359,10 @@ async function handleSubmit() {
 
         <div class="mnd__modal-footer">
           <button class="mnd__btn-ghost" :disabled="saving" @click="cerrar">Cancelar</button>
-          <button class="mnd__btn-primary" :disabled="saving || (esDispensaInmediata ? !items.length : !form.stock_id) || (esDispensaInmediata && ccInsuficiente)" @click="handleSubmit">
+          <!-- Con la caja cerrada el backend rechaza la dispensa: dejar apretar para que rebote
+               es el peor error posible, parece culpa del usuario. El aviso de arriba dice dónde
+               se arregla. -->
+          <button class="mnd__btn-primary" :disabled="saving || cajaCerrada || (esDispensaInmediata ? !items.length : !form.stock_id) || (esDispensaInmediata && ccInsuficiente)" @click="handleSubmit">
             <DsSpinner v-if="saving" :size="14" />
             <i v-else class="bi" :class="form.es_reserva ? 'bi-bookmark-star' : 'bi-check-lg'"></i>
             {{ modoReserva ? 'Entregar reserva' : (form.es_reserva ? 'Crear reserva' : 'Registrar dispensación') }}
@@ -1421,7 +1466,9 @@ async function handleSubmit() {
 .mnd__td-disp { text-align: right; white-space: nowrap; }
 .mnd__td-disp-n { font-family: monospace; font-weight: 800; color: #1b5e20; }
 .mnd__td-evento { display: block; font-size: .64rem; color: #b45309; }
-.mnd__td-mostrador { display: inline-block; margin-left: 6px; font-size: .64rem; font-weight: 700; color: #1d4ed8; background: #dbeafe; border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+/* Informativo ("va a descontar de la mesa"), con los tokens de info del DS: el azul estaba
+   escrito a mano en dos lugares y no coincidía con ningún otro badge de la app. */
+.mnd__td-mostrador { display: inline-block; margin-left: 6px; font-size: .64rem; font-weight: 700; color: var(--c-sky-600); background: var(--c-sky-100); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
 
 /* Debajo de 720px no hay ancho para cinco columnas: manda la tarjeta. */
 .mnd__stock-list { display: none; flex-direction: column; gap: .35rem; max-height: 220px; overflow-y: auto; }
@@ -1442,7 +1489,7 @@ async function handleSubmit() {
 .mnd__stock-disp  { font-size: .8rem; font-weight: 700; color: #1b5e20; font-family: monospace; }
 .mnd__stock-precio { font-size: .7rem; color: var(--c-slate-500); font-family: monospace; white-space: nowrap; }
 .mnd__stock-evento { font-size: .66rem; color: #6d28d9; background: #ede9fe; border-radius: 999px; padding: 1px 7px; white-space: nowrap; font-weight: 700; }
-.mnd__stock-mostrador { display: inline-block; margin-left: 6px; font-size: .62rem; font-weight: 700; color: #1d4ed8; background: #dbeafe; border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
+.mnd__stock-mostrador { display: inline-block; margin-left: 6px; font-size: .62rem; font-weight: 700; color: var(--c-sky-600); background: var(--c-sky-100); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
 .mnd__cart-evento { font-size: .62rem; color: #6d28d9; background: #ede9fe; border-radius: 999px; padding: 1px 6px; margin-left: .35rem; font-weight: 700; }
 .mnd__evento-box { background: #faf5ff; border: 1.5px solid #e9d5ff; border-radius: 10px; padding: .7rem .85rem; margin: .7rem 0; }
 .mnd__evento-title { font-size: .78rem; font-weight: 700; color: #6d28d9; display: flex; align-items: center; gap: .4rem; margin-bottom: .45rem; }
@@ -1465,6 +1512,18 @@ async function handleSubmit() {
 .mnd__sede-n { font-size: .68rem; font-weight: 700; opacity: .75; }
 .mnd__hint-box { background: var(--c-slate-50); border: 1px dashed var(--c-slate-300); border-radius: 8px; padding: .55rem .75rem; font-size: .8rem; color: var(--c-slate-500); display: flex; align-items: center; gap: .4rem; }
 .mnd__warn-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: .5rem .75rem; font-size: .8rem; color: #92400e; display: flex; align-items: center; gap: .4rem; }
+
+/* La caja cerrada: es un dato del turno, no un error de lo que la persona hizo. Ámbar y con el
+   camino a la vista, arriba de todo — no rojo al final. */
+.mnd__caja-box {
+  background: var(--c-amber-100); border: 1px solid var(--c-amber-500);
+  border-radius: 9px; padding: .6rem .8rem; margin-bottom: .7rem;
+  font-size: .8rem; color: var(--c-ink-700); line-height: 1.45;
+  display: flex; align-items: flex-start; gap: .5rem;
+}
+.mnd__caja-box b { color: var(--c-ink-900); }
+.mnd__caja-box .bi { color: var(--c-amber-500); margin-top: .1rem; }
+.mnd__caja-link { color: var(--c-leaf-800); font-weight: 700; text-decoration: underline; }
 
 /* Agregar item + carrito */
 .mnd__add-field { justify-content: flex-start; }

@@ -37,8 +37,14 @@
         <template v-else-if="productos">
           La caja está cerrada. Hay mercadería sobre la mesa esperando que alguien abra.
         </template>
-        <template v-else>
+        <!-- LA MESA LA CARGA ADMINISTRACIÓN. A quien atiende decirle "cargala" es proponerle lo
+             único que no puede hacer, y un cartel que propone una acción prohibida es peor que
+             no tener cartel: parece culpa suya. -->
+        <template v-else-if="puedeGestionar">
           La mesa está vacía. Cargala para que se pueda dispensar.
+        </template>
+        <template v-else>
+          La mesa está vacía. La carga administración: pedile que baje producto del depósito.
         </template>
       </p>
 
@@ -68,8 +74,8 @@ import { formatARS as fmtARS } from '../../lib/formatters.js'
 
 const props = defineProps({
   sede:     { type: Object, default: null },
-  // Quedó de cuando la tarjeta abría y cerraba la caja. Hoy no tiene acciones —todas viven en
-  // Mostrador— así que no cambia nada; se acepta para no romper a quien todavía lo pase.
+  // La tarjeta ya no tiene acciones —abrir, contar y cerrar viven en Mostrador— pero sí cambia
+  // QUÉ SE LE DICE a cada uno con la mesa vacía: administración la carga, quien atiende la pide.
   puedeGestionar: { type: Boolean, default: false },
   compacto: { type: Boolean, default: false },
 })

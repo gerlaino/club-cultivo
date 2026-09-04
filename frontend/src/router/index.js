@@ -1184,6 +1184,35 @@ export function moduloRequerido(path) {
   return mejor
 }
 
+// ¿ESTA PANTALLA DE ESCRITORIO EXISTE TAL CUAL DENTRO DEL SHELL MOBILE?
+//
+// Varias vistas se montan en los dos lados sin escribirse dos veces (`/m/mostrador`, `/m/stock`,
+// `/m/historial`, `/m/pacientes`…): son la misma pantalla con otro envoltorio. Con la PWA
+// instalada, un link a la versión de escritorio tiene entonces un destino real, y devolverlo al
+// home es perder el viaje.
+//
+// Sin esto, "Ir al mostrador" —el link de la tarjeta de caja, en la pantalla que más se usa—
+// dejaba al dispensador en la pantalla donde ya estaba: el botón parecía no hacer nada.
+//
+// Se le PREGUNTA AL ROUTER en vez de mantener una lista a mano: una segunda copia de las rutas
+// es una copia que se desactualiza, y acá el síntoma sería un botón muerto.
+//
+// Y SE PIDE EL PERMISO SOBRE LA RUTA DE ESCRITORIO, que es donde la matriz es específica: bajo
+// `/m` todos los roles mobile entran en bloque (un solo prefijo para todo el shell), así que
+// mapear a ciegas le habría abierto `/m/pacientes` a un repartidor por el solo hecho de haber
+// tocado un link a `/pacientes`. La PWA no puede ser más permisiva que el escritorio.
+export function rutaEnShell (to, role) {
+  // La raíz no: `/m/` es el redirect al home del rol, que es exactamente lo que ya hace el guard.
+  if (!to?.path || to.path === '/') return null
+  if (!puedeEntrar(role, to.path)) return null
+
+  const destino = router.resolve({ path: `/m${to.path}`, query: to.query || {}, hash: to.hash || '' })
+  // `matched` vacío no existe: sin ruta cae en el comodín `/:pathMatch(.*)*`, que redirige a `/`.
+  const existe = destino.matched.length > 0 &&
+                 !destino.matched.some(r => r.path.includes(':pathMatch'))
+  return existe ? destino.fullPath : null
+}
+
 export { ROLE_ALLOWED_PREFIX, ROLE_HOME, MOBILE_ROLES, MOBILE_HOME, MODULO_LABEL }
 
 router.beforeEach(async (to) => {
@@ -1257,6 +1286,10 @@ router.beforeEach(async (to) => {
     // Ruta de manicura → equivalente mobile
     const mncMatch = to.path.match(/^\/mnc\/lotes\/(\d+)/)
     if (mncMatch) return `/m/mnc/lotes/${mncMatch[1]}`
+
+    // Si la MISMA pantalla existe bajo /m, se va ahí en vez de al home.
+    const enElShell = rutaEnShell(to, role)
+    if (enElShell) return enElShell
 
     return MOBILE_HOME[role]
   }

@@ -1,5 +1,65 @@
 # Changelog
 
+## Septiembre 2026 (ab) — los huecos del mostrador, mirando la pantalla
+
+Repaso del módulo rol por rol, con la app corriendo. Casi todo lo que apareció es la misma clase
+de error: **la pantalla ofrece un camino que el backend termina rechazando**, o una regla escrita
+en un lado y leída en otro.
+
+**El disponible que veía quien atiende era el del DEPÓSITO.** `StocksController#index` ya filtraba
+el carrito a lo que está sobre la mesa y pisaba `cantidad_disponible_real` con esa cantidad — pero
+el carrito muestra y valida contra `cantidad`, el frasco entero. Con 300 g sobre la mesa y 1.000 en
+el depósito, la pantalla decía **1.000 g** y lo dejaba cargar 500 para que el backend se lo
+rechazara al confirmar, con el paciente enfrente. Se pisan los dos campos. Apareció mirando la
+pantalla renderizada: los 1748 tests en verde no lo veían.
+
+**La caja cerrada se avisa ANTES de armar el carrito.** La mesa es permanente, así que con la caja
+cerrada el producto sigue estando y el carrito se llenaba igual; el rechazo llegaba al final
+(`Dispensacion#mostrador_abierto`). Ahora, al abrir el modal, quien atiende consulta el estado de
+su mostrador: si no hay turno, un aviso arriba de todo con el camino ("abrila en Mostrador") y el
+botón de confirmar deshabilitado. Si la consulta falla no traba nada — el backend sigue siendo el
+que decide.
+
+**En la PWA instalada, "Ir al mostrador" no iba a ningún lado.** El guard rebota todo lo que no
+empiece con `/m`, y varias pantallas se montan en los dos lados sin escribirse dos veces
+(`/m/mostrador`, `/m/stock`, `/m/historial`). El link de la tarjeta de caja —en la pantalla que más
+usa el dispensador— lo devolvía a esa misma pantalla: el botón parecía no hacer nada. `rutaEnShell`
+le pregunta al router si existe el equivalente bajo `/m` (nada de listas a mano) y **pide el permiso
+sobre la ruta de ESCRITORIO**: bajo `/m` la matriz es un solo prefijo para todo el shell, así que
+mapear a ciegas le habría abierto `/m/pacientes` a un repartidor.
+
+**`Mostradores::Contar` tenía servicio, ruta y función en `api.js`, y ninguna pantalla.** Contar un
+frasco sin cerrar la caja era el punto entero —cerrar y reabrir con quince productos son veinte
+minutos, y el control que cuesta eso no se hace— y el único camino seguía siendo el arqueo completo.
+Botón por fila para quien atiende (con la caja abierta; administración no cuenta a distancia) y
+modal `ModalContarItem`: lo esperado no aparece hasta que el conteo está escrito, y con diferencia
+el motivo es obligatorio, porque acá el ajuste SÍ toca el inventario.
+
+**Confirmar los cambios de la mesa** (`ModalCargarMesa`): el motivo se escribía en una barra angosta
+ANTES de ver qué se estaba cambiando, y con buscador y orden de por medio lo tocado podía no estar
+todo en pantalla. Ahora "Revisar y guardar" abre la lista completa con el antes y el después de cada
+producto, cuánta plata queda sobre la mesa, un chip "sale de la mesa" para los que van a cero, y
+recién ahí el motivo, con sugerencias según se esté subiendo o bajando. De paso, el botón se
+deshabilita si alguna fila pide más de lo que hay libre (lo avisaba la fila, pero dejaba apretar).
+
+**Detalles que quedaban del rediseño de la mesa:** el badge del encabezado decía "Cerrado" cuando lo
+cerrado es la CAJA (la mesa sigue con su producto a la vista); la tarjeta de caja le decía al
+dispensador "cargala" cuando la mesa la carga administración; y el shell de la PWA le daba al
+dispensador identidad celeste cuando en el escritorio es verde (`--c-role-dispensador`).
+
+**Y "su" mostrador ahora sale de una sede que ATIENDE.** `/me` elegía `sedes_asignadas.activas
+.first` sin filtrar por tipo: en una organización que además cultiva, si al dispensador le caía
+primero una sede de producción, la tarjeta de caja le contestaba "no se pudo cargar el mostrador"
+sin decir por qué y sin forma de arreglarlo desde la pantalla.
+
+**Y una prueba de navegador que estaba en rojo en master**: `getByRole('link', { name: 'Mostrador' })`
+matcheaba dos links (la tab y el de la tarjeta) y moría con "strict mode violation", no con un fallo
+de la app.
+
+2772 rspec ✓ · 1748 vitest ✓ · 7 pruebas de navegador ✓.
+
+---
+
 ## Septiembre 2026 (aa) — la plata que entra sin pasar por una dispensa
 
 Germán preguntó qué pasa si un paciente llega y paga una deuda sin que haya una dispensa nueva de

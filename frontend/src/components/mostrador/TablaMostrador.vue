@@ -51,8 +51,20 @@
                 <span v-if="excede(s)" class="tmo__error">quedan {{ fmt(s.disponible) }}</span>
               </template>
               <template v-else>
-                <span class="tmo__mesa">{{ contando ? '—' : fmt(s.mostrador) }}</span>
-                <span class="tmo__unidad">{{ s.unidad }}</span>
+                <!-- El número y su unidad viajan juntos: en el teléfono la celda es flex con la
+                     etiqueta de la columna adelante, y sueltos se repartían a lo ancho con el
+                     botón en el medio. -->
+                <span class="tmo__mesa-val">
+                  <span class="tmo__mesa">{{ contando ? '—' : fmt(s.mostrador) }}</span>
+                  <span class="tmo__unidad">{{ s.unidad }}</span>
+                </span>
+                <!-- Contar ESTE frasco, sin cerrar la caja. Con quince productos, el arqueo
+                     entero para verificar uno son veinte minutos: el control que cuesta eso no
+                     se hace, y el que no se hace no controla nada. -->
+                <button v-if="contable" type="button" class="tmo__contar"
+                        :title="`Contar ${formaLabel(s.forma)}`" @click="emit('contar', s)">
+                  Contar
+                </button>
               </template>
             </td>
           </tr>
@@ -67,7 +79,16 @@
         <b>{{ cambios.length }}</b> cambio{{ cambios.length === 1 ? '' : 's' }} sin guardar
         · {{ resumenCambios }}
       </span>
-      <button class="tmo__limpiar" @click="descartar">Descartar</button>
+      <div class="tmo__pie-acc">
+        <button class="tmo__limpiar" @click="descartar">Descartar</button>
+        <!-- Guardar vive acá y no en una barra propia: eran dos franjas pegadas diciendo lo
+             mismo ("1 cambio sin guardar") y con acciones distintas, así que había que leer las
+             dos para saber cuál servía.
+             `hayExceso` viaja al slot porque quien manda el cambio necesita la MISMA respuesta
+             que pinta la fila en ámbar: calculada de nuevo afuera, un día la fila avisa y el
+             botón deja apretar igual. -->
+        <slot name="acciones" :hay-exceso="hayExceso" />
+      </div>
     </div>
   </div>
 </template>
@@ -99,8 +120,12 @@ const props = defineProps({
   // edita la mesa), no se muestra cuánto dice el sistema. Misma regla que el efectivo esperado:
   // con el número puesto al lado, se escribe ese y el conteo es teatro.
   contando:     { type: Boolean, default: false },
+  // Quien ATIENDE puede contar un producto suelto sin cerrar la caja. Administración no: su
+  // gesto sobre la mesa es decir cuánto tiene que haber (que mueve producto del depósito), y
+  // contar es otra cosa —ajusta el inventario— que además se hace con el frasco en la mano.
+  contable:     { type: Boolean, default: false },
 })
-const emit = defineEmits(['update:modelValue'])
+const emit = defineEmits(['update:modelValue', 'contar'])
 
 const busqueda = ref('')
 // Por defecto lo que YA está sobre la mesa primero, y dentro de eso lo más viejo: lo viejo sale
@@ -260,6 +285,16 @@ defineExpose({ cambios, hayCambios, hayExceso })
 .tmo__error  { display: block; font-size: var(--fs-12); color: var(--c-amber-500); margin-top: 2px; }
 /* El número que se lee de un vistazo: es la única pregunta del que atiende. */
 .tmo__mesa { font-family: var(--font-mono); font-size: var(--fs-16); font-weight: 700; color: var(--c-leaf-800); }
+.tmo__mesa-val { display: inline-flex; align-items: baseline; white-space: nowrap; }
+
+/* Discreto: se usa cuando algo no cierra, no en cada fila todo el tiempo. */
+.tmo__contar {
+  margin-left: 10px; border: 1px solid var(--c-slate-300); background: #fff;
+  color: var(--c-ink-700); border-radius: 999px; padding: 4px 11px;
+  font-size: var(--fs-12); font-weight: 600; cursor: pointer;
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+}
+.tmo__contar:hover { background: var(--c-leaf-50); border-color: var(--c-leaf-300); color: var(--c-leaf-800); }
 
 .tmo__pie {
   position: sticky; bottom: 0;
@@ -268,6 +303,7 @@ defineExpose({ cambios, hayCambios, hayExceso })
 }
 .tmo__pie-txt { font-size: var(--fs-13); color: var(--c-ink-700); }
 .tmo__pie-txt b { font-family: var(--font-mono); color: var(--c-ink-900); }
+.tmo__pie-acc { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .tmo__limpiar {
   border: 0; background: transparent; color: var(--c-ink-500);
   font-size: var(--fs-13); cursor: pointer; text-decoration: underline;

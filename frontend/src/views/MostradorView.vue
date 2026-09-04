@@ -117,18 +117,27 @@
       </div>
 
       <TablaMostrador v-model="cantidades" :stocks="tabla" :editable="gestiona"
-                      :muestra-costo="gestiona" :contando="!!conteo"
+                      :muestra-costo="gestiona" :contando="!!conteo || !!itemAContar"
+                      :contable="!gestiona && !!turno" @contar="itemAContar = $event"
                       :vacio-texto="gestiona ? 'No hay stock habilitado para dispensar en esta sede.'
-                                             : 'La mesa está vacía. La carga administración.'" />
-
-      <div v-if="gestiona && hayCambios" class="mst__guardar">
-        <input v-model="motivo" type="text" class="mst__input"
-               placeholder="Por qué se cambia la mesa — ej: reposición del mediodía" />
-        <button class="mst__btn mst__btn--primary" :disabled="guardando || !motivo.trim()"
-                @click="guardarMesa">
-          {{ guardando ? 'Guardando…' : 'Guardar cambios' }}
-        </button>
-      </div>
+                                             : 'La mesa está vacía. La carga administración.'">
+        <!-- Guardar va en el pie de la tabla, junto al resumen de lo que cambió: en una barra
+             propia eran dos franjas pegadas diciendo lo mismo. El motivo NO se pide acá — se
+             pide en el modal, con la lista delante: escrito a ciegas terminaba diciendo "carga"
+             en todos los renglones. -->
+        <!-- `hayExceso` sale de la tabla, que es la que ya lo calcula para pintar la fila: no se
+             puede subir a la mesa lo que no está libre, y el botón tiene que quedar
+             deshabilitado o el backend rechaza y parece culpa del usuario. -->
+        <template #acciones="{ hayExceso }">
+          <span v-if="hayExceso" class="mst__exceso">
+            Hay filas que piden más de lo que queda libre
+          </span>
+          <button class="mst__btn mst__btn--primary mst__btn--guardar"
+                  :disabled="guardando || hayExceso" @click="revisando = true">
+            Revisar y guardar
+          </button>
+        </template>
+      </TablaMostrador>
 
       <div v-if="gestiona && turno?.caja" class="mst__caja-barra">
         <span class="mst__caja-barra-lbl">
@@ -139,6 +148,12 @@
       </div>
     </template>
     </template>
+
+    <ModalContarItem v-if="itemAContar" :item="itemAContar" :guardando="guardando"
+                     @cerrar="itemAContar = null" @confirmar="confirmarConteoDeUno" />
+
+    <ModalCargarMesa v-if="revisando" :cambios="cambiosMesa" :valor-despues="valorMesaDespues"
+                     :guardando="guardando" @cerrar="revisando = false" @confirmar="guardarMesa" />
 
     <ModalConteo v-if="conteo" :mesa="mesa" :es-cierre="conteo === 'cierre'"
                  :esperado-efectivo="esperadoEfectivo" :otros-ingresos-efectivo="otrosIngresosEfectivo"
@@ -193,8 +208,10 @@ import RendicionCajaCard from '../components/RendicionCajaCard.vue'
 import MostradorMerma from '../components/mostrador/MostradorMerma.vue'
 import MostradorTurnos from '../components/mostrador/MostradorTurnos.vue'
 import TablaMostrador from '../components/mostrador/TablaMostrador.vue'
+import ModalCargarMesa from '../components/mostrador/ModalCargarMesa.vue'
+import ModalContarItem from '../components/mostrador/ModalContarItem.vue'
 import ModalConteo from '../components/mostrador/ModalConteo.vue'
-import { getMostrador, cargarMostrador, abrirMostrador, cerrarMostrador,
+import { getMostrador, cargarMostrador, abrirMostrador, cerrarMostrador, contarMostrador,
          ingresoCajaMostrador, salidaCajaMostrador } from '../lib/api.js'
 import { formaLabel } from '../lib/formatters.js'
 import { useAuthStore } from '../stores/auth.js'
@@ -221,6 +238,8 @@ const mesa      = ref([])
 const disponibles = ref([])
 const fondoSugerido = ref(null)
 const conteo    = ref(null)      // 'apertura' | 'cierre'
+// Contar UN producto sin cerrar la caja: la fila de la mesa que se está pesando.
+const itemAContar = ref(null)
 const plata     = ref(null)
 const tab       = ref('hoy')
 const sinRevisar = ref(0)
@@ -228,9 +247,12 @@ const sinRevisar = ref(0)
 // Lo que va a quedar sobre la mesa: { stock_id: cantidad }. Vive acá y no en la tabla para
 // sobrevivir al buscador y al orden — si viviera adentro, filtrar borraría lo ya escrito.
 const cantidades = ref({})
-const motivo     = ref('')
+const revisando  = ref(false)
 
-const ESTADO_LABEL = { cerrado: 'Cerrado', abierto: 'Abierto' }
+// LO QUE ABRE Y CIERRA ES LA CAJA, NO EL MOSTRADOR. Desde que la mesa dejó de ser del turno, un
+// "Mostrador · Cerrado" con 300 g a la vista se contradice con lo que la persona está mirando: el
+// producto sigue ahí, lo que no hay es nadie atendiendo.
+const ESTADO_LABEL = { cerrado: 'Caja cerrada', abierto: 'Caja abierta' }
 
 const sedes   = computed(() => (sedeStore.sedes || []).filter(s => s.tipo === 'social' || s.tipo === 'mixta'))
 const estado  = computed(() => (turno.value ? 'abierto' : 'cerrado'))
@@ -243,11 +265,26 @@ const tabla = computed(() => {
   return disponibles.value.map(s => ({ ...s, mostrador: enMesa.get(s.stock_id) || 0 }))
 })
 
-const hayCambios = computed(() =>
-  tabla.value.some(s => {
-    const v = cantidades.value[s.stock_id]
-    return v !== undefined && Number(v) !== Number(s.mostrador || 0)
-  })
+// Lo que cambia, con el antes y el después de cada producto: es lo que se revisa en el modal.
+// Con buscador y orden de por medio, lo tocado puede no estar todo en pantalla al guardar.
+const cambiosMesa = computed(() =>
+  tabla.value
+    .filter(s => {
+      const v = cantidades.value[s.stock_id]
+      return v !== undefined && Number(v) !== Number(s.mostrador || 0)
+    })
+    .map(s => ({
+      stock_id: s.stock_id, forma: s.forma, genetica: s.genetica, numero: s.numero,
+      unidad: s.unidad, antes: Number(s.mostrador || 0), ahora: Number(cantidades.value[s.stock_id]),
+    }))
+)
+
+// Con cuánta plata queda la mesa si se guarda. Sólo para administración, que es quien la gobierna.
+const valorMesaDespues = computed(() =>
+  tabla.value.reduce((t, s) => {
+    const cant = Number(cantidades.value[s.stock_id] ?? s.mostrador ?? 0)
+    return t + cant * Number(s.precio_ars || 0)
+  }, 0)
 )
 
 const esperadoEfectivo = computed(() =>
@@ -292,7 +329,6 @@ async function cargar () {
     sinRevisar.value  = data.sin_revisar ?? 0
     // La tabla arranca con lo que HAY: se corrige lo que haya que corregir, no se declara todo.
     cantidades.value  = Object.fromEntries(tabla.value.map(s => [s.stock_id, Number(s.mostrador || 0)]))
-    motivo.value      = ''
   } catch (e) {
     if (mia === cargaEnCurso) error.value = e?.response?.data?.error || 'No se pudo cargar el mostrador.'
   } finally {
@@ -301,16 +337,14 @@ async function cargar () {
 }
 
 // Sólo lo que cambió: mandar la tabla entera haría que el backend evalúe productos que nadie tocó.
-async function guardarMesa () {
-  const cambios = tabla.value
-    .filter(s => cantidades.value[s.stock_id] !== undefined &&
-                 Number(cantidades.value[s.stock_id]) !== Number(s.mostrador || 0))
-    .map(s => ({ stock_id: s.stock_id, cantidad: Number(cantidades.value[s.stock_id]) }))
+async function guardarMesa ({ motivo }) {
+  const cambios = cambiosMesa.value.map(c => ({ stock_id: c.stock_id, cantidad: c.ahora }))
   if (!cambios.length) return
 
   guardando.value = true
   try {
-    await cargarMostrador(sedeId.value, { cambios, motivo: motivo.value })
+    await cargarMostrador(sedeId.value, { cambios, motivo })
+    revisando.value = false
     toast.success(cambios.length === 1 ? 'Mesa actualizada' : `${cambios.length} productos actualizados`)
     await cargar()
   } catch (e) {
@@ -326,6 +360,21 @@ async function confirmarConteo (payload) {
     else          await abrirMostrador(sedeId.value, payload)
     conteo.value = null
     toast.success(esCierre ? 'Caja cerrada' : 'Caja abierta')
+    await cargar()
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo registrar el conteo.')
+  } finally { guardando.value = false }
+}
+
+// Contar un producto suelto, con la caja abierta y sin cerrarla. A diferencia del conteo de
+// APERTURA —que sólo corre el punto de partida— acá la diferencia SÍ ajusta el inventario: el
+// producto estaba sobre la mesa, se contó, y no está.
+async function confirmarConteoDeUno (payload) {
+  guardando.value = true
+  try {
+    await contarMostrador(sedeId.value, payload)
+    itemAContar.value = null
+    toast.success('Conteo registrado')
     await cargar()
   } catch (e) {
     toast.error(e?.response?.data?.error || 'No se pudo registrar el conteo.')
@@ -391,11 +440,10 @@ watch(sedeId, () => { cargado.value = false; cantidades.value = {}; cargar() }, 
   font-family: var(--font-display); font-size: var(--fs-16); font-weight: 700;
   color: var(--c-leaf-900); margin: 0 0 2px;
 }
-.mst__guardar {
-  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-  background: var(--c-amber-100); border-radius: 11px; padding: 12px 16px;
-}
-.mst__guardar .mst__input { flex: 1; min-width: 240px; }
+/* El botón de guardar vive en el pie de la tabla (slot `acciones`), que ya es sticky y ya tiene
+   el resumen de lo que cambió. */
+.mst__btn--guardar { padding: 7px 15px; font-size: var(--fs-13); }
+.mst__exceso { font-size: var(--fs-12); color: var(--c-amber-500); font-weight: 600; }
 
 /* Lo que administración tocó mientras la caja estaba abierta: quien atiende lo tiene que ver o
    cierra con un faltante que no es suyo. */

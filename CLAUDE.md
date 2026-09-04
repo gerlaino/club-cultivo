@@ -125,7 +125,10 @@ Ninguno se considera cerrado; todos son candidatos a revisión.
     la que después se dispensa: buscador, orden por columna, y **se escribe el TOTAL que tiene
     que quedar, no el delta** — pedirle al usuario la resta es pedirle la cuenta que hace la
     máquina. Sin paginación a propósito: el listado viaja completo y paginar perdería lo escrito
-    al cambiar de página. Para quien atiende la tabla es de LECTURA: él nunca elige qué hay.
+    al cambiar de página. Para quien atiende la tabla es de LECTURA —él nunca elige qué hay— con
+    un botón **"Contar"** por fila (`ModalContarItem`) para verificar un producto sin cerrar la
+    caja. Administración guarda desde el pie de la tabla, y el motivo se pide en el modal de
+    confirmación (`ModalCargarMesa`), con la lista de lo que cambia delante.
     Vive en `/mostrador` y en la PWA en **`/m/mostrador`**, que es la MISMA pantalla servida
     dentro del envoltorio móvil (como `/m/stock`), con el mismo guard de rol.
     Cuatro solapas: **Hoy** · **Turnos** (los cerrados; administración ve todos, el que atiende ve
@@ -320,6 +323,24 @@ Cuando Germán plantee un problema o feature nueva antes de implementar:
 
 Suite 1239 ✓ + 58 vitest ✓. **Deploy: sumar `add_vendible_a_bar_venta_items` y `add_consumo_evento_a_provisiones_y_dispensas` al `db:migrate`.**
 
+## 📍 Dónde retomar (4-sep-2026)
+
+**Repaso del mostrador rol por rol, con la app corriendo** (bloque (ab) del CHANGELOG). Casi todo
+lo que apareció era la misma clase de error: la pantalla ofrecía un camino que el backend termina
+rechazando, o una regla escrita en un lado y leída en otro. Lo gordo lo encontró **mirar la
+pantalla renderizada**, no los tests: al que atiende se le mostraba el disponible del DEPÓSITO
+(1.000 g) cuando sobre la mesa había 300, y lo dejaba cargar de más para rebotar al confirmar.
+También: la caja cerrada se avisa ahora al abrir el carrito y no al final; en la PWA instalada
+"Ir al mostrador" volvía a la misma pantalla; `Mostradores::Contar` tenía servicio y ruta pero
+**ninguna pantalla**; y el motivo de un cambio de mesa se pide con la lista de cambios delante.
+**2772 rspec ✓ · 1748 vitest ✓ · 7 pruebas de navegador ✓** (una de ellas estaba roja en master
+por un locator ambiguo, no por la app).
+
+**Pendiente de decisión (mío):** si administración debería poder contar a distancia (hoy no: su
+gesto sobre la mesa es decir cuánto tiene que haber, que mueve producto del depósito).
+
+---
+
 ## 📍 Dónde retomar (3-sep-2026)
 
 **La MESA dejó de ser del turno** (bloque (x) del CHANGELOG). El mostrador tiene contenido propio
@@ -503,6 +524,18 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   dispensador ve el carrito vacío y el depósito está lleno: el mensaje tiene que decir que no hay
   nada sobre la mesa y dónde se arregla. Es el único lugar donde el frontend mira el rol para el
   mostrador, y sólo elige el TEXTO — la regla vive entera en `User#atiende_mostrador?`.
+- **EL CARRITO DE QUIEN ATIENDE MUESTRA LO DE LA MESA EN LOS DOS CAMPOS.** `StocksController#index`
+  pisa `cantidad` **y** `cantidad_disponible_real` con lo que hay arriba: el carrito muestra y
+  valida contra `cantidad` (el frasco entero), así que pisar sólo el otro le decía "1.000 g" con
+  300 sobre la mesa y lo dejaba cargar 500 para que el backend se lo rechazara al confirmar. Al
+  admin NO se le pisa: dispensa del depósito entero y mostrarle la mesa le escondería lo que sí
+  puede entregar.
+- **LA CAJA CERRADA SE AVISA AL ABRIR EL CARRITO, NO AL CONFIRMAR.** Como la mesa es permanente, el
+  producto sigue estando con la caja cerrada y la lista se llena igual; `Dispensacion
+  #mostrador_abierto` recién rechaza al final, con el paciente enfrente. `ModalNuevaDispensacion`
+  consulta el estado del mostrador al abrirse (sólo si quien dispensa atiende y tiene sede),
+  avisa arriba de todo con el camino y deshabilita confirmar. **Si la consulta falla no traba
+  nada**: el backend sigue siendo el que decide, y trabar por un request que no salió es peor.
 - **UNA CAJA ABIERTA POR ERROR SE ANULA, Y ESO DESHACE LAS DOS COSAS.** Abrir crea la caja de
   plata Y el turno de mercadería, así que `CajaTurno#anular!` tiene que deshacer las dos: anulando
   sólo la caja, el turno quedaba abierto apuntando a una caja anulada y el mostrador no se podía
@@ -572,7 +605,20 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   A diferencia del conteo de APERTURA —que sólo corre el punto de partida— acá la diferencia SÍ
   ajusta el inventario, igual que el cierre. Por eso los dos usan
   `MostradorItem#ajustar_inventario!`: estaba escrito dos veces, y la misma regla en dos lugares
-  es de donde salen las divergencias.
+  es de donde salen las divergencias. **Su pantalla es el botón "Contar" de cada fila**
+  (`ModalContarItem`), y sólo para QUIEN ATIENDE y con la caja abierta: administración no cuenta a
+  distancia —su gesto sobre la mesa es decir cuánto tiene que haber, que mueve producto del
+  depósito— y con la caja cerrada el gesto es abrir, que ya cuenta todo. El servicio vivió sin
+  pantalla desde el rediseño: construido, ruteado, con su función en `api.js` y sin un solo
+  llamador.
+- **EL MOTIVO DE UN CAMBIO DE MESA SE PIDE CON LA LISTA DELANTE** (`ModalCargarMesa`). Escrito
+  antes, en una barra angosta, terminaba diciendo "carga" en todos los renglones —o sea nada, y el
+  historial de la mesa es justo lo que se quería guardar—. Y con buscador y orden de por medio, lo
+  tocado puede no estar todo en pantalla al guardar: el modal muestra el antes y el después de
+  cada producto. Va en el pie de la tabla, no en una barra propia: eran dos franjas pegadas
+  diciendo lo mismo.
+- **EL BADGE DEL ENCABEZADO DICE "CAJA", NO "MOSTRADOR".** Desde que la mesa dejó de ser del turno,
+  "Mostrador · Cerrado" con 300 g a la vista se contradice con lo que la persona está mirando.
 - **El aviso de merma NO tiene umbral fijo** (`MermaMostradorJob`): un 3% puede ser normal
   fraccionando flor y un escándalo en aceite. Se compara la última semana contra las ocho
   anteriores DE ESA organización, con pisos de historia y de volumen, y uno por semana como mucho
@@ -719,6 +765,14 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 - **Un módulo se pide por su clave NUEVA y en un solo lugar.** Chequear la vieja (`ia_voz`) con
   la nueva guardada (`ia`) daba false: `feature?` resuelve viejo ⇒ nuevo, no al revés. Rompía el
   registro por voz de toda organización moderna con el botón a la vista.
+- **EN LA PWA, UN LINK DE ESCRITORIO TIENE DESTINO SI LA PANTALLA EXISTE BAJO `/m`**
+  (`rutaEnShell`). El guard rebota todo lo que no empiece con `/m`, pero varias vistas se montan
+  en los dos lados sin escribirse dos veces (`/m/mostrador`, `/m/stock`, `/m/historial`): rebotar
+  al home era perder un viaje que tenía a dónde ir, y le pegaba a lo que más se usa — "Ir al
+  mostrador", en la pantalla donde aterriza el dispensador, lo devolvía a esa misma pantalla.
+  **Se le pregunta al router**, no a una lista a mano. Y **el permiso se pide sobre la ruta de
+  ESCRITORIO**: bajo `/m` la matriz es un solo prefijo para todo el shell, así que mapear a ciegas
+  le abría `/m/pacientes` a un repartidor. La PWA no puede ser más permisiva que el escritorio.
 
 ### Pendientes de Germán
 

@@ -47,6 +47,7 @@ const getMostrador    = vi.fn(() => Promise.resolve({ data: respuesta }))
 const cargarMostrador = vi.fn(() => Promise.resolve({ data: {} }))
 const abrirMostrador  = vi.fn(() => Promise.resolve({ data: {} }))
 const cerrarMostrador = vi.fn(() => Promise.resolve({ data: {} }))
+const contarMostrador = vi.fn(() => Promise.resolve({ data: {} }))
 const ingresoCajaMostrador = vi.fn(() => Promise.resolve({ data: {} }))
 const salidaCajaMostrador  = vi.fn(() => Promise.resolve({ data: {} }))
 
@@ -62,6 +63,7 @@ vi.mock('../lib/api.js', () => ({
   ingresoCajaMostrador: (...a) => ingresoCajaMostrador(...a),
   salidaCajaMostrador:  (...a) => salidaCajaMostrador(...a),
   getMermaMostrador: vi.fn(() => Promise.resolve({ data: { resumen: { turnos: 0 }, por_producto: [], por_turno: [] } })),
+  contarMostrador: (...a) => contarMostrador(...a),
   revisarTurnoMostrador: vi.fn(), getTurnoMostrador: vi.fn(), corregirTurnoMostrador: vi.fn(),
   listTurnosMostrador: vi.fn(() => Promise.resolve({ data: { turnos: [], gestiona: false } })),
   listRendiciones: vi.fn(() => Promise.resolve({ data: { rendiciones: [] } })),
@@ -132,8 +134,9 @@ describe('La mesa, que gobierna administración', () => {
   it('se escribe el total y se guarda con motivo', async () => {
     const w = await montar()
     await fila(w, 0).find('.tmo__input').setValue(300)
-    await w.find('.mst__guardar .mst__input').setValue('carga del lunes')
-    await w.find('.mst__guardar .mst__btn').trigger('click')
+    await w.find('.mst__btn--guardar').trigger('click')
+    await w.find('.cmm__input').setValue('carga del lunes')
+    await w.find('.cmm__btn--primary').trigger('click')
     await flushPromises()
 
     expect(cargarMostrador).toHaveBeenCalledWith(10, {
@@ -142,13 +145,57 @@ describe('La mesa, que gobierna administración', () => {
     })
   })
 
+  // Con buscador y orden de por medio, lo tocado puede no estar todo en pantalla al guardar: el
+  // modal muestra la lista completa con el antes y el después ANTES de pedir el motivo.
+  it('el modal muestra qué cambia, con el antes y el después', async () => {
+    respuesta = { ...respuesta, mesa: [{ ...FLOR, mostrador: 120 }] }
+    const w = await montar()
+    const flor = filas(w).find(f => f.text().includes('Northern'))
+    await flor.find('.tmo__input').setValue(300)
+    await w.find('.mst__btn--guardar').trigger('click')
+
+    const row = w.find('.cmm__row')
+    expect(row.classes()).toContain('is-sube')
+    expect(row.find('.cmm__antes').text()).toBe('120')
+    expect(row.find('.cmm__ahora').text()).toContain('300')
+    expect(row.find('.cmm__delta').text()).toContain('+180')
+  })
+
+  // Bajar a cero NO borra la fila ni su historial: deja de listarse. Decirlo evita que parezca
+  // que se está eliminando el producto.
+  it('avisa cuando un producto sale de la mesa', async () => {
+    respuesta = { ...respuesta, mesa: [{ ...FLOR, mostrador: 120 }] }
+    const w = await montar()
+    const flor = filas(w).find(f => f.text().includes('Northern'))
+    await flor.find('.tmo__input').setValue(0)
+    await w.find('.mst__btn--guardar').trigger('click')
+
+    expect(w.find('.cmm__row').classes()).toContain('is-baja')
+    expect(w.find('.cmm__chip-sale').text()).toContain('sale de la mesa')
+  })
+
   // Un cambio de mesa sin motivo es un número que aparece: el backend lo rechaza igual, pero
   // ofrecer el botón para que rebote es el peor error posible.
   it('sin motivo no deja guardar', async () => {
     const w = await montar()
     await fila(w, 0).find('.tmo__input').setValue(300)
+    await w.find('.mst__btn--guardar').trigger('click')
 
-    expect(w.find('.mst__guardar .mst__btn').attributes('disabled')).toBeDefined()
+    expect(w.find('.cmm__btn--primary').attributes('disabled')).toBeDefined()
+  })
+
+  // Los motivos de siempre a un click: sin esto se escribe la palabra más corta que cierre el
+  // modal, y el historial de la mesa —que es lo que se quería guardar— no dice nada.
+  it('ofrece motivos sugeridos, distintos según se suba o se baje', async () => {
+    const w = await montar()
+    await fila(w, 0).find('.tmo__input').setValue(300)
+    await w.find('.mst__btn--guardar').trigger('click')
+
+    const chips = w.findAll('.cmm__chip')
+    expect(chips.map(c => c.text())).toContain('Reposición del turno')
+    await chips[0].trigger('click')
+    expect(w.find('.cmm__input').element.value).toBe('Reposición del turno')
+    expect(w.find('.cmm__btn--primary').attributes('disabled')).toBeUndefined()
   })
 
   it('avisa si se pide más de lo que hay libre en el depósito', async () => {
@@ -157,6 +204,14 @@ describe('La mesa, que gobierna administración', () => {
 
     expect(fila(w, 1).text()).toContain('quedan 120')
     expect(fila(w, 1).find('.tmo__input').classes()).toContain('is-mal')
+  })
+
+  // El backend lo rechaza igual: dejar apretar para que rebote parece culpa del usuario.
+  it('y con exceso no deja ni abrir el modal', async () => {
+    const w = await montar()
+    await fila(w, 1).find('.tmo__input').setValue(500) // hay 120
+
+    expect(w.find('.mst__btn--guardar').attributes('disabled')).toBeDefined()
   })
 
   it('se busca y se ordena por columna', async () => {
@@ -202,14 +257,97 @@ describe('Lo que ve quien atiende', () => {
 
     expect(w.findAll('.tmo__th').map(t => t.text()).join(' ')).not.toContain('Costo')
   })
+
+  // Cerrar y reabrir con quince frascos son veinte minutos: el control que cuesta eso no se
+  // hace, y el que no se hace no controla nada. El servicio existía sin pantalla.
+  describe('contar un producto sin cerrar la caja', () => {
+    // Es un control DEL TURNO: se cuenta mientras se atiende. Con la caja cerrada el gesto es
+    // abrir, que ya cuenta todo.
+    beforeEach(() => { respuesta = { ...respuesta, turno: TURNO } })
+
+    it('quien atiende puede contar una fila suelta', async () => {
+      const w = await montar('dispensador')
+
+      expect(w.find('.tmo__contar').exists()).toBe(true)
+    })
+
+    it('con la caja cerrada no se ofrece: ahí el gesto es abrir, que cuenta todo', async () => {
+      respuesta = { ...respuesta, turno: null }
+      const w = await montar('dispensador')
+
+      expect(w.find('.tmo__contar').exists()).toBe(false)
+    })
+
+    // Administración no cuenta a distancia: su gesto sobre la mesa es decir cuánto tiene que
+    // haber, que mueve producto del depósito. Contar se hace con el frasco en la mano.
+    it('administración no: ella carga, no cuenta', async () => {
+      respuesta = { ...respuesta, mesa: [{ ...FLOR, mostrador: 300 }] }
+      const w = await montar()
+
+      expect(w.find('.tmo__contar').exists()).toBe(false)
+    })
+
+    // Misma regla que el arqueo: con el número a la vista se escribe ése y el conteo es teatro.
+    it('no muestra lo esperado hasta que se escribe, ni en la pantalla de atrás', async () => {
+      const w = await montar('dispensador')
+      await w.find('.tmo__contar').trigger('click')
+
+      expect(w.find('.cti__comparacion').exists()).toBe(false)
+      expect(w.find('.tmo__mesa').text()).toBe('—')
+    })
+
+    it('y lo compara apenas se escribe', async () => {
+      const w = await montar('dispensador')
+      await w.find('.tmo__contar').trigger('click')
+      await w.find('.cti__input').setValue(280)
+
+      const comp = w.find('.cti__comparacion')
+      expect(comp.text()).toContain('300')
+      expect(comp.text()).toContain('280')
+      expect(w.find('.cti__comp-dif').text()).toContain('−20')
+    })
+
+    // Acá la diferencia SÍ ajusta el inventario: el producto estaba sobre la mesa y no está.
+    // Sin motivo el backend lo rechaza, así que el botón no se habilita.
+    it('con diferencia pide el motivo', async () => {
+      const w = await montar('dispensador')
+      await w.find('.tmo__contar').trigger('click')
+      await w.find('.cti__input').setValue(280)
+
+      expect(w.find('.cti__btn--primary').attributes('disabled')).toBeDefined()
+      await w.find('.cti__input--texto').setValue('se fraccionó para prerolls')
+      expect(w.find('.cti__btn--primary').attributes('disabled')).toBeUndefined()
+    })
+
+    it('si cuadra, no pide nada y se registra', async () => {
+      const w = await montar('dispensador')
+      await w.find('.tmo__contar').trigger('click')
+      await w.find('.cti__input').setValue(300)
+
+      expect(w.find('.cti__input--texto').exists()).toBe(false)
+      await w.find('.cti__btn--primary').trigger('click')
+      await flushPromises()
+
+      expect(contarMostrador).toHaveBeenCalledWith(10, { stock_id: 1, contado: 300, motivo: undefined })
+    })
+  })
 })
 
 describe('Abrir y cerrar la caja', () => {
-  it('con la caja cerrada ofrece abrirla', async () => {
+  // LO QUE ABRE Y CIERRA ES LA CAJA, NO EL MOSTRADOR: desde que la mesa dejó de ser del turno,
+  // un "Cerrado" con 300 g arriba se contradice con lo que la persona está mirando.
+  it('con la caja cerrada ofrece abrirla, y lo dice sin confundir con la mesa', async () => {
     const w = await montar()
 
-    expect(w.find('.mst__estado').text()).toMatch(/Cerrado/)
+    expect(w.find('.mst__estado').text()).toBe('Caja cerrada')
     expect(w.find('.mst__turno-acc .mst__btn').text()).toBe('Abrir caja')
+  })
+
+  it('con la caja abierta el estado lo dice igual de claro', async () => {
+    respuesta = { ...respuesta, turno: TURNO }
+    const w = await montar()
+
+    expect(w.find('.mst__estado').text()).toBe('Caja abierta')
   })
 
   it('con la caja abierta dice quién y ofrece cerrarla', async () => {

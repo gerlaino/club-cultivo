@@ -84,7 +84,13 @@ class StocksController < ApplicationController
       return render json: stocks.map { |st|
         # El disponible que ve es el del MOSTRADOR, no el del depósito: ofrecerle 1.240 g cuando
         # sobre la mesa hay 155 es prometerle algo que no puede entregar.
-        serialize_stock(st).merge(cantidad_disponible_real: sobre_la_mesa[st.id].cantidad.to_f)
+        #
+        # Se pisan LOS DOS campos. `cantidad_disponible_real` solo no alcanzaba: el carrito
+        # muestra y valida contra `cantidad` —el frasco entero—, así que al que atiende le decía
+        # "1.000 g" con 300 sobre la mesa y lo dejaba cargar 500 para que el backend se lo
+        # rechazara al confirmar. La regla estaba escrita acá y leída en otro campo allá.
+        en_la_mesa = sobre_la_mesa[st.id].cantidad.to_f
+        serialize_stock(st).merge(cantidad: en_la_mesa, cantidad_disponible_real: en_la_mesa)
       }
     end
 
