@@ -37,7 +37,7 @@ descuadre como que se quede callado con lo legítimo.
 Sobre la base de desarrollo (que incluye una copia de Mitocondria) queda **un** hallazgo real: una
 dispensa de $25.000 del 31-08 que no dejó asiento, del lote de pruebas de reparto de esa noche.
 
-2778 rspec ✓.
+2781 rspec ✓.
 
 ---
 
