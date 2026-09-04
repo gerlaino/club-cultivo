@@ -397,6 +397,9 @@ module Dispensario
           fondo_ars:            turno.caja_turno.monto_inicial_ars.to_f,
           cobrado_efectivo_ars: turno.caja_turno.total_efectivo_ars,
           cobrado_digital_ars:  turno.caja_turno.total_digital_ars,
+          # Plata que entró en efectivo sin ser una dispensa: pagó una deuda, señó una reserva.
+          # Aparte de lo cobrado, para que una diferencia se pueda explicar por su origen.
+          otros_ingresos_efectivo_ars: turno.caja_turno.total_otros_ingresos_efectivo_ars,
           salidas_ars:          turno.caja_turno.total_salidas_ars,
           esperado_ars:         turno.caja_turno.efectivo_esperado_ars,
           contado_ars:          turno.caja_turno.efectivo_declarado_ars&.to_f,

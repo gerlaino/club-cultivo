@@ -74,3 +74,51 @@ RSpec.describe 'Registrar pago — dispensador', type: :request do
     expect(cc.reload.saldo_disponible.to_f).to eq(0.0)
   end
 end
+
+# El pago de una deuda es plata REAL que entra al cajón, aunque no venga de una dispensa. Antes
+# de esto, era invisible para el arqueo del mostrador: MovimientoContable no se ataba a ninguna
+# caja, y quien contaba esa noche encontraba un sobrante que no podía explicar.
+RSpec.describe 'Registrar pago — se ata a la caja del mostrador abierta', type: :request do
+  include AuthHelpers
+
+  let(:club)     { create(:club) }
+  let(:admin)    { create(:user, :admin, club: club) }
+  let(:sede)     { create(:sede, club: club, created_by: admin, tipo: 'social') }
+  let(:paciente) { create(:paciente, club: club, created_by: admin) }
+  let!(:cc) do
+    CuentaCorriente.create!(paciente: paciente, club: club,
+                            saldo_disponible: -5_000, limite_credito: 10_000)
+  end
+
+  def registrar(monto:, medio: 'efectivo')
+    sign_in_as(admin)
+    post "/pacientes/#{paciente.id}/cuenta_corriente/registrar_pago",
+         params: { monto: monto, medio_pago: medio, sede_id: sede.id }, headers: auth_headers, as: :json
+  end
+
+  it 'con la caja abierta, se ata sola y entra al esperado del arqueo' do
+    turno = abrir_mostrador!(sede, usuario: admin, fondo: 10_000)
+
+    registrar(monto: 5_000)
+
+    mov = MovimientoContable.last
+    expect(mov.caja_turno_id).to eq(turno.caja_turno_id)
+    expect(turno.caja_turno.reload.total_otros_ingresos_efectivo_ars).to eq(5_000.0)
+    expect(turno.caja_turno.reload.efectivo_esperado_ars).to eq(15_000.0) # 10.000 de fondo + 5.000 pagados
+  end
+
+  it 'sin caja abierta, no rompe: queda sin atar' do
+    registrar(monto: 5_000)
+
+    expect(response).to have_http_status(:created)
+    expect(MovimientoContable.last.caja_turno_id).to be_nil
+  end
+
+  it 'pagado por transferencia no cuenta como efectivo esperado' do
+    turno = abrir_mostrador!(sede, usuario: admin, fondo: 10_000)
+
+    registrar(monto: 5_000, medio: 'transferencia')
+
+    expect(turno.caja_turno.reload.total_otros_ingresos_efectivo_ars).to eq(0.0)
+  end
+end

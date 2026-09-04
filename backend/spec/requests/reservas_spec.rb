@@ -310,3 +310,40 @@ RSpec.describe 'Reservas', type: :request do
     end
   end
 end
+
+# Mismo agujero que el pago de cuenta corriente, y mismo arreglo: la seña es plata real que entra
+# al cajón, y antes era invisible para el arqueo del mostrador.
+RSpec.describe 'La seña de una reserva se ata a la caja del mostrador abierta', type: :request do
+  include AuthHelpers
+
+  let(:club)     { create(:club) }
+  let(:admin)    { create(:user, :admin, club: club) }
+  let(:sede)     { create(:sede, club: club, created_by: admin, tipo: 'social') }
+  let(:sala)     { create(:sala, club: club, sede: sede, created_by: admin) }
+  let(:lote)     { create(:lote, club: club, sala: sala) }
+  let(:paciente) { create(:paciente, club: club, created_by: admin) }
+  let!(:stock) do
+    Stock.create!(sede: sede, lote: lote, origen: 'lote',
+                  forma_producto: 'flor_seca', unidad: 'g', cantidad: 100,
+                  precio_sugerido_ars: 100)
+  end
+
+  it 'con la caja abierta, entra al esperado del arqueo' do
+    # Sólo la caja, sin cargar el stock a la mesa: cargarlo lo apartaría entero y no quedaría
+    # nada disponible para reservar — lo que este test necesita es la caja abierta, no la mesa.
+    turno = ActsAsTenant.with_tenant(club) do
+      Mostradores::AbrirCaja.call(mostrador: sede.mostrador!, usuario: admin,
+                                  efectivo_contado_ars: 10_000).turno
+    end
+
+    sign_in_as(admin)
+    post "/pacientes/#{paciente.id}/reservas",
+         params: { reserva: { stock_id: stock.id, cantidad: 10, sena_ars: 300,
+                              medio_pago: 'efectivo', aporte_estimado_ars: 1000,
+                              fecha_entrega_estimada: 3.days.from_now.to_date } },
+         headers: auth_headers
+
+    expect(response).to have_http_status(:created)
+    expect(turno.caja_turno.reload.efectivo_esperado_ars).to eq(10_300.0)
+  end
+end

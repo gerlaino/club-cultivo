@@ -46,6 +46,19 @@ class MovimientoContable < ApplicationRecord
   # (que aún dispara aporte_socio / mapeo de costos) y hereda su unidad de negocio.
   before_validation :sincronizar_desde_categoria_contable
 
+  # PLATA REAL QUE ENTRA SIN PASAR POR UNA DISPENSA: un pago de cuenta corriente
+  # (`CuentaCorrientesController#registrar_pago`) o la seña de una reserva
+  # (`ReservasController#registrar_sena`). El arqueo del mostrador sólo miraba `Cobro` —lo que
+  # sale de una dispensa— así que esta plata era invisible: entraba al cajón de verdad, y a la
+  # noche el que arqueaba encontraba un sobrante que no podía explicar.
+  #
+  # Se ata SOLA a la caja abierta de esa sede, si hay una: ningún controller tiene que acordarse
+  # de hacerlo, que es la misma regla escrita una sola vez en vez de en cada punto de entrada
+  # nuevo que aparezca. Sólo para `aporte_socio` —el resto de las categorías no es plata que
+  # alguien puso en el cajón— y sólo si no vino ya atada (los movimientos del propio mostrador,
+  # `ingreso_caja`/`retiro_caja`/`salida_caja`, siempre la traen puesta).
+  before_validation :atar_a_la_caja_abierta, if: -> { categoria == 'aporte_socio' && caja_turno_id.blank? }
+
   after_create   :acreditar_cuenta_corriente
   before_destroy :revertir_credito_cuenta_corriente
   # El libro es la fuente de verdad de los costos por lote: cualquier cambio
@@ -203,6 +216,12 @@ class MovimientoContable < ApplicationRecord
   end
 
   private
+
+  def atar_a_la_caja_abierta
+    return if sede_id.blank?
+
+    self.caja_turno_id = CajaTurno.abierta_en_sede(club_id: club_id, sede_id: sede_id)&.id
+  end
 
   ROLES_RETIRO = %w[admin supervisor].freeze
 

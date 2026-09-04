@@ -48,7 +48,12 @@
           <span></span><span>Debería haber</span><span>Contaste</span><span>Diferencia</span>
         </div>
         <div class="cnt__comp-row">
-          <span class="cnt__comp-lbl">Efectivo</span>
+          <span class="cnt__comp-lbl">
+            Efectivo
+            <em v-if="otrosIngresosEfectivo > 0" class="cnt__comp-nota">
+              incluye ${{ fmt(otrosIngresosEfectivo) }} de deuda/señas
+            </em>
+          </span>
           <span class="cnt__comp-num">${{ fmt(esperadoEfectivo) }}</span>
           <span class="cnt__comp-num">${{ fmt(efectivo) }}</span>
           <span class="cnt__comp-dif" :class="clase(difEfectivo)">{{ signo(difEfectivo) }}${{ fmt(Math.abs(difEfectivo)) }}</span>
@@ -119,6 +124,9 @@ const props = defineProps({
   mesa:     { type: Array,  default: () => [] },   // lo que hay sobre la mesa
   esCierre: { type: Boolean, default: false },
   esperadoEfectivo: { type: Number, default: 0 },
+  // Parte de lo esperado que NO vino de una dispensa: pagó una deuda, señó una reserva.
+  // Se muestra aparte para que una diferencia se pueda explicar por su origen.
+  otrosIngresosEfectivo: { type: Number, default: 0 },
   puedeRetirar: { type: Boolean, default: false },
   guardando:    { type: Boolean, default: false },
   // Es la primera vez que se abre este mostrador: no hay ningún cierre anterior del que heredar
@@ -226,6 +234,7 @@ function confirmar () {
 .cnt__comp-hd span { font-size: var(--fs-12); color: var(--c-ink-500); text-align: right; }
 .cnt__comp-hd span:first-child { text-align: left; }
 .cnt__comp-lbl { font-size: var(--fs-13); color: var(--c-ink-700); }
+.cnt__comp-nota { display: block; font-size: var(--fs-11); font-style: normal; color: var(--c-ink-500); font-weight: 400; }
 .cnt__comp-lbl em { font-style: normal; color: var(--c-ink-500); }
 .cnt__comp-num { font-family: var(--font-mono); font-size: var(--fs-14); color: var(--c-ink-900); text-align: right; }
 .cnt__comp-dif { font-family: var(--font-mono); font-size: var(--fs-14); font-weight: 700; text-align: right; }

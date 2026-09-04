@@ -233,8 +233,14 @@ module Dispensario
         total_cobrado_ars:      caja.total_ventas_ars,
         total_efectivo_ars:     caja.total_efectivo_ars,
         total_digital_ars:      caja.total_digital_ars,
+        # Plata en efectivo que entró SIN ser una dispensa: pago de cuenta corriente, seña de
+        # reserva. Línea propia: si el arqueo no cuadra, hay que poder distinguir de dónde vino.
+        total_otros_ingresos_efectivo_ars: caja.total_otros_ingresos_efectivo_ars,
         total_salidas_ars:      caja.total_salidas_ars,
         total_ingresos_ars:     caja.total_ingresos_ars,
+        otros_ingresos_efectivo: caja.otros_ingresos_efectivo.order(:created_at).map { |m|
+          { id: m.id, monto_ars: m.monto_ars.to_f, descripcion: m.descripcion, quien: m.created_by&.nombre_completo }
+        },
         ingresos:               caja.ingresos.order(:created_at).map { |m| { id: m.id, monto_ars: m.monto_ars.to_f, descripcion: m.descripcion, quien: m.created_by&.nombre_completo } },
         salidas:                caja.salidas.order(:created_at).map { |m| { id: m.id, monto_ars: m.monto_ars.to_f, descripcion: m.descripcion, clase: m.categoria == 'retiro_caja' ? 'retiro' : 'gasto', quien: (m.retirado_por || m.created_by)&.nombre_completo } },
         efectivo_esperado_ars:  caja.efectivo_esperado_ars,

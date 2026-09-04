@@ -120,6 +120,21 @@ class CajaTurno < ApplicationRecord
                     : bar_ventas.where(medio_pago: 'efectivo').sum(:total_ars).to_f
   end
 
+  # Plata que entró en efectivo SIN ser una dispensa: un pago de cuenta corriente o la seña de
+  # una reserva. No es lo mismo que la nota de arriba sobre `total_ventas_ars` —esa habla de NO
+  # contar el crédito que se le da a alguien, esto es lo opuesto: SÍ contar la plata real que
+  # alguien puso en el cajón para cancelar una deuda—.
+  #
+  # Línea PROPIA y no sumada a `total_efectivo_ars`: si el arqueo da una diferencia, quien la mira
+  # tiene que poder distinguir si vino de una venta o de un pago de deuda, no adivinarlo.
+  # `MovimientoContable#atar_a_la_caja_abierta` es quien la engancha acá, sola, apenas se crea.
+  def otros_ingresos_efectivo
+    movs = movimientos_contables.where(categoria: 'aporte_socio', medio_pago: 'efectivo')
+    cerrada_at.present? ? movs.where(movimientos_contables: { created_at: ...cerrada_at }) : movs
+  end
+
+  def total_otros_ingresos_efectivo_ars = otros_ingresos_efectivo.sum(:monto_ars).to_f
+
   # Efectivo que se sacó del cajón en el turno. Son DOS cosas distintas y la diferencia es
   # contable, no cosmética:
   #
@@ -166,10 +181,11 @@ class CajaTurno < ApplicationRecord
     (total_ventas_ars - total_efectivo_ars).round(2)
   end
 
-  # Efectivo que debería haber en el cajón: el fondo, más lo cobrado en efectivo, menos lo que
-  # se sacó. Es la cuenta que hace quien arquea, escrita igual.
+  # Efectivo que debería haber en el cajón: el fondo, más lo cobrado en efectivo (de dispensas Y
+  # de deudas/señas pagadas), más lo que se puso a mano, menos lo que se sacó. Es la cuenta que
+  # hace quien arquea, escrita igual.
   def efectivo_esperado_ars
-    (monto_inicial_ars.to_d + total_efectivo_ars.to_d +
+    (monto_inicial_ars.to_d + total_efectivo_ars.to_d + total_otros_ingresos_efectivo_ars.to_d +
      total_ingresos_ars.to_d - total_salidas_ars.to_d).to_f
   end
 

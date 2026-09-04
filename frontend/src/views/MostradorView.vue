@@ -141,8 +141,8 @@
     </template>
 
     <ModalConteo v-if="conteo" :mesa="mesa" :es-cierre="conteo === 'cierre'"
-                 :esperado-efectivo="esperadoEfectivo" :puede-retirar="gestiona"
-                 :guardando="guardando"
+                 :esperado-efectivo="esperadoEfectivo" :otros-ingresos-efectivo="otrosIngresosEfectivo"
+                 :puede-retirar="gestiona" :guardando="guardando"
                  :fondo-obligatorio="conteo === 'apertura' && fondoSugerido == null"
                  @cerrar="conteo = null" @confirmar="confirmarConteo" />
 
@@ -253,6 +253,9 @@ const hayCambios = computed(() =>
 const esperadoEfectivo = computed(() =>
   turno.value?.caja?.esperado_ars ?? Number(fondoSugerido.value || 0)
 )
+// Plata en efectivo que entró sin ser una dispensa — pagó una deuda, señó una reserva. Se le
+// muestra a quien arquea aparte, para que una diferencia se pueda explicar por su origen.
+const otrosIngresosEfectivo = computed(() => turno.value?.caja?.otros_ingresos_efectivo_ars || 0)
 
 // Lo que administración tocó mientras la caja estaba abierta. Sin esto, quien atiende cierra con
 // un faltante que no es suyo y no lo puede explicar.

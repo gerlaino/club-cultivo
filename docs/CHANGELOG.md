@@ -1,5 +1,30 @@
 # Changelog
 
+## Septiembre 2026 (aa) — la plata que entra sin pasar por una dispensa
+
+Germán preguntó qué pasa si un paciente llega y paga una deuda sin que haya una dispensa nueva de
+por medio. La respuesta era: esa plata desaparece. `CuentaCorrientesController#registrar_pago`
+crea un `MovimientoContable` (categoría `aporte_socio`) que **no se ata a ninguna caja** —
+`CajaTurno#total_efectivo_ars` sólo mira `Cobro`, lo que sale de una dispensa—. Un paciente que
+paga $10.000 en efectivo entra al cajón de verdad, y a la noche quien arquea encuentra un
+sobrante que no puede explicar.
+
+**El mismo agujero, en un segundo lugar**: la seña de una reserva (`ReservasController
+#registrar_sena`) crea el mismo tipo de movimiento suelto.
+
+En vez de parchear los dos puntos de entrada, un único enganche en `MovimientoContable`: si es
+`aporte_socio`, tiene medio de pago, y hay una caja abierta en esa sede, se ata sola
+(`atar_a_la_caja_abierta`). Ningún controller nuevo tiene que acordarse de hacerlo.
+
+**Línea PROPIA en el arqueo, no sumada al efectivo cobrado** (`CajaTurno
+#total_otros_ingresos_efectivo_ars`): si el conteo no cuadra, quien lo mira tiene que poder
+distinguir si vino de una venta o de un pago de deuda, no adivinarlo. El modal de conteo lo
+muestra como una nota bajo "Efectivo" cuando corresponde.
+
+2767 rspec ✓ · 1709 vitest ✓.
+
+---
+
 ## Septiembre 2026 (z) — un badge para saber de dónde va a descontar
 
 Administración dispensa del depósito entero, más allá de lo que haya sobre la mesa del
