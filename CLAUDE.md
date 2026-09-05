@@ -525,6 +525,15 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   saca al usuario del envoltorio móvil y lo deja en la versión de escritorio, sin barra de abajo.
   El guard de PWA sólo corrige la app INSTALADA; en el navegador del celular esa ruta es válida y
   no hay nada que corregir. Los links de una tarjeta que vive en los dos lados miran `route.path`.
+- **SIN SEDE DE ATENCIÓN NO HAY MOSTRADOR, Y HAY QUE DECIRLO** (`useMostrador#faltaSede`). El
+  mostrador vive en una sede `social`/`mixta`: sin ninguna, `sedeId` queda en null, la pantalla se
+  dibujaba como si todo estuviera bien —caja cerrada, mesa vacía— con "Abrir caja" habilitado, y
+  abrir pegaba a `/sedes/null/mostrador/abrir`. Apareció probando en producción con el dispensador
+  del Club Modelo. **Son DOS causas y el cartel dice la que corresponde**, porque se arreglan en
+  lugares distintos: le asignaron sólo sedes que no atienden público (se corrige en su ficha) o la
+  organización no tiene ninguna (se corrige en Sedes). Un cartel que manda a arreglar lo que no
+  está roto es peor que no tener cartel. `motivoSinSede` los distingue mirando si ve sedes pero
+  ninguna atiende.
 - **LA PANTALLA DEL MOSTRADOR ARRANCA EN LA SEDE PROPIA** (`dispensario_sede`), no en la primera
   de la lista: quien atiende abre la caja en su mostrador, y aterrizar en otra sede le muestra una
   mesa vacía y ninguna caja abierta — la pantalla diciéndole que no hizo lo que acaba de hacer.

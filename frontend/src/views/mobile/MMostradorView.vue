@@ -3,10 +3,29 @@
     <!-- Un repartidor esperando que le reciban la caja: acá es donde está el cajón. -->
     <RendicionCajaCard @recibida="cargar" />
 
+    <!-- ══ SIN SEDE NO HAY MOSTRADOR ═══════════════════════════════════════════
+         Va en lugar de la caja, no al lado: ofrecer "Abrir caja" cuando no hay sede donde
+         abrirla es dejar apretar para que el backend rechace, y parece culpa suya. Dice quién
+         lo arregla, porque no es él. -->
+    <section v-if="faltaSede" class="mmo__sinsede">
+      <i class="bi bi-exclamation-triangle"></i>
+      <div>
+        <b>Todavía no podés abrir la caja.</b>
+        <p v-if="motivoSinSede === 'asignacion'">
+          Las sedes que tenés asignadas no atienden público, así que no hay mostrador al que
+          entrar. Pedile a administración que te asigne la sede donde atendés.
+        </p>
+        <p v-else>
+          Esta organización no tiene ninguna sede de atención activa, que es donde vive el
+          mostrador. Avisale a administración.
+        </p>
+      </div>
+    </section>
+
     <!-- ══ LA CAJA ═══════════════════════════════════════════════════════════════
          Lo primero y lo último del día, y por eso va arriba con la acción a ancho
          completo: el que atiende llega, abre contando, y a la noche cierra contando. -->
-    <section class="mmo__caja" :class="`is-${estado}`">
+    <section v-else class="mmo__caja" :class="`is-${estado}`">
       <div class="mmo__caja-txt">
         <span class="mmo__caja-estado">
           <span class="mmo__dot" />{{ turno ? 'Caja abierta' : 'Caja cerrada' }}
@@ -35,6 +54,9 @@
       <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
     </select>
 
+    <!-- Todo lo que sigue necesita una sede: envuelto en un solo `v-if` y no uno por bloque,
+         que además rompía el encadenado del `v-else` de las solapas. -->
+    <template v-if="!faltaSede">
     <nav class="mmo__tabs">
       <button class="mmo__tab" :class="{ 'is-on': tab === 'hoy' }" @click="tab = 'hoy'">Hoy</button>
       <button class="mmo__tab" :class="{ 'is-on': tab === 'turnos' }" @click="tab = 'turnos'">
@@ -98,6 +120,8 @@
           </button>
         </div>
       </template>
+    </template>
+
     </template>
 
     <!-- ══ La hoja del producto: el resto de los datos, y contarlo ══════════════ -->
@@ -190,7 +214,7 @@ import { useMostrador } from '../../composables/useMostrador.js'
 
 const auth = useAuthStore()
 const {
-  sedeId, sedes, cargando, guardando, error, turno, mesa, estado,
+  sedeId, sedes, faltaSede, motivoSinSede, cargando, guardando, error, turno, mesa, estado,
   fondoSugerido, esperadoEfectivo, otrosIngresosEfectivo, movimientosDelTurno,
   cargar, confirmarConteo, confirmarConteoDeUno,
 } = useMostrador()
@@ -282,6 +306,15 @@ async function onConfirmarConteoDeUno (payload) {
   padding: .7rem .8rem; font-size: .95rem; background: #fff; font-family: inherit;
 }
 
+/* Ámbar, no rojo: falta un dato de configuración, no se rompió nada ni hizo nada mal. */
+.mmo__sinsede {
+  display: flex; gap: .7rem; align-items: flex-start;
+  background: var(--c-amber-100); color: var(--c-amber-500);
+  border-radius: 14px; padding: .9rem;
+}
+.mmo__sinsede b { display: block; margin-bottom: 2px; font-size: .95rem; }
+.mmo__sinsede p { margin: 0; font-size: .85rem; line-height: 1.4; }
+
 /* ── Tabs ── */
 .mmo__tabs { display: flex; gap: .4rem; }
 .mmo__tab {
@@ -296,10 +329,10 @@ async function onConfirmarConteoDeUno (payload) {
 
 /* ── Avisos y movimientos ── */
 .mmo__aviso {
-  margin: 0; background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;
-  padding: .65rem .8rem; font-size: .85rem; color: #92400e;
+  margin: 0; background: var(--c-amber-100); color: var(--c-amber-500);
+  border-radius: 10px; padding: .65rem .8rem; font-size: .85rem;
 }
-.mmo__aviso--error { background: #fef2f2; border-color: #fecaca; color: #b91c1c; }
+.mmo__aviso--error { background: var(--c-rust-100); color: var(--c-rust-600); }
 
 .mmo__movs {
   background: #fff; border: 1px solid var(--c-slate-200); border-radius: 12px; overflow: hidden;

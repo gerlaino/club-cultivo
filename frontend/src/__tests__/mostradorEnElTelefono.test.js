@@ -222,3 +222,45 @@ describe('La hoja del producto', () => {
     expect(w.find('.sheet-stub .mmo__btn').exists()).toBe(false)
   })
 })
+
+// SIN SEDE QUE ATIENDA NO HAY MOSTRADOR AL QUE ENTRAR.
+//
+// Apareció probando en producción con el dispensador del Club Modelo: no tenía sede asignada, y
+// la pantalla se dibujaba como si todo estuviera bien —caja cerrada, mesa vacía— con "Abrir
+// caja" habilitado. Abrir pegaba a `/sedes/null/mostrador/abrir`. Es el peor error posible: la
+// pantalla ofrece algo que el backend rechaza, así que parece culpa del usuario.
+describe('Cuando no hay sede de atención', () => {
+  it('no ofrece abrir la caja: lo dice y explica quién lo arregla', async () => {
+    useSedeStore().sedes = []
+    const w = await montar()
+
+    expect(w.find('.mmo__sinsede').exists()).toBe(true)
+    expect(w.find('.mmo__caja').exists()).toBe(false)
+    expect(w.find('.mmo__btn').exists()).toBe(false)
+    expect(w.text()).toContain('administración')
+  })
+
+  // Son dos causas distintas y se arreglan en lugares distintos: un cartel que manda a arreglar
+  // lo que no está roto es peor que no tener cartel.
+  it('distingue "te asignaron sedes que no atienden" de "la organización no tiene ninguna"', async () => {
+    useSedeStore().sedes = [{ id: 12, nombre: 'Vivero', tipo: 'produccion' }]
+    const conAsignacion = await montar()
+    expect(conAsignacion.find('.mmo__sinsede').text()).toContain('que tenés asignadas')
+
+    setActivePinia(createPinia())
+    const sede = useSedeStore()
+    sede.sedes = []
+    sede.loaded = true
+    useAuthStore().user = { id: 2, role: 'dispensador' }
+    const sinNinguna = await montar()
+    expect(sinNinguna.find('.mmo__sinsede').text()).toContain('no tiene ninguna sede de atención')
+  })
+
+  it('tampoco muestra la mesa ni las solapas: no hay de qué', async () => {
+    useSedeStore().sedes = []
+    const w = await montar()
+
+    expect(w.find('.mmo__tabs').exists()).toBe(false)
+    expect(tarjetas(w)).toHaveLength(0)
+  })
+})

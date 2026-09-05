@@ -55,6 +55,25 @@ export function useMostrador () {
   const sedes  = computed(() => (sedeStore.sedes || []).filter(s => s.tipo === 'social' || s.tipo === 'mixta'))
   const estado = computed(() => (turno.value ? 'abierto' : 'cerrado'))
 
+  // NO HAY MOSTRADOR AL QUE ENTRAR, y hay que decirlo en vez de dejar apretar "Abrir caja".
+  //
+  // El mostrador vive en una sede que atiende (`social`/`mixta`). Sin una, `sedeId` queda en
+  // null, la pantalla se dibujaba igual —caja cerrada, mesa vacía— con el botón habilitado, y
+  // abrir pegaba a `/sedes/null/mostrador/abrir`. Es el peor error posible: la pantalla ofrece
+  // algo que el backend rechaza, así que parece culpa del usuario.
+  //
+  // Son DOS causas distintas y el cartel tiene que decir la que corresponde, porque se arreglan
+  // en lugares distintos: o a esta persona le asignaron sólo sedes que no atienden público, o la
+  // organización no tiene ninguna. Un cartel que manda a arreglar lo que no está roto es peor
+  // que no tener cartel.
+  const faltaSede = computed(() => sedeStore.loaded && !sedes.value.length)
+  const motivoSinSede = computed(() => {
+    if (!faltaSede.value) return null
+    // Ve sedes, pero ninguna atiende público: la asignación es lo que hay que corregir. (El
+    // backend le da las asignadas sin filtrar tipo, así que esto sólo pasa con asignación.)
+    return (sedeStore.sedes || []).length ? 'asignacion' : 'sin_mostrador'
+  })
+
   // Administración ve TODO el stock apto de la sede, con lo que hay en el depósito y lo que hay
   // sobre la mesa. Quien atiende ve sólo la mesa: él no elige qué hay.
   const tabla = computed(() => {
@@ -133,6 +152,9 @@ export function useMostrador () {
       // Todavía no sabemos con qué sede trabajar: el watcher corre con `immediate` ANTES de que
       // `onMounted` la fije. Si la pantalla se dibujara vacía y un instante después se rearmara,
       // lo que la persona haya empezado a escribir se pierde sin que haya tocado nada.
+      //
+      // Cuando ya sabemos que NO hay sede que atienda, en cambio, deja de cargar: el spinner
+      // eterno es la forma más cara de no decir nada. Lo dice `faltaSede`.
       cargando.value = !sedeStore.loaded || sedes.value.length > 0
       return
     }
@@ -266,7 +288,7 @@ export function useMostrador () {
   watch(sedeId, () => { cargado.value = false; cantidades.value = {}; cargar() }, { immediate: true })
 
   return {
-    gestiona, sedeId, sedes, cargando, guardando, error, turno, mesa, estado,
+    gestiona, sedeId, sedes, faltaSede, motivoSinSede, cargando, guardando, error, turno, mesa, estado,
     fondoSugerido, sinRevisar, cantidades, tabla, cambiosMesa, valorMesaDespues,
     esperadoEfectivo, otrosIngresosEfectivo, movimientosDelTurno,
     cargar, guardarMesa, confirmarConteo, confirmarConteoDeUno, moverPlata,

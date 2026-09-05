@@ -64,12 +64,32 @@
     <p v-else-if="error" class="mst__aviso mst__aviso--error">{{ error }}</p>
 
     <template v-else>
+      <!-- SIN SEDE QUE ATIENDA NO HAY MOSTRADOR. Va en lugar de la caja: ofrecer "Abrir caja"
+           cuando no hay dónde abrirla es dejar apretar para que el backend rechace. El texto
+           cambia según quién mira, porque lo arreglan personas distintas. -->
+      <section v-if="faltaSede" class="mst__sinsede">
+        <i class="bi bi-exclamation-triangle"></i>
+        <div>
+          <b>No hay ninguna sede de atención con la que trabajar.</b>
+          <p v-if="motivoSinSede === 'asignacion'">
+            {{ gestiona ? 'Las sedes asignadas a este usuario no atienden público.'
+                        : 'Las sedes que tenés asignadas no atienden público, así que no hay mostrador al que entrar.' }}
+            {{ gestiona ? 'Asignale la sede donde atiende, en su ficha de usuario.'
+                        : 'Pedile a administración que te asigne la sede donde atendés.' }}
+          </p>
+          <p v-else>
+            El mostrador vive en una sede social o mixta.
+            {{ gestiona ? 'Creá o activá una en Sedes.' : 'Avisale a administración.' }}
+          </p>
+        </div>
+      </section>
+
       <!-- ══ LA CAJA: quién la abrió y cómo viene ═══════════════════════════════ -->
       <!-- Cada dato con su etiqueta y su número, no una frase corrida: "abrió a las 14:02 · en
            caja tendría que haber $150.000" y al otro lado "$784.920,5 sobre la mesa" obligaba a
            leer un párrafo para encontrar dos cifras, y en el teléfono se apilaba en un bloque
            ilegible. Son tres preguntas distintas y se contestan por separado. -->
-      <section class="mst__turno">
+      <section v-else class="mst__turno">
         <div class="mst__turno-datos">
           <template v-if="turno">
             <div class="mst__dato">
@@ -126,7 +146,7 @@
       <!-- ══ LA MESA ═══════════════════════════════════════════════════════════
            Para administración es editable: escribe cuánto tiene que haber de cada producto y
            guarda con un motivo. Para quien atiende es de lectura — él nunca elige qué hay. -->
-      <div v-if="gestiona" class="mst__mesa-hd">
+      <div v-if="gestiona && !faltaSede" class="mst__mesa-hd">
         <h2 class="mst__seccion">Qué hay sobre la mesa</h2>
         <p class="mst__seccion-sub">
           Escribí cuánto de cada producto tiene que quedar disponible para dispensar. Podés subir
@@ -134,7 +154,7 @@
         </p>
       </div>
 
-      <TablaMostrador v-model="cantidades" :stocks="tabla" :editable="gestiona"
+      <TablaMostrador v-if="!faltaSede" v-model="cantidades" :stocks="tabla" :editable="gestiona"
                       :muestra-costo="gestiona"
                       :contable="!gestiona && !!turno" @contar="itemAContar = $event"
                       :vacio-texto="gestiona ? 'No hay stock habilitado para dispensar en esta sede.'
@@ -159,7 +179,7 @@
 
       <!-- Sin repetir el esperado: ya está arriba, con su etiqueta. El mismo número dos veces en
            una pantalla no informa el doble, hace dudar de cuál de los dos mira. -->
-      <div v-if="gestiona && turno?.caja" class="mst__caja-barra">
+      <div v-if="!faltaSede && gestiona && turno?.caja" class="mst__caja-barra">
         <span class="mst__caja-barra-lbl">Mover plata del cajón</span>
         <button class="mst__btn mst__btn--mini" @click="abrirPlata('ingreso')">Poner plata</button>
         <button class="mst__btn mst__btn--mini mst__btn--ghost" @click="abrirPlata('salida')">Sacar plata</button>
@@ -237,7 +257,7 @@ import { formaLabel } from '../lib/formatters.js'
 import { useMostrador } from '../composables/useMostrador.js'
 
 const {
-  gestiona, sedeId, sedes, cargando, guardando, error, turno, mesa, estado,
+  gestiona, sedeId, sedes, faltaSede, motivoSinSede, cargando, guardando, error, turno, mesa, estado,
   fondoSugerido, sinRevisar, cantidades, tabla, cambiosMesa, valorMesaDespues,
   esperadoEfectivo, otrosIngresosEfectivo, movimientosDelTurno,
   cargar, guardarMesa, confirmarConteo, confirmarConteoDeUno, moverPlata,
@@ -557,6 +577,15 @@ async function confirmarPlata () {
 .mst__dif-caja.is-ok  { color: var(--c-leaf-600); }
 .mst__dif-caja.is-mal { color: var(--c-amber-500); }
 .mst__retiro { margin: 0; font-size: var(--fs-13); color: var(--c-ink-700); }
+
+/* Ámbar, no rojo: falta un dato de configuración, no se rompió nada ni nadie hizo nada mal. */
+.mst__sinsede {
+  display: flex; gap: 12px; align-items: flex-start;
+  background: var(--c-amber-100); color: var(--c-amber-500);
+  border-radius: 12px; padding: 14px 16px;
+}
+.mst__sinsede b { display: block; margin-bottom: 2px; font-size: var(--fs-14); }
+.mst__sinsede p { margin: 0; font-size: var(--fs-13); line-height: 1.45; }
 
 .mst__fondo-hint {
   display: block; font-style: normal; font-weight: 400;

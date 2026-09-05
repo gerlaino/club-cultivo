@@ -603,3 +603,24 @@ it('si la API falla, la pantalla lo dice en vez de quedarse en blanco', async ()
 
   expect(w.text()).toContain('Esta sede no dispensa')
 })
+
+// Le pasa también a administración: una organización sin sede social ni mixta no tiene dónde
+// vivir el mostrador, y la pantalla ofrecía abrir una caja que el backend iba a rechazar.
+describe('Cuando no hay sede de atención', () => {
+  it('lo dice en vez de ofrecer abrir la caja, y a cada uno le dice quién lo arregla', async () => {
+    useSedeStore().sedes = []
+    const w = await montar('admin')
+
+    expect(w.find('.mst__sinsede').exists()).toBe(true)
+    expect(w.find('.mst__turno').exists()).toBe(false)
+    expect(w.find('.tmo__table').exists()).toBe(false)
+    expect(w.find('.mst__sinsede').text()).toContain('Sedes')   // el admin lo arregla ahí
+  })
+
+  it('al que atiende lo manda a administración, que es quien puede', async () => {
+    useSedeStore().sedes = []
+    const w = await montar('dispensador')
+
+    expect(w.find('.mst__sinsede').text()).toContain('administración')
+  })
+})
