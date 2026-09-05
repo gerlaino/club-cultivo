@@ -1,5 +1,57 @@
 # Changelog
 
+## Septiembre 2026 (ae) — el mostrador del que atiende, en el teléfono
+
+**LA PWA EXISTE PARA QUE LA PANTALLA SEA OTRA, NO PARA SERVIR LA MISMA MÁS ANGOSTA.** `/m/mostrador`
+reusaba `MostradorView`, que está hecha para administración: una tabla de siete columnas que en el
+teléfono cae en el `tabla-cards` genérico y deja **cada producto como una tarjeta de siete
+renglones** —producto, variedad, lote, elaborado, precio, depósito, mostrador—. Con quince frascos
+son cien renglones de scroll para contestar *"¿tenés Northern?"*, que es la pregunta que el
+dispensador más veces contesta por día, **de pie y con alguien enfrente**. De esos siete campos usa
+dos: cuánto hay y contar.
+
+**Ahora `/m/mostrador` DESPACHA POR ROL** (`MMostradorDispatch`). Administración sigue entrando a la
+de escritorio —la tabla es su herramienta, y al teléfono se asoma de vez en cuando—; quien atiende
+tiene la suya (`views/mobile/MMostradorView.vue`), que es **consulta y arqueo, no operación**:
+dispensar sigue por su flujo de siempre.
+
+- **La caja arriba**, con la acción a ancho completo: es lo primero y lo último de su día.
+- **Buscador** en el mismo lugar que en Dispensar, donde su mano ya va.
+- **Una línea por producto**: qué es y cuánto hay, con el número grande y tabular. El resto
+  —lote, elaborado, precio, depósito— y el botón **Contar** están a un toque, en una hoja.
+- **Lo que movió administración, colapsado**: hay que poder verlo (si no, se cierra con un faltante
+  que no es suyo y no lo puede explicar) pero desplegado empuja la mesa hacia abajo.
+- **El depósito NO se le tapa**: ya lo ve en su pantalla de Stock con más columnas, y esconderlo en
+  un lado y dejarlo en el otro sería teatro.
+
+**EL ESTADO ES UNO SOLO** (`composables/useMostrador.js`): cargar, guardar, contar, abrir, cerrar,
+mover plata, la sede inicial y el canal con su número de carga. La regla del proyecto es que una
+regla escrita en dos lados ya está mal, y acá el síntoma sería el peor de todos —dos pantallas
+diciendo distinto de la misma mesa, o el teléfono ofreciendo algo que el backend rechaza—. Lo único
+que difiere es la PRESENTACIÓN, que es lo único que puede diferir. `gestionaMostrador` decide a la
+vez cuál pantalla se sirve y qué se ve adentro, por lo mismo: escrita dos veces, un día el dispatch
+manda a una pantalla y la pantalla se dibuja para el otro rol.
+
+**Y EN LA MISMA TANDA SE REVIRTIÓ UNA REGLA VIEJA: EL ARQUEO AHORA MUESTRA LO ESPERADO.** La
+plata y los gramos, en la pantalla y dentro del modal mientras se cuenta, para quien atiende y
+para administración — antes se escondía hasta que el conteo estuviera escrito. El argumento de la
+regla vieja era el anclaje, y **sigue siendo cierto**: nadie pesa 297 g teniendo el 297 delante, y
+si eso pasa la diferencia medida tiende a cero justo cuando existía. Pesó más lo otro, que la
+regla estaba tirando a la basura: una diferencia vista EN EL MOMENTO se sale a buscar —el vuelto
+mal dado, el frasco que quedó en el depósito— y una descubierta al día siguiente ya no la puede
+explicar nadie. Decisión de Germán, que conoce la operación real. Lo que se guarda sigue siendo lo
+**contado**, la diferencia queda con su nombre y no frena el cierre. La prop `contando` de
+`TablaMostrador`, que existía sólo para taparlo, se retiró. **Si alguna vez la merma medida se
+aplana sospechosamente, esto es lo primero que hay que mirar.**
+
+**Y el último link fijo a la ruta de escritorio.** `ModalNuevaDispensacion` avisa que la caja está
+cerrada con un link a "Mostrador" que estaba clavado en `/mostrador`: ese modal se abre desde
+`/m/dispensar` y `/m/historial`, así que en el teléfono te sacaba del envoltorio. Mismo criterio
+que `CajaMostradorCard` — mira `route.path`. Era el que quedaba: los demás viven sólo en escritorio.
+
+`MostradorView` no cambió de comportamiento (sus 41 tests pasan intactos tras la extracción).
+**1784 vitest ✓** (14 nuevos en `mostradorEnElTelefono.test.js`).
+
 ## Septiembre 2026 (ad) — el mostrador, sin bordes ásperos
 
 Tanda larga sobre el módulo entero: lo que faltaba de correctitud, lo que Germán encontró probando

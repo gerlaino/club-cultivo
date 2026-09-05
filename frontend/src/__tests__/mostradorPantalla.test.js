@@ -338,13 +338,16 @@ describe('Lo que ve quien atiende', () => {
       expect(w.find('.tmo__contar').exists()).toBe(false)
     })
 
-    // Misma regla que el arqueo: con el número a la vista se escribe ése y el conteo es teatro.
-    it('no muestra lo esperado hasta que se escribe, ni en la pantalla de atrás', async () => {
+    // LO ESPERADO SE VE MIENTRAS SE CUENTA (sep-2026). Se escondía para que nadie escribiera el
+    // número que tenía delante en vez de terminar de pesar; pesó más poder salir a buscar la
+    // diferencia en el momento, con el frasco en la mano. Lo que se guarda sigue siendo lo
+    // contado.
+    it('dice cuánto debería haber mientras se cuenta, y no tapa la mesa de atrás', async () => {
       const w = await montar('dispensador')
       await w.find('.tmo__contar').trigger('click')
 
-      expect(w.find('.cti__comparacion').exists()).toBe(false)
-      expect(w.find('.tmo__mesa').text()).toBe('—')
+      expect(w.find('.cti__esperado').text()).toContain('300')
+      expect(w.find('.tmo__mesa').text()).toBe('300')
     })
 
     it('y lo compara apenas se escribe', async () => {
@@ -419,16 +422,24 @@ describe('Abrir y cerrar la caja', () => {
       await flushPromises()
     }
 
-    // Con el número esperado a la vista nadie pesa: se escribe ése, y toda la merma que se mide
-    // da cero.
-    it('NO muestra lo esperado hasta que el conteo está escrito', async () => {
+    // Lo esperado acompaña cada campo desde que se abre el modal: la plata y los gramos.
+    it('al ABRIR dice los gramos y el fondo que dejó el cierre anterior', async () => {
       const w = await montar()
       await abrirModal(w)
 
-      expect(w.find('.cnt__comparacion').exists()).toBe(false)
+      expect(w.find('.cnt__esperado').text()).toContain('300')
+      expect(w.find('.cnt__esperado-plata').text()).toContain('50.000')
     })
 
-    it('y lo muestra, grande y claro, apenas se escribe', async () => {
+    it('al CERRAR dice lo que tendría que haber en el cajón', async () => {
+      respuesta = { ...respuesta, turno: TURNO }
+      const w = await montar()
+      await abrirModal(w)
+
+      expect(w.find('.cnt__esperado-plata').text()).toContain('58.500')
+    })
+
+    it('y la comparación aparece, grande y clara, apenas se escribe', async () => {
       const w = await montar()
       await abrirModal(w)
       await w.find('.cnt__cant .cnt__input').setValue(295)

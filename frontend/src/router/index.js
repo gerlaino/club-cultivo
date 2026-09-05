@@ -966,13 +966,14 @@ const routes = [
 
       // ── Dispensador ──
       { path: 'dispensar', component: () => import('../views/mobile/MDispensarView.vue') },
-      // El mostrador en el teléfono. REUSA la pantalla de escritorio en vez de escribir una
-      // segunda —igual que `/m/stock` e `/m/historial`—: son la misma mesa, y dos pantallas para
-      // el mismo hecho es cómo dejan de coincidir. Sin esto, el que atiende con el celular no
-      // podía ni recibir la mesa ni cerrar contando, que es la mitad de su día.
+      // El mostrador en el teléfono. Se despacha por rol: QUIEN ATIENDE tiene su pantalla
+      // —lista de tarjetas, para consultar y arquear de pie— y ADMINISTRACIÓN entra a la de
+      // escritorio, que es una tabla para gobernar la mesa. Son dos trabajos distintos sobre la
+      // misma mesa, y el ESTADO es uno solo (`useMostrador`): lo que difiere es la presentación,
+      // que es lo único que puede diferir sin que las dos digan cosas distintas de la misma mesa.
       {
         path: 'mostrador',
-        component: () => import('../views/MostradorView.vue'),
+        component: () => import('../views/mobile/MMostradorDispatch.vue'),
         // El mismo guard que la ruta de escritorio: es la misma pantalla y la misma regla, y
         // escribirla dos veces distintas es cómo dejan de coincidir.
         beforeEnter: (to, from, next) => {

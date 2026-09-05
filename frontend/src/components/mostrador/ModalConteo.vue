@@ -26,6 +26,14 @@
             <span class="cnt__meta">{{ c.genetica || c.numero }}</span>
           </div>
           <div class="cnt__cant">
+            <!-- CUÁNTO DEBERÍA HABER, A LA VISTA MIENTRAS SE CUENTA. Se sabe lo que cuesta —el
+                 número puesto delante invita a escribir ése en vez de terminar de pesar— pero la
+                 practicidad gana: viendo que faltan 5 g se sale a buscar qué pasó AHORA, con el
+                 frasco en la mano y la jornada fresca, en vez de descubrirlo al día siguiente
+                 cuando ya nadie se acuerda. Decisión de Germán (sep-2026), que conoce la
+                 operación real. Lo que se anota sigue siendo lo CONTADO, y la diferencia queda
+                 igual con su nombre. -->
+            <span class="cnt__esperado">de {{ fmt(c.esperado) }}</span>
             <input v-model.number="c.contado" type="number" min="0" step="0.1"
                    class="cnt__input" :aria-label="`Contado de ${formaLabel(c.forma)}`" />
             <span class="cnt__unidad">{{ c.unidad }}</span>
@@ -34,15 +42,18 @@
       </div>
 
       <label class="cnt__campo">
-        <span class="cnt__campo-lbl">Efectivo contado</span>
+        <span class="cnt__campo-lbl">
+          Efectivo contado
+          <em class="cnt__esperado-plata">de ${{ fmt(esperadoEfectivo) }}</em>
+        </span>
         <span class="cnt__campo-input">
           <span class="cnt__signo">$</span>
           <input v-model.number="efectivo" type="number" min="0" step="100" class="cnt__input cnt__input--plata" />
         </span>
       </label>
 
-      <!-- LA COMPARACIÓN, GRANDE Y CLARA. Y recién DESPUÉS de escribir lo contado: con el número
-           esperado a la vista nadie pesa, se escribe ese, y toda la merma que se mide da cero. -->
+      <!-- LA COMPARACIÓN, GRANDE Y CLARA, apenas hay algo escrito con qué comparar. Ya no se
+           esconde lo esperado hasta entonces: está al lado de cada campo desde el principio. -->
       <div v-if="hayAlgoContado" class="cnt__comparacion">
         <div class="cnt__comp-hd">
           <span></span><span>Debería haber</span><span>Contaste</span><span>Diferencia</span>
@@ -239,6 +250,13 @@ function confirmar () {
 .cnt__comp-num { font-family: var(--font-mono); font-size: var(--fs-14); color: var(--c-ink-900); text-align: right; }
 .cnt__comp-dif { font-family: var(--font-mono); font-size: var(--fs-14); font-weight: 700; text-align: right; }
 .cnt__comp-dif.is-ok  { color: var(--c-leaf-600); }
+/* El esperado, al lado del campo pero en segundo plano: acompaña, no compite con lo que se
+   escribe — el número que vale es el contado. */
+.cnt__esperado, .cnt__esperado-plata {
+  font-size: var(--fs-12); color: var(--c-ink-500); font-style: normal; white-space: nowrap;
+}
+.cnt__esperado-plata { margin-left: .4rem; }
+
 /* Ámbar y no rojo: una diferencia es un dato que se anota, no una falta que alguien explica. */
 .cnt__comp-dif.is-dif { color: var(--c-amber-500); }
 .cnt__cuadra { margin: 0; font-size: var(--fs-13); font-weight: 600; color: var(--c-leaf-600); }

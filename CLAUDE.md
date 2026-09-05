@@ -108,7 +108,8 @@ Ninguno se considera cerrado; todos son candidatos a revisión.
       `MostradorMovimiento` con autor: "hay 300 g" sin historial es un número que apareció, y
       monitorear a distancia sin historial es mirar una foto.
     · **El arqueo** (`TurnoMostrador`) lo hace **quien atiende**: abre contando lo que encuentra
-      y la plata (`AbrirCaja`), y cierra contando de nuevo (`CerrarCaja`). **Cierra en el acto,
+      y la plata (`AbrirCaja`), y cierra contando de nuevo (`CerrarCaja`). **Con lo esperado a la
+      vista** — ver "Lo que NO hay que romper". **Cierra en el acto,
       sin esperar al admin.** **Cerrar y volver a abrir ES el arqueo** — varias veces por día.
     **ABRIR ES CONTAR: no hay recepción separada.** Era la misma verificación pedida dos veces,
     con un botón que nadie miraba. Y **no bloquea por diferencia**: pone lo que contó y arranca,
@@ -129,8 +130,20 @@ Ninguno se considera cerrado; todos son candidatos a revisión.
     un botón **"Contar"** por fila (`ModalContarItem`) para verificar un producto sin cerrar la
     caja. Administración guarda desde el pie de la tabla, y el motivo se pide en el modal de
     confirmación (`ModalCargarMesa`), con la lista de lo que cambia delante.
-    Vive en `/mostrador` y en la PWA en **`/m/mostrador`**, que es la MISMA pantalla servida
-    dentro del envoltorio móvil (como `/m/stock`), con el mismo guard de rol.
+    Vive en `/mostrador`, y en la PWA **`/m/mostrador` DESPACHA POR ROL**
+    (`MMostradorDispatch`): administración entra a la de escritorio —la tabla es su herramienta y
+    se asoma al teléfono de vez en cuando—, y **quien atiende tiene su propia pantalla**
+    (`views/mobile/MMostradorView.vue`), porque él vive ahí. Servirle la de escritorio le dejaba
+    cada producto como una tarjeta de SIETE renglones, así que con quince frascos eran cien
+    renglones de scroll para contestar "¿tenés Northern?", que es la pregunta que más veces
+    contesta por día, de pie y con alguien enfrente. La suya es lista de una línea por producto
+    —qué es y cuánto hay— con el resto de los datos y "Contar" a un toque, en una hoja; la caja
+    arriba con la acción a ancho completo; y lo que movió administración, colapsado.
+    **El ESTADO es UNO SOLO** (`composables/useMostrador.js`): cargar, guardar, contar, abrir,
+    cerrar, mover plata, la sede inicial y el canal. Lo único que difiere es la PRESENTACIÓN —si
+    la regla viviera dos veces, un día las dos pantallas dirían distinto de la misma mesa.
+    `gestionaMostrador` decide a la vez cuál pantalla se sirve y qué se ve adentro, por lo mismo.
+    Es una pantalla de CONSULTA y ARQUEO, no de operación: **dispensar sigue por su flujo**.
     Cuatro solapas: **Hoy** · **Turnos** (los cerrados; administración ve todos, el que atiende ve
     LOS SUYOS — el filtro es del backend) · **Merma** y **Rendiciones**, sólo administración. La
     solapa de Merma hace DOS cosas y por eso están separadas: arriba la **lista de trabajo** (los
@@ -651,12 +664,18 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   fraccionando flor y un escándalo en aceite. Se compara la última semana contra las ocho
   anteriores DE ESA organización, con pisos de historia y de volumen, y uno por semana como mucho
   — repetirlo a diario es cómo se aprende a ignorarlo.
-- **EL ARQUEO NO MUESTRA LO ESPERADO HASTA QUE EL CONTEO ESTÉ ESCRITO.** Nadie pesa 297 g
-  teniendo el 297 delante: con el número a la vista se escribe ese, el conteo es teatro y toda la
-  merma que se mide da cero — o sea, el módulo entero deja de servir. Vale para los gramos y para
-  el efectivo, y vale también **para la pantalla de atrás**: el modal se cuidaba de no revelarlo
-  hasta que escribías, pero el encabezado decía "en caja tendría que haber $20.000" todo el día,
-  sin guard de rol. Lo esperado es para administración, que monitorea — no para quien va a contar.
+- **EL ARQUEO MUESTRA LO ESPERADO, y lo muestra a todos** (sep-2026, **decisión de Germán que
+  REVIRTIÓ la regla anterior** — si aparece en un comentario viejo el criterio contrario, es
+  legacy). La plata y los gramos, en la pantalla y **dentro del modal mientras se cuenta**, para
+  quien atiende y para administración. Antes se escondía hasta que el conteo estuviera escrito,
+  con el argumento de que nadie pesa 297 g teniendo el 297 delante. **Ese riesgo es real y no
+  desapareció**: el número puesto delante invita a escribir ése en vez de terminar de contar, y si
+  eso pasa la diferencia medida tiende a cero justo cuando existía. Pesó más lo otro: una
+  diferencia vista EN EL MOMENTO se sale a buscar —el vuelto mal dado, el frasco que quedó en el
+  depósito— y una descubierta al día siguiente ya no la puede explicar nadie. Lo que se guarda
+  sigue siendo lo **CONTADO**, la diferencia queda anotada con su nombre y no frena el cierre. Si
+  alguna vez la merma medida se aplana sospechosamente, **esto es lo primero que hay que mirar**.
+  (`TablaMostrador` tenía una prop `contando` para taparlo: se retiró, no quedó código muerto.)
 - **REVERTIR UNA DISPENSA: A LA MESA O AL DEPÓSITO, Y NO ES LO MISMO**
   (`Dispensacion#desimputar_del_mostrador`, inverso exacto de `imputar_a_mostrador`). Vuelve a la
   mesa en DOS casos y sólo en esos dos: el producto **ya está** arriba —salió de ahí y vuelve

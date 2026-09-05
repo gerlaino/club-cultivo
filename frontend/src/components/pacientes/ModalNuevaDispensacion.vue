@@ -5,7 +5,7 @@ import { useToast } from '../../composables/useToast.js'
 import { useAuthStore } from '../../stores/auth.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
-import { RouterLink } from 'vue-router'
+import { RouterLink, useRoute } from 'vue-router'
 import { createDispensacion, createReserva, entregarReserva, listStocks, listEntregadores,
          getMostrador } from '../../lib/api.js'
 
@@ -60,6 +60,15 @@ const loadingStocks   = ref(false)
 // La caja del mostrador de quien atiende: sin turno abierto el backend rechaza la dispensa, y
 // enterarse al confirmar es enterarse con el paciente enfrente.
 const cajaCerrada     = ref(false)
+
+// DENTRO DEL SHELL SE NAVEGA POR EL SHELL. Este modal se abre desde `/m/dispensar` y
+// `/m/historial`: con el link fijo a la ruta de escritorio, el que atiende con el teléfono
+// tocaba "Mostrador" y salía del envoltorio móvil, sin la barra de abajo. Mismo criterio que
+// `CajaMostradorCard`. Sin ruta (montado fuera de un router, en tests) se asume escritorio, que
+// es el caso conservador.
+const route           = useRoute()
+const destinoMostrador = computed(() =>
+  (route?.path || '').startsWith('/m') ? '/m/mostrador' : '/mostrador')
 const saving          = ref(false)
 const formError       = ref(null)
 const deliveryUsers   = ref([])
@@ -834,7 +843,7 @@ async function handleSubmit() {
             <i class="bi bi-lock"></i>
             <span>
               <b>La caja del mostrador está cerrada.</b>
-              Abrila en <RouterLink to="/mostrador" class="mnd__caja-link">Mostrador</RouterLink>
+              Abrila en <RouterLink :to="destinoMostrador" class="mnd__caja-link">Mostrador</RouterLink>
               contando lo que hay sobre la mesa y la plata del cajón: hasta entonces lo que
               cobres en efectivo no tiene dónde caer.
             </span>

@@ -8,7 +8,10 @@
       </p>
 
       <label class="cti__campo">
-        <span class="cti__campo-lbl">¿Cuánto hay?</span>
+        <span class="cti__campo-lbl">
+          ¿Cuánto hay?
+          <em class="cti__esperado">de {{ fmt(item.mostrador) }} {{ item.unidad }}</em>
+        </span>
         <span class="cti__campo-input">
           <input ref="campo" v-model.number="contado" type="number" min="0" step="0.1"
                  class="cti__input" :aria-label="`Contado de ${formaLabel(item.forma)}`" />
@@ -16,8 +19,8 @@
         </span>
       </label>
 
-      <!-- LO ESPERADO, RECIÉN DESPUÉS DE ESCRIBIR. Con el número a la vista nadie pesa: se
-           escribe ése, el conteo es teatro y toda la merma que se mide da cero. -->
+      <!-- La comparación aparece cuando hay algo con qué comparar. Lo esperado ya no se
+           esconde: está arriba, al lado del campo. -->
       <div v-if="escrito" class="cti__comparacion">
         <div class="cti__comp-row">
           <span class="cti__comp-lbl">Debería haber</span>
@@ -128,6 +131,11 @@ onMounted(() => campo.value?.focus())
 
 .cti__campo { display: flex; flex-direction: column; gap: 6px; }
 .cti__campo-lbl { font-size: var(--fs-13); font-weight: 600; color: var(--c-ink-900); }
+/* En segundo plano: acompaña el conteo, no compite con él. El número que vale es el contado. */
+.cti__esperado {
+  font-size: var(--fs-12); font-weight: 400; font-style: normal;
+  color: var(--c-ink-500); margin-left: .4rem;
+}
 .cti__campo-input { display: inline-flex; align-items: center; gap: 8px; }
 /* El motivo se destaca porque hay que completarlo, no porque haya pasado algo malo. */
 .cti__campo--motivo .cti__campo-lbl { color: var(--c-amber-500); }

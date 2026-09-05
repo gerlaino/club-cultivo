@@ -55,7 +55,7 @@
                      etiqueta de la columna adelante, y sueltos se repartían a lo ancho con el
                      botón en el medio. -->
                 <span class="tmo__mesa-val">
-                  <span class="tmo__mesa">{{ contando ? '—' : fmt(s.mostrador) }}</span>
+                  <span class="tmo__mesa">{{ fmt(s.mostrador) }}</span>
                   <span class="tmo__unidad">{{ s.unidad }}</span>
                 </span>
                 <!-- Contar ESTE frasco, sin cerrar la caja. Con quince productos, el arqueo
@@ -116,10 +116,6 @@ const props = defineProps({
   muestraCosto: { type: Boolean, default: false },
   tituloColumna:{ type: String,  default: 'Mostrador' },
   vacioTexto:   { type: String,  default: 'No hay stock habilitado para dispensar en esta sede.' },
-  // Con el modal de conteo abierto (solo en la vista de LECTURA — quien atiende, no quien
-  // edita la mesa), no se muestra cuánto dice el sistema. Misma regla que el efectivo esperado:
-  // con el número puesto al lado, se escribe ese y el conteo es teatro.
-  contando:     { type: Boolean, default: false },
   // Quien ATIENDE puede contar un producto suelto sin cerrar la caja. Administración no: su
   // gesto sobre la mesa es decir cuánto tiene que haber (que mueve producto del depósito), y
   // contar es otra cosa —ajusta el inventario— que además se hace con el frasco en la mano.
