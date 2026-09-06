@@ -646,7 +646,7 @@ describe('Las solapas', () => {
     const w = await montar()
 
     expect(w.findAll('.mst__tab').map(t => t.text().trim())).toEqual(
-      expect.arrayContaining(['Hoy', 'Turnos', expect.stringContaining('Merma'), 'Rendiciones'])
+      expect.arrayContaining(['Hoy', 'Cierres', expect.stringContaining('Merma'), 'Rendiciones'])
     )
   })
 
@@ -655,7 +655,7 @@ describe('Las solapas', () => {
     const w = await montar('dispensador')
 
     const tabs = w.findAll('.mst__tab').map(t => t.text().trim())
-    expect(tabs).toContain('Turnos')
+    expect(tabs).toContain('Cierres')
     expect(tabs.some(t => t.startsWith('Merma'))).toBe(false)
   })
 })

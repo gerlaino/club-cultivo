@@ -9,7 +9,7 @@ require 'rails_helper'
 # No se borra nada: se asienta la diferencia entre lo que se había contado y lo que se cuenta
 # ahora. Borrar un movimiento de stock para tapar un error es peor que el error — el rastro de
 # que alguien corrigió es justamente lo que hay que poder mostrar.
-RSpec.describe 'Corregir el conteo de un turno cerrado', type: :request do
+RSpec.describe 'Corregir el conteo de una caja ya cerrada', type: :request do
   include AuthHelpers
 
   let(:club)     { create(:club) }
@@ -70,7 +70,7 @@ RSpec.describe 'Corregir el conteo de un turno cerrado', type: :request do
     expect(ajustes.count).to eq(2)
     expect(ajustes.first.gramos.to_f).to eq(-394.0)  # el faltante inventado por el dedazo
     expect(ajustes.last.gramos.to_f).to eq(394.0)    # la corrección, que lo compensa
-    expect(ajustes.last.notas).to match(/Corrección del conteo del turno/)
+    expect(ajustes.last.notas).to match(/Corrección del conteo del cierre/)
     expect(ajustes.last.usuario_id).to eq(admin.id)
   end
 

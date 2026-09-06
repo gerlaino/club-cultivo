@@ -26,7 +26,7 @@
       <!-- Los turnos cerrados los ve TAMBIÉN el que atiende, con los suyos: cerraba y no tenía
            dónde mirarlo si al día siguiente le preguntaban por una diferencia. -->
       <button class="mst__tab" :class="{ 'is-on': tab === 'turnos' }" @click="tab = 'turnos'">
-        Turnos
+        Cierres
       </button>
       <template v-if="gestiona">
         <button class="mst__tab" :class="{ 'is-on': tab === 'merma' }" @click="tab = 'merma'">

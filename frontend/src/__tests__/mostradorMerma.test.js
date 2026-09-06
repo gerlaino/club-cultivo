@@ -139,7 +139,7 @@ describe('③ Dónde se va', () => {
   // UNA tabla con un corte a la vez, no tres apiladas con las mismas columnas.
   it('cambiar el corte cambia la misma tabla', async () => {
     const w = await montar()
-    const botonTurno = w.findAll('.mrm__cortes .mrm__periodo').find(b => b.text() === 'Turno por turno')
+    const botonTurno = w.findAll('.mrm__cortes .mrm__periodo').find(b => b.text() === 'Cierre por cierre')
     await botonTurno.trigger('click')
 
     expect(w.find('.mrm__table th').text()).toBe('Cerró')
@@ -163,7 +163,7 @@ describe('③ Dónde se va', () => {
     const w = await montar()
     expect(w.find('.mrm__td-acc').exists()).toBe(false)
 
-    const botonTurno = w.findAll('.mrm__cortes .mrm__periodo').find(b => b.text() === 'Turno por turno')
+    const botonTurno = w.findAll('.mrm__cortes .mrm__periodo').find(b => b.text() === 'Cierre por cierre')
     await botonTurno.trigger('click')
     expect(w.find('.mrm__td-acc').exists()).toBe(true)
   })
@@ -194,7 +194,7 @@ describe('Por persona', () => {
     const w = await abrirCorte()
     const filas = w.findAll('.mrm__table tbody tr')
 
-    expect(filas[0].text()).toContain('6 turnos')
+    expect(filas[0].text()).toContain('6 cierres')
     expect(filas[0].text()).toContain('6.000')
   })
 
@@ -204,7 +204,7 @@ describe('Por persona', () => {
     const w = await abrirCorte()
     const filas = w.findAll('.mrm__table tbody tr')
 
-    expect(filas[1].text()).toContain('Pocos turnos')
+    expect(filas[1].text()).toContain('Pocos cierres')
     expect(filas[1].find('.mrm__delta').classes()).toContain('is-mudo')
   })
 
@@ -212,7 +212,7 @@ describe('Por persona', () => {
   it('avisa cuando algún turno lo cerró otra persona', async () => {
     const w = await abrirCorte()
 
-    expect(w.findAll('.mrm__table tbody tr')[1].text()).toContain('otra persona')
+    expect(w.findAll('.mrm__table tbody tr')[1].text()).toContain('lo hizo otra persona')
   })
 
   it('y el CSV se lleva la comparación', async () => {

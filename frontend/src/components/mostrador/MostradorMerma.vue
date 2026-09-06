@@ -30,7 +30,7 @@
 
     <p v-if="cargando" class="mrm__vacio">Calculando…</p>
     <p v-else-if="!merma || !merma.resumen.turnos" class="mrm__vacio">
-      Todavía no hay turnos cerrados en este período.
+      Todavía no hay cierres en este período.
     </p>
 
     <template v-else>
@@ -49,7 +49,7 @@
           <p class="mrm__ver-pie">
             En el período elegido: {{ merma.resumen.merma_pct ?? '—' }}% de lo entregado ·
             ${{ fmt(merma.resumen.faltante_ars) }} a costo · {{ merma.resumen.turnos }}
-            {{ merma.resumen.turnos === 1 ? 'turno cerrado' : 'turnos cerrados' }}.
+            {{ merma.resumen.turnos === 1 ? 'cierre' : 'cierres' }}.
           </p>
         </div>
 
@@ -78,7 +78,7 @@
       </h2>
       <template v-if="pendientes.length">
         <p class="mrm__seccion-sub">
-          Turnos donde pasó algo que conviene mirar. No es una lista de sospechosos: se mira, se
+          Cierres donde pasó algo que conviene mirar. No es una lista de sospechosos: se mira, se
           marca y se archiva.
         </p>
         <ul class="mrm__pendientes">
@@ -236,10 +236,10 @@ const PERIODOS = [
 // etiqueta acá se dibuja como un chip vacío, que es peor todavía.
 const MOTIVO = { faltante: 'Faltó producto', sobrante: 'Contó de más — no se cargó al inventario',
                  corregido: 'Se corrigió al abrir',
-                 mesa_movida: 'Se movió la mesa durante el turno',
+                 mesa_movida: 'Se movió la mesa con la caja abierta',
                  // Del corte por persona: la letra chica que evita leer mal el número de al lado.
-                 pocos_turnos: 'Pocos turnos: todavía no alcanza para concluir',
-                 cerro_otro: 'Algún turno lo cerró otra persona' }
+                 pocos_turnos: 'Pocos cierres: todavía no alcanza para concluir',
+                 cerro_otro: 'Algún cierre lo hizo otra persona' }
 const PILL   = { faltante: 'warn', sobrante: 'warn', corregido: 'info', mesa_movida: 'info',
                  pocos_turnos: 'info', cerro_otro: 'info' }
 
@@ -278,7 +278,7 @@ const frase = computed(() => {
       return `Esta semana se entregó poco (${fmt(v.dispensado)}). Con ese volumen el porcentaje ` +
              'no dice nada: cualquier gramo se ve enorme.'
     case 'sin_historia':
-      return 'Todavía no hay con qué comparar: hacen falta unas semanas de turnos cerrados para ' +
+      return 'Todavía no hay con qué comparar: hacen falta unas semanas de cierres para ' +
              'saber qué es lo normal en este mostrador.'
     default:
       return 'No hubo cierres esta semana, así que no hay nada nuevo que comparar.'
@@ -304,8 +304,8 @@ const cortes = computed(() => [
   { id: 'persona', label: 'Por persona',
     nota: 'Cada uno contra el promedio del período en este mostrador, no contra un número suelto: ' +
           'quien más volumen mueve encabeza siempre un ranking pelado, y quien fracciona flor ' +
-          'pierde más que quien entrega prerolls. Con menos de 3 turnos no alcanza para concluir.' },
-  { id: 'turno', label: 'Turno por turno',
+          'pierde más que quien entrega prerolls. Con menos de 3 cierres no alcanza para concluir.' },
+  { id: 'turno', label: 'Cierre por cierre',
     nota: 'Cada cierre, del más reciente al más viejo. Es donde se corrige un conteo mal cargado.' },
 ])
 
@@ -324,7 +324,7 @@ const filas = computed(() => {
   if (!m) return []
   if (corte.value === 'sede') {
     return (m.por_sede || []).map(s => ({
-      clave: `s${s.sede_id}`, titulo: s.sede, meta: `${s.turnos} turnos`, chips: [],
+      clave: `s${s.sede_id}`, titulo: s.sede, meta: `${s.turnos} cierres`, chips: [],
       pct: s.merma_pct, faltante: s.faltante, ars: s.faltante_ars, dispensado: s.dispensado,
       unidad: '',
     }))
@@ -332,7 +332,7 @@ const filas = computed(() => {
   if (corte.value === 'persona') {
     return (m.por_persona || []).map(p => ({
       clave: `u${p.usuario_id}`, titulo: p.persona,
-      meta: `${p.turnos} ${p.turnos === 1 ? 'turno' : 'turnos'}`,
+      meta: `${p.turnos} ${p.turnos === 1 ? 'cierre' : 'cierres'}`,
       chips: [
         ...(p.suficientes ? [] : ['pocos_turnos']),
         ...(p.cerro_otro ? ['cerro_otro'] : []),
@@ -350,7 +350,7 @@ const filas = computed(() => {
     }))
   }
   return (m.por_producto || []).map(p => ({
-    clave: `p${p.producto}`, titulo: p.producto, meta: `${p.turnos} turnos`, chips: [],
+    clave: `p${p.producto}`, titulo: p.producto, meta: `${p.turnos} cierres`, chips: [],
     pct: p.merma_pct, faltante: p.faltante, ars: p.faltante_ars, dispensado: p.dispensado,
     unidad: p.unidad,
   }))

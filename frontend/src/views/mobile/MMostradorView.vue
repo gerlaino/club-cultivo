@@ -60,7 +60,7 @@
     <nav class="mmo__tabs">
       <button class="mmo__tab" :class="{ 'is-on': tab === 'hoy' }" @click="tab = 'hoy'">Hoy</button>
       <button class="mmo__tab" :class="{ 'is-on': tab === 'turnos' }" @click="tab = 'turnos'">
-        Mis arqueos
+        Mis cierres
       </button>
     </nav>
 

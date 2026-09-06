@@ -171,7 +171,7 @@ module Mostradores
       caja.movimientos_contables.create!(
         club: @turno.club, sede_id: caja.sede_id, created_by: @usuario,
         tipo: 'ajuste', categoria: 'retiro_caja', retirado_por: dueño,
-        descripcion: "Retiro de caja — recaudación del turno del " \
+        descripcion: "Retiro de caja — recaudación de la jornada del " \
                      "#{caja.abierta_at&.to_date&.strftime('%d/%m/%Y')} (queda $#{fondo.to_i} de fondo)",
         monto_ars: retiro, fecha: Time.zone.today,
         pagado: true, medio_pago: 'efectivo', comprobante_tipo: 'sin_comprobante'

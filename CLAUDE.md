@@ -144,7 +144,13 @@ Ninguno se considera cerrado; todos son candidatos a revisión.
     la regla viviera dos veces, un día las dos pantallas dirían distinto de la misma mesa.
     `gestionaMostrador` decide a la vez cuál pantalla se sirve y qué se ve adentro, por lo mismo.
     Es una pantalla de CONSULTA y ARQUEO, no de operación: **dispensar sigue por su flujo**.
-    Cuatro solapas: **Hoy** · **Turnos** (los cerrados; administración ve todos, el que atiende ve
+    **EN PANTALLA NO EXISTE LA PALABRA "TURNO": SE ABRE Y SE CIERRA LA CAJA, Y CADA CICLO ES UN
+    CIERRE.** El modelo se sigue llamando `TurnoMostrador` y los identificadores no se tocan (misma
+    regla que Club → Organización), pero el texto visible dice **cierre** — "turno" ya significa
+    otra cosa en la app (el turno MÉDICO, la cita del paciente) y encima chocaba con el botón de al
+    lado, que dice "Cerrar caja". Lo preguntó Germán probando: *"no vamos a abrir o cerrar turnos,
+    solo abrimos y cerramos caja"*.
+    Cuatro solapas: **Hoy** · **Cierres** (los hechos; administración ve todos, el que atiende ve
     LOS SUYOS — el filtro es del backend) · **Merma** y **Rendiciones**, sólo administración. La
     solapa de Merma está ordenada **POR PREGUNTA**, no por entidad: **① ¿cómo viene?** (el
     veredicto contra el patrón de esa organización + la tendencia semanal) · **② para mirar** (la

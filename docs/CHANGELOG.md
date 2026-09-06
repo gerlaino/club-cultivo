@@ -1,5 +1,23 @@
 # Changelog
 
+## Septiembre 2026 (ah) — en pantalla no hay turnos: se abre y se cierra la caja
+
+Lo preguntó Germán probando: *"no vamos a abrir o cerrar turnos, solo abrimos y cerramos caja, pero
+entiendo que cada vez que cerramos caja, implicaría cerrar un turno... ¿es así?"*. Es así, y que
+haya que preguntarlo es el problema: **la misma cosa tenía dos nombres en la misma pantalla** —el
+badge decía "Caja abierta", el botón "Cerrar caja", y al lado una solapa decía "Turnos"—. Y hay una
+razón más fuerte: **"turno" ya significa otra cosa en la app**, el turno médico, la cita del
+paciente.
+
+El texto visible dice ahora **cierre**: la solapa (escritorio y PWA, que además decía "Mis
+arqueos", un tercer nombre), "3 cierres", "Cierre por cierre", "Pocos cierres", "Algún cierre lo
+hizo otra persona", "Se movió la mesa con la caja abierta". También los tres textos del backend que
+lee un humano: el error del modal, la nota que queda en el historial del stock ("Corrección del
+conteo del cierre #12") y la descripción del retiro en contabilidad.
+
+**El modelo sigue siendo `TurnoMostrador` y no se renombró un solo identificador** — misma regla
+que Club → Organización.
+
 ## Septiembre 2026 (ag) — la solapa de Merma contesta, y el arqueo deja de pedir lo que ya sabe
 
 **LA PANTALLA NO CONTESTABA NADA: ENTREGABA CUATRO TABLAS.** Filtros con un botón "Ver", la lista

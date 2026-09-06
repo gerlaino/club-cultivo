@@ -27,7 +27,7 @@ module Mostradores
     end
 
     def call
-      return err('El turno no está cerrado') unless @turno&.cerrado?
+      return err('Esa caja todavía no se cerró') unless @turno&.cerrado?
       return err('Escribí por qué se corrige el conteo') if @motivo.blank?
       return err('No hay nada que corregir') if @conteos.empty?
 
@@ -52,7 +52,7 @@ module Mostradores
 
     def corregir!(datos)
       item = @turno.items.find_by(id: (datos[:item_id] || datos['item_id']))
-      raise ArgumentError, 'Ese producto no está en el turno' if item.nil?
+      raise ArgumentError, 'Ese producto no está en ese cierre' if item.nil?
 
       nuevo = (datos[:contado] || datos['contado']).to_d
       raise ArgumentError, 'La cantidad contada no puede ser negativa' if nuevo.negative?
@@ -82,7 +82,7 @@ module Mostradores
         stock.update!(cantidad: [stock.cantidad.to_d + delta, 0].max)
         stock.stock_movimientos.create!(
           tipo: 'ajuste', gramos: delta, usuario: @usuario, turno_mostrador: @turno,
-          notas: "Corrección del conteo del turno ##{@turno.id} — se había contado " \
+          notas: "Corrección del conteo del cierre ##{@turno.id} — se había contado " \
                  "#{anterior.to_f} y eran #{nuevo.to_f} #{stock.unidad || 'g'} — #{@motivo}"
         )
       end

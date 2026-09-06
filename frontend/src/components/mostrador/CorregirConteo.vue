@@ -3,7 +3,7 @@
     <div class="cc__modal">
       <h3 class="cc__title">Corregir el conteo</h3>
       <p class="cc__sub">
-        Turno del {{ fecha(turno.cerrado_at) }}. Escribí lo que había de verdad: el movimiento
+        Cierre del {{ fecha(turno.cerrado_at) }}. Escribí lo que había de verdad: el movimiento
         equivocado no se borra, se asienta la diferencia.
       </p>
 
@@ -42,7 +42,7 @@
 </template>
 
 <script setup>
-// Corregir el conteo de un turno YA CERRADO.
+// Corregir el conteo de un cierre YA HECHO.
 //
 // Es el único lugar del módulo donde un dedazo ajusta el inventario real: 21 en vez de 215 cierra
 // con un faltante de 194 g que después nadie entiende. Vive en su propio componente porque se

@@ -4,7 +4,7 @@
       <p class="trn__sub">
         {{ gestiona
            ? 'Cada cierre con su conteo y su arqueo, del más nuevo al más viejo.'
-           : 'Los turnos que atendiste vos. Si mañana te preguntan por una diferencia, está acá.' }}
+           : 'Los cierres que hiciste vos. Si mañana te preguntan por una diferencia, está acá.' }}
       </p>
       <div class="trn__hd-acc">
         <span v-if="total" class="trn__total">{{ total }} cierre{{ total === 1 ? '' : 's' }}</span>
@@ -16,18 +16,18 @@
     </div>
 
     <p v-if="cargando" class="trn__vacio">Buscando…</p>
-    <!-- Cada uno con su vacío: al admin decirle "no cerraste ningún turno" es contarle algo que
+    <!-- Cada uno con su vacío: al admin decirle "no cerraste ninguno" es contarle algo que
          no es suyo — él no atiende, mira los de los demás. -->
     <p v-else-if="!turnos.length" class="trn__vacio">
-      {{ gestiona ? 'Todavía no cerró ningún turno en esta sede.'
-                  : 'Todavía no cerraste ningún turno acá.' }}
+      {{ gestiona ? 'Todavía no se cerró ninguna caja en esta sede.'
+                  : 'Todavía no cerraste ninguna caja acá.' }}
     </p>
 
     <div v-else class="trn__table-wrap">
       <table class="trn__table tabla-cards">
         <thead>
           <tr>
-            <th>Turno</th>
+            <th>Cierre</th>
             <th class="trn__th-num">Entregado</th>
             <th class="trn__th-num">Faltó</th>
             <th class="trn__th-num">Caja</th>
@@ -36,7 +36,7 @@
         </thead>
         <tbody>
           <tr v-for="t in turnos" :key="t.id">
-            <td data-col="Turno">
+            <td data-col="Cierre">
               <div class="trn__cuando">{{ fecha(t.cerrado_at) }} · {{ hora(t.abierto_at) }}–{{ hora(t.cerrado_at) }}</div>
               <div class="trn__meta">
                 <span class="trn__mut">{{ t.atendio || t.cerrado_por }}</span>
@@ -141,7 +141,7 @@ async function cargar () {
     paginas.value  = data.paginas || 1
     total.value    = data.total ?? turnos.value.length
   } catch (e) {
-    toast.error(e?.response?.data?.error || 'No se pudieron cargar los turnos.')
+    toast.error(e?.response?.data?.error || 'No se pudieron cargar los cierres.')
   } finally {
     cargando.value = false
   }
