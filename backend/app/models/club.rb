@@ -791,6 +791,33 @@ class Club < ApplicationRecord
     end
   end
 
+  # ¿A QUÉ HORA TENDRÍA QUE ESTAR CERRADA LA CAJA DE ESTA SEDE?
+  #
+  # Vive acá y no adentro del job porque la pregunta la hacen dos: el job que avisa y la pantalla
+  # que muestra qué quedó configurado. La misma regla escrita en dos lados es de donde salen las
+  # divergencias de este proyecto.
+  #
+  # Config en `alertas_config['cierre_mostrador']`:
+  #   { 'activo' => true, 'hora' => '23:00', 'por_sede' => { '12' => '21:30' } }
+  #
+  # Una hora general para la organización y, para la sede que cierra distinto, la suya. Devuelve
+  # nil cuando la alerta está apagada o no hay hora: no avisar es un estado válido y explícito.
+  # Una excepción vacía (`''`) significa "usa la general", que es lo que manda el formulario
+  # cuando el campo se deja en blanco.
+  def hora_limite_cierre_mostrador(sede_id = nil)
+    cfg = (alertas_config || {})['cierre_mostrador'] || {}
+    return nil unless ActiveModel::Type::Boolean.new.cast(cfg['activo'])
+
+    propia = (cfg['por_sede'] || {})[sede_id.to_s].presence
+    hora   = propia || cfg['hora'].presence
+    return nil if hora.blank?
+
+    h, m = hora.to_s.split(':')
+    return nil if h.blank?
+
+    [h.to_i, m.to_i]
+  end
+
   private
 
   def generar_slug

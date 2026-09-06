@@ -31,6 +31,14 @@ Sidekiq.configure_server do |config|
         'class' => 'StockBajoJob',
         'description' => 'Genera alertas de stock bajo (umbral configurable por club) para todos los clubes'
       },
+      'cierre_mostrador_pendiente' => {
+        # Cada quince minutos porque la hora la elige cada organización: un aviso a las 23:07 en
+        # vez de las 23:00 no cambia nada, y esperar a una hora en punto obligaría a que todas
+        # cerraran a horas redondas.
+        'cron'  => '*/15 * * * *',
+        'class' => 'CierreMostradorPendienteJob',
+        'description' => 'Avisa al admin si la caja del mostrador sigue abierta pasada la hora que configuró'
+      },
       'merma_mostrador' => {
         'cron'  => '30 9 * * 1',
         'class' => 'MermaMostradorJob',

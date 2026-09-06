@@ -154,6 +154,49 @@
           </div>
         </fieldset>
 
+        <!-- LA CAJA QUE QUEDÓ ABIERTA.
+             Se cierra a la noche, y a la noche el admin no está: si alguien se fue sin cerrar,
+             nadie se entera hasta la mañana siguiente —cuando el que abre no puede arrancar— y
+             para entonces el arqueo de esa jornada ya no lo puede hacer nadie. -->
+        <fieldset v-if="sedesQueAtienden.length" class="spc__fieldset">
+          <legend class="spc__legend">Caja del mostrador sin cerrar</legend>
+          <p class="spc__field-desc">
+            Si a la hora que elijas la caja sigue abierta, te llega un aviso a la campana y al
+            celular. La caja se cierra de noche, cuando no hay nadie de administración mirando.
+          </p>
+
+          <label class="spc__check">
+            <input v-model="configForm.cierre_mostrador.activo" type="checkbox" />
+            Avisarme si la caja queda abierta
+          </label>
+
+          <template v-if="configForm.cierre_mostrador.activo">
+            <div class="spc__field">
+              <label class="spc__label">Hora límite</label>
+              <input v-model="configForm.cierre_mostrador.hora" type="time"
+                     class="spc__input spc__input--sm" />
+            </div>
+
+            <!-- Una organización con dos sedes puede cerrar a horas distintas, y es justo donde
+                 más sirve: el admin no está en ninguna de las dos. -->
+            <div v-if="sedesQueAtienden.length > 1" class="spc__excepciones">
+              <p class="spc__label">Excepciones por sede</p>
+              <div v-for="sede in sedesQueAtienden" :key="sede.id" class="spc__excepcion">
+                <span class="spc__excepcion-sede">{{ sede.nombre }}</span>
+                <input v-model="configForm.cierre_mostrador.por_sede[String(sede.id)]"
+                       type="time" class="spc__input spc__input--sm"
+                       :aria-label="`Hora límite de ${sede.nombre}`" />
+                <button v-if="configForm.cierre_mostrador.por_sede[String(sede.id)]"
+                        type="button" class="spc__excepcion-limpiar"
+                        @click="configForm.cierre_mostrador.por_sede[String(sede.id)] = ''">
+                  usar la general
+                </button>
+                <span v-else class="spc__excepcion-nota">usa la general</span>
+              </div>
+            </div>
+          </template>
+        </fieldset>
+
         <div class="spc__form-footer">
           <button type="submit" class="spc__btn-primary" :disabled="guardandoAlertas">
             {{ guardandoAlertas ? 'Guardando…' : 'Guardar configuración' }}
@@ -219,7 +262,7 @@ import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import {
   listSetpointsFase, createSetpointFase, updateSetpointFase, deleteSetpointFase,
-  getPreferences, updatePreferences, listUsers,
+  getPreferences, updatePreferences, listUsers, listSedes,
 } from '../lib/api.js'
 
 const toast   = useToast()
@@ -384,7 +427,24 @@ const configForm = ref({
   postcosecha_dias: 0,
   postcosecha_modo: 'avisar',
   postcosecha_manicura_default_id: null,
+  // El aviso de caja sin cerrar: una hora general y, para la sede que cierre distinto, la suya.
+  cierre_mostrador: { activo: false, hora: '23:00', por_sede: {} },
 })
+
+// El mostrador vive en una sede que atiende (`social`/`mixta`). Sin ninguna no hay mostrador, y
+// ofrecer la alerta sería configurar algo que no existe.
+const sedes = ref([])
+const sedesQueAtienden = computed(() =>
+  sedes.value.filter(s => s.tipo === 'social' || s.tipo === 'mixta')
+)
+async function cargarSedes () {
+  try {
+    const { data } = await listSedes()
+    sedes.value = Array.isArray(data) ? data : (data.items || data.sedes || [])
+  } catch {
+    sedes.value = []
+  }
+}
 
 // Manicuras de la organización — para elegir un default cuando hay varios (modo asignar_automatico).
 const manicuras = ref([])
@@ -417,6 +477,13 @@ async function cargarPreferences() {
     if (ac.postcosecha_manicura_default_id !== undefined) {
       configForm.value.postcosecha_manicura_default_id = ac.postcosecha_manicura_default_id
     }
+    if (ac.cierre_mostrador) {
+      configForm.value.cierre_mostrador = {
+        activo:   !!ac.cierre_mostrador.activo,
+        hora:     ac.cierre_mostrador.hora || '23:00',
+        por_sede: { ...(ac.cierre_mostrador.por_sede || {}) },
+      }
+    }
   } finally {
     loadingPrefs.value = false
   }
@@ -432,6 +499,12 @@ async function guardarAlertas() {
         postcosecha_dias: configForm.value.postcosecha_dias,
         postcosecha_modo: configForm.value.postcosecha_modo,
         postcosecha_manicura_default_id: configForm.value.postcosecha_manicura_default_id || null,
+        cierre_mostrador: {
+          ...configForm.value.cierre_mostrador,
+          // Una excepción vacía es "usa la general": se manda igual para poder BORRAR una que
+          // había, y el backend la lee como ausente.
+          por_sede: { ...configForm.value.cierre_mostrador.por_sede },
+        },
       },
     })
     toast.success('Configuración guardada')
@@ -446,10 +519,24 @@ onMounted(() => {
   cargarSetpoints()
   cargarPreferences()
   cargarManicuras()
+  cargarSedes()
 })
 </script>
 
 <style scoped>
+.spc__check {
+  display: flex; align-items: center; gap: .5rem; margin-bottom: .85rem;
+  font-size: .875rem; color: var(--c-ink-700, #3A3F44); cursor: pointer;
+}
+.spc__excepciones { margin-top: 1rem; display: flex; flex-direction: column; gap: .5rem; }
+.spc__excepcion { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+.spc__excepcion-sede { min-width: 9rem; font-size: .875rem; color: var(--c-ink-900, #1A1D1F); }
+.spc__excepcion-nota { font-size: .8125rem; color: var(--c-ink-500, #6B7280); }
+.spc__excepcion-limpiar {
+  background: none; border: 0; padding: 0; cursor: pointer;
+  font-size: .8125rem; color: var(--c-ink-500, #6B7280); text-decoration: underline;
+}
+
 .spc { max-width: 900px; margin: 0 auto; padding: 1.5rem 1.25rem; display: flex; flex-direction: column; gap: 1.75rem; }
 @media (max-width: 640px) { .spc { padding: 1rem .75rem 80px; gap: 1.25rem; } }
 

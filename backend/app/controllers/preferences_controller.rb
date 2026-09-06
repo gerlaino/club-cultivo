@@ -17,8 +17,15 @@ class PreferencesController < ApplicationController
       @club.logo.purge if @club.logo.attached?
     end
 
+    # SE MERGEA, NO SE REEMPLAZA.
+    #
+    # `alertas_config` la escriben varias pantallas —las alertas de cultivo, el aviso de caja sin
+    # cerrar— y cada formulario manda sólo SUS claves. Reemplazando el jsonb entero, guardar en
+    # una borraba en silencio lo configurado en la otra: el admin no se entera hasta que el aviso
+    # que había prendido deja de llegar, que es la peor forma de perder una configuración.
     if (ac = params.dig(:club, :alertas_config))
-      @club.alertas_config = ac.is_a?(ActionController::Parameters) ? ac.to_unsafe_h : ac
+      nuevas = ac.is_a?(ActionController::Parameters) ? ac.to_unsafe_h : ac
+      @club.alertas_config = (@club.alertas_config || {}).merge(nuevas.stringify_keys)
     end
 
     if @club.update(club_params)

@@ -552,6 +552,19 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   falta que alguien explica. Nada de rojo, nada de "la diferencia es tuya", nada de "sin
   supervisión". El número que manda es el **porcentaje sobre lo entregado**, no los gramos: un
   ranking absoluto siempre encabeza con lo que más se vende y no dice nada.
+- **`alertas_config` SE MERGEA, NUNCA SE REEMPLAZA** (`PreferencesController#update`). La escriben
+  varias pantallas y cada formulario manda sólo SUS claves: reemplazando el jsonb entero, guardar
+  en una borraba en silencio lo de la otra. Es la peor forma de perder una configuración — no
+  falta un registro, cambia solo lo que la app hace, y se descubre porque un aviso deja de llegar.
+- **LA HORA LÍMITE DE CIERRE VIVE EN `Club#hora_limite_cierre_mostrador`**, y la preguntan el job
+  que avisa y la pantalla que la muestra. General para la organización y por sede cuando alguna
+  cierra distinto; devuelve nil cuando está apagada, porque no avisar es un estado válido.
+- **EL MODAL EN UN TELÉFONO ES LA PANTALLA, y se verifica EN un teléfono.** `ModalNuevaDispensacion`
+  se rompía a ≤360 px de tres formas —el pie desbordado con "Cancelar" afuera, la lista con
+  `max-height` fijo scrolleando tres píxeles (tarjetas cortadas = lo que se lee como "solapado"), y
+  el aviso con `display:flex` partido en columnas por el link de adentro— y **ninguna se ve leyendo
+  el CSS ni en un test de jsdom**: se reprodujeron con Playwright a 320/360/390 px sobre la app
+  corriendo. Cualquier caja de texto con un enlace adentro va en `display: block`.
 - **EL VEREDICTO DE LA MERMA VIVE EN UN SOLO LUGAR** (`Mostradores::Veredicto`, sep-2026): la
   última semana contra las ocho anteriores DE ESA organización, con pisos de historia (8 turnos) y
   de volumen (200 g) y factor 2. La regla estaba escrita adentro de `MermaMostradorJob`, así que el

@@ -1,5 +1,46 @@
 # Changelog
 
+## Septiembre 2026 (ai) — el aviso de caja sin cerrar, y el modal de dispensa en un teléfono de verdad
+
+**LA CAJA QUE QUEDÓ ABIERTA.** Se cierra de noche, y de noche administración no está: si alguien
+se fue sin cerrar, nadie se entera hasta la mañana siguiente —cuando el que abre no puede
+arrancar, porque ya hay una caja abierta— y para entonces el arqueo de esa jornada ya no lo puede
+hacer nadie: la mercadería pasó la noche sin contar y lo cobrado en efectivo quedó sin cuadrar
+contra nada. El admin elige la hora en Configuración → Alertas, **general para la organización y
+por sede cuando alguna cierra distinto** — que es donde más sirve, porque él no está en ninguna de
+las dos. `CierreMostradorPendienteJob` corre cada quince minutos (la hora la elige cada
+organización: esperar a horas en punto obligaría a que todas cerraran a horas redondas), avisa
+**una vez por mostrador y por día** —cada quince minutos es cómo se aprende a ignorarlo— y llega
+por campana **y push**, porque a las 23:00 nadie está mirando la app. Sin migración: la config vive
+en `clubs.alertas_config`, y la regla en `Club#hora_limite_cierre_mostrador`, que preguntan el job
+y la pantalla.
+
+**Y un bug latente que apareció de paso: `alertas_config` se REEMPLAZABA entera.** La escriben
+varias pantallas y cada formulario manda sólo sus claves, así que guardar en una borraba en
+silencio lo configurado en la otra. El admin no se entera hasta que el aviso que había prendido
+deja de llegar, que es la peor forma de perder una configuración: no falta un registro, cambia
+solo lo que la app hace. Ahora se mergea.
+
+**EL MODAL DE DISPENSA EN UN TELÉFONO, mirado en un teléfono.** Lo reportó Germán con una captura,
+y se reprodujo con Playwright a 320/360/390 px sobre la app corriendo — no leyendo el CSS:
+
+- **A ≤360 px el pie se desbordaba y "Cancelar" quedaba cortado FUERA del modal.** Dos botones que
+  no achican con `justify-content: flex-end` desbordan por la izquierda.
+- **La lista de productos tenía `max-height: 220px` fijo** y cuatro productos miden 223: scrolleaba
+  **tres píxeles** y mostraba la primera y la última tarjeta cortadas — que es exactamente lo que
+  se lee como "se superpone". Ahora es relativa a la pantalla (46vh).
+- **El aviso de mesa vacía se partía en tres columnas.** `display:flex` convierte cada nodo de
+  texto y cada enlace de adentro en una COLUMNA, y ese aviso lleva un link a Mostrador en el medio
+  de la frase. Se ve sólo con la caja cerrada, que es cuando el dispensador más necesita leerlo.
+- **En el teléfono el modal ES la pantalla**: ocupaba el 92% del alto igual, así que el margen y
+  las esquinas redondeadas sólo servían para dejar ver una franja de atrás y para robarle al pie
+  los 32 px que le faltaban.
+
+**Y la prueba de navegador del mostrador móvil estaba ROJA en master**: el commit que le dio
+pantalla propia al dispensador (`09d77a1b`, ya en producción) no tocó su e2e, que seguía afirmando
+la tabla de escritorio. Adaptada a la pantalla real. **7 pruebas de navegador ✓** (con los
+contadores de rack-attack limpios: son 5 logins por minuto y la suite hace siete).
+
 ## Septiembre 2026 (ah) — en pantalla no hay turnos: se abre y se cierra la caja
 
 Lo preguntó Germán probando: *"no vamos a abrir o cerrar turnos, solo abrimos y cerramos caja, pero

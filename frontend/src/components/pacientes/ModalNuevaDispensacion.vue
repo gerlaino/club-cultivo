@@ -1449,7 +1449,7 @@ async function handleSubmit() {
 .mnd__seg-btn { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: .4rem; border: none; background: transparent; color: var(--c-slate-500); font-size: .82rem; font-weight: 700; padding: .5rem .75rem; border-radius: 8px; cursor: pointer; transition: all .15s; }
 .mnd__seg-btn--active { background: #fff; color: #15803d; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
 .mnd__segmented--sm .mnd__seg-btn { font-size: .78rem; padding: .4rem .5rem; }
-.mnd__modal-footer { display: flex; justify-content: flex-end; gap: .75rem; padding: .875rem 1.25rem; border-top: 1px solid var(--c-slate-100); position: sticky; bottom: 0; background: #fff; }
+.mnd__modal-footer { display: flex; justify-content: flex-end; gap: .75rem; padding: .875rem 1.25rem; border-top: 1px solid var(--c-slate-100); position: sticky; bottom: 0; background: #fff; flex-wrap: wrap; }
 
 .mnd__error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 9px; padding: .6rem .875rem; font-size: .82rem; display: flex; align-items: center; gap: .4rem; }
 
@@ -1529,7 +1529,10 @@ async function handleSubmit() {
 .mnd__td-mostrador { display: inline-block; margin-left: 6px; font-size: .64rem; font-weight: 700; color: var(--c-sky-600); background: var(--c-sky-100); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
 
 /* Debajo de 720px no hay ancho para cinco columnas: manda la tarjeta. */
-.mnd__stock-list { display: none; flex-direction: column; gap: .35rem; max-height: 220px; overflow-y: auto; }
+/* La altura, RELATIVA A LA PANTALLA y no 220px fijos: con cuatro productos el contenido mide
+   223 px, así que la lista scrolleaba tres píxeles y mostraba la primera y la última tarjeta
+   cortadas — que es exactamente lo que se lee como "se superpone". */
+.mnd__stock-list { display: none; flex-direction: column; gap: .35rem; max-height: 46vh; overflow-y: auto; }
 @media (max-width: 720px) {
   .mnd__tabla-wrap { display: none; }
   .mnd__stock-list { display: flex; }
@@ -1569,7 +1572,12 @@ async function handleSubmit() {
 .mnd__sede-chip--on { background: #1b5e20; border-color: #1b5e20; color: #fff; }
 .mnd__sede-n { font-size: .68rem; font-weight: 700; opacity: .75; }
 .mnd__hint-box { background: var(--c-slate-50); border: 1px dashed var(--c-slate-300); border-radius: 8px; padding: .55rem .75rem; font-size: .8rem; color: var(--c-slate-500); display: flex; align-items: center; gap: .4rem; }
-.mnd__warn-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: .5rem .75rem; font-size: .8rem; color: #92400e; display: flex; align-items: center; gap: .4rem; }
+/* EN BLOQUE, NO EN FLEX. Con `display:flex` cada nodo de texto y cada enlace de adentro se
+   volvía una COLUMNA: el aviso de "no hay nada sobre la mesa" —que lleva un link a Mostrador en
+   el medio de la frase— se partía en tres tiras de una palabra por renglón. Se ve sólo con la
+   caja cerrada, que es cuando el dispensador más necesita leerlo. */
+.mnd__warn-box { background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: .5rem .75rem; font-size: .8rem; color: #92400e; line-height: 1.45; }
+.mnd__warn-box > .bi { margin-right: .35rem; }
 
 /* La caja cerrada: es un dato del turno, no un error de lo que la persona hizo. Ámbar y con el
    camino a la vista, arriba de todo — no rojo al final. */
@@ -1623,6 +1631,21 @@ async function handleSubmit() {
 .mnd__reserva-info i { margin-top: 1px; }
 .mnd__form-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
 @media (max-width: 400px) { .mnd__form-row { grid-template-columns: 1fr; } }
+
+/* EN EL TELÉFONO, EL MODAL ES LA PANTALLA.
+   Ocupaba el 92% del alto igual, así que el margen y las esquinas redondeadas sólo servían para
+   dejar ver una franja de la pantalla de atrás — y para robarle 32 px de ancho al pie, que es
+   por lo que "Cancelar" terminaba cortado FUERA del modal: dos botones que no achican, con
+   `justify-content: flex-end`, desbordan por la izquierda. */
+@media (max-width: 480px) {
+  .mnd__overlay { padding: 0; align-items: stretch; }
+  .mnd__modal   { max-width: none; max-height: 100%; height: 100%; border-radius: 0; }
+  /* Los dos botones comparten el ancho y ninguno se sale. El primario manda, así que se queda
+     con lo que sobra. */
+  .mnd__modal-footer { padding: .875rem 1rem; }
+  .mnd__modal-footer .mnd__btn-primary { flex: 1 1 auto; min-width: 0; justify-content: center; }
+  .mnd__modal-footer .mnd__btn-ghost   { flex: 0 0 auto; }
+}
 .mnd__field { display: flex; flex-direction: column; gap: .3rem; }
 .mnd__label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .05em; }
 .mnd__req { color: #ef4444; }
