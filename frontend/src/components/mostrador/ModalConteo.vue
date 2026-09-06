@@ -174,11 +174,11 @@ const conteos = ref(props.mesa.map(m => ({
 // el número que acababa de contar. Los dos son editables y el que manda sigue siendo lo que se
 // escriba.
 //
-// EL COSTO ES REAL Y ESTÁ ASUMIDO: un campo que llega con el esperado adentro invita a
-// confirmarlo sin terminar de contar, y ahí la diferencia medida tiende a cero justo cuando
-// existía. Es la misma decisión que mostrar lo esperado al lado del campo (sep-2026): pesa más
-// que una diferencia vista EN EL MOMENTO se sale a buscar. Si alguna vez la merma de plata se
-// aplana sospechosamente, esto es lo primero que hay que mirar.
+// Y NO ES UNA APUESTA, PORQUE EL ESPERADO NO ES UN SECRETO: es una cuenta que cualquiera puede
+// hacer —fondo inicial + lo cobrado en efectivo + otros ingresos (una deuda, una seña, lo que
+// rindió el repartidor) − los retiros— y que la pantalla ya muestra al lado del campo desde que
+// se decidió mostrar lo esperado. Dejarlo vacío no protegía la medición: sólo obligaba a tipear
+// un número que el sistema ya sabe.
 const efectivo = ref(props.esCierre ? redondeo(props.esperadoEfectivo) : null)
 const fondo    = ref(props.esCierre && !props.puedeRetirar ? redondeo(props.esperadoEfectivo) : null)
 const notas    = ref('')

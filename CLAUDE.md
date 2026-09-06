@@ -587,9 +587,14 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   el fondo con lo mismo ("dejo todo"), que es lo que la pantalla ya le dice a quien no puede
   retirar — vacío, el modal le anunciaba un retiro A SU NOMBRE que él no puede hacer y tenía que
   volver a tipear lo que acababa de contar. A administración el fondo NO se le llena: ella sí se
-  lleva la recaudación. **Es la misma apuesta que mostrar lo esperado** y tiene el mismo costo: un
-  campo lleno invita a confirmarlo sin terminar de contar. Si la diferencia de caja se aplana
-  sospechosamente, mirar esto primero.
+  lleva la recaudación. **Y NO ES UNA APUESTA: EL ESPERADO NO ES UN SECRETO**, es una cuenta —fondo
+  inicial + lo cobrado EN EFECTIVO (lo de cuenta corriente y transferencia nunca entró al cajón) +
+  otros ingresos en efectivo (una deuda que pagó, una seña, la rendición del repartidor) − los
+  retiros— que cualquiera puede hacer, y que además la pantalla ya muestra al lado del campo desde
+  que se decidió mostrar lo esperado. Esconderlo del campo no protegía nada: sólo obligaba a
+  tipear un número que el sistema ya sabe. **Razonamiento de Germán, sep-2026** — si aparece en un
+  comentario viejo el argumento contrario ("un campo lleno invita a confirmar sin contar"), es
+  legacy y esto lo reemplaza.
 - **CORREGIR UN CIERRE SE CALCULA CONTRA LO ESPERADO, NO CONTRA LO CONTADO**
   (`TurnoMostradorItem#efecto_en_inventario`). Restar lo viejo y sumar lo nuevo sólo vale si lo
   viejo se aplicó, y el sobrante de quien atiende queda ANOTADO sin aplicarse: corregir un cierre

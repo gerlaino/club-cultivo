@@ -108,9 +108,11 @@ el efectivo con lo que tendría que haber, y el fondo con lo mismo —"dejo todo
 que la pantalla ya le dice a quien no puede retirar. Antes, dejando el fondo vacío, el modal le
 anunciaba un retiro **a su nombre que él no puede hacer**, y tenía que volver a tipear el número
 que acababa de contar. A administración el fondo NO se le llena: ella sí se lleva la recaudación.
-El costo está asumido y es el mismo de mostrar lo esperado al lado del campo: un campo que llega
-lleno invita a confirmarlo sin terminar de contar. **Si la diferencia de caja se aplana
-sospechosamente, esto es lo primero que hay que mirar.**
+**Y no es una apuesta contra la medición, porque el esperado no es un secreto**: es una cuenta que
+cualquiera puede hacer —fondo inicial + lo cobrado EN EFECTIVO (lo de cuenta corriente y
+transferencia nunca entró al cajón) + otros ingresos en efectivo − los retiros— y que la pantalla
+ya muestra al lado del campo. Dejarlo vacío no protegía nada: sólo obligaba a tipear un número que
+el sistema ya sabe.
 
 **Y un bug que apareció tirando del hilo del sobrante:** `CorregirCierre` restaba lo viejo y sumaba
 lo nuevo, y eso sólo vale si lo viejo se había aplicado. Con un sobrante anotado-y-no-aplicado,
