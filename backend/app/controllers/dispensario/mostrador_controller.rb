@@ -125,9 +125,14 @@ module Dispensario
     # mirarlo después: si al día siguiente le preguntan por una diferencia, no tiene con qué.
     def turnos
       escala = @mostrador.turno_mostradores.cerrados
-      # Quien ATENDIÓ es quien abrió la caja contando: ése es su turno. Los de los demás no son
-      # asunto suyo, y el filtro es del backend — la pantalla no es la regla.
-      escala = escala.where(abierto_por_id: current_user.id) unless gestiona?
+      # QUIEN ATENDIÓ ES EL QUE ABRIÓ **O** EL QUE CERRÓ, no sólo el que abrió. La caja es del
+      # mostrador y no de una persona: es normal que la abra el admin a la mañana y la cierre
+      # contando quien atendió todo el día. Con el filtro sólo por `abierto_por_id`, ése cerraba
+      # su turno y la pantalla le decía "todavía no cerraste ningún turno acá" — justo lo que
+      # necesita si al día siguiente le preguntan por una diferencia que él anotó.
+      unless gestiona?
+        escala = escala.where('abierto_por_id = :id OR cerrado_por_id = :id', id: current_user.id)
+      end
 
       escala = escala.includes(:cerrado_por, :abierto_por, :caja_turno, items: :stock)
                      .order(cerrado_at: :desc)
@@ -370,15 +375,19 @@ module Dispensario
     def enviar_csv(escala)
       require 'csv'
       filas = CSV.generate(col_sep: ';', encoding: 'UTF-8') do |csv|
+        # El CSV sí lleva las cantidades además de los pesos: lo abre alguien que va a analizar,
+        # no a leer de un vistazo, y ahí el detalle sirve. La PANTALLA muestra sólo los pesos,
+        # porque sumar gramos con unidades da un número que no significa nada.
         csv << ['Fecha', 'Abrió', 'Cerró', 'Atendió', 'Cerrado por', 'Productos',
-                'Entregado', 'Faltó', 'Faltó ($)', 'Efectivo contado ($)', 'Diferencia caja ($)',
-                'Revisado']
+                'Entregado', 'Entregado ($)', 'Faltó', 'Faltó ($)', 'Productos con faltante',
+                'Efectivo contado ($)', 'Diferencia caja ($)', 'Revisado']
         escala.each do |t|
           r = serialize_turno_resumen(t)
           csv << [
             t.cerrado_at&.to_date, hora_corta(t.abierto_at), hora_corta(t.cerrado_at),
-            r[:atendio], r[:cerrado_por], r[:productos], r[:dispensado], r[:faltante],
-            r[:faltante_ars], r[:efectivo_contado_ars], r[:diferencia_caja_ars],
+            r[:atendio], r[:cerrado_por], r[:productos], r[:dispensado], r[:dispensado_ars],
+            r[:faltante], r[:faltante_ars], r[:productos_con_faltante],
+            r[:efectivo_contado_ars], r[:diferencia_caja_ars],
             r[:revisado] ? 'sí' : 'no',
           ]
         end
@@ -402,11 +411,19 @@ module Dispensario
         revisado:    turno.revisado_at.present?,
         productos:   items.size,
         dispensado:  items.sum { |it| it.cantidad_dispensada.to_d }.to_f.round(2),
-        # Lo que faltó, en producto y en plata. En gramos no se compara con nada.
+        # EN PLATA, porque en cantidad no se compara con nada: sumar gramos de flor con unidades
+        # de preroll da un número que no significa nada ("23" era 23 g más 4 prerolls). La tabla
+        # de turnos muestra los pesos, que sí se suman y se comparan entre turnos.
+        dispensado_ars: items.sum { |it|
+          it.cantidad_dispensada.to_d * it.stock&.precio_sugerido_ars.to_d
+        }.to_f.round(2),
+        # Lo que faltó, en producto y en plata.
         faltante:    items.sum { |it| [-it.diferencia_cierre.to_d, 0].max }.to_f.round(2),
         faltante_ars: items.sum { |it|
           [-it.diferencia_cierre.to_d, 0].max * it.stock&.costo_unitario_ars.to_d
         }.to_f.round(2),
+        # En cuántos productos faltó: "en 1 producto" dice mucho más que un número suelto.
+        productos_con_faltante: items.count { |it| it.diferencia_cierre.to_d.negative? },
         con_diferencia: con_dif,
         # El arqueo de plata del mismo turno, sin abrirlo.
         efectivo_contado_ars: turno.caja_turno&.efectivo_declarado_ars&.to_f,

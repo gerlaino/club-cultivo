@@ -83,6 +83,73 @@ RSpec.describe 'Abrir la caja del mostrador', type: :request do
       expect(turno.notas_apertura).to match(/contó 297.*había 300/)
     end
 
+    # CONTAR DE MÁS NO PONE PRODUCTO SOBRE LA MESA.
+    #
+    # Era la puerta más grande de las tres, porque la mesa está APARTADA: subirla a 1.500 con
+    # 1.000 en la fila del stock no toca el inventario, pero `Dispensacion#stock_disponible` suma
+    # lo apartado en el mostrador, así que esos gramos que no existen se podían DISPENSAR —y
+    # `decrement!` no valida: la fila terminaba en negativo—. Se guarda lo contado, no se aplica,
+    # y NO SE BLOQUEA: abrir nunca bloquea.
+    describe 'cuando quien atiende cuenta de MÁS' do
+      it 'abre igual, pero la mesa no sube' do
+        abrir!(conteos: [{ stock_id: stock.id, contado: 1_500 }], efectivo: 10_000)
+
+        expect(response).to have_http_status(:created)
+        expect(en_la_mesa).to eq(300.0)
+      end
+
+      it 'y lo contado queda escrito igual: el dato es el dato' do
+        abrir!(conteos: [{ stock_id: stock.id, contado: 1_500 }], efectivo: 10_000)
+
+        item = turno.items.find_by(stock_id: stock.id)
+        expect(item.cantidad_apertura.to_f).to eq(1_500.0)
+        expect(item.esperado_apertura.to_f).to eq(300.0)
+        expect(turno.notas_apertura).to match(/no se cargó a la mesa/i)
+      end
+
+      it 'el inventario tampoco se toca, y no aparece un movimiento de mesa' do
+        expect {
+          abrir!(conteos: [{ stock_id: stock.id, contado: 1_500 }], efectivo: 10_000)
+        }.not_to change { MostradorMovimiento.unscoped.count }
+
+        expect(stock.reload.cantidad.to_f).to eq(1_000.0)
+      end
+
+      # Lo que esto evitaba: con la mesa inflada, el disponible que ve la dispensa sale de lo
+      # apartado en el mostrador — se podían entregar gramos que no existen.
+      it 'y el disponible del depósito sigue siendo el real' do
+        abrir!(conteos: [{ stock_id: stock.id, contado: 1_500 }], efectivo: 10_000)
+
+        ActsAsTenant.with_tenant(club) do
+          s = stock.reload
+          expect(s.apartado_en_mostrador_de_sede(sede.id).to_f).to eq(300.0)
+          expect(s.cantidad_disponible_real.to_f).to eq(700.0)
+        end
+      end
+
+      it 'el turno entra a la lista de trabajo como sobrante, no como corregido' do
+        abrir!(conteos: [{ stock_id: stock.id, contado: 1_500 }], efectivo: 10_000)
+        t = turno
+        ActsAsTenant.with_tenant(club) do
+          Mostradores::CerrarCaja.call(turno: t, usuario: ana, efectivo_contado_ars: 10_000,
+                                       conteos: [{ stock_id: stock.id, contado: 300 }])
+        end
+
+        razones = ActsAsTenant.with_tenant(club) do
+          Mostradores::MotivosDeRevision.por_turno(sede.mostrador!.turno_mostradores.cerrados)
+        end
+        expect(razones[t.id]).to include('sobrante')
+        expect(razones[t.id]).not_to include('corregido')
+      end
+
+      it 'administración sí puede: ella gobierna la mesa' do
+        abrir!(conteos: [{ stock_id: stock.id, contado: 350 }], efectivo: 10_000, como: admin)
+
+        expect(response).to have_http_status(:created)
+        expect(en_la_mesa).to eq(350.0)
+      end
+    end
+
     it 'con la mesa vacía se puede abrir igual: la carga administración después' do
       ActsAsTenant.with_tenant(club) do
         Mostradores::Cargar.call(mostrador: sede.mostrador!, usuario: admin, motivo: 'saco todo',

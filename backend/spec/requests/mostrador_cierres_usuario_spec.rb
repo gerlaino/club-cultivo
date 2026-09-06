@@ -239,4 +239,42 @@ RSpec.describe 'Quién ve qué del mostrador', type: :request do
       expect(response.body.lines.size).to eq(2)          # encabezado + el suyo
     end
   end
+
+  # QUIEN ATENDIÓ ES EL QUE ABRIÓ **O** EL QUE CERRÓ.
+  #
+  # La caja es del mostrador, no de una persona: es normal que la abra el admin a la mañana y la
+  # cierre contando quien atendió todo el día. Con el filtro sólo por `abierto_por_id`, ése
+  # cerraba su turno y la pantalla le decía "todavía no cerraste ningún turno acá" — justo lo que
+  # necesita si al día siguiente le preguntan por una diferencia que él mismo anotó.
+  describe 'un turno que abrió el admin y cerró quien atiende' do
+    let!(:turno) do
+      cargar!(300, 20)
+      t = abrir!(usuario: admin)
+      cerrar!(t, 290, 20, usuario: ana)
+      t
+    end
+
+    it 'lo ve quien lo cerró, aunque no lo haya abierto' do
+      sign_in_as(ana)
+      get "/api/sedes/#{sede.id}/mostrador/turnos", headers: auth_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(JSON.parse(response.body)['turnos'].map { |t| t['id'] }).to include(turno.id)
+    end
+
+    it 'y lo sigue viendo administración, que los ve todos' do
+      sign_in_as(admin)
+      get "/api/sedes/#{sede.id}/mostrador/turnos", headers: auth_headers
+
+      expect(JSON.parse(response.body)['turnos'].map { |t| t['id'] }).to include(turno.id)
+    end
+
+    it 'pero no el turno de otro dispensador' do
+      otro = create(:user, :dispensador, club: club)
+      sign_in_as(otro)
+      get "/api/sedes/#{sede.id}/mostrador/turnos", headers: auth_headers
+
+      expect(JSON.parse(response.body)['turnos']).to be_empty
+    end
+  end
 end

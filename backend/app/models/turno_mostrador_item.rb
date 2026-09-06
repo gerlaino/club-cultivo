@@ -34,6 +34,33 @@ class TurnoMostradorItem < ApplicationRecord
     (cantidad_cierre.to_d - esperado_cierre.to_d).round(3)
   end
 
+  # ¿ESTE SOBRANTE QUEDÓ ANOTADO SIN APLICARSE?
+  #
+  # Cuando quien atiende cuenta MÁS de lo que había, el número se guarda pero no mueve nada:
+  # contar no crea producto de la nada (ver `CerrarCaja#sobrante_sin_aplicar?`). Entonces
+  # `cantidad_cierre` dice 1.000 y el inventario nunca vio esos 700 de más — y todo lo que
+  # después haga cuentas contra lo contado tiene que saberlo, o las repite sobre una base falsa.
+  # Le pasaba a `CorregirCierre`: corregir 1.000 a 100 restaba 900 del stock en vez de 200.
+  #
+  # Se DERIVA en vez de guardarse en una columna: es la misma regla que lo produjo, y escrita en
+  # dos lados un día dejan de coincidir. El precio es que si esa persona cambia de rol después,
+  # esto responde por el rol de hoy — por eso la corrección la hace administración, con motivo,
+  # y viendo lo esperado y lo contado en pantalla.
+  def sobrante_no_aplicado?
+    return false if esperado_cierre.nil? || cantidad_cierre.nil?
+    return false unless cantidad_cierre.to_d > esperado_cierre.to_d
+
+    turno_mostrador&.cerrado_por&.atiende_mostrador? || false
+  end
+
+  # Cuánto movió del INVENTARIO el cierre de este ítem. No es lo mismo que la diferencia contada:
+  # un sobrante de quien atiende quedó anotado y no movió nada.
+  def efecto_en_inventario
+    return 0.to_d if sobrante_no_aplicado?
+
+    diferencia_cierre || 0.to_d
+  end
+
   # Lo que quien abrió contó, contra lo que decía la mesa. No es una ceremonia: es un campo
   # editable que no bloquea, y si lo tocó queda registrado.
   def diferencia_apertura

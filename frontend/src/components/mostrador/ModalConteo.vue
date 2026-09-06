@@ -82,6 +82,15 @@
         <p v-else class="cnt__nota">
           Queda anotado. No te frena: {{ esCierre ? 'la caja cierra igual' : 'podés abrir igual' }}.
         </p>
+        <!-- CONTAR DE MÁS NO CREA PRODUCTO. Se dice ACÁ, mientras se escribe el número, y no
+             después de confirmar: el conteo se guarda igual, pero no mueve ni la mesa ni el
+             inventario, y quien lo escribió tiene que saber que eso no queda cargado. Sin este
+             renglón, cerraba convencido de que la mesa quedaba en lo que él contó. -->
+        <p v-if="sobranteQueNoSeAplica" class="cnt__nota cnt__nota--sobrante">
+          Contaste de más{{ deQue }}. Queda anotado como sobrante y lo revisa administración:
+          {{ esCierre ? 'no se suma al inventario' : 'la mesa sigue como está' }}. Si de verdad
+          sobró producto, ella lo carga desde el depósito.
+        </p>
       </div>
 
       <label class="cnt__campo cnt__campo--obs">
@@ -139,6 +148,10 @@ const props = defineProps({
   // Se muestra aparte para que una diferencia se pueda explicar por su origen.
   otrosIngresosEfectivo: { type: Number, default: 0 },
   puedeRetirar: { type: Boolean, default: false },
+  // Si quien cuenta es administración, un sobrante SÍ se aplica —ella gobierna la mesa— y no hay
+  // nada que avisar. Es lo único que el modal mira del rol, y sólo para elegir el texto: la
+  // regla vive entera en el backend.
+  gestiona:     { type: Boolean, default: false },
   guardando:    { type: Boolean, default: false },
   // Es la primera vez que se abre este mostrador: no hay ningún cierre anterior del que heredar
   // el fondo. Sin esto escrito, el turno arranca IGUAL —no bloquea por diferencia— pero sin
@@ -153,11 +166,26 @@ const conteos = ref(props.mesa.map(m => ({
   stock_id: m.stock_id, forma: m.forma, genetica: m.genetica, numero: m.numero,
   unidad: m.unidad, esperado: Number(m.mostrador || 0), contado: null,
 })))
-const efectivo = ref(null)
-const fondo    = ref(null)
+// AL CERRAR, LOS CAMPOS ARRANCAN CON UN NÚMERO, no en blanco.
+//
+// `efectivo` con lo que TENDRÍA que haber en el cajón, y `fondo` con eso mismo — o sea "dejo
+// todo", que es lo que la pantalla ya le dice a quien no puede retirar: si lo dejaba vacío, el
+// modal le anunciaba un retiro a su nombre que él no puede hacer, y tenía que volver a escribir
+// el número que acababa de contar. Los dos son editables y el que manda sigue siendo lo que se
+// escriba.
+//
+// EL COSTO ES REAL Y ESTÁ ASUMIDO: un campo que llega con el esperado adentro invita a
+// confirmarlo sin terminar de contar, y ahí la diferencia medida tiende a cero justo cuando
+// existía. Es la misma decisión que mostrar lo esperado al lado del campo (sep-2026): pesa más
+// que una diferencia vista EN EL MOMENTO se sale a buscar. Si alguna vez la merma de plata se
+// aplana sospechosamente, esto es lo primero que hay que mirar.
+const efectivo = ref(props.esCierre ? redondeo(props.esperadoEfectivo) : null)
+const fondo    = ref(props.esCierre && !props.puedeRetirar ? redondeo(props.esperadoEfectivo) : null)
 const notas    = ref('')
 
 const fmt = (n) => Number(n ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })
+// El esperado puede traer centavos de un descuento; el cajón tiene billetes.
+function redondeo (n) { return Math.round(Number(n || 0) * 100) / 100 }
 const escrito = (v) => v !== null && v !== '' && !Number.isNaN(Number(v))
 const faltaFondo = computed(() => props.fondoObligatorio && !escrito(efectivo.value))
 
@@ -171,6 +199,14 @@ const conDiferencia = computed(() =>
   conteos.value.filter(c => escrito(c.contado) && Number(c.contado) !== c.esperado)
 )
 const hayDiferencia = computed(() => conDiferencia.value.length > 0 || difEfectivo.value !== 0)
+// Lo contado de MÁS por quien atiende: se guarda, no se aplica.
+const sobrantes = computed(() =>
+  props.gestiona ? [] : conDiferencia.value.filter(c => Number(c.contado) > c.esperado)
+)
+const sobranteQueNoSeAplica = computed(() => sobrantes.value.length > 0)
+const deQue = computed(() =>
+  sobrantes.value.length === 1 ? ` en ${formaLabel(sobrantes.value[0].forma)}` : ''
+)
 const aRetirar = computed(() => {
   if (!props.esCierre || !escrito(efectivo.value)) return 0
   return Math.max(Number(efectivo.value) - Number(fondo.value || 0), 0)
@@ -241,6 +277,7 @@ function confirmar () {
 }
 .cnt__comp-hd, .cnt__comp-row {
   display: grid; grid-template-columns: 1fr auto auto auto; gap: 14px; align-items: baseline;
+  min-width: 0;
 }
 .cnt__comp-hd span { font-size: var(--fs-12); color: var(--c-ink-500); text-align: right; }
 .cnt__comp-hd span:first-child { text-align: left; }
@@ -252,6 +289,11 @@ function confirmar () {
 .cnt__comp-dif.is-ok  { color: var(--c-leaf-600); }
 /* El esperado, al lado del campo pero en segundo plano: acompaña, no compite con lo que se
    escribe — el número que vale es el contado. */
+.cnt__nota--sobrante {
+  margin-top: .35rem; padding: .5rem .6rem; border-radius: 8px;
+  background: var(--c-amber-100); color: var(--c-ink-700);
+}
+
 .cnt__esperado, .cnt__esperado-plata {
   font-size: var(--fs-12); color: var(--c-ink-500); font-style: normal; white-space: nowrap;
 }
@@ -271,4 +313,34 @@ function confirmar () {
 .cnt__btn:disabled { opacity: .5; cursor: not-allowed; }
 .cnt__btn--primary { background: var(--c-leaf-800); color: #fff; }
 .cnt__btn--ghost   { background: #fff; color: var(--c-ink-700); border-color: var(--c-slate-300); }
+
+/* ── EN EL TELÉFONO ─────────────────────────────────────────────────────────────
+   Este modal es el que usa quien atiende todos los días, y no tenía una sola media query: la
+   comparación es un grid de cuatro columnas y con "$150.000 · $130.000 · −$20.000" la última se
+   iba FUERA del modal. La diferencia —el número por el que existe el arqueo— quedaba cortada
+   contra el borde, así que parecía que estaba mal calculada. */
+@media (max-width: 560px) {
+  /* Dos columnas: el concepto arriba y las tres cifras abajo, cada una con su etiqueta. El
+     encabezado de columnas no sirve cuando las filas ya no son columnas. */
+  .cnt__comp-hd { display: none; }
+  .cnt__comp-row {
+    grid-template-columns: repeat(3, 1fr); gap: 4px 10px;
+  }
+  .cnt__comp-lbl { grid-column: 1 / -1; }
+  /* Cada cifra dice qué es: sin el encabezado, tres números sueltos no se distinguen. */
+  .cnt__comp-row .cnt__comp-num:nth-of-type(1)::before { content: 'Debería'; }
+  .cnt__comp-row .cnt__comp-num:nth-of-type(2)::before { content: 'Contaste'; }
+  .cnt__comp-dif::before { content: 'Diferencia'; }
+  .cnt__comp-num::before, .cnt__comp-dif::before {
+    display: block; font-family: var(--font-sans); font-size: var(--fs-11);
+    font-weight: 400; color: var(--c-ink-500);
+  }
+  .cnt__comp-num, .cnt__comp-dif { text-align: left; }
+
+  /* La fila de cada producto: el nombre entero arriba y el campo abajo. En una línea, el flex
+     comprime el nombre —"Flor seca · Critical Kush" se apilaba en tres renglones angostos— y
+     deja el campo pegado al borde. */
+  .cnt__row { flex-direction: column; align-items: stretch; gap: 8px; }
+  .cnt__cant { align-self: flex-start; }
+}
 </style>

@@ -34,6 +34,17 @@ module Mostradores
 
       dif = contado - item.cantidad.to_d
       return Result.new(ok: true, item: item, diferencia: 0.to_d) if dif.zero?
+
+      # CONTAR NO CREA PRODUCTO DE LA NADA. `ajustar_inventario!` con diferencia positiva SUMA al
+      # stock del club: contando 997 donde había 100 entraban 897 g trazables que nadie cargó.
+      # Quien atiende no puede justificar un sobrante —él no elige qué hay sobre la mesa— y acá
+      # rechazar es seguro: no bloquea nada, sigue atendiendo. (En el CIERRE, en cambio, se anota
+      # sin aplicar, porque ahí trabar dejaría la caja sin poder cerrar.)
+      if dif.positive? && @usuario&.atiende_mostrador?
+        return err('Contaste más de lo que hay sobre la mesa. Si sobró producto, pedile a ' \
+                   'administración que lo cargue: por acá no se puede sumar al inventario.')
+      end
+
       return err('Hay diferencia: escribí el motivo') if @motivo.blank?
 
       turno = @mostrador.turno_abierto

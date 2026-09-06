@@ -88,15 +88,6 @@ RSpec.describe 'Cerrar el mostrador', type: :request do
       expect(mov.notas).to match(/faltante de 3\.6 g — merma de fraccionamiento/)
     end
 
-    it 'un sobrante también se asienta' do
-      dispensar!(85)
-
-      cerrar!(contado: 216.2, motivo: 'se entregó de menos', efectivo: 58_500)
-
-      expect(stock.reload.cantidad.to_f).to eq(416.2)
-      expect(stock.stock_movimientos.where(tipo: 'ajuste').last.gramos.to_f).to eq(1.2)
-    end
-
     # La regla de oro: lo trazable sale del inventario por dispensación. Un faltante de arqueo es
     # una corrección de conteo, no una salida — por eso NUNCA es merma, que es lo que cuenta el
     # informe de Pérdidas.
@@ -302,6 +293,67 @@ RSpec.describe 'Cerrar el mostrador', type: :request do
                                fecha_dispensacion: Time.zone.today)
         end
       }.not_to raise_error
+    end
+  end
+
+  # CONTAR NO CREA PRODUCTO DE LA NADA — pero EL CIERRE NO SE BLOQUEA.
+  #
+  # Son las dos reglas a la vez: quien atiende no puede justificar un sobrante (el inventario no
+  # sube), y a las once de la noche nadie puede quedar trabado esperando a un admin (la caja
+  # cierra igual). Se guarda lo que contó, que es el dato, y el turno queda para revisar.
+  describe 'cuando quien atiende cuenta de MÁS' do
+    it 'cierra igual y guarda lo contado, pero NO sube el inventario' do
+      abrir!(cantidad: 300)
+      antes_stock = stock.reload.cantidad.to_d
+
+      cerrar!(contado: 1_000, efectivo: 50_000, motivo: 'conté de más', como: ana)
+
+      expect(response).to have_http_status(:ok)
+      turno = ActsAsTenant.with_tenant(club) { sede.mostrador!.turno_mostradores.order(:id).last }
+      expect(turno.estado).to eq('cerrado')
+
+      item = turno.items.find_by(stock_id: stock.id)
+      expect(item.cantidad_cierre.to_d).to eq(1_000)   # el dato no se pierde
+      expect(item.esperado_cierre.to_d).to eq(300)
+      expect(stock.reload.cantidad.to_d).to eq(antes_stock)  # y el stock no se movió
+      expect(mesa_de(sede)[stock.id].to_d).to eq(300)
+    end
+
+    it 'deja dicho en el item que se anotó sin cargarse' do
+      abrir!(cantidad: 300)
+      cerrar!(contado: 1_000, efectivo: 50_000, como: ana)
+
+      turno = ActsAsTenant.with_tenant(club) { sede.mostrador!.turno_mostradores.order(:id).last }
+      expect(turno.items.find_by(stock_id: stock.id).motivo_diferencia).to match(/no se cargó/i)
+    end
+
+    it 'y el turno entra a la lista de revisión como sobrante' do
+      abrir!(cantidad: 300)
+      cerrar!(contado: 1_000, efectivo: 50_000, como: ana)
+
+      turnos = ActsAsTenant.with_tenant(club) { sede.mostrador!.turno_mostradores.cerrados }
+      razones = Mostradores::MotivosDeRevision.por_turno(turnos)
+      expect(razones.values.flatten).to include('sobrante')
+    end
+
+    it 'administración sí puede: ella gobierna la mesa' do
+      abrir!(cantidad: 300)
+      antes_stock = stock.reload.cantidad.to_d
+
+      cerrar!(contado: 310, efectivo: 50_000, motivo: 'apareció', como: admin)
+
+      expect(response).to have_http_status(:ok)
+      expect(stock.reload.cantidad.to_d).to eq(antes_stock + 10)
+      expect(stock.stock_movimientos.where(tipo: 'ajuste').last.gramos.to_f).to eq(10.0)
+    end
+
+    it 'el faltante se sigue aplicando: restar lo que no está no inventa nada' do
+      abrir!(cantidad: 300)
+      antes_stock = stock.reload.cantidad.to_d
+
+      cerrar!(contado: 280, efectivo: 50_000, motivo: 'faltó', como: ana)
+
+      expect(stock.reload.cantidad.to_d).to eq(antes_stock - 20)
     end
   end
 end

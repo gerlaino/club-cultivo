@@ -101,6 +101,50 @@ RSpec.describe 'Corregir el conteo de un turno cerrado', type: :request do
     expect(stock.reload.cantidad.to_f).to eq(21.0)
   end
 
+  # EL SOBRANTE QUE NO SE APLICÓ NO SE PUEDE DESCONTAR DOS VECES.
+  #
+  # Quien atiende cuenta de más → el número queda anotado y el inventario NO se mueve. Si después
+  # se corrige contra lo contado —restar lo viejo, sumar lo nuevo— se descuentan gramos que nunca
+  # entraron. Se corrige contra lo ESPERADO, que es el número contra el que se arquea.
+  describe 'corregir un sobrante que había quedado anotado sin aplicarse' do
+    let!(:turno) do
+      ActsAsTenant.with_tenant(club) do
+        t = abrir_mostrador!(sede, usuario: admin, recibe: ana)
+        Mostradores::CerrarCaja.call(turno: t, usuario: ana, efectivo_contado_ars: 0,
+                                     conteos: [{ stock_id: stock.id, contado: 1_000 }],
+                                     notas: 'conté de más')
+        t.reload
+      end
+    end
+
+    it 'el cierre no había movido el inventario' do
+      expect(stock.reload.cantidad.to_f).to eq(500.0)
+      expect(item.cantidad_cierre.to_f).to eq(1_000.0)
+      expect(item.esperado_cierre.to_f).to eq(500.0)
+    end
+
+    it 'corregir a lo que había de verdad descuenta SÓLO lo que faltó' do
+      corregir!(contado: 100, motivo: 'eran 100')
+
+      # Esperaba 500 y había 100: faltan 400. No 900, que es lo que daba restando contra lo
+      # contado — y esos 900 nunca habían entrado al inventario.
+      expect(stock.reload.cantidad.to_f).to eq(100.0)
+      expect(stock.stock_movimientos.where(tipo: 'ajuste').last.gramos.to_f).to eq(-400.0)
+    end
+
+    it 'y si de verdad sobraba, administración lo confirma y ahí sí entra' do
+      corregir!(contado: 510, motivo: 'había un frasco más, lo verifiqué')
+
+      expect(stock.reload.cantidad.to_f).to eq(510.0)
+      expect(stock.stock_movimientos.where(tipo: 'ajuste').last.gramos.to_f).to eq(10.0)
+    end
+
+    it 'corregir a lo esperado deja el inventario donde estaba' do
+      expect { corregir!(contado: 500, motivo: 'era lo que decía la mesa') }
+        .not_to change { stock.reload.cantidad }
+    end
+  end
+
   it 'queda en el audit log quién corrigió el conteo' do
     corregir!(contado: 415)
 

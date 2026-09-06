@@ -73,12 +73,6 @@ RSpec.describe 'Contar un producto del mostrador', type: :request do
     expect(item.cantidad_cierre.to_d - item.esperado_cierre.to_d).to eq(0)
   end
 
-  it 'un sobrante también' do
-    contar!(en_la_mesa + 2, motivo: 'apareció')
-
-    expect(stock.reload.cantidad.to_f).to eq(502.0)
-  end
-
   it 'con diferencia y sin motivo no se registra' do
     body = contar!(en_la_mesa - 3)
 
@@ -115,5 +109,46 @@ RSpec.describe 'Contar un producto del mostrador', type: :request do
 
     contar!(en_la_mesa - 1, motivo: 'se cayó', como: admin)
     expect(response).to have_http_status(:ok)
+  end
+
+  # CONTAR NO PUEDE CREAR PRODUCTO DE LA NADA.
+  #
+  # `ajustar_inventario!` con diferencia positiva SUMA al stock del club: contando 997 donde había
+  # 100 entraban 897 g trazables que nadie cargó. Es una puerta de entrada de producto sin origen,
+  # y se dispara con un dedazo. Quien atiende no puede justificar un sobrante —él no elige qué hay
+  # sobre la mesa, la carga administración— y acá rechazar es seguro: no bloquea nada.
+  describe 'contar de MÁS' do
+    it 'quien atiende no puede: el inventario no se toca y se le dice a quién pedirle' do
+      antes_mesa  = en_la_mesa
+      antes_stock = stock.reload.cantidad.to_d
+
+      body = contar!(antes_mesa + 100, motivo: 'aparecieron', como: ana)
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(body['error']).to match(/más de lo que hay/i)
+      expect(body['error']).to match(/administración/i)
+      expect(en_la_mesa).to eq(antes_mesa)
+      expect(stock.reload.cantidad.to_d).to eq(antes_stock)
+    end
+
+    it 'administración sí: ella gobierna la mesa, y el inventario sube con ella' do
+      antes = en_la_mesa
+
+      contar!(antes + 10, motivo: 'apareció un frasco', como: admin)
+
+      expect(response).to have_http_status(:ok)
+      expect(en_la_mesa).to eq(antes + 10)
+      expect(stock.reload.cantidad.to_f).to eq(510.0)
+      expect(stock.stock_movimientos.where(tipo: 'ajuste').last.gramos.to_f).to eq(10.0)
+    end
+
+    it 'y el faltante de quien atiende se sigue aplicando: restar no inventa nada' do
+      antes = en_la_mesa
+
+      contar!(antes - 10, motivo: 'se fraccionó', como: ana)
+
+      expect(response).to have_http_status(:ok)
+      expect(en_la_mesa).to eq(antes - 10)
+    end
   end
 end

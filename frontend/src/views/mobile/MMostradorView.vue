@@ -173,7 +173,7 @@
 
     <ModalConteo v-if="conteo" :mesa="mesa" :es-cierre="conteo === 'cierre'"
                  :esperado-efectivo="esperadoEfectivo" :otros-ingresos-efectivo="otrosIngresosEfectivo"
-                 :puede-retirar="false" :guardando="guardando"
+                 :puede-retirar="false" :gestiona="false" :guardando="guardando"
                  :fondo-obligatorio="conteo === 'apertura' && fondoSugerido == null"
                  @cerrar="conteo = null" @confirmar="onConfirmarConteo" />
   </div>

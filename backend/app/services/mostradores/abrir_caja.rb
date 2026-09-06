@@ -91,6 +91,20 @@ module Mostradores
         dif = contado - esperado
         next if dif.zero?
 
+        # CONTAR DE MÁS NO PONE PRODUCTO SOBRE LA MESA.
+        #
+        # Corregir hacia ABAJO no inventa nada: lo que no está, no está. Hacia ARRIBA sí, y acá
+        # era la puerta más grande de las tres, porque la mesa está APARTADA: subirla a 1.000 con
+        # 350 en la fila del stock no toca el inventario —de ahí venía el "no pasa nada"— pero
+        # `Dispensacion#stock_disponible` suma lo apartado en el mostrador, así que esos 650 g que
+        # no existen se podían DISPENSAR, y `decrement!` no valida: la fila terminaba en negativo.
+        #
+        # Se guarda lo contado igual (el dato es el dato, ya quedó escrito arriba en el item y en
+        # las notas del turno) y el turno cae en la lista de trabajo como `sobrante`. Sin
+        # bloquear: abrir NUNCA bloquea, a las 8 de la mañana no hay a quién esperar. Si de
+        # verdad sobra, lo carga administración por su puerta, que descuenta del depósito.
+        next if sobrante_sin_aplicar?(dif)
+
         # La mesa pasa a tener lo que se contó. NO toca el inventario real: acá todavía no se
         # sabe si faltó de verdad o si el admin declaró de más, y el producto puede estar en el
         # depósito. Lo que sí queda es el rastro, con nombre y hora.
@@ -98,6 +112,10 @@ module Mostradores
                   motivo: "Conteo de apertura de #{@usuario.nombre_completo}")
       end
     end
+
+    # El mismo criterio que en el cierre (`CerrarCaja#sobrante_sin_aplicar?`): quien atiende no
+    # elige qué hay sobre la mesa, así que no puede declarar que hay de más. Administración sí.
+    def sobrante_sin_aplicar?(dif) = dif.positive? && @usuario&.atiende_mostrador?
 
     # Lo que la persona anota al abrir: las diferencias, en texto, para que el admin las lea sin
     # tener que reconstruirlas.
@@ -109,7 +127,9 @@ module Mostradores
         dif = crudo.to_d - mi.cantidad.to_d
         next if dif.zero?
 
-        "#{mi.stock&.etiqueta}: contó #{crudo.to_d.round(2)} y había #{mi.cantidad.to_d.round(2)}"
+        cola = ' (no se cargó a la mesa)' if sobrante_sin_aplicar?(dif)
+        "#{mi.stock&.etiqueta}: contó #{crudo.to_d.round(2)} y había " \
+          "#{mi.cantidad.to_d.round(2)}#{cola}"
       end
       [@notas.presence, difs.presence&.join(' · ')].compact.join(' · ').presence
     end

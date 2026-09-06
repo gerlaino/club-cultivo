@@ -462,6 +462,69 @@ describe('Abrir y cerrar la caja', () => {
       expect(w.find('.cnt__acc .cnt__btn--primary').attributes('disabled')).toBeUndefined()
     })
 
+    // CONTAR DE MÁS NO PONE PRODUCTO SOBRE LA MESA, y se dice MIENTRAS se escribe el número:
+    // después de confirmar, la persona ya se fue creyendo que la mesa quedó en lo que contó.
+    it('a quien atiende le avisa que un sobrante no se carga', async () => {
+      const w = await montar('dispensador')
+      await abrirModal(w)
+      await w.find('.cnt__cant .cnt__input').setValue(1500)
+
+      const aviso = w.find('.cnt__nota--sobrante')
+      expect(aviso.exists()).toBe(true)
+      expect(aviso.text()).toContain('sobrante')
+      expect(aviso.text()).toContain('la mesa sigue como está')
+      // Y NO bloquea: abrir nunca bloquea.
+      expect(w.find('.cnt__acc .cnt__btn--primary').attributes('disabled')).toBeUndefined()
+    })
+
+    it('y a administración no, porque ella sí gobierna la mesa', async () => {
+      const w = await montar('admin')
+      await abrirModal(w)
+      await w.find('.cnt__cant .cnt__input').setValue(1500)
+
+      expect(w.find('.cnt__nota--sobrante').exists()).toBe(false)
+    })
+
+    it('contar de MENOS no dispara ese aviso: eso sí se aplica', async () => {
+      const w = await montar('dispensador')
+      await abrirModal(w)
+      await w.find('.cnt__cant .cnt__input').setValue(295)
+
+      expect(w.find('.cnt__nota--sobrante').exists()).toBe(false)
+    })
+
+    // AL CERRAR, LOS CAMPOS LLEGAN CON UN NÚMERO. Quien atiende no puede retirar: si dejaba el
+    // fondo vacío, el modal le anunciaba un retiro a su nombre y tenía que volver a escribir el
+    // número que acababa de contar.
+    it('al CERRAR el efectivo arranca con lo esperado y el fondo con lo mismo', async () => {
+      respuesta = { ...respuesta, turno: TURNO }
+      const w = await montar('dispensador')
+      await abrirModal(w)
+
+      const plata = w.findAll('.cnt__input--plata')
+      expect(Number(plata[0].element.value)).toBe(58500)   // debería haber
+      expect(Number(plata[1].element.value)).toBe(58500)   // y dejo todo
+      expect(w.find('.cnt__retiro').exists()).toBe(false)  // no se retira nada
+    })
+
+    it('a administración el fondo NO se le llena: ella sí se lleva la recaudación', async () => {
+      respuesta = { ...respuesta, turno: TURNO }
+      const w = await montar('admin')
+      await abrirModal(w)
+
+      const plata = w.findAll('.cnt__input--plata')
+      expect(Number(plata[0].element.value)).toBe(58500)
+      expect(plata[1].element.value).toBe('')
+      expect(w.find('.cnt__retiro').text()).toContain('58.500')
+    })
+
+    it('al ABRIR no se llena nada: ahí el número es lo que hay en el cajón', async () => {
+      const w = await montar('dispensador')
+      await abrirModal(w)
+
+      expect(w.find('.cnt__input--plata').element.value).toBe('')
+    })
+
     it('manda el conteo y el efectivo al abrir', async () => {
       const w = await montar()
       await abrirModal(w)

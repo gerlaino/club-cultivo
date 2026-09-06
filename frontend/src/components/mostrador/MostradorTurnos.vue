@@ -44,19 +44,30 @@
                 <span v-if="t.revisado" class="trn__pill trn__pill--ok">Visto</span>
               </div>
             </td>
-            <td class="trn__td-num trn__mut" data-col="Entregado">{{ fmt(t.dispensado) }}</td>
+            <!-- EN PLATA, no en cantidad. Sumar gramos de flor con unidades de preroll da un
+                 número que no significa nada: "faltó 23" era 23 g más 4 prerolls, y no se podía
+                 ni saber de qué hablaba ni comparar un turno con otro. Los pesos sí se suman. -->
+            <td class="trn__td-num" data-col="Entregado">
+              <span v-if="t.dispensado_ars > 0" class="trn__num">${{ fmt(t.dispensado_ars) }}</span>
+              <span v-else class="trn__nada">—</span>
+            </td>
             <td class="trn__td-num" data-col="Faltó">
               <template v-if="t.faltante > 0">
-                <span class="trn__num">{{ fmt(t.faltante) }}</span>
-                <span class="trn__unidad">${{ fmt(t.faltante_ars) }}</span>
+                <span class="trn__num">${{ fmt(t.faltante_ars) }}</span>
+                <span class="trn__pie">
+                  en {{ t.productos_con_faltante }} producto{{ t.productos_con_faltante === 1 ? '' : 's' }}
+                </span>
               </template>
               <span v-else class="trn__ok">cuadró</span>
             </td>
             <td class="trn__td-num" data-col="Caja">
               <template v-if="t.efectivo_contado_ars !== null">
                 <span class="trn__num">${{ fmt(t.efectivo_contado_ars) }}</span>
-                <span v-if="t.diferencia_caja_ars" class="trn__unidad">
-                  {{ t.diferencia_caja_ars > 0 ? '+' : '' }}${{ fmt(t.diferencia_caja_ars) }}
+                <!-- Qué ES el segundo número. Suelto al lado del contado se leía como el costo de
+                     algo: son dos cifras pegadas sin decir cuál es cuál. -->
+                <span v-if="t.diferencia_caja_ars" class="trn__pie">
+                  {{ t.diferencia_caja_ars > 0 ? 'sobró' : 'faltó' }}
+                  ${{ fmt(Math.abs(t.diferencia_caja_ars)) }}
                 </span>
               </template>
               <span v-else class="trn__mut">—</span>
@@ -202,7 +213,13 @@ watch(() => props.sedeId, () => { pagina.value = 1; cargar() }, { immediate: tru
 .trn__cuando { font-size: var(--fs-14); font-weight: 600; color: var(--c-ink-900); }
 .trn__meta   { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 5px; align-items: center; }
 .trn__mut    { color: var(--c-ink-500); font-size: var(--fs-13); }
-.trn__num    { font-family: var(--font-mono); font-weight: 600; color: var(--c-ink-900); }
+/* TODOS los números de la tabla con el mismo estilo. Antes "Entregado" salía en sans y los
+   demás en monoespaciada: la misma tabla con dos tipografías para el mismo tipo de dato. */
+.trn__td-num { font-family: var(--font-mono); }
+.trn__num    { font-family: var(--font-mono); font-weight: 600; color: var(--c-ink-900); display: block; }
+.trn__nada   { color: var(--c-ink-500); }
+/* Qué es la cifra de arriba, no otra cifra: va debajo y en la tipografía del texto. */
+.trn__pie    { display: block; font-family: var(--font-sans); font-size: var(--fs-12); color: var(--c-ink-500); }
 .trn__unidad { font-size: var(--fs-12); color: var(--c-ink-500); margin-left: 3px; }
 .trn__ok     { font-size: var(--fs-13); color: var(--c-leaf-600); }
 

@@ -41,6 +41,15 @@ module Mostradores
 
     def err(msg) = Result.new(ok: false, error: msg)
 
+    # Lo que el cierre TENDRÍA que haber movido si se hubiera contado esto. Contra el esperado,
+    # que es el número contra el que se arquea. (Sin esperado —ítems viejos, de antes de que se
+    # guardara— no hay contra qué: se cae a la resta de siempre.)
+    def efecto_corregido(item, nuevo)
+      return nuevo - item.cantidad_cierre.to_d + item.efecto_en_inventario if item.esperado_cierre.nil?
+
+      nuevo - item.esperado_cierre.to_d
+    end
+
     def corregir!(datos)
       item = @turno.items.find_by(id: (datos[:item_id] || datos['item_id']))
       raise ArgumentError, 'Ese producto no está en el turno' if item.nil?
@@ -48,21 +57,33 @@ module Mostradores
       nuevo = (datos[:contado] || datos['contado']).to_d
       raise ArgumentError, 'La cantidad contada no puede ser negativa' if nuevo.negative?
 
-      delta = nuevo - item.cantidad_cierre.to_d
-      return if delta.zero?
+      return if nuevo == item.cantidad_cierre.to_d
 
       stock = item.stock
       raise ArgumentError, 'El producto ya no existe' if stock.nil?
 
+      # SE CORRIGE CONTRA LO ESPERADO, NO CONTRA LO CONTADO.
+      #
+      # Restar lo viejo y sumar lo nuevo sólo funciona si lo viejo se había aplicado, y hay un
+      # caso en que no: el sobrante de quien atiende queda ANOTADO y no mueve el inventario
+      # (contar no crea producto de la nada). Con la resta ingenua, corregir un cierre de 1.000
+      # —donde había 300— a los 100 reales restaba 900 g que nunca habían entrado, en vez de los
+      # 200 que faltaron de verdad. Se calcula el efecto que corresponde AHORA y se le descuenta
+      # el que se aplicó ENTONCES: si no se aplicó ninguno, entra entero.
+      anterior = item.cantidad_cierre.to_d
+      aplicado = item.efecto_en_inventario
+      delta    = efecto_corregido(item, nuevo) - aplicado
+
       item.update!(cantidad_cierre: nuevo,
                    motivo_diferencia: [item.motivo_diferencia, "corregido: #{@motivo}"].compact.join(' · '))
+      return if delta.zero?
 
       stock.with_lock do
         stock.update!(cantidad: [stock.cantidad.to_d + delta, 0].max)
         stock.stock_movimientos.create!(
           tipo: 'ajuste', gramos: delta, usuario: @usuario, turno_mostrador: @turno,
           notas: "Corrección del conteo del turno ##{@turno.id} — se había contado " \
-                 "#{(nuevo - delta).to_f} y eran #{nuevo.to_f} #{stock.unidad || 'g'} — #{@motivo}"
+                 "#{anterior.to_f} y eran #{nuevo.to_f} #{stock.unidad || 'g'} — #{@motivo}"
         )
       end
       stock.reload.marcar_agotado_si_vacio!(usuario: @usuario)

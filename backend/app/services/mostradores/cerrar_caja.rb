@@ -86,22 +86,48 @@ module Mostradores
         contado  = contado_por_stock[mi.stock_id].to_d
         raise ArgumentError, 'La cantidad contada no puede ser negativa' if contado.negative?
 
+        dif = contado - esperado
+
         item = @turno.items.find_or_initialize_by(stock_id: mi.stock_id)
         item.club_id           ||= @turno.club_id
         item.cantidad_apertura ||= 0
         item.esperado_cierre     = esperado
         item.cantidad_cierre     = contado
-        item.motivo_diferencia   = @notas.presence if contado != esperado
+        item.motivo_diferencia   = motivo_diferencia(dif) if dif != 0
         item.save!
 
-        dif = contado - esperado
         next if dif.zero?
+        # LO CONTADO QUEDA ESCRITO IGUAL, pero un sobrante de quien atiende no toca el inventario.
+        next if sobrante_sin_aplicar?(dif)
 
         mi.mover!(cantidad: dif, tipo: 'ajuste', usuario: @usuario, turno: @turno,
                   motivo: motivo_del_ajuste(dif))
         mi.ajustar_inventario!(dif, usuario: @usuario, turno: @turno,
                                concepto: 'Arqueo del mostrador', notas: @notas)
       end
+    end
+
+    # CONTAR NO PUEDE CREAR PRODUCTO DE LA NADA — no para quien atiende.
+    #
+    # `ajustar_inventario!` con una diferencia positiva SUMA al stock del club: contando 997 donde
+    # había 100 entraban 897 g trazables que nadie cargó. Es una puerta de entrada de producto sin
+    # origen, y se dispara con un dedazo.
+    #
+    # Quien atiende no puede justificar un sobrante: él no elige qué hay sobre la mesa, la carga
+    # administración. Si de verdad sobra, lo carga ella por su puerta, que descuenta del depósito
+    # y deja su motivo.
+    #
+    # PERO EL CIERRE NO SE BLOQUEA: a las once de la noche nadie puede quedar trabado esperando a
+    # un admin. Se guarda lo que contó —el dato no se pierde— sin mover el inventario, y el turno
+    # cae en la lista de revisión como `sobrante`. El faltante sí se aplica como siempre: restar
+    # lo que no está no inventa nada.
+    def sobrante_sin_aplicar?(dif) = dif.positive? && @usuario&.atiende_mostrador?
+
+    def motivo_diferencia(dif)
+      return @notas.presence unless sobrante_sin_aplicar?(dif)
+
+      ["Contó #{dif.abs.round(3)} de más — queda anotado, no se cargó al inventario",
+       @notas.presence].compact.join(' — ')
     end
 
     def motivo_del_ajuste(dif)
