@@ -34,7 +34,9 @@ RSpec.describe 'La merma del mostrador', type: :request do
 
   # Un turno completo: administración carga la mesa, quien atiende abre contando, dispensa y
   # cierra contando.
-  def turno!(flor_carga:, flor_disp:, flor_contado:, preroll_carga:, preroll_disp:, preroll_contado:)
+  def turno!(flor_carga:, flor_disp:, flor_contado:, preroll_carga:, preroll_disp:, preroll_contado:,
+             quien: nil, cierra: nil)
+    quien ||= ana
     ActsAsTenant.with_tenant(club) do
       mostrador = sede.mostrador!
       Mostradores::Cargar.call(
@@ -42,18 +44,18 @@ RSpec.describe 'La merma del mostrador', type: :request do
         cambios: [{ stock_id: flor.id, cantidad: flor_carga },
                   { stock_id: preroll.id, cantidad: preroll_carga }]
       )
-      turno = Mostradores::AbrirCaja.call(mostrador: mostrador, usuario: ana,
+      turno = Mostradores::AbrirCaja.call(mostrador: mostrador, usuario: quien,
                                           efectivo_contado_ars: 0).turno
 
       [[flor, flor_disp], [preroll, preroll_disp]].each do |st, cant|
         next if cant.zero?
-        Dispensacion.create!(paciente: paciente, user: ana, stock: st, sede: sede, cantidad: cant,
+        Dispensacion.create!(paciente: paciente, user: quien, stock: st, sede: sede, cantidad: cant,
                              medio_pago: 'efectivo', aporte_socio_ars: 1_000,
                              fecha_dispensacion: Time.zone.today)
       end
 
       Mostradores::CerrarCaja.call(
-        turno: turno, usuario: ana, efectivo_contado_ars: 0, fondo_siguiente_ars: 0,
+        turno: turno, usuario: cierra || quien, efectivo_contado_ars: 0, fondo_siguiente_ars: 0,
         conteos: [{ stock_id: flor.id, contado: flor_contado },
                   { stock_id: preroll.id, contado: preroll_contado }],
         notas: 'merma de fraccionamiento'
@@ -158,6 +160,76 @@ RSpec.describe 'La merma del mostrador', type: :request do
       end
 
       expect(merma['por_turno'].first['correcciones']).to eq(1)
+    end
+  end
+
+  # EL TABLERO POR PERSONA: para saber dónde ajustar.
+  #
+  # El problema de un ranking de gente no es moral, es estadístico: quien más volumen mueve
+  # encabeza siempre, y quien fracciona flor pierde más que quien entrega prerolls. Por eso la
+  # fila lleva el volumen, la comparación contra el promedio del MISMO mostrador en el MISMO
+  # período, y si hay turnos suficientes como para concluir algo.
+  describe 'por persona' do
+    let(:beto) { create(:user, :dispensador, club: club) }
+
+    before do
+      # Ana: tres turnos prolijos. Entrega 100, falta 1 → 1%.
+      3.times do
+        turno!(flor_carga: 150, flor_disp: 100, flor_contado: 49,
+               preroll_carga: 0, preroll_disp: 0, preroll_contado: 0)
+      end
+      # Beto: uno solo, y desprolijo. Entrega 100 y faltan 10 → 10%.
+      turno!(flor_carga: 150, flor_disp: 100, flor_contado: 40,
+             preroll_carga: 0, preroll_disp: 0, preroll_contado: 0, quien: beto)
+    end
+
+    it 'atribuye el turno a QUIEN ATENDIÓ, que es quien abrió contando' do
+      gente = merma['por_persona']
+
+      expect(gente.map { |g| g['persona'] }).to contain_exactly(ana.nombre_completo, beto.nombre_completo)
+      expect(gente.find { |g| g['usuario_id'] == ana.id }['turnos']).to eq(3)
+    end
+
+    # El número que dice dónde ajustar. Un porcentaje solo mide cuánto se vendió tanto como
+    # cuánto se perdió.
+    it 'compara a cada uno contra el promedio del período' do
+      gente = merma['por_persona']
+      b = gente.find { |g| g['usuario_id'] == beto.id }
+
+      expect(b['merma_pct']).to eq(10.0)
+      expect(b['contra_promedio']).to be > 0
+      expect(gente.find { |g| g['usuario_id'] == ana.id }['contra_promedio']).to be < 0
+    end
+
+    it 'y ordena por porcentaje, con el volumen al lado para no leerlo mal' do
+      gente = merma['por_persona']
+
+      expect(gente.first['usuario_id']).to eq(beto.id)
+      expect(gente.first['dispensado']).to eq(100.0)
+      expect(gente.second['dispensado']).to eq(300.0)
+    end
+
+    # Un +9 pts con un solo turno es ruido: la pantalla lo muestra igual —esconderlo sería
+    # peor— pero sin conclusión.
+    it 'marca quién tiene turnos suficientes como para concluir algo' do
+      gente = merma['por_persona']
+
+      expect(gente.find { |g| g['usuario_id'] == beto.id }['suficientes']).to be(false)
+      expect(gente.find { |g| g['usuario_id'] == ana.id }['suficientes']).to be(true)
+    end
+
+    # Si no, el admin lee el número de alguien que no hizo ese arqueo.
+    it 'avisa cuando el turno lo cerró otra persona' do
+      turno!(flor_carga: 150, flor_disp: 100, flor_contado: 49,
+             preroll_carga: 0, preroll_disp: 0, preroll_contado: 0, quien: beto, cierra: admin)
+
+      b = merma['por_persona'].find { |g| g['usuario_id'] == beto.id }
+      expect(b['cerro_otro']).to eq(1)
+    end
+
+    it 'no lo ve quien atiende: es información de gestión' do
+      merma(como: ana)
+      expect(response).to have_http_status(:forbidden)
     end
   end
 

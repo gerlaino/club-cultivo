@@ -8,18 +8,14 @@
 # en aceite; y lo que importa no es el número absoluto sino que CAMBIÓ. Se compara la última
 # semana contra las ocho anteriores de la misma organización: cada una es su propio patrón.
 #
+# ESA REGLA NO VIVE ACÁ: vive en `Mostradores::Veredicto`, y la misma que dispara este aviso es
+# la que la solapa de Merma muestra en pantalla. Estaba escrita sólo acá, así que el admin recibía
+# el mail diciendo "algo cambió", entraba a mirar, y la pantalla no le decía nada de eso.
+#
 # El aviso NO acusa a nadie: la merma es inevitable y lo que dice es "acá cambió algo, andá a
 # mirar". Ver `Mostradores::Merma`.
 class MermaMostradorJob < ApplicationJob
   queue_as :default
-
-  # Hace falta historia para que "cambió" signifique algo: con dos turnos, cualquier diferencia
-  # parece un salto.
-  TURNOS_MINIMOS = 8
-  # Y un piso de volumen: 2 g sobre 10 dispensados es 20% y no dice nada.
-  GRAMOS_MINIMOS = 200
-  # Cuánto tiene que empeorar respecto de su propio patrón para que valga interrumpir a alguien.
-  FACTOR = 2.0
 
   def perform
     cada_club_con(:produccion_dispensa) { |club| procesar_club(club) }
@@ -32,14 +28,12 @@ class MermaMostradorJob < ApplicationJob
   end
 
   def revisar(club, mostrador)
-    hoy      = Time.zone.today
-    semana   = medir(mostrador, hoy - 6, hoy)
-    anterior = medir(mostrador, hoy - 62, hoy - 7)
-
-    return if semana[:dispensado] < GRAMOS_MINIMOS
-    return if anterior[:turnos] < TURNOS_MINIMOS || anterior[:pct].nil? || semana[:pct].nil?
-    return if semana[:pct] <= anterior[:pct] * FACTOR
+    v = Mostradores::Veredicto.call(mostrador: mostrador)
+    return unless v[:estado] == 'subio'
     return if aviso_reciente?(club, mostrador)
+
+    semana   = { pct: v[:pct], ars: v[:faltante_ars] }
+    anterior = { pct: v[:pct_previo] }
 
     AlertaInterna.create!(
       club:             club,
@@ -76,12 +70,6 @@ class MermaMostradorJob < ApplicationJob
     ).deliver_now
   rescue => e
     Rails.logger.warn "MermaMostradorJob: no se pudo mandar el mail — #{e.message}"
-  end
-
-  def medir(mostrador, desde, hasta)
-    r = Mostradores::Merma.call(mostrador: mostrador, desde: desde, hasta: hasta)[:resumen]
-    { pct: r[:merma_pct], dispensado: r[:dispensado].to_f, turnos: r[:turnos].to_i,
-      ars: r[:faltante_ars].to_f }
   end
 
   # Uno por semana y por mostrador: repetirlo todos los días es cómo se aprende a ignorarlo.

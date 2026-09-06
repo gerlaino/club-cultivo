@@ -1,5 +1,122 @@
 # Changelog
 
+## Septiembre 2026 (ag) — la solapa de Merma contesta, y el arqueo deja de pedir lo que ya sabe
+
+**LA PANTALLA NO CONTESTABA NADA: ENTREGABA CUATRO TABLAS.** Filtros con un botón "Ver", la lista
+de pendientes, tres KPIs y después *Sede por sede*, *Por producto* y *Turno por turno* — las tres
+con las MISMAS columnas. El admin tenía que elegir cuál mirar antes de saber qué estaba buscando. Y
+el número principal —"2,4% de lo entregado"— no se comparaba con nada: 3% puede ser normal
+fraccionando flor y un escándalo en aceite.
+
+**Lo peor es que la app YA sabía contestarlo.** `MermaMostradorJob` compara la última semana contra
+las ocho anteriores de esa organización y le manda un mail al admin diciendo "acá cambió algo, andá
+a mirar"; el admin entraba a mirar y la solapa no le decía una palabra de eso. La regla vivía
+adentro del job. Ahora vive en **`Mostradores::Veredicto`** y la preguntan los dos: **la que
+dispara el aviso es la que se lee en pantalla.**
+
+La solapa quedó ordenada **por pregunta**, el mismo criterio con el que se ordenaron los informes:
+
+- **① ¿Cómo viene?** — el veredicto en castellano ("subió a 5,1% esta semana, contra 1,2% de las
+  últimas 8 semanas"), **qué producto la está moviendo** —sin eso, "subió" manda a mirar tres
+  tablas para encontrar el renglón que ya sabemos cuál es— y la **tendencia semana a semana**, que
+  es lo que contesta "¿viene subiendo?". El total del período no lo dice, y hasta ahora la única
+  forma de saberlo era cambiar el rango a mano y acordarse del número anterior. El veredicto mira
+  siempre la última semana y no el rango elegido: si cambiara con el filtro no se podría comparar
+  con nada. Y siempre dice algo —`sin_historia`, `poco_volumen`, `sin_datos`— porque quedarse en
+  blanco se lee como que está todo bien.
+- **② Para mirar · N** — la lista de trabajo con el contador en el título.
+- **③ Dónde se va** — **una sola tabla** con un corte a la vez (Producto · Sede · Turno), el **%
+  primero y con peso** (es el número que manda) y el resto en gris. Se baja en CSV el corte que se
+  está mirando, armado en el navegador: pedirle al backend un CSV de lo mismo es otro endpoint para
+  mantener sincronizado.
+- **El período en botones** (Este mes · 30 días · 90 días · Otro). Se fue el botón "Ver".
+
+**Y SE CORTA POR PERSONA** (decisión de Germán): el admin necesita saber dónde ajustar, y para eso
+hay que poder mirarlo. El reparo no era moral sino estadístico —quien más volumen mueve encabeza
+siempre un ranking pelado, y quien fracciona flor pierde más que quien entrega prerolls—, así que
+la fila lleva lo que hace falta para no leerla mal: **cada uno contra el promedio del MISMO
+mostrador en el MISMO período** (en puntos, no en veces: "el doble" de 0,2% no es nada), el
+**volumen al lado**, y un **piso de 3 turnos** para sacar conclusiones — debajo de eso el dato se
+muestra igual, porque esconderlo sería peor, pero la diferencia no se pinta. **El turno se le
+atribuye a quien ATENDIÓ, o sea a quien abrió contando** —la diferencia se produce durante la
+jornada, no en el momento de contarla— y cuando lo cerró otra persona la fila lo dice, o el admin
+estaría leyendo el número de alguien que no hizo ese arqueo.
+
+**EL CIERRE DE CAJA YA NO PIDE ESCRIBIR LO QUE LA APP SABE.** Los dos campos llegan con un número:
+el efectivo con lo que tendría que haber, y el fondo con lo mismo —"dejo todo"—, que es justo lo
+que la pantalla ya le dice a quien no puede retirar. Antes, dejando el fondo vacío, el modal le
+anunciaba un retiro **a su nombre que él no puede hacer**, y tenía que volver a tipear el número
+que acababa de contar. A administración el fondo NO se le llena: ella sí se lleva la recaudación.
+El costo está asumido y es el mismo de mostrar lo esperado al lado del campo: un campo que llega
+lleno invita a confirmarlo sin terminar de contar. **Si la diferencia de caja se aplana
+sospechosamente, esto es lo primero que hay que mirar.**
+
+**Y un bug que apareció tirando del hilo del sobrante:** `CorregirCierre` restaba lo viejo y sumaba
+lo nuevo, y eso sólo vale si lo viejo se había aplicado. Con un sobrante anotado-y-no-aplicado,
+corregir un cierre de 1.000 —donde había 500— a los 100 reales **descontaba 900 g que nunca habían
+entrado**, en vez de los 400 que faltaron. Se corrige **contra lo esperado**, que es el número
+contra el que se arquea: `TurnoMostradorItem#efecto_en_inventario` dice cuánto movió de verdad ese
+cierre y la corrección le descuenta eso.
+
+## Septiembre 2026 (af) — lo que apareció probando el mostrador en producción
+
+Cinco hallazgos de una sola pasada con el Club Modelo, y el peor no se veía en la pantalla.
+
+**CONTAR CREABA PRODUCTO DE LA NADA.** `ajustar_inventario!` con diferencia positiva SUMA al stock
+del club: contando 997 donde había 100 entraban **897 g trazables que nadie cargó**. En un producto
+regulado eso es una puerta de entrada de mercadería sin origen, y se dispara con un dedazo. Ahora
+quien atiende no puede declarar un sobrante —él no elige qué hay sobre la mesa, la carga
+administración— y las tres puertas se comportan distinto a propósito: `Contar` de a uno lo RECHAZA
+(no bloquea nada, sigue atendiendo) y el CIERRE y la APERTURA lo ACEPTAN sin aplicarlo, porque
+trabar el cierre dejaría la caja sin poder cerrarse a las once de la noche, y trabar la apertura
+dejaría el mostrador cerrado a las ocho de la mañana. Se guarda lo que contó, no se mueve nada y el
+turno cae en la lista de revisión como `sobrante` (cuarta razón de `MotivosDeRevision`), donde
+administración decide si lo carga de verdad. El faltante se sigue aplicando: restar lo que no está
+no inventa nada.
+
+**Y LA APERTURA ERA LA PUERTA MÁS GRANDE**, que era la que parecía más inocente: corregir al abrir
+"no toca el inventario" —es cierto, y por eso pasaba desapercibida— pero **sí mueve la mesa, y la
+mesa está APARTADA**. Abriendo con 1.500 contados donde la fila del `Stock` tiene 1.000, el
+disponible que mira `Dispensacion` sale de `cantidad_disponible_real + apartado_en_mostrador_de_sede`
+= 0 + 1.500: autorizaba a entregar 500 g **que no existen**, y como `decrement!` no valida, la fila
+del stock terminaba **en negativo** con la mercadería ya afuera. Ahora la mesa sólo se corrige hacia
+abajo cuando la cuenta quien atiende, y el conteo de más queda escrito en el item y en las notas del
+turno ("no se cargó a la mesa"). De paso, `corregido` pasó a significar exactamente lo que dice —la
+mesa que efectivamente bajó—: etiquetar como "corregido" un conteo que no corrigió nada es cómo se
+aprende a ignorar la lista de pendientes.
+
+`ModalConteo` lo avisa **mientras se escribe el número**, no después de confirmar: quien cerraba el
+modal se iba convencido de que la mesa había quedado en lo que contó. No bloquea el botón — abrir
+nunca bloquea.
+
+**LA DIFERENCIA DEL ARQUEO SE CORTABA CONTRA EL BORDE.** `ModalConteo` es el que usa quien atiende
+todos los días y **no tenía una sola media query**: la comparación es un grid de cuatro columnas y
+con "$150.000 · $130.000 · −$20.000" la última se iba fuera del modal. O sea que el número por el
+que existe el arqueo quedaba invisible, y parecía mal calculado. En el teléfono cada fila pasa a
+dos renglones con la etiqueta de cada cifra, y la del producto pone el nombre arriba y el campo
+abajo.
+
+**EL QUE CERRÓ EL TURNO NO LO VEÍA.** Los turnos se filtraban por `abierto_por_id`, pero la caja es
+del mostrador y no de una persona: la abre el admin a la mañana y la cierra contando quien atendió
+todo el día. Ése cerraba su arqueo y la pantalla le decía "todavía no cerraste ningún turno acá",
+que es justo lo que necesita si al día siguiente le preguntan por una diferencia que él anotó.
+
+**LOS ARQUEOS SE MIDEN EN PLATA.** "Faltó 23" eran 23 g de flor más 4 prerolls: `faltante` y
+`dispensado` suman unidades distintas, así que el número no significa nada ni se compara entre
+turnos. Al lado aparecía "$27.636,6" sin etiqueta, que se leía como el costo de algo. La tabla
+muestra ahora los pesos y **en cuántos productos** faltó, y la diferencia de caja dice si sobró o
+faltó en vez de ser una segunda cifra pegada. El CSV lleva las dos cosas: lo abre alguien que va a
+analizar, no a leer de un vistazo.
+
+**Y los números de esa tabla salían con dos tipografías**: "Entregado" en sans y los demás en
+monoespaciada, en la misma tabla y para el mismo tipo de dato.
+
+**2813 rspec ✓ · 1797 vitest ✓ · build limpio.** Correr el backend encontró dos bugs de lo escrito
+a ciegas: `stock.precio_ars` no existe —es `precio_sugerido_ars`— y **la solapa Turnos tiraba 500
+para todos**, que es de las que se ven abriendo la pantalla y no compilando; y dos specs viejos que
+afirmaban la regla anterior (el sobrante de quien atiende subía el inventario) pasaron a
+administración, que es quien sí puede.
+
 ## Septiembre 2026 (ae) — el mostrador del que atiende, en el teléfono
 
 **LA PWA EXISTE PARA QUE LA PANTALLA SEA OTRA, NO PARA SERVIR LA MISMA MÁS ANGOSTA.** `/m/mostrador`

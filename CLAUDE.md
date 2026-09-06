@@ -146,11 +146,14 @@ Ninguno se considera cerrado; todos son candidatos a revisión.
     Es una pantalla de CONSULTA y ARQUEO, no de operación: **dispensar sigue por su flujo**.
     Cuatro solapas: **Hoy** · **Turnos** (los cerrados; administración ve todos, el que atiende ve
     LOS SUYOS — el filtro es del backend) · **Merma** y **Rendiciones**, sólo administración. La
-    solapa de Merma hace DOS cosas y por eso están separadas: arriba la **lista de trabajo** (los
-    turnos que piden una mirada, que se terminan) y abajo el análisis, que se consulta.
-    Un turno entra a esa lista por **tres** razones —faltante, **corrección al abrir**, o
-    **administración movió la mesa durante el turno**— y cada renglón dice cuál: un pendiente que
-    no dice qué mirar obliga a abrirlo para descubrir que no era nada.
+    solapa de Merma está ordenada **POR PREGUNTA**, no por entidad: **① ¿cómo viene?** (el
+    veredicto contra el patrón de esa organización + la tendencia semanal) · **② para mirar** (la
+    lista de trabajo, que se termina) · **③ dónde se va** (UNA tabla con un corte a la vez:
+    producto, sede o turno). Eran cuatro tablas apiladas con las mismas columnas y había que elegir
+    cuál mirar antes de saber qué se buscaba.
+    Un turno entra a esa lista por **cuatro** razones —faltante, **sobrante**, **corrección al
+    abrir**, o **administración movió la mesa durante el turno**— y cada renglón dice cuál: un
+    pendiente que no dice qué mirar obliga a abrirlo para descubrir que no era nada.
     **La caja del dispensario se abre y se cierra SÓLO por acá.** `caja/abrir`,
     `confirmar_apertura`, `solicitar_cierre`, `confirmar_cierre` y `cerrar` se retiraron: abrir
     declarando sólo un fondo salteaba la mitad del arqueo. En `cajas#*` queda mover plata
@@ -543,6 +546,67 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   falta que alguien explica. Nada de rojo, nada de "la diferencia es tuya", nada de "sin
   supervisión". El número que manda es el **porcentaje sobre lo entregado**, no los gramos: un
   ranking absoluto siempre encabeza con lo que más se vende y no dice nada.
+- **EL VEREDICTO DE LA MERMA VIVE EN UN SOLO LUGAR** (`Mostradores::Veredicto`, sep-2026): la
+  última semana contra las ocho anteriores DE ESA organización, con pisos de historia (8 turnos) y
+  de volumen (200 g) y factor 2. La regla estaba escrita adentro de `MermaMostradorJob`, así que el
+  admin recibía el mail diciendo "algo cambió", entraba a mirar y **la pantalla no le decía nada de
+  eso**. Ahora la preguntan los dos. El veredicto mira **siempre la última semana**, no el rango
+  elegido en la solapa: si cambiara con el filtro no se podría comparar con nada. Y **siempre
+  devuelve un estado** —`sin_historia`, `poco_volumen`, `sin_datos`— porque quedarse en blanco se
+  lee como que está todo bien.
+- **LA MERMA SE CORTA TAMBIÉN POR PERSONA, Y NUNCA COMO RANKING PELADO** (sep-2026, decisión de
+  Germán: para ajustar hay que poder mirarlo). El reparo no es moral sino estadístico —quien más
+  volumen mueve encabeza siempre, y quien fracciona flor pierde más que quien entrega prerolls—,
+  así que la fila SIEMPRE lleva las tres cosas que evitan leerla mal: **`contra_promedio`** (el
+  mismo mostrador, el mismo período, en PUNTOS y no en veces), el **volumen**, y **`suficientes`**
+  (piso de 3 turnos; debajo se muestra igual pero sin conclusión y sin pintar la diferencia).
+  **Se atribuye a quien ATENDIÓ = quien ABRIÓ**: la diferencia se produce durante la jornada, no
+  al contarla. Si cerró otro, la fila lo dice (`cerro_otro`) — si no, el admin lee el número de
+  alguien que no hizo ese arqueo. Sigue valiendo el tono: se mide para encontrar cuellos de
+  botella, y el texto de la pantalla tiene que sonar así.
+- **AL CERRAR LA CAJA, LOS CAMPOS LLEGAN CON UN NÚMERO** (sep-2026): el efectivo con lo esperado y
+  el fondo con lo mismo ("dejo todo"), que es lo que la pantalla ya le dice a quien no puede
+  retirar — vacío, el modal le anunciaba un retiro A SU NOMBRE que él no puede hacer y tenía que
+  volver a tipear lo que acababa de contar. A administración el fondo NO se le llena: ella sí se
+  lleva la recaudación. **Es la misma apuesta que mostrar lo esperado** y tiene el mismo costo: un
+  campo lleno invita a confirmarlo sin terminar de contar. Si la diferencia de caja se aplana
+  sospechosamente, mirar esto primero.
+- **CORREGIR UN CIERRE SE CALCULA CONTRA LO ESPERADO, NO CONTRA LO CONTADO**
+  (`TurnoMostradorItem#efecto_en_inventario`). Restar lo viejo y sumar lo nuevo sólo vale si lo
+  viejo se aplicó, y el sobrante de quien atiende queda ANOTADO sin aplicarse: corregir un cierre
+  de 1.000 —donde había 500— a los 100 reales descontaba **900 g que nunca entraron**, en vez de
+  los 400 que faltaron. Todo lo que haga cuentas contra `cantidad_cierre` tiene que preguntar
+  primero si eso movió algo.
+- **CONTAR NO CREA PRODUCTO DE LA NADA** (sep-2026). `ajustar_inventario!` con diferencia
+  positiva SUMA al stock del club: contando 997 donde había 100 entraban 897 g **trazables que
+  nadie cargó**. Es una puerta de entrada de producto sin origen y se dispara con un dedazo.
+  **Quien atiende no puede declarar un sobrante** — él no elige qué hay sobre la mesa, la carga
+  administración, y si de verdad sobra lo carga ella por su puerta, que descuenta del depósito.
+  Son **TRES puertas** y se comportan distinto **a propósito**: `Contar` de a uno lo RECHAZA (no
+  bloquea nada, sigue atendiendo); el CIERRE y la APERTURA lo ACEPTAN sin aplicarlo —guardan lo
+  contado, no tocan nada y el turno cae en la lista de trabajo como `sobrante`— porque trabar el
+  cierre dejaría la caja sin poder cerrarse a las once de la noche, y trabar la apertura dejaría
+  el mostrador cerrado a las ocho de la mañana. El faltante se aplica siempre: restar lo que no
+  está no inventa nada. Administración sí puede subir contando.
+  **LA APERTURA ERA LA PUERTA MÁS GRANDE**, y parecía la más inocente: corregir al abrir "no toca
+  el inventario", pero **sí mueve la mesa, y la mesa está APARTADA**. Subirla a 1.500 con 1.000 en
+  la fila del `Stock` dejaba `Dispensacion#stock_disponible` —que suma `apartado_en_mostrador_de_sede`—
+  autorizando 500 g que no existen, y `decrement!` no valida: la fila terminaba **en negativo**,
+  con la mercadería ya afuera. Por eso `AbrirCaja#sobrante_sin_aplicar?` es el gemelo exacto del
+  de `CerrarCaja`. **La mesa sólo se corrige HACIA ABAJO** cuando la cuenta quien atiende.
+  Y `corregido` pasó a significar exactamente eso —la mesa que efectivamente bajó—: llamar
+  "corregido" a un conteo que no corrigió nada es el tipo de etiqueta que hace que nadie mire la
+  lista.
+- **QUIEN ATENDIÓ ES EL QUE ABRIÓ *O* EL QUE CERRÓ.** La caja es del mostrador, no de una
+  persona: es normal que la abra el admin a la mañana y la cierre contando quien atendió todo el
+  día. Filtrando los turnos sólo por `abierto_por_id`, ése cerraba su arqueo y la pantalla le
+  decía "todavía no cerraste ningún turno acá" — justo lo que necesita si al día siguiente le
+  preguntan por una diferencia que él anotó.
+- **LOS ARQUEOS SE MIDEN EN PLATA, NO EN CANTIDAD.** `faltante` y `dispensado` SUMAN unidades
+  distintas: "faltó 23" eran 23 g de flor más 4 prerolls, un número que no significa nada y que
+  no se compara entre turnos. La tabla de turnos muestra los pesos y en cuántos productos faltó;
+  el CSV sí lleva las dos cosas, porque lo abre alguien que va a analizar, no a leer de un
+  vistazo.
 - **El ajuste del arqueo NUNCA es `merma`.** Es una corrección de conteo y va como `ajuste` con
   motivo obligatorio. El informe de Pérdidas cuenta `merma`: anotarlo ahí declararía destruido
   producto que puede estar entero. Corregir AL ABRIR no toca el inventario en absoluto — todavía
