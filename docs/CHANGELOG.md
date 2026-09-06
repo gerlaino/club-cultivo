@@ -8,9 +8,11 @@ arrancar, porque ya hay una caja abierta— y para entonces el arqueo de esa jor
 hacer nadie: la mercadería pasó la noche sin contar y lo cobrado en efectivo quedó sin cuadrar
 contra nada. El admin elige la hora en Configuración → Alertas, **general para la organización y
 por sede cuando alguna cierra distinto** — que es donde más sirve, porque él no está en ninguna de
-las dos. `CierreMostradorPendienteJob` corre cada quince minutos (la hora la elige cada
-organización: esperar a horas en punto obligaría a que todas cerraran a horas redondas), avisa
-**una vez por mostrador y por día** —cada quince minutos es cómo se aprende a ignorarlo— y llega
+las dos. `CierreMostradorPendienteJob` **barre cada diez minutos**, y no arranca "a la hora
+límite" porque no hay UNA hora: cada organización elige la suya y cada sede puede tener otra, así
+que un cron —que es global— no puede saberla. Cada pasada pregunta si esa hora ya pasó y antes del
+límite no hace nada; lo único que fija el intervalo es cuánto tarde llega el aviso. Avisa
+**una vez por mostrador y por día** —repetirlo cada diez minutos es cómo se aprende a ignorarlo— y llega
 por campana **y push**, porque a las 23:00 nadie está mirando la app. Sin migración: la config vive
 en `clubs.alertas_config`, y la regla en `Club#hora_limite_cierre_mostrador`, que preguntan el job
 y la pantalla.

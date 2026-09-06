@@ -32,10 +32,13 @@ Sidekiq.configure_server do |config|
         'description' => 'Genera alertas de stock bajo (umbral configurable por club) para todos los clubes'
       },
       'cierre_mostrador_pendiente' => {
-        # Cada quince minutos porque la hora la elige cada organización: un aviso a las 23:07 en
-        # vez de las 23:00 no cambia nada, y esperar a una hora en punto obligaría a que todas
-        # cerraran a horas redondas.
-        'cron'  => '*/15 * * * *',
+        # BARRE CADA DIEZ MINUTOS, y no arranca "a la hora límite" porque no hay UNA hora: cada
+        # organización elige la suya y cada sede puede tener otra, así que un cron —que es global—
+        # no puede saberla. Lo que hace cada pasada es preguntar si esa hora ya pasó
+        # (`Time.zone.now < limite` → sigue de largo): antes del límite no avisa nada, y después
+        # avisa UNA vez por mostrador y por día. Lo único que fija el intervalo es cuánto tarde
+        # llega el aviso.
+        'cron'  => '*/10 * * * *',
         'class' => 'CierreMostradorPendienteJob',
         'description' => 'Avisa al admin si la caja del mostrador sigue abierta pasada la hora que configuró'
       },
