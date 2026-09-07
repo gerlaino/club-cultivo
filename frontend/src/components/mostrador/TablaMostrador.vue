@@ -40,7 +40,10 @@
             <td v-if="muestraCosto" class="tmo__num tmo__mut" data-col="Costo">
               {{ s.costo_ars ? `$${fmt(s.costo_ars)}` : '—' }}
             </td>
-            <td class="tmo__num tmo__mut" data-col="Depósito">{{ fmt(s.disponible) }} {{ s.unidad }}</td>
+            <!-- CUÁNTO HAY EN EL DEPÓSITO ES DE ADMINISTRACIÓN. Quien atiende no lo ve: lo que
+                 necesitaba de ahí era saber qué pedir, y para eso tiene el botón de reposición.
+                 El backend además ya no se lo manda — esconder una columna no es una regla. -->
+            <td v-if="muestraCosto" class="tmo__num tmo__mut" data-col="Depósito">{{ fmt(s.disponible) }} {{ s.unidad }}</td>
             <td class="tmo__num tmo__td-input" :data-col="tituloColumna">
               <template v-if="editable">
                 <input :value="valores[s.stock_id] ?? ''" type="number" min="0" step="0.1"
@@ -136,8 +139,9 @@ const COLUMNAS = [
   { campo: 'precio',   label: 'Precio', num: true },
 ]
 const columnas = computed(() => {
-  const base = props.muestraCosto ? [...COLUMNAS, { campo: 'costo', label: 'Costo', num: true }] : COLUMNAS
-  return [...base, { campo: 'disponible', label: 'Depósito', num: true }]
+  if (!props.muestraCosto) return COLUMNAS
+  return [...COLUMNAS, { campo: 'costo', label: 'Costo', num: true },
+          { campo: 'disponible', label: 'Depósito', num: true }]
 })
 
 const valores = computed(() => props.modelValue)

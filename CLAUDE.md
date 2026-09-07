@@ -669,10 +669,18 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 - **EL QUE ATIENDE NO ELIGE QUÉ HAY SOBRE LA MESA: LA CUENTA.** La mesa la carga administración
   (`Cargar`, gestiona-only) y él abre contando lo que encuentra. Esto reemplazó a la regla vieja
   de "abre con lo que heredó y puede corregir para abajo", que existía sólo porque abrir ERA
-  poner mercadería: con la mesa permanente no hay nada que elegir al abrir. Si le falta algo, se
-  lo pide a administración, que lo baja con su motivo y queda como `mesa_movida` en la lista de
-  trabajo. **Ver** el depósito no se toca: ya lo ve en su pantalla de Stock con más columnas, y
-  taparlo en un lado y dejarlo en el otro sería teatro.
+  poner mercadería: con la mesa permanente no hay nada que elegir al abrir.
+- **Y NO VE EL DEPÓSITO: LO PIDE** (sep-2026, decisión de Germán que REVIRTIÓ la regla anterior —
+  si aparece en un comentario viejo que "ver el depósito no se le tapa", es legacy). Cuánto hay
+  guardado no es asunto suyo; lo que necesitaba de ahí era saber qué pedir, y para eso está el
+  botón **Pedir reposición** (`mostrador#reponer`), que le avisa por campana y push a **admin y
+  supervisor** en vez de dejarlo avisando por fuera de la app. Le llega **una sola fila de alerta
+  marcada para supervisor**: el admin ve todas las de su organización, así que con dos filas la
+  vería repetida. **Uno por producto y por día**, o la campana se llena del mismo aviso. El
+  backend le manda **`hay_en_deposito` (sí/no), nunca `disponible`** — lo justo para no pedir lo
+  que no hay—, y `StocksController#index` le muestra la MESA también fuera del carrito: antes el
+  filtro aplicaba sólo con `para_dispensa` y su pantalla de Stock le mostraba el depósito entero.
+  En el nav del teléfono, **Historial** ocupa el lugar visible y Stock queda en "Más".
 - **EL MOSTRADOR DE OTRA SEDE NO SE TOCA.** `set_mostrador` y `CajasController#set_sede` filtran
   por `current_user.sedes_visibles_ids`: sin eso, un dispensador de Norte abría y cerraba el
   mostrador de Centro mandando otro `sede_id`. La pantalla sólo le ofrece las suyas, pero la

@@ -20,12 +20,15 @@ const SEDES = [{ id: 10, nombre: 'Central', tipo: 'social' }]
 
 const FLOR = {
   stock_id: 1, numero: 'ST-26-0031', forma: 'flor_seca', unidad: 'g', lote: 'L-26-002',
-  genetica: 'Northern Lights', fecha: '2026-06-10', precio_ars: 1200, disponible: 500,
+  genetica: 'Northern Lights', fecha: '2026-06-10', precio_ars: 1200,
+  // A quien atiende NO le llega cuánto hay guardado: sólo si queda algo que pedir.
+  hay_en_deposito: true, reposicion_pedida: false,
   mostrador: 297.5,
 }
 const PREROLL = {
   stock_id: 2, numero: 'ST-26-0061', forma: 'preroll', unidad: 'un', lote: null,
-  genetica: 'Amnesia', fecha: '2026-07-02', precio_ars: 2500, disponible: 120, mostrador: 42,
+  genetica: 'Amnesia', fecha: '2026-07-02', precio_ars: 2500,
+  hay_en_deposito: false, reposicion_pedida: false, mostrador: 42,
 }
 
 const TURNO = {
@@ -38,6 +41,7 @@ const getMostrador = vi.fn(() => Promise.resolve({ data: respuesta }))
 const contarMostrador = vi.fn(() => Promise.resolve({ data: {} }))
 
 vi.mock('../composables/useStockChannel.js', () => ({ useStockChannel: () => {} }))
+const pedirReposicionMostrador = vi.fn(() => Promise.resolve({ data: { ok: true } }))
 vi.mock('../lib/api.js', () => ({
   getMostrador:    (...a) => getMostrador(...a),
   contarMostrador: (...a) => contarMostrador(...a),
@@ -49,6 +53,7 @@ vi.mock('../lib/api.js', () => ({
   listRendiciones: vi.fn(() => Promise.resolve({ data: { rendiciones: [] } })),
   receptoresRendicion: vi.fn(() => Promise.resolve({ data: [] })),
   crearRendicion: vi.fn(), recibirRendicion: vi.fn(), conformarRendicion: vi.fn(),
+  pedirReposicionMostrador: (...a) => pedirReposicionMostrador(...a),
   listSedes: vi.fn(() => Promise.resolve({ data: SEDES })),
 }))
 
@@ -198,7 +203,7 @@ describe('La hoja del producto', () => {
     expect(hoja.text()).toContain('L-26-002')     // lote
     expect(hoja.text()).toContain('10/06/26')     // elaborado
     expect(hoja.text()).toContain('$1.200')       // precio
-    expect(hoja.text()).toContain('500')          // en el depósito
+    // El depósito NO: cuánto hay guardado no es asunto suyo (ver "Pedir reposición").
   })
 
   // Contar un frasco suelto existe porque cerrar y reabrir con quince productos son veinte
@@ -219,7 +224,10 @@ describe('La hoja del producto', () => {
     await tarjetas(w)[0].trigger('click')
 
     expect(w.find('.sheet-stub').text()).toContain('caja abierta')
-    expect(w.find('.sheet-stub .mmo__btn').exists()).toBe(false)
+    // El de CONTAR: el de pedir reposición no depende de la caja — que le falte producto no
+    // tiene nada que ver con que esté atendiendo.
+    const contar = w.findAll('.sheet-stub .mmo__btn').filter(b => b.text().includes('Contar'))
+    expect(contar).toHaveLength(0)
   })
 })
 
@@ -262,5 +270,56 @@ describe('Cuando no hay sede de atención', () => {
 
     expect(w.find('.mmo__tabs').exists()).toBe(false)
     expect(tarjetas(w)).toHaveLength(0)
+  })
+})
+
+// PEDIR, NO MIRAR.
+//
+// Cuánto hay guardado en el depósito no es asunto de quien atiende —lo decidió Germán al ver que
+// su pantalla de Stock se lo mostraba entero—, pero sí necesita decir "se me está acabando esto".
+// El botón reemplaza a mirar el número y avisar por fuera de la app: el pedido le llega a
+// administración por la campana y por el celular.
+describe('Pedir reposición', () => {
+  it('no le muestra cuánto hay en el depósito', async () => {
+    const w = await montar()
+    await w.findAll('.mmo__card')[0].trigger('click')
+
+    expect(w.find('.mmo__sheet').text()).not.toContain('depósito')
+    expect(w.find('.mmo__sheet').text()).not.toContain('500')
+  })
+
+  it('ofrece pedirlo cuando queda algo que traer', async () => {
+    const w = await montar()
+    await w.findAll('.mmo__card')[0].trigger('click')
+
+    expect(w.find('.mmo__btn--sec').text()).toContain('Pedir reposición')
+  })
+
+  // Pedir lo que no hay les hace perder el viaje a los dos.
+  it('y no lo ofrece cuando el depósito no tiene', async () => {
+    const w = await montar()
+    await w.findAll('.mmo__card')[1].trigger('click')   // preroll: sin stock en depósito
+
+    expect(w.find('.mmo__btn--sec').exists()).toBe(false)
+  })
+
+  it('manda el pedido con el producto', async () => {
+    const w = await montar()
+    await w.findAll('.mmo__card')[0].trigger('click')
+    await w.find('.mmo__btn--sec').trigger('click')
+    await flushPromises()
+
+    expect(pedirReposicionMostrador).toHaveBeenCalledWith(10, { stock_id: 1 })
+  })
+
+  // Uno por producto y por día: la campana de administración no se llena del mismo aviso.
+  it('lo ya pedido se ve en la lista y no se vuelve a ofrecer', async () => {
+    respuesta = { ...respuesta, mesa: [{ ...FLOR, reposicion_pedida: true }] }
+    const w = await montar()
+
+    expect(w.find('.mmo__card-pedido').text()).toBe('pedido')
+    await w.findAll('.mmo__card')[0].trigger('click')
+    expect(w.find('.mmo__btn--sec').exists()).toBe(false)
+    expect(w.find('.mmo__sheet').text()).toContain('Ya pediste reposición')
   })
 })

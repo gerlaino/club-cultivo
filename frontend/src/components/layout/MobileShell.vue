@@ -212,8 +212,12 @@ const NAV = {
     // escritorio, así que atendiendo con el celular no podía ni arrancar el turno.
     { to: '/m/mostrador', icon: 'bi-shop',           label: 'Mostrador', feature: 'produccion_dispensa' },
     { to: '/m/reservas',  icon: 'bi-bookmark-check', label: 'Reservas',  feature: 'produccion_dispensa' },
-    { to: '/m/stock',     icon: 'bi-boxes',          label: 'Stock' },
+    // HISTORIAL antes que STOCK: lo que consulta a diario es qué le entregó a alguien, no el
+    // inventario. Y desde que el depósito no es asunto suyo, su pantalla de Stock muestra lo que
+    // está sobre la mesa — que ya tiene, entera y con buscador, en Mostrador. Sigue accesible
+    // desde "Más": correrla un toque no es esconderla.
     { to: '/m/historial', icon: 'bi-clock-history',  label: 'Historial', feature: 'produccion_dispensa' },
+    { to: '/m/stock',     icon: 'bi-boxes',          label: 'Stock' },
     { to: '/m/tareas',    icon: 'bi-check2-square',  label: 'Tareas' },
     { to: '/m/horas',     icon: 'bi-stopwatch',      label: 'Mis horas' },
   ] },

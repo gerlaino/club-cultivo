@@ -8,8 +8,15 @@ class PushNotificationService
   end
 
   def self.notify_admins_async(club, title:, body:, url: '/')
-    club.users.where(role: 'admin').each do |admin|
-      notify_user_async(admin, title: title, body: body, url: url)
+    notify_roles_async(club, 'admin', title: title, body: body, url: url)
+  end
+
+  # A quien corresponda: administración es admin Y supervisor, y hay avisos —una reposición
+  # pedida desde el mostrador— que le sirven a los dos. Una sola implementación, para que no se
+  # arme una lista de usuarios por cada aviso nuevo.
+  def self.notify_roles_async(club, *roles, title:, body:, url: '/')
+    club.users.where(role: roles.flatten).each do |u|
+      notify_user_async(u, title: title, body: body, url: url)
     end
   end
 end

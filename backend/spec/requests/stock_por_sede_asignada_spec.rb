@@ -20,6 +20,10 @@ RSpec.describe 'Stock acotado a las sedes asignadas', type: :request do
     create(:stock, club: club, sede: sur, lote: lote, cantidad: 200, estado: 'asignado')
   end
 
+  # EL SUJETO ES EL SUPERVISOR, no el dispensador. La regla que este spec protege es la de las
+  # SEDES asignadas, y desde sep-2026 quien ATIENDE ya no ve el depósito en ninguna sede: ve lo
+  # que está sobre su mesa (ver el context del final). Probarla con él mediría otra cosa.
+  let(:supervisor)  { create(:user, :supervisor, club: club) }
   let(:dispensador) { create(:user, :dispensador, club: club) }
 
   def ids_visibles
@@ -28,10 +32,10 @@ RSpec.describe 'Stock acotado a las sedes asignadas', type: :request do
     JSON.parse(response.body).map { |s| s['id'] }
   end
 
-  context 'un dispensador con la Finca Norte asignada' do
+  context 'alguien de administración con la Finca Norte asignada' do
     before do
-      dispensador.sedes_asignadas << norte
-      sign_in_as(dispensador)
+      supervisor.sedes_asignadas << norte
+      sign_in_as(supervisor)
     end
 
     it 've el stock de su sede' do
@@ -59,9 +63,9 @@ RSpec.describe 'Stock acotado a las sedes asignadas', type: :request do
 
   context 'con dos sedes asignadas' do
     before do
-      dispensador.sedes_asignadas << norte
-      dispensador.sedes_asignadas << sur
-      sign_in_as(dispensador)
+      supervisor.sedes_asignadas << norte
+      supervisor.sedes_asignadas << sur
+      sign_in_as(supervisor)
     end
 
     it 've el stock de las dos' do
@@ -70,7 +74,7 @@ RSpec.describe 'Stock acotado a las sedes asignadas', type: :request do
   end
 
   context 'sin ninguna sede asignada' do
-    before { sign_in_as(dispensador) }
+    before { sign_in_as(supervisor) }
 
     it 've todo el club, como antes' do
       expect(ids_visibles).to include(stock_norte.id, stock_sur.id)
@@ -83,12 +87,43 @@ RSpec.describe 'Stock acotado a las sedes asignadas', type: :request do
     end
 
     before do
-      dispensador.sedes_asignadas << norte
-      sign_in_as(dispensador)
+      supervisor.sedes_asignadas << norte
+      sign_in_as(supervisor)
     end
 
     it 'se ve igual: no es de ninguna sede' do
       expect(ids_visibles).to include(stock_pool.id)
+    end
+  end
+
+  # QUIEN ATIENDE NO VE EL DEPÓSITO, EN NINGUNA SEDE.
+  #
+  # Antes esto se acotaba por sede y él veía el inventario de la suya, producto por producto.
+  # Cuánto hay guardado no es asunto suyo: ve lo que está sobre su mesa, y lo que le falta lo
+  # PIDE (`mostrador#reponer`).
+  context 'el dispensador' do
+    before do
+      dispensador.sedes_asignadas << norte
+      sign_in_as(dispensador)
+    end
+
+    it 'no ve el depósito de su sede: sólo lo que está sobre la mesa' do
+      expect(ids_visibles).to be_empty
+    end
+
+    it 'y sí ve lo que administración le puso arriba' do
+      # El mostrador vive en una sede que atiende: una de producción no tiene.
+      norte.update!(tipo: 'social')
+      ActsAsTenant.with_tenant(club) do
+        Mostradores::Cargar.call(mostrador: norte.mostrador!, usuario: admin, motivo: 'carga',
+                                 cambios: [{ stock_id: stock_norte.id, cantidad: 30 }])
+      end
+
+      get '/api/stocks'
+      visto = JSON.parse(response.body)
+      expect(visto.map { |s| s['id'] }).to eq([stock_norte.id])
+      # Y con la cantidad de la MESA, no la del depósito.
+      expect(visto.first['cantidad']).to eq(30.0)
     end
   end
 

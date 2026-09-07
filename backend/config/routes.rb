@@ -448,6 +448,9 @@ Rails.application.routes.draw do
         post 'mostrador/abrir',    to: 'mostrador#abrir'
         post 'mostrador/cargar',   to: 'mostrador#cargar'
         post 'mostrador/contar',   to: 'mostrador#contar'
+        # Quien atiende pide que le repongan un producto. No elige cuánto ni de dónde:
+        # eso lo decide administración, que es la que gobierna la mesa.
+        post 'mostrador/reponer',  to: 'mostrador#reponer'
         post 'mostrador/cerrar',   to: 'mostrador#cerrar'
         get  'mostrador/merma',    to: 'mostrador#merma'
         get  'mostrador/turnos',              to: 'mostrador#turnos'

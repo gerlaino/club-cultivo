@@ -119,6 +119,49 @@ module Dispensario
       render json: { error: 'Fecha inválida' }, status: :unprocessable_entity
     end
 
+    # POST /sedes/:sede_id/mostrador/reponer — { stock_id }
+    #
+    # QUIEN ATIENDE PIDE, ADMINISTRACIÓN REPONE.
+    #
+    # Él no ve el depósito —no es asunto suyo cuánto hay guardado— pero sí necesita decir "se me
+    # está acabando esto". Antes la única forma era verlo en su pantalla de Stock y avisar por
+    # fuera de la app; ahora es un botón, y el pedido llega a la campana y al celular de quien
+    # puede hacer algo.
+    #
+    # NO ELIGE CUÁNTO ni de dónde: eso lo decide administración, que es la que gobierna la mesa.
+    #
+    # UNO POR PRODUCTO Y POR DÍA. Un botón que se puede apretar diez veces llena la campana de
+    # avisos iguales, y eso es cómo se aprende a ignorarla.
+    def reponer
+      stock = @mostrador.club.stocks.find_by(id: params[:stock_id])
+      return render json: { error: 'Ese producto no existe' }, status: :not_found if stock.nil?
+
+      if pedidos_de_reposicion_de_hoy.include?(stock.id)
+        return render json: { ok: true, ya_pedido: true }
+      end
+
+      quien  = current_user.nombre_completo
+      donde  = @mostrador.sede&.nombre
+      texto  = "#{quien} pide reponer #{stock.etiqueta} en el mostrador de #{donde}."
+
+      # Una sola fila: el admin ve TODAS las alertas de su organización (`scoped_alertas`) y el
+      # supervisor sólo las suyas, así que marcada para supervisor le llega a los dos. Dos filas
+      # le mostrarían el mismo pedido dos veces al admin.
+      AlertaInterna.create!(
+        club: @mostrador.club, tipo: 'reposicion_mostrador', mensaje: texto, severidad: 'info',
+        destinada_a_role: 'supervisor',
+        contexto: { stock_id: stock.id, sede_id: @mostrador.sede_id, sede_nombre: donde,
+                    pedido_por: quien, pedido_por_id: current_user.id }
+      )
+      PushNotificationService.notify_roles_async(
+        @mostrador.club, 'admin', 'supervisor',
+        title: 'Reponer en el mostrador', body: texto,
+        url: "/mostrador?sede=#{@mostrador.sede_id}"
+      )
+
+      render json: { ok: true, stock_id: stock.id }
+    end
+
     # GET /sedes/:sede_id/mostrador/turnos — los turnos cerrados.
     #
     # Administración los ve todos; el que atiende, LOS SUYOS. Cerraba un turno y no tenía dónde
@@ -357,10 +400,26 @@ module Dispensario
         # Lo viejo sale primero: sin la fecha, el que arma la mesa no tiene con qué decidirlo.
         fecha:     stock.fecha_elaboracion || stock.created_at&.to_date,
         precio_ars: stock.precio_sugerido_ars&.to_f,
-        # Sólo para quien responde por la mercadería: cuánto vale lo que se pone sobre la mesa.
+        # Sólo para quien responde por la mercadería: cuánto vale lo que se pone sobre la mesa,
+        # y cuánto hay guardado en el depósito.
         costo_ars:  (stock.costo_unitario_ars&.to_f if gestiona?),
-        disponible: stock.cantidad_disponible_real.to_f,
+        disponible: (stock.cantidad_disponible_real.to_f if gestiona?),
+        # A quien atiende no le decimos CUÁNTO hay guardado —no es asunto suyo— pero sí si queda
+        # algo, que es lo único que necesita para saber si tiene sentido pedir reposición. Pedir
+        # lo que no hay es hacerle perder el viaje a los dos.
+        hay_en_deposito:   stock.cantidad_disponible_real.to_d.positive?,
+        reposicion_pedida: pedidos_de_reposicion_de_hoy.include?(stock.id),
       }
+    end
+
+    # Los pedidos de reposición de HOY, en una query para toda la mesa: preguntarlo producto por
+    # producto serían quince consultas para pintar una pantalla.
+    def pedidos_de_reposicion_de_hoy
+      @pedidos_de_reposicion_de_hoy ||=
+        AlertaInterna.where(club_id: @mostrador.club_id, tipo: 'reposicion_mostrador')
+                     .where('created_at >= ?', Time.zone.now.beginning_of_day)
+                     .where("contexto->>'sede_id' = ?", @mostrador.sede_id.to_s)
+                     .pluck(Arel.sql("contexto->>'stock_id'")).compact.map(&:to_i).to_set
     end
 
     # La lista de turnos cerrados. NO usa `serialize_turno`: ése arma la mesa entera producto por

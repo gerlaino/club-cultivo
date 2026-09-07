@@ -115,6 +115,7 @@
             </span>
             <span class="mmo__card-cant">
               <b>{{ fmt(s.mostrador) }}</b><small>{{ s.unidad }}</small>
+              <em v-if="pedido(s)" class="mmo__card-pedido" title="Reposición pedida hoy">pedido</em>
             </span>
             <i class="bi bi-chevron-right mmo__card-arr"></i>
           </button>
@@ -148,13 +149,20 @@
             <span class="mmo__dato-lbl">Elaborado</span>
             <span class="mmo__dato-val">{{ fecha(detalle.fecha) }}</span>
           </div>
-          <!-- El depósito NO se le tapa: ya lo ve en su pantalla de Stock con más columnas, y
-               esconderlo en un lado y dejarlo en el otro sería teatro. -->
-          <div class="mmo__dato">
-            <span class="mmo__dato-lbl">En el depósito</span>
-            <span class="mmo__dato-val">{{ fmt(detalle.disponible) }} {{ detalle.unidad }}</span>
-          </div>
         </div>
+
+        <!-- PEDIR, NO MIRAR. Cuánto hay guardado en el depósito no es asunto suyo; lo que
+             necesita es decir "se me está acabando esto", y que le llegue a quien puede hacer
+             algo. Antes veía el número y avisaba por fuera de la app. Sólo aparece si queda algo
+             que traer: pedir lo que no hay les hace perder el viaje a los dos. -->
+        <button v-if="detalle.hay_en_deposito && !pedido(detalle)" class="mmo__btn mmo__btn--sec"
+                :disabled="pidiendo === detalle.stock_id" @click="pedirReposicion(detalle)">
+          <i class="bi bi-arrow-up-circle"></i>
+          {{ pidiendo === detalle.stock_id ? 'Pidiendo…' : 'Pedir reposición' }}
+        </button>
+        <p v-else-if="pedido(detalle)" class="mmo__sheet-nota">
+          Ya pediste reposición de esto hoy. Administración lo tiene en su campana.
+        </p>
 
         <!-- Contar ESTE frasco sin cerrar la caja: con quince productos, el arqueo entero para
              verificar uno son veinte minutos, y el control que cuesta eso no se hace. Con la
@@ -209,10 +217,13 @@ import ModalContarItem from '../../components/mostrador/ModalContarItem.vue'
 import ModalConteo from '../../components/mostrador/ModalConteo.vue'
 import SheetBottom from '../../components/cultivador/SheetBottom.vue'
 import { formaLabel } from '../../lib/formatters.js'
+import { pedirReposicionMostrador } from '../../lib/api.js'
+import { useToast } from '../../composables/useToast.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useMostrador } from '../../composables/useMostrador.js'
 
-const auth = useAuthStore()
+const auth  = useAuthStore()
+const toast = useToast()
 const {
   sedeId, sedes, faltaSede, motivoSinSede, cargando, guardando, error, turno, mesa, estado,
   fondoSugerido, esperadoEfectivo, otrosIngresosEfectivo, movimientosDelTurno,
@@ -225,6 +236,26 @@ const detalle      = ref(null)
 const conteo       = ref(null)   // 'apertura' | 'cierre'
 const itemAContar  = ref(null)
 const movsAbiertos = ref(false)
+const pidiendo     = ref(null)
+
+// Lo ya pedido HOY lo dice el backend en cada producto: uno por producto y por día, para que la
+// campana de administración no se llene del mismo aviso.
+const pedido = (s) => !!s?.reposicion_pedida
+
+// PEDIR, NO MIRAR. Él no ve cuánto hay guardado; dice que se le está acabando y el aviso le llega
+// a administración por la campana y por el celular. No elige cuánto: eso lo decide quien gobierna
+// la mesa.
+async function pedirReposicion (s) {
+  pidiendo.value = s.stock_id
+  try {
+    await pedirReposicionMostrador(sedeId.value, { stock_id: s.stock_id })
+    toast.success('Pedido enviado a administración')
+    await cargar()
+    detalle.value = null
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo enviar el pedido')
+  } finally { pidiendo.value = null }
+}
 
 // La hoja se cierra con el gesto de arrastrar, que sólo sabe de un booleano: sin esto, cerrarla
 // dejaba `detalle` puesto y el próximo toque abría la anterior por un instante.
@@ -391,6 +422,11 @@ async function onConfirmarConteoDeUno (payload) {
 }
 .mmo__dato-lbl { color: var(--c-slate-500); }
 .mmo__dato-val { font-weight: 600; color: var(--c-ink-900); text-align: right; }
+.mmo__card-pedido {
+  display: block; font-style: normal; font-size: .62rem; font-weight: 700;
+  color: var(--c-sky-600); text-transform: uppercase; letter-spacing: .03em;
+}
+.mmo__btn--sec { background: #fff; color: var(--c-leaf-800); border: 1.5px solid var(--c-leaf-600); }
 .mmo__sheet-nota { margin: 0; font-size: .82rem; color: var(--c-slate-500); text-align: center; }
 
 /* ── Esqueleto ── */

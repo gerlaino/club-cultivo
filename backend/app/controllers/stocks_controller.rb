@@ -75,10 +75,17 @@ class StocksController < ApplicationController
     # `cantidad_disponible_real`, que pregunta por el apartado del mostrador.
     Stock.precargar_apartados(stocks)
 
-    # Y para quien ATIENDE, el carrito ofrece únicamente lo que está sobre la mesa del mostrador.
-    # Sin esto la pantalla le ofrecía todo el depósito y el backend después se lo rechazaba, que
-    # es el peor error posible: parece culpa del usuario.
-    if params[:para_dispensa].present? && current_user.atiende_mostrador?
+    # QUIEN ATIENDE VE LA MESA, NUNCA EL DEPÓSITO.
+    #
+    # Antes esto aplicaba SÓLO al carrito (`para_dispensa`), así que su pantalla de Stock le
+    # mostraba el depósito entero — lo que había guardado, producto por producto. Cuánto hay en
+    # el depósito no es asunto suyo: lo que necesitaba de ahí era saber qué pedir, y para eso
+    # ahora tiene el botón de reposición en el mostrador (`mostrador#reponer`), que además le
+    # avisa a quien puede hacer algo en vez de dejarlo avisando por fuera de la app.
+    #
+    # Va en el backend y no en la pantalla: por la API se saltea siempre, y esconder una columna
+    # no es aplicar una regla.
+    if current_user.atiende_mostrador?
       sobre_la_mesa = items_del_mostrador
       stocks = stocks.select { |st| sobre_la_mesa.key?(st.id) }
       return render json: stocks.map { |st|

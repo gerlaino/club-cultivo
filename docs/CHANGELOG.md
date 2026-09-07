@@ -1,5 +1,29 @@
 # Changelog
 
+## Septiembre 2026 (am) — el que atiende no ve el depósito: lo pide
+
+**Decisión de Germán, que revierte una regla escrita al revés.** Decía que al dispensador *no se
+le tapa el depósito* —"ya lo ve en su pantalla de Stock con más columnas"— y el argumento era que
+lo necesitaba para pedir lo que falta. Si puede **pedirlo con un botón**, esa razón desaparece: lo
+que hay guardado no es asunto suyo.
+
+- **Botón "Pedir reposición"** en la hoja de cada producto del mostrador (`mostrador#reponer`). No
+  elige cuánto ni de dónde: eso lo decide administración, que gobierna la mesa. El pedido llega
+  por **campana y push a admin y supervisor**, con quién, qué y en qué sede.
+- **Una sola fila de alerta, marcada para supervisor**: el admin ve todas las de su organización,
+  así que con dos filas vería el mismo pedido repetido.
+- **Uno por producto y por día.** Un botón que se puede apretar diez veces llena la campana de
+  avisos iguales, y eso es cómo se aprende a ignorarla. Lo ya pedido queda sellado en la lista.
+- **Sólo aparece si queda algo que traer**: el backend le manda `hay_en_deposito` (sí/no) y
+  **nunca `disponible`**. Pedir lo que no hay les hace perder el viaje a los dos.
+- **Y el agujero real**: `StocksController#index` filtraba a la mesa **sólo con `para_dispensa`**
+  (el carrito), así que su pantalla de Stock le mostraba el depósito entero, producto por
+  producto. Ahora aplica siempre. Va en el backend porque por la API se saltea siempre, y esconder
+  una columna no es aplicar una regla.
+- En el nav del teléfono, **Historial** sube al lugar visible y **Stock** queda en "Más": lo que
+  consulta a diario es qué le entregó a alguien, no el inventario — y su Stock ahora muestra lo
+  mismo que ya tiene en Mostrador.
+
 ## Septiembre 2026 (al) — "No se pudo entregar", que no dice nada
 
 Germán tocó Entregar en una reserva desde el teléfono y le salió un toast rojo: **"No se pudo
