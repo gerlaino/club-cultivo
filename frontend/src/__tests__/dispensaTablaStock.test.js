@@ -225,3 +225,48 @@ describe('Dispensar — el badge de Mostrador', () => {
     expect(w.text()).not.toContain('Mostrador')
   })
 })
+
+// ENTREGAR UNA RESERVA NO DEPENDE DE LA LISTA DE PRODUCTOS.
+//
+// Lo reservado ya está apartado a nombre del paciente, y por eso justamente NO está sobre la mesa
+// —que es lo único que ve quien atiende—. Un guard borraba el producto elegido apenas cargaba la
+// lista si no lo encontraba ahí, y dejaba "Entregar reserva" muerto sin decir por qué. Le pasaba
+// también en el escritorio: no era del teléfono.
+describe('Entregar una reserva', () => {
+  const RESERVA = {
+    id: 9, cantidad: 5, sena_ars: 5000, aporte_restante_ars: 12084, medio_pago: 'efectivo',
+    paciente: { id: 5, nombre: 'Ana Gómez' },
+    // Un producto que NO está en la lista que ve quien atiende.
+    stock: { id: 99, forma_producto: 'flor_seca', unidad: 'g', precio_sugerido_ars: 1800 },
+  }
+
+  async function montarEntrega () {
+    listStocks.mockResolvedValue({ data: STOCKS })   // ninguno es el 99
+    setActivePinia(createPinia())
+    const { useAuthStore } = await import('../stores/auth.js')
+    useAuthStore().user = { id: 1, role: 'dispensador' }
+    const { default: Modal } = await import('../components/pacientes/ModalNuevaDispensacion.vue')
+    const w = mount(Modal, {
+      props: { modelValue: true, paciente: PACIENTE, socioId: PACIENTE.id, reserva: RESERVA },
+      global: { stubs: { Teleport: true, DsSpinner: true, AppDatePicker: true } },
+    })
+    for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0))
+    return w
+  }
+
+  it('el botón queda habilitado aunque el producto no esté en la lista', async () => {
+    const w = await montarEntrega()
+
+    expect(w.find('.mnd__btn-primary').attributes('disabled')).toBeUndefined()
+  })
+
+  // No hay nada que elegir: el producto es el que se apartó, y los carteles de "elegí una sede",
+  // "no hay nada sobre la mesa" o "nada coincide" son todos falsos acá.
+  it('y no se ofrece elegir producto', async () => {
+    const w = await montarEntrega()
+
+    expect(w.find('.mnd__stock-list').exists()).toBe(false)
+    expect(w.find('.mnd__sedes').exists()).toBe(false)
+    expect(w.text()).not.toContain('No hay nada sobre la mesa')
+  })
+})

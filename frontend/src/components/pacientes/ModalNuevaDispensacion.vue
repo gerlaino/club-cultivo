@@ -152,7 +152,9 @@ watch(sedesConStock, (lista) => {
 }, { immediate: true })
 
 // Cambiar de sede limpia el stock elegido: si no, quedaba seleccionado uno que ya no se ve.
-watch(sedeElegida, () => { form.value.stock_id = null })
+// Entregando una reserva no: el producto es el que se apartó y la sede no lo elige. (Acá ni
+// siquiera se pregunta la sede, pero la lista se autoselecciona sola y borraba el producto.)
+watch(sedeElegida, () => { if (!modoReserva.value) form.value.stock_id = null })
 
 const stocksDisponibles = computed(() =>
   sedeElegida.value === undefined && hayVariasSedes.value
@@ -218,7 +220,13 @@ const stocksVisibles = computed(() => {
 })
 
 // Cambiar de sede o de búsqueda no puede dejar seleccionado algo que ya no se ve.
+//
+// SALVO ENTREGANDO UNA RESERVA: ahí el producto no sale de esta lista, ya está apartado a nombre
+// del paciente —y por eso justamente NO está sobre la mesa, que es lo que ve quien atiende—. El
+// guard se lo borraba apenas cargaba la lista y dejaba "Entregar reserva" muerto, sin decir por
+// qué. Le pasaba también en el escritorio: no era del teléfono.
 watch(stocksVisibles, (lista) => {
+  if (modoReserva.value) return
   if (form.value.stock_id && !lista.some(s => s.id === form.value.stock_id)) form.value.stock_id = null
 })
 
@@ -914,9 +922,18 @@ async function handleSubmit() {
           <!-- Stock -->
           <div v-if="!modoReserva" class="mnd__section-label">{{ esDispensaInmediata ? 'Agregar producto' : 'Stock a reservar' }} <span class="mnd__req">*</span></div>
           <div v-if="modoReserva"></div>
+          <!-- ══ ELEGIR EL PRODUCTO ═══════════════════════════════════════════
+               Entero apagado al ENTREGAR UNA RESERVA: el producto ya está definido —es el que se
+               apartó a nombre del paciente— y se muestra arriba en "Producto reservado". Dejarlo
+               vivo iba sacando un cartel atrás de otro (elegí una sede, no hay nada sobre la
+               mesa, nada coincide con «»), todos falsos: no hay nada que elegir ni que pedir. -->
+          <template v-if="!modoReserva">
           <!-- Paso 1: la sede. Sólo cuando hay más de una: si la organización tiene una sola, elegirla
-               sería un clic de peaje y se selecciona sola. -->
-          <div v-if="hayVariasSedes && !loadingStocks" class="mnd__sedes">
+               sería un clic de peaje y se selecciona sola.
+               Y ENTREGANDO UNA RESERVA NO SE PREGUNTA: el producto ya está definido —es el que se
+               apartó—, así que elegir sede no decide nada y encima dejaba la entrega trabada
+               hasta contestar una pregunta sin respuesta posible. -->
+          <div v-if="hayVariasSedes && !loadingStocks && !modoReserva" class="mnd__sedes">
             <span class="mnd__sedes-lbl">¿De qué sede?</span>
             <div class="mnd__sedes-chips">
               <button
@@ -933,7 +950,7 @@ async function handleSubmit() {
           </div>
 
           <div v-else-if="loadingStocks" class="mnd__loading-inline"><DsSpinner :size="13" /> Cargando stocks…</div>
-          <div v-if="hayVariasSedes && sedeElegida === undefined" class="mnd__hint-box">
+          <div v-if="hayVariasSedes && sedeElegida === undefined && !modoReserva" class="mnd__hint-box">
             <i class="bi bi-arrow-up"></i> Elegí una sede para ver su stock.
           </div>
           <!-- "Sin stock disponible" es FALSO para el que atiende: el depósito está lleno, lo
@@ -941,7 +958,10 @@ async function handleSubmit() {
                lo manda a buscar un problema que no existe, y a los cinco minutos llama por
                teléfono. Sólo cambia el TEXTO — la regla de qué puede dispensar vive entera en el
                backend (`User#atiende_mostrador?`). -->
-          <div v-else-if="!loadingStocks && !stocksDisponibles.length" class="mnd__warn-box">
+          <!-- Y NUNCA entregando una reserva: lo reservado ya está apartado a nombre del
+               paciente y por eso NO está sobre la mesa (es la excepción documentada). Decirle
+               que pida que le bajen producto es mandarlo a resolver algo que no hace falta. -->
+          <div v-else-if="!loadingStocks && !stocksDisponibles.length && !modoReserva" class="mnd__warn-box">
             <i class="bi bi-exclamation-triangle"></i>
             <!-- Y le dice lo que SÍ puede hacer. Antes lo mandaba a "bajar lo que falte del
                  depósito", que es justo lo único que no puede: la mesa la carga administración.
@@ -1065,6 +1085,7 @@ async function handleSubmit() {
                 <span class="mnd__stock-check" v-if="form.stock_id === s.id"><i class="bi bi-check-circle-fill"></i></span>
               </button>
             </div>
+          </template>
           </template>
 
           <!-- Origen: stock libre o lo apartado para un evento EN CURSO -->

@@ -18,13 +18,21 @@ const RESERVAS = [
 let turno = { id: 1 }
 const listReservas   = vi.fn(() => Promise.resolve({ data: { reservas: RESERVAS } }))
 const getMostrador   = vi.fn(() => Promise.resolve({ data: { turno } }))
-const entregarReserva = vi.fn(() => Promise.resolve({ data: {} }))
 const errorToast = vi.fn()
 
 vi.mock('../lib/api.js', () => ({
   listReservas:    (...a) => listReservas(...a),
   getMostrador:    (...a) => getMostrador(...a),
-  entregarReserva: (...a) => entregarReserva(...a),
+}))
+// El modal se stubbea a propósito: montarlo entero probaría el modal, no esta pantalla. Lo que
+// se afirma acá es que se abre y con qué datos.
+vi.mock('../components/pacientes/ModalNuevaDispensacion.vue', () => ({
+  default: {
+    name: 'ModalNuevaDispensacion',
+    props: ['modelValue', 'socioId', 'pacienteNombre', 'saldoCc', 'limiteCc', 'reserva'],
+    emits: ['update:modelValue', 'saved'],
+    template: '<div class="modal-stub" />',
+  },
 }))
 vi.mock('../composables/useToast.js', () => ({
   useToast: () => ({ success: vi.fn(), error: (...a) => errorToast(...a), warning: vi.fn(), info: vi.fn() }),
@@ -42,7 +50,7 @@ async function montar (conCaja = true, rol = 'dispensador') {
   return w
 }
 
-beforeEach(() => { errorToast.mockClear(); entregarReserva.mockClear() })
+beforeEach(() => { errorToast.mockClear() })
 
 describe('Entregar una reserva desde el teléfono', () => {
   it('con la caja abierta, se puede', async () => {
@@ -80,15 +88,31 @@ describe('Entregar una reserva desde el teléfono', () => {
     expect(getMostrador).not.toHaveBeenCalled()
   })
 
-  it('cuando el backend rechaza, se muestra SU motivo y no un "no se pudo" pelado', async () => {
+  // ENTREGAR NO ENTREGA: ABRE EL MODAL, con todo precargado.
+  //
+  // Con un toque suelto la entrega salía a ciegas: sin ver la seña ya paga ni el resto a cobrar,
+  // sin poder elegir el medio de pago —salía con el de la reserva, y si era cuenta corriente y el
+  // paciente no la tiene habilitada, rebotaba— y sin poder ajustar la cantidad real.
+  it('abre el modal de dispensa con la reserva cargada, no entrega de una', async () => {
     const w = await montar(true)
-    entregarReserva.mockRejectedValueOnce({
-      response: { data: { error: 'La caja del mostrador está cerrada: contá y abrila antes de dispensar.' } },
-    })
 
     await w.find('.mres__btn').trigger('click')
     await flushPromises()
 
-    expect(errorToast).toHaveBeenCalledWith(expect.stringContaining('caja del mostrador'))
+    const modal = w.findComponent({ name: 'ModalNuevaDispensacion' })
+    expect(modal.exists()).toBe(true)
+    expect(modal.props('reserva').id).toBe(7)
+    expect(modal.props('pacienteNombre')).toBe('Diego Benítez')
+  })
+
+  it('y al cerrarlo sin entregar, suelta la reserva', async () => {
+    const w = await montar(true)
+    await w.find('.mres__btn').trigger('click')
+    await flushPromises()
+
+    await w.findComponent({ name: 'ModalNuevaDispensacion' }).vm.$emit('update:modelValue', false)
+    await flushPromises()
+
+    expect(w.findComponent({ name: 'ModalNuevaDispensacion' }).exists()).toBe(false)
   })
 })

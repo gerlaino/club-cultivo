@@ -1,5 +1,26 @@
 # Changelog
 
+## Septiembre 2026 (an) — entregar una reserva estaba roto, y no era del teléfono
+
+Germán: *"al poner entregar no teníamos que abrir el modal de nueva dispensa con los datos
+precargados? más que nada por si ya pagó una seña... porque así pongo entregar y qué pasa?"*.
+Tenía razón: en el teléfono, Entregar **entregaba de una**, sin ver la seña ya paga ni el resto a
+cobrar, sin poder elegir el medio de pago —salía con el de la reserva, y si era cuenta corriente y
+el paciente no la tiene habilitada, rebotaba— y sin poder ajustar la cantidad real. Ahora abre el
+**mismo modal que el escritorio**, con todo precargado: es el mismo componente, así que la regla
+de cobro vive una sola vez.
+
+**Y abriéndolo apareció el bug de fondo, que no era del teléfono: "Entregar reserva" estaba
+MUERTO.** Dos guards del modal borran el producto elegido —uno cuando cambia la sede, otro cuando
+el producto no está en la lista visible— y **lo reservado nunca está en esa lista**: ya está
+apartado a nombre del paciente, que es justamente por lo que NO está sobre la mesa. El botón
+quedaba deshabilitado sin decir por qué, también en el escritorio.
+
+De paso, entregando una reserva ya no se pregunta **de qué sede** ni se ofrece elegir producto: el
+producto es el que se apartó. Cada cartel que se sacaba dejaba ver el siguiente —"elegí una sede",
+"no hay nada sobre la mesa", "nada coincide con «»"—, todos falsos ahí, así que se apagó el bloque
+entero de elegir producto en ese modo.
+
 ## Septiembre 2026 (am) — el que atiende no ve el depósito: lo pide
 
 **Decisión de Germán, que revierte una regla escrita al revés.** Decía que al dispensador *no se

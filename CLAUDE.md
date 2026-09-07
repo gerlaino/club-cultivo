@@ -817,6 +817,15 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   cosa o la otra —219 leen `error`, 42 leen `errors[0]`—: las primeras se comían el motivo y
   mostraban un "no se pudo" pelado, que es el peor mensaje posible. El interceptor rellena `error`
   desde `errors`, así todas lo muestran y la pantalla nueva nace bien.
+- **ENTREGAR UNA RESERVA ABRE EL MODAL, NO ENTREGA.** Hay una seña ya paga, un resto a cobrar y un
+  medio de pago que elegir con el paciente enfrente: entregar de un toque salía a ciegas y con el
+  medio guardado en la reserva (si era cuenta corriente y el paciente no la tiene habilitada,
+  rebotaba). Es el mismo componente en los dos lados, así que la regla de cobro vive una vez.
+- **EN MODO RESERVA, EL PRODUCTO NO SALE DE LA LISTA.** Los dos guards que limpian `stock_id`
+  —al cambiar de sede y al no encontrarlo entre los visibles— lo borraban y dejaban "Entregar
+  reserva" MUERTO, sin decir por qué: lo reservado **nunca** está en esa lista, porque ya está
+  apartado a nombre del paciente. Tampoco se pregunta la sede ni se ofrece elegir producto, y los
+  carteles de "no hay nada sobre la mesa" / "nada coincide" no aplican ahí.
 - **ENTREGAR UNA RESERVA NECESITA LA CAJA ABIERTA** —crea una dispensa, y lo cobrado en efectivo
   tiene que tener dónde caer—, **pero NO necesita que el producto esté sobre la mesa**: es una de
   las dos excepciones, porque ya está apartado a nombre de esa persona (`desde_reserva`). La

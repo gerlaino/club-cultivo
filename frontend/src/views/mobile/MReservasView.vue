@@ -41,22 +41,37 @@
         <div class="mres__pie">
           <span v-if="Number(r.aporte_restante_ars) > 0" class="mres__resta">Resta {{ formatARS(r.aporte_restante_ars) }}</span>
           <span v-else class="mres__senada">Señada ✓</span>
-          <button class="mres__btn" :disabled="entregando === r.id || cajaCerrada" @click="entregar(r)">
-            {{ entregando === r.id ? 'Entregando…' : 'Entregar' }}
-          </button>
+          <button class="mres__btn" :disabled="cajaCerrada" @click="entregar(r)">Entregar</button>
         </div>
       </div>
     </div>
+
+    <!-- ENTREGAR ABRE EL MISMO MODAL QUE EN EL ESCRITORIO, con todo precargado.
+         Con un toque suelto la entrega salía a ciegas: sin ver la seña ni el resto a cobrar, sin
+         poder elegir el medio de pago —salía con el de la reserva, y si era cuenta corriente y el
+         paciente no la tiene habilitada, rebotaba— y sin poder ajustar la cantidad que se lleva
+         de verdad. Es el mismo componente, así que la regla de cobro vive una sola vez. -->
+    <ModalNuevaDispensacion
+      v-if="entregando"
+      v-model="modalAbierto"
+      :socio-id="entregando.paciente?.id"
+      :paciente-nombre="entregando.paciente?.nombre"
+      :saldo-cc="entregando.paciente?.saldo_cc ?? null"
+      :limite-cc="entregando.paciente?.limite_cc ?? null"
+      :reserva="entregando"
+      @saved="onEntregada"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { listReservas, entregarReserva, getMostrador } from '../../lib/api.js'
+import { listReservas, getMostrador } from '../../lib/api.js'
 import { formaLabel, formatARS } from '../../lib/formatters.js'
 import { useToast } from '../../composables/useToast.js'
 import { useAuthStore } from '../../stores/auth.js'
+import ModalNuevaDispensacion from '../../components/pacientes/ModalNuevaDispensacion.vue'
 
 const toast = useToast()
 const auth  = useAuthStore()
@@ -64,7 +79,13 @@ const auth  = useAuthStore()
 const filtro     = ref('hoy')
 const loading    = ref(false)
 const reservas   = ref([])
-const entregando = ref(null)
+const entregando   = ref(null)   // la reserva que se está entregando
+// Cerrar el modal suelta la reserva: si no, el `v-if` la deja montada y el próximo toque abre la
+// anterior por un instante.
+const modalAbierto = computed({
+  get: () => !!entregando.value,
+  set: (v) => { if (!v) entregando.value = null },
+})
 
 const hoyISO = new Date().toISOString().slice(0, 10)
 
@@ -109,16 +130,17 @@ async function cargar() {
 
 function esVencida(r) { return (r.fecha_entrega_estimada || '') < hoyISO }
 
-async function entregar(r) {
-  entregando.value = r.id
-  try {
-    await entregarReserva(r.id)
-    toast.success('Reserva entregada')
-    await cargar()
-    await cargarEstadoCaja()
-  } catch (e) {
-    toast.error(e?.response?.data?.error || 'No se pudo entregar')
-  } finally { entregando.value = null }
+// Abrir el modal, no entregar de una: lo que se cobra —la seña ya paga, el resto, con qué medio—
+// se decide con el paciente enfrente, no se adivina desde la lista.
+function entregar(r) {
+  entregando.value = r
+}
+
+async function onEntregada() {
+  toast.success('Reserva entregada')
+  entregando.value = null
+  await cargar()
+  await cargarEstadoCaja()
 }
 
 function fechaCorta(f) {
