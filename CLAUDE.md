@@ -936,10 +936,23 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 - **Las URLs que se encolan van SIN `/api`:** el `baseURL` de axios ya lo trae. Con el prefijo, el
   reintento pegaba a `/api/api/...` → 404, y como un 404 tiene `response` la cola lo marcaba
   FALLIDO en vez de reintentar. Nada de lo encolado llegó nunca al servidor.
+- **`render file:` NO EXISTE EN MODO API, y no falla: devuelve vacío.** Esta app es
+  `ActionController::API`, así que `spa_fallback` contestaba 200 con un ESPACIO y `text/plain` en
+  toda ruta profunda. **La PWA instalada abre `start_url: '/m'`**: en una instalación nueva la
+  primera navegación va a la red, recibía la página vacía —pantalla negra— y como no corría JS, no
+  se registraba el service worker: no había salida. No se veía porque `/` lo sirve el middleware de
+  estáticos sin pasar por el controller, y en desarrollo no hay `public/index.html`, o sea que se
+  caía por la otra rama. Se sirve con `render plain: ..., content_type: 'text/html'` y **sin
+  caché**: el shell nombra los assets por hash, y uno viejo cacheado apunta a archivos que ya no
+  existen.
+- **EL HELPER DE SPECS LE PONE `/api` A TODO.** `spec/support/api_prefix.rb` prefija cualquier
+  ruta que no empiece con `/api`, `/webhooks`, `/public/`… o `http`. Un spec de una ruta del
+  FRONTEND (`get '/m'`) prueba `/api/m` y pasa por la razón equivocada — se escapa con la URL
+  absoluta (`http://www.example.com/m`).
 - **El service worker necesita `NavigationRoute`.** Sin él la PWA instalada NO ABRE sin internet:
-  `start_url` es `/m` y esa navegación no matchea la entrada `index.html` del precache. En
-  producción lo tapa el `spa_fallback` de Rails; offline no hay servidor, que es justo cuando hace
-  falta. `/me` sigue SIN cachearse a propósito (servido del caché, tras un logout devolvía el
+  `start_url` es `/m` y esa navegación no matchea la entrada `index.html` del precache. (Se decía
+  que "en producción lo tapa el `spa_fallback` de Rails": era FALSO, ver arriba — el fallback
+  devolvía vacío, y el precache era lo ÚNICO que hacía andar la app instalada.) `/me` sigue SIN cachearse a propósito (servido del caché, tras un logout devolvía el
   usuario viejo).
 - **Un módulo se pide por su clave NUEVA y en un solo lugar.** Chequear la vieja (`ia_voz`) con
   la nueva guardada (`ia`) daba false: `feature?` resuelve viejo ⇒ nuevo, no al revés. Rompía el

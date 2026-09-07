@@ -1,5 +1,30 @@
 # Changelog
 
+## Septiembre 2026 (ak) — la pantalla negra de la PWA recién instalada
+
+Germán desinstaló la PWA, la reinstaló, y quedó **la pantalla en negro**. No era el cambio del
+service worker: era un agujero que estaba desde siempre y que sólo se ve en una instalación NUEVA.
+
+**`render file:` NO EXISTE EN MODO API, y no falla: devuelve una respuesta vacía.** El backend es
+`ActionController::API`, así que `spa_fallback` contestaba **200 con un espacio y `text/plain`** en
+toda ruta profunda: `/m`, `/login`, `/mostrador`. No se notaba porque `/` lo sirve el middleware de
+estáticos sin pasar por el controller, y en desarrollo no hay `public/index.html`, o sea que el
+código se caía siempre por la otra rama.
+
+**Rompía justo donde más duele.** La PWA declara `start_url: '/m'`. Con el service worker ya
+instalado la navegación la resolvía el precache —por eso funcionaba—, pero en una instalación nueva
+la primera navegación va a la red: página vacía, pantalla negra, y como no corre JS **no se
+registra el service worker**. No había forma de salir de ahí, y le pasa a **cualquiera que instale
+la app por primera vez**.
+
+Se sirve con `render plain: …, content_type: 'text/html'` y **sin caché**: el shell nombra los
+assets por hash, y uno viejo cacheado apunta a archivos que ya no existen — la otra forma de que un
+arreglo no llegue nunca al teléfono.
+
+**Y el spec que lo cubre casi pasa por la razón equivocada**: `spec/support/api_prefix.rb` le pone
+`/api` a toda ruta que no empiece con `/api`, `/webhooks`, `/public/`… o `http`, así que `get '/m'`
+probaba `/api/m`. Se escapa con la URL absoluta.
+
 ## Septiembre 2026 (aj) — el arreglo que no llegaba al teléfono, y la dispensa en dos pasos
 
 **UN ARREGLO QUE NO LLEGA AL TELÉFONO ES UN ARREGLO QUE NO EXISTE.** Germán seguía viendo el modal

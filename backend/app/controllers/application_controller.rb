@@ -55,13 +55,27 @@ class ApplicationController < ActionController::API
 
   # SPA fallback — sirve index.html para el root y las rutas del front (get '*path').
   # DEBE ser pública: una action privada no es ruteable → Rails tira ActionNotFound.
+  # SIRVE EL index.html DE LA SPA para cualquier ruta que no sea de la API.
+  #
+  # `render file:` NO EXISTE EN MODO API y no falla: devuelve una respuesta VACÍA —un espacio, con
+  # `text/plain`— en silencio. Esta app es `ActionController::API`, así que toda ruta profunda
+  # (`/m`, `/login`, `/mostrador`) contestaba 200 con la pantalla en blanco. No se veía porque `/`
+  # lo sirve el middleware de estáticos sin pasar por acá, y en desarrollo no hay
+  # `public/index.html`, o sea que se caía por la otra rama.
+  #
+  # LO ROMPÍA JUSTO DONDE MÁS DUELE: la PWA instalada abre `start_url: '/m'`. Con el service worker
+  # ya instalado lo tapaba el precache, pero en una instalación NUEVA la primera navegación va a la
+  # red, recibía la página vacía —pantalla negra— y como no corría JS, no se registraba el service
+  # worker: no había forma de salir de ahí.
+  #
+  # SIN CACHÉ: el shell nombra los assets por hash, y uno viejo cacheado apunta a archivos que ya
+  # no existen. Es la otra forma de que un arreglo no llegue nunca al teléfono.
   def spa_fallback
     index_html = Rails.root.join('public', 'index.html')
-    if index_html.exist?
-      render file: index_html, layout: false
-    else
-      render json: { error: 'Not found' }, status: :not_found
-    end
+    return render(json: { error: 'Not found' }, status: :not_found) unless index_html.exist?
+
+    response.set_header('Cache-Control', 'no-store')
+    render plain: index_html.read, content_type: 'text/html'
   end
 
   private
