@@ -25,6 +25,11 @@ De paso quedó verificada la regla que decía CLAUDE.md y nadie había probado: 
 entregar una reserva funciona aunque el producto no esté sobre la mesa** — es una de las dos
 excepciones (ya está apartado a nombre de esa persona).
 
+**Y el mensaje de caja cerrada ahora dice DE QUÉ SEDE.** El turno se busca por la sede del
+PRODUCTO, no por la caja que la persona abrió: dispensando algo de otra sede —una reserva de un
+stock que quedó allá— el mensaje le mentía en la cara, porque la suya estaba abierta. Nombrar la
+sede convierte un mensaje que parece un error de la app en uno que se puede resolver.
+
 ## Septiembre 2026 (ak) — la pantalla negra de la PWA recién instalada
 
 Germán desinstaló la PWA, la reinstaló, y quedó **la pantalla en negro**. No era el cambio del

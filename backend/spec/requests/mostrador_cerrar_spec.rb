@@ -255,7 +255,7 @@ RSpec.describe 'Cerrar el mostrador', type: :request do
   # abierto no dispensa, y sólo dispensa lo que está sobre la mesa.
   describe 'sin mostrador abierto no se dispensa' do
     it 'con el mostrador cerrado, rechaza' do
-      expect { dispensar!(10) }.to raise_error(ActiveRecord::RecordInvalid, /caja del mostrador está cerrada/i)
+      expect { dispensar!(10) }.to raise_error(ActiveRecord::RecordInvalid, /caja del mostrador de .+ está cerrada/i)
     end
 
     it 'con el mostrador abierto, dispensa normal' do

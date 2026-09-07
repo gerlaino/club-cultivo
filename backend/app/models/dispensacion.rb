@@ -464,7 +464,13 @@ class Dispensacion < ApplicationRecord
     return unless sede_dispensa?
 
     if turno_mostrador_id.blank?
-      errors.add(:base, 'La caja del mostrador está cerrada: contá y abrila antes de dispensar.')
+      # DICE DE QUÉ SEDE, porque el turno se busca por la sede del PRODUCTO y no por la caja que
+      # la persona abrió. Si dispensa algo de otra sede —una reserva de un stock que quedó allá—
+      # el mensaje "la caja está cerrada" le miente en la cara: la suya está abierta. Nombrarla
+      # convierte un mensaje que parece un error de la app en uno que se puede resolver.
+      donde = Sede.unscoped.where(id: sede_del_mostrador).pick(:nombre)
+      errors.add(:base, "La caja del mostrador#{donde ? " de #{donde}" : ''} está cerrada: " \
+                        'contá y abrila antes de dispensar.')
       return
     end
 
