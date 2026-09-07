@@ -74,15 +74,23 @@ class Reserva < ApplicationRecord
     errors.add(:stock, 'no está habilitado para dispensa') if stock.persisted? && !stock.apto_dispensa?
   end
 
-  # Valida contra el disponible REAL, que ya descuenta dispensaciones pendientes y otras
-  # reservas pendientes (ver Stock#gramos_reservados). Así dos reservas no comprometen el
-  # mismo stock.
+  # Valida contra lo que NO TIENE DUEÑO: lo libre del depósito más lo libre de la mesa.
+  #
+  # Los dos sumandos son necesarios y ninguno alcanza solo. `cantidad_disponible_real` es el
+  # depósito y ya NO incluye lo que está sobre la mesa (ver Stock#apartado_para_mesa_y_reservas):
+  # sin el segundo término no se podría reservar nada de lo que se reserva, que es justamente lo
+  # que está arriba. Y `libre_en_mostrador` ya descuenta las otras reservas pendientes, así que
+  # dos reservas no comprometen el mismo gramo.
+  #
+  # Es el gemelo exacto de `Dispensacion#stock_disponible`, y por el mismo motivo: la pantalla
+  # ofrece la mesa, pero el techo contra el sobregiro lo pone el backend.
   def stock_disponible
     return unless stock && cantidad.to_d > 0
     stock.with_lock do
-      if cantidad.to_d > stock.cantidad_disponible_real
+      disp = stock.cantidad_disponible_real.to_d + stock.libre_en_mostrador(stock.sede_id)
+      if cantidad.to_d > disp
         errors.add(:cantidad,
-          "supera el stock disponible (#{stock.cantidad_disponible_real.round(2)} #{stock.unidad || 'g'} disponibles)")
+          "supera el stock disponible (#{disp.round(2)} #{stock.unidad || 'g'} disponibles)")
       end
     end
   end

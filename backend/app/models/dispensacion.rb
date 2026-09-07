@@ -258,7 +258,10 @@ class Dispensacion < ApplicationRecord
   def stock_disponible
     return unless stock && cantidad.to_d > 0
     stock.with_lock do
-      disp = stock.cantidad_disponible_real.to_d + stock.apartado_en_mostrador_de_sede(sede_del_mostrador)
+      # `libre_en_mostrador` y no la mesa entera: lo que está arriba apartado a nombre de un
+      # paciente no lo puede entregar otro. Entregar ESA reserva pasa igual — el controller la
+      # marca `entregada` antes de guardar la dispensa, así que deja de contar sola.
+      disp = stock.cantidad_disponible_real.to_d + stock.libre_en_mostrador(sede_del_mostrador)
       if cantidad.to_d > disp
         errors.add(:cantidad,
           "supera el stock disponible (#{disp.round(2)} #{stock.unidad || 'g'} disponibles)")
@@ -312,7 +315,7 @@ class Dispensacion < ApplicationRecord
       # para él no es un bloqueo — es su stock, y de ahí dispensa.
       eventos = ls.map(&:evento_bar_id).compact.uniq
       disp    = st.cantidad_disponible_real.to_d + eventos.sum { |ev| st.apartado_en_evento(ev) } +
-                st.apartado_en_mostrador_de_sede(sede_del_mostrador)
+                st.libre_en_mostrador(sede_del_mostrador)
       if pedido > disp
         nombre = st.forma_producto.to_s.humanize
         errors.add(:base, "Stock insuficiente (#{nombre}): hay #{disp.round(2)}#{st.unidad || 'g'} y se piden #{pedido.to_f}#{st.unidad || 'g'}.")

@@ -1,5 +1,73 @@
 # Changelog
 
+## Septiembre 2026 (ao) — reservar eligiendo de la mesa
+
+Germán: *"si quiere reservar de algo que hay en el depósito, que baje a mostrador la cantidad de
+la reserva y se haga la reserva, de esa manera queda bloqueado para la dispensa pero lo puede
+entregar el dispensador sin necesitar al admin o supervisor"*.
+
+Ahí está el problema entero. **La reserva la hace administración y la mercadería se enfrasca
+recién AL ENTREGAR**, así que entre una cosa y la otra el producto sigue físicamente sobre la
+mesa. Eligiéndolo del depósito quedaba una reserva sin respaldo arriba: hasta que alguien bajara
+el frasco, la entregaba admin o supervisor — nunca el dispensador, que es el que está ahí con el
+paciente enfrente.
+
+**LO RESERVADO SALE DE LA MESA, NO DEL DEPÓSITO — y por eso se cuenta UNA vez.** Los gramos
+reservados YA ESTÁN adentro de los que el mostrador tiene apartados. Restarlos otra vez contra el
+depósito los bloqueaba dos veces: con 1.000 en la fila, 110 sobre la mesa y una reserva de 15, el
+depósito quedaba en **875 donde hay 890** — quince gramos que existen y que nadie podía usar. La
+regla vive en un solo lugar, `Stock#apartado_para_mesa_y_reservas`, y es `max(mesa, reservas)` y
+no la suma: los dos apartados se pisan hasta donde llega el más chico, y si lo reservado supera lo
+que hay arriba el excedente sí bloquea depósito, que es lo que dice la fórmula sola. Sin schema
+nuevo: no hace falta marcar la reserva, la aritmética lo resuelve y las reservas viejas siguen
+comportándose igual.
+
+**La mesa NO SE TOCA.** `MostradorItem#cantidad` sigue siendo lo que hay físicamente arriba, que
+es lo que se pesa a la noche; lo que cambia es contra qué se descuenta. Y la entrega ya bajaba la
+mesa (`imputar_a_mostrador` corre también con `desde_reserva`), así que el invariante cierra solo:
+antes de entregar el depósito libre es 890, después de entregar sigue siendo 890.
+
+**LO RESERVADO NO ES DE QUIEN ATIENDE PARA ENTREGAR.** El carrito del dispensador mostraba los 110
+enteros con 15 apartados a nombre de un paciente: el gramo se lo llevaba el que llegaba primero y
+la reserva no se podía cumplir. Ahora `StocksController#index` le sirve **lo libre** (95) en los
+dos campos —muestra y valida contra `cantidad`— y manda `reservado` para que la fila lo diga.
+Mostrar 110 y que reste él es pedirle la cuenta que hace la máquina. Lo mismo en
+`Stock#libre_en_mostrador`, que es lo que ahora suman `Dispensacion#stock_disponible` y
+`#lineas_validas` en vez de la mesa entera.
+
+**La lista al reservar es la de la mesa de esa sede** (`ModalNuevaDispensacion`, modo reserva),
+traída del mismo endpoint que la pantalla del mostrador — la mesa es una sola y preguntarla por
+otra puerta sería la misma verdad escrita dos veces. Con la mesa vacía el cartel **dice el gesto
+que falta y que quien reserva sí puede hacer**: bajar al mostrador lo que va a apartar, con el
+link al lado. Es el mismo criterio que ya se había aplicado al dispensador con el carrito vacío —
+un cartel que propone una acción prohibida es peor que no tener cartel.
+
+**LA MESA DICE CUÁNTO DE LO QUE HAY ARRIBA YA TIENE DUEÑO** — pedido de Germán, y va en
+`serialize_stock` para que lo tengan las DOS listas del mostrador (lo que está sobre la mesa y lo
+que se puede subir del depósito: bajar la mesa por debajo de lo reservado es justo lo que hay que
+poder ver antes de hacerlo). En la tabla se muestra **siempre, también en cero** y apagado —un
+número que aparece de la nada el día que hay una reserva no se aprende a mirar—. En el teléfono
+NO: esa pantalla es de una línea por producto a propósito, así que en la lista va sólo cuando hay
+algo y el cero se lee en la hoja del frasco, a un toque.
+
+**LO QUE SE DESCARTÓ, y por qué: crear el `MostradorItem` solo al reservar.** La idea era que
+reservar algo del depósito lo subiera automáticamente a la mesa, para que lo entregara el
+dispensador sin depender de administración. Dos razones:
+1. **Ese beneficio ya existe.** `desde_reserva` es una excepción documentada a "sólo se dispensa
+   lo que está arriba" (`lineas_fuera_del_mostrador` corta antes): el dispensador YA entrega una
+   reserva sin que el producto esté sobre la mesa. Sólo necesita la caja abierta.
+2. **La mesa es lo que se PESA a la noche.** Subir 15 g que nadie movió deja el `MostradorItem`
+   en 125 con 110 arriba: al cerrar, `ajustar_inventario!` descuenta 15 g como faltante real,
+   producto entero que está en el depósito. Y no es un caso raro — la reserva es mínimo para
+   mañana, así que pasa en todos los cierres del medio, con el frasco todavía guardado porque se
+   enfrasca recién al entregar.
+
+**Y el formulario se mudó ARRIBA DE TODO LO QUE LO LEE.** En `<script setup>` los `computed` son
+perezosos, pero un `watch` evalúa su fuente al registrarse: `stocksVisibles` tiene uno, y desde que
+la lista de reservar sale de la mesa esa cadena termina leyendo `form.es_reserva`. Declarado
+después, la pantalla ni abría. Es la misma trampa que mordió al partir la dispensa en pasos, y se
+cierra de raíz poniendo el estado primero en vez de acomodar cada `watch` a mano.
+
 ## Septiembre 2026 (an) — entregar una reserva estaba roto, y no era del teléfono
 
 Germán: *"al poner entregar no teníamos que abrir el modal de nueva dispensa con los datos

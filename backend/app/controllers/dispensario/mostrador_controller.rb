@@ -395,6 +395,18 @@ module Dispensario
         numero:    stock.numero_lote_producto,
         forma:     stock.forma_producto,
         unidad:    stock.unidad,
+        # Lo que se anotó al cargar el producto: es donde se distingue un frasco de otro que en
+        # una tabla se ven en todo iguales. Lo necesita la lista de reservar, que ahora se arma
+        # con la mesa, y no le sobra a la del mostrador.
+        descripcion: stock.descripcion,
+        # CUÁNTO DE ESTE PRODUCTO YA TIENE DUEÑO. La reserva la hace administración y el producto
+        # se enfrasca recién al entregar: hasta entonces sigue arriba, mezclado con lo que se
+        # puede vender. Sin decirlo, la mesa dice 110 y sólo 95 se pueden entregar.
+        #
+        # Va en `serialize_stock` y no en `serialize_item` porque lo necesitan LAS DOS listas: la
+        # mesa y lo que se puede subir del depósito — bajar la mesa por debajo de lo reservado es
+        # justo lo que hay que poder ver antes de hacerlo.
+        reservado: stock.apartado_para_reservas.to_f,
         lote:      stock.lote&.codigo,
         genetica:  stock.genetica&.nombre || stock.lote&.genetica&.nombre,
         # Lo viejo sale primero: sin la fecha, el que arma la mesa no tiene con qué decidirlo.

@@ -108,6 +108,29 @@ const today = new Date().toISOString().split('T')[0]
 // Una reserva es apartar stock a FUTURO: la fecha mínima es mañana (hoy = dispensación directa).
 const tomorrow = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0] })()
 
+// EL FORMULARIO VA ARRIBA DE TODO LO QUE LO LEE, y no a mitad del archivo.
+//
+// En `<script setup>` los `computed` son perezosos y aguantan referenciar algo declarado más
+// abajo, pero un `watch` evalúa su fuente AL REGISTRARSE. `stocksVisibles` tiene uno, y desde que
+// la lista de reservar sale de la mesa esa cadena termina leyendo `form.es_reserva`: declarado
+// después, la pantalla ni abría (`Cannot access before initialization`). Es la misma trampa que
+// ya mordió al partir la dispensa en pasos, y se cierra de raíz poniendo el estado primero.
+// `emptyForm` sólo necesita `today`, que ya está.
+function emptyForm() {
+  return {
+    stock_id: null, cantidad: null, descuento_pct: 0, aporte_socio_ars: null,
+    fecha_dispensacion: today, observaciones: '', medio_pago: 'efectivo', es_regalo: false,
+    con_envio: false, delivery_id: null, direccion_envio: '',
+    contacto_nombre: '', contacto_telefono: '', notas_envio: '',
+    // Dirección de entrega estructurada (o usar el domicilio registrado del paciente)
+    usar_domicilio_paciente: true,
+    envio_calle: '', envio_altura: '', envio_piso: '', envio_depto: '', envio_barrio: '', envio_ciudad: '',
+    // Reserva: si es_reserva, no se entrega ahora — se aparta stock para una fecha futura.
+    es_reserva: false, fecha_entrega_estimada: '', sena_ars: null,
+  }
+}
+const form = ref(emptyForm())
+
 const FORMA_LABEL = {
   flor_seca: 'Flor seca', hash: 'Hash', aceite: 'Aceite',
   preroll: 'Preroll', crema: 'Crema', descarte: 'Descarte', otro: 'Otro',
@@ -129,11 +152,34 @@ const FORMA_EMOJI = {
 // Una organización con varias sedes mostraba todo el inventario junto en una sola lista, y quien
 // dispensa tenía que acordarse de cuál era de su mostrador. Se elige la sede y la lista queda
 // acotada. Con UNA sola sede el paso no aparece: no hay nada que elegir.
-const conStock = computed(() => stocks.value.filter(s => s.cantidad > 0))
+// ── RESERVAR ES ELEGIR DE LA MESA ────────────────────────────────────────────────
+//
+// La reserva la hace administración y la mercadería se enfrasca recién AL ENTREGAR: entre una
+// cosa y la otra el producto sigue físicamente sobre la mesa del mostrador. Eligiéndolo del
+// depósito quedaba una reserva que después había que bajar a mano, y hasta que alguien lo
+// hiciera la entregaba admin o supervisor — nunca el dispensador, que es el que está ahí.
+// Reservando de la mesa el gramo queda bloqueado para la dispensa Y lo entrega el que atiende
+// sin depender de nadie.
+//
+// Si lo que se quiere reservar está en el depósito, el camino es bajarlo a la mesa primero: el
+// cartel de la lista vacía lo dice y linkea al mostrador. No es un rodeo — es exactamente el
+// gesto que hace falta para que después se pueda entregar.
+const reservaNueva = computed(() => !modoReserva.value && form.value.es_reserva)
+const mesa         = ref([])
+const loadingMesa  = ref(false)
+// Un solo indicador para los guards de la pantalla: si no, cambiando de sede en modo reserva la
+// lista aparecía vacía por un instante y sacaba el cartel de "no hay nada sobre la mesa".
+const cargando = computed(() => loadingStocks.value || loadingMesa.value)
+
+// El depósito. Sigue siendo la fuente para el paso de la sede aunque después se liste la mesa:
+// la mesa recién se puede pedir DESPUÉS de elegir una sede, así que sacar los chips de ahí sería
+// pedir que elijas una sede de una lista que se arma con la sede elegida.
+const stockLibre = computed(() => stocks.value.filter(s => s.cantidad > 0))
+const conStock   = computed(() => reservaNueva.value ? mesa.value : stockLibre.value)
 
 const sedesConStock = computed(() => {
   const mapa = new Map()
-  for (const s of conStock.value) {
+  for (const s of stockLibre.value) {
     const id = s.sede?.id ?? null
     if (!mapa.has(id)) mapa.set(id, { id, nombre: s.sede?.nombre || 'Sin sede (club)', items: 0 })
     mapa.get(id).items += 1
@@ -309,6 +355,54 @@ async function cargarStocks() {
   finally { loadingStocks.value = false }
 }
 
+// LO QUE HAY SOBRE LA MESA DE ESA SEDE, para elegir qué se reserva.
+//
+// Sale del mismo endpoint que la pantalla del mostrador: la mesa es una sola y preguntarla por
+// otra puerta sería la misma verdad escrita dos veces. De cada renglón se arma lo que el listado
+// necesita — `cantidad` es LO LIBRE (lo que hay arriba menos lo ya reservado por otro paciente),
+// porque la tabla muestra y valida contra ese campo; `en_la_mesa` y `reservado` viajan aparte
+// para que la fila pueda decir por qué el número no es el que se ve sobre el mostrador.
+async function cargarMesa() {
+  if (!reservaNueva.value || sedeElegida.value === undefined || sedeElegida.value === null) {
+    mesa.value = []
+    return
+  }
+  loadingMesa.value = true
+  const sd = sedesConStock.value.find(x => x.id === sedeElegida.value)
+  try {
+    const { data } = await getMostrador(sedeElegida.value)
+    mesa.value = (data?.mesa || [])
+      .filter(it => Number(it.mostrador) > 0)
+      .map(it => {
+        const arriba    = Number(it.mostrador) || 0
+        const reservado = Number(it.reservado) || 0
+        const libre     = Math.max(0, arriba - reservado)
+        // La mesa habla en su propio idioma (`stock_id`, `forma`, `genetica` como texto): esta
+        // lista es la de dispensar y espera la forma del listado de stock. Se traduce acá, en un
+        // solo lugar — la alternativa era que la tabla supiera leer dos formatos.
+        return {
+          id:                  it.stock_id,
+          forma_producto:      it.forma,
+          unidad:              it.unidad,
+          genetica:            it.genetica ? { nombre: it.genetica } : null,
+          lote:                it.lote ? { codigo: it.lote } : null,
+          numero_lote_producto: it.numero,
+          descripcion:         it.descripcion,
+          fecha_elaboracion:   it.fecha,
+          precio_sugerido_ars: it.precio_ars,
+          // La mesa es de UNA sede, y es la elegida: sin esto el filtro por sede la descartaba
+          // entera y la lista quedaba vacía con la mesa llena.
+          sede:                { id: sedeElegida.value, nombre: sd?.nombre || '' },
+          cantidad:            libre,
+          cantidad_disponible_real: libre,
+          en_la_mesa:          arriba,
+          reservado,
+        }
+      })
+  } catch { mesa.value = [] }
+  finally { loadingMesa.value = false }
+}
+watch([reservaNueva, sedeElegida], cargarMesa)
 // LOS PRODUCTOS QUE NO EXISTÍAN EN ESA FECHA.
 //
 // El backend lo rechaza (`Dispensacion#fecha_no_anterior_al_producto`), pero enterarse al
@@ -425,21 +519,6 @@ async function cargarDeliveryUsers() {
   finally { loadingDelivery.value = false }
 }
 
-function emptyForm() {
-  return {
-    stock_id: null, cantidad: null, descuento_pct: 0, aporte_socio_ars: null,
-    fecha_dispensacion: today, observaciones: '', medio_pago: 'efectivo', es_regalo: false,
-    con_envio: false, delivery_id: null, direccion_envio: '',
-    contacto_nombre: '', contacto_telefono: '', notas_envio: '',
-    // Dirección de entrega estructurada (o usar el domicilio registrado del paciente)
-    usar_domicilio_paciente: true,
-    envio_calle: '', envio_altura: '', envio_piso: '', envio_depto: '', envio_barrio: '', envio_ciudad: '',
-    // Reserva: si es_reserva, no se entrega ahora — se aparta stock para una fecha futura.
-    es_reserva: false, fecha_entrega_estimada: '', sena_ars: null,
-  }
-}
-
-const form               = ref(emptyForm())
 const precioUnitarioManual = ref(null)
 
 // "Contra entrega" como medio de pago = el delivery cobra al entregar. Requiere envío.
@@ -920,7 +999,7 @@ async function handleSubmit() {
           </div>
 
           <!-- Stock -->
-          <div v-if="!modoReserva" class="mnd__section-label">{{ esDispensaInmediata ? 'Agregar producto' : 'Stock a reservar' }} <span class="mnd__req">*</span></div>
+          <div v-if="!modoReserva" class="mnd__section-label">{{ esDispensaInmediata ? 'Agregar producto' : 'Qué se reserva, de la mesa' }} <span class="mnd__req">*</span></div>
           <div v-if="modoReserva"></div>
           <!-- ══ ELEGIR EL PRODUCTO ═══════════════════════════════════════════
                Entero apagado al ENTREGAR UNA RESERVA: el producto ya está definido —es el que se
@@ -933,7 +1012,7 @@ async function handleSubmit() {
                Y ENTREGANDO UNA RESERVA NO SE PREGUNTA: el producto ya está definido —es el que se
                apartó—, así que elegir sede no decide nada y encima dejaba la entrega trabada
                hasta contestar una pregunta sin respuesta posible. -->
-          <div v-if="hayVariasSedes && !loadingStocks && !modoReserva" class="mnd__sedes">
+          <div v-if="hayVariasSedes && !cargando && !modoReserva" class="mnd__sedes">
             <span class="mnd__sedes-lbl">¿De qué sede?</span>
             <div class="mnd__sedes-chips">
               <button
@@ -944,12 +1023,15 @@ async function handleSubmit() {
                 @click="sedeElegida = sd.id"
               >
                 {{ sd.nombre }}
-                <span class="mnd__sede-n">{{ sd.items }}</span>
+                <!-- El número cuenta el DEPÓSITO, que es de donde salen los chips. Reservando se
+                     lista la mesa, así que decir "12" al lado de una mesa con tres productos
+                     sería un dato que se contradice con la lista de abajo. -->
+                <span v-if="!reservaNueva" class="mnd__sede-n">{{ sd.items }}</span>
               </button>
             </div>
           </div>
 
-          <div v-else-if="loadingStocks" class="mnd__loading-inline"><DsSpinner :size="13" /> Cargando stocks…</div>
+          <div v-else-if="cargando" class="mnd__loading-inline"><DsSpinner :size="13" /> {{ reservaNueva ? 'Cargando la mesa…' : 'Cargando stocks…' }}</div>
           <div v-if="hayVariasSedes && sedeElegida === undefined && !modoReserva" class="mnd__hint-box">
             <i class="bi bi-arrow-up"></i> Elegí una sede para ver su stock.
           </div>
@@ -961,12 +1043,23 @@ async function handleSubmit() {
           <!-- Y NUNCA entregando una reserva: lo reservado ya está apartado a nombre del
                paciente y por eso NO está sobre la mesa (es la excepción documentada). Decirle
                que pida que le bajen producto es mandarlo a resolver algo que no hace falta. -->
-          <div v-else-if="!loadingStocks && !stocksDisponibles.length && !modoReserva" class="mnd__warn-box">
+          <div v-else-if="!cargando && !stocksDisponibles.length && !modoReserva" class="mnd__warn-box">
             <i class="bi bi-exclamation-triangle"></i>
             <!-- Y le dice lo que SÍ puede hacer. Antes lo mandaba a "bajar lo que falte del
                  depósito", que es justo lo único que no puede: la mesa la carga administración.
                  Un cartel que propone una acción prohibida es peor que no tener cartel. -->
-            <template v-if="dispensaDelMostrador">
+            <!-- RESERVANDO, LA LISTA ES LA MESA — y el cartel dice el gesto que falta, que acá
+                 sí es uno que administración puede hacer: bajar al mostrador lo que va a
+                 reservar. No es un rodeo, es lo que hace que después lo entregue el dispensador
+                 solo. Va primero porque quien reserva es admin/supervisor y no entra por la
+                 rama de abajo. -->
+            <template v-if="reservaNueva">
+              No hay nada sobre la mesa{{ hayVariasSedes ? ' de esta sede' : '' }}. Se reserva de
+              lo que está en el mostrador: bajá primero la cantidad que vas a apartar y queda
+              bloqueada para la dispensa, así la entrega el dispensador sin depender de vos.
+              <RouterLink :to="destinoMostrador" class="mnd__warn-link">Ir al mostrador</RouterLink>
+            </template>
+            <template v-else-if="dispensaDelMostrador">
               No hay nada sobre la mesa. Si la caja está cerrada, abrila desde <b>Mostrador</b>;
               si ya está abierta, pedile a administración que baje producto del depósito.
             </template>
@@ -1041,6 +1134,13 @@ async function handleSubmit() {
                     </td>
                     <td class="mnd__td-disp">
                       <span class="mnd__td-disp-n">{{ s.cantidad }}{{ s.unidad }}</span>
+                      <!-- EL NÚMERO GRANDE ES LO LIBRE, NO LO QUE HAY ARRIBA. Sobre la mesa hay
+                           110 y 15 son de un paciente que ya los reservó: mostrar los 110 y que
+                           el que atiende reste es pedirle la cuenta que hace la máquina, y
+                           termina con el gramo entregado al que llegó primero. El badge explica
+                           por qué el número no coincide con el frasco. -->
+                      <span v-if="s.reservado > 0" class="mnd__td-reservado"
+                            :title="`Sobre la mesa hay ${s.en_la_mesa ?? ''}${s.unidad || ''}, pero ${s.reservado}${s.unidad || ''} ya están reservados a nombre de un paciente`">🔒 {{ s.reservado }}{{ s.unidad }} reservados</span>
                       <span v-for="a in (s.apartados_evento || [])" :key="a.evento_id" class="mnd__td-evento"
                             :title="`Apartado para el evento ${a.evento_nombre}`">🎉 {{ a.cantidad }}{{ s.unidad }}</span>
                     </td>
@@ -1075,6 +1175,8 @@ async function handleSubmit() {
                 </span>
                 <span class="mnd__stock-right">
                   <span class="mnd__stock-disp">{{ s.cantidad }}{{ s.unidad }}</span>
+                  <span v-if="s.reservado > 0" class="mnd__stock-reservado"
+                        :title="`Sobre la mesa hay ${s.en_la_mesa ?? ''}${s.unidad || ''}, pero ${s.reservado}${s.unidad || ''} ya están reservados`">🔒 {{ s.reservado }}{{ s.unidad }} reservados</span>
                   <span v-for="a in (s.apartados_evento || [])" :key="a.evento_id" class="mnd__stock-evento" :title="`Apartado para el evento ${a.evento_nombre}`">
                     🎉 {{ a.cantidad }}{{ s.unidad }}
                   </span>
@@ -1680,6 +1782,9 @@ async function handleSubmit() {
 .mnd__td-disp { text-align: right; white-space: nowrap; }
 .mnd__td-disp-n { font-family: monospace; font-weight: 800; color: #1b5e20; }
 .mnd__td-evento { display: block; font-size: .64rem; color: #b45309; }
+/* Lo reservado por otro paciente. Ámbar informativo y NO rojo: no es un error de nadie ni algo
+   que haya que arreglar — es producto que está ahí y tiene dueño. */
+.mnd__td-reservado { display: block; font-size: .64rem; font-weight: 700; color: var(--c-amber-700, #b45309); white-space: nowrap; }
 /* Informativo ("va a descontar de la mesa"), con los tokens de info del DS: el azul estaba
    escrito a mano en dos lugares y no coincidía con ningún otro badge de la app. */
 .mnd__td-mostrador { display: inline-block; margin-left: 6px; font-size: .64rem; font-weight: 700; color: var(--c-sky-600); background: var(--c-sky-100); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
@@ -1705,6 +1810,10 @@ async function handleSubmit() {
 .mnd__stock-right { display: flex; flex-direction: column; align-items: flex-end; gap: .1rem; flex-shrink: 0; }
 .mnd__stock-disp  { font-size: .8rem; font-weight: 700; color: #1b5e20; font-family: monospace; }
 .mnd__stock-precio { font-size: .7rem; color: var(--c-slate-500); font-family: monospace; white-space: nowrap; }
+.mnd__stock-reservado { font-size: .64rem; font-weight: 700; color: var(--c-amber-700, #b45309); white-space: nowrap; }
+/* El link dentro del aviso: la caja es `display:block` a propósito (ver .mnd__warn-box), así que
+   alcanza con marcarlo. */
+.mnd__warn-link { color: inherit; font-weight: 700; text-decoration: underline; margin-left: .25rem; }
 .mnd__stock-evento { font-size: .66rem; color: #6d28d9; background: #ede9fe; border-radius: 999px; padding: 1px 7px; white-space: nowrap; font-weight: 700; }
 .mnd__stock-mostrador { display: inline-block; margin-left: 6px; font-size: .62rem; font-weight: 700; color: var(--c-sky-600); background: var(--c-sky-100); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
 .mnd__cart-evento { font-size: .62rem; color: #6d28d9; background: #ede9fe; border-radius: 999px; padding: 1px 6px; margin-left: .35rem; font-weight: 700; }

@@ -362,17 +362,18 @@ verde** y apareció mirando la app corriendo:
 - Y un arreglo deployado que **no llegaba al teléfono**: la PWA sólo preguntaba por versión nueva
   al arrancar en frío, y una app instalada casi nunca arranca en frío.
 
-**LO QUE SIGUE, acordado con Germán: reservar eligiendo de la MESA.** La reserva la hace
-admin/supervisor y la mercadería **se enfrasca recién al entregar**, así que entre una cosa y la
-otra el producto sigue sobre la mesa. Cuatro piezas, y las dos del medio no son opcionales:
-(1) la lista al reservar pasa a ser la del mostrador de esa sede; (2) lo reservado se descuenta del
-carrito del dispensador y se le muestra ("100 g · 15 reservados"), o se lo lleva otro; (3) dejar de
-restar dos veces contra el depósito —hoy reservar 15 de la mesa deja 875 donde hay 890—; (4) sin
-tocar el número físico de la mesa, que es lo que se pesa a la noche. La entrega YA baja la mesa.
+**RESERVAR ELIGIENDO DE LA MESA — HECHO** (bloque (ao) del CHANGELOG). Las cuatro piezas están:
+la lista al reservar es la de la mesa de esa sede; lo reservado se descuenta del carrito del
+dispensador y la fila dice cuánto es; se dejó de restar dos veces contra el depósito
+(`max(mesa, reservas)`, sin columna nueva); y el número físico de la mesa no se toca. Decisión de
+Germán sobre lo que está sólo en el depósito: **se baja a la mesa la cantidad a reservar y ahí se
+reserva** — así queda bloqueado para la dispensa Y lo entrega el dispensador sin depender de
+admin ni supervisor. El cartel de mesa vacía dice exactamente eso, con el link.
 
 Pendiente menor: los **cierres como tarjetas desplegables** en el teléfono (hoy es una tabla).
 
-**2856 rspec ✓ · 1850 vitest ✓ · 8 navegador ✓.**
+**1854 vitest ✓ · sin correr en el navegador todavía: la lista de reservar hay que verla
+renderizada.**
 
 ---
 
@@ -540,6 +541,48 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   `Dispensacion#imputar_a_mostrador` es el gemelo exacto de `imputar_a_apartado_evento`. Hace DOS
   cosas y son distintas: baja la mesa (el estado permanente, lo que queda para el próximo
   paciente) y suma al contador del turno (el arqueo de esta jornada).
+- **LO RESERVADO SALE DE LA MESA, NO DEL DEPÓSITO — y se cuenta UNA vez**
+  (`Stock#apartado_para_mesa_y_reservas`, sep-2026). La reserva la hace administración y la
+  mercadería se enfrasca recién AL ENTREGAR: entre una cosa y la otra el producto sigue
+  físicamente sobre la mesa, **adentro** de los gramos que el mostrador ya tiene apartados.
+  Restarlos otra vez contra el depósito los bloqueaba dos veces —1.000 en la fila, 110 arriba,
+  reserva de 15, y el depósito quedaba en **875 donde hay 890**—. Es `max(mesa, reservas)` y no
+  la suma: los dos apartados se pisan hasta donde llega el más chico, y si lo reservado supera
+  lo que hay arriba el excedente sí bloquea depósito. **Sin columna nueva**: no hace falta marcar
+  la reserva, la aritmética lo resuelve y las viejas se comportan igual. **La mesa NO se toca** —
+  `MostradorItem#cantidad` sigue siendo lo que se pesa a la noche; lo que cambia es contra qué se
+  descuenta. Y **la entrega ya bajaba la mesa** (`imputar_a_mostrador` corre también con
+  `desde_reserva`), así que el invariante cierra solo: el depósito libre es 890 antes y después.
+- **LO RESERVADO NO ES DE QUIEN ATIENDE PARA ENTREGAR** (`Stock#libre_en_mostrador`). Su carrito
+  mostraba los 110 enteros con 15 apartados a nombre de un paciente: se lo llevaba el que llegaba
+  primero y la reserva no se podía cumplir. Ve **lo libre** (95) en los DOS campos —muestra y
+  valida contra `cantidad`— y la fila dice `reservado`, porque un número que baja sin motivo se
+  lee como un error de la app. Mostrar 110 y que reste él es pedirle la cuenta que hace la
+  máquina. Lo mismo suman `Dispensacion#stock_disponible` y `#lineas_validas`.
+- **LA LISTA AL RESERVAR ES LA DE LA MESA DE ESA SEDE**, del mismo endpoint que la pantalla del
+  mostrador — la mesa es una sola y preguntarla por otra puerta sería la misma verdad escrita dos
+  veces. Si lo que se quiere reservar está en el depósito, **el camino es bajarlo a la mesa
+  primero**, y el cartel de lista vacía lo dice con el link al lado: así queda bloqueado para la
+  dispensa **y lo entrega el dispensador sin depender de admin ni supervisor**, que es el punto.
+  (Decisión de Germán, sep-2026.) El payload de la mesa habla otro idioma (`stock_id`, `forma`,
+  `genetica` como texto) y se traduce en `cargarMesa`, en un solo lugar.
+- **NO SE CREA EL `MostradorItem` SOLO AL RESERVAR** (evaluado y descartado, sep-2026). Subir a
+  la mesa lo reservado del depósito no hace falta —**el dispensador YA entrega una reserva sin que
+  el producto esté arriba**, `desde_reserva` es la excepción documentada y sólo pide la caja
+  abierta— y **rompe el arqueo**: la mesa es lo que se PESA a la noche, así que 15 g que nadie
+  movió dejan el ítem en 125 con 110 arriba y el cierre los descuenta como faltante real. Como la
+  reserva es mínimo para mañana, pasaría en todos los cierres del medio.
+- **LA MESA DICE CUÁNTO YA TIENE DUEÑO** (`reservado`, en `serialize_stock` del mostrador para que
+  lo tengan las dos listas: la mesa y lo que se puede subir). En la tabla, **siempre y también en
+  cero**, apagado — un número que aparece de la nada el día que hay una reserva no se aprende a
+  mirar. En el teléfono sólo cuando hay algo: esa pantalla es de UNA línea por producto a
+  propósito, y el cero se lee en la hoja del frasco.
+- **EL FORMULARIO DEL MODAL VA ARRIBA DE TODO LO QUE LO LEE.** Los `computed` de `<script setup>`
+  son perezosos y aguantan referenciar algo de más abajo, pero un `watch` evalúa su fuente AL
+  REGISTRARSE: `stocksVisibles` tiene uno, y desde que la lista de reservar sale de la mesa esa
+  cadena termina leyendo `form.es_reserva`. Declarado después, la pantalla ni abría. Es la misma
+  trampa que mordió al partir la dispensa en pasos, y se cierra **de raíz** poniendo el estado
+  primero en vez de acomodar cada `watch` a mano.
 - **LO QUE ADMINISTRACIÓN BAJA A MEDIA TARDE TAMBIÉN CUENTA EN EL ARQUEO.** Los renglones del
   turno (`TurnoMostradorItem`) se crean al ABRIR, con lo que había entonces, e `imputar_a_mostrador`
   los BUSCABA: un producto agregado después se dispensaba —la mesa es el estado de AHORA, no la

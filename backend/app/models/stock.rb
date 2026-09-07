@@ -105,9 +105,40 @@ class Stock < ApplicationRecord
   # (que descuenta el real) y la reserva pasa a 'entregada', dejando de contar acá — sin
   # doble conteo.
   def gramos_reservados
-    envios   = dispensaciones.where(estado_envio: %w[pendiente en_viaje]).sum(:cantidad).to_f
-    apartado = reservas.pendientes.sum(:cantidad).to_f
-    envios + apartado + apartado_para_eventos.to_f + apartado_para_mostrador.to_f
+    envios = dispensaciones.where(estado_envio: %w[pendiente en_viaje]).sum(:cantidad).to_f
+    envios + apartado_para_eventos.to_f + apartado_para_mesa_y_reservas.to_f
+  end
+
+  # Lo apartado a nombre de un paciente que todavía no lo retiró.
+  def apartado_para_reservas
+    return @apartado_reservas_precargado if defined?(@apartado_reservas_precargado)
+
+    reservas.pendientes.sum(:cantidad).to_d
+  end
+
+  # LO RESERVADO SALE DE LA MESA, NO DEL DEPÓSITO — y por eso se cuenta UNA vez.
+  #
+  # La reserva la hace administración y la mercadería se enfrasca recién al entregar: entre una
+  # cosa y la otra el producto sigue físicamente sobre la mesa, ADENTRO de los gramos que el
+  # mostrador ya tiene apartados. Restarlo también contra el depósito lo bloqueaba dos veces:
+  # con 1.000 en la fila, 110 sobre la mesa y una reserva de 15, el depósito quedaba en 875
+  # donde hay 890 — quince gramos que existen y que nadie podía usar.
+  #
+  # `max` y no suma: los dos apartados se pisan hasta donde llega el más chico. Si lo reservado
+  # supera lo que hay arriba (se reservó del depósito, o la mesa bajó después), el excedente sí
+  # bloquea depósito, que es lo que dice la fórmula sola.
+  #
+  # Es la MESA la que no se toca: `MostradorItem#cantidad` sigue siendo lo que hay físicamente
+  # arriba, que es lo que se pesa a la noche. Lo que cambia es contra qué se descuenta.
+  def apartado_para_mesa_y_reservas
+    [apartado_para_mostrador.to_d, apartado_para_reservas].max
+  end
+
+  # LO QUE QUEDA SOBRE LA MESA PARA EL PRÓXIMO QUE LLEGA: lo que hay arriba menos lo que ya
+  # tiene dueño. Con 110 sobre la mesa y 15 reservados, quien atiende puede entregar 95 — los
+  # otros 15 están ahí, pero son de alguien. Sin esto se los lleva el que llegue primero.
+  def libre_en_mostrador(sede_id)
+    [apartado_en_mostrador_de_sede(sede_id) - apartado_para_reservas, 0.to_d].max
   end
 
   # Cantidad que está SOBRE LA MESA de un mostrador.
@@ -182,9 +213,25 @@ class Stock < ApplicationRecord
     lista
   end
 
-  # Las dos precargas juntas: lo que necesita cualquier listado que muestre disponibilidad.
+  # El tercer hermano de las precargas, por el mismo motivo: `cantidad_disponible_real` suma las
+  # reservas pendientes de cada stock, y ahora además las pregunta `libre_en_mostrador` para
+  # pintar cuánto de la mesa ya tiene dueño. Sin esto son dos queries por producto en pantalla.
+  def self.precargar_apartado_reservas(stocks)
+    lista = Array(stocks)
+    return lista if lista.empty?
+
+    # `unscoped` saca el tenant (esto se llama también desde pantallas sin club fijado), pero
+    # `deleted_at` se repone a mano: Reserva es paranoia, y contar las borradas bloquearía stock
+    # a nombre de una reserva que ya no existe.
+    saldos = Reserva.unscoped.where(deleted_at: nil, estado: 'pendiente', stock_id: lista.map(&:id))
+                    .group(:stock_id).sum(:cantidad)
+    lista.each { |s| s.instance_variable_set(:@apartado_reservas_precargado, saldos[s.id].to_d) }
+    lista
+  end
+
+  # Las tres precargas juntas: lo que necesita cualquier listado que muestre disponibilidad.
   def self.precargar_apartados(stocks)
-    precargar_apartado_eventos(precargar_apartado_mostrador(stocks))
+    precargar_apartado_reservas(precargar_apartado_eventos(precargar_apartado_mostrador(stocks)))
   end
 
   # Provisiones vivas de eventos EN CURSO (los que están sucediendo ahora). Son las únicas de las
@@ -227,8 +274,10 @@ class Stock < ApplicationRecord
     # dispensación (after_create :decrementar_stock). NO se vuelven a restar acá (eso era un
     # doble descuento que dejaba el disponible en ~0 tras una entrega grande). Solo restamos las
     # reservas (apartado), que comprometen stock SIN descontar el real, y lo apartado por eventos.
-    comprometido = reservas.pendientes.sum(:cantidad).to_f + apartado_para_eventos.to_f +
-                   apartado_para_mostrador.to_f
+    #
+    # La mesa y las reservas van juntas y se cuentan una sola vez: ver
+    # `apartado_para_mesa_y_reservas`.
+    comprometido = apartado_para_eventos.to_f + apartado_para_mesa_y_reservas.to_f
     [cantidad.to_f - comprometido, 0].max
   end
 

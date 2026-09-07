@@ -69,6 +69,16 @@
                   Contar
                 </button>
               </template>
+              <!-- CUÁNTO DE LO QUE HAY ARRIBA YA TIENE DUEÑO.
+                   La reserva la hace administración y el producto se enfrasca recién al entregar:
+                   hasta entonces sigue sobre la mesa, mezclado con lo que se puede vender. La mesa
+                   dice 110 y sólo 95 se pueden entregar — sin decirlo, el gramo se lo lleva el que
+                   llega primero y la reserva no se puede cumplir.
+                   SE MUESTRA SIEMPRE, TAMBIÉN EN CERO (pedido de Germán): así la columna se
+                   explica sola y el número no aparece de la nada el día que hay una reserva. -->
+              <span class="tmo__reservado" :class="{ 'is-cero': !Number(s.reservado) }">
+                {{ fmt(s.reservado) }} {{ s.unidad }} reservados
+              </span>
             </td>
           </tr>
         </tbody>
@@ -249,6 +259,10 @@ defineExpose({ cambios, hayCambios, hayExceso })
   text-align: left; padding: 0; border-bottom: 1px solid var(--c-slate-200); white-space: nowrap;
 }
 .tmo__th--num { text-align: right; }
+/* Lo reservado: dato, no alerta. En cero se apaga casi del todo — está para que la columna se
+   explique sola, no para gritar quince veces que no pasa nada. */
+.tmo__reservado { display: block; font-size: .68rem; font-weight: 700; color: var(--c-amber-700, #b45309); white-space: nowrap; margin-top: 2px; }
+.tmo__reservado.is-cero { font-weight: 500; color: var(--c-ink-400, #9aa0aa); }
 .tmo__th-btn {
   width: 100%; border: 0; background: transparent; cursor: pointer;
   padding: 11px 14px; text-align: inherit;

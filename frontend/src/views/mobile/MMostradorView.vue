@@ -116,6 +116,14 @@
             <span class="mmo__card-cant">
               <b>{{ fmt(s.mostrador) }}</b><small>{{ s.unidad }}</small>
               <em v-if="pedido(s)" class="mmo__card-pedido" title="Reposición pedida hoy">pedido</em>
+              <!-- De lo que hay arriba, cuánto ya tiene dueño. En la LISTA sólo si hay algo: la
+                   pantalla es de una línea por producto a propósito, y "0 g reservados" en cada
+                   tarjeta serían quince renglones diciendo que no pasa nada. El cero se lee en la
+                   hoja, a un toque. -->
+              <em v-if="Number(s.reservado) > 0" class="mmo__card-reservado"
+                  :title="`${fmt(s.reservado)} ${s.unidad} reservados a nombre de un paciente`">
+                {{ fmt(s.reservado) }} res.
+              </em>
             </span>
             <i class="bi bi-chevron-right mmo__card-arr"></i>
           </button>
@@ -132,6 +140,12 @@
           <div class="mmo__dato">
             <span class="mmo__dato-lbl">Sobre la mesa</span>
             <span class="mmo__dato-val">{{ fmt(detalle.mostrador) }} {{ detalle.unidad }}</span>
+          </div>
+          <!-- SIEMPRE, TAMBIÉN EN CERO: acá sí, porque es la pantalla de "contame todo de este
+               frasco". Un dato que sólo aparece cuando pasa algo no se aprende a mirar. -->
+          <div class="mmo__dato">
+            <span class="mmo__dato-lbl">Reservado</span>
+            <span class="mmo__dato-val">{{ fmt(detalle.reservado) }} {{ detalle.unidad }}</span>
           </div>
           <div class="mmo__dato">
             <span class="mmo__dato-lbl">Variedad</span>
@@ -404,6 +418,10 @@ async function onConfirmarConteoDeUno (payload) {
   font-size: .75rem; color: var(--c-slate-400); margin-top: 2px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+/* Lo reservado, al lado del número: dato, no alerta. */
+.mmo__card-reservado { font-style: normal; font-size: .62rem; font-weight: 700; white-space: nowrap;
+  color: var(--c-amber-700, #b45309); background: var(--c-amber-100, #fef3c7);
+  border-radius: 999px; padding: 1px 6px; }
 /* El número es lo que se vino a leer: grande, tabular y con la unidad pegada. */
 .mmo__card-cant { display: flex; align-items: baseline; gap: 2px; white-space: nowrap; }
 .mmo__card-cant b {

@@ -39,7 +39,10 @@ async function montar({ limiteCc = 50000, saldoCc = 0 } = {}) {
   const { default: Modal } = await import('../components/pacientes/ModalNuevaDispensacion.vue')
   const w = mount(Modal, {
     props: { modelValue: true, paciente: PACIENTE, socioId: PACIENTE.id, limiteCc, saldoCc },
-    global: { stubs: { Teleport: true, DsSpinner: true, AppDatePicker: true } },
+    // RouterLink stubeado como en el resto: en modo reserva el aviso de "no hay nada sobre la
+    // mesa" lleva el link al mostrador, y sin router montado `useLink` revienta en una promesa
+    // suelta — el test pasaba igual, con un error al costado que enseña a ignorar errores.
+    global: { stubs: { Teleport: true, DsSpinner: true, AppDatePicker: true, RouterLink: true } },
   })
   for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0))
   return w

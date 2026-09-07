@@ -69,8 +69,13 @@ class ReservasController < ApplicationController
     attrs = reserva_update_params
     # Si cambia la cantidad, re-validar disponibilidad (devolviendo el bloqueo propio actual).
     if attrs[:cantidad].present?
-      nueva       = attrs[:cantidad].to_d
-      disponible  = @reserva.stock.cantidad_disponible_real.to_d + @reserva.cantidad.to_d
+      nueva = attrs[:cantidad].to_d
+      # El mismo techo que al crearla (`Reserva#stock_disponible`): depósito libre + mesa libre.
+      # Sin el término de la mesa, agrandar una reserva de algo que está arriba se rechazaba
+      # contra un depósito que ya no la cuenta. Se le devuelve además su propio bloqueo actual.
+      st         = @reserva.stock
+      disponible = st.cantidad_disponible_real.to_d + st.libre_en_mostrador(st.sede_id) +
+                   @reserva.cantidad.to_d
       if nueva <= 0 || nueva > disponible
         return render json: { errors: ["Cantidad inválida. Disponible: #{disponible.to_f}#{@reserva.stock.unidad}"] }, status: :unprocessable_entity
       end

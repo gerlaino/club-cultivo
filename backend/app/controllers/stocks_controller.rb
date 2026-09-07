@@ -96,8 +96,17 @@ class StocksController < ApplicationController
         # muestra y valida contra `cantidad` —el frasco entero—, así que al que atiende le decía
         # "1.000 g" con 300 sobre la mesa y lo dejaba cargar 500 para que el backend se lo
         # rechazara al confirmar. La regla estaba escrita acá y leída en otro campo allá.
+        #
+        # Y LO RESERVADO NO ES SUYO PARA ENTREGAR. La reserva la hace administración y el
+        # producto se enfrasca recién al entregar: hasta entonces sigue arriba, entre los gramos
+        # que él ve. Mostrarle los 110 enteros con 15 apartados a nombre de un paciente termina
+        # con el gramo entregado al que llegó primero y la reserva sin poder cumplirse. Viaja
+        # además `reservado`, para que la fila lo diga en vez de que el número baje sin motivo.
         en_la_mesa = sobre_la_mesa[st.id].cantidad.to_f
-        serialize_stock(st).merge(cantidad: en_la_mesa, cantidad_disponible_real: en_la_mesa)
+        reservado  = st.apartado_para_reservas.to_f
+        libre      = [en_la_mesa - reservado, 0].max
+        serialize_stock(st).merge(cantidad: libre, cantidad_disponible_real: libre,
+                                  en_la_mesa: en_la_mesa, reservado: reservado)
       }
     end
 
