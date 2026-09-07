@@ -345,6 +345,37 @@ Cuando Germán plantee un problema o feature nueva antes de implementar:
 
 Suite 1239 ✓ + 58 vitest ✓. **Deploy: sumar `add_vendible_a_bar_venta_items` y `add_consumo_evento_a_provisiones_y_dispensas` al `db:migrate`.**
 
+## 📍 Dónde retomar (7-sep-2026)
+
+**Dos días probando el mostrador en producción, con el celular en la mano.** 12 commits, todos
+pusheados (bloques (ag) a (an) del CHANGELOG). Lo que rompía de verdad **pasó todas las suites en
+verde** y apareció mirando la app corriendo:
+
+- **La PWA recién instalada abría en NEGRO** — y le pasaba a cualquiera que la instalara por
+  primera vez. `render file:` no existe en modo API y devuelve vacío en silencio, así que `/m` —el
+  `start_url`— servía una página sin nada; sin JS no se registraba el service worker y no había
+  salida. Lo tapaba el precache mientras el SW ya estuviera instalado.
+- **"Entregar reserva" estaba MUERTO**, también en el escritorio: dos guards borran el producto
+  elegido si no está en la lista visible, y lo reservado nunca está ahí.
+- **El porcentaje de merma salía inflado**: lo dispensado de un producto bajado a la mesa después
+  de abrir la caja no sumaba al arqueo. El faltante cuadraba igual, así que no se veía.
+- Y un arreglo deployado que **no llegaba al teléfono**: la PWA sólo preguntaba por versión nueva
+  al arrancar en frío, y una app instalada casi nunca arranca en frío.
+
+**LO QUE SIGUE, acordado con Germán: reservar eligiendo de la MESA.** La reserva la hace
+admin/supervisor y la mercadería **se enfrasca recién al entregar**, así que entre una cosa y la
+otra el producto sigue sobre la mesa. Cuatro piezas, y las dos del medio no son opcionales:
+(1) la lista al reservar pasa a ser la del mostrador de esa sede; (2) lo reservado se descuenta del
+carrito del dispensador y se le muestra ("100 g · 15 reservados"), o se lo lleva otro; (3) dejar de
+restar dos veces contra el depósito —hoy reservar 15 de la mesa deja 875 donde hay 890—; (4) sin
+tocar el número físico de la mesa, que es lo que se pesa a la noche. La entrega YA baja la mesa.
+
+Pendiente menor: los **cierres como tarjetas desplegables** en el teléfono (hoy es una tabla).
+
+**2856 rspec ✓ · 1850 vitest ✓ · 8 navegador ✓.**
+
+---
+
 ## 📍 Dónde retomar (4-sep-2026)
 
 **Repaso del mostrador rol por rol, con la app corriendo** (bloque (ab) del CHANGELOG). Casi todo
