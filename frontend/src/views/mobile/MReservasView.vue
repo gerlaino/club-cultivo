@@ -9,6 +9,17 @@
       </button>
     </div>
 
+    <!-- LA CAJA CERRADA SE AVISA ACÁ, NO AL APRETAR ENTREGAR.
+         Entregar una reserva crea una dispensa, y sin caja abierta el backend la rechaza: lo
+         cobrado en efectivo no tendría dónde caer. La lista se llena igual —las reservas están
+         ahí— así que sin este cartel el botón se aprieta y rebota, con el paciente enfrente y un
+         mensaje que parece culpa del usuario. -->
+    <div v-if="cajaCerrada" class="mres__aviso">
+      <b>La caja del mostrador está cerrada.</b>
+      Abrila en <RouterLink to="/m/mostrador" class="mres__aviso-link">Mostrador</RouterLink>
+      contando lo que hay sobre la mesa y la plata del cajón: hasta entonces no se puede entregar.
+    </div>
+
     <div v-if="loading" class="mres__muted">Cargando…</div>
 
     <div v-else-if="!visibles.length" class="mres__empty">
@@ -30,7 +41,7 @@
         <div class="mres__pie">
           <span v-if="Number(r.aporte_restante_ars) > 0" class="mres__resta">Resta {{ formatARS(r.aporte_restante_ars) }}</span>
           <span v-else class="mres__senada">Señada ✓</span>
-          <button class="mres__btn" :disabled="entregando === r.id" @click="entregar(r)">
+          <button class="mres__btn" :disabled="entregando === r.id || cajaCerrada" @click="entregar(r)">
             {{ entregando === r.id ? 'Entregando…' : 'Entregar' }}
           </button>
         </div>
@@ -41,11 +52,14 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { listReservas, entregarReserva } from '../../lib/api.js'
+import { RouterLink } from 'vue-router'
+import { listReservas, entregarReserva, getMostrador } from '../../lib/api.js'
 import { formaLabel, formatARS } from '../../lib/formatters.js'
 import { useToast } from '../../composables/useToast.js'
+import { useAuthStore } from '../../stores/auth.js'
 
 const toast = useToast()
+const auth  = useAuthStore()
 
 const filtro     = ref('hoy')
 const loading    = ref(false)
@@ -63,7 +77,25 @@ const visibles = computed(() =>
 
 const cuentaHoy = computed(() => reservas.value.filter(r => (r.fecha_entrega_estimada || '') <= hoyISO).length)
 
-onMounted(cargar)
+const cajaCerrada = ref(false)
+
+onMounted(() => { cargar(); cargarEstadoCaja() })
+
+// Mirar el estado de la caja para no ofrecer un camino que termina en un 422. La regla vive
+// entera en el backend (`Dispensacion#mostrador_abierto`); esto sólo la lee.
+//
+// Si la consulta falla NO se bloquea nada: trabar las entregas por un request que no salió es
+// peor que dejar que el backend rechace, que es lo que sabe decidir.
+async function cargarEstadoCaja () {
+  cajaCerrada.value = false
+  const sedeId = auth.user?.dispensario_sede?.id ?? auth.user?.dispensario_sede_id
+  if (auth.user?.role !== 'dispensador' || !sedeId) return
+
+  try {
+    const { data } = await getMostrador(sedeId)
+    cajaCerrada.value = !data?.turno
+  } catch { cajaCerrada.value = false }
+}
 
 async function cargar() {
   loading.value = true
@@ -83,6 +115,7 @@ async function entregar(r) {
     await entregarReserva(r.id)
     toast.success('Reserva entregada')
     await cargar()
+    await cargarEstadoCaja()
   } catch (e) {
     toast.error(e?.response?.data?.error || 'No se pudo entregar')
   } finally { entregando.value = null }
@@ -97,6 +130,12 @@ function fechaCorta(f) {
 
 <style scoped>
 .mres { padding: .75rem; display: flex; flex-direction: column; gap: .75rem; }
+.mres__aviso {
+  background: var(--c-amber-100); border: 1px solid var(--c-amber-300, #fcd34d);
+  border-radius: 10px; padding: .6rem .75rem;
+  font-size: .8rem; line-height: 1.45; color: var(--c-ink-700);
+}
+.mres__aviso-link { color: inherit; font-weight: 700; }
 
 .mres__tabs { display: flex; gap: .4rem; }
 .mres__tab {

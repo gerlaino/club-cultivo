@@ -29,6 +29,23 @@ api.interceptors.response.use(
     const status = error?.response?.status;
     const url = error?.config?.url || "";
 
+    // UNA RESPUESTA DE ERROR, UNA SOLA FORMA DE LEERLA.
+    //
+    // El backend contesta a veces `{ error: "…" }` y a veces `{ errors: [...] }` —las validaciones
+    // de modelo, con `full_messages`—, y en las pantallas conviven las dos lecturas: 219 leen
+    // `data.error` y 42 leen `data.errors[0]`. Las que leen sólo `error` se COMÍAN el motivo y
+    // mostraban un "no se pudo" pelado, que es el peor mensaje posible: la persona no sabe si es
+    // la caja, el stock o la fecha, y no tiene qué hacer con eso. Pasó al entregar una reserva
+    // desde el teléfono.
+    //
+    // Se normaliza acá y no en cada pantalla, por lo mismo que el tope de plan y el 401: son
+    // doscientos lugares, y el que se agregue mañana nace bien.
+    const cuerpo = error?.response?.data;
+    if (cuerpo && typeof cuerpo === "object" && !cuerpo.error &&
+        Array.isArray(cuerpo.errors) && cuerpo.errors.length) {
+      cuerpo.error = cuerpo.errors.join(" · ");
+    }
+
     if (status === 401 && !url.includes('/users/sign_in')) {
       let loggingOut = false;
       try {

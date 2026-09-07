@@ -1,5 +1,30 @@
 # Changelog
 
+## Septiembre 2026 (al) — "No se pudo entregar", que no dice nada
+
+Germán tocó Entregar en una reserva desde el teléfono y le salió un toast rojo: **"No se pudo
+entregar"**. Nada más. La persona no sabe si es la caja, el stock, la fecha o el crédito — y con
+alguien enfrente, un mensaje así parece culpa suya.
+
+**El motivo estaba, y la pantalla lo tiraba a la basura.** El backend contesta a veces
+`{ error: "…" }` y a veces `{ errors: [...] }` —las validaciones de modelo, con `full_messages`— y
+en las pantallas conviven las dos lecturas: **219 leen `data.error` y 42 leen `data.errors[0]`**.
+La de reservas leía sólo `error`, así que se comía el texto real: *"La caja del mostrador está
+cerrada: contá y abrila antes de dispensar"*. Se normaliza en el **interceptor** y no en cada
+pantalla —son doscientos lugares, y la que se agregue mañana nace bien—, por el mismo criterio con
+el que ya viven ahí el 401 y el tope de plan.
+
+**Y el caso real era ése: la caja cerrada.** Entregar una reserva crea una dispensa, y sin caja
+abierta el backend la rechaza (lo cobrado en efectivo no tendría dónde caer). La lista de reservas
+se llena igual —están ahí—, así que el botón se apretaba y rebotaba. Ahora se avisa **arriba y
+antes**, con el camino para arreglarlo, y el botón no se habilita: el mismo criterio que el carrito
+de dispensa. Si la consulta del estado de la caja falla, **no traba nada**: el backend sigue siendo
+el que decide.
+
+De paso quedó verificada la regla que decía CLAUDE.md y nadie había probado: **con la caja abierta,
+entregar una reserva funciona aunque el producto no esté sobre la mesa** — es una de las dos
+excepciones (ya está apartado a nombre de esa persona).
+
 ## Septiembre 2026 (ak) — la pantalla negra de la PWA recién instalada
 
 Germán desinstaló la PWA, la reinstaló, y quedó **la pantalla en negro**. No era el cambio del

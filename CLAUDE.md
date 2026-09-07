@@ -804,6 +804,15 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   alguien firmó.
 - **Un reparto FALLIDO no devuelve el stock, y está bien**: puede reprogramarse. Para devolverlo
   de verdad está `cancelar_entrega`, que revierte stock, cuenta corriente y asientos.
+- **EL MOTIVO DEL RECHAZO SE NORMALIZA EN EL INTERCEPTOR** (`lib/api.js`, sep-2026). El backend
+  contesta `{ error: "…" }` o `{ errors: [...] }` (validaciones de modelo) y las pantallas leen una
+  cosa o la otra —219 leen `error`, 42 leen `errors[0]`—: las primeras se comían el motivo y
+  mostraban un "no se pudo" pelado, que es el peor mensaje posible. El interceptor rellena `error`
+  desde `errors`, así todas lo muestran y la pantalla nueva nace bien.
+- **ENTREGAR UNA RESERVA NECESITA LA CAJA ABIERTA** —crea una dispensa, y lo cobrado en efectivo
+  tiene que tener dónde caer—, **pero NO necesita que el producto esté sobre la mesa**: es una de
+  las dos excepciones, porque ya está apartado a nombre de esa persona (`desde_reserva`). La
+  pantalla de reservas avisa antes y no habilita el botón, como el carrito.
 - **LA PANTALLA NO LE PROPONE A NADIE ALGO QUE EL BACKEND LE VA A RECHAZAR.** Al dispensador con
   el carrito vacío el cartel le decía "bajá lo que falte del depósito", que es exactamente lo
   único que no puede hacer: la mesa la carga administración. Un cartel que propone una acción
