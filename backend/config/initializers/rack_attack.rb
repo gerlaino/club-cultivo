@@ -1,5 +1,18 @@
 unless Rails.env.test?
   class Rack::Attack
+    # EN DESARROLLO, LA MÁQUINA PROPIA NO SE LIMITA.
+    #
+    # El tope de sign-in son 5 por minuto y la suite de punta a punta hace siete logins: corriéndola
+    # entera, el sexto recibía 429 y la prueba fallaba en un lugar que no tenía nada que ver —una
+    # pantalla que "no cargaba"—. Una suite que falla por el ambiente y no por el código enseña a
+    # ignorar los rojos, que es exactamente lo que estas pruebas existen para evitar.
+    #
+    # Sólo en desarrollo y sólo desde la máquina local: en producción el candado no se toca, que es
+    # donde protege de la fuerza bruta de verdad.
+    if Rails.env.development?
+      safelist('dev/local') { |req| %w[127.0.0.1 ::1].include?(req.ip) }
+    end
+
     # Webhooks IoT: 60 req/min por dispositivo_id; si falta el id, cae al IP
     throttle('webhooks/dispositivo', limit: 60, period: 60) do |req|
       if req.path.match?(%r{/webhooks/lecturas})

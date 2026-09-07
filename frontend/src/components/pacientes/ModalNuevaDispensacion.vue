@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
 import { useAuthStore } from '../../stores/auth.js'
@@ -54,6 +54,35 @@ const puedeReservar         = esAdminoSup
 // es la suma y el descuento se aplica sobre ella. Las reservas siguen siendo de un producto.
 const items = ref([])
 const esDispensaInmediata = computed(() => !modoReserva.value && !form.value.es_reserva)
+
+// EN EL TELÉFONO, DOS PASOS: qué se lleva y cómo paga.
+//
+// Son los dos momentos reales del mostrador, y en esa pantalla no entra un formulario de
+// dieciocho campos: el que lo usa está PARADO con alguien enfrente. En el escritorio no hay
+// pasos —entra entero y verlo de una es mejor— así que es la MISMA pantalla con otra
+// distribución, no otra pantalla: la lógica vive una sola vez.
+//
+// Sólo para la dispensa inmediata. Reservar y entregar una reserva son flujos de administración,
+// se hacen sentado y con un solo producto: partirlos en pasos sería ceremonia.
+const ANCHO_TELEFONO = '(max-width: 480px)'
+const esTelefono = ref(typeof window !== 'undefined' && window.matchMedia?.(ANCHO_TELEFONO).matches)
+let mqTelefono = null
+const onCambioAncho = (e) => { esTelefono.value = e.matches }
+onMounted(() => {
+  mqTelefono = window.matchMedia?.(ANCHO_TELEFONO)
+  mqTelefono?.addEventListener?.('change', onCambioAncho)
+})
+onBeforeUnmount(() => mqTelefono?.removeEventListener?.('change', onCambioAncho))
+
+const paso = ref(1)
+const enPasos = computed(() => esTelefono.value && esDispensaInmediata.value && !modoReserva.value)
+// SIN `watch` ACÁ. Un `watch` corre su fuente al registrarse para tener el valor viejo, y eso
+// evaluaba `esDispensaInmediata` —que lee `form`— antes de que `form` estuviera declarado:
+// `ReferenceError: Cannot access before initialization`, y la pantalla no abría. Es la trampa de
+// siempre con `<script setup>`: los computed son perezosos, pero un `watch` los despierta.
+// No hace falta: si deja de aplicar, el `v-show` muestra todo igual, y el paso vuelve a 1 cuando
+// se abre el modal, que es donde se reinicia el resto del formulario.
+
 
 const stocks          = ref([])
 const loadingStocks   = ref(false)
@@ -328,6 +357,21 @@ function subtotalItem(it) {
 }
 
 // Agrega la línea en edición (stock seleccionado + cantidad) al carrito.
+// La misma condición que habilita el botón "Agregar item" del escritorio. Escrita dos veces, un
+// día una deja pasar lo que la otra frena.
+const puedeAgregar = computed(() =>
+  !!form.value.stock_id && !!form.value.cantidad && !excederiaStock.value
+)
+// Cómo se llama lo que acaba de tocar, para que la barra de abajo no diga sólo "Agregar" sobre un
+// producto que quedó fuera de pantalla.
+const nombreSeleccionado = computed(() => {
+  const s = stockSeleccionado.value
+  if (!s) return ''
+  const forma = FORMA_LABEL[s.forma_producto] || s.forma_producto
+  const gen = generica(s)
+  return gen ? `${forma} · ${gen}` : forma
+})
+
 function agregarItem() {
   const s = stockSeleccionado.value
   if (!s) { formError.value = 'Elegí un stock para agregar'; return }
@@ -521,6 +565,8 @@ watch(() => props.modelValue, (open) => {
   if (open) {
     form.value = emptyForm()
     items.value = []
+    // En el teléfono se abre siempre por el principio: qué se lleva.
+    paso.value = 1
     precioUnitarioManual.value = null
     formError.value = null
     deliveryUsers.value = []
@@ -791,7 +837,16 @@ async function handleSubmit() {
       <div class="mnd__modal">
 
         <div class="mnd__modal-header">
-          <h3 class="mnd__modal-title">
+          <!-- EN EL TELÉFONO EL TÍTULO DICE EN QUÉ PASO ESTÁ, y el paciente pasa a segunda
+               línea: "Nueva dispensación para Fulano" ocupaba dos renglones para decir algo que
+               la persona ya sabe —acaba de tocar a ese paciente—, y lo que no sabe es cuánto
+               falta. -->
+          <h3 v-if="enPasos" class="mnd__modal-title">
+            {{ paso === 1 ? 'Qué se lleva' : 'Cómo paga' }}
+            <span class="mnd__modal-paso">paso {{ paso }} de 2</span>
+            <span v-if="props.pacienteNombre" class="mnd__modal-title-paciente">{{ props.pacienteNombre }}</span>
+          </h3>
+          <h3 v-else class="mnd__modal-title">
             <template v-if="modoReserva">Entregar reserva<template v-if="props.pacienteNombre"> de <span class="mnd__modal-title-paciente">{{ props.pacienteNombre }}</span></template></template>
             <template v-else>Nueva dispensación<template v-if="props.pacienteNombre"> para <span class="mnd__modal-title-paciente">{{ props.pacienteNombre }}</span></template></template>
           </h3>
@@ -799,6 +854,13 @@ async function handleSubmit() {
         </div>
 
         <div class="mnd__modal-body">
+
+          <!-- ══ PASO 1 EN EL TELÉFONO: QUÉ SE LLEVA ═══════════════════════════
+               En el escritorio esto es un formulario largo y está bien: entra entero y se ve de
+               una. En un teléfono no entra, y el que lo usa está PARADO con alguien enfrente. Los
+               dos pasos son los dos momentos reales del mostrador —qué se lleva y cómo paga— y
+               con `v-show` (no `v-if`) lo escrito no se pierde al ir y volver. -->
+          <div v-show="!enPasos || paso === 1" class="mnd__paso">
           <div v-if="formError" class="mnd__error"><i class="bi bi-exclamation-triangle-fill"></i> {{ formError }}</div>
 
           <!-- Seña / resto a cobrar (modo entrega de reserva) -->
@@ -1037,10 +1099,21 @@ async function handleSubmit() {
             </div>
           </div>
 
-          <div v-if="!modoReserva" class="mnd__divider"></div>
+          <div v-if="!modoReserva && !enPasos" class="mnd__divider"></div>
 
-          <!-- Cantidad: en dispensa inmediata se carga y se "Agrega" al carrito; en reserva es único -->
-          <div v-if="!modoReserva" class="mnd__form-row">
+          <!-- En el teléfono el campo de cantidad está abajo, así que el aviso de que se pasó
+               tiene que estar acá: si no, el botón no se habilita y no dice por qué. -->
+          <p v-if="enPasos && excederiaStock" class="mnd__warn-box">
+            <i class="bi bi-exclamation-triangle"></i>
+            Máximo {{ stockSeleccionado.cantidad }}{{ stockSeleccionado.unidad || 'g' }} disponibles
+            de {{ nombreSeleccionado }}.
+          </p>
+
+          <!-- Cantidad: en dispensa inmediata se carga y se "Agrega" al carrito; en reserva es único.
+               EN EL TELÉFONO ESTE BLOQUE NO VA: la cantidad vive en la barra de abajo, pegada al
+               pulgar y al producto que se acaba de tocar. Tenerlo en los dos lados sería el mismo
+               campo dos veces, y el de acá queda fuera de pantalla justo cuando se usa. -->
+          <div v-if="!modoReserva && !enPasos" class="mnd__form-row">
             <div class="mnd__field">
               <label class="mnd__label">Cantidad <span class="mnd__req">*</span></label>
               <div class="mnd__input-suffix-wrap">
@@ -1107,6 +1180,11 @@ async function handleSubmit() {
               <button type="button" class="mnd__cart-rm" @click="quitarItem(i)" title="Quitar"><i class="bi bi-x-lg"></i></button>
             </div>
           </div>
+
+          </div>
+
+          <!-- ══ PASO 2 EN EL TELÉFONO: CÓMO PAGA ══════════════════════════════ -->
+          <div v-show="!enPasos || paso === 2" class="mnd__paso">
 
           <!-- Descuento global (dispensa inmediata): aplica a la suma del carrito -->
           <div v-if="esDispensaInmediata" class="mnd__field">
@@ -1413,18 +1491,75 @@ async function handleSubmit() {
             </div>
           </div>
 
+          </div>
         </div>
 
-        <div class="mnd__modal-footer">
-          <button class="mnd__btn-ghost" :disabled="saving" @click="cerrar">Cancelar</button>
-          <!-- Con la caja cerrada el backend rechaza la dispensa: dejar apretar para que rebote
-               es el peor error posible, parece culpa del usuario. El aviso de arriba dice dónde
-               se arregla. -->
-          <button class="mnd__btn-primary" :disabled="saving || cajaCerrada || productosPosteriores.length > 0 || (esDispensaInmediata ? !items.length : !form.stock_id) || (esDispensaInmediata && ccInsuficiente)" @click="handleSubmit">
-            <DsSpinner v-if="saving" :size="14" />
-            <i v-else class="bi" :class="form.es_reserva ? 'bi-bookmark-star' : 'bi-check-lg'"></i>
-            {{ modoReserva ? 'Entregar reserva' : (form.es_reserva ? 'Crear reserva' : 'Registrar dispensación') }}
-          </button>
+        <!-- ══ LA BARRA DE ABAJO ═════════════════════════════════════════════
+             En el escritorio son dos botones y ya. En el teléfono es CONTEXTUAL, porque el
+             problema no era el tamaño: elegir el producto arriba, escribir la cantidad abajo y
+             después buscar "Agregar" eran tres puntos de la pantalla a dos scrolls de distancia,
+             con alguien enfrente esperando. Acá la cantidad aparece donde está el pulgar, apenas
+             se toca un producto. -->
+        <div class="mnd__modal-footer" :class="{ 'mnd__modal-footer--pasos': enPasos }">
+
+          <!-- Paso 1: cuánto de lo que acaba de tocar, y al carrito. -->
+          <div v-if="enPasos && paso === 1 && form.stock_id" class="mnd__barra-cant">
+            <div class="mnd__barra-prod">
+              <span class="mnd__barra-nombre">{{ nombreSeleccionado }}</span>
+              <span v-if="stockSeleccionado" class="mnd__barra-disp">
+                quedan {{ stockSeleccionado.cantidad }}{{ stockSeleccionado.unidad || 'g' }}
+              </span>
+            </div>
+            <div class="mnd__barra-campos">
+              <div class="mnd__input-suffix-wrap">
+                <input v-model="form.cantidad" type="number" inputmode="decimal" min="0" step="0.1"
+                       class="mnd__input mnd__input--with-suffix" placeholder="0"
+                       aria-label="Cantidad" @keyup.enter="agregarItem()" />
+                <span class="mnd__input-suffix">{{ stockSeleccionado?.unidad || 'g' }}</span>
+              </div>
+              <button class="mnd__btn-primary mnd__barra-add" :disabled="!puedeAgregar" @click="agregarItem()">
+                <i class="bi bi-plus-lg"></i> Agregar
+              </button>
+            </div>
+          </div>
+
+          <!-- Y el resumen con el paso siguiente: el total a la vista siempre, que es lo que la
+               persona le va a decir en voz alta al paciente. -->
+          <div v-if="enPasos" class="mnd__barra-acc">
+            <button v-if="paso === 2" class="mnd__btn-ghost" :disabled="saving" @click="paso = 1">
+              <i class="bi bi-chevron-left"></i> Atrás
+            </button>
+            <button v-else class="mnd__btn-ghost" :disabled="saving" @click="cerrar">Cancelar</button>
+
+            <span v-if="items.length" class="mnd__barra-total">
+              <b>{{ items.length }}</b> {{ items.length === 1 ? 'ítem' : 'ítems' }}
+              <em v-if="precioFinal != null">{{ fmt(Math.round(precioFinal)) }}</em>
+            </span>
+
+            <button v-if="paso === 1" class="mnd__btn-primary mnd__barra-seguir"
+                    :disabled="!items.length" @click="paso = 2">
+              Cómo paga <i class="bi bi-chevron-right"></i>
+            </button>
+            <button v-else class="mnd__btn-primary mnd__barra-seguir"
+                    :disabled="saving || cajaCerrada || productosPosteriores.length > 0 || !items.length || ccInsuficiente"
+                    @click="handleSubmit">
+              <DsSpinner v-if="saving" :size="14" />
+              <i v-else class="bi bi-check-lg"></i> Registrar
+            </button>
+          </div>
+
+          <!-- Escritorio (y reservas en cualquier pantalla): entra entero, no hay pasos. -->
+          <template v-if="!enPasos">
+            <button class="mnd__btn-ghost" :disabled="saving" @click="cerrar">Cancelar</button>
+            <!-- Con la caja cerrada el backend rechaza la dispensa: dejar apretar para que rebote
+                 es el peor error posible, parece culpa del usuario. El aviso de arriba dice dónde
+                 se arregla. -->
+            <button class="mnd__btn-primary" :disabled="saving || cajaCerrada || productosPosteriores.length > 0 || (esDispensaInmediata ? !items.length : !form.stock_id) || (esDispensaInmediata && ccInsuficiente)" @click="handleSubmit">
+              <DsSpinner v-if="saving" :size="14" />
+              <i v-else class="bi" :class="form.es_reserva ? 'bi-bookmark-star' : 'bi-check-lg'"></i>
+              {{ modoReserva ? 'Entregar reserva' : (form.es_reserva ? 'Crear reserva' : 'Registrar dispensación') }}
+            </button>
+          </template>
         </div>
 
       </div>
@@ -1637,9 +1772,40 @@ async function handleSubmit() {
    dejar ver una franja de la pantalla de atrás — y para robarle 32 px de ancho al pie, que es
    por lo que "Cancelar" terminaba cortado FUERA del modal: dos botones que no achican, con
    `justify-content: flex-end`, desbordan por la izquierda. */
+/* ── Los dos pasos del teléfono ──────────────────────────────────────────────── */
+.mnd__paso { display: flex; flex-direction: column; gap: .9rem; }
+.mnd__modal-paso {
+  margin-left: .5rem; font-size: .68rem; font-weight: 700; letter-spacing: .03em;
+  text-transform: uppercase; color: var(--c-slate-500);
+}
+/* El paciente, en su renglón y en segundo plano: ya sabe a quién le está dispensando. */
+.mnd__modal-title .mnd__modal-title-paciente { display: block; font-size: .8rem; font-weight: 600; margin-top: .1rem; }
+
+/* La cantidad, pegada al pulgar y al producto que se acaba de tocar. */
+.mnd__barra-cant {
+  display: flex; flex-direction: column; gap: .4rem; width: 100%;
+  padding-bottom: .6rem; border-bottom: 1px solid var(--c-slate-100);
+}
+.mnd__barra-prod   { display: flex; align-items: baseline; gap: .5rem; min-width: 0; }
+.mnd__barra-nombre { font-size: .82rem; font-weight: 700; color: var(--c-slate-900); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mnd__barra-disp   { font-size: .72rem; color: var(--c-slate-500); font-family: var(--font-mono); white-space: nowrap; }
+.mnd__barra-campos { display: flex; gap: .5rem; align-items: center; }
+.mnd__barra-campos .mnd__input-suffix-wrap { flex: 1 1 auto; min-width: 0; }
+.mnd__barra-add    { flex: 0 0 auto; }
+
+/* El resumen y el paso siguiente. El total va SIEMPRE a la vista: es lo que la persona le dice
+   en voz alta al paciente. */
+.mnd__barra-acc    { display: flex; align-items: center; gap: .6rem; width: 100%; }
+.mnd__barra-total  { flex: 1 1 auto; min-width: 0; font-size: .78rem; color: var(--c-slate-500); text-align: center; }
+.mnd__barra-total b  { color: var(--c-slate-900); }
+.mnd__barra-total em { display: block; font-style: normal; font-weight: 700; font-size: .95rem; color: #1b5e20; font-family: var(--font-mono); }
+.mnd__barra-seguir { flex: 0 0 auto; }
+
 @media (max-width: 480px) {
   .mnd__overlay { padding: 0; align-items: stretch; }
   .mnd__modal   { max-width: none; max-height: 100%; height: 100%; border-radius: 0; }
+  /* Con pasos, el pie es una columna: la cantidad arriba y el resumen abajo. */
+  .mnd__modal-footer--pasos { flex-direction: column; align-items: stretch; gap: .55rem; }
   /* Los dos botones comparten el ancho y ninguno se sale. El primario manda, así que se queda
      con lo que sobra. */
   .mnd__modal-footer { padding: .875rem 1rem; }

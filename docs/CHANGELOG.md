@@ -1,5 +1,41 @@
 # Changelog
 
+## Septiembre 2026 (aj) — el arreglo que no llegaba al teléfono, y la dispensa en dos pasos
+
+**UN ARREGLO QUE NO LLEGA AL TELÉFONO ES UN ARREGLO QUE NO EXISTE.** Germán seguía viendo el modal
+roto con el fix ya deployado: se verificó contra el bundle que sirve producción —`max-height:46vh`
+y el `@media (max-width:480px)` estaban ahí— y lo que fallaba era la ACTUALIZACIÓN. La app ya se
+actualiza sola, pero el navegador pregunta si hay versión nueva **una sola vez, al registrar el
+service worker**, o sea al arrancar en frío; y una PWA instalada casi nunca arranca en frío, se
+resume desde el conmutador de apps. Un teléfono podía quedarse días atrás. Ahora se pregunta **al
+volver a la app** —que es cuando la persona la va a usar— y cada media hora si quedó abierta.
+**Pero no se recarga encima de alguien que está trabajando**: aplicar la versión nueva recarga la
+página, y hacerlo con una dispensa a medio cargar es peor que estar una hora desactualizado, así
+que con un diálogo abierto se posterga hasta que se cierre. (De paso se retiró el banner
+"Actualizar", que era código muerto desde que se pasó a actualizar solo.)
+
+**LA DISPENSA EN EL TELÉFONO, EN DOS PASOS: qué se lleva y cómo paga.** Son los dos momentos reales
+del mostrador. El formulario completo entra en un escritorio y ahí está bien —verlo de una es
+mejor—, pero en un teléfono el que lo usa está **parado con alguien enfrente**, y elegir el producto
+arriba, escribir la cantidad abajo y después buscar "Agregar" eran tres puntos de la pantalla a dos
+scrolls de distancia.
+
+- **La cantidad aparece donde está el pulgar**, apenas se toca un producto: la barra de abajo dice
+  qué se tocó, cuánto queda, y tiene el campo y "Agregar". Ese campo **no se repite** en el medio
+  del formulario.
+- **El total, siempre a la vista** — es lo que la persona le dice en voz alta al paciente.
+- El encabezado dice en qué paso está; el nombre del paciente pasa a segunda línea, porque acaba
+  de tocarlo y lo que no sabe es cuánto falta.
+- Es la **misma pantalla con otra distribución**, no otra pantalla: un solo componente, la lógica
+  vive una sola vez. En el escritorio no hay pasos, y reservar o entregar una reserva tampoco los
+  tiene (son flujos de administración, se hacen sentado y con un solo producto).
+- `v-show` y no `v-if`: lo cargado sobrevive a ir y volver entre pasos.
+
+**Y la suite de punta a punta dejaba de ser confiable por el ambiente**: el tope de sign-in son 5
+por minuto y la suite hace siete logins, así que la corrida entera fallaba en un lugar que no tenía
+nada que ver —una pantalla que "no cargaba"—. En **desarrollo y sólo desde la máquina local** el
+candado se saltea; en producción no se toca, que es donde protege de verdad.
+
 ## Septiembre 2026 (ai) — el aviso de caja sin cerrar, y el modal de dispensa en un teléfono de verdad
 
 **LA CAJA QUE QUEDÓ ABIERTA.** Se cierra de noche, y de noche administración no está: si alguien

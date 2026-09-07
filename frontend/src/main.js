@@ -28,34 +28,52 @@ import { anotarReload, leerReloads } from './utils/reloadTrace.js'
 // Para leer desde la consola por qué se recargó sola la pantalla: `ceReloads()`.
 window.ceReloads = leerReloads
 
-// Nueva versión disponible → aplicar la actualización automáticamente.
-// (Antes mostraba un banner "Actualizar" que en mobile casi nadie tocaba, y los
-//  dispositivos quedaban con la versión vieja. Ahora se actualiza solo.)
+// NUEVA VERSIÓN → SE APLICA SOLA. Y HAY QUE IR A BUSCARLA.
+//
+// Actualizar solo ya estaba (antes había un banner que en el teléfono casi nadie tocaba), pero el
+// navegador pregunta si hay versión nueva UNA sola vez: al registrar el service worker, o sea al
+// arrancar en frío. Y una PWA instalada casi nunca arranca en frío — se resume desde el conmutador
+// de apps— así que un teléfono podía quedarse días con la versión vieja mientras producción ya
+// tenía el arreglo. Un arreglo que no llega al teléfono es un arreglo que no existe: pasó con el
+// modal de dispensa, deployado y sin llegar.
+//
+// Se pregunta al VOLVER a la app (que es el momento en que la persona la va a usar) y cada media
+// hora si quedó abierta.
+//
+// PERO NO SE RECARGA ENCIMA DE ALGUIEN QUE ESTÁ TRABAJANDO. Aplicar la versión nueva recarga la
+// página, y hacerlo con una dispensa a medio cargar —el paciente enfrente y el carrito armado— es
+// peor que estar una hora desactualizado. Si hay un diálogo abierto se posterga hasta que se
+// cierre.
+let swPendiente = false
+
+function hayAlgoAbierto() {
+  return !!document.querySelector('.mnd__overlay, .cnt__back, [role="dialog"], .sheet-bottom--open')
+}
+
+function aplicarActualizacion() {
+  if (hayAlgoAbierto()) { swPendiente = true; return }
+  swPendiente = false
+  updateSW(true)   // skipWaiting → controllerchange → reload (abajo)
+}
+
 const updateSW = registerSW({
   immediate: true,
-  onNeedRefresh() {
-    updateSW(true)   // skipWaiting → controllerchange → reload (abajo)
+  onNeedRefresh: aplicarActualizacion,
+  onRegisteredSW(_url, registro) {
+    if (!registro) return
+
+    const preguntar = () => { if (navigator.onLine !== false) registro.update().catch(() => {}) }
+    setInterval(preguntar, 30 * 60 * 1000)
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) return
+      // Si ya había una versión esperando porque estaba trabajando, se aplica ahora.
+      if (swPendiente) aplicarActualizacion()
+      preguntar()
+    })
   },
 })
 
-function mostrarBannerActualizacion() {
-  if (document.getElementById('sw-update-banner')) return
-  const banner = document.createElement('div')
-  banner.id = 'sw-update-banner'
-  banner.style.cssText = 'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:9999;' +
-    'display:flex;align-items:center;gap:12px;background:#0f172a;color:#fff;padding:10px 16px;' +
-    'border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.25);font:600 13px system-ui,sans-serif;'
-  banner.innerHTML = '<span>Hay una nueva versión de la app</span>'
-  const btn = document.createElement('button')
-  btn.textContent = 'Actualizar'
-  btn.style.cssText = 'background:#4ade80;color:#0f172a;border:none;border-radius:8px;' +
-    'padding:6px 14px;font:700 13px system-ui,sans-serif;cursor:pointer;'
-  btn.onclick = () => { btn.textContent = 'Actualizando…'; updateSW(true) }
-  banner.appendChild(btn)
-  document.body.appendChild(banner)
-}
-
-// Cuando el SW nuevo toma control (tras aceptar el banner), recargar para servir assets frescos
+// Cuando el SW nuevo toma control, recargar para servir assets frescos
 let swRecargando = false
 navigator.serviceWorker?.addEventListener('controllerchange', () => {
   if (swRecargando) return

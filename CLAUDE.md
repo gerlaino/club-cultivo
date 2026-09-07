@@ -559,6 +559,25 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 - **LA HORA LÍMITE DE CIERRE VIVE EN `Club#hora_limite_cierre_mostrador`**, y la preguntan el job
   que avisa y la pantalla que la muestra. General para la organización y por sede cuando alguna
   cierra distinto; devuelve nil cuando está apagada, porque no avisar es un estado válido.
+- **UN ARREGLO QUE NO LLEGA AL TELÉFONO NO EXISTE** (`main.js`, sep-2026). La PWA se actualiza
+  sola, pero el navegador pregunta por una versión nueva **una sola vez: al registrar el service
+  worker**, o sea al arrancar en frío — y una PWA instalada casi nunca arranca en frío. Se pregunta
+  también **al volver a la app** y cada media hora. **Y no se recarga encima de alguien que está
+  trabajando**: si hay un diálogo abierto (`hayAlgoAbierto`) se posterga, porque recargar con una
+  dispensa a medio cargar es peor que estar una hora desactualizado.
+- **LA DISPENSA EN EL TELÉFONO VA EN DOS PASOS** —qué se lleva y cómo paga— y **es la misma pantalla
+  con otra distribución**, no otra pantalla: un solo componente, la lógica una sola vez (mismo
+  patrón que `useMostrador`). La cantidad vive en la barra de abajo, pegada al pulgar y al producto
+  que se acaba de tocar, y **no se repite** en el formulario. `v-show` y no `v-if`, para que lo
+  cargado sobreviva a ir y volver. Sin pasos en el escritorio ni en reservas.
+- **UN `watch` DESPIERTA A UN COMPUTED PEREZOSO.** En `<script setup>` los `computed` no se evalúan
+  hasta que alguien los lee, así que uno puede referenciar algo declarado más abajo; un `watch`
+  sobre ese computed **lo evalúa al registrarse** y ahí explota con `Cannot access before
+  initialization` — la pantalla no abre. Pasó al partir la dispensa en pasos.
+- **EN DESARROLLO, LOCALHOST NO SE THROTTLEA** (`rack_attack.rb`). El tope de sign-in son 5 por
+  minuto y la suite de punta a punta hace siete logins: la corrida entera fallaba en un lugar que no
+  tenía nada que ver. Una suite que falla por el ambiente enseña a ignorar los rojos. En producción
+  el candado no se toca.
 - **EL MODAL EN UN TELÉFONO ES LA PANTALLA, y se verifica EN un teléfono.** `ModalNuevaDispensacion`
   se rompía a ≤360 px de tres formas —el pie desbordado con "Cancelar" afuera, la lista con
   `max-height` fijo scrolleando tres píxeles (tarjetas cortadas = lo que se lee como "solapado"), y
