@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { readFileSync } from 'node:fs'
 import { resolve, dirname } from 'node:path'
@@ -47,13 +47,21 @@ describe('Contabilidad → Categorías', () => {
     setActivePinia(createPinia())
     const { default: Vista } = await import('../views/admin/FinanzasCatalogoView.vue')
     const w = mount(Vista, { global: { stubs: { Teleport: true } } })
-    for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 0))
+    // `flushPromises` y no cinco vueltas de `setTimeout(0)`: aquello asumía que en cinco ticks
+    // del reloj ya había terminado de montar, y con la máquina sin CPU libre —la suite de Rails
+    // corriendo al lado— no alcanzaba. Un test que pasa o falla según cuán ocupada está la
+    // máquina enseña a desconfiar de toda la suite.
+    await flushPromises()
     // El sector arranca plegado: se despliega para ver su contenido.
     await w.find('.acc-head').trigger('click')
+    await flushPromises()
     return w
   }
 
   beforeEach(async () => { wrapper = await montar() })
+  // Cada caso montaba uno nuevo sin bajar el anterior, y cada `DsDropdown` deja escuchando al
+  // `document`: al quinto caso había cinco componentes vivos oyendo los mismos eventos.
+  afterEach(() => { wrapper?.unmount() })
 
   // El error que ya cometí una vez: escribir markup con clases que no existen en el <style>.
   it('ninguna clase del template quedó sin estilo', () => {
@@ -107,9 +115,20 @@ describe('Contabilidad → Categorías', () => {
     expect(menu.text()).toContain('Agregar subcategoría')
   })
 
-  it('una categoría del sistema no ofrece eliminar; una propia sí', async () => {
+  // Las dos mitades, que es lo que dice el título: el test afirmaba sólo la primera.
+  it('una categoría del sistema no ofrece eliminar', async () => {
     await wrapper.findAll('.cf__mas')[0].trigger('click')   // Insumos, del sistema
+
     expect(wrapper.find('.cf__menu').text()).not.toContain('Eliminar')
+  })
+
+  it('y una propia sí', async () => {
+    // Por su NOMBRE y no por su posición: el orden de las columnas es del componente, y buscar
+    // por índice hace que el test pase por la razón equivocada el día que se mueva una fila.
+    const fila = wrapper.findAll('.cf').find((f) => f.find('.cf__nombre').text() === 'Mi categoría')
+    await fila.find('.cf__mas').trigger('click')
+
+    expect(fila.find('.cf__menu').text()).toContain('Eliminar')
   })
 
   it('muestra la subcategoría debajo de su madre', () => {

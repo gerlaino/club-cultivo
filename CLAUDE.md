@@ -999,6 +999,15 @@ corregidas a `efectivo`; era una etiqueta, no movió plata).
 
 ### Deuda técnica conocida
 
+- **Un test que espera con `setTimeout(0)` no es un test, es una apuesta.** `finanzasCatalogo`
+  esperaba "cinco vueltas del reloj" a que montara el componente y fallaba **sólo con la máquina
+  sin CPU libre** (la suite de Rails corriendo al lado): pasa o falla según cuán ocupada esté la
+  máquina, que es la peor clase de rojo — enseña a desconfiar de toda la suite. Se espera con
+  `flushPromises`, y **lo que se monta se desmonta** (`afterEach`): cada `DsDropdown` vivo deja un
+  listener en `document`. El `vitest.config.js` ya documenta la misma familia de problema (el test
+  de ESLint ocupa un núcleo 13 s y mata por timeout a los de DOM que corren al lado).
+
+
 - **155 clases CSS sin estilo** en 81 archivos, congeladas en
   `frontend/src/__tests__/clasesSinEstilo.baseline.json`. El test impide que la lista crezca y
   falla si arreglás una sin sacarla del baseline. NO todas son bugs (hay nombres de
