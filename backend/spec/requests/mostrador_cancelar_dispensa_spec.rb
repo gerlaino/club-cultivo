@@ -121,4 +121,52 @@ RSpec.describe 'Cancelar una dispensa del mostrador', type: :request do
       expect(mesa_de(otra_sede)[suelto.id]).to eq(300.0)
     end
   end
+
+  # LO QUE ADMINISTRACIÓN BAJA A MEDIA TARDE TAMBIÉN CUENTA EN EL ARQUEO.
+  #
+  # Los renglones del turno se crean al ABRIR, con lo que había sobre la mesa entonces. Un
+  # producto agregado después se puede dispensar —la mesa es el estado de AHORA, no la foto de la
+  # mañana— pero no tenía renglón, así que lo entregado no se sumaba a ningún lado: la mesa bajaba
+  # y el arqueo decía que de ese producto no salió nada.
+  #
+  # El faltante seguía cuadrando (el esperado se calcula desde la mesa), pero el informe de merma
+  # dividía por un "entregado" más chico y el PORCENTAJE salía inflado — justo el número que se
+  # mira para saber si algo cambió.
+  describe 'un producto que se cargó DESPUÉS de abrir la caja' do
+    let!(:tarde) do
+      ActsAsTenant.with_tenant(club) do
+        st = create(:stock, club: club, sede: sede, lote: lote, forma_producto: 'preroll',
+                            unidad: 'un', cantidad: 80, estado: 'asignado',
+                            disponibilidad: 'ambas', precio_sugerido_ars: 2_000)
+        Mostradores::Cargar.call(mostrador: sede.mostrador!, usuario: admin,
+                                 motivo: 'se acabaron los prerolls',
+                                 cambios: [{ stock_id: st.id, cantidad: 20 }])
+        st
+      end
+    end
+
+    it 'lo dispensado se suma al arqueo de ese turno' do
+      ActsAsTenant.with_tenant(club) do
+        Dispensacion.create!(paciente: paciente, user: ana, stock: tarde, sede: sede, cantidad: 5,
+                             medio_pago: 'efectivo', aporte_socio_ars: 10_000,
+                             fecha_dispensacion: Time.zone.today)
+      end
+
+      item = turno.reload.items.find_by(stock_id: tarde.id)
+      expect(item).to be_present, 'el turno ni siquiera tiene renglón para ese producto'
+      expect(item.cantidad_dispensada.to_f).to eq(5.0)
+      # Y no estaba a la mañana: eso es lo que dice el arqueo.
+      expect(item.cantidad_apertura.to_f).to eq(0.0)
+    end
+
+    it 'y la mesa baja igual' do
+      ActsAsTenant.with_tenant(club) do
+        Dispensacion.create!(paciente: paciente, user: ana, stock: tarde, sede: sede, cantidad: 5,
+                             medio_pago: 'efectivo', aporte_socio_ars: 10_000,
+                             fecha_dispensacion: Time.zone.today)
+      end
+
+      expect(mesa_de(sede)[tarde.id].to_f).to eq(15.0)
+    end
+  end
 end

@@ -16,6 +16,14 @@ el producto no está en la lista visible— y **lo reservado nunca está en esa 
 apartado a nombre del paciente, que es justamente por lo que NO está sobre la mesa. El botón
 quedaba deshabilitado sin decir por qué, también en el escritorio.
 
+**Y verificando que la entrega asiente bien —cobro y movimiento contable— apareció otro:** lo
+dispensado de un producto que administración bajó a la mesa **después** de abrir la caja no se
+sumaba al arqueo de ese turno. Los renglones del turno se crean al abrir y el código los BUSCABA:
+la mesa bajaba, pero el arqueo decía que de ese producto no salió nada. El faltante seguía
+cuadrando —el esperado sale de la mesa— así que no se veía; lo que salía mal era el **porcentaje
+de merma**, que dividía por un "entregado" más chico. Justo el número que se mira para saber si
+algo cambió.
+
 De paso, entregando una reserva ya no se pregunta **de qué sede** ni se ofrece elegir producto: el
 producto es el que se apartó. Cada cartel que se sacaba dejaba ver el siguiente —"elegí una sede",
 "no hay nada sobre la mesa", "nada coincide con «»"—, todos falsos ahí, así que se apagó el bloque

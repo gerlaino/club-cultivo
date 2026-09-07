@@ -433,9 +433,19 @@ class Dispensacion < ApplicationRecord
 
     return unless turno_mostrador_id
 
+    # `find_or_create_by` y no `find_by`: los renglones del turno se crean al ABRIR, con lo que
+    # había sobre la mesa entonces. Un producto que administración bajó a media tarde se puede
+    # dispensar —la mesa es el estado de AHORA, no la foto de la mañana— pero no tenía renglón,
+    # así que lo entregado no se sumaba a ningún lado: la mesa bajaba y el arqueo decía que de ese
+    # producto no salió nada. El faltante seguía cuadrando (el esperado se calcula desde la mesa),
+    # pero el informe de merma dividía por un "entregado" más chico y el PORCENTAJE salía inflado
+    # justo donde se mira si algo cambió.
+    #
+    # `cantidad_apertura: 0` es la verdad: a la mañana no estaba.
     TurnoMostradorItem.unscoped
-                      .find_by(turno_mostrador_id: turno_mostrador_id, stock_id: item.stock_id)
-                      &.imputar_dispensa!(item.cantidad)
+                      .find_or_create_by!(turno_mostrador_id: turno_mostrador_id,
+                                          stock_id: item.stock_id) { |ti| ti.club_id = club_id }
+                      .imputar_dispensa!(item.cantidad)
   end
 
   # El renglón de este producto sobre la mesa de la sede que atiende. Nil si no está: hay dos

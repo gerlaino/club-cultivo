@@ -509,6 +509,13 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   `Dispensacion#imputar_a_mostrador` es el gemelo exacto de `imputar_a_apartado_evento`. Hace DOS
   cosas y son distintas: baja la mesa (el estado permanente, lo que queda para el próximo
   paciente) y suma al contador del turno (el arqueo de esta jornada).
+- **LO QUE ADMINISTRACIÓN BAJA A MEDIA TARDE TAMBIÉN CUENTA EN EL ARQUEO.** Los renglones del
+  turno (`TurnoMostradorItem`) se crean al ABRIR, con lo que había entonces, e `imputar_a_mostrador`
+  los BUSCABA: un producto agregado después se dispensaba —la mesa es el estado de AHORA, no la
+  foto de la mañana— pero lo entregado no se sumaba a ningún lado. El faltante seguía cuadrando
+  (el esperado sale de la mesa), así que no se veía; lo que salía mal era el **porcentaje de
+  merma**, que dividía por un "entregado" más chico. Ahora es `find_or_create_by!` con
+  `cantidad_apertura: 0`, que es la verdad: a la mañana no estaba.
 - **BAJAR DE LA MESA NO ES SIEMPRE "VUELVE AL DEPÓSITO".** Cada línea que baja lleva `destino`:
   `deposito` (por defecto, libera el apartado y el `Stock` queda entero) o `merma` (sale del
   inventario con `StockMovimiento` tipo `merma`). Sin esa distinción, bajar 12 g porque se
