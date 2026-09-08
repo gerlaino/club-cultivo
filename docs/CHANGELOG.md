@@ -1,5 +1,31 @@
 # Changelog
 
+## Septiembre 2026 (at) — el total cortado al medio, en el pie del modal
+
+Germán mandó la captura: `$ 543.06` **cortado al medio** y «Cómo paga» saliéndose de la pantalla.
+
+**Eran TRES cosas en una fila** —`Cancelar`, el total, el botón del paso siguiente— y **el total es
+un número que no se puede partir**: `$543.064,2` en monoespaciado mide más que la columna que le
+queda, así que se salía de su caja y empujaba el botón afuera. No hay ancho que alcance: con un
+total de seis cifras la fila no entra nunca. Y lo que quedaba cortado era justo el número que la
+persona está por decirle en voz alta al paciente.
+
+**El total pasa a su propio renglón**, arriba de los dos botones. No es una concesión: es MÁS
+visible, que era la intención declarada del pie. Los botones quedan abajo, `Cancelar` a la
+izquierda y el primario contra el borde derecho — el hueco del medio es lo que se achica.
+
+**Y queda un caso de navegador que lo cuida** (`e2e/pieDispensaTelefono.spec.js`): mide a 320, 360
+y 390 px con el número exacto de la captura. Dos decisiones que lo hacen valer algo:
+- **usa el CSS COMPILADO del `dist/`**, no una copia a mano — si la regla se rompe, el test se
+  entera;
+- y **verifica que el CSS efectivamente aplicó** (`aplicaElCss`). Los estilos del componente son
+  *scoped*: sin el atributo `data-v-xxxx` no aplica ni una regla y el test mide el layout por
+  defecto del navegador. Pasó en esta misma sesión — verde por la razón equivocada.
+
+**Lo que NO era.** Al ver la primera captura leí "se ve mal abajo" como que la pantalla se cortaba
+a la derecha, y me fui a buscar un desborde horizontal del modal que no existía. Era el pie. La
+segunda captura, recortada al pie, lo resolvió en un minuto.
+
 ## Septiembre 2026 (as) — la app no elige por vos en qué mostrador estás
 
 Germán: *"al entrar a mostrador, ¿no debería elegir la sede primero? porque puedo tener un

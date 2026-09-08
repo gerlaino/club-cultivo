@@ -566,6 +566,15 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   dispensa **y lo entrega el dispensador sin depender de admin ni supervisor**, que es el punto.
   (Decisión de Germán, sep-2026.) El payload de la mesa habla otro idioma (`stock_id`, `forma`,
   `genetica` como texto) y se traduce en `cargarMesa`, en un solo lugar.
+- **EN EL PIE DEL TELÉFONO, EL TOTAL VA EN SU PROPIO RENGLÓN.** Eran tres cosas en una fila
+  —`Cancelar`, el total, el botón— y el total es un número que NO se puede partir: con seis cifras
+  no entra a ningún ancho, se salía de su caja y empujaba el botón fuera de la pantalla. Quedaba
+  cortado justo el número que la persona le dice en voz alta al paciente. Lo cuida
+  `e2e/pieDispensaTelefono.spec.js` a 320/360/390.
+- **UN TEST DE ESTILOS SCOPED TIENE QUE VERIFICAR QUE EL CSS APLICÓ.** Los estilos de un componente
+  Vue llevan `[data-v-xxxx]`: en un markup armado a mano sin ese atributo no aplica NI UNA regla y
+  se termina midiendo el layout por defecto del navegador — verde por la razón equivocada. El caso
+  saca el scope del propio CSS compilado y afirma `aplicaElCss` antes de medir nada.
 - **LA SOLAPA DE MERMA ES UNA LÍNEA Y UNA LISTA** (sep-2026, rediseño acordado con Germán). El
   titular **arranca por el número** —`Faltaron $10.000 en 1 cierre.` / `Cuadró todo.`— y la
   comparación contra el historial va debajo y **sólo cuando dice algo**: antes el cuadro empezaba

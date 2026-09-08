@@ -1973,12 +1973,25 @@ async function handleSubmit() {
 .mnd__barra-add    { flex: 0 0 auto; }
 
 /* El resumen y el paso siguiente. El total va SIEMPRE a la vista: es lo que la persona le dice
-   en voz alta al paciente. */
-.mnd__barra-acc    { display: flex; align-items: center; gap: .6rem; width: 100%; }
-.mnd__barra-total  { flex: 1 1 auto; min-width: 0; font-size: .78rem; color: var(--c-slate-500); text-align: center; }
+   en voz alta al paciente.
+
+   EL TOTAL EN SU PROPIO RENGLÓN, y no apretado entre los dos botones.
+   Eran tres cosas en una fila —«Cancelar», el total, «Cómo paga»— y el total es un número que no
+   se puede partir: `$543.064,2` en monoespaciado mide más que la columna que le queda, así que se
+   salía de la caja y empujaba el botón fuera de la pantalla. A 360 px se veía «$ 543.06» cortado
+   al medio, que es justo el número que la persona está por decir en voz alta.
+   No hay ancho que alcance para los tres: con un total de seis cifras la fila no entra nunca. Y
+   darle el renglón entero no es una concesión — es MÁS visible, que era la intención. */
+.mnd__barra-acc    { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; width: 100%; }
+.mnd__barra-total  {
+  order: -1; flex: 1 0 100%; min-width: 0; font-size: .78rem; color: var(--c-slate-500);
+  text-align: center; overflow-wrap: anywhere;
+}
 .mnd__barra-total b  { color: var(--c-slate-900); }
-.mnd__barra-total em { display: block; font-style: normal; font-weight: 700; font-size: .95rem; color: #1b5e20; font-family: var(--font-mono); }
-.mnd__barra-seguir { flex: 0 0 auto; }
+.mnd__barra-total em { display: block; font-style: normal; font-weight: 700; font-size: 1.05rem; color: #1b5e20; font-family: var(--font-mono); }
+/* El primario contra el borde derecho, con «Cancelar» a la izquierda: el hueco del medio es lo
+   que se achica, no los botones. */
+.mnd__barra-seguir { flex: 0 1 auto; margin-left: auto; min-width: 0; }
 
 @media (max-width: 480px) {
   .mnd__overlay { padding: 0; align-items: stretch; }
