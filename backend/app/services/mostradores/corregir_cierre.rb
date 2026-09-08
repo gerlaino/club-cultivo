@@ -19,19 +19,24 @@ module Mostradores
     def self.call(**kwargs) = new(**kwargs).call
 
     # `conteos`: [{ item_id:, contado: }] — sólo los que haya que corregir.
-    def initialize(turno:, usuario:, conteos: [], motivo: nil)
-      @turno   = turno
-      @usuario = usuario
-      @conteos = Array(conteos).select { |c| c.respond_to?(:[]) && !c.is_a?(String) }
-      @motivo  = motivo
+    # `efectivo_contado_ars`: la plata, si es ESA la que se cargó mal.
+    def initialize(turno:, usuario:, conteos: [], motivo: nil, efectivo_contado_ars: nil)
+      @turno    = turno
+      @usuario  = usuario
+      @conteos  = Array(conteos).select { |c| c.respond_to?(:[]) && !c.is_a?(String) }
+      @motivo   = motivo
+      @efectivo = efectivo_contado_ars
     end
 
     def call
       return err('Esa caja todavía no se cerró') unless @turno&.cerrado?
       return err('Escribí por qué se corrige el conteo') if @motivo.blank?
-      return err('No hay nada que corregir') if @conteos.empty?
+      return err('No hay nada que corregir') if @conteos.empty? && @efectivo.blank?
 
-      ActiveRecord::Base.transaction { @conteos.each { |c| corregir!(c) } }
+      ActiveRecord::Base.transaction do
+        @conteos.each { |c| corregir!(c) }
+        corregir_efectivo!
+      end
       Result.new(ok: true, turno: @turno.reload)
     rescue ArgumentError, ActiveRecord::RecordInvalid => e
       err(e.message)
@@ -40,6 +45,47 @@ module Mostradores
     private
 
     def err(msg) = Result.new(ok: false, error: msg)
+
+    # LA PLATA TAMBIÉN SE CUENTA MAL, y hasta acá no se podía arreglar: la pantalla dejaba
+    # corregir los gramos y el efectivo quedaba con el número equivocado para siempre — con su
+    # asiento de faltante en el libro y su diferencia en el arqueo.
+    #
+    # MISMA REGLA QUE EL STOCK: no se borra el asiento viejo, se asienta LA DIFERENCIA. Borrar un
+    # movimiento contable para tapar un error es peor que el error, y el rastro de que alguien
+    # corrigió es justamente lo que hay que poder mostrar después.
+    def corregir_efectivo!
+      return if @efectivo.blank?
+
+      caja = @turno.caja_turno
+      raise ArgumentError, 'Este cierre no tiene caja' if caja.nil?
+
+      nuevo = @efectivo.to_d
+      raise ArgumentError, 'La plata contada no puede ser negativa' if nuevo.negative?
+
+      viejo = caja.efectivo_declarado_ars.to_d
+      return if nuevo == viejo
+
+      dif_vieja = caja.diferencia_ars.to_d
+      caja.update!(efectivo_declarado_ars: nuevo)
+      delta = caja.reload.diferencia_ars.to_d - dif_vieja
+      return if delta.abs < 0.01
+
+      caja.movimientos_contables.create!(
+        club:             caja.club,
+        sede_id:          caja.sede_id,
+        created_by:       @usuario,
+        tipo:             delta.negative? ? 'egreso' : 'ingreso',
+        categoria:        'diferencia_caja',
+        descripcion:      "Corrección del arqueo — #{caja.sede&.nombre} " \
+                          "(cierre del #{caja.cerrada_at&.to_date&.strftime('%d/%m/%Y')}): " \
+                          "se había contado $#{viejo.round(2)} y había $#{nuevo.round(2)} — #{@motivo}",
+        monto_ars:        delta.abs,
+        fecha:            (caja.cerrada_at || Time.current).to_date,
+        pagado:           true,
+        medio_pago:       'efectivo',
+        comprobante_tipo: 'sin_comprobante',
+      )
+    end
 
     # Lo que el cierre TENDRÍA que haber movido si se hubiera contado esto. Contra el esperado,
     # que es el número contra el que se arquea. (Sin esperado —ítems viejos, de antes de que se

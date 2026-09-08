@@ -575,6 +575,21 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   Vue llevan `[data-v-xxxx]`: en un markup armado a mano sin ese atributo no aplica NI UNA regla y
   se termina midiendo el layout por defecto del navegador — verde por la razón equivocada. El caso
   saca el scope del propio CSS compilado y afirma `aplicaElCss` antes de medir nada.
+- **LOS MODALES DEL MOSTRADOR NO SE CIERRAN AL TOCAR AFUERA.** Ahí se cuenta plata y mercadería:
+  un click al costado borraba todo lo escrito sin preguntar y sin vuelta atrás. Se sale por
+  **Cancelar o Escape** (`composables/useEscape.js`, en un solo lugar — cuatro listeners copiados
+  sobre `document` son cuatro oportunidades de olvidarse de sacarlo al desmontar).
+- **CORREGIR UN CIERRE INCLUYE LA PLATA, y asienta la corrección AL LADO.** El efectivo se cuenta
+  mal igual que los gramos, y quedaba con el número equivocado para siempre —con su asiento de
+  faltante en el libro—. Misma regla que el stock: el movimiento viejo no se borra, se anota la
+  diferencia. Se puede corregir sólo la plata, sin tocar ningún producto.
+- **ENTREGAR UNA RESERVA SE PUEDE COBRAR EN PARTES.** Estaba excluido con el argumento de que "la
+  seña de una reserva es un pago único", que mezcla dos cosas: la seña se cobra al CREARLA; al
+  entregarla se cobra el RESTO, que es una cobranza como cualquier otra. Lo que se reparte es el
+  resto (`totalACobrar`), no el total de lo que se lleva.
+- **UN SOLO TOAST POR ACCIÓN, Y LO CANTA QUIEN SABE SI SALIÓ BIEN.** La vista de reservas del
+  teléfono festejaba además del modal: el mensaje salía dos veces y se leía como que la dispensa
+  se registró dos veces. El susto es peor que el bug.
 - **EL ADMIN SABE DE CULTIVAR, NO DE ARQUEOS.** Es la regla que ordena el texto de todo el
   módulo: «cuadró», «arqueo», «a costo», «esperado» son palabras de contador y cada una es un
   peaje. Se dice `no falta nada`, `el conteo`, `producirlos costó $X`, `lo que tenía que haber`. Y

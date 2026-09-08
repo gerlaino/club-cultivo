@@ -250,7 +250,8 @@ module Dispensario
       return render json: { error: 'Turno no encontrado' }, status: :not_found if turno.nil?
 
       res = Mostradores::CorregirCierre.call(turno: turno, usuario: current_user,
-                                             conteos: params[:conteos] || [], motivo: params[:motivo])
+                                             conteos: params[:conteos] || [], motivo: params[:motivo],
+                                             efectivo_contado_ars: params[:efectivo_contado_ars])
       return render json: { error: res.error }, status: :unprocessable_entity unless res.ok?
 
       render json: serialize_turno(res.turno)

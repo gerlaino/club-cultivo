@@ -1,5 +1,8 @@
 <template>
-  <div class="cmm__back" @click.self="$emit('cerrar')">
+  <!-- SIN CERRAR AL TOCAR AFUERA. Acá se cuenta plata y mercadería: un click al costado
+       —el que se te va buscando el scroll— borraba todo lo escrito sin preguntar nada, y no hay
+       forma de recuperarlo. Se sale por Cancelar o con Escape, que son gestos deliberados. -->
+  <div class="cmm__back">
     <div class="cmm__modal" role="dialog" aria-modal="true" aria-label="Confirmar los cambios de la mesa">
       <header class="cmm__hd">
         <h3 class="cmm__title">Confirmá los cambios de la mesa</h3>
@@ -106,6 +109,7 @@
 // LO QUE SUBE SE APARTA, NO SE DESCUENTA: la fila de Stock sigue siendo una sola con su ST-xx.
 // Lo trazable sale del inventario por dispensación y nunca por cambiar de mesa.
 import { ref, computed, onMounted } from 'vue'
+import { useEscape } from '../../composables/useEscape.js'
 import { formaLabel } from '../../lib/formatters.js'
 
 const props = defineProps({
@@ -117,6 +121,8 @@ const props = defineProps({
   guardando: { type: Boolean, default: false },
 })
 const emit = defineEmits(['cerrar', 'confirmar'])
+
+useEscape(() => emit('cerrar'))
 
 const motivo      = ref('')
 const campoMotivo = ref(null)

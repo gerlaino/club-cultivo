@@ -1,5 +1,8 @@
 <template>
-  <div class="cnt__back" @click.self="$emit('cerrar')">
+  <!-- SIN CERRAR AL TOCAR AFUERA. Acá se cuenta plata y mercadería: un click al costado
+       —el que se te va buscando el scroll— borraba todo lo escrito sin preguntar nada, y no hay
+       forma de recuperarlo. Se sale por Cancelar o con Escape, que son gestos deliberados. -->
+  <div class="cnt__back">
     <div class="cnt__modal">
       <h3 class="cnt__title">{{ esCierre ? 'Cerrar caja' : 'Abrir caja' }}</h3>
       <p class="cnt__sub">
@@ -138,6 +141,7 @@
 // Y LO ESPERADO NO SE MUESTRA HASTA QUE EL CONTEO ESTÁ ESCRITO: con el número a la vista nadie
 // pesa, se escribe ése, y toda la merma que se mide da cero.
 import { ref, computed } from 'vue'
+import { useEscape } from '../../composables/useEscape.js'
 import { formaLabel } from '../../lib/formatters.js'
 
 const props = defineProps({
@@ -161,6 +165,8 @@ const props = defineProps({
   fondoObligatorio: { type: Boolean, default: false },
 })
 const emit = defineEmits(['cerrar', 'confirmar'])
+
+useEscape(() => emit('cerrar'))
 
 const conteos = ref(props.mesa.map(m => ({
   stock_id: m.stock_id, forma: m.forma, genetica: m.genetica, numero: m.numero,

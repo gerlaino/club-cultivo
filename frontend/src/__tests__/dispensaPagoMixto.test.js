@@ -18,13 +18,14 @@ const STOCK = {
 
 const listStocks = vi.fn(() => Promise.resolve({ data: [STOCK] }))
 const createDispensacion = vi.fn(() => Promise.resolve({ data: { id: 99 } }))
+const entregarReserva    = vi.fn(() => Promise.resolve({ data: {} }))
 vi.mock('../lib/api.js', () => ({
   listStocks: (...a) => listStocks(...a),
   createDispensacion: (...a) => createDispensacion(...a),
   listEntregadores: vi.fn(() => Promise.resolve({ data: [] })),
   // El carrito pregunta si hay caja abierta cuando lo abre quien atiende el mostrador.
   getMostrador: vi.fn(() => Promise.resolve({ data: { mesa: [], turno: { id: 1 } } })),
-  createReserva: vi.fn(), entregarReserva: vi.fn(),
+  createReserva: vi.fn(), entregarReserva: (...a) => entregarReserva(...a),
 }))
 vi.mock('../composables/useToast.js', () => ({
   useToast: () => ({ success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() }),
@@ -216,5 +217,74 @@ describe('Dispensar — pago dividido', () => {
     w.vm.form.es_regalo = true
     await w.vm.$nextTick()
     expect(w.vm.pagoDividido).toBe(false)
+  })
+})
+
+// ── ENTREGAR UNA RESERVA TAMBIÉN SE PUEDE COBRAR EN PARTES ─────────────────────────
+//
+// Germán, probándolo: «no me permite hacer más de un medio de pago». Estaba excluido a propósito,
+// con este argumento escrito al lado: «la seña de una reserva es un pago único». Mezcla dos cosas:
+// la seña se cobra al CREAR la reserva; al ENTREGARLA se cobra el RESTO, que es una cobranza como
+// cualquier otra —con el paciente enfrente, que bien puede pagar una parte en efectivo y otra por
+// transferencia—. El backend ya recibía un array de cobros; sólo la pantalla no lo ofrecía.
+describe('Entregar una reserva — cobrar el resto en partes', () => {
+  const RESERVA = {
+    id: 7, cantidad: 50, sena_ars: 2000, aporte_estimado_ars: 5000, aporte_restante_ars: 3000,
+    stock: { id: 1, unidad: 'g' },
+  }
+
+  async function entregando () {
+    setActivePinia(createPinia())
+    const { default: Modal } = await import('../components/pacientes/ModalNuevaDispensacion.vue')
+    const w = mount(Modal, {
+      props: { modelValue: true, paciente: PACIENTE, socioId: PACIENTE.id,
+               limiteCc: 50000, saldoCc: 0, reserva: RESERVA },
+      global: { stubs: { Teleport: true, DsSpinner: true, AppDatePicker: true, RouterLink: true } },
+    })
+    for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0))
+    return w
+  }
+
+  it('ofrece dividir: es una cobranza como cualquier otra', async () => {
+    const w = await entregando()
+    expect(w.find('.mnd__dividir-btn').exists()).toBe(true)
+  })
+
+  // Lo que se reparte es el RESTO ($3.000), no el total de lo que se lleva ($5.000): la seña ya
+  // se cobró cuando se apartó el producto.
+  it('reparte el resto a cobrar, no el total del producto', async () => {
+    const w = await entregando()
+    await w.find('.mnd__dividir-btn').trigger('click')
+
+    expect(w.vm.lineasPago[0].monto).toBe(3000)
+  })
+
+  it('manda las líneas al entregar', async () => {
+    entregarReserva.mockClear()
+    const w = await entregando()
+    await w.find('.mnd__dividir-btn').trigger('click')
+    w.vm.lineasPago = [{ medio: 'efectivo', monto: 1000 }, { medio: 'transferencia', monto: 2000 }]
+    await w.vm.$nextTick()
+    await w.find('.mnd__btn-primary').trigger('click')
+    await new Promise((r) => setTimeout(r, 0))
+
+    expect(entregarReserva).toHaveBeenCalledTimes(1)
+    expect(entregarReserva.mock.calls[0][1].cobros).toEqual([
+      { medio: 'efectivo', monto: '1000.00' },
+      { medio: 'transferencia', monto: '2000.00' },
+    ])
+  })
+
+  it('si la seña cubrió todo no hay nada que partir', async () => {
+    setActivePinia(createPinia())
+    const { default: Modal } = await import('../components/pacientes/ModalNuevaDispensacion.vue')
+    const w = mount(Modal, {
+      props: { modelValue: true, paciente: PACIENTE, socioId: PACIENTE.id, limiteCc: 50000, saldoCc: 0,
+               reserva: { ...RESERVA, sena_ars: 5000, aporte_restante_ars: 0 } },
+      global: { stubs: { Teleport: true, DsSpinner: true, AppDatePicker: true, RouterLink: true } },
+    })
+    for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0))
+
+    expect(w.find('.mnd__dividir-btn').exists()).toBe(false)
   })
 })

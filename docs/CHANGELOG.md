@@ -1,5 +1,37 @@
 # Changelog
 
+## Septiembre 2026 (av) — cuatro cosas que aparecieron usándolo
+
+**EL TOAST DOBLE AL ENTREGAR UNA RESERVA.** Germán: *"salta el cartel de successful dos veces, no
+sea cosa que se registre doble"*. `MReservasView` festejaba **además** del modal. Un solo request
+—no había doble registro— pero el susto es razonable: lo que está en juego es una dispensa.
+Canta sólo el modal, que es el que sabe si salió bien.
+
+**NO DEJABA MÁS DE UN MEDIO DE PAGO.** Estaba excluido a propósito, con este argumento al lado:
+*"la seña de una reserva es un pago único"*. Mezcla dos cosas: **la seña se cobra al CREAR** la
+reserva; **al ENTREGARLA se cobra el RESTO**, que es una cobranza como cualquier otra —con el
+paciente enfrente, que bien puede pagar una parte en efectivo y otra por transferencia—. El
+backend ya recibía un array (`aplicar_lineas_cobro!`); sólo la pantalla no lo ofrecía. Y lo que se
+reparte es el resto, no el total: por eso `totalACobrar`.
+
+**LOS MODALES SE CERRABAN AL TOCAR AFUERA** — los cinco del mostrador. Ahí se cuenta plata y
+mercadería: el click que se te va buscando el scroll borraba todo lo escrito sin preguntar, y no
+hay forma de recuperarlo. Se sale por **Cancelar o Escape**, que son gestos deliberados — y
+Escape ahora existe de verdad, en `useEscape`, un solo lugar y no cuatro listeners copiados sobre
+`document`.
+
+**NO DEJABA CORREGIR LA PLATA CONTADA**, sólo los gramos — y el efectivo mal cargado quedaba así
+para siempre, con su asiento de faltante en el libro y su diferencia en el arqueo. Ahora se
+corrige, **con la misma regla que el stock: no se borra el asiento viejo, se anota la corrección
+al lado**. Borrar un movimiento contable para tapar un error es peor que el error, y el rastro de
+que alguien corrigió es justo lo que hay que poder mostrar después. Se puede corregir sólo la
+plata, sin tocar ningún producto.
+
+**Y de paso, el mismo bug de la caja en otra pantalla.** `MReservasView` leía `dispensario_sede` a
+secas para saber si la caja estaba abierta: con esa columna en null —el caso normal— no avisaba
+nada y ofrecía "Entregar" para que el backend rebotara. Es exactamente lo que se arregló en el
+carrito unas horas antes. Ahora las tres pantallas preguntan `sedeDeMostrador`.
+
 ## Septiembre 2026 (au) — Cierres en criollo, y el modal de corregir que no listaba nada
 
 Germán: *"es ilegible, entrás ahí, ves eso y no entendés absolutamente nada... ponete en el lugar

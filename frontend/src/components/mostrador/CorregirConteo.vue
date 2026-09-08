@@ -1,5 +1,8 @@
 <template>
-  <div class="cc__back" @click.self="$emit('cerrar')">
+  <!-- SIN CERRAR AL TOCAR AFUERA. Acá se cuenta plata y mercadería: un click al costado
+       —el que se te va buscando el scroll— borraba todo lo escrito sin preguntar nada, y no hay
+       forma de recuperarlo. Se sale por Cancelar o con Escape, que son gestos deliberados. -->
+  <div class="cc__back">
     <div class="cc__modal">
       <h3 class="cc__title">Corregir el conteo</h3>
       <p class="cc__sub">
@@ -35,8 +38,20 @@
           </div>
         </div>
 
-        <!-- QUÉ VA A PASAR CON EL INVENTARIO, mientras se escribe. Corregir un conteo mueve
-             stock real: enterarse después de guardar es enterarse tarde. -->
+        <!-- LA PLATA TAMBIÉN SE CUENTA MAL. Se dejaba corregir los gramos y el efectivo quedaba
+             con el número equivocado para siempre, con su asiento de faltante en el libro. -->
+        <div v-if="caja" class="cc__row cc__row--plata">
+          <span class="cc__nombre">Plata en la caja</span>
+          <span class="cc__col cc__num">{{ pesos(caja.esperado_ars) }}</span>
+          <span class="cc__col cc__num" :class="{ 'cc__num--dif': difPlataOriginal }">{{ pesos(caja.contado_ars) }}</span>
+          <span class="cc__col cc__cant">
+            <input v-model.number="efectivo" type="number" min="0" step="1"
+                   class="cc__input cc__input--cant" aria-label="Lo que de verdad había en la caja" />
+          </span>
+        </div>
+
+        <!-- QUÉ VA A PASAR CON EL INVENTARIO Y CON EL LIBRO, mientras se escribe. Corregir mueve
+             stock real y asienta plata: enterarse después de guardar es enterarse tarde. -->
         <p class="cc__efecto" v-html="efecto"></p>
 
         <label class="cc__campo">
@@ -64,6 +79,7 @@
 // abre desde dos lados —la solapa de Merma y la lista de turnos— y tener el mismo modal escrito
 // dos veces es cómo se empiezan a contradecir.
 import { ref, computed, onMounted } from 'vue'
+import { useEscape } from '../../composables/useEscape.js'
 import { getTurnoMostrador, corregirTurnoMostrador } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
@@ -73,8 +89,12 @@ const props = defineProps({
 })
 const emit = defineEmits(['cerrar', 'corregido'])
 
+useEscape(() => emit('cerrar'))
+
 const toast     = useToast()
 const items     = ref([])
+const caja      = ref(null)
+const efectivo  = ref(null)
 const motivo    = ref('')
 const cargando  = ref(true)
 const guardando = ref(false)
@@ -85,8 +105,17 @@ const fmt = (n) => Number(n ?? 0).toLocaleString('es-AR', { maximumFractionDigit
 // eso hay que restar de a ojo entre dos columnas para encontrar cuál es el que está mal.
 const difOriginal = (c) => c.esperado != null && Number(c.original) !== Number(c.esperado)
 
+const cambioPlata = computed(() =>
+  !!caja.value && efectivo.value != null && Number(efectivo.value) !== Number(caja.value.contado_ars))
+
 // QUÉ VA A PASAR CON EL INVENTARIO, en castellano y mientras se escribe. Corregir un conteo mueve
 // stock real: enterarse recién después de guardar es enterarse tarde.
+const pesos = (n) => n == null ? '—' :
+  new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
+
+const difPlataOriginal = computed(() =>
+  !!caja.value && Number(caja.value.contado_ars) !== Number(caja.value.esperado_ars))
+
 const efecto = computed(() => {
   let falta = 0, sobra = 0
   for (const c of items.value) {
@@ -98,6 +127,13 @@ const efecto = computed(() => {
   const partes = []
   if (falta) partes.push(`con estos números <b>faltan ${r(falta)}</b>, que salen del inventario`)
   if (sobra) partes.push(`hay <b>${r(sobra)} de más</b>, que no se cargan: el mostrador descuenta producto, nunca lo suma`)
+  // La plata va aparte del producto: son dos arqueos distintos y se explican distinto.
+  if (caja.value && efectivo.value != null) {
+    const dif = Number(efectivo.value) - Number(caja.value.esperado_ars || 0)
+    if (Math.abs(dif) >= 1) {
+      partes.push(`en la caja ${dif < 0 ? 'faltan' : 'sobran'} <b>${pesos(Math.abs(dif))}</b>, que se asientan en el libro`)
+    }
+  }
   if (!partes.length) return 'Con estos números <b>no falta nada</b>: vuelve al inventario lo que se había descontado.'
   return partes.join(' y ') + '.'
 })
@@ -114,6 +150,8 @@ onMounted(async () => {
       original: it.contado_cierre ?? it.contado,
       contado:  it.contado_cierre ?? it.contado,
     }))
+    caja.value = data.caja || null
+    efectivo.value = caja.value?.contado_ars ?? null
   } catch (e) {
     toast.error(e?.response?.data?.error || 'No se pudo abrir el turno.')
     emit('cerrar')
@@ -128,11 +166,14 @@ async function confirmar () {
   const cambiados = items.value
     .filter(c => Number(c.contado) !== Number(c.original))
     .map(c => ({ item_id: c.item_id, contado: c.contado }))
-  if (!cambiados.length) return toast.error('No cambiaste ningún número.')
+  if (!cambiados.length && !cambioPlata.value) return toast.error('No cambiaste ningún número.')
 
   guardando.value = true
   try {
-    await corregirTurnoMostrador(props.sedeId, props.turno.id, { conteos: cambiados, motivo: motivo.value })
+    await corregirTurnoMostrador(props.sedeId, props.turno.id, {
+      conteos: cambiados, motivo: motivo.value,
+      ...(cambioPlata.value ? { efectivo_contado_ars: efectivo.value } : {}),
+    })
     toast.success('Conteo corregido')
     emit('corregido')
     emit('cerrar')
@@ -168,6 +209,8 @@ async function confirmar () {
 .cc__num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--fs-14); color: var(--c-ink-500); }
 /* El renglón que no cerró: el que hay que mirar. Ámbar, no rojo — no es culpa de nadie. */
 .cc__num--dif { color: var(--c-amber-700, #b45309); font-weight: 700; }
+/* La plata, separada del producto por una línea: son dos arqueos distintos. */
+.cc__row--plata { border-top: 2px solid var(--c-slate-200); margin-top: 4px; }
 .cc__efecto {
   margin: 0; font-size: var(--fs-13); color: var(--c-ink-700);
   background: var(--c-leaf-50, #f0fdf4); border-radius: 9px; padding: 10px 12px;

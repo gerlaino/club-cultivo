@@ -570,10 +570,23 @@ const MEDIOS_COBRO = [
 const pagoDividido = ref(false)
 const lineasPago   = ref([])
 
-// Dividir sólo aplica a una dispensa que se cobra ACÁ y AHORA: un regalo no se cobra, la seña
-// de una reserva es un pago único, y contra entrega lo cobra el repartidor en la puerta.
+// LO QUE HAY QUE COBRAR ACÁ Y AHORA. Entregando una reserva es el RESTO —la seña ya se cobró
+// cuando se apartó el producto—, no el total de lo que se lleva.
+const totalACobrar = computed(() =>
+  modoReserva.value ? restoReserva.value : (Number(precioFinal.value) || 0))
+
+// Dividir aplica a lo que se cobra ACÁ: un regalo no se cobra y contra entrega lo cobra el
+// repartidor en la puerta.
+//
+// ENTREGAR UNA RESERVA SÍ SE PUEDE DIVIDIR. Estaba excluido con el argumento de que "la seña de
+// una reserva es un pago único", que mezcla dos cosas: la seña se cobra al CREARLA, y al
+// entregarla se cobra el resto, que es una cobranza como cualquier otra —con el paciente
+// enfrente, que bien puede pagar una parte en efectivo y otra por transferencia—. El backend ya
+// aceptaba varias líneas (`aplicar_lineas_cobro!` recibe un array); sólo la pantalla no lo
+// ofrecía. Si la seña cubrió todo no hay nada que partir.
 const puedeDividirPago = computed(() =>
-  !form.value.es_regalo && !form.value.es_reserva && !modoReserva.value && !cobraDelivery.value)
+  !form.value.es_regalo && !form.value.es_reserva && !cobraDelivery.value &&
+  (!modoReserva.value || restoReserva.value > 0))
 
 const totalAsignado = computed(() =>
   lineasPago.value.reduce((a, l) => a + (Number(l.monto) || 0), 0))
@@ -581,7 +594,7 @@ const totalAsignado = computed(() =>
 // Lo que falta asignar. El backend lo manda solo a cuenta corriente, así que hay que decirlo
 // en pantalla: si no, el paciente se va debiendo plata que nadie escribió en ningún lado.
 const restoPago = computed(() =>
-  Math.round(((Number(precioFinal.value) || 0) - totalAsignado.value) * 100) / 100)
+  Math.round((totalACobrar.value - totalAsignado.value) * 100) / 100)
 const excedentePago = computed(() => Math.max(0, -restoPago.value))
 
 // Un medio por línea: repetirlo no significa nada y sólo confunde el desglose.
@@ -592,7 +605,7 @@ const mediosLibres = computed(() => MEDIOS_COBRO.filter(m =>
 function activarPagoDividido() {
   // Arranca con lo que ya estaba elegido y el total puesto: dividir es partir algo que ya existe.
   const primero = MEDIOS_COBRO.some(m => m.valor === form.value.medio_pago) ? form.value.medio_pago : 'efectivo'
-  lineasPago.value = [{ medio: primero, monto: Number(precioFinal.value) || null }]
+  lineasPago.value = [{ medio: primero, monto: totalACobrar.value || null }]
   pagoDividido.value = true
   agregarLineaPago()
 }
@@ -740,7 +753,7 @@ async function handleSubmit() {
   // ── Rama ENTREGAR RESERVA: convierte la reserva en dispensación, cobra el resto ──
   if (modoReserva.value) {
     const cobrarDelivery = form.value.medio_pago === 'contra_entrega'
-    if (!cobrarDelivery && form.value.medio_pago === 'cuenta_corriente' && !tieneCc.value) {
+    if (!cobrarDelivery && !pagoDividido.value && form.value.medio_pago === 'cuenta_corriente' && !tieneCc.value) {
       formError.value = 'El paciente no tiene crédito configurado para cobrar por cuenta corriente'; saving.value = false; return
     }
     if (form.value.con_envio && !form.value.delivery_id) {
@@ -753,7 +766,12 @@ async function handleSubmit() {
         cobrar_en_entrega: cobrarDelivery,
       }
       if (!cobrarDelivery && restoReserva.value > 0) {
-        payload.cobros = [{ medio: form.value.medio_pago, monto: Number(restoReserva.value).toFixed(2) }]
+        // Una línea o varias: es el mismo array que manda la dispensa, y lo que sobra sin asignar
+        // lo resuelve el backend contra la cuenta corriente, como siempre.
+        payload.cobros = pagoDividido.value
+          ? lineasPago.value.filter(l => Number(l.monto) > 0)
+                            .map(l => ({ medio: l.medio, monto: Number(l.monto).toFixed(2) }))
+          : [{ medio: form.value.medio_pago, monto: Number(restoReserva.value).toFixed(2) }]
       }
       if (form.value.con_envio) {
         payload.delivery_id             = form.value.delivery_id

@@ -14,7 +14,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 
 const TURNO = {
   id: 7, cerrado_at: '2026-09-05T22:00:00Z',
-  caja: {},
+  caja: { fondo_ars: 110000, esperado_ars: 150000, contado_ars: 130000, diferencia_ars: -20000 },
   // El nombre que manda el backend. `items` es el mismo array, agregado para esta pantalla.
   conteo_apertura: [
     { id: 91, stock_id: 1, etiqueta: 'Critical Kush L-26-017', unidad: 'g',
@@ -49,7 +49,7 @@ beforeEach(() => { getTurnoMostrador.mockClear(); corregirTurnoMostrador.mockCle
 describe('Corregir el conteo de un cierre', () => {
   it('lista los productos: era lo que no pasaba nunca', async () => {
     const w = await abrir()
-    expect(w.findAll('.cc__row:not(.cc__row--head)')).toHaveLength(2)
+    expect(w.findAll('.cc__row:not(.cc__row--head):not(.cc__row--plata)')).toHaveLength(2)
     expect(w.text()).toContain('Critical Kush L-26-017')
   })
 
@@ -58,12 +58,12 @@ describe('Corregir el conteo de un cierre', () => {
   it('funciona con cualquiera de los dos nombres del payload', async () => {
     const soloViejo = { ...TURNO, items: undefined }
     const w = await abrir(soloViejo)
-    expect(w.findAll('.cc__row:not(.cc__row--head)')).toHaveLength(2)
+    expect(w.findAll('.cc__row:not(.cc__row--head):not(.cc__row--plata)')).toHaveLength(2)
   })
 
   it('muestra contra QUÉ está mal, no sólo lo que se contó', async () => {
     const w = await abrir()
-    const fila = w.findAll('.cc__row:not(.cc__row--head)')[0]
+    const fila = w.findAll('.cc__row:not(.cc__row--head):not(.cc__row--plata)')[0]
 
     expect(fila.text()).toContain('46')   // lo que tenía que haber
     expect(fila.text()).toContain('23')   // lo que se contó
@@ -81,7 +81,10 @@ describe('Corregir el conteo de un cierre', () => {
     const w = await abrir()
     expect(w.find('.cc__efecto').text()).toContain('faltan 23')
 
+    // Se corrigen las DOS cosas: el producto y la plata. Son dos arqueos distintos y el efecto
+    // habla de los dos — dejar la caja mal y esperar «no falta nada» sería mentira.
     await w.findAll('.cc__input--cant')[0].setValue(46)
+    await w.find('.cc__row--plata .cc__input--cant').setValue(150000)
     expect(w.find('.cc__efecto').text()).toContain('no falta nada')
   })
 
@@ -96,5 +99,81 @@ describe('Corregir el conteo de un cierre', () => {
       conteos: [{ item_id: 91, contado: 40 }],
       motivo: 'se cargó 23 en vez de 40',
     })
+  })
+})
+
+// ── LA PLATA TAMBIÉN SE CUENTA MAL ─────────────────────────────────────────────────
+//
+// Germán: «en mostrador/cierres, cuando voy a corregir lo que se contó no me permite editar el
+// dinero contado, sólo las cantidades de stocks». Y el efectivo mal cargado quedaba así para
+// siempre, con su asiento de faltante en el libro y su diferencia en el arqueo.
+describe('Corregir la plata contada', () => {
+  it('la ofrece, con lo que tenía que haber al lado', async () => {
+    const w = await abrir()
+    const fila = w.find('.cc__row--plata')
+
+    expect(fila.exists()).toBe(true)
+    expect(fila.text()).toContain('150.000')   // lo que tenía que haber
+    expect(fila.text()).toContain('130.000')   // lo que se contó
+  })
+
+  it('dice qué se va a asentar en el libro, mientras se escribe', async () => {
+    const w = await abrir()
+    await w.find('.cc__row--plata .cc__input--cant').setValue(150000)
+    expect(w.find('.cc__efecto').text()).not.toContain('caja')
+
+    await w.find('.cc__row--plata .cc__input--cant').setValue(140000)
+    expect(w.find('.cc__efecto').text()).toContain('caja')
+  })
+
+  it('la manda sólo si de verdad cambió', async () => {
+    const w = await abrir()
+    await w.findAll('.cc__input--cant')[0].setValue(40)
+    await w.find('.cc__campo input').setValue('dedazo')
+    await w.find('.cc__btn--primary').trigger('click')
+    await flushPromises()
+
+    expect(corregirTurnoMostrador.mock.calls[0][2].efectivo_contado_ars).toBeUndefined()
+  })
+
+  it('y se puede corregir SÓLO la plata, sin tocar ningún producto', async () => {
+    const w = await abrir()
+    await w.find('.cc__row--plata .cc__input--cant').setValue(148000)
+    await w.find('.cc__campo input').setValue('se contó mal el efectivo')
+    await w.find('.cc__btn--primary').trigger('click')
+    await flushPromises()
+
+    expect(corregirTurnoMostrador).toHaveBeenCalledWith(10, 7, {
+      conteos: [], motivo: 'se contó mal el efectivo', efectivo_contado_ars: 148000,
+    })
+  })
+})
+
+// ── NO SE CIERRA AL TOCAR AFUERA ───────────────────────────────────────────────────
+//
+// Germán: «si hacés click sin querer afuera, salís del modal, deberíamos prevenir eso, es
+// bastante molesto». Acá se cuenta plata y mercadería: el click que se te va buscando el scroll
+// borraba todo lo escrito sin preguntar nada, y no hay forma de recuperarlo.
+//
+// Pero un modal del que no se puede salir con el teclado es otro problema —y peor para quien no
+// usa mouse—, así que la salida deliberada queda: Cancelar o Escape.
+describe('Salir del modal', () => {
+  it('un click afuera NO lo cierra', async () => {
+    const w = await abrir()
+    await w.find('.cc__back').trigger('click')
+    expect(w.emitted('cerrar')).toBeUndefined()
+  })
+
+  it('Escape sí, que es un gesto deliberado', async () => {
+    const w = await abrir()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+    expect(w.emitted('cerrar')).toBeTruthy()
+  })
+
+  it('y al desmontarse deja de escuchar: cuatro modales son cuatro listeners sueltos', async () => {
+    const w = await abrir()
+    w.unmount()
+    // Si el listener siguiera vivo, esto tiraría sobre un componente desmontado.
+    expect(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))).not.toThrow()
   })
 })

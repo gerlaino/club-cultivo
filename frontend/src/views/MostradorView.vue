@@ -251,7 +251,8 @@
                  @cerrar="conteo = null" @confirmar="onConfirmarConteo" />
 
     <!-- ── Poner o sacar plata del cajón, con la caja abierta ─────────────────── -->
-    <div v-if="plata" class="mst__modal-back" @click.self="plata = null">
+    <!-- SIN CERRAR AL TOCAR AFUERA: se está por mover plata del cajón. -->
+    <div v-if="plata" class="mst__modal-back">
       <div class="mst__modal">
         <h3 class="mst__modal-title">{{ plata.tipo === 'ingreso' ? 'Poner plata en el cajón' : 'Sacar plata del cajón' }}</h3>
         <p class="mst__modal-sub">

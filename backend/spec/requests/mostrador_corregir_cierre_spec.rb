@@ -152,4 +152,60 @@ RSpec.describe 'Corregir el conteo de una caja ya cerrada', type: :request do
     expect(aud).to be_present
     expect(aud.cambios.keys).to include('cantidad_cierre')
   end
+
+  # LA PLATA TAMBIÉN SE CUENTA MAL, y hasta acá no se podía arreglar.
+  #
+  # Germán: «cuando voy a corregir lo que se contó no me permite editar el dinero contado, sólo
+  # las cantidades de stocks». El efectivo mal cargado quedaba así para siempre, con su asiento de
+  # faltante en el libro y su diferencia en el arqueo.
+  describe 'la plata contada' do
+    def caja = turno.caja_turno.reload
+
+    def corregir_plata!(monto, motivo: 'conté mal el efectivo', conteos: [])
+      sign_in_as(admin)
+      post "/api/sedes/#{sede.id}/mostrador/turnos/#{turno.id}/corregir", headers: auth_headers,
+           params: { conteos: conteos, motivo: motivo, efectivo_contado_ars: monto }
+      JSON.parse(response.body)
+    end
+
+    it 'se puede corregir sola, sin tocar ningún producto' do
+      corregir_plata!(9_000)
+      expect(response).to have_http_status(:ok)
+      expect(caja.efectivo_declarado_ars.to_f).to eq(9_000.0)
+    end
+
+    # MISMA REGLA QUE EL STOCK: el asiento viejo queda y se anota la diferencia al lado. Borrar un
+    # movimiento contable para tapar un error es peor que el error.
+    it 'no borra el asiento viejo: anota la corrección al lado' do
+      antes = caja.movimientos_contables.where(categoria: 'diferencia_caja').count
+      corregir_plata!(9_000)
+
+      movs = caja.movimientos_contables.where(categoria: 'diferencia_caja')
+      expect(movs.count).to eq(antes + 1)
+      expect(movs.order(:id).last.descripcion).to include('Corrección del arqueo')
+      expect(movs.order(:id).last.descripcion).to include('conté mal el efectivo')
+    end
+
+    it 'y la diferencia del arqueo queda calculada contra el número nuevo' do
+      esperado = caja.efectivo_esperado_ars.to_f
+      corregir_plata!(esperado)
+      expect(caja.diferencia_ars.to_f).to eq(0.0)
+    end
+
+    it 'corregir al mismo número no asienta nada' do
+      antes = caja.movimientos_contables.count
+      corregir_plata!(caja.efectivo_declarado_ars.to_f)
+      expect(caja.movimientos_contables.count).to eq(antes)
+    end
+
+    it 'sigue pidiendo el motivo' do
+      corregir_plata!(9_000, motivo: '')
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+
+    it 'y no acepta un número negativo' do
+      corregir_plata!(-100)
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+  end
 end

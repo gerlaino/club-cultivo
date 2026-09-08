@@ -69,12 +69,13 @@ import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { listReservas, getMostrador } from '../../lib/api.js'
 import { formaLabel, formatARS } from '../../lib/formatters.js'
-import { useToast } from '../../composables/useToast.js'
 import { useAuthStore } from '../../stores/auth.js'
+import { useSedeStore } from '../../stores/sede.js'
+import { sedeDeMostrador } from '../../composables/useMostrador.js'
 import ModalNuevaDispensacion from '../../components/pacientes/ModalNuevaDispensacion.vue'
 
-const toast = useToast()
-const auth  = useAuthStore()
+const auth      = useAuthStore()
+const sedeStore = useSedeStore()
 
 const filtro     = ref('hoy')
 const loading    = ref(false)
@@ -109,8 +110,15 @@ onMounted(() => { cargar(); cargarEstadoCaja() })
 // peor que dejar que el backend rechace, que es lo que sabe decidir.
 async function cargarEstadoCaja () {
   cajaCerrada.value = false
-  const sedeId = auth.user?.dispensario_sede?.id ?? auth.user?.dispensario_sede_id
-  if (auth.user?.role !== 'dispensador' || !sedeId) return
+  if (auth.user?.role !== 'dispensador') return
+
+  // CUÁL ES SU MOSTRADOR LO DECIDE `sedeDeMostrador`, igual que el carrito y que la pantalla del
+  // mostrador. Acá se leía `dispensario_sede` a secas y esa columna nace en null: sin sede
+  // asignada cortaba antes de preguntar y no avisaba nada, así que la lista ofrecía "Entregar"
+  // con la caja cerrada. Es el mismo bug que ya se arregló en el carrito, en otra pantalla.
+  if (!sedeStore.loaded) await sedeStore.fetchSedes()
+  const sedeId = sedeDeMostrador(auth.user, sedeStore.sedes)
+  if (!sedeId) return
 
   try {
     const { data } = await getMostrador(sedeId)
@@ -137,7 +145,9 @@ function entregar(r) {
 }
 
 async function onEntregada() {
-  toast.success('Reserva entregada')
+  // SIN TOAST ACÁ: lo canta el modal, que es el que sabe si la entrega salió bien. Festejando en
+  // los dos lados salía dos veces y se leía como que se registró dos veces — el susto es peor que
+  // el bug, porque lo que está en juego es una dispensa.
   entregando.value = null
   await cargar()
   await cargarEstadoCaja()

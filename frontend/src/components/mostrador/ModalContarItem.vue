@@ -1,5 +1,8 @@
 <template>
-  <div class="cti__back" @click.self="$emit('cerrar')">
+  <!-- SIN CERRAR AL TOCAR AFUERA. Acá se cuenta plata y mercadería: un click al costado
+       —el que se te va buscando el scroll— borraba todo lo escrito sin preguntar nada, y no hay
+       forma de recuperarlo. Se sale por Cancelar o con Escape, que son gestos deliberados. -->
+  <div class="cti__back">
     <div class="cti__modal" role="dialog" aria-modal="true">
       <h3 class="cti__title">Contar {{ formaLabel(item.forma) }}</h3>
       <p class="cti__sub">
@@ -72,6 +75,7 @@
 // camino para verificar un frasco era el arqueo entero. En el teléfono, que es donde más se
 // atiende, eso es quince campos en un modal.
 import { ref, computed, onMounted } from 'vue'
+import { useEscape } from '../../composables/useEscape.js'
 import { formaLabel } from '../../lib/formatters.js'
 
 const props = defineProps({
@@ -80,6 +84,8 @@ const props = defineProps({
   guardando: { type: Boolean, default: false },
 })
 const emit = defineEmits(['cerrar', 'confirmar'])
+
+useEscape(() => emit('cerrar'))
 
 const contado = ref(null)
 const motivo  = ref('')
