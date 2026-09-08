@@ -112,14 +112,11 @@ class MovimientoContable < ApplicationRecord
   # cuenta_corriente y no_abona llegan desde dispensaciones a crédito (pagado: false)
   MEDIOS_PAGO       = %w[efectivo transferencia mercado_pago cuenta_corriente no_abona].freeze
 
-  # Categorías que típicamente son egresos
-  CATEGORIAS_EGRESO = %w[
-    insumo electricidad agua alquiler sueldo
-    mantenimiento honorario seguro admin
-  ].freeze
-
-  # Categorías que típicamente son ingresos
-  CATEGORIAS_INGRESO = %w[aporte_socio dispensacion subvencion].freeze
+  # Acá vivían CATEGORIAS_EGRESO y CATEGORIAS_INGRESO, "las que TÍPICAMENTE son egresos/ingresos".
+  # Se retiraron: `INGRESO` no la leía nadie, y `EGRESO` se usaba como LISTA BLANCA en
+  # `CompraCuotas` —una heurística haciendo de regla— y rechazaba `otro`, que es donde caen todas
+  # las categorías propias del club. El tipo de un movimiento lo dice `tipo`, no una lista de
+  # claves; el catálogo real vive en `CategoriaContable`.
 
   validates :tipo,        presence: true, inclusion: { in: TIPOS }
   validates :categoria,   presence: true, inclusion: { in: CATEGORIAS }

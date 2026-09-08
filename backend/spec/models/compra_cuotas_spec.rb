@@ -47,4 +47,38 @@ RSpec.describe CompraCuotas, type: :model do
     compra = nueva
     expect { compra.destroy }.to change(MovimientoContable, :count).by(-6)
   end
+
+  # EL MISMO GASTO ENTRABA COMO PAGO ÚNICO Y REBOTABA EN CUOTAS.
+  #
+  # Lo encontró el socio de Germán cargando «kit contenedor 40*30» en 3 cuotas con la categoría
+  # «Bienes de Uso» elegida en pantalla: «Categoría no está en la lista». Validaba contra
+  # `CATEGORIAS_EGRESO` —las que "TÍPICAMENTE son egresos", una heurística usada como lista
+  # blanca— y las categorías que crea el club no están ahí: sin `clave_sistema` no tienen clave
+  # legacy, así que el formulario manda `otro`.
+  #
+  # Los specs de acá arriba nunca lo agarraron porque TODOS usaban `mantenimiento`, que sí estaba
+  # entre esas nueve. Una lista blanca probada sólo con sus propios valores siempre parece bien.
+  describe 'la categoría' do
+    it 'acepta `otro`, que es donde caen las categorías propias del club' do
+      compra = nueva(categoria: 'otro')
+      expect(compra).to be_persisted
+      expect(compra.movimientos_contables.pluck(:categoria).uniq).to eq(['otro'])
+    end
+
+    it 'acepta cualquiera que sirva para un movimiento: una compra en cuotas son N egresos' do
+      MovimientoContable::CATEGORIAS.each do |cat|
+        expect(CompraCuotas.new(club: club, sede: sede, created_by: admin, descripcion: 'x',
+                                categoria: cat, monto_total_ars: 100, cuotas_total: 2,
+                                fecha_primera_cuota: Date.current)).to be_valid, "rechazó #{cat}"
+      end
+    end
+
+    it 'y si de verdad no existe, dice CUÁL era en vez de «no está en la lista»' do
+      compra = CompraCuotas.new(club: club, sede: sede, created_by: admin, descripcion: 'x',
+                                categoria: 'inventada', monto_total_ars: 100, cuotas_total: 2,
+                                fecha_primera_cuota: Date.current)
+      expect(compra).not_to be_valid
+      expect(compra.errors.full_messages.join).to include('inventada')
+    end
+  end
 end

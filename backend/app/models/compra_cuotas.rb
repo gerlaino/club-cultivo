@@ -15,7 +15,19 @@ class CompraCuotas < ApplicationRecord
              foreign_key: :compra_cuotas_id, dependent: :destroy  # las cuotas generadas
 
   validates :descripcion,         presence: true
-  validates :categoria,           presence: true, inclusion: { in: MovimientoContable::CATEGORIAS_EGRESO }
+  # LA MISMA LISTA QUE LOS MOVIMIENTOS QUE ESTA COMPRA GENERA.
+  #
+  # Validaba contra `CATEGORIAS_EGRESO`, que era —según su propio comentario— la lista de las que
+  # "TÍPICAMENTE son egresos": una heurística usada como lista blanca. Y las categorías que crea el
+  # club no están ahí: una categoría propia sin `clave_sistema` no tiene clave legacy, así que el
+  # formulario manda `otro`, que SÍ es una categoría válida de movimiento y NO estaba entre esas
+  # nueve. Resultado: el mismo gasto entraba como pago único y rebotaba en cuotas, con un
+  # «Categoría no está en la lista» sobre una categoría que estaba elegida en pantalla.
+  #
+  # Una compra en cuotas son N egresos y nada más: si la categoría sirve para un egreso, sirve acá.
+  validates :categoria,           presence: true,
+                                  inclusion: { in: MovimientoContable::CATEGORIAS,
+                                               message: '«%{value}» no es una categoría del libro' }
   validates :monto_total_ars,     presence: true, numericality: { greater_than: 0 }
   validates :cuotas_total,        presence: true, numericality: { only_integer: true, greater_than: 0, less_than_or_equal_to: 120 }
   validates :fecha_primera_cuota, presence: true
