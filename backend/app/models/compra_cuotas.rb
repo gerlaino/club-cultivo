@@ -11,6 +11,9 @@ class CompraCuotas < ApplicationRecord
   belongs_to :club
   belongs_to :sede
   belongs_to :created_by, class_name: 'User'
+  # La categoría del catálogo que eligió la persona. `optional` porque las compras cargadas antes
+  # de esta columna no la tienen, y una compra vieja tiene que poder seguir editándose.
+  belongs_to :categoria_contable, optional: true
   has_many   :movimientos_contables, class_name: 'MovimientoContable',
              foreign_key: :compra_cuotas_id, dependent: :destroy  # las cuotas generadas
 
@@ -61,6 +64,10 @@ class CompraCuotas < ApplicationRecord
         created_by:  created_by,
         tipo:        'egreso',
         categoria:   categoria,
+        # LA CATEGORÍA REAL, no sólo la clave legacy. Sin esto cada cuota entraba al libro
+        # diciendo "Otro" —porque las categorías propias del club no tienen clave legacy— en vez
+        # de la que la persona eligió en pantalla.
+        categoria_contable_id: categoria_contable_id,
         descripcion: "#{descripcion} — cuota #{i}/#{cuotas_total}",
         monto_ars:   monto,
         fecha:       fecha,

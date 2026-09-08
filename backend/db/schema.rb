@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_03_140000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_08_210000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -334,7 +334,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_03_140000) do
     t.index ["cerrada_por_id"], name: "index_caja_turnos_on_cerrada_por_id"
     t.index ["cierre_solicitado_por_id"], name: "index_caja_turnos_on_cierre_solicitado_por_id"
     t.index ["club_id"], name: "index_caja_turnos_on_club_id"
-    t.index ["punto_type", "punto_id"], name: "index_caja_turnos_activa_por_punto", unique: true, where: "((estado)::text = ANY ((ARRAY['abierta'::character varying, 'pendiente_cierre'::character varying])::text[]))"
+    t.index ["punto_type", "punto_id"], name: "index_caja_turnos_activa_por_punto", unique: true, where: "((estado)::text = ANY (ARRAY[('abierta'::character varying)::text, ('pendiente_cierre'::character varying)::text]))"
     t.index ["sede_id"], name: "index_caja_turnos_on_sede_id"
   end
 
@@ -506,6 +506,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_03_140000) do
     t.datetime "deleted_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "categoria_contable_id"
+    t.index ["categoria_contable_id"], name: "index_compras_cuotas_on_categoria_contable_id"
     t.index ["club_id"], name: "index_compras_cuotas_on_club_id"
     t.index ["created_by_id"], name: "index_compras_cuotas_on_created_by_id"
     t.index ["deleted_at"], name: "index_compras_cuotas_on_deleted_at"
@@ -2449,6 +2451,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_03_140000) do
   add_foreign_key "cobros", "rendiciones_caja", column: "rendicion_caja_id"
   add_foreign_key "cobros", "users", column: "created_by_id"
   add_foreign_key "cobros", "users", column: "deleted_by_id"
+  add_foreign_key "compras_cuotas", "categorias_contables", column: "categoria_contable_id"
   add_foreign_key "compras_cuotas", "clubs"
   add_foreign_key "compras_cuotas", "sedes"
   add_foreign_key "compras_cuotas", "users", column: "created_by_id"

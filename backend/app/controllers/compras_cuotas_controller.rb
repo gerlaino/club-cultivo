@@ -65,7 +65,7 @@ class ComprasCuotasController < ApplicationController
 
   def compra_params
     params.require(:compra_cuotas).permit(
-      :sede_id, :descripcion, :categoria, :monto_total_ars, :cuotas_total,
+      :sede_id, :descripcion, :categoria, :categoria_contable_id, :monto_total_ars, :cuotas_total,
       :fecha_primera_cuota, :medio_pago, :responsable, :proveedor, :notas
     )
   end
@@ -75,6 +75,8 @@ class ComprasCuotasController < ApplicationController
       id:                  c.id,
       descripcion:         c.descripcion,
       categoria:           c.categoria,
+      categoria_contable_id: c.categoria_contable_id,
+      categoria_nombre:    c.categoria_contable&.nombre,
       monto_total_ars:     c.monto_total_ars.to_f,
       cuotas_total:        c.cuotas_total,
       fecha_primera_cuota: c.fecha_primera_cuota,

@@ -73,6 +73,27 @@ RSpec.describe CompraCuotas, type: :model do
       end
     end
 
+    # LA CATEGORÍA QUE SE ELIGIÓ TIENE QUE LLEGAR AL LIBRO.
+    #
+    # La clave legacy no alcanza: las categorías propias del club no tienen, así que todas caen en
+    # `otro` y cada cuota aparecía como "Otro" en vez de la que la persona eligió en pantalla.
+    it 'le pasa a cada cuota la categoría del catálogo, no sólo la clave legacy' do
+      cat = CategoriaContable.create!(club: club, nombre: 'Bienes de Uso', tipo: 'egreso')
+      compra = nueva(categoria: 'otro', categoria_contable: cat)
+
+      expect(compra.movimientos_contables.pluck(:categoria_contable_id).uniq).to eq([cat.id])
+    end
+
+    # Editar REGENERA las cuotas: si la categoría no estuviera guardada en la compra, se perdía
+    # en la primera edición. Por eso es una columna y no un dato de paso.
+    it 'y la conserva al editar, que es cuando las cuotas se rehacen' do
+      cat = CategoriaContable.create!(club: club, nombre: 'Bienes de Uso', tipo: 'egreso')
+      compra = nueva(categoria: 'otro', categoria_contable: cat)
+      compra.actualizar_y_regenerar!(monto_total_ars: 900_000)
+
+      expect(compra.reload.movimientos_contables.pluck(:categoria_contable_id).uniq).to eq([cat.id])
+    end
+
     it 'y si de verdad no existe, dice CUÁL era en vez de «no está en la lista»' do
       compra = CompraCuotas.new(club: club, sede: sede, created_by: admin, descripcion: 'x',
                                 categoria: 'inventada', monto_total_ars: 100, cuotas_total: 2,

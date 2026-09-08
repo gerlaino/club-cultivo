@@ -493,6 +493,10 @@ async function onMovimientoGuardado(payload) {
         sede_id:             payload.sede_id || sedes.value[0]?.id,
         descripcion:         payload.descripcion,
         categoria:           payload.categoria,
+        // La categoría REAL del catálogo. Sin esto la compra guarda sólo la clave legacy y, como
+        // las categorías propias del club caen todas en `otro`, cada cuota aparecía en el libro
+        // como "Otro" en vez de la que se eligió.
+        categoria_contable_id: payload.categoria_contable_id,
         monto_total_ars:     payload.monto_ars,
         cuotas_total:        payload.cuotas_total,
         fecha_primera_cuota: payload.fecha,
