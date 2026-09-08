@@ -180,6 +180,13 @@ module Dispensario
       escala = escala.includes(:cerrado_por, :abierto_por, :caja_turno, items: :stock)
                      .order(cerrado_at: :desc)
 
+      # LA LISTA DE TRABAJO VIVE ACÁ, no en otra solapa.
+      #
+      # «Para mirar» era esta misma lista, filtrada, viviendo en Merma con otro nombre: dos listas
+      # de cierres en dos lugares, y la que decía qué hacer estaba en la solapa de análisis. Acá
+      # es un filtro, que es lo que siempre fue.
+      escala = escala.where(revisado_at: nil).where(id: turnos_que_piden_mirada) if params[:sin_revisar].present?
+
       # DESCARGA: el historial de arqueos es lo que se le muestra a un contador o a un socio, y
       # eso no se hace leyendo una pantalla. Sin tope de páginas: se baja todo lo que haya.
       return enviar_csv(escala) if params[:formato] == 'csv'
@@ -197,6 +204,8 @@ module Dispensario
         pagina:   pagina,
         paginas:  [(total / por.to_f).ceil, 1].max,
         total:    total,
+        # Cuántos piden una mirada, para que el filtro pueda decirlo sin pedir otra vuelta.
+        sin_revisar: gestiona? ? turnos_sin_revisar : 0,
       }
     end
 
@@ -317,6 +326,14 @@ module Dispensario
 
     # El badge de la solapa Merma. Las razones viven en `Mostradores::MotivosDeRevision` — acá NO
     # se decide qué cuenta como pendiente, sólo se cuenta.
+    # Los ids de los cierres que piden una mirada. Sale del MISMO servicio que el badge y que la
+    # solapa de merma: si el filtro decidiera por su cuenta qué cuenta como "para mirar", un día
+    # el badge diría 2 y la lista mostraría otra cosa.
+    def turnos_que_piden_mirada
+      candidatos = @mostrador.turno_mostradores.cerrados.where(revisado_at: nil)
+      Mostradores::MotivosDeRevision.por_turno(candidatos).keys
+    end
+
     def turnos_sin_revisar
       candidatos = @mostrador.turno_mostradores.cerrados.where(revisado_at: nil)
       Mostradores::MotivosDeRevision.por_turno(candidatos).size
@@ -416,14 +433,6 @@ module Dispensario
         # y cuánto hay guardado en el depósito.
         costo_ars:  (stock.costo_unitario_ars&.to_f if gestiona?),
         disponible: (stock.cantidad_disponible_real.to_f if gestiona?),
-        # LO QUE SE PUEDE ENTREGAR DE ESTE PRODUCTO, esté sobre la mesa o guardado: el frasco
-        # menos lo que ya tiene dueño. Es EL MISMO número que el carrito de la dispensa
-        # (`disponible_para_entregar`) — si acá significara otra cosa, la misma palabra diría dos
-        # verdades en dos pantallas de la misma app.
-        #
-        # Junto a `disponible` (lo que queda para subir) y `reservado`, cierra la cuenta: lo que
-        # está guardado, lo que está arriba, lo que tiene dueño y lo que se puede vender.
-        libre: (stock.disponible_para_entregar.to_f if gestiona?),
         # A quien atiende no le decimos CUÁNTO hay guardado —no es asunto suyo— pero sí si queda
         # algo, que es lo único que necesita para saber si tiene sentido pedir reposición. Pedir
         # lo que no hay es hacerle perder el viaje a los dos.
@@ -476,6 +485,12 @@ module Dispensario
                 filename: "arqueos-#{@mostrador.sede&.nombre.to_s.parameterize}-#{Time.zone.today}.csv"
     end
 
+    # Una consulta para toda la página, no una por fila.
+    def motivos_de_revision
+      @motivos_de_revision ||=
+        Mostradores::MotivosDeRevision.por_turno(@mostrador.turno_mostradores.cerrados.where(revisado_at: nil))
+    end
+
     def hora_corta(t) = t&.in_time_zone&.strftime('%H:%M')
 
     def serialize_turno_resumen(turno)
@@ -488,6 +503,9 @@ module Dispensario
         cerrado_por: turno.cerrado_por&.nombre_completo,
         atendio:     turno.abierto_por&.nombre_completo,
         revisado:    turno.revisado_at.present?,
+        # POR QUÉ ESTE CIERRE PIDE UNA MIRADA. Un renglón que no lo dice obliga a abrirlo para
+        # descubrir que no era nada. Viene del mismo servicio que el badge y que la merma.
+        motivos_revision: motivos_de_revision[turno.id] || [],
         productos:   items.size,
         dispensado:  items.sum { |it| it.cantidad_dispensada.to_d }.to_f.round(2),
         # EN PLATA, porque en cantidad no se compara con nada: sumar gramos de flor con unidades

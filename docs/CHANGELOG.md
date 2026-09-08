@@ -1,5 +1,48 @@
 # Changelog
 
+## Septiembre 2026 (ar) — la solapa de Merma: una línea y una lista
+
+Germán, mirándola en producción: *"sigue sin ser intuitiva, simple, sencilla... me gusta toda esta
+parte pero siento que algo no está bien, lo siento sucio, con ruido"*.
+
+El diagnóstico: **había más texto explicando la pantalla que datos en la pantalla.** Título,
+subtítulo, 4 chips de período, un cuadro de veredicto de 3 líneas, "Para mirar" con 2 líneas de
+explicación, tarjetas con 5 chips y 4 botones, "Dónde se va" con 3 chips más, 2 líneas explicando
+el orden, y una tabla de 5 columnas — para **2 cierres**. Y las dos frases más largas estaban
+defendiendo decisiones de diseño ("No es una lista de sospechosos…", "Ordenado por porcentaje, no
+por cantidad…"). Una pantalla que necesita defender su propio orden no es evidente.
+
+**EL NÚMERO PRIMERO, SIEMPRE.** El cuadro arrancaba diciendo *"esta semana se entregó poco (0),
+con ese volumen el porcentaje no dice nada"* con los **$27.636 que faltaban** abajo, en gris y
+monoespaciado: la pantalla declarándose muda encima del único dato que importaba. Ahora el titular
+es `Faltaron $10.000 en 1 cierre.` o `Cuadró todo. 12 cierres.`, y la comparación contra el
+historial va debajo, en chico, **sólo cuando dice algo** — un `–%` no es información.
+
+**«PARA MIRAR» SE MUDÓ A CIERRES**, donde están los cierres. Era la misma lista, filtrada, con
+otro nombre y viviendo en la solapa de análisis: dos listas de lo mismo en dos lugares. Ahora es
+un filtro (`Todos` / `Para mirar N`) con el chip del motivo en la fila y el botón "Ya lo miré" al
+lado de "Corregir conteo". **Un chip, el que manda**: tres juntos obligan a leer los tres para
+saber cuál importa, y el resto se ve entrando al cierre. Y en castellano — "Contó de más — no se
+cargó al inventario" describía la implementación.
+
+**LA TABLA DE CINCO COLUMNAS SE FUE.** `% · vs promedio · Faltó · A costo · Entregado` eran cinco
+números sin sujeto —Germán preguntó qué era "Entregado" (el denominador del %)— y con la mesa
+parada **todas** las celdas decían `–%` y `0 g`. Ahora son filas de dos líneas **ordenadas por
+plata**, que es lo único comparable entre productos y que existe siempre: el porcentaje desaparece
+cuando no se vendió nada, y ordenar por él dejaba el orden sin hacer nada. El % pasó a ser
+contexto de la fila, así que no puede quedar una columna llena de guiones.
+
+**Y APARECIÓ UN HALLAZGO QUE LA TABLA NO SABÍA DECIR:** faltar 23 g de un producto con CERO
+entregado no es merma —merma es lo que se pierde vendiendo— es producto que desapareció sin
+venderse. La fila ahora lo dice: *"1 cierre · no se entregó nada de esto en el período"*.
+
+**Verificado renderizado** con un cierre con faltante creado a propósito: **cero `–%` en pantalla**,
+sin tabla vieja, sin "Para mirar", y la lista de trabajo respondiendo en Cierres.
+
+De paso: **se sacó la columna `Libre` de la mesa** (bloque anterior). Era `Depósito − Reservado` y
+con la mesa vacía —que es casi toda la tabla— daba exactamente lo mismo que Depósito: una columna
+repetida en 20 de 21 filas es ruido, no información.
+
 ## Septiembre 2026 (aq) — la mesa, leída por alguien que no la escribió
 
 Tres cosas que aparecieron mirando la pantalla en producción, y las tres son de LECTURA: el dato

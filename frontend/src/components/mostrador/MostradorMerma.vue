@@ -35,28 +35,20 @@
 
     <template v-else>
       <!-- ══ ① ¿CÓMO VIENE? ════════════════════════════════════════════════════
-           Un porcentaje solo no dice nada: 3% puede ser normal fraccionando flor y un
-           escándalo en aceite. Acá va el veredicto en castellano, con el mismo criterio que
-           dispara el aviso automático — que existía en el job y esta pantalla ignoraba. -->
-      <section v-if="veredicto" class="mrm__veredicto" :class="`mrm__veredicto--${tono}`">
-        <div class="mrm__ver-texto">
-          <p class="mrm__ver-frase">{{ frase }}</p>
-          <p v-if="veredicto.motor" class="mrm__ver-motor">
-            La está moviendo <b>{{ veredicto.motor.producto }}</b>:
-            faltaron {{ fmt(veredicto.motor.faltante) }} {{ veredicto.motor.unidad }}
-            (${{ fmt(veredicto.motor.faltante_ars) }}) en la semana.
-          </p>
-          <p class="mrm__ver-pie">
-            En el período elegido: {{ merma.resumen.merma_pct ?? '—' }}% de lo entregado ·
-            ${{ fmt(merma.resumen.faltante_ars) }} a costo · {{ merma.resumen.turnos }}
-            {{ merma.resumen.turnos === 1 ? 'cierre' : 'cierres' }}.
-          </p>
-        </div>
+           EL NÚMERO PRIMERO, SIEMPRE. Acá había un cuadro que arrancaba diciendo «con ese
+           volumen el porcentaje no dice nada» y abajo, en gris y monoespaciado, los $27.636 que
+           faltaban. La pantalla declarándose muda encima del único dato que importaba.
+           El porcentaje es una aclaración, no el titular: cuando no se puede calcular —no se
+           entregó nada— no queda un «–%», simplemente no se dice. -->
+      <section class="mrm__estado" :class="`mrm__estado--${tono}`">
+        <p class="mrm__estado-frase">{{ titular }}</p>
+        <p v-if="aclaracion" class="mrm__estado-sub">{{ aclaracion }}</p>
+        <p v-if="veredicto && veredicto.motor" class="mrm__estado-sub">
+          La está moviendo <b>{{ veredicto.motor.producto }}</b>:
+          faltaron {{ fmt(veredicto.motor.faltante) }} {{ veredicto.motor.unidad }}
+          (${{ fmt(veredicto.motor.faltante_ars) }}) en la semana.
+        </p>
 
-        <!-- LA TENDENCIA, que es lo que contesta "¿viene subiendo?". El total del período no lo
-             dice, y hasta ahora la única forma de saberlo era cambiar el rango a mano y
-             acordarse del número anterior. Por semana y no por día: un mostrador cierra una o
-             dos veces por jornada y en días la mitad de las barras serían cero. -->
         <div v-if="serie.length > 1" class="mrm__tendencia">
           <div class="mrm__barras">
             <div v-for="s in serie" :key="s.semana" class="mrm__barra-col"
@@ -69,46 +61,6 @@
         </div>
       </section>
 
-      <!-- ══ ② LO QUE HAY QUE MIRAR ════════════════════════════════════════════
-           Se termina —se mira, se marca y desaparece—; lo de abajo se consulta. Mezclados, la
-           lista de trabajo quedaba enterrada entre tres tablas y no se hacía nunca. -->
-      <h2 class="mrm__seccion">
-        Para mirar
-        <span v-if="pendientes.length" class="mrm__contador">{{ pendientes.length }}</span>
-      </h2>
-      <template v-if="pendientes.length">
-        <p class="mrm__seccion-sub">
-          Cierres donde pasó algo que conviene mirar. No es una lista de sospechosos: se mira, se
-          marca y se archiva.
-        </p>
-        <ul class="mrm__pendientes">
-          <li v-for="t in pendientes" :key="t.id" class="mrm__pendiente">
-            <div class="mrm__pendiente-info">
-              <span class="mrm__pendiente-quien">
-                {{ t.atendio || t.cerrado_por || 'Alguien' }}
-                <em class="mrm__pendiente-cuando">· {{ fecha(t.cerrado_at) }}</em>
-              </span>
-              <span class="mrm__pendiente-motivos">
-                <span v-for="m in t.motivos_revision" :key="m" class="mrm__pill" :class="`mrm__pill--${PILL[m]}`">
-                  {{ MOTIVO[m] }}
-                </span>
-                <span v-if="t.faltante > 0" class="mrm__pendiente-num">
-                  faltaron {{ fmt(t.faltante) }} · ${{ fmt(t.faltante_ars) }}
-                </span>
-              </span>
-              <span v-if="t.motivos.length" class="mrm__pendiente-motivo">{{ t.motivos.join(' · ') }}</span>
-            </div>
-            <div class="mrm__pendiente-acc">
-              <button class="mrm__btn mrm__btn--mini" @click="revisar(t)">Ya lo miré</button>
-              <button class="mrm__btn mrm__btn--mini mrm__btn--ghost" @click="corrigiendo = t">
-                Corregir conteo
-              </button>
-            </div>
-          </li>
-        </ul>
-      </template>
-      <p v-else class="mrm__nada">Nada pendiente de mirar en este período.</p>
-
       <!-- ══ ③ ¿DÓNDE SE VA? ═══════════════════════════════════════════════════
            UNA tabla con un corte a la vez, no tres apiladas con las mismas columnas: había que
            elegir cuál mirar antes de saber qué se estaba buscando. -->
@@ -120,61 +72,31 @@
         </div>
         <button class="mrm__btn mrm__btn--mini mrm__btn--ghost" @click="bajarCsv">Bajar CSV</button>
       </div>
-      <p class="mrm__seccion-sub">{{ cortes.find(c => c.id === corte)?.nota }}</p>
 
-      <div class="mrm__table-wrap">
-        <table class="mrm__table tabla-cards">
-          <thead>
-            <tr>
-              <th>{{ encabezado }}</th>
-              <th class="mrm__th-num">%</th>
-              <th v-if="conPromedio" class="mrm__th-num">vs promedio</th>
-              <th class="mrm__th-num">Faltó</th>
-              <th class="mrm__th-num">A costo</th>
-              <th class="mrm__th-num">Entregado</th>
-              <th v-if="corte === 'turno'" class="mrm__th-acc"></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="f in filas" :key="f.clave">
-              <td :data-col="encabezado">
-                <div class="mrm__prod">{{ f.titulo }}</div>
-                <div v-if="f.meta" class="mrm__prod-meta">
-                  <span class="mrm__td-mut">{{ f.meta }}</span>
-                  <span v-for="m in f.chips" :key="m" class="mrm__pill" :class="`mrm__pill--${PILL[m] || 'info'}`">
-                    {{ MOTIVO[m] || m }}
-                  </span>
-                </div>
-              </td>
-              <!-- El % primero y con peso: es el número que manda. Un ranking por gramos siempre
-                   encabeza con lo que más se vende y no dice nada. -->
-              <td class="mrm__td-num" data-col="%"><span class="mrm__pct">{{ f.pct ?? '—' }}%</span></td>
-              <!-- EL NÚMERO QUE DICE DÓNDE AJUSTAR: contra el promedio del mismo mostrador en el
-                   mismo período. Un porcentaje solo mide cuánto se vendió tanto como cuánto se
-                   perdió. En puntos y no en veces: "el doble" de 0,2% no es nada. -->
-              <td v-if="conPromedio" class="mrm__td-num" data-col="vs promedio">
-                <span v-if="f.contra == null" class="mrm__td-mut">—</span>
-                <span v-else class="mrm__delta" :class="claseDelta(f)">
-                  {{ f.contra > 0 ? '+' : '' }}{{ fmt(f.contra) }} pts
-                </span>
-              </td>
-              <td class="mrm__td-num mrm__td-mut" data-col="Faltó">{{ fmt(f.faltante) }} {{ f.unidad }}</td>
-              <td class="mrm__td-num mrm__td-mut" data-col="A costo">${{ fmt(f.ars) }}</td>
-              <td class="mrm__td-num mrm__td-mut" data-col="Entregado">{{ fmt(f.dispensado) }} {{ f.unidad }}</td>
-              <td v-if="corte === 'turno'" class="mrm__td-acc" data-col="">
-                <span v-if="f.turno.revisado" class="mrm__pill mrm__pill--ok">Visto</span>
-                <button v-else class="mrm__btn mrm__btn--mini" @click="revisar(f.turno)">Ya lo miré</button>
-                <button class="mrm__btn mrm__btn--mini mrm__btn--ghost mrm__btn--corregir"
-                        @click="corrigiendo = f.turno">Corregir conteo</button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <p v-if="!filas.length" class="mrm__nada">No falta nada en este período.</p>
+
+      <!-- FILAS DE DOS LÍNEAS, NO UNA TABLA DE CINCO COLUMNAS.
+           Era «% · vs promedio · Faltó · A costo · Entregado»: cinco números sin sujeto, y
+           «Entregado» nadie sabía qué era (es el denominador del %). Con la mesa parada, todas
+           las celdas decían «–%» y «0 g» — una tabla entera de guiones.
+           Ahora manda LA PLATA, que es lo único comparable entre productos y que existe siempre:
+           el porcentaje desaparece cuando no se vendió nada, y ordenar por él dejaba el orden
+           sin hacer nada. Se cae también la frase que defendía el criterio: ordenar por plata no
+           necesita explicación. -->
+      <ul v-else class="mrm__filas">
+        <li v-for="f in filas" :key="f.clave" class="mrm__fila">
+          <div class="mrm__fila-txt">
+            <span class="mrm__fila-titulo">{{ f.titulo }}</span>
+            <span class="mrm__fila-sub">{{ f.contexto }}</span>
+          </div>
+          <div class="mrm__fila-num">
+            <span class="mrm__fila-ars">${{ fmt(f.ars) }}</span>
+            <span class="mrm__fila-cant">{{ fmt(f.faltante) }} {{ f.unidad }}</span>
+          </div>
+        </li>
+      </ul>
     </template>
 
-    <CorregirConteo v-if="corrigiendo" :sede-id="sedeId" :turno="corrigiendo"
-                    @cerrar="corrigiendo = null" @corregido="cargar" />
   </div>
 </template>
 <script setup>
@@ -196,8 +118,7 @@
 // pantalla no lo usaba: le llegaba el mail diciendo "algo cambió", entraba a mirar, y acá no
 // decía nada de eso.
 import { ref, computed, watch } from 'vue'
-import CorregirConteo from './CorregirConteo.vue'
-import { getMermaMostrador, revisarTurnoMostrador } from '../../lib/api.js'
+import { getMermaMostrador } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
 const props = defineProps({
@@ -211,7 +132,6 @@ const toast    = useToast()
 const merma    = ref(null)
 const cargando = ref(false)
 const todasLasSedes = ref(false)
-const corrigiendo   = ref(null)
 const corte    = ref('producto')
 const periodo  = ref('mes')
 // El rango arranca VACÍO y lo completa el backend con el mes en curso en SU zona horaria.
@@ -231,57 +151,47 @@ const PERIODOS = [
   { id: 'd90',  label: '90 días',    dias: 90 },
 ]
 
-// Las razones por las que un turno entra a la lista, con el nombre que usa la gente. Un renglón
-// que no dice qué mirar obliga a abrirlo para descubrir que no era nada — y una razón sin
-// etiqueta acá se dibuja como un chip vacío, que es peor todavía.
-const MOTIVO = { faltante: 'Faltó producto', sobrante: 'Contó de más — no se cargó al inventario',
-                 corregido: 'Se corrigió al abrir',
-                 mesa_movida: 'Se movió la mesa con la caja abierta',
-                 // Del corte por persona: la letra chica que evita leer mal el número de al lado.
-                 pocos_turnos: 'Pocos cierres: todavía no alcanza para concluir',
-                 cerro_otro: 'Algún cierre lo hizo otra persona' }
-const PILL   = { faltante: 'warn', sobrante: 'warn', corregido: 'info', mesa_movida: 'info',
-                 pocos_turnos: 'info', cerro_otro: 'info' }
-
-// Se pinta sólo cuando hay con qué concluir: un +8 pts de una persona con un turno es ruido, y
-// pintarlo de ámbar lo convierte en una acusación fundada en nada.
-function claseDelta (f) {
-  if (!f.chips || f.chips.includes('pocos_turnos')) return 'is-mudo'
-  if (f.contra > 0) return 'is-alto'
-  return 'is-bajo'
-}
-
-// Lo que todavía no miró nadie Y tiene algo para mirar.
-const pendientes = computed(() =>
-  (merma.value?.por_turno || []).filter(t => !t.revisado && t.motivos_revision?.length)
-)
-
 const veredicto = computed(() => merma.value?.veredicto || null)
 const serie     = computed(() => merma.value?.serie || [])
 
 // El tono acompaña, no grita: la merma es inevitable y no es culpa de nadie. Rojo no hay.
 const tono = computed(() => ({ subio: 'alerta', normal: 'ok' })[veredicto.value?.estado] || 'mudo')
 
-// LA FRASE. Es lo primero que se lee y tiene que contestar sola "¿estoy bien o mal?".
-const frase = computed(() => {
+// EL TITULAR: ARRANCA POR EL NÚMERO, SIEMPRE.
+//
+// Antes la frase empezaba por el veredicto —«se entregó poco (0), el porcentaje no dice nada»—
+// con la plata faltante escondida en un pie gris. La pantalla se declaraba muda encima del único
+// dato que importaba. Ahora el hecho va primero y el veredicto es la línea de abajo.
+const faltanteArs = computed(() => Number(merma.value?.resumen?.faltante_ars) || 0)
+const cierres     = computed(() => Number(merma.value?.resumen?.turnos) || 0)
+
+const titular = computed(() => {
+  const m = merma.value
+  if (!m) return ''
+  const n = `${cierres.value} ${cierres.value === 1 ? 'cierre' : 'cierres'}`
+  if (!faltanteArs.value) return `Cuadró todo. ${n} en este período.`
+  return `Faltaron $${fmt(faltanteArs.value)} en ${n}.`
+})
+
+// La comparación contra el historial, que es lo que contesta «¿viene subiendo?». Va DEBAJO del
+// número y sólo cuando dice algo: un «–%» no es información, es una celda vacía con formato.
+const aclaracion = computed(() => {
   const v = veredicto.value
   if (!v) return ''
   const semanas = v.semanas_previas || 8
   switch (v.estado) {
     case 'subio':
-      return `La merma subió a ${v.pct}% esta semana, contra ${v.pct_previo}% de las últimas ` +
-             `${semanas} semanas. Conviene mirar qué la está moviendo.`
+      return `Subió a ${v.pct}% esta semana, contra ${v.pct_previo}% de las últimas ${semanas} ` +
+             'semanas. Conviene mirar qué la está moviendo.'
     case 'normal':
       return `${v.pct}% esta semana: como viene siempre acá (${v.pct_previo}% en las últimas ` +
              `${semanas} semanas).`
     case 'poco_volumen':
-      return `Esta semana se entregó poco (${fmt(v.dispensado)}). Con ese volumen el porcentaje ` +
-             'no dice nada: cualquier gramo se ve enorme.'
+      return 'Todavía es poco volumen para comparar contra tu historial.'
     case 'sin_historia':
-      return 'Todavía no hay con qué comparar: hacen falta unas semanas de cierres para ' +
-             'saber qué es lo normal en este mostrador.'
+      return 'Todavía no hay con qué comparar: hacen falta unas semanas de cierres.'
     default:
-      return 'No hubo cierres esta semana, así que no hay nada nuevo que comparar.'
+      return ''
   }
 })
 
@@ -292,68 +202,79 @@ const topeSerie = computed(() =>
 )
 const alto = (s) => `${Math.max(((Number(s.merma_pct) || 0) / topeSerie.value) * 100, 3)}%`
 
+// LOS CORTES, sin «Cierre por cierre»: eso ES la solapa Cierres, con su filtro «Para mirar» y su
+// botón de corregir. Tenerlo también acá eran dos listas de lo mismo en dos lugares.
+//
+// Y sin las notas de tres renglones que explicaban cada corte: eran texto defendiendo el diseño.
+// Lo que hay que saber para no leer mal el corte por persona viaja EN LA FILA (los cierres que
+// tiene, y si son pocos), que es donde se lo mira.
 const cortes = computed(() => [
-  { id: 'producto', label: 'Por producto',
-    nota: 'Ordenado por porcentaje, no por cantidad: lo que más se vende siempre encabeza un ' +
-          'ranking de gramos y eso no dice nada.' },
-  ...(merma.value?.por_sede?.length
-    ? [{ id: 'sede', label: 'Por sede',
-         nota: 'Si en una se pierde el triple que en otra con el mismo producto, el problema no ' +
-               'es la merma: es algo de esa sede, y hasta que no se ponen al lado no se ve.' }]
-    : []),
-  { id: 'persona', label: 'Por persona',
-    nota: 'Cada uno contra el promedio del período en este mostrador, no contra un número suelto: ' +
-          'quien más volumen mueve encabeza siempre un ranking pelado, y quien fracciona flor ' +
-          'pierde más que quien entrega prerolls. Con menos de 3 cierres no alcanza para concluir.' },
-  { id: 'turno', label: 'Cierre por cierre',
-    nota: 'Cada cierre, del más reciente al más viejo. Es donde se corrige un conteo mal cargado.' },
+  { id: 'producto', label: 'Por producto' },
+  ...(merma.value?.por_sede?.length ? [{ id: 'sede', label: 'Por sede' }] : []),
+  { id: 'persona', label: 'Por persona' },
 ])
 
 const encabezado = computed(() =>
   ({ producto: 'Producto', sede: 'Sede', turno: 'Cerró', persona: 'Atendió' })[corte.value]
 )
 
-// Sólo el corte por persona muestra la comparación contra el promedio: en los otros, comparar
-// una sede contra el promedio de todas las sedes sería compararla contra sí misma.
-const conPromedio = computed(() => corte.value === 'persona')
-
-// Las tres vistas se normalizan a la MISMA fila: si cada corte armara su tabla, volveríamos a
-// tener tres tablas que se contradicen en las columnas.
+// Los cortes se normalizan a LA MISMA FILA: título, contexto en castellano, plata y cantidad.
+//
+// `contexto` es la segunda línea y es donde vive todo lo que antes eran columnas de números sin
+// sujeto. Ahí va el porcentaje —pero SÓLO cuando se puede calcular— y ahí aparece el hallazgo que
+// la tabla vieja no sabía decir: faltar 23 g de algo con CERO entregado no es merma, es producto
+// que desapareció sin venderse, y es más urgente que cualquier porcentaje.
+//
+// ORDENADAS POR PLATA. Es lo único comparable entre productos y que existe siempre: el porcentaje
+// desaparece cuando no se vendió nada, y ordenar por él dejaba el orden sin hacer nada.
 const filas = computed(() => {
   const m = merma.value
   if (!m) return []
+
+  const cierres = (n) => `${n} ${n === 1 ? 'cierre' : 'cierres'}`
+  // Cuánto se entregó de esto, y qué proporción se fue. Con 0 entregado no hay porcentaje que
+  // valga: se dice lo que pasó de verdad.
+  const sobreLoEntregado = (f) => {
+    const d = Number(f.dispensado) || 0
+    if (!d) return 'no se entregó nada de esto en el período'
+    const pct = f.merma_pct ?? f.pct
+    return `sobre ${fmt(d)} ${f.unidad || ''} entregados${pct != null ? ` (${pct}%)` : ''}`.replace('  ', ' ')
+  }
+
+  let lista
   if (corte.value === 'sede') {
-    return (m.por_sede || []).map(s => ({
-      clave: `s${s.sede_id}`, titulo: s.sede, meta: `${s.turnos} cierres`, chips: [],
-      pct: s.merma_pct, faltante: s.faltante, ars: s.faltante_ars, dispensado: s.dispensado,
-      unidad: '',
+    lista = (m.por_sede || []).map(x => ({
+      clave: `s${x.sede_id}`, titulo: x.sede, unidad: '',
+      faltante: x.faltante, ars: x.faltante_ars,
+      contexto: `${cierres(x.turnos)} · ${sobreLoEntregado(x)}`,
+    }))
+  } else if (corte.value === 'persona') {
+    lista = (m.por_persona || []).map(x => ({
+      clave: `u${x.usuario_id}`, titulo: x.persona, unidad: '',
+      faltante: x.faltante, ars: x.faltante_ars,
+      // LO QUE EVITA LEER MAL EL NÚMERO, en la misma línea y en castellano: quien más volumen
+      // mueve encabeza siempre, y con pocos cierres no hay conclusión posible.
+      contexto: [
+        cierres(x.turnos),
+        sobreLoEntregado(x),
+        x.suficientes && x.contra_promedio != null
+          ? `${x.contra_promedio > 0 ? '+' : ''}${fmt(x.contra_promedio)} pts contra el promedio de acá`
+          : 'todavía son pocos cierres para concluir',
+        x.cerro_otro ? 'algún cierre lo hizo otra persona' : null,
+      ].filter(Boolean).join(' · '),
+    }))
+  } else {
+    lista = (m.por_producto || []).map(x => ({
+      clave: `p${x.producto}`, titulo: x.producto, unidad: x.unidad,
+      faltante: x.faltante, ars: x.faltante_ars,
+      contexto: `${cierres(x.turnos)} · ${sobreLoEntregado(x)}`,
     }))
   }
-  if (corte.value === 'persona') {
-    return (m.por_persona || []).map(p => ({
-      clave: `u${p.usuario_id}`, titulo: p.persona,
-      meta: `${p.turnos} ${p.turnos === 1 ? 'cierre' : 'cierres'}`,
-      chips: [
-        ...(p.suficientes ? [] : ['pocos_turnos']),
-        ...(p.cerro_otro ? ['cerro_otro'] : []),
-      ],
-      pct: p.merma_pct, contra: p.contra_promedio, faltante: p.faltante, ars: p.faltante_ars,
-      dispensado: p.dispensado, unidad: '',
-    }))
-  }
-  if (corte.value === 'turno') {
-    return (m.por_turno || []).map(t => ({
-      clave: `t${t.id}`, titulo: fecha(t.cerrado_at), meta: t.cerrado_por,
-      chips: t.motivos_revision || [],
-      pct: t.merma_pct, faltante: t.faltante, ars: t.faltante_ars, dispensado: t.dispensado,
-      unidad: '', turno: t,
-    }))
-  }
-  return (m.por_producto || []).map(p => ({
-    clave: `p${p.producto}`, titulo: p.producto, meta: `${p.turnos} cierres`, chips: [],
-    pct: p.merma_pct, faltante: p.faltante, ars: p.faltante_ars, dispensado: p.dispensado,
-    unidad: p.unidad,
-  }))
+
+  // Sin las filas en cero: en una lista de «dónde se va», un renglón que no se fue a ningún lado
+  // es una fila que hay que leer para descartar.
+  return lista.filter(f => Number(f.ars) > 0 || Number(f.faltante) > 0)
+              .sort((a, b) => (Number(b.ars) || 0) - (Number(a.ars) || 0))
 })
 
 const fmt = (n) => Number(n ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })
@@ -387,6 +308,9 @@ async function cargar () {
     // El backend contesta con el rango que efectivamente usó: los campos lo muestran.
     if (data.rango) rango.value = { desde: data.rango.desde, hasta: data.rango.hasta }
     if (corte.value === 'sede' && !data.por_sede?.length) corte.value = 'producto'
+    // «Cierre por cierre» se mudó a la solapa Cierres: si quedó elegido de una sesión anterior,
+    // vuelve al corte por producto en vez de dejar la lista vacía sin decir por qué.
+    if (corte.value === 'turno') corte.value = 'producto'
   } catch (e) {
     toast.error(e?.response?.data?.error || 'No se pudo calcular la merma.')
   } finally {
@@ -397,15 +321,11 @@ async function cargar () {
 // Se baja EL CORTE QUE SE ESTÁ MIRANDO, no un archivo con todo: quien lo abre ya eligió la
 // pregunta acá adentro. Se arma en el navegador con lo que ya está en pantalla — pedirle al
 // backend un CSV de lo mismo sería otro endpoint que mantener sincronizado.
+// EL CSV SÍ LLEVA LOS NÚMEROS SUELTOS. Lo abre alguien que va a analizar, no a leer de un
+// vistazo: ahí las columnas separadas sirven, y en la pantalla eran cinco cifras sin sujeto.
 function bajarCsv () {
-  const cab = [encabezado.value, 'Detalle', '%',
-               ...(conPromedio.value ? ['vs promedio (pts)'] : []),
-               'Falto', 'A costo ($)', 'Entregado']
-  const filasCsv = filas.value.map(f => [
-    f.titulo, f.meta || '', f.pct ?? '',
-    ...(conPromedio.value ? [f.contra ?? ''] : []),
-    f.faltante, f.ars, f.dispensado,
-  ])
+  const cab = [encabezado.value, 'Contexto', 'A costo ($)', 'Falto']
+  const filasCsv = filas.value.map(f => [f.titulo, f.contexto, f.ars, f.faltante])
   const csv = [cab, ...filasCsv]
     .map(fila => fila.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(';'))
     .join('\n')
@@ -417,13 +337,7 @@ function bajarCsv () {
   URL.revokeObjectURL(url)
 }
 
-async function revisar (t) {
-  try {
-    await revisarTurnoMostrador(props.sedeId, t.id)
-    t.revisado = true
-    emit('sin-revisar', pendientes.value.length)
-  } catch { toast.error('No se pudo marcar como revisado.') }
-}
+
 
 // Cambiar de sede recalcula: si no, se veían números de la sede anterior que parecen de esta.
 watch(() => props.sedeId, () => { merma.value = null; cargar() }, { immediate: true })
@@ -445,20 +359,6 @@ watch(() => props.sedeId, () => { merma.value = null; cargar() }, { immediate: t
 .mrm__nada  { margin: 0 0 6px; font-size: var(--fs-14); color: var(--c-leaf-700); }
 
 /* ── Lista de trabajo ───────────────────────────────────────────────────────── */
-.mrm__pendientes { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.mrm__pendiente {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
-  background: #fff; border: 1px solid var(--c-amber-100); border-left: 3px solid var(--c-amber-500);
-  border-radius: 11px; padding: 13px 16px;
-}
-.mrm__pendiente-info   { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
-.mrm__pendiente-quien  { font-size: var(--fs-14); font-weight: 600; color: var(--c-ink-900); }
-.mrm__pendiente-cuando { font-style: normal; font-weight: 400; color: var(--c-ink-500); }
-.mrm__pendiente-motivos { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-.mrm__pendiente-num    { font-family: var(--font-mono); font-size: var(--fs-12); color: var(--c-ink-500); }
-.mrm__pendiente-motivo { font-size: var(--fs-12); color: var(--c-ink-500); }
-.mrm__pendiente-acc    { display: flex; gap: 8px; flex-shrink: 0; }
-
 /* ── Análisis ───────────────────────────────────────────────────────────────── */
 .mrm__kpis { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 24px; }
 .mrm__kpi {
@@ -477,36 +377,7 @@ watch(() => props.sedeId, () => { merma.value = null; cargar() }, { immediate: t
   font-family: var(--font-display); font-size: var(--fs-16); font-weight: 700;
   color: var(--c-leaf-900); margin: 26px 0 2px;
 }
-.mrm__seccion-sub { margin: 0 0 12px; font-size: var(--fs-13); color: var(--c-ink-500); max-width: 60ch; }
-
-.mrm__table-wrap {
-  background: #fff; border: 1px solid var(--c-slate-200);
-  border-radius: 14px; overflow-x: auto;
-}
-.mrm__table { width: 100%; border-collapse: collapse; }
-.mrm__table th {
-  text-align: left; font-size: var(--fs-12); font-weight: 600; text-transform: uppercase;
-  letter-spacing: .04em; color: var(--c-ink-500);
-  padding: 13px 16px; border-bottom: 1px solid var(--c-slate-200); white-space: nowrap;
-}
-.mrm__table td { padding: 14px 16px; border-bottom: 1px solid var(--c-slate-100); vertical-align: middle; }
-.mrm__table tbody tr:last-child td { border-bottom: 0; }
-
-.mrm__th-num, .mrm__td-num { text-align: right; }
-.mrm__th-acc, .mrm__td-acc { text-align: right; white-space: nowrap; }
-.mrm__td-mut { color: var(--c-ink-500); font-size: var(--fs-13); font-family: var(--font-mono); }
-.mrm__prod { font-size: var(--fs-14); font-weight: 600; color: var(--c-ink-900); }
-.mrm__prod-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 5px; }
-.mrm__pct { font-family: var(--font-mono); font-weight: 600; color: var(--c-ink-900); }
 .mrm__unidad { font-size: var(--fs-12); color: var(--c-ink-500); margin-left: 3px; }
-
-.mrm__pill {
-  display: inline-block; padding: 2px 8px; border-radius: 999px;
-  font-size: var(--fs-12); font-weight: 600;
-}
-.mrm__pill--ok   { background: var(--c-leaf-100);  color: var(--c-leaf-700); }
-.mrm__pill--warn { background: var(--c-amber-100); color: var(--c-amber-500); }
-.mrm__pill--info { background: var(--c-sky-100);   color: var(--c-sky-600); }
 
 .mrm__btn {
   border-radius: 9px; padding: 10px 18px; font-size: var(--fs-14); font-weight: 600;
@@ -528,20 +399,7 @@ watch(() => props.sedeId, () => { merma.value = null; cargar() }, { immediate: t
 .mrm__periodo.is-on { background: var(--c-leaf-800); color: #fff; border-color: var(--c-leaf-800); }
 
 /* ── ① El veredicto ─────────────────────────────────────────────────────────── */
-.mrm__veredicto {
-  display: flex; gap: 20px; align-items: center; justify-content: space-between; flex-wrap: wrap;
-  background: #fff; border: 1px solid var(--c-slate-200); border-left: 4px solid var(--c-slate-300);
-  border-radius: 14px; padding: 18px 20px; margin-bottom: 6px;
-}
 /* La merma es inevitable y no es culpa de nadie: ámbar para "mirá esto", nunca rojo. */
-.mrm__veredicto--alerta { border-left-color: var(--c-amber-500); background: var(--c-amber-50, #FFFBEB); }
-.mrm__veredicto--ok     { border-left-color: var(--c-leaf-600); }
-.mrm__veredicto--mudo   { border-left-color: var(--c-slate-300); }
-.mrm__ver-texto  { min-width: 0; flex: 1 1 320px; }
-.mrm__ver-frase  { margin: 0; font-size: var(--fs-16); font-weight: 600; color: var(--c-ink-900); line-height: 1.45; }
-.mrm__ver-motor  { margin: 7px 0 0; font-size: var(--fs-14); color: var(--c-ink-700); }
-.mrm__ver-pie    { margin: 9px 0 0; font-size: var(--fs-12); color: var(--c-ink-500); font-family: var(--font-mono); }
-
 .mrm__tendencia { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
 .mrm__barras    { display: flex; align-items: flex-end; gap: 5px; height: 62px; }
 .mrm__barra-col { display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%; justify-content: flex-end; }
@@ -549,23 +407,35 @@ watch(() => props.sedeId, () => { merma.value = null; cargar() }, { immediate: t
 .mrm__barra-lbl { font-size: 10px; color: var(--c-ink-500); font-family: var(--font-mono); }
 .mrm__tendencia-lbl { font-size: var(--fs-12); color: var(--c-ink-500); }
 
-.mrm__delta { font-family: var(--font-mono); font-weight: 600; }
-.mrm__delta.is-alto { color: var(--c-amber-500); }
-.mrm__delta.is-bajo { color: var(--c-leaf-600); }
-.mrm__delta.is-mudo { color: var(--c-ink-500); font-weight: 400; }
-
 /* ── ③ El corte ─────────────────────────────────────────────────────────────── */
 .mrm__corte {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   flex-wrap: wrap; margin: 4px 0 8px;
 }
-.mrm__contador {
-  display: inline-block; margin-left: 7px; padding: 1px 9px; border-radius: 999px;
-  background: var(--c-amber-100); color: var(--c-amber-500);
-  font-size: var(--fs-13); font-weight: 700; font-family: var(--font-mono);
-}
-
 @media (max-width: 640px) {
-  .mrm__pendiente { flex-direction: column; align-items: stretch; }
 }
+/* ── EL ESTADO: UNA LÍNEA, NO UN CUADRO ────────────────────────────────────────
+   El titular arranca por el número y la comparación va debajo, en chico. Era un cuadro con
+   borde de color que empezaba diciendo que no tenía nada que decir. */
+.mrm__estado { padding: 4px 0 16px; }
+.mrm__estado-frase { margin: 0; font-size: var(--fs-18, 1.05rem); font-weight: 700; color: var(--c-ink-900); line-height: 1.4; }
+.mrm__estado-sub   { margin: 6px 0 0; font-size: var(--fs-13); color: var(--c-ink-500); max-width: 70ch; line-height: 1.5; }
+/* El tono acompaña, no grita: la merma es inevitable y no es culpa de nadie. Rojo no hay. */
+.mrm__estado--alerta .mrm__estado-frase { color: var(--c-amber-700, #b45309); }
+.mrm__estado--ok     .mrm__estado-frase { color: var(--c-ink-900); }
+
+/* ── LAS FILAS: la plata adelante, el resto en castellano abajo ──────────────── */
+.mrm__filas { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.mrm__fila {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+  padding: 12px 0; border-bottom: 1px solid var(--c-slate-100);
+}
+.mrm__fila:last-child { border-bottom: 0; }
+.mrm__fila-txt    { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.mrm__fila-titulo { font-size: var(--fs-14); font-weight: 600; color: var(--c-ink-900); }
+.mrm__fila-sub    { font-size: var(--fs-12); color: var(--c-ink-500); line-height: 1.45; }
+.mrm__fila-num    { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+/* La plata manda: es lo único comparable entre productos y lo que existe siempre. */
+.mrm__fila-ars    { font-family: var(--font-mono); font-size: var(--fs-15, .95rem); font-weight: 700; color: var(--c-ink-900); }
+.mrm__fila-cant   { font-family: var(--font-mono); font-size: var(--fs-12); color: var(--c-ink-500); }
 </style>

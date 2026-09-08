@@ -1,12 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 
-// LA SOLAPA DE MERMA, ORDENADA POR PREGUNTA.
+// LA SOLAPA DE MERMA: UNA LÍNEA Y UNA LISTA.
 //
-// Era cuatro tablas apiladas —sede, producto, turno— con las MISMAS columnas y tres KPIs arriba:
-// había que elegir cuál mirar antes de saber qué se estaba buscando. Y el número principal
-// ("2,4% de lo entregado") no se comparaba con nada, aunque la app ya sabía si eso era mucho o
-// poco: el aviso automático compara contra las ocho semanas anteriores y esta pantalla no lo usaba.
+// Germán, mirándola en producción: "sigue sin ser intuitiva, simple, sencilla... lo siento sucio,
+// con ruido". Tenía razón, y el diagnóstico fue que había más texto explicando la pantalla que
+// datos en la pantalla — dos frases largas defendiendo el orden de una tabla y el nombre de una
+// sección.
+//
+// Tres cosas cambiaron y las tres se prueban acá:
+//   ① EL NÚMERO PRIMERO. El cuadro arrancaba diciendo «con ese volumen el porcentaje no dice
+//      nada» con los $27.636 que faltaban abajo, en gris. La pantalla muda encima del único dato.
+//   ② «PARA MIRAR» SE MUDÓ A CIERRES. Era la misma lista de cierres, filtrada, en otra solapa.
+//   ③ LA TABLA DE 5 COLUMNAS SE FUE. «% · vs promedio · Faltó · A costo · Entregado» eran cinco
+//      números sin sujeto —Germán preguntó qué era «Entregado»— y con la mesa parada TODAS las
+//      celdas decían «–%». Ahora manda la plata, que existe siempre y se compara entre productos.
 
 let respuesta = {}
 const getMermaMostrador     = vi.fn(() => Promise.resolve({ data: respuesta }))
@@ -66,84 +74,117 @@ async function montar (extra = {}, props = {}) {
 beforeEach(() => { getMermaMostrador.mockClear(); revisarTurnoMostrador.mockClear() })
 
 describe('① Cómo viene', () => {
-  // Un porcentaje solo no dice nada: 3% puede ser normal fraccionando flor y un escándalo en
-  // aceite. Lo que importa es que CAMBIÓ respecto del patrón de esta organización.
-  it('lo dice en castellano, con los dos números al lado', async () => {
+  // EL HECHO PRIMERO. Lo que se lee al entrar es cuánto falta, no un veredicto sobre si el
+  // porcentaje es calculable.
+  it('el titular arranca por la plata que falta', async () => {
     const w = await montar()
-
-    const v = w.find('.mrm__ver-frase').text()
-    expect(v).toContain('5.1%')
-    expect(v).toContain('1.2%')
-    expect(v).toContain('8 semanas')
+    expect(w.find('.mrm__estado-frase').text()).toBe('Faltaron $9.000 en 9 cierres.')
   })
 
-  // Sin esto, "subió" manda a mirar tres tablas para encontrar el renglón que ya sabemos cuál es.
+  it('cuando cuadró lo dice, en vez de no decir nada', async () => {
+    const w = await montar({ resumen: { ...BASE.resumen, faltante: 0, faltante_ars: 0 } })
+    expect(w.find('.mrm__estado-frase').text()).toContain('Cuadró todo')
+  })
+
+  // Este es el caso de la captura: se entregó 0, así que no hay porcentaje. Antes el titular
+  // decía «con ese volumen el porcentaje no dice nada» ENCIMA de los pesos faltantes.
+  it('sin volumen para comparar, el número sigue primero y la advertencia va abajo', async () => {
+    const w = await montar({ veredicto: { ...BASE.veredicto, estado: 'poco_volumen', motor: null } })
+
+    expect(w.find('.mrm__estado-frase').text()).toContain('$9.000')
+    expect(w.find('.mrm__estado-sub').text()).toContain('poco volumen')
+  })
+
+  // Un porcentaje solo no dice nada: lo que importa es que CAMBIÓ respecto del patrón de acá.
+  it('la comparación contra el historial va debajo, con los dos números', async () => {
+    const w = await montar()
+    const sub = w.find('.mrm__estado-sub').text()
+    expect(sub).toContain('5.1%')
+    expect(sub).toContain('1.2%')
+    expect(sub).toContain('8 semanas')
+  })
+
   it('y dice qué producto la está moviendo', async () => {
     const w = await montar()
-
-    expect(w.find('.mrm__ver-motor').text()).toContain('Northern Lights')
+    expect(w.text()).toContain('Northern Lights')
   })
 
   it('cuando está como siempre no inventa una alarma', async () => {
     const w = await montar({
       veredicto: { ...BASE.veredicto, estado: 'normal', motor: null, pct: 1.1, pct_previo: 1.2 },
     })
-
-    expect(w.find('.mrm__veredicto').classes()).toContain('mrm__veredicto--ok')
-    expect(w.find('.mrm__ver-motor').exists()).toBe(false)
-  })
-
-  // Quedarse en blanco se lee como que está todo bien.
-  it('y cuando no hay con qué comparar, lo dice', async () => {
-    const w = await montar({ veredicto: { ...BASE.veredicto, estado: 'sin_historia', motor: null } })
-
-    expect(w.find('.mrm__ver-frase').text()).toContain('no hay con qué comparar')
+    expect(w.find('.mrm__estado').classes()).toContain('mrm__estado--ok')
   })
 
   it('dibuja la tendencia semana a semana', async () => {
     const w = await montar()
-
     expect(w.findAll('.mrm__barra')).toHaveLength(2)
   })
 })
 
-describe('② Para mirar', () => {
-  it('lleva el contador en el título: sin número no se sabe si hay trabajo', async () => {
+// ② «Para mirar» ya no vive acá: es un filtro de la solapa Cierres, que es donde están los
+// cierres. Tenerlo en los dos lados eran dos listas de lo mismo con distinto nombre.
+describe('② La lista de trabajo se mudó a Cierres', () => {
+  it('la solapa de merma ya no la muestra', async () => {
     const w = await montar()
-
-    expect(w.find('.mrm__contador').text()).toBe('1')
-    expect(w.find('.mrm__pendiente').text()).toContain('Faltó producto')
+    expect(w.find('.mrm__pendiente').exists()).toBe(false)
+    expect(w.text()).not.toContain('Para mirar')
   })
 
-  it('marcar visto lo saca de la lista y le baja el número a la solapa', async () => {
+  it('ni ofrece corregir un cierre: eso se hace donde se lo mira', async () => {
     const w = await montar()
-    await w.find('.mrm__pendiente .mrm__btn').trigger('click')
-    await flushPromises()
-
-    expect(revisarTurnoMostrador).toHaveBeenCalledWith(10, 7)
-    expect(w.findAll('.mrm__pendiente')).toHaveLength(0)
-    expect(w.emitted('sin-revisar').at(-1)).toEqual([0])
+    expect(w.text()).not.toContain('Corregir conteo')
+    expect(w.findAll('.mrm__cortes .mrm__periodo').map(b => b.text()))
+      .not.toContain('Cierre por cierre')
   })
 })
 
 describe('③ Dónde se va', () => {
-  it('arranca por producto y con el % primero, que es el número que manda', async () => {
+  const filas = (w) => w.findAll('.mrm__fila')
+
+  it('arranca por producto, con la plata adelante y el resto en castellano', async () => {
     const w = await montar()
 
-    expect(w.find('.mrm__table th').text()).toBe('Producto')
-    const ths = w.findAll('.mrm__table th').map(t => t.text())
-    expect(ths[1]).toBe('%')
-    expect(w.find('.mrm__table tbody tr').text()).toContain('Northern Lights')
+    expect(filas(w)).toHaveLength(1)
+    expect(filas(w)[0].find('.mrm__fila-titulo').text()).toContain('Northern Lights')
+    expect(filas(w)[0].find('.mrm__fila-ars').text()).toBe('$5.000')
+    expect(filas(w)[0].find('.mrm__fila-sub').text()).toContain('sobre 1.000 g entregados (5%)')
   })
 
-  // UNA tabla con un corte a la vez, no tres apiladas con las mismas columnas.
-  it('cambiar el corte cambia la misma tabla', async () => {
-    const w = await montar()
-    const botonTurno = w.findAll('.mrm__cortes .mrm__periodo').find(b => b.text() === 'Cierre por cierre')
-    await botonTurno.trigger('click')
+  // EL HALLAZGO QUE LA TABLA VIEJA NO SABÍA DECIR: faltar producto de algo que no se vendió no es
+  // merma, es producto que desapareció. Y era una fila entera de «–%» y «0 g».
+  it('si no se entregó nada, lo dice en vez de mostrar un porcentaje vacío', async () => {
+    const w = await montar({
+      por_producto: [{ producto: 'Critical Kush — L-26-017 (flor seca)', unidad: 'g',
+                       dispensado: 0, faltante: 23, faltante_ars: 27636, merma_pct: null, turnos: 2 }],
+    })
 
-    expect(w.find('.mrm__table th').text()).toBe('Cerró')
-    expect(w.find('.mrm__table tbody tr').text()).toContain('Ana Gómez')
+    const sub = filas(w)[0].find('.mrm__fila-sub').text()
+    expect(sub).toContain('no se entregó nada')
+    expect(sub).not.toContain('%')
+  })
+
+  // Ordenar por porcentaje no servía: desaparece cuando no se vendió. La plata existe siempre.
+  it('ordena por plata, de mayor a menor', async () => {
+    const w = await montar({
+      por_producto: [
+        { producto: 'Poco', unidad: 'g', dispensado: 100, faltante: 1, faltante_ars: 500, merma_pct: 1, turnos: 1 },
+        { producto: 'Mucho', unidad: 'g', dispensado: 100, faltante: 9, faltante_ars: 9000, merma_pct: 9, turnos: 1 },
+      ],
+    })
+
+    expect(filas(w).map(f => f.find('.mrm__fila-titulo').text())).toEqual(['Mucho', 'Poco'])
+  })
+
+  it('no lista lo que no se fue a ningún lado', async () => {
+    const w = await montar({
+      por_producto: [
+        { producto: 'Cuadró', unidad: 'g', dispensado: 500, faltante: 0, faltante_ars: 0, merma_pct: 0, turnos: 2 },
+        { producto: 'Faltó', unidad: 'g', dispensado: 500, faltante: 5, faltante_ars: 900, merma_pct: 1, turnos: 2 },
+      ],
+    })
+
+    expect(filas(w).map(f => f.find('.mrm__fila-titulo').text())).toEqual(['Faltó'])
   })
 
   it('el corte por sede aparece sólo cuando hay más de una', async () => {
@@ -156,66 +197,47 @@ describe('③ Dónde se va', () => {
     })
     expect(conSedes.findAll('.mrm__cortes .mrm__periodo').map(b => b.text())).toContain('Por sede')
   })
-
-  // Corregir un conteo cerrado ajusta el inventario: vive en el corte por turno, que es donde se
-  // mira un cierre concreto.
-  it('las acciones de un turno están en su corte, no en el de producto', async () => {
-    const w = await montar()
-    expect(w.find('.mrm__td-acc').exists()).toBe(false)
-
-    const botonTurno = w.findAll('.mrm__cortes .mrm__periodo').find(b => b.text() === 'Cierre por cierre')
-    await botonTurno.trigger('click')
-    expect(w.find('.mrm__td-acc').exists()).toBe(true)
-  })
 })
 
-// EL TABLERO POR PERSONA: para saber dónde ajustar.
+// EL CORTE POR PERSONA: para saber dónde ajustar.
 //
 // El problema de un ranking de gente no es moral, es estadístico: quien más volumen mueve
-// encabeza siempre, y quien fracciona flor pierde más que quien entrega prerolls. Por eso cada
-// uno va contra el PROMEDIO del mismo mostrador en el mismo período, con su volumen al lado.
+// encabeza siempre. Por eso lo que evita leerlo mal —el volumen, la comparación contra el
+// promedio de acá, y si son pocos cierres— va EN LA MISMA LÍNEA, no en tres columnas y un chip.
 describe('Por persona', () => {
-  async function abrirCorte () {
-    const w = await montar()
+  async function abrirCorte (extra) {
+    const w = await montar(extra)
     const b = w.findAll('.mrm__cortes .mrm__periodo').find(x => x.text() === 'Por persona')
     await b.trigger('click')
     return w
   }
 
-  it('compara contra el promedio, no contra un número suelto', async () => {
+  it('compara contra el promedio de acá, con el volumen al lado', async () => {
     const w = await abrirCorte()
+    const sub = w.findAll('.mrm__fila')[0].find('.mrm__fila-sub').text()
 
-    expect(w.find('.mrm__table th').text()).toBe('Atendió')
-    expect(w.findAll('.mrm__table th').map(t => t.text())).toContain('vs promedio')
-    expect(w.find('.mrm__delta').text()).toContain('+4 pts')
+    expect(sub).toContain('6 cierres')
+    expect(sub).toContain('6.000')
+    expect(sub).toContain('+4 pts contra el promedio')
   })
 
-  it('muestra el volumen al lado: una fila de un turno no puede gritar igual que una de veinte', async () => {
-    const w = await abrirCorte()
-    const filas = w.findAll('.mrm__table tbody tr')
-
-    expect(filas[0].text()).toContain('6 cierres')
-    expect(filas[0].text()).toContain('6.000')
-  })
-
-  // Un +9 pts de alguien con un solo turno es ruido: pintarlo lo convierte en una acusación
+  // Un +9 pts de alguien con un solo cierre es ruido: darlo por bueno sería una conclusión
   // fundada en nada.
-  it('con pocos turnos lo dice y no pinta la diferencia', async () => {
+  it('con pocos cierres no concluye', async () => {
     const w = await abrirCorte()
-    const filas = w.findAll('.mrm__table tbody tr')
+    const sub = w.findAll('.mrm__fila')[1].find('.mrm__fila-sub').text()
 
-    expect(filas[1].text()).toContain('Pocos cierres')
-    expect(filas[1].find('.mrm__delta').classes()).toContain('is-mudo')
+    expect(sub).toContain('pocos cierres para concluir')
+    expect(sub).not.toContain('pts')
   })
 
   // Si no, el admin lee el número de alguien que no hizo ese arqueo.
-  it('avisa cuando algún turno lo cerró otra persona', async () => {
+  it('avisa cuando algún cierre lo hizo otra persona', async () => {
     const w = await abrirCorte()
-
-    expect(w.findAll('.mrm__table tbody tr')[1].text()).toContain('lo hizo otra persona')
+    expect(w.findAll('.mrm__fila')[1].find('.mrm__fila-sub').text()).toContain('otra persona')
   })
 
-  it('y el CSV se lleva la comparación', async () => {
+  it('y el CSV se lleva el contexto entero', async () => {
     const w = await abrirCorte()
     let contenido = ''
     const BlobOriginal = globalThis.Blob
@@ -232,8 +254,8 @@ describe('Por persona', () => {
     globalThis.Blob = BlobOriginal
     URL.createObjectURL = urlOriginal
     HTMLAnchorElement.prototype.click = clickOriginal
-    expect(contenido).toContain('vs promedio')
     expect(contenido).toContain('Ana Gómez')
+    expect(contenido).toContain('contra el promedio')
   })
 })
 

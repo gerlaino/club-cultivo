@@ -66,11 +66,7 @@
                 {{ fmt(s.reservado) }} {{ s.unidad }}
               </span>
             </td>
-            <!-- LIBRE ES LO QUE SE PUEDE ENTREGAR, esté guardado o arriba: el frasco menos lo que
-                 tiene dueño. Es EL MISMO número que muestra y valida el carrito de la dispensa
-                 (`disponible_para_entregar`): si acá significara otra cosa, la misma palabra diría
-                 dos verdades en dos pantallas de la misma app. -->
-            <td v-if="muestraCosto" class="tmo__num tmo__libre" data-col="Libre">{{ fmt(s.libre) }} {{ s.unidad }}</td>
+
             <td class="tmo__num tmo__td-input" :data-col="tituloColumna">
               <template v-if="editable">
                 <input :value="valores[s.stock_id] ?? ''" type="number" min="0" step="0.1"
@@ -169,8 +165,11 @@ const columnas = computed(() => {
   if (!props.muestraCosto) return COLUMNAS
   return [...COLUMNAS, { campo: 'costo', label: 'Costo', num: true },
           { campo: 'disponible', label: 'Depósito', num: true },
-          { campo: 'reservado',  label: 'Reservado', num: true },
-          { campo: 'libre',      label: 'Libre', num: true }]
+          // Sin columna «Libre»: era `Depósito − Reservado` y con la mesa vacía —que es casi
+          // toda la tabla— daba exactamente lo mismo que Depósito. Una columna repetida en 20 de
+          // 21 filas es ruido, no información. El número sigue existiendo donde se decide con
+          // él: el carrito de la dispensa.
+          { campo: 'reservado',  label: 'Reservado', num: true }]
 })
 
 const valores = computed(() => props.modelValue)
@@ -214,7 +213,6 @@ function valorOrden (s, campo) {
     // Las columnas nuevas también ordenan: un encabezado que se puede tocar y no hace nada es
     // peor que uno que no se puede tocar.
     case 'reservado':  return Number(s.reservado) || 0
-    case 'libre':      return Number(s.libre) || 0
     // Lo GUARDADO, nunca lo que se está escribiendo en el input: ordenar por el valor en edición
     // haría saltar la fila de lugar mientras se tipea, que es la peor forma de perder de vista
     // lo que estabas cargando.
@@ -298,8 +296,6 @@ defineExpose({ cambios, hayCambios, hayExceso })
    explique sola, no para gritar quince veces que no pasa nada. */
 /* Reservado: ámbar sólo cuando hay algo. En cero es un cero más, no un aviso. */
 .tmo__res   { color: var(--c-amber-700, #b45309); font-weight: 700; }
-/* Libre es el número con el que se decide: el único de los tres que se lee entero. */
-.tmo__libre { font-weight: 700; color: var(--c-ink-900, #1a1d21); }
 .tmo__th-btn {
   width: 100%; border: 0; background: transparent; cursor: pointer;
   padding: 11px 14px; text-align: inherit;

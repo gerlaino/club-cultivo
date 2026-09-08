@@ -168,10 +168,12 @@ describe('La mesa dice qué tiene dueño y qué se puede vender', () => {
     expect(celda(w, 'ST-26-0001', 'Reservado')).toContain('15')
   })
 
-  it('«Libre» es lo que se puede entregar, el mismo número que el carrito', async () => {
+  // Se probó una columna «Libre» (= Depósito − Reservado) y se sacó al verla renderizada: con la
+  // mesa vacía —que es casi toda la tabla— da exactamente lo mismo que Depósito, o sea una
+  // columna repetida en 20 de 21 filas. El número vive donde se decide con él: el carrito.
+  it('no hay columna «Libre»: repetía a Depósito en casi todas las filas', async () => {
     const w = await tabla()
-    expect(celda(w, 'ST-26-0001', 'Libre')).toContain('470')   // guardado, menos lo que tiene dueño
-    expect(celda(w, 'ST-02',       'Libre')).toContain('340')   // depósito 300 + los 40 de la mesa
+    expect(w.find('[data-col="Libre"]').exists()).toBe(false)
   })
 
   it('también están cargando la mesa: bajar por debajo de lo reservado se ve antes', async () => {
@@ -182,7 +184,6 @@ describe('La mesa dice qué tiene dueño y qué se puede vender', () => {
   it('a quien atiende no se le muestran: no gobierna la mesa ni ve el depósito', async () => {
     const w = await tabla({ muestraCosto: false })
     expect(w.find('[data-col="Reservado"]').exists()).toBe(false)
-    expect(w.find('[data-col="Libre"]').exists()).toBe(false)
   })
 })
 

@@ -566,6 +566,26 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   dispensa **y lo entrega el dispensador sin depender de admin ni supervisor**, que es el punto.
   (Decisión de Germán, sep-2026.) El payload de la mesa habla otro idioma (`stock_id`, `forma`,
   `genetica` como texto) y se traduce en `cargarMesa`, en un solo lugar.
+- **LA SOLAPA DE MERMA ES UNA LÍNEA Y UNA LISTA** (sep-2026, rediseño acordado con Germán). El
+  titular **arranca por el número** —`Faltaron $10.000 en 1 cierre.` / `Cuadró todo.`— y la
+  comparación contra el historial va debajo y **sólo cuando dice algo**: antes el cuadro empezaba
+  diciendo que el porcentaje no significaba nada, con los pesos faltantes escondidos en un pie
+  gris. La lista se **ordena por PLATA**, que es lo único comparable entre productos y que existe
+  siempre; el % es contexto de la fila, nunca una columna, porque desaparece cuando no se vendió
+  nada y dejaba la tabla llena de `–%`. Y **faltar producto de algo con CERO entregado no es
+  merma**: la fila lo dice ("no se entregó nada de esto"), porque es producto que desapareció sin
+  venderse y es más urgente que cualquier porcentaje.
+- **LA LISTA DE TRABAJO VIVE EN CIERRES, NO EN MERMA.** "Para mirar" era la misma lista de cierres,
+  filtrada, con otro nombre y en la solapa de análisis. Es un filtro (`Todos` / `Para mirar N`) con
+  el motivo en la fila y "Ya lo miré" al lado de "Corregir conteo". **Un chip, el que manda**
+  (`faltante > sobrante > mesa_movida > corregido`): tres juntos obligan a leer los tres para saber
+  cuál importa. Los ids salen del MISMO `Mostradores::MotivosDeRevision` que el badge — si el
+  filtro decidiera por su cuenta, un día el badge diría 2 y la lista otra cosa.
+- **SI UNA PANTALLA NECESITA DEFENDER SU PROPIO ORDEN, NO ES EVIDENTE.** Las dos frases más largas
+  de la solapa de Merma explicaban por qué la lista se ordenaba así y por qué la sección se llamaba
+  así. Eran verdad las dos y las dos se cayeron con el rediseño: ordenar por plata no necesita
+  explicación. Vale como olfato — texto que justifica una decisión de diseño es el síntoma, no la
+  cura.
 - **`reservado` ES DEL PRODUCTO, NO DE LA MESA — y por eso tiene columna propia.** Colgado como
   cartelito debajo del input de Mostrador decía «mostrador 0 · 15 reservados», que es imposible:
   esos 15 g están en el depósito (que ya los descontó). Un número correcto en la columna
