@@ -1,5 +1,42 @@
 # Changelog
 
+## Septiembre 2026 (ap) — la caja cerrada que sólo veía el admin, y el techo del carrito
+
+Germán, probando en producción con el teléfono en la mano: *"para el dispensador está la caja
+abierta, pero para el admin no. muy mal está esto"*. Y antes: *"puse para dispensar 155grs de un
+stock de 165grs que tenía 15grs reservados"*.
+
+**DOS FUENTES DISTINTAS PARA "¿CUÁL ES MI MOSTRADOR?".** `cargarEstadoCaja` leía
+`dispensario_sede` a secas, y esa columna **nace en null** — en la práctica casi nadie la carga.
+Sin ella la función CORTABA ANTES DE PREGUNTAR y dejaba `cajaCerrada` en false. Pero la lista de
+productos aparecía igual, porque el backend la arma con `sedes_visibles_ids`: el dispensador
+cargaba el carrito entero con la caja cerrada y se enteraba al confirmar, con el paciente
+enfrente, mientras la pantalla del admin decía "Caja cerrada" desde hacía rato.
+
+La pantalla del mostrador ya resolvía bien el fallback —si no tiene sede propia, la primera que
+atienda público—; el carrito no. La regla salió a **`sedeDeMostrador(user, sedes)`**, exportada al
+lado de `gestionaMostrador`, y ahora la preguntan las dos. Con la lista a mano verifica que su
+sede atienda público; sin lista confía en la suya, que era la regla anterior.
+
+**Y HABÍA UN TEST QUE FIJABA EL BUG.** Decía *"sede de producción, o el dispensador sin sede
+asignada"* y montaba con `sede: null`: afirmaba la misma regla equivocada que el código. Son dos
+casos distintos —quien no tiene sede asignada SÍ tiene mostrador, el de la sede que atiende— y
+confundirlos dejaba sin aviso a casi todos los dispensadores. Se separaron: el caso legítimo es
+que NINGUNA sede atienda público.
+
+**EL TECHO DEL CARRITO ERA EL FRASCO, NO LO QUE EL BACKEND ACEPTA.** `cantidad` es la fila del
+stock, y sobre ella puede haber gramos apartados para un evento o reservados a nombre de un
+paciente: la pantalla ofrecía 1.000 y `Dispensacion#stock_disponible` rechazaba en 985, justo los
+15 reservados. Le pasaba a **administración**, que dispensa del depósito. `serialize_stock` manda
+ahora **`disponible_para_entregar`** —el mismo número que valida el backend, sin una query por
+producto: es `cantidad − eventos − reservas`, porque la mesa es un LUGAR y no un compromiso— y el
+carrito muestra, ordena y valida contra él.
+
+**Y EL NÚMERO DICE "LIBRES".** Los 165 que Germán leyó ya eran lo libre (mesa 180 − 15
+reservados), pero "165g" con "15g reservados" al lado invita a restar de nuevo. Una palabra corta
+esa lectura. Sin ella el error es en los dos sentidos: creer que se pueden llevar 150, o cargar de
+más creyendo que 165 era el total.
+
 ## Septiembre 2026 (ao) — reservar eligiendo de la mesa
 
 Germán: *"si quiere reservar de algo que hay en el depósito, que baje a mostrador la cantidad de

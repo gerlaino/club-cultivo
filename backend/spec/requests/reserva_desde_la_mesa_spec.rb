@@ -113,6 +113,43 @@ RSpec.describe 'Reservar de lo que está sobre la mesa', type: :request do
     end
   end
 
+  # EL BUG QUE APARECIÓ PROBANDO EN EL TELÉFONO: el carrito ofrecía el frasco ENTERO sobre un
+  # stock con gramos ya reservados, y la dispensa rebotaba recién al confirmar.
+  #
+  # `cantidad` es la fila del stock y NO sirve de techo. `disponible_para_entregar` es el mismo
+  # número que valida `Dispensacion#stock_disponible`, así que la pantalla puede pedirlo y dejar
+  # de ofrecer lo que el backend va a rechazar.
+  describe 'el techo que se le manda a la pantalla' do
+    before { reservar(15) }
+
+    it 'descuenta lo reservado, aunque el producto no esté sobre ninguna mesa' do
+      expect(stock.reload.disponible_para_entregar).to eq(985)
+    end
+
+    it 'es exactamente el techo que valida la dispensa' do
+      st = stock.reload
+      techo_de_la_dispensa = st.cantidad_disponible_real.to_d + st.libre_en_mostrador(st.sede_id)
+      expect(st.disponible_para_entregar).to eq(techo_de_la_dispensa)
+    end
+
+    it 'sigue siendo el mismo con el producto sobre la mesa: la mesa es un lugar, no un compromiso' do
+      cargar_mesa(110)
+      st = stock.reload
+      expect(st.disponible_para_entregar).to eq(985)
+      expect(st.disponible_para_entregar).to eq(st.cantidad_disponible_real.to_d + st.libre_en_mostrador(st.sede_id))
+    end
+
+    it 'viaja en el listado, junto a lo reservado' do
+      sign_in_as(admin)
+      get '/stocks', params: { para_dispensa: 1 }, headers: auth_headers
+
+      fila = JSON.parse(response.body).find { |x| x['id'] == stock.id }
+      expect(fila['cantidad']).to eq(1_000.0)                 # el frasco, que sigue siendo el frasco
+      expect(fila['disponible_para_entregar']).to eq(985.0)   # lo que se puede entregar
+      expect(fila['reservado']).to eq(15.0)
+    end
+  end
+
   describe 'al entregarla' do
     it 'baja la mesa y deja el libre del depósito donde estaba' do
       cargar_mesa(110)

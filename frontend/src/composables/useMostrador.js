@@ -29,6 +29,32 @@ import { useToast } from './useToast.js'
 // día el dispatch manda a una pantalla y la pantalla se dibuja para el otro rol.
 export const gestionaMostrador = (role) => ['admin', 'supervisor', 'super_admin'].includes(role)
 
+// CUÁL ES "MI MOSTRADOR": UNA SOLA REGLA, y por eso vive afuera del composable.
+//
+// La SUYA (`dispensario_sede`) si atiende público; y si no tiene una asignada —que es el caso por
+// defecto, la columna nace en null— la primera que atienda. Ese fallback existía sólo acá adentro,
+// y el carrito de la dispensa resolvía la sede por su cuenta leyendo `dispensario_sede` a secas:
+// con la columna en null CORTABA ANTES DE PREGUNTAR y dejaba la caja como si estuviera abierta.
+// El resultado es el que reportó Germán desde el teléfono: el dispensador arma el carrito entero
+// —la lista de productos sí aparecía, porque el backend la arma con `sedes_visibles_ids` y no con
+// `dispensario_sede`— y se entera de que la caja está cerrada al confirmar, con el paciente
+// enfrente, mientras la pantalla del admin dice "Caja cerrada" desde hace rato.
+//
+// Dos fuentes distintas para la misma pregunta: exactamente el error que este archivo existe para
+// no cometer.
+export const atiendenPublico = (sedes) => (sedes || []).filter(s => s.tipo === 'social' || s.tipo === 'mixta')
+
+export function sedeDeMostrador (user, sedes) {
+  const propias = atiendenPublico(sedes)
+  const propia  = user?.dispensario_sede?.id ?? user?.dispensario_sede_id
+  // CON la lista a mano se verifica que su sede atienda público —aterrizar en una de producción
+  // le muestra una mesa vacía y ninguna caja—. SIN lista (todavía no cargó, o el rol no puede
+  // listarlas) se confía en la suya: era la regla de antes, y perderla dejaría sin aviso justo a
+  // quien SÍ tiene sede asignada, que es el caso que ya funcionaba.
+  if (propia && (!propias.length || propias.some(s => s.id === propia))) return propia
+  return propias[0]?.id ?? null
+}
+
 export function useMostrador () {
   const sedeStore = useSedeStore()
   const auth      = useAuthStore()
@@ -52,7 +78,7 @@ export function useMostrador () {
   // sobrevivir al buscador y al orden — si viviera adentro, filtrar borraría lo ya escrito.
   const cantidades = ref({})
 
-  const sedes  = computed(() => (sedeStore.sedes || []).filter(s => s.tipo === 'social' || s.tipo === 'mixta'))
+  const sedes  = computed(() => atiendenPublico(sedeStore.sedes))
   const estado = computed(() => (turno.value ? 'abierto' : 'cerrado'))
 
   // NO HAY MOSTRADOR AL QUE ENTRAR, y hay que decirlo en vez de dejar apretar "Abrir caja".
@@ -266,11 +292,9 @@ export function useMostrador () {
     // en su mostrador, y aterrizar en el de otra sede le muestra una mesa vacía y ninguna caja
     // abierta — o sea, la pantalla le dice que no hizo lo que acaba de hacer. `/me` ya trae cuál
     // es (`dispensario_sede`), así que no hace falta preguntar nada.
-    const propia = auth.user?.dispensario_sede?.id ?? auth.user?.dispensario_sede_id
-    sedeId.value =
-      (desdeUrl && sedes.value.some(s => s.id === desdeUrl)) ? desdeUrl
-      : (propia && sedes.value.some(s => s.id === propia))   ? propia
-      : sedes.value[0]?.id ?? null
+    sedeId.value = (desdeUrl && sedes.value.some(s => s.id === desdeUrl))
+      ? desdeUrl
+      : sedeDeMostrador(auth.user, sedeStore.sedes)
   })
 
   // La mesa se actualiza sola: si administración baja producto desde su oficina, quien atiende lo

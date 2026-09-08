@@ -79,7 +79,13 @@ describe('Reservar — la lista es la mesa del mostrador', () => {
 
     // 110 sobre la mesa, 15 de un paciente: quedan 95. Pedirle la resta al usuario es pedirle
     // la cuenta que hace la máquina.
-    expect(w.find('.mnd__td-disp-n').text()).toBe('95g')
+    //
+    // Y DICE "LIBRES", que es lo que evita la otra lectura: sin esa palabra, "95" con "15
+    // reservados" al lado invita a restar de nuevo — o a cargar de más creyendo que el 95 era el
+    // total. Germán leyó exactamente eso en el teléfono.
+    const disp = w.find('.mnd__td-disp-n').text()
+    expect(disp).toContain('95g')
+    expect(disp).toContain('libres')
     expect(w.find('.mnd__td-reservado').text()).toContain('15')
     expect(w.find('.mnd__td-reservado').text()).toContain('reservados')
   })
@@ -156,5 +162,53 @@ describe('La mesa dice cuánto ya tiene dueño', () => {
   it('también cuando administración está cargando la mesa: bajar por debajo de lo reservado se ve antes', async () => {
     const w = await tabla({ editable: true, muestraCosto: true })
     expect(w.findAll('.tmo__reservado')[0].text()).toContain('15')
+  })
+})
+
+// ── EL TECHO DEL CARRITO ES EL DEL BACKEND ─────────────────────────────────────────
+//
+// El bug que reportó Germán probando en el teléfono: sobre un frasco con gramos ya reservados,
+// el carrito ofrecía el frasco ENTERO y la dispensa rebotaba al confirmar. `cantidad` es la fila
+// del stock; el techo es `disponible_para_entregar`, el mismo número que valida
+// `Dispensacion#stock_disponible`.
+describe('Dispensar — no se ofrece lo que ya tiene dueño', () => {
+  const CON_RESERVA = [
+    { id: 1, cantidad: 1679.7, disponible_para_entregar: 1664.7, reservado: 15, unidad: 'g',
+      forma_producto: 'flor_seca', precio_sugerido_ars: 100, genetica: { nombre: 'Amnesia Haze' },
+      fecha_elaboracion: '2026-05-12', sede: SEDE },
+  ]
+
+  async function conCarrito() {
+    listStocks.mockResolvedValue({ data: CON_RESERVA })
+    setActivePinia(createPinia())
+    const { useAuthStore } = await import('../stores/auth.js')
+    useAuthStore().user = { id: 1, role: 'admin' }
+    const { default: Modal } = await import('../components/pacientes/ModalNuevaDispensacion.vue')
+    const w = mount(Modal, {
+      props: { modelValue: true, socioId: PACIENTE.id },
+      global: { stubs: { Teleport: true, DsSpinner: true, AppDatePicker: true, RouterLink: true } },
+    })
+    await flushPromises(); await flushPromises()
+    return w
+  }
+
+  it('muestra el techo real, no el frasco entero', async () => {
+    const w = await conCarrito()
+    const disp = w.find('.mnd__td-disp-n').text()
+    expect(disp).toContain('1664.7')
+    expect(disp).not.toContain('1679.7')
+  })
+
+  it('no deja agregar al carrito más de lo que el backend acepta', async () => {
+    const w = await conCarrito()
+    w.vm.form.stock_id = 1
+
+    w.vm.form.cantidad = 1670          // entra en el frasco, pero pisa lo reservado
+    await flushPromises()
+    expect(w.vm.excederiaStock).toBe(true)
+
+    w.vm.form.cantidad = 1664          // debajo del techo
+    await flushPromises()
+    expect(w.vm.excederiaStock).toBe(false)
   })
 })

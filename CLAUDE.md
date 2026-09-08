@@ -566,6 +566,21 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   dispensa **y lo entrega el dispensador sin depender de admin ni supervisor**, que es el punto.
   (Decisión de Germán, sep-2026.) El payload de la mesa habla otro idioma (`stock_id`, `forma`,
   `genetica` como texto) y se traduce en `cargarMesa`, en un solo lugar.
+- **CUÁL ES "MI MOSTRADOR" LO CONTESTA `sedeDeMostrador`, Y NADIE MÁS** (sep-2026). La suya
+  (`dispensario_sede`) si atiende público; si no tiene asignada —**la columna nace en null y casi
+  nadie la carga**— la primera que atienda. El carrito de la dispensa la resolvía por su cuenta
+  leyendo `dispensario_sede` a secas: con la columna vacía cortaba antes de preguntar y daba la
+  caja por ABIERTA, mientras la lista de productos aparecía igual (el backend la arma con
+  `sedes_visibles_ids`). El dispensador cargaba el carrito entero con la caja cerrada y se
+  enteraba al confirmar, con el admin viendo "Caja cerrada" en su pantalla. Vive exportada al lado
+  de `gestionaMostrador`, por lo mismo: son las dos preguntas que no pueden tener dos respuestas.
+- **EL TECHO DE UNA DISPENSA ES `disponible_para_entregar`, NUNCA `cantidad`.** La fila del stock
+  puede tener gramos apartados para un evento o reservados a nombre de un paciente: el carrito
+  ofrecía 1.000 y el backend rechazaba en 985. Es `cantidad − eventos − reservas` —la mesa es un
+  LUGAR, no un compromiso, y por eso no resta— y da exactamente lo mismo que
+  `Dispensacion#stock_disponible`, que es el punto: la pantalla pide el número que el backend va a
+  validar. Y cuando hay algo reservado, el número **dice "libres"**: sin esa palabra, "165g" con
+  "15g reservados" al lado se lee mal en los dos sentidos.
 - **NO SE CREA EL `MostradorItem` SOLO AL RESERVAR** (evaluado y descartado, sep-2026). Subir a
   la mesa lo reservado del depósito no hace falta —**el dispensador YA entrega una reserva sin que
   el producto esté arriba**, `desde_reserva` es la excepción documentada y sólo pide la caja

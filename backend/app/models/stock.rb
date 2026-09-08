@@ -134,6 +134,21 @@ class Stock < ApplicationRecord
     [apartado_para_mostrador.to_d, apartado_para_reservas].max
   end
 
+  # EL TECHO REAL DE UNA DISPENSA: el frasco menos lo PROMETIDO —a un evento y a un paciente—.
+  #
+  # La mesa no resta acá: es un LUGAR, no un compromiso. Sale de la misma cuenta que hace
+  # `Dispensacion#stock_disponible` (`cantidad_disponible_real + libre_en_mostrador`), y da igual
+  # esté el producto arriba o guardado: si la mesa tiene 180 de los 1.000, lo libre del depósito
+  # es 820 y lo libre de la mesa 165, y suman los mismos 985 que este método devuelve de una.
+  #
+  # Existe para que la PANTALLA pueda pedir el mismo número que el backend va a validar sin hacer
+  # una query por producto. El carrito mostraba y validaba contra `cantidad` —el frasco entero—
+  # así que ofrecía los 15 g que ya tienen dueño y el backend los rechazaba al confirmar, que es
+  # el peor error posible: parece culpa del usuario.
+  def disponible_para_entregar
+    [cantidad.to_d - apartado_para_eventos.to_d - apartado_para_reservas, 0.to_d].max
+  end
+
   # LO QUE QUEDA SOBRE LA MESA PARA EL PRÓXIMO QUE LLEGA: lo que hay arriba menos lo que ya
   # tiene dueño. Con 110 sobre la mesa y 15 reservados, quien atiende puede entregar 95 — los
   # otros 15 están ahí, pero son de alguien. Sin esto se los lleva el que llegue primero.

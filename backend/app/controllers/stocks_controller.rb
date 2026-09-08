@@ -106,6 +106,7 @@ class StocksController < ApplicationController
         reservado  = st.apartado_para_reservas.to_f
         libre      = [en_la_mesa - reservado, 0].max
         serialize_stock(st).merge(cantidad: libre, cantidad_disponible_real: libre,
+                                  disponible_para_entregar: libre,
                                   en_la_mesa: en_la_mesa, reservado: reservado)
       }
     end
@@ -873,6 +874,13 @@ class StocksController < ApplicationController
                          logo_url: s.club.logo.attached? ? url_for(s.club.logo) : nil } : nil,
       gramos_reservados:        s.gramos_reservados,
       cantidad_disponible_real: s.cantidad_disponible_real,
+      # LO QUE SE PUEDE ENTREGAR HOY, que es contra lo que valida el backend. `cantidad` es el
+      # frasco entero y NO sirve de techo: el carrito ofrecía los gramos que ya tienen dueño y la
+      # dispensa rebotaba al confirmar, con el paciente enfrente.
+      disponible_para_entregar: s.disponible_para_entregar.to_f,
+      # De ese frasco, cuánto está apartado a nombre de un paciente. Viaja para poder DECIRLO:
+      # un número que baja sin explicación se lee como un error de la app.
+      reservado:                s.apartado_para_reservas.to_f,
       # Lo apartado por eventos EN CURSO: el carrito lo ofrece además del disponible libre, para
       # que el dispensador pueda entregar desde lo reservado del evento que está sucediendo.
       apartados_evento: s.apartados_en_curso.map { |p|

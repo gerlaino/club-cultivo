@@ -3,6 +3,8 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
 import { useAuthStore } from '../../stores/auth.js'
+import { useSedeStore } from '../../stores/sede.js'
+import { sedeDeMostrador } from '../../composables/useMostrador.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
 import { RouterLink, useRoute } from 'vue-router'
@@ -32,6 +34,7 @@ const emit = defineEmits(['update:modelValue', 'saved'])
 const { confirm }     = useConfirm()
 const toast           = useToast()
 const auth            = useAuthStore()
+const sedeStore       = useSedeStore()
 // Quién dispensa de la MESA y no del depósito. Se usa sólo para elegir el mensaje cuando la
 // lista viene vacía: la regla en sí la aplica el backend, y duplicarla acá sería el cuarto
 // mecanismo de permisos del proyecto.
@@ -130,6 +133,21 @@ function emptyForm() {
   }
 }
 const form = ref(emptyForm())
+
+// EL TECHO ES LO QUE EL BACKEND VA A ACEPTAR, NO EL FRASCO.
+//
+// `cantidad` es la fila entera del stock, y sobre ella puede haber gramos que ya tienen dueño —
+// apartados para un evento o reservados a nombre de un paciente—. El carrito los ofrecía igual y
+// la dispensa rebotaba al confirmar: 1.679,7 en pantalla contra 1.664,7 que acepta el backend,
+// justo los 15 reservados. Es el peor error posible, el que parece culpa del usuario.
+//
+// `disponible_para_entregar` es el mismo número que valida `Dispensacion#stock_disponible`. El
+// fallback a `cantidad` es para las pantallas viejas que todavía no lo mandan.
+//
+// ARRIBA DE TODO, por lo mismo que `form`: lo lee `valorOrden`, y a ese lo despierta el
+// `watch(stocksVisibles)` al registrarse. Declarado más abajo, la pantalla no abre.
+const techoStock = (s) => Number(s?.disponible_para_entregar ?? s?.cantidad ?? 0)
+
 
 const FORMA_LABEL = {
   flor_seca: 'Flor seca', hash: 'Hash', aceite: 'Aceite',
@@ -234,7 +252,7 @@ function valorOrden(s, campo) {
     case 'genetica':   return generica(s).toLowerCase()
     case 'fecha':      return s.fecha_elaboracion || s.created_at || ''
     case 'precio':     return Number(s.precio_sugerido_ars) || 0
-    case 'disponible': return Number(s.cantidad) || 0
+    case 'disponible': return techoStock(s)
     default:           return ''
   }
 }
@@ -326,7 +344,7 @@ const excederiaStock = computed(() => {
   const yaEnCarrito = items.value
     .filter(it => it.stock.id === stockSeleccionado.value.id)
     .reduce((a, it) => a + it.cantidad, 0)
-  return parseFloat(form.value.cantidad) + yaEnCarrito > stockSeleccionado.value.cantidad
+  return parseFloat(form.value.cantidad) + yaEnCarrito > techoStock(stockSeleccionado.value)
 })
 
 const fmt = n => n == null ? '—' :
@@ -433,8 +451,22 @@ const productosPosteriores = computed(() => {
 // esto es sólo mirar el estado para no ofrecer un camino que termina en un 422.
 async function cargarEstadoCaja () {
   cajaCerrada.value = false
-  const sedeId = auth.user?.dispensario_sede?.id ?? auth.user?.dispensario_sede_id
-  if (!dispensaDelMostrador.value || !sedeId) return
+  if (!dispensaDelMostrador.value) return
+
+  // CUÁL ES SU MOSTRADOR LO DECIDE `sedeDeMostrador`, LA MISMA REGLA QUE LA PANTALLA DEL MOSTRADOR.
+  //
+  // Acá se leía `dispensario_sede` a secas, y esa columna nace en NULL: sin sede asignada la
+  // función cortaba antes de preguntar y dejaba `cajaCerrada` en false. La lista de productos sí
+  // aparecía —el backend la arma con `sedes_visibles_ids`— así que el dispensador cargaba el
+  // carrito entero con la caja cerrada y se enteraba al confirmar, con el paciente enfrente,
+  // mientras el admin veía "Caja cerrada" en su pantalla desde hacía rato. Dos fuentes distintas
+  // para la misma pregunta.
+  //
+  // Las sedes hacen falta para resolver el fallback, y puede que el store todavía no las tenga:
+  // se piden. Es una sola vez al abrir el modal.
+  if (!sedeStore.loaded) await sedeStore.fetchSedes()   // el store se traga sus propios errores
+  const sedeId = sedeDeMostrador(auth.user, sedeStore.sedes)
+  if (!sedeId) return
 
   try {
     const { data } = await getMostrador(sedeId)
@@ -480,8 +512,8 @@ function agregarItem() {
   const cant = parseFloat(form.value.cantidad)
   if (!cant || cant <= 0) { formError.value = 'Ingresá una cantidad válida'; return }
   const yaEnCarrito = items.value.filter(it => it.stock.id === s.id).reduce((a, it) => a + it.cantidad, 0)
-  if (cant + yaEnCarrito > s.cantidad) {
-    formError.value = `Stock insuficiente: ${(s.cantidad - yaEnCarrito).toFixed(2)}${s.unidad || 'g'} disponibles`
+  if (cant + yaEnCarrito > techoStock(s)) {
+    formError.value = `Stock insuficiente: ${(techoStock(s) - yaEnCarrito).toFixed(2)}${s.unidad || 'g'} disponibles`
     return
   }
   // El dispensador no puede dispensar stock sin precio (no fija precios).
@@ -700,7 +732,7 @@ async function handleSubmit() {
     // En modo reserva el backend libera el stock apartado de la propia reserva, así que
     // no aplicamos el chequeo de disponible local (mostraría de menos por su propio hold).
     if (!modoReserva.value && excederiaStock.value) {
-      formError.value = `Stock insuficiente: solo hay ${stockSeleccionado.value.cantidad}${stockSeleccionado.value.unidad || 'g'} disponibles`
+      formError.value = `Stock insuficiente: solo hay ${techoStock(stockSeleccionado.value)}${stockSeleccionado.value.unidad || 'g'} disponibles`
       saving.value = false; return
     }
   }
@@ -1133,14 +1165,20 @@ async function handleSubmit() {
                       <template v-else>—</template>
                     </td>
                     <td class="mnd__td-disp">
-                      <span class="mnd__td-disp-n">{{ s.cantidad }}{{ s.unidad }}</span>
+                      <!-- EL NÚMERO ES EL TECHO, y cuando hay algo reservado la palabra
+                           "libres" es lo que evita que se lea como un total del que todavía hay
+                           que restar. Sin ella, "165g" con "15g reservados" al lado invita a
+                           pensar que se pueden llevar 150 — y a la inversa, a cargar 155 creyendo
+                           que sobran. -->
+                      <span class="mnd__td-disp-n">{{ techoStock(s) }}{{ s.unidad
+                        }}<small v-if="s.reservado > 0" class="mnd__td-libres"> libres</small></span>
                       <!-- EL NÚMERO GRANDE ES LO LIBRE, NO LO QUE HAY ARRIBA. Sobre la mesa hay
                            110 y 15 son de un paciente que ya los reservó: mostrar los 110 y que
                            el que atiende reste es pedirle la cuenta que hace la máquina, y
                            termina con el gramo entregado al que llegó primero. El badge explica
                            por qué el número no coincide con el frasco. -->
                       <span v-if="s.reservado > 0" class="mnd__td-reservado"
-                            :title="`Sobre la mesa hay ${s.en_la_mesa ?? ''}${s.unidad || ''}, pero ${s.reservado}${s.unidad || ''} ya están reservados a nombre de un paciente`">🔒 {{ s.reservado }}{{ s.unidad }} reservados</span>
+                            :title="`${s.reservado}${s.unidad || ''} ya están reservados a nombre de un paciente y no se pueden entregar acá`">🔒 {{ s.reservado }}{{ s.unidad }} reservados</span>
                       <span v-for="a in (s.apartados_evento || [])" :key="a.evento_id" class="mnd__td-evento"
                             :title="`Apartado para el evento ${a.evento_nombre}`">🎉 {{ a.cantidad }}{{ s.unidad }}</span>
                     </td>
@@ -1174,9 +1212,10 @@ async function handleSubmit() {
                   </span>
                 </span>
                 <span class="mnd__stock-right">
-                  <span class="mnd__stock-disp">{{ s.cantidad }}{{ s.unidad }}</span>
+                  <span class="mnd__stock-disp">{{ techoStock(s) }}{{ s.unidad
+                    }}<small v-if="s.reservado > 0" class="mnd__stock-libres"> libres</small></span>
                   <span v-if="s.reservado > 0" class="mnd__stock-reservado"
-                        :title="`Sobre la mesa hay ${s.en_la_mesa ?? ''}${s.unidad || ''}, pero ${s.reservado}${s.unidad || ''} ya están reservados`">🔒 {{ s.reservado }}{{ s.unidad }} reservados</span>
+                        :title="`${s.reservado}${s.unidad || ''} ya están reservados a nombre de un paciente`">🔒 {{ s.reservado }}{{ s.unidad }} res.</span>
                   <span v-for="a in (s.apartados_evento || [])" :key="a.evento_id" class="mnd__stock-evento" :title="`Apartado para el evento ${a.evento_nombre}`">
                     🎉 {{ a.cantidad }}{{ s.unidad }}
                   </span>
@@ -1784,7 +1823,8 @@ async function handleSubmit() {
 .mnd__td-evento { display: block; font-size: .64rem; color: #b45309; }
 /* Lo reservado por otro paciente. Ámbar informativo y NO rojo: no es un error de nadie ni algo
    que haya que arreglar — es producto que está ahí y tiene dueño. */
-.mnd__td-reservado { display: block; font-size: .64rem; font-weight: 700; color: var(--c-amber-700, #b45309); white-space: nowrap; }
+.mnd__td-reservado { display: block; font-size: .64rem; font-weight: 700; color: var(--c-amber-700, #b45309); }
+.mnd__td-libres { font-size: .62rem; font-weight: 600; color: var(--c-slate-500); }
 /* Informativo ("va a descontar de la mesa"), con los tokens de info del DS: el azul estaba
    escrito a mano en dos lugares y no coincidía con ningún otro badge de la app. */
 .mnd__td-mostrador { display: inline-block; margin-left: 6px; font-size: .64rem; font-weight: 700; color: var(--c-sky-600); background: var(--c-sky-100); border-radius: 999px; padding: 1px 7px; white-space: nowrap; }
@@ -1807,10 +1847,19 @@ async function handleSubmit() {
 .mnd__stock-gen { font-size: .72rem; color: var(--c-slate-500); font-style: italic; }
 .mnd__stock-obs { font-size: .7rem; color: var(--c-slate-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
 .mnd__stock-fecha { font-size: .68rem; color: var(--c-slate-400); display: flex; align-items: center; gap: .25rem; }
-.mnd__stock-right { display: flex; flex-direction: column; align-items: flex-end; gap: .1rem; flex-shrink: 0; }
+/* `flex-shrink: 0` mantiene los números legibles, pero sin `min-width: 0` un hijo largo hace
+   crecer la columna sin techo y desborda la fila. Los dos juntos: no se achica de gusto, pero
+   tampoco empuja. */
+.mnd__stock-right { display: flex; flex-direction: column; align-items: flex-end; gap: .1rem; flex-shrink: 0; min-width: 0; max-width: 45%; }
 .mnd__stock-disp  { font-size: .8rem; font-weight: 700; color: #1b5e20; font-family: monospace; }
 .mnd__stock-precio { font-size: .7rem; color: var(--c-slate-500); font-family: monospace; white-space: nowrap; }
-.mnd__stock-reservado { font-size: .64rem; font-weight: 700; color: var(--c-amber-700, #b45309); white-space: nowrap; }
+/* SIN `white-space: nowrap`. Con él, "15g reservados" fijaba un ancho mínimo en una columna que
+   además es `flex-shrink: 0`: el ancho del texto se propagaba hacia arriba y empujaba el MODAL
+   ENTERO más allá de la pantalla — se cortaban el buscador, el total y el botón de confirmar, no
+   sólo esta tarjeta. Es la tercera vez que este modal se rompe a ≤360px por una caja que no
+   puede achicarse, y la regla es siempre la misma: nada acá adentro fija un ancho. */
+.mnd__stock-reservado { font-size: .64rem; font-weight: 700; color: var(--c-amber-700, #b45309); max-width: 100%; }
+.mnd__stock-libres { font-size: .62rem; font-weight: 600; color: var(--c-slate-500); font-family: inherit; }
 /* El link dentro del aviso: la caja es `display:block` a propósito (ver .mnd__warn-box), así que
    alcanza con marcarlo. */
 .mnd__warn-link { color: inherit; font-weight: 700; text-decoration: underline; margin-left: .25rem; }
