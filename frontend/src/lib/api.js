@@ -520,6 +520,9 @@ export const deleteBarVenta     = (barId, id)      => api.delete(`/bares/${barId
 // El turno de STOCK del mostrador, hermano de la caja de plata: se abren y se cierran juntos
 // (un gesto, dos arqueos) pero son registros aparte. Lo cargado se APARTA, no se descuenta.
 export const getMostrador      = (sedeId)          => api.get(`/sedes/${sedeId}/mostrador`)
+// El estado de CADA mostrador del club: cuelga del club y no de una sede porque la pregunta es
+// «¿cómo viene cada uno?», que es la que no se puede hacer parado dentro de una.
+export const listMostradores   = ()                => api.get('/mostradores')
 // ABRIR y CERRAR son el ARQUEO: quien atiende cuenta lo que hay sobre la mesa y la plata.
 export const abrirMostrador    = (sedeId, payload) => api.post(`/sedes/${sedeId}/mostrador/abrir`, payload)
 

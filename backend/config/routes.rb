@@ -460,6 +460,13 @@ Rails.application.routes.draw do
       end
     end
 
+    # EL ESTADO DE CADA MOSTRADOR DEL CLUB, de un vistazo.
+    #
+    # Cuelga del club y no de una sede a propósito: la pregunta es «¿cómo viene cada uno?», que es
+    # justamente la que no se puede hacer parado dentro de una. Es lo que necesita administración
+    # para monitorear a distancia, que es el punto del módulo.
+    get 'mostradores', to: 'dispensario/mostrador#resumen'
+
     # Lo que cada persona sacó del cajón y no cerró. Vive aparte del libro porque la pregunta es
     # otra: no "qué gastó la organización" sino "quién tiene plata nuestra".
     # La entrega de la recaudación del repartidor: la inicia él, la cuenta y recibe el otro.

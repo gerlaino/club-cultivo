@@ -44,6 +44,17 @@ export const gestionaMostrador = (role) => ['admin', 'supervisor', 'super_admin'
 // no cometer.
 export const atiendenPublico = (sedes) => (sedes || []).filter(s => s.tipo === 'social' || s.tipo === 'mixta')
 
+// LA ÚLTIMA QUE ELIGIÓ, para no preguntarle lo mismo cada vez que entra. Es una comodidad de
+// ESTE navegador y de esta persona —no un dato del club— así que vive en `localStorage`, envuelto
+// porque en una ventana privada el acceso mismo puede tirar.
+const RECUERDO = 'mostrador:sede'
+export function sedeRecordada () {
+  try { return Number(localStorage.getItem(RECUERDO)) || null } catch { return null }
+}
+export function recordarSede (id) {
+  try { localStorage.setItem(RECUERDO, String(id)) } catch { /* ventana privada */ }
+}
+
 export function sedeDeMostrador (user, sedes) {
   const propias = atiendenPublico(sedes)
   const propia  = user?.dispensario_sede?.id ?? user?.dispensario_sede_id
@@ -93,6 +104,20 @@ export function useMostrador () {
   // organización no tiene ninguna. Un cartel que manda a arreglar lo que no está roto es peor
   // que no tener cartel.
   const faltaSede = computed(() => sedeStore.loaded && !sedes.value.length)
+
+  // HAY MOSTRADORES, PERO TODAVÍA NO SABEMOS EN CUÁL. Distinto de `faltaSede`, que es «no hay
+  // ninguno»: acá hay varios y la pregunta es cuál. Se arreglan en lugares distintos, así que la
+  // pantalla tiene que poder decir la que corresponde.
+  const debeElegirSede = computed(() =>
+    sedeStore.loaded && sedes.value.length > 1 && !sedeId.value
+  )
+
+  // Elegir a mano se recuerda; entrar por la sede propia o por URL no, para que un link no le
+  // cambie a nadie su mostrador de siempre.
+  function elegirSede (id) {
+    sedeId.value = id
+    recordarSede(id)
+  }
   const motivoSinSede = computed(() => {
     if (!faltaSede.value) return null
     // Ve sedes, pero ninguna atiende público: la asignación es lo que hay que corregir. (El
@@ -181,7 +206,9 @@ export function useMostrador () {
       //
       // Cuando ya sabemos que NO hay sede que atienda, en cambio, deja de cargar: el spinner
       // eterno es la forma más cara de no decir nada. Lo dice `faltaSede`.
-      cargando.value = !sedeStore.loaded || sedes.value.length > 0
+      // Y deja de cargar cuando lo que falta es que ELIJA: el spinner eterno es la forma más
+      // cara de no decir nada, y acá la pantalla sí tiene algo que mostrar — la lista.
+      cargando.value = !sedeStore.loaded || (sedes.value.length > 0 && !debeElegirSede.value)
       return
     }
     const mia = ++cargaEnCurso
@@ -292,9 +319,33 @@ export function useMostrador () {
     // en su mostrador, y aterrizar en el de otra sede le muestra una mesa vacía y ninguna caja
     // abierta — o sea, la pantalla le dice que no hizo lo que acaba de hacer. `/me` ya trae cuál
     // es (`dispensario_sede`), así que no hace falta preguntar nada.
-    sedeId.value = (desdeUrl && sedes.value.some(s => s.id === desdeUrl))
-      ? desdeUrl
-      : sedeDeMostrador(auth.user, sedeStore.sedes)
+    // LA APP NO ELIGE POR VOS EN QUÉ MOSTRADOR ESTÁS.
+    //
+    // Antes, sin sede propia y con varias que atienden, se caía a `sedes[0]` —la primera
+    // alfabética— y entraba. En una pantalla donde se carga la mesa, se abre y se cierra caja, eso
+    // es la app decidiendo por vos dónde estás parado: cargás la mesa de Centro creyendo que es
+    // Norte. Y NO es un caso raro: `dispensario_sede` nace en null y casi nadie la carga.
+    //
+    // Se entra directo sólo cuando NO hay nada que adivinar: la que vino por URL, la suya
+    // asignada, una sola sede, o la última que eligió acá. Si no, se pregunta.
+    const propia    = sedeDeMostrador(auth.user, sedeStore.sedes)
+    const recordada = sedeRecordada()
+    const valida    = (id) => id && sedes.value.some(s => s.id === id)
+    const tieneSuya = auth.user?.dispensario_sede?.id ?? auth.user?.dispensario_sede_id
+
+    if (valida(desdeUrl))                 sedeId.value = desdeUrl
+    else if (tieneSuya && valida(propia)) sedeId.value = propia
+    else if (sedes.value.length === 1)    sedeId.value = sedes.value[0].id
+    else if (valida(recordada))           sedeId.value = recordada
+    else                                  sedeId.value = null   // que elija
+
+    // Y SI QUEDÓ EN NULL, HAY QUE VOLVER A PASAR POR `cargar()`.
+    //
+    // El watcher de `sedeId` no dispara de null a null, así que nadie recalculaba `cargando` y la
+    // pantalla se quedaba en el esqueleto para siempre — con la lista de sedes lista para elegir,
+    // invisible detrás de las barritas grises. El spinner eterno es la forma más cara de no decir
+    // nada, y acá encima había algo que decir.
+    if (sedeId.value === null) cargar()
   })
 
   // La mesa se actualiza sola: si administración baja producto desde su oficina, quien atiende lo
@@ -312,7 +363,8 @@ export function useMostrador () {
   watch(sedeId, () => { cargado.value = false; cantidades.value = {}; cargar() }, { immediate: true })
 
   return {
-    gestiona, sedeId, sedes, faltaSede, motivoSinSede, cargando, guardando, error, turno, mesa, estado,
+    gestiona, sedeId, sedes, faltaSede, motivoSinSede, debeElegirSede, elegirSede,
+    cargando, guardando, error, turno, mesa, estado,
     fondoSugerido, sinRevisar, cantidades, tabla, cambiosMesa, valorMesaDespues,
     esperadoEfectivo, otrosIngresosEfectivo, movimientosDelTurno,
     cargar, guardarMesa, confirmarConteo, confirmarConteoDeUno, moverPlata,

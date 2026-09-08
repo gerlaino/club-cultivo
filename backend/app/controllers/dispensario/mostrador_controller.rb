@@ -11,7 +11,7 @@ module Dispensario
   class MostradorController < ApplicationController
     before_action :authenticate_user!
     before_action -> { require_feature!(:produccion_dispensa) }
-    before_action :set_mostrador
+    before_action :set_mostrador, except: [:resumen]
     before_action :require_operador
 
     # GET /sedes/:sede_id/mostrador
@@ -41,6 +41,24 @@ module Dispensario
         # Todo lo que se puede subir a la mesa desde el depósito de esta sede.
         disponibles: disponibles.map { |s| serialize_stock(s) },
       }
+    end
+
+    # GET /mostradores — el estado de CADA mostrador del club, para elegir a cuál entrar.
+    #
+    # Sin esto, elegir sede es un desplegable de nombres: hay que entrar a cada una para saber si
+    # alguien está atendiendo. Con el estado al lado, la pantalla de elección es además el
+    # pantallazo del día — que es lo que administración viene a buscar.
+    #
+    # Sólo las sedes que ATIENDEN (`social`/`mixta`) y sólo las visibles para esta persona: un
+    # dispensador de Norte no monitorea Centro.
+    def resumen
+      sedes = current_user.club.sedes
+                          .where(id: current_user.sedes_visibles_ids, tipo: %w[social mixta])
+                          .order(:nombre)
+
+      # `mostrador` y no `mostrador!`: un GET que escribe en la base es una sorpresa que se paga
+      # cara, y una sede que nunca abrió su mostrador simplemente no tiene fila todavía.
+      render json: { mostradores: sedes.map { |sede| resumen_de(sede) } }
     end
 
     # POST /sedes/:sede_id/mostrador/cargar { cambios: [{ stock_id, cantidad }], motivo }
@@ -483,6 +501,28 @@ module Dispensario
 
       send_data "﻿#{filas}", type: 'text/csv; charset=utf-8',
                 filename: "arqueos-#{@mostrador.sede&.nombre.to_s.parameterize}-#{Time.zone.today}.csv"
+    end
+
+    def resumen_de(sede)
+      most  = sede.mostrador
+      items = most ? most.sobre_la_mesa.to_a : []
+      turno = most&.turno_abierto
+
+      {
+        sede_id: sede.id,
+        sede:    sede.nombre,
+        # Cuánto hay arriba, POR UNIDAD: sumar 300 g de flor con 12 prerolls da 312 de nada.
+        productos: items.size,
+        totales:   items.group_by { |i| i.stock&.unidad || 'g' }
+                        .map { |u, is| { unidad: u, cantidad: is.sum { |i| i.cantidad.to_f } } },
+        # Si hay alguien atendiendo, quién y desde cuándo. Nil = nadie, y eso NO significa que la
+        # mesa esté vacía.
+        turno: turno && { desde: turno.abierto_at, quien: turno.abierto_por&.nombre_completo },
+        # Cierres que piden una mirada en ESA sede. Es media razón para entrar.
+        sin_revisar: gestiona? && most ? Mostradores::MotivosDeRevision.por_turno(
+          most.turno_mostradores.cerrados.where(revisado_at: nil)
+        ).size : 0,
+      }
     end
 
     # Una consulta para toda la página, no una por fila.

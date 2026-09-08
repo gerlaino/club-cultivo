@@ -4,11 +4,20 @@
     <header class="mst__head">
       <div class="mst__head-left">
         <h1 class="mst__title">Mostrador</h1>
-        <p class="mst__sub">Lo que hay sobre la mesa para dispensar hoy.</p>
+        <!-- CON VARIAS SEDES, LA PANTALLA DICE EN CUÁL ESTÁS. El select de arriba se lee como
+             un filtro; acá es dónde estás parado, que es otra cosa — y es lo que evita cargar la
+             mesa de una sede creyendo que es la otra. -->
+        <p class="mst__sub">
+          Lo que hay sobre la mesa para dispensar hoy<template v-if="sedes.length > 1 && nombreSede">
+            en <b>{{ nombreSede }}</b></template>.
+        </p>
       </div>
 
       <div class="mst__head-right">
-        <select v-if="sedes.length > 1" v-model="sedeId" class="mst__select mst__select--sede">
+        <!-- Mientras se está eligiendo, el select sobra y encima confunde: sin sede elegida se
+             dibuja en blanco, al lado de la lista que justamente pregunta cuál. -->
+        <select v-if="sedes.length > 1 && !debeElegirSede" v-model="sedeId"
+                class="mst__select mst__select--sede">
           <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
         </select>
         <span v-if="tab === 'hoy'" class="mst__estado" :class="`is-${estado}`">
@@ -84,12 +93,47 @@
         </div>
       </section>
 
+      <!-- ══ ¿EN QUÉ MOSTRADOR ESTÁS? ═══════════════════════════════════════════
+           LA APP NO ELIGE POR VOS. Antes, sin sede asignada y con varias que atienden, entraba a
+           la primera alfabética: en una pantalla donde se carga la mesa y se abre y cierra caja,
+           eso es cargar la mesa de Centro creyendo que estás en Norte. Y `dispensario_sede` nace
+           en null, así que le pasaba a casi todos.
+           No es un peaje: con el estado de cada uno al lado, elegir ES el pantallazo del día —
+           que es lo que administración viene a buscar cuando entra a monitorear. -->
+      <section v-else-if="debeElegirSede" class="mst__elegir">
+        <h2 class="mst__seccion">¿En qué mostrador?</h2>
+        <p class="mst__seccion-sub">Tenés más de una sede que atiende. Elegí cuál mirar.</p>
+        <ul class="mst__sedes">
+          <li v-for="sd in sedes" :key="sd.id">
+            <button type="button" class="mst__sede" @click="entrarA(sd.id)">
+              <span class="mst__sede-nombre">{{ sd.nombre }}</span>
+              <span class="mst__sede-estado">
+                <template v-if="resumenDe(sd.id)?.turno">
+                  <span class="mst__punto mst__punto--on"></span>
+                  Caja abierta · {{ resumenDe(sd.id).turno.quien }}
+                  desde las {{ hora(resumenDe(sd.id).turno.desde) }}
+                </template>
+                <template v-else>
+                  <span class="mst__punto"></span> Caja cerrada
+                </template>
+              </span>
+              <span class="mst__sede-mesa">{{ mesaDe(sd.id) }}</span>
+              <!-- Media razón para entrar a ESA sede y no a otra. -->
+              <span v-if="resumenDe(sd.id)?.sin_revisar" class="mst__sede-pend">
+                {{ resumenDe(sd.id).sin_revisar }} para mirar
+              </span>
+              <i class="bi bi-chevron-right mst__sede-arr"></i>
+            </button>
+          </li>
+        </ul>
+      </section>
+
       <!-- ══ LA CAJA: quién la abrió y cómo viene ═══════════════════════════════ -->
       <!-- Cada dato con su etiqueta y su número, no una frase corrida: "abrió a las 14:02 · en
            caja tendría que haber $150.000" y al otro lado "$784.920,5 sobre la mesa" obligaba a
            leer un párrafo para encontrar dos cifras, y en el teléfono se apilaba en un bloque
            ilegible. Son tres preguntas distintas y se contestan por separado. -->
-      <section v-else class="mst__turno">
+      <section v-else-if="sedeId" class="mst__turno">
         <div class="mst__turno-datos">
           <template v-if="turno">
             <div class="mst__dato">
@@ -153,7 +197,7 @@
       <!-- ══ LA MESA ═══════════════════════════════════════════════════════════
            Para administración es editable: escribe cuánto tiene que haber de cada producto y
            guarda con un motivo. Para quien atiende es de lectura — él nunca elige qué hay. -->
-      <div v-if="gestiona && !faltaSede" class="mst__mesa-hd">
+      <div v-if="gestiona && !faltaSede && !debeElegirSede" class="mst__mesa-hd">
         <h2 class="mst__seccion">Qué hay sobre la mesa</h2>
         <p class="mst__seccion-sub">
           Escribí cuánto de cada producto tiene que quedar disponible para dispensar. Podés subir
@@ -161,7 +205,7 @@
         </p>
       </div>
 
-      <TablaMostrador v-if="!faltaSede" v-model="cantidades" :stocks="tabla" :editable="gestiona"
+      <TablaMostrador v-if="!faltaSede && !debeElegirSede" v-model="cantidades" :stocks="tabla" :editable="gestiona"
                       :muestra-costo="gestiona"
                       :contable="!gestiona && !!turno" @contar="itemAContar = $event"
                       :vacio-texto="gestiona ? 'No hay stock habilitado para dispensar en esta sede.'
@@ -252,7 +296,7 @@
 // (`MMostradorView`): son la misma mesa y la misma caja, y lo único que difiere es cómo se
 // muestran. Acá queda la presentación y el estado de los modales, que cada pantalla abre a su
 // manera.
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import RendicionCajaCard from '../components/RendicionCajaCard.vue'
 import MostradorMerma from '../components/mostrador/MostradorMerma.vue'
 import MostradorTurnos from '../components/mostrador/MostradorTurnos.vue'
@@ -261,10 +305,12 @@ import ModalCargarMesa from '../components/mostrador/ModalCargarMesa.vue'
 import ModalContarItem from '../components/mostrador/ModalContarItem.vue'
 import ModalConteo from '../components/mostrador/ModalConteo.vue'
 import { formaLabel } from '../lib/formatters.js'
+import { listMostradores } from '../lib/api.js'
 import { useMostrador } from '../composables/useMostrador.js'
 
 const {
-  gestiona, sedeId, sedes, faltaSede, motivoSinSede, cargando, guardando, error, turno, mesa, estado,
+  gestiona, sedeId, sedes, faltaSede, motivoSinSede, debeElegirSede, elegirSede,
+  cargando, guardando, error, turno, mesa, estado,
   fondoSugerido, sinRevisar, cantidades, tabla, cambiosMesa, valorMesaDespues,
   esperadoEfectivo, otrosIngresosEfectivo, movimientosDelTurno,
   cargar, guardarMesa, confirmarConteo, confirmarConteoDeUno, moverPlata,
@@ -286,6 +332,41 @@ const totalMesa = computed(() => {
     .map(([u, n]) => `${n.toLocaleString('es-AR', { maximumFractionDigits: 1 })} ${u}`)
     .join(' · ')
 })
+
+// EL ESTADO DE CADA MOSTRADOR, para que elegir no sea leer una lista de nombres.
+//
+// Sin esto hay que entrar a cada sede para saber si alguien está atendiendo — o sea, la pregunta
+// que administración viene a hacerse tiene que responderse a mano, una sede por vez.
+const nombreSede = computed(() => sedes.value.find(s => s.id === sedeId.value)?.nombre || '')
+
+const resumenes = ref([])
+const resumenDe = (id) => resumenes.value.find(r => r.sede_id === id) || null
+
+// Cuánto hay arriba, por unidad. Mismo criterio que el KPI: 300 g de flor y 12 prerolls no son
+// 312 de nada.
+function mesaDe (id) {
+  const r = resumenDe(id)
+  if (!r || !r.productos) return 'Mesa vacía'
+  const totales = (r.totales || [])
+    .map(t => `${Number(t.cantidad).toLocaleString('es-AR', { maximumFractionDigits: 1 })} ${t.unidad}`)
+    .join(' · ')
+  return `${r.productos} producto${r.productos === 1 ? '' : 's'}${totales ? ` · ${totales}` : ''}`
+}
+
+function entrarA (id) {
+  elegirSede(id)
+  cargar()
+}
+
+// Se pide sólo cuando hay algo que elegir: en una organización de una sola sede sería una consulta
+// para pintar una pantalla que no se dibuja.
+watch(debeElegirSede, async (hayQueElegir) => {
+  if (!hayQueElegir || resumenes.value.length) return
+  try {
+    const { data } = await listMostradores()
+    resumenes.value = data.mostradores || []
+  } catch { resumenes.value = [] }   // la lista de nombres sigue sirviendo para elegir
+}, { immediate: true })
 
 const conteo    = ref(null)      // 'apertura' | 'cierre'
 // Contar UN producto sin cerrar la caja: la fila de la mesa que se está pesando.
@@ -631,4 +712,31 @@ async function confirmarPlata () {
   .mst__draft-row { flex-wrap: wrap; }
   .mst__acciones--turno { flex-direction: column; align-items: stretch; }
 }
+/* ── ELEGIR MOSTRADOR: la lista es también el pantallazo del día ─────────────── */
+.mst__elegir { padding: 4px 0 8px; }
+.mst__sedes  { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.mst__sede {
+  width: 100%; display: grid; align-items: center; gap: 4px 14px; text-align: left;
+  grid-template-columns: 1fr auto auto 16px;
+  background: #fff; border: 1px solid var(--c-slate-200); border-radius: 11px;
+  padding: 14px 16px; cursor: pointer;
+}
+.mst__sede:hover { border-color: var(--c-leaf-600); background: var(--c-leaf-50, #f0fdf4); }
+.mst__sede-nombre { font-size: var(--fs-15, .95rem); font-weight: 700; color: var(--c-ink-900); }
+.mst__sede-estado { font-size: var(--fs-13); color: var(--c-ink-500); display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.mst__sede-mesa   { font-size: var(--fs-13); color: var(--c-ink-500); font-family: var(--font-mono); white-space: nowrap; }
+.mst__sede-pend {
+  font-size: var(--fs-12); font-weight: 700; white-space: nowrap;
+  background: var(--c-amber-100, #fef3c7); color: var(--c-amber-700, #b45309);
+  border-radius: 999px; padding: 2px 8px;
+}
+.mst__sede-arr { color: var(--c-ink-400, #9aa0aa); }
+/* Verde = hay alguien atendiendo ahora. Es el dato que se busca de un vistazo. */
+.mst__punto { width: 7px; height: 7px; border-radius: 50%; background: var(--c-slate-300); display: inline-block; }
+.mst__punto--on { background: var(--c-leaf-600); }
+@media (max-width: 640px) {
+  .mst__sede { grid-template-columns: 1fr 16px; }
+  .mst__sede-estado, .mst__sede-mesa, .mst__sede-pend { grid-column: 1 / -1; }
+}
+
 </style>

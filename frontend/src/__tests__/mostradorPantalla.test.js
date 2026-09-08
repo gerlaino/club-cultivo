@@ -70,6 +70,12 @@ vi.mock('../lib/api.js', () => ({
   receptoresRendicion: vi.fn(() => Promise.resolve({ data: [] })),
   crearRendicion: vi.fn(), recibirRendicion: vi.fn(), conformarRendicion: vi.fn(),
   listSedes: vi.fn(() => Promise.resolve({ data: SEDES })),
+  // El estado de cada mostrador, para la pantalla de elección.
+  listMostradores: vi.fn(() => Promise.resolve({ data: { mostradores: [
+    { sede_id: 10, sede: 'Central', productos: 2, totales: [{ unidad: 'g', cantidad: 300 }],
+      turno: { desde: '2026-09-08T09:14:00Z', quien: 'Ana Gómez' }, sin_revisar: 0 },
+    { sede_id: 12, sede: 'Norte', productos: 0, totales: [], turno: null, sin_revisar: 2 },
+  ] } })),
 }))
 
 import MostradorView from '../views/MostradorView.vue'
@@ -626,6 +632,7 @@ describe('Con qué sede arranca la pantalla', () => {
     const sede = useSedeStore()
     sede.sedes = DOS_SEDES
     sede.loaded = true
+    localStorage.removeItem('mostrador:sede')
   })
 
   it('la del usuario antes que la primera de la lista', async () => {
@@ -634,10 +641,42 @@ describe('Con qué sede arranca la pantalla', () => {
     expect(getMostrador).toHaveBeenCalledWith(12)
   })
 
-  it('sin sede propia, la primera', async () => {
-    await montar('admin')
+  // LA APP NO ELIGE POR VOS. Este caso decía «sin sede propia, la primera» y afirmaba justo lo
+  // que había que arreglar: entrar a la primera alfabética en una pantalla donde se carga la mesa
+  // y se abre y cierra caja es decidir por el usuario dónde está parado. Y no era raro —
+  // `dispensario_sede` nace en null, así que le pasaba a casi todos.
+  it('sin sede propia y con varias que atienden, pregunta en vez de adivinar', async () => {
+    const w = await montar('admin')
 
+    expect(getMostrador).not.toHaveBeenCalled()
+    expect(w.find('.mst__elegir').exists()).toBe(true)
+    expect(w.findAll('.mst__sede-nombre').map(n => n.text())).toEqual(['Central', 'Norte'])
+  })
+
+  it('y al elegir, entra a esa', async () => {
+    const w = await montar('admin')
+    await w.findAll('.mst__sede')[1].trigger('click')
+    await flushPromises()
+
+    expect(getMostrador).toHaveBeenCalledWith(12)
+  })
+
+  it('con una sola sede no pregunta: no hay nada que elegir', async () => {
+    const sede = useSedeStore()
+    sede.sedes = [{ id: 10, nombre: 'Central', tipo: 'social' }]
+    const w = await montar('admin')
+
+    expect(w.find('.mst__elegir').exists()).toBe(false)
     expect(getMostrador).toHaveBeenCalledWith(10)
+  })
+
+  // Elegir a mano se recuerda: preguntarle lo mismo cada vez que entra es un peaje.
+  it('la próxima vez entra a la que eligió', async () => {
+    localStorage.setItem('mostrador:sede', '12')
+    const w = await montar('admin')
+
+    expect(w.find('.mst__elegir').exists()).toBe(false)
+    expect(getMostrador).toHaveBeenCalledWith(12)
   })
 })
 

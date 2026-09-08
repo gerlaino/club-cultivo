@@ -1,5 +1,39 @@
 # Changelog
 
+## Septiembre 2026 (as) — la app no elige por vos en qué mostrador estás
+
+Germán: *"al entrar a mostrador, ¿no debería elegir la sede primero? porque puedo tener un
+mostrador por sede dispensario o mixta... esto es para el admin, para que pueda entrar a
+monitorear el mostrador de cada sede y hacer lo que tenga que hacer"*.
+
+**Había un `<select>` de sede arriba, pero la pantalla ya había entrado a alguna antes de que
+eligieras.** El orden era `?sede=` → su `dispensario_sede` → **la primera de la lista**. Ese último
+escalón es el problema, y no es teórico: `dispensario_sede` nace en null y casi nadie la carga, así
+que en una organización con dos sedes que atienden **la app elegía por vos** — en la pantalla donde
+se carga la mesa, se abre y se cierra caja. Cargás la mesa de Centro creyendo que estás en Norte.
+
+**Se pregunta SÓLO cuando la app estaría adivinando.** Una sola sede, la suya asignada, la que vino
+por URL o la última que eligió: entra directo. Con varias y ninguna razón para preferir una:
+pregunta. A quien atiende no le cambia nada — tiene su sede, o hay una sola.
+
+**Y elegir NO es un peaje: es el pantallazo del día.** Cada sede se ofrece con su estado —caja
+abierta desde cuándo y con quién, cuántos productos hay arriba y cuánto, y cuántos cierres piden
+una mirada— porque eso es exactamente lo que administración viene a buscar cuando entra a
+monitorear. Sale de `GET /mostradores`, que cuelga del club y no de una sede a propósito: la
+pregunta «¿cómo viene cada uno?» es la que no se puede hacer parado dentro de una.
+
+**La elección se recuerda** (`localStorage`, por navegador y por persona): preguntarle lo mismo
+cada vez que entra sería el peaje que se quería evitar. Entrar por la sede propia o por URL no
+se recuerda, para que un link no le cambie a nadie su mostrador de siempre.
+
+**Y con varias sedes, la pantalla dice en cuál estás**: el select se lee como un filtro, y dónde
+estás parado es otra cosa.
+
+**Un cuelgue que apareció en el camino:** el watcher de `sedeId` no dispara de `null` a `null`, así
+que al quedar sin sede elegida nadie recalculaba `cargando` y la pantalla se quedaba en el
+esqueleto para siempre — con la lista de sedes lista, invisible detrás de las barritas grises. El
+spinner eterno es la forma más cara de no decir nada, y acá encima había algo que decir.
+
 ## Septiembre 2026 (ar) — la solapa de Merma: una línea y una lista
 
 Germán, mirándola en producción: *"sigue sin ser intuitiva, simple, sencilla... me gusta toda esta

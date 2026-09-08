@@ -604,6 +604,19 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 - **EN DESARROLLO, `localhost:5173` PUEDE SER `vite preview` Y NO `vite dev`**: sirve el `dist/`,
   no el código. Toda verificación con Playwright necesita `npm run build` antes, o se está
   probando el bundle viejo y las conclusiones son basura. Ya costó media sesión.
+- **LA APP NO ELIGE POR VOS EN QUÉ MOSTRADOR ESTÁS** (sep-2026). Se entra directo sólo cuando no
+  hay nada que adivinar: una sola sede que atienda, la suya (`dispensario_sede`), la que vino por
+  `?sede=`, o la última que eligió (recordada en `localStorage`). Con varias y ninguna razón para
+  preferir una, **se pregunta** — antes caía en `sedes[0]`, la primera alfabética, en la pantalla
+  donde se carga la mesa y se abre y cierra caja. Y no era un caso raro: `dispensario_sede` nace
+  en null. **Elegir no es un peaje**: cada sede se ofrece con su estado (caja abierta desde cuándo
+  y con quién, qué hay arriba, cuántos cierres para mirar), que es lo que administración viene a
+  buscar cuando entra a monitorear. Sale de `GET /mostradores`, que cuelga del CLUB y no de una
+  sede: «¿cómo viene cada uno?» es la pregunta que no se puede hacer parado dentro de una.
+- **UN `watch` NO DISPARA DE `null` A `null`.** Al dejar `sedeId` sin resolver a propósito, nadie
+  recalculaba `cargando` y la pantalla quedaba en el esqueleto para siempre, con la lista de sedes
+  lista e invisible detrás. Todo estado que se deja deliberadamente en su valor inicial necesita
+  que alguien vuelva a pasar por el cálculo a mano.
 - **CUÁL ES "MI MOSTRADOR" LO CONTESTA `sedeDeMostrador`, Y NADIE MÁS** (sep-2026). La suya
   (`dispensario_sede`) si atiende público; si no tiene asignada —**la columna nace en null y casi
   nadie la carga**— la primera que atienda. El carrito de la dispensa la resolvía por su cuenta
