@@ -21,7 +21,19 @@
                 <span v-if="orden.campo === c.campo" class="tmo__caret">{{ orden.dir === 'asc' ? '▲' : '▼' }}</span>
               </button>
             </th>
-            <th class="tmo__th tmo__th--num tmo__th--fija">{{ tituloColumna }}</th>
+            <!-- ERA LA ÚNICA COLUMNA QUE NO ORDENABA, y es por la que más se quiere ordenar:
+                 "¿de qué tengo más arriba?" y "¿qué se está por acabar?" son la misma pregunta
+                 mirada desde los dos extremos. Un encabezado que no se puede tocar entre siete
+                 que sí se lee como que esa columna está rota. -->
+            <th class="tmo__th tmo__th--num tmo__th--fija"
+                :class="{ 'is-activa': orden.campo === 'mostrador' }"
+                :aria-sort="orden.campo === 'mostrador' ? (orden.dir === 'asc' ? 'ascending' : 'descending') : 'none'">
+              <button type="button" class="tmo__th-btn" @click="ordenarPor('mostrador')">
+                {{ tituloColumna }}
+                <i v-if="orden.campo === 'mostrador'"
+                   :class="orden.dir === 'asc' ? 'bi bi-caret-up-fill' : 'bi bi-caret-down-fill'"></i>
+              </button>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -44,6 +56,21 @@
                  necesitaba de ahí era saber qué pedir, y para eso tiene el botón de reposición.
                  El backend además ya no se lo manda — esconder una columna no es una regla. -->
             <td v-if="muestraCosto" class="tmo__num tmo__mut" data-col="Depósito">{{ fmt(s.disponible) }} {{ s.unidad }}</td>
+            <!-- RESERVADO ES DEL PRODUCTO, NO DE LA MESA — y por eso tiene columna propia.
+                 Antes iba como un cartelito debajo del input de Mostrador, y ahí decía una cosa
+                 imposible: "mostrador 0 · 15 reservados". Esos 15 g no están arriba, están en el
+                 depósito (que ya los descontó: por eso la columna de al lado no los incluye).
+                 Colgado de la columna equivocada, un dato correcto se lee como un error. -->
+            <td v-if="muestraCosto" class="tmo__num" data-col="Reservado">
+              <span :class="Number(s.reservado) > 0 ? 'tmo__res' : 'tmo__mut'">
+                {{ fmt(s.reservado) }} {{ s.unidad }}
+              </span>
+            </td>
+            <!-- LIBRE ES LO QUE SE PUEDE ENTREGAR, esté guardado o arriba: el frasco menos lo que
+                 tiene dueño. Es EL MISMO número que muestra y valida el carrito de la dispensa
+                 (`disponible_para_entregar`): si acá significara otra cosa, la misma palabra diría
+                 dos verdades en dos pantallas de la misma app. -->
+            <td v-if="muestraCosto" class="tmo__num tmo__libre" data-col="Libre">{{ fmt(s.libre) }} {{ s.unidad }}</td>
             <td class="tmo__num tmo__td-input" :data-col="tituloColumna">
               <template v-if="editable">
                 <input :value="valores[s.stock_id] ?? ''" type="number" min="0" step="0.1"
@@ -69,16 +96,6 @@
                   Contar
                 </button>
               </template>
-              <!-- CUÁNTO DE LO QUE HAY ARRIBA YA TIENE DUEÑO.
-                   La reserva la hace administración y el producto se enfrasca recién al entregar:
-                   hasta entonces sigue sobre la mesa, mezclado con lo que se puede vender. La mesa
-                   dice 110 y sólo 95 se pueden entregar — sin decirlo, el gramo se lo lleva el que
-                   llega primero y la reserva no se puede cumplir.
-                   SE MUESTRA SIEMPRE, TAMBIÉN EN CERO (pedido de Germán): así la columna se
-                   explica sola y el número no aparece de la nada el día que hay una reserva. -->
-              <span class="tmo__reservado" :class="{ 'is-cero': !Number(s.reservado) }">
-                {{ fmt(s.reservado) }} {{ s.unidad }} reservados
-              </span>
             </td>
           </tr>
         </tbody>
@@ -151,7 +168,9 @@ const COLUMNAS = [
 const columnas = computed(() => {
   if (!props.muestraCosto) return COLUMNAS
   return [...COLUMNAS, { campo: 'costo', label: 'Costo', num: true },
-          { campo: 'disponible', label: 'Depósito', num: true }]
+          { campo: 'disponible', label: 'Depósito', num: true },
+          { campo: 'reservado',  label: 'Reservado', num: true },
+          { campo: 'libre',      label: 'Libre', num: true }]
 })
 
 const valores = computed(() => props.modelValue)
@@ -192,6 +211,14 @@ function valorOrden (s, campo) {
     case 'lote':       return (s.lote || '').toLowerCase()
     case 'fecha':      return s.fecha || ''
     case 'disponible': return Number(s.disponible) || 0
+    // Las columnas nuevas también ordenan: un encabezado que se puede tocar y no hace nada es
+    // peor que uno que no se puede tocar.
+    case 'reservado':  return Number(s.reservado) || 0
+    case 'libre':      return Number(s.libre) || 0
+    // Lo GUARDADO, nunca lo que se está escribiendo en el input: ordenar por el valor en edición
+    // haría saltar la fila de lugar mientras se tipea, que es la peor forma de perder de vista
+    // lo que estabas cargando.
+    case 'mostrador':  return Number(s.mostrador) || 0
     case 'precio':     return Number(s.precio_ars) || 0
     case 'costo':      return Number(s.costo_ars) || 0
     default:           return ''
@@ -212,11 +239,19 @@ const visibles = computed(() => {
 
   const { campo, dir } = orden.value
   const signo = dir === 'asc' ? 1 : -1
+  // Lo que ya está sobre la mesa va arriba: es lo que se está mirando.
+  //
+  // SALVO cuando se ordena JUSTO por esa columna: ahí el agrupado previo rompe el orden que se
+  // pidió. De menor a mayor daría «5, 40, 200, 0, 0, 0» — los ceros al final, que es cualquier
+  // cosa menos ascendente.
+  const agrupar = campo !== 'mostrador'
+
   return lista.sort((a, b) => {
-    // Lo que ya está sobre la mesa va arriba: es lo que se está mirando.
-    const ma = Number(a.mostrador || 0) > 0 ? 0 : 1
-    const mb = Number(b.mostrador || 0) > 0 ? 0 : 1
-    if (ma !== mb) return ma - mb
+    if (agrupar) {
+      const ma = Number(a.mostrador || 0) > 0 ? 0 : 1
+      const mb = Number(b.mostrador || 0) > 0 ? 0 : 1
+      if (ma !== mb) return ma - mb
+    }
 
     const va = valorOrden(a, campo), vb = valorOrden(b, campo)
     return va < vb ? -signo : va > vb ? signo : 0
@@ -261,8 +296,10 @@ defineExpose({ cambios, hayCambios, hayExceso })
 .tmo__th--num { text-align: right; }
 /* Lo reservado: dato, no alerta. En cero se apaga casi del todo — está para que la columna se
    explique sola, no para gritar quince veces que no pasa nada. */
-.tmo__reservado { display: block; font-size: .68rem; font-weight: 700; color: var(--c-amber-700, #b45309); white-space: nowrap; margin-top: 2px; }
-.tmo__reservado.is-cero { font-weight: 500; color: var(--c-ink-400, #9aa0aa); }
+/* Reservado: ámbar sólo cuando hay algo. En cero es un cero más, no un aviso. */
+.tmo__res   { color: var(--c-amber-700, #b45309); font-weight: 700; }
+/* Libre es el número con el que se decide: el único de los tres que se lee entero. */
+.tmo__libre { font-weight: 700; color: var(--c-ink-900, #1a1d21); }
 .tmo__th-btn {
   width: 100%; border: 0; background: transparent; cursor: pointer;
   padding: 11px 14px; text-align: inherit;

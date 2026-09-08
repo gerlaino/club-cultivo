@@ -1,5 +1,37 @@
 # Changelog
 
+## Septiembre 2026 (aq) — la mesa, leída por alguien que no la escribió
+
+Tres cosas que aparecieron mirando la pantalla en producción, y las tres son de LECTURA: el dato
+estaba bien calculado y decía otra cosa.
+
+**«MOSTRADOR 0 · 15 RESERVADOS» ERA IMPOSIBLE DE LEER.** Germán: *"mostrador 0 reservado 15, ¿cómo
+es?"*. Tenía razón y el error era mío: `reservado` es un dato del PRODUCTO —los 15 g están en el
+depósito— y lo había colgado como un cartelito debajo del input de Mostrador. Ahí decía que hay 15
+apartados sobre una mesa vacía. El número era correcto; la columna, la equivocada. Ahora son
+**dos columnas propias**: `Reservado` (a nombre de pacientes) y `Libre` (lo que se puede entregar,
+esté guardado o arriba). **`Libre` es EL MISMO número que el carrito de la dispensa**
+(`disponible_para_entregar`) — si acá significara otra cosa, la misma palabra diría dos verdades
+en dos pantallas de la misma app.
+
+**EL KPI DECÍA CUÁNTO VALE, Y LO QUE SE MIRA ES CUÁNTO HAY.** *"al ser un kpi quiero la cantidad
+total de grs en mostrador"*. Decía `$711.319`, y el valor de la mercadería no es una decisión que
+se tome en el mostrador — encima al lado de "en caja tendría que haber" se lee como plata que hay
+que contar. Ahora suma producto, **agrupado por unidad** (`200 g · 40 un`): sumar 300 g de flor
+con 12 prerolls da 312 de nada. Sin desglose plegable a propósito: la tabla de abajo YA es el
+detalle producto por producto.
+
+**LA COLUMNA MOSTRADOR ERA LA ÚNICA QUE NO ORDENABA**, y es por la que más se quiere ordenar —"¿de
+qué tengo más arriba?" y "¿qué se está por acabar?" son la misma pregunta desde los dos extremos.
+Ordena por lo GUARDADO y nunca por lo que se está tipeando (la fila saltaría de lugar mientras
+escribís), y **ordenando por esa columna se apaga el agrupado previo** de "lo que está sobre la
+mesa arriba": de menor a mayor daría `40, 200, 0, 0`, que es cualquier cosa menos ascendente.
+
+**Verificado renderizado, con la mesa cargada y la caja abierta** — no sólo en tests. Y en el
+camino apareció por qué las verificaciones anteriores no servían: **`localhost:5173` corre
+`vite preview`, que sirve el `dist/`**, así que Playwright estaba probando el build viejo. Hay que
+`npm run build` antes de cada corrida.
+
 ## Septiembre 2026 (ap) — la caja cerrada que sólo veía el admin, y el techo del carrito
 
 Germán, probando en producción con el teléfono en la mano: *"para el dispensador está la caja

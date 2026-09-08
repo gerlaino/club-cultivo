@@ -106,9 +106,16 @@
               <span class="mst__dato-lbl">En caja tendría que haber</span>
               <span class="mst__dato-val mst__dato-val--num">${{ pesos(turno.caja.esperado_ars) }}</span>
             </div>
-            <div v-if="gestiona && turno.valor_mesa_ars" class="mst__dato">
+            <!-- CUÁNTO HAY, NO CUÁNTO VALE. Acá decía la plata ($711.319) y como KPI no sirve:
+                 el valor de la mercadería no es una decisión que se tome en el mostrador, y al
+                 lado de "en caja tendría que haber" se lee como si fuera plata que hay que
+                 contar. Lo que se mira de un golpe es cuánto producto hay arriba.
+                 Sin desglose: la tabla de abajo YA es el detalle producto por producto.
+                 Y sin el candado de administración: son gramos, no costos — quien atiende los
+                 tiene todos a la vista en la tabla, sumarlos no le dice nada nuevo. -->
+            <div v-if="totalMesa" class="mst__dato">
               <span class="mst__dato-lbl">Sobre la mesa</span>
-              <span class="mst__dato-val mst__dato-val--num">${{ pesos(turno.valor_mesa_ars) }}</span>
+              <span class="mst__dato-val mst__dato-val--num">{{ totalMesa }}</span>
             </div>
           </template>
           <div v-else class="mst__dato">
@@ -262,6 +269,23 @@ const {
   esperadoEfectivo, otrosIngresosEfectivo, movimientosDelTurno,
   cargar, guardarMesa, confirmarConteo, confirmarConteoDeUno, moverPlata,
 } = useMostrador()
+
+// CUÁNTO HAY SOBRE LA MESA, EN PRODUCTO.
+//
+// Por UNIDAD y no todo junto: sumar 300 g de flor con 12 prerolls da 312 de nada. Se agrupa y se
+// muestran las que haya («1.240 g · 12 u»), que además es como se cuenta al cerrar.
+const totalMesa = computed(() => {
+  const porUnidad = new Map()
+  for (const it of mesa.value) {
+    const n = Number(it.mostrador) || 0
+    if (n <= 0) continue
+    const u = it.unidad || 'g'
+    porUnidad.set(u, (porUnidad.get(u) || 0) + n)
+  }
+  return [...porUnidad.entries()]
+    .map(([u, n]) => `${n.toLocaleString('es-AR', { maximumFractionDigits: 1 })} ${u}`)
+    .join(' · ')
+})
 
 const conteo    = ref(null)      // 'apertura' | 'cierre'
 // Contar UN producto sin cerrar la caja: la fila de la mesa que se está pesando.

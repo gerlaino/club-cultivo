@@ -416,6 +416,14 @@ module Dispensario
         # y cuánto hay guardado en el depósito.
         costo_ars:  (stock.costo_unitario_ars&.to_f if gestiona?),
         disponible: (stock.cantidad_disponible_real.to_f if gestiona?),
+        # LO QUE SE PUEDE ENTREGAR DE ESTE PRODUCTO, esté sobre la mesa o guardado: el frasco
+        # menos lo que ya tiene dueño. Es EL MISMO número que el carrito de la dispensa
+        # (`disponible_para_entregar`) — si acá significara otra cosa, la misma palabra diría dos
+        # verdades en dos pantallas de la misma app.
+        #
+        # Junto a `disponible` (lo que queda para subir) y `reservado`, cierra la cuenta: lo que
+        # está guardado, lo que está arriba, lo que tiene dueño y lo que se puede vender.
+        libre: (stock.disponible_para_entregar.to_f if gestiona?),
         # A quien atiende no le decimos CUÁNTO hay guardado —no es asunto suyo— pero sí si queda
         # algo, que es lo único que necesita para saber si tiene sentido pedir reposición. Pedir
         # lo que no hay es hacerle perder el viaje a los dos.

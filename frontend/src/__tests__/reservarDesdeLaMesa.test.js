@@ -122,46 +122,67 @@ describe('Dispensar — sigue saliendo del depósito', () => {
   })
 })
 
-// ── Y EN LA MESA SE VE CUÁNTO YA TIENE DUEÑO ───────────────────────────────────────
+// ── RESERVADO Y LIBRE SON COLUMNAS, NO UN CARTEL DEBAJO DEL INPUT ──────────────────
 //
-// Pedido de Germán: que aparezca en pantalla lo reservado de cada producto del mostrador, y que
-// en cero diga "0 reservados" — un número que aparece de la nada el día que hay una reserva no
-// se aprende a mirar.
-describe('La mesa dice cuánto ya tiene dueño', () => {
+// Iban como una línea suelta pegada al input de Mostrador, y ahí decían algo imposible:
+// «mostrador 0 · 15 reservados». Esos 15 g no están sobre la mesa —están en el depósito, que ya
+// los descontó—: `reservado` es un dato del PRODUCTO, no de la mesa. Colgado de la columna
+// equivocada, un número correcto se lee como un error. Lo vio Germán probando en producción.
+describe('La mesa dice qué tiene dueño y qué se puede vender', () => {
   const FILAS = [
-    { stock_id: 1, forma: 'flor_seca', unidad: 'g', genetica: 'Lemon Cookie', numero: 'ST-01',
-      mostrador: 110, reservado: 15, disponible: 890 },
+    // El caso de la captura: nada arriba, 15 reservados que viven en el depósito.
+    { stock_id: 1, forma: 'flor_seca', unidad: 'g', genetica: 'Northern Lights', numero: 'ST-26-0001',
+      mostrador: 0, reservado: 15, disponible: 470.1, libre: 470.1 },
+    // Y el caso con mercadería arriba.
     { stock_id: 2, forma: 'hash', unidad: 'g', genetica: 'Zamaleña', numero: 'ST-02',
-      mostrador: 40, reservado: 0, disponible: 300 },
+      mostrador: 40, reservado: 0, disponible: 300, libre: 340 },
   ]
 
-  async function tabla(props = {}) {
+  async function tabla (props = {}) {
     const { default: Tabla } = await import('../components/mostrador/TablaMostrador.vue')
     return mount(Tabla, {
-      props: { stocks: FILAS, modelValue: {}, editable: false, ...props },
+      // `muestraCosto` = administración: es quien gobierna la mesa y quien ve estas columnas.
+      props: { stocks: FILAS, modelValue: {}, editable: false, muestraCosto: true, ...props },
       global: { stubs: { RouterLink: true } },
     })
   }
 
-  it('muestra los gramos reservados de cada producto', async () => {
+  // POR FILA, NO POR POSICIÓN: la tabla ordena sola —lo que está sobre la mesa primero— así que
+  // atarse al índice hace que el test falle por el orden y no por lo que se está probando.
+  const fila = (w, numero) =>
+    w.findAll('tbody tr').find(r => r.text().includes(numero))
+  const celda = (w, numero, col) => fila(w, numero).find(`[data-col="${col}"]`).text()
+
+  it('lo reservado tiene columna propia y no cuelga del input de la mesa', async () => {
     const w = await tabla()
-    const textos = w.findAll('.tmo__reservado').map(n => n.text())
-    expect(textos[0]).toContain('15')
-    expect(textos[0]).toContain('reservados')
+    expect(w.find('.tmo__reservado').exists()).toBe(false)   // el cartel viejo, que mentía
+
+    expect(celda(w, 'ST-26-0001', 'Reservado')).toContain('15')
+    expect(celda(w, 'ST-02',       'Reservado')).toContain('0')
   })
 
-  it('y en cero lo dice igual, apagado — no aparece de la nada el día que hay una reserva', async () => {
+  it('con la mesa en cero, lo reservado sigue siendo del producto: no dice que hay 15 arriba', async () => {
     const w = await tabla()
-    const filas = w.findAll('.tmo__reservado')
-    expect(filas).toHaveLength(2)
-    expect(filas[1].text()).toContain('0')
-    expect(filas[1].classes()).toContain('is-cero')
-    expect(filas[0].classes()).not.toContain('is-cero')
+    expect(celda(w, 'ST-26-0001', 'Mostrador')).toContain('0')
+    // El dato existe, pero en su propia columna — no pegado al 0 de la mesa.
+    expect(celda(w, 'ST-26-0001', 'Reservado')).toContain('15')
   })
 
-  it('también cuando administración está cargando la mesa: bajar por debajo de lo reservado se ve antes', async () => {
-    const w = await tabla({ editable: true, muestraCosto: true })
-    expect(w.findAll('.tmo__reservado')[0].text()).toContain('15')
+  it('«Libre» es lo que se puede entregar, el mismo número que el carrito', async () => {
+    const w = await tabla()
+    expect(celda(w, 'ST-26-0001', 'Libre')).toContain('470')   // guardado, menos lo que tiene dueño
+    expect(celda(w, 'ST-02',       'Libre')).toContain('340')   // depósito 300 + los 40 de la mesa
+  })
+
+  it('también están cargando la mesa: bajar por debajo de lo reservado se ve antes', async () => {
+    const w = await tabla({ editable: true })
+    expect(celda(w, 'ST-26-0001', 'Reservado')).toContain('15')
+  })
+
+  it('a quien atiende no se le muestran: no gobierna la mesa ni ve el depósito', async () => {
+    const w = await tabla({ muestraCosto: false })
+    expect(w.find('[data-col="Reservado"]').exists()).toBe(false)
+    expect(w.find('[data-col="Libre"]').exists()).toBe(false)
   })
 })
 
@@ -210,5 +231,50 @@ describe('Dispensar — no se ofrece lo que ya tiene dueño', () => {
     w.vm.form.cantidad = 1664          // debajo del techo
     await flushPromises()
     expect(w.vm.excederiaStock).toBe(false)
+  })
+})
+
+// ── LA COLUMNA MOSTRADOR TAMBIÉN ORDENA ────────────────────────────────────────────
+//
+// Era la única de las ocho que no lo hacía, y es por la que más se quiere ordenar: "¿de qué tengo
+// más arriba?" y "¿qué se está por acabar?" son la misma pregunta desde los dos extremos. Un
+// encabezado que no responde entre siete que sí se lee como que esa columna está rota.
+describe('Ordenar por lo que hay sobre la mesa', () => {
+  const FILAS = [
+    { stock_id: 1, forma: 'flor_seca', unidad: 'g', genetica: 'A', numero: 'ST-A', mostrador: 40,  disponible: 100, reservado: 0, libre: 140 },
+    { stock_id: 2, forma: 'flor_seca', unidad: 'g', genetica: 'B', numero: 'ST-B', mostrador: 200, disponible: 100, reservado: 0, libre: 300 },
+    { stock_id: 3, forma: 'flor_seca', unidad: 'g', genetica: 'C', numero: 'ST-C', mostrador: 0,   disponible: 100, reservado: 0, libre: 100 },
+  ]
+
+  async function tabla () {
+    const { default: Tabla } = await import('../components/mostrador/TablaMostrador.vue')
+    return mount(Tabla, {
+      props: { stocks: FILAS, modelValue: {}, editable: false, muestraCosto: true },
+      global: { stubs: { RouterLink: true } },
+    })
+  }
+
+  const orden = (w) => w.findAll('tbody tr').map(r => r.find('[data-col="Mostrador"]').text().trim())
+  const encabezado = (w) => w.findAll('.tmo__th').find(t => t.text().includes('Mostrador'))
+
+  it('el encabezado se puede tocar y ordena de menor a mayor', async () => {
+    const w = await tabla()
+    await encabezado(w).find('button').trigger('click')
+    expect(orden(w).map(t => parseFloat(t))).toEqual([0, 40, 200])
+  })
+
+  it('el segundo click lo da vuelta', async () => {
+    const w = await tabla()
+    await encabezado(w).find('button').trigger('click')
+    await encabezado(w).find('button').trigger('click')
+    expect(orden(w).map(t => parseFloat(t))).toEqual([200, 40, 0])
+  })
+
+  it('ordenando por esa columna, los ceros NO se van al final', async () => {
+    // El agrupado por defecto —lo que está sobre la mesa arriba— tiene que apagarse acá: si no,
+    // "de menor a mayor" daría 40, 200, 0, que es cualquier cosa menos ascendente.
+    const w = await tabla()
+    await encabezado(w).find('button').trigger('click')
+    expect(parseFloat(orden(w)[0])).toBe(0)
   })
 })

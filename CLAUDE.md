@@ -566,6 +566,24 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   dispensa **y lo entrega el dispensador sin depender de admin ni supervisor**, que es el punto.
   (Decisión de Germán, sep-2026.) El payload de la mesa habla otro idioma (`stock_id`, `forma`,
   `genetica` como texto) y se traduce en `cargarMesa`, en un solo lugar.
+- **`reservado` ES DEL PRODUCTO, NO DE LA MESA — y por eso tiene columna propia.** Colgado como
+  cartelito debajo del input de Mostrador decía «mostrador 0 · 15 reservados», que es imposible:
+  esos 15 g están en el depósito (que ya los descontó). Un número correcto en la columna
+  equivocada se lee como un error de la app. Van `Reservado` y `Libre` como columnas, sólo para
+  administración —mismo criterio que Costo y Depósito—, y **`Libre` es EL MISMO número que el
+  carrito** (`disponible_para_entregar`): si significara otra cosa acá, la misma palabra diría dos
+  verdades en dos pantallas.
+- **EL KPI DE LA MESA DICE CUÁNTO HAY, NO CUÁNTO VALE**, y **agrupado por unidad**: 300 g de flor
+  más 12 prerolls no son 312 de nada. El valor en pesos no es una decisión que se tome en el
+  mostrador, y al lado de "en caja tendría que haber" se leía como plata a contar. Sin desglose
+  plegable: la tabla de abajo ya es el detalle.
+- **ORDENANDO POR LA COLUMNA MOSTRADOR SE APAGA EL AGRUPADO PREVIO.** La tabla pone arriba lo que
+  está sobre la mesa, pero si el orden pedido ES esa columna, ese agrupado lo rompe: de menor a
+  mayor daría `40, 200, 0, 0`. Y ordena por lo GUARDADO, nunca por lo que se está escribiendo en
+  el input — la fila saltaría de lugar mientras se tipea.
+- **EN DESARROLLO, `localhost:5173` PUEDE SER `vite preview` Y NO `vite dev`**: sirve el `dist/`,
+  no el código. Toda verificación con Playwright necesita `npm run build` antes, o se está
+  probando el bundle viejo y las conclusiones son basura. Ya costó media sesión.
 - **CUÁL ES "MI MOSTRADOR" LO CONTESTA `sedeDeMostrador`, Y NADIE MÁS** (sep-2026). La suya
   (`dispensario_sede`) si atiende público; si no tiene asignada —**la columna nace en null y casi
   nadie la carga**— la primera que atienda. El carrito de la dispensa la resolvía por su cuenta

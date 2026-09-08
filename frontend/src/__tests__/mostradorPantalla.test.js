@@ -687,3 +687,41 @@ describe('Cuando no hay sede de atención', () => {
     expect(w.find('.mst__sinsede').text()).toContain('administración')
   })
 })
+
+// ── EL KPI DE LA MESA DICE CUÁNTO HAY, NO CUÁNTO VALE ──────────────────────────────
+//
+// Decía la plata ($711.319) y como KPI no sirve: el valor de la mercadería no es una decisión que
+// se tome en el mostrador, y al lado de "en caja tendría que haber" se lee como plata a contar.
+// Pedido de Germán mirando la pantalla en producción.
+describe('Sobre la mesa', () => {
+  const kpiMesa = (w) => w.findAll('.mst__dato').find(d => d.text().includes('Sobre la mesa'))
+
+  it('suma el producto que hay arriba, no su valor en pesos', async () => {
+    respuesta = { ...respuesta, turno: TURNO, mesa: [{ ...FLOR, mostrador: 300 }] }
+    const w = await montar()
+
+    const kpi = kpiMesa(w)
+    expect(kpi).toBeTruthy()
+    expect(kpi.text()).toContain('300 g')
+    expect(kpi.text()).not.toContain('68.000')   // el valor viejo, en pesos
+    expect(kpi.text()).not.toContain('$')
+  })
+
+  it('agrupa por unidad: no suma gramos con unidades', async () => {
+    respuesta = { ...respuesta, turno: TURNO,
+                  mesa: [{ ...FLOR, mostrador: 300 }, { ...PREROLL, mostrador: 12 }] }
+    const w = await montar()
+
+    // 300 g de flor y 12 prerolls no son 312 de nada.
+    const texto = kpiMesa(w).text()
+    expect(texto).toContain('300 g')
+    expect(texto).toContain('12 un')
+    expect(texto).not.toContain('312')
+  })
+
+  it('con la mesa vacía no se dibuja: un cero no es un indicador', async () => {
+    respuesta = { ...respuesta, turno: TURNO, mesa: [] }
+    const w = await montar()
+    expect(kpiMesa(w)).toBeUndefined()
+  })
+})
