@@ -453,6 +453,9 @@ Rails.application.routes.draw do
         post 'mostrador/reponer',  to: 'mostrador#reponer'
         post 'mostrador/cerrar',   to: 'mostrador#cerrar'
         get  'mostrador/merma',    to: 'mostrador#merma'
+        # Lo que tenía que haber contra lo que se contó, día por día y PRODUCTO POR PRODUCTO: en
+        # un total habría que sumar gramos con unidades, que no significa nada.
+        get  'mostrador/evolucion', to: 'mostrador#evolucion'
         get  'mostrador/turnos',              to: 'mostrador#turnos'
         get  'mostrador/turnos/:id',          to: 'mostrador#turno'
         post 'mostrador/turnos/:id/revisar',  to: 'mostrador#revisar'

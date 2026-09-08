@@ -1,5 +1,46 @@
 # Changelog
 
+## Septiembre 2026 (aw) — Cierres día por día, y un gráfico por producto
+
+Propuesta de Germán: *"¿qué te parece si agrupamos por día, y ahí desglosamos, y si queremos ver
+el detalle de cada uno que se abra un modal? Y arriba un buscador, y un gráfico al final que
+muestre lo que debería haber y lo que realmente hay"*. Y después, la corrección que ordenó todo:
+*"pero se hace una línea por cada producto de stock"*.
+
+**AGRUPADO POR DÍA.** Es como se piensa —«¿cómo fue el martes?», no «¿cómo fue el cierre 47?»— y
+el encabezado del día trae el saldo (`2 cierres · faltan $27.636` / `no falta nada · Ana Gómez`),
+así el caso normal —un solo cierre— no obliga a abrir nada para saber si pasó algo. El día más
+reciente arranca abierto.
+
+**UNA LÍNEA POR CIERRE, Y EL DETALLE EN SU FICHA.** Con el detalle inline serían tres niveles de
+anidado para leer una oración. Y la ficha es **la misma donde se corrige**: mirás qué pasó y, si
+algo está mal, cambiás el número sin cambiar de pantalla. Antes eran dos gestos y el de corregir
+no tenía contexto.
+
+**UN GRÁFICO POR PRODUCTO** (`GET /sedes/:id/mostrador/evolucion`), y acá está lo bueno de la
+corrección de Germán: **por producto no hay nada que sumar**. Un total tendría que sumar gramos de
+flor con unidades de preroll —el problema que arrastraba todo el módulo— y por producto cada uno
+va en su unidad.
+
+**Y CADA UNO CON SU ESCALA, que es toda la decisión.** Los dos casos que fija el spec:
+· **el desplome** — 23 g de golpe un día, que se ve en cualquier gráfico;
+· **el goteo** — un gramo casi todos los días, que en un eje compartido con la flor a 400 g NO
+EXISTE. Ese es el que sangra sin disparar ninguna alarma, y es el que sólo se ve con escala propia.
+Se descartó por eso el gráfico con todas las líneas juntas: mostraría el peso relativo del stock
+—que la tabla de la mesa ya da con números exactos— y escondería la pregunta de esta pantalla.
+
+Los productos que siempre cuadran se pliegan: si no, la pantalla son doce gráficos planos que hay
+que mirar para descubrir que no pasa nada.
+
+**El `watch` que se registra antes que su fuente, cuarta vez.** `watch(porDia, …)` puesto encima
+de `porDia` → «Cannot access before initialization» y la pantalla no abre. Ya está anotado y lo
+sigo pisando: el estado va arriba de todo lo que lo lee.
+
+**Y UN BUILD QUE FALLABA EN SILENCIO.** `npm run build 2>&1 | tail -2 && npx vitest run` **siempre
+sigue de largo**: el estado de una tubería es el del ÚLTIMO comando, o sea `tail`, que siempre da
+0. El build venía roto por un `}` de más en un CSS y la suite corría igual, en verde, sobre el
+bundle viejo. Se descubrió porque una solapa nueva no aparecía en el navegador.
+
 ## Septiembre 2026 (av) — cuatro cosas que aparecieron usándolo
 
 **EL TOAST DOBLE AL ENTREGAR UNA RESERVA.** Germán: *"salta el cartel de successful dos veces, no

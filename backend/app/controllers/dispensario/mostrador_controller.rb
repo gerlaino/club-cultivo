@@ -125,6 +125,38 @@ module Dispensario
       actual
     end
 
+    # GET /sedes/:sede_id/mostrador/evolucion?desde=&hasta=
+    #
+    # LO QUE TENÍA QUE HABER CONTRA LO QUE SE CONTÓ, día por día y PRODUCTO POR PRODUCTO.
+    #
+    # Por producto y no en total, que era la idea de Germán y resuelve el problema de fondo: en un
+    # total hay que sumar gramos de flor con unidades de preroll, y eso da un número que no
+    # significa nada. Por producto no hay nada que sumar — cada uno en su unidad.
+    #
+    # Y cada uno con SU escala en la pantalla: así se ve igual de bien el desplome de 23 g de un
+    # día y el gramo que gotea todos los días, que es el que sangra sin disparar ninguna alarma y
+    # el que un eje compartido esconde.
+    #
+    # Se cuenta por STOCK y no por genética: dos frascos de la misma variedad son dos conteos, y
+    # sumarlos perdería la trazabilidad lote→dispensación.
+    def evolucion
+      return render json: { error: 'No autorizado' }, status: :forbidden unless gestiona?
+
+      desde = params[:desde].presence&.to_date || Time.zone.today.beginning_of_month
+      hasta = params[:hasta].presence&.to_date || Time.zone.today
+
+      items = TurnoMostradorItem
+              .joins(:turno_mostrador).includes(:stock)
+              .where(turno_mostradores: { mostrador_id: @mostrador.id })
+              .where.not(turno_mostradores: { cerrado_at: nil })
+              .where(turno_mostradores: { cerrado_at: desde.beginning_of_day..hasta.end_of_day })
+              .where.not(esperado_cierre: nil).where.not(cantidad_cierre: nil)
+
+      render json: { desde: desde, hasta: hasta, productos: evolucion_por_producto(items) }
+    rescue ArgumentError, Date::Error
+      render json: { error: 'Fecha inválida' }, status: :unprocessable_entity
+    end
+
     def merma
       return render json: { error: 'No autorizado' }, status: :forbidden unless gestiona?
 
@@ -524,6 +556,42 @@ module Dispensario
           most.turno_mostradores.cerrados.where(revisado_at: nil)
         ).size : 0,
       }
+    end
+
+    # UN PRODUCTO POR SERIE, con sus puntos ordenados en el tiempo.
+    #
+    # Con varios cierres en el mismo día se toma EL ÚLTIMO: el gráfico es «cómo terminó cada día»,
+    # y dos puntos en la misma fecha se pisarían en el eje.
+    #
+    # Ordenados por lo que costó lo que falta, no por gramos: lo que más pesa no es lo que más
+    # duele. Los que nunca tuvieron diferencia viajan igual, marcados, para que la pantalla los
+    # pliegue — esconderlos del payload obligaría a otra consulta para poder desplegarlos.
+    def evolucion_por_producto(items)
+      items.group_by(&:stock_id).map { |_sid, del_stock|
+        stock  = del_stock.first.stock
+        puntos = del_stock.group_by { |it| it.turno_mostrador.cerrado_at.in_time_zone.to_date }
+                          .map { |dia, dels|
+                            ult = dels.max_by { |it| it.turno_mostrador.cerrado_at }
+                            { fecha: dia, esperado: ult.esperado_cierre.to_f,
+                              contado: ult.cantidad_cierre.to_f }
+                          }.sort_by { |p| p[:fecha] }
+
+        falta = puntos.sum { |p| [p[:esperado] - p[:contado], 0].max }
+        {
+          stock_id: stock&.id,
+          etiqueta: stock&.etiqueta,
+          unidad:   stock&.unidad || 'g',
+          puntos:   puntos,
+          falta:    falta.round(2),
+          falta_ars: (falta.to_d * stock&.costo_unitario_ars.to_d).to_f.round(2),
+          # El peor día, para poder titular la ficha sin que la pantalla lo recalcule.
+          peor: puntos.max_by { |p| p[:esperado] - p[:contado] }&.then { |p|
+            d = (p[:esperado] - p[:contado]).round(2)
+            d.positive? ? { fecha: p[:fecha], falta: d } : nil
+          },
+          sin_diferencias: falta.zero?,
+        }
+      }.sort_by { |p| [p[:sin_diferencias] ? 1 : 0, -p[:falta_ars]] }
     end
 
     # LOS PRODUCTOS EN LOS QUE HUBO DIFERENCIA, con nombre y con plata.

@@ -9,9 +9,11 @@ import { createPinia, setActivePinia } from 'pinia'
 // es de cultivar».
 //
 // Era una tabla de cinco columnas —CIERRE · ENTREGADO · FALTÓ · CAJA— que mostraba el RESULTADO de
-// una cuenta sin mostrar la cuenta: «$27.636,6 en 1 producto» sin decir cuál producto, contra qué
-// se comparó ni de dónde sale el número de la caja. Ahora cada fila cuenta qué pasó, en oraciones,
-// y el detalle está a un toque.
+// una cuenta sin mostrar la cuenta.
+//
+// Ahora, propuesta de Germán: AGRUPADO POR DÍA —«¿cómo fue el martes?», no «¿cómo fue el cierre
+// 47?»— con el saldo del día en el encabezado, una línea por cierre, y el detalle en su ficha.
+// Lo que cuenta qué pasó se prueba en `corregirConteo.test.js`, que es donde vive ahora.
 const TURNO = {
   id: 7,
   abierto_at: '2026-09-05T17:02:00Z', cerrado_at: '2026-09-05T23:03:00Z',
@@ -29,8 +31,9 @@ const TURNO = {
 
 let respuesta = { turnos: [TURNO], gestiona: true, pagina: 1, paginas: 1, total: 1, sin_revisar: 1 }
 const revisarTurnoMostrador = vi.fn(() => Promise.resolve({ data: {} }))
+const listTurnos = vi.fn()
 vi.mock('../lib/api.js', () => ({
-  listTurnosMostrador: (...a) => Promise.resolve({ data: respuesta }),
+  listTurnosMostrador: (...a) => { listTurnos(...a); return Promise.resolve({ data: respuesta }) },
   descargarTurnosMostrador: vi.fn(),
   corregirTurnoMostrador: vi.fn(),
   getTurnoMostrador: vi.fn(() => Promise.resolve({ data: { items: [] } })),
@@ -48,111 +51,106 @@ async function montar (turnos = [TURNO]) {
   await flushPromises()
   return w
 }
-const abrir = async (w) => { await w.find('.trn__c-hd').trigger('click'); return w }
 
-beforeEach(() => { setActivePinia(createPinia()); revisarTurnoMostrador.mockClear() })
+beforeEach(() => { setActivePinia(createPinia()); revisarTurnoMostrador.mockClear(); listTurnos.mockClear() })
 
-describe('La fila, sin abrirla', () => {
-  it('dice cuándo y quién en castellano, no una fecha con dos horas al lado', async () => {
-    const w = await montar()
-    expect(w.find('.trn__c-cuando').text()).toContain('septiembre')
-    expect(w.find('.trn__c-quien').text()).toContain('Ana Gómez')
+describe('Agrupado por día', () => {
+  const dia = (w, i = 0) => w.findAll('.trn__dia')[i]
+
+  it('junta los cierres del día bajo su nombre', async () => {
+    const w = await montar([TURNO, { ...TURNO, id: 8, abierto_at: '2026-09-05T12:00:00Z',
+                                     cerrado_at: '2026-09-05T17:00:00Z' }])
+
+    expect(w.findAll('.trn__dia')).toHaveLength(1)
+    expect(dia(w).find('.trn__dia-nombre').text()).toContain('septiembre')
+    expect(dia(w).find('.trn__dia-resumen').text()).toContain('2 cierres')
   })
 
-  // EL BUG QUE APARECIÓ LEYENDO: decía «14:02–12:03», que se lee como que cerró antes de abrir.
-  // Es una caja que cruzó la medianoche y sólo se mostraba la fecha del cierre. Una fila
-  // imposible te hace desconfiar de toda la tabla.
-  it('cuando la caja cruzó la medianoche, lo dice en vez de parecer imposible', async () => {
-    const w = await montar([{ ...TURNO,
-      abierto_at: '2026-09-05T17:02:00Z', cerrado_at: '2026-09-06T15:03:00Z' }])
+  // El encabezado trae el saldo: con un solo cierre —el caso normal— no hace falta abrir nada
+  // para saber si pasó algo.
+  it('el encabezado dice si falta plata, sin abrir el día', async () => {
+    const w = await montar()
+    expect(dia(w).find('.trn__dia-resumen').text()).toContain('27.636')
+  })
 
-    const txt = w.find('.trn__c-quien').text()
-    expect(txt).toMatch(/del (lunes|martes|miércoles|jueves|viernes|sábado|domingo)/)
+  it('y cuando no falta nada lo dice, con quién atendió', async () => {
+    const w = await montar([{ ...TURNO, motivos_revision: [],
+      faltaron: { total: 0, ars: 0, items: [] }, sobraron: { total: 0, items: [] } }])
+
+    const t = dia(w).find('.trn__dia-resumen').text()
+    expect(t).toContain('no falta nada')
+    expect(t).toContain('Ana Gómez')
+  })
+
+  it('el día más reciente arranca abierto: es el que se viene a mirar', async () => {
+    const w = await montar()
+    expect(dia(w).findAll('.trn__cierre').length).toBeGreaterThan(0)
+  })
+
+  it('y se puede cerrar', async () => {
+    const w = await montar()
+    await dia(w).find('.trn__dia-hd').trigger('click')
+    expect(dia(w).findAll('.trn__cierre')).toHaveLength(0)
+  })
+})
+
+describe('La línea de cada cierre', () => {
+  const cierre = (w, i = 0) => w.findAll('.trn__cierre')[i]
+
+  it('dice el horario y quién atendió', async () => {
+    const w = await montar()
+    expect(cierre(w).find('.trn__cierre-hora').text()).toMatch(/\d{2}:\d{2}/)
+    expect(cierre(w).find('.trn__cierre-quien').text()).toContain('Ana Gómez')
+  })
+
+  // EL BUG QUE APARECIÓ LEYENDO: «14:02–12:03» se leía como que cerró antes de abrir. Es una caja
+  // que cruzó la medianoche. Una fila imposible te hace desconfiar de toda la tabla.
+  it('cuando la caja cruzó la medianoche, lo dice en vez de parecer imposible', async () => {
+    const w = await montar([{ ...TURNO, abierto_at: '2026-09-05T17:02:00Z',
+                                        cerrado_at: '2026-09-06T15:03:00Z' }])
+    expect(cierre(w).find('.trn__cierre-hora').text())
+      .toMatch(/del (lunes|martes|miércoles|jueves|viernes|sábado|domingo)/)
   })
 
   it('y cuando abrió uno y cerró otro, nombra a los dos', async () => {
     const w = await montar([{ ...TURNO, atendio: 'Admin Demo', cerrado_por: 'Dispensa Demo' }])
-    const txt = w.find('.trn__c-quien').text()
-    expect(txt).toContain('Abrió Admin Demo')
-    expect(txt).toContain('cerró Dispensa Demo')
+    const t = cierre(w).find('.trn__cierre-quien').text()
+    expect(t).toContain('Abrió Admin Demo')
+    expect(t).toContain('cerró Dispensa Demo')
   })
 
   it('el veredicto se lee sin abrir nada', async () => {
     const w = await montar()
-    expect(w.find('.trn__pill').text()).toBe('Falta producto')
+    expect(cierre(w).find('.trn__pill').text()).toBe('Falta producto')
   })
 
-  it('y un cierre sin novedad lo dice, en vez de no decir nada', async () => {
+  it('y uno sin novedad lo dice, en vez de no decir nada', async () => {
     const w = await montar([{ ...TURNO, motivos_revision: [],
-      faltaron: { total: 0, items: [] }, sobraron: { total: 0, items: [] },
-      caja: { ...TURNO.caja, contado_ars: 150000, diferencia_ars: 0 } }])
-    expect(w.find('.trn__pill').text()).toBe('Sin novedad')
+      faltaron: { total: 0, ars: 0, items: [] }, sobraron: { total: 0, items: [] } }])
+    expect(cierre(w).find('.trn__pill').text()).toBe('Sin novedad')
+  })
+
+  it('lo ya mirado se marca, para no volver a abrirlo', async () => {
+    const w = await montar([{ ...TURNO, revisado: true }])
+    expect(cierre(w).find('.trn__pill').text()).toBe('Visto')
+  })
+
+  // Un solo gesto: la ficha muestra qué pasó Y los números para corregirlo. Antes eran dos —abrir
+  // la fila, abrir otro modal— y el de corregir no tenía contexto.
+  it('tocarlo abre su ficha', async () => {
+    const w = await montar()
+    await cierre(w).trigger('click')
+    expect(w.findComponent({ name: 'CorregirConteo' }).exists()).toBe(true)
   })
 })
 
-describe('La fila abierta cuenta qué pasó', () => {
-  it('nombra EL PRODUCTO que faltó, que es lo único accionable', async () => {
-    const w = await abrir(await montar())
-    expect(w.text()).toContain('Critical Kush L-26-017')
-    expect(w.text()).toContain('23')
-  })
-
-  // Mostrar el resultado sin la cuenta es pedir que se confíe: sin el 46 no hay forma de
-  // comprobar de dónde salen los 23 que faltan.
-  it('muestra la cuenta: lo que tenía que haber y lo que apareció', async () => {
-    const w = await abrir(await montar())
-    const t = w.text()
-    expect(t).toContain('46')
-    expect(t).toContain('costó')
-  })
-
-  it('explica la caja en vez de tirar dos números pegados', async () => {
-    const w = await abrir(await montar())
-    const t = w.text()
-    expect(t).toContain('130.000')          // lo que había
-    expect(t).toContain('20.000')           // la diferencia
-    expect(t).toContain('110.000')          // el fondo: de dónde sale la cuenta
-  })
-
-  // Antes eran chips y un «+2 más» que escondía justo lo que había que leer.
-  it('los otros motivos son oraciones, no chips escondidos', async () => {
-    const w = await abrir(await montar())
-    expect(w.text()).toContain('administración movió lo que había sobre la mesa')
-    expect(w.text()).not.toContain('+1 más')
-  })
-
-  it('contar de más se explica distinto: no se carga al inventario', async () => {
-    const w = await abrir(await montar([{ ...TURNO, motivos_revision: ['sobrante'],
-      faltaron: { total: 0, items: [] },
-      sobraron: { total: 1, items: [{ etiqueta: 'Northern Lights', cantidad: 12, unidad: 'g',
-                                      ars: 0, esperado: 108, contado: 120 }] } }]))
-    expect(w.text()).toContain('de más')
-    expect(w.text()).toContain('nunca lo carga')
-  })
-})
-
-describe('Qué se puede hacer', () => {
-  it('con algo para mirar, corregir es la acción principal', async () => {
-    const w = await abrir(await montar())
-    expect(w.find('.trn__btn--primary').text()).toContain('Corregir')
-    expect(w.text()).toContain('ya lo miré')
-  })
-
-  // Si contó mal pero por casualidad dio bien, tiene que poder entrar — pero la fila no pide
-  // atención, así que la acción no compite con nada.
-  it('sin novedad, corregir sigue accesible pero en segundo plano', async () => {
-    const w = await abrir(await montar([{ ...TURNO, motivos_revision: [],
-      faltaron: { total: 0, items: [] }, sobraron: { total: 0, items: [] } }]))
-    expect(w.find('.trn__btn--primary').exists()).toBe(false)
-    expect(w.text()).toContain('Corregir')
-    expect(w.text()).not.toContain('ya lo miré')
-  })
-
-  it('marcar visto lo saca de la lista de trabajo', async () => {
-    const w = await abrir(await montar())
-    const btn = w.findAll('.trn__btn').find(b => b.text().includes('ya lo miré'))
+describe('El filtro de trabajo', () => {
+  it('«Para mirar» filtra en el backend, no en la pantalla', async () => {
+    const w = await montar()
+    const btn = w.findAll('.trn__filtro').find(b => b.text().includes('Para mirar'))
     await btn.trigger('click')
     await flushPromises()
-    expect(revisarTurnoMostrador).toHaveBeenCalledWith(10, 7)
+
+    expect(listTurnos).toHaveBeenLastCalledWith(10, { pagina: 1, sin_revisar: 1 })
   })
 })

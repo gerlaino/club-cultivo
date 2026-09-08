@@ -38,6 +38,11 @@
         Cierres
       </button>
       <template v-if="gestiona">
+        <!-- Lo que tenía que haber contra lo que se contó, producto por producto. Es de
+             administración: el que atiende cuenta, no analiza. -->
+        <button class="mst__tab" :class="{ 'is-on': tab === 'evolucion' }" @click="tab = 'evolucion'">
+          Producto por producto
+        </button>
         <button class="mst__tab" :class="{ 'is-on': tab === 'merma' }" @click="tab = 'merma'">
           Merma
           <span v-if="sinRevisar" class="mst__tab-badge">{{ sinRevisar }}</span>
@@ -63,6 +68,7 @@
 
     <!-- ══ TURNOS: los que ya cerraron ════════════════════════════════════════ -->
     <MostradorTurnos v-else-if="tab === 'turnos'" :sede-id="sedeId" />
+    <EvolucionMostrador v-else-if="tab === 'evolucion'" :sede-id="sedeId" />
 
     <template v-else>
 
@@ -301,6 +307,7 @@ import { ref, computed, watch } from 'vue'
 import RendicionCajaCard from '../components/RendicionCajaCard.vue'
 import MostradorMerma from '../components/mostrador/MostradorMerma.vue'
 import MostradorTurnos from '../components/mostrador/MostradorTurnos.vue'
+import EvolucionMostrador from '../components/mostrador/EvolucionMostrador.vue'
 import TablaMostrador from '../components/mostrador/TablaMostrador.vue'
 import ModalCargarMesa from '../components/mostrador/ModalCargarMesa.vue'
 import ModalContarItem from '../components/mostrador/ModalContarItem.vue'

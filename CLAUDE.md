@@ -590,6 +590,21 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 - **UN SOLO TOAST POR ACCIÓN, Y LO CANTA QUIEN SABE SI SALIÓ BIEN.** La vista de reservas del
   teléfono festejaba además del modal: el mensaje salía dos veces y se leía como que la dispensa
   se registró dos veces. El susto es peor que el bug.
+- **`npm run build | tail -N && …` SIGUE DE LARGO AUNQUE EL BUILD FALLE.** El estado de salida de
+  una tubería es el del ÚLTIMO comando —`tail`, que siempre da 0—, así que la suite corre en verde
+  sobre el `dist/` viejo y las verificaciones de navegador prueban el bundle anterior. Ya pasó:
+  el build estaba roto por un `}` de más en un CSS y sólo se descubrió porque una solapa nueva no
+  aparecía en pantalla. Correr `npm run build` sin tubería, o mirar el exit code.
+- **EL GRÁFICO DEL MOSTRADOR ES UNO POR PRODUCTO, CADA UNO CON SU ESCALA** (`evolucion`,
+  sep-2026, idea de Germán). Por producto **no hay nada que sumar** —un total mezclaría gramos de
+  flor con unidades de preroll, que es el problema que arrastra todo el módulo— y la escala propia
+  es lo que hace visible **el goteo**: un gramo que falta casi todos los días, que en un eje
+  compartido con la flor a 400 g no existe y es el que sangra sin disparar ninguna alarma. Un
+  gráfico con todas las líneas juntas se descartó: muestra el peso relativo del stock, que la
+  tabla de la mesa ya da con números exactos, y esconde la pregunta de la pantalla.
+- **CIERRES SE AGRUPA POR DÍA, Y EL DETALLE VA EN LA FICHA DEL CIERRE.** El encabezado del día
+  trae el saldo, así el caso normal —un cierre— no obliga a abrir nada. Y la ficha es **la misma
+  donde se corrige**: qué pasó y los números para arreglarlo en un solo lugar.
 - **EL ADMIN SABE DE CULTIVAR, NO DE ARQUEOS.** Es la regla que ordena el texto de todo el
   módulo: «cuadró», «arqueo», «a costo», «esperado» son palabras de contador y cada una es un
   peaje. Se dice `no falta nada`, `el conteo`, `producirlos costó $X`, `lo que tenía que haber`. Y

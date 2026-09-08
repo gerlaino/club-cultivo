@@ -5,10 +5,15 @@
   <div class="cc__back">
     <div class="cc__modal">
       <h3 class="cc__title">Corregir el conteo</h3>
-      <p class="cc__sub">
-        Cierre del {{ fecha(turno.cerrado_at) }}. Escribí lo que de verdad había: el conteo
-        equivocado no se borra, se anota la corrección al lado.
-      </p>
+      <p class="cc__sub">{{ subtitulo }}</p>
+
+      <!-- QUÉ PASÓ, ANTES DE PEDIR NADA. Estas oraciones vivían en la fila de la lista y el modal
+           te pedía un número sin contexto. Son el mismo gesto: mirás el cierre y, si algo está
+           mal, lo corregís sin cambiar de pantalla. -->
+      <div v-if="hechos.length" class="cc__hechos">
+        <p v-for="(h, i) in hechos" :key="i" class="cc__hecho" :class="`cc__hecho--${h.tono}`"
+           v-html="h.texto"></p>
+      </div>
 
       <p v-if="cargando" class="cc__vacio">Buscando el conteo…</p>
 
@@ -110,6 +115,77 @@ const cambioPlata = computed(() =>
 
 // QUÉ VA A PASAR CON EL INVENTARIO, en castellano y mientras se escribe. Corregir un conteo mueve
 // stock real: enterarse recién después de guardar es enterarse tarde.
+const DIAS  = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',
+               'septiembre', 'octubre', 'noviembre', 'diciembre']
+const hora = (iso) => (iso ? new Date(iso).toLocaleTimeString('es-AR',
+  { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) : '')
+
+const subtitulo = computed(() => {
+  const t = props.turno
+  const c = t.cerrado_at ? new Date(t.cerrado_at) : null
+  if (!c) return ''
+  const dia = `${DIAS[c.getDay()]} ${c.getDate()} de ${MESES[c.getMonth()]}`
+  const a = t.abierto_at ? new Date(t.abierto_at) : null
+  const otroDia = a && a.toDateString() !== c.toDateString()
+  const quien = (t.atendio && t.cerrado_por && t.atendio !== t.cerrado_por)
+    ? `abrió ${t.atendio}, cerró ${t.cerrado_por}`
+    : (t.atendio || t.cerrado_por || '')
+  return `${dia.charAt(0).toUpperCase() + dia.slice(1)}, de ${hora(t.abierto_at)} a ` +
+         `${hora(t.cerrado_at)}${otroDia ? ` del ${DIAS[c.getDay()]}` : ''}` +
+         (quien ? ` · ${quien}` : '')
+})
+
+// QUÉ PASÓ EN ESTE CIERRE, en oraciones. El producto por su NOMBRE y la cuenta a la vista: sin el
+// esperado, «faltan 23 g» es una conclusión que no se puede comprobar.
+const hechos = computed(() => {
+  const t = props.turno
+  const out = []
+  const n = (v) => fmt(v)
+
+  for (const f of (t.faltaron?.items || [])) {
+    out.push({ tono: 'warn', texto:
+      `Faltan <b>${n(f.cantidad)} ${f.unidad}</b> de <b>${f.etiqueta}</b>. ` +
+      `<small>Sobre la mesa tenía que haber ${n(f.esperado)} ${f.unidad} y al contar aparecieron ` +
+      `${n(f.contado)}. Producir esos ${n(f.cantidad)} ${f.unidad} costó $${n(f.ars)}.</small>` })
+  }
+  const restanF = (t.faltaron?.total || 0) - (t.faltaron?.items?.length || 0)
+  if (restanF > 0) out.push({ tono: 'warn', texto: `Y en ${restanF} producto${restanF === 1 ? '' : 's'} más.` })
+
+  for (const f of (t.sobraron?.items || [])) {
+    out.push({ tono: 'warn', texto:
+      `Contó <b>${n(f.cantidad)} ${f.unidad}</b> de más de <b>${f.etiqueta}</b>. ` +
+      '<small>No se sumaron al inventario: el mostrador descuenta producto, nunca lo carga. Si de ' +
+      'verdad hay de más, los sube administración desde el depósito.</small>' })
+  }
+
+  if (!(t.faltaron?.total) && !(t.sobraron?.total)) {
+    out.push({ tono: 'ok', texto:
+      `Contó ${t.productos} producto${t.productos === 1 ? '' : 's'} y estaba todo.` +
+      (t.dispensado_ars > 0 ? ` Entregó <b>$${n(t.dispensado_ars)}</b>.` : '') })
+  }
+
+  if (t.caja) {
+    const d = Number(t.caja.diferencia_ars) || 0
+    out.push({ tono: d ? 'warn' : 'ok', texto:
+      `En la caja había <b>$${n(t.caja.contado_ars)}</b>` +
+      (d ? ` — <b>$${n(Math.abs(d))} ${d < 0 ? 'menos' : 'más'}</b> de lo que tenía que haber` : ', lo que tenía que haber') +
+      '.' + (t.caja.fondo_ars != null ? ` <small>Empezó con $${n(t.caja.fondo_ars)} de fondo.</small>` : '') })
+  }
+
+  for (const m of (t.motivos_revision || [])) {
+    if (MOTIVO_FRASE[m]) out.push({ tono: '', texto: MOTIVO_FRASE[m] })
+  }
+  return out
+})
+
+// Los motivos que no son la mercadería van como oración: un chip con «+2 más» esconde justo lo
+// que hay que leer.
+const MOTIVO_FRASE = {
+  corregido:   'Al abrir corrigió lo que había sobre la mesa.',
+  mesa_movida: 'Mientras la caja estuvo abierta, administración movió lo que había sobre la mesa.',
+}
+
 const pesos = (n) => n == null ? '—' :
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
 
@@ -201,6 +277,17 @@ async function confirmar () {
 }
 .cc__sub   { margin: 0; font-size: var(--fs-13); color: var(--c-ink-500); }
 .cc__vacio { margin: 0; font-size: var(--fs-14); color: var(--c-ink-500); }
+
+/* Qué pasó, antes de pedir nada. La barra de color dice qué clase de hecho es, sin gritar. */
+.cc__hechos { display: flex; flex-direction: column; gap: 10px; }
+.cc__hecho {
+  margin: 0; padding-left: 12px; border-left: 3px solid var(--c-slate-200);
+  font-size: var(--fs-14); color: var(--c-ink-700); line-height: 1.5;
+}
+.cc__hecho :deep(b) { color: var(--c-ink-900); font-weight: 600; }
+.cc__hecho :deep(small) { display: block; color: var(--c-ink-500); font-size: var(--fs-13); margin-top: 2px; }
+.cc__hecho--warn { border-left-color: var(--c-amber-500, #f59e0b); }
+.cc__hecho--ok   { border-left-color: var(--c-leaf-600, #16a34a); }
 .cc__row--head {
   font-size: var(--fs-11, .7rem); letter-spacing: .06em; text-transform: uppercase;
   color: var(--c-ink-500); font-weight: 600;

@@ -13,7 +13,13 @@ import { mount, flushPromises } from '@vue/test-utils'
 // mesa decía 46. Corregir un número sin ver contra qué está mal es adivinar.
 
 const TURNO = {
-  id: 7, cerrado_at: '2026-09-05T22:00:00Z',
+  id: 7, abierto_at: '2026-09-05T12:00:00Z', cerrado_at: '2026-09-05T22:00:00Z',
+  atendio: 'Ana Gómez', cerrado_por: 'Ana Gómez', productos: 2, dispensado_ars: 186400,
+  motivos_revision: ['faltante', 'mesa_movida'],
+  faltaron: { total: 1, cantidad: 23, ars: 27636,
+              items: [{ etiqueta: 'Critical Kush L-26-017', cantidad: 23, unidad: 'g',
+                        ars: 27636, esperado: 46, contado: 23 }] },
+  sobraron: { total: 0, cantidad: 0, ars: 0, items: [] },
   caja: { fondo_ars: 110000, esperado_ars: 150000, contado_ars: 130000, diferencia_ars: -20000 },
   // El nombre que manda el backend. `items` es el mismo array, agregado para esta pantalla.
   conteo_apertura: [
@@ -39,7 +45,9 @@ import CorregirConteo from '../components/mostrador/CorregirConteo.vue'
 
 async function abrir (data = TURNO) {
   getTurnoMostrador.mockResolvedValue({ data })
-  const w = mount(CorregirConteo, { props: { sedeId: 10, turno: { id: 7, cerrado_at: TURNO.cerrado_at } } })
+  // El turno ENTERO como prop: la ficha cuenta qué pasó con esos datos, no sólo con lo que trae
+  // el pedido de los conteos.
+  const w = mount(CorregirConteo, { props: { sedeId: 10, turno: data } })
   await flushPromises()
   return w
 }
@@ -175,5 +183,62 @@ describe('Salir del modal', () => {
     w.unmount()
     // Si el listener siguiera vivo, esto tiraría sobre un componente desmontado.
     expect(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))).not.toThrow()
+  })
+})
+
+// ── LA FICHA CUENTA QUÉ PASÓ, ANTES DE PEDIR NADA ──────────────────────────────────
+//
+// Estas oraciones vivían en la fila de la lista y el modal te pedía un número sin contexto: dos
+// gestos para una sola pregunta. Ahora es un solo lugar — mirás el cierre y, si algo está mal, lo
+// corregís sin cambiar de pantalla. Propuesta de Germán al agrupar por día.
+describe('La ficha del cierre', () => {
+  const hechos = (w) => w.findAll('.cc__hecho').map(h => h.text())
+
+  it('dice cuándo fue y quién atendió', async () => {
+    const w = await abrir()
+    const sub = w.find('.cc__sub').text()
+    expect(sub).toContain('septiembre')
+    expect(sub).toContain('Ana Gómez')
+  })
+
+  it('nombra EL PRODUCTO que faltó, con la cuenta a la vista', async () => {
+    const w = await abrir()
+    const t = hechos(w).join(' ')
+
+    expect(t).toContain('Critical Kush L-26-017')
+    expect(t).toContain('46')     // lo que tenía que haber: sin esto no se puede comprobar
+    expect(t).toContain('23')
+    expect(t).toContain('costó')
+  })
+
+  it('explica la caja en vez de tirar dos números pegados', async () => {
+    const w = await abrir()
+    const t = hechos(w).join(' ')
+
+    expect(t).toContain('130.000')   // lo que había
+    expect(t).toContain('20.000')    // la diferencia
+    expect(t).toContain('110.000')   // el fondo: de dónde sale la cuenta
+  })
+
+  // Antes eran chips con un «+2 más» que escondía justo lo que había que leer.
+  it('los otros motivos son oraciones, no chips escondidos', async () => {
+    const w = await abrir()
+    expect(hechos(w).join(' ')).toContain('administración movió lo que había sobre la mesa')
+  })
+
+  it('y un cierre sin novedad lo dice', async () => {
+    const w = await abrir({ ...TURNO, motivos_revision: [],
+      faltaron: { total: 0, items: [] }, sobraron: { total: 0, items: [] } })
+    expect(hechos(w).join(' ')).toContain('estaba todo')
+  })
+
+  it('contar de más se explica distinto: no se carga al inventario', async () => {
+    const w = await abrir({ ...TURNO, motivos_revision: ['sobrante'],
+      faltaron: { total: 0, items: [] },
+      sobraron: { total: 1, items: [{ etiqueta: 'Northern Lights', cantidad: 12, unidad: 'g',
+                                      ars: 0, esperado: 108, contado: 120 }] } })
+    const t = hechos(w).join(' ')
+    expect(t).toContain('de más')
+    expect(t).toContain('nunca lo carga')
   })
 })

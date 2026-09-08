@@ -43,69 +43,34 @@
          Era una tabla de cinco columnas —CIERRE · ENTREGADO · FALTÓ · CAJA— con «—» en casi todas
          las celdas y el dato accionable ausente: decía «en 1 producto» sin decir cuál. Ahora la
          fila cuenta qué pasó, en oraciones, y el detalle está a un toque. -->
-    <div v-else class="trn__lista">
-      <div v-for="t in turnos" :key="t.id" class="trn__c" :data-abierta="abiertas.has(t.id)">
-        <button class="trn__c-hd" @click="alternar(t.id)">
-          <span class="trn__c-txt">
-            <span class="trn__c-cuando">{{ cuando(t) }}</span>
-            <span class="trn__c-quien">{{ quien(t) }}</span>
+    <!-- AGRUPADO POR DÍA. Es como se piensa: «¿cómo fue el martes?», no «¿cómo fue el cierre 47?».
+         Y el encabezado del día trae el saldo, así el caso normal —un solo cierre— no obliga a
+         abrir nada para saber si pasó algo. -->
+    <div v-else class="trn__dias">
+      <div v-for="d in porDia" :key="d.clave" class="trn__dia" :data-abierta="abiertas.has(d.clave)">
+        <button class="trn__dia-hd" @click="alternar(d.clave)">
+          <i class="bi bi-chevron-right trn__dia-arr"></i>
+          <span class="trn__dia-nombre">{{ d.nombre }}</span>
+          <span class="trn__dia-resumen">
+            <template v-if="d.cierres.length > 1">{{ d.cierres.length }} cierres · </template>
+            <template v-if="d.faltanteArs">faltan <b>${{ fmt(d.faltanteArs) }}</b></template>
+            <template v-else><span class="trn__ok">no falta nada</span></template>
+            <template v-if="d.cierres.length === 1"> · {{ d.cierres[0].atendio || d.cierres[0].cerrado_por }}</template>
           </span>
-          <span class="trn__pill" :class="veredicto(t).clase">{{ veredicto(t).texto }}</span>
-          <i class="bi bi-chevron-right trn__c-arr"></i>
         </button>
 
-        <div v-if="abiertas.has(t.id)" class="trn__c-body">
-          <!-- ① LA MERCADERÍA. Con el producto por su NOMBRE: es lo único con lo que se puede
-               ir a buscar algo. -->
-          <p v-for="(f, i) in (t.faltaron?.items || [])" :key="`f${i}`" class="trn__f trn__f--warn">
-            Faltan <b>{{ fmt(f.cantidad) }} {{ f.unidad }}</b> de <b>{{ f.etiqueta }}</b>.
-            <small>
-              Sobre la mesa tenía que haber {{ fmt(f.esperado) }} {{ f.unidad }} y al contar
-              aparecieron {{ fmt(f.contado) }}. Producir esos {{ fmt(f.cantidad) }} {{ f.unidad }}
-              costó ${{ fmt(f.ars) }}.
-            </small>
-          </p>
-          <p v-if="restantes(t.faltaron)" class="trn__f trn__f--warn">
-            Y en {{ restantes(t.faltaron) }} producto{{ restantes(t.faltaron) === 1 ? '' : 's' }} más.
-          </p>
-
-          <!-- ② LO QUE SE CONTÓ DE MÁS. Es otra cosa y se explica distinto. -->
-          <p v-for="(f, i) in (t.sobraron?.items || [])" :key="`s${i}`" class="trn__f trn__f--warn">
-            Contó <b>{{ fmt(f.cantidad) }} {{ f.unidad }}</b> de más de <b>{{ f.etiqueta }}</b>.
-            <small>
-              No se sumaron al inventario: el mostrador descuenta producto, nunca lo carga. Si de
-              verdad hay {{ fmt(f.cantidad) }} {{ f.unidad }} más, los sube administración desde
-              el depósito.
-            </small>
-          </p>
-
-          <p v-if="todoEnOrden(t)" class="trn__f trn__f--ok">
-            Contó {{ t.productos }} producto{{ t.productos === 1 ? '' : 's' }} y estaba todo.
-            <template v-if="t.dispensado_ars > 0">Entregó ${{ fmt(t.dispensado_ars) }}.</template>
-          </p>
-
-          <!-- ③ LA PLATA, con la cuenta hecha. «$130.000, faltó $20.000» no se puede comprobar. -->
-          <p v-if="t.caja" class="trn__f" :class="t.caja.diferencia_ars ? 'trn__f--warn' : 'trn__f--ok'">
-            En la caja había <b>${{ fmt(t.caja.contado_ars) }}</b><template v-if="t.caja.diferencia_ars">
-              — <b>${{ fmt(Math.abs(t.caja.diferencia_ars)) }}
-              {{ t.caja.diferencia_ars < 0 ? 'menos' : 'más' }}</b> de lo que tenía que haber</template
-            ><template v-else>, lo que tenía que haber</template>.
-            <small v-if="t.caja.fondo_ars != null">
-              Empezó con ${{ fmt(t.caja.fondo_ars) }} de fondo; tenía que haber
-              ${{ fmt(t.caja.esperado_ars) }}.
-            </small>
-          </p>
-
-          <!-- ④ LO DEMÁS, en oraciones. Antes eran chips y un «+2 más» que escondía el resto. -->
-          <p v-for="m in otrosMotivos(t)" :key="m" class="trn__f">{{ MOTIVO_FRASE[m] }}</p>
-
-          <p v-if="t.revisado" class="trn__visto">Ya está mirado.</p>
-          <div v-else-if="gestiona" class="trn__c-acc">
-            <button class="trn__btn" :class="pideAtencion(t) ? 'trn__btn--primary' : 'trn__btn--ghost'"
-                    @click="corrigiendo = t">Corregir lo que se contó</button>
-            <button v-if="pideAtencion(t)" class="trn__btn trn__btn--ghost"
-                    @click="marcarVisto(t)">Está bien, ya lo miré</button>
-          </div>
+        <div v-if="abiertas.has(d.clave)" class="trn__dia-body">
+          <!-- Cada cierre es UNA línea; el detalle se abre en su ficha. Con el detalle acá adentro
+               serían tres niveles de anidado para leer una oración. -->
+          <button v-for="t in d.cierres" :key="t.id" class="trn__cierre" @click="abrir(t)">
+            <span class="trn__cierre-hora">{{ horario(t) }}</span>
+            <span class="trn__cierre-quien">
+              {{ quien(t) }}<template v-if="t.dispensado_ars > 0"> · entregó ${{ fmt(t.dispensado_ars) }}</template>
+            </span>
+            <span v-if="t.revisado" class="trn__pill trn__pill--ok">Visto</span>
+            <span v-else class="trn__pill" :class="veredicto(t).clase">{{ veredicto(t).texto }}</span>
+            <i class="bi bi-chevron-right trn__cierre-arr"></i>
+          </button>
         </div>
       </div>
     </div>
@@ -135,7 +100,7 @@
 // El que atiende cerraba su turno y no tenía dónde mirarlo después: si al día siguiente le
 // preguntan por una diferencia, no tenía con qué. Administración ve todos; él ve LOS SUYOS —el
 // backend filtra, no la pantalla.
-import { ref, watch } from 'vue'
+import { ref, computed, watch } from 'vue'
 import CorregirConteo from './CorregirConteo.vue'
 import { listTurnosMostrador, descargarTurnosMostrador, revisarTurnoMostrador } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
@@ -175,6 +140,11 @@ const MOTIVO_FRASE = {
 }
 const TONO = { faltante: 'warn', sobrante: 'warn', corregido: 'info', mesa_movida: 'info' }
 
+// La ficha del cierre: qué pasó Y los números para corregirlo, en el mismo lugar. Antes eran dos
+// gestos —abrir la fila, abrir otro modal— y el de corregir no tenía contexto.
+function abrir (t) { corrigiendo.value = t }
+
+// El día más reciente arranca abierto: es el que se viene a mirar.
 const abiertas = ref(new Set())
 function alternar (id) {
   const s = new Set(abiertas.value)
@@ -191,26 +161,53 @@ const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', '
 // Decía «5/9 · 14:02–12:03», que se lee como que cerró antes de abrir: era una caja que cruzó la
 // medianoche y sólo se mostraba la fecha del CIERRE. Una fila imposible te hace desconfiar de
 // toda la tabla. Cuando abrió otro día, se dice.
-function cuando (t) {
+// LOS CIERRES, AGRUPADOS POR DÍA. El encabezado trae el saldo del día: con un solo cierre —el
+// caso normal— no hace falta abrir nada para saber si pasó algo.
+//
+// Se agrupa por el día del CIERRE. Una caja que cruzó la medianoche cuenta en el día que cerró,
+// que es cuando se contó y cuando se asentó la diferencia.
+const porDia = computed(() => {
+  const mapa = new Map()
+  for (const t of turnos.value) {
+    const c = t.cerrado_at ? new Date(t.cerrado_at) : null
+    if (!c) continue
+    const clave = `${c.getFullYear()}-${c.getMonth()}-${c.getDate()}`
+    if (!mapa.has(clave)) {
+      const dia = `${DIAS[c.getDay()]} ${c.getDate()} de ${MESES[c.getMonth()]}`
+      mapa.set(clave, { clave, nombre: dia.charAt(0).toUpperCase() + dia.slice(1),
+                        cierres: [], faltanteArs: 0 })
+    }
+    const g = mapa.get(clave)
+    g.cierres.push(t)
+    g.faltanteArs += Number(t.faltaron?.ars) || 0
+  }
+  return [...mapa.values()]
+})
+
+// ACÁ Y NO ARRIBA: un `watch` evalúa su fuente AL REGISTRARSE, así que puesto antes de `porDia`
+// reventaba con «Cannot access before initialization» y la pantalla no abría. Es la misma trampa
+// que ya mordió en el modal de dispensa, dos veces.
+watch(porDia, (dias) => {
+  if (dias.length && !abiertas.value.size) abiertas.value = new Set([dias[0].clave])
+})
+
+// CUÁNDO FUE, SIN QUE PAREZCA IMPOSIBLE. «14:02–12:03» se leía como que cerró antes de abrir: era
+// una caja que cruzó la medianoche y sólo se mostraba la fecha del cierre.
+function horario (t) {
   const a = t.abierto_at ? new Date(t.abierto_at) : null
   const c = t.cerrado_at ? new Date(t.cerrado_at) : null
   if (!c) return '—'
-  const dia = `${DIAS[c.getDay()]} ${c.getDate()} de ${MESES[c.getMonth()]}`
-  return dia.charAt(0).toUpperCase() + dia.slice(1)
+  const otroDia = a && a.toDateString() !== c.toDateString()
+  return `${hora(t.abierto_at)} → ${hora(t.cerrado_at)}${otroDia ? ` del ${DIAS[c.getDay()]}` : ''}`
 }
 
+// Quién atendió. Es normal que abra el admin a la mañana y cierre contando quien atendió todo el
+// día: cuando son dos personas se nombran las dos.
 function quien (t) {
-  const a = t.abierto_at ? new Date(t.abierto_at) : null
-  const c = t.cerrado_at ? new Date(t.cerrado_at) : null
-  const otroDia = a && c && a.toDateString() !== c.toDateString()
-  const cierre = otroDia ? `${hora(t.cerrado_at)} del ${DIAS[c.getDay()]}` : hora(t.cerrado_at)
-
-  // Es normal que abra el admin a la mañana y cierre contando quien atendió todo el día: cuando
-  // son dos personas se nombran las dos, y si no alcanza con una.
   if (t.atendio && t.cerrado_por && t.atendio !== t.cerrado_por) {
-    return `Abrió ${t.atendio} ${hora(t.abierto_at)} · cerró ${t.cerrado_por} ${cierre}`
+    return `Abrió ${t.atendio} · cerró ${t.cerrado_por}`
   }
-  return `${t.atendio || t.cerrado_por || 'Alguien'}, de ${hora(t.abierto_at)} a ${cierre}`
+  return t.atendio || t.cerrado_por || 'Alguien'
 }
 
 // El veredicto de la fila: lo que se lee sin abrir nada.
@@ -222,11 +219,6 @@ function veredicto (t) {
   return { texto: 'Sin novedad', clase: 'trn__pill--ok' }
 }
 
-const pideAtencion = (t) => !!motivoPrincipal(t)
-const restantes    = (d) => Math.max(0, (d?.total || 0) - (d?.items?.length || 0))
-const todoEnOrden  = (t) => !(t.faltaron?.total) && !(t.sobraron?.total)
-// Los que ya se contaron arriba no se repiten: la mercadería tiene su propia oración.
-const otrosMotivos = (t) => (t.motivos_revision || []).filter(m => MOTIVO_FRASE[m])
 // EL QUE MANDA, no los tres. Un faltante es lo que se sale a buscar; que se haya corregido al
 // abrir es contexto. Tres chips en una fila obligan a leer los tres para saber cuál importa.
 const PRIORIDAD = ['faltante', 'sobrante', 'mesa_movida', 'corregido']
@@ -359,38 +351,43 @@ watch(() => props.sedeId, () => { pagina.value = 1; cargar() }, { immediate: tru
 }
 .trn__pill--ok   { background: var(--c-leaf-100); color: var(--c-leaf-700); }
 
-/* ── UNA LÍNEA POR CIERRE, y se abre la que interesa ─────────────────────────── */
-.trn__lista { display: flex; flex-direction: column; }
-.trn__c     { border-top: 1px solid var(--c-slate-100); }
-.trn__c:last-child { border-bottom: 1px solid var(--c-slate-100); }
-.trn__c-hd  {
+/* ── AGRUPADO POR DÍA ────────────────────────────────────────────────────────
+   Es como se piensa: «¿cómo fue el martes?». Y el encabezado del día trae el saldo, así el caso
+   normal —un solo cierre— no obliga a abrir nada para saber si pasó algo. */
+.trn__dias { display: flex; flex-direction: column; }
+.trn__dia  { border-top: 1px solid var(--c-slate-100); }
+.trn__dia:last-child { border-bottom: 1px solid var(--c-slate-100); }
+.trn__dia-hd {
   width: 100%; appearance: none; border: 0; background: none; font: inherit; cursor: pointer;
-  text-align: left; display: grid; grid-template-columns: minmax(0,1fr) auto 16px;
-  align-items: center; gap: 14px; padding: 15px 6px;
+  text-align: left; display: grid; grid-template-columns: 14px minmax(0,1fr) auto;
+  align-items: center; gap: 12px; padding: 14px 6px;
 }
-.trn__c-hd:hover { background: var(--c-slate-50, #f8fafc); }
-.trn__c-txt    { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.trn__c-cuando { font-size: var(--fs-15, .95rem); font-weight: 600; color: var(--c-ink-900); }
-.trn__c-quien  { font-size: var(--fs-13); color: var(--c-ink-500); }
-.trn__c-arr    { color: var(--c-ink-400, #9aa0aa); font-size: var(--fs-12); transition: transform .16s ease; }
-.trn__c[data-abierta="true"] .trn__c-arr { transform: rotate(90deg); }
-.trn__c-body   { display: flex; flex-direction: column; gap: 12px; padding: 2px 6px 20px; }
+.trn__dia-hd:hover { background: var(--c-slate-50, #f8fafc); }
+.trn__dia-arr { color: var(--c-ink-400, #9aa0aa); font-size: var(--fs-12); transition: transform .16s ease; }
+.trn__dia[data-abierta="true"] .trn__dia-arr { transform: rotate(90deg); }
+.trn__dia-nombre  { font-size: var(--fs-15, .95rem); font-weight: 700; color: var(--c-ink-900); }
+.trn__dia-resumen { font-size: var(--fs-13); color: var(--c-ink-500); text-align: right; white-space: nowrap; }
+.trn__dia-resumen b { color: var(--c-amber-700, #b45309); font-weight: 600; font-family: var(--font-mono); }
+.trn__dia-body { display: flex; flex-direction: column; gap: 2px; padding: 0 6px 12px 32px; }
 
-/* La oración, con su barra: el color dice qué clase de hecho es, sin gritar. */
-.trn__f {
-  margin: 0; padding-left: 13px; border-left: 3px solid var(--c-slate-200);
-  font-size: var(--fs-14, .9rem); color: var(--c-ink-700); max-width: 74ch; line-height: 1.5;
+/* Cada cierre, UNA línea. El detalle se abre en su ficha: acá adentro serían tres niveles de
+   anidado para leer una oración. */
+.trn__cierre {
+  width: 100%; appearance: none; border: 0; background: none; font: inherit; cursor: pointer;
+  text-align: left; display: grid; grid-template-columns: auto minmax(0,1fr) auto 14px;
+  align-items: center; gap: 12px; padding: 10px 10px; border-radius: 9px;
 }
-.trn__f b { color: var(--c-ink-900); font-weight: 600; }
-.trn__f small { display: block; color: var(--c-ink-500); font-size: var(--fs-13); margin-top: 3px; }
-.trn__f--warn { border-left-color: var(--c-amber-500, #f59e0b); }
-.trn__f--ok   { border-left-color: var(--c-leaf-600); }
-.trn__visto   { margin: 0; padding-left: 13px; font-size: var(--fs-13); color: var(--c-ink-500); }
-.trn__c-acc   { display: flex; gap: 9px; flex-wrap: wrap; padding-left: 13px; }
-@media (max-width: 520px) {
-  .trn__c-hd { grid-template-columns: minmax(0,1fr) auto; }
-  .trn__c-arr { display: none; }
+.trn__cierre:hover { background: var(--c-slate-50, #f8fafc); }
+.trn__cierre-hora  { font-family: var(--font-mono); font-size: var(--fs-13); color: var(--c-ink-500); white-space: nowrap; }
+.trn__cierre-quien { font-size: var(--fs-14); color: var(--c-ink-700); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.trn__cierre-arr   { color: var(--c-ink-400, #9aa0aa); font-size: var(--fs-12); }
+@media (max-width: 560px) {
+  .trn__cierre { grid-template-columns: minmax(0,1fr) auto; gap: 4px 8px; }
+  .trn__cierre-hora { grid-column: 1 / -1; }
+  .trn__cierre-arr { display: none; }
+  .trn__dia-body { padding-left: 14px; }
 }
+
 /* Ámbar y no rojo: una diferencia es un dato que se anota, no una falta que alguien explica. */
 .trn__pill--warn { background: var(--c-amber-100, #fef3c7); color: var(--c-amber-700, #b45309); }
 .trn__pill--info { background: var(--c-sky-100, #e0f2fe); color: var(--c-sky-600, #0284c7); }

@@ -538,6 +538,10 @@ export const pedirReposicionMostrador = (sedeId, payload) => api.post(`/sedes/${
 export const cerrarMostrador   = (sedeId, payload) => api.post(`/sedes/${sedeId}/mostrador/cerrar`, payload)
 // Dónde se le va el producto a la organización. No es auditoría: la merma es inevitable y se
 // mide para encontrar el cuello de botella — qué producto y en qué momento.
+// Lo que tenía que haber contra lo que se contó, día por día y PRODUCTO POR PRODUCTO: en un
+// total habría que sumar gramos con unidades, y eso no significa nada.
+export const getEvolucionMostrador = (sedeId, params = {}) =>
+  api.get(`/sedes/${sedeId}/mostrador/evolucion`, { params })
 export const getMermaMostrador = (sedeId, params = {}) => api.get(`/sedes/${sedeId}/mostrador/merma`, { params })
 export const revisarTurnoMostrador = (sedeId, id) => api.post(`/sedes/${sedeId}/mostrador/turnos/${id}/revisar`)
 export const getTurnoMostrador     = (sedeId, id) => api.get(`/sedes/${sedeId}/mostrador/turnos/${id}`)
