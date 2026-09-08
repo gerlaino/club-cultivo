@@ -1,5 +1,51 @@
 # Changelog
 
+## Septiembre 2026 (au) — Cierres en criollo, y el modal de corregir que no listaba nada
+
+Germán: *"es ilegible, entrás ahí, ves eso y no entendés absolutamente nada... ponete en el lugar
+del admin del club, el admin no sabe nada de todo esto, lo que sabe es de cultivar"*. Se acordó
+sobre un prototipo navegable y esto es aplicarlo.
+
+**EL MODAL DE CORREGIR ESTABA ROTO, no era una impresión.** Germán: *"hacés click en corregir
+conteo y ¿qué pasa? se abre un modal que dice ingresar motivo, pero no hacés más nada, ¿para qué
+sirve eso?"*. El componente leía `data.items` y el backend mandaba la lista bajo `conteo_apertura`:
+salía **vacía siempre**, quedaba un campo de motivo suelto, y al confirmar contestaba «no cambiaste
+ningún número». La función tenía servicio, ruta y pantalla, y **no era alcanzable**. Encima el
+payload no mandaba el `id` del renglón, que es con lo que corrige `CorregirCierre`, y la pantalla
+partía de `contado` —lo que se contó al ABRIR— en vez del conteo del cierre, que es lo que está
+mal. Tres cosas, ninguna con test.
+
+**Y aunque hubiera listado, pedía un número a ciegas.** Decía «se había contado 23 g» y nunca que
+la mesa decía 46. Ahora son cuatro columnas —**Producto · Tenía que haber · Se contó · De verdad
+había**— con el renglón que no cerró marcado, y abajo, mientras se escribe, qué va a pasar con el
+inventario.
+
+**CADA CIERRE CUENTA QUÉ PASÓ, EN ORACIONES.** Era una tabla de cinco columnas con «—» en casi
+todas las celdas y el dato accionable ausente: decía «$27.636,6 en 1 producto» sin decir cuál.
+Ahora: `Faltan 23 g de Critical Kush L-26-017. Sobre la mesa tenía que haber 46 g y al contar
+aparecieron 23. Producir esos 23 g costó $11.500.` El resultado con la cuenta, y el producto por
+su nombre. La caja igual: `En la caja había $130.000 — $20.000 menos de lo que tenía que haber.
+Empezó con $110.000 de fondo`. El backend suma `faltaron`/`sobraron` (cuáles, no cuántos) y el
+detalle de la caja.
+
+**LA CAJA QUE CRUZÓ LA MEDIANOCHE.** `14:02–12:03` se leía como que cerró antes de abrir: se
+mostraba sólo la fecha del cierre con las dos horas al lado. Ahora dice `de 14:02 a 12:03 del
+sábado`. Una fila imposible hace desconfiar de toda la tabla.
+
+**VOCABULARIO DE CULTIVADOR, no de contador.** `cuadró → está todo / no falta nada` ·
+`a costo → producirlos costó $X` · `esperado → lo que tenía que haber` ·
+`contó de más — no se cargó al inventario → contó de más` (y la explicación en la oración).
+Se quedan **merma** y **cierre**: merma es palabra de campo y «cierre» ya lo eligió Germán.
+
+**EL PORCENTAJE, DICHO COMO SE DICE.** «0,7%» hay que traducirlo mentalmente; `se pierden 7 de
+cada 1.000 que salen` ya está en la cabeza del que lo lee. Y «Dónde se va» —un título sin
+sujeto— pasa a **«De qué falta»**.
+
+**Los chips se fueron.** Un `+2 más` esconde justo lo que hay que leer: los otros motivos son
+oraciones al pie, una debajo de la otra.
+
+Verificado renderizado con un cierre con faltante creado a propósito, incluido el modal listando.
+
 ## Septiembre 2026 (at) — el total cortado al medio, en el pie del modal
 
 Germán mandó la captura: `$ 543.06` **cortado al medio** y «Cómo paga» saliéndose de la pantalla.

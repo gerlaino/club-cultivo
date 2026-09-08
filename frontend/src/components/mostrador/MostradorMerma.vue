@@ -64,7 +64,8 @@
       <!-- ══ ③ ¿DÓNDE SE VA? ═══════════════════════════════════════════════════
            UNA tabla con un corte a la vez, no tres apiladas con las mismas columnas: había que
            elegir cuál mirar antes de saber qué se estaba buscando. -->
-      <h2 class="mrm__seccion">Dónde se va</h2>
+      <!-- «Dónde se va» era un título sin sujeto: ¿dónde se va qué? -->
+      <h2 class="mrm__seccion">De qué falta</h2>
       <div class="mrm__corte">
         <div class="mrm__cortes">
           <button v-for="c in cortes" :key="c.id" class="mrm__periodo"
@@ -74,6 +75,9 @@
       </div>
 
       <p v-if="!filas.length" class="mrm__nada">No falta nada en este período.</p>
+
+      <!-- El hallazgo que la tabla vieja no sabía decir. Va como aviso y no como una línea más:
+           faltar producto de algo que nadie vendió es otra cosa, y más urgente. -->
 
       <!-- FILAS DE DOS LÍNEAS, NO UNA TABLA DE CINCO COLUMNAS.
            Era «% · vs promedio · Faltó · A costo · Entregado»: cinco números sin sujeto, y
@@ -169,8 +173,9 @@ const titular = computed(() => {
   const m = merma.value
   if (!m) return ''
   const n = `${cierres.value} ${cierres.value === 1 ? 'cierre' : 'cierres'}`
-  if (!faltanteArs.value) return `Cuadró todo. ${n} en este período.`
-  return `Faltaron $${fmt(faltanteArs.value)} en ${n}.`
+  // «Cuadró» y «a costo» son palabras de contador. El que abre esta pantalla sabe de plantas.
+  if (!faltanteArs.value) return `No falta nada. ${n} en este período.`
+  return `Falta producto por $${fmt(faltanteArs.value)} en ${n}.`
 })
 
 // La comparación contra el historial, que es lo que contesta «¿viene subiendo?». Va DEBAJO del
@@ -187,7 +192,7 @@ const aclaracion = computed(() => {
       return `${v.pct}% esta semana: como viene siempre acá (${v.pct_previo}% en las últimas ` +
              `${semanas} semanas).`
     case 'poco_volumen':
-      return 'Todavía es poco volumen para comparar contra tu historial.'
+      return 'Todavía se entregó poco como para comparar contra tu historial.'
     case 'sin_historia':
       return 'Todavía no hay con qué comparar: hacen falta unas semanas de cierres.'
     default:
@@ -234,11 +239,16 @@ const filas = computed(() => {
   const cierres = (n) => `${n} ${n === 1 ? 'cierre' : 'cierres'}`
   // Cuánto se entregó de esto, y qué proporción se fue. Con 0 entregado no hay porcentaje que
   // valga: se dice lo que pasó de verdad.
+  // EL PORCENTAJE, DICHO COMO SE DICE. «0,7%» hay que traducirlo mentalmente; «se pierden 7 de
+  // cada 1.000 que salen» es el mismo dato en la cabeza del que lo lee.
   const sobreLoEntregado = (f) => {
     const d = Number(f.dispensado) || 0
     if (!d) return 'no se entregó nada de esto en el período'
-    const pct = f.merma_pct ?? f.pct
-    return `sobre ${fmt(d)} ${f.unidad || ''} entregados${pct != null ? ` (${pct}%)` : ''}`.replace('  ', ' ')
+    const pct = Number(f.merma_pct ?? f.pct)
+    const u = f.unidad || ''
+    if (!Number.isFinite(pct) || pct <= 0) return `sobre ${fmt(d)} ${u} entregados`.trim()
+    const cada = Math.round(pct * 10)   // % → cuántos de cada 1.000
+    return `sobre ${fmt(d)} ${u} entregados: se pierden ${cada} de cada 1.000 que salen`.replace('  ', ' ')
   }
 
   let lista

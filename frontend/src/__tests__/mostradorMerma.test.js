@@ -78,12 +78,14 @@ describe('① Cómo viene', () => {
   // porcentaje es calculable.
   it('el titular arranca por la plata que falta', async () => {
     const w = await montar()
-    expect(w.find('.mrm__estado-frase').text()).toBe('Faltaron $9.000 en 9 cierres.')
+    // «Faltaron $X a costo» era jerga. El que abre esto sabe de plantas, no de arqueos.
+    expect(w.find('.mrm__estado-frase').text()).toBe('Falta producto por $9.000 en 9 cierres.')
   })
 
   it('cuando cuadró lo dice, en vez de no decir nada', async () => {
     const w = await montar({ resumen: { ...BASE.resumen, faltante: 0, faltante_ars: 0 } })
-    expect(w.find('.mrm__estado-frase').text()).toContain('Cuadró todo')
+    // «Cuadró» es palabra de contador.
+    expect(w.find('.mrm__estado-frase').text()).toContain('No falta nada')
   })
 
   // Este es el caso de la captura: se entregó 0, así que no hay porcentaje. Antes el titular
@@ -92,7 +94,7 @@ describe('① Cómo viene', () => {
     const w = await montar({ veredicto: { ...BASE.veredicto, estado: 'poco_volumen', motor: null } })
 
     expect(w.find('.mrm__estado-frase').text()).toContain('$9.000')
-    expect(w.find('.mrm__estado-sub').text()).toContain('poco volumen')
+    expect(w.find('.mrm__estado-sub').text()).toContain('se entregó poco')
   })
 
   // Un porcentaje solo no dice nada: lo que importa es que CAMBIÓ respecto del patrón de acá.
@@ -148,7 +150,10 @@ describe('③ Dónde se va', () => {
     expect(filas(w)).toHaveLength(1)
     expect(filas(w)[0].find('.mrm__fila-titulo').text()).toContain('Northern Lights')
     expect(filas(w)[0].find('.mrm__fila-ars').text()).toBe('$5.000')
-    expect(filas(w)[0].find('.mrm__fila-sub').text()).toContain('sobre 1.000 g entregados (5%)')
+    // EL PORCENTAJE DICHO COMO SE DICE: «5%» hay que traducirlo; «50 de cada 1.000 que salen»
+    // ya está en la cabeza del que lo lee.
+    expect(filas(w)[0].find('.mrm__fila-sub').text())
+      .toContain('sobre 1.000 g entregados: se pierden 50 de cada 1.000 que salen')
   })
 
   // EL HALLAZGO QUE LA TABLA VIEJA NO SABÍA DECIR: faltar producto de algo que no se vendió no es

@@ -525,6 +525,37 @@ module Dispensario
       }
     end
 
+    # LOS PRODUCTOS EN LOS QUE HUBO DIFERENCIA, con nombre y con plata.
+    #
+    # Ordenados por lo que costaron, no por gramos: lo que más pesa no es lo que más duele.
+    # Se cortan en tres — la fila es una oración, no un listado — y el resto viaja como número
+    # para poder decir «y 2 más».
+    TOPE_DETALLE = 3
+
+    def detalle_diferencias(items, lado)
+      con_dif = items.select do |it|
+        d = it.diferencia_cierre.to_d
+        lado == :falta ? d.negative? : d.positive?
+      end
+      filas = con_dif.map do |it|
+        cant = it.diferencia_cierre.to_d.abs
+        {
+          etiqueta: it.stock&.etiqueta,
+          cantidad: cant.to_f.round(2),
+          unidad:   it.stock&.unidad || 'g',
+          # Lo que costó producirlo. En la pantalla se dice así, no «a costo».
+          ars:      (cant * it.stock&.costo_unitario_ars.to_d).to_f.round(2),
+          # Contra qué se compara, que es lo que hoy no se ve en ningún lado.
+          esperado: it.esperado_cierre&.to_f,
+          contado:  it.cantidad_cierre&.to_f,
+        }
+      end.sort_by { |x| -x[:ars] }
+
+      { items: filas.first(TOPE_DETALLE), total: filas.size,
+        cantidad: filas.sum { |x| x[:cantidad] }.round(2),
+        ars: filas.sum { |x| x[:ars] }.round(2) }
+    end
+
     # Una consulta para toda la página, no una por fila.
     def motivos_de_revision
       @motivos_de_revision ||=
@@ -561,6 +592,21 @@ module Dispensario
         }.to_f.round(2),
         # En cuántos productos faltó: "en 1 producto" dice mucho más que un número suelto.
         productos_con_faltante: items.count { |it| it.diferencia_cierre.to_d.negative? },
+        # CUÁLES faltaron, no cuántos. «En 1 producto» no sirve para hacer nada: para ir a
+        # buscarlo hay que saber si es la flor o los prerolls. Van los tres más caros y el resto
+        # se cuenta — con quince renglones la fila deja de ser una oración.
+        faltaron:  detalle_diferencias(items, :falta),
+        # Y lo mismo con lo que se contó de MÁS, que es otra cosa y se explica distinto: no se
+        # carga al inventario, porque el mostrador descuenta producto y nunca lo suma.
+        sobraron:  detalle_diferencias(items, :sobra),
+        # DE DÓNDE SALE LA CUENTA DE LA CAJA. «$130.000, faltó $20.000» no se puede comprobar:
+        # con el fondo y lo cobrado, la frase se explica sola.
+        caja: turno.caja_turno && {
+          fondo_ars:     turno.caja_turno.monto_inicial_ars&.to_f,
+          esperado_ars:  turno.caja_turno.efectivo_esperado_ars&.to_f,
+          contado_ars:   turno.caja_turno.efectivo_declarado_ars&.to_f,
+          diferencia_ars: turno.caja_turno.diferencia_ars&.to_f,
+        },
         con_diferencia: con_dif,
         # El arqueo de plata del mismo turno, sin abrirlo.
         efectivo_contado_ars: turno.caja_turno&.efectivo_declarado_ars&.to_f,
@@ -607,6 +653,10 @@ module Dispensario
         # después: si el que abrió corrigió algo, está.
         conteo_apertura: turno.items.includes(:stock).map do |it|
           {
+            # EL ID DEL RENGLÓN, que es con lo que se corrige (`CorregirCierre` busca por
+            # `item_id`). No estaba, así que la pantalla de corregir no tenía con qué mandar
+            # nada aunque hubiera listado algo.
+            id: it.id,
             stock_id: it.stock_id, etiqueta: it.stock&.etiqueta, unidad: it.stock&.unidad,
             esperado: it.esperado_apertura&.to_f, contado: it.cantidad_apertura.to_f,
             diferencia: it.esperado_apertura ? (it.cantidad_apertura.to_d - it.esperado_apertura.to_d).to_f : nil,
@@ -615,7 +665,16 @@ module Dispensario
             contado_cierre:  it.cantidad_cierre&.to_f,
           }
         end,
-      }
+      }.then { |h| h.merge(items: h[:conteo_apertura]) }
+      # `items` es el MISMO array, con el nombre que la pantalla de corregir siempre leyó.
+      #
+      # Ese modal hacía `data.items` y el payload sólo traía `conteo_apertura`: la lista salía
+      # VACÍA siempre, así que quedaba un campo de motivo suelto —«se abre un modal que dice
+      # ingresar motivo y no hacés nada más», lo reportó Germán— y al confirmar contestaba «no
+      # cambiaste ningún número». La función existía y no era alcanzable.
+      #
+      # Se manda con los dos nombres en vez de renombrar: `conteo_apertura` lo lee la pantalla
+      # del mostrador y romperla para arreglar esta sería cambiar un bug por otro.
     end
 
     def valor_de_la_mesa

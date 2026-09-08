@@ -575,6 +575,21 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   Vue llevan `[data-v-xxxx]`: en un markup armado a mano sin ese atributo no aplica NI UNA regla y
   se termina midiendo el layout por defecto del navegador — verde por la razón equivocada. El caso
   saca el scope del propio CSS compilado y afirma `aplicaElCss` antes de medir nada.
+- **EL ADMIN SABE DE CULTIVAR, NO DE ARQUEOS.** Es la regla que ordena el texto de todo el
+  módulo: «cuadró», «arqueo», «a costo», «esperado» son palabras de contador y cada una es un
+  peaje. Se dice `no falta nada`, `el conteo`, `producirlos costó $X`, `lo que tenía que haber`. Y
+  el porcentaje se dice como se dice: **`se pierden 7 de cada 1.000 que salen`**, no `0,7%`. Se
+  quedan **merma** (palabra de campo) y **cierre** (lo eligió Germán). Decisión de sep-2026, sobre
+  un prototipo navegable que revisó antes de que se escribiera código.
+- **CADA CIERRE CUENTA QUÉ PASÓ, CON LA CUENTA A LA VISTA.** No `$27.636,6 · en 1 producto` —cinco
+  celdas sin sujeto y el dato accionable ausente— sino *«Faltan 23 g de Critical Kush L-26-017.
+  Sobre la mesa tenía que haber 46 g y al contar aparecieron 23»*. **El producto por su nombre** es
+  lo único con lo que se puede ir a buscar algo, y sin el esperado el número no se puede
+  comprobar. Por eso el payload manda `faltaron`/`sobraron` (CUÁLES, con esperado y contado) y el
+  detalle de la caja (fondo y esperado), no sólo totales.
+- **UNA CAJA PUEDE CRUZAR LA MEDIANOCHE.** `14:02–12:03` se leía como que cerró antes de abrir:
+  se mostraba sólo la fecha del CIERRE con las dos horas al lado. Se dice `del sábado` cuando
+  abrió otro día. Una fila imposible hace desconfiar de toda la tabla.
 - **LA SOLAPA DE MERMA ES UNA LÍNEA Y UNA LISTA** (sep-2026, rediseño acordado con Germán). El
   titular **arranca por el número** —`Faltaron $10.000 en 1 cierre.` / `Cuadró todo.`— y la
   comparación contra el historial va debajo y **sólo cuando dice algo**: antes el cuadro empezaba
