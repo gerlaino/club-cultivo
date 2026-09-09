@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
@@ -114,5 +114,71 @@ describe('Entregar una reserva desde el teléfono', () => {
     await flushPromises()
 
     expect(w.findComponent({ name: 'ModalNuevaDispensacion' }).exists()).toBe(false)
+  })
+})
+
+// QUÉ DICE CADA TARJETA. Germán, mirándola en el teléfono: «me gustaría un poquito más de info en
+// ese detalle, como por ejemplo la genética, y la que está señada debería decir cuánto resta
+// pagar, no sólo señada, porque puede estar señada y con un resto todavía por cobrar».
+//
+// Decir «Señada ✓» sobre una reserva con la mitad sin cobrar es peor que no decir nada: el que
+// atiende la entrega sin cobrar el resto, y el que paga la diferencia es el club.
+describe('Lo que cuenta la tarjeta de una reserva', () => {
+  const conStock = (extra, stock = {}) => [{
+    id: 7, cantidad: 5, fecha_entrega_estimada: '2026-08-11',
+    paciente: { id: 3, nombre: 'Diego Cabrera' },
+    stock: { unidad: 'g', forma_producto: 'flor_seca', genetica: 'Critical Kush',
+             lote: 'L-26-017', ...stock },
+    ...extra,
+  }]
+
+  const conReservas = async (rs) => {
+    listReservas.mockResolvedValue({ data: { reservas: rs } })
+    return montar(true)
+  }
+  afterEach(() => { listReservas.mockResolvedValue({ data: { reservas: RESERVAS } }) })
+
+  it('dice la variedad, que es con lo que se va a buscar el frasco', async () => {
+    const w = await conReservas(conStock({ sena_ars: 0, aporte_restante_ars: 12000 }))
+
+    expect(w.find('.mres__prod').text()).toBe('Critical Kush')
+    expect(w.find('.mres__meta').text()).toContain('5g · Flor seca')
+    expect(w.find('.mres__meta').text()).toContain('L-26-017')
+  })
+
+  it('señada Y con resto dice las dos cosas', async () => {
+    const w = await conReservas(conStock({ sena_ars: 5000, aporte_restante_ars: 12000 }))
+
+    const txt = w.find('.mres__cobro').text()
+    expect(txt).toContain('5.000')    // lo que ya puso
+    expect(txt).toContain('12.000')   // lo que hay que cobrarle ahora
+    expect(w.find('.mres__cobro').classes()).toContain('mres__cobro--resta')
+  })
+
+  it('sin seña, sólo lo que resta', async () => {
+    const w = await conReservas(conStock({ sena_ars: 0, aporte_restante_ars: 17084 }))
+    expect(w.find('.mres__cobro').text()).toMatch(/^Resta/)
+  })
+
+  it('paga del todo, lo dice y muestra con cuánto', async () => {
+    const w = await conReservas(conStock({ sena_ars: 17084, aporte_restante_ars: 0 }))
+
+    expect(w.find('.mres__cobro').text()).toContain('Paga')
+    expect(w.find('.mres__cobro').text()).toContain('17.084')
+    expect(w.find('.mres__cobro').classes()).toContain('mres__cobro--ok')
+  })
+
+  // Sin seña y sin resto no es que esté paga: es que no se estimó el aporte al reservarla.
+  // Decirle «Paga ✓» ahí es hacerle regalar la mercadería.
+  it('sin seña y sin total estimado, no dice que esté paga', async () => {
+    const w = await conReservas(conStock({ sena_ars: 0, aporte_restante_ars: 0 }))
+
+    expect(w.find('.mres__cobro').text()).toBe('Se cobra al entregar')
+    expect(w.find('.mres__cobro').text()).not.toContain('Paga')
+  })
+
+  it('y si no se sabe la variedad, no deja el renglón vacío', async () => {
+    const w = await conReservas(conStock({ sena_ars: 0, aporte_restante_ars: 100 }, { genetica: null }))
+    expect(w.find('.mres__prod').exists()).toBe(false)
   })
 })

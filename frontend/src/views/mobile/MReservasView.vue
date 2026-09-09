@@ -35,12 +35,20 @@
             {{ esVencida(r) ? 'Venció ' : '' }}{{ fechaCorta(r.fecha_entrega_estimada) }}
           </span>
         </div>
-        <div class="mres__prod">
+        <!-- QUÉ ES LO QUE ESTÁ APARTADO. «5g · Flor seca» no alcanza para ir a buscarlo: la
+             variedad es lo que dice cuál de los quince frascos hay que agarrar, y es lo primero
+             que nombra el paciente cuando lo viene a retirar. -->
+        <div v-if="r.stock?.genetica" class="mres__prod">{{ r.stock.genetica }}</div>
+        <div class="mres__meta">
           {{ r.cantidad }}{{ r.stock?.unidad || 'g' }} · {{ formaLabel(r.stock?.forma_producto) }}
+          <template v-if="r.stock?.lote"> · {{ r.stock.lote }}</template>
         </div>
         <div class="mres__pie">
-          <span v-if="Number(r.aporte_restante_ars) > 0" class="mres__resta">Resta {{ formatARS(r.aporte_restante_ars) }}</span>
-          <span v-else class="mres__senada">Señada ✓</span>
+          <!-- SEÑADA NO ES PAGA. Decía «Señada ✓» apenas había seña, y una reserva puede estar
+               señada con la mitad todavía por cobrar: el que atiende lo entregaba sin cobrar el
+               resto. Se dicen las dos cosas —lo que ya puso y lo que falta—, que es lo que va a
+               tener que decirle al paciente. -->
+          <span class="mres__cobro" :class="`mres__cobro--${cobro(r).tono}`">{{ cobro(r).texto }}</span>
           <button class="mres__btn" :disabled="cajaCerrada" @click="entregar(r)">Entregar</button>
         </div>
       </div>
@@ -89,6 +97,21 @@ const modalAbierto = computed({
 })
 
 const hoyISO = new Date().toISOString().slice(0, 10)
+
+// LO QUE HAY QUE COBRAR AL ENTREGAR, en una frase. Son cuatro casos distintos y antes se
+// mostraban como dos: si había seña decía «Señada ✓» aunque quedara la mitad por cobrar.
+function cobro (r) {
+  const resta = Number(r.aporte_restante_ars) || 0
+  const sena  = Number(r.sena_ars) || 0
+  if (resta > 0) {
+    return { tono: 'resta',
+             texto: sena > 0 ? `Señó ${formatARS(sena)} · resta ${formatARS(resta)}`
+                             : `Resta ${formatARS(resta)}` }
+  }
+  if (sena > 0) return { tono: 'ok', texto: `Paga ✓ · señó ${formatARS(sena)}` }
+  // Sin seña y sin resto no es que esté paga: es que no se estimó el aporte al reservarla.
+  return { tono: 'muted', texto: 'Se cobra al entregar' }
+}
 
 // "Para hoy" incluye las VENCIDAS: una reserva que quedó de ayer sigue esperando a alguien, y
 // esconderla es la forma de que se olvide.
@@ -197,10 +220,16 @@ function fechaCorta(f) {
 .mres__paciente { font-weight: 600; color: var(--c-ink-800, #1e293b); }
 .mres__fecha { font-size: .75rem; color: var(--c-slate-400); white-space: nowrap; }
 .mres__fecha--vencida { color: #dc2626; font-weight: 600; }
-.mres__prod { font-size: .85rem; color: var(--c-slate-600); }
+/* La variedad primero y con peso: es el dato con el que se va a buscar el frasco. */
+.mres__prod { font-size: .9rem; font-weight: 600; color: var(--c-ink-800, #1e293b); }
+.mres__meta { font-size: .8rem; color: var(--c-slate-500); margin-top: -.25rem; }
 .mres__pie { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
-.mres__resta { font-size: .8rem; color: #b45309; font-weight: 600; }
-.mres__senada { font-size: .8rem; color: #15803d; }
+/* El cobro no se parte: con «señó $5.000 · resta $12.000» y el botón al lado, dos renglones son
+   mejor que un número cortado — es el que se dice en voz alta. */
+.mres__cobro { font-size: .8rem; font-weight: 600; min-width: 0; }
+.mres__cobro--resta { color: #b45309; }
+.mres__cobro--ok    { color: #15803d; }
+.mres__cobro--muted { color: var(--c-slate-500); font-weight: 500; }
 .mres__btn {
   border: none; border-radius: 10px; padding: .5rem 1rem; cursor: pointer;
   background: var(--c-leaf-600, #16a34a); color: #fff; font-size: .85rem; font-weight: 600;

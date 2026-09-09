@@ -24,7 +24,7 @@ class ReservasController < ApplicationController
                     current_user.sedes_visibles_ids, current_user.club_id)
     end
     scope = scope.where(estado: params[:estado]) if params[:estado].present?
-    scope = scope.includes(:user, { stock: [:lote, :sede] }, paciente: :cuenta_corriente).recientes
+    scope = scope.includes(:user, { stock: [:genetica, :sede, { lote: :genetica }] }, paciente: :cuenta_corriente).recientes
     render json: { reservas: scope.map { |r| serialize_reserva(r) } }
   end
 
@@ -352,6 +352,10 @@ class ReservasController < ApplicationController
         id:             r.stock.id,
         forma_producto: r.stock.forma_producto,
         unidad:         r.stock.unidad,
+        # QUÉ ES lo que está apartado. «5 g · Flor seca» no alcanza para prepararlo: la variedad
+        # es lo que dice cuál de los frascos hay que agarrar, y es lo primero que pregunta el
+        # paciente cuando lo viene a buscar.
+        genetica:       (r.stock.genetica || r.stock.lote&.genetica)&.nombre,
         lote:           r.stock.lote&.codigo,
         # De qué sede sale lo reservado: quien atiende varias no puede leer una lista donde
         # las reservas de dos mostradores están mezcladas.

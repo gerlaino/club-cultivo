@@ -1,5 +1,64 @@
 # Changelog
 
+## Septiembre 2026 (ax) — Un cierre ya mirado no se corrige, y «señada» no es «paga»
+
+Lo planteó Germán mirando la solapa Cierres: *"al marcar como visto no deberíamos dejar que se
+pueda editar después. Otra cosa: si hay diferencias pero el admin tardó en verlo, por lo cual se
+abrió otra caja, ya no se debería poder editar el cierre anterior"*.
+
+**CORREGIR UN CIERRE NO TENÍA NINGUNA FRONTERA TEMPORAL**: cualquiera, para siempre. Y mueve
+inventario real y asienta plata en el libro. Ahora son tres candados, y **la regla vive en
+`TurnoMostrador#bloqueo_correccion`** —un solo lugar— porque la preguntan los dos lados: el
+servicio que la aplica y la ficha que la muestra (`correccion: { permitida, motivo, texto }`).
+Escrita dos veces, un día la pantalla invita a corregir algo que el backend rechaza.
+
+**EL ORDEN LO DECIDE CUÁL TIENE ARREGLO, primero el que no lo tiene.** Decirle «ya está mirado,
+reabrilo» a un cierre que además tiene una caja posterior lo manda a un callejón sin salida.
+
+1. **`caja_posterior`** — se volvió a abrir la caja, y **abrir es contar**: el producto ya se
+   re-midió. No es una regla que decidimos: aplicar un delta viejo lo movería lejos de la última
+   medición real. Una caja **anulada** no congela nada — nunca hubo turno.
+2. **`periodo_cerrado`** — el que faltaba y nadie había pedido. `CorregirCierre` asienta un
+   `diferencia_caja` y mueve stock sin mirar `contabilidad_cerrada_hasta`: los gramos solos pasaban
+   lisos, y la plata reventaba con el mensaje de validación del movimiento haciendo rollback de
+   todo. Mismo candado que cambiar la forma de un producto ya dispensado.
+3. **`visto`** — la firma, **con llave**: `DELETE /sedes/:id/mostrador/turnos/:id/revisar` reabre
+   para revisión. Sin llave, un clic de más sería permanente y el gesto —que tiene que ser liviano,
+   la lista está para vaciarse— pasaría a ser una decisión que el admin duda antes de tomar. Quién
+   lo reabrió y cuándo queda en la auditoría.
+
+**Y «YA LO MIRÉ» NO EXISTÍA EN LA PANTALLA.** El rediseño del bloque (aw) —agrupar por día, mover
+el detalle a la ficha— se llevó puesto el botón: `marcarVisto()` quedó **sin un solo llamador**, o
+sea que el badge contaba pendientes que no se podían sacar de la lista de ninguna forma. Ningún
+test lo notó. Volvió, en la ficha del cierre, que es donde se mira.
+
+**Al dispensador se le ofrecían los campos y el botón de corregir**, para un 403: corregir toca
+inventario de un turno cerrado y es de administración. La ficha recibe `gestiona` y a él le muestra
+sólo qué pasó en su cierre.
+
+**El nit de la misma captura:** dentro del grupo «Sábado 5», la fila decía `14:02 → 12:03 del
+sábado` —repitiendo el encabezado y escondiendo lo único que faltaba—. Ahora nombra el día de
+**apertura**: `viernes 14:02 → 12:03`.
+
+### La tarjeta de reservas del teléfono
+
+Germán, con la app en la mano: *"me gustaría un poquito más de info en ese detalle, como por
+ejemplo la genética, y la que está señada debería decir cuánto resta pagar, no sólo señada, porque
+puede estar señada y con un resto todavía por cobrar"*.
+
+**«SEÑADA ✓» SOBRE UNA RESERVA CON LA MITAD SIN COBRAR ES PEOR QUE NO DECIR NADA**: el que atiende
+la entrega sin cobrar el resto. Son cuatro casos y se mostraban como dos — ahora dice
+`Señó $5.000 · resta $12.000`, `Resta $17.084`, `Paga ✓ · señó $17.084`, y **sin seña y sin total
+estimado** dice `Se cobra al entregar`, que es la verdad: no es que esté paga, es que no se estimó
+el aporte al reservarla.
+
+**Y LA VARIEDAD**, que es con lo que se va a buscar el frasco entre quince y lo primero que nombra
+el paciente cuando lo viene a retirar: `Critical Kush` arriba, `5g · Flor seca · L-26-017` debajo.
+El backend suma `genetica` al payload de la reserva, con su `includes` para no pegarle una consulta
+por fila.
+
+**2898 rspec ✓ · 1932 vitest ✓ · build limpio.**
+
 ## Septiembre 2026 (aw) — Cierres día por día, y un gráfico por producto
 
 Propuesta de Germán: *"¿qué te parece si agrupamos por día, y ahí desglosamos, y si queremos ver

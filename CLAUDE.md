@@ -1036,6 +1036,23 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   único que no puede hacer: la mesa la carga administración. Un cartel que propone una acción
   prohibida es peor que no tener cartel — parece culpa del usuario. Mismo criterio que el botón
   que no se habilita si el backend va a rechazar.
+- **UN CIERRE SE CONGELA POR TRES RAZONES, Y LA REGLA VIVE EN `TurnoMostrador#bloqueo_correccion`**
+  (sep-2026). Corregir mueve inventario real y asienta plata, y no tenía NINGUNA frontera
+  temporal: cualquier cierre, para siempre. Vive en un solo lugar porque la preguntan los dos
+  lados —`CorregirCierre` que la aplica y la ficha que la muestra—, y **el orden lo decide cuál
+  tiene arreglo**: ① **se abrió otra caja** (abrir es contar: el producto ya se re-midió, y
+  aplicar un delta viejo lo aleja de la última medición real; una caja **anulada** no congela
+  nada) · ② **período contable cerrado** · ③ **marcado como visto**, que es el único con llave:
+  se reabre para revisión con `DELETE …/turnos/:id/revisar` y el rastro queda en la auditoría.
+  Sin esa llave, un clic de más sería permanente y el gesto —que tiene que ser liviano, la lista
+  está para vaciarse— pasaría a ser una decisión que el admin duda antes de tomar. **La ficha DICE
+  cuál de los tres es**: son tres arreglos distintos en tres lugares distintos.
+- **«SEÑADA» NO ES «PAGA»** (`MReservasView`, sep-2026). La tarjeta decía «Señada ✓» apenas había
+  seña, y una reserva puede estar señada con la mitad todavía por cobrar: se entregaba sin cobrar
+  el resto. Se dicen **las dos cosas** —lo que ya puso y lo que falta—, que es lo que hay que
+  decirle al paciente. Y **sin seña y sin total estimado no está paga**: ahí dice «se cobra al
+  entregar», porque un `resta 0` puede significar que nunca se estimó el aporte. La tarjeta lleva
+  además **la variedad**, que es con lo que se busca el frasco entre quince.
 - **Corregir un cierre NO borra el movimiento equivocado** (`Mostradores::CorregirCierre`):
   asienta la diferencia al lado. Era el único lugar del módulo donde un dedazo destruía datos —21
   en vez de 215 ajusta el inventario real—, y borrar para tapar el error es peor que el error.
