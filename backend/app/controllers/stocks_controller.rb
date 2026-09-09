@@ -164,10 +164,14 @@ class StocksController < ApplicationController
     # EL ORDEN VA EN LA CONSULTA, NO EN LA PANTALLA. La tabla la pagina el servidor: ordenar en el
     # navegador acomodaría los 25 renglones de la página y diría «ordenado por cantidad» mostrando
     # los 25 de siempre. Eso es peor que no ordenar — se lee como una respuesta y no lo es.
-    stocks = scope.left_joins(:sede, :genetica, lote: :genetica)
-                  .includes(:lote, :genetica, :sede)
-                  .order(Arel.sql(orden_inventario))
-                  .offset((page - 1) * per).limit(per)
+    stocks = if params[:orden].to_s == 'actual'
+               ordenar_por_disponible(scope, page, per)
+             else
+               scope.left_joins(:sede, :genetica, lote: :genetica)
+                    .includes(:lote, :genetica, :sede)
+                    .order(Arel.sql(orden_inventario))
+                    .offset((page - 1) * per).limit(per)
+             end
 
     render json: {
       stocks:  stocks.map { |s| serialize_stock(s) },
@@ -928,6 +932,27 @@ class StocksController < ApplicationController
     'cantidad_inicial' => 'stocks.cantidad_inicial',
     'actual'           => 'stocks.cantidad',
   }.freeze
+
+  # ORDENAR POR LO QUE LA COLUMNA MUESTRA, que no es `stocks.cantidad`.
+  #
+  # «Actual» muestra el DISPONIBLE: la cantidad menos lo apartado para un evento y menos lo que
+  # está sobre la mesa del mostrador o reservado a un paciente. Ordenando por `cantidad` la tabla
+  # decía una cosa y ordenaba por otra, y con 300 g sobre la mesa la diferencia no es un detalle:
+  # el renglón que la pantalla muestra último aparecía primero. Germán: «funciona mal actual».
+  #
+  # Ese número se calcula en Ruby (`cantidad_disponible_real`) y no existe en SQL. Reescribirlo
+  # como subconsultas sería la misma regla en dos lenguajes, que es de donde salen las
+  # divergencias: se ordena con la regla de verdad, en memoria, sobre el inventario FILTRADO —que
+  # es lo que hay hoy en existencia, no el histórico—. Si algún día una organización tiene miles
+  # de filas vivas a la vez, lo que hay que hacer es materializar el apartado en una columna, no
+  # duplicar la fórmula acá.
+  def ordenar_por_disponible(scope, page, per)
+    todos = scope.includes(:lote, :genetica, :sede).to_a
+    Stock.precargar_apartados(todos)
+    ordenados = todos.sort_by { |s| s.cantidad_disponible_real.to_d }
+    ordenados.reverse! unless params[:dir].to_s.downcase == 'asc'
+    ordenados.drop((page - 1) * per).first(per)
+  end
 
   def orden_inventario
     campo = ORDEN_INVENTARIO[params[:orden].to_s]

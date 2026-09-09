@@ -246,6 +246,15 @@
             </table>
           </div>
 
+          <!-- ORDENAR NÚMEROS DE COSAS DISTINTAS NO CONTESTA NADA. 2.278 g de flor arriba de 320
+               prerolls no es «más»: son dos cosas que no se comparan, y el orden se lee como que
+               está roto. No se bloquea —a veces se ordena igual, para agrupar— pero se dice, y se
+               dice dónde se arregla: el filtro de tipo está tres centímetros más arriba. -->
+          <p v-if="mezclaUnidades" class="stk__inv-aviso">
+            Estás ordenando por cantidad con <strong>gramos y unidades mezclados</strong>: 300 g y
+            300 prerolls no se comparan. Filtrá por tipo para que el orden signifique algo.
+          </p>
+
           <Paginator
             :page="invPage" :per-page="invPerPage" :total="invTotal"
             @update:page="onInvPage" @update:per-page="onInvPerPage"
@@ -926,6 +935,14 @@ const COLUMNAS_INV = [
 ]
 // Vacío = como venía: lo último que entró arriba.
 const invOrden = ref({ campo: '', dir: 'desc' })
+
+// ¿Se está ordenando por cantidad con unidades distintas en la lista? Es el caso en que el orden
+// no significa nada, y el único momento en que hace falta decirlo.
+const mezclaUnidades = computed(() => {
+  if (!['actual', 'cantidad_inicial'].includes(invOrden.value.campo)) return false
+  const unidades = new Set(inventario.value.map(s => s.unidad || 'g'))
+  return unidades.size > 1
+})
 
 function ordenarInv (campo) {
   const col = COLUMNAS_INV.find(c => c.campo === campo)
@@ -1667,6 +1684,13 @@ function formatDate(dateStr) {
 .stk__inv-th-btn:hover { color: var(--c-slate-700); }
 .stk__inv-th.is-activa .stk__inv-th-btn { color: var(--c-leaf-800); }
 .stk__inv-caret { font-size: 9px; margin-left: 3px; }
+/* El aviso de unidades mezcladas: es una aclaración, no una alarma. */
+.stk__inv-aviso {
+  margin: .6rem 0 0; font-size: .78rem; color: var(--c-slate-600);
+  background: var(--c-slate-50); border-left: 3px solid var(--c-slate-300);
+  border-radius: 0 8px 8px 0; padding: .5rem .7rem;
+}
+.stk__inv-aviso strong { color: var(--c-slate-700); }
 .stk__inv-table td { padding: .6rem .85rem; border-bottom: 1px solid var(--c-slate-100); color: var(--c-slate-700); vertical-align: middle; }
 .stk__inv-table tbody tr:last-child td { border-bottom: none; }
 .stk__inv-num { text-align: right; }

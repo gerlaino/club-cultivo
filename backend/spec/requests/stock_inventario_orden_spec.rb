@@ -63,6 +63,40 @@ RSpec.describe 'Inventario — ordenar por columna', type: :request do
     expect(orden('actual', 'asc')).to eq(%w[ST-26-0001 ST-26-0002])
   end
 
+  # ORDENA POR LO QUE LA COLUMNA MUESTRA, que no es `stocks.cantidad`: «Actual» es el DISPONIBLE
+  # —menos lo que está sobre la mesa del mostrador y lo reservado a un paciente—. Ordenando por la
+  # columna de la base, el renglón que la pantalla muestra último aparecía primero. Germán,
+  # probándolo: «funciona mal actual».
+  describe 'con producto apartado' do
+    before do
+      ActsAsTenant.with_tenant(club) do
+        paciente = create(:paciente, club: club)
+        Reserva.create!(club: club, paciente: paciente, user: admin, stock: del_lote,
+                        cantidad: 880, fecha_entrega_estimada: 3.days.from_now.to_date)
+      end
+    end
+
+    it 'el que tiene casi todo apartado queda último, como lo muestra la tabla' do
+      # 900 en la fila, 880 reservados a un paciente: quedan 20 disponibles contra los 40 del otro.
+      expect(del_lote.reload.cantidad_disponible_real.to_f).to eq(20.0)
+
+      expect(orden('actual', 'desc')).to eq(%w[ST-26-0001 ST-26-0002])
+      expect(orden('actual', 'asc')).to  eq(%w[ST-26-0002 ST-26-0001])
+    end
+
+    it 'y la paginación sigue siendo del servidor: la página 1 trae el primero de TODOS' do
+      get '/api/stocks/inventario', headers: auth_headers,
+          params: { orden: 'actual', dir: 'desc', page: 1, per_page: 1 }
+      body = JSON.parse(response.body)
+      expect(body['stocks'].map { |s| s['numero_lote_producto'] }).to eq(%w[ST-26-0001])
+      expect(body['meta']['total']).to eq(2)
+
+      get '/api/stocks/inventario', headers: auth_headers,
+          params: { orden: 'actual', dir: 'desc', page: 2, per_page: 1 }
+      expect(JSON.parse(response.body)['stocks'].map { |s| s['numero_lote_producto'] }).to eq(%w[ST-26-0002])
+    end
+  end
+
   it 'por cantidad inicial, por código, por tipo y por fecha' do
     expect(orden('cantidad_inicial', 'desc')).to eq(%w[ST-26-0002 ST-26-0001])
     expect(orden('codigo', 'asc')).to eq(%w[ST-26-0001 ST-26-0002])

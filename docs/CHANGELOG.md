@@ -21,9 +21,20 @@ Detalles que decidieron cómo quedó:
 - **La primera vez, cada columna ordena para donde se pregunta**: de un nombre se busca la A, de
   una cantidad y de una fecha se busca lo más grande y lo más nuevo.
 - **Reordenar vuelve a la página 1**: quedarse en la 3 muestra un pedazo del medio de otra lista.
-- `Actual` ordena por `cantidad`; la pantalla muestra el **disponible** (menos lo reservado y lo
-  apartado), que se calcula en Ruby y no existe en SQL. En las filas con algo apartado el orden
-  puede diferir del número mostrado por esos gramos: está anotado en el código.
+- **`Actual` ordena por lo que MUESTRA**, no por `stocks.cantidad`. La primera versión ordenaba por
+  la columna de la base y la pantalla muestra el **disponible** —menos lo que está sobre la mesa
+  del mostrador y lo reservado—: con 300 g arriba de la mesa, el renglón que la tabla muestra
+  último aparecía primero. Germán: *"funciona mal actual, deberíamos o hacer que funcione bien o
+  que no se pueda ordenar por esa columna"*. Ese número se calcula en Ruby y no existe en SQL, y
+  reescribirlo como subconsultas sería **la misma regla en dos lenguajes**: se ordena con la regla
+  de verdad, en memoria, sobre el inventario filtrado (lo que hay en existencia hoy, no el
+  histórico). Si algún día son miles de filas vivas, lo que hay que hacer es materializar el
+  apartado en una columna, no duplicar la fórmula.
+- **Y SE AVISA CUANDO SE ESTÁN COMPARANDO COSAS DISTINTAS.** Ordenar por cantidad con gramos y
+  unidades en la misma lista pone 2.278 g de flor arriba de 320 prerolls, que no es «más»: son dos
+  cosas que no se comparan, y el orden se lee como que está roto. No se bloquea —a veces se ordena
+  igual, para agrupar— pero se dice, y se dice dónde se arregla: el filtro por tipo está tres
+  centímetros más arriba.
 
 ## Septiembre 2026 (ba) — «P&L» no se dice
 
