@@ -459,6 +459,9 @@ Rails.application.routes.draw do
         get  'mostrador/turnos',              to: 'mostrador#turnos'
         get  'mostrador/turnos/:id',          to: 'mostrador#turno'
         post 'mostrador/turnos/:id/revisar',  to: 'mostrador#revisar'
+        # La llave del candado: marcar visto congela la corrección, así que se tiene que
+        # poder reabrir para revisión — con rastro de quién y cuándo.
+        delete 'mostrador/turnos/:id/revisar', to: 'mostrador#desmarcar_revision'
         post 'mostrador/turnos/:id/corregir', to: 'mostrador#corregir'
       end
     end

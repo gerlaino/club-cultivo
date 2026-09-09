@@ -300,9 +300,31 @@ module Dispensario
       render json: { id: turno.id, revisado: true }
     end
 
+    # DELETE /sedes/:sede_id/mostrador/turnos/:id/revisar — reabrir para revisión
+    #
+    # MARCAR VISTO CONGELA LA CORRECCIÓN, ASÍ QUE TIENE QUE TENER LLAVE. Sin ella un clic de más
+    # sería permanente, y el gesto —que tiene que ser liviano: la lista está para vaciarse— pasaría
+    # a ser una decisión pesada que el admin va a dudar antes de tomar. Vuelve a la lista de
+    # trabajo, y quién lo reabrió y cuándo queda en la auditoría (`revisado_por_id` está en la
+    # allowlist de `Auditable`).
+    def desmarcar_revision
+      return render json: { error: 'No autorizado' }, status: :forbidden unless gestiona?
+
+      turno = @mostrador.turno_mostradores.find_by(id: params[:id])
+      return render json: { error: 'Turno no encontrado' }, status: :not_found if turno.nil?
+
+      turno.update!(revisado_por: nil, revisado_at: nil)
+      render json: serialize_turno(turno)
+    end
+
     private
 
     def gestiona? = %w[admin supervisor super_admin].include?(current_user.role)
+
+    def bloqueo_correccion(turno)
+      b = turno.bloqueo_correccion
+      b ? { permitida: false, motivo: b[:motivo], texto: b[:texto] } : { permitida: true }
+    end
 
     # Lo que hay sobre la mesa, con lo que hace falta para decidir y para contar.
     def mesa
@@ -697,6 +719,12 @@ module Dispensario
         cerrado_at:  turno.cerrado_at,
         cerrado_por: turno.cerrado_por&.nombre_completo,
         revisado:    turno.revisado_at.present?,
+        revisado_por: turno.revisado_por&.nombre_completo,
+        # POR QUÉ NO SE PUEDE CORREGIR, SI ES QUE NO SE PUEDE. La ficha lo DICE en vez de esconder
+        # el botón: «ya está mirado» / «se abrió otra caja» / «el período está cerrado» son tres
+        # arreglos distintos en tres lugares distintos, y un botón que no se habilita tiene que
+        # decir por qué. Sale del turno, que es el mismo que consulta `CorregirCierre`.
+        correccion:  bloqueo_correccion(turno),
         notas_apertura: turno.notas_apertura,
         notas_cierre:   turno.notas_cierre,
         caja_turno_id:  turno.caja_turno_id,

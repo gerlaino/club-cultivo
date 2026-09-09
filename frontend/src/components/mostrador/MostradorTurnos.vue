@@ -89,8 +89,8 @@
       nada — se asienta la diferencia.
     </p>
 
-    <CorregirConteo v-if="corrigiendo" :sede-id="sedeId" :turno="corrigiendo"
-                    @cerrar="corrigiendo = null" @corregido="cargar" />
+    <CorregirConteo v-if="corrigiendo" :sede-id="sedeId" :turno="corrigiendo" :gestiona="gestiona"
+                    @cerrar="corrigiendo = null" @corregido="cargar" @revisado="marcarVisto" />
   </div>
 </template>
 
@@ -102,7 +102,7 @@
 // backend filtra, no la pantalla.
 import { ref, computed, watch } from 'vue'
 import CorregirConteo from './CorregirConteo.vue'
-import { listTurnosMostrador, descargarTurnosMostrador, revisarTurnoMostrador } from '../../lib/api.js'
+import { listTurnosMostrador, descargarTurnosMostrador } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
 const props = defineProps({ sedeId: { type: Number, default: null } })
@@ -197,8 +197,11 @@ function horario (t) {
   const a = t.abierto_at ? new Date(t.abierto_at) : null
   const c = t.cerrado_at ? new Date(t.cerrado_at) : null
   if (!c) return '—'
+  // EL DÍA QUE SE NOMBRA ES EL DE APERTURA, no el del cierre. La fila vive DENTRO del grupo del
+  // día en que cerró, así que decir «12:03 del sábado» adentro de «Sábado 5» es repetir lo que ya
+  // está arriba y esconder el único dato que falta: que abrió el viernes.
   const otroDia = a && a.toDateString() !== c.toDateString()
-  return `${hora(t.abierto_at)} → ${hora(t.cerrado_at)}${otroDia ? ` del ${DIAS[c.getDay()]}` : ''}`
+  return `${otroDia ? `${DIAS[a.getDay()]} ` : ''}${hora(t.abierto_at)} → ${hora(t.cerrado_at)}`
 }
 
 // Quién atendió. Es normal que abra el admin a la mañana y cierre contando quien atendió todo el
@@ -231,18 +234,15 @@ function filtrar (soloPend) {
   cargar()
 }
 
-// Se marca y se archiva: no es una lista de sospechosos. Se saca de la lista en el acto en vez de
-// esperar la recarga — con el filtro puesto, ver la fila quedarse ahí se lee como que no anduvo.
-async function marcarVisto (t) {
-  try {
-    await revisarTurnoMostrador(props.sedeId, t.id)
-    t.revisado = true
-    sinRevisar.value = Math.max(0, sinRevisar.value - 1)
-    emit('sin-revisar', sinRevisar.value)
-    if (soloPendientes.value) turnos.value = turnos.value.filter(x => x.id !== t.id)
-  } catch (e) {
-    toast.error(e?.response?.data?.error || 'No se pudo marcar como visto.')
-  }
+// SE MARCA Y SE ARCHIVA: no es una lista de sospechosos. El botón vive en la ficha del cierre
+// —que es donde se mira— y acá se refleja el resultado sin esperar la recarga: con el filtro
+// puesto, ver la fila quedarse ahí se lee como que no anduvo.
+function marcarVisto ({ id, revisado }) {
+  const t = turnos.value.find(x => x.id === id)
+  if (t) t.revisado = revisado
+  sinRevisar.value = Math.max(0, sinRevisar.value + (revisado ? -1 : 1))
+  emit('sin-revisar', sinRevisar.value)
+  if (revisado && soloPendientes.value) turnos.value = turnos.value.filter(x => x.id !== id)
 }
 
 const fmt = (n) => Number(n ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })

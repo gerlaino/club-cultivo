@@ -30,6 +30,12 @@ module Mostradores
 
     def call
       return err('Esa caja todavía no se cerró') unless @turno&.cerrado?
+
+      # LOS TRES CANDADOS, en un solo lugar: acá y no en el controller, porque por la API se
+      # saltea siempre. Cuál aplica lo decide el turno —la misma pregunta que le hace la ficha
+      # para decir por qué no se puede corregir.
+      bloqueo = @turno.bloqueo_correccion
+      return err(bloqueo[:texto]) if bloqueo
       return err('Escribí por qué se corrige el conteo') if @motivo.blank?
       return err('No hay nada que corregir') if @conteos.empty? && @efectivo.blank?
 

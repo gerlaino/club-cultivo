@@ -33,9 +33,14 @@ TURNO.items = TURNO.conteo_apertura
 
 const getTurnoMostrador     = vi.fn(() => Promise.resolve({ data: TURNO }))
 const corregirTurnoMostrador = vi.fn(() => Promise.resolve({ data: {} }))
+const revisarTurnoMostrador  = vi.fn(() => Promise.resolve({ data: {} }))
+const reabrirRevisionTurnoMostrador = vi.fn(() =>
+  Promise.resolve({ data: { ...TURNO, revisado: false, correccion: { permitida: true } } }))
 vi.mock('../lib/api.js', () => ({
   getTurnoMostrador:      (...a) => getTurnoMostrador(...a),
   corregirTurnoMostrador: (...a) => corregirTurnoMostrador(...a),
+  revisarTurnoMostrador:  (...a) => revisarTurnoMostrador(...a),
+  reabrirRevisionTurnoMostrador: (...a) => reabrirRevisionTurnoMostrador(...a),
 }))
 vi.mock('../composables/useToast.js', () => ({
   useToast: () => ({ success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() }),
@@ -43,16 +48,21 @@ vi.mock('../composables/useToast.js', () => ({
 
 import CorregirConteo from '../components/mostrador/CorregirConteo.vue'
 
-async function abrir (data = TURNO) {
+async function abrir (data = TURNO, props = {}) {
   getTurnoMostrador.mockResolvedValue({ data })
   // El turno ENTERO como prop: la ficha cuenta qué pasó con esos datos, no sólo con lo que trae
   // el pedido de los conteos.
-  const w = mount(CorregirConteo, { props: { sedeId: 10, turno: data } })
+  const w = mount(CorregirConteo, { props: { sedeId: 10, turno: data, gestiona: true, ...props } })
   await flushPromises()
   return w
 }
 
-beforeEach(() => { getTurnoMostrador.mockClear(); corregirTurnoMostrador.mockClear() })
+const boton = (w, txt) => w.findAll('button').find(b => b.text().includes(txt))
+
+beforeEach(() => {
+  getTurnoMostrador.mockClear(); corregirTurnoMostrador.mockClear()
+  revisarTurnoMostrador.mockClear(); reabrirRevisionTurnoMostrador.mockClear()
+})
 
 describe('Corregir el conteo de un cierre', () => {
   it('lista los productos: era lo que no pasaba nunca', async () => {
@@ -240,5 +250,83 @@ describe('La ficha del cierre', () => {
     const t = hechos(w).join(' ')
     expect(t).toContain('de más')
     expect(t).toContain('nunca lo carga')
+  })
+})
+
+// CUÁNDO UN CIERRE DEJA DE PODER CORREGIRSE.
+//
+// Corregir mueve inventario real y asienta plata, y no tenía NINGUNA frontera temporal: cualquier
+// cierre, para siempre. La ficha tiene que DECIR por qué no se puede —son tres arreglos distintos
+// en tres lugares distintos— en vez de esconder el botón.
+describe('Un cierre que ya no se corrige', () => {
+  const bloqueado = (motivo, texto) => ({
+    ...TURNO, revisado: motivo === 'visto',
+    correccion: { permitida: false, motivo, texto },
+  })
+
+  it('lo dice, y no ofrece los campos ni el botón', async () => {
+    const w = await abrir(bloqueado('caja_posterior', 'Después de este cierre se volvió a abrir la caja.'))
+
+    expect(w.find('.cc__bloqueo').text()).toContain('se volvió a abrir la caja')
+    expect(w.findAll('.cc__input')).toHaveLength(0)
+    expect(boton(w, 'Corregir')).toBeUndefined()
+  })
+
+  // LA LLAVE. Marcar visto congela: sin poder reabrir, un clic de más sería permanente y el gesto
+  // —que tiene que ser liviano, la lista está para vaciarse— pasaría a ser una decisión pesada.
+  it('el que está visto se puede reabrir, y ahí vuelven los campos', async () => {
+    const w = await abrir(bloqueado('visto', 'Este cierre ya lo miró Admin Demo.'))
+    expect(boton(w, 'Reabrir para revisión')).toBeDefined()
+
+    await boton(w, 'Reabrir para revisión').trigger('click')
+    await flushPromises()
+
+    expect(reabrirRevisionTurnoMostrador).toHaveBeenCalledWith(10, 7)
+    expect(w.find('.cc__bloqueo').exists()).toBe(false)
+    expect(boton(w, 'Corregir')).toBeDefined()
+    expect(w.emitted('revisado')[0][0]).toEqual({ id: 7, revisado: false })
+  })
+
+  it('los otros dos no tienen llave acá: se arreglan en otro lado', async () => {
+    const w = await abrir(bloqueado('periodo_cerrado', 'El período está cerrado.'))
+    expect(boton(w, 'Reabrir para revisión')).toBeUndefined()
+  })
+})
+
+// EL BOTÓN QUE SE HABÍA PERDIDO. El rediseño de la solapa se llevó puesto «Ya lo miré»
+// (`marcarVisto` quedó sin un solo llamador): el badge contaba pendientes que no se podían sacar
+// de la lista de ninguna forma.
+describe('Marcar el cierre como visto', () => {
+  it('se marca desde la ficha, que es donde se mira', async () => {
+    const w = await abrir()
+    await boton(w, 'Ya lo miré').trigger('click')
+    await flushPromises()
+
+    expect(revisarTurnoMostrador).toHaveBeenCalledWith(10, 7)
+    expect(w.emitted('revisado')[0][0]).toEqual({ id: 7, revisado: true })
+    expect(w.emitted('cerrar')).toBeTruthy()
+  })
+
+  it('el que ya está visto no lo vuelve a ofrecer', async () => {
+    const w = await abrir({ ...TURNO, revisado: true, correccion: { permitida: true } })
+    expect(boton(w, 'Ya lo miré')).toBeUndefined()
+  })
+})
+
+// QUIEN ATIENDE ABRE ESTA FICHA PARA MIRAR SU CIERRE. Corregir es de administración: ofrecerle
+// los campos y el botón era proponerle algo que el backend le contesta con un 403.
+describe('La ficha del que atiende', () => {
+  it('no le ofrece corregir, y le dice a quién avisar', async () => {
+    const w = await abrir(TURNO, { gestiona: false })
+
+    expect(w.findAll('.cc__input')).toHaveLength(0)
+    expect(boton(w, 'Corregir')).toBeUndefined()
+    expect(boton(w, 'Ya lo miré')).toBeUndefined()
+    expect(w.text()).toContain('lo corrige administración')
+  })
+
+  it('pero sí ve qué pasó en su cierre', async () => {
+    const w = await abrir(TURNO, { gestiona: false })
+    expect(w.text()).toContain('Critical Kush L-26-017')
   })
 })

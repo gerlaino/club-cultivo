@@ -4,7 +4,10 @@
        forma de recuperarlo. Se sale por Cancelar o con Escape, que son gestos deliberados. -->
   <div class="cc__back">
     <div class="cc__modal">
-      <h3 class="cc__title">Corregir el conteo</h3>
+      <!-- ES LA FICHA DEL CIERRE, y a veces además se corrige. Titularla siempre «Corregir el
+           conteo» le prometía a quien atiende —y a cualquier cierre ya congelado— algo que ahí
+           adentro no va a poder hacer. -->
+      <h3 class="cc__title">{{ titulo }}</h3>
       <p class="cc__sub">{{ subtitulo }}</p>
 
       <!-- QUÉ PASÓ, ANTES DE PEDIR NADA. Estas oraciones vivían en la fila de la lista y el modal
@@ -16,6 +19,18 @@
       </div>
 
       <p v-if="cargando" class="cc__vacio">Buscando el conteo…</p>
+
+      <!-- POR QUÉ ESTE CIERRE YA NO SE CORRIGE. Se DICE, no se esconde el botón: son tres
+           arreglos distintos en tres lugares distintos, y uno de ellos —el visto— tiene llave
+           acá mismo. La regla vive en el backend; la pantalla sólo la muestra. -->
+      <p v-else-if="bloqueo" class="cc__bloqueo">{{ bloqueo.texto }}</p>
+
+      <template v-else-if="!gestiona">
+        <p class="cc__vacio">
+          El conteo lo corrige administración. Si contaste mal alguno, avisales: no se borra nada
+          — se asienta la diferencia.
+        </p>
+      </template>
 
       <template v-else>
         <p v-if="!items.length" class="cc__vacio">Este cierre no tiene productos contados.</p>
@@ -67,8 +82,24 @@
       </template>
 
       <div class="cc__acc">
-        <button class="cc__btn cc__btn--ghost" @click="$emit('cerrar')">Cancelar</button>
-        <button class="cc__btn cc__btn--primary" :disabled="guardando || cargando" @click="confirmar">
+        <!-- SE MIRA, SE MARCA Y SE ARCHIVA: es lo que vacía la lista de trabajo, y desde el
+             rediseño de la solapa había quedado SIN BOTÓN — el badge contaba pendientes que no
+             se podían sacar de ninguna forma. Va acá, que es donde se mira el cierre. -->
+        <button v-if="gestiona && !bloqueo && !visto" class="cc__btn cc__btn--ghost cc__btn--izq"
+                :disabled="marcando || cargando" @click="marcarVisto">
+          {{ marcando ? 'Guardando…' : 'Ya lo miré' }}
+        </button>
+        <!-- LA LLAVE. Marcar visto congela la corrección: sin poder reabrir, un clic de más sería
+             permanente y nadie se animaría a marcar. -->
+        <button v-if="gestiona && bloqueo?.motivo === 'visto'" class="cc__btn cc__btn--ghost cc__btn--izq"
+                :disabled="marcando" @click="reabrir">
+          {{ marcando ? 'Reabriendo…' : 'Reabrir para revisión' }}
+        </button>
+        <button class="cc__btn cc__btn--ghost" @click="$emit('cerrar')">
+          {{ bloqueo || !gestiona ? 'Cerrar' : 'Cancelar' }}
+        </button>
+        <button v-if="gestiona && !bloqueo" class="cc__btn cc__btn--primary"
+                :disabled="guardando || cargando" @click="confirmar">
           Corregir
         </button>
       </div>
@@ -85,14 +116,18 @@
 // dos veces es cómo se empiezan a contradecir.
 import { ref, computed, onMounted } from 'vue'
 import { useEscape } from '../../composables/useEscape.js'
-import { getTurnoMostrador, corregirTurnoMostrador } from '../../lib/api.js'
+import { getTurnoMostrador, corregirTurnoMostrador, revisarTurnoMostrador,
+         reabrirRevisionTurnoMostrador } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
 const props = defineProps({
   sedeId: { type: Number, required: true },
   turno:  { type: Object, required: true },
+  // Quien atiende abre esta ficha para MIRAR su cierre; corregir es de administración. Sin esto
+  // la pantalla le ofrecía los campos y el botón, y el backend se lo rechazaba con un 403.
+  gestiona: { type: Boolean, default: false },
 })
-const emit = defineEmits(['cerrar', 'corregido'])
+const emit = defineEmits(['cerrar', 'corregido', 'revisado'])
 
 useEscape(() => emit('cerrar'))
 
@@ -103,8 +138,15 @@ const efectivo  = ref(null)
 const motivo    = ref('')
 const cargando  = ref(true)
 const guardando = ref(false)
+const marcando  = ref(false)
+// Por qué no se puede corregir, si es que no se puede. Lo decide el backend —el mismo lugar que
+// lo aplica—, así que la pantalla nunca puede ofrecer algo que después va a rebotar.
+const bloqueo   = ref(null)
+const visto     = ref(false)
 
 const fmt = (n) => Number(n ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })
+
+const titulo = computed(() => (props.gestiona && !bloqueo.value ? 'Corregir el conteo' : 'El cierre'))
 
 // ¿Este renglón ya venía con diferencia? Es lo que hace que la columna «Se contó» se pinte: sin
 // eso hay que restar de a ojo entre dos columnas para encontrar cuál es el que está mal.
@@ -131,8 +173,10 @@ const subtitulo = computed(() => {
   const quien = (t.atendio && t.cerrado_por && t.atendio !== t.cerrado_por)
     ? `abrió ${t.atendio}, cerró ${t.cerrado_por}`
     : (t.atendio || t.cerrado_por || '')
-  return `${dia.charAt(0).toUpperCase() + dia.slice(1)}, de ${hora(t.abierto_at)} a ` +
-         `${hora(t.cerrado_at)}${otroDia ? ` del ${DIAS[c.getDay()]}` : ''}` +
+  // El día que se nombra es el de APERTURA: el título ya dice el del cierre, así que «a las 12:03
+  // del sábado» repetía lo de arriba y escondía lo único que faltaba — que abrió el viernes.
+  return `${dia.charAt(0).toUpperCase() + dia.slice(1)}, de ${hora(t.abierto_at)}` +
+         `${otroDia ? ` del ${DIAS[a.getDay()]}` : ''} a ${hora(t.cerrado_at)}` +
          (quien ? ` · ${quien}` : '')
 })
 
@@ -228,6 +272,7 @@ onMounted(async () => {
     }))
     caja.value = data.caja || null
     efectivo.value = caja.value?.contado_ars ?? null
+    aplicar(data)
   } catch (e) {
     toast.error(e?.response?.data?.error || 'No se pudo abrir el turno.')
     emit('cerrar')
@@ -235,6 +280,42 @@ onMounted(async () => {
     cargando.value = false
   }
 })
+
+function aplicar (data) {
+  bloqueo.value = data.correccion?.permitida === false ? data.correccion : null
+  visto.value   = !!data.revisado
+}
+
+// Se marca y se archiva. Congela la corrección —por eso lo de al lado es la llave—, pero el gesto
+// tiene que seguir siendo liviano: la lista está para vaciarse.
+async function marcarVisto () {
+  marcando.value = true
+  try {
+    await revisarTurnoMostrador(props.sedeId, props.turno.id)
+    visto.value = true
+    emit('revisado', { id: props.turno.id, revisado: true })
+    toast.success('Marcado como visto')
+    emit('cerrar')
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo marcar como visto.')
+  } finally {
+    marcando.value = false
+  }
+}
+
+async function reabrir () {
+  marcando.value = true
+  try {
+    const { data } = await reabrirRevisionTurnoMostrador(props.sedeId, props.turno.id)
+    aplicar(data)
+    emit('revisado', { id: props.turno.id, revisado: false })
+    toast.success('Reabierto para revisión')
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo reabrir el cierre.')
+  } finally {
+    marcando.value = false
+  }
+}
 
 async function confirmar () {
   if (!motivo.value.trim()) return toast.error('Escribí por qué se corrige.')
@@ -333,7 +414,15 @@ async function confirmar () {
 .cc__campo { display: flex; flex-direction: column; gap: 5px; }
 .cc__campo-lbl { font-size: var(--fs-13); font-weight: 600; color: var(--c-amber-500); }
 
+.cc__bloqueo {
+  margin: 0; font-size: var(--fs-14); color: var(--c-ink-700); line-height: 1.5;
+  background: var(--c-slate-50, #f8fafc); border-left: 3px solid var(--c-slate-300);
+  border-radius: 0 9px 9px 0; padding: 10px 12px;
+}
 .cc__acc { display: flex; gap: 10px; justify-content: flex-end; }
+/* La acción sobre el cierre —verlo, reabrirlo— vive del otro lado del pie: no es cancelar ni
+   confirmar lo que se está escribiendo. */
+.cc__btn--izq { margin-right: auto; }
 .cc__btn {
   border-radius: 9px; padding: 10px 18px; font-size: var(--fs-14); font-weight: 600;
   cursor: pointer; border: 1px solid transparent;

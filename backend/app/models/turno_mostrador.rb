@@ -52,6 +52,60 @@ class TurnoMostrador < ApplicationRecord
   def cerrado? = estado == 'cerrado'
   def anulado? = estado == 'anulado'
 
+  def revisado? = revisado_at.present?
+
+  # POR QUÉ ESTE CIERRE YA NO SE PUEDE CORREGIR — y vive acá, en UN solo lugar, porque lo
+  # preguntan los dos lados: el servicio que corrige y la ficha que ofrece el botón. Escrita dos
+  # veces, un día la pantalla invita a corregir algo que el backend rechaza, que es el peor error
+  # posible: parece culpa del usuario.
+  #
+  # Corregir un cierre mueve inventario real y asienta plata en el libro, y hasta acá no tenía
+  # NINGUNA frontera temporal: cualquier cierre, para siempre.
+  #
+  # EL ORDEN IMPORTA: primero el que no tiene arreglo. Decirle «ya está mirado, reabrilo» a un
+  # cierre que además tiene una caja posterior lo manda a un callejón sin salida.
+  def bloqueo_correccion
+    return nil unless cerrado?
+
+    if caja_posterior?
+      { motivo: 'caja_posterior',
+        texto: 'Después de este cierre se volvió a abrir la caja, y abrir es contar: el producto ' \
+               'ya se midió de nuevo. Corregir este conteo lo movería lejos de esa medición, que ' \
+               'es la más fresca — la diferencia se arregla en el último cierre.' }
+    elsif periodo_cerrado?
+      { motivo: 'periodo_cerrado',
+        texto: 'Este cierre cae dentro de un período contable cerrado ' \
+               "(hasta el #{club.contabilidad_cerrada_hasta.strftime('%d/%m/%Y')}). " \
+               'Corregirlo reinterpretaría cantidades ya asentadas: reabrí el período si hay que ' \
+               'corregirlo igual.' }
+    elsif revisado?
+      { motivo: 'visto',
+        texto: "Este cierre ya lo miró #{revisado_por&.nombre_completo || 'administración'}" \
+               "#{revisado_at ? " el #{revisado_at.in_time_zone.strftime('%d/%m/%Y')}" : ''}. " \
+               'Para corregirlo hay que reabrirlo para revisión.' }
+    end
+  end
+
+  # SE ABRIÓ OTRA CAJA DESPUÉS. No es una regla que decidimos: es que la corrección deja de ser
+  # correcta. El conteo del cierre YA ajustó el inventario; si alguien volvió a abrir —y abrir es
+  # contar— el stock se re-midió, y aplicarle ahora un delta viejo lo aleja de la última medición
+  # real. Las anuladas no cuentan: nunca hubo turno, y su conteo se borra con él.
+  def caja_posterior?
+    return false if cerrado_at.blank?
+
+    mostrador.turno_mostradores.where.not(id: id).where.not(estado: 'anulado')
+             .where(abierto_at: (cerrado_at..)).exists?
+  end
+
+  # El ejercicio ya presentado. `CorregirCierre` asienta un movimiento de `diferencia_caja` y
+  # mueve stock: sin esto se podía corregir un cierre de un período cerrado — la plata reventaba
+  # con el mensaje de validación del movimiento (y hacía rollback de todo), pero los gramos solos
+  # pasaban lisos. Mismo candado que cambiar la forma de un producto ya dispensado.
+  def periodo_cerrado?
+    hasta = club&.contabilidad_cerrada_hasta
+    hasta.present? && cerrado_at.present? && cerrado_at.to_date <= hasta
+  end
+
   delegate :sede, :sede_id, to: :mostrador
 
   # Se usa el canal del club, que ya existe: es la misma conexión y el mismo alcance. Un fallo

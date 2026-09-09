@@ -544,6 +544,9 @@ export const getEvolucionMostrador = (sedeId, params = {}) =>
   api.get(`/sedes/${sedeId}/mostrador/evolucion`, { params })
 export const getMermaMostrador = (sedeId, params = {}) => api.get(`/sedes/${sedeId}/mostrador/merma`, { params })
 export const revisarTurnoMostrador = (sedeId, id) => api.post(`/sedes/${sedeId}/mostrador/turnos/${id}/revisar`)
+// LA LLAVE DEL CANDADO: marcar visto congela la corrección del cierre, así que se tiene que
+// poder reabrir para revisión — con rastro de quién y cuándo.
+export const reabrirRevisionTurnoMostrador = (sedeId, id) => api.delete(`/sedes/${sedeId}/mostrador/turnos/${id}/revisar`)
 export const getTurnoMostrador     = (sedeId, id) => api.get(`/sedes/${sedeId}/mostrador/turnos/${id}`)
 // Los turnos ya cerrados: administración los ve todos, el que atiende ve LOS SUYOS.
 export const listTurnosMostrador   = (sedeId, params = {}) => api.get(`/sedes/${sedeId}/mostrador/turnos`, { params })

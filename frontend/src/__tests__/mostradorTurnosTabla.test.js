@@ -105,11 +105,15 @@ describe('La línea de cada cierre', () => {
 
   // EL BUG QUE APARECIÓ LEYENDO: «14:02–12:03» se leía como que cerró antes de abrir. Es una caja
   // que cruzó la medianoche. Una fila imposible te hace desconfiar de toda la tabla.
-  it('cuando la caja cruzó la medianoche, lo dice en vez de parecer imposible', async () => {
+  //
+  // Y el día que se nombra es el de APERTURA: la fila vive dentro del grupo del día en que cerró,
+  // así que decir el del cierre repetía el encabezado y escondía el dato que falta.
+  it('cuando la caja cruzó la medianoche, nombra el día en que abrió', async () => {
     const w = await montar([{ ...TURNO, abierto_at: '2026-09-05T17:02:00Z',
                                         cerrado_at: '2026-09-06T15:03:00Z' }])
-    expect(cierre(w).find('.trn__cierre-hora').text())
-      .toMatch(/del (lunes|martes|miércoles|jueves|viernes|sábado|domingo)/)
+    const txt = cierre(w).find('.trn__cierre-hora').text()
+    expect(txt).toMatch(/^sábado /)   // abrió el sábado 5, cerró el domingo 6
+    expect(txt).not.toMatch(/domingo/)
   })
 
   it('y cuando abrió uno y cerró otro, nombra a los dos', async () => {
