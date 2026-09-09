@@ -52,6 +52,12 @@ la entrega sin cobrar el resto. Son cuatro casos y se mostraban como dos — aho
 estimado** dice `Se cobra al entregar`, que es la verdad: no es que esté paga, es que no se estimó
 el aporte al reservarla.
 
+**Y EN DOS RENGLONES, CON LO QUE FALTA ARRIBA.** Germán, viéndolo en el teléfono: *"señó x,
+restan x, ¿cómo es eso? es confuso"*. En una sola línea eran dos importes seguidos sin forma de
+saber cuál era cuál —y cuando la seña es la mitad exacta, el MISMO número dos veces—. Arriba va el
+que se le dice al paciente y el único que hace falta para entregar (`Resta $17.084` / `Paga ✓`), y
+la seña debajo, en segundo plano, explicando por qué no es el total.
+
 **Y LA VARIEDAD**, que es con lo que se va a buscar el frasco entre quince y lo primero que nombra
 el paciente cuando lo viene a retirar: `Critical Kush` arriba, `5g · Flor seca · L-26-017` debajo.
 El backend suma `genetica` al payload de la reserva, con su `includes` para no pegarle una consulta

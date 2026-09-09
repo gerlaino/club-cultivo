@@ -46,9 +46,14 @@
         <div class="mres__pie">
           <!-- SEÑADA NO ES PAGA. Decía «Señada ✓» apenas había seña, y una reserva puede estar
                señada con la mitad todavía por cobrar: el que atiende lo entregaba sin cobrar el
-               resto. Se dicen las dos cosas —lo que ya puso y lo que falta—, que es lo que va a
-               tener que decirle al paciente. -->
-          <span class="mres__cobro" :class="`mres__cobro--${cobro(r).tono}`">{{ cobro(r).texto }}</span>
+               resto.
+               PRIMERO LO QUE HAY QUE COBRAR, la seña debajo y en segundo plano. En un renglón
+               —«Señó $17.084 · resta $17.084»— son dos plata seguidas y no se sabe cuál es cuál:
+               el número que se dice en voz alta es el que falta, y ése va solo y arriba. -->
+          <span class="mres__cobro">
+            <span class="mres__cobro-hay" :class="`mres__cobro-hay--${cobro(r).tono}`">{{ cobro(r).texto }}</span>
+            <span v-if="cobro(r).sena" class="mres__cobro-sena">Seña {{ cobro(r).sena }}</span>
+          </span>
           <button class="mres__btn" :disabled="cajaCerrada" @click="entregar(r)">Entregar</button>
         </div>
       </div>
@@ -98,19 +103,21 @@ const modalAbierto = computed({
 
 const hoyISO = new Date().toISOString().slice(0, 10)
 
-// LO QUE HAY QUE COBRAR AL ENTREGAR, en una frase. Son cuatro casos distintos y antes se
-// mostraban como dos: si había seña decía «Señada ✓» aunque quedara la mitad por cobrar.
+// LO QUE HAY QUE COBRAR AL ENTREGAR. Son cuatro casos distintos y antes se mostraban como dos:
+// si había seña decía «Señada ✓» aunque quedara la mitad por cobrar.
+//
+// Van en DOS renglones y en este orden: arriba lo que falta —el número que se le dice al paciente
+// y el único que hace falta para entregar— y la seña abajo, como contexto de por qué es ése y no
+// el total. Juntos en una línea eran dos importes seguidos sin forma de saber cuál era cuál.
 function cobro (r) {
   const resta = Number(r.aporte_restante_ars) || 0
   const sena  = Number(r.sena_ars) || 0
-  if (resta > 0) {
-    return { tono: 'resta',
-             texto: sena > 0 ? `Señó ${formatARS(sena)} · resta ${formatARS(resta)}`
-                             : `Resta ${formatARS(resta)}` }
-  }
-  if (sena > 0) return { tono: 'ok', texto: `Paga ✓ · señó ${formatARS(sena)}` }
+  const conSena = sena > 0 ? formatARS(sena) : null
+
+  if (resta > 0)  return { tono: 'resta', texto: `Resta ${formatARS(resta)}`, sena: conSena }
+  if (sena > 0)   return { tono: 'ok',    texto: 'Paga ✓',                    sena: conSena }
   // Sin seña y sin resto no es que esté paga: es que no se estimó el aporte al reservarla.
-  return { tono: 'muted', texto: 'Se cobra al entregar' }
+  return { tono: 'muted', texto: 'Se cobra al entregar', sena: null }
 }
 
 // "Para hoy" incluye las VENCIDAS: una reserva que quedó de ayer sigue esperando a alguien, y
@@ -224,12 +231,15 @@ function fechaCorta(f) {
 .mres__prod { font-size: .9rem; font-weight: 600; color: var(--c-ink-800, #1e293b); }
 .mres__meta { font-size: .8rem; color: var(--c-slate-500); margin-top: -.25rem; }
 .mres__pie { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
-/* El cobro no se parte: con «señó $5.000 · resta $12.000» y el botón al lado, dos renglones son
-   mejor que un número cortado — es el que se dice en voz alta. */
-.mres__cobro { font-size: .8rem; font-weight: 600; min-width: 0; }
-.mres__cobro--resta { color: #b45309; }
-.mres__cobro--ok    { color: #15803d; }
-.mres__cobro--muted { color: var(--c-slate-500); font-weight: 500; }
+/* Lo que falta cobrar arriba y solo; la seña abajo y en segundo plano. Con el botón al lado, dos
+   renglones cortos entran donde uno largo se parte — y el importe que se dice en voz alta no se
+   puede cortar. */
+.mres__cobro { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
+.mres__cobro-hay { font-size: .8rem; font-weight: 600; }
+.mres__cobro-hay--resta { color: #b45309; }
+.mres__cobro-hay--ok    { color: #15803d; }
+.mres__cobro-hay--muted { color: var(--c-slate-500); font-weight: 500; }
+.mres__cobro-sena { font-size: .72rem; color: var(--c-slate-500); }
 .mres__btn {
   border: none; border-radius: 10px; padding: .5rem 1rem; cursor: pointer;
   background: var(--c-leaf-600, #16a34a); color: #fff; font-size: .85rem; font-weight: 600;

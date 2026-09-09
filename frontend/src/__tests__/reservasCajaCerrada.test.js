@@ -146,26 +146,31 @@ describe('Lo que cuenta la tarjeta de una reserva', () => {
     expect(w.find('.mres__meta').text()).toContain('L-26-017')
   })
 
-  it('señada Y con resto dice las dos cosas', async () => {
+  // Y EN DOS RENGLONES, con lo que falta ARRIBA. Germán, viéndolo: «señó x, restan x, ¿cómo es
+  // eso? es confuso». Eran dos importes seguidos en una línea —y cuando la seña es la mitad son
+  // el MISMO número dos veces— sin forma de saber cuál era cuál. Arriba va el que se le dice al
+  // paciente; la seña abajo explica por qué no es el total.
+  it('señada Y con resto dice las dos cosas, y lo que falta primero', async () => {
     const w = await conReservas(conStock({ sena_ars: 5000, aporte_restante_ars: 12000 }))
 
-    const txt = w.find('.mres__cobro').text()
-    expect(txt).toContain('5.000')    // lo que ya puso
-    expect(txt).toContain('12.000')   // lo que hay que cobrarle ahora
-    expect(w.find('.mres__cobro').classes()).toContain('mres__cobro--resta')
+    expect(w.find('.mres__cobro-hay').text()).toMatch(/^Resta \$.?12\.000$/)
+    expect(w.find('.mres__cobro-sena').text()).toMatch(/^Seña \$.?5\.000$/)
+    expect(w.find('.mres__cobro-hay').classes()).toContain('mres__cobro-hay--resta')
   })
 
   it('sin seña, sólo lo que resta', async () => {
     const w = await conReservas(conStock({ sena_ars: 0, aporte_restante_ars: 17084 }))
-    expect(w.find('.mres__cobro').text()).toMatch(/^Resta/)
+
+    expect(w.find('.mres__cobro-hay').text()).toMatch(/^Resta/)
+    expect(w.find('.mres__cobro-sena').exists()).toBe(false)
   })
 
   it('paga del todo, lo dice y muestra con cuánto', async () => {
     const w = await conReservas(conStock({ sena_ars: 17084, aporte_restante_ars: 0 }))
 
-    expect(w.find('.mres__cobro').text()).toContain('Paga')
-    expect(w.find('.mres__cobro').text()).toContain('17.084')
-    expect(w.find('.mres__cobro').classes()).toContain('mres__cobro--ok')
+    expect(w.find('.mres__cobro-hay').text()).toBe('Paga ✓')
+    expect(w.find('.mres__cobro-sena').text()).toContain('17.084')
+    expect(w.find('.mres__cobro-hay').classes()).toContain('mres__cobro-hay--ok')
   })
 
   // Sin seña y sin resto no es que esté paga: es que no se estimó el aporte al reservarla.
@@ -173,8 +178,9 @@ describe('Lo que cuenta la tarjeta de una reserva', () => {
   it('sin seña y sin total estimado, no dice que esté paga', async () => {
     const w = await conReservas(conStock({ sena_ars: 0, aporte_restante_ars: 0 }))
 
-    expect(w.find('.mres__cobro').text()).toBe('Se cobra al entregar')
-    expect(w.find('.mres__cobro').text()).not.toContain('Paga')
+    expect(w.find('.mres__cobro-hay').text()).toBe('Se cobra al entregar')
+    expect(w.find('.mres__cobro-hay').text()).not.toContain('Paga')
+    expect(w.find('.mres__cobro-sena').exists()).toBe(false)
   })
 
   it('y si no se sabe la variedad, no deja el renglón vacío', async () => {
