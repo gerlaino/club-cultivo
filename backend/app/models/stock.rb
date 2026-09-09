@@ -418,6 +418,10 @@ class Stock < ApplicationRecord
   # `current_user`.
   attr_accessor :usuario_movimiento
 
+  # Y CUÁNDO pasó, por lo mismo: el lote que se cierra con el último stock tiene que quedar
+  # cerrado el día en que se cerró de verdad, no el día en que alguien lo cargó.
+  attr_accessor :fecha_movimiento
+
   # Marca el stock como agotado cuando ya no queda nada. Hay que llamarlo explícitamente
   # después de descontar: `decrement!` baja la cantidad pero NO toca el estado, así que sin
   # esto un stock dispensado hasta el último gramo quedaba 'asignado' con cantidad 0 y el
@@ -430,7 +434,7 @@ class Stock < ApplicationRecord
   end
 
   def finalizar_lote_si_agotado
-    lote&.finalizar_si_stock_agotado!(usuario: usuario_movimiento)
+    lote&.finalizar_si_stock_agotado!(usuario: usuario_movimiento, fecha: fecha_movimiento)
   end
 
   def descontar_lote_origen_si_corresponde

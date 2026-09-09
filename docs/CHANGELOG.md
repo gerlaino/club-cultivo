@@ -1,5 +1,65 @@
 # Changelog
 
+## Septiembre 2026 (az) — Cerrar un stock: qué pasó, y cuándo
+
+Dos cosas que Germán encontró probando, y que resultaron ser la misma familia: **la app deja hacer
+cosas que después no sirven, y no lo dice**.
+
+### Un stock para dispensar no puede vivir donde no hay mostrador
+
+*"Al crear un stock y elijo la sede, me permite elegir una sede de producción, ¿está bien eso?"* No:
+el mostrador vive en una sede `social`/`mixta`, así que un preroll cargado como **«solo dispensa»**
+en una sede de producción **no aparece en ningún mostrador** — que es exactamente el preroll que
+estuvo buscando media hora. Se guardaba sin una queja.
+
+Ahora las sedes que se ofrecen salen de **para qué es el stock**, que se declara en el mismo
+formulario: «solo dispensa» → las que atienden; «solo producción» → las que producen. Con su cartel
+diciendo por qué la lista es corta, y la misma regla en el backend, porque por la API se saltea.
+
+**Y `ambas` queda libre a propósito** — lo encontró un test viejo antes de que rompiera nada: la
+flor de un lote **nace en la sede donde se cultiva** y sirve para las dos cosas; exigirle una sede
+que atienda habría hecho inguardable el alta más común que hay. La regla acota sólo las
+declaraciones explícitas. Lo mismo `ninguna`, que es cuarentena.
+
+**La misma regla en «Repartir a sede»**, sus dos puertas incluidas: verificar que el candado esté
+puesto en una no es verificar que lo tengan todas.
+
+### Finalizar un lote es finalizar su stock
+
+*"Ponele que tengo sólo el pack producción: los lotes cosechados pasan a curado y ahí deberían poder
+darse por finalizados, más que nada para que no sigan acumulando días de curado cuando ya no es
+real"*. Una organización sin dispensa nunca agota su stock, así que el lote se quedaba en `curado`
+**para siempre**, sumando días que no eran ciertos y contando como activo en todos los tableros.
+
+La decisión de Germán, y es la correcta: **no hay un botón «finalizar lote»**. Se cierra el STOCK
+diciendo qué pasó —entregado a otra organización · vendido · regalado · uso interno · destruido— y
+**el lote se finaliza solo**, por el camino que ya existía. Un solo camino a `finalizado`, que es lo
+que evita que dos reglas se contradigan: `finalizado` sigue significando «no queda nada», el balance
+de la trazabilidad cierra, y *«andá a saber para dónde fue»* deja de ser cierto — queda escrito con
+fecha y autor.
+
+### Y la fecha, que es lo que faltaba
+
+*"Puede pasar que por ahí lo cerré hace 4 días y recién hoy que me siento con la compu lo registro"*.
+El movimiento se fechaba con `created_at` —el momento de la carga—, así que el informe de Pérdidas
+mostraba la merma en la semana equivocada.
+
+**`stock_movimientos.fecha`** (migración + backfill de toda la historia), el modelo la completa
+siempre para que nunca quede vacía, y el único informe que corta por período pasa a usarla. Es el
+mismo patrón que `dispensaciones.fecha_dispensacion`: una carga retroactiva es legítima. No futura,
+y no anterior a la elaboración del producto —no se puede cerrar algo antes de que existiera—, contra
+`fecha_elaboracion` y no contra `created_at`, por lo mismo.
+
+**Y el lote hereda esa fecha**: si no, su evento diría que el ciclo terminó hoy cuando terminó el
+jueves.
+
+De paso se corrigió el texto de esa pantalla, que era de cuando **todo** se anotaba como merma
+(«lo que sobra queda como merma», «Finalizar 100g a merma») y contradecía la regla que hoy rige el
+módulo: sólo `destruido` es pérdida. Y decía «g» sobre 100 prerolls.
+
+**Deploy:** `add_fecha_a_stock_movimientos` (columna nueva + backfill, no borra nada). La corre sola
+`bin/render-build.sh`.
+
 ## Septiembre 2026 (ay) — El depósito no se elige: se deduce
 
 Germán, cargando una compra de packaging para probar la app: *"es como que estoy ingresando por

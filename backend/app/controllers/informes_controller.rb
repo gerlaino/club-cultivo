@@ -466,9 +466,12 @@ class InformesController < ApplicationController
     # 2. MERMA de inventario: lo que salió del stock sin ser una dispensación. `merma` es la
     #    pérdida declarada; los ajustes negativos son correcciones de inventario que también
     #    son producto que ya no está.
+    # Por la fecha en que PASÓ, no por la de carga: un cierre del jueves anotado el lunes es
+    # merma del jueves, y contarla en la semana equivocada es lo que hace que el informe no
+    # coincida con lo que la persona recuerda.
     movs   = StockMovimiento.joins(stock: :sede)
                             .where(sedes: { club_id: club.id })
-                            .where(created_at: desde..hasta)
+                            .en_periodo(desde, hasta)
     merma_g  = movs.where(tipo: 'merma').sum(:gramos).to_f.abs.round(1)
     negativos = movs.where(tipo: 'ajuste').where('gramos < 0')
     # El arqueo del MOSTRADOR va aparte. Estaba dentro de "ajustes en menos" junto con cualquier

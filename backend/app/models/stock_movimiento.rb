@@ -25,7 +25,20 @@ class StockMovimiento < ApplicationRecord
   validates :tipo,   inclusion: { in: TIPOS }
   validates :gramos, numericality: { other_than: 0 }
 
+  # CUÁNDO PASÓ, que no es cuándo se cargó. Se fechaba con `created_at`, o sea el momento en que
+  # alguien se sienta con la computadora: cerrar un stock el jueves y anotarlo el lunes lo ponía
+  # en el lunes, y el informe de Pérdidas mostraba la merma en la semana equivocada. Casi todos
+  # los movimientos pasan ahora mismo y no la traen; se completa sola para que la columna nunca
+  # quede vacía, que es lo que la volvería inservible para cortar por período.
+  before_validation { self.fecha ||= (created_at || Time.current).to_date }
+
   scope :recientes,      -> { order(created_at: :desc) }
+  # El corte por período, en un solo lugar. `COALESCE` por los movimientos que el código viejo
+  # pudo insertar entre la migración y el deploy: cortarlos afuera sería perder merma real.
+  scope :en_periodo,     ->(desde, hasta) {
+    where('COALESCE(stock_movimientos.fecha, stock_movimientos.created_at::date) BETWEEN ? AND ?',
+          desde.to_date, hasta.to_date)
+  }
   scope :de_mostrador,   -> { where.not(turno_mostrador_id: nil) }
   scope :sin_mostrador,  -> { where(turno_mostrador_id: nil) }
 end

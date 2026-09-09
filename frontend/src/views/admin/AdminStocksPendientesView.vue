@@ -347,11 +347,24 @@
                   </div>
                 </div>
                 <div class="stk__field">
+                  <!-- DÓNDE PUEDE VIVIR ESTE STOCK: sale de para qué es, que se declara acá al
+                       lado. Ofrecerlas todas dejaba cargar un producto para dispensar en una sede
+                       de producción, donde no hay mostrador que lo muestre. -->
                   <label class="stk__label">Sede destino <span class="stk__req">*</span></label>
                   <select class="stk__input" v-model="crearForm.sede_id" required>
                     <option value="">— Elegir sede —</option>
-                    <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+                    <option v-for="s in sedesParaCrear" :key="s.id" :value="s.id">{{ s.nombre }}</option>
                   </select>
+                  <span v-if="sedesOcultas" class="stk__hint">
+                    {{ crearForm.disponibilidad === 'produccion'
+                       ? 'Sólo las sedes que producen: es materia prima.'
+                       : 'Sólo las sedes que atienden público: es donde hay mostrador.' }}
+                  </span>
+                  <span v-else-if="!sedesParaCrear.length" class="stk__hint stk__hint--mal">
+                    {{ crearForm.disponibilidad === 'produccion'
+                       ? 'Esta organización no tiene ninguna sede de producción.'
+                       : 'Esta organización no tiene ninguna sede que atienda público, así que no hay dónde dispensarlo.' }}
+                  </span>
                 </div>
                 <div class="stk__field">
                   <label class="stk__label">Variedad / Genética <span class="stk__req">*</span></label>
@@ -493,7 +506,9 @@
                   <label class="stk__label">Sede destino <span class="stk__req">*</span></label>
                   <select class="stk__input" v-model="repartirForm.sede_id">
                     <option value="">— Elegir sede —</option>
-                    <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+                    <!-- Sólo donde este producto puede vivir: repartir uno de dispensa a una sede
+                         que no atiende lo manda a donde ningún mostrador lo va a ver. -->
+                    <option v-for="s in sedesParaRepartir" :key="s.id" :value="s.id">{{ s.nombre }}</option>
                   </select>
                 </div>
               </div>
@@ -678,6 +693,14 @@
                   </select>
                   <p v-if="descartarForm.motivo" class="stk__hint-motivo">{{ ayudaDe(descartarForm.motivo) }}</p>
                 </div>
+                <!-- CUÁNDO PASÓ, que puede no ser hoy: se cierra un stock el jueves y recién el
+                     lunes uno se sienta a cargarlo. Con la fecha de carga, la merma aparecía en la
+                     semana equivocada. -->
+                <div class="stk__field">
+                  <label class="stk__label">¿Cuándo fue?</label>
+                  <input type="date" class="stk__input" v-model="descartarForm.fecha" :max="hoyISO" />
+                  <span class="stk__hint">Hoy, salvo que lo hayas cerrado antes.</span>
+                </div>
                 <div class="stk__field stk__field--full">
                   <label class="stk__label">Detalle <span class="stk__label-opt">(opcional)</span></label>
                   <textarea class="stk__input stk__textarea" rows="2" v-model="descartarForm.detalle" placeholder="A quién, número de remito, lo que sirva para encontrarlo después…"></textarea>
@@ -770,6 +793,15 @@ const historial        = ref([])
 const historialLoaded  = ref(false)
 const loadingHistorial = ref(false)
 const sedes            = ref([])
+// Para qué sirve cada tipo de sede. El mostrador vive en una `social`/`mixta`, así que un
+// producto para dispensar tiene que estar en una de esas o no lo va a ver nadie.
+// SÓLO LAS DECLARACIONES EXPLÍCITAS. `ambas` queda libre a propósito: la flor de un lote nace en
+// la sede donde se cultiva —de producción— y sirve para las dos cosas. Cuando alguien dice «esto
+// es SÓLO para dispensar», ahí sí hay una sola respuesta posible: donde hay mostrador.
+const TIPOS_SEDE_POR_DISPONIBILIDAD = {
+  dispensa:   ['social', 'mixta'],
+  produccion: ['produccion', 'mixta'],
+}
 const geneticas        = ref([])
 const liveConectado    = ref(false)
 const flashIds         = ref(new Set())
@@ -781,6 +813,12 @@ const umbralSaving     = ref(false)
 const showRepartir   = ref(false)
 const repartirTarget = ref(null)
 const repartirForm   = ref({ sede_id: '', cantidad: '' })
+// Misma regla que en el alta: sólo las sedes donde ese producto puede vivir, y nunca la suya.
+const sedesParaRepartir = computed(() => {
+  const tipos = TIPOS_SEDE_POR_DISPONIBILIDAD[repartirTarget.value?.disponibilidad]
+  const lista = (sedes.value || []).filter(s => String(s.id) !== String(repartirTarget.value?.sede_id))
+  return tipos ? lista.filter(s => tipos.includes(s.tipo)) : lista
+})
 const repartirError  = ref(null)
 const repartiendo    = ref(false)
 
@@ -1255,13 +1293,17 @@ async function ejecutarAjustar() {
 // ── Descartar ──────────────────────────────────────────────────────────────────
 const showDescartar   = ref(false)
 const descartarTarget = ref(null)
-const descartarForm   = ref({ motivo: '', detalle: '' })
+// La fecha en LOCAL: `toISOString()` es UTC y pasadas las 21hs en Argentina devuelve mañana, que
+// además es una fecha futura y el backend la rechaza.
+const hoyISO = (() => { const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })()
+const descartarForm   = ref({ motivo: '', detalle: '', fecha: hoyISO })
 const descartarError  = ref(null)
 const descartando     = ref(false)
 
 function openDescartar(s) {
   descartarTarget.value = s
-  descartarForm.value   = { motivo: '', detalle: '' }
+  descartarForm.value   = { motivo: '', detalle: '', fecha: hoyISO }
   descartarError.value  = null
   showDescartar.value   = true
 }
@@ -1273,7 +1315,9 @@ async function ejecutarDescartar() {
   if (!motivo) { descartarError.value = 'Elegí qué pasó con el stock'; return }
   descartando.value = true
   try {
-    await descartarStock(descartarTarget.value.id, { motivo, detalle: (descartarForm.value.detalle || '').trim() })
+    await descartarStock(descartarTarget.value.id, {
+      motivo, detalle: (descartarForm.value.detalle || '').trim(), fecha: descartarForm.value.fecha,
+    })
     closeDescartar()
     const [rPend] = await Promise.all([listStocksPendientes()])
     pendientes.value = rPend.data || []
@@ -1329,6 +1373,22 @@ const FORMA_MAP = Object.fromEntries(FORMAS.map(f => [f.value, f.label]))
 // Lo que se guarda y lo que dice la etiqueta, del mismo lado: si la pantalla dice "g" y el
 // registro queda en unidades, el número no significa nada.
 const unidadCrear = computed(() => unidadDe(crearForm.value.forma_producto))
+
+// Las sedes donde este stock puede vivir, según para qué es. 'ninguna' (apartado, cuarentena) no
+// tiene restricción: todavía no se decidió qué va a ser.
+const sedesParaCrear = computed(() => {
+  const tipos = TIPOS_SEDE_POR_DISPONIBILIDAD[crearForm.value.disponibilidad]
+  return tipos ? sedes.value.filter(s => tipos.includes(s.tipo)) : sedes.value
+})
+const sedesOcultas = computed(() =>
+  sedesParaCrear.value.length > 0 && sedesParaCrear.value.length < sedes.value.length)
+
+// Cambiar para qué es puede dejar elegida una sede que ya no sirve: se suelta en vez de guardarla
+// escondida y que el backend la rechace al confirmar.
+watch(() => crearForm.value.disponibilidad, () => {
+  const id = crearForm.value.sede_id
+  if (id && !sedesParaCrear.value.some(s => String(s.id) === String(id))) crearForm.value.sede_id = ''
+})
 function formaLabel(f) { return FORMA_MAP[f] || f || 'Stock' }
 
 function estadoLabel(e) {
@@ -1574,6 +1634,9 @@ function formatDate(dateStr) {
 /* Texto libre: se acota y el resto se lee en el tooltip. Sin tope, un comentario largo
    empuja las columnas de cantidad fuera de la pantalla. */
 .stk__hint-motivo { margin: .2rem 0 0; font-size: .74rem; color: var(--c-slate-500); }
+.stk__hint { display: block; margin-top: .25rem; font-size: .74rem; color: var(--c-slate-500); }
+/* Cuando no hay NINGUNA sede donde pueda vivir: no es una aclaración, es un impedimento. */
+.stk__hint--mal { color: var(--c-amber-500); font-weight: 600; }
 .stk__label-opt { color: var(--c-slate-400); font-weight: 400; }
 .stk__inv-td-obs { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--c-slate-500); font-size: .78rem; }
 .stk__inv-td-mono { font-family: var(--font-mono, monospace); font-size: .8rem; color: var(--c-slate-600); }

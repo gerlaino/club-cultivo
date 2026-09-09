@@ -55,7 +55,8 @@
       <!-- Stock finalizado: cerrado, ya no hay nada que hacer con él -->
       <div v-if="stock.agotado" class="sd__finalizado">
         <i class="bi bi-flag-fill"></i>
-        <span>Stock finalizado — cerrado. El sobrante quedó como merma y ya no aparece en el inventario disponible.</span>
+        <span>Stock finalizado — cerrado. Lo que quedaba salió del inventario con su motivo, y ya no
+        aparece en el disponible.</span>
       </div>
 
       <!-- ── Layout ─────────────────────────────────────────────────── -->
@@ -295,7 +296,7 @@
                 <span class="sd__action-ico sd__action-ico--red"><i class="bi bi-flag"></i></span>
                 <div class="sd__action-txt">
                   <div class="sd__action-lbl">Finalizar stock</div>
-                  <div class="sd__action-sub">Cierra el stock; lo que sobra queda como merma</div>
+                  <div class="sd__action-sub">Cierra el stock diciendo qué pasó con lo que queda</div>
                 </div>
               </button>
               <button class="sd__action sd__action--danger" @click="eliminarStock" :disabled="eliminando">
@@ -431,7 +432,11 @@
               <div class="sd__modal-ico sd__modal-ico--danger"><i class="bi bi-flag"></i></div>
               <div>
                 <h2 class="sd__modal-title">Finalizar stock</h2>
-                <p class="sd__modal-sub">Lo que queda (<strong>{{ stock?.cantidad }}g</strong>) se registra como merma</p>
+                <!-- Ya no todo es merma: desde que el cierre pide QUÉ PASÓ, sólo «destruido» lo
+                     es. Y la unidad es la del producto: 100 prerolls no son 100 g. -->
+                <p class="sd__modal-sub">
+                  Lo que queda (<strong>{{ stock?.cantidad }}{{ stock?.unidad || 'g' }}</strong>) sale del inventario
+                </p>
               </div>
               <button class="sd__modal-close" @click="showDescartar = false"><i class="bi bi-x-lg"></i></button>
             </div>
@@ -439,7 +444,9 @@
               <div v-if="descartarError" class="sd__alert">{{ descartarError }}</div>
               <div class="sd__descarte-warn">
                 <i class="bi bi-exclamation-triangle-fill"></i>
-                Cierra el stock (queda <strong>agotado</strong>) y no se puede revertir. La diferencia entre lo rendido y el peso total del lote queda como <strong>merma</strong>.
+                Cierra el stock: lo deja en <strong>agotado</strong> y descuenta
+                <strong>{{ stock?.cantidad }}{{ stock?.unidad || 'g' }}</strong>. No se puede revertir.
+                Sólo cuenta como <strong>pérdida</strong> si lo que pasó fue que se destruyó.
               </div>
               <div class="sd__form-grid">
                 <div class="sd__field sd__field--full">
@@ -451,6 +458,11 @@
                     <option v-for="m in MOTIVOS_FINALIZACION" :key="m.value" :value="m.value">{{ m.label }}</option>
                   </select>
                   <p v-if="descartarForm.motivo" class="sd__hint">{{ ayudaDe(descartarForm.motivo) }}</p>
+                  <!-- CUÁNDO PASÓ, que puede no ser hoy: se cierra un stock el jueves y recién el
+                       lunes uno se sienta a cargarlo. -->
+                  <label class="sd__label">¿Cuándo fue?</label>
+                  <input type="date" class="sd__input" v-model="descartarForm.fecha" :max="hoyISO" />
+                  <p class="sd__hint">Hoy, salvo que lo hayas cerrado antes.</p>
                   <label class="sd__label">Detalle <span class="sd__opt">(opcional)</span></label>
                   <textarea class="sd__input sd__textarea" rows="2" v-model="descartarForm.detalle" placeholder="A quién, número de remito, lo que sirva para encontrarlo después…"></textarea>
                 </div>
@@ -461,7 +473,7 @@
               <button class="sd__btn-danger" :disabled="descartando || !descartarForm.motivo.trim()" @click="ejecutarDescartar">
                 <DsSpinner v-if="descartando" :size="12" />
                 <i v-else class="bi bi-flag"></i>
-                Finalizar ({{ stock?.cantidad }}g a merma)
+                Finalizar {{ stock?.cantidad }}{{ stock?.unidad || 'g' }}
               </button>
             </div>
           </div>
@@ -498,7 +510,9 @@
                   <label class="sd__label">Sede destino <span class="sd__req">*</span></label>
                   <select class="sd__input" v-model="repartirForm.sede_id">
                     <option value="">— Elegir sede —</option>
-                    <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+                    <!-- Sólo donde este producto puede vivir: repartir uno de dispensa a una sede
+                         que no atiende lo manda a donde ningún mostrador lo va a ver. -->
+                    <option v-for="s in sedesParaRepartir" :key="s.id" :value="s.id">{{ s.nombre }}</option>
                   </select>
                 </div>
               </div>
@@ -870,7 +884,11 @@ async function ejecutarAjustar() {
 
 // ── Descartar ──────────────────────────────────────────────────────────────────
 const showDescartar  = ref(false)
-const descartarForm  = ref({ motivo: '', detalle: '' })
+// En LOCAL: `toISOString()` es UTC y pasadas las 21hs en Argentina devuelve mañana — una fecha
+// futura, que el backend rechaza.
+const hoyISO = (() => { const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}` })()
+const descartarForm  = ref({ motivo: '', detalle: '', fecha: hoyISO })
 const descartarError = ref(null)
 const descartando    = ref(false)
 
@@ -880,7 +898,9 @@ async function ejecutarDescartar() {
   if (!motivo) { descartarError.value = 'Elegí qué pasó con el stock'; return }
   descartando.value = true
   try {
-    await descartarStock(stock.value.id, { motivo, detalle: descartarForm.value.detalle.trim() })
+    await descartarStock(stock.value.id, {
+      motivo, detalle: descartarForm.value.detalle.trim(), fecha: descartarForm.value.fecha,
+    })
     toast.success('Stock finalizado')
     router.push('/admin/stock')
   } catch (e) {
@@ -891,6 +911,20 @@ async function ejecutarDescartar() {
 // ── Repartir ───────────────────────────────────────────────────────────────────
 const showRepartir  = ref(false)
 const repartirForm  = ref({ sede_id: '', cantidad: null })
+// Dónde puede vivir este producto, según para qué es. El mostrador vive en una sede social o
+// mixta: repartir ahí algo de dispensa es lo único que lo deja aparecer en un mostrador.
+// SÓLO LAS DECLARACIONES EXPLÍCITAS. `ambas` queda libre a propósito: la flor de un lote nace en
+// la sede donde se cultiva —de producción— y sirve para las dos cosas. Cuando alguien dice «esto
+// es SÓLO para dispensar», ahí sí hay una sola respuesta posible: donde hay mostrador.
+const TIPOS_SEDE_POR_DISPONIBILIDAD = {
+  dispensa:   ['social', 'mixta'],
+  produccion: ['produccion', 'mixta'],
+}
+const sedesParaRepartir = computed(() => {
+  const tipos = TIPOS_SEDE_POR_DISPONIBILIDAD[stock.value?.disponibilidad]
+  const lista = (sedes.value || []).filter(s => String(s.id) !== String(stock.value?.sede_id))
+  return tipos ? lista.filter(s => tipos.includes(s.tipo)) : lista
+})
 const repartirError = ref(null)
 const repartiendo   = ref(false)
 

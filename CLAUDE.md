@@ -1048,6 +1048,25 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   compras** (lo llena la cosecha), y un depósito propio del club se comporta como insumos generales.
   Sigue existiendo **«esta vez no entra: es sólo un gasto»**, pero como SALIDA y no como una de dos
   opciones en igualdad: si la categoría guarda cosas, lo normal es que entre.
+- **UN STOCK «SOLO DISPENSA» NO PUEDE VIVIR DONDE NO HAY MOSTRADOR** (sep-2026). El mostrador vive
+  en una sede `social`/`mixta`: cargarlo en una de producción lo deja invisible para siempre, y así
+  se perdió un preroll media hora. Las sedes que se ofrecen salen de la **disponibilidad**, que se
+  declara en el mismo formulario, y la regla está también en el backend y en «Repartir a sede» (dos
+  puertas). **`ambas` NO se acota**: la flor de un lote nace en la sede donde se cultiva y sirve
+  para las dos cosas — acotarla haría inguardable el alta más común que hay. Sólo se acotan las
+  declaraciones explícitas (`dispensa`, `produccion`).
+- **NO HAY BOTÓN «FINALIZAR LOTE»: SE FINALIZA EL STOCK Y EL LOTE SE CIERRA SOLO** (sep-2026,
+  decisión de Germán). Una organización sin dispensa nunca agota su stock, así que el lote se
+  quedaba en `curado` para siempre acumulando días que no eran ciertos. Se cierra el stock diciendo
+  **qué pasó** (`Stock::MOTIVOS_FINALIZACION`: entregado a otra organización · vendido · regalado ·
+  uso interno · destruido) y `finalizar_si_stock_agotado!` hace el resto. **Un solo camino a
+  `finalizado`**, que sigue significando «no queda nada»: un botón que escribiera el estado a mano
+  rompería el balance de la trazabilidad y la validación que existe porque ya pasó.
+- **CERRAR UN STOCK LLEVA FECHA, Y NO ES LA DE CARGA** (`stock_movimientos.fecha`, sep-2026). Se
+  cierra un jueves y se registra el lunes: con `created_at` la merma caía en la semana equivocada.
+  No futura y no anterior a `fecha_elaboracion` —no a `created_at`, que una carga retroactiva del
+  producto es legítima—, y **el lote hereda esa fecha** al cerrarse. Todo lo que corte
+  `stock_movimientos` por período usa el scope `en_periodo`, nunca `created_at`.
 - **LA SEDE DE LA CATEGORÍA MANDA** (sep-2026). Una categoría contable puede estar acotada a una
   sede: entonces el gasto es de ESA sede y, si entra a un depósito, al de esa sede — no se pregunta,
   ya se decidió al elegir la categoría. El campo existía desde siempre (se elegía en el catálogo, se

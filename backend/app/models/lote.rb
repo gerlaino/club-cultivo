@@ -543,7 +543,7 @@ class Lote < ApplicationRecord
   # El lote pasa a 'finalizado' cuando se agota todo su stock (lo llama Stock al quedar
   # en 0). Solo aplica desde 'curado' (ya tuvo stock); requiere que exista al menos un
   # stock y que todos estén agotados.
-  def finalizar_si_stock_agotado!(usuario: nil)
+  def finalizar_si_stock_agotado!(usuario: nil, fecha: nil)
     return unless estado == 'curado'
     # Mismo criterio que la validación (`stock_remanente`), para que las dos no puedan
     # divergir: si una dice "cerrado" y la otra "queda producto", el lote no se guarda nunca.
@@ -561,11 +561,19 @@ class Lote < ApplicationRecord
       return
     end
 
+    # La fecha viene del movimiento que lo dejó en cero: un stock cerrado el jueves y cargado el
+    # lunes cierra el lote el JUEVES. Sin eso, el ciclo del lote dura hasta que alguien se sienta
+    # con la computadora, y los días de curado que muestra la ficha no son los reales.
+    # Si es de hoy, la hora real; si es de un día pasado, el final de ese día — nunca una hora
+    # futura, que dejaría un evento fechado más adelante que el momento en que se registró.
+    cuando = if fecha.blank? || fecha.to_date >= Time.zone.today then Time.current
+             else fecha.to_date.end_of_day
+             end
     update!(estado: 'finalizado')
     lote_eventos.create!(
       tipo: 'cambio_estado', estado_anterior: 'curado', estado_nuevo: 'finalizado',
       descripcion: 'Stock agotado — lote finalizado.', user: usuario, club: club,
-      registrado_en: Time.current,
+      registrado_en: cuando,
     )
   end
 

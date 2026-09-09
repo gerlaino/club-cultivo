@@ -233,6 +233,10 @@ class StocksController < ApplicationController
     # hacerle elegir de nuevo algo que el lote ya dice.
     @stock.genetica_id ||= @stock.lote&.genetica_id
 
+    if (motivo = sede_incompatible(@stock))
+      return render json: { errors: [motivo] }, status: :unprocessable_entity
+    end
+
     return render json: { errors: [SIN_GENETICA] }, status: :unprocessable_entity if @stock.genetica_id.blank?
     return render json: { errors: [GENETICA_AJENA] }, status: :unprocessable_entity unless genetica_del_club?(@stock.genetica_id)
 
@@ -421,6 +425,9 @@ class StocksController < ApplicationController
     end
     return render json: { error: 'El stock ya está agotado' }, status: :unprocessable_entity if @stock.agotado?
 
+    fecha = fecha_de_cierre(params[:fecha])
+    return render json: { error: fecha }, status: :unprocessable_entity if fecha.is_a?(String)
+
     gramos_finalizados = @stock.cantidad.to_f
     etiqueta = Stock::MOTIVOS_FINALIZACION[motivo]
     ActiveRecord::Base.transaction do
@@ -428,9 +435,13 @@ class StocksController < ApplicationController
         tipo:    Stock.tipo_movimiento_para(motivo),
         gramos:  -gramos_finalizados,
         usuario: current_user,
+        fecha:   fecha,
         notas:   ["[FINALIZADO]", etiqueta, detalle.presence].compact.join(' · '),
       )
       @stock.usuario_movimiento = current_user
+      # Y el lote hereda la misma fecha al cerrarse: si no, su evento diría que el ciclo terminó
+      # hoy cuando terminó el jueves.
+      @stock.fecha_movimiento = fecha
       @stock.update!(cantidad: 0, estado: 'agotado')
     end
     render json: serialize_stock(@stock.reload)
@@ -675,6 +686,16 @@ class StocksController < ApplicationController
     sede = current_user.club.sedes.find_by(id: sede_id)
     return render json: { error: 'Sede no encontrada' }, status: :not_found unless sede
 
+    # La misma regla que en el alta, y por la misma razón: repartir un producto de dispensa a una
+    # sede que no atiende lo manda a un lugar donde ningún mostrador lo va a ver. Verificar que el
+    # candado esté puesto en una puerta no es verificar que lo tengan todas.
+    @stock.sede = sede
+    if (motivo = sede_incompatible(@stock))
+      @stock.reload
+      return render json: { error: motivo }, status: :unprocessable_entity
+    end
+    @stock.reload
+
     cantidad_total = @stock.cantidad.to_f
     es_parcial = cantidad.present? && cantidad > 0 && (cantidad + 0.001) < cantidad_total
 
@@ -824,6 +845,62 @@ class StocksController < ApplicationController
     @stock = Stock.where(club_id: current_user.club_id).find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Stock no encontrado' }, status: :not_found
+  end
+
+  # DÓNDE PUEDE VIVIR ESTE STOCK. Depende de para qué es, que ya se declaró en el mismo
+  # formulario: lo que se va a dispensar tiene que estar en una sede que atienda —el mostrador
+  # vive en una `social`/`mixta`—, y lo que es materia prima, donde se produce.
+  #
+  # Sin esto se podía cargar un preroll «solo dispensa» en una sede de producción: se guardaba
+  # sin una queja y no aparecía en ningún mostrador, porque esa sede no tiene. Pasó.
+  # (Tiene arreglo —«Repartir a sede» mueve la cantidad a otra— pero primero hay que darse
+  # cuenta, y la pantalla no ayudaba en nada.)
+  # SÓLO LAS DECLARACIONES EXPLÍCITAS. `ambas` queda libre a propósito: la flor de un lote nace en
+  # la sede donde se cultiva —de producción— y es apta para las dos cosas; exigirle una sede que
+  # atienda haría inguardable el alta más común que hay. Lo mismo `ninguna`, que es cuarentena:
+  # todavía no se decidió qué va a ser. Cuando alguien dice «esto es SÓLO para dispensar», ahí sí
+  # hay una sola respuesta posible.
+  TIPOS_SEDE_POR_DISPONIBILIDAD = {
+    'dispensa'   => %w[social mixta],
+    'produccion' => %w[produccion mixta],
+  }.freeze
+
+  def sede_incompatible(stock)
+    sede = stock.sede
+    return nil if sede.nil?
+
+    tipos = TIPOS_SEDE_POR_DISPONIBILIDAD[stock.disponibilidad]
+    return nil if tipos.nil? || tipos.include?(sede.tipo)
+
+    if stock.apto_dispensa?
+      "«#{sede.nombre}» es una sede de producción y no atiende público: un producto para " \
+        'dispensar tiene que estar en una sede social o mixta, que es donde hay mostrador.'
+    else
+      "«#{sede.nombre}» no produce: un stock de materia prima va a una sede de producción o mixta."
+    end
+  end
+
+  # CUÁNDO SE CERRÓ, que puede no ser hoy: se cierra un stock un jueves y se registra el lunes.
+  # Devuelve la fecha, o el texto del error (que es lo que se le muestra a la persona).
+  def fecha_de_cierre(valor)
+    return Time.zone.today if valor.blank?
+
+    fecha = begin
+      Date.parse(valor.to_s)
+    rescue ArgumentError
+      nil
+    end
+    return 'Esa fecha no se entiende.' if fecha.nil?
+    return 'La fecha no puede ser futura.' if fecha > Time.zone.today
+
+    # No se puede cerrar algo antes de que existiera. Contra `fecha_elaboracion` y NO contra
+    # `created_at`, por lo mismo que la dispensación: una carga retroactiva es legítima.
+    nacio = @stock.fecha_elaboracion
+    if nacio.present? && fecha < nacio
+      return "Este producto es del #{I18n.l(nacio, format: :default)}: no se puede cerrar antes."
+    end
+
+    fecha
   end
 
   def sede_for_stock
