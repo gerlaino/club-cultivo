@@ -1,5 +1,30 @@
 # Changelog
 
+## Septiembre 2026 (bb) — La tabla de inventario ordena por cualquier columna
+
+Pedido de Germán: *"quiero que esa tabla se pueda reordenar haciendo click en los cabezales"*. Las
+diez columnas ordenan —código, tipo, origen, genética, lote, sede, ingresó, observaciones, cantidad
+inicial y actual—, un click invierte, y el cabezal activo lo dice con su flecha.
+
+**EL ORDEN LO HACE EL SERVIDOR, y esa es toda la decisión.** Esta tabla la pagina el backend
+(25 por página): ordenar en el navegador habría acomodado los 25 renglones de la página y dicho
+«ordenado por cantidad» mostrando los 25 de siempre. Eso se lee como una respuesta y no lo es —
+peor que no ordenar. El parámetro entra en un `ORDER BY`, así que va por **lista blanca**
+(`ORDEN_INVENTARIO`), con un caso que lo prueba.
+
+Detalles que decidieron cómo quedó:
+- **La genética se ordena como se muestra**: la del lote y, si no tiene, la del stock
+  (`COALESCE`). Mirando sólo `stocks.genetica_id`, todo lo que viene de un lote se habría ido al
+  fondo.
+- **Lo vacío va al final siempre**, ordene para donde ordene: una sede sin asignar arriba de todo
+  es ruido en la única pantalla que se mira.
+- **La primera vez, cada columna ordena para donde se pregunta**: de un nombre se busca la A, de
+  una cantidad y de una fecha se busca lo más grande y lo más nuevo.
+- **Reordenar vuelve a la página 1**: quedarse en la 3 muestra un pedazo del medio de otra lista.
+- `Actual` ordena por `cantidad`; la pantalla muestra el **disponible** (menos lo reservado y lo
+  apartado), que se calcula en Ruby y no existe en SQL. En las filas con algo apartado el orden
+  puede diferir del número mostrado por esos gramos: está anotado en el código.
+
 ## Septiembre 2026 (ba) — «P&L» no se dice
 
 *"El admin no tiene por qué saber de contabilidad, y justamente ahí entramos nosotros para

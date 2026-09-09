@@ -190,23 +190,24 @@
         <template v-else>
           <div class="stk__inv-table-wrap">
             <table class="stk__inv-table">
+              <!-- TODAS LAS COLUMNAS ORDENAN, y el orden lo hace el SERVIDOR: esta tabla la
+                   pagina el backend, así que ordenar en el navegador acomodaría los 25 renglones
+                   de la página y diría «ordenado por cantidad» mostrando los 25 de siempre.
+                   · El código va primero: es lo único que identifica una fila. Sin él, tres
+                     compras externas de flor seca son tres renglones idénticos.
+                   · «Observaciones» es lo que se escribió al cargar el producto (`descripcion`). -->
               <thead>
                 <tr>
-                  <!-- El código va primero: es lo único que identifica una fila. Sin esto, tres
-                       compras externas de flor seca se veían como tres renglones idénticos y no
-                       había forma de saber cuál era cuál sin entrar a cada uno. -->
-                  <th>Código</th>
-                  <th>Tipo</th>
-                  <th>Origen</th>
-                  <th>Genética</th>
-                  <th>Lote</th>
-                  <th>Sede</th>
-                  <th>Ingresó</th>
-                  <!-- Lo que se escribió al cargar el producto ("observaciones" en el alta, se
-                       guarda en `descripcion`). Se cargaba y no se leía en ningún lado. -->
-                  <th>Observaciones</th>
-                  <th class="stk__inv-num">Cantidad inicial</th>
-                  <th class="stk__inv-num">Actual</th>
+                  <th v-for="c in COLUMNAS_INV" :key="c.campo"
+                      :class="['stk__inv-th', c.num ? 'stk__inv-num' : '',
+                               invOrden.campo === c.campo ? 'is-activa' : '']"
+                      :aria-sort="invOrden.campo === c.campo
+                                  ? (invOrden.dir === 'asc' ? 'ascending' : 'descending') : 'none'">
+                    <button type="button" class="stk__inv-th-btn" @click="ordenarInv(c.campo)">
+                      {{ c.label }}
+                      <span v-if="invOrden.campo === c.campo" class="stk__inv-caret">{{ invOrden.dir === 'asc' ? '▲' : '▼' }}</span>
+                    </button>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -904,10 +905,44 @@ const invFiltros  = ref({ forma_producto: '', sede_id: '', fecha_desde: '', fech
 
 const hayFiltrosInv = computed(() => Object.values(invFiltros.value).some(v => v))
 
+// LAS COLUMNAS DE LA TABLA, Y POR CUÁL SE PUEDE ORDENAR. `campo` es el nombre que entiende el
+// backend (lista blanca en `ORDEN_INVENTARIO`): un cabezal que no ordena, entre nueve que sí, se
+// lee como que esa columna está rota.
+//
+// `dir` es hacia dónde ordena la PRIMERA vez que se toca. Los números y las fechas arrancan al
+// revés que el texto porque la pregunta también es al revés: de un nombre se busca la A, de una
+// cantidad y de una fecha se busca lo más grande y lo más nuevo.
+const COLUMNAS_INV = [
+  { campo: 'codigo',           label: 'Código',          dir: 'asc' },
+  { campo: 'tipo',             label: 'Tipo',            dir: 'asc' },
+  { campo: 'origen',           label: 'Origen',          dir: 'asc' },
+  { campo: 'genetica',         label: 'Genética',        dir: 'asc' },
+  { campo: 'lote',             label: 'Lote',            dir: 'asc' },
+  { campo: 'sede',             label: 'Sede',            dir: 'asc' },
+  { campo: 'ingreso',          label: 'Ingresó',         dir: 'desc' },
+  { campo: 'observaciones',    label: 'Observaciones',   dir: 'asc' },
+  { campo: 'cantidad_inicial', label: 'Cantidad inicial', dir: 'desc', num: true },
+  { campo: 'actual',           label: 'Actual',          dir: 'desc', num: true },
+]
+// Vacío = como venía: lo último que entró arriba.
+const invOrden = ref({ campo: '', dir: 'desc' })
+
+function ordenarInv (campo) {
+  const col = COLUMNAS_INV.find(c => c.campo === campo)
+  invOrden.value = invOrden.value.campo === campo
+    ? { campo, dir: invOrden.value.dir === 'asc' ? 'desc' : 'asc' }
+    : { campo, dir: col?.dir || 'asc' }
+  // Vuelve a la primera página: quedarse en la 3 después de reordenar muestra un pedazo del
+  // medio de otra lista, que se lee como que el orden no anduvo.
+  invPage.value = 1
+  cargarInventario()
+}
+
 async function cargarInventario() {
   loadingInv.value = true
   try {
     const params = { page: invPage.value, per_page: invPerPage.value }
+    if (invOrden.value.campo) { params.orden = invOrden.value.campo; params.dir = invOrden.value.dir }
     for (const [k, v] of Object.entries(invFiltros.value)) { if (v) params[k] = v }
     const { data } = await listStockInventario(params)
     inventario.value = data.stocks  || []
@@ -1619,8 +1654,19 @@ function formatDate(dateStr) {
 .stk__inv-table { width: 100%; border-collapse: collapse; font-size: .84rem; }
 .stk__inv-table th {
   text-align: left; font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
-  color: var(--c-slate-500); padding: .6rem .85rem; background: var(--c-slate-50); border-bottom: 2px solid var(--c-slate-200); white-space: nowrap;
+  color: var(--c-slate-500); background: var(--c-slate-50); border-bottom: 2px solid var(--c-slate-200); white-space: nowrap;
 }
+/* El padding pasa al botón para que TODO el ancho del cabezal sea clickeable: un área de click
+   más chica que la celda se siente como que a veces no anda. */
+.stk__inv-th { padding: 0; }
+.stk__inv-th-btn {
+  width: 100%; border: 0; background: transparent; cursor: pointer;
+  padding: .6rem .85rem; text-align: inherit;
+  font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit;
+}
+.stk__inv-th-btn:hover { color: var(--c-slate-700); }
+.stk__inv-th.is-activa .stk__inv-th-btn { color: var(--c-leaf-800); }
+.stk__inv-caret { font-size: 9px; margin-left: 3px; }
 .stk__inv-table td { padding: .6rem .85rem; border-bottom: 1px solid var(--c-slate-100); color: var(--c-slate-700); vertical-align: middle; }
 .stk__inv-table tbody tr:last-child td { border-bottom: none; }
 .stk__inv-num { text-align: right; }

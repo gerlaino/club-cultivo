@@ -161,8 +161,12 @@ class StocksController < ApplicationController
 
     page = [params[:page].to_i, 1].max
     per  = (params[:per_page].presence || 25).to_i.clamp(1, 100)
-    stocks = scope.includes(:lote, :genetica, :sede)
-                  .order(created_at: :desc)
+    # EL ORDEN VA EN LA CONSULTA, NO EN LA PANTALLA. La tabla la pagina el servidor: ordenar en el
+    # navegador acomodaría los 25 renglones de la página y diría «ordenado por cantidad» mostrando
+    # los 25 de siempre. Eso es peor que no ordenar — se lee como una respuesta y no lo es.
+    stocks = scope.left_joins(:sede, :genetica, lote: :genetica)
+                  .includes(:lote, :genetica, :sede)
+                  .order(Arel.sql(orden_inventario))
                   .offset((page - 1) * per).limit(per)
 
     render json: {
@@ -901,6 +905,38 @@ class StocksController < ApplicationController
     end
 
     fecha
+  end
+
+  # POR QUÉ COLUMNA SE PUEDE ORDENAR. Lista blanca: el parámetro entra en un `ORDER BY`, así que
+  # no puede venir del cliente sin filtrar.
+  #
+  # `actual` ordena por `cantidad`, que es la columna de la base. La pantalla muestra el
+  # DISPONIBLE (cantidad menos lo reservado y lo apartado a un evento), que se calcula en Ruby y no
+  # existe en SQL: en las filas con algo apartado el orden puede diferir del número mostrado por
+  # esos gramos. Ordenar bien exigiría materializar el apartado; hasta entonces, esto contesta la
+  # pregunta que se hace («¿de qué tengo más?») sin traer las 3.000 filas a memoria.
+  ORDEN_INVENTARIO = {
+    'codigo'           => 'stocks.numero_lote_producto',
+    'tipo'             => 'stocks.forma_producto',
+    'origen'           => 'stocks.origen',
+    # La pantalla muestra la del LOTE y cae a la del stock: el orden hace lo mismo.
+    'genetica'         => 'COALESCE(geneticas_lotes.nombre, geneticas.nombre)',
+    'lote'             => 'lotes.codigo',
+    'sede'             => 'sedes.nombre',
+    'ingreso'          => 'stocks.created_at',
+    'observaciones'    => 'stocks.descripcion',
+    'cantidad_inicial' => 'stocks.cantidad_inicial',
+    'actual'           => 'stocks.cantidad',
+  }.freeze
+
+  def orden_inventario
+    campo = ORDEN_INVENTARIO[params[:orden].to_s]
+    return 'stocks.created_at DESC' if campo.blank?
+
+    dir = params[:dir].to_s.downcase == 'asc' ? 'ASC' : 'DESC'
+    # Lo vacío al final SIEMPRE: una sede sin asignar o un producto sin observaciones arriba de
+    # todo es ruido en la primera pantalla, que es la única que se mira.
+    "#{campo} #{dir} NULLS LAST, stocks.id DESC"
   end
 
   def sede_for_stock
