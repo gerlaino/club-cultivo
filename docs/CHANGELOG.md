@@ -40,6 +40,21 @@ sabe de contabilidad — el mismo recurso que la ficha de un cierre del mostrado
 Y el eco de la categoría se quedó **sólo con lo que no se ve en ningún otro lado**: a qué parte del
 club se carga el gasto (`Se carga a Dispensario.`).
 
+### Y la sede de la categoría, que existía y no leía nadie
+
+Germán, mirando la pantalla ya rediseñada: *"packaging ya tiene su depósito en la sede Example y
+entra al sector dispensario, ¿por qué me pide dónde ir?"*. Porque una categoría **puede estar
+acotada a una sede** —se elige en el catálogo, se guarda, se devuelve en el payload— y **no lo leía
+nadie**: el alta preguntaba la sede desde cero aunque la categoría ya la tuviera decidida. Es la
+tercera vez que aparece el mismo patrón (`vista_paciente_activa`, el interruptor del portal, fue el
+primero): se guarda, se muestra y no hace nada.
+
+**Ahora la sede de la categoría MANDA**: el gasto recae en esa sede y, si entra a un depósito, al de
+esa sede. La pantalla lo dice en vez de ofrecerlo (`de **Sede Central** · la sede la fija la
+categoría`), y la regla vive en el modelo (`MovimientoContable#sede_de_la_categoria`) porque son
+varias las puertas que crean movimientos. El backend además rechaza un depósito de otra sede: si no,
+la plata queda en una y la mercadería en otra.
+
 ### Los tres agujeros que aparecieron en el camino
 
 1. **La lista no filtraba y el backend no validaba.** El comentario de `aplicar_deposito!` promete
@@ -67,7 +82,7 @@ depósitos de la misma familia en la sede (General y Otro), y ahí el desplegabl
 decía que sí entraba. Ahora siempre queda uno elegido y el nombre no se escribe dos veces en la
 misma oración. Y el resumen decía «entran a el depósito» y «1500 unidad».
 
-**2904 rspec ✓ · 1952 vitest ✓ · build limpio.**
+**2909 rspec ✓ · 1954 vitest ✓ · build limpio.**
 
 ## Septiembre 2026 (ax) — Un cierre ya mirado no se corrige, y «señada» no es «paga»
 

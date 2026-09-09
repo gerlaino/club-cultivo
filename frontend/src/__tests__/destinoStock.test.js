@@ -175,3 +175,27 @@ describe('Una categoría que no guarda nada', () => {
     expect(w.text().trim()).toBe('')
   })
 })
+
+// LA SEDE DE LA CATEGORÍA MANDA. Germán, mirando la pantalla: «packaging ya tiene su depósito en
+// la sede Example, ¿por qué me pide dónde ir?». El campo existía en el catálogo, se guardaba, se
+// devolvía en el payload, y no lo leía nadie.
+describe('Cuando la categoría ya trae su sede', () => {
+  it('no ofrece cambiarla: la dice', async () => {
+    const w = montar({ sedeFija: true, sedeId: 10 })
+    await w.vm.$nextTick()
+
+    expect(w.text()).toContain('Entra al depósito')
+    expect(w.text()).toContain('Sede Central')
+    expect(w.text()).toContain('La sede la fija la categoría')
+    expect(w.findAll('.dst__sede-inline').length).toBe(0)
+  })
+
+  it('y en un gasto que no guarda nada, tampoco', async () => {
+    const w = montar({ familia: null, sedeFija: true, sedeId: 20 })
+    await w.vm.$nextTick()
+
+    expect(w.text()).toContain('Es un gasto de')
+    expect(w.text()).toContain('Finca Norte')
+    expect(w.find('select').exists()).toBe(false)
+  })
+})

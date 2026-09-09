@@ -506,6 +506,16 @@ class MovimientosContablesController < ApplicationController
     # El depósito de Dispensación no recibe compras: lo llena la cosecha y lo vacía la
     # dispensación. Comparte familia con el Salón, así que sin esto una compra de mercadería lo
     # ofrecía como destino y terminaba en un error mucho más abajo.
+    # Y si la categoría está acotada a una sede, el depósito tiene que ser el de ESA sede: si no,
+    # el gasto queda en una y la mercadería en otra —lo mismo que ya se cuidaba entre el insumo y
+    # su depósito—.
+    sede_cat = cat.sede_id_efectiva
+    if sede_cat.present? && deposito.sede_id.present? && deposito.sede_id != sede_cat
+      raise ArgumentError,
+            "«#{cat.nombre}» es una categoría de #{cat.sede_efectiva&.nombre}: no puede entrar al " \
+            "depósito «#{deposito.nombre}» de #{deposito.sede&.nombre}."
+    end
+
     if deposito.clave_sistema == 'dispensacion'
       raise ArgumentError,
             "Al depósito «#{deposito.nombre}» no entran compras: se llena con la cosecha y la " \

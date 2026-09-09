@@ -1048,6 +1048,13 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   compras** (lo llena la cosecha), y un depósito propio del club se comporta como insumos generales.
   Sigue existiendo **«esta vez no entra: es sólo un gasto»**, pero como SALIDA y no como una de dos
   opciones en igualdad: si la categoría guarda cosas, lo normal es que entre.
+- **LA SEDE DE LA CATEGORÍA MANDA** (sep-2026). Una categoría contable puede estar acotada a una
+  sede: entonces el gasto es de ESA sede y, si entra a un depósito, al de esa sede — no se pregunta,
+  ya se decidió al elegir la categoría. El campo existía desde siempre (se elegía en el catálogo, se
+  guardaba, se devolvía) y **no lo leía nadie**, que es la tercera vez que aparece ese patrón. La
+  regla vive en `MovimientoContable#sede_de_la_categoria` (modelo, porque son varias las puertas que
+  crean movimientos) y el backend rechaza un depósito de otra sede: si no, la plata queda en una
+  sede y la mercadería en otra.
 - **EL NOMBRE Y LA UNIDAD DE UN INSUMO NUEVO SE ESCRIBEN UNA VEZ, ARRIBA.** Un insumo nuevo se llama
   como lo que compraste y se mide en la unidad que ya elegiste: el campo *Nombre del insumo* sólo
   aparece si se pide. Mismo criterio que la cantidad, que se muestra en gris. Y la lista de «qué

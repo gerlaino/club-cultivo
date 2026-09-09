@@ -18,9 +18,10 @@ RSpec.describe 'A qué depósito puede entrar una compra', type: :request do
 
   def deposito(clave) = ActsAsTenant.with_tenant(club) { club.depositos.find_by(clave_sistema: clave, sede_id: sede.id) }
 
-  def categoria(nombre, comportamiento)
+  def categoria(nombre, comportamiento, sede_de: nil)
     ActsAsTenant.with_tenant(club) do
-      CategoriaContable.create!(club: club, nombre: nombre, tipo: 'egreso', comportamiento: comportamiento)
+      CategoriaContable.create!(club: club, nombre: nombre, tipo: 'egreso',
+                                comportamiento: comportamiento, sede: sede_de)
     end
   end
 
@@ -127,5 +128,91 @@ RSpec.describe 'El depósito de Dispensación', type: :request do
 
     expect(response).to have_http_status(:unprocessable_entity)
     expect(JSON.parse(response.body)['errors'].join).to include('cosecha')
+  end
+end
+
+# LA SEDE DE LA CATEGORÍA MANDA.
+#
+# Una categoría puede estar acotada a una sede en el catálogo. El campo existía —se elegía, se
+# guardaba y se devolvía en el payload— y NO LO LEÍA NADIE: el alta preguntaba la sede desde cero
+# aunque la categoría ya la tuviera decidida. Germán, mirando la pantalla: «packaging ya tiene su
+# depósito en la sede Example, ¿por qué me pide dónde ir?».
+RSpec.describe 'Una categoría acotada a una sede', type: :request do
+  let(:club)   { create(:club) }
+  let(:admin)  { create(:user, :admin, club: club) }
+  let!(:norte) { create(:sede, club: club, created_by: admin, tipo: 'produccion') }
+  let!(:sur)   { create(:sede, club: club, created_by: admin, tipo: 'produccion') }
+
+  before do
+    ActsAsTenant.with_tenant(club) { Finanzas::SembrarDepositos.new(club).call }
+    sign_in_as(admin)
+  end
+
+  let(:cat) do
+    ActsAsTenant.with_tenant(club) do
+      CategoriaContable.create!(club: club, nombre: 'packaging', tipo: 'egreso',
+                                comportamiento: 'insumo_general', sede: norte)
+    end
+  end
+  def deposito(clave, sede) = ActsAsTenant.with_tenant(club) { club.depositos.find_by(clave_sistema: clave, sede_id: sede.id) }
+
+  def cargar(destino: nil, sede_id: nil)
+    post '/api/movimientos_contables', params: {
+      movimiento_contable: {
+        tipo: 'egreso', categoria: 'insumo', categoria_contable_id: cat.id,
+        descripcion: 'Bolsas', monto_ars: 10_000, fecha: Date.current,
+        sede_id: sede_id, destino: destino
+      }.compact
+    }, as: :json
+  end
+
+  it 'el gasto recae en esa sede, sin preguntarla' do
+    cargar
+
+    expect(response).to have_http_status(:created)
+    expect(JSON.parse(response.body).dig('sede', 'id')).to eq(norte.id)
+  end
+
+  # Por la API se puede mandar cualquier cosa; la categoría manda igual.
+  it 'y no se le puede pasar otra por encima' do
+    cargar(sede_id: sur.id)
+
+    expect(response).to have_http_status(:created)
+    expect(JSON.parse(response.body).dig('sede', 'id')).to eq(norte.id)
+  end
+
+  it 'lo que entra al depósito va al de esa sede' do
+    cargar(destino: { tipo: 'deposito', deposito_id: deposito('general', norte).id,
+                      nombre: 'Bolsas', unidad_medida: 'unidad', cantidad: 10 })
+
+    expect(response).to have_http_status(:created)
+    expect(ActsAsTenant.with_tenant(club) { club.insumos.find_by(nombre: 'Bolsas').sede_id }).to eq(norte.id)
+  end
+
+  # Si no, la plata queda en una sede y la mercadería en otra: el mismo error que ya se cuidaba
+  # entre un insumo y su depósito.
+  it 'y no al de otra sede, con un mensaje que nombra a las dos' do
+    cargar(destino: { tipo: 'deposito', deposito_id: deposito('general', sur).id,
+                      nombre: 'Bolsas', unidad_medida: 'unidad', cantidad: 10 })
+
+    expect(response).to have_http_status(:unprocessable_entity)
+    body = JSON.parse(response.body)['errors'].join
+    expect(body).to include(norte.nombre)
+    expect(body).to include(sur.nombre)
+    expect(club.movimientos_contables.count).to eq(0)
+  end
+
+  it 'una categoría sin sede sigue dejando elegirla' do
+    libre = ActsAsTenant.with_tenant(club) do
+      CategoriaContable.create!(club: club, nombre: 'Alquiler', tipo: 'egreso', comportamiento: 'general')
+    end
+    post '/api/movimientos_contables', params: {
+      movimiento_contable: { tipo: 'egreso', categoria: 'otro', categoria_contable_id: libre.id,
+                             descripcion: 'Alquiler', monto_ars: 10_000, fecha: Date.current,
+                             sede_id: sur.id }
+    }, as: :json
+
+    expect(response).to have_http_status(:created)
+    expect(JSON.parse(response.body).dig('sede', 'id')).to eq(sur.id)
   end
 end

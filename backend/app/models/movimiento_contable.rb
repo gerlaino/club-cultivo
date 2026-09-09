@@ -45,6 +45,7 @@ class MovimientoContable < ApplicationRecord
   # Puente legacy ⇄ nuevo: si viene una categoría editable, autocompleta el string `categoria`
   # (que aún dispara aporte_socio / mapeo de costos) y hereda su unidad de negocio.
   before_validation :sincronizar_desde_categoria_contable
+  before_validation :sede_de_la_categoria
 
   # PLATA REAL QUE ENTRA SIN PASAR POR UNA DISPENSA: un pago de cuenta corriente
   # (`CuentaCorrientesController#registrar_pago`) o la seña de una reserva
@@ -232,6 +233,19 @@ class MovimientoContable < ApplicationRecord
     return if ROLES_RETIRO.include?(retirado_por.role)
 
     errors.add(:retirado_por, 'sólo un administrador o supervisor puede retirar de la caja')
+  end
+
+  # LA SEDE DE LA CATEGORÍA MANDA. Una categoría puede estar acotada a una sede en el catálogo
+  # (`sede_id`, nulo = toda la organización): si lo está, el gasto es de ESA sede, y cuando entra a
+  # un depósito, al de esa sede.
+  #
+  # El campo existía desde que se pudo acotar una categoría —se elegía, se guardaba y se
+  # devolvía— y NO LO LEÍA NADIE: el alta preguntaba la sede desde cero aunque la categoría ya la
+  # tuviera decidida. Es la peor forma de una configuración: se guarda, se muestra y no hace nada.
+  # Va en el modelo y no en el controller porque son varias las puertas que crean movimientos.
+  def sede_de_la_categoria
+    fija = categoria_contable&.sede_id_efectiva
+    self.sede_id = fija if fija.present?
   end
 
   # Deriva el string legacy `categoria` y la unidad de negocio desde la categoría editable.

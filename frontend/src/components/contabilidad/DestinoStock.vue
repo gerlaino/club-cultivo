@@ -37,6 +37,9 @@ const props = defineProps({
   cantidad:   { type: Number,  default: null },
   // Una organización de una sola sede no tiene nada que elegir: no se le pregunta.
   multiSede:  { type: Boolean, default: false },
+  // La categoría está acotada a una sede: entonces la sede ya está decidida y no se ofrece
+  // cambiarla acá. Elegir otra sería contradecir a la categoría desde el mismo formulario.
+  sedeFija:   { type: Boolean, default: false },
   errores:    { type: Object,  default: () => ({}) },
 })
 const emit = defineEmits(['update:modelValue', 'update:sedeId'])
@@ -141,17 +144,25 @@ const nombreSede = (id) => props.sedes.find(s => String(s.id) === String(id))?.n
     <template v-if="!familia">
       <template v-if="multiSede">
         <span class="dst__q">De qué sede es</span>
-        <label class="dst__fld dst__fld--md">
-          <span class="dst__lbl">Sede</span>
-          <select class="dst__inp" :value="sedeId ?? ''" @change="cambiarSede($event.target.value)">
-            <option value="">Toda la organización</option>
-            <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
-          </select>
-        </label>
-        <p class="dst__hint">
-          Para que el gasto aparezca en el resultado de esa sede. Si es de todo el club —el
-          contador, un seguro— dejalo en «toda la organización».
+        <!-- Acotada a una sede en el catálogo: ya está decidido, y ofrecer un desplegable acá
+             sería dejar contradecir a la categoría desde el mismo formulario. -->
+        <p v-if="sedeFija" class="dst__afirma dst__afirma--no">
+          <span>Es un gasto de <b>{{ nombreSede(sedeId) }}</b>.</span>
+          <span class="dst__afirma-sub">La sede la fija la categoría.</span>
         </p>
+        <template v-else>
+          <label class="dst__fld dst__fld--md">
+            <span class="dst__lbl">Sede</span>
+            <select class="dst__inp" :value="sedeId ?? ''" @change="cambiarSede($event.target.value)">
+              <option value="">Toda la organización</option>
+              <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+            </select>
+          </label>
+          <p class="dst__hint">
+            Para que el gasto aparezca en el resultado de esa sede. Si es de todo el club —el
+            contador, un seguro— dejalo en «toda la organización».
+          </p>
+        </template>
       </template>
     </template>
 
@@ -211,12 +222,16 @@ const nombreSede = (id) => props.sedes.find(s => String(s.id) === String(id))?.n
           </select>
           <template v-if="multiSede">
             <span>de</span>
-            <select class="dst__sede-inline" :value="sedeId ?? ''"
+            <b v-if="sedeFija">{{ nombreSede(sedeId) }}</b>
+            <select v-else class="dst__sede-inline" :value="sedeId ?? ''"
                     aria-label="Sede del depósito" @change="cambiarSede($event.target.value)">
               <option v-for="s in sedesPosibles" :key="s.id" :value="s.id">{{ s.nombre }}</option>
             </select>
           </template>
-          <span class="dst__afirma-sub">Queda contado, y se descuenta cuando lo uses.</span>
+          <span class="dst__afirma-sub">
+            Queda contado, y se descuenta cuando lo uses.<template v-if="sedeFija && multiSede">
+            La sede la fija la categoría.</template>
+          </span>
         </p>
 
         <div class="dst__box">

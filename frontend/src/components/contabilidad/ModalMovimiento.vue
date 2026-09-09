@@ -147,13 +147,18 @@ const catsSelectables = computed(() => {
         out.push({ id: s.id, label: `${m.nombre} › ${s.nombre}`, tipo: s.tipo, clave: s.clave_efectiva,
                    area: s.unidad_negocio?.id || m.unidad_negocio?.id || null,
                    areaNombre: s.unidad_negocio?.nombre || m.unidad_negocio?.nombre || null,
-                   comportamiento: s.comportamiento_efectivo || m.comportamiento_efectivo || 'general' })
+                   comportamiento: s.comportamiento_efectivo || m.comportamiento_efectivo || 'general',
+                   // Una categoría puede estar acotada a UNA sede. El campo existía —se elige en
+                   // el catálogo, se guarda y se devuelve— y no lo leía nadie: el alta ofrecía
+                   // todas las categorías y después preguntaba la sede desde cero.
+                   sedeId: s.sede_id ?? m.sede_id ?? null })
       }
     } else {
       out.push({ id: m.id, label: m.nombre, tipo: m.tipo, clave: m.clave_efectiva,
                  area: m.unidad_negocio?.id || null,
                  areaNombre: m.unidad_negocio?.nombre || null,
-                 comportamiento: m.comportamiento_efectivo || 'general' })
+                 comportamiento: m.comportamiento_efectivo || 'general',
+                 sedeId: m.sede_id ?? null })
     }
   }
   // Las creadas recién, acá adentro: viven en local hasta que el padre refresque el catálogo, así
@@ -283,6 +288,13 @@ const pideDestino = computed(() => !!flujo.value?.pideDestino || pideDestinoCat.
 
 // A qué clase de depósito va lo que se compre con esta categoría. De acá sale TODO el bloque
 // «dónde queda»: el depósito es esta familia por la sede, y las dos ya están contestadas.
+// LA SEDE DE LA CATEGORÍA MANDA. Si la categoría está acotada a una sede, el gasto es de esa
+// sede y —cuando entra a un depósito— del depósito de esa sede. No se pregunta: ya está decidido
+// al elegir la categoría, que es lo que Germán esperaba y la app no hacía («packaging ya tiene su
+// depósito en la sede Example, ¿por qué me pide dónde ir?»).
+const sedeDeCategoria = computed(() => catActual.value?.sedeId ?? null)
+watch(sedeDeCategoria, (id) => { if (id != null) form.value.sede_id = id }, { immediate: true })
+
 const familiaCat = computed(() =>
   (COMPORTAMIENTOS_CON_STOCK.includes(catActual.value?.comportamiento) ? catActual.value.comportamiento : null))
 
@@ -405,7 +417,8 @@ const resumenGuardar = computed(() => {
     const donde = `al depósito <b>${esc(dep.nombre)}</b>` +
                   (dep.sede_nombre ? ` de <b>${esc(dep.sede_nombre)}</b>` : '')
     partes.push(cant
-      ? `<b>${fmtMiles(cant)}</b> ${esc(plural(f.unidad, cant))} de <b>${item}</b> entran ${donde}` +
+      ? `<b>${fmtMiles(cant)}</b> ${esc(plural(f.unidad, cant))} de <b>${item}</b> ` +
+        `${cant === 1 ? 'entra' : 'entran'} ${donde}` +
         `${unitario.value ? `, a ${fmtARS(unitario.value)} cada ${esc(f.unidad)}` : ''}.`
       : `<b>${item}</b> entra ${donde}.`)
   } else {
@@ -925,6 +938,7 @@ const titulo = computed(() => {
               :familia="familiaCat"
               :depositos="depositos" :insumos="insumos" :bares="bares" :sedes="sedes"
               :sede-id="form.sede_id" @update:sede-id="form.sede_id = $event"
+              :sede-fija="sedeDeCategoria != null"
               :descripcion="form.descripcion" :unidad="form.unidad" :multi-sede="multiSede"
               :cantidad="form.cantidad" :errores="errores"
             />
