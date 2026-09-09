@@ -155,6 +155,56 @@ export const UNIDADES_INSUMO = ['unidad', 'litro', 'mililitro', 'kilogramo', 'gr
  */
 export const UNIDADES = [...UNIDADES_INSUMO.filter(u => u !== 'otro'), 'hora', 'servicio', 'otro']
 
+// ─── De dónde sale el depósito ──────────────────────────────────────────────────
+//
+// NO SE ELIGE: SE DEDUCE. La categoría dice qué CLASE de cosa es (su `comportamiento`) y la sede
+// dice dónde; el depósito es el cruce de las dos.
+//
+// EL COMPORTAMIENTO DE LA CATEGORÍA Y LA FAMILIA DEL DEPÓSITO SON EL MISMO VOCABULARIO —`insumo`,
+// `insumo_general`, `mercaderia`—: `Deposito::FAMILIA` se escribió para reemplazar al viejo
+// comportamiento. (Ojo con `familia_deposito` del payload de la categoría, que se llama parecido y
+// devuelve otra cosa: la CLAVE del depósito, `cultivo`/`general`/`salon`.) Antes era una grilla con los
+// diez depósitos del club, sin filtrar por la categoría —el backend tampoco lo validaba, así que
+// las bolsas del dispensario entraban al depósito de Cultivo de otra sede sin una queja— y encima
+// la sede se preguntaba aparte, arriba, para que después el depósito la pisara en silencio. Dos
+// preguntas para una decisión, con dos respuestas que podían contradecirse.
+
+/**
+ * La familia de un depósito, normalizada. Los propios del club (sin `clave_sistema`) se comportan
+ * como insumos generales; el backend los devolvía como 'general', que no es una familia que exista
+ * en ningún otro lado.
+ */
+export function familiaDeDeposito(dep) {
+  const f = dep?.familia
+  return f === 'general' ? 'insumo_general' : (f || null)
+}
+
+/**
+ * Los depósitos donde puede entrar una compra de esta categoría (activos y de su familia).
+ * Dispensación queda afuera aunque comparta familia con el Salón: ahí no entran compras — lo
+ * llena la cosecha y lo vacía la dispensación.
+ */
+export function depositosDeFamilia(depositos, familia) {
+  if (!familia) return []
+  return (depositos || []).filter(d =>
+    d.activo !== false && d.clave_sistema !== 'dispensacion' && familiaDeDeposito(d) === familia)
+}
+
+/** Los de UNA sede. Normalmente uno solo: hay un depósito por sector y por sede. */
+export function depositosDeFamiliaEnSede(depositos, familia, sedeId) {
+  return depositosDeFamilia(depositos, familia)
+    .filter(d => sedeId != null && sedeId !== '' && String(d.sede_id) === String(sedeId))
+}
+
+/** Las sedes que tienen depósito de esa familia — las únicas donde esta compra puede entrar. */
+export function sedesConDeposito(depositos, familia) {
+  const ids = []
+  for (const d of depositosDeFamilia(depositos, familia)) {
+    if (d.sede_id != null && !ids.some(x => String(x) === String(d.sede_id))) ids.push(d.sede_id)
+  }
+  return ids
+}
+
 /** El depósito Salón guarda productos del bar (no insumos): otra entrada. */
 export function esDepositoSalon(deposito) {
   return deposito?.clave_sistema === 'salon' || deposito?.familia === 'mercaderia'

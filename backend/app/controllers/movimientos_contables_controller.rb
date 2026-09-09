@@ -477,6 +477,47 @@ class MovimientosContablesController < ApplicationController
     end
   end
 
+  # Cómo se llama cada familia de depósito cuando hay que explicarle a alguien por qué su compra
+  # no puede ir ahí. 'insumo_general' no significa nada fuera del código.
+  FAMILIA_EN_CASTELLANO = {
+    'insumo'         => 'insumos de cultivo',
+    'insumo_general' => 'insumos generales',
+    'mercaderia'     => 'mercadería del buffet',
+  }.freeze
+
+  # LA CATEGORÍA DICE A QUÉ CLASE DE DEPÓSITO VA, y hasta acá no lo hacía cumplir nadie: el
+  # formulario ofrecía los diez depósitos del club sin mirarla —el comentario de `aplicar_deposito!`
+  # prometía ese filtro desde que se escribió— así que las bolsas del dispensario entraban al
+  # depósito de Cultivo de otra sede sin una queja. Ahora la pantalla lo DEDUCE y esto lo hace
+  # cumplir, porque por la API se saltea siempre.
+  #
+  # Sin categoría no hay contra qué comparar, y un movimiento puede cargarse sin ella.
+  #
+  # LA FAMILIA DEL DEPÓSITO Y EL COMPORTAMIENTO DE LA CATEGORÍA SON EL MISMO VOCABULARIO
+  # (`insumo` · `insumo_general` · `mercaderia`): `Deposito::FAMILIA` se escribió justamente para
+  # reemplazar al viejo comportamiento. Ojo con `CategoriaContable#familia_deposito`, que se llama
+  # parecido y devuelve otra cosa —la CLAVE del depósito (`cultivo` · `general` · `salon`)—: son
+  # dos nombres para el mismo concepto y compararlos entre sí no matchea nunca.
+  def verificar_familia!(movimiento, deposito)
+    cat = movimiento.categoria_contable
+    return if deposito.nil? || cat.nil? || !cat.va_a_deposito?
+
+    familia = cat.comportamiento_efectivo
+    # El depósito de Dispensación no recibe compras: lo llena la cosecha y lo vacía la
+    # dispensación. Comparte familia con el Salón, así que sin esto una compra de mercadería lo
+    # ofrecía como destino y terminaba en un error mucho más abajo.
+    if deposito.clave_sistema == 'dispensacion'
+      raise ArgumentError,
+            "Al depósito «#{deposito.nombre}» no entran compras: se llena con la cosecha y la " \
+            'manicura, y sale por dispensación.'
+    end
+    return if deposito.familia == familia
+
+    raise ArgumentError,
+          "«#{cat.nombre}» no se guarda en el depósito «#{deposito.nombre}»: " \
+          "va a un depósito de #{FAMILIA_EN_CASTELLANO[familia] || familia}."
+  end
+
   # Depósito: compra de insumo. Sube stock + recalcula costo promedio; el egreso es este movimiento.
   # El DEPÓSITO lo elige el usuario (entre los del área de la categoría). Un insumo nuevo nace en ese
   # depósito y en una sede (la elegida / la del movimiento). El `tipo` legacy (cultivo/general) se
@@ -490,6 +531,8 @@ class MovimientosContablesController < ApplicationController
     # del depósito (si no, el insumo cae en una sede y el asiento queda en otra).
     sede_id  = deposito.sede_id || d[:sede_id].presence || movimiento.sede_id
     cat      = movimiento.categoria_contable
+
+    verificar_familia!(movimiento, deposito)
     tipo     = deposito.clave_sistema == 'cultivo' ? 'cultivo' : 'general'
 
     insumo   = if d[:insumo_id].present?
@@ -530,6 +573,7 @@ class MovimientosContablesController < ApplicationController
     # autoridades sobre la sede del asiento (el depósito la fijaba y después el bar la pisaba).
     if d[:deposito_id].present?
       dep = club.depositos.find_by(id: d[:deposito_id])
+      verificar_familia!(movimiento, dep)
       if dep&.sede_id.present? && bar.sede_id != dep.sede_id
         raise ArgumentError, "El bar «#{bar.nombre}» no es de la sede del depósito «#{dep.nombre}»."
       end

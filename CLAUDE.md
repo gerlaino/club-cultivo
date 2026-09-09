@@ -1036,6 +1036,27 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   único que no puede hacer: la mesa la carga administración. Un cartel que propone una acción
   prohibida es peor que no tener cartel — parece culpa del usuario. Mismo criterio que el botón
   que no se habilita si el backend va a rechazar.
+- **EL DEPÓSITO DE UNA COMPRA NO SE ELIGE: SE DEDUCE** (sep-2026) — la **familia de la categoría
+  POR la sede**, que ya están las dos contestadas más arriba. Se AFIRMA, con la sede editable
+  adentro de la oración; preguntarlo después de haberlo dicho eran dos preguntas para una decisión,
+  con dos respuestas que podían contradecirse. **El comportamiento de la categoría y
+  `Deposito#familia` son el mismo vocabulario** (`insumo` · `insumo_general` · `mercaderia`):
+  `Deposito::FAMILIA` se escribió para reemplazar al comportamiento. **Ojo con
+  `CategoriaContable#familia_deposito`**, que se llama parecido y devuelve otra cosa —la CLAVE del
+  depósito (`cultivo`/`general`/`salon`)—: comparados entre sí no matchean nunca. Lo hace cumplir
+  `verificar_familia!` en el backend, porque por la API se saltea siempre. **Dispensación no recibe
+  compras** (lo llena la cosecha), y un depósito propio del club se comporta como insumos generales.
+  Sigue existiendo **«esta vez no entra: es sólo un gasto»**, pero como SALIDA y no como una de dos
+  opciones en igualdad: si la categoría guarda cosas, lo normal es que entre.
+- **EL NOMBRE Y LA UNIDAD DE UN INSUMO NUEVO SE ESCRIBEN UNA VEZ, ARRIBA.** Un insumo nuevo se llama
+  como lo que compraste y se mide en la unidad que ya elegiste: el campo *Nombre del insumo* sólo
+  aparece si se pide. Mismo criterio que la cantidad, que se muestra en gris. Y la lista de «qué
+  entró» **dice que es para reposición** — la etiqueta era «¿es algo que ya tenías?» y hubo que
+  preguntar qué significaba.
+- **CADA MODAL LARGO TERMINA EN UNA ORACIÓN QUE DICE QUÉ VA A PASAR.** «Salen $80.000 en efectivo.
+  1.500 unidades de Bolsas entran al depósito General de Sede Central, a $53 cada una.» Es lo que
+  deja cargar bien a alguien que no sabe de contabilidad, y lo mismo que hace la ficha de un cierre
+  del mostrador. **El admin sabe de cultivar**, y esa es la regla que ordena el texto entero.
 - **UN CIERRE SE CONGELA POR TRES RAZONES, Y LA REGLA VIVE EN `TurnoMostrador#bloqueo_correccion`**
   (sep-2026). Corregir mueve inventario real y asienta plata, y no tenía NINGUNA frontera
   temporal: cualquier cierre, para siempre. Vive en un solo lugar porque la preguntan los dos

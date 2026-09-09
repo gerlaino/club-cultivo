@@ -281,6 +281,11 @@ const pideDestinoCat = computed(() =>
 // categoría.
 const pideDestino = computed(() => !!flujo.value?.pideDestino || pideDestinoCat.value)
 
+// A qué clase de depósito va lo que se compre con esta categoría. De acá sale TODO el bloque
+// «dónde queda»: el depósito es esta familia por la sede, y las dos ya están contestadas.
+const familiaCat = computed(() =>
+  (COMPORTAMIENTOS_CON_STOCK.includes(catActual.value?.comportamiento) ? catActual.value.comportamiento : null))
+
 // El sector ya no se elige: sale de la categoría y se muestra como dato.
 const areaDeLaCategoria = computed(() => catActual.value?.areaNombre || null)
 const pacQuery = ref('')
@@ -299,12 +304,9 @@ function elegirPac(p) { form.value.paciente_id = p.id; pacOpen.value = false; de
 const depositoSel = computed(() =>
   props.depositos.find(d => String(d.id) === String(destino.value.deposito_id)) || null)
 
-// El depósito manda: fija la sede del asiento (y el sector, vía su unidad de negocio).
-watch(depositoSel, (dep) => {
-  if (!dep) return
-  if (dep.sede_id) form.value.sede_id = dep.sede_id
-  if (dep.unidad_negocio_id && !form.value.unidad_negocio_id) form.value.unidad_negocio_id = dep.unidad_negocio_id
-})
+// LA SEDE MANDA, Y EL DEPÓSITO SE DEDUCE — antes era al revés y la sede elegida arriba se pisaba
+// en silencio: elegías Example y el asiento terminaba en Sede Central. El sector no lo toca nadie
+// acá: lo trae la categoría (ver `submit`).
 
 // Qué hay adentro del bloque plegado, para no tener que abrirlo a ver si cargaste algo.
 const resumenExtras = computed(() => {
@@ -338,6 +340,17 @@ function onMonto(e) {
   if (monto > 0) delete errores.value.monto_ars
 }
 
+// EL NOMBRE Y LA UNIDAD SE ESCRIBEN UNA VEZ, ARRIBA. Un insumo nuevo se llama como lo que
+// compraste («Bolsas») y se mide en la unidad que ya elegiste: volver a pedirlos abajo era pedir
+// dos veces el mismo dato, y con dos respuestas posibles. `nombre` sólo se llena si lo cambiaste
+// a mano en el bloque de destino.
+const destinoEfectivo = computed(() => ({
+  ...destino.value,
+  cantidad:      form.value.cantidad,
+  nombre:        destino.value.nombre?.trim() || form.value.descripcion?.trim() || '',
+  unidad_medida: destino.value.unidad_medida || form.value.unidad || 'unidad',
+}))
+
 // ─── Validez (una sola fuente para el botón y el submit) ────────────────────────
 const ctxValidacion = computed(() => ({
   pacienteObligatorio: pacienteObligatorio.value,
@@ -346,10 +359,63 @@ const ctxValidacion = computed(() => ({
   // empezado a completar, no qué flujo se eligió arriba.
   pideDestino: true,
   // La cantidad del destino es la del movimiento: se carga una sola vez, arriba.
-  destino: { ...destinoEstado(destino.value, depositoSel.value), cantidad: form.value.cantidad },
+  destino: destinoEstado(destinoEfectivo.value, depositoSel.value),
 }))
 const erroresActuales = computed(() => validarMovimiento(form.value, ctxValidacion.value))
 const puedeGuardar    = computed(() => esValido(erroresActuales.value) && !props.guardando)
+
+// ─── Qué va a pasar cuando guardes ──────────────────────────────────────────────
+//
+// La plata, el plan de pago y qué entra al depósito, con los números puestos y en una oración.
+// Es lo que le permite a alguien que no sabe de contabilidad darse cuenta ANTES de guardar de que
+// algo quedó mal — el mismo recurso que la ficha de un cierre del mostrador.
+// «1500 unidad» no lo dice nadie. Las unidades del sistema son todas regulares en castellano:
+// las terminadas en consonante suman -es (unidad → unidades) y el resto -s.
+const plural = (u, n) => (Number(n) === 1 || !u ? u : /[dlnrsz]$/.test(u) ? `${u}es` : `${u}s`)
+
+const esc = (t) => String(t ?? '')
+  .replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+
+const resumenGuardar = computed(() => {
+  const f = form.value
+  const monto = Number(f.monto_ars) || 0
+  const partes = []
+
+  if (!monto) return 'Todavía falta el monto.'
+
+  if (esCuotas.value) {
+    const n = Number(f.cuotas_total) || 2
+    partes.push(`Salen <b>${fmtARS(monto)}</b> en <b>${n} cuotas</b> de ${fmtARS(monto / n)}, ` +
+                'mensuales desde la fecha elegida.')
+  } else if (!f.pagado) {
+    partes.push(`Quedan <b>${fmtARS(monto)}</b> pendientes de ${esEgreso.value ? 'pago' : 'cobro'}.`)
+  } else {
+    // «por efectivo» no se dice: es EN efectivo, y POR transferencia.
+    const mp = MEDIOS_PAGO.find(m => m.value === f.medio_pago)
+    const medio = mp ? `${mp.value === 'efectivo' ? 'en' : 'por'} ${mp.label.toLowerCase()}` : ''
+    partes.push(`${esEgreso.value ? 'Salen' : 'Entran'} <b>${fmtARS(monto)}</b>` +
+                `${medio ? ` ${medio}` : ''}.`)
+  }
+
+  const dep = depositoSel.value
+  if (dep) {
+    const existente = props.insumos.find(i => String(i.id) === String(destino.value.insumo_id))
+    const item = esc(existente?.nombre || destinoEfectivo.value.nombre || 'lo comprado')
+    const cant = Number(f.cantidad) || 0
+    const donde = `al depósito <b>${esc(dep.nombre)}</b>` +
+                  (dep.sede_nombre ? ` de <b>${esc(dep.sede_nombre)}</b>` : '')
+    partes.push(cant
+      ? `<b>${fmtMiles(cant)}</b> ${esc(plural(f.unidad, cant))} de <b>${item}</b> entran ${donde}` +
+        `${unitario.value ? `, a ${fmtARS(unitario.value)} cada ${esc(f.unidad)}` : ''}.`
+      : `<b>${item}</b> entra ${donde}.`)
+  } else {
+    const sector = areaDeLaCategoria.value ? ` a <b>${esc(areaDeLaCategoria.value)}</b>` : ''
+    const sede = props.sedes.find(x => String(x.id) === String(f.sede_id))
+    partes.push(`No entra nada al depósito: el gasto se carga${sector}` +
+                `${sede ? ` de <b>${esc(sede.nombre)}</b>` : ' de toda la organización'}.`)
+  }
+  return partes.join(' ')
+})
 
 // ─── Navegación ─────────────────────────────────────────────────────────────────
 function elegirFlujo(key) {
@@ -434,9 +500,7 @@ function submit() {
   // Con `pideDestinoCat` acá, una compra por el flujo mostraba el bloque de depósito y después
   // TIRABA el destino al guardar: el asiento entraba y el stock no se movía, en silencio.
   // El destino usa la cantidad del movimiento: es el mismo dato, cargado una sola vez arriba.
-  const dst = pideDestino.value
-    ? destinoPayload({ ...destino.value, cantidad: form.value.cantidad }, depositoSel.value)
-    : null
+  const dst = pideDestino.value ? destinoPayload(destinoEfectivo.value, depositoSel.value) : null
   if (dst) payload.destino = dst
   emit('guardado', payload)
 }
@@ -682,14 +746,15 @@ const titulo = computed(() => {
                   </div>
                 </div>
                 <span v-if="errores.categoria" class="mv-err">{{ errores.categoria }}</span>
-                <!-- Lo que la categoría acaba de decidir, dicho en una línea: a qué sector imputa
-                     y si la compra entra a un depósito. Son consecuencias, no preguntas. -->
+                <!-- SÓLO LO QUE NO SE VE EN NINGÚN OTRO LADO: a qué parte del club se carga el
+                     gasto. El depósito lo dice el bloque «dónde queda», que además lo deja
+                     cambiar; decirlo también acá era volver a afirmar lo mismo con otra cara —la
+                     duplicación que este bloque venía a sacar. -->
                 <p v-if="catActual" class="mv-cat-eco">
                   <i class="bi bi-diagram-3"></i>
-                  <span v-if="areaDeLaCategoria"><strong>{{ areaDeLaCategoria }}</strong></span>
-                  <span v-else class="mv-opt">Sin sector</span>
-                  <span v-if="pideDestinoCat" class="mv-cat-eco-tag">entra al depósito</span>
-                  <span v-else class="mv-opt">· no va a depósito</span>
+                  <span v-if="areaDeLaCategoria">Se carga a <strong>{{ areaDeLaCategoria }}</strong>.</span>
+                  <span v-else class="mv-opt">Sin sector.</span>
+                  <span v-if="!familiaCat" class="mv-opt">No se guarda nada: se consume y listo.</span>
                 </p>
               </div>
 
@@ -843,30 +908,25 @@ const titulo = computed(() => {
                  depósito?" decide si la compra mueve inventario: son decisiones del movimiento,
                  no papeleo. Van a la vista, siempre. -->
             <!-- El SECTOR no se pregunta: lo trae la categoría (ver el eco debajo de ella). La
-                 SEDE sí, y sólo si la organización tiene más de una: es física, y la categoría
-                 no puede saber en cuál se hizo el gasto. -->
-            <div v-if="multiSede" class="mv-imputacion">
-              <label class="mv-fld">
-                <span class="mv-lbl">
-                  Sede <span v-if="depositoSel?.sede_id" class="mv-opt">(la fija el depósito)</span>
-                </span>
-                <select class="mv-inp" v-model="form.sede_id" :disabled="!!depositoSel?.sede_id">
-                  <option :value="null">— Sin sede —</option>
-                  <option v-for="s in sedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
-                </select>
-              </label>
-            </div>
+                 SEDE tampoco se pregunta acá: vive adentro de «dónde queda», que es donde se usa
+                 —el depósito es la familia de la categoría POR la sede—. Suelta acá arriba, el
+                 depósito la pisaba después en silencio. -->
 
             <!-- Destino del stock. SIEMPRE visible: si entra o no al depósito es una decisión
                  del movimiento, y esconderla detrás del flujo elegido hacía que una compra
                  cargada desde "Pagué un gasto" no tuviera forma de entrar al inventario. Adentro
                  la primera opción es "No, es solo un gasto", así que decir que no cuesta un
                  click y queda explícito en la pantalla. -->
+            <!-- DÓNDE QUEDA. Se muestra siempre: con una categoría que guarda cosas dice a qué
+                 depósito entra (deducido), y con una que no, pregunta de qué sede es el gasto —que
+                 es la única pregunta que queda. -->
             <DestinoStock
-              v-if="pideDestinoCat"
               v-model="destino"
-              :depositos="depositos" :insumos="insumos" :bares="bares"
-              :monto="form.monto_ars" :cantidad="form.cantidad" :errores="errores"
+              :familia="familiaCat"
+              :depositos="depositos" :insumos="insumos" :bares="bares" :sedes="sedes"
+              :sede-id="form.sede_id" @update:sede-id="form.sede_id = $event"
+              :descripcion="form.descripcion" :unidad="form.unidad" :multi-sede="multiSede"
+              :cantidad="form.cantidad" :errores="errores"
             />
             <span v-if="errores.destino_item || errores.destino_cantidad" class="mv-err">
               {{ errores.destino_item || errores.destino_cantidad }}
@@ -903,6 +963,14 @@ const titulo = computed(() => {
               </label>
                           </div>
             </details>
+
+            <!-- QUÉ VA A PASAR, EN UNA ORACIÓN. Es lo que deja cargar bien a alguien que no sabe
+                 de contabilidad: la plata, el plan de pago y qué entra al depósito, con los
+                 números puestos. El mismo recurso que la ficha de un cierre del mostrador. -->
+            <p class="mv-resumen">
+              <span class="mv-resumen-t">Cuando guardes</span>
+              <span class="mv-resumen-p" v-html="resumenGuardar"></span>
+            </p>
 
             </div><!-- /mv-col--hecho -->
 
@@ -1025,7 +1093,17 @@ const titulo = computed(() => {
 
 .mv-fld--clave { background: #fff; border: 1.5px solid var(--c-slate-300); border-radius: 10px; padding: .7rem .8rem; }
 .mv-cat-eco { display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; font-size: .75rem; color: var(--c-slate-500); margin: -.4rem 0 0; padding: 0 .2rem; }
-.mv-cat-eco-tag { font-size: .68rem; font-weight: 700; background: #dbeafe; color: #0369a1; padding: .1em .5em; border-radius: 999px; }
+.mv-cat-eco strong { color: var(--c-ink-700); font-weight: 600; }
+
+/* QUÉ VA A PASAR CUANDO GUARDES. Oscuro y al pie: es la última cosa que se lee antes de apretar,
+   y la única línea del formulario que se lee como una frase y no como un campo. */
+.mv-resumen {
+  display: flex; flex-direction: column; gap: .25rem; margin: 0;
+  background: var(--c-leaf-900); color: #E8F0EB; border-radius: 12px; padding: .8rem .95rem;
+}
+.mv-resumen-t { font-size: .65rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; opacity: .65; }
+.mv-resumen-p { font-size: .84rem; line-height: 1.55; }
+.mv-resumen-p :deep(b) { color: #fff; font-weight: 600; }
 
 .mv-rail-sep { border: none; border-top: 1px solid var(--c-ink-100); margin: var(--sp-2) 0 0; }
 

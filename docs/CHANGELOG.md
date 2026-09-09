@@ -1,5 +1,74 @@
 # Changelog
 
+## Septiembre 2026 (ay) — El depósito no se elige: se deduce
+
+Germán, cargando una compra de packaging para probar la app: *"es como que estoy ingresando por
+duplicado, ¿no? Pregunta si entra y en qué inventario, pero ya arriba al elegir la categoría me
+indicaba el depósito al que iba… lo siento confuso"*. Y después, la regla que ordenó el rediseño:
+*"ponete en la piel del admin, no entiende nada de contabilidad, tiene que poder hacerlo perfecto
+sin problemas"*.
+
+Tenía razón, y era peor que una repetición: **eran dos preguntas para una sola decisión, con dos
+respuestas que podían contradecirse**. La categoría afirmaba «Dispensario · entra al depósito» y
+abajo una grilla con los **diez** depósitos del club volvía a preguntarlo — sin filtrar por la
+categoría, con la sede preguntada aparte y pisada después en silencio.
+
+**EL DEPÓSITO SE DEDUCE: la familia de la categoría POR la sede.** Las dos ya están contestadas más
+arriba, así que no hay nada que preguntar: se afirma, con la sede editable adentro de la oración
+(`Entra al depósito General de [Example ▾]`). Se diseñó en un
+[prototipo navegable](https://claude.ai/code/artifact/bfa543f9-f722-43db-b9ed-371e65edf200) que
+Germán revisó antes de que se escribiera una línea de código — el mismo camino que Cierres.
+
+**Lo que SÍ sigue siendo una decisión, y por eso sigue estando:** que ESTA compra puntual no entre.
+Pero no pesa lo mismo que la regla, así que va como **salida** (un link al pie) y no como una de dos
+opciones en igualdad: si la categoría guarda cosas, lo normal es que entre.
+
+**EL NOMBRE Y LA UNIDAD SE ESCRIBEN UNA VEZ.** Escribiste «Bolsas» arriba: la opción es
+`＋ Es nuevo: «Bolsas»` y el campo *Nombre del insumo* sólo aparece si lo pedís. La cantidad ya se
+mostraba en gris; ahora el costo unitario también vive en un solo lugar (arriba, al lado de la
+cantidad) en vez de repetirse abajo.
+
+**Y LA LISTA DE «QUÉ ENTRÓ» DICE PARA QUÉ SIRVE**: *si es **reposición** de algo que ya tenés,
+elegilo de la lista: se suma a lo que hay y se recalcula el costo*. La pregunta era «¿es algo que ya
+tenías?» y Germán tuvo que preguntar qué significaba. Con el depósito vacío lo dice, en vez de
+ofrecer una lista de una sola opción sin explicación.
+
+**UNA ORACIÓN ANTES DE GUARDAR**: *«Salen $80.000 en efectivo. 1.500 unidades de Bolsas entran al
+depósito General de Sede Central, a $53 cada unidad.»* Es lo que deja cargar bien a alguien que no
+sabe de contabilidad — el mismo recurso que la ficha de un cierre del mostrador.
+
+Y el eco de la categoría se quedó **sólo con lo que no se ve en ningún otro lado**: a qué parte del
+club se carga el gasto (`Se carga a Dispensario.`).
+
+### Los tres agujeros que aparecieron en el camino
+
+1. **La lista no filtraba y el backend no validaba.** El comentario de `aplicar_deposito!` promete
+   desde que se escribió que el depósito se elige «entre los del área de la categoría»: ese filtro
+   no existía. Ahora lo hace cumplir `verificar_familia!`, que corre también en el camino del salón.
+2. **La sede se pisaba en silencio** (`movimiento.update!(sede_id:)` con la del depósito, después de
+   que el usuario eligiera otra). Ya no puede diverger: la sede manda y el depósito se deduce.
+3. **La misma regla en dos vocabularios.** `CategoriaContable#familia_deposito` devuelve la CLAVE
+   del depósito (`cultivo`/`general`/`salon`) y `Deposito#familia` devuelve la familia
+   (`insumo`/`insumo_general`/`mercaderia`): se llaman parecido, significan lo mismo y **comparados
+   entre sí no matchean nunca**. El comportamiento de la categoría y la familia del depósito SÍ son
+   el mismo vocabulario —`Deposito::FAMILIA` se escribió para reemplazar al comportamiento—, y eso
+   es lo que se compara. Además, un depósito propio del club devolvía la familia `general`, que no
+   existe en ningún otro lado: quedaba inalcanzable.
+
+**Y el depósito de Dispensación no recibe compras** — lo llena la cosecha y la manicura, y sale por
+dispensación. Comparte familia con el Salón, así que sin el guard aparecía como destino de una
+compra de mercadería y reventaba mucho más abajo.
+
+### Lo que sólo se vio en el navegador
+
+Con la app corriendo, dos cosas que las suites daban por buenas: la organización tenía **dos**
+depósitos de la misma familia en la sede (General y Otro), y ahí el desplegable quedaba **en blanco**
+—guardando `''`— mientras el resumen decía «no entra nada al depósito» justo debajo de la línea que
+decía que sí entraba. Ahora siempre queda uno elegido y el nombre no se escribe dos veces en la
+misma oración. Y el resumen decía «entran a el depósito» y «1500 unidad».
+
+**2904 rspec ✓ · 1952 vitest ✓ · build limpio.**
+
 ## Septiembre 2026 (ax) — Un cierre ya mirado no se corrige, y «señada» no es «paga»
 
 Lo planteó Germán mirando la solapa Cierres: *"al marcar como visto no deberíamos dejar que se

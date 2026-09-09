@@ -66,8 +66,12 @@ class Deposito < ApplicationRecord
   scope :ordenados, -> { order(:orden, :nombre) }
   scope :sistema,   -> { where(es_sistema: true) }
 
+  # Los depósitos propios del club (sin clave de sistema) se comportan como insumos generales.
+  # Devolvían 'general', que no es una familia que exista en ningún otro lado: no matcheaba con la
+  # de ninguna categoría, así que un depósito propio quedaba inalcanzable desde el alta de un
+  # movimiento apenas el destino empezó a derivarse de la categoría.
   def familia
-    FAMILIA[clave_sistema] || 'general'
+    FAMILIA[clave_sistema] || 'insumo_general'
   end
 
   # El depósito de Salón depende del feature bar; el resto siempre disponible.

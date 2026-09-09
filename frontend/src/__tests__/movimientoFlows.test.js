@@ -3,6 +3,7 @@ import {
   hoyLocal, fmtMiles, parseMonto, FLOWS, FLOWS_ORDEN,
   destinoVacio, destinoEstado, destinoPayload, costoUnitario,
   validarMovimiento, esValido,
+  familiaDeDeposito, depositosDeFamilia, depositosDeFamiliaEnSede, sedesConDeposito,
 } from '../components/contabilidad/movimientoFlows.js'
 
 describe('hoyLocal', () => {
@@ -190,5 +191,59 @@ describe('validarMovimiento', () => {
   it('un destino sin empezar no molesta (la compra puede ser puro gasto)', () => {
     const ctx = { pideDestino: true, destino: { iniciado: false, itemOk: true, cantidad: null } }
     expect(esValido(validarMovimiento(valido, ctx))).toBe(true)
+  })
+})
+
+// EL DEPÓSITO NO SE ELIGE: SE DEDUCE — la familia de la categoría POR la sede.
+//
+// Antes era una grilla con los diez depósitos del club, sin filtrar por la categoría, y el backend
+// tampoco validaba: las bolsas del dispensario entraban al depósito de Cultivo de otra sede sin
+// una queja. Germán, cargando una compra: «es como que estoy ingresando por duplicado».
+describe('De dónde sale el depósito', () => {
+  const DEPS = [
+    { id: 1, nombre: 'General',      clave_sistema: 'general',      familia: 'insumo_general', sede_id: 10, activo: true },
+    { id: 2, nombre: 'General',      clave_sistema: 'general',      familia: 'insumo_general', sede_id: 20, activo: true },
+    { id: 3, nombre: 'Cultivo',      clave_sistema: 'cultivo',      familia: 'insumo',         sede_id: 20, activo: true },
+    { id: 4, nombre: 'Salón',        clave_sistema: 'salon',        familia: 'mercaderia',     sede_id: 10, activo: true },
+    { id: 5, nombre: 'Dispensación', clave_sistema: 'dispensacion', familia: 'mercaderia',     sede_id: 10, activo: true },
+    { id: 6, nombre: 'Viejo',        clave_sistema: 'cultivo',      familia: 'insumo',         sede_id: 10, activo: false },
+    { id: 7, nombre: 'Taller',       clave_sistema: null,           familia: 'general',        sede_id: 10, activo: true },
+  ]
+
+  // Los propios del club llegan con familia 'general', que no existe en ningún otro lado: sin
+  // normalizar quedaban inalcanzables apenas el destino empezó a derivarse de la categoría.
+  it('un depósito propio del club se comporta como insumos generales', () => {
+    expect(familiaDeDeposito({ familia: 'general' })).toBe('insumo_general')
+    expect(familiaDeDeposito({ familia: 'insumo' })).toBe('insumo')
+    expect(familiaDeDeposito(null)).toBe(null)
+  })
+
+  it('sin familia no hay depósito posible: es sólo un gasto', () => {
+    expect(depositosDeFamilia(DEPS, null)).toEqual([])
+    expect(sedesConDeposito(DEPS, null)).toEqual([])
+  })
+
+  it('sólo los de la familia, y sólo los activos', () => {
+    expect(depositosDeFamilia(DEPS, 'insumo').map(d => d.id)).toEqual([3])
+  })
+
+  // Comparte familia con el Salón, pero ahí no entran compras: lo llena la cosecha.
+  it('Dispensación queda afuera aunque sea mercadería', () => {
+    expect(depositosDeFamilia(DEPS, 'mercaderia').map(d => d.id)).toEqual([4])
+  })
+
+  it('el propio del club aparece junto al General de su sede', () => {
+    expect(depositosDeFamiliaEnSede(DEPS, 'insumo_general', 10).map(d => d.id)).toEqual([1, 7])
+  })
+
+  it('el de la sede, que es el que se deduce', () => {
+    expect(depositosDeFamiliaEnSede(DEPS, 'insumo', 20).map(d => d.id)).toEqual([3])
+    expect(depositosDeFamiliaEnSede(DEPS, 'insumo', 10)).toEqual([])   // Cultivo de esa sede está inactivo
+    expect(depositosDeFamiliaEnSede(DEPS, 'insumo', null)).toEqual([])
+  })
+
+  it('y las sedes donde esta compra puede entrar, sin repetir', () => {
+    expect(sedesConDeposito(DEPS, 'insumo_general')).toEqual([10, 20])
+    expect(sedesConDeposito(DEPS, 'mercaderia')).toEqual([10])
   })
 })

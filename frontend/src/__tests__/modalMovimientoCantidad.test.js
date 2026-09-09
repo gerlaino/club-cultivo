@@ -216,11 +216,12 @@ describe('Nuevo movimiento — el formulario reordenado', () => {
   it('las etiquetas dejaron de ser un interrogatorio', () => {
     const texto = wrapper.text()
 
-    // Las únicas dos preguntas que quedan, y las dos son a propósito: el atajo de los gastos
-    // que se repiten, y la decisión de si la compra entra al inventario (que desde ago-2026
-    // está siempre a la vista). El resto son etiquetas: Fecha, Estado del pago, Sector.
+    // La única pregunta que queda es el atajo de los gastos que se repiten. La del inventario
+    // desapareció en sep-2026: el depósito se DEDUCE (categoría × sede) y se afirma, porque
+    // preguntarlo después de haberlo dicho arriba era pedir lo mismo dos veces. El resto son
+    // etiquetas: Fecha, Estado del pago, Sector.
     const preguntas = (texto.match(/¿[^?]*\?/g) || [])
-    expect(preguntas.every(p => /se repiten|entra al inventario/i.test(p)), preguntas.join(' | ')).toBe(true)
+    expect(preguntas.every(p => /se repiten|en cuál lo guardás/i.test(p)), preguntas.join(' | ')).toBe(true)
 
     expect(texto).toContain('Fecha')
     expect(texto).toContain('Estado del pago')
@@ -321,11 +322,13 @@ describe('Nuevo movimiento — crear una categoría', () => {
       expect(wrapper.element.querySelector('.mv-cat-eco').textContent).toContain('Cultivo')
     })
 
+    // Y se AFIRMA, no se pregunta: el depósito sale de la categoría por la sede, y las dos ya
+    // están contestadas más arriba.
     it('el depósito aparece cuando la categoría stockea', async () => {
       wrapper.vm.form.categoria_contable_id = 1
       await wrapper.vm.$nextTick()
 
-      expect(wrapper.element.textContent).toMatch(/entra al inventario/i)
+      expect(wrapper.element.textContent).toMatch(/dónde queda/i)
     })
   })
 

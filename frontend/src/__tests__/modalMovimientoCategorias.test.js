@@ -178,7 +178,10 @@ describe('ModalMovimiento — un solo formulario', () => {
     const eco = document.body.querySelector('.mv-cat-eco')
     expect(eco, 'el eco de la categoría tiene que estar en pantalla').toBeTruthy()
     expect(eco.textContent).toContain('Cultivo')
-    expect(eco.textContent).toMatch(/dep[óo]sito/i)
+    // Y NO nombra el depósito: eso lo dice el bloque «dónde queda», que además lo deja cambiar.
+    // Afirmarlo en los dos lados era la duplicación que Germán encontró cargando una compra
+    // («ya arriba al elegir la categoría me indicaba el depósito al que iba»).
+    expect(eco.textContent).not.toMatch(/dep[óo]sito/i)
     w.unmount()
   })
 
