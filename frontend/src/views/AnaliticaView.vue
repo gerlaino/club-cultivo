@@ -976,7 +976,7 @@ function bucketColor(desv) {
         <!-- Gráfico de barras: P&L mensual -->
         <div class="an__card" style="margin-bottom:1.25rem">
           <div class="an__card-header">
-            <span class="an__card-title">P&amp;L mensual — últimos 12 meses</span>
+            <span class="an__card-title">Ingresos y gastos por mes — últimos 12</span>
           </div>
           <div class="an__cont-chart">
             <div v-for="m in contMeses" :key="m.mes" class="an__cont-col">

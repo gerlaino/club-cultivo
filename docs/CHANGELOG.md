@@ -1,5 +1,19 @@
 # Changelog
 
+## Septiembre 2026 (ba) — «P&L» no se dice
+
+*"El admin no tiene por qué saber de contabilidad, y justamente ahí entramos nosotros para
+resolverle la vida"*. P&L es la sigla de *profit & loss*: una solapa a la vista, en inglés, que
+obliga a traducir antes de entender qué hay adentro. Se llama **Ganancia por lote**, y adentro
+**«Cuánto deja cada lote»**.
+
+Se cambió en las siete pantallas donde estaba a la vista —la solapa de Contabilidad, la tarjeta del
+lote, Rendimiento, el gráfico de Analítica, la ayuda del sector en Insumos y el paso «Cerrado» de un
+evento— porque dejar la sigla en seis y traducirla en una es peor: la misma cosa con dos nombres.
+Identificadores, clases CSS y comentarios quedan como están, igual que en Club → Organización.
+
+`Libro diario` y `Dashboard` se quedan: los dos se entienden (decisión de Germán).
+
 ## Septiembre 2026 (az) — Cerrar un stock: qué pasó, y cuándo
 
 Dos cosas que Germán encontró probando, y que resultaron ser la misma familia: **la app deja hacer

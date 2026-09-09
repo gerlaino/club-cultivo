@@ -3,7 +3,7 @@
     <div class="rnd__header">
       <h1 class="rnd__title"><TrendingUp :size="22" :stroke-width="1.75" /> Rendimiento</h1>
       <div class="rnd__header-right">
-        <button v-if="tab === 'financiero'" class="rnd__btn-csv" @click="exportarCSV" title="Exportar P&L a CSV">
+        <button v-if="tab === 'financiero'" class="rnd__btn-csv" @click="exportarCSV" title="Exportar la ganancia por lote a CSV">
           <Download :size="14" :stroke-width="2" /> CSV
         </button>
         <button class="rnd__refresh" @click="cargar" :disabled="loading">
@@ -126,7 +126,7 @@
 
     <!-- TAB FINANCIERO -->
     <template v-if="tab === 'financiero'">
-      <div v-if="loadingPL" class="rnd__loading">Cargando P&L…</div>
+      <div v-if="loadingPL" class="rnd__loading">Cargando…</div>
 
       <template v-else-if="plLotes.length">
         <!-- KPIs financieros -->
@@ -150,7 +150,7 @@
         </div>
 
         <div class="rnd__section">
-          <h2 class="rnd__section-title">P&L por lote</h2>
+          <h2 class="rnd__section-title">Ganancia por lote</h2>
           <div class="rnd__table-wrap">
             <table class="rnd__table">
               <thead>
@@ -200,7 +200,7 @@
         </div>
       </template>
 
-      <div v-else class="rnd__empty">Sin lotes con datos financieros. Cargá costos en algún lote para ver el P&L.</div>
+      <div v-else class="rnd__empty">Sin lotes con datos financieros. Cargá los costos de algún lote para ver cuánto dejó.</div>
     </template>
   </div>
 </template>

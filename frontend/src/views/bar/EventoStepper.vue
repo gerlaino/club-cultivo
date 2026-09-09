@@ -15,7 +15,7 @@ const CARRIL = [
   { v: 'planificado', l: 'Planificado', hint: 'Armando el evento' },
   { v: 'en_venta',    l: 'En venta',    hint: 'Vendiendo entradas' },
   { v: 'en_curso',    l: 'En curso',    hint: 'Sucediendo ahora' },
-  { v: 'finalizado',  l: 'Cerrado',     hint: 'P&L asentado' },
+  { v: 'finalizado',  l: 'Cerrado',     hint: 'ingresos y gastos ya asentados' },
 ]
 
 const cancelado = computed(() => props.estado === 'cancelado')

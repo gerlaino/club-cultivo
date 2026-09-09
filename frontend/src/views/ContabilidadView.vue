@@ -670,7 +670,7 @@ onMounted(async () => {
         <i class="bi bi-journal-text"></i> Libro diario
       </button>
       <button class="cv__tab" :class="{ 'cv__tab--active': vistaActiva === 'pl' }" @click="irAPL">
-        <i class="bi bi-bar-chart-line"></i> P&amp;L por lote
+        <i class="bi bi-bar-chart-line"></i> Ganancia por lote
       </button>
       <button class="cv__tab" :class="{ 'cv__tab--active': vistaActiva === 'categorias' }" @click="vistaActiva = 'categorias'">
         <i class="bi bi-tags"></i> Categorías
@@ -1345,7 +1345,7 @@ onMounted(async () => {
         <div v-if="plSubTab === 'lotes'">
         <div class="cv__pl-header">
           <div>
-            <h2 class="cv__pl-title">P&amp;L por lote de producción</h2>
+            <h2 class="cv__pl-title">Cuánto deja cada lote</h2>
             <p class="cv__pl-sub">Lotes con costos cargados · ordenados por eficiencia (costo/g)</p>
           </div>
           <span class="cv__pl-count">{{ lotesConCosto.length }} lote{{ lotesConCosto.length !== 1 ? 's' : '' }}</span>

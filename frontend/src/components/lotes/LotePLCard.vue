@@ -2,7 +2,7 @@
   <div class="plc">
     <!-- Header -->
     <div class="plc__header">
-      <span class="plc__title">P&L del lote</span>
+      <span class="plc__title">Ganancia del lote</span>
       <button class="plc__btn-edit" @click="openCostoForm">
         <Pencil :size="13" :stroke-width="2" />
         {{ costoLote ? 'Editar costos' : 'Cargar costos' }}
@@ -114,13 +114,13 @@
 
         <!-- Advertencias -->
         <div v-if="!pl.tiene_costos || !pl.tiene_ingresos" class="plc__hints">
-          <span v-if="!pl.tiene_costos" class="plc__hint">Cargá los costos para ver el P&L completo</span>
+          <span v-if="!pl.tiene_costos" class="plc__hint">Cargá los costos para ver cuánto dejó</span>
           <span v-if="!pl.tiene_ingresos" class="plc__hint">El margen mejorará cuando se registren dispensaciones con precio</span>
         </div>
       </template>
 
       <div v-else class="plc__empty">
-        <span>Cargá los costos para calcular el P&L</span>
+        <span>Cargá los costos para saber cuánto dejó este lote</span>
       </div>
     </template>
   </div>

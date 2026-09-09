@@ -749,7 +749,7 @@ async function revertirCompra(compra) {
         <h3 class="modal__title">Nuevo depósito</h3>
         <p class="modal__hint">Un depósito propio para agrupar tu mercadería (ej: Merchandising, Insumos de oficina). Los productos que cargues acá se consumen como gasto general.</p>
         <label class="fld">Nombre<input v-model.trim="depoForm.nombre" class="inp" maxlength="40" placeholder="Ej: Merchandising" v-focus @keydown.enter.prevent="confirmarNuevoDeposito" /></label>
-        <label class="fld">Sector <small class="mut">(a qué línea de negocio pertenece, para el P&L)</small>
+        <label class="fld">Sector <small class="mut">(a qué parte del club se le carga el costo)</small>
           <select v-model="depoForm.unidad_negocio_id" class="inp">
             <option :value="null">— Sin sector —</option>
             <option v-for="a in areas" :key="a.id" :value="a.id">{{ a.nombre }}</option>
@@ -764,7 +764,7 @@ async function revertirCompra(compra) {
       <div class="dpdlg">
         <h3 class="modal__title">Gestionar depósito</h3>
         <label class="fld">Nombre<input v-model.trim="depoEdit.nombre" class="inp" maxlength="40" v-focus @keydown.enter.prevent="guardarDeposito" /></label>
-        <label class="fld">Sector <small class="mut">(para el P&L)</small>
+        <label class="fld">Sector <small class="mut">(a quién se le carga el costo)</small>
           <select v-model="depoEdit.unidad_negocio_id" class="inp">
             <option :value="null">— Sin sector —</option>
             <option v-for="a in areas" :key="a.id" :value="a.id">{{ a.nombre }}</option>
