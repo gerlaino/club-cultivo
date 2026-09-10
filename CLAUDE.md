@@ -345,6 +345,43 @@ Cuando Germán plantee un problema o feature nueva antes de implementar:
 
 Suite 1239 ✓ + 58 vitest ✓. **Deploy: sumar `add_vendible_a_bar_venta_items` y `add_consumo_evento_a_provisiones_y_dispensas` al `db:migrate`.**
 
+## 📍 Dónde retomar (10-sep-2026)
+
+**Repaso del delivery, la auditoría y los informes, con la app corriendo.** 2 commits, pusheados
+(`fe402003`, `3b5b4f22`). Todo lo que apareció era la misma clase de error —**la pantalla diciendo
+algo distinto de lo que el dato dice**— y **ninguna suite lo veía**:
+
+- **La tarjeta "Tu próxima entrega" estaba pegada DOS veces** y la copia mala quedó adentro del
+  cartel de cobro del modal del repartidor: aparecía en mitad del formulario justo cuando efectivo
+  + transferencia cubrían el total, y se comía el "Cubierto ✓". El template compila igual: el bug
+  es DÓNDE está dibujado.
+- **`[object Object]` y firmas en base64 en el historial de actividad** — `Dispensacion` era el
+  único de 13 modelos auditados sin `auditar_solo`.
+- **El PDF de trazabilidad no salía**, y la pantalla decía "reintentá en un momento" sobre un 422
+  que explicaba exactamente qué hacer.
+- **Contar de más creaba stock**: la causa real del balance descuadrado de la trazabilidad.
+- **`toISOString()` es UTC**: dispensar rebotaba con "la fecha no puede ser futura" **todas las
+  noches entre las 21:00 y las 00:00 ART**. 60 usos en 48 archivos.
+
+**2970 rspec ✓ · 1960 vitest ✓ · build limpio · eslint en su baseline.**
+
+**SIGUE:** el socio de Germán estuvo probando la app y encontró cosas mal — eso arranca la próxima
+sesión. Y Germán iba a repasar informe por informe y analítica por analítica.
+
+**Pendientes suyos (no de código):** rotar el secreto de Render · los 5 usuarios con la clave vieja
+(`rake seguridad:usuarios_con_password_default`) · `rake stocks:balance_descuadrado` (8 stocks, pero
+**sólo 1 es el bug del mostrador**; las orgs 3 y 6 tienen los mismos tres descuadres idénticos, o
+sea una **clonación** que copió el problema) · `rake auditorias:limpiar_blobs` (315 filas / 531 KB) ·
+declarar 8 variedades del INASE a mano.
+
+**Pendiente de código:** **2 pruebas de navegador rotas desde el 8-sep** (`e2e/mostrador.spec.js`)
+afirman `.mrm__veredicto`, "Dónde se va" y "Cierre por cierre" — **nada de eso existe** desde que
+se rehizo la solapa de Merma. **No reescribirlas mirando el código**: preguntarle a Germán cómo
+quedó. Y la suite de navegador es **inestable**: en cuatro corridas falló un test distinto cada vez
+y cada archivo pasa solo.
+
+---
+
 ## 📍 Dónde retomar (7-sep-2026)
 
 **Dos días probando el mostrador en producción, con el celular en la mano.** 12 commits, todos
@@ -535,6 +572,51 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 
 ### Lo que NO hay que romper
 
+- **CONTAR NUNCA SUBE EL INVENTARIO, LO CUENTE QUIEN LO CUENTE** (sep-2026). Contar de más
+  significa que sobre la mesa hay producto no anotado, y ese producto **salió del depósito**: ya
+  estaba en el `Stock`, sólo cambió de lugar. `ajustar_inventario!` se lo SUMABA al `Stock` —
+  producto trazable sin origen, disparado con un dedazo— y así se rompía el balance de la
+  Trazabilidad: **"en stock" mayor que "producido"** y una **merma NEGATIVA**, porque el informe
+  deduce la merma por resta y no tiene casillero para algo que entró. El candado existía desde
+  septiembre pero **sólo miraba a quien atiende**; administración pasaba de largo por Contar y por
+  Cerrar caja. **Subir la mesa es APARTAR**, y `mover!` tiene ahora el mismo tope que `Cargar`: no
+  se aparta más de lo que hay libre (`devolucion` exenta: el paquete que vuelve ya se le devolvió
+  al `Stock`). El **sobrante del arqueo** se anota y no se aplica, de nadie —el cierre no se traba
+  nunca—; **contar de a uno** sí deja a administración subir la mesa, con el tope real. Para sumar
+  stock de verdad está **editar el stock**, que es la puerta que deja el origen.
+  `rake stocks:balance_descuadrado` encuentra lo que ya entró así.
+- **UN INFORME SE DESCARGA SIEMPRE; PRESENTARLO ES OTRA COSA** (sep-2026, decisión de Germán). La
+  app no es un canal oficial, así que lo que se baja es material de trabajo: negarle la descarga a
+  la organización la dejaba sin poder ver su propia realidad. Son **dos caminos** y los pide quien
+  descarga (`para_presentar`): normal → sale con la **salvedad impresa** nombrando qué no se puede
+  acreditar; **para presentar** → valida y no sale si falta algo. Presentables: **INASE, semestral
+  y REPROCANN**; **trazabilidad NO** —la pide un auditor en una inspección— y su salvedad nombra
+  **sólo las variedades de ESA cadena**. **NO se vinculan genéticas automáticamente**:
+  `declarada_como` **renombra la planta en el informe regulatorio**, así que vincular a ciegas es
+  una declaración falsa firmada por un rake.
+- **EL PIE DE LOS PDF NO LLEVA LA MARCA DE LA PLATAFORMA.** El documento es de la organización y
+  lo firma ella; quién lo generó es asunto nuestro, no del auditor que lo recibe.
+- **CON `responseType: 'blob'` EL ERROR TAMBIÉN LLEGA COMO BLOB**, así que ni el interceptor de
+  `api.js` puede normalizarlo: hay que parsearlo (`await e.response.data.text()`). Estaba resuelto
+  en `useInformePdf` y **tres vistas más se bajaban archivos por su cuenta con un `catch` pelado**,
+  mostrando "reintentá en un momento" sobre un 422 que decía qué hacer. Vive en `lib/descargas.js`.
+- **`toISOString()` ES UTC: NUNCA PARA DECIR "HOY"** (sep-2026). En Argentina da **mañana desde las
+  21:00**, y el backend valida contra `Time.zone.today` en Buenos Aires — dispensar rebotaba con
+  "la fecha no puede ser futura" todas las noches, en las horas de más movimiento del dispensario.
+  Se dice con **`hoyISO()`** / **`toISO(fecha)`** de `utils/dates.js`, que arman la fecha con los
+  componentes LOCALES, y con **`paraInputDatetime()`** para los `datetime-local` (ahí el desfase es
+  de tres horas). Lo fija `hoyLocal.test.js`, que congela el reloj a las 23:30 ART: es un bug de
+  tres horas por día y no se encuentra probando a mano.
+- **EL RASTRO DICE QUÉ HIZO LA PERSONA, NO QUÉ FILAS ESCRIBIÓ LA APP EN SU NOMBRE** (sep-2026). La
+  fila nombra el hecho —**"Entregó"**, no "Editó": `update` es el verbo de Rails, no el de nadie
+  más— y **cuando el cambio se puede nombrar, los campos que lo componen no se repiten**. Vive en
+  `AuditoriaSerializer` porque son dos consumidores. Los asientos contables que la app escribe
+  detrás de cada dispensa (los que tienen `dispensacion_id`) se piden aparte: tapaban 8 de cada 10
+  filas. Y **las imágenes de una entrega viven 30 días** (`PurgarAdjuntosEntregaJob`): se borra la
+  imagen, nunca el registro, y queda el evento en `historial_envio` — si el hueco no hablara, una
+  entrega vieja se vería idéntica a una donde nadie firmó. **El comprobante de PAGO no se toca**:
+  lo trajo el paciente, no se regenera, y cuelga del `Cobro`, que usan también el mostrador y las
+  reservas.
 - **EL MOSTRADOR APARTA, NO DESCUENTA — y la dispensa TIENE QUE BAJAR LA MESA.** Si aparta y la
   dispensa no baja el `MostradorItem`, cae `cantidad` Y sigue apartado: el disponible baja el
   doble y el stock cargado se vuelve indispensable. Es el mismo bug que ya pasó con los eventos, y

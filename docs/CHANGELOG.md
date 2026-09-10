@@ -1,5 +1,59 @@
 # Changelog
 
+## Septiembre 2026 (bc) — Contar no crea stock, el rastro se lee, y la fecha es la de acá
+
+Repaso del delivery, la auditoría y los informes **con la app corriendo**. Todo lo que apareció es
+la misma clase de error —la pantalla diciendo algo distinto de lo que dice el dato— y **ninguna
+suite lo veía**.
+
+**Delivery**
+- La tarjeta «Tu próxima entrega» estaba pegada **dos veces**: la copia mala quedó adentro del
+  `<template v-else>` del cartel de cobro, así que aparecía en mitad del modal justo cuando
+  efectivo + transferencia cubrían el total, y se comía el «Cubierto ✓». El template compila
+  igual: el bug es *dónde* está dibujado. Lo fija `e2e/entregaModal.spec.js`.
+- Firma y comprobantes abren en el **visor del DS con descarga**. Un adjunto de R2 es otro origen
+  y ahí el navegador ignora `download`: se pide la URL con `disposition=attachment`.
+- **Las imágenes de una entrega viven 30 días** (`PurgarAdjuntosEntregaJob`). Se borra la imagen,
+  nunca el registro, y queda el evento en `historial_envio`. El comprobante de **pago** no se
+  toca: lo trajo el paciente, no se regenera, y cuelga del `Cobro`.
+
+**Auditoría**
+- `Dispensacion` era el único de 13 modelos auditados **sin `auditar_solo`**: guardaba las 46
+  columnas y una copia entera de cada firma en base64 dentro de `auditorias.cambios`.
+- La presentación se fue a **`AuditoriaSerializer`**: la fila dice «Entregó», no «Editó»; los
+  campos que componen la acción no se repiten; nada de `[object Object]` ni de ISO crudo. Faltaban
+  **5 tipos** en el mapa de nombres.
+- El historial contesta «¿qué hizo esta persona?»: los asientos que la app escribe detrás de cada
+  dispensa se piden aparte con un check. Tapaban 8 de cada 10 filas.
+- `rake auditorias:limpiar_blobs` saca las firmas que quedaron de antes.
+
+**Informes**
+- **La descarga deja de bloquearse.** Dos caminos: normal (sale con la salvedad impresa) y **«Para
+  presentar»** (valida). Presentables: INASE, semestral y REPROCANN. Trazabilidad no, y su
+  salvedad nombra **sólo las variedades de esa cadena**.
+- Se descartó vincular genéticas automáticamente: `declarada_como` **renombra la planta en el
+  informe regulatorio**.
+- **El pie ya no lleva la marca de la plataforma.**
+- `lib/descargas.js`: con `responseType: 'blob'` el error también llega como blob. Cuatro
+  pantallas lo tiraban con un `catch` pelado.
+
+**Mostrador**
+- **Contar de más ya no suma al inventario**, lo cuente quien lo cuente: ese producto salió del
+  depósito. Subir la mesa es apartar, y ahora tiene el mismo tope que `Cargar`. Era la puerta por
+  la que entraba producto sin origen y lo que descuadraba el balance de la Trazabilidad («en
+  stock» mayor que «producido», merma negativa).
+- `rake stocks:balance_descuadrado` encuentra lo que ya entró así, dice de qué conteo salió y no
+  vuelve a restar lo que una corrección anterior devolvió.
+
+**La fecha**
+- `toISOString()` es UTC: en Argentina daba **mañana desde las 21:00** y el backend valida contra
+  Buenos Aires, así que **dispensar rebotaba todas las noches** con «la fecha no puede ser
+  futura». 60 usos en 48 archivos → `hoyISO()` / `toISO()` / `paraInputDatetime()`.
+
+**2970 rspec ✓ · 1960 vitest ✓ · build limpio.**
+
+---
+
 ## Septiembre 2026 (bb) — La tabla de inventario ordena por cualquier columna
 
 Pedido de Germán: *"quiero que esa tabla se pueda reordenar haciendo click en los cabezales"*. Las
