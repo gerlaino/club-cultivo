@@ -8,6 +8,7 @@ import { useClubStore } from '../stores/club'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import CredencialesNuevas from '../components/ui/CredencialesNuevas.vue'
+import { toISO } from '../utils/dates.js'
 
 const router = useRouter()
 const store  = usePacientesStore()
@@ -71,7 +72,7 @@ const REPROCANN_ESTADOS = [
 const reprocannVencimientoSugerido = computed(() => {
   const d = new Date()
   d.setFullYear(d.getFullYear() + 3)
-  return d.toISOString().slice(0, 10)
+  return toISO(d)
 })
 
 function sugerirVencimiento() {

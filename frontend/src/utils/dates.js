@@ -88,10 +88,43 @@ export function semestreActual() {
 
 /**
  * toISO(date) → "2026-01-01" (formato para inputs date)
+ *
+ * OJO: se arma con los componentes LOCALES, nunca con `toISOString()`, que devuelve UTC.
+ * En Argentina (UTC−3) `new Date().toISOString().slice(0,10)` da el día SIGUIENTE desde las
+ * 21:00 — y el backend valida contra `Time.zone.today` en Buenos Aires. Resultado: entre las
+ * 21:00 y la medianoche, dispensar rebotaba con "la fecha no puede ser futura", justo en las
+ * horas de más movimiento del dispensario.
  */
 export function toISO(date) {
   if (!date) return ''
   const d = date instanceof Date ? date : new Date(date)
   if (isNaN(d)) return ''
-  return d.toISOString().slice(0, 10)
+  const mes = String(d.getMonth() + 1).padStart(2, '0')
+  const dia = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mes}-${dia}`
+}
+
+/**
+ * hoyISO() → "2026-09-09" — el día de HOY según el reloj de quien usa la app.
+ *
+ * Es la única forma correcta de decir "hoy" para mandárselo al backend. Usala en vez de
+ * `new Date().toISOString().slice(0, 10)`, que es UTC y adelanta un día cada noche.
+ */
+export function hoyISO() {
+  return toISO(new Date())
+}
+
+/**
+ * paraInputDatetime(date = new Date()) → "2026-09-09T23:30" (para <input type="datetime-local">)
+ *
+ * Mismo problema que `toISO` pero con la hora: `toISOString().slice(0, 16)` da la hora UTC, o sea
+ * tres horas adelantada en Argentina. Un campo de fecha y hora que arranca tres horas en el
+ * futuro es peor que uno vacío.
+ */
+export function paraInputDatetime(date = new Date()) {
+  const d = date instanceof Date ? date : new Date(date)
+  if (isNaN(d)) return ''
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  return `${toISO(d)}T${hh}:${mm}`
 }

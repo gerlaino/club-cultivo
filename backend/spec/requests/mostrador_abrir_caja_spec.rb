@@ -142,11 +142,15 @@ RSpec.describe 'Abrir la caja del mostrador', type: :request do
         expect(razones[t.id]).not_to include('corregido')
       end
 
-      it 'administración sí puede: ella gobierna la mesa' do
+      # NI SIQUIERA ADMINISTRACIÓN. Contar de más al abrir no dice de dónde salió ese producto,
+      # y la mesa APARTA del depósito: subirla sin origen apartaba gramos que no existen. Si de
+      # verdad hay más, se carga por `Cargar`, que descuenta del depósito y deja el motivo.
+      it 'administración tampoco lo aplica: se anota, y la mesa no se mueve' do
         abrir!(conteos: [{ stock_id: stock.id, contado: 350 }], efectivo: 10_000, como: admin)
 
         expect(response).to have_http_status(:created)
-        expect(en_la_mesa).to eq(350.0)
+        expect(en_la_mesa).to eq(300.0)
+        expect(stock.reload.cantidad.to_f).to eq(1_000.0)
       end
     end
 

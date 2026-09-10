@@ -35,10 +35,11 @@
 import { ref, computed } from 'vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
 import { CATEGORIAS, placeholderFor } from '../../lib/historialHelpers.js'
+import { hoyISO } from '../../utils/dates.js'
 
 const emit = defineEmits(['crear', 'trasplante', 'cancelar'])
 
-const hoy = new Date().toISOString().split('T')[0]
+const hoy = hoyISO()
 const blank = () => ({ categoria: 'riego', fecha: hoy, descripcion: '', producto: '', ec: null, volumen: null, macetaOrigen: null, macetaDestino: null })
 const form = ref(blank())
 

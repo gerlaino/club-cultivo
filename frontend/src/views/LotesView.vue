@@ -18,6 +18,7 @@ import { useToast } from '../composables/useToast.js'
 import { LAYOUT_LOTE, dibujarEtiquetaLote } from '../lib/pdfEtiquetas.js'
 
 import { moverLotes } from '../lib/api.js'
+import { hoyISO } from '../utils/dates.js'
 
 const store = useLotesStore();
 const salas = useSalasStore();
@@ -279,7 +280,7 @@ async function descargarEtiquetas() {
 function emptyForm() {
   return {
     estado: "vegetativo", plants_count: 0,
-    start_date: new Date().toISOString().slice(0,10),
+    start_date: hoyISO(),
     genetica_id: null, strain: "", grow_type: "sustrato", light_type: "", notes: "",
     sala_id: salas.items[0]?.id ?? "",
     tamanio_maceta: null,
@@ -311,7 +312,7 @@ function startEdit(l) {
   editForm.value = {
     id: l.id, codigo: l.codigo||"", estado: l.estado||"vegetativo",
     plants_count: l.plants_count??0,
-    start_date: l.start_date ? l.start_date.slice(0,10) : new Date().toISOString().slice(0,10),
+    start_date: l.start_date ? l.start_date.slice(0,10) : hoyISO(),
     strain: l.strain||"", grow_type: l.grow_type||"sustrato", light_type: l.light_type||"",
     notes: l.notes||"", sala_id: l.sala_id||"",
     tamanio_maceta: l.tamanio_maceta ?? null,
@@ -357,7 +358,7 @@ async function exportarCSV() {
     const url  = URL.createObjectURL(new Blob([data], { type: 'text/csv;charset=utf-8;' }));
     const link = document.createElement('a');
     link.href  = url;
-    link.setAttribute('download', `lotes_${new Date().toISOString().slice(0,10)}.csv`);
+    link.setAttribute('download', `lotes_${hoyISO()}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

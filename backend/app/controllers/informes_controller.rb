@@ -24,13 +24,18 @@ class InformesController < ApplicationController
     respond_to do |format|
       format.json { render json: sin_dni_completo(data) }
       format.pdf do
-        pdf = ReprocannDocument.new(club: current_user.club, usuario: current_user, data: data).render
+        next if bloquear_descarga_si_falta_declarar!
+
+        pdf = ReprocannDocument.new(club: current_user.club, usuario: current_user, data: data,
+                                    salvedad_inase: salvedad_inase).render
         send_data pdf,
                   filename:    "informe_reprocann_#{Time.zone.today.strftime('%Y%m%d')}.pdf",
                   type:        "application/pdf",
                   disposition: "attachment"
       end
       format.xlsx do
+        next if bloquear_descarga_si_falta_declarar!
+
         send_data reprocann_xlsx(current_user.club, data),
                   filename:    "informe_reprocann_#{Time.zone.today.strftime('%Y%m%d')}.xlsx",
                   type:        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -50,10 +55,12 @@ class InformesController < ApplicationController
     respond_to do |format|
       format.json { render json: datos.merge(resena: resena) }
       format.pdf do
+        # Sólo frena si quien descarga dijo que es PARA PRESENTAR. Si no, sale con la salvedad.
         next if exige_declaracion_inase && bloquear_descarga_si_falta_declarar!
 
         pdf = InformeDocument.new(club: current_user.club, usuario: current_user, titulo: titulo,
-                                  kpis: kpis, secciones: secciones, periodo: periodo, nota: nota).render
+                                  kpis: kpis, secciones: secciones, periodo: periodo, nota: nota,
+                                  salvedad_inase: (salvedad_inase if exige_declaracion_inase)).render
         send_data pdf, filename: "#{nombre}_#{Time.zone.today.strftime('%Y%m%d')}.pdf",
                   type: 'application/pdf', disposition: 'attachment'
       end
@@ -61,11 +68,16 @@ class InformesController < ApplicationController
         next if exige_declaracion_inase && bloquear_descarga_si_falta_declarar!
 
         principal = secciones.first || { headers: [], rows: [] }
+        # El Excel no tiene recuadro, así que la salvedad entra al resumen: la misma advertencia
+        # tiene que viajar en los dos formatos o el que se baje el Excel no se entera.
+        pendientes = (salvedad_inase if exige_declaracion_inase)
+        resumen = kpis.to_h { |k| [k[:label], k[:valor]] }
+        resumen['Variedades sin acreditar ante el INASE'] = pendientes.join(', ') if pendientes
         xlsx = XlsxExport.new(
           club: current_user.club, titulo: titulo, subtitulo: periodo,
           headers: principal[:headers], rows: principal[:rows],
           formatos: principal[:formatos], totales: principal[:totales],
-          resumen: kpis.to_h { |k| [k[:label], k[:valor]] },
+          resumen: resumen,
         ).render
         send_data xlsx, filename: "#{nombre}_#{Time.zone.today.strftime('%Y%m%d')}.xlsx",
                   type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',

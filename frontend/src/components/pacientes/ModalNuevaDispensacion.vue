@@ -7,6 +7,7 @@ import { useSedeStore } from '../../stores/sede.js'
 import { sedeDeMostrador } from '../../composables/useMostrador.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
+import { hoyISO, toISO } from '../../utils/dates.js'
 import { RouterLink, useRoute } from 'vue-router'
 import { createDispensacion, createReserva, entregarReserva, listStocks, listEntregadores,
          getMostrador } from '../../lib/api.js'
@@ -107,9 +108,11 @@ const deliveryUsers   = ref([])
 const deliveryError   = ref(null)
 const loadingDelivery = ref(false)
 
-const today = new Date().toISOString().split('T')[0]
+// `toISOString()` es UTC: en Argentina daba MAÑANA desde las 21:00, y el backend valida contra
+// Buenos Aires — dispensar de noche rebotaba con "la fecha no puede ser futura". Ver hoyISO().
+const today = hoyISO()
 // Una reserva es apartar stock a FUTURO: la fecha mínima es mañana (hoy = dispensación directa).
-const tomorrow = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return d.toISOString().split('T')[0] })()
+const tomorrow = (() => { const d = new Date(); d.setDate(d.getDate() + 1); return toISO(d) })()
 
 // EL FORMULARIO VA ARRIBA DE TODO LO QUE LO LEE, y no a mitad del archivo.
 //

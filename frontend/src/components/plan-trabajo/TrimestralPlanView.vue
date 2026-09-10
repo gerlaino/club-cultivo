@@ -35,6 +35,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { toISO } from '../../utils/dates.js'
 
 const props = defineProps({
   plan:       { type: Object, required: true },
@@ -50,7 +51,7 @@ function parseDate(iso) {
   const [y, m, d] = iso.split('-').map(Number)
   return new Date(y, m - 1, d)
 }
-function isoDate(d) { return d.toISOString().slice(0, 10) }
+function isoDate(d) { return toISO(d) }
 function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r }
 
 function tareasEnRango(desde, hasta) {

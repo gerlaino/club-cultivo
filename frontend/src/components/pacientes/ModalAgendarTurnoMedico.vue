@@ -12,6 +12,7 @@ import {
   X, ChevronLeft, ChevronRight, Plus, User2, Clock,
   Calendar, CheckCircle2, Pencil, Trash2, AlertTriangle,
 } from 'lucide-vue-next'
+import { toISO } from '../../utils/dates.js'
 
 const props = defineProps({
   pacienteId:     { type: Number, required: true },
@@ -162,7 +163,7 @@ function onClickSlot(dia, event) {
   slotSel.value = {
     dia,
     hora:  `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`,
-    fecha: dia.toISOString().split('T')[0],
+    fecha: toISO(dia),
   }
   editTurnoId.value = null
   form.value        = { duracion_minutos: 30, tipo: 'seguimiento', motivo: '', estado: 'programado' }

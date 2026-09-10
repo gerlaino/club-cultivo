@@ -11,12 +11,12 @@
 # muestra el nombre completo: las iniciales no protegían nada frente a quien ya tiene acceso
 # a las fichas, y volvían las tablas ilegibles.
 class InformeSemestralDocument < BaseDocument
-  def initialize(club:, usuario:, datos:)
+  def initialize(club:, usuario:, datos:, salvedad_inase: nil)
     @d = datos.deep_symbolize_keys
     per = @d[:periodo] || {}
     super(club: club, usuario: usuario,
           titulo: "Informe semestral REPROCANN — #{per[:semestre]}° semestre #{per[:anio]}",
-          tipo_doc: "Informe semestral", tipo_code: "SEM")
+          tipo_doc: "Informe semestral", tipo_code: "SEM", salvedad_inase: salvedad_inase)
   end
 
   def cuerpo(pdf)

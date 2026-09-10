@@ -86,6 +86,7 @@ import { useAuthStore } from '../../stores/auth.js'
 import { useSedeStore } from '../../stores/sede.js'
 import { sedeDeMostrador } from '../../composables/useMostrador.js'
 import ModalNuevaDispensacion from '../../components/pacientes/ModalNuevaDispensacion.vue'
+import { hoyISO } from '../../utils/dates.js'
 
 const auth      = useAuthStore()
 const sedeStore = useSedeStore()
@@ -101,7 +102,6 @@ const modalAbierto = computed({
   set: (v) => { if (!v) entregando.value = null },
 })
 
-const hoyISO = new Date().toISOString().slice(0, 10)
 
 // LO QUE HAY QUE COBRAR AL ENTREGAR. Son cuatro casos distintos y antes se mostraban como dos:
 // si había seña decía «Señada ✓» aunque quedara la mitad por cobrar.
@@ -125,9 +125,9 @@ function cobro (r) {
 const visibles = computed(() =>
   filtro.value === 'todas'
     ? reservas.value
-    : reservas.value.filter(r => (r.fecha_entrega_estimada || '') <= hoyISO))
+    : reservas.value.filter(r => (r.fecha_entrega_estimada || '') <= hoyISO()))
 
-const cuentaHoy = computed(() => reservas.value.filter(r => (r.fecha_entrega_estimada || '') <= hoyISO).length)
+const cuentaHoy = computed(() => reservas.value.filter(r => (r.fecha_entrega_estimada || '') <= hoyISO()).length)
 
 const cajaCerrada = ref(false)
 
@@ -166,7 +166,7 @@ async function cargar() {
   } catch { reservas.value = [] } finally { loading.value = false }
 }
 
-function esVencida(r) { return (r.fecha_entrega_estimada || '') < hoyISO }
+function esVencida(r) { return (r.fecha_entrega_estimada || '') < hoyISO() }
 
 // Abrir el modal, no entregar de una: lo que se cobra —la seña ya paga, el resto, con qué medio—
 // se decide con el paciente enfrente, no se adivina desde la lista.

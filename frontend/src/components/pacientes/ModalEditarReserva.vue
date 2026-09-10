@@ -37,6 +37,7 @@ import { ref, computed, watch } from 'vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
 import { updateReserva } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import { hoyISO } from '../../utils/dates.js'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -45,7 +46,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'saved'])
 const toast = useToast()
 
-const hoy    = new Date().toISOString().split('T')[0]
+const hoy    = hoyISO()
 const saving = ref(false)
 const error  = ref(null)
 const form   = ref({ cantidad: null, fecha_entrega_estimada: '', medio_pago: 'efectivo', sena_ars: 0 })

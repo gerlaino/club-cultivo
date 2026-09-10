@@ -36,5 +36,5 @@ export function formatFechaLarga(d) {
 
 /** Hoy como ISO YYYY-MM-DD */
 export function hoyISO() {
-  return new Date().toISOString().slice(0, 10)
+  return hoyISO()
 }

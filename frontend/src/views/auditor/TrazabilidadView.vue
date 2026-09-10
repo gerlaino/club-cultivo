@@ -490,7 +490,9 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import api, { getStockTrazabilidad, listStocks } from '../../lib/api.js'
+import { getStockTrazabilidad, listStocks } from '../../lib/api.js'
+import { descargarArchivo } from '../../lib/descargas.js'
+import { hoyISO } from '../../utils/dates.js'
 
 const FORMA_LABELS = {
   flor_seca: 'Flor seca', hash: 'Hash', aceite: 'Aceite', tintura: 'Tintura',
@@ -639,16 +641,15 @@ async function exportPdf() {
   const st = data.value?.stock
   if (!st?.id) return
   try {
-    const { data: blob } = await api.get(`/stocks/${st.id}/trazabilidad.pdf`, { responseType: 'blob' })
     const ref = st.numero_lote_producto || st.id
-    const url  = URL.createObjectURL(new Blob([blob]))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `trazabilidad_${ref}_${new Date().toISOString().slice(0, 10)}.pdf`
-    document.body.appendChild(link); link.click(); link.remove()
-    URL.revokeObjectURL(url)
-  } catch {
-    error.value = 'No se pudo generar el PDF. Reintentá en un momento.'
+    await descargarArchivo(`/stocks/${st.id}/trazabilidad.pdf`, {
+      filename: `trazabilidad_${ref}_${hoyISO()}.pdf`,
+    })
+    error.value = null
+  } catch (e) {
+    // El motivo lo trae el backend. Antes acá había un `catch` pelado que lo tiraba y decía
+    // "reintentá en un momento" — invitando a reintentar algo que no iba a andar nunca.
+    error.value = e.message
   }
 }
 

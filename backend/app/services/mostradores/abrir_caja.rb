@@ -113,9 +113,10 @@ module Mostradores
       end
     end
 
-    # El mismo criterio que en el cierre (`CerrarCaja#sobrante_sin_aplicar?`): quien atiende no
-    # elige qué hay sobre la mesa, así que no puede declarar que hay de más. Administración sí.
-    def sobrante_sin_aplicar?(dif) = dif.positive? && @usuario&.atiende_mostrador?
+    # El mismo criterio que en el cierre (`CerrarCaja#sobrante_sin_aplicar?`): un sobrante del
+    # arqueo no se aplica, lo cuente quien lo cuente. Nadie declara al contar que hay MÁS producto
+    # del que el depósito registra — para eso está `Cargar`, que sabe de dónde sale.
+    def sobrante_sin_aplicar?(dif) = dif.positive?
 
     # Lo que la persona anota al abrir: las diferencias, en texto, para que el admin las lea sin
     # tener que reconstruirlas.

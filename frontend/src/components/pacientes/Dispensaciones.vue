@@ -10,6 +10,7 @@ import { listDispensaciones, deleteDispensacion, listReservasPaciente, deleteRes
 import ModalNuevaDispensacion from './ModalNuevaDispensacion.vue'
 import ModalEditarDispensacion from './ModalEditarDispensacion.vue'
 import ModalEditarReserva from './ModalEditarReserva.vue'
+import { hoyISO } from '../../utils/dates.js'
 
 const props = defineProps({
   socioId:          { type: Number,  required: true },
@@ -115,7 +116,6 @@ const totalCantidad = computed(() => dispensaciones.value.reduce((s, d) => s + (
 const reservasPend  = ref([])
 const showEntrega   = ref(false)
 const reservaSel    = ref(null)
-const hoyISO        = new Date().toISOString().split('T')[0]
 
 async function loadReservas() {
   try {
@@ -190,7 +190,7 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
     <div v-if="(canDispensar || canReservar) && reservasPend.length" class="dv__reservas">
       <div class="dv__reservas-title"><i class="bi bi-bookmark-star"></i> Reservas pendientes</div>
       <div v-for="r in reservasPend" :key="r.id" class="dv__reserva"
-           :class="{ 'dv__reserva--vencida': r.fecha_entrega_estimada < hoyISO }">
+           :class="{ 'dv__reserva--vencida': r.fecha_entrega_estimada < hoyISO() }">
         <div class="dv__reserva-info">
           <span class="dv__reserva-prod">{{ FORMA_LABEL[r.stock?.forma_producto] || r.stock?.forma_producto }} · {{ r.cantidad }}{{ r.stock?.unidad || 'g' }}</span>
           <span class="dv__reserva-meta">

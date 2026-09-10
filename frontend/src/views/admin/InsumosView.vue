@@ -11,6 +11,7 @@ import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import DepositoDispensacion from './DepositoDispensacion.vue'
 import DepositoSalon from './DepositoSalon.vue'
+import { hoyISO } from '../../utils/dates.js'
 
 const store = useInsumosStore()
 const sede  = useSedeStore()
@@ -26,7 +27,6 @@ const salas = ref([])
 const categorias = ref([])          // árbol contable (para el alta y las etiquetas de grupo)
 const mostrarInactivos = ref(false)  // los insumos desactivados quedan ocultos por defecto
 
-const hoyISO = () => new Date().toISOString().slice(0, 10)
 const fmt = (n) => `$${Math.round(n || 0).toLocaleString('es-AR')}`
 
 // ── Depósitos (dinámicos: sistema + los que crea el admin) ────────────────────

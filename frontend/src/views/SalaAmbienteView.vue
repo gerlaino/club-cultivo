@@ -15,6 +15,7 @@ import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import { getSala, listLotes, getSalaAmbienteHistorico, listDispositivos } from '../lib/api.js'
 import { RouterLink } from 'vue-router'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import { paraInputDatetime } from '../utils/dates.js'
 
 const route  = useRoute()
 const auth   = useAuthStore()
@@ -29,8 +30,8 @@ const loading = ref(true)
 // Parámetros del chart
 const bucket    = ref('raw')
 const tipoChart = ref('temperatura')
-const desde     = ref(new Date(Date.now() - 7 * 24 * 3600_000).toISOString().slice(0, 16))
-const hasta     = ref(new Date().toISOString().slice(0, 16))
+const desde     = ref(paraInputDatetime(new Date(Date.now() - 7 * 24 * 3600_000)))
+const hasta     = ref(paraInputDatetime())
 
 // Activa sección
 const seccionActiva = ref('semaforo') // 'semaforo' | 'chart' | 'tendencia' | 'sensores' | 'manual' | 'alertas'

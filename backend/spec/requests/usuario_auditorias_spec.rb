@@ -75,13 +75,17 @@ RSpec.describe 'Usuario — historial de auditoría', type: :request do
       expect(body['has_more']).to be(false)
     end
 
-    it 'formatea el diff de una edición (campo/de/a) y no en un alta' do
+    # El diff se sirve LISTO PARA LEER: el nombre del campo en castellano y los valores ya
+    # formateados. Antes salía crudo (`tamano_maceta`, y un jsonb como "[object Object]") porque
+    # cada pantalla se arreglaba por su cuenta. Ver AuditoriaSerializer.
+    it 'sirve el diff de una edición en castellano, y ninguno en un alta' do
       sign_in_as(admin)
       get "/usuarios/#{actor.id}/auditorias", headers: auth_headers
       body = JSON.parse(response.body)
       edicion = body['data'].find { |a| a['accion'] == 'actualizar' }
       expect(edicion['tipo']).to eq('Lote')
-      expect(edicion['cambios']).to include('campo' => 'tamano_maceta', 'de' => 7, 'a' => 11)
+      expect(edicion['accion_label']).to eq('Editó')
+      expect(edicion['cambios']).to include('campo' => 'tamaño de maceta', 'de' => '7', 'a' => '11')
       alta = body['data'].find { |a| a['accion'] == 'crear' }
       expect(alta['cambios']).to eq([]) # crear/eliminar se explican solos
     end
@@ -93,6 +97,63 @@ RSpec.describe 'Usuario — historial de auditoría', type: :request do
       tipos = (JSON.parse(response.body)['data']).map { |a| a['accion'] }
       expect(body['total']).to eq(13) # las 13 del club, ninguna del otro
       expect(tipos).not_to include('eliminar') # la del otro club era 'eliminar'
+    end
+
+    # EL HISTORIAL ES LO QUE HIZO LA PERSONA, no lo que la app escribió en su nombre. Una dispensa
+    # deja dos o tres asientos detrás: los escribe la app, ella dispensó una vez.
+    describe 'las consecuencias no tapan los actos' do
+      # Un asiento CON dispensación detrás lo escribió la app; sin ella, lo cargó una persona.
+      # Hace falta una dispensación de verdad: el asiento la referencia por clave foránea.
+      let(:dispensa) do
+        ActsAsTenant.with_tenant(club) do
+          sede = create(:sede, club: club, tipo: 'mixta')
+          lote = create(:lote, club: club, sala: create(:sala, club: club, sede: sede))
+          st   = create(:stock, club: club, sede: sede, lote: lote, forma_producto: 'flor_seca',
+                                unidad: 'g', cantidad: 100, estado: 'asignado',
+                                disponibilidad: 'ambas', precio_sugerido_ars: 100)
+          Dispensacion.new(paciente: create(:paciente, club: club), user: actor, stock: st,
+                           sede: sede, cantidad: 1, medio_pago: 'efectivo', aporte_socio_ars: 100,
+                           fecha_dispensacion: Time.zone.today)
+                      .tap { |d| d.save!(validate: false) }
+        end
+      end
+      let(:mov_de_dispensa) do
+        ActsAsTenant.with_tenant(club) do
+          create(:movimiento_contable, club: club, created_by: actor, dispensacion_id: dispensa.id)
+        end
+      end
+      let(:mov_a_mano) do
+        ActsAsTenant.with_tenant(club) { create(:movimiento_contable, club: club, created_by: actor) }
+      end
+      let!(:generado) do
+        ActsAsTenant.with_tenant(club) do
+          Auditoria.create!(auditable_type: 'MovimientoContable', auditable_id: mov_de_dispensa.id,
+                            club: club, user: actor, accion: 'crear', cambios: { 'monto_ars' => '100.0' })
+        end
+      end
+      let!(:a_mano) do
+        ActsAsTenant.with_tenant(club) do
+          Auditoria.create!(auditable_type: 'MovimientoContable', auditable_id: mov_a_mano.id,
+                            club: club, user: actor, accion: 'crear', cambios: { 'monto_ars' => '500.0' })
+        end
+      end
+
+      it 'un asiento generado por una dispensa no aparece' do
+        sign_in_as(admin)
+        get "/usuarios/#{actor.id}/auditorias", headers: auth_headers
+
+        ids = JSON.parse(response.body)['data'].map { |a| a['id'] }
+        expect(ids).not_to include(generado.id)   # lo escribió la dispensa
+        expect(ids).to include(a_mano.id)         # esto sí lo hizo la persona
+      end
+
+      it 'pero se puede pedir verlo todo' do
+        sign_in_as(admin)
+        get "/usuarios/#{actor.id}/auditorias", params: { todo: '1' }, headers: auth_headers
+
+        ids = JSON.parse(response.body)['data'].map { |a| a['id'] }
+        expect(ids).to include(generado.id)
+      end
     end
 
     it 'un no-admin no puede ver el historial' do

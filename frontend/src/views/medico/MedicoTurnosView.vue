@@ -1,4 +1,5 @@
 <script setup>
+import { toISO } from '../../utils/dates.js'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { useRouter } from 'vue-router'
@@ -201,7 +202,7 @@ function onClickSlot(dia, event) {
 
   form.value = {
     ...defForm(),
-    fecha: dia.toISOString().split('T')[0],
+    fecha: toISO(dia),
     hora:  `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}`,
   }
   searchPac.value = ''
@@ -214,7 +215,7 @@ function abrirCrear() {
   const hoy = new Date()
   form.value = {
     ...defForm(),
-    fecha: hoy.toISOString().split('T')[0],
+    fecha: toISO(hoy),
     hora:  '09:00',
   }
   searchPac.value = ''
@@ -497,7 +498,7 @@ onUnmounted(() => clearInterval(tickInterval))
               <div class="tv__row-2">
                 <div class="tv__field">
                   <label class="tv__label">Fecha <span class="tv__req">*</span></label>
-                  <AppDatePicker v-model="form.fecha" :min="ahora.toISOString().split('T')[0]" />
+                  <AppDatePicker v-model="form.fecha" :min="toISO(ahora)" />
                 </div>
                 <div class="tv__field">
                   <label class="tv__label">Hora</label>

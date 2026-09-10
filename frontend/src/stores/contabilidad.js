@@ -1,3 +1,4 @@
+import { hoyISO } from '../utils/dates.js'
 import { logger } from '../utils/logger.js'
 // frontend/src/stores/contabilidad.js
 import { defineStore } from "pinia";
@@ -153,7 +154,7 @@ export const useContabilidadStore = defineStore("contabilidad", {
         const url  = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement("a");
         link.href  = url;
-        link.setAttribute("download", `movimientos_${new Date().toISOString().slice(0,10)}.${esXlsx ? "xlsx" : "csv"}`);
+        link.setAttribute("download", `movimientos_${hoyISO()}.${esXlsx ? "xlsx" : "csv"}`);
         document.body.appendChild(link);
         link.click();
         link.remove();

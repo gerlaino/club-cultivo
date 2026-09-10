@@ -13,6 +13,7 @@ import { useStatsStore } from '../../stores/stats.js'
 import { useTareasStore } from '../../stores/tareas.js'
 import OnboardingWizard  from '../OnboardingWizard.vue'
 import DsSpinner         from '../../design-system/components/Spinner.vue'
+import { hoyISO } from '../../utils/dates.js'
 
 const router      = useRouter()
 const auth        = useAuthStore()
@@ -430,7 +431,7 @@ watch(() => contable.value?.mes_actual?.por_semana, (data) => {
 
 // ── Data loading ───────────────────────────────────────────────────────────
 
-const todayISO = new Date().toISOString().slice(0, 10)
+const todayISO = hoyISO()
 
 onMounted(async () => {
   // Etapa 1: ¿la organización está configurado? Si no, el wizard entra sin esperar nada más.

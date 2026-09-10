@@ -1,6 +1,7 @@
 import { ref } from 'vue'
-import api from '../lib/api.js'
+import { descargarArchivo } from '../lib/descargas.js'
 import { useToast } from './useToast.js'
+import { hoyISO } from '../utils/dates.js'
 
 // Descarga de informes en PDF y Excel.
 //
@@ -23,39 +24,16 @@ export function useInformePdf(nombre, recurso = null) {
   async function descargar(formato, params = {}) {
     exporting.value = true
     try {
-      const { data } = await api.get(`/informes/${path}.${formato}`, {
-        params, responseType: 'blob',
+      await descargarArchivo(`/informes/${path}.${formato}`, {
+        params,
+        filename: `${nombre}_${hoyISO()}.${formato}`,
       })
-      const url  = URL.createObjectURL(new Blob([data]))
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `${nombre}_${new Date().toISOString().slice(0, 10)}.${formato}`
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-      URL.revokeObjectURL(url)
     } catch (e) {
-      // Con responseType 'blob' el cuerpo del error TAMBIÉN llega como blob, así que un
-      // rechazo con motivo (por ejemplo: faltan declarar variedades ante el INASE) se veía
-      // como "reintentá en un momento" — y reintentar no lo iba a resolver nunca.
-      const motivo = await leerError(e)
-      toast.error(motivo || 'No se pudo generar el archivo. Reintentá en un momento.',
-                  { timeout: motivo ? 9000 : 5000 })
+      // El motivo lo lee `descargarArchivo`: acá sólo se decide cuánto dejarlo en pantalla.
+      // Un rechazo con explicación (faltan variedades por declarar) no se lee en 5 segundos.
+      toast.error(e.message, { timeout: e.conMotivo ? 9000 : 5000 })
     } finally {
       exporting.value = false
-    }
-  }
-
-  async function leerError(e) {
-    const data = e?.response?.data
-    if (!data) return null
-    try {
-      const json = typeof data.text === 'function' ? JSON.parse(await data.text()) : data
-      if (!json?.error) return null
-      const faltan = json.geneticas_sin_declarar
-      return faltan?.length ? `${json.error} Faltan: ${faltan.join(', ')}.` : json.error
-    } catch {
-      return null
     }
   }
 

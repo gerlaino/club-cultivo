@@ -1,6 +1,7 @@
 import { computed, unref } from 'vue'
+import { toISO as toISOLocal } from '../utils/dates.js'
 
-const toISO = (d) => new Date(d).toISOString().slice(0, 10)
+const toISO = (d) => toISOLocal(new Date(d))
 
 /**
  * La semana de trabajo tal como se lee: una tarea que venció y sigue pendiente NO se queda en

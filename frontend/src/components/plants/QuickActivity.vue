@@ -179,6 +179,7 @@ import { ref, computed, watch } from 'vue'
 import { createPlantActivity } from '../../lib/api.js'
 import VoiceInput from '../VoiceInput.vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
+import { paraInputDatetime } from '../../utils/dates.js'
 
 const props = defineProps({
   show:       { type: Boolean, default: false },
@@ -244,7 +245,7 @@ function formVacio() {
   return {
     activity_type: props.tipoInicial || '',
     description:   '',
-    occurred_at:   new Date().toISOString().slice(0, 16),
+    occurred_at:   paraInputDatetime(),
     ph:            null,
     ec:            null,
     temperatura:   null,

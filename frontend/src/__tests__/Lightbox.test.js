@@ -62,9 +62,39 @@ describe('Lightbox', () => {
       props: { images: IMAGES, index: 0, open: true },
     })
     await w.vm.$nextTick()
-    document.querySelector('.lb__close')?.click()
+    document.querySelector('button.lb__btn')?.click()
     await w.vm.$nextTick()
     expect(w.emitted('close')).toBeTruthy()
+    w.unmount()
+  })
+
+  it('ofrece descargar la imagen que se está viendo, con su nombre', async () => {
+    const w = mount(Lightbox, {
+      attachTo: document.body,
+      props: { images: IMAGES, index: 1, open: true },
+    })
+    await w.vm.$nextTick()
+    const a = document.querySelector('a.lb__btn')
+    expect(a?.getAttribute('href')).toBe('/b.jpg')
+    expect(a?.getAttribute('download')).toBe('imagen')
+    w.unmount()
+  })
+
+  // Un adjunto de R2 es otro origen: ahí el atributo `download` no alcanza y hay que bajar por
+  // una URL distinta (la de `disposition=attachment`). Por eso `descarga` gana sobre `src`.
+  it('cuando hay una url de descarga propia, baja de esa y no de la que muestra', async () => {
+    const w = mount(Lightbox, {
+      attachTo: document.body,
+      props: {
+        images: [{ src: '/ver.jpg', alt: 'Comprobante', nombre: 'comprobante.jpg', descarga: '/bajar.jpg?disposition=attachment' }],
+        index: 0,
+        open: true,
+      },
+    })
+    await w.vm.$nextTick()
+    const a = document.querySelector('a.lb__btn')
+    expect(a?.getAttribute('href')).toBe('/bajar.jpg?disposition=attachment')
+    expect(a?.getAttribute('download')).toBe('comprobante.jpg')
     w.unmount()
   })
 

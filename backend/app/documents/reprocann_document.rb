@@ -16,10 +16,11 @@ class ReprocannDocument < BaseDocument
     "sin_reprocann"           => nil,
   }.freeze
 
-  def initialize(club:, usuario:, data:)
+  def initialize(club:, usuario:, data:, salvedad_inase: nil)
     @data = data
     super(club: club, usuario: usuario,
-          titulo: "Informe REPROCANN", tipo_doc: "Informe REPROCANN", tipo_code: "RPC")
+          titulo: "Informe REPROCANN", tipo_doc: "Informe REPROCANN", tipo_code: "RPC",
+          salvedad_inase: salvedad_inase)
   end
 
   def cuerpo(pdf)

@@ -668,10 +668,13 @@ class StocksController < ApplicationController
       # PDF de servidor: la trazabilidad de un lote es lo primero que pide un auditor y se
       # bajaba como captura de pantalla.
       format.pdf do
-        # Documento que se presenta: no sale si hay variedades sin acreditar.
-        next if bloquear_descarga_si_falta_declarar!
-
-        send_data TrazabilidadDocument.new(club: current_user.club, usuario: current_user, datos: datos).render,
+        # SALE SIEMPRE. No es un documento que se presente por mesa de entradas: es lo que pide un
+        # auditor en una inspección y lo que la organización usa para mirar su propia cadena.
+        # Si hay variedades sin acreditar, el PDF lo DICE — y nombra sólo las de ESTE frasco:
+        # avisar acá por una variedad que no lo tocó nunca es ruido que enseña a ignorar el aviso.
+        ids_genetica = [s.genetica_id, lote&.genetica_id].compact.uniq
+        send_data TrazabilidadDocument.new(club: current_user.club, usuario: current_user, datos: datos,
+                                           salvedad_inase: salvedad_inase(ids: ids_genetica)).render,
                   filename: "trazabilidad_#{s.numero_lote_producto.presence || s.id}_#{Time.zone.today.strftime('%Y%m%d')}.pdf",
                   type: 'application/pdf', disposition: 'attachment'
       end

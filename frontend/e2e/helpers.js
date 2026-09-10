@@ -61,12 +61,26 @@ export async function entrar (page, quien) {
 
   // Y se VERIFICA con quién entró. Sin esto, un login que no cambió de usuario se descubre tres
   // pasos después, con un error que no tiene nada que ver.
-  const email = await page.evaluate(async (base) => {
+  //
+  // El login deja MÁS DE UNA navegación en vuelo (el guard de rol manda a la home del usuario), y
+  // si una cae justo acá el `evaluate` muere con "Execution context was destroyed" — un rojo que
+  // no tiene nada que ver con lo que la prueba mira. Se espera a que la página se quede quieta y
+  // se reintenta una vez: un flake enseña a desconfiar de toda la suite.
+  const preguntarQuienSoy = () => page.evaluate(async (base) => {
     const r = await fetch(`${base}/me`, { credentials: 'include' })
     if (!r.ok) return null
     const j = await r.json()
     return j?.email || j?.user?.email || j?.data?.email || null
   }, API)
+
+  await page.waitForLoadState('networkidle').catch(() => {})
+  let email
+  try {
+    email = await preguntarQuienSoy()
+  } catch {
+    await page.waitForLoadState('domcontentloaded').catch(() => {})
+    email = await preguntarQuienSoy()
+  }
   if (email !== USUARIOS[quien]) {
     throw new Error(`Se esperaba entrar como ${USUARIOS[quien]} y la sesión es de ${email || '(nadie)'}`)
   }

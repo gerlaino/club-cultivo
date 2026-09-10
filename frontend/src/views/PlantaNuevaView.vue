@@ -5,6 +5,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { listLotes } from '../lib/api.js'
 import api from '../lib/api.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import { hoyISO } from '../utils/dates.js'
 
 const router = useRouter()
 const route  = useRoute()
@@ -18,7 +19,7 @@ const fotoFile    = ref(null)
 const fotoPreview = ref(null)
 const fotoInput   = ref(null)
 
-const today = new Date().toISOString().split('T')[0]
+const today = hoyISO()
 
 // Estados correctos según el modelo
 const STATE_META = {

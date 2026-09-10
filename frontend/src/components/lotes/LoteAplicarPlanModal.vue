@@ -122,6 +122,7 @@ import { listPlanTrabajos, previewLotePlan, aplicarLotePlan } from '../../lib/ap
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
 import { useToast } from '../../composables/useToast.js'
+import { hoyISO } from '../../utils/dates.js'
 
 const props = defineProps({
   lote: { type: Object, required: true },
@@ -132,7 +133,7 @@ const toast = useToast()
 
 const planes        = ref([])
 const planId        = ref('')
-const fechaInicio   = ref((props.lote.start_date || '').slice(0, 10) || new Date().toISOString().slice(0, 10))
+const fechaInicio   = ref((props.lote.start_date || '').slice(0, 10) || hoyISO())
 const preview       = ref(null)
 const loadingPlanes = ref(false)
 const loadingPreview = ref(false)

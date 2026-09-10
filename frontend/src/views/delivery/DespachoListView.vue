@@ -2,6 +2,7 @@
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
+import Lightbox from '../../components/ui/Lightbox.vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import {
   PackageCheck, Truck, CheckCircle2, XCircle, User, MapPin,
@@ -11,15 +12,69 @@ import {
 import {
   listDespachos, listEntregadores, reasignarDelivery, reprogramarPaquete,
   listReservas, entregarReserva, entregarPaquete, reportarFallo, cancelarEntregaDispensacion,
-  getRutaEntrega, ordenarRuta, bloquearRuta, assetUrl, iniciarViaje,
+  getRutaEntrega, ordenarRuta, bloquearRuta, assetUrl, assetDownloadUrl, iniciarViaje,
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useAuthStore } from '../../stores/auth'
+import { hoyISO } from '../../utils/dates.js'
 
 const toast = useToast()
 const { confirm } = useConfirm()
 const auth = useAuthStore()
+
+// ── Visor de las imágenes de una entrega ───────────────────────────────────
+// Firma y comprobantes se miraban de tres formas distintas: la firma como un <img> de 240px sin
+// click, y los comprobantes con un <a target="_blank"> que te sacaba de la app. Van los tres al
+// mismo visor (el Lightbox del DS), como una galería de ESA entrega, con descarga.
+const visor      = ref({ open: false, index: 0, images: [] })
+
+function imagenesDe(d) {
+  const imgs = []
+  if (d.estado_envio === 'entregado' && d.firma_entrega_data) {
+    imgs.push({
+      src: d.firma_entrega_data,
+      alt: 'Firma del receptor',
+      nombre: `firma-${d.codigo_paquete || d.id}.png`,
+    })
+  }
+  for (const c of (d.cobros || [])) {
+    if (!c.comprobante_url) continue
+    imgs.push({
+      src: assetUrl(c.comprobante_url),
+      descarga: assetDownloadUrl(c.comprobante_url),
+      alt: 'Comprobante de pago',
+      nombre: `comprobante-pago-${d.codigo_paquete || d.id}`,
+    })
+  }
+  if (d.comprobante_entrega_url) {
+    imgs.push({
+      src: assetUrl(d.comprobante_entrega_url),
+      descarga: assetDownloadUrl(d.comprobante_entrega_url),
+      alt: 'Comprobante de entrega',
+      nombre: `comprobante-entrega-${d.codigo_paquete || d.id}`,
+    })
+  }
+  return imgs
+}
+
+// La firma y la foto se borran a los 30 días (PurgarAdjuntosEntregaJob). Si el hueco no dijera
+// nada, una entrega vieja se vería IGUAL que una donde nadie firmó — y eso hace dudar del
+// registro entero. La bitácora del envío guarda el evento; acá se lee.
+function imagenesPurgadas(d) {
+  return (d.historial_envio || []).find(e => e?.evento === 'imagenes_purgadas') || null
+}
+function fechaCorta(iso) {
+  if (!iso) return ''
+  const dt = new Date(iso)
+  return isNaN(dt) ? '' : dt.toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function abrirVisor(d, alt) {
+  const images = imagenesDe(d)
+  const index  = Math.max(0, images.findIndex(i => i.alt === alt))
+  visor.value = { open: true, index, images }
+}
 
 const despachos      = ref([])
 const deliveryUsers  = ref([])
@@ -131,7 +186,7 @@ const modoRuta       = computed(() => !!filtroDelivery.value)
 // La ruta es siempre la del día: los despachos se arman y se envían en el día (una dispensa
 // futura es una Reserva, no un despacho — el modelo prohíbe fecha_dispensacion futura). Por eso
 // fechaRuta queda fija a hoy y no se expone un selector: solo indexa el orden guardado de la ruta.
-const fechaRuta      = ref(new Date().toISOString().slice(0, 10))
+const fechaRuta      = ref(hoyISO())
 const rutaActual     = ref(null)   // { id, bloqueada, despachos: [ids] } de (repartidor, fechaRuta)
 const guardandoOrden = ref(false)
 
@@ -235,7 +290,7 @@ const fmtFechaHora = (iso) => iso
 
 const fmtMoneda = (n) => (n == null ? null : new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n))
 
-const HOY = new Date().toISOString().slice(0, 10)
+const HOY = hoyISO()
 
 // Reservas con envío pendientes, ordenadas por urgencia (las más próximas/vencidas primero).
 const reservasEnvio = computed(() =>
@@ -750,25 +805,33 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
 
               <template v-if="d.estado_envio === 'entregado' && d.firma_entrega_data">
                 <div class="dsp__detail-label dsp__detail-label--green">Firma del receptor</div>
-                <div class="dsp__firma-preview">
-                  <img :src="d.firma_entrega_data" alt="Firma" class="dsp__firma-img" />
+                <button type="button" class="dsp__firma-preview" @click="abrirVisor(d, 'Firma del receptor')">
+                  <img :src="d.firma_entrega_data" alt="Firma del receptor" class="dsp__firma-img" />
+                </button>
+              </template>
+
+              <template v-if="imagenesPurgadas(d)">
+                <div class="dsp__detail-label">Firma y foto de la entrega</div>
+                <div class="dsp__detail-val dsp__detail-val--italic">
+                  Se borraron el {{ fechaCorta(imagenesPurgadas(d).fecha) }} por antigüedad. La entrega
+                  sigue registrada.
                 </div>
               </template>
 
               <!-- Comprobantes de pago (por cobro) -->
               <template v-for="c in (d.cobros || []).filter(c => c.comprobante_url)" :key="`comp-${c.id}`">
                 <div class="dsp__detail-label dsp__detail-label--green">Comprobante de pago</div>
-                <a :href="assetUrl(c.comprobante_url)" target="_blank" rel="noopener" class="dsp__comp-link">
+                <button type="button" class="dsp__comp-link" @click="abrirVisor(d, 'Comprobante de pago')">
                   <img :src="assetUrl(c.comprobante_url)" alt="Comprobante de pago" class="dsp__comp-img" />
-                </a>
+                </button>
               </template>
 
               <!-- Comprobante de entrega -->
               <template v-if="d.comprobante_entrega_url">
                 <div class="dsp__detail-label dsp__detail-label--green">Comprobante de entrega</div>
-                <a :href="assetUrl(d.comprobante_entrega_url)" target="_blank" rel="noopener" class="dsp__comp-link">
+                <button type="button" class="dsp__comp-link" @click="abrirVisor(d, 'Comprobante de entrega')">
                   <img :src="assetUrl(d.comprobante_entrega_url)" alt="Comprobante de entrega" class="dsp__comp-img" />
-                </a>
+                </button>
               </template>
             </div>
 
@@ -953,6 +1016,14 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
         </div>
       </div>
     </Teleport>
+
+    <Lightbox
+      :images="visor.images"
+      :index="visor.index"
+      :open="visor.open"
+      @update:index="visor.index = $event"
+      @close="visor.open = false"
+    />
 
   </div>
 </template>
@@ -1299,9 +1370,11 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
 .dsp__detail-val--italic { font-style: italic; color: var(--c-ink-500); }
 .dsp__detail-val--red    { color: #dc2626; }
 .dsp__detail-val--green  { color: var(--c-leaf-700); }
-.dsp__firma-preview { border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; padding: .4rem; display: inline-block; }
+.dsp__firma-preview { border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; padding: .4rem; display: inline-block; cursor: zoom-in; font: inherit; }
+.dsp__firma-preview:hover { border-color: var(--c-leaf-600, #3F6452); }
 .dsp__firma-img { display: block; max-width: 240px; height: auto; }
-.dsp__comp-link { display: inline-block; }
+.dsp__comp-link { display: inline-block; padding: 0; border: none; background: none; cursor: zoom-in; font: inherit; }
+.dsp__comp-link:hover .dsp__comp-img { border-color: var(--c-leaf-600, #3F6452); }
 .dsp__comp-img { display: block; max-width: 240px; max-height: 320px; height: auto; border-radius: 8px; border: 1px solid var(--c-slate-200); }
 .dsp__code-sm {
   font-family: monospace;

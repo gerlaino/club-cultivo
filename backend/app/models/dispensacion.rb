@@ -2,10 +2,27 @@ class Dispensacion < ApplicationRecord
   include Restorable
   include Auditable
   self.table_name = 'dispensaciones'
+  # AUDITORÍA: allowlist, como Paciente/User/CajaTurno. Sin esto se guardaban las 46 columnas
+  # en cada alta y, en cada entrega, una COPIA ENTERA de la firma en base64 dentro de
+  # `auditorias.cambios` — lo que volvía inútil cualquier política de retención sobre la firma:
+  # se borraba la de `dispensaciones` y quedaba la del rastro, para siempre.
+  # Fuera a propósito: firma_entrega_data (blob), historial_envio y producto_snapshot (jsonb que
+  # ya se cuentan solos en otro lado), token/lote_codigo/genetica_nombre (derivados del alta).
+  auditar_solo :fecha_dispensacion, :paciente_id, :stock_id, :sede_id, :cantidad,
+               :aporte_socio_ars, :precio_unitario_ars, :medio_pago, :monto_credito_ars,
+               :descuento_dispensa_pct, :descuento_paciente_pct, :es_regalo, :observaciones,
+               :con_envio, :estado_envio, :delivery_id, :codigo_paquete, :direccion_envio,
+               :entregado_at, :fallido_at, :motivo_fallo, :notas_entrega,
+               :cobrar_en_entrega, :ruta_entrega_id, :orden_entrega
 
   # dispensaciones no tiene columna club_id (no es acts_as_tenant): lo deriva del paciente
   # (paciente_id es NOT NULL). Lo necesita el concern Auditable para el rastro.
   def club_id = paciente&.club_id
+
+  # Cuánto viven la firma del receptor y la foto de la entrega. Pasado eso las borra
+  # `PurgarAdjuntosEntregaJob` y queda el evento en `historial_envio` — la entrega sigue
+  # registrada, lo que se pierde es la imagen. Vive acá porque lo preguntan el job y la pantalla.
+  RETENCION_IMAGENES_ENTREGA = 30.days
 
   ESTADOS_ENVIO = %w[pendiente en_viaje entregado fallido cancelada].freeze
   MEDIOS_PAGO   = %w[efectivo transferencia cuenta_corriente no_abona credito_gramos mixto regalo].freeze

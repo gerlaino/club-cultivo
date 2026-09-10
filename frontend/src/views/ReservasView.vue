@@ -127,6 +127,7 @@ import { listReservas, cancelarReserva, anularSenaReserva, updateReserva, delete
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import { useAuthStore } from '../stores/auth'
+import { hoyISO } from '../utils/dates.js'
 
 const toast = useToast()
 const { confirm } = useConfirm()
@@ -163,7 +164,7 @@ const loading  = ref(true)
 const busy     = ref(null)
 const estado   = ref('pendiente')
 
-const hoy = new Date().toISOString().split('T')[0]
+const hoy = hoyISO()
 
 const fmt = n => n == null ? '—' :
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(n)

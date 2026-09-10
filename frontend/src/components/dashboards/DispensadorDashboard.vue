@@ -210,6 +210,7 @@ import CajaMostradorCard from './CajaMostradorCard.vue'
 import { useSemanaTareas } from '../../composables/useSemanaTareas.js'
 import DsStat               from '../../design-system/components/Stat.vue'
 import { PackagePlus }      from 'lucide-vue-next'
+import { toISO } from '../../utils/dates.js'
 
 const auth = useAuthStore()
 
@@ -233,7 +234,7 @@ const hora    = new Date().getHours()
 const saludo  = hora < 12 ? 'Buenos días' : hora < 19 ? 'Buenas tardes' : 'Buenas noches'
 const hoy     = new Date()
 const fechaHoy = (() => { const s = hoy.toLocaleDateString('es-AR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }); return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() })()
-const fechaParam = hoy.toISOString().slice(0, 10)
+const fechaParam = toISO(hoy)
 
 // El alcance lo dice el BACKEND (`alcance`), no el rol leído en el front: si la pantalla lo
 // decidiera por su cuenta, un día mostraría una columna que el payload ya no trae — o peor,

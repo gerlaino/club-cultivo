@@ -131,15 +131,34 @@ RSpec.describe 'Contar un producto del mostrador', type: :request do
       expect(stock.reload.cantidad.to_d).to eq(antes_stock)
     end
 
-    it 'administración sí: ella gobierna la mesa, y el inventario sube con ella' do
+    # SUBIR LA MESA ES APARTAR DEL DEPÓSITO, NO CREAR PRODUCTO. Administración puede hacerlo
+    # —ella gobierna la mesa— pero lo que sube sale de lo que ya existe: el `Stock` no se mueve.
+    it 'administración sube la mesa, y el inventario NO sube con ella' do
+      ActsAsTenant.with_tenant(club) do
+        # Baja 50 g al depósito para que haya algo libre que apartar.
+        Mostradores::Cargar.call(mostrador: sede.mostrador!, usuario: admin, motivo: 'al depósito',
+                                 cambios: [{ stock_id: stock.id, cantidad: en_la_mesa - 50 }])
+      end
       antes = en_la_mesa
 
       contar!(antes + 10, motivo: 'apareció un frasco', como: admin)
 
       expect(response).to have_http_status(:ok)
       expect(en_la_mesa).to eq(antes + 10)
-      expect(stock.reload.cantidad.to_f).to eq(510.0)
-      expect(stock.stock_movimientos.where(tipo: 'ajuste').last.gramos.to_f).to eq(10.0)
+      expect(stock.reload.cantidad.to_f).to eq(500.0)          # el inventario, intacto
+      expect(stock.stock_movimientos.where(tipo: 'ajuste')).to be_empty
+    end
+
+    # El tope que ya tenía `Cargar` y les faltaba a los conteos: no se aparta lo que no existe.
+    it 'y no puede apartar más de lo que hay libre en el depósito' do
+      antes = en_la_mesa # la mesa tiene TODO: no queda nada libre
+
+      body = contar!(antes + 10, motivo: 'apareció un frasco', como: admin)
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(body['error']).to match(/depósito/i)
+      expect(en_la_mesa).to eq(antes)
+      expect(stock.reload.cantidad.to_f).to eq(500.0)
     end
 
     it 'y el faltante de quien atiende se sigue aplicando: restar no inventa nada' do

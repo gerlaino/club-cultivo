@@ -14,12 +14,12 @@
 # últimos cuatro, que alcanzan para desambiguar homónimos sin dejar el padrón a la vista de
 # cualquiera que pase por atrás.
 class TrazabilidadDocument < BaseDocument
-  def initialize(club:, usuario:, datos:)
+  def initialize(club:, usuario:, datos:, salvedad_inase: nil)
     @d = datos.deep_symbolize_keys
     st = @d[:stock] || {}
     super(club: club, usuario: usuario,
           titulo: "Trazabilidad — #{st[:numero_lote_producto].presence || "Stock ##{st[:id]}"}",
-          tipo_doc: "Trazabilidad", tipo_code: "TRZ")
+          tipo_doc: "Trazabilidad", tipo_code: "TRZ", salvedad_inase: salvedad_inase)
   end
 
   def cuerpo(pdf)

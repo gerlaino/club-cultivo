@@ -14,6 +14,7 @@ import EditarCompraCuotasModal from "../components/contabilidad/EditarCompraCuot
 import DsSpinner from '../design-system/components/Spinner.vue'
 // Categorías integradas como sección de Contabilidad (config del hub contable)
 import FinanzasCatalogoView from './admin/FinanzasCatalogoView.vue'
+import { hoyISO, toISO } from '../utils/dates.js'
 
 const store   = useContabilidadStore()
 const auth    = useAuthStore()
@@ -58,7 +59,7 @@ function fmtFechaCorta(d) {
 }
 
 async function cerrarMesAnterior() {
-  const hasta = finMesAnterior.value.toISOString().slice(0, 10)
+  const hasta = toISO(finMesAnterior.value)
   const ok = await confirm({
     title:       'Cerrar período contable',
     message:     `Se congela el libro hasta el ${fmtFechaCorta(hasta)} inclusive: ningún movimiento anterior a esa fecha se podrá crear, editar ni eliminar. Las correcciones futuras serán por contra-asiento o reapertura.`,
@@ -243,7 +244,7 @@ async function exportarPDF(formato = 'pdf') {
     const url  = URL.createObjectURL(new Blob([data]))
     const link = document.createElement('a')
     link.href = url
-    link.download = `PL_produccion_${new Date().toISOString().slice(0, 10)}.${formato}`
+    link.download = `PL_produccion_${hoyISO()}.${formato}`
     document.body.appendChild(link); link.click(); link.remove()
     URL.revokeObjectURL(url)
   } catch {

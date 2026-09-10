@@ -9,6 +9,12 @@ Sidekiq.configure_server do |config|
         'cron'  => '0 * * * *',
         'class' => 'JwtDenylistCleanupJob'
       },
+      'purgar_adjuntos_entrega' => {
+        # De madrugada: toca adjuntos y no hay nadie mirando una entrega vieja a esa hora.
+        'cron'  => '40 4 * * *',
+        'class' => 'PurgarAdjuntosEntregaJob',
+        'description' => 'Borra firma y foto de las entregas pasados 30 días (deja el rastro en la bitácora del envío)'
+      },
       'aplicar_bajas_modulos' => {
         # Temprano, antes de que la organización arranque el día: el módulo se apaga sin que
         # nadie esté a mitad de una operación.

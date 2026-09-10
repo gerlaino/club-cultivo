@@ -31,6 +31,7 @@ import SocioTabPortal          from '../components/pacientes/SocioTabPortal.vue'
 import SocioEditarModal          from '../components/pacientes/SocioEditarModal.vue'
 import ModalAgendarTurnoMedico  from '../components/pacientes/ModalAgendarTurnoMedico.vue'
 import TurnoDetallePanel        from '../components/TurnoDetallePanel.vue'
+import { hoyISO } from '../utils/dates.js'
 
 const route  = useRoute()
 const store  = usePacientesStore()
@@ -696,7 +697,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
               <div class="sd__edit-body">
                 <div class="sd__edit-row">
                   <label class="sd__edit-lbl">Fecha</label>
-                  <AppDatePicker v-model="editForm.fecha" :min="new Date().toISOString().split('T')[0]" />
+                  <AppDatePicker v-model="editForm.fecha" :min="hoyISO()" />
                 </div>
                 <div class="sd__edit-row">
                   <label class="sd__edit-lbl">Hora</label>

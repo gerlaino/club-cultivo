@@ -107,6 +107,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { listLotes, listSalas, listGeneticas, getLoteProximoCodigo, createLote } from '../../lib/api'
 import { useAuthStore } from '../../stores/auth'
+import { hoyISO } from '../../utils/dates.js'
 
 const router = useRouter()
 const auth   = useAuthStore()
@@ -144,7 +145,7 @@ async function crearLote() {
       estado:       form.value.estado,
       plants_count: form.value.plants_count || 1,
       codigo:       cd.codigo,
-      start_date:   new Date().toISOString().slice(0, 10),
+      start_date:   hoyISO(),
     })
     showCrear.value = false
     router.push(`/m/lote/${lote.id}`)

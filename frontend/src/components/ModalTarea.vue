@@ -281,6 +281,7 @@ import { formatFechaCorta, formatFechaLarga } from '../utils/fecha.js'
 import { getUserSalasAsignadas } from '../lib/api.js'
 import AppDatePicker from './ui/AppDatePicker.vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import { hoyISO, toISO } from '../utils/dates.js'
 
 const props = defineProps({
   show:         { type: Boolean, default: false },
@@ -377,7 +378,7 @@ const fechasGeneradas = computed(() => {
   const cur    = new Date(form.value.fecha_programada + 'T00:00:00')
   while (cur <= fin && fechas.length < 365) {
     if (repeticion.value.dias.includes(cur.getDay()))
-      fechas.push(cur.toISOString().split('T')[0])
+      fechas.push(toISO(cur))
     cur.setDate(cur.getDate() + 1)
   }
   return fechas
@@ -399,7 +400,7 @@ function formVacio() {
   return {
     titulo: '', descripcion: '', tipo: 'riego', prioridad: 'normal',
     asignada_a_id: '', sala_id: '', lote_id: '',
-    fecha_programada: new Date().toISOString().split('T')[0],
+    fecha_programada: hoyISO(),
   }
 }
 const form = ref(formVacio())
@@ -441,7 +442,7 @@ watch(() => props.show, (val) => {
       asignada_a_id:    t.asignada_a?.id || '',
       sala_id:          t.sala_id || t.sala?.id || '',
       lote_id:          t.lote_id || t.lote?.id || '',
-      fecha_programada: t.fecha_programada || new Date().toISOString().split('T')[0],
+      fecha_programada: t.fecha_programada || hoyISO(),
     }
   } else {
     mostrarSala.value = false

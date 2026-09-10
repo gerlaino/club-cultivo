@@ -55,6 +55,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { toISO } from '../../utils/dates.js'
 
 const props = defineProps({
   plan:       { type: Object, required: true },
@@ -73,7 +74,7 @@ function parseDate(iso) {
   return new Date(y, m - 1, d)
 }
 function isoDate(d) {
-  return d.toISOString().slice(0, 10)
+  return toISO(d)
 }
 function isoLunes(from) {
   const d = from ? parseDate(from) : new Date()

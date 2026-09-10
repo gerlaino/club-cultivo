@@ -4,6 +4,7 @@ import AppDatePicker from '../ui/AppDatePicker.vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { createAplicacion, listLotes, listSalas } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import { hoyISO, toISO } from '../../utils/dates.js'
 
 const props = defineProps({
   plan: { type: Object, required: true },
@@ -30,11 +31,11 @@ const TIPO_SALA_LABEL = {
   enraizado: 'Enraizado',
 }
 
-function isoHoy() { return new Date().toISOString().slice(0, 10) }
+function isoHoy() { return hoyISO() }
 function addDays(iso, n) {
   const d = new Date(iso + 'T00:00:00')
   d.setDate(d.getDate() + n)
-  return d.toISOString().slice(0, 10)
+  return toISO(d)
 }
 function formatFecha(iso) {
   const [y, m, d] = iso.split('-')

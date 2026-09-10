@@ -15,6 +15,12 @@
         <button class="inf__btn" :disabled="descargando" @click="descargar('xlsx')">
           <Sheet :size="15" :stroke-width="2" /> Excel
         </button>
+        <!-- Presentar es un acto aparte y la app no lo hace: sólo este botón valida el INASE. -->
+        <button class="inf__btn" :disabled="descargando"
+                title="Valida que todas las variedades estén acreditadas ante el INASE"
+                @click="descargar('pdf', true)">
+          <FileCheck :size="15" :stroke-width="2" /> Para presentar
+        </button>
       </div>
     </div>
 
@@ -104,7 +110,9 @@ import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { FileCheck, FileDown, Sheet } from 'lucide-vue-next'
 import api from '../../lib/api.js'
+import { descargarArchivo } from '../../lib/descargas.js'
 import { useToast } from '../../composables/useToast.js'
+import { hoyISO } from '../../utils/dates.js'
 
 const toast = useToast()
 const periodo = ref('mes_actual')
@@ -112,18 +120,18 @@ const loading = ref(false)
 const data    = ref(null)
 const descargando = ref(false)
 
-async function descargar(formato) {
+// `paraPresentar`: sólo entonces se valida que las variedades estén acreditadas ante el INASE.
+// Para mirar, sale siempre con la salvedad impresa — la app no es un canal oficial.
+async function descargar(formato, paraPresentar = false) {
   descargando.value = true
   try {
-    const res = await api.get(`/informes/reprocann.${formato}`, { responseType: 'blob' })
-    const url = window.URL.createObjectURL(new Blob([res.data]))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `informe_reprocann_${new Date().toISOString().slice(0, 10)}.${formato}`
-    document.body.appendChild(a); a.click(); a.remove()
-    window.URL.revokeObjectURL(url)
-  } catch {
-    toast.error('No se pudo descargar el informe')
+    await descargarArchivo(`/informes/reprocann.${formato}`, {
+      params: { para_presentar: paraPresentar ? 1 : undefined },
+      filename: `informe_reprocann_${hoyISO()}.${formato}`,
+    })
+  } catch (e) {
+    // Antes: `catch {}` con un mensaje genérico que tapaba lo que el backend explicaba.
+    toast.error(e.message, { timeout: e.conMotivo ? 9000 : 5000 })
   } finally {
     descargando.value = false
   }

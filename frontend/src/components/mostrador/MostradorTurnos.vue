@@ -104,6 +104,7 @@ import { ref, computed, watch } from 'vue'
 import CorregirConteo from './CorregirConteo.vue'
 import { listTurnosMostrador, descargarTurnosMostrador } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import { hoyISO } from '../../utils/dates.js'
 
 const props = defineProps({ sedeId: { type: Number, default: null } })
 
@@ -285,7 +286,7 @@ async function descargar () {
     const url  = URL.createObjectURL(new Blob([res.data], { type: 'text/csv;charset=utf-8' }))
     const a    = document.createElement('a')
     a.href = url
-    a.download = nombre || `arqueos-${new Date().toISOString().slice(0, 10)}.csv`
+    a.download = nombre || `arqueos-${hoyISO()}.csv`
     document.body.appendChild(a)
     a.click()
     a.remove()

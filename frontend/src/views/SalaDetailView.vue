@@ -20,6 +20,7 @@ import EmptyState from '../components/ui/EmptyState.vue'
 import { useToast } from '../composables/useToast.js'
 import SemaforoAmbiente from '../components/ambiente/SemaforoAmbiente.vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import { hoyISO, toISO } from '../utils/dates.js'
 
 const route  = useRoute()
 const router = useRouter()
@@ -664,7 +665,7 @@ const heredadoStartDatePreview = computed(() => {
   if (total <= 0) return null
   const date = new Date()
   date.setDate(date.getDate() - total)
-  return date.toISOString().slice(0, 10)
+  return toISO(date)
 })
 
 function emptyLoteForm() {
@@ -676,7 +677,7 @@ function emptyLoteForm() {
     origen: conOrigen ? 'semilla' : null,
     planta_madre_id: null,
     plants_count: 0,
-    start_date: new Date().toISOString().slice(0, 10),
+    start_date: hoyISO(),
     genetica_id: '',
     grow_type: 'sustrato',
     light_type: '',

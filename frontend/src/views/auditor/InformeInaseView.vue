@@ -2,8 +2,16 @@
   <div class="inf">
     <div class="inf__header">
       <h1 class="inf__title"><FileBadge :size="20" :stroke-width="1.75" /> Informe INASE — Variedades</h1>
-      <button class="inf__pdf" :disabled="!data || exporting" @click="exportarPdf">
+      <button class="inf__pdf" :disabled="!data || exporting" @click="exportarPdf()">
         <i class="bi bi-filetype-pdf"></i> {{ exporting ? 'Generando…' : 'PDF' }}
+      </button>
+      <!-- DOS documentos, no dos modos del mismo archivo. Presentar es un acto aparte que la app
+           no hace: el PDF de arriba sale siempre para que la organización vea su realidad; éste
+           valida que todo esté acreditable ante el INASE y no sale si falta algo. -->
+      <button class="inf__pdf" :disabled="!data || exporting"
+              title="Valida que todas las variedades estén acreditadas ante el INASE"
+              @click="exportarPdf({ para_presentar: 1 })">
+        <i class="bi bi-patch-check"></i> Para presentar
       </button>
       <button class="inf__pdf" :disabled="!data || exporting" @click="exportarXlsx">
         <i class="bi bi-file-earmark-spreadsheet"></i> Excel

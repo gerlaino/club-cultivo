@@ -378,6 +378,15 @@ export const assetUrl = (path) => {
   const base = (import.meta.env.VITE_API_URL || 'http://localhost:3001/api').replace(/\/api\/?$/, '')
   return base + path
 }
+// La MISMA url pero pidiendo que baje en vez de abrirse. Hace falta porque en producción los
+// adjuntos salen de R2 —otro origen— y ahí el navegador IGNORA el atributo `download` del <a>:
+// navega al archivo en vez de guardarlo. `disposition=attachment` hace que ActiveStorage firme
+// la URL con `response-content-disposition`, y entonces baja de verdad.
+export const assetDownloadUrl = (path) => {
+  const url = assetUrl(path)
+  if (!url) return null
+  return url + (url.includes('?') ? '&' : '?') + 'disposition=attachment'
+}
 export const createUser        = (payload) => api.post('/usuarios', { user: payload });
 export const updateUser        = (id, payload) => api.put(`/usuarios/${id}`, { user: payload });
 export const deleteUser        = (id) => api.delete(`/usuarios/${id}`);

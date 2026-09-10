@@ -211,6 +211,7 @@ import { RouterLink } from 'vue-router'
 import { TrendingUp, RefreshCw, Download } from 'lucide-vue-next'
 import { getAnalyticsRendimiento, getAnalyticsPL } from '../lib/api.js'
 import { formatARS } from '../lib/formatters.js'
+import { hoyISO } from '../utils/dates.js'
 
 const loading   = ref(false)
 const loadingPL = ref(false)
@@ -275,7 +276,7 @@ function exportarCSV() {
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement('a')
   a.href     = url
-  a.download = `pl_lotes_${new Date().toISOString().slice(0, 10)}.csv`
+  a.download = `pl_lotes_${hoyISO()}.csv`
   a.click()
   URL.revokeObjectURL(url)
 }

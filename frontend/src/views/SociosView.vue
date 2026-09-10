@@ -10,6 +10,7 @@ import EmptyState from '../components/ui/EmptyState.vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import SocioEditarModal from '../components/pacientes/SocioEditarModal.vue'
 import { reprocannBadge, reprocannCategoria } from '../composables/useReprocann.js'
+import { hoyISO } from '../utils/dates.js'
 
 const store  = usePacientesStore()
 const auth   = useAuthStore()
@@ -218,7 +219,7 @@ async function exportarCSV() {
     const url = URL.createObjectURL(new Blob([data], { type: 'text/csv' }))
     const a = document.createElement('a')
     a.href = url
-    a.download = `pacientes_${new Date().toISOString().slice(0,10)}.csv`
+    a.download = `pacientes_${hoyISO()}.csv`
     a.click()
     URL.revokeObjectURL(url)
   } catch {

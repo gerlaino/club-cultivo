@@ -117,6 +117,32 @@ namespace :e2e do
     end
   end
 
+  # Un paquete EN VIAJE que se cobra al entregar: es el único estado desde el que se ve el panel
+  # de cobro del modal de entrega, que es donde vivía la tarjeta de "tu próxima entrega" pegada
+  # por error. Los del `reparto` ya vienen cobrados y ese panel no aparece.
+  desc 'Pone al repartidor e2e con un paquete en viaje a cobrar contra entrega'
+  task entrega_a_cobrar: :environment do
+    club = ActsAsTenant.without_tenant { Club.unscoped.find_by(slug: SLUG_E2E) }
+    abort 'Corré antes rake e2e:seed' if club.nil?
+
+    ActsAsTenant.with_tenant(club) do
+      admin = User.find_by(email: 'admin@e2e.test')
+      rep   = User.find_by(email: 'delivery@e2e.test')
+      sede  = club.sedes.first
+      stock = club.stocks.where(sede_id: sede.id, forma_producto: 'flor_seca').first
+      pac   = club.pacientes.order(:id).last
+
+      d = Dispensacion.create!(paciente: pac, user: admin, stock: stock, sede: sede,
+                               cantidad: 5, medio_pago: 'efectivo', aporte_socio_ars: 212_500,
+                               fecha_dispensacion: Time.zone.today, con_envio: true,
+                               cobrar_en_entrega: true, delivery_id: rep.id,
+                               direccion_envio: 'Calle 500', contacto_nombre: pac.nombre)
+      d.update!(estado_envio: 'en_viaje')
+
+      puts "Paquete #{d.codigo_paquete} en viaje, a cobrar $212.500 contra entrega"
+    end
+  end
+
   desc 'Deja la organización e2e sin datos operativos'
   task limpiar: :environment do
     club = ActsAsTenant.without_tenant { Club.unscoped.find_by(slug: SLUG_E2E) }

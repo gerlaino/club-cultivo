@@ -1,7 +1,9 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from "vue"
 import { useAuthStore } from "../stores/auth"
-import api, { getInformeSemestral } from "../lib/api"
+import { getInformeSemestral } from "../lib/api"
+import { descargarArchivo } from '../lib/descargas.js'
+import { useToast } from '../composables/useToast.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import { semestreActual as getSemestreActual, formatFechaLarga, formatFechaCorta, formatFechaSemestre } from '../utils/dates.js'
 
@@ -26,6 +28,8 @@ const periodoLabel = computed(() => {
   const { semestre: s, anio: a } = informe.value.periodo
   return `${s}° Semestre ${a} — ${formatFechaSemestre(a, s)}`
 })
+
+const toast = useToast()
 
 async function cargar() {
   loading.value = true
@@ -68,23 +72,21 @@ const generandoPDF = ref(false)
 
 // El PDF lo arma el servidor. Este es el documento que se presenta ante la autoridad, y se
 // bajaba como una foto JPEG de la pantalla: sin texto seleccionable ni buscable.
-async function descargarPDF(formato = 'pdf') {
+// `paraPresentar`: éste es EL documento que va ante la autoridad, y sólo en ese caso se valida
+// que las variedades estén acreditadas ante el INASE. Para mirar la realidad de la organización
+// sale siempre, con la salvedad impresa.
+async function descargarPDF(formato = 'pdf', paraPresentar = false) {
   generandoPDF.value = true
   try {
-    const { data } = await api.get(`/informe_semestral.${formato}`, {
-      params: { anio: anio.value, semestre: semestre.value },
-      responseType: 'blob',
-    })
     const club = (informe.value?.club?.nombre_legal || informe.value?.club?.nombre || 'Club')
       .replace(/\s+/g, '_')
-    const url  = URL.createObjectURL(new Blob([data]))
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `REPROCANN_${semestre.value}S_${anio.value}_${club}.${formato}`
-    document.body.appendChild(link); link.click(); link.remove()
-    URL.revokeObjectURL(url)
-  } catch {
-    alert('No se pudo generar el archivo. Reintentá en un momento.')
+    await descargarArchivo(`/informe_semestral.${formato}`, {
+      params: { anio: anio.value, semestre: semestre.value, para_presentar: paraPresentar ? 1 : undefined },
+      filename: `REPROCANN_${semestre.value}S_${anio.value}_${club}.${formato}`,
+    })
+  } catch (e) {
+    // Antes esto era un `alert()` genérico que se comía el motivo del backend.
+    toast.error(e.message, { timeout: e.conMotivo ? 9000 : 5000 })
   } finally {
     generandoPDF.value = false
   }
@@ -122,6 +124,13 @@ onMounted(() => cargar())
           <DsSpinner v-if="generandoPDF" :size="14" />
           <i v-else class="bi bi-file-earmark-pdf"></i>
           {{ generandoPDF ? 'Generando PDF...' : 'Descargar PDF' }}
+        </button>
+        <!-- El documento que va ante la autoridad. Sólo acá se valida el INASE: el PDF de al
+             lado sale siempre, para que la organización pueda mirar su propia realidad. -->
+        <button v-if="informe" class="ir__btn-download" :disabled="generandoPDF"
+                title="Valida que todas las variedades estén acreditadas ante el INASE"
+                @click="descargarPDF('pdf', true)">
+          <i class="bi bi-patch-check"></i> Para presentar
         </button>
       </div>
     </div>

@@ -10,13 +10,17 @@ class BaseDocument
 
   # tipo_doc: texto que se muestra en el membrete ("INFORME REPROCANN")
   # tipo_code: código corto para el folio ("RPC")
-  def initialize(club:, usuario:, titulo:, tipo_doc: nil, tipo_code: "DOC", subtitulo: nil, folio: nil)
+  def initialize(club:, usuario:, titulo:, tipo_doc: nil, tipo_code: "DOC", subtitulo: nil, folio: nil,
+                 salvedad_inase: nil)
     @club      = club
     @usuario   = usuario
     @titulo    = titulo
     @tipo_doc  = tipo_doc || titulo
     @subtitulo = subtitulo
     @folio     = folio || generar_folio(tipo_code)
+    # Variedades que la organización no puede acreditar ante el INASE. El informe sale igual —la
+    # app no es un canal oficial— pero lo DICE. Ver DeclaracionInaseGuard.
+    @salvedad_inase = Array(salvedad_inase).compact_blank
   end
 
   attr_reader :folio
@@ -31,6 +35,7 @@ class BaseDocument
     @pdf.fill_color INK
     dibujar_membrete
     dibujar_pie
+    dibujar_salvedad_inase
     cuerpo(@pdf)
     @pdf.render
   end
@@ -114,7 +119,9 @@ class BaseDocument
         @pdf.stroke_horizontal_line MARGIN_LR, ancho - MARGIN_LR, at: 42
         @pdf.fill_color GRAY
         @pdf.font(SANS) do
-          @pdf.text_box "Confidencial · Generado vía Cultivo Espacial",
+          # El pie NO lleva la marca de la plataforma: el documento es de la organización y lo
+          # firma ella. Quién lo generó es asunto nuestro, no del auditor que lo recibe.
+          @pdf.text_box "Confidencial",
                         at: [MARGIN_LR, 33], width: 190, size: 6.5, overflow: :truncate
         end
         @pdf.font(MONO) do
@@ -125,6 +132,26 @@ class BaseDocument
         @pdf.stroke_color "000000"
       end
     end
+  end
+
+  # Recuadro de salvedad, antes que nada. No es `nota` (7,5pt gris): eso es una acotación, y esto
+  # cambia cómo hay que leer el documento entero.
+  def dibujar_salvedad_inase
+    return if @salvedad_inase.empty?
+
+    texto = "Este informe incluye variedades que la organización no tiene inscriptas en el INASE " \
+            "ni declaradas contra una variedad inscripta: #{@salvedad_inase.join(', ')}. " \
+            "Se informan con su nombre de uso."
+
+    @pdf.font(SANS, style: :bold) { @pdf.text "Variedades sin acreditar ante el INASE", size: 9 }
+    @pdf.move_down 3
+    @pdf.font(SANS) { @pdf.text texto, size: 8, leading: 1.5 }
+    @pdf.move_down 4
+    @pdf.stroke_color BRAND
+    @pdf.line_width 0.9
+    @pdf.stroke_horizontal_rule
+    @pdf.stroke_color "000000"
+    @pdf.move_down 12
   end
 
   def datos_legales

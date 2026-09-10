@@ -2,7 +2,11 @@
 import { onMounted, onUnmounted, watch } from 'vue'
 
 const props = defineProps({
-  images: { type: Array, required: true },  // Array<{ src, alt? }>
+  // Array<{ src, alt?, nombre?, descarga? }>. `descarga` es la URL a bajar cuando difiere de
+  // `src`: un adjunto de R2 es OTRO ORIGEN y ahí el navegador IGNORA el atributo `download`
+  // —en vez de bajar el archivo, navega a él—, así que hay que pedirle a Rails la URL con
+  // `disposition=attachment` (ver assetDownloadUrl). Un `data:` URI baja bien tal cual.
+  images: { type: Array, required: true },
   index:  { type: Number, default: 0 },
   open:   { type: Boolean, default: false },
 })
@@ -46,9 +50,21 @@ onUnmounted(() => {
         aria-label="Galería de fotos"
         @click.self="close"
       >
-        <button class="lb__close" @click="close" aria-label="Cerrar">
-          <i class="bi bi-x-lg"></i>
-        </button>
+        <div class="lb__acciones">
+          <a
+            v-if="images[index]?.src"
+            class="lb__btn"
+            :href="images[index].descarga || images[index].src"
+            :download="images[index].nombre || 'imagen'"
+            :aria-label="`Descargar ${images[index].nombre || 'imagen'}`"
+            @click.stop
+          >
+            <i class="bi bi-download"></i>
+          </a>
+          <button class="lb__btn" @click="close" aria-label="Cerrar">
+            <i class="bi bi-x-lg"></i>
+          </button>
+        </div>
 
         <button
           v-if="images.length > 1"
@@ -65,8 +81,8 @@ onUnmounted(() => {
             :alt="images[index]?.alt || ''"
             class="lb__img"
           />
-          <div v-if="images.length > 1" class="lb__counter" aria-live="polite">
-            {{ index + 1 }} / {{ images.length }}
+          <div v-if="images[index]?.alt || images.length > 1" class="lb__counter" aria-live="polite">
+            {{ images[index]?.alt }}<template v-if="images.length > 1"> · {{ index + 1 }} / {{ images.length }}</template>
           </div>
         </div>
 
@@ -89,15 +105,17 @@ onUnmounted(() => {
   background: rgba(0,0,0,.93);
   display: flex; align-items: center; justify-content: center;
 }
-.lb__close {
+.lb__acciones {
   position: absolute; top: 1rem; right: 1rem;
+  display: flex; gap: .5rem; z-index: 1;
+}
+.lb__btn {
   background: rgba(255,255,255,.15); border: none; color: white;
   width: 40px; height: 40px; border-radius: 50%; font-size: 1rem;
   display: flex; align-items: center; justify-content: center;
-  cursor: pointer; transition: background .15s;
-  z-index: 1;
+  cursor: pointer; transition: background .15s; text-decoration: none;
 }
-.lb__close:hover { background: rgba(255,255,255,.3); }
+.lb__btn:hover { background: rgba(255,255,255,.3); color: white; }
 .lb__nav {
   position: absolute; top: 50%; transform: translateY(-50%);
   background: rgba(255,255,255,.15); border: none; color: white;

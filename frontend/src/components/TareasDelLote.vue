@@ -412,7 +412,7 @@ function getMondayOf(date) {
 }
 
 function toISO(date) {
-  return date.toISOString().slice(0, 10)
+  return toISO(date)
 }
 
 const hoyISO       = toISO(new Date())

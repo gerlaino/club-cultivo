@@ -262,6 +262,7 @@ class ClubUsersController < ApplicationController
 
     scope = Auditoria.where(user_id: @user.id, club_id: current_user.club_id)
     scope = scope.where(auditable_type: params[:tipo]) if params[:tipo].present?
+    scope = sin_consecuencias(scope) unless params[:tipo].present? || ver_todo?
     if (desde = fecha_param(params[:desde]))
       scope = scope.where('auditorias.created_at >= ?', desde.beginning_of_day)
     end
@@ -339,24 +340,28 @@ class ClubUsersController < ApplicationController
   end
 
   # ── Auditoría (rastro read-only) ──────────────────────────────
-  TIPOS_AUDITABLE = {
-    'Lote' => 'Lote', 'Plant' => 'Planta', 'Stock' => 'Stock', 'Dispensacion' => 'Dispensación',
-    'Paciente' => 'Paciente', 'User' => 'Usuario', 'Reserva' => 'Reserva',
-  }.freeze
-  # Campos internos que no tiene sentido mostrar en el diff.
-  CAMPOS_OCULTOS  = %w[id created_at updated_at deleted_at club_id].freeze
+  # EL HISTORIAL CONTESTA "¿QUÉ HIZO ESTA PERSONA?", NO "¿QUÉ FILAS ESCRIBIÓ LA APP EN SU NOMBRE?".
+  #
+  # Una dispensa deja detrás dos o tres asientos contables y sus renglones de arqueo. Los escribe
+  # la app, no la persona: ella dispensó UNA vez. En la primera página se veían 8 de 10 filas
+  # diciendo "Creó · Movimiento contable #1905 · —", que no le dice nada a nadie y tapa lo único
+  # que se quería mirar.
+  #
+  # Un asiento CON dispensación detrás es una consecuencia; uno sin ella lo cargó alguien a mano
+  # por «Nuevo movimiento» y es un acto — por eso el corte es ése y no el tipo entero.
+  # `todo=1` los trae igual, y filtrar por tipo también: si alguien pide ver los movimientos
+  # contables, es porque quiere verlos.
+  def ver_todo? = ActiveModel::Type::Boolean.new.cast(params[:todo]).present?
 
-  def serialize_auditoria(a)
-    {
-      id:          a.id,
-      accion:      a.accion, # crear | actualizar | eliminar
-      tipo:        TIPOS_AUDITABLE[a.auditable_type] || a.auditable_type,
-      registro_id: a.auditable_id,
-      fecha:       a.created_at,
-      # Solo en "actualizar" mostramos el antes→después; crear/eliminar se explican solos.
-      cambios:     a.accion == 'actualizar' ? formato_cambios(a.cambios) : [],
-    }
+  def sin_consecuencias(scope)
+    generados = MovimientoContable.where.not(dispensacion_id: nil).select(:id)
+    scope.where.not(auditable_type: %w[MovimientoContable TurnoMostradorItem])
+         .or(scope.where(auditable_type: 'MovimientoContable').where.not(auditable_id: generados))
   end
+
+  # Cómo se presenta una fila vive entero en AuditoriaSerializer: la lee también el super admin
+  # y ya sabemos cómo termina la misma regla escrita en dos lados.
+  def serialize_auditoria(a) = AuditoriaSerializer.serialize(a)
 
   # Parsea "YYYY-MM-DD" a Date; nil si viene vacío o inválido (no rompe el filtro).
   def fecha_param(valor)
@@ -365,15 +370,6 @@ class ClubUsersController < ApplicationController
     Date.parse(valor.to_s)
   rescue ArgumentError
     nil
-  end
-
-  # {"campo" => [de, a]} (saved_changes) → [{campo, de, a}], salteando internos.
-  def formato_cambios(cambios)
-    (cambios || {}).except(*CAMPOS_OCULTOS).filter_map do |campo, valores|
-      next unless valores.is_a?(Array) && valores.size == 2
-
-      { campo: campo, de: valores[0], a: valores[1] }
-    end
   end
 
   def require_admin!

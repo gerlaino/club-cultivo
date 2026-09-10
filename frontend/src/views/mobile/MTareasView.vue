@@ -182,7 +182,7 @@ const toast = useToast()
 // ── Calendario ────────────────────────────────────────────────────
 
 function toISO(d) {
-  return d.toISOString().split('T')[0]
+  return toISO(d)
 }
 
 function addDays(d, n) {

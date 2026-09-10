@@ -17,13 +17,13 @@ class InformeDocument < BaseDocument
   # Ancho útil de la caja en A4 vertical con los márgenes de BaseDocument. Las columnas
   # tienen que sumar exactamente esto: Prawn no acepta ni de más ni de menos.
   def initialize(club:, usuario:, titulo:, secciones:, kpis: nil, periodo: nil, nota: nil,
-                 tipo_code: "INF")
+                 tipo_code: "INF", salvedad_inase: nil)
     @kpis      = kpis
     @secciones = secciones
     @periodo   = periodo
     @nota      = nota
     super(club: club, usuario: usuario, titulo: titulo,
-          tipo_doc: titulo, tipo_code: tipo_code)
+          tipo_doc: titulo, tipo_code: tipo_code, salvedad_inase: salvedad_inase)
   end
 
   def cuerpo(pdf)

@@ -264,39 +264,29 @@ const auditsPerPage = ref(10)
 const auditsTotal   = ref(0)
 const loadingAudits = ref(false)
 const auditsFiltro  = ref({ desde: '', hasta: '', tipo: '' })
+// Por defecto el historial muestra lo que HIZO la persona. Los asientos que la app escribe sola
+// detrás de cada dispensa tapaban 8 de cada 10 filas — se piden aparte.
+const verTodo       = ref(false)
 const hayFiltro     = computed(() => !!(auditsFiltro.value.desde || auditsFiltro.value.hasta || auditsFiltro.value.tipo))
+// Los 13 modelos auditados. Faltaban los del mostrador y los contables: se auditaban, se
+// mostraban en la tabla, y el filtro no los ofrecía — o sea que no había forma de aislarlos.
 const TIPO_OPCIONES = [
   { v: '', l: 'Todos los tipos' }, { v: 'Lote', l: 'Lote' }, { v: 'Plant', l: 'Planta' },
   { v: 'Stock', l: 'Stock' }, { v: 'Dispensacion', l: 'Dispensación' },
   { v: 'Paciente', l: 'Paciente' }, { v: 'User', l: 'Usuario' }, { v: 'Reserva', l: 'Reserva' },
+  { v: 'CajaTurno', l: 'Caja' }, { v: 'TurnoMostrador', l: 'Cierre de caja' },
+  { v: 'TurnoMostradorItem', l: 'Conteo de un producto' },
+  { v: 'RendicionCaja', l: 'Rendición' }, { v: 'MovimientoContable', l: 'Movimiento contable' },
 ]
 
-const ACCION_INFO = {
-  crear:      { label: 'Creó',    icon: 'bi-plus-circle-fill',   cls: 'act--new' },
-  actualizar: { label: 'Editó',   icon: 'bi-pencil-fill',        cls: 'act--edit' },
-  eliminar:   { label: 'Eliminó', icon: 'bi-trash-fill',         cls: 'act--del' },
-}
-// Nombres lindos para los campos más habituales; el resto se humaniza (guiones bajos → espacios).
-const CAMPO_LABEL = {
-  tamano_maceta: 'tamaño de maceta', tamaño_maceta: 'tamaño de maceta',
-  precio_sugerido_ars: 'precio sugerido', costo_unitario_ars: 'costo unitario',
-  sala_id: 'sala', sede_id: 'sede', genetica_id: 'genética', estado: 'estado',
-  codigo: 'código', descripcion: 'descripción', categoria: 'categoría',
-  medio_pago: 'medio de pago', cantidad: 'cantidad', notas: 'notas', nombre: 'nombre',
-  // Fase 2: paciente / usuario / reserva
-  apellido: 'apellido', fecha_nacimiento: 'fecha de nacimiento',
-  reprocann_vencimiento: 'venc. REPROCANN', reprocann_estado: 'estado REPROCANN',
-  role: 'rol', first_name: 'nombre', last_name: 'apellido', email_personal: 'email personal',
-  fecha_entrega_estimada: 'fecha de entrega', sena_ars: 'seña', aporte_estimado_ars: 'aporte estimado',
-  con_envio: 'con envío', direccion_envio: 'dirección de envío', contacto_nombre: 'contacto',
-  contacto_telefono: 'tel. de contacto',
-}
-function labelCampo(c) { return CAMPO_LABEL[c] || String(c).replace(/_/g, ' ') }
-function formatVal(v) {
-  if (v === null || v === undefined || v === '') return '—'
-  if (v === true) return 'Sí'
-  if (v === false) return 'No'
-  return String(v)
+// La ACCIÓN y el detalle los nombra el backend (AuditoriaSerializer): "Entregó", no "Editó" —
+// `update` es el verbo de Rails, no el de nadie más. Acá sólo se elige cómo se pinta.
+const TONO_INFO = {
+  crear:    { icon: 'bi-plus-circle-fill', cls: 'act--new' },
+  editar:   { icon: 'bi-pencil-fill',      cls: 'act--edit' },
+  eliminar: { icon: 'bi-trash-fill',       cls: 'act--del' },
+  ok:       { icon: 'bi-check-circle-fill', cls: 'act--ok' },
+  alerta:   { icon: 'bi-exclamation-triangle-fill', cls: 'act--warn' },
 }
 function fechaAudit(d) {
   const dt = new Date(d)
@@ -312,6 +302,7 @@ async function cargarAudits() {
       page:     auditsPage.value,
       per_page: auditsPerPage.value,
       tipo:     auditsFiltro.value.tipo || undefined,
+      todo:     verTodo.value ? 1 : undefined,
       desde:    auditsFiltro.value.desde || undefined,
       hasta:    auditsFiltro.value.hasta || undefined,
     })
@@ -561,6 +552,10 @@ onMounted(async () => {
                     <option v-for="o in TIPO_OPCIONES" :key="o.v" :value="o.v">{{ o.l }}</option>
                   </select>
                 </label>
+                <label class="uda__todo">
+                  <input type="checkbox" v-model="verTodo" @change="aplicarFiltro" />
+                  <span>Ver lo que generó la app</span>
+                </label>
                 <button v-if="hayFiltro" class="uda__clear" @click="limpiarFiltro">
                   <i class="bi bi-x-lg"></i> Limpiar
                 </button>
@@ -575,28 +570,28 @@ onMounted(async () => {
                   <table class="uda__table">
                     <thead>
                       <tr>
-                        <th>Fecha</th><th>Acción</th><th>Tipo</th><th>Registro</th><th>Cambios</th>
+                        <th>Fecha</th><th>Acción</th><th>Registro</th><th>Detalle</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr v-for="a in audits" :key="a.id">
                         <td class="uda__td-fecha">{{ fechaAudit(a.fecha) }}</td>
                         <td>
-                          <span class="uda__chip" :class="(ACCION_INFO[a.accion] || {}).cls">
-                            <i :class="['bi', (ACCION_INFO[a.accion] || {}).icon]"></i>
-                            {{ (ACCION_INFO[a.accion] || {}).label || a.accion }}
+                          <span class="uda__chip" :class="(TONO_INFO[a.accion_tono] || {}).cls">
+                            <i :class="['bi', (TONO_INFO[a.accion_tono] || {}).icon]"></i>
+                            {{ a.accion_label || a.accion }}
                           </span>
                         </td>
-                        <td>{{ a.tipo }}</td>
-                        <td class="uda__ref">#{{ a.registro_id }}</td>
+                        <td class="uda__ref">{{ a.tipo }} <span class="uda__num">#{{ a.registro_id }}</span></td>
                         <td>
-                          <ul v-if="a.cambios && a.cambios.length" class="uda__diffs">
-                            <li v-for="(c, i) in a.cambios" :key="i" class="uda__diff">
-                              <span class="uda__campo">{{ labelCampo(c.campo) }}:</span>
-                              <span class="uda__de">{{ formatVal(c.de) }}</span>
+                          <ul v-if="a.cambios?.length || a.notas?.length" class="uda__diffs">
+                            <li v-for="(c, i) in a.cambios" :key="`c${i}`" class="uda__diff">
+                              <span class="uda__campo">{{ c.campo }}:</span>
+                              <span class="uda__de">{{ c.de || '—' }}</span>
                               <i class="bi bi-arrow-right"></i>
-                              <span class="uda__a">{{ formatVal(c.a) }}</span>
+                              <span class="uda__a">{{ c.a || '—' }}</span>
                             </li>
+                            <li v-for="(n, i) in a.notas" :key="`n${i}`" class="uda__nota">{{ n }}</li>
                           </ul>
                           <span v-else class="uda__nodiff">—</span>
                         </td>
@@ -1148,11 +1143,17 @@ onMounted(async () => {
 .uda__table td { padding: .6rem .6rem; border-bottom: 1px solid #f5f7fa; color: var(--c-slate-600); vertical-align: top; }
 .uda__table tbody tr:hover td { background: #fafbfc; }
 .uda__td-fecha { white-space: nowrap; color: var(--c-slate-500); font-variant-numeric: tabular-nums; }
-.uda__ref { color: var(--c-slate-400); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.uda__ref { color: var(--c-slate-600); white-space: nowrap; }
 .uda__chip { display: inline-flex; align-items: center; gap: .3rem; font-size: .7rem; font-weight: 700; padding: .18rem .55rem; border-radius: 999px; white-space: nowrap; background: var(--c-slate-100); color: var(--c-slate-500); }
 .uda__chip.act--new { background: rgba(21,128,61,.1); color: #15803d; }
 .uda__chip.act--edit { background: rgba(180,83,9,.1); color: #b45309; }
 .uda__chip.act--del { background: rgba(220,38,38,.1); color: #dc2626; }
+.uda__chip.act--ok { background: rgba(21,128,61,.1); color: #15803d; }
+.uda__chip.act--warn { background: rgba(217,119,6,.12); color: #b45309; }
+.uda__num { color: var(--c-slate-400); font-variant-numeric: tabular-nums; }
+.uda__nota { color: var(--c-slate-500); }
+.uda__todo { display: inline-flex; align-items: center; gap: .35rem; font-size: .75rem; font-weight: 600; color: var(--c-slate-500); cursor: pointer; padding-bottom: .1rem; }
+.uda__todo input { cursor: pointer; }
 .uda__diffs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: .2rem; }
 .uda__diff { display: flex; align-items: center; gap: .3rem; flex-wrap: wrap; }
 .uda__campo { font-weight: 600; color: var(--c-slate-500); }

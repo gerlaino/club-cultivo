@@ -107,21 +107,21 @@ module Mostradores
       end
     end
 
-    # CONTAR NO PUEDE CREAR PRODUCTO DE LA NADA — no para quien atiende.
+    # UN SOBRANTE DEL ARQUEO NO SE APLICA, LO CUENTE QUIEN LO CUENTE.
     #
-    # `ajustar_inventario!` con una diferencia positiva SUMA al stock del club: contando 997 donde
-    # había 100 entraban 897 g trazables que nadie cargó. Es una puerta de entrada de producto sin
-    # origen, y se dispara con un dedazo.
+    # Contar de más no puede subir el inventario: ese producto no apareció, salió del depósito, y
+    # el depósito tiene su puerta (`Mostradores::Cargar`) que sabe de dónde sale y no deja apartar
+    # más de lo que hay libre. Un arqueo no sabe nada de eso — sólo sabe que el número no coincide.
     #
-    # Quien atiende no puede justificar un sobrante: él no elige qué hay sobre la mesa, la carga
-    # administración. Si de verdad sobra, lo carga ella por su puerta, que descuenta del depósito
-    # y deja su motivo.
+    # Antes esto miraba `atiende_mostrador?`, o sea que frenaba al dispensador y dejaba pasar a
+    # administración: contando 997 donde había 100 entraban 897 g trazables que nadie cargó, y la
+    # trazabilidad quedaba con "en stock" MÁS que "producido" y la merma en negativo.
     #
-    # PERO EL CIERRE NO SE BLOQUEA: a las once de la noche nadie puede quedar trabado esperando a
-    # un admin. Se guarda lo que contó —el dato no se pierde— sin mover el inventario, y el turno
-    # cae en la lista de revisión como `sobrante`. El faltante sí se aplica como siempre: restar
-    # lo que no está no inventa nada.
-    def sobrante_sin_aplicar?(dif) = dif.positive? && @usuario&.atiende_mostrador?
+    # Y EL CIERRE NO SE BLOQUEA: a las once de la noche nadie puede quedar trabado esperando a un
+    # admin. Se guarda lo que contó —el dato no se pierde—, no se mueve nada, y el turno cae en la
+    # lista de trabajo como `sobrante`. El faltante sí se aplica siempre: restar lo que no está no
+    # inventa nada.
+    def sobrante_sin_aplicar?(dif) = dif.positive?
 
     def motivo_diferencia(dif)
       return @notas.presence unless sobrante_sin_aplicar?(dif)

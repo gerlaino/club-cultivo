@@ -4,6 +4,7 @@ import AppDatePicker from '../ui/AppDatePicker.vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { exportPlanCSV } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import { hoyISO, toISO } from '../../utils/dates.js'
 
 const props = defineProps({
   plan: { type: Object, required: true },
@@ -11,7 +12,7 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 const toast = useToast()
 
-function isoHoy() { return new Date().toISOString().slice(0, 10) }
+function isoHoy() { return hoyISO() }
 
 const fechaInicio = ref(isoHoy())
 const descargando = ref(false)
@@ -29,7 +30,7 @@ function fechaEstimadaFin() {
   if (!fechaInicio.value) return ''
   const d = new Date(fechaInicio.value + 'T00:00:00')
   d.setDate(d.getDate() + ultimoDia)
-  return formatFecha(d.toISOString().slice(0, 10))
+  return formatFecha(toISO(d))
 }
 
 function triggerDownload(blob, filename) {

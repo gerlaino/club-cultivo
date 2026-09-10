@@ -6,6 +6,7 @@ import { updateMedicoTurno, updateAdminTurno } from '../lib/api.js'
 import { useToast } from '../composables/useToast.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import { X, CheckCircle2, XCircle, AlertCircle, Pencil } from 'lucide-vue-next'
+import { hoyISO } from '../utils/dates.js'
 
 const props = defineProps({
   turno:     { type: Object,  required: true },
@@ -193,7 +194,7 @@ function irFicha() {
           <div class="tdp__reprog-fields">
             <div class="tdp__reprog-field">
               <label class="tdp__lbl">Fecha</label>
-              <AppDatePicker v-model="reprogramForm.fecha" :min="new Date().toISOString().split('T')[0]" />
+              <AppDatePicker v-model="reprogramForm.fecha" :min="hoyISO()" />
             </div>
             <div class="tdp__reprog-field">
               <label class="tdp__lbl">Hora</label>

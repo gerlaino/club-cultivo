@@ -3,12 +3,13 @@
 import { ref, computed, onMounted } from 'vue'
 import { getReporteFinanzas, exportReporteFinanzas } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import { hoyISO } from '../../utils/dates.js'
 
 const toast = useToast()
 const data = ref(null)
 const loading = ref(false)
 
-const hoy = new Date().toISOString().slice(0, 10)
+const hoy = hoyISO()
 const inicioMes = hoy.slice(0, 8) + '01'
 const desde = ref(inicioMes)
 const hasta = ref(hoy)

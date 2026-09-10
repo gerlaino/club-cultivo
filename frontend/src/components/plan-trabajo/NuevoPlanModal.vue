@@ -341,6 +341,7 @@ import {
   interpretarArchivoPlan, listPlanTrabajos, listPlanTareas,
 } from '../../lib/api.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
+import { hoyISO, toISO } from '../../utils/dates.js'
 
 const props = defineProps({
   usuarios: { type: Array, default: () => [] },
@@ -371,9 +372,9 @@ const DIAS = [
   { value: 'jue', label: 'J' }, { value: 'vie', label: 'V' }, { value: 'sab', label: 'S' }, { value: 'dom', label: 'D' },
 ]
 
-function isoHoy() { return new Date().toISOString().slice(0, 10) }
+function isoHoy() { return hoyISO() }
 function addDays(iso, n) {
-  const d = new Date(iso); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10)
+  const d = new Date(iso); d.setDate(d.getDate() + n); return toISO(d)
 }
 
 // ── State ──

@@ -33,12 +33,30 @@ class MostradorItem < ApplicationRecord
   # número que apareció, y monitorear a distancia sin historial es mirar una foto.
   #
   # `cantidad` es FIRMADA: positiva sube, negativa baja.
+  #
+  # SUBIR LA MESA ES APARTAR DEL DEPÓSITO, y por eso tiene el MISMO TOPE que `Mostradores::Cargar`:
+  # no se puede poner sobre la mesa más de lo que hay libre. `Cargar` lo chequeaba y los tres
+  # conteos —abrir, cerrar, contar de a uno— no, así que administración contando de más apartaba
+  # producto que no existe. El tope vive acá, en la única puerta por la que se mueve la mesa.
+  #
+  # `devolucion` queda afuera a propósito: es el paquete que el repartidor no pudo entregar
+  # volviendo a la mesa, y esos gramos ya se le devolvieron al `Stock` un instante antes
+  # (`incrementar_stock`). No es apartar nada nuevo — es producto que vuelve.
+  TIPOS_SIN_TOPE = %w[devolucion].freeze
+
   def mover!(cantidad:, tipo:, usuario:, motivo: nil, turno: nil)
     delta = cantidad.to_d
     return 0.to_d if delta.zero?
 
     nueva = self.cantidad.to_d + delta
     raise ArgumentError, "No hay tanto de #{stock&.etiqueta} sobre la mesa" if nueva.negative?
+
+    if delta.positive? && stock && !TIPOS_SIN_TOPE.include?(tipo.to_s) &&
+       delta > stock.cantidad_disponible_real.to_d
+      raise ArgumentError,
+            "No hay tanto de #{stock.etiqueta} en el depósito: quedan " \
+            "#{stock.cantidad_disponible_real.round(2)} #{stock.unidad || 'g'} libres"
+    end
 
     transaction do
       update!(cantidad: nueva)
@@ -61,6 +79,21 @@ class MostradorItem < ApplicationRecord
   def ajustar_inventario!(dif, usuario:, concepto:, turno: nil, notas: nil)
     dif = dif.to_d
     return if stock.nil? || dif.zero?
+    # CONTAR NUNCA SUBE EL INVENTARIO, LO CUENTE QUIEN LO CUENTE.
+    #
+    # Contar de más significa que sobre la mesa hay producto que no estaba anotado, y ese
+    # producto SALIÓ DEL DEPÓSITO: ya estaba en el `Stock`, sólo cambió de lugar. Sumárselo al
+    # `Stock` lo creaba de la nada —producto trazable sin origen— y descuadraba la trazabilidad:
+    # el balance del informe daba "en stock" MÁS que "producido", y la merma salía en negativo
+    # para tapar el hueco. Subir la mesa (`mover!`) ya es todo lo que hay que hacer: la mesa
+    # aparta, no descuenta.
+    #
+    # El candado existía desde septiembre pero sólo miraba a quien atiende
+    # (`sobrante_sin_aplicar?`); administración pasaba de largo por Contar y por Cerrar caja.
+    #
+    # Para SUMAR stock de verdad está la puerta de siempre: editar el stock (propio o externo),
+    # que es la que deja la trazabilidad del origen.
+    return if dif.positive?
 
     stock.with_lock do
       stock.update!(cantidad: [stock.cantidad.to_d + dif, 0].max)

@@ -149,6 +149,7 @@ import { getSala, listLotes, createSalaNota, createLote, listGeneticas,
 import { useToast }       from '../../composables/useToast'
 import SheetBottom        from '../../components/cultivador/SheetBottom.vue'
 import RegistroSalaModal  from '../../components/salas/RegistroSalaModal.vue'
+import { hoyISO } from '../../utils/dates.js'
 
 const route = useRoute()
 const toast = useToast()
@@ -180,7 +181,7 @@ const estadoInicialLote = computed(() => {
 function emptyLoteForm() {
   return {
     estado:       estadoInicialLote.value,
-    start_date:   new Date().toISOString().slice(0, 10),
+    start_date:   hoyISO(),
     plants_count: 0,
     genetica_id:  '',
     grow_type:    'sustrato',

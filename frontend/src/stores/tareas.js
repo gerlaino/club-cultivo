@@ -1,4 +1,5 @@
 // frontend/src/stores/tareas.js
+import { hoyISO } from '../utils/dates.js'
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import {
@@ -70,7 +71,7 @@ export const useTareasStore = defineStore('tareas', () => {
     const res    = await createTarea(data)
     const nueva  = res.data
     // Refrescar dashboard si es de hoy
-    if (nueva.fecha_programada === new Date().toISOString().split('T')[0]) {
+    if (nueva.fecha_programada === hoyISO()) {
       dashboard.value.hoy.unshift(nueva)
     }
     return nueva

@@ -11,6 +11,7 @@ import ModalEditarDispensacion from '../components/pacientes/ModalEditarDispensa
 import { useAuthStore } from '../stores/auth'
 import { useConfirm } from '../composables/useConfirm.js'
 import { useToast } from '../composables/useToast.js'
+import { hoyISO, toISO } from '../utils/dates.js'
 
 const auth    = useAuthStore()
 const { confirm } = useConfirm()
@@ -116,9 +117,9 @@ function onDispensacionGuardada() {
 }
 
 // ── Fechas ─────────────────────────────────────────────────────────────────────
-const hoy = new Date().toISOString().slice(0, 10)
+const hoy = hoyISO()
 const desdeDefault = () => {
-  const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().slice(0, 10)
+  const d = new Date(); d.setDate(d.getDate() - 6); return toISO(d)
 }
 const desde = ref(desdeDefault())
 const hasta  = ref(hoy)
@@ -235,7 +236,7 @@ async function exportar() {
 
 function setRango(dias) {
   const d = new Date(); d.setDate(d.getDate() - (dias - 1))
-  desde.value = d.toISOString().slice(0, 10)
+  desde.value = toISO(d)
   hasta.value = hoy
 }
 

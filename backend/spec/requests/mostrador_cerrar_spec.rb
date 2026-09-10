@@ -336,15 +336,19 @@ RSpec.describe 'Cerrar el mostrador', type: :request do
       expect(razones.values.flatten).to include('sobrante')
     end
 
-    it 'administración sí puede: ella gobierna la mesa' do
+    # NI SIQUIERA ADMINISTRACIÓN. Un arqueo no sabe de dónde salió el producto que sobra, y
+    # subir el inventario lo creaba de la nada: la trazabilidad terminaba con "en stock" MÁS que
+    # "producido" y la merma en negativo. Si de verdad hay más, se carga por `Cargar`, que
+    # descuenta del depósito y deja el motivo. El cierre no se traba: se anota y sigue.
+    it 'administración tampoco: se anota y el inventario no se mueve' do
       abrir!(cantidad: 300)
       antes_stock = stock.reload.cantidad.to_d
 
       cerrar!(contado: 310, efectivo: 50_000, motivo: 'apareció', como: admin)
 
       expect(response).to have_http_status(:ok)
-      expect(stock.reload.cantidad.to_d).to eq(antes_stock + 10)
-      expect(stock.stock_movimientos.where(tipo: 'ajuste').last.gramos.to_f).to eq(10.0)
+      expect(stock.reload.cantidad.to_d).to eq(antes_stock)
+      expect(stock.stock_movimientos.where(tipo: 'ajuste')).to be_empty
     end
 
     it 'el faltante se sigue aplicando: restar lo que no está no inventa nada' do

@@ -212,6 +212,7 @@ import { useAuthStore } from '../../stores/auth'
 import { listIndicaciones, createIndicacion, updateIndicacion, deleteIndicacion } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
+import { hoyISO, toISO } from '../../utils/dates.js'
 
 const props = defineProps({
   socioId: { type: Number, required: true }
@@ -237,7 +238,7 @@ const form = ref({
   dosificacion: '',
   via_administracion: '',
   duracion_dias: null,
-  fecha_emision: new Date().toISOString().split('T')[0],
+  fecha_emision: hoyISO(),
   fecha_vencimiento: '',
   activa: true,
   observaciones: ''
@@ -266,7 +267,7 @@ const vencimientoCalculado = computed(() => {
   const d = new Date(form.value.fecha_emision)
   if (Number.isNaN(d.getTime())) return null
   d.setDate(d.getDate() + dias)
-  return d.toISOString().split('T')[0]
+  return toISO(d)
 })
 
 const hintVencimiento = computed(() => {
@@ -300,7 +301,7 @@ const resetForm = () => {
     dosificacion: '',
     via_administracion: '',
     duracion_dias: null,
-    fecha_emision: new Date().toISOString().split('T')[0],
+    fecha_emision: hoyISO(),
     fecha_vencimiento: '',
     activa: true,
     observaciones: ''

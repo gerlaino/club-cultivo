@@ -7,6 +7,7 @@ import RendicionCajaCard from '../../components/RendicionCajaCard.vue'
 import { useEntregasOffline } from '../../composables/useEntregasOffline.js'
 import { useToast } from '../../composables/useToast.js'
 import { useAuthStore } from '../../stores/auth.js'
+import { hoyISO } from '../../utils/dates.js'
 
 const toast    = useToast()
 // Cola offline: la entrega se guarda en el dispositivo si no hay señal y se manda sola después.
@@ -182,7 +183,7 @@ async function persistirOrdenDelivery(lista) {
   try {
     const { data } = await ordenarRuta({
       delivery_id: auth.user?.id,
-      fecha:       new Date().toISOString().slice(0, 10),
+      fecha:       hoyISO(),
       orden:       lista.map(p => p.id),
     })
     lista.forEach((p, i) => { p.orden_entrega = i + 1 })
@@ -685,54 +686,7 @@ onMounted(load)
               <div class="dlv__cobro-resto" :class="{ 'dlv__cobro-resto--info': excedenteEntrega > 0 }">
                 <template v-if="excedenteEntrega > 0">Paga de más: <strong>{{ fmtMoneda(excedenteEntrega) }}</strong> → queda a favor en su cuenta</template>
                 <template v-else-if="restoEntregaCuenta > 0">Resto a cuenta corriente: <strong>{{ fmtMoneda(restoEntregaCuenta) }}</strong></template>
-                <template v-else>
-
-      <!-- LO QUE HAY QUE HACER AHORA.
-           Un repartidor mira esto parado en la vereda con una caja en la mano: necesita saber
-           a dónde va, no leer tres secciones con checkboxes. El resto de la pantalla queda
-           abajo para consultar; acá arriba hay UNA cosa a la vez. -->
-      <div v-if="siguienteParada" class="dlv__foco">
-        <div class="dlv__foco-tag">Tu próxima entrega</div>
-        <div class="dlv__foco-nombre">{{ siguienteParada.paciente?.nombre || 'Paciente' }}</div>
-        <div class="dlv__foco-dir">{{ siguienteParada.direccion_envio || 'Sin dirección cargada' }}</div>
-        <div class="dlv__foco-acts">
-          <button class="dlv__foco-btn dlv__foco-btn--nav" @click="irAParada(siguienteParada)">
-            <Route :size="16" :stroke-width="2" /> Cómo llegar
-          </button>
-          <button class="dlv__foco-btn dlv__foco-btn--ok" @click="abrirEntregar(siguienteParada)">
-            <Check :size="16" :stroke-width="2.5" /> Entregué
-          </button>
-          <button class="dlv__foco-btn dlv__foco-btn--no" @click="abrirFallo(siguienteParada)">
-            No pude
-          </button>
-        </div>
-        <p v-if="enViaje.length > 1" class="dlv__foco-resto">
-          Te quedan {{ enViaje.length - 1 }} más en este viaje.
-        </p>
-      </div>
-
-      <!-- Todavía no salió: lo único que importa es arrancar. -->
-      <div v-else-if="pendientes.length" class="dlv__foco dlv__foco--salir">
-        <div class="dlv__foco-tag">Listo para salir</div>
-        <div class="dlv__foco-nombre">
-          {{ pendientes.length }} paquete{{ pendientes.length === 1 ? '' : 's' }} para llevar
-        </div>
-        <div class="dlv__foco-dir">Elegí cuáles cargás y arrancá. Los que dejes quedan para después.</div>
-        <div class="dlv__foco-acts">
-          <button class="dlv__foco-btn dlv__foco-btn--ok" :disabled="!selected.size || saving" @click="handleIniciarViaje">
-            <Bike :size="16" :stroke-width="2" />
-            Salir a repartir{{ selected.size ? ` (${selected.size})` : '' }}
-          </button>
-        </div>
-        <p v-if="!selected.size" class="dlv__foco-resto">Marcá abajo los que llevás.</p>
-      </div>
-
-      <!-- Nada que hacer: que se note, en vez de dejar una pantalla con listas vacías. -->
-      <div v-else class="dlv__foco dlv__foco--vacio">
-        <div class="dlv__foco-nombre">No tenés entregas pendientes</div>
-        <div class="dlv__foco-dir">Cuando la organización te asigne un paquete, aparece acá.</div>
-      </div>
-Cubierto ✓</template>
+                <template v-else>Cubierto ✓</template>
               </div>
             </div>
 
