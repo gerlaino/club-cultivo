@@ -427,6 +427,13 @@ module Dispensario
     # Todo lo que se puede subir a la mesa: stock de esta sede habilitado para dispensa y con
     # algo libre. `cantidad_disponible_real` ya descuenta lo reservado a un paciente y lo
     # apartado a un evento: eso está en el mismo frasco pero no es del mostrador.
+    #
+    # Y TODO LO QUE YA ESTÁ ARRIBA, quede o no algo libre abajo. La mesa también es un apartado,
+    # así que un producto subido ENTERO tiene disponible 0 y el filtro de abajo lo sacaba: la
+    # tabla de administración —que es esta lista con la mesa mergeada encima— se quedaba sin la
+    # fila mientras el KPI de al lado decía "46 g sobre la mesa". Peor que un número que no se
+    # ve: sin fila no había desde dónde bajarlo. Pasó en producción con el primer producto chico
+    # que se subió completo.
     def disponibles
       @disponibles ||= calcular_disponibles
     end
@@ -437,7 +444,13 @@ module Dispensario
                                .para_dispensa.disponibles
                                .includes(:lote, :genetica).to_a
       Stock.precargar_apartados(candidatos)
-      candidatos.select { |s| s.cantidad_disponible_real.to_d.positive? }
+      libres = candidatos.select { |s| s.cantidad_disponible_real.to_d.positive? }
+
+      # Lo de la mesa entra por fuera del scope y no sólo por fuera del `select`: un stock que
+      # llegó a 0 en su fila con producto todavía arriba tampoco pasaba `.disponibles`.
+      ids_libres = libres.map(&:id).to_set
+      en_mesa    = mesa.map(&:stock).compact.reject { |s| ids_libres.include?(s.id) }
+      libres + en_mesa
     end
 
     # Dos señales, y la segunda es la que importa:
