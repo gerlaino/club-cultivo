@@ -46,6 +46,32 @@ describe('Los parámetros de GET /pacientes', () => {
     expect(consumidores.length).toBeGreaterThan(3)
   })
 
+// LO QUE LLEGA A `listPacientes`, no lo que haya en el archivo.
+//
+// Antes se escaneaba el archivo entero y alcanzaba, porque ninguna pantalla mezclaba dos APIs.
+// Cuando el libro de Contabilidad —que también lista pacientes— empezó a mandarle `q` a SU propio
+// endpoint (el buscador de movimientos, donde `q` es el nombre correcto), el test lo leyó como un
+// `q` para pacientes y falló por la razón equivocada. Un guard que grita en falso se termina
+// borrando, y con él se va lo que sí cuidaba.
+//
+// Se juntan los argumentos de cada llamada: el objeto literal si va inline, y si va una variable,
+// dónde se arma y qué se le asigna. Eso cubre las dos formas que hay en el código.
+function paramsQueLlegan(src) {
+  const trozos = []
+  for (const m of src.matchAll(/listPacientes\(\s*([^)]*)\)/g)) {
+    const arg = m[1].trim()
+    if (!arg) continue
+    if (arg.startsWith('{')) { trozos.push(arg); continue }
+
+    const id = arg.match(/^[A-Za-z_$][\w$]*/)?.[0]
+    if (!id) { trozos.push(arg); continue }
+    // Dónde se arma esa variable y qué se le va agregando.
+    for (const d of src.matchAll(new RegExp(`(?:const|let|var)\\s+${id}\\s*=\\s*(\\{[\\s\\S]*?\\})`, 'g'))) trozos.push(d[1])
+    for (const a of src.matchAll(new RegExp(`\\b${id}\\.[\\w$]+\\s*=[^=][^\\n]*`, 'g'))) trozos.push(a[0])
+  }
+  return trozos.join('\n')
+}
+
   it.each(Object.entries(EQUIVOCADOS))(
     'ninguna manda "%s" (el backend lee "%s")',
     (malo, bueno) => {
@@ -54,8 +80,8 @@ describe('Los parámetros de GET /pacientes', () => {
         // que se llame `search` ni con la palabra suelta en un comentario.
         const comoClave = new RegExp(`(\\{|,|\\.)\\s*${malo}\\s*(:|=[^=])`)
 
-        expect(comoClave.test(src), `${f}: manda "${malo}" a listPacientes; el backend lee "${bueno}"`)
-          .toBe(false)
+        expect(comoClave.test(paramsQueLlegan(src)),
+          `${f}: manda "${malo}" a listPacientes; el backend lee "${bueno}"`).toBe(false)
       }
     },
   )

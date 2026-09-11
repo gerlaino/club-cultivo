@@ -609,11 +609,23 @@ async function goToPage(p) {
   window.scrollTo({ top: 0, behavior: "smooth" })
 }
 
+// SE BAJA LO QUE SE ESTÁ MIRANDO. Mandaba sólo las fechas: buscabas "Calentador", veías una fila
+// y el archivo traía las 27 del período. Desde el libro van TODOS los filtros de la pantalla; desde
+// el dashboard, su sede, que es el único filtro que tiene.
 async function exportar(formato = "xlsx") {
   const params = {}
   if (filtroDesde.value) params.desde = filtroDesde.value
   if (filtroHasta.value) params.hasta = filtroHasta.value
-  if (dashboardSede.value && vistaActiva.value === "dashboard") params.sede_id = dashboardSede.value
+
+  if (vistaActiva.value === "dashboard") {
+    if (dashboardSede.value) params.sede_id = dashboardSede.value
+  } else {
+    if (filtroQ.value)         params.q                 = filtroQ.value.trim()
+    if (filtroTipo.value)      params.tipo              = filtroTipo.value
+    if (filtroCategoria.value) params.categoria         = filtroCategoria.value
+    if (filtroSector.value)    params.unidad_negocio_id = filtroSector.value
+    if (filtroSede.value)      params.sede_id           = filtroSede.value
+  }
   await store.exportCSV(params, formato)
 }
 

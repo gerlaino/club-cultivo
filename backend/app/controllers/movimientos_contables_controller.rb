@@ -12,31 +12,7 @@ class MovimientosContablesController < ApplicationController
                         .includes(:sede, :lote, :dispensacion, :created_by, :categoria_contable, :unidad_negocio)
                         .recientes
 
-    # El buscador es del SERVIDOR: el libro está paginado, así que filtrar en el navegador
-    # buscaba sólo entre los renglones de la página a la vista.
-    scope = scope.buscar(params[:q])                               if params[:q].present?
-    scope = scope.where(tipo: params[:tipo])                       if params[:tipo].present?
-    scope = scope.where(categoria: params[:categoria])             if params[:categoria].present?
-    # Filtrar por una categoría MADRE trae también sus subcategorías: si pedís "Insumos" querés
-    # ver lo de Fertilizante y Macetas, no una lista vacía porque los movimientos cuelgan de las
-    # hijas. Pedir una subcategoría filtra sólo por ella.
-    if params[:categoria_contable_id].present?
-      cat_id = params[:categoria_contable_id]
-      hijas  = CategoriaContable.where(club_id: current_user.club_id, parent_id: cat_id).pluck(:id)
-      scope  = scope.where(categoria_contable_id: [cat_id] + hijas)
-    end
-    scope = scope.where(unidad_negocio_id: params[:unidad_negocio_id])         if params[:unidad_negocio_id].present?
-    scope = scope.por_sede(params[:sede_id])                       if params[:sede_id].present?
-    scope = scope.por_lote(params[:lote_id])                       if params[:lote_id].present?
-
-    if params[:desde].present? && params[:hasta].present?
-      desde = Date.parse(params[:desde]) rescue nil
-      hasta = Date.parse(params[:hasta]) rescue nil
-      scope = scope.del_periodo(desde, hasta) if desde && hasta
-    elsif params[:mes].present?
-      fecha = Date.parse("#{params[:mes]}-01") rescue Time.zone.today
-      scope = scope.del_mes(fecha)
-    end
+    scope = filtrar(scope)
 
     # Las CUOTAS futuras (aún no llegó su mes) no van en el libro ni en los totales: son un
     # compromiso a futuro, no un gasto ocurrido. Aparecen solas cuando llega su fecha. El
@@ -349,15 +325,17 @@ class MovimientosContablesController < ApplicationController
   end
 
   # GET /movimientos_contables/export_csv
+  # SE BAJA LO QUE SE ESTÁ MIRANDO.
+  #
+  # Respetaba SÓLO las fechas: buscabas "Calentador", veías una fila, apretabas Exportar y te
+  # bajabas las 27 del período. Con el buscador nuevo eso se volvió imposible de no notar. Los
+  # filtros son los mismos que los del libro porque salen del mismo método — escritos dos veces,
+  # un día el archivo y la pantalla dicen cosas distintas y el que lo descubre está armando un
+  # balance.
   def export_csv
-    scope = current_user.club.movimientos_contables.recientes.sin_cuotas_futuras
-
-    desde = hasta = nil
-    if params[:desde].present? && params[:hasta].present?
-      desde = Date.parse(params[:desde]) rescue nil
-      hasta = Date.parse(params[:hasta]) rescue nil
-      scope = scope.del_periodo(desde, hasta) if desde && hasta
-    end
+    scope = filtrar(current_user.club.movimientos_contables.recientes).sin_cuotas_futuras
+    desde = (Date.parse(params[:desde]) rescue nil) if params[:desde].present?
+    hasta = (Date.parse(params[:hasta]) rescue nil) if params[:hasta].present?
 
     respond_to do |format|
       format.csv do
@@ -698,6 +676,54 @@ class MovimientosContablesController < ApplicationController
     }
   end
 
+  # Los filtros del libro, en un solo lugar: los usan el listado y la exportación.
+  def filtrar(scope)
+    # El buscador es del SERVIDOR: el libro está paginado, así que filtrar en el navegador
+    # buscaba sólo entre los renglones de la página a la vista.
+    scope = scope.buscar(params[:q])                   if params[:q].present?
+    scope = scope.where(tipo: params[:tipo])           if params[:tipo].present?
+    scope = scope.where(categoria: params[:categoria]) if params[:categoria].present?
+    # Filtrar por una categoría MADRE trae también sus subcategorías: si pedís "Insumos" querés
+    # ver lo de Fertilizante y Macetas, no una lista vacía porque los movimientos cuelgan de las
+    # hijas. Pedir una subcategoría filtra sólo por ella.
+    if params[:categoria_contable_id].present?
+      cat_id = params[:categoria_contable_id]
+      hijas  = CategoriaContable.where(club_id: current_user.club_id, parent_id: cat_id).pluck(:id)
+      scope  = scope.where(categoria_contable_id: [cat_id] + hijas)
+    end
+    scope = scope.where(unidad_negocio_id: params[:unidad_negocio_id]) if params[:unidad_negocio_id].present?
+    scope = scope.por_sede(params[:sede_id])           if params[:sede_id].present?
+    scope = scope.por_lote(params[:lote_id])           if params[:lote_id].present?
+
+    if params[:desde].present? && params[:hasta].present?
+      desde = Date.parse(params[:desde]) rescue nil
+      hasta = Date.parse(params[:hasta]) rescue nil
+      scope = scope.del_periodo(desde, hasta) if desde && hasta
+    elsif params[:mes].present?
+      fecha = Date.parse("#{params[:mes]}-01") rescue Time.zone.today
+      scope = scope.del_mes(fecha)
+    end
+    scope
+  end
+
+  # QUÉ ES ESTE ARCHIVO. Un Excel de una sola fila que arriba dice "Todos los movimientos" es la
+  # misma clase de mentira que veníamos arreglando: el encabezado tiene que decir con qué se
+  # filtró, porque el archivo se abre una semana después y sin la pantalla al lado.
+  def subtitulo_export(desde, hasta)
+    partes = []
+    partes << if desde && hasta
+                "Período #{desde.strftime('%d/%m/%Y')} — #{hasta.strftime('%d/%m/%Y')}"
+              else
+                'Todos los movimientos'
+              end
+    partes << "buscando «#{params[:q]}»"                      if params[:q].present?
+    partes << MovimientoContable.new(tipo: params[:tipo]).tipo_label.downcase.pluralize if params[:tipo].present?
+    partes << "categoría #{MovimientoContable::CATEGORIA_LABELS[params[:categoria]] || params[:categoria]}" if params[:categoria].present?
+    partes << "sector #{UnidadNegocio.find_by(id: params[:unidad_negocio_id])&.nombre}" if params[:unidad_negocio_id].present?
+    partes << "sede #{Sede.find_by(id: params[:sede_id])&.nombre}" if params[:sede_id].present?
+    partes.join(' · ')
+  end
+
   def calcular_totales(scope)
     {
       ingresos:  scope.ingresos.sum(:monto_ars).to_f,
@@ -812,7 +838,7 @@ class MovimientosContablesController < ApplicationController
     XlsxExport.new(
       club:   current_user.club,
       titulo: 'Movimientos contables',
-      subtitulo: (desde && hasta) ? "Período #{desde.strftime('%d/%m/%Y')} — #{hasta.strftime('%d/%m/%Y')}" : 'Todos los movimientos',
+      subtitulo: subtitulo_export(desde, hasta),
       resumen: {
         'Ingresos'  => ingresos,
         'Egresos'   => -egresos,

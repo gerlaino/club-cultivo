@@ -77,4 +77,35 @@ RSpec.describe 'GET /movimientos_contables — buscar y paginar', type: :request
       expect(segunda & primera).to be_empty
     end
   end
+
+  # SE BAJA LO QUE SE ESTÁ MIRANDO. El export respetaba SÓLO las fechas: buscabas "Calentador",
+  # veías una fila, apretabas Exportar y te bajabas las 27 del período. Los filtros salen ahora
+  # del mismo método que los del libro.
+  describe 'el export' do
+    it 'respeta la búsqueda' do
+      gasto('Calentador de Agua')
+
+      get '/movimientos_contables/export_csv.csv', params: { q: 'calentador' }, headers: auth_headers
+      expect(response).to have_http_status(:ok)
+
+      filas = response.body.lines.grep(/Gasto de relleno|Calentador/)
+      expect(filas.size).to eq(1)
+      expect(filas.first).to include('Calentador de Agua')
+    end
+
+    it 'respeta el tipo' do
+      MovimientoContable.create!(club: club, created_by: admin, tipo: 'ingreso',
+                                 categoria: 'aporte_socio', descripcion: 'Un aporte',
+                                 monto_ars: 5_000, fecha: Time.zone.today, pagado: true)
+
+      get '/movimientos_contables/export_csv.csv', params: { tipo: 'ingreso' }, headers: auth_headers
+      expect(response.body).to include('Un aporte')
+      expect(response.body).not_to include('Gasto de relleno')
+    end
+
+    it 'sin filtros los baja todos, como antes' do
+      get '/movimientos_contables/export_csv.csv', headers: auth_headers
+      expect(response.body.lines.grep(/Gasto de relleno/).size).to eq(25)
+    end
+  end
 end
