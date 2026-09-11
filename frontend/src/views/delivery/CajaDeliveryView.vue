@@ -8,27 +8,23 @@
 //
 // Vive en su propia solapa y NO en el inicio: el inicio es a dónde va ahora. Acá entra cuando la
 // pregunta es la plata, que es dos o tres veces por día.
-import { ref, onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { Wallet, Package } from 'lucide-vue-next'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import RendicionCajaCard from '../../components/RendicionCajaCard.vue'
-import { getMiCajaDelivery } from '../../lib/api.js'
+import { useCajaDeliveryStore } from '../../stores/cajaDelivery.js'
 
-const caja    = ref(null)
-const loading = ref(true)
-const error   = ref(false)
+// El MISMO dato que mira la barra de abajo para ponerle el punto a la solapa: si saliera de dos
+// consultas, un día el punto y la pantalla dirían cosas distintas de la misma plata.
+const store   = useCajaDeliveryStore()
+const caja    = computed(() => store.caja)
+const loading = computed(() => !store.caja && !store.error)
+const error   = computed(() => store.error)
 
 const fmt  = (n) => `$${Number(n ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`
 const hora = (iso) => (iso ? new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) : '')
 
-async function cargar () {
-  loading.value = true
-  error.value   = false
-  try {
-    const { data } = await getMiCajaDelivery()
-    caja.value = data
-  } catch { error.value = true } finally { loading.value = false }
-}
+const cargar = () => store.cargar()
 
 onMounted(cargar)
 </script>
@@ -44,7 +40,7 @@ onMounted(cargar)
       <button class="cjd__retry" @click="cargar">Reintentar</button>
     </div>
 
-    <template v-else>
+    <template v-else-if="caja">
       <!-- EL NÚMERO, primero y grande: es a lo que vino. -->
       <section class="cjd__total">
         <Wallet :size="20" :stroke-width="1.75" />
@@ -59,7 +55,7 @@ onMounted(cargar)
 
       <!-- Rendir, el estado de la que rindió y lo que quedó a su nombre. Es el mismo componente
            que usa el que recibe: la regla de la rendición vive en un solo lugar. -->
-      <RendicionCajaCard @recibida="cargar" />
+      <RendicionCajaCard @recibida="cargar" @rendida="cargar" />
 
       <!-- El desglose es para CONTAR: entrega por entrega, con el nombre y la hora, así puede ir
            tachando mientras separa los billetes. -->

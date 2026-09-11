@@ -14,6 +14,7 @@
            la calle), así que sólo la ve quien reparte. -->
       <RouterLink v-if="soyRepartidor" to="/delivery/caja" class="dlv-link" active-class="dlv-link--active">
         <Wallet :size="18" :stroke-width="1.75" /><span>Caja</span>
+        <span v-if="cajaDelivery.llevaEfectivo" class="dlv-punto" aria-label="Tenés efectivo sin rendir"></span>
       </RouterLink>
       <RouterLink v-if="canSeeDespachos" to="/delivery/despachos" class="dlv-link" active-class="dlv-link--active">
         <PackageCheck :size="18" :stroke-width="1.75" /><span>Despachos</span>
@@ -24,13 +25,18 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { Home, PackageCheck, Wallet } from 'lucide-vue-next'
 import { useAuthStore } from '../../stores/auth'
+import { useCajaDeliveryStore } from '../../stores/cajaDelivery.js'
 // El logout vive en el menú de usuario de DeliveryTopBar, como en el resto de los roles.
 const auth = useAuthStore()
 const canSeeDespachos = computed(() => ['admin', 'supervisor'].includes(auth.user?.role))
 const soyRepartidor   = computed(() => auth.user?.role === 'delivery')
+// El mismo punto que la barra del teléfono, por lo mismo: la plata salió del inicio y algo tiene
+// que decirle que la tiene. El store se carga solo en el shell móvil; acá se pide al entrar.
+const cajaDelivery = useCajaDeliveryStore()
+onMounted(() => { if (soyRepartidor.value) cajaDelivery.cargar() })
 </script>
 
 <style scoped>
@@ -56,5 +62,6 @@ const soyRepartidor   = computed(() => auth.user?.role === 'delivery')
 }
 .dlv-link:hover { color: #fff; background: rgba(255,255,255,.1); }
 .dlv-link--active { color: #fff; background: rgba(255,255,255,.18); }
+.dlv-punto { width: 7px; height: 7px; border-radius: 50%; background: #f59e0b; margin-left: auto; }
 @media (max-width: 1023px) { .dlv-sidebar { display: none; } }
 </style>

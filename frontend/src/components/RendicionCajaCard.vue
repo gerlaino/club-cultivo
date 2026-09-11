@@ -178,7 +178,9 @@ const props = defineProps({ historial: { type: Boolean, default: false } })
 // Recibir una rendición cambia la MESA: entra la plata al cajón y sube el producto que volvió.
 // La tarjeta se recarga sola, pero la pantalla que la contiene no se enteraba — el paquete
 // aparecía en el sistema y no en la pantalla del que lo acababa de recibir en la mano.
-const emit = defineEmits(['recibida'])
+// `rendida` la escucha la pantalla de Caja del repartidor: al rendir, lo que lleva encima pasa a
+// cero y el punto de la solapa tiene que apagarse solo.
+const emit = defineEmits(['recibida', 'rendida'])
 
 const auth  = useAuthStore()
 const toast = useToast()
@@ -238,6 +240,7 @@ async function rendir () {
     receptorId.value = ''
     toast.success('Caja rendida')
     await cargar()
+    emit('rendida')
   } catch (e) {
     toast.error(e?.response?.data?.error || 'No se pudo rendir la caja.')
   } finally { guardando.value = false }

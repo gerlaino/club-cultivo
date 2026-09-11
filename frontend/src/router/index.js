@@ -923,7 +923,18 @@ const routes = [
     children: [
       { path: '', name: 'delivery-dashboard', component: () => import('../views/delivery/DeliveryDashboard.vue') },
       // La caja salió del inicio y tiene su propia pantalla: el inicio es a dónde va ahora.
-      { path: 'caja', name: 'delivery-caja', component: () => import('../views/delivery/CajaDeliveryView.vue') },
+      // Es SUYA: `/rendiciones/mi_caja` contesta 403 a cualquier otro, así que un admin que
+      // escribiera la URL aterrizaba en una pantalla que sólo sabe decirle que no se pudo cargar.
+      {
+        path: 'caja',
+        name: 'delivery-caja',
+        component: () => import('../views/delivery/CajaDeliveryView.vue'),
+        beforeEnter: (to, from, next) => {
+          const auth = useAuthStore()
+          if (auth.user?.role !== 'delivery') return next('/delivery')
+          next()
+        },
+      },
       {
         path: 'despachos',
         name: 'delivery-despachos',
@@ -1022,7 +1033,14 @@ const routes = [
 
       // ── Delivery ── (el repartidor ve SU dashboard, no la vista admin de despachos)
       { path: 'delivery/despachos', component: () => import('../views/delivery/DeliveryDashboard.vue') },
-      { path: 'delivery/caja',      component: () => import('../views/delivery/CajaDeliveryView.vue') },
+      // Misma regla que en el escritorio: la caja es del repartidor y el endpoint le contesta 403
+      // a cualquier otro.
+      { path: 'delivery/caja',      component: () => import('../views/delivery/CajaDeliveryView.vue'),
+        beforeEnter: (to, from, next) => {
+          const auth = useAuthStore()
+          if (auth.user?.role !== 'delivery') return next('/m')
+          next()
+        } },
       { path: 'delivery/historial', component: () => import('../views/mobile/MDeliveryHistorialView.vue') },
     ],
   },

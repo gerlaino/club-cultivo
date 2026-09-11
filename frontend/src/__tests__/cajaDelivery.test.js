@@ -119,4 +119,40 @@ describe('El inicio del repartidor', () => {
     expect(w.findAll('.dlv__stat-l').map(s => s.text())).not.toContain('Entregados')
     w.unmount()
   })
+
+  // ES LO ÚNICO QUE LE RECUERDA QUE TIENE QUE RENDIR. La tarjeta de la caja salió del inicio a
+  // propósito —esa pantalla es a dónde va ahora— pero si nada se lo dice, se va a su casa con la
+  // recaudación. Un punto, no un número: acá no se cuenta plata, se avisa que hay.
+  it('el punto de la solapa se enciende con lo que lleva encima', async () => {
+    setActivePinia(createPinia())
+    const { useCajaDeliveryStore } = await import('../stores/cajaDelivery.js')
+    const store = useCajaDeliveryStore()
+
+    expect(store.llevaEfectivo).toBe(false)   // sin dato todavía no se pinta nada
+    await store.cargar()
+    expect(store.llevaEfectivo).toBe(true)
+  })
+
+  it('y se apaga cuando ya no lleva nada', async () => {
+    setActivePinia(createPinia())
+    const { useCajaDeliveryStore } = await import('../stores/cajaDelivery.js')
+    const store = useCajaDeliveryStore()
+
+    getMiCajaDelivery.mockResolvedValueOnce({ data: { ...caja, efectivo_ars: 0, cobros: [] } })
+    await store.cargar()
+    expect(store.llevaEfectivo).toBe(false)
+  })
+
+  // "Vacío" y "no se pudo cargar" no son lo mismo: decirle tranquilamente que no lleva nada a
+  // alguien que tiene plata encima es lo peor que le podemos contestar.
+  it('si la consulta falla no dice que no lleva nada: dice que no se pudo', async () => {
+    setActivePinia(createPinia())
+    const { useCajaDeliveryStore } = await import('../stores/cajaDelivery.js')
+    const store = useCajaDeliveryStore()
+
+    getMiCajaDelivery.mockRejectedValueOnce(new Error('sin red'))
+    await store.cargar()
+    expect(store.error).toBe(true)
+    expect(store.caja).toBeNull()
+  })
 })

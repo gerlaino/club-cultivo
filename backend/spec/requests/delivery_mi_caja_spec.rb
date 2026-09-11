@@ -104,6 +104,16 @@ RSpec.describe 'GET /rendiciones/mi_caja', type: :request do
     expect(mi_caja!(juan)['efectivo_ars']).to eq(0.0)
   end
 
+  # Lo que quedó a su nombre de rendiciones anteriores lo dice la TARJETA de rendición con su
+  # propio dato: viajaba también acá y no lo leía nadie. El campo que se calcula, se serializa y
+  # nadie usa es de donde salen las divergencias — en este proyecto ya apareció tres veces.
+  it 'no manda lo que ya dice la tarjeta de rendición' do
+    entrega!(60_000)
+    body = mi_caja!(juan)
+
+    expect(body).not_to have_key('saldo_a_cuenta_ars')
+  end
+
   it 'es del repartidor: nadie más la pide' do
     mi_caja!(admin)
     expect(response).to have_http_status(:forbidden)

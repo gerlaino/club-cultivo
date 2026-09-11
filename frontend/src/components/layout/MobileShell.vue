@@ -65,6 +65,7 @@
           :to="item.to" class="msh__tab" :class="{ 'msh__tab--active': isActive(item) }"
         >
           <i class="bi msh__tab-icon" :class="item.icon"></i>
+          <span v-if="conPunto(item)" class="msh__tab-punto" aria-hidden="true"></span>
           <span class="msh__tab-label">{{ item.label }}</span>
         </RouterLink>
 
@@ -77,6 +78,7 @@
           :to="item.to" class="msh__tab" :class="{ 'msh__tab--active': isActive(item) }"
         >
           <i class="bi msh__tab-icon" :class="item.icon"></i>
+          <span v-if="conPunto(item)" class="msh__tab-punto" aria-hidden="true"></span>
           <span class="msh__tab-label">{{ item.label }}</span>
         </RouterLink>
       </template>
@@ -87,6 +89,7 @@
           :to="item.to" class="msh__tab" :class="{ 'msh__tab--active': isActive(item) }"
         >
           <i class="bi msh__tab-icon" :class="item.icon"></i>
+          <span v-if="conPunto(item)" class="msh__tab-punto" aria-hidden="true"></span>
           <span class="msh__tab-label">{{ item.label }}</span>
         </RouterLink>
       </template>
@@ -125,6 +128,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { useClubStore }  from '../../stores/club'
+import { useCajaDeliveryStore } from '../../stores/cajaDelivery.js'
 import { usePushNotifications } from '../../composables/usePushNotifications.js'
 import { useToast } from '../../composables/useToast.js'
 import { listSalas } from '../../lib/api.js'
@@ -159,6 +163,14 @@ const clubInitials = computed(() => {
   const n = club.data?.name || 'CE'
   return n.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
 })
+
+// UN PUNTO EN LA SOLAPA CUANDO LLEVA PLATA ENCIMA.
+//
+// Es lo único que le queda recordándole que tiene que rendir: la tarjeta de la caja salió del
+// inicio a propósito —esa pantalla es a dónde va ahora— pero si nada se lo dice, se va a su casa
+// con la recaudación. Un punto, no un número: acá no se cuenta plata, se avisa que hay.
+const cajaDelivery = useCajaDeliveryStore()
+const conPunto = (item) => item.punto === 'caja_delivery' && cajaDelivery.llevaEfectivo
 
 // ── Navegación por rol ──────────────────────────────────────────
 const NAV = {
@@ -201,7 +213,7 @@ const NAV = {
     { to: '/m/delivery/despachos', icon: 'bi-truck',         label: 'Despachos' },
     // La plata tiene su propia solapa: el inicio es a dónde va ahora, y la caja se mira dos o
     // tres veces por día. Antes era una tarjeta arriba de todo en la pantalla que más abre.
-    { to: '/m/delivery/caja',      icon: 'bi-cash-coin',     label: 'Caja' },
+    { to: '/m/delivery/caja',      icon: 'bi-cash-coin',     label: 'Caja', punto: 'caja_delivery' },
     { to: '/m/delivery/historial', icon: 'bi-clock-history', label: 'Historial' },
   ] },
   // El dispensador trabaja de pie con alguien enfrente: la primera pantalla es buscar y dispensar,
@@ -323,6 +335,10 @@ async function doLogout() {
   await auth.logOut?.()
   router.replace('/login')
 }
+
+// Una sola consulta, al entrar, y sólo para el repartidor: es lo que enciende el punto de la
+// solapa Caja. Se refresca sola cuando él rinde o cuando abre la pantalla.
+onMounted(() => { if (auth.user?.role === 'delivery') cajaDelivery.cargar() })
 
 // ── Push (sin cambios de comportamiento) ────────────────────────
 const { supported: pushSupported, subscribed: pushSubscribed, subscribe: pushSubscribe } = usePushNotifications()
@@ -470,6 +486,10 @@ onMounted(() => {
   -webkit-tap-highlight-color: transparent;
 }
 .msh__tab-icon { font-size: 1.28rem; line-height: 1; }
+.msh__tab-punto {
+  position: absolute; top: 6px; left: 50%; margin-left: 6px;
+  width: 7px; height: 7px; border-radius: 50%; background: var(--msh-accent, #ea580c);
+}
 .msh__tab-label { font-size: .62rem; font-weight: 600; letter-spacing: .01em; }
 .msh__tab--active { color: var(--msh-accent); }
 .msh__tab--active::before {

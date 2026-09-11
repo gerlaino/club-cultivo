@@ -66,7 +66,10 @@ class RendicionesController < ApplicationController
       transferencias_ars: transferencias_de_hoy(club).to_f,
       # Los paquetes que vuelven sin entregar: entran en la misma entrega y se desarman.
       paquetes_sin_entregar: Rendiciones::Rendir.devoluciones_de(current_user, club).count,
-      saldo_a_cuenta_ars: Rendiciones::SaldarACuenta.saldo_de(club, current_user).to_f,
+      # Lo que quedó a su nombre de rendiciones anteriores NO va acá: se lo dice la tarjeta de
+      # rendición con su propio dato (`GET /rendiciones` → `mi_saldo_ars`), que es la que lo
+      # muestra. Viajaba y no lo leía nadie — el campo que se calcula, se serializa y nadie usa es
+      # de donde salen las divergencias, y en este proyecto ya apareció tres veces.
     }
   end
 
