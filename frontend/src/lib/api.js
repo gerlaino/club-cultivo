@@ -356,7 +356,9 @@ export const listUsers         = (params = {}) => api.get('/usuarios', { params 
 export const getUser           = (id) => api.get(`/usuarios/${id}`);
 export const getUsuarioStats   = (id, params = {}) => api.get(`/usuarios/${id}/stats`, { params });
 export const getUsuarioAuditorias = (id, params = {}) => api.get(`/usuarios/${id}/auditorias`, { params });
-export const recibirCajaDelivery = (id) => api.post(`/usuarios/${id}/recibir_caja`);
+// `payload.destino`: en qué caja entra el efectivo (id de sede, o 'club' si no hay ninguna
+// abierta). La misma pregunta que cuando el repartidor rinde por su cuenta.
+export const recibirCajaDelivery = (id, payload) => api.post(`/usuarios/${id}/recibir_caja`, payload);
 
 // ── Rendición de caja del repartidor ──────────────────────────────────────────
 // Él la inicia y elige a quién; el receptor CUENTA y recibe. La plata nunca queda en el aire: el

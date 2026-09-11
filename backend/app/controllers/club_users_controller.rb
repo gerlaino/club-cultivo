@@ -246,6 +246,10 @@ class ClubUsersController < ApplicationController
       despachos: despachos,
       dispensaciones: dispensaciones,
       caja_delivery: caja_delivery,
+      # Dónde puede caer ese efectivo si el admin lo recibe desde acá. Viaja con las stats
+      # porque es la misma tarjeta que ya las pide: una pantalla que pregunta "¿en qué caja?" no
+      # puede tener que salir a buscar la lista por otra puerta.
+      cajas_abiertas: (@user.delivery? ? Rendiciones::DestinoEfectivo.cajas_abiertas_para(current_user) : []),
       # Lo que esta persona tiene del club y todavía no devolvió, acumulado. Sin verlo junto,
       # cada faltante parece un caso aislado y nadie nota que van seis meses seguidos.
       a_cuenta: a_cuenta_de(@user),
@@ -284,12 +288,21 @@ class ClubUsersController < ApplicationController
     }
   end
 
-  # POST /usuarios/:id/recibir_caja
-  # El admin recibe el efectivo en tránsito del delivery: asienta los ingresos y
-  # marca los cobros como rendidos.
+  # POST /usuarios/:id/recibir_caja { destino }
+  #
+  # El admin recibe el efectivo en tránsito del delivery: asienta los ingresos y marca los cobros
+  # como rendidos. Es la puerta de "se fue sin rendir" — la otra la arranca el repartidor.
+  #
+  # `destino` = id de sede (entra a la caja de ese mostrador) o 'club'. La regla es la MISMA que
+  # en la rendición: con un cajón abierto el efectivo entra ahí, y llevárselo es sacarlo después.
+  # Si no viene, el servicio lo deduce (lo llaman también desde adentro, sin pantalla que pregunte).
   def recibir_caja
+    if (err = Rendiciones::DestinoEfectivo.error_de(params[:destino], current_user))
+      return render json: { error: err }, status: :unprocessable_entity
+    end
+
     res = Dispensaciones::RecibirCajaDelivery.call(
-      delivery: @user, club: current_user.club, receptor: current_user)
+      delivery: @user, club: current_user.club, receptor: current_user, destino: params[:destino])
     if res.ok?
       render json: { recibido_ars: res.total.to_f, cobros: res.cantidad }
     else

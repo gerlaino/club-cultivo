@@ -18,10 +18,17 @@ class RendicionesController < ApplicationController
     elsif %w[admin supervisor super_admin].include?(current_user.role)
       base
     else
-      base.where(receptor_id: current_user.id).or(base.pendientes)
+      # LAS SUYAS, no las pendientes de cualquiera. Con el `.or(base.pendientes)` que había acá,
+      # a TODOS los dispensadores de la organización les aparecía la rendición que el repartidor
+      # le está entregando a uno solo, cada uno con su botón de recibir.
+      base.where(receptor_id: current_user.id)
     end
     render json: {
       rendiciones: mias.limit(30).map { |r| serialize(r) },
+      # Dónde puede entrar el efectivo que recibe ESTA persona. Administración elige (puede haber
+      # varios mostradores abiertos, y puede no querer ninguno); el dispensador no elige, así que
+      # ni se le manda la lista: su caja es la de su mostrador.
+      cajas_abiertas: Rendiciones::DestinoEfectivo.cajas_abiertas_para(current_user),
       # Lo que el admin tiene que mirar: se ajustó el monto y el repartidor no dijo si está de
       # acuerdo. No bloquea nada, pero alguien tiene que hablarlo.
       sin_conformar: base.sin_conformar.count,
@@ -67,11 +74,19 @@ class RendicionesController < ApplicationController
     render json: serialize(res.rendicion), status: :created
   end
 
-  # POST /rendiciones/:id/recibir { monto_recibido_ars, motivo }
+  # POST /rendiciones/:id/recibir { monto_recibido_ars, motivo, destino }
+  #
+  # `destino` = id de sede (entra a la caja de ese mostrador) o 'club' (queda asentado como
+  # ingreso y no entra a ningún arqueo). El dispensador no lo manda: su caja es la de su mostrador.
   def recibir
+    # Dónde puede entrar: la misma regla que aplica la ficha del repartidor, en un solo lugar.
+    if (err = Rendiciones::DestinoEfectivo.error_de(params[:destino], current_user))
+      return render json: { error: err }, status: :unprocessable_entity
+    end
+
     res = Rendiciones::Recibir.call(rendicion: @rendicion, receptor: current_user,
                                     monto_recibido: params[:monto_recibido_ars],
-                                    motivo: params[:motivo])
+                                    motivo: params[:motivo], destino: params[:destino])
     return render json: { error: res.error }, status: :unprocessable_entity unless res.ok?
 
     render json: serialize(res.rendicion)
@@ -125,7 +140,13 @@ class RendicionesController < ApplicationController
       devoluciones: r.pendiente? ? paquetes_de(r).map { |d| serialize_paquete(d) } : [],
       rendida_at: r.rendida_at, recibida_at: r.recibida_at, conformada_at: r.conformada_at,
       # Qué le toca hacer a QUIEN mira: la pantalla no tiene que deducirlo de tres campos.
-      puedo_recibir:  r.pendiente? && current_user.id != r.delivery_id,
+      # A QUIÉN le toca recibirla: a la persona a la que se la rindieron, y a nadie más. Decía
+      # "cualquiera que no sea el repartidor", así que el botón le aparecía al admin, al
+      # supervisor y a todos los dispensadores a la vez, por la misma plata.
+      puedo_recibir:  r.pendiente? && current_user.id == r.receptor_id,
+      # El dispensador no elige dónde cae: es la caja de su mostrador, y la pantalla lo dice en
+      # vez de preguntárselo.
+      elijo_destino:  r.pendiente? && current_user.id == r.receptor_id && !current_user.atiende_mostrador?,
       puedo_conformar: r.recibida? && r.conforme == false && current_user.id == r.delivery_id,
     }
   end

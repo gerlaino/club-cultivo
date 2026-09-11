@@ -46,10 +46,13 @@ RSpec.describe 'Rendir la caja del repartidor', type: :request do
     JSON.parse(response.body)
   end
 
-  def recibir!(id, monto: nil, motivo: nil, como: admin)
+  # `destino` = dónde entra el efectivo. Acá recibe el admin y en estos casos no hay mostrador
+  # abierto de por medio: queda asentado como ingreso de la organización ('club'). Las reglas del
+  # destino se prueban aparte, en `rendicion_destino_efectivo_spec.rb`.
+  def recibir!(id, monto: nil, motivo: nil, como: admin, destino: 'club')
     sign_in_as(como)
     post "/api/rendiciones/#{id}/recibir", headers: auth_headers,
-         params: { monto_recibido_ars: monto, motivo: motivo }.compact
+         params: { monto_recibido_ars: monto, motivo: motivo, destino: destino }.compact
     JSON.parse(response.body)
   end
 
@@ -248,7 +251,9 @@ RSpec.describe 'Rendir la caja del repartidor', type: :request do
       expect(mesa_de(sede)[stock.id]).to be_nil
 
       id = rendir!['id']
-      recibir!(id)
+      # Con el mostrador abierto el efectivo entra a ESA caja: 'club' sólo vale cuando no hay
+      # ninguna abierta (ver `rendicion_destino_efectivo_spec.rb`).
+      recibir!(id, destino: sede.id)
 
       expect(mesa_de(sede)[stock.id]).to eq(25.0)
       mov = MostradorMovimiento.unscoped.recientes.first

@@ -10,8 +10,9 @@ import { createPinia, setActivePinia } from 'pinia'
 
 let rendiciones = []
 let miSaldo = 0
+let cajasAbiertas = []
 const listRendiciones     = vi.fn(() => Promise.resolve({
-  data: { rendiciones, sin_conformar: 0, mi_saldo_ars: miSaldo },
+  data: { rendiciones, sin_conformar: 0, mi_saldo_ars: miSaldo, cajas_abiertas: cajasAbiertas },
 }))
 const receptoresRendicion = vi.fn(() => Promise.resolve({ data: [{ id: 5, nombre: 'Germán', rol: 'admin' }] }))
 const crearRendicion      = vi.fn(() => Promise.resolve({ data: {} }))
@@ -38,7 +39,7 @@ async function montar (rol, id = 1) {
   return w
 }
 
-beforeEach(() => { vi.clearAllMocks(); rendiciones = []; miSaldo = 0 })
+beforeEach(() => { vi.clearAllMocks(); rendiciones = []; miSaldo = 0; cajasAbiertas = [] })
 
 describe('El repartidor rinde', () => {
   it('elige a quién le da la plata; el monto no lo escribe él', async () => {
@@ -288,5 +289,84 @@ describe('Lo que el repartidor tiene del club', () => {
     const w = await montar('delivery')
 
     expect(w.find('.rnd').exists()).toBe(true)
+  })
+})
+
+// DÓNDE ENTRA EL EFECTIVO.
+//
+// El que atiende no elige: cae en la caja de su mostrador, que es el cajón que tiene abierto
+// adelante. Administración sí — puede haber varios mostradores abiertos, y puede no querer
+// ninguno (se lo lleva, y queda asentado como ingreso de la organización).
+describe('Dónde entra el efectivo', () => {
+  beforeEach(() => {
+    cajasAbiertas = [{ sede_id: 3, sede: 'Example', abierta_por: 'Ada' }]
+  })
+
+  it('al que atiende no se le pregunta', async () => {
+    rendiciones = [{ id: 7, estado: 'pendiente', delivery: 'Juan', declarado_ars: 100000,
+                     cobros: 1, puedo_recibir: true, elijo_destino: false }]
+    const w = await montar('dispensador', 5)
+
+    expect(w.find('.rnd__destino').exists()).toBe(false)
+
+    await w.find('.rnd__input').setValue(100000)
+    await w.find('.rnd__btn--primary').trigger('click')
+    await flushPromises()
+
+    expect(recibirRendicion).toHaveBeenCalledWith(7, {
+      monto_recibido_ars: 100000, motivo: undefined, destino: undefined,
+    })
+  })
+
+  it('administración elige entre los mostradores abiertos', async () => {
+    rendiciones = [{ id: 7, estado: 'pendiente', delivery: 'Juan', declarado_ars: 100000,
+                     cobros: 1, puedo_recibir: true, elijo_destino: true }]
+    const w = await montar('admin', 5)
+
+    // Arranca en el placeholder, no en blanco: un select apuntando a `undefined` no matchea
+    // ninguna opción y se dibuja vacío, sin el aviso de que falta contestarlo.
+    expect(w.find('.rnd__destino select').element.value).toBe('')
+
+    const opciones = w.find('.rnd__destino select').findAll('option').map(o => o.text())
+    expect(opciones).toContain('Caja de Example — la abrió Ada')
+    // El efectivo ENTRA A UNA CAJA: llevárselo es sacarlo del cajón después, y eso queda
+    // registrado a nombre de quien lo saca. Con una caja abierta no se ofrece la organización.
+    expect(opciones.some(o => /organización/i.test(o))).toBe(false)
+    expect(w.find('.rnd__destino-hint').text()).toMatch(/sacala del cajón/i)
+  })
+
+  it('sin ninguna caja abierta sí se puede recibir: si no, el repartidor se va con la plata', async () => {
+    cajasAbiertas = []
+    rendiciones = [{ id: 7, estado: 'pendiente', delivery: 'Juan', declarado_ars: 100000,
+                     cobros: 1, puedo_recibir: true, elijo_destino: true }]
+    const w = await montar('admin', 5)
+
+    const opciones = w.find('.rnd__destino select').findAll('option').map(o => o.text())
+    expect(opciones.some(o => /No hay ninguna caja abierta/i.test(o))).toBe(true)
+  })
+
+  it('sin elegir dónde, no recibe', async () => {
+    rendiciones = [{ id: 7, estado: 'pendiente', delivery: 'Juan', declarado_ars: 100000,
+                     cobros: 1, puedo_recibir: true, elijo_destino: true }]
+    const w = await montar('admin', 5)
+    await w.find('.rnd__input').setValue(100000)
+    await w.find('.rnd__btn--primary').trigger('click')
+    await flushPromises()
+
+    expect(recibirRendicion).not.toHaveBeenCalled()
+  })
+
+  it('elegido el mostrador, viaja la sede', async () => {
+    rendiciones = [{ id: 7, estado: 'pendiente', delivery: 'Juan', declarado_ars: 100000,
+                     cobros: 1, puedo_recibir: true, elijo_destino: true }]
+    const w = await montar('admin', 5)
+    await w.find('.rnd__input').setValue(100000)
+    await w.find('.rnd__destino select').setValue('3')
+    await w.find('.rnd__btn--primary').trigger('click')
+    await flushPromises()
+
+    expect(recibirRendicion).toHaveBeenCalledWith(7, {
+      monto_recibido_ars: 100000, motivo: undefined, destino: '3',
+    })
   })
 })

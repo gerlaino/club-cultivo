@@ -35,9 +35,7 @@ class MeController < ApplicationController
       # —la lista no está ordenada por nada en particular— se le devolvía como su mostrador. La
       # tarjeta de caja le contestaba "no se pudo cargar el mostrador" sin decir por qué, y no
       # había forma de arreglarlo desde la pantalla.
-      atienden = u.sedes_asignadas.activas.where(tipo: %w[social mixta])
-      sede_mostrador = atienden.order(:id).first ||
-                       u.club&.sedes&.activas&.where(tipo: %w[social mixta])&.order(:id)&.first
+      sede_mostrador = u.sede_de_mostrador
       data['dispensario_sede_id'] = sede_mostrador&.id
       # Con el nombre: la tarjeta de caja lo muestra y la PWA no tiene de dónde sacarlo sin
       # pedir el listado de sedes entero en la pantalla que más se usa.

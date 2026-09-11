@@ -10,22 +10,37 @@ module Rendiciones
   # no se cargó: eso se arregla cargándolo, no tocando el número de la rendición. Un ajuste para
   # arriba taparía el cobro que falta y la dispensa quedaría figurando impaga para siempre.
   class Recibir
+    # El destino "no va a ningún cajón": queda asentado como ingreso del club y listo.
+    DESTINO_CLUB = 'club'.freeze
+
     Result = Struct.new(:ok, :rendicion, :error, keyword_init: true) do
       def ok? = ok
     end
 
     def self.call(**kwargs) = new(**kwargs).call
 
-    def initialize(rendicion:, receptor:, monto_recibido: nil, motivo: nil)
+    # `destino`: dónde entra el efectivo. `'club'` = a la organización sin pasar por ningún
+    # cajón; un id de sede = la caja abierta de ESE mostrador. Lo manda quien recibe — salvo el
+    # dispensador, que no elige (ver `caja_de_recepcion`).
+    def initialize(rendicion:, receptor:, monto_recibido: nil, motivo: nil, destino: nil)
       @rendicion = rendicion
       @receptor  = receptor
       @monto     = monto_recibido
       @motivo    = motivo
+      @destino   = destino.presence
     end
 
     def call
       return err('Esta rendición ya fue recibida') unless @rendicion&.pendiente?
       return err('No podés recibirte tu propia rendición') if @receptor.id == @rendicion.delivery_id
+      # LA RENDICIÓN VA DIRIGIDA A UNA PERSONA: es efectivo que se entrega en mano. Sin esto,
+      # cualquiera que no fuera el repartidor podía tomarla —el admin veía la que el repartidor
+      # le estaba rindiendo al dispensador y podía recibirla desde su escritorio, con los
+      # billetes a treinta cuadras—, y encima el registro pasaba a decir que la recibió él.
+      unless @receptor.id == @rendicion.receptor_id
+        return err("Esta rendición es para #{@rendicion.receptor&.nombre_completo}: sólo esa " \
+                   'persona puede contarla y recibirla.')
+      end
 
       declarado = @rendicion.monto_declarado_ars.to_d
       recibido  = @monto.nil? || @monto.to_s.strip.empty? ? declarado : @monto.to_d
@@ -39,14 +54,19 @@ module Rendiciones
       diferencia = recibido - declarado
       return err('Falta menos plata de la que cobró: escribí el motivo') if diferencia.negative? && @motivo.blank?
 
+      caja, err_destino = caja_de_recepcion
+      return err(err_destino) if err_destino
+
       ActiveRecord::Base.transaction do
-        caja = caja_de_recepcion
         @rendicion.cobros.each { |c| asentar_y_rendir!(c, caja) }
         asentar_a_cuenta!(diferencia.abs, caja) if diferencia.negative?
         devolver_paquetes!
 
+        # `receptor` no se toca: es a quien el repartidor le rindió, y ahora sólo esa persona
+        # puede recibirla. Pisarlo con quien apretó el botón era lo que hacía que elegir
+        # destinatario no significara nada.
         @rendicion.update!(
-          estado: 'recibida', receptor: @receptor, caja_turno: caja,
+          estado: 'recibida', caja_turno: caja,
           monto_recibido_ars: recibido, motivo_ajuste: @motivo.presence,
           recibida_at: Time.current,
           # nil = coincidió y no hay nada que conformar. false = hubo ajuste y el repartidor
@@ -122,13 +142,42 @@ module Rendiciones
     end
 
     # Dónde entra la plata: en el mostrador del que la recibe.
+    # DÓNDE ENTRA EL EFECTIVO. Devuelve [caja, error].
+    #
+    # Antes se DEDUCÍA de las sedes del que recibe, y con un admin —que no tiene sede asignada—
+    # caía en "la única caja abierta del club": con dos mostradores abiertos devolvía nil, el
+    # cobro se marcaba rendido igual y no entraba a NINGÚN arqueo. Plata en el aire, en silencio.
+    #
+    # Ahora lo dice una persona, y quién lo dice depende del rol:
+    #
+    #   · el DISPENSADOR no elige — el efectivo cae en la caja de SU mostrador, que es el cajón
+    #     que tiene abierto adelante. Si no la abrió, no hay dónde ponerlo y se lo decimos.
+    #   · ADMINISTRACIÓN elige: la caja de alguno de los mostradores abiertos, o el club (queda
+    #     asentado como ingreso y no entra a ningún arqueo). El supervisor puede estar en varias
+    #     sedes, así que tiene que indicarlo igual que el admin: es la misma decisión.
     def caja_de_recepcion
-      sedes = @receptor.sedes_ids_asignadas
-      return CajaTurno.abierta_en_sede(club_id: @rendicion.club_id, sede_id: sedes.first) if sedes.one?
+      return caja_del_dispensador if @receptor.atiende_mostrador?
+      return [nil, 'Elegí dónde entra el efectivo: la caja de un mostrador o el club.'] if @destino.blank?
+      return [nil, nil] if @destino.to_s == DESTINO_CLUB
 
-      abiertas = CajaTurno.unscoped.where(club_id: @rendicion.club_id, estado: 'abierta')
-                          .de_mostradores.limit(2).to_a
-      abiertas.one? ? abiertas.first : nil
+      sede_id = @destino.to_i
+      unless @receptor.sedes_visibles_ids.include?(sede_id)
+        return [nil, 'Ese mostrador no es de tus sedes.']
+      end
+
+      caja = CajaTurno.abierta_en_sede(club_id: @rendicion.club_id, sede_id: sede_id)
+      caja ? [caja, nil] : [nil, 'Ese mostrador no tiene la caja abierta.']
+    end
+
+    def caja_del_dispensador
+      sede = @receptor.sede_de_mostrador
+      return [nil, 'No tenés un mostrador asignado donde poner este efectivo.'] if sede.nil?
+
+      caja = CajaTurno.abierta_en_sede(club_id: @rendicion.club_id, sede_id: sede.id)
+      return [caja, nil] if caja
+
+      [nil, "Abrí la caja de #{sede.nombre} para recibir el efectivo: si no, no hay dónde " \
+            'anotarlo y tu cierre no lo va a ver.']
     end
   end
 end

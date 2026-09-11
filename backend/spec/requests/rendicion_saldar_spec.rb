@@ -40,8 +40,11 @@ RSpec.describe 'Devolver lo que quedó a cuenta', type: :request do
     post '/api/rendiciones', headers: auth_headers, params: { receptor_id: admin.id }
     id = JSON.parse(response.body)['id']
     sign_in_as(admin)
+    # 'club': lo recibe el admin y no hay mostrador de por medio. El destino del efectivo lo
+    # elige quien recibe — ver `rendicion_destino_efectivo_spec.rb`.
     post "/api/rendiciones/#{id}/recibir", headers: auth_headers,
-         params: { monto_recibido_ars: 80_000, motivo: 'trajo 80, el resto lo trae mañana' }
+         params: { monto_recibido_ars: 80_000, motivo: 'trajo 80, el resto lo trae mañana',
+                   destino: 'club' }
   end
 
   def saldo_de(u) = Rendiciones::SaldarACuenta.saldo_de(club, u)

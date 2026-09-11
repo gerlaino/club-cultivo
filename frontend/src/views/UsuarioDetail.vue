@@ -213,6 +213,10 @@ const fmtARS = (n) => '$' + (Number(n) || 0).toLocaleString('es-AR', { minimumFr
 const cajaEfectivo = computed(() => stats.value?.caja_delivery?.efectivo_en_mano || 0)
 const cajaCobros   = computed(() => stats.value?.caja_delivery?.cobros_pendientes || 0)
 const cajaEnViaje  = computed(() => stats.value?.caja_delivery?.en_viaje || 0)
+// DÓNDE ENTRA ESE EFECTIVO. Misma pregunta y mismas opciones que cuando el repartidor rinde por
+// su cuenta: si acá no se preguntara, la misma plata entraría distinto según por qué puerta pasó.
+const cajasAbiertas = computed(() => stats.value?.cajas_abiertas || [])
+const cajaDestino   = ref('')
 // Lo que se quedó al rendir la caja, acumulado. No es una pérdida del club: esa plata existe y
 // está con una persona — por eso se muestra como saldo y no como gasto.
 const aCuenta = computed(() => stats.value?.a_cuenta || { total_ars: 0, veces: 0, detalle: [] })
@@ -236,10 +240,12 @@ const fmtFechaCorta = (f) => (f ? new Date(f).toLocaleDateString('es-AR', { day:
 
 async function recibirCaja() {
   if (cajaEfectivo.value <= 0) return
+  if (!cajaDestino.value) return toast.error('Elegí en qué caja entra el efectivo.')
   recibiendoCaja.value = true
   try {
-    const { data } = await recibirCajaDelivery(userId)
+    const { data } = await recibirCajaDelivery(userId, { destino: cajaDestino.value })
     toast.success(`Caja recibida: ${fmtARS(data.recibido_ars)} (${data.cobros} cobro${data.cobros !== 1 ? 's' : ''})`)
+    cajaDestino.value = ''
     await cargarStats()
   } catch (e) {
     toast.error(e?.response?.data?.error || 'No se pudo recibir la caja')
@@ -634,12 +640,28 @@ onMounted(async () => {
                 <span class="udc__monto-val">{{ fmtARS(cajaEfectivo) }}</span>
                 <span class="udc__monto-sub">{{ cajaCobros }} cobro{{ cajaCobros !== 1 ? 's' : '' }} · {{ cajaEnViaje }} en viaje</span>
               </div>
-              <button v-if="canEdit" class="udc__btn" :disabled="recibiendoCaja || cajaEfectivo <= 0" @click="recibirCaja">
-                <DsSpinner v-if="recibiendoCaja" :size="14" />
-                <template v-else><i class="bi bi-check2-circle"></i> Recibir caja</template>
-              </button>
+              <div v-if="canEdit && cajaEfectivo > 0" class="udc__recibir">
+                <select v-model="cajaDestino" class="udc__select" aria-label="¿En qué caja entra?">
+                  <option value="">¿En qué caja entra?</option>
+                  <option v-for="c in cajasAbiertas" :key="c.sede_id" :value="String(c.sede_id)">
+                    Caja de {{ c.sede }}{{ c.abierta_por ? ` — la abrió ${c.abierta_por}` : '' }}
+                  </option>
+                  <!-- Sólo cuando no hay ninguna abierta: con un cajón disponible el efectivo
+                       entra ahí, y llevárselo es sacarlo después, que queda a tu nombre. -->
+                  <option v-if="!cajasAbiertas.length" value="club">
+                    No hay ninguna caja abierta — queda asentada en la organización
+                  </option>
+                </select>
+                <button class="udc__btn" :disabled="recibiendoCaja || !cajaDestino" @click="recibirCaja">
+                  <DsSpinner v-if="recibiendoCaja" :size="14" />
+                  <template v-else><i class="bi bi-check2-circle"></i> Recibir caja</template>
+                </button>
+              </div>
             </div>
-            <p class="udc__hint">Al recibir la caja, el efectivo se asienta en contabilidad como ingreso y se marca como rendido.</p>
+            <p class="udc__hint">
+              Al recibir la caja, el efectivo entra a esa caja y se asienta como ingreso.
+              <template v-if="cajasAbiertas.length">Si te la llevás, sacala del cajón después: así queda registrado quién la tiene.</template>
+            </p>
 
             <!-- Lo que se quedó al rendir, acumulado. Sin verlo junto, cada faltante parece un
                  caso aislado y nadie nota que van seis meses seguidos. -->
@@ -949,6 +971,17 @@ onMounted(async () => {
 .udc__btn { display: inline-flex; align-items: center; gap: .4rem; background: #15803d; color: #fff; border: none; border-radius: 9px; padding: .6rem 1rem; font-size: .85rem; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .udc__btn:hover:not(:disabled) { background: #14532d; }
 .udc__btn:disabled { opacity: .45; cursor: not-allowed; }
+/* El destino y el botón van juntos: es una sola decisión. En pantalla angosta se apilan, con el
+   botón a lo ancho — el desplegable de arriba ya dice qué se está por hacer. */
+.udc__recibir { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.udc__select {
+  border: 1px solid rgba(0,0,0,.14); border-radius: 9px; padding: .58rem .6rem;
+  font-size: .85rem; background: #fff; max-width: 100%;
+}
+@media (max-width: 560px) {
+  .udc__recibir { width: 100%; }
+  .udc__select, .udc__recibir .udc__btn { width: 100%; justify-content: center; }
+}
 /* Lo que el repartidor tiene del club. Ámbar y no rojo: no es una pérdida, es un saldo. */
 .udc__acuenta { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(0,0,0,.06); }
 .udc__acuenta-hdr { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }

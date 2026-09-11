@@ -210,6 +210,19 @@ class User < ApplicationRecord
   # Esto NO se puede escribir en dos lugares: gobierna a la vez el catálogo que ofrece el carrito
   # (`StocksController#index`) y la validación de `Dispensacion`. Si se separaran, la pantalla
   # ofrecería algo que el backend rechaza, que es el peor error posible — parece culpa del usuario.
+  # CUÁL ES "MI MOSTRADOR", en un solo lugar.
+  #
+  # El mostrador vive en una sede `social`/`mixta`: la suya si atiende público, y si no tiene
+  # asignada —la columna nace en null y casi nadie la carga— la primera que atienda. Estaba
+  # escrita adentro de `MeController` y la volvió a necesitar la rendición del repartidor (el
+  # efectivo que recibe un dispensador cae en LA CAJA DE SU MOSTRADOR, no en una que elija).
+  # Dos copias de esta pregunta son dos respuestas el día que una cambie.
+  def sede_de_mostrador
+    atienden = sedes_asignadas.activas.where(tipo: %w[social mixta])
+    atienden.order(:id).first ||
+      club&.sedes&.activas&.where(tipo: %w[social mixta])&.order(:id)&.first
+  end
+
   def atiende_mostrador? = role.to_s == 'dispensador'
 
   def salas_ids_en_sedes_asignadas

@@ -97,6 +97,31 @@
             {{ r.cobros }} entrega{{ r.cobros === 1 ? '' : 's' }} · declara ${{ fmt(r.declarado_ars) }}
           </p>
         </div>
+        <!-- DÓNDE ENTRA EL EFECTIVO. El que atiende no elige: cae en la caja de su mostrador,
+             que es el cajón que tiene abierto adelante. Administración sí — puede haber varios
+             mostradores abiertos, y puede no querer ninguno (se lo lleva y queda asentado como
+             ingreso del club). Antes esto se DEDUCÍA de las sedes del que recibía, y con dos
+             cajas abiertas la plata no entraba a ninguna. -->
+        <div v-if="r.elijo_destino" class="rnd__destino">
+          <label class="rnd__destino-lbl" :for="`destino-${r.id}`">¿En qué caja entra?</label>
+          <select :id="`destino-${r.id}`" v-model="destino[r.id]" class="rnd__select">
+            <option value="">Elegí la caja</option>
+            <option v-for="c in cajasAbiertas" :key="c.sede_id" :value="String(c.sede_id)">
+              Caja de {{ c.sede }}{{ c.abierta_por ? ` — la abrió ${c.abierta_por}` : '' }}
+            </option>
+            <!-- SÓLO cuando no hay ninguna abierta. Con una caja disponible, el efectivo entra
+                 ahí: si después te lo llevás, lo sacás del cajón y queda a tu nombre. Dejarlo
+                 como una opción más era ofrecer que la plata no la tuviera nadie. -->
+            <option v-if="!cajasAbiertas.length" value="club">
+              No hay ninguna caja abierta — queda asentada en la organización
+            </option>
+          </select>
+          <p v-if="cajasAbiertas.length" class="rnd__destino-hint">
+            ¿Te la llevás? Recibila igual en la caja y después sacala del cajón: así queda
+            registrado quién la tiene.
+          </p>
+        </div>
+
         <div class="rnd__acc">
           <!-- Se cuenta primero. Lo declarado ya está a la vista porque no es la medición: es lo
                que la otra persona dice que trae, y contra eso se contrasta. -->
@@ -162,6 +187,9 @@ const rendiciones = ref([])
 const receptores  = ref([])
 const receptorId  = ref('')
 const contado     = ref({})
+// Dónde entra el efectivo de cada rendición (id de sede, o 'club'). Sólo lo elige administración.
+const destino       = ref({})
+const cajasAbiertas = ref([])
 // Lo que ESTA persona tiene del club: el backend lo calcula para quien pregunta.
 const miSaldo     = ref(0)
 const motivo      = ref({})
@@ -193,8 +221,13 @@ function falta (r) {
 async function cargar () {
   try {
     const { data } = await listRendiciones()
-    rendiciones.value = data.rendiciones || []
-    miSaldo.value     = data.mi_saldo_ars || 0
+    rendiciones.value  = data.rendiciones || []
+    miSaldo.value      = data.mi_saldo_ars || 0
+    cajasAbiertas.value = data.cajas_abiertas || []
+    // En '' y no sin clave: un `v-model` apuntando a `undefined` no matchea NINGUNA opción, y el
+    // desplegable se dibuja VACÍO — sin el "Elegí dónde" que es todo el aviso de que falta
+    // contestarlo. Se ve sólo con la pantalla delante.
+    rendiciones.value.forEach(r => { if (r.elijo_destino) destino.value[r.id] ??= '' })
   } catch { rendiciones.value = [] }
 }
 
@@ -216,11 +249,15 @@ async function recibir (r) {
   if (falta(r) && !(motivo.value[r.id] || '').trim()) {
     return toast.error('Falta plata: escribí el motivo.')
   }
+  if (r.elijo_destino && !destino.value[r.id]) {
+    return toast.error('Elegí dónde entra el efectivo.')
+  }
   guardando.value = true
   try {
     await recibirRendicion(r.id, {
       monto_recibido_ars: c,
       motivo: motivo.value[r.id] || undefined,
+      destino: destino.value[r.id] || undefined,
     })
     toast.success('Caja recibida')
     await cargar()
@@ -310,6 +347,10 @@ onMounted(async () => {
 .rnd__input { width: 120px; text-align: right; font-family: var(--font-mono); }
 .rnd__input--motivo { width: 180px; text-align: left; font-family: var(--font-ui); }
 .rnd__select { min-width: 170px; }
+.rnd__destino { margin-top: .6rem; display: flex; flex-direction: column; gap: .3rem; }
+.rnd__destino-lbl { font-size: .78rem; font-weight: 600; color: var(--c-slate-600); }
+.rnd__destino-hint { margin: 0; font-size: .74rem; color: var(--c-slate-500); line-height: 1.35; }
+.rnd__destino .rnd__select { width: 100%; min-width: 0; }
 
 .rnd__btn {
   border-radius: 9px; padding: 9px 16px; font-size: var(--fs-14); font-weight: 600;
