@@ -164,7 +164,7 @@ Ninguno se considera cerrado; todos son candidatos a revisión.
     `confirmar_apertura`, `solicitar_cierre`, `confirmar_cierre` y `cerrar` se retiraron: abrir
     declarando sólo un fondo salteaba la mitad del arqueo. En `cajas#*` queda mover plata
     (salida/ingreso) y **anular** una abierta por error.
-7. **Delivery** — paquetes, estados (pendiente/en viaje/entregado/fallido), firma de entrega, reprogramación. **Es un add-on contratable** (antes era un rol suelto): sin el módulo activo, el rol `delivery` no se ofrece ni se acepta, `rutas_entrega` y las acciones de reparto devuelven 403, y `Dispensacion` rechaza al CREAR una dispensa con envío. **`entregar` y `reportar_fallo` quedan SIN gatear a propósito** — ver "Lo que NO hay que romper".
+7. **Delivery** — paquetes, estados (pendiente/en viaje/entregado/fallido), firma de entrega, reprogramación. **Su PWA son tres solapas: Despachos · Caja · Historial** — el inicio es a dónde va ahora, la plata vive en Caja (cuánto lleva encima, el desglose y rendir) y el historial trae las entregas y **cómo cerró cada caja que rindió**. **Es un add-on contratable** (antes era un rol suelto): sin el módulo activo, el rol `delivery` no se ofrece ni se acepta, `rutas_entrega` y las acciones de reparto devuelven 403, y `Dispensacion` rechaza al CREAR una dispensa con envío. **`entregar` y `reportar_fallo` quedan SIN gatear a propósito** — ver "Lo que NO hay que romper".
 8. **Ambiente / IoT** — dispositivos con webhook token, lecturas, reglas y alertas, setpoints por fase, VPD, drivers (Sonoff, CSV manual, CSV-IA).
 9. **Contabilidad** — movimientos contables, costos por lote, P&L.
 10. **Analítica e informes** — genéticas/ciclos/pérdidas/comparativa, benchmark, informe semestral, informes auditor (REPROCANN, producción, cumplimiento, plan vs real, trazabilidad).
@@ -344,6 +344,42 @@ Cuando Germán plantee un problema o feature nueva antes de implementar:
 3. **Cierre de período (F5) ya existía** — se le agregó el guard `hasta < hoy` (cerrar el día en curso dejaba al mostrador sin poder cobrar, porque todo asiento automático nace con fecha de hoy) y mensaje claro en vez de 500.
 
 Suite 1239 ✓ + 58 vitest ✓. **Deploy: sumar `add_vendible_a_bar_venta_items` y `add_consumo_evento_a_provisiones_y_dispensas` al `db:migrate`.**
+
+## 📍 Dónde retomar (11-sep-2026)
+
+**Lo que encontró el socio de Germán probando, y el repaso del PWA del repartidor.** 4 commits
+(`a9bf0965`, `3b636100`, `609a9f54` + este), **sin pushear**. Bloque (bd) del CHANGELOG.
+
+- **Los 4 del socio:** editar una dispensa rebotaba con «hay 0.0g» (el techo de la edición restaba
+  la mesa entera) · «Cuenta corriente sin límite» con el crédito ya habilitado (el historial no le
+  pasaba la CC al modal) · el libro diario **no avanzaba de página** y **el buscador miraba sólo
+  los diez renglones cargados** · el stock decía «18 g disponible» arriba y «0.0g» en rojo abajo.
+- **La rendición:** va dirigida a una persona y cae en un cajón. El admin veía el botón de una
+  rendición que era del dispensador, y con dos mostradores abiertos la plata **no entraba a ningún
+  arqueo**.
+- **El PWA del repartidor:** solapa **Caja** (por fin ve cuánto lleva antes de rendir), inicio
+  limpio, historial con las cajas rendidas, las dos fotos del modal con nombre propio, y
+  `mis_paquetes` acotado a lo que está en la calle.
+
+**3014 rspec ✓ · 1999 vitest ✓ · build limpio · 3 pruebas de navegador de rendición ✓.** Todo
+verificado renderizado, a 390 px lo del repartidor.
+
+**SIGUE:** el socio iba a seguir probando — **lo que aparezca arranca la próxima sesión**. Y sigue
+pendiente lo de Germán: repasar informe por informe y analítica por analítica.
+
+**Decidido y NO hecho (menor):** los dos botones de foto ya dicen distinto; si algún día molesta
+que el de la entrega diga «Subir / tomar foto», es una línea.
+
+**Pendientes suyos (no de código), sin cambios:** rotar el secreto de Render · los 5 usuarios con
+la clave vieja · `rake stocks:balance_descuadrado` · `rake auditorias:limpiar_blobs` · declarar 8
+variedades del INASE a mano.
+
+**Pendiente de código, sin cambios:** las **2 pruebas de navegador rotas desde el 8-sep**
+(`e2e/mostrador.spec.js`) afirman `.mrm__veredicto`, «Dónde se va» y «Cierre por cierre» — nada de
+eso existe desde que se rehizo la solapa de Merma. **No reescribirlas mirando el código**:
+preguntarle a Germán cómo quedó.
+
+---
 
 ## 📍 Dónde retomar (10-sep-2026)
 
@@ -572,6 +608,55 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 
 ### Lo que NO hay que romper
 
+- **EL TECHO DE UNA DISPENSA ES EL MISMO AL CREAR Y AL EDITAR** (`Stock#techo_para_dispensa`,
+  sep-2026). Lo libre del depósito, MÁS lo que la mesa de ese mostrador tiene arriba —para quien
+  dispensa desde ahí no es un bloqueo, es su stock— MÁS lo apartado del evento del que sale la
+  línea. Estaba escrito TRES veces y la tercera se quedó atrás: la edición validaba contra
+  `cantidad_disponible_real` a secas, que resta la mesa entera, así que con el producto arriba
+  —el caso normal del dispensario— daba SIEMPRE cero y editar rebotaba con «hay 0.0g» aunque no
+  se tocara la cantidad. Cambiarle el medio de pago a la dispensa de ayer era imposible.
+- **UNA RENDICIÓN VA DIRIGIDA A UNA PERSONA Y CAE EN UN CAJÓN** (sep-2026, decisión de Germán).
+  Las dos mitades estaban rotas. `puedo_recibir` decía «cualquiera que no sea el repartidor», así
+  que la que el repartidor le entregaba al dispensador le aparecía con su botón al admin, al
+  supervisor y a todos los dispensadores — y `Recibir` **pisaba el receptor con el que apretaba**,
+  o sea que elegir a quién rendirle no significaba nada. Y la caja se DEDUCÍA de las sedes del que
+  recibía: con un admin (que no tiene sede) y dos mostradores abiertos daba `nil`, el cobro se
+  marcaba rendido, el asiento se escribía y **no entraba a ningún arqueo**.
+  **El destino lo dice una persona**, y quién lo dice depende del rol: el **dispensador no elige**
+  (cae en la caja de SU mostrador; sin caja abierta no recibe y el cartel dice qué hacer) y
+  **administración elige** entre los mostradores abiertos. Con un cajón disponible **no existe
+  «queda en la organización»**: si se la lleva, la recibe en la caja y la **saca** después —eso es
+  un retiro, ya existe, queda a su nombre y se salda cuando la trae—. Son dos registros en vez de
+  una desaparición. **Sin ninguna caja abierta sí** entra a la organización: obligar ahí dejaría
+  al repartidor volviéndose a su casa con la recaudación, que es peor.
+  La regla vive en **`Rendiciones::DestinoEfectivo`** porque la preguntan las DOS puertas: la
+  rendición que arranca el repartidor y el **«Recibir caja» de su ficha** (`club_users#recibir_caja`,
+  sólo admin), que es la de «se fue sin rendir». Esa puerta también pregunta ahora en qué caja; el
+  SERVICIO conserva la deducción para los llamadores internos, que no tienen pantalla donde
+  preguntar.
+- **EL REPARTIDOR TIENE QUE VER CUÁNTO LLEVA ENCIMA** (`GET /rendiciones/mi_caja`, sep-2026). El
+  monto de la rendición lo pone el sistema —pedirle que se acuerde de lo que cobró en doce puertas
+  es pedirle un error— pero nunca se lo mostrábamos: rendía a ciegas, sin poder contar los
+  billetes contra nada, y si el que recibía contaba distinto se enteraba al día siguiente con la
+  diferencia anotada a su nombre. Sale de la **misma consulta** que arma lo declarado
+  (`Rendiciones::Rendir.cobros_en_transito_de`): escrita dos veces, un día dicen distinto y el que
+  descubre la diferencia es él, contando billetes con alguien esperando. **Lo cobrado por
+  transferencia va aparte y NO suma**: esa plata ya entró a la organización, y sumarla sería
+  pedirle billetes que nunca tuvo.
+- **LA PLATA NO VA EN EL INICIO DEL REPARTIDOR** (sep-2026, decisión de Germán: *"la caja que no
+  se vea en el inicio… recordemos que esto es el celu, deberíamos ser simples"*). Esa pantalla se
+  abre cuarenta veces por día para saber A DÓNDE IR, y arrancaba con la tarjeta de rendición
+  —«Rendiste $200.000, esperando que la reciban»—, que es un recibo, no una tarea. Todo lo de la
+  caja vive en su solapa. Y el contador «Entregados» era de TODA SU VIDA al lado de dos que eran
+  de hoy: eso se mira en Historial, que tiene período. Por lo mismo `mis_paquetes` trae lo que
+  está en la calle y no todos los paquetes que le asignaron desde siempre.
+- **DOS FOTOS DISTINTAS NO PUEDEN TENER EL MISMO BOTÓN** (sep-2026). El modal de entrega decía
+  «Subir / tomar foto» dos veces, con el mismo ícono y a quince renglones una de otra. Son dos
+  cosas de verdad distintas —el comprobante de PAGO cuelga del `Cobro` y no se borra nunca; la
+  foto de la ENTREGA se purga a los 30 días— así que no se saca ninguna: se las nombra («Subir
+  comprobante» / «Subir / tomar foto»), y la de la transferencia aparece **sólo si hay
+  transferencia**. Cobrando en efectivo no hay nada que fotografiar, y ése era el botón que
+  sobraba nueve de cada diez veces. Si se borra el monto, la foto se descarta con él.
 - **CONTAR NUNCA SUBE EL INVENTARIO, LO CUENTE QUIEN LO CUENTE** (sep-2026). Contar de más
   significa que sobre la mesa hay producto no anotado, y ese producto **salió del depósito**: ya
   estaba en el `Stock`, sólo cambió de lugar. `ajustar_inventario!` se lo SUMABA al `Stock` —

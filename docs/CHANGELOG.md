@@ -1,5 +1,77 @@
 # Changelog
 
+## Septiembre 2026 (bd) — Lo que encontró el socio, y la caja del repartidor
+
+Dos cosas en la misma sesión: los bugs que encontró el socio de Germán probando la app, y el
+repaso del PWA del repartidor poniéndose en su lugar. Otra vez, **ninguna suite veía nada de
+esto** y todo apareció con la app corriendo.
+
+**Lo que encontró el socio**
+- **Editar una dispensa rebotaba con «Stock insuficiente: hay 0.0g»** aunque no se tocara la
+  cantidad —cambiar el medio de pago de la dispensa de ayer era imposible—. El techo de la
+  EDICIÓN estaba escrito aparte del techo del ALTA y restaba **la mesa entera**: con el producto
+  sobre la mesa, que es donde vive el producto del dispensario, daba siempre cero. Los tres
+  llamadores preguntan ahora `Stock#techo_para_dispensa`.
+- **«Cuenta corriente (sin límite configurado)» con el crédito recién habilitado.** El modal de
+  edición recibía la CC por props y el historial no se las pasaba (la ficha del paciente sí): el
+  mismo modal andaba desde una puerta y no desde la otra. La CC **viaja con la dispensa**.
+- **El libro diario no avanzaba de página**: `setFiltro("page", 2)` ponía el 2 y en la línea
+  siguiente lo pisaba con 1. Y **el buscador miraba los diez renglones cargados**, así que un
+  gasto de la página 2 no aparecía nunca y la pantalla contestaba «probá ajustando los filtros»
+  sobre algo que existe. Ahora busca el servidor (descripción, proveedor, categoría y sus hijas) y
+  los totales responden a lo buscado.
+- **El stock se contradecía consigo mismo**: el KPI decía «18 g de flor disponible» y el único
+  renglón decía «0.0g» en rojo, porque la columna restaba la mesa y el KPI no. **La mesa es un
+  LUGAR, no un compromiso**: «Actual» dice lo que se puede entregar —el mismo número que valida el
+  backend— y la columna **Mostrador** dice dónde está. Decisión de Germán: *"agregando una columna
+  mostrador veo dónde está el stock ese"*.
+
+**La rendición del repartidor: va dirigida a una persona y cae en un cajón**
+- Germán rindió al dispensador y **el botón de recibir le apareció al admin**. `puedo_recibir`
+  decía «cualquiera que no sea el repartidor», y `Recibir` **pisaba el receptor con el que
+  apretaba**: elegir a quién rendirle no significaba nada. Ahora sólo la ve y la recibe la persona
+  a la que se la rindieron.
+- **La caja se deducía** de las sedes del que recibía: con un admin —que no tiene sede— y dos
+  mostradores abiertos daba `nil`, el cobro se marcaba rendido, el asiento se escribía y **no
+  entraba a ningún arqueo**. Plata en el aire, en silencio.
+- Ahora lo dice una persona: **el dispensador no elige** (cae en la caja de su mostrador, y si no
+  la abrió se lo decimos) y **administración elige** entre los mostradores abiertos. Con un cajón
+  disponible ya **no existe «queda en la organización»**: si se la lleva, la recibe en la caja y
+  la **saca** después, que es un retiro y queda a su nombre — dos registros en vez de una
+  desaparición. Sin ninguna caja abierta sí entra a la organización: obligar ahí dejaría al
+  repartidor volviéndose a su casa con la recaudación. **Decisión de Germán.**
+- La regla vive en **`Rendiciones::DestinoEfectivo`** porque la preguntan las **dos** puertas: la
+  rendición que arranca el repartidor y el **«Recibir caja» de su ficha**, que antes deducía y
+  ahora pregunta lo mismo. Y «cuál es mi mostrador» salió de `MeController` a
+  **`User#sede_de_mostrador`**.
+
+**El PWA del repartidor**
+- **La caja tiene su propia solapa.** El monto de una rendición lo pone el sistema —pedirle que se
+  acuerde de lo que cobró en doce puertas es pedirle un error— pero **nunca se lo mostrábamos**:
+  rendía a ciegas, sin poder contar los billetes contra nada. Ahora ve cuánto lleva, entrega por
+  entrega, y desde ahí rinde. Sale de la **misma consulta** que después declara
+  (`Rendir.cobros_en_transito_de`). **Lo cobrado por transferencia va aparte y no suma**: esa plata
+  ya entró a la organización.
+- **El inicio quedó limpio**: se fue la tarjeta de rendición —un recibo, no una tarea, arriba de
+  todo en la pantalla que abre cuarenta veces por día— y el contador «Entregados», que era de toda
+  su vida al lado de dos que eran de hoy.
+- **El historial contesta sus dos preguntas**: qué entregué y **cómo cerró cada caja que rendí**.
+  Lo segundo no estaba en ningún lado para él: existía, pero escrito para administración, con una
+  columna «Repartidor» que para él es siempre él.
+- **Dos fotos distintas no pueden tener el mismo botón.** El modal decía «Subir / tomar foto» dos
+  veces a quince renglones una de otra. Son dos cosas de verdad distintas —el comprobante de pago
+  cuelga del `Cobro` y no se borra nunca; la foto de la entrega se purga a los 30 días— así que no
+  se sacó ninguna: se las nombró (**«Subir comprobante»** / «Subir / tomar foto») y la de la
+  transferencia aparece **sólo si hay transferencia**. Cobrando en efectivo no hay nada que
+  fotografiar, y ése era el botón que sobraba nueve de cada diez veces.
+- **`mis_paquetes` dejó de mandarle todos los paquetes de su vida** en la pantalla que más abre:
+  trae lo que está en la calle (pendiente, en viaje, y lo que vuelve sin entregar).
+
+**3014 rspec ✓ · 1999 vitest ✓ · build limpio · las 3 pruebas de navegador de rendición ✓**, y
+todo verificado renderizado a 390 px, que es donde vive el repartidor.
+
+---
+
 ## Septiembre 2026 (bc) — Contar no crea stock, el rastro se lee, y la fecha es la de acá
 
 Repaso del delivery, la auditoría y los informes **con la app corriendo**. Todo lo que apareció es
