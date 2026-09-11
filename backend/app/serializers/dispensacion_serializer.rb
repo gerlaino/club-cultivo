@@ -6,6 +6,13 @@ class DispensacionSerializer
       club_id:         d.sede&.club_id,
       paciente_id:     d.paciente_id,
       paciente_nombre: "#{d.paciente.nombre} #{d.paciente.apellido}",
+      # LA CUENTA CORRIENTE VIAJA CON LA DISPENSA, no se la pasa la pantalla que la muestra.
+      # El modal de edición la recibía por props y el historial no se las pasaba: al paciente con
+      # crédito recién habilitado el desplegable le decía "Cuenta corriente (sin límite)" y no lo
+      # dejaba elegirla, mientras el MISMO modal abierto desde la ficha del paciente sí. Un dato
+      # del paciente que depende de por qué puerta se abrió el modal termina así.
+      paciente_saldo_cc:  d.paciente.saldo_cc,
+      paciente_limite_cc: d.paciente.limite_cc,
       usuario:         { id: d.user.id, nombre: d.user.first_name || d.user.email },
       sede:            d.sede ? { id: d.sede.id, nombre: d.sede.nombre } : nil,
       stock:           StockSerializer.serialize_dispensacion(d.stock),

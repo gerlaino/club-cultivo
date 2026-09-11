@@ -238,8 +238,14 @@
                   <td class="stk__inv-num stk__inv-td-cosechado">
                     {{ s.cantidad_inicial != null ? s.cantidad_inicial.toFixed(1) + (s.unidad || 'g') : '—' }}
                   </td>
-                  <td class="stk__inv-num stk__inv-td-actual" :class="{ 'stk__inv-td-bajo': s.forma_producto === 'flor_seca' && (s.cantidad_disponible_real ?? s.cantidad) < umbralValor }">
-                    {{ (s.cantidad_disponible_real ?? s.cantidad).toFixed(1) }}{{ s.unidad || 'g' }}
+                  <td class="stk__inv-num stk__inv-td-actual" :class="{ 'stk__inv-td-bajo': s.forma_producto === 'flor_seca' && disponible(s) < umbralValor }">
+                    {{ disponible(s).toFixed(1) }}{{ s.unidad || 'g' }}
+                  </td>
+                  <!-- DÓNDE ESTÁ EL PRODUCTO, que es otra pregunta que cuánto hay. Siempre, y
+                       también en cero apagado: un número que aparece de la nada el día que alguien
+                       carga la mesa no se aprende a mirar. -->
+                  <td class="stk__inv-num stk__inv-td-mesa" :class="{ 'stk__inv-td-mesa--cero': !s.en_mostrador_g }">
+                    {{ (s.en_mostrador_g || 0).toFixed(1) }}{{ s.unidad || 'g' }}
                   </td>
                 </tr>
               </tbody>
@@ -932,14 +938,22 @@ const COLUMNAS_INV = [
   { campo: 'observaciones',    label: 'Observaciones',   dir: 'asc' },
   { campo: 'cantidad_inicial', label: 'Cantidad inicial', dir: 'desc', num: true },
   { campo: 'actual',           label: 'Actual',          dir: 'desc', num: true },
+  { campo: 'mostrador',        label: 'Mostrador',       dir: 'desc', num: true },
 ]
 // Vacío = como venía: lo último que entró arriba.
 const invOrden = ref({ campo: '', dir: 'desc' })
 
+// LO QUE SE PUEDE ENTREGAR HOY: el mismo número que valida el backend y que muestra el carrito.
+// La mesa NO se resta —es un LUGAR, no un compromiso: administración dispensa igual de un frasco
+// que está arriba, y la dispensa baja la mesa sola—. Restándola, un stock entero cargado al
+// mostrador se leía como "0.0g" en rojo mientras el KPI de arriba decía que había 18: la pantalla
+// contradiciéndose consigo misma. Dónde está cada gramo lo dice la columna Mostrador.
+const disponible = s => s.disponible_para_entregar ?? s.cantidad_disponible_real ?? s.cantidad ?? 0
+
 // ¿Se está ordenando por cantidad con unidades distintas en la lista? Es el caso en que el orden
 // no significa nada, y el único momento en que hace falta decirlo.
 const mezclaUnidades = computed(() => {
-  if (!['actual', 'cantidad_inicial'].includes(invOrden.value.campo)) return false
+  if (!['actual', 'cantidad_inicial', 'mostrador'].includes(invOrden.value.campo)) return false
   const unidades = new Set(inventario.value.map(s => s.unidad || 'g'))
   return unidades.size > 1
 })
@@ -1678,7 +1692,7 @@ function formatDate(dateStr) {
 .stk__inv-th { padding: 0; }
 .stk__inv-th-btn {
   width: 100%; border: 0; background: transparent; cursor: pointer;
-  padding: .6rem .85rem; text-align: inherit;
+  padding: .6rem .6rem; text-align: inherit;
   font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit;
 }
 .stk__inv-th-btn:hover { color: var(--c-slate-700); }
@@ -1691,7 +1705,7 @@ function formatDate(dateStr) {
   border-radius: 0 8px 8px 0; padding: .5rem .7rem;
 }
 .stk__inv-aviso strong { color: var(--c-slate-700); }
-.stk__inv-table td { padding: .6rem .85rem; border-bottom: 1px solid var(--c-slate-100); color: var(--c-slate-700); vertical-align: middle; }
+.stk__inv-table td { padding: .6rem .6rem; border-bottom: 1px solid var(--c-slate-100); color: var(--c-slate-700); vertical-align: middle; }
 .stk__inv-table tbody tr:last-child td { border-bottom: none; }
 .stk__inv-num { text-align: right; }
 .stk__inv-trow { cursor: pointer; transition: background .12s; }
@@ -1708,11 +1722,13 @@ function formatDate(dateStr) {
 /* Cuando no hay NINGUNA sede donde pueda vivir: no es una aclaración, es un impedimento. */
 .stk__hint--mal { color: var(--c-amber-500); font-weight: 600; }
 .stk__label-opt { color: var(--c-slate-400); font-weight: 400; }
-.stk__inv-td-obs { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--c-slate-500); font-size: .78rem; }
+.stk__inv-td-obs { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--c-slate-500); font-size: .78rem; }
 .stk__inv-td-mono { font-family: var(--font-mono, monospace); font-size: .8rem; color: var(--c-slate-600); }
 .stk__inv-td-fecha { white-space: nowrap; color: var(--c-slate-500); }
 .stk__inv-td-cosechado { color: var(--c-slate-500); font-weight: 600; white-space: nowrap; }
 .stk__inv-td-actual { font-weight: 800; color: #15803d; white-space: nowrap; }
+.stk__inv-td-mesa { font-weight: 700; color: var(--c-slate-700); white-space: nowrap; }
+.stk__inv-td-mesa--cero { font-weight: 500; color: var(--c-slate-400); }
 .stk__inv-td-bajo { color: #dc2626 !important; }
 @media (max-width: 640px) {
   /* 5, no 4: la columna Código se sumó adelante y corrió a Lote un lugar. */

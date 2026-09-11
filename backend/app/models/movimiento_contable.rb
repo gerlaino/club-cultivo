@@ -150,6 +150,31 @@ class MovimientoContable < ApplicationRecord
   # ocurridos. No afecta a los movimientos normales (sin compra_cuotas_id).
   scope :sin_cuotas_futuras, -> { where('compra_cuotas_id IS NULL OR fecha <= ?', Date.current) }
 
+  # BUSCAR ES BUSCAR EN EL LIBRO ENTERO, NO EN LA PÁGINA QUE ESTÁ A LA VISTA.
+  #
+  # El libro se pagina en el servidor y el buscador filtraba en el navegador los 10 renglones
+  # cargados: un movimiento que estaba en la página 2 no aparecía nunca, y la pantalla decía
+  # "Probá ajustando los filtros" sobre un gasto que existe. Además así los totales del período
+  # responden a lo buscado, que es la mitad de para qué se busca.
+  #
+  # Se busca por lo que la fila MUESTRA: descripción, proveedor y el nombre de la categoría
+  # (la propia y la de su madre, porque la tabla muestra la madre cuando hay jerarquía).
+  scope :buscar, ->(texto) {
+    q = texto.to_s.strip
+    next all if q.blank?
+
+    like = "%#{MovimientoContable.sanitize_sql_like(q)}%"
+    # Buscar el nombre de una categoría MADRE trae también lo que cuelga de sus hijas, igual que
+    # el filtro de categoría: pedir "Insumos" y ver una lista vacía porque los movimientos están
+    # en "Fertilizante" se lee como que el buscador no anda.
+    cats  = CategoriaContable.where('nombre ILIKE :q', q: like).pluck(:id)
+    cats += CategoriaContable.where(parent_id: cats).pluck(:id) if cats.any?
+
+    sql  = 'movimientos_contables.descripcion ILIKE :q OR movimientos_contables.proveedor ILIKE :q'
+    sql += ' OR movimientos_contables.categoria_contable_id IN (:cats)' if cats.any?
+    where(sql, q: like, cats: cats)
+  }
+
   def categoria_label
     CATEGORIA_LABELS[categoria] || categoria
   end

@@ -29,7 +29,8 @@ class DispensacionesController < ApplicationController
   def index
     if @paciente
       base  = @paciente.dispensaciones
-                       .includes(:user, :indicacion_medica, :sede, { stock: :lote }, { items: { stock: :lote } })
+                       .includes(:user, :indicacion_medica, :sede, { paciente: :cuenta_corriente },
+                                 { stock: :lote }, { items: { stock: :lote } })
                        .recientes
       page  = [params[:pagina].to_i, 1].max
       limit = [[(params[:limite] || 10).to_i, 1].max, 100].min
@@ -42,7 +43,8 @@ class DispensacionesController < ApplicationController
         .joins(stock: :sede)
         .where(sedes: { club_id: current_user.club_id })
         .where(con_envio: true)
-        .includes(:user, :paciente, :sede, :delivery_user, :ruta_entrega, { stock: :lote }, { items: { stock: :lote } })
+        .includes(:user, :sede, :delivery_user, :ruta_entrega, { paciente: :cuenta_corriente },
+                   { stock: :lote }, { items: { stock: :lote } })
       scope = scope.where(estado_envio: params[:estado_envio]) if params[:estado_envio].present?
       scope = scope.where(delivery_id: params[:delivery_id])   if params[:delivery_id].present?
       scope = scope.where("fecha_dispensacion >= ?", Date.parse(params[:desde])) if params[:desde].present?
@@ -54,7 +56,7 @@ class DispensacionesController < ApplicationController
       scope = Dispensacion
         .joins(stock: :sede)
         .where(sedes: { club_id: current_user.club_id })
-        .includes(:user, :paciente, :sede, { stock: :lote }, { items: { stock: :lote } })
+        .includes(:user, :sede, { paciente: :cuenta_corriente }, { stock: :lote }, { items: { stock: :lote } })
       scope = acotar_historial(scope)
       scope = apply_dispensacion_filters(scope)
       if params[:desde].present? || params[:hasta].present?
@@ -263,8 +265,11 @@ class DispensacionesController < ApplicationController
           @dispensacion.cantidad = @dispensacion.items.sum { |it| it.cantidad.to_d }
           validar_stock_items!(@dispensacion)   # cada línea vs disponible (acumulado por stock)
         else
-          # 3) validar stock disponible con la cantidad nueva (single legacy)
-          disp_real = @dispensacion.stock.cantidad_disponible_real.to_d
+          # 3) validar stock disponible con la cantidad nueva (single legacy), con el MISMO
+          #    techo que usa la creación: lo libre más lo que la mesa de esa sede tiene arriba.
+          disp_real = @dispensacion.stock.techo_para_dispensa(
+            sede_mostrador: @dispensacion.sede_del_mostrador
+          )
           if @dispensacion.cantidad.to_d > disp_real
             raise "Stock insuficiente: hay #{disp_real.round(2)}#{@dispensacion.stock.unidad || 'g'} disponibles"
           end
@@ -698,14 +703,30 @@ class DispensacionesController < ApplicationController
   # Valida que las líneas no excedan el stock disponible (acumulado por stock, por si dos
   # líneas comparten el mismo contenedor). Se usa en la edición multi-ítem, donde las
   # validaciones on:create del modelo no corren.
+  #
+  # EL TECHO ES EL MISMO QUE AL CREAR (`Stock#techo_para_dispensa`), y por eso se pregunta ahí.
+  # Acá decía `cantidad_disponible_real` a secas —que resta la mesa entera— así que editar una
+  # dispensa de un producto que está sobre la mesa rebotaba con "hay 0.0g disponibles" aunque no
+  # se tocara la cantidad: cambiar el medio de pago de la dispensa de ayer era imposible. Y no
+  # era un caso raro, es dónde vive el producto del dispensario.
   def validar_stock_items!(disp)
     por_stock = Hash.new(0.to_d)
-    disp.items.each { |it| por_stock[it.stock_id] += it.cantidad.to_d if it.stock_id }
+    eventos   = Hash.new { |h, k| h[k] = [] }
+    disp.items.each do |it|
+      next unless it.stock_id
+      por_stock[it.stock_id] += it.cantidad.to_d
+      eventos[it.stock_id] << it.evento_bar_id
+    end
     por_stock.each do |stock_id, total|
       st = Stock.find_by(id: stock_id)
       next unless st
-      disp_real = st.cantidad_disponible_real.to_d
-      raise "Stock insuficiente para #{st.forma_producto}: hay #{disp_real.round(2)}#{st.unidad || 'g'} disponibles" if total > disp_real
+      disp_real = st.techo_para_dispensa(sede_mostrador: disp.sede_del_mostrador,
+                                         eventos: eventos[stock_id])
+      next unless total > disp_real
+
+      nombre = st.forma_producto.to_s.humanize
+      raise "Stock insuficiente (#{nombre}): hay #{disp_real.round(2)}#{st.unidad || 'g'} " \
+            "y se piden #{total.to_f}#{st.unidad || 'g'}."
     end
   end
 

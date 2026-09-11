@@ -149,6 +149,23 @@ class Stock < ApplicationRecord
     [cantidad.to_d - apartado_para_eventos.to_d - apartado_para_reservas, 0.to_d].max
   end
 
+  # EL TECHO DE UNA DISPENSA, Y VIVE EN UN SOLO LUGAR.
+  #
+  # Lo libre del depósito, MÁS lo que la mesa de ese mostrador tiene arriba —para el que dispensa
+  # desde ahí no es un bloqueo, es su stock— MÁS lo que el evento del que sale la línea tiene
+  # apartado. La mesa es un LUGAR, no un compromiso.
+  #
+  # Estaba escrito tres veces: `Dispensacion#stock_disponible`, `#lineas_validas` y la validación
+  # de la EDICIÓN en el controller. La tercera se quedó atrás —validaba contra
+  # `cantidad_disponible_real` a secas, que resta la mesa entera— así que editar una dispensa de
+  # un producto que está sobre la mesa (el caso normal del dispensario) rebotaba con "hay 0.0g
+  # disponibles", aunque no se tocara la cantidad: cambiar el medio de pago era imposible.
+  def techo_para_dispensa(sede_mostrador: nil, eventos: nil)
+    cantidad_disponible_real.to_d +
+      libre_en_mostrador(sede_mostrador) +
+      Array(eventos).compact.uniq.sum { |ev| apartado_en_evento(ev) }
+  end
+
   # LO QUE QUEDA SOBRE LA MESA PARA EL PRÓXIMO QUE LLEGA: lo que hay arriba menos lo que ya
   # tiene dueño. Con 110 sobre la mesa y 15 reservados, quien atiende puede entregar 95 — los
   # otros 15 están ahí, pero son de alguien. Sin esto se los lleva el que llegue primero.

@@ -278,7 +278,7 @@ class Dispensacion < ApplicationRecord
       # `libre_en_mostrador` y no la mesa entera: lo que está arriba apartado a nombre de un
       # paciente no lo puede entregar otro. Entregar ESA reserva pasa igual — el controller la
       # marca `entregada` antes de guardar la dispensa, así que deja de contar sola.
-      disp = stock.cantidad_disponible_real.to_d + stock.libre_en_mostrador(sede_del_mostrador)
+      disp = stock.techo_para_dispensa(sede_mostrador: sede_del_mostrador)
       if cantidad.to_d > disp
         errors.add(:cantidad,
           "supera el stock disponible (#{disp.round(2)} #{stock.unidad || 'g'} disponibles)")
@@ -330,9 +330,8 @@ class Dispensacion < ApplicationRecord
       #
       # Y lo mismo con el mostrador: lo que tiene sobre la mesa bloquea al resto del mundo, pero
       # para él no es un bloqueo — es su stock, y de ahí dispensa.
-      eventos = ls.map(&:evento_bar_id).compact.uniq
-      disp    = st.cantidad_disponible_real.to_d + eventos.sum { |ev| st.apartado_en_evento(ev) } +
-                st.libre_en_mostrador(sede_del_mostrador)
+      eventos = ls.map(&:evento_bar_id)
+      disp    = st.techo_para_dispensa(sede_mostrador: sede_del_mostrador, eventos: eventos)
       if pedido > disp
         nombre = st.forma_producto.to_s.humanize
         errors.add(:base, "Stock insuficiente (#{nombre}): hay #{disp.round(2)}#{st.unidad || 'g'} y se piden #{pedido.to_f}#{st.unidad || 'g'}.")
@@ -606,7 +605,10 @@ class Dispensacion < ApplicationRecord
   end
 
   # La sede cuyo mostrador atiende esta dispensa. La de la dispensa, y si no vino, la del stock.
-  def sede_del_mostrador = sede_id || stock&.sede_id
+  # Pública porque la pregunta también el controller, que valida la EDICIÓN con el mismo techo
+  # que la creación: resolverla allá sería la misma regla escrita en dos lugares.
+  public def sede_del_mostrador = sede_id || stock&.sede_id
+  private
 
   # El turno abierto del mostrador de esa sede, si hay uno. No hay nada que elegir: es uno por
   # mostrador. Sin turno abierto queda nil, y ahí manda quién dispensa: para administración la

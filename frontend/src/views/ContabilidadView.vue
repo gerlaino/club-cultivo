@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, nextTick, watch } from "vue"
+import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useContabilidadStore } from "../stores/contabilidad"
@@ -362,17 +362,25 @@ const filtroSector    = ref("")
 const filtroDesde     = ref("")
 const filtroHasta     = ref("")
 
-const itemsFiltrados = computed(() => {
-  const q = filtroQ.value.trim().toLowerCase()
-  return (store.items || []).filter(m => {
-    if (q && !m.descripcion?.toLowerCase().includes(q) &&
-      !catLabel(m.categoria).toLowerCase().includes(q) &&
-      !m.proveedor?.toLowerCase().includes(q)) return false
-    return true
-  })
+// El libro llega ya filtrado del servidor: la búsqueda no puede vivir acá, porque acá sólo hay
+// los renglones de la página a la vista y lo de la página 2 no aparecía nunca.
+const itemsFiltrados = computed(() => store.items || [])
+
+// Se busca mientras se escribe, pero no en cada tecla: una consulta por letra sobre el libro
+// entero, y la respuesta de "Cal" puede llegar después que la de "Calent" y pisarla.
+let buscarTimer = null
+watch(filtroQ, () => {
+  clearTimeout(buscarTimer)
+  const q = filtroQ.value.trim()
+  // "Limpiar" ya vacía el filtro y recarga: sin esto, 350ms después salía una segunda consulta
+  // idéntica y la tabla parpadeaba.
+  if (q === (store.filtros.q || "")) return
+  buscarTimer = setTimeout(() => { store.setFiltro("q", q); store.fetch() }, 350)
 })
+onBeforeUnmount(() => clearTimeout(buscarTimer))
 
 async function aplicarFiltros() {
+  store.setFiltro("q",         filtroQ.value.trim())
   store.setFiltro("tipo",      filtroTipo.value)
   store.setFiltro("categoria", filtroCategoria.value)
   store.setFiltro("sede_id",   filtroSede.value)
@@ -389,8 +397,8 @@ function limpiarFiltros() {
 }
 
 const hayFiltros = computed(() =>
-  filtroTipo.value || filtroCategoria.value || filtroSede.value || filtroSector.value ||
-  filtroDesde.value || filtroHasta.value
+  filtroQ.value || filtroTipo.value || filtroCategoria.value || filtroSede.value ||
+  filtroSector.value || filtroDesde.value || filtroHasta.value
 )
 
 const route  = useRoute()

@@ -33,6 +33,7 @@ export const useContabilidadStore = defineStore("contabilidad", {
     removeError: null,
 
     filtros: {
+      q:         "",
       tipo:      "",
       categoria: "",
       sede_id:   "",
@@ -164,13 +165,22 @@ export const useContabilidadStore = defineStore("contabilidad", {
       }
     },
 
+    // CAMBIAR UN FILTRO VUELVE A LA PÁGINA 1; CAMBIAR DE PÁGINA NO.
+    // `setFiltro("page", 2)` ponía el 2 y en la línea siguiente lo pisaba con 1, así que el
+    // libro NO AVANZABA NUNCA: los botones de paginado recargaban la primera página y la
+    // pantalla se quedaba igual, que se lee como que están rotos.
     setFiltro(key, value) {
+      if (key === "page") return this.setPage(value);
       this.filtros[key] = value;
       this.filtros.page = 1;
     },
 
+    setPage(page) {
+      this.filtros.page = Math.max(1, Number(page) || 1);
+    },
+
     resetFiltros() {
-      this.filtros = { tipo: "", categoria: "", sede_id: "", lote_id: "",
+      this.filtros = { q: "", tipo: "", categoria: "", sede_id: "", lote_id: "",
         desde: "", hasta: "", page: 1, per_page: 10 };
     },
   },

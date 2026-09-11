@@ -36,8 +36,15 @@ const fmt = n => n == null ? '—' :
   new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', minimumFractionDigits: 0 }).format(n)
 
 // ── Cuenta corriente ───────────────────────────────────────
-const tieneCc  = computed(() => props.limiteCc !== null && props.limiteCc > 0)
-const ccMargen = computed(() => (props.saldoCc ?? 0) + (props.limiteCc ?? 0))
+// LA CC SALE DE LA DISPENSA, no de quién montó el modal. Las props existen desde antes y se
+// respetan si vienen, pero el historial no las pasaba: al paciente con crédito recién habilitado
+// el desplegable le decía "Cuenta corriente (sin límite)" y no lo dejaba elegirla, mientras el
+// MISMO modal abierto desde la ficha del paciente sí. Un dato del paciente no puede depender de
+// por qué puerta se abrió la pantalla.
+const limiteCc = computed(() => props.limiteCc ?? props.dispensacion?.paciente_limite_cc ?? null)
+const saldoCc  = computed(() => props.saldoCc  ?? props.dispensacion?.paciente_saldo_cc  ?? null)
+const tieneCc  = computed(() => limiteCc.value !== null && limiteCc.value > 0)
+const ccMargen = computed(() => (saldoCc.value ?? 0) + (limiteCc.value ?? 0))
 
 const ccInsuficiente = computed(() => {
   if (!tieneCc.value || form.value.medio_pago !== 'cuenta_corriente') return false
@@ -49,7 +56,7 @@ const estadoCc = computed(() => {
   if (!tieneCc.value) return null
   if (ccMargen.value <= 0)  return 'agotado'
   if (ccInsuficiente.value) return 'insuficiente'
-  if (ccMargen.value < (props.limiteCc ?? 0) * 0.2) return 'critico'
+  if (ccMargen.value < (limiteCc.value ?? 0) * 0.2) return 'critico'
   return 'ok'
 })
 
@@ -212,7 +219,7 @@ async function handleSubmit() {
               <select v-model="form.medio_pago" class="med__input">
                 <option value="efectivo">Efectivo</option>
                 <option value="transferencia">Transferencia</option>
-                <option value="cuenta_corriente" :disabled="!tieneCc">Cuenta corriente{{ !tieneCc ? ' (sin límite)' : '' }}</option>
+                <option value="cuenta_corriente" :disabled="!tieneCc">Cuenta corriente{{ !tieneCc ? ' (sin límite configurado)' : '' }}</option>
                 <option value="no_abona">No abona</option>
               </select>
             </div>

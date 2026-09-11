@@ -139,12 +139,19 @@ class StocksController < ApplicationController
 
     # Lista + counts: respetan el filtro de forma.
     scope = params[:forma_producto].present? ? base.where(forma_producto: params[:forma_producto]) : base
-    # KPI en gramos: SOLO flor seca, y DISPONIBLE REAL (cantidad menos lo reservado/apartado),
-    # para que coincida con la columna "Actual" de la tabla. Los derivados (preroll, hash…) son
-    # inventario con su propia unidad y no se suman como gramos.
-    flor           = base.where(forma_producto: 'flor_seca')
-    reservado_flor = Reserva.pendientes.where(stock_id: flor.select(:id)).sum(:cantidad).to_f
-    flor_disponible = [flor.sum(:cantidad).to_f - reservado_flor, 0].max
+    # KPI en gramos: SOLO flor seca, y LO QUE SE PUEDE ENTREGAR (`disponible_para_entregar`:
+    # el frasco menos lo prometido a un evento y a un paciente). Los derivados (preroll, hash…)
+    # son inventario con su propia unidad y no se suman como gramos.
+    #
+    # LA MESA NO SE RESTA ACÁ NI EN LA COLUMNA: es un LUGAR, no un compromiso —administración
+    # dispensa igual de un frasco que está arriba, y dispensarlo baja la mesa solo—. El KPI ya no
+    # la restaba y la columna sí, así que la pantalla se contradecía consigo misma: "18 g de flor
+    # disponible" arriba y el único renglón en "0.0g" abajo, en rojo de stock bajo. Dónde está
+    # cada gramo lo dice ahora la columna Mostrador, que es otra pregunta.
+    flor = base.where(forma_producto: 'flor_seca').to_a
+    Stock.precargar_apartados(flor)
+    reservado_flor  = flor.sum { |s| s.apartado_para_reservas.to_f }
+    flor_disponible = flor.sum { |s| s.disponible_para_entregar.to_f }
 
     hoy = Time.zone.today
     totales = {
@@ -164,7 +171,7 @@ class StocksController < ApplicationController
     # EL ORDEN VA EN LA CONSULTA, NO EN LA PANTALLA. La tabla la pagina el servidor: ordenar en el
     # navegador acomodaría los 25 renglones de la página y diría «ordenado por cantidad» mostrando
     # los 25 de siempre. Eso es peor que no ordenar — se lee como una respuesta y no lo es.
-    stocks = if params[:orden].to_s == 'actual'
+    stocks = if ORDEN_EN_RUBY.key?(params[:orden].to_s)
                ordenar_por_disponible(scope, page, per)
              else
                scope.left_joins(:sede, :genetica, lote: :genetica)
@@ -917,11 +924,8 @@ class StocksController < ApplicationController
   # POR QUÉ COLUMNA SE PUEDE ORDENAR. Lista blanca: el parámetro entra en un `ORDER BY`, así que
   # no puede venir del cliente sin filtrar.
   #
-  # `actual` ordena por `cantidad`, que es la columna de la base. La pantalla muestra el
-  # DISPONIBLE (cantidad menos lo reservado y lo apartado a un evento), que se calcula en Ruby y no
-  # existe en SQL: en las filas con algo apartado el orden puede diferir del número mostrado por
-  # esos gramos. Ordenar bien exigiría materializar el apartado; hasta entonces, esto contesta la
-  # pregunta que se hace («¿de qué tengo más?») sin traer las 3.000 filas a memoria.
+  # Las columnas que SÍ existen en SQL se ordenan en la consulta. Las dos que se calculan
+  # —«Actual» y «Mostrador»— van por ORDEN_EN_RUBY, acá abajo.
   ORDEN_INVENTARIO = {
     'codigo'           => 'stocks.numero_lote_producto',
     'tipo'             => 'stocks.forma_producto',
@@ -933,26 +937,33 @@ class StocksController < ApplicationController
     'ingreso'          => 'stocks.created_at',
     'observaciones'    => 'stocks.descripcion',
     'cantidad_inicial' => 'stocks.cantidad_inicial',
-    'actual'           => 'stocks.cantidad',
+    # 'actual' y 'mostrador' NO están acá: se ordenan en Ruby (ver ORDEN_EN_RUBY). Dejar la
+    # entrada `'actual' => 'stocks.cantidad'` era una segunda respuesta a la misma pregunta,
+    # esperando a que alguien la usara y ordenara por el frasco entero.
   }.freeze
 
   # ORDENAR POR LO QUE LA COLUMNA MUESTRA, que no es `stocks.cantidad`.
   #
-  # «Actual» muestra el DISPONIBLE: la cantidad menos lo apartado para un evento y menos lo que
-  # está sobre la mesa del mostrador o reservado a un paciente. Ordenando por `cantidad` la tabla
-  # decía una cosa y ordenaba por otra, y con 300 g sobre la mesa la diferencia no es un detalle:
-  # el renglón que la pantalla muestra último aparecía primero. Germán: «funciona mal actual».
+  # «Actual» muestra lo que se puede entregar (`disponible_para_entregar`: la cantidad menos lo
+  # apartado para un evento y lo reservado a un paciente) y «Mostrador» lo que está sobre la mesa.
+  # Ordenando por `cantidad` la tabla decía una cosa y ordenaba por otra, y con 300 g apartados la
+  # diferencia no es un detalle: el renglón que la pantalla muestra último aparecía primero.
+  # Germán: «funciona mal actual».
   #
-  # Ese número se calcula en Ruby (`cantidad_disponible_real`) y no existe en SQL. Reescribirlo
-  # como subconsultas sería la misma regla en dos lenguajes, que es de donde salen las
-  # divergencias: se ordena con la regla de verdad, en memoria, sobre el inventario FILTRADO —que
-  # es lo que hay hoy en existencia, no el histórico—. Si algún día una organización tiene miles
-  # de filas vivas a la vez, lo que hay que hacer es materializar el apartado en una columna, no
-  # duplicar la fórmula acá.
+  # Esos números se calculan en Ruby y no existen en SQL. Reescribirlos como subconsultas sería la
+  # misma regla en dos lenguajes, que es de donde salen las divergencias: se ordena con la regla de
+  # verdad, en memoria, sobre el inventario FILTRADO —que es lo que hay hoy en existencia, no el
+  # histórico—. Si algún día una organización tiene miles de filas vivas a la vez, lo que hay que
+  # hacer es materializar el apartado en una columna, no duplicar la fórmula acá.
+  ORDEN_EN_RUBY = {
+    'actual'    => ->(s) { s.disponible_para_entregar.to_d },
+    'mostrador' => ->(s) { s.apartado_para_mostrador.to_d },
+  }.freeze
+
   def ordenar_por_disponible(scope, page, per)
     todos = scope.includes(:lote, :genetica, :sede).to_a
     Stock.precargar_apartados(todos)
-    ordenados = todos.sort_by { |s| s.cantidad_disponible_real.to_d }
+    ordenados = todos.sort_by(&ORDEN_EN_RUBY.fetch(params[:orden].to_s))
     ordenados.reverse! unless params[:dir].to_s.downcase == 'asc'
     ordenados.drop((page - 1) * per).first(per)
   end
@@ -1032,6 +1043,10 @@ class StocksController < ApplicationController
       # badge para que no se entere recién cuando el que atiende cierra con un faltante que no
       # esperaba.
       en_mostrador: s.apartado_para_mostrador.to_f.positive?,
+      # CUÁNTO de este frasco está sobre una mesa. El booleano de arriba le alcanza al carrito
+      # (un badge), pero el inventario tiene que poder DECIR dónde está el producto: sin esto, un
+      # stock entero cargado al mostrador se veía como si no quedara nada.
+      en_mostrador_g: s.apartado_para_mostrador.to_f,
       dias_para_vencimiento:    s.dias_para_vencimiento,
       estado_vencimiento:       s.estado_vencimiento,
       created_at:               s.created_at,

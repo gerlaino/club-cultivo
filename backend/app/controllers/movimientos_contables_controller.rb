@@ -12,6 +12,9 @@ class MovimientosContablesController < ApplicationController
                         .includes(:sede, :lote, :dispensacion, :created_by, :categoria_contable, :unidad_negocio)
                         .recientes
 
+    # El buscador es del SERVIDOR: el libro está paginado, así que filtrar en el navegador
+    # buscaba sólo entre los renglones de la página a la vista.
+    scope = scope.buscar(params[:q])                               if params[:q].present?
     scope = scope.where(tipo: params[:tipo])                       if params[:tipo].present?
     scope = scope.where(categoria: params[:categoria])             if params[:categoria].present?
     # Filtrar por una categoría MADRE trae también sus subcategorías: si pedís "Insumos" querés
