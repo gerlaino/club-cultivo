@@ -362,6 +362,12 @@ const filtroSector    = ref("")
 const filtroDesde     = ref("")
 const filtroHasta     = ref("")
 
+// UNA COLUMNA, NO DOS. «Subcategoría» decía "—" en TODOS los renglones desde que se aplanó el
+// catálogo en agosto: una columna muerta ocupando ancho en una tabla que ya no entra a 1280 px.
+// No se borra el dato: si una organización todavía tiene una subcategoría, la ruta entera va en
+// la misma celda («Insumos › Fertilizante»), que es como se lee de todos modos.
+const categoriaDe = (m) => m.categoria_ruta || m.categoria_madre || catLabel(m.categoria)
+
 // El libro llega ya filtrado del servidor: la búsqueda no puede vivir acá, porque acá sólo hay
 // los renglones de la página a la vista y lo de la página 2 no aparecía nunca.
 const itemsFiltrados = computed(() => store.items || [])
@@ -1079,7 +1085,6 @@ onMounted(async () => {
                   <th>Fecha</th>
                   <th>Descripción</th>
                   <th>Categoría</th>
-                  <th>Subcategoría</th>
                   <th>Sector</th>
                   <th>Depósito</th>
                   <th class="cv__th-right">Monto ARS</th>
@@ -1098,8 +1103,7 @@ onMounted(async () => {
                       <i class="bi bi-info-circle cv__mov-info"></i>
                     </div>
                   </td>
-                  <td class="cv__td-muted">{{ m.categoria_madre || catLabel(m.categoria) }}</td>
-                  <td class="cv__td-muted">{{ m.subcategoria || '—' }}</td>
+                  <td class="cv__td-muted">{{ categoriaDe(m) }}</td>
                   <td class="cv__td-muted">{{ m.unidad_negocio?.nombre || 'Sin sector' }}</td>
                   <td class="cv__td-muted">{{ m.deposito?.nombre || 'Sin depósito' }}</td>
                   <td class="cv__td-right cv__td-bold" :style="{ color: tipoMeta(m.tipo).color }">{{ fmt(m.monto_ars) }}</td>
@@ -1191,7 +1195,6 @@ onMounted(async () => {
               <th>Fecha</th>
               <th>Descripción</th>
               <th>Categoría</th>
-              <th>Subcategoría</th>
               <th>Sector</th>
               <th>Depósito</th>
               <th>Sede</th>
@@ -1211,8 +1214,7 @@ onMounted(async () => {
                   <span class="cv__desc-text">{{ m.descripcion }}</span>
                 </div>
               </td>
-              <td class="cv__td-muted">{{ m.categoria_madre || catLabel(m.categoria) }}</td>
-              <td class="cv__td-muted">{{ m.subcategoria || '—' }}</td>
+              <td class="cv__td-muted">{{ categoriaDe(m) }}</td>
               <td class="cv__td-muted">{{ m.unidad_negocio?.nombre || 'Sin sector' }}</td>
               <td class="cv__td-muted">{{ m.deposito?.nombre || 'Sin depósito' }}</td>
               <td class="cv__td-muted">{{ m.sede?.nombre || '—' }}</td>
@@ -1573,8 +1575,8 @@ onMounted(async () => {
 
 .cv__table-wrap { overflow-x: auto; }
 .cv__table { width: 100%; border-collapse: collapse; font-size: .82rem; }
-.cv__table th { padding: .75rem 1rem; font-size: .7rem; font-weight: 700; color: var(--c-slate-500); text-transform: uppercase; letter-spacing: .04em; border-bottom: 1.5px solid var(--c-slate-100); background: #fafbfc; white-space: nowrap; }
-.cv__table td { padding: .75rem 1rem; border-bottom: 1px solid var(--c-slate-50); vertical-align: middle; }
+.cv__table th { padding: .75rem .6rem; font-size: .7rem; font-weight: 700; color: var(--c-slate-500); text-transform: uppercase; letter-spacing: .04em; border-bottom: 1.5px solid var(--c-slate-100); background: #fafbfc; white-space: nowrap; }
+.cv__table td { padding: .75rem .6rem; border-bottom: 1px solid var(--c-slate-50); vertical-align: middle; }
 .cv__table tfoot td { padding: .75rem 1rem; border-top: 2px solid var(--c-slate-200); font-weight: 700; background: #fafbfc; }
 .cv__table tbody tr:last-child td { border-bottom: none; }
 .cv__table tbody tr:hover td { background: #fafbfc; }
