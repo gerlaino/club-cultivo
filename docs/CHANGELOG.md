@@ -67,7 +67,17 @@ esto** y todo apareció con la app corriendo.
 - **`mis_paquetes` dejó de mandarle todos los paquetes de su vida** en la pantalla que más abre:
   trae lo que está en la calle (pendiente, en viaje, y lo que vuelve sin entregar).
 
-**3014 rspec ✓ · 1999 vitest ✓ · build limpio · las 3 pruebas de navegador de rendición ✓**, y
+**Y los cuatro cabos que quedaron abiertos, cerrados en la misma sesión:** del libro **se baja lo
+que estás mirando** (el export respetaba sólo las fechas, y el encabezado del Excel dice ahora con
+qué se filtró); **un punto en la solapa Caja** cuando el repartidor lleva efectivo sin rendir, que
+es lo único que se lo recuerda desde que la plata salió del inicio; `saldo_a_cuenta_ars` salió de
+`mi_caja` (lo dice la tarjeta de rendición con su propio dato); y **`/delivery/caja` es del
+repartidor** — un admin que escribía la URL caía en una pantalla que sólo sabía decirle que no se
+pudo cargar. Y **el libro perdió la columna «Subcategoría»**, que decía "—" en todos los renglones
+de todas las organizaciones desde que se aplanó el catálogo: la ruta entera va en la celda de
+Categoría, así que no se pierde el dato el día que alguien cree una.
+
+**3018 rspec ✓ · 2002 vitest ✓ · build limpio · las 3 pruebas de navegador de rendición ✓**, y
 todo verificado renderizado a 390 px, que es donde vive el repartidor.
 
 ---
