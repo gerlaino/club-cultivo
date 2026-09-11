@@ -347,8 +347,8 @@ Suite 1239 ✓ + 58 vitest ✓. **Deploy: sumar `add_vendible_a_bar_venta_items`
 
 ## 📍 Dónde retomar (11-sep-2026)
 
-**Lo que encontró el socio de Germán probando, y el repaso del PWA del repartidor.** 4 commits
-(`a9bf0965`, `3b636100`, `609a9f54` + este), **sin pushear**. Bloque (bd) del CHANGELOG.
+**Lo que encontró el socio de Germán probando, y el repaso del PWA del repartidor.** 5 commits,
+**pusheados** (`a9bf0965` → `d55b26a3`). Bloque (bd) del CHANGELOG.
 
 - **Los 4 del socio:** editar una dispensa rebotaba con «hay 0.0g» (el techo de la edición restaba
   la mesa entera) · «Cuenta corriente sin límite» con el crédito ya habilitado (el historial no le
@@ -367,8 +367,25 @@ verificado renderizado, a 390 px lo del repartidor.
 **SIGUE:** el socio iba a seguir probando — **lo que aparezca arranca la próxima sesión**. Y sigue
 pendiente lo de Germán: repasar informe por informe y analítica por analítica.
 
-**Decidido y NO hecho (menor):** los dos botones de foto ya dicen distinto; si algún día molesta
-que el de la entrega diga «Subir / tomar foto», es una línea.
+**Y el libro diario perdió la columna «Subcategoría»**, que decía "—" en todos los renglones de
+todas las organizaciones desde que se aplanó el catálogo: la ruta entera («Bienes de Uso ›
+Herramientas») va en la celda de Categoría, así que no se pierde el dato el día que alguien cree
+una. La tabla igual **sigue sin entrar a 1280 px: sobran 52**, y son 9 columnas.
+
+**Cabos sueltos que quedaron sin decidir:**
+- **El export del libro IGNORA los filtros** (sólo respeta las fechas). Ahora que el buscador
+  anda, buscás algo, ves una fila y «Exportar Excel» te baja las 27. Se arregla extrayendo los
+  filtros de `index` a un método que use también `export_csv`.
+- **Nada le recuerda al repartidor que tiene que rendir.** La plata salió del inicio (decisión de
+  Germán, y está bien), pero si no entra a la solapa Caja por su cuenta, se va a su casa con la
+  recaudación. Se propuso un puntito en la solapa y quedó sin respuesta.
+- **`saldo_a_cuenta_ars` viaja en `mi_caja` y no lo lee nadie** (lo muestra la tarjeta de
+  rendición por su cuenta): es el patrón del campo que se guarda, se devuelve y nadie usa, que en
+  este proyecto ya apareció tres veces. Sacarlo.
+- **`/delivery/caja` la puede abrir un admin escribiendo la URL** y recibe "No se pudo cargar tu
+  caja": el endpoint es sólo del repartidor. No está linkeada para él, pero la ruta lo deja pasar.
+- Los dos botones de foto ya dicen distinto; si algún día molesta que el de la entrega diga
+  «Subir / tomar foto», es una línea.
 
 **Pendientes suyos (no de código), sin cambios:** rotar el secreto de Render · los 5 usuarios con
 la clave vieja · `rake stocks:balance_descuadrado` · `rake auditorias:limpiar_blobs` · declarar 8
