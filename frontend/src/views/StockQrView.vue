@@ -89,32 +89,46 @@
             <div class="sqr-lote__codigo">{{ stock.lote.codigo }}</div>
           </div>
 
-          <!-- KPI disponible + desglose -->
+          <!-- KPI disponible + desglose. LA CUENTA ES LA QUE HACE EL BACKEND: frasco menos lo que
+               ya tiene dueño (reserva, evento, paquete en la calle). La mesa NO resta —es dónde
+               está el producto, no un compromiso— y va aparte. Antes «En delivery» leía la suma
+               de todo, mesa incluida: escaneando un frasco que estaba entero sobre el mostrador,
+               el QR lo daba por salido en un reparto y el disponible en cero. -->
           <div class="sqr-kpi">
             <div class="sqr-kpi__header">
-              <span class="sqr-kpi__label">Disponible real</span>
+              <span class="sqr-kpi__label">Disponible para entregar</span>
               <span class="sqr-kpi__badge">
                 <i class="bi bi-lock-fill"></i> Admin
               </span>
             </div>
             <div class="sqr-kpi__valor">
-              {{ fmtG(stock.cantidad_disponible_real) }}<span class="sqr-kpi__unit">g</span>
+              {{ fmtG(disponible) }}<span class="sqr-kpi__unit">g</span>
             </div>
             <div class="sqr-kpi__desglose">
               <div class="sqr-kpi__row">
                 <span class="sqr-kpi__row-lbl">Stock físico</span>
                 <span class="sqr-kpi__row-val">{{ fmtG(stock.cantidad_total) }} g</span>
               </div>
+              <div v-if="stock.reservado > 0" class="sqr-kpi__row sqr-kpi__row--amber">
+                <span class="sqr-kpi__row-lbl"><i class="bi bi-bookmark-fill"></i> Reservado a un paciente</span>
+                <span class="sqr-kpi__row-val">− {{ fmtG(stock.reservado) }} g</span>
+              </div>
+              <div v-if="stock.apartado_eventos_g > 0" class="sqr-kpi__row sqr-kpi__row--amber">
+                <span class="sqr-kpi__row-lbl"><i class="bi bi-calendar-event"></i> Apartado a un evento</span>
+                <span class="sqr-kpi__row-val">− {{ fmtG(stock.apartado_eventos_g) }} g</span>
+              </div>
               <div v-if="stock.en_delivery_g > 0" class="sqr-kpi__row sqr-kpi__row--amber">
-                <span class="sqr-kpi__row-lbl">
-                  <i class="bi bi-truck"></i> En delivery
-                </span>
+                <span class="sqr-kpi__row-lbl"><i class="bi bi-truck"></i> En delivery</span>
                 <span class="sqr-kpi__row-val">− {{ fmtG(stock.en_delivery_g) }} g</span>
               </div>
               <div class="sqr-kpi__sep"></div>
               <div class="sqr-kpi__row sqr-kpi__row--result">
-                <span class="sqr-kpi__row-lbl">Disponible real</span>
-                <span class="sqr-kpi__row-val">{{ fmtG(stock.cantidad_disponible_real) }} g</span>
+                <span class="sqr-kpi__row-lbl">Disponible para entregar</span>
+                <span class="sqr-kpi__row-val">{{ fmtG(disponible) }} g</span>
+              </div>
+              <div v-if="stock.en_mostrador_g > 0" class="sqr-kpi__row">
+                <span class="sqr-kpi__row-lbl">De eso, sobre la mesa del mostrador</span>
+                <span class="sqr-kpi__row-val">{{ fmtG(stock.en_mostrador_g) }} g</span>
               </div>
             </div>
           </div>
@@ -166,7 +180,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import { useAuthStore } from '../stores/auth'
@@ -193,6 +207,9 @@ const FORMA_ICO = {
 function formaLabel(f) { return FORMA_LABELS[f] || f || '—' }
 function formaIco(f)   { return FORMA_ICO[f] || '📦' }
 function fmtG(v)       { return v != null ? Number(v).toFixed(1) : '—' }
+// El mismo número que valida el backend al dispensar. Cae en `cantidad_disponible_real` sólo si
+// el payload es viejo.
+const disponible = computed(() => stock.value?.disponible_para_entregar ?? stock.value?.cantidad_disponible_real)
 function formatDate(d) {
   if (!d) return '—'
   return new Date(d + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })

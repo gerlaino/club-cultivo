@@ -25,9 +25,13 @@
            dos informes que cortan el mismo dato distinto parecen contradecirse. -->
       <p v-if="data.resena" class="inf__resena">{{ data.resena }}</p>
       <div class="inf__kpis">
+        <!-- LOS MISMOS NOMBRES QUE EL PDF Y EL EXCEL. Acá decía «Gramos producidos» y «Plantas
+             totales» donde el archivo dice «Cosechado en el período» y «Plantas en pie»: el mismo
+             número con dos nombres, y uno de los dos mentía (no son las plantas totales, son las
+             que están en pie). -->
         <div class="inf__kpi">
           <span class="inf__kpi-valor">{{ data.total_lotes }}</span>
-          <span class="inf__kpi-label">Total lotes</span>
+          <span class="inf__kpi-label">Lotes totales</span>
         </div>
         <div class="inf__kpi inf__kpi--ok">
           <span class="inf__kpi-valor">{{ data.lotes_activos }}</span>
@@ -39,27 +43,48 @@
         </div>
         <div class="inf__kpi inf__kpi--ok">
           <span class="inf__kpi-valor">{{ formatGramos(data.gramos_producidos) }}</span>
-          <span class="inf__kpi-label">Gramos producidos</span>
+          <span class="inf__kpi-label">Cosechado en el período</span>
         </div>
         <div class="inf__kpi">
           <span class="inf__kpi-valor">{{ data.plantas_totales }}</span>
-          <span class="inf__kpi-label">Plantas totales</span>
+          <span class="inf__kpi-label">Plantas en pie</span>
         </div>
       </div>
 
+      <!-- LA FOTO DE HOY, no del período: estos lotes están en ese estado AHORA, con el
+           rendimiento acumulado de cada uno. La columna leía `r.gramos`, que el backend dejó de
+           mandar cuando la renombró a `rendimiento`: mostraba «—» en todas las filas mientras el
+           PDF del mismo informe traía el número. -->
       <div class="inf__section">
-        <h2 class="inf__section-title">Lotes por estado</h2>
+        <h2 class="inf__section-title">Hoy en el cultivo</h2>
         <table class="inf__table">
-          <thead><tr><th>Estado</th><th>Cantidad</th><th>Plantas</th><th>Gramos</th></tr></thead>
+          <thead><tr><th>Estado</th><th>Lotes</th><th>Plantas</th><th>Rendimiento acumulado</th></tr></thead>
           <tbody>
             <tr v-for="(r, i) in data.por_estado" :key="i">
               <td><span class="inf__badge" :class="`inf__badge--${r.estado}`">{{ r.estado }}</span></td>
               <td>{{ r.lotes }}</td>
               <td>{{ r.plantas }}</td>
-              <td>{{ formatGramos(r.gramos) }}</td>
+              <td>{{ formatGramos(r.rendimiento) }}</td>
             </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- Estaba en el PDF y el Excel y no en la pantalla: la descarga mostraba más que la app. -->
+      <div class="inf__section">
+        <h2 class="inf__section-title">Por sede</h2>
+        <table v-if="data.por_sede?.length" class="inf__table">
+          <thead><tr><th>Sede</th><th>Salas</th><th>Plantas</th><th>Flor seca (g)</th></tr></thead>
+          <tbody>
+            <tr v-for="s in data.por_sede" :key="s.id">
+              <td>{{ s.nombre }}</td>
+              <td>{{ s.salas }}</td>
+              <td>{{ s.plantas }}</td>
+              <td>{{ formatGramos(s.stock_disponible) }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-else class="inf__empty">La organización todavía no tiene sedes cargadas.</p>
       </div>
     </div>
   </div>
@@ -100,6 +125,7 @@ onMounted(cargar)
 .inf__title { font-size: var(--fs-20); font-weight: 700; color: var(--c-ink-900); display: flex; align-items: center; gap: var(--sp-2); margin: 0; }
 .inf__periodo { background: var(--c-ink-50); border: 1.5px solid var(--c-ink-200); border-radius: var(--r-md); padding: 6px 12px; font-size: var(--fs-14); color: var(--c-ink-900); }
 .inf__loading { color: var(--c-ink-500); padding: var(--sp-8); text-align: center; }
+.inf__empty { color: var(--c-ink-400); padding: var(--sp-4); font-size: var(--fs-13); }
 .inf__resena {
   margin: 0 0 var(--sp-4); padding: .7rem .9rem;
   background: var(--c-slate-50); border-left: 3px solid var(--c-slate-300); border-radius: 0 8px 8px 0;

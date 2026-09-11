@@ -31,7 +31,7 @@ defineEmits(['open-drawer'])
 
 const auth  = useAuthStore()
 const route = useRoute()
-const LABELS = { '/auditor': 'Inicio', '/auditor/reprocann': 'Informe REPROCANN', '/auditor/produccion': 'Informe Producción', '/auditor/dispensaciones': 'Informe Dispensaciones', '/auditor/sedes': 'Informe Sedes', '/auditor/cumplimiento': 'Informe Cumplimiento' }
+const LABELS = { '/auditor': 'Inicio', '/auditor/reprocann': 'Informe REPROCANN', '/auditor/produccion': 'Informe Producción', '/auditor/dispensaciones': 'Informe Dispensaciones', '/auditor/cumplimiento': 'Informe Cumplimiento' }
 const pageTitle = computed(() => LABELS[route.path] || 'Auditoría')
 
 const helpOpen = ref(false)

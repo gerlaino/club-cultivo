@@ -38,9 +38,16 @@ function nombre(s) {
 const flor = computed(() => stocks.value.filter(s => s.forma_producto === 'flor_seca'))
 const derivados = computed(() => stocks.value.filter(s => s.forma_producto !== 'flor_seca'))
 
+// ES UNA PANTALLA DE DEPÓSITO: dice cuánto hay GUARDADO y cuánto está sobre la mesa, por
+// separado. Antes «Disponible» leía `cantidad_disponible_real` —que resta la mesa— y «Reservado»
+// leía `gramos_reservados` —que la suma—, así que un frasco subido entero al mostrador se leía
+// «Disponible 0 · Reservado 46» y el KPI de flor bajaba a cero: el producto no se perdió, cambió
+// de lugar, y la pantalla tiene que poder decir dónde está.
+const enDeposito = (s) => Math.max(0, nOf(s.cantidad) - nOf(s.en_mostrador_g))
 const kpis = computed(() => ({
-  florDisponible: flor.value.reduce((a, s) => a + nOf(s.cantidad_disponible_real), 0),
-  florReservada:  flor.value.reduce((a, s) => a + nOf(s.gramos_reservados), 0),
+  florEnDeposito: flor.value.reduce((a, s) => a + enDeposito(s), 0),
+  florEnMesa:     flor.value.reduce((a, s) => a + nOf(s.en_mostrador_g), 0),
+  florReservada:  flor.value.reduce((a, s) => a + nOf(s.reservado), 0),
   derivados:      derivados.value.length,
 }))
 
@@ -66,11 +73,15 @@ const vencCls = (s) =>
 
     <div class="dd__summary">
       <div class="dd__kpi">
-        <span class="dd__kpi-label">Flor seca disponible</span>
-        <span class="dd__kpi-val">{{ fmtG(kpis.florDisponible) }} <small>g</small></span>
+        <span class="dd__kpi-label">Flor seca en depósito</span>
+        <span class="dd__kpi-val">{{ fmtG(kpis.florEnDeposito) }} <small>g</small></span>
       </div>
       <div class="dd__kpi">
-        <span class="dd__kpi-label">Reservada</span>
+        <span class="dd__kpi-label">Sobre la mesa</span>
+        <span class="dd__kpi-val">{{ fmtG(kpis.florEnMesa) }} <small>g</small></span>
+      </div>
+      <div class="dd__kpi">
+        <span class="dd__kpi-label">Reservada a pacientes</span>
         <span class="dd__kpi-val">{{ fmtG(kpis.florReservada) }} <small>g</small></span>
       </div>
       <div class="dd__kpi">
@@ -91,7 +102,8 @@ const vencCls = (s) =>
             <th>Producto</th>
             <th>Forma</th>
             <th>Lote / origen</th>
-            <th class="ta-r">Disponible</th>
+            <th class="ta-r">En depósito</th>
+            <th class="ta-r">Sobre la mesa</th>
             <th class="ta-r">Reservado</th>
             <th>Vencimiento</th>
           </tr>
@@ -101,8 +113,9 @@ const vencCls = (s) =>
             <td><span class="dd__name">{{ nombre(s) }}</span></td>
             <td><span class="dd__forma">{{ formaLabel(s.forma_producto) }}</span></td>
             <td class="mut">{{ s.lote_codigo || (s.origen === 'compra_externa' ? 'Externo' : '—') }}</td>
-            <td class="ta-r num"><b>{{ fmtG(s.cantidad_disponible_real) }}</b> <small class="mut">{{ s.unidad || 'g' }}</small></td>
-            <td class="ta-r num mut">{{ nOf(s.gramos_reservados) ? fmtG(s.gramos_reservados) + ' ' + (s.unidad || 'g') : '—' }}</td>
+            <td class="ta-r num"><b>{{ fmtG(enDeposito(s)) }}</b> <small class="mut">{{ s.unidad || 'g' }}</small></td>
+            <td class="ta-r num mut">{{ nOf(s.en_mostrador_g) ? fmtG(s.en_mostrador_g) + ' ' + (s.unidad || 'g') : '—' }}</td>
+            <td class="ta-r num mut">{{ nOf(s.reservado) ? fmtG(s.reservado) + ' ' + (s.unidad || 'g') : '—' }}</td>
             <td :class="vencCls(s)">
               <template v-if="s.fecha_vencimiento_est">
                 {{ s.fecha_vencimiento_est }}

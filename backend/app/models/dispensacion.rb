@@ -779,13 +779,15 @@ class Dispensacion < ApplicationRecord
     club_id = paciente&.club_id || stock&.club_id
     return unless club_id
 
-    s = stock
+    # ES UN TIMBRE, NO UN DATO. Viajaban `cantidad` y `cantidad_disponible_real` crudos y las
+    # listas los pegaban encima de su fila — pero esos números significan otra cosa según quién
+    # mira: al que atiende el índice le traduce el disponible a lo que hay sobre la mesa, y el
+    # broadcast lo pisaba con el del depósito. Entregaba 5 g de un frasco que estaba entero
+    # arriba y su fila pasaba a decir «0 g». Cada pantalla vuelve a pedir la fila por la puerta
+    # que se la dio.
     ActionCable.server.broadcast("stocks_club_#{club_id}", {
-      tipo:      'stock_actualizado',
-      stock_id:  stock_id,
-      cantidad:  s.cantidad.to_f,
-      gramos_reservados: s.gramos_reservados,
-      cantidad_disponible_real: s.cantidad_disponible_real,
+      tipo:     'stock_actualizado',
+      stock_id: stock_id,
     })
   rescue => e
     Rails.logger.warn "Dispensacion#broadcast_stock_actualizado falló: #{e.message}"

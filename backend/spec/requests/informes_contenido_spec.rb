@@ -60,11 +60,11 @@ RSpec.describe 'Informes — contenido de los archivos', type: :request do
     end
   end
 
-  describe 'informe de sedes' do
+  describe 'informe de producción — por sede' do
     before { create(:plant, lote: create(:lote, club: club, sala: sala, estado: 'vegetativo'), club: club) }
 
     it 'nombra cada sede en la tabla' do
-      get '/api/informes/sedes.pdf'
+      get '/api/informes/produccion.pdf'
 
       expect(texto_pdf).to include('Sede Centro')
     end

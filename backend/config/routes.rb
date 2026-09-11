@@ -396,7 +396,7 @@ Rails.application.routes.draw do
       get :reprocann
       get :produccion
       get :dispensaciones,  action: :dispensaciones
-      get :sedes,           action: :sedes
+      # `sedes` se retiró (sep-2026): era el desglose «Por sede» de Producción como informe aparte.
       get :cumplimiento
       get :plan_vs_real
       get :inase

@@ -234,10 +234,6 @@
   "views/auditor/InformeReprocannView.vue": [
     "inf__section"
   ],
-  "views/auditor/InformeSedesView.vue": [
-    "inf__hoja",
-    "inf__section"
-  ],
   "views/auditor/TrazabilidadView.vue": [
     "trz__report"
   ],

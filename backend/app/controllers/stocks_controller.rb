@@ -209,8 +209,6 @@ class StocksController < ApplicationController
 
     return render json: { error: 'Producto no encontrado' }, status: :not_found unless stock
 
-    en_delivery = stock.gramos_reservados
-
     render json: {
       id:                       stock.id,
       numero_lote_producto:     stock.numero_lote_producto,
@@ -219,7 +217,14 @@ class StocksController < ApplicationController
       unidad:                   stock.unidad,
       cantidad_total:           stock.cantidad.to_f,
       cantidad_disponible_real: stock.cantidad_disponible_real,
-      en_delivery_g:            en_delivery,
+      # Lo que se puede entregar hoy y de qué está hecho el resto. `en_delivery_g` decía
+      # `gramos_reservados` —la suma de todo, mesa incluida—: al escanear un frasco que estaba
+      # entero sobre el mostrador, el QR lo daba por salido en un reparto.
+      disponible_para_entregar: stock.disponible_para_entregar.to_f,
+      en_delivery_g:            stock.en_delivery_g,
+      reservado:                stock.apartado_para_reservas.to_f,
+      apartado_eventos_g:       stock.apartado_para_eventos.to_f,
+      en_mostrador_g:           stock.apartado_para_mostrador.to_f,
       fecha_elaboracion:       stock.fecha_elaboracion,
       fecha_vencimiento_est:   stock.fecha_vencimiento_est,
       estado:                  stock.estado,
@@ -1024,7 +1029,13 @@ class StocksController < ApplicationController
       sede:  s.sede  ? { id: s.sede.id, nombre: s.sede.nombre } : nil,
       club:  s.club  ? { id: s.club.id, nombre: s.club.name,
                          logo_url: s.club.logo.attached? ? url_for(s.club.logo) : nil } : nil,
+      # EL DESGLOSE DE LO COMPROMETIDO, cada parte con su nombre. `gramos_reservados` es la suma
+      # de todo y queda por compatibilidad, pero NO se muestra: incluye la mesa, y las pantallas
+      # que lo etiquetaban "En delivery" decían que había un reparto donde había un frasco sobre
+      # el mostrador.
       gramos_reservados:        s.gramos_reservados,
+      en_delivery_g:            s.en_delivery_g,
+      apartado_eventos_g:       s.apartado_para_eventos.to_f,
       cantidad_disponible_real: s.cantidad_disponible_real,
       # LO QUE SE PUEDE ENTREGAR HOY, que es contra lo que valida el backend. `cantidad` es el
       # frasco entero y NO sirve de techo: el carrito ofrecía los gramos que ya tienen dueño y la

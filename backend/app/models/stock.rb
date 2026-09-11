@@ -104,9 +104,20 @@ class Stock < ApplicationRecord
   # MÁS reservas pendientes de entrega. Al entregar una reserva se crea la Dispensacion
   # (que descuenta el real) y la reserva pasa a 'entregada', dejando de contar acá — sin
   # doble conteo.
+  #
+  # ES UN TOTAL, NO UN DATO PARA MOSTRAR. Cuatro pantallas lo llamaban "En delivery" o
+  # "Reservado" mientras sumaba también la mesa: un frasco de 46 g subido entero al mostrador se
+  # leía «Disponible 0 · En delivery 46» sin que existiera un solo reparto. Lo que la pantalla
+  # muestra es el DESGLOSE (`en_delivery_g`, `reservado`, `en_mostrador_g`, `apartado_eventos_g`),
+  # cada parte con su nombre; esto queda para quien necesite la suma.
   def gramos_reservados
-    envios = dispensaciones.where(estado_envio: %w[pendiente en_viaje]).sum(:cantidad).to_f
-    envios + apartado_para_eventos.to_f + apartado_para_mesa_y_reservas.to_f
+    en_delivery_g + apartado_para_eventos.to_f + apartado_para_mesa_y_reservas.to_f
+  end
+
+  # Lo que ya salió en un paquete y todavía no se entregó. Es la única parte de lo comprometido
+  # que de verdad está "en delivery".
+  def en_delivery_g
+    dispensaciones.where(estado_envio: %w[pendiente en_viaje]).sum(:cantidad).to_f
   end
 
   # Lo apartado a nombre de un paciente que todavía no lo retiró.

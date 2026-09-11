@@ -56,12 +56,15 @@ RSpec.describe 'Informes — los totales tienen que cerrar', type: :request do
     end
   end
 
-  describe 'GET /informes/sedes' do
-    it 'las plantas totales son la suma de las de cada sede' do
+  # El desglose «Por sede» de Producción. Era un informe aparte (`/informes/sedes`) con el mismo
+  # dato, y se retiró: una organización de una sola sede abría un informe de una fila.
+  describe 'GET /informes/produccion — por sede' do
+    it 'las plantas en pie son la suma de las de cada sede' do
       lote!(estado: 'vegetativo', plantas: 3)
 
-      get '/api/informes/sedes'
+      get '/api/informes/produccion'
 
+      expect(json['plantas_totales']).to eq(3)
       expect(json['plantas_totales']).to eq(json['por_sede'].sum { |s| s['plantas'] })
     end
 
@@ -71,9 +74,23 @@ RSpec.describe 'Informes — los totales tienen que cerrar', type: :request do
       ActsAsTenant.with_tenant(otro) { create(:sede, club: otro, created_by: otro_admin, tipo: 'produccion') }
       sede
 
-      get '/api/informes/sedes'
+      get '/api/informes/produccion'
 
       expect(json['total_sedes']).to eq(1)
+      expect(json['por_sede'].map { |s| s['nombre'] }).to eq([sede.nombre])
+    end
+
+    # Cuenta SOLO salas de cultivo. Las de proceso post-cosecha (cosecha/secado/curado) son legacy
+    # del flujo viejo y no son lugar donde haya plantas.
+    it 'cuenta sólo las salas de cultivo, no las de proceso' do
+      create(:sala, club: club, sede: sede, kind: 'vegetativo')
+      create(:sala, club: club, sede: sede, kind: 'cosecha')   # legacy — no debe contar
+      sala                                                      # la mixta del let
+
+      get '/api/informes/produccion'
+
+      fila = json['por_sede'].find { |s| s['nombre'] == sede.nombre }
+      expect(fila['salas']).to eq(2)
     end
   end
 

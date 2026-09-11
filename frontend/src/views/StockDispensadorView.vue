@@ -29,7 +29,7 @@
             <th>Sede</th>
             <th class="sdv__th-ing">Ingresó</th>
             <th class="sdv__th-num">Disponible</th>
-            <th class="sdv__th-num">Comprometido</th>
+            <th class="sdv__th-num">Reservado</th>
             <th class="sdv__th-num">P. sugerido</th>
             <th>Vencimiento</th>
             <!-- Lo que se escribió al ingresar el producto. El alta ya lo llama "observaciones"
@@ -58,9 +58,13 @@
               <div class="sdv__cant">{{ fmtCant(s.cantidad_disponible_real ?? s.cantidad) }}<span class="sdv__unidad">{{ s.unidad }}</span></div>
               <span v-if="mostrarInicial(s)" class="sdv__td-inicial">de {{ fmtCant(s.cantidad_inicial) }}{{ s.unidad }}</span>
             </td>
-            <td class="sdv__td-num" data-col="Comprometido">
-              <span v-if="s.gramos_reservados > 0" class="sdv__badge-reservado" :title="`${s.gramos_reservados}g comprometidos en delivery`">
-                −{{ fmtCant(s.gramos_reservados) }}g
+            <!-- Lo que de ESTE frasco no es suyo para entregar: apartado a nombre de un paciente.
+                 Antes mostraba `gramos_reservados`, que suma también la mesa, con el título
+                 "comprometidos en delivery": un frasco entero sobre el mostrador se leía
+                 «46 g · −46g en delivery». -->
+            <td class="sdv__td-num" data-col="Reservado">
+              <span v-if="s.reservado > 0" class="sdv__badge-reservado" :title="`${fmtCant(s.reservado)}${s.unidad} reservados a nombre de un paciente`">
+                −{{ fmtCant(s.reservado) }}{{ s.unidad }}
               </span>
               <span v-else class="sdv__none">—</span>
             </td>
@@ -119,17 +123,24 @@ const stocksFiltrados = computed(() => {
   return s
 })
 
+// EL CANAL ES UN TIMBRE: la fila se vuelve a pedir por la misma puerta que la trajo. El índice
+// traduce el disponible al de la MESA para quien atiende; el broadcast traía los números del
+// depósito y se pegaban encima — entregaba 5 g de un frasco que estaba entero arriba y la fila
+// pasaba a decir «0 g». Una recarga por ráfaga, no una por dispensa.
+let recargaPendiente = null
+async function recargar() {
+  try {
+    const { data } = await listStocks()
+    stocks.value = data.stocks ?? data ?? []
+  } catch { /* la lista que hay sigue valiendo hasta la próxima */ }
+}
+
 function onStockActualizado(data) {
   liveConectado.value = true
-  const idx = stocks.value.findIndex(s => s.id === data.stock_id)
-  if (idx === -1) return
+  if (!stocks.value.some(s => s.id === data.stock_id)) return
 
-  stocks.value[idx] = {
-    ...stocks.value[idx],
-    cantidad:                 data.cantidad,
-    gramos_reservados:        data.gramos_reservados,
-    cantidad_disponible_real: data.cantidad_disponible_real,
-  }
+  clearTimeout(recargaPendiente)
+  recargaPendiente = setTimeout(recargar, 300)
 
   // flash visual
   const newSet = new Set(flashIds.value)
@@ -146,14 +157,8 @@ useStockChannel(onStockActualizado)
 
 onMounted(async () => {
   liveConectado.value = true
-  try {
-    const { data } = await listStocks()
-    stocks.value = data.stocks ?? data ?? []
-  } catch {
-    stocks.value = []
-  } finally {
-    loading.value = false
-  }
+  await recargar()
+  loading.value = false
 })
 
 function badgeVencimiento(s) {

@@ -866,16 +866,16 @@ watch(tabActiva, async (val) => {
 })
 
 // ── Live updates ───────────────────────────────────────────────────────────────
+// EL CANAL ES UN TIMBRE: la página se vuelve a pedir por la misma puerta que la trajo, con sus
+// filtros y su orden. Pegar encima los tres números que viajaban dejaba `disponible_para_entregar`
+// y la columna Mesa viejos al lado de una `cantidad` nueva — la fila se contradecía sola.
+// Una recarga por ráfaga, sin esqueleto: la tabla que hay sigue valiendo mientras llega.
+let recargaPendiente = null
 function onStockActualizado(data) {
   liveConectado.value = true
-  const idx = inventario.value.findIndex(s => s.id === data.stock_id)
-  if (idx === -1) return
-  inventario.value[idx] = {
-    ...inventario.value[idx],
-    cantidad:                 data.cantidad,
-    gramos_reservados:        data.gramos_reservados,
-    cantidad_disponible_real: data.cantidad_disponible_real,
-  }
+  if (!inventario.value.some(s => s.id === data.stock_id)) return
+  clearTimeout(recargaPendiente)
+  recargaPendiente = setTimeout(() => cargarInventario({ silencioso: true }), 300)
   const newSet = new Set(flashIds.value)
   newSet.add(data.stock_id)
   flashIds.value = newSet
@@ -969,8 +969,8 @@ function ordenarInv (campo) {
   cargarInventario()
 }
 
-async function cargarInventario() {
-  loadingInv.value = true
+async function cargarInventario({ silencioso = false } = {}) {
+  if (!silencioso) loadingInv.value = true
   try {
     const params = { page: invPage.value, per_page: invPerPage.value }
     if (invOrden.value.campo) { params.orden = invOrden.value.campo; params.dir = invOrden.value.dir }

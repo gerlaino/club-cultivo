@@ -36,18 +36,36 @@
             </div>
           </div>
         </div>
+        <!-- LO COMPROMETIDO SE MUESTRA DESGLOSADO, cada parte con su nombre. Acá decía
+             «Disponible» leyendo `cantidad_disponible_real` —que resta la mesa— y «En delivery»
+             leyendo `gramos_reservados` —que la suma—: un frasco de 46 g subido entero al
+             mostrador se leía «Total 46 · Disponible 0 · En delivery 46» sin un solo reparto.
+             El disponible es lo que se puede entregar hoy (el mismo techo que valida el
+             backend); la mesa es un LUGAR y va aparte, no como resta. -->
         <div class="sd__hero-kpis">
           <div class="sd__kpi">
             <div class="sd__kpi-val">{{ Number(stock.cantidad_inicial ?? stock.cantidad).toFixed(1) }}<span class="sd__kpi-unit">{{ unidad }}</span></div>
             <div class="sd__kpi-lbl">Total inicial</div>
           </div>
-          <div class="sd__kpi" :class="{ 'sd__kpi--warn': stock.gramos_reservados > 0 }">
-            <div class="sd__kpi-val">{{ Number(stock.cantidad_disponible_real).toFixed(1) }}<span class="sd__kpi-unit">{{ unidad }}</span></div>
-            <div class="sd__kpi-lbl">Disponible</div>
+          <div class="sd__kpi sd__kpi--warn">
+            <div class="sd__kpi-val">{{ Number(stock.disponible_para_entregar ?? stock.cantidad_disponible_real).toFixed(1) }}<span class="sd__kpi-unit">{{ unidad }}</span></div>
+            <div class="sd__kpi-lbl">Disponible para entregar</div>
           </div>
-          <div v-if="stock.gramos_reservados > 0" class="sd__kpi sd__kpi--amber">
-            <div class="sd__kpi-val">{{ Number(stock.gramos_reservados).toFixed(1) }}<span class="sd__kpi-unit">{{ unidad }}</span></div>
+          <div v-if="stock.en_mostrador_g > 0" class="sd__kpi">
+            <div class="sd__kpi-val">{{ Number(stock.en_mostrador_g).toFixed(1) }}<span class="sd__kpi-unit">{{ unidad }}</span></div>
+            <div class="sd__kpi-lbl">Sobre la mesa</div>
+          </div>
+          <div v-if="stock.reservado > 0" class="sd__kpi sd__kpi--amber">
+            <div class="sd__kpi-val">{{ Number(stock.reservado).toFixed(1) }}<span class="sd__kpi-unit">{{ unidad }}</span></div>
+            <div class="sd__kpi-lbl">Reservado</div>
+          </div>
+          <div v-if="stock.en_delivery_g > 0" class="sd__kpi sd__kpi--amber">
+            <div class="sd__kpi-val">{{ Number(stock.en_delivery_g).toFixed(1) }}<span class="sd__kpi-unit">{{ unidad }}</span></div>
             <div class="sd__kpi-lbl">En delivery</div>
+          </div>
+          <div v-if="stock.apartado_eventos_g > 0" class="sd__kpi sd__kpi--amber">
+            <div class="sd__kpi-val">{{ Number(stock.apartado_eventos_g).toFixed(1) }}<span class="sd__kpi-unit">{{ unidad }}</span></div>
+            <div class="sd__kpi-lbl">Apartado a evento</div>
           </div>
         </div>
       </div>
@@ -1086,7 +1104,7 @@ function badgeVencLabel(s) {
 .sd__hero-lote  { font-size: .78rem; font-weight: 700; color: var(--c-slate-400); font-family: monospace; margin-bottom: .5rem; letter-spacing: .05em; }
 .sd__hero-chips { display: flex; flex-wrap: wrap; gap: .35rem; }
 
-.sd__hero-kpis { display: flex; gap: 1.5rem; flex-shrink: 0; }
+.sd__hero-kpis { display: flex; gap: 1.5rem; flex-shrink: 0; flex-wrap: wrap; }
 .sd__kpi { text-align: center; }
 .sd__kpi-val  { font-size: 1.6rem; font-weight: 900; color: var(--c-slate-900); line-height: 1; letter-spacing: -.04em; }
 .sd__kpi-unit { font-size: .9rem; font-weight: 500; color: var(--c-slate-400); margin-left: 1px; }

@@ -266,56 +266,6 @@ class InformesController < ApplicationController
     )
   end
 
-  def sedes
-    club  = current_user.club
-    sedes = club.sedes.includes(:salas)
-
-    por_sede = sedes.map do |s|
-      plantas = Plant.joins(lote: :sala).where(salas: { sede_id: s.id })
-                     .where.not(state: %w[cosechado finalizado]).count
-      # "Stock disponible (g)" = flor seca solamente. Los derivados (preroll, hash…) son
-      # inventario con su propia unidad y no se suman como gramos de flor.
-      stock_g = Stock.joins(:sede).where(sede: s, forma_producto: 'flor_seca').disponibles.sum(:cantidad).to_f rescue 0
-      {
-        nombre:          s.nombre,
-        salas:           s.salas.cultivo.count,
-        plantas:         plantas,
-        stock_disponible: stock_g,
-      }
-    end
-
-    sedes_activas  = sedes.where(activa: true).count rescue sedes.count
-    salas_totales  = sedes.sum { |s| s.salas.cultivo.count }
-    plantas_totales = por_sede.sum { |r| r[:plantas] }
-
-    datos = {
-      total_sedes:    sedes.count,
-      sedes_activas:  sedes_activas,
-      salas_totales:  salas_totales,
-      plantas_totales: plantas_totales,
-      por_sede:       por_sede,
-    }
-
-    responder_informe(
-      titulo: 'Informe de sedes', nombre: 'informe_sedes', datos: datos,
-      resena: 'Cómo está repartido el cultivo entre las sedes: salas, plantas en pie y flor seca disponible en cada una.',
-      kpis: [
-        { label: 'Sedes',    valor: sedes.count },
-        { label: 'Activas',  valor: sedes_activas, tono: :ok },
-        { label: 'Salas',    valor: salas_totales },
-        { label: 'Plantas',  valor: plantas_totales },
-      ],
-      secciones: [{
-        titulo: 'Detalle por sede',
-        headers: ['Sede', 'Salas', 'Plantas', 'Flor seca (g)'],
-        rows: por_sede.map { |r| [r[:nombre], r[:salas], r[:plantas], r[:stock_disponible]] },
-        formatos: [:texto, :numero, :numero, :numero],
-        totales: [1, 2, 3],
-        aligns: { 1 => :right, 2 => :right, 3 => :right },
-      }],
-    )
-  end
-
   def cumplimiento
     club = current_user.club
     desde, hasta = periodo_rango

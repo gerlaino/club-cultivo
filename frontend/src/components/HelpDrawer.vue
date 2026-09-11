@@ -199,7 +199,7 @@ const CONTENT = {
       title: 'Informes disponibles',
       items: [
         { label: 'Solo lectura', text: 'El rol auditor puede ver todos los informes pero no puede modificar datos.' },
-        { label: 'Tipos de informes', text: 'REPROCANN, producción, dispensaciones, sedes, cumplimiento, plan vs real, INASE y trazabilidad. Cada informe tiene filtros de fecha y descarga en PDF.' },
+        { label: 'Tipos de informes', text: 'REPROCANN, producción (con el desglose por sede), dispensaciones, cumplimiento, plan vs real, INASE, pérdidas y trazabilidad. Cada informe tiene filtros de fecha y descarga en PDF.' },
         { label: 'Acceso por sede', text: 'Si tenés sedes asignadas, solo ves datos de esas sedes. Sin sedes asignadas, ves toda la organización.' },
       ]
     },
