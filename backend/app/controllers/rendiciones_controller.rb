@@ -38,6 +38,38 @@ class RendicionesController < ApplicationController
     }
   end
 
+  # GET /rendiciones/mi_caja — lo que el repartidor lleva encima AHORA.
+  #
+  # El monto de una rendición lo pone el sistema, y estaba bien: pedirle que se acuerde de lo que
+  # cobró en doce puertas es pedirle un error. Pero NUNCA SE LO MOSTRÁBAMOS: rendía a ciegas, sin
+  # poder contar los billetes contra nada, y si el que recibía contaba distinto se enteraba
+  # después, con la diferencia anotada a su nombre.
+  #
+  # Sale de la MISMA consulta que arma el monto declarado (`Rendir.cobros_en_transito_de`).
+  def mi_caja
+    return render json: { error: 'No autorizado' }, status: :forbidden unless current_user.delivery?
+
+    club   = current_user.club
+    cobros = Rendiciones::Rendir.cobros_en_transito_de(current_user, club).to_a
+
+    render json: {
+      # Lo que tiene en el bolsillo y va a entregar.
+      efectivo_ars: cobros.sum { |c| c.monto_ars.to_d }.to_f,
+      cobros: cobros.map { |c|
+        { id: c.id, monto_ars: c.monto_ars.to_f, hora: c.created_at,
+          paciente: c.dispensacion&.paciente&.nombre_completo,
+          codigo_paquete: c.dispensacion&.codigo_paquete }
+      },
+      # LO COBRADO POR TRANSFERENCIA NO LO LLEVA ENCIMA: esa plata ya entró a la cuenta de la
+      # organización. Va aparte y sólo como dato — sumarlo al total sería pedirle billetes que
+      # nunca tuvo.
+      transferencias_ars: transferencias_de_hoy(club).to_f,
+      # Los paquetes que vuelven sin entregar: entran en la misma entrega y se desarman.
+      paquetes_sin_entregar: Rendiciones::Rendir.devoluciones_de(current_user, club).count,
+      saldo_a_cuenta_ars: Rendiciones::SaldarACuenta.saldo_de(club, current_user).to_f,
+    }
+  end
+
   # POST /rendiciones/saldar { delivery_id, monto_ars, notas }
   #
   # El repartidor devuelve plata que se había quedado. "Rendir en partes" —entregar hoy la mitad y
@@ -113,6 +145,15 @@ class RendicionesController < ApplicationController
 
   def paquetes_de(r)
     Rendiciones::Rendir.devoluciones_de(r.delivery, r.club)
+  end
+
+  # Lo que cobró hoy por transferencia: no lo lleva encima, pero lo cobró él y tiene que poder
+  # verlo. `Date#all_day` y no `all_month`/rangos de Date: contra un `created_at` un rango de
+  # fechas corta a la medianoche del último día.
+  def transferencias_de_hoy(club)
+    Cobro.where(club_id: club.id, medio: 'transferencia', contexto: 'entrega',
+                created_by_id: current_user.id, created_at: Time.zone.today.all_day)
+         .sum(:monto_ars)
   end
 
   def serialize_paquete(d)

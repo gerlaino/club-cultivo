@@ -60,6 +60,18 @@ module Rendiciones
                   .includes(:paciente, :stock).order(:fallido_at)
     end
 
+    # LO QUE LLEVA ENCIMA, AHORA MISMO: el efectivo que cobró en la puerta y todavía no rindió.
+    #
+    # Es la MISMA consulta con la que se arma el monto declarado al rendir, y por eso vive acá y
+    # no en el controller: el repartidor tiene que poder ver antes de rendir exactamente el
+    # número que el sistema le va a declarar. Escrita dos veces, un día dicen distinto y el que
+    # descubre la diferencia es él, contando billetes con alguien esperando.
+    def self.cobros_en_transito_de(delivery, club)
+      Cobro.efectivo_en_transito.del_delivery(delivery.id)
+           .where(club_id: club.id, rendicion_caja_id: nil)
+           .includes(dispensacion: :paciente).order(:created_at)
+    end
+
     # A quién se le puede rendir: quien responde por la caja o quien la atiende.
     RECIBEN = %w[admin supervisor dispensador].freeze
 
@@ -71,10 +83,6 @@ module Rendiciones
 
     def err(msg) = Result.new(ok: false, error: msg)
 
-    def cobros_en_transito
-      Cobro.efectivo_en_transito.del_delivery(@delivery.id)
-           .where(club_id: @club.id, rendicion_caja_id: nil)
-           .includes(dispensacion: :paciente).to_a
-    end
+    def cobros_en_transito = self.class.cobros_en_transito_de(@delivery, @club).to_a
   end
 end

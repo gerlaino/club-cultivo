@@ -3,7 +3,6 @@ import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { Package, Bike, CheckCircle2, XCircle, MapPin, Phone, User, FileText, ChevronRight, ChevronDown, Send, Route, Navigation, PenLine, Trash2, Lock, Check } from 'lucide-vue-next'
 import { getMisPaquetes, iniciarViaje, ordenarRuta } from '../../lib/api.js'
-import RendicionCajaCard from '../../components/RendicionCajaCard.vue'
 import { useEntregasOffline } from '../../composables/useEntregasOffline.js'
 import { useToast } from '../../composables/useToast.js'
 import { useAuthStore } from '../../stores/auth.js'
@@ -45,6 +44,11 @@ function clearComprobante() {
   comprobanteFile.value = null
   comprobantePreview.value = null
 }
+// Sin transferencia no hay comprobante de transferencia: si ya sacó la foto y después borra el
+// monto, se descarta. Mandarla igual sería adjuntarle a un pago en efectivo el comprobante de
+// una transferencia que no se hizo.
+watch(cobroTransf, (v) => { if (!(Number(v) > 0) && comprobanteFile.value) clearComprobante() })
+
 function setComprobanteEntrega(e) {
   const f = e.target.files?.[0] || null
   if (comprobanteEntregaPreview.value) URL.revokeObjectURL(comprobanteEntregaPreview.value)
@@ -342,8 +346,9 @@ onMounted(load)
 <template>
   <div class="dlv">
 
-    <!-- La entrega de lo que cobró: la arranca él y elige a quién. -->
-    <RendicionCajaCard />
+    <!-- LA PLATA NO VA EN EL INICIO. Esta pantalla se abre cuarenta veces por día para saber a
+         dónde ir, y arrancaba con una tarjeta de rendición —"Rendiste $200.000, esperando que la
+         reciban"—, que es un recibo, no una tarea. Todo lo de la caja vive en su solapa. -->
 
     <!-- Entregas guardadas sin señal. Se muestra para que el repartidor SEPA que algo todavía no
          llegó al servidor: en silencio parecería que se perdió. -->
@@ -433,10 +438,6 @@ onMounted(load)
         <div class="dlv__stat">
           <span class="dlv__stat-n dlv__stat-n--orange">{{ enViaje.length }}</span>
           <span class="dlv__stat-l">En camino</span>
-        </div>
-        <div class="dlv__stat">
-          <span class="dlv__stat-n dlv__stat-n--green">{{ paquetes.filter(p => p.estado_envio === 'entregado').length }}</span>
-          <span class="dlv__stat-l">Entregados</span>
         </div>
         <div v-if="fallidos.length" class="dlv__stat dlv__stat--alert">
           <span class="dlv__stat-n dlv__stat-n--red">{{ fallidos.length }}</span>
@@ -671,15 +672,25 @@ onMounted(load)
                   <input type="number" min="0" step="any" v-model.number="cobroTransf" placeholder="0" />
                 </label>
               </div>
-              <!-- Comprobante de pago (foto, opcional) -->
-              <div class="dlv__foto">
-                <div class="dlv__foto-label"><FileText :size="13" :stroke-width="2" /> Comprobante de pago <span class="dlv__opt">opcional</span></div>
+              <!-- LA FOTO DE LA TRANSFERENCIA, SÓLO SI HAY TRANSFERENCIA.
+                   Aparecía siempre que hubiera algo que cobrar, así que cobrando en efectivo
+                   —el caso normal— quedaban DOS botones idénticos que decían "Subir / tomar
+                   foto" a quince renglones uno del otro, y uno de ellos no tenía nada que
+                   fotografiar. Cada uno dice ahora DE QUÉ es la foto: son dos cosas distintas
+                   (el comprobante de pago cuelga del cobro y no se borra nunca; la foto de la
+                   entrega se purga a los 30 días) y tienen que leerse como dos cosas distintas. -->
+              <div v-if="Number(cobroTransf) > 0" class="dlv__foto">
+                <div class="dlv__foto-label"><FileText :size="13" :stroke-width="2" /> Foto de la transferencia <span class="dlv__opt">opcional</span></div>
                 <div v-if="comprobantePreview" class="dlv__foto-preview">
                   <img :src="comprobantePreview" alt="comprobante de pago" />
                   <button type="button" class="dlv__foto-del" @click="clearComprobante"><Trash2 :size="13" :stroke-width="2" /></button>
                 </div>
+                <!-- "Subir comprobante" y no "Subir / tomar foto": dos botones verdes idénticos
+                     a quince renglones uno del otro se leen como el mismo botón repetido, que
+                     es lo que reportó Germán. Además es lo que es — el comprobante lo tiene el
+                     paciente en el teléfono; la de abajo es una foto que saca el repartidor. -->
                 <label v-else class="dlv__foto-btn">
-                  <FileText :size="14" :stroke-width="2" /> Subir / tomar foto
+                  <FileText :size="14" :stroke-width="2" /> Subir comprobante
                   <input type="file" accept="image/*" capture="environment" @change="setComprobante" hidden />
                 </label>
               </div>
@@ -715,9 +726,9 @@ onMounted(load)
               <p v-if="firmaData" class="dlv__firma-ok">✓ Firma capturada</p>
             </div>
 
-            <!-- Comprobante de entrega (foto, opcional) -->
+            <!-- La foto de la entrega: el paquete en la puerta, quien recibió. Vive 30 días. -->
             <div class="dlv__foto">
-              <div class="dlv__foto-label"><FileText :size="13" :stroke-width="2" /> Comprobante de entrega <span class="dlv__opt">opcional</span></div>
+              <div class="dlv__foto-label"><FileText :size="13" :stroke-width="2" /> Foto de la entrega <span class="dlv__opt">opcional</span></div>
               <div v-if="comprobanteEntregaPreview" class="dlv__foto-preview">
                 <img :src="comprobanteEntregaPreview" alt="comprobante de entrega" />
                 <button type="button" class="dlv__foto-del" @click="clearComprobanteEntrega"><Trash2 :size="13" :stroke-width="2" /></button>

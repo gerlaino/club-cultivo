@@ -1,6 +1,6 @@
 <template>
   <div class="mdh">
-    <div class="mdh__resumen">
+    <div v-if="tab === 'entregas'" class="mdh__resumen">
       <div class="mdh__stat">
         <span class="mdh__stat-n mdh__stat-n--ok">{{ resumen.entregados ?? 0 }}</span>
         <span class="mdh__stat-l">Entregados</span>
@@ -15,6 +15,46 @@
         <option :value="90">90 días</option>
       </select>
     </div>
+
+    <!-- SU HISTORIAL SON DOS PREGUNTAS: qué entregué, y cómo cerró cada caja que rendí. La
+         segunda no estaba en ningún lado para él: el historial de rendiciones existía, pero
+         escrito para administración (una tabla con columna "Repartidor", que para él es
+         siempre él). -->
+    <div class="mdh__tabs">
+      <button class="mdh__tab" :class="{ 'mdh__tab--on': tab === 'entregas' }" @click="tab = 'entregas'">
+        Entregas
+      </button>
+      <button class="mdh__tab" :class="{ 'mdh__tab--on': tab === 'cajas' }" @click="tab = 'cajas'">
+        Cajas rendidas
+      </button>
+    </div>
+
+    <template v-if="tab === 'cajas'">
+      <p v-if="!rendiciones.length" class="mdh__muted">Todavía no rendiste ninguna caja.</p>
+      <div v-else class="mdh__list">
+        <div v-for="r in rendiciones" :key="r.id" class="mdh__card">
+          <div class="mdh__card-head">
+            <span class="mdh__paciente">{{ fmt(r.declarado_ars) }} cobrados</span>
+            <span class="mdh__estado" :class="r.diferencia_ars ? 'mdh__estado--fallido' : 'mdh__estado--entregado'">
+              {{ r.diferencia_ars ? 'Con diferencia' : 'Cuadró' }}
+            </span>
+          </div>
+          <!-- El nombre de quien la recibió es con lo que después se puede ir a hablar. -->
+          <div class="mdh__dir">
+            Se la diste a {{ r.receptor || '—' }} · te recibió <b>{{ fmt(r.recibido_ars) }}</b>
+          </div>
+          <div v-if="r.diferencia_ars" class="mdh__dir">
+            Quedaron <b>{{ fmt(Math.abs(r.diferencia_ars)) }}</b> a tu nombre{{ r.motivo ? `: ${r.motivo}` : '' }}
+          </div>
+          <div class="mdh__pie">
+            <span class="mdh__fecha">{{ fechaHora(r.recibida_at || r.rendida_at) }}</span>
+            <span v-if="r.conforme === false" class="mdh__motivo">Falta que digas si estás de acuerdo</span>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template v-else>
 
     <div v-if="loading" class="mdh__muted">Cargando…</div>
 
@@ -50,20 +90,35 @@
         </div>
       </div>
     </div>
+
+    </template>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { getMiHistorialDelivery } from '../../lib/api.js'
+import { getMiHistorialDelivery, listRendiciones } from '../../lib/api.js'
 
+const tab         = ref('entregas')
+const rendiciones = ref([])
 const dias     = ref(30)
 const loading  = ref(false)
 const paquetes = ref([])
 const resumen  = ref({})
 const error    = ref(false)
 
-onMounted(cargar)
+onMounted(() => { cargar(); cargarRendiciones() })
+
+// Las suyas: el backend ya filtra por quien pregunta. Sólo las cerradas — una pendiente no es
+// historia, es algo que todavía está pasando y se ve en Caja.
+async function cargarRendiciones() {
+  try {
+    const { data } = await listRendiciones()
+    rendiciones.value = (data.rendiciones || []).filter(r => r.estado === 'recibida')
+  } catch { rendiciones.value = [] }
+}
+
+const fmt = (n) => `$${Number(n ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 0 })}`
 
 async function cargar() {
   loading.value = true
@@ -102,6 +157,13 @@ function fechaHora(f) {
   margin-left: auto; border: 1px solid var(--c-slate-200); border-radius: 8px;
   padding: .4rem .5rem; font-size: .8rem; background: #fff;
 }
+
+.mdh__tabs { display: flex; gap: .4rem; }
+.mdh__tab {
+  flex: 1; min-height: 38px; border: 1px solid var(--c-slate-200); background: #fff;
+  border-radius: 10px; font-size: .82rem; font-weight: 600; color: var(--c-slate-500); cursor: pointer;
+}
+.mdh__tab--on { background: var(--c-role-delivery, #1A3D2E); border-color: transparent; color: #fff; }
 
 .mdh__muted { text-align: center; color: var(--c-slate-400); padding: 1rem; font-size: .85rem; }
 .mdh__empty { text-align: center; padding: 2rem 1rem; color: var(--c-slate-500); }

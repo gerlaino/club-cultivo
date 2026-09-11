@@ -9,6 +9,12 @@
       <RouterLink to="/delivery" class="dlv-link" exact-active-class="dlv-link--active">
         <Home :size="18" :stroke-width="1.75" /><span>Inicio</span>
       </RouterLink>
+      <!-- La caja del repartidor: salió del inicio y tiene su pantalla. Es la MISMA vista que
+           sirve la PWA — una sola, dos envoltorios. Al admin no le sirve (no lleva efectivo en
+           la calle), así que sólo la ve quien reparte. -->
+      <RouterLink v-if="soyRepartidor" to="/delivery/caja" class="dlv-link" active-class="dlv-link--active">
+        <Wallet :size="18" :stroke-width="1.75" /><span>Caja</span>
+      </RouterLink>
       <RouterLink v-if="canSeeDespachos" to="/delivery/despachos" class="dlv-link" active-class="dlv-link--active">
         <PackageCheck :size="18" :stroke-width="1.75" /><span>Despachos</span>
       </RouterLink>
@@ -19,11 +25,12 @@
 
 <script setup>
 import { computed } from 'vue'
-import { Home, PackageCheck } from 'lucide-vue-next'
+import { Home, PackageCheck, Wallet } from 'lucide-vue-next'
 import { useAuthStore } from '../../stores/auth'
 // El logout vive en el menú de usuario de DeliveryTopBar, como en el resto de los roles.
 const auth = useAuthStore()
 const canSeeDespachos = computed(() => ['admin', 'supervisor'].includes(auth.user?.role))
+const soyRepartidor   = computed(() => auth.user?.role === 'delivery')
 </script>
 
 <style scoped>

@@ -368,6 +368,8 @@ export const listRendiciones      = ()            => api.get('/rendiciones')
 export const receptoresRendicion  = ()            => api.get('/rendiciones/receptores')
 export const crearRendicion       = (payload)     => api.post('/rendiciones', payload)
 export const recibirRendicion     = (id, payload) => api.post(`/rendiciones/${id}/recibir`, payload)
+// Lo que el repartidor lleva encima ahora: sale de la misma consulta que declara al rendir.
+export const getMiCajaDelivery    = () => api.get('/rendiciones/mi_caja')
 export const conformarRendicion   = (id, payload) => api.post(`/rendiciones/${id}/conformar`, payload)
 // Lo que el repartidor se había quedado y devuelve después. "Rendir en partes" es esto.
 export const saldarACuenta        = (payload)     => api.post('/rendiciones/saldar', payload)

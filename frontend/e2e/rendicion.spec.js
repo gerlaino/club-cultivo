@@ -22,10 +22,16 @@ test('la rendición del repartidor, de punta a punta', async ({ page }) => {
   // que un fallo del setup se lea como un fallo de lo que se está probando.
 
   // ── 2. Beto rinde y elige a quién ─────────────────────────────────────────
+  //
+  // Desde su SOLAPA CAJA: el inicio quedó para lo único que se mira parado en la vereda, que es
+  // a dónde va. La plata se mira dos o tres veces por día y tiene su pantalla.
   await entrar(page, 'delivery')
-  await page.goto('/delivery')
+  await page.goto('/delivery/caja')
   await expect(page.getByText('Rendir la caja')).toBeVisible()
-  // El monto NO lo escribe él: no hay ningún campo de plata en su pantalla.
+  // AHORA VE CUÁNTO LLEVA. El monto lo sigue poniendo el sistema —no hay ningún campo de plata
+  // en su pantalla— pero antes tampoco se lo mostrábamos: rendía a ciegas, sin poder contar los
+  // billetes contra nada.
+  await expect(page.locator('.cjd__total-n')).toHaveText('$100.000')
   await expect(page.locator('.rnd__input')).toHaveCount(0)
 
   await elegirPorTexto(page, '.rnd__select', 'Dana')
@@ -63,8 +69,9 @@ test('la rendición del repartidor, de punta a punta', async ({ page }) => {
   await expect(page.locator('.tmo__mesa').first()).toHaveText('125')
 
   // ── 5. Beto deja constancia de si está de acuerdo ─────────────────────────
+  // También en su Caja: es donde vive todo lo de la plata desde que salió del inicio.
   await entrar(page, 'delivery')
-  await page.goto('/delivery')
+  await page.goto('/delivery/caja')
   await expect(page.getByText(/recibió \$80\.000 de los \$100\.000 que cobraste/)).toBeVisible()
   await expect(page.getByText('se quedó 20 a cuenta de sueldo')).toBeVisible()
   await page.click('.rnd__btn--primary') // "Estoy de acuerdo"

@@ -922,6 +922,8 @@ const routes = [
     },
     children: [
       { path: '', name: 'delivery-dashboard', component: () => import('../views/delivery/DeliveryDashboard.vue') },
+      // La caja salió del inicio y tiene su propia pantalla: el inicio es a dónde va ahora.
+      { path: 'caja', name: 'delivery-caja', component: () => import('../views/delivery/CajaDeliveryView.vue') },
       {
         path: 'despachos',
         name: 'delivery-despachos',
@@ -1020,6 +1022,7 @@ const routes = [
 
       // ── Delivery ── (el repartidor ve SU dashboard, no la vista admin de despachos)
       { path: 'delivery/despachos', component: () => import('../views/delivery/DeliveryDashboard.vue') },
+      { path: 'delivery/caja',      component: () => import('../views/delivery/CajaDeliveryView.vue') },
       { path: 'delivery/historial', component: () => import('../views/mobile/MDeliveryHistorialView.vue') },
     ],
   },

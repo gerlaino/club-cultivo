@@ -199,6 +199,9 @@ const NAV = {
   ] },
   delivery: { items: [
     { to: '/m/delivery/despachos', icon: 'bi-truck',         label: 'Despachos' },
+    // La plata tiene su propia solapa: el inicio es a dónde va ahora, y la caja se mira dos o
+    // tres veces por día. Antes era una tarjeta arriba de todo en la pantalla que más abre.
+    { to: '/m/delivery/caja',      icon: 'bi-cash-coin',     label: 'Caja' },
     { to: '/m/delivery/historial', icon: 'bi-clock-history', label: 'Historial' },
   ] },
   // El dispensador trabaja de pie con alguien enfrente: la primera pantalla es buscar y dispensar,

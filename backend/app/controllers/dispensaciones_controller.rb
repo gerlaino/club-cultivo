@@ -295,9 +295,19 @@ class DispensacionesController < ApplicationController
   end
 
   # GET /delivery/mis_paquetes
+  # EL TRABAJO DE AHORA, no todo lo que repartió en su vida.
+  #
+  # No filtraba por estado: le mandaba TODOS los paquetes que le asignaron desde siempre, en la
+  # pantalla que más abre y que va a crecer para siempre. Quedan los tres estados vivos: lo que
+  # tiene para llevar, lo que está llevando, y lo que vuelve sin entregar (que deja de ser
+  # `fallido` recién cuando rinde, así que es su pendiente real). Lo cerrado se mira en
+  # `mi_historial`, que tiene período.
+  ESTADOS_EN_LA_CALLE = %w[pendiente en_viaje fallido].freeze
+
   def mis_paquetes
     @dispensaciones = Dispensacion
       .del_delivery(current_user.id)
+      .where(estado_envio: ESTADOS_EN_LA_CALLE)
       .joins(stock: :sede)
       .where(sedes: { club_id: current_user.club_id })
       .includes(:paciente, :sede, :ruta_entrega, { stock: :lote }, { items: { stock: :lote } })

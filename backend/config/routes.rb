@@ -479,6 +479,7 @@ Rails.application.routes.draw do
     resources :rendiciones, only: [:index, :create] do
       collection do
         get  :receptores
+        get  :mi_caja
         post :saldar
       end
       member do
