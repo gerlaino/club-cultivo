@@ -228,8 +228,7 @@
     "inf__section"
   ],
   "views/auditor/InformeProduccionView.vue": [
-    "inf__hoja",
-    "inf__section"
+    "inf__hoja"
   ],
   "views/auditor/InformeReprocannView.vue": [
     "inf__section"

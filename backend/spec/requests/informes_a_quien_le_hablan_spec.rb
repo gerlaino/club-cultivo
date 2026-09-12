@@ -61,8 +61,10 @@ RSpec.describe 'Informes — a quién le habla cada uno', type: :request do
   describe 'Producción — separa el período de la foto de hoy' do
     let(:sala) { create(:sala, club: club, sede: sede, created_by: admin) }
     let!(:curado_viejo) do
-      create(:lote, club: club, sala: sala, estado: 'curado', rendimiento_real_g: 1_500)
-        .tap { |l| l.update_columns(updated_at: 6.months.ago) }
+      create(:lote, club: club, sala: sala, estado: 'curado', rendimiento_real_g: 1_500).tap do |l|
+        l.lote_eventos.create!(tipo: 'cambio_estado', estado_nuevo: 'cosecha', club: club, user: admin,
+                               registrado_en: 6.months.ago)
+      end
     end
 
     def informe
@@ -74,14 +76,15 @@ RSpec.describe 'Informes — a quién le habla cada uno', type: :request do
     # El bug que veía Germán: un lote curado con peso confirmado mostraba 0 g, porque la tabla
     # de estados —que habla del PRESENTE— traía una columna filtrada por el período elegido.
     it 'la tabla de hoy muestra el rendimiento acumulado, no el del período' do
-      fila = informe['por_estado'].find { |e| e['estado'] == 'curado' }
+      fila = informe['hoy']['por_estado'].find { |e| e['estado'] == 'curado' }
 
       expect(fila['rendimiento']).to eq(1500.0)
     end
 
     it 'el KPI del período sigue siendo del período' do
-      # El lote se curó hace medio año: no entra en el mes actual.
-      expect(informe['gramos_producidos']).to eq(0.0)
+      # El lote se cosechó hace medio año: no entra en el mes actual.
+      expect(informe['periodo']['gramos']).to eq(0.0)
+      expect(informe['periodo']['total_lotes']).to eq(0)
     end
   end
 

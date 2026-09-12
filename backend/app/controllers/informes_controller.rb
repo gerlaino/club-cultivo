@@ -86,100 +86,86 @@ class InformesController < ApplicationController
     end
   end
 
+  # Tres bloques en tres marcos de tiempo: lo cosechado del período (comparado con el anterior),
+  # la foto de hoy y lo que viene. El cálculo vive en `Informes::Produccion`; acá sólo se arma
+  # cómo se muestra en el PDF y el Excel.
   def produccion
     club  = current_user.club
     desde, hasta = periodo_rango
+    datos = Informes::Produccion.new(club: club, desde: desde, hasta: hasta).call
+    per   = datos[:periodo]
+    hoy   = datos[:hoy]
 
-    total_lotes   = club.lotes.count
-    lotes_activos = club.lotes.where.not(estado: %w[finalizado]).count
-    lotes_cosechados = club.lotes.where(estado: 'finalizado')
-                           .where(updated_at: desde..hasta).count
-
-    # Los gramos del período salen del RENDIMIENTO DEL LOTE, que es lo que llena el flujo de
-    # manicura al cerrar el curado (`Lote#check_and_finalize_manicura!`). Antes se sumaban
-    # `Pesada.peso_curado_g` con `fase_destino: 'finalizado'`: una tabla que en la práctica
-    # está vacía —la organización pesa por PesajeManicura, no por Pesada— así que el informe mostraba
-    # "0 gramos producidos" con veinte lotes curados a la vista.
-    #
-    # La fecha del lote es la de su paso a curado (cuando el producto existe); si ese evento
-    # no está, se usa `updated_at`, que es lo mejor disponible.
-    gramos_producidos = gramos_del_periodo(club, desde, hasta)
-
-    plantas_totales = Plant.joins(lote: :sala).where(salas: { sede_id: club.sede_ids })
-                           .where.not(state: %w[cosechado finalizado]).count
-
-    # Agregados por estado. Las PLANTAS se cuentan igual que el KPI de arriba: plantas que
-    # están en pie, no `lotes.plants_count`. Ese campo es el declarado histórico —incluye las
-    # cosechadas y las de lotes ya cerrados— así que la tabla sumaba 548 mientras el KPI
-    # "Plantas en pie" del mismo informe decía 156. Un informe no puede contradecirse solo.
-    lotes_por_estado = club.lotes.group(:estado).count
-    plantas_por_estado = Plant.joins(lote: :sala)
-                              .where(salas: { sede_id: club.sede_ids })
-                              .where.not(state: %w[cosechado finalizado])
-                              .group('lotes.estado').count
-    por_estado = Lote::ESTADOS.filter_map do |e|
-      next if (lotes_e = lotes_por_estado[e].to_i).zero?
-
-      # Rendimiento ACUMULADO de los lotes que hoy están en ese estado (sin filtro de fecha:
-      # la tabla habla del presente, no del período).
-      { estado: e, lotes: lotes_e, plantas: plantas_por_estado[e].to_i,
-        rendimiento: club.lotes.where(estado: e).sum(:rendimiento_real_g).to_f.round(1) }
-    end
-
-    # El informe de Sedes era este mismo dato partido en otra pantalla: plantas y flor por
-    # sede, con el MISMO criterio de conteo que el KPI de acá. Un club de una sola sede abría
-    # un informe de una fila. Vive como desglose de Producción, que es de lo que habla.
-    por_sede = club.sedes.includes(:salas).map do |s|
-      plantas = Plant.joins(lote: :sala).where(salas: { sede_id: s.id })
-                     .where.not(state: %w[cosechado finalizado]).count
-      # Flor seca solamente: los derivados (hash, preroll) tienen su propia unidad y no se
-      # suman como gramos.
-      flor = Stock.where(sede_id: s.id, forma_producto: 'flor_seca').disponibles.sum(:cantidad).to_f
-      { id: s.id, nombre: s.nombre, salas: s.salas.cultivo.count,
-        plantas: plantas, stock_disponible: flor.round(1) }
-    end
-
-    datos = {
-      total_lotes:      total_lotes,
-      lotes_activos:    lotes_activos,
-      lotes_cosechados: lotes_cosechados,
-      gramos_producidos: gramos_producidos,
-      plantas_totales:  plantas_totales,
-      por_estado:       por_estado,
-      por_sede:         por_sede,
-      total_sedes:      por_sede.size,
-    }
+    fmt_g   = ->(g) { g.nil? ? '—' : "#{ActiveSupport::NumberHelper.number_to_delimited(g.round(1), delimiter: '.', separator: ',')} g" }
+    fmt_var = ->(v) { v.nil? ? 'sin período anterior' : "#{v.positive? ? '+' : ''}#{v} %" }
 
     responder_informe(
       titulo: 'Informe de producción', nombre: 'informe_produccion',
-      resena: 'Cuánto produjo la organización y cómo viene el cultivo. Arriba, lo cosechado en el período elegido; abajo, la foto de HOY: qué lotes y plantas hay en cada estado ahora mismo, con el rendimiento acumulado de cada uno.',
+      resena: 'Qué se cosechó en el período elegido —comparado con el anterior—, qué hay hoy en cada etapa del cultivo y hace cuánto, y qué está por cortarse. Un lote cuenta como cosechado el día que se corta, y sus gramos pertenecen a ese período aunque se pesen después.',
       datos: datos, periodo: etiqueta_periodo(desde, hasta),
       kpis: [
-        { label: 'Lotes totales',   valor: total_lotes },
-        { label: 'Lotes activos',   valor: lotes_activos, tono: :ok },
-        { label: 'Cosechados',      valor: lotes_cosechados },
-        { label: 'Cosechado en el período', valor: gramos_producidos.round(1) },
-        { label: 'Plantas en pie',  valor: plantas_totales },
+        { label: 'Flor seca cosechada', valor: fmt_g.call(per[:gramos]), tono: :ok },
+        { label: 'Lotes cosechados',    valor: per[:total_lotes] },
+        { label: 'Por planta',          valor: fmt_g.call(per[:gramos_por_planta]) },
+        { label: 'Plantas en pie',      valor: hoy[:plantas_en_pie] },
+        { label: 'Lotes en proceso',    valor: hoy[:lotes_en_proceso] },
       ],
       secciones: [
         {
-          # LA FOTO DE HOY, no del período: estos lotes están en ese estado AHORA. Antes esta
-          # tabla traía una columna "Gramos" filtrada por el período elegido, así que un lote
-          # curado el mes pasado aparecía con 0 g al lado —dos marcos temporales en la misma
-          # pantalla, y el de abajo contradecía al de arriba—. Los gramos del período están en
-          # el KPI y en su propia sección; acá va el rendimiento acumulado de cada lote, que es
-          # lo que ese lote realmente tiene.
-          titulo: 'Hoy en el cultivo',
-          headers: ['Estado', 'Lotes', 'Plantas', 'Rendimiento acumulado'],
-          rows: por_estado.map { |e| [e[:estado].to_s.tr('_', ' ').capitalize, e[:lotes], e[:plantas], e[:rendimiento]] },
-          formatos: [:texto, :numero, :numero, :numero],
-          totales: [1, 2, 3],
+          titulo: 'Lotes cosechados en el período',
+          headers: ['Lote', 'Genética', 'Sede', 'Cosecha', 'Plantas', 'Flor seca (g)', 'g / planta', 'Días de ciclo'],
+          rows: per[:lotes].map do |l|
+            [l[:codigo], l[:genetica] || '—', l[:sede] || '—', fmt_fecha(l[:fecha]), l[:plantas],
+             l[:gramos] || 'sin peso', l[:gramos_por_planta] || '—', l[:dias_ciclo] || '—']
+          end,
+          formatos: [:texto, :texto, :texto, :texto, :numero, :numero, :numero, :numero],
+          totales: [4, 5],
+          aligns: { 4 => :right, 5 => :right, 6 => :right, 7 => :right },
+          col_min: { 5 => 58 },
+          vacio: 'No se cosechó ningún lote en el período elegido.',
+        },
+        {
+          titulo: 'Comparado con el período anterior',
+          headers: ['', 'Este período', 'Anterior', 'Variación'],
+          rows: [
+            ['Flor seca cosechada', fmt_g.call(per[:gramos]), fmt_g.call(per[:anterior][:gramos]), fmt_var.call(per[:variacion][:gramos])],
+            ['Lotes cosechados',    per[:total_lotes],        per[:anterior][:total_lotes],        fmt_var.call(per[:variacion][:total_lotes])],
+            ['Plantas cosechadas',  per[:plantas],            per[:anterior][:plantas],            fmt_var.call(per[:variacion][:plantas])],
+            ['Por planta',          fmt_g.call(per[:gramos_por_planta]), fmt_g.call(per[:anterior][:gramos_por_planta]), fmt_var.call(per[:variacion][:gramos_por_planta])],
+          ],
           aligns: { 1 => :right, 2 => :right, 3 => :right },
         },
         {
+          # LA FOTO DE HOY, no del período: estos lotes están en ese estado AHORA.
+          titulo: 'Hoy en el cultivo',
+          headers: ['Etapa', 'Lotes', 'Plantas', 'Días (prom.)', 'El más viejo', 'Rendimiento acumulado'],
+          rows: hoy[:por_estado].map do |e|
+            viejo = e[:mas_viejo]
+            [e[:estado].to_s.tr('_', ' ').capitalize, e[:lotes], e[:plantas], e[:dias_promedio] || '—',
+             viejo ? "#{viejo[:codigo]} · #{viejo[:dias]} d#{viejo[:excedido] ? " (objetivo #{viejo[:objetivo]})" : ''}" : '—',
+             e[:rendimiento].positive? ? fmt_g.call(e[:rendimiento]) : '—']
+          end,
+          totales: [1, 2],
+          aligns: { 1 => :right, 2 => :right, 3 => :right, 5 => :right },
+          col_min: { 4 => 90 },
+          vacio: 'No hay lotes en el cultivo ahora mismo.',
+        },
+        {
+          titulo: 'Lo que viene',
+          headers: ['Lote', 'Genética', 'Sala', 'Plantas', 'Cosecha estimada', 'Estimado'],
+          rows: datos[:proximas].map do |p|
+            [p[:codigo], p[:genetica] || '—', p[:sala] || '—', p[:plantas],
+             p[:fecha] ? "#{fmt_fecha(p[:fecha])} (#{p[:dias]} d)" : 'sin fecha',
+             p[:estimado] ? "≈ #{fmt_g.call(p[:estimado])}" : 'sin historia']
+          end,
+          aligns: { 3 => :right, 5 => :right },
+          col_min: { 4 => 80 },
+          vacio: 'No hay lotes en floración.',
+        },
+        {
           titulo: 'Por sede',
-          headers: ['Sede', 'Salas', 'Plantas', 'Flor seca (g)'],
-          rows: por_sede.map { |s| [s[:nombre], s[:salas], s[:plantas], s[:stock_disponible]] },
+          headers: ['Sede', 'Salas', 'Plantas en pie', 'Flor seca (g)'],
+          rows: datos[:por_sede].map { |s| [s[:nombre], s[:salas], s[:plantas], s[:stock_disponible]] },
           formatos: [:texto, :numero, :numero, :numero],
           totales: [1, 2, 3],
           aligns: { 1 => :right, 2 => :right, 3 => :right },
@@ -642,21 +628,6 @@ class InformesController < ApplicationController
   # del lote es la de su paso a CURADO —el momento en que el producto existe— y si ese evento
   # falta se cae a `updated_at`. Antes esto salía de la tabla `pesadas`, que el flujo real no
   # llena, y el informe decía "0 gramos" con veinte lotes curados.
-  def gramos_del_periodo(club, desde, hasta, estado: nil)
-    scope = club.lotes.where.not(rendimiento_real_g: nil).where('rendimiento_real_g > 0')
-    scope = scope.where(estado: estado) if estado
-
-    # Fecha de curado por lote, en una sola consulta (evita N+1 sobre lote_eventos).
-    curados = LoteEvento.where(lote_id: scope.select(:id), tipo: 'cambio_estado',
-                               estado_nuevo: %w[curado finalizado])
-                        .group(:lote_id).minimum(:registrado_en)
-
-    scope.sum do |lote|
-      fecha = curados[lote.id] || lote.updated_at
-      fecha && fecha >= desde.to_time.beginning_of_day && fecha <= hasta.to_time.end_of_day ? lote.rendimiento_real_g.to_f : 0.0
-    end.round(1)
-  end
-
   # Datos del informe REPROCANN — compartidos por la respuesta JSON y el PDF
   def reprocann_data(club)
     # Este informe le habla AL ORGANISMO: declara la población registrada en REPROCANN. Por eso

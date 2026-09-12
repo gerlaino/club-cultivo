@@ -1,5 +1,43 @@
 # Changelog
 
+## Septiembre 2026 (be) — El informe de Producción contesta la pregunta de producción
+
+Primero de la revisión informe por informe con Germán. El de Producción tenía cinco KPIs y **dos
+estaban mal en silencio**: «Cosechados» contaba lotes `finalizado` por `updated_at` —corregirle
+una nota a un lote del año pasado lo traía al mes de hoy— y «Plantas en pie» excluía `finalizado`
+(que no es un estado de planta) y dejaba adentro a las **descartadas** y a las que están en
+**secado**. Un número plausible que no es el real es el peor error de un informe.
+
+Se rehízo en **tres bloques, tres marcos de tiempo**, y el cálculo salió del controller a
+`Informes::Produccion`:
+
+- **Lo que se cosechó** (del período elegido). **Cosechado es cuando el lote entra a `cosecha`**
+  (decisión de Germán) y los gramos pertenecen a ese período aunque se pesen semanas después: lo
+  que se cortó en agosto rindió X, se sepa en agosto o en septiembre. Mientras no haya peso, la
+  fila dice «sin peso todavía» y el bloque cuenta cuántos faltan. Cada KPI lleva al lado **el
+  período inmediato anterior** de la misma duración y la variación; sin anterior no hay flecha.
+  **Gramos por planta cosechada** como KPI y como columna: es lo único que compara un lote de 3
+  plantas con uno de 40. Y **la lista de lotes**, con genética, sede, fecha, plantas, g/planta y
+  días de ciclo — sin ella el total no se puede comprobar.
+- **Hoy en el cultivo** (la foto de ahora). **En pie** y **en proceso** separados —«Lotes activos»
+  sumaba plantas creciendo con producto secándose—. Por etapa: lotes, plantas, **días promedio y
+  el más viejo**, marcado cuando supera el objetivo que el lote heredó de la genética; sin
+  objetivo no se marca (un umbral fijo sería una regla más escrita en otro lado). **Ocupación
+  contra el tope del plan** sólo en Básico, con EL MISMO número que usa `PlanEnforcer` para
+  rebotar el alta. «Lotes totales» se fue: sólo crece y no se actúa sobre él.
+- **Lo que viene**: todo lo que está en floración, por fecha de corte (la estimada del lote, o
+  entrada a floración + objetivo). El estimado en gramos sale del **g/planta histórico de esa
+  genética en esa organización**; sin historia, «sin historia para estimar».
+
+`Plant.en_pie` (enraizado · vegetativo · floración) es el scope que usan el KPI, la tabla y el
+desglose por sede. PDF y Excel salen de la misma definición: la lista de lotes cosechados es la
+hoja principal del Excel y la comparación con el anterior va como tabla en el PDF.
+
+**Pendiente de decisión:** `PlanEnforcer` cuenta contra el tope **todas las plantas que existen**,
+también las cosechadas y descartadas de lotes ya cerrados. En el informe se ve: «40 en pie · 44 de
+450 del plan». Una organización del Básico que cosechó 450 plantas en su vida no puede crear una
+más. No se tocó: es del plan, no del informe.
+
 ## Septiembre 2026 (bd) — Lo que encontró el socio, y la caja del repartidor
 
 Dos cosas en la misma sesión: los bugs que encontró el socio de Germán probando la app, y el

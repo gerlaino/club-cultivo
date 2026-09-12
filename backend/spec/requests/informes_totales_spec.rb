@@ -20,38 +20,33 @@ RSpec.describe 'Informes — los totales tienen que cerrar', type: :request do
   end
 
   describe 'GET /informes/produccion' do
-    it 'el desglose por estado suma los mismos lotes que el total' do
+    it 'la tabla de hoy suma los mismos lotes que los KPIs de en pie y en proceso' do
       lote!(estado: 'vegetativo')
       lote!(estado: 'floracion')
-      lote!(estado: 'vegetativo')
+      lote!(estado: 'curado')
+      create(:lote, club: club, sala: nil, sede: sede, estado: 'finalizado')  # historia: no es «hoy»
 
       get '/api/informes/produccion'
 
-      expect(json['por_estado'].sum { |e| e['lotes'] }).to eq(json['total_lotes'])
-    end
-
-    it 'los lotes activos son el total menos los finalizados' do
-      lote!(estado: 'vegetativo')
-      lote!(estado: 'floracion')
-      create(:lote, club: club, sala: nil, sede: sede, estado: 'finalizado')
-
-      get '/api/informes/produccion'
-
-      expect(json['lotes_activos']).to eq(json['total_lotes'] - 1)
+      hoy = json['hoy']
+      expect(hoy['por_estado'].sum { |e| e['lotes'] }).to eq(hoy['lotes_en_pie'] + hoy['lotes_en_proceso'])
+      expect(hoy['lotes_en_pie']).to eq(2)
+      expect(hoy['lotes_en_proceso']).to eq(1)
     end
 
     # El encabezado habla del PERÍODO y la tabla de abajo habla del PRESENTE: son dos marcos
-    # temporales distintos y ahora está dicho en la pantalla. Antes la tabla traía una columna
-    # "Gramos" filtrada por período, así que un lote curado el mes pasado aparecía con 0 g al
-    # lado — y el informe se contradecía consigo mismo.
+    # temporales distintos. Un lote curado hace medio año tiene su rendimiento en la tabla de
+    # hoy y no suma nada al período.
     it 'el KPI es del período y el desglose muestra el rendimiento acumulado' do
       l = lote!(estado: 'curado')
-      l.update_columns(rendimiento_real_g: 500, updated_at: 8.months.ago)
+      l.update_columns(rendimiento_real_g: 500)
+      l.lote_eventos.create!(tipo: 'cambio_estado', estado_nuevo: 'cosecha', club: club, user: admin,
+                             registrado_en: 8.months.ago)
 
       get '/api/informes/produccion', params: { periodo: 'mes_actual' }
 
-      expect(json['gramos_producidos']).to eq(0.0)   # no se cosechó nada este mes
-      fila = json['por_estado'].find { |e| e['estado'] == 'curado' }
+      expect(json['periodo']['gramos']).to eq(0.0)   # no se cosechó nada este mes
+      fila = json['hoy']['por_estado'].find { |e| e['estado'] == 'curado' }
       expect(fila['rendimiento']).to eq(500.0)       # pero el lote tiene su rendimiento
     end
   end
@@ -64,8 +59,8 @@ RSpec.describe 'Informes — los totales tienen que cerrar', type: :request do
 
       get '/api/informes/produccion'
 
-      expect(json['plantas_totales']).to eq(3)
-      expect(json['plantas_totales']).to eq(json['por_sede'].sum { |s| s['plantas'] })
+      expect(json['hoy']['plantas_en_pie']).to eq(3)
+      expect(json['hoy']['plantas_en_pie']).to eq(json['por_sede'].sum { |s| s['plantas'] })
     end
 
     it 'no cuenta sedes de otro club' do
@@ -76,7 +71,6 @@ RSpec.describe 'Informes — los totales tienen que cerrar', type: :request do
 
       get '/api/informes/produccion'
 
-      expect(json['total_sedes']).to eq(1)
       expect(json['por_sede'].map { |s| s['nombre'] }).to eq([sede.nombre])
     end
 

@@ -38,10 +38,11 @@ RSpec.describe 'Ola 5 — Informes (auditor)', type: :request do
       expect(iniciales).not_to include('Néstor Cruz')
     end
 
-    it 'GET /informes/produccion devuelve métricas de lotes' do
+    it 'GET /informes/produccion devuelve los tres bloques del informe' do
       get '/informes/produccion', headers: auth_headers
       body = JSON.parse(response.body)
-      expect(body.keys).to include('total_lotes', 'lotes_activos', 'gramos_producidos')
+      expect(body.keys).to include('periodo', 'hoy', 'proximas', 'por_sede')
+      expect(body['periodo'].keys).to include('gramos', 'total_lotes', 'anterior', 'variacion')
     end
 
     it 'GET /informes/dispensaciones devuelve métricas sin nombres' do

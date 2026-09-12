@@ -50,6 +50,11 @@ class Plant < ApplicationRecord
   scope :en_floracion,   -> { where(state: 'floracion') }
   scope :en_secado,      -> { where(state: 'secado') }
   scope :cosechadas,     -> { where(state: 'cosechado') }
+  # EN PIE = viva y en el cultivo: enraizando, en vegetativo o en floración. Lo que está en
+  # secado ya se cortó, y una descartada no está en ningún lado. El informe de Producción
+  # contaba «en pie» excluyendo `finalizado` —que no es un estado de planta— y dejaba adentro a
+  # las descartadas: el KPI, la tabla y el desglose por sede sumaban plantas que no existían.
+  scope :en_pie,         -> { where(state: %w[enraizado vegetativo floracion]) }
 
   scope :descartadas,    -> { where(state: 'descartada') }
   scope :no_prendieron,  -> { where(motivo_descarte: 'no_prendio') }
