@@ -3,6 +3,10 @@ class InformesController < ApplicationController
   before_action :authenticate_user!
   before_action :require_auditor_o_admin!
 
+  # Cómo se llama lo que se mide en cada unidad, para el título de un KPI. Lo que no está acá se
+  # dice «En <unidad>».
+  FORMAS_UNIDAD = { 'g' => 'En gramos', 'un' => 'En unidades', 'ml' => 'En mililitros' }.freeze
+
   PERIODO_RANGOS = {
     'mes_actual'   => -> { [Time.zone.today.beginning_of_month, Time.zone.today.end_of_month] },
     'mes_anterior' => -> { [1.month.ago.beginning_of_month, 1.month.ago.end_of_month] },
@@ -136,6 +140,8 @@ class InformesController < ApplicationController
             ['Por planta',          fmt_g.call(per[:gramos_por_planta]), fmt_g.call(per[:anterior][:gramos_por_planta]), fmt_var.call(per[:variacion][:gramos_por_planta])],
           ],
           aligns: { 1 => :right, 2 => :right, 3 => :right },
+          # «Este período» y «sin período anterior» no entran en 46 pt: se partían en sílabas.
+          col_min: { 1 => 80, 2 => 70, 3 => 100 },
         },
         {
           # LA FOTO DE HOY, no del período: estos lotes están en ese estado AHORA.
@@ -177,79 +183,83 @@ class InformesController < ApplicationController
     )
   end
 
+  # Tres preguntas del período: QUÉ salió (por unidad, contra el anterior), A QUIÉN y POR DÓNDE.
+  # El cálculo vive en `Informes::Dispensaciones`; acá sólo se arma cómo se muestra.
   def dispensaciones
     club  = current_user.club
     desde, hasta = periodo_rango
+    datos = Informes::Dispensaciones.new(club: club, desde: desde, hasta: hasta).call
+    salio = datos[:salio]
 
-    disps = Dispensacion.no_canceladas.joins(stock: :sede)
-                        .where(sedes: { club_id: club.id })
-                        .where(fecha_dispensacion: desde..hasta)
+    fmt_u   = ->(c, u) { "#{ActiveSupport::NumberHelper.number_to_delimited(c.to_f.round(1).to_s.sub(/\.0\z/, ''), delimiter: '.', separator: ',')} #{u}" }
+    fmt_var = ->(v) { v.nil? ? 'sin período anterior' : "#{v.positive? ? '+' : ''}#{v} %" }
+    unidades = ->(lista) { lista.map { |x| fmt_u.call(x[:cantidad], x[:unidad]) }.join(' · ').presence || '—' }
+    otros    = ->(lista) { lista.map { |x| "#{fmt_u.call(x[:cantidad], x[:unidad])} #{x[:forma].to_s.tr('_', ' ')}" }.join(' · ').presence || '—' }
 
-    total  = disps.count
-    gramos = disps.sum(:cantidad).to_f
-    pax    = disps.select(:paciente_id).distinct.count
-    promedio = total.positive? ? (gramos / total).round(2) : 0
-
-    # Nombre y apellido completos. Estaba con iniciales "para no exponer datos personales",
-    # pero quien abre este informe (admin o auditor de la organización) ya puede ver la ficha entera del
-    # paciente: la inicial no protegía nada y volvía el informe ilegible — con dos "G.L." no
-    # se sabe de quién se habla ni se puede cruzar con nada.
-    # Con qué se lo identifica y QUÉ se le entregó. Sólo el nombre y los gramos no alcanza
-    # para cruzar este informe con producción ni para acreditar a nadie: el DNI parcial
-    # desambigua homónimos y la genética/forma es lo que permite seguir el producto.
-    resumen = disps.includes(:paciente, stock: :lote).group_by(&:paciente_id).map do |_, ds|
-      p = ds.first.paciente
-      formas    = ds.filter_map { |d| d.stock&.forma_producto }.uniq
-      geneticas = ds.filter_map { |d| d.genetica_nombre.presence || d.stock&.genetica&.nombre ||
-                                      d.stock&.lote&.genetica&.nombre }.uniq
-      {
-        paciente:     p.nombre_completo,
-        # Completo para el PDF y el Excel; abajo se saca del JSON de la pantalla.
-        dni:          p.dni_normalizado.to_s,
-        dni_ultimos_3: p.dni_normalizado.to_s.last(3),
-        iniciales:    "#{p.nombre[0]}.#{p.apellido[0]}.",   # se mantiene por compatibilidad
-        geneticas:    geneticas,
-        formas:       formas,
-        cantidad:     ds.size,
-        total_gramos: ds.sum { |d| d.cantidad.to_f }.round(2),
-        ultima_fecha: ds.max_by(&:fecha_dispensacion)&.fecha_dispensacion,
-      }
-    end.first(100)
-
-    datos = {
-      total_dispensaciones:    total,
-      gramos_dispensados:      gramos,
-      pacientes_atendidos:     pax,
-      promedio_por_dispensacion: promedio,
-      # Al navegador va sin el documento completo: la pantalla muestra los últimos tres.
-      resumen_anonimizado:     resumen.map { |r| r.except(:dni) },
-    }
+    # Al navegador va sin el documento completo y con la lista cortada: la pantalla muestra los
+    # últimos tres y lista 100, y dice cuántos más. Los totales de arriba son sobre todos.
+    pacientes_pantalla = datos[:pacientes].first(Informes::Dispensaciones::LISTA_PANTALLA).map { |r| r.except(:dni) }
+    json = datos.merge(
+      pacientes: pacientes_pantalla,
+      pacientes_omitidos: [datos[:pacientes].size - pacientes_pantalla.size, 0].max,
+    )
 
     responder_informe(
       titulo: 'Informe de dispensaciones', nombre: 'informe_dispensaciones',
-      resena: 'Qué salió de la organización y hacia quién, en el período elegido. Una fila por paciente, con el DNI parcial para identificarlo sin ambigüedad y la genética y forma de lo que retiró — que es lo que permite cruzar este informe con producción.',
-      datos: datos, periodo: etiqueta_periodo(desde, hasta),
-      kpis: [
-        { label: 'Entregas',           valor: total },
-        { label: 'Gramos dispensados', valor: gramos.round(1), tono: :ok },
-        { label: 'Pacientes',          valor: pax },
-        { label: 'Promedio por entrega', valor: promedio },
-      ],
-      secciones: [{
-        titulo: 'Detalle por paciente',
-        headers: ['Paciente', 'DNI', 'Genética', 'Producto', 'Entregas', 'Gramos', 'Última entrega'],
-        rows: resumen.map { |r|
-          [r[:paciente], r[:dni].presence || '—',
-           r[:geneticas].any? ? r[:geneticas].join(', ') : '—',
-           r[:formas].map { |f| f.to_s.tr('_', ' ') }.join(', ').presence || '—',
-           r[:cantidad], r[:total_gramos], fmt_fecha(r[:ultima_fecha])]
+      resena: 'Qué salió de la organización en el período elegido —por unidad, nunca sumado—, a quién y por dónde. Una fila por paciente con el DNI parcial y la genética y forma de lo que retiró, que es lo que cruza con la trazabilidad.',
+      datos: json, periodo: etiqueta_periodo(desde, hasta),
+      kpis: salio[:por_unidad].map { |x| { label: FORMAS_UNIDAD[x[:unidad]] || "En #{x[:unidad]}", valor: fmt_u.call(x[:cantidad], x[:unidad]), tono: :ok } } +
+            [{ label: 'Entregas',  valor: salio[:entregas][:valor] },
+             { label: 'Pacientes', valor: salio[:pacientes][:valor] },
+             { label: 'Nuevos',    valor: salio[:nuevos] }],
+      secciones: [
+        {
+          titulo: 'A quién',
+          headers: ['Paciente', 'DNI', 'Entregas', 'Flor seca (g)', 'Otros', 'Genéticas', 'Última entrega'],
+          rows: datos[:pacientes].map { |r|
+            [r[:paciente], r[:dni].presence || '—', r[:entregas], r[:flor_seca_g],
+             otros.call(r[:otros]), r[:geneticas].join(', ').presence || '—', fmt_fecha(r[:ultima_fecha])]
+          },
+          formatos: [:texto, :texto, :numero, :numero, :texto, :texto, :texto],
+          totales: [2, 3],
+          aligns: { 2 => :right, 3 => :right },
+          # El documento completo no se puede partir en dos líneas: este informe se presenta.
+          col_min: { 1 => 62, 2 => 60, 3 => 60, 4 => 88, 5 => 96, 6 => 68 },
+          vacio: 'No se dispensó nada en el período elegido.',
         },
-        formatos: [:texto, :texto, :texto, :texto, :numero, :numero, :texto],
-        totales: [4, 5],
-        aligns: { 4 => :right, 5 => :right },
-        # El documento completo no se puede partir en dos líneas: este informe se presenta.
-        col_min: { 1 => 62 },
-      }],
+        {
+          titulo: 'Lo que salió, comparado con el período anterior',
+          headers: ['', 'Este período', 'Anterior', 'Variación'],
+          rows: salio[:por_unidad].map { |x| [FORMAS_UNIDAD[x[:unidad]] || x[:unidad], fmt_u.call(x[:cantidad], x[:unidad]), x[:anterior] ? fmt_u.call(x[:anterior], x[:unidad]) : '—', fmt_var.call(x[:variacion])] } +
+                [['Entregas', salio[:entregas][:valor], salio[:entregas][:anterior], fmt_var.call(salio[:entregas][:variacion])],
+                 ['Pacientes', salio[:pacientes][:valor], salio[:pacientes][:anterior], '—'],
+                 (salio[:regalos_entregas].positive? ? ['De eso, regalos', "#{unidades.call(salio[:regalos])} en #{salio[:regalos_entregas]} #{salio[:regalos_entregas] == 1 ? 'entrega' : 'entregas'}", '', ''] : nil)].compact,
+          aligns: { 1 => :right, 2 => :right, 3 => :right },
+          col_min: { 1 => 110, 2 => 70, 3 => 100 },
+        },
+        {
+          titulo: 'Por producto',
+          headers: ['Producto', 'Genética', 'Entregas', 'Cantidad', 'Pacientes', 'vs. anterior'],
+          rows: datos[:productos].flat_map { |f|
+            [[f[:forma].to_s.tr('_', ' ').capitalize, 'Todas', f[:entregas], fmt_u.call(f[:cantidad], f[:unidad]), f[:pacientes], '']] +
+              f[:geneticas].map { |g| ['', g[:genetica], g[:entregas], fmt_u.call(g[:cantidad], f[:unidad]), g[:pacientes], fmt_var.call(g[:variacion])] }
+          },
+          aligns: { 2 => :right, 3 => :right, 4 => :right, 5 => :right },
+          col_min: { 1 => 110, 2 => 60, 3 => 60, 4 => 64, 5 => 70 },
+          vacio: 'No se dispensó nada en el período elegido.',
+        },
+        {
+          titulo: 'Por dónde',
+          headers: ['Canal', 'Entregas', 'Flor seca (g)', 'Otros', 'Pacientes'],
+          rows: datos[:canales].map { |c|
+            [c[:sin_llegar].to_i.positive? ? "#{c[:canal]} (#{c[:sin_llegar]} sin llegar todavía)" : c[:canal],
+             c[:entregas], c[:flor_seca_g], otros.call(c[:otros]), c[:pacientes]]
+          },
+          aligns: { 1 => :right, 2 => :right, 4 => :right },
+          col_min: { 1 => 60, 2 => 60, 3 => 130, 4 => 64 },
+          vacio: 'No se dispensó nada en el período elegido.',
+        },
+      ],
       nota: 'Contiene datos personales de pacientes: tratar como información sensible.',
     )
   end
@@ -808,9 +818,22 @@ class InformesController < ApplicationController
     data.merge(lista_anonimizada: lista.map { |p| p.except(:dni) })
   end
 
+  # Los cuatro períodos de siempre, o un rango a elección (`desde`/`hasta`): «del 1 al 15» es lo
+  # que pide un auditor. Vale para todos los informes que pasan por acá. Un rango dado vuelta se
+  # endereza; sin `hasta`, hasta hoy.
   def periodo_rango
+    if params[:desde].present?
+      desde = Date.parse(params[:desde].to_s)
+      hasta = params[:hasta].present? ? Date.parse(params[:hasta].to_s) : Time.zone.today
+      desde, hasta = hasta, desde if hasta < desde
+      return [desde.beginning_of_day, hasta.end_of_day]
+    end
+
     periodo = params[:periodo].presence_in(PERIODO_RANGOS.keys) || 'mes_actual'
     desde, hasta = PERIODO_RANGOS[periodo].call
+    [desde.to_date.beginning_of_day, hasta.to_date.end_of_day]
+  rescue Date::Error
+    desde, hasta = PERIODO_RANGOS['mes_actual'].call
     [desde.to_date.beginning_of_day, hasta.to_date.end_of_day]
   end
 

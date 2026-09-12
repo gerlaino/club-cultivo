@@ -71,7 +71,7 @@ RSpec.describe 'El DNI en los informes', type: :request do
     end
 
     it 'en pantalla, sólo los últimos tres' do
-      fila = informe('dispensaciones')['resumen_anonimizado'].first
+      fila = informe('dispensaciones')['pacientes'].first
 
       expect(fila['dni_ultimos_3']).to eq('222')
       expect(fila).not_to have_key('dni')

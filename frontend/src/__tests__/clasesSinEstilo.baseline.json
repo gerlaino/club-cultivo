@@ -217,8 +217,7 @@
     "inf__section"
   ],
   "views/auditor/InformeDispensacionesView.vue": [
-    "inf__hoja",
-    "inf__section"
+    "inf__hoja"
   ],
   "views/auditor/InformeInaseView.vue": [
     "inf__section"

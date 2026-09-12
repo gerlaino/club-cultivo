@@ -136,24 +136,25 @@ RSpec.describe 'Informes — los totales tienen que cerrar', type: :request do
                            cantidad: cantidad, fecha_dispensacion: fecha)
     end
 
-    it 'el promedio es los gramos sobre la cantidad de dispensaciones' do
+    def gramos(json) = json['salio']['por_unidad'].find { |u| u['unidad'] == 'g' }['cantidad']
+
+    it 'las entregas y los gramos son los del período' do
       dispensar!(10)
       dispensar!(20)
 
       get '/api/informes/dispensaciones'
 
-      expect(json['total_dispensaciones']).to eq(2)
-      expect(json['gramos_dispensados']).to eq(30.0)
-      expect(json['promedio_por_dispensacion']).to eq(15.0)
+      expect(json['salio']['entregas']['valor']).to eq(2)
+      expect(gramos(json)).to eq(30.0)
     end
 
-    it 'el resumen por paciente suma los mismos gramos que el total' do
+    it 'la fila del paciente suma los mismos gramos que el total' do
       dispensar!(10)
       dispensar!(20)
 
       get '/api/informes/dispensaciones'
 
-      expect(json['resumen_anonimizado'].sum { |r| r['total_gramos'] }).to eq(json['gramos_dispensados'])
+      expect(json['pacientes'].sum { |r| r['flor_seca_g'] }).to eq(gramos(json))
     end
 
     it 'una dispensación fuera del período no entra' do
@@ -162,8 +163,18 @@ RSpec.describe 'Informes — los totales tienen que cerrar', type: :request do
 
       get '/api/informes/dispensaciones', params: { periodo: 'mes_actual' }
 
-      expect(json['total_dispensaciones']).to eq(1)
-      expect(json['gramos_dispensados']).to eq(10.0)
+      expect(json['salio']['entregas']['valor']).to eq(1)
+      expect(gramos(json)).to eq(10.0)
+    end
+
+    # «Del 1 al 15» es lo que pide un auditor. Vale para todos los informes.
+    it 'acepta un rango a elección' do
+      dispensar!(10, fecha: Time.zone.today.beginning_of_month)
+      dispensar!(20, fecha: Time.zone.today.beginning_of_month + 20.days) if Time.zone.today.day > 20
+
+      get '/api/informes/dispensaciones', params: { desde: Time.zone.today.beginning_of_month.to_s, hasta: (Time.zone.today.beginning_of_month + 15.days).to_s }
+
+      expect(gramos(json)).to eq(10.0)
     end
   end
 end

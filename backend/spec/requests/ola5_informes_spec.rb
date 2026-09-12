@@ -45,11 +45,11 @@ RSpec.describe 'Ola 5 — Informes (auditor)', type: :request do
       expect(body['periodo'].keys).to include('gramos', 'total_lotes', 'anterior', 'variacion')
     end
 
-    it 'GET /informes/dispensaciones devuelve métricas sin nombres' do
+    it 'GET /informes/dispensaciones devuelve los tres bloques, sin el DNI completo' do
       get '/informes/dispensaciones', headers: auth_headers
       body = JSON.parse(response.body)
-      expect(body.keys).to include('total_dispensaciones', 'pacientes_atendidos')
-      expect(body.keys).not_to include('pacientes')
+      expect(body.keys).to include('salio', 'productos', 'pacientes', 'canales')
+      expect(body['pacientes'].none? { |r| r.key?('dni') }).to be true
     end
 
     it 'GET /informes/cumplimiento devuelve alertas regulatorias' do

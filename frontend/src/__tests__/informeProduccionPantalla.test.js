@@ -96,7 +96,7 @@ describe('Informe de Producción — la pantalla muestra lo que el backend manda
     expect(seccion(1).text()).toContain('312 de 450 del plan Básico · 69 %')
 
     apiGet.mockResolvedValue({ data: { ...PAYLOAD, hoy: { ...PAYLOAD.hoy, plan: null } } })
-    await wrapper.find('.inf__periodo').trigger('change')
+    await wrapper.find('.spe__select').trigger('change')
     await flushPromises()
     expect(wrapper.text()).not.toContain('del plan')
   })

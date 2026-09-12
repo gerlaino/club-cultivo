@@ -3,16 +3,11 @@
     <div class="inf__header">
       <h1 class="inf__title"><TrendingDown :size="20" :stroke-width="1.75" /> Informe de pérdidas</h1>
       <div class="inf__acciones">
-        <select v-model="periodo" class="inf__periodo" @change="cargar">
-          <option value="mes_actual">Mes actual</option>
-          <option value="mes_anterior">Mes anterior</option>
-          <option value="trimestre">Trimestre</option>
-          <option value="anio">Año</option>
-        </select>
-        <button class="inf__btn" :disabled="exporting" @click="exportarPdf">
+        <SelectorPeriodo @change="cambiarPeriodo" />
+        <button class="inf__btn" :disabled="exporting" @click="exportarPdf(params)">
           <FileDown :size="15" :stroke-width="2" /> PDF
         </button>
-        <button class="inf__btn" :disabled="exporting" @click="exportarXlsx">
+        <button class="inf__btn" :disabled="exporting" @click="exportarXlsx(params)">
           <Sheet :size="15" :stroke-width="2" /> Excel
         </button>
       </div>
@@ -88,8 +83,10 @@ import { ref, computed, onMounted } from 'vue'
 import { TrendingDown, FileDown, Sheet } from 'lucide-vue-next'
 import api from '../../lib/api.js'
 import { useInformePdf } from '../../composables/useInformePdf.js'
+import SelectorPeriodo from '../../components/informes/SelectorPeriodo.vue'
 
-const periodo = ref('mes_actual')
+// Los MISMOS parámetros para la pantalla y para la descarga.
+const params  = ref({ periodo: 'mes_actual' })
 const loading = ref(false)
 const data    = ref(null)
 const { hoja, exporting, exportarPdf, exportarXlsx } = useInformePdf('informe_perdidas', 'perdidas')
@@ -101,12 +98,14 @@ const fmtG = (g) => `${Number(g || 0).toLocaleString('es-AR')} g`
 async function cargar() {
   loading.value = true
   try {
-    const res = await api.get('/informes/perdidas', { params: { periodo: periodo.value } })
+    const res = await api.get('/informes/perdidas', { params: params.value })
     data.value = res.data
   } finally {
     loading.value = false
   }
 }
+
+function cambiarPeriodo(p) { params.value = p; cargar() }
 
 onMounted(cargar)
 </script>

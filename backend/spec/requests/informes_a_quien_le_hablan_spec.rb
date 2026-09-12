@@ -106,7 +106,7 @@ RSpec.describe 'Informes — a quién le habla cada uno', type: :request do
     def fila
       get '/api/informes/dispensaciones'
       expect(response).to have_http_status(:ok), response.body
-      JSON.parse(response.body)['resumen_anonimizado'].first
+      JSON.parse(response.body)['pacientes'].first
     end
 
     it 'identifica al paciente sin ambigüedad: nombre y DNI parcial' do

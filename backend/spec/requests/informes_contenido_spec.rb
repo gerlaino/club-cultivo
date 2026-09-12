@@ -74,7 +74,7 @@ RSpec.describe 'Informes — contenido de los archivos', type: :request do
     it 'el PDF lo dice en vez de mostrar una tabla vacía' do
       get '/api/informes/dispensaciones.pdf'
 
-      expect(texto_pdf).to match(/Sin datos/i)
+      expect(texto_pdf).to match(/No se dispensó nada/i)
     end
   end
 

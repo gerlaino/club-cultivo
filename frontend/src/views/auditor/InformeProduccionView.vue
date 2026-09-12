@@ -3,16 +3,11 @@
     <div class="inf__header">
       <h1 class="inf__title"><Sprout :size="20" :stroke-width="1.75" /> Informe Producción</h1>
       <div class="inf__head-actions">
-        <select v-model="periodo" class="inf__periodo" @change="cargar">
-          <option value="mes_actual">Mes actual</option>
-          <option value="mes_anterior">Mes anterior</option>
-          <option value="trimestre">Trimestre</option>
-          <option value="anio">Año</option>
-        </select>
-        <button class="inf__pdf" :disabled="!data || exporting" @click="exportarPdf">
+        <SelectorPeriodo @change="cambiarPeriodo" />
+        <button class="inf__pdf" :disabled="!data || exporting" @click="exportarPdf(params)">
           <i class="bi bi-filetype-pdf"></i> {{ exporting ? 'Generando…' : 'PDF' }}
         </button>
-        <button class="inf__pdf" :disabled="!data || exporting" @click="exportarXlsx">
+        <button class="inf__pdf" :disabled="!data || exporting" @click="exportarXlsx(params)">
           <i class="bi bi-file-earmark-spreadsheet"></i> Excel
         </button>
       </div>
@@ -204,10 +199,12 @@ import { ref, computed, onMounted } from 'vue'
 import { Sprout } from 'lucide-vue-next'
 import api from '../../lib/api.js'
 import { useInformePdf } from '../../composables/useInformePdf.js'
+import SelectorPeriodo from '../../components/informes/SelectorPeriodo.vue'
 import { formatFechaCorta } from '../../utils/dates.js'
 
 const { hoja, exporting, exportarPdf, exportarXlsx } = useInformePdf('informe_produccion')
-const periodo = ref('mes_actual')
+// Los MISMOS parámetros para la pantalla y para la descarga.
+const params  = ref({ periodo: 'mes_actual' })
 const loading = ref(false)
 const data    = ref(null)
 
@@ -217,7 +214,7 @@ const hoy = computed(() => data.value?.hoy || {})
 async function cargar() {
   loading.value = true
   try {
-    const res = await api.get('/informes/produccion', { params: { periodo: periodo.value } })
+    const res = await api.get('/informes/produccion', { params: params.value })
     data.value = res.data
   } finally {
     loading.value = false
@@ -240,6 +237,8 @@ const textoDelta = (v, anterior) => {
 }
 const claseDelta = (v) => v == null || v === 0 ? 'inf__kpi-delta--flat' : v > 0 ? 'inf__kpi-delta--up' : 'inf__kpi-delta--down'
 const enDias = (d) => d < 0 ? `hace ${-d} días` : d === 0 ? 'hoy' : d === 1 ? 'mañana' : `en ${d} días`
+
+function cambiarPeriodo(p) { params.value = p; cargar() }
 
 onMounted(cargar)
 </script>

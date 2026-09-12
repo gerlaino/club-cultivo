@@ -1,5 +1,34 @@
 # Changelog
 
+## Septiembre 2026 (bh) — Dispensaciones cuenta por línea y por unidad, y el PDF baja lo que la pantalla muestra
+
+Tercero de la revisión informe por informe. El cálculo salió del controller a
+**`Informes::Dispensaciones`**; pantalla, PDF y Excel leen el mismo hash. Dos errores que ya
+conocemos del módulo estaban en el informe: **«Gramos dispensados» sumaba `dispensaciones.cantidad`**
+—la suma de todas las líneas en la unidad de cada una: 12 prerolls entraban como 12 gramos— y
+**genética y producto salían de `stock_id`**, la primera línea, así que quien se llevó flor y hash
+figuraba sólo con flor. La lista por paciente cortaba en 100 en silencio, también en el archivo.
+
+Tres bloques del período (decisiones de Germán, 12-sep):
+- **Lo que salió**, por unidad y nunca sumado (gramos · unidades · ml), cada uno contra el período
+  anterior; entregas, pacientes y **nuevos** (primera vez en la organización). **Los regalos cuentan
+  y se dicen aparte**: «De eso, 14 g fueron regalos, en 3 entregas». Tabla **forma × genética**
+  con el subtotal por forma delante y la variación por genética. «Promedio por dispensación» se
+  fue: con unidades mezcladas no decía nada.
+- **A quién**: una fila por paciente, **completa** (la pantalla lista 100 y dice cuántos más; PDF y
+  Excel llevan todos), ordenada por lo que retiró, con flor seca aparte y «otros» cada uno en su
+  forma y unidad («2 un preroll»), DNI en tres dígitos en pantalla y entero en el archivo.
+- **Por dónde**: mostrador de cada sede o envío a domicilio; **un envío que no llegó cuenta como
+  salida** y la fila dice cuántos.
+
+**Y en TODOS los informes: el PDF bajaba siempre «mes actual».** Los botones llamaban
+`exportarPdf` sin paréntesis —el `MouseEvent` iba como parámetros— así que en pantalla estaba el
+trimestre y el archivo traía el mes. Un solo `SelectorPeriodo` para Producción, Dispensaciones,
+Cumplimiento y Pérdidas, que emite los MISMOS parámetros para la pantalla y la descarga, y gana
+**rango a elección** («del 1 al 15», lo que pide un auditor): `periodo_rango` acepta
+`desde`/`hasta` para todos. Los anchos mínimos del PDF dejaron de partir «Entreg-as» y «Este
+períod-o» en las tablas de comparación (también en Producción).
+
 ## Septiembre 2026 (bg) — La plata del admin, el pesaje que suma al frasco de ayer, y la sala en el dispensario
 
 Tres cosas que encontró Germán probando, y una cuarta que apareció debajo de la segunda.

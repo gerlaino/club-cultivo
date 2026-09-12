@@ -652,6 +652,13 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 
 ### Lo que NO hay que romper
 
+- **LA DESCARGA DE UN INFORME PIDE EL MISMO PERÍODO QUE LA PANTALLA** (sep-2026). `@click="exportarPdf"`
+  sin paréntesis mandaba el `MouseEvent` como parámetros y el PDF bajaba siempre «mes actual».
+  El período vive en `SelectorPeriodo` (emite `{periodo}` o `{desde,hasta}`) y la vista pasa esos
+  mismos `params` a `exportarPdf(params)`; `periodo_rango` acepta el rango para todos los informes.
+- **UN INFORME CUENTA POR LÍNEA Y POR UNIDAD** (`Informes::Dispensaciones`). `dispensaciones.cantidad`
+  es la suma de las líneas en la unidad de cada una y `stock_id` es la primera línea: ninguno de
+  los dos sirve para contar. Gramos, unidades y ml van cada uno en lo suyo, nunca sumados.
 - **LA PLATA DEL ADMIN VA A LA CAJA QUE ÉL DICE, Y LA DE LA MESA A LA DE SU MOSTRADOR**
   (`Dispensacion#caja_para_cobros`, sep-2026, decisión de Germán). Quien atiende cobra en la
   suya. Administración: si algo del carrito está sobre una mesa, la caja de ese mostrador sin

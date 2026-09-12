@@ -3,16 +3,11 @@
     <div class="inf__header">
       <h1 class="inf__title"><ShieldAlert :size="20" :stroke-width="1.75" /> Informe Cumplimiento</h1>
       <div class="inf__head-actions">
-        <select v-model="periodo" class="inf__periodo" @change="cargar">
-        <option value="mes_actual">Mes actual</option>
-        <option value="mes_anterior">Mes anterior</option>
-        <option value="trimestre">Trimestre</option>
-        <option value="anio">Año</option>
-      </select>
-        <button class="inf__pdf" :disabled="!data || exporting" @click="exportarPdf">
+        <SelectorPeriodo @change="cambiarPeriodo" />
+        <button class="inf__pdf" :disabled="!data || exporting" @click="exportarPdf(params)">
           <i class="bi bi-filetype-pdf"></i> {{ exporting ? 'Generando…' : 'PDF' }}
         </button>
-        <button class="inf__pdf" :disabled="!data || exporting" @click="exportarXlsx">
+        <button class="inf__pdf" :disabled="!data || exporting" @click="exportarXlsx(params)">
           <i class="bi bi-file-earmark-spreadsheet"></i> Excel
         </button>
       </div>
@@ -70,17 +65,19 @@ import { ref, onMounted } from 'vue'
 import { ShieldAlert } from 'lucide-vue-next'
 import api from '../../lib/api.js'
 import { useInformePdf } from '../../composables/useInformePdf.js'
+import SelectorPeriodo from '../../components/informes/SelectorPeriodo.vue'
 
 const { hoja, exporting, exportarPdf, exportarXlsx } = useInformePdf('informe_cumplimiento')
 
-const periodo = ref('mes_actual')
+// Los MISMOS parámetros para la pantalla y para la descarga.
+const params  = ref({ periodo: 'mes_actual' })
 const loading = ref(false)
 const data    = ref(null)
 
 async function cargar() {
   loading.value = true
   try {
-    const res = await api.get('/informes/cumplimiento', { params: { periodo: periodo.value } })
+    const res = await api.get('/informes/cumplimiento', { params: params.value })
     data.value = res.data
   } finally {
     loading.value = false
@@ -88,6 +85,8 @@ async function cargar() {
 }
 
 const pct = (v) => v != null ? `${Math.round(v)}%` : '—'
+
+function cambiarPeriodo(p) { params.value = p; cargar() }
 
 onMounted(cargar)
 </script>

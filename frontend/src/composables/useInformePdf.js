@@ -22,6 +22,10 @@ export function useInformePdf(nombre, recurso = null) {
   const path = recurso || nombre.replace(/^informe_/, '')
 
   async function descargar(formato, params = {}) {
+    // `@click="exportarPdf"` sin paréntesis manda el MouseEvent como parámetros: no es un objeto
+    // de query. Así bajaban todos los informes con el período por defecto, aunque en pantalla
+    // estuviera otro.
+    if (typeof Event !== 'undefined' && params instanceof Event) params = {}
     exporting.value = true
     try {
       await descargarArchivo(`/informes/${path}.${formato}`, {
