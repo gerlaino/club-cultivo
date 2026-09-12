@@ -372,15 +372,16 @@ RSpec.describe 'La merma del mostrador', type: :request do
       JSON.parse(response.body)
     end
 
-    it 'separa el faltante del mostrador de los otros ajustes' do
-      d = perdidas
+    # CADA UNIDAD EN LO SUYO: los 4 g de flor y los 2 prerolls del mostrador NUNCA se suman en un
+    # «6». Y el frasco roto del depósito va como fila propia, con su nota.
+    it 'separa el faltante del mostrador de los otros ajustes, por unidad' do
+      pr = perdidas['producto']
 
-      expect(d['merma_mostrador_g']).to eq(6.0)     # 4 de flor + 2 de prerolls
-      expect(d['ajustes_negativos_g']).to eq(10.0)  # el frasco roto, que no es del mostrador
-    end
-
-    it 'y el total los suma a los dos' do
-      expect(perdidas['total_gramos']).to eq(16.0)
+      expect(pr['mostrador_por_unidad']).to contain_exactly({ 'unidad' => 'g', 'cantidad' => 4.0 }, { 'unidad' => 'un', 'cantidad' => 2.0 })
+      expect(pr['por_unidad'].to_h { |x| [x['unidad'], x['cantidad']] }).to eq('g' => 14.0, 'un' => 2.0)
+      roto = pr['lista'].find { |f| f['que_paso'] == 'Ajuste de inventario' }
+      expect(roto['detalle']).to eq('se rompió un frasco')
+      expect(roto['cantidad']).to eq(10.0)
     end
 
     # `end_of_month` es una Date, y comparada contra un timestamp corta a la medianoche: el
@@ -390,7 +391,7 @@ RSpec.describe 'La merma del mostrador', type: :request do
     it 'incluye lo que pasó hoy, aunque hoy sea el último día del mes' do
       viajar_al_ultimo_dia = Time.zone.today.end_of_month.to_time.change(hour: 18)
       travel_to(viajar_al_ultimo_dia) do
-        expect(perdidas['total_gramos']).to be > 0
+        expect(perdidas['producto']['por_unidad'].sum { |x| x['cantidad'] }).to be > 0
       end
     end
 

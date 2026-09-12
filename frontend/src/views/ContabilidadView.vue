@@ -119,8 +119,11 @@ const FORMAS = [
   { valor: 'devuelto',    label: 'Devolvió la plata',      hint: 'Vuelve al cajón. No genera gasto.' },
   { valor: 'comprobante', label: 'Trajo comprobante',      hint: 'Se convierte en un gasto real, con su categoría.' },
   { valor: 'sueldo',      label: 'Se descuenta del sueldo', hint: 'Genera un egreso de sueldo.' },
+  // La recaudación que se llevó para guardarla con el resto del fondo del club: no es deuda de
+  // nadie ni gasto, sólo plata de la organización en otro lado.
+  { valor: 'organizacion', label: 'Quedó guardada en la organización', hint: 'Caja fuerte, banco: sigue siendo del club y deja de estar a su nombre.' },
 ]
-const FORMA_LABEL = { devuelto: 'devolvió', comprobante: 'rindió comprobante', sueldo: 'a cuenta de sueldo' }
+const FORMA_LABEL = { devuelto: 'devolvió', comprobante: 'rindió comprobante', sueldo: 'a cuenta de sueldo', organizacion: 'guardada en la organización' }
 // Las que tienen sentido para algo que se compró con la plata del cajón.
 const CATEGORIAS_GASTO = {
   insumo: 'Insumo', mantenimiento: 'Mantenimiento', admin: 'Gasto administrativo',

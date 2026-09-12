@@ -67,6 +67,10 @@ module Stocks
           id:       lote.id,
           codigo:   lote.codigo,
           estado:   lote.estado,
+          sede:     lote.sede&.nombre,
+          sala:     lote.sala&.nombre,
+          start_date: lote.start_date,
+          dias_en_estado: lote.dias_en_estado,
           genetica: lote.genetica && genetica_payload(lote.genetica),
         },
         aplicaciones:         Lotes::ResumenAplicaciones.new(lote).call,
@@ -135,14 +139,14 @@ module Stocks
         pesadas_plantas.group_by(&:plant_id).map do |plant_id, filas|
           planta = filas.first.plant
           pesos  = filas.filter_map { |pp| (pp.peso_seco_g || pp.peso_humedo_g)&.to_f }
-          { id: plant_id, codigo_qr: planta&.codigo_qr, origen: planta&.origen,
+          { id: plant_id, nombre: planta&.nombre, codigo_qr: planta&.codigo_qr, origen: planta&.origen,
             peso_g:   pesos.any? ? pesos.sum.round(2) : nil,
             promedio: filas.any?(&:es_promedio) }
         end
       elsif @stock.lote
         # Sin descartadas: una planta que no produjo no es origen de nada. Van aparte.
         @stock.lote.plants.where.not(state: 'descartada')
-              .map { |p| { id: p.id, codigo_qr: p.codigo_qr, origen: p.origen, peso_g: nil } }
+              .map { |p| { id: p.id, nombre: p.nombre, codigo_qr: p.codigo_qr, origen: p.origen, peso_g: nil } }
       else
         []
       end
@@ -152,7 +156,7 @@ module Stocks
       return [] unless @stock.lote
 
       @stock.lote.plants.where(state: 'descartada').map do |p|
-        { id: p.id, codigo_qr: p.codigo_qr, motivo_descarte: p.motivo_descarte }
+        { id: p.id, nombre: p.nombre, codigo_qr: p.codigo_qr, motivo_descarte: p.motivo_descarte }
       end
     end
 
@@ -179,42 +183,10 @@ module Stocks
     # anterior, las plantas descartadas cuando se descartaron, los pesajes que alimentaron ESTE
     # frasco. La pantalla ya la dibujaba leyendo `lote_eventos`, que el backend nunca mandó: la
     # línea de tiempo mostró sólo la pesada durante meses.
+    # La cronología es del LOTE y la comparte la trazabilidad del lote (`Lotes::Trazabilidad`).
     def cronologia(lote)
-      return [] unless lote
-
-      items = []
-      cambios = lote.lote_eventos.where(tipo: 'cambio_estado').order(:registrado_en).to_a
-      cambios.each_with_index do |ev, i|
-        anterior = cambios[i - 1] if i.positive?
-        dias = anterior && (ev.registrado_en.to_date - anterior.registrado_en.to_date).to_i
-        items << {
-          fecha:   ev.registrado_en,
-          tipo:    'estado',
-          estado:  ev.estado_nuevo,
-          titulo:  ev.estado_nuevo,
-          detalle: [ev.sala_destino&.nombre,
-                    dias && anterior && "#{dias} días en #{anterior.estado_nuevo}"].compact.join(' · ').presence,
-        }
-      end
-
-      PlantActivity.where(plant_id: lote.plants.select(:id), activity_type: 'state_change')
-                   .where("description ILIKE 'Descartada%'").includes(:plant).order(:occurred_at).each do |a|
-        items << { fecha: a.occurred_at, tipo: 'descarte', titulo: 'Descartada 1 planta',
-                   detalle: [a.plant&.codigo_qr, a.plant&.motivo_descarte].compact.join(' · ').presence }
-      end
-
-      frasco_de_origen.pesajes_manicura.confirmados.order(:fecha_pesaje).each do |pj|
-        items << { fecha: pj.confirmado_at || pj.fecha_pesaje, tipo: 'pesaje',
-                   titulo: "Pesaje de manicura · #{pj.peso_confirmado_g.to_f.round(1)} g",
-                   detalle: pj.plantas_count && "#{pj.plantas_count} plantas" }
-      end
-      if pesada
-        items << { fecha: pesada.registrado_at, tipo: 'pesaje',
-                   titulo: "Pesada · #{pesada.peso_total_g.to_f.round(1)} g",
-                   detalle: plantas.any? ? "#{plantas.size} plantas" : nil }
-      end
-
-      items.sort_by { |i| i[:fecha] || Time.zone.at(0) }
+      Lotes::Cronologia.new(lote, pesajes: frasco_de_origen.pesajes_manicura.confirmados,
+                                  pesada: pesada, plantas_count: plantas.size).call
     end
 
     # ── A quién fue ──────────────────────────────────────────────────────────
@@ -276,18 +248,42 @@ module Stocks
     # la fila destino y un derivado el frasco que se elaboró. Los `dispensacion` no van: las
     # entregas ya se cuentan por línea. Un ajuste positivo es una ENTRADA y se lista como tal.
     def salidas_del_frasco
-      @salidas ||= @stock.stock_movimientos.where(tipo: TIPOS_SALIDA)
-                         .includes(:stock_resultante, :sede_destino).order(:fecha, :created_at).map do |m|
-        dest = m.stock_resultante
-        {
-          id:      m.id,
-          tipo:    m.tipo,
-          gramos:  m.gramos.to_f.round(2),
-          fecha:   m.fecha || m.created_at&.to_date,
-          detalle: m.notas.to_s.sub(/\A\[PRODUCCIÓN\]\s*/, '').presence,
-          destino: dest && { id: dest.id, numero: dest.numero_lote_producto, forma: dest.forma_producto,
-                             sede: (m.sede_destino || dest.sede)&.nombre },
-        }
+      @salidas ||= begin
+        movs = @stock.stock_movimientos.where(tipo: TIPOS_SALIDA)
+                     .includes(:stock_resultante, :sede_destino).order(:fecha, :created_at).to_a
+        sueltos, de_cierre = movs.partition { |m| m.tipo != 'ajuste' || m.turno_mostrador_id.nil? }
+        sueltos.map { |m| salida(m) } + ajustes_neteados(de_cierre)
+      end
+    end
+
+    def salida(m)
+      dest = m.stock_resultante
+      {
+        id:      m.id,
+        tipo:    m.tipo,
+        gramos:  m.gramos.to_f.round(2),
+        fecha:   m.fecha || m.created_at&.to_date,
+        detalle: m.notas.to_s.sub(/\A\[PRODUCCIÓN\]\s*/, '').presence,
+        destino: dest && { id: dest.id, numero: dest.numero_lote_producto, forma: dest.forma_producto,
+                           sede: (m.sede_destino || dest.sede)&.nombre },
+      }
+    end
+
+    # LOS AJUSTES DE CONTEO SE NETEAN POR CIERRE (Germán, sep-2026). Contar 21 donde había 215 y
+    # corregirlo después deja dos movimientos —−194 y +194— para un producto que no se movió:
+    # listarlos es contar un error de tipeo como salida y luego como entrada. Se suman por cierre
+    # y por frasco; si el neto es cero no aparecen (quedan en el historial del mostrador, que es
+    # donde importa quién contó qué). Si queda diferencia, una sola línea con el cierre.
+    def ajustes_neteados(movs)
+      movs.group_by(&:turno_mostrador_id).filter_map do |turno_id, ms|
+        neto = ms.sum { |m| m.gramos.to_d }.round(2)
+        next if neto.zero?
+
+        ultimo = ms.max_by { |m| [m.fecha || m.created_at.to_date, m.created_at] }
+        { id: "cierre-#{turno_id}", tipo: 'ajuste', gramos: neto.to_f,
+          fecha: ultimo.fecha || ultimo.created_at&.to_date,
+          detalle: "diferencia de conteo del cierre del #{(ms.first.fecha || ms.first.created_at.to_date).strftime('%d/%m')}",
+          destino: nil }
       end
     end
 

@@ -255,14 +255,15 @@
         <p class="mst__modal-sub">
           {{ plata.tipo === 'ingreso'
              ? 'Cambio, reponer el fondo, o lo que se cobró por fuera. No cuenta como ingreso del club: esa plata ya era suya.'
-             : 'Un gasto pagado con la caja baja el resultado; un retiro no, pero queda a nombre de alguien.' }}
+             : 'Un gasto pagado con la caja baja el resultado. Un retiro no: o queda a nombre de alguien, o va a guardarse con el resto de la plata de la organización.' }}
         </p>
         <input v-model.number="plata.monto" type="number" min="0" step="100" class="mst__input"
                placeholder="Monto" aria-label="Monto" />
         <input v-model="plata.motivo" type="text" class="mst__input"
                :placeholder="plata.tipo === 'ingreso' ? 'De dónde sale' : 'Para qué se saca'" />
         <select v-if="plata.tipo === 'salida'" v-model="plata.clase" class="mst__select">
-          <option value="retiro">Retiro — sigue siendo del club</option>
+          <option value="guardado">Va a guardarse en la organización — no queda a nombre de nadie</option>
+          <option value="retiro">Retiro a mi nombre — lo rindo después</option>
           <option value="gasto">Gasto — el club gastó esa plata</option>
         </select>
         <div class="mst__modal-acc">
@@ -396,7 +397,7 @@ async function onConfirmarConteoDeUno (payload) {
   if (await confirmarConteoDeUno(payload)) itemAContar.value = null
 }
 
-function abrirPlata (tipo) { plata.value = { tipo, monto: null, motivo: '', clase: 'retiro' } }
+function abrirPlata (tipo) { plata.value = { tipo, monto: null, motivo: '', clase: 'guardado' } }
 
 async function confirmarPlata () {
   if (await moverPlata(plata.value)) plata.value = null

@@ -86,6 +86,8 @@ module Finanzas
       cat('Alquiler',       'egreso', admin, clave: 'alquiler')
       cat('Mantenimiento',  'egreso', admin, clave: 'mantenimiento')
       cat('Seguro',         'egreso', admin, clave: 'seguro')
+      # Impuestos y tasas: no había forma de cargar uno (sep-2026, lo pidió Germán probando).
+      cat('Impuestos y tasas', 'egreso', admin, clave: 'impuesto')
       cat('Administrativo', 'egreso', admin, clave: 'admin')
 
       # Insumos generales: van al depósito General de la sede.

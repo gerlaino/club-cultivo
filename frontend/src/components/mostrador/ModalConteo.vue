@@ -111,11 +111,23 @@
           </span>
         </label>
         <p v-if="aRetirar > 0" class="cnt__retiro">
-          Se retiran <b>${{ fmt(aRetirar) }}</b>{{ puedeRetirar ? ' — quedan a tu nombre.' : '.' }}
+          Se retiran <b>${{ fmt(aRetirar) }}</b>{{ puedeRetirar ? '' : '.' }}
           <span v-if="!puedeRetirar" class="cnt__nota">
             El retiro queda a nombre de administración: si no hay nadie, dejá todo como fondo.
           </span>
         </p>
+        <!-- A DÓNDE VA lo que se retira. Llevarse la recaudación para guardarla con el resto de la
+             plata del club no es un retiro personal: antes quedaba como deuda del admin. -->
+        <div v-if="aRetirar > 0 && puedeRetirar" class="cnt__destino">
+          <label class="cnt__destino-op" :class="{ 'cnt__destino-op--on': destinoRetiro === 'organizacion' }">
+            <input type="radio" value="organizacion" v-model="destinoRetiro" />
+            <span>Van a guardarse en la organización <small>caja fuerte, banco: no quedan a nombre de nadie</small></span>
+          </label>
+          <label class="cnt__destino-op" :class="{ 'cnt__destino-op--on': destinoRetiro === 'persona' }">
+            <input type="radio" value="persona" v-model="destinoRetiro" />
+            <span>Quedan a mi nombre <small>los rindo después en Contabilidad → Retiros</small></span>
+          </label>
+        </div>
       </template>
 
       <div class="cnt__acc">
@@ -187,6 +199,7 @@ const conteos = ref(props.mesa.map(m => ({
 // un número que el sistema ya sabe.
 const efectivo = ref(props.esCierre ? redondeo(props.esperadoEfectivo) : null)
 const fondo    = ref(props.esCierre && !props.puedeRetirar ? redondeo(props.esperadoEfectivo) : null)
+const destinoRetiro = ref('organizacion')
 const notas    = ref('')
 
 const fmt = (n) => Number(n ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })
@@ -230,6 +243,7 @@ function confirmar () {
       .map(c => ({ stock_id: c.stock_id, contado: escrito(c.contado) ? Number(c.contado) : c.esperado })),
     efectivo_contado_ars: escrito(efectivo.value) ? Number(efectivo.value) : null,
     fondo_siguiente_ars:  props.esCierre && escrito(fondo.value) ? Number(fondo.value) : null,
+    destino_retiro:       props.esCierre && props.puedeRetirar ? destinoRetiro.value : undefined,
     notas: notas.value || undefined,
   })
 }
@@ -310,6 +324,13 @@ function confirmar () {
 .cnt__cuadra { margin: 0; font-size: var(--fs-13); font-weight: 600; color: var(--c-leaf-600); }
 .cnt__nota   { margin: 0; font-size: var(--fs-12); color: var(--c-ink-500); }
 .cnt__retiro { margin: 0; font-size: var(--fs-13); color: var(--c-ink-700); }
+.cnt__destino { display: flex; flex-direction: column; gap: .4rem; }
+.cnt__destino-op {
+  display: flex; align-items: flex-start; gap: .5rem; padding: .5rem .7rem; border: 1.5px solid var(--c-ink-200);
+  border-radius: var(--r-md); font-size: var(--fs-13); color: var(--c-ink-900); cursor: pointer;
+}
+.cnt__destino-op--on { border-color: var(--c-leaf-600); background: var(--c-leaf-50, #f0fdf4); }
+.cnt__destino-op small { display: block; color: var(--c-ink-500); font-size: var(--fs-12); }
 
 .cnt__acc { display: flex; gap: 10px; justify-content: flex-end; }
 .cnt__btn {

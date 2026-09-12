@@ -129,6 +129,7 @@ Rails.application.routes.draw do
     resources :lotes, only: [:index, :show, :update, :destroy, :create] do
       # Separar parte de un lote a uno nuevo (típico: al prender, la mitad a 3L y la mitad a 5L).
       member { post :desprender }
+      member { get :trazabilidad }
       collection do
         get :export_csv
         get :proximo_codigo

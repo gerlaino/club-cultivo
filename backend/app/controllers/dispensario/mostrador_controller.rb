@@ -104,6 +104,7 @@ module Dispensario
         # El retiro de la recaudación queda a nombre de quien responde por ella. Si cierra quien
         # atiende y no hay a quién atribuirlo, se deja todo como fondo.
         retirado_por: (current_user if MovimientoContable::ROLES_RETIRO.include?(current_user.role)),
+        destino_retiro: params[:destino_retiro],
         notas: params[:notas]
       )
       return render json: { error: res.error }, status: :unprocessable_entity unless res.ok?
@@ -277,12 +278,19 @@ module Dispensario
 
     # GET /sedes/:sede_id/mostrador/turnos/:id — un turno cerrado, para poder corregir su conteo
     def turno
-      return render json: { error: 'No autorizado' }, status: :forbidden unless gestiona?
-
       t = @mostrador.turno_mostradores.find_by(id: params[:id])
       return render json: { error: 'Turno no encontrado' }, status: :not_found if t.nil?
+      return render json: { error: 'No autorizado' }, status: :forbidden unless puede_corregir?(t)
 
       render json: serialize_turno(t)
+    end
+
+    # Corrige administración, y también QUIEN CERRÓ ese cierre: si el que atiende tipeó 21 en vez
+    # de 215 y el admin no está, esperarlo dejaba el error en el inventario hasta el día siguiente
+    # (Germán, sep-2026). El backend ya limita la corrección al ÚLTIMO cierre
+    # (`bloqueo_correccion`), así que no puede tocar más que el suyo de hoy.
+    def puede_corregir?(turno)
+      gestiona? || turno.cerrado_por_id == current_user.id
     end
 
     # POST /sedes/:sede_id/mostrador/turnos/:id/corregir
@@ -292,13 +300,13 @@ module Dispensario
     # un dedazo destruye datos —21 en vez de 215 ajusta el inventario real—, y hasta acá no tenía
     # vuelta atrás. No borra nada: asienta la diferencia entre lo contado y lo corregido.
     def corregir
-      return render json: { error: 'No autorizado' }, status: :forbidden unless gestiona?
-
       turno = @mostrador.turno_mostradores.find_by(id: params[:id])
       return render json: { error: 'Turno no encontrado' }, status: :not_found if turno.nil?
+      return render json: { error: 'No autorizado' }, status: :forbidden unless puede_corregir?(turno)
 
       res = Mostradores::CorregirCierre.call(turno: turno, usuario: current_user,
                                              conteos: params[:conteos] || [], motivo: params[:motivo],
+                                             causa: params[:causa],
                                              efectivo_contado_ars: params[:efectivo_contado_ars])
       return render json: { error: res.error }, status: :unprocessable_entity unless res.ok?
 
@@ -741,7 +749,10 @@ module Dispensario
         # lo aplica— y viaja en la lista para que el panel del día no ofrezca «Corregir» en un
         # cierre que ya tiene otra caja abierta después: se volvió a contar, y la diferencia se
         # arregla en el último. Nil = se puede.
-        bloqueo_correccion: gestiona? ? turno.bloqueo_correccion : nil,
+        bloqueo_correccion: puede_corregir?(turno) ? turno.bloqueo_correccion : nil,
+        # Quien cerró también corrige el suyo: la pantalla ofrece el botón con la misma regla que
+        # el backend aplica.
+        puedo_corregir: puede_corregir?(turno),
       }
     end
 

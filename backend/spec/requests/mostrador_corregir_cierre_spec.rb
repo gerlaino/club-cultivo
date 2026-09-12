@@ -41,10 +41,10 @@ RSpec.describe 'Corregir el conteo de una caja ya cerrada', type: :request do
 
   def item = turno.items.find_by(stock_id: stock.id)
 
-  def corregir!(contado:, motivo: 'me comí un dígito', como: admin)
+  def corregir!(contado:, motivo: 'me comí un dígito', como: admin, causa: nil)
     sign_in_as(como)
     post "/api/sedes/#{sede.id}/mostrador/turnos/#{turno.id}/corregir", headers: auth_headers,
-         params: { conteos: [{ item_id: item.id, contado: contado }], motivo: motivo }
+         params: { conteos: [{ item_id: item.id, contado: contado }], motivo: motivo, causa: causa }
     JSON.parse(response.body)
   end
 
@@ -93,12 +93,19 @@ RSpec.describe 'Corregir el conteo de una caja ya cerrada', type: :request do
       .not_to change { stock.stock_movimientos.where(tipo: 'ajuste').count }
   end
 
-  # Toca inventario de un turno cerrado: no es del mostrador.
-  it 'el dispensador no corrige un cierre' do
-    corregir!(contado: 415, como: ana)
-
+  # QUIEN CERRÓ corrige su propio último cierre (Germán, sep-2026): si tipeó 21 en vez de 215 y
+  # el admin no está, esperarlo dejaba el error en el inventario hasta el día siguiente. Otro
+  # dispensador, no: ese cierre no es suyo.
+  it 'quien cerró corrige su cierre; otro dispensador no' do
+    otro = create(:user, :dispensador, club: club)
+    corregir!(contado: 415, como: otro)
     expect(response).to have_http_status(:forbidden)
     expect(stock.reload.cantidad.to_f).to eq(21.0)
+
+    corregir!(contado: 415, como: ana, causa: 'error_conteo')
+    expect(response).to have_http_status(:ok), response.body
+    expect(stock.reload.cantidad.to_f).to eq(415.0)
+    expect(stock.stock_movimientos.where(tipo: 'ajuste').last.notas).to start_with('[ERROR DE CONTEO]')
   end
 
   # EL SOBRANTE QUE NO SE APLICÓ NO SE PUEDE DESCONTAR DOS VECES.

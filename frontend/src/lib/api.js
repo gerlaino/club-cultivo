@@ -878,6 +878,7 @@ export const deleteStock          = (id)                  => api.delete(`/stocks
 export const getStockMovimientos  = (id)                  => api.get(`/stocks/${id}/movimientos`)
 export const getSedeStocks        = (sedeId, params = {}) => api.get(`/sedes/${sedeId}/stocks`, { params })
 export const getStockTrazabilidad = (id)                  => api.get(`/stocks/${id}/trazabilidad`)
+export const getLoteTrazabilidad  = (id)                  => api.get(`/lotes/${id}/trazabilidad`)
 
 // ── ARICCAME ──────────────────────────────────────────────────────────────────
 export const listAriccameRegistros = (params = {}) => api.get('/ariccame_registros', { params })

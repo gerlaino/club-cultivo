@@ -113,8 +113,24 @@
                     {{ parseFloat(planta.peso_humedo) > 0 ? parseFloat(planta.peso_humedo).toFixed(1) : '—' }}
                   </span>
                 </td>
-                <td class="mnl__td mnl__td--peso">
-                  <span :class="parseFloat(planta.peso_seco) > 0 ? 'mnl__peso--ok' : 'mnl__peso--none'">
+                <!-- EL PESO SE ESCRIBE EN LA CELDA, como en la mesa del mostrador: con una tablet en la
+                     mesa de manicura, ir y volver a la vista de cada planta era un viaje por
+                     planta. Tocar el nombre sigue abriendo la vista del QR. -->
+                <td class="mnl__td mnl__td--peso" @click.stop>
+                  <template v-if="puedeRegistrar && !(parseFloat(planta.peso_seco) > 0)">
+                    <input
+                      type="number" inputmode="decimal" min="0.1" step="0.1"
+                      class="mnl__peso-input"
+                      :class="{ 'mnl__peso-input--guardando': guardandoPeso === planta.id }"
+                      :disabled="guardandoPeso === planta.id"
+                      placeholder="g"
+                      :value="pesoEscrito[planta.id] ?? ''"
+                      @input="pesoEscrito[planta.id] = $event.target.value"
+                      @keydown.enter.prevent="guardarPesoEnCelda(planta, $event)"
+                      @blur="guardarPesoEnCelda(planta)"
+                    />
+                  </template>
+                  <span v-else :class="parseFloat(planta.peso_seco) > 0 ? 'mnl__peso--ok' : 'mnl__peso--none'">
                     {{ parseFloat(planta.peso_seco) > 0 ? parseFloat(planta.peso_seco).toFixed(1) : '—' }}
                     <span v-if="planta.peso_es_promedio" class="mnl__prom">(prom)</span>
                   </span>
@@ -345,7 +361,7 @@ import { ChevronLeft, Scissors, Leaf, Scale, Send, X, RefreshCw, RotateCw, Packa
 import {
   getLote, listPlants, registrarDirectoManicura, listStocks, listSedes,
   listPesajesManicura, enviarPesajeManicura, deletePesajeManicura, reabrirPesajeManicura,
-  devolverManicura, reevaluarManicura,
+  devolverManicura, reevaluarManicura, registrarPesoPlanta,
 } from '../../lib/api.js'
 import { registrarPesajeManicuraOffline } from '../../lib/offlineApi.js'
 import { useToast } from '../../composables/useToast.js'
@@ -597,6 +613,41 @@ async function cargar() {
 
 function irAPlanta(p) { router.push(`/p/${p.codigo_qr}`) }
 
+// ── Peso escrito en la celda ────────────────────────────────────────────────
+// Misma jornada y mismo endpoint que la vista del QR (`registrarPesoPlanta` + `registrarConJornada`):
+// la regla de "¿sigo la jornada abierta o abro otra?" vive en un solo lugar.
+const pesoEscrito   = ref({})
+const guardandoPeso = ref(null)
+
+async function guardarPesoEnCelda(planta, ev) {
+  const v = parseFloat(pesoEscrito.value[planta.id])
+  if (!v || v <= 0 || guardandoPeso.value === planta.id) return
+  guardandoPeso.value = planta.id
+  try {
+    const res = await registrarConJornada(id, (extra) => registrarPesoPlanta(planta.id, { peso_seco_g: v, ...extra }))
+    if (!res) return // la manicura canceló la pregunta de la jornada
+    // La fila cambia sola: el número queda escrito y el foco pasa a la siguiente sin pesar.
+    planta.peso_seco = v
+    planta.tiene_pesada = true
+    delete pesoEscrito.value[planta.id]
+    toast.success(`${planta.nombre || 'Planta'}: ${v} g`)
+    if (ev) siguienteSinPesar(ev.target)
+    listPesajesManicura(id).then(r => { pesajes.value = r.data || [] }).catch(() => {})
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo registrar el peso')
+  } finally {
+    guardandoPeso.value = null
+  }
+}
+
+// Enter guarda y salta a la próxima celda vacía: con la balanza al lado, es una planta por Enter.
+function siguienteSinPesar(desde) {
+  const inputs = [...document.querySelectorAll('.mnl__peso-input')]
+  const i = inputs.indexOf(desde)
+  const prox = inputs.slice(i + 1).find(el => !el.disabled)
+  prox?.focus()
+}
+
 async function abrirModal() {
   modalError.value = ''
   if (esAdmin.value) {
@@ -821,6 +872,13 @@ onActivated(cargar)
 .mnl__td--nombre { font-weight: 600; color: var(--c-slate-900); }
 .mnl__td--qr     { font-size: .72rem; color: var(--c-slate-400); }
 .mnl__td--peso   { text-align: right; font-weight: 700; font-size: .85rem; }
+.mnl__peso-input {
+  width: 5.5rem; text-align: right; font: inherit; font-weight: 700; font-size: .9rem;
+  padding: .35rem .5rem; border: 1.5px solid var(--c-slate-200); border-radius: 8px; background: #fff;
+  color: var(--c-slate-900);
+}
+.mnl__peso-input:focus { outline: none; border-color: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,.15); }
+.mnl__peso-input--guardando { opacity: .5; }
 .mnl__td--estado { text-align: center; }
 
 .mnl__peso--ok     { color: #16a34a; }

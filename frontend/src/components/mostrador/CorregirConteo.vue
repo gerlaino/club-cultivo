@@ -74,6 +74,18 @@
              stock real y asienta plata: enterarse después de guardar es enterarse tarde. -->
         <p class="cc__efecto" v-html="efecto"></p>
 
+        <!-- QUÉ PASÓ, que son dos cosas distintas: si fue un error al contar o tipear NO hubo
+             diferencia real, y el par de ajustes no cuenta en la trazabilidad ni en Pérdidas. -->
+        <div class="cc__causa">
+          <label class="cc__causa-op" :class="{ 'cc__causa-op--on': causa === 'error_conteo' }">
+            <input type="radio" value="error_conteo" v-model="causa" />
+            <span>Me equivoqué al contar o al tipear <small>no faltaba nada: la diferencia no fue real</small></span>
+          </label>
+          <label class="cc__causa-op" :class="{ 'cc__causa-op--on': causa === 'faltaba' }">
+            <input type="radio" value="faltaba" v-model="causa" />
+            <span>Sí faltaba o sobraba, anoté mal la cantidad <small>cuenta la diferencia corregida</small></span>
+          </label>
+        </div>
         <label class="cc__campo">
           <span class="cc__campo-lbl">Por qué se corrige</span>
           <input v-model="motivo" type="text" class="cc__input"
@@ -137,6 +149,7 @@ const items     = ref([])
 const caja      = ref(null)
 const efectivo  = ref(null)
 const motivo    = ref('')
+const causa     = ref('error_conteo')
 const cargando  = ref(true)
 const guardando = ref(false)
 const marcando  = ref(false)
@@ -283,7 +296,7 @@ async function confirmar () {
   guardando.value = true
   try {
     await corregirTurnoMostrador(props.sedeId, props.turno.id, {
-      conteos: cambiados, motivo: motivo.value,
+      conteos: cambiados, motivo: motivo.value, causa: causa.value,
       ...(cambioPlata.value ? { efectivo_contado_ars: efectivo.value } : {}),
     })
     toast.success('Conteo corregido')
@@ -367,6 +380,13 @@ async function confirmar () {
 .cc__input--cant { width: 96px; text-align: right; }
 
 .cc__campo { display: flex; flex-direction: column; gap: 5px; }
+.cc__causa { display: flex; flex-direction: column; gap: .4rem; }
+.cc__causa-op {
+  display: flex; align-items: flex-start; gap: .5rem; padding: .5rem .7rem; border: 1.5px solid var(--c-ink-200);
+  border-radius: var(--r-md); font-size: var(--fs-13); color: var(--c-ink-900); cursor: pointer;
+}
+.cc__causa-op--on { border-color: var(--c-leaf-600); background: var(--c-leaf-50, #f0fdf4); }
+.cc__causa-op small { display: block; color: var(--c-ink-500); font-size: var(--fs-12); }
 .cc__campo-lbl { font-size: var(--fs-13); font-weight: 600; color: var(--c-amber-500); }
 
 .cc__bloqueo {

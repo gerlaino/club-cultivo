@@ -2,7 +2,7 @@ class LotesController < ApplicationController
   before_action :authenticate_user!
   before_action -> { require_feature!(:cultivo) }
   before_action :require_admin_cultivador_o_manicura
-  before_action :set_lote, only: [:show, :update, :completar_datos, :destroy, :transiciones, :avanzar_fase, :cosechar_plantas, :timeline, :historial, :asignar_manicurador, :devolver_manicura, :reevaluar_manicura, :registrar_trasplante, :desprender]
+  before_action :set_lote, only: [:show, :trazabilidad, :update, :completar_datos, :destroy, :transiciones, :avanzar_fase, :cosechar_plantas, :timeline, :historial, :asignar_manicurador, :devolver_manicura, :reevaluar_manicura, :registrar_trasplante, :desprender]
   before_action :require_export_role!, only: [:export_csv]
   before_action :set_sala, only: [:index, :create], if: -> { params[:sala_id].present? }
 
@@ -63,6 +63,12 @@ class LotesController < ApplicationController
   # GET /lotes/:id
   def show
     render json: LoteSerializer.serialize(@lote, include_plants: true, include_cycle_data: true)
+  end
+
+  # GET /lotes/:id/trazabilidad — la cadena del lote, cortada hasta donde llegó, y los frascos
+  # que salieron de él. La de un frasco vive en `stocks#trazabilidad`.
+  def trazabilidad
+    render json: Lotes::Trazabilidad.new(lote: @lote).call
   end
 
   # GET /lotes/por_qr/:codigo_qr

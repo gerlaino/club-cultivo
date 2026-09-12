@@ -652,6 +652,16 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 
 ### Lo que NO hay que romper
 
+- **LOS AJUSTES DE CONTEO SE NETEAN POR CIERRE** (sep-2026, Germán: «si me equivoqué al tipear no
+  hubo esa diferencia real»). Trazabilidad y Pérdidas suman los `ajuste` con el mismo
+  `turno_mostrador_id` y frasco; neto cero no aparece. `CorregirCierre` pide `causa`
+  (`error_conteo` / `faltaba`) y **quien cerró corrige su propio último cierre** — esperar al
+  admin dejaba el error en el inventario hasta el día siguiente.
+- **UN RETIRO PUEDE NACER «GUARDADO EN LA ORGANIZACIÓN»**: `retiro_caja` con
+  `saldado_como: 'organizacion'` (`MovimientoContable.atributos_guardado_en_organizacion`). Sale del
+  cajón, no es deuda de nadie, no es gasto. Sin «cuenta del club» a propósito.
+- **NO EXISTE «STOCK VENCIDO»** (Germán, sep-2026): Pérdidas no lo muestra. `fecha_vencimiento_est`
+  sigue en la tabla pero no es una pérdida ni algo por perderse.
 - **LA DESCARGA DE UN INFORME PIDE EL MISMO PERÍODO QUE LA PANTALLA** (sep-2026). `@click="exportarPdf"`
   sin paréntesis mandaba el `MouseEvent` como parámetros y el PDF bajaba siempre «mes actual».
   El período vive en `SelectorPeriodo` (emite `{periodo}` o `{desde,hasta}`) y la vista pasa esos

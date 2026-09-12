@@ -83,10 +83,12 @@
             <!-- SÓLO EL ÚLTIMO SE CORRIGE. Si después se abrió otra caja, se volvió a contar y la
                  diferencia se arregla ahí. Lo decide el backend (`bloqueo_correccion`); acá se
                  DICE, no se esconde el botón sin explicar. -->
-            <p v-if="gestiona && t.bloqueo_correccion" class="trn__bloqueo">{{ t.bloqueo_correccion.texto }}</p>
+            <p v-if="t.puedo_corregir && t.bloqueo_correccion" class="trn__bloqueo">{{ t.bloqueo_correccion.texto }}</p>
 
-            <div v-if="gestiona" class="trn__acc">
-              <button v-if="!t.revisado" class="trn__btn trn__btn--ghost" type="button"
+            <!-- Quien cerró corrige el suyo (`puedo_corregir`, lo decide el backend): un dedazo no
+                 tiene que esperar al admin. «Ya lo miré» sigue siendo de administración. -->
+            <div v-if="gestiona || t.puedo_corregir" class="trn__acc">
+              <button v-if="gestiona && !t.revisado" class="trn__btn trn__btn--ghost" type="button"
                       :disabled="marcando === t.id" @click="marcarVisto(t)">
                 {{ marcando === t.id ? 'Guardando…' : 'Ya lo miré' }}
               </button>

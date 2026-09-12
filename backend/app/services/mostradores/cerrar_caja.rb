@@ -25,9 +25,12 @@ module Mostradores
 
     # `conteos`: [{ stock_id:, contado: }] — uno por producto que haya sobre la mesa.
     def initialize(turno:, usuario:, conteos: [], efectivo_contado_ars: nil,
-                   fondo_siguiente_ars: nil, retirado_por: nil, notas: nil)
+                   fondo_siguiente_ars: nil, retirado_por: nil, notas: nil, destino_retiro: nil)
       @turno    = turno
       @usuario  = usuario
+      # 'persona' (a nombre de quien retira, lo de siempre) u 'organizacion' (va a la caja fuerte
+      # o al banco: sale del cajón y no es deuda de nadie).
+      @destino_retiro = destino_retiro.to_s.presence || 'persona'
       @conteos  = Array(conteos).select { |c| c.respond_to?(:[]) && !c.is_a?(String) }
       @efectivo = efectivo_contado_ars
       @fondo    = fondo_siguiente_ars
@@ -168,14 +171,15 @@ module Mostradores
               'Si no hay ninguno, dejá todo como fondo y que lo retiren después.'
       end
 
-      caja.movimientos_contables.create!(
+      guardado = @destino_retiro == 'organizacion'
+      caja.movimientos_contables.create!({
         club: @turno.club, sede_id: caja.sede_id, created_by: @usuario,
         tipo: 'ajuste', categoria: 'retiro_caja', retirado_por: dueño,
-        descripcion: "Retiro de caja — recaudación de la jornada del " \
+        descripcion: "#{guardado ? 'Guardado en la organización' : 'Retiro de caja'} — recaudación de la jornada del " \
                      "#{caja.abierta_at&.to_date&.strftime('%d/%m/%Y')} (queda $#{fondo.to_i} de fondo)",
         monto_ars: retiro, fecha: Time.zone.today,
         pagado: true, medio_pago: 'efectivo', comprobante_tipo: 'sin_comprobante'
-      )
+      }.merge(guardado ? MovimientoContable.atributos_guardado_en_organizacion(@usuario) : {}))
     end
   end
 end

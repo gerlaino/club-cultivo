@@ -137,3 +137,64 @@ RSpec.describe 'Retiro de caja vs. gasto pagado con la caja', type: :request do
     expect(response).to have_http_status(:forbidden)
   end
 end
+
+# PLATA DEL CLUB QUE VA A GUARDARSE CON EL RESTO DE LA PLATA DEL CLUB (Germán, sep-2026). Sacar la
+# recaudación del mostrador para llevarla a la caja fuerte no es un retiro personal, y quedaba
+# como deuda del admin («Admin Demo debe $217.097»). Sin «cuenta del club»: es el mismo
+# `retiro_caja`, que nace saldado con `organizacion`.
+RSpec.describe 'Guardado en la organización', type: :request do
+  include AuthHelpers
+
+  let(:club)  { create(:club) }
+  let(:admin) { create(:user, :admin, club: club) }
+  let(:sede)  { create(:sede, club: club, tipo: 'mixta') }
+  let(:turno) do
+    ActsAsTenant.with_tenant(club) do
+      Mostradores::AbrirCaja.call(mostrador: sede.mostrador!, usuario: admin, efectivo_contado_ars: 200_000).turno
+    end
+  end
+  def movs = ActsAsTenant.with_tenant(club) { MovimientoContable.where(club_id: club.id) }
+
+  before { sign_in_as(admin) }
+
+  it 'sacar plata «guardado» descuenta del arqueo pero no queda a nombre de nadie' do
+    post "/api/sedes/#{sede.id}/caja/#{turno.caja_turno_id}/salida", headers: auth_headers,
+         params: { monto_ars: 150_000, motivo: 'a la caja fuerte', clase: 'guardado' }
+    expect(response).to have_http_status(:ok), response.body
+
+    mov = movs.where(categoria: 'retiro_caja').last
+    expect(mov.saldado_como).to eq('organizacion')
+    expect(mov.saldado_at).to be_present
+    expect(turno.caja_turno.reload.efectivo_esperado_ars).to eq(50_000.0)
+    expect(movs.retiros_abiertos).to be_empty
+
+    get '/api/retiros_caja', headers: auth_headers
+    expect(JSON.parse(response.body)['total_abierto']).to eq(0)
+  end
+
+  it 'al cerrar la caja, la recaudación puede ir directo a la organización' do
+    turno
+    post "/api/sedes/#{sede.id}/mostrador/cerrar", headers: auth_headers,
+         params: { efectivo_contado_ars: 200_000, fondo_siguiente_ars: 30_000, destino_retiro: 'organizacion' }
+    expect(response).to have_http_status(:ok), response.body
+
+    mov = movs.where(categoria: 'retiro_caja').last
+    expect(mov.monto_ars).to eq(170_000)
+    expect(mov.saldado_como).to eq('organizacion')
+    expect(movs.retiros_abiertos).to be_empty
+  end
+
+  it 'y un retiro que ya estaba a nombre de alguien se salda como guardado, sin generar movimiento' do
+    post "/api/sedes/#{sede.id}/caja/#{turno.caja_turno_id}/salida", headers: auth_headers,
+         params: { monto_ars: 100_000, motivo: 'para depositar', clase: 'retiro' }
+    retiro = movs.where(categoria: 'retiro_caja').last
+    expect(movs.retiros_abiertos.count).to eq(1)
+
+    expect {
+      post "/api/retiros_caja/#{retiro.id}/saldar", headers: auth_headers, params: { forma: 'organizacion' }
+    }.not_to change { movs.count }
+    expect(response).to have_http_status(:ok), response.body
+    expect(retiro.reload.saldado_como).to eq('organizacion')
+    expect(movs.retiros_abiertos).to be_empty
+  end
+end

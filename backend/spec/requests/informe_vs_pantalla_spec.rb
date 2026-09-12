@@ -98,7 +98,7 @@ RSpec.describe 'Los informes dicen lo mismo que las pantallas', type: :request d
 
     it 'los gramos del informe son los mismos que los del historial' do
       get '/api/informes/dispensaciones'
-      del_informe = json['gramos_dispensados'].to_f
+      del_informe = json['salio']['por_unidad'].find { |u| u['unidad'] == 'g' }['cantidad'].to_f
 
       get '/api/dispensaciones'
       lista = json.is_a?(Array) ? json : (json['data'] || json['dispensaciones'])

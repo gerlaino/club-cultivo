@@ -90,6 +90,29 @@ RSpec.describe Stocks::Trazabilidad do
       expect(t[:frase]).to include('siguen en', 'se convirtieron en', 'son merma', 'La cuenta cierra.')
     end
 
+    # Un dedazo corregido son dos ajustes que nunca pasaron. Se netean por cierre (Germán, sep-2026).
+    it 'los ajustes de conteo de un mismo cierre se netean, y si dan cero no aparecen' do
+      turno = ActsAsTenant.with_tenant(club) do
+        Mostradores::Cargar.call(mostrador: sede.mostrador!, usuario: admin, motivo: 'x', cambios: [{ stock_id: flor.id, cantidad: 100 }])
+        t = Mostradores::AbrirCaja.call(mostrador: sede.mostrador!, usuario: admin, efectivo_contado_ars: 0).turno
+        Mostradores::CerrarCaja.call(turno: t, usuario: admin, efectivo_contado_ars: 0, conteos: [{ stock_id: flor.id, contado: 21 }])
+        t.reload
+      end
+      expect(flor.reload.cantidad).to eq(21)
+      expect(traza(flor)[:salidas].size).to eq(1)
+
+      item = turno.items.find_by(stock_id: flor.id)
+      ActsAsTenant.with_tenant(club) do
+        Mostradores::CorregirCierre.call(turno: turno, usuario: admin, motivo: 'me comí un dígito', causa: 'error_conteo',
+                                         conteos: [{ item_id: item.id, contado: 100 }])
+      end
+      expect(flor.reload.cantidad).to eq(100)
+      t = traza(flor)
+      expect(t[:salidas]).to be_empty
+      expect(t[:totales][:sin_explicar_g]).to eq(0.0)
+      expect(t[:frase]).to include('La cuenta cierra.')
+    end
+
     it 'lo que ningún movimiento explica se dice, y la cuenta no cierra' do
       flor.update!(cantidad: 90) # bajó sin movimiento ni dispensa
 
@@ -109,6 +132,11 @@ RSpec.describe Stocks::Trazabilidad do
       expect(t[:lote][:codigo]).to eq(lote.codigo)
       expect(t[:stock][:producido_desde]).to include(numero: flor.numero_lote_producto, gramos: 10.0)
       expect(t[:frase]).to include("de 10 g de #{flor.numero_lote_producto}")
+    end
+
+    it 'las plantas van con su nombre, que es con lo que se las nombra' do
+      create(:plant, lote: lote, club: club, nombre: 'L-X-P001', state: 'cosechado')
+      expect(traza(flor)[:plantas].first[:nombre]).to eq('L-X-P001')
     end
 
     it 'un stock comprado afuera tiene proveedor y no lote' do

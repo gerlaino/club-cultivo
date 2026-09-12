@@ -39,6 +39,14 @@ const categoriasEgreso = computed(() =>
 
 const multiSede = computed(() => sedes.value.length > 1)
 
+// Cantidad y unidad sólo si lo que se compra ENTRA A UN DEPÓSITO: un impuesto o el alquiler no
+// tienen «cantidad». Se preguntaba siempre.
+const categoriaElegida = computed(() => categorias.value.find(c => c.id === form.value.categoria_contable_id))
+const pideCantidad = computed(() => {
+  const comp = categoriaElegida.value?.comportamiento_efectivo || categoriaElegida.value?.comportamiento
+  return !!comp && comp !== 'general'
+})
+
 async function cargar() {
   cargando.value = true
   try {
@@ -67,6 +75,7 @@ async function guardar() {
   error.value = ''
   try {
     const payload = { ...f, nombre: f.nombre.trim() }
+    if (!pideCantidad.value) { payload.cantidad = null; payload.unidad = null }
     if (f.id) await updateGastoRecurrente(f.id, payload)
     else      await createGastoRecurrente(payload)
     form.value = null
@@ -143,11 +152,11 @@ async function borrar(g) {
           <span class="gr__lbl">Monto de referencia</span>
           <input v-model.number="form.monto_ars" type="number" min="0" step="0.01" class="gr__inp" placeholder="0" />
         </label>
-        <label class="gr__fld gr__fld--sm">
+        <label v-if="pideCantidad" class="gr__fld gr__fld--sm">
           <span class="gr__lbl">Cantidad</span>
           <input v-model.number="form.cantidad" type="number" min="0" step="0.001" class="gr__inp" placeholder="0" />
         </label>
-        <label class="gr__fld gr__fld--sm">
+        <label v-if="pideCantidad" class="gr__fld gr__fld--sm">
           <span class="gr__lbl">Unidad</span>
           <select v-model="form.unidad" class="gr__inp">
             <option v-for="u in UNIDADES" :key="u" :value="u">{{ u }}</option>

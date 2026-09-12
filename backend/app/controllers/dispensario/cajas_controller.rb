@@ -70,9 +70,13 @@ module Dispensario
     #            queda afuera de los scopes de ingresos y egresos.
     #
     # Las dos restan del arqueo: en las dos, la plata no está en el cajón.
+    #   guardado → la plata va a la caja fuerte o al banco de la organización: sale del cajón
+    #            pero NO es deuda de nadie. Es mover plata del club de un lado a otro, y antes
+    #            no había forma de decirlo: todo retiro quedaba a nombre de alguien.
     CLASES_SALIDA = {
-      'gasto'  => { tipo: 'egreso',  categoria: 'salida_caja', prefijo: 'Gasto pagado con la caja' },
-      'retiro' => { tipo: 'ajuste',  categoria: 'retiro_caja', prefijo: 'Retiro de caja' },
+      'gasto'    => { tipo: 'egreso',  categoria: 'salida_caja', prefijo: 'Gasto pagado con la caja' },
+      'retiro'   => { tipo: 'ajuste',  categoria: 'retiro_caja', prefijo: 'Retiro de caja' },
+      'guardado' => { tipo: 'ajuste',  categoria: 'retiro_caja', prefijo: 'Guardado en la organización', guardado: true },
     }.freeze
 
     # `abrir`, `confirmar_apertura`, `solicitar_cierre`, `confirmar_cierre` y `cerrar` se fueron
@@ -111,13 +115,13 @@ module Dispensario
           raise ArgumentError, "No hay tanto efectivo en la caja: hay #{caja.efectivo_esperado_ars}."
         end
 
-        caja.movimientos_contables.create!(
+        caja.movimientos_contables.create!({
           club: current_user.club, sede_id: caja.sede_id, created_by: current_user,
           tipo: clase[:tipo], categoria: clase[:categoria], retirado_por: retirado_por,
           descripcion: "#{clase[:prefijo]} — #{motivo}",
           monto_ars: monto, fecha: Time.zone.today,
           pagado: true, medio_pago: 'efectivo', comprobante_tipo: 'sin_comprobante',
-        )
+        }.merge(clase[:guardado] ? MovimientoContable.atributos_guardado_en_organizacion(current_user) : {}))
       end
     end
 
@@ -242,7 +246,7 @@ module Dispensario
           { id: m.id, monto_ars: m.monto_ars.to_f, descripcion: m.descripcion, quien: m.created_by&.nombre_completo }
         },
         ingresos:               caja.ingresos.order(:created_at).map { |m| { id: m.id, monto_ars: m.monto_ars.to_f, descripcion: m.descripcion, quien: m.created_by&.nombre_completo } },
-        salidas:                caja.salidas.order(:created_at).map { |m| { id: m.id, monto_ars: m.monto_ars.to_f, descripcion: m.descripcion, clase: m.categoria == 'retiro_caja' ? 'retiro' : 'gasto', quien: (m.retirado_por || m.created_by)&.nombre_completo } },
+        salidas:                caja.salidas.order(:created_at).map { |m| { id: m.id, monto_ars: m.monto_ars.to_f, descripcion: m.descripcion, clase: m.categoria != 'retiro_caja' ? 'gasto' : (m.saldado_como == 'organizacion' ? 'guardado' : 'retiro'), quien: (m.retirado_por || m.created_by)&.nombre_completo } },
         efectivo_esperado_ars:  caja.efectivo_esperado_ars,
         efectivo_declarado_ars: caja.efectivo_declarado_ars&.to_f,
         diferencia_ars:         caja.diferencia_ars,

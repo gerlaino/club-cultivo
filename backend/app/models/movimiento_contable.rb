@@ -260,6 +260,13 @@ class MovimientoContable < ApplicationRecord
 
   ROLES_RETIRO = %w[admin supervisor].freeze
 
+  # Un retiro que ya nace GUARDADO EN LA ORGANIZACIÓN: sale del cajón (el arqueo lo descuenta
+  # igual) pero no queda a nombre de nadie. Sin «cuenta del club»: es el mismo `retiro_caja`, ya
+  # saldado con `organizacion`.
+  def self.atributos_guardado_en_organizacion(usuario)
+    { saldado_at: Time.current, saldado_como: 'organizacion', saldado_por: usuario }
+  end
+
   def retiro_con_dueno_responsable
     if retirado_por.nil?
       errors.add(:retirado_por, 'es obligatorio en un retiro de caja: la plata queda a nombre de alguien')

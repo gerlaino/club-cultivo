@@ -9,10 +9,15 @@ module Caja
   #                 registra como devolución para que el arqueo del turno EN CURSO la espere.
   #   comprobante → se convierte en un egreso real, con la categoría de lo que se compró.
   #   sueldo      → egreso de sueldo. Es el "adelanto", pero decidido al cerrar.
+  #   organizacion → la plata quedó GUARDADA EN LA ORGANIZACIÓN (la caja fuerte, el banco): no es
+  #                 deuda de nadie y no es gasto. No genera movimiento: la salida del cajón ya
+  #                 está asentada, sólo deja de estar a nombre de la persona. Es el caso de
+  #                 "saqué la recaudación para llevarla con el resto del fondo del club" (Germán,
+  #                 sep-2026), que aparecía como que el admin debía $217.097.
   #
   # El saldo de cada persona NO se guarda en ningún lado: sale de sumar sus retiros sin saldar.
   class SaldarRetiro
-    FORMAS = %w[devuelto comprobante sueldo].freeze
+    FORMAS = %w[devuelto comprobante sueldo organizacion].freeze
 
     Result = Struct.new(:ok, :retiro, :movimiento, :error, keyword_init: true) do
       def ok? = ok
@@ -67,6 +72,7 @@ module Caja
       when 'devuelto'    then movimiento_devolucion!
       when 'comprobante' then movimiento_egreso!(@categoria, 'Gasto rendido')
       when 'sueldo'      then movimiento_egreso!('sueldo', 'Descontado del sueldo')
+      when 'organizacion' then nil
       end
     end
 

@@ -20,12 +20,20 @@ module Mostradores
 
     # `conteos`: [{ item_id:, contado: }] — sólo los que haya que corregir.
     # `efectivo_contado_ars`: la plata, si es ESA la que se cargó mal.
-    def initialize(turno:, usuario:, conteos: [], motivo: nil, efectivo_contado_ars: nil)
+    # POR QUÉ se corrige, y son dos cosas distintas (Germán, sep-2026):
+    #   error_conteo → se contó o tipeó mal: NO hubo diferencia real. El ajuste original y la
+    #                  corrección se anulan entre sí, y el neto por cierre (que leen la
+    #                  trazabilidad y Pérdidas) queda en cero.
+    #   faltaba      → sí faltaba o sobraba, se anotó mal la cantidad: cuenta el neto.
+    CAUSAS = %w[error_conteo faltaba].freeze
+
+    def initialize(turno:, usuario:, conteos: [], motivo: nil, efectivo_contado_ars: nil, causa: nil)
       @turno    = turno
       @usuario  = usuario
       @conteos  = Array(conteos).select { |c| c.respond_to?(:[]) && !c.is_a?(String) }
       @motivo   = motivo
       @efectivo = efectivo_contado_ars
+      @causa    = CAUSAS.include?(causa.to_s) ? causa.to_s : 'faltaba'
     end
 
     def call
@@ -126,15 +134,16 @@ module Mostradores
       aplicado = item.efecto_en_inventario
       delta    = efecto_corregido(item, nuevo) - aplicado
 
+      etiqueta = @causa == 'error_conteo' ? 'corregido (error de conteo)' : 'corregido'
       item.update!(cantidad_cierre: nuevo,
-                   motivo_diferencia: [item.motivo_diferencia, "corregido: #{@motivo}"].compact.join(' · '))
+                   motivo_diferencia: [item.motivo_diferencia, "#{etiqueta}: #{@motivo}"].compact.join(' · '))
       return if delta.zero?
 
       stock.with_lock do
         stock.update!(cantidad: [stock.cantidad.to_d + delta, 0].max)
         stock.stock_movimientos.create!(
           tipo: 'ajuste', gramos: delta, usuario: @usuario, turno_mostrador: @turno,
-          notas: "Corrección del conteo del cierre ##{@turno.id} — se había contado " \
+          notas: "#{@causa == 'error_conteo' ? '[ERROR DE CONTEO] ' : ''}Corrección del conteo del cierre ##{@turno.id} — se había contado " \
                  "#{anterior.to_f} y eran #{nuevo.to_f} #{stock.unidad || 'g'} — #{@motivo}"
         )
       end

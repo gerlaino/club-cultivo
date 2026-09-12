@@ -102,11 +102,16 @@ class CategoriasContablesController < ApplicationController
   #
   # Solo garantizamos los SECTORES. El árbol de categorías NO se auto-siembra: el club arranca
   # en limpio y crea las suyas.
+  # Y con las categorías del sistema que se agregaron DESPUÉS de la siembra original: una
+  # organización sembrada antes no recibía «Impuestos y tasas» nunca.
+  CLAVES_SISTEMA_ESPERADAS = %w[impuesto].freeze
+
   def catalogo_al_dia?(club)
     esperados = UnidadNegocio::CANONICOS.keys
     esperados -= ['bar'] unless club.feature?(:bar)
+    return false unless (esperados - club.unidades_negocio.pluck(:tipo)).empty?
 
-    (esperados - club.unidades_negocio.pluck(:tipo)).empty?
+    (CLAVES_SISTEMA_ESPERADAS - club.categorias_contables.where(clave_sistema: CLAVES_SISTEMA_ESPERADAS).pluck(:clave_sistema)).empty?
   end
 
   # El formulario pregunta "¿va a depósito?" (sí/no) y el SECTOR decide a cuál. Se traduce a

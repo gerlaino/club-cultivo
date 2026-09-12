@@ -116,6 +116,7 @@ describe('Corregir el conteo de un cierre', () => {
     expect(corregirTurnoMostrador).toHaveBeenCalledWith(10, 7, {
       conteos: [{ item_id: 91, contado: 40 }],
       motivo: 'se cargó 23 en vez de 40',
+      causa: 'error_conteo',   // la causa viaja siempre: un error de tipeo no es una diferencia real
     })
   })
 })
@@ -162,7 +163,7 @@ describe('Corregir la plata contada', () => {
     await flushPromises()
 
     expect(corregirTurnoMostrador).toHaveBeenCalledWith(10, 7, {
-      conteos: [], motivo: 'se contó mal el efectivo', efectivo_contado_ars: 148000,
+      conteos: [], motivo: 'se contó mal el efectivo', causa: 'error_conteo', efectivo_contado_ars: 148000,
     })
   })
 })

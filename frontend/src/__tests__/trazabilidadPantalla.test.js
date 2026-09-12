@@ -7,11 +7,15 @@ import { mount, flushPromises } from '@vue/test-utils'
 // con los MISMOS nombres de clave y fija lo que se decidió en sep-2026: la cuenta con las salidas
 // nombradas, la oración, la cronología viva, el DNI en tres dígitos y «siguió en».
 const getStockTrazabilidad = vi.fn()
+const getLoteTrazabilidad = vi.fn()
 const listStocks = vi.fn()
+const listLotes = vi.fn()
 vi.mock('../lib/api.js', () => ({
   default: { get: vi.fn() },
   getStockTrazabilidad: (...a) => getStockTrazabilidad(...a),
+  getLoteTrazabilidad: (...a) => getLoteTrazabilidad(...a),
   listStocks: (...a) => listStocks(...a),
+  listLotes: (...a) => listLotes(...a),
 }))
 vi.mock('../lib/descargas.js', () => ({ descargarArchivo: vi.fn() }))
 
@@ -27,7 +31,7 @@ const PAYLOAD = {
   aplicaciones: { registros: 0 },
   analisis_laboratorio: [{ fecha: '2026-09-02', laboratorio: 'Cannalab', thc_pct: 16.4, cbd_pct: 0.3, cbg_pct: null, terpenos: null }],
   pesada: null,
-  plantas: [{ id: 1, codigo_qr: 'P-0398', origen: 'semilla', peso_g: 36.2, promedio: false }],
+  plantas: [{ id: 1, nombre: 'L-26-031-P020', codigo_qr: '9-395-1786032765-60c169fa', origen: 'semilla', peso_g: 36.2, promedio: false }],
   atribucion: 'planta',
   plantas_descartadas: [],
   cronologia: [
@@ -57,13 +61,51 @@ describe('Trazabilidad — la pantalla dibuja lo que el backend manda', () => {
 
   beforeEach(async () => {
     vi.clearAllMocks()
-    listStocks.mockResolvedValue({ data: [{ id: 41, numero_lote_producto: 'ST-26-041', forma_producto: 'flor_seca' }] })
+    listStocks.mockResolvedValue({ data: [{ id: 41, numero_lote_producto: 'ST-26-041', forma_producto: 'flor_seca', lote_id: 31, cantidad: 97.5, sede: { nombre: 'Central' } }] })
+    listLotes.mockResolvedValue({ data: [
+      { id: 31, codigo: 'L-26-031', estado: 'en_manicura', start_date: '2026-05-03', plants_count: 18, genetica: { nombre: 'Critical Kush' }, sala: { sede: { nombre: 'Central' } } },
+      { id: 38, codigo: 'L-26-038', estado: 'floracion',   start_date: '2026-07-10', plants_count: 36, genetica: { nombre: 'Northern' }, sala: { sede: { nombre: 'Norte' } } },
+    ] })
     getStockTrazabilidad.mockResolvedValue({ data: PAYLOAD })
+    getLoteTrazabilidad.mockResolvedValue({ data: {
+      lote: { id: 38, codigo: 'L-26-038', estado: 'floracion', genetica: { nombre: 'Northern', thc: 15 } },
+      aplicaciones: { registros: 0 }, analisis_laboratorio: [], cronologia: [],
+      plantas: [{ id: 9, nombre: 'L-26-038-P001', codigo_qr: 'x', origen: 'esqueje', estado: 'floracion', peso_g: null }],
+      plantas_descartadas: [], frascos: [],
+    } })
     const { default: Vista } = await import('../views/auditor/TrazabilidadView.vue')
     wrapper = mount(Vista, { global: { stubs: { RouterLink: true } } })
     await flushPromises()
+    await wrapper.findAll('.trz__tab')[1].trigger('click')   // Frascos
     await wrapper.find('.trz__tr').trigger('click')
     await flushPromises()
+  })
+
+  it('las plantas van por nombre, con el QR sólo como título', () => {
+    const fila = wrapper.find('.trz__plantas-tabla tbody tr')
+    expect(fila.text()).toContain('L-26-031-P020')
+    expect(fila.text()).not.toContain('9-395-1786032765')
+    expect(fila.find('td').attributes('title')).toBe('9-395-1786032765-60c169fa')
+  })
+
+  // La trazabilidad arranca también desde el lote: un lote en floración no tiene frasco todavía.
+  it('la solapa Lotes lista los lotes en cultivo, con filtros, y abre su cadena', async () => {
+    await wrapper.find('.trz__btn-back').trigger('click')
+    await wrapper.findAll('.trz__tab')[0].trigger('click')
+    expect(wrapper.findAll('.trz__tr')).toHaveLength(2)
+
+    await wrapper.findAll('.trz__filtro')[0].setValue('cultivo')
+    expect(wrapper.findAll('.trz__tr')).toHaveLength(1)
+    expect(wrapper.find('.trz__tr').text()).toContain('L-26-038')
+    expect(wrapper.find('.trz__tr').text()).toContain('todavía ninguno')
+
+    await wrapper.find('.trz__tr').trigger('click')
+    await flushPromises()
+    expect(getLoteTrazabilidad).toHaveBeenCalledWith(38)
+    expect(wrapper.find('.trz__banner-label').text()).toBe('Trazabilidad del lote')
+    expect(wrapper.find('.trz__balance').exists()).toBe(false)        // sin frasco no hay cuenta
+    expect(wrapper.text()).toContain('Todavía no salió ningún frasco')
+    expect(wrapper.find('.trz__plantas-tabla').text()).toContain('L-26-038-P001')
   })
 
   it('la cuenta nombra cada salida y dice dónde está lo que queda', () => {

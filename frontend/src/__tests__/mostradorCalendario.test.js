@@ -30,13 +30,13 @@ const TURNO = {
   },
   sobraron: { total: 0, cantidad: 0, ars: 0, items: [] },
   caja: { fondo_ars: 110000, esperado_ars: 150000, contado_ars: 130000, diferencia_ars: -20000 },
-  bloqueo_correccion: null,
+  bloqueo_correccion: null, puedo_corregir: true,
 }
 const LIMPIO = {
   ...TURNO, id: 8, abierto_at: local(Y, M, 3, 10), cerrado_at: local(Y, M, 3, 20),
   motivos_revision: [], faltaron: { total: 0, ars: 0, items: [] }, sobraron: { total: 0, items: [] },
   caja: { ...TURNO.caja, contado_ars: 150000, diferencia_ars: 0 },
-  bloqueo_correccion: { motivo: 'caja_posterior', texto: 'Después de este cierre se volvió a abrir la caja.' },
+  bloqueo_correccion: { motivo: 'caja_posterior', texto: 'Después de este cierre se volvió a abrir la caja.' }, puedo_corregir: true,
 }
 
 let respuestaMes = { mes: `${Y}-${String(M).padStart(2, '0')}`, turnos: [TURNO, LIMPIO], gestiona: true, sin_revisar: 1 }

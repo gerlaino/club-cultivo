@@ -44,7 +44,7 @@
           </div>
         </div>
 
-        <button v-if="data" class="trz__btn-pdf" @click="exportPdf">
+        <button v-if="data?.stock" class="trz__btn-pdf" @click="exportPdf">
           <i class="bi bi-printer"></i> PDF
         </button>
         <button v-if="data" class="trz__btn-back" @click="volver">
@@ -64,62 +64,102 @@
       Cargando cadena de trazabilidad…
     </div>
 
-    <!-- ESTADO: listado de stocks (default) -->
+    <!-- ESTADO: listado. Dos solapas —LOTES y FRASCOS— con los mismos filtros. La trazabilidad
+         arranca también desde el lote (Germán, sep-2026): un lote en floración no tiene frasco
+         todavía, y la pregunta del auditor puede empezar por la planta. -->
     <template v-else-if="!data">
       <div v-if="loadingList" class="trz__loader">
-        <DsSpinner /> Cargando stocks…
+        <DsSpinner /> Cargando…
       </div>
-      <div v-else-if="!stocksList.length" class="trz__empty-plain">
-        <i class="bi bi-inbox"></i> Sin stocks registrados aún.
-      </div>
-      <div v-else class="trz__stocks-section">
-        <div class="trz__stocks-header">
-          <span class="trz__stocks-count">{{ stocksList.length }} stocks registrados</span>
-          <span class="trz__stocks-hint"><i class="bi bi-hand-index"></i> Hacé click en un stock para ver su cadena</span>
+      <template v-else>
+        <div class="trz__tabs">
+          <button class="trz__tab" :class="{ 'trz__tab--on': solapa === 'lotes' }" @click="solapa = 'lotes'">Lotes · {{ lotesFiltrados.length }}</button>
+          <button class="trz__tab" :class="{ 'trz__tab--on': solapa === 'frascos' }" @click="solapa = 'frascos'">Frascos · {{ stocksFiltrados.length }}</button>
         </div>
-        <div class="trz__table-wrap">
-          <table class="trz__table">
-            <thead>
-              <tr>
-                <th>N.° lote</th>
-                <th>Genética</th>
-                <th>Forma</th>
-                <th class="trz__th-r">Cantidad</th>
-                <th>Lote origen</th>
-                <th>Elaborado</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr
-                v-for="s in stocksList"
-                :key="s.id"
-                class="trz__tr"
-                @click="seleccionarStock(s)"
-              >
-                <td class="trz__td-code">{{ s.numero_lote_producto || `#${s.id}` }}</td>
-                <td class="trz__td-gen">{{ s.genetica_nombre || '—' }}</td>
-                <td>
-                  <span class="trz__forma-badge">{{ FORMA_LABELS[s.forma_producto] || s.forma_producto }}</span>
-                </td>
-                <td class="trz__td-g">{{ s.cantidad ?? '—' }} {{ s.unidad || 'g' }}</td>
-                <!-- Un stock comprado afuera no tiene lote propio y mostraba un guion, que
-                     se lee como "falta el dato". Tiene origen conocido: es externo. Un
-                     derivado (hash, preroll) sí arrastra el lote del que salió. -->
-                <td class="trz__td-lote">
-                  <span v-if="s.origen === 'compra_externa'" class="trz__externo">Externo</span>
-                  <template v-else>{{ s.lote_codigo || s.lote?.codigo || '—' }}</template>
-                  <span v-if="s.origen === 'derivado_lote'" class="trz__deriv" title="Elaborado a partir de ese lote">derivado</span>
-                </td>
-                <td class="trz__td-fecha">{{ formatDate(s.fecha_elaboracion) }}</td>
-                <td class="trz__td-action">
-                  <span class="trz__td-ver">Ver cadena <i class="bi bi-arrow-right"></i></span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="trz__filtros">
+          <select v-model="filtro.estado" class="trz__filtro">
+            <option value="">Todos los estados</option>
+            <template v-if="solapa === 'lotes'">
+              <option value="cultivo">En cultivo</option>
+              <option value="cosechados">Cosechados (sin finalizar)</option>
+              <option value="finalizado">Finalizados</option>
+            </template>
+            <template v-else>
+              <option value="con_stock">Con producto</option>
+              <option value="agotado">Agotados</option>
+            </template>
+          </select>
+          <select v-model="filtro.sede" class="trz__filtro">
+            <option value="">Todas las sedes</option>
+            <option v-for="sd in sedesDeLista" :key="sd" :value="sd">{{ sd }}</option>
+          </select>
+          <select v-model="filtro.genetica" class="trz__filtro">
+            <option value="">Todas las genéticas</option>
+            <option v-for="g in geneticasDeLista" :key="g" :value="g">{{ g }}</option>
+          </select>
+          <label class="trz__filtro-fechas">
+            <span>{{ solapa === 'lotes' ? 'Arrancó' : 'Elaborado' }} entre</span>
+            <input v-model="filtro.desde" type="date" class="trz__filtro" />
+            <span>y</span>
+            <input v-model="filtro.hasta" type="date" class="trz__filtro" />
+          </label>
+          <button v-if="hayFiltros" class="trz__filtro-limpiar" @click="limpiarFiltros">Limpiar</button>
         </div>
-      </div>
+
+        <div v-if="solapa === 'lotes'" class="trz__stocks-section">
+          <div v-if="!lotesFiltrados.length" class="trz__empty-plain"><i class="bi bi-inbox"></i> Ningún lote con esos filtros.</div>
+          <div v-else class="trz__table-wrap">
+            <table class="trz__table">
+              <thead>
+                <tr><th>Lote</th><th>Genética</th><th>Sede</th><th>Estado</th><th>Arrancó</th><th class="trz__th-r">Plantas</th><th>Frascos</th><th></th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="l in lotesFiltrados" :key="l.id" class="trz__tr" @click="abrirLote(l.id)">
+                  <td class="trz__td-code">{{ l.codigo }}</td>
+                  <td class="trz__td-gen">{{ l.genetica?.nombre || '—' }}</td>
+                  <td>{{ sedeDeLote(l) || '—' }}</td>
+                  <td><span class="trz__estado-pill">{{ estadoLabel(l.estado) }}</span><span v-if="l.dias_en_estado != null" class="trz__dias"> · {{ l.dias_en_estado }} días</span></td>
+                  <td class="trz__td-fecha">{{ formatDate(l.start_date) }}</td>
+                  <td class="trz__td-g">{{ l.plants_count ?? '—' }}</td>
+                  <td class="trz__td-lote">
+                    <template v-if="frascosDeLote(l).length">{{ frascosDeLote(l).map(f => f.numero_lote_producto).join(' · ') }}</template>
+                    <span v-else class="trz__muted">{{ ['finalizado'].includes(l.estado) ? '—' : 'todavía ninguno' }}</span>
+                  </td>
+                  <td class="trz__td-action"><span class="trz__td-ver">Ver cadena <i class="bi bi-arrow-right"></i></span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div v-else class="trz__stocks-section">
+          <div v-if="!stocksFiltrados.length" class="trz__empty-plain"><i class="bi bi-inbox"></i> Ningún frasco con esos filtros.</div>
+          <div v-else class="trz__table-wrap">
+            <table class="trz__table">
+              <thead>
+                <tr><th>N.° lote</th><th>Genética</th><th>Forma</th><th class="trz__th-r">Cantidad</th><th>Lote origen</th><th>Sede</th><th>Elaborado</th><th></th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="s in stocksFiltrados" :key="s.id" class="trz__tr" @click="seleccionarStock(s)">
+                  <td class="trz__td-code">{{ s.numero_lote_producto || `#${s.id}` }}</td>
+                  <td class="trz__td-gen">{{ s.genetica_nombre || s.genetica?.nombre || '—' }}</td>
+                  <td><span class="trz__forma-badge">{{ FORMA_LABELS[s.forma_producto] || s.forma_producto }}</span></td>
+                  <td class="trz__td-g">{{ s.cantidad ?? '—' }} {{ s.unidad || 'g' }}</td>
+                  <!-- Un stock comprado afuera no tiene lote propio: tiene origen conocido, es externo. -->
+                  <td class="trz__td-lote">
+                    <span v-if="s.origen === 'compra_externa'" class="trz__externo">Externo</span>
+                    <template v-else>{{ s.lote_codigo || s.lote?.codigo || '—' }}</template>
+                    <span v-if="s.origen === 'derivado_lote'" class="trz__deriv" title="Elaborado a partir de ese lote">derivado</span>
+                  </td>
+                  <td>{{ s.sede?.nombre || '—' }}</td>
+                  <td class="trz__td-fecha">{{ formatDate(s.fecha_elaboracion) }}</td>
+                  <td class="trz__td-action"><span class="trz__td-ver">Ver cadena <i class="bi bi-arrow-right"></i></span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </template>
     </template>
 
     <!-- ESTADO: cadena de custodia -->
@@ -128,8 +168,8 @@
       <!-- Banner -->
       <div class="trz__banner">
         <div>
-          <div class="trz__banner-label">Informe de trazabilidad</div>
-          <div class="trz__banner-ref">{{ data.stock.numero_lote_producto || `STOCK-${data.stock.id}` }}</div>
+          <div class="trz__banner-label">{{ data.stock ? 'Trazabilidad del frasco' : 'Trazabilidad del lote' }}</div>
+          <div class="trz__banner-ref">{{ data.stock ? (data.stock.numero_lote_producto || `STOCK-${data.stock.id}`) : data.lote?.codigo }}</div>
         </div>
         <div class="trz__banner-date"><i class="bi bi-calendar3"></i> {{ hoy }}</div>
       </div>
@@ -138,7 +178,7 @@
            salió tanto a pacientes, salió tanto por otro lado (CON NOMBRE: un traslado o un
            derivado son el mismo producto en otra fila, no una pérdida), queda tanto. Lo que
            ningún movimiento explica se llama así, y es lo que hay que ir a buscar. -->
-      <div class="trz__balance">
+      <div v-if="data.totales" class="trz__balance">
         <div class="trz__bal-item">
           <span class="trz__bal-lbl">Entró</span>
           <span class="trz__bal-val">{{ data.totales.gramos_producidos }} {{ unidad }}</span>
@@ -203,11 +243,11 @@
               </div>
               <div class="trz__field">
                 <span class="trz__field-lbl">Genética</span>
-                <span class="trz__field-val">{{ data.lote?.genetica?.nombre || data.stock.genetica?.nombre || 'No registrada' }}</span>
+                <span class="trz__field-val">{{ genetica?.nombre || 'No registrada' }}</span>
               </div>
-              <div v-if="data.stock.genetica?.thc || data.stock.genetica?.cbd" class="trz__field">
+              <div v-if="genetica?.thc || genetica?.cbd" class="trz__field">
                 <span class="trz__field-lbl">Perfil declarado</span>
-                <span class="trz__field-val">THC {{ data.stock.genetica.thc || '—' }}% · CBD {{ data.stock.genetica.cbd || '—' }}%</span>
+                <span class="trz__field-val">THC {{ genetica.thc || '—' }}% · CBD {{ genetica.cbd || '—' }}%</span>
               </div>
               <!-- Medido, no declarado: es lo más fuerte que se le puede mostrar a un paciente,
                    y va al lado del declarado porque es la misma pregunta. -->
@@ -244,9 +284,18 @@
               <div class="trz__field">
                 <span class="trz__field-lbl">Estado</span>
                 <span class="trz__estado-pill">{{ estadoLabel(data.lote?.estado) }}</span>
+                <span v-if="data.lote?.dias_en_estado != null" class="trz__dias">{{ data.lote.dias_en_estado }} días ahí</span>
+              </div>
+              <div v-if="data.lote?.sede || data.lote?.sala" class="trz__field">
+                <span class="trz__field-lbl">Dónde</span>
+                <span class="trz__field-val">{{ [data.lote.sede, data.lote.sala].filter(Boolean).join(' · ') }}</span>
+              </div>
+              <div v-if="data.lote?.start_date" class="trz__field">
+                <span class="trz__field-lbl">Arrancó</span>
+                <span class="trz__field-val">{{ formatDate(data.lote.start_date) }}</span>
               </div>
               <!-- Un derivado hereda la cadena de la flor de la que salió, y dice de qué frasco. -->
-              <div v-if="data.stock.producido_desde" class="trz__field">
+              <div v-if="data.stock?.producido_desde" class="trz__field">
                 <span class="trz__field-lbl">Elaborado de</span>
                 <span class="trz__field-val">{{ data.stock.producido_desde.gramos }} g de <a href="#" class="trz__link" @click.prevent="buscar(data.stock.producido_desde.id)">{{ data.stock.producido_desde.numero }}</a></span>
               </div>
@@ -274,34 +323,33 @@
               </div>
             </div>
 
-            <!-- Plantas individuales.
-                 El rótulo dice QUÉ es esta lista: "de estas plantas salió este frasco" (hay
-                 pesaje por planta) o "las plantas vivas del lote" (no lo hay). Se leían como lo
-                 primero siempre, así que un frasco que salió de dos plantas mostraba las diez
-                 del lote. -->
-            <div v-if="data.plantas?.length" class="trz__plantas">
+            <!-- PLANTAS POR NOMBRE, no por QR (Germán, sep-2026): el código QR es un identificador de
+                 máquina y quince seguidos son una pared. Se nombra como en manicura (L-26-023-P020);
+                 el QR queda como título al pasar el mouse y entero en el PDF. Plegada en cinco filas:
+                 un lote de 40 plantas es una lista que se abre, no una pared. -->
+            <div v-if="data.plantas?.length || data.plantas_descartadas?.length" class="trz__plantas">
               <span class="trz__plantas-lbl">
-                {{ data.plantas.length }} {{ data.atribucion === 'planta' ? 'plantas pesadas a este stock' : 'plantas del lote' }}
+                {{ data.plantas?.length || 0 }} {{ data.atribucion === 'planta' ? 'plantas pesadas a este frasco' : (data.stock ? 'plantas del lote' : 'plantas') }}
+                <template v-if="data.plantas_descartadas?.length"> · {{ data.plantas_descartadas.length }} descartadas</template>
               </span>
               <span v-if="data.atribucion === 'lote'" class="trz__plantas-nota">
                 Sin pesaje planta por planta: el origen se acredita a nivel de lote, no como medición individual.
               </span>
-              <div class="trz__plantas-chips">
-                <span v-for="p in data.plantas" :key="p.id" class="trz__planta-chip">
-                  {{ p.codigo_qr || `#${p.id}` }}{{ p.peso_g ? ` · ${p.peso_g}g` : '' }}{{ p.promedio ? ' (prom.)' : '' }}
-                </span>
-              </div>
-            </div>
-
-            <!-- Descartadas: no produjeron nada, pero sin ellas la cuenta de plantas del lote no
-                 cierra y el hueco parece un error del informe. -->
-            <div v-if="data.plantas_descartadas?.length" class="trz__plantas">
-              <span class="trz__plantas-lbl">{{ data.plantas_descartadas.length }} descartadas · no produjeron</span>
-              <div class="trz__plantas-chips">
-                <span v-for="p in data.plantas_descartadas" :key="p.id" class="trz__planta-chip trz__planta-chip--descartada">
-                  {{ p.codigo_qr || `#${p.id}` }}{{ p.motivo_descarte ? ` · ${motivoLabel(p.motivo_descarte)}` : '' }}
-                </span>
-              </div>
+              <table class="trz__plantas-tabla">
+                <thead><tr><th>Planta</th><th>Origen</th><th class="num">Peso seco</th><th>Estado</th></tr></thead>
+                <tbody>
+                  <tr v-for="p in plantasVisibles" :key="p.id" :class="{ 'trz__planta--descartada': p.descartada }">
+                    <td class="mono" :title="p.codigo_qr">{{ p.nombre || p.codigo_qr || `#${p.id}` }}</td>
+                    <td>{{ p.origen === 'semilla' ? 'Semilla' : p.origen === 'esqueje' ? 'Esqueje' : (p.origen || '—') }}</td>
+                    <td class="num">{{ p.peso_g ? `${p.peso_g} g${p.promedio ? ' (prom.)' : ''}` : '—' }}</td>
+                    <td class="trz__planta-estado">{{ p.descartada ? `descartada · ${motivoLabel(p.motivo_descarte) || 'sin motivo'}` : (p.estado ? estadoPlanta(p.estado) : '') }}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <button v-if="todasLasPlantas.length > PLANTAS_PLEGADAS" type="button" class="trz__detalle-btn" @click="plantasAbiertas = !plantasAbiertas">
+                <i :class="plantasAbiertas ? 'bi bi-chevron-down' : 'bi bi-chevron-right'"></i>
+                {{ plantasAbiertas ? 'Ver menos' : `Ver las ${todasLasPlantas.length} plantas` }}
+              </button>
             </div>
           </div>
         </div>
@@ -393,6 +441,36 @@
           </div>
         </div>
 
+        <!-- LOS FRASCOS QUE SALIERON DEL LOTE, cada uno con su link: la cadena sigue en cada uno. -->
+        <template v-if="data.frascos">
+          <div class="trz__arrow"><i class="bi bi-arrow-down"></i></div>
+          <div class="trz__node trz__node--stock">
+            <div class="trz__node-head">
+              <span class="trz__node-badge trz__node-badge--stock">🏷️ FRASCOS QUE SALIERON</span>
+              <span class="trz__node-code">{{ data.frascos.length }}</span>
+            </div>
+            <div class="trz__node-body">
+              <div v-if="data.frascos.length" class="trz__disp-wrap">
+                <table class="trz__disp-table">
+                  <thead><tr><th>Frasco</th><th>Forma</th><th>Sede</th><th>Entró</th><th>Queda</th><th>Elaborado</th></tr></thead>
+                  <tbody>
+                    <tr v-for="f in data.frascos" :key="f.id">
+                      <td class="trz__td-bold"><a href="#" class="trz__link" @click.prevent="buscar(f.id)">{{ f.numero || `#${f.id}` }}</a></td>
+                      <td>{{ FORMA_LABELS[f.forma] || f.forma }}</td>
+                      <td>{{ f.sede || '—' }}</td>
+                      <td class="trz__td-g">{{ f.cantidad_inicial }} {{ f.unidad || 'g' }}</td>
+                      <td class="trz__td-g">{{ f.cantidad }} {{ f.unidad || 'g' }}</td>
+                      <td class="trz__td-fecha">{{ formatDate(f.fecha_elaboracion) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div v-else class="trz__no-disp"><i class="bi bi-inbox"></i> Todavía no salió ningún frasco de este lote.</div>
+            </div>
+          </div>
+        </template>
+
+        <template v-if="data.stock">
         <div class="trz__arrow"><i class="bi bi-arrow-down"></i></div>
 
         <!-- Nodo 3: STOCK -->
@@ -486,6 +564,7 @@
             </div>
           </div>
         </div>
+        </template>
 
       </div>
 
@@ -501,10 +580,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { getStockTrazabilidad, listStocks } from '../../lib/api.js'
+import { getStockTrazabilidad, getLoteTrazabilidad, listStocks, listLotes } from '../../lib/api.js'
 import { descargarArchivo } from '../../lib/descargas.js'
 import { hoyISO } from '../../utils/dates.js'
-import { ESTADO_META } from '../../lib/loteHelpers.js'
+import { ESTADO_META, PLANT_STATE_META } from '../../lib/loteHelpers.js'
 
 const FORMA_LABELS = {
   flor_seca: 'Flor seca', hash: 'Hash', aceite: 'Aceite', tintura: 'Tintura',
@@ -523,6 +602,7 @@ const MOTIVO_DESCARTE_LABELS = {
 }
 const motivoLabel = (m) => MOTIVO_DESCARTE_LABELS[m] || m
 const estadoLabel = (e) => ESTADO_META[e]?.label || e
+const estadoPlanta = (e) => PLANT_STATE_META[e]?.label || e
 
 // Cada salida con su nombre y, cuando el producto sigue existiendo, a dónde fue. Un traslado o
 // un derivado no son pérdida: son el mismo producto en otra fila.
@@ -557,7 +637,53 @@ const loadingList = ref(true)
 const error       = ref(null)
 const data        = ref(null)
 const stocksList  = ref([])
+const lotesList   = ref([])
 const autoVisible = ref(false)
+
+// ── Solapas y filtros del listado ───────────────────────────────────────────
+const solapa = ref('lotes')
+const filtro = ref({ estado: '', sede: '', genetica: '', desde: '', hasta: '' })
+const hayFiltros = computed(() => Object.values(filtro.value).some(Boolean))
+function limpiarFiltros () { filtro.value = { estado: '', sede: '', genetica: '', desde: '', hasta: '' } }
+
+const EN_CULTIVO = ['enraizado', 'vegetativo', 'floracion']
+const COSECHADOS = ['cosecha', 'en_manicura', 'curado']
+const sedeDeLote = (l) => l.sede?.nombre || l.sala?.sede?.nombre || l.sede_nombre
+const frascosDeLote = (l) => stocksList.value.filter(s => (s.lote_id ?? s.lote?.id) === l.id)
+const enRango = (fecha) => {
+  if (!fecha) return !filtro.value.desde && !filtro.value.hasta
+  const f = String(fecha).slice(0, 10)
+  return (!filtro.value.desde || f >= filtro.value.desde) && (!filtro.value.hasta || f <= filtro.value.hasta)
+}
+const lotesFiltrados = computed(() => lotesList.value.filter(l => {
+  const e = filtro.value.estado
+  if (e === 'cultivo' && !EN_CULTIVO.includes(l.estado)) return false
+  if (e === 'cosechados' && !COSECHADOS.includes(l.estado)) return false
+  if (e === 'finalizado' && l.estado !== 'finalizado') return false
+  if (filtro.value.sede && sedeDeLote(l) !== filtro.value.sede) return false
+  if (filtro.value.genetica && l.genetica?.nombre !== filtro.value.genetica) return false
+  return enRango(l.start_date)
+}))
+const stocksFiltrados = computed(() => stocksList.value.filter(s => {
+  const e = filtro.value.estado
+  if (e === 'con_stock' && !(Number(s.cantidad) > 0)) return false
+  if (e === 'agotado' && Number(s.cantidad) > 0) return false
+  if (filtro.value.sede && s.sede?.nombre !== filtro.value.sede) return false
+  if (filtro.value.genetica && (s.genetica_nombre || s.genetica?.nombre) !== filtro.value.genetica) return false
+  return enRango(s.fecha_elaboracion)
+}))
+const sedesDeLista = computed(() => [...new Set([...lotesList.value.map(sedeDeLote), ...stocksList.value.map(s => s.sede?.nombre)].filter(Boolean))].sort())
+const geneticasDeLista = computed(() => [...new Set([...lotesList.value.map(l => l.genetica?.nombre), ...stocksList.value.map(s => s.genetica_nombre || s.genetica?.nombre)].filter(Boolean))].sort())
+
+// ── Plantas: una lista, vivas y descartadas, plegada ──
+const PLANTAS_PLEGADAS = 5
+const plantasAbiertas = ref(false)
+const todasLasPlantas = computed(() => [
+  ...(data.value?.plantas || []),
+  ...(data.value?.plantas_descartadas || []).map(p => ({ ...p, descartada: true })),
+])
+const plantasVisibles = computed(() => plantasAbiertas.value ? todasLasPlantas.value : todasLasPlantas.value.slice(0, PLANTAS_PLEGADAS))
+const genetica = computed(() => data.value?.stock?.genetica || data.value?.lote?.genetica || null)
 // El log detallado arranca plegado: se abre a pedido, no por defecto.
 const detalleAbierto = ref(false)
 
@@ -603,11 +729,27 @@ const timeline = computed(() => {
 
 onMounted(async () => {
   try {
-    const r = await listStocks()
+    const [r, l] = await Promise.all([listStocks(), listLotes()])
     stocksList.value = r.data || []
-  } catch { stocksList.value = [] }
+    lotesList.value  = l.data || []
+  } catch { stocksList.value = []; lotesList.value = [] }
   finally { loadingList.value = false }
 })
+
+async function abrirLote (id) {
+  loading.value = true
+  error.value   = null
+  data.value    = null
+  plantasAbiertas.value = false
+  try {
+    const res = await getLoteTrazabilidad(id)
+    data.value = res.data
+  } catch (e) {
+    error.value = e.response?.data?.error || 'Error al cargar la trazabilidad del lote'
+  } finally {
+    loading.value = false
+  }
+}
 
 function onInput() { autoVisible.value = true; error.value = null }
 function onBlur() { setTimeout(() => { autoVisible.value = false }, 150) }
@@ -641,6 +783,7 @@ async function buscar(id) {
   loading.value = true
   error.value   = null
   data.value    = null
+  plantasAbiertas.value = false
   try {
     const res = await getStockTrazabilidad(id)
     data.value = res.data
@@ -925,14 +1068,25 @@ const formatDate = d => d
 
 /* Plantas chips */
 .trz__plantas { display: flex; flex-direction: column; gap: .35rem; }
+.trz__plantas-tabla { width: 100%; border-collapse: collapse; font-size: .8rem; margin-top: .25rem; }
+.trz__plantas-tabla th { text-align: left; font-size: .65rem; text-transform: uppercase; letter-spacing: .05em; color: var(--c-slate-400); padding: .25rem .5rem; border-bottom: 1px solid var(--c-slate-200); }
+.trz__plantas-tabla td { padding: .3rem .5rem; border-bottom: 1px solid var(--c-slate-100); color: var(--c-slate-800); }
+.trz__plantas-tabla .num { text-align: right; font-variant-numeric: tabular-nums; }
+.trz__plantas-tabla .mono { font-family: var(--font-mono, monospace); font-size: .78rem; }
+.trz__planta--descartada td { color: var(--c-slate-400); }
+.trz__planta-estado { font-size: .74rem; color: var(--c-slate-500); }
+.trz__tabs { display: flex; gap: .25rem; border-bottom: 1px solid var(--c-slate-200); margin-bottom: .75rem; }
+.trz__tab { background: none; border: none; border-bottom: 2px solid transparent; padding: .45rem .9rem; font: inherit; font-size: .875rem; color: var(--c-slate-500); cursor: pointer; }
+.trz__tab--on { color: #1b5e20; border-bottom-color: #1b5e20; font-weight: 700; }
+.trz__filtros { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; margin-bottom: .9rem; }
+.trz__filtro { background: #fff; border: 1.5px solid var(--c-slate-200); border-radius: 8px; padding: .4rem .6rem; font-size: .82rem; color: var(--c-slate-900); font-family: inherit; }
+.trz__filtro-fechas { display: inline-flex; align-items: center; gap: .4rem; font-size: .8rem; color: var(--c-slate-500); }
+.trz__filtro-limpiar { background: none; border: none; font: inherit; font-size: .8rem; color: #1b5e20; cursor: pointer; text-decoration: underline; }
+.trz__dias { font-size: .74rem; color: var(--c-slate-500); }
+.trz__muted { color: var(--c-slate-400); font-size: .8rem; }
 .trz__plantas-lbl { font-size: .68rem; font-weight: 600; color: var(--c-slate-500); }
 .trz__plantas-chips { display: flex; flex-wrap: wrap; gap: .25rem; }
-.trz__planta-chip {
-  background: #f0fdf4; border: 1px solid #bbf7d0; color: #15803d;
-  font-size: .68rem; padding: .1em .5em; border-radius: 5px; font-family: monospace; font-weight: 600;
-}
 /* Las descartadas se leen distinto de las que produjeron: en gris, no en verde. */
-.trz__planta-chip--descartada { background: var(--c-slate-50); border-color: var(--c-slate-200); color: var(--c-slate-500); }
 .trz__plantas-nota { font-size: .66rem; color: var(--c-slate-500); line-height: 1.35; }
 
 /* Arrow */

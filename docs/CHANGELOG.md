@@ -1,5 +1,40 @@
 # Changelog
 
+## Septiembre 2026 (bi) — Trazabilidad desde el lote, Pérdidas sin sumar unidades, y cuatro cosas de probar la app
+
+**Trazabilidad, segunda vuelta** (lo que vio Germán en producción):
+- **Solapa Lotes** al lado de Frascos (`GET /lotes/:id/trazabilidad`, `Lotes::Trazabilidad`): un
+  lote en floración no tiene frasco todavía y la pregunta del auditor puede empezar por la
+  planta. Misma cadena cortada antes, más los frascos que salieron de él con link. **Filtros** en
+  las dos solapas: estado, sede, genética, rango de fechas.
+- **Las plantas por NOMBRE** (`L-26-031-P020`), en tabla plegada de cinco; el QR sólo como título
+  al pasar el mouse. Quince códigos de máquina seguidos eran una pared.
+- **Los ajustes de conteo se netean por cierre** (`Stocks::Trazabilidad#ajustes_neteados`): un
+  dedazo corregido —−194 y +194— ya no aparece como salida y entrada de producto que no se movió.
+  **«Corregir conteo» pide la causa** (`error_conteo` / `faltaba`) y **quien cerró corrige su
+  propio último cierre** sin esperar al admin (`puede_corregir?`): si el que atiende tipeó 21 en
+  vez de 215 y el admin no está, el error quedaba en el inventario hasta el día siguiente.
+- La cronología del lote salió a `Lotes::Cronologia`, que leen las dos trazabilidades.
+
+**Pérdidas**, cuarto de la revisión (`Informes::Perdidas`): descartes **por la fecha en que
+pasó** (`PlantActivity`, nunca `updated_at`), producto **por unidad** (4 prerolls ya no son 4
+gramos), **diferencias del mostrador neteadas** por frasco, y **«producirlo costó»** al lado de
+cada cosa (costo del lote prorrateado por planta; costo unitario del frasco). Comparación con el
+anterior en cantidad —subir es ámbar—, motivo con sus lotes, lista planta por planta y frasco por
+frasco. **Sin «stock vencido»: no existe** (Germán).
+
+**Y de probar la app:**
+- **Un retiro puede ir «a guardarse en la organización»** (sacar plata, cierre de caja, y como
+  cuarta forma de saldar uno viejo): la recaudación que se lleva el admin a la caja fuerte no es
+  deuda suya y aparecía como «Admin Demo debe $217.097». Sin «cuenta del club»: es el mismo
+  `retiro_caja`, que nace saldado con `organizacion`.
+- **El pesaje se escribe en la celda de la tabla** de manicura (`MncLoteDetailView`), como en la
+  mesa del mostrador: con una tablet, ir y volver a la vista de cada planta era un viaje por
+  planta. Enter guarda y salta a la siguiente sin pesar; tocar el nombre sigue abriendo el QR.
+- **«Impuestos y tasas»** en el catálogo contable (se siembra solo en las organizaciones viejas), y
+  en Gastos recurrentes **cantidad y unidad sólo si la categoría entra a un depósito**: un
+  impuesto no tiene cantidad.
+
 ## Septiembre 2026 (bh) — Dispensaciones cuenta por línea y por unidad, y el PDF baja lo que la pantalla muestra
 
 Tercero de la revisión informe por informe. El cálculo salió del controller a

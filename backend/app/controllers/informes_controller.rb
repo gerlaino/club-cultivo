@@ -411,89 +411,58 @@ class InformesController < ApplicationController
   # Qué se perdió, y por qué. Ningún informe lo decía: producción cuenta lo que salió bien y
   # trazabilidad cierra el balance de UN producto, pero la organización no tenía dónde ver cuánto se
   # cayó en total. Para quien audita es de lo primero que se pregunta; para el dueño es plata.
+  # Dos preguntas del período: qué no llegó a cosecha y qué se perdió después, cada cosa por
+  # unidad y con lo que costó producirla. El cálculo vive en `Informes::Perdidas`.
   def perdidas
     club = current_user.club
     desde, hasta = periodo_rango
+    datos = Informes::Perdidas.new(club: club, desde: desde, hasta: hasta).call
+    pl = datos[:plantas]
+    pr = datos[:producto]
 
-    # 1. PLANTAS descartadas, con su motivo. Es la pérdida más cara: cada una es un ciclo que
-    #    no llegó a cosecha.
-    descartadas = Plant.joins(lote: :sala)
-                       .where(salas: { sede_id: club.sede_ids }, state: 'descartada')
-                       .where(updated_at: desde..hasta)
-    por_motivo = descartadas.group(:motivo_descarte).count
-                            .transform_keys { |m| (m || 'sin_motivo').to_s.tr('_', ' ').capitalize }
-
-    # 2. MERMA de inventario: lo que salió del stock sin ser una dispensación. `merma` es la
-    #    pérdida declarada; los ajustes negativos son correcciones de inventario que también
-    #    son producto que ya no está.
-    # Por la fecha en que PASÓ, no por la de carga: un cierre del jueves anotado el lunes es
-    # merma del jueves, y contarla en la semana equivocada es lo que hace que el informe no
-    # coincida con lo que la persona recuerda.
-    movs   = StockMovimiento.joins(stock: :sede)
-                            .where(sedes: { club_id: club.id })
-                            .en_periodo(desde, hasta)
-    merma_g  = movs.where(tipo: 'merma').sum(:gramos).to_f.abs.round(1)
-    negativos = movs.where(tipo: 'ajuste').where('gramos < 0')
-    # El arqueo del MOSTRADOR va aparte. Estaba dentro de "ajustes en menos" junto con cualquier
-    # otra corrección de inventario: el admin veía un número y no tenía forma de saber que era
-    # lo que se pierde atendiendo, que es lo único de esta lista sobre lo que puede hacer algo
-    # esta semana.
-    mostrador_g = negativos.de_mostrador.sum(:gramos).to_f.abs.round(1)
-    ajuste_g    = negativos.sin_mostrador.sum(:gramos).to_f.abs.round(1)
-
-    # 3. STOCK VENCIDO que sigue en góndola: todavía no es pérdida contable, pero lo va a ser.
-    vencido = Stock.where(club_id: club.id).where('cantidad > 0')
-                   .where.not(estado: 'agotado')
-                   .where('fecha_vencimiento_est < ?', Time.zone.today)
-    vencido_g = vencido.where(forma_producto: 'flor_seca').sum(:cantidad).to_f.round(1)
-
-    datos = {
-      plantas_descartadas: descartadas.count,
-      plantas_por_motivo:  por_motivo,
-      merma_g:             merma_g,
-      merma_mostrador_g:   mostrador_g,
-      ajustes_negativos_g: ajuste_g,
-      total_gramos:        (merma_g + mostrador_g + ajuste_g).round(1),
-      stock_vencido_g:     vencido_g,
-      stock_vencido_items: vencido.count,
-    }
-
-    secciones = [{
-      titulo: 'Plantas descartadas, por motivo',
-      headers: ['Motivo', 'Plantas'],
-      rows: por_motivo.sort_by { |_, n| -n }.map { |motivo, n| [motivo, n] },
-      formatos: [:texto, :numero],
-      totales: [1],
-      aligns: { 1 => :right },
-      vacio: 'No se descartó ninguna planta en el período.',
-    }, {
-      titulo: 'Producto perdido',
-      headers: ['Concepto', 'Gramos'],
-      rows: [['Merma declarada', merma_g],
-             ['Faltante en el arqueo del mostrador', mostrador_g],
-             ['Otros ajustes de inventario en menos', ajuste_g],
-             ['Stock vencido todavía en góndola', vencido_g]],
-      formatos: [:texto, :numero],
-      aligns: { 1 => :right },
-    }]
+    fmt_u   = ->(c, u) { "#{ActiveSupport::NumberHelper.number_to_delimited(c.to_f.round(1).to_s.sub(/\.0\z/, ''), delimiter: '.', separator: ',')} #{u}" }
+    fmt_ars = ->(v) { v.nil? ? '—' : "$ #{ActiveSupport::NumberHelper.number_to_delimited(v.round, delimiter: '.', separator: ',')}" }
+    motivo_label = ->(m) { m.to_s.tr('_', ' ').capitalize }
 
     responder_informe(
       titulo: 'Informe de pérdidas', nombre: 'informe_perdidas',
-      resena: 'Qué se perdió la organización en el período y por qué: plantas que no llegaron a cosecha ' \
-              'con su motivo, y producto que salió del inventario sin ser una dispensación ' \
-              '(merma declarada, faltantes del arqueo del mostrador y otros ajustes en menos). ' \
-              'El faltante del mostrador es merma de atención —fraccionar, pesar— y es inevitable: ' \
-              'el detalle por producto y por turno está en Mostrador → Merma. ' \
-              'El stock vencido todavía no es pérdida, pero lo va a ser.',
+      resena: 'Qué se perdió la organización en el período y por qué: las plantas que no llegaron a cosecha, ' \
+              'con su motivo y su lote, y el producto que salió del inventario sin entregarse —merma declarada ' \
+              'y diferencias de conteo del mostrador, neteadas por cierre—. Cada cosa en su unidad, con lo que ' \
+              'costó producirla al lado.',
       datos: datos, periodo: etiqueta_periodo(desde, hasta),
-      kpis: [
-        { label: 'Plantas descartadas', valor: descartadas.count, tono: descartadas.count.positive? ? :warn : :ok },
-        { label: 'Merma', valor: merma_g },
-        { label: 'Faltante del mostrador', valor: mostrador_g },
-        { label: 'Otros ajustes en menos', valor: ajuste_g },
-        { label: 'Vencido en góndola', valor: vencido_g, tono: vencido_g.positive? ? :crit : :ok },
+      kpis: [{ label: 'Plantas descartadas', valor: pl[:total], tono: pl[:total].positive? ? :warn : :ok },
+             { label: 'Producirlas costó', valor: fmt_ars.call(pl[:costo_ars]) }] +
+            pr[:por_unidad].map { |x| { label: "Producto perdido, #{FORMAS_UNIDAD[x[:unidad]]&.downcase || x[:unidad]}", valor: fmt_u.call(x[:cantidad], x[:unidad]), tono: :warn } } +
+            [{ label: 'Producirlo costó', valor: fmt_ars.call(pr[:costo_ars]) }],
+      secciones: [
+        {
+          titulo: 'Lo que no llegó a cosecha, por motivo',
+          headers: ['Motivo', 'Plantas', 'Lotes', 'Última'],
+          rows: pl[:por_motivo].map { |m| [motivo_label.call(m[:motivo]), m[:plantas], m[:lotes].map { |l| "#{l[:codigo]}#{l[:plantas] > 1 ? " (#{l[:plantas]})" : ''}" }.join(', '), fmt_fecha(m[:ultima])] },
+          formatos: [:texto, :numero, :texto, :texto],
+          totales: [1],
+          aligns: { 1 => :right },
+          col_min: { 1 => 60, 3 => 68 },
+          vacio: 'No se descartó ninguna planta en el período.',
+        },
+        {
+          titulo: 'Planta por planta',
+          headers: ['Fecha', 'Lote', 'Planta', 'Genética', 'Motivo', 'Costó'],
+          rows: pl[:lista].map { |p| [fmt_fecha(p[:fecha]) + (p[:fecha_estimada] ? ' (aprox.)' : ''), p[:lote], p[:nombre], p[:genetica] || '—', motivo_label.call(p[:motivo]), fmt_ars.call(p[:costo_ars])] },
+          aligns: { 5 => :right },
+          col_min: { 0 => 80, 5 => 70 },
+          vacio: 'No se descartó ninguna planta en el período.',
+        },
+        {
+          titulo: 'Lo que se perdió después',
+          headers: ['Fecha', 'Frasco', 'Qué pasó', 'Cantidad', 'Costó'],
+          rows: pr[:lista].map { |f| [fmt_fecha(f[:fecha]), [f[:frasco], f[:genetica]].compact.join(' · '), [f[:que_paso], f[:detalle]].compact.join(' · «') + (f[:detalle] ? '»' : ''), fmt_u.call(f[:cantidad], f[:unidad]), fmt_ars.call(f[:costo_ars])] },
+          aligns: { 3 => :right, 4 => :right },
+          col_min: { 0 => 68, 3 => 64, 4 => 70 },
+          vacio: 'No se perdió producto en el período.',
+        },
       ],
-      secciones: secciones,
     )
   end
 
