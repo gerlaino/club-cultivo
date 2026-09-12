@@ -1,5 +1,35 @@
 # Changelog
 
+## Septiembre 2026 (bf) — La trazabilidad cierra la cuenta, y la cuenta tiene nombres
+
+Segundo de la revisión informe por informe. El balance de un frasco —lo único que un auditor
+comprueba con lápiz— estaba mal en tres sentidos que no se veían, y el cálculo salió del controller
+a **`Stocks::Trazabilidad`** (pantalla y PDF leen el mismo hash):
+
+- **Las entregas se cuentan POR LÍNEA** (`DispensacionItem`). Desde la dispensa multi-producto,
+  `dispensaciones.stock_id` es la primera línea y `cantidad` la suma de todas: 5 g de A + 3 g de B
+  figuraba en A con 8 g y en B no figuraba. Cada frasco ve su parte, y la fila dice «con ST-x».
+- **Las canceladas no cuentan**: lo que volvió al frasco no salió. Estaban en «queda» y en
+  «dispensado» a la vez.
+- **El total se suma sobre TODAS**; la pantalla lista las últimas 100 y dice cuántas más hay. El
+  PDF las lleva completas, porque es lo que se entrega.
+- **«Salió por otro lado» tiene nombres**: traslado (con la fila destino), a derivado (con el
+  frasco), consumo en evento, ajuste, merma. Antes se deducía por resta y metía un traslado a otra
+  sede —el mismo producto en otra fila— en una bolsa ámbar con la merma. Lo que ningún movimiento
+  explica se llama **«sin explicar»** y es lo único que se pinta junto con la merma. El traslado
+  por fraccionamiento ahora enlaza `stock_resultante`.
+- **La cuenta en una oración** (`frase`), para leer en voz alta: «Entraron 612 g de 18 plantas del
+  lote L-26-031. 418,5 g fueron a 134 entregas. 30 g se convirtieron en ST-26-052. 2 g son merma.
+  Quedan 97,5 g. La cuenta cierra.» Y «queda» se parte en mesa / depósito.
+- **La cronología del lote estaba MUERTA**: la pantalla leía `lote_eventos`, que el backend nunca
+  mandó, y mostraba sólo la pesada. Ahora viaja `cronologia` (cambios de estado con los días del
+  anterior, descartes, pesajes) y hay un test de pantalla que la fija.
+- **Un derivado hereda la cadena** de la flor de la que salió (decisión de Germán) y dice de qué
+  frasco; **un stock externo** muestra su proveedor y no un nodo de cultivo vacío; **«siguió en…»**
+  enlaza al traslado y al derivado. El perfil **medido** va al lado del declarado.
+- **DNI: tres dígitos en pantalla, entero sólo en el PDF** (decisión de Germán). Estado del lote
+  traducido, pie sin marca de la plataforma.
+
 ## Septiembre 2026 (be) — El informe de Producción contesta la pregunta de producción
 
 Primero de la revisión informe por informe con Germán. El de Producción tenía cinco KPIs y **dos

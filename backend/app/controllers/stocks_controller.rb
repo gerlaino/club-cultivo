@@ -507,184 +507,20 @@ class StocksController < ApplicationController
   end
 
   # GET /stocks/:id/trazabilidad
+  # El cálculo vive en `Stocks::Trazabilidad`; acá sólo se elige el formato. El PDF pide la lista
+  # de entregas COMPLETA y el DNI entero: es lo que se entrega, y cortado en cien no acredita nada.
   def trazabilidad
     s = @stock
 
-    # Lote origen
-    lote = s.lote
-
-    # Genética — directo en stock o heredada del lote
-    genetica = s.genetica || lote&.genetica
-
-    # Pesada origen
-    pesada = s.pesada
-
-    # ── Plantas de origen ─────────────────────────────────────────────────────────────────
-    #
-    # Trazar es decir DE QUÉ PLANTAS salió ESTE frasco, no qué plantas tuvo el lote. Se leía
-    # sólo `pesada.pesadas_plantas` —el flujo viejo—, así que un stock nacido del flujo de
-    # manicura (`PesajeManicura`, que es por donde entra hoy toda la flor seca) no encontraba
-    # nada y caía a "todas las plantas del lote": diez plantas listadas como origen de un frasco
-    # que salió de dos, con las descartadas adentro. El registro decía una cosa y el informe otra.
-    #
-    # `atribucion` explicita cuál de las dos cosas se está mostrando, porque no valen lo mismo:
-    #   planta → cada planta con el peso que aportó a este stock (trazabilidad de verdad)
-    #   lote   → no hay pesaje por planta; lo único cierto es de qué lote vino
-    # El peso que vale es el SECO: es el que se convirtió en stock. El húmedo queda de respaldo
-    # para los pesajes que sólo registraron eso. (`peso_g` no existe en `pesadas_plantas` — la
-    # rama vieja lo leía igual y habría reventado la primera vez que un stock tuviera pesada.)
-    peso_por_planta = ->(pp) { (pp.peso_seco_g || pp.peso_humedo_g)&.to_f }
-
-    pesadas_plantas = PesadaPlanta.includes(:plant)
-                                  .where(pesaje_manicura_id: s.pesajes_manicura.select(:id))
-                                  .to_a
-    pesadas_plantas += pesada.pesadas_plantas.includes(:plant).to_a if pesada
-
-    if pesadas_plantas.any?
-      atribucion = 'planta'
-      # Una planta puede aparecer en más de un pesaje del mismo contenedor (se pesa en tandas):
-      # va una sola vez, con la suma de lo que aportó.
-      plantas = pesadas_plantas.group_by(&:plant_id).map do |plant_id, filas|
-        planta = filas.first.plant
-        pesos  = filas.filter_map(&peso_por_planta)
-        { id: plant_id, codigo_qr: planta&.codigo_qr, origen: planta&.origen,
-          peso_g: pesos.any? ? pesos.sum.round(2) : nil,
-          # Peso repartido en partes iguales, no medido planta por planta: se declara para que
-          # nadie lea como medición lo que fue un promedio.
-          promedio: filas.any?(&:es_promedio) }
-      end
-    elsif lote
-      atribucion = 'lote'
-      # Sin descartadas: una planta que se descartó por error humano o que murió no produjo
-      # nada — listarla como origen de un frasco es afirmar lo contrario de lo que pasó. Van
-      # aparte, en `plantas_descartadas`, que es donde explican el hueco del balance.
-      plantas = lote.plants.where.not(state: 'descartada')
-                    .map { |p| { id: p.id, codigo_qr: p.codigo_qr, origen: p.origen, peso_g: nil } }
-    else
-      atribucion = nil
-      plantas    = []
-    end
-
-    # Las descartadas del lote, con el motivo. No son origen de nada, pero sin ellas el lector
-    # cuenta las plantas del lote, las compara con las de acá y no entiende la diferencia.
-    descartadas = lote ? lote.plants.where(state: 'descartada').map { |p|
-      { id: p.id, codigo_qr: p.codigo_qr, motivo_descarte: p.motivo_descarte }
-    } : []
-
-    # Dispensaciones
-    dispensaciones = s.dispensaciones.includes(:paciente).order(created_at: :desc).limit(100).map do |d|
-      {
-        id:                 d.id,
-        fecha:              d.fecha_dispensacion,
-        cantidad_g:         d.cantidad&.to_f,
-        # Nombre completo: la trazabilidad se lee para saber a quién le llegó cada gramo, y
-        # dos iniciales no acreditan a nadie. El DNI sigue parcial (últimos cuatro).
-        paciente:           d.paciente&.nombre_completo,
-        paciente_iniciales: "#{d.paciente&.nombre&.[](0)}.#{d.paciente&.apellido&.[](0)}.",
-        # Últimos TRES, como el resto de los informes: dos criterios distintos para el mismo dato
-        # hacen que dos informes parezcan contradecirse.
-        paciente_dni_last3: d.paciente&.dni_normalizado.to_s.last(3),
-        # Completo sólo para el PDF, que es lo que se presenta. La pantalla usa los últimos 4.
-        paciente_dni:       d.paciente&.dni_normalizado.to_s,
-      }
-    end
-
-    gramos_dispensados  = dispensaciones.sum { |d| d[:cantidad_g].to_f }.round(2)
-    cantidad_disponible = s.cantidad.to_f.round(2)
-    cantidad_inicial    = s.cantidad_inicial.to_f.round(2) # verdad única (no reconstruir)
-
-    datos = {
-      stock: {
-        id:                   s.id,
-        numero_lote_producto: s.numero_lote_producto,
-        forma_producto:       s.forma_producto,
-        cantidad_inicial_g:   cantidad_inicial,
-        cantidad_disponible_g: cantidad_disponible,
-        fecha_elaboracion:    s.fecha_elaboracion,
-        codigo_qr:            s.codigo_qr,
-        genetica: genetica ? {
-          id:                    genetica.id,
-          # Informe REGULATORIO: va el nombre con el que el club acredita la variedad ante
-          # el organismo. Si declara contra una inscripta, esa es la que corresponde; el
-          # nombre real queda en `nombre_propio` para que la traducción sea auditable.
-          nombre:                genetica.nombre_declarado,
-          nombre_propio:         genetica.nombre,
-          declarada:             genetica.declarada_como.present?,
-          numero_registro_inase: genetica.numero_inase_declarado,
-          tipo:                  genetica.tipo,
-          thc:                   genetica.thc,
-          cbd:                   genetica.cbd,
-        } : nil,
-      },
-      lote: lote ? {
-        id:      lote.id,
-        codigo:  lote.codigo,
-        estado:  lote.estado,
-        genetica: lote.genetica ? { nombre: lote.genetica.nombre_declarado,
-                                    nombre_propio: lote.genetica.nombre,
-                                    declarada: lote.genetica.declarada_como.present?,
-                                    numero_registro_inase: lote.genetica.numero_inase_declarado } : nil,
-      } : nil,
-      # QUÉ SE LE APLICÓ, que es la otra mitad de trazar. La cadena de origen decía de qué plantas
-      # salió el frasco; esto dice qué recibieron esas plantas. Todo estaba guardado en
-      # `registros_ambientales` y no lo mostraba nadie.
-      aplicaciones: Lotes::ResumenAplicaciones.new(lote).call,
-      # El dato más fuerte que se le puede mostrar a un paciente: THC y CBD MEDIDOS, no los que
-      # declara el criador. Estaban en su tabla, fuera de la trazabilidad.
-      analisis_laboratorio: lote ? lote.analisis_laboratorio.order(fecha_analisis: :desc).map { |a|
-        {
-          fecha:       a.fecha_analisis,
-          laboratorio: a.laboratorio,
-          thc_pct:     a.thc_pct&.to_f,
-          cbd_pct:     a.cbd_pct&.to_f,
-          cbg_pct:     a.cbg_pct&.to_f,
-          terpenos:    a.terpenos_principales,
-        }
-      } : [],
-      pesada: pesada ? {
-        id:             pesada.id,
-        fase_destino:   pesada.fase_destino,
-        peso_total_g:   pesada.peso_total_g&.to_f,
-        registrado_at:  pesada.registrado_at,
-        plantas_count:  plantas.size,
-      } : nil,
-      plantas:             plantas,
-      # 'planta' = de estas plantas salió este frasco, con su peso. 'lote' = no hay pesaje por
-      # planta; lo único cierto es el lote. Quien lee tiene que saber cuál de las dos está viendo.
-      atribucion:          atribucion,
-      plantas_descartadas: descartadas,
-      dispensaciones: dispensaciones,
-      # EL BALANCE, que es lo que un auditor va a preguntar: entró tanto, salió tanto, queda
-      # tanto — ¿y la diferencia? Sin esto la trazabilidad mostraba la cadena pero no cerraba
-      # la cuenta, y el hueco entre lo producido y lo dispensado quedaba invisible.
-      totales: {
-        plantas_origen:       plantas.size,
-        # Las que no llegaron a producir. Van al lado del origen para que la resta cierre a
-        # simple vista: el lote tenía tantas, produjeron estas, se descartaron aquellas.
-        plantas_descartadas:  descartadas.size,
-        dispensaciones_count: dispensaciones.size,
-        gramos_producidos:    cantidad_inicial,
-        gramos_dispensados:   gramos_dispensados,
-        cantidad_disponible_g: cantidad_disponible,
-        # Lo que salió sin ser una dispensación: mermas, descartes, ajustes y lo que se consumió
-        # para elaborar derivados. Se deduce del balance, así que incluye cualquier salida que
-        # no haya pasado por el mostrador.
-        otras_salidas_g:      (cantidad_inicial - gramos_dispensados - cantidad_disponible).round(2),
-        # Qué proporción del lote llegó efectivamente al paciente.
-        pct_dispensado:       cantidad_inicial.positive? ? ((gramos_dispensados / cantidad_inicial) * 100).round(1) : 0,
-      },
-    }
-
     respond_to do |format|
-      format.json { render json: datos }
-      # PDF de servidor: la trazabilidad de un lote es lo primero que pide un auditor y se
-      # bajaba como captura de pantalla.
+      format.json { render json: Stocks::Trazabilidad.new(stock: s).call }
+      # SALE SIEMPRE. No es un documento que se presente por mesa de entradas: es lo que pide un
+      # auditor en una inspección y lo que la organización usa para mirar su propia cadena.
+      # Si hay variedades sin acreditar, el PDF lo DICE — y nombra sólo las de ESTE frasco:
+      # avisar acá por una variedad que no lo tocó nunca es ruido que enseña a ignorar el aviso.
       format.pdf do
-        # SALE SIEMPRE. No es un documento que se presente por mesa de entradas: es lo que pide un
-        # auditor en una inspección y lo que la organización usa para mirar su propia cadena.
-        # Si hay variedades sin acreditar, el PDF lo DICE — y nombra sólo las de ESTE frasco:
-        # avisar acá por una variedad que no lo tocó nunca es ruido que enseña a ignorar el aviso.
-        ids_genetica = [s.genetica_id, lote&.genetica_id].compact.uniq
+        datos = Stocks::Trazabilidad.new(stock: s, completo: true).call
+        ids_genetica = [s.genetica_id, s.lote&.genetica_id].compact.uniq
         send_data TrazabilidadDocument.new(club: current_user.club, usuario: current_user, datos: datos,
                                            salvedad_inase: salvedad_inase(ids: ids_genetica)).render,
                   filename: "trazabilidad_#{s.numero_lote_producto.presence || s.id}_#{Time.zone.today.strftime('%Y%m%d')}.pdf",
@@ -758,6 +594,7 @@ class StocksController < ApplicationController
           gramos:          -cantidad,
           sede_origen_id:  @stock.sede_id,
           sede_destino_id: sede.id,
+          stock_resultante: nuevo, # la trazabilidad sigue la cadena por acá («siguió en…»)
           usuario:         current_user,
           notas:           "Fraccionado a #{nuevo.numero_lote_producto} · #{sede.nombre}",
         )

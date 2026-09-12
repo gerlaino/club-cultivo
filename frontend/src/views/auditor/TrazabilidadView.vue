@@ -5,7 +5,7 @@
     <div class="trz__top">
       <div class="trz__top-left">
         <h1 class="trz__title"><i class="bi bi-diagram-3-fill"></i> Trazabilidad legal</h1>
-        <p class="trz__sub">Cadena completa: origen → cultivo → stock → dispensaciones · Compliance REPROCANN</p>
+        <p class="trz__sub">Un frasco, de la planta al paciente, con la cuenta cerrada: de qué salió, qué recibió, a quién fue y qué falta por explicar.</p>
       </div>
       <div class="trz__top-right">
         <div class="trz__search-wrap">
@@ -134,56 +134,52 @@
         <div class="trz__banner-date"><i class="bi bi-calendar3"></i> {{ hoy }}</div>
       </div>
 
-      <!-- KPIs -->
-      <div class="trz__kpis">
-        <div class="trz__kpi trz__kpi--green">
-          <span class="trz__kpi-ico">🌿</span>
-          <span class="trz__kpi-val">{{ data.totales.plantas_origen }}</span>
-          <span class="trz__kpi-lbl">Plantas cultivadas</span>
-        </div>
-        <div class="trz__kpi trz__kpi--amber">
-          <span class="trz__kpi-ico">🏷️</span>
-          <span class="trz__kpi-val">{{ data.stock.cantidad_inicial_g }} g</span>
-          <span class="trz__kpi-lbl">Stock generado</span>
-        </div>
-        <div class="trz__kpi trz__kpi--blue">
-          <span class="trz__kpi-ico">📋</span>
-          <span class="trz__kpi-val">{{ data.totales.dispensaciones_count }}</span>
-          <span class="trz__kpi-lbl">Dispensaciones</span>
-        </div>
-        <div class="trz__kpi trz__kpi--purple">
-          <span class="trz__kpi-ico">⚖️</span>
-          <span class="trz__kpi-val">{{ data.totales.gramos_dispensados }} g</span>
-          <span class="trz__kpi-lbl">Gramos dispensados</span>
-        </div>
-      </div>
-
-      <!-- EL BALANCE. Es la cuenta que un auditor hace de cabeza y que el informe no cerraba:
-           entró tanto, salió tanto al paciente, queda tanto — y lo que no cuadra tiene nombre
-           (merma, descarte, lo que se consumió para elaborar un derivado). Dejarlo implícito
-           era dejar el hueco a la vista sin explicarlo. -->
+      <!-- LA CUENTA. Es lo único del informe que un auditor comprueba con lápiz: entró tanto,
+           salió tanto a pacientes, salió tanto por otro lado (CON NOMBRE: un traslado o un
+           derivado son el mismo producto en otra fila, no una pérdida), queda tanto. Lo que
+           ningún movimiento explica se llama así, y es lo que hay que ir a buscar. -->
       <div class="trz__balance">
         <div class="trz__bal-item">
-          <span class="trz__bal-lbl">Producido</span>
-          <span class="trz__bal-val">{{ data.totales.gramos_producidos }} g</span>
+          <span class="trz__bal-lbl">Entró</span>
+          <span class="trz__bal-val">{{ data.totales.gramos_producidos }} {{ unidad }}</span>
+          <span v-if="data.totales.plantas_origen" class="trz__bal-pct">de {{ data.totales.plantas_origen }} plantas</span>
+          <span v-else-if="data.stock.producido_desde" class="trz__bal-pct">de {{ data.stock.producido_desde.gramos }} g de {{ data.stock.producido_desde.numero }}</span>
+          <span v-else-if="data.stock.proveedor" class="trz__bal-pct">comprado a {{ data.stock.proveedor }}</span>
         </div>
         <span class="trz__bal-op">−</span>
         <div class="trz__bal-item">
-          <span class="trz__bal-lbl">Dispensado</span>
-          <span class="trz__bal-val">{{ data.totales.gramos_dispensados }} g</span>
-          <span class="trz__bal-pct">{{ data.totales.pct_dispensado }}%</span>
+          <span class="trz__bal-lbl">A pacientes</span>
+          <span class="trz__bal-val">{{ data.totales.gramos_dispensados }} {{ unidad }}</span>
+          <span class="trz__bal-pct">{{ data.totales.dispensaciones_count }} entregas · {{ data.totales.pct_dispensado }}%</span>
         </div>
         <span class="trz__bal-op">−</span>
-        <div class="trz__bal-item" :class="{ 'trz__bal-item--alerta': data.totales.otras_salidas_g > 0 }">
-          <span class="trz__bal-lbl">Merma y otras salidas</span>
-          <span class="trz__bal-val">{{ data.totales.otras_salidas_g }} g</span>
+        <div class="trz__bal-item trz__bal-item--salidas">
+          <span class="trz__bal-lbl">Salió por otro lado</span>
+          <span class="trz__bal-val">{{ data.totales.otras_salidas_g }} {{ unidad }}</span>
+          <ul v-if="data.salidas?.length" class="trz__bal-sub">
+            <li v-for="m in data.salidas" :key="m.id" :class="{ 'trz__bal-sub--merma': m.tipo === 'merma' }">
+              <span>{{ salidaLabel(m) }}</span>
+              <span class="trz__bal-sub-g">{{ Math.abs(m.gramos) }} {{ unidad }}</span>
+            </li>
+          </ul>
         </div>
         <span class="trz__bal-op">=</span>
         <div class="trz__bal-item trz__bal-item--total">
-          <span class="trz__bal-lbl">En stock</span>
-          <span class="trz__bal-val">{{ data.totales.cantidad_disponible_g }} g</span>
+          <span class="trz__bal-lbl">Queda</span>
+          <span class="trz__bal-val">{{ data.totales.cantidad_disponible_g }} {{ unidad }}</span>
+          <ul v-if="data.totales.en_mesa_g > 0" class="trz__bal-sub">
+            <li><span>sobre la mesa</span><span class="trz__bal-sub-g">{{ data.totales.en_mesa_g }} {{ unidad }}</span></li>
+            <li><span>en el depósito</span><span class="trz__bal-sub-g">{{ data.totales.en_deposito_g }} {{ unidad }}</span></li>
+          </ul>
+        </div>
+        <div v-if="data.totales.sin_explicar_g" class="trz__bal-item trz__bal-item--alerta">
+          <span class="trz__bal-lbl">Sin explicar</span>
+          <span class="trz__bal-val">{{ data.totales.sin_explicar_g }} {{ unidad }}</span>
+          <span class="trz__bal-pct">ningún movimiento lo explica</span>
         </div>
       </div>
+      <!-- La cuenta en una oración: lo que se lee en voz alta delante del auditor. -->
+      <p v-if="data.frase" class="trz__frase" :class="{ 'trz__frase--abierta': data.totales.sin_explicar_g }">{{ data.frase }}</p>
 
       <!-- Cadena -->
       <div class="trz__chain-divider">
@@ -195,14 +191,29 @@
         <!-- Nodo 1: ORIGEN -->
         <div class="trz__node trz__node--origen">
           <div class="trz__node-head">
-            <span class="trz__node-badge trz__node-badge--origen">🌱 ORIGEN GENÉTICO</span>
+            <span class="trz__node-badge trz__node-badge--origen">🌱 {{ esExterno ? 'ORIGEN' : 'ORIGEN GENÉTICO' }}</span>
             <span class="trz__node-code">{{ origenLabel }}</span>
           </div>
           <div class="trz__node-body">
             <div class="trz__fields">
+              <!-- Un producto comprado afuera no tiene lote: tiene proveedor. Ese es su origen. -->
+              <div v-if="esExterno" class="trz__field">
+                <span class="trz__field-lbl">Proveedor</span>
+                <span class="trz__field-val">{{ data.stock.proveedor || 'No registrado' }}</span>
+              </div>
               <div class="trz__field">
                 <span class="trz__field-lbl">Genética</span>
-                <span class="trz__field-val">{{ data.lote?.genetica?.nombre || 'No registrada' }}</span>
+                <span class="trz__field-val">{{ data.lote?.genetica?.nombre || data.stock.genetica?.nombre || 'No registrada' }}</span>
+              </div>
+              <div v-if="data.stock.genetica?.thc || data.stock.genetica?.cbd" class="trz__field">
+                <span class="trz__field-lbl">Perfil declarado</span>
+                <span class="trz__field-val">THC {{ data.stock.genetica.thc || '—' }}% · CBD {{ data.stock.genetica.cbd || '—' }}%</span>
+              </div>
+              <!-- Medido, no declarado: es lo más fuerte que se le puede mostrar a un paciente,
+                   y va al lado del declarado porque es la misma pregunta. -->
+              <div v-if="ultimoAnalisis" class="trz__field">
+                <span class="trz__field-lbl">Perfil medido</span>
+                <span class="trz__field-val">THC {{ ultimoAnalisis.thc_pct ?? '—' }}% · CBD {{ ultimoAnalisis.cbd_pct ?? '—' }}%<span v-if="ultimoAnalisis.laboratorio"> · {{ ultimoAnalisis.laboratorio }}</span><span v-if="ultimoAnalisis.fecha"> · {{ fecha(ultimoAnalisis.fecha) }}</span></span>
               </div>
               <div class="trz__field" v-if="data.lote?.genetica?.tipo">
                 <span class="trz__field-lbl">Tipo</span>
@@ -219,10 +230,11 @@
           </div>
         </div>
 
-        <div class="trz__arrow"><i class="bi bi-arrow-down"></i></div>
+        <div v-if="data.lote" class="trz__arrow"><i class="bi bi-arrow-down"></i></div>
 
-        <!-- Nodo 2: CULTIVO (lote + plantas) -->
-        <div class="trz__node trz__node--lote">
+        <!-- Nodo 2: CULTIVO (lote + plantas). Un stock externo no pasa por acá: no tiene lote,
+             y un nodo vacío se lee como que falta el dato. -->
+        <div v-if="data.lote" class="trz__node trz__node--lote">
           <div class="trz__node-head">
             <span class="trz__node-badge trz__node-badge--lote">📦 CULTIVO / LOTE</span>
             <span v-if="data.lote" class="trz__node-code">{{ data.lote.codigo }}</span>
@@ -231,7 +243,12 @@
             <div class="trz__fields">
               <div class="trz__field">
                 <span class="trz__field-lbl">Estado</span>
-                <span class="trz__estado-pill">{{ data.lote?.estado }}</span>
+                <span class="trz__estado-pill">{{ estadoLabel(data.lote?.estado) }}</span>
+              </div>
+              <!-- Un derivado hereda la cadena de la flor de la que salió, y dice de qué frasco. -->
+              <div v-if="data.stock.producido_desde" class="trz__field">
+                <span class="trz__field-lbl">Elaborado de</span>
+                <span class="trz__field-val">{{ data.stock.producido_desde.gramos }} g de <a href="#" class="trz__link" @click.prevent="buscar(data.stock.producido_desde.id)">{{ data.stock.producido_desde.numero }}</a></span>
               </div>
               <div v-if="data.pesada" class="trz__field">
                 <span class="trz__field-lbl">Pesada</span>
@@ -239,7 +256,8 @@
               </div>
             </div>
 
-            <!-- Timeline de ciclo -->
+            <!-- Cronología del ciclo: cada cambio de estado con los días del anterior, los
+                 descartes y los pesajes. Leía `lote_eventos`, que el backend nunca mandó. -->
             <div v-if="timeline.length" class="trz__timeline">
               <div
                 v-for="(ev, idx) in timeline"
@@ -288,7 +306,7 @@
           </div>
         </div>
 
-        <div class="trz__arrow"><i class="bi bi-arrow-down"></i></div>
+        <div v-if="data.aplicaciones?.registros" class="trz__arrow"><i class="bi bi-arrow-down"></i></div>
 
         <!-- Nodo 3: QUÉ SE LE APLICÓ.
              La cadena decía de qué plantas salió el frasco y no qué recibieron esas plantas. Los
@@ -361,8 +379,8 @@
               </div>
             </div>
 
-            <!-- Medido, no declarado: es lo más fuerte que se le puede mostrar a un paciente. -->
-            <div v-if="data.analisis_laboratorio?.length" class="trz__lab">
+            <!-- Todos los análisis, si hubo más de uno; el último ya está arriba, en el origen. -->
+            <div v-if="data.analisis_laboratorio?.length > 1" class="trz__lab">
               <div class="trz__fito-tit">🔬 Análisis de laboratorio</div>
               <div v-for="(a, i) in data.analisis_laboratorio" :key="i" class="trz__fito-row">
                 <span v-if="a.thc_pct != null">THC {{ a.thc_pct }}%</span>
@@ -380,7 +398,7 @@
         <!-- Nodo 3: STOCK -->
         <div class="trz__node trz__node--stock">
           <div class="trz__node-head">
-            <span class="trz__node-badge trz__node-badge--stock">🏷️ STOCK GENERADO</span>
+            <span class="trz__node-badge trz__node-badge--stock">🏷️ ESTE FRASCO</span>
             <span class="trz__node-code">{{ data.stock.numero_lote_producto || `ID ${data.stock.id}` }}</span>
           </div>
           <div class="trz__node-body">
@@ -389,39 +407,25 @@
                 <span class="trz__field-lbl">Forma</span>
                 <span class="trz__field-val">{{ FORMA_LABELS[data.stock.forma_producto] || data.stock.forma_producto }}</span>
               </div>
-              <div v-if="data.stock.genetica" class="trz__field">
-                <span class="trz__field-lbl">Genética</span>
-                <span class="trz__field-val trz__field-gen">{{ data.stock.genetica.nombre }}</span>
+              <div class="trz__field">
+                <span class="trz__field-lbl">Entró</span>
+                <span class="trz__field-val trz__field-g">{{ data.stock.cantidad_inicial_g }} {{ unidad }}<span v-if="data.stock.fecha_elaboracion"> · {{ formatDate(data.stock.fecha_elaboracion) }}</span></span>
               </div>
-              <div v-if="data.stock.genetica?.tipo" class="trz__field">
-                <span class="trz__field-lbl">Tipo</span>
-                <span class="trz__field-val">{{ data.stock.genetica.tipo }}</span>
+              <div class="trz__field">
+                <span class="trz__field-lbl">Hoy</span>
+                <span class="trz__field-val trz__field-g">{{ data.stock.cantidad_disponible_g }} {{ unidad }}<span v-if="data.stock.sede"> en {{ data.stock.sede }}</span></span>
               </div>
-              <div v-if="data.stock.genetica?.thc || data.stock.genetica?.cbd" class="trz__field">
-                <span class="trz__field-lbl">Perfil</span>
-                <span class="trz__field-val trz__field-perfil">
-                  <span v-if="data.stock.genetica.thc">THC {{ data.stock.genetica.thc }}%</span>
-                  <span v-if="data.stock.genetica.cbd">CBD {{ data.stock.genetica.cbd }}%</span>
+              <!-- Si el frasco se partió a otra sede o se convirtió en un derivado, la cadena
+                   continúa en otra fila, con su propio balance. Cada una nombra a la otra. -->
+              <div v-if="data.siguio_en?.length" class="trz__field">
+                <span class="trz__field-lbl">Siguió en</span>
+                <span class="trz__field-val">
+                  <template v-for="(x, i) in data.siguio_en" :key="x.stock_id">
+                    <span v-if="i"> · </span>
+                    <a href="#" class="trz__link" @click.prevent="buscar(x.stock_id)">{{ x.numero }}</a>
+                    ({{ x.gramos }} g, {{ x.tipo === 'derivado' ? (FORMA_LABELS[x.forma] || 'derivado') : x.sede || 'otra sede' }})
+                  </template>
                 </span>
-              </div>
-              <div v-if="data.stock.genetica?.numero_registro_inase" class="trz__field">
-                <span class="trz__field-lbl">Reg. INASE</span>
-                <span class="trz__field-val trz__field-inase">
-                  <i class="bi bi-patch-check-fill"></i>
-                  {{ data.stock.genetica.numero_registro_inase }}
-                </span>
-              </div>
-              <div class="trz__field">
-                <span class="trz__field-lbl">Cantidad generada</span>
-                <span class="trz__field-val trz__field-g">{{ data.stock.cantidad_inicial_g }} g</span>
-              </div>
-              <div class="trz__field">
-                <span class="trz__field-lbl">Disponible actual</span>
-                <span class="trz__field-val trz__field-g">{{ data.stock.cantidad_disponible_g }} g</span>
-              </div>
-              <div class="trz__field">
-                <span class="trz__field-lbl">Elaborado</span>
-                <span class="trz__field-val">{{ formatDate(data.stock.fecha_elaboracion) }}</span>
               </div>
             </div>
             <div v-if="data.stock.codigo_qr" class="trz__qr-row">
@@ -436,9 +440,9 @@
         <!-- Nodo 4: DISPENSACIONES -->
         <div class="trz__node trz__node--dispens">
           <div class="trz__node-head">
-            <span class="trz__node-badge trz__node-badge--dispens">💊 DISPENSACIONES</span>
+            <span class="trz__node-badge trz__node-badge--dispens">💊 A QUIÉN FUE</span>
             <span class="trz__node-sub">
-              {{ data.totales.dispensaciones_count }} entregas · {{ data.totales.gramos_dispensados }} g dispensados
+              {{ data.totales.dispensaciones_count }} entregas · {{ data.totales.gramos_dispensados }} {{ unidad }}
             </span>
           </div>
           <div class="trz__node-body">
@@ -446,26 +450,32 @@
               <table class="trz__disp-table">
                 <thead>
                   <tr>
-                    <th>#</th>
-                    <th>Paciente</th>
-                    <th>DNI (últimos 4)</th>
-                    <th>Gramos</th>
                     <th>Fecha</th>
+                    <th>Paciente</th>
+                    <!-- Últimos TRES en pantalla; el DNI entero va sólo en el PDF, que es lo
+                         que se entrega (decisión de Germán, sep-2026). -->
+                    <th>DNI</th>
+                    <th>Cantidad</th>
+                    <th>Cómo</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(d, i) in data.dispensaciones" :key="d.id">
-                    <td class="trz__td-n">{{ i + 1 }}</td>
-                    <td class="trz__td-bold">{{ d.paciente || d.paciente_iniciales }}</td>
-                    <td class="trz__td-mono">***{{ d.paciente_dni_last3 }}</td>
-                    <td class="trz__td-g">{{ d.cantidad_g }} g</td>
+                  <tr v-for="d in data.dispensaciones" :key="d.id">
                     <td class="trz__td-fecha">{{ formatDate(d.fecha) }}</td>
+                    <td class="trz__td-bold">{{ d.paciente || d.paciente_iniciales }}</td>
+                    <td class="trz__td-mono">···{{ d.paciente_dni_last3 }}</td>
+                    <td class="trz__td-g">{{ d.cantidad_g }} {{ unidad }}</td>
+                    <td class="trz__td-canal">{{ d.canal }}<span v-if="d.junto_con?.length"> · con {{ d.junto_con.join(', ') }}</span></td>
+                  </tr>
+                  <!-- Los totales de arriba son sobre TODAS; acá se listan las últimas cien. -->
+                  <tr v-if="data.dispensaciones_omitidas">
+                    <td colspan="5" class="trz__td-mas">… {{ data.dispensaciones_omitidas }} entregas más. El total es sobre todas; el PDF las lleva completas.</td>
                   </tr>
                 </tbody>
                 <tfoot>
                   <tr>
                     <td colspan="3"><strong>Total</strong></td>
-                    <td class="trz__td-g"><strong>{{ data.totales.gramos_dispensados }} g</strong></td>
+                    <td class="trz__td-g"><strong>{{ data.totales.gramos_dispensados }} {{ unidad }}</strong></td>
                     <td></td>
                   </tr>
                 </tfoot>
@@ -479,8 +489,9 @@
 
       </div>
 
+      <!-- Sin marca de la plataforma: el documento es de la organización (misma regla que el PDF). -->
       <div class="trz__footer-legal">
-        Informe generado por Cultivo Espacial · {{ hoy }} · Uso exclusivo para auditoría REPROCANN / ARICCAME
+        Al {{ hoy }} · Contiene datos personales de pacientes: tratar como información sensible.
       </div>
     </div>
 
@@ -493,6 +504,7 @@ import DsSpinner from '../../design-system/components/Spinner.vue'
 import { getStockTrazabilidad, listStocks } from '../../lib/api.js'
 import { descargarArchivo } from '../../lib/descargas.js'
 import { hoyISO } from '../../utils/dates.js'
+import { ESTADO_META } from '../../lib/loteHelpers.js'
 
 const FORMA_LABELS = {
   flor_seca: 'Flor seca', hash: 'Hash', aceite: 'Aceite', tintura: 'Tintura',
@@ -510,6 +522,23 @@ const MOTIVO_DESCARTE_LABELS = {
   hermafrodita: 'Hermafrodita', estres: 'Estrés', rotura: 'Rotura', otro: 'Otro',
 }
 const motivoLabel = (m) => MOTIVO_DESCARTE_LABELS[m] || m
+const estadoLabel = (e) => ESTADO_META[e]?.label || e
+
+// Cada salida con su nombre y, cuando el producto sigue existiendo, a dónde fue. Un traslado o
+// un derivado no son pérdida: son el mismo producto en otra fila.
+const SALIDA_LABELS = {
+  transferencia: 'traslado', produccion: 'a derivado', consumo_evento: 'consumo en evento',
+  salida: 'salida', ajuste: 'ajuste de conteo', merma: 'merma',
+}
+function salidaLabel(m) {
+  const base = SALIDA_LABELS[m.tipo] || m.tipo
+  if (m.destino?.numero) {
+    const donde = m.tipo === 'produccion' ? `${m.destino.numero}` : `${m.destino.numero}${m.destino.sede ? ` · ${m.destino.sede}` : ''}`
+    return `${base} → ${donde}`
+  }
+  const cuando = m.fecha ? ` · ${fecha(m.fecha)}` : ''
+  return m.detalle ? `${base} · ${m.detalle}${cuando}` : `${base}${cuando}`
+}
 
 // Cómo se llaman las tareas en el idioma en que se habla de ellas: en la base son claves
 // (`limpieza_sala`, `scrog_lst`) y en un informe que lee un auditor eso no dice nada.
@@ -546,37 +575,30 @@ const sugerencias = computed(() => {
     .slice(0, 8)
 })
 
+const unidad = computed(() => data.value?.stock?.unidad || 'g')
+const esExterno = computed(() => data.value?.stock?.origen === 'compra_externa' && !data.value?.lote)
+const ultimoAnalisis = computed(() => data.value?.analisis_laboratorio?.[0] || null)
+
 const origenLabel = computed(() => {
+  if (esExterno.value) return 'Compra externa'
   if (!data.value?.plantas?.length) return 'No especificado'
   const origenes = [...new Set(data.value.plantas.map(p => p.origen).filter(Boolean))]
   if (!origenes.length) return 'No especificado'
   return origenes.map(o => o === 'semilla' ? 'Semilla' : o === 'esqueje' ? 'Esqueje' : o).join(' / ')
 })
 
+// La cronología la arma el backend (`cronologia`): cambios de estado con los días del anterior,
+// descartes y pesajes, ya ordenados. Antes se leía `lote_eventos`, que nunca llegaba.
+const CRONO_ICONS = { estado: null, descarte: '🚫', pesaje: '⚖️' }
 const timeline = computed(() => {
-  if (!data.value) return []
-  const items = []
-  if (Array.isArray(data.value.lote_eventos)) {
-    data.value.lote_eventos.forEach(ev => {
-      items.push({
-        type: 'evento',
-        fecha: ev.registrado_en || ev.created_at,
-        icon: FASE_ICONS[ev.tipo] || '📋',
-        titulo: ev.descripcion || ev.tipo || 'Evento',
-        detalle: null,
-      })
-    })
-  }
-  if (data.value.pesada) {
-    items.push({
-      type: 'pesada',
-      fecha: data.value.pesada.registrado_at || data.value.pesada.created_at,
-      icon: '⚖️',
-      titulo: `Pesada · ${data.value.pesada.peso_total_g} g`,
-      detalle: data.value.plantas?.length ? `${data.value.plantas.length} plantas` : null,
-    })
-  }
-  return items.sort((a, b) => new Date(a.fecha) - new Date(b.fecha))
+  if (!Array.isArray(data.value?.cronologia)) return []
+  return data.value.cronologia.map(ev => ({
+    type:    ev.tipo,
+    fecha:   ev.fecha,
+    icon:    ev.tipo === 'estado' ? (FASE_ICONS[ev.estado] || '📋') : CRONO_ICONS[ev.tipo] || '📋',
+    titulo:  ev.tipo === 'estado' ? estadoLabel(ev.estado) : ev.titulo,
+    detalle: ev.detalle || null,
+  }))
 })
 
 onMounted(async () => {
@@ -791,21 +813,6 @@ const formatDate = d => d
 .trz__banner-date { font-size: .78rem; color: rgba(255,255,255,.5); display: flex; align-items: center; gap: .35rem; }
 
 /* KPIs */
-.trz__kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: .75rem; margin-bottom: 1.5rem; }
-@media (max-width: 600px) { .trz__kpis { grid-template-columns: repeat(2, 1fr); } }
-.trz__kpi {
-  background: #fff; border: 1.5px solid var(--c-slate-200); border-radius: 12px;
-  padding: 1rem .875rem; display: flex; flex-direction: column; align-items: center;
-  text-align: center; gap: .15rem;
-}
-.trz__kpi-ico { font-size: 1.2rem; }
-.trz__kpi-val { font-size: 1.35rem; font-weight: 800; letter-spacing: -.04em; color: var(--c-slate-900); line-height: 1.1; }
-.trz__kpi-lbl { font-size: .65rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--c-slate-400); }
-.trz__kpi--green  { border-color: #bbf7d0; } .trz__kpi--green  .trz__kpi-val { color: #15803d; }
-.trz__kpi--amber  { border-color: #fde68a; } .trz__kpi--amber  .trz__kpi-val { color: #d97706; }
-.trz__kpi--blue   { border-color: #bae6fd; } .trz__kpi--blue   .trz__kpi-val { color: #0369a1; }
-.trz__kpi--purple { border-color: #e9d5ff; } .trz__kpi--purple .trz__kpi-val { color: #7c3aed; }
-
 /* Chain divider */
 .trz__balance {
   display: flex; align-items: center; flex-wrap: wrap; gap: .5rem 1rem;
@@ -821,6 +828,18 @@ const formatDate = d => d
 .trz__bal-item--alerta .trz__bal-val { color: #b45309; }
 .trz__bal-item--total .trz__bal-val { color: #15803d; }
 .trz__bal-op { font-size: 1.05rem; font-weight: 700; color: var(--c-slate-300); }
+/* El desglose de cada caja: qué es cada salida y dónde está lo que queda. La merma es lo único
+   que se pinta: es la única salida que es pérdida. */
+.trz__bal-item--salidas { min-width: 180px; }
+.trz__bal-sub { list-style: none; margin: .25rem 0 0; padding: 0; display: flex; flex-direction: column; gap: .1rem; font-size: .72rem; color: var(--c-slate-600); }
+.trz__bal-sub li { display: flex; justify-content: space-between; gap: .75rem; }
+.trz__bal-sub-g { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.trz__bal-sub--merma { color: #b45309; font-weight: 600; }
+.trz__frase { font-size: .9rem; color: var(--c-slate-700); margin: -.25rem 0 1rem; line-height: 1.5; }
+.trz__frase--abierta { color: #92400e; }
+.trz__link { color: #1b5e20; text-decoration: underline; text-decoration-color: var(--c-slate-300); }
+.trz__td-canal { font-size: .78rem; color: var(--c-slate-500); }
+.trz__td-mas { font-size: .78rem; color: var(--c-slate-400); font-style: italic; }
 .trz__chain-divider {
   display: flex; align-items: center; gap: .75rem;
   font-size: .65rem; font-weight: 700; color: var(--c-slate-400);
@@ -879,8 +898,6 @@ const formatDate = d => d
 .trz__field-val { font-size: .875rem; color: var(--c-slate-900); font-weight: 500; }
 .trz__field-inase { display: inline-flex; align-items: center; gap: .3rem; color: #15803d; }
 .trz__field-g { color: #d97706; font-weight: 700; }
-.trz__field-gen { color: #7c3aed; font-weight: 700; }
-.trz__field-perfil { display: inline-flex; gap: .5rem; color: var(--c-slate-500); font-size: .8rem; }
 .trz__estado-pill {
   display: inline-block; background: var(--c-slate-100); color: var(--c-slate-600);
   font-size: .72rem; font-weight: 700; text-transform: capitalize;
