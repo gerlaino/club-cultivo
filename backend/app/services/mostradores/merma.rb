@@ -89,7 +89,21 @@ module Mostradores
         # mismo dato que decide la razón `caja` de `MotivosDeRevision`.
         caja_ars:      caja_neta.to_f.round(2),
         caja_turnos:   caja_turnos_con_diferencia,
+        # LO QUE FALTÓ, POR UNIDAD Y FORMA, para poder titular en producto y no en plata (sep-2026,
+        # pedido de Germán: «que sea más importante el stock y sus cantidades»). «27 g de flor seca
+        # y 4 prerolls» — se suma por forma porque 27 g + 4 prerolls no son 31 de nada, el mismo
+        # criterio del KPI de la mesa.
+        faltante_por_forma: faltante_por_forma,
       }
+    end
+
+    def faltante_por_forma
+      items.group_by { |i| [i.stock&.forma_producto, i.stock&.unidad || 'g'] }.filter_map do |(forma, unidad), its|
+        f = its.sum { |i| [i.diferencia_cierre.to_d, 0].min.abs }
+        next if f.zero?
+
+        { forma: forma, unidad: unidad, faltante: f.to_f.round(3) }
+      end.sort_by { |x| -x[:faltante] }
     end
 
     def diferencias_de_caja
@@ -105,24 +119,39 @@ module Mostradores
     def caja_neta = diferencias_de_caja.values.sum(0.to_d)
     def caja_turnos_con_diferencia = diferencias_de_caja.values.count { |v| v.to_d.abs >= 0.01 }
 
-    # Agrupado por producto (genética + forma), no por frasco: dos lotes de la misma variedad son
-    # el mismo problema, y separarlos esconde la tendencia.
+    # UNA FILA POR FRASCO (sep-2026, pedido de Germán). Agrupaba por variedad + forma con el
+    # argumento de que dos lotes de la misma variedad son el mismo problema; pero lo que se sale
+    # a buscar es un frasco —«faltaron 23 g del ST-26-0013»— y agrupados no se sabía cuál. La
+    # tendencia la da el gráfico de cada frasco, que se abre desde la fila.
+    #
+    # Van también los que no perdieron nada: que un frasco no aparezca no es lo mismo que que
+    # esté bien. La pantalla los pone al final.
     def por_producto
-      items.group_by { |i| i.stock&.etiqueta || '—' }.map do |etiqueta, its|
+      items.group_by(&:stock_id).map do |_sid, its|
+        st = its.first.stock
         dispensado = its.sum { |i| i.cantidad_dispensada.to_d }
         faltante   = its.sum { |i| [i.diferencia_cierre.to_d, 0].min.abs }
         {
-          producto:   etiqueta,
-          unidad:     its.first.stock&.unidad || 'g',
+          stock_id:   st&.id,
+          producto:   st&.etiqueta || '—',
+          numero:     st&.numero_lote_producto,
+          forma:      st&.forma_producto,
+          unidad:     st&.unidad || 'g',
           dispensado: dispensado.to_f.round(2),
           faltante:   faltante.to_f.round(3),
           faltante_ars: its.sum { |i| i.diferencia_cierre.to_d.negative? ? valor(i, i.diferencia_cierre) : 0 }.to_f.round(2),
           merma_pct:  dispensado.positive? ? ((faltante / dispensado) * 100).to_f.round(2) : nil,
           turnos:     its.map(&:turno_mostrador_id).uniq.size,
         }
-      # Por porcentaje, no por gramos: el ranking absoluto siempre encabeza con lo que más se
-      # vende. Los que no tienen porcentaje (nada dispensado) van al final.
-      end.sort_by { |p| -(p[:merma_pct] || -1) }
+      # POR PROPORCIÓN, no por cantidad ni por plata: es lo único que compara flor con prerolls.
+      # Sin porcentaje (nada entregado) pero con faltante, arriba de todo: producto que desapareció
+      # sin venderse. Sin faltante, al final.
+      end.sort_by { |p|
+        if p[:faltante].zero? then [2, 0]
+        elsif p[:merma_pct].nil? then [0, 0]
+        else [1, -p[:merma_pct]]
+        end
+      }
     end
 
     def por_turno

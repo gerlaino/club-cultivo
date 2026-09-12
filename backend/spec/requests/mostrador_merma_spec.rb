@@ -123,6 +123,49 @@ RSpec.describe 'La merma del mostrador', type: :request do
       expect(productos.second['merma_pct']).to eq(1.0)
       expect(productos.second['faltante']).to be > productos.first['faltante']
     end
+
+    # UNA FILA POR FRASCO: lo que se sale a buscar es un frasco, no una variedad. Dos lotes de la
+    # misma flor son dos filas, cada una con su número.
+    it 'es por frasco, con su número, y un segundo lote de la misma flor es otra fila' do
+      otro = ActsAsTenant.with_tenant(club) do
+        create(:stock, club: club, sede: sede, lote: lote, forma_producto: 'flor_seca', unidad: 'g',
+                       cantidad: 300, estado: 'asignado', disponibilidad: 'ambas',
+                       precio_sugerido_ars: 100, costo_unitario_ars: 500)
+      end
+      ActsAsTenant.with_tenant(club) do
+        m = sede.mostrador!
+        Mostradores::Cargar.call(mostrador: m, usuario: admin, motivo: 'carga',
+                                 cambios: [{ stock_id: otro.id, cantidad: 100 }])
+        t = Mostradores::AbrirCaja.call(mostrador: m, usuario: ana, efectivo_contado_ars: 0).turno
+        Mostradores::CerrarCaja.call(turno: t, usuario: ana, efectivo_contado_ars: 0, fondo_siguiente_ars: 0,
+                                     conteos: [{ stock_id: otro.id, contado: 100 }], notas: 'nada')
+      end
+
+      productos = merma['por_producto']
+      filas_flor = productos.select { |p| p['forma'] == 'flor_seca' }
+
+      expect(filas_flor.map { |p| p['stock_id'] }).to contain_exactly(flor.id, otro.id)
+      expect(filas_flor.map { |p| p['numero'] }).to all(be_present)
+      # El que no perdió nada también está, al final: que no aparezca no es lo mismo que estar bien.
+      expect(productos.last['stock_id']).to eq(otro.id)
+      expect(productos.last['faltante']).to eq(0.0)
+    end
+  end
+
+  # El titular habla de producto, en su unidad: «27 g de flor seca y 4 prerolls». Sumado por
+  # forma, porque 4 g + 2 prerolls no son 6 de nada.
+  describe 'lo que faltó, por forma' do
+    it 'suma cada forma en su unidad, la que más faltó primero' do
+      turno!(flor_carga: 500, flor_disp: 400, flor_contado: 96,
+             preroll_carga: 50, preroll_disp: 20, preroll_contado: 28)
+
+      por_forma = merma['resumen']['faltante_por_forma']
+
+      expect(por_forma).to eq([
+        { 'forma' => 'flor_seca', 'unidad' => 'g',  'faltante' => 4.0 },
+        { 'forma' => 'preroll',   'unidad' => 'un', 'faltante' => 2.0 },
+      ])
+    end
   end
 
   describe 'por turno' do

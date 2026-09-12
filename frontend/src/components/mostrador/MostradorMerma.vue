@@ -45,7 +45,7 @@
         <!-- Y LA PLATA, en su propia oración. «¿Cómo viene?» hablaba sólo del producto: el
              efectivo que faltó en el cajón no estaba en ningún resumen, sólo abriendo cierre
              por cierre. Se dice en neto y con signo, y sólo cuando pasó algo. -->
-        <p v-if="fraseCaja" class="mrm__estado-sub mrm__estado-caja">{{ fraseCaja }}</p>
+        <p v-if="fraseCosto || fraseCaja" class="mrm__estado-sub mrm__estado-caja">{{ [fraseCosto, fraseCaja].filter(Boolean).join(' ') }}</p>
         <p v-if="aclaracion" class="mrm__estado-sub">{{ aclaracion }}</p>
         <p v-if="veredicto && veredicto.motor" class="mrm__estado-sub">
           La está moviendo <b>{{ veredicto.motor.producto }}</b>:
@@ -69,7 +69,7 @@
            UNA tabla con un corte a la vez, no tres apiladas con las mismas columnas: había que
            elegir cuál mirar antes de saber qué se estaba buscando. -->
       <!-- «Dónde se va» era un título sin sujeto: ¿dónde se va qué? -->
-      <h2 class="mrm__seccion">De qué falta</h2>
+      <h2 class="mrm__seccion">{{ corte === 'producto' ? 'Qué falta, frasco por frasco' : 'De qué falta' }}</h2>
       <div class="mrm__corte">
         <div class="mrm__cortes">
           <button v-for="c in cortes" :key="c.id" class="mrm__periodo"
@@ -77,37 +77,38 @@
         </div>
         <button class="mrm__btn mrm__btn--mini mrm__btn--ghost" @click="bajarCsv">Bajar CSV</button>
       </div>
+      <!-- El orden se dice en una línea porque no es el obvio: la cantidad no compara flor con
+           prerolls, y la plata ya no manda. -->
+      <p v-if="corte === 'producto' && filas.length" class="mrm__orden">
+        Ordenado por cuánto se pierde de lo que sale, que es lo único que se compara entre flor y prerolls.
+      </p>
 
       <p v-if="!filas.length" class="mrm__nada">No falta nada en este período.</p>
 
-      <!-- El hallazgo que la tabla vieja no sabía decir. Va como aviso y no como una línea más:
-           faltar producto de algo que nadie vendió es otra cosa, y más urgente. -->
-
-      <!-- FILAS DE DOS LÍNEAS, NO UNA TABLA DE CINCO COLUMNAS.
-           Era «% · vs promedio · Faltó · A costo · Entregado»: cinco números sin sujeto, y
-           «Entregado» nadie sabía qué era (es el denominador del %). Con la mesa parada, todas
-           las celdas decían «–%» y «0 g» — una tabla entera de guiones.
-           Ahora manda LA PLATA, que es lo único comparable entre productos y que existe siempre:
-           el porcentaje desaparece cuando no se vendió nada, y ordenar por él dejaba el orden
-           sin hacer nada. Se cae también la frase que defendía el criterio: ordenar por plata no
-           necesita explicación. -->
+      <!-- LA CANTIDAD GRANDE, LA PLATA EN LA SEGUNDA LÍNEA (sep-2026, pedido de Germán: «que sea
+           más importante el stock y sus cantidades»). La plata sirve para decidir si importa; la
+           cantidad es con lo que se va a buscar el problema. «Faltaron 23 g del ST-26-0013» es
+           una acción; «$27.636» es un juicio. -->
       <ul v-else class="mrm__filas">
         <li v-for="f in filas" :key="f.clave" class="mrm__item">
-          <!-- LA FILA DE UN PRODUCTO SE ABRE Y MUESTRA SU GRÁFICO. Era otra solapa («Producto
-               por producto») con su propio filtro de fecha: la misma pregunta partida en dos
-               lugares. El gráfico es la EXPLICACIÓN del número, y va donde está el número. -->
+          <!-- LA FILA DE UN FRASCO SE ABRE Y MUESTRA SU GRÁFICO. Era otra solapa («Producto por
+               producto») con su propio filtro de fecha: la misma pregunta partida en dos lugares.
+               El gráfico es la EXPLICACIÓN del número, y va donde está el número. -->
           <component :is="abrible(f) ? 'button' : 'div'" class="mrm__fila"
                      :class="{ 'mrm__fila--abrible': abrible(f), 'is-abierta': abierta === f.clave }"
                      :type="abrible(f) ? 'button' : undefined"
                      :aria-expanded="abrible(f) ? String(abierta === f.clave) : undefined"
                      @click="abrible(f) && alternar(f)">
             <div class="mrm__fila-txt">
-              <span class="mrm__fila-titulo">{{ f.titulo }}</span>
+              <span class="mrm__fila-titulo">
+                {{ f.titulo }}<span v-if="f.numero" class="mrm__fila-num-lote">{{ f.numero }}</span>
+              </span>
               <span class="mrm__fila-sub">{{ f.contexto }}</span>
             </div>
             <div class="mrm__fila-num">
-              <span class="mrm__fila-ars">${{ fmt(f.ars) }}</span>
-              <span class="mrm__fila-cant">{{ fmt(f.faltante) }} {{ f.unidad }}</span>
+              <span v-if="f.faltante > 0" class="mrm__fila-cant">{{ fmt(f.faltante) }} {{ f.unidad }}</span>
+              <span v-else class="mrm__fila-cant mrm__fila-cant--ok">está todo</span>
+              <span v-if="f.faltante > 0 && f.ars > 0" class="mrm__fila-ars">producirlos costó ${{ fmt(f.ars) }}</span>
             </div>
             <i v-if="abrible(f)" class="bi mrm__fila-arr" :class="abierta === f.clave ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
           </component>
@@ -117,13 +118,13 @@
             <template v-else>
               <p class="mrm__detalle-nota">
                 Lo que tenía que haber (punteado) contra lo que se contó (lleno), cierre por cierre.
-                Cada frasco con <b>su propia escala</b>: el hueco entre las dos líneas es lo que faltó.
+                El hueco entre las dos líneas es lo que faltó.
               </p>
-              <p v-if="!graficosDe(f).length" class="mrm__detalle-nota">
-                Todavía no hay cierres con conteo de este producto en el período.
+              <p v-if="!graficoDe(f)" class="mrm__detalle-nota">
+                Todavía no hay cierres con conteo de este frasco en el período.
               </p>
               <div v-else class="mrm__graficos">
-                <GraficoProducto v-for="g in graficosDe(f)" :key="g.stock_id" :producto="g" />
+                <GraficoProducto :producto="graficoDe(f)" />
               </div>
             </template>
           </div>
@@ -155,6 +156,7 @@ import { ref, computed, watch } from 'vue'
 import { getMermaMostrador, getEvolucionMostrador } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import GraficoProducto from './GraficoProducto.vue'
+import { formaLabel } from '../../lib/formatters.js'
 
 const props = defineProps({
   sedeId:      { type: Number, default: null },
@@ -213,9 +215,8 @@ const fraseCaja = computed(() => {
 })
 
 // ── EL GRÁFICO DE CADA PRODUCTO, adentro de su fila ──────────────────────────────────────
-// La evolución se pide UNA vez por rango, cuando alguien abre la primera fila, y se filtra acá:
-// Merma agrupa por etiqueta (genética + forma) y la evolución va por frasco, así que una fila
-// puede abrir dos gráficos — dos lotes de la misma variedad, cada uno con su escala.
+// La evolución se pide UNA vez por rango, cuando alguien abre la primera fila, y se busca acá
+// por frasco.
 const abierta = ref(null)
 const evolucion = ref(null)          // { clave, productos }
 const cargandoEvolucion = ref(false)
@@ -229,7 +230,8 @@ function alternar (f) {
   if (abierta.value) cargarEvolucion()
 }
 
-const graficosDe = (f) => (evolucion.value?.productos || []).filter(g => g.etiqueta === f.titulo)
+// La fila ya es el frasco: un solo gráfico, el suyo.
+const graficoDe = (f) => (evolucion.value?.productos || []).find(g => g.stock_id === f.stock_id) || null
 
 async function cargarEvolucion () {
   const clave = `${props.sedeId}|${rango.value.desde}|${rango.value.hasta}`
@@ -246,14 +248,32 @@ async function cargarEvolucion () {
   }
 }
 
+// EL TITULAR HABLA DE PRODUCTO, EN SU UNIDAD: «Faltaron 27 g de flor seca y 4 prerolls en 6
+// cierres.» Sumado por forma, porque 27 g + 4 prerolls no son 31 de nada. La plata va en la
+// línea de abajo (sep-2026, pedido de Germán).
+function fraseForma (f) {
+  const label = formaLabel(f.forma) || f.forma || ''
+  if (f.unidad === 'un') {
+    const n = Number(f.faltante)
+    return `${fmt(n)} ${label.toLowerCase()}${n === 1 ? '' : 's'}`
+  }
+  return `${fmt(f.faltante)} ${f.unidad} de ${label.toLowerCase()}`
+}
+const porForma = computed(() => merma.value?.resumen?.faltante_por_forma || [])
+
 const titular = computed(() => {
   const m = merma.value
   if (!m) return ''
   const n = `${cierres.value} ${cierres.value === 1 ? 'cierre' : 'cierres'}`
   // «Cuadró» y «a costo» son palabras de contador. El que abre esta pantalla sabe de plantas.
-  if (!faltanteArs.value) return `No falta nada. ${n} en este período.`
-  return `Falta producto por $${fmt(faltanteArs.value)} en ${n}.`
+  if (!porForma.value.length) return `No falta nada. ${n} en este período.`
+  const partes = porForma.value.map(fraseForma)
+  const lista = partes.length > 1 ? `${partes.slice(0, -1).join(', ')} y ${partes[partes.length - 1]}` : partes[0]
+  return `Faltaron ${lista} en ${n}.`
 })
+// Cuánto costó producir lo que faltó. Es la segunda línea, no el titular.
+const fraseCosto = computed(() =>
+  faltanteArs.value > 0 ? `Producirlos costó $${fmt(faltanteArs.value)}.` : '')
 
 // La comparación contra el historial, que es lo que contesta «¿viene subiendo?». Va DEBAJO del
 // número y sólo cuando dice algo: un «–%» no es información, es una celda vacía con formato.
@@ -291,13 +311,13 @@ const alto = (s) => `${Math.max(((Number(s.merma_pct) || 0) / topeSerie.value) *
 // Lo que hay que saber para no leer mal el corte por persona viaja EN LA FILA (los cierres que
 // tiene, y si son pocos), que es donde se lo mira.
 const cortes = computed(() => [
-  { id: 'producto', label: 'Por producto' },
+  { id: 'producto', label: 'Por frasco' },
   ...(merma.value?.por_sede?.length ? [{ id: 'sede', label: 'Por sede' }] : []),
   { id: 'persona', label: 'Por persona' },
 ])
 
 const encabezado = computed(() =>
-  ({ producto: 'Producto', sede: 'Sede', turno: 'Cerró', persona: 'Atendió' })[corte.value]
+  ({ producto: 'Frasco', sede: 'Sede', turno: 'Cerró', persona: 'Atendió' })[corte.value]
 )
 
 // Los cortes se normalizan a LA MISMA FILA: título, contexto en castellano, plata y cantidad.
@@ -351,15 +371,20 @@ const filas = computed(() => {
       ].filter(Boolean).join(' · '),
     }))
   } else {
-    lista = (m.por_producto || []).map(x => ({
-      clave: `p${x.producto}`, titulo: x.producto, unidad: x.unidad,
-      faltante: x.faltante, ars: x.faltante_ars,
-      contexto: `${cierres(x.turnos)} · ${sobreLoEntregado(x)}`,
+    // POR FRASCO, en el orden del backend (por proporción sobre lo entregado; los que no
+    // perdieron nada, al final). Van también los que están enteros: que un frasco no aparezca
+    // no es lo mismo que que esté bien.
+    return (m.por_producto || []).map(x => ({
+      clave: `p${x.stock_id}`, stock_id: x.stock_id, titulo: x.producto, numero: x.numero,
+      unidad: x.unidad, faltante: x.faltante, ars: x.faltante_ars,
+      contexto: Number(x.faltante) > 0
+        ? `${cierres(x.turnos)} · ${sobreLoEntregado(x)}`
+        : `${cierres(x.turnos)} · ${Number(x.dispensado) > 0 ? `de ${fmt(x.dispensado)} ${x.unidad} entregados` : 'no se entregó nada de esto'}`,
     }))
   }
 
-  // Sin las filas en cero: en una lista de «dónde se va», un renglón que no se fue a ningún lado
-  // es una fila que hay que leer para descartar.
+  // Sede y persona: sin las filas en cero, ordenadas por plata (entre sedes o personas no hay
+  // otra unidad común).
   return lista.filter(f => Number(f.ars) > 0 || Number(f.faltante) > 0)
               .sort((a, b) => (Number(b.ars) || 0) - (Number(a.ars) || 0))
 })
@@ -412,8 +437,8 @@ async function cargar () {
 // EL CSV SÍ LLEVA LOS NÚMEROS SUELTOS. Lo abre alguien que va a analizar, no a leer de un
 // vistazo: ahí las columnas separadas sirven, y en la pantalla eran cinco cifras sin sujeto.
 function bajarCsv () {
-  const cab = [encabezado.value, 'Contexto', 'A costo ($)', 'Falto']
-  const filasCsv = filas.value.map(f => [f.titulo, f.contexto, f.ars, f.faltante])
+  const cab = [encabezado.value, 'Numero', 'Falto', 'Unidad', 'Contexto', 'A costo ($)']
+  const filasCsv = filas.value.map(f => [f.titulo, f.numero || '', f.faltante, f.unidad || '', f.contexto, f.ars])
   const csv = [cab, ...filasCsv]
     .map(fila => fila.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(';'))
     .join('\n')
@@ -533,7 +558,10 @@ watch(() => props.sedeId, () => { merma.value = null; cargar() }, { immediate: t
 .mrm__fila-titulo { font-size: var(--fs-14); font-weight: 600; color: var(--c-ink-900); }
 .mrm__fila-sub    { font-size: var(--fs-12); color: var(--c-ink-500); line-height: 1.45; }
 .mrm__fila-num    { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
-/* La plata manda: es lo único comparable entre productos y lo que existe siempre. */
-.mrm__fila-ars    { font-family: var(--font-mono); font-size: var(--fs-15, .95rem); font-weight: 700; color: var(--c-ink-900); }
-.mrm__fila-cant   { font-family: var(--font-mono); font-size: var(--fs-12); color: var(--c-ink-500); }
+/* LA CANTIDAD MANDA; la plata es la segunda línea. Ámbar y no rojo: es un dato, no una falta. */
+.mrm__fila-cant   { font-family: var(--font-mono); font-size: var(--fs-18, 1.1rem); font-weight: 800; color: var(--c-amber-700, #b45309); white-space: nowrap; }
+.mrm__fila-cant--ok { font-size: var(--fs-13); font-weight: 600; color: var(--c-leaf-600); }
+.mrm__fila-ars    { font-size: var(--fs-12); color: var(--c-ink-500); white-space: nowrap; }
+.mrm__fila-num-lote { font-family: var(--font-mono); font-weight: 500; color: var(--c-ink-500); margin-left: 6px; font-size: var(--fs-12); }
+.mrm__orden { margin: -4px 0 10px; font-size: var(--fs-12); color: var(--c-ink-500); }
 </style>

@@ -241,6 +241,20 @@ module Dispensario
       # eso no se hace leyendo una pantalla. Sin tope de páginas: se baja todo lo que haya.
       return enviar_csv(escala) if params[:formato] == 'csv'
 
+      # EL MES ENTERO, para el calendario (sep-2026, idea de Germán): cada día con su marca y el
+      # detalle al tocarlo. Un mes de un mostrador son treinta y pico de cierres: van todos, sin
+      # paginar, y la pantalla arma la grilla y el panel del día sin otra vuelta.
+      if params[:mes].present?
+        mes = Date.strptime(params[:mes], '%Y-%m')
+        del_mes = escala.where(cerrado_at: mes.beginning_of_month.beginning_of_day..mes.end_of_month.end_of_day)
+        return render json: {
+          mes:      mes.strftime('%Y-%m'),
+          turnos:   del_mes.map { |t| serialize_turno_resumen(t) },
+          gestiona: gestiona?,
+          sin_revisar: gestiona? ? turnos_sin_revisar : 0,
+        }
+      end
+
       total  = escala.count
       por    = (params[:por].presence || 20).to_i.clamp(1, 100)
       pagina = [params[:pagina].to_i, 1].max
@@ -257,6 +271,8 @@ module Dispensario
         # Cuántos piden una mirada, para que el filtro pueda decirlo sin pedir otra vuelta.
         sin_revisar: gestiona? ? turnos_sin_revisar : 0,
       }
+    rescue ArgumentError, Date::Error
+      render json: { error: 'Mes inválido' }, status: :unprocessable_entity
     end
 
     # GET /sedes/:sede_id/mostrador/turnos/:id — un turno cerrado, para poder corregir su conteo
@@ -718,6 +734,11 @@ module Dispensario
         # El arqueo de plata del mismo turno, sin abrirlo.
         efectivo_contado_ars: turno.caja_turno&.efectivo_declarado_ars&.to_f,
         diferencia_caja_ars:  turno.caja_turno&.diferencia_ars&.to_f,
+        # SI TODAVÍA SE PUEDE CORREGIR, y si no, por qué. Lo decide el modelo —el mismo lugar que
+        # lo aplica— y viaja en la lista para que el panel del día no ofrezca «Corregir» en un
+        # cierre que ya tiene otra caja abierta después: se volvió a contar, y la diferencia se
+        # arregla en el último. Nil = se puede.
+        bloqueo_correccion: gestiona? ? turno.bloqueo_correccion : nil,
       }
     end
 

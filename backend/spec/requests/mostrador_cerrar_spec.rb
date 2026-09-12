@@ -301,6 +301,48 @@ RSpec.describe 'Cerrar el mostrador', type: :request do
   # Son las dos reglas a la vez: quien atiende no puede justificar un sobrante (el inventario no
   # sube), y a las once de la noche nadie puede quedar trabado esperando a un admin (la caja
   # cierra igual). Se guarda lo que contó, que es el dato, y el turno queda para revisar.
+  # EL CALENDARIO DE CIERRES (sep-2026, idea de Germán): el mes entero de una vez, sin paginar,
+  # y cada cierre dice si todavía se puede corregir.
+  describe 'los cierres de un mes' do
+    def cierres_del_mes(mes, como: admin)
+      sign_in_as(como)
+      get "/api/sedes/#{sede.id}/mostrador/turnos", headers: auth_headers, params: { mes: mes }
+      JSON.parse(response.body)
+    end
+
+    it 'trae todos los del mes pedido y ninguno de otro' do
+      abrir!(cantidad: 300); cerrar!(contado: 300, efectivo: 50_000)
+      abrir!(cantidad: 300); cerrar!(contado: 300, efectivo: 50_000)
+      viejo = ActsAsTenant.with_tenant(club) { sede.mostrador!.turno_mostradores.cerrados.order(:id).first }
+      viejo.update_columns(cerrado_at: 2.months.ago, abierto_at: 2.months.ago - 3.hours)
+
+      cuerpo = cierres_del_mes(Time.zone.today.strftime('%Y-%m'))
+
+      expect(cuerpo['mes']).to eq(Time.zone.today.strftime('%Y-%m'))
+      expect(cuerpo['turnos'].size).to eq(1)
+      expect(cuerpo['turnos'].first['id']).not_to eq(viejo.id)
+      expect(cuerpo).not_to have_key('paginas')
+    end
+
+    # SÓLO EL ÚLTIMO SE CORRIGE. Si después se abrió otra caja, se volvió a contar y la
+    # diferencia se arregla ahí. La lista lo dice para que el panel no ofrezca el botón.
+    it 'cada cierre dice si se puede corregir: el viejo no, el último sí' do
+      abrir!(cantidad: 300); cerrar!(contado: 290, efectivo: 50_000, como: ana)
+      abrir!(cantidad: 300); cerrar!(contado: 300, efectivo: 50_000, como: ana)
+
+      turnos = cierres_del_mes(Time.zone.today.strftime('%Y-%m'))['turnos'].sort_by { |t| t['id'] }
+
+      expect(turnos.first['bloqueo_correccion']['motivo']).to eq('caja_posterior')
+      expect(turnos.last['bloqueo_correccion']).to be_nil
+    end
+
+    it 'con un mes mal escrito contesta 422, no 500' do
+      sign_in_as(admin)
+      get "/api/sedes/#{sede.id}/mostrador/turnos", headers: auth_headers, params: { mes: 'ayer' }
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+  end
+
   describe 'cuando quien atiende cuenta de MÁS' do
     it 'cierra igual y guarda lo contado, pero NO sube el inventario' do
       abrir!(cantidad: 300)

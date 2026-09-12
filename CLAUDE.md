@@ -164,8 +164,18 @@ Ninguno se considera cerrado; todos son candidatos a revisión.
     a la vez: producto, sede o persona; la fila de producto se abre). **LA PLATA ES MOTIVO DE
     REVISIÓN** (`caja` en `Mostradores::MotivosDeRevision`, sale de los asientos `diferencia_caja`):
     un cierre con $8.500 menos en el cajón decía «Sin novedad» y no entraba en «Para mirar». Manda
-    sobre el producto en la fila y el día dice las dos cosas. **Pendiente de decisión: Cierres como
-    CALENDARIO** (idea de Germán; maqueta en el artifact «Mostrador en tres solapas»).
+    sobre el producto en la fila. **CIERRES ES UN CALENDARIO** (idea de Germán, 12-sep): fechas, no
+    tarjetas —«los números así sueltos no se entiende por qué son»—; el estado es una marca debajo
+    del número (ámbar = faltó producto o plata), el mes viaja entero (`turnos?mes=YYYY-MM`, sin
+    paginar) y el detalle del día va AL LADO con los cierres ya desplegados y sus botones — no un
+    modal con otro modal adentro. «Para mirar» es una franja ARRIBA de la grilla, nunca puntitos
+    dispersos. **«Corregir» sólo en el último cierre**: `bloqueo_correccion` viaja en el resumen y
+    el panel lo dice en vez de esconder el botón. Las oraciones de un cierre viven en
+    `lib/hechosDelCierre.js`, que leen la ficha y el panel. **MERMA HABLA DE PRODUCTO, NO DE PLATA**
+    (pedido de Germán, 12-sep): el titular suma por forma («27 g de flor seca y 4 prerolls»), la
+    lista es **por frasco** con la cantidad grande y la plata en la segunda línea, ordenada por
+    proporción sobre lo entregado (lo único que compara flor con prerolls), y los frascos enteros
+    se listan igual, al final: que uno no aparezca no es lo mismo que que esté bien.
     Un turno entra a esa lista por **cuatro** razones —faltante, **sobrante**, **corrección al
     abrir**, o **administración movió la mesa durante el turno**— y cada renglón dice cuál: un
     pendiente que no dice qué mirar obliga a abrirlo para descubrir que no era nada.

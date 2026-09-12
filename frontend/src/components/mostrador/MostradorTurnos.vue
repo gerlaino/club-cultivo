@@ -3,91 +3,104 @@
     <div class="trn__hd">
       <p class="trn__sub">
         {{ gestiona
-           ? 'Cada cierre con su conteo y su arqueo, del más nuevo al más viejo.'
+           ? 'Tocá un día y se abren sus cierres, con la cuenta a la vista.'
            : 'Los cierres que hiciste vos. Si mañana te preguntan por una diferencia, está acá.' }}
       </p>
-      <div class="trn__hd-acc">
-        <!-- LA LISTA DE TRABAJO ES UN FILTRO DE ESTA LISTA, no otra pantalla.
-             «Para mirar» vivía en la solapa de Merma: la misma lista de cierres, filtrada, con
-             otro nombre y en el lugar donde se va a ANALIZAR, no a trabajar. Acá es lo que
-             siempre fue — un filtro. -->
-        <div v-if="gestiona && (sinRevisar || soloPendientes)" class="trn__filtros">
-          <button class="trn__filtro" :class="{ 'is-on': !soloPendientes }"
-                  @click="filtrar(false)">Todos</button>
-          <button class="trn__filtro" :class="{ 'is-on': soloPendientes }"
-                  @click="filtrar(true)">
-            Para mirar
-            <span v-if="sinRevisar" class="trn__filtro-n">{{ sinRevisar }}</span>
-          </button>
-        </div>
-        <span v-if="total" class="trn__total">{{ total }} cierre{{ total === 1 ? '' : 's' }}</span>
-        <button v-if="total" class="trn__btn trn__btn--mini trn__btn--ghost"
-                :disabled="bajando" @click="descargar">
-          {{ bajando ? 'Preparando…' : 'Descargar CSV' }}
-        </button>
-      </div>
+      <button v-if="turnos.length || pendientes.length" class="trn__btn trn__btn--mini trn__btn--ghost"
+              :disabled="bajando" @click="descargar">
+        {{ bajando ? 'Preparando…' : 'Descargar CSV' }}
+      </button>
     </div>
 
-    <p v-if="cargando" class="trn__vacio">Buscando…</p>
-    <!-- Cada uno con su vacío: al admin decirle "no cerraste ninguno" es contarle algo que
-         no es suyo — él no atiende, mira los de los demás. -->
-    <p v-else-if="!turnos.length && soloPendientes" class="trn__vacio">
-      Nada para mirar: todos los cierres están vistos.
-    </p>
-    <p v-else-if="!turnos.length" class="trn__vacio">
-      {{ gestiona ? 'Todavía no se cerró ninguna caja en esta sede.'
-                  : 'Todavía no cerraste ninguna caja acá.' }}
-    </p>
-
-    <!-- UNA LÍNEA POR CIERRE, Y SE ABRE LA QUE INTERESA.
-         Era una tabla de cinco columnas —CIERRE · ENTREGADO · FALTÓ · CAJA— con «—» en casi todas
-         las celdas y el dato accionable ausente: decía «en 1 producto» sin decir cuál. Ahora la
-         fila cuenta qué pasó, en oraciones, y el detalle está a un toque. -->
-    <!-- AGRUPADO POR DÍA. Es como se piensa: «¿cómo fue el martes?», no «¿cómo fue el cierre 47?».
-         Y el encabezado del día trae el saldo, así el caso normal —un solo cierre— no obliga a
-         abrir nada para saber si pasó algo. -->
-    <div v-else class="trn__dias">
-      <div v-for="d in porDia" :key="d.clave" class="trn__dia" :data-abierta="abiertas.has(d.clave)">
-        <button class="trn__dia-hd" @click="alternar(d.clave)">
-          <i class="bi bi-chevron-right trn__dia-arr"></i>
-          <span class="trn__dia-nombre">{{ d.nombre }}</span>
-          <!-- EL SALDO DEL DÍA DICE LAS DOS COSAS: producto Y plata. Sumaba sólo el producto, así
-               que un día con la mesa perfecta y $8.500 menos en el cajón decía «no falta nada». -->
-          <span class="trn__dia-resumen">
-            <template v-if="d.cierres.length > 1">{{ d.cierres.length }} cierres · </template>
-            <template v-if="!d.faltanteArs && !d.cajaArs"><span class="trn__ok">no falta nada</span></template>
-            <template v-else>
-              <template v-if="d.faltanteArs">falta producto por <b>${{ fmt(d.faltanteArs) }}</b></template>
-              <template v-if="d.faltanteArs && d.cajaArs"> · </template>
-              <template v-if="d.cajaArs">en la caja <b>${{ fmt(Math.abs(d.cajaArs)) }} {{ d.cajaArs < 0 ? 'menos' : 'de más' }}</b></template>
-            </template>
-            <template v-if="d.cierres.length === 1"> · {{ d.cierres[0].atendio || d.cierres[0].cerrado_por }}</template>
-          </span>
-        </button>
-
-        <div v-if="abiertas.has(d.clave)" class="trn__dia-body">
-          <!-- Cada cierre es UNA línea; el detalle se abre en su ficha. Con el detalle acá adentro
-               serían tres niveles de anidado para leer una oración. -->
-          <button v-for="t in d.cierres" :key="t.id" class="trn__cierre" @click="abrir(t)">
-            <span class="trn__cierre-hora">{{ horario(t) }}</span>
-            <span class="trn__cierre-quien">
-              {{ quien(t) }}<template v-if="t.dispensado_ars > 0"> · entregó ${{ fmt(t.dispensado_ars) }}</template>
-            </span>
-            <span v-if="t.revisado" class="trn__pill trn__pill--ok">Visto</span>
-            <span v-else class="trn__pill" :class="veredicto(t).clase">{{ veredicto(t).texto }}</span>
-            <i class="bi bi-chevron-right trn__cierre-arr"></i>
-          </button>
-        </div>
-      </div>
+    <!-- LA LISTA DE TRABAJO VA ARRIBA DE LA GRILLA, no enterrada en ella. Es una lista que se
+         vacía; como puntitos dispersos en tres meses, nadie los caza. Cuando está vacía no ocupa
+         lugar. -->
+    <div v-if="gestiona && pendientes.length" class="trn__pend">
+      <span class="trn__pend-lbl">
+        {{ pendientes.length }} {{ pendientes.length === 1 ? 'cierre' : 'cierres' }} para mirar
+      </span>
+      <button v-for="t in pendientes" :key="t.id" class="trn__pend-btn" type="button" @click="irA(t)">
+        {{ diaCorto(t.cerrado_at) }} · {{ veredicto(t).texto.toLowerCase() }}
+      </button>
     </div>
 
-    <!-- Paginado: sólo aparece cuando hay más de una página, y dice en cuál está. -->
-    <div v-if="paginas > 1" class="trn__pag">
-      <button class="trn__btn trn__btn--mini trn__btn--ghost" :disabled="pagina === 1"
-              @click="irA(pagina - 1)">Anterior</button>
-      <span class="trn__pag-txt">Página {{ pagina }} de {{ paginas }}</span>
-      <button class="trn__btn trn__btn--mini trn__btn--ghost" :disabled="pagina === paginas"
-              @click="irA(pagina + 1)">Siguiente</button>
+    <div class="trn__cal-wrap">
+      <!-- ══ EL CALENDARIO: fechas, no tarjetas (idea de Germán). El estado va en una marca y el
+           detalle al lado. Un número por día; el ámbar salta solo y no hay nada que leer hasta
+           que tocás. ══ -->
+      <div class="trn__cal-box">
+        <div class="trn__cal-hd">
+          <h3 class="trn__cal-titulo">{{ nombreMes }}</h3>
+          <div class="trn__cal-nav">
+            <button type="button" class="trn__cal-btn" aria-label="Mes anterior" @click="moverMes(-1)">‹</button>
+            <button type="button" class="trn__cal-btn" aria-label="Mes siguiente" :disabled="esMesActual" @click="moverMes(1)">›</button>
+          </div>
+        </div>
+        <div class="trn__cal" role="grid" :aria-label="`Cierres de ${nombreMes}`" :aria-busy="String(cargando)">
+          <span v-for="(d, i) in DOW" :key="i" class="trn__dow" aria-hidden="true">{{ d }}</span>
+          <template v-for="c in celdas" :key="c.clave">
+            <span v-if="c.vacia" class="trn__dia trn__dia--vacia"></span>
+            <button v-else type="button" class="trn__dia"
+                    :class="{ 'is-off': !c.cierres.length, 'is-warn': c.warn, 'is-sel': c.clave === seleccionado,
+                              'is-hoy': c.hoy, 'is-dos': c.cierres.length > 1 }"
+                    :disabled="!c.cierres.length" :aria-label="rotulo(c)" :aria-pressed="String(c.clave === seleccionado)"
+                    @click="seleccionado = c.clave">
+              {{ c.dia }}<span class="trn__marca"></span>
+            </button>
+          </template>
+        </div>
+        <div class="trn__cal-leg">
+          <span><i class="trn__leg-ok"></i>se cerró caja</span>
+          <span><i class="trn__leg-warn"></i>faltó producto o plata</span>
+        </div>
+        <p v-if="!cargando && !turnos.length" class="trn__vacio">
+          {{ gestiona ? 'Ningún cierre en este mes.' : 'No cerraste ninguna caja en este mes.' }}
+        </p>
+      </div>
+
+      <!-- ══ EL DÍA, AL LADO. Sus cierres ya desplegados, con sus oraciones y sus botones. No es
+           un modal con otro modal adentro: un cierre por día —el caso normal— es una pantalla. ══ -->
+      <div class="trn__panel">
+        <template v-if="diaElegido">
+          <h3 class="trn__panel-titulo">{{ diaElegido.nombre }}</h3>
+          <p class="trn__panel-sub">
+            {{ diaElegido.cierres.length }} {{ diaElegido.cierres.length === 1 ? 'cierre' : 'cierres' }}
+            <template v-if="entregadoDelDia(diaElegido) > 0"> · entregó ${{ fmt(entregadoDelDia(diaElegido)) }}</template>
+          </p>
+
+          <article v-for="t in diaElegido.cierres" :key="t.id" class="trn__cierre">
+            <div class="trn__cierre-meta">
+              <span><span class="trn__hora">{{ horario(t) }}</span> · {{ quien(t) }}</span>
+              <span v-if="t.revisado" class="trn__pill trn__pill--ok">Visto</span>
+              <span v-else class="trn__pill" :class="veredicto(t).clase">{{ veredicto(t).texto }}</span>
+            </div>
+            <p v-for="(h, i) in hechosDelCierre(t)" :key="i" class="trn__hecho" :class="`trn__hecho--${h.tono}`"
+               v-html="h.texto"></p>
+
+            <!-- SÓLO EL ÚLTIMO SE CORRIGE. Si después se abrió otra caja, se volvió a contar y la
+                 diferencia se arregla ahí. Lo decide el backend (`bloqueo_correccion`); acá se
+                 DICE, no se esconde el botón sin explicar. -->
+            <p v-if="gestiona && t.bloqueo_correccion" class="trn__bloqueo">{{ t.bloqueo_correccion.texto }}</p>
+
+            <div v-if="gestiona" class="trn__acc">
+              <button v-if="!t.revisado" class="trn__btn trn__btn--ghost" type="button"
+                      :disabled="marcando === t.id" @click="marcarVisto(t)">
+                {{ marcando === t.id ? 'Guardando…' : 'Ya lo miré' }}
+              </button>
+              <button v-if="!t.bloqueo_correccion" class="trn__btn trn__btn--primary" type="button" @click="corrigiendo = t">
+                Corregir el conteo
+              </button>
+              <button v-else-if="t.bloqueo_correccion.motivo === 'visto'" class="trn__btn trn__btn--ghost" type="button" @click="corrigiendo = t">
+                Reabrir para revisión
+              </button>
+            </div>
+          </article>
+        </template>
+        <p v-else-if="cargando" class="trn__vacio">Buscando…</p>
+        <p v-else class="trn__vacio">
+          {{ turnos.length ? 'Elegí un día del calendario.' : 'Cuando haya cierres, acá se leen día por día.' }}
+        </p>
+      </div>
     </div>
 
     <p v-if="!gestiona && turnos.length" class="trn__nota">
@@ -96,136 +109,68 @@
     </p>
 
     <CorregirConteo v-if="corrigiendo" :sede-id="sedeId" :turno="corrigiendo" :gestiona="gestiona"
-                    @cerrar="corrigiendo = null" @corregido="cargar" @revisado="marcarVisto" />
+                    @cerrar="corrigiendo = null" @corregido="recargar" @revisado="reflejarVisto" />
   </div>
 </template>
 
 <script setup>
-// LOS TURNOS QUE YA CERRARON.
+// LOS CIERRES, EN UN CALENDARIO (sep-2026, idea de Germán).
 //
-// El que atiende cerraba su turno y no tenía dónde mirarlo después: si al día siguiente le
-// preguntan por una diferencia, no tenía con qué. Administración ve todos; él ve LOS SUYOS —el
-// backend filtra, no la pantalla.
+// Era una lista agrupada por día. La pregunta del admin es «¿cómo fue el martes?», y una grilla
+// del mes la contesta para todos los días a la vez: con cada día marcado se ve el PATRÓN —si
+// falta los viernes, si empezó el día que cambió el turno, si es un goteo o un día suelto—. Eso
+// la lista no lo mostraba ni scrolleando. Y buscar una fecha es tocarla.
+//
+// Administración ve todos; el que atiende ve LOS SUYOS —el backend filtra, no la pantalla.
 import { ref, computed, watch } from 'vue'
 import CorregirConteo from './CorregirConteo.vue'
-import { listTurnosMostrador, descargarTurnosMostrador } from '../../lib/api.js'
+import { listTurnosMostrador, revisarTurnoMostrador, descargarTurnosMostrador } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import { hechosDelCierre } from '../../lib/hechosDelCierre.js'
 import { hoyISO } from '../../utils/dates.js'
 
 const props = defineProps({ sedeId: { type: Number, default: null } })
-
-const toast    = useToast()
-const turnos   = ref([])
-const gestiona = ref(false)
-const cargando = ref(false)
-const corrigiendo = ref(null)
-// Paginado del BACKEND: un mostrador con un año de arqueos son cientos de turnos, y traerlos
-// todos para mostrar veinte es hacer esperar a alguien que está atendiendo.
-const pagina   = ref(1)
-const paginas  = ref(1)
-const total    = ref(0)
-const bajando  = ref(false)
-const soloPendientes = ref(false)
-const sinRevisar     = ref(0)
 const emit = defineEmits(['sin-revisar'])
 
-// POR QUÉ UN CIERRE PIDE UNA MIRADA, con el nombre que usa la gente.
-//
-// Salió de la solapa de Merma junto con la lista. Y en castellano: «Contó de más — no se cargó al
-// inventario» describía la implementación, no lo que pasó.
+const toast    = useToast()
+const turnos   = ref([])        // los del mes que se mira
+const pendientes = ref([])      // «para mirar», de cualquier mes
+const gestiona = ref(false)
+const cargando = ref(false)
+const bajando  = ref(false)
+const marcando = ref(null)
+const corrigiendo = ref(null)
+const seleccionado = ref(null)  // clave del día elegido: 'YYYY-M-D'
+
+// El mes que se mira, como primer día en hora LOCAL. `toISOString()` es UTC y de noche da
+// mañana: todo lo que diga «hoy» acá sale de los componentes locales.
+const hoy = new Date()
+const mes = ref(new Date(hoy.getFullYear(), hoy.getMonth(), 1))
+const esMesActual = computed(() =>
+  mes.value.getFullYear() === hoy.getFullYear() && mes.value.getMonth() === hoy.getMonth())
+const mesParam = computed(() => `${mes.value.getFullYear()}-${String(mes.value.getMonth() + 1).padStart(2, '0')}`)
+
+const DOW   = ['L', 'M', 'M', 'J', 'V', 'S', 'D']
+const DIAS  = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
+const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',
+               'septiembre', 'octubre', 'noviembre', 'diciembre']
+const cap = (s) => s.charAt(0).toUpperCase() + s.slice(1)
+const nombreMes = computed(() => `${cap(MESES[mes.value.getMonth()])} ${mes.value.getFullYear()}`)
+
+// POR QUÉ UN CIERRE PIDE UNA MIRADA, con el nombre que usa la gente. La plata primero: es lo
+// que un admin quiere que le griten. Los ids salen del MISMO `Mostradores::MotivosDeRevision`
+// que el badge — si la pantalla decidiera por su cuenta, un día el badge diría 2 y acá otra cosa.
 const MOTIVO = {
-  caja:        'Falta plata',
   faltante:    'Falta producto',
   sobrante:    'Contó de más',
   corregido:   'Se corrigió al abrir',
   mesa_movida: 'Se movió la mesa',
 }
-// Los motivos que NO son la mercadería van como oración al pie, no como chip: un «+2 más»
-// esconde justo lo que hay que leer.
-const MOTIVO_FRASE = {
-  corregido:   'Al abrir corrigió lo que había sobre la mesa.',
-  mesa_movida: 'Mientras la caja estuvo abierta, administración movió lo que había sobre la mesa.',
-}
-const TONO = { caja: 'warn', faltante: 'warn', sobrante: 'warn', corregido: 'info', mesa_movida: 'info' }
+const PRIORIDAD = ['caja', 'faltante', 'sobrante', 'mesa_movida', 'corregido']
+const motivoPrincipal = (t) => PRIORIDAD.find(m => (t.motivos_revision || []).includes(m)) || null
 
-// La ficha del cierre: qué pasó Y los números para corregirlo, en el mismo lugar. Antes eran dos
-// gestos —abrir la fila, abrir otro modal— y el de corregir no tenía contexto.
-function abrir (t) { corrigiendo.value = t }
-
-// El día más reciente arranca abierto: es el que se viene a mirar.
-const abiertas = ref(new Set())
-function alternar (id) {
-  const s = new Set(abiertas.value)
-  s.has(id) ? s.delete(id) : s.add(id)
-  abiertas.value = s
-}
-
-const DIAS  = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado']
-const MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto',
-               'septiembre', 'octubre', 'noviembre', 'diciembre']
-
-// CUÁNDO FUE, SIN QUE PAREZCA IMPOSIBLE.
-//
-// Decía «5/9 · 14:02–12:03», que se lee como que cerró antes de abrir: era una caja que cruzó la
-// medianoche y sólo se mostraba la fecha del CIERRE. Una fila imposible te hace desconfiar de
-// toda la tabla. Cuando abrió otro día, se dice.
-// LOS CIERRES, AGRUPADOS POR DÍA. El encabezado trae el saldo del día: con un solo cierre —el
-// caso normal— no hace falta abrir nada para saber si pasó algo.
-//
-// Se agrupa por el día del CIERRE. Una caja que cruzó la medianoche cuenta en el día que cerró,
-// que es cuando se contó y cuando se asentó la diferencia.
-const porDia = computed(() => {
-  const mapa = new Map()
-  for (const t of turnos.value) {
-    const c = t.cerrado_at ? new Date(t.cerrado_at) : null
-    if (!c) continue
-    const clave = `${c.getFullYear()}-${c.getMonth()}-${c.getDate()}`
-    if (!mapa.has(clave)) {
-      const dia = `${DIAS[c.getDay()]} ${c.getDate()} de ${MESES[c.getMonth()]}`
-      mapa.set(clave, { clave, nombre: dia.charAt(0).toUpperCase() + dia.slice(1),
-                        cierres: [], faltanteArs: 0, cajaArs: 0 })
-    }
-    const g = mapa.get(clave)
-    g.cierres.push(t)
-    g.faltanteArs += Number(t.faltaron?.ars) || 0
-    g.cajaArs     += Number(t.caja?.diferencia_ars) || 0
-  }
-  return [...mapa.values()]
-})
-
-// ACÁ Y NO ARRIBA: un `watch` evalúa su fuente AL REGISTRARSE, así que puesto antes de `porDia`
-// reventaba con «Cannot access before initialization» y la pantalla no abría. Es la misma trampa
-// que ya mordió en el modal de dispensa, dos veces.
-watch(porDia, (dias) => {
-  if (dias.length && !abiertas.value.size) abiertas.value = new Set([dias[0].clave])
-})
-
-// CUÁNDO FUE, SIN QUE PAREZCA IMPOSIBLE. «14:02–12:03» se leía como que cerró antes de abrir: era
-// una caja que cruzó la medianoche y sólo se mostraba la fecha del cierre.
-function horario (t) {
-  const a = t.abierto_at ? new Date(t.abierto_at) : null
-  const c = t.cerrado_at ? new Date(t.cerrado_at) : null
-  if (!c) return '—'
-  // EL DÍA QUE SE NOMBRA ES EL DE APERTURA, no el del cierre. La fila vive DENTRO del grupo del
-  // día en que cerró, así que decir «12:03 del sábado» adentro de «Sábado 5» es repetir lo que ya
-  // está arriba y esconder el único dato que falta: que abrió el viernes.
-  const otroDia = a && a.toDateString() !== c.toDateString()
-  return `${otroDia ? `${DIAS[a.getDay()]} ` : ''}${hora(t.abierto_at)} → ${hora(t.cerrado_at)}`
-}
-
-// Quién atendió. Es normal que abra el admin a la mañana y cierre contando quien atendió todo el
-// día: cuando son dos personas se nombran las dos.
-function quien (t) {
-  if (t.atendio && t.cerrado_por && t.atendio !== t.cerrado_por) {
-    return `Abrió ${t.atendio} · cerró ${t.cerrado_por}`
-  }
-  return t.atendio || t.cerrado_por || 'Alguien'
-}
-
-// El veredicto de la fila: lo que se lee sin abrir nada.
 function veredicto (t) {
   const m = motivoPrincipal(t)
-  // La plata primero: es lo que un admin quiere que le griten, y era lo único que la fila no decía.
   if (m === 'caja') {
     const d = Number(t.caja?.diferencia_ars) || 0
     return { texto: d < 0 ? 'Falta plata' : 'Sobra plata', clase: 'trn__pill--warn' }
@@ -235,59 +180,154 @@ function veredicto (t) {
   if (m)                return { texto: MOTIVO[m],        clase: 'trn__pill--info' }
   return { texto: 'Sin novedad', clase: 'trn__pill--ok' }
 }
+// Lo que pinta el día de ámbar: faltó producto o plata. Lo demás es contexto, no marca.
+const pideMirada = (t) => ['caja', 'faltante', 'sobrante'].includes(motivoPrincipal(t))
 
-// EL QUE MANDA, no los tres. Un faltante es lo que se sale a buscar; que se haya corregido al
-// abrir es contexto. Tres chips en una fila obligan a leer los tres para saber cuál importa.
-const PRIORIDAD = ['caja', 'faltante', 'sobrante', 'mesa_movida', 'corregido']
-const motivoPrincipal = (t) =>
-  PRIORIDAD.find(m => (t.motivos_revision || []).includes(m)) || null
+// ── LA GRILLA ──────────────────────────────────────────────────────────────────────────────
+// Se agrupa por el día del CIERRE: una caja que cruzó la medianoche cuenta en el día que cerró,
+// que es cuando se contó y cuando se asentó la diferencia.
+const claveDe = (d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`
+const porDia = computed(() => {
+  const mapa = new Map()
+  for (const t of turnos.value) {
+    if (!t.cerrado_at) continue
+    const c = new Date(t.cerrado_at)
+    const k = claveDe(c)
+    if (!mapa.has(k)) {
+      mapa.set(k, { clave: k, fecha: c, nombre: cap(`${DIAS[c.getDay()]} ${c.getDate()} de ${MESES[c.getMonth()]}`), cierres: [] })
+    }
+    mapa.get(k).cierres.push(t)
+  }
+  // Dentro del día, del más temprano al más tarde: se lee como pasó.
+  for (const d of mapa.values()) d.cierres.sort((a, b) => (a.cerrado_at < b.cerrado_at ? -1 : 1))
+  return mapa
+})
 
-function filtrar (soloPend) {
-  soloPendientes.value = soloPend
-  pagina.value = 1
-  cargar()
+const celdas = computed(() => {
+  const y = mes.value.getFullYear(), m = mes.value.getMonth()
+  const primero = new Date(y, m, 1)
+  const dias = new Date(y, m + 1, 0).getDate()
+  // Lunes primero: getDay() da 0 para el domingo.
+  const huecos = (primero.getDay() + 6) % 7
+  const out = []
+  for (let i = 0; i < huecos; i++) out.push({ clave: `v${i}`, vacia: true })
+  for (let d = 1; d <= dias; d++) {
+    const fecha = new Date(y, m, d)
+    const k = claveDe(fecha)
+    const cierres = porDia.value.get(k)?.cierres || []
+    out.push({ clave: k, dia: d, cierres, warn: cierres.some(pideMirada), hoy: k === claveDe(hoy) })
+  }
+  return out
+})
+
+const diaElegido = computed(() => (seleccionado.value && porDia.value.get(seleccionado.value)) || null)
+const entregadoDelDia = (d) => d.cierres.reduce((a, t) => a + (Number(t.dispensado_ars) || 0), 0)
+
+function rotulo (c) {
+  if (!c.cierres.length) return `${c.dia}, sin caja`
+  const n = c.cierres.length > 1 ? `${c.cierres.length} cierres` : '1 cierre'
+  return `${c.dia}, ${n}, ${c.warn ? 'faltó producto o plata' : 'no faltó nada'}`
 }
 
-// SE MARCA Y SE ARCHIVA: no es una lista de sospechosos. El botón vive en la ficha del cierre
-// —que es donde se mira— y acá se refleja el resultado sin esperar la recarga: con el filtro
-// puesto, ver la fila quedarse ahí se lee como que no anduvo.
-function marcarVisto ({ id, revisado }) {
+// El día más reciente con cierres arranca elegido: es el que se viene a mirar.
+watch(porDia, (mapa) => {
+  if (seleccionado.value && mapa.has(seleccionado.value)) return
+  const dias = [...mapa.values()].sort((a, b) => a.fecha - b.fecha)
+  seleccionado.value = dias.length ? dias[dias.length - 1].clave : null
+})
+
+// ── CUÁNDO Y QUIÉN ─────────────────────────────────────────────────────────────────────────
+const fmt  = (n) => Number(n ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })
+const hora = (iso) => (iso ? new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) : '')
+const diaCorto = (iso) => {
+  const d = new Date(iso)
+  return `${cap(DIAS[d.getDay()].slice(0, 3))} ${d.getDate()}/${d.getMonth() + 1}`
+}
+
+// CUÁNDO FUE, SIN QUE PAREZCA IMPOSIBLE. «14:02 → 12:03» se leía como que cerró antes de abrir:
+// era una caja que cruzó la medianoche. Cuando abrió otro día, se dice.
+function horario (t) {
+  const a = t.abierto_at ? new Date(t.abierto_at) : null
+  const c = t.cerrado_at ? new Date(t.cerrado_at) : null
+  if (!c) return '—'
+  const otroDia = a && a.toDateString() !== c.toDateString()
+  return `${otroDia ? `${DIAS[a.getDay()]} ` : ''}${hora(t.abierto_at)} → ${hora(t.cerrado_at)}`
+}
+
+// Quién atendió. Es normal que abra el admin a la mañana y cierre contando quien atendió todo el
+// día: cuando son dos personas se nombran las dos.
+function quien (t) {
+  if (t.atendio && t.cerrado_por && t.atendio !== t.cerrado_por) return `abrió ${t.atendio}, cerró ${t.cerrado_por}`
+  return t.atendio || t.cerrado_por || 'Alguien'
+}
+
+// ── ACCIONES ───────────────────────────────────────────────────────────────────────────────
+// Ir a un cierre desde «para mirar»: si es de otro mes, se cambia el mes y se lo elige al llegar.
+let irAlLlegar = null
+function irA (t) {
+  const c = new Date(t.cerrado_at)
+  const k = claveDe(c)
+  if (c.getFullYear() === mes.value.getFullYear() && c.getMonth() === mes.value.getMonth()) {
+    seleccionado.value = k
+  } else {
+    irAlLlegar = k
+    mes.value = new Date(c.getFullYear(), c.getMonth(), 1)
+  }
+}
+
+function moverMes (delta) {
+  mes.value = new Date(mes.value.getFullYear(), mes.value.getMonth() + delta, 1)
+}
+
+// SE MARCA Y SE ARCHIVA: no es una lista de sospechosos. El gesto tiene que ser liviano —la
+// lista está para vaciarse— y se refleja sin esperar la recarga.
+async function marcarVisto (t) {
+  marcando.value = t.id
+  try {
+    await revisarTurnoMostrador(props.sedeId, t.id)
+    reflejarVisto({ id: t.id, revisado: true })
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo marcar.')
+  } finally { marcando.value = null }
+}
+
+function reflejarVisto ({ id, revisado }) {
   const t = turnos.value.find(x => x.id === id)
-  if (t) t.revisado = revisado
-  sinRevisar.value = Math.max(0, sinRevisar.value + (revisado ? -1 : 1))
-  emit('sin-revisar', sinRevisar.value)
-  if (revisado && soloPendientes.value) turnos.value = turnos.value.filter(x => x.id !== id)
+  if (t) {
+    t.revisado = revisado
+    // Visto congela la corrección (con llave): el panel lo dice sin volver a pedir.
+    if (revisado && !t.bloqueo_correccion) {
+      t.bloqueo_correccion = { motivo: 'visto', texto: 'Este cierre ya se miró. Para corregirlo hay que reabrirlo para revisión.' }
+    }
+    if (!revisado && t.bloqueo_correccion?.motivo === 'visto') t.bloqueo_correccion = null
+  }
+  if (revisado) pendientes.value = pendientes.value.filter(x => x.id !== id)
+  emit('sin-revisar', pendientes.value.length)
+  if (!revisado) recargar()
 }
-
-const fmt = (n) => Number(n ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })
-const fecha = (iso) => (iso ? new Date(iso).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) : '')
-const hora  = (iso) => (iso ? new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }) : '')
 
 async function cargar () {
   if (!props.sedeId) return
   cargando.value = true
   try {
-    const params = { pagina: pagina.value }
-    if (soloPendientes.value) params.sin_revisar = 1
-    const { data } = await listTurnosMostrador(props.sedeId, params)
+    const { data } = await listTurnosMostrador(props.sedeId, { mes: mesParam.value })
     turnos.value   = data.turnos || []
     gestiona.value = !!data.gestiona
-    paginas.value  = data.paginas || 1
-    total.value    = data.total ?? turnos.value.length
-    sinRevisar.value = data.sin_revisar ?? 0
-    emit('sin-revisar', sinRevisar.value)
+    if (irAlLlegar) { seleccionado.value = irAlLlegar; irAlLlegar = null }
+    if (gestiona.value) {
+      const p = await listTurnosMostrador(props.sedeId, { sin_revisar: 1 })
+      pendientes.value = p.data.turnos || []
+      emit('sin-revisar', p.data.sin_revisar ?? pendientes.value.length)
+    } else {
+      pendientes.value = []
+    }
   } catch (e) {
     toast.error(e?.response?.data?.error || 'No se pudieron cargar los cierres.')
   } finally {
     cargando.value = false
   }
 }
-
-function irA (n) {
-  if (n < 1 || n > paginas.value || n === pagina.value) return
-  pagina.value = n
-  cargar()
-}
+const recargar = () => cargar()
 
 // Se arma el archivo en el backend y se baja acá. El nombre lo pone el servidor (sede + fecha):
 // tres archivos "arqueos.csv" en la carpeta de descargas no le sirven a nadie.
@@ -309,9 +349,13 @@ async function descargar () {
   } finally { bajando.value = false }
 }
 
-// Cambiar de sede vuelve a la primera página: quedarse en la 4 de un mostrador que tiene 2 es
-// mostrar una lista vacía sin explicar por qué.
-watch(() => props.sedeId, () => { pagina.value = 1; cargar() }, { immediate: true })
+// Cambiar de sede vuelve al mes actual: octubre de Norte no es octubre de Centro.
+watch(() => props.sedeId, () => {
+  mes.value = new Date(hoy.getFullYear(), hoy.getMonth(), 1)
+  seleccionado.value = null
+  cargar()
+}, { immediate: true })
+watch(mes, () => { seleccionado.value = null; cargar() })
 </script>
 
 <style scoped>
@@ -319,115 +363,88 @@ watch(() => props.sedeId, () => { pagina.value = 1; cargar() }, { immediate: tru
   display: flex; align-items: flex-start; justify-content: space-between;
   gap: 12px; flex-wrap: wrap; margin-bottom: 14px;
 }
-.trn__hd-acc { display: flex; align-items: center; gap: 10px; }
-.trn__total  { font-size: var(--fs-13); color: var(--c-ink-500); font-family: var(--font-mono); }
 .trn__sub   { margin: 0; font-size: var(--fs-13); color: var(--c-ink-500); max-width: 60ch; }
-
-.trn__pag {
-  display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 14px;
-}
-.trn__pag-txt { font-size: var(--fs-13); color: var(--c-ink-500); }
-.trn__vacio { margin: 0; font-size: var(--fs-14); color: var(--c-ink-500); }
+.trn__vacio { margin: 10px 0 0; font-size: var(--fs-14); color: var(--c-ink-500); }
 .trn__nota  { margin: 12px 0 0; font-size: var(--fs-13); color: var(--c-ink-500); max-width: 60ch; }
 
-.trn__table-wrap {
-  background: #fff; border: 1px solid var(--c-slate-200);
-  border-radius: 14px; overflow-x: auto;
+/* ── «Para mirar», arriba de todo ─────────────────────────────────────────── */
+.trn__pend {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  background: var(--c-amber-100, #fef3c7); border-radius: 10px; padding: 9px 12px; margin-bottom: 14px;
 }
-.trn__table { width: 100%; border-collapse: collapse; }
-.trn__table th {
-  text-align: left; font-size: var(--fs-12); font-weight: 600; text-transform: uppercase;
-  letter-spacing: .04em; color: var(--c-ink-500);
-  padding: 13px 16px; border-bottom: 1px solid var(--c-slate-200); white-space: nowrap;
+.trn__pend-lbl { font-size: var(--fs-13); font-weight: 700; color: var(--c-amber-700, #b45309); }
+.trn__pend-btn {
+  border: 0; background: #fff; border-radius: 8px; padding: 4px 10px;
+  font: inherit; font-size: var(--fs-13); font-weight: 600; color: var(--c-ink-700); cursor: pointer;
 }
-.trn__table td { padding: 14px 16px; border-bottom: 1px solid var(--c-slate-100); vertical-align: middle; }
-.trn__table tbody tr:last-child td { border-bottom: 0; }
+.trn__pend-btn:hover { color: var(--c-ink-900); }
 
-.trn__th-num, .trn__td-num { text-align: right; }
-.trn__th-acc, .trn__td-acc { text-align: right; white-space: nowrap; }
-
-.trn__cuando { font-size: var(--fs-14); font-weight: 600; color: var(--c-ink-900); }
-.trn__meta   { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 5px; align-items: center; }
-.trn__mut    { color: var(--c-ink-500); font-size: var(--fs-13); }
-/* TODOS los números de la tabla con el mismo estilo. Antes "Entregado" salía en sans y los
-   demás en monoespaciada: la misma tabla con dos tipografías para el mismo tipo de dato. */
-.trn__td-num { font-family: var(--font-mono); }
-.trn__num    { font-family: var(--font-mono); font-weight: 600; color: var(--c-ink-900); display: block; }
-.trn__nada   { color: var(--c-ink-500); }
-/* Qué es la cifra de arriba, no otra cifra: va debajo y en la tipografía del texto. */
-.trn__pie    { display: block; font-family: var(--font-sans); font-size: var(--fs-12); color: var(--c-ink-500); }
-.trn__unidad { font-size: var(--fs-12); color: var(--c-ink-500); margin-left: 3px; }
-.trn__ok     { font-size: var(--fs-13); color: var(--c-leaf-600); }
-
-.trn__pill {
-  display: inline-block; padding: 2px 8px; border-radius: 999px;
-  font-size: var(--fs-12); font-weight: 600;
+/* ── Calendario a la izquierda, el día a la derecha ───────────────────────── */
+.trn__cal-wrap { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 22px; align-items: start; }
+.trn__cal-box { border: 1px solid var(--c-slate-200); border-radius: 12px; padding: 14px 14px 12px; background: #fff; }
+.trn__cal-hd { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.trn__cal-titulo { margin: 0; font-size: var(--fs-15, .95rem); font-weight: 700; color: var(--c-ink-900); }
+.trn__cal-nav { display: flex; gap: 4px; }
+.trn__cal-btn {
+  border: 1px solid var(--c-slate-200); background: #fff; border-radius: 8px; width: 30px; height: 30px;
+  font: inherit; font-size: var(--fs-15, .95rem); cursor: pointer; color: var(--c-ink-700);
 }
-.trn__pill--ok   { background: var(--c-leaf-100); color: var(--c-leaf-700); }
+.trn__cal-btn:disabled { opacity: .4; cursor: default; }
+.trn__cal { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.trn__dow { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--c-ink-500); font-weight: 700; text-align: center; padding: 4px 0 6px; }
 
-/* ── AGRUPADO POR DÍA ────────────────────────────────────────────────────────
-   Es como se piensa: «¿cómo fue el martes?». Y el encabezado del día trae el saldo, así el caso
-   normal —un solo cierre— no obliga a abrir nada para saber si pasó algo. */
-.trn__dias { display: flex; flex-direction: column; }
-.trn__dia  { border-top: 1px solid var(--c-slate-100); }
-.trn__dia:last-child { border-bottom: 1px solid var(--c-slate-100); }
-.trn__dia-hd {
-  width: 100%; appearance: none; border: 0; background: none; font: inherit; cursor: pointer;
-  text-align: left; display: grid; grid-template-columns: 14px minmax(0,1fr) auto;
-  align-items: center; gap: 12px; padding: 14px 6px;
+/* Un número por día y una marca debajo. El estado es la marca, no un texto. */
+.trn__dia {
+  position: relative; height: 42px; border: 0; border-radius: 8px; background: transparent;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  font: inherit; font-weight: 600; font-size: var(--fs-13); color: var(--c-ink-900); cursor: pointer;
 }
-.trn__dia-hd:hover { background: var(--c-slate-50, #f8fafc); }
-.trn__dia-arr { color: var(--c-ink-400, #9aa0aa); font-size: var(--fs-12); transition: transform .16s ease; }
-.trn__dia[data-abierta="true"] .trn__dia-arr { transform: rotate(90deg); }
-.trn__dia-nombre  { font-size: var(--fs-15, .95rem); font-weight: 700; color: var(--c-ink-900); }
-.trn__dia-resumen { font-size: var(--fs-13); color: var(--c-ink-500); text-align: right; white-space: nowrap; }
-.trn__dia-resumen b { color: var(--c-amber-700, #b45309); font-weight: 600; font-family: var(--font-mono); }
-.trn__dia-body { display: flex; flex-direction: column; gap: 2px; padding: 0 6px 12px 32px; }
-
-/* Cada cierre, UNA línea. El detalle se abre en su ficha: acá adentro serían tres niveles de
-   anidado para leer una oración. */
-.trn__cierre {
-  width: 100%; appearance: none; border: 0; background: none; font: inherit; cursor: pointer;
-  text-align: left; display: grid; grid-template-columns: auto minmax(0,1fr) auto 14px;
-  align-items: center; gap: 12px; padding: 10px 10px; border-radius: 9px;
-}
-.trn__cierre:hover { background: var(--c-slate-50, #f8fafc); }
-.trn__cierre-hora  { font-family: var(--font-mono); font-size: var(--fs-13); color: var(--c-ink-500); white-space: nowrap; }
-.trn__cierre-quien { font-size: var(--fs-14); color: var(--c-ink-700); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.trn__cierre-arr   { color: var(--c-ink-400, #9aa0aa); font-size: var(--fs-12); }
-@media (max-width: 560px) {
-  .trn__cierre { grid-template-columns: minmax(0,1fr) auto; gap: 4px 8px; }
-  .trn__cierre-hora { grid-column: 1 / -1; }
-  .trn__cierre-arr { display: none; }
-  .trn__dia-body { padding-left: 14px; }
-}
-
+.trn__dia--vacia { visibility: hidden; }
+.trn__dia.is-off { color: var(--c-ink-400, #9aa0aa); font-weight: 400; cursor: default; }
+.trn__dia:not(.is-off):hover { background: var(--c-slate-50, #f8fafc); }
+.trn__marca { width: 6px; height: 6px; border-radius: 3px; background: var(--c-slate-300); }
+.trn__dia.is-off .trn__marca { background: transparent; }
 /* Ámbar y no rojo: una diferencia es un dato que se anota, no una falta que alguien explica. */
+.trn__dia.is-warn { color: var(--c-amber-700, #b45309); font-weight: 800; }
+.trn__dia.is-warn .trn__marca { background: var(--c-amber-500, #d97706); }
+.trn__dia.is-dos .trn__marca { width: 14px; }
+.trn__dia.is-sel { background: var(--c-leaf-800, #14532d); color: #fff; }
+.trn__dia.is-sel .trn__marca { background: #fff; }
+.trn__dia.is-hoy::after { content: ''; position: absolute; inset: 3px; border: 1px dashed var(--c-ink-400, #9aa0aa); border-radius: 7px; pointer-events: none; }
+.trn__cal-leg { display: flex; gap: 14px; font-size: var(--fs-12); color: var(--c-ink-500); margin-top: 10px; flex-wrap: wrap; }
+.trn__cal-leg i { display: inline-block; width: 6px; height: 6px; border-radius: 3px; vertical-align: 1px; margin-right: 6px; }
+.trn__leg-ok   { background: var(--c-slate-300); }
+.trn__leg-warn { background: var(--c-amber-500, #d97706); }
+
+/* El panel del día */
+.trn__panel { border: 1px solid var(--c-slate-200); border-radius: 12px; padding: 16px 18px; min-height: 200px; background: #fff; }
+.trn__panel-titulo { margin: 0; font-size: var(--fs-16); font-weight: 700; color: var(--c-ink-900); }
+.trn__panel-sub { margin: 2px 0 12px; font-size: var(--fs-13); color: var(--c-ink-500); }
+.trn__cierre { border-top: 1px solid var(--c-slate-100); padding: 14px 0 6px; }
+.trn__cierre:first-of-type { border-top: 0; padding-top: 0; }
+.trn__cierre-meta { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; font-size: var(--fs-14); color: var(--c-ink-700); }
+.trn__hora { font-family: var(--font-mono); font-size: var(--fs-13); color: var(--c-ink-500); }
+.trn__hecho { margin: 0 0 8px; padding: 10px 12px; border-radius: 8px; background: var(--c-slate-50, #f8fafc); font-size: var(--fs-14); color: var(--c-ink-900); line-height: 1.45; }
+.trn__hecho--warn { background: var(--c-amber-100, #fef3c7); }
+.trn__hecho :deep(small) { display: block; color: var(--c-ink-700); font-size: var(--fs-12); margin-top: 2px; }
+.trn__bloqueo { margin: 8px 0 0; font-size: var(--fs-12); color: var(--c-ink-500); border-left: 3px solid var(--c-slate-200); padding-left: 10px; }
+.trn__acc { display: flex; gap: 8px; justify-content: flex-end; margin-top: 12px; flex-wrap: wrap; }
+
+.trn__pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: var(--fs-12); font-weight: 600; white-space: nowrap; }
+.trn__pill--ok   { background: var(--c-leaf-100); color: var(--c-leaf-700); }
 .trn__pill--warn { background: var(--c-amber-100, #fef3c7); color: var(--c-amber-700, #b45309); }
 .trn__pill--info { background: var(--c-sky-100, #e0f2fe); color: var(--c-sky-600, #0284c7); }
 
-/* El filtro de la lista de trabajo. Dos botones, no un desplegable: son dos estados. */
-.trn__filtros { display: inline-flex; gap: 4px; }
-.trn__filtro {
-  border: 1px solid var(--c-slate-300); background: #fff; color: var(--c-ink-700);
-  border-radius: 999px; padding: 4px 12px; font-size: var(--fs-13); font-weight: 600;
-  cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
-}
-.trn__filtro.is-on { background: var(--c-leaf-800, #14532d); color: #fff; border-color: transparent; }
-.trn__filtro-n {
-  background: var(--c-amber-100, #fef3c7); color: var(--c-amber-700, #b45309);
-  border-radius: 999px; padding: 0 6px; font-size: var(--fs-12); font-weight: 700;
-}
-.trn__filtro.is-on .trn__filtro-n { background: rgba(255,255,255,.22); color: #fff; }
-
 .trn__btn {
-  border-radius: 9px; font-size: var(--fs-14); font-weight: 600;
+  border-radius: 9px; padding: 9px 16px; font: inherit; font-size: var(--fs-14); font-weight: 600;
   cursor: pointer; border: 1px solid transparent;
 }
-.trn__btn--mini  { padding: 6px 12px; font-size: var(--fs-13); }
-.trn__btn--ghost { background: #fff; color: var(--c-ink-700); border-color: var(--c-slate-300); }
-/* La acción principal, sólo cuando el cierre pide algo. En uno sin novedad corregir sigue
-   accesible, pero en segundo plano: la fila no tiene que pedir atención. */
+.trn__btn--ghost   { background: #fff; color: var(--c-ink-700); border-color: var(--c-slate-300); }
 .trn__btn--primary { background: var(--c-leaf-800, #14532d); color: #fff; }
-.trn__btn--primary:hover { filter: brightness(1.12); }
+.trn__btn--mini    { padding: 6px 12px; font-size: var(--fs-13); }
+.trn__btn:disabled { opacity: .6; cursor: default; }
+
+@media (max-width: 760px) {
+  .trn__cal-wrap { grid-template-columns: 1fr; }
+}
 </style>

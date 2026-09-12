@@ -49,10 +49,12 @@ const TURNO = {
 }
 
 const BASE = {
-  resumen: { turnos: 9, dispensado: 9000, faltante: 90, faltante_ars: 9000, merma_pct: 1 },
+  resumen: { turnos: 9, dispensado: 9000, faltante: 90, faltante_ars: 9000, merma_pct: 1,
+             faltante_por_forma: [{ forma: 'flor_seca', unidad: 'g', faltante: 86 },
+                                  { forma: 'preroll', unidad: 'un', faltante: 4 }] },
   por_producto: [
-    { producto: 'Northern Lights (flor seca)', unidad: 'g', dispensado: 1000, faltante: 50,
-      faltante_ars: 5000, merma_pct: 5, turnos: 3 },
+    { stock_id: 1, producto: 'Northern Lights (flor seca)', numero: 'ST-26-0013', forma: 'flor_seca',
+      unidad: 'g', dispensado: 1000, faltante: 50, faltante_ars: 5000, merma_pct: 5, turnos: 3 },
   ],
   por_turno: [TURNO],
   por_sede: null,
@@ -89,31 +91,39 @@ beforeEach(() => { getMermaMostrador.mockClear(); revisarTurnoMostrador.mockClea
 describe('① Cómo viene', () => {
   // EL HECHO PRIMERO. Lo que se lee al entrar es cuánto falta, no un veredicto sobre si el
   // porcentaje es calculable.
-  it('el titular arranca por la plata que falta', async () => {
+  // EL TITULAR HABLA DE PRODUCTO, EN SU UNIDAD (sep-2026, pedido de Germán: «que sea más
+  // importante el stock y sus cantidades»). Sumado por forma: 86 g + 4 prerolls no son 90 de nada.
+  it('el titular arranca por lo que faltó de cada cosa, no por la plata', async () => {
     const w = await montar()
-    // «Faltaron $X a costo» era jerga. El que abre esto sabe de plantas, no de arqueos.
-    expect(w.find('.mrm__estado-frase').text()).toBe('Falta producto por $9.000 en 9 cierres.')
+    expect(w.find('.mrm__estado-frase').text()).toBe('Faltaron 86 g de flor seca y 4 prerolls en 9 cierres.')
+  })
+
+  it('y la plata va en la línea de abajo', async () => {
+    const w = await montar()
+    expect(w.find('.mrm__estado-caja').text()).toContain('Producirlos costó $9.000.')
+    expect(w.find('.mrm__estado-frase').text()).not.toContain('$')
   })
 
   it('cuando cuadró lo dice, en vez de no decir nada', async () => {
-    const w = await montar({ resumen: { ...BASE.resumen, faltante: 0, faltante_ars: 0 } })
+    const w = await montar({ resumen: { ...BASE.resumen, faltante: 0, faltante_ars: 0, faltante_por_forma: [] } })
     // «Cuadró» es palabra de contador.
     expect(w.find('.mrm__estado-frase').text()).toContain('No falta nada')
+    expect(w.find('.mrm__estado-caja').exists()).toBe(false)
   })
 
   // Este es el caso de la captura: se entregó 0, así que no hay porcentaje. Antes el titular
-  // decía «con ese volumen el porcentaje no dice nada» ENCIMA de los pesos faltantes.
-  it('sin volumen para comparar, el número sigue primero y la advertencia va abajo', async () => {
+  // decía «con ese volumen el porcentaje no dice nada» ENCIMA de lo que faltaba.
+  it('sin volumen para comparar, el hecho sigue primero y la advertencia va abajo', async () => {
     const w = await montar({ veredicto: { ...BASE.veredicto, estado: 'poco_volumen', motor: null } })
 
-    expect(w.find('.mrm__estado-frase').text()).toContain('$9.000')
-    expect(w.find('.mrm__estado-sub').text()).toContain('se entregó poco')
+    expect(w.find('.mrm__estado-frase').text()).toContain('86 g')
+    expect(w.findAll('.mrm__estado-sub').map(x => x.text()).join(' ')).toContain('se entregó poco')
   })
 
   // Un porcentaje solo no dice nada: lo que importa es que CAMBIÓ respecto del patrón de acá.
   it('la comparación contra el historial va debajo, con los dos números', async () => {
     const w = await montar()
-    const sub = w.find('.mrm__estado-sub').text()
+    const sub = w.findAll('.mrm__estado-sub').map(x => x.text()).join(' ')
     expect(sub).toContain('5.1%')
     expect(sub).toContain('1.2%')
     expect(sub).toContain('8 semanas')
@@ -154,15 +164,19 @@ describe('② La lista de trabajo se mudó a Cierres', () => {
   })
 })
 
-describe('③ Dónde se va', () => {
+describe('③ Qué falta, frasco por frasco', () => {
   const filas = (w) => w.findAll('.mrm__fila')
 
-  it('arranca por producto, con la plata adelante y el resto en castellano', async () => {
+  // LA CANTIDAD GRANDE, LA PLATA CHICA. «Faltaron 23 g del ST-26-0013» es una acción; «$27.636»
+  // es un juicio. Y el frasco por su número: es con lo que se lo va a buscar.
+  it('arranca por el frasco, con la cantidad adelante, la plata abajo y el resto en castellano', async () => {
     const w = await montar()
 
     expect(filas(w)).toHaveLength(1)
     expect(filas(w)[0].find('.mrm__fila-titulo').text()).toContain('Northern Lights')
-    expect(filas(w)[0].find('.mrm__fila-ars').text()).toBe('$5.000')
+    expect(filas(w)[0].find('.mrm__fila-titulo').text()).toContain('ST-26-0013')
+    expect(filas(w)[0].find('.mrm__fila-cant').text()).toBe('50 g')
+    expect(filas(w)[0].find('.mrm__fila-ars').text()).toBe('producirlos costó $5.000')
     // EL PORCENTAJE DICHO COMO SE DICE: «5%» hay que traducirlo; «50 de cada 1.000 que salen»
     // ya está en la cabeza del que lo lee.
     expect(filas(w)[0].find('.mrm__fila-sub').text())
@@ -173,7 +187,7 @@ describe('③ Dónde se va', () => {
   // merma, es producto que desapareció. Y era una fila entera de «–%» y «0 g».
   it('si no se entregó nada, lo dice en vez de mostrar un porcentaje vacío', async () => {
     const w = await montar({
-      por_producto: [{ producto: 'Critical Kush — L-26-017 (flor seca)', unidad: 'g',
+      por_producto: [{ stock_id: 9, producto: 'Critical Kush (flor seca)', numero: 'ST-26-0017', unidad: 'g',
                        dispensado: 0, faltante: 23, faltante_ars: 27636, merma_pct: null, turnos: 2 }],
     })
 
@@ -182,27 +196,34 @@ describe('③ Dónde se va', () => {
     expect(sub).not.toContain('%')
   })
 
-  // Ordenar por porcentaje no servía: desaparece cuando no se vendió. La plata existe siempre.
-  it('ordena por plata, de mayor a menor', async () => {
+  // EL ORDEN LO PONE EL BACKEND (por proporción sobre lo entregado, lo único que compara flor
+  // con prerolls) y la pantalla lo respeta: reordenar acá por plata era la misma regla escrita
+  // dos veces, y un día dicen distinto.
+  it('respeta el orden del backend y lo dice', async () => {
     const w = await montar({
       por_producto: [
-        { producto: 'Poco', unidad: 'g', dispensado: 100, faltante: 1, faltante_ars: 500, merma_pct: 1, turnos: 1 },
-        { producto: 'Mucho', unidad: 'g', dispensado: 100, faltante: 9, faltante_ars: 9000, merma_pct: 9, turnos: 1 },
+        { stock_id: 1, producto: 'Primero', unidad: 'g', dispensado: 100, faltante: 1, faltante_ars: 500, merma_pct: 1, turnos: 1 },
+        { stock_id: 2, producto: 'Segundo', unidad: 'g', dispensado: 100, faltante: 9, faltante_ars: 9000, merma_pct: 9, turnos: 1 },
       ],
     })
 
-    expect(filas(w).map(f => f.find('.mrm__fila-titulo').text())).toEqual(['Mucho', 'Poco'])
+    expect(filas(w).map(f => f.find('.mrm__fila-titulo').text())).toEqual(['Primero', 'Segundo'])
+    expect(w.find('.mrm__orden').text()).toContain('cuánto se pierde de lo que sale')
   })
 
-  it('no lista lo que no se fue a ningún lado', async () => {
+  // Que un frasco no aparezca no es lo mismo que que esté bien: el que no perdió nada se lista
+  // igual, al final y diciéndolo.
+  it('el frasco que está entero también se lista, y lo dice', async () => {
     const w = await montar({
       por_producto: [
-        { producto: 'Cuadró', unidad: 'g', dispensado: 500, faltante: 0, faltante_ars: 0, merma_pct: 0, turnos: 2 },
-        { producto: 'Faltó', unidad: 'g', dispensado: 500, faltante: 5, faltante_ars: 900, merma_pct: 1, turnos: 2 },
+        { stock_id: 2, producto: 'Faltó', unidad: 'g', dispensado: 500, faltante: 5, faltante_ars: 900, merma_pct: 1, turnos: 2 },
+        { stock_id: 1, producto: 'Entero', unidad: 'g', dispensado: 500, faltante: 0, faltante_ars: 0, merma_pct: 0, turnos: 2 },
       ],
     })
 
-    expect(filas(w).map(f => f.find('.mrm__fila-titulo').text())).toEqual(['Faltó'])
+    expect(filas(w).map(f => f.find('.mrm__fila-titulo').text())).toEqual(['Faltó', 'Entero'])
+    expect(filas(w)[1].find('.mrm__fila-cant').text()).toBe('está todo')
+    expect(filas(w)[1].find('.mrm__fila-ars').exists()).toBe(false)
   })
 
   it('el corte por sede aparece sólo cuando hay más de una', async () => {
@@ -323,33 +344,32 @@ describe('La plata en el titular', () => {
     expect(w.find('.mrm__estado-caja').text()).toContain('sobraron $2.000 en 2 cierres')
   })
 
-  it('y con la plata justa no dice nada: «$0» es una celda vacía con formato', async () => {
+  it('y con la plata justa no dice nada de la caja: «$0» es una celda vacía con formato', async () => {
     const w = await montar({ resumen: { ...BASE.resumen, caja_ars: 0, caja_turnos: 0 } })
-    expect(w.find('.mrm__estado-caja').exists()).toBe(false)
+    expect(w.find('.mrm__estado-caja').text()).not.toContain('en la caja')
   })
 })
 
 // ── EL GRÁFICO, ADENTRO DE LA FILA ─────────────────────────────────────────────────────────
 // «Producto por producto» era otra solapa con su propio filtro de fecha: la misma pregunta
 // partida en dos lugares. El gráfico es la explicación del número y va donde está el número.
-describe('La fila de un producto se abre y muestra su gráfico', () => {
+describe('La fila de un frasco se abre y muestra su gráfico', () => {
   it('no pide la evolución hasta que alguien abre una fila', async () => {
     await montar()
     expect(getEvolucionMostrador).not.toHaveBeenCalled()
   })
 
-  it('al abrir, pide la evolución del MISMO rango y dibuja un gráfico por frasco', async () => {
+  it('al abrir, pide la evolución del MISMO rango y dibuja el gráfico de ESE frasco', async () => {
     const w = await montar()
     await w.find('.mrm__fila--abrible').trigger('click')
     await flushPromises()
 
     expect(getEvolucionMostrador).toHaveBeenCalledWith(10, { desde: '2026-09-01', hasta: '2026-09-06' })
-    // Dos lotes de la misma variedad: la fila los agrupa, el gráfico va por frasco.
     const graficos = w.findAll('.gpr')
-    expect(graficos).toHaveLength(2)
-    expect(w.text()).toContain('ST-26-0013')
-    expect(w.text()).toContain('ST-26-0014')
-    expect(w.text()).not.toContain('ST-26-0020')   // el preroll es de otra fila
+    expect(graficos).toHaveLength(1)
+    expect(graficos[0].text()).toContain('ST-26-0013')
+    expect(w.text()).not.toContain('ST-26-0014')   // otro frasco, otra fila
+    expect(w.text()).not.toContain('ST-26-0020')
   })
 
   it('abrir otra vez la cierra, y volver a abrir no vuelve a pedir', async () => {
