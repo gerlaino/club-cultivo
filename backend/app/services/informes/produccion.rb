@@ -19,6 +19,12 @@ module Informes
     EN_PROCESO = %w[cosecha en_manicura curado].freeze   # ya cortado, todavía sin ser stock
     POST_COSECHA = %w[cosecha en_manicura curado finalizado].freeze
 
+    # Etapas donde la planta cortada TODAVÍA EXISTE como planta: colgada secándose en `cosecha`,
+    # y pesándose una por una en `en_manicura`. En `curado` ya es flor en frasco, y un número de
+    # plantas ahí se leería como que hay plantas. Las que se cuentan son las que no se descartaron.
+    CON_PLANTAS_CORTADAS = %w[cosecha en_manicura].freeze
+    PLANTA_CORTADA       = %w[secado cosechado].freeze
+
     # Contra qué se mide «hace cuánto está ahí». El objetivo lo pone la genética y el lote lo
     # hereda al crearse (`LotesController#create`); si alguien lo cambió en el lote, manda ese.
     OBJETIVO_POR_ESTADO = {
@@ -104,6 +110,9 @@ module Informes
       lotes = @club.lotes.where(estado: EN_PIE + EN_PROCESO).includes(:lote_eventos)
       plantas_por_estado = Plant.en_pie.joins(:lote).where(lotes: { club_id: @club.id })
                                 .group('lotes.estado').count
+      cortadas_por_estado = Plant.where(state: PLANTA_CORTADA).joins(:lote)
+                                 .where(lotes: { club_id: @club.id, estado: CON_PLANTAS_CORTADAS })
+                                 .group('lotes.estado').count
 
       por_estado = Lote::ESTADOS.filter_map do |estado|
         del_estado = lotes.select { |l| l.estado == estado }
@@ -117,7 +126,7 @@ module Informes
         {
           estado:      estado,
           lotes:       del_estado.size,
-          plantas:     plantas_por_estado[estado].to_i,
+          plantas:     plantas_en_etapa(estado, plantas_por_estado, cortadas_por_estado),
           dias_promedio: dias.any? ? (dias.sum(&:last).to_f / dias.size).round : nil,
           mas_viejo:   mas_viejo && {
             codigo:   mas_viejo.first.codigo,
@@ -129,6 +138,7 @@ module Informes
         }
       end
 
+      # El KPI de arriba sigue siendo sólo lo que está EN PIE: lo cortado se cuenta en su fila.
       {
         plantas_en_pie:   plantas_por_estado.values.sum,
         lotes_en_pie:     lotes.count { |l| EN_PIE.include?(l.estado) },
@@ -136,6 +146,15 @@ module Informes
         por_estado:       por_estado,
         plan:             plan,
       }
+    end
+
+    # En pie mientras el lote está en cultivo; cortadas mientras siguen siendo plantas; nil en
+    # curado — la pantalla y el PDF ponen «—», que no es lo mismo que cero.
+    def plantas_en_etapa(estado, en_pie, cortadas)
+      return en_pie[estado].to_i if EN_PIE.include?(estado)
+      return cortadas[estado].to_i if CON_PLANTAS_CORTADAS.include?(estado)
+
+      nil
     end
 
     # Sólo cuando el plan tiene tope (Básico). En Total no hay nada contra qué medir.

@@ -26,11 +26,13 @@ const PAYLOAD = {
     variacion: { gramos: 22.4, total_lotes: 100.0, plantas: -10.0, gramos_por_planta: 36.0 },
   },
   hoy: {
-    plantas_en_pie: 312, lotes_en_pie: 2, lotes_en_proceso: 1,
+    plantas_en_pie: 312, lotes_en_pie: 2, lotes_en_proceso: 2,
     por_estado: [
       { estado: 'floracion', lotes: 2, plantas: 110, dias_promedio: 41,
         mas_viejo: { codigo: 'L-26-038', dias: 80, objetivo: 60, excedido: true }, rendimiento: 0 },
-      { estado: 'curado', lotes: 1, plantas: 0, dias_promedio: 19,
+      { estado: 'cosecha', lotes: 1, plantas: 24, dias_promedio: 4,
+        mas_viejo: { codigo: 'L-26-035', dias: 4, objetivo: null, excedido: false }, rendimiento: 0 },
+      { estado: 'curado', lotes: 1, plantas: null, dias_promedio: 19,
         mas_viejo: { codigo: 'L-26-029', dias: 19, objetivo: null, excedido: false }, rendimiento: 3150.5 },
     ],
     plan: { label: 'Básico', tope: 450, cuentan: 312 },
@@ -75,10 +77,19 @@ describe('Informe de Producción — la pantalla muestra lo que el backend manda
 
   it('el rendimiento acumulado por etapa aparece, y el más viejo se marca sólo si excede el objetivo', () => {
     const filas = seccion(1).findAll('tbody tr')
-    expect(filas[1].text()).toContain('3.150,5 g')
+    expect(filas[2].text()).toContain('3.150,5 g')
     expect(filas[0].find('.inf__excedido').exists()).toBe(true)
     expect(filas[0].find('.inf__excedido').text()).toBe('objetivo 60')
-    expect(filas[1].find('.inf__excedido').exists()).toBe(false)
+    expect(filas[2].find('.inf__excedido').exists()).toBe(false)
+  })
+
+  // Las plantas cortadas siguen siendo plantas mientras cuelgan (cosecha) y se pesan (manicura);
+  // en curado ya es flor en frasco y la celda va vacía, no en cero.
+  it('la etapa cosecha muestra sus plantas y curado no', () => {
+    const celdas = seccion(1).findAll('tbody tr').map(f => f.findAll('td')[2].text())
+    expect(celdas).toEqual(['110', '24', '—'])
+    const labels = seccion(1).findAll('.inf__kpi-label').map(l => l.text())
+    expect(labels).toEqual(['Plantas en cultivo', 'Lotes en cultivo', 'Lotes cosechados'])
   })
 
   it('la ocupación contra el plan sale sólo si hay tope', async () => {

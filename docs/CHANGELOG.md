@@ -19,9 +19,11 @@ Se rehízo en **tres bloques, tres marcos de tiempo**, y el cálculo salió del 
   **Gramos por planta cosechada** como KPI y como columna: es lo único que compara un lote de 3
   plantas con uno de 40. Y **la lista de lotes**, con genética, sede, fecha, plantas, g/planta y
   días de ciclo — sin ella el total no se puede comprobar.
-- **Hoy en el cultivo** (la foto de ahora). **En pie** y **en proceso** separados —«Lotes activos»
-  sumaba plantas creciendo con producto secándose—. Por etapa: lotes, plantas, **días promedio y
-  el más viejo**, marcado cuando supera el objetivo que el lote heredó de la genética; sin
+- **Hoy en el cultivo** (la foto de ahora). **En cultivo** y **cosechados** separados —«Lotes
+  activos» sumaba plantas creciendo con producto secándose— (Germán los pidió con esos nombres al
+  verlos: «en pie» y «en proceso» no le decían nada; en el PDF el de hoy dice «Cosechados sin
+  terminar», porque en esa fila ya está el del período). Por etapa: lotes, plantas, **días
+  promedio y el más viejo**, marcado cuando supera el objetivo que el lote heredó de la genética; sin
   objetivo no se marca (un umbral fijo sería una regla más escrita en otro lado). **Ocupación
   contra el tope del plan** sólo en Básico, con EL MISMO número que usa `PlanEnforcer` para
   rebotar el alta. «Lotes totales» se fue: sólo crece y no se actúa sobre él.
@@ -30,7 +32,10 @@ Se rehízo en **tres bloques, tres marcos de tiempo**, y el cálculo salió del 
   genética en esa organización**; sin historia, «sin historia para estimar».
 
 `Plant.en_pie` (enraizado · vegetativo · floración) es el scope que usan el KPI, la tabla y el
-desglose por sede. PDF y Excel salen de la misma definición: la lista de lotes cosechados es la
+desglose por sede. **En la tabla por etapa, las cortadas siguen contando** mientras son plantas:
+colgadas en `cosecha` y pesándose una por una en `en_manicura` (`CON_PLANTAS_CORTADAS`); en
+`curado` ya es flor en frasco y la celda va vacía, no en cero. Lo pidió Germán al ver la columna
+en blanco desde cosecha: «todavía tengo las plantas ahí colgadas secándose». PDF y Excel salen de la misma definición: la lista de lotes cosechados es la
 hoja principal del Excel y la comparación con el anterior va como tabla en el PDF.
 
 **Pendiente de decisión:** `PlanEnforcer` cuenta contra el tope **todas las plantas que existen**,

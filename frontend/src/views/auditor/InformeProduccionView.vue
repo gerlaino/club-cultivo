@@ -93,7 +93,7 @@
         <div class="inf__kpis">
           <div class="inf__kpi">
             <span class="inf__kpi-valor">{{ hoy.plantas_en_pie }}</span>
-            <span class="inf__kpi-label">Plantas en pie</span>
+            <span class="inf__kpi-label">Plantas en cultivo</span>
             <!-- Sólo en el plan con tope. Es EL MISMO número contra el que el alta rebota
                  (PlanEnforcer), no las plantas en pie: si dijera otro, el informe diría «queda
                  lugar» y el alta no dejaría. -->
@@ -104,12 +104,12 @@
           </div>
           <div class="inf__kpi">
             <span class="inf__kpi-valor">{{ hoy.lotes_en_pie }}</span>
-            <span class="inf__kpi-label">Lotes en pie</span>
+            <span class="inf__kpi-label">Lotes en cultivo</span>
             <span class="inf__kpi-delta inf__kpi-delta--flat">enraizado · vegetativo · floración</span>
           </div>
           <div class="inf__kpi">
             <span class="inf__kpi-valor">{{ hoy.lotes_en_proceso }}</span>
-            <span class="inf__kpi-label">Lotes en proceso</span>
+            <span class="inf__kpi-label">Lotes cosechados</span>
             <span class="inf__kpi-delta inf__kpi-delta--flat">cosecha · manicura · curado</span>
           </div>
         </div>
@@ -124,7 +124,9 @@
             <tr v-for="e in hoy.por_estado" :key="e.estado">
               <td><span class="inf__badge">{{ nombreEstado(e.estado) }}</span></td>
               <td class="num">{{ e.lotes }}</td>
-              <td class="num">{{ e.plantas || '—' }}</td>
+              <!-- Cortadas en cosecha y manicura son plantas todavía (colgadas, pesándose);
+                   en curado el backend manda null y acá va «—»: ya es flor en frasco. -->
+              <td class="num">{{ e.plantas ?? '—' }}</td>
               <td class="num">{{ e.dias_promedio ?? '—' }}</td>
               <td>
                 <template v-if="e.mas_viejo">
@@ -181,7 +183,7 @@
           <h2 class="inf__section-title">Por sede</h2>
         </div>
         <table v-if="data.por_sede?.length" class="inf__table">
-          <thead><tr><th>Sede</th><th class="num">Salas</th><th class="num">Plantas en pie</th><th class="num">Flor seca disponible</th></tr></thead>
+          <thead><tr><th>Sede</th><th class="num">Salas</th><th class="num">Plantas en cultivo</th><th class="num">Flor seca disponible</th></tr></thead>
           <tbody>
             <tr v-for="s in data.por_sede" :key="s.id">
               <td>{{ s.nombre }}</td>

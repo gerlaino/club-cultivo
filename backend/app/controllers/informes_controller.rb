@@ -107,8 +107,10 @@ class InformesController < ApplicationController
         { label: 'Flor seca cosechada', valor: fmt_g.call(per[:gramos]), tono: :ok },
         { label: 'Lotes cosechados',    valor: per[:total_lotes] },
         { label: 'Por planta',          valor: fmt_g.call(per[:gramos_por_planta]) },
-        { label: 'Plantas en pie',      valor: hoy[:plantas_en_pie] },
-        { label: 'Lotes en proceso',    valor: hoy[:lotes_en_proceso] },
+        { label: 'Plantas en cultivo',  valor: hoy[:plantas_en_pie] },
+        # No «Lotes cosechados» como en la pantalla: en esta fila ya está el del período, y dos
+        # KPIs con el mismo nombre y distinto número al lado se leen como un error.
+        { label: 'Cosechados sin terminar', valor: hoy[:lotes_en_proceso] },
       ],
       secciones: [
         {
@@ -141,7 +143,7 @@ class InformesController < ApplicationController
           headers: ['Etapa', 'Lotes', 'Plantas', 'Días (prom.)', 'El más viejo', 'Rendimiento acumulado'],
           rows: hoy[:por_estado].map do |e|
             viejo = e[:mas_viejo]
-            [e[:estado].to_s.tr('_', ' ').capitalize, e[:lotes], e[:plantas], e[:dias_promedio] || '—',
+            [e[:estado].to_s.tr('_', ' ').capitalize, e[:lotes], e[:plantas] || '—', e[:dias_promedio] || '—',
              viejo ? "#{viejo[:codigo]} · #{viejo[:dias]} d#{viejo[:excedido] ? " (objetivo #{viejo[:objetivo]})" : ''}" : '—',
              e[:rendimiento].positive? ? fmt_g.call(e[:rendimiento]) : '—']
           end,
@@ -164,7 +166,7 @@ class InformesController < ApplicationController
         },
         {
           titulo: 'Por sede',
-          headers: ['Sede', 'Salas', 'Plantas en pie', 'Flor seca (g)'],
+          headers: ['Sede', 'Salas', 'Plantas en cultivo', 'Flor seca (g)'],
           rows: datos[:por_sede].map { |s| [s[:nombre], s[:salas], s[:plantas], s[:stock_disponible]] },
           formatos: [:texto, :numero, :numero, :numero],
           totales: [1, 2, 3],

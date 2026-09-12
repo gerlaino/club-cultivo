@@ -101,6 +101,24 @@ RSpec.describe Informes::Produccion do
       expect(hoy[:por_estado].map { |e| e[:estado] }).not_to include('finalizado')
     end
 
+    # Cortada no es desaparecida: en cosecha cuelga y en manicura se pesa una por una. En curado
+    # ya es flor en frasco, y ahí la celda va vacía (nil), que no es lo mismo que cero plantas.
+    it 'cuenta las plantas cortadas en cosecha y manicura, y nada en curado' do
+      cosecha = lote!(estado: 'cosecha')
+      3.times { create(:plant, lote: cosecha, club: club, state: 'cosechado') }
+      create(:plant, lote: cosecha, club: club, state: 'secado')
+      create(:plant, lote: cosecha, club: club, state: 'descartada')
+      manicura = lote!(estado: 'en_manicura')
+      2.times { create(:plant, lote: manicura, club: club, state: 'cosechado') }
+      curado = lote!(estado: 'curado')
+      create(:plant, lote: curado, club: club, state: 'cosechado')
+
+      hoy = informe[:hoy]
+      por = hoy[:por_estado].to_h { |e| [e[:estado], e[:plantas]] }
+      expect(por).to eq('cosecha' => 4, 'en_manicura' => 2, 'curado' => nil)
+      expect(hoy[:plantas_en_pie]).to eq(0)
+    end
+
     # Un estado sin tiempo no es un dato: «2 lotes en floración» es normal, «uno lleva 80 días
     # con objetivo de 60» es un lote que alguien tiene que mirar.
     it 'marca el más viejo sólo cuando supera el objetivo que heredó de la genética' do
