@@ -944,6 +944,17 @@ const routes = [
           next()
         },
       },
+      // Lo que rindieron los repartidores. Salió del mostrador: es plata del delivery.
+      {
+        path: 'rendiciones',
+        name: 'delivery-rendiciones',
+        component: () => import('../views/delivery/RendicionesView.vue'),
+        beforeEnter: (to, from, next) => {
+          const auth = useAuthStore()
+          if (!['admin', 'supervisor'].includes(auth.user?.role)) return next('/delivery')
+          next()
+        },
+      },
     ],
   },
 

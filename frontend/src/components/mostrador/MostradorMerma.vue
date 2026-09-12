@@ -42,6 +42,10 @@
            entregó nada— no queda un «–%», simplemente no se dice. -->
       <section class="mrm__estado" :class="`mrm__estado--${tono}`">
         <p class="mrm__estado-frase">{{ titular }}</p>
+        <!-- Y LA PLATA, en su propia oración. «¿Cómo viene?» hablaba sólo del producto: el
+             efectivo que faltó en el cajón no estaba en ningún resumen, sólo abriendo cierre
+             por cierre. Se dice en neto y con signo, y sólo cuando pasó algo. -->
+        <p v-if="fraseCaja" class="mrm__estado-sub mrm__estado-caja">{{ fraseCaja }}</p>
         <p v-if="aclaracion" class="mrm__estado-sub">{{ aclaracion }}</p>
         <p v-if="veredicto && veredicto.motor" class="mrm__estado-sub">
           La está moviendo <b>{{ veredicto.motor.producto }}</b>:
@@ -88,14 +92,40 @@
            sin hacer nada. Se cae también la frase que defendía el criterio: ordenar por plata no
            necesita explicación. -->
       <ul v-else class="mrm__filas">
-        <li v-for="f in filas" :key="f.clave" class="mrm__fila">
-          <div class="mrm__fila-txt">
-            <span class="mrm__fila-titulo">{{ f.titulo }}</span>
-            <span class="mrm__fila-sub">{{ f.contexto }}</span>
-          </div>
-          <div class="mrm__fila-num">
-            <span class="mrm__fila-ars">${{ fmt(f.ars) }}</span>
-            <span class="mrm__fila-cant">{{ fmt(f.faltante) }} {{ f.unidad }}</span>
+        <li v-for="f in filas" :key="f.clave" class="mrm__item">
+          <!-- LA FILA DE UN PRODUCTO SE ABRE Y MUESTRA SU GRÁFICO. Era otra solapa («Producto
+               por producto») con su propio filtro de fecha: la misma pregunta partida en dos
+               lugares. El gráfico es la EXPLICACIÓN del número, y va donde está el número. -->
+          <component :is="abrible(f) ? 'button' : 'div'" class="mrm__fila"
+                     :class="{ 'mrm__fila--abrible': abrible(f), 'is-abierta': abierta === f.clave }"
+                     :type="abrible(f) ? 'button' : undefined"
+                     :aria-expanded="abrible(f) ? String(abierta === f.clave) : undefined"
+                     @click="abrible(f) && alternar(f)">
+            <div class="mrm__fila-txt">
+              <span class="mrm__fila-titulo">{{ f.titulo }}</span>
+              <span class="mrm__fila-sub">{{ f.contexto }}</span>
+            </div>
+            <div class="mrm__fila-num">
+              <span class="mrm__fila-ars">${{ fmt(f.ars) }}</span>
+              <span class="mrm__fila-cant">{{ fmt(f.faltante) }} {{ f.unidad }}</span>
+            </div>
+            <i v-if="abrible(f)" class="bi mrm__fila-arr" :class="abierta === f.clave ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+          </component>
+
+          <div v-if="abierta === f.clave" class="mrm__detalle">
+            <p v-if="cargandoEvolucion" class="mrm__detalle-nota">Buscando cierre por cierre…</p>
+            <template v-else>
+              <p class="mrm__detalle-nota">
+                Lo que tenía que haber (punteado) contra lo que se contó (lleno), cierre por cierre.
+                Cada frasco con <b>su propia escala</b>: el hueco entre las dos líneas es lo que faltó.
+              </p>
+              <p v-if="!graficosDe(f).length" class="mrm__detalle-nota">
+                Todavía no hay cierres con conteo de este producto en el período.
+              </p>
+              <div v-else class="mrm__graficos">
+                <GraficoProducto v-for="g in graficosDe(f)" :key="g.stock_id" :producto="g" />
+              </div>
+            </template>
           </div>
         </li>
       </ul>
@@ -122,8 +152,9 @@
 // pantalla no lo usaba: le llegaba el mail diciendo "algo cambió", entraba a mirar, y acá no
 // decía nada de eso.
 import { ref, computed, watch } from 'vue'
-import { getMermaMostrador } from '../../lib/api.js'
+import { getMermaMostrador, getEvolucionMostrador } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import GraficoProducto from './GraficoProducto.vue'
 
 const props = defineProps({
   sedeId:      { type: Number, default: null },
@@ -168,6 +199,52 @@ const tono = computed(() => ({ subio: 'alerta', normal: 'ok' })[veredicto.value?
 // dato que importaba. Ahora el hecho va primero y el veredicto es la línea de abajo.
 const faltanteArs = computed(() => Number(merma.value?.resumen?.faltante_ars) || 0)
 const cierres     = computed(() => Number(merma.value?.resumen?.turnos) || 0)
+
+// La plata, neta y con signo. Se dice sólo cuando pasó algo: «$0» es una celda vacía con formato.
+const fraseCaja = computed(() => {
+  const r = merma.value?.resumen
+  const neto = Number(r?.caja_ars) || 0
+  const n = Number(r?.caja_turnos) || 0
+  if (!n || Math.abs(neto) < 1) return ''
+  const en = `en ${n} ${n === 1 ? 'cierre' : 'cierres'}`
+  return neto < 0
+    ? `Y en la caja faltaron $${fmt(Math.abs(neto))} ${en}.`
+    : `Y en la caja sobraron $${fmt(neto)} ${en}.`
+})
+
+// ── EL GRÁFICO DE CADA PRODUCTO, adentro de su fila ──────────────────────────────────────
+// La evolución se pide UNA vez por rango, cuando alguien abre la primera fila, y se filtra acá:
+// Merma agrupa por etiqueta (genética + forma) y la evolución va por frasco, así que una fila
+// puede abrir dos gráficos — dos lotes de la misma variedad, cada uno con su escala.
+const abierta = ref(null)
+const evolucion = ref(null)          // { clave, productos }
+const cargandoEvolucion = ref(false)
+
+// Sólo el corte por producto tiene detalle, y sólo de UNA sede: el gráfico cuelga del mostrador
+// y con «todas las sedes» la fila es del club entero.
+const abrible = (f) => corte.value === 'producto' && !todasLasSedes.value
+
+function alternar (f) {
+  abierta.value = abierta.value === f.clave ? null : f.clave
+  if (abierta.value) cargarEvolucion()
+}
+
+const graficosDe = (f) => (evolucion.value?.productos || []).filter(g => g.etiqueta === f.titulo)
+
+async function cargarEvolucion () {
+  const clave = `${props.sedeId}|${rango.value.desde}|${rango.value.hasta}`
+  if (evolucion.value?.clave === clave) return
+  cargandoEvolucion.value = true
+  try {
+    const { data } = await getEvolucionMostrador(props.sedeId, { ...rango.value })
+    evolucion.value = { clave, productos: data.productos || [] }
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo calcular cierre por cierre.')
+    evolucion.value = { clave, productos: [] }
+  } finally {
+    cargandoEvolucion.value = false
+  }
+}
 
 const titular = computed(() => {
   const m = merma.value
@@ -314,6 +391,7 @@ async function cargar () {
     if (todasLasSedes.value) params.todas = 1
     const { data } = await getMermaMostrador(props.sedeId, params)
     merma.value = data
+    abierta.value = null
     emit('sin-revisar', data.sin_revisar ?? 0)
     // El backend contesta con el rango que efectivamente usó: los campos lo muestran.
     if (data.rango) rango.value = { desde: data.rango.desde, hasta: data.rango.hasta }
@@ -434,13 +512,23 @@ watch(() => props.sedeId, () => { merma.value = null; cargar() }, { immediate: t
 .mrm__estado--alerta .mrm__estado-frase { color: var(--c-amber-700, #b45309); }
 .mrm__estado--ok     .mrm__estado-frase { color: var(--c-ink-900); }
 
+.mrm__estado-caja { color: var(--c-ink-700); font-weight: 600; }
+
 /* ── LAS FILAS: la plata adelante, el resto en castellano abajo ──────────────── */
 .mrm__filas { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.mrm__item  { border-bottom: 1px solid var(--c-slate-100); }
+.mrm__item:last-child { border-bottom: 0; }
 .mrm__fila {
   display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
-  padding: 12px 0; border-bottom: 1px solid var(--c-slate-100);
+  padding: 12px 0; width: 100%;
 }
-.mrm__fila:last-child { border-bottom: 0; }
+/* La fila que se abre es un botón, pero se ve como las demás: lo que cambia es el chevron. */
+.mrm__fila--abrible { appearance: none; border: 0; background: none; font: inherit; text-align: left; cursor: pointer; color: inherit; }
+.mrm__fila--abrible:hover .mrm__fila-titulo { text-decoration: underline; text-underline-offset: 3px; }
+.mrm__fila-arr { color: var(--c-ink-500); font-size: var(--fs-12); align-self: center; }
+.mrm__detalle { padding: 2px 0 14px; }
+.mrm__detalle-nota { margin: 0 0 10px; font-size: var(--fs-12); color: var(--c-ink-500); max-width: 72ch; }
+.mrm__graficos { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 .mrm__fila-txt    { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .mrm__fila-titulo { font-size: var(--fs-14); font-weight: 600; color: var(--c-ink-900); }
 .mrm__fila-sub    { font-size: var(--fs-12); color: var(--c-ink-500); line-height: 1.45; }

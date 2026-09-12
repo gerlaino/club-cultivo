@@ -83,8 +83,27 @@ module Mostradores
         faltante_ars:  items.sum { |i| i.diferencia_cierre.to_d.negative? ? valor(i, i.diferencia_cierre) : 0 }.to_f.round(2),
         # Sobre lo ENTREGADO: es la única forma de comparar productos que se venden distinto.
         merma_pct:     dispensado.positive? ? ((faltante / dispensado) * 100).to_f.round(2) : nil,
+        # Y LA PLATA. «¿Cómo viene?» hablaba sólo del producto: el efectivo que faltó en el cajón no
+        # aparecía en ningún resumen, sólo abriendo cierre por cierre. Neto con signo (negativo =
+        # faltó) y en cuántos cierres, sacado de los asientos `diferencia_caja` de esas cajas —el
+        # mismo dato que decide la razón `caja` de `MotivosDeRevision`.
+        caja_ars:      caja_neta.to_f.round(2),
+        caja_turnos:   caja_turnos_con_diferencia,
       }
     end
+
+    def diferencias_de_caja
+      @diferencias_de_caja ||= begin
+        ids = turnos.map(&:caja_turno_id).compact
+        ids.empty? ? {} :
+          MovimientoContable.where(caja_turno_id: ids, categoria: 'diferencia_caja')
+                            .group(:caja_turno_id)
+                            .sum(Arel.sql("CASE WHEN tipo = 'egreso' THEN -monto_ars ELSE monto_ars END"))
+      end
+    end
+
+    def caja_neta = diferencias_de_caja.values.sum(0.to_d)
+    def caja_turnos_con_diferencia = diferencias_de_caja.values.count { |v| v.to_d.abs >= 0.01 }
 
     # Agrupado por producto (genética + forma), no por frasco: dos lotes de la misma variedad son
     # el mismo problema, y separarlos esconde la tendencia.

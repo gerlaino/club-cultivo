@@ -80,6 +80,8 @@ export const NAV_GROUPS = [
       { to: '/reservas', label: 'Reservas' },
       // Despachos es Delivery, que desde el 11-ago se contrata aparte.
       { to: '/delivery/despachos', label: 'Despachos', feature: 'delivery' },
+      // Salió del mostrador (sep-2026): es plata del delivery, no de la mesa.
+      { to: '/delivery/rendiciones', label: 'Rendiciones', feature: 'delivery' },
     ],
   },
   {

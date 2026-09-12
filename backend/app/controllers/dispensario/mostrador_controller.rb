@@ -615,6 +615,9 @@ module Dispensario
         {
           stock_id: stock&.id,
           etiqueta: stock&.etiqueta,
+          # El número del frasco: dos lotes de la misma variedad comparten etiqueta y la solapa de
+          # Merma los agrupa; el gráfico va por frasco y tiene que poder decir cuál es.
+          numero:   stock&.numero_lote_producto,
           unidad:   stock&.unidad || 'g',
           puntos:   puntos,
           falta:    falta.round(2),

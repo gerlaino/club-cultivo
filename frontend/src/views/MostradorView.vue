@@ -37,38 +37,26 @@
       <button class="mst__tab" :class="{ 'is-on': tab === 'turnos' }" @click="tab = 'turnos'">
         Cierres
       </button>
-      <template v-if="gestiona">
-        <!-- Lo que tenía que haber contra lo que se contó, producto por producto. Es de
-             administración: el que atiende cuenta, no analiza. -->
-        <button class="mst__tab" :class="{ 'is-on': tab === 'evolucion' }" @click="tab = 'evolucion'">
-          Producto por producto
-        </button>
-        <button class="mst__tab" :class="{ 'is-on': tab === 'merma' }" @click="tab = 'merma'">
-          Merma
-          <span v-if="sinRevisar" class="mst__tab-badge">{{ sinRevisar }}</span>
-        </button>
-        <button class="mst__tab" :class="{ 'is-on': tab === 'rendiciones' }" @click="tab = 'rendiciones'">
-          Rendiciones
-        </button>
-      </template>
+      <!-- TRES SOLAPAS, no cinco (sep-2026, acordado con Germán sobre una maqueta). Eran Hoy ·
+           Cierres · Producto por producto · Merma · Rendiciones, y tres contestaban la misma
+           pregunta —¿se me está yendo producto?— en tres unidades y tres marcos de tiempo.
+           «Producto por producto» era Merma con otro corte y otro filtro de fecha: ahora es el
+           detalle de cada fila de Merma. «Rendiciones» no es del mostrador —es plata del
+           delivery— y vive en Comercial → Rendiciones; acá queda la tarjeta de arriba, que es
+           la del repartidor rindiendo a ESTA caja. Es de administración: el que atiende cuenta,
+           no analiza. -->
+      <button v-if="gestiona" class="mst__tab" :class="{ 'is-on': tab === 'merma' }" @click="tab = 'merma'">
+        Merma
+        <span v-if="sinRevisar" class="mst__tab-badge">{{ sinRevisar }}</span>
+      </button>
     </nav>
 
-    <!-- ══ RENDICIONES: lo que ya rindieron los repartidores ══════════════════ -->
-    <template v-if="tab === 'rendiciones'">
-      <p class="mst__seccion-sub">
-        Lo que cada repartidor cobró en la calle y lo que entregó al volver. Lo que falta no es
-        una pérdida: queda a su nombre y se ve acumulado en su ficha.
-      </p>
-      <RendicionCajaCard historial />
-    </template>
-
     <!-- ══ MERMA: dónde se le va el producto ══════════════════════════════════ -->
-    <MostradorMerma v-else-if="tab === 'merma'" :sede-id="sedeId" :varias-sedes="sedes.length > 1"
+    <MostradorMerma v-if="tab === 'merma'" :sede-id="sedeId" :varias-sedes="sedes.length > 1"
                     @sin-revisar="sinRevisar = $event" />
 
     <!-- ══ TURNOS: los que ya cerraron ════════════════════════════════════════ -->
     <MostradorTurnos v-else-if="tab === 'turnos'" :sede-id="sedeId" />
-    <EvolucionMostrador v-else-if="tab === 'evolucion'" :sede-id="sedeId" />
 
     <template v-else>
 
@@ -310,7 +298,6 @@ import { ref, computed, watch } from 'vue'
 import RendicionCajaCard from '../components/RendicionCajaCard.vue'
 import MostradorMerma from '../components/mostrador/MostradorMerma.vue'
 import MostradorTurnos from '../components/mostrador/MostradorTurnos.vue'
-import EvolucionMostrador from '../components/mostrador/EvolucionMostrador.vue'
 import TablaMostrador from '../components/mostrador/TablaMostrador.vue'
 import ModalCargarMesa from '../components/mostrador/ModalCargarMesa.vue'
 import ModalContarItem from '../components/mostrador/ModalContarItem.vue'

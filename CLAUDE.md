@@ -150,13 +150,22 @@ Ninguno se considera cerrado; todos son candidatos a revisión.
     otra cosa en la app (el turno MÉDICO, la cita del paciente) y encima chocaba con el botón de al
     lado, que dice "Cerrar caja". Lo preguntó Germán probando: *"no vamos a abrir o cerrar turnos,
     solo abrimos y cerramos caja"*.
-    Cuatro solapas: **Hoy** · **Cierres** (los hechos; administración ve todos, el que atiende ve
-    LOS SUYOS — el filtro es del backend) · **Merma** y **Rendiciones**, sólo administración. La
-    solapa de Merma está ordenada **POR PREGUNTA**, no por entidad: **① ¿cómo viene?** (el
-    veredicto contra el patrón de esa organización + la tendencia semanal) · **② para mirar** (la
-    lista de trabajo, que se termina) · **③ dónde se va** (UNA tabla con un corte a la vez:
-    producto, sede o turno). Eran cuatro tablas apiladas con las mismas columnas y había que elegir
-    cuál mirar antes de saber qué se buscaba.
+    **TRES solapas** (12-sep-2026, acordado con Germán sobre una maqueta navegable): **Hoy** ·
+    **Cierres** (los hechos; administración ve todos, el que atiende ve LOS SUYOS — el filtro es
+    del backend) · **Merma**, sólo administración. Eran cinco y tres contestaban la misma pregunta
+    —¿se me está yendo producto?— en tres unidades y tres marcos de tiempo: **«Producto por
+    producto» era Merma con otro corte y otro filtro de fecha** y pasó a ser el detalle de cada
+    fila de Merma (tocás el producto y se abre su gráfico, `GraficoProducto`, uno por frasco con su
+    escala); **«Rendiciones» no es del mostrador** —es plata del delivery— y vive en Comercial →
+    Rendiciones (`/delivery/rendiciones`); en el mostrador queda la tarjeta del repartidor que está
+    rindiendo a ESTA caja. La solapa de Merma está ordenada **POR PREGUNTA**: **① ¿cómo viene?**
+    (el veredicto contra el patrón de esa organización + la tendencia semanal, **y la plata**: lo
+    que faltó en la caja, neto, en su propia oración) · **② de qué falta** (UNA lista con un corte
+    a la vez: producto, sede o persona; la fila de producto se abre). **LA PLATA ES MOTIVO DE
+    REVISIÓN** (`caja` en `Mostradores::MotivosDeRevision`, sale de los asientos `diferencia_caja`):
+    un cierre con $8.500 menos en el cajón decía «Sin novedad» y no entraba en «Para mirar». Manda
+    sobre el producto en la fila y el día dice las dos cosas. **Pendiente de decisión: Cierres como
+    CALENDARIO** (idea de Germán; maqueta en el artifact «Mostrador en tres solapas»).
     Un turno entra a esa lista por **cuatro** razones —faltante, **sobrante**, **corrección al
     abrir**, o **administración movió la mesa durante el turno**— y cada renglón dice cuál: un
     pendiente que no dice qué mirar obliga a abrirlo para descubrir que no era nada.

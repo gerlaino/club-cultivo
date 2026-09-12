@@ -20,8 +20,21 @@ let respuesta = {}
 const getMermaMostrador     = vi.fn(() => Promise.resolve({ data: respuesta }))
 const revisarTurnoMostrador = vi.fn(() => Promise.resolve({ data: {} }))
 
+const evolucion = { desde: '2026-09-01', hasta: '2026-09-06', productos: [
+  { stock_id: 1, etiqueta: 'Northern Lights (flor seca)', numero: 'ST-26-0013', unidad: 'g', falta: 30,
+    falta_ars: 3000, sin_diferencias: false, peor: { fecha: '2026-09-03', falta: 30 },
+    puntos: [{ fecha: '2026-09-02', esperado: 100, contado: 100 }, { fecha: '2026-09-03', esperado: 100, contado: 70 }] },
+  { stock_id: 2, etiqueta: 'Northern Lights (flor seca)', numero: 'ST-26-0014', unidad: 'g', falta: 20,
+    falta_ars: 2000, sin_diferencias: false, peor: { fecha: '2026-09-05', falta: 20 },
+    puntos: [{ fecha: '2026-09-04', esperado: 80, contado: 80 }, { fecha: '2026-09-05', esperado: 80, contado: 60 }] },
+  { stock_id: 3, etiqueta: 'Preroll', numero: 'ST-26-0020', unidad: 'un', falta: 0, falta_ars: 0,
+    sin_diferencias: true, peor: null, puntos: [{ fecha: '2026-09-02', esperado: 12, contado: 12 }] },
+] }
+const getEvolucionMostrador = vi.fn(() => Promise.resolve({ data: evolucion }))
+
 vi.mock('../lib/api.js', () => ({
   getMermaMostrador:     (...a) => getMermaMostrador(...a),
+  getEvolucionMostrador: (...a) => getEvolucionMostrador(...a),
   revisarTurnoMostrador: (...a) => revisarTurnoMostrador(...a),
   getTurnoMostrador:     vi.fn(() => Promise.resolve({ data: { conteo_apertura: [] } })),
   corregirTurnoMostrador: vi.fn(),
@@ -71,7 +84,7 @@ async function montar (extra = {}, props = {}) {
   return w
 }
 
-beforeEach(() => { getMermaMostrador.mockClear(); revisarTurnoMostrador.mockClear() })
+beforeEach(() => { getMermaMostrador.mockClear(); revisarTurnoMostrador.mockClear(); getEvolucionMostrador.mockClear() })
 
 describe('① Cómo viene', () => {
   // EL HECHO PRIMERO. Lo que se lee al entrar es cuánto falta, no un veredicto sobre si el
@@ -291,5 +304,68 @@ describe('El período', () => {
     await flushPromises()
 
     expect(getMermaMostrador.mock.calls[0][1].desde).toBe('')
+  })
+})
+
+// ── LA PLATA EN «¿CÓMO VIENE?» ────────────────────────────────────────────────────────────
+// Hablaba sólo del producto: el efectivo que faltó en el cajón no estaba en ningún resumen.
+describe('La plata en el titular', () => {
+  it('dice cuánto faltó en la caja y en cuántos cierres', async () => {
+    const w = await montar({ resumen: { ...BASE.resumen, caja_ars: -8500, caja_turnos: 1 } })
+    const t = w.find('.mrm__estado-caja').text()
+    expect(t).toContain('en la caja faltaron')
+    expect(t).toContain('8.500')
+    expect(t).toContain('1 cierre')
+  })
+
+  it('si sobró, lo dice así', async () => {
+    const w = await montar({ resumen: { ...BASE.resumen, caja_ars: 2000, caja_turnos: 2 } })
+    expect(w.find('.mrm__estado-caja').text()).toContain('sobraron $2.000 en 2 cierres')
+  })
+
+  it('y con la plata justa no dice nada: «$0» es una celda vacía con formato', async () => {
+    const w = await montar({ resumen: { ...BASE.resumen, caja_ars: 0, caja_turnos: 0 } })
+    expect(w.find('.mrm__estado-caja').exists()).toBe(false)
+  })
+})
+
+// ── EL GRÁFICO, ADENTRO DE LA FILA ─────────────────────────────────────────────────────────
+// «Producto por producto» era otra solapa con su propio filtro de fecha: la misma pregunta
+// partida en dos lugares. El gráfico es la explicación del número y va donde está el número.
+describe('La fila de un producto se abre y muestra su gráfico', () => {
+  it('no pide la evolución hasta que alguien abre una fila', async () => {
+    await montar()
+    expect(getEvolucionMostrador).not.toHaveBeenCalled()
+  })
+
+  it('al abrir, pide la evolución del MISMO rango y dibuja un gráfico por frasco', async () => {
+    const w = await montar()
+    await w.find('.mrm__fila--abrible').trigger('click')
+    await flushPromises()
+
+    expect(getEvolucionMostrador).toHaveBeenCalledWith(10, { desde: '2026-09-01', hasta: '2026-09-06' })
+    // Dos lotes de la misma variedad: la fila los agrupa, el gráfico va por frasco.
+    const graficos = w.findAll('.gpr')
+    expect(graficos).toHaveLength(2)
+    expect(w.text()).toContain('ST-26-0013')
+    expect(w.text()).toContain('ST-26-0014')
+    expect(w.text()).not.toContain('ST-26-0020')   // el preroll es de otra fila
+  })
+
+  it('abrir otra vez la cierra, y volver a abrir no vuelve a pedir', async () => {
+    const w = await montar()
+    const fila = () => w.find('.mrm__fila--abrible')
+    await fila().trigger('click'); await flushPromises()
+    await fila().trigger('click'); await flushPromises()
+    expect(w.find('.gpr').exists()).toBe(false)
+    await fila().trigger('click'); await flushPromises()
+    expect(getEvolucionMostrador).toHaveBeenCalledTimes(1)
+  })
+
+  it('el corte por persona no se abre: el gráfico es de un producto', async () => {
+    const w = await montar()
+    const botones = w.findAll('.mrm__periodo')
+    await botones.find(b => b.text() === 'Por persona').trigger('click')
+    expect(w.find('.mrm__fila--abrible').exists()).toBe(false)
   })
 })

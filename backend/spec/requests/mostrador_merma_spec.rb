@@ -96,6 +96,15 @@ RSpec.describe 'La merma del mostrador', type: :request do
       # 4 g × $500 + 2 un × $1.000 = $4.000
       expect(merma['resumen']['faltante_ars']).to eq(4_000.0)
     end
+
+    # «¿Cómo viene?» hablaba sólo del producto: la plata que faltó en el cajón no estaba en ningún
+    # resumen. Acá se cobraron $2.000 en efectivo y se cerró contando $0.
+    it 'dice también cuánta plata faltó en la caja, y en cuántos cierres' do
+      r = merma['resumen']
+
+      expect(r['caja_ars']).to eq(-2_000.0)
+      expect(r['caja_turnos']).to eq(1)
+    end
   end
 
   describe 'por producto' do

@@ -710,12 +710,17 @@ describe('Con qué sede arranca la pantalla', () => {
 })
 
 describe('Las solapas', () => {
-  it('administración ve las cuatro', async () => {
+  // TRES, no cinco (sep-2026). «Producto por producto» era Merma con otro corte y vive adentro
+  // de Merma; «Rendiciones» es plata del delivery y vive en Comercial. Tres solapas que contestan
+  // la misma pregunta en tres unidades no son intuitivas para nadie.
+  it('administración ve exactamente tres: Hoy, Cierres y Merma', async () => {
     const w = await montar()
 
-    expect(w.findAll('.mst__tab').map(t => t.text().trim())).toEqual(
-      expect.arrayContaining(['Hoy', 'Cierres', expect.stringContaining('Merma'), 'Rendiciones'])
-    )
+    const tabs = w.findAll('.mst__tab').map(t => t.text().trim())
+    expect(tabs).toHaveLength(3)
+    expect(tabs).toEqual(['Hoy', 'Cierres', expect.stringContaining('Merma')])
+    expect(tabs).not.toContain('Rendiciones')
+    expect(tabs).not.toContain('Producto por producto')
   })
 
   // La merma es información de gestión; sus turnos, no.
