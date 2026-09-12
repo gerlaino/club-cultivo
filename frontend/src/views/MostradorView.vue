@@ -190,10 +190,13 @@
            cierra con un faltante que no es suyo y encima no lo puede explicar. -->
       <div v-if="movimientosDelTurno.length" class="mst__movs">
         <span class="mst__movs-lbl">Mientras la caja estuvo abierta</span>
-        <p v-for="(m, i) in movimientosDelTurno" :key="i" class="mst__mov">
-          <b>{{ m.usuario }}</b> {{ m.cantidad > 0 ? 'subió' : 'bajó' }}
+        <p v-for="m in movimientosDelTurno" :key="m.stock_id" class="mst__mov">
+          <b>{{ m.usuarios.join(' y ') }}</b> {{ m.cantidad > 0 ? 'subió' : 'bajó' }}
           <b class="mst__mov-num">{{ fmt(Math.abs(m.cantidad)) }} {{ m.unidad }}</b>
-          de {{ formaLabel(m.forma) }}<template v-if="m.motivo"> — {{ m.motivo }}</template>
+          de {{ formaLabel(m.forma) }}<template v-if="m.genetica"> {{ m.genetica }}</template>
+          <span v-if="m.numero" class="mst__mov-num">{{ m.numero }}</span>:
+          de {{ fmt(m.antes) }} a <b class="mst__mov-num">{{ fmt(m.ahora) }} {{ m.unidad }}</b><template
+            v-if="m.motivos.length"> — {{ m.motivos.join(' · ') }}</template>
           <span class="mst__mov-hora">
             {{ m.veces > 1 ? `${m.veces} cargas, última ` : '' }}{{ hora(m.cuando) }}
           </span>

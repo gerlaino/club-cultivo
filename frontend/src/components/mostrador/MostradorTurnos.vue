@@ -51,10 +51,16 @@
         <button class="trn__dia-hd" @click="alternar(d.clave)">
           <i class="bi bi-chevron-right trn__dia-arr"></i>
           <span class="trn__dia-nombre">{{ d.nombre }}</span>
+          <!-- EL SALDO DEL DÍA DICE LAS DOS COSAS: producto Y plata. Sumaba sólo el producto, así
+               que un día con la mesa perfecta y $8.500 menos en el cajón decía «no falta nada». -->
           <span class="trn__dia-resumen">
             <template v-if="d.cierres.length > 1">{{ d.cierres.length }} cierres · </template>
-            <template v-if="d.faltanteArs">faltan <b>${{ fmt(d.faltanteArs) }}</b></template>
-            <template v-else><span class="trn__ok">no falta nada</span></template>
+            <template v-if="!d.faltanteArs && !d.cajaArs"><span class="trn__ok">no falta nada</span></template>
+            <template v-else>
+              <template v-if="d.faltanteArs">falta producto por <b>${{ fmt(d.faltanteArs) }}</b></template>
+              <template v-if="d.faltanteArs && d.cajaArs"> · </template>
+              <template v-if="d.cajaArs">en la caja <b>${{ fmt(Math.abs(d.cajaArs)) }} {{ d.cajaArs < 0 ? 'menos' : 'de más' }}</b></template>
+            </template>
             <template v-if="d.cierres.length === 1"> · {{ d.cierres[0].atendio || d.cierres[0].cerrado_por }}</template>
           </span>
         </button>
@@ -128,6 +134,7 @@ const emit = defineEmits(['sin-revisar'])
 // Salió de la solapa de Merma junto con la lista. Y en castellano: «Contó de más — no se cargó al
 // inventario» describía la implementación, no lo que pasó.
 const MOTIVO = {
+  caja:        'Falta plata',
   faltante:    'Falta producto',
   sobrante:    'Contó de más',
   corregido:   'Se corrigió al abrir',
@@ -139,7 +146,7 @@ const MOTIVO_FRASE = {
   corregido:   'Al abrir corrigió lo que había sobre la mesa.',
   mesa_movida: 'Mientras la caja estuvo abierta, administración movió lo que había sobre la mesa.',
 }
-const TONO = { faltante: 'warn', sobrante: 'warn', corregido: 'info', mesa_movida: 'info' }
+const TONO = { caja: 'warn', faltante: 'warn', sobrante: 'warn', corregido: 'info', mesa_movida: 'info' }
 
 // La ficha del cierre: qué pasó Y los números para corregirlo, en el mismo lugar. Antes eran dos
 // gestos —abrir la fila, abrir otro modal— y el de corregir no tenía contexto.
@@ -176,11 +183,12 @@ const porDia = computed(() => {
     if (!mapa.has(clave)) {
       const dia = `${DIAS[c.getDay()]} ${c.getDate()} de ${MESES[c.getMonth()]}`
       mapa.set(clave, { clave, nombre: dia.charAt(0).toUpperCase() + dia.slice(1),
-                        cierres: [], faltanteArs: 0 })
+                        cierres: [], faltanteArs: 0, cajaArs: 0 })
     }
     const g = mapa.get(clave)
     g.cierres.push(t)
     g.faltanteArs += Number(t.faltaron?.ars) || 0
+    g.cajaArs     += Number(t.caja?.diferencia_ars) || 0
   }
   return [...mapa.values()]
 })
@@ -217,6 +225,11 @@ function quien (t) {
 // El veredicto de la fila: lo que se lee sin abrir nada.
 function veredicto (t) {
   const m = motivoPrincipal(t)
+  // La plata primero: es lo que un admin quiere que le griten, y era lo único que la fila no decía.
+  if (m === 'caja') {
+    const d = Number(t.caja?.diferencia_ars) || 0
+    return { texto: d < 0 ? 'Falta plata' : 'Sobra plata', clase: 'trn__pill--warn' }
+  }
   if (m === 'faltante') return { texto: 'Falta producto', clase: 'trn__pill--warn' }
   if (m === 'sobrante') return { texto: 'Contó de más',   clase: 'trn__pill--warn' }
   if (m)                return { texto: MOTIVO[m],        clase: 'trn__pill--info' }
@@ -225,7 +238,7 @@ function veredicto (t) {
 
 // EL QUE MANDA, no los tres. Un faltante es lo que se sale a buscar; que se haya corregido al
 // abrir es contexto. Tres chips en una fila obligan a leer los tres para saber cuál importa.
-const PRIORIDAD = ['faltante', 'sobrante', 'mesa_movida', 'corregido']
+const PRIORIDAD = ['caja', 'faltante', 'sobrante', 'mesa_movida', 'corregido']
 const motivoPrincipal = (t) =>
   PRIORIDAD.find(m => (t.motivos_revision || []).includes(m)) || null
 

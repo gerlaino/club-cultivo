@@ -73,9 +73,23 @@ describe('Agrupado por día', () => {
     expect(dia(w).find('.trn__dia-resumen').text()).toContain('27.636')
   })
 
-  it('y cuando no falta nada lo dice, con quién atendió', async () => {
-    const w = await montar([{ ...TURNO, motivos_revision: [],
+  // Y LA PLATA. El saldo del día sumaba sólo el producto: con la mesa perfecta y $20.000 menos
+  // en el cajón, el encabezado decía «no falta nada».
+  it('el encabezado dice también lo que falta en la caja', async () => {
+    const w = await montar([{ ...TURNO, motivos_revision: ['caja'],
       faltaron: { total: 0, ars: 0, items: [] }, sobraron: { total: 0, items: [] } }])
+
+    const t = dia(w).find('.trn__dia-resumen').text()
+    expect(t).toContain('en la caja')
+    expect(t).toContain('20.000')
+    expect(t).toContain('menos')
+    expect(t).not.toContain('no falta nada')
+  })
+
+  it('y cuando no falta nada —ni producto ni plata— lo dice, con quién atendió', async () => {
+    const w = await montar([{ ...TURNO, motivos_revision: [],
+      faltaron: { total: 0, ars: 0, items: [] }, sobraron: { total: 0, items: [] },
+      caja: { ...TURNO.caja, contado_ars: 150000, diferencia_ars: 0 } }])
 
     const t = dia(w).find('.trn__dia-resumen').text()
     expect(t).toContain('no falta nada')
@@ -128,9 +142,22 @@ describe('La línea de cada cierre', () => {
     expect(cierre(w).find('.trn__pill').text()).toBe('Falta producto')
   })
 
+  // La plata manda sobre el producto: es lo que un admin quiere que le griten primero.
+  it('si faltó plata, el veredicto es ése aunque también falte producto', async () => {
+    const w = await montar([{ ...TURNO, motivos_revision: ['caja', 'faltante'] }])
+    expect(cierre(w).find('.trn__pill').text()).toBe('Falta plata')
+  })
+
+  it('y si sobró, lo dice así', async () => {
+    const w = await montar([{ ...TURNO, motivos_revision: ['caja'],
+      caja: { ...TURNO.caja, contado_ars: 160000, diferencia_ars: 10000 } }])
+    expect(cierre(w).find('.trn__pill').text()).toBe('Sobra plata')
+  })
+
   it('y uno sin novedad lo dice, en vez de no decir nada', async () => {
     const w = await montar([{ ...TURNO, motivos_revision: [],
-      faltaron: { total: 0, ars: 0, items: [] }, sobraron: { total: 0, items: [] } }])
+      faltaron: { total: 0, ars: 0, items: [] }, sobraron: { total: 0, items: [] },
+      caja: { ...TURNO.caja, contado_ars: 150000, diferencia_ars: 0 } }])
     expect(cierre(w).find('.trn__pill').text()).toBe('Sin novedad')
   })
 

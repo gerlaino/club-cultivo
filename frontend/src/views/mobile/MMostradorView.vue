@@ -79,10 +79,11 @@
           <span>Administración movió la mesa ({{ movimientosDelTurno.length }})</span>
           <i class="bi" :class="movsAbiertos ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
         </button>
-        <p v-for="(m, i) in (movsAbiertos ? movimientosDelTurno : [])" :key="i" class="mmo__mov">
-          <b>{{ m.usuario }}</b> {{ m.cantidad > 0 ? 'subió' : 'bajó' }}
-          <b>{{ fmt(Math.abs(m.cantidad)) }} {{ m.unidad }}</b>
-          de {{ formaLabel(m.forma) }}<template v-if="m.motivo"> — {{ m.motivo }}</template>
+        <p v-for="m in (movsAbiertos ? movimientosDelTurno : [])" :key="m.stock_id" class="mmo__mov">
+          <b>{{ formaLabel(m.forma) }}<template v-if="m.genetica"> {{ m.genetica }}</template></b>
+          <template v-if="m.numero"> {{ m.numero }}</template>:
+          de {{ fmt(m.antes) }} a <b>{{ fmt(m.ahora) }} {{ m.unidad }}</b>
+          ({{ m.usuarios.join(' y ') }}<template v-if="m.motivos.length"> — {{ m.motivos.join(' · ') }}</template>)
           <span class="mmo__mov-hora">{{ hora(m.cuando) }}</span>
         </p>
       </div>

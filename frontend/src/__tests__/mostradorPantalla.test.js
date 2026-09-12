@@ -590,6 +590,35 @@ describe('Lo que administración tocó durante el turno', () => {
     expect(movs.text()).toContain('bajó')
     expect(movs.text()).toContain('200')
     expect(movs.text()).toContain('me lo llevo a la otra sede')
+    // Con la cuenta a la vista: de dónde a dónde quedó ESE frasco.
+    expect(movs.text()).toContain('ST-26-0031')
+    expect(movs.text()).toMatch(/de 300 a 100/)
+  })
+
+  // Pasó en producción: dos frascos de la misma flor, uno con 46 g arriba al abrir la caja y el
+  // otro vacío, los dos llevados a 150. Agrupado por FORMA decía «subió 254 g de Flor seca» con
+  // 300 g sobre la mesa — correcto y ilegible. Una línea por producto, de dónde a dónde.
+  it('una línea por producto, con el antes y el después — no un delta sin sujeto', async () => {
+    const OTRA = { ...FLOR, stock_id: 3, numero: 'ST-26-0032' }
+    respuesta = {
+      ...respuesta, turno: TURNO,
+      mesa: [
+        { ...FLOR, mostrador: 150, movimientos_del_turno: [
+          { tipo: 'carga', cantidad: 104, motivo: 'Se pidió del depósito', usuario: 'German Laino', cuando: '2026-09-11T17:30:00Z' },
+        ] },
+        { ...OTRA, mostrador: 150, movimientos_del_turno: [
+          { tipo: 'carga', cantidad: 150, motivo: 'Se pidió del depósito', usuario: 'German Laino', cuando: '2026-09-11T17:30:00Z' },
+        ] },
+      ],
+      puedo: { cargar: false, abrir: true, cerrar: true },
+    }
+    const w = await montar('dispensador')
+
+    const lineas = w.findAll('.mst__mov').map(l => l.text().replace(/\s+/g, ' '))
+    expect(lineas).toHaveLength(2)
+    expect(lineas.find(l => l.includes('ST-26-0031'))).toMatch(/de 46 a 150/)
+    expect(lineas.find(l => l.includes('ST-26-0032'))).toMatch(/de 0 a 150/)
+    expect(w.find('.mst__movs').text()).not.toContain('254')
   })
 })
 

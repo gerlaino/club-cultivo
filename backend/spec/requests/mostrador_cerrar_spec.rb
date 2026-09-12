@@ -336,6 +336,28 @@ RSpec.describe 'Cerrar el mostrador', type: :request do
       expect(razones.values.flatten).to include('sobrante')
     end
 
+    # LA PLATA TAMBIÉN PIDE UNA MIRADA. Un cierre con la mesa perfecta y $8.500 menos en el cajón
+    # decía «Sin novedad» y no entraba en «Para mirar»: las cuatro razones eran de mercadería.
+    it 'una diferencia de efectivo entra a la lista de revisión como caja, aunque la mesa cuadre' do
+      abrir!(cantidad: 300, fondo: 50_000)
+      dispensar!(85)                                   # esperado en caja: 58.500
+      cerrar!(contado: 215, efectivo: 50_000, como: ana)  # cuadra la mesa, faltan $8.500
+
+      turnos  = ActsAsTenant.with_tenant(club) { sede.mostrador!.turno_mostradores.cerrados }
+      razones = ActsAsTenant.with_tenant(club) { Mostradores::MotivosDeRevision.por_turno(turnos) }
+      expect(razones.values.flatten).to eq(['caja'])
+    end
+
+    it 'y con la plata justa no entra por eso' do
+      abrir!(cantidad: 300, fondo: 50_000)
+      dispensar!(85)
+      cerrar!(contado: 215, efectivo: 58_500, como: ana)
+
+      turnos  = ActsAsTenant.with_tenant(club) { sede.mostrador!.turno_mostradores.cerrados }
+      razones = ActsAsTenant.with_tenant(club) { Mostradores::MotivosDeRevision.por_turno(turnos) }
+      expect(razones).to be_empty
+    end
+
     # NI SIQUIERA ADMINISTRACIÓN. Un arqueo no sabe de dónde salió el producto que sobra, y
     # subir el inventario lo creaba de la nada: la trazabilidad terminaba con "en stock" MÁS que
     # "producido" y la merma en negativo. Si de verdad hay más, se carga por `Cargar`, que

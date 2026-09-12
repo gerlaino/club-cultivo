@@ -164,36 +164,35 @@ export function useMostrador () {
 
   // Lo que administración tocó mientras la caja estaba abierta. Sin esto, quien atiende cierra
   // con un faltante que no es suyo y no lo puede explicar.
-  // AGRUPADOS por quién, qué producto y por qué. Cargar la mesa de a poco es lo normal —se sube
-  // una variedad, después otra, después se completa— y sin agrupar salían cuatro renglones casi
-  // idénticos ("subió 100 g de Flor seca a las 17:51", "subió 150 g de Flor seca a las 17:51"…)
-  // que hay que leer uno por uno para entender que se cargaron 650 g. La pregunta de quien
-  // atiende es CUÁNTO cambió lo suyo, no cuántas veces tocaron el botón.
+  //
+  // UNA LÍNEA POR PRODUCTO, CON LA CUENTA A LA VISTA: «ST-26-0013 Fruti Punchi: de 46 a 150 g».
+  // Antes agrupaba por FORMA y decía sólo el delta —"subió 254 g de Flor seca"— así que dos
+  // frascos distintos se fundían en un renglón y, con 300 g sobre la mesa, 254 se leía como una
+  // contradicción: era 104 de un frasco que ya tenía 46 al abrir, más 150 del otro. El "antes"
+  // no viaja: se deduce de lo que hay ahora menos todo lo que se movió en el turno.
   const movimientosDelTurno = computed(() => {
-    const porClave = new Map()
+    const filas = []
 
     mesa.value.forEach(m => {
-      (m.movimientos_del_turno || [])
-        .filter(mv => mv.tipo !== 'ajuste')
-        .forEach(mv => {
-          const sentido = Number(mv.cantidad) > 0 ? 'sube' : 'baja'
-          const clave = [mv.usuario, m.forma, m.unidad, mv.motivo || '', sentido].join('|')
-          const previo = porClave.get(clave)
+      const movs = m.movimientos_del_turno || []
+      const deAdmin = movs.filter(mv => mv.tipo !== 'ajuste')
+      if (!deAdmin.length) return
 
-          if (previo) {
-            previo.cantidad += Number(mv.cantidad)
-            previo.veces += 1
-            if (mv.cuando > previo.cuando) previo.cuando = mv.cuando
-          } else {
-            porClave.set(clave, {
-              usuario: mv.usuario, motivo: mv.motivo, cuando: mv.cuando,
-              cantidad: Number(mv.cantidad), forma: m.forma, unidad: m.unidad, veces: 1,
-            })
-          }
-        })
+      const ahora   = Number(m.mostrador) || 0
+      const antes   = ahora - movs.reduce((a, mv) => a + Number(mv.cantidad), 0)
+      const neto    = deAdmin.reduce((a, mv) => a + Number(mv.cantidad), 0)
+      const cuando  = deAdmin.reduce((a, mv) => (mv.cuando > a ? mv.cuando : a), deAdmin[0].cuando)
+      const unicos  = (xs) => [...new Set(xs.filter(Boolean))]
+
+      filas.push({
+        stock_id: m.stock_id, numero: m.numero, genetica: m.genetica, forma: m.forma, unidad: m.unidad,
+        usuarios: unicos(deAdmin.map(mv => mv.usuario)),
+        motivos:  unicos(deAdmin.map(mv => mv.motivo)),
+        antes: Math.max(0, antes), ahora, cantidad: neto, veces: deAdmin.length, cuando,
+      })
     })
 
-    return [...porClave.values()].sort((a, b) => (a.cuando < b.cuando ? 1 : -1))
+    return filas.sort((a, b) => (a.cuando < b.cuando ? 1 : -1))
   })
 
   let cargaEnCurso = 0
