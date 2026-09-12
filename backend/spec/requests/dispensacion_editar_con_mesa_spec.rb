@@ -15,7 +15,7 @@ RSpec.describe 'PATCH /dispensaciones/:id — con el producto sobre la mesa', ty
 
   let(:club)     { create(:club) }
   let(:admin)    { create(:user, :admin, club: club) }
-  let(:sede)     { create(:sede, club: club, created_by: admin, tipo: 'social') }
+  let(:sede)     { create(:sede, club: club, created_by: admin, tipo: 'mixta') }
   let(:sala)     { create(:sala, club: club, sede: sede, created_by: admin) }
   let(:lote)     { create(:lote, club: club, sala: sala) }
   let(:paciente) { create(:paciente, club: club, created_by: admin) }
@@ -57,7 +57,7 @@ RSpec.describe 'PATCH /dispensaciones/:id — con el producto sobre la mesa', ty
                                       items: [{ stock_id: stock.id, cantidad: 5 }] } },
             headers: auth_headers, as: :json
 
-      expect(response).to have_http_status(:ok)
+      expect(response).to have_http_status(:ok), response.body
       expect(d.reload.medio_pago).to eq('efectivo')
       expect(d.cantidad.to_f).to eq(5.0)
       expect(stock.reload.cantidad.to_f).to eq(95.0) # el stock no se movió

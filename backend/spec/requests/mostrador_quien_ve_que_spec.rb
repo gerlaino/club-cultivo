@@ -21,7 +21,7 @@ RSpec.describe 'Quién ve qué stock al dispensar', type: :request do
   let(:admin)      { create(:user, :admin, club: club) }
   let(:supervisor) { create(:user, :supervisor, club: club) }
   let(:ana)        { create(:user, :dispensador, club: club) }
-  let(:sede)       { create(:sede, club: club, tipo: 'social') }
+  let(:sede)       { create(:sede, club: club, tipo: 'mixta') }
   let(:sala)       { create(:sala, club: club, sede: sede) }
   let(:lote)       { ActsAsTenant.with_tenant(club) { create(:lote, club: club, sala: sala) } }
   let(:paciente)   { ActsAsTenant.with_tenant(club) { create(:paciente, club: club) } }
@@ -150,8 +150,8 @@ RSpec.describe 'El mostrador de una sede que no es la mía', type: :request do
 
   let(:club)  { create(:club, features: { 'produccion_dispensa' => true }) }
   let(:admin) { create(:user, :admin, club: club) }
-  let(:norte)  { create(:sede, club: club, tipo: 'social', nombre: 'Norte') }
-  let(:centro) { create(:sede, club: club, tipo: 'social', nombre: 'Centro') }
+  let(:norte)  { create(:sede, club: club, tipo: 'mixta', nombre: 'Norte') }
+  let(:centro) { create(:sede, club: club, tipo: 'mixta', nombre: 'Centro') }
 
   # Dana atiende SÓLO en Norte.
   let(:dana) do

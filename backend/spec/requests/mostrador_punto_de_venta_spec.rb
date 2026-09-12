@@ -9,7 +9,7 @@ require 'rails_helper'
 RSpec.describe 'El mostrador como punto de venta', type: :request do
   let(:club)  { create(:club) }
   let(:admin) { create(:user, :admin, club: club) }
-  let(:sede)  { create(:sede, club: club, tipo: 'social') }
+  let(:sede)  { create(:sede, club: club, tipo: 'mixta') }
 
   # `mostrador` LEE y `mostrador!` crea si hace falta. Una lectura que escribe es una escritura
   # que nadie ve en el log ni espera en un GET.
@@ -93,7 +93,7 @@ RSpec.describe 'El mostrador como punto de venta', type: :request do
     it 'no encuentra la caja de otra organización' do
       otro       = create(:club)
       otro_admin = create(:user, :admin, club: otro)
-      otra_sede  = create(:sede, club: otro, tipo: 'social')
+      otra_sede  = create(:sede, club: otro, tipo: 'mixta')
       ActsAsTenant.with_tenant(otro) do
         CajaTurno.create!(club: otro, sede: otra_sede, punto: otra_sede.mostrador!,
                           abierta_por: otro_admin, monto_inicial_ars: 9_000,
@@ -110,8 +110,8 @@ RSpec.describe 'El mostrador como punto de venta', type: :request do
   # explicara.
   describe 'la rendición del repartidor con más de una sede' do
     let(:repartidor) { create(:user, :delivery, club: club) }
-    let(:norte)      { create(:sede, club: club, tipo: 'social', nombre: 'Norte') }
-    let(:centro)     { create(:sede, club: club, tipo: 'social', nombre: 'Centro') }
+    let(:norte)      { create(:sede, club: club, tipo: 'mixta', nombre: 'Norte') }
+    let(:centro)     { create(:sede, club: club, tipo: 'mixta', nombre: 'Centro') }
 
     def abrir_caja!(en_sede, hace:)
       ActsAsTenant.with_tenant(club) do

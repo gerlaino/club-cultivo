@@ -58,3 +58,37 @@ RSpec.describe 'Qué tipo de sala se puede crear', type: :request do
     end
   end
 end
+
+# EN UN DISPENSARIO NO SE CULTIVA. La regla existía sólo para la sala de manicura; una de
+# vegetativo se creaba en una sede social si la pantalla llegaba con la sede ya fijada (la ficha
+# de la sede en la PWA). Apareció probando: una sede «Dispensario» con «1 salas».
+RSpec.describe 'Dónde se puede crear una sala', type: :request do
+  include AuthHelpers
+
+  let(:club)        { create(:club) }
+  let(:admin)       { create(:user, :admin, club: club) }
+  let(:dispensario) { create(:sede, club: club, created_by: admin, tipo: 'social') }
+  let(:mixta)       { create(:sede, club: club, created_by: admin, tipo: 'mixta') }
+
+  before { sign_in_as(admin) }
+
+  def crear(sede)
+    post '/api/salas', params: { sala: { nombre: 'Vege 1', kind: 'vegetativo', sede_id: sede.id } }
+  end
+
+  it 'rechaza una sala de cultivo en una sede social, y dice por qué' do
+    expect { crear(dispensario) }.not_to change(Sala, :count)
+    expect(response).to have_http_status(:unprocessable_entity)
+    expect(response.body).to include('en un dispensario no se cultiva')
+  end
+
+  it 'la acepta en una mixta' do
+    expect { crear(mixta) }.to change(Sala, :count).by(1)
+  end
+
+  it 'una sala que ya estaba en una sede social se puede seguir editando' do
+    sala = ActsAsTenant.with_tenant(club) { Sala.new(club: club, sede: mixta, nombre: 'Vieja', kind: 'vegetativo', created_by: admin).tap(&:save!) }
+    sala.update_column(:sede_id, dispensario.id)
+    expect(sala.reload.update(nombre: 'Vieja renombrada')).to be true
+  end
+end

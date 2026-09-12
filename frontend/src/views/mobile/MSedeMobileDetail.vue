@@ -14,9 +14,10 @@
 
       <div v-if="!salas.length" class="msd__empty">
         <i class="bi bi-grid-3x3-gap msd__empty-icon"></i>
-        <p>Sin salas en esta sede</p>
+        <p>{{ cultiva ? 'Sin salas en esta sede' : 'En un dispensario no se cultiva' }}</p>
         <button v-if="puedeCrearSalas" class="msd__empty-cta" @click="showNuevaSala = true"><i class="bi bi-plus-lg"></i> Crear primera sala</button>
-        <p v-else class="msd__empty-hint">Las salas las crea un administrador.</p>
+        <p v-else-if="cultiva" class="msd__empty-hint">Las salas las crea un administrador.</p>
+        <p v-else class="msd__empty-hint">Las salas van en una sede de producción o mixta.</p>
       </div>
 
       <div v-else class="msd__list">
@@ -55,7 +56,10 @@ import ModalCrearSala from '../../components/salas/ModalCrearSala.vue'
 
 const route = useRoute()
 const auth  = useAuthStore()
-const puedeCrearSalas = computed(() => ['admin', 'supervisor'].includes(auth.user?.role))
+// Y sólo en una sede que cultive: en un dispensario (sede social) no hay dónde poner plantas.
+// El backend lo rechaza igual (`Sala#sede_de_cultivo`); acá es para no ofrecer el camino.
+const cultiva = computed(() => ['produccion', 'mixta'].includes(sede.value?.tipo))
+const puedeCrearSalas = computed(() => ['admin', 'supervisor'].includes(auth.user?.role) && cultiva.value)
 const id    = Number(route.params.id)
 const toast = useToast()
 

@@ -25,11 +25,20 @@ module DispensacionesFinancieras
     params[:comprobante] || params.dig(:dispensacion, :comprobante)
   end
 
+  # A qué caja va la plata cuando administración dispensa del depósito. Sólo administración lo
+  # elige: quien atiende cobra en la suya (`Dispensacion#caja_para_cobros`).
+  def caja_elegida_param
+    return nil if current_user.atiende_mostrador?
+
+    params.dig(:dispensacion, :caja_turno_id).presence || params[:caja_turno_id].presence
+  end
+
   # Registra los cobros de una dispensa. Cada línea cubre hasta el saldo; lo que pague
   # de más (transfirió de más, le pagó de más al delivery, etc.) NO se bloquea: el
   # excedente se acredita a favor en su cuenta corriente. Lo que falte cubrir queda como
   # deuda en cuenta corriente. La foto se adjunta al primer cobro de transferencia.
   def aplicar_lineas_cobro!(disp, lineas, contexto)
+    disp.caja_turno_elegida_id = caja_elegida_param if caja_elegida_param.present?
     comp = comprobante_param
     comp_usado = false
     excedente  = 0.to_d

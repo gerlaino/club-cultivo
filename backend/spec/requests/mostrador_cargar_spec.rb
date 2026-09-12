@@ -15,7 +15,7 @@ RSpec.describe 'Cargar la mesa del mostrador', type: :request do
   let(:club)  { create(:club, features: { 'produccion_dispensa' => true }) }
   let(:admin) { create(:user, :admin, club: club) }
   let(:ana)   { create(:user, :dispensador, club: club) }
-  let(:sede)  { create(:sede, club: club, tipo: 'social') }
+  let(:sede)  { create(:sede, club: club, tipo: 'mixta') }
   let(:lote)  { ActsAsTenant.with_tenant(club) { create(:lote, club: club, sala: create(:sala, club: club, sede: sede)) } }
 
   let!(:stock) do
@@ -129,7 +129,7 @@ RSpec.describe 'Cargar la mesa del mostrador', type: :request do
 
   describe 'lo que no se puede subir' do
     it 'stock de otra sede' do
-      otra  = create(:sede, club: club, tipo: 'social')
+      otra  = create(:sede, club: club, tipo: 'mixta')
       ajeno = ActsAsTenant.with_tenant(club) do
         create(:stock, club: club, sede: otra, lote: lote, forma_producto: 'flor_seca',
                        unidad: 'g', cantidad: 100, estado: 'asignado', disponibilidad: 'ambas')

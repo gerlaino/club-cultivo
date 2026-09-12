@@ -11,7 +11,7 @@ RSpec.describe 'Un cierre que ya no se corrige', type: :request do
   let(:club)  { create(:club) }
   let(:admin) { create(:user, :admin, club: club) }
   let(:ana)   { create(:user, :dispensador, club: club) }
-  let(:sede)  { create(:sede, club: club, tipo: 'social') }
+  let(:sede)  { create(:sede, club: club, tipo: 'mixta') }
   let(:lote)  { ActsAsTenant.with_tenant(club) { create(:lote, club: club, sala: create(:sala, club: club, sede: sede)) } }
 
   let!(:stock) do

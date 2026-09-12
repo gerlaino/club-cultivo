@@ -30,7 +30,7 @@ class Sala < ApplicationRecord
   validates :nombre, presence: true, uniqueness: { scope: :club_id, conditions: -> { where(deleted_at: nil) } }
   validates :state,  inclusion: { in: ESTADOS }, allow_blank: false
   validates :tipo,   inclusion: { in: TIPOS }, allow_blank: true
-  validate  :manicura_requiere_sede_produccion
+  validate  :sede_de_cultivo, if: -> { new_record? || will_save_change_to_sede_id? }
 
   private
 
@@ -38,12 +38,17 @@ class Sala < ApplicationRecord
     self.state ||= 'activa'
   end
 
-  def manicura_requiere_sede_produccion
-    return unless kind == 'manicura'
+  # UNA SALA ES DE CULTIVO, Y SE CULTIVA EN UNA SEDE DE PRODUCCIÓN O MIXTA. Una sede social es el
+  # dispensario: no tiene dónde poner plantas, y una sala ahí queda invisible para el cultivador
+  # y contando contra el tope del plan. La regla existía sólo para manicura; el resto de las salas
+  # se creaban en cualquier sede si la pantalla llegaba con la sede ya fijada (la ficha de la sede
+  # en la PWA). Sólo al crear o al cambiar de sede: la validación no vuelve inguardable una sala
+  # que ya estaba mal.
+  def sede_de_cultivo
     return if sede.nil?
-    unless %w[produccion mixta].include?(sede.tipo)
-      errors.add(:sede, 'La sala de manicura solo puede estar en sedes de producción o mixtas')
-    end
+    return if sede.es_produccion?
+
+    errors.add(:sede, 'Una sala sólo puede estar en una sede de producción o mixta: en un dispensario no se cultiva')
   end
 
   public

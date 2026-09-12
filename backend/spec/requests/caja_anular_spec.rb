@@ -21,7 +21,7 @@ RSpec.describe 'Anular una caja abierta por error', type: :request do
   let(:club)  { create(:club) }
   let(:admin) { create(:user, :admin, club: club) }
   let(:ana)   { create(:user, :dispensador, club: club) }
-  let(:sede)  { create(:sede, club: club, tipo: 'social') }
+  let(:sede)  { create(:sede, club: club, tipo: 'mixta') }
 
   def abrir!(monto: 100_000, como: admin)
     sign_in_as(como)
@@ -119,6 +119,8 @@ RSpec.describe 'Anular una caja abierta por error', type: :request do
     it 'ya no se anula: se cierra con su arqueo' do
       caja = abrir!
       ActsAsTenant.with_tenant(club) do
+        # Administración eligió esta caja: sin elegir, su plata no entra a ningún cajón.
+        dispensacion.caja_turno_elegida_id = caja['caja_turno_id']
         Dispensaciones::RegistrarCobro.call(dispensacion: dispensacion, club: club, usuario: admin,
                                             medio: 'efectivo', monto: 5_000)
       end
@@ -126,7 +128,7 @@ RSpec.describe 'Anular una caja abierta por error', type: :request do
       anular!(caja['caja_turno_id'])
 
       expect(response).to have_http_status(:unprocessable_entity)
-      expect(JSON.parse(response.body)['error']).to match(/movimientos/i)
+      expect(JSON.parse(response.body)['error']).to match(/movimientos|dispensó/i)
     end
   end
 

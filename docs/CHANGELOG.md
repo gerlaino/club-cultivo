@@ -1,5 +1,38 @@
 # Changelog
 
+## Septiembre 2026 (bg) — La plata del admin, el pesaje que suma al frasco de ayer, y la sala en el dispensario
+
+Tres cosas que encontró Germán probando, y una cuarta que apareció debajo de la segunda.
+
+- **A QUÉ CAJA VA LO QUE COBRA ADMINISTRACIÓN** (`Dispensacion#caja_para_cobros`, decisión de
+  Germán). El cobro caía siempre en la caja abierta de la sede, sin preguntar: el admin vendía del
+  depósito, se guardaba la plata, y a la noche el arqueo del dispensador esperaba $X que nunca
+  entraron al cajón. Ahora: si algo del carrito está **sobre una mesa**, va a la caja de ese
+  mostrador sin elegir; si todo sale del **depósito**, va a la caja que eligió en el modal (entre
+  las abiertas, de `GET /mostradores`) o a **ninguna** si no eligió. Quien atiende sigue cobrando
+  en la suya. Se elige sólo cuando aplica: administración, efectivo, nada de la mesa.
+- **Y DEBAJO, LO GRAVE: la venta simple en efectivo no entraba a NINGÚN arqueo.** El modal manda
+  `cobros` sólo al pagar de varias formas; con un medio solo mandaba `medio_pago`, la dispensa
+  tomaba el camino legacy y **no creaba el `Cobro`** — y desde que el arqueo suma `cobros`
+  (26-ago) la plata de casi todas las ventas no existía para la caja: fondo $1.000, venta de $500
+  en efectivo, esperado $1.000. Efectivo y transferencia con un solo medio pasan ahora por el
+  mismo camino de cobros; cuenta corriente y gramos siguen por el legacy (tienen su aritmética de
+  crédito parcial). **Editar** una dispensa con ese único cobro de creación lo rehace junto con el
+  asiento —el guard «cancelá y volvé a crearla» queda para los pagos partidos y lo cobrado después—.
+- **Bajar de la mesa lo que había arriba, y el resto del depósito** (`imputar_a_mostrador`).
+  Administración dispensa contra depósito + mesa, pero la imputación restaba la línea entera: con
+  40 g arriba y 50 en la línea, `mover!` rebotaba con «No hay tanto sobre la mesa».
+- **El pesaje se suma al frasco de ayer también desde el teléfono.** El backend y el escritorio ya
+  lo ofrecían (`confirmar!(stock_id:)`); la hoja del PWA (`MAdminAprobacionView`) creaba SIEMPRE
+  uno nuevo, así que cada jornada de manicura terminaba en un stock distinto del mismo lote. Misma
+  lista que el escritorio: frascos de flor seca del lote, «Frasco nuevo» por defecto.
+- **EN UN DISPENSARIO NO SE CULTIVA** (`Sala#sede_de_cultivo`). La regla existía sólo para la
+  sala de manicura; una de vegetativo se creaba en una sede social si la pantalla llegaba con la
+  sede fijada (la ficha de la sede en la PWA). Apareció probando: «Example · DISPENSARIO · 1
+  salas». Sólo al crear o al cambiar de sede —no vuelve inguardable la que ya estaba—, y la ficha
+  móvil no ofrece «Crear primera sala» en una sede social. 41 specs usaban una sede social con
+  salas como atajo: pasaron a mixta.
+
 ## Septiembre 2026 (bf) — La trazabilidad cierra la cuenta, y la cuenta tiene nombres
 
 Segundo de la revisión informe por informe. El balance de un frasco —lo único que un auditor

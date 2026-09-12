@@ -14,7 +14,7 @@ require 'rails_helper'
 RSpec.describe 'El arqueo de un turno cerrado no cambia después', type: :model do
   let(:club)     { create(:club) }
   let(:ana)      { create(:user, :dispensador, club: club) }
-  let(:sede)     { create(:sede, club: club, tipo: 'social') }
+  let(:sede)     { create(:sede, club: club, tipo: 'mixta') }
   let(:lote)     { ActsAsTenant.with_tenant(club) { create(:lote, club: club, sala: create(:sala, club: club, sede: sede)) } }
   let(:paciente) { ActsAsTenant.with_tenant(club) { create(:paciente, club: club) } }
 

@@ -13,7 +13,7 @@ RSpec.describe AuditoriaContable do
   # Las dispensas las crea administración: un dispensador dispensa del MOSTRADOR y necesitaría
   # una caja abierta, que no es lo que se está probando acá.
   let(:ana)      { create(:user, :admin, club: club) }
-  let(:sede)     { create(:sede, club: club, tipo: 'social') }
+  let(:sede)     { create(:sede, club: club, tipo: 'mixta') }
   let(:lote)     { ActsAsTenant.with_tenant(club) { create(:lote, club: club, sala: create(:sala, club: club, sede: sede)) } }
   let(:paciente) { ActsAsTenant.with_tenant(club) { create(:paciente, club: club) } }
 

@@ -13,7 +13,7 @@ RSpec.describe 'El stock dice de qué está hecho lo comprometido', type: :reque
   let(:club)     { create(:club, features: { 'produccion_dispensa' => true, 'delivery' => true }) }
   let(:admin)    { create(:user, :admin, club: club) }
   let(:delivery) { create(:user, club: club, role: 'delivery') }
-  let(:sede)     { create(:sede, club: club, tipo: 'social', created_by: admin) }
+  let(:sede)     { create(:sede, club: club, tipo: 'mixta', created_by: admin) }
   let(:sala)     { create(:sala, club: club, sede: sede, created_by: admin) }
   let(:lote)     { ActsAsTenant.with_tenant(club) { create(:lote, club: club, sala: sala) } }
   let(:paciente) { create(:paciente, club: club, created_by: admin) }

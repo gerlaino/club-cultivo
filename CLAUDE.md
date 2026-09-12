@@ -652,6 +652,24 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 
 ### Lo que NO hay que romper
 
+- **LA PLATA DEL ADMIN VA A LA CAJA QUE ÉL DICE, Y LA DE LA MESA A LA DE SU MOSTRADOR**
+  (`Dispensacion#caja_para_cobros`, sep-2026, decisión de Germán). Quien atiende cobra en la
+  suya. Administración: si algo del carrito está sobre una mesa, la caja de ese mostrador sin
+  preguntar; si todo sale del depósito, la que eligió en el modal (`caja_turno_id`, entre las
+  abiertas) o **ninguna** — el asiento se escribe igual, la plata no entra a ningún arqueo. Antes
+  caía siempre en la caja de la sede y el dispensador cerraba con un faltante que no era suyo.
+- **UNA VENTA EN EFECTIVO CREA SU `Cobro`, AUNQUE SEA UN SOLO MEDIO.** El arqueo suma `cobros`;
+  el camino legacy de `medio_pago` único asentaba sin crear ninguno y la venta simple —casi
+  todas— no existía para la caja. Efectivo y transferencia pasan por `aplicar_lineas_cobro!`
+  también con un medio; cuenta corriente y gramos siguen por el legacy. Editar una dispensa con
+  ese único cobro de creación lo rehace (`cobro_simple_de`); los partidos siguen sin editarse.
+- **SE BAJA DE LA MESA LO QUE HABÍA ARRIBA; EL RESTO SALE DEL DEPÓSITO.** Administración dispensa
+  contra depósito + mesa, e `imputar_a_mostrador` restaba la línea entera: 50 g con 40 arriba
+  rebotaba con «No hay tanto sobre la mesa».
+- **EN UN DISPENSARIO NO SE CULTIVA** (`Sala#sede_de_cultivo`): toda sala pide sede de producción
+  o mixta, al crear o al cambiar de sede. En specs, una sede con salas es `mixta`, no `social`.
+- **EL PESAJE SE SUMA AL FRASCO DE AYER** también en el PWA (`MAdminAprobacionView`): el backend
+  ya aceptaba `stock_id` y el teléfono creaba uno nuevo cada día.
 - **EL TECHO DE UNA DISPENSA ES EL MISMO AL CREAR Y AL EDITAR** (`Stock#techo_para_dispensa`,
   sep-2026). Lo libre del depósito, MÁS lo que la mesa de ese mostrador tiene arriba —para quien
   dispensa desde ahí no es un bloqueo, es su stock— MÁS lo apartado del evento del que sale la

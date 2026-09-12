@@ -6,7 +6,7 @@ require 'rails_helper'
 RSpec.describe PurgarAdjuntosEntregaJob, type: :job do
   let(:club)     { create(:club) }
   let(:admin)    { create(:user, :admin, club: club) }
-  let(:sede)     { create(:sede, club: club, tipo: 'social') }
+  let(:sede)     { create(:sede, club: club, tipo: 'mixta') }
   let(:lote)     { ActsAsTenant.with_tenant(club) { create(:lote, club: club, sala: create(:sala, club: club, sede: sede)) } }
   let(:paciente) { ActsAsTenant.with_tenant(club) { create(:paciente, club: club) } }
   let(:stock) do

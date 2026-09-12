@@ -91,9 +91,10 @@ module Dispensaciones
       caja_abierta
     end
 
+    # La regla vive en la dispensa (`Dispensacion#caja_para_cobros`): es ella la que sabe si el
+    # producto pasó por una mesa y qué caja eligió administración cuando no pasó.
     def caja_abierta
-      sede = @dispensacion.sede || @dispensacion.stock&.sede
-      CajaTurno.abierta_en_sede(club_id: @club.id, sede_id: sede&.id)
+      @dispensacion.caja_para_cobros
     end
 
     def cuenta_corriente

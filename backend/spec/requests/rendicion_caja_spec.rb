@@ -15,7 +15,7 @@ RSpec.describe 'Rendir la caja del repartidor', type: :request do
   let(:club)  { create(:club, features: { 'produccion_dispensa' => true, 'delivery' => true }) }
   let(:admin) { create(:user, :admin, club: club) }
   let(:juan)  { create(:user, :delivery, club: club, first_name: 'Juan') }
-  let(:sede)  { create(:sede, club: club, tipo: 'social') }
+  let(:sede)  { create(:sede, club: club, tipo: 'mixta') }
   let(:lote)  { ActsAsTenant.with_tenant(club) { create(:lote, club: club, sala: create(:sala, club: club, sede: sede)) } }
 
   let!(:stock) do

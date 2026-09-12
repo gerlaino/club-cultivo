@@ -149,6 +149,20 @@ class DispensacionesController < ApplicationController
 
     @dispensacion.cobrar_en_entrega = !es_regalo && (ActiveModel::Type::Boolean.new.cast(params.dig(:dispensacion, :cobrar_en_entrega)) || false)
     lineas_cobro = es_regalo ? [] : cobros_param
+
+    # UN COBRO EN EFECTIVO ES UN COBRO, AUNQUE SEA UNO SOLO. El modal manda `cobros` sólo cuando se
+    # paga de varias formas; con un medio solo mandaba `medio_pago` y la dispensa tomaba el camino
+    # legacy, que asienta pero NO crea el `Cobro` — y desde que el arqueo del mostrador suma
+    # `cobros` (ago-2026), la plata de la venta simple, que es casi toda, no entraba a ninguna
+    # caja: fondo $1.000, venta de $500 en efectivo, esperado $1.000. Se verificó en sep-2026
+    # arreglando a qué caja va lo que cobra administración. Cuenta corriente y gramos siguen por
+    # el camino legacy: tienen su propia aritmética de crédito parcial.
+    medio_unico = params.dig(:dispensacion, :medio_pago).to_s
+    if lineas_cobro.empty? && !@dispensacion.cobrar_en_entrega &&
+       %w[efectivo transferencia].include?(medio_unico) && @dispensacion.aporte_socio_ars.to_d > 0
+      lineas_cobro = [{ medio: medio_unico, monto: @dispensacion.aporte_socio_ars.to_d }]
+    end
+
     usa_cobros   = @dispensacion.cobrar_en_entrega || lineas_cobro.present?
 
     cc = @paciente.cuenta_corriente
@@ -214,9 +228,12 @@ class DispensacionesController < ApplicationController
       end
     end
 
-    # Las dispensas con cobros (pagos partidos / contra-entrega) no se editan en monto
-    # por la vía legacy —corrompería el desglose de cobros—. Se cancela y se rehace.
-    if @dispensacion.usa_cobros?
+    # Las dispensas con cobros PARTIDOS o cobrados después (contra-entrega, recupero) no se
+    # editan en monto por la vía legacy —corrompería el desglose de cobros—. Se cancela y se
+    # rehace. La venta simple en efectivo o transferencia tiene UN cobro de creación (desde
+    # sep-2026, para que entre al arqueo): ése se rehace junto con el asiento, como siempre.
+    cobro_simple = cobro_simple_de(@dispensacion)
+    if @dispensacion.usa_cobros? && cobro_simple.nil?
       return render json: { error: 'Esta dispensación tiene cobros registrados. Para cambiar el monto, cancelala y volvé a crearla.' }, status: :unprocessable_entity
     end
 
@@ -235,6 +252,11 @@ class DispensacionesController < ApplicationController
         revertir_cuenta_corriente(@dispensacion)
         CuentaCorrienteMovimiento.where(dispensacion_id: @dispensacion.id).update_all(dispensacion_id: nil)
         @dispensacion.movimientos_contables.destroy_all
+        # El cobro simple se rehace con el medio nuevo; la caja en la que cayó se conserva si
+        # sigue abierta (`caja_para_cobros` la valida).
+        caja_anterior = cobro_simple&.caja_turno_id
+        cobro_simple&.destroy!
+        @dispensacion.cobros.reset
         @dispensacion.send(:incrementar_stock)   # devuelve al stock la cantidad vieja
         @dispensacion.stock.reload
         cc&.reload
@@ -282,9 +304,15 @@ class DispensacionesController < ApplicationController
         @dispensacion.save!
         sincronizar_item_legacy!(@dispensacion) unless items_param.present?  # la línea espejo refleja stock/cantidad nuevos
         @dispensacion.send(:decrementar_stock)   # descuenta la cantidad nueva (por línea)
-        crear_movimiento_contable(@dispensacion)
-        debitar_cuenta_corriente(@dispensacion) if @dispensacion.a_credito? && cc
-        debitar_gramos(@dispensacion)           if @dispensacion.medio_pago == 'credito_gramos'
+        if %w[efectivo transferencia].include?(@dispensacion.medio_pago) && @dispensacion.aporte_socio_ars.to_d > 0
+          # Mismo camino que la creación: el cobro y su asiento, enganchado a la caja.
+          @dispensacion.caja_turno_elegida_id = caja_elegida_param || caja_anterior
+          aplicar_lineas_cobro!(@dispensacion, [{ medio: @dispensacion.medio_pago, monto: @dispensacion.aporte_socio_ars.to_d }], 'creacion')
+        else
+          crear_movimiento_contable(@dispensacion)
+          debitar_cuenta_corriente(@dispensacion) if @dispensacion.a_credito? && cc
+          debitar_gramos(@dispensacion)           if @dispensacion.medio_pago == 'credito_gramos'
+        end
       end
       render json: serialize_dispensacion(@dispensacion)
     rescue ActiveRecord::RecordInvalid => e
@@ -878,6 +906,19 @@ class DispensacionesController < ApplicationController
       descripcion:    "Reversa dispensación ##{dispensacion.id} (gramos)",
       created_by:     current_user,
     )
+  end
+
+  # El único cobro de una venta simple: uno solo, de creación, en efectivo o transferencia, por
+  # el total. Cualquier otra combinación es un desglose que la edición legacy no sabe rehacer.
+  def cobro_simple_de(disp)
+    return nil if disp.cobrar_en_entrega?
+
+    cobros = disp.cobros.to_a
+    return nil unless cobros.size == 1
+
+    c = cobros.first
+    c if c.contexto == 'creacion' && %w[efectivo transferencia].include?(c.medio) &&
+         (c.monto_ars.to_d - disp.aporte_socio_ars.to_d).abs < 0.01
   end
 
   # Con qué medio nace una dispensa que todavía no tiene cobros registrados. Nunca 'mixto':

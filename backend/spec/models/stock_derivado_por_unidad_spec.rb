@@ -8,7 +8,7 @@ require 'rails_helper'
 # hash— sigue en pie, pero sólo donde tiene sentido: cuando el resultado se mide en gramos.
 RSpec.describe Stock, 'derivados medidos en otra unidad' do
   let(:club) { create(:club) }
-  let(:sede) { create(:sede, club: club, tipo: 'social') }
+  let(:sede) { create(:sede, club: club, tipo: 'mixta') }
   let(:lote) { create(:lote, club: club, sala: create(:sala, club: club, sede: sede)) }
 
   def derivado(forma:, unidad:, cantidad:, consumidos: 100)

@@ -23,7 +23,7 @@ RSpec.describe 'Dónde entra el efectivo de una rendición', type: :request do
   let(:juan)  { create(:user, :delivery, club: club, first_name: 'Juan') }
   let(:dana)  { create(:user, :dispensador, club: club, first_name: 'Dana') }
   let(:otro)  { create(:user, :dispensador, club: club, first_name: 'Otro') }
-  let(:sede)  { create(:sede, club: club, tipo: 'social') }
+  let(:sede)  { create(:sede, club: club, tipo: 'mixta') }
   let(:lote)  { ActsAsTenant.with_tenant(club) { create(:lote, club: club, sala: create(:sala, club: club, sede: sede)) } }
 
   let!(:stock) do
@@ -190,7 +190,7 @@ RSpec.describe 'Dónde entra el efectivo de una rendición', type: :request do
     end
 
     it 'no puede mandar el mostrador de una sede que no es suya' do
-      otra = create(:sede, club: club, tipo: 'social')
+      otra = create(:sede, club: club, tipo: 'mixta')
       abrir_mostrador!(otra, usuario: admin, recibe: dana)
       admin.sedes_asignadas << sede   # queda limitado a la suya
 

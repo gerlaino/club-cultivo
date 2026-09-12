@@ -601,7 +601,10 @@ module Dispensario
                         .map { |u, is| { unidad: u, cantidad: is.sum { |i| i.cantidad.to_f } } },
         # Si hay alguien atendiendo, quién y desde cuándo. Nil = nadie, y eso NO significa que la
         # mesa esté vacía.
-        turno: turno && { desde: turno.abierto_at, quien: turno.abierto_por&.nombre_completo },
+        # `caja_turno_id` es lo que elige administración al dispensar del depósito: a qué cajón
+        # entra el efectivo (`Dispensacion#caja_para_cobros`).
+        turno: turno && { desde: turno.abierto_at, quien: turno.abierto_por&.nombre_completo,
+                          caja_turno_id: turno.caja_turno_id },
         # Cierres que piden una mirada en ESA sede. Es media razón para entrar.
         sin_revisar: gestiona? && most ? Mostradores::MotivosDeRevision.por_turno(
           most.turno_mostradores.cerrados.where(revisado_at: nil)

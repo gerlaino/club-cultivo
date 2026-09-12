@@ -10,7 +10,7 @@ import AppDatePicker from '../ui/AppDatePicker.vue'
 import { hoyISO, toISO } from '../../utils/dates.js'
 import { RouterLink, useRoute } from 'vue-router'
 import { createDispensacion, createReserva, entregarReserva, listStocks, listEntregadores,
-         getMostrador } from '../../lib/api.js'
+         getMostrador, listMostradores } from '../../lib/api.js'
 
 const props = defineProps({
   modelValue:     { type: Boolean, required: true },
@@ -481,6 +481,34 @@ async function cargarEstadoCaja () {
   }
 }
 
+// ── A QUÉ CAJA ENTRA EL EFECTIVO cuando dispensa ADMINISTRACIÓN (decisión de Germán, sep-2026) ──
+// Si algo del carrito está sobre una mesa, va a la caja de ese mostrador y no se pregunta. Si todo
+// sale del depósito, se elige entre las cajas abiertas — y si no se elige, no entra a ninguna. La
+// regla vive en el backend (`Dispensacion#caja_para_cobros`); acá se ofrece sólo cuando aplica.
+const cajasAbiertas = ref([])
+const cajaElegida   = ref(null)
+
+async function cargarCajasAbiertas () {
+  cajasAbiertas.value = []
+  cajaElegida.value   = null
+  if (dispensaDelMostrador.value) return
+  try {
+    const { data } = await listMostradores()
+    cajasAbiertas.value = (data?.mostradores || []).filter(m => m.turno?.caja_turno_id)
+  } catch { cajasAbiertas.value = [] }
+}
+
+const hayEfectivo = computed(() => pagoDividido.value
+  ? lineasPago.value.some(l => l.medio === 'efectivo' && Number(l.monto) > 0)
+  : form.value.medio_pago === 'efectivo')
+// Lo reservado nunca está sobre la mesa: entregando una reserva siempre se pregunta.
+const algoEnMesa = computed(() => !modoReserva.value && items.value.some(it => it.stock?.en_mostrador))
+const pideCaja = computed(() =>
+  !dispensaDelMostrador.value && !form.value.es_regalo && !form.value.es_reserva && !cobraDelivery.value &&
+  (modoReserva.value || items.value.length > 0) &&
+  hayEfectivo.value && !algoEnMesa.value && cajasAbiertas.value.length > 0)
+const horaDesde = (iso) => iso ? new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }) : ''
+
 // ── Carrito multi-item (dispensa inmediata) ──────────────────────────────────────
 // Subtotal de una línea con el precio sugerido del stock (sin descuento; el descuento
 // se muestra sobre el total). 0 si el stock no tiene precio configurado.
@@ -707,6 +735,7 @@ watch(() => props.modelValue, (open) => {
     deliveryUsers.value = []
     cargarStocks()
     cargarEstadoCaja()
+    cargarCajasAbiertas()
     // Modo entrega de reserva: pre-cargar producto/cantidad de la reserva.
     if (modoReserva.value) {
       form.value.es_reserva = false
@@ -767,6 +796,7 @@ async function handleSubmit() {
         cantidad:          form.value.cantidad,
         con_envio:         form.value.con_envio,
         cobrar_en_entrega: cobrarDelivery,
+        caja_turno_id:     pideCaja.value ? (cajaElegida.value || undefined) : undefined,
       }
       if (!cobrarDelivery && restoReserva.value > 0) {
         // Una línea o varias: es el mismo array que manda la dispensa, y lo que sobra sin asignar
@@ -912,6 +942,7 @@ async function handleSubmit() {
       medio_pago: (form.value.es_regalo || cobraDelivery.value || pagoDividido.value) ? undefined : form.value.medio_pago, con_envio: form.value.con_envio,
       // Descuento de la dispensa (puntual). El del paciente lo aplica el server desde la ficha.
       descuento_dispensa_pct: descDispensaPct.value,
+      caja_turno_id: pideCaja.value ? (cajaElegida.value || undefined) : undefined,
     }
     if (pagoDividido.value) {
       payload.cobros = lineasPago.value
@@ -1534,6 +1565,19 @@ async function handleSubmit() {
             <div v-else class="mnd__pagos-resto mnd__pagos-resto--ok">
               <i class="bi bi-check-circle-fill"></i> Cubre el total exacto.
             </div>
+          </div>
+
+          <!-- A qué caja entra el efectivo, sólo para administración y sólo cuando nada sale de una
+               mesa: lo que sale de la mesa cae en la caja de ese mostrador sin preguntar. -->
+          <div v-if="pideCaja" class="mnd__field">
+            <label class="mnd__label">A qué caja entra el efectivo <span class="mnd__opt">sale del depósito, no de una mesa</span></label>
+            <select v-model="cajaElegida" class="mnd__input">
+              <option :value="null">A ninguna — no entra a ningún mostrador</option>
+              <option v-for="c in cajasAbiertas" :key="c.turno.caja_turno_id" :value="c.turno.caja_turno_id">
+                Caja de {{ c.sede }} · abierta {{ horaDesde(c.turno.desde) }}{{ c.turno.quien ? ` con ${c.turno.quien}` : '' }}
+              </option>
+            </select>
+            <span class="mnd__field-hint">Si no elegís ninguna, la venta se asienta igual pero no suma al arqueo de ningún mostrador.</span>
           </div>
 
           <!-- Regalo: entrega gratis (solo admin/supervisor, dispensa inmediata) -->

@@ -15,7 +15,7 @@ RSpec.describe 'Abrir la caja del mostrador', type: :request do
   let(:club)  { create(:club, features: { 'produccion_dispensa' => true }) }
   let(:admin) { create(:user, :admin, club: club) }
   let(:ana)   { create(:user, :dispensador, club: club) }
-  let(:sede)  { create(:sede, club: club, tipo: 'social') }
+  let(:sede)  { create(:sede, club: club, tipo: 'mixta') }
   let(:lote)  { ActsAsTenant.with_tenant(club) { create(:lote, club: club, sala: create(:sala, club: club, sede: sede)) } }
 
   let!(:stock) do

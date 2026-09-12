@@ -19,7 +19,7 @@ RSpec.describe 'Caja del mostrador de dispensa', type: :request do
   let(:club)  { create(:club) }
   let(:admin) { create(:user, :admin, club: club) }
   let(:ana)   { create(:user, :dispensador, club: club) }
-  let(:sede)  { create(:sede, club: club, tipo: 'social') }
+  let(:sede)  { create(:sede, club: club, tipo: 'mixta') }
 
   # Abrir es contar: la mercadería que hay arriba y la plata que hay en el cajón.
   def abrir!(fondo: 10_000, como: ana, conteos: [])

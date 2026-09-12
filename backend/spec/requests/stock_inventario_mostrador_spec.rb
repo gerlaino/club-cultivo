@@ -14,7 +14,7 @@ RSpec.describe 'GET /stocks/inventario — dónde está el producto', type: :req
 
   let(:club)  { create(:club) }
   let(:admin) { create(:user, :admin, club: club) }
-  let(:sede)  { create(:sede, club: club, created_by: admin, tipo: 'social') }
+  let(:sede)  { create(:sede, club: club, created_by: admin, tipo: 'mixta') }
   let(:sala)  { create(:sala, club: club, sede: sede, created_by: admin) }
   let(:lote)  { create(:lote, club: club, sala: sala) }
   let!(:stock) do

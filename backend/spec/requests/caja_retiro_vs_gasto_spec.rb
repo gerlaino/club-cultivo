@@ -17,7 +17,7 @@ RSpec.describe 'Retiro de caja vs. gasto pagado con la caja', type: :request do
   let(:club)  { create(:club) }
   let(:admin) { create(:user, :admin, club: club) }
   let(:ana)   { create(:user, :dispensador, club: club) }
-  let(:sede)  { create(:sede, club: club, tipo: 'social') }
+  let(:sede)  { create(:sede, club: club, tipo: 'mixta') }
 
   let(:caja) do
     sign_in_as(admin)

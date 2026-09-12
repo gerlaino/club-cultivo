@@ -15,7 +15,7 @@ RSpec.describe 'El efectivo del repartidor y la caja del mostrador', type: :requ
   let(:club)     { create(:club) }
   let(:admin)    { create(:user, :admin, club: club) }
   let(:repartidor) { create(:user, :delivery, club: club) }
-  let(:sede)     { create(:sede, club: club, tipo: 'social') }
+  let(:sede)     { create(:sede, club: club, tipo: 'mixta') }
 
   let!(:caja) do
     ActsAsTenant.with_tenant(club) do
@@ -70,9 +70,11 @@ RSpec.describe 'El efectivo del repartidor y la caja del mostrador', type: :requ
     expect(caja.efectivo_esperado_ars).to eq(18_000.0)
   end
 
-  # Si entrega un admin, la plata va directo al cajón: ahí sí se engancha en el acto.
-  it 'si el que entrega es el admin, entra en el momento' do
+  # Si entrega un admin, la plata va al cajón QUE ELIJA (`Dispensacion#caja_para_cobros`,
+  # sep-2026): el producto no salió de una mesa, así que ninguna caja lo reclama sola.
+  it 'si el que entrega es el admin, entra en el momento a la caja que eligió' do
     res = ActsAsTenant.with_tenant(club) do
+      dispensacion.caja_turno_elegida_id = caja.id
       Dispensaciones::RegistrarCobro.call(dispensacion: dispensacion, club: club, usuario: admin,
                                           medio: 'efectivo', monto: 8_000, contexto: 'entrega')
     end
@@ -81,13 +83,14 @@ RSpec.describe 'El efectivo del repartidor y la caja del mostrador', type: :requ
     expect(caja.reload.total_efectivo_ars).to eq(8_000.0)
   end
 
-  # Un cobro del mostrador sí es plata en el cajón, en el acto.
-  it 'lo cobrado en el mostrador entra en el momento' do
+  # Sin elegir, la plata de administración no entra a ningún arqueo: el que atiende no la tiene.
+  it 'sin elegir caja, lo que cobra administración del depósito no entra a ningún arqueo' do
     res = ActsAsTenant.with_tenant(club) do
       Dispensaciones::RegistrarCobro.call(dispensacion: dispensacion, club: club, usuario: admin,
                                           medio: 'efectivo', monto: 3_000, contexto: 'creacion')
     end
 
-    expect(res.cobro.caja_turno_id).to eq(caja.id)
+    expect(res.cobro.caja_turno_id).to be_nil
+    expect(caja.reload.total_efectivo_ars).to eq(0.0)
   end
 end

@@ -75,8 +75,30 @@
               />
               <span class="maa__hint">Pre-completado desde el pesaje. Ajustalo si hace falta.</span>
             </div>
-            <div class="maa__info-box">
-              El stock se crea sin sede (pendiente de asignación). La sede se asigna después en Stock.
+            <!-- A DÓNDE VA EL PESO: a un frasco nuevo o a uno que ya existe de este lote. La manicura
+                 pesa todos los días y el escritorio ya lo ofrecía; acá se creaba SIEMPRE uno
+                 nuevo, así que cada jornada terminaba en un stock distinto del mismo lote. -->
+            <div class="maa__field">
+              <label class="maa__label">A dónde va</label>
+              <div v-if="cargandoContenedores" class="maa__hint">Buscando frascos de este lote…</div>
+              <div v-else class="maa__cont-list">
+                <button type="button" class="maa__cont" :class="{ 'maa__cont--sel': stockDestino === null }" @click="stockDestino = null">
+                  <span class="maa__cont-radio"><span v-if="stockDestino === null" class="maa__cont-dot"></span></span>
+                  <span class="maa__cont-body">
+                    <span class="maa__cont-title">Frasco nuevo</span>
+                    <span class="maa__cont-meta">Sin sede: se asigna después en Depósito</span>
+                  </span>
+                </button>
+                <button v-for="s in contenedores" :key="s.id" type="button" class="maa__cont"
+                        :class="{ 'maa__cont--sel': stockDestino === s.id }" @click="stockDestino = s.id">
+                  <span class="maa__cont-radio"><span v-if="stockDestino === s.id" class="maa__cont-dot"></span></span>
+                  <span class="maa__cont-body">
+                    <span class="maa__cont-title">{{ s.numero_lote_producto || `Frasco #${s.id}` }} <b>{{ Number(s.cantidad || 0).toFixed(0) }} g</b></span>
+                    <span class="maa__cont-meta">{{ s.sede?.nombre || (s.estado === 'pendiente_asignacion' ? 'Sin asignar' : 'Sin sede') }}<span v-if="s.fecha_elaboracion"> · del {{ fecha(s.fecha_elaboracion) }}</span></span>
+                  </span>
+                </button>
+              </div>
+              <span class="maa__hint">{{ stockDestino ? 'El peso se suma al frasco elegido.' : 'Se crea un frasco nuevo de flor seca para este lote.' }}</span>
             </div>
             <div v-if="errorMsg" class="maa__error">{{ errorMsg }}</div>
             <button
@@ -86,7 +108,7 @@
             >
               <i v-if="!confirmando" class="bi bi-check-circle-fill"></i>
               <i v-else class="bi bi-arrow-repeat maa__spin"></i>
-              Confirmar y generar stock
+              {{ stockDestino ? 'Confirmar y sumar al frasco' : 'Confirmar y generar stock' }}
             </button>
           </div>
         </div>
@@ -98,7 +120,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { listPesajesManicuraAdmin, confirmarPesajeManicura, reabrirPesajeManicura } from '../../lib/api.js'
+import { listPesajesManicuraAdmin, confirmarPesajeManicura, reabrirPesajeManicura, listStocks } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
 const toast   = useToast()
@@ -111,6 +133,24 @@ const pesoConfirmado = ref(null)
 const confirmando    = ref(false)
 const reabriendo     = ref(null)
 const errorMsg       = ref('')
+// Frascos de flor seca del lote a los que se puede sumar el peso (misma lista que el escritorio).
+const contenedores        = ref([])
+const cargandoContenedores = ref(false)
+const stockDestino        = ref(null)   // null = frasco nuevo
+
+const fecha = (f) => (f ? new Date(f).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) : '')
+
+async function cargarContenedores(loteId) {
+  cargandoContenedores.value = true
+  stockDestino.value = null
+  try {
+    const { data } = await listStocks({ lote_id: loteId })
+    contenedores.value = (data || []).filter(s =>
+      s.forma_producto === 'flor_seca' && ['pendiente_asignacion', 'asignado'].includes(s.estado))
+  } catch {
+    contenedores.value = []
+  } finally { cargandoContenedores.value = false }
+}
 
 async function cargar() {
   loading.value = true
@@ -127,6 +167,7 @@ function abrirConfirmacion(p) {
   pesoConfirmado.value = p.peso_total_g || p.peso_calculado_g || null
   errorMsg.value       = ''
   sheetConfirmar.value = true
+  cargarContenedores(p.lote_id)
 }
 
 function cerrarConfirmacion() {
@@ -143,8 +184,12 @@ async function confirmar() {
   try {
     await confirmarPesajeManicura(pesajeActivo.value.lote_id, pesajeActivo.value.id, {
       peso_confirmado_g: pesoConfirmado.value,
+      stock_id:          stockDestino.value || undefined,
     })
-    toast.success(`Pesaje de ${pesajeActivo.value.lote_codigo} confirmado — ${pesoConfirmado.value}g`)
+    const destino = stockDestino.value
+      ? `sumado a ${contenedores.value.find(s => s.id === stockDestino.value)?.numero_lote_producto || 'el frasco'}`
+      : 'frasco nuevo'
+    toast.success(`Pesaje de ${pesajeActivo.value.lote_codigo} confirmado — ${pesoConfirmado.value}g · ${destino}`)
     cerrarConfirmacion()
     cargar()
   } catch (e) {
@@ -268,6 +313,23 @@ onMounted(cargar)
 }
 
 .maa__field { display: flex; flex-direction: column; gap: .35rem; }
+.maa__cont-list { display: flex; flex-direction: column; gap: .4rem; }
+.maa__cont {
+  display: flex; align-items: center; gap: .6rem; width: 100%; text-align: left;
+  background: #fff; border: 1.5px solid var(--c-slate-200); border-radius: 10px; padding: .6rem .75rem;
+  font: inherit; color: inherit; cursor: pointer;
+}
+.maa__cont--sel { border-color: #1b5e20; background: var(--c-green-50, #f0fdf4); }
+.maa__cont-radio {
+  width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--c-slate-300);
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.maa__cont--sel .maa__cont-radio { border-color: #1b5e20; }
+.maa__cont-dot { width: 8px; height: 8px; border-radius: 50%; background: #1b5e20; }
+.maa__cont-body { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
+.maa__cont-title { font-size: .875rem; font-weight: 600; color: var(--c-slate-900); }
+.maa__cont-title b { font-weight: 700; color: #1b5e20; margin-left: .3rem; }
+.maa__cont-meta { font-size: .72rem; color: var(--c-slate-500); }
 .maa__label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; }
 .maa__req { color: #ef4444; }
 .maa__input {

@@ -12,7 +12,7 @@ RSpec.describe 'Cancelar una dispensa del mostrador', type: :request do
   let(:club)     { create(:club) }
   let(:admin)    { create(:user, :admin, club: club) }
   let(:ana)      { create(:user, :dispensador, club: club) }
-  let(:sede)     { create(:sede, club: club, tipo: 'social') }
+  let(:sede)     { create(:sede, club: club, tipo: 'mixta') }
   let(:lote)     { ActsAsTenant.with_tenant(club) { create(:lote, club: club, sala: create(:sala, club: club, sede: sede)) } }
   let(:paciente) { ActsAsTenant.with_tenant(club) { create(:paciente, club: club) } }
 
@@ -80,7 +80,7 @@ RSpec.describe 'Cancelar una dispensa del mostrador', type: :request do
   # DEPÓSITO. Subirlo igual lo dejaría apartado sobre una mesa cerrada — invisible como
   # disponible, esperando que alguien se dé cuenta de bajarlo.
   describe 'un producto que nunca estuvo sobre la mesa' do
-    let!(:otra_sede) { create(:sede, club: club, tipo: 'social') }
+    let!(:otra_sede) { create(:sede, club: club, tipo: 'mixta') }
     let!(:suelto) do
       ActsAsTenant.with_tenant(club) do
         create(:stock, club: club, sede: otra_sede, forma_producto: 'flor_seca', unidad: 'g',

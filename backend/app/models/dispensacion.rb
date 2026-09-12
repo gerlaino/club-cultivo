@@ -453,8 +453,17 @@ class Dispensacion < ApplicationRecord
     return unless item.stock_id
 
     mi = mostrador_item_de(item.stock_id)
-    mi&.mover!(cantidad: -item.cantidad.to_d, tipo: 'dispensa', usuario: user,
-               turno: turno_mostrador_id && TurnoMostrador.unscoped.find_by(id: turno_mostrador_id))
+    # BAJA DE LA MESA LO QUE HABÍA ARRIBA, Y EL RESTO SALE DEL DEPÓSITO. Administración dispensa
+    # contra depósito + mesa (`Stock#techo_para_dispensa`): con 40 g arriba y 50 g en la línea,
+    # restar la línea entera dejaba la mesa en negativo y `mover!` rebotaba la dispensa con «No
+    # hay tanto sobre la mesa» — la pantalla ofrecía lo que el backend rechazaba. Quien atiende
+    # nunca pasa de la mesa, así que para él es el mismo número.
+    bajar = mi ? [item.cantidad.to_d, mi.cantidad.to_d].min : 0.to_d
+    return unless bajar.positive?
+
+    @paso_por_mesa = true
+    mi.mover!(cantidad: -bajar, tipo: 'dispensa', usuario: user,
+              turno: turno_mostrador_id && TurnoMostrador.unscoped.find_by(id: turno_mostrador_id))
 
     return unless turno_mostrador_id
 
@@ -470,7 +479,7 @@ class Dispensacion < ApplicationRecord
     TurnoMostradorItem.unscoped
                       .find_or_create_by!(turno_mostrador_id: turno_mostrador_id,
                                           stock_id: item.stock_id) { |ti| ti.club_id = club_id }
-                      .imputar_dispensa!(item.cantidad)
+                      .imputar_dispensa!(bajar)
   end
 
   # El renglón de este producto sobre la mesa de la sede que atiende. Nil si no está: hay dos
@@ -614,6 +623,41 @@ class Dispensacion < ApplicationRecord
   # Pública porque la pregunta también el controller, que valida la EDICIÓN con el mismo techo
   # que la creación: resolverla allá sería la misma regla escrita en dos lugares.
   public def sede_del_mostrador = sede_id || stock&.sede_id
+
+  # A QUÉ CAJA VA LO QUE SE COBRA. Se le pregunta a la dispensa porque es ella la que sabe si el
+  # producto pasó por una mesa; lo lee `Dispensaciones::RegistrarCobro`.
+  #
+  # Antes el cobro caía SIEMPRE en la caja abierta de la sede, sin preguntar: el admin vendía del
+  # depósito, se guardaba la plata, y a la noche el arqueo del dispensador esperaba $X que nunca
+  # entraron al cajón — la diferencia quedaba anotada a nombre de alguien que no la produjo.
+  # (Decisión de Germán, sep-2026.)
+  #
+  #   · Quien ATIENDE: la caja de su mostrador, como siempre (sólo dispensa de la mesa).
+  #   · Administración, con algo del carrito SOBRE UNA MESA: la caja de ese mostrador, sin
+  #     elegir — el producto salió de ahí y el turno ya lo imputó (`imputar_a_mostrador`).
+  #   · Administración, todo del depósito: la caja que ELIGIÓ (`caja_turno_elegida_id`, una
+  #     abierta de un mostrador de la organización), y si no eligió, NINGUNA: la plata no entra
+  #     a ningún arqueo, y el asiento contable se escribe igual.
+  public
+
+  attr_accessor :caja_turno_elegida_id
+
+  def caja_para_cobros
+    return CajaTurno.abierta_en_sede(club_id: club_id, sede_id: sede_del_mostrador) if user&.atiende_mostrador?
+
+    # `@paso_por_mesa` lo deja `imputar_a_mostrador` en esta misma petición; el `any?` cubre a
+    # quien pregunta con otra instancia (el renglón sigue arriba con lo que quedó).
+    if turno_mostrador_id.present? &&
+       (@paso_por_mesa || items.any? { |it| mostrador_item_de(it.stock_id)&.cantidad.to_d.positive? })
+      return TurnoMostrador.unscoped.find_by(id: turno_mostrador_id)&.caja_turno
+    end
+
+    return nil if caja_turno_elegida_id.blank?
+
+    CajaTurno.unscoped.abiertas.where(club_id: club_id, punto_type: CajaTurno::PUNTO_MOSTRADOR)
+             .find_by(id: caja_turno_elegida_id)
+  end
+
   private
 
   # El turno abierto del mostrador de esa sede, si hay uno. No hay nada que elegir: es uno por
