@@ -161,6 +161,12 @@ class Dispensacion < ApplicationRecord
   scope :estado_envio,   ->(estado)             { where(estado_envio: estado) }
   scope :pendientes_envio, ->                   { con_envio.where(estado_envio: 'pendiente') }
   scope :en_viaje,       ->                     { con_envio.where(estado_envio: 'en_viaje') }
+  # Los tres estados vivos de un envío: lo que hay que llevar, lo que se está llevando, y lo que
+  # volvió sin entregar (deja de ser `fallido` recién cuando se rinde o se cancela). Lo preguntan
+  # el trabajo del día del repartidor y el cierre contable —lo que está en la calle cuando se
+  # cierra un mes cae en el siguiente—, así que la lista vive acá y no en cada uno.
+  ESTADOS_EN_LA_CALLE = %w[pendiente en_viaje fallido].freeze
+  scope :en_la_calle,    ->                     { con_envio.where(estado_envio: ESTADOS_EN_LA_CALLE) }
 
   # Despachos que comparten "ruta" con este, para evaluar el orden de entrega.
   # Si el despacho tiene ruta_id, el grupo es esa ruta; si no (nunca se reordenó),

@@ -93,7 +93,10 @@ module Rendiciones
         club: @rendicion.club, sede_id: d&.sede_id, dispensacion: d, paciente: d&.paciente,
         created_by: @receptor, tipo: 'recupero_costo', categoria: 'dispensacion',
         descripcion: "Recepción de caja (#{quien}) — Dispensación ##{d&.id}",
-        monto_ars: cobro.monto_ars, fecha: d&.fecha_dispensacion || Time.zone.today,
+        # Con fecha de HOY, no la del pedido: la plata entra al cajón cuando se rinde. Fechada con
+        # el pedido caía en el mes anterior, y si ese mes ya estaba cerrado la rendición entera
+        # rebotaba. Mismo criterio que `RegistrarCobro#fecha_del_asiento`.
+        monto_ars: cobro.monto_ars, fecha: Time.zone.today,
         pagado: true, medio_pago: 'efectivo', comprobante_tipo: 'sin_comprobante'
       )
       cobro.update!(rendido: true, rendido_at: Time.current, caja_turno: caja)

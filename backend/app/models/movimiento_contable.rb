@@ -233,6 +233,18 @@ class MovimientoContable < ApplicationRecord
     cierre.present? && fecha.present? && fecha <= cierre
   end
 
+  # Con qué fecha se asienta algo que PASÓ en `fecha` pero se registra ahora. La del hecho si el
+  # período está abierto —una dispensa de ayer cargada hoy es legítima y va en el día que fue—,
+  # y la de hoy si ya se cerró: el asiento no puede nacer adentro de un mes cerrado (lo rechaza
+  # `periodo_no_cerrado`) y rebotar ahí dejaba sin poder cobrar una entrega o recibir una
+  # rendición por un mes que se cerró mientras el paquete estaba en la calle. Lo que quedó sin
+  # resolver al cerrar cae en el período siguiente, que es cuando se resolvió.
+  def self.fecha_asentable(club, fecha)
+    fecha  = fecha.presence || Time.zone.today
+    cierre = club&.contabilidad_cerrada_hasta
+    cierre.present? && fecha <= cierre ? Time.zone.today : fecha
+  end
+
   # Es una cuota de una compra financiada (puede tener fecha futura).
   def cuota?
     compra_cuotas_id.present?

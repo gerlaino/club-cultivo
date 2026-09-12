@@ -22,15 +22,12 @@ module Dispensaciones
 
     def call
       return err('La dispensación ya está cancelada') if @d.cancelada?
-      if @d.movimientos_contables.any?(&:cerrado?)
-        return err('Pertenece a un período contable cerrado y no puede cancelarse.')
-      end
 
       ActiveRecord::Base.transaction do
         revertir_gramos
         revertir_cuenta_corriente
         CuentaCorrienteMovimiento.where(dispensacion_id: @d.id).update_all(dispensacion_id: nil)
-        @d.movimientos_contables.destroy_all
+        revertir_asientos
         @d.cobros.destroy_all # los cobros (y sus comprobantes) se van con la cancelación
         @d.send(:incrementar_stock) # el producto vuelve al stock — y a la mesa, si sigue abierta
         registrar_evento if @evento
@@ -50,6 +47,31 @@ module Dispensaciones
         estado: 'cancelado', at: Time.current.iso8601,
         por: @usuario&.nombre_completo, motivo: @motivo,
       }.compact.stringify_keys]
+    end
+
+    # Un asiento en período ABIERTO se borra: la dispensa no pasó. Uno en período CERRADO no se
+    # toca —ese mes ya se reportó y la plata entró de verdad ese día— y se escribe la devolución
+    # con fecha de hoy, al lado. Antes el candado rechazaba la cancelación entera ("pertenece a un
+    # período cerrado"), o sea que un paquete pagado por adelantado que falló y quedó en la calle
+    # mientras se cerraba el mes no se podía cancelar ni volver a despachar sin reabrir el período.
+    # Es la salida que el propio cierre promete: correcciones = contra-asiento.
+    def revertir_asientos
+      @d.movimientos_contables.each do |m|
+        m.cerrado? ? contra_asentar(m) : m.destroy!
+      end
+    end
+
+    def contra_asentar(m)
+      return unless m.es_ingreso?
+
+      MovimientoContable.create!(
+        club: m.club, sede_id: m.sede_id, dispensacion: @d, paciente: m.paciente,
+        created_by: @usuario, tipo: 'egreso', categoria: m.categoria,
+        descripcion: "Devolución — cancelación de dispensación ##{@d.id} " \
+                     "(asiento del #{m.fecha.strftime('%d/%m/%Y')}, período cerrado)",
+        monto_ars: m.monto_ars, fecha: Time.zone.today,
+        pagado: m.pagado, medio_pago: m.medio_pago, comprobante_tipo: 'sin_comprobante'
+      )
     end
 
     def revertir_cuenta_corriente

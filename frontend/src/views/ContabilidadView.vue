@@ -58,11 +58,19 @@ function fmtFechaCorta(d) {
   return new Date(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' })
 }
 
+// Paquetes de ese período que siguen en la calle. No frenan el cierre: lo que se cobre o se
+// cancele después cae en el período siguiente, pero hay que decirlo antes de que cierre.
+const enLaCalleAlCierre = computed(() => store.dashboard?.envios_en_la_calle_al_cierre || 0)
+
 async function cerrarMesAnterior() {
   const hasta = toISO(finMesAnterior.value)
+  const n = enLaCalleAlCierre.value
+  const enLaCalle = n
+    ? ` Hay ${n} ${n === 1 ? 'envío de este período que todavía está' : 'envíos de este período que todavía están'} en la calle: se puede cerrar igual, y lo que se cobre o se cancele de esos envíos va a quedar asentado en el período siguiente.`
+    : ''
   const ok = await confirm({
     title:       'Cerrar período contable',
-    message:     `Se congela el libro hasta el ${fmtFechaCorta(hasta)} inclusive: ningún movimiento anterior a esa fecha se podrá crear, editar ni eliminar. Las correcciones futuras serán por contra-asiento o reapertura.`,
+    message:     `Se congela el libro hasta el ${fmtFechaCorta(hasta)} inclusive: ningún movimiento anterior a esa fecha se podrá crear, editar ni eliminar. Las correcciones futuras serán por contra-asiento o reapertura.${enLaCalle}`,
     confirmText: 'Cerrar período',
     variant:     'danger',
   })

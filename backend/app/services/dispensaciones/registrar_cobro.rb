@@ -100,6 +100,18 @@ module Dispensaciones
       @cuenta_corriente ||= @dispensacion.paciente.cuenta_corriente
     end
 
+    # EL ASIENTO LLEVA LA FECHA DEL HECHO, NO LA DEL PEDIDO. Cobrar al crear es el mismo día que
+    # la dispensa (o una carga retroactiva legítima: va en el día que fue). Pero un cobro en la
+    # ENTREGA o desde Contabilidad pasa cuando pasa: el paquete se armó el 30 y la transferencia
+    # entró el 2 del mes siguiente. Fecharlo con el pedido metía plata de agosto en julio — y si
+    # julio ya estaba cerrado, el asiento ni se podía crear y la entrega rebotaba con el paciente
+    # en la puerta. Lo que quedó en la calle al cerrar cae en el período siguiente.
+    def fecha_del_asiento
+      return Time.zone.today unless @contexto == 'creacion'
+
+      MovimientoContable.fecha_asentable(@club, @dispensacion.fecha_dispensacion)
+    end
+
     # Efectivo cobrado por el DELIVERY en la entrega: su asiento se difiere hasta la
     # recepción de caja (caja en tránsito). Si entrega un admin/supervisor, la plata
     # entra directo a la caja del club → se asienta en el acto (no se difiere).
@@ -123,7 +135,7 @@ module Dispensaciones
         categoria:        'dispensacion',
         descripcion:      base + sufijo,
         monto_ars:        @monto,
-        fecha:            @dispensacion.fecha_dispensacion,
+        fecha:            fecha_del_asiento,
         pagado:           cobro.pagado,
         medio_pago:       @medio,
         comprobante_tipo: 'sin_comprobante',

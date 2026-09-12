@@ -117,6 +117,10 @@ class MovimientosContablesController < ApplicationController
                                           .where('saldo_disponible < 0')
                                           .sum('-saldo_disponible').to_f,
       contabilidad_cerrada_hasta: club.contabilidad_cerrada_hasta,
+      # Paquetes del mes anterior (lo que cierra el botón "Cerrar hasta…") que todavía están en
+      # la calle. No bloquean el cierre —decisión de Germán, sep-2026—: lo que se cobre o se
+      # cancele después cae en el período siguiente, y la pantalla lo avisa antes de cerrar.
+      envios_en_la_calle_al_cierre: envios_en_la_calle_hasta(club, (hoy - 1.month).end_of_month),
       ultimos_movimientos: scope.sin_cuotas_futuras.recientes.limit(10).map { |m| serialize(m) },
     }
   end
@@ -357,6 +361,13 @@ class MovimientosContablesController < ApplicationController
   end
 
   private
+
+  def envios_en_la_calle_hasta(club, hasta)
+    Dispensacion.en_la_calle
+                .joins(:paciente).where(pacientes: { club_id: club.id })
+                .where('fecha_dispensacion <= ?', hasta)
+                .count
+  end
 
   def set_movimiento
     @movimiento = current_user.club.movimientos_contables.find(params[:id])

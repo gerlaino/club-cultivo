@@ -302,12 +302,10 @@ class DispensacionesController < ApplicationController
   # tiene para llevar, lo que está llevando, y lo que vuelve sin entregar (que deja de ser
   # `fallido` recién cuando rinde, así que es su pendiente real). Lo cerrado se mira en
   # `mi_historial`, que tiene período.
-  ESTADOS_EN_LA_CALLE = %w[pendiente en_viaje fallido].freeze
-
   def mis_paquetes
     @dispensaciones = Dispensacion
       .del_delivery(current_user.id)
-      .where(estado_envio: ESTADOS_EN_LA_CALLE)
+      .where(estado_envio: Dispensacion::ESTADOS_EN_LA_CALLE)
       .joins(stock: :sede)
       .where(sedes: { club_id: current_user.club_id })
       .includes(:paciente, :sede, :ruta_entrega, { stock: :lote }, { items: { stock: :lote } })
@@ -463,9 +461,6 @@ class DispensacionesController < ApplicationController
     end
     if @dispensacion.cancelada?
       return render json: { error: 'La dispensación ya está cancelada' }, status: :unprocessable_entity
-    end
-    if @dispensacion.movimientos_contables.any?(&:cerrado?)
-      return render json: { error: 'Pertenece a un período contable cerrado y no puede cancelarse.' }, status: :unprocessable_entity
     end
     motivo = params[:motivo].presence
     registrar_evento_envio(@dispensacion, 'cancelado', motivo: motivo)
