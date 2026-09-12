@@ -13,8 +13,10 @@ RSpec.describe 'Informes — los totales tienen que cerrar', type: :request do
 
   def json = JSON.parse(response.body)
 
+  let(:genetica) { create(:genetica, club: club, nombre: 'Critical Kush') }
+
   def lote!(estado: 'vegetativo', plantas: 0, **attrs)
-    l = create(:lote, club: club, sala: sala, estado: estado, **attrs)
+    l = create(:lote, club: club, sala: sala, estado: estado, genetica: genetica, **attrs)
     plantas.times { create(:plant, lote: l, club: club, state: estado) }
     l
   end
@@ -107,23 +109,55 @@ RSpec.describe 'Informes — los totales tienen que cerrar', type: :request do
   end
 
   describe 'GET /informes/plan_vs_real' do
-    # `lotes` ya viene con `.limit(50)`; contar sobre esa relación con otro `where` encima
-    # es la clase de cosa que devuelve un número que no corresponde a la lista mostrada.
-    it 'el total de lotes con objetivo coincide con los que muestra el detalle' do
-      3.times { lote!(estado: 'floracion', rendimiento_objetivo_g: 500) }
-
-      get '/api/informes/plan_vs_real'
-
-      expect(json['total_lotes_con_objetivo']).to eq(json['detalle'].size)
+    def cosechado!(g_plan:, g_real:, flora_plan: 60, flora_dias: 60, plantas: 10)
+      l = lote!(estado: 'curado', rendimiento_objetivo_g: g_plan, rendimiento_real_g: g_real,
+                dias_floracion_objetivo: flora_plan, plants_count_cosechadas: plantas)
+      l.lote_eventos.create!(tipo: 'cambio_estado', estado_nuevo: 'floracion', club: club, user: admin, registrado_en: (flora_dias + 2).days.ago)
+      l.lote_eventos.create!(tipo: 'cambio_estado', estado_nuevo: 'cosecha', club: club, user: admin, registrado_en: 2.days.ago)
+      l
     end
 
-    it 'los cerrados son los que tienen rendimiento real cargado' do
-      lote!(estado: 'floracion', rendimiento_objetivo_g: 500, rendimiento_real_g: 480)
-      lote!(estado: 'floracion', rendimiento_objetivo_g: 500)
+    # El desvío se PONDERA: un lote de 3 plantas no pesa igual que uno de 40. Y el plan es tiempo
+    # además de gramos: los días de floración plan/real van en la fila y en el veredicto.
+    it 'compara gramos y días contra el plan, ponderando, y dice quién cumplió' do
+      cosechado!(g_plan: 500, g_real: 480, flora_dias: 63)           # gramos ✓ · floración ✓ (dentro de 7)
+      cosechado!(g_plan: 500, g_real: 400, flora_dias: 72)           # −20 % · +12 días
+
+      get '/api/informes/plan_vs_real', params: { periodo: 'mes_actual' }
+
+      sa = json['salio']
+      expect(sa['total']).to eq(2)
+      expect(sa['gramos']).to include('plan' => 1000.0, 'real' => 880.0, 'desvio_pct' => -12.0)
+      expect(sa['cumplieron']).to eq(1)
+      expect(sa['evaluables']).to eq(2)
+      malo = sa['lotes'].find { |l| l['g_real'] == 400.0 }
+      expect(malo['flora_real']).to eq(72)
+      expect(malo['veredicto']).to eq('-20.0 % gramos · floración +12 días')
+    end
+
+    it 'un lote en cultivo va en «cómo viene», contra su plan hasta hoy' do
+      l = lote!(estado: 'floracion', dias_floracion_objetivo: 60)
+      l.lote_eventos.create!(tipo: 'cambio_estado', estado_nuevo: 'floracion', club: club, user: admin, registrado_en: 70.days.ago)
 
       get '/api/informes/plan_vs_real'
 
-      expect(json['total_lotes_cerrados']).to eq(1)
+      v = json['viene'].first
+      expect(v['dias_plan']).to eq(60)
+      expect(v['dias_hoy']).to eq(70)
+      expect(v['como_viene']).to include('10 días pasado del plan')
+    end
+
+    # La ficha de la genética es de donde el lote hereda el objetivo: si todos sus lotes rinden
+    # menos, es la ficha la que hay que corregir.
+    it 'compara lo que rinde cada genética con su ficha' do
+      genetica.update!(rendimiento: 40, tiempo_floracion: 60)
+      cosechado!(g_plan: 400, g_real: 300, plantas: 10, flora_dias: 70)
+
+      get '/api/informes/plan_vs_real'
+
+      x = json['geneticas'].first
+      expect(x['g_por_planta_real']).to eq(30.0)
+      expect(x['frase']).to eq('rinde 25.0 % menos que su ficha · tarda 10 días más')
     end
   end
 

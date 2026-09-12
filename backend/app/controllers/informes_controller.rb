@@ -23,7 +23,8 @@ class InformesController < ApplicationController
   # El dato completo NO viaja en el JSON: si viajara, estaría en el navegador de cualquiera que
   # abra el informe, se vea o no en pantalla. Se agrega recién al armar el archivo.
   def reprocann
-    data = reprocann_data(current_user.club)
+    desde, hasta = periodo_rango
+    data = reprocann_data(current_user.club, desde: desde, hasta: hasta)
 
     respond_to do |format|
       format.json { render json: sin_dni_completo(data) }
@@ -264,144 +265,53 @@ class InformesController < ApplicationController
     )
   end
 
-  def cumplimiento
-    club = current_user.club
-    desde, hasta = periodo_rango
-
-    # Sólo la población activa, y con las mismas categorías excluyentes del informe
-    # REPROCANN: la tasa de cumplimiento no puede pasar de 100% ni contar bajas.
-    pacientes = Paciente.for_club(club.id).where(es_paciente: true)
-    conteos = Hash.new(0)
-    pacientes.pluck(:reprocann_estado, :reprocann_numero, :reprocann_vencimiento).each do |e, n, v|
-      conteos[Paciente.reprocann_categoria(estado: e, numero: n, vencimiento: v)] += 1
-    end
-    con_vigente  = conteos['vigente']
-    vencen_30d   = conteos['por_vencer']
-    vencidos     = conteos['vencido']
-    sin_seg      = pacientes.where(con_seguimiento_medico: false).count
-
-    total_pax = conteos.values.sum
-    # Quien vence en 20 días HOY está en regla: cuenta como cumplimiento, aunque tenga alerta.
-    en_regla = con_vigente + vencen_30d
-    tasa = total_pax.positive? ? ((en_regla.to_f / total_pax) * 100).round(1) : 0
-
-    # Socios SIN número REPROCANN que dispensaron en el período (no es un "límite": no existe
-    # tope de gramos — es un indicador de cumplimiento regulatorio).
-    disp_sin_reprocann = Dispensacion
-      .joins(:paciente, stock: :sede)
-      .where(sedes: { club_id: club.id })
-      .where(pacientes: { reprocann_numero: nil })
-      .where(fecha_dispensacion: desde..hasta)
-      .distinct.count(:paciente_id)
-
-    alertas = []
-    if vencidos > 0
-      alertas << { tipo: 'reprocann_vencido', severidad: 'error',
-                   iniciales: '—', detalle: "#{vencidos} pacientes con REPROCANN vencido" }
-    end
-    if vencen_30d > 0
-      alertas << { tipo: 'reprocann_por_vencer', severidad: 'warning',
-                   iniciales: '—', detalle: "#{vencen_30d} pacientes vencen en ≤30 días" }
-    end
-    if sin_seg > 0
-      alertas << { tipo: 'sin_seguimiento', severidad: 'warning',
-                   iniciales: '—', detalle: "#{sin_seg} pacientes sin seguimiento médico" }
-    end
-
-    datos = {
-      pacientes_con_reprocann_vigente: con_vigente,
-      reprocann_vencen_30d:            vencen_30d,
-      reprocann_vencidos:              vencidos,
-      dispensaciones_sin_reprocann:    disp_sin_reprocann,
-      tasa_cumplimiento:               tasa,
-      alertas:                         alertas,
-    }
-
-    responder_informe(
-      titulo: 'Informe de cumplimiento', nombre: 'informe_cumplimiento',
-      resena: 'Qué tan al día está la población de pacientes con su REPROCANN y qué alertas hay abiertas.',
-      datos: datos, periodo: etiqueta_periodo(desde, hasta),
-      kpis: [
-        { label: 'Tasa de cumplimiento', valor: "#{tasa}%", tono: tasa >= 90 ? :ok : :warn },
-        { label: 'Con REPROCANN vigente', valor: con_vigente, tono: :ok },
-        { label: 'Vencen en ≤30 días',    valor: vencen_30d, tono: :warn },
-        { label: 'Vencidos',              valor: vencidos,   tono: :crit },
-      ],
-      secciones: [{
-        titulo: 'Alertas',
-        headers: ['Severidad', 'Detalle'],
-        rows: alertas.map { |a| [a[:severidad] == 'error' ? 'Crítica' : 'Atención', a[:detalle]] },
-        vacio: 'Sin alertas: la población está en regla.',
-        col_widths: nil,
-      }],
-      nota: "Pacientes sin número de REPROCANN que recibieron una entrega en el período: #{disp_sin_reprocann}.",
-    )
-  end
-
+  # Cómo salió, cómo viene y qué dice la genética. El cálculo vive en `Informes::PlanVsReal`.
   def plan_vs_real
     club = current_user.club
-    lotes = club.lotes.where.not(rendimiento_objetivo_g: nil)
-                      .or(club.lotes.where.not(plants_count_objetivo: nil))
-                      .order(created_at: :desc)
-                      .limit(50)
+    desde, hasta = periodo_rango
+    datos = Informes::PlanVsReal.new(club: club, desde: desde, hasta: hasta).call
+    sa = datos[:salio]
 
-    detalle = lotes.map do |l|
-      desv_rendimiento = if l.rendimiento_objetivo_g.present? && l.rendimiento_real_g.present?
-        ((l.rendimiento_real_g.to_f - l.rendimiento_objetivo_g.to_f) / l.rendimiento_objetivo_g.to_f * 100).round(1)
-      end
-      desv_plantas = if l.plants_count_objetivo.present? && l.plants_count_cosechadas.present?
-        ((l.plants_count_cosechadas.to_f - l.plants_count_objetivo.to_f) / l.plants_count_objetivo.to_f * 100).round(1)
-      end
-      {
-        id:                       l.id,
-        codigo:                   l.codigo,
-        estado:                   l.estado,
-        plants_count_objetivo:    l.plants_count_objetivo,
-        plants_count_cosechadas:  l.plants_count_cosechadas,
-        rendimiento_objetivo_g:   l.rendimiento_objetivo_g,
-        rendimiento_real_g:       l.rendimiento_real_g,
-        fecha_cosecha_estimada:   l.fecha_cosecha_estimada,
-        desv_rendimiento_pct:     desv_rendimiento,
-        desv_plantas_pct:         desv_plantas,
-      }
-    end
-
-    lotes_con_obj = lotes.where.not(rendimiento_objetivo_g: nil)
-    lotes_cerrados = lotes_con_obj.where.not(rendimiento_real_g: nil)
-
-    promedio_desv = if lotes_cerrados.any?
-      devs = lotes_cerrados.map do |l|
-        (l.rendimiento_real_g.to_f - l.rendimiento_objetivo_g.to_f) / l.rendimiento_objetivo_g.to_f * 100
-      end
-      (devs.sum / devs.size).round(1)
-    end
-
-    datos = {
-      total_lotes_con_objetivo: lotes_con_obj.count,
-      total_lotes_cerrados:     lotes_cerrados.count,
-      promedio_desviacion_pct:  promedio_desv,
-      detalle:                  detalle,
-    }
+    pct  = ->(v) { v.nil? ? '—' : "#{v.positive? ? '+' : ''}#{v} %" }
+    dias = ->(plan, real) { "#{plan || '—'} / #{real || '—'}" }
+    g    = ->(v) { v.nil? ? '—' : ActiveSupport::NumberHelper.number_to_delimited(v.round(1).to_s.sub(/\.0\z/, ''), delimiter: '.', separator: ',') }
 
     responder_informe(
       titulo: 'Plan vs. real', nombre: 'informe_plan_vs_real', datos: datos,
-      resena: 'Qué se propuso cada lote y qué consiguió: plantas y gramos objetivo contra los reales, con el desvío entre ambos.',
+      resena: 'Qué se propuso cada lote y qué consiguió, en gramos y en días: los lotes cosechados en el período contra su plan, los que están en cultivo contra su plan hasta hoy, y lo que rinde cada genética de verdad contra lo que dice su ficha.',
+      periodo: etiqueta_periodo(desde, hasta),
       kpis: [
-        { label: 'Lotes con objetivo', valor: lotes_con_obj.count },
-        { label: 'Ya cerrados',        valor: lotes_cerrados.count },
-        { label: 'Desvío promedio',    valor: promedio_desv ? "#{promedio_desv}%" : '—',
-          tono: promedio_desv && promedio_desv < 0 ? :crit : :ok },
+        { label: 'Gramos, contra el plan', valor: pct.call(sa[:gramos][:desvio_pct]), tono: sa[:gramos][:desvio_pct] && sa[:gramos][:desvio_pct] < -Informes::PlanVsReal::TOLERANCIA_GRAMOS_PCT ? :warn : :ok },
+        { label: 'Floración plan / real', valor: dias.call(sa[:floracion][:plan], sa[:floracion][:real]) },
+        { label: 'g / planta plan / real', valor: dias.call(g.call(sa[:gramos_por_planta][:plan]), g.call(sa[:gramos_por_planta][:real])) },
+        { label: 'Cumplieron el plan', valor: "#{sa[:cumplieron]} de #{sa[:evaluables]}" },
       ],
-      secciones: [{
-        titulo: 'Detalle por lote',
-        headers: ['Lote', 'Estado', 'Plantas obj.', 'Cosechadas', 'Gramos obj.', 'Reales', 'Desvío %'],
-        rows: detalle.map { |l|
-          [l[:codigo], l[:estado].to_s.tr('_', ' ').capitalize, l[:plants_count_objetivo],
-           l[:plants_count_cosechadas], l[:rendimiento_objetivo_g], l[:rendimiento_real_g],
-           l[:desv_rendimiento_pct]]
+      secciones: [
+        {
+          titulo: 'Cómo salió',
+          headers: ['Lote', 'Genética', 'Plantas', 'g plan', 'g real', 'g/planta', 'Vege plan / real', 'Flora plan / real', 'Veredicto'],
+          rows: sa[:lotes].map { |l| [l[:codigo], l[:genetica] || '—', l[:plantas], g.call(l[:g_plan]), g.call(l[:g_real]), g.call(l[:g_por_planta]), dias.call(l[:vege_plan], l[:vege_real]), dias.call(l[:flora_plan], l[:flora_real]), l[:veredicto]] },
+          aligns: { 2 => :right, 3 => :right, 4 => :right, 5 => :right, 6 => :right, 7 => :right },
+          col_min: { 2 => 46, 6 => 60, 7 => 60, 8 => 110 },
+          vacio: 'No se cosechó ningún lote en el período elegido.',
         },
-        aligns: (2..6).to_h { |i| [i, :right] },
-      }],
+        {
+          titulo: 'Cómo viene',
+          headers: ['Lote', 'Genética', 'Etapa', 'Días plan / hoy', 'Cosecha planeada', 'Cómo viene'],
+          rows: datos[:viene].map { |l| [l[:codigo], l[:genetica] || '—', l[:estado].to_s.tr('_', ' ').capitalize, dias.call(l[:dias_plan], l[:dias_hoy]), fmt_fecha(l[:cosecha_planeada]), l[:como_viene]] },
+          aligns: { 3 => :right },
+          col_min: { 3 => 70, 4 => 70, 5 => 120 },
+          vacio: 'No hay lotes en cultivo.',
+        },
+        {
+          titulo: 'Qué dice la genética',
+          headers: ['Genética', 'Lotes cerrados', 'g/planta ficha', 'g/planta real', 'Floración ficha / real', ''],
+          rows: datos[:geneticas].map { |x| [x[:genetica], x[:lotes], x[:g_por_planta_ficha] || '—', g.call(x[:g_por_planta_real]), dias.call(x[:floracion_ficha], x[:floracion_real]), x[:frase]] },
+          aligns: { 1 => :right, 2 => :right, 3 => :right, 4 => :right },
+          col_min: { 1 => 56, 2 => 60, 3 => 60, 4 => 80, 5 => 130 },
+          vacio: 'Todavía no hay lotes cerrados con rendimiento.',
+        },
+      ],
     )
   end
 
@@ -610,7 +520,10 @@ class InformesController < ApplicationController
   # falta se cae a `updated_at`. Antes esto salía de la tabla `pesadas`, que el flujo real no
   # llena, y el informe decía "0 gramos" con veinte lotes curados.
   # Datos del informe REPROCANN — compartidos por la respuesta JSON y el PDF
-  def reprocann_data(club)
+  def reprocann_data(club, desde: nil, hasta: nil)
+    desde ||= Time.zone.today.beginning_of_month.beginning_of_day
+    hasta ||= Time.zone.today.end_of_month.end_of_day
+    servicio = Informes::Reprocann.new(club: club, desde: desde, hasta: hasta)
     # Este informe le habla AL ORGANISMO: declara la población registrada en REPROCANN. Por eso
     # sólo entran los pacientes que tienen registro —vigente, vencido o en trámite—. Que existan
     # pacientes sin REPROCANN es un pendiente interno de la organización, no algo que se presenta: eso se
@@ -635,7 +548,8 @@ class InformesController < ApplicationController
       conteos[Paciente.reprocann_categoria(estado: e, numero: n, vencimiento: v)] += 1
     end
 
-    lista = pacientes.limit(200).map do |p|
+    # COMPLETA: el archivo lleva a todos; la pantalla lista 200 y dice cuántos más.
+    lista = pacientes.map do |p|
       {
         # Nombre completo y los últimos TRES del documento: este informe se presenta ante la
         # autoridad, que necesita saber de quién se habla. Las iniciales sirven para un
@@ -664,7 +578,12 @@ class InformesController < ApplicationController
       # nunca dispensaron en una fila fantasma. La actividad por sede es otra pregunta y vive
       # en el informe de dispensaciones.
       pacientes_sin_registro: sin_registro,
-      dispensaciones:         reprocann_dispensaciones(club, pacientes),
+      periodo:                etiqueta_periodo(desde, hasta),
+      # Del PERÍODO, por línea y por unidad, y «sin vigente» juzgado el día de la entrega.
+      dispensaciones:         servicio.dispensaciones,
+      # Lo que hay que hacer, con nombre: la parte del admin. No va al PDF que se presenta.
+      lista_pendientes:       servicio.pendientes,
+      pendientes_resumen:     servicio.resumen_pendientes(servicio.pendientes),
       # El informe de Cumplimiento era esto mismo con otro título: sus cuatro KPIs salían de
       # los conteos que ya se calculan acá arriba. Vive adentro de REPROCANN, que es de lo que
       # habla.
@@ -696,31 +615,6 @@ class InformesController < ApplicationController
   # Actividad de dispensación de la población informada. Es lo que le da sentido al informe:
   # no alcanza con decir cuántos pacientes hay en regla, importa a quién se le entregó y si
   # tenía el certificado al día. Nada de cultivo: eso vive en los informes de Producción.
-  def reprocann_dispensaciones(club, pacientes)
-    ids = pacientes.pluck(:id)
-    return { total: 0, gramos: 0.0, pacientes_atendidos: 0, sin_reprocann_vigente: 0 } if ids.empty?
-
-    disps = Dispensacion.no_canceladas
-                        .where(paciente_id: ids)
-                        .joins(stock: :sede)
-                        .where(sedes: { club_id: club.id })
-
-    # Los que recibieron algo sin tener el certificado en regla: el dato que un auditor busca.
-    categorias = pacientes.pluck(:id, :reprocann_estado, :reprocann_numero, :reprocann_vencimiento)
-                          .to_h { |pid, e, n, v|
-                            [pid, Paciente.reprocann_categoria(estado: e, numero: n, vencimiento: v)]
-                          }
-    atendidos = disps.distinct.pluck(:paciente_id)
-    en_falta  = atendidos.count { |pid| %w[vencido sin_reprocann].include?(categorias[pid]) }
-
-    {
-      total:                 disps.count,
-      gramos:                disps.sum(:cantidad).to_f.round(1),
-      pacientes_atendidos:   atendidos.size,
-      sin_reprocann_vigente: en_falta,
-    }
-  end
-
   # Pacientes por sede de atención. El paciente NO tiene sede propia: se atiende donde
   # dispensa, así que la sede sale de sus dispensaciones (la más reciente manda, porque
   # alguien que se mudó de sede cuenta en la que se atiende hoy).
@@ -781,10 +675,13 @@ class InformesController < ApplicationController
   # arreglo va acá y no en cada query.
   # Saca el DNI completo de lo que se manda al navegador. La pantalla usa `dni_ultimos_3`.
   def sin_dni_completo(data)
-    lista = data[:lista_anonimizada] || data['lista_anonimizada']
-    return data if lista.blank?
-
-    data.merge(lista_anonimizada: lista.map { |p| p.except(:dni) })
+    lista = data[:lista_anonimizada] || []
+    pend  = data[:lista_pendientes] || []
+    data.merge(
+      lista_anonimizada: lista.first(Informes::Reprocann::LISTA_PANTALLA).map { |p| p.except(:dni) },
+      lista_omitidos:    [lista.size - Informes::Reprocann::LISTA_PANTALLA, 0].max,
+      lista_pendientes:  pend.map { |p| p.except(:dni) },
+    )
   end
 
   # Los cuatro períodos de siempre, o un rango a elección (`desde`/`hasta`): «del 1 al 15» es lo

@@ -12,7 +12,7 @@ RSpec.describe 'Informes — descargas', type: :request do
 
   before { sign_in_as(admin) }
 
-  INFORMES = %w[reprocann produccion dispensaciones cumplimiento plan_vs_real inase perdidas].freeze
+  INFORMES = %w[reprocann produccion dispensaciones plan_vs_real inase perdidas].freeze
 
   # Datos mínimos para que cada informe tenga algo que mostrar.
   before do

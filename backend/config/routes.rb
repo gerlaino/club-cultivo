@@ -398,7 +398,8 @@ Rails.application.routes.draw do
       get :produccion
       get :dispensaciones,  action: :dispensaciones
       # `sedes` se retiró (sep-2026): era el desglose «Por sede» de Producción como informe aparte.
-      get :cumplimiento
+      # `cumplimiento` se retiró (sep-2026): eran los KPIs del REPROCANN con otro título y sin nombres;
+      # sus pendientes viven en REPROCANN, con nombre.
       get :plan_vs_real
       get :inase
       get :perdidas

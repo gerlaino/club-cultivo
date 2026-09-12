@@ -3,12 +3,7 @@
     <div class="inf__header">
       <h1 class="inf__title"><FileCheck :size="20" :stroke-width="1.75" /> Informe REPROCANN</h1>
       <div class="inf__acciones">
-        <select v-model="periodo" class="inf__periodo" @change="cargar">
-          <option value="mes_actual">Mes actual</option>
-          <option value="mes_anterior">Mes anterior</option>
-          <option value="trimestre">Trimestre</option>
-          <option value="anio">Año</option>
-        </select>
+        <SelectorPeriodo @change="cambiarPeriodo" />
         <button class="inf__btn" :disabled="descargando" @click="descargar('pdf')">
           <FileDown :size="15" :stroke-width="2" /> PDF
         </button>
@@ -53,27 +48,48 @@
         </div>
       </div>
 
-      <!-- Qué se entregó y a quién. Nada de cultivo: eso está en el informe de Producción. -->
+      <!-- Qué se entregó y a quién, DEL PERÍODO, por unidad. «Sin vigente» se juzga el día de la
+           entrega, no hoy. Nada de cultivo: eso está en Producción. -->
       <div v-if="data.dispensaciones" class="inf__section">
-        <h2 class="inf__section-title">Dispensaciones a esta población</h2>
+        <h2 class="inf__section-title">Entregas a esta población <span class="inf__section-marco">{{ data.periodo }}</span></h2>
         <div class="inf__kpis">
           <div class="inf__kpi">
             <span class="inf__kpi-valor">{{ data.dispensaciones.total }}</span>
             <span class="inf__kpi-label">Entregas</span>
           </div>
-          <div class="inf__kpi">
-            <span class="inf__kpi-valor">{{ data.dispensaciones.gramos }} g</span>
-            <span class="inf__kpi-label">Total dispensado</span>
+          <div v-for="u in data.dispensaciones.por_unidad" :key="u.unidad" class="inf__kpi">
+            <span class="inf__kpi-valor">{{ cant(u.cantidad, u.unidad) }}</span>
+            <span class="inf__kpi-label">{{ nombreUnidad(u.unidad) }}</span>
           </div>
           <div class="inf__kpi">
             <span class="inf__kpi-valor">{{ data.dispensaciones.pacientes_atendidos }}</span>
             <span class="inf__kpi-label">Pacientes atendidos</span>
           </div>
-          <div class="inf__kpi" :class="data.dispensaciones.sin_reprocann_vigente ? 'inf__kpi--err' : ''">
-            <span class="inf__kpi-valor">{{ data.dispensaciones.sin_reprocann_vigente }}</span>
-            <span class="inf__kpi-label">Sin REPROCANN vigente</span>
+          <div class="inf__kpi" :class="data.dispensaciones.entregas_sin_vigente ? 'inf__kpi--err' : 'inf__kpi--ok'">
+            <span class="inf__kpi-valor">{{ data.dispensaciones.entregas_sin_vigente }}</span>
+            <span class="inf__kpi-label">Entregas sin REPROCANN vigente ese día</span>
+            <span v-if="data.dispensaciones.sin_reprocann_vigente" class="inf__kpi-sub">a {{ data.dispensaciones.sin_reprocann_vigente }} {{ data.dispensaciones.sin_reprocann_vigente === 1 ? 'paciente' : 'pacientes' }}</span>
           </div>
         </div>
+      </div>
+
+      <!-- LO QUE HAY QUE HACER, con nombre: la parte del admin. No va al PDF que se presenta. -->
+      <div class="inf__section">
+        <h2 class="inf__section-title">Lo que hay que hacer <span class="inf__section-marco">para el admin, con nombres · no va al PDF que se presenta</span></h2>
+        <table v-if="data.lista_pendientes?.length" class="inf__table">
+          <thead><tr><th>Pendiente</th><th>Paciente</th><th>DNI</th><th>Vence / venció</th><th>Última entrega</th><th></th></tr></thead>
+          <tbody>
+            <tr v-for="(p, i) in data.lista_pendientes" :key="i">
+              <td><span class="inf__badge" :class="`inf__badge--${p.pendiente}`">{{ PENDIENTES[p.pendiente] || p.pendiente }}</span></td>
+              <td>{{ p.paciente }}</td>
+              <td class="inf__mono">···{{ p.dni_ultimos_3 }}</td>
+              <td :class="{ 'inf__vencido': p.dias != null && p.dias < 0 }">{{ vence(p) }}</td>
+              <td>{{ p.ultima_entrega ? formatDate(p.ultima_entrega) : '—' }}</td>
+              <td><RouterLink :to="`/pacientes/${p.paciente_id}`" class="inf__link">ficha</RouterLink></td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-else class="inf__ok">Nada pendiente: toda la población registrada está en regla.</p>
       </div>
 
       <!-- Sin corte por sede: un PACIENTE ES DEL CLUB, no de una sede. Lo que había agrupaba
@@ -88,16 +104,17 @@
       </p>
 
       <div class="inf__section">
-        <h2 class="inf__section-title">Nómina de pacientes (vigentes y por vencer)</h2>
+        <h2 class="inf__section-title">Nómina de pacientes <span class="inf__section-marco">lo que se presenta · ordenada por vencimiento</span></h2>
         <table class="inf__table">
-          <thead><tr><th>Paciente</th><th>DNI (últ. 3)</th><th>Estado REPROCANN</th><th>Vencimiento</th></tr></thead>
+          <thead><tr><th>Paciente</th><th>DNI</th><th>Estado REPROCANN</th><th>Vencimiento</th></tr></thead>
           <tbody>
-            <tr v-for="(p, i) in listaFiltrada" :key="i">
+            <tr v-for="(p, i) in nomina" :key="i">
               <td>{{ p.nombre_completo || p.iniciales }}</td>
-              <td>***{{ p.dni_ultimos_3 }}</td>
+              <td class="inf__mono">···{{ p.dni_ultimos_3 }}</td>
               <td><span class="inf__badge" :class="`inf__badge--${p.reprocann_estado}`">{{ estadoLabel(p.reprocann_estado) }}</span></td>
               <td>{{ p.reprocann_vencimiento ? formatDate(p.reprocann_vencimiento) : '—' }}</td>
             </tr>
+            <tr v-if="data.lista_omitidos"><td colspan="4" class="inf__mas">… {{ data.lista_omitidos }} pacientes más. El PDF y el Excel los llevan completos.</td></tr>
           </tbody>
         </table>
       </div>
@@ -113,9 +130,11 @@ import api from '../../lib/api.js'
 import { descargarArchivo } from '../../lib/descargas.js'
 import { useToast } from '../../composables/useToast.js'
 import { hoyISO } from '../../utils/dates.js'
+import SelectorPeriodo from '../../components/informes/SelectorPeriodo.vue'
 
 const toast = useToast()
-const periodo = ref('mes_actual')
+// Los MISMOS parámetros para la pantalla y para la descarga.
+const params = ref({ periodo: 'mes_actual' })
 const loading = ref(false)
 const data    = ref(null)
 const descargando = ref(false)
@@ -126,7 +145,7 @@ async function descargar(formato, paraPresentar = false) {
   descargando.value = true
   try {
     await descargarArchivo(`/informes/reprocann.${formato}`, {
-      params: { para_presentar: paraPresentar ? 1 : undefined },
+      params: { ...params.value, para_presentar: paraPresentar ? 1 : undefined },
       filename: `informe_reprocann_${hoyISO()}.${formato}`,
     })
   } catch (e) {
@@ -140,16 +159,26 @@ async function descargar(formato, paraPresentar = false) {
 async function cargar() {
   loading.value = true
   try {
-    const res = await api.get('/informes/reprocann', { params: { periodo: periodo.value } })
+    const res = await api.get('/informes/reprocann', { params: params.value })
     data.value = res.data
   } finally {
     loading.value = false
   }
 }
 
-const ESTADOS_VISIBLES = new Set(['vigente', 'vigente_sin_vencimiento', 'por_vencer'])
-const listaFiltrada = computed(() => data.value?.lista_anonimizada?.filter(p => ESTADOS_VISIBLES.has(p.reprocann_estado)) ?? [])
-const ESTADO_LABELS = { vigente: 'Vigente', vencido: 'Vencido', por_vencer: 'Por vencer', sin_reprocann: 'Sin REPROCANN', vigente_sin_vencimiento: 'Vigente s/venc.' }
+function cambiarPeriodo(p) { params.value = p; cargar() }
+// La nómina es la población registrada ENTERA (vencidos incluidos: están registrados), por
+// vencimiento. Los sin registro se informan aparte.
+const ORDEN = { vencido: 0, por_vencer: 1, pendiente: 2, vigente: 3, vigente_sin_vencimiento: 4 }
+const nomina = computed(() => [...(data.value?.lista_anonimizada || [])]
+  .filter(p => p.reprocann_estado !== 'sin_reprocann')
+  .sort((a, b) => (ORDEN[a.reprocann_estado] ?? 9) - (ORDEN[b.reprocann_estado] ?? 9) || String(a.reprocann_vencimiento || '9').localeCompare(String(b.reprocann_vencimiento || '9'))))
+const PENDIENTES = { vencido_retiro: 'Venció y sigue retirando', vencido: 'Vencido', por_vencer: 'Vence en ≤30 días', pendiente: 'Trámite pendiente', sin_seguimiento: 'Sin seguimiento médico' }
+const vence = (p) => p.dias == null ? '—' : p.dias < 0 ? `hace ${-p.dias} días` : p.dias === 0 ? 'hoy' : `en ${p.dias} días`
+const UNIDADES = { g: 'En gramos', un: 'En unidades', ml: 'En mililitros' }
+const nombreUnidad = (u) => UNIDADES[u] || `En ${u}`
+const cant = (c, u) => `${Number(c).toLocaleString('es-AR', { maximumFractionDigits: 1 })} ${u}`
+const ESTADO_LABELS = { vigente: 'Vigente', vencido: 'Vencido', por_vencer: 'Por vencer', pendiente: 'Trámite pendiente', sin_reprocann: 'Sin REPROCANN', vigente_sin_vencimiento: 'Vigente s/venc.' }
 const estadoLabel = (e) => ESTADO_LABELS[e] || e
 const formatDate = (d) => d ? new Date(d).toLocaleDateString('es-AR') : '—'
 
@@ -195,4 +224,14 @@ onMounted(cargar)
 .inf__badge--vigente { background: rgba(45,138,107,.1); color: #2D8A6B; }
 .inf__badge--vencido { background: rgba(180,40,40,.1); color: var(--c-rust-600); }
 .inf__badge--por_vencer { background: rgba(184,92,0,.1); color: #B85C00; }
+.inf__badge--vencido_retiro { background: rgba(180,40,40,.15); color: var(--c-rust-600); }
+.inf__badge--pendiente { background: rgba(184,92,0,.1); color: #B85C00; }
+.inf__badge--sin_seguimiento { background: var(--c-ink-100); color: var(--c-ink-600); }
+.inf__section-marco { font-size: var(--fs-12); color: var(--c-ink-500); font-weight: 400; margin-left: var(--sp-2); }
+.inf__kpi-sub { display: block; font-size: var(--fs-12); color: var(--c-ink-500); margin-top: 2px; }
+.inf__mono { font-family: var(--font-mono, monospace); font-size: var(--fs-13); }
+.inf__vencido { color: var(--c-rust-600); font-weight: 600; }
+.inf__link { color: #15803d; font-size: var(--fs-13); }
+.inf__ok { color: #2D8A6B; font-size: var(--fs-14); }
+.inf__mas { color: var(--c-ink-500); font-size: var(--fs-13); font-style: italic; }
 </style>

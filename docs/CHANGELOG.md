@@ -1,5 +1,25 @@
 # Changelog
 
+## Septiembre 2026 (bj) — Plan vs. real mira los días, y Cumplimiento se funde en REPROCANN con nombres
+
+Quinto y sexto de la revisión informe por informe (decisiones de Germán sobre el artifact, 12-sep).
+
+**Plan vs. real** (`Informes::PlanVsReal`): el plan de un cultivo es tiempo además de gramos y el
+informe no miraba los días. Tres bloques: **cómo salió** (lotes cosechados en el período contra su
+plan: gramos, g/planta, **vegetativo y floración plan/real**, veredicto por lote), **cómo viene**
+(los en cultivo contra su plan hasta hoy, con la cosecha planeada) y **qué dice la genética** (lo
+que rinde de verdad en esta organización contra su ficha, sobre todos sus lotes cerrados). El
+desvío se **pondera** —el promedio de porcentajes pesaba igual un lote de 3 plantas que uno de 40—
+y se pinta sólo fuera de la tolerancia (±10 % gramos, ±7 días floración): −2 % ya no es «crítico».
+Selector de período como el resto; se fue el `limit(50)` silencioso.
+
+**Cumplimiento se retiró** (era el REPROCANN con otro título, y sin nombres): la ruta redirige.
+**REPROCANN** gana **«Lo que hay que hacer»**, con nombre y por urgencia —venció y sigue retirando ·
+vencido · vence en ≤30 días · trámite pendiente · sin seguimiento— con link a la ficha; no va al PDF
+que se presenta. Las **entregas son del período, por unidad**, y **«sin REPROCANN vigente» se juzga
+el día de la entrega**, no hoy (un paciente en regla en marzo que venció en agosto figuraba en falta
+todo el año). La nómina va completa al archivo; la pantalla lista 200 y dice cuántos más.
+
 ## Septiembre 2026 (bi) — Trazabilidad desde el lote, Pérdidas sin sumar unidades, y cuatro cosas de probar la app
 
 **Trazabilidad, segunda vuelta** (lo que vio Germán en producción):

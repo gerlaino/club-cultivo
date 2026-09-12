@@ -212,18 +212,10 @@
     "stk__kpi--error",
     "stk__kpi-body"
   ],
-  "views/auditor/InformeCumplimientoView.vue": [
-    "inf__hoja",
-    "inf__section"
-  ],
   "views/auditor/InformeDispensacionesView.vue": [
     "inf__hoja"
   ],
   "views/auditor/InformeInaseView.vue": [
-    "inf__section"
-  ],
-  "views/auditor/InformePlanVsRealView.vue": [
-    "inf__hoja",
     "inf__section"
   ],
   "views/auditor/InformeProduccionView.vue": [

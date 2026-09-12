@@ -30,7 +30,7 @@ RSpec.describe 'Club nuevo — el primer día', type: :request do
     end
 
     it 'los informes se abren aunque no haya un solo dato' do
-      %w[reprocann produccion dispensaciones cumplimiento plan_vs_real inase perdidas].each do |informe|
+      %w[reprocann produccion dispensaciones plan_vs_real inase perdidas].each do |informe|
         get "/api/informes/#{informe}"
 
         expect(response).to have_http_status(:ok), "informe #{informe}: #{response.body[0, 200]}"

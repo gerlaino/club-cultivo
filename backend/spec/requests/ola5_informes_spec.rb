@@ -9,7 +9,7 @@ RSpec.describe 'Ola 5 — Informes (auditor)', type: :request do
   let!(:sede)  { create(:sede, club: club, created_by: admin) }
   let!(:sala)  { create(:sala, club: club, sede: sede, created_by: admin) }
 
-  INFORMES_ENDPOINTS = %w[reprocann produccion dispensaciones cumplimiento].freeze
+  INFORMES_ENDPOINTS = %w[reprocann produccion dispensaciones].freeze
 
   context 'auditor' do
     before { sign_in_as(auditor) }
@@ -52,10 +52,11 @@ RSpec.describe 'Ola 5 — Informes (auditor)', type: :request do
       expect(body['pacientes'].none? { |r| r.key?('dni') }).to be true
     end
 
-    it 'GET /informes/cumplimiento devuelve alertas regulatorias' do
-      get '/informes/cumplimiento', headers: auth_headers
+    # Cumplimiento se retiró: eran los KPIs del REPROCANN sin nombres. Sus pendientes viven acá.
+    it 'GET /informes/reprocann trae el cumplimiento y los pendientes con nombre' do
+      get '/informes/reprocann', headers: auth_headers
       body = JSON.parse(response.body)
-      expect(body.keys).to include('pacientes_con_reprocann_vigente', 'tasa_cumplimiento', 'alertas')
+      expect(body.keys).to include('cumplimiento', 'lista_pendientes', 'pendientes_resumen')
     end
   end
 

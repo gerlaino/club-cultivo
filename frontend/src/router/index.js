@@ -903,7 +903,9 @@ const routes = [
       { path: 'reprocann', name: 'auditor-reprocann', component: () => import('../views/auditor/InformeReprocannView.vue') },
       { path: 'produccion', name: 'auditor-produccion', component: () => import('../views/auditor/InformeProduccionView.vue') },
       { path: 'dispensaciones', name: 'auditor-dispensaciones', component: () => import('../views/auditor/InformeDispensacionesView.vue') },
-      { path: 'cumplimiento', name: 'auditor-cumplimiento', component: () => import('../views/auditor/InformeCumplimientoView.vue') },
+      // Cumplimiento se retiró (sep-2026): era el REPROCANN con otro título y sin nombres. La ruta
+      // queda para no romper un link guardado.
+      { path: 'cumplimiento', redirect: '/auditor/reprocann' },
       { path: 'plan-vs-real', name: 'auditor-plan-vs-real', component: () => import('../views/auditor/InformePlanVsRealView.vue') },
       { path: 'inase', name: 'auditor-inase', component: () => import('../views/auditor/InformeInaseView.vue') },
       { path: 'perdidas', name: 'auditor-perdidas', component: () => import('../views/auditor/InformePerdidasView.vue') },
