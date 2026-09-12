@@ -578,6 +578,17 @@ escrita en dos lugares que dejaron de coincidir**. Vale como criterio antes de a
 
 ### Reglas de dominio que quedaron fijadas
 
+- **FLORACIÓN → VEGETATIVO CON LOTES ADENTRO ES DESHACER, NO REVEGETAR** (`Salas::CambiarFase`,
+  12-sep-2026, decisión de Germán). Nadie revegeta a propósito una planta que ya recibió 12/12:
+  una sala vuelve a vegetativo o vacía o por error de click. Como avance dejaba al lote con un
+  ciclo falso («estuvo un día en floración y revegetó») que contaminaba días por etapa, Plan vs
+  real y la analítica de ciclos. Se BORRA el paso: el evento de entrada a floración (define la
+  fecha de inicio y los relojes), el estado de las plantas y las tareas automáticas de floración
+  pendientes; **fotos, notas, riegos y registros QUEDAN** (son hechos reales) y queda una `nota`
+  en el lote diciendo qué se deshizo. Con lotes adentro, **las dos direcciones piden confirmación**
+  lote por lote con los días (el error es simétrico); una sala vacía se da vuelta sin preguntar.
+  **Una regla para las dos puertas** —editar el `kind` y el botón «Cambiar fase»—; el botón no
+  preguntaba nada. El texto del guard vive en `lib/textoCambioDeFase.js`.
 - **PONER EN MACETA ES PRENDER.** Enraizado ⇔ sin maceta, en `Lote#prender_al_ponerlo_en_maceta`,
   cubriendo alta heredada, desprender, trasplante y edición. **No es una validación**: como
   validación volvía inguardable un lote que ya estaba así.

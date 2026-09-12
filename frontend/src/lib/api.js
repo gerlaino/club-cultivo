@@ -144,7 +144,7 @@ export const getSala     = (id) => api.get(`/salas/${id}`);
 export const createSala      = (payload)         => api.post("/salas", { sala: payload });
 export const updateSala      = (id, payload)     => api.patch(`/salas/${id}`, { sala: payload });
 export const deleteSala      = (id)              => api.delete(`/salas/${id}`);
-export const cambiarFaseSala  = (id)              => api.post(`/salas/${id}/cambiar_fase`);
+export const cambiarFaseSala  = (id, params = {}) => api.post(`/salas/${id}/cambiar_fase`, params);
 export const registrarSala    = (id, payload)     => api.post(`/salas/${id}/registrar_sala`, { registro_ambiental: payload });
 
 // El clima del PROPAGADOR: los lotes que enraízan tienen su propio microclima (la sala marca 60%

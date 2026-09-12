@@ -81,7 +81,8 @@ RSpec.describe 'Lotes enraizando', type: :request do
     it 'y se deja hacer cuando no hay ninguno' do
       create(:lote, club: club, sala: vege, estado: 'vegetativo', tamanio_maceta: 3)
 
-      post "/api/salas/#{vege.id}/cambiar_fase"
+      # Con lotes adentro pide confirmación (ver `salas_cambiar_fase_spec`); acá se confirma.
+      post "/api/salas/#{vege.id}/cambiar_fase", params: { confirmar_cambio_fase: 1 }
 
       expect(response).to have_http_status(:success)
       expect(vege.reload.kind).to eq('floracion')

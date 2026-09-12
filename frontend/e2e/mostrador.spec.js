@@ -104,38 +104,47 @@ test('el día del mostrador, de punta a punta', async ({ page }) => {
   expect(errores, errores.join('\n')).toEqual([])
 })
 
-test('el admin ve la merma del turno que cerró', async ({ page }) => {
+test('el admin ve la merma del turno que cerró, en producto antes que en plata', async ({ page }) => {
   const errores = vigilarErrores(page)
   await entrar(page, 'admin')
   await page.goto('/mostrador')
 
   await page.locator('.mst__tab', { hasText: 'Merma' }).click()
-  // Arriba de todo, el VEREDICTO: un porcentaje solo no se compara con nada. Y siempre dice algo
-  // —acá, que todavía no hay historia con qué comparar—, porque quedarse en blanco se lee como
-  // que está todo bien.
-  await expect(page.locator('.mrm__veredicto')).toBeVisible()
-  await expect(page.locator('.mrm__ver-frase')).not.toBeEmpty()
-  // Y UNA sola tabla, con un corte a la vez: eran cuatro apiladas con las mismas columnas.
-  await expect(page.getByRole('heading', { name: 'Dónde se va' })).toBeVisible()
-  await expect(page.locator('.mrm__cortes .mrm__periodo').first()).toHaveText('Por producto')
-  await page.locator('.mrm__cortes .mrm__periodo', { hasText: 'Cierre por cierre' }).click()
-  await expect(page.locator('.mrm__table th').first()).toHaveText('Cerró')
+  // Arriba de todo, el hecho: qué faltó, en su unidad. La plata va en la línea de abajo y la
+  // comparación contra el historial también — y siempre dice algo, porque quedarse en blanco se
+  // lee como que está todo bien.
+  await expect(page.locator('.mrm__estado-frase')).not.toBeEmpty()
+  await expect(page.locator('.mrm__estado-frase')).toContainText(/Faltaron|No falta nada/)
+  // UNA lista, por frasco, con la cantidad grande. «Producto por producto» ya no es otra solapa:
+  // la fila se abre y muestra su gráfico.
+  await expect(page.getByRole('heading', { name: 'Qué falta, frasco por frasco' })).toBeVisible()
+  await expect(page.locator('.mrm__cortes .mrm__periodo').first()).toHaveText('Por frasco')
+  await expect(page.locator('.mst__tab', { hasText: 'Producto por producto' })).toHaveCount(0)
+  await expect(page.locator('.mrm__fila-cant').first()).toBeVisible()
+  await page.locator('.mrm__fila--abrible').first().click()
+  await expect(page.locator('.gpr svg')).toBeVisible()
 
   expect(errores, errores.join('\n')).toEqual([])
 })
 
 // El que atiende cerraba su turno y no tenía dónde mirarlo: si al día siguiente le preguntan por
 // una diferencia, no tenía con qué. Ve LOS SUYOS — el filtro es del backend, no de la pantalla.
-test('el dispensador ve los cierres que hizo', async ({ page }) => {
+test('el dispensador ve los cierres que hizo, en el calendario', async ({ page }) => {
   const errores = vigilarErrores(page)
   await entrar(page, 'dispensador')
   await page.goto('/mostrador')
 
-  // En pantalla no hay "turnos": se abre y se cierra la caja, y cada ciclo es un CIERRE.
+  // En pantalla no hay "turnos": se abre y se cierra la caja, y cada ciclo es un CIERRE. Y los
+  // cierres son un calendario: el día de hoy tiene marca, arranca elegido y su panel al lado
+  // muestra el cierre con la cuenta a la vista.
   await page.locator('.mst__tab', { hasText: 'Cierres' }).click()
-  await expect(page.locator('.trn__table tbody tr').first()).toBeVisible()
+  await expect(page.locator('.trn__cal')).toBeVisible()
+  await expect(page.locator('.trn__dia.is-sel')).toHaveCount(1)
+  await expect(page.locator('.trn__panel .trn__cierre').first()).toBeVisible()
+  await expect(page.locator('.trn__panel .trn__hecho').first()).toBeVisible()
   // Corregir un conteo ajusta el inventario real: eso es de administración.
-  await expect(page.getByRole('button', { name: 'Corregir conteo' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /Corregir/ })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Ya lo miré' })).toHaveCount(0)
 
   expect(errores, errores.join('\n')).toEqual([])
 })

@@ -70,8 +70,8 @@ RSpec.describe 'Cultivo — el ciclo completo', type: :request do
       post "/api/lotes/#{lote.id}/avanzar_fase"
       por_ficha = response.status
 
-      # Puerta B: dar vuelta la sala entera.
-      post "/api/salas/#{vege.id}/cambiar_fase"
+      # Puerta B: dar vuelta la sala entera (con lotes adentro pide confirmación; se confirma).
+      post "/api/salas/#{vege.id}/cambiar_fase", params: { confirmar_cambio_fase: 1 }
       por_sala = response.status
 
       # La ficha rechaza (la sala sigue en vegetativo) y la sala acepta (se da vuelta ella

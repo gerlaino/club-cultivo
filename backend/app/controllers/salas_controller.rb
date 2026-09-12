@@ -69,33 +69,22 @@ class SalasController < ApplicationController
       return render json: { error: msg }, status: :unprocessable_entity
     end
 
-    # Cambiar la fase de la sala ARRASTRA a sus lotes: pasar una sala de floración a vegetativo
-    # revegeta todo lo que esté florando adentro y les reinicia el contador de días de fase.
-    # Mover lotes a otra sala ya pedía confirmación lote por lote; esta puerta no pedía nada.
-    # Sin `confirmar_cambio_fase` no se guarda: devuelve qué lotes se verían afectados.
-    # Misma protección que la acción "Cambiar fase": en 12/12 un esqueje sin raíz no prende.
-    # Editando el `kind` se podía saltear esa guarda por la puerta de atrás.
-    if kind_nuevo == 'floracion' && kind_antes != 'floracion'
-      enraizando = @sala.lotes.enraizando
-      if enraizando.exists?
-        return render json: {
-          error: "Esta sala tiene lotes enraizando (#{enraizando.limit(5).pluck(:codigo).join(', ')}). " \
-                 'En floración (12/12) los esquejes no prenden: movelos a otra sala antes.',
-        }, status: :unprocessable_entity
-      end
-    end
+    # CAMBIAR LA FASE DE LA SALA ARRASTRA A SUS LOTES, y es la misma regla que el botón «Cambiar
+    # fase»: vive en `Salas::CambiarFase` (ida = avance con evento; vuelta = se DESHACE el paso a
+    # floración; con lotes adentro pide confirmación con la lista). Editando el `kind` se
+    # salteaba todo eso por la puerta de atrás.
+    # Primero se valida TODO lo editado; recién con la sala válida se da vuelta la fase. Si no,
+    # un nombre vacío rechazado dejaba la fase ya cambiada y los lotes ya arrastrados.
+    @sala.assign_attributes(sala_params.except(:kind))
+    return render json: { errors: @sala.errors.full_messages }, status: :unprocessable_entity unless @sala.valid?
 
-    afectados = lotes_afectados_por_cambio_de_fase(kind_antes, kind_nuevo)
-    if afectados.any? && params[:confirmar_cambio_fase].blank?
-      return render json: {
-        error: "Cambiar la sala a #{kind_nuevo} cambia de fase a #{afectados.size} lote(s) que están adentro.",
-        requiere_confirmacion: true,
-        lotes_afectados: afectados.map { |l| serialize_lote_afectado(l, kind_nuevo) },
-      }, status: :unprocessable_entity
+    if kind_nuevo.present? && kind_cambio_veg_flo?(kind_antes, kind_nuevo)
+      r = Salas::CambiarFase.call(sala: @sala, nueva_fase: kind_nuevo, usuario: current_user,
+                                  confirmado: params[:confirmar_cambio_fase].present?, origen: 'edición')
+      return responder_confirmacion_fase(r) unless r.ok?
     end
 
     if @sala.update(sala_params)
-      cascade_kind_a_lotes(kind_antes) if kind_cambio_veg_flo?(kind_antes)
       render json: serialize_sala_detail(@sala.reload)
     else
       render json: { errors: @sala.errors.full_messages }, status: :unprocessable_entity
@@ -222,82 +211,25 @@ class SalasController < ApplicationController
   end
 
   # POST /salas/:id/cambiar_fase
-  # Cambia toda la sala de vegetativo ↔ floración. Afecta lotes y plantas activas.
-  # Accesible a admin, supervisor y cultivador.
+  # POST /salas/:id/cambiar_fase — da vuelta la sala entre vegetativo y floración.
+  # Accesible a admin, supervisor y cultivador. La regla vive en `Salas::CambiarFase`.
   def cambiar_fase
     unless %w[admin supervisor cultivador].include?(current_user.role)
       return render json: { error: 'No autorizado' }, status: :forbidden
     end
 
-    unless %w[vegetativo floracion].include?(@sala.kind)
-      return render json: { error: 'Solo las salas en vegetativo o floración pueden cambiar de fase' }, status: :unprocessable_entity
-    end
-
-    nueva_fase        = @sala.kind == 'vegetativo' ? 'floracion' : 'vegetativo'
-
-    # La sala no se da vuelta con lotes enraizando adentro: 12/12 le daría 12 horas de oscuridad a
-    # esquejes que necesitan luz casi continua. La regla protege A LA PLANTA, así que mira el estado
-    # del lote y no el equipamiento —un esqueje sin domo corre el mismo riesgo—.
-    if nueva_fase == 'floracion'
-      enraizando = @sala.lotes.enraizando
-      if enraizando.exists?
-        codigos = enraizando.limit(5).pluck(:codigo).join(', ')
-        return render json: {
-          error: "Esta sala tiene lotes enraizando (#{codigos}). En floración (12/12) los esquejes " \
-                 'no prenden: movelos a otra sala antes de cambiar la fase.'
-        }, status: :unprocessable_entity
-      end
-    end
-    plant_state_orig  = @sala.kind   # 'vegetativo' | 'floracion'
-    plant_state_dest  = nueva_fase
-
-    lotes_a_cambiar = @sala.lotes.where(estado: @sala.kind)
-
-    if lotes_a_cambiar.empty?
-      return render json: {
-        error: "No hay lotes en #{@sala.kind} en esta sala para cambiar de fase"
-      }, status: :unprocessable_entity
-    end
-
-    lotes_count   = 0
-    plantas_count = 0
-
-    ActiveRecord::Base.transaction do
-      # La SALA se da vuelta primero: es ella la que arrastra a los lotes. Al revés, cada lote
-      # pasaba a floración mientras su sala todavía figuraba en vegetativo, un estado
-      # intermedio que no existe en la realidad (y que la validación sala↔estado rechaza).
-      @sala.update!(kind: nueva_fase)
-
-      lotes_a_cambiar.each do |lote|
-        estado_anterior = lote.estado
-        plantas = lote.plants.where(state: plant_state_orig)
-        plantas_count += plantas.count
-        plantas.update_all(state: plant_state_dest)
-
-        lote.update!(estado: nueva_fase)
-
-        lote.lote_eventos.create!(
-          tipo:            'cambio_estado',
-          estado_anterior: estado_anterior,
-          estado_nuevo:    nueva_fase,
-          descripcion:     "Cambio de fase grupal desde sala #{@sala.nombre}: #{estado_anterior} → #{nueva_fase}",
-          user:            current_user,
-          club:            current_user.club,
-          registrado_en:   Time.current,
-        )
-
-        lotes_count += 1
-      end
-    end
+    nueva_fase = @sala.kind == 'vegetativo' ? 'floracion' : 'vegetativo'
+    r = Salas::CambiarFase.call(sala: @sala, nueva_fase: nueva_fase, usuario: current_user,
+                                confirmado: params[:confirmar_cambio_fase].present?)
+    return responder_confirmacion_fase(r) unless r.ok?
 
     render json: {
-      sala:              serialize_sala_detail(@sala.reload),
-      nueva_fase:        nueva_fase,
-      lotes_afectados:   lotes_count,
-      plantas_afectadas: plantas_count,
+      sala:              serialize_sala_detail(r.sala),
+      nueva_fase:        r.nueva_fase,
+      lotes_afectados:   r.lotes_afectados,
+      plantas_afectadas: r.plantas_afectadas,
+      tareas_canceladas: r.tareas_canceladas,
     }
-  rescue ActiveRecord::RecordInvalid => e
-    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
 
   private
@@ -340,54 +272,22 @@ class SalasController < ApplicationController
 
   KINDS_VEG_FLO = %w[vegetativo floracion].freeze
 
-  def kind_cambio_veg_flo?(kind_antes)
-    KINDS_VEG_FLO.include?(kind_antes) && KINDS_VEG_FLO.include?(@sala.kind) && kind_antes != @sala.kind
+  def kind_cambio_veg_flo?(kind_antes, kind_nuevo)
+    KINDS_VEG_FLO.include?(kind_antes) && KINDS_VEG_FLO.include?(kind_nuevo) && kind_antes != kind_nuevo
   end
 
-  # Los lotes que el cascade tocaría: los que están en la fase vieja de esta sala.
-  def lotes_afectados_por_cambio_de_fase(kind_antes, kind_nuevo)
-    return Lote.none if kind_nuevo.blank? || kind_antes == kind_nuevo
-    return Lote.none unless KINDS_VEG_FLO.include?(kind_antes) && KINDS_VEG_FLO.include?(kind_nuevo)
-
-    @sala.lotes.where(estado: kind_antes)
-  end
-
-  # Cuántos días lleva el lote en la fase que está por perder. Sale del último cambio de estado,
-  # igual que `dias_en_estado` del serializer — el cascade crea un evento nuevo y lo reinicia.
-  def serialize_lote_afectado(lote, kind_nuevo)
-    desde = lote.lote_eventos
-                .where(tipo: 'cambio_estado', estado_nuevo: lote.estado)
-                .order(registrado_en: :desc).first&.registrado_en&.to_date
-
-    {
-      id:              lote.id,
-      codigo:          lote.codigo,
-      estado_actual:   lote.estado,
-      estado_nuevo:    kind_nuevo,
-      plantas:         lote.plants.where.not(state: %w[descartada cosechado]).count,
-      dias_en_fase:    desde ? (Date.current - desde).to_i : nil,
-    }
-  end
-
-  def cascade_kind_a_lotes(kind_antes)
-    nueva_fase = @sala.kind
-    lotes = @sala.lotes.where(estado: kind_antes)
-    return if lotes.empty?
-
-    ActiveRecord::Base.transaction do
-      lotes.each do |lote|
-        lote.plants.where(state: kind_antes).update_all(state: nueva_fase)
-        lote.update!(estado: nueva_fase)
-        lote.lote_eventos.create!(
-          tipo:            'cambio_estado',
-          estado_anterior: kind_antes,
-          estado_nuevo:    nueva_fase,
-          descripcion:     "Cambio de fase por edición de sala #{@sala.nombre}: #{kind_antes} → #{nueva_fase}",
-          user:            current_user,
-          club:            current_user.club,
-          registrado_en:   Time.current,
-        )
-      end
+  # Lo que el servicio frenó: o pide confirmación —con la lista lote por lote para que la pantalla
+  # la muestre— o rechaza. `deshace` le dice a la pantalla qué texto corresponde.
+  def responder_confirmacion_fase(r)
+    if r.requiere_confirmacion
+      render json: {
+        error: r.error, requiere_confirmacion: true,
+        deshace: r.nueva_fase == 'vegetativo',
+        lotes_afectados: r.detalle,
+        tareas_a_cancelar: r.detalle.sum { |l| l[:tareas_a_cancelar].to_i },
+      }, status: :unprocessable_entity
+    else
+      render json: { error: r.error }, status: :unprocessable_entity
     end
   end
 

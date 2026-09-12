@@ -1,11 +1,14 @@
 <template>
   <div class="trn">
     <div class="trn__hd">
-      <p class="trn__sub">
+      <!-- Quién es lo dice el backend con la primera carga: hasta entonces no se adivina el texto,
+           que un segundo después cambiaba delante del admin. -->
+      <p v-if="cargado" class="trn__sub">
         {{ gestiona
            ? 'Tocá un día y se abren sus cierres, con la cuenta a la vista.'
            : 'Los cierres que hiciste vos. Si mañana te preguntan por una diferencia, está acá.' }}
       </p>
+      <p v-else class="trn__sub">&nbsp;</p>
       <button v-if="turnos.length || pendientes.length" class="trn__btn trn__btn--mini trn__btn--ghost"
               :disabled="bajando" @click="descargar">
         {{ bajando ? 'Preparando…' : 'Descargar CSV' }}
@@ -137,6 +140,7 @@ const turnos   = ref([])        // los del mes que se mira
 const pendientes = ref([])      // «para mirar», de cualquier mes
 const gestiona = ref(false)
 const cargando = ref(false)
+const cargado  = ref(false)
 const bajando  = ref(false)
 const marcando = ref(null)
 const corrigiendo = ref(null)
@@ -313,6 +317,7 @@ async function cargar () {
     const { data } = await listTurnosMostrador(props.sedeId, { mes: mesParam.value })
     turnos.value   = data.turnos || []
     gestiona.value = !!data.gestiona
+    cargado.value  = true
     if (irAlLlegar) { seleccionado.value = irAlLlegar; irAlLlegar = null }
     if (gestiona.value) {
       const p = await listTurnosMostrador(props.sedeId, { sin_revisar: 1 })

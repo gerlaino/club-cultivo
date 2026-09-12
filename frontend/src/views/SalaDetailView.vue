@@ -18,6 +18,7 @@ import { Gauge } from 'lucide-vue-next'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
 import { useToast } from '../composables/useToast.js'
+import { textoCambioDeFase } from '../lib/textoCambioDeFase.js'
 import SemaforoAmbiente from '../components/ambiente/SemaforoAmbiente.vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import { hoyISO, toISO } from '../utils/dates.js'
@@ -206,31 +207,10 @@ async function saveEditSala(confirmado = false) {
   }
 }
 
+// EL GUARD DE LAS DOS PUERTAS (editar la sala y el botón), con el mismo texto: vive en
+// `lib/textoCambioDeFase.js`, que es donde se prueba.
 async function confirmarCambioDeFaseDeSala(data) {
-  const lotes = data.lotes_afectados || []
-  const aFloracion = lotes[0]?.estado_nuevo === 'floracion'
-
-  const lineas = [
-    `Cambiar la fase de la sala arrastra a ${lotes.length} lote(s) que están adentro:`,
-    '',
-    ...lotes.map(l => {
-      const dias = l.dias_en_fase != null ? ` · lleva ${l.dias_en_fase} día${l.dias_en_fase === 1 ? '' : 's'}` : ''
-      return `   · ${l.codigo}: ${estadoMeta(l.estado_actual).label} → ${estadoMeta(l.estado_nuevo).label}${dias} · ${l.plantas} plantas`
-    }),
-    '',
-    aFloracion
-      ? 'Pasar a floración no se deshace: la planta ya recibió 12/12.'
-      : 'Volver a vegetativo REVEGETA las plantas que están florando y reinicia el contador de días de fase.',
-    '',
-    'Si lo que querés es mover estos lotes y no revegetarlos, cancelá y usá "Mover lotes".',
-  ]
-
-  return confirm({
-    title: 'Esto cambia de fase a los lotes de la sala',
-    message: lineas.join('\n'),
-    variant: 'danger',
-    confirmText: aFloracion ? 'Pasar a floración' : 'Revegetar igual',
-  })
+  return confirm({ ...textoCambioDeFase(data), variant: 'danger' })
 }
 
 const salaAcciones = computed(() => {
@@ -249,7 +229,7 @@ const salaAcciones = computed(() => {
   }
   if (canCambiarFase.value) {
     const hacia = sala.value?.kind === 'vegetativo' ? 'Floración' : 'Vegetativo'
-    items.push({ emoji: '🔄', label: `Pasar sala a ${hacia}`, onClick: () => { showCambiarFaseModal.value = true; cambiarFaseError.value = null } })
+    items.push({ emoji: '🔄', label: `Pasar sala a ${hacia}`, onClick: () => ejecutarCambioFase(), disabled: cambiarFaseLoading.value })
   }
   if (canEdit.value) {
     items.push({ emoji: '✏️', label: 'Editar sala', onClick: openEditSala })
@@ -262,7 +242,6 @@ const salaAcciones = computed(() => {
 function salaEscapeHandler(e) {
   if (e.key !== 'Escape') return
   if (showEditSala.value)    { showEditSala.value = false; return }
-  if (showCambiarFaseModal.value)   { showCambiarFaseModal.value = false; return }
   if (showCrearLoteCosecha.value) { showCrearLoteCosecha.value = false; return }
   if (showCreate.value)      { closeCreate(); return }
   if (showCargarLote.value)  { showCargarLote.value = false; return }
@@ -548,33 +527,31 @@ const breadcrumbs = computed(() => {
 const showCargarLote = ref(false)
 
 // ── Cambiar fase (vege ↔ flora) ────────────────────────────
-const showCambiarFaseModal = ref(false)
-const cambiarFaseLoading   = ref(false)
-const cambiarFaseError     = ref(null)
-
-const faseSiguiente = computed(() =>
-  sala.value?.kind === 'vegetativo' ? 'floracion' : 'vegetativo'
-)
+// Sin modal propio: el backend frena con la lista de lotes y acá se muestra el MISMO diálogo que
+// al editar la sala. Tenía un modal aparte que no pedía confirmación de nada — la puerta que se
+// toca a la mañana con el café en la mano era la que no avisaba.
+const cambiarFaseLoading = ref(false)
 const faseLabel = (f) => ({ vegetativo: 'Vegetativo', floracion: 'Floración' }[f] || f)
 
-const lotesAfectados = computed(() =>
-  lotes.bySala(salaId).filter(l => l.estado === sala.value?.kind)
-)
-const plantasAfectadas = computed(() =>
-  lotesAfectados.value.reduce((sum, l) => sum + (l.plants_count || 0), 0)
-)
-
-async function ejecutarCambioFase() {
+async function ejecutarCambioFase(confirmado = false) {
   cambiarFaseLoading.value = true
-  cambiarFaseError.value   = null
   try {
-    const { data } = await cambiarFaseSala(salaId)
+    const { data } = await cambiarFaseSala(salaId, confirmado ? { confirmar_cambio_fase: true } : {})
     await salas.fetchSala(salaId)
     await lotes.fetchBySala(salaId)
-    showCambiarFaseModal.value = false
-    toast.success(`Sala cambiada a ${faseLabel(data.nueva_fase)} — ${data.lotes_afectados} lotes, ${data.plantas_afectadas} plantas`)
+    const partes = [`${data.lotes_afectados} lote${data.lotes_afectados === 1 ? '' : 's'}`]
+    if (data.tareas_canceladas) partes.push(`${data.tareas_canceladas} tarea${data.tareas_canceladas === 1 ? '' : 's'} cancelada${data.tareas_canceladas === 1 ? '' : 's'}`)
+    toast.success(data.lotes_afectados
+      ? `Sala en ${faseLabel(data.nueva_fase)} — ${partes.join(', ')}`
+      : `Sala en ${faseLabel(data.nueva_fase)}`)
   } catch (e) {
-    cambiarFaseError.value = e?.response?.data?.error || e?.response?.data?.errors?.[0] || 'Error al cambiar la fase'
+    const data = e?.response?.data
+    if (data?.requiere_confirmacion) {
+      cambiarFaseLoading.value = false
+      if (await confirmarCambioDeFaseDeSala(data)) return ejecutarCambioFase(true)
+      return
+    }
+    toast.error(data?.error || data?.errors?.[0] || 'No se pudo cambiar la fase.')
   } finally {
     cambiarFaseLoading.value = false
   }
@@ -1333,61 +1310,6 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 
     <!-- Modal cambiar fase (vege ↔ flora) -->
     <Teleport to="body">
-      <div v-modal="() => showCambiarFaseModal = false" v-if="showCambiarFaseModal" class="sd__overlay">
-        <div class="sd__modal" style="max-width:420px">
-          <div class="sd__modal-header">
-            <div>
-              <h3 class="sd__modal-title">🔄 Cambiar fase de la sala</h3>
-              <p class="sd__modal-sub">{{ sala?.nombre }}</p>
-            </div>
-            <button class="sd__modal-close" @click="showCambiarFaseModal = false"><i class="bi bi-x-lg"></i></button>
-          </div>
-          <div class="sd__modal-body">
-            <div v-if="cambiarFaseError" class="sd__alert">{{ cambiarFaseError }}</div>
-
-            <!-- Flecha de transición -->
-            <div class="sd__fase-arrow">
-              <div class="sd__fase-chip sd__fase-chip--origen">
-                <i class="bi" :class="sala?.kind === 'vegetativo' ? 'bi-flower1' : 'bi-flower2'"></i>
-                {{ faseLabel(sala?.kind) }}
-              </div>
-              <i class="bi bi-arrow-right sd__fase-ico"></i>
-              <div class="sd__fase-chip sd__fase-chip--destino">
-                <i class="bi" :class="faseSiguiente === 'vegetativo' ? 'bi-flower1' : 'bi-flower2'"></i>
-                {{ faseLabel(faseSiguiente) }}
-              </div>
-            </div>
-
-            <!-- Impacto -->
-            <div v-if="lotesAfectados.length" class="sd__fase-impacto">
-              <div class="sd__fase-impacto-row">
-                <span>Lotes que cambian de estado</span>
-                <strong>{{ lotesAfectados.length }}</strong>
-              </div>
-              <div class="sd__fase-impacto-row">
-                <span>Plantas afectadas</span>
-                <strong>{{ plantasAfectadas }}</strong>
-              </div>
-            </div>
-            <div v-else class="sd__fase-warning">
-              <i class="bi bi-exclamation-triangle-fill"></i>
-              No hay lotes en estado <strong>{{ faseLabel(sala?.kind) }}</strong> en esta sala. No habrá cambios en lotes ni plantas, solo cambia el tipo de sala.
-            </div>
-
-            <p class="sd__fase-desc">
-              Esta acción cambia el estado de todos los lotes y sus plantas. Se registra un evento en cada lote para trazabilidad.
-            </p>
-          </div>
-          <div class="sd__modal-footer">
-            <button class="sd__btn-ghost" :disabled="cambiarFaseLoading" @click="showCambiarFaseModal = false">Cancelar</button>
-            <button class="sd__btn-primary" :disabled="cambiarFaseLoading" @click="ejecutarCambioFase">
-              <DsSpinner v-if="cambiarFaseLoading" :size="14" />
-              <i v-else class="bi bi-arrow-right-circle"></i>
-              Pasar a {{ faseLabel(faseSiguiente) }}
-            </button>
-          </div>
-        </div>
-      </div>
     </Teleport>
 
     <!-- Wizard crear lote cosecha -->
@@ -1772,16 +1694,6 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 .sd__btn-ghost-sm:hover { background: #f0fdf4; color: #1b5e20; }
 
 /* Cambiar fase modal */
-.sd__fase-arrow { display: flex; align-items: center; justify-content: center; gap: 1rem; margin: 1.25rem 0; }
-.sd__fase-chip { display: flex; align-items: center; gap: .4rem; padding: .5rem 1rem; border-radius: 9px; font-size: .9rem; font-weight: 700; }
-.sd__fase-chip--origen { background: var(--c-slate-100); color: var(--c-slate-600); }
-.sd__fase-chip--destino { background: #f0fdf4; color: #15803d; border: 1.5px solid #86efac; }
-.sd__fase-ico { color: var(--c-slate-400); font-size: 1.1rem; }
-.sd__fase-impacto { background: var(--c-slate-50); border: 1.5px solid var(--c-slate-200); border-radius: 10px; padding: .75rem 1rem; margin-bottom: 1rem; display: flex; flex-direction: column; gap: .4rem; }
-.sd__fase-impacto-row { display: flex; justify-content: space-between; align-items: center; font-size: .85rem; color: var(--c-slate-700); }
-.sd__fase-impacto-row strong { color: var(--c-slate-900); font-size: .95rem; }
-.sd__fase-warning { background: #fffbeb; border: 1.5px solid #fde68a; color: #92400e; border-radius: 10px; padding: .75rem 1rem; font-size: .82rem; margin-bottom: 1rem; display: flex; align-items: flex-start; gap: .5rem; }
-.sd__fase-desc { font-size: .78rem; color: var(--c-slate-400); margin: 0; }
 .sd__btn-primary-sm { background: #1b5e20; color: #fff; border: none; padding: .4rem .9rem; border-radius: 6px; font-size: .78rem; font-weight: 600; cursor: pointer; transition: background .15s; }
 .sd__btn-primary-sm:hover { background: #155016; }
 .sd__cam-form { display: flex; flex-direction: column; gap: .75rem; padding-top: .25rem; }

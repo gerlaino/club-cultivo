@@ -111,11 +111,15 @@ RSpec.describe 'Cultivo — casos reales', type: :request do
       expect(vege.reload.kind).to eq('vegetativo')
     end
 
-    it 'una sala sin lotes de esa fase lo dice en vez de no hacer nada' do
+    # Una sala vacía se da vuelta sin preguntar: es uno de los dos casos legítimos de volver a
+    # vegetativo («o estando vacía y arrancando de cero, o por error humano»), y antes el botón
+    # la rechazaba con «no hay lotes» — para dar vuelta una sala vacía había que editarla.
+    it 'una sala sin lotes de esa fase se da vuelta sin preguntar' do
       post "/api/salas/#{vege.id}/cambiar_fase"
 
-      expect(response).to have_http_status(:unprocessable_entity)
-      expect(error_msg).to match(/no hay lotes/i)
+      expect(response).to have_http_status(:ok)
+      expect(vege.reload.kind).to eq('floracion')
+      expect(JSON.parse(response.body)['lotes_afectados']).to eq(0)
     end
   end
 

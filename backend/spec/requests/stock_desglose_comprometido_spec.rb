@@ -85,17 +85,17 @@ RSpec.describe 'El stock dice de qué está hecho lo comprometido', type: :reque
   # El canal en vivo dejó de llevar números: eran los del depósito y las listas los pegaban
   # encima de los que el índice había traducido para quien atiende. Ahora es un timbre.
   it 'el broadcast de stock actualizado no lleva cantidades' do
-    ActsAsTenant.with_tenant(club) do
+    allow(ActionCable.server).to receive(:broadcast)
+    d = ActsAsTenant.with_tenant(club) do
       Dispensacion.create!(paciente: paciente, user: admin, stock: stock, sede: sede,
                            cantidad: 5, medio_pago: 'efectivo', fecha_dispensacion: Time.zone.today,
                            aporte_socio_ars: 500)
     end
+    # El callback es `after_create_commit`: se lo llama a mano para no depender de si la
+    # transacción del test lo dispara.
+    d.send(:broadcast_stock_actualizado)
 
-    emitidos = ActionCable.server.pubsub.broadcasts("stocks_club_#{club.id}")
-                          .map { |m| JSON.parse(m) }
-                          .select { |m| m['tipo'] == 'stock_actualizado' }
-
-    expect(emitidos).not_to be_empty
-    emitidos.each { |m| expect(m.keys).to contain_exactly('tipo', 'stock_id') }
+    expect(ActionCable.server).to have_received(:broadcast)
+      .with("stocks_club_#{club.id}", { tipo: 'stock_actualizado', stock_id: stock.id })
   end
 end

@@ -98,8 +98,17 @@ RSpec.describe 'La merma del mostrador', type: :request do
     end
 
     # «¿Cómo viene?» hablaba sólo del producto: la plata que faltó en el cajón no estaba en ningún
-    # resumen. Acá se cobraron $2.000 en efectivo y se cerró contando $0.
+    # resumen. Un turno que abre contando $10.000 de fondo y cierra con $8.000.
     it 'dice también cuánta plata faltó en la caja, y en cuántos cierres' do
+      ActsAsTenant.with_tenant(club) do
+        m = sede.mostrador!
+        Mostradores::Cargar.call(mostrador: m, usuario: admin, motivo: 'carga',
+                                 cambios: [{ stock_id: flor.id, cantidad: 100 }])
+        t = Mostradores::AbrirCaja.call(mostrador: m, usuario: ana, efectivo_contado_ars: 10_000).turno
+        Mostradores::CerrarCaja.call(turno: t, usuario: ana, efectivo_contado_ars: 8_000, fondo_siguiente_ars: 8_000,
+                                     conteos: [{ stock_id: flor.id, contado: 100 }], notas: 'faltó plata')
+      end
+
       r = merma['resumen']
 
       expect(r['caja_ars']).to eq(-2_000.0)

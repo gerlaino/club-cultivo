@@ -9,7 +9,7 @@ RSpec.describe 'Ola 5 — Informes (auditor)', type: :request do
   let!(:sede)  { create(:sede, club: club, created_by: admin) }
   let!(:sala)  { create(:sala, club: club, sede: sede, created_by: admin) }
 
-  INFORMES_ENDPOINTS = %w[reprocann produccion dispensaciones sedes cumplimiento].freeze
+  INFORMES_ENDPOINTS = %w[reprocann produccion dispensaciones cumplimiento].freeze
 
   context 'auditor' do
     before { sign_in_as(auditor) }
