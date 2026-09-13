@@ -2,11 +2,10 @@
 
 ## Septiembre 2026 (bq) — La ficha del usuario: sedes y salas en un bloque, y el historial dice qué esconde
 
-- **Sedes y salas del cultivador en UN bloque y en ese orden**: primero a qué sedes va (chips que
-  se prenden y apagan, como las salas; era un desplegable con «Confirmar»), y las salas se ofrecen
-  **sólo de las sedes asignadas** (sin sedes, de toda la organización). Eran dos tarjetas, salas
-  arriba y sedes abajo, y las salas venían de todas las sedes, incluidas las que la persona no ve
-  (Germán, 13-sep).
+- **Sedes y salas del cultivador ANIDADAS** (`UsuarioSedesYSalas`): se asigna la sede y ahí mismo
+  aparecen sus salas para elegir; quitar la sede se lleva sus salas. Sin ninguna sede, ve toda la
+  organización. Eran dos tarjetas —salas arriba, sedes abajo— con las salas de todas las sedes,
+  incluidas las que la persona no ve (Germán, 13-sep). `UsuarioSalasManager` se retiró.
 - El checkbox del historial de actividad decía «Ver lo que generó la app» —«¿no es todo de la
   app?»—: ahora dice **«Incluir los asientos automáticos»**, que es lo que esconde (el asiento
   contable de cada dispensa, los renglones del arqueo: tapaban 8 de cada 10 filas).

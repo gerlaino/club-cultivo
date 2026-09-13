@@ -9,10 +9,6 @@
   "components/TurnoDetallePanel.vue": [
     "tdp__item--full"
   ],
-  "components/UsuarioSalasManager.vue": [
-    "usm__sala--spinner",
-    "usm__sala-nombre"
-  ],
   "components/cultivador/SalaCard.vue": [
     "sc__ultima"
   ],

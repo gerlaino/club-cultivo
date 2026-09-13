@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useUsuariosStore } from "../stores/usuarios"
 import { useAuthStore } from "../stores/auth"
-import UsuarioSalasManager  from '../components/UsuarioSalasManager.vue'
+import UsuarioSedesYSalas   from '../components/UsuarioSedesYSalas.vue'
 import UsuarioSedesManager  from '../components/UsuarioSedesManager.vue'
 import MedicoCalendarioWidget from '../components/medico/MedicoCalendarioWidget.vue'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
@@ -121,9 +121,6 @@ async function saveInfo() {
   } catch { toast.error(store.error || 'No se pudo actualizar.') }
   finally { savingInfo.value = false }
 }
-
-// Las sedes asignadas (las avisa el manager de sedes): las salas se acotan a ellas.
-const sedesDelUsuario = ref([])
 
 // ── Editar rol ──────────────────────────────────────────────────────────
 const editingRole = ref(false)
@@ -733,10 +730,9 @@ onMounted(async () => {
             </div>
           </div>
 
-          <!-- Cultivador → SEDES Y SALAS, en un solo bloque y en ese orden: primero a qué sedes
-               va, y de esas sedes, a qué salas. Eran dos tarjetas —salas arriba, sedes abajo—
-               y las salas se ofrecían de todas las sedes, incluidas las que la persona no ve
-               (Germán, 13-sep-2026). -->
+          <!-- Cultivador → SEDES Y SALAS ANIDADAS: se asigna la sede y ahí mismo aparecen sus
+               salas para elegir. Eran dos tarjetas —salas arriba, sedes abajo— y las salas se
+               ofrecían de todas las sedes, incluidas las que la persona no ve (Germán, 13-sep). -->
           <div v-if="u.role === 'cultivador'" class="ud__card">
             <div class="ud__card-hdr">
               <div class="ud__card-ico" style="background:rgba(8,145,178,.1);color:#0891b2">
@@ -745,10 +741,7 @@ onMounted(async () => {
               <span class="ud__card-title">Sedes y salas</span>
             </div>
             <div class="ud__card-body ud__sedes-salas">
-              <div class="ud__sub-lbl">Sedes</div>
-              <UsuarioSedesManager :user-id="userId" @change="sedesDelUsuario = $event" />
-              <div class="ud__sub-lbl ud__sub-lbl--mt">Salas <span class="ud__sub-hint">{{ sedesDelUsuario.length ? 'de las sedes asignadas' : 'de toda la organización' }}</span></div>
-              <UsuarioSalasManager :user-id="userId" :solo-sedes="sedesDelUsuario" />
+              <UsuarioSedesYSalas :user-id="userId" :user-role="u.role" />
             </div>
           </div>
 
@@ -917,9 +910,6 @@ onMounted(async () => {
 }
 .ud__btn-edit-hero:hover { background: #fff; border-color: var(--c-slate-400); }
 .ud__sedes-salas { display: flex; flex-direction: column; gap: .5rem; }
-.ud__sub-lbl { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--c-slate-500); }
-.ud__sub-lbl--mt { margin-top: .75rem; padding-top: .75rem; border-top: 1px solid var(--c-slate-100); }
-.ud__sub-hint { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--c-slate-400); }
 
 /* Avatar */
 .ud__av-wrap { position: relative; flex-shrink: 0; }
