@@ -313,12 +313,9 @@ const routes = [
     component: () => import("../views/PlanTrabajoView.vue"),
     meta: { requiresAuth: true },
   },
-  {
-    path: "/rendimiento",
-    name: "rendimiento",
-    component: () => import("../views/RendimientoView.vue"),
-    meta: { requiresAuth: true },
-  },
+  // `/rendimiento` era una pantalla suelta sin link desde ningún lado, sobre un endpoint que ya
+  // no existe: lo suyo vive en Analítica → Genéticas.
+  { path: "/rendimiento", redirect: "/analitica" },
   {
     path: "/analitica",
     name: "analitica",

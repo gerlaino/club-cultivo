@@ -1,5 +1,39 @@
 # Changelog
 
+## Septiembre 2026 (bn) — Analítica: cuatro solapas, una pregunta cada una
+
+Último de la revisión informe por informe (decisiones de Germán sobre el artifact, 13-sep). La
+analítica COMPARA —qué rinde mejor— sobre los lotes cerrados con rendimiento, todo el historial
+por defecto (para comparar hacen falta muchos lotes). Eran ocho solapas: tres contaban mal, cuatro
+repetían informes ya revisados, y una proyectaba «ingresos» con el costo.
+
+- **`Analitica::Universo`** (lotes cerrados, cosechados en el período; plantas con las descartadas
+  en el denominador; fases de la cronología real; sala y ventana de floración) y cuatro services:
+  **Genéticas** (g/planta PONDERADO: gramos ÷ plantas, nunca promedio de promedios; prendió; se
+  perdió en el ciclo; ciclo) · **Fases** (días por estado REAL del lote —la vieja calculaba sobre
+  una fase `secado` que no existe y dejaba Cosecha/Manicura/Curado vacíos— con el prendimiento y
+  el origen adelante) · **Dónde y cómo** (g/planta cortado por sala de FLORACIÓN —el lote pierde
+  la sala al cosechar—, método o luz; el ambiente es el de la sala durante la floración, sensores
+  incluidos; queda preparado hasta que se conecten) · **Costo** (sólo lotes cerrados con costo; la
+  vieja dividía el costo de lotes abiertos por gramos de cerrados).
+- **Umbral de 3 lotes**: debajo, la fila va gris y «sin conclusión».
+- **Sacadas**: Pérdidas (es el informe), Comparativa y Ambiente (fundidas en Dónde y cómo),
+  Contabilidad (la evolución mensual ya está en Contabilidad; la «proyección» usaba el costo como
+  precio). Las `?tab=` viejas caen en la solapa que contesta su pregunta. `/rendimiento`
+  (pantalla suelta sin link) redirige a Analítica.
+- Endpoints retirados: `rendimiento_genetica`, `produccion`, `correlacion_ambiental`,
+  `costo_por_gramo_sede`. Quedan `prendimiento`, `contabilidad` (el P&L que baja Contabilidad),
+  `comparativa_salas` (lo usa la pantalla de Salas), `pl_lotes`, `ejecutivo`, `dispensador`.
+- `SelectorPeriodo` gana «Todo el historial» (`con-todo`, sólo acá).
+
+## Septiembre 2026 (bm-bis) — La trazabilidad del frasco fraccionado cerraba mal
+
+Un frasco fraccionado de otro nacía con `cantidad_inicial` Y con la transferencia positiva que
+dice de dónde vino: la cuenta sumaba los 50 dos veces y decía «faltan 50 que ningún movimiento
+explica» sobre un frasco que cerraba (Germán, 13-sep). Ese movimiento es el ORIGEN
+(`fraccionado_desde`, con link al frasco madre), no una entrada ni una salida. Y «Contar» salió
+de cada fila del mostrador: vive detrás del «⋯» del producto.
+
 ## Septiembre 2026 (bm) — Lo que se agotó sobre la mesa no desaparece
 
 Pedido de Germán (13-sep) probando con el dispensador: cuando un producto se terminaba sobre la

@@ -51,17 +51,6 @@ class AnalyticsController < ApplicationController
 
   # GET /api/analytics/rendimiento_genetica
   # Para: admin, supervisor, super_admin
-  def rendimiento_genetica
-    club = current_user.club
-    año  = params[:año].presence
-    cache_key = "analytics/rendimiento_genetica/#{club.id}/#{año || 'all'}"
-    Rails.cache.delete(cache_key) if params[:bust]
-    data = Rails.cache.fetch(cache_key, expires_in: 15.minutes) do
-      calcular_rendimiento_genetica(club, año: año)
-    end
-    render json: data
-  end
-
   def vacio_prendimiento
     { global: serializar_prendimiento(0, 0), por_genetica: [] }
   end
@@ -75,85 +64,6 @@ class AnalyticsController < ApplicationController
       # Sin intentos no hay porcentaje: devolver 0 haría leer "0% de prendimiento" donde en realidad
       # no hay dato, que es peor que no mostrar nada.
       porcentaje:    intentos.positive? ? (prendidas * 100.0 / intentos).round(1) : nil,
-    }
-  end
-
-  def calcular_rendimiento_genetica(club, año: nil)
-    lotes = club.lotes.where.not(estado: 'enraizado').includes(:genetica)
-    lotes = lotes.where('EXTRACT(YEAR FROM COALESCE(start_date, created_at)) = ?', año) if año
-
-    # Rendimiento por genética (solo lotes con datos reales)
-    por_genetica = lotes.group_by { |l| l.genetica_id }.filter_map do |gid, ls|
-      genetica = ls.first&.genetica
-      next unless genetica
-
-      con_rendimiento = ls.select { |l| l.rendimiento_real_g.present? }
-      rendimiento_avg = con_rendimiento.any? ? (con_rendimiento.sum { |l| l.rendimiento_real_g.to_f } / con_rendimiento.size).round(1) : nil
-
-      objetivo_avg = begin
-        obj = ls.select { |l| l.rendimiento_objetivo_g.present? }
-        obj.any? ? (obj.sum { |l| l.rendimiento_objetivo_g.to_f } / obj.size).round(1) : nil
-      end
-
-      merma_avg = begin
-        con_merma = ls.select { |l| l.plants_count.present? && l.plants_count_cosechadas.present? && l.plants_count > 0 }
-        if con_merma.any?
-          mermas = con_merma.map { |l| ((l.plants_count - l.plants_count_cosechadas).to_f / l.plants_count * 100).round(1) }
-          (mermas.sum / mermas.size).round(1)
-        end
-      end
-
-      con_ambos     = ls.select { |l| l.rendimiento_real_g.present? && l.plants_count.present? && l.plants_count > 0 }
-      g_por_planta  = con_ambos.any? ? (con_ambos.sum { |l| l.rendimiento_real_g.to_f / l.plants_count } / con_ambos.size).round(1) : nil
-
-      {
-        genetica_id:          gid,
-        nombre:               genetica.nombre,
-        lotes_total:          ls.size,
-        lotes_finalizados:    ls.count { |l| l.rendimiento_real_g.present? },
-        rendimiento_promedio: rendimiento_avg,
-        objetivo_promedio:    objetivo_avg,
-        desviacion_promedio:  rendimiento_avg && objetivo_avg ? ((rendimiento_avg - objetivo_avg) / objetivo_avg * 100).round(1) : nil,
-        merma_promedio_pct:   merma_avg,
-        g_por_planta:         g_por_planta,
-        lotes_activos:        ls.count { |l| !%w[enraizado finalizado].include?(l.estado) },
-      }
-    end.sort_by { |r| [-(r[:rendimiento_promedio] || 0)] }
-
-    # Top lotes recientes
-    lotes_recientes = club.lotes
-                          .includes(:genetica)
-                          .where.not(estado: %w[enraizado])
-                          .order(created_at: :desc)
-                          .limit(20)
-                          .map do |l|
-      {
-        id:                  l.id,
-        codigo:              l.codigo,
-        estado:              l.estado,
-        genetica:            l.genetica&.nombre,
-        plants_count:        l.plants_count,
-        rendimiento_real_g:  l.rendimiento_real_g&.to_f,
-        rendimiento_obj_g:   l.rendimiento_objetivo_g&.to_f,
-        g_por_planta:        l.rendimiento_real_g && l.plants_count.to_i > 0 ? (l.rendimiento_real_g.to_f / l.plants_count).round(1) : nil,
-        desv_pct:            l.rendimiento_real_g && l.rendimiento_objetivo_g ? ((l.rendimiento_real_g.to_f - l.rendimiento_objetivo_g.to_f) / l.rendimiento_objetivo_g.to_f * 100).round(1) : nil,
-        created_at:          l.created_at,
-      }
-    end
-
-    # Resumen global
-    lotes_finalizados = lotes.select { |l| l.rendimiento_real_g.present? }
-    rendimiento_global = lotes_finalizados.any? ? (lotes_finalizados.sum { |l| l.rendimiento_real_g.to_f } / lotes_finalizados.size).round(1) : nil
-
-    {
-      resumen: {
-        lotes_totales:        lotes.count,
-        lotes_finalizados:    lotes_finalizados.size,
-        geneticas_activas:    por_genetica.count { |g| g[:lotes_activos] > 0 },
-        rendimiento_global_g: rendimiento_global,
-      },
-      por_genetica:    por_genetica,
-      lotes_recientes: lotes_recientes,
     }
   end
 
@@ -480,291 +390,34 @@ class AnalyticsController < ApplicationController
     }
   end
 
-  # GET /api/analytics/correlacion_ambiental
-  # Para: admin, supervisor, super_admin
-  def correlacion_ambiental
-    club = current_user.club
-    año  = params[:año].presence
-    cache_key = "analytics/correlacion_ambiental/#{club.id}/#{año || 'all'}"
-    Rails.cache.delete(cache_key) if params[:bust]
-    data = Rails.cache.fetch(cache_key, expires_in: 15.minutes) do
-      calcular_correlacion_ambiental(club, año: año)
-    end
-    render json: data
+  # ── ANALÍTICA: cuatro solapas, una pregunta cada una (rediseño de sep-2026, decisiones de
+  # Germán sobre el artifact). Todas sobre el mismo universo —lotes cerrados con rendimiento,
+  # cosechados en el período elegido, TODO el historial por defecto— y el cálculo vive en
+  # `app/services/analitica/*`. Reemplazan a rendimiento_genetica, produccion,
+  # correlacion_ambiental, comparativa_salas y costo_por_gramo_sede, que contaban mal (merma
+  # siempre 0, una fase `secado` que no existe, el costo de lotes abiertos dividido por gramos de
+  # cerrados) o repetían informes.
+
+  # GET /api/analytics/geneticas
+  def geneticas
+    render json: { periodo: periodo_analitica_etiqueta, filas: Analitica::Geneticas.new(universo).call }
   end
 
-  # GET /api/analytics/produccion
-  # Para: admin, supervisor, super_admin
-  def produccion
-    club = current_user.club
-    año  = params[:año].presence
-    cache_key = "analytics/produccion/#{club.id}/#{año || 'all'}"
-    Rails.cache.delete(cache_key) if params[:bust]
-    data = Rails.cache.fetch(cache_key, expires_in: 15.minutes) do
-      calcular_produccion(club, año: año)
-    end
-    render json: data
+  # GET /api/analytics/fases
+  def fases
+    render json: { periodo: periodo_analitica_etiqueta, fases: Analitica::Universo::FASES,
+                   filas: Analitica::Fases.new(universo).call }
   end
 
-  TIPOS_CORRELACION = %w[temperatura humedad vpd ph co2 ec ppfd].freeze
-
-  VPD_BUCKETS = [
-    [nil,  0.8, 'Bajo (<0.8 kPa)'],
-    [0.8,  1.2, 'Óptimo bajo (0.8–1.2 kPa)'],
-    [1.2,  1.6, 'Óptimo (1.2–1.6 kPa)'],
-    [1.6,  2.0, 'Alto (1.6–2.0 kPa)'],
-    [2.0,  nil, 'Muy alto (>2.0 kPa)'],
-  ].freeze
-
-  TEMP_BUCKETS = [
-    [nil,  20.0, 'Frío (<20°C)'],
-    [20.0, 23.0, 'Fresco (20–23°C)'],
-    [23.0, 26.0, 'Óptimo (23–26°C)'],
-    [26.0, 29.0, 'Cálido (26–29°C)'],
-    [29.0, nil,  'Caliente (>29°C)'],
-  ].freeze
-
-  PH_BUCKETS = [
-    [nil, 5.8, 'Ácido (<5.8)'],
-    [5.8, 6.2, 'Óptimo (5.8–6.2)'],
-    [6.2, 6.8, 'Normal (6.2–6.8)'],
-    [6.8, nil, 'Alcalino (>6.8)'],
-  ].freeze
-
-  def calcular_correlacion_ambiental(club, año: nil)
-    lotes = club.lotes
-                .where(estado: 'finalizado')
-                .where.not(rendimiento_real_g: nil)
-                .includes(:genetica)
-    lotes = lotes.where('EXTRACT(YEAR FROM COALESCE(start_date, created_at)) = ?', año) if año
-
-    # Precarga lecturas en memoria agrupadas por lote para evitar N+1
-    lote_ids = lotes.map(&:id)
-    lecturas_por_lote = LecturaAmbiental
-      .where(lote_id: lote_ids)
-      .group_by(&:lote_id)
-
-    lotes_data = lotes.filter_map do |l|
-      lecturas = lecturas_por_lote[l.id] || []
-      next if lecturas.empty?
-
-      promedios = TIPOS_CORRELACION.each_with_object({}) do |tipo, h|
-        vals = lecturas.select { |r| r.tipo == tipo }.map { |r| r.valor.to_f }
-        h[tipo.to_sym] = vals.any? ? (vals.sum / vals.size).round(2) : nil
-      end
-      next if promedios.values.all?(&:nil?)
-
-      rend = l.rendimiento_real_g.to_f
-      obj  = l.rendimiento_objetivo_g&.to_f
-
-      {
-        lote_id:       l.id,
-        codigo:        l.codigo,
-        genetica:      l.genetica&.nombre,
-        rendimiento_g: rend,
-        objetivo_g:    obj,
-        desv_pct:      (obj && obj > 0) ? ((rend - obj) / obj * 100).round(1) : nil,
-        n_registros:   lecturas.size,
-        **promedios,
-      }
-    end.sort_by { |l| -(l[:rendimiento_g] || 0) }
-
-    regresiones = TIPOS_CORRELACION.each_with_object({}) do |tipo, h|
-      pairs = lotes_data.filter_map { |l| v = l[tipo.to_sym]; [v, l[:rendimiento_g]] if v }
-      h[tipo.to_sym] = regresion_lineal(pairs.map(&:first), pairs.map(&:last))
-    end
-
-    {
-      lotes:            lotes_data,
-      vpd_buckets:      agrupar_buckets(lotes_data, :vpd,         VPD_BUCKETS),
-      temp_buckets:     agrupar_buckets(lotes_data, :temperatura,  TEMP_BUCKETS),
-      ph_buckets:       agrupar_buckets(lotes_data, :ph,           PH_BUCKETS),
-      regresiones:,
-      total_con_datos:  lotes_data.size,
-      total_finalizados: lotes.count,
-    }
+  # GET /api/analytics/donde_y_como?corte=sala|metodo|luz
+  def donde_y_como
+    render json: Analitica::DondeYComo.new(universo, corte: params[:corte]).call
+                                      .merge(periodo: periodo_analitica_etiqueta)
   end
 
-  def agrupar_buckets(lotes_data, campo, rangos)
-    rangos.filter_map do |min, max, label|
-      subset = lotes_data.select do |l|
-        v = l[campo]
-        next false if v.nil?
-        (min.nil? || v >= min) && (max.nil? || v < max)
-      end
-      next if subset.empty?
-
-      con_desv = subset.select { |l| l[:desv_pct] }
-      {
-        label:    label,
-        count:    subset.size,
-        rend_avg: (subset.sum { |l| l[:rendimiento_g] } / subset.size).round(1),
-        desv_avg: con_desv.any? ? (con_desv.sum { |l| l[:desv_pct] } / con_desv.size).round(1) : nil,
-      }
-    end
-  end
-
-  def calcular_produccion(club, año: nil)
-    lotes = club.lotes.includes(:genetica, :plants).where.not(estado: 'enraizado')
-    lotes = lotes.where('EXTRACT(YEAR FROM COALESCE(start_date, created_at)) = ?', año) if año
-
-    # ── 1. PÉRDIDAS por cepa ───────────────────────────────────────
-    perdidas_por_genetica = lotes.group_by(&:genetica_id).filter_map do |gid, ls|
-      g = ls.first&.genetica
-      next unless g
-
-      con_datos = ls.select { |l| l.plants_count.present? && l.plants_count > 0 }
-      next if con_datos.empty?
-
-      mermas = con_datos.map do |l|
-        cosechadas = l.plants_count_cosechadas || l.plants.where(state: 'cosechado').count
-        descartadas = l.plants.where(state: 'descartada').count
-        total = l.plants_count
-        {
-          lote_id:         l.id,
-          lote_codigo:     l.codigo,
-          total:           total,
-          cosechadas:      cosechadas,
-          descartadas:     descartadas,
-          merma_pct:       total > 0 ? ((total - cosechadas).to_f / total * 100).round(1) : nil,
-          descarte_pct:    total > 0 ? (descartadas.to_f / total * 100).round(1) : nil,
-        }
-      end
-
-      merma_avg   = mermas.filter_map { |m| m[:merma_pct] }
-      descarte_avg = mermas.filter_map { |m| m[:descarte_pct] }
-
-      {
-        genetica_id:      gid,
-        nombre:           g.nombre,
-        lotes_count:      ls.size,
-        merma_promedio:   merma_avg.any? ? (merma_avg.sum / merma_avg.size).round(1) : nil,
-        descarte_promedio: descarte_avg.any? ? (descarte_avg.sum / descarte_avg.size).round(1) : nil,
-        por_lote:         mermas.sort_by { |m| m[:lote_codigo] },
-      }
-    end.sort_by { |r| [-(r[:merma_promedio] || 0)] }
-
-    # ── 2. CICLOS — tiempo en cada fase por cepa ────────────────────
-    # Usa lote_eventos para calcular días reales entre transiciones
-    eventos_por_lote = LoteEvento
-      .where(lote_id: lotes.map(&:id), tipo: 'cambio_estado')
-      .order(:registrado_en)
-      .group_by(&:lote_id)
-
-    ciclos_por_lote = lotes.filter_map do |l|
-      evs = eventos_por_lote[l.id] || []
-      next if evs.empty? && l.start_date.nil?
-
-      # El vegetativo arranca cuando la planta entra a maceta, no en el esqueje: en el domo emite
-      # raíz, no crece. El enraizado se mide aparte (abajo): es su propia etapa, no parte del vege.
-      # Fallback a start_date solo para los lotes viejos/heredados sin evento de vegetativo.
-      ev_veg = evs.find { |e| e.estado_nuevo == 'vegetativo' }
-      fase_inicio = {}
-      fase_inicio['vegetativo'] = ev_veg&.registrado_en || l.start_date&.to_time
-
-      evs.each do |ev|
-        next unless ev.estado_nuevo.present?
-        next if ev.estado_nuevo == 'vegetativo'   # ya resuelto arriba
-        fase_inicio[ev.estado_nuevo] = ev.registrado_en
-      end
-
-      fases = %w[vegetativo floracion cosecha secado curado]
-      dias = {}
-      fases.each_with_index do |fase, idx|
-        inicio = fase_inicio[fase]
-        siguiente = fases[idx + 1]
-        fin = siguiente ? fase_inicio[siguiente] : nil
-        fin ||= Time.current if l.estado == fase
-        dias[fase] = inicio && fin ? ((fin - inicio) / 86400.0).round(1) : nil
-      end
-
-      next if dias.values.all?(&:nil?)
-
-      # ── Enraizado: etapa PREVIA al ciclo, no una sub-fase del vegetativo ──
-      # Días desde el esqueje/semilla hasta que prendió. Es lo que delata un propagador con
-      # problemas: si se muere una manta térmica, este número se estira antes de caer el prendimiento.
-      # `vegetativo` (arriba) ya es el vegetativo puro, así que no hace falta desglosarlo.
-      propagacion_dias = if ev_veg && l.start_date
-        ((ev_veg.registrado_en - l.start_date.to_time) / 86400.0).round(1)
-      end
-      veg_puro_dias = dias['vegetativo']
-
-      {
-        lote_id:        l.id,
-        lote_codigo:    l.codigo,
-        genetica_id:    l.genetica_id,
-        propagacion:    propagacion_dias,
-        vegetativo_puro: veg_puro_dias,
-        # De dónde vino la planta. Un esqueje y una semilla NO enraízan igual, así que los días
-        # de enraizado sólo se leen bien sabiendo contra qué origen compararlos.
-        origen:         l.origen,
-        **dias,
-      }
-    end
-
-    ciclos_por_genetica = ciclos_por_lote.group_by { |c| c[:genetica_id] }.filter_map do |gid, cs|
-      g = lotes.find { |l| l.genetica_id == gid }&.genetica
-      next unless g
-
-      fases = %w[vegetativo floracion cosecha secado curado]
-      promedios = fases.map do |fase|
-        vals = cs.filter_map { |c| c[fase] }
-        [fase, vals.any? ? (vals.sum / vals.size).round(1) : nil]
-      end.to_h
-
-      # Promedios de sub-fases de propagación (solo para lotes que pasaron por esa etapa)
-      prop_vals = cs.filter_map { |c| c[:propagacion] }
-      veg_puro_vals = cs.filter_map { |c| c[:vegetativo_puro] }
-
-      # Mezcla de orígenes de los lotes promediados: "3 de semilla · 9 de esqueje". Sin esto,
-      # un promedio de enraizado alto puede ser una genética lenta o simplemente que ese mes se
-      # trabajó con esquejes, y no hay forma de distinguirlo.
-      origenes = cs.filter_map { |c| c[:origen] }.tally
-
-      {
-        genetica_id:     gid,
-        nombre:          g.nombre,
-        lotes_con_datos: cs.size,
-        # `propagacion` es el ENRAIZADO: etapa propia, no una sub-fase del vegetativo. Estaba
-        # calculada pero la tabla no la mostraba, así que ese tiempo quedaba invisible.
-        enraizado:       prop_vals.any? ? (prop_vals.sum / prop_vals.size).round(1) : nil,
-        propagacion:     prop_vals.any? ? (prop_vals.sum / prop_vals.size).round(1) : nil,
-        origenes:        origenes,
-        origen_label:    origenes.map { |o, n| "#{n} de #{o}" }.join(' · ').presence,
-        vegetativo_puro: veg_puro_vals.any? ? (veg_puro_vals.sum / veg_puro_vals.size).round(1) : nil,
-        **promedios,
-      }
-    end.sort_by { |r| r[:nombre] }
-
-    # ── 3. COMPARATIVA — lotes finalizados por cepa ─────────────────
-    lotes_finalizados = lotes.select { |l| l.rendimiento_real_g.present? }
-    comparativa = lotes_finalizados.group_by(&:genetica_id).filter_map do |gid, ls|
-      g = ls.first&.genetica
-      next unless g && ls.size >= 2
-
-      {
-        genetica_id: gid,
-        nombre:      g.nombre,
-        lotes:       ls.map { |l|
-          {
-            id:                l.id,
-            codigo:            l.codigo,
-            rendimiento_g:     l.rendimiento_real_g&.to_f,
-            objetivo_g:        l.rendimiento_objetivo_g&.to_f,
-            plants_count:      l.plants_count,
-            grow_type:         l.grow_type,
-            light_type:        l.light_type,
-            start_date:        l.start_date,
-          }
-        }.sort_by { |l| l[:rendimiento_g] || 0 }.reverse,
-      }
-    end.sort_by { |r| r[:nombre] }
-
-    {
-      perdidas:    perdidas_por_genetica,
-      ciclos:      ciclos_por_genetica,
-      comparativa: comparativa,
-    }
+  # GET /api/analytics/costo
+  def costo
+    render json: Analitica::Costo.new(universo).call.merge(periodo: periodo_analitica_etiqueta)
   end
 
   # GET /api/analytics/ejecutivo
@@ -835,53 +488,6 @@ class AnalyticsController < ApplicationController
     }
   end
 
-  def pearson_r(xs, ys)
-    n = xs.size
-    return nil if n < 3
-
-    mx = xs.sum.to_f / n
-    my = ys.sum.to_f / n
-    num = xs.zip(ys).sum { |x, y| (x - mx) * (y - my) }
-    den = Math.sqrt(xs.sum { |x| (x - mx)**2 } * ys.sum { |y| (y - my)**2 })
-    return nil if den < 1e-10
-    (num / den).round(3)
-  rescue
-    nil
-  end
-
-  def regresion_lineal(xs, ys)
-    n = xs.size
-    return nil if n < 3
-
-    r = pearson_r(xs, ys)
-    return nil unless r
-
-    mx = xs.sum.to_f / n
-    my = ys.sum.to_f / n
-    ss_xy = xs.zip(ys).sum { |x, y| (x - mx) * (y - my) }
-    ss_xx = xs.sum { |x| (x - mx)**2 }
-    return nil if ss_xx < 1e-10
-
-    slope     = (ss_xy / ss_xx).round(4)
-    intercept = (my - slope * mx).round(2)
-    min_x     = xs.min.round(3)
-    max_x     = xs.max.round(3)
-
-    {
-      r:,
-      r_squared:   (r**2).round(3),
-      slope:,
-      intercept:,
-      n:,
-      x_min:       min_x,
-      x_max:       max_x,
-      y_at_xmin:   (slope * min_x + intercept).round(1),
-      y_at_xmax:   (slope * max_x + intercept).round(1),
-    }
-  rescue
-    nil
-  end
-
   def calcular_pl_lotes(club)
     lotes = club.lotes.includes(:genetica, :costo_lote).order(created_at: :desc)
 
@@ -950,6 +556,8 @@ class AnalyticsController < ApplicationController
   end
 
   # GET /api/analytics/comparativa_salas
+  # GET /api/analytics/comparativa_salas — el resumen por sala que muestra la pantalla de Salas
+  # (ciclos cerrados, gramos, últimas lecturas). No es de la analítica: es de Salas.
   def comparativa_salas
     club     = current_user.club
     sala_ids = club.salas.pluck(:id)
@@ -1023,78 +631,38 @@ class AnalyticsController < ApplicationController
     render json: { salas: filas }
   end
 
-  # GET /api/analytics/costo_por_gramo_sede
-  # $/gramo producido, agregado por SEDE. Cierra el círculo cultivo→plata:
-  #   numerador   = Σ CostoLote.costo_total   (costo real del ciclo)
-  #   denominador = Σ Lote.rendimiento_real_g  (gramos producidos, NO dispensados)
-  # Un lote que costó plata y no rindió (pérdida) suma su costo con 0 gramos: es un costo
-  # real de la producción de esa sede y así debe pesar en el $/g agregado.
-  def costo_por_gramo_sede
-    club = current_user.club
-    cache_key = "analytics/costo_por_gramo_sede/#{club.id}/#{analytics_stamp(club)}"
-    Rails.cache.delete(cache_key) if params[:bust]
-    data = Rails.cache.fetch(cache_key, expires_in: 30.minutes) do
-      calcular_costo_por_gramo_sede(club)
+  # El período de la analítica: el mismo selector que los informes (`periodo` o `desde`/`hasta`),
+  # pero con «todo» como default: para comparar hacen falta muchos lotes.
+  def universo
+    @universo ||= begin
+      desde, hasta = periodo_analitica
+      Analitica::Universo.new(club: current_user.club, desde: desde, hasta: hasta)
     end
-    render json: data
   end
 
-  def calcular_costo_por_gramo_sede(club)
-    # Solo lotes con costo calculado. La sede se resuelve con coalesce
-    # (post-cosecha: lote.sede_id; en cultivo: sala.sede_id). Un lote con rendimiento real
-    # ya pasó por cosecha y tiene sede_id directo; el fallback cubre lotes con costo cargado
-    # que todavía están en cultivo (sin rendimiento aún).
-    lotes = club.lotes.joins(:costo_lote).includes(:costo_lote, :sala, :genetica)
-
-    sedes = club.sedes.index_by(&:id)
-    acc = Hash.new { |h, k| h[k] = { costo_total: 0.0, gramos: 0.0, sin_rendimiento: 0, lotes: [] } }
-
-    lotes.find_each do |lote|
-      sede_id = lote.sede_id || lote.sala&.sede_id
-      costo   = lote.costo_lote.costo_total.to_f
-      gramos  = lote.rendimiento_real_g.to_f
-      b = acc[sede_id]
-      b[:costo_total]    += costo
-      b[:gramos]         += gramos
-      b[:sin_rendimiento] += 1 if gramos <= 0
-      b[:lotes] << {
-        id:                lote.id,
-        codigo:            lote.codigo,
-        genetica:          lote.genetica&.nombre,
-        estado:            lote.estado,
-        costo_total:       costo.round(2),
-        gramos_producidos: gramos.round(2),
-        costo_por_gramo:   gramos.positive? ? (costo / gramos).round(2) : nil,
-      }
+  def periodo_analitica
+    if params[:desde].present?
+      desde = Date.parse(params[:desde].to_s)
+      hasta = params[:hasta].present? ? Date.parse(params[:hasta].to_s) : Time.zone.today
+      desde, hasta = hasta, desde if hasta < desde
+      return [desde.beginning_of_day, hasta.end_of_day]
     end
+    rango = InformesController::PERIODO_RANGOS[params[:periodo].to_s]
+    return [nil, nil] if rango.nil?
 
-    filas = acc.map do |sede_id, b|
-      sede = sedes[sede_id]
-      {
-        sede_id:               sede_id,
-        sede_nombre:           sede&.nombre || (sede_id ? "Sede ##{sede_id}" : 'Sin sede'),
-        sede_tipo:             sede&.tipo,
-        costo_total:           b[:costo_total].round(2),
-        gramos_producidos:     b[:gramos].round(2),
-        costo_por_gramo:       b[:gramos].positive? ? (b[:costo_total] / b[:gramos]).round(2) : nil,
-        lotes_con_costo:       b[:lotes].size,
-        lotes_sin_rendimiento: b[:sin_rendimiento],
-        lotes:                 b[:lotes].sort_by { |l| -l[:costo_total] },
-      }
-    end.sort_by { |f| f[:sede_nombre] }
+    d, h = rango.call
+    [d.to_date.beginning_of_day, h.to_date.end_of_day]
+  rescue Date::Error
+    [nil, nil]
+  end
 
-    total_costo  = filas.sum { |f| f[:costo_total] }
-    total_gramos = filas.sum { |f| f[:gramos_producidos] }
+  def periodo_analitica_etiqueta
+    desde, hasta = periodo_analitica
+    return { desde: nil, hasta: nil, etiqueta: 'todo el historial', lotes: universo.lotes.size } if desde.nil?
 
-    {
-      sedes: filas,
-      total: {
-        costo_total:       total_costo.round(2),
-        gramos_producidos: total_gramos.round(2),
-        costo_por_gramo:   total_gramos.positive? ? (total_costo / total_gramos).round(2) : nil,
-        lotes_con_costo:   filas.sum { |f| f[:lotes_con_costo] },
-      },
-    }
+    { desde: desde.to_date, hasta: hasta.to_date,
+      etiqueta: "cosechados entre el #{desde.strftime('%d/%m/%Y')} y el #{hasta.strftime('%d/%m/%Y')}",
+      lotes: universo.lotes.size }
   end
 
   def require_analytics_access!
@@ -1247,8 +815,7 @@ class AnalyticsController < ApplicationController
     }
   end
 
-  private :calcular_rendimiento_genetica, :calcular_dispensador, :calcular_correlacion_ambiental,
-          :agrupar_buckets, :calcular_produccion, :calcular_pl_lotes, :kpis_anuales,
-          :pearson_r, :regresion_lineal, :calcular_contabilidad,
+  private :calcular_dispensador, :calcular_pl_lotes, :kpis_anuales, :calcular_contabilidad,
+          :universo, :periodo_analitica, :periodo_analitica_etiqueta,
           :require_analytics_access!, :require_dispensador_access!
 end

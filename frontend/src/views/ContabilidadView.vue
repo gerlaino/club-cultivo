@@ -684,6 +684,9 @@ onMounted(async () => {
   // ?nuevo=<flujo>&deposito=<id> → abre el alta directo en ese flujo. Lo usa "＋ Comprar" del
   // Depósito: comprar arranca acá (el egreso genera la entrada al depósito) y llega con el depósito
   // ya elegido. Se limpia el query para que un refresh no lo reabra.
+  // ?vista=pl → abre directo en Ganancia por lote (lo linkea Analítica → Costo).
+  if (route.query.vista === 'pl') irAPL()
+
   if (route.query.nuevo) {
     const { nuevo, deposito, ...resto } = route.query
     router.replace({ query: resto })

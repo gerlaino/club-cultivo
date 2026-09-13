@@ -1,6 +1,9 @@
 <template>
   <div class="spe">
     <select v-model="modo" class="spe__select" @change="emitir">
+      <!-- «Todo el historial» sólo donde tiene sentido: la analítica compara y necesita muchos
+           lotes. En un informe de período no se ofrece. -->
+      <option v-if="conTodo" value="todo">Todo el historial</option>
       <option value="mes_actual">Mes actual</option>
       <option value="mes_anterior">Mes anterior</option>
       <option value="trimestre">Trimestre</option>
@@ -28,7 +31,7 @@ import { hoyISO } from '../../utils/dates.js'
 const emit = defineEmits(['change'])
 // `inicial`: con qué período arranca. Casi todos en el mes actual; el INASE en el año, porque
 // nadie declara variedades por mes.
-const props = defineProps({ inicial: { type: String, default: 'mes_actual' } })
+const props = defineProps({ inicial: { type: String, default: 'mes_actual' }, conTodo: { type: Boolean, default: false } })
 
 const modo  = ref(props.inicial)
 const desde = ref('')

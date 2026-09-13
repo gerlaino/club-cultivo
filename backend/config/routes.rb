@@ -60,16 +60,17 @@ Rails.application.routes.draw do
     get "/stats/ambiente_salas", to: "stats#ambiente_salas"
 
     scope '/analytics', controller: :analytics do
-      get :rendimiento_genetica
+      # La analítica: cuatro preguntas sobre los lotes cerrados (`app/services/analitica/*`).
+      get :geneticas
+      get :fases
+      get :donde_y_como
+      get :costo
       get :prendimiento          # % de esquejes/plántulas que enraizaron, global y por genética
       get :dispensador
-      get :produccion
-      get :correlacion_ambiental
       get :pl_lotes
       get :ejecutivo
-      get :comparativa_salas
-      get :contabilidad
-      get :costo_por_gramo_sede
+      get :contabilidad          # el P&L de producción que baja Contabilidad (PDF/Excel)
+      get :comparativa_salas     # el resumen por sala de la pantalla de Salas
     end
 
     resource :benchmark, only: [:show], controller: :benchmark  # solo super_admin, uso interno de plataforma

@@ -895,18 +895,19 @@ export const getStockPublico  = (codigoQr) => axios.get(`/s/${codigoQr}`)
 export const getStockByQR     = (codigoQr) => api.get(`/stocks/qr/${codigoQr}`)
 
 // ── Analytics ─────────────────────────────────────────────────────────────────
-export const getAnalyticsRendimiento      = (params = {}) => api.get('/analytics/rendimiento_genetica',   { params })
 // % de esquejes/plántulas que enraizaron, global y por genética. Hasta ahora los que no prendían
 // se perdían mezclados con cualquier otro descarte.
 export const getAnalyticsPrendimiento     = (params = {}) => api.get('/analytics/prendimiento',           { params })
+// La analítica: cuatro preguntas sobre los lotes cerrados. Mismo período para las cuatro.
+export const getAnaliticaGeneticas        = (params = {}) => api.get('/analytics/geneticas',    { params })
+export const getAnaliticaFases            = (params = {}) => api.get('/analytics/fases',        { params })
+export const getAnaliticaDondeYComo       = (params = {}) => api.get('/analytics/donde_y_como', { params })
+export const getAnaliticaCosto            = (params = {}) => api.get('/analytics/costo',        { params })
 export const getAnalyticsDispensador      = ()            => api.get('/analytics/dispensador')
-export const getAnalyticsProduccion       = (params = {}) => api.get('/analytics/produccion',              { params })
-export const getAnalyticsCorrelacion      = (params = {}) => api.get('/analytics/correlacion_ambiental',   { params })
 export const getAnalyticsPL               = ()            => api.get('/analytics/pl_lotes')
 export const getAnalyticsEjecutivo        = ()            => api.get('/analytics/ejecutivo')
 export const getAnalyticsComparativaSalas = ()            => api.get('/analytics/comparativa_salas')
 export const getAnalyticsContabilidad     = ()            => api.get('/analytics/contabilidad')
-export const getAnalyticsCostoPorGramoSede = ()           => api.get('/analytics/costo_por_gramo_sede')
 export const getLotePL                    = (id)          => api.get(`/lotes/${id}/pl`)
 
 // ── Alertas internas ──────────────────────────────────────────────────────────
