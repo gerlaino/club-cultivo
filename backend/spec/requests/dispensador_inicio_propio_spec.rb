@@ -93,6 +93,21 @@ RSpec.describe 'Inicio del dispensador — ve lo suyo', type: :request do
 
       expect(total).to be < 9_999
     end
+
+    # CUÁL ES "MI MOSTRADOR" LO CONTESTA `User#sede_de_mostrador`. El inicio tomaba la primera
+    # sede asignada por nombre sin mirar el tipo: con «Finca Norte» (producción) asignada, la
+    # tarjeta decía "Esta sede no dispensa: no tiene mostrador" mientras la pantalla del mostrador
+    # le mostraba la caja abierta en la sede que sí atiende. Encontrado por Germán en el Club Modelo.
+    it 'la tarjeta de caja apunta a una sede que ATIENDE, aunque tenga una de producción antes' do
+      ActsAsTenant.with_tenant(club) do
+        finca = create(:sede, club: club, nombre: 'Finca Norte', tipo: 'produccion')
+        sur.update!(tipo: 'mixta')
+        UserSede.create!(user: ana, sede: finca)
+        UserSede.create!(user: ana, sede: sur)
+      end
+
+      expect(inicio_de(ana).dig('sede_mostrador', 'nombre')).to eq('Sur')
+    end
   end
 
   describe 'el admin' do

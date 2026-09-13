@@ -285,6 +285,10 @@ class AnalyticsController < ApplicationController
     caja.apertura_confirmada? ? caja.estado : 'sin_confirmar'
   end
 
+  def sede_de_mostrador_de(usuario)
+    usuario.sede_de_mostrador&.then { |x| { id: x.id, nombre: x.nombre } }
+  end
+
   def calcular_dispensador_propio(club, usuario)
     hoy           = Time.zone.today
     inicio_semana = hoy.beginning_of_week
@@ -326,10 +330,13 @@ class AnalyticsController < ApplicationController
 
     {
       alcance: 'propio',
-      # El mostrador cuya caja le corresponde. Con varias sedes asignadas se toma la primera:
-      # una persona atiende un mostrador por turno, y elegir cuál es una pregunta que hoy nadie
-      # se hace. Si algún día se turnan entre sedes, acá va el selector.
-      sede_mostrador: (Sede.where(id: sedes_ids).order(:nombre).first&.then { |x| { id: x.id, nombre: x.nombre } }),
+      # El mostrador cuya caja le corresponde. CUÁL ES "MI MOSTRADOR" LO CONTESTA
+      # `User#sede_de_mostrador` y nadie más: acá se tomaba la primera sede asignada por nombre, sin
+      # mirar el tipo, así que un dispensador con «Finca Norte» (producción) asignada veía en su
+      # inicio "Esta sede no dispensa: no tiene mostrador" mientras la pantalla del mostrador —que
+      # sí pregunta bien— le mostraba la caja abierta con 643 g arriba. La misma regla en dos
+      # lugares, y el inicio contradiciendo a la pantalla de al lado.
+      sede_mostrador: sede_de_mostrador_de(usuario),
       resumen: {
         dispensaciones_hoy:    mias.where(fecha_dispensacion: hoy..hoy).count,
         gramos_hoy:            mias.where(fecha_dispensacion: hoy..hoy).sum(:cantidad).to_f.round(2),
@@ -442,7 +449,8 @@ class AnalyticsController < ApplicationController
 
     {
       alcance: 'club',
-      sede_mostrador: (club.sedes.order(:nombre).first&.then { |x| { id: x.id, nombre: x.nombre } }),
+      # Misma regla que arriba: una sede que atienda público, no la primera por nombre.
+      sede_mostrador: sede_de_mostrador_de(current_user),
       resumen: {
         dispensaciones_hoy:    disps_hoy.count,
         gramos_hoy:            disps_hoy.sum(:cantidad).to_f.round(2),
