@@ -1230,8 +1230,10 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   A diferencia del conteo de APERTURA —que sólo corre el punto de partida— acá la diferencia SÍ
   ajusta el inventario, igual que el cierre. Por eso los dos usan
   `MostradorItem#ajustar_inventario!`: estaba escrito dos veces, y la misma regla en dos lugares
-  es de donde salen las divergencias. **Su pantalla es el botón "Contar" de cada fila**
-  (`ModalContarItem`), y sólo para QUIEN ATIENDE y con la caja abierta: administración no cuenta a
+  es de donde salen las divergencias. **Su pantalla es «Contar este producto» detrás del «⋯» de
+  cada fila** (`ModalContarItem`; en el teléfono, en la hoja del producto) — era un botón
+  permanente por fila y pesaba igual que «Pedir reposición», que sí es de todos los días
+  (Germán, 13-sep) —, y sólo para QUIEN ATIENDE y con la caja abierta: administración no cuenta a
   distancia —su gesto sobre la mesa es decir cuánto tiene que haber, que mueve producto del
   depósito— y con la caja cerrada el gesto es abrir, que ya cuenta todo. El servicio vivió sin
   pantalla desde el rediseño: construido, ruteado, con su función en `api.js` y sin un solo

@@ -344,7 +344,7 @@ describe('Lo que ve quien atiende', () => {
       const f = filaDe(w, 'ST-26-0061')
 
       expect(f.find('.tmo__reponer').text()).toBe('Pedir reposición')
-      expect(f.find('.tmo__contar').exists()).toBe(false)
+      expect(f.find('.tmo__mas').exists()).toBe(false)
       await f.find('.tmo__reponer').trigger('click')
       await flushPromises()
       expect(pedirReposicionMostrador).toHaveBeenCalledWith(10, { stock_id: 2 })
@@ -366,19 +366,33 @@ describe('Lo que ve quien atiende', () => {
   describe('contar un producto sin cerrar la caja', () => {
     // Es un control DEL TURNO: se cuenta mientras se atiende. Con la caja cerrada el gesto es
     // abrir, que ya cuenta todo.
-    beforeEach(() => { respuesta = { ...respuesta, turno: TURNO } })
+    // Los menús teleportados de un test anterior quedan en el body (nada desmonta el wrapper).
+    beforeEach(() => { respuesta = { ...respuesta, turno: TURNO }; document.body.innerHTML = '' })
 
-    it('quien atiende puede contar una fila suelta', async () => {
+    // Detrás del «⋯» de la fila, no como botón permanente: es un gesto excepcional y como botón
+    // pesaba igual que «Pedir reposición», que sí es de todos los días (Germán, 13-sep).
+    // El menú se teleporta al body (adentro de la tabla lo recortaba el scroll): se busca ahí.
+    const menuItem = () => document.body.querySelector('.tmo__menu-item')
+    const abrirContar = async (w) => {
+      await w.find('.tmo__mas').trigger('click')
+      menuItem().click()
+      await flushPromises()
+    }
+
+    it('quien atiende puede contar una fila suelta, desde el menú de la fila', async () => {
       const w = await montar('dispensador')
 
-      expect(w.find('.tmo__contar').exists()).toBe(true)
+      expect(w.find('.tmo__mas').exists()).toBe(true)
+      expect(menuItem()).toBeNull()
+      await w.find('.tmo__mas').trigger('click')
+      expect(menuItem().textContent.trim()).toBe('Contar este producto')
     })
 
     it('con la caja cerrada no se ofrece: ahí el gesto es abrir, que cuenta todo', async () => {
       respuesta = { ...respuesta, turno: null }
       const w = await montar('dispensador')
 
-      expect(w.find('.tmo__contar').exists()).toBe(false)
+      expect(w.find('.tmo__mas').exists()).toBe(false)
     })
 
     // Administración no cuenta a distancia: su gesto sobre la mesa es decir cuánto tiene que
@@ -387,7 +401,7 @@ describe('Lo que ve quien atiende', () => {
       respuesta = { ...respuesta, mesa: [{ ...FLOR, mostrador: 300 }] }
       const w = await montar()
 
-      expect(w.find('.tmo__contar').exists()).toBe(false)
+      expect(w.find('.tmo__mas').exists()).toBe(false)
     })
 
     // LO ESPERADO SE VE MIENTRAS SE CUENTA (sep-2026). Se escondía para que nadie escribiera el
@@ -396,7 +410,7 @@ describe('Lo que ve quien atiende', () => {
     // contado.
     it('dice cuánto debería haber mientras se cuenta, y no tapa la mesa de atrás', async () => {
       const w = await montar('dispensador')
-      await w.find('.tmo__contar').trigger('click')
+      await abrirContar(w)
 
       expect(w.find('.cti__esperado').text()).toContain('300')
       expect(w.find('.tmo__mesa').text()).toBe('300')
@@ -404,7 +418,7 @@ describe('Lo que ve quien atiende', () => {
 
     it('y lo compara apenas se escribe', async () => {
       const w = await montar('dispensador')
-      await w.find('.tmo__contar').trigger('click')
+      await abrirContar(w)
       await w.find('.cti__input').setValue(280)
 
       const comp = w.find('.cti__comparacion')
@@ -417,7 +431,7 @@ describe('Lo que ve quien atiende', () => {
     // Sin motivo el backend lo rechaza, así que el botón no se habilita.
     it('con diferencia pide el motivo', async () => {
       const w = await montar('dispensador')
-      await w.find('.tmo__contar').trigger('click')
+      await abrirContar(w)
       await w.find('.cti__input').setValue(280)
 
       expect(w.find('.cti__btn--primary').attributes('disabled')).toBeDefined()
@@ -427,7 +441,7 @@ describe('Lo que ve quien atiende', () => {
 
     it('si cuadra, no pide nada y se registra', async () => {
       const w = await montar('dispensador')
-      await w.find('.tmo__contar').trigger('click')
+      await abrirContar(w)
       await w.find('.cti__input').setValue(300)
 
       expect(w.find('.cti__input--texto').exists()).toBe(false)

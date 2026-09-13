@@ -99,19 +99,30 @@
                   <span v-else-if="s.reposicion_pedida" class="tmo__pedido" title="Reposición pedida hoy">pedido</span>
                   <span v-else class="tmo__agotado">agotado</span>
                 </template>
-                <!-- Contar ESTE frasco, sin cerrar la caja. Con quince productos, el arqueo
-                     entero para verificar uno son veinte minutos: el control que cuesta eso no
-                     se hace, y el que no se hace no controla nada. -->
-                <button v-else-if="contable" type="button" class="tmo__contar"
-                        :title="`Contar ${formaLabel(s.forma)}`" @click="emit('contar', s)">
-                  Contar
-                </button>
+                <!-- Contar ESTE frasco, sin cerrar la caja: con quince productos, el arqueo
+                     entero para verificar uno son veinte minutos. Es un gesto EXCEPCIONAL —«me
+                     parece que falta, dejame pesar éste»— y como botón permanente en cada fila
+                     pesaba igual que una acción de todos los días (Germán, 13-sep): vive detrás
+                     de «⋯», como en la hoja del teléfono. -->
+                <button v-else-if="contable" type="button" class="tmo__mas" :aria-expanded="menuAbierto === s.stock_id"
+                        :aria-label="`Más acciones sobre ${formaLabel(s.forma)}`"
+                        @click.stop="abrirMenu(s, $event)">⋯</button>
               </template>
             </td>
           </tr>
         </tbody>
       </table>
     </div>
+
+    <!-- El menú de la fila vive fuera de la tabla (Teleport + posición fija): adentro, el
+         `overflow` del contenedor scrolleable lo recortaba a la altura de la fila. -->
+    <Teleport to="body">
+      <div v-if="menuAbierto" class="tmo__menu" role="menu" :style="menuPos" @click.stop>
+        <button type="button" class="tmo__menu-item" role="menuitem" @click="contarDesdeMenu">
+          Contar este producto
+        </button>
+      </div>
+    </Teleport>
 
     <!-- Con buscador de por medio, lo cargado puede no estar en pantalla: sin este resumen, el
          que filtra cree que perdió lo que ya había escrito. -->
@@ -144,7 +155,7 @@
 // La columna editable dice **Mostrador**, no "cuánto baja": se escribe el TOTAL que tiene que
 // quedar arriba, no la diferencia. Pedirle al usuario que calcule el delta es pedirle la cuenta
 // que hace la máquina.
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { formaLabel } from '../../lib/formatters.js'
 
 const props = defineProps({
@@ -167,6 +178,24 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'contar', 'reponer'])
 
 const busqueda = ref('')
+// El «⋯» abierto, si hay uno. Un solo listener para toda la tabla: uno por fila son quince
+// oportunidades de olvidarse de sacarlo al desmontar.
+const menuAbierto = ref(null)
+const menuPos     = ref({})
+const cerrarMenu  = () => { menuAbierto.value = null }
+function abrirMenu (s, e) {
+  if (menuAbierto.value === s.stock_id) return cerrarMenu()
+  const r = e.currentTarget.getBoundingClientRect()
+  menuPos.value = { top: `${r.bottom + 4}px`, right: `${window.innerWidth - r.right}px` }
+  menuAbierto.value = s.stock_id
+}
+function contarDesdeMenu () {
+  const s = filas.value.find(x => x.stock_id === menuAbierto.value)
+  cerrarMenu()
+  if (s) emit('contar', s)
+}
+onMounted(() => document.addEventListener('click', cerrarMenu))
+onBeforeUnmount(() => document.removeEventListener('click', cerrarMenu))
 // Por defecto lo que YA está sobre la mesa primero, y dentro de eso lo más viejo: lo viejo sale
 // primero.
 const orden = ref({ campo: 'fecha', dir: 'asc' })
@@ -352,13 +381,22 @@ defineExpose({ cambios, hayCambios, hayExceso })
 .tmo__mesa-val { display: inline-flex; align-items: baseline; white-space: nowrap; }
 
 /* Discreto: se usa cuando algo no cierra, no en cada fila todo el tiempo. */
-.tmo__contar {
-  margin-left: 10px; border: 1px solid var(--c-slate-300); background: #fff;
-  color: var(--c-ink-700); border-radius: 999px; padding: 4px 11px;
-  font-size: var(--fs-12); font-weight: 600; cursor: pointer;
-  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
+.tmo__mas {
+  margin-left: var(--sp-2);
+  background: none; border: 1px solid transparent; border-radius: var(--r-md); padding: 0 6px;
+  font-size: var(--fs-16); line-height: 1.3; color: var(--c-ink-500); cursor: pointer;
 }
-.tmo__contar:hover { background: var(--c-leaf-50); border-color: var(--c-leaf-300); color: var(--c-leaf-800); }
+.tmo__mas:hover, .tmo__mas[aria-expanded="true"] { border-color: var(--c-ink-300); color: var(--c-ink-900); }
+.tmo__menu {
+  position: fixed; z-index: 1100; min-width: 190px;
+  background: var(--c-paper); border: 1px solid var(--c-ink-100); border-radius: var(--r-md);
+  box-shadow: var(--sh-3); padding: 4px; text-align: left;
+}
+.tmo__menu-item {
+  display: block; width: 100%; background: none; border: none; text-align: left; cursor: pointer;
+  padding: 6px 10px; border-radius: var(--r-sm); font-size: var(--fs-13); color: var(--c-ink-900);
+}
+.tmo__menu-item:hover { background: var(--c-ink-50); }
 .tmo__reponer {
   margin-left: var(--sp-2); background: #fff; border: 1.5px solid var(--c-leaf-600); border-radius: var(--r-md);
   padding: 2px 10px; font-size: var(--fs-12); font-weight: 700; color: var(--c-leaf-800); cursor: pointer; white-space: nowrap;
