@@ -838,6 +838,11 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   mal igual que los gramos, y quedaba con el número equivocado para siempre —con su asiento de
   faltante en el libro—. Misma regla que el stock: el movimiento viejo no se borra, se anota la
   diferencia. Se puede corregir sólo la plata, sin tocar ningún producto.
+- **UNA PARTE AHORA Y EL RESTO EN LA PUERTA** (sep-2026, decisión de Germán). «Contra entrega»
+  era todo o nada. Con el pago partido, lo que falte puede quedar para el repartidor
+  (`aplicar_lineas_cobro!(dejar_saldo: true)`): lo cobrado se asienta al crear, el resto queda
+  como `saldo_pendiente`, y el repartidor —etiqueta y modal— ve **sólo el saldo, y sólo si hay
+  algo que cobrar**. Si lo cobrado cubre el total, contra entrega se rechaza.
 - **ENTREGAR UNA RESERVA SE PUEDE COBRAR EN PARTES.** Estaba excluido con el argumento de que "la
   seña de una reserva es un pago único", que mezcla dos cosas: la seña se cobra al CREARLA; al
   entregarla se cobra el RESTO, que es una cobranza como cualquier otra. Lo que se reparte es el

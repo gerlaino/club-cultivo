@@ -180,7 +180,8 @@ class ReservasController < ApplicationController
         dispensacion.save! # corre validaciones on:create (stock/REPROCANN) + callbacks
         # Cobro del resto con el motor nuevo (efectivo/transf/cuenta + contra-entrega).
         # Si es contra-entrega, el delivery lo cobra al entregar.
-        aplicar_lineas_cobro!(dispensacion, cobros_param, 'creacion') unless cobrar_en_entrega
+        # Con contra entrega, lo que venga se cobra ahora y el resto queda para el repartidor.
+        aplicar_lineas_cobro!(dispensacion, cobros_param, 'creacion', dejar_saldo: cobrar_en_entrega) if cobros_param.present? || !cobrar_en_entrega
         afinar_medio_pago!(dispensacion)
         @reserva.update!(dispensacion: dispensacion)
       end

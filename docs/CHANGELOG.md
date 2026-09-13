@@ -1,5 +1,20 @@
 # Changelog
 
+## Septiembre 2026 (bo) — Una parte se paga ahora y el resto lo cobra el repartidor
+
+Pregunta de Germán (13-sep): «¿qué pasa si quiero envío y una parte se paga por transferencia y
+la otra al delivery?». «Contra entrega» era todo o nada: con el flag puesto, el backend no
+registraba ningún cobro al crear. Decisión: **anticiparlo** —la plata que ya entró se asienta al
+crear, y el repartidor ve sólo el saldo, que es lo único que necesita en la puerta—.
+
+- `aplicar_lineas_cobro!(…, dejar_saldo:)`: con contra entrega, las líneas que vienen se cobran
+  ahora y lo que falta queda **pendiente** (no va a cuenta corriente). Si lo cobrado cubre el
+  total, 422: no queda nada para la puerta. Vale al crear una dispensa y al entregar una reserva.
+- Carrito: en el pago partido, **«Lo que falte lo cobra el repartidor al entregar»** (marca el
+  envío). El aviso de «faltan $X» dice adónde van: cuenta corriente o repartidor.
+- Etiqueta del despacho: **sólo el saldo, y sólo si hay algo que cobrar** (pedido de Germán); con
+  saldo cero no dice nada aunque el envío haya nacido «contra entrega».
+
 ## Septiembre 2026 (bn) — Analítica: cuatro solapas, una pregunta cada una
 
 Último de la revisión informe por informe (decisiones de Germán sobre el artifact, 13-sep). La

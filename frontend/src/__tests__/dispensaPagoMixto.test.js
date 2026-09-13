@@ -207,6 +207,57 @@ describe('Dispensar — pago dividido', () => {
   })
 
   // Si deja de aplicar, un desglose invisible no puede seguir viajando.
+  // UNA PARTE AHORA Y EL RESTO EN LA PUERTA (Germán, sep-2026): la transferencia que ya entró se
+  // asienta al crear; el repartidor cobra sólo lo que falta. Antes «contra entrega» era todo o nada.
+  describe('el resto lo cobra el repartidor', () => {
+    it('marca el envío, deja de mandar el resto a cuenta corriente y lo dice', async () => {
+      const w = await montar({ limiteCc: 0 })   // sin cuenta corriente: antes esto trababa
+      await conCarrito(w)
+      w.vm.activarPagoDividido()
+      w.vm.lineasPago = [{ medio: 'transferencia', monto: 3000 }]
+      w.vm.restoAlDelivery = true
+      w.vm.form.delivery_id = 7
+      await w.vm.$nextTick()
+
+      expect(w.vm.form.con_envio).toBe(true)
+      expect(w.text()).toContain('los cobra el repartidor al entregar')
+
+      await w.vm.handleSubmit()
+      await new Promise((r) => setTimeout(r, 0))
+
+      const payload = createDispensacion.mock.calls[0][1]
+      expect(payload.cobros).toEqual([{ medio: 'transferencia', monto: '3000.00' }])
+      expect(payload.cobrar_en_entrega).toBe(true)
+      expect(payload.con_envio).toBe(true)
+    })
+
+    it('si lo cobrado ahora cubre el total, no deja: no hay nada para la puerta', async () => {
+      const w = await montar()
+      await conCarrito(w)
+      w.vm.activarPagoDividido()
+      w.vm.lineasPago = [{ medio: 'transferencia', monto: 5000 }]
+      w.vm.restoAlDelivery = true
+      w.vm.form.delivery_id = 7
+      await w.vm.$nextTick()
+
+      await w.vm.handleSubmit()
+      expect(createDispensacion).not.toHaveBeenCalled()
+      expect(w.vm.formError).toMatch(/cubre el total/)
+    })
+
+    it('sacar el envío devuelve el resto a la cuenta corriente', async () => {
+      const w = await montar()
+      await conCarrito(w)
+      w.vm.activarPagoDividido()
+      w.vm.restoAlDelivery = true
+      await w.vm.$nextTick()
+      w.vm.form.con_envio = false
+      await w.vm.$nextTick()
+
+      expect(w.vm.restoAlDelivery).toBe(false)
+    })
+  })
+
   it('pasar a regalo apaga el pago dividido', async () => {
     const w = await montar()
     await conCarrito(w)

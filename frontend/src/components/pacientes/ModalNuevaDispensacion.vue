@@ -504,7 +504,7 @@ const hayEfectivo = computed(() => pagoDividido.value
 // Lo reservado nunca está sobre la mesa: entregando una reserva siempre se pregunta.
 const algoEnMesa = computed(() => !modoReserva.value && items.value.some(it => it.stock?.en_mostrador))
 const pideCaja = computed(() =>
-  !dispensaDelMostrador.value && !form.value.es_regalo && !form.value.es_reserva && !cobraDelivery.value &&
+  !dispensaDelMostrador.value && !form.value.es_regalo && !form.value.es_reserva && form.value.medio_pago !== 'contra_entrega' &&
   (modoReserva.value || items.value.length > 0) &&
   hayEfectivo.value && !algoEnMesa.value && cajasAbiertas.value.length > 0)
 const horaDesde = (iso) => iso ? new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }) : ''
@@ -585,7 +585,8 @@ async function cargarDeliveryUsers() {
 const precioUnitarioManual = ref(null)
 
 // "Contra entrega" como medio de pago = el delivery cobra al entregar. Requiere envío.
-const cobraDelivery = computed(() => form.value.medio_pago === 'contra_entrega')
+// «Contra entrega» a secas (todo en la puerta) o el pago partido con el resto para el repartidor.
+const cobraDelivery = computed(() => form.value.medio_pago === 'contra_entrega' || (pagoDividido.value && restoAlDelivery.value))
 
 // ── Pago dividido ────────────────────────────────────────────────────────────────
 // El backend ya sabía cobrar una dispensa en varias partes: la tabla `cobros` guarda N líneas
@@ -600,6 +601,10 @@ const MEDIOS_COBRO = [
 ]
 const pagoDividido = ref(false)
 const lineasPago   = ref([])
+// UNA PARTE AHORA Y EL RESTO EN LA PUERTA (decisión de Germán, sep-2026). Con el pago partido, lo
+// que falte puede ir a cuenta corriente (lo de siempre) o quedar para que lo cobre el repartidor
+// al entregar. Lo que ya entró se asienta ya; el repartidor ve sólo el saldo.
+const restoAlDelivery = ref(false)
 
 // LO QUE HAY QUE COBRAR ACÁ Y AHORA. Entregando una reserva es el RESTO —la seña ya se cobró
 // cuando se apartó el producto—, no el total de lo que se lleva.
@@ -616,7 +621,7 @@ const totalACobrar = computed(() =>
 // aceptaba varias líneas (`aplicar_lineas_cobro!` recibe un array); sólo la pantalla no lo
 // ofrecía. Si la seña cubrió todo no hay nada que partir.
 const puedeDividirPago = computed(() =>
-  !form.value.es_regalo && !form.value.es_reserva && !cobraDelivery.value &&
+  !form.value.es_regalo && !form.value.es_reserva && form.value.medio_pago !== 'contra_entrega' &&
   (!modoReserva.value || restoReserva.value > 0))
 
 const totalAsignado = computed(() =>
@@ -656,7 +661,10 @@ function quitarLineaPago(i) {
 function cancelarPagoDividido() {
   pagoDividido.value = false
   lineasPago.value = []
+  restoAlDelivery.value = false
 }
+// Que lo cobre el repartidor implica envío; si se saca el envío, el resto vuelve a cuenta corriente.
+watch(restoAlDelivery, (v) => { if (v) form.value.con_envio = true })
 
 // Si deja de aplicar (pasa a regalo, a reserva o a contra entrega) se apaga solo: si no, quedaría
 // un desglose invisible que igual se manda.
@@ -664,7 +672,10 @@ watch(puedeDividirPago, (puede) => { if (!puede) cancelarPagoDividido() })
 watch(() => form.value.medio_pago, (val) => { if (val === 'contra_entrega') form.value.con_envio = true })
 watch(() => form.value.con_envio, (val) => {
   if (val) cargarDeliveryUsers()
-  else if (form.value.medio_pago === 'contra_entrega') form.value.medio_pago = 'efectivo'
+  else {
+    if (form.value.medio_pago === 'contra_entrega') form.value.medio_pago = 'efectivo'
+    restoAlDelivery.value = false
+  }
 })
 watch(() => form.value.stock_id,  ()    => { precioUnitarioManual.value = null })
 // La seña de una reserva solo se cobra en efectivo o transferencia.
@@ -784,7 +795,7 @@ async function handleSubmit() {
 
   // ── Rama ENTREGAR RESERVA: convierte la reserva en dispensación, cobra el resto ──
   if (modoReserva.value) {
-    const cobrarDelivery = form.value.medio_pago === 'contra_entrega'
+    const cobrarDelivery = cobraDelivery.value
     if (!cobrarDelivery && !pagoDividido.value && form.value.medio_pago === 'cuenta_corriente' && !tieneCc.value) {
       formError.value = 'El paciente no tiene crédito configurado para cobrar por cuenta corriente'; saving.value = false; return
     }
@@ -798,7 +809,9 @@ async function handleSubmit() {
         cobrar_en_entrega: cobrarDelivery,
         caja_turno_id:     pideCaja.value ? (cajaElegida.value || undefined) : undefined,
       }
-      if (!cobrarDelivery && restoReserva.value > 0) {
+      // Con «contra entrega» a secas no se manda nada; con el pago partido y el resto para el
+      // repartidor, se mandan las líneas que se cobran ahora y el backend deja el saldo.
+      if ((!cobrarDelivery || pagoDividido.value) && restoReserva.value > 0) {
         // Una línea o varias: es el mismo array que manda la dispensa, y lo que sobra sin asignar
         // lo resuelve el backend contra la cuenta corriente, como siempre.
         payload.cobros = pagoDividido.value
@@ -899,12 +912,16 @@ async function handleSubmit() {
     if (!lineas.length) { formError.value = 'Cargá al menos un monto, o volvé a un solo medio de pago'; saving.value = false; return }
     // Lo que falte lo manda el backend a cuenta corriente. Sin cuenta corriente no hay dónde
     // dejarlo y la dispensa se rechazaría del otro lado: mejor decirlo acá.
-    if (restoPago.value > 0.009 && !tieneCc.value) {
+    if (restoAlDelivery.value && restoPago.value <= 0.009) {
+      formError.value = 'Lo cobrado ahora cubre el total: no queda nada para que cobre el repartidor.'
+      saving.value = false; return
+    }
+    if (restoPago.value > 0.009 && !tieneCc.value && !restoAlDelivery.value) {
       formError.value = `Faltan ${fmt(restoPago.value)} por asignar y el paciente no tiene cuenta corriente donde dejarlos.`
       saving.value = false; return
     }
     const enCc = lineas.filter(l => l.medio === 'cuenta_corriente').reduce((a, l) => a + Number(l.monto), 0)
-      + (restoPago.value > 0 ? restoPago.value : 0)
+      + (restoPago.value > 0 && !restoAlDelivery.value ? restoPago.value : 0)
     if (enCc > 0 && enCc > ccMargen.value + 0.009) {
       formError.value = `A cuenta corriente van ${fmt(enCc)} y el crédito disponible es ${fmt(ccMargen.value)}.`
       saving.value = false; return
@@ -1551,8 +1568,11 @@ async function handleSubmit() {
 
             <!-- Lo que falta NO se pierde: el backend lo manda a cuenta corriente. Decirlo acá es
                  la diferencia entre una decisión y una sorpresa a fin de mes. -->
-            <div v-if="restoPago > 0.009" class="mnd__pagos-resto" :class="{ 'mnd__pagos-resto--mal': !tieneCc }">
-              <template v-if="tieneCc">
+            <div v-if="restoPago > 0.009" class="mnd__pagos-resto" :class="{ 'mnd__pagos-resto--mal': !tieneCc && !restoAlDelivery }">
+              <template v-if="restoAlDelivery">
+                Faltan <strong>{{ fmt(restoPago) }}</strong> — los cobra el repartidor al entregar.
+              </template>
+              <template v-else-if="tieneCc">
                 Faltan <strong>{{ fmt(restoPago) }}</strong> — se le cargan a la cuenta corriente.
               </template>
               <template v-else>
@@ -1565,6 +1585,12 @@ async function handleSubmit() {
             <div v-else class="mnd__pagos-resto mnd__pagos-resto--ok">
               <i class="bi bi-check-circle-fill"></i> Cubre el total exacto.
             </div>
+            <!-- El resto puede quedar para la puerta en vez de la cuenta corriente: una parte se
+                 paga ahora (transferencia, efectivo) y el repartidor cobra lo que falta. -->
+            <label v-if="!modoReserva || restoReserva > 0" class="mnd__pagos-delivery">
+              <input type="checkbox" v-model="restoAlDelivery" />
+              <span>Lo que falte lo cobra el repartidor al entregar <span class="mnd__opt">(marca el envío)</span></span>
+            </label>
           </div>
 
           <!-- A qué caja entra el efectivo, sólo para administración y sólo cuando nada sale de una
@@ -1839,6 +1865,8 @@ async function handleSubmit() {
 .mnd__pago-add:disabled { opacity: .4; cursor: not-allowed; color: var(--c-slate-400); }
 .mnd__pago-cancel { background: none; border: none; padding: 0; cursor: pointer; font-size: .72rem; color: var(--c-slate-500); text-decoration: underline; }
 
+.mnd__pagos-delivery { display: flex; align-items: flex-start; gap: .45rem; font-size: .78rem; color: var(--c-slate-700); margin-top: .5rem; cursor: pointer; }
+.mnd__pagos-delivery input { margin-top: .15rem; }
 .mnd__pagos-resto { font-size: .74rem; color: var(--c-slate-600); border-top: 1px solid var(--c-slate-200); padding-top: .5rem; display: flex; align-items: center; gap: .3rem; }
 .mnd__pagos-resto strong { color: var(--c-slate-900); font-family: monospace; }
 .mnd__pagos-resto--ok { color: #15803d; }

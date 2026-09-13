@@ -183,10 +183,17 @@ class DispensacionesController < ApplicationController
       # Se arranca con el medio que el mostrador informó (o efectivo, que es el caso normal de
       # una entrega a domicilio) y `afinar_medio_pago!` lo corrige cuando existan los cobros.
       @dispensacion.medio_pago = medio_pago_inicial(lineas_cobro)
+      # CONTRA ENTREGA CON UNA PARTE YA PAGA: las líneas que vienen se cobran ahora y el resto
+      # queda pendiente para el repartidor. Si las líneas cubren todo, no hay nada que cobrar en
+      # la puerta y «contra entrega» está de más.
+      if @dispensacion.cobrar_en_entrega && lineas_cobro.present? &&
+         lineas_cobro.sum { |l| l[:monto].to_d } >= @dispensacion.aporte_socio_ars.to_d - 0.001
+        return render json: { error: 'Lo cobrado ahora cubre el total: no queda nada para que cobre el repartidor. Sacá «contra entrega» o bajá lo que se paga ahora.' }, status: :unprocessable_entity
+      end
       begin
         ActiveRecord::Base.transaction do
           @dispensacion.save!
-          aplicar_lineas_cobro!(@dispensacion, lineas_cobro, 'creacion') unless @dispensacion.cobrar_en_entrega
+          aplicar_lineas_cobro!(@dispensacion, lineas_cobro, 'creacion', dejar_saldo: @dispensacion.cobrar_en_entrega) if lineas_cobro.present? || !@dispensacion.cobrar_en_entrega
           afinar_medio_pago!(@dispensacion)
         end
       rescue ActiveRecord::RecordInvalid => e

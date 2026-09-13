@@ -37,7 +37,12 @@ module DispensacionesFinancieras
   # de más (transfirió de más, le pagó de más al delivery, etc.) NO se bloquea: el
   # excedente se acredita a favor en su cuenta corriente. Lo que falte cubrir queda como
   # deuda en cuenta corriente. La foto se adjunta al primer cobro de transferencia.
-  def aplicar_lineas_cobro!(disp, lineas, contexto)
+  #
+  # `dejar_saldo`: lo que falte NO va a cuenta corriente, queda PENDIENTE para que lo cobre el
+  # repartidor en la puerta (decisión de Germán, sep-2026: una parte se paga ahora, por
+  # transferencia o efectivo, y el resto contra entrega). Lo que ya entró se asienta ya; el
+  # repartidor ve `saldo_pendiente`, que es lo único que necesita.
+  def aplicar_lineas_cobro!(disp, lineas, contexto, dejar_saldo: false)
     disp.caja_turno_elegida_id = caja_elegida_param if caja_elegida_param.present?
     comp = comprobante_param
     comp_usado = false
@@ -59,9 +64,9 @@ module DispensacionesFinancieras
       raise res.error unless res.ok?
     end
 
-    # Lo que falta cubrir → deuda en cuenta corriente.
+    # Lo que falta cubrir → deuda en cuenta corriente (salvo que lo cobre el repartidor).
     saldo = disp.monto_sin_cobrar
-    if saldo > 0.001
+    if saldo > 0.001 && !dejar_saldo
       res = Dispensaciones::RegistrarCobro.call(
         dispensacion: disp, club: current_user.club, usuario: current_user,
         medio: 'cuenta_corriente', monto: saldo, contexto: contexto)

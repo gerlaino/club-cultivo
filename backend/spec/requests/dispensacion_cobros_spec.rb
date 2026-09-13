@@ -74,6 +74,39 @@ RSpec.describe 'Dispensaciones con cobros (pagos partidos / contra-entrega)', ty
       expect(cc.reload.saldo_disponible).to eq(-70_000)
     end
 
+    # UNA PARTE AHORA Y EL RESTO EN LA PUERTA (decisión de Germán, sep-2026): la transferencia que
+    # ya entró se asienta al crear, y el repartidor ve sólo el saldo. Antes «contra entrega» era
+    # todo o nada: con el flag puesto no se registraba ningún cobro.
+    it 'con una parte ya paga, la asienta ahora y el repartidor cobra sólo el resto' do
+      sign_in_as(dispensador)
+      crear(cobros: [{ medio: 'transferencia', monto: 60_000 }], cobrar_en_entrega: true,
+            con_envio: true, delivery_id: delivery.id, usar_domicilio_paciente: true)
+      expect(response).to have_http_status(:created), response.body
+      d = Dispensacion.last
+      expect(d.cobros.pluck(:medio, :monto_ars)).to eq([['transferencia', 60_000]])
+      expect(d.saldo_pendiente).to eq(40_000)
+      expect(d.cobros.a_credito).to be_empty   # el resto NO fue a cuenta corriente
+      expect(d.medio_pago).to eq('transferencia')
+
+      delete '/api/users/sign_out'
+      sign_in_as(delivery)
+      patch "/dispensaciones/#{d.id}/entregar",
+            params: { cobros: [{ medio: 'efectivo', monto: 40_000 }], notas_entrega: 'OK' }, headers: auth_headers
+      expect(response).to have_http_status(:ok)
+      expect(d.reload.saldo_pendiente).to eq(0)
+      expect(d.medio_pago).to eq('mixto')
+      expect(cc.reload.saldo_disponible).to eq(0)
+    end
+
+    it 'si lo cobrado ahora cubre el total, contra entrega no tiene sentido y lo dice' do
+      sign_in_as(dispensador)
+      crear(cobros: [{ medio: 'transferencia', monto: 100_000 }], cobrar_en_entrega: true,
+            con_envio: true, delivery_id: delivery.id, usar_domicilio_paciente: true)
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)['error']).to match(/cubre el total/)
+      expect(Dispensacion.count).to eq(0)
+    end
+
     it 'acepta los cobros en forma de hash (multipart, cuando se sube foto)' do
       sign_in_as(dispensador)
       crear(cobrar_en_entrega: true, con_envio: true, delivery_id: delivery.id, usar_domicilio_paciente: true)

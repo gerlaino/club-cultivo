@@ -37,7 +37,11 @@ const props = defineProps({
 
 const club = useClubStore()
 
-const cobrarAlEntregar = computed(() => props.despacho?.cobrar_en_entrega || (props.despacho?.saldo_pendiente || 0) > 0)
+// SÓLO SI HAY ALGO QUE COBRAR, y sólo el saldo (Germán, sep-2026): una parte puede haberse pagado
+// al crear la dispensa —transferencia hoy, el resto en la puerta— y al repartidor lo único que le
+// sirve es cuánto tiene que cobrar. Con saldo cero, aunque el envío haya nacido «contra entrega»,
+// no se dice nada.
+const cobrarAlEntregar = computed(() => (props.despacho?.saldo_pendiente || 0) > 0)
 const montoCobrar = computed(() => {
   const m = props.despacho?.saldo_pendiente || 0
   return m > 0 ? '$' + Number(m).toLocaleString('es-AR') : ''
