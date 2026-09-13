@@ -122,6 +122,9 @@ async function saveInfo() {
   finally { savingInfo.value = false }
 }
 
+// Las sedes asignadas (las avisa el manager de sedes): las salas se acotan a ellas.
+const sedesDelUsuario = ref([])
+
 // ── Editar rol ──────────────────────────────────────────────────────────
 const editingRole = ref(false)
 const newRole     = ref('')
@@ -586,8 +589,12 @@ onMounted(async () => {
                   </select>
                 </label>
                 <label class="uda__todo">
+                  <!-- Lo que la app escribió SOLA detrás de una acción (el asiento contable de
+                       cada dispensa, los renglones del arqueo): tapaba 8 de cada 10 filas y no
+                       dice nada que la acción no diga. Se pide aparte. «Ver lo que generó la
+                       app» se leía como «¿no es todo de la app?» (Germán, 13-sep). -->
                   <input type="checkbox" v-model="verTodo" @change="aplicarFiltro" />
-                  <span>Ver lo que generó la app</span>
+                  <span title="Los asientos contables y renglones de arqueo que la app escribe sola por cada acción. Tapan la lista y no agregan nada: se muestran sólo si se piden.">Incluir los asientos automáticos</span>
                 </label>
                 <button v-if="hayFiltro" class="uda__clear" @click="limpiarFiltro">
                   <i class="bi bi-x-lg"></i> Limpiar
@@ -726,33 +733,22 @@ onMounted(async () => {
             </div>
           </div>
 
-          <!-- Cultivador → Salas asignadas -->
+          <!-- Cultivador → SEDES Y SALAS, en un solo bloque y en ese orden: primero a qué sedes
+               va, y de esas sedes, a qué salas. Eran dos tarjetas —salas arriba, sedes abajo—
+               y las salas se ofrecían de todas las sedes, incluidas las que la persona no ve
+               (Germán, 13-sep-2026). -->
           <div v-if="u.role === 'cultivador'" class="ud__card">
-            <div class="ud__card-hdr">
-              <div class="ud__card-ico" style="background:rgba(8,145,178,.1);color:#0891b2">
-                <i class="bi bi-layers"></i>
-              </div>
-              <span class="ud__card-title">Salas asignadas</span>
-            </div>
-            <div class="ud__card-body">
-              <UsuarioSalasManager :user-id="userId" />
-            </div>
-          </div>
-
-          <!-- Cultivador → Sedes (en main, no de costado) -->
-          <div v-if="u.role === 'cultivador'" class="ud__card ud__card--mt">
             <div class="ud__card-hdr">
               <div class="ud__card-ico" style="background:rgba(8,145,178,.1);color:#0891b2">
                 <i class="bi bi-building"></i>
               </div>
-              <span class="ud__card-title">Sedes asignadas</span>
+              <span class="ud__card-title">Sedes y salas</span>
             </div>
-            <div class="ud__card-body">
-              <UsuarioSedesManager :user-id="userId" />
-              <p class="ud__sede-note">
-                <i class="bi bi-info-circle"></i>
-                Sin sedes asignadas = accede a toda la organización
-              </p>
+            <div class="ud__card-body ud__sedes-salas">
+              <div class="ud__sub-lbl">Sedes</div>
+              <UsuarioSedesManager :user-id="userId" @change="sedesDelUsuario = $event" />
+              <div class="ud__sub-lbl ud__sub-lbl--mt">Salas <span class="ud__sub-hint">{{ sedesDelUsuario.length ? 'de las sedes asignadas' : 'de toda la organización' }}</span></div>
+              <UsuarioSalasManager :user-id="userId" :solo-sedes="sedesDelUsuario" />
             </div>
           </div>
 
@@ -844,10 +840,6 @@ onMounted(async () => {
                 <i class="bi bi-exclamation-triangle-fill"></i>
                 Requiere al menos una sede asignada para operar.
               </p>
-              <p v-else class="ud__sede-note">
-                <i class="bi bi-info-circle"></i>
-                Sin sedes = acceso a toda la organización
-              </p>
             </div>
           </div>
 
@@ -924,6 +916,10 @@ onMounted(async () => {
   transition: all .15s; backdrop-filter: blur(4px);
 }
 .ud__btn-edit-hero:hover { background: #fff; border-color: var(--c-slate-400); }
+.ud__sedes-salas { display: flex; flex-direction: column; gap: .5rem; }
+.ud__sub-lbl { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--c-slate-500); }
+.ud__sub-lbl--mt { margin-top: .75rem; padding-top: .75rem; border-top: 1px solid var(--c-slate-100); }
+.ud__sub-hint { font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--c-slate-400); }
 
 /* Avatar */
 .ud__av-wrap { position: relative; flex-shrink: 0; }

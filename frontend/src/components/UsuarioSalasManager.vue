@@ -8,7 +8,7 @@
     <template v-else-if="salasParaRol.length === 0">
       <div class="usm__empty">
         <i class="bi bi-grid-3x3-gap"></i>
-        <span>No hay salas disponibles en sedes de producción.</span>
+        <span>{{ soloSedes.length ? 'Las sedes asignadas no tienen salas de cultivo.' : 'No hay salas disponibles en sedes de producción.' }}</span>
       </div>
     </template>
 
@@ -74,6 +74,9 @@ import { getUserSalasAsignadas, asignarSalaAUsuario, desasignarSalaAUsuario, lis
 const props = defineProps({
   userId:   { type: Number, required: true },
   userRole: { type: String, default: '' },
+  // Las sedes asignadas al usuario: las salas se acotan a ellas. Vacío = toda la organización.
+  // Antes se ofrecían las salas de todas las sedes, incluidas las que la persona no ve.
+  soloSedes: { type: Array, default: () => [] },
 })
 
 const auth           = useAuthStore()
@@ -89,6 +92,7 @@ const esManicurador = computed(() => props.userRole === 'manicura')
 const salasParaRol = computed(() =>
   todasLasSalas.value.filter(s => {
     if (!['produccion', 'mixta'].includes(s.sede?.tipo)) return false
+    if (props.soloSedes.length && !props.soloSedes.includes(s.sede?.id)) return false
     return esManicurador.value ? s.kind === 'manicura' : s.kind !== 'manicura'
   })
 )

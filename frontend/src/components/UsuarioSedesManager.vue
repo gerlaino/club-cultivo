@@ -1,55 +1,36 @@
 <template>
-  <div>
-    <div v-if="loading" class="text-center py-2">
-      <DsSpinner :size="18" />
-    </div>
-    <div v-else-if="sedesAsignadas.length === 0" class="text-muted small py-1">
-      <i class="bi bi-building-dash me-1"></i>Sin sedes asignadas
-    </div>
-    <div v-else class="mb-3">
-      <div v-for="sede in sedesAsignadas" :key="sede.id"
-           class="d-flex align-items-center justify-content-between py-2 border-bottom">
-        <div>
-          <div class="fw-semibold small">{{ sede.nombre }}</div>
-          <div class="text-muted" style="font-size:0.72rem">
-            <i class="bi bi-geo-alt me-1"></i>{{ sede.tipo || 'Sede' }}
-          </div>
-        </div>
-        <button v-if="puedeEditar" class="btn btn-sm btn-outline-danger" @click="desasignar(sede)">
-          <i class="bi bi-x-lg"></i>
+  <div class="use">
+    <div v-if="loading" class="use__loading"><DsSpinner :size="18" /></div>
+
+    <template v-else>
+      <!-- Las sedes como chips que se prenden y apagan, igual que las salas de abajo: un
+           desplegable con «Confirmar» para elegir entre dos o tres sedes eran tres clics y un
+           lenguaje distinto al de la fila siguiente (Germán, 13-sep-2026). -->
+      <div v-if="todasLasSedes.length" class="use__grid">
+        <button v-for="sede in todasLasSedes" :key="sede.id" type="button" class="use__sede"
+                :class="{ 'use__sede--on': isAsignada(sede) }"
+                :disabled="toggling !== null || !puedeEditar"
+                :title="isAsignada(sede) ? 'Quitar esta sede' : 'Asignar esta sede'"
+                @click="toggle(sede)">
+          <span class="use__sede-ico">
+            <DsSpinner v-if="toggling === sede.id" :size="12" />
+            <i v-else-if="isAsignada(sede)" class="bi bi-check-lg"></i>
+            <i v-else class="bi bi-plus-lg"></i>
+          </span>
+          <span class="use__sede-nombre">{{ sede.nombre }}</span>
+          <span class="use__sede-tipo">{{ tipoLabel(sede.tipo) }}</span>
         </button>
       </div>
-    </div>
+      <div v-else class="use__empty"><i class="bi bi-building-dash"></i> La organización no tiene sedes cargadas.</div>
 
-    <div v-if="puedeEditar">
-      <div v-if="!mostrarForm" class="d-grid">
-        <button class="btn btn-sm btn-outline-success" @click="abrirForm" style="border-color:#0f766e;color:#0f766e">
-          <i class="bi bi-plus-lg me-1"></i>Asignar sede
-        </button>
-      </div>
+      <p class="use__nota">
+        <i class="bi bi-info-circle"></i>
+        <template v-if="sedesAsignadas.length">Ve sólo lo de {{ sedesAsignadas.length === 1 ? 'esta sede' : 'estas sedes' }}.</template>
+        <template v-else>Sin sedes asignadas ve toda la organización.</template>
+      </p>
+    </template>
 
-      <div v-else class="border rounded p-3 bg-light">
-        <div class="mb-3">
-          <label class="form-label small fw-semibold mb-1">Sede</label>
-          <select v-model="sedeSeleccionada" class="form-select form-select-sm">
-            <option value="">Seleccioná una sede...</option>
-            <option v-for="sede in sedesDisponibles" :key="sede.id" :value="sede.id">{{ sede.nombre }}</option>
-          </select>
-          <div v-if="sedesDisponibles.length === 0" class="text-muted small mt-1">No hay más sedes disponibles</div>
-        </div>
-
-        <div v-if="error" class="text-danger small mb-2">{{ error }}</div>
-
-        <div class="d-flex gap-2">
-          <button class="btn btn-sm btn-success" @click="asignar" :disabled="!sedeSeleccionada || asignando"
-                  style="background:#0f766e;border-color:#0f766e">
-            <DsSpinner v-if="asignando" :size="14" />
-            <i v-else class="bi bi-check-lg me-1"></i>Confirmar
-          </button>
-          <button class="btn btn-sm btn-outline-secondary" @click="cerrarForm">Cancelar</button>
-        </div>
-      </div>
-    </div>
+    <div v-if="error" class="use__error"><i class="bi bi-exclamation-triangle-fill"></i> {{ error }}</div>
   </div>
 </template>
 
@@ -58,80 +39,83 @@ import { ref, computed, onMounted } from 'vue'
 import { logger } from '../utils/logger.js'
 import { useAuthStore } from '../stores/auth'
 import { getUserSedesAsignadas, asignarSedeAUsuario, desasignarSedeAUsuario, listSedes } from '../lib/api.js'
-import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
-
-const { confirm } = useConfirm()
 
 const props = defineProps({
   userId: { type: Number, required: true },
 })
+// Las sedes asignadas, cada vez que cambian: el manager de salas se acota a ellas.
+const emit = defineEmits(['change'])
 
 const auth           = useAuthStore()
 const sedesAsignadas = ref([])
 const todasLasSedes  = ref([])
 const loading        = ref(false)
-const mostrarForm    = ref(false)
-const sedeSeleccionada = ref('')
-const asignando      = ref(false)
+const toggling       = ref(null)
 const error          = ref('')
 
 const puedeEditar = computed(() => auth.user?.role === 'admin')
 
-const sedesDisponibles = computed(() => {
-  const asignadasIds = new Set(sedesAsignadas.value.map(s => s.id))
-  return todasLasSedes.value.filter(s => !asignadasIds.has(s.id))
-})
+const TIPO = { social: 'dispensario', produccion: 'producción', mixta: 'mixta' }
+const tipoLabel = (t) => TIPO[t] || t || ''
+const isAsignada = (sede) => sedesAsignadas.value.some(s => s.id === sede.id)
+const avisar = () => emit('change', sedesAsignadas.value.map(s => s.id))
 
 onMounted(async () => {
   loading.value = true
   try {
     const [resSedes, resTodas] = await Promise.all([
       getUserSedesAsignadas(props.userId),
-      puedeEditar.value ? listSedes() : Promise.resolve({ data: [] })
+      listSedes(),
     ])
     sedesAsignadas.value = resSedes.data || []
     todasLasSedes.value  = resTodas.data || []
+    // Sin permiso de edición igual se ven las asignadas, marcadas.
+    if (!puedeEditar.value) todasLasSedes.value = sedesAsignadas.value
+    avisar()
   } catch (e) { logger.error(e) }
   finally { loading.value = false }
 })
 
-function abrirForm() {
-  sedeSeleccionada.value = ''
+async function toggle(sede) {
+  if (!puedeEditar.value) return
   error.value = ''
-  mostrarForm.value = true
-}
-
-function cerrarForm() {
-  mostrarForm.value = false
-  sedeSeleccionada.value = ''
-  error.value = ''
-}
-
-async function asignar() {
-  if (!sedeSeleccionada.value) return
-  asignando.value = true
-  error.value = ''
+  toggling.value = sede.id
   try {
-    await asignarSedeAUsuario(props.userId, sedeSeleccionada.value)
-    const sede = todasLasSedes.value.find(s => s.id === sedeSeleccionada.value)
-    if (sede) sedesAsignadas.value.push(sede)
-    cerrarForm()
+    if (isAsignada(sede)) {
+      await desasignarSedeAUsuario(props.userId, sede.id)
+      sedesAsignadas.value = sedesAsignadas.value.filter(s => s.id !== sede.id)
+    } else {
+      await asignarSedeAUsuario(props.userId, sede.id)
+      sedesAsignadas.value = [...sedesAsignadas.value, sede]
+    }
+    avisar()
   } catch (e) {
-    error.value = e.response?.data?.error || 'Error al asignar'
-  } finally { asignando.value = false }
-}
-
-async function desasignar(sede) {
-  const ok = await confirm({
-    title: `¿Quitar "${sede.nombre}"?`,
-    message: 'Se quitará esta sede del supervisor.',
-    confirmText: 'Quitar',
-  })
-  if (!ok) return
-  try {
-    await desasignarSedeAUsuario(props.userId, sede.id)
-    sedesAsignadas.value = sedesAsignadas.value.filter(s => s.id !== sede.id)
-  } catch (e) { error.value = e.response?.data?.error || 'Error al desasignar' }
+    error.value = e.response?.data?.error || 'No se pudo actualizar la sede'
+    logger.error(e)
+  } finally { toggling.value = null }
 }
 </script>
+
+<style scoped>
+.use { display: flex; flex-direction: column; gap: .6rem; }
+.use__loading { display: flex; justify-content: center; padding: .5rem 0; }
+.use__grid { display: flex; flex-wrap: wrap; gap: .4rem; }
+.use__sede {
+  display: inline-flex; align-items: center; gap: .45rem;
+  padding: .45rem .8rem; border-radius: 9px;
+  border: 1.5px solid var(--c-slate-200); background: var(--c-slate-50);
+  font-size: .82rem; font-weight: 500; color: var(--c-slate-600);
+  cursor: pointer; transition: all .15s; font-family: inherit;
+}
+.use__sede:hover:not(:disabled) { border-color: var(--c-leaf-300); background: var(--c-leaf-50); color: var(--c-leaf-800); }
+.use__sede--on { border-color: var(--c-leaf-800); background: var(--c-leaf-100); color: var(--c-leaf-800); font-weight: 600; }
+.use__sede--on:hover:not(:disabled) { border-color: var(--c-rust-600); background: var(--c-rust-100); color: var(--c-rust-600); }
+.use__sede:disabled { opacity: .55; cursor: not-allowed; }
+.use__sede-ico { width: 16px; height: 16px; display: flex; align-items: center; justify-content: center; font-size: .75rem; flex-shrink: 0; }
+.use__sede-nombre { font-weight: inherit; }
+.use__sede-tipo { font-size: .68rem; color: var(--c-slate-400); font-weight: 400; }
+.use__empty { font-size: .82rem; color: var(--c-slate-500); }
+.use__nota { margin: 0; font-size: .74rem; color: var(--c-slate-500); display: flex; align-items: center; gap: .35rem; }
+.use__error { font-size: .78rem; color: var(--c-rust-600); display: flex; align-items: center; gap: .35rem; }
+</style>

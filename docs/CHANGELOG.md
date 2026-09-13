@@ -1,5 +1,16 @@
 # Changelog
 
+## Septiembre 2026 (bq) — La ficha del usuario: sedes y salas en un bloque, y el historial dice qué esconde
+
+- **Sedes y salas del cultivador en UN bloque y en ese orden**: primero a qué sedes va (chips que
+  se prenden y apagan, como las salas; era un desplegable con «Confirmar»), y las salas se ofrecen
+  **sólo de las sedes asignadas** (sin sedes, de toda la organización). Eran dos tarjetas, salas
+  arriba y sedes abajo, y las salas venían de todas las sedes, incluidas las que la persona no ve
+  (Germán, 13-sep).
+- El checkbox del historial de actividad decía «Ver lo que generó la app» —«¿no es todo de la
+  app?»—: ahora dice **«Incluir los asientos automáticos»**, que es lo que esconde (el asiento
+  contable de cada dispensa, los renglones del arqueo: tapaban 8 de cada 10 filas).
+
 ## Septiembre 2026 (bp) — Cambiar el rol pasa por las mismas puertas que crearlo; supervisor, auditor y abogado no se ofrecen
 
 Revisión de Germán (13-sep): «¿dónde se crean o editan usuarios y roles? Si editamos el rol, ¿qué
