@@ -115,6 +115,17 @@ RSpec.describe 'Analitica' do
       expect(r[:con_lecturas]).to be(false)
     end
 
+    # En producción el evento de floración no lleva sala y el lote la pierde al cosecharse: 25 de 25
+    # salían «Sin dato». La sala de la que SALIÓ al cortarse sí queda escrita.
+    it 'sin sala en el evento de floración, toma la sala de la que salió al cortarse' do
+      l = cerrado!(kush, inicio: Date.new(2026, 1, 1), plantas: 10, gramos: 300, sala_flora: nil)
+      l.lote_eventos.find_by(estado_nuevo: 'cosecha').update!(sala_origen: flora2)
+      l.update_column(:sala_id, nil)
+
+      r = described_class.new(universo, corte: 'sala').call
+      expect(r[:filas].map { |f| f[:nombre] }).to eq(['Flora 2'])
+    end
+
     it 'el ambiente es el de la sala DURANTE la floración del lote, sensores incluidos' do
       l = cerrado!(kush, inicio: Date.new(2026, 1, 1), plantas: 10, gramos: 300, sala_flora: flora1)
       [[Date.new(2026, 2, 20), 1.2], [Date.new(2026, 3, 1), 1.4]].each do |fecha, vpd|   # en floración

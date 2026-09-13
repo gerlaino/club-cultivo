@@ -265,6 +265,7 @@ async function exportPdf() {
         </div>
         <p v-if="donde && !donde.con_lecturas" class="an__nota">Sin lecturas de ambiente en la floración de estos lotes: cuando los sensores de la sala estén conectados, VPD, temperatura y humedad de la floración aparecen acá solos.</p>
         <p v-if="corte !== 'sala' && donde?.filas?.some(f => f.clave == null)" class="an__nota">«Sin dato» son lotes sin {{ corte === 'metodo' ? 'método de cultivo' : 'tipo de luz' }} cargado: se completa en la ficha del lote.</p>
+        <p v-if="corte === 'sala' && donde?.filas?.some(f => f.clave == null)" class="an__nota">«Sin dato» son lotes cuya cronología no registra en qué sala florecieron (cargas anteriores a que se guardara la sala en cada cambio de fase).</p>
       </template>
 
       <!-- ══ COSTO · ¿cuánto cuesta producir un gramo? ════════════════════════ -->

@@ -94,15 +94,24 @@ module Analitica
     # Dónde y cuándo floreció cada lote: la sala a la que entró en floración (el lote pierde la
     # sala al cosecharse, así que `lote.sala_id` no sirve) y la ventana hasta el corte. Es contra
     # esto que se mira el ambiente: lo que la planta vivió, no el promedio del ciclo entero.
+    #
+    # LA SALA DE FLORACIÓN SE RECONSTRUYE DE LOS EVENTOS, en este orden: la sala de la que SALIÓ
+    # al cortarse (`sala_origen` del evento de cosecha: es la que vació, y es la que casi siempre
+    # está escrita), la sala a la que ENTRÓ en floración o la última mudanza antes del corte
+    # (`sala_destino`), y si nada de eso quedó registrado, la sala del lote. En producción, 25 de
+    # 25 lotes salían «Sin dato» porque el evento de floración no lleva sala y el lote la pierde
+    # al cosecharse (Germán, 13-sep).
     def floracion
       @floracion ||= begin
-        eventos = LoteEvento.where(lote_id: ids, tipo: 'cambio_estado').order(:registrado_en)
-                            .includes(:sala_destino).group_by(&:lote_id)
+        eventos = LoteEvento.where(lote_id: ids).order(:registrado_en)
+                            .includes(:sala_destino, :sala_origen).group_by(&:lote_id)
         lotes.to_h do |l|
-          evs = eventos[l.id] || []
-          flo = evs.find { |e| e.estado_nuevo == 'floracion' }
-          corte = flo && evs.find { |e| e.registrado_en > flo.registrado_en && Informes::Produccion::POST_COSECHA.include?(e.estado_nuevo) }
-          sala  = flo&.sala_destino || l.sala
+          evs   = eventos[l.id] || []
+          flo   = evs.find { |e| e.tipo == 'cambio_estado' && e.estado_nuevo == 'floracion' }
+          corte = evs.find { |e| e.tipo == 'cambio_estado' && Informes::Produccion::POST_COSECHA.include?(e.estado_nuevo) &&
+                                 (flo.nil? || e.registrado_en > flo.registrado_en) }
+          antes_del_corte = evs.select { |e| e.sala_destino && (corte.nil? || e.registrado_en <= corte.registrado_en) }
+          sala = corte&.sala_origen || antes_del_corte.last&.sala_destino || l.sala
           [l.id, { sala_id: sala&.id, sala: sala&.nombre, desde: flo&.registrado_en, hasta: corte&.registrado_en }]
         end
       end
