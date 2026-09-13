@@ -5,11 +5,16 @@ class MovimientosContablesController < ApplicationController
   before_action :require_escritura, only: [:create, :update, :destroy, :cerrar_periodo, :reabrir_periodo, :registrar_pago]
   before_action :set_movimiento,    only: [:show, :update, :destroy, :registrar_pago]
 
+  # Con lo que se paga DE VERDAD. `cuenta_corriente` y `no_abona` son de las dispensas a crédito
+  # y no saldan nada.
+  MEDIOS_DE_PAGO_REAL = %w[efectivo transferencia mercado_pago].freeze
+
   # GET /movimientos_contables
   # Params opcionales: desde, hasta, tipo, categoria, sede_id, lote_id, page, per_page
   def index
     scope = current_user.club.movimientos_contables
-                        .includes(:sede, :lote, :dispensacion, :created_by, :categoria_contable, :unidad_negocio)
+                        .includes(:sede, :lote, :dispensacion, :created_by, :categoria_contable, :unidad_negocio,
+                                  caja_turno: :sede)
                         .recientes
 
     scope = filtrar(scope)
@@ -177,6 +182,9 @@ class MovimientosContablesController < ApplicationController
   def create
     movimiento = current_user.club.movimientos_contables.build(movimiento_params)
     movimiento.created_by = current_user
+    # De qué caja sale (o a cuál entra) el efectivo. Sólo si la persona lo dijo: sin caja, el
+    # asiento se escribe igual y la plata no entra a ningún arqueo — como al dispensar del depósito.
+    return unless atar_a_caja_elegida!(movimiento, params.dig(:movimiento_contable, :caja_turno_id))
 
     ActiveRecord::Base.transaction do
       movimiento.save!
@@ -257,15 +265,16 @@ class MovimientosContablesController < ApplicationController
     end
   end
 
-  # PATCH /movimientos_contables/:id/registrar_pago  { medio_pago?, fecha_pago? }
+  # PATCH /movimientos_contables/:id/registrar_pago  { medio_pago, fecha_pago?, caja_turno_id? }
   #
-  # Saldar una compra que había quedado en "Pendiente de pago". Antes se podía MARCAR la deuda
-  # pero no había ninguna forma de decir que se pagó: el gasto quedaba como pendiente para
-  # siempre y el total por pagar del club no bajaba nunca.
+  # Saldar una compra que había quedado en "Pendiente de pago" (o una cuota). Antes se podía
+  # MARCAR la deuda pero no había ninguna forma de decir que se pagó: el gasto quedaba como
+  # pendiente para siempre y el total por pagar del club no bajaba nunca. Y después se podía
+  # marcar, pero sin decir CÓMO ni CUÁNDO ni DE DÓNDE salió la plata (pedido de Germán, sep-2026).
   #
-  # No crea un movimiento nuevo: el egreso ya está asentado desde que se compró. Lo que cambia
-  # es su estado de pago —y con eso sale del "a crédito" y entra a la caja del día en que se
-  # pagó de verdad.
+  # No crea un movimiento nuevo: el egreso ya está asentado desde que se compró. Lo que cambia es
+  # su estado de pago —con qué se pagó, qué día (`fecha_pago`; `fecha` sigue siendo la del gasto)
+  # y, si fue en efectivo del cajón, de qué caja salió, para que el arqueo de esa noche lo espere.
   def registrar_pago
     if @movimiento.pagado?
       return render json: { error: 'Este movimiento ya figura como pagado.' }, status: :unprocessable_entity
@@ -274,15 +283,51 @@ class MovimientosContablesController < ApplicationController
       return render json: { error: 'El movimiento pertenece a un período contable cerrado.' },
                     status: :unprocessable_entity
     end
+    unless MEDIOS_DE_PAGO_REAL.include?(params[:medio_pago].to_s)
+      return render json: { error: 'Decí cómo se pagó: efectivo, transferencia o Mercado Pago.' },
+                    status: :unprocessable_entity
+    end
 
-    attrs = { pagado: true }
-    attrs[:medio_pago] = params[:medio_pago] if params[:medio_pago].present?
+    @movimiento.assign_attributes(
+      pagado:     true,
+      medio_pago: params[:medio_pago],
+      fecha_pago: params[:fecha_pago].presence || Time.zone.today,
+    )
+    return unless atar_a_caja_elegida!(@movimiento, params[:caja_turno_id])
 
-    if @movimiento.update(attrs)
+    if @movimiento.save
       render json: serialize(@movimiento.reload)
     else
       render json: { errors: @movimiento.errors.full_messages }, status: :unprocessable_entity
     end
+  rescue Date::Error
+    render json: { error: 'La fecha del pago no es válida.' }, status: :unprocessable_entity
+  end
+
+  # DE QUÉ CAJA SALE EL EFECTIVO (o a cuál entra). La regla es la misma que al dispensar del
+  # depósito: se elige entre las cajas ABIERTAS de los mostradores de la organización, y si no se
+  # elige ninguna, el asiento se escribe igual y no entra a ningún arqueo. Sólo tiene sentido en
+  # efectivo —una transferencia no pasa por ningún cajón— y sólo en lo que se está pagando ahora.
+  # Devuelve false si ya contestó con el error.
+  def atar_a_caja_elegida!(movimiento, caja_id)
+    return true if caja_id.blank?
+
+    if movimiento.medio_pago != 'efectivo' || !movimiento.pagado
+      render json: { error: 'La caja sólo aplica a un pago en efectivo.' }, status: :unprocessable_entity
+      return false
+    end
+
+    caja = CajaTurno.unscoped.abiertas
+                    .where(club_id: current_user.club_id, punto_type: CajaTurno::PUNTO_MOSTRADOR)
+                    .find_by(id: caja_id)
+    if caja.nil?
+      render json: { error: 'Esa caja no está abierta. Elegí una caja abierta o registralo sin caja.' },
+             status: :unprocessable_entity
+      return false
+    end
+
+    movimiento.caja_turno = caja
+    true
   end
 
   # POST /movimientos_contables/cerrar_periodo  { hasta: 'YYYY-MM-DD' }
@@ -385,7 +430,7 @@ class MovimientosContablesController < ApplicationController
       # porque un gasto que no entra a ningún depósito también se compra por cantidad
       # (10 horas de electricista, 3 análisis de laboratorio).
       :cantidad, :unidad,
-      :pagado, :medio_pago, :notas
+      :pagado, :medio_pago, :notas, :fecha_pago
     )
   end
 
@@ -668,6 +713,9 @@ class MovimientosContablesController < ApplicationController
       proveedor:            m.proveedor,
       pagado:               m.pagado,
       medio_pago:           m.medio_pago,
+      # Cuándo salió la plata (nil mientras esté pendiente) y de qué caja, si fue del cajón.
+      fecha_pago:           m.fecha_pago,
+      caja:                 m.caja_turno ? { id: m.caja_turno.id, sede: m.caja_turno.sede&.nombre } : nil,
       notas:                m.notas,
       sede:                 m.sede ? { id: m.sede.id, nombre: m.sede.nombre } : nil,
       # A qué depósito entró la compra, para el listado. Sale por la compra de insumo que el

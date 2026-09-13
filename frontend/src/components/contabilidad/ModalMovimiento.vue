@@ -10,6 +10,7 @@ import AppDatePicker from '../ui/AppDatePicker.vue'
 import DestinoStock from './DestinoStock.vue'
 import MovimientosFijos from './MovimientosFijos.vue'
 import { createCategoriaContable, listGastosRecurrentes } from '../../lib/api.js'
+import { useCajasAbiertas, SIN_CAJA } from '../../composables/useCajasAbiertas.js'
 import {
   flowDe, hoyLocal, fmtARS, fmtMiles, parseMonto, costoUnitario, UNIDADES,
   destinoVacio, destinoEstado, destinoPayload, esDepositoSalon,
@@ -405,8 +406,11 @@ const resumenGuardar = computed(() => {
     // «por efectivo» no se dice: es EN efectivo, y POR transferencia.
     const mp = MEDIOS_PAGO.find(m => m.value === f.medio_pago)
     const medio = mp ? `${mp.value === 'efectivo' ? 'en' : 'por'} ${mp.label.toLowerCase()}` : ''
+    // Y de qué caja, si sale del cajón de un mostrador: es lo que hace que el arqueo lo espere.
+    const caja = pideCaja.value && cajaSel.value
+      ? ` ${esEgreso.value ? 'de' : 'a'} la caja de <b>${esc(cajaSel.value.sede)}</b>` : ''
     partes.push(`${esEgreso.value ? 'Salen' : 'Entran'} <b>${fmtARS(monto)}</b>` +
-                `${medio ? ` ${medio}` : ''}.`)
+                `${medio ? ` ${medio}` : ''}${caja}.`)
   }
 
   const dep = depositoSel.value
@@ -492,6 +496,19 @@ function setTipo(tipo) {
 function cerrar() { emit('update:modelValue', false) }
 
 // ─── Submit ─────────────────────────────────────────────────────────────────────
+// DE QUÉ CAJA SALE EL EFECTIVO (pedido de Germán, sep-2026). Sólo al CREAR, sólo si ya está
+// pagado y en efectivo, y sólo si hay alguna caja abierta: una transferencia no pasa por ningún
+// cajón, y lo que quedó pendiente no salió de ningún lado todavía —se pregunta al registrar el
+// pago—. En cuotas tampoco: nacen todas pendientes. La de la sede del movimiento viene
+// preseleccionada; «de ninguna» es válido y el asiento no entra a ningún arqueo.
+const { cajas, cargar: cargarCajas, cajaDeSede, etiqueta: etiquetaCaja } = useCajasAbiertas()
+const cajaElegida = ref(SIN_CAJA)
+const pideCaja = computed(() =>
+  !editando.value && !esCuotas.value && form.value.pagado && form.value.medio_pago === 'efectivo' &&
+  cajas.value.length > 0)
+watch(() => form.value.sede_id, (id) => { cajaElegida.value = cajaDeSede(id) })
+const cajaSel = computed(() => cajas.value.find(c => c.id === cajaElegida.value) || null)
+
 // El padre es quien await-ea la API: se le pasa el payload y él controla `guardando`/`errorGuardado`.
 // Así el botón queda deshabilitado durante la request (antes el estado se reseteaba al instante y un
 // doble click cargaba el movimiento dos veces).
@@ -508,6 +525,7 @@ function submit() {
     // primero: un gasto y una compra no son lo mismo en el libro.
     categoria: catActual.value?.clave || flujo.value?.claveLegacy || 'otro',
     medio_pago: esCuotas.value ? 'en_cuotas' : form.value.medio_pago,
+    caja_turno_id: pideCaja.value ? (cajaElegida.value ?? undefined) : undefined,
   }
   delete payload.plan
   // Con `pideDestinoCat` acá, una compra por el flujo mostraba el bloque de depósito y después
@@ -533,6 +551,8 @@ watch(() => props.modelValue, (abierto) => {
   crearCat.value = null; errorCrear.value = ''
   frecOpen.value = false; frecQuery.value = ''
   cargarFrecuentes()
+  cajaElegida.value = SIN_CAJA
+  if (!props.movimientoEditar) cargarCajas().then(() => { cajaElegida.value = cajaDeSede(form.value.sede_id) })
 
   if (props.movimientoEditar) {
     const m = props.movimientoEditar
@@ -883,6 +903,17 @@ const titulo = computed(() => {
                 </select>
               </div>
             </div>
+
+            <!-- En efectivo, de qué caja sale (o a cuál entra). Sólo si hay una caja abierta: sin
+                 caja no hay nada que elegir, y sin elegir el asiento se escribe igual. -->
+            <label v-if="pideCaja" class="mv-fld">
+              <span class="mv-lbl">{{ esEgreso ? 'De qué caja sale' : 'A qué caja entra' }}</span>
+              <select id="mv-caja" class="mv-inp" v-model="cajaElegida">
+                <option :value="null">De ninguna — la plata no {{ esEgreso ? 'sale de' : 'entra a' }} un mostrador</option>
+                <option v-for="c in cajas" :key="c.id" :value="c.id">{{ etiquetaCaja(c) }}</option>
+              </select>
+              <span class="mv-hint">Si {{ esEgreso ? 'sale de' : 'entra a' }} una caja, el arqueo de esa noche lo tiene en cuenta.</span>
+            </label>
 
             <!-- Plan de pago: cuotas. Es un PLAN, no un medio de pago (antes convivían en el mismo
                  selector, así que pagar en cuotas te tapaba con qué pagabas). -->

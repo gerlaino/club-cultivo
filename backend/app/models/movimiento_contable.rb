@@ -60,6 +60,13 @@ class MovimientoContable < ApplicationRecord
   # `ingreso_caja`/`retiro_caja`/`salida_caja`, siempre la traen puesta).
   before_validation :atar_a_la_caja_abierta, if: -> { categoria == 'aporte_socio' && caja_turno_id.blank? }
 
+  # CUÁNDO SALIÓ LA PLATA. `fecha` es la del gasto y no se mueve (el egreso se reconoce al
+  # comprar, pagado o no); `fecha_pago` es cuándo se pagó de verdad. Lo que nace pagado se pagó el
+  # mismo día del hecho, salvo que alguien diga otra cosa; lo que quedó pendiente la recibe en
+  # `registrar_pago`. Al volver a pendiente, se vacía: no hay pago del que hablar.
+  before_validation :completar_fecha_pago
+  validate :fecha_pago_coherente, if: -> { fecha_pago.present? }
+
   after_create   :acreditar_cuenta_corriente
   before_destroy :revertir_credito_cuenta_corriente
   # El libro es la fuente de verdad de los costos por lote: cualquier cambio
@@ -251,6 +258,24 @@ class MovimientoContable < ApplicationRecord
   end
 
   private
+
+  def completar_fecha_pago
+    if pagado
+      self.fecha_pago ||= fecha
+    else
+      self.fecha_pago = nil
+    end
+  end
+
+  # No se paga antes de comprar ni en el futuro. Contra el gasto y no contra `created_at`: una
+  # carga retroactiva es legítima. Una CUOTA sí se puede pagar antes de su vencimiento —su
+  # `fecha` es cuándo vence, no cuándo se compró—.
+  def fecha_pago_coherente
+    errors.add(:fecha_pago, 'no puede ser futura') if fecha_pago > Time.zone.today
+    return if cuota?
+
+    errors.add(:fecha_pago, 'no puede ser anterior a la fecha del gasto') if fecha.present? && fecha_pago < fecha
+  end
 
   def atar_a_la_caja_abierta
     return if sede_id.blank?

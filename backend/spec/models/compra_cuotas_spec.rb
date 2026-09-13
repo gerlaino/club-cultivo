@@ -38,9 +38,26 @@ RSpec.describe CompraCuotas, type: :model do
     expect(futuras.all? { |m| m.pagado == false }).to be(true)
   end
 
-  it 'las cuotas pasadas quedan como pagadas' do
+  # Nacían pagadas solas, con el medio de la compra y sin caja: una compra backdateada quedaba
+  # «pagada» sin que nadie dijera cuándo ni con qué. Cada cuota se salda con «Registrar pago».
+  it 'las cuotas pasadas también nacen pendientes' do
     compra = nueva(fecha_primera_cuota: (Time.zone.today << 3), cuotas_total: 2)
-    expect(compra.movimientos_contables.all?(&:pagado)).to be(true)
+    expect(compra.movimientos_contables.none?(&:pagado)).to be(true)
+    expect(compra.movimientos_contables.map(&:fecha_pago).compact).to be_empty
+  end
+
+  it 'al editar la compra conserva los pagos ya registrados, cuota por cuota' do
+    compra = nueva(fecha_primera_cuota: (Time.zone.today << 2), cuotas_total: 3)
+    primera = compra.movimientos_contables.order(:fecha).first
+    primera.update!(pagado: true, medio_pago: 'transferencia', fecha_pago: Time.zone.today - 1)
+
+    expect(compra.actualizar_y_regenerar!(proveedor: 'Otro proveedor')).to be(true)
+
+    cuotas = compra.reload.movimientos_contables.order(:cuota_numero)
+    expect(cuotas.first.pagado).to be(true)
+    expect(cuotas.first.medio_pago).to eq('transferencia')
+    expect(cuotas.first.fecha_pago).to eq(Time.zone.today - 1)
+    expect(cuotas.drop(1).none?(&:pagado)).to be(true)
   end
 
   it 'al borrar la compra borra sus cuotas' do

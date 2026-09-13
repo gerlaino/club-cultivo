@@ -40,11 +40,25 @@ class CompraCuotas < ApplicationRecord
   # Edita la compra y REGENERA las cuotas desde cero (borra los movimientos viejos y crea los
   # nuevos con el total/cantidad actualizados). Atómico. Devuelve true/false (errores en el
   # record). El guard de período cerrado se valida en el controller antes de llamar.
+  #
+  # LOS PAGOS YA REGISTRADOS SE CONSERVAN, cuota por cuota (por su número): corregir el proveedor
+  # de una compra con tres cuotas pagas no puede volver a dejarlas pendientes. Si la cantidad de
+  # cuotas baja y una pagada queda afuera, se pierde ese registro — es el mismo caso que borrar
+  # la compra, y la pantalla lo avisa.
   def actualizar_y_regenerar!(attrs)
     transaction do
+      pagos = movimientos_contables.where(pagado: true)
+                                   .pluck(:cuota_numero, :medio_pago, :fecha_pago, :caja_turno_id)
+                                   .to_h { |n, *resto| [n, resto] }
       update!(attrs)
       movimientos_contables.destroy_all
       generar_cuotas!
+      movimientos_contables.each do |cuota|
+        medio, fecha_pago, caja_id = pagos[cuota.cuota_numero]
+        next if fecha_pago.nil?
+
+        cuota.update!(pagado: true, medio_pago: medio, fecha_pago: fecha_pago, caja_turno_id: caja_id)
+      end
     end
     true
   rescue ActiveRecord::RecordInvalid
@@ -74,7 +88,11 @@ class CompraCuotas < ApplicationRecord
         medio_pago:  medio_pago,
         proveedor:   proveedor,
         cuota_numero: i,
-        pagado:      fecha <= Date.current,  # cuotas pasadas: pagadas; futuras: pendientes (zona del club)
+        # TODAS nacen pendientes (sep-2026, decisión de Germán). Antes las de fecha pasada nacían
+        # pagadas solas, con el medio de la compra y sin caja: una compra backdateada quedaba
+        # «pagada» sin que nadie dijera cuándo ni con qué. Cada cuota se salda con «Registrar
+        # pago», que pide medio, fecha y de qué caja salió si fue en efectivo.
+        pagado:      false,
         # Se refleja quién pagó (tarjeta/responsable) en cada cuota para que sea visible.
         notas:       [("Pago: #{responsable}" if responsable.present?), notas].compact.join(' · ').presence,
       )

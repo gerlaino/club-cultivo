@@ -658,6 +658,14 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   `turno_mostrador_id` y frasco; neto cero no aparece. `CorregirCierre` pide `causa`
   (`error_conteo` / `faltaba`) y **quien cerró corrige su propio último cierre** — esperar al
   admin dejaba el error en el inventario hasta el día siguiente.
+- **UN PAGO DICE CÓMO, CUÁNDO Y DE QUÉ CAJA** (sep-2026, pedido de Germán). `fecha` es la del gasto
+  y no se mueve; `fecha_pago` es cuándo salió la plata (`completar_fecha_pago`: lo que nace pagado
+  se pagó ese día). En efectivo se elige entre las cajas ABIERTAS (`useCajasAbiertas`, la misma
+  lista que el carrito del admin) y «de ninguna» es válido: el asiento se escribe igual y no entra a
+  ningún arqueo. **`CajaTurno#salidas` cuenta cualquier egreso en efectivo atado a la caja**, no sólo
+  `salida_caja` — pagar un proveedor con plata del cajón antes daba faltante o se asentaba dos veces.
+  `diferencia_caja` se excluye a propósito. **Las cuotas nacen todas pendientes** y editar la compra
+  conserva los pagos por `cuota_numero`.
 - **UN RETIRO PUEDE NACER «GUARDADO EN LA ORGANIZACIÓN»**: `retiro_caja` con
   `saldado_como: 'organizacion'` (`MovimientoContable.atributos_guardado_en_organizacion`). Sale del
   cajón, no es deuda de nadie, no es gasto. Sin «cuenta del club» a propósito.

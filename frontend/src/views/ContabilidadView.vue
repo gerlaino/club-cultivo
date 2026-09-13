@@ -10,11 +10,12 @@ import { useToast }             from "../composables/useToast.js"
 import GastosRecurrentesView from './admin/GastosRecurrentesView.vue'
 import ModalIngreso from '../components/contabilidad/ModalIngreso.vue'
 import ModalMovimiento from "../components/contabilidad/ModalMovimiento.vue"
+import ModalRegistrarPago from "../components/contabilidad/ModalRegistrarPago.vue"
 import EditarCompraCuotasModal from "../components/contabilidad/EditarCompraCuotasModal.vue"
 import DsSpinner from '../design-system/components/Spinner.vue'
 // Categorías integradas como sección de Contabilidad (config del hub contable)
 import FinanzasCatalogoView from './admin/FinanzasCatalogoView.vue'
-import { hoyISO, toISO } from '../utils/dates.js'
+import { hoyISO, toISO, formatFechaCorta } from '../utils/dates.js'
 
 const store   = useContabilidadStore()
 const auth    = useAuthStore()
@@ -575,22 +576,46 @@ async function onFijosGuardados({ items, marcar }) {
   if (ok && !fallaron) showModal.value = false
 }
 
-// Saldar un gasto que había quedado pendiente. No genera un movimiento nuevo: el egreso ya
-// está asentado desde que se compró; lo que cambia es su estado de pago.
-async function marcarPagado(m) {
-  const ok = await confirm({
-    title:   '¿Registrar el pago?',
-    message: `${m.descripcion} · ${fmt(m.monto_ars)}. Deja de figurar como pendiente.`,
-    confirmText: 'Registrar pago',
-  })
-  if (!ok) return
+// Saldar un gasto que había quedado pendiente (o una cuota). No genera un movimiento nuevo: el
+// egreso ya está asentado desde que se compró; lo que cambia es su estado de pago — con qué, qué
+// día y, si fue en efectivo, de qué caja salió. Era un confirm que sólo marcaba `pagado`.
+const showPago       = ref(false)
+const movimientoPago = ref(null)
+const guardandoPago  = ref(false)
+const errorPago      = ref('')
+
+// La pastilla «Pendiente» es el botón: un ícono verde suelto entre tres grises no decía «pagar».
+const puedePagar = (m) => canEdit.value && !m.pagado && m.tipo === 'egreso' && !esAutomatico(m) && !esCerrado(m)
+
+function abrirPago(m) {
+  if (!puedePagar(m)) return
+  movimientoPago.value = m
+  errorPago.value = ''
+  showPago.value = true
+}
+
+async function registrarPago({ id, ...payload }) {
+  guardandoPago.value = true
+  errorPago.value = ''
   try {
-    await registrarPagoMovimiento(m.id)
+    await registrarPagoMovimiento(id, payload)
+    showPago.value = false
     await store.fetch()
     toast.success('Pago registrado')
   } catch (e) {
-    toast.error(e?.response?.data?.error || 'No se pudo registrar el pago')
+    errorPago.value = e?.response?.data?.errors?.join(' · ') || e?.response?.data?.error || 'No se pudo registrar el pago'
+  } finally {
+    guardandoPago.value = false
   }
+}
+
+// Con qué y cuándo se pagó, para leerlo sin abrir nada.
+function detallePago(m) {
+  if (!m.pagado) return ''
+  const medio = { efectivo: 'en efectivo', transferencia: 'por transferencia', mercado_pago: 'por Mercado Pago' }[m.medio_pago]
+  const partes = [m.fecha_pago ? `Pagado el ${formatFechaCorta(m.fecha_pago)}` : 'Pagado', medio]
+  if (m.caja?.sede) partes.push(`de la caja de ${m.caja.sede}`)
+  return partes.filter(Boolean).join(' ')
 }
 
 async function confirmDelete(m) {
@@ -1243,23 +1268,24 @@ onMounted(async () => {
               <td class="cv__td-muted">{{ m.sede?.nombre || '—' }}</td>
               <td class="cv__td-right cv__td-bold" :style="{ color: tipoMeta(m.tipo).color }">{{ fmt(m.monto_ars) }}</td>
               <td>
-                  <span class="cv__pagado-pill" :class="m.pagado ? 'cv__pagado-pill--ok' : 'cv__pagado-pill--pend'">
+                  <!-- Saldar una compra que quedó pendiente se hace ACÁ, sobre la deuda misma: la
+                       pastilla es el botón. Antes era un ícono verde suelto en la columna de
+                       acciones, y no se encontraba. Un ingreso «a crédito» no se paga por acá: se
+                       cobra desde la cuenta corriente del paciente. -->
+                  <button v-if="puedePagar(m)" type="button"
+                          class="cv__pagado-pill cv__pagado-pill--pend cv__pagado-pill--btn"
+                          title="Registrar el pago de este gasto"
+                          @click="abrirPago(m)">
+                    Pendiente · Registrar pago
+                  </button>
+                  <span v-else class="cv__pagado-pill" :class="m.pagado ? 'cv__pagado-pill--ok' : 'cv__pagado-pill--pend'"
+                        :title="detallePago(m)">
                     {{ m.pagado ? '✓ Pagado' : (['ingreso','recupero_costo'].includes(m.tipo) ? 'A crédito' : 'Pendiente') }}
                   </span>
               </td>
               <td v-if="canEdit">
                 <div class="cv__row-actions">
                   <template v-if="!esAutomatico(m) && !esCerrado(m)">
-                    <!-- Saldar una compra que quedó pendiente. Se podía MARCAR la deuda pero
-                         no había forma de decir que se pagó: el gasto quedaba pendiente para
-                         siempre y el total por pagar no bajaba nunca. Va acá, sobre la deuda
-                         misma, y no escondido en Nuevo movimiento. -->
-                    <button v-if="!m.pagado && m.tipo === 'egreso'"
-                            class="cv__icon-btn cv__icon-btn--pago"
-                            title="Registrar el pago de este gasto"
-                            @click="marcarPagado(m)">
-                      <i class="bi bi-cash-coin"></i>
-                    </button>
                     <button class="cv__icon-btn" @click="openEdit(m)"><i class="bi bi-pencil"></i></button>
                     <button class="cv__icon-btn cv__icon-btn--danger" @click="confirmDelete(m)"><i class="bi bi-trash"></i></button>
                   </template>
@@ -1294,6 +1320,14 @@ onMounted(async () => {
       :sedes="sedes" :unidades="unidades"
       :guardando="guardandoIngreso" :error="errorIngreso"
       @guardado="guardarIngreso"
+    />
+
+    <ModalRegistrarPago
+      v-model="showPago"
+      :movimiento="movimientoPago"
+      :guardando="guardandoPago"
+      :error="errorPago"
+      @registrar="registrarPago"
     />
 
     <ModalMovimiento
@@ -1619,6 +1653,9 @@ onMounted(async () => {
 .cv__pagado-pill { font-size: .68rem; font-weight: 700; padding: .2em .65em; border-radius: 6px; white-space: nowrap; }
 .cv__pagado-pill--ok   { background: rgba(21,128,61,.1); color: #15803d; }
 .cv__pagado-pill--pend { background: rgba(180,83,9,.1);  color: #b45309; }
+.cv__pagado-pill--btn  { border: 1px solid rgba(180,83,9,.35); cursor: pointer; font-family: inherit; }
+.cv__pagado-pill--btn:hover { background: rgba(180,83,9,.18); }
+.cv__pagado-pill--btn:focus-visible { outline: 2px solid #b45309; outline-offset: 1px; }
 
 .cv__row-actions { display: flex; gap: .35rem; justify-content: flex-end; }
 
@@ -1626,8 +1663,6 @@ onMounted(async () => {
 .cv__icon-btn:hover { background: var(--c-slate-200); color: var(--c-slate-900); }
 .cv__icon-btn--danger:hover { background: #fef2f2; border-color: #fecaca; color: #dc2626; }
 /* Saldar un pendiente es la acción CONSTRUCTIVA de la fila: se distingue del editar/borrar. */
-.cv__icon-btn--pago { border-color: #bbf7d0; background: #f0fdf4; color: #15803d; }
-.cv__icon-btn--pago:hover { background: #dcfce7; border-color: #86efac; color: #14532d; }
 
 .cv__empty { text-align: center; padding: 3.5rem 1rem; color: var(--c-slate-400); }
 .cv__empty-sm { text-align: center; padding: 2rem 1rem; color: var(--c-slate-400); font-size: .85rem; }

@@ -182,6 +182,8 @@ async function guardar() {
           <p class="ecc__warn ecc__field--full">
             <i class="bi bi-info-circle"></i>
             Al guardar se recalculan y regeneran las {{ form.cuotas_total }} cuotas con el nuevo total.
+            Los pagos ya registrados se conservan, cuota por cuota; si bajás la cantidad y una cuota
+            pagada queda afuera, ese pago se pierde.
           </p>
         </div>
 

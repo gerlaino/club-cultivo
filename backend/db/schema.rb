@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_09_130000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_12_150000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1418,6 +1418,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_09_130000) do
     t.string "saldado_como"
     t.bigint "saldado_por_id"
     t.bigint "salda_a_id"
+    t.date "fecha_pago"
     t.index ["caja_turno_id"], name: "index_movimientos_contables_on_caja_turno_id"
     t.index ["categoria_contable_id"], name: "index_movimientos_contables_on_categoria_contable_id"
     t.index ["club_id", "fecha"], name: "index_movimientos_contables_on_club_id_and_fecha"

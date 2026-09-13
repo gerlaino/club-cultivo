@@ -162,8 +162,15 @@ class CajaTurno < ApplicationRecord
   # Línea PROPIA y no sumada a `total_efectivo_ars`: si el arqueo da una diferencia, quien la mira
   # tiene que poder distinguir si vino de una venta o de un pago de deuda, no adivinarlo.
   # `MovimientoContable#atar_a_la_caja_abierta` es quien la engancha acá, sola, apenas se crea.
+  #
+  # Y desde sep-2026 también un INGRESO EXCEPCIONAL que se cargó desde Contabilidad diciendo «entra
+  # en efectivo a esta caja» (una subvención, la venta de un bien): la pantalla lo pregunta y el
+  # movimiento viene atado. Ningún asiento de dispensa cuelga de la caja —lo que cobra una dispensa
+  # es su `Cobro`—, así que contar todo ingreso atado no cuenta nada dos veces.
   def otros_ingresos_efectivo
-    movs = movimientos_contables.where(categoria: 'aporte_socio', medio_pago: 'efectivo')
+    movs = movimientos_contables.where(medio_pago: 'efectivo')
+                                .where("movimientos_contables.categoria = 'aporte_socio' OR " \
+                                       "(movimientos_contables.tipo IN ('ingreso', 'recupero_costo') AND movimientos_contables.categoria <> 'diferencia_caja')")
     cerrada_at.present? ? movs.where(movimientos_contables: { created_at: ...cerrada_at }) : movs
   end
 
@@ -181,15 +188,26 @@ class CajaTurno < ApplicationRecord
   #
   # Las dos restan del esperado: en las dos, la plata no está en el cajón.
   #
-  # Se excluye la diferencia de arqueo, que se asienta al cerrar y no es plata que salió durante
-  # el turno sino lo que no apareció al contarlo.
+  #   Y CUALQUIER OTRO EGRESO EN EFECTIVO ATADO A ESTA CAJA (sep-2026): pagar un proveedor con la
+  #     plata del cajón se registra desde Contabilidad —al cargar el gasto o al saldar uno que
+  #     estaba pendiente— eligiendo de qué caja sale. Antes no había forma correcta: o el arqueo
+  #     daba faltante, o se cargaba además una `salida_caja` y el gasto quedaba asentado dos veces.
+  #     Conserva su categoría (es una compra de insumos, no «una salida»); lo que lo hace del
+  #     arqueo es la caja a la que quedó atado.
+  #
+  # Se excluye la diferencia de arqueo (`diferencia_caja`, que también es un egreso en efectivo
+  # atado a la caja): se asienta al abrir o al cerrar y no es plata que salió durante el turno
+  # sino lo que no apareció al contarlo. Contarla movería el esperado con lo que se midió contra
+  # el esperado.
   #
   # Y se excluye lo posterior al CIERRE: el retiro de la recaudación se registra justo después
   # del arqueo, y si contara como salida del turno bajaría lo esperado y la diferencia de arqueo
   # quedaría mal para siempre — un turno que cerró cuadrado aparecería con un sobrante igual a lo
   # que se llevaron. Lo de después del cierre no salió "durante": es la entrega de lo recaudado.
   def salidas
-    movs = movimientos_contables.where(categoria: %w[salida_caja retiro_caja])
+    movs = movimientos_contables.where("movimientos_contables.categoria IN ('salida_caja', 'retiro_caja') OR " \
+                                       "(movimientos_contables.tipo = 'egreso' AND movimientos_contables.medio_pago = 'efectivo' " \
+                                       " AND movimientos_contables.categoria <> 'diferencia_caja')")
     cerrada_at.present? ? movs.where(movimientos_contables: { created_at: ...cerrada_at }) : movs
   end
 

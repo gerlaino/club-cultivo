@@ -1,5 +1,34 @@
 # Changelog
 
+## Septiembre 2026 (bk) — Registrar un pago dice cómo, cuándo y de qué caja; las cuotas nacen pendientes
+
+Pedido de Germán (12-sep) probando la app: un gasto «pendiente de pago» se saldaba con un botón que
+sólo marcaba `pagado` — sin medio, sin fecha, sin decir de dónde salió la plata. Un gasto de agosto
+pagado hoy salía de la caja en agosto, y pagado con el efectivo del cajón el arqueo de la noche daba
+faltante (o, si se cargaba además como «salida de caja», el gasto quedaba asentado dos veces).
+
+- **`movimientos_contables.fecha_pago`** (migración, con backfill: lo ya pagado queda con la fecha
+  del gasto). `fecha` sigue siendo la del gasto —el egreso se reconoce al comprar—; `fecha_pago`
+  es cuándo salió la plata. No futura ni anterior al gasto; una cuota sí se paga antes de vencer.
+- **Registrar pago** (`ModalRegistrarPago`): medio obligatorio (efectivo / transferencia / Mercado
+  Pago), fecha (default hoy) y, en efectivo, **de qué caja sale**. Termina en la oración de siempre.
+  La pastilla «Pendiente» pasó a ser el botón; el ícono verde suelto en la columna de acciones no
+  se encontraba. La pastilla «Pagado» dice al pasar el mouse cuándo, con qué y de qué caja.
+- **«De qué caja sale / a qué caja entra» en un solo lugar** (`useCajasAbiertas`): vale para
+  registrar un pago, para Nuevo movimiento y para un ingreso excepcional. Lista de cajas abiertas de
+  `GET /mostradores` (la misma que usa el admin al dispensar del depósito), la de la sede del
+  movimiento preseleccionada, y **«de ninguna»** como opción válida: el asiento se escribe igual y
+  no entra a ningún arqueo. El backend valida caja abierta, de la organización y sólo en efectivo.
+- **El arqueo lo ve**: `CajaTurno#salidas` cuenta cualquier egreso en efectivo atado a la caja (no
+  sólo `salida_caja`/`retiro_caja`) y `otros_ingresos_efectivo` cualquier ingreso en efectivo atado.
+  `diferencia_caja` queda excluida explícitamente: es lo que se midió contra lo esperado.
+- **Cuotas**: nacen **todas pendientes** (antes las de fecha pasada nacían pagadas solas, con el
+  medio de la compra y sin caja) y cada una se salda con Registrar pago. Editar la compra
+  **conserva los pagos ya registrados**, cuota por cuota.
+
+Lo que NO entró: los movimientos fijos cargados en tanda siguen sin preguntar caja (son varios de
+un saque; se registran sin caja).
+
 ## Septiembre 2026 (bj) — Plan vs. real mira los días, y Cumplimiento se funde en REPROCANN con nombres
 
 Quinto y sexto de la revisión informe por informe (decisiones de Germán sobre el artifact, 12-sep).

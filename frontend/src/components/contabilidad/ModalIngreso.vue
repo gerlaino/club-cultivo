@@ -12,6 +12,7 @@
 import { ref, computed, watch } from 'vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
 import { hoyLocal, fmtMiles, parseMonto } from './movimientoFlows.js'
+import { useCajasAbiertas, SIN_CAJA } from '../../composables/useCajasAbiertas.js'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -68,6 +69,14 @@ const erroresActuales = computed(() => {
 })
 const puedeGuardar = computed(() => Object.keys(erroresActuales.value).length === 0 && !props.guardando)
 
+// A QUÉ CAJA ENTRA, si vino en efectivo y hay una caja abierta: así el arqueo de esa noche la
+// espera en vez de encontrar un sobrante. Sin caja el ingreso se registra igual. Misma regla que
+// el egreso en efectivo (`useCajasAbiertas`).
+const { cajas, cargar: cargarCajas, cajaDeSede, etiqueta: etiquetaCaja } = useCajasAbiertas()
+const cajaElegida = ref(SIN_CAJA)
+const pideCaja    = computed(() => form.value.medio_pago === 'efectivo' && cajas.value.length > 0)
+watch(() => form.value.sede_id, (id) => { cajaElegida.value = cajaDeSede(id) })
+
 function guardar() {
   errores.value = erroresActuales.value
   if (Object.keys(errores.value).length) return
@@ -82,6 +91,7 @@ function guardar() {
     pagado: true,                       // un ingreso excepcional se registra cuando ya entró
     sede_id: form.value.sede_id,
     unidad_negocio_id: form.value.unidad_negocio_id,
+    caja_turno_id: pideCaja.value ? (cajaElegida.value ?? undefined) : undefined,
   })
 }
 
@@ -92,6 +102,8 @@ watch(() => props.modelValue, (abierto) => {
   form.value = vacio()
   montoTexto.value = ''
   errores.value = {}
+  cajaElegida.value = SIN_CAJA
+  cargarCajas().then(() => { cajaElegida.value = cajaDeSede(form.value.sede_id) })
 })
 </script>
 
@@ -150,6 +162,15 @@ watch(() => props.modelValue, (abierto) => {
             </label>
           </div>
 
+          <label v-if="pideCaja" class="mi__fld">
+            <span class="mi__lbl">A qué caja entra</span>
+            <select id="mi-caja" class="mi__inp" v-model="cajaElegida">
+              <option :value="null">A ninguna — no entra a un mostrador</option>
+              <option v-for="c in cajas" :key="c.id" :value="c.id">{{ etiquetaCaja(c) }}</option>
+            </select>
+            <span class="mi__hint">Si entra a una caja, el arqueo de esa noche la espera.</span>
+          </label>
+
           <div class="mi__row">
             <label v-if="sectores.length" class="mi__fld mi__fld--sm">
               <span class="mi__lbl">Sector <span class="mi__opt">(opcional)</span></span>
@@ -193,6 +214,7 @@ watch(() => props.modelValue, (abierto) => {
 .mi__row { display: flex; gap: .7rem; flex-wrap: wrap; }
 .mi__lbl { font-size: .74rem; font-weight: 700; color: var(--c-slate-500); }
 .mi__opt { font-weight: 400; color: var(--c-slate-400); }
+.mi__hint { font-size: .72rem; color: var(--c-slate-500); line-height: 1.4; }
 .mi__inp { width: 100%; box-sizing: border-box; padding: .5rem .65rem; border: 1.5px solid var(--c-slate-200); border-radius: 9px; font-size: .86rem; color: var(--c-slate-900); font-family: inherit; }
 .mi__inp:focus { outline: none; border-color: #15803d; }
 .mi__inp--err { border-color: var(--c-rust-600); }
