@@ -36,6 +36,9 @@ RSpec.describe 'Inicio del dispensador — ve lo suyo', type: :request do
                          fecha_dispensacion: Time.zone.today)
   end
 
+  # Las sedes de este spec son de producción (sin mostrador que abrir) y los dispensadores se les
+  # asignan SIN validar: hoy la app no lo deja (`UserSede#sede_del_tipo_del_rol`), pero lo que se
+  # prueba acá es el alcance por sede, no la asignación.
   before do
     ActsAsTenant.with_tenant(club) do
       dispensa!(usuario: ana,  paciente: paciente_de_ana,  sede: norte, gramos: 10)
@@ -85,7 +88,7 @@ RSpec.describe 'Inicio del dispensador — ve lo suyo', type: :request do
 
     it 've el stock de SU sede, no el de todas' do
       ActsAsTenant.with_tenant(club) do
-        UserSede.create!(user: ana, sede: norte)
+        UserSede.new(user: ana, sede: norte).save!(validate: false)
         stock_en(sur, cantidad: 9_999)
       end
 
@@ -101,8 +104,10 @@ RSpec.describe 'Inicio del dispensador — ve lo suyo', type: :request do
     it 'la tarjeta de caja apunta a una sede que ATIENDE, aunque tenga una de producción antes' do
       ActsAsTenant.with_tenant(club) do
         finca = create(:sede, club: club, nombre: 'Finca Norte', tipo: 'produccion')
+        # Dato heredado: hoy la app no deja asignar un dispensador a una sede de producción
+        # (`UserSede#sede_del_tipo_del_rol`), pero en producción ya había uno así.
+        UserSede.new(user: ana, sede: finca).save!(validate: false)
         sur.update!(tipo: 'mixta')
-        UserSede.create!(user: ana, sede: finca)
         UserSede.create!(user: ana, sede: sur)
       end
 

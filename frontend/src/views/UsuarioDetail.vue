@@ -828,7 +828,7 @@ onMounted(async () => {
               <span class="ud__card-title">Sedes</span>
             </div>
             <div class="ud__card-body">
-              <UsuarioSedesManager :user-id="userId" />
+              <UsuarioSedesManager :user-id="userId" :user-role="u.role" />
               <p v-if="u.role === 'supervisor'" class="ud__sede-note ud__sede-note--warn">
                 <i class="bi bi-exclamation-triangle-fill"></i>
                 Requiere al menos una sede asignada para operar.

@@ -34,7 +34,7 @@ RSpec.describe 'Historial de dispensaciones — alcance por rol', type: :request
       # Ana atiende en Norte; Beto, en Sur.
       dispensa!(usuario: ana,  paciente: pac_ana,  sede: norte, gramos: 10)
       dispensa!(usuario: beto, paciente: pac_beto, sede: sur,   gramos: 40)
-      UserSede.create!(user: ana, sede: norte)
+      UserSede.new(user: ana, sede: norte).save!(validate: false)
     end
   end
 

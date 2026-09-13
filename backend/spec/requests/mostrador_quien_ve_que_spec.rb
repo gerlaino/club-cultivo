@@ -156,7 +156,7 @@ RSpec.describe 'El mostrador de una sede que no es la mía', type: :request do
   # Dana atiende SÓLO en Norte.
   let(:dana) do
     u = create(:user, :dispensador, club: club)
-    ActsAsTenant.with_tenant(club) { UserSede.create!(user: u, sede: norte) }
+    ActsAsTenant.with_tenant(club) { UserSede.new(user: u, sede: norte).save!(validate: false) }
     u
   end
 

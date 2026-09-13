@@ -134,6 +134,23 @@ export function rolPermisos(valor) { return rolInfo(valor).permisos || [] }
 
 // Qué roles se limitan por sede, y si la sede es obligatoria para que puedan trabajar.
 export function rolSedes(valor)      { return rolInfo(valor).sedes || null }
+
+// A QUÉ SEDES SE ASIGNA CADA ROL. La regla vive en el backend (`Sede::TIPOS_POR_ROL`, la aplica
+// `UserSede`) y viaja en `/me` (`reglas_cultivo.sedes_por_rol`): acá sólo se lee, con un respaldo
+// por si el usuario cargado es de antes. Un cultivador no va a un dispensario ni un dispensador a
+// una finca (Germán, 13-sep-2026). Los roles que no figuran van a cualquiera.
+const SEDES_POR_ROL_FALLBACK = {
+  cultivador: ['produccion', 'mixta'], manicura: ['produccion', 'mixta'],
+  dispensador: ['social', 'mixta'], medico: ['social', 'mixta'], delivery: ['social', 'mixta'],
+}
+export function tiposDeSedePara(rol, reglas) {
+  const tabla = reglas?.sedes_por_rol || SEDES_POR_ROL_FALLBACK
+  return tabla[rol] || null   // null = cualquiera
+}
+export function sedesParaRol(rol, sedes, reglas) {
+  const tipos = tiposDeSedePara(rol, reglas)
+  return tipos ? (sedes || []).filter(s => tipos.includes(s.tipo)) : (sedes || [])
+}
 export function rolPideSede(valor)   { return !!rolInfo(valor).sedes?.pide }
 export function rolHintSede(valor)   { return rolInfo(valor).sedes?.hint || '' }
 

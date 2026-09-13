@@ -9,7 +9,7 @@ import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import CredencialesNuevas from '../components/ui/CredencialesNuevas.vue'
-import { rolesParaAlta, rolInfo, rolEstilo, rolColor, rolBg, rolPideSede, rolHintSede } from '../lib/roles.js'
+import { rolesParaAlta, rolInfo, rolEstilo, rolColor, rolBg, rolPideSede, rolHintSede, sedesParaRol } from '../lib/roles.js'
 
 const store           = useUsuariosStore()
 const club            = useClubStore()
@@ -78,6 +78,8 @@ const wizardStep = ref(1)
 
 const todasLasSalas       = ref([])
 const todasLasSedes       = ref([])
+// Sólo las sedes donde el rol elegido tiene algo que hacer (regla del backend, vía /me).
+const sedesParaElRol      = computed(() => sedesParaRol(form.value.role, todasLasSedes.value, auth.user?.reglas_cultivo))
 const sedesSeleccionadas  = ref([])
 
 const form = ref({ id: null, first_name: "", last_name: "", email: "", email_personal: "", role: "admin", sede_id: "", sala_id: "" })
@@ -416,12 +418,12 @@ async function removeOne(u) {
                   <span v-else class="uv__opt"> (opcional)</span>
                 </label>
 
-                <div v-if="todasLasSedes.length === 0" class="uv__sedes-empty">
-                  <i class="bi bi-building-dash"></i> No hay sedes configuradas en la organización.
+                <div v-if="sedesParaElRol.length === 0" class="uv__sedes-empty">
+                  <i class="bi bi-building-dash"></i> {{ todasLasSedes.length ? 'Ninguna sede de la organización es del tipo que atiende este rol.' : 'No hay sedes configuradas en la organización.' }}
                 </div>
                 <div v-else class="uv__sedes-list">
                   <label
-                    v-for="s in todasLasSedes"
+                    v-for="s in sedesParaElRol"
                     :key="s.id"
                     class="uv__sede-item"
                     :class="{ 'uv__sede-item--checked': sedesSeleccionadas.includes(s.id) }"
@@ -453,7 +455,7 @@ async function removeOne(u) {
                   <label class="uv__label">Sede <span class="uv__opt">(opcional)</span></label>
                   <select class="uv__input" v-model="form.sede_id" @change="form.sala_id = ''">
                     <option value="">Sin sede asignada</option>
-                    <option v-for="s in todasLasSedes" :key="s.id" :value="s.id">{{ s.nombre }}</option>
+                    <option v-for="s in sedesParaElRol" :key="s.id" :value="s.id">{{ s.nombre }}</option>
                   </select>
                 </div>
                 <div v-if="form.sede_id && salasDeLaSede.length > 0" class="uv__field uv__field--full">

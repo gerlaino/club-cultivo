@@ -38,11 +38,13 @@
 import { ref, computed, onMounted } from 'vue'
 import { logger } from '../utils/logger.js'
 import { useAuthStore } from '../stores/auth'
+import { sedesParaRol } from '../lib/roles.js'
 import { getUserSedesAsignadas, asignarSedeAUsuario, desasignarSedeAUsuario, listSedes } from '../lib/api.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 
 const props = defineProps({
-  userId: { type: Number, required: true },
+  userId:   { type: Number, required: true },
+  userRole: { type: String, default: '' },
 })
 // Las sedes asignadas, cada vez que cambian: el manager de salas se acota a ellas.
 const emit = defineEmits(['change'])
@@ -69,7 +71,10 @@ onMounted(async () => {
       listSedes(),
     ])
     sedesAsignadas.value = resSedes.data || []
-    todasLasSedes.value  = resTodas.data || []
+    // Sólo las sedes donde este rol tiene algo que hacer (regla del backend, vía /me), más las
+    // que ya tenga de antes aunque hoy no se ofrezcan: se ven para poder quitarlas.
+    const ofrecidas = sedesParaRol(props.userRole, resTodas.data || [], auth.user?.reglas_cultivo)
+    todasLasSedes.value  = [...ofrecidas, ...sedesAsignadas.value.filter(a => !ofrecidas.some(o => o.id === a.id))]
     // Sin permiso de edición igual se ven las asignadas, marcadas.
     if (!puedeEditar.value) todasLasSedes.value = sedesAsignadas.value
     avisar()

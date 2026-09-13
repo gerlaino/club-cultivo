@@ -27,6 +27,20 @@ class Sede < ApplicationRecord
     'mixta'      => %w[cultivo produccion_dispensa],
   }.freeze
 
+  # A QUÉ SEDES SE PUEDE ASIGNAR CADA ROL (Germán, 13-sep-2026): un cultivador no tiene nada que
+  # hacer en un dispensario ni un dispensador en una finca. La regla vive acá —es del dato, la
+  # aplica `UserSede`— y viaja al front en `/me` (`reglas_cultivo.sedes_por_rol`) para que la
+  # pantalla ofrezca sólo lo que el backend acepta. Los roles que no figuran van a cualquiera.
+  TIPOS_POR_ROL = {
+    'cultivador'  => %w[produccion mixta],
+    'manicura'    => %w[produccion mixta],
+    'dispensador' => %w[social mixta],
+    'medico'      => %w[social mixta],
+    'delivery'    => %w[social mixta],
+  }.freeze
+
+  def self.tipos_para_rol(rol) = TIPOS_POR_ROL[rol.to_s] || TIPOS
+
   validates :nombre, presence: true
   validates :tipo,   inclusion: { in: TIPOS }
   # Sólo al CREAR. Una organización puede dar de baja una suite y quedarse con sedes de un tipo

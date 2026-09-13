@@ -171,6 +171,9 @@ class ClubUsersController < ApplicationController
     render json: { message: "Sede asignada correctamente" }
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Sede no encontrada' }, status: :not_found
+  rescue ActiveRecord::RecordInvalid => e
+    # Un cultivador en un dispensario, un dispensador en una finca: la regla es del dato.
+    render json: { error: e.record.errors.full_messages.join(', ') }, status: :unprocessable_entity
   end
 
   def desasignar_sede

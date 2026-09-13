@@ -254,6 +254,10 @@ cambio de rol (`Club::ROLES_ALTA` + `CambioDeRol`). **Cambiar el rol pasa por la
 crearlo** (rol ofrecido, módulo, cupo, repartidor sin paquetes en la calle); los permisos cambian en
 el acto y el historial queda con el `user_id`.
 
+**CADA ROL SÓLO SE ASIGNA A LAS SEDES DONDE TIENE ALGO QUE HACER** (`Sede::TIPOS_POR_ROL`, lo aplica
+`UserSede`, viaja en `/me` como `reglas_cultivo.sedes_por_rol` y el front lo lee con `sedesParaRol`):
+cultivador/manicura → producción o mixta; dispensador/médico/delivery → dispensario o mixta.
+
 **No existe ni va a existir** rol contador.
 
 ---

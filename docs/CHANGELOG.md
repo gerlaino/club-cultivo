@@ -6,6 +6,10 @@
   aparecen sus salas para elegir; quitar la sede se lleva sus salas. Sin ninguna sede, ve toda la
   organización. Eran dos tarjetas —salas arriba, sedes abajo— con las salas de todas las sedes,
   incluidas las que la persona no ve (Germán, 13-sep). `UsuarioSalasManager` se retiró.
+- **Cada rol sólo se asigna a las sedes donde tiene algo que hacer** (`Sede::TIPOS_POR_ROL`, lo
+  aplica `UserSede`, viaja en `/me`): cultivador y manicura a producción o mixta; dispensador,
+  médico y delivery a dispensario o mixta. Las tres pantallas (alta, ficha, aside) ofrecen sólo
+  eso; una asignación heredada que hoy no se ofrecería se sigue viendo para poder quitarla.
 - El checkbox del historial de actividad decía «Ver lo que generó la app» —«¿no es todo de la
   app?»—: ahora dice **«Incluir los asientos automáticos»**, que es lo que esconde (el asiento
   contable de cada dispensa, los renglones del arqueo: tapaban 8 de cada 10 filas).

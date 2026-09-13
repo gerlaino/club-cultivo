@@ -61,6 +61,7 @@ import { ref, computed, onMounted } from 'vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import { logger } from '../utils/logger.js'
 import { useAuthStore } from '../stores/auth'
+import { sedesParaRol } from '../lib/roles.js'
 import {
   getUserSedesAsignadas, asignarSedeAUsuario, desasignarSedeAUsuario, listSedes,
   getUserSalasAsignadas, asignarSalaAUsuario, desasignarSalaAUsuario, listSalas,
@@ -89,8 +90,15 @@ const tipoLabel = (t) => TIPO[t] || t || ''
 const isSede = (sede) => sedesAsignadas.value.some(s => s.id === sede.id)
 const isSala = (sala) => salasAsignadas.value.some(s => s.id === sala.id)
 
-// Sin permiso de edición se ven sólo las asignadas, marcadas.
-const sedes = computed(() => puedeEditar.value ? todasLasSedes.value : sedesAsignadas.value)
+// Sólo las sedes donde este rol tiene algo que hacer (regla del backend, vía /me), más las que
+// ya tenga asignadas de antes aunque hoy no se ofrezcan: se ven, marcadas, para poder quitarlas.
+// Sin permiso de edición se ven sólo las asignadas.
+const sedes = computed(() => {
+  if (!puedeEditar.value) return sedesAsignadas.value
+  const ofrecidas = sedesParaRol(props.userRole, todasLasSedes.value, auth.user?.reglas_cultivo)
+  const heredadas = sedesAsignadas.value.filter(a => !ofrecidas.some(o => o.id === a.id))
+  return [...ofrecidas, ...heredadas]
+})
 
 // Las salas de cultivo de esa sede (las de manicura para un manicura). Una sede de dispensario
 // no tiene salas de cultivo: se asigna igual —la persona ve esa sede— y lo dice.

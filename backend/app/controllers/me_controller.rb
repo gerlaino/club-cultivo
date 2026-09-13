@@ -48,7 +48,9 @@ class MeController < ApplicationController
     #
     # Va en /me a propósito: el router espera este request antes de montar cualquier pantalla,
     # así que la regla siempre está antes de que se pueda abrir un formulario.
-    data['reglas_cultivo'] = { 'kinds_sala_por_estado' => Lote::KINDS_SALA_POR_ESTADO }
+    data['reglas_cultivo'] = { 'kinds_sala_por_estado' => Lote::KINDS_SALA_POR_ESTADO,
+                               # A qué sedes se asigna cada rol: la pantalla ofrece sólo eso.
+                               'sedes_por_rol'         => Sede::TIPOS_POR_ROL }
 
     render json: data
   end
