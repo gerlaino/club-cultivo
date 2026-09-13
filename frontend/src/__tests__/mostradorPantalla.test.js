@@ -47,6 +47,7 @@ const getMostrador    = vi.fn(() => Promise.resolve({ data: respuesta }))
 const cargarMostrador = vi.fn(() => Promise.resolve({ data: {} }))
 const abrirMostrador  = vi.fn(() => Promise.resolve({ data: {} }))
 const cerrarMostrador = vi.fn(() => Promise.resolve({ data: {} }))
+const pedirReposicionMostrador = vi.fn(() => Promise.resolve({ data: { ok: true } }))
 const contarMostrador = vi.fn(() => Promise.resolve({ data: {} }))
 const ingresoCajaMostrador = vi.fn(() => Promise.resolve({ data: {} }))
 const salidaCajaMostrador  = vi.fn(() => Promise.resolve({ data: {} }))
@@ -64,6 +65,7 @@ vi.mock('../lib/api.js', () => ({
   salidaCajaMostrador:  (...a) => salidaCajaMostrador(...a),
   getMermaMostrador: vi.fn(() => Promise.resolve({ data: { resumen: { turnos: 0 }, por_producto: [], por_turno: [] } })),
   contarMostrador: (...a) => contarMostrador(...a),
+  pedirReposicionMostrador: (...a) => pedirReposicionMostrador(...a),
   revisarTurnoMostrador: vi.fn(), getTurnoMostrador: vi.fn(), corregirTurnoMostrador: vi.fn(),
   listTurnosMostrador: vi.fn(() => Promise.resolve({ data: { turnos: [], gestiona: false } })),
   listRendiciones: vi.fn(() => Promise.resolve({ data: { rendiciones: [] } })),
@@ -313,6 +315,50 @@ describe('Lo que ve quien atiende', () => {
     const w = await montar('dispensador')
 
     expect(w.findAll('.tmo__th').map(t => t.text()).join(' ')).not.toContain('Costo')
+  })
+
+  // AGOTADO ≠ SACADO (Germán, sep-2026): lo que se terminó atendiendo no desaparece de la lista.
+  // Sigue en cero; con producto en el depósito lleva «Pedir reposición», sin producto queda
+  // apagado y el título de la fila dice por qué. Sin esto, él no tenía idea de si se acabó.
+  describe('lo que se agotó', () => {
+    beforeEach(() => {
+      respuesta = { ...respuesta, turno: TURNO, agotados: [
+        { ...PREROLL, mostrador: 0, agotado: true, hay_en_deposito: true,  reposicion_pedida: false },
+        { ...FLOR, stock_id: 9, numero: 'ST-26-0099', mostrador: 0, agotado: true, hay_en_deposito: false },
+      ] }
+    })
+
+    const filaDe = (w, numero) => filas(w).find(f => f.text().includes(numero))
+
+    it('sigue en la lista, en cero, después de lo que hay', async () => {
+      const w = await montar('dispensador')
+
+      expect(filas(w)).toHaveLength(3)
+      expect(fila(w, 0).classes()).toContain('is-en-mesa')
+      expect(filaDe(w, 'ST-26-0061').classes()).toContain('is-agotada')
+      expect(filaDe(w, 'ST-26-0061').find('.tmo__mesa').text()).toBe('0')
+    })
+
+    it('con producto en el depósito ofrece pedir reposición, y no contar', async () => {
+      const w = await montar('dispensador')
+      const f = filaDe(w, 'ST-26-0061')
+
+      expect(f.find('.tmo__reponer').text()).toBe('Pedir reposición')
+      expect(f.find('.tmo__contar').exists()).toBe(false)
+      await f.find('.tmo__reponer').trigger('click')
+      await flushPromises()
+      expect(pedirReposicionMostrador).toHaveBeenCalledWith(10, { stock_id: 2 })
+    })
+
+    it('sin producto en el depósito, la fila queda apagada y lo dice', async () => {
+      const w = await montar('dispensador')
+      const f = filaDe(w, 'ST-26-0099')
+
+      expect(f.classes()).toContain('is-sin-deposito')
+      expect(f.attributes('title')).toContain('Stock agotado')
+      expect(f.find('.tmo__reponer').exists()).toBe(false)
+      expect(f.find('.tmo__agotado').text()).toBe('agotado')
+    })
   })
 
   // Cerrar y reabrir con quince frascos son veinte minutos: el control que cuesta eso no se

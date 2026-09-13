@@ -25,6 +25,19 @@ class MostradorItem < ApplicationRecord
   # que dicen quién lo puso y quién lo sacó— simplemente deja de listarse.
   scope :con_stock, -> { where('cantidad > 0') }
 
+  # AGOTADO ≠ SACADO. Un renglón en cero se dejó de listar siempre, y para quien atiende eso era
+  # una desaparición: el frasco que se terminó a las cinco de la tarde no estaba en ningún lado,
+  # y no había forma de pedir que lo repongan (pedido de Germán, sep-2026). Se agotó si llegó a
+  # cero DISPENSANDO (o contando); si lo bajó administración a propósito (`retiro`), se fue de la
+  # mesa y no hay nada que reponer. Un stock que se terminó del todo (`estado: agotado`) sigue
+  # siendo agotado sobre la mesa: es justo la fila apagada que dice «tampoco queda en el depósito».
+  def agotado?
+    return false unless cantidad.to_d.zero? && stock
+
+    ultimo = movimientos.order(created_at: :desc).first
+    ultimo.present? && ultimo.tipo != 'retiro'
+  end
+
   # Cada cambio de la mesa se avisa por el canal del club: si el admin baja producto desde su
   # oficina, el que atiende lo ve sin recargar.
   after_commit { mostrador&.avisar_cambio }

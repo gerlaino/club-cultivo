@@ -100,7 +100,7 @@
         <input v-model.trim="busqueda" type="search" class="mmo__buscar"
                placeholder="Buscar producto, variedad o lote…" aria-label="Buscar" />
 
-        <p v-if="!mesa.length" class="mmo__vacio">
+        <p v-if="!mesa.length && !agotados.length" class="mmo__vacio">
           La mesa está vacía. La carga administración: pedile lo que necesites.
         </p>
         <p v-else-if="!visibles.length" class="mmo__vacio">Nada coincide con «{{ busqueda }}».</p>
@@ -116,6 +116,10 @@
             </span>
             <span class="mmo__card-cant">
               <b>{{ fmt(s.mostrador) }}</b><small>{{ s.unidad }}</small>
+              <!-- Se terminó atendiendo: sigue acá para que se vea y se pida. Si tampoco queda
+                   en el depósito, lo dice — no hay a quién pedirle. -->
+              <em v-if="s.agotado && !s.hay_en_deposito" class="mmo__card-agotado" title="Stock agotado: tampoco queda en el depósito">agotado</em>
+              <em v-else-if="s.agotado && !pedido(s)" class="mmo__card-agotado" title="Se terminó: pedí reposición desde la hoja">se acabó</em>
               <em v-if="pedido(s)" class="mmo__card-pedido" title="Reposición pedida hoy">pedido</em>
               <!-- De lo que hay arriba, cuánto ya tiene dueño. En la LISTA sólo si hay algo: la
                    pantalla es de una línea por producto a propósito, y "0 g reservados" en cada
@@ -178,14 +182,17 @@
         <p v-else-if="pedido(detalle)" class="mmo__sheet-nota">
           Ya pediste reposición de esto hoy. Administración lo tiene en su campana.
         </p>
+        <p v-else-if="detalle.agotado" class="mmo__sheet-nota">
+          Stock agotado: tampoco queda en el depósito. No hay a quién pedirle reposición.
+        </p>
 
         <!-- Contar ESTE frasco sin cerrar la caja: con quince productos, el arqueo entero para
              verificar uno son veinte minutos, y el control que cuesta eso no se hace. Con la
              caja cerrada el gesto es abrir, que ya cuenta todo. -->
-        <button v-if="turno" class="mmo__btn" @click="contarEste">
+        <button v-if="turno && !detalle.agotado" class="mmo__btn" @click="contarEste">
           Contar {{ formaLabel(detalle.forma).toLowerCase() }}
         </button>
-        <p v-else class="mmo__sheet-nota">
+        <p v-else-if="!detalle.agotado" class="mmo__sheet-nota">
           Para contar un producto suelto hay que tener la caja abierta.
         </p>
       </div>
@@ -232,7 +239,6 @@ import ModalContarItem from '../../components/mostrador/ModalContarItem.vue'
 import ModalConteo from '../../components/mostrador/ModalConteo.vue'
 import SheetBottom from '../../components/cultivador/SheetBottom.vue'
 import { formaLabel } from '../../lib/formatters.js'
-import { pedirReposicionMostrador } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useMostrador } from '../../composables/useMostrador.js'
@@ -240,9 +246,9 @@ import { useMostrador } from '../../composables/useMostrador.js'
 const auth  = useAuthStore()
 const toast = useToast()
 const {
-  sedeId, sedes, faltaSede, motivoSinSede, cargando, guardando, error, turno, mesa, estado,
+  sedeId, sedes, faltaSede, motivoSinSede, cargando, guardando, error, turno, mesa, agotados, estado,
   fondoSugerido, esperadoEfectivo, otrosIngresosEfectivo, movimientosDelTurno,
-  cargar, confirmarConteo, confirmarConteoDeUno,
+  cargar, confirmarConteo, confirmarConteoDeUno, pidiendo, pedirReposicion: pedirReposicionMesa,
 } = useMostrador()
 
 const tab          = ref('hoy')
@@ -251,25 +257,14 @@ const detalle      = ref(null)
 const conteo       = ref(null)   // 'apertura' | 'cierre'
 const itemAContar  = ref(null)
 const movsAbiertos = ref(false)
-const pidiendo     = ref(null)
 
 // Lo ya pedido HOY lo dice el backend en cada producto: uno por producto y por día, para que la
 // campana de administración no se llene del mismo aviso.
 const pedido = (s) => !!s?.reposicion_pedida
 
-// PEDIR, NO MIRAR. Él no ve cuánto hay guardado; dice que se le está acabando y el aviso le llega
-// a administración por la campana y por el celular. No elige cuánto: eso lo decide quien gobierna
-// la mesa.
+// El pedido vive en el composable (es el mismo que el de escritorio); acá sólo se cierra la hoja.
 async function pedirReposicion (s) {
-  pidiendo.value = s.stock_id
-  try {
-    await pedirReposicionMostrador(sedeId.value, { stock_id: s.stock_id })
-    toast.success('Pedido enviado a administración')
-    await cargar()
-    detalle.value = null
-  } catch (e) {
-    toast.error(e?.response?.data?.error || 'No se pudo enviar el pedido')
-  } finally { pidiendo.value = null }
+  if (await pedirReposicionMesa(s)) detalle.value = null
 }
 
 // La hoja se cierra con el gesto de arrastrar, que sólo sabe de un booleano: sin esto, cerrarla
@@ -285,14 +280,14 @@ const esMia = computed(() => turno.value?.abierto_por_id === auth.user?.id)
 // mismo producto, lo más viejo arriba: es lo que sale primero.
 const visibles = computed(() => {
   const q = busqueda.value.toLowerCase()
-  return mesa.value
-    .filter(s => !q || [formaLabel(s.forma), s.genetica, s.lote, s.numero]
-      .some(v => String(v || '').toLowerCase().includes(q)))
-    .slice()
-    .sort((a, b) =>
-      formaLabel(a.forma).localeCompare(formaLabel(b.forma)) ||
-      String(a.genetica || '').localeCompare(String(b.genetica || '')) ||
-      String(a.fecha || '').localeCompare(String(b.fecha || '')))
+  const orden = (a, b) =>
+    formaLabel(a.forma).localeCompare(formaLabel(b.forma)) ||
+    String(a.genetica || '').localeCompare(String(b.genetica || '')) ||
+    String(a.fecha || '').localeCompare(String(b.fecha || ''))
+  const coincide = (s) => !q || [formaLabel(s.forma), s.genetica, s.lote, s.numero]
+    .some(v => String(v || '').toLowerCase().includes(q))
+  // Lo agotado al final, en cero: sigue en la lista para que se vea y se pida.
+  return [...mesa.value.filter(coincide).sort(orden), ...agotados.value.filter(coincide).sort(orden)]
 })
 
 const fmt   = (n) => Number(n ?? 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })
@@ -444,6 +439,11 @@ async function onConfirmarConteoDeUno (payload) {
 .mmo__card-pedido {
   display: block; font-style: normal; font-size: .62rem; font-weight: 700;
   color: var(--c-sky-600); text-transform: uppercase; letter-spacing: .03em;
+}
+.mmo__card-agotado {
+  display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px;
+  font-style: normal; font-size: .62rem; font-weight: 700;
+  background: var(--c-amber-100); color: var(--c-amber-500); text-transform: uppercase; letter-spacing: .03em;
 }
 .mmo__btn--sec { background: #fff; color: var(--c-leaf-800); border: 1.5px solid var(--c-leaf-600); }
 .mmo__sheet-nota { margin: 0; font-size: .82rem; color: var(--c-slate-500); text-align: center; }

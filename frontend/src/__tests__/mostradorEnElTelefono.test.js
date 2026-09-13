@@ -148,6 +148,27 @@ describe('La mesa, para quien atiende', () => {
 
     expect(w.find('.mmo__vacio').text()).toContain('administración')
   })
+
+  // AGOTADO ≠ SACADO (Germán, sep-2026): lo que se terminó atendiendo sigue en la lista, en cero.
+  // Con producto en el depósito se puede pedir; sin producto, lo dice y no ofrece nada.
+  it('lo que se agotó sigue en la lista, en cero, al final', async () => {
+    const agotadoConDeposito = { ...FLOR, mostrador: 0, agotado: true, hay_en_deposito: true }
+    const agotadoSinNada     = { ...PREROLL, mostrador: 0, agotado: true, hay_en_deposito: false }
+    respuesta = { ...respuesta, mesa: [], agotados: [agotadoConDeposito, agotadoSinNada] }
+    const w = await montar()
+
+    expect(w.find('.mmo__vacio').exists()).toBe(false)
+    expect(tarjetas(w)).toHaveLength(2)
+    const flor = tarjetas(w).find(t => t.text().includes('Northern Lights'))
+    expect(flor.find('.mmo__card-agotado').text()).toBe('se acabó')
+    const pre = tarjetas(w).find(t => t.text().includes('Amnesia'))
+    expect(pre.find('.mmo__card-agotado').text()).toBe('agotado')
+
+    // En la hoja: el botón sólo si hay de dónde reponer; si no, lo dice.
+    await pre.trigger('click')
+    expect(w.text()).toContain('tampoco queda en el depósito')
+    expect(w.findAll('.mmo__btn--sec')).toHaveLength(0)
+  })
 })
 
 describe('La caja', () => {

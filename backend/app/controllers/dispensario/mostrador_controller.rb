@@ -27,6 +27,11 @@ module Dispensario
         # LO QUE HAY SOBRE LA MESA. Es el estado permanente del mostrador, no del turno: existe
         # con la caja abierta y con la caja cerrada, porque el producto está físicamente ahí.
         mesa:        mesa.map { |mi| serialize_item(mi) },
+        # LO QUE SE AGOTÓ ATENDIENDO, en cero: sigue en la lista con el botón de reposición (si en el
+        # depósito queda) o deshabilitado diciendo que no queda. Desaparecer de la lista era no
+        # saber si se acabó o si nunca estuvo. Aparte de `mesa` a propósito: la mesa es lo que se
+        # cuenta y de lo que se dispensa, y acá no hay nada de eso.
+        agotados:    @mostrador.agotados.map { |mi| serialize_item(mi).merge(agotado: true) },
         # El turno de caja, si hay uno abierto. Nil = nadie está atendiendo, y eso NO significa
         # que la mesa esté vacía.
         turno:       serialize_turno(turno),

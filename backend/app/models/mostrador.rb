@@ -47,6 +47,9 @@ class Mostrador < ApplicationRecord
   # Lo que hay sobre la mesa ahora. Cero filas no es lo mismo que "cerrado": el mostrador existe
   # siempre, y puede estar vacío esperando que el admin lo cargue.
   def sobre_la_mesa = items.con_stock.includes(:stock)
+  # Lo que se terminó atendiendo y sigue en cero: para que quien atiende lo vea y pida reponer.
+  # No entra al arqueo (no hay nada que contar) ni a la dispensa (no hay nada arriba).
+  def agotados = items.where(cantidad: 0).includes(:stock, :movimientos).select(&:agotado?)
 
   def vacio? = !items.con_stock.exists?
 

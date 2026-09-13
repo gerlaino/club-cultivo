@@ -205,6 +205,7 @@
       <TablaMostrador v-if="!faltaSede && !debeElegirSede" v-model="cantidades" :stocks="tabla" :editable="gestiona"
                       :muestra-costo="gestiona"
                       :contable="!gestiona && !!turno" @contar="itemAContar = $event"
+                      :pidiendo="pidiendo" @reponer="pedirReposicion"
                       :vacio-texto="gestiona ? 'No hay stock habilitado para dispensar en esta sede.'
                                              : 'La mesa está vacía. La carga administración.'">
         <!-- Guardar va en el pie de la tabla, junto al resumen de lo que cambió: en una barra
@@ -312,7 +313,7 @@ const {
   cargando, guardando, error, turno, mesa, estado,
   fondoSugerido, sinRevisar, cantidades, tabla, cambiosMesa, valorMesaDespues,
   esperadoEfectivo, otrosIngresosEfectivo, movimientosDelTurno,
-  cargar, guardarMesa, confirmarConteo, confirmarConteoDeUno, moverPlata,
+  cargar, guardarMesa, confirmarConteo, confirmarConteoDeUno, moverPlata, pidiendo, pedirReposicion,
 } = useMostrador()
 
 // CUÁNTO HAY SOBRE LA MESA, EN PRODUCTO.

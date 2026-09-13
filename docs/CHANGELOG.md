@@ -1,5 +1,19 @@
 # Changelog
 
+## Septiembre 2026 (bm) — Lo que se agotó sobre la mesa no desaparece
+
+Pedido de Germán (13-sep) probando con el dispensador: cuando un producto se terminaba sobre la
+mesa, desaparecía de la lista y quien atiende no sabía si se había acabado o si nunca estuvo.
+
+- **`MostradorItem#agotado?`**: en cero y con su último movimiento distinto de `retiro` — se
+  terminó atendiendo (o contando), no lo bajó administración a propósito. `Mostrador#agotados`
+  viaja aparte de `mesa` (`agotados` en `GET /sedes/:id/mostrador`): no se cuenta ni se dispensa.
+- **En la tabla y en el teléfono** sigue en la lista, al final, en cero. Con producto en el
+  depósito: **«Pedir reposición»** (uno por producto y por día; avisa a admin y supervisor por
+  campana y push). Sin producto: la fila queda apagada y el título dice «Stock agotado: tampoco
+  queda en el depósito». «Contar» no se ofrece sobre un agotado.
+- El pedido de reposición vive en `useMostrador` (era sólo del teléfono; el escritorio no lo tenía).
+
 ## Septiembre 2026 (bl) — INASE con período y origen del material; la declaración semestral compone los informes revisados
 
 Séptimo y octavo de la revisión informe por informe (decisiones de Germán sobre el artifact, 12/13-sep).

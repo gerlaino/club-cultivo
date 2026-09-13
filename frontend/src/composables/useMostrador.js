@@ -15,7 +15,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { getMostrador, cargarMostrador, abrirMostrador, cerrarMostrador, contarMostrador,
-         ingresoCajaMostrador, salidaCajaMostrador } from '../lib/api.js'
+         ingresoCajaMostrador, salidaCajaMostrador, pedirReposicionMostrador } from '../lib/api.js'
 import { useAuthStore } from '../stores/auth.js'
 import { useSedeStore } from '../stores/sede.js'
 import { useStockChannel } from './useStockChannel.js'
@@ -81,6 +81,11 @@ export function useMostrador () {
   const error     = ref('')
   const turno     = ref(null)
   const mesa      = ref([])
+  // LO QUE SE AGOTÓ ATENDIENDO, en cero (pedido de Germán, sep-2026). Antes desaparecía de la
+  // lista y quien atiende no sabía si se había acabado o si nunca estuvo. Va aparte de `mesa`:
+  // no se cuenta ni se dispensa, sólo se ve y se pide.
+  const agotados  = ref([])
+  const pidiendo  = ref(null)
   const disponibles = ref([])
   const fondoSugerido = ref(null)
   const sinRevisar = ref(0)
@@ -128,7 +133,8 @@ export function useMostrador () {
   // Administración ve TODO el stock apto de la sede, con lo que hay en el depósito y lo que hay
   // sobre la mesa. Quien atiende ve sólo la mesa: él no elige qué hay.
   const tabla = computed(() => {
-    if (!gestiona.value) return mesa.value
+    // Lo agotado al final, en cero, con su botón de reposición.
+    if (!gestiona.value) return [...mesa.value, ...agotados.value]
     const enMesa = new Map(mesa.value.map(m => [m.stock_id, m.mostrador]))
     return disponibles.value.map(s => ({ ...s, mostrador: enMesa.get(s.stock_id) || 0 }))
   })
@@ -219,6 +225,7 @@ export function useMostrador () {
 
       turno.value       = data.turno
       mesa.value        = data.mesa || []
+      agotados.value    = data.agotados || []
       disponibles.value = data.disponibles || []
       fondoSugerido.value = data.fondo_sugerido ?? null
       sinRevisar.value  = data.sin_revisar ?? 0
@@ -361,9 +368,25 @@ export function useMostrador () {
 
   watch(sedeId, () => { cargado.value = false; cantidades.value = {}; cargar() }, { immediate: true })
 
+  // PEDIR, NO MIRAR. Quien atiende no ve cuánto hay guardado; dice que se le acabó y el aviso le
+  // llega a administración por la campana y por el celular. No elige cuánto: eso lo decide quien
+  // gobierna la mesa. Uno por producto y por día (lo dice el backend en `reposicion_pedida`).
+  async function pedirReposicion (s) {
+    pidiendo.value = s.stock_id
+    try {
+      await pedirReposicionMostrador(sedeId.value, { stock_id: s.stock_id })
+      toast.success('Pedido enviado a administración')
+      await cargar()
+      return true
+    } catch (e) {
+      toast.error(e?.response?.data?.error || 'No se pudo enviar el pedido')
+      return false
+    } finally { pidiendo.value = null }
+  }
+
   return {
     gestiona, sedeId, sedes, faltaSede, motivoSinSede, debeElegirSede, elegirSede,
-    cargando, guardando, error, turno, mesa, estado,
+    cargando, guardando, error, turno, mesa, agotados, pidiendo, pedirReposicion, estado,
     fondoSugerido, sinRevisar, cantidades, tabla, cambiosMesa, valorMesaDespues,
     esperadoEfectivo, otrosIngresosEfectivo, movimientosDelTurno,
     cargar, guardarMesa, confirmarConteo, confirmarConteoDeUno, moverPlata,

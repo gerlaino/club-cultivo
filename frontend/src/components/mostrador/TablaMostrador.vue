@@ -37,7 +37,12 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="s in visibles" :key="s.stock_id" :class="{ 'is-en-mesa': enLaMesa(s) }">
+          <!-- AGOTADO: se terminó atendiendo y sigue en la lista, en cero. Con producto en el
+               depósito lleva el botón de reposición; sin producto, la fila queda apagada y lo dice —
+               desaparecer era no saber si se acabó o si nunca estuvo (pedido de Germán, sep-2026). -->
+          <tr v-for="s in visibles" :key="s.stock_id"
+              :class="{ 'is-en-mesa': enLaMesa(s), 'is-agotada': s.agotado, 'is-sin-deposito': s.agotado && !s.hay_en_deposito }"
+              :title="s.agotado && !s.hay_en_deposito ? 'Stock agotado: tampoco queda en el depósito' : null">
             <!-- El PRODUCTO es la forma, y la VARIEDAD va en su columna. Antes la primera decía
                  "LO (flor seca)" y la de al lado "LO": el mismo dato dos veces, y la forma —que
                  es lo que distingue un frasco de un preroll— escondida entre paréntesis. -->
@@ -84,10 +89,20 @@
                   <span class="tmo__mesa">{{ fmt(s.mostrador) }}</span>
                   <span class="tmo__unidad">{{ s.unidad }}</span>
                 </span>
+                <template v-if="s.agotado">
+                  <button v-if="s.hay_en_deposito && !s.reposicion_pedida" type="button" class="tmo__reponer"
+                          :disabled="pidiendo === s.stock_id"
+                          title="Avisa a administración que se terminó, para que lo repongan"
+                          @click="emit('reponer', s)">
+                    {{ pidiendo === s.stock_id ? 'Pidiendo…' : 'Pedir reposición' }}
+                  </button>
+                  <span v-else-if="s.reposicion_pedida" class="tmo__pedido" title="Reposición pedida hoy">pedido</span>
+                  <span v-else class="tmo__agotado">agotado</span>
+                </template>
                 <!-- Contar ESTE frasco, sin cerrar la caja. Con quince productos, el arqueo
                      entero para verificar uno son veinte minutos: el control que cuesta eso no
                      se hace, y el que no se hace no controla nada. -->
-                <button v-if="contable" type="button" class="tmo__contar"
+                <button v-else-if="contable" type="button" class="tmo__contar"
                         :title="`Contar ${formaLabel(s.forma)}`" @click="emit('contar', s)">
                   Contar
                 </button>
@@ -146,8 +161,10 @@ const props = defineProps({
   // gesto sobre la mesa es decir cuánto tiene que haber (que mueve producto del depósito), y
   // contar es otra cosa —ajusta el inventario— que además se hace con el frasco en la mano.
   contable:     { type: Boolean, default: false },
+  // Qué producto está pidiendo reposición ahora mismo, para no ofrecer dos veces el botón.
+  pidiendo:     { type: [Number, String], default: null },
 })
-const emit = defineEmits(['update:modelValue', 'contar'])
+const emit = defineEmits(['update:modelValue', 'contar', 'reponer'])
 
 const busqueda = ref('')
 // Por defecto lo que YA está sobre la mesa primero, y dentro de eso lo más viejo: lo viejo sale
@@ -342,6 +359,19 @@ defineExpose({ cambios, hayCambios, hayExceso })
   transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast);
 }
 .tmo__contar:hover { background: var(--c-leaf-50); border-color: var(--c-leaf-300); color: var(--c-leaf-800); }
+.tmo__reponer {
+  margin-left: var(--sp-2); background: #fff; border: 1.5px solid var(--c-leaf-600); border-radius: var(--r-md);
+  padding: 2px 10px; font-size: var(--fs-12); font-weight: 700; color: var(--c-leaf-800); cursor: pointer; white-space: nowrap;
+}
+.tmo__reponer:disabled { opacity: .6; cursor: wait; }
+.tmo__pedido, .tmo__agotado {
+  margin-left: var(--sp-2); font-size: var(--fs-11); font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+}
+.tmo__pedido  { color: var(--c-sky-600); }
+.tmo__agotado { color: var(--c-amber-500); }
+/* Sin producto ni en la mesa ni en el depósito: la fila queda apagada, y el título de la fila dice por qué. */
+.tmo__table tr.is-sin-deposito td { opacity: .5; }
+.tmo__table tr.is-agotada .tmo__mesa { color: var(--c-amber-500); }
 
 .tmo__pie {
   position: sticky; bottom: 0;

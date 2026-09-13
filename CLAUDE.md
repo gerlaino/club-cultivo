@@ -1110,6 +1110,10 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   motivo obligatorio. El informe de Pérdidas cuenta `merma`: anotarlo ahí declararía destruido
   producto que puede estar entero. Corregir AL ABRIR no toca el inventario en absoluto — todavía
   no se sabe si faltó de verdad, y lo que se cargó de más puede estar en el depósito.
+- **AGOTADO ≠ SACADO** (`MostradorItem#agotado?`, sep-2026, pedido de Germán). Lo que se terminó
+  ATENDIENDO sigue en la lista de quien atiende, en cero, con «Pedir reposición» si en el depósito
+  queda y apagado con «Stock agotado» si no. Lo que administración bajó a propósito (`retiro`) sí
+  se va. Viaja en `agotados`, aparte de `mesa`: no se cuenta ni se dispensa.
 - **SACAR UN PRODUCTO DE LA MESA NO BORRA SU FILA.** Se pone en CERO y el scope
   `MostradorItem.con_stock` deja de listarlo — un renglón en cero es un pendiente eterno que hay
   que volver a explicar cada vez que alguien mira, pero **destruir la fila se lleva puesto, por
