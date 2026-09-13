@@ -43,4 +43,52 @@ RSpec.describe 'Cambio de rol — guard de despachos pendientes', type: :request
     expect(response).to have_http_status(:ok)
     expect(delivery.reload.role).to eq('cultivador')
   end
+
+  # CAMBIAR EL ROL PASA POR LAS MISMAS PUERTAS QUE CREARLO (Germán, sep-2026). `update` aceptaba
+  # cualquier rol: uno que no se ofrece, uno sin módulo, o pisando el cupo del plan.
+  describe 'las mismas puertas que el alta' do
+    before { sign_in_as(admin) }
+
+    it 'no deja pasar a un rol que no se ofrece (supervisor, auditor, abogado)' do
+      %w[supervisor auditor abogado].each do |rol|
+        patch "/usuarios/#{dispensador.id}", params: { user: { role: rol } }, headers: auth_headers
+        expect(response).to have_http_status(:unprocessable_entity), rol
+        expect(JSON.parse(response.body)['errors'].first).to match(/no está disponible/)
+      end
+      expect(dispensador.reload.role).to eq('dispensador')
+    end
+
+    it 'no deja pasar a un rol cuyo módulo la organización no tiene' do
+      club.update!(features: club.features.merge('delivery' => false))
+      patch "/usuarios/#{dispensador.id}", params: { user: { role: 'delivery' } }, headers: auth_headers
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)['errors'].first).to match(/necesita el módulo/)
+    end
+
+    it 'respeta el cupo del plan: en Básico no puede haber dos cultivadores por cambio de rol' do
+      club.update!(plan: 'basico')
+      create(:user, :cultivador, club: club)
+      patch "/usuarios/#{dispensador.id}", params: { user: { role: 'cultivador' } }, headers: auth_headers
+
+      expect(response).to have_http_status(:payment_required)
+      expect(dispensador.reload.role).to eq('dispensador')
+    end
+
+    it 'el cambio queda en la auditoría del usuario, con quién y de qué a qué' do
+      patch "/usuarios/#{dispensador.id}", params: { user: { role: 'cultivador' } }, headers: auth_headers
+      expect(response).to have_http_status(:ok)
+
+      a = Auditoria.where(auditable: dispensador).order(:created_at).last
+      expect(a.user_id).to eq(admin.id)
+      expect(a.cambios['role']).to eq(%w[dispensador cultivador])
+    end
+
+    it 'editar nombre o mail sin tocar el rol no pasa por ninguna puerta' do
+      club.update!(plan: 'basico')
+      patch "/usuarios/#{dispensador.id}", params: { user: { first_name: 'Dani', role: 'dispensador' } }, headers: auth_headers
+      expect(response).to have_http_status(:ok)
+      expect(dispensador.reload.first_name).to eq('Dani')
+    end
+  end
 end

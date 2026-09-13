@@ -43,7 +43,7 @@ export const ROLES = [
     ],
   },
   {
-    value: 'supervisor', label: 'Supervisor', icon: 'bi-binoculars-fill',
+    value: 'supervisor', suspendido: true, label: 'Supervisor', icon: 'bi-binoculars-fill',
     desc: 'Ve el cultivo de sus sedes y gestiona tareas. Además dispensa y maneja reservas.',
     sedes: { pide: false, hint: 'Sin sedes asignadas supervisa todo el club.' },
     permisos: [
@@ -86,7 +86,7 @@ export const ROLES = [
     ],
   },
   {
-    value: 'abogado', label: 'Abogado', icon: 'bi-briefcase-fill',
+    value: 'abogado', suspendido: true, label: 'Abogado', icon: 'bi-briefcase-fill',
     desc: 'Informes legales y de REPROCANN. Lectura de pacientes, sin la historia clínica.',
     permisos: [
       { ok: true,  label: 'Informes legales y REPROCANN' },
@@ -96,7 +96,7 @@ export const ROLES = [
     ],
   },
   {
-    value: 'auditor', label: 'Auditor', icon: 'bi-clipboard-data-fill',
+    value: 'auditor', suspendido: true, label: 'Auditor', icon: 'bi-clipboard-data-fill',
     desc: 'Solo lectura de todo el club. No puede modificar absolutamente nada.',
     sedes: { pide: false, hint: 'Sin sedes asignadas ve los informes de todo el club.' },
     permisos: [
@@ -117,6 +117,10 @@ const POR_VALOR = Object.fromEntries(ROLES.map(r => [r.value, r]))
 // backend los rechaza — ver `Club::ROLES_ALTA`). Un usuario que ya los tenga se sigue viendo
 // normal; lo que no se puede es crear uno nuevo desde la pantalla.
 export const ROLES_ALTA = ['admin', 'medico', 'cultivador', 'dispensador', 'manicura', 'delivery']
+// `suspendido: true` en la ficha del rol: no se ofrece ni al crear ni al cambiar (el backend también
+// lo rechaza, `CambioDeRol`). Decisión de Germán, 13-sep-2026: quedan sólo los roles que sabemos
+// que funcionan; supervisor suspendido hasta revisarlo, auditor y abogado afuera. Quien ya lo
+// tiene sigue entrando y trabajando igual.
 
 export function rolesParaAlta() {
   return ROLES.filter(r => ROLES_ALTA.includes(r.value))

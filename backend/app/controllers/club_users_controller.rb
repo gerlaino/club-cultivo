@@ -1,4 +1,5 @@
 class ClubUsersController < ApplicationController
+  include CambioDeRol
   before_action :authenticate_user!
   before_action :require_admin!
   before_action :set_user, only: [:show, :update, :destroy, :reset_password, :salas_asignadas, :asignar_sala, :desasignar_sala, :sedes_asignadas, :asignar_sede, :desasignar_sede, :stats, :auditorias, :recibir_caja]
@@ -97,17 +98,10 @@ class ClubUsersController < ApplicationController
 
   # PUT/PATCH /usuarios/:id
   def update
-    nuevo_rol = params.dig(:user, :role).to_s
-
-    # Guard: un delivery con despachos pendientes no puede cambiar de rol hasta
-    # reasignarlos (si no, quedarían asignados a alguien que ya no es repartidor).
-    if nuevo_rol.present? && nuevo_rol != @user.role && @user.role == 'delivery'
-      pend = despachos_pendientes_de(@user)
-      if pend > 0
-        return render json: {
-          errors: ["#{@user.first_name} tiene #{pend} despacho#{'s' if pend != 1} pendiente#{'s' if pend != 1} asignado#{'s' if pend != 1}. Reasignalos antes de cambiarle el rol."]
-        }, status: :unprocessable_entity
-      end
+    # Cambiar el rol pasa por las mismas puertas que crearlo (ver `CambioDeRol`).
+    if (rechazo = rechazo_cambio_de_rol(current_user.club, @user, params.dig(:user, :role)))
+      status, payload = rechazo
+      return render json: payload, status: status
     end
 
     if @user.update(user_params)
@@ -394,13 +388,6 @@ class ClubUsersController < ApplicationController
     params.require(:user).permit(:email, :email_personal, :first_name, :last_name, :role, :password, :password_confirmation)
   end
 
-  # Despachos (dispensaciones con envío) pendientes o en viaje asignados al usuario.
-  def despachos_pendientes_de(user)
-    Dispensacion.joins(stock: :sede)
-                .where(sedes: { club_id: current_user.club_id })
-                .where(delivery_id: user.id, con_envio: true, estado_envio: %w[pendiente en_viaje])
-                .count
-  end
 end
 
 

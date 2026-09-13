@@ -1,5 +1,23 @@
 # Changelog
 
+## Septiembre 2026 (bp) — Cambiar el rol pasa por las mismas puertas que crearlo; supervisor, auditor y abogado no se ofrecen
+
+Revisión de Germán (13-sep): «¿dónde se crean o editan usuarios y roles? Si editamos el rol, ¿qué
+pasa con permisos e historial?».
+
+- **Lo que ya estaba bien**: la pantalla de Equipo no edita el rol; los permisos se leen del
+  usuario en cada request (cambian en el acto); el historial cuelga del `user_id` (dispensas,
+  turnos, cobros, auditoría) y la auditoría del usuario deja quién cambió el rol, cuándo y de qué a
+  qué; el repartidor con paquetes en la calle no cambia de rol.
+- **Lo que estaba mal**: `update` (club y super admin) aceptaba **cualquier** rol por API — uno
+  que no se ofrece, uno cuyo módulo la organización no tiene (la persona no vuelve a entrar), o
+  pisando el cupo del plan que el alta sí respeta. Ahora `CambioDeRol`: las mismas puertas.
+- **Roles disponibles**: admin, cultivador, manicura, dispensador, médico (+ delivery con el
+  add-on). Supervisor **suspendido** hasta revisarlo; auditor y abogado **afuera**. No se
+  ofrecen al crear ni al cambiar (`Club::ROLES_ALTA` ya lo hacía al crear; ahora también al
+  editar). Quien ya tiene uno de esos roles sigue entrando y trabajando igual; en Equipo su badge
+  dice «no disponible».
+
 ## Septiembre 2026 (bo) — Una parte se paga ahora y el resto lo cobra el repartidor
 
 Pregunta de Germán (13-sep): «¿qué pasa si quiero envío y una parte se paga por transferencia y

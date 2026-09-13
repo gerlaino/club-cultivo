@@ -282,9 +282,10 @@ async function removeOne(u) {
               </div>
             </td>
             <td>
-              <span class="uv__role-badge" :style="roleStyle(u.role)">
+              <span class="uv__role-badge" :style="roleStyle(u.role)"
+                    :title="getRoleInfo(u.role).suspendido ? 'Rol no disponible por ahora: quien ya lo tiene sigue trabajando igual, pero no se puede asignar a nadie más.' : null">
                 <i :class="['bi', getRoleInfo(u.role).icon]"></i>
-                {{ getRoleInfo(u.role).label }}
+                {{ getRoleInfo(u.role).label }}<template v-if="getRoleInfo(u.role).suspendido"> · no disponible</template>
               </span>
             </td>
             <td class="uv__col-fecha">

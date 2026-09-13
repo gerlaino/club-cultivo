@@ -1,4 +1,5 @@
 class SuperAdmin::UsersController < SuperAdmin::BaseController
+  include CambioDeRol
   def index
     # Los ÚLTIMOS arriba. Ordenado por club y rol, el usuario que acabás de crear caía en el
     # medio de la lista y había que buscarlo: en el panel de plataforma lo que se mira es lo
@@ -57,6 +58,11 @@ class SuperAdmin::UsersController < SuperAdmin::BaseController
 
   def update
     user = User.find(params[:id])
+    # Mismas puertas que el alta para cambiar el rol (ver `CambioDeRol`).
+    if user.club && (rechazo = rechazo_cambio_de_rol(user.club, user, params.dig(:user, :role)))
+      status, payload = rechazo
+      return render json: payload, status: status
+    end
     if user.update(user_params_update)
       render json: serialize_user(user)
     else

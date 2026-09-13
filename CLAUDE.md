@@ -247,6 +247,13 @@ Toda llamada a la API queda en `ia_llamadas` (organización, persona, función, 
 | `auditor` | **Solo lectura global** (bloqueado a nivel `ApplicationController`) |
 | `paciente` | Su perfil, sus dispensaciones, eventos |
 
+**Roles que se OFRECEN (sep-2026, decisión de Germán):** admin, cultivador, manicura, dispensador,
+médico, y delivery con su add-on. **Supervisor está suspendido** hasta revisarlo; **auditor y abogado
+afuera**. Existen en el enum y quien ya los tiene sigue trabajando; no se pueden crear ni asignar por
+cambio de rol (`Club::ROLES_ALTA` + `CambioDeRol`). **Cambiar el rol pasa por las mismas puertas que
+crearlo** (rol ofrecido, módulo, cupo, repartidor sin paquetes en la calle); los permisos cambian en
+el acto y el historial queda con el `user_id`.
+
 **No existe ni va a existir** rol contador.
 
 ---
