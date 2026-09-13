@@ -467,7 +467,7 @@ async function hacerLogin() {
     await club.fetch()
     await resolverEstado()
   } catch (e) {
-    loginError.value = e?.response?.data?.error || 'Email o contraseña incorrectos'
+    loginError.value = e?.response?.data?.error || 'Usuario o contraseña incorrectos'
   } finally {
     loginCargando.value = false
   }

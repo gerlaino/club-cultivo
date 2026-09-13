@@ -28,13 +28,13 @@ class ClubUsersController < ApplicationController
 
     users = rel.order("created_at DESC")
     render json: { data: users.map { |u|
-      u.as_json(only: [:id, :email, :email_personal, :first_name, :last_name, :role, :created_at, :updated_at])
+      usuario_json(u)
     } }
   end
 
   # GET /usuarios/:id
   def show
-    render json: { data: @user.as_json(only: [:id, :email, :email_personal, :first_name, :last_name, :role, :created_at, :updated_at]) }
+    render json: { data: usuario_json(@user) }
   end
 
   # POST /usuarios
@@ -88,7 +88,7 @@ class ClubUsersController < ApplicationController
       # entera. La contraseña se devuelve para que el admin pueda dársela en mano.
       enviado = enviar_instrucciones(user)
       render json: {
-        data: user.as_json(only: [:id, :email, :email_personal, :first_name, :last_name, :role]),
+        data: usuario_json(user),
         credenciales: { email: user.email, password_inicial: tmp_password, mail_enviado: enviado },
       }, status: :created
     else
@@ -105,7 +105,7 @@ class ClubUsersController < ApplicationController
     end
 
     if @user.update(user_params)
-      render json: { data: @user.as_json(only: [:id, :email, :email_personal, :first_name, :last_name, :role]) }
+      render json: { data: usuario_json(@user) }
     else
       render json: { errors: @user.errors.full_messages }, status: :unprocessable_entity
     end
@@ -387,6 +387,12 @@ class ClubUsersController < ApplicationController
   end
 
   # Solo campos que EXISTEN en tu schema
+  # Los mismos campos en las cuatro respuestas: crear y editar devolvían el usuario sin
+  # `created_at`, y la ficha decía «Miembro desde —» hasta recargar.
+  def usuario_json(u)
+    u.as_json(only: [:id, :email, :email_personal, :first_name, :last_name, :role, :created_at, :updated_at])
+  end
+
   def user_params
     params.require(:user).permit(:email, :email_personal, :first_name, :last_name, :role, :password, :password_confirmation)
   end

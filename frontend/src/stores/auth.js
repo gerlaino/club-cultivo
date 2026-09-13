@@ -37,7 +37,7 @@ export function mensajeDeErrorDeLogin(e) {
   const status = e?.response?.status;
   const data   = e?.response?.data;
 
-  if (status === 401) return "Email o contraseña incorrectos.";
+  if (status === 401) return "Usuario o contraseña incorrectos.";
   // El backend ya explica cuál módulo falta o por qué está suspendida la organización.
   if (data?.modulo_rol_apagado || data?.club_suspendido) return data.error;
   if (status === 403) return data?.error || "Tu usuario no tiene permiso para entrar.";

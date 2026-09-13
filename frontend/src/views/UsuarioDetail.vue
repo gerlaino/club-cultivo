@@ -105,10 +105,14 @@ async function resetearPassword() {
 // ── Editar info personal ────────────────────────────────────────────────
 const editingInfo = ref(false)
 const savingInfo  = ref(false)
-const infoForm    = ref({ first_name: '', last_name: '', email: '' })
+// `email` es el USUARIO DE INGRESO (puede ser inventado); `email_personal` es el mail real de la
+// persona, al que la organización le escribe. Este formulario decía «Email» a secas para el
+// login y no ofrecía el personal (Germán, 13-sep).
+const infoForm    = ref({ first_name: '', last_name: '', email: '', email_personal: '' })
 
 function startEditInfo() {
-  infoForm.value = { first_name: u.value?.first_name || '', last_name: u.value?.last_name || '', email: u.value?.email || '' }
+  infoForm.value = { first_name: u.value?.first_name || '', last_name: u.value?.last_name || '',
+                     email: u.value?.email || '', email_personal: u.value?.email_personal || '' }
   editingInfo.value = true
 }
 
@@ -393,7 +397,8 @@ onMounted(async () => {
               {{ u.first_name }} {{ u.last_name }}
               <span v-if="isMe" class="ud__me-badge">Vos</span>
             </div>
-            <div class="ud__email">{{ u.email }}</div>
+            <div class="ud__email" title="Usuario de ingreso"><i class="bi bi-person-badge"></i> {{ u.email }}</div>
+            <div v-if="u.email_personal" class="ud__email" title="Email personal"><i class="bi bi-envelope"></i> {{ u.email_personal }}</div>
             <div class="ud__role-chip" :style="{ background: roleInfo(u.role).bg, color: roleInfo(u.role).color }">
               <i :class="['bi', roleInfo(u.role).icon]"></i>
               {{ roleInfo(u.role).label }}
@@ -426,9 +431,17 @@ onMounted(async () => {
               <label class="ud__field-label">Apellido</label>
               <input v-model="infoForm.last_name" class="ud__input" placeholder="Apellido" />
             </div>
+          </div>
+          <div class="ud__hero-form-row">
             <div class="ud__field ud__field--email">
-              <label class="ud__field-label">Email</label>
-              <input v-model="infoForm.email" class="ud__input" type="email" placeholder="correo@ejemplo.com" />
+              <label class="ud__field-label">Usuario de ingreso</label>
+              <input v-model="infoForm.email" class="ud__input" type="email" placeholder="rol@nombreclub.com" autocomplete="off" />
+              <span class="ud__field-hint">Con esto se loguea. Puede ser inventado.</span>
+            </div>
+            <div class="ud__field ud__field--email">
+              <label class="ud__field-label">Email personal <span class="ud__field-opt">(opcional)</span></label>
+              <input v-model="infoForm.email_personal" class="ud__input" type="email" placeholder="persona@gmail.com" autocomplete="off" />
+              <span class="ud__field-hint">El mail real, para escribirle desde la app.</span>
             </div>
           </div>
           <div class="ud__hero-form-actions">
@@ -845,6 +858,8 @@ onMounted(async () => {
               <span class="ud__card-title">Cuenta</span>
             </div>
             <dl class="ud__dl">
+              <dt>Usuario de ingreso</dt><dd>{{ u.email }}</dd>
+              <dt>Email personal</dt><dd>{{ u.email_personal || '—' }}</dd>
               <dt>ID de usuario</dt><dd>#{{ u.id }}</dd>
               <dt>Creado</dt><dd>{{ formatDate(u.created_at) }}</dd>
               <dt>Actualizado</dt><dd>{{ formatDate(u.updated_at) }}</dd>
@@ -892,12 +907,12 @@ onMounted(async () => {
 }
 .ud__hero-form-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 1.5fr;
+  grid-template-columns: 1fr 1fr;
   gap: .75rem;
   margin-bottom: .875rem;
 }
 @media (max-width: 700px) { .ud__hero-form-row { grid-template-columns: 1fr; } }
-.ud__field--email { grid-column: auto; }
+.ud__field--email { grid-column: auto; min-width: 0; }
 .ud__hero-form-actions { display: flex; justify-content: flex-end; gap: .5rem; }
 
 /* Edit hero button */
@@ -910,6 +925,8 @@ onMounted(async () => {
 }
 .ud__btn-edit-hero:hover { background: #fff; border-color: var(--c-slate-400); }
 .ud__sedes-salas { display: flex; flex-direction: column; gap: .5rem; }
+.ud__field-hint { display: block; font-size: .7rem; color: var(--c-slate-400); margin-top: .25rem; }
+.ud__field-opt { font-weight: 400; color: var(--c-slate-400); text-transform: none; letter-spacing: 0; }
 
 /* Avatar */
 .ud__av-wrap { position: relative; flex-shrink: 0; }

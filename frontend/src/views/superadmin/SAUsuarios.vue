@@ -30,7 +30,7 @@ const createError = ref(null)
 // El campo arranca VACÍO. Venía precargado con '123456Aa', la misma clave para toda la plataforma:
 // sabiendo el email de cualquiera se entraba. Ahora, si se deja vacío, el backend genera una
 // temporal y dictable, y se muestra acá abajo una sola vez.
-const form = ref({ email: '', first_name: '', last_name: '', role: 'admin', club_id: '' })
+const form = ref({ email: '', email_personal: '', first_name: '', last_name: '', role: 'admin', club_id: '' })
 // La contraseña del último usuario creado, para poder dictarla. El endpoint la devuelve en claro a
 // propósito: es temporal y Devise pide cambiarla al entrar.
 const passwordCreada = ref(null)
@@ -80,7 +80,7 @@ async function cargar() {
 
 async function handleCreate() {
   if (!form.value.email || !form.value.club_id) {
-    createError.value = 'Email y club son obligatorios'
+    createError.value = 'Usuario de ingreso y organización son obligatorios'
     return
   }
   saving.value = true
@@ -90,7 +90,7 @@ async function handleCreate() {
     users.value.unshift(data)
     passwordCreada.value = { email: data.email, password_inicial: data.password_inicial }
     showCreate.value = false
-    form.value = { email: '', first_name: '', last_name: '', role: 'admin', club_id: '' }
+    form.value = { email: '', email_personal: '', first_name: '', last_name: '', role: 'admin', club_id: '' }
   } catch (e) {
     createError.value = e?.response?.data?.errors?.join(', ') || 'Error al crear usuario'
   } finally {
@@ -273,8 +273,14 @@ onMounted(cargar)
                 <input v-model.trim="form.last_name" class="sau__input" placeholder="García" />
               </div>
               <div class="sau__field sau__field--full">
-                <label class="sau__label">Email <span style="color:#dc2626">*</span></label>
-                <input v-model.trim="form.email" type="email" class="sau__input" placeholder="juan@club.com" />
+                <label class="sau__label">Usuario de ingreso <span style="color:#dc2626">*</span></label>
+                <input v-model.trim="form.email" type="email" class="sau__input" placeholder="rol@nombreclub.com" autocomplete="off" />
+                <span class="sau__hint">Con esto se loguea. Puede ser inventado.</span>
+              </div>
+              <div class="sau__field sau__field--full">
+                <label class="sau__label">Email personal <span class="sau__opt">(opcional)</span></label>
+                <input v-model.trim="form.email_personal" type="email" class="sau__input" placeholder="persona@gmail.com" autocomplete="off" />
+                <span class="sau__hint">El mail real de la persona, para escribirle desde la app.</span>
               </div>
               <div class="sau__field">
                 <label class="sau__label">Rol</label>
@@ -349,6 +355,8 @@ onMounted(cargar)
 .sau__avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--c-slate-100); color: var(--c-slate-600); font-size: .75rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .sau__nombre { font-size: .85rem; font-weight: 600; color: var(--c-slate-900); }
 .sau__email  { font-size: .72rem; color: var(--c-slate-400); font-family: monospace; }
+.sau__hint   { display: block; font-size: .7rem; color: var(--c-slate-400); margin-top: .25rem; }
+.sau__opt    { font-weight: 400; color: var(--c-slate-400); }
 .sau__club-link { font-size: .82rem; font-weight: 600; color: #0369a1; text-decoration: none; }
 .sau__club-link:hover { text-decoration: underline; }
 .sau__no-club { font-size: .78rem; color: var(--c-slate-300); }

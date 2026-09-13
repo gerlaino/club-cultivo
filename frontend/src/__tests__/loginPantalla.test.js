@@ -28,10 +28,10 @@ describe('LoginView — la pantalla siempre dice qué pasó', () => {
 
   it('muestra el error de login cuando lo hay', async () => {
     const w = montar()
-    auth.error = 'Email o contraseña incorrectos.'
+    auth.error = 'Usuario o contraseña incorrectos.'
     await w.vm.$nextTick()
 
-    expect(w.find('.lv__error').text()).toContain('Email o contraseña incorrectos.')
+    expect(w.find('.lv__error').text()).toContain('Usuario o contraseña incorrectos.')
   })
 
   // El servidor dormido: la espera es larga y legítima, pero hay que contarla.
@@ -47,7 +47,7 @@ describe('LoginView — la pantalla siempre dice qué pasó', () => {
   it('con un error de verdad, el aviso desaparece', async () => {
     const w = montar()
     auth.aviso = 'El servidor estaba en reposo y está arrancando.'
-    auth.error = 'Email o contraseña incorrectos.'
+    auth.error = 'Usuario o contraseña incorrectos.'
     await w.vm.$nextTick()
 
     expect(w.find('.lv__aviso').exists()).toBe(false)

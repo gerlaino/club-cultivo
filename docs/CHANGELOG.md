@@ -1,5 +1,18 @@
 # Changelog
 
+## Septiembre 2026 (br) — «Usuario de ingreso» y «Email personal» en todas las puertas
+
+- **La ficha del usuario decía «Email» a secas** para el login y **no ofrecía el mail personal**
+  (Germán, 13-sep). `email` es el USUARIO DE INGRESO (puede ser inventado, `rol@nombreclub.com`)
+  y `email_personal` el mail real al que la organización le escribe (`User#email_notificacion`).
+  El alta de Equipo y el perfil ya lo decían así; la ficha (`UsuarioDetail`, «Editar datos»), el
+  alta del super admin (`SAUsuarios`, que ni lo mandaba aunque el backend lo aceptaba) y el
+  login («Usuario», y «Usuario o contraseña incorrectos» en Devise y en la app) quedaron iguales.
+  El hero y la tarjeta «Cuenta» muestran los dos.
+- **Crear y editar devolvían el usuario sin `created_at`**: después de guardar, el hero decía
+  «Miembro desde —» hasta recargar. Las cuatro respuestas de `ClubUsersController` salen del
+  mismo `usuario_json`.
+
 ## Septiembre 2026 (bq) — La ficha del usuario: sedes y salas en un bloque, y el historial dice qué esconde
 
 - **Sedes y salas del cultivador ANIDADAS** (`UsuarioSedesYSalas`): se asigna la sede y ahí mismo
