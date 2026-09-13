@@ -182,7 +182,10 @@
         <div class="trz__bal-item">
           <span class="trz__bal-lbl">Entró</span>
           <span class="trz__bal-val">{{ data.totales.gramos_producidos }} {{ unidad }}</span>
-          <span v-if="data.totales.plantas_origen" class="trz__bal-pct">de {{ data.totales.plantas_origen }} plantas</span>
+          <!-- Un frasco fraccionado de otro nació de ESE frasco: se dice antes que el proveedor o
+               las plantas, que son el origen del frasco madre. -->
+          <span v-if="data.stock.fraccionado_desde" class="trz__bal-pct">fraccionado de <a href="#" class="trz__link" @click.prevent="buscar(data.stock.fraccionado_desde.id)">{{ data.stock.fraccionado_desde.numero }}</a></span>
+          <span v-else-if="data.totales.plantas_origen" class="trz__bal-pct">de {{ data.totales.plantas_origen }} plantas</span>
           <span v-else-if="data.stock.producido_desde" class="trz__bal-pct">de {{ data.stock.producido_desde.gramos }} g de {{ data.stock.producido_desde.numero }}</span>
           <span v-else-if="data.stock.proveedor" class="trz__bal-pct">comprado a {{ data.stock.proveedor }}</span>
         </div>

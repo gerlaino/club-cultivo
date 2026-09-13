@@ -90,6 +90,30 @@ RSpec.describe Stocks::Trazabilidad do
       expect(t[:frase]).to include('siguen en', 'se convirtieron en', 'son merma', 'La cuenta cierra.')
     end
 
+    # EL FRASCO QUE NACIÓ FRACCIONADO cierra su cuenta desde el primer día. Nace con
+    # `cantidad_inicial` Y con la transferencia positiva que dice de dónde vino; contarla como
+    # «entró» sumaba los 50 dos veces y la ficha decía «faltan 50 que ningún movimiento explica»
+    # sobre un frasco que cerraba (encontrado por Germán, 13-sep).
+    it 'el frasco fraccionado de otro no cuenta su nacimiento como una entrada más' do
+      hijo = Stock.create!(sede: sede, lote: lote, origen: 'lote', forma_producto: 'flor_seca', unidad: 'g',
+                           cantidad: 50, precio_sugerido_ars: 100)
+      flor.update!(cantidad: 50)
+      flor.stock_movimientos.create!(tipo: 'transferencia', gramos: -50, usuario: admin, stock_resultante: hijo,
+                                     sede_destino: sede, notas: "Fraccionado a #{hijo.numero_lote_producto}")
+      hijo.stock_movimientos.create!(tipo: 'transferencia', gramos: 50, usuario: admin, sede_destino: sede,
+                                     notas: "Fraccionado desde #{flor.numero_lote_producto}")
+      dispensar([[hijo, 20]])
+
+      t = traza(hijo.reload)
+      expect(t[:totales][:gramos_producidos]).to eq(50.0)
+      expect(t[:totales][:entradas_g]).to eq(0.0)
+      expect(t[:totales][:otras_salidas_g]).to eq(0.0)
+      expect(t[:totales][:sin_explicar_g]).to eq(0.0)
+      expect(t[:salidas]).to be_empty
+      expect(t[:stock][:fraccionado_desde]).to include(numero: flor.numero_lote_producto, gramos: 50.0)
+      expect(t[:frase]).to include("fraccionados de #{flor.numero_lote_producto}", 'La cuenta cierra.')
+    end
+
     # Un dedazo corregido son dos ajustes que nunca pasaron. Se netean por cierre (Germán, sep-2026).
     it 'los ajustes de conteo de un mismo cierre se netean, y si dan cero no aparecen' do
       turno = ActsAsTenant.with_tenant(club) do

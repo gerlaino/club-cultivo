@@ -62,6 +62,8 @@ module Stocks
             numero:  s.producido_desde_stock.numero_lote_producto,
             gramos:  s.lote_origen_consumido_g&.to_f,
           },
+          # Si se fraccionó de otro frasco: de cuál y cuánto. Es su origen, no una entrada aparte.
+          fraccionado_desde:     fraccionado_desde,
         },
         lote: lote && {
           id:       lote.id,
@@ -251,6 +253,12 @@ module Stocks
       @salidas ||= begin
         movs = @stock.stock_movimientos.where(tipo: TIPOS_SALIDA)
                      .includes(:stock_resultante, :sede_destino).order(:fecha, :created_at).to_a
+        # EL MOVIMIENTO CON EL QUE NACIÓ NO ES UNA ENTRADA MÁS. Un frasco fraccionado desde otro
+        # nace con su `cantidad_inicial` Y con una transferencia positiva que dice de dónde vino:
+        # contarla como «entró» sumaba los 50 dos veces y la cuenta decía «faltan 50 que ningún
+        # movimiento explica» sobre un frasco que cerraba (Germán, 13-sep). Ese movimiento es el
+        # ORIGEN y se dice como tal (`fraccionado_desde`), no como salida ni como entrada.
+        movs.reject! { |m| m.id == movimiento_de_nacimiento&.id }
         sueltos, de_cierre = movs.partition { |m| m.tipo != 'ajuste' || m.turno_mostrador_id.nil? }
         sueltos.map { |m| salida(m) } + ajustes_neteados(de_cierre)
       end
@@ -285,6 +293,31 @@ module Stocks
           detalle: "diferencia de conteo del cierre del #{(ms.first.fecha || ms.first.created_at.to_date).strftime('%d/%m')}",
           destino: nil }
       end
+    end
+
+    # De qué frasco se fraccionó éste, si nació así: la punta de origen del traslado nombra a este
+    # stock como `stock_resultante`. Es la fuente autoritativa; las notas son sólo texto.
+    def movimiento_de_origen
+      return @movimiento_de_origen if defined?(@movimiento_de_origen)
+
+      @movimiento_de_origen = StockMovimiento.where(stock_resultante_id: @stock.id, tipo: 'transferencia')
+                                             .where('gramos < 0').includes(:stock).first
+    end
+
+    # La punta de destino de ese mismo traslado, escrita sobre este frasco al nacer.
+    def movimiento_de_nacimiento
+      return nil if movimiento_de_origen.nil?
+      return @movimiento_de_nacimiento if defined?(@movimiento_de_nacimiento)
+
+      @movimiento_de_nacimiento = @stock.stock_movimientos.where(tipo: 'transferencia').where('gramos > 0')
+                                        .where(created_at: (@stock.created_at - 1.minute)..(@stock.created_at + 1.minute))
+                                        .order(:created_at).first
+    end
+
+    def fraccionado_desde
+      m = movimiento_de_origen
+      m && { id: m.stock_id, numero: m.stock&.numero_lote_producto, gramos: m.gramos.to_f.abs.round(2),
+             fecha: m.fecha || m.created_at&.to_date }
     end
 
     # Dónde continúa la cadena: los frascos que nacieron de éste, por traslado o por elaboración.
@@ -336,7 +369,9 @@ module Stocks
       u = @stock.unidad.presence || 'g'
       n = ->(v) { ActiveSupport::NumberHelper.number_to_delimited(v.round(1).to_s.sub(/\.0\z/, ''), delimiter: '.', separator: ',') }
       partes = []
-      origen = if @stock.producido_desde_stock
+      origen = if fraccionado_desde
+                 "fraccionados de #{fraccionado_desde[:numero]}"
+               elsif @stock.producido_desde_stock
                  "de #{n.call(@stock.lote_origen_consumido_g.to_f)} g de #{@stock.producido_desde_stock.numero_lote_producto}"
                elsif t[:plantas_origen].positive? && lote
                  "de #{t[:plantas_origen]} plantas del lote #{lote.codigo}"
