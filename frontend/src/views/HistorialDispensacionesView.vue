@@ -1,13 +1,14 @@
 <script setup>
 import { ref, watch, computed, onMounted } from 'vue'
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
-import { listDispensacionesFecha, exportDispensacionesCSV, listPacientes, getPaciente, listSedes, deleteDispensacion } from '../lib/api.js'
+import { listDispensacionesFecha, exportDispensacionesCSV, listPacientes, getPaciente, listSedes, anularDispensacion } from '../lib/api.js'
 import { formaLabel, formatARS, formatFecha } from '../lib/formatters.js'
 import { RouterLink, useRouter, useRoute } from 'vue-router'
 import { Download, RefreshCw, Search, Plus, X, Filter, Pencil, Trash2, QrCode, Truck, ChevronRight } from 'lucide-vue-next'
 import { useEtiquetaDispensa } from '../composables/useEtiquetaDispensa.js'
 import ModalNuevaDispensacion from '../components/pacientes/ModalNuevaDispensacion.vue'
 import ModalEditarDispensacion from '../components/pacientes/ModalEditarDispensacion.vue'
+import ModalAnularDispensa from '../components/dispensaciones/ModalAnularDispensa.vue'
 import { useAuthStore } from '../stores/auth'
 import { useConfirm } from '../composables/useConfirm.js'
 import { useToast } from '../composables/useToast.js'
@@ -19,7 +20,8 @@ const toast   = useToast()
 const { imprimirEtiqueta } = useEtiquetaDispensa()
 
 const canEdit   = computed(() => ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role))
-const canDelete = computed(() => ['admin', 'super_admin'].includes(auth.user?.role))
+// Anula administración y también el dispensador (las de su mostrador; el backend lo verifica).
+const canAnular = computed(() => ['admin', 'supervisor', 'dispensador', 'super_admin'].includes(auth.user?.role))
 
 // Quien administra ve la organización entera y no tiene toggle. El dispensador abre en LO SUYO:
 // el listado le mostraba todas las entregas del club con paciente y monto, y para trabajar le
@@ -37,15 +39,22 @@ function openEdit(d) {
   editModal.value  = true
 }
 
-async function handleDelete(d) {
-  const label = `${d.cantidad}g · ${d.paciente_nombre} · ${formatFecha(d.fecha_dispensacion, false)}`
-  const ok = await confirm({ title: '¿Eliminar dispensación?', message: label, confirmText: 'Eliminar', variant: 'danger' })
-  if (!ok) return
+// ANULAR, NO BORRAR: se pregunta por qué y la dispensa queda en el historial (sep-2026).
+const anularModal   = ref(false)
+const anularTarget  = ref(null)
+const anulando      = ref(false)
+const anularError   = ref('')
+function abrirAnular(d) { anularTarget.value = d; anularError.value = ''; anularModal.value = true }
+async function handleAnular({ id, ...payload }) {
+  anulando.value = true; anularError.value = ''
   try {
-    await deleteDispensacion(d.id)
+    await anularDispensacion(id, payload)
+    anularModal.value = false
     await cargar()
-    toast.success('Dispensación eliminada')
-  } catch { toast.error('Error al eliminar') }
+    toast.success('Dispensa anulada')
+  } catch (e) {
+    anularError.value = e?.response?.data?.error || 'No se pudo anular'
+  } finally { anulando.value = false }
 }
 
 // ── Modal: buscar paciente (para nueva dispensación O para filtrar) ─────────────
@@ -174,18 +183,21 @@ const exporting = ref(false)
 const allDisps  = ref([])
 
 const dispensaciones = computed(() => allDisps.value)
+// Las anuladas se VEN en la lista (con su motivo) pero no SUMAN: 10 g devueltos no son 10 g
+// entregados, y $10.000 devueltos no son $10.000 cobrados.
+const vigentes = computed(() => allDisps.value.filter(d => !d.anulada))
 
 // Cobrado = lo que efectivamente entró (efectivo/transfer). A crédito = lo que quedó en cuenta
 // corriente (el paciente dispensó sin pagar). No mezclarlos: el "cobrado" no incluye el fiado.
-const totalCobrado   = computed(() => allDisps.value.reduce((s, d) => s + (d.monto_efectivo_ars ?? 0), 0))
-const totalCredito   = computed(() => allDisps.value.reduce((s, d) => s + (d.monto_credito_ars ?? 0), 0))
+const totalCobrado   = computed(() => vigentes.value.reduce((s, d) => s + (d.monto_efectivo_ars ?? 0), 0))
+const totalCredito   = computed(() => vigentes.value.reduce((s, d) => s + (d.monto_credito_ars ?? 0), 0))
 const totalRecaudado = computed(() => totalCobrado.value + totalCredito.value) // aporte total (informativo)
-const totalGramos    = computed(() => allDisps.value.reduce((s, d) => s + (d.cantidad ?? 0), 0))
-const totalConEnvio  = computed(() => allDisps.value.filter(d => d.con_envio).length)
+const totalGramos    = computed(() => vigentes.value.reduce((s, d) => s + (d.cantidad ?? 0), 0))
+const totalConEnvio  = computed(() => vigentes.value.filter(d => d.con_envio).length)
 
 const resumenPago = computed(() => {
   const map = {}
-  for (const d of allDisps.value) {
+  for (const d of vigentes.value) {
     const k = d.medio_pago || 'otro'
     if (!map[k]) map[k] = { count: 0, total: 0 }
     map[k].count++
@@ -251,6 +263,12 @@ function medioPagoLabel(m) {
 // Qué decir en el badge de pago. No siempre es el medio: si es contra entrega y todavía
 // queda saldo, lo que corresponde informar es que el cobro está pendiente en la calle.
 function pagoBadge(d) {
+  // Una anulada dice POR QUÉ en el lugar del medio de pago: es lo que hay que saber de esa fila.
+  if (d.anulada) {
+    const a = d.anulacion || {}
+    return { texto: `Anulada · ${(a.motivo_label || 'sin motivo').toLowerCase()}`, clase: 'hd__pago--anulada',
+             title: [a.por && `por ${a.por}`, a.nota].filter(Boolean).join(' — ') }
+  }
   const pendiente = Number(d.saldo_pendiente ?? 0) > 0
   if (d.cobrar_en_entrega && pendiente) {
     return { texto: 'Contra entrega', clase: 'hd__pago--amber' }
@@ -523,7 +541,7 @@ const FORMAS = [
           </thead>
           <tbody>
             <template v-for="d in dispensaciones" :key="d.id">
-              <tr class="hd__tr hd__tr--click" @click="verDetalle(d, $event)" title="Ver detalle de la dispensa">
+              <tr class="hd__tr hd__tr--click" :class="{ 'hd__tr--anulada': d.anulada }" @click="verDetalle(d, $event)" title="Ver detalle de la dispensa">
 
                 <td class="hd__td-fecha" data-col="Fecha">
                   <span class="hd__fecha-day">{{ formatFecha(d.fecha_dispensacion, false) }}</span>
@@ -557,7 +575,7 @@ const FORMAS = [
                   <!-- Mientras el delivery no cobró, no hay medio de pago que mostrar: lo que
                        hay es una entrega pendiente de cobro. Poner "Efectivo" o "Mixto" ahí es
                        afirmar algo que todavía no pasó. -->
-                  <span class="hd__pago-badge" :class="pagoBadge(d).clase">{{ pagoBadge(d).texto }}</span>
+                  <span class="hd__pago-badge" :class="pagoBadge(d).clase" :title="pagoBadge(d).title">{{ pagoBadge(d).texto }}</span>
                 </td>
                 <td class="hd__td-user">{{ d.usuario?.nombre ?? '—' }}</td>
                 <td class="hd__td-envio">
@@ -569,10 +587,10 @@ const FORMAS = [
                   <button v-if="d.token" class="hd__action-btn" @click="imprimirEtiqueta(d)" title="Imprimir etiqueta">
                     <QrCode :size="13" :stroke-width="2" />
                   </button>
-                  <button v-if="canEdit" class="hd__action-btn" @click="openEdit(d)" title="Editar">
+                  <button v-if="canEdit && !d.anulada" class="hd__action-btn" @click="openEdit(d)" title="Editar">
                     <Pencil :size="13" :stroke-width="2" />
                   </button>
-                  <button v-if="canDelete" class="hd__action-btn hd__action-btn--danger" @click="handleDelete(d)" title="Eliminar">
+                  <button v-if="canAnular && !d.anulada" class="hd__action-btn hd__action-btn--danger" @click="abrirAnular(d)" title="Anular">
                     <Trash2 :size="13" :stroke-width="2" />
                   </button>
                 </td>
@@ -598,7 +616,7 @@ const FORMAS = [
         </table>
 
         <div class="hd__summary">
-          <span class="hd__summary-count">{{ dispensaciones.length }} dispensaciones · {{ totalGramos.toFixed(1) }}g</span>
+          <span class="hd__summary-count">{{ vigentes.length }} dispensaciones<template v-if="dispensaciones.length - vigentes.length"> · {{ dispensaciones.length - vigentes.length }} anuladas</template> · {{ totalGramos.toFixed(1) }}g</span>
           <span class="hd__summary-total">
             Cobrado <strong>{{ formatARS(totalCobrado) }}</strong>
             <span v-if="totalCredito > 0" class="hd__summary-credito"> · a cuenta corriente {{ formatARS(totalCredito) }}</span>
@@ -618,6 +636,14 @@ const FORMAS = [
       v-model="editModal"
       :dispensacion="editTarget"
       @saved="cargar"
+    />
+
+    <ModalAnularDispensa
+      v-model="anularModal"
+      :dispensacion="anularTarget"
+      :guardando="anulando"
+      :error="anularError"
+      @anular="handleAnular"
     />
 
   </div>
@@ -922,6 +948,8 @@ const FORMAS = [
 .hd__pago--amber   { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
 .hd__pago--teal    { background: #ccfbf1; color: #0f766e; border: 1px solid #99f6e4; }
 .hd__pago--gris    { background: var(--c-ink-100); color: var(--c-ink-600); border: 1px solid var(--c-ink-200); }
+.hd__pago--anulada { background: var(--c-rust-100); color: var(--c-rust-600); border: 1px solid var(--c-rust-100); }
+.hd__tr--anulada > td:not(.hd__td-pago):not(.hd__td-actions) { opacity: .5; text-decoration: line-through; text-decoration-color: var(--c-ink-300); }
 .hd__td-user { font-size: var(--fs-12); color: var(--c-ink-400); }
 .hd__td-envio { width: 36px; }
 .hd__envio-badge {

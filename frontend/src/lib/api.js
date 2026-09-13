@@ -306,7 +306,9 @@ export const listDispensacionesFecha = (params = {}) => api.get('/dispensaciones
 export const getDispensacion = (id) => api.get(`/dispensaciones/${id}`);
 export const createDispensacion = (pacienteId, payload) => api.post(`/pacientes/${pacienteId}/dispensaciones`, { dispensacion: payload });
 export const updateDispensacion = (id, payload) => api.put(`/dispensaciones/${id}`, { dispensacion: payload });
-export const deleteDispensacion = (id) => api.delete(`/dispensaciones/${id}`);
+// Una dispensa no se borra: se ANULA con motivo (error_carga · devolucion · producto_defectuoso)
+// y queda en el historial. `descartar_producto` la manda a merma en vez de a la mesa.
+export const anularDispensacion = (id, payload) => api.patch(`/dispensaciones/${id}/anular`, payload);
 
 // ── Reservas de dispensa ────────────────────────────────────────────────────
 export const createReserva   = (pacienteId, payload) => api.post(`/pacientes/${pacienteId}/reservas`, { reserva: payload });

@@ -306,7 +306,9 @@ Rails.application.routes.draw do
     resources :indicaciones, controller: "indicacion_medica", only: [:show, :update, :destroy] do
       member { get :prescripcion_pdf }
     end
-    resources :dispensaciones, only: [:index, :show, :update, :destroy] do
+    # Sin `destroy` a propósito (sep-2026): una dispensa no se borra, se ANULA con motivo y
+    # queda en el historial (`anular`). Borrarla sin decir por qué es lo que un auditor pregunta.
+    resources :dispensaciones, only: [:index, :show, :update] do
       collection do
         get  :mis_paquetes
         get  :mi_historial   # lo que el repartidor ya cerró (entregado/fallido)
@@ -315,6 +317,7 @@ Rails.application.routes.draw do
         patch :iniciar_viaje
       end
       member do
+        patch :anular
         patch :entregar
         patch :reportar_fallo
         patch :reprogramar

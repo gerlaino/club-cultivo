@@ -33,6 +33,7 @@ class Dispensacion < ApplicationRecord
   belongs_to :stock
   belongs_to :sede,          optional: true
   belongs_to :delivery_user, class_name: 'User', foreign_key: :delivery_id, optional: true
+  belongs_to :anulada_por,   class_name: 'User', optional: true
   belongs_to :ruta_entrega,  optional: true
 
   # Líneas de la dispensación: cada una es un stock + cantidad (con precio/costo/trazabilidad
@@ -152,6 +153,29 @@ class Dispensacion < ApplicationRecord
   scope :no_canceladas,  ->                     { where("dispensaciones.estado_envio IS NULL OR dispensaciones.estado_envio != 'cancelada'") }
   def cancelada? = estado_envio == 'cancelada'
 
+  # POR QUÉ se anuló una dispensa. Son hechos distintos y se deshacen distinto
+  # (`Dispensaciones::Cancelar`):
+  #   · error_carga          — nunca pasó: el producto no salió y la plata no entró. Se BORRA el
+  #                            asiento y vuelve todo, como si no se hubiera cargado.
+  #   · devolucion           — pasó y se deshizo: el paciente trajo el producto y se le devuelve
+  #                            la plata. La venta existió, así que el ingreso queda y se escribe
+  #                            un EGRESO «devolución a paciente» al lado.
+  #   · producto_defectuoso  — como la devolución, pero el producto no se puede volver a entregar
+  #                            (el preroll llegó roto): sale como MERMA, no vuelve a la mesa.
+  #   · no_entregado         — el paquete que el repartidor trajo de vuelta. Como error_carga
+  #                            (la plata no entró, o se rindió aparte), y el producto vuelve a la
+  #                            mesa si hay alguien atendiendo.
+  MOTIVOS_ANULACION = %w[error_carga devolucion producto_defectuoso no_entregado].freeze
+  MOTIVOS_ANULACION_LABEL = {
+    'error_carga'         => 'Error de carga',
+    'devolucion'          => 'Devolución del paciente',
+    'producto_defectuoso' => 'Producto defectuoso',
+    'no_entregado'        => 'No se pudo entregar',
+  }.freeze
+  # En estos dos la venta pasó de verdad: la plata entró y hay que devolverla.
+  MOTIVOS_CON_DEVOLUCION = %w[devolucion producto_defectuoso].freeze
+  validates :motivo_anulacion, inclusion: { in: MOTIVOS_ANULACION }, allow_nil: true
+
   scope :del_mes,        ->(fecha = Time.zone.today) { where(fecha_dispensacion: fecha.beginning_of_month..fecha.end_of_month) }
   scope :del_paciente,   ->(paciente_id)        { where(paciente_id: paciente_id) }
   scope :regalos,        ->                     { where(es_regalo: true) }
@@ -201,6 +225,7 @@ class Dispensacion < ApplicationRecord
   after_update_commit :broadcast_stock_actualizado, if: :estado_envio_changed?
   after_commit        :notificar_delivery, on: [:update]
   after_destroy       :incrementar_stock
+  def incrementar_stock = revertir_stock!
 
   private
 
@@ -688,7 +713,14 @@ class Dispensacion < ApplicationRecord
   # cascada. Por eso la edición de una dispensa borra en duro sus líneas superadas
   # (DispensacionesController#update): si quedaran soft-borradas, acá entrarían también las de
   # ediciones anteriores y la reversa devolvería los mismos gramos una vez por versión.
-  def incrementar_stock
+  # El producto de cada línea deja de estar dispensado. ¿Y a dónde va?
+  #   · `vuelve: true`  — al depósito, y a la mesa si corresponde (`desimputar_del_mostrador`).
+  #     El movimiento de dispensa se borra y el frasco recupera su cantidad.
+  #   · `vuelve: false` — NO se puede volver a entregar (producto defectuoso, o el paciente lo
+  #     devolvió abierto). El movimiento de dispensa se reemplaza por uno de MERMA con la misma
+  #     cantidad: el frasco no cambia, la mesa no se toca —el producto salió de ahí y no vuelve—
+  #     y en la trazabilidad baja «dispensado» y sube «merma», que es lo que pasó.
+  public def revertir_stock!(vuelve: true, usuario: nil, nota: nil)
     items.with_deleted.each do |it|
       next unless it.stock
       ActiveRecord::Base.transaction do
@@ -697,10 +729,20 @@ class Dispensacion < ApplicationRecord
         movs     = it.stock.stock_movimientos.where(tipo: 'dispensacion')
         borrados = movs.where(dispensacion_id: id).destroy_all
         movs.where("notas LIKE ?", "Dispensación ##{id} —%").destroy_all if borrados.empty?
-        desimputar_del_mostrador(it)
+        if vuelve
+          desimputar_del_mostrador(it)
+        else
+          it.stock.decrement!(:cantidad, it.cantidad)
+          it.stock.stock_movimientos.create!(
+            tipo: 'merma', gramos: -it.cantidad, usuario: usuario, fecha: Time.zone.today,
+            notas: "Dispensación ##{id} anulada — #{nota.presence || 'el producto no se puede volver a entregar'}",
+          )
+          it.stock.reload.marcar_agotado_si_vacio!(usuario: usuario)
+        end
       end
     end
   end
+  private
 
   def generar_codigo_paquete
     self.codigo_paquete = "PKG-#{Time.zone.today.strftime('%Y%m%d')}-#{SecureRandom.hex(3).upcase}"

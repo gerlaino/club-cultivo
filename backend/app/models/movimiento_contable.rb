@@ -79,7 +79,7 @@ class MovimientoContable < ApplicationRecord
     insumo electricidad agua alquiler sueldo mantenimiento
     honorario seguro admin aporte_socio dispensacion subvencion bar
     salida_caja retiro_caja devolucion_caja diferencia_caja ingreso_caja
-    a_cuenta_repartidor devolucion_a_cuenta otro
+    a_cuenta_repartidor devolucion_a_cuenta devolucion_paciente otro
   ].freeze
 
   CATEGORIA_LABELS = {
@@ -113,6 +113,9 @@ class MovimientoContable < ApplicationRecord
     "a_cuenta_repartidor" => "A cuenta del repartidor",
     # El espejo: devolvió lo que se había quedado. Baja su saldo y entra al cajón.
     "devolucion_a_cuenta" => "Devolución a cuenta",
+    # Plata que se le devuelve a un paciente por una dispensa anulada (devolución o producto
+    # defectuoso). La venta existió y su ingreso queda; esto es el egreso de al lado.
+    "devolucion_paciente" => "Devolución a paciente",
     "otro"          => "Otro",
   }.freeze
 

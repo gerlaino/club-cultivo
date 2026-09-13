@@ -6,9 +6,10 @@ import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
 import { useEtiquetaDispensa } from '../../composables/useEtiquetaDispensa.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { listDispensaciones, deleteDispensacion, listReservasPaciente, deleteReserva, cancelarReserva } from '../../lib/api.js'
+import { listDispensaciones, anularDispensacion, listReservasPaciente, deleteReserva, cancelarReserva } from '../../lib/api.js'
 import ModalNuevaDispensacion from './ModalNuevaDispensacion.vue'
 import ModalEditarDispensacion from './ModalEditarDispensacion.vue'
+import ModalAnularDispensa from '../dispensaciones/ModalAnularDispensa.vue'
 import ModalEditarReserva from './ModalEditarReserva.vue'
 import { hoyISO } from '../../utils/dates.js'
 
@@ -50,7 +51,8 @@ const tieneRolDispensar = computed(() => ['admin', 'dispensador', 'supervisor', 
 const tieneRolReservar  = computed(() => ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role))
 const canDispensar = computed(() => tieneRolDispensar.value && !props.pendienteAprobacion)
 const canReservar  = computed(() => tieneRolReservar.value  && !props.pendienteAprobacion)
-const canDelete = computed(() => ['admin', 'dispensador', 'super_admin'].includes(auth.user?.role))
+// Anula administración y el dispensador (las de su mostrador; el backend lo verifica).
+const canAnular = computed(() => ['admin', 'supervisor', 'dispensador', 'super_admin'].includes(auth.user?.role))
 const canEdit   = computed(() => ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role))
 
 const fmt = n => n == null ? '—' :
@@ -75,18 +77,22 @@ async function onDispensacionGuardada() {
   emit('dispensacion-creada')
 }
 
-async function handleDelete(d) {
-  const stk   = d.stock
-  const label = d.multi_stock && d.items?.length
-    ? `${d.items.length} productos · ${fmtDate(d.fecha_dispensacion)}`
-    : `${d.cantidad}${stk?.unidad || 'g'} de ${FORMA_LABEL[stk?.forma_producto] || stk?.forma_producto || '—'} · ${fmtDate(d.fecha_dispensacion)}`
-  const ok    = await confirm({ title: '¿Eliminar dispensación?', message: label, confirmText: 'Eliminar', variant: 'danger' })
-  if (!ok) return
+// ANULAR, NO BORRAR: se pregunta por qué y la dispensa queda en el historial (sep-2026).
+const anularModal  = ref(false)
+const anularTarget = ref(null)
+const anulando     = ref(false)
+const anularError  = ref('')
+function abrirAnular(d) { anularTarget.value = d; anularError.value = ''; anularModal.value = true }
+async function handleAnular({ id, ...payload }) {
+  anulando.value = true; anularError.value = ''
   try {
-    await deleteDispensacion(d.id)
+    await anularDispensacion(id, payload)
+    anularModal.value = false
     await loadDispensaciones()
-    toast.success('Dispensación eliminada')
-  } catch { toast.error('Error al eliminar') }
+    toast.success('Dispensa anulada')
+  } catch (e) {
+    anularError.value = e?.response?.data?.error || 'No se pudo anular'
+  } finally { anulando.value = false }
 }
 
 function openEdit(d) {
@@ -110,7 +116,7 @@ function irPagina(p) {
   loadDispensaciones()
 }
 
-const totalCantidad = computed(() => dispensaciones.value.reduce((s, d) => s + (parseFloat(d.cantidad) || 0), 0))
+const totalCantidad = computed(() => dispensaciones.value.filter(d => !d.anulada).reduce((s, d) => s + (parseFloat(d.cantidad) || 0), 0))
 
 // ── Reservas pendientes del socio ──
 const reservasPend  = ref([])
@@ -255,6 +261,9 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
             </span>
           </div>
           <div v-if="d.observaciones" class="dv__item-obs">{{ d.observaciones }}</div>
+          <div v-if="d.anulada" class="dv__item-anulada" :title="[d.anulacion?.por && `por ${d.anulacion.por}`, d.anulacion?.nota].filter(Boolean).join(' — ')">
+            <i class="bi bi-x-circle"></i> Anulada · {{ (d.anulacion?.motivo_label || 'sin motivo').toLowerCase() }}
+          </div>
           <div v-if="d.con_envio" class="dv__item-envio-badge"
                :class="`dv__item-envio-badge--${d.estado_envio || 'pendiente'}`">
             <i class="bi bi-truck"></i>
@@ -269,14 +278,14 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
           <div v-if="d.aporte_socio_ars" class="dv__item-aporte">{{ fmt(d.aporte_socio_ars) }}</div>
           <div v-if="d.usuario?.nombre" class="dv__item-usuario">{{ d.usuario.nombre }}</div>
         </div>
-        <div v-if="canEdit || canDelete || d.token" class="dv__item-actions">
+        <div v-if="(canEdit || canAnular || d.token) && !d.anulada" class="dv__item-actions">
           <button v-if="d.token" class="dv__icon-btn" @click="imprimirEtiqueta(d)" title="Imprimir etiqueta">
             <i class="bi bi-upc-scan"></i>
           </button>
           <button v-if="canEdit" class="dv__icon-btn" @click="openEdit(d)" title="Editar">
             <i class="bi bi-pencil"></i>
           </button>
-          <button v-if="canDelete" class="dv__icon-btn dv__icon-btn--danger" @click="handleDelete(d)" title="Eliminar">
+          <button v-if="canAnular" class="dv__icon-btn dv__icon-btn--danger" @click="abrirAnular(d)" title="Anular">
             <i class="bi bi-trash"></i>
           </button>
         </div>
@@ -296,6 +305,14 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
       :saldo-cc="props.saldoCc"
       :limite-cc="props.limiteCc"
       @saved="loadDispensaciones"
+    />
+
+    <ModalAnularDispensa
+      v-model="anularModal"
+      :dispensacion="anularTarget"
+      :guardando="anulando"
+      :error="anularError"
+      @anular="handleAnular"
     />
 
     <!-- Modal nueva dispensación -->
@@ -366,6 +383,7 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
 .dv__reserva-acts { display: flex; gap: .35rem; flex-shrink: 0; }
 .dv__reserva-btn { border: 1.5px solid var(--c-slate-200); background: #fff; border-radius: 7px; padding: .3rem .6rem; font-size: .75rem; font-weight: 700; cursor: pointer; color: var(--c-slate-600); }
 .dv__reserva-btn--primary { background: #15803d; color: #fff; border-color: #15803d; }
+.dv__item-anulada { display: inline-flex; align-items: center; gap: .3rem; margin-top: .2rem; font-size: 12px; font-weight: 600; padding: .15em .55em; border-radius: 5px; background: var(--c-rust-100); color: var(--c-rust-600); }
 .dv__item-envio-badge { display: inline-flex; align-items: center; gap: .25rem; margin-top: .2rem; font-size: 12px; font-weight: 600; padding: .15em .55em; border-radius: 5px; }
 .dv__item-envio-badge--pendiente { background: var(--c-sky-100);   color: var(--c-sky-600); }
 .dv__item-envio-badge--en_viaje  { background: var(--c-amber-100); color: var(--c-amber-500); }

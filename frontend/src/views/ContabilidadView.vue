@@ -378,7 +378,7 @@ const filtroHasta     = ref("")
 // catálogo en agosto: una columna muerta ocupando ancho en una tabla que ya no entra a 1280 px.
 // No se borra el dato: si una organización todavía tiene una subcategoría, la ruta entera va en
 // la misma celda («Insumos › Fertilizante»), que es como se lee de todos modos.
-const categoriaDe = (m) => m.categoria_ruta || m.categoria_madre || catLabel(m.categoria)
+const categoriaDe = (m) => m.categoria_ruta || m.categoria_madre || m.categoria_label || catLabel(m.categoria)
 
 // El libro llega ya filtrado del servidor: la búsqueda no puede vivir acá, porque acá sólo hay
 // los renglones de la página a la vista y lo de la página 2 no aparecía nunca.

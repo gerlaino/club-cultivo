@@ -9,7 +9,7 @@ require 'rails_helper'
 RSpec.describe 'Stock acotado a las sedes asignadas', type: :request do
   let(:club)  { create(:club) }
   let(:admin) { create(:user, :admin, club: club) }
-  let(:norte) { create(:sede, club: club, created_by: admin, nombre: 'Finca Norte') }
+  let(:norte) { create(:sede, club: club, created_by: admin, nombre: 'Finca Norte', tipo: 'mixta') }
   let(:sur)   { create(:sede, club: club, created_by: admin, nombre: 'Finca Sur') }
   let(:lote)  { create(:lote, club: club) }
 

@@ -137,9 +137,8 @@ module Rendiciones
     # intentar a las 19 sin pasar por la base—: ahí el paquete nunca volvió.
     def devolver_paquetes!
       Rendiciones::Rendir.devoluciones_de(@rendicion.delivery, @rendicion.club).each do |d|
-        res = Dispensaciones::Cancelar.call(dispensacion: d, usuario: @receptor,
-                                            motivo: "Volvió con la rendición ##{@rendicion.id} — " \
-                                                    'el paquete se desarma')
+        res = Dispensaciones::Cancelar.call(dispensacion: d, usuario: @receptor, motivo: 'no_entregado',
+                                            nota: "Volvió con la rendición ##{@rendicion.id} — el paquete se desarma")
         raise ArgumentError, res.error unless res.ok?
       end
     end

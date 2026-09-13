@@ -23,7 +23,8 @@ RSpec.describe 'GET /me — la sede de mostrador del dispensador', type: :reques
   end
 
   it 'con las dos asignadas, devuelve la que atiende' do
-    ana.sedes_asignadas << cultivo
+    # Dato heredado: hoy un dispensador no se asigna a una sede de producción (`UserSede`).
+    UserSede.new(user: ana, sede: cultivo).save!(validate: false)
     ana.sedes_asignadas << atiende
 
     expect(dispensario_sede['nombre']).to eq('Central')
@@ -32,7 +33,8 @@ RSpec.describe 'GET /me — la sede de mostrador del dispensador', type: :reques
   # El caso que mordía: la lista de asignadas no está ordenada por nada en particular, así que
   # alcanzaba con que la de producción cayera primera.
   it 'con SÓLO una de producción asignada, no la devuelve: cae a la que atiende' do
-    ana.sedes_asignadas << cultivo
+    # Dato heredado: hoy un dispensador no se asigna a una sede de producción (`UserSede`).
+    UserSede.new(user: ana, sede: cultivo).save!(validate: false)
 
     expect(dispensario_sede['nombre']).to eq('Central')
   end

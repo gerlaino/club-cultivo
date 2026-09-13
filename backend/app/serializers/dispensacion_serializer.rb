@@ -40,6 +40,8 @@ class DispensacionSerializer
       comprobante_entrega_url: (d.comprobante_entrega.attached? ? Rails.application.routes.url_helpers.rails_blob_path(d.comprobante_entrega, only_path: true) : nil),
       con_envio:       d.con_envio,
       estado_envio:    d.estado_envio,
+      anulada:         d.cancelada?,
+      anulacion:       serialize_anulacion(d),
       codigo_paquete:  d.codigo_paquete,
       delivery_id:     d.delivery_id,
       delivery_nombre: d.delivery_user ? [d.delivery_user.first_name, d.delivery_user.last_name].compact.join(' ').strip.presence || d.delivery_user.email : nil,
@@ -120,6 +122,22 @@ class DispensacionSerializer
   end
 
   # Líneas de la dispensación (multi-stock). Cada una con su stock, cantidad, precio y trazabilidad.
+  # Por qué, quién y cuándo se anuló. Las canceladas de antes de sep-2026 no tienen motivo
+  # tipificado: se muestran igual, con lo que haya.
+  def self.serialize_anulacion(d)
+    return nil unless d.cancelada?
+
+    {
+      motivo:       d.motivo_anulacion,
+      motivo_label: Dispensacion::MOTIVOS_ANULACION_LABEL[d.motivo_anulacion] || 'Anulada',
+      nota:         d.nota_anulacion,
+      at:           d.anulada_at,
+      por:          d.anulada_por ? (d.anulada_por.first_name.presence || d.anulada_por.email) : nil,
+      producto_descartado: Array(d.historial_envio).any? { |e| e['producto_descartado'] },
+      con_devolucion: Dispensacion::MOTIVOS_CON_DEVOLUCION.include?(d.motivo_anulacion),
+    }
+  end
+
   def self.serialize_items(d)
     # Legacy: dispensas previas al refactor multi-stock no tienen filas DispensacionItem.
     # Se sintetiza un ítem único desde el stock+cantidad de la dispensa, así el front trata

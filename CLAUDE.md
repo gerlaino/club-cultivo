@@ -669,6 +669,16 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   `turno_mostrador_id` y frasco; neto cero no aparece. `CorregirCierre` pide `causa`
   (`error_conteo` / `faltaba`) y **quien cerró corrige su propio último cierre** — esperar al
   admin dejaba el error en el inventario hasta el día siguiente.
+- **UNA DISPENSA NO SE BORRA: SE ANULA, Y DICE POR QUÉ** (sep-2026, pedido de Germán). No hay
+  `destroy`; la única puerta es `anular` con `Dispensacion::MOTIVOS_ANULACION` (`error_carga` ·
+  `devolucion` · `producto_defectuoso`; `no_entregado` lo pone el paquete que vuelve). El registro
+  queda con motivo, nota, quién y cuándo, visible en las listas y fuera de los KPIs. **Error de
+  carga** = nunca pasó (asiento borrado, cobros afuera). **Devolución** = pasó y se deshizo: la
+  venta y sus cobros QUEDAN y se escribe el egreso `devolucion_paciente` al lado — en efectivo
+  sale hoy de la caja abierta de la sede (el arqueo de ayer no se mueve), por transferencia queda
+  pendiente hasta «Registrar pago». **Producto defectuoso** (o devolución con «no se puede volver
+  a entregar») sale como MERMA y la mesa no se toca (`revertir_stock!(vuelve: false)`). El
+  dispensador anula sólo las de su sede. Sin plazo, a propósito.
 - **UN PAGO DICE CÓMO, CUÁNDO Y DE QUÉ CAJA** (sep-2026, pedido de Germán). `fecha` es la del gasto
   y no se mueve; `fecha_pago` es cuándo salió la plata (`completar_fecha_pago`: lo que nace pagado
   se pagó ese día). En efectivo se elige entre las cajas ABIERTAS (`useCajasAbiertas`, la misma

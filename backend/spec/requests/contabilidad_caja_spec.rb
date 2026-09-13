@@ -85,12 +85,12 @@ RSpec.describe 'Contabilidad de caja', type: :request do
     end
   end
 
-  context 'eliminación de la dispensación' do
-    it 'elimina también su movimiento contable (sin ingresos huérfanos)' do
+  context 'anulación de la dispensación por error de carga' do
+    it 'borra también su movimiento contable (sin ingresos huérfanos)' do
       dispensar(medio_pago: 'efectivo')
       dispensacion = Dispensacion.last
       expect {
-        delete "/dispensaciones/#{dispensacion.id}", headers: auth_headers, as: :json
+        patch "/dispensaciones/#{dispensacion.id}/anular", params: { motivo: 'error_carga' }, headers: auth_headers, as: :json
       }.to change(MovimientoContable, :count).by(-1)
     end
   end

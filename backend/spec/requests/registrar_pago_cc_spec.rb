@@ -53,7 +53,7 @@ end
 RSpec.describe 'Registrar pago — dispensador', type: :request do
   let(:club)        { create(:club) }
   let(:admin)       { create(:user, :admin, club: club) }
-  let(:sede)        { create(:sede, club: club, created_by: admin) }
+  let(:sede)        { create(:sede, club: club, created_by: admin, tipo: 'mixta') }
   let(:dispensador) { create(:user, :dispensador, club: club) }
   let(:paciente)    { create(:paciente, club: club, created_by: admin) }
   let!(:cc) do

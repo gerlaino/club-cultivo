@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_13_180000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_13_230000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -334,7 +334,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_13_180000) do
     t.index ["cerrada_por_id"], name: "index_caja_turnos_on_cerrada_por_id"
     t.index ["cierre_solicitado_por_id"], name: "index_caja_turnos_on_cierre_solicitado_por_id"
     t.index ["club_id"], name: "index_caja_turnos_on_club_id"
-    t.index ["punto_type", "punto_id"], name: "index_caja_turnos_activa_por_punto", unique: true, where: "((estado)::text = ANY ((ARRAY['abierta'::character varying, 'pendiente_cierre'::character varying])::text[]))"
+    t.index ["punto_type", "punto_id"], name: "index_caja_turnos_activa_por_punto", unique: true, where: "((estado)::text = ANY (ARRAY[('abierta'::character varying)::text, ('pendiente_cierre'::character varying)::text]))"
     t.index ["sede_id"], name: "index_caja_turnos_on_sede_id"
   end
 
@@ -678,6 +678,11 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_13_180000) do
     t.boolean "es_regalo", default: false, null: false
     t.datetime "fallido_at"
     t.bigint "turno_mostrador_id"
+    t.string "motivo_anulacion"
+    t.text "nota_anulacion"
+    t.datetime "anulada_at"
+    t.bigint "anulada_por_id"
+    t.index ["anulada_por_id"], name: "index_dispensaciones_on_anulada_por_id"
     t.index ["ariccame_reportada"], name: "index_dispensaciones_on_ariccame_reportada", where: "(ariccame_reportada = false)"
     t.index ["codigo_paquete"], name: "index_dispensaciones_on_codigo_paquete", unique: true
     t.index ["deleted_at"], name: "index_dispensaciones_on_deleted_at"
@@ -687,6 +692,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_13_180000) do
     t.index ["fecha_dispensacion"], name: "index_dispensaciones_on_fecha_dispensacion"
     t.index ["indicacion_medica_id"], name: "index_dispensaciones_on_indicacion_medica_id"
     t.index ["medio_pago"], name: "index_dispensaciones_on_medio_pago"
+    t.index ["motivo_anulacion"], name: "index_dispensaciones_on_motivo_anulacion"
     t.index ["paciente_id", "fecha_dispensacion"], name: "index_dispensaciones_on_paciente_id_and_fecha_dispensacion"
     t.index ["paciente_id"], name: "index_dispensaciones_on_paciente_id"
     t.index ["ruta_entrega_id"], name: "index_dispensaciones_on_ruta_entrega_id"
@@ -2485,6 +2491,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_13_180000) do
   add_foreign_key "dispensaciones", "stocks", on_delete: :nullify
   add_foreign_key "dispensaciones", "turno_mostradores"
   add_foreign_key "dispensaciones", "users"
+  add_foreign_key "dispensaciones", "users", column: "anulada_por_id"
   add_foreign_key "dispensaciones", "users", column: "deleted_by_id"
   add_foreign_key "dispensaciones", "users", column: "delivery_id"
   add_foreign_key "disponibilidad_medicos", "clubs"

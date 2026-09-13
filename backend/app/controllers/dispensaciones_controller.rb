@@ -22,7 +22,7 @@ class DispensacionesController < ApplicationController
   before_action :require_dispensador_o_admin, except: [:index, :show, :iniciar_viaje, :entregar, :reportar_fallo, :cancelar_entrega, :mis_paquetes, :mi_historial, :export_csv, :entregadores]
   before_action :set_paciente,     only: [:create]
   before_action :set_paciente_opt, only: [:index]
-  before_action :set_dispensacion, only: [:show, :update, :destroy, :entregar, :reportar_fallo, :reprogramar, :cancelar_entrega]
+  before_action :set_dispensacion, only: [:show, :update, :anular, :entregar, :reportar_fallo, :reprogramar, :cancelar_entrega]
 
   # GET /pacientes/:paciente_id/dispensaciones  OR  GET /dispensaciones?fecha=YYYY-MM-DD
   # GET /dispensaciones?con_envio=true[&estado_envio=pendiente][&delivery_id=N][&desde=YYYY-MM-DD][&hasta=YYYY-MM-DD]
@@ -497,15 +497,45 @@ class DispensacionesController < ApplicationController
     if @dispensacion.cancelada?
       return render json: { error: 'La dispensación ya está cancelada' }, status: :unprocessable_entity
     end
-    motivo = params[:motivo].presence
-    registrar_evento_envio(@dispensacion, 'cancelado', motivo: motivo)
+    nota = params[:motivo].presence
+    registrar_evento_envio(@dispensacion, 'cancelado', motivo: nota)
     # La reversa vive en `Dispensaciones::Cancelar`: la usa también la rendición del repartidor
     # cuando vuelve un paquete, y escribirla dos veces es cómo dejan de coincidir.
     res = Dispensaciones::Cancelar.call(dispensacion: @dispensacion, usuario: current_user,
-                                        motivo: motivo, evento: false)
+                                        motivo: 'no_entregado', nota: nota, evento: false)
     return render json: { errors: [res.error] }, status: :unprocessable_entity unless res.ok?
 
     render json: serialize_dispensacion_delivery(@dispensacion)
+  end
+
+  # PATCH /dispensaciones/:id/anular
+  #
+  # LA ÚNICA puerta para deshacer una dispensa (reemplazó a «Eliminar», sep-2026, pedido de
+  # Germán). Conserva el registro y pide POR QUÉ, porque son hechos distintos que se deshacen
+  # distinto (`Dispensacion::MOTIVOS_ANULACION`): un error de carga nunca pasó; una devolución
+  # pasó y hay que devolver la plata; un producto defectuoso además no vuelve a la mesa.
+  #
+  # Quién: administración cualquiera; el dispensador sólo las que salieron por SU sede — la
+  # pantalla no es la regla, y por API mandaría cualquier id.
+  def anular
+    if current_user.dispensador? && !current_user.sedes_visibles_ids.include?(@dispensacion.sede_id)
+      return render json: { error: 'Esa dispensa no salió por tu mostrador.' }, status: :forbidden
+    end
+    if @dispensacion.cancelada?
+      return render json: { error: 'La dispensación ya está anulada' }, status: :unprocessable_entity
+    end
+    motivo = params[:motivo].to_s
+    unless (Dispensacion::MOTIVOS_ANULACION - %w[no_entregado]).include?(motivo)
+      return render json: { error: 'Decí por qué se anula: error de carga, devolución o producto defectuoso.' },
+                    status: :unprocessable_entity
+    end
+
+    res = Dispensaciones::Cancelar.call(dispensacion: @dispensacion, usuario: current_user,
+                                        motivo: motivo, nota: params[:nota].presence,
+                                        descartar_producto: ActiveModel::Type::Boolean.new.cast(params[:descartar_producto]))
+    return render json: { errors: [res.error] }, status: :unprocessable_entity unless res.ok?
+
+    render json: serialize_dispensacion(@dispensacion.reload)
   end
 
   # GET /dispensaciones/export_csv
@@ -580,24 +610,6 @@ class DispensacionesController < ApplicationController
               filename:    "dispensaciones_#{Time.zone.today}.csv",
               type:        "text/csv; charset=utf-8",
               disposition: "attachment"
-  end
-
-  # DELETE /dispensaciones/:id
-  def destroy
-    # Una dispensación cuyo asiento cae en un período contable cerrado es
-    # inmutable: borrarla dejaría el libro congelado inconsistente con el stock
-    if @dispensacion.movimientos_contables.any?(&:cerrado?)
-      return render json: { error: 'La dispensación pertenece a un período contable cerrado y no puede eliminarse.' }, status: :unprocessable_entity
-    end
-
-    ActiveRecord::Base.transaction do
-      revertir_gramos(@dispensacion)
-      revertir_cuenta_corriente(@dispensacion)
-      # Nullify FK references before destroy (prevents FK constraint violation)
-      CuentaCorrienteMovimiento.where(dispensacion_id: @dispensacion.id).update_all(dispensacion_id: nil)
-      @dispensacion.destroy
-    end
-    head :no_content
   end
 
   private

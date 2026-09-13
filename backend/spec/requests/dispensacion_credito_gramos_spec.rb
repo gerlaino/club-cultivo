@@ -96,22 +96,22 @@ RSpec.describe 'Dispensacion con credito_gramos', type: :request do
     end
   end
 
-  context 'eliminación — reversa de gramos' do
+  context 'anulación — reversa de gramos' do
     let!(:dispensacion) do
       dispensar(cantidad: 15)
       Dispensacion.last
     end
 
-    it 'restaura el saldo_disponible_g al eliminar' do
+    it 'restaura el saldo_disponible_g al anular' do
       saldo_previo = cc.reload.saldo_disponible_g.to_f
-      delete "/dispensaciones/#{dispensacion.id}", headers: auth_headers
-      expect(response).to have_http_status(:no_content)
+      patch "/dispensaciones/#{dispensacion.id}/anular", params: { motivo: 'error_carga' }, headers: auth_headers
+      expect(response).to have_http_status(:ok)
       expect(cc.reload.saldo_disponible_g.to_f).to eq(saldo_previo + 15.0)
     end
 
     it 'crea un movimiento de ajuste al revertir' do
       count_antes = cc.movimientos.count
-      delete "/dispensaciones/#{dispensacion.id}", headers: auth_headers
+      patch "/dispensaciones/#{dispensacion.id}/anular", params: { motivo: 'error_carga' }, headers: auth_headers
       expect(cc.movimientos.count).to eq(count_antes + 1)
       expect(cc.movimientos.order(:created_at).last.tipo).to eq('ajuste')
     end

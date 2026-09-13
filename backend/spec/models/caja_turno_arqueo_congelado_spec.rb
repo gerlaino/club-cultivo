@@ -56,7 +56,7 @@ RSpec.describe 'El arqueo de un turno cerrado no cambia después', type: :model 
       expect(caja.diferencia_ars).to eq(0.0)
 
       # Al día siguiente se cancela esa dispensa (un reparto que volvió, un error, lo que sea).
-      Dispensaciones::Cancelar.call(dispensacion: dispensa, usuario: ana, motivo: 'prueba')
+      Dispensaciones::Cancelar.call(dispensacion: dispensa, usuario: ana, motivo: 'error_carga')
 
       # El arqueo de ayer ya está firmado: no puede moverse por algo que pasó hoy.
       expect(caja.reload.diferencia_ars).to eq(0.0)
@@ -78,7 +78,7 @@ RSpec.describe 'El arqueo de un turno cerrado no cambia después', type: :model 
       caja     = sede.mostrador!.turno_abierto.caja_turno
       expect(caja.efectivo_esperado_ars).to eq(58_500.0)
 
-      Dispensaciones::Cancelar.call(dispensacion: dispensa, usuario: ana, motivo: 'se arrepintió')
+      Dispensaciones::Cancelar.call(dispensacion: dispensa, usuario: ana, motivo: 'error_carga', nota: 'se cargó mal')
 
       expect(caja.reload.efectivo_esperado_ars).to eq(50_000.0)
     end

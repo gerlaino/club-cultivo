@@ -1,5 +1,37 @@
 # Changelog
 
+## Septiembre 2026 (bs) — Una dispensa no se borra: se anula, y dice por qué
+
+- **«Eliminar» se retiró** (`DELETE /dispensaciones/:id` ya no existe). Soft-borraba la fila sin
+  motivo: la dispensa desaparecía de las listas y nadie sabía si fue un dedazo o un paciente que
+  devolvió el producto. Además el backend se lo dejaba al dispensador mientras el Historial le
+  escondía el botón y la ficha del paciente se lo mostraba.
+- **La única puerta es «Anular»** (`PATCH /dispensaciones/:id/anular`, `ModalAnularDispensa`),
+  con motivo obligatorio (`Dispensacion::MOTIVOS_ANULACION`, pedido de Germán, 13-sep). El
+  registro QUEDA (estado `cancelada` + `motivo_anulacion`, `nota_anulacion`, `anulada_por`,
+  `anulada_at` — columnas nuevas) y se ve en las dos listas con su chip y su motivo; las
+  anuladas no suman en los KPIs. **El dispensador puede**, pero sólo las que salieron por su
+  sede (el backend lo verifica, no la pantalla).
+- **Son hechos distintos y se deshacen distinto** (`Dispensaciones::Cancelar`, la misma reversa
+  que ya usaba el paquete que vuelve con el repartidor):
+  · **error de carga** — nunca pasó: el asiento se borra, los cobros se van, el producto vuelve
+    al stock y a la mesa si corresponde.
+  · **devolución** — pasó y se deshizo: la venta y sus cobros QUEDAN (esa plata entró al cajón
+    de verdad) y se escribe un egreso **«Devolución a paciente»** (`devolucion_paciente`,
+    categoría nueva) por cada ingreso cobrado. En efectivo sale HOY, atado a la caja abierta de
+    la sede — si es la misma de la venta, +venta −devolución da cero; si la de la venta ya
+    cerró, su arqueo no se mueve y la plata sale de la de hoy. Por transferencia queda
+    PENDIENTE hasta «Registrar pago». La cuenta corriente se reacredita como siempre. El
+    producto vuelve como cuando el repartidor trae el paquete; con «no se puede volver a
+    entregar» sale como merma.
+  · **producto defectuoso** — como la devolución, y el producto sale como **merma** sin
+    preguntar (`Dispensacion#revertir_stock!(vuelve: false)`: el movimiento de dispensa se
+    reemplaza por uno de merma, la mesa no se toca porque el producto salió de ahí y no vuelve).
+  · **no entregado** — el motivo del paquete que vuelve; no se elige a mano.
+- Sin plazo para anular, a propósito: si hace falta, será configurable por la organización.
+- El libro diario mostraba la clave cruda de las categorías de sistema (`devolucion_a_cuenta`…):
+  la fila usa `categoria_label` del backend antes de caer a la lista del front.
+
 ## Septiembre 2026 (br) — «Usuario de ingreso» y «Email personal» en todas las puertas
 
 - **La ficha del usuario decía «Email» a secas** para el login y **no ofrecía el mail personal**

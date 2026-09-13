@@ -115,7 +115,6 @@
   "views/HistorialDispensacionesView.vue": [
     "hd__detalle-prod",
     "hd__search-ico",
-    "hd__td-pago",
     "hd__td-producto"
   ],
   "views/LandingView.vue": [

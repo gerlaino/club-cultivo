@@ -13,25 +13,41 @@ module Dispensaciones
 
     def self.call(**kwargs) = new(**kwargs).call
 
-    def initialize(dispensacion:, usuario:, motivo: nil, evento: true)
-      @d       = dispensacion
-      @usuario = usuario
-      @motivo  = motivo
-      @evento  = evento
+    # `motivo` es uno de `Dispensacion::MOTIVOS_ANULACION` y decide CÓMO se deshace (ver el
+    # modelo); `nota` es el texto libre de la persona. `descartar_producto` es para la devolución
+    # de algo que no se puede volver a entregar (con `producto_defectuoso` va implícito).
+    def initialize(dispensacion:, usuario:, motivo: 'error_carga', nota: nil, descartar_producto: false, evento: true)
+      @d        = dispensacion
+      @usuario  = usuario
+      @motivo   = motivo.to_s
+      @nota     = nota.presence
+      @descarta = descartar_producto || @motivo == 'producto_defectuoso'
+      @evento   = evento
     end
 
     def call
       return err('La dispensación ya está cancelada') if @d.cancelada?
+      return err('Motivo de anulación inválido') unless Dispensacion::MOTIVOS_ANULACION.include?(@motivo)
 
       ActiveRecord::Base.transaction do
         revertir_gramos
         revertir_cuenta_corriente
         CuentaCorrienteMovimiento.where(dispensacion_id: @d.id).update_all(dispensacion_id: nil)
-        revertir_asientos
-        @d.cobros.destroy_all # los cobros (y sus comprobantes) se van con la cancelación
-        @d.send(:incrementar_stock) # el producto vuelve al stock — y a la mesa, si sigue abierta
+        if devolucion?
+          # La venta PASÓ: la plata entró y hay que devolverla. El ingreso y sus cobros quedan
+          # —son lo que cobró la caja esa noche— y se escribe el egreso al lado.
+          asentar_devolucion
+        else
+          # Nunca pasó: el asiento se borra y los cobros (con sus comprobantes) se van con él.
+          revertir_asientos
+          @d.cobros.destroy_all
+        end
+        # El producto vuelve al stock —y a la mesa, si corresponde— o sale como merma.
+        @d.revertir_stock!(vuelve: !@descarta, usuario: @usuario, nota: @nota)
         registrar_evento if @evento
-        @d.update!(estado_envio: 'cancelada', historial_envio: @d.historial_envio)
+        @d.update!(estado_envio: 'cancelada', historial_envio: @d.historial_envio,
+                   motivo_anulacion: @motivo, nota_anulacion: @nota,
+                   anulada_por: @usuario, anulada_at: Time.current)
       end
       Result.new(ok: true, dispensacion: @d)
     rescue => e
@@ -41,12 +57,51 @@ module Dispensaciones
     private
 
     def err(msg) = Result.new(ok: false, error: msg)
+    def devolucion? = Dispensacion::MOTIVOS_CON_DEVOLUCION.include?(@motivo)
 
     def registrar_evento
       @d.historial_envio = (@d.historial_envio || []) + [{
         estado: 'cancelado', at: Time.current.iso8601,
-        por: @usuario&.nombre_completo, motivo: @motivo,
+        por: @usuario&.nombre_completo, motivo: @motivo, nota: @nota,
+        producto_descartado: (@descarta || nil),
       }.compact.stringify_keys]
+    end
+
+    # DEVOLVER LA PLATA. Por cada ingreso que se cobró de verdad (`pagado`), un egreso
+    # «devolución a paciente» por el mismo monto y el mismo medio:
+    #   · efectivo → sale HOY del cajón: pagado, con fecha de hoy y atado a la caja abierta de
+    #     la sede (si no hay ninguna, se escribe igual y no entra a ningún arqueo, como cualquier
+    #     pago en efectivo del admin). Si la caja de la venta sigue abierta, +venta −devolución
+    #     da cero, que es lo que hay en el cajón.
+    #   · transferencia / Mercado Pago → queda PENDIENTE hasta que se la transfieran de vuelta:
+    #     se cierra con «Registrar pago».
+    # Lo que no se cobró (cuenta corriente, no abona) no tiene plata que devolver: la cuenta
+    # corriente ya se reacreditó arriba, y el asiento pendiente se borra si el período está
+    # abierto.
+    def asentar_devolucion
+      @d.movimientos_contables.each do |m|
+        next unless m.es_ingreso?
+
+        if m.pagado
+          MovimientoContable.create!(devolucion_attrs(m))
+        elsif !m.cerrado?
+          m.destroy!
+        end
+      end
+    end
+
+    def devolucion_attrs(m)
+      efectivo = m.medio_pago == 'efectivo'
+      caja_id  = efectivo ? CajaTurno.abierta_en_sede(club_id: m.club_id, sede_id: @d.sede_id || m.sede_id)&.id : nil
+      {
+        club: m.club, sede_id: @d.sede_id || m.sede_id, dispensacion: @d, paciente: m.paciente,
+        created_by: @usuario, tipo: 'egreso', categoria: 'devolucion_paciente',
+        descripcion: "Devolución a #{@d.paciente&.nombre_completo} — dispensación ##{@d.id} anulada " \
+                     "(#{Dispensacion::MOTIVOS_ANULACION_LABEL[@motivo].downcase})",
+        monto_ars: m.monto_ars, fecha: Time.zone.today,
+        medio_pago: m.medio_pago, pagado: efectivo, fecha_pago: (efectivo ? Time.zone.today : nil),
+        caja_turno_id: caja_id, comprobante_tipo: 'sin_comprobante',
+      }
     end
 
     # Un asiento en período ABIERTO se borra: la dispensa no pasó. Uno en período CERRADO no se
