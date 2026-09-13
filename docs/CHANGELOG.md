@@ -10,8 +10,10 @@ crear, y el repartidor ve sólo el saldo, que es lo único que necesita en la pu
 - `aplicar_lineas_cobro!(…, dejar_saldo:)`: con contra entrega, las líneas que vienen se cobran
   ahora y lo que falta queda **pendiente** (no va a cuenta corriente). Si lo cobrado cubre el
   total, 422: no queda nada para la puerta. Vale al crear una dispensa y al entregar una reserva.
-- Carrito: en el pago partido, **«Lo que falte lo cobra el repartidor al entregar»** (marca el
-  envío). El aviso de «faltan $X» dice adónde van: cuenta corriente o repartidor.
+- Carrito: en el pago partido, **«Contra entrega» es un medio más de la línea** (Germán: un tilde
+  aparte dejaba la duda de con qué se pagaba ese resto). Su monto no se escribe: es lo que queda
+  después de los otros medios. Elegirlo marca el envío; sacar el envío saca la línea. Y **nunca dos
+  líneas del mismo medio** (el select ya lo impedía; ahora además se depura la lista).
 - Etiqueta del despacho: **sólo el saldo, y sólo si hay algo que cobrar** (pedido de Germán); con
   saldo cero no dice nada aunque el envío haya nacido «contra entrega».
 

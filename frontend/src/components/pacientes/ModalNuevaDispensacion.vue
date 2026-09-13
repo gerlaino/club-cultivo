@@ -594,17 +594,24 @@ const cobraDelivery = computed(() => form.value.medio_pago === 'contra_entrega' 
 // medio. Lo usaban las entregas del delivery. Lo que faltaba era la pantalla: el mostrador
 // mandaba una sola línea sacada de un `<select>`, así que la mitad en efectivo y la mitad en
 // cuenta corriente no se podía cobrar aunque el modelo lo soportara.
+// UNA PARTE AHORA Y EL RESTO EN LA PUERTA (decisión de Germán, sep-2026). «Contra entrega» es un
+// medio más de la lista —como siempre—, con la diferencia de que su monto no se escribe: es lo que
+// queda después de los otros medios. Un tilde aparte («lo que falte lo cobra el repartidor») dejaba
+// la duda de con qué se iba a pagar ese resto; como medio de la línea, no hay duda.
 const MEDIOS_COBRO = [
   { valor: 'efectivo',         label: 'Efectivo' },
   { valor: 'transferencia',    label: 'Transferencia' },
   { valor: 'cuenta_corriente', label: 'Cuenta corriente' },
+  { valor: 'contra_entrega',   label: 'Contra entrega (cobra el delivery)' },
 ]
 const pagoDividido = ref(false)
 const lineasPago   = ref([])
-// UNA PARTE AHORA Y EL RESTO EN LA PUERTA (decisión de Germán, sep-2026). Con el pago partido, lo
-// que falte puede ir a cuenta corriente (lo de siempre) o quedar para que lo cobre el repartidor
-// al entregar. Lo que ya entró se asienta ya; el repartidor ve sólo el saldo.
-const restoAlDelivery = ref(false)
+const restoAlDelivery = computed(() => lineasPago.value.some(l => l.medio === 'contra_entrega'))
+// Lo que cobra el repartidor: el total menos lo que se paga por los otros medios. Nunca negativo.
+const montoContraEntrega = computed(() => {
+  const otros = lineasPago.value.filter(l => l.medio !== 'contra_entrega').reduce((a, l) => a + (Number(l.monto) || 0), 0)
+  return Math.max(0, Math.round((totalACobrar.value - otros) * 100) / 100)
+})
 
 // LO QUE HAY QUE COBRAR ACÁ Y AHORA. Entregando una reserva es el RESTO —la seña ya se cobró
 // cuando se apartó el producto—, no el total de lo que se lleva.
@@ -621,11 +628,11 @@ const totalACobrar = computed(() =>
 // aceptaba varias líneas (`aplicar_lineas_cobro!` recibe un array); sólo la pantalla no lo
 // ofrecía. Si la seña cubrió todo no hay nada que partir.
 const puedeDividirPago = computed(() =>
-  !form.value.es_regalo && !form.value.es_reserva && form.value.medio_pago !== 'contra_entrega' &&
+  !form.value.es_regalo && !form.value.es_reserva &&
   (!modoReserva.value || restoReserva.value > 0))
 
 const totalAsignado = computed(() =>
-  lineasPago.value.reduce((a, l) => a + (Number(l.monto) || 0), 0))
+  lineasPago.value.reduce((a, l) => a + (l.medio === 'contra_entrega' ? montoContraEntrega.value : (Number(l.monto) || 0)), 0))
 
 // Lo que falta asignar. El backend lo manda solo a cuenta corriente, así que hay que decirlo
 // en pantalla: si no, el paciente se va debiendo plata que nadie escribió en ningún lado.
@@ -637,8 +644,25 @@ const excedentePago = computed(() => Math.max(0, -restoPago.value))
 const mediosLibres = computed(() => MEDIOS_COBRO.filter(m =>
   !lineasPago.value.some(l => l.medio === m.valor) &&
   (m.valor !== 'cuenta_corriente' || tieneCc.value)))
+// Cambiar una línea a «contra entrega» marca el envío; y nunca dos líneas del mismo medio —si el
+// usuario llegara a repetirlo, la segunda se saca—.
+watch(lineasPago, (ls) => {
+  const vistos = new Set()
+  for (let i = ls.length - 1; i >= 0; i--) {
+    if (vistos.has(ls[i].medio)) ls.splice(i, 1)
+    else vistos.add(ls[i].medio)
+  }
+  if (ls.some(l => l.medio === 'contra_entrega')) form.value.con_envio = true
+}, { deep: true })
 
 function activarPagoDividido() {
+  // Desde «contra entrega»: una línea para lo que se paga ahora y la del repartidor con el resto.
+  if (form.value.medio_pago === 'contra_entrega') {
+    form.value.medio_pago = 'efectivo'
+    lineasPago.value = [{ medio: 'efectivo', monto: null }, { medio: 'contra_entrega', monto: null }]
+    pagoDividido.value = true
+    return
+  }
   // Arranca con lo que ya estaba elegido y el total puesto: dividir es partir algo que ya existe.
   const primero = MEDIOS_COBRO.some(m => m.valor === form.value.medio_pago) ? form.value.medio_pago : 'efectivo'
   lineasPago.value = [{ medio: primero, monto: totalACobrar.value || null }]
@@ -661,10 +685,7 @@ function quitarLineaPago(i) {
 function cancelarPagoDividido() {
   pagoDividido.value = false
   lineasPago.value = []
-  restoAlDelivery.value = false
 }
-// Que lo cobre el repartidor implica envío; si se saca el envío, el resto vuelve a cuenta corriente.
-watch(restoAlDelivery, (v) => { if (v) form.value.con_envio = true })
 
 // Si deja de aplicar (pasa a regalo, a reserva o a contra entrega) se apaga solo: si no, quedaría
 // un desglose invisible que igual se manda.
@@ -674,7 +695,8 @@ watch(() => form.value.con_envio, (val) => {
   if (val) cargarDeliveryUsers()
   else {
     if (form.value.medio_pago === 'contra_entrega') form.value.medio_pago = 'efectivo'
-    restoAlDelivery.value = false
+    // Sin envío no hay quien cobre en la puerta: la línea se va.
+    lineasPago.value = lineasPago.value.filter(l => l.medio !== 'contra_entrega')
   }
 })
 watch(() => form.value.stock_id,  ()    => { precioUnitarioManual.value = null })
@@ -815,7 +837,7 @@ async function handleSubmit() {
         // Una línea o varias: es el mismo array que manda la dispensa, y lo que sobra sin asignar
         // lo resuelve el backend contra la cuenta corriente, como siempre.
         payload.cobros = pagoDividido.value
-          ? lineasPago.value.filter(l => Number(l.monto) > 0)
+          ? lineasPago.value.filter(l => l.medio !== 'contra_entrega' && Number(l.monto) > 0)
                             .map(l => ({ medio: l.medio, monto: Number(l.monto).toFixed(2) }))
           : [{ medio: form.value.medio_pago, monto: Number(restoReserva.value).toFixed(2) }]
       }
@@ -908,14 +930,14 @@ async function handleSubmit() {
 
 
   if (pagoDividido.value) {
-    const lineas = lineasPago.value.filter(l => Number(l.monto) > 0)
-    if (!lineas.length) { formError.value = 'Cargá al menos un monto, o volvé a un solo medio de pago'; saving.value = false; return }
-    // Lo que falte lo manda el backend a cuenta corriente. Sin cuenta corriente no hay dónde
-    // dejarlo y la dispensa se rechazaría del otro lado: mejor decirlo acá.
-    if (restoAlDelivery.value && restoPago.value <= 0.009) {
-      formError.value = 'Lo cobrado ahora cubre el total: no queda nada para que cobre el repartidor.'
+    const lineas = lineasPago.value.filter(l => l.medio !== 'contra_entrega' && Number(l.monto) > 0)
+    if (!lineas.length && !restoAlDelivery.value) { formError.value = 'Cargá al menos un monto, o volvé a un solo medio de pago'; saving.value = false; return }
+    if (restoAlDelivery.value && montoContraEntrega.value <= 0.009) {
+      formError.value = 'Los otros medios cubren el total: no queda nada para que cobre el repartidor. Sacá «contra entrega» o bajá lo que se paga ahora.'
       saving.value = false; return
     }
+    // Lo que falte lo manda el backend a cuenta corriente. Sin cuenta corriente no hay dónde
+    // dejarlo y la dispensa se rechazaría del otro lado: mejor decirlo acá.
     if (restoPago.value > 0.009 && !tieneCc.value && !restoAlDelivery.value) {
       formError.value = `Faltan ${fmt(restoPago.value)} por asignar y el paciente no tiene cuenta corriente donde dejarlos.`
       saving.value = false; return
@@ -962,8 +984,9 @@ async function handleSubmit() {
       caja_turno_id: pideCaja.value ? (cajaElegida.value || undefined) : undefined,
     }
     if (pagoDividido.value) {
+      // La línea «contra entrega» no es un cobro: es lo que queda, y lo cobra el repartidor.
       payload.cobros = lineasPago.value
-        .filter(l => Number(l.monto) > 0)
+        .filter(l => l.medio !== 'contra_entrega' && Number(l.monto) > 0)
         .map(l => ({ medio: l.medio, monto: Number(l.monto).toFixed(2) }))
     }
     if (form.value.es_regalo) payload.es_regalo = true
@@ -1549,7 +1572,13 @@ async function handleSubmit() {
                   {{ m.label }}
                 </option>
               </select>
-              <div class="mnd__input-suffix-wrap mnd__pago-monto">
+              <!-- «Contra entrega» no se tipea: es lo que queda después de los otros medios. -->
+              <div v-if="l.medio === 'contra_entrega'" class="mnd__input-suffix-wrap mnd__pago-monto"
+                   title="Lo que queda después de los otros medios: lo cobra el repartidor al entregar">
+                <span class="mnd__input-prefix">$</span>
+                <input :value="montoContraEntrega" type="number" disabled class="mnd__input mnd__input--with-prefix mnd__pago-monto--auto" />
+              </div>
+              <div v-else class="mnd__input-suffix-wrap mnd__pago-monto">
                 <span class="mnd__input-prefix">$</span>
                 <input v-model.number="l.monto" type="number" min="0" step="1"
                        class="mnd__input mnd__input--with-prefix" placeholder="0" />
@@ -1568,11 +1597,14 @@ async function handleSubmit() {
 
             <!-- Lo que falta NO se pierde: el backend lo manda a cuenta corriente. Decirlo acá es
                  la diferencia entre una decisión y una sorpresa a fin de mes. -->
-            <div v-if="restoPago > 0.009" class="mnd__pagos-resto" :class="{ 'mnd__pagos-resto--mal': !tieneCc && !restoAlDelivery }">
-              <template v-if="restoAlDelivery">
-                Faltan <strong>{{ fmt(restoPago) }}</strong> — los cobra el repartidor al entregar.
-              </template>
-              <template v-else-if="tieneCc">
+            <div v-if="restoAlDelivery && montoContraEntrega <= 0.009" class="mnd__pagos-resto mnd__pagos-resto--mal">
+              Los otros medios cubren el total: no queda nada para que cobre el repartidor.
+            </div>
+            <div v-else-if="restoAlDelivery" class="mnd__pagos-resto mnd__pagos-resto--ok">
+              <i class="bi bi-truck"></i> El repartidor cobra <strong>{{ fmt(montoContraEntrega) }}</strong> al entregar.
+            </div>
+            <div v-else-if="restoPago > 0.009" class="mnd__pagos-resto" :class="{ 'mnd__pagos-resto--mal': !tieneCc }">
+              <template v-if="tieneCc">
                 Faltan <strong>{{ fmt(restoPago) }}</strong> — se le cargan a la cuenta corriente.
               </template>
               <template v-else>
@@ -1585,12 +1617,6 @@ async function handleSubmit() {
             <div v-else class="mnd__pagos-resto mnd__pagos-resto--ok">
               <i class="bi bi-check-circle-fill"></i> Cubre el total exacto.
             </div>
-            <!-- El resto puede quedar para la puerta en vez de la cuenta corriente: una parte se
-                 paga ahora (transferencia, efectivo) y el repartidor cobra lo que falta. -->
-            <label v-if="!modoReserva || restoReserva > 0" class="mnd__pagos-delivery">
-              <input type="checkbox" v-model="restoAlDelivery" />
-              <span>Lo que falte lo cobra el repartidor al entregar <span class="mnd__opt">(marca el envío)</span></span>
-            </label>
           </div>
 
           <!-- A qué caja entra el efectivo, sólo para administración y sólo cuando nada sale de una
@@ -1865,8 +1891,7 @@ async function handleSubmit() {
 .mnd__pago-add:disabled { opacity: .4; cursor: not-allowed; color: var(--c-slate-400); }
 .mnd__pago-cancel { background: none; border: none; padding: 0; cursor: pointer; font-size: .72rem; color: var(--c-slate-500); text-decoration: underline; }
 
-.mnd__pagos-delivery { display: flex; align-items: flex-start; gap: .45rem; font-size: .78rem; color: var(--c-slate-700); margin-top: .5rem; cursor: pointer; }
-.mnd__pagos-delivery input { margin-top: .15rem; }
+.mnd__pago-monto--auto { background: var(--c-slate-50); color: var(--c-slate-700); font-weight: 700; }
 .mnd__pagos-resto { font-size: .74rem; color: var(--c-slate-600); border-top: 1px solid var(--c-slate-200); padding-top: .5rem; display: flex; align-items: center; gap: .3rem; }
 .mnd__pagos-resto strong { color: var(--c-slate-900); font-family: monospace; }
 .mnd__pagos-resto--ok { color: #15803d; }

@@ -207,20 +207,22 @@ describe('Dispensar — pago dividido', () => {
   })
 
   // Si deja de aplicar, un desglose invisible no puede seguir viajando.
-  // UNA PARTE AHORA Y EL RESTO EN LA PUERTA (Germán, sep-2026): la transferencia que ya entró se
-  // asienta al crear; el repartidor cobra sólo lo que falta. Antes «contra entrega» era todo o nada.
-  describe('el resto lo cobra el repartidor', () => {
-    it('marca el envío, deja de mandar el resto a cuenta corriente y lo dice', async () => {
+  // UNA PARTE AHORA Y EL RESTO EN LA PUERTA (Germán, sep-2026): «contra entrega» es un medio más de
+  // la línea, y su monto es lo que queda después de los otros. Antes era todo o nada.
+  describe('contra entrega como una línea más', () => {
+    it('se ofrece como medio, su monto es el resto y marca el envío', async () => {
       const w = await montar({ limiteCc: 0 })   // sin cuenta corriente: antes esto trababa
       await conCarrito(w)
       w.vm.activarPagoDividido()
-      w.vm.lineasPago = [{ medio: 'transferencia', monto: 3000 }]
-      w.vm.restoAlDelivery = true
+      w.vm.lineasPago = [{ medio: 'transferencia', monto: 3000 }, { medio: 'contra_entrega', monto: null }]
       w.vm.form.delivery_id = 7
       await w.vm.$nextTick()
 
+      expect(w.vm.montoContraEntrega).toBe(2000)
       expect(w.vm.form.con_envio).toBe(true)
-      expect(w.text()).toContain('los cobra el repartidor al entregar')
+      expect(w.text()).toContain('El repartidor cobra')
+      const autos = w.findAll('input[disabled][type="number"]')
+      expect(autos.length).toBe(1)
 
       await w.vm.handleSubmit()
       await new Promise((r) => setTimeout(r, 0))
@@ -231,30 +233,51 @@ describe('Dispensar — pago dividido', () => {
       expect(payload.con_envio).toBe(true)
     })
 
-    it('si lo cobrado ahora cubre el total, no deja: no hay nada para la puerta', async () => {
+    it('si los otros medios cubren el total, no deja: no hay nada para la puerta', async () => {
       const w = await montar()
       await conCarrito(w)
       w.vm.activarPagoDividido()
-      w.vm.lineasPago = [{ medio: 'transferencia', monto: 5000 }]
-      w.vm.restoAlDelivery = true
+      w.vm.lineasPago = [{ medio: 'transferencia', monto: 5000 }, { medio: 'contra_entrega', monto: null }]
       w.vm.form.delivery_id = 7
       await w.vm.$nextTick()
 
       await w.vm.handleSubmit()
       expect(createDispensacion).not.toHaveBeenCalled()
-      expect(w.vm.formError).toMatch(/cubre el total/)
+      expect(w.vm.formError).toMatch(/cubren el total/)
     })
 
-    it('sacar el envío devuelve el resto a la cuenta corriente', async () => {
+    it('dos líneas del mismo medio no conviven: la repetida se saca', async () => {
       const w = await montar()
       await conCarrito(w)
       w.vm.activarPagoDividido()
-      w.vm.restoAlDelivery = true
+      w.vm.lineasPago = [{ medio: 'transferencia', monto: 1000 }, { medio: 'transferencia', monto: 2000 }]
+      await w.vm.$nextTick()
+
+      expect(w.vm.lineasPago).toHaveLength(1)
+    })
+
+    it('desde «contra entrega» se puede partir: una línea para ahora y la del repartidor', async () => {
+      const w = await montar()
+      await conCarrito(w)
+      w.vm.form.medio_pago = 'contra_entrega'
+      await w.vm.$nextTick()
+      w.vm.activarPagoDividido()
+      await w.vm.$nextTick()
+
+      expect(w.vm.lineasPago.map(l => l.medio)).toEqual(['efectivo', 'contra_entrega'])
+      expect(w.vm.form.con_envio).toBe(true)
+    })
+
+    it('sacar el envío saca la línea del repartidor', async () => {
+      const w = await montar()
+      await conCarrito(w)
+      w.vm.activarPagoDividido()
+      w.vm.lineasPago = [{ medio: 'efectivo', monto: 1000 }, { medio: 'contra_entrega', monto: null }]
       await w.vm.$nextTick()
       w.vm.form.con_envio = false
       await w.vm.$nextTick()
 
-      expect(w.vm.restoAlDelivery).toBe(false)
+      expect(w.vm.lineasPago.map(l => l.medio)).toEqual(['efectivo'])
     })
   })
 
