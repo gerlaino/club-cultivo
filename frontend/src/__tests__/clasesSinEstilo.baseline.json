@@ -122,12 +122,6 @@
     "hd__td-pago",
     "hd__td-producto"
   ],
-  "views/InformeSemestralView.vue": [
-    "ir__controls-left",
-    "ir__gen-info",
-    "ir__pie-firma",
-    "ir__portada-club"
-  ],
   "views/LandingView.vue": [
     "ld__final"
   ],
@@ -214,9 +208,6 @@
   ],
   "views/auditor/InformeDispensacionesView.vue": [
     "inf__hoja"
-  ],
-  "views/auditor/InformeInaseView.vue": [
-    "inf__section"
   ],
   "views/auditor/InformeProduccionView.vue": [
     "inf__hoja"

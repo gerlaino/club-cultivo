@@ -55,27 +55,30 @@ class InformesController < ApplicationController
   # `resena`: en una o dos frases, qué pregunta contesta este informe y con qué criterio está
   # armado. Un informe que no dice de qué habla obliga a adivinar a partir de los números —y con
   # dos informes que cortan el mismo dato distinto, adivinar termina en "esto no coincide".
+  # `ids_inase`: a qué genéticas se acota la salvedad y el candado de «Para presentar» — las que
+  # APARECEN en el documento. Sin acotar, el candado mira todas las del club, archivadas y nunca
+  # cultivadas incluidas, y bloquea la descarga por una variedad que no está en ningún lado.
   def responder_informe(titulo:, datos:, kpis:, secciones:, nombre:, periodo: nil, nota: nil,
-                        resena: nil, exige_declaracion_inase: false)
+                        resena: nil, exige_declaracion_inase: false, ids_inase: nil)
     respond_to do |format|
       format.json { render json: datos.merge(resena: resena) }
       format.pdf do
         # Sólo frena si quien descarga dijo que es PARA PRESENTAR. Si no, sale con la salvedad.
-        next if exige_declaracion_inase && bloquear_descarga_si_falta_declarar!
+        next if exige_declaracion_inase && bloquear_descarga_si_falta_declarar!(ids: ids_inase)
 
         pdf = InformeDocument.new(club: current_user.club, usuario: current_user, titulo: titulo,
                                   kpis: kpis, secciones: secciones, periodo: periodo, nota: nota,
-                                  salvedad_inase: (salvedad_inase if exige_declaracion_inase)).render
+                                  salvedad_inase: (salvedad_inase(ids: ids_inase) if exige_declaracion_inase)).render
         send_data pdf, filename: "#{nombre}_#{Time.zone.today.strftime('%Y%m%d')}.pdf",
                   type: 'application/pdf', disposition: 'attachment'
       end
       format.xlsx do
-        next if exige_declaracion_inase && bloquear_descarga_si_falta_declarar!
+        next if exige_declaracion_inase && bloquear_descarga_si_falta_declarar!(ids: ids_inase)
 
         principal = secciones.first || { headers: [], rows: [] }
         # El Excel no tiene recuadro, así que la salvedad entra al resumen: la misma advertencia
         # tiene que viajar en los dos formatos o el que se baje el Excel no se entera.
-        pendientes = (salvedad_inase if exige_declaracion_inase)
+        pendientes = (salvedad_inase(ids: ids_inase) if exige_declaracion_inase)
         resumen = kpis.to_h { |k| [k[:label], k[:valor]] }
         resumen['Variedades sin acreditar ante el INASE'] = pendientes.join(', ') if pendientes
         xlsx = XlsxExport.new(
@@ -376,138 +379,60 @@ class InformesController < ApplicationController
     )
   end
 
+  # Qué variedades del Catálogo Nacional cultiva la organización y cuánto produjo de cada una. El
+  # cálculo vive en `Informes::Inase`; acá sólo se arma cómo se muestra en el PDF y el Excel.
   def inase
-    club  = current_user.club
-    lotes = club.lotes
+    desde, hasta = periodo_rango
+    datos = Informes::Inase.new(club: current_user.club, desde: desde, hasta: hasta).call
+    k = datos[:kpis]
 
-    # Qué genéticas se declaran: las que la organización TIENE, más las que archivó pero llegó a
-    # cultivar.
-    #
-    # Leía `club.geneticas` a secas y listaba también las archivadas —"eliminar" una genética es
-    # `activa: false`, no un borrado—, así que el informe declaraba ante el organismo variedades
-    # que la organización ya no trabaja. Filtrar sólo por activas sería el error opuesto: lo que
-    # se cultivó en el período hay que declararlo aunque después se haya archivado, o el informe
-    # deja de cuadrar contra las plantas y los gramos que sí figuran.
-    cultivadas = lotes.where.not(genetica_id: nil).distinct.pluck(:genetica_id)
-    geneticas  = club.geneticas.where(activa: true)
-                     .or(club.geneticas.where(id: cultivadas))
-                     .order(:nombre)
-
-    lotes_por_gen   = lotes.group(:genetica_id).count
-    plantas_por_gen = lotes.group(:genetica_id).sum(:plants_count)
-    gramos_por_gen  = lotes.where.not(rendimiento_real_g: nil).group(:genetica_id).sum(:rendimiento_real_g)
-
-    filas = geneticas.includes(:declarada_como).map do |g|
-      {
-        id:                    g.id,
-        # `nombre` es el que usa la organización puertas adentro; `nombre_declarado` es el que se
-        # presenta ante el organismo. Un club cultiva "Northern Lights" y la declara contra
-        # una variedad inscripta: el informe tiene que decir la inscripta.
-        nombre:                g.nombre_declarado,
-        nombre_propio:         g.nombre,
-        declarada:             g.declarada_como.present?,
-        acreditada:            g.acreditada_inase?,
-        tipo:                  g.tipo,
-        registrada_inase:      g.registrada_inase,
-        numero_registro_inase: g.numero_inase_declarado,
-        categoria_inase:       g.categoria_inase,
-        fecha_registro_inase:  g.fecha_registro_inase,
-        criador:               g.criador,
-        # El del criador de la VARIEDAD contra la que acredita, que es el que va al informe: si
-        # el club cultiva "Amarillo" y lo declara como TROPICANA WFC, el obtentor es el de
-        # Tropicana, no el que le puso el nombre de fantasía.
-        criador_variedad:      (g.declarada_como&.criador || g.criador),
-        thc:                   g.thc&.to_f,
-        cbd:                   g.cbd&.to_f,
-        lotes:                 lotes_por_gen[g.id] || 0,
-        plantas:               plantas_por_gen[g.id].to_i,
-        gramos_producidos:     (gramos_por_gen[g.id] || 0).to_f.round(1),
-      }
-    end
-
-    # Lo que le falta a la organización: lo que cultiva sin poder acreditarlo, ni por registro propio
-    # ni por declaración. Es la única fila accionable del informe.
-    pendientes  = filas.reject { |f| f[:acreditada] }
-
-    # UNA FILA POR VARIEDAD ACREDITABLE, no por genética de la organización. Si veinte genéticas
-    # propias se declaran contra TROPICANA WFC, listarlas por separado da veinte filas con el
-    # mismo nombre —parece un error de datos— y al organismo le importa cuánto se cultivó de esa
-    # variedad, no cómo la llama la organización puertas adentro.
-    #
-    # Por eso mismo los nombres propios NO viajan: este informe se presenta ante el INASE, y cómo
-    # la organización llama a sus genéticas es asunto suyo. La traducción se audita en la pantalla
-    # de Genéticas, que es donde se declara cada una.
-    #
-    # Y se agrupan sólo las ACREDITADAS: una genética sin declarar no es una variedad, y entraba
-    # igual a la tabla haciéndose pasar por una (su `nombre_declarado` cae en su propio nombre).
-    # Las que no se pueden acreditar tienen su propia sección, que es la accionable.
-    agrupadas = filas.select { |f| f[:acreditada] }
-                     .group_by { |g| g[:nombre] }.map do |nombre, gs|
-      {
-        nombre:   nombre,
-        # Quién obtuvo la variedad. Es dato del registro del INASE —a diferencia del "N° de
-        # registro", que no existe— y es lo que permite identificarla sin ambigüedad ante el
-        # organismo. Sale de la variedad ACREDITANTE, no de la genética del club.
-        criador:  gs.filter_map { |g| g[:criador_variedad] }.first,
-        lotes:    gs.sum { |g| g[:lotes] },
-        plantas:  gs.sum { |g| g[:plantas] },
-        gramos:   gs.sum { |g| g[:gramos_producidos] }.round(1),
-      }
-    end.sort_by { |g| g[:nombre].to_s }
-
-    # LOS KPIs VAN EN LA MISMA UNIDAD QUE LA TABLA: la variedad acreditable.
-    #
-    # Contaban genéticas propias mientras la tabla agrupaba por variedad, así que un club con 24
-    # genéticas declaradas contra TROPICANA WFC leía "24 genéticas" arriba de UNA sola fila. Dos
-    # unidades distintas en la misma pantalla, y ninguna manera de saber cuál mirar.
-    #
-    # `sin_acreditar` es la excepción y va en genéticas propias a propósito: son justamente las
-    # que NO son una variedad todavía, y tienen su propia sección abajo.
-    datos = {
-      total_variedades: agrupadas.size,
-      sin_acreditar:    pendientes.size,
-      gramos_totales:   agrupadas.sum { |v| v[:gramos] }.round(1),
-      lotes_totales:    agrupadas.sum { |v| v[:lotes] },
-      geneticas:        filas,
-      agrupadas:        agrupadas,
-      pendientes:       pendientes,
+    fmt_g  = ->(g) { "#{ActiveSupport::NumberHelper.number_to_delimited(g.to_f.round(1), delimiter: '.', separator: ',')} g" }
+    origen = ->(v) { "#{v[:origen]['semilla']} / #{v[:origen]['esqueje']}" }
+    # Cada fila lleva la variedad Y las genéticas propias que acredita: así el informe se audita
+    # solo. Una sin vincular sale con su nombre propio y lo dice.
+    nombre = ->(v) {
+      partes = [v[:nombre]]
+      partes << "(acredita: #{v[:acredita].join(', ')})" if v[:acredita].any?
+      partes << '— SIN VINCULACIÓN INASE' unless v[:vinculada]
+      partes.join(' ')
     }
 
     secciones = [{
-      titulo: 'Variedades cultivadas',
-      headers: ['Variedad', 'Obtentor', 'Lotes', 'Plantas', 'Gramos'],
-      rows: agrupadas.map { |g| [g[:nombre], g[:criador].presence || '—', g[:lotes], g[:plantas], g[:gramos]] },
-      formatos: [:texto, :texto, :numero, :numero, :numero],
-      totales: [2, 3, 4],
-      aligns: { 2 => :right, 3 => :right, 4 => :right },
+      titulo:   'Cosechado en el período',
+      headers:  ['Variedad', 'Obtentor', 'Lotes', 'Plantas', 'Semilla / esqueje', 'Flor seca'],
+      rows:     datos[:variedades].map { |v| [nombre.call(v), v[:criador].presence || '—', v[:lotes], v[:plantas], origen.call(v), fmt_g.call(v[:gramos])] },
+      formatos: [:texto, :texto, :numero, :numero, :texto, :texto],
+      totales:  [2, 3],
+      aligns:   { 2 => :right, 3 => :right, 4 => :right, 5 => :right },
+      col_min:  { 4 => 80, 5 => 70 },
+      vacio:    'No se cosechó ningún lote en el período.',
     }]
-
-    if pendientes.any?
+    if datos[:periodo][:incluye_hoy]
       secciones << {
-        titulo: 'Sin acreditar — hay que declararlas contra una variedad inscripta',
-        headers: ['Variedad', 'Lotes', 'Plantas'],
-        rows: pendientes.map { |g| [g[:nombre_propio], g[:lotes], g[:plantas]] },
-        formatos: [:texto, :numero, :numero],
-        aligns: { 1 => :right, 2 => :right },
+        titulo:  "En cultivo al #{Time.zone.today.strftime('%d/%m/%Y')}",
+        headers: ['Variedad', 'Lotes', 'Plantas en pie', 'Semilla / esqueje'],
+        rows:    datos[:en_cultivo].map { |v| [nombre.call(v), v[:lotes], v[:plantas], origen.call(v)] },
+        aligns:  { 1 => :right, 2 => :right, 3 => :right },
+        vacio:   'No hay lotes en cultivo hoy.',
       }
     end
 
     responder_informe(
       titulo: 'Informe INASE — variedades', nombre: 'informe_inase', datos: datos,
-      resena: 'Las variedades del registro INASE con las que la organización acredita lo que cultiva, y cuánto produjo de cada una. Una fila por variedad. Al pie, lo que todavía no se puede acreditar.',
+      periodo: etiqueta_periodo(desde, hasta),
+      resena: 'Las variedades del Catálogo Nacional con las que la organización acredita lo que cosechó en el período elegido —un lote pertenece al período en que se cortó— y, si el período llega a hoy, lo que tiene en pie. Una fila por variedad, con las genéticas propias que acredita y cuántas plantas vinieron de semilla y cuántas de esqueje.',
       kpis: [
-        { label: 'Variedades',    valor: datos[:total_variedades] },
-        { label: 'Sin acreditar', valor: pendientes.size, tono: pendientes.any? ? :warn : :ok },
-        { label: 'Lotes',         valor: datos[:lotes_totales] },
+        { label: 'Variedades',        valor: k[:variedades] },
+        { label: 'Lotes cosechados',  valor: k[:lotes] },
+        { label: 'Plantas',           valor: k[:plantas] },
+        { label: 'Flor seca',         valor: fmt_g.call(k[:gramos]) },
       ],
       secciones: secciones,
-      nota: 'Cada variedad de esta tabla acredita una o más genéticas de la organización. Con qué ' \
-            'nombre las cultiva puertas adentro es asunto suyo y no se informa acá: el par se ' \
-            'audita en la pantalla de Genéticas. La variedad se identifica por su NOMBRE en el ' \
-            'Catálogo Nacional de Cultivares — el INASE no asigna un número por variedad.',
-      # La pantalla se abre siempre —es la que lista los pendientes—; el archivo que se
-      # presenta ante el organismo, no, mientras haya variedades sin acreditar.
+      nota: 'La variedad se identifica por su NOMBRE en el Catálogo Nacional de Cultivares — el INASE no ' \
+            'asigna un número por variedad. «Acredita» lista con qué nombre la cultiva la organización ' \
+            'puertas adentro. Semilla / esqueje: de dónde vino el material de propagación de cada planta.',
       exige_declaracion_inase: true,
+      ids_inase: datos[:geneticas_sin_vincular_ids],
     )
   end
 
@@ -532,11 +457,9 @@ class InformesController < ApplicationController
     # Antes entraban todos, así que el total del informe no coincidía con nada y la tasa de
     # cumplimiento se calculaba contra una población que incluía a quienes ni siquiera iniciaron
     # el trámite.
-    activos   = Paciente.for_club(club.id).where(es_paciente: true)
-    # "Tiene registro" = tiene número, o su estado dice algo distinto de `sin_registro` (que es
-    # el default de la columna: el paciente que nunca inició el trámite).
-    pacientes = activos.where.not(reprocann_numero: [nil, ''])
-                       .or(activos.where.not(reprocann_estado: [nil, '', 'sin_registro']))
+    # La población vive en el service (`activos` / `registrados`): la misma que declara el semestral.
+    activos   = servicio.activos
+    pacientes = servicio.registrados
 
     # Los que quedaron afuera se informan como un pendiente, con su número, no escondidos.
     sin_registro = activos.count - pacientes.count

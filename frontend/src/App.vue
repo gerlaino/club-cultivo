@@ -98,7 +98,7 @@ const ALL_NAV_LINKS = [
   { to: '/tareas',            icon: 'bi-clipboard-check',    label: 'Tareas',     perm: ['tareas','index'] },
   { to: '/geneticas',         icon: 'bi-diagram-3',          label: 'Genéticas',  perm: ['geneticas','index'] },
   { to: '/mnc/pendientes',    icon: 'bi-scissors',           label: 'Manicura',   perm: ['manicura','access'] },
-  { to: '/informe-semestral', icon: 'bi-file-earmark-text',  label: 'REPROCANN',  perm: ['informe_semestral','show'] },
+  { to: '/informe-semestral', icon: 'bi-file-earmark-text',  label: 'Declaración',  perm: ['informe_semestral','show'] },
   { to: '/documentos',        icon: 'bi-file-earmark',       label: 'Docs',       perm: ['documentos','index'] },
   { to: '/usuarios',          icon: 'bi-person-badge',       label: 'Equipo',     adminOnly: true },
   { to: '/web',               icon: 'bi-globe',              label: 'Web',        adminOnly: true },
@@ -465,7 +465,7 @@ onMounted(async () => {
               <RouterLink class="nav-link px-2" to="/contabilidad" @click="closeNav">Contabilidad</RouterLink>
             </li>
             <li class="nav-item" v-if="can('informe_semestral', 'show')">
-              <RouterLink class="nav-link px-2" to="/informe-semestral" @click="closeNav">Informe REPROCANN</RouterLink>
+              <RouterLink class="nav-link px-2" to="/informe-semestral" @click="closeNav">Declaración semestral</RouterLink>
             </li>
             <li class="nav-item" v-if="can('tareas', 'index')">
               <RouterLink class="nav-link px-2" to="/tareas" @click="closeNav">Tareas</RouterLink>

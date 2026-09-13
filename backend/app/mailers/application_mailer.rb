@@ -2,6 +2,16 @@ class ApplicationMailer < ActionMailer::Base
   default from: -> { Club::PLATFORM_FROM }
   layout "mailer"
 
+  # Un link a la app desde un mail. `APP_HOST` es el host de la plataforma (sin protocolo, como lo
+  # lee `default_url_options`); los templates lo pegaban a mano con un dominio viejo por defecto y
+  # un path que no existía.
+  helper_method :url_app
+  def url_app(path)
+    host = ENV['APP_HOST'].presence || 'cultivoespacial.com'
+    host = "https://#{host}" unless host.start_with?('http')
+    "#{host.chomp('/')}#{path}"
+  end
+
   private
 
   # Arma y manda el mail desde la casilla propia del club. Si el club NO conectó su correo

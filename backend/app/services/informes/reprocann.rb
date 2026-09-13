@@ -17,12 +17,54 @@ module Informes
       @hasta = hasta
     end
 
-    def activos = Paciente.for_club(@club.id).where(es_paciente: true)
+    # LA POBLACIÓN, en un solo lugar: la preguntan el informe REPROCANN y la declaración semestral,
+    # y los dos documentos van al mismo organismo — con dos reglas decían dos totales.
+    #
+    # `al`: a qué fecha. Sin fecha, hoy. Con fecha, quiénes eran pacientes ESE día: los dados de alta
+    # hasta entonces y no dados de baja antes. Una declaración de un semestre cerrado tiene que dar
+    # lo mismo hoy que dentro de un año.
+    def activos(al: nil)
+      scope = Paciente.for_club(@club.id).where(es_paciente: true)
+      return scope if al.nil?
+
+      fin = al.to_date.end_of_day
+      scope.with_deleted.where('pacientes.created_at <= ?', fin)
+           .where('pacientes.deleted_at IS NULL OR pacientes.deleted_at > ?', fin)
+    end
+
+    # Los que TIENEN REGISTRO —vigente, vencido o en trámite—: son los que se presentan. Que existan
+    # pacientes sin REPROCANN es un pendiente interno, y se informa como número.
+    # "Tiene registro" = tiene número, o su estado dice algo distinto de `sin_registro` (que es el
+    # default de la columna: el paciente que nunca inició el trámite).
+    def registrados(al: nil)
+      a = activos(al: al)
+      a.where.not(reprocann_numero: [nil, '']).or(a.where.not(reprocann_estado: [nil, '', 'sin_registro']))
+    end
+
+    # La nómina que se presenta, con la vigencia juzgada A ESA FECHA (`Paciente.reprocann_categoria`
+    # recibe el día). Completa: el que corta es el llamador.
+    def nomina(al: nil)
+      fecha = al ? [al.to_date, Time.zone.today].min : Time.zone.today
+      registrados(al: al).order(:apellido, :nombre).map do |p|
+        {
+          paciente_id:           p.id,
+          nombre_completo:       p.nombre_completo,
+          dni:                   p.dni_normalizado.to_s,
+          dni_ultimos_3:         p.dni_normalizado.to_s.last(3),
+          fecha_nacimiento:      p.fecha_nacimiento,
+          reprocann_numero:      p.reprocann_numero.presence,
+          reprocann_vencimiento: p.reprocann_vencimiento,
+          reprocann_estado:      Paciente.reprocann_categoria(estado: p.reprocann_estado, numero: p.reprocann_numero,
+                                                               vencimiento: p.reprocann_vencimiento, hoy: fecha),
+        }
+      end
+    end
 
     # ── Entregas del período ─────────────────────────────────────────────────
 
-    def dispensaciones
-      pacs = activos.pluck(:id, :reprocann_numero, :reprocann_vencimiento, :reprocann_estado)
+    # `al`: la población a esa fecha (el semestral pregunta por la del cierre del semestre).
+    def dispensaciones(al: nil)
+      pacs = activos(al: al).pluck(:id, :reprocann_numero, :reprocann_vencimiento, :reprocann_estado)
                     .to_h { |id, n, v, e| [id, { numero: n, vencimiento: v, estado: e }] }
       return { total: 0, por_unidad: [], pacientes_atendidos: 0, sin_reprocann_vigente: 0, entregas_sin_vigente: 0 } if pacs.empty?
 

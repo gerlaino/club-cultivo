@@ -30,7 +30,7 @@
 
 <script setup>
 import {
-  FileCheck, Sprout, Package, FileBadge, Target, Search, TrendingDown,
+  FileCheck, Sprout, Package, FileBadge, FileSignature, Target, Search, TrendingDown,
 } from 'lucide-vue-next'
 
 const GRUPOS = [
@@ -44,8 +44,13 @@ const GRUPOS = [
         desc: 'Estado del certificado de cada paciente, la tasa al día y las alertas abiertas.',
         pregunta: '¿Está todo el mundo en regla?' },
       { to: '/auditor/inase', icon: FileBadge, label: 'INASE',
-        desc: 'Variedades cultivadas y su registro.',
-        pregunta: '¿Qué genéticas declaro?' },
+        desc: 'Variedades cosechadas en el período, con su vinculación al Catálogo y el origen del material.',
+        pregunta: '¿Qué variedades declaro?' },
+      // EL documento que se presenta. No estaba en la lista y en la nav se llamaba «REPROCANN»,
+      // igual que el informe de arriba.
+      { to: '/informe-semestral', icon: FileSignature, label: 'Declaración jurada semestral',
+        desc: 'Pacientes registrados al cierre, cultivo y entregas del semestre. Para presentar ante REPROCANN.',
+        pregunta: '¿Qué presento este semestre?' },
     ],
   },
   {

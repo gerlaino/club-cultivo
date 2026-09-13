@@ -26,8 +26,11 @@ import { hoyISO } from '../../utils/dates.js'
 // pantalla y el archivo tienen que pedir exactamente lo mismo, y antes el PDF bajaba siempre
 // «mes actual» aunque en pantalla estuviera el trimestre.
 const emit = defineEmits(['change'])
+// `inicial`: con qué período arranca. Casi todos en el mes actual; el INASE en el año, porque
+// nadie declara variedades por mes.
+const props = defineProps({ inicial: { type: String, default: 'mes_actual' } })
 
-const modo  = ref('mes_actual')
+const modo  = ref(props.inicial)
 const desde = ref('')
 const hasta = ref('')
 const hoy   = hoyISO()

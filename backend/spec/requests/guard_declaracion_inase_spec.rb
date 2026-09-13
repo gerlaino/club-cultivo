@@ -19,6 +19,12 @@ RSpec.describe 'Informes con variedades sin declarar ante el INASE', type: :requ
   end
 
   let!(:pendiente) { create(:genetica, club: club, nombre: 'Critical Kush', registrada_inase: false) }
+  # Y con un lote en pie: el candado mira lo que APARECE en el documento. Una genética sin declarar
+  # que no tiene ni un lote no bloquea nada — antes bloqueaba la descarga por una variedad que no
+  # estaba en ningún lado.
+  let(:sede) { create(:sede, club: club, created_by: admin, tipo: 'produccion') }
+  let(:sala) { create(:sala, club: club, sede: sede, created_by: admin) }
+  let!(:lote_pendiente) { create(:lote, club: club, sala: sala, genetica: pendiente, estado: 'vegetativo') }
 
   before { sign_in_as(admin) }
 
@@ -27,7 +33,7 @@ RSpec.describe 'Informes con variedades sin declarar ante el INASE', type: :requ
       get '/api/informes/inase'
 
       expect(response).to have_http_status(:ok)
-      expect(JSON.parse(response.body)['pendientes'].size).to eq(1)
+      expect(JSON.parse(response.body)['sin_vincular'].size).to eq(1)
     end
 
     it 'el PDF del informe INASE SALE' do
@@ -71,6 +77,14 @@ RSpec.describe 'Informes con variedades sin declarar ante el INASE', type: :requ
       body = JSON.parse(response.body)
       expect(body['requiere_declaracion_inase']).to be(true)
       expect(body['geneticas_sin_declarar']).to include('Critical Kush')
+    end
+
+    it 'pero una genética sin declarar que NO aparece en el informe no lo traba' do
+      lote_pendiente.destroy!
+
+      get '/api/informes/inase.pdf', params: { para_presentar: '1' }
+
+      expect(response).to have_http_status(:ok)
     end
 
     it 'el Excel del informe INASE también se niega' do

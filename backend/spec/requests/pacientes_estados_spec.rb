@@ -226,7 +226,8 @@ RSpec.describe 'Pacientes — activo/inactivo y estados REPROCANN', type: :reque
       d = informe['dispensaciones']
 
       expect(d['total']).to eq(1)
-      expect(d['gramos']).to eq(12.0)
+      # Por unidad, nunca sumado: 12 g de flor no se mezclan con prerolls.
+      expect(d['por_unidad']).to eq([{ 'unidad' => 'g', 'cantidad' => 12.0 }])
       expect(d['pacientes_atendidos']).to eq(1)
       expect(d['sin_reprocann_vigente']).to eq(0)
     end

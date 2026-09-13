@@ -47,7 +47,7 @@ RSpec.describe 'Club nuevo — el primer día', type: :request do
       get '/api/informe_semestral'
 
       expect(response).to have_http_status(:ok)
-      expect(json.dig('pacientes', 'total')).to eq(0)
+      expect(json.dig('pacientes', 'registrados')).to eq(0)
     end
   end
 

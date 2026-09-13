@@ -9,7 +9,7 @@ Los siguientes productos tienen stock por debajo del umbral mínimo (50g):
   • <%= s[:forma] %>: <%= s[:cantidad_g] %> g
 <% end %>
 
-Ver stock: <%= ENV.fetch('APP_HOST', 'https://app.clubcultivo.app') %>/stock
+Ver stock: <%= url_app('/stock') %>
 
 ---
 Este es un aviso automático de Cultivo Espacial.

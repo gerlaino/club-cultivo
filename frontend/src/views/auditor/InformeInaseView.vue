@@ -2,106 +2,130 @@
   <div class="inf">
     <div class="inf__header">
       <h1 class="inf__title"><FileBadge :size="20" :stroke-width="1.75" /> Informe INASE — Variedades</h1>
-      <button class="inf__pdf" :disabled="!data || exporting" @click="exportarPdf()">
-        <i class="bi bi-filetype-pdf"></i> {{ exporting ? 'Generando…' : 'PDF' }}
-      </button>
-      <!-- DOS documentos, no dos modos del mismo archivo. Presentar es un acto aparte que la app
-           no hace: el PDF de arriba sale siempre para que la organización vea su realidad; éste
-           valida que todo esté acreditable ante el INASE y no sale si falta algo. -->
-      <button class="inf__pdf" :disabled="!data || exporting"
-              title="Valida que todas las variedades estén acreditadas ante el INASE"
-              @click="exportarPdf({ para_presentar: 1 })">
-        <i class="bi bi-patch-check"></i> Para presentar
-      </button>
-      <button class="inf__pdf" :disabled="!data || exporting" @click="exportarXlsx">
-        <i class="bi bi-file-earmark-spreadsheet"></i> Excel
-      </button>
+      <div class="inf__head-actions">
+        <!-- Arranca en el año: nadie declara variedades por mes. -->
+        <SelectorPeriodo inicial="anio" @change="cambiarPeriodo" />
+        <button class="inf__pdf" :disabled="!data || exporting" @click="exportarPdf(params)">
+          <i class="bi bi-filetype-pdf"></i> {{ exporting ? 'Generando…' : 'PDF' }}
+        </button>
+        <!-- DOS documentos, no dos modos del mismo archivo. Presentar es un acto aparte que la app
+             no hace: el PDF de arriba sale siempre para que la organización vea su realidad; éste
+             valida que todo lo que aparece esté vinculado al INASE y no sale si falta algo. -->
+        <button class="inf__pdf" :disabled="!data || exporting"
+                title="Valida que todas las variedades del informe estén vinculadas al INASE"
+                @click="exportarPdf({ ...params, para_presentar: 1 })">
+          <i class="bi bi-patch-check"></i> Para presentar
+        </button>
+        <button class="inf__pdf" :disabled="!data || exporting" @click="exportarXlsx(params)">
+          <i class="bi bi-file-earmark-spreadsheet"></i> Excel
+        </button>
+      </div>
     </div>
 
     <div v-if="loading" class="inf__loading">Cargando…</div>
 
-    <template v-else-if="data">
-      <div ref="hoja" class="inf__hoja">
-        <!-- Qué contesta este informe. Sin esto hay que deducirlo de los números, y
-             dos informes que cortan el mismo dato distinto parecen contradecirse. -->
-        <p v-if="data.resena" class="inf__resena">{{ data.resena }}</p>
-        <div class="inf__kpis">
-          <!-- Los KPIs van en la MISMA unidad que la tabla: la variedad del INASE. Contaban
-               genéticas propias mientras la tabla agrupaba por variedad, así que un club con 24
-               genéticas declaradas contra TROPICANA WFC leía "24 genéticas" arriba de UNA fila.
-               No hay columna ni contador de "N° de registro": el INASE identifica cada variedad
-               por su NOMBRE en el Catálogo Nacional de Cultivares y no le asigna un número
-               propio. Pedirlo dejaba un pendiente imposible de cerrar, que es lo que entrena a
-               la gente a ignorar los avisos del informe. -->
-          <div class="inf__kpi">
-            <span class="inf__kpi-valor">{{ data.total_variedades }}</span>
-            <span class="inf__kpi-label">Variedades</span>
-          </div>
-          <!-- El único que va en genéticas propias, y a propósito: son las que todavía NO son una
-               variedad. Tienen su propia sección abajo. -->
-          <div class="inf__kpi" :class="data.sin_acreditar ? 'inf__kpi--warn' : 'inf__kpi--ok'">
-            <span class="inf__kpi-valor">{{ data.sin_acreditar }}</span>
-            <span class="inf__kpi-label">Sin acreditar</span>
-          </div>
-          <div class="inf__kpi">
-            <span class="inf__kpi-valor">{{ data.lotes_totales }}</span>
-            <span class="inf__kpi-label">Lotes producidos</span>
-          </div>
-          <div class="inf__kpi inf__kpi--ok">
-            <span class="inf__kpi-valor">{{ formatGramos(data.gramos_totales) }}</span>
-            <span class="inf__kpi-label">Gramos producidos</span>
-          </div>
-        </div>
+    <div v-else-if="data" ref="hoja" class="inf__hoja">
+      <p v-if="data.resena" class="inf__resena">{{ data.resena }}</p>
 
-        <div class="inf__section">
-          <h2 class="inf__section-title">Variedades acreditadas y su producción</h2>
-          <table class="inf__table">
-            <thead>
-              <tr>
-                <th>Variedad</th><th>Obtentor</th>
-                <th class="inf__num">Lotes</th><th class="inf__num">Plantas</th><th class="inf__num">Gramos</th>
-              </tr>
-            </thead>
-            <tbody>
-              <!-- UNA FILA POR VARIEDAD ACREDITABLE, no por genética de la organización: si veinte
-                   genéticas propias se declaran contra TROPICANA WFC, listarlas sueltas daba
-                   veinte filas con el mismo nombre y parecía un error de datos.
-                   Y los nombres propios NO se muestran: esto se presenta ante el INASE, y cómo la
-                   organización llama a sus genéticas puertas adentro es asunto suyo. El par se
-                   audita en la pantalla de Genéticas, que es donde se declara cada una. -->
-              <tr v-for="g in (data.agrupadas || [])" :key="g.nombre">
-                <td><strong>{{ g.nombre }}</strong></td>
-                <!-- Quién obtuvo la variedad: es parte del registro del INASE y sí es dato de
-                     ellos, a diferencia del "N° de registro" que no existe. -->
-                <td class="inf__obtentor">{{ g.criador || '—' }}</td>
-                <td class="inf__num">{{ g.lotes }}</td>
-                <td class="inf__num">{{ g.plantas }}</td>
-                <td class="inf__num">{{ formatGramos(g.gramos) }}</td>
-              </tr>
-              <tr v-if="!(data.agrupadas || []).length"><td colspan="5" class="inf__empty">Ninguna variedad acreditada todavía.</td></tr>
-            </tbody>
-          </table>
-        </div>
+      <!-- UN AVISO, sólo si hay algo, y sólo sobre lo que SALE en este informe. No un KPI en grande
+           en un documento que se presenta (decisión de Germán, sep-2026). Es la misma lista que la
+           salvedad del PDF y que el candado de «Para presentar». -->
+      <div v-if="data.sin_vincular?.length" class="inf__aviso">
+        <strong>{{ data.sin_vincular.length === 1 ? '1 genética sale' : `${data.sin_vincular.length} genéticas salen` }}
+          en este informe sin vinculación con el INASE:</strong>
+        {{ data.sin_vincular.map(g => g.nombre).join(', ') }}.
+        El PDF sale con la salvedad impresa; «Para presentar» no sale hasta declararlas.
+        <RouterLink :to="`/geneticas?edit=${data.sin_vincular[0].id}`" class="inf__aviso-link">Declararlas →</RouterLink>
+      </div>
 
-        <!-- Lo único accionable del informe: lo que la organización cultiva y todavía no puede
-             acreditar, ni por registro propio ni declarándolo. -->
-        <div v-if="data.pendientes?.length" class="inf__section">
-          <h2 class="inf__section-title">Sin acreditar — hay que declararlas contra una variedad inscripta</h2>
-          <table class="inf__table">
-            <thead>
-              <tr><th>Variedad</th><th class="inf__num">Lotes</th><th class="inf__num">Plantas</th></tr>
-            </thead>
-            <tbody>
-              <tr v-for="g in data.pendientes" :key="g.id">
-                <td><strong>{{ g.nombre_propio }}</strong></td>
-                <td class="inf__num">{{ g.lotes }}</td>
-                <td class="inf__num">{{ g.plantas }}</td>
-              </tr>
-            </tbody>
-          </table>
+      <div class="inf__kpis">
+        <div class="inf__kpi">
+          <span class="inf__kpi-valor">{{ data.kpis.variedades }}</span>
+          <span class="inf__kpi-label">Variedades</span>
+        </div>
+        <div class="inf__kpi">
+          <span class="inf__kpi-valor">{{ data.kpis.lotes }}</span>
+          <span class="inf__kpi-label">Lotes cosechados</span>
+        </div>
+        <div class="inf__kpi">
+          <span class="inf__kpi-valor">{{ data.kpis.plantas }}</span>
+          <span class="inf__kpi-label">Plantas</span>
+        </div>
+        <div class="inf__kpi inf__kpi--ok">
+          <span class="inf__kpi-valor">{{ formatGramos(data.kpis.gramos) }}</span>
+          <span class="inf__kpi-label">Flor seca</span>
         </div>
       </div>
-    </template>
+
+      <!-- ── Cosechado en el período ─────────────────────────────────────── -->
+      <section class="inf__section">
+        <div class="inf__section-head">
+          <h2 class="inf__section-title">Cosechado en el período</h2>
+          <span class="inf__section-marco">un lote pertenece al período en que se cortó · una fila por variedad del Catálogo</span>
+        </div>
+        <table v-if="data.variedades.length" class="inf__table">
+          <thead>
+            <tr>
+              <th>Variedad</th><th>Obtentor</th>
+              <th class="num">Lotes</th><th class="num">Plantas</th>
+              <th class="num" title="De dónde vino el material de propagación de cada planta">Semilla / esqueje</th>
+              <th class="num">Flor seca</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="v in data.variedades" :key="v.nombre">
+              <td>
+                <strong>{{ v.nombre }}</strong>
+                <span v-if="!v.vinculada" class="inf__sin-vinculo">sin vinculación</span>
+                <!-- Con qué nombre la cultiva la organización puertas adentro: lo que hace que el
+                     informe se audite solo, sin ir a Genéticas. -->
+                <div v-if="v.acredita.length" class="inf__acredita">acredita: {{ v.acredita.join(', ') }}</div>
+                <div v-else-if="!v.vinculada" class="inf__acredita">
+                  nombre propio · <RouterLink :to="`/geneticas?edit=${v.genetica_ids[0]}`" class="inf__aviso-link">declarar</RouterLink>
+                </div>
+              </td>
+              <td class="inf__obtentor">{{ v.criador || '—' }}</td>
+              <td class="num">{{ v.lotes }}</td>
+              <td class="num">{{ v.plantas }}</td>
+              <td class="num">{{ v.origen.semilla }} / {{ v.origen.esqueje }}</td>
+              <td class="num">{{ formatGramos(v.gramos) }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-else class="inf__nota">No se cosechó ningún lote en el período elegido.</p>
+      </section>
+
+      <!-- ── En cultivo hoy ──────────────────────────────────────────────── -->
+      <section v-if="data.periodo.incluye_hoy" class="inf__section">
+        <div class="inf__section-head">
+          <h2 class="inf__section-title">En cultivo hoy</h2>
+          <span class="inf__section-marco">lo que hay en pie, con su variedad</span>
+        </div>
+        <table v-if="data.en_cultivo.length" class="inf__table">
+          <thead>
+            <tr><th>Variedad</th><th class="num">Lotes</th><th class="num">Plantas en pie</th><th class="num">Semilla / esqueje</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="v in data.en_cultivo" :key="v.nombre">
+              <td>
+                <strong>{{ v.nombre }}</strong>
+                <span v-if="!v.vinculada" class="inf__sin-vinculo">sin vinculación</span>
+                <div v-if="v.acredita.length" class="inf__acredita">acredita: {{ v.acredita.join(', ') }}</div>
+              </td>
+              <td class="num">{{ v.lotes }}</td>
+              <td class="num">{{ v.plantas }}</td>
+              <td class="num">{{ v.origen.semilla }} / {{ v.origen.esqueje }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-else class="inf__nota">No hay lotes en cultivo hoy.</p>
+      </section>
+
+      <p class="inf__nota">
+        La variedad se identifica por su nombre en el Catálogo Nacional de Cultivares — el INASE no asigna
+        un número por variedad.
+      </p>
+    </div>
   </div>
 </template>
 
@@ -110,34 +134,26 @@ import { ref, onMounted } from 'vue'
 import { FileBadge } from 'lucide-vue-next'
 import api from '../../lib/api.js'
 import { useInformePdf } from '../../composables/useInformePdf.js'
+import SelectorPeriodo from '../../components/informes/SelectorPeriodo.vue'
 
-const loading   = ref(false)
-const data      = ref(null)
+const loading = ref(false)
+const data    = ref(null)
+const params  = ref({ periodo: 'anio' })
 const { hoja, exporting, exportarPdf, exportarXlsx } = useInformePdf('informe_inase')
 
-const CATEGORIAS = {
-  semilla_feminizada: 'Semilla feminizada',
-  semilla_regular:    'Semilla regular',
-  material_vegetativo:'Material vegetativo',
-  hibrido:            'Híbrido',
-}
-const categoriaLabel = (c) => CATEGORIAS[c] || (c || '—')
-
-// Tres situaciones, no dos: inscripta, declarada contra una inscripta, o sin acreditar.
-const etiquetaInase = (g) =>
-  g.registrada_inase ? '✓ Inscripta' : g.declarada ? '✓ Declarada' : 'Sin acreditar'
-const badgeInase = (g) => (g.registrada_inase || g.declarada ? 'inf__badge--ok' : 'inf__badge--no')
 const formatGramos = (g) => g != null ? `${Number(g).toLocaleString('es-AR')} g` : '—'
 
 async function cargar() {
   loading.value = true
   try {
-    const res = await api.get('/informes/inase')
+    const res = await api.get('/informes/inase', { params: params.value })
     data.value = res.data
   } finally {
     loading.value = false
   }
 }
+
+function cambiarPeriodo(p) { params.value = p; cargar() }
 
 onMounted(cargar)
 </script>
@@ -145,8 +161,9 @@ onMounted(cargar)
 <style scoped>
 .inf { padding: var(--sp-6); max-width: 1100px; margin: 0 auto; }
 .inf__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-6); gap: var(--sp-4); flex-wrap: wrap; }
+.inf__head-actions { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
 .inf__title { font-size: var(--fs-20); font-weight: 700; color: var(--c-ink-900); display: flex; align-items: center; gap: var(--sp-2); margin: 0; }
-.inf__pdf { background: #fff; border: 1.5px solid var(--c-ink-200); border-radius: var(--r-md); padding: 6px 14px; font-size: var(--fs-14); font-weight: 600; color: var(--c-leaf-700, #15803d); cursor: pointer; }
+.inf__pdf { display: inline-flex; align-items: center; gap: .4rem; background: #fff; border: 1.5px solid var(--c-ink-300); border-radius: var(--r-md); padding: 6px 14px; font-size: var(--fs-14); font-weight: 600; color: var(--c-leaf-700); cursor: pointer; }
 .inf__pdf:disabled { opacity: .5; cursor: not-allowed; }
 .inf__loading { color: var(--c-ink-500); padding: var(--sp-8); text-align: center; }
 .inf__hoja { background: #fff; }
@@ -155,26 +172,29 @@ onMounted(cargar)
   background: var(--c-slate-50); border-left: 3px solid var(--c-slate-300); border-radius: 0 8px 8px 0;
   font-size: var(--fs-13); color: var(--c-slate-600); line-height: 1.55; max-width: 80ch;
 }
+.inf__aviso {
+  margin: 0 0 var(--sp-4); padding: .7rem .9rem;
+  background: var(--c-amber-100); border-left: 3px solid var(--c-amber-500); border-radius: 0 8px 8px 0;
+  font-size: var(--fs-13); color: var(--c-ink-800); line-height: 1.55;
+}
+.inf__aviso-link { color: var(--c-leaf-700); font-weight: 600; text-decoration: underline; }
 .inf__kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: var(--sp-4); margin-bottom: var(--sp-6); max-width: 720px; }
 .inf__kpi { background: var(--c-paper); border: 1px solid var(--c-ink-100); border-radius: var(--r-lg); padding: var(--sp-4); text-align: center; }
-.inf__kpi-valor { display: block; font-size: var(--fs-28); font-weight: 800; color: var(--c-ink-900); line-height: 1; }
+.inf__kpi-valor { display: block; font-size: var(--fs-28); font-weight: 800; color: var(--c-ink-900); line-height: 1; font-variant-numeric: tabular-nums; }
 .inf__kpi-label { display: block; font-size: var(--fs-12); color: var(--c-ink-500); margin-top: var(--sp-1); text-wrap: balance; }
-.inf__kpi--ok .inf__kpi-valor   { color: #2D8A6B; }
-.inf__kpi--warn .inf__kpi-valor { color: #b45309; }
-.inf__section-title { font-size: var(--fs-16); font-weight: 700; color: var(--c-ink-900); margin-bottom: var(--sp-3); }
+.inf__kpi--ok .inf__kpi-valor { color: var(--c-leaf-600); }
+.inf__section { margin-bottom: var(--sp-8); }
+.inf__section-head { display: flex; align-items: baseline; gap: var(--sp-3); flex-wrap: wrap; margin-bottom: var(--sp-3); }
+.inf__section-title { font-size: var(--fs-16); font-weight: 700; color: var(--c-ink-900); margin: 0; }
+.inf__section-marco { font-size: var(--fs-12); color: var(--c-ink-500); }
+.inf__nota { color: var(--c-ink-500); font-size: var(--fs-13); margin: var(--sp-2) 0 0; }
 .inf__table { width: 100%; border-collapse: collapse; font-size: var(--fs-13); }
 .inf__table th { text-align: left; padding: var(--sp-2) var(--sp-3); background: var(--c-ink-50); font-weight: 600; color: var(--c-ink-600); border-bottom: 1px solid var(--c-ink-100); }
-.inf__table td { padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--c-ink-50); color: var(--c-ink-800); }
-.inf__num { text-align: right; width: 1%; white-space: nowrap; }
-/* La primera columna se come el espacio sobrante, así los números quedan juntos a la derecha en
-   vez de repartidos por todo el ancho. Al sacar tres columnas del informe la tabla había quedado
-   con metros de aire entre el nombre de la variedad y sus totales. */
+.inf__table td { padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--c-ink-50); color: var(--c-ink-800); vertical-align: top; }
+.inf__table .num { text-align: right; width: 1%; white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* La primera columna se come el sobrante: así los números quedan juntos a la derecha. */
 .inf__table th:first-child, .inf__table td:first-child { width: auto; }
 .inf__obtentor { color: var(--c-ink-500); }
-.inf__table td.inf__num { font-variant-numeric: tabular-nums; }
-.inf__tipo { color: var(--c-ink-400); font-weight: 400; }
-.inf__empty { text-align: center; color: var(--c-ink-400); padding: var(--sp-6); }
-.inf__badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: var(--fs-11); font-weight: 600; }
-.inf__badge--ok { background: rgba(45,138,107,.12); color: #2D8A6B; }
-.inf__badge--no { background: rgba(180,83,9,.12);  color: #b45309; }
+.inf__acredita { font-size: var(--fs-12); color: var(--c-ink-500); margin-top: 2px; }
+.inf__sin-vinculo { display: inline-block; margin-left: var(--sp-2); padding: 1px 7px; border-radius: 999px; background: var(--c-amber-100); color: var(--c-amber-500); font-size: var(--fs-11); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
 </style>

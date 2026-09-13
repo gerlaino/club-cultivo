@@ -19,7 +19,7 @@ Hay <%= @total %> paciente<%= @total == 1 ? '' : 's' %> que requieren atención 
 <% end %>
 <% end %>
 
-Ver pacientes: <%= ENV.fetch('APP_HOST', 'https://app.clubcultivo.app') %>/pacientes?reprocann=vencidos
+Ver pacientes: <%= url_app('/pacientes?reprocann=vencidos') %>
 
 ---
 Este es un aviso automático de Cultivo Espacial.

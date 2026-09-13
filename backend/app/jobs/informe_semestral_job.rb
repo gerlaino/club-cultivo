@@ -12,9 +12,16 @@ class InformeSemestralJob < ApplicationJob
     hoy      = Time.zone.today
     anio     = hoy.year
     semestre = hoy.month <= 6 ? 1 : 2
+    # El ENVÍO corre el 1 de julio y el 1 de enero: el semestre que hay que mandar es EL QUE ACABA
+    # DE CERRAR, no el que empieza ese día. Con el cálculo de arriba, el 1 de julio mandaba el 2°
+    # semestre (vacío) y el 1 de enero el 1° del año nuevo.
+    if modo.to_sym == :envio
+      semestre = semestre == 1 ? 2 : 1
+      anio    -= 1 if semestre == 2
+    end
 
     cada_club_con(:cultivo, :produccion_dispensa) do |club|
-      datos = InformeSemestralService.new(club, anio: anio, semestre: semestre).call
+      datos = Informes::Semestral.new(club: club, anio: anio, semestre: semestre).call
       NotificacionesMailer.informe_semestral(
         club:      club,
         datos:     datos,

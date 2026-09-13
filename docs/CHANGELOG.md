@@ -1,5 +1,37 @@
 # Changelog
 
+## Septiembre 2026 (bl) — INASE con período y origen del material; la declaración semestral compone los informes revisados
+
+Séptimo y octavo de la revisión informe por informe (decisiones de Germán sobre el artifact, 12/13-sep).
+
+**INASE** (`Informes::Inase`, extraído del controller): era el único informe **sin período** —contaba
+de toda la vida—. Ahora un lote pertenece al período en que se cosechó (como Producción; el
+selector arranca en **el año**), y lo en pie va en su bloque «En cultivo hoy» sólo si el período
+llega a hoy. **Sin KPI «Sin acreditar»** en un documento que se presenta: lo no vinculado sale **en
+la misma tabla** con su nombre propio y marcado, y arriba **un aviso, sólo si hay algo**, que nombra
+qué genéticas salen sin vinculación. **Cada fila dice el nombre y su vinculación** («acredita: Tropi
+2, Naranja»), en pantalla, PDF y «Para presentar». **El aviso, la salvedad y el candado miran la
+misma lista**: lo que aparece en el documento (`geneticas_sin_vincular_ids` → guard con `ids:`);
+antes el candado miraba todas las del club y una archivada sin lotes bloqueaba la descarga sin
+aparecer en ningún lado. Y **origen del material**: cuántas plantas de cada variedad vinieron de
+semilla y cuántas de esqueje (`plants.origen`, con el del lote como respaldo).
+
+**Declaración jurada semestral** (`Informes::Semestral`, reemplaza a `InformeSemestralService`):
+**no calcula nada por su cuenta**, compone REPROCANN, Producción/INASE y Dispensaciones con el
+semestre como período, **todo al cierre** (un semestre cerrado deja de cambiar). Lo que tenía mal:
+otra población que REPROCANN (sin `es_paciente`, sin filtrar registrados), la vigencia contra HOY,
+entregas con `sum(cantidad)` + primera línea + sin excluir canceladas, la producción de este momento
+en el informe de cualquier semestre, «Lotes del período» con una condición que excluía el caso
+normal y «Cromatog.» siempre vacío, la resolución escrita a mano mientras `numero_resolucion_reprocann`
+existía en Configuración, el mail con link a una ruta inexistente (`/informes/semestral`) y host
+viejo, y el job de envío del 1-jul mandando el semestre que EMPEZABA ese día. La población vive en
+`Informes::Reprocann#activos/registrados/nomina(al:)` y la lee también el informe REPROCANN.
+**Sacados**: la tabla lote por lote, «por vencer» (pendiente del admin, ya en REPROCANN) y los
+aportes en pesos (declaración sanitaria). DNI en 3 dígitos en pantalla, entero en el archivo. PDF
+con firma. Pantalla con el esqueleto `inf__` del resto; entra a la lista de Informes como
+«Declaración jurada semestral» y la nav deja de decir «REPROCANN» dos veces. `url_app` en
+`ApplicationMailer` para los links de todos los mails.
+
 ## Septiembre 2026 (bk) — Registrar un pago dice cómo, cuándo y de qué caja; las cuotas nacen pendientes
 
 Pedido de Germán (12-sep) probando la app: un gasto «pendiente de pago» se saldaba con un botón que

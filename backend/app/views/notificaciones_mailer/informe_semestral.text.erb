@@ -1,14 +1,17 @@
-<%= @club.name %> — Informe semestral <%= @semestre %>° semestre <%= @anio %>
+<%= @club.name %> — Declaración jurada semestral REPROCANN · <%= @semestre %>° semestre <%= @anio %>
 <%= '-' * 60 %>
 
 <% if @modo == :recordatorio %>
-RECORDATORIO: el plazo para presentar el informe ante REPROCANN vence en 30 días.
+RECORDATORIO: el plazo para presentar la declaración ante REPROCANN vence en 30 días.
 <% end %>
+<% pac = @datos[:pacientes]; ent = @datos[:entregas]; cul = @datos[:cultivo][:cosechados] %>
+PACIENTES REGISTRADOS al <%= @datos[:periodo][:al].strftime('%d/%m/%Y') %>: <%= pac[:registrados] %> (<%= pac[:vigentes] %> vigentes, <%= pac[:vencidos] %> vencidos, <%= pac[:en_tramite] %> en trámite)
+<% if pac[:sin_registro] > 0 %>Sin registro (no se presentan): <%= pac[:sin_registro] %><% end %>
 
-SOCIOS: <%= @datos[:pacientes][:total] %> activos, <%= @datos[:pacientes][:con_reprocann] %> con REPROCANN
-<% if @datos[:pacientes][:vencidos] > 0 %>⚠ REPROCANN vencido: <%= @datos[:pacientes][:vencidos] %> socios<% end %>
-<% if @datos[:pacientes][:por_vencer] > 0 %>⚠ Por vencer (30d): <%= @datos[:pacientes][:por_vencer] %> socios<% end %>
+CULTIVO: <%= cul[:lotes] %> lotes cosechados · <%= cul[:gramos].round(1) %> g de flor seca
 
-DISPENSACIONES: <%= @datos[:dispensaciones][:total] %> | <%= @datos[:dispensaciones][:total_gramos].round(1) %>g entregados
-
-Ver informe completo: <%= ENV.fetch('APP_HOST', 'https://app.clubcultivo.app') %>/informes/semestral
+ENTREGAS: <%= ent[:entregas] %> a <%= ent[:pacientes] %> pacientes<% ent[:por_unidad].each do |u| %> · <%= u[:cantidad] %> <%= u[:unidad] %><% end %>
+<% if @datos[:sin_vincular].any? %>
+ATENCIÓN: <%= @datos[:sin_vincular].size %> genéticas salen en la declaración sin vinculación con el INASE: <%= @datos[:sin_vincular].map { |g| g[:nombre] }.join(', ') %>.
+<% end %>
+Ver la declaración completa: <%= url_app('/informe-semestral') %>
