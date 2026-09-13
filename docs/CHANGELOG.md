@@ -5,7 +5,11 @@
 Revisión de Germán (13-sep): «¿dónde se crean o editan usuarios y roles? Si editamos el rol, ¿qué
 pasa con permisos e historial?».
 
-- **Lo que ya estaba bien**: la pantalla de Equipo no edita el rol; los permisos se leen del
+- **Dónde se edita el rol**: en la ficha del usuario (panel «Rol»), no en la lista de Equipo. Ese
+  panel ofrecía **los nueve roles** —supervisor, abogado, auditor y delivery sin el módulo—
+  cuando el alta hacía rato que no: ahora ofrece los mismos que el alta (más el actual, que se
+  conserva) y pide confirmación diciendo qué cambia y qué queda.
+- **Lo que ya estaba bien**: los permisos se leen del
   usuario en cada request (cambian en el acto); el historial cuelga del `user_id` (dispensas,
   turnos, cobros, auditoría) y la auditoría del usuario deja quién cambió el rol, cuándo y de qué a
   qué; el repartidor con paquetes en la calle no cambia de rol.

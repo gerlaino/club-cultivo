@@ -13,7 +13,8 @@ import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import { getUsuarioStats, getUsuarioAuditorias, recibirCajaDelivery, listJornadas, confirmarJornadas, reabrirJornadas, resetUserPassword, saldarACuenta } from '../lib/api.js'
-import { ROLES as ROLES_DS, rolInfo, rolColor, rolBg } from '../lib/roles.js'
+import { ROLES as ROLES_DS, rolesParaAlta, rolInfo, rolColor, rolBg } from '../lib/roles.js'
+import { useClubStore } from '../stores/club.js'
 
 const route  = useRoute()
 const router = useRouter()
@@ -39,7 +40,22 @@ const ROLES_CON_SEDES = ROLES_DS.filter(r => r.sedes).map(r => r.value)
 
 // Metadata de roles: una sola fuente (lib/roles.js). Acá vivía una copia con descripciones
 // distintas de las de la lista de Equipo, para los mismos roles.
-const ROLES     = ROLES_DS
+//
+// LOS ROLES QUE SE PUEDEN ELEGIR AL CAMBIAR SON LOS MISMOS QUE AL CREAR (Germán, 13-sep-2026):
+// este panel ofrecía los nueve —supervisor, abogado, auditor, y delivery sin el módulo— cuando
+// el alta hacía rato que no. Sale de `rolesParaAlta()` filtrado por módulo, igual que Equipo; el
+// backend rechaza el resto (`CambioDeRol`). El rol ACTUAL se muestra siempre, aunque ya no se
+// ofrezca: quien lo tiene lo conserva.
+const clubStore = useClubStore()
+const MODULO_POR_ROL = { delivery: 'delivery' }
+const ROLES = computed(() => {
+  const ofrecidos = rolesParaAlta().filter(r => {
+    const modulo = MODULO_POR_ROL[r.value]
+    return !modulo || clubStore.data?.features?.[modulo] === true
+  })
+  const actual = ROLES_DS.find(r => r.value === u.value?.role)
+  return actual && !ofrecidos.includes(actual) ? [actual, ...ofrecidos] : ofrecidos
+})
 const PERMISOS  = Object.fromEntries(ROLES_DS.map(r => [r.value, r.permisos || []]))
 const SEDE_HINTS = Object.fromEntries(
   ROLES_DS.filter(r => r.sedes).map(r => [r.value, r.sedes.hint]))
@@ -111,6 +127,15 @@ const editingRole = ref(false)
 const newRole     = ref('')
 function startEditRole() { newRole.value = u.value?.role || ''; editingRole.value = true }
 async function saveRole() {
+  if (newRole.value === u.value?.role) { editingRole.value = false; return }
+  // Los permisos cambian en el acto; el historial (dispensas, turnos, cobros, auditoría) queda
+  // con la persona, y la auditoría del usuario guarda quién lo cambió y de qué a qué.
+  const ok = await confirm({
+    title: 'Cambiar rol',
+    message: `${u.value?.first_name} pasa de ${roleInfo(u.value?.role).label} a ${roleInfo(newRole.value).label}. Sus permisos cambian ahora mismo; lo que hizo hasta hoy queda registrado a su nombre. Revisá sus sedes y salas asignadas por si ya no tienen sentido.`,
+    confirmText: 'Cambiar rol',
+  })
+  if (!ok) return
   try {
     await store.update(userId, { role: newRole.value })
     editingRole.value = false
@@ -324,6 +349,8 @@ function irAPagina(p)      { auditsPage.value = p; cargarAudits() }
 function cambiarPerPage(pp){ auditsPerPage.value = pp; auditsPage.value = 1; cargarAudits() }
 
 onMounted(async () => {
+  // Los módulos del club deciden qué roles se ofrecen (delivery sólo con su add-on).
+  if (!clubStore.data) clubStore.fetch().catch(() => {})
   try { await store.fetchOne(userId) }
   catch { error.value = 'No se pudo cargar el usuario.' }
   finally { loading.value = false }
@@ -759,7 +786,8 @@ onMounted(async () => {
                     v-for="r in ROLES" :key="r.value"
                     class="ud__role-option"
                     :class="{ 'ud__role-option--active': newRole === r.value }"
-                    :style="newRole === r.value ? { background: r.bg, borderColor: r.color, color: r.color } : {}"
+                    :style="newRole === r.value ? { background: rolBg(r.value), borderColor: rolColor(r.value), color: rolColor(r.value) } : {}"
+                    :title="r.suspendido ? 'Rol no disponible por ahora: lo conserva porque ya lo tenía' : null"
                     @click="newRole = r.value"
                   >
                     <i :class="['bi', r.icon]"></i> {{ r.label }}
