@@ -1,5 +1,29 @@
 # Changelog
 
+## Septiembre 2026 (bt) — Producto defectuoso: se devuelve la plata o se cambia el producto
+
+- **Con «Producto defectuoso» hay dos salidas** (`resolucion_anulacion`, pedido de Germán,
+  14-sep): **devolver la plata** o **cambiar el producto**. Sólo para defectuoso: si el producto
+  vino sano vuelve a la mesa y no hay nada que cambiar.
+- **El cambio es una dispensa NUEVA atada a la anulada** (`reemplaza_a_id`, medio de pago
+  `cambio`): no cobra, no asienta ni toca la cuenta corriente —lo que se lleva ya lo pagó en la
+  original, cuya venta y cobros quedan—; sólo baja stock, con las reglas de siempre (mesa, caja
+  abierta) y **con envío si hace falta**. Es el mismo `ModalNuevaDispensacion` en modo cambio:
+  se precarga con lo devuelto si está sobre la mesa (si no, vacío) y se puede elegir otra cosa,
+  **hasta el valor que pagó** (`Dispensacion#cambio_coherente`; lo de más va en una dispensa
+  aparte, lo de menos no se devuelve). Una anulada con cambio elegido y sin reemplazo dice
+  «cambio pendiente» en la fila, con el botón para retomarlo. Las dos filas se apuntan:
+  «Anulada · producto defectuoso → cambio #124» / «Cambio de #123».
+- **Los informes cierran solos**: el defectuoso sale como merma, la de cambio cuenta como
+  dispensada (la anulada ya no), y la plata es una sola. En el Historial, lo cobrado se cuenta
+  en la anulada con cambio y no en la de cambio.
+- **La plata vuelve por el medio que se elige, no por el que pagó** (`devolucion: { medio,
+  caja_turno_id }`): pagó por transferencia y se lleva efectivo, o al revés. Un solo egreso por
+  todo lo cobrado. **En efectivo tiene que alcanzar lo que hay en la caja** (`efectivo_esperado`
+  viaja ahora en `GET /mostradores`): quien atiende devuelve de la suya y no elige —con la caja
+  cerrada, sólo por transferencia—; administración elige entre las abiertas, o ninguna. El
+  modal lo dice antes y el backend lo rechaza igual.
+
 ## Septiembre 2026 (bs) — Una dispensa no se borra: se anula, y dice por qué
 
 - **«Eliminar» se retiró** (`DELETE /dispensaciones/:id` ya no existe). Soft-borraba la fila sin

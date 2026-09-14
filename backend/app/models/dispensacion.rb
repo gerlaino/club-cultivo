@@ -25,7 +25,9 @@ class Dispensacion < ApplicationRecord
   RETENCION_IMAGENES_ENTREGA = 30.days
 
   ESTADOS_ENVIO = %w[pendiente en_viaje entregado fallido cancelada].freeze
-  MEDIOS_PAGO   = %w[efectivo transferencia cuenta_corriente no_abona credito_gramos mixto regalo].freeze
+  # `cambio`: la dispensa que reemplaza a una anulada por producto defectuoso. Lo que se lleva ya
+  # lo pagó en la original: no cobra, no asienta, no toca la cuenta corriente; sólo baja stock.
+  MEDIOS_PAGO   = %w[efectivo transferencia cuenta_corriente no_abona credito_gramos mixto regalo cambio].freeze
 
   belongs_to :paciente
   belongs_to :user
@@ -34,6 +36,8 @@ class Dispensacion < ApplicationRecord
   belongs_to :sede,          optional: true
   belongs_to :delivery_user, class_name: 'User', foreign_key: :delivery_id, optional: true
   belongs_to :anulada_por,   class_name: 'User', optional: true
+  belongs_to :reemplaza_a,   class_name: 'Dispensacion', optional: true
+  has_one    :reemplazo,     class_name: 'Dispensacion', foreign_key: :reemplaza_a_id, inverse_of: :reemplaza_a
   belongs_to :ruta_entrega,  optional: true
 
   # Líneas de la dispensación: cada una es un stock + cantidad (con precio/costo/trazabilidad
@@ -175,6 +179,32 @@ class Dispensacion < ApplicationRecord
   # En estos dos la venta pasó de verdad: la plata entró y hay que devolverla.
   MOTIVOS_CON_DEVOLUCION = %w[devolucion producto_defectuoso].freeze
   validates :motivo_anulacion, inclusion: { in: MOTIVOS_ANULACION }, allow_nil: true
+  # Qué se hizo después de anular por devolución o producto defectuoso: se devolvió la plata, o
+  # se cambió el producto (sólo defectuoso: si el producto vino sano vuelve a la mesa y listo).
+  RESOLUCIONES_ANULACION = %w[devolver_plata cambio].freeze
+  validates :resolucion_anulacion, inclusion: { in: RESOLUCIONES_ANULACION }, allow_nil: true
+  validate  :cambio_coherente, if: -> { reemplaza_a_id.present? || medio_pago == 'cambio' }
+
+  def cambio? = medio_pago == 'cambio'
+  # Anulada por defectuoso, con cambio elegido, y la dispensa de cambio todavía no salió.
+  def cambio_pendiente? = cancelada? && resolucion_anulacion == 'cambio' && reemplazo.nil?
+
+  # LA DISPENSA DE CAMBIO REEMPLAZA A UNA ANULADA POR DEFECTUOSO, DEL MISMO PACIENTE, UNA SOLA VEZ,
+  # Y NO VALE MÁS DE LO QUE YA PAGÓ. Si quiere algo más caro, es cambio + una dispensa normal por
+  # la diferencia: manejar diferencias en el mismo gesto es donde esto se complica.
+  def cambio_coherente
+    if reemplaza_a.nil? || !cambio?
+      errors.add(:base, 'Una dispensa de cambio tiene que decir a cuál reemplaza, y al revés.')
+      return
+    end
+    o = reemplaza_a
+    errors.add(:base, 'Sólo se cambia una dispensa anulada por producto defectuoso con cambio elegido.') unless o.cancelada? && o.motivo_anulacion == 'producto_defectuoso' && o.resolucion_anulacion == 'cambio'
+    errors.add(:base, 'El cambio es para el mismo paciente.') unless o.paciente_id == paciente_id
+    errors.add(:base, "La dispensación ##{o.id} ya se cambió (##{o.reemplazo.id}).") if o.reemplazo && o.reemplazo.id != id
+    if aporte_socio_ars.to_d > o.aporte_socio_ars.to_d + 0.01
+      errors.add(:base, "El cambio no puede valer más que lo que pagó (#{ActionController::Base.helpers.number_to_currency(o.aporte_socio_ars, unit: '$', separator: ',', delimiter: '.', precision: 0)}): lo de más va en una dispensa aparte.")
+    end
+  end
 
   scope :del_mes,        ->(fecha = Time.zone.today) { where(fecha_dispensacion: fecha.beginning_of_month..fecha.end_of_month) }
   scope :del_paciente,   ->(paciente_id)        { where(paciente_id: paciente_id) }

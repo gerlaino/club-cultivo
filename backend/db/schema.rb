@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_13_230000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_14_010000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -682,6 +682,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_13_230000) do
     t.text "nota_anulacion"
     t.datetime "anulada_at"
     t.bigint "anulada_por_id"
+    t.string "resolucion_anulacion"
+    t.bigint "reemplaza_a_id"
     t.index ["anulada_por_id"], name: "index_dispensaciones_on_anulada_por_id"
     t.index ["ariccame_reportada"], name: "index_dispensaciones_on_ariccame_reportada", where: "(ariccame_reportada = false)"
     t.index ["codigo_paquete"], name: "index_dispensaciones_on_codigo_paquete", unique: true
@@ -695,6 +697,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_13_230000) do
     t.index ["motivo_anulacion"], name: "index_dispensaciones_on_motivo_anulacion"
     t.index ["paciente_id", "fecha_dispensacion"], name: "index_dispensaciones_on_paciente_id_and_fecha_dispensacion"
     t.index ["paciente_id"], name: "index_dispensaciones_on_paciente_id"
+    t.index ["reemplaza_a_id"], name: "index_dispensaciones_on_reemplaza_a_id"
     t.index ["ruta_entrega_id"], name: "index_dispensaciones_on_ruta_entrega_id"
     t.index ["sede_id"], name: "index_dispensaciones_on_sede_id"
     t.index ["stock_id"], name: "index_dispensaciones_on_stock_id"
@@ -2484,6 +2487,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_13_230000) do
   add_foreign_key "dispensacion_items", "eventos_bar", column: "evento_bar_id"
   add_foreign_key "dispensacion_items", "stocks"
   add_foreign_key "dispensacion_items", "users", column: "deleted_by_id"
+  add_foreign_key "dispensaciones", "dispensaciones", column: "reemplaza_a_id"
   add_foreign_key "dispensaciones", "indicacion_medicas"
   add_foreign_key "dispensaciones", "pacientes"
   add_foreign_key "dispensaciones", "rutas_entrega", column: "ruta_entrega_id"

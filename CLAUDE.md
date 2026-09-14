@@ -678,7 +678,12 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   sale hoy de la caja abierta de la sede (el arqueo de ayer no se mueve), por transferencia queda
   pendiente hasta «Registrar pago». **Producto defectuoso** (o devolución con «no se puede volver
   a entregar») sale como MERMA y la mesa no se toca (`revertir_stock!(vuelve: false)`). El
-  dispensador anula sólo las de su sede. Sin plazo, a propósito.
+  dispensador anula sólo las de su sede. Sin plazo, a propósito. **Con defectuoso hay dos
+  salidas** (`resolucion_anulacion`): devolver la plata —por el medio que se ELIGE, y en efectivo
+  de una caja a la que le tiene que alcanzar— o **cambiar el producto**: una dispensa nueva con
+  medio `cambio` y `reemplaza_a_id`, que no cobra ni asienta (lo pagó en la original, cuya venta
+  queda), sólo baja stock, hasta el valor que pagó, con envío si hace falta. «Cambio pendiente»
+  = anulada con cambio elegido y sin reemplazo.
 - **UN PAGO DICE CÓMO, CUÁNDO Y DE QUÉ CAJA** (sep-2026, pedido de Germán). `fecha` es la del gasto
   y no se mueve; `fecha_pago` es cuándo salió la plata (`completar_fecha_pago`: lo que nace pagado
   se pagó ese día). En efectivo se elige entre las cajas ABIERTAS (`useCajasAbiertas`, la misma

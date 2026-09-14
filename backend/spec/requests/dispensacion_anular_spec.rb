@@ -72,6 +72,78 @@ RSpec.describe 'PATCH /dispensaciones/:id/anular', type: :request do
     expect(response).to have_http_status(:unprocessable_entity)
   end
 
+  context 'el cambio' do
+    def anular_con_cambio!(d)
+      patch "/dispensaciones/#{d.id}/anular", params: { motivo: 'producto_defectuoso', resolucion: 'cambio' }, as: :json
+      expect(response).to have_http_status(:ok)
+      body = JSON.parse(response.body)
+      expect(body.dig('anulacion', 'cambio_pendiente')).to be true
+    end
+
+    it 'sale como una dispensa nueva que no cobra y queda atada a la anulada' do
+      d = dispensa_en(centro)
+      sign_in_as(admin)
+      anular_con_cambio!(d)
+
+      nuevo = stock_en(centro)
+      post "/pacientes/#{paciente.id}/dispensaciones", params: {
+                                        dispensacion: { reemplaza_a_id: d.id, items: [{ stock_id: nuevo.id, cantidad: 5 }],
+                                                        fecha_dispensacion: Time.zone.today.to_s } }, as: :json
+      expect(response).to have_http_status(:created), response.body
+      body = JSON.parse(response.body)
+      expect(body['medio_pago']).to eq('cambio')
+      expect(body['reemplaza_a_id']).to eq(d.id)
+      expect(body['monto_efectivo_ars']).to eq(0.0)
+      expect(body['aporte_socio_ars']).to eq(500.0)
+
+      cambio = Dispensacion.find(body['id'])
+      expect(cambio.movimientos_contables).to be_empty
+      expect(cambio.cobros).to be_empty
+      expect(nuevo.reload.cantidad.to_d).to eq(95)
+      expect(d.reload.cambio_pendiente?).to be false
+      expect(d.reemplazo).to eq(cambio)
+    end
+
+    it 'no puede valer más que lo que pagó' do
+      d = dispensa_en(centro)
+      sign_in_as(admin)
+      anular_con_cambio!(d)
+      nuevo = stock_en(centro)
+      post "/pacientes/#{paciente.id}/dispensaciones", params: {
+                                        dispensacion: { reemplaza_a_id: d.id, items: [{ stock_id: nuevo.id, cantidad: 8 }],
+                                                        fecha_dispensacion: Time.zone.today.to_s } }, as: :json
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.body).to include('no puede valer más')
+      expect(nuevo.reload.cantidad.to_d).to eq(100)
+    end
+
+    it 'una sola vez' do
+      d = dispensa_en(centro)
+      sign_in_as(admin)
+      anular_con_cambio!(d)
+      nuevo = stock_en(centro)
+      2.times do
+        post "/pacientes/#{paciente.id}/dispensaciones", params: {
+                                          dispensacion: { reemplaza_a_id: d.id, items: [{ stock_id: nuevo.id, cantidad: 2 }],
+                                                          fecha_dispensacion: Time.zone.today.to_s } }, as: :json
+      end
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.body).to include('ya se cambió')
+    end
+
+    it 'no cambia una anulada que devolvió la plata' do
+      d = dispensa_en(centro)
+      sign_in_as(admin)
+      patch "/dispensaciones/#{d.id}/anular", params: { motivo: 'producto_defectuoso', resolucion: 'devolver_plata', devolucion: { medio: 'transferencia' } }, as: :json
+      expect(response).to have_http_status(:ok)
+      nuevo = stock_en(centro)
+      post "/pacientes/#{paciente.id}/dispensaciones", params: {
+                                        dispensacion: { reemplaza_a_id: d.id, items: [{ stock_id: nuevo.id, cantidad: 2 }],
+                                                        fecha_dispensacion: Time.zone.today.to_s } }, as: :json
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+  end
+
   it 'borrar ya no existe' do
     expect { Rails.application.routes.recognize_path('/api/dispensaciones/1', method: :delete) }
       .to raise_error(ActionController::RoutingError)

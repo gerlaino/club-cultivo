@@ -7,6 +7,8 @@
 // se pregunta primero, y el modal termina en una oración que dice exactamente qué va a pasar.
 // La regla vive en el backend (`Dispensaciones::Cancelar`); acá sólo se la cuenta.
 import { ref, computed, watch } from 'vue'
+import { useAuthStore } from '../../stores/auth'
+import { useCajasAbiertas, SIN_CAJA } from '../../composables/useCajasAbiertas.js'
 
 const props = defineProps({
   modelValue:   { type: Boolean, default: false },
@@ -28,9 +30,26 @@ const MOTIVOS = [
 const MEDIO_LABEL = { efectivo: 'en efectivo', transferencia: 'por transferencia', mercado_pago: 'por Mercado Pago' }
 const FORMA = { flor_seca: 'flor', preroll: 'prerolls', aceite: 'aceite', hash: 'hash', extracto: 'extracto', comestible: 'comestibles', prensado: 'prensado', capsula: 'cápsulas', crema: 'crema', tintura: 'tintura' }
 
-const motivo    = ref('')
-const nota      = ref('')
-const descartar = ref(false)
+const auth = useAuthStore()
+// Quien atiende devuelve de SU cajón y no elige; administración elige entre las cajas abiertas.
+const atiende = computed(() => auth.user?.role === 'dispensador')
+const { cajas, cargar: cargarCajas } = useCajasAbiertas()
+
+const MEDIOS_DEVOLUCION = [
+  { value: 'efectivo',      label: 'Efectivo' },
+  { value: 'transferencia', label: 'Transferencia' },
+  { value: 'mercado_pago',  label: 'Mercado Pago' },
+]
+
+const motivo     = ref('')
+const nota       = ref('')
+const descartar  = ref(false)
+// Con producto defectuoso: se devuelve la plata o se cambia el producto.
+const resolucion = ref('devolver_plata')
+// Cómo vuelve la plata: por el medio que se elige (no necesariamente por el que pagó) y, en
+// efectivo, de qué caja.
+const medioDev   = ref('efectivo')
+const cajaDev    = ref(SIN_CAJA)
 
 const fmtARS = n => new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n || 0)
 const fmtCant = n => { const x = Number(n || 0); return Number.isInteger(x) ? String(x) : x.toFixed(2).replace(/\.?0+$/, '') }
@@ -66,6 +85,25 @@ const cobrado = computed(() => {
   return [{ medio: d.value?.medio_pago || 'efectivo', monto }]
 })
 
+const esCambio = computed(() => motivo.value === 'producto_defectuoso' && resolucion.value === 'cambio')
+// Lo que se cobró de verdad (efectivo, transferencia, MP): eso es lo que se devuelve. La cuenta
+// corriente se reacredita sola y no cuenta acá.
+const montoADevolver = computed(() => cobrado.value.filter(c => ['efectivo', 'transferencia', 'mercado_pago'].includes(c.medio)).reduce((a, c) => a + c.monto, 0))
+const hayPlata = computed(() => conDevolucion.value && !esCambio.value && montoADevolver.value > 0)
+// La caja de donde sale el efectivo: la de la sede de la dispensa para quien atiende; la elegida
+// para administración. `null` = de ninguna (administración, de su bolsillo).
+const cajaDeLaSede = computed(() => cajas.value.find(c => c.sede_id === d.value?.sede?.id) || null)
+const cajaSel = computed(() => atiende.value ? cajaDeLaSede.value : (cajas.value.find(c => c.id === cajaDev.value) || null))
+const faltaEnCaja = computed(() => medioDev.value === 'efectivo' && cajaSel.value && cajaSel.value.esperado < montoADevolver.value - 0.009)
+const sinCajaAtendiendo = computed(() => medioDev.value === 'efectivo' && atiende.value && !cajaDeLaSede.value)
+const errorDevolucion = computed(() => {
+  if (!hayPlata.value) return ''
+  if (sinCajaAtendiendo.value) return 'Tu caja está cerrada: no hay de dónde sacar el efectivo. Devolvé por transferencia, o abrí la caja.'
+  if (faltaEnCaja.value) return `En la caja de ${cajaSel.value.sede} hay ${fmtARS(cajaSel.value.esperado)} y hay que devolver ${fmtARS(montoADevolver.value)}. Devolvé por transferencia, o ingresá plata a la caja primero.`
+  return ''
+})
+const puedeGuardarTodo = computed(() => puedeGuardar.value && !errorDevolucion.value)
+
 const oracion = computed(() => {
   if (!d.value || !motivo.value) return ''
   const frases = []
@@ -76,13 +114,21 @@ const oracion = computed(() => {
     frases.push(`${producto.value} vuelve al stock —y a la mesa si hay alguien atendiendo—.`)
   }
   // La plata.
-  if (conDevolucion.value) {
-    const partes = cobrado.value.map(({ medio, monto }) => {
-      if (medio === 'cuenta_corriente') return `se le reacreditan ${fmtARS(monto)} en su cuenta corriente`
-      if (medio === 'efectivo') return `salen ${fmtARS(monto)} en efectivo de la caja`
-      if (medio === 'no_abona' || medio === 'gramos') return null
-      return `queda una devolución pendiente de ${fmtARS(monto)} ${MEDIO_LABEL[medio] || medio}, que se registra cuando se la devuelvan`
-    }).filter(Boolean)
+  if (esCambio.value) {
+    frases.push(`La venta queda: lo que pagó (${fmtARS(d.value.aporte_socio_ars)}) cubre lo que se lleve en el cambio. Después elegís qué se lleva.`)
+  } else if (conDevolucion.value) {
+    const partes = []
+    const cc = cobrado.value.find(c => c.medio === 'cuenta_corriente')
+    if (cc) partes.push(`se le reacreditan ${fmtARS(cc.monto)} en su cuenta corriente`)
+    if (montoADevolver.value > 0) {
+      if (medioDev.value === 'efectivo') {
+        partes.push(cajaSel.value
+          ? `salen ${fmtARS(montoADevolver.value)} en efectivo de la caja de ${cajaSel.value.sede}`
+          : `salen ${fmtARS(montoADevolver.value)} en efectivo (de ninguna caja: no entra a ningún arqueo)`)
+      } else {
+        partes.push(`queda una devolución pendiente de ${fmtARS(montoADevolver.value)} ${MEDIO_LABEL[medioDev.value]}, que se registra cuando se la devuelvan`)
+      }
+    }
     if (partes.length) frases.push(`La venta queda registrada y ${partes.join('; ')}.`)
     else frases.push('No había plata que devolver.')
   } else {
@@ -93,15 +139,29 @@ const oracion = computed(() => {
   return frases.map(f => f.charAt(0).toUpperCase() + f.slice(1)).join(' ')
 })
 
-watch(() => props.modelValue, (abierto) => {
+watch(() => props.modelValue, async (abierto) => {
   if (!abierto) return
-  motivo.value = ''; nota.value = ''; descartar.value = false
-})
+  motivo.value = ''; nota.value = ''; descartar.value = false; resolucion.value = 'devolver_plata'
+  // Por donde pagó, salvo que haya pagado de varias formas: efectivo.
+  const medios = cobrado.value.map(c => c.medio).filter(m => ['efectivo', 'transferencia', 'mercado_pago'].includes(m))
+  medioDev.value = medios.length === 1 ? medios[0] : 'efectivo'
+  cajaDev.value  = SIN_CAJA
+  await cargarCajas()
+  cajaDev.value = cajaDeLaSede.value?.id ?? SIN_CAJA
+}, { immediate: true })
 
 function cerrar() { emit('update:modelValue', false) }
 function anular() {
-  if (!puedeGuardar.value) return
-  emit('anular', { id: d.value.id, motivo: motivo.value, nota: nota.value.trim() || null, descartar_producto: seDescarta.value })
+  if (!puedeGuardarTodo.value) return
+  const payload = { id: d.value.id, motivo: motivo.value, nota: nota.value.trim() || null, descartar_producto: seDescarta.value }
+  if (conDevolucion.value) {
+    payload.resolucion = motivo.value === 'producto_defectuoso' ? resolucion.value : 'devolver_plata'
+    if (hayPlata.value) {
+      payload.devolucion = { medio: medioDev.value }
+      if (medioDev.value === 'efectivo' && !atiende.value) payload.devolucion.caja_turno_id = cajaDev.value
+    }
+  }
+  emit('anular', payload)
 }
 </script>
 
@@ -138,6 +198,31 @@ function anular() {
             </div>
           </div>
 
+          <div v-if="motivo === 'producto_defectuoso'" class="ad__fld">
+            <span class="ad__lbl">¿Qué se hace?</span>
+            <div class="ad__seg" role="radiogroup" aria-label="Qué se hace">
+              <button type="button" class="ad__seg-b" :class="{ 'ad__seg-b--on': resolucion === 'devolver_plata' }" id="ad-res-plata"
+                      role="radio" :aria-checked="resolucion === 'devolver_plata'" @click="resolucion = 'devolver_plata'">Devolver la plata</button>
+              <button type="button" class="ad__seg-b" :class="{ 'ad__seg-b--on': resolucion === 'cambio' }" id="ad-res-cambio"
+                      role="radio" :aria-checked="resolucion === 'cambio'" @click="resolucion = 'cambio'">Cambiar el producto</button>
+            </div>
+          </div>
+
+          <div v-if="hayPlata" class="ad__fld">
+            <span class="ad__lbl">Cómo se devuelve {{ fmtARS(montoADevolver) }}</span>
+            <div class="ad__seg" role="radiogroup" aria-label="Cómo se devuelve">
+              <button v-for="m in MEDIOS_DEVOLUCION" :key="m.value" type="button" class="ad__seg-b"
+                      :class="{ 'ad__seg-b--on': medioDev === m.value }" :id="`ad-dev-${m.value}`"
+                      role="radio" :aria-checked="medioDev === m.value" @click="medioDev = m.value">{{ m.label }}</button>
+            </div>
+            <!-- Administración elige de qué caja sale el efectivo; quien atiende devuelve de la suya. -->
+            <select v-if="medioDev === 'efectivo' && !atiende && cajas.length" id="ad-caja" class="ad__inp" v-model="cajaDev">
+              <option :value="null">De ninguna caja — la plata no sale de un mostrador</option>
+              <option v-for="c in cajas" :key="c.id" :value="c.id">Caja de {{ c.sede }} · hay {{ fmtARS(c.esperado) }}</option>
+            </select>
+            <span v-if="errorDevolucion" class="ad__err">{{ errorDevolucion }}</span>
+          </div>
+
           <label v-if="motivo === 'devolucion'" class="ad__check">
             <input id="ad-descartar" type="checkbox" v-model="descartar" />
             <span>El producto no se puede volver a entregar (vino abierto, mojado…): sale como merma.</span>
@@ -154,8 +239,8 @@ function anular() {
 
         <div class="ad__foot">
           <button class="ad__btn-ghost" type="button" @click="cerrar">Cancelar</button>
-          <button class="ad__btn" type="button" :disabled="!puedeGuardar" @click="anular">
-            {{ guardando ? 'Anulando…' : 'Anular dispensa' }}
+          <button class="ad__btn" type="button" :disabled="!puedeGuardarTodo" @click="anular">
+            {{ guardando ? 'Anulando…' : (esCambio ? 'Anular y elegir el cambio' : 'Anular dispensa') }}
           </button>
         </div>
       </div>
@@ -188,6 +273,12 @@ function anular() {
 .ad__motivo-txt { display: flex; flex-direction: column; gap: .1rem; }
 .ad__motivo-lbl { font-size: .86rem; font-weight: 700; color: var(--c-slate-900); }
 .ad__motivo-desc { font-size: .76rem; color: var(--c-slate-500); line-height: 1.35; }
+.ad__seg { display: inline-flex; border: 1.5px solid var(--c-slate-200); border-radius: 9px; overflow: hidden; align-self: flex-start; max-width: 100%; }
+.ad__seg-b { background: #fff; border: none; padding: .5rem .8rem; font-size: .82rem; font-weight: 600; color: var(--c-slate-600); cursor: pointer; font-family: inherit; white-space: nowrap; }
+.ad__seg-b + .ad__seg-b { border-left: 1.5px solid var(--c-slate-200); }
+.ad__seg-b--on { background: var(--c-rust-600); color: #fff; }
+.ad__seg-b:focus-visible { outline: 2px solid var(--c-rust-600); outline-offset: -2px; }
+.ad__err { font-size: .74rem; color: var(--c-rust-600); line-height: 1.4; }
 .ad__check { display: flex; gap: .5rem; align-items: flex-start; font-size: .8rem; color: var(--c-slate-700); line-height: 1.4; cursor: pointer; }
 .ad__check input { margin-top: .2rem; }
 .ad__inp { width: 100%; box-sizing: border-box; padding: .5rem .65rem; border: 1.5px solid var(--c-slate-200); border-radius: 9px; font-size: .86rem; color: var(--c-slate-900); font-family: inherit; background: #fff; }

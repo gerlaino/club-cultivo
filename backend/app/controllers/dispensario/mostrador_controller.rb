@@ -616,8 +616,11 @@ module Dispensario
         # mesa esté vacía.
         # `caja_turno_id` es lo que elige administración al dispensar del depósito: a qué cajón
         # entra el efectivo (`Dispensacion#caja_para_cobros`).
+        # `efectivo_esperado` es lo que tendría que haber en el cajón: una devolución en efectivo
+        # sale de ahí y tiene que alcanzar. Es una cuenta que la pantalla ya muestra.
         turno: turno && { desde: turno.abierto_at, quien: turno.abierto_por&.nombre_completo,
-                          caja_turno_id: turno.caja_turno_id },
+                          caja_turno_id: turno.caja_turno_id,
+                          efectivo_esperado: turno.caja_turno&.efectivo_esperado_ars.to_f },
         # Cierres que piden una mirada en ESA sede. Es media razón para entrar.
         sin_revisar: gestiona? && most ? Mostradores::MotivosDeRevision.por_turno(
           most.turno_mostradores.cerrados.where(revisado_at: nil)

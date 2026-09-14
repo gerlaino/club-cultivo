@@ -4,7 +4,7 @@ import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { listDispensacionesFecha, exportDispensacionesCSV, listPacientes, getPaciente, listSedes, anularDispensacion } from '../lib/api.js'
 import { formaLabel, formatARS, formatFecha } from '../lib/formatters.js'
 import { RouterLink, useRouter, useRoute } from 'vue-router'
-import { Download, RefreshCw, Search, Plus, X, Filter, Pencil, Trash2, QrCode, Truck, ChevronRight } from 'lucide-vue-next'
+import { Download, RefreshCw, Search, Plus, X, Filter, Pencil, Trash2, QrCode, Truck, ChevronRight, Repeat } from 'lucide-vue-next'
 import { useEtiquetaDispensa } from '../composables/useEtiquetaDispensa.js'
 import ModalNuevaDispensacion from '../components/pacientes/ModalNuevaDispensacion.vue'
 import ModalEditarDispensacion from '../components/pacientes/ModalEditarDispensacion.vue'
@@ -48,13 +48,28 @@ function abrirAnular(d) { anularTarget.value = d; anularError.value = ''; anular
 async function handleAnular({ id, ...payload }) {
   anulando.value = true; anularError.value = ''
   try {
-    await anularDispensacion(id, payload)
+    const { data } = await anularDispensacion(id, payload)
     anularModal.value = false
     await cargar()
     toast.success('Dispensa anulada')
+    // Con cambio elegido, sigue el segundo paso: qué se lleva.
+    if (data?.anulacion?.cambio_pendiente) await abrirCambio(data)
   } catch (e) {
     anularError.value = e?.response?.data?.error || 'No se pudo anular'
   } finally { anulando.value = false }
+}
+
+// EL CAMBIO ES UNA DISPENSA NUEVA atada a la anulada: el mismo modal de siempre, precargado con
+// lo devuelto y sin cobrar. Se puede retomar desde la fila («cambio pendiente») si se cerró.
+const cambioTarget = ref(null)
+async function abrirCambio(d) {
+  cargandoPaciente.value = true
+  try {
+    const { data } = await getPaciente(d.paciente_id)
+    pacienteSeleccionado.value = data.data ?? data
+    cambioTarget.value = d
+    showDispensarModal.value = true
+  } catch { toast.error('No se pudo abrir el cambio') } finally { cargandoPaciente.value = false }
 }
 
 // ── Modal: buscar paciente (para nueva dispensación O para filtrar) ─────────────
@@ -66,6 +81,8 @@ const loadingPacientes     = ref(false)
 const cargandoPaciente     = ref(false)
 
 const showDispensarModal   = ref(false)
+// Al cerrar el modal se suelta el cambio: el próximo «Nueva dispensación» es una común.
+watch(showDispensarModal, (v) => { if (!v) cambioTarget.value = null })
 const pacienteSeleccionado = ref(null)
 
 async function abrirNuevaDispensacion() {
@@ -186,22 +203,26 @@ const dispensaciones = computed(() => allDisps.value)
 // Las anuladas se VEN en la lista (con su motivo) pero no SUMAN: 10 g devueltos no son 10 g
 // entregados, y $10.000 devueltos no son $10.000 cobrados.
 const vigentes = computed(() => allDisps.value.filter(d => !d.anulada))
+// LA PLATA de una anulada con CAMBIO sí quedó: la venta existe y cubre la dispensa de cambio, que
+// por eso cobra $0. Para contar lo cobrado se mira esa y no la de cambio.
+const cobradas = computed(() => allDisps.value.filter(d => !d.anulada || d.anulacion?.resolucion === 'cambio'))
 
 // Cobrado = lo que efectivamente entró (efectivo/transfer). A crédito = lo que quedó en cuenta
 // corriente (el paciente dispensó sin pagar). No mezclarlos: el "cobrado" no incluye el fiado.
-const totalCobrado   = computed(() => vigentes.value.reduce((s, d) => s + (d.monto_efectivo_ars ?? 0), 0))
-const totalCredito   = computed(() => vigentes.value.reduce((s, d) => s + (d.monto_credito_ars ?? 0), 0))
+const totalCobrado   = computed(() => cobradas.value.reduce((s, d) => s + (d.monto_efectivo_ars ?? 0), 0))
+const totalCredito   = computed(() => cobradas.value.reduce((s, d) => s + (d.monto_credito_ars ?? 0), 0))
 const totalRecaudado = computed(() => totalCobrado.value + totalCredito.value) // aporte total (informativo)
 const totalGramos    = computed(() => vigentes.value.reduce((s, d) => s + (d.cantidad ?? 0), 0))
 const totalConEnvio  = computed(() => vigentes.value.filter(d => d.con_envio).length)
 
 const resumenPago = computed(() => {
   const map = {}
-  for (const d of vigentes.value) {
+  for (const d of cobradas.value) {
     const k = d.medio_pago || 'otro'
     if (!map[k]) map[k] = { count: 0, total: 0 }
     map[k].count++
-    map[k].total += d.aporte_socio_ars ?? 0
+    // Un cambio no cobra: lo que vale lo pagó la anulada que reemplaza, y ésa ya está sumada.
+    map[k].total += d.medio_pago === 'cambio' ? 0 : (d.aporte_socio_ars ?? 0)
   }
   return Object.entries(map).map(([medio, v]) => ({ medio, ...v })).sort((a, b) => b.total - a.total)
 })
@@ -257,7 +278,7 @@ function formatHora(ts) {
   return new Date(ts).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
 }
 function medioPagoLabel(m) {
-  const L = { efectivo: 'Efectivo', transferencia: 'Transf.', debito: 'Débito', credito: 'Crédito', cuenta_corriente: 'Cta. cte.', no_abona: 'No abona', credito_gramos: 'Gramos', mixto: 'Mixto', regalo: 'Regalo' }
+  const L = { efectivo: 'Efectivo', transferencia: 'Transf.', debito: 'Débito', credito: 'Crédito', cuenta_corriente: 'Cta. cte.', no_abona: 'No abona', credito_gramos: 'Gramos', mixto: 'Mixto', regalo: 'Regalo', cambio: 'Cambio' }
   return L[m] || m || '—'
 }
 // Qué decir en el badge de pago. No siempre es el medio: si es contra entrega y todavía
@@ -266,9 +287,11 @@ function pagoBadge(d) {
   // Una anulada dice POR QUÉ en el lugar del medio de pago: es lo que hay que saber de esa fila.
   if (d.anulada) {
     const a = d.anulacion || {}
-    return { texto: `Anulada · ${(a.motivo_label || 'sin motivo').toLowerCase()}`, clase: 'hd__pago--anulada',
+    const cambio = a.reemplazo_id ? ` → cambio #${a.reemplazo_id}` : (a.cambio_pendiente ? ' · cambio pendiente' : '')
+    return { texto: `Anulada · ${(a.motivo_label || 'sin motivo').toLowerCase()}${cambio}`, clase: 'hd__pago--anulada',
              title: [a.por && `por ${a.por}`, a.nota].filter(Boolean).join(' — ') }
   }
+  if (d.reemplaza_a_id) return { texto: `Cambio de #${d.reemplaza_a_id}`, clase: 'hd__pago--morado', title: 'No cobra: lo pagó en la dispensa que reemplaza' }
   const pendiente = Number(d.saldo_pendiente ?? 0) > 0
   if (d.cobrar_en_entrega && pendiente) {
     return { texto: 'Contra entrega', clase: 'hd__pago--amber' }
@@ -277,7 +300,7 @@ function pagoBadge(d) {
 }
 
 function medioPagoClass(m) {
-  const C = { efectivo: 'hd__pago--verde', transferencia: 'hd__pago--azul', debito: 'hd__pago--azul', credito: 'hd__pago--morado', cuenta_corriente: 'hd__pago--amber', no_abona: 'hd__pago--gris', credito_gramos: 'hd__pago--morado', mixto: 'hd__pago--azul', regalo: 'hd__pago--morado' }
+  const C = { efectivo: 'hd__pago--verde', transferencia: 'hd__pago--azul', debito: 'hd__pago--azul', credito: 'hd__pago--morado', cuenta_corriente: 'hd__pago--amber', no_abona: 'hd__pago--gris', credito_gramos: 'hd__pago--morado', mixto: 'hd__pago--azul', regalo: 'hd__pago--morado', cambio: 'hd__pago--morado' }
   return C[m] || 'hd__pago--gris'
 }
 function descuentoPct(d) {
@@ -420,6 +443,7 @@ const FORMAS = [
       :saldo-cc="pacienteSeleccionado.saldo_cc ?? null"
       :limite-cc="pacienteSeleccionado.limite_cc ?? null"
       :descuento-porcentaje="Number(pacienteSeleccionado.descuento_porcentaje ?? 0)"
+      :cambio-de="cambioTarget"
       @saved="onDispensacionGuardada"
     />
 
@@ -589,6 +613,9 @@ const FORMAS = [
                   </button>
                   <button v-if="canEdit && !d.anulada" class="hd__action-btn" @click="openEdit(d)" title="Editar">
                     <Pencil :size="13" :stroke-width="2" />
+                  </button>
+                  <button v-if="canAnular && d.anulacion?.cambio_pendiente" class="hd__action-btn hd__action-btn--cambio" @click="abrirCambio(d)" title="Entregar el cambio">
+                    <Repeat :size="13" :stroke-width="2" />
                   </button>
                   <button v-if="canAnular && !d.anulada" class="hd__action-btn hd__action-btn--danger" @click="abrirAnular(d)" title="Anular">
                     <Trash2 :size="13" :stroke-width="2" />
@@ -974,6 +1001,8 @@ const FORMAS = [
 }
 .hd__action-btn:hover { background: var(--c-slate-100); color: var(--c-slate-700); }
 .hd__action-btn--danger:hover { background: #fef2f2; border-color: #fecaca; color: #dc2626; }
+.hd__action-btn--cambio { color: var(--c-rust-600); border-color: var(--c-rust-100); background: var(--c-rust-100); }
+.hd__action-btn--cambio:hover { background: #fff; border-color: var(--c-rust-600); }
 
 
 /* Summary row */

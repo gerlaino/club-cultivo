@@ -32,7 +32,8 @@ class DispensacionSerializer
       es_regalo:           d.es_regalo,
       tiene_movimiento_contable: d.movimientos_contables.any?,
       monto_credito_ars:   d.monto_credito_ars&.to_f,
-      monto_efectivo_ars:  (d.aporte_socio_ars.to_d - d.monto_credito_ars.to_d).to_f,
+      # Un cambio no cobra nada: lo que vale ya lo pagó en la dispensa que reemplaza.
+      monto_efectivo_ars:  d.cambio? ? 0.0 : (d.aporte_socio_ars.to_d - d.monto_credito_ars.to_d).to_f,
       cobrar_en_entrega:   d.cobrar_en_entrega,
       total_cobrado:       d.total_cobrado.to_f,
       saldo_pendiente:     d.saldo_pendiente.to_f,
@@ -42,6 +43,8 @@ class DispensacionSerializer
       estado_envio:    d.estado_envio,
       anulada:         d.cancelada?,
       anulacion:       serialize_anulacion(d),
+      # Cambio: esta dispensa reemplaza a una anulada por defectuoso (y no cobra).
+      reemplaza_a_id:  d.reemplaza_a_id,
       codigo_paquete:  d.codigo_paquete,
       delivery_id:     d.delivery_id,
       delivery_nombre: d.delivery_user ? [d.delivery_user.first_name, d.delivery_user.last_name].compact.join(' ').strip.presence || d.delivery_user.email : nil,
@@ -135,6 +138,10 @@ class DispensacionSerializer
       por:          d.anulada_por ? (d.anulada_por.first_name.presence || d.anulada_por.email) : nil,
       producto_descartado: Array(d.historial_envio).any? { |e| e['producto_descartado'] },
       con_devolucion: Dispensacion::MOTIVOS_CON_DEVOLUCION.include?(d.motivo_anulacion),
+      resolucion:     d.resolucion_anulacion,
+      # Con cambio elegido: la dispensa que la reemplazó, o `cambio_pendiente` hasta que salga.
+      reemplazo_id:   d.reemplazo&.id,
+      cambio_pendiente: d.cambio_pendiente?,
     }
   end
 

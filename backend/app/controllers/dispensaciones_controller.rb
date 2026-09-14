@@ -147,6 +147,22 @@ class DispensacionesController < ApplicationController
       @dispensacion.aporte_socio_ars = 0
     end
 
+    # CAMBIO: reemplaza a una anulada por producto defectuoso. Lo que se lleva ya lo pagó en la
+    # original, así que no cobra, no asienta ni toca la cuenta corriente; sólo baja stock. Con
+    # envío si hace falta (el preroll llegó roto a la casa y se manda otro). Lo que puede y no
+    # puede reemplazar lo valida el modelo (`cambio_coherente`).
+    if params.dig(:dispensacion, :reemplaza_a_id).present?
+      @dispensacion.reemplaza_a = Dispensacion.where(paciente_id: current_user.club.pacientes.select(:id))
+                                              .find_by(id: params.dig(:dispensacion, :reemplaza_a_id))
+      return render json: { error: 'No existe la dispensa a cambiar.' }, status: :unprocessable_entity if @dispensacion.reemplaza_a.nil?
+      @dispensacion.medio_pago        = 'cambio'
+      @dispensacion.es_regalo         = false
+      @dispensacion.cobrar_en_entrega = false
+      @dispensacion.monto_credito_ars = 0
+      @dispensacion.save!
+      return render json: serialize_dispensacion(@dispensacion), status: :created
+    end
+
     @dispensacion.cobrar_en_entrega = !es_regalo && (ActiveModel::Type::Boolean.new.cast(params.dig(:dispensacion, :cobrar_en_entrega)) || false)
     lineas_cobro = es_regalo ? [] : cobros_param
 
@@ -530,9 +546,15 @@ class DispensacionesController < ApplicationController
                     status: :unprocessable_entity
     end
 
+    # Cómo vuelve la plata. Quien atiende devuelve de SU cajón (la caja de la sede de la
+    # dispensa): no elige. Administración elige entre las abiertas, o ninguna.
+    devolucion = { medio: params.dig(:devolucion, :medio).presence }
+    devolucion[:caja_turno_id] = params.dig(:devolucion, :caja_turno_id) if !current_user.atiende_mostrador? && params[:devolucion]&.key?(:caja_turno_id)
+
     res = Dispensaciones::Cancelar.call(dispensacion: @dispensacion, usuario: current_user,
                                         motivo: motivo, nota: params[:nota].presence,
-                                        descartar_producto: ActiveModel::Type::Boolean.new.cast(params[:descartar_producto]))
+                                        descartar_producto: ActiveModel::Type::Boolean.new.cast(params[:descartar_producto]),
+                                        resolucion: params[:resolucion].presence, devolucion: devolucion)
     return render json: { errors: [res.error] }, status: :unprocessable_entity unless res.ok?
 
     render json: serialize_dispensacion(@dispensacion.reload)

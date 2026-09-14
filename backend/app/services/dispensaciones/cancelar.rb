@@ -16,27 +16,42 @@ module Dispensaciones
     # `motivo` es uno de `Dispensacion::MOTIVOS_ANULACION` y decide CÓMO se deshace (ver el
     # modelo); `nota` es el texto libre de la persona. `descartar_producto` es para la devolución
     # de algo que no se puede volver a entregar (con `producto_defectuoso` va implícito).
-    def initialize(dispensacion:, usuario:, motivo: 'error_carga', nota: nil, descartar_producto: false, evento: true)
-      @d        = dispensacion
-      @usuario  = usuario
-      @motivo   = motivo.to_s
-      @nota     = nota.presence
-      @descarta = descartar_producto || @motivo == 'producto_defectuoso'
-      @evento   = evento
+    # `resolucion` (sólo con devolución o defectuoso): `devolver_plata` o `cambio` (defectuoso
+    # nada más: el producto sano vuelve a la mesa y no hay nada que cambiar). `devolucion` dice
+    # CÓMO vuelve la plata: `{ medio:, caja_turno_id: }` — el paciente pudo pagar por
+    # transferencia y llevarse efectivo, o al revés. Sin `medio`, por donde pagó.
+    def initialize(dispensacion:, usuario:, motivo: 'error_carga', nota: nil, descartar_producto: false,
+                   resolucion: nil, devolucion: {}, evento: true)
+      @d          = dispensacion
+      @usuario    = usuario
+      @motivo     = motivo.to_s
+      @nota       = nota.presence
+      @descarta   = descartar_producto || @motivo == 'producto_defectuoso'
+      @resolucion = resolucion.presence&.to_s
+      @devolucion = (devolucion || {}).to_h.symbolize_keys
+      @evento     = evento
     end
 
     def call
       return err('La dispensación ya está cancelada') if @d.cancelada?
       return err('Motivo de anulación inválido') unless Dispensacion::MOTIVOS_ANULACION.include?(@motivo)
+      if devolucion?
+        @resolucion ||= 'devolver_plata'
+        return err('Decí qué se hace: devolver la plata o cambiar el producto.') unless Dispensacion::RESOLUCIONES_ANULACION.include?(@resolucion)
+        return err('El cambio es sólo para producto defectuoso: si vino sano, vuelve a la mesa.') if @resolucion == 'cambio' && @motivo != 'producto_defectuoso'
+      else
+        @resolucion = nil
+      end
 
       ActiveRecord::Base.transaction do
         revertir_gramos
         revertir_cuenta_corriente
         CuentaCorrienteMovimiento.where(dispensacion_id: @d.id).update_all(dispensacion_id: nil)
         if devolucion?
-          # La venta PASÓ: la plata entró y hay que devolverla. El ingreso y sus cobros quedan
-          # —son lo que cobró la caja esa noche— y se escribe el egreso al lado.
-          asentar_devolucion
+          # La venta PASÓ: la plata entró. El ingreso y sus cobros quedan —son lo que cobró la
+          # caja esa noche—. Si se devuelve, se escribe el egreso al lado; si se cambia el
+          # producto, lo que pagó cubre lo que se lleva después (`Dispensacion#cambio?`).
+          asentar_devolucion if @resolucion == 'devolver_plata'
         else
           # Nunca pasó: el asiento se borra y los cobros (con sus comprobantes) se van con él.
           revertir_asientos
@@ -46,13 +61,15 @@ module Dispensaciones
         @d.revertir_stock!(vuelve: !@descarta, usuario: @usuario, nota: @nota)
         registrar_evento if @evento
         @d.update!(estado_envio: 'cancelada', historial_envio: @d.historial_envio,
-                   motivo_anulacion: @motivo, nota_anulacion: @nota,
+                   motivo_anulacion: @motivo, nota_anulacion: @nota, resolucion_anulacion: @resolucion,
                    anulada_por: @usuario, anulada_at: Time.current)
       end
       Result.new(ok: true, dispensacion: @d)
     rescue => e
       err(e.message)
     end
+
+    MEDIOS_DEVOLUCION = %w[efectivo transferencia mercado_pago].freeze
 
     private
 
@@ -78,31 +95,61 @@ module Dispensaciones
     # Lo que no se cobró (cuenta corriente, no abona) no tiene plata que devolver: la cuenta
     # corriente ya se reacreditó arriba, y el asiento pendiente se borra si el período está
     # abierto.
+    # UN SOLO EGRESO por todo lo cobrado, por el medio que se ELIGE — no necesariamente por el
+    # que pagó: pagó por transferencia y se lleva efectivo, o al revés. Sin medio, por donde pagó.
     def asentar_devolucion
-      @d.movimientos_contables.each do |m|
-        next unless m.es_ingreso?
+      pagados = @d.movimientos_contables.select { |m| m.es_ingreso? && m.pagado }
+      @d.movimientos_contables.each { |m| m.destroy! if m.es_ingreso? && !m.pagado && !m.cerrado? }
+      total = pagados.sum(&:monto_ars).to_d
+      return if total <= 0
 
-        if m.pagado
-          MovimientoContable.create!(devolucion_attrs(m))
-        elsif !m.cerrado?
-          m.destroy!
-        end
-      end
-    end
+      medio = (@devolucion[:medio].presence || medio_por_donde_pago(pagados)).to_s
+      raise ArgumentError, 'Elegí cómo se devuelve: efectivo, transferencia o Mercado Pago.' unless MEDIOS_DEVOLUCION.include?(medio)
 
-    def devolucion_attrs(m)
-      efectivo = m.medio_pago == 'efectivo'
-      caja_id  = efectivo ? CajaTurno.abierta_en_sede(club_id: m.club_id, sede_id: @d.sede_id || m.sede_id)&.id : nil
-      {
-        club: m.club, sede_id: @d.sede_id || m.sede_id, dispensacion: @d, paciente: m.paciente,
+      efectivo = medio == 'efectivo'
+      caja     = efectivo ? caja_de_donde_sale!(total) : nil
+      MovimientoContable.create!(
+        club_id: @d.club_id, sede_id: @d.sede_id || pagados.first.sede_id, dispensacion: @d, paciente: @d.paciente,
         created_by: @usuario, tipo: 'egreso', categoria: 'devolucion_paciente',
         descripcion: "Devolución a #{@d.paciente&.nombre_completo} — dispensación ##{@d.id} anulada " \
                      "(#{Dispensacion::MOTIVOS_ANULACION_LABEL[@motivo].downcase})",
-        monto_ars: m.monto_ars, fecha: Time.zone.today,
-        medio_pago: m.medio_pago, pagado: efectivo, fecha_pago: (efectivo ? Time.zone.today : nil),
-        caja_turno_id: caja_id, comprobante_tipo: 'sin_comprobante',
-      }
+        monto_ars: total, fecha: Time.zone.today,
+        medio_pago: medio, pagado: efectivo, fecha_pago: (efectivo ? Time.zone.today : nil),
+        caja_turno_id: caja&.id, comprobante_tipo: 'sin_comprobante',
+      )
     end
+
+    def medio_por_donde_pago(pagados)
+      medios = pagados.map(&:medio_pago).uniq
+      medios.include?('efectivo') || medios.size != 1 ? 'efectivo' : medios.first
+    end
+
+    # DE QUÉ CAJA SALE EL EFECTIVO. La elegida (administración) o la abierta en la sede de la
+    # dispensa (quien atiende, que devuelve de su cajón). Con caja, TIENE QUE ALCANZAR: devolver
+    # $8.500 de un cajón con $5.000 es un faltante inventado esa noche — se devuelve por
+    # transferencia o se trae plata. Sin ninguna caja (administración, de su bolsillo) se
+    # escribe igual y no entra a ningún arqueo, como cualquier pago en efectivo del admin.
+    def caja_de_donde_sale!(monto)
+      caja = if @devolucion.key?(:caja_turno_id)
+               id = @devolucion[:caja_turno_id]
+               return nil if id.blank?
+
+               c = CajaTurno.unscoped.abiertas.where(club_id: @d.club_id, punto_type: CajaTurno::PUNTO_MOSTRADOR).find_by(id: id)
+               raise ArgumentError, 'Esa caja no está abierta.' if c.nil?
+               c
+             else
+               CajaTurno.abierta_en_sede(club_id: @d.club_id, sede_id: @d.sede_id)
+             end
+      return nil if caja.nil?
+
+      hay = caja.efectivo_esperado_ars.to_d
+      if hay < monto
+        raise ArgumentError, "En la caja hay #{fmt(hay)} y hay que devolver #{fmt(monto)}: devolvé por transferencia, o ingresá plata a la caja primero."
+      end
+      caja
+    end
+
+    def fmt(n) = ActionController::Base.helpers.number_to_currency(n, unit: '$', separator: ',', delimiter: '.', precision: 0)
 
     # Un asiento en período ABIERTO se borra: la dispensa no pasó. Uno en período CERRADO no se
     # toca —ese mes ya se reportó y la plata entró de verdad ese día— y se escribe la devolución

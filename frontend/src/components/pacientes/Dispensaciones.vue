@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { logger } from '../../utils/logger.js'
 import { useAuthStore } from '../../stores/auth'
 import { useConfirm } from '../../composables/useConfirm.js'
@@ -86,14 +86,22 @@ function abrirAnular(d) { anularTarget.value = d; anularError.value = ''; anular
 async function handleAnular({ id, ...payload }) {
   anulando.value = true; anularError.value = ''
   try {
-    await anularDispensacion(id, payload)
+    const { data } = await anularDispensacion(id, payload)
     anularModal.value = false
     await loadDispensaciones()
     toast.success('Dispensa anulada')
+    // Con cambio elegido, sigue el segundo paso: qué se lleva.
+    if (data?.anulacion?.cambio_pendiente) abrirCambio(data)
   } catch (e) {
     anularError.value = e?.response?.data?.error || 'No se pudo anular'
   } finally { anulando.value = false }
 }
+
+// EL CAMBIO ES UNA DISPENSA NUEVA atada a la anulada: el mismo modal, precargado con lo devuelto
+// y sin cobrar. Se retoma desde la tarjeta («cambio pendiente») si se cerró sin entregar.
+const cambioTarget = ref(null)
+function abrirCambio(d) { cambioTarget.value = d; modoModal.value = 'dispensa'; showModal.value = true }
+watch(showModal, (v) => { if (!v) cambioTarget.value = null })
 
 function openEdit(d) {
   editTarget.value = d
@@ -263,6 +271,13 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
           <div v-if="d.observaciones" class="dv__item-obs">{{ d.observaciones }}</div>
           <div v-if="d.anulada" class="dv__item-anulada" :title="[d.anulacion?.por && `por ${d.anulacion.por}`, d.anulacion?.nota].filter(Boolean).join(' — ')">
             <i class="bi bi-x-circle"></i> Anulada · {{ (d.anulacion?.motivo_label || 'sin motivo').toLowerCase() }}
+            <template v-if="d.anulacion?.reemplazo_id"> → cambio #{{ d.anulacion.reemplazo_id }}</template>
+            <button v-else-if="d.anulacion?.cambio_pendiente && canAnular" type="button" class="dv__cambio-btn" @click="abrirCambio(d)">
+              <i class="bi bi-arrow-repeat"></i> Entregar el cambio
+            </button>
+          </div>
+          <div v-else-if="d.reemplaza_a_id" class="dv__item-cambio" title="No cobra: lo pagó en la dispensa que reemplaza">
+            <i class="bi bi-arrow-repeat"></i> Cambio de #{{ d.reemplaza_a_id }}
           </div>
           <div v-if="d.con_envio" class="dv__item-envio-badge"
                :class="`dv__item-envio-badge--${d.estado_envio || 'pendiente'}`">
@@ -324,6 +339,7 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
       :limite-cc="props.limiteCc"
       :descuento-porcentaje="props.descuentoPorcentaje"
       :modo-inicial="modoModal"
+      :cambio-de="cambioTarget"
       @saved="onDispensacionGuardadaConReservas"
     />
 
@@ -383,6 +399,8 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
 .dv__reserva-acts { display: flex; gap: .35rem; flex-shrink: 0; }
 .dv__reserva-btn { border: 1.5px solid var(--c-slate-200); background: #fff; border-radius: 7px; padding: .3rem .6rem; font-size: .75rem; font-weight: 700; cursor: pointer; color: var(--c-slate-600); }
 .dv__reserva-btn--primary { background: #15803d; color: #fff; border-color: #15803d; }
+.dv__item-cambio { display: inline-flex; align-items: center; gap: .3rem; margin-top: .2rem; font-size: 12px; font-weight: 600; padding: .15em .55em; border-radius: 5px; background: #f3e8ff; color: #6b21a8; }
+.dv__cambio-btn { margin-left: .3rem; background: var(--c-rust-600); color: #fff; border: none; border-radius: 5px; padding: .1em .5em; font-size: 11px; font-weight: 700; cursor: pointer; font-family: inherit; display: inline-flex; align-items: center; gap: .25rem; }
 .dv__item-anulada { display: inline-flex; align-items: center; gap: .3rem; margin-top: .2rem; font-size: 12px; font-weight: 600; padding: .15em .55em; border-radius: 5px; background: var(--c-rust-100); color: var(--c-rust-600); }
 .dv__item-envio-badge { display: inline-flex; align-items: center; gap: .25rem; margin-top: .2rem; font-size: 12px; font-weight: 600; padding: .15em .55em; border-radius: 5px; }
 .dv__item-envio-badge--pendiente { background: var(--c-sky-100);   color: var(--c-sky-600); }

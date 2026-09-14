@@ -29,6 +29,8 @@ export function useCajasAbiertas() {
           sede:    m.sede,
           desde:   m.turno.desde,
           quien:   m.turno.quien,
+          // Lo que tendría que haber en el cajón: una devolución en efectivo sale de ahí.
+          esperado: Number(m.turno.efectivo_esperado ?? 0),
         }))
     } catch {
       // Sin la lista no se traba nada: el movimiento se guarda sin caja, que es un estado válido.

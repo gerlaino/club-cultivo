@@ -24,9 +24,15 @@ const props = defineProps({
   reserva:        { type: Object,  default: null },
   // Modo en el que se abre: 'dispensa' (carrito) o 'reserva'. Solo aplica si puede reservar.
   modoInicial:    { type: String,  default: 'dispensa' },
+  // CAMBIO: la dispensa anulada por producto defectuoso a la que ésta reemplaza. Lo que se lleva
+  // ya lo pagó ahí: no cobra, no toca la cuenta corriente; sólo baja stock. Se precarga con lo
+  // devuelto (si está sobre la mesa) y se puede elegir otra cosa, hasta ese valor.
+  cambioDe:       { type: Object,  default: null },
 })
 
 const modoReserva   = computed(() => !!props.reserva)
+const modoCambio    = computed(() => !!props.cambioDe)
+const topeCambio    = computed(() => Number(props.cambioDe?.aporte_socio_ars) || 0)
 const restoReserva  = computed(() => Number(props.reserva?.aporte_restante_ars) || 0)
 const senaReserva   = computed(() => Number(props.reserva?.sena_ars) || 0)
 
@@ -766,9 +772,12 @@ watch(() => props.modelValue, (open) => {
     precioUnitarioManual.value = null
     formError.value = null
     deliveryUsers.value = []
-    cargarStocks()
+    cargarStocks().then(precargarCambio)
     cargarEstadoCaja()
     cargarCajasAbiertas()
+    // Cambio: gratis por dentro (mismo camino que el regalo: sin medio, sin crédito), y el
+    // backend lo ata a la anulada con `reemplaza_a_id`.
+    if (modoCambio.value) form.value.es_regalo = true
     // Modo entrega de reserva: pre-cargar producto/cantidad de la reserva.
     if (modoReserva.value) {
       form.value.es_reserva = false
@@ -783,6 +792,22 @@ watch(() => props.modelValue, (open) => {
 }, { immediate: true })
 
 function cerrar() { emit('update:modelValue', false) }
+
+// LO DEVUELTO, PRECARGADO — si está sobre la mesa. Lo que no esté (se agotó, quien atiende no lo
+// ve, era de otra sede) queda afuera y se elige otra cosa: precargar algo que el backend va a
+// rechazar es el peor error posible.
+function precargarCambio() {
+  if (!modoCambio.value || !props.modelValue) return
+  items.value = []
+  for (const it of props.cambioDe.items || []) {
+    const s = stocks.value.find(x => x.id === (it.stock_id ?? it.stock?.id))
+    if (!s) continue
+    const cant = Math.min(Number(it.cantidad) || 0, techoStock(s))
+    if (cant > 0) items.value.push({ stock: s, cantidad: cant, precioManual: null, guardarPrecio: false, desdeEvento: null })
+  }
+}
+// Cuánto queda del valor que cubre la anulada, con lo que hay en el carrito.
+const restoCambio = computed(() => Math.round((topeCambio.value - (Number(precioFinal.value) || 0)) * 100) / 100)
 
 // Compone la dirección de entrega a partir de los campos estructurados (para reservas,
 // que guardan texto). Si se usa el domicilio del paciente, lo resuelve el backend.
@@ -894,6 +919,11 @@ async function handleSubmit() {
     } finally { saving.value = false }
     return
   }
+  // El cambio no puede valer más que lo que pagó: lo de más va en una dispensa aparte.
+  if (modoCambio.value && restoCambio.value < -0.009) {
+    formError.value = `El cambio vale ${fmt(precioFinal.value)} y lo que pagó fueron ${fmt(topeCambio.value)}: sacá algo, o lo de más va en una dispensa aparte.`
+    saving.value = false; return
+  }
   // Aporte obligatorio para todos los medios de pago
   // Un regalo es gratis: no valida aporte ni crédito (el stock igual se descuenta).
   if (!form.value.es_regalo) {
@@ -989,7 +1019,8 @@ async function handleSubmit() {
         .filter(l => l.medio !== 'contra_entrega' && Number(l.monto) > 0)
         .map(l => ({ medio: l.medio, monto: Number(l.monto).toFixed(2) }))
     }
-    if (form.value.es_regalo) payload.es_regalo = true
+    if (modoCambio.value) payload.reemplaza_a_id = props.cambioDe.id
+    else if (form.value.es_regalo) payload.es_regalo = true
     // El total lo calcula el server (descuento paciente + dispensa). Solo admin/supervisor
     // pueden pisar el aporte a mano (sobre el total del carrito); el dispensador no manda aporte.
     // En un regalo no se manda aporte (el server lo fuerza a 0).
@@ -1011,7 +1042,7 @@ async function handleSubmit() {
     }
     await createDispensacion(props.socioId, payload)
     cerrar()
-    toast.success('Dispensación registrada')
+    toast.success(modoCambio.value ? 'Cambio entregado' : 'Dispensación registrada')
     emit('saved')
   } catch (e) {
     // SIN CONEXIÓN NO SE DISPENSA. Antes se encolaba y se le decía "guardada localmente — se
@@ -1053,12 +1084,13 @@ async function handleSubmit() {
                la persona ya sabe —acaba de tocar a ese paciente—, y lo que no sabe es cuánto
                falta. -->
           <h3 v-if="enPasos" class="mnd__modal-title">
-            {{ paso === 1 ? 'Qué se lleva' : 'Cómo paga' }}
+            {{ paso === 1 ? 'Qué se lleva' : (modoCambio ? 'Confirmar el cambio' : 'Cómo paga') }}
             <span class="mnd__modal-paso">paso {{ paso }} de 2</span>
             <span v-if="props.pacienteNombre" class="mnd__modal-title-paciente">{{ props.pacienteNombre }}</span>
           </h3>
           <h3 v-else class="mnd__modal-title">
             <template v-if="modoReserva">Entregar reserva<template v-if="props.pacienteNombre"> de <span class="mnd__modal-title-paciente">{{ props.pacienteNombre }}</span></template></template>
+            <template v-else-if="modoCambio">Cambio por la dispensa #{{ props.cambioDe.id }}<template v-if="props.pacienteNombre"> · <span class="mnd__modal-title-paciente">{{ props.pacienteNombre }}</span></template></template>
             <template v-else>Nueva dispensación<template v-if="props.pacienteNombre"> para <span class="mnd__modal-title-paciente">{{ props.pacienteNombre }}</span></template></template>
           </h3>
           <button class="mnd__modal-close" @click="cerrar"><i class="bi bi-x-lg"></i></button>
@@ -1440,8 +1472,19 @@ async function handleSubmit() {
           <!-- ══ PASO 2 EN EL TELÉFONO: CÓMO PAGA ══════════════════════════════ -->
           <div v-show="!enPasos || paso === 2" class="mnd__paso">
 
+          <!-- Cambio: lo que pagó en la anulada cubre lo que se lleva. -->
+          <div v-if="modoCambio" class="mnd__cambio-box" :class="{ 'mnd__cambio-box--pasado': restoCambio < -0.009 }">
+            <i class="bi bi-arrow-repeat"></i>
+            <div>
+              <div><b>Cubierto por lo que pagó en la dispensa #{{ props.cambioDe.id }}: {{ fmt(topeCambio) }}.</b> No se cobra nada.</div>
+              <div v-if="restoCambio < -0.009">Lo elegido vale {{ fmt(precioFinal) }}: se pasa por {{ fmt(-restoCambio) }}. Sacá algo, o lo de más va en una dispensa aparte.</div>
+              <div v-else-if="items.length && restoCambio > 0.009">Lo elegido vale {{ fmt(precioFinal) }}; quedan {{ fmt(restoCambio) }} sin usar, que no se devuelven.</div>
+              <div v-else-if="!items.length">Lo devuelto no está sobre la mesa: elegí qué se lleva.</div>
+            </div>
+          </div>
+
           <!-- Descuento global (dispensa inmediata): aplica a la suma del carrito -->
-          <div v-if="esDispensaInmediata" class="mnd__field">
+          <div v-if="esDispensaInmediata && !modoCambio" class="mnd__field">
             <label class="mnd__label">Descuento <span class="mnd__opt">esta dispensa — sobre el total</span></label>
             <div class="mnd__input-suffix-wrap mnd__desc-input">
               <input v-model.number="form.descuento_pct" type="number" step="1" min="0" max="100"
@@ -1464,10 +1507,10 @@ async function handleSubmit() {
                   <span>Descuento esta dispensa {{ descDispensaPct }}%</span>
                   <span>- {{ fmt(precioBase * descDispensaPct / 100) }}</span>
                 </div>
-                <div class="mnd__precio-row mnd__precio-row--total"><span>Total</span><span>{{ fmt(precioFinal) }}</span></div>
+                <div class="mnd__precio-row mnd__precio-row--total"><span>{{ modoCambio ? 'Valor de lo que se lleva' : 'Total' }}</span><span>{{ fmt(precioFinal) }}</span></div>
               </template>
               <!-- Dispensador: solo el total final (sin desglose ni descuento del paciente) -->
-              <div v-else class="mnd__precio-row mnd__precio-row--total"><span>Total a cobrar</span><span>{{ fmt(precioFinal) }}</span></div>
+              <div v-else class="mnd__precio-row mnd__precio-row--total"><span>{{ modoCambio ? 'Valor de lo que se lleva' : 'Total a cobrar' }}</span><span>{{ fmt(precioFinal) }}</span></div>
             </div>
             <!-- Override del aporte: solo admin/supervisor.
                  En CUENTA CORRIENTE no se muestra: el paciente no está aportando nada en este
@@ -1475,7 +1518,7 @@ async function handleSubmit() {
                  sobre una entrega que la persona no paga, y eso se lee como que sí pagó. El
                  monto se sigue calculando igual —el asiento contable no cambia—; lo que se ve
                  en su lugar es el panel de crédito, que lo dice como es: "se carga al crédito". -->
-            <div v-if="puedeEditarAporte && !esCuentaCorriente" class="mnd__field">
+            <div v-if="puedeEditarAporte && !esCuentaCorriente && !modoCambio" class="mnd__field">
               <label class="mnd__label">Aporte del paciente
                 <span class="mnd__opt">{{ aporteBloqueado ? 'ARS — fijo al total (socio sin cuenta corriente)' : 'ARS — editable' }}</span>
               </label>
@@ -1633,7 +1676,7 @@ async function handleSubmit() {
           </div>
 
           <!-- Regalo: entrega gratis (solo admin/supervisor, dispensa inmediata) -->
-          <label v-if="puedeEditarAporte && !form.es_reserva && !modoReserva" class="mnd__regalo">
+          <label v-if="puedeEditarAporte && !form.es_reserva && !modoReserva && !modoCambio" class="mnd__regalo">
             <input type="checkbox" v-model="form.es_regalo" />
             <span>
               🎁 Es un regalo <span class="mnd__opt">no cobra, no toca la cuenta corriente; el stock igual se descuenta</span>
@@ -1817,7 +1860,7 @@ async function handleSubmit() {
 
             <button v-if="paso === 1" class="mnd__btn-primary mnd__barra-seguir"
                     :disabled="!items.length" @click="paso = 2">
-              Cómo paga <i class="bi bi-chevron-right"></i>
+              {{ modoCambio ? 'Seguir' : 'Cómo paga' }} <i class="bi bi-chevron-right"></i>
             </button>
             <button v-else class="mnd__btn-primary mnd__barra-seguir"
                     :disabled="saving || cajaCerrada || productosPosteriores.length > 0 || !items.length || ccInsuficiente"
@@ -1836,7 +1879,7 @@ async function handleSubmit() {
             <button class="mnd__btn-primary" :disabled="saving || cajaCerrada || productosPosteriores.length > 0 || (esDispensaInmediata ? !items.length : !form.stock_id) || (esDispensaInmediata && ccInsuficiente)" @click="handleSubmit">
               <DsSpinner v-if="saving" :size="14" />
               <i v-else class="bi" :class="form.es_reserva ? 'bi-bookmark-star' : 'bi-check-lg'"></i>
-              {{ modoReserva ? 'Entregar reserva' : (form.es_reserva ? 'Crear reserva' : 'Registrar dispensación') }}
+              {{ modoReserva ? 'Entregar reserva' : (modoCambio ? 'Entregar el cambio' : (form.es_reserva ? 'Crear reserva' : 'Registrar dispensación')) }}
             </button>
           </template>
         </div>
@@ -2132,6 +2175,9 @@ async function handleSubmit() {
 .mnd__field-error { font-size: .72rem; color: #dc2626; font-weight: 600; }
 .mnd__field-hint  { font-size: .72rem; color: var(--c-slate-400); }
 .mnd__textarea { resize: vertical; min-height: 58px; }
+.mnd__cambio-box { display: flex; gap: .6rem; align-items: flex-start; margin: .2rem 0 .9rem; padding: .7rem .85rem; background: var(--c-rust-100); border: 1.5px solid var(--c-rust-100); border-radius: 10px; font-size: .82rem; color: var(--c-slate-700); line-height: 1.45; }
+.mnd__cambio-box > i { color: var(--c-rust-600); font-size: 1rem; margin-top: .05rem; }
+.mnd__cambio-box--pasado { border-color: var(--c-rust-600); }
 .mnd__regalo { display: flex; align-items: flex-start; gap: .55rem; margin-top: .9rem; padding: .7rem .85rem; background: #faf5ff; border: 1.5px solid #e9d5ff; border-radius: 10px; font-size: .84rem; font-weight: 600; color: #6b21a8; cursor: pointer; }
 .mnd__regalo input { margin-top: .15rem; accent-color: #7c3aed; }
 .mnd__regalo .mnd__opt { display: block; font-weight: 400; color: #a78bca; margin-top: .1rem; }
