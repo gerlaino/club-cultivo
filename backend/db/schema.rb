@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_14_010000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_15_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1959,6 +1959,19 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_14_010000) do
     t.index ["paciente_id"], name: "index_resenas_producto_on_paciente_id"
   end
 
+  create_table "reserva_items", force: :cascade do |t|
+    t.bigint "reserva_id", null: false
+    t.bigint "stock_id"
+    t.decimal "cantidad", precision: 10, scale: 3, default: "0.0", null: false
+    t.decimal "precio_unitario_ars", precision: 10, scale: 2
+    t.string "lote_codigo"
+    t.string "genetica_nombre"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["reserva_id"], name: "index_reserva_items_on_reserva_id"
+    t.index ["stock_id"], name: "index_reserva_items_on_stock_id"
+  end
+
   create_table "reservas", force: :cascade do |t|
     t.bigint "club_id", null: false
     t.bigint "paciente_id", null: false
@@ -2691,6 +2704,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_14_010000) do
   add_foreign_key "resenas_producto", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "resenas_producto", "geneticas"
   add_foreign_key "resenas_producto", "pacientes"
+  add_foreign_key "reserva_items", "reservas"
+  add_foreign_key "reserva_items", "stocks"
   add_foreign_key "reservas", "clubs"
   add_foreign_key "reservas", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "reservas", "pacientes"

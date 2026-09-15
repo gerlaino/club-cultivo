@@ -35,6 +35,15 @@ const modoCambio    = computed(() => !!props.cambioDe)
 const topeCambio    = computed(() => Number(props.cambioDe?.aporte_socio_ars) || 0)
 const restoReserva  = computed(() => Number(props.reserva?.aporte_restante_ars) || 0)
 const senaReserva   = computed(() => Number(props.reserva?.sena_ars) || 0)
+// Las líneas de la reserva que se entrega. Las viejas (de antes del carrito) llegan sin `items`:
+// se arma una sola con lo que la fila siempre dijo.
+const lineasReserva = computed(() => {
+  const r = props.reserva
+  if (!r) return []
+  if (r.items?.length) return r.items
+  return [{ id: r.id, stock_id: r.stock?.id, cantidad: r.cantidad, unidad: r.stock?.unidad,
+            forma_producto: r.stock?.forma_producto, genetica: r.stock?.genetica, lote: r.stock?.lote }]
+})
 
 const emit = defineEmits(['update:modelValue', 'saved'])
 
@@ -60,10 +69,13 @@ const puedeFecharAtras      = esAdminoSup
 // Reservas: solo admin/supervisor. El dispensador no ve el toggle de reserva.
 const puedeReservar         = esAdminoSup
 
-// Carrito multi-item de la dispensa inmediata: cada línea es un stock + cantidad. El total
-// es la suma y el descuento se aplica sobre ella. Las reservas siguen siendo de un producto.
+// Carrito multi-item: cada línea es un stock + cantidad. El total es la suma y el descuento se
+// aplica sobre ella. Lo usan la dispensa inmediata Y la reserva nueva (15-sep-2026, pedido de
+// Germán: «quiero poder hacer lo mismo en la reserva»); al ENTREGAR una reserva las líneas ya
+// están definidas —son las que se apartaron— y se muestran, no se eligen.
 const items = ref([])
 const esDispensaInmediata = computed(() => !modoReserva.value && !form.value.es_reserva)
+const usaCarrito          = computed(() => !modoReserva.value)
 
 // EN EL TELÉFONO, DOS PASOS: qué se lleva y cómo paga.
 //
@@ -439,7 +451,7 @@ const productosPosteriores = computed(() => {
   const fecha = form.value.es_reserva ? null : form.value.fecha_dispensacion
   if (!fecha) return []
 
-  const enJuego = esDispensaInmediata.value
+  const enJuego = usaCarrito.value
     ? items.value.map(it => it.stock)
     : [stockSeleccionado.value].filter(Boolean)
 
@@ -588,7 +600,6 @@ async function cargarDeliveryUsers() {
   finally { loadingDelivery.value = false }
 }
 
-const precioUnitarioManual = ref(null)
 
 // "Contra entrega" como medio de pago = el delivery cobra al entregar. Requiere envío.
 // «Contra entrega» a secas (todo en la puerta) o el pago partido con el resto para el repartidor.
@@ -705,11 +716,14 @@ watch(() => form.value.con_envio, (val) => {
     lineasPago.value = lineasPago.value.filter(l => l.medio !== 'contra_entrega')
   }
 })
-watch(() => form.value.stock_id,  ()    => { precioUnitarioManual.value = null })
 // La seña de una reserva solo se cobra en efectivo o transferencia.
 watch(() => form.value.es_reserva, (val) => {
   if (val && !['efectivo', 'transferencia'].includes(form.value.medio_pago)) form.value.medio_pago = 'efectivo'
   if (val) form.value.es_regalo = false // una reserva no puede ser regalo
+  // La lista cambia (depósito ↔ mesa): lo elegido de una no vale en la otra, se empieza de nuevo.
+  items.value = []
+  form.value.stock_id = null
+  form.value.cantidad = null
 })
 // Regalo: entrega gratis. Neutraliza el medio de pago (no cobra por ninguna vía).
 watch(() => form.value.es_regalo, (val) => {
@@ -725,24 +739,13 @@ const apartadosDelStock = computed(() => stockSeleccionado.value?.apartados_even
 const desdeEvento = ref(null) // evento_bar_id del que sale la línea, o null = del stock libre
 watch(() => form.value.stock_id, () => { desdeEvento.value = null })
 const eventoDe = (id) => apartadosDelStock.value.find(a => a.evento_id === id) || null
-const necesitaPrecioManual = computed(() => stockSeleccionado.value != null && !stockSeleccionado.value.precio_sugerido_ars)
 
 const precioBase = computed(() => {
-  // Dispensa inmediata: suma del carrito (cada línea por su precio sugerido).
-  if (esDispensaInmediata.value) {
-    if (!items.value.length) return null
-    const total = items.value.reduce((a, it) => a + precioLinea(it) * it.cantidad, 0)
-    return total > 0 ? total : null
-  }
-  // Reserva / entregar reserva: un solo producto (con precio manual si el stock no tiene).
-  const s   = stockSeleccionado.value
-  const cnt = parseFloat(form.value.cantidad) || 0
-  if (!s || cnt <= 0) return null
-  const ppu = s.precio_sugerido_ars
-    ? parseFloat(s.precio_sugerido_ars)
-    : (parseFloat(precioUnitarioManual.value) || 0)
-  if (ppu <= 0) return null
-  return ppu * cnt
+  // Suma del carrito, cada línea por su precio (el sugerido del stock, o el manual de la línea
+  // si no tiene). Entregando una reserva no hay precio que calcular: se cobra el resto.
+  if (!usaCarrito.value || !items.value.length) return null
+  const total = items.value.reduce((a, it) => a + precioLinea(it) * it.cantidad, 0)
+  return total > 0 ? total : null
 })
 
 // Descuento del paciente (de la ficha, privado) + descuento de la dispensa (puntual del modal),
@@ -769,7 +772,6 @@ watch(() => props.modelValue, (open) => {
     items.value = []
     // En el teléfono se abre siempre por el principio: qué se lleva.
     paso.value = 1
-    precioUnitarioManual.value = null
     formError.value = null
     deliveryUsers.value = []
     cargarStocks().then(precargarCambio)
@@ -782,7 +784,6 @@ watch(() => props.modelValue, (open) => {
     if (modoReserva.value) {
       form.value.es_reserva = false
       form.value.stock_id   = props.reserva.stock?.id ?? props.reserva.stock_id ?? null
-      form.value.cantidad   = Number(props.reserva.cantidad) || null
       form.value.medio_pago = 'efectivo'
     } else if (props.modoInicial === 'reserva' && puedeReservar.value) {
       // Abierto desde el botón "Reservar" (admin/supervisor).
@@ -826,18 +827,10 @@ async function handleSubmit() {
   saving.value = true
   formError.value = null
 
-  // Dispensa inmediata: validamos el carrito. Reserva / entregar reserva: un solo producto.
-  if (esDispensaInmediata.value) {
-    if (!items.value.length) { formError.value = 'Agregá al menos un producto al carrito'; saving.value = false; return }
-  } else {
-    if (!form.value.stock_id) { formError.value = 'Seleccioná un stock'; saving.value = false; return }
-    if (!form.value.cantidad || form.value.cantidad <= 0) { formError.value = 'La cantidad debe ser > 0'; saving.value = false; return }
-    // En modo reserva el backend libera el stock apartado de la propia reserva, así que
-    // no aplicamos el chequeo de disponible local (mostraría de menos por su propio hold).
-    if (!modoReserva.value && excederiaStock.value) {
-      formError.value = `Stock insuficiente: solo hay ${techoStock(stockSeleccionado.value)}${stockSeleccionado.value.unidad || 'g'} disponibles`
-      saving.value = false; return
-    }
+  // Dispensa inmediata y reserva nueva: validamos el carrito. Entregar reserva: las líneas ya
+  // están definidas y el backend libera el apartado de la propia reserva antes de validar.
+  if (usaCarrito.value && !items.value.length) {
+    formError.value = 'Agregá al menos un producto al carrito'; saving.value = false; return
   }
 
   // ── Rama ENTREGAR RESERVA: convierte la reserva en dispensación, cobra el resto ──
@@ -900,8 +893,7 @@ async function handleSubmit() {
     try {
       // El envío (delivery/dirección) NO se define al reservar — se define al entregar.
       const payload = {
-        stock_id: form.value.stock_id,
-        cantidad: form.value.cantidad,
+        items: items.value.map(it => ({ stock_id: it.stock.id, cantidad: it.cantidad })),
         fecha_entrega_estimada: form.value.fecha_entrega_estimada,
         medio_pago: form.value.medio_pago,
         notas: form.value.observaciones || undefined,
@@ -1125,17 +1117,20 @@ async function handleSubmit() {
             </button>
           </div>
 
-          <!-- Stock de la reserva (solo lectura) -->
+          <!-- Lo reservado (solo lectura): una fila por línea. Con lo que dice cada una se va a
+               buscar el frasco, así que lleva la variedad y el lote, no sólo «Flor seca». -->
           <template v-if="modoReserva">
-            <div class="mnd__section-label">Producto reservado</div>
-            <div class="mnd__stock-row mnd__stock-row--active" style="cursor:default">
-              <span class="mnd__stock-emoji">{{ FORMA_EMOJI[props.reserva.stock?.forma_producto] || '📦' }}</span>
+            <div class="mnd__section-label">
+              {{ lineasReserva.length === 1 ? 'Producto reservado' : `Productos reservados · ${lineasReserva.length}` }}
+            </div>
+            <div v-for="ln in lineasReserva" :key="ln.id ?? ln.stock_id" class="mnd__stock-row mnd__stock-row--active" style="cursor:default">
+              <span class="mnd__stock-emoji">{{ FORMA_EMOJI[ln.forma_producto] || '📦' }}</span>
               <span class="mnd__stock-info">
-                <span class="mnd__stock-nombre">{{ FORMA_LABEL[props.reserva.stock?.forma_producto] || props.reserva.stock?.forma_producto || '—' }}</span>
-                <span v-if="props.reserva.stock?.lote" class="mnd__stock-gen">Lote {{ props.reserva.stock.lote }}</span>
+                <span class="mnd__stock-nombre">{{ FORMA_LABEL[ln.forma_producto] || ln.forma_producto || '—' }}</span>
+                <span v-if="ln.genetica || ln.lote" class="mnd__stock-gen">{{ [ln.genetica, ln.lote].filter(Boolean).join(' · ') }}</span>
               </span>
               <span class="mnd__stock-right">
-                <span class="mnd__stock-disp">{{ props.reserva.cantidad }}{{ props.reserva.stock?.unidad || 'g' }}</span>
+                <span class="mnd__stock-disp">{{ ln.cantidad }}{{ ln.unidad || 'g' }}</span>
               </span>
             </div>
           </template>
@@ -1372,19 +1367,6 @@ async function handleSubmit() {
             </p>
           </div>
 
-          <!-- Precio manual (solo al reservar un stock sin precio) -->
-          <div v-if="form.es_reserva && necesitaPrecioManual" class="mnd__field">
-            <label class="mnd__label">
-              Precio por {{ stockSeleccionado?.unidad || 'g' }}
-              <span class="mnd__opt">solo para el cálculo — no se guarda</span>
-            </label>
-            <div class="mnd__input-suffix-wrap">
-              <span class="mnd__input-prefix">$</span>
-              <input v-model.number="precioUnitarioManual" type="number" min="0" step="1"
-                     class="mnd__input mnd__input--with-prefix" placeholder="0" />
-            </div>
-          </div>
-
           <div v-if="!modoReserva && !enPasos" class="mnd__divider"></div>
 
           <!-- En el teléfono el campo de cantidad está abajo, así que el aviso de que se pasó
@@ -1407,7 +1389,7 @@ async function handleSubmit() {
                        class="mnd__input mnd__input--with-suffix"
                        :class="{ 'mnd__input--error': excederiaStock }"
                        placeholder="0"
-                       @keyup.enter="esDispensaInmediata && agregarItem()" />
+                       @keyup.enter="usaCarrito && agregarItem()" />
                 <span class="mnd__input-suffix">{{ stockSeleccionado?.unidad || 'g' }}</span>
               </div>
               <span v-if="excederiaStock" class="mnd__field-error">
@@ -1417,27 +1399,19 @@ async function handleSubmit() {
                 Disponible: {{ stockSeleccionado.cantidad }}{{ stockSeleccionado.unidad || 'g' }}
               </span>
             </div>
-            <!-- Inmediata: sumar la línea al carrito. Reserva: descuento al lado. -->
-            <div v-if="esDispensaInmediata" class="mnd__field mnd__add-field">
+            <!-- Sumar la línea al carrito: dispensa inmediata y reserva por igual. -->
+            <div class="mnd__field mnd__add-field">
               <label class="mnd__label">&nbsp;</label>
               <button type="button" class="mnd__add-item"
                       :disabled="!form.stock_id || !form.cantidad || excederiaStock" @click="agregarItem">
                 <i class="bi bi-plus-lg"></i> Agregar item
               </button>
             </div>
-            <div v-else class="mnd__field">
-              <label class="mnd__label">Descuento <span class="mnd__opt">esta dispensa</span></label>
-              <div class="mnd__input-suffix-wrap">
-                <input v-model.number="form.descuento_pct" type="number" step="1" min="0" max="100"
-                       class="mnd__input mnd__input--with-suffix" placeholder="0" />
-                <span class="mnd__input-suffix">%</span>
-              </div>
-            </div>
           </div>
 
-          <!-- Carrito de la dispensa (multi-item) -->
-          <div v-if="esDispensaInmediata && items.length" class="mnd__cart">
-            <div class="mnd__section-label">Carrito · {{ items.length }} {{ items.length === 1 ? 'producto' : 'productos' }}</div>
+          <!-- Carrito (multi-item): lo que se lleva, o lo que se aparta. -->
+          <div v-if="usaCarrito && items.length" class="mnd__cart">
+            <div class="mnd__section-label">{{ form.es_reserva ? 'Se reserva' : 'Carrito' }} · {{ items.length }} {{ items.length === 1 ? 'producto' : 'productos' }}</div>
             <div v-for="(it, i) in items" :key="i" class="mnd__cart-item">
               <span class="mnd__cart-emoji">{{ FORMA_EMOJI[it.stock.forma_producto] || '📦' }}</span>
               <span class="mnd__cart-info">
@@ -1483,9 +1457,9 @@ async function handleSubmit() {
             </div>
           </div>
 
-          <!-- Descuento global (dispensa inmediata): aplica a la suma del carrito -->
-          <div v-if="esDispensaInmediata && !modoCambio" class="mnd__field">
-            <label class="mnd__label">Descuento <span class="mnd__opt">esta dispensa — sobre el total</span></label>
+          <!-- Descuento global: aplica a la suma del carrito, en dispensa y en reserva -->
+          <div v-if="usaCarrito && !modoCambio" class="mnd__field">
+            <label class="mnd__label">Descuento <span class="mnd__opt">{{ form.es_reserva ? 'esta reserva' : 'esta dispensa' }} — sobre el total</span></label>
             <div class="mnd__input-suffix-wrap mnd__desc-input">
               <input v-model.number="form.descuento_pct" type="number" step="1" min="0" max="100"
                      class="mnd__input mnd__input--with-suffix" placeholder="0" />
@@ -1876,7 +1850,7 @@ async function handleSubmit() {
             <!-- Con la caja cerrada el backend rechaza la dispensa: dejar apretar para que rebote
                  es el peor error posible, parece culpa del usuario. El aviso de arriba dice dónde
                  se arregla. -->
-            <button class="mnd__btn-primary" :disabled="saving || cajaCerrada || productosPosteriores.length > 0 || (esDispensaInmediata ? !items.length : !form.stock_id) || (esDispensaInmediata && ccInsuficiente)" @click="handleSubmit">
+            <button class="mnd__btn-primary" :disabled="saving || cajaCerrada || productosPosteriores.length > 0 || (usaCarrito && !items.length) || (esDispensaInmediata && ccInsuficiente)" @click="handleSubmit">
               <DsSpinner v-if="saving" :size="14" />
               <i v-else class="bi" :class="form.es_reserva ? 'bi-bookmark-star' : 'bi-check-lg'"></i>
               {{ modoReserva ? 'Entregar reserva' : (modoCambio ? 'Entregar el cambio' : (form.es_reserva ? 'Crear reserva' : 'Registrar dispensación')) }}

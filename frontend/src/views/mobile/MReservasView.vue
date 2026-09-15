@@ -38,10 +38,14 @@
         <!-- QUÉ ES LO QUE ESTÁ APARTADO. «5g · Flor seca» no alcanza para ir a buscarlo: la
              variedad es lo que dice cuál de los quince frascos hay que agarrar, y es lo primero
              que nombra el paciente cuando lo viene a retirar. -->
-        <div v-if="r.stock?.genetica" class="mres__prod">{{ r.stock.genetica }}</div>
-        <div class="mres__meta">
-          {{ r.cantidad }}{{ r.stock?.unidad || 'g' }} · {{ formaLabel(r.stock?.forma_producto) }}
-          <template v-if="r.stock?.lote"> · {{ r.stock.lote }}</template>
+        <!-- Una línea por producto: con varios, cada uno con su cantidad, que es lo que se
+             va a pesar o contar frasco por frasco. -->
+        <div v-for="ln in lineasDe(r)" :key="ln.id ?? ln.stock_id" class="mres__linea">
+          <div v-if="ln.genetica" class="mres__prod">{{ ln.genetica }}</div>
+          <div class="mres__meta">
+            {{ ln.cantidad }}{{ ln.unidad || 'g' }} · {{ formaLabel(ln.forma_producto) }}
+            <template v-if="ln.lote"> · {{ ln.lote }}</template>
+          </div>
         </div>
         <div class="mres__pie">
           <!-- SEÑADA NO ES PAGA. Decía «Señada ✓» apenas había seña, y una reserva puede estar
@@ -82,6 +86,7 @@ import { ref, computed, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
 import { listReservas, getMostrador } from '../../lib/api.js'
 import { formaLabel, formatARS } from '../../lib/formatters.js'
+import { lineasDe } from '../../lib/reservaLineas.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { useSedeStore } from '../../stores/sede.js'
 import { sedeDeMostrador } from '../../composables/useMostrador.js'
@@ -230,6 +235,7 @@ function fechaCorta(f) {
 /* La variedad primero y con peso: es el dato con el que se va a buscar el frasco. */
 .mres__prod { font-size: .9rem; font-weight: 600; color: var(--c-ink-800, #1e293b); }
 .mres__meta { font-size: .8rem; color: var(--c-slate-500); margin-top: -.25rem; }
+.mres__linea + .mres__linea { margin-top: .35rem; }
 .mres__pie { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
 /* Lo que falta cobrar arriba y solo; la seña abajo y en segundo plano. Con el botón al lado, dos
    renglones cortos entran donde uno largo se parte — y el importe que se dice en voz alta no se

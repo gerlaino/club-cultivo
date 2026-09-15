@@ -24,7 +24,7 @@ class ReservasController < ApplicationController
                     current_user.sedes_visibles_ids, current_user.club_id)
     end
     scope = scope.where(estado: params[:estado]) if params[:estado].present?
-    scope = scope.includes(:user, { stock: [:genetica, :sede, { lote: :genetica }] }, paciente: :cuenta_corriente).recientes
+    scope = scope.includes(:user, { stock: [:genetica, :sede, { lote: :genetica }] }, { items: { stock: [:genetica, { lote: :genetica }] } }, paciente: :cuenta_corriente).recientes
     render json: { reservas: scope.map { |r| serialize_reserva(r) } }
   end
 
@@ -35,18 +35,28 @@ class ReservasController < ApplicationController
 
   # POST /pacientes/:paciente_id/reservas
   def create
-    stock = Stock.where(id: reserva_params[:stock_id])
-                 .where("stocks.club_id = ? OR stocks.sede_id IN (?)", current_user.club_id, club_sede_ids)
-                 .first
-    unless stock
+    lineas = lineas_param
+    if lineas.empty?
+      return render json: { errors: ['Agregá al menos un producto a la reserva'] }, status: :unprocessable_entity
+    end
+
+    stocks = stocks_visibles(lineas.map { |l| l[:stock_id] })
+    faltan = lineas.map { |l| l[:stock_id].to_i } - stocks.keys
+    if faltan.any?
       return render json: { errors: ['Stock no encontrado'] }, status: :unprocessable_entity
     end
 
-    reserva = @paciente.reservas.new(reserva_params)
+    reserva = @paciente.reservas.new(reserva_params.except(:stock_id, :cantidad))
     reserva.club  = current_user.club
     reserva.user  = current_user
-    reserva.stock = stock
-    reserva.aporte_estimado_ars ||= estimar_aporte(stock, @paciente, reserva.cantidad)
+    # El precio de cada línea es el sugerido del stock con el descuento del paciente, como en la
+    # dispensa; el aporte estimado de la reserva es la suma, salvo que lo manden a mano.
+    lineas.each do |ln|
+      st = stocks[ln[:stock_id].to_i]
+      reserva.items.build(stock: st, cantidad: ln[:cantidad].to_d,
+                          precio_unitario_ars: precio_linea(st, @paciente))
+    end
+    reserva.aporte_estimado_ars ||= reserva.items.sum(&:subtotal_ars).round(2)
 
     if reserva.sena_ars.to_d > reserva.aporte_estimado_ars.to_d
       return render json: { errors: ['La seña no puede superar el total estimado'] }, status: :unprocessable_entity
@@ -67,22 +77,44 @@ class ReservasController < ApplicationController
       return render json: { error: 'Solo se pueden editar reservas pendientes.' }, status: :unprocessable_entity
     end
     attrs = reserva_update_params
-    # Si cambia la cantidad, re-validar disponibilidad (devolviendo el bloqueo propio actual).
-    if attrs[:cantidad].present?
-      nueva = attrs[:cantidad].to_d
+    # Cantidad por línea. `cantidad` a secas sigue valiendo para la reserva de UNA línea (el
+    # modelo lo traduce); con varias, hay que decir de cuál.
+    lineas_edit = Array(params.dig(:reserva, :items)).map { |l| l.permit(:id, :cantidad) }
+    if lineas_edit.empty? && attrs[:cantidad].present?
+      if @reserva.items.size > 1
+        return render json: { errors: ['La reserva tiene varios productos: indicá la cantidad de cada uno.'] },
+                      status: :unprocessable_entity
+      end
+      lineas_edit = [{ id: @reserva.items.first&.id, cantidad: attrs[:cantidad] }]
+    end
+    attrs = attrs.except(:cantidad)
+
+    lineas_edit.each do |ln|
+      item = @reserva.items.to_a.find { |it| it.id == ln[:id].to_i }
+      next unless item
+      nueva = ln[:cantidad].to_d
       # El mismo techo que al crearla (`Reserva#stock_disponible`): depósito libre + mesa libre.
       # Sin el término de la mesa, agrandar una reserva de algo que está arriba se rechazaba
       # contra un depósito que ya no la cuenta. Se le devuelve además su propio bloqueo actual.
-      st         = @reserva.stock
-      disponible = st.cantidad_disponible_real.to_d + st.libre_en_mostrador(st.sede_id) +
-                   @reserva.cantidad.to_d
-      if nueva <= 0 || nueva > disponible
-        return render json: { errors: ["Cantidad inválida. Disponible: #{disponible.to_f}#{@reserva.stock.unidad}"] }, status: :unprocessable_entity
+      st = item.stock
+      if st.nil?
+        return render json: { errors: ['Ese producto ya no existe.'] }, status: :unprocessable_entity
       end
+      disponible = st.cantidad_disponible_real.to_d + st.libre_en_mostrador(st.sede_id) + item.cantidad.to_d
+      if nueva <= 0 || nueva > disponible
+        return render json: { errors: ["Cantidad inválida para «#{st.etiqueta}». Disponible: #{disponible.to_f}#{st.unidad}"] }, status: :unprocessable_entity
+      end
+      item.cantidad = nueva
+    end
+    # Si cambian cantidades, el total estimado se recalcula con los precios de cada línea — salvo
+    # que la reserva lo tenga escrito a mano, que no se pisa.
+    if lineas_edit.any? && @reserva.items.any?(&:cantidad_changed?) && !attrs.key?(:aporte_estimado_ars)
+      @reserva.aporte_estimado_ars = @reserva.items.sum(&:subtotal_ars).round(2) if @reserva.items.all? { |it| it.precio_unitario_ars.present? }
     end
     # La seña no puede superar el total estimado.
     nueva_sena = attrs[:sena_ars].present? ? attrs[:sena_ars].to_d : @reserva.sena_ars.to_d
-    if nueva_sena > @reserva.aporte_estimado_ars.to_d
+    total_est  = attrs[:aporte_estimado_ars].present? ? attrs[:aporte_estimado_ars].to_d : @reserva.aporte_estimado_ars.to_d
+    if nueva_sena > total_est
       return render json: { errors: ['La seña no puede superar el total estimado.'] }, status: :unprocessable_entity
     end
 
@@ -122,17 +154,20 @@ class ReservasController < ApplicationController
     end
 
     paciente  = @reserva.paciente
-    # Se puede ajustar al entregar: cantidad real entregada y monto a cobrar (el RESTO,
+    # Se puede ajustar al entregar: cantidad real entregada por línea y monto a cobrar (el RESTO,
     # total − seña). El cobro de ese resto usa el motor nuevo de cobros.
-    cantidad  = params[:cantidad].presence ? params[:cantidad].to_d : @reserva.cantidad
+    #
+    # `cantidad` a secas sigue valiendo para la reserva de una línea; con varias van `items`.
+    cantidades = Array(params[:items]).to_h { |l| [l[:id].to_i, l[:cantidad]] }
+    if cantidades.empty? && params[:cantidad].present? && @reserva.items.size == 1
+      cantidades = { @reserva.items.first.id => params[:cantidad] }
+    end
     aporte    = params[:aporte_socio_ars].presence ? params[:aporte_socio_ars].to_d : @reserva.aporte_restante_ars
     con_envio = ActiveModel::Type::Boolean.new.cast(params[:con_envio]) == true
     cobrar_en_entrega = ActiveModel::Type::Boolean.new.cast(params[:cobrar_en_entrega]) || false
 
     dispensacion = paciente.dispensaciones.build(
-      stock:                  @reserva.stock,
       sede_id:                @reserva.stock&.sede_id,
-      cantidad:               cantidad,
       # El medio con el que se seña la reserva es el que se espera al entregarla. Acá había un
       # placeholder 'mixto' "que los cobros afinan": cuando no hay cobros que afinar —el resto
       # es cero porque la seña cubrió todo, o se cobra contra entrega— el placeholder quedaba
@@ -145,6 +180,17 @@ class ReservasController < ApplicationController
       cobrar_en_entrega:      cobrar_en_entrega,
       observaciones:          "Entrega de reserva ##{@reserva.id}",
     )
+    # Una línea de dispensa por línea de reserva: el modelo espeja stock/cantidad en la fila
+    # (`sincronizar_mirror_desde_items`) y valida cada una contra su stock.
+    @reserva.items.each do |it|
+      cant = cantidades.key?(it.id) ? cantidades[it.id].to_d : it.cantidad.to_d
+      next if cant <= 0
+      dispensacion.items.build(stock: it.stock, cantidad: cant, precio_unitario_ars: it.precio_unitario_ars)
+    end
+    dispensacion.precio_unitario_ars = dispensacion.items.first&.precio_unitario_ars
+    if dispensacion.items.empty?
+      return render json: { errors: ['No queda nada para entregar: todas las líneas están en cero.'] }, status: :unprocessable_entity
+    end
     dispensacion.user = current_user
     # Lo reservado ya está apartado a nombre del paciente: no pasa por la mesa del mostrador.
     dispensacion.desde_reserva = true
@@ -267,10 +313,35 @@ class ReservasController < ApplicationController
     )
   end
 
+  # Las líneas del carrito (`items: [{stock_id, cantidad}]`). `stock_id` + `cantidad` sueltos
+  # siguen valiendo como una reserva de una línea, para quien no se enteró del carrito.
+  def lineas_param
+    lineas = Array(params.dig(:reserva, :items)).map { |l| l.permit(:stock_id, :cantidad).to_h.symbolize_keys }
+    if lineas.empty? && reserva_params[:stock_id].present?
+      lineas = [{ stock_id: reserva_params[:stock_id], cantidad: reserva_params[:cantidad] }]
+    end
+    lineas.select { |l| l[:stock_id].present? && l[:cantidad].to_d > 0 }
+  end
+
+  # Los stocks pedidos que esta persona puede ver, por id. Un id que no aparece es de otra
+  # organización o de una sede que no atiende, y se rechaza igual que antes.
+  def stocks_visibles(ids)
+    Stock.where(id: ids.map(&:to_i).uniq)
+         .where("stocks.club_id = ? OR stocks.sede_id IN (?)", current_user.club_id, club_sede_ids)
+         .index_by(&:id)
+  end
+
+  # Mismo cálculo que la dispensación: precio sugerido del stock con descuento del paciente.
+  def precio_linea(stock, paciente)
+    precio_base = stock.precio_sugerido_ars.to_d
+    descuento   = paciente.descuento_porcentaje.to_d.clamp(0, 100) / 100
+    (precio_base * (1 - descuento)).round(2)
+  end
+
   # Edición de reserva pendiente. La seña SÍ se puede editar (monto y medio): al cambiarla
   # se re-registra su asiento contable y se ajusta el crédito de cuenta corriente.
   def reserva_update_params
-    params.require(:reserva).permit(:cantidad, :fecha_entrega_estimada, :medio_pago, :notas, :sena_ars)
+    params.require(:reserva).permit(:cantidad, :fecha_entrega_estimada, :medio_pago, :notas, :sena_ars, :aporte_estimado_ars)
   end
 
   # Gestionan reservas (crear/editar/cancelar/anular seña): admin y supervisor.
@@ -283,13 +354,6 @@ class ReservasController < ApplicationController
     return if %w[admin supervisor].include?(role)
     return if role == 'dispensador' && DISPENSADOR_ACCIONES.include?(action_name)
     render json: { error: 'No autorizado' }, status: :forbidden
-  end
-
-  # Mismo cálculo que la dispensación: precio sugerido del stock con descuento del socio.
-  def estimar_aporte(stock, paciente, cantidad)
-    precio_base = stock.precio_sugerido_ars.to_d
-    descuento   = paciente.descuento_porcentaje.to_d.clamp(0, 100) / 100
-    (precio_base * (1 - descuento) * cantidad.to_d).round(2)
   end
 
   # Al editar la seña (monto o medio) re-registramos su asiento contable: destruye el
@@ -361,6 +425,19 @@ class ReservasController < ApplicationController
         # De qué sede sale lo reservado: quien atiende varias no puede leer una lista donde
         # las reservas de dos mostradores están mezcladas.
         sede:           r.stock.sede && { id: r.stock.sede.id, nombre: r.stock.sede.nombre },
+      },
+      # Las líneas. `stock` (arriba) es la primera, para los lectores que todavía no las miran.
+      items: r.items.map { |it|
+        {
+          id:                  it.id,
+          stock_id:            it.stock_id,
+          cantidad:            it.cantidad.to_f,
+          precio_unitario_ars: it.precio_unitario_ars&.to_f,
+          unidad:              it.stock&.unidad,
+          forma_producto:      it.stock&.forma_producto,
+          genetica:            it.genetica_nombre || (it.stock&.genetica || it.stock&.lote&.genetica)&.nombre,
+          lote:                it.lote_codigo || it.stock&.lote&.codigo,
+        }
       },
       reservado_por: r.user && (r.user.first_name || r.user.email),
     }

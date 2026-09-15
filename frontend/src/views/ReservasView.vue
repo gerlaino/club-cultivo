@@ -46,8 +46,15 @@
           </tr>
         <tr v-for="r in g.reservas" :key="r.id" :class="{ 'rsv__row--vencida': esVencidaHoy(r) }">
           <td>{{ r.paciente?.nombre || '—' }}</td>
-          <td>{{ r.stock?.forma_producto || '—' }}<span v-if="r.stock?.lote" class="rsv__lote"> · {{ r.stock.lote }}</span></td>
-          <td>{{ r.cantidad }}{{ r.stock?.unidad || 'g' }}</td>
+          <!-- Una fila por línea: con varios productos, cada uno con su cantidad al lado. -->
+          <td>
+            <div v-for="ln in lineasDe(r)" :key="ln.id ?? ln.stock_id" class="rsv__linea">
+              {{ ln.genetica || formaLabel(ln.forma_producto) }}<span v-if="ln.lote" class="rsv__lote"> · {{ ln.lote }}</span>
+            </div>
+          </td>
+          <td>
+            <div v-for="ln in lineasDe(r)" :key="ln.id ?? ln.stock_id" class="rsv__linea">{{ ln.cantidad }}{{ ln.unidad || 'g' }}</div>
+          </td>
           <td :class="{ 'rsv__fecha--hoy': esEntregaHoy(r) }">{{ fmtFecha(r.fecha_entrega_estimada) }}</td>
           <td>{{ r.sena_ars ? fmt(r.sena_ars) : '—' }}</td>
           <td>{{ r.aporte_restante_ars != null ? fmt(r.aporte_restante_ars) : '—' }}</td>
@@ -84,46 +91,19 @@
       @saved="cargar"
     />
 
-    <!-- Modal editar -->
-    <Teleport to="body">
-      <div v-modal="() => showEdit = false" v-if="showEdit" class="rsv__overlay">
-        <div class="rsv__modal">
-          <div class="rsv__modal-head">
-            <h3>Editar reserva</h3>
-            <button class="rsv__modal-close" @click="showEdit = false"><i class="bi bi-x-lg"></i></button>
-          </div>
-          <div class="rsv__modal-body">
-            <div v-if="editError" class="rsv__modal-err">{{ editError }}</div>
-            <label class="rsv__modal-label">Cantidad</label>
-            <input v-model.number="editForm.cantidad" type="number" min="0.01" step="0.01" class="rsv__modal-input" />
-            <label class="rsv__modal-label">Fecha de entrega estimada</label>
-            <AppDatePicker v-model="editForm.fecha_entrega_estimada" :min="hoy" />
-            <label class="rsv__modal-label">Seña</label>
-            <input v-model.number="editForm.sena_ars" type="number" min="0" step="1" class="rsv__modal-input" placeholder="0" />
-            <template v-if="editTieneSena">
-              <label class="rsv__modal-label">Medio de pago de la seña</label>
-              <select v-model="editForm.medio_pago" class="rsv__modal-input">
-                <option value="efectivo">Efectivo</option>
-                <option value="transferencia">Transferencia</option>
-              </select>
-            </template>
-          </div>
-          <div class="rsv__modal-foot">
-            <button class="rsv__btn rsv__btn--ghost" @click="showEdit = false">Cancelar</button>
-            <button class="rsv__btn rsv__btn--primary" :disabled="savingEdit" @click="guardarEdicion">Guardar</button>
-          </div>
-        </div>
-      </div>
-    </Teleport>
+    <!-- Editar: el mismo modal que la ficha del paciente. Estaba escrito dos veces. -->
+    <ModalEditarReserva v-model="showEdit" :reserva="reservaEdit" @saved="cargar" />
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
-import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import ModalNuevaDispensacion from '../components/pacientes/ModalNuevaDispensacion.vue'
-import { listReservas, cancelarReserva, anularSenaReserva, updateReserva, deleteReserva } from '../lib/api.js'
+import ModalEditarReserva from '../components/pacientes/ModalEditarReserva.vue'
+import { lineasDe } from '../lib/reservaLineas.js'
+import { formaLabel } from '../lib/formatters.js'
+import { listReservas, cancelarReserva, anularSenaReserva, deleteReserva } from '../lib/api.js'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import { useAuthStore } from '../stores/auth'
@@ -190,37 +170,9 @@ const reservaSel  = ref(null)
 function abrirEntrega(r) { reservaSel.value = r; showEntrega.value = true }
 
 // ── Edición ──
-const showEdit   = ref(false)
-const savingEdit = ref(false)
-const editError  = ref(null)
-const editForm   = ref({ id: null, cantidad: null, fecha_entrega_estimada: '', medio_pago: 'efectivo', sena_ars: 0 })
-// El medio de pago solo aplica si se dejó seña (es el medio con que se pagó esa seña).
-const editTieneSena = computed(() => Number(editForm.value.sena_ars) > 0)
-
-function abrirEdicion(r) {
-  editForm.value = {
-    id: r.id, cantidad: r.cantidad,
-    fecha_entrega_estimada: r.fecha_entrega_estimada,
-    medio_pago: r.medio_pago || 'efectivo',
-    sena_ars: r.sena_ars || 0,
-  }
-  editError.value = null
-  showEdit.value = true
-}
-
-async function guardarEdicion() {
-  savingEdit.value = true
-  editError.value = null
-  try {
-    const { id, ...payload } = editForm.value
-    await updateReserva(id, payload)
-    toast.success('Reserva actualizada')
-    showEdit.value = false
-    await cargar()
-  } catch (e) {
-    editError.value = e.response?.data?.errors?.[0] || e.response?.data?.error || 'No se pudo guardar'
-  } finally { savingEdit.value = false }
-}
+const showEdit    = ref(false)
+const reservaEdit = ref(null)
+function abrirEdicion(r) { reservaEdit.value = r; showEdit.value = true }
 
 async function eliminar(r) {
   const ok = await confirm({
@@ -314,15 +266,5 @@ onMounted(cargar)
 .rsv__btn--danger:hover:not(:disabled) { background: #fef2f2; }
 .rsv__btn:disabled { opacity: .5; cursor: not-allowed; }
 
-/* Modal editar */
-.rsv__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 1060; padding: 1rem; backdrop-filter: blur(3px); }
-.rsv__modal { background: #fff; border-radius: 14px; width: 100%; max-width: 400px; box-shadow: 0 24px 64px rgba(0,0,0,.18); }
-.rsv__modal-head { display: flex; align-items: center; justify-content: space-between; padding: 1rem 1.25rem; border-bottom: 1px solid var(--c-slate-100); }
-.rsv__modal-head h3 { font-size: 1rem; font-weight: 800; margin: 0; color: var(--c-slate-900); }
-.rsv__modal-close { background: var(--c-slate-100); border: none; width: 28px; height: 28px; border-radius: 7px; cursor: pointer; color: var(--c-slate-500); }
-.rsv__modal-body { padding: 1rem 1.25rem; display: flex; flex-direction: column; gap: .5rem; }
-.rsv__modal-err { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; border-radius: 8px; padding: .5rem .7rem; font-size: .8rem; }
-.rsv__modal-label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .04em; margin-top: .3rem; }
-.rsv__modal-input { background: var(--c-slate-50); border: 1.5px solid var(--c-slate-200); border-radius: 9px; padding: .55rem .8rem; font-size: .85rem; color: var(--c-slate-900); width: 100%; box-sizing: border-box; outline: none; }
-.rsv__modal-foot { display: flex; justify-content: flex-end; gap: .6rem; padding: .85rem 1.25rem; border-top: 1px solid var(--c-slate-100); }
+.rsv__linea + .rsv__linea { margin-top: .15rem; }
 </style>

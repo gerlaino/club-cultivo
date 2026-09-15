@@ -8,8 +8,14 @@
         </div>
         <div class="mre__body">
           <div v-if="error" class="mre__err">{{ error }}</div>
-          <label class="mre__label">Cantidad ({{ reserva.stock?.unidad || 'g' }})</label>
-          <input v-model.number="form.cantidad" type="number" min="0.01" step="0.01" class="mre__input" />
+          <!-- Una cantidad por línea. Con un solo producto es el campo de siempre; con varios,
+               cada uno dice de qué es, porque «Cantidad» a secas no alcanza para saber cuál. -->
+          <template v-for="ln in form.items" :key="ln.id">
+            <label class="mre__label">
+              Cantidad<template v-if="form.items.length > 1"> · {{ ln.que }}</template> ({{ ln.unidad || 'g' }})
+            </label>
+            <input v-model.number="ln.cantidad" type="number" min="0.01" step="0.01" class="mre__input" />
+          </template>
           <label class="mre__label">Fecha de entrega estimada</label>
           <AppDatePicker v-model="form.fecha_entrega_estimada" :min="hoy" />
           <label class="mre__label">Seña</label>
@@ -38,6 +44,8 @@ import AppDatePicker from '../ui/AppDatePicker.vue'
 import { updateReserva } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { hoyISO } from '../../utils/dates.js'
+import { lineasDe } from '../../lib/reservaLineas.js'
+import { formaLabel } from '../../lib/formatters.js'
 
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
@@ -49,14 +57,17 @@ const toast = useToast()
 const hoy    = hoyISO()
 const saving = ref(false)
 const error  = ref(null)
-const form   = ref({ cantidad: null, fecha_entrega_estimada: '', medio_pago: 'efectivo', sena_ars: 0 })
+const form   = ref({ items: [], fecha_entrega_estimada: '', medio_pago: 'efectivo', sena_ars: 0 })
 // El medio de pago solo aplica si hay seña (es el medio con que se pagó esa seña).
 const tieneSena = computed(() => Number(form.value.sena_ars) > 0)
 
 watch(() => props.modelValue, (open) => {
   if (!open || !props.reserva) return
   form.value = {
-    cantidad: props.reserva.cantidad,
+    items: lineasDe(props.reserva).map(ln => ({
+      id: ln.id, cantidad: ln.cantidad, unidad: ln.unidad,
+      que: ln.genetica || formaLabel(ln.forma_producto),
+    })),
     fecha_entrega_estimada: props.reserva.fecha_entrega_estimada,
     medio_pago: props.reserva.medio_pago || 'efectivo',
     sena_ars: props.reserva.sena_ars || 0,
@@ -70,7 +81,11 @@ async function guardar() {
   saving.value = true
   error.value = null
   try {
-    await updateReserva(props.reserva.id, { ...form.value })
+    const { items, ...resto } = form.value
+    await updateReserva(props.reserva.id, {
+      ...resto,
+      items: items.map(ln => ({ id: ln.id, cantidad: ln.cantidad })),
+    })
     toast.success('Reserva actualizada')
     emit('saved')
     cerrar()

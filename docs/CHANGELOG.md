@@ -1,5 +1,38 @@
 # Changelog
 
+## Septiembre 2026 (bu) — La reserva tiene carrito, como la dispensa
+
+- **Una reserva puede apartar varios productos** (pedido de Germán, 15-sep: «al momento de crear
+  una dispensa el modal me ofrece agregar más de un ítem; quiero poder hacer lo mismo en la
+  reserva»). `reserva_items`, gemela de `dispensacion_items`: un stock y una cantidad por línea,
+  con el precio de la línea y la foto de lote y variedad. **Migración con backfill**: cada reserva
+  existente —también las entregadas, canceladas y borradas— nace con su única línea.
+- **La fila sigue diciendo lo que siempre dijo**: `reservas.stock_id` es la primera línea y
+  `cantidad` la suma, igual que en `dispensaciones`; el modelo las espeja solo
+  (`sincronizar_fila_desde_items`). Construir una reserva con `stock` + `cantidad` a secas —la
+  demo, specs viejas— sigue andando: se le arma la línea, **también en `before_create`** (un
+  `save(validate: false)` se saltea la validación y dejaba una reserva que apartaba cero).
+- **Lo apartado se cuenta POR LÍNEA, en un solo lugar** (`Stock.apartado_por_reservas_de`): la
+  precarga de los listados y el cálculo de a uno leen la misma consulta. Un stock que es
+  segunda línea de una reserva quedaba libre con una reserva encima. El disponible se valida
+  **por línea agrupando las del mismo frasco**; una sola línea que se pasa rechaza la reserva
+  entera. Borrar un stock mira las reservas que lo incluyen en cualquier línea.
+- **`POST /pacientes/:id/reservas` recibe `items`**; `stock_id` + `cantidad` sueltos siguen
+  valiendo. El total estimado es la suma de las líneas con el descuento del paciente. **Editar es
+  por línea** (`items: [{id, cantidad}]`; con varias, `cantidad` a secas rebota diciéndolo) y
+  recalcula el total. **Entregar arma UNA dispensa con una línea por línea de la reserva**,
+  ajustables al entregar, y cada frasco descuenta lo suyo.
+- **El modal usa el mismo carrito al reservar** (`usaCarrito`): «Agregar item», descuento sobre el
+  total, precio manual por línea si el stock no tiene. Al cambiar entre entrega inmediata y
+  reserva el carrito se vacía: las listas son distintas (depósito / mesa). Al entregar se ven
+  **todas** las líneas. `ReservasView`, `MReservasView`, la ficha del paciente y los dashboards
+  muestran una línea por producto (`lib/reservaLineas.js`, para que ninguna vista vuelva a
+  preguntarse qué lado de la reserva mirar). `ModalEditarReserva` edita por línea y reemplaza la
+  copia inline que tenía `ReservasView` (la misma regla escrita dos veces). Se borró
+  `ModalEntregarReserva.vue`, que no lo llamaba nadie.
+- Ya fallaban en master antes de esto: `delivery_periodo_cerrado_spec.rb:132` (rspec) y
+  `mostradorPantalla.test.js` (vitest, un caso distinto cada corrida).
+
 ## Septiembre 2026 (bt) — Producto defectuoso: se devuelve la plata o se cambia el producto
 
 - **Con «Producto defectuoso» hay dos salidas** (`resolucion_anulacion`, pedido de Germán,

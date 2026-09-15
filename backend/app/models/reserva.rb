@@ -19,7 +19,22 @@ class Reserva < ApplicationRecord
   belongs_to :user
   belongs_to :dispensacion, optional: true
 
+  # Las LÍNEAS de la reserva (15-sep-2026): un stock y una cantidad cada una, como en la
+  # dispensa. `stock_id` y `cantidad` de la fila quedan con el mismo significado que en
+  # `dispensaciones` —primera línea y suma— para los lectores que todavía miran la fila; lo
+  # que aparta stock lee SIEMPRE las líneas.
+  has_many :items, class_name: 'ReservaItem', dependent: :destroy, inverse_of: :reserva, autosave: true
+
+  # Compatibilidad: quien construye una reserva con `stock` + `cantidad` a secas (specs, la demo,
+  # la restauración) obtiene su única línea sin tener que saber que existen. También en
+  # `before_create`, porque un `save(validate: false)` se saltea la validación y dejaría una
+  # reserva sin líneas: apartaría cero.
+  before_validation :linea_desde_la_fila, on: :create
+  before_create     :linea_desde_la_fila
+  before_validation :sincronizar_fila_desde_items
+
   validates :cantidad,               presence: true, numericality: { greater_than: 0 }
+  validate  :al_menos_una_linea,     on: :create
   validates :estado,                 inclusion: { in: ESTADOS }
   validates :fecha_entrega_estimada, presence: true
   validates :sena_ars,               numericality: { greater_than_or_equal_to: 0 }
@@ -44,6 +59,21 @@ class Reserva < ApplicationRecord
     [aporte_estimado_ars.to_d - sena_ars.to_d, 0].max
   end
 
+  # Líneas en memoria, válidas también antes de guardar (que es cuando se validan).
+  def lineas
+    items.reject(&:marked_for_destruction?)
+  end
+
+  # «5g de Critical Kush · 2u de OG Kush». Para los avisos: «5g» a secas no dice qué preparar.
+  def descripcion_items
+    lineas.map(&:descripcion).join(' · ')
+  end
+
+  # Los stocks que la reserva compromete, sin repetir.
+  def stocks
+    lineas.map(&:stock).compact.uniq
+  end
+
   def cancelar!(motivo: nil)
     return false unless pendiente?
     update!(estado: 'cancelada', cancelada_at: Time.current,
@@ -57,6 +87,28 @@ class Reserva < ApplicationRecord
 
   private
 
+  def linea_desde_la_fila
+    return if items.any? || stock.nil? || cantidad.to_d <= 0
+    items.build(stock: stock, cantidad: cantidad)
+  end
+
+  # La fila espeja las líneas: stock = primera línea, cantidad = suma. Igual que la dispensa.
+  # Y al revés para el caso viejo: editar `cantidad` en una reserva de UNA línea edita esa línea
+  # (`reserva.update(cantidad: 5)` sigue significando lo que significaba).
+  def sincronizar_fila_desde_items
+    ls = lineas
+    return if ls.empty?
+    if persisted? && cantidad_changed? && ls.size == 1 && !ls.first.cantidad_changed?
+      ls.first.cantidad = cantidad
+    end
+    self.stock_id ||= ls.first.stock_id
+    self.cantidad   = ls.sum { |l| l.cantidad.to_d }
+  end
+
+  def al_menos_una_linea
+    errors.add(:base, 'Agregá al menos un producto a la reserva') if lineas.empty?
+  end
+
   # Una reserva aparta stock a futuro: la entrega estimada debe ser a partir de mañana.
   # Hoy (o antes) es una dispensación directa, no una reserva.
   def fecha_entrega_futura
@@ -67,11 +119,13 @@ class Reserva < ApplicationRecord
   end
 
   def stock_pertenece_al_club
-    return unless stock && paciente
-    unless stock.club_id == paciente.club_id || stock.sede&.club_id == paciente.club_id
-      errors.add(:stock, 'no pertenece a la organización')
+    return unless paciente
+    stocks.each do |st|
+      unless st.club_id == paciente.club_id || st.sede&.club_id == paciente.club_id
+        errors.add(:stock, 'no pertenece a la organización')
+      end
+      errors.add(:stock, "«#{st.etiqueta}» no está habilitado para dispensa") if st.persisted? && !st.apto_dispensa?
     end
-    errors.add(:stock, 'no está habilitado para dispensa') if stock.persisted? && !stock.apto_dispensa?
   end
 
   # Valida contra lo que NO TIENE DUEÑO: lo libre del depósito más lo libre de la mesa.
@@ -84,13 +138,20 @@ class Reserva < ApplicationRecord
   #
   # Es el gemelo exacto de `Dispensacion#stock_disponible`, y por el mismo motivo: la pantalla
   # ofrece la mesa, pero el techo contra el sobregiro lo pone el backend.
+  #
+  # Por LÍNEA, agrupando las que repiten el mismo stock: dos renglones de 10 g del mismo frasco
+  # piden 20 contra ese frasco, no 10 dos veces.
   def stock_disponible
-    return unless stock && cantidad.to_d > 0
-    stock.with_lock do
-      disp = stock.cantidad_disponible_real.to_d + stock.libre_en_mostrador(stock.sede_id)
-      if cantidad.to_d > disp
-        errors.add(:cantidad,
-          "supera el stock disponible (#{disp.round(2)} #{stock.unidad || 'g'} disponibles)")
+    lineas.select(&:stock).group_by(&:stock_id).each do |_sid, ls|
+      st     = ls.first.stock
+      pedido = ls.sum { |l| l.cantidad.to_d }
+      next if pedido <= 0
+      st.with_lock do
+        disp = st.cantidad_disponible_real.to_d + st.libre_en_mostrador(st.sede_id)
+        if pedido > disp
+          errors.add(:cantidad,
+            "de «#{st.etiqueta}» supera el stock disponible (#{disp.round(2)} #{st.unidad || 'g'} disponibles)")
+        end
       end
     end
   end

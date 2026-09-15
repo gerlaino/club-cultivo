@@ -12,6 +12,7 @@ import ModalEditarDispensacion from './ModalEditarDispensacion.vue'
 import ModalAnularDispensa from '../dispensaciones/ModalAnularDispensa.vue'
 import ModalEditarReserva from './ModalEditarReserva.vue'
 import { hoyISO } from '../../utils/dates.js'
+import { resumenLineas } from '../../lib/reservaLineas.js'
 
 const props = defineProps({
   socioId:          { type: Number,  required: true },
@@ -206,7 +207,7 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
       <div v-for="r in reservasPend" :key="r.id" class="dv__reserva"
            :class="{ 'dv__reserva--vencida': r.fecha_entrega_estimada < hoyISO() }">
         <div class="dv__reserva-info">
-          <span class="dv__reserva-prod">{{ FORMA_LABEL[r.stock?.forma_producto] || r.stock?.forma_producto }} · {{ r.cantidad }}{{ r.stock?.unidad || 'g' }}</span>
+          <span class="dv__reserva-prod">{{ resumenLineas(r) }}</span>
           <span class="dv__reserva-meta">
             entrega {{ fmtDate(r.fecha_entrega_estimada) }}
             <template v-if="r.sena_ars > 0"> · seña {{ fmt(r.sena_ars) }}</template>

@@ -75,7 +75,9 @@
         >
           <div class="dd__reserva-main">
             <div class="dd__reserva-nombre">{{ r.paciente }}</div>
-            <div class="dd__reserva-prod">{{ formatG(r.cantidad) }} · {{ formaLabel(r.forma_producto) }}</div>
+            <!-- `detalle` trae todas las líneas («5g de Critical · 2u de OG»); las respuestas
+                 viejas sólo la primera. -->
+            <div class="dd__reserva-prod">{{ r.detalle || `${formatG(r.cantidad)} · ${formaLabel(r.forma_producto)}` }}</div>
           </div>
           <div class="dd__reserva-side">
             <div class="dd__reserva-fecha" :class="{ 'dd__reserva-fecha--vencida': r.vencida }">

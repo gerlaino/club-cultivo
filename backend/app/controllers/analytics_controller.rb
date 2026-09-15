@@ -236,7 +236,7 @@ class AnalyticsController < ApplicationController
     reservas_scope = Reserva.where(club_id: club.id).pendientes
                             .joins(:stock).where(stocks: { sede_id: sedes_ids })
     por_preparar = reservas_scope.where('fecha_entrega_estimada <= ?', hoy)
-                                 .includes(:paciente, :stock).order(fecha_entrega_estimada: :asc)
+                                 .includes(:paciente, :stock, items: :stock).order(fecha_entrega_estimada: :asc)
 
     {
       alcance: 'propio',
@@ -277,6 +277,8 @@ class AnalyticsController < ApplicationController
       vencida:        r.fecha_entrega_estimada < hoy,
       forma_producto: r.stock&.forma_producto,
       cantidad:       r.cantidad.to_f,
+      detalle:        r.descripcion_items,
+      productos:      r.items.size,
       sena_ars:       r.sena_ars.to_f,
       resta_ars:      r.aporte_restante_ars.to_f,
     }
@@ -342,7 +344,7 @@ class AnalyticsController < ApplicationController
     # Reservas a preparar: pendientes con fecha de entrega <= hoy (las de hoy + las vencidas).
     reservas_scope = Reserva.where(club_id: club.id).pendientes
     reservas_por_preparar = reservas_scope.where('fecha_entrega_estimada <= ?', hoy)
-                                          .includes(:paciente, :stock)
+                                          .includes(:paciente, :stock, items: :stock)
                                           .order(fecha_entrega_estimada: :asc)
     reservas_lista = reservas_por_preparar.limit(20).map do |r|
       {
@@ -352,6 +354,9 @@ class AnalyticsController < ApplicationController
         vencida:        r.fecha_entrega_estimada < hoy,
         forma_producto: r.stock&.forma_producto,
         cantidad:       r.cantidad.to_f,
+        # Qué preparar, línea por línea: «5g de Critical · 2u de OG». La fila sola era la primera.
+        detalle:        r.descripcion_items,
+        productos:      r.items.size,
         sena_ars:       r.sena_ars.to_f,
         resta_ars:      r.aporte_restante_ars.to_f,
       }

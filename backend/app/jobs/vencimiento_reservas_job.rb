@@ -41,7 +41,7 @@ class VencimientoReservasJob < ApplicationJob
       AlertaInterna.create!(
         club:             club,
         tipo:             'reserva_por_entregar',
-        mensaje:          "Reserva ##{reserva.id} de #{reserva.paciente.nombre_completo} se entrega hoy — #{reserva.cantidad.to_f}#{reserva.stock&.unidad || 'g'}.",
+        mensaje:          "Reserva ##{reserva.id} de #{reserva.paciente.nombre_completo} se entrega hoy — #{reserva.descripcion_items}.",
         severidad:        'info',
         destinada_a_role: 'admin',
         contexto:         { reserva_id: reserva.id, paciente_id: reserva.paciente_id, accion: 'reserva_por_entregar' }

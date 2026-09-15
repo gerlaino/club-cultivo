@@ -670,7 +670,7 @@ async function onOnboardingCompletado() {
           >
             <div class="ad__reserva-main">
               <span class="ad__reserva-nombre">{{ r.paciente }}</span>
-              <span class="ad__reserva-prod">{{ fmtG(r.cantidad) }} · {{ formaLabelRes(r.forma_producto) }}</span>
+              <span class="ad__reserva-prod">{{ r.detalle || `${fmtG(r.cantidad)} · ${formaLabelRes(r.forma_producto)}` }}</span>
             </div>
             <div class="ad__reserva-side">
               <span class="ad__reserva-fecha" :class="{ 'ad__reserva-fecha--venc': r.vencida }">

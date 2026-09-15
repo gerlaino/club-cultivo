@@ -22,6 +22,9 @@ class Stock < ApplicationRecord
   has_many :stock_movimientos, dependent: :destroy
   has_many :dispensaciones, class_name: 'Dispensacion', dependent: :nullify
   has_many :reservas, dependent: :nullify
+  # Las LÍNEAS de reserva que comprometen este stock: desde que una reserva tiene carrito, lo
+  # apartado se lee de acá y no de `reservas.stock_id` (que es sólo la primera línea).
+  has_many :reserva_items, dependent: :nullify
   # Provisiones de eventos del salón que apartan este stock (ver EventoBarProvision).
   has_many :provisiones_evento, class_name: 'EventoBarProvision', as: :provisionable, dependent: :destroy
   # Los turnos de mostrador que tienen este stock sobre la mesa. Apartan igual que un evento:
@@ -124,7 +127,7 @@ class Stock < ApplicationRecord
   def apartado_para_reservas
     return @apartado_reservas_precargado if defined?(@apartado_reservas_precargado)
 
-    reservas.pendientes.sum(:cantidad).to_d
+    Stock.apartado_por_reservas_de([id])[id].to_d
   end
 
   # LO RESERVADO SALE DE LA MESA, NO DEL DEPÓSITO — y por eso se cuenta UNA vez.
@@ -263,13 +266,28 @@ class Stock < ApplicationRecord
     lista = Array(stocks)
     return lista if lista.empty?
 
-    # `unscoped` saca el tenant (esto se llama también desde pantallas sin club fijado), pero
-    # `deleted_at` se repone a mano: Reserva es paranoia, y contar las borradas bloquearía stock
-    # a nombre de una reserva que ya no existe.
-    saldos = Reserva.unscoped.where(deleted_at: nil, estado: 'pendiente', stock_id: lista.map(&:id))
-                    .group(:stock_id).sum(:cantidad)
+    saldos = apartado_por_reservas_de(lista.map(&:id))
     lista.each { |s| s.instance_variable_set(:@apartado_reservas_precargado, saldos[s.id].to_d) }
     lista
+  end
+
+  # Cuánto tiene apartado cada stock en reservas PENDIENTES, sumando sus líneas. Un solo lugar:
+  # la precarga de los listados y el cálculo de a uno tienen que decir lo mismo.
+  #
+  # `joins(:reserva)` no aplica el default scope de Reserva (ni el tenant —esto se llama también
+  # desde pantallas sin club fijado— ni la paranoia), así que el `deleted_at` se repone a mano:
+  # contar las borradas bloquearía stock a nombre de una reserva que ya no existe.
+  def self.apartado_por_reservas_de(stock_ids)
+    return {} if stock_ids.blank?
+
+    ReservaItem.joins(:reserva)
+               .where(stock_id: stock_ids, reservas: { deleted_at: nil, estado: 'pendiente' })
+               .group(:stock_id).sum(:cantidad)
+  end
+
+  # Las reservas que incluyen este stock en alguna línea (no sólo las que lo tienen de primera).
+  def reservas_que_lo_incluyen
+    Reserva.where(id: ReservaItem.where(stock_id: id).select(:reserva_id))
   end
 
   # Las tres precargas juntas: lo que necesita cualquier listado que muestre disponibilidad.
