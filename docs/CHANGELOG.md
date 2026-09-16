@@ -13,6 +13,13 @@
   plata— no puede verse distinto según la puerta). Cancelar o editar la dispensa lo destruye con
   los demás y devuelve el crédito, como antes. El auditor (`contabilidad:auditar`) no lo cuenta
   como ingreso de la dispensa.
+- **Se puede pagar de más SÓLO para bajar deuda** (decisión de Germán, 16-sep): el tope de lo
+  que sobra es lo que el paciente debe. Sin deuda, el total es exacto; con deuda, hasta esa
+  deuda, y lo de más la baja (el asiento de aporte, arriba). Dejar plata «a favor» al cobrar es
+  que el club se quede con plata del paciente por accidente; para adelantar plata está «Cargar
+  crédito» en la ficha, que es un acto explícito. El modal lo dice con el número («paga $10.000
+  de más y sólo debe $5.000: cobrale hasta $5.000 de más») y no manda; el backend lo rechaza
+  con el mismo texto (`aplicar_lineas_cobro!`, con la deuda de ANTES de esta dispensa).
 - **La cuenta corriente no puede ser la línea que sobra.** «Efectivo 30.000 + cuenta corriente
   10.000» sobre 30.000 no significa nada y acreditaba $10.000 que nadie puso: el modal lo dice
   y no manda, y el backend lo rechaza (`aplicar_lineas_cobro!`). Si pagó de más, va en el medio

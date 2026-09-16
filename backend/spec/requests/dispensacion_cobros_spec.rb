@@ -123,16 +123,19 @@ RSpec.describe 'Dispensaciones con cobros (pagos partidos / contra-entrega)', ty
     end
   end
 
+  # SE PUEDE PAGAR DE MÁS SÓLO PARA BAJAR DEUDA (Germán, 16-sep-2026): dejar plata «a favor» al
+  # cobrar es que el club se quede con plata del paciente por accidente. Para adelantar plata
+  # está «Cargar crédito» en la ficha.
   context 'sobrepago: el socio paga de más' do
-    it 'con cuenta corriente: cubre la dispensa y acredita el excedente a favor' do
-      cc = create(:cuenta_corriente, paciente: paciente, club: club, saldo_disponible: 0, limite_credito: 80_000)
+    it 'con deuda en cuenta corriente: cubre la dispensa y lo de más baja la deuda' do
+      cc = create(:cuenta_corriente, paciente: paciente, club: club, saldo_disponible: -20_000, limite_credito: 80_000)
       sign_in_as(dispensador)
       crear(cobros: [{ medio: 'efectivo', monto: 120_000 }])   # total 100.000 → 20.000 de más
       expect(response).to have_http_status(:created)
       d = Dispensacion.last
       expect(d.saldo_pendiente).to eq(0)
       expect(d.cobros.sum(:monto_ars)).to eq(100_000)          # los cobros no superan el total
-      expect(cc.reload.saldo_disponible).to eq(20_000)          # excedente a favor
+      expect(cc.reload.saldo_disponible).to eq(0)               # debía 20.000, quedó en cero
       # La plata ENTRÓ: queda en el libro como «Aporte socio» —el mismo asiento que «Registrar
       # pago»—, atado a la dispensa y con el medio con el que pagó. (Hasta sep-2026 no había
       # asiento: el libro decía 100.000 habiendo entrado 120.000, y la caja cerraba con un
@@ -150,7 +153,7 @@ RSpec.describe 'Dispensaciones con cobros (pagos partidos / contra-entrega)', ty
     # «Efectivo 30.000 + cuenta corriente 10.000» sobre 30.000 no significa nada: la cuenta
     # corriente cubre lo que falta. Pasó en producción y acreditaba plata que nadie puso.
     it 'la cuenta corriente no puede ser la línea que sobra' do
-      create(:cuenta_corriente, paciente: paciente, club: club, saldo_disponible: 0, limite_credito: 80_000)
+      create(:cuenta_corriente, paciente: paciente, club: club, saldo_disponible: -50_000, limite_credito: 80_000)
       sign_in_as(dispensador)
       crear(cobros: [{ medio: 'efectivo', monto: 100_000 }, { medio: 'cuenta_corriente', monto: 10_000 }])
 
@@ -159,18 +162,37 @@ RSpec.describe 'Dispensaciones con cobros (pagos partidos / contra-entrega)', ty
       expect(Dispensacion.count).to eq(0)
     end
 
-    it 'con cuenta corriente: al cancelar, revierte el excedente acreditado' do
-      cc = create(:cuenta_corriente, paciente: paciente, club: club, saldo_disponible: 0, limite_credito: 80_000)
+    it 'con deuda: al cancelar, la deuda vuelve' do
+      cc = create(:cuenta_corriente, paciente: paciente, club: club, saldo_disponible: -20_000, limite_credito: 80_000)
       sign_in_as(dispensador)
       crear(cobros: [{ medio: 'efectivo', monto: 120_000 }])
       d = Dispensacion.last
-      expect(cc.reload.saldo_disponible).to eq(20_000)
+      expect(cc.reload.saldo_disponible).to eq(0)
 
       delete '/api/users/sign_out'
       sign_in_as(admin)
       patch "/dispensaciones/#{d.id}/cancelar_entrega", params: { motivo: 'test' }, headers: auth_headers
       expect(response).to have_http_status(:ok)
-      expect(cc.reload.saldo_disponible).to eq(0)   # el crédito de excedente se revirtió
+      expect(cc.reload.saldo_disponible).to eq(-20_000)   # el aporte se revirtió con la dispensa
+    end
+
+    it 'sin deuda: no se puede pagar de más, y lo dice' do
+      create(:cuenta_corriente, paciente: paciente, club: club, saldo_disponible: 0, limite_credito: 80_000)
+      sign_in_as(dispensador)
+      crear(cobros: [{ medio: 'efectivo', monto: 120_000 }])
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body).values.flatten.join).to include('no debe nada')
+      expect(Dispensacion.count).to eq(0)
+    end
+
+    it 'con menos deuda que lo pagado de más: rebota diciendo hasta cuánto' do
+      create(:cuenta_corriente, paciente: paciente, club: club, saldo_disponible: -5_000, limite_credito: 80_000)
+      sign_in_as(dispensador)
+      crear(cobros: [{ medio: 'efectivo', monto: 120_000 }])
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body).values.flatten.join).to include('sólo debe $5.000')
     end
 
     it 'sin cuenta corriente: bloquea (no hay dónde acreditar el excedente)' do

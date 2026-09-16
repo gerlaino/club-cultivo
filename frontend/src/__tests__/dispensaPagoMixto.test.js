@@ -139,26 +139,41 @@ describe('Dispensar — pago dividido', () => {
     expect(w.vm.formError).toContain('sólo cubre lo que falta')
   })
 
-  it('con efectivo de más sí: queda a favor y lo dice', async () => {
-    const w = await montar()
-    await conCarrito(w)
-    w.vm.activarPagoDividido()
-    w.vm.lineasPago = [{ medio: 'efectivo', monto: 6000 }]
-    await w.vm.$nextTick()
-
-    expect(w.vm.ccSobra).toBe(false)
-    expect(w.text()).toContain('queda a favor')
-  })
-
-  it('avisa cuando paga de más: le queda a favor', async () => {
-    const w = await montar()
+  // SE PUEDE PAGAR DE MÁS SÓLO PARA BAJAR DEUDA (Germán, 16-sep): lo de más nunca queda «a
+  // favor». Para adelantar plata está «Cargar crédito» en la ficha.
+  it('con deuda, pagar de más la baja, y lo dice', async () => {
+    const w = await montar({ saldoCc: -3000 })
     await conCarrito(w)
     w.vm.activarPagoDividido()
     w.vm.lineasPago = [{ medio: 'efectivo', monto: 6000 }]
     await w.vm.$nextTick()
 
     expect(w.vm.excedentePago).toBe(1000)
-    expect(w.find('.mnd__pagos-resto').text()).toContain('a favor')
+    expect(w.vm.excedeDeuda).toBe(false)
+    expect(w.find('.mnd__pagos-resto').text().replace(/\s/g, ' ')).toMatch(/baja su deuda de \$ ?3\.000 a \$ ?2\.000/)
+  })
+
+  it('sin deuda, pagar de más rebota antes de mandar', async () => {
+    const w = await montar({ saldoCc: 0 })
+    await conCarrito(w)
+    w.vm.activarPagoDividido()
+    w.vm.lineasPago = [{ medio: 'efectivo', monto: 6000 }]
+    await w.vm.$nextTick()
+
+    expect(w.vm.excedeDeuda).toBe(true)
+    expect(w.find('.mnd__pagos-resto--mal').text()).toContain('no debe nada')
+    await w.vm.handleSubmit()
+    expect(createDispensacion).not.toHaveBeenCalled()
+  })
+
+  it('con menos deuda que lo pagado de más, dice hasta cuánto', async () => {
+    const w = await montar({ saldoCc: -400 })
+    await conCarrito(w)
+    w.vm.activarPagoDividido()
+    w.vm.lineasPago = [{ medio: 'efectivo', monto: 6000 }]
+    await w.vm.$nextTick()
+
+    expect(w.find('.mnd__pagos-resto--mal').text().replace(/\s/g, ' ')).toMatch(/sólo debe \$ ?400/)
   })
 
   it('manda una línea de cobro por medio, y no un medio_pago único', async () => {

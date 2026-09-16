@@ -49,6 +49,8 @@ module DispensacionesFinancieras
     excedente  = 0.to_d
 
     medio_excedente = nil
+    # Lo que debía ANTES de esta dispensa: es hasta donde se puede pagar de más.
+    deuda_previa = [-(disp.paciente.cuenta_corriente&.saldo_disponible || 0).to_d, 0].max
 
     lineas.each do |l|
       saldo = disp.monto_sin_cobrar
@@ -60,7 +62,7 @@ module DispensacionesFinancieras
       # el paciente había pagado 40.000 en efectivo y la segunda línea se cargó mal), y dejarlo
       # pasar acreditaba 10.000 que nadie puso.
       if sobra > 0.001 && l[:medio].to_s == 'cuenta_corriente'
-        raise "La cuenta corriente sólo cubre lo que falta (#{ActiveSupport::NumberHelper.number_to_currency(saldo, unit: '$', precision: 0, delimiter: '.')}). "               'Si pagó de más, cargalo en el medio con el que pagó.'
+        raise "La cuenta corriente sólo cubre lo que falta (#{pesos(saldo)}). Si pagó de más, cargalo en el medio con el que pagó."
       end
       excedente += sobra
       medio_excedente ||= l[:medio] if sobra > 0.001
@@ -84,11 +86,26 @@ module DispensacionesFinancieras
       raise res.error unless res.ok?
     end
 
+    # SE PUEDE PAGAR DE MÁS SÓLO PARA BAJAR DEUDA (decisión de Germán, 16-sep-2026). Dejar plata
+    # «a favor» al cobrar es que el club se quede con plata del paciente por accidente —un número
+    # mal tipeado se vuelve un crédito que después alguien tiene que explicar—. Si quiere dejar
+    # plata adelantada, eso es «Cargar crédito» en su ficha: un acto explícito, con nombre.
+    if excedente > deuda_previa + 0.001
+      raise(if deuda_previa.positive?
+              "Paga #{pesos(excedente)} de más y sólo debe #{pesos(deuda_previa)}: cobrale hasta #{pesos(deuda_previa)} de más. " \
+              'Si quiere dejar plata adelantada, cargale crédito desde su ficha.'
+            else
+              "Paga #{pesos(excedente)} de más y no debe nada: cobrale el total exacto. " \
+              'Si quiere dejar plata adelantada, cargale crédito desde su ficha.'
+            end)
+    end
     acreditar_excedente!(disp, excedente.round(2), medio: medio_excedente) if excedente > 0.001
   end
 
-  # Lo que el paciente pagó DE MÁS queda a favor en su cuenta corriente, y ENTRA al libro y a
-  # la caja como «Aporte socio» — el mismo asiento que hace «Registrar pago» en su ficha.
+  def pesos(n) = ActiveSupport::NumberHelper.number_to_currency(n, unit: '$', precision: 0, delimiter: '.', separator: ',')
+
+  # Lo que el paciente pagó DE MÁS —hasta lo que debía— baja su deuda en la cuenta corriente, y
+  # ENTRA al libro y a la caja como «Aporte socio», el mismo asiento que hace «Registrar pago».
   #
   # Hasta sep-2026 se acreditaba directo en la CC sin asiento, con el argumento de que es plata
   # del paciente y no ingreso. Lo que pasó en producción: pagó 40.000 en efectivo por una
@@ -116,7 +133,7 @@ module DispensacionesFinancieras
       created_by:    current_user,
       tipo:          'ingreso',
       categoria:     'aporte_socio',
-      descripcion:   "Pagó de más — Dispensación ##{disp.id} (#{disp.paciente.nombre_completo}), queda a favor",
+      descripcion:   "Pagó de más — Dispensación ##{disp.id} (#{disp.paciente.nombre_completo}), baja su deuda",
       monto_ars:     monto.to_d,
       fecha:         disp.fecha_dispensacion || Date.current,
       pagado:        true,

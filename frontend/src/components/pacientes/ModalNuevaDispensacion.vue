@@ -326,6 +326,10 @@ watch(stocksVisibles, (lista) => {
 // ── Cuenta corriente ARS ───────────────────────────────────────────────────────
 const tieneCc  = computed(() => props.limiteCc !== null && props.limiteCc > 0)
 const ccMargen = computed(() => (props.saldoCc ?? 0) + (props.limiteCc ?? 0))
+// Lo que DEBE hoy (saldo negativo). Es hasta donde se puede pagar de más: lo de más baja la
+// deuda, nunca queda «a favor» (decisión de Germán, 16-sep). Para adelantar plata está «Cargar
+// crédito» en la ficha.
+const deudaCc  = computed(() => Math.max(0, -(props.saldoCc ?? 0)))
 
 // El crédito solo aplica cuando el medio de pago consume crédito.
 const esMedioCredito = computed(() => ['cuenta_corriente', 'no_abona'].includes(form.value.medio_pago))
@@ -667,6 +671,9 @@ const excedentePago = computed(() => Math.max(0, -restoPago.value))
 // + cuenta corriente 10.000» sobre 30.000 pasó en producción —el paciente había pagado 40.000
 // en efectivo y la segunda línea se cargó mal— y acreditaba plata que nadie puso. El backend
 // lo rechaza; acá se dice antes.
+// Paga de más y no debe (o debe menos): el backend lo rechaza; acá se dice antes.
+const excedeDeuda = computed(() => pagoDividido.value && excedentePago.value > deudaCc.value + 0.009)
+
 const ccSobra = computed(() => {
   if (!pagoDividido.value || excedentePago.value <= 0.009) return false
   const sinCc = lineasPago.value.filter(l => l.medio !== 'cuenta_corriente' && l.medio !== 'contra_entrega')
@@ -969,7 +976,7 @@ async function handleSubmit() {
     if (!cobraDelivery.value && !tieneCc.value && !esMedioCredito.value &&
         precioFinal.value != null &&
         Math.abs((Number(form.value.aporte_socio_ars) || 0) - Math.round(precioFinal.value)) > 0.01) {
-      formError.value = 'El socio no tiene cuenta corriente: el monto debe ser igual al total. Solo con cuenta corriente se puede pagar de más (se acredita) o de menos (queda a cuenta).'
+      formError.value = 'El paciente no tiene cuenta corriente: el monto debe ser igual al total. Sólo con cuenta corriente puede pagar de menos (queda a cuenta) o de más para bajar una deuda.'
       saving.value = false; return
     }
   }
@@ -990,6 +997,12 @@ async function handleSubmit() {
     }
     if (ccSobra.value) {
       formError.value = 'La cuenta corriente sólo cubre lo que falta. Si pagó de más, cargalo en el medio con el que pagó.'
+      saving.value = false; return
+    }
+    if (excedeDeuda.value) {
+      formError.value = deudaCc.value > 0
+        ? `Paga ${fmt(excedentePago.value)} de más y sólo debe ${fmt(deudaCc.value)}: cobrale hasta ${fmt(deudaCc.value)} de más.`
+        : `Paga ${fmt(excedentePago.value)} de más y no debe nada: cobrale el total exacto.`
       saving.value = false; return
     }
     const enCc = lineas.filter(l => l.medio === 'cuenta_corriente').reduce((a, l) => a + Number(l.monto), 0)
@@ -1659,8 +1672,17 @@ async function handleSubmit() {
               La cuenta corriente sólo cubre lo que falta. Si pagó de más, cargalo en el medio con el que pagó
               (efectivo o transferencia): queda a favor.
             </div>
+            <div v-else-if="excedeDeuda" class="mnd__pagos-resto mnd__pagos-resto--mal">
+              <template v-if="deudaCc > 0">
+                Paga <strong>{{ fmt(excedentePago) }}</strong> de más y sólo debe {{ fmt(deudaCc) }}: cobrale hasta {{ fmt(deudaCc) }} de más.
+              </template>
+              <template v-else>
+                Paga <strong>{{ fmt(excedentePago) }}</strong> de más y no debe nada: cobrale el total exacto.
+              </template>
+              Si quiere dejar plata adelantada, cargale crédito desde su ficha.
+            </div>
             <div v-else-if="excedentePago > 0.009" class="mnd__pagos-resto">
-              Paga <strong>{{ fmt(excedentePago) }}</strong> de más — queda a favor en su cuenta corriente y entra al libro como aporte.
+              Paga <strong>{{ fmt(excedentePago) }}</strong> de más — baja su deuda de {{ fmt(deudaCc) }} a {{ fmt(deudaCc - excedentePago) }}.
             </div>
             <div v-else class="mnd__pagos-resto mnd__pagos-resto--ok">
               <i class="bi bi-check-circle-fill"></i> Cubre el total exacto.
