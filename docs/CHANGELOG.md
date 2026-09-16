@@ -19,6 +19,11 @@
   viejo) sigue resolviendo como antes.
 - **«Otra dirección» se puede guardar en la ficha como dirección de envío** (`guardar_como_envio`),
   así la próxima vez aparece como tarjeta en vez de tipearse de nuevo.
+- **«Ir» y «Ruta» del repartidor mandan a Maps sólo calle, altura y localidad.** Mandaban el
+  texto entero —«Directorio 1602, Depto TRABAJO, CABA»— y Maps no lo encontraba; el modelo tenía
+  `direccion_envio_maps` desde siempre y no lo servía nadie. Ahora viaja como `direccion_maps` en
+  el paquete (sin piso, depto ni barrio) y lo usan los cuatro botones. La etiqueta y la ficha
+  siguen mostrando la dirección completa.
 - Sin esquema. Pendiente si hace falta: que la etiqueta del repartidor diga CUÁL de las dos es
   (hoy el snapshot no guarda el origen), y N direcciones por paciente si aparece uno con tres.
 

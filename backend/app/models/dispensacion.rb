@@ -105,10 +105,13 @@ class Dispensacion < ApplicationRecord
     MEDIOS_A_CREDITO.include?(medio_pago)
   end
 
-  # Dirección limpia para Google Maps (sin piso/depto, que confunden el geocoding).
+  # Dirección para Google Maps: SÓLO calle y altura, y la localidad. Piso, depto y barrio
+  # confunden el geocoding —«Directorio 1602, Depto TRABAJO, CABA» no lo encuentra— y hasta
+  # sep-2026 los botones «Ir» y «Ruta» del repartidor mandaban el texto entero: existía esta
+  # versión limpia y no la servía nadie. (Lo encontró Germán en el primer reparto.)
   def direccion_envio_maps
     limpia = [[envio_calle, envio_altura].reject(&:blank?).join(' ').presence,
-              envio_barrio.presence, envio_ciudad.presence].compact.join(', ')
+              envio_ciudad.presence].compact.join(', ')
     limpia.presence || direccion_envio
   end
 

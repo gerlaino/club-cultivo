@@ -162,7 +162,7 @@ function toggleSel(id) {
 function abrirEnMaps() {
   let base = despachosPendientesRuta.value
   if (seleccionados.value.size) base = base.filter(d => seleccionados.value.has(d.id))
-  const dirs = base.map(d => d.direccion_envio).filter(Boolean)
+  const dirs = base.map(d => d.direccion_maps || d.direccion_envio).filter(Boolean)
   if (!dirs.length) { toast.error('Seleccioná despachos con dirección para armar la ruta'); return }
   const destino   = encodeURIComponent(dirs[dirs.length - 1])
   const waypoints = dirs.slice(0, -1).map(encodeURIComponent).join('|')

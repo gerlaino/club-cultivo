@@ -30,7 +30,18 @@ RSpec.describe 'Dispensación con envío — dirección', type: :request do
     d = Dispensacion.last
     expect(d.envio_calle).to eq('Av. Siempreviva')
     expect(d.direccion_envio).to eq('Av. Siempreviva 742, Palermo, CABA')
-    expect(d.direccion_envio_maps).to eq('Av. Siempreviva 742, Palermo, CABA')
+    # Para Maps: sólo calle, altura y localidad. El barrio, el piso y el depto confunden el
+    # geocoding («Directorio 1602, Depto TRABAJO, CABA» no lo encuentra).
+    expect(d.direccion_envio_maps).to eq('Av. Siempreviva 742, CABA')
+  end
+
+  it 'el paquete que ve el repartidor trae la dirección para Maps aparte de la completa' do
+    crear(usar_domicilio_paciente: false, envio_calle: 'Directorio', envio_altura: '1602',
+          envio_depto: 'TRABAJO', envio_ciudad: 'CABA')
+
+    j = JSON.parse(response.body)
+    expect(j['direccion_envio']).to eq('Directorio 1602, Depto TRABAJO, CABA')
+    expect(j['direccion_maps']).to  eq('Directorio 1602, CABA')
   end
 
   it 'acepta otra dirección estructurada y la compone (con piso/depto)' do

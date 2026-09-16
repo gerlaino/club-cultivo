@@ -121,7 +121,7 @@ function borrarFirma() {
 
 // Google Maps route — abre Maps con todas las direcciones en viaje como waypoints
 function verRutaEnMaps() {
-  const dirs = enViaje.value.map(p => p.direccion_envio).filter(Boolean)
+  const dirs = enViaje.value.map(p => p.direccion_maps || p.direccion_envio).filter(Boolean)
   if (!dirs.length) return
   const base     = 'https://www.google.com/maps/dir/'
   const waypoints = dirs.map(d => encodeURIComponent(d)).join('/')
@@ -219,7 +219,7 @@ function moverAbajo(p) {
 // Navegar a UNA parada (Maps con un solo destino).
 function irAParada(p) {
   if (!p.direccion_envio) { toast.error('Sin dirección'); return }
-  const url = `https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=${encodeURIComponent(p.direccion_envio)}`
+  const url = `https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=${encodeURIComponent(p.direccion_maps || p.direccion_envio)}`
   window.open(url, '_blank', 'noopener')
 }
 
@@ -228,7 +228,7 @@ function abrirEnMaps() {
   const base = selected.value.size
     ? pendientes.value.filter(p => selected.value.has(p.id))
     : pendientes.value
-  const dirs = base.map(p => p.direccion_envio).filter(Boolean)
+  const dirs = base.map(p => p.direccion_maps || p.direccion_envio).filter(Boolean)
   if (!dirs.length) { toast.error('No hay direcciones para armar la ruta'); return }
   // origin = ubicación actual (se omite); waypoints intermedios + destino final.
   const destino   = encodeURIComponent(dirs[dirs.length - 1])
