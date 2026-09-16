@@ -4,7 +4,7 @@ import { useRoute, useRouter } from "vue-router"
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useContabilidadStore } from "../stores/contabilidad"
 import { useAuthStore }         from "../stores/auth"
-import api, { listSedes, listLotes, listPacientes, cerrarPeriodoContable, reabrirPeriodoContable, createCompraCuotas, listComprasCuotas, listUnidadesNegocio, listInsumos, listBares, listCategoriasContables, listDepositos, registrarPagoMovimiento , listRetirosCaja, saldarRetiroCaja } from "../lib/api"
+import api, { listSedes, listLotes, listPacientes, cerrarPeriodoContable, reabrirPeriodoContable, createCompraCuotas, listComprasCuotas, listUnidadesNegocio, listInsumos, listBares, listCategoriasContables, listDepositos, registrarPagoMovimiento , listRetirosCaja, saldarRetiroCaja, listCuentasCorrientes } from "../lib/api"
 import { useConfirm }           from "../composables/useConfirm.js"
 import { useToast }             from "../composables/useToast.js"
 import GastosRecurrentesView from './admin/GastosRecurrentesView.vue'
@@ -149,6 +149,72 @@ async function cargarRetiros() {
 function irARetiros() {
   vistaActiva.value = 'retiros'
   cargarRetiros()
+}
+
+// ── Deudores ──────────────────────────────────────────────────────────────
+// El KPI «Por cobrar» era un número sin lista: no llevaba a ningún lado. Acá está la lista
+// completa de pacientes con cuenta corriente (`GET /cuentas_corrientes`), mayor deudor primero,
+// con buscador. El total es el MISMO que el KPI: sale de la misma cuenta en el backend.
+const deudores = ref({ cuentas: [], total_deuda: 0, deudores: 0 })
+const deudoresCargando = ref(false)
+const deudoresBusqueda = ref('')
+const deudoresSoloConDeuda = ref(true)
+const deudoresOrden = ref({ col: 'deuda', asc: false })
+
+async function cargarDeudores() {
+  deudoresCargando.value = true
+  try {
+    const { data } = await listCuentasCorrientes()
+    deudores.value = data || { cuentas: [], total_deuda: 0, deudores: 0 }
+  } catch { /* la solapa queda vacía; el resto de Contabilidad no depende de esto */ }
+  finally { deudoresCargando.value = false }
+}
+
+function irADeudores() {
+  vistaActiva.value = 'deudores'
+  cargarDeudores()
+}
+
+function ordenarDeudoresPor(col) {
+  if (deudoresOrden.value.col === col) deudoresOrden.value.asc = !deudoresOrden.value.asc
+  else deudoresOrden.value = { col, asc: col === 'nombre' }
+}
+
+const VALOR_DEUDOR = {
+  nombre: c => (c.nombre || '').toLowerCase(),
+  deuda:  c => c.deuda || 0,
+  limite: c => c.limite || 0,
+  // Sin movimientos va al final en cualquier sentido.
+  ultimo_movimiento: c => c.ultimo_movimiento ? new Date(c.ultimo_movimiento).getTime() : -Infinity,
+}
+
+const deudoresFiltrados = computed(() => {
+  let list = deudores.value.cuentas || []
+  if (deudoresSoloConDeuda.value) list = list.filter(c => c.deuda > 0)
+  const q = deudoresBusqueda.value.trim().toLowerCase()
+  if (q) list = list.filter(c => c.nombre?.toLowerCase().includes(q) || String(c.dni || '').includes(q))
+  const val = VALOR_DEUDOR[deudoresOrden.value.col] || VALOR_DEUDOR.deuda
+  const dir = deudoresOrden.value.asc ? 1 : -1
+  return [...list].sort((a, b) => {
+    const x = val(a), y = val(b)
+    return x < y ? -dir : x > y ? dir : 0
+  })
+})
+
+function flechaDeudores(col) {
+  if (deudoresOrden.value.col !== col) return ''
+  return deudoresOrden.value.asc ? '↑' : '↓'
+}
+
+// «hace 3 días» se lee más rápido que una fecha cuando la pregunta es si la deuda es vieja.
+function haceDias(iso) {
+  if (!iso) return 'sin movimientos'
+  const dias = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
+  if (dias <= 0) return 'hoy'
+  if (dias === 1) return 'ayer'
+  if (dias < 30) return `hace ${dias} días`
+  const meses = Math.floor(dias / 30)
+  return meses === 1 ? 'hace un mes' : `hace ${meses} meses`
 }
 
 function abrirSaldar(r) {
@@ -686,6 +752,7 @@ onMounted(async () => {
   // ya elegido. Se limpia el query para que un refresh no lo reabra.
   // ?vista=pl → abre directo en Ganancia por lote (lo linkea Analítica → Costo).
   if (route.query.vista === 'pl') irAPL()
+  if (route.query.vista === 'deudores') irADeudores()
 
   if (route.query.nuevo) {
     const { nuevo, deposito, ...resto } = route.query
@@ -752,7 +819,76 @@ onMounted(async () => {
         <i class="bi bi-person-badge"></i> Retiros
         <span v-if="totalRetiros" class="cv__tab-badge">{{ fmt(totalRetiros) }}</span>
       </button>
+      <!-- La otra plata afuera: la que los pacientes le deben a la organización. -->
+      <button class="cv__tab" :class="{ 'cv__tab--active': vistaActiva === 'deudores' }" @click="irADeudores">
+        <i class="bi bi-wallet2"></i> Deudores
+        <span v-if="store.dashboard?.por_cobrar > 0" class="cv__tab-badge">{{ fmt(store.dashboard.por_cobrar) }}</span>
+      </button>
     </div>
+
+    <!-- ── DEUDORES ──────────────────────────────────────────────────────────
+         La lista detrás del KPI. Se ordena por columna (mayor deudor primero) y se busca por
+         nombre o DNI; cada fila lleva a la cuenta corriente del paciente, que es donde se
+         registra el pago. -->
+    <section v-if="vistaActiva === 'deudores'" class="cv__deudores">
+      <div class="cv__deu-head">
+        <div class="cv__deu-resumen">
+          <span class="cv__deu-total">{{ fmt(deudores.total_deuda) }}</span>
+          <span class="cv__deu-sub">
+            {{ deudores.deudores === 1 ? 'le debe un paciente' : `deben ${deudores.deudores} pacientes` }}
+            · {{ (deudores.cuentas || []).length }} con cuenta corriente
+          </span>
+        </div>
+        <div class="cv__deu-tools">
+          <div class="cv__search-inline">
+            <i class="bi bi-search cv__search-icon-sm"></i>
+            <input v-model="deudoresBusqueda" class="cv__search-sm" placeholder="Nombre o DNI" />
+            <span v-if="deudoresBusqueda" class="cv__search-x" @click="deudoresBusqueda = ''">✕</span>
+          </div>
+          <label class="cv__deu-toggle">
+            <input v-model="deudoresSoloConDeuda" type="checkbox" /> Sólo con deuda
+          </label>
+        </div>
+      </div>
+
+      <div v-if="deudoresCargando" class="cv__retiros-vacio">Cargando…</div>
+      <div v-else-if="!deudoresFiltrados.length" class="cv__retiros-vacio">
+        {{ deudoresBusqueda ? 'Nadie coincide con la búsqueda.' : (deudoresSoloConDeuda ? 'Nadie debe nada.' : 'Ningún paciente tiene cuenta corriente.') }}
+      </div>
+      <div v-else class="cv__card cv__table-wrap">
+        <table class="cv__table">
+          <thead>
+            <tr>
+              <th><button class="cv__th-btn" @click="ordenarDeudoresPor('nombre')">Paciente {{ flechaDeudores('nombre') }}</button></th>
+              <th class="cv__th-right"><button class="cv__th-btn" @click="ordenarDeudoresPor('deuda')">Debe {{ flechaDeudores('deuda') }}</button></th>
+              <th class="cv__th-right"><button class="cv__th-btn" @click="ordenarDeudoresPor('limite')">Límite {{ flechaDeudores('limite') }}</button></th>
+              <th><button class="cv__th-btn" @click="ordenarDeudoresPor('ultimo_movimiento')">Último movimiento {{ flechaDeudores('ultimo_movimiento') }}</button></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="c in deudoresFiltrados" :key="c.paciente_id" class="cv__deu-row" @click="router.push({ path: `/pacientes/${c.paciente_id}`, query: { tab: 'cuenta_corriente' } })">
+              <td>
+                <span class="cv__td-bold">{{ c.nombre }}</span>
+                <span v-if="!c.activo" class="cv__deu-baja">dado de baja</span>
+                <div class="cv__td-muted">DNI {{ c.dni }}</div>
+              </td>
+              <td class="cv__td-right">
+                <span v-if="c.deuda > 0" class="cv__td-bold cv__deu-debe">{{ fmt(c.deuda) }}</span>
+                <span v-else-if="c.saldo > 0" class="cv__td-green">a favor {{ fmt(c.saldo) }}</span>
+                <span v-else class="cv__td-muted">—</span>
+              </td>
+              <td class="cv__td-right cv__td-muted">
+                <template v-if="c.limite > 0">{{ fmt(c.limite) }} · {{ c.porcentaje_limite }}%</template>
+                <template v-else>sin crédito</template>
+              </td>
+              <td class="cv__td-muted" :title="c.ultimo_movimiento ? fmtFechaCorta(c.ultimo_movimiento) : ''">{{ haceDias(c.ultimo_movimiento) }}</td>
+              <td class="cv__td-right"><i class="bi bi-chevron-right cv__deu-chev"></i></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
     <!-- ── RETIROS DE CAJA ────────────────────────────────────────────────────
          El saldo de cada persona NO se guarda: sale de sumar sus retiros abiertos. Una sola
@@ -905,11 +1041,12 @@ onMounted(async () => {
             </div>
             <div class="cv__kpi-bar" :style="{ background: balanceColor(store.dashboard.mes_actual.balance) }"></div>
           </div>
-          <div v-if="store.dashboard.por_cobrar > 0" class="cv__kpi">
-            <div class="cv__kpi-label">Por cobrar (deuda de socios)</div>
+          <!-- Clickeable: el número solo no dice QUIÉNES. Lleva a la solapa Deudores. -->
+          <button v-if="store.dashboard.por_cobrar > 0" type="button" class="cv__kpi cv__kpi--link" @click="irADeudores" title="Ver quiénes deben">
+            <div class="cv__kpi-label">Por cobrar (deuda de pacientes) <i class="bi bi-arrow-right-short"></i></div>
             <div class="cv__kpi-val cv__kpi-val--amber">{{ fmt(store.dashboard.por_cobrar) }}</div>
             <div class="cv__kpi-bar cv__kpi-bar--amber"></div>
-          </div>
+          </button>
           <div class="cv__kpi cv__kpi--highlight">
             <div class="cv__kpi-label">Balance del año</div>
             <div class="cv__kpi-val" :style="{ color: balanceColor(store.dashboard.anio_actual.balance) }">
@@ -1890,6 +2027,24 @@ onMounted(async () => {
 .cv__input:focus { outline: none; border-color: #1b5e20; }
 .cv__tab-badge { margin-left: .35rem; font-size: .68rem; font-weight: 800; color: #b45309; background: #fef3c7; border-radius: 999px; padding: 0 .4rem; }
 .cv__retiros { display: flex; flex-direction: column; gap: 1rem; }
+
+/* Deudores */
+.cv__kpi--link { text-align: left; cursor: pointer; font: inherit; color: inherit; transition: border-color .15s, transform .1s; }
+.cv__kpi--link:hover { border-color: #f59e0b; transform: translateY(-1px); }
+.cv__deudores { display: flex; flex-direction: column; gap: 1rem; }
+.cv__deu-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.cv__deu-resumen { display: flex; flex-direction: column; gap: .15rem; }
+.cv__deu-total { font-size: 1.6rem; font-weight: 800; color: #b45309; letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1; }
+.cv__deu-sub { font-size: .8rem; color: var(--c-slate-500); }
+.cv__deu-tools { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.cv__deu-toggle { display: inline-flex; align-items: center; gap: .35rem; font-size: .8rem; color: var(--c-slate-600); cursor: pointer; }
+.cv__th-btn { background: none; border: none; padding: 0; font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
+.cv__th-btn:hover { color: var(--c-slate-900); }
+.cv__deu-row { cursor: pointer; }
+.cv__deu-debe { color: #b45309; font-variant-numeric: tabular-nums; }
+.cv__deu-baja { margin-left: .4rem; font-size: .66rem; font-weight: 700; text-transform: uppercase; color: var(--c-slate-400); }
+.cv__deu-chev { color: var(--c-slate-300); }
+.cv__deu-row:hover .cv__deu-chev { color: var(--c-slate-700); }
 .cv__retiros-vacio { color: var(--c-slate-500); font-size: .88rem; }
 .cv__ret-persona { border: 1px solid var(--c-slate-200); border-radius: 12px; background: #fff; overflow: hidden; }
 .cv__ret-hd { display: flex; align-items: baseline; gap: .5rem; padding: .7rem .9rem; border-bottom: 1px solid var(--c-slate-100); }

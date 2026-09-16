@@ -1,5 +1,20 @@
 # Changelog
 
+## Septiembre 2026 (bw) — Deudores: la lista detrás del KPI «Por cobrar»
+
+- **El KPI «Por cobrar (deuda de pacientes)» de Contabilidad es clickeable y lleva a la solapa
+  nueva «Deudores»** (pedido de Germán, 16-sep). Era un número sin lista: no llevaba a ningún
+  lado. `GET /cuentas_corrientes` (admin/supervisor, como Retiros) devuelve todos los pacientes
+  con cuenta corriente —deuda, límite y % usado, último movimiento, si está de baja— con el
+  total calculado con la MISMA cuenta que el KPI (`saldo_disponible < 0`). Sin paginar: es el
+  padrón con CC, y buscador (nombre o DNI) y orden por columna (mayor deudor primero) viven en la
+  pantalla, con «Sólo con deuda» prendido por defecto. Cada fila abre la ficha del paciente en la
+  cuenta corriente (`?tab=cuenta_corriente`, que `SocioDetailView` ahora entiende), que es donde
+  se registra el pago. `?vista=deudores` abre Contabilidad directo ahí.
+- **En floración, la ficha del lote en el teléfono dice «Cosechar»** y abre el modal de cosecha
+  del escritorio; ofrecía «Avanzar fase → Cosecha» y el backend lo rechazaba después de
+  confirmar. Y `SheetBottom` tiene tope de 560 px: en pantalla ancha se estiraba al ancho entero.
+
 ## Septiembre 2026 (bv) — El super admin, visto por el dueño del negocio
 
 Los siete puntos de la propuesta del 15-sep («hace todo», Germán, 16-sep). Lo que faltaba no era

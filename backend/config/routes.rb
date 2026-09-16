@@ -505,6 +505,8 @@ Rails.application.routes.draw do
     end
 
     get  'retiros_caja',            to: 'retiros_caja#index'
+    # Quién le debe a la organización: la lista detrás del KPI «Por cobrar» de Contabilidad.
+    get  'cuentas_corrientes',      to: 'cuentas_corrientes#index'
     post 'retiros_caja/:id/saldar', to: 'retiros_caja#saldar'
 
     resources :movimientos_contables, only: [:index, :show, :create, :update, :destroy] do

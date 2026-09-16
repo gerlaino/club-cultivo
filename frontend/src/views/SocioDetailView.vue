@@ -321,6 +321,13 @@ const TABS = computed(() => {
   })
 })
 
+// `?tab=` abre la ficha en una solapa concreta (Contabilidad → Deudores manda a la cuenta
+// corriente). Va DESPUÉS de `ALL_TABS` a propósito: `activeTab` se declara arriba y esto lo
+// referencia al montar. Si el rol no ve esa solapa, `TABS` la filtra y queda la de siempre.
+if (typeof route.query.tab === 'string' && TABS.value.some(t => t.key === route.query.tab)) {
+  activeTab.value = route.query.tab
+}
+
 // P1: tabs primarias (alta frecuencia) visibles; el resto va a un menú "Más".
 const TABS_PRIMARY = computed(() => TABS.value.filter(t => t.primary))
 const TABS_MORE    = computed(() => TABS.value.filter(t => !t.primary))
