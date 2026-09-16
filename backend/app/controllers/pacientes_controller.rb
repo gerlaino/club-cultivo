@@ -3,7 +3,7 @@ class PacientesController < ApplicationController
   before_action -> { require_feature!(:produccion_dispensa) }
   before_action :check_pacientes_role!
   before_action :set_paciente, only: [:show, :update, :destroy, :timeline, :subir_reprocann, :eliminar_reprocann, :enviar_mail, :mails_enviados, :aprobar,
-                                          :crear_acceso_portal, :restablecer_acceso_portal]
+                                          :crear_acceso_portal, :restablecer_acceso_portal, :direcciones]
   # Hasta ahora `mailer` era una etiqueta que no controlaba nada: no había un solo
   # `require_feature!` ni chequeo en el frontend, así que el flag se podía apagar y los mails
   # seguían saliendo. Ahora que se vende aparte, la barrera va acá — el candado en el backend,
@@ -107,6 +107,14 @@ class PacientesController < ApplicationController
     return render json: { error: 'Carnet no encontrado' }, status: :not_found unless paciente
 
     render json: { data: paciente.as_json(only: campos_visibles, methods: [:nombre_completo]) }
+  end
+
+  # GET /pacientes/:id/direcciones — el domicilio (REPROCANN) y la de envío, con nombre y con el
+  # texto ya armado. Lo pide el modal de dispensa al prender «con envío»: hasta sep-2026 elegía
+  # una sin mostrarla, y con las dos cargadas el paquete salía a la que no era.
+  def direcciones
+    authorize @paciente, :show?
+    render json: @paciente.direcciones
   end
 
   def show

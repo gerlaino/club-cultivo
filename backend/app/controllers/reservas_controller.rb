@@ -196,26 +196,15 @@ class ReservasController < ApplicationController
     dispensacion.desde_reserva = true
 
     if con_envio
-      dispensacion.delivery_id = params[:delivery_id]
-      usar_domicilio = ActiveModel::Type::Boolean.new.cast(params[:usar_domicilio_paciente])
-      if usar_domicilio || params[:envio_calle].blank?
-        dir = paciente.direccion_entrega
-        dispensacion.envio_calle  = dir[:calle]
-        dispensacion.envio_altura = dir[:altura]
-        dispensacion.envio_piso   = dir[:piso]
-        dispensacion.envio_depto  = dir[:depto]
-        dispensacion.envio_barrio = dir[:barrio]
-        dispensacion.envio_ciudad = dir[:ciudad]
-      else
-        dispensacion.envio_calle  = params[:envio_calle]
-        dispensacion.envio_altura = params[:envio_altura]
-        dispensacion.envio_piso   = params[:envio_piso]
-        dispensacion.envio_depto  = params[:envio_depto]
-        dispensacion.envio_barrio = params[:envio_barrio]
-        dispensacion.envio_ciudad = params[:envio_ciudad]
+      dispensacion.delivery_id       = params[:delivery_id]
+      dispensacion.contacto_nombre   = params[:contacto_nombre].presence
+      dispensacion.contacto_telefono = params[:contacto_telefono].presence
+      # La misma regla que la dispensa con envío: la dirección que eligió la pantalla.
+      begin
+        Envios::DireccionDeEntrega.aplicar(dispensacion, paciente: paciente, params: params)
+      rescue Envios::DireccionDeEntrega::Error => e
+        return render json: { errors: [e.message] }, status: :unprocessable_entity
       end
-      dispensacion.contacto_nombre   = params[:contacto_nombre].presence   || paciente.nombre_completo
-      dispensacion.contacto_telefono = params[:contacto_telefono].presence || paciente.telefono
     end
 
     begin

@@ -42,4 +42,77 @@ RSpec.describe 'Dispensación con envío — dirección', type: :request do
     # Maps ignora piso/depto
     expect(d.direccion_envio_maps).to eq('Corrientes 1000, CABA')
   end
+
+  # AC (socio de Germán, 16-sep-2026, primer reparto de Mitocondria ONG): con las DOS direcciones
+  # cargadas, «domicilio del paciente» mandaba a la de ENVÍO sin decirlo y la otra no se podía
+  # elegir. Ahora la pantalla elige POR NOMBRE y ve el texto antes de confirmar.
+  describe 'eligiendo la dirección por su nombre' do
+    before { paciente.update!(envio_calle: 'Lavalle', envio_altura: '400', envio_ciudad: 'CABA') }
+
+    it 'las dos direcciones se consultan con nombre y texto' do
+      get "/pacientes/#{paciente.id}/direcciones", headers: auth_headers
+
+      j = JSON.parse(response.body)
+      expect(j['domicilio']['label']).to eq('Domicilio REPROCANN')
+      expect(j['domicilio']['texto']).to eq('Av. Siempreviva 742, Palermo, CABA')
+      expect(j['envio']['label']).to     eq('Dirección de envío')
+      expect(j['envio']['texto']).to     eq('Lavalle 400, CABA')
+    end
+
+    it 'sin dirección de envío cargada, esa viene en nil' do
+      paciente.update!(envio_calle: nil)
+      get "/pacientes/#{paciente.id}/direcciones", headers: auth_headers
+
+      expect(JSON.parse(response.body)['envio']).to be_nil
+    end
+
+    it '«domicilio» manda al domicilio aunque tenga dirección de envío' do
+      crear(direccion_origen: 'domicilio')
+
+      expect(response).to have_http_status(:created)
+      expect(Dispensacion.last.direccion_envio).to eq('Av. Siempreviva 742, Palermo, CABA')
+    end
+
+    it '«envio» manda a la de envío' do
+      crear(direccion_origen: 'envio')
+
+      expect(Dispensacion.last.direccion_envio).to eq('Lavalle 400, CABA')
+    end
+
+    it 'elegir una que no tiene cargada rebota con el motivo, no con un paquete sin dirección' do
+      paciente.update!(envio_calle: nil)
+      crear(direccion_origen: 'envio')
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)['errors'].first).to include('dirección de envío')
+    end
+
+    it '«otra» exige calle, altura y ciudad' do
+      crear(direccion_origen: 'otra', envio_calle: 'Corrientes')
+
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+
+    it '«otra» con «guardar como envío» queda en la ficha para la próxima' do
+      crear(direccion_origen: 'otra', envio_calle: 'Corrientes', envio_altura: '1000', envio_ciudad: 'CABA', guardar_como_envio: true)
+
+      expect(response).to have_http_status(:created)
+      expect(paciente.reload.envio_calle).to eq('Corrientes')
+      expect(paciente.direccion('envio')[:texto]).to eq('Corrientes 1000, CABA')
+    end
+
+    it '«otra» sin guardar no toca la ficha' do
+      crear(direccion_origen: 'otra', envio_calle: 'Corrientes', envio_altura: '1000', envio_ciudad: 'CABA')
+
+      expect(paciente.reload.envio_calle).to eq('Lavalle')
+    end
+
+    # El bundle viejo de la PWA sigue mandando `usar_domicilio_paciente`: no puede romperse.
+    it 'el cliente viejo sigue resolviendo como antes' do
+      crear(usar_domicilio_paciente: true)
+
+      expect(response).to have_http_status(:created)
+      expect(Dispensacion.last.direccion_envio).to eq('Lavalle 400, CABA')
+    end
+  end
 end

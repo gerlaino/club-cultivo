@@ -89,21 +89,14 @@ class DispensacionesController < ApplicationController
     @dispensacion.user = current_user
     @dispensacion.sede_id ||= @dispensacion.stock&.sede_id
 
-    # Dirección de entrega: si se pidió usar el domicilio del paciente (o no se cargó
-    # ninguna calle), tomamos el domicilio registrado del paciente como snapshot.
+    # A dónde va el paquete: la que eligió la pantalla (`direccion_origen`), copiada como
+    # snapshot. Una sola regla con la entrega de reservas (`Envios::DireccionDeEntrega`).
     if @dispensacion.con_envio
-      usar_domicilio = ActiveModel::Type::Boolean.new.cast(params.dig(:dispensacion, :usar_domicilio_paciente))
-      if usar_domicilio || @dispensacion.envio_calle.blank?
-        dir = @paciente.direccion_entrega
-        @dispensacion.envio_calle  = dir[:calle]
-        @dispensacion.envio_altura = dir[:altura]
-        @dispensacion.envio_piso   = dir[:piso]
-        @dispensacion.envio_depto  = dir[:depto]
-        @dispensacion.envio_barrio = dir[:barrio]
-        @dispensacion.envio_ciudad = dir[:ciudad]
+      begin
+        Envios::DireccionDeEntrega.aplicar(@dispensacion, paciente: @paciente, params: params[:dispensacion])
+      rescue Envios::DireccionDeEntrega::Error => e
+        return render json: { errors: [e.message] }, status: :unprocessable_entity
       end
-      @dispensacion.contacto_nombre   ||= @paciente.nombre_completo
-      @dispensacion.contacto_telefono ||= @paciente.telefono
     end
 
     # ── Descuentos: dos distintos, aditivos con tope 100% ──
@@ -827,6 +820,8 @@ class DispensacionesController < ApplicationController
       :contacto_nombre, :contacto_telefono, :notas_envio,
       :firma_entrega_data,
       :envio_calle, :envio_altura, :envio_piso, :envio_depto, :envio_barrio, :envio_ciudad
+      # `direccion_origen`, `usar_domicilio_paciente` y `guardar_como_envio` no son columnas: los
+      # lee `Envios::DireccionDeEntrega` directo de `params[:dispensacion]`.
     )
   end
 

@@ -252,6 +252,9 @@ export const getPacientePorCarnet = (token) => api.get(`/pacientes/por_carnet/${
 export const listPacientes         = (params = {}) => api.get("/pacientes", { params });
 export const getPacientesCriticos  = () => api.get("/pacientes/criticos");
 export const getPaciente           = (id) => api.get(`/pacientes/${id}`);
+// Sus dos direcciones con nombre y texto (domicilio REPROCANN y envío), para elegir a dónde va
+// el paquete viendo la dirección.
+export const getDireccionesPaciente = (id) => api.get(`/pacientes/${id}/direcciones`);
 // `enviar_bienvenida` va al lado de `paciente`, no adentro: no es un campo de la persona sino
 // una instrucción sobre el alta. El backend igual ignora el parámetro si el rol no puede aprobar.
 export const createPaciente     = (payload, { enviarBienvenida = false } = {}) =>

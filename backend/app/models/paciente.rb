@@ -114,14 +114,39 @@ class Paciente < ApplicationRecord
     "#{nombre} #{apellido}"
   end
 
-  # Dirección de entrega efectiva: la de envío si el paciente la cargó (envio_calle),
-  # si no, su domicilio. Se usa como snapshot al dispensar/reservar con envío.
+  # Las DOS direcciones del paciente, con nombre: el domicilio (el del REPROCANN) y la de envío
+  # (opcional). Nil la que no tiene calle. `texto` es la línea que se muestra y se imprime —se
+  # arma acá para que el modal, la etiqueta y el PDF digan exactamente lo mismo.
+  DIRECCIONES = {
+    'domicilio' => { label: 'Domicilio REPROCANN', prefijo: 'domicilio' },
+    'envio'     => { label: 'Dirección de envío',  prefijo: 'envio' },
+  }.freeze
+
+  def direccion(origen)
+    meta = DIRECCIONES[origen.to_s] or return nil
+    pre  = meta[:prefijo]
+    calle = public_send("#{pre}_calle")
+    return nil if calle.blank?
+
+    campos = { calle: calle, altura: public_send("#{pre}_altura"), piso: public_send("#{pre}_piso"),
+               depto: public_send("#{pre}_depto"), barrio: public_send("#{pre}_barrio"), ciudad: public_send("#{pre}_ciudad") }
+    campos.merge(origen: origen.to_s, label: meta[:label], texto: Paciente.direccion_texto(campos))
+  end
+
+  def direcciones = DIRECCIONES.keys.to_h { |o| [o, direccion(o)] }
+
+  def self.direccion_texto(d)
+    l1 = [d[:calle], d[:altura]].compact_blank.join(' ')
+    pd = [d[:piso].presence && "Piso #{d[:piso]}", d[:depto].presence && "Depto #{d[:depto]}"].compact.join(' ')
+    [l1, pd, d[:barrio], d[:ciudad]].compact_blank.join(', ')
+  end
+
+  # Dirección de entrega POR DEFECTO cuando nadie eligió: la de envío si la cargó, si no el
+  # domicilio. Se mantiene para los llamadores viejos (`usar_domicilio_paciente`); lo nuevo
+  # pide una por su nombre (`Envios::DireccionDeEntrega`).
   def direccion_entrega
-    if envio_calle.present?
-      { calle: envio_calle, altura: envio_altura, piso: envio_piso, depto: envio_depto, barrio: envio_barrio, ciudad: envio_ciudad }
-    else
+    direccion('envio') || direccion('domicilio') ||
       { calle: domicilio_calle, altura: domicilio_altura, piso: domicilio_piso, depto: domicilio_depto, barrio: domicilio_barrio, ciudad: domicilio_ciudad }
-    end
   end
 
   # Estado REPROCANN cruzado con la fecha: el campo manual puede quedar en

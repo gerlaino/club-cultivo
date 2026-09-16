@@ -1,5 +1,27 @@
 # Changelog
 
+## Septiembre 2026 (bx) — A dónde va el paquete: la dirección se elige VIENDO cuál es
+
+- **Lo encontró el socio de Germán en el primer reparto de Mitocondria ONG**: el modal de
+  dispensa con envío ofrecía «Domicilio del paciente» / «Otra dirección» sin mostrar ninguna, y
+  «domicilio» resolvía en el backend a la dirección de ENVÍO si estaba cargada (y al domicilio si
+  no) sin decirlo. Con las dos cargadas, el que dispensaba no sabía a cuál mandaba y la otra no
+  se podía elegir.
+- **Ahora son tarjetas con el texto**: «Domicilio REPROCANN — Av. X 742, Palermo, CABA» ·
+  «Dirección de envío — Lavalle 400, CABA» (sólo si la tiene) · «Otra dirección». Se elige por
+  nombre (`direccion_origen`: `domicilio` · `envio` · `otra`) y el backend copia ESA como
+  snapshot. Por defecto la de envío si la tiene, si no el domicilio, si no «otra». Una que no
+  está cargada se ve apagada y lo dice; si la consulta falla, las dos quedan elegibles y decide
+  el backend. `GET /pacientes/:id/direcciones` (`Paciente#direcciones`, con `texto` armado en un
+  solo lugar).
+- **Una sola regla para las dos puertas** (`Envios::DireccionDeEntrega`): la dispensa con envío y
+  la entrega de una reserva la tenían copiada. `usar_domicilio_paciente` (la PWA con el bundle
+  viejo) sigue resolviendo como antes.
+- **«Otra dirección» se puede guardar en la ficha como dirección de envío** (`guardar_como_envio`),
+  así la próxima vez aparece como tarjeta en vez de tipearse de nuevo.
+- Sin esquema. Pendiente si hace falta: que la etiqueta del repartidor diga CUÁL de las dos es
+  (hoy el snapshot no guarda el origen), y N direcciones por paciente si aparece uno con tres.
+
 ## Septiembre 2026 (bw) — Deudores: la lista detrás del KPI «Por cobrar»
 
 - **El KPI «Por cobrar (deuda de pacientes)» de Contabilidad es clickeable y lleva a la solapa
