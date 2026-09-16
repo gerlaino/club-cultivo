@@ -34,6 +34,18 @@
                    :class="orden.dir === 'asc' ? 'bi bi-caret-up-fill' : 'bi bi-caret-down-fill'"></i>
               </button>
             </th>
+            <!-- TOTAL = depósito + mostrador (Germán, 16-sep): cuánto hay de ese producto en
+                 total, esté donde esté. Es la cuenta que el admin hacía a ojo entre las dos
+                 columnas. Va DESPUÉS de Mostrador: es la suma de lo que tiene a la izquierda.
+                 Sólo administración, como Depósito. -->
+            <th v-if="muestraCosto" class="tmo__th tmo__th--num"
+                :class="{ 'is-activa': orden.campo === 'total' }"
+                :aria-sort="orden.campo === 'total' ? (orden.dir === 'asc' ? 'ascending' : 'descending') : 'none'">
+              <button type="button" class="tmo__th-btn" @click="ordenarPor('total')">
+                Total
+                <span v-if="orden.campo === 'total'" class="tmo__caret">{{ orden.dir === 'asc' ? '▲' : '▼' }}</span>
+              </button>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -109,6 +121,10 @@
                         @click.stop="abrirMenu(s, $event)">⋯</button>
               </template>
             </td>
+            <!-- Lo GUARDADO, no lo que se está escribiendo: subir a la mesa no cambia el total
+                 (sale del depósito y entra a la mesa), así que el número no tiene por qué moverse
+                 mientras se tipea. -->
+            <td v-if="muestraCosto" class="tmo__num tmo__total" data-col="Total">{{ fmt(totalDe(s)) }} {{ s.unidad }}</td>
           </tr>
         </tbody>
       </table>
@@ -225,6 +241,8 @@ const fmt = (n) => Number(n ?? 0).toLocaleString('es-AR', { maximumFractionDigit
 const fecha = (f) => (f ? new Date(`${f}T12:00:00`).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—')
 
 const enLaMesa = (s) => Number(valores.value[s.stock_id] ?? s.mostrador) > 0
+// Depósito (lo libre) + mostrador. Lo reservado no entra: ya tiene dueño.
+const totalDe  = (s) => (Number(s.disponible) || 0) + (Number(s.mostrador) || 0)
 // No se puede subir a la mesa lo que no está libre. El backend lo rechaza igual, pero decirlo en
 // la fila evita llenar la tabla entera para que rebote al final.
 const excede = (s) => {
@@ -263,6 +281,7 @@ function valorOrden (s, campo) {
     // haría saltar la fila de lugar mientras se tipea, que es la peor forma de perder de vista
     // lo que estabas cargando.
     case 'mostrador':  return Number(s.mostrador) || 0
+    case 'total':      return totalDe(s)
     case 'precio':     return Number(s.precio_ars) || 0
     case 'costo':      return Number(s.costo_ars) || 0
     default:           return ''
@@ -367,6 +386,7 @@ defineExpose({ cambios, hayCambios, hayExceso })
 .tmo__meta { font-size: var(--fs-12); color: var(--c-ink-500); margin-top: 2px; }
 
 .tmo__td-input { white-space: nowrap; }
+.tmo__total { font-weight: 700; color: var(--c-slate-800); white-space: nowrap; }
 .tmo__input {
   width: 92px; text-align: right;
   border: 1px solid var(--c-slate-300); border-radius: 8px; padding: 7px 9px;

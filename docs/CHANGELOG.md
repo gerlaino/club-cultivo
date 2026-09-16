@@ -1,5 +1,13 @@
 # Changelog
 
+## Septiembre 2026 (cb) — La mesa tiene columna «Total»
+
+- **Total = Depósito + Mostrador** en la tabla de la mesa (Germán, 16-sep): cuánto hay de ese
+  producto en total, esté donde esté; la cuenta que el admin hacía a ojo entre las dos columnas.
+  Va después de Mostrador, ordena, y es sólo de administración, como Depósito. Muestra lo
+  GUARDADO: subir a la mesa no cambia el total, así que el número no se mueve mientras se tipea.
+  Lo reservado no entra: ya tiene dueño.
+
 ## Septiembre 2026 (ca) — «Ajustar gramos» pide cuánto se agrega o se quita
 
 - El modal de ajuste de un stock pedía la **cantidad exacta que tenés ahora** y la persona hacía

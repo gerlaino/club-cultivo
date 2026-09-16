@@ -118,6 +118,20 @@ describe('La mesa, que gobierna administración', () => {
     expect(th.join(' ')).toContain('Mostrador')
   })
 
+  // TOTAL = depósito + mostrador (Germán, 16-sep): cuánto hay del producto en total, esté donde
+  // esté. Es la cuenta que el admin hacía a ojo entre las dos columnas.
+  it('y una columna TOTAL que suma depósito y mostrador', async () => {
+    const w = await montar()
+
+    const th = w.findAll('.tmo__th').map(t => t.text())
+    expect(th.at(-1)).toContain('Total')
+    const fila = filas(w)[0]
+    const deposito  = Number(fila.find('[data-col="Depósito"]').text().replace(/[^\d.,]/g, '').replace(',', '.'))
+    const mostrador = Number(fila.find('[data-col="Mostrador"] input').element.value || 0)
+    const total     = Number(fila.find('[data-col="Total"]').text().replace(/[^\d.,]/g, '').replace(',', '.'))
+    expect(total).toBe(deposito + mostrador)
+  })
+
   // Antes la primera columna decía "LO (flor seca)" y la de al lado "LO": el mismo dato dos
   // veces, y la forma —que es lo que distingue un frasco de un preroll— entre paréntesis.
   it('Producto es la forma y Variedad la genética: no el mismo dato dos veces', async () => {
