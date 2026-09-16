@@ -45,9 +45,11 @@ RSpec.describe 'SuperAdmin: demo y clonar', type: :request do
 
       expect(response).to have_http_status(:created)
       nuevo = Club.find(json['club']['id'])
-      expect(nuevo.name).to        eq('Copia')
-      expect(nuevo.sedes.count).to eq(1)
-      expect(nuevo.salas.count).to eq(1)
+      expect(nuevo.name).to eq('Copia')
+      ActsAsTenant.with_tenant(nuevo) do
+        expect(nuevo.sedes.count).to eq(1)
+        expect(nuevo.salas.count).to eq(1)
+      end
       expect(json['password_inicial']).to be_present
       expect(nuevo.users.find_by(role: 'admin').valid_password?(json['password_inicial'])).to be(true)
     end

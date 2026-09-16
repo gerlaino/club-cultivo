@@ -109,7 +109,9 @@ RSpec.describe 'Olvidé mi contraseña', type: :request do
 
       expect(mail.to).to eq(['juan@gmail.com'])
       expect(mail.from).to eq([Club::PLATFORM_FROM])
-      expect(mail.body.encoded).to include('/restablecer?token=abc123')
+      # `decoded`, no `encoded`: en quoted-printable el `=` del query string viaja como `=3D`.
+      expect(mail.text_part.decoded).to include('/restablecer?token=abc123')
+      expect(mail.html_part.decoded).to include('/restablecer?token=abc123')
     end
   end
 end

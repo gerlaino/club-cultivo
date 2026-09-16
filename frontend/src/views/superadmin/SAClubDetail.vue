@@ -903,7 +903,7 @@ onMounted(async () => {
 
       <!-- ── Modal suspender (con motivo) ── -->
       <Teleport to="body">
-        <div v-if="showSuspenderModal" class="scd__overlay" @click.self="showSuspenderModal = false">
+        <div v-modal="() => showSuspenderModal = false" v-if="showSuspenderModal" class="scd__overlay" @click.self="showSuspenderModal = false">
           <div class="scd__modal">
             <div class="scd__modal-hd">
               <span class="scd__modal-title">Suspender {{ club.name }}</span>
@@ -931,7 +931,7 @@ onMounted(async () => {
 
       <!-- ── Modal clonar ── -->
       <Teleport to="body">
-        <div v-if="showClonarModal" class="scd__overlay" @click.self="showClonarModal = false">
+        <div v-modal="() => showClonarModal = false" v-if="showClonarModal" class="scd__overlay" @click.self="showClonarModal = false">
           <div class="scd__modal">
             <div class="scd__modal-hd">
               <span class="scd__modal-title">Clonar el cultivo de {{ club.name }}</span>

@@ -160,7 +160,11 @@ module SuperAdmin
     # fuente, no una por organización.
     def ultima_actividad_por_club(ids)
       visto     = User.del_equipo.where(club_id: ids).group(:club_id).maximum(:visto_at)
-      escrito   = ActsAsTenant.without_tenant { Auditoria.where(club_id: ids).group(:club_id).maximum(:created_at) }
+      # Sin lo que le hicimos NOSOTROS a la organización (cambios sobre `Club`: plan, módulos,
+      # suspensión): eso no es la organización trabajando.
+      escrito   = ActsAsTenant.without_tenant {
+        Auditoria.where(club_id: ids).where.not(auditable_type: 'Club').group(:club_id).maximum(:created_at)
+      }
       dispensa  = Dispensacion.no_canceladas.joins(:paciente)
                               .where(pacientes: { club_id: ids })
                               .group('pacientes.club_id').maximum(:fecha_dispensacion)

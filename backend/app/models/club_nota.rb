@@ -5,6 +5,8 @@
 # Sin `acts_as_tenant` a propósito: es dato de la PLATAFORMA sobre la organización, lo escribe
 # el super admin (que no tiene tenant) y la organización nunca lo ve.
 class ClubNota < ApplicationRecord
+  self.table_name = 'club_notas' # el inflector EN no pluraliza "nota"
+
   belongs_to :club
   belongs_to :user, optional: true
 

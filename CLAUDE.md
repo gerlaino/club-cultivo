@@ -402,12 +402,14 @@ no toca nada más · ② el **vencimiento es informativo**: avisa 7 días antes 
 push, mail y franja, pero **no corta**; el modo «vencido» de sólo lectura queda para cuando lo
 decida · ③ contacto/notas/próxima acción **en la ficha**, no un CRM aparte.
 
-**Sin verificar en Docker todavía al escribir esto** (Docker Desktop estaba apagado): ver el
-estado real de rspec y migraciones en el mensaje de cierre de la sesión. Vitest de lo nuevo
-(`superAdminDueno.test.js`, 18 casos) ✓, estructurales ✓, build ✓.
+**3255 rspec ✓ (queda el rojo ajeno `delivery_periodo_cerrado_spec:132`) · 2109 vitest ✓ · build ✓
+· panel, lista, ficha (solapas, ⋯, suspender con motivo), alta, «Olvidé mi contraseña» y
+«Restablecer» vistos renderizados con Playwright.** Pusheado para que Germán lo pruebe en producción.
 
-**Falta ver renderizado**: la ficha en solapas, el alta con precios y el admin, «Olvidé mi
-contraseña» y la franja de vencimiento.
+**Trampas de este bloque:** el inflector no pluraliza «nota» (`ClubNota` lleva `self.table_name`) ·
+crear una organización o un usuario en un spec deja `Auditoria` de HOY, y el panel la lee como
+señal de vida (el rastro sobre `Club` se excluye; el de `User` hay que borrarlo en el spec) · en
+un mail multipart el `=` del query string viaja como `=3D`: se afirma sobre `text_part.decoded`.
 
 ---
 

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_15_120000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_16_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -398,6 +398,16 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_15_120000) do
     t.index ["paciente_id"], name: "index_check_ins_on_paciente_id"
   end
 
+  create_table "club_notas", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "user_id"
+    t.text "texto", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_club_notas_on_club_id"
+    t.index ["user_id"], name: "index_club_notas_on_user_id"
+  end
+
   create_table "clubs", force: :cascade do |t|
     t.string "name"
     t.datetime "created_at", null: false
@@ -452,12 +462,19 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_15_120000) do
     t.boolean "demo", default: false, null: false
     t.text "pulse_api_key_enc"
     t.jsonb "features_baja", default: {}, null: false
+    t.string "contacto_nombre"
+    t.string "proxima_accion"
+    t.date "proxima_accion_el"
+    t.string "suspension_motivo"
+    t.datetime "suspendida_at"
+    t.datetime "archivada_at"
     t.index ["benchmark_opt_in"], name: "index_clubs_on_benchmark_opt_in"
     t.index ["deleted_at"], name: "index_clubs_on_deleted_at"
     t.index ["deleted_by_id"], name: "index_clubs_on_deleted_by_id"
     t.index ["demo"], name: "index_clubs_on_demo", where: "(demo = true)"
     t.index ["features"], name: "index_clubs_on_features", using: :gin
     t.index ["plan"], name: "index_clubs_on_plan"
+    t.index ["proxima_accion_el"], name: "index_clubs_on_proxima_accion_el"
     t.index ["slug"], name: "index_clubs_on_slug", unique: true
   end
 
@@ -2360,6 +2377,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_15_120000) do
     t.datetime "deleted_at"
     t.bigint "deleted_by_id"
     t.string "email_personal"
+    t.datetime "visto_at"
+    t.index ["club_id", "visto_at"], name: "index_users_on_club_id_and_visto_at"
     t.index ["club_id"], name: "index_users_on_club_id"
     t.index ["deleted_at"], name: "index_users_on_deleted_at"
     t.index ["deleted_by_id"], name: "index_users_on_deleted_by_id"
@@ -2469,6 +2488,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_15_120000) do
   add_foreign_key "check_ins", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "check_ins", "pacientes"
   add_foreign_key "check_ins", "users", column: "deleted_by_id"
+  add_foreign_key "club_notas", "clubs"
+  add_foreign_key "club_notas", "users"
   add_foreign_key "clubs", "users", column: "deleted_by_id"
   add_foreign_key "cobros", "caja_turnos"
   add_foreign_key "cobros", "clubs"

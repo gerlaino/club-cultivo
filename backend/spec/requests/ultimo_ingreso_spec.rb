@@ -63,6 +63,9 @@ RSpec.describe 'Último ingreso', type: :request do
 
     it 'una organización en la que nadie entra hace un mes SÍ, con la fecha' do
       admin.update_column(:visto_at, 40.days.ago)
+      # El alta del admin de la factory deja un rastro de auditoría de HOY, y el rastro es la
+      # segunda señal de vida que mira el panel. Acá se prueba la primera.
+      ActsAsTenant.without_tenant { Auditoria.where(club_id: club.id).delete_all }
 
       get '/api/super_admin/pulso'
       fila = JSON.parse(response.body)['sin_actividad'].find { |c| c['id'] == club.id }
