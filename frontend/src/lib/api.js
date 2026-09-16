@@ -361,6 +361,8 @@ export const listDeliveryUsers  = ()                => api.get('/usuarios', { pa
 // Endpoint propio (no /usuarios, que es sólo de admin): el dispensador necesita esta lista
 // para poder despachar y no puede leer el índice de usuarios del club.
 export const listEntregadores   = ()                => api.get('/dispensaciones/entregadores')
+// Mandar por delivery una dispensa que salió sin envío: repartidor + dirección (misma regla que al crear).
+export const agregarEnvioDispensacion = (id, payload) => api.patch(`/dispensaciones/${id}/agregar_envio`, { dispensacion: payload })
 export const listDespachos     = (params = {})      => api.get('/dispensaciones', { params: { con_envio: 'true', ...params } })
 export const getRutaEntrega    = (params = {})      => api.get('/rutas_entrega', { params })
 export const ordenarRuta       = (payload)          => api.post('/rutas_entrega/ordenar', payload)

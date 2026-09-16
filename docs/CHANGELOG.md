@@ -1,5 +1,19 @@
 # Changelog
 
+## Septiembre 2026 (bz) — Una dispensa que salió sin envío se manda por delivery después
+
+- **«Hice una dispensa y no marqué que era por delivery; al editar no me da la opción»**
+  (Germán, 16-sep). Editar tiene ahora la sección **Envío**: si salió sin tildar, un toggle
+  «Mandar por delivery» pide repartidor, dirección (las del paciente con el texto, o «otra» con
+  nombre), contacto y notas, y al guardar —después de lo financiero, y sólo si eso pasó— llama a
+  `PATCH /dispensaciones/:id/agregar_envio`, que le agrega el paquete (código, estado
+  `pendiente`, snapshot de dirección) **sin tocar lo cobrado**. El repartidor lo ve en su lista
+  como cualquier otro; queda el evento `envio_agregado` en la bitácora. Si ya va por delivery, la
+  sección lo dice y manda a Despachos.
+- **El bloque de dirección de entrega es un componente** (`SelectorDireccionEntrega`): lo usan
+  el modal de dispensa/reserva y el de edición. Emite parches sobre el form del padre
+  (`update:modelValue` con la clave que cambió) y expone `validar()`.
+
 ## Septiembre 2026 (by) — Nombre para la dirección, y «Envíos de hoy» en vivo
 
 - **La dirección de envío tiene nombre** («Trabajo», «Casa de la madre»): `pacientes.envio_etiqueta`

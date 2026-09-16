@@ -329,6 +329,8 @@ Rails.application.routes.draw do
       end
       member do
         patch :anular
+        # Una dispensa que salió sin envío y después hay que mandar por delivery.
+        patch :agregar_envio
         patch :entregar
         patch :reportar_fallo
         patch :reprogramar

@@ -49,7 +49,7 @@ async function montar () {
   return w
 }
 
-const tarjetas = (w) => w.findAll('.mnd__dir')
+const tarjetas = (w) => w.findAll('.sde__dir')
 
 describe('Dispensar con envío — a dónde va', () => {
   beforeEach(() => {

@@ -17,12 +17,12 @@ class DispensacionesController < ApplicationController
   # decisión que ya tomó `AplicarBajasModulosJob`, que suelta los pendientes y no toca lo que
   # está en la calle. Bloquear el cierre dejaría esos envíos colgados para siempre.
   before_action -> { require_feature!(:delivery) },
-                only: [:mis_paquetes, :mi_historial, :iniciar_viaje, :reprogramar, :entregadores, :envios_del_dia]
+                only: [:mis_paquetes, :mi_historial, :iniciar_viaje, :reprogramar, :entregadores, :envios_del_dia, :agregar_envio]
   before_action :require_dispensaciones_role!
   before_action :require_dispensador_o_admin, except: [:index, :show, :iniciar_viaje, :entregar, :reportar_fallo, :cancelar_entrega, :mis_paquetes, :mi_historial, :export_csv, :entregadores]
   before_action :set_paciente,     only: [:create]
   before_action :set_paciente_opt, only: [:index]
-  before_action :set_dispensacion, only: [:show, :update, :anular, :entregar, :reportar_fallo, :reprogramar, :cancelar_entrega]
+  before_action :set_dispensacion, only: [:show, :update, :anular, :agregar_envio, :entregar, :reportar_fallo, :reprogramar, :cancelar_entrega]
 
   # GET /pacientes/:paciente_id/dispensaciones  OR  GET /dispensaciones?fecha=YYYY-MM-DD
   # GET /dispensaciones?con_envio=true[&estado_envio=pendiente][&delivery_id=N][&desde=YYYY-MM-DD][&hasta=YYYY-MM-DD]
@@ -429,6 +429,40 @@ class DispensacionesController < ApplicationController
       proximos_ids.include?(d.id) ? svc.notificar_proximo : svc.notificar_recorrido_iniciado
     end
     render json: { updated: dispensaciones.size }
+  end
+
+  # PATCH /dispensaciones/:id/agregar_envio — mandar por delivery una dispensa que salió sin envío.
+  #
+  # Se dispensó y no se tildó «con envío» (Germán, 16-sep): editar no lo ofrecía y la única
+  # salida era anular y rehacer. Lo cobrado no se toca —ya se cobró como se cobró—: sólo se le
+  # agrega el paquete: repartidor, dirección (misma regla que al crear), contacto, notas, código
+  # y estado `pendiente`. El repartidor lo ve en su lista como cualquier otro.
+  def agregar_envio
+    if @dispensacion.con_envio
+      return render json: { error: 'Esta dispensación ya va por delivery.' }, status: :unprocessable_entity
+    end
+    if @dispensacion.cancelada?
+      return render json: { error: 'Una dispensación anulada no se manda.' }, status: :unprocessable_entity
+    end
+
+    p = params.require(:dispensacion)
+    @dispensacion.assign_attributes(
+      con_envio: true, delivery_id: p[:delivery_id],
+      contacto_nombre: p[:contacto_nombre].presence, contacto_telefono: p[:contacto_telefono].presence,
+      notas_envio: p[:notas_envio].presence,
+    )
+    Envios::DireccionDeEntrega.aplicar(@dispensacion, paciente: @dispensacion.paciente, params: p)
+    # Lo que hace `before_create` para una dispensa que nace con envío: acá nace el paquete.
+    @dispensacion.send(:generar_codigo_paquete)
+    registrar_evento_envio(@dispensacion, 'envio_agregado')
+
+    if @dispensacion.save
+      render json: serialize_dispensacion(@dispensacion)
+    else
+      render json: { errors: @dispensacion.errors.full_messages }, status: :unprocessable_entity
+    end
+  rescue Envios::DireccionDeEntrega::Error => e
+    render json: { errors: [e.message] }, status: :unprocessable_entity
   end
 
   # PATCH /dispensaciones/:id/entregar

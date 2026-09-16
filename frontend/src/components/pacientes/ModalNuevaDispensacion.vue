@@ -10,7 +10,8 @@ import AppDatePicker from '../ui/AppDatePicker.vue'
 import { hoyISO, toISO } from '../../utils/dates.js'
 import { RouterLink, useRoute } from 'vue-router'
 import { createDispensacion, createReserva, entregarReserva, listStocks, listEntregadores,
-         getMostrador, listMostradores, getDireccionesPaciente } from '../../lib/api.js'
+         getMostrador, listMostradores } from '../../lib/api.js'
+import SelectorDireccionEntrega from './SelectorDireccionEntrega.vue'
 
 const props = defineProps({
   modelValue:     { type: Boolean, required: true },
@@ -160,9 +161,6 @@ function emptyForm() {
   }
 }
 const form = ref(emptyForm())
-// Las direcciones del paciente para el envío (ver `cargarDirecciones`, más abajo).
-const direcciones = ref(null)          // { domicilio: {...}|null, envio: {...}|null }
-const direccionesCargando = ref(false)
 
 // EL TECHO ES LO QUE EL BACKEND VA A ACEPTAR, NO EL FRASCO.
 //
@@ -718,7 +716,7 @@ function cancelarPagoDividido() {
 watch(puedeDividirPago, (puede) => { if (!puede) cancelarPagoDividido() })
 watch(() => form.value.medio_pago, (val) => { if (val === 'contra_entrega') form.value.con_envio = true })
 watch(() => form.value.con_envio, (val) => {
-  if (val) { cargarDeliveryUsers(); cargarDirecciones() }
+  if (val) cargarDeliveryUsers()
   else {
     if (form.value.medio_pago === 'contra_entrega') form.value.medio_pago = 'efectivo'
     // Sin envío no hay quien cobre en la puerta: la línea se va.
@@ -783,7 +781,6 @@ watch(() => props.modelValue, (open) => {
     paso.value = 1
     formError.value = null
     deliveryUsers.value = []
-    direcciones.value = null
     cargarStocks().then(precargarCambio)
     cargarEstadoCaja()
     cargarCajasAbiertas()
@@ -820,44 +817,9 @@ function precargarCambio() {
 // Cuánto queda del valor que cubre la anulada, con lo que hay en el carrito.
 const restoCambio = computed(() => Math.round((topeCambio.value - (Number(precioFinal.value) || 0)) * 100) / 100)
 
-// ── Las direcciones del paciente ──
-// Se piden al prender «con envío» (no antes: la mayoría de las dispensas no llevan envío) y se
-// muestran como tarjetas con el texto: el que dispensa tiene que VER a dónde va antes de
-// confirmar. Por defecto la de envío si la tiene —es para eso que la cargó—, si no el
-// domicilio, y si no tiene ninguna, «otra».
-// (`direcciones` y `direccionesCargando` viven arriba, junto al form: el watcher de apertura
-// las resetea y corre `immediate` — declaradas acá reventaban con "before initialization".)
-async function cargarDirecciones() {
-  if (direcciones.value || direccionesCargando.value) return
-  direccionesCargando.value = true
-  try {
-    const { data } = await getDireccionesPaciente(props.socioId)
-    direcciones.value = data || { domicilio: null, envio: null }
-    elegirDireccionPorDefecto()
-  } catch {
-    // Sin respuesta no se sabe qué tiene cargado: se dejan elegibles las dos de la ficha y el
-    // backend decide. Marcarlas como "no cargadas" por un request que no salió sería mentir.
-    direcciones.value = null
-  } finally {
-    direccionesCargando.value = false
-  }
-}
-
-function elegirDireccionPorDefecto() {
-  const d = direcciones.value || {}
-  form.value.direccion_origen = d.envio ? 'envio' : (d.domicilio ? 'domicilio' : 'otra')
-}
-
-const opcionesDireccion = computed(() => {
-  const d = direcciones.value
-  const sinDatos = d === null   // no se pudieron consultar: no se marca nada como faltante
-  return [
-    { origen: 'domicilio', label: 'Domicilio REPROCANN', icono: 'bi-house',    texto: d?.domicilio?.texto, disponible: sinDatos || !!d.domicilio },
-    { origen: 'envio',     label: d?.envio?.etiqueta ? `Dirección de envío · ${d.envio.etiqueta}` : 'Dirección de envío',
-      icono: 'bi-box-seam', texto: d?.envio?.texto, disponible: sinDatos || !!d.envio },
-    { origen: 'otra',      label: 'Otra dirección',      icono: 'bi-geo-alt',  texto: null,                disponible: true },
-  ]
-})
+// Las direcciones del paciente las maneja <SelectorDireccionEntrega>; acá sólo se lee su
+// validación antes de mandar.
+const selectorDireccion = ref(null)
 
 // Compone la dirección de entrega a partir de los campos estructurados (para reservas,
 // que guardan texto). Si va a una de la ficha, la resuelve el backend.
@@ -1025,13 +987,8 @@ async function handleSubmit() {
 
   if (form.value.con_envio) {
     if (!form.value.delivery_id) { formError.value = 'Seleccioná un delivery para asignar el envío'; saving.value = false; return }
-    if (form.value.direccion_origen === 'otra') {
-      if (!form.value.envio_calle?.trim() || !form.value.envio_altura?.trim() || !form.value.envio_ciudad?.trim()) {
-        formError.value = 'Completá calle, altura y ciudad de la dirección de entrega'; saving.value = false; return
-      }
-    } else if (direcciones.value && !direcciones.value[form.value.direccion_origen]) {
-      formError.value = 'El paciente no tiene cargada esa dirección. Cargala en su ficha o elegí «Otra dirección».'; saving.value = false; return
-    }
+    const errorDireccion = selectorDireccion.value?.validar?.()
+    if (errorDireccion) { formError.value = errorDireccion; saving.value = false; return }
   }
 
   try {
@@ -1775,72 +1732,10 @@ async function handleSubmit() {
               El delivery se asigna al entregar la reserva.
             </div>
 
-            <!-- Dirección de entrega: las del paciente CON EL TEXTO, y «otra». El que dispensa
-                 tiene que ver a dónde va antes de confirmar; un botón que dice «domicilio» y
-                 manda a otro lado es cómo un paquete termina en la dirección equivocada. -->
-            <div class="mnd__field">
-              <label class="mnd__label">Dirección de entrega</label>
-              <div v-if="direccionesCargando && !direcciones" class="mnd__field-hint">Buscando las direcciones del paciente…</div>
-              <div v-else class="mnd__dirs">
-                <button v-for="o in opcionesDireccion" :key="o.origen" type="button"
-                        class="mnd__dir" :class="{ 'mnd__dir--on': form.direccion_origen === o.origen, 'mnd__dir--off': !o.disponible }"
-                        :disabled="!o.disponible" @click="form.direccion_origen = o.origen">
-                  <i class="bi" :class="o.icono"></i>
-                  <span class="mnd__dir-txt">
-                    <span class="mnd__dir-label">{{ o.label }}</span>
-                    <span v-if="o.texto" class="mnd__dir-dir">{{ o.texto }}</span>
-                    <span v-else-if="o.origen !== 'otra' && !direcciones" class="mnd__dir-dir mnd__dir-dir--falta">No se pudo consultar la ficha</span>
-                    <span v-else-if="o.origen !== 'otra'" class="mnd__dir-dir mnd__dir-dir--falta">No está cargada en la ficha</span>
-                    <span v-else class="mnd__dir-dir">Escribirla ahora</span>
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            <template v-if="form.direccion_origen === 'otra'">
-              <div class="mnd__form-row">
-                <div class="mnd__field" style="flex:2">
-                  <label class="mnd__label">Calle <span class="mnd__req">*</span></label>
-                  <input v-model.trim="form.envio_calle" type="text" class="mnd__input" placeholder="Av. Siempreviva" />
-                </div>
-                <div class="mnd__field">
-                  <label class="mnd__label">Altura <span class="mnd__req">*</span></label>
-                  <input v-model.trim="form.envio_altura" type="text" class="mnd__input" placeholder="742" />
-                </div>
-              </div>
-              <div class="mnd__form-row">
-                <div class="mnd__field">
-                  <label class="mnd__label">Piso <span class="mnd__opt">opc.</span></label>
-                  <input v-model.trim="form.envio_piso" type="text" class="mnd__input" placeholder="3" />
-                </div>
-                <div class="mnd__field">
-                  <label class="mnd__label">Depto <span class="mnd__opt">opc.</span></label>
-                  <input v-model.trim="form.envio_depto" type="text" class="mnd__input" placeholder="B" />
-                </div>
-              </div>
-              <div class="mnd__form-row">
-                <div class="mnd__field">
-                  <label class="mnd__label">Barrio <span class="mnd__opt">opc.</span></label>
-                  <input v-model.trim="form.envio_barrio" type="text" class="mnd__input" placeholder="Palermo" />
-                </div>
-                <div class="mnd__field">
-                  <label class="mnd__label">Ciudad <span class="mnd__req">*</span></label>
-                  <input v-model.trim="form.envio_ciudad" type="text" class="mnd__input" placeholder="CABA" />
-                </div>
-              </div>
-              <!-- Para no tipearla de nuevo la próxima vez: queda en la ficha como dirección de envío,
-                   con nombre. El repartidor lo lee en el paquete: «Trabajo · Directorio 1602». -->
-              <div class="mnd__form-row">
-                <div class="mnd__field" style="flex:2">
-                  <label class="mnd__label">Nombre de la dirección <span class="mnd__opt">ej. Trabajo</span></label>
-                  <input v-model.trim="form.envio_etiqueta" type="text" class="mnd__input" placeholder="Trabajo, casa de la madre…" />
-                </div>
-              </div>
-              <label class="mnd__check">
-                <input v-model="form.guardar_como_envio" type="checkbox" />
-                Guardarla en la ficha como dirección de envío del paciente
-              </label>
-            </template>
+            <!-- A dónde va: las direcciones del paciente con el texto, y «otra». Mismo componente
+                 que al editar una dispensa para mandarla por delivery. -->
+            <SelectorDireccionEntrega ref="selectorDireccion" :model-value="form" :socio-id="socioId"
+                                      @update:model-value="Object.assign(form, $event)" />
             <div class="mnd__form-row">
               <div class="mnd__field">
                 <label class="mnd__label">Contacto <span class="mnd__req">*</span></label>
@@ -2220,18 +2115,6 @@ async function handleSubmit() {
 .mnd__input--error { border-color: #ef4444 !important; background: #fef2f2; }
 .mnd__field-error { font-size: .72rem; color: #dc2626; font-weight: 600; }
 .mnd__field-hint  { font-size: .72rem; color: var(--c-slate-400); }
-/* Direcciones de entrega: tarjetas con el texto */
-.mnd__dirs { display: grid; gap: .4rem; }
-.mnd__dir { display: flex; align-items: flex-start; gap: .6rem; width: 100%; text-align: left; padding: .55rem .7rem; border: 1.5px solid var(--c-slate-200); border-radius: 10px; background: #fff; cursor: pointer; font: inherit; color: var(--c-slate-700); transition: border-color .15s, background .15s; }
-.mnd__dir i { margin-top: .1rem; color: var(--c-slate-400); }
-.mnd__dir--on { border-color: #15803d; background: #f0fdf4; color: var(--c-slate-900); }
-.mnd__dir--on i { color: #15803d; }
-.mnd__dir--off { opacity: .55; cursor: not-allowed; }
-.mnd__dir-txt { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
-.mnd__dir-label { font-size: .8rem; font-weight: 700; }
-.mnd__dir-dir { font-size: .78rem; color: var(--c-slate-600); }
-.mnd__dir-dir--falta { color: var(--c-slate-400); font-style: italic; }
-.mnd__check { display: inline-flex; align-items: center; gap: .4rem; font-size: .78rem; color: var(--c-slate-600); cursor: pointer; }
 .mnd__textarea { resize: vertical; min-height: 58px; }
 .mnd__cambio-box { display: flex; gap: .6rem; align-items: flex-start; margin: .2rem 0 .9rem; padding: .7rem .85rem; background: var(--c-rust-100); border: 1.5px solid var(--c-rust-100); border-radius: 10px; font-size: .82rem; color: var(--c-slate-700); line-height: 1.45; }
 .mnd__cambio-box > i { color: var(--c-rust-600); font-size: 1rem; margin-top: .05rem; }

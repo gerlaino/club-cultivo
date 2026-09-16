@@ -3,8 +3,10 @@ import { ref, computed, watch } from 'vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
 import { useToast } from '../../composables/useToast.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { updateDispensacion } from '../../lib/api.js'
+import { updateDispensacion, agregarEnvioDispensacion, listEntregadores } from '../../lib/api.js'
 import { useAuthStore } from '../../stores/auth'
+import { useClubStore } from '../../stores/club'
+import SelectorDireccionEntrega from './SelectorDireccionEntrega.vue'
 
 const auth = useAuthStore()
 // Solo admin/supervisor pueden pisar el precio por ítem; el resto edita cantidades.
@@ -60,6 +62,28 @@ const estadoCc = computed(() => {
   return 'ok'
 })
 
+// ── Envío ─────────────────────────────────────────────────
+// Se dispensó y no se tildó «con envío» (Germán, 16-sep): acá se le agrega el paquete —
+// repartidor y dirección con la misma regla que al crear— sin tocar lo cobrado. Si ya va por
+// delivery, se dice y no se edita desde acá: el paquete se maneja en Despachos.
+const club = useClubStore()
+const tieneDelivery = computed(() => club.data?.features?.delivery === true)
+const agregarEnvio  = ref(false)
+const envio = ref({})
+const entregadores = ref([])
+const selectorDireccion = ref(null)
+
+function envioVacio() {
+  return { delivery_id: null, direccion_origen: 'domicilio', envio_calle: '', envio_altura: '', envio_piso: '',
+           envio_depto: '', envio_barrio: '', envio_ciudad: '', envio_etiqueta: '', guardar_como_envio: false,
+           contacto_nombre: '', contacto_telefono: '', notas_envio: '' }
+}
+
+watch(agregarEnvio, async (on) => {
+  if (!on || entregadores.value.length) return
+  try { const { data } = await listEntregadores(); entregadores.value = data?.data || data || [] } catch { /* el select queda vacío y se ve */ }
+})
+
 // ── Form ──────────────────────────────────────────────────
 const form = ref({})
 
@@ -98,6 +122,8 @@ watch(() => props.modelValue, (open) => {
   if (open && props.dispensacion) {
     form.value  = buildForm(props.dispensacion)
     formError.value = null
+    agregarEnvio.value = false
+    envio.value = envioVacio()
   }
 }, { immediate: true })
 
@@ -122,6 +148,12 @@ async function handleSubmit() {
     saving.value = false; return
   }
 
+  if (agregarEnvio.value) {
+    if (!envio.value.delivery_id) { formError.value = 'Elegí un repartidor para el envío'; saving.value = false; return }
+    const errorDireccion = selectorDireccion.value?.validar?.()
+    if (errorDireccion) { formError.value = errorDireccion; saving.value = false; return }
+  }
+
   try {
     await updateDispensacion(props.dispensacion.id, {
       items: form.value.items.map(it => ({
@@ -134,8 +166,22 @@ async function handleSubmit() {
       aporte_socio_ars:   form.value.aporte_socio_ars,
       observaciones:      form.value.observaciones || null,
     })
+    // Después de guardar lo financiero: si eso rebotó, no se manda nada a la calle.
+    if (agregarEnvio.value) {
+      const e = envio.value
+      await agregarEnvioDispensacion(props.dispensacion.id, {
+        delivery_id: e.delivery_id, direccion_origen: e.direccion_origen,
+        envio_calle: e.envio_calle || undefined, envio_altura: e.envio_altura || undefined,
+        envio_piso: e.envio_piso || undefined, envio_depto: e.envio_depto || undefined,
+        envio_barrio: e.envio_barrio || undefined, envio_ciudad: e.envio_ciudad || undefined,
+        envio_etiqueta: e.envio_etiqueta || undefined,
+        guardar_como_envio: e.direccion_origen === 'otra' && e.guardar_como_envio,
+        contacto_nombre: e.contacto_nombre || undefined, contacto_telefono: e.contacto_telefono || undefined,
+        notas_envio: e.notas_envio || undefined,
+      })
+    }
     cerrar()
-    toast.success('Dispensación actualizada')
+    toast.success(agregarEnvio.value ? 'Dispensación actualizada y mandada por delivery' : 'Dispensación actualizada')
     emit('saved')
   } catch (e) {
     formError.value = e.response?.data?.errors?.[0] || e.response?.data?.error || 'Error al guardar'
@@ -232,6 +278,51 @@ async function handleSubmit() {
                       placeholder="Notas adicionales…"></textarea>
           </div>
 
+          <!-- Envío. Si salió sin tildar «con envío», acá se manda por delivery. -->
+          <template v-if="tieneDelivery">
+            <div class="med__divider"></div>
+            <div v-if="dispensacion.con_envio" class="med__envio-info">
+              <i class="bi bi-truck"></i>
+              Va por delivery<template v-if="dispensacion.delivery_nombre"> con {{ dispensacion.delivery_nombre }}</template>
+              <template v-if="dispensacion.direccion_envio"> a {{ dispensacion.direccion_envio }}</template>.
+              El paquete se maneja desde Despachos.
+            </div>
+            <template v-else>
+              <div class="med__envio-toggle" @click="agregarEnvio = !agregarEnvio">
+                <div>
+                  <div class="med__envio-toggle-title">Mandar por delivery</div>
+                  <div class="med__opt">Salió sin envío: se le agrega el paquete sin tocar lo cobrado</div>
+                </div>
+                <div class="med__switch" :class="{ 'med__switch--on': agregarEnvio }"><div class="med__switch-knob"></div></div>
+              </div>
+              <div v-if="agregarEnvio" class="med__envio">
+                <div class="med__field">
+                  <label class="med__label">Repartidor <span class="med__req">*</span></label>
+                  <select v-model="envio.delivery_id" class="med__input">
+                    <option :value="null">Seleccioná un repartidor…</option>
+                    <option v-for="u in entregadores" :key="u.id" :value="u.id">{{ u.nombre || u.email }}</option>
+                  </select>
+                </div>
+                <SelectorDireccionEntrega ref="selectorDireccion" :model-value="envio" :socio-id="dispensacion.paciente_id"
+                                          @update:model-value="Object.assign(envio, $event)" />
+                <div class="med__form-row">
+                  <div class="med__field">
+                    <label class="med__label">Contacto <span class="med__opt">si no es el paciente</span></label>
+                    <input v-model.trim="envio.contacto_nombre" type="text" class="med__input" placeholder="Quien recibe" />
+                  </div>
+                  <div class="med__field">
+                    <label class="med__label">Teléfono <span class="med__opt">opcional</span></label>
+                    <input v-model.trim="envio.contacto_telefono" type="tel" class="med__input" placeholder="+54 11 …" />
+                  </div>
+                </div>
+                <div class="med__field">
+                  <label class="med__label">Notas de envío <span class="med__opt">opcional</span></label>
+                  <textarea v-model.trim="envio.notas_envio" class="med__input med__textarea" rows="2" placeholder="Instrucciones para el delivery…"></textarea>
+                </div>
+              </div>
+            </template>
+          </template>
+
         </div>
 
         <div class="med__modal-footer">
@@ -294,6 +385,16 @@ async function handleSubmit() {
 
 /* Form */
 .med__divider { height: 1px; background: var(--c-slate-200); }
+/* Envío */
+.med__envio-info { display: flex; gap: .5rem; align-items: flex-start; font-size: .82rem; color: var(--c-slate-600); background: var(--c-slate-50); border-radius: 9px; padding: .6rem .8rem; }
+.med__envio-toggle { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .7rem .85rem; border: 1.5px solid var(--c-slate-200); border-radius: 10px; cursor: pointer; }
+.med__envio-toggle-title { font-size: .86rem; font-weight: 700; color: var(--c-slate-900); }
+.med__switch { width: 40px; height: 22px; border-radius: 11px; background: var(--c-slate-300); position: relative; flex-shrink: 0; transition: background .15s; }
+.med__switch--on { background: #15803d; }
+.med__switch-knob { position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left .15s; }
+.med__switch--on .med__switch-knob { left: 20px; }
+.med__envio { display: flex; flex-direction: column; gap: .75rem; padding: .75rem; background: var(--c-slate-50); border: 1px solid var(--c-slate-200); border-radius: 10px; }
+.med__req { color: #dc2626; }
 .med__form-row { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
 @media (max-width: 400px) { .med__form-row { grid-template-columns: 1fr; } }
 .med__field { display: flex; flex-direction: column; gap: .3rem; }
