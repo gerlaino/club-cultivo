@@ -48,6 +48,7 @@ export function useSocioEditar(socioIdRef) {
       envio_depto:                    s?.envio_depto          || '',
       envio_barrio:                   s?.envio_barrio         || '',
       envio_ciudad:                   s?.envio_ciudad         || '',
+      envio_etiqueta:                 s?.envio_etiqueta       || '',
     }
     editError.value = null
     editOpen.value  = true

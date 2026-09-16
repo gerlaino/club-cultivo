@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_16_120000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_16_200000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -701,6 +701,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_16_120000) do
     t.bigint "anulada_por_id"
     t.string "resolucion_anulacion"
     t.bigint "reemplaza_a_id"
+    t.string "direccion_etiqueta"
     t.index ["anulada_por_id"], name: "index_dispensaciones_on_anulada_por_id"
     t.index ["ariccame_reportada"], name: "index_dispensaciones_on_ariccame_reportada", where: "(ariccame_reportada = false)"
     t.index ["codigo_paquete"], name: "index_dispensaciones_on_codigo_paquete", unique: true
@@ -1566,6 +1567,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_16_120000) do
     t.datetime "aprobado_at"
     t.bigint "aprobado_por_id"
     t.bigint "user_id"
+    t.string "envio_etiqueta"
     t.index "lower((apellido)::text)", name: "index_socios_on_lower_apellido"
     t.index "lower((nombre)::text)", name: "index_socios_on_lower_nombre"
     t.index ["aprobado_at"], name: "index_pacientes_on_aprobado_at"

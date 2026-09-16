@@ -118,6 +118,29 @@ RSpec.describe 'Dispensación con envío — dirección', type: :request do
       expect(paciente.reload.envio_calle).to eq('Lavalle')
     end
 
+    # El nombre de la dirección («Trabajo»): el socio de Germán lo escribió en Depto porque no
+    # había otro lugar, y Maps dejó de encontrarla. Viaja con el paquete como snapshot.
+    it 'la de envío lleva su etiqueta, y el paquete la conserva' do
+      paciente.update!(envio_etiqueta: 'Trabajo')
+
+      get "/pacientes/#{paciente.id}/direcciones", headers: auth_headers
+      expect(JSON.parse(response.body)['envio']['etiqueta']).to eq('Trabajo')
+
+      crear(direccion_origen: 'envio')
+      d = Dispensacion.last
+      expect(d.direccion_etiqueta).to eq('Trabajo')
+      expect(DispensacionSerializer.serialize_delivery(d)[:direccion_etiqueta]).to eq('Trabajo')
+    end
+
+    it '«otra» con etiqueta y guardar: la ficha queda con nombre y el paquete también' do
+      crear(direccion_origen: 'otra', envio_calle: 'Directorio', envio_altura: '1602', envio_ciudad: 'CABA',
+            envio_etiqueta: 'Trabajo', guardar_como_envio: true)
+
+      expect(paciente.reload.envio_etiqueta).to eq('Trabajo')
+      expect(Dispensacion.last.direccion_etiqueta).to eq('Trabajo')
+      expect(Dispensacion.last.direccion_envio).to eq('Directorio 1602, CABA')
+    end
+
     # El bundle viejo de la PWA sigue mandando `usar_domicilio_paciente`: no puede romperse.
     it 'el cliente viejo sigue resolviendo como antes' do
       crear(usar_domicilio_paciente: true)

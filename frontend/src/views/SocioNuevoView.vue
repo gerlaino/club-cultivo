@@ -56,6 +56,7 @@ const form = ref({
   envio_depto:          '',
   envio_barrio:         '',
   envio_ciudad:         '',
+  envio_etiqueta:       '',
   reprocann_numero:     '',
   reprocann_vencimiento:'',
   reprocann_estado:     'sin_registro',
@@ -245,6 +246,10 @@ async function handleSubmit() {
         <details class="snv__envio">
           <summary class="snv__envio-sum">Dirección de entrega distinta <span class="snv__opt">opcional</span></summary>
           <div class="snv__grid snv__grid--2" style="margin-top:.75rem">
+            <div class="snv__field" style="grid-column: 1 / -1">
+              <label class="snv__label">Nombre de la dirección <span class="snv__opt">ej. Trabajo</span></label>
+              <input v-model.trim="form.envio_etiqueta" class="snv__input" placeholder="Trabajo, casa de la madre…" />
+            </div>
             <div class="snv__field">
               <label class="snv__label">Calle</label>
               <input v-model.trim="form.envio_calle" class="snv__input" placeholder="Calle de entrega" />

@@ -335,6 +335,8 @@ export const deleteReserva   = (id)                  => api.delete(`/reservas/${
 // ── Delivery ──────────────────────────────────────────────────────────────────
 export const exportDispensacionesCSV = (params = {}) => api.get('/dispensaciones/export_csv', { params, responseType: 'blob' })
 export const getMisPaquetes   = ()                  => api.get('/dispensaciones/mis_paquetes')
+// Los envíos que despachó HOY quien pregunta, con su estado (`todos=1` para administración).
+export const getEnviosDelDia  = (params = {})       => api.get('/dispensaciones/envios_del_dia', { params })
 // Lo que el repartidor YA cerró (entregado/fallido). Va aparte de mis_paquetes: ese trae el trabajo
 // pendiente del día, y mezclarlos escondería lo que falta hacer detrás de semanas de entregas.
 export const getMiHistorialDelivery = (dias = 30)   => api.get('/dispensaciones/mi_historial', { params: { dias } })

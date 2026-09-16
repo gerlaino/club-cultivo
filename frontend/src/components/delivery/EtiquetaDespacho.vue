@@ -10,7 +10,9 @@
     <div class="et-lbl__para-lbl">Para</div>
     <div class="et-lbl__para">{{ despacho.contacto_nombre || despacho.paciente_nombre || '—' }}</div>
 
-    <div v-if="despacho.direccion_envio" class="et-lbl__dir">{{ despacho.direccion_envio }}</div>
+    <!-- Con el nombre de la dirección adelante («Trabajo · Directorio 1602»): el repartidor
+         sabe a cuál va sin preguntar. -->
+    <div v-if="despacho.direccion_envio" class="et-lbl__dir"><template v-if="despacho.direccion_etiqueta">{{ despacho.direccion_etiqueta }} · </template>{{ despacho.direccion_envio }}</div>
     <div v-if="despacho.contacto_telefono" class="et-lbl__tel">Tel: {{ despacho.contacto_telefono }}</div>
 
     <!-- Cobrar al entregar (contra-entrega) -->

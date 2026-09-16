@@ -49,6 +49,7 @@ class DispensacionSerializer
       delivery_id:     d.delivery_id,
       delivery_nombre: d.delivery_user ? [d.delivery_user.first_name, d.delivery_user.last_name].compact.join(' ').strip.presence || d.delivery_user.email : nil,
       direccion_envio:   d.direccion_envio,
+      direccion_etiqueta: d.direccion_etiqueta,
       # Para el botón «Ir»: sin piso, depto ni barrio, que Maps no encuentra.
       direccion_maps:    d.direccion_envio_maps,
       contacto_nombre:   d.contacto_nombre,
@@ -114,6 +115,9 @@ class DispensacionSerializer
       comprobante_entrega_url: (d.comprobante_entrega.attached? ? Rails.application.routes.url_helpers.rails_blob_path(d.comprobante_entrega, only_path: true) : nil),
       observaciones:      d.observaciones,
       direccion_envio:    d.direccion_envio,
+      # El nombre que el paciente le puso a la dirección («Trabajo»): el repartidor lo lee en
+      # el paquete y en la etiqueta.
+      direccion_etiqueta: d.direccion_etiqueta,
       direccion_maps:     d.direccion_envio_maps,
       contacto_nombre:    d.contacto_nombre,
       contacto_telefono:  d.contacto_telefono,

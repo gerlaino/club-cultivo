@@ -152,8 +152,9 @@ function emptyForm() {
     // elegir. Se fija al cargar las direcciones del paciente (`elegirDireccionPorDefecto`).
     direccion_origen: 'domicilio',
     envio_calle: '', envio_altura: '', envio_piso: '', envio_depto: '', envio_barrio: '', envio_ciudad: '',
-    // «Otra dirección» tipeada que queda en la ficha como dirección de envío para la próxima.
-    guardar_como_envio: false,
+    // «Otra dirección» tipeada que queda en la ficha como dirección de envío para la próxima,
+    // con su nombre («Trabajo»): es lo que el repartidor lee en el paquete.
+    guardar_como_envio: false, envio_etiqueta: '',
     // Reserva: si es_reserva, no se entrega ahora — se aparta stock para una fecha futura.
     es_reserva: false, fecha_entrega_estimada: '', sena_ars: null,
   }
@@ -852,7 +853,8 @@ const opcionesDireccion = computed(() => {
   const sinDatos = d === null   // no se pudieron consultar: no se marca nada como faltante
   return [
     { origen: 'domicilio', label: 'Domicilio REPROCANN', icono: 'bi-house',    texto: d?.domicilio?.texto, disponible: sinDatos || !!d.domicilio },
-    { origen: 'envio',     label: 'Dirección de envío',  icono: 'bi-box-seam', texto: d?.envio?.texto,     disponible: sinDatos || !!d.envio },
+    { origen: 'envio',     label: d?.envio?.etiqueta ? `Dirección de envío · ${d.envio.etiqueta}` : 'Dirección de envío',
+      icono: 'bi-box-seam', texto: d?.envio?.texto, disponible: sinDatos || !!d.envio },
     { origen: 'otra',      label: 'Otra dirección',      icono: 'bi-geo-alt',  texto: null,                disponible: true },
   ]
 })
@@ -910,6 +912,7 @@ async function handleSubmit() {
         payload.delivery_id       = form.value.delivery_id
         payload.direccion_origen  = form.value.direccion_origen
         payload.guardar_como_envio = form.value.direccion_origen === 'otra' && form.value.guardar_como_envio
+        payload.envio_etiqueta    = form.value.envio_etiqueta || undefined
         payload.envio_calle       = form.value.envio_calle || undefined
         payload.envio_altura      = form.value.envio_altura || undefined
         payload.envio_piso        = form.value.envio_piso || undefined
@@ -1073,6 +1076,7 @@ async function handleSubmit() {
       payload.delivery_id       = form.value.delivery_id
       payload.direccion_origen  = form.value.direccion_origen
       payload.guardar_como_envio = form.value.direccion_origen === 'otra' && form.value.guardar_como_envio
+      payload.envio_etiqueta    = form.value.envio_etiqueta || undefined
       payload.envio_calle       = form.value.envio_calle || undefined
       payload.envio_altura      = form.value.envio_altura || undefined
       payload.envio_piso        = form.value.envio_piso || undefined
@@ -1824,7 +1828,14 @@ async function handleSubmit() {
                   <input v-model.trim="form.envio_ciudad" type="text" class="mnd__input" placeholder="CABA" />
                 </div>
               </div>
-              <!-- Para no tipearla de nuevo la próxima vez: queda en la ficha como dirección de envío. -->
+              <!-- Para no tipearla de nuevo la próxima vez: queda en la ficha como dirección de envío,
+                   con nombre. El repartidor lo lee en el paquete: «Trabajo · Directorio 1602». -->
+              <div class="mnd__form-row">
+                <div class="mnd__field" style="flex:2">
+                  <label class="mnd__label">Nombre de la dirección <span class="mnd__opt">ej. Trabajo</span></label>
+                  <input v-model.trim="form.envio_etiqueta" type="text" class="mnd__input" placeholder="Trabajo, casa de la madre…" />
+                </div>
+              </div>
               <label class="mnd__check">
                 <input v-model="form.guardar_como_envio" type="checkbox" />
                 Guardarla en la ficha como dirección de envío del paciente

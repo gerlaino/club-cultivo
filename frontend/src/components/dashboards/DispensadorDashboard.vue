@@ -18,6 +18,9 @@
          la ABRE. Dos vistas del mismo objeto, un solo lugar donde arreglarla. -->
     <CajaMostradorCard :sede="sedeMostrador" :puede-gestionar="puedeGestionarCaja" />
 
+    <!-- Lo que despachó hoy y cómo va: se actualiza sola cuando el repartidor lo marca. -->
+    <EnviosDeHoy :todos="puedeGestionarCaja" />
+
     <!-- Banner: reservas vencidas sin preparar -->
     <RouterLink v-if="!loading && reservasVencidas > 0" to="/reservas" class="dd__banner-alert">
       <i class="bi bi-exclamation-triangle-fill"></i>
@@ -209,6 +212,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useAuthStore }     from '../../stores/auth.js'
 import { listDispensacionesFecha, getAnalyticsDispensador, getTareasSemana } from '../../lib/api.js'
 import CajaMostradorCard from './CajaMostradorCard.vue'
+import EnviosDeHoy       from './EnviosDeHoy.vue'
 import { useSemanaTareas } from '../../composables/useSemanaTareas.js'
 import DsStat               from '../../design-system/components/Stat.vue'
 import { PackagePlus }      from 'lucide-vue-next'

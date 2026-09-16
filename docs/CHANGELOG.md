@@ -1,5 +1,25 @@
 # Changelog
 
+## Septiembre 2026 (by) — Nombre para la dirección, y «Envíos de hoy» en vivo
+
+- **La dirección de envío tiene nombre** («Trabajo», «Casa de la madre»): `pacientes.envio_etiqueta`
+  y el snapshot `dispensaciones.direccion_etiqueta`. Se carga en la ficha (alta y edición), la
+  tarjeta del modal la muestra («Dirección de envío · Trabajo»), «Otra dirección» + guardar lo
+  pide, y el repartidor lo lee en el paquete, en la parada en foco y en la etiqueta impresa
+  («Trabajo · Directorio 1602»). Es lo que el socio de Germán resolvió escribiendo "TRABAJO" en
+  Depto. El domicilio no lleva etiqueta: es «Domicilio REPROCANN» siempre.
+- **«Envíos de hoy»** (pedido del socio de Germán): el dispensador ve los envíos que despachó HOY
+  con su estado —pendiente · en viaje · entregado · fallido—, repartidor, nombre de la dirección,
+  hora y si cobra en la puerta. `GET /dispensaciones/envios_del_dia` (los propios; administración
+  con `todos=1` ve los del equipo). Tarjeta en el inicio del escritorio y, plegada a un renglón,
+  en el inicio del teléfono. **Se actualiza sola**: la dispensa emite `envio_actualizado` por el
+  canal del club que ya existía (`stocks_club_X`, no se abre otro) y la tarjeta vuelve a pedir su
+  lista. Dos cosas que aparecieron haciéndolo: el `after_update_commit` del cambio de estado
+  usaba `estado_envio_changed?`, que dentro de un after_commit da false —el timbre del stock
+  tampoco sonaba—, y `iniciar_viaje` cambia el estado con `update_all` (sin callbacks), así que
+  toca el timbre a mano.
+- Migración: `add_etiqueta_a_direcciones`.
+
 ## Septiembre 2026 (bx) — A dónde va el paquete: la dirección se elige VIENDO cuál es
 
 - **Lo encontró el socio de Germán en el primer reparto de Mitocondria ONG**: el modal de

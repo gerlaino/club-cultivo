@@ -4,6 +4,8 @@
          es la pantalla donde aterriza. Va en modo COMPACTO — con el turno andando se colapsa a
          un renglón para no empujar el buscador, que es lo primero que se usa. -->
     <CajaMostradorCard v-if="sedeMostrador" :sede="sedeMostrador" :puede-gestionar="puedeGestionarCaja" compacto />
+    <!-- Sus envíos de hoy, en un renglón: la lista se abre al tocar, para no empujar el buscador. -->
+    <EnviosDeHoy compacto :todos="puedeGestionarCaja" />
 
     <!-- Buscar es LO PRIMERO: el dispensador está de pie con alguien enfrente, no navegando. -->
     <div class="mdis__search-wrap">
@@ -105,6 +107,7 @@ import ModalNuevaDispensacion from '../../components/pacientes/ModalNuevaDispens
 import { useToast } from '../../composables/useToast.js'
 import { useAuthStore } from '../../stores/auth.js'
 import CajaMostradorCard from '../../components/dashboards/CajaMostradorCard.vue'
+import EnviosDeHoy       from '../../components/dashboards/EnviosDeHoy.vue'
 
 const router = useRouter()
 const route  = useRoute()

@@ -733,7 +733,7 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
             </div>
             <div class="dsp__row-dir">
               <MapPin :size="12" :stroke-width="2" />
-              {{ d.direccion_envio || '(sin dirección)' }}
+              <template v-if="d.direccion_etiqueta">{{ d.direccion_etiqueta }} · </template>{{ d.direccion_envio || '(sin dirección)' }}
             </div>
           </div>
 
@@ -762,7 +762,7 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
               <div class="dsp__detail-val"><User :size="13" :stroke-width="2" /> {{ d.paciente_nombre }}</div>
 
               <div class="dsp__detail-label">Dirección de envío</div>
-              <div class="dsp__detail-val"><MapPin :size="13" :stroke-width="2" /> {{ d.direccion_envio || '—' }}</div>
+              <div class="dsp__detail-val"><MapPin :size="13" :stroke-width="2" /> <template v-if="d.direccion_etiqueta">{{ d.direccion_etiqueta }} · </template>{{ d.direccion_envio || '—' }}</div>
 
               <div v-if="d.contacto_nombre" class="dsp__detail-label">Contacto</div>
               <div v-if="d.contacto_nombre" class="dsp__detail-val">{{ d.contacto_nombre }}</div>

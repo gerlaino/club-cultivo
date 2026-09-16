@@ -114,10 +114,11 @@ describe('Dispensar con envío — a dónde va', () => {
     expect(w.vm.formError).toContain('calle, altura y ciudad')
   })
 
-  it('«otra» con «guardar en la ficha» lo manda para que la próxima aparezca como tarjeta', async () => {
+  it('«otra» con nombre y «guardar en la ficha» lo manda para que la próxima aparezca como tarjeta', async () => {
     const w = await montar()
     await tarjetas(w)[2].trigger('click')
     w.vm.form.envio_calle = 'Corrientes'; w.vm.form.envio_altura = '1000'; w.vm.form.envio_ciudad = 'CABA'
+    w.vm.form.envio_etiqueta = 'Trabajo'
     w.vm.form.guardar_como_envio = true
     await w.vm.handleSubmit()
     await flushPromises()
@@ -126,6 +127,14 @@ describe('Dispensar con envío — a dónde va', () => {
     expect(payload.direccion_origen).toBe('otra')
     expect(payload.guardar_como_envio).toBe(true)
     expect(payload.envio_calle).toBe('Corrientes')
+    expect(payload.envio_etiqueta).toBe('Trabajo')
+  })
+
+  it('la tarjeta de envío lleva el nombre que le puso el paciente', async () => {
+    direcciones = { ...direcciones, envio: { ...direcciones.envio, etiqueta: 'Trabajo' } }
+    const w = await montar()
+
+    expect(tarjetas(w)[1].text()).toContain('Dirección de envío · Trabajo')
   })
 
   it('el tilde de guardar no viaja si se eligió una de la ficha', async () => {

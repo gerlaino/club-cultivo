@@ -321,6 +321,8 @@ Rails.application.routes.draw do
       collection do
         get  :mis_paquetes
         get  :mi_historial   # lo que el repartidor ya cerró (entregado/fallido)
+        # Los envíos que despachó HOY quien pregunta, con su estado: para saber si llegaron.
+        get  :envios_del_dia
         get  :export_csv
         get  :entregadores   # a quién se le puede asignar un envío (no requiere ser admin)
         patch :iniciar_viaje

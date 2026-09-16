@@ -17,7 +17,7 @@ class DispensacionesController < ApplicationController
   # decisión que ya tomó `AplicarBajasModulosJob`, que suelta los pendientes y no toca lo que
   # está en la calle. Bloquear el cierre dejaría esos envíos colgados para siempre.
   before_action -> { require_feature!(:delivery) },
-                only: [:mis_paquetes, :mi_historial, :iniciar_viaje, :reprogramar, :entregadores]
+                only: [:mis_paquetes, :mi_historial, :iniciar_viaje, :reprogramar, :entregadores, :envios_del_dia]
   before_action :require_dispensaciones_role!
   before_action :require_dispensador_o_admin, except: [:index, :show, :iniciar_viaje, :entregar, :reportar_fallo, :cancelar_entrega, :mis_paquetes, :mi_historial, :export_csv, :entregadores]
   before_action :set_paciente,     only: [:create]
@@ -346,6 +346,21 @@ class DispensacionesController < ApplicationController
   # tiene para llevar, lo que está llevando, y lo que vuelve sin entregar (que deja de ser
   # `fallido` recién cuando rinde, así que es su pendiente real). Lo cerrado se mira en
   # `mi_historial`, que tiene período.
+  # GET /dispensaciones/envios_del_dia — lo que despachó HOY quien pregunta, con el estado de
+  # cada paquete. El dispensador arma el envío y después no sabía si llegó: la lista se
+  # actualiza sola cuando el repartidor lo marca (ver `Dispensacion#broadcast_envio_actualizado`).
+  # Administración puede pedir los de todos (`todos=1`); el dispensador ve los suyos.
+  def envios_del_dia
+    hoy  = Time.zone.today
+    base = Dispensacion.joins(:paciente).where(pacientes: { club_id: current_user.club_id })
+                       .where(con_envio: true).where(fecha_dispensacion: hoy)
+                       .includes(:paciente, :delivery_user, :sede)
+    todos = ActiveModel::Type::Boolean.new.cast(params[:todos]) && (current_user.admin? || current_user.supervisor?)
+    base  = base.where(user_id: current_user.id) unless todos
+
+    render json: base.order(created_at: :desc).map { |d| serialize_envio_del_dia(d) }
+  end
+
   def mis_paquetes
     @dispensaciones = Dispensacion
       .del_delivery(current_user.id)
@@ -403,6 +418,9 @@ class DispensacionesController < ApplicationController
       .to_a
     Dispensacion.where(id: dispensaciones.map(&:id)).update_all(estado_envio: 'en_viaje')
     dispensaciones.each { |d| d.estado_envio = 'en_viaje' }
+    # `update_all` no corre callbacks: el timbre de «cambió el envío» hay que tocarlo a mano, o
+    # «Envíos de hoy» del dispensador se queda en «pendiente» con el paquete ya en la calle.
+    dispensaciones.each(&:broadcast_envio_actualizado)
 
     # El "próximo en entregar" de cada ruta recibe "sos el próximo"; el resto, "empezó el recorrido".
     proximos_ids = dispensaciones.map { |d| Dispensacion.siguiente_de_ruta(d)&.id }.compact.uniq
@@ -886,6 +904,25 @@ class DispensacionesController < ApplicationController
     if blocked.include?(current_user&.role)
       render json: { error: 'No autorizado' }, status: :forbidden
     end
+  end
+
+  def serialize_envio_del_dia(d)
+    {
+      id:                 d.id,
+      codigo_paquete:     d.codigo_paquete,
+      estado_envio:       d.estado_envio,
+      creada_at:          d.created_at,
+      entregado_at:       d.entregado_at,
+      fallido_at:         d.fallido_at,
+      motivo_fallo:       d.motivo_fallo,
+      direccion_envio:    d.direccion_envio,
+      direccion_etiqueta: d.direccion_etiqueta,
+      cobrar_en_entrega:  d.cobrar_en_entrega,
+      saldo_pendiente:    d.saldo_pendiente.to_f,
+      paciente:           { id: d.paciente.id, nombre: d.paciente.nombre_completo },
+      delivery:           d.delivery_user ? { id: d.delivery_user.id, nombre: d.delivery_user.nombre_completo.presence || d.delivery_user.email } : nil,
+      despachado_por:     d.user&.nombre_completo.presence || d.user&.email,
+    }
   end
 
   def require_dispensador_o_admin

@@ -130,7 +130,9 @@ class Paciente < ApplicationRecord
 
     campos = { calle: calle, altura: public_send("#{pre}_altura"), piso: public_send("#{pre}_piso"),
                depto: public_send("#{pre}_depto"), barrio: public_send("#{pre}_barrio"), ciudad: public_send("#{pre}_ciudad") }
-    campos.merge(origen: origen.to_s, label: meta[:label], texto: Paciente.direccion_texto(campos))
+    # La de envío lleva el nombre que le puso el paciente («Trabajo»); el domicilio, no.
+    etiqueta = origen.to_s == 'envio' ? envio_etiqueta.presence : nil
+    campos.merge(origen: origen.to_s, label: meta[:label], etiqueta: etiqueta, texto: Paciente.direccion_texto(campos))
   end
 
   def direcciones = DIRECCIONES.keys.to_h { |o| [o, direccion(o)] }

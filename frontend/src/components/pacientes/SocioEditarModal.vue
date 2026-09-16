@@ -87,6 +87,10 @@
                 <details>
                   <summary class="sem__envio-sum">Dirección de entrega distinta <span class="sem__opt">opcional</span></summary>
                   <div class="sem__domicilio-grid" style="margin-top:.5rem">
+                    <!-- El nombre de la dirección: es lo que el repartidor lee en el paquete
+                         («Trabajo · Directorio 1602») y lo que evita que alguien escriba
+                         "TRABAJO" en Depto. -->
+                    <input v-model.trim="editForm.envio_etiqueta" class="sem__input" type="text" placeholder="Nombre (ej. Trabajo)" style="grid-column: span 4" />
                     <input v-model.trim="editForm.envio_calle"  class="sem__input" type="text" placeholder="Calle" style="grid-column: span 2" />
                     <input v-model.trim="editForm.envio_altura" class="sem__input" type="text" placeholder="Altura" />
                     <input v-model.trim="editForm.envio_piso"   class="sem__input" type="text" placeholder="Piso" />

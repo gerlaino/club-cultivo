@@ -255,7 +255,9 @@ class Dispensacion < ApplicationRecord
   after_create_commit :encolar_reporte_ariccame
   after_create_commit :dispatch_webhook
   after_create_commit :broadcast_stock_actualizado
-  after_update_commit :broadcast_stock_actualizado, if: :estado_envio_changed?
+  # `saved_change_to_*`: dentro de un after_commit los cambios ya están aplicados y
+  # `estado_envio_changed?` da false — el timbre de "cambió el envío" no sonaba nunca.
+  after_update_commit :broadcast_stock_actualizado, if: :saved_change_to_estado_envio?
   after_commit        :notificar_delivery, on: [:update]
   after_destroy       :incrementar_stock
   def incrementar_stock = revertir_stock!
@@ -900,6 +902,7 @@ class Dispensacion < ApplicationRecord
   end
 
   def broadcast_stock_actualizado
+    broadcast_envio_actualizado if saved_change_to_estado_envio?
     return unless stock_id
     club_id = paciente&.club_id || stock&.club_id
     return unless club_id
@@ -916,6 +919,21 @@ class Dispensacion < ApplicationRecord
     })
   rescue => e
     Rails.logger.warn "Dispensacion#broadcast_stock_actualizado falló: #{e.message}"
+  end
+
+  # El paquete cambió de estado (el repartidor lo marcó en viaje, entregado o fallido). Va por
+  # el canal del club que ya existe —no se abre otro—, y es un TIMBRE: quien lo escucha vuelve a
+  # pedir su lista. Lo mira «Envíos de hoy» del dispensador, que dispensó y quiere saber si llegó.
+  # Público a propósito: `iniciar_viaje` cambia el estado con `update_all` y lo toca a mano.
+  public def broadcast_envio_actualizado
+    club_id = paciente&.club_id
+    return unless club_id
+
+    ActionCable.server.broadcast("stocks_club_#{club_id}", {
+      tipo: 'envio_actualizado', dispensacion_id: id, estado_envio: estado_envio,
+    })
+  rescue => e
+    Rails.logger.warn "Dispensacion#broadcast_envio_actualizado falló: #{e.message}"
   end
 
   def notificar_delivery

@@ -389,7 +389,9 @@ onMounted(load)
       <div v-if="siguienteParada" class="dlv__foco">
         <div class="dlv__foco-tag">Tu próxima entrega</div>
         <div class="dlv__foco-nombre">{{ siguienteParada.paciente?.nombre || 'Paciente' }}</div>
-        <div class="dlv__foco-dir">{{ siguienteParada.direccion_envio || 'Sin dirección cargada' }}</div>
+        <div class="dlv__foco-dir">
+          <strong v-if="siguienteParada.direccion_etiqueta">{{ siguienteParada.direccion_etiqueta }} · </strong>{{ siguienteParada.direccion_envio || 'Sin dirección cargada' }}
+        </div>
         <div class="dlv__foco-acts">
           <button class="dlv__foco-btn dlv__foco-btn--nav" @click="irAParada(siguienteParada)">
             <Route :size="16" :stroke-width="2" /> Cómo llegar
@@ -522,7 +524,7 @@ onMounted(load)
                 <User :size="12" :stroke-width="2" /> {{ p.paciente?.nombre }}
               </div>
               <div class="dlv__row-dir">
-                <MapPin :size="12" :stroke-width="2" /> {{ p.direccion_envio }}
+                <MapPin :size="12" :stroke-width="2" /> <strong v-if="p.direccion_etiqueta">{{ p.direccion_etiqueta }} · </strong>{{ p.direccion_envio }}
               </div>
               <div v-if="p.contacto_telefono" class="dlv__row-tel">
                 <Phone :size="12" :stroke-width="2" /> {{ p.contacto_telefono }}
@@ -571,7 +573,7 @@ onMounted(load)
                 <User :size="12" :stroke-width="2" /> {{ p.paciente?.nombre }}
               </div>
               <div class="dlv__row-dir">
-                <MapPin :size="12" :stroke-width="2" /> {{ p.direccion_envio }}
+                <MapPin :size="12" :stroke-width="2" /> <strong v-if="p.direccion_etiqueta">{{ p.direccion_etiqueta }} · </strong>{{ p.direccion_envio }}
               </div>
               <div v-if="p.contacto_telefono" class="dlv__row-tel">
                 <Phone :size="12" :stroke-width="2" /> {{ p.contacto_telefono }}

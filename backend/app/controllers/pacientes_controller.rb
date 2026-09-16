@@ -22,7 +22,7 @@ class PacientesController < ApplicationController
     con_seguimiento_medico limite_dispensacion_mensual_g descuento_porcentaje carnet_token
     aprobado_at
     domicilio_calle domicilio_altura domicilio_piso domicilio_depto domicilio_barrio domicilio_ciudad
-    envio_calle envio_altura envio_piso envio_depto envio_barrio envio_ciudad
+    envio_calle envio_altura envio_piso envio_depto envio_barrio envio_ciudad envio_etiqueta
     created_at updated_at
   ].freeze
 
@@ -576,7 +576,7 @@ class PacientesController < ApplicationController
   def paciente_params
     allowed = %i[nombre apellido dni fecha_nacimiento es_paciente email telefono reprocann_numero reprocann_vencimiento reprocann_estado
                  domicilio_calle domicilio_altura domicilio_piso domicilio_depto domicilio_barrio domicilio_ciudad
-                 envio_calle envio_altura envio_piso envio_depto envio_barrio envio_ciudad]
+                 envio_calle envio_altura envio_piso envio_depto envio_barrio envio_ciudad envio_etiqueta]
     if current_user&.admin? || current_user&.super_admin?
       allowed += %i[limite_dispensacion_mensual_g descuento_porcentaje]
     end

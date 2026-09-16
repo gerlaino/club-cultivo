@@ -43,6 +43,8 @@ module Envios
         end
 
       CAMPOS.each { |c| @d.public_send("envio_#{c}=", dir[c]) }
+      # El nombre de la dirección viaja con el paquete: «Trabajo · Directorio 1602».
+      @d.direccion_etiqueta = dir[:etiqueta].presence
       @d.contacto_nombre   = @paciente.nombre_completo if @d.contacto_nombre.blank?
       @d.contacto_telefono = @paciente.telefono        if @d.contacto_telefono.blank?
 
@@ -59,6 +61,7 @@ module Envios
 
     def tipeada(estricta: true)
       dir = CAMPOS.to_h { |c| [c, @params["envio_#{c}"].presence] }
+      dir[:etiqueta] = @params[:envio_etiqueta].presence
       if estricta && (dir[:calle].blank? || dir[:altura].blank? || dir[:ciudad].blank?)
         raise Error, 'Completá calle, altura y ciudad de la dirección de entrega.'
       end
@@ -67,7 +70,7 @@ module Envios
     end
 
     def guardar_como_envio!(dir)
-      @paciente.update!(CAMPOS.to_h { |c| ["envio_#{c}", dir[c]] })
+      @paciente.update!(CAMPOS.to_h { |c| ["envio_#{c}", dir[c]] }.merge('envio_etiqueta' => dir[:etiqueta]))
     end
   end
 end
