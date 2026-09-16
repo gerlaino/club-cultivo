@@ -54,7 +54,15 @@
         <span class="mlot__qa-ico" style="background:#ede9fe;color:#7c3aed"><i class="bi bi-camera"></i></span>
         <span class="mlot__qa-lbl">Foto</span>
       </button>
-      <button class="mlot__qa" v-if="faseSiguiente" @click="abrirAvanzarFase">
+      <!-- En floración lo que sigue es COSECHAR, y la cosecha se registra con pesada: ofrecer
+           «Avanzar fase → Cosecha» era proponer lo que el backend rechaza («usá el formulario de
+           cosecha»), con el error apareciendo después de confirmar. Es el mismo modal que en el
+           escritorio, así la regla vive una sola vez. -->
+      <button class="mlot__qa" v-if="lote.estado === 'floracion'" @click="showCosecha = true">
+        <span class="mlot__qa-ico" style="background:#fee2e2;color:#b91c1c"><i class="bi bi-scissors"></i></span>
+        <span class="mlot__qa-lbl">Cosechar</span>
+      </button>
+      <button class="mlot__qa" v-else-if="faseSiguiente" @click="abrirAvanzarFase">
         <span class="mlot__qa-ico" style="background:var(--c-leaf-100);color:var(--c-leaf-700)"><i class="bi bi-arrow-up-circle"></i></span>
         <span class="mlot__qa-lbl">Avanzar fase</span>
       </button>
@@ -93,6 +101,16 @@
 
     <!-- Modal registro lote (reutiliza el de la web) -->
     <RegistroLoteModal v-model="showRegistrar" :lote="lote" :plants="plantas" @saved="recargarLote" />
+
+    <ModalCosechaPartial
+      v-if="showCosecha && lote"
+      :lote="lote"
+      :plantas="plantas"
+      :pasadas-usadas="pasadasUsadas"
+      :pasada-inicial="siguientePasada"
+      @cosechado="onCosechado"
+      @cerrar="showCosecha = false"
+    />
 
     <!-- Sheet: Más (editar / eliminar) -->
     <SheetBottom v-model="showAcciones" title="Más acciones">
@@ -189,6 +207,7 @@ import {
 import { useToast }        from '../../composables/useToast'
 import SheetBottom         from '../../components/cultivador/SheetBottom.vue'
 import RegistroLoteModal   from '../../components/lotes/registro/RegistroLoteModal.vue'
+import ModalCosechaPartial from '../../components/salas/ModalCosechaPartial.vue'
 
 const route  = useRoute()
 const router = useRouter()
@@ -202,6 +221,7 @@ const loadingPlantas  = ref(false)
 const showRegistrar   = ref(false)
 const showAcciones    = ref(false)
 const showAvanzarFase = ref(false)
+const showCosecha     = ref(false)
 const showEditarLote  = ref(false)
 const showEliminar    = ref(false)
 const savingFase      = ref(false)
@@ -243,6 +263,19 @@ const FASES_META  = [
   { value:'en_manicura', label:'Manicura',    emoji:'✂️' },
     { value:'curado',      label:'Curado',      emoji:'🫙' },
 ]
+
+// Las pasadas de cosecha ya usadas (A, B, C…) y la que sigue: la misma cuenta que hace el
+// escritorio para el mismo modal.
+const pasadasUsadas   = computed(() => [...new Set(plantas.value.map(p => p.pasada_cosecha).filter(Boolean))])
+const siguientePasada = computed(() => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').find(l => !pasadasUsadas.value.includes(l)) || 'Z')
+
+async function onCosechado(loteActualizado) {
+  showCosecha.value = false
+  lote.value = { ...lote.value, ...loteActualizado }
+  toast.success('Cosecha registrada')
+  await recargarLote()
+  await cargarPlantas()
+}
 
 // Avanzar es SIEMPRE a la fase siguiente, no a una elegida de una lista. Ofrecer todas las
 // posteriores dejaba saltear etapas —de vegetativo directo a curado— y eso rompe la historia del
@@ -340,6 +373,13 @@ async function subirFoto(e) {
     toast.success('Foto subida')
   } catch { toast.error('Error al subir la foto') }
   e.target.value = ''
+}
+
+async function cargarPlantas() {
+  try {
+    const { data } = await listPlants({ lote_id: id })
+    plantas.value = data?.data || data || []
+  } catch { /* la lista que había sigue en pantalla */ }
 }
 
 onMounted(async () => {

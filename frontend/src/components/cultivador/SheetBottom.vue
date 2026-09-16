@@ -74,6 +74,11 @@ function onTouchEnd()    { if (touchDeltaY.value > 80) close(); touchDeltaY.valu
   bottom: 0;
   left: 0;
   right: 0;
+  /* Es un panel de TELÉFONO. En un navegador de escritorio o un teléfono apaisado se estiraba
+     al ancho entero de la pantalla, con el contenido pegado a los bordes y un hueco de un metro
+     en el medio. Con tope y centrado, se lee igual en cualquier ancho. */
+  max-width: 560px;
+  margin: 0 auto;
   background: var(--c-paper);
   border-radius: 20px 20px 0 0;
   max-height: 82vh;
@@ -81,6 +86,9 @@ function onTouchEnd()    { if (touchDeltaY.value > 80) close(); touchDeltaY.valu
   overscroll-behavior: contain;
   z-index: 501;
   box-shadow: 0 -4px 32px rgba(0, 0, 0, 0.14);
+}
+@media (min-width: 600px) {
+  .sb__sheet { border-radius: 20px 20px 0 0; }
 }
 .sb__handle-wrap {
   display: flex;
