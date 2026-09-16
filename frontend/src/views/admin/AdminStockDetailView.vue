@@ -409,12 +409,26 @@
                     <option value="reconteo">Reconteo (corrección de inventario)</option>
                   </select>
                 </div>
+                <!-- Se pide CUÁNTO se agrega o se quita, no el total (Germán, 16-sep): "encontré
+                     12 g más" es lo que la persona sabe; el total lo calcula la máquina. Merma y
+                     pérdida siempre quitan, así que ahí no se pregunta. «Recontar» sigue estando
+                     para quien pesó el frasco entero. -->
                 <div class="sd__field">
-                  <label class="sd__label">Cantidad exacta que tenés ahora <span class="sd__req">*</span></label>
+                  <label class="sd__label">
+                    <template v-if="ajustarModo === 'recontar'">Cantidad exacta que tenés ahora</template>
+                    <template v-else-if="ajustarModo === 'quitar'">Gramos que se quitan</template>
+                    <template v-else>Gramos que se agregan</template>
+                    <span class="sd__req">*</span>
+                  </label>
                   <div class="sd__input-row">
+                    <select v-if="ajustarForm.tipo === 'reconteo'" class="sd__input sd__input--modo" v-model="ajustarForm.modo" aria-label="Qué hacés">
+                      <option value="agregar">+ Agregar</option>
+                      <option value="quitar">− Quitar</option>
+                      <option value="recontar">= Recontar</option>
+                    </select>
                     <input type="number" min="0" step="0.01"
-                      class="sd__input" v-model.number="ajustarForm.cantidad_real"
-                      :placeholder="`actual: ${stock?.cantidad}g`" />
+                      class="sd__input" v-model.number="ajustarForm.cantidad"
+                      :placeholder="ajustarModo === 'recontar' ? `actual: ${stock?.cantidad}g` : '0'" />
                     <span class="sd__input-suf">g</span>
                   </div>
                 </div>
@@ -424,7 +438,7 @@
                 </div>
               </div>
               <div v-if="ajustarPreview !== null" class="sd__ajuste-preview" :class="ajustarDelta >= 0 ? 'sd__ajuste-preview--pos' : 'sd__ajuste-preview--neg'">
-                <span>Resultado: <strong>{{ ajustarPreview.toFixed(2) }}g</strong></span>
+                <span>Queda: <strong>{{ ajustarPreview.toFixed(2) }}g</strong></span>
                 <span class="sd__ajuste-delta">{{ ajustarDelta >= 0 ? '+' : '' }}{{ ajustarDelta.toFixed(2) }}g</span>
               </div>
             </div>
@@ -867,32 +881,42 @@ async function guardarEdit() {
 
 // ── Ajustar ────────────────────────────────────────────────────────────────────
 const showAjustar  = ref(false)
-const ajustarForm  = ref({ tipo: 'merma', cantidad_real: null, motivo: '' })
+const ajustarForm  = ref({ tipo: 'merma', modo: 'agregar', cantidad: null, motivo: '' })
 const ajustarError = ref(null)
 const ajustando    = ref(false)
 
-// Se ingresa la cantidad exacta actual; el delta es real − actual (informativo).
+// Qué se escribe en el campo: cuánto se agrega, cuánto se quita, o el total contado. Merma y
+// pérdida siempre quitan; con reconteo se elige.
+const ajustarModo = computed(() => ajustarForm.value.tipo === 'reconteo' ? ajustarForm.value.modo : 'quitar')
+
+// El delta que va al backend, con signo. En «recontar» es total − actual.
 const ajustarDelta = computed(() => {
-  if (!stock.value || ajustarForm.value.cantidad_real == null) return 0
-  return ajustarForm.value.cantidad_real - parseFloat(stock.value.cantidad)
+  const c = ajustarForm.value.cantidad
+  if (!stock.value || c == null) return 0
+  const actual = parseFloat(stock.value.cantidad)
+  if (ajustarModo.value === 'recontar') return c - actual
+  return ajustarModo.value === 'quitar' ? -c : c
 })
 const ajustarPreview = computed(() =>
-  ajustarForm.value.cantidad_real != null ? ajustarForm.value.cantidad_real : null
+  ajustarForm.value.cantidad != null && stock.value ? parseFloat(stock.value.cantidad) + ajustarDelta.value : null
 )
 
 async function ejecutarAjustar() {
   ajustarError.value = null
   const motivo = ajustarForm.value.motivo.trim()
   if (!motivo) { ajustarError.value = 'El motivo es obligatorio'; return }
-  if (ajustarForm.value.cantidad_real == null || ajustarForm.value.cantidad_real < 0) {
-    ajustarError.value = 'Ingresá la cantidad exacta que tenés ahora'; return
+  if (ajustarForm.value.cantidad == null || ajustarForm.value.cantidad < 0) {
+    ajustarError.value = ajustarModo.value === 'recontar' ? 'Ingresá la cantidad exacta que tenés ahora' : 'Ingresá cuántos gramos'; return
   }
-  if (ajustarDelta.value === 0) { ajustarError.value = 'La cantidad ingresada es igual a la actual'; return }
+  if (ajustarDelta.value === 0) { ajustarError.value = 'Con esa cantidad el stock no cambia'; return }
+  if (ajustarPreview.value < 0) { ajustarError.value = `No podés quitar más de lo que hay (${stock.value.cantidad}g)`; return }
   ajustando.value = true
   try {
-    await ajustarStock(stock.value.id, { tipo: ajustarForm.value.tipo, cantidad_real: ajustarForm.value.cantidad_real, motivo })
+    // El backend acepta `gramos` como delta directo; `cantidad_real` era el total y queda para
+    // los clientes viejos.
+    await ajustarStock(stock.value.id, { tipo: ajustarForm.value.tipo, gramos: ajustarDelta.value, motivo })
     showAjustar.value = false
-    ajustarForm.value = { tipo: 'merma', cantidad_real: null, motivo: '' }
+    ajustarForm.value = { tipo: 'merma', modo: 'agregar', cantidad: null, motivo: '' }
     await recargar()
     toast.success('Stock ajustado')
   } catch (e) {
@@ -1178,6 +1202,7 @@ function badgeVencLabel(s) {
 .sd__input:focus { outline: none; border-color: #1b5e20; background: #fff; }
 .sd__textarea  { resize: vertical; min-height: 60px; }
 .sd__input-row { display: flex; }
+.sd__input--modo { flex: 0 0 auto; width: auto; min-width: 118px; }
 .sd__input-row .sd__input { border-radius: 7px 0 0 7px; }
 .sd__input-suf { background: var(--c-slate-100); border: 1.5px solid var(--c-slate-200); border-left: none; border-radius: 0 7px 7px 0; padding: .5rem .75rem; font-size: .82rem; font-weight: 600; color: var(--c-slate-500); }
 .sd__alert     { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; border-radius: 7px; padding: .55rem .75rem; font-size: .82rem; margin-bottom: 1rem; }

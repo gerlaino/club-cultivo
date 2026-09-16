@@ -1,5 +1,13 @@
 # Changelog
 
+## Septiembre 2026 (ca) — «Ajustar gramos» pide cuánto se agrega o se quita
+
+- El modal de ajuste de un stock pedía la **cantidad exacta que tenés ahora** y la persona hacía
+  la resta (Germán, 16-sep: «me gustaría que sea cantidad de gramos a agregar»). Ahora, con
+  Reconteo, se elige **+ Agregar / − Quitar / = Recontar** y se escribe eso; merma y pérdida
+  siempre quitan y no preguntan. La vista previa dice **«Queda: X g (+Δ)»**. Sin cambio en el
+  backend: `POST /stocks/:id/ajuste` ya aceptaba `gramos` como delta.
+
 ## Septiembre 2026 (bz) — Una dispensa que salió sin envío se manda por delivery después
 
 - **«Hice una dispensa y no marqué que era por delivery; al editar no me da la opción»**
