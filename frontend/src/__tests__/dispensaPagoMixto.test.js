@@ -121,6 +121,35 @@ describe('Dispensar — pago dividido', () => {
     expect(w.find('.mnd__pagos-resto').text()).toContain('se le cargan a la cuenta corriente')
   })
 
+  // Pasó en producción: «efectivo 30.000 + cuenta corriente 10.000» sobre 30.000. El paciente
+  // había pagado 40.000 en efectivo, la segunda línea se cargó mal, y se acreditaban 10.000 que
+  // nadie puso. La cuenta corriente cubre lo que falta, nunca puede ser lo que sobra.
+  it('la cuenta corriente no puede ser la línea que sobra: avisa y no manda', async () => {
+    const w = await montar()
+    await conCarrito(w)   // $5.000
+    w.vm.activarPagoDividido()
+    w.vm.lineasPago = [{ medio: 'efectivo', monto: 5000 }, { medio: 'cuenta_corriente', monto: 1000 }]
+    await w.vm.$nextTick()
+
+    expect(w.vm.ccSobra).toBe(true)
+    expect(w.find('.mnd__pagos-resto--mal').text()).toContain('sólo cubre lo que falta')
+
+    await w.vm.handleSubmit()
+    expect(createDispensacion).not.toHaveBeenCalled()
+    expect(w.vm.formError).toContain('sólo cubre lo que falta')
+  })
+
+  it('con efectivo de más sí: queda a favor y lo dice', async () => {
+    const w = await montar()
+    await conCarrito(w)
+    w.vm.activarPagoDividido()
+    w.vm.lineasPago = [{ medio: 'efectivo', monto: 6000 }]
+    await w.vm.$nextTick()
+
+    expect(w.vm.ccSobra).toBe(false)
+    expect(w.text()).toContain('queda a favor')
+  })
+
   it('avisa cuando paga de más: le queda a favor', async () => {
     const w = await montar()
     await conCarrito(w)

@@ -48,11 +48,22 @@ module DispensacionesFinancieras
     comp_usado = false
     excedente  = 0.to_d
 
+    medio_excedente = nil
+
     lineas.each do |l|
       saldo = disp.monto_sin_cobrar
       monto = l[:monto].to_d
       cobro = [monto, saldo].min          # lo que entra contra esta dispensa
-      excedente += (monto - cobro)        # lo que sobra → a favor
+      sobra = monto - cobro               # lo que sobra → a favor
+      # La cuenta corriente cubre lo que FALTA; no puede sobrar por ahí. «Efectivo 30.000 +
+      # cuenta corriente 10.000» sobre un total de 30.000 no significa nada (pasó en producción:
+      # el paciente había pagado 40.000 en efectivo y la segunda línea se cargó mal), y dejarlo
+      # pasar acreditaba 10.000 que nadie puso.
+      if sobra > 0.001 && l[:medio].to_s == 'cuenta_corriente'
+        raise "La cuenta corriente sólo cubre lo que falta (#{ActiveSupport::NumberHelper.number_to_currency(saldo, unit: '$', precision: 0, delimiter: '.')}). "               'Si pagó de más, cargalo en el medio con el que pagó.'
+      end
+      excedente += sobra
+      medio_excedente ||= l[:medio] if sobra > 0.001
 
       next if cobro <= 0
       usar = !comp_usado && comp.present?  # comprobante de pago → al primer cobro
@@ -73,34 +84,45 @@ module DispensacionesFinancieras
       raise res.error unless res.ok?
     end
 
-    acreditar_excedente!(disp, excedente.round(2)) if excedente > 0.001
+    acreditar_excedente!(disp, excedente.round(2), medio: medio_excedente) if excedente > 0.001
   end
 
-  # Excedente pagado por el socio → crédito a favor en su cuenta corriente.
-  # NO es ingreso del club: es plata del socio parkeada como crédito (un pasivo). Por eso
-  # se acredita DIRECTO en la CC, sin asiento contable 'aporte_socio' (que lo contaba como
-  # ingreso e inflaba el libro). Cuando el socio use ese crédito en una dispensa futura, esa
-  # dispensa se cobra contra la CC. Requiere que tenga cuenta corriente.
-  def acreditar_excedente!(disp, monto)
+  # Lo que el paciente pagó DE MÁS queda a favor en su cuenta corriente, y ENTRA al libro y a
+  # la caja como «Aporte socio» — el mismo asiento que hace «Registrar pago» en su ficha.
+  #
+  # Hasta sep-2026 se acreditaba directo en la CC sin asiento, con el argumento de que es plata
+  # del paciente y no ingreso. Lo que pasó en producción: pagó 40.000 en efectivo por una
+  # dispensa de 30.000, el libro mostraba 30.000 y la caja cerraba con 10.000 de sobrante que
+  # nadie podía explicar. La plata ENTRÓ, y el criterio que ya tenía la app para un pago que
+  # deja saldo a favor («Registrar pago») es asentarlo como aporte. Un mismo hecho —el paciente
+  # adelantó plata— no puede verse distinto según la puerta por la que entró.
+  # (Germán, 16-sep: «pagaron 40 mil en total» y los 10 no aparecían.)
+  #
+  # El asiento va atado a la dispensa (`dispensacion_id`): al cancelarla o editarla se destruye
+  # con los demás y `before_destroy` devuelve el crédito, como antes. El `after_create` del
+  # movimiento es el que acredita la CC: acá no se toca el saldo a mano.
+  def acreditar_excedente!(disp, monto, medio: nil)
     cc = disp.paciente.cuenta_corriente
     unless cc
       raise "El socio no tiene cuenta corriente para acreditar el excedente ($#{monto.to_f}). Ajustá el monto cobrado."
     end
-    anterior = cc.saldo_disponible
-    nuevo    = anterior + monto.to_d
-    ActiveRecord::Base.transaction do
-      cc.update!(saldo_disponible: nuevo)
-      cc.movimientos.create!(
-        tipo:           'pago',
-        unidad:         'ars',
-        monto:          monto.to_d,
-        saldo_anterior: anterior,
-        saldo_nuevo:    nuevo,
-        descripcion:    "Excedente de pago — Dispensación ##{disp.id}",
-        dispensacion:   disp,
-        created_by:     current_user,
-      )
-    end
+    medio = MovimientoContable::MEDIOS_PAGO.include?(medio.to_s) ? medio.to_s : 'efectivo'
+    caja  = medio == 'efectivo' ? disp.caja_para_cobros : nil
+    MovimientoContable.create!(
+      club:          current_user.club,
+      sede_id:       disp.sede_id || current_user.club.sedes.activas.first&.id,
+      paciente:      disp.paciente,
+      dispensacion:  disp,
+      created_by:    current_user,
+      tipo:          'ingreso',
+      categoria:     'aporte_socio',
+      descripcion:   "Pagó de más — Dispensación ##{disp.id} (#{disp.paciente.nombre_completo}), queda a favor",
+      monto_ars:     monto.to_d,
+      fecha:         disp.fecha_dispensacion || Date.current,
+      pagado:        true,
+      medio_pago:    medio,
+      caja_turno_id: caja&.id,
+    )
   end
 
   # medio_pago denormalizado de la dispensa: el único medio, o 'mixto' si hay varios.

@@ -133,10 +133,30 @@ RSpec.describe 'Dispensaciones con cobros (pagos partidos / contra-entrega)', ty
       expect(d.saldo_pendiente).to eq(0)
       expect(d.cobros.sum(:monto_ars)).to eq(100_000)          # los cobros no superan el total
       expect(cc.reload.saldo_disponible).to eq(20_000)          # excedente a favor
-      # El excedente es crédito del socio, NO ingreso del club: no debe generar asiento.
-      expect(MovimientoContable.where(dispensacion: d, categoria: 'aporte_socio')).to be_empty
-      # Queda trazado como movimiento de CC ligado a la dispensa.
-      expect(cc.movimientos.where(dispensacion: d, tipo: 'pago').sum(:monto)).to eq(20_000)
+      # La plata ENTRÓ: queda en el libro como «Aporte socio» —el mismo asiento que «Registrar
+      # pago»—, atado a la dispensa y con el medio con el que pagó. (Hasta sep-2026 no había
+      # asiento: el libro decía 100.000 habiendo entrado 120.000, y la caja cerraba con un
+      # sobrante que nadie podía explicar.)
+      aporte = MovimientoContable.where(dispensacion: d, categoria: 'aporte_socio')
+      expect(aporte.count).to eq(1)
+      expect(aporte.first.monto_ars).to eq(20_000)
+      expect(aporte.first.medio_pago).to eq('efectivo')
+      # El asiento de la dispensa sigue siendo el de la dispensa: 100.000, no 120.000.
+      expect(MovimientoContable.where(dispensacion: d, categoria: 'dispensacion').sum(:monto_ars)).to eq(100_000)
+      # Y la CC quedó acreditada una sola vez (por el asiento, no a mano).
+      expect(cc.movimientos.where(tipo: 'pago').sum(:monto)).to eq(20_000)
+    end
+
+    # «Efectivo 30.000 + cuenta corriente 10.000» sobre 30.000 no significa nada: la cuenta
+    # corriente cubre lo que falta. Pasó en producción y acreditaba plata que nadie puso.
+    it 'la cuenta corriente no puede ser la línea que sobra' do
+      create(:cuenta_corriente, paciente: paciente, club: club, saldo_disponible: 0, limite_credito: 80_000)
+      sign_in_as(dispensador)
+      crear(cobros: [{ medio: 'efectivo', monto: 100_000 }, { medio: 'cuenta_corriente', monto: 10_000 }])
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body).values.flatten.join).to include('cuenta corriente sólo cubre lo que falta')
+      expect(Dispensacion.count).to eq(0)
     end
 
     it 'con cuenta corriente: al cancelar, revierte el excedente acreditado' do

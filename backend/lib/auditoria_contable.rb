@@ -98,7 +98,9 @@ class AuditoriaContable
         else
           d.aporte_socio_ars.to_d - en_la_calle
         end
-      asentado = d.movimientos_contables.sum { |m| m.monto_ars.to_d }
+      # Sin el «Aporte socio» del pago de más: es plata del paciente que queda a favor, atada a
+      # la dispensa para poder revertirla, pero no es el ingreso de ESTA dispensa.
+      asentado = d.movimientos_contables.reject { |m| m.categoria == 'aporte_socio' }.sum { |m| m.monto_ars.to_d }
       next if (asentado - esperado).abs <= 1
 
       detalle = if asentado > esperado

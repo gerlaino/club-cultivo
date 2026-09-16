@@ -663,6 +663,17 @@ const totalAsignado = computed(() =>
 const restoPago = computed(() =>
   Math.round((totalACobrar.value - totalAsignado.value) * 100) / 100)
 const excedentePago = computed(() => Math.max(0, -restoPago.value))
+// La cuenta corriente cubre lo que FALTA: nunca puede ser la línea que sobra. «Efectivo 30.000
+// + cuenta corriente 10.000» sobre 30.000 pasó en producción —el paciente había pagado 40.000
+// en efectivo y la segunda línea se cargó mal— y acreditaba plata que nadie puso. El backend
+// lo rechaza; acá se dice antes.
+const ccSobra = computed(() => {
+  if (!pagoDividido.value || excedentePago.value <= 0.009) return false
+  const sinCc = lineasPago.value.filter(l => l.medio !== 'cuenta_corriente' && l.medio !== 'contra_entrega')
+                                .reduce((a, l) => a + (Number(l.monto) || 0), 0)
+  const enCc  = lineasPago.value.filter(l => l.medio === 'cuenta_corriente').reduce((a, l) => a + (Number(l.monto) || 0), 0)
+  return enCc > 0 && enCc > Math.max(0, totalACobrar.value - sinCc) + 0.009
+})
 
 // Un medio por línea: repetirlo no significa nada y sólo confunde el desglose.
 const mediosLibres = computed(() => MEDIOS_COBRO.filter(m =>
@@ -975,6 +986,10 @@ async function handleSubmit() {
     // dejarlo y la dispensa se rechazaría del otro lado: mejor decirlo acá.
     if (restoPago.value > 0.009 && !tieneCc.value && !restoAlDelivery.value) {
       formError.value = `Faltan ${fmt(restoPago.value)} por asignar y el paciente no tiene cuenta corriente donde dejarlos.`
+      saving.value = false; return
+    }
+    if (ccSobra.value) {
+      formError.value = 'La cuenta corriente sólo cubre lo que falta. Si pagó de más, cargalo en el medio con el que pagó.'
       saving.value = false; return
     }
     const enCc = lineas.filter(l => l.medio === 'cuenta_corriente').reduce((a, l) => a + Number(l.monto), 0)
@@ -1640,8 +1655,12 @@ async function handleSubmit() {
                 Faltan <strong>{{ fmt(restoPago) }}</strong> y el paciente no tiene cuenta corriente: asigná el total.
               </template>
             </div>
+            <div v-else-if="ccSobra" class="mnd__pagos-resto mnd__pagos-resto--mal">
+              La cuenta corriente sólo cubre lo que falta. Si pagó de más, cargalo en el medio con el que pagó
+              (efectivo o transferencia): queda a favor.
+            </div>
             <div v-else-if="excedentePago > 0.009" class="mnd__pagos-resto">
-              Paga <strong>{{ fmt(excedentePago) }}</strong> de más — le queda a favor en su cuenta corriente.
+              Paga <strong>{{ fmt(excedentePago) }}</strong> de más — queda a favor en su cuenta corriente y entra al libro como aporte.
             </div>
             <div v-else class="mnd__pagos-resto mnd__pagos-resto--ok">
               <i class="bi bi-check-circle-fill"></i> Cubre el total exacto.

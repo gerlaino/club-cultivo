@@ -1,5 +1,23 @@
 # Changelog
 
+## Septiembre 2026 (cc) — Lo que el paciente paga de más ENTRA al libro y a la caja
+
+- **Lo encontró Germán en producción**: dispensa de $30.000 pagada $30.000 en efectivo +
+  $10.000 «cuenta corriente»; el modal decía «paga $10.000 de más, le queda a favor», el libro
+  mostraba $30.000 y «pagaron 40 mil en total». Dos cosas estaban mal.
+- **El excedente ahora se asienta como «Aporte socio»** —el mismo asiento que hace «Registrar
+  pago» en la ficha cuando el paciente paga de más—, atado a la dispensa, con el medio con el
+  que pagó y, en efectivo, a la caja del mostrador (`caja_para_cobros`): el libro dice lo que
+  entró y el arqueo cuadra. El `after_create` del asiento acredita la CC (antes se acreditaba a
+  mano sin asiento, con el argumento de que «no es ingreso»; un mismo hecho —el paciente adelantó
+  plata— no puede verse distinto según la puerta). Cancelar o editar la dispensa lo destruye con
+  los demás y devuelve el crédito, como antes. El auditor (`contabilidad:auditar`) no lo cuenta
+  como ingreso de la dispensa.
+- **La cuenta corriente no puede ser la línea que sobra.** «Efectivo 30.000 + cuenta corriente
+  10.000» sobre 30.000 no significa nada y acreditaba $10.000 que nadie puso: el modal lo dice
+  y no manda, y el backend lo rechaza (`aplicar_lineas_cobro!`). Si pagó de más, va en el medio
+  con el que pagó.
+
 ## Septiembre 2026 (cb) — La mesa tiene columna «Total»
 
 - **Total = Depósito + Mostrador** en la tabla de la mesa (Germán, 16-sep): cuánto hay de ese
