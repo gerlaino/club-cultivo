@@ -12,6 +12,15 @@ class PreferencesController < ApplicationController
     render json: serialize(@club)
   end
 
+  # GET /preferences/puesta_en_marcha — la misma lista que ve el super admin en la ficha.
+  def puesta_en_marcha
+    unless current_user.admin?
+      return render json: { error: 'Sólo el administrador de la organización.' }, status: :forbidden
+    end
+
+    render json: Clubs::PuestaEnMarcha.de(@club)
+  end
+
   def update
     if ActiveModel::Type::Boolean.new.cast(params[:purge_logo])
       @club.logo.purge if @club.logo.attached?

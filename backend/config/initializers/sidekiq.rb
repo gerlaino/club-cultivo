@@ -22,6 +22,11 @@ Sidekiq.configure_server do |config|
         'class' => 'AplicarBajasModulosJob',
         'description' => 'Apaga los módulos cuya baja programada ya venció y ordena lo que dejan colgando'
       },
+      'plan_vencimiento' => {
+        'cron'  => '30 8 * * *',
+        'class' => 'PlanVencimientoJob',
+        'description' => 'Avisa al admin de la organización que su plan vence en 7 días o venció hoy'
+      },
       'reprocann_vencimiento' => {
         'cron'  => '0 8 * * *',
         'class' => 'ReprocannVencimientoJob',

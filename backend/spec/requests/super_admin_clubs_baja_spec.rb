@@ -16,6 +16,57 @@ RSpec.describe 'Super admin — baja y eliminación de clubes', type: :request d
   def json = JSON.parse(response.body)
 
   describe 'suspender' do
+    # Con MOTIVO: «Suspendida · Reactivar» era un aviso que no se apagaba. Si no pagó, el
+    # pendiente es cobrar; el motivo viaja a la cola del panel y al cartel de la organización.
+    it 'guarda el motivo y la fecha, y la cola del panel los muestra' do
+      patch "/api/super_admin/clubs/#{club.id}/suspender", params: { motivo: 'no_pago' }, as: :json
+
+      expect(json['suspension_motivo']).to eq('no_pago')
+      expect(json['suspendida_at']).to     be_present
+
+      get '/api/super_admin/pulso'
+      fila = json['atencion']['suspendidos'].find { |c| c['id'] == club.id }
+      expect(fila['motivo']).to eq('no_pago')
+    end
+
+    it 'un motivo desconocido cae en «otro»' do
+      patch "/api/super_admin/clubs/#{club.id}/suspender", params: { motivo: 'x' }, as: :json
+
+      expect(json['suspension_motivo']).to eq('otro')
+    end
+
+    it 'el cartel de la organización recibe el motivo' do
+      club.suspender!(motivo: 'no_pago')
+      reset!
+
+      post '/api/users/sign_in', params: { user: { email: admin.email, password: 'password123' } }, as: :json
+
+      expect(json['motivo']).to eq('no_pago')
+    end
+
+    it 'archivada sale de la cola pero sigue en la lista; reactivar la desarchiva' do
+      club.suspender!(motivo: 'lo_pidio')
+
+      patch "/api/super_admin/clubs/#{club.id}/archivar"
+      expect(json['archivada']).to be(true)
+
+      get '/api/super_admin/pulso'
+      expect(json['atencion']['suspendidos'].map { |c| c['id'] }).not_to include(club.id)
+
+      get '/api/super_admin/clubs'
+      expect(json.find { |c| c['id'] == club.id }['archivada']).to be(true)
+
+      patch "/api/super_admin/clubs/#{club.id}/reactivar"
+      expect(json['archivada']).to be(false)
+      expect(json['suspension_motivo']).to be_nil
+    end
+
+    it 'no se archiva una que opera' do
+      patch "/api/super_admin/clubs/#{club.id}/archivar"
+
+      expect(response).to have_http_status(:unprocessable_entity)
+    end
+
     it 'el club sigue en la lista, marcado como suspendido' do
       patch "/api/super_admin/clubs/#{club.id}/suspender"
 

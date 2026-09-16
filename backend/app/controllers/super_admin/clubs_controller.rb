@@ -1,5 +1,5 @@
 class SuperAdmin::ClubsController < SuperAdmin::BaseController
-  before_action :set_club, only: [:show, :update, :crear_usuarios_default, :cambiar_plan, :observar, :detener_observacion, :destroy, :restaurar, :suspender, :reactivar, :provisionar_pulse, :provisionar_whatsapp, :desconectar_whatsapp, :historial, :ia_recarga]
+  before_action :set_club, only: [:show, :update, :clonar, :archivar, :desarchivar, :crear_usuarios_default, :cambiar_plan, :observar, :detener_observacion, :destroy, :restaurar, :suspender, :reactivar, :provisionar_pulse, :provisionar_whatsapp, :desconectar_whatsapp, :historial, :ia_recarga]
 
   # Los ELIMINADOS no se listan salvo que se los pida: verlos mezclados con los activos, sin
   # distinguirse, era lo que hacía pensar que borrar una organización no hacía nada.
@@ -30,7 +30,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       roles    = (Array(params[:roles_a_crear]).map(&:to_s) & club.roles_para_alta(Club::ROLES_ALTA))
                  .presence || Club::ROLES_DEFAULT
       password = params[:password_inicial].presence || User.password_temporal
-      usuarios = club.crear_usuarios_default!(roles: roles, password: password)
+      usuarios = club.crear_usuarios_default!(roles: roles, password: password, admin: admin_params)
       club.crear_geneticas_default!
       render json: {
         club:     serialize_club_detail(club),
@@ -85,6 +85,53 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     end
 
     render json: serialize_club_detail(@club.reload), status: :created
+  end
+
+  # POST /super_admin/clubs/demo — generar un Club Modelo.
+  #
+  # Para vender, «mostrale el Club Modelo» es lo primero. Existía como rake y desde el panel
+  # no se podía. Corre en segundo plano (ver `SembrarDemoJob`): se contesta con la contraseña
+  # y el usuario ya, y la organización aparece en la lista cuando termina de sembrarse.
+  def demo
+    nombre = params[:nombre].presence || 'Club Modelo'
+    slug   = (params[:slug].presence || nombre.parameterize(separator: '_')).downcase.gsub(/[^a-z0-9_]/, '_')
+    if Club.unscoped.exists?(slug: slug)
+      return render json: { errors: ["Ya existe una organización con el identificador «#{slug}». Elegí otro nombre."] },
+                    status: :unprocessable_entity
+    end
+
+    password = User.password_temporal
+    SembrarDemoJob.perform_later(nombre: nombre, slug: slug, admin_password: password)
+
+    render json: {
+      slug: slug, nombre: nombre, password_inicial: password,
+      # El mail del admin lo arma `Clubs::SembrarDemo` a partir del slug.
+      usuario: "admin@#{slug.tr('_', '-')}.example.com",
+      mensaje: 'Se está generando con doce meses de historia. Aparece en la lista en unos minutos.',
+    }, status: :accepted
+  end
+
+  # POST /super_admin/clubs/:id/clonar — una organización nueva con el cultivo de ésta.
+  #
+  # Para arrancar una organización con las genéticas, sedes y salas de otra sin cargarlas a
+  # mano, o para tener una copia de prueba con lotes reales. No lleva pacientes ni plata (ver
+  # `Clubs::Clonar`). Es todo o nada.
+  def clonar
+    nombre = params[:nombre].to_s.strip
+    return render json: { errors: ['Poné el nombre de la organización nueva.'] }, status: :unprocessable_entity if nombre.blank?
+
+    password = User.password_temporal
+    res = Clubs::Clonar.call(origen: @club, nombre: nombre, slug: params[:slug].presence,
+                             admin_email: params[:admin_email].presence, admin_password: password)
+
+    render json: {
+      club:             serialize_club(res.club),
+      resumen:          res.resumen,
+      usuario:          res.club.users.find_by(role: 'admin')&.email,
+      password_inicial: password,
+    }, status: :created
+  rescue ArgumentError => e
+    render json: { errors: [e.message] }, status: :unprocessable_entity
   end
 
   def crear_usuarios_default
@@ -158,7 +205,21 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
   end
 
   def suspender
-    @club.suspender!
+    @club.suspender!(motivo: params[:motivo])
+    render json: serialize_club_detail(@club)
+  end
+
+  # Sale de la cola del panel sin borrarse. Sólo una suspendida: archivar una que opera no
+  # significa nada.
+  def archivar
+    return render json: { error: 'Sólo se archiva una organización suspendida.' }, status: :unprocessable_entity if @club.activo?
+
+    @club.archivar!
+    render json: serialize_club_detail(@club)
+  end
+
+  def desarchivar
+    @club.desarchivar!
     render json: serialize_club_detail(@club)
   end
 
@@ -248,6 +309,14 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     }
   end
 
+  # Quién es el admin de verdad. Va aparte de `club_params` porque no es un dato de la
+  # organización sino de la persona que la va a manejar.
+  def admin_params
+    return {} unless params[:admin].respond_to?(:permit)
+
+    params.require(:admin).permit(:first_name, :last_name, :email_personal).to_h
+  end
+
   def set_club
     @club = Club.unscoped.find(params[:id])
   rescue ActiveRecord::RecordNotFound
@@ -262,6 +331,9 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       :name, :legal_name, :email, :phone, :website,
       :address, :city, :state, :country, :timezone,
       :plan_activo_hasta, :plan_trial, :vista_paciente_activa,
+      # CRM mínimo: con quién hablo y qué quedamos. La próxima acción con fecha entra a la
+      # cola del panel.
+      :contacto_nombre, :proxima_accion, :proxima_accion_el,
       :smtp_host, :smtp_port, :smtp_user, :smtp_pass,
       :smtp_from, :smtp_from_name,
       # `ia_tier` ya no se acepta: el tramo sale del PLAN (ver `Club::IA_TIERS`). Lo que se
@@ -367,8 +439,17 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       deleted_at:       c.deleted_at,
       activo:           c.activo,
       estado:           estado_de(c),
+      suspension_motivo: c.suspension_motivo,
+      suspension_motivo_label: Club::MOTIVOS_SUSPENSION[c.suspension_motivo],
+      suspendida_at:    c.suspendida_at,
+      archivada:        c.archivada?,
       salud:            salud_de(c),
       salud_label:      SALUD[salud_de(c)],
+      # Cuánto paga por mes según la lista, y si esa plata entra (una prueba no factura).
+      precio_mensual:   c.precio_mensual,
+      factura:          c.factura?,
+      # Cuándo entró alguien del equipo por última vez. Es LA métrica de churn.
+      ultimo_ingreso:   c.ultimo_ingreso,
       # Qué contrató: la lista se ordena por suites, no por el plan viejo.
       features:         c.features_expandidas,
     }
@@ -412,12 +493,25 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     a_medias ? 'a_medias' : 'ok'
   end
 
+  def serialize_nota(n)
+    { id: n.id, texto: n.texto, fecha: n.created_at,
+      usuario: n.user ? { id: n.user.id, nombre: n.user.nombre_completo.presence || n.user.email } : nil }
+  end
+
   def serialize_club_detail(c)
     serialize_club(c).merge(
       website:        c.website,
       address:        c.address,
+      contacto_nombre:   c.contacto_nombre,
+      proxima_accion:    c.proxima_accion,
+      proxima_accion_el: c.proxima_accion_el,
+      notas:          c.notas.recientes.includes(:user).limit(50).map { |n| serialize_nota(n) },
+      # Qué le falta para estar operando, derivado de sus datos. Antes la ficha mostraba
+      # 0 · 0 · 0 sin decir qué faltaba.
+      puesta_en_marcha: ActsAsTenant.with_tenant(c) { Clubs::PuestaEnMarcha.de(c) },
       timezone:       c.timezone,
-      usuarios:       c.users.map { |u| { id: u.id, email: u.email, role: u.role, nombre: u.nombre_completo } },
+      usuarios:       c.users.map { |u| { id: u.id, email: u.email, email_personal: u.email_personal, role: u.role,
+                                           nombre: u.nombre_completo, visto_at: u.visto_at } },
       vista_paciente_activa:      c.vista_paciente_activa,
       smtp_configured: c.smtp_configured?,
       smtp_host:       c.smtp_host,
@@ -452,6 +546,8 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
         { clave: k, label: v[:label], desc: v[:desc], requiere: v[:requiere], activo: false }
       },
       plan_info:       PlanEnforcer.new(c).info,
+      # El desglose de lo que paga: plan + suites + adicionales, línea por línea.
+      precios:         Precios.de(c),
       ia_limite_hora:  c.ia_limite_hora,
       # El tramo de IA sale del plan: se manda ya resuelto para que la pantalla no vuelva a
       # deducirlo por su cuenta (era justo la copia que se desincronizaba).

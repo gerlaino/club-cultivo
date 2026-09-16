@@ -57,13 +57,25 @@ RSpec.describe 'SuperAdmin: restablecer contraseña', type: :request do
     expect(json['password_inicial']).not_to eq(una)
   end
 
-  # El mail es la vía cómoda, no la única: la mayoría de las organizaciones no tiene el correo
-  # configurado, y ahí la contraseña en pantalla es TODO lo que hay.
-  it 'avisa si el mail salió o no, sin romper cuando la organización no tiene correo' do
+  # El mail es la vía cómoda, no la única. Sale por la casilla de la PLATAFORMA —no de la
+  # organización, que casi nunca la tiene— y sólo a una casilla real: con el login inventado y
+  # sin mail personal, la contraseña en pantalla es TODO lo que hay, y el panel lo dice.
+  it 'manda el link a la casilla real y dice a cuál' do
+    admin.update!(email_personal: 'la.persona@gmail.com')
+
+    expect { resetear! }.to have_enqueued_mail(AccesoMailer, :restablecer_contrasena)
+    expect(json['mail_enviado']).to be(true)
+    expect(json['mail_destino']).to eq('la.persona@gmail.com')
+  end
+
+  it 'avisa que no salió cuando no hay a dónde mandarlo, sin romper' do
+    admin.update_columns(email: "admin@#{club.slug}.com", email_personal: nil)
+
     resetear!
 
-    expect(json['mail_enviado']).to be(false)
     expect(response).to have_http_status(:ok)
+    expect(json['mail_enviado']).to be(false)
+    expect(json['mail_destino']).to be_nil
   end
 
   it 'funciona con un usuario de cualquier organización, no sólo del club en contexto' do

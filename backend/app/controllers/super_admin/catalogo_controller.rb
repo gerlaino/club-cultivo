@@ -12,6 +12,7 @@ class SuperAdmin::CatalogoController < SuperAdmin::BaseController
         {
           clave:    clave,
           label:    l[:label],
+          precio_mensual: Precios.plan(clave),
           limites:  PlanEnforcer::RECURSOS.to_h { |r| [r, l[r]] },
           usuarios_por_rol: l[:usuarios_por_rol],
           # Cada tope con la suite a la que le importa. El wizard elige los módulos ANTES que el
@@ -34,9 +35,10 @@ class SuperAdmin::CatalogoController < SuperAdmin::BaseController
       # wizard mostraba Delivery y Correo APAGADOS y la organización se creaba con los dos
       # prendidos. La pantalla decía una cosa y pasaba otra.
       features_por_defecto: Club::FEATURES_POR_DEFECTO,
-      suites: Club::SUITES.map { |k, v| { clave: k, label: v[:label], desc: v[:desc] } },
+      moneda: Precios::MONEDA,
+      suites: Club::SUITES.map { |k, v| { clave: k, label: v[:label], desc: v[:desc], precio_mensual: Precios.suite(k) } },
       addons: Club::ADDONS.map { |k, v|
-        { clave: k, label: v[:label], desc: v[:desc], requiere: v[:requiere],
+        { clave: k, label: v[:label], desc: v[:desc], requiere: v[:requiere], precio_mensual: Precios.addon(k),
           pack: v[:pack], pack_label: v[:pack] && Club::SUITES.dig(v[:pack], :label),
           bloqueado: Club.addon_bloqueado?(k), motivo_bloqueo: Club::ADDONS_BLOQUEADOS[k],
           incompleto: Club::ADDONS_INCOMPLETOS.include?(k) }

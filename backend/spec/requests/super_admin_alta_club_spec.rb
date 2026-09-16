@@ -43,6 +43,29 @@ RSpec.describe 'SuperAdmin alta de club', type: :request do
     end
   end
 
+  # La PERSONA detrás del admin. Hasta sep-2026 no quedaba en ningún lado: el usuario nacía como
+  # "Admin <club>" sin mail personal, y «olvidé mi contraseña» no tenía a dónde escribirle.
+  describe 'el admin' do
+    it 'nace con su nombre y su mail real, aparte del usuario de ingreso' do
+      body = alta(admin: { first_name: 'Juan', last_name: 'Pérez', email_personal: 'juan@gmail.com' })
+
+      admin = Club.find(body['club']['id']).users.find_by(role: 'admin')
+      expect(admin.email).to           end_with('.com')
+      expect(admin.email_generado?).to be(true)
+      expect(admin.first_name).to      eq('Juan')
+      expect(admin.last_name).to       eq('Pérez')
+      expect(admin.email_personal).to  eq('juan@gmail.com')
+    end
+
+    it 'sin persona explícita, su mail es el de contacto de la organización' do
+      body = alta(club: { email: 'contacto@club.test' })
+
+      admin = Club.find(body['club']['id']).users.find_by(role: 'admin')
+      expect(admin.email_personal).to eq('contacto@club.test')
+      expect(admin.email_real).to     eq('contacto@club.test')
+    end
+  end
+
   describe 'los módulos' do
     it 'un club nuevo nace con las suites y el Buffet' do
       body = alta

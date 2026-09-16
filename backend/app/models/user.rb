@@ -154,6 +154,23 @@ class User < ApplicationRecord
     email_personal.presence || email
   end
 
+  # El login lo inventó la app: `rol@slug.com` (alta de la organización) o
+  # `nombre.apellido@slug.paciente` (cuenta del portal). No es una casilla y nadie lo lee.
+  def email_generado?
+    return false if club.nil?
+
+    email.to_s.end_with?("@#{club.slug}.com", "@#{club.slug}.paciente")
+  end
+
+  # A dónde se le puede escribir DE VERDAD, o nil. Distinto de `email_notificacion`, que cae en
+  # el login cuando no hay personal: para mandar un link de restablecimiento eso es mandarlo a
+  # una dirección de un dominio ajeno. Acá, sin casilla real no se manda nada, y se dice.
+  def email_real
+    return email_personal if email_personal.present?
+
+    email_generado? ? nil : email
+  end
+
   KINDS_CULTIVADOR = %w[vegetativo floracion mixta madre clon].freeze
   KINDS_MANICURA   = %w[manicura].freeze
 

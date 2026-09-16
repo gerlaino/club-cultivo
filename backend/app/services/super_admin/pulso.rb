@@ -23,6 +23,8 @@ module SuperAdmin
 
     def call
       {
+        plata:         plata,
+        agenda:        agenda,
         suscripciones: suscripciones,
         atencion:      atencion,
         sin_actividad: sin_actividad,
@@ -37,6 +39,42 @@ module SuperAdmin
     attr_reader :hoy, :clubes
 
     # ── La plata ──────────────────────────────────────────────────────────
+    #
+    # Lo primero que mira quien vende: cuánto entra por mes, cuánto está vencido y sigue
+    # operando (o sea, hay que cobrarlo) y cuánto vence este mes. Sale de `Precios` y de
+    # `Club#factura?`: una prueba no suma, una suspendida tampoco.
+    def plata
+      facturables = clubes.select(&:factura?)
+      vencidos    = facturables.select { |c| c.plan_vencido?(hoy) }
+      este_mes    = facturables.select { |c| c.plan_activo_hasta.present? && c.plan_activo_hasta.between?(hoy, hoy.end_of_month) }
+
+      {
+        moneda:            Precios::MONEDA,
+        mrr:               facturables.sum(&:precio_mensual),
+        facturables:       facturables.size,
+        vencido_ars:       vencidos.sum(&:precio_mensual),
+        vencidos:          vencidos.size,
+        vence_este_mes_ars: este_mes.sum(&:precio_mensual),
+        vencen_este_mes:   este_mes.size,
+        # Lo que hoy no entra pero podría: pruebas en curso, a precio de lista.
+        en_prueba_ars:     clubes.select(&:plan_trial).sum(&:precio_mensual),
+      }
+    end
+
+    # ── Lo que quedé en hacer ─────────────────────────────────────────────
+    #
+    # La próxima acción anotada en la ficha («llamar el 18/9»), cuando llega su día o ya pasó.
+    # Es la mitad del CRM que faltaba: lo que uno mismo se prometió, en la misma cola que lo que
+    # la app detecta sola. Una semana de anticipación, para poder ordenar la agenda.
+    def agenda
+      Club.reales.activos.where.not(proxima_accion_el: nil)
+          .where('proxima_accion_el <= ?', hoy + 7)
+          .order(:proxima_accion_el).map do |c|
+        resumen(c).merge(accion: c.proxima_accion, el: c.proxima_accion_el, vencida: c.proxima_accion_el < hoy,
+                         contacto: c.contacto_nombre)
+      end
+    end
+
     def suscripciones
       con_vencimiento = clubes.select { |c| c.plan_activo_hasta.present? }
 
@@ -79,7 +117,12 @@ module SuperAdmin
       {
         modulos_a_medias: pendientes,
         sin_suites: clubes.reject { |c| Club::SUITES.keys.any? { |s| c.suite?(s) } }.map { |c| resumen(c) },
-        suspendidos: Club.reales.activos.where(activo: false).map { |c| resumen(c) },
+        # Con el motivo, para que la cola diga la acción que corresponde. Las archivadas ya no
+        # son un pendiente.
+        suspendidos: Club.reales.activos.where(activo: false, archivada_at: nil).map { |c|
+          resumen(c).merge(motivo: c.suspension_motivo, motivo_label: Club::MOTIVOS_SUSPENSION[c.suspension_motivo],
+                           suspendida_at: c.suspendida_at)
+        },
       }
     end
 
@@ -89,34 +132,82 @@ module SuperAdmin
 
     # ── Quién se está por ir ──────────────────────────────────────────────
     #
-    # El churn que importa es el que todavía no pasó. No hay tracking de logins (Devise
-    # trackable está apagado), así que se mide por el rastro que deja operar: la última
-    # dispensación y el último lote abierto.
+    # El churn que importa es el que todavía no pasó. Se mide por cuándo ENTRÓ alguien del
+    # equipo por última vez (`users.visto_at`, desde sep-2026): antes se miraba la última
+    # dispensa y el último lote creado, y una organización sólo-Cultivo —que abre un lote cada
+    # dos meses— aparecía en silencio trabajando a diario. Para las organizaciones sin marca
+    # todavía (el deploy es reciente) se cae al rastro que deja escribir (`Auditoria`) y, en
+    # último término, a la dispensa y el lote de antes.
     def sin_actividad
       corte = hoy - DIAS_SIN_ACTIVIDAD
       ids   = clubes.map(&:id)
       return [] if ids.empty?
 
-      ultima_dispensa = Dispensacion.no_canceladas.joins(:paciente)
-                                    .where(pacientes: { club_id: ids })
-                                    .group('pacientes.club_id').maximum(:fecha_dispensacion)
-      ultimo_lote     = Lote.where(club_id: ids).group(:club_id).maximum(:created_at)
+      ultima = ultima_actividad_por_club(ids)
 
       clubes.filter_map do |club|
-        marcas = [ultima_dispensa[club.id], ultimo_lote[club.id]&.to_date].compact
-        ultima = marcas.max
-        next if ultima.present? && ultima >= corte
+        fecha = ultima[club.id]
+        next if fecha.present? && fecha >= corte
 
         resumen(club).merge(
-          ultima_actividad: ultima,
-          dias_en_silencio: ultima ? (hoy - ultima).to_i : nil,
+          ultima_actividad: fecha,
+          dias_en_silencio: fecha ? (hoy - fecha).to_i : nil,
         )
       end
     end
 
+    # Fecha de la última señal de vida de cada organización, por id. La consulta es una por
+    # fuente, no una por organización.
+    def ultima_actividad_por_club(ids)
+      visto     = User.del_equipo.where(club_id: ids).group(:club_id).maximum(:visto_at)
+      escrito   = ActsAsTenant.without_tenant { Auditoria.where(club_id: ids).group(:club_id).maximum(:created_at) }
+      dispensa  = Dispensacion.no_canceladas.joins(:paciente)
+                              .where(pacientes: { club_id: ids })
+                              .group('pacientes.club_id').maximum(:fecha_dispensacion)
+      lote      = Lote.where(club_id: ids).group(:club_id).maximum(:created_at)
+
+      ids.to_h do |id|
+        marcas = [visto[id]&.to_date, escrito[id]&.to_date, dispensa[id], lote[id]&.to_date].compact
+        [id, marcas.max]
+      end
+    end
+
     # ── Salud de la plataforma ────────────────────────────────────────────
+    #
+    # Lo que hoy se descubría corriendo un rake a mano (`sidekiq:health`, 79 días sin worker
+    # que nadie vio) o entrando al bucket: el último backup, y qué cron no corrió cuando tenía
+    # que correr.
     def salud
-      { iot_mudo: iot_mudo, sidekiq: sidekiq }
+      { iot_mudo: iot_mudo, sidekiq: sidekiq, backup: Backups::Ultimo.call, cron: cron }
+    end
+
+    # Cada job programado con su última corrida. `atrasado` cuando pasó más del doble de su
+    # período sin encolarse: un cron que no corre no avisa, y este panel es el único lugar
+    # donde se puede ver.
+    def cron
+      require 'sidekiq/cron/job'
+      Sidekiq::Cron::Job.all.map do |j|
+        ultima   = j.last_enqueue_time
+        periodo  = periodo_de(j.cron)
+        atrasado = periodo.present? && (ultima.nil? || ultima < Time.current - (periodo * 2))
+        { nombre: j.name, cron: j.cron, descripcion: j.description, ultima: ultima, atrasado: atrasado }
+      end.sort_by { |c| [c[:atrasado] ? 0 : 1, c[:nombre]] }
+    rescue StandardError => e
+      Rails.logger.warn("[Pulso] cron no disponible: #{e.class} #{e.message}")
+      []
+    end
+
+    # Cuánto tarda en volver a correr, a partir del cron. Con lo justo para los que hay: por
+    # minutos, por hora, por día, por semana. Lo anual (los informes semestrales) no se vigila.
+    def periodo_de(cron)
+      m, h, dom, mon, dow = cron.to_s.split
+      return nil if mon != '*' || dom != '*'
+      return 1.week if dow != '*'
+      return 1.day  if h != '*'
+      return 1.hour if m != '*' && !m.start_with?('*/')
+      return m.delete_prefix('*/').to_i.minutes if m.start_with?('*/')
+
+      nil
     end
 
     # Un club con el IoT contratado y las sondas calladas está pagando por nada y no se entera.
@@ -157,7 +248,13 @@ module SuperAdmin
     #
     # Cuántos clubes lo TIENEN contra cuántos lo tienen ANDANDO. La diferencia entre esas dos
     # columnas es exactamente el trabajo pendiente, y dice qué vender y qué dejar de ofrecer.
+    # Y la tercera columna, USADO en los últimos 30 días: «Delivery: 4 tienen · 4 andando» con
+    # cero paquetes en un mes es un módulo que se va a dar de baja. Cada módulo tiene su propia
+    # señal de uso; los que no tienen ninguna medible (WhatsApp, ARICCAME) van en nil.
+    DIAS_USO = 30
+
     def adopcion
+      uso = uso_por_modulo
       (Club::SUITES.keys + Club::ADDONS.keys).map do |clave|
         con  = clubes.select { |c| c.feature?(clave) || c.suite?(clave) }
         {
@@ -166,6 +263,33 @@ module SuperAdmin
           suite:    Club::SUITES.key?(clave),
           tienen:   con.size,
           andando:  con.count { |c| c.falta_para_funcionar(clave).blank? },
+          usado:    uso.key?(clave) ? con.count { |c| uso[clave].include?(c.id) } : nil,
+        }
+      end
+    end
+
+    # Qué organizaciones dejaron rastro de cada módulo en los últimos 30 días. Una consulta por
+    # módulo, agrupada por club, nunca una por organización.
+    def uso_por_modulo
+      ids   = clubes.map(&:id)
+      desde = DIAS_USO.days.ago
+      return {} if ids.empty?
+
+      ActsAsTenant.without_tenant do
+        ia = IaLlamada.where(club_id: ids).where('created_at >= ?', desde)
+        {
+          'cultivo'             => LoteEvento.where(club_id: ids).where('created_at >= ?', desde).distinct.pluck(:club_id),
+          'produccion_dispensa' => Dispensacion.no_canceladas.joins(:paciente).where(pacientes: { club_id: ids })
+                                               .where('fecha_dispensacion >= ?', desde.to_date).distinct.pluck('pacientes.club_id'),
+          'delivery'            => Dispensacion.joins(:paciente).where(pacientes: { club_id: ids }).where.not(estado_envio: nil)
+                                               .where('dispensaciones.created_at >= ?', desde).distinct.pluck('pacientes.club_id'),
+          'bar'                 => BarVenta.where(club_id: ids).where('created_at >= ?', desde).distinct.pluck(:club_id),
+          'eventos'             => EventoBar.where(club_id: ids).where('created_at >= ?', desde).distinct.pluck(:club_id),
+          'mailer'              => MailEnviado.where(club_id: ids).where('created_at >= ?', desde).distinct.pluck(:club_id),
+          'vista_paciente'      => User.where(club_id: ids, role: 'paciente').where('visto_at >= ?', desde).distinct.pluck(:club_id),
+          'iot'                 => LecturaAmbiental.where(club_id: ids).where('medido_at >= ?', desde).distinct.pluck(:club_id),
+          'ia'                  => ia.where.not(funcion: 'chatbot').distinct.pluck(:club_id),
+          'chatbot'             => ia.where(funcion: 'chatbot').distinct.pluck(:club_id),
         }
       end
     end
@@ -177,6 +301,10 @@ module SuperAdmin
         plan:              PlanEnforcer.normalizar(club.plan),
         trial:             club.plan_trial,
         plan_activo_hasta: club.plan_activo_hasta,
+        # Cada fila con su número: «vencido hace 9 días» sin «$120.000/mes» al lado no dice
+        # cuánto importa.
+        precio_mensual:    club.precio_mensual,
+        ultimo_ingreso:    club.ultimo_ingreso,
       }
     end
   end

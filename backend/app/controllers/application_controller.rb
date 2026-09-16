@@ -8,6 +8,7 @@ class ApplicationController < ActionController::API
 
   before_action :inject_jwt_from_cookie
   before_action :set_current_user
+  before_action :marcar_visto!
   before_action :set_tenant_from_current_user
   before_action :check_club_activo!
   before_action :check_rol_habilitado!
@@ -96,8 +97,9 @@ class ApplicationController < ActionController::API
       render json: { error: 'Esta organización fue eliminada. Contactate con soporte.' }, status: :forbidden
     elsif club.suspendido?
       # `activo` existía en la tabla y no lo miraba nadie: suspender una organización no la suspendía.
+      # Con el motivo: el cartel de la organización dice por qué y qué hacer, no un 403 pelado.
       render json: { error: 'Esta organización está suspendida. Contactate con soporte para reactivarla.',
-                     club_suspendido: true }, status: :forbidden
+                     club_suspendido: true, motivo: club.suspension_motivo }, status: :forbidden
     end
   end
 
@@ -236,6 +238,20 @@ class ApplicationController < ActionController::API
   rescue StandardError => e
     Rails.logger.error("[TEN] Error fijando el tenant para user##{current_user&.id}: #{e.class} #{e.message}")
     render json: { error: 'No se pudo resolver la organización de la sesión.' }, status: :internal_server_error
+  end
+
+  # Cuándo entró por última vez, con granularidad de UNA HORA. Con JWT no hay "login" que
+  # marcar —la PWA instalada no vuelve a loguearse en semanas—, así que se marca la actividad:
+  # cualquier request autenticado, pero escribiendo una sola vez por hora para no pagar un
+  # UPDATE por cada llamada. Es lo que lee «último ingreso» en el panel de plataforma.
+  # `update_column`: sin callbacks ni `updated_at`, que no es un cambio del registro.
+  def marcar_visto!
+    u = current_user
+    return if u.nil? || (u.visto_at.present? && u.visto_at > 1.hour.ago)
+
+    u.update_column(:visto_at, Time.current)
+  rescue StandardError => e
+    Rails.logger.warn("[visto] no se pudo marcar user##{u&.id}: #{e.class} #{e.message}")
   end
 
   # Expone el usuario del request a la capa de modelos (concern Auditable)

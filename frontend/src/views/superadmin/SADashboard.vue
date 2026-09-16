@@ -10,6 +10,7 @@ import { useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { getSuperAdminPulso } from '../../lib/api.js'
 import { AlertTriangle, CalendarClock, MoonStar, Activity, Plus } from 'lucide-vue-next'
+import { formatARS } from '../../lib/formatters.js'
 
 const router  = useRouter()
 const pulso   = ref(null)
@@ -17,6 +18,7 @@ const cargando = ref(true)
 const error   = ref(null)
 
 const susc     = computed(() => pulso.value?.suscripciones || {})
+const plata    = computed(() => pulso.value?.plata || {})
 const atencion = computed(() => pulso.value?.atencion || {})
 const salud    = computed(() => pulso.value?.salud || {})
 
@@ -32,20 +34,39 @@ const salud    = computed(() => pulso.value?.salud || {})
 const GRUPOS = [
   { clave: 'perdiendo', titulo: 'Se está perdiendo plata', tono: 'rojo' },
   { clave: 'roto',      titulo: 'Paga y no le funciona',   tono: 'ambar' },
+  { clave: 'agenda',    titulo: 'Quedaste en hacer',       tono: 'verde' },
   { clave: 'avisar',    titulo: 'Avisar con tiempo',       tono: 'azul' },
 ]
+
+// Una suspendida no es siempre «reactivar»: si la suspendí porque no pagó, el pendiente es
+// COBRAR. El motivo lo carga quien suspende y acá decide el grupo y la acción.
+const SUSPENDIDA = {
+  no_pago:          { grupo: 'perdiendo', texto: 'Suspendida por falta de pago', accion: 'Cobrar' },
+  lo_pidio:         { grupo: 'avisar',    texto: 'Suspendida a pedido de la organización', accion: 'Ver ficha' },
+  prueba_terminada: { grupo: 'avisar',    texto: 'Terminó la prueba y no siguió', accion: 'Convertir o archivar' },
+  otro:             { grupo: 'perdiendo', texto: 'Suspendida', accion: 'Reactivar' },
+}
 
 const pendientes = computed(() => {
   const p = []
   const add = (items, grupo, texto, accion) =>
     (items || []).forEach(c => p.push({ ...c, grupo, texto: texto(c), accion }))
 
+  // Con el número: «venció» sin «$120.000/mes» al lado no dice cuánto importa.
   add(susc.value.vencidos, 'perdiendo',
-    () => 'El plan venció y sigue operando', 'Cobrar y renovar')
+    c => `El plan venció y sigue operando · ${formatARS(c.precio_mensual)}/mes`, 'Cobrar y renovar')
   add(atencion.value.sin_suites, 'perdiendo',
     () => 'Sin ninguna suite: entra pero no puede trabajar', 'Asignar suite')
-  add(atencion.value.suspendidos, 'perdiendo',
-    () => 'Suspendida: es plata que no entra', 'Reactivar')
+  ;(atencion.value.suspendidos || []).forEach(c => {
+    const m = SUSPENDIDA[c.motivo] || SUSPENDIDA.otro
+    p.push({ ...c, grupo: m.grupo, texto: `${m.texto} · ${formatARS(c.precio_mensual)}/mes`, accion: m.accion })
+  })
+
+  // Lo que uno mismo anotó en la ficha con fecha: vencido, o en la semana.
+  ;(pulso.value?.agenda || []).forEach(c => {
+    const cuando = c.vencida ? `venció el ${fecha(c.el)}` : `el ${fecha(c.el)}`
+    p.push({ ...c, grupo: 'agenda', texto: `${c.accion || 'Próxima acción'} · ${cuando}${c.contacto ? ` · ${c.contacto}` : ''}`, accion: 'Ver ficha' })
+  })
 
   add(atencion.value.modulos_a_medias, 'roto',
     c => `${c.modulo_label}: ${c.falta}`, 'Completar configuración')
@@ -56,7 +77,7 @@ const pendientes = computed(() => {
     'Revisar sensores')
 
   add(susc.value.vencen_7, 'avisar',
-    c => `Vence el ${fecha(c.plan_activo_hasta)}`, 'Renovar')
+    c => `Vence el ${fecha(c.plan_activo_hasta)} · ${formatARS(c.precio_mensual)}/mes`, 'Renovar')
 
   return p
 })
@@ -70,6 +91,14 @@ const gruposConPendientes = computed(() =>
 const sinActividad = computed(() => pulso.value?.sin_actividad || [])
 const adopcion     = computed(() => (pulso.value?.adopcion || []).filter(a => a.tienen > 0))
 const sidekiq      = computed(() => salud.value.sidekiq || {})
+const backup       = computed(() => salud.value.backup || {})
+const cron         = computed(() => salud.value.cron || [])
+const cronAtrasados = computed(() => cron.value.filter(c => c.atrasado))
+
+function fechaHora(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
 
 function fecha(f) {
   if (!f) return '—'
@@ -110,6 +139,28 @@ onMounted(async () => {
     <div v-else-if="error" class="sad__error">{{ error }}</div>
 
     <template v-else-if="pulso">
+
+      <!-- 0 · La plata. Cuánto entra por mes, cuánto está vencido y sigue operando (hay que
+           cobrarlo) y cuánto vence este mes. Hasta sep-2026 el panel no tenía un solo número
+           en pesos: «se está perdiendo plata» era una frase. -->
+      <section class="sad__plata">
+        <div class="sad__kpi">
+          <span class="sad__kpi-n">{{ formatARS(plata.mrr || 0) }}</span>
+          <span class="sad__kpi-l">por mes · {{ plata.facturables || 0 }} {{ plata.facturables === 1 ? 'organización factura' : 'organizaciones facturan' }}</span>
+        </div>
+        <div class="sad__kpi" :class="{ 'sad__kpi--rojo': plata.vencido_ars > 0 }">
+          <span class="sad__kpi-n">{{ formatARS(plata.vencido_ars || 0) }}</span>
+          <span class="sad__kpi-l">vencido y operando · {{ plata.vencidos || 0 }}</span>
+        </div>
+        <div class="sad__kpi" :class="{ 'sad__kpi--ambar': plata.vence_este_mes_ars > 0 }">
+          <span class="sad__kpi-n">{{ formatARS(plata.vence_este_mes_ars || 0) }}</span>
+          <span class="sad__kpi-l">vence este mes · {{ plata.vencen_este_mes || 0 }}</span>
+        </div>
+        <div class="sad__kpi">
+          <span class="sad__kpi-n">{{ formatARS(plata.en_prueba_ars || 0) }}</span>
+          <span class="sad__kpi-l">en prueba · {{ (susc.trials || []).length }} a precio de lista</span>
+        </div>
+      </section>
 
       <!-- 1 · Lo que hay que hacer hoy. Va primero porque es lo único accionable. -->
       <section class="sad__section">
@@ -193,7 +244,7 @@ onMounted(async () => {
               </span>
             </li>
           </ul>
-          <p class="sad__pie">Sin dispensaciones ni lotes nuevos en las últimas tres semanas.</p>
+          <p class="sad__pie">Nadie del equipo entró en las últimas tres semanas.</p>
         </section>
 
       </div>
@@ -205,13 +256,33 @@ onMounted(async () => {
           <span class="sad__section-title">Salud</span>
         </div>
         <div class="sad__salud">
-          <div class="sad__salud-item" :class="{ 'sad__salud-item--mal': !sidekiq.disponible }">
+          <div class="sad__salud-item" :class="{ 'sad__salud-item--mal': !sidekiq.disponible || sidekiq.workers === 0 }">
             <span class="sad__salud-l">Trabajos en segundo plano</span>
             <span v-if="sidekiq.disponible" class="sad__salud-v">
               {{ sidekiq.workers }} worker{{ sidekiq.workers === 1 ? '' : 's' }} ·
               {{ sidekiq.encolados }} en cola · {{ sidekiq.muertos }} muertos
             </span>
             <span v-else class="sad__salud-v">Sin respuesta de la cola</span>
+          </div>
+          <!-- Lo que se descubría entrando al bucket a mano. -->
+          <div class="sad__salud-item" :class="{ 'sad__salud-item--mal': backup.disponible && backup.atrasado }">
+            <span class="sad__salud-l">Último backup</span>
+            <span v-if="!backup.disponible" class="sad__salud-v">{{ backup.motivo || 'Sin datos' }}</span>
+            <span v-else-if="!backup.ultimo" class="sad__salud-v">{{ backup.motivo }}</span>
+            <span v-else class="sad__salud-v">
+              {{ fechaHora(backup.ultimo) }} · {{ backup.tamano_mb }} MB
+              <template v-if="backup.atrasado"> · hace más de dos días</template>
+            </span>
+          </div>
+          <!-- Un cron que no corre no avisa (79 días sin worker que nadie vio). -->
+          <div class="sad__salud-item" :class="{ 'sad__salud-item--mal': cronAtrasados.length }">
+            <span class="sad__salud-l">Tareas programadas</span>
+            <span v-if="!cron.length" class="sad__salud-v">Sin datos de la cola</span>
+            <span v-else-if="!cronAtrasados.length" class="sad__salud-v">{{ cron.length }} al día</span>
+            <span v-else class="sad__salud-v">
+              {{ cronAtrasados.length }} sin correr cuando tenían que:
+              {{ cronAtrasados.map(c => c.nombre).join(', ') }}
+            </span>
           </div>
           <!-- El IoT mudo NO va acá: ya está arriba, en la cola, con la organización y el botón
                para resolverlo. Repetirlo como "3 sin señal" agregaba un número que no lleva a
@@ -223,13 +294,15 @@ onMounted(async () => {
       <section v-if="adopcion.length" class="sad__section">
         <div class="sad__section-head">
           <span class="sad__section-title">Qué se usa</span>
-          <span class="sad__section-sub">contratado · andando</span>
+          <span class="sad__section-sub">contratado · andando · usado en 30 días</span>
         </div>
+        <!-- La tercera columna es la que dice qué vender más y qué dejar de ofrecer: «4 tienen ·
+             4 andando» con cero usados en un mes es un módulo que se va a dar de baja. -->
         <div class="sad__adopcion">
           <div v-for="a in adopcion" :key="a.clave" class="sad__adop">
             <span class="sad__adop-l">{{ a.label }}</span>
-            <span class="sad__adop-v" :class="{ 'sad__adop-v--gap': a.andando < a.tienen }">
-              {{ a.tienen }} · {{ a.andando }}
+            <span class="sad__adop-v" :class="{ 'sad__adop-v--gap': a.andando < a.tienen || (a.usado !== null && a.usado < a.andando) }">
+              {{ a.tienen }} · {{ a.andando }} · {{ a.usado === null ? '—' : a.usado }}
             </span>
           </div>
         </div>
@@ -256,6 +329,20 @@ onMounted(async () => {
 
 .sad__cargando { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 4rem 0; color: var(--c-slate-500); font-size: .85rem; }
 .sad__error { padding: 1rem; border-radius: 10px; background: #fef2f2; color: #b91c1c; font-size: .85rem; }
+
+/* La plata, arriba de todo y en grande: es la pregunta con la que se abre el panel. */
+.sad__plata { display: grid; grid-template-columns: repeat(4, 1fr); gap: .6rem; margin-bottom: 1rem; }
+@media (max-width: 900px) { .sad__plata { grid-template-columns: 1fr 1fr; } }
+.sad__kpi {
+  display: grid; gap: .2rem; padding: .85rem 1rem;
+  background: #fff; border: 1px solid var(--c-slate-200); border-radius: 14px;
+}
+.sad__kpi--rojo  { border-color: #fecaca; background: #fef2f2; }
+.sad__kpi--ambar { border-color: #fde68a; background: #fffbeb; }
+.sad__kpi-n { font-size: 1.35rem; font-weight: 800; color: var(--c-slate-900); letter-spacing: -.02em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.sad__kpi--rojo .sad__kpi-n  { color: #b91c1c; }
+.sad__kpi--ambar .sad__kpi-n { color: #b45309; }
+.sad__kpi-l { font-size: .7rem; color: var(--c-slate-500); }
 
 .sad__cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 @media (max-width: 900px) { .sad__cols { grid-template-columns: 1fr; } }
@@ -287,6 +374,7 @@ onMounted(async () => {
 .sad__pend--rojo  { border-left-color: #dc2626; background: #fef2f2; }
 .sad__pend--ambar { border-left-color: #f59e0b; background: #fffbeb; }
 .sad__pend--azul  { border-left-color: #0284c7; background: #f0f9ff; }
+.sad__pend--verde { border-left-color: #15803d; background: #f0fdf4; }
 .sad__pend--gris  { border-left-color: var(--c-slate-400); }
 .sad__pend-club { font-size: .82rem; font-weight: 700; color: var(--c-slate-900); }
 .sad__pend-txt  { font-size: .76rem; color: var(--c-slate-600); }
@@ -303,6 +391,7 @@ onMounted(async () => {
 .sad__grupo-title--rojo  { color: #b91c1c; }
 .sad__grupo-title--ambar { color: #b45309; }
 .sad__grupo-title--azul  { color: #0369a1; }
+.sad__grupo-title--verde { color: #15803d; }
 .sad__grupo-n {
   font-weight: 700; font-size: .66rem; color: var(--c-slate-500);
   background: var(--c-slate-100); border-radius: 20px; padding: .05rem .4rem;

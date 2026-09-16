@@ -13,6 +13,7 @@ class AlertaInterna < ApplicationRecord
     stock_bajo stock_vencimiento saldo_cc_bajo saldo_gramos_bajo merma_mostrador cierre_mostrador_pendiente reposicion_mostrador
     delivery_entregado delivery_fallido
     reserva_por_entregar reserva_vencida
+    plan_por_vencer plan_vencido
     otro
   ].freeze
 

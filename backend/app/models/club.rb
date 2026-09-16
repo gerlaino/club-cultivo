@@ -9,7 +9,8 @@ class Club < ApplicationRecord
   # Nunca se auditan credenciales: smtp_pass, twilio_auth_token_enc, pulse_api_key_enc quedan
   # fuera por no estar en esta lista, y una columna nueva tampoco se cuela sola.
   auditar_solo :name, :legal_name, :email, :slug, :plan, :plan_activo_hasta, :plan_trial,
-               :features, :activo, :deleted_at, :demo, :ia_tier, :ia_limite_hora, :vista_paciente_activa
+               :features, :activo, :deleted_at, :demo, :ia_tier, :ia_limite_hora, :vista_paciente_activa,
+               :contacto_nombre, :proxima_accion, :proxima_accion_el, :suspension_motivo, :archivada_at
 
   # Se declaran para poder verificarlo en un test: que estén fuera no puede depender de que
   # alguien se acuerde de mirar la allowlist de arriba.
@@ -71,6 +72,7 @@ class Club < ApplicationRecord
   has_many :turnos,             dependent: :destroy
   has_many :check_ins,          dependent: :destroy
   has_many :ia_recargas,        class_name: 'IaRecarga', dependent: :destroy
+  has_many :notas,              class_name: 'ClubNota',  dependent: :destroy
 
   has_one_attached :logo
 
@@ -241,19 +243,29 @@ class Club < ApplicationRecord
   # `password` en nil ⇒ se genera una temporal para el lote de usuarios. Es UNA sola para todos
   # los que se crean en el mismo acto porque se dictan juntos al armar la organización; cada
   # persona la cambia al entrar.
-  def crear_usuarios_default!(roles: ROLES_DEFAULT, password: nil)
+  #
+  # `admin` es la PERSONA detrás del usuario admin: nombre, apellido y su mail de verdad. El
+  # usuario de ingreso sigue siendo `admin@slug.com` —es un identificador, no una casilla—, pero
+  # hasta sep-2026 la persona real no quedaba en ningún lado: el mail de contacto del alta iba a
+  # `clubs.email` y el usuario nacía como "Admin <nombre del club>" sin `email_personal`, así que
+  # «olvidé mi contraseña» no tenía a dónde escribirle y el reset decía "le llegó por mail" a una
+  # dirección de un dominio ajeno. Sin `email_personal` explícito, el del admin es el de contacto
+  # de la organización: es la misma persona en el 99% de las altas.
+  def crear_usuarios_default!(roles: ROLES_DEFAULT, password: nil, admin: {})
     password ||= User.password_temporal
+    admin    = (admin || {}).to_h.with_indifferent_access
     roles.select { |r| ROLES_VALIDOS_CLUB.include?(r) }.map do |rol|
-      email = "#{rol}@#{slug}.com"
-      next if User.exists?(email: email)
-      User.create!(
-        club:       self,
-        role:       rol,
-        email:      email,
-        password:   password,
-        first_name: rol.capitalize,
-        last_name:  name,
-      )
+      login = "#{rol}@#{slug}.com"
+      next if User.exists?(email: login)
+
+      attrs = { club: self, role: rol, email: login, password: password,
+                first_name: rol.capitalize, last_name: name }
+      if rol == 'admin'
+        attrs[:first_name]     = admin[:first_name].presence  || attrs[:first_name]
+        attrs[:last_name]      = admin[:last_name].presence   || attrs[:last_name]
+        attrs[:email_personal] = admin[:email_personal].presence || email.presence
+      end
+      User.create!(attrs)
     end.compact
   end
 
@@ -265,6 +277,25 @@ class Club < ApplicationRecord
   end
 
   def eliminado? = deleted_at.present?
+
+  # Cuándo entró alguien del EQUIPO por última vez (`users.visto_at`, granularidad de una
+  # hora). El paciente que mira su portal no cuenta: la pregunta es si la organización trabaja.
+  def ultimo_ingreso = users.del_equipo.maximum(:visto_at)
+
+  # ── La plata ────────────────────────────────────────────────────────────────
+  #
+  # Cuánto paga por mes, según la lista (`Precios`): plan + suites + adicionales. Es el precio
+  # de LISTA de lo que tiene contratado, tenga o no vencimiento cargado.
+  def precio_mensual = Precios.de(self)[:total]
+
+  # Si esa plata ENTRA: una organización en prueba no paga, y una suspendida o eliminada
+  # tampoco. Es lo que suma el MRR del panel; lo vencido se cuenta aparte, porque sigue
+  # operando y hay que cobrarlo.
+  def factura? = activo? && !eliminado? && !plan_trial?
+
+  # Vencido = tiene fecha y ya pasó. Sin fecha no vence nunca (una organización propia, una
+  # cortesía): no es lo mismo que "vence hoy".
+  def plan_vencido?(hoy = Time.zone.today) = plan_activo_hasta.present? && plan_activo_hasta < hoy
 
   # ── Qué se vende y qué se prende ──────────────────────────────────────────
   #
@@ -752,13 +783,29 @@ class Club < ApplicationRecord
   # ELIMINAR (`deleted_at`) — el club se va. Sale de la lista, y su nombre, los emails de sus
   #   usuarios y los DNI de sus pacientes quedan LIBRES para volver a usarse. Es soft delete:
   #   se puede restaurar mientras nadie haya tomado esos identificadores.
-  def suspender!
-    update!(activo: false)
+  # Por qué se suspende. Cada motivo tiene su acción en la cola del panel: «no pagó» se cobra,
+  # «lo pidió» se espera, «prueba terminada» se convierte o se archiva.
+  MOTIVOS_SUSPENSION = {
+    'no_pago'          => 'No pagó',
+    'lo_pidio'         => 'Lo pidió la organización',
+    'prueba_terminada' => 'Terminó la prueba',
+    'otro'             => 'Otro',
+  }.freeze
+
+  def suspender!(motivo: nil)
+    motivo = MOTIVOS_SUSPENSION.key?(motivo.to_s) ? motivo.to_s : 'otro'
+    update!(activo: false, suspension_motivo: motivo, suspendida_at: Time.current)
   end
 
   def reactivar!
-    update!(activo: true)
+    update!(activo: true, suspension_motivo: nil, suspendida_at: nil, archivada_at: nil)
   end
+
+  # Sale de la cola del panel sin borrarse: la organización que se fue sigue existiendo, con
+  # sus datos y sus identificadores, pero ya no es un pendiente.
+  def archivar!    = update!(archivada_at: Time.current)
+  def desarchivar! = update!(archivada_at: nil)
+  def archivada?   = archivada_at.present?
 
   def suspendido? = !activo?
 

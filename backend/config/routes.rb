@@ -53,7 +53,14 @@ Rails.application.routes.draw do
     devise_for :users,
                path: '',
                path_names: { sign_in: 'users/sign_in', sign_out: 'users/sign_out' },
-               controllers: { sessions: 'users/sessions' }
+               controllers: { sessions: 'users/sessions' },
+               # Las rutas de Devise para la contraseña rinden vistas HTML que esta app (API) no
+               # tiene. «Olvidé mi contraseña» va por las dos de abajo, con el link a la SPA.
+               skip: [:passwords]
+
+    # «Olvidé mi contraseña»: pedir el link (por usuario o mail personal) y elegir la nueva.
+    post 'password', to: 'users/passwords#create'
+    put  'password', to: 'users/passwords#update'
 
     get "/me",             to: "me#show"
     get "/stats",          to: "stats#show"
@@ -348,6 +355,9 @@ Rails.application.routes.draw do
     end
 
     resource :preferences, only: [:show, :update], controller: "preferences" do
+      # Qué le falta a la organización para estar operando (`Clubs::PuestaEnMarcha`). Lo lee
+      # el inicio del admin hasta que se completa.
+      get    :puesta_en_marcha,  on: :collection
       post   :upload_logo,       on: :collection
       post   :test_smtp,         on: :collection
       patch  :conectar_email,     on: :collection
@@ -643,7 +653,13 @@ Rails.application.routes.draw do
 
     namespace :super_admin do
       resources :clubs, only: [:index, :show, :create, :update, :destroy] do
+        # Un Club Modelo con datos inventados, para mostrarle la app a un prospecto. Era un
+        # rake (`club:demo`); desde el panel se genera en segundo plano.
+        post :demo, on: :collection
         member do
+          # Una organización nueva con el CULTIVO de ésta (sedes, salas, genéticas, lotes,
+          # plantas e historia). Sin pacientes ni plata. Era `rake club:clonar`.
+          post   :clonar
           post   :crear_usuarios_default
           patch  :cambiar_plan
           post   :observar
@@ -652,6 +668,8 @@ Rails.application.routes.draw do
           patch  :restaurar
           patch  :suspender
           patch  :reactivar
+          patch  :archivar
+          patch  :desarchivar
           patch  :provisionar_whatsapp
           patch  :provisionar_pulse
           delete :desconectar_whatsapp
@@ -659,14 +677,14 @@ Rails.application.routes.draw do
           # va por su propia puerta y deja una fila para poder facturarla.
           post   :ia_recarga
         end
+        # Lo que anotamos sobre la organización (CRM mínimo). Se crea y se borra, no se edita.
+        resources :notas, only: [:index, :create, :destroy], controller: 'club_notas'
       end
       resources :users, only: [:index, :create, :update, :destroy] do
         # "Perdí la contraseña del admin de esa organización". Era el único caso sin salida desde
         # el panel: había que crear un segundo admin o meter mano en la consola.
         member { post :reset_password }
       end
-      get :stats,    to: 'stats#show'
-      get :metricas, to: 'stats#metricas'
       get :catalogo, to: 'catalogo#show'
       # El panel de quien vende la plataforma: vencimientos, módulos a medias, clubes en
       # silencio y salud. Los agregados (plantas, lotes, pacientes) viven en informes.

@@ -102,7 +102,9 @@ api.interceptors.response.use(
     if (status === 403 && error?.response?.data?.club_suspendido) {
       try {
         const { useAuthStore } = await import("../stores/auth");
-        useAuthStore().clubSuspendido = true;
+        const auth = useAuthStore();
+        auth.clubSuspendido = true;
+        auth.clubSuspendidoMotivo = error.response.data.motivo || null;
       } catch {}
       return Promise.reject(error);
     }
@@ -136,6 +138,11 @@ api.interceptors.response.use(
 export const signIn  = (email, password) =>
   api.post("/users/sign_in", { user: { email, password } }, { timeout: 45000 });
 export const signOut = () => api.delete("/users/sign_out");
+// «Olvidé mi contraseña»: pedir el link (por usuario de ingreso o mail personal) y elegir la
+// nueva con el token que trae el mail. No llevan sesión.
+export const solicitarRestablecimiento = (usuario) => api.post('/password', { usuario })
+export const restablecerContrasena     = (token, password, password_confirmation) =>
+  api.put('/password', { token, password, password_confirmation })
 export const me               = () => api.get("/me");
 
 // -------- Salas --------
@@ -210,6 +217,8 @@ export const uploadAvatar     = (file) => {
 
 // -------- Preferencias del Club --------
 export const getPreferences    = () => api.get("/preferences");
+// Qué le falta a la organización para estar operando (sólo admin). Deriva de los datos.
+export const getPuestaEnMarcha = () => api.get("/preferences/puesta_en_marcha");
 export const updatePreferences = (payload) => api.put("/preferences", { club: payload });
 export const testSmtp          = () => api.post("/preferences/test_smtp");
 export const conectarEmail     = (payload) => api.patch("/preferences/conectar_email", payload);
@@ -750,7 +759,6 @@ export const deleteFotoLote  = (loteId, fotoId)   => api.delete(`/lotes/${loteId
 export const setFotoPortadaLote = (loteId, fotoId) => api.patch(`/lotes/${loteId}/fotos/${fotoId}/portada`)
 
 // ── Super Admin ──────────────────────────────────────────────────────
-export const getSuperAdminStats  = ()             => api.get('/super_admin/stats')
 // Sin params no trae los eliminados: verlos mezclados con los activos era lo que hacía
 // pensar que borrar un club no hacía nada.
 // Qué se puede vender (planes, suites, add-ons, incluidos, en construcción, roles del alta).
@@ -777,7 +785,15 @@ export const restaurarClub       = (id)           => api.patch(`/super_admin/clu
 // operar; el eliminado sale de la lista y libera nombre, emails y DNI.
 // La API key de Pulse la carga el super admin al activar ambiente/IoT.
 export const provisionarPulse    = (id, key)      => api.patch(`/super_admin/clubs/${id}/provisionar_pulse`, { pulse_api_key: key })
-export const suspenderClub       = (id)           => api.patch(`/super_admin/clubs/${id}/suspender`)
+export const suspenderClub       = (id, motivo)   => api.patch(`/super_admin/clubs/${id}/suspender`, { motivo })
+export const archivarClub        = (id)           => api.patch(`/super_admin/clubs/${id}/archivar`)
+export const desarchivarClub     = (id)           => api.patch(`/super_admin/clubs/${id}/desarchivar`)
+// Un Club Modelo (en segundo plano) y una organización nueva con el cultivo de otra.
+export const crearClubDemo       = (nombre)       => api.post('/super_admin/clubs/demo', { nombre })
+export const clonarClub          = (id, payload)  => api.post(`/super_admin/clubs/${id}/clonar`, payload, { timeout: 120000 })
+// CRM mínimo: notas sobre la organización (se crean y se borran, no se editan).
+export const crearNotaClub       = (id, texto)    => api.post(`/super_admin/clubs/${id}/notas`, { texto })
+export const borrarNotaClub      = (id, notaId)   => api.delete(`/super_admin/clubs/${id}/notas/${notaId}`)
 export const reactivarClub       = (id)           => api.patch(`/super_admin/clubs/${id}/reactivar`)
 // Créditos de IA vendidos por fuera del plan. Es una VENTA, no una configuración: aplican al
 // mes en curso, no se acumulan y quedan registrados para poder facturarlos.

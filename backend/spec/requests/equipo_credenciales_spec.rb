@@ -57,9 +57,17 @@ RSpec.describe 'Equipo — credenciales', type: :request do
       expect(User.find_by(email: 'nuevo@club.com').valid_password?(pass)).to be(true)
     end
 
-    # Sin SMTP el mail no sale, y el admin tiene que enterarse para dictarla él.
-    it 'avisa si el mail no se pudo enviar' do
-      crear!
+    # El link para elegir la clave sale por la casilla de la PLATAFORMA (no depende de que la
+    # organización tenga correo) y sólo a una casilla real. Un login inventado (`rol@slug.com`)
+    # sin mail personal no tiene a dónde ir, y el admin tiene que enterarse para dictarla él.
+    it 'manda el link cuando el usuario tiene una casilla real' do
+      expect { crear! }.to have_enqueued_mail(AccesoMailer, :restablecer_contrasena)
+
+      expect(json['credenciales']['mail_enviado']).to be(true)
+    end
+
+    it 'avisa que no salió cuando el login es inventado y no hay mail personal' do
+      crear!(email: "nuevo@#{club.slug}.com")
 
       expect(json['credenciales']['mail_enviado']).to be(false)
     end

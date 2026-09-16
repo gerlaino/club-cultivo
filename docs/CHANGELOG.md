@@ -1,5 +1,63 @@
 # Changelog
 
+## Septiembre 2026 (bv) — El super admin, visto por el dueño del negocio
+
+Los siete puntos de la propuesta del 15-sep («hace todo», Germán, 16-sep). Lo que faltaba no era
+software sino lo que convierte un panel de quien mantiene la app en el panel de quien la vende.
+
+- **El mail real del admin, y «olvidé mi contraseña».** El alta pedía un mail de contacto en el
+  paso 1 y creaba `admin@slug.com` en el paso 4: la persona real no quedaba en ningún lado y el
+  reset decía «le llegó por mail» a un dominio ajeno. El paso 4 pide nombre, apellido y mail
+  personal del admin (precargado con el de contacto; `crear_usuarios_default!(admin:)`), y el
+  login tiene **«¿Olvidaste tu contraseña?»** (`/olvide-contrasena` → `POST /api/password` por
+  usuario de ingreso o mail personal; `/restablecer?token=` → `PUT /api/password`). El mail
+  (`AccesoMailer`) sale por la casilla de la **plataforma** —quien no puede entrar no puede
+  conectar su correo— y sólo a **`User#email_real`** (personal, o el login si no es inventado);
+  sin casilla real la pantalla dice a quién pedirle la clave. **Una sola forma de mandar el
+  link** (`Acceso::EnviarRestablecimiento`): el reset del panel y el de la ficha del club usaban
+  el mail de Devise, cuyo link apuntaba a una vista HTML que esta app (API) no sirve, y sólo si
+  la organización tenía SMTP. Throttle propio en rack-attack (5 cada 10 min por IP).
+- **Precios y MRR.** `Precios` (constante, **valores provisorios** hasta que Germán fije la
+  lista): plan + suites + adicionales. `Club#precio_mensual`, `#factura?` (activa y no en
+  prueba), `#plan_vencido?`. El panel abre con **MRR · vencido y operando · vence este mes · en
+  prueba**, en pesos; cada fila de la cola lleva su `$/mes`; la ficha desglosa línea por línea;
+  el alta muestra el precio en cada tarjeta y el total en el resumen; el catálogo lo sirve.
+  **`stats#show` y `stats#metricas` se retiraron**: ninguna pantalla los llamaba y tenían
+  `mrr: 0` a mano.
+- **Último ingreso real.** `users.visto_at`, tocado como mucho **una vez por hora** desde
+  `ApplicationController#marcar_visto!` — no `devise :trackable`, que con JWT escribiría en cada
+  request. `Club#ultimo_ingreso` (sólo el equipo: el paciente en su portal no cuenta). «En
+  silencio» del panel lo usa primero, con `Auditoria` y lote/dispensa como respaldo para lo
+  anterior al deploy. La lista de organizaciones tiene columna **Último ingreso** (y **Vence**,
+  **Plan y $**), orden por columna y filtro **«Para mirar»**; la ficha lo muestra por usuario.
+- **Contacto, notas y próxima acción** (CRM mínimo). `clubs.contacto_nombre`,
+  `proxima_accion`, `proxima_accion_el`; `club_notas` (autor, fecha; se crean y se borran, no se
+  editan; **sin tenant**: es dato de la plataforma). La próxima acción con fecha entra a la cola
+  del panel como **«Quedaste en hacer»** (vencida o en la semana).
+- **Puesta en marcha visible.** `Clubs::PuestaEnMarcha` deriva de los datos qué falta (sedes,
+  salas y lotes con Cultivo, pacientes con Dispensa, correo con el add-on, alguien más que el
+  admin que haya entrado). La lee la ficha del panel **y el inicio del admin**
+  (`GET /preferences/puesta_en_marcha`, tarjeta `PuestaEnMarcha`), después del wizard de la
+  primera sede y hasta que esté completa.
+- **Demo y clonar desde el panel.** `POST /super_admin/clubs/demo` genera el Club Modelo **en
+  segundo plano** (`SembrarDemoJob`) y devuelve el acceso; `POST …/:id/clonar` crea una
+  organización con el cultivo de otra (`Clubs::Clonar`, sincrónico, todo o nada). Eran rakes.
+- **Suspensión con motivo y archivar.** `Club#suspender!(motivo:)` (`no_pago` · `lo_pidio` ·
+  `prueba_terminada` · `otro`, `suspendida_at`): la cola muestra la acción que corresponde
+  («Cobrar», no «Reactivar») y el cartel de la organización dice por qué (`motivo` en el 403).
+  **Archivar** (`archivada_at`) saca de la cola sin borrar; reactivar desarchiva.
+- **El vencimiento avisa** (informativo, **no corta**: decisión pendiente). `PlanVencimientoJob`
+  (cron 8:30) siete días antes y el día que vence: campana (`plan_por_vencer` /
+  `plan_vencido`), push y mail al admin por la plataforma. Franja `AvisoVencimientoPlan` en la
+  app del admin desde 7 días antes, que se queda cuando venció.
+- **Salud y adopción.** Último backup del bucket (`Backups::Ultimo`, cacheado 1 h, timeout
+  corto) y cada cron con su última corrida (`atrasado` al doble del período). Adopción con la
+  tercera columna **usado en 30 días**, con la señal propia de cada módulo.
+- **La ficha en solapas** (Resumen · Suscripción y módulos · Usuarios · Historial),
+  «Generar usuarios», «Clonar», «Archivar» y «Eliminar» detrás del **«⋯»**, «socios» →
+  «pacientes».
+- Migraciones: `add_visto_at_a_users`, `add_crm_minimo_a_clubs`, `add_motivo_de_suspension_a_clubs`.
+
 ## Septiembre 2026 (bu) — La reserva tiene carrito, como la dispensa
 
 - **Una reserva puede apartar varios productos** (pedido de Germán, 15-sep: «al momento de crear

@@ -46,6 +46,20 @@ const routes = [
     meta: { guestOnly: true, fullscreen: true },
   },
 
+  // «Olvidé mi contraseña»: pedir el link y elegir la nueva con el token del mail. Sin sesión.
+  {
+    path: "/olvide-contrasena",
+    name: "olvide-contrasena",
+    component: () => import("../views/RecuperarAccesoView.vue"),
+    meta: { guestOnly: true, fullscreen: true },
+  },
+  {
+    path: "/restablecer",
+    name: "restablecer",
+    component: () => import("../views/RecuperarAccesoView.vue"),
+    meta: { guestOnly: true, fullscreen: true },
+  },
+
   // Landing pública de la plataforma. Es lo que ve quien entra al dominio sin sesión:
   // antes caía directo en el formulario de login, que no le cuenta a nadie qué es esto.
   // El dashboard sigue viviendo en "/" para los usuarios logueados (ver el guard global).
@@ -1259,7 +1273,8 @@ router.beforeEach(async (to) => {
   // El formulario no necesita saber si había sesión previa — necesita dejarte entrar.
   // Las públicas por token (carnet, dispensa, genética) y la landing, por lo mismo: rendir ya.
   const noEsperaBootstrap =
-    /^\/(c|d|g)\//.test(to.path) || to.path === '/bienvenida' || to.path === '/login';
+    /^\/(c|d|g)\//.test(to.path) || to.path === '/bienvenida' || to.path === '/login' ||
+    to.path === '/olvide-contrasena' || to.path === '/restablecer';
 
   if (noEsperaBootstrap) {
     auth.ensureBootstrapped();

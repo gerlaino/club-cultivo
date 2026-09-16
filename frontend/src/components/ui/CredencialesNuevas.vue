@@ -19,8 +19,12 @@
             <span v-for="(bloque, i) in passwordBloques" :key="i" class="cred__pw-bloque">{{ bloque }}</span>
           </code>
         </div>
+        <!-- Al paciente le llega la contraseña; a alguien del equipo, un link para elegir la
+             suya. `mail_con_link` lo dice la pantalla que sabe cuál de los dos es. -->
         <p v-if="datos.mail_enviado === true" class="cred__mail">
-          <i class="bi bi-envelope-check"></i> También se las mandamos por mail.
+          <i class="bi bi-envelope-check"></i>
+          <template v-if="datos.mail_con_link">También le mandamos por mail un link para elegir su propia contraseña.</template>
+          <template v-else>También se las mandamos por mail.</template>
         </p>
         <p v-else-if="datos.mail_enviado === false" class="cred__mail cred__mail--off">
           <i class="bi bi-envelope-slash"></i>
@@ -50,7 +54,7 @@ import { computed } from 'vue'
 import { useToast } from '../../composables/useToast'
 
 const props = defineProps({
-  // `{ nombre, email, password_inicial, mail_enviado? }` o null para no mostrar nada.
+  // `{ nombre, email, password_inicial, mail_enviado?, mail_con_link? }` o null para no mostrar nada.
   datos: { type: Object, default: null },
 })
 const emit = defineEmits(['cerrar'])

@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
+import { formatARS } from '../../lib/formatters.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { useRouter } from 'vue-router'
 import { Building2, Gauge, Zap, Users, ChevronRight, ChevronLeft, Check, ArrowLeft,
@@ -141,6 +142,15 @@ const rolesACrear = computed(() => {
 // El plan Básico incluye uno de cada rol; el admin queda fuera del cupo.
 const planElegido = computed(() => planes.value.find(p => p.clave === form.value.plan))
 
+// Cuánto va a pagar por mes: plan + suites + adicionales, con los precios del catálogo. Es
+// la misma cuenta que hace `Precios.de` en el backend; acá sólo se muestra antes de crear.
+const precioMensual = computed(() => {
+  const plan = planElegido.value?.precio_mensual || 0
+  const s = suites.value.filter(x => form.value.features[x.clave] === true).reduce((t, x) => t + (x.precio_mensual || 0), 0)
+  const a = addons.value.filter(x => form.value.features[x.clave] === true).reduce((t, x) => t + (x.precio_mensual || 0), 0)
+  return plan + s + a
+})
+
 // ── El resumen final ───────────────────────────────────────────────────────
 //
 // El paso que faltaba: se creaba a ciegas. Nunca se veía junto qué contrató, contra qué topes y
@@ -161,6 +171,12 @@ const TIMEZONES = ['America/Argentina/Buenos_Aires', 'America/Montevideo', 'Amer
 
 // ── Usuarios ──────────────────────────────────────────────────────────
 const rolesSeleccionados = ref(['admin'])
+// La PERSONA detrás del admin. El usuario de ingreso es `admin@slug.com` —un identificador—,
+// pero hasta sep-2026 la persona real no quedaba en ningún lado: el mail de contacto iba a la
+// organización y el usuario nacía como "Admin <club>" sin mail personal, así que «olvidé mi
+// contraseña» no tenía a dónde escribirle. El mail se precarga con el de contacto del paso 1:
+// es la misma persona en casi todas las altas, y se puede cambiar.
+const adminPersona = ref({ first_name: '', last_name: '', email_personal: '' })
 const passwordInicial    = ref('')
 const passwordCopiada    = ref(false)
 
@@ -222,6 +238,7 @@ function validarPaso1() {
 }
 
 function siguiente() {
+  if (paso.value === 3 && !adminPersona.value.email_personal) adminPersona.value.email_personal = form.value.email
   if (paso.value === 1 && !validarPaso1()) return
   // Sin ninguna suite la organización entra y no puede hacer nada: es el error más caro del
   // alta, porque se descubre recién cuando el cliente entra a trabajar.
@@ -239,6 +256,7 @@ async function handleSubmit() {
     Object.keys(club).forEach(k => { if (club[k] === '') delete club[k] })
     const { data } = await createSuperAdminClub({
       club,
+      admin:            adminPersona.value,
       roles_a_crear:    rolesACrear.value,
       password_inicial: passwordInicial.value,
     })
@@ -413,7 +431,7 @@ async function handleSubmit() {
             >
               <span class="cnv__suite-check">{{ form.features[s.clave] ? '✓' : '' }}</span>
               <span class="cnv__suite-txt">
-                <span class="cnv__suite-name">{{ s.label }}</span>
+                <span class="cnv__suite-name">{{ s.label }} <span class="cnv__precio">{{ formatARS(s.precio_mensual) }}/mes</span></span>
                 <span class="cnv__suite-desc">{{ s.desc }}</span>
               </span>
             </button>
@@ -457,7 +475,10 @@ async function handleSubmit() {
               >
                 <div class="cnv__feat-left">
                   <div>
-                    <div class="cnv__feat-name">{{ a.label }}</div>
+                    <div class="cnv__feat-name">
+                      {{ a.label }}
+                      <span v-if="a.precio_mensual" class="cnv__precio">{{ formatARS(a.precio_mensual) }}/mes</span>
+                    </div>
                     <div class="cnv__feat-desc">{{ a.desc }}</div>
                     <!-- Por qué NO se puede prender. Antes esto vivía en letra chica que nadie
                          leía y el toggle se dejaba mover igual: quedaba un módulo contratado
@@ -523,6 +544,7 @@ async function handleSubmit() {
               <div class="cnv__plan-top">
                 <span class="cnv__plan-check"><Check v-if="form.plan === p.clave" :size="12" :stroke-width="3" /></span>
                 <span class="cnv__plan-name">{{ p.label }}</span>
+                <span class="cnv__precio cnv__precio--plan">{{ formatARS(p.precio_mensual) }}/mes</span>
               </div>
               <ul class="cnv__plan-limites">
                 <li v-for="r in topesDe(p)" :key="r.clave">{{ r.texto }}</li>
@@ -585,6 +607,26 @@ async function handleSubmit() {
               ceros ni eles) y te la mostramos al crear la organización. La misma para todos los
               usuarios que se creen; cada uno la cambia al entrar.
             </span>
+          </div>
+
+          <div class="cnv__section-label">Quién es el admin</div>
+          <p class="cnv__hint" style="margin:0 0 .6rem">
+            Entra con <code>{{ emailRol('admin') }}</code>, que es un usuario, no una casilla. Su mail
+            de verdad es a donde le llega el link de «olvidé mi contraseña».
+          </p>
+          <div class="cnv__grid-3" style="margin-bottom:1.5rem">
+            <div class="cnv__field">
+              <label class="cnv__label">Nombre</label>
+              <input v-model.trim="adminPersona.first_name" type="text" class="cnv__input" placeholder="Juan" autocomplete="off" />
+            </div>
+            <div class="cnv__field">
+              <label class="cnv__label">Apellido</label>
+              <input v-model.trim="adminPersona.last_name" type="text" class="cnv__input" placeholder="Pérez" autocomplete="off" />
+            </div>
+            <div class="cnv__field">
+              <label class="cnv__label">Mail personal</label>
+              <input v-model.trim="adminPersona.email_personal" type="email" class="cnv__input" placeholder="juan@gmail.com" autocomplete="off" />
+            </div>
           </div>
 
           <div class="cnv__section-label">Usuarios a crear</div>
@@ -670,10 +712,24 @@ async function handleSubmit() {
             </div>
 
             <div class="cnv__res-row">
+              <span class="cnv__res-k">Cuánto paga</span>
+              <span class="cnv__res-v">
+                <strong>{{ formatARS(precioMensual) }} por mes</strong>
+                <span class="cnv__res-sub">
+                  {{ form.plan_trial ? 'En prueba: no factura hasta que salga del trial.' : 'Plan + suites + adicionales, a precio de lista.' }}
+                </span>
+              </span>
+            </div>
+
+            <div class="cnv__res-row">
               <span class="cnv__res-k">Con qué entran</span>
               <span class="cnv__res-v">
                 <strong>{{ rolesACrear.length }} usuario{{ rolesACrear.length === 1 ? '' : 's' }}</strong>
                 <span class="cnv__res-sub">{{ rolesACrear.join(', ') }}</span>
+                <span class="cnv__res-sub">
+                  Admin: {{ [adminPersona.first_name, adminPersona.last_name].filter(Boolean).join(' ') || 'sin nombre' }}
+                  · {{ adminPersona.email_personal || 'sin mail personal' }}
+                </span>
                 <span class="cnv__res-sub">
                   Contraseña: {{ passwordInicial || 'se genera una y te la mostramos' }}
                 </span>
@@ -789,7 +845,8 @@ async function handleSubmit() {
 
 /* Form */
 .cnv__grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-@media (max-width: 640px) { .cnv__grid { grid-template-columns: 1fr; } }
+.cnv__grid-3 { display: grid; grid-template-columns: 1fr 1fr 1.4fr; gap: 1rem; }
+@media (max-width: 640px) { .cnv__grid, .cnv__grid-3 { grid-template-columns: 1fr; } }
 .cnv__row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 @media (max-width: 640px) { .cnv__row-2 { grid-template-columns: 1fr; } }
 
@@ -858,6 +915,8 @@ async function handleSubmit() {
 }
 .cnv__plan--on .cnv__plan-check { background: #1b5e20; border-color: #1b5e20; }
 .cnv__plan-name { font-size: .95rem; font-weight: 800; color: var(--c-slate-900); }
+.cnv__precio { font-size: .7rem; font-weight: 700; color: var(--c-slate-500); font-variant-numeric: tabular-nums; margin-left: .3rem; }
+.cnv__precio--plan { margin-left: auto; }
 .cnv__plan-limites { list-style: none; margin: 0; padding: 0; display: grid; gap: .25rem; }
 .cnv__plan-limites li { font-size: .74rem; color: var(--c-slate-500); line-height: 1.35; }
 .cnv__plan--on .cnv__plan-limites li { color: var(--c-slate-600); }

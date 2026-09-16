@@ -12,6 +12,7 @@ import { useClubStore }  from '../../stores/club.js'
 import { useStatsStore } from '../../stores/stats.js'
 import { useTareasStore } from '../../stores/tareas.js'
 import OnboardingWizard  from '../OnboardingWizard.vue'
+import PuestaEnMarcha    from '../PuestaEnMarcha.vue'
 import DsSpinner         from '../../design-system/components/Spinner.vue'
 import { hoyISO } from '../../utils/dates.js'
 
@@ -495,6 +496,10 @@ async function onOnboardingCompletado() {
       <div v-if="erroresCarga.length" class="ad__error-banner">
         Algunos datos no pudieron cargarse: {{ erroresCarga.join(', ') }}. Recargá la página si el problema persiste.
       </div>
+
+      <!-- Qué falta para estar operando. Aparece después del wizard de la primera sede y se
+           apaga sola cuando está todo hecho: el wizard dejaba al admin solo con una app vacía. -->
+      <PuestaEnMarcha />
 
       <!-- ── CAJAS DE LOS MOSTRADORES ─────────────────────────────────────
            El admin no está parado en la sede: acá ve a distancia si abrieron, si hay mesa

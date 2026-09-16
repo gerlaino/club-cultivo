@@ -1,0 +1,5 @@
+Hola <%= @user.first_name.presence || '' %>,
+
+<% if @dias.zero? %>El plan de <%= @club.name %> en Cultivo Espacial vence hoy (<%= @fecha %>).<% else %>El plan de <%= @club.name %> en Cultivo Espacial vence el <%= @fecha %>, en <%= @dias %> días.<% end %>
+
+La app sigue andando. Para renovarlo, respondé este mail o escribinos por el canal de siempre.

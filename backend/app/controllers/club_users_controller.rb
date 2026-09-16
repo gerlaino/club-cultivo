@@ -331,16 +331,10 @@ class ClubUsersController < ApplicationController
     }
   end
 
-  # Devuelve si el mail salió de verdad. Un fallo de SMTP no puede tumbar el alta: el usuario
-  # ya está creado y el admin tiene la contraseña en pantalla.
-  def enviar_instrucciones(user)
-    return false unless current_user.club.smtp_configured?
-    user.send_reset_password_instructions
-    true
-  rescue StandardError => e
-    Rails.logger.warn("[usuarios] no se pudo enviar el mail a #{user.email}: #{e.message}")
-    false
-  end
+  # Devuelve si el mail salió de verdad. Sale por la casilla de la plataforma y a `email_real`
+  # (`Acceso::EnviarRestablecimiento`): antes dependía del SMTP de la organización y del mail
+  # de Devise, cuyo link no llevaba a ninguna pantalla de esta app.
+  def enviar_instrucciones(user) = Acceso::EnviarRestablecimiento.call(user)
 
   def set_user
     # `del_equipo`: por acá no se toca la cuenta de un paciente. Sin el scope, un admin podía

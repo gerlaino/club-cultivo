@@ -15,14 +15,16 @@ RSpec.describe 'Ola 5 — Super Admin', type: :request do
     end
   end
 
-  context 'GET /super_admin/metricas' do
+  # `GET /super_admin/metricas` y `/stats` se retiraron (sep-2026): el panel es `pulso` y el
+  # tamaño de la plataforma, `informes/plataforma`.
+  context 'GET /super_admin/pulso' do
     before { sign_in_as(super_admin) }
 
-    it 'devuelve métricas globales → 200' do
-      get '/super_admin/metricas', headers: auth_headers
+    it 'devuelve el panel → 200' do
+      get '/super_admin/pulso', headers: auth_headers
       expect(response).to have_http_status(:ok)
       body = JSON.parse(response.body)
-      expect(body.keys).to include('total_clubes', 'total_lotes_activos', 'mrr')
+      expect(body.keys).to include('plata', 'suscripciones', 'atencion')
     end
   end
 

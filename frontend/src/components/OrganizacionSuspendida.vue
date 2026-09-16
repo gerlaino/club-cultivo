@@ -6,9 +6,19 @@
 //
 // Lo que más importa del texto es la última línea: un 403 pelado —o un "no autorizado"— le hace
 // creer al club que perdió su información. No la perdió, y hay que decírselo.
+import { computed } from 'vue'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
+
+// Qué pasó y qué hacer, según el motivo que cargó la plataforma al suspender. Sin motivo (una
+// suspensión vieja) queda el texto genérico.
+const TEXTOS = {
+  no_pago:          'El plan de la organización está impago. Apenas se regularice, el acceso vuelve completo.',
+  lo_pidio:         'La organización pidió pausar el acceso. Para retomarlo, avisá a Cultivo Espacial.',
+  prueba_terminada: 'El período de prueba terminó. Para seguir usando la app, hablá con Cultivo Espacial.',
+}
+const detalle = computed(() => TEXTOS[auth.clubSuspendidoMotivo] || null)
 
 async function salir() {
   try { await auth.logout() } catch {}
@@ -25,6 +35,7 @@ async function salir() {
         El acceso de tu organización está temporalmente suspendido, así que las secciones de la
         app no van a responder.
       </p>
+      <p v-if="detalle" class="susp__text susp__text--motivo">{{ detalle }}</p>
       <p class="susp__text">
         Ante cualquier duda, comunicate con los administradores de <strong>Cultivo Espacial</strong>.
       </p>
@@ -44,6 +55,7 @@ async function salir() {
 .susp__logo { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; margin-bottom: 1rem; }
 .susp__title { margin: 0 0 .75rem; font-size: 1.25rem; font-weight: 800; color: #0f172a; letter-spacing: -.01em; }
 .susp__text { margin: 0 0 .6rem; font-size: .9rem; color: #475569; line-height: 1.6; }
+.susp__text--motivo { color: #0f172a; font-weight: 600; }
 .susp__resguardo { display: flex; align-items: flex-start; gap: .5rem; text-align: left; margin: 1.1rem 0 1.4rem; padding: .75rem .9rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; font-size: .82rem; color: #15803d; line-height: 1.55; }
 .susp__resguardo i { flex-shrink: 0; margin-top: .1rem; }
 .susp__btn { background: #1b5e20; color: #fff; border: none; border-radius: 9px; padding: .6rem 1.4rem; font-size: .875rem; font-weight: 700; cursor: pointer; }

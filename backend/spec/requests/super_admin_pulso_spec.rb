@@ -15,6 +15,54 @@ RSpec.describe 'SuperAdmin pulso', type: :request do
 
   before { sign_in_as(super_admin) }
 
+  # Lo primero que mira quien vende. Hasta sep-2026 no había un solo número de plata en el
+  # panel: `mrr: 0` estaba escrito a mano en un endpoint que nadie llamaba.
+  describe 'la plata' do
+    let(:solo_cultivo) { { 'cultivo' => true } }
+
+    it 'suma el MRR de lo que factura: plan + suites + adicionales' do
+      club = create(:club, plan: 'basico', plan_trial: false, features: { 'cultivo' => true, 'iot' => true })
+
+      esperado = Precios.plan('basico') + Precios.suite('cultivo') + Precios.addon('iot')
+      expect(club.precio_mensual).to eq(esperado)
+      expect(pulso['plata']['mrr']).to be >= esperado
+    end
+
+    it 'una prueba no factura, pero se ve cuánto valdría' do
+      create(:club, plan: 'total', plan_trial: true, features: solo_cultivo)
+      create(:club, plan: 'total', plan_trial: false, features: solo_cultivo)
+
+      p = pulso['plata']
+      expect(p['mrr']).to           eq(Precios.plan('total') + Precios.suite('cultivo'))
+      # `>=`: la factory del super admin deja una organización propia, también en prueba.
+      expect(p['en_prueba_ars']).to be >= Precios.plan('total') + Precios.suite('cultivo')
+    end
+
+    it 'lo vencido y lo que vence este mes van aparte, en pesos' do
+      create(:club, plan: 'basico', plan_trial: false, features: solo_cultivo, plan_activo_hasta: Time.zone.today - 9)
+      create(:club, plan: 'basico', plan_trial: false, features: solo_cultivo, plan_activo_hasta: Time.zone.today.end_of_month)
+
+      p = pulso['plata']
+      precio = Precios.plan('basico') + Precios.suite('cultivo')
+      expect(p['vencido_ars']).to        eq(precio)
+      expect(p['vencidos']).to           eq(1)
+      expect(p['vence_este_mes_ars']).to eq(precio)
+    end
+
+    it 'una organización demo no cuenta' do
+      create(:club, demo: true, plan: 'total', plan_trial: false, features: solo_cultivo)
+
+      expect(pulso['plata']['mrr']).to eq(0)
+    end
+
+    it 'cada organización de la cola lleva su precio' do
+      vencido = create(:club, plan_trial: false, features: solo_cultivo, plan_activo_hasta: Time.zone.today - 1)
+
+      fila = pulso['suscripciones']['vencidos'].find { |c| c['id'] == vencido.id }
+      expect(fila['precio_mensual']).to eq(vencido.precio_mensual)
+    end
+  end
+
   describe 'suscripciones' do
     it 'separa lo vencido de lo que está por vencer' do
       vencido  = create(:club, name: 'Vencido',  plan_activo_hasta: Time.zone.today - 1)

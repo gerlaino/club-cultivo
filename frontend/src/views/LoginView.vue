@@ -131,6 +131,8 @@
               </div>
             </Transition>
 
+            <RouterLink to="/olvide-contrasena" class="lv__olvide">¿Olvidaste tu contraseña?</RouterLink>
+
             <button class="lv__btn" type="submit" :disabled="auth.loading || retrying || !email || !password">
               <DsSpinner v-if="auth.loading || retrying" :size="18" />
               <template v-else>
@@ -397,6 +399,9 @@ async function onSubmit() {
 .lv__copy { font-size: .65rem; color: var(--c-slate-400); }
 .lv__dot { width: 6px; height: 6px; border-radius: 50%; background: var(--c-leaf-500, #5A8A72); display: inline-block; animation: pulse 2.5s ease infinite; }
 @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
+
+.lv__olvide { align-self: flex-end; margin-top: -.3rem; font-size: .72rem; font-weight: 600; color: var(--c-slate-500); text-decoration: none; }
+.lv__olvide:hover { color: var(--c-leaf-800, #1A3D2E); text-decoration: underline; }
 
 .lv__back {
   margin-top: 1.1rem; font-size: .72rem; font-weight: 600;

@@ -200,7 +200,7 @@ async function save() {
     // Un toast se va solo y la contraseña se pierde: queda en pantalla hasta que el admin la
     // haya pasado, con el aviso de si el mail salió o no.
     if (nuevo?.credenciales) {
-      credencialesNuevas.value = { ...nuevo.credenciales, nombre: `${form.value.first_name} ${form.value.last_name}`.trim() }
+      credencialesNuevas.value = { ...nuevo.credenciales, nombre: `${form.value.first_name} ${form.value.last_name}`.trim(), mail_con_link: true }
     } else {
       toast.success('Usuario creado.')
     }

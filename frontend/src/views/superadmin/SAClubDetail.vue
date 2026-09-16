@@ -3,11 +3,12 @@ import { ref, computed, onMounted } from 'vue'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub, suspenderClub, reactivarClub, getSuperAdminCatalogo, getHistorialClub, resetSuperAdminUserPassword } from '../../lib/api.js'
+import { formatARS } from '../../lib/formatters.js'
+import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub, suspenderClub, reactivarClub, archivarClub, desarchivarClub, clonarClub, crearNotaClub, borrarNotaClub, getSuperAdminCatalogo, getHistorialClub, resetSuperAdminUserPassword } from '../../lib/api.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
 import SAModulos from './SAModulos.vue'
-import { ArrowLeft, Pencil, Trash2, RotateCcw, Sparkles, UserPlus, Check, X, Users, Info, CreditCard, PauseCircle, PlayCircle, History, KeyRound } from 'lucide-vue-next'
+import { ArrowLeft, Pencil, Trash2, RotateCcw, Sparkles, UserPlus, Check, X, Users, Info, CreditCard, PauseCircle, PlayCircle, History, KeyRound, MoreHorizontal, Copy, Archive, ArchiveRestore, StickyNote, ListChecks } from 'lucide-vue-next'
 
 const { confirm } = useConfirm()
 const toast = useToast()
@@ -72,6 +73,121 @@ async function copiarPassword(valor) {
 }
 const userError = ref(null)
 
+// ── Solapas ──
+// La ficha era UNA tira de 1.700 líneas: datos, suscripción, usuarios, módulos, IA, WhatsApp,
+// SMTP, historial. Cuatro solapas, una pregunta cada una: cómo está (Resumen), qué paga y qué
+// tiene (Suscripción y módulos), quién entra (Usuarios), qué le hicimos (Historial).
+const SOLAPAS = [
+  { clave: 'resumen',  label: 'Resumen' },
+  { clave: 'modulos',  label: 'Suscripción y módulos' },
+  { clave: 'usuarios', label: 'Usuarios' },
+  { clave: 'historial', label: 'Historial' },
+]
+const solapa = ref(route.query.tab && SOLAPAS.some(s => s.clave === route.query.tab) ? route.query.tab : 'resumen')
+function irA(clave) {
+  solapa.value = clave
+  router.replace({ query: { ...route.query, tab: clave } })
+  if (clave === 'historial' && !historial.value) cargarHistorial()
+}
+
+// Menú «⋯» del hero: lo de mantenimiento (generar usuarios, clonar) y lo irreversible
+// (eliminar) salen de al lado de Suspender, donde «Generar usuarios» era el botón más visible
+// de la ficha para algo que se usa una vez.
+const menuAbierto = ref(false)
+function cerrarMenu() { menuAbierto.value = false }
+
+// ── Contacto, notas y próxima acción (CRM mínimo) ──
+const notaTexto  = ref('')
+const notaSaving = ref(false)
+const accionForm = ref({ proxima_accion: '', proxima_accion_el: '' })
+const accionEdit = ref(false)
+const accionSaving = ref(false)
+
+async function agregarNota() {
+  const texto = notaTexto.value.trim()
+  if (!texto || notaSaving.value) return
+  notaSaving.value = true
+  try {
+    const { data } = await crearNotaClub(id, texto)
+    club.value = { ...club.value, notas: [data, ...(club.value.notas || [])] }
+    notaTexto.value = ''
+  } catch (e) {
+    toast.error(e?.response?.data?.errors?.join(', ') || 'No se pudo guardar la nota')
+  } finally {
+    notaSaving.value = false
+  }
+}
+
+async function borrarNota(n) {
+  const ok = await confirm({ title: 'Borrar la nota', message: n.texto, confirmText: 'Borrar', variant: 'danger' })
+  if (!ok) return
+  try {
+    await borrarNotaClub(id, n.id)
+    club.value = { ...club.value, notas: (club.value.notas || []).filter(x => x.id !== n.id) }
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo borrar la nota')
+  }
+}
+
+function abrirAccion() {
+  accionForm.value = {
+    proxima_accion:    club.value.proxima_accion || '',
+    proxima_accion_el: club.value.proxima_accion_el?.toString().slice(0, 10) || '',
+  }
+  accionEdit.value = true
+}
+
+async function guardarAccion(limpiar = false) {
+  accionSaving.value = true
+  try {
+    const payload = limpiar
+      ? { proxima_accion: null, proxima_accion_el: null }
+      : { proxima_accion: accionForm.value.proxima_accion || null, proxima_accion_el: accionForm.value.proxima_accion_el || null }
+    const { data } = await updateSuperAdminClub(id, payload)
+    club.value = { ...club.value, ...data }
+    accionEdit.value = false
+  } catch (e) {
+    toast.error(e?.response?.data?.errors?.join(', ') || 'No se pudo guardar')
+  } finally {
+    accionSaving.value = false
+  }
+}
+
+const accionVencida = computed(() => {
+  const el = club.value?.proxima_accion_el
+  return el && new Date(el + 'T00:00:00') < new Date(new Date().toDateString())
+})
+
+// «hace 3 días» para el último ingreso: la pregunta es si siguen entrando, no la fecha exacta.
+function hace(iso) {
+  if (!iso) return 'nunca entró'
+  const dias = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
+  if (dias <= 0) return 'hoy'
+  if (dias === 1) return 'ayer'
+  if (dias < 30) return `hace ${dias} días`
+  const meses = Math.floor(dias / 30)
+  return meses === 1 ? 'hace un mes' : `hace ${meses} meses`
+}
+
+// ── Clonar el cultivo a una organización nueva ──
+const showClonarModal = ref(false)
+const clonarForm  = ref({ nombre: '' })
+const clonando    = ref(false)
+const clonado     = ref(null)
+
+async function clonar() {
+  if (!clonarForm.value.nombre.trim()) return
+  clonando.value = true
+  try {
+    const { data } = await clonarClub(id, { nombre: clonarForm.value.nombre.trim() })
+    clonado.value = data
+  } catch (e) {
+    toast.error(e?.response?.data?.errors?.join(', ') || 'No se pudo clonar')
+  } finally {
+    clonando.value = false
+  }
+}
+
 const editingInfo  = ref(false)
 const infoForm     = ref({})
 const savingInfo   = ref(false)
@@ -89,6 +205,7 @@ function abrirEditInfo() {
     state:      club.value.state      || '',
     country:    club.value.country    || '',
     timezone:   club.value.timezone   || '',
+    contacto_nombre: club.value.contacto_nombre || '',
   }
   infoError.value   = null
   editingInfo.value = true
@@ -265,23 +382,44 @@ async function generarUsuarios() {
 }
 
 
-// Dar de baja: el club deja de operar pero sigue entero y en la lista. Es lo que se hace
-// cuando dejan de pagar o se toman una pausa — reversible sin consecuencias.
+// Dar de baja: la organización deja de operar pero sigue entera y en la lista. Es lo que se
+// hace cuando dejan de pagar o se toman una pausa — reversible sin consecuencias.
+//
+// CON MOTIVO: «Suspendida · Reactivar» era un aviso que no se apagaba. Si la suspendí porque
+// no pagó, el pendiente es cobrar, y eso lo decide el motivo en la cola del panel. La
+// organización también lo lee en su cartel.
+const MOTIVOS_SUSPENSION = [
+  { clave: 'no_pago',          label: 'No pagó',                  desc: 'Queda en «se está perdiendo plata» hasta cobrar.' },
+  { clave: 'lo_pidio',         label: 'Lo pidió la organización', desc: 'Una pausa. Queda en «avisar con tiempo».' },
+  { clave: 'prueba_terminada', label: 'Terminó la prueba',        desc: 'Para convertir o archivar.' },
+  { clave: 'otro',             label: 'Otro',                     desc: '' },
+]
+const showSuspenderModal = ref(false)
+const motivoSuspension   = ref('no_pago')
+
 async function suspender() {
-  const ok = await confirm({
-    title: `Suspender ${club.value.name}`,
-    message: 'Sus usuarios no van a poder entrar hasta que lo reactives. No se borra ni se cambia nada: el club queda tal cual está.',
-    confirmText: 'Suspender club',
-    variant: 'danger',
-  })
-  if (!ok) return
+  showSuspenderModal.value = false
   saving.value = true
   try {
-    const { data } = await suspenderClub(id)
+    const { data } = await suspenderClub(id, motivoSuspension.value)
     club.value = data
-    toast.success('Club suspendido')
+    toast.success('Organización suspendida')
   } catch (e) {
     toast.error(e?.response?.data?.error || 'Error al suspender')
+  } finally {
+    saving.value = false
+  }
+}
+
+// Sale de la cola del panel sin borrarse. Distinto de eliminar, que libera identificadores.
+async function archivar() {
+  saving.value = true
+  try {
+    const { data } = await (club.value.archivada ? desarchivarClub(id) : archivarClub(id))
+    club.value = data
+    toast.success(club.value.archivada ? 'Archivada: sale de la cola del panel' : 'Vuelve a la cola del panel')
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo archivar')
   } finally {
     saving.value = false
   }
@@ -342,6 +480,7 @@ async function restaurar() {
 
 onMounted(async () => {
   await cargar()
+  if (solapa.value === 'historial') cargarHistorial()
   // Los planes con sus límites salen del backend, para que el modal muestre exactamente los
   // topes que después se aplican.
   try {
@@ -373,7 +512,13 @@ onMounted(async () => {
       <!-- Banner suspendido -->
       <div v-else-if="club.activo === false" class="scd__susp-banner">
         <PauseCircle :size="16" :stroke-width="1.75" />
-        <div><strong>Organización suspendida</strong> — sus usuarios no pueden iniciar sesión. Los datos están intactos.</div>
+        <div>
+          <strong>Organización suspendida</strong>
+          <template v-if="club.suspension_motivo_label"> · {{ club.suspension_motivo_label }}</template>
+          <template v-if="club.suspendida_at"> · {{ formatDate(club.suspendida_at) }}</template>
+          <template v-if="club.archivada"> · archivada, fuera de la cola del panel</template>
+          — sus usuarios no pueden iniciar sesión. Los datos están intactos.
+        </div>
         <button class="scd__btn-restore" :disabled="saving" @click="reactivar">
           <PlayCircle :size="13" :stroke-width="2" /> Reactivar
         </button>
@@ -406,30 +551,58 @@ onMounted(async () => {
           </div>
           <div class="scd__hero-stats">
             <div class="scd__hstat"><span class="scd__hstat-val">{{ club.usuarios_count }}</span><span class="scd__hstat-lbl">usuarios</span></div>
-            <div class="scd__hstat"><span class="scd__hstat-val">{{ club.pacientes_count }}</span><span class="scd__hstat-lbl">socios</span></div>
+            <div class="scd__hstat"><span class="scd__hstat-val">{{ club.pacientes_count }}</span><span class="scd__hstat-lbl">pacientes</span></div>
             <div class="scd__hstat"><span class="scd__hstat-val">{{ club.lotes_count }}</span><span class="scd__hstat-lbl">lotes</span></div>
           </div>
           <div class="scd__hero-actions">
-            <button class="scd__btn-sm scd__btn-secondary" @click="generarUsuarios" :disabled="saving">
-              <Sparkles :size="13" :stroke-width="1.75" /> Generar usuarios
-            </button>
             <!-- Dos acciones distintas, no una: suspender pausa, eliminar libera. -->
             <template v-if="!club.deleted_at">
-              <button v-if="club.activo !== false" class="scd__btn-sm scd__btn-secondary" @click="suspender" :disabled="saving">
+              <button v-if="club.activo !== false" class="scd__btn-sm scd__btn-secondary" @click="showSuspenderModal = true" :disabled="saving">
                 <PauseCircle :size="13" :stroke-width="1.75" /> Suspender
               </button>
               <button v-else class="scd__btn-sm scd__btn-secondary" @click="reactivar" :disabled="saving">
                 <PlayCircle :size="13" :stroke-width="1.75" /> Reactivar
               </button>
-              <button class="scd__btn-sm scd__btn-danger" @click="eliminar" :disabled="saving">
-                <Trash2 :size="13" :stroke-width="1.75" /> Eliminar
-              </button>
             </template>
+            <!-- Lo de mantenimiento y lo irreversible, detrás del «⋯»: «Generar usuarios» era
+                 el botón más visible de la ficha para algo que se usa una vez. -->
+            <div class="scd__menu" v-click-outside="cerrarMenu">
+              <button class="scd__btn-sm scd__btn-secondary" aria-label="Más acciones" @click="menuAbierto = !menuAbierto">
+                <MoreHorizontal :size="15" :stroke-width="2" />
+              </button>
+              <div v-if="menuAbierto" class="scd__menu-list">
+                <button class="scd__menu-item" @click="cerrarMenu(); showClonarModal = true; clonado = null; clonarForm.nombre = ''">
+                  <Copy :size="13" :stroke-width="1.75" /> Clonar el cultivo a una organización nueva
+                </button>
+                <button class="scd__menu-item" @click="cerrarMenu(); generarUsuarios()" :disabled="saving">
+                  <Sparkles :size="13" :stroke-width="1.75" /> Generar usuarios que falten
+                </button>
+                <button v-if="club.activo === false && !club.deleted_at" class="scd__menu-item" @click="cerrarMenu(); archivar()" :disabled="saving">
+                  <component :is="club.archivada ? ArchiveRestore : Archive" :size="13" :stroke-width="1.75" />
+                  {{ club.archivada ? 'Volver a la cola del panel' : 'Archivar (sale de la cola del panel)' }}
+                </button>
+                <button v-if="!club.deleted_at" class="scd__menu-item scd__menu-item--danger" @click="cerrarMenu(); eliminar()" :disabled="saving">
+                  <Trash2 :size="13" :stroke-width="1.75" /> Eliminar la organización
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <!-- ── Row 1: Info + Plan ── -->
+      <!-- ── Solapas ── -->
+      <nav class="scd__tabs" aria-label="Secciones de la ficha">
+        <button v-for="t in SOLAPAS" :key="t.clave" class="scd__tab" :class="{ 'scd__tab--on': solapa === t.clave }" @click="irA(t.clave)">
+          {{ t.label }}
+          <span v-if="t.clave === 'usuarios' && club.usuarios?.length" class="scd__tab-n">{{ club.usuarios.length }}</span>
+          <span v-if="t.clave === 'resumen' && club.puesta_en_marcha && !club.puesta_en_marcha.completa" class="scd__tab-n scd__tab-n--ambar">
+            {{ club.puesta_en_marcha.total - club.puesta_en_marcha.hechos }}
+          </span>
+        </button>
+      </nav>
+
+      <!-- ══ Resumen ══ -->
+      <template v-if="solapa === 'resumen'">
       <div class="scd__row">
 
         <!-- Info -->
@@ -445,6 +618,8 @@ onMounted(async () => {
           <dl v-if="!editingInfo" class="scd__dl">
             <dt>Nombre</dt><dd>{{ club.name || '—' }}</dd>
             <dt>Razón social</dt><dd>{{ club.legal_name || '—' }}</dd>
+            <!-- Con quién hablo. La ficha tenía razón social y sitio web, pero no esto. -->
+            <dt>Contacto</dt><dd>{{ club.contacto_nombre || '—' }}</dd>
             <dt>Email</dt><dd>{{ club.email || '—' }}</dd>
             <dt>Teléfono</dt><dd>{{ club.phone || '—' }}</dd>
             <dt>Sitio web</dt><dd>{{ club.website || '—' }}</dd>
@@ -463,6 +638,10 @@ onMounted(async () => {
               <div class="scd__field scd__field--full">
                 <label class="scd__lbl">Razón social</label>
                 <input v-model.trim="infoForm.legal_name" class="scd__input" placeholder="Asociación Civil Club Cannábico del Sur" />
+              </div>
+              <div class="scd__field scd__field--full">
+                <label class="scd__lbl">Contacto (con quién hablás)</label>
+                <input v-model.trim="infoForm.contacto_nombre" class="scd__input" placeholder="Juan Pérez, presidente" />
               </div>
               <div class="scd__field">
                 <label class="scd__lbl">Email</label>
@@ -535,14 +714,95 @@ onMounted(async () => {
               <p class="scd__plan-until">
                 {{ club.plan_activo_hasta ? `Vigente hasta ${formatDate(club.plan_activo_hasta)}` : 'Sin vencimiento' }}
               </p>
+              <!-- Cuánto paga y por qué, línea por línea. Sale de `Precios` en el backend. -->
+              <div v-if="club.precios" class="scd__precios">
+                <div v-for="l in club.precios.lineas" :key="l.tipo + l.clave" class="scd__precio-row">
+                  <span>{{ l.label }}</span>
+                  <span class="scd__precio-monto">{{ formatARS(l.monto) }}</span>
+                </div>
+                <div class="scd__precio-row scd__precio-row--total">
+                  <span>{{ club.plan_trial ? 'Valdría por mes' : 'Por mes' }}</span>
+                  <span class="scd__precio-monto">{{ formatARS(club.precios.total) }}</span>
+                </div>
+                <p v-if="club.plan_trial" class="scd__hint">En prueba: no factura hasta que salga del trial.</p>
+              </div>
             </div>
           </div>
         </div>
 
       </div>
 
-      <!-- ── Usuarios ── -->
-      <div class="scd__card scd__card--users">
+      <div class="scd__row">
+        <!-- Qué le falta para estar operando, derivado de sus datos. Antes la ficha mostraba
+             0 · 0 · 0 sin decir qué faltaba. La misma lista la ve el admin en su inicio. -->
+        <div class="scd__card">
+          <div class="scd__card-hd">
+            <ListChecks :size="14" :stroke-width="1.75" class="scd__card-ico" /> Puesta en marcha
+            <span v-if="club.puesta_en_marcha" class="scd__count">{{ club.puesta_en_marcha.hechos }} de {{ club.puesta_en_marcha.total }}</span>
+          </div>
+          <div v-if="club.puesta_en_marcha?.completa" class="scd__empty">Está operando: todos los pasos hechos.</div>
+          <ul v-else-if="club.puesta_en_marcha" class="scd__pem">
+            <li v-for="p in club.puesta_en_marcha.pasos" :key="p.clave" class="scd__pem-item" :class="{ 'scd__pem-item--hecho': p.hecho }">
+              <span class="scd__pem-check">{{ p.hecho ? '✓' : '' }}</span>
+              <div>
+                <div class="scd__pem-label">{{ p.label }}</div>
+                <div v-if="!p.hecho" class="scd__pem-detalle">{{ p.detalle }}</div>
+              </div>
+            </li>
+          </ul>
+        </div>
+
+        <!-- Qué quedamos. Notas con autor y fecha, y la próxima acción con fecha, que entra a
+             la cola del panel cuando llega su día. -->
+        <div class="scd__card-col">
+          <div class="scd__card">
+            <div class="scd__card-hd">
+              <StickyNote :size="14" :stroke-width="1.75" class="scd__card-ico" /> Próxima acción
+              <button v-if="!accionEdit" class="scd__link-btn" @click="abrirAccion"><Pencil :size="12" :stroke-width="2" /> {{ club.proxima_accion_el ? 'Cambiar' : 'Anotar' }}</button>
+            </div>
+            <div class="scd__accion">
+              <template v-if="accionEdit">
+                <input v-model.trim="accionForm.proxima_accion" class="scd__input" placeholder="Llamar por el Delivery" autofocus />
+                <AppDatePicker v-model="accionForm.proxima_accion_el" />
+                <div class="scd__info-footer">
+                  <button v-if="club.proxima_accion_el" class="scd__btn-ghost" :disabled="accionSaving" @click="guardarAccion(true)">Ya está hecha</button>
+                  <button class="scd__btn-ghost" :disabled="accionSaving" @click="accionEdit = false">Cancelar</button>
+                  <button class="scd__btn-primary" :disabled="accionSaving || !accionForm.proxima_accion_el" @click="guardarAccion()">Guardar</button>
+                </div>
+              </template>
+              <template v-else-if="club.proxima_accion_el">
+                <div class="scd__accion-txt" :class="{ 'scd__accion-txt--vencida': accionVencida }">
+                  <strong>{{ club.proxima_accion || 'Sin detalle' }}</strong>
+                  <span>{{ accionVencida ? 'venció el' : 'el' }} {{ formatDate(club.proxima_accion_el) }}</span>
+                </div>
+              </template>
+              <div v-else class="scd__empty">Nada agendado. Lo que anotes con fecha aparece en la cola del panel.</div>
+            </div>
+          </div>
+
+          <div class="scd__card">
+            <div class="scd__card-hd"><StickyNote :size="14" :stroke-width="1.75" class="scd__card-ico" /> Notas</div>
+            <div class="scd__notas">
+              <form class="scd__nota-form" @submit.prevent="agregarNota">
+                <textarea v-model="notaTexto" class="scd__input scd__textarea" rows="2" placeholder="Habló con Juan el 3/9, quiere Delivery en octubre"></textarea>
+                <button class="scd__btn-primary scd__btn-sm" type="submit" :disabled="notaSaving || !notaTexto.trim()">Anotar</button>
+              </form>
+              <div v-if="!club.notas?.length" class="scd__empty">Sin notas todavía.</div>
+              <ul v-else class="scd__nota-list">
+                <li v-for="n in club.notas" :key="n.id" class="scd__nota">
+                  <div class="scd__nota-meta">{{ formatDateTime(n.fecha) }} · {{ n.usuario?.nombre || 'plataforma' }}</div>
+                  <div class="scd__nota-txt">{{ n.texto }}</div>
+                  <button class="scd__nota-x" aria-label="Borrar nota" @click="borrarNota(n)">✕</button>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+      </template>
+
+      <!-- ══ Usuarios ══ -->
+      <div v-if="solapa === 'usuarios'" class="scd__card scd__card--users">
         <div class="scd__card-hd">
           <Users :size="14" :stroke-width="1.75" class="scd__card-ico" />
           Usuarios <span class="scd__count">{{ club.usuarios?.length || 0 }}</span>
@@ -566,8 +826,13 @@ onMounted(async () => {
               </template>
               <template v-else>
                 Dictásela ahora, no se vuelve a mostrar. La anterior ya no sirve.
-                <template v-if="passwordNueva.mail_enviado">También le llegó por mail.</template>
-                <template v-else>La organización no tiene correo configurado, así que por mail no le llega.</template>
+                <template v-if="passwordNueva.mail_enviado">
+                  También le mandamos a <strong>{{ passwordNueva.mail_destino }}</strong> un link para elegir la suya.
+                </template>
+                <template v-else>
+                  No tiene un mail personal cargado, así que el link no le llega: cargáselo en su ficha
+                  o dictale esta.
+                </template>
               </template>
             </span>
           </div>
@@ -583,8 +848,10 @@ onMounted(async () => {
             <div class="scd__user-av">{{ (u.nombre?.[0] || u.email?.[0] || '?').toUpperCase() }}</div>
             <div class="scd__user-info">
               <div class="scd__user-name">{{ u.nombre || '—' }}</div>
-              <div class="scd__user-email">{{ u.email }}</div>
+              <div class="scd__user-email">{{ u.email }}<template v-if="u.email_personal"> · {{ u.email_personal }}</template></div>
             </div>
+            <!-- Cuándo entró por última vez: es la métrica de churn, persona por persona. -->
+            <span class="scd__user-visto" :class="{ 'scd__user-visto--nunca': !u.visto_at }" :title="u.visto_at ? formatDateTime(u.visto_at) : ''">{{ hace(u.visto_at) }}</span>
             <span class="scd__role-pill" :style="{ background: roleMeta(u.role).bg, color: roleMeta(u.role).color }">
               {{ roleMeta(u.role).label }}
             </span>
@@ -605,20 +872,18 @@ onMounted(async () => {
            La sección vive en su propio componente y cada interruptor se guarda solo: acá había
            un "Guardar" arriba de todo que se perdía de vista al bajar, así que se tildaban tres
            módulos, se cambiaba de pestaña y no se había guardado ninguno. -->
-      <div class="scd__card">
+      <div v-if="solapa === 'modulos'" class="scd__card">
         <SAModulos :club="club" @actualizado="onModulosActualizados" />
       </div>
 
       <!-- Qué le hicimos NOSOTROS a este club. Es lo primero que se pregunta cuando reclaman
            "yo no pedí que me cambien el plan": hasta ahora no había forma de saberlo. -->
-      <div class="scd__card">
+      <div v-if="solapa === 'historial'" class="scd__card">
         <div class="scd__card-hd">
           <History :size="14" :stroke-width="1.75" class="scd__card-ico" />
           Historial
-          <button v-if="!historial" class="scd__btn-sm" style="margin-left:auto" @click="cargarHistorial">
-            Ver historial
-          </button>
         </div>
+        <div v-if="!historial" class="scd__empty">Cargando…</div>
         <template v-if="historial">
           <div v-if="!historial.length" class="scd__empty">
             Todavía no se registró ningún cambio sobre este club.
@@ -635,6 +900,80 @@ onMounted(async () => {
       </div>
 
       <!-- El correo lo configura el ADMIN del club (conecta su Gmail), no el super_admin. -->
+
+      <!-- ── Modal suspender (con motivo) ── -->
+      <Teleport to="body">
+        <div v-if="showSuspenderModal" class="scd__overlay" @click.self="showSuspenderModal = false">
+          <div class="scd__modal">
+            <div class="scd__modal-hd">
+              <span class="scd__modal-title">Suspender {{ club.name }}</span>
+              <button class="scd__modal-close" @click="showSuspenderModal = false"><X :size="16" :stroke-width="2" /></button>
+            </div>
+            <div class="scd__modal-body">
+              <p class="scd__hint" style="margin:0 0 .75rem">
+                Sus usuarios no van a poder entrar hasta que la reactives. No se borra ni se cambia nada.
+                El motivo decide qué pendiente queda en el panel, y la organización lo ve en su cartel.
+              </p>
+              <div class="scd__motivos">
+                <label v-for="m in MOTIVOS_SUSPENSION" :key="m.clave" class="scd__motivo" :class="{ 'scd__motivo--on': motivoSuspension === m.clave }">
+                  <input type="radio" v-model="motivoSuspension" :value="m.clave" />
+                  <span><strong>{{ m.label }}</strong><small v-if="m.desc">{{ m.desc }}</small></span>
+                </label>
+              </div>
+            </div>
+            <div class="scd__modal-ft">
+              <button class="scd__btn-ghost" @click="showSuspenderModal = false">Cancelar</button>
+              <button class="scd__btn-danger scd__btn-sm" :disabled="saving" @click="suspender">Suspender</button>
+            </div>
+          </div>
+        </div>
+      </Teleport>
+
+      <!-- ── Modal clonar ── -->
+      <Teleport to="body">
+        <div v-if="showClonarModal" class="scd__overlay" @click.self="showClonarModal = false">
+          <div class="scd__modal">
+            <div class="scd__modal-hd">
+              <span class="scd__modal-title">Clonar el cultivo de {{ club.name }}</span>
+              <button class="scd__modal-close" @click="showClonarModal = false"><X :size="16" :stroke-width="2" /></button>
+            </div>
+            <div class="scd__modal-body">
+              <template v-if="!clonado">
+                <p class="scd__hint" style="margin:0 0 .75rem">
+                  Una organización nueva con las sedes, salas, genéticas, lotes y plantas de ésta, con su historia.
+                  <strong>Sin pacientes, sin plata, sin dispensaciones.</strong> Se crea un admin nuevo con su contraseña.
+                </p>
+                <label class="scd__lbl">Nombre de la organización nueva</label>
+                <input v-model.trim="clonarForm.nombre" class="scd__input" placeholder="Mitocondria — prueba" autofocus @keyup.enter="clonar" />
+              </template>
+              <template v-else>
+                <p class="scd__hint" style="margin:0 0 .5rem"><strong>{{ clonado.club.name }}</strong> ya está creada.</p>
+                <div class="scd__pass" style="margin:0">
+                  <KeyRound :size="14" :stroke-width="2" class="scd__pass-ico" />
+                  <div class="scd__pass-txt">
+                    <strong>{{ clonado.usuario }}</strong>
+                    <code>{{ clonado.password_inicial }}</code>
+                    <span>Anotala: no se vuelve a mostrar.</span>
+                  </div>
+                  <button class="scd__pass-copy" @click="copiarPassword(clonado.password_inicial)">{{ passwordCopiada ? 'Copiada' : 'Copiar' }}</button>
+                </div>
+              </template>
+            </div>
+            <div class="scd__modal-ft">
+              <template v-if="!clonado">
+                <button class="scd__btn-ghost" :disabled="clonando" @click="showClonarModal = false">Cancelar</button>
+                <button class="scd__btn-primary scd__btn-sm" :disabled="clonando || !clonarForm.nombre.trim()" @click="clonar">
+                  <DsSpinner v-if="clonando" :size="13" /> {{ clonando ? 'Clonando…' : 'Clonar' }}
+                </button>
+              </template>
+              <template v-else>
+                <button class="scd__btn-ghost" @click="showClonarModal = false">Cerrar</button>
+                <RouterLink :to="{ name: 'sa-club-detail', params: { id: clonado.club.id } }" class="scd__btn-primary scd__btn-sm" @click="showClonarModal = false">Ir a la nueva</RouterLink>
+              </template>
+            </div>
+          </div>
+        </div>
+      </Teleport>
 
       <!-- ── Modal plan ── -->
       <Teleport to="body">
@@ -825,7 +1164,58 @@ onMounted(async () => {
 .scd__trial-pill { font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; background: #fffbeb; color: #b45309; padding: .2em .6em; border-radius: 6px; }
 
 /* Row layout */
-.scd__row { display: grid; grid-template-columns: 1fr 320px; gap: 1rem; align-items: start; }
+.scd__row { display: grid; grid-template-columns: 1fr 320px; gap: 1rem; align-items: start; margin-bottom: 1rem; }
+
+/* Solapas */
+.scd__tabs { display: flex; gap: .25rem; border-bottom: 1px solid var(--c-slate-200); margin-bottom: 1rem; overflow-x: auto; }
+.scd__tab { background: none; border: none; border-bottom: 2px solid transparent; padding: .6rem .8rem; font-size: .82rem; font-weight: 700; color: var(--c-slate-500); cursor: pointer; white-space: nowrap; display: inline-flex; align-items: center; gap: .35rem; }
+.scd__tab:hover { color: var(--c-slate-800); }
+.scd__tab--on { color: var(--c-slate-900); border-bottom-color: var(--c-role-superadmin, #0F2A1E); }
+.scd__tab-n { font-size: .66rem; font-weight: 800; background: var(--c-slate-100); color: var(--c-slate-600); border-radius: 20px; padding: .05rem .4rem; }
+.scd__tab-n--ambar { background: #fffbeb; color: #b45309; }
+
+/* Menú ⋯ */
+.scd__menu { position: relative; }
+.scd__menu-list { position: absolute; right: 0; top: calc(100% + 4px); z-index: 20; min-width: 300px; background: #fff; border: 1px solid var(--c-slate-200); border-radius: 10px; box-shadow: 0 12px 32px rgba(15,23,42,.14); padding: .3rem; display: grid; }
+.scd__menu-item { display: flex; align-items: center; gap: .5rem; width: 100%; background: none; border: none; text-align: left; padding: .55rem .7rem; border-radius: 7px; font-size: .8rem; font-weight: 600; color: var(--c-slate-700); cursor: pointer; }
+.scd__menu-item:hover { background: var(--c-slate-50); color: var(--c-slate-900); }
+.scd__menu-item--danger { color: #b91c1c; }
+.scd__menu-item:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Puesta en marcha */
+.scd__pem { list-style: none; margin: 0; padding: .6rem 1.1rem 1rem; display: grid; gap: .5rem; }
+.scd__pem-item { display: flex; gap: .6rem; align-items: flex-start; }
+.scd__pem-check { width: 18px; height: 18px; border-radius: 50%; border: 1.5px solid var(--c-slate-300); display: grid; place-items: center; font-size: .7rem; font-weight: 800; color: #fff; flex-shrink: 0; margin-top: .1rem; }
+.scd__pem-item--hecho .scd__pem-check { background: #15803d; border-color: #15803d; }
+.scd__pem-label { font-size: .82rem; font-weight: 700; color: var(--c-slate-800); }
+.scd__pem-item--hecho .scd__pem-label { color: var(--c-slate-400); text-decoration: line-through; font-weight: 600; }
+.scd__pem-detalle { font-size: .74rem; color: var(--c-slate-500); }
+
+/* Próxima acción y notas */
+.scd__accion { padding: .75rem 1.1rem 1rem; display: grid; gap: .5rem; }
+.scd__accion-txt { display: grid; gap: .15rem; font-size: .84rem; color: var(--c-slate-800); }
+.scd__accion-txt span { font-size: .74rem; color: var(--c-slate-500); }
+.scd__accion-txt--vencida span { color: #b91c1c; font-weight: 700; }
+.scd__notas { padding: .75rem 1.1rem 1rem; display: grid; gap: .6rem; }
+.scd__nota-form { display: grid; gap: .4rem; }
+.scd__textarea { resize: vertical; font: inherit; }
+.scd__nota-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .4rem; }
+.scd__nota { position: relative; padding: .5rem .7rem; padding-right: 1.8rem; background: var(--c-slate-50); border-radius: 8px; }
+.scd__nota-meta { font-size: .66rem; color: var(--c-slate-400); margin-bottom: .15rem; }
+.scd__nota-txt { font-size: .8rem; color: var(--c-slate-800); white-space: pre-wrap; }
+.scd__nota-x { position: absolute; right: .35rem; top: .35rem; background: none; border: none; color: var(--c-slate-400); cursor: pointer; font-size: .7rem; }
+.scd__nota-x:hover { color: #b91c1c; }
+
+/* Motivo de suspensión */
+.scd__motivos { display: grid; gap: .4rem; }
+.scd__motivo { display: flex; gap: .6rem; align-items: flex-start; padding: .6rem .75rem; border: 1.5px solid var(--c-slate-200); border-radius: 9px; cursor: pointer; }
+.scd__motivo--on { border-color: var(--c-role-superadmin, #0F2A1E); background: var(--c-slate-50); }
+.scd__motivo span { display: grid; gap: .1rem; font-size: .82rem; color: var(--c-slate-800); }
+.scd__motivo small { font-size: .72rem; color: var(--c-slate-500); }
+
+/* Último ingreso por usuario */
+.scd__user-visto { font-size: .7rem; color: var(--c-slate-500); white-space: nowrap; }
+.scd__user-visto--nunca { color: var(--c-slate-400); font-style: italic; }
 @media (max-width: 900px) { .scd__row { grid-template-columns: 1fr; } }
 
 /* Cards */
@@ -863,6 +1253,10 @@ onMounted(async () => {
 .scd__plan-pill--lg { font-size: .85rem; padding: .3em .9em; }
 .scd__plan-body { padding: 1rem 1.1rem; display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
 .scd__plan-until { font-size: .72rem; color: var(--c-slate-400); width: 100%; margin: .25rem 0 0; }
+.scd__precios { width: 100%; margin-top: .6rem; border-top: 1px solid var(--c-slate-100); padding-top: .6rem; display: grid; gap: .2rem; }
+.scd__precio-row { display: flex; justify-content: space-between; gap: .75rem; font-size: .76rem; color: var(--c-slate-600); }
+.scd__precio-row--total { font-weight: 800; color: var(--c-slate-900); border-top: 1px solid var(--c-slate-100); padding-top: .35rem; margin-top: .15rem; }
+.scd__precio-monto { font-variant-numeric: tabular-nums; white-space: nowrap; }
 
 /* Web card */
 .scd__web-card { }

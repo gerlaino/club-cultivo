@@ -1,0 +1,17 @@
+<p style="font-size:16px; color:#0f172a; margin:0 0 12px;">Hola <%= @user.first_name.presence || '' %>,</p>
+<p style="font-size:14px; color:#334155; line-height:1.6; margin:0 0 12px;">
+  Alguien pidió una contraseña nueva para tu usuario <strong><%= @user.email %></strong>
+  <% if @club %>de <strong><%= @club.name %></strong><% end %> en Cultivo Espacial.
+</p>
+<p style="margin:20px 0;">
+  <a href="<%= @link %>" style="display:inline-block; background:#1b5e20; color:#ffffff; text-decoration:none; padding:12px 20px; border-radius:8px; font-weight:bold; font-size:14px;">Elegir contraseña nueva</a>
+</p>
+<p style="font-size:13px; color:#475569; line-height:1.6; margin:0 0 8px;">
+  El link vale por <%= @horas %> horas. Si no lo abrís, tu contraseña sigue siendo la de siempre.
+</p>
+<p style="font-size:13px; color:#475569; line-height:1.6; margin:0 0 8px;">
+  Si no pediste nada, ignorá este mail: nadie puede cambiar tu contraseña sin abrir el link.
+</p>
+<p style="font-size:12px; color:#94a3b8; margin:16px 0 0; word-break:break-all;">
+  Si el botón no funciona, copiá esta dirección en el navegador:<br><%= @link %>
+</p>

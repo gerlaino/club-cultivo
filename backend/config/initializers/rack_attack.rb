@@ -25,6 +25,12 @@ unless Rails.env.test?
       req.ip if req.path.match?(%r{/api/users/sign_in}) && req.post?
     end
 
+    # «Olvidé mi contraseña»: cada pedido manda un mail. Sin freno, una IP puede usar la
+    # plataforma para inundar la casilla de alguien o para probar logins.
+    throttle('password/ip', limit: 5, period: 10.minutes) do |req|
+      req.ip if req.path.match?(%r{\A/api/password\z}) && (req.post? || req.put?)
+    end
+
     # Gate por DNI del pasaporte de dispensa: evita probar DNIs a lo bruto.
     throttle('dispensa_ver/ip', limit: 10, period: 1.minute) do |req|
       req.ip if req.path.match?(%r{\A/api/d/[^/]+/ver\z}) && req.post?

@@ -12,6 +12,7 @@ import { usePlan } from "./composables/usePlan";
 import Avatar from "./components/Avatar.vue";
 import BrandLogo from "./components/BrandLogo.vue";
 import PlanBadge from "./components/PlanBadge.vue";
+import AvisoVencimientoPlan from "./components/AvisoVencimientoPlan.vue";
 import ToastProvider from "./components/ui/ToastProvider.vue"
 import OrganizacionSuspendida from './components/OrganizacionSuspendida.vue';
 import ConfirmDialog from "./components/ui/ConfirmDialog.vue";
@@ -207,6 +208,7 @@ onMounted(async () => {
         <div class="admin-body">
           <AdminTopBar @toggle-drawer="adminDrawerOpen = !adminDrawerOpen" />
           <div class="admin-accent-bar"></div>
+          <AvisoVencimientoPlan />
           <main class="admin-main">
             <router-view />
           </main>

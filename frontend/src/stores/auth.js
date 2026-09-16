@@ -79,6 +79,8 @@ export const useAuthStore = defineStore("auth", {
     // en vez de una sucesión de pantallas vacías y errores sueltos, se muestra un cartel que
     // explica qué pasó. Lo prende el interceptor de axios.
     clubSuspendido: false,
+    // Por qué (`no_pago` · `lo_pidio` · `prueba_terminada` · `otro`): el cartel lo dice.
+    clubSuspendidoMotivo: null,
   }),
   getters: {
     isAuthenticated: (s) => !!s.user,

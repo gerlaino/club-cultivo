@@ -1,0 +1,8 @@
+Hola <%= @user.first_name.presence || '' %>,
+
+Alguien pidió una contraseña nueva para tu usuario <%= @user.email %><% if @club %> de <%= @club.name %><% end %> en Cultivo Espacial.
+
+Elegí la nueva acá (vale por <%= @horas %> horas):
+<%= @link %>
+
+Si no pediste nada, ignorá este mail: nadie puede cambiar tu contraseña sin abrir el link.

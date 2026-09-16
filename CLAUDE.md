@@ -189,7 +189,23 @@ Ninguno se considera cerrado; todos son candidatos a revisión.
 10. **Analítica e informes** — **Analítica son CUATRO solapas, una pregunta cada una** (sep-2026): Genéticas (¿cuál rinde mejor?, g/planta ponderado) · Fases (¿cuánto tarda cada fase?, cronología real + prendimiento) · Dónde y cómo (¿en qué sala, método, ambiente de floración?) · Costo (¿cuánto cuesta un gramo?, sólo cerrados). Cálculo en `app/services/analitica/*` sobre `Analitica::Universo` (lotes cerrados con rendimiento, todo el historial por defecto, umbral de 3 lotes para concluir). Benchmark, informe semestral, informes auditor (REPROCANN, producción, plan vs real, trazabilidad, INASE, pérdidas).
 10b. **Informes del auditor, revisados uno por uno (sep-2026):** Producción, Trazabilidad (frasco y lote), Dispensaciones, Pérdidas, Plan vs. real y REPROCANN viven en `app/services/informes/*` (y `Stocks::Trazabilidad`, `Lotes::Trazabilidad`); pantalla, PDF y Excel leen el mismo hash. **Cumplimiento se retiró** (ruta redirige a REPROCANN). Reglas que valen para todos: por línea y por unidad, nunca `updated_at` como fecha de un hecho, la descarga pide el mismo período que la pantalla (`SelectorPeriodo`), DNI en 3 dígitos en pantalla y entero en el archivo. **INASE** (`Informes::Inase`) tiene período por fecha de cosecha, «en cultivo hoy», origen semilla/esqueje por variedad y **un aviso en vez de un KPI** para lo no vinculado — el aviso, la salvedad y el candado de «Para presentar» miran **la misma lista**: lo que aparece en el documento (`ids:` al guard). **La declaración semestral** (`Informes::Semestral`) **compone** Reprocann/Inase/Dispensaciones con el semestre como período y **todo al cierre**; la población del REPROCANN vive en `Informes::Reprocann#registrados/nomina(al:)`. **Analítica revisada (13-sep): la revisión informe por informe está COMPLETA.**
 11. **ARICCAME** — reporte de dispensaciones y stock (feature flag por club). La transmisión está SIMULADA: no envía nada de verdad.
-12. **Super admin** — panel de plataforma como **cola de trabajo** (cada pendiente con su acción, agrupado por urgencia: se está perdiendo plata · paga y no le funciona · avisar con tiempo), organizaciones, **dos planes** (`PlanEnforcer`: básico/total, sólo límites), catálogo de módulos (`GET /super_admin/catalogo`), informes de plataforma, historial por organización. **El modo observador está SUSPENDIDO** (`User::OBSERVADOR_HABILITADO = false`). Un super_admin sin contexto que pega a un endpoint de organización recibe **409 explicando qué falta** (`block_super_admin_sin_contexto!`), no un 500.
+12. **Super admin** — panel de plataforma como **cola de trabajo** (cada pendiente con su acción, agrupado por urgencia: se está perdiendo plata · paga y no le funciona · **quedaste en hacer** · avisar con tiempo), organizaciones, **dos planes** (`PlanEnforcer`: básico/total, sólo límites), catálogo de módulos (`GET /super_admin/catalogo`), informes de plataforma, historial por organización. **El modo observador está SUSPENDIDO** (`User::OBSERVADOR_HABILITADO = false`). Un super_admin sin contexto que pega a un endpoint de organización recibe **409 explicando qué falta** (`block_super_admin_sin_contexto!`), no un 500.
+    **Visto por el dueño del negocio (16-sep-2026, bloque bv):** el panel **abre con la plata**
+    (`Precios`: constante con **valores provisorios**; `Club#precio_mensual` / `#factura?`; MRR,
+    vencido y operando, vence este mes) · **último ingreso real** (`users.visto_at`, tocado una
+    vez por hora desde `ApplicationController#marcar_visto!`; NO `devise :trackable`, que con JWT
+    escribiría en cada request) · **contacto, notas y próxima acción** (`club_notas` sin tenant;
+    la acción con fecha entra a la cola) · **puesta en marcha** derivada de los datos
+    (`Clubs::PuestaEnMarcha`, la ven la ficha y el inicio del admin) · **demo y clonar** desde el
+    panel (`SembrarDemoJob` en segundo plano; `Clubs::Clonar` sincrónico) · **suspender pide
+    motivo** (`Club::MOTIVOS_SUSPENSION`; la cola muestra la acción del motivo, el cartel de la
+    organización lo dice) y **archivar** saca de la cola sin borrar · **el vencimiento avisa**
+    (`PlanVencimientoJob` 7 días antes y el día; franja en la app del admin) **pero no corta** ·
+    Salud con último backup (`Backups::Ultimo`) y cron atrasados · adopción con **usado en 30
+    días** · la ficha en **cuatro solapas**. **«Olvidé mi contraseña»** existe (`/olvide-contrasena`,
+    `Users::PasswordsController`, `Acceso::EnviarRestablecimiento`, por la casilla de la
+    PLATAFORMA y sólo a `User#email_real`) y el alta guarda **la persona detrás del admin**
+    (`crear_usuarios_default!(admin:)`). `stats#show`/`#metricas` se retiraron.
 13. **Notificaciones** — push web, ActionCable, alertas internas por rol.
 14. **Portal del paciente** (`vista_paciente`, **add-on**) + carnets digitales. Cada paciente que se da de alta recibe su **cuenta** (`Pacientes::Acceso`): usuario `nombre.apellido@organizacion.paciente` y contraseña generada por paciente y dictable — nunca una fija, que acá sería fatal porque el usuario se deduce del nombre. La cuenta nace cuando el paciente queda ADMITIDO. **Sin el módulo el paciente no puede ni loguearse** (`User::MODULOS_POR_ROL`), como el repartidor sin Delivery.
     **Son DOS llaves y hacen falta las dos:** el add-on CONTRATADO (lo prende el super admin) y el portal ABIERTO (`clubs.vista_paciente_activa`, el interruptor de la organización en Configuración → Portal del paciente). La regla vive en **`Club#portal_paciente_disponible?`** y la preguntan el login (`User#rol_habilitado?`) y `Portal::BaseController` — cerrado, el paciente no entra ni con la sesión abierta. El interruptor existía desde antes y **no lo leía nadie**: se guardaba, se mostraba y no hacía nada. Toda spec que contrate `vista_paciente` tiene que pasar `vista_paciente_activa: true`.
@@ -375,6 +391,25 @@ Cuando Germán plantee un problema o feature nueva antes de implementar:
 3. **Cierre de período (F5) ya existía** — se le agregó el guard `hasta < hoy` (cerrar el día en curso dejaba al mostrador sin poder cobrar, porque todo asiento automático nace con fecha de hoy) y mensaje claro en vez de 500.
 
 Suite 1239 ✓ + 58 vitest ✓. **Deploy: sumar `add_vendible_a_bar_venta_items` y `add_consumo_evento_a_provisiones_y_dispensas` al `db:migrate`.**
+
+## 📍 Dónde retomar (16-sep-2026)
+
+**El super admin visto por el dueño del negocio: los 7 puntos de la propuesta del 15-sep, HECHOS**
+(bloque (bv) del CHANGELOG). Decisiones que tomé con supuestos y Germán puede revertir:
+① **precios provisorios** en `Precios` (plan Básico 40.000 / Total 90.000; Cultivo 30.000;
+Producción y dispensa 45.000; adicionales entre 6.000 y 25.000; bloqueados 0) — cambiar un número
+no toca nada más · ② el **vencimiento es informativo**: avisa 7 días antes y el día, en campana,
+push, mail y franja, pero **no corta**; el modo «vencido» de sólo lectura queda para cuando lo
+decida · ③ contacto/notas/próxima acción **en la ficha**, no un CRM aparte.
+
+**Sin verificar en Docker todavía al escribir esto** (Docker Desktop estaba apagado): ver el
+estado real de rspec y migraciones en el mensaje de cierre de la sesión. Vitest de lo nuevo
+(`superAdminDueno.test.js`, 18 casos) ✓, estructurales ✓, build ✓.
+
+**Falta ver renderizado**: la ficha en solapas, el alta con precios y el admin, «Olvidé mi
+contraseña» y la franja de vencimiento.
+
+---
 
 ## 📍 Dónde retomar (11-sep-2026)
 
