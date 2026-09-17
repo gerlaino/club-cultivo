@@ -1,5 +1,18 @@
 # Changelog
 
+## Septiembre 2026 (cd) — No hay plata a favor, y el 422 al guardar «Otra dirección»
+
+- **No hay plata a favor** (decisión de Germán, 17-sep): la cuenta corriente es lo que el
+  paciente DEBE, y nada más. «Registrar pago» en la ficha se registra hasta la deuda (el modal
+  lo dice y deshabilita el botón; el backend rebota con «Debe $X: se registra hasta eso»); pagar
+  de más en una dispensa ya tenía ese tope. Si trajo de más, se le da el vuelto. Un saldo
+  positivo dejaba dispensas anotadas «a crédito» como si debiera cuando ya había pagado.
+- **«Dispensaciones no es válido» (422) al dispensar con «Otra dirección» + guardar en la
+  ficha** (producción, 17-sep). La dispensa se construye con `paciente.dispensaciones.build` y
+  el `update!` del paciente la validaba como parte de la asociación, a medio armar y sin
+  productos todavía. `update_columns` (los campos de dirección no se auditan ni tienen
+  callbacks). El spec que lo reproduce usa el carrito multi-producto, que es donde pasaba.
+
 ## Septiembre 2026 (cc) — Lo que el paciente paga de más ENTRA al libro y a la caja
 
 - **Lo encontró Germán en producción**: dispensa de $30.000 pagada $30.000 en efectivo +

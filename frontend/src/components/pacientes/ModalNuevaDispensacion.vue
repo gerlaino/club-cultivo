@@ -327,8 +327,8 @@ watch(stocksVisibles, (lista) => {
 const tieneCc  = computed(() => props.limiteCc !== null && props.limiteCc > 0)
 const ccMargen = computed(() => (props.saldoCc ?? 0) + (props.limiteCc ?? 0))
 // Lo que DEBE hoy (saldo negativo). Es hasta donde se puede pagar de más: lo de más baja la
-// deuda, nunca queda «a favor» (decisión de Germán, 16-sep). Para adelantar plata está «Cargar
-// crédito» en la ficha.
+// deuda, nunca queda «a favor» (decisión de Germán, 16/17-sep: no hay plata a favor, la cuenta
+// corriente es lo que debe).
 const deudaCc  = computed(() => Math.max(0, -(props.saldoCc ?? 0)))
 
 // El crédito solo aplica cuando el medio de pago consume crédito.
@@ -1679,7 +1679,7 @@ async function handleSubmit() {
               <template v-else>
                 Paga <strong>{{ fmt(excedentePago) }}</strong> de más y no debe nada: cobrale el total exacto.
               </template>
-              Si quiere dejar plata adelantada, cargale crédito desde su ficha.
+              Si trajo de más, dale el vuelto: no hay saldo a favor.
             </div>
             <div v-else-if="excedentePago > 0.009" class="mnd__pagos-resto">
               Paga <strong>{{ fmt(excedentePago) }}</strong> de más — baja su deuda de {{ fmt(deudaCc) }} a {{ fmt(deudaCc - excedentePago) }}.

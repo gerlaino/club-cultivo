@@ -69,8 +69,13 @@ module Envios
       dir
     end
 
+    # `update_columns`, no `update!`: la dispensa que se está creando cuelga de `paciente.
+    # dispensaciones` (se construye con `build`) y un `update!` del paciente la valida como parte
+    # de la asociación — a medio armar, sin productos todavía — y rebotaba con «Dispensaciones no
+    # es válido» (pasó en producción, 17-sep). Los campos de dirección no se auditan ni tienen
+    # callbacks, así que saltear las validaciones acá no pierde nada.
     def guardar_como_envio!(dir)
-      @paciente.update!(CAMPOS.to_h { |c| ["envio_#{c}", dir[c]] }.merge('envio_etiqueta' => dir[:etiqueta]))
+      @paciente.update_columns(CAMPOS.to_h { |c| ["envio_#{c}", dir[c]] }.merge('envio_etiqueta' => dir[:etiqueta], 'updated_at' => Time.current))
     end
   end
 end

@@ -86,17 +86,17 @@ module DispensacionesFinancieras
       raise res.error unless res.ok?
     end
 
-    # SE PUEDE PAGAR DE MÁS SÓLO PARA BAJAR DEUDA (decisión de Germán, 16-sep-2026). Dejar plata
-    # «a favor» al cobrar es que el club se quede con plata del paciente por accidente —un número
-    # mal tipeado se vuelve un crédito que después alguien tiene que explicar—. Si quiere dejar
-    # plata adelantada, eso es «Cargar crédito» en su ficha: un acto explícito, con nombre.
+    # SE PUEDE PAGAR DE MÁS SÓLO PARA BAJAR DEUDA (decisión de Germán, 16-sep-2026), y NO HAY PLATA
+    # A FAVOR (17-sep): la cuenta corriente es lo que el paciente debe, y nada más. Dejar plata «a
+    # favor» al cobrar era que el club se quedara con plata del paciente por accidente —un número
+    # mal tipeado se volvía un crédito que después alguien tenía que explicar—.
     if excedente > deuda_previa + 0.001
       raise(if deuda_previa.positive?
               "Paga #{pesos(excedente)} de más y sólo debe #{pesos(deuda_previa)}: cobrale hasta #{pesos(deuda_previa)} de más. " \
-              'Si quiere dejar plata adelantada, cargale crédito desde su ficha.'
+              'Si trajo de más, dale el vuelto: no hay saldo a favor.'
             else
               "Paga #{pesos(excedente)} de más y no debe nada: cobrale el total exacto. " \
-              'Si quiere dejar plata adelantada, cargale crédito desde su ficha.'
+              'Si trajo de más, dale el vuelto: no hay saldo a favor.'
             end)
     end
     acreditar_excedente!(disp, excedente.round(2), medio: medio_excedente) if excedente > 0.001

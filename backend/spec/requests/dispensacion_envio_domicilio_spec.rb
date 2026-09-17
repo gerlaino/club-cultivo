@@ -112,6 +112,21 @@ RSpec.describe 'Dispensación con envío — dirección', type: :request do
       expect(paciente.direccion('envio')[:texto]).to eq('Corrientes 1000, CABA')
     end
 
+    # Con el carrito (items) la dispensa se arma DESPUÉS de resolver la dirección: guardar en la
+    # ficha con `update!` validaba al paciente con esa dispensa a medias y rebotaba con
+    # «Dispensaciones no es válido» (producción, 17-sep).
+    it '«otra» con guardar también anda con el carrito multi-producto' do
+      post "/pacientes/#{paciente.id}/dispensaciones",
+           params: { dispensacion: { items: [{ stock_id: stock.id, cantidad: 5 }], medio_pago: 'efectivo', aporte_socio_ars: 500,
+                                     con_envio: true, delivery_id: delivery.id, direccion_origen: 'otra',
+                                     envio_calle: 'Balbastro', envio_altura: '1265', envio_ciudad: 'CABA', envio_etiqueta: 'Hobby',
+                                     guardar_como_envio: true, contacto_nombre: 'Example' } },
+           headers: auth_headers
+
+      expect(response).to have_http_status(:created), response.body
+      expect(paciente.reload.envio_calle).to eq('Balbastro')
+    end
+
     it '«otra» sin guardar no toca la ficha' do
       crear(direccion_origen: 'otra', envio_calle: 'Corrientes', envio_altura: '1000', envio_ciudad: 'CABA')
 

@@ -74,7 +74,7 @@
       <div v-if="(cc.limite_credito ?? 0) > 0" class="scc__estado-card">
         <div class="scc__estado-row">
           <div class="scc__estado-block" :class="cc.saldo_disponible < 0 ? 'scc__estado-block--deuda' : ''">
-            <span class="scc__estado-label">{{ cc.saldo_disponible < 0 ? 'Deuda actual' : 'Saldo a favor' }}</span>
+            <span class="scc__estado-label">{{ cc.saldo_disponible < 0 ? 'Deuda actual' : (cc.saldo_disponible > 0 ? 'Saldo a favor' : 'Sin deuda') }}</span>
             <span class="scc__estado-val" :class="cc.saldo_disponible < 0 ? 'scc__val--deuda' : cc.saldo_disponible > 0 ? 'scc__val--ok' : 'scc__val--zero'">
               {{ cc.saldo_disponible < 0 ? '−' : '' }}{{ fmtARS(Math.abs(cc.saldo_disponible)) }}
             </span>
@@ -142,12 +142,15 @@
             <option value="transferencia">Transferencia</option>
             <option value="mercado_pago">Mercado Pago</option>
           </select>
-          <p v-if="pagoMonto > ccDeudaActual && ccDeudaActual >= 0" class="scc__modal-hint">
-            Quedará <strong>{{ fmtARS(pagoMonto - ccDeudaActual) }}</strong> a favor del paciente.
+          <!-- No hay plata a favor: la cuenta corriente es lo que debe. Se registra hasta la
+               deuda; si trajo de más, se le da el vuelto. -->
+          <p v-if="pagoMonto > ccDeudaActual + 0.009" class="scc__modal-hint scc__modal-hint--mal">
+            <template v-if="ccDeudaActual > 0">Debe {{ fmtARS(ccDeudaActual) }}: se registra hasta eso. Si trajo de más, dale el vuelto.</template>
+            <template v-else>No debe nada: no hay pago que registrar.</template>
           </p>
           <div class="scc__modal-actions">
             <button class="scc__discard-btn" :disabled="pagando" @click="pagoOpen = false">Cancelar</button>
-            <button class="scc__save-btn" :disabled="pagando || !(pagoMonto > 0)" @click="confirmarPago">
+            <button class="scc__save-btn" :disabled="pagando || !(pagoMonto > 0) || pagoMonto > ccDeudaActual + 0.009" @click="confirmarPago">
               {{ pagando ? 'Registrando…' : 'Registrar pago' }}
             </button>
           </div>
@@ -376,6 +379,7 @@ watch(() => props.refreshKey, (v, old) => { if (v !== old) loadCC() })
 .scc__modal { background: #fff; border-radius: 14px; padding: 1.5rem; width: 100%; max-width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
 .scc__modal-title { font-size: 1.05rem; font-weight: 800; color: var(--c-slate-900); margin: 0 0 .5rem; }
 .scc__modal-deuda { font-size: .82rem; color: #b45309; margin: 0 0 1rem; }
+.scc__modal-hint--mal { color: #b91c1c; }
 .scc__modal-label { display: block; font-size: .75rem; font-weight: 700; color: var(--c-slate-500); margin: .75rem 0 .3rem; }
 .scc__modal-hint { font-size: .78rem; color: #15803d; margin: .6rem 0 0; }
 .scc__modal-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1.25rem; }

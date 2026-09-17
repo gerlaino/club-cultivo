@@ -33,9 +33,22 @@ RSpec.describe 'Registrar pago en cuenta corriente', type: :request do
     expect(cc.reload.saldo_disponible.to_f).to eq(0.0)
   end
 
-  it 'pagar de más deja saldo a favor' do
+  # NO HAY PLATA A FAVOR (Germán, 17-sep-2026): la cuenta corriente es lo que debe. Se registra
+  # hasta la deuda; si trajo de más, se le da el vuelto.
+  it 'no se puede pagar más que la deuda, y dice hasta cuánto' do
     registrar(monto: 7_000)
-    expect(cc.reload.saldo_disponible.to_f).to eq(2_000.0)
+
+    expect(response).to have_http_status(:unprocessable_entity)
+    expect(JSON.parse(response.body)['error']).to include('Debe $5.000')
+    expect(cc.reload.saldo_disponible.to_f).to eq(-5_000.0)
+  end
+
+  it 'sin deuda no hay pago que registrar' do
+    cc.update!(saldo_disponible: 0)
+    registrar(monto: 1_000)
+
+    expect(response).to have_http_status(:unprocessable_entity)
+    expect(JSON.parse(response.body)['error']).to include('No debe nada')
   end
 
   it 'suma a los ingresos del libro' do
