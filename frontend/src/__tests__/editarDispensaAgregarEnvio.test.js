@@ -104,6 +104,38 @@ describe('Editar dispensación — mandar por delivery', () => {
     expect(w.find('.med__envio-toggle').exists()).toBe(false)
   })
 
+  // Contra entrega al editar (Germán, 17-sep): sólo si va —o se va a mandar— por delivery.
+  it('sin envío, «contra entrega» está pero deshabilitada; con «mandar por delivery» se habilita', async () => {
+    const w = await montar()
+    const opcion = () => w.findAll('option').find(o => o.attributes('value') === 'contra_entrega')
+    expect(opcion().attributes('disabled')).toBeDefined()
+
+    await w.find('.med__envio-toggle').trigger('click')
+    await flushPromises()
+    expect(opcion().attributes('disabled')).toBeUndefined()
+  })
+
+  it('mandar por delivery + contra entrega: primero el envío, después el medio', async () => {
+    const orden = []
+    agregarEnvioDispensacion.mockImplementationOnce(() => { orden.push('envio'); return Promise.resolve({ data: {} }) })
+    updateDispensacion.mockImplementationOnce(() => { orden.push('update'); return Promise.resolve({ data: {} }) })
+    const w = await montar()
+    await w.find('.med__envio-toggle').trigger('click')
+    await flushPromises()
+    w.vm.envio.delivery_id = 7
+    w.vm.form.medio_pago = 'contra_entrega'
+    await w.vm.handleSubmit()
+    await flushPromises()
+
+    expect(orden).toEqual(['envio', 'update'])
+    expect(updateDispensacion.mock.calls[0][1].medio_pago).toBe('contra_entrega')
+  })
+
+  it('una contra entrega sin cobrar se muestra como tal, no como efectivo', async () => {
+    const w = await montar({ ...DISPENSA, con_envio: true, cobrar_en_entrega: true, medio_pago: 'efectivo', cobros: [] })
+    expect(w.vm.form.medio_pago).toBe('contra_entrega')
+  })
+
   it('sin el add-on de Delivery no aparece nada de esto', async () => {
     const w = await montar(DISPENSA, { delivery: false })
     expect(w.text()).not.toContain('Mandar por delivery')

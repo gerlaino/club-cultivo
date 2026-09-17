@@ -1,5 +1,15 @@
 # Changelog
 
+## Septiembre 2026 (ce) — Contra entrega se pone y se saca al editar
+
+- **Al editar una dispensa que va por delivery, el medio de pago ofrece «Contra entrega»**
+  (Germán, 17-sep). Ponerla deshace el cobro y el asiento (la plata todavía no entró: la cobra
+  el repartidor y ahí se asienta) y deja `saldo_pendiente` = total; sacarla se puede mientras el
+  repartidor no haya cobrado, y ahí se cobra ahora con el medio elegido. Exige que la dispensa
+  vaya por delivery: si se la manda en la misma edición, el modal agrega el envío ANTES de
+  cambiar el medio. Con el paquete cerrado, no. Una contra entrega sin cobrar se muestra como
+  tal en el modal, no como el «efectivo» placeholder.
+
 ## Septiembre 2026 (cd) — No hay plata a favor, y el 422 al guardar «Otra dirección»
 
 - **No hay plata a favor** (decisión de Germán, 17-sep): la cuenta corriente es lo que el

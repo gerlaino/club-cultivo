@@ -79,13 +79,34 @@ function envioVacio() {
            contacto_nombre: '', contacto_telefono: '', notas_envio: '' }
 }
 
+async function mandarPorDelivery() {
+  const e = envio.value
+  await agregarEnvioDispensacion(props.dispensacion.id, {
+    delivery_id: e.delivery_id, direccion_origen: e.direccion_origen,
+    envio_calle: e.envio_calle || undefined, envio_altura: e.envio_altura || undefined,
+    envio_piso: e.envio_piso || undefined, envio_depto: e.envio_depto || undefined,
+    envio_barrio: e.envio_barrio || undefined, envio_ciudad: e.envio_ciudad || undefined,
+    envio_etiqueta: e.envio_etiqueta || undefined,
+    guardar_como_envio: e.direccion_origen === 'otra' && e.guardar_como_envio,
+    contacto_nombre: e.contacto_nombre || undefined, contacto_telefono: e.contacto_telefono || undefined,
+    notas_envio: e.notas_envio || undefined,
+  })
+}
+
 watch(agregarEnvio, async (on) => {
+  if (!on && !props.dispensacion?.con_envio && form.value.medio_pago === 'contra_entrega') form.value.medio_pago = 'efectivo'
   if (!on || entregadores.value.length) return
   try { const { data } = await listEntregadores(); entregadores.value = data?.data || data || [] } catch { /* el select queda vacío y se ve */ }
 })
 
 // ── Form ──────────────────────────────────────────────────
 const form = ref({})
+
+// Contra entrega se puede poner si va por delivery (o se lo manda en esta misma edición) y el
+// paquete no cerró; y sacar sólo si el repartidor todavía no cobró.
+const paqueteCerrado = computed(() => ['entregado', 'fallido', 'cancelada'].includes(props.dispensacion?.estado_envio))
+const puedeContraEntrega = computed(() =>
+  (props.dispensacion?.con_envio || agregarEnvio.value) && !paqueteCerrado.value)
 
 function buildForm(d) {
   if (!d) return { items: [], fecha_dispensacion: '', medio_pago: 'efectivo', aporte_socio_ars: null, observaciones: '' }
@@ -100,7 +121,8 @@ function buildForm(d) {
   return {
     items,
     fecha_dispensacion: d.fecha_dispensacion || '',
-    medio_pago:         d.medio_pago || 'efectivo',
+    // Una contra entrega sin cobrar se muestra como tal, no como el «efectivo» placeholder.
+    medio_pago:         (d.cobrar_en_entrega && !(d.cobros?.length)) ? 'contra_entrega' : (d.medio_pago || 'efectivo'),
     aporte_socio_ars:   d.aporte_socio_ars ?? null,
     observaciones:      d.observaciones || '',
   }
@@ -154,7 +176,12 @@ async function handleSubmit() {
     if (errorDireccion) { formError.value = errorDireccion; saving.value = false; return }
   }
 
+  // Contra entrega pide que la dispensa YA vaya por delivery: si se la manda en esta misma
+  // edición, el envío va primero. En el resto de los casos, primero lo financiero.
+  const envioPrimero = agregarEnvio.value && form.value.medio_pago === 'contra_entrega'
+
   try {
+    if (envioPrimero) await mandarPorDelivery()
     await updateDispensacion(props.dispensacion.id, {
       items: form.value.items.map(it => ({
         stock_id: it.stock_id,
@@ -167,19 +194,7 @@ async function handleSubmit() {
       observaciones:      form.value.observaciones || null,
     })
     // Después de guardar lo financiero: si eso rebotó, no se manda nada a la calle.
-    if (agregarEnvio.value) {
-      const e = envio.value
-      await agregarEnvioDispensacion(props.dispensacion.id, {
-        delivery_id: e.delivery_id, direccion_origen: e.direccion_origen,
-        envio_calle: e.envio_calle || undefined, envio_altura: e.envio_altura || undefined,
-        envio_piso: e.envio_piso || undefined, envio_depto: e.envio_depto || undefined,
-        envio_barrio: e.envio_barrio || undefined, envio_ciudad: e.envio_ciudad || undefined,
-        envio_etiqueta: e.envio_etiqueta || undefined,
-        guardar_como_envio: e.direccion_origen === 'otra' && e.guardar_como_envio,
-        contacto_nombre: e.contacto_nombre || undefined, contacto_telefono: e.contacto_telefono || undefined,
-        notas_envio: e.notas_envio || undefined,
-      })
-    }
+    if (agregarEnvio.value && !envioPrimero) await mandarPorDelivery()
     cerrar()
     toast.success(agregarEnvio.value ? 'Dispensación actualizada y mandada por delivery' : 'Dispensación actualizada')
     emit('saved')
@@ -267,7 +282,16 @@ async function handleSubmit() {
                 <option value="transferencia">Transferencia</option>
                 <option value="cuenta_corriente" :disabled="!tieneCc">Cuenta corriente{{ !tieneCc ? ' (sin límite configurado)' : '' }}</option>
                 <option value="no_abona">No abona</option>
+                <!-- Contra entrega: lo cobra el repartidor en la puerta. Sólo si va (o se va a
+                     mandar) por delivery y el paquete todavía no cerró; y sacarla sólo mientras
+                     no se cobró. -->
+                <option v-if="tieneDelivery" value="contra_entrega" :disabled="!puedeContraEntrega">
+                  Contra entrega (lo cobra el repartidor){{ puedeContraEntrega ? '' : ' — mandala por delivery primero' }}
+                </option>
               </select>
+              <p v-if="form.medio_pago === 'contra_entrega' && dispensacion.medio_pago !== 'contra_entrega'" class="med__opt" style="margin-top:.3rem">
+                Se deshace lo cobrado: el repartidor cobra {{ fmt(form.aporte_socio_ars) }} en la puerta.
+              </p>
             </div>
           </div>
 

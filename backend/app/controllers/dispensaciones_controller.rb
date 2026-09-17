@@ -248,8 +248,23 @@ class DispensacionesController < ApplicationController
     # editan en monto por la vía legacy —corrompería el desglose de cobros—. Se cancela y se
     # rehace. La venta simple en efectivo o transferencia tiene UN cobro de creación (desde
     # sep-2026, para que entre al arqueo): ése se rehace junto con el asiento, como siempre.
+    # CONTRA ENTREGA se puede poner y sacar al editar (Germán, 17-sep), mientras el repartidor
+    # no haya cobrado: una contra entrega sin cobros es una dispensa sin plata adentro, así que
+    # editarla no corrompe nada. Ponerla exige que la dispensa vaya por delivery (o que se la
+    # mande en la misma edición: el modal agrega el envío ANTES de cambiar el medio).
+    a_contra_entrega = attrs[:medio_pago].to_s == 'contra_entrega'
+    if a_contra_entrega
+      unless @dispensacion.con_envio
+        return render json: { error: 'Contra entrega es para una dispensa que va por delivery: mandala por delivery primero.' }, status: :unprocessable_entity
+      end
+      if @dispensacion.estado_envio.in?(%w[entregado fallido cancelada])
+        return render json: { error: 'El paquete ya cerró: no se puede pasar a contra entrega.' }, status: :unprocessable_entity
+      end
+    end
+    contra_entrega_sin_cobrar = @dispensacion.cobrar_en_entrega? && @dispensacion.cobros.empty?
+
     cobro_simple = cobro_simple_de(@dispensacion)
-    if @dispensacion.usa_cobros? && cobro_simple.nil?
+    if @dispensacion.usa_cobros? && cobro_simple.nil? && !contra_entrega_sin_cobrar
       return render json: { error: 'Esta dispensación tiene cobros registrados. Para cambiar el monto, cancelala y volvé a crearla.' }, status: :unprocessable_entity
     end
 
@@ -278,6 +293,14 @@ class DispensacionesController < ApplicationController
         cc&.reload
 
         # 2) aplicar cambios nuevos
+        # `contra_entrega` no es un medio guardable: es «cobra el repartidor». Queda
+        # `cobrar_en_entrega` y el medio placeholder que después afina el cobro real.
+        if a_contra_entrega
+          attrs = attrs.merge(medio_pago: 'efectivo')
+          @dispensacion.cobrar_en_entrega = true
+        elsif attrs.key?(:medio_pago)
+          @dispensacion.cobrar_en_entrega = false
+        end
         @dispensacion.assign_attributes(attrs)
 
         if items_param.present?
@@ -320,7 +343,10 @@ class DispensacionesController < ApplicationController
         @dispensacion.save!
         sincronizar_item_legacy!(@dispensacion) unless items_param.present?  # la línea espejo refleja stock/cantidad nuevos
         @dispensacion.send(:decrementar_stock)   # descuenta la cantidad nueva (por línea)
-        if %w[efectivo transferencia].include?(@dispensacion.medio_pago) && @dispensacion.aporte_socio_ars.to_d > 0
+        if @dispensacion.cobrar_en_entrega?
+          # Contra entrega: no entró un peso todavía. El cobro y el asiento los hace el
+          # repartidor al entregar; acá no se asienta nada.
+        elsif %w[efectivo transferencia].include?(@dispensacion.medio_pago) && @dispensacion.aporte_socio_ars.to_d > 0
           # Mismo camino que la creación: el cobro y su asiento, enganchado a la caja.
           @dispensacion.caja_turno_elegida_id = caja_elegida_param || caja_anterior
           aplicar_lineas_cobro!(@dispensacion, [{ medio: @dispensacion.medio_pago, monto: @dispensacion.aporte_socio_ars.to_d }], 'creacion')
