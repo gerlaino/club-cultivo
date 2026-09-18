@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_16_200000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_17_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -625,6 +625,24 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_16_200000) do
     t.index ["deleted_at"], name: "index_depositos_on_deleted_at"
     t.index ["sede_id"], name: "index_depositos_on_sede_id"
     t.index ["unidad_negocio_id"], name: "index_depositos_on_unidad_negocio_id"
+  end
+
+  create_table "direcciones_pacientes", force: :cascade do |t|
+    t.bigint "paciente_id", null: false
+    t.bigint "club_id", null: false
+    t.string "etiqueta"
+    t.string "calle", null: false
+    t.string "altura"
+    t.string "piso"
+    t.string "depto"
+    t.string "barrio"
+    t.string "ciudad"
+    t.boolean "por_defecto", default: false, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_direcciones_pacientes_on_club_id"
+    t.index ["paciente_id", "por_defecto"], name: "index_direcciones_pacientes_on_paciente_id_and_por_defecto"
+    t.index ["paciente_id"], name: "index_direcciones_pacientes_on_paciente_id"
   end
 
   create_table "dispensacion_items", force: :cascade do |t|
@@ -2519,6 +2537,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_16_200000) do
   add_foreign_key "depositos", "clubs"
   add_foreign_key "depositos", "sedes"
   add_foreign_key "depositos", "unidades_negocio", column: "unidad_negocio_id"
+  add_foreign_key "direcciones_pacientes", "clubs"
+  add_foreign_key "direcciones_pacientes", "pacientes"
   add_foreign_key "dispensacion_items", "dispensaciones", column: "dispensacion_id"
   add_foreign_key "dispensacion_items", "eventos_bar", column: "evento_bar_id"
   add_foreign_key "dispensacion_items", "stocks"

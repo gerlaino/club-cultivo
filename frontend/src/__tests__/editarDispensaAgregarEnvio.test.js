@@ -13,7 +13,7 @@ vi.mock('../lib/api.js', () => ({
   agregarEnvioDispensacion: (...a) => agregarEnvioDispensacion(...a),
   listEntregadores: vi.fn(() => Promise.resolve({ data: { data: [{ id: 7, nombre: 'Beto Reparto' }] } })),
   getDireccionesPaciente: vi.fn(() => Promise.resolve({ data: {
-    domicilio: { texto: 'Av. Siempreviva 742, CABA' }, envio: null,
+    domicilio: { texto: 'Av. Siempreviva 742, CABA' }, guardadas: [],
   } })),
 }))
 vi.mock('../composables/useToast.js', () => ({

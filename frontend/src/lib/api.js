@@ -252,9 +252,13 @@ export const getPacientePorCarnet = (token) => api.get(`/pacientes/por_carnet/${
 export const listPacientes         = (params = {}) => api.get("/pacientes", { params });
 export const getPacientesCriticos  = () => api.get("/pacientes/criticos");
 export const getPaciente           = (id) => api.get(`/pacientes/${id}`);
-// Sus dos direcciones con nombre y texto (domicilio REPROCANN y envío), para elegir a dónde va
-// el paquete viendo la dirección.
-export const getDireccionesPaciente = (id) => api.get(`/pacientes/${id}/direcciones`);
+// Sus direcciones: el domicilio REPROCANN y las guardadas (con nombre, una por defecto), para
+// elegir a dónde va el paquete viendo la dirección. Y la solapa Direcciones de la ficha.
+export const getDireccionesPaciente   = (id)              => api.get(`/pacientes/${id}/direcciones`);
+export const crearDireccionPaciente   = (id, direccion)   => api.post(`/pacientes/${id}/direcciones`, { direccion });
+export const editarDireccionPaciente  = (id, dId, direccion) => api.patch(`/pacientes/${id}/direcciones/${dId}`, { direccion });
+export const borrarDireccionPaciente  = (id, dId)         => api.delete(`/pacientes/${id}/direcciones/${dId}`);
+export const direccionPorDefecto      = (id, dId)         => api.patch(`/pacientes/${id}/direcciones/${dId}/por_defecto`);
 // `enviar_bienvenida` va al lado de `paciente`, no adentro: no es un campo de la persona sino
 // una instrucción sobre el alta. El backend igual ignora el parámetro si el rol no puede aprobar.
 export const createPaciente     = (payload, { enviarBienvenida = false } = {}) =>

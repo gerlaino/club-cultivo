@@ -1,5 +1,24 @@
 # Changelog
 
+## Septiembre 2026 (cf) — Solapa «Direcciones»: varias por paciente, con nombre y una por defecto
+
+- **`direcciones_pacientes`** (pedido de Germán, 17-sep): un paciente tiene N direcciones de
+  entrega, cada una con nombre («Trabajo», «Casa de la madre»), y **una por defecto** que el
+  modal de dispensa preselecciona. La primera que se carga nace por defecto; marcar otra desmarca
+  la anterior; al borrar la por defecto, la más vieja pasa a serlo. El domicilio REPROCANN sigue
+  en la ficha (`domicilio_*`): es del trámite, no una dirección más. **Backfill**: la vieja
+  dirección de envío (`envio_*`) de cada paciente pasa a ser su primera guardada; esas columnas
+  dejaron de escribirse y salen del payload público (se borran en una migración posterior).
+- **Solapa «Direcciones» en la ficha** (`SocioTabDirecciones`, admin/supervisor/médico/
+  dispensador): el domicilio arriba, la lista con nombre, agregar / corregir / borrar y «Usar
+  por defecto». `GET/POST/PATCH/DELETE /pacientes/:id/direcciones` + `PATCH …/:id/por_defecto`.
+  El bloque «dirección de entrega distinta» salió del modal de edición de la ficha (vive acá); en
+  el alta queda y crea la primera guardada.
+- **El selector de la dispensa** lista Domicilio REPROCANN · cada guardada (la por defecto
+  marcada y preseleccionada) · Otra; `direccion_origen` acepta `domicilio` · `otra` · el id de
+  una guardada (`envio` sigue valiendo como «la por defecto» para el cliente viejo). «Otra» +
+  guardar crea una guardada más, con su nombre. El paquete conserva el nombre como snapshot.
+
 ## Septiembre 2026 (ce) — Contra entrega se pone y se saca al editar
 
 - **Al editar una dispensa que va por delivery, el medio de pago ofrece «Contra entrega»**

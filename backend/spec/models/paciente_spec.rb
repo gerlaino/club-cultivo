@@ -285,11 +285,20 @@ RSpec.describe Paciente, type: :model do
       expect(p.direccion_entrega[:ciudad]).to eq('CABA')
     end
 
-    it 'prefiere la dirección de envío cuando está cargada' do
-      p = build(:paciente, domicilio_calle: 'Corrientes', domicilio_ciudad: 'CABA',
-                           envio_calle: 'Rivadavia', envio_ciudad: 'Quilmes')
-      expect(p.direccion_entrega[:calle]).to eq('Rivadavia')
-      expect(p.direccion_entrega[:ciudad]).to eq('Quilmes')
+    # Desde el 17-sep las direcciones de entrega son guardadas (`DireccionPaciente`), con una
+    # por defecto: es la que manda cuando nadie eligió (cliente viejo).
+    it 'prefiere la dirección guardada por defecto cuando hay una' do
+      club = create(:club)
+      p = ActsAsTenant.with_tenant(club) do
+        create(:paciente, club: club, created_by: create(:user, :admin, club: club),
+                          domicilio_calle: 'Corrientes', domicilio_ciudad: 'CABA').tap do |pac|
+          pac.direcciones_guardadas.create!(club: club, etiqueta: 'Trabajo', calle: 'Rivadavia', ciudad: 'Quilmes')
+        end
+      end
+      ActsAsTenant.with_tenant(club) do
+        expect(p.direccion_entrega[:calle]).to eq('Rivadavia')
+        expect(p.direccion_entrega[:ciudad]).to eq('Quilmes')
+      end
     end
   end
 end

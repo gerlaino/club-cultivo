@@ -15,7 +15,7 @@ import { getPacienteTimeline, getPacienteTurnos, updateAdminTurno, deleteAdminTu
 import {
   User, ShieldCheck, Pill, BookOpen, FileText, ClipboardList, Clock,
   Pencil, AlertTriangle, Info, Wallet, CreditCard, Mail, CalendarPlus,
-  CalendarDays, UserCheck, RotateCcw, X, ChevronDown, Check, MoreHorizontal, FileHeart, KeyRound
+  CalendarDays, UserCheck, RotateCcw, X, ChevronDown, Check, MoreHorizontal, FileHeart, KeyRound, MapPin
 } from 'lucide-vue-next'
 import DsDropdown from '../design-system/components/Dropdown.vue'
 import { REPROCANN_ESTADOS } from '../composables/useSocioEditar.js'
@@ -28,6 +28,7 @@ import SocioTabCorreo          from '../components/pacientes/SocioTabCorreo.vue'
 import SocioTabHistoria        from '../components/pacientes/SocioTabHistoria.vue'
 import SocioTabNotas           from '../components/pacientes/SocioTabNotas.vue'
 import SocioTabPortal          from '../components/pacientes/SocioTabPortal.vue'
+import SocioTabDirecciones     from '../components/pacientes/SocioTabDirecciones.vue'
 import SocioEditarModal          from '../components/pacientes/SocioEditarModal.vue'
 import ModalAgendarTurnoMedico  from '../components/pacientes/ModalAgendarTurnoMedico.vue'
 import TurnoDetallePanel        from '../components/TurnoDetallePanel.vue'
@@ -296,6 +297,8 @@ const ALL_TABS = [
   { key: 'reprocann',        label: 'REPROCANN',         icon: ShieldCheck,   primary: true },
   { key: 'dispensaciones',   label: 'Dispensaciones',    icon: Pill,          primary: true },
   { key: 'cuenta_corriente', label: 'Cuenta corriente',  icon: Wallet,        roles: ['admin', 'dispensador'], primary: true },
+  // A dónde se le mandan los paquetes: varias, con nombre y una por defecto (Germán, 17-sep).
+  { key: 'direcciones',      label: 'Direcciones',       icon: MapPin,        roles: ['admin', 'supervisor', 'medico', 'dispensador'] },
   { key: 'turnos',           label: 'Turnos',            icon: CalendarDays,  roles: ['admin', 'medico'] },
   { key: 'historia',         label: 'Historia clínica',  icon: ClipboardList, roles: ['admin', 'medico'] },
   { key: 'indicaciones',     label: 'Indicaciones',      icon: FileHeart,     roles: ['admin', 'medico', 'supervisor'] },
@@ -782,6 +785,11 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
       <!-- ── Tab: Correo ── -->
       <div v-if="tabVisible('correo') && activeTab === 'correo'" class="sd__tab-content">
         <SocioTabCorreo :socio-id="socioId" :socio="s" @open-edit="editarOpen = true" />
+      </div>
+
+      <!-- ── Tab: Direcciones ── -->
+      <div v-if="tabVisible('direcciones') && activeTab === 'direcciones'" class="sd__tab-content">
+        <SocioTabDirecciones :socio-id="socioId" />
       </div>
 
       <!-- ── Tab: Acceso al portal ── -->

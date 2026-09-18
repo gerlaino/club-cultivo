@@ -83,23 +83,8 @@
                   <input v-model.trim="editForm.domicilio_ciudad" class="sem__input" type="text" placeholder="Ciudad" style="grid-column: span 2" />
                 </div>
               </div>
-              <div class="sem__field sem__field--full">
-                <details>
-                  <summary class="sem__envio-sum">Dirección de entrega distinta <span class="sem__opt">opcional</span></summary>
-                  <div class="sem__domicilio-grid" style="margin-top:.5rem">
-                    <!-- El nombre de la dirección: es lo que el repartidor lee en el paquete
-                         («Trabajo · Directorio 1602») y lo que evita que alguien escriba
-                         "TRABAJO" en Depto. -->
-                    <input v-model.trim="editForm.envio_etiqueta" class="sem__input" type="text" placeholder="Nombre (ej. Trabajo)" style="grid-column: span 4" />
-                    <input v-model.trim="editForm.envio_calle"  class="sem__input" type="text" placeholder="Calle" style="grid-column: span 2" />
-                    <input v-model.trim="editForm.envio_altura" class="sem__input" type="text" placeholder="Altura" />
-                    <input v-model.trim="editForm.envio_piso"   class="sem__input" type="text" placeholder="Piso" />
-                    <input v-model.trim="editForm.envio_depto"  class="sem__input" type="text" placeholder="Depto" />
-                    <input v-model.trim="editForm.envio_barrio" class="sem__input" type="text" placeholder="Barrio" />
-                    <input v-model.trim="editForm.envio_ciudad" class="sem__input" type="text" placeholder="Ciudad" style="grid-column: span 2" />
-                  </div>
-                </details>
-              </div>
+              <!-- Las direcciones de entrega viven en la solapa «Direcciones» de la ficha (varias,
+                   con nombre y una por defecto): acá sólo el domicilio del trámite. -->
               <div class="sem__field sem__field--full">
                 <label class="sem__label">
                   <input v-model="editForm.es_paciente" type="checkbox" class="sem__check" />
@@ -196,9 +181,6 @@ async function doSave() {
 .sem__repro-btn { padding: .4rem .8rem; border-radius: 7px; border: 1.5px solid var(--c-slate-200); background: var(--c-slate-50); color: var(--c-slate-500); font-size: .75rem; font-weight: 600; cursor: pointer; transition: all .15s; }
 .sem__repro-btn:hover { border-color: var(--c-slate-400); }
 .sem__opt { font-size: .68rem; font-weight: 400; color: var(--c-slate-400); text-transform: none; letter-spacing: 0; margin-left: .35rem; }
-.sem__envio-sum { cursor: pointer; font-size: .78rem; font-weight: 700; color: #b45309; list-style: none; }
-.sem__envio-sum::before { content: '＋ '; font-weight: 800; }
-details[open] .sem__envio-sum::before { content: '− '; }
 .sem__limit-wrap { display: flex; align-items: center; gap: .4rem; }
 .sem__input--limit { max-width: 140px; }
 .sem__limit-unit { font-size: .8rem; font-weight: 600; color: var(--c-slate-500); white-space: nowrap; }

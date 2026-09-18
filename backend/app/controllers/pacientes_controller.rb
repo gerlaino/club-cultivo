@@ -3,7 +3,7 @@ class PacientesController < ApplicationController
   before_action -> { require_feature!(:produccion_dispensa) }
   before_action :check_pacientes_role!
   before_action :set_paciente, only: [:show, :update, :destroy, :timeline, :subir_reprocann, :eliminar_reprocann, :enviar_mail, :mails_enviados, :aprobar,
-                                          :crear_acceso_portal, :restablecer_acceso_portal, :direcciones]
+                                          :crear_acceso_portal, :restablecer_acceso_portal]
   # Hasta ahora `mailer` era una etiqueta que no controlaba nada: no había un solo
   # `require_feature!` ni chequeo en el frontend, así que el flag se podía apagar y los mails
   # seguían saliendo. Ahora que se vende aparte, la barrera va acá — el candado en el backend,
@@ -22,7 +22,6 @@ class PacientesController < ApplicationController
     con_seguimiento_medico limite_dispensacion_mensual_g descuento_porcentaje carnet_token
     aprobado_at
     domicilio_calle domicilio_altura domicilio_piso domicilio_depto domicilio_barrio domicilio_ciudad
-    envio_calle envio_altura envio_piso envio_depto envio_barrio envio_ciudad envio_etiqueta
     created_at updated_at
   ].freeze
 
@@ -107,14 +106,6 @@ class PacientesController < ApplicationController
     return render json: { error: 'Carnet no encontrado' }, status: :not_found unless paciente
 
     render json: { data: paciente.as_json(only: campos_visibles, methods: [:nombre_completo]) }
-  end
-
-  # GET /pacientes/:id/direcciones — el domicilio (REPROCANN) y la de envío, con nombre y con el
-  # texto ya armado. Lo pide el modal de dispensa al prender «con envío»: hasta sep-2026 elegía
-  # una sin mostrarla, y con las dos cargadas el paquete salía a la que no era.
-  def direcciones
-    authorize @paciente, :show?
-    render json: @paciente.direcciones
   end
 
   def show
@@ -292,6 +283,9 @@ class PacientesController < ApplicationController
     end
 
     if paciente.save
+      # La «dirección de entrega distinta» del alta es la primera dirección guardada (con su
+      # nombre y por defecto). Las columnas `envio_*` de `pacientes` ya no se escriben.
+      guardar_direccion_de_entrega!(paciente)
       avisar_alta_pendiente(paciente) if paciente.pendiente_aprobacion?
       # Sólo sale acá si el alta ya quedó aprobada (admin o médico). La cargada desde el
       # mostrador todavía no es paciente de la organización: darle la bienvenida antes de que
@@ -575,8 +569,7 @@ class PacientesController < ApplicationController
 
   def paciente_params
     allowed = %i[nombre apellido dni fecha_nacimiento es_paciente email telefono reprocann_numero reprocann_vencimiento reprocann_estado
-                 domicilio_calle domicilio_altura domicilio_piso domicilio_depto domicilio_barrio domicilio_ciudad
-                 envio_calle envio_altura envio_piso envio_depto envio_barrio envio_ciudad envio_etiqueta]
+                 domicilio_calle domicilio_altura domicilio_piso domicilio_depto domicilio_barrio domicilio_ciudad]
     if current_user&.admin? || current_user&.super_admin?
       allowed += %i[limite_dispensacion_mensual_g descuento_porcentaje]
     end
@@ -597,6 +590,19 @@ class PacientesController < ApplicationController
 
   def can_edit_notas_clinicas?
     %w[admin medico].include?(current_user&.role)
+  end
+
+  # Los campos `envio_*` del alta —«dirección de entrega distinta»— van a `DireccionPaciente`,
+  # no a las columnas viejas. Sólo si vino calle.
+  def guardar_direccion_de_entrega!(paciente)
+    p = params[:paciente] || {}
+    return if p[:envio_calle].blank?
+
+    paciente.direcciones_guardadas.create!(
+      club: paciente.club, etiqueta: p[:envio_etiqueta].presence || 'Envío',
+      calle: p[:envio_calle], altura: p[:envio_altura], piso: p[:envio_piso], depto: p[:envio_depto],
+      barrio: p[:envio_barrio], ciudad: p[:envio_ciudad],
+    )
   end
 
   def check_pacientes_role!

@@ -19,6 +19,7 @@ class Paciente < ApplicationRecord
   belongs_to :user, optional: true
 
   has_many :notas, class_name: "PacienteNota", dependent: :destroy
+  has_many :direcciones_guardadas, class_name: 'DireccionPaciente', dependent: :destroy
   has_many :indicacion_medicas, dependent: :destroy
   has_many :dispensaciones, class_name: 'Dispensacion', dependent: :destroy
   has_many :resenas, class_name: 'ResenaProducto', dependent: :destroy
@@ -114,28 +115,35 @@ class Paciente < ApplicationRecord
     "#{nombre} #{apellido}"
   end
 
-  # Las DOS direcciones del paciente, con nombre: el domicilio (el del REPROCANN) y la de envío
-  # (opcional). Nil la que no tiene calle. `texto` es la línea que se muestra y se imprime —se
-  # arma acá para que el modal, la etiqueta y el PDF digan exactamente lo mismo.
-  DIRECCIONES = {
-    'domicilio' => { label: 'Domicilio REPROCANN', prefijo: 'domicilio' },
-    'envio'     => { label: 'Dirección de envío',  prefijo: 'envio' },
-  }.freeze
+  # A dónde se le puede mandar un paquete: el domicilio REPROCANN (de la ficha, del trámite) y
+  # sus direcciones guardadas (`DireccionPaciente`, con nombre y una por defecto). `texto` se arma
+  # acá para que el modal, la etiqueta y el PDF digan exactamente lo mismo.
+  def domicilio
+    return nil if domicilio_calle.blank?
 
-  def direccion(origen)
-    meta = DIRECCIONES[origen.to_s] or return nil
-    pre  = meta[:prefijo]
-    calle = public_send("#{pre}_calle")
-    return nil if calle.blank?
-
-    campos = { calle: calle, altura: public_send("#{pre}_altura"), piso: public_send("#{pre}_piso"),
-               depto: public_send("#{pre}_depto"), barrio: public_send("#{pre}_barrio"), ciudad: public_send("#{pre}_ciudad") }
-    # La de envío lleva el nombre que le puso el paciente («Trabajo»); el domicilio, no.
-    etiqueta = origen.to_s == 'envio' ? envio_etiqueta.presence : nil
-    campos.merge(origen: origen.to_s, label: meta[:label], etiqueta: etiqueta, texto: Paciente.direccion_texto(campos))
+    campos = { calle: domicilio_calle, altura: domicilio_altura, piso: domicilio_piso,
+               depto: domicilio_depto, barrio: domicilio_barrio, ciudad: domicilio_ciudad }
+    campos.merge(origen: 'domicilio', label: 'Domicilio REPROCANN', etiqueta: nil, texto: Paciente.direccion_texto(campos))
   end
 
-  def direcciones = DIRECCIONES.keys.to_h { |o| [o, direccion(o)] }
+  # Lo que ve el modal de dispensa. `envio` se mantiene por compatibilidad —es la por defecto—
+  # para los clientes que todavía miran esa clave.
+  def direcciones
+    guardadas = direcciones_guardadas.ordenadas.map(&:como_json)
+    { domicilio: domicilio, guardadas: guardadas, envio: guardadas.find { |d| d[:por_defecto] } }
+  end
+
+  # Una dirección por su nombre de origen: `domicilio`, o el id de una guardada.
+  def direccion(origen)
+    return domicilio if origen.to_s == 'domicilio'
+    # Compatibilidad: `envio` era la única de envío; hoy es la por defecto.
+    return direccion_por_defecto&.campos&.merge(etiqueta: direccion_por_defecto.etiqueta) if origen.to_s == 'envio'
+
+    d = direcciones_guardadas.find_by(id: origen.to_s.to_i)
+    d && d.campos.merge(etiqueta: d.etiqueta)
+  end
+
+  def direccion_por_defecto = direcciones_guardadas.ordenadas.first
 
   def self.direccion_texto(d)
     l1 = [d[:calle], d[:altura]].compact_blank.join(' ')
@@ -143,11 +151,11 @@ class Paciente < ApplicationRecord
     [l1, pd, d[:barrio], d[:ciudad]].compact_blank.join(', ')
   end
 
-  # Dirección de entrega POR DEFECTO cuando nadie eligió: la de envío si la cargó, si no el
-  # domicilio. Se mantiene para los llamadores viejos (`usar_domicilio_paciente`); lo nuevo
+  # Dirección de entrega POR DEFECTO cuando nadie eligió: la guardada por defecto si hay, si no
+  # el domicilio. Se mantiene para los llamadores viejos (`usar_domicilio_paciente`); lo nuevo
   # pide una por su nombre (`Envios::DireccionDeEntrega`).
   def direccion_entrega
-    direccion('envio') || direccion('domicilio') ||
+    direccion('envio') || domicilio ||
       { calle: domicilio_calle, altura: domicilio_altura, piso: domicilio_piso, depto: domicilio_depto, barrio: domicilio_barrio, ciudad: domicilio_ciudad }
   end
 

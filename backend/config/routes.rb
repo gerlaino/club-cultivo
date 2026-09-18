@@ -232,14 +232,17 @@ Rails.application.routes.draw do
       # Admitir a alguien cargado desde el mostrador. Sólo admin y médico (ver Paciente).
       member do
         post :aprobar
-        # Sus dos direcciones con nombre, para que el que dispensa elija VIENDO a dónde va.
-        get  :direcciones
         # Su cuenta del portal: crearla (los pacientes de antes no tienen) y darle una contraseña
         # nueva cuando la pierde. Mismo par que ya existe para el equipo.
         post 'acceso',             action: :crear_acceso_portal
         post 'acceso/restablecer', action: :restablecer_acceso_portal
       end
       resources :notas,        controller: "paciente_notas",    only: [:index, :create]
+      # Sus direcciones de entrega con nombre y una por defecto (solapa Direcciones). El index
+      # trae también el domicilio REPROCANN: es lo que lista el modal de dispensa.
+      resources :direcciones, controller: "direcciones_pacientes", only: [:index, :create, :update, :destroy] do
+        member { patch :por_defecto }
+      end
       resources :indicaciones, controller: "indicacion_medica", only: [:index, :create]
       resources :dispensaciones, only: [:index, :create]
       resources :reservas, only: [:index, :create]

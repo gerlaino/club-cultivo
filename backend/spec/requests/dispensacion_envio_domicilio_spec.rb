@@ -56,46 +56,59 @@ RSpec.describe 'Dispensación con envío — dirección', type: :request do
 
   # AC (socio de Germán, 16-sep-2026, primer reparto de Mitocondria ONG): con las DOS direcciones
   # cargadas, «domicilio del paciente» mandaba a la de ENVÍO sin decirlo y la otra no se podía
-  # elegir. Ahora la pantalla elige POR NOMBRE y ve el texto antes de confirmar.
+  # elegir. Ahora la pantalla elige POR NOMBRE y ve el texto antes de confirmar. Desde el 17-sep
+  # las direcciones de entrega son VARIAS (`DireccionPaciente`), con nombre y una por defecto.
   describe 'eligiendo la dirección por su nombre' do
-    before { paciente.update!(envio_calle: 'Lavalle', envio_altura: '400', envio_ciudad: 'CABA') }
+    let!(:trabajo) { paciente.direcciones_guardadas.create!(club: club, etiqueta: 'Trabajo', calle: 'Lavalle', altura: '400', ciudad: 'CABA') }
 
-    it 'las dos direcciones se consultan con nombre y texto' do
+    def direcciones
       get "/pacientes/#{paciente.id}/direcciones", headers: auth_headers
+      JSON.parse(response.body)
+    end
 
-      j = JSON.parse(response.body)
+    it 'se consultan el domicilio y las guardadas, con nombre y texto' do
+      j = direcciones
       expect(j['domicilio']['label']).to eq('Domicilio REPROCANN')
       expect(j['domicilio']['texto']).to eq('Av. Siempreviva 742, Palermo, CABA')
-      expect(j['envio']['label']).to     eq('Dirección de envío')
+      expect(j['guardadas'].size).to     eq(1)
+      expect(j['guardadas'].first).to    include('etiqueta' => 'Trabajo', 'texto' => 'Lavalle 400, CABA', 'por_defecto' => true)
+      # Compatibilidad: `envio` es la por defecto.
       expect(j['envio']['texto']).to     eq('Lavalle 400, CABA')
     end
 
-    it 'sin dirección de envío cargada, esa viene en nil' do
-      paciente.update!(envio_calle: nil)
-      get "/pacientes/#{paciente.id}/direcciones", headers: auth_headers
-
-      expect(JSON.parse(response.body)['envio']).to be_nil
+    it 'sin guardadas, `envio` viene en nil' do
+      trabajo.destroy!
+      expect(direcciones['envio']).to be_nil
     end
 
-    it '«domicilio» manda al domicilio aunque tenga dirección de envío' do
+    it '«domicilio» manda al domicilio aunque tenga guardadas' do
       crear(direccion_origen: 'domicilio')
 
       expect(response).to have_http_status(:created)
       expect(Dispensacion.last.direccion_envio).to eq('Av. Siempreviva 742, Palermo, CABA')
     end
 
-    it '«envio» manda a la de envío' do
+    it 'el id de una guardada manda ahí, con su nombre en el paquete' do
+      crear(direccion_origen: trabajo.id.to_s)
+
+      expect(response).to have_http_status(:created), response.body
+      d = Dispensacion.last
+      expect(d.direccion_envio).to    eq('Lavalle 400, CABA')
+      expect(d.direccion_etiqueta).to eq('Trabajo')
+      expect(DispensacionSerializer.serialize_delivery(d)[:direccion_etiqueta]).to eq('Trabajo')
+    end
+
+    it '«envio» (cliente viejo) manda a la por defecto' do
       crear(direccion_origen: 'envio')
 
       expect(Dispensacion.last.direccion_envio).to eq('Lavalle 400, CABA')
     end
 
-    it 'elegir una que no tiene cargada rebota con el motivo, no con un paquete sin dirección' do
-      paciente.update!(envio_calle: nil)
-      crear(direccion_origen: 'envio')
+    it 'elegir una que no existe rebota con el motivo, no con un paquete sin dirección' do
+      crear(direccion_origen: '999999')
 
       expect(response).to have_http_status(:unprocessable_entity)
-      expect(JSON.parse(response.body)['errors'].first).to include('dirección de envío')
+      expect(JSON.parse(response.body)['errors'].first).to include('no tiene cargada esa dirección')
     end
 
     it '«otra» exige calle, altura y ciudad' do
@@ -104,16 +117,19 @@ RSpec.describe 'Dispensación con envío — dirección', type: :request do
       expect(response).to have_http_status(:unprocessable_entity)
     end
 
-    it '«otra» con «guardar como envío» queda en la ficha para la próxima' do
-      crear(direccion_origen: 'otra', envio_calle: 'Corrientes', envio_altura: '1000', envio_ciudad: 'CABA', guardar_como_envio: true)
+    it '«otra» con etiqueta y «guardar» queda como una guardada más, para la próxima' do
+      crear(direccion_origen: 'otra', envio_calle: 'Corrientes', envio_altura: '1000', envio_ciudad: 'CABA',
+            envio_etiqueta: 'Club', guardar_como_envio: true)
 
-      expect(response).to have_http_status(:created)
-      expect(paciente.reload.envio_calle).to eq('Corrientes')
-      expect(paciente.direccion('envio')[:texto]).to eq('Corrientes 1000, CABA')
+      expect(response).to have_http_status(:created), response.body
+      nueva = paciente.direcciones_guardadas.find_by(etiqueta: 'Club')
+      expect(nueva.texto).to       eq('Corrientes 1000, CABA')
+      expect(nueva.por_defecto).to be(false)   # la por defecto sigue siendo Trabajo
+      expect(Dispensacion.last.direccion_etiqueta).to eq('Club')
     end
 
     # Con el carrito (items) la dispensa se arma DESPUÉS de resolver la dirección: guardar en la
-    # ficha con `update!` validaba al paciente con esa dispensa a medias y rebotaba con
+    # ficha pasando por el paciente lo validaba con esa dispensa a medias y rebotaba con
     # «Dispensaciones no es válido» (producción, 17-sep).
     it '«otra» con guardar también anda con el carrito multi-producto' do
       post "/pacientes/#{paciente.id}/dispensaciones",
@@ -124,40 +140,17 @@ RSpec.describe 'Dispensación con envío — dirección', type: :request do
            headers: auth_headers
 
       expect(response).to have_http_status(:created), response.body
-      expect(paciente.reload.envio_calle).to eq('Balbastro')
+      expect(paciente.direcciones_guardadas.pluck(:etiqueta)).to include('Hobby')
     end
 
     it '«otra» sin guardar no toca la ficha' do
       crear(direccion_origen: 'otra', envio_calle: 'Corrientes', envio_altura: '1000', envio_ciudad: 'CABA')
 
-      expect(paciente.reload.envio_calle).to eq('Lavalle')
-    end
-
-    # El nombre de la dirección («Trabajo»): el socio de Germán lo escribió en Depto porque no
-    # había otro lugar, y Maps dejó de encontrarla. Viaja con el paquete como snapshot.
-    it 'la de envío lleva su etiqueta, y el paquete la conserva' do
-      paciente.update!(envio_etiqueta: 'Trabajo')
-
-      get "/pacientes/#{paciente.id}/direcciones", headers: auth_headers
-      expect(JSON.parse(response.body)['envio']['etiqueta']).to eq('Trabajo')
-
-      crear(direccion_origen: 'envio')
-      d = Dispensacion.last
-      expect(d.direccion_etiqueta).to eq('Trabajo')
-      expect(DispensacionSerializer.serialize_delivery(d)[:direccion_etiqueta]).to eq('Trabajo')
-    end
-
-    it '«otra» con etiqueta y guardar: la ficha queda con nombre y el paquete también' do
-      crear(direccion_origen: 'otra', envio_calle: 'Directorio', envio_altura: '1602', envio_ciudad: 'CABA',
-            envio_etiqueta: 'Trabajo', guardar_como_envio: true)
-
-      expect(paciente.reload.envio_etiqueta).to eq('Trabajo')
-      expect(Dispensacion.last.direccion_etiqueta).to eq('Trabajo')
-      expect(Dispensacion.last.direccion_envio).to eq('Directorio 1602, CABA')
+      expect(paciente.direcciones_guardadas.count).to eq(1)
     end
 
     # El bundle viejo de la PWA sigue mandando `usar_domicilio_paciente`: no puede romperse.
-    it 'el cliente viejo sigue resolviendo como antes' do
+    it 'el cliente viejo sigue resolviendo como antes (la por defecto)' do
       crear(usar_domicilio_paciente: true)
 
       expect(response).to have_http_status(:created)

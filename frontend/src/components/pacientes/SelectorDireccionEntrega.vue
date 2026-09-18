@@ -23,16 +23,19 @@ const emit = defineEmits(['update:modelValue'])
 const form = computed(() => props.modelValue)
 const set  = (clave, valor) => emit('update:modelValue', { [clave]: valor })
 
-const direcciones = ref(null)          // { domicilio: {...}|null, envio: {...}|null }
+const direcciones = ref(null)          // { domicilio: {...}|null, guardadas: [...] }
 const cargando    = ref(false)
 
+// Por defecto: la guardada marcada como tal (es para eso que existe); si no hay guardadas, el
+// domicilio; y sin nada, «otra».
 async function cargar() {
   cargando.value = true
   try {
     const { data } = await getDireccionesPaciente(props.socioId)
-    direcciones.value = data || { domicilio: null, envio: null }
+    direcciones.value = { domicilio: null, guardadas: [], ...(data || {}) }
     const d = direcciones.value
-    set('direccion_origen', d.envio ? 'envio' : (d.domicilio ? 'domicilio' : 'otra'))
+    const def = (d.guardadas || []).find(g => g.por_defecto) || (d.guardadas || [])[0]
+    set('direccion_origen', def ? String(def.id) : (d.domicilio ? 'domicilio' : 'otra'))
   } catch {
     // Sin respuesta no se sabe qué tiene cargado: se dejan elegibles las dos de la ficha y el
     // backend decide. Marcarlas como "no cargadas" por un request que no salió sería mentir.
@@ -46,11 +49,14 @@ onMounted(cargar)
 const opciones = computed(() => {
   const d = direcciones.value
   const sinDatos = d === null   // no se pudieron consultar: no se marca nada como faltante
+  const guardadas = (d?.guardadas || []).map(g => ({
+    origen: String(g.id), label: g.etiqueta || 'Dirección de entrega', icono: 'bi-box-seam', texto: g.texto,
+    disponible: true, porDefecto: g.por_defecto,
+  }))
   return [
-    { origen: 'domicilio', label: 'Domicilio REPROCANN', icono: 'bi-house',    texto: d?.domicilio?.texto, disponible: sinDatos || !!d.domicilio },
-    { origen: 'envio',     label: d?.envio?.etiqueta ? `Dirección de envío · ${d.envio.etiqueta}` : 'Dirección de envío',
-      icono: 'bi-box-seam', texto: d?.envio?.texto, disponible: sinDatos || !!d.envio },
-    { origen: 'otra',      label: 'Otra dirección',      icono: 'bi-geo-alt',  texto: null,                disponible: true },
+    { origen: 'domicilio', label: 'Domicilio REPROCANN', icono: 'bi-house', texto: d?.domicilio?.texto, disponible: sinDatos || !!d?.domicilio },
+    ...guardadas,
+    { origen: 'otra',      label: 'Otra dirección',      icono: 'bi-geo-alt', texto: null, disponible: true },
   ]
 })
 
@@ -63,8 +69,11 @@ function validar() {
     }
     return null
   }
-  if (direcciones.value && !direcciones.value[f.direccion_origen]) {
-    return 'El paciente no tiene cargada esa dirección. Cargala en su ficha o elegí «Otra dirección».'
+  if (direcciones.value) {
+    const existe = f.direccion_origen === 'domicilio'
+      ? !!direcciones.value.domicilio
+      : (direcciones.value.guardadas || []).some(g => String(g.id) === String(f.direccion_origen))
+    if (!existe) return 'El paciente no tiene cargada esa dirección. Cargala en su ficha o elegí «Otra dirección».'
   }
   return null
 }
@@ -83,7 +92,7 @@ defineExpose({ validar, direcciones })
                 :disabled="!o.disponible" @click="set('direccion_origen', o.origen)">
           <i class="bi" :class="o.icono"></i>
           <span class="sde__dir-txt">
-            <span class="sde__dir-label">{{ o.label }}</span>
+            <span class="sde__dir-label">{{ o.label }} <span v-if="o.porDefecto" class="sde__def">por defecto</span></span>
             <span v-if="o.texto" class="sde__dir-dir">{{ o.texto }}</span>
             <span v-else-if="o.origen !== 'otra' && !direcciones" class="sde__dir-dir sde__dir-dir--falta">No se pudo consultar la ficha</span>
             <span v-else-if="o.origen !== 'otra'" class="sde__dir-dir sde__dir-dir--falta">No está cargada en la ficha</span>
@@ -134,7 +143,7 @@ defineExpose({ validar, direcciones })
       </div>
       <label class="sde__check">
         <input :checked="form.guardar_como_envio" type="checkbox" @change="set('guardar_como_envio', $event.target.checked)" />
-        Guardarla en la ficha como dirección de envío del paciente
+        Guardarla en la ficha (queda en sus direcciones)
       </label>
     </template>
   </div>
@@ -158,6 +167,7 @@ defineExpose({ validar, direcciones })
 .sde__dir--off { opacity: .55; cursor: not-allowed; }
 .sde__dir-txt { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
 .sde__dir-label { font-size: .8rem; font-weight: 700; }
+.sde__def { margin-left: .3rem; font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; color: #15803d; }
 .sde__dir-dir { font-size: .78rem; color: var(--c-slate-600); }
 .sde__dir-dir--falta { color: var(--c-slate-400); font-style: italic; }
 .sde__check { display: inline-flex; align-items: center; gap: .4rem; font-size: .78rem; color: var(--c-slate-600); cursor: pointer; }

@@ -13,7 +13,8 @@
 module Envios
   class DireccionDeEntrega
     CAMPOS  = %i[calle altura piso depto barrio ciudad].freeze
-    ORIGENES = %w[domicilio envio otra].freeze
+    # `domicilio` · `otra` · `envio` (la guardada por defecto, compatibilidad) · el id de una guardada.
+    def self.origen_valido?(o) = %w[domicilio envio otra].include?(o.to_s) || o.to_s.match?(/\A\d+\z/)
 
     Error = Class.new(StandardError)
 
@@ -32,7 +33,7 @@ module Envios
     def aplicar
       origen = @params[:direccion_origen].to_s
       dir =
-        if ORIGENES.include?(origen)
+        if self.class.origen_valido?(origen)
           origen == 'otra' ? tipeada : elegida(origen)
         elsif ActiveModel::Type::Boolean.new.cast(@params[:usar_domicilio_paciente]) || @params[:envio_calle].blank?
           @paciente.direccion_entrega   # regla vieja, para quien todavía no manda `direccion_origen`
@@ -56,7 +57,7 @@ module Envios
 
     def elegida(origen)
       @paciente.direccion(origen) or
-        raise Error, "El paciente no tiene cargada su #{Paciente::DIRECCIONES.dig(origen, :label).to_s.downcase}. Cargala en su ficha o elegí «Otra dirección»."
+        raise Error, "El paciente no tiene cargada esa dirección#{origen == 'domicilio' ? ' (domicilio REPROCANN)' : ''}. Cargala en su ficha o elegí «Otra dirección»."
     end
 
     def tipeada(estricta: true)
@@ -69,13 +70,12 @@ module Envios
       dir
     end
 
-    # `update_columns`, no `update!`: la dispensa que se está creando cuelga de `paciente.
-    # dispensaciones` (se construye con `build`) y un `update!` del paciente la valida como parte
-    # de la asociación — a medio armar, sin productos todavía — y rebotaba con «Dispensaciones no
-    # es válido» (pasó en producción, 17-sep). Los campos de dirección no se auditan ni tienen
-    # callbacks, así que saltear las validaciones acá no pierde nada.
+    # Queda como una dirección guardada más, con su nombre. (Se crea la fila directo, sin pasar
+    # por `paciente.save`: la dispensa que se está creando cuelga de `paciente.dispensaciones` a
+    # medio armar, y validar al paciente la validaba a ella — «Dispensaciones no es válido».)
     def guardar_como_envio!(dir)
-      @paciente.update_columns(CAMPOS.to_h { |c| ["envio_#{c}", dir[c]] }.merge('envio_etiqueta' => dir[:etiqueta], 'updated_at' => Time.current))
+      DireccionPaciente.create!(paciente: @paciente, club: @paciente.club, etiqueta: dir[:etiqueta].presence || 'Otra',
+                                **CAMPOS.to_h { |c| [c, dir[c]] })
     end
   end
 end
