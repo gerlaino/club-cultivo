@@ -31,7 +31,7 @@ export const NAV_GROUPS = [
   {
     key: 'cultivo', label: 'Cultivo', to: '/salas', feature: 'cultivo',
     tabs: [
-      { to: '/salas', label: 'Salas' },
+      { to: '/salas', label: 'Salas', labelPersonal: 'Espacios' },
       { to: '/lotes', label: 'Lotes' },
       { to: '/plantas', label: 'Plantas' },
       { to: '/geneticas', label: 'Genéticas' },
@@ -56,8 +56,7 @@ export const NAV_GROUPS = [
   {
     key: 'produccion', label: 'Producción', to: '/admin/stock', feature: 'cultivo',
     tabs: [
-      // En uso personal la pantalla es «Frascos» (ver StockDispatch): sin sedes ni mostrador.
-      { to: '/admin/stock', label: 'Stock', labelPersonal: 'Frascos' },
+      { to: '/admin/stock', label: 'Stock' },
       { to: '/admin/cosechado', label: 'Cosecha' },
       // La cola de pesajes que OTROS mandan a confirmar: en uso personal no hay otros.
       { to: '/admin/pesajes-manicura', label: 'Manicura', badge: 'aprob', soloOrganizacion: true },

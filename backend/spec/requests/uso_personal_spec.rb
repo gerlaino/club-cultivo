@@ -152,6 +152,26 @@ RSpec.describe 'Uso personal', type: :request do
     end
   end
 
+  describe 'pesar la cosecha' do
+    let(:club)  { create(:club, plan: 'personal', features: Club::FEATURES_PERSONAL) }
+    let(:admin) { create(:user, :admin, club: club) }
+    let(:sede)  { create(:sede, club: club, nombre: 'Mi cultivo', tipo: 'produccion') }
+    let(:lote)  { create(:lote, club: club, sede: sede, sala: create(:sala, club: club, sede: sede), estado: 'en_manicura') }
+    before { sign_in_as(admin) }
+
+    # Para él no existe «asignar a una sede»: el frasco nace en su casa, que es la única.
+    it 'el frasco nace en su casa, sin pasar por «por asignar»' do
+      plantas = create_list(:plant, 2, lote: lote, club: club, state: 'cosechado')
+      post "/api/lotes/#{lote.id}/pesajes_manicura/registrar_directo",
+           params: { resto: { plant_ids: plantas.map(&:id), peso_total_g: 40 } }, as: :json
+      expect(response).to have_http_status(:created), response.body
+
+      stock = Stock.find(json['stock_id'])
+      expect(stock.sede_id).to eq(sede.id)
+      expect(stock).to be_asignado
+    end
+  end
+
   describe 'lo que paga' do
     it 'es un solo número con todo adentro' do
       club = create(:club, plan: 'personal', features: Club::FEATURES_PERSONAL)

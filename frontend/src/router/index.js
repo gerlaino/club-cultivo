@@ -586,8 +586,7 @@ const routes = [
     path: '/admin/stock',
     alias: '/admin/stocks/pendientes',
     name: 'admin-stock',
-    // En uso personal es «Frascos» (ver StockDispatch).
-    component: () => import('../views/StockDispatch.vue'),
+    component: () => import('../views/admin/AdminStocksPendientesView.vue'),
     meta: { requiresAuth: true },
     beforeEnter: (to, from, next) => {
       const auth = useAuthStore()
@@ -1047,7 +1046,7 @@ const routes = [
       // ── Uso personal (el admin del plan personal) ──
       { path: 'personal/hoy',     component: () => import('../views/mobile/MPersonalHomeView.vue') },
       { path: 'personal/cultivo', component: () => import('../views/mobile/MPersonalCultivoView.vue') },
-      { path: 'personal/frascos', component: () => import('../views/mobile/MPersonalFrascosView.vue') },
+      { path: 'personal/stock',   component: () => import('../views/mobile/MPersonalFrascosView.vue') },
       { path: 'personal/gastos',  component: () => import('../views/mobile/MPersonalGastosView.vue') },
       { path: 'admin/sedes',   component: () => import('../views/mobile/MSedesView.vue') },
       { path: 'admin/tareas',  component: () => import('../views/mobile/MTareasView.vue') },

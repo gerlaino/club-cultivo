@@ -341,6 +341,10 @@ class PesajesManicuraController < ApplicationController
     if params[:sede_id].present? && stock.sede_id.nil?
       sede = current_user.club.sedes.find(params[:sede_id])
       stock.update!(sede: sede, estado: 'asignado')
+    elsif stock.sede_id.nil? && current_user.club.personal?
+      # Uso personal: la sede es su casa, hay una sola y no se le pregunta. Sin esto el frasco
+      # nacía «por asignar» en una pantalla que para él no existe.
+      stock.update!(sede: current_user.club.sedes.first, estado: 'asignado')
     end
     stock
   end

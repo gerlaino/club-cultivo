@@ -58,7 +58,7 @@
       <div v-if="cargando" class="mph__skel"></div>
       <div v-else-if="!ambiente.length" class="mph__empty">
         <i class="bi bi-thermometer-half"></i>
-        <span>Sin lecturas todavía. Cargá una a mano desde la sala, o conectá un sensor.</span>
+        <span>Sin lecturas todavía. Cargá una a mano desde tu espacio de cultivo, o conectá un sensor.</span>
       </div>
       <div v-else class="mph__salas">
         <RouterLink v-for="s in ambiente" :key="s.sala_id" :to="`/m/sala-m/${s.sala_id}`" class="mph__sala">
@@ -77,7 +77,7 @@
     <section class="mph__section">
       <div class="mph__section-head">
         <h2 class="mph__section-title">En el cultivo</h2>
-        <RouterLink to="/m/personal/cultivo" class="mph__section-link">Ver salas →</RouterLink>
+        <RouterLink to="/m/personal/cultivo" class="mph__section-link">Ver espacios →</RouterLink>
       </div>
       <div v-if="cargando" class="mph__skel"></div>
       <div v-else-if="!lotesEnCurso.length" class="mph__empty">
@@ -103,7 +103,7 @@
     <section v-if="lotesPostCosecha.length" class="mph__section">
       <div class="mph__section-head">
         <h2 class="mph__section-title">Secando y curando</h2>
-        <RouterLink to="/m/personal/frascos" class="mph__section-link">Frascos →</RouterLink>
+        <RouterLink to="/m/personal/stock" class="mph__section-link">Stock →</RouterLink>
       </div>
       <div class="mph__lotes">
         <RouterLink v-for="l in lotesPostCosecha" :key="l.id"
@@ -183,7 +183,7 @@ async function completar(t) {
 }
 
 const alertasCriticas = computed(() => (ambienteStore.alertasActivas || []).slice(0, 2))
-function salaNombre(id) { return salas.items?.find(s => s.id === id)?.nombre || 'una sala' }
+function salaNombre(id) { return salas.items?.find(s => s.id === id)?.nombre || 'un espacio' }
 
 const EN_CURSO = ['enraizado', 'vegetativo', 'floracion']
 const POST     = ['cosecha', 'en_manicura', 'curado']

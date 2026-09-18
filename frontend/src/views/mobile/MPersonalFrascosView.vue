@@ -1,8 +1,8 @@
 <template>
   <div class="mpf">
     <header class="mpf__header">
-      <h1 class="mpf__title">Frascos</h1>
-      <p class="mpf__sub">Lo que cosechaste y cuánto queda.</p>
+      <h1 class="mpf__title">Stock</h1>
+      <p class="mpf__sub">Lo que cosechaste y cuánto queda. Para producir hash, aceite o prerolls, abrí el frasco.</p>
     </header>
 
     <div v-if="f.cargando.value" class="mpf__loading"><i class="bi bi-arrow-repeat mpf__spin"></i> Cargando…</div>

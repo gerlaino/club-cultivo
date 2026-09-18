@@ -48,7 +48,7 @@
       <div class="cvd__kpi-card">
         <div class="cvd__kpi-ico"><LayoutGrid :size="18" :stroke-width="1.75" /></div>
         <div class="cvd__kpi-val">{{ salasActivas.length }}</div>
-        <div class="cvd__kpi-lbl">Salas activas</div>
+        <div class="cvd__kpi-lbl">{{ personal ? 'Espacios activos' : 'Salas activas' }}</div>
         <div class="cvd__kpi-sub">de {{ salas.length }} en total</div>
       </div>
       <!-- El "N listos para avanzar" era un número muerto: ahora abre cuáles son. -->
@@ -202,7 +202,7 @@
     <div class="cvd__section">
       <button class="cvd__section-toggle" @click="salasExpanded = !salasExpanded">
         <div class="cvd__section-toggle-left">
-          <h2 class="cvd__section-title">Mis salas</h2>
+          <h2 class="cvd__section-title">{{ personal ? 'Mis espacios' : 'Mis salas' }}</h2>
           <span v-if="salas.length" class="cvd__section-badge">{{ salas.length }}</span>
         </div>
         <ChevronRight :size="16" class="cvd__section-chevron" :class="{ 'cvd__section-chevron--open': salasExpanded }" />
@@ -213,9 +213,9 @@
         </div>
         <DsEmpty
           v-else-if="salas.length === 0"
-          :title="personal ? 'Todavía no tenés salas' : 'Sin salas activas'"
+          :title="personal ? 'Todavía no tenés un espacio de cultivo' : 'Sin salas activas'"
           :description="personal
-            ? 'Una carpa, un cuarto: creá tu primera sala en Cultivo → Salas y de ahí arranca el lote.'
+            ? 'Una carpa, un cuarto: creá tu primer espacio en Cultivo → Espacios y de ahí arranca el lote.'
             : 'No hay salas de vegetativo o floración en tu sede. Pedile al admin que cree una sala.'"
         />
         <div v-else class="cvd__salas-grid">

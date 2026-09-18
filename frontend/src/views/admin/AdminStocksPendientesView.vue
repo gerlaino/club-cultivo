@@ -8,7 +8,7 @@
           <h1 class="stk__title">Stock</h1>
           <span v-if="liveConectado" class="stk__live-dot">● en vivo</span>
         </div>
-        <p class="stk__sub">Inventario de la organización · asignación de sedes · stock externo</p>
+        <p class="stk__sub">{{ esPersonal ? 'Lo que cosechaste y lo que hiciste con eso: flor, hash, aceite, prerolls.' : 'Inventario de la organización · asignación de sedes · stock externo' }}</p>
       </div>
       <div class="stk__header-actions">
         <!-- Umbral configurable -->
@@ -27,7 +27,8 @@
             <button class="stk__umbral-edit" @click="umbralEditing = true" title="Editar umbral">✏️</button>
           </template>
         </div>
-        <button class="stk__btn-primary" @click="openCrear">
+        <!-- El stock externo se compra para dispensar: en uso personal no hay a quién. -->
+        <button v-if="!esPersonal" class="stk__btn-primary" @click="openCrear">
           <i class="bi bi-plus-lg"></i> Agregar stock externo
         </button>
       </div>
@@ -55,14 +56,14 @@
             <div class="stk__kpi-lbl">Reservado (flor)</div>
           </div>
         </div>
-        <div class="stk__kpi" :class="{ 'stk__kpi--warn': pendientes.length > 0 }">
+        <div v-if="!esPersonal" class="stk__kpi" :class="{ 'stk__kpi--warn': pendientes.length > 0 }">
           <div class="stk__kpi-ico">⏳</div>
           <div class="stk__kpi-body">
             <div class="stk__kpi-val">{{ pendientes.length }}</div>
             <div class="stk__kpi-lbl">Por asignar</div>
           </div>
         </div>
-        <div class="stk__kpi">
+        <div v-if="!esPersonal" class="stk__kpi">
           <div class="stk__kpi-ico">🏪</div>
           <div class="stk__kpi-body">
             <div class="stk__kpi-val">{{ sedesConStock }}</div>
@@ -154,8 +155,9 @@
       <!-- ── Tab: Inventario ────────────────────────────────────── -->
       <div v-if="tabActiva === 'inventario'">
 
-        <!-- Filtro por sede (tabs): toda la organización o una sede puntual -->
-        <div class="stk__sede-tabs">
+        <!-- Filtro por sede (tabs): toda la organización o una sede puntual. Con una sola
+             sede (uso personal) no hay nada que filtrar. -->
+        <div v-if="!esPersonal" class="stk__sede-tabs">
           <button class="stk__sede-tab" :class="{ 'is-on': invFiltros.sede_id === '' }" @click="invFiltros.sede_id = ''">🏢 Toda la organización</button>
           <button v-for="s in sedes" :key="s.id" class="stk__sede-tab" :class="{ 'is-on': invFiltros.sede_id === String(s.id) }" @click="invFiltros.sede_id = String(s.id)">
             {{ s.nombre }}
@@ -181,8 +183,8 @@
         <div v-else-if="!inventario.length" class="stk__empty">
           <span class="stk__empty-ico">📭</span>
           <p class="stk__empty-title">Sin stock para este filtro</p>
-          <span class="stk__empty-sub">Ajustá los filtros o agregá stock externo.</span>
-          <button class="stk__btn-outline stk__empty-cta" @click="openCrear">
+          <span class="stk__empty-sub">{{ esPersonal ? 'Cuando peses una cosecha, aparece acá.' : 'Ajustá los filtros o agregá stock externo.' }}</span>
+          <button v-if="!esPersonal" class="stk__btn-outline stk__empty-cta" @click="openCrear">
             <i class="bi bi-plus-lg"></i> Agregar stock externo
           </button>
         </div>
@@ -218,7 +220,7 @@
                 >
                   <td class="stk__inv-td-cod">{{ s.numero_lote_producto || '—' }}</td>
                   <td class="stk__inv-td-tipo">{{ formaLabel(s.forma_producto) }}</td>
-                  <td>
+                  <td v-if="!esPersonal">
                     <span class="stk__chip" :class="s.regulatorio ? 'stk__chip--propio' : 'stk__chip--ext'">
                       {{ s.regulatorio ? 'Propio' : 'Externo' }}
                     </span>
@@ -229,7 +231,7 @@
                     <span v-else-if="!s.regulatorio || s.origen === 'compra_externa'" class="stk__chip stk__chip--ext">Externo</span>
                     <span v-else class="stk__inv-td-mono">—</span>
                   </td>
-                  <td>{{ s.sede?.nombre || 'Sin asignar' }}</td>
+                  <td v-if="!esPersonal">{{ s.sede?.nombre || 'Sin asignar' }}</td>
                   <td class="stk__inv-td-fecha">{{ formatDate(s.created_at) }}</td>
                   <td class="stk__inv-td-obs" :title="s.descripcion || ''">
                     <span v-if="s.descripcion">{{ s.descripcion }}</span>
@@ -244,7 +246,7 @@
                   <!-- DÓNDE ESTÁ EL PRODUCTO, que es otra pregunta que cuánto hay. Siempre, y
                        también en cero apagado: un número que aparece de la nada el día que alguien
                        carga la mesa no se aprende a mirar. -->
-                  <td class="stk__inv-num stk__inv-td-mesa" :class="{ 'stk__inv-td-mesa--cero': !s.en_mostrador_g }">
+                  <td v-if="!esPersonal" class="stk__inv-num stk__inv-td-mesa" :class="{ 'stk__inv-td-mesa--cero': !s.en_mostrador_g }">
                     {{ (s.en_mostrador_g || 0).toFixed(1) }}{{ s.unidad || 'g' }}
                   </td>
                 </tr>
@@ -289,7 +291,7 @@
             <div class="stk__hist-hd">
               <span class="stk__hist-col stk__hist-col--estado">Estado</span>
               <span class="stk__hist-col stk__hist-col--producto">Producto</span>
-              <span class="stk__hist-col stk__hist-col--sede">Sede</span>
+              <span v-if="!esPersonal" class="stk__hist-col stk__hist-col--sede">Sede</span>
               <span class="stk__hist-col stk__hist-col--cant">Cant.</span>
               <span class="stk__hist-col stk__hist-col--fecha">Fecha</span>
             </div>
@@ -307,7 +309,7 @@
                   <span v-if="s.origen === 'compra_externa'" class="stk__chip stk__chip--ext stk__chip--xs">Ext.</span>
                 </div>
               </div>
-              <div class="stk__hist-col stk__hist-col--sede">
+              <div v-if="!esPersonal" class="stk__hist-col stk__hist-col--sede">
                 <span v-if="s.sede" class="stk__hist-sede-nm">{{ s.sede.nombre }}</span>
                 <span v-else class="stk__hist-pool">Pool</span>
               </div>
@@ -798,6 +800,7 @@ import { unidadDe } from '../../lib/formatters.js'
 import { useToast } from '../../composables/useToast.js'
 import { MOTIVOS_FINALIZACION, ayudaDe } from '../../composables/useStockFinalizacion.js'
 import { useStockChannel } from '../../composables/useStockChannel.js'
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
 
 const toast = useToast()
 
@@ -846,9 +849,15 @@ const procesarError  = ref(null)
 const procesando     = ref(false)
 
 // ── Tabs ───────────────────────────────────────────────────────────────────────
-const tabActiva = ref('por_asignar')
+const { esPersonal } = useUsoPersonal()
+// Arranca en lo que tiene sentido ver: en uso personal no existe «por asignar».
+const tabActiva = ref(esPersonal.value ? 'inventario' : 'por_asignar')
+// Las preferencias pueden llegar después del primer render: si resulta personal, la solapa
+// «por asignar» ya no existe y hay que moverse.
+watch(esPersonal, (p) => { if (p && tabActiva.value === 'por_asignar') tabActiva.value = 'inventario' })
+// En uso personal no hay «por asignar»: el frasco nace en su casa, que es la única sede.
 const TABS = computed(() => [
-  { key: 'por_asignar', label: '⏳ Por asignar', count: pendientes.value.length },
+  ...(esPersonal.value ? [] : [{ key: 'por_asignar', label: '⏳ Por asignar', count: pendientes.value.length }]),
   { key: 'inventario',  label: '📦 Inventario',  count: invTotal.value },
   { key: 'historial',   label: '📋 Historial',   count: null },
 ])
@@ -927,19 +936,22 @@ const hayFiltrosInv = computed(() => Object.values(invFiltros.value).some(v => v
 // `dir` es hacia dónde ordena la PRIMERA vez que se toca. Los números y las fechas arrancan al
 // revés que el texto porque la pregunta también es al revés: de un nombre se busca la A, de una
 // cantidad y de una fecha se busca lo más grande y lo más nuevo.
-const COLUMNAS_INV = [
+// Origen (propio/externo), Sede y Mostrador son columnas de una organización: en uso personal
+// todo es propio, hay una sola sede y no hay mesa. La fila las esconde con la misma condición.
+const COLUMNAS_INV_TODAS = [
   { campo: 'codigo',           label: 'Código',          dir: 'asc' },
   { campo: 'tipo',             label: 'Tipo',            dir: 'asc' },
-  { campo: 'origen',           label: 'Origen',          dir: 'asc' },
+  { campo: 'origen',           label: 'Origen',          dir: 'asc',  org: true },
   { campo: 'genetica',         label: 'Genética',        dir: 'asc' },
   { campo: 'lote',             label: 'Lote',            dir: 'asc' },
-  { campo: 'sede',             label: 'Sede',            dir: 'asc' },
+  { campo: 'sede',             label: 'Sede',            dir: 'asc',  org: true },
   { campo: 'ingreso',          label: 'Ingresó',         dir: 'desc' },
   { campo: 'observaciones',    label: 'Observaciones',   dir: 'asc' },
   { campo: 'cantidad_inicial', label: 'Cantidad inicial', dir: 'desc', num: true },
   { campo: 'actual',           label: 'Actual',          dir: 'desc', num: true },
-  { campo: 'mostrador',        label: 'Mostrador',       dir: 'desc', num: true },
+  { campo: 'mostrador',        label: 'Mostrador',       dir: 'desc', num: true, org: true },
 ]
+const COLUMNAS_INV = computed(() => COLUMNAS_INV_TODAS.filter(c => !c.org || !esPersonal.value))
 // Vacío = como venía: lo último que entró arriba.
 const invOrden = ref({ campo: '', dir: 'desc' })
 
@@ -959,7 +971,7 @@ const mezclaUnidades = computed(() => {
 })
 
 function ordenarInv (campo) {
-  const col = COLUMNAS_INV.find(c => c.campo === campo)
+  const col = COLUMNAS_INV.value.find(c => c.campo === campo)
   invOrden.value = invOrden.value.campo === campo
     ? { campo, dir: invOrden.value.dir === 'asc' ? 'desc' : 'asc' }
     : { campo, dir: col?.dir || 'asc' }

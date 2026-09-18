@@ -11,6 +11,7 @@
     <div class="gp__tabs">
       <button class="gp__tab" :class="{ 'gp__tab--on': tab === 'gastos' }" @click="tab = 'gastos'"><i class="bi bi-receipt"></i> Gastos</button>
       <button class="gp__tab" :class="{ 'gp__tab--on': tab === 'lotes' }" @click="tab = 'lotes'"><i class="bi bi-box-seam"></i> Costo por lote</button>
+      <button class="gp__tab" :class="{ 'gp__tab--on': tab === 'tipos' }" @click="tab = 'tipos'"><i class="bi bi-tags"></i> Tipos de gasto</button>
     </div>
 
     <!-- ── Gastos ── -->
@@ -55,10 +56,48 @@
       </table>
     </template>
 
+    <!-- ── Tipos de gasto ──
+         Las categorías de siempre, con nombre propio: «Nutrientes», «Luz», «Carpa». Se crean, se
+         renombran y se apagan; no se borran, porque los gastos viejos las siguen nombrando. -->
+    <template v-if="tab === 'tipos'">
+      <div class="gp__tipos-head">
+        <p class="gp__nota" style="margin:0">Cada gasto lleva un tipo. Poneles el nombre con el que vos pensás: después se filtra y se compara por acá.</p>
+        <form class="gp__tipo-nuevo" @submit.prevent="crearTipo">
+          <input v-model.trim="tipoNuevo" type="text" class="gp__input" placeholder="Nuevo tipo: Nutrientes, Luz, Carpa…" maxlength="60" />
+          <button type="submit" class="gp__nuevo" :disabled="!tipoNuevo || creandoTipo">{{ creandoTipo ? 'Creando…' : 'Agregar' }}</button>
+        </form>
+      </div>
+      <table class="gp__table">
+        <thead><tr><th>Tipo</th><th>Sector</th><th></th></tr></thead>
+        <tbody>
+          <tr v-for="c in g.categorias.value" :key="c.id">
+            <td class="gp__desc">
+              <template v-if="editandoTipo === c.id">
+                <input v-model.trim="tipoNombre" type="text" class="gp__input gp__input--inline" maxlength="60" @keydown.enter.prevent="guardarTipo(c)" @keydown.esc="editandoTipo = null" />
+              </template>
+              <template v-else>{{ c.nombre }}</template>
+            </td>
+            <td>{{ c.unidad_negocio?.nombre || '—' }}</td>
+            <td class="gp__acciones">
+              <template v-if="editandoTipo === c.id">
+                <button type="button" class="gp__btn-sec" @click="editandoTipo = null">Cancelar</button>
+                <button type="button" class="gp__btn-sec gp__btn-sec--ok" @click="guardarTipo(c)">Guardar</button>
+              </template>
+              <template v-else>
+                <button type="button" class="gp__icon" title="Renombrar" @click="editandoTipo = c.id; tipoNombre = c.nombre"><i class="bi bi-pencil"></i></button>
+                <button type="button" class="gp__icon" title="Dejar de usar" @click="apagarTipo(c)"><i class="bi bi-eye-slash"></i></button>
+              </template>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+      <p v-if="!g.categorias.value.length" class="gp__nota">Sin tipos todavía: agregá el primero arriba.</p>
+    </template>
+
     <!-- ── Costo por lote ──
          Sin ingresos ni margen: el cultivador de casa no vende. La pregunta es una sola —cuánto
          me costó este lote y cuánto cada gramo— y sale de los gastos que ató a cada lote. -->
-    <template v-else>
+    <template v-if="tab === 'lotes'">
       <div v-if="cargandoLotes" class="gp__loading"><DsSpinner :size="18" /> Cargando…</div>
       <DsEmpty v-else-if="!lotesCosto.length" title="Todavía no hay costos por lote"
                description="Cuando anotes un gasto «para un lote» y ese lote se pese, acá aparece cuánto costó cada gramo." />
@@ -89,7 +128,7 @@
             <button type="button" class="gp__icon" aria-label="Cerrar" @click="modal = false"><i class="bi bi-x-lg"></i></button>
           </div>
           <GastoForm :form="g.form" :categorias="g.categorias.value" :lotes="g.lotesAbiertos.value" :hoy="g.hoy"
-                     :error="g.error.value" :guardando="g.guardando.value"
+                     :error="g.error.value" :guardando="g.guardando.value" :crear-tipo="g.crearTipo"
                      @guardar="guardar" @cancelar="modal = false" />
         </div>
       </div>
@@ -141,6 +180,29 @@ async function borrar(x) {
   } catch (e) {
     toast.error(e?.response?.data?.error || 'No se pudo borrar')
   }
+}
+
+// ── Tipos de gasto ──
+const tipoNuevo    = ref('')
+const creandoTipo  = ref(false)
+const editandoTipo = ref(null)
+const tipoNombre   = ref('')
+async function crearTipo() {
+  if (!tipoNuevo.value) return
+  creandoTipo.value = true
+  try { await g.crearTipo(tipoNuevo.value); tipoNuevo.value = ''; toast.success('Tipo agregado') }
+  catch (e) { toast.error(e?.response?.data?.errors?.join(', ') || e?.response?.data?.error || 'No se pudo crear') }
+  finally { creandoTipo.value = false }
+}
+async function guardarTipo(c) {
+  if (!tipoNombre.value) return
+  try { await g.renombrarTipo(c, tipoNombre.value); editandoTipo.value = null }
+  catch (e) { toast.error(e?.response?.data?.errors?.join(', ') || 'No se pudo renombrar') }
+}
+async function apagarTipo(c) {
+  const ok = await confirm({ title: `¿Dejar de usar «${c.nombre}»?`, message: 'Los gastos que ya lo tienen lo conservan; sólo deja de ofrecerse al anotar uno nuevo.', confirmText: 'Dejar de usar', variant: 'warning' })
+  if (!ok) return
+  try { await g.activarTipo(c, false) } catch { toast.error('No se pudo') }
 }
 
 // ── Costo por lote ──
@@ -202,6 +264,12 @@ onMounted(() => g.cargarTodo())
 .gp__icon { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--c-slate-200); background: #fff; color: var(--c-slate-600); cursor: pointer; }
 .gp__icon--danger:hover { color: #b91c1c; border-color: #fecaca; }
 .gp__nota { margin: .9rem 0 0; font-size: .8rem; color: var(--c-slate-500); }
+.gp__tipos-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.gp__tipo-nuevo { display: flex; gap: .5rem; }
+.gp__input { padding: .6rem .8rem; border: 1.5px solid var(--c-slate-200); border-radius: 10px; font: inherit; font-size: .9rem; min-width: 18rem; }
+.gp__input--inline { min-width: 12rem; padding: .4rem .6rem; }
+.gp__btn-sec { padding: .4rem .7rem; border-radius: 8px; border: 1px solid var(--c-slate-200); background: #fff; color: var(--c-slate-700); font-size: .8rem; font-weight: 600; cursor: pointer; }
+.gp__btn-sec--ok { background: var(--c-leaf-800, #1A3D2E); color: #fff; border-color: transparent; }
 
 /* Modal */
 .gp__overlay { position: fixed; inset: 0; background: rgba(15, 23, 42, .45); display: flex; align-items: center; justify-content: center; padding: 1rem; z-index: 1000; }

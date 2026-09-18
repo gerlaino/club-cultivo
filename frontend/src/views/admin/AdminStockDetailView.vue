@@ -26,7 +26,7 @@
               <span v-if="stock.lote?.genetica" class="sd__chip sd__chip--gen">{{ stock.lote.genetica.nombre }}</span>
               <span v-else-if="stock.genetica" class="sd__chip sd__chip--gen">{{ stock.genetica.nombre }}</span>
               <span v-if="stock.origen === 'compra_externa'" class="sd__chip sd__chip--ext">Externo</span>
-              <span v-if="stock.disponibilidad && stock.disponibilidad !== 'ambas'" class="sd__chip sd__chip--disp">
+              <span v-if="!esPersonal && stock.disponibilidad && stock.disponibilidad !== 'ambas'" class="sd__chip sd__chip--disp">
                 {{ { dispensa: 'Solo dispensa', produccion: 'Solo producción', ninguna: 'No disponible' }[stock.disponibilidad] }}
               </span>
               <span v-if="stock.estado_vencimiento && stock.estado_vencimiento !== 'ok'"
@@ -49,7 +49,7 @@
           </div>
           <div class="sd__kpi sd__kpi--warn">
             <div class="sd__kpi-val">{{ Number(stock.disponible_para_entregar ?? stock.cantidad_disponible_real).toFixed(1) }}<span class="sd__kpi-unit">{{ unidad }}</span></div>
-            <div class="sd__kpi-lbl">Disponible para entregar</div>
+            <div class="sd__kpi-lbl">{{ esPersonal ? 'Disponible' : 'Disponible para entregar' }}</div>
           </div>
           <div v-if="stock.en_mostrador_g > 0" class="sd__kpi">
             <div class="sd__kpi-val">{{ Number(stock.en_mostrador_g).toFixed(1) }}<span class="sd__kpi-unit">{{ unidad }}</span></div>
@@ -94,11 +94,11 @@
 
             <template v-if="!editando">
               <div class="sd__data-grid">
-                <div class="sd__data-item">
+                <div v-if="!esPersonal" class="sd__data-item">
                   <span class="sd__data-lbl">Sede</span>
                   <span class="sd__data-val">{{ stock.sede?.nombre || 'Pool (sin sede)' }}</span>
                 </div>
-                <div class="sd__data-item">
+                <div v-if="!esPersonal" class="sd__data-item">
                   <span class="sd__data-lbl">Origen</span>
                   <span class="sd__data-val">{{ origenLabel(stock.origen) }}</span>
                 </div>
@@ -117,7 +117,7 @@
                   <span class="sd__data-lbl">Ingresó</span>
                   <span class="sd__data-val">{{ formatDate(stock.created_at) }}</span>
                 </div>
-                <div class="sd__data-item">
+                <div v-if="!esPersonal" class="sd__data-item">
                   <span class="sd__data-lbl">Precio sugerido</span>
                   <span class="sd__data-val">{{ stock.precio_sugerido_ars ? `$${Number(stock.precio_sugerido_ars).toFixed(2)}/g` : '—' }}</span>
                 </div>
@@ -190,7 +190,7 @@
                     </button>
                   </template>
                 </div>
-                <div class="sd__field">
+                <div v-if="!esPersonal" class="sd__field">
                   <label class="sd__label">Precio sugerido (ARS/{{ editForm.unidad || unidad }})</label>
                   <input type="number" min="0" step="0.01" class="sd__input" v-model.number="editForm.precio_sugerido_ars" placeholder="0.00" />
                 </div>
@@ -209,7 +209,7 @@
                     <option v-for="g in geneticas" :key="g.id" :value="g.id">{{ g.nombre }}</option>
                   </select>
                 </div>
-                <div class="sd__field">
+                <div v-if="!esPersonal" class="sd__field">
                   <label class="sd__label">Disponible para</label>
                   <select class="sd__input" v-model="editForm.disponibilidad">
                     <option value="ambas">Dispensa y producción</option>
@@ -289,7 +289,16 @@
                   <div class="sd__action-sub">Merma, pérdida o reconteo</div>
                 </div>
               </button>
-              <button class="sd__action" @click="openRepartir" :disabled="stock.agotado || !stock.sede_id">
+              <!-- Uso personal: la única salida de un frasco es consumirlo. Va primero porque es
+                   lo que hace todos los días; ajustar y producir son de vez en cuando. -->
+              <button v-if="esPersonal" class="sd__action" @click="abrirConsumo" :disabled="stock.agotado">
+                <span class="sd__action-ico sd__action-ico--green"><i class="bi bi-cup-hot"></i></span>
+                <div class="sd__action-txt">
+                  <div class="sd__action-lbl">Consumí</div>
+                  <div class="sd__action-sub">Lo que sacaste del frasco, con fecha</div>
+                </div>
+              </button>
+              <button v-if="!esPersonal" class="sd__action" @click="openRepartir" :disabled="stock.agotado || !stock.sede_id">
                 <span class="sd__action-ico sd__action-ico--blue"><i class="bi bi-arrows-angle-expand"></i></span>
                 <div class="sd__action-txt">
                   <div class="sd__action-lbl">Repartir a sede</div>
@@ -306,7 +315,7 @@
                 <span class="sd__action-ico sd__action-ico--amber"><i class="bi bi-arrow-right-square"></i></span>
                 <div class="sd__action-txt">
                   <div class="sd__action-lbl">Producir</div>
-                  <div class="sd__action-sub">Convertir en hash, aceite, etc.</div>
+                  <div class="sd__action-sub">Convertir en hash, aceite, prerolls…</div>
                 </div>
               </button>
               <div class="sd__actions-sep"></div>
@@ -384,6 +393,27 @@
       <p>Stock no encontrado</p>
       <RouterLink to="/admin/stock" class="sd__btn-ghost">← Volver al inventario</RouterLink>
     </div>
+
+    <!-- ── Modal: Consumí (uso personal) ─────────────────────────────── -->
+    <Teleport to="body">
+      <Transition name="sd-fade">
+        <div v-modal="() => showConsumo = false" v-if="showConsumo" class="sd__overlay" @click.self="showConsumo = false">
+          <div class="sd__modal" role="dialog" aria-modal="true">
+            <div class="sd__modal-hd">
+              <div class="sd__modal-ico"><i class="bi bi-cup-hot"></i></div>
+              <div>
+                <h2 class="sd__modal-title">Consumí</h2>
+                <p class="sd__modal-sub">{{ formaLabel(stock?.forma_producto) }} · {{ stock?.numero_lote_producto }}</p>
+              </div>
+              <button class="sd__modal-close" @click="showConsumo = false"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="sd__modal-body">
+              <ConsumoForm v-if="consumo.stock" :consumo="consumo" :hoy="hoyISO" @guardar="ejecutarConsumo" @cancelar="showConsumo = false" />
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
 
     <!-- ── Modal: Ajustar ────────────────────────────────────────────── -->
     <Teleport to="body">
@@ -606,7 +636,7 @@
                   </div>
                 </div>
                 <div class="sd__field">
-                  <label class="sd__label">Precio sugerido <span class="sd__label-opt">(opc.)</span></label>
+                  <label v-if="!esPersonal" class="sd__label">Precio sugerido <span class="sd__label-opt">(opc.)</span></label>
                   <div class="sd__input-row">
                     <span class="sd__input-pre">$</span>
                     <input type="number" min="0" step="1" class="sd__input" v-model.number="procesarForm.precio_sugerido_ars" placeholder="por unidad" />
@@ -672,7 +702,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import {
@@ -685,10 +715,37 @@ import { useToast } from '../../composables/useToast.js'
 import { MOTIVOS_FINALIZACION, ayudaDe } from '../../composables/useStockFinalizacion.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useQRCode } from '../../composables/useQRCode.js'
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
+import { consumirStock } from '../../lib/api.js'
+import ConsumoForm from '../../components/personal/ConsumoForm.vue'
 
 const route  = useRoute()
 const router = useRouter()
 const toast  = useToast()
+const { esPersonal } = useUsoPersonal()
+
+// ── Consumí (uso personal) ────────────────────────────────────────────────────
+// La única salida de un frasco cuando no hay a quién dispensar. Mismo formulario que la solapa
+// del teléfono; el backend lo rechaza fuera del plan personal.
+const showConsumo = ref(false)
+const consumo = reactive({ stock: null, cantidad: null, fecha: null, nota: '', error: null, guardando: false })
+function abrirConsumo() {
+  Object.assign(consumo, { stock: stock.value, cantidad: null, fecha: hoyISO, nota: '', error: null, guardando: false })
+  showConsumo.value = true
+}
+async function ejecutarConsumo() {
+  if (!(consumo.cantidad > 0)) return
+  consumo.guardando = true
+  consumo.error = null
+  try {
+    const { data } = await consumirStock(stock.value.id, { cantidad: consumo.cantidad, fecha: consumo.fecha, nota: consumo.nota })
+    showConsumo.value = false
+    toast.success(`Anotado: ${consumo.cantidad} ${data.unidad || 'g'}`)
+    await recargar()
+  } catch (e) {
+    consumo.error = e?.response?.data?.error || 'No se pudo anotar'
+  } finally { consumo.guardando = false }
+}
 const { confirm } = useConfirm()
 const eliminando = ref(false)
 
@@ -1066,7 +1123,7 @@ const FORMA_ICO = {
 }
 const ORIGEN_MAP = { lote: 'Producción propia', derivado_lote: 'Derivado de lote', compra_externa: 'Compra externa' }
 const ESTADO_MAP = { pendiente_asignacion: 'Por asignar', asignado: 'Asignado', agotado: 'Agotado' }
-const MOV_TIPO_MAP = { produccion: 'Producción', transferencia: 'Transferencia', dispensacion: 'Dispensación', ajuste: 'Ajuste', merma: 'Merma', consumo_evento: 'Consumo en evento' }
+const MOV_TIPO_MAP = { produccion: 'Producción', transferencia: 'Transferencia', dispensacion: 'Dispensación', ajuste: 'Ajuste', merma: 'Merma', consumo_evento: 'Consumo en evento', consumo: 'Consumo', salida: 'Salida' }
 
 function formaLabel(f)    { return FORMA_MAP[f]  || f || 'Stock' }
 function formaIco(f)      { return FORMA_ICO[f]  || '📦' }
@@ -1297,6 +1354,7 @@ function badgeVencLabel(s) {
 .sd__mov-tipo--dispensacion { background: #fdf4ff; color: #7e22ce; border-color: #e9d5ff; }
 .sd__mov-tipo--ajuste       { background: #fefce8; color: #854d0e; border-color: #fef08a; }
 .sd__mov-tipo--merma        { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
+.sd__mov-tipo--consumo      { background: #ecfccb; color: #3f6212; border-color: #d9f99d; }
 .sd__mov-g     { font-size: .88rem; font-weight: 800; }
 .sd__mov-g--pos { color: #15803d; }
 .sd__mov-g--neg { color: #dc2626; }

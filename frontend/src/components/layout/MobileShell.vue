@@ -248,7 +248,7 @@ NAV.personal = { fab: true, items: [
   // Entra directo a sus salas (una sola sede, la casa); se resalta también dentro de una sala,
   // un lote o una planta, que es donde vive el recorrido.
   { to: '/m/personal/cultivo', icon: 'bi-diagram-3',     label: 'Cultivo', match: ['/m/sede/', '/m/sala-m/', '/m/lote-m/', '/m/planta/', '/m/mnc/'] },
-  { to: '/m/personal/frascos', icon: 'bi-archive',       label: 'Frascos' },
+  { to: '/m/personal/stock',   icon: 'bi-archive',       label: 'Stock' },
   { to: '/m/personal/gastos',  icon: 'bi-receipt',       label: 'Gastos' },
 ] }
 
@@ -320,7 +320,7 @@ const fabActions = computed(() => {
   ]
   // Crear una SALA es decisión de infraestructura, no del que está en el pasillo.
   if (!esCultivador) {
-    acciones.push({ key: 'sala', label: 'Crear sala', icon: 'bi-grid-3x3-gap',
+    acciones.push({ key: 'sala', label: club.data?.personal ? 'Crear espacio' : 'Crear sala', icon: 'bi-grid-3x3-gap',
                     tint: 'var(--c-sky-100)', color: 'var(--c-sky-600)', onClick: abrirNuevaSala })
     acciones.push({ key: 'scan', label: 'Escanear QR', icon: 'bi-qr-code-scan',
                     tint: '#ede9fe', color: '#7c3aed', onClick: irEscanear })

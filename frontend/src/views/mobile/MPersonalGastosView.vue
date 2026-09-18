@@ -47,7 +47,7 @@
 
     <MobileSheet v-model="sheet" :title="g.form.id ? 'Corregir gasto' : 'Nuevo gasto'">
       <GastoForm :form="g.form" :categorias="g.categorias.value" :lotes="g.lotesAbiertos.value" :hoy="g.hoy"
-                 :error="g.error.value" :guardando="g.guardando.value"
+                 :error="g.error.value" :guardando="g.guardando.value" :crear-tipo="g.crearTipo"
                  @guardar="guardar" @cancelar="sheet = false" />
       <button v-if="g.form.id" type="button" class="mpg__borrar" :disabled="g.guardando.value" @click="borrar">Borrar este gasto</button>
     </MobileSheet>

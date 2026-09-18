@@ -67,7 +67,7 @@
     <!-- Tab: Parámetros de alerta -->
     <section v-if="tabActivo === 'alertas'" class="spc__section">
       <p class="spc__section-desc">
-        Controlá cuándo el sistema genera alertas automáticas. Estos valores aplican a todos los lotes de la organización.
+        Controlá cuándo el sistema genera alertas automáticas. {{ esPersonal ? 'Valen para todos tus lotes.' : 'Estos valores aplican a todos los lotes de la organización.' }}
       </p>
 
       <div v-if="loadingPrefs" class="spc__loading">Cargando…</div>
@@ -111,7 +111,8 @@
           </div>
         </fieldset>
 
-        <fieldset class="spc__fieldset">
+        <!-- La manicura la hace él: no hay a quién avisar ni a quién asignar. -->
+        <fieldset v-if="!esPersonal" class="spc__fieldset">
           <legend class="spc__legend">Post-cosecha → manicura</legend>
           <p class="spc__field-desc">
             Qué hacer con un lote cosechado que sigue esperando manicura. A los días indicados,
@@ -260,6 +261,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
+import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 import {
   listSetpointsFase, createSetpointFase, updateSetpointFase, deleteSetpointFase,
   getPreferences, updatePreferences, listUsers, listSedes,
@@ -273,6 +275,7 @@ const TABS = [
   { key: 'alertas',   label: 'Parámetros de alerta' },
 ]
 const tabActivo = ref('setpoints')
+const { esPersonal } = useUsoPersonal()
 
 const FASES_LABELS = {
   // El enraizado va PRIMERO: es la fase donde los setpoints más importan (humedad altísima, EC ~0,

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
+import { createPinia, setActivePinia } from 'pinia'
 
 // LA CAJA QUE QUEDÓ ABIERTA: el admin elige a qué hora quiere que le avisen.
 //
@@ -27,6 +28,8 @@ const NORTE  = { id: 11, nombre: 'Norte',  tipo: 'mixta' }
 const VIVERO = { id: 12, nombre: 'Vivero', tipo: 'produccion' }
 
 async function montar (opciones = {}) {
+  // La pantalla lee el store de la organización (para saber si es uso personal).
+  setActivePinia(createPinia())
   preferencias = { alertas_config: opciones.config || {} }
   sedes = opciones.sedes ?? [CENTRO, VIVERO]
   const w = mount(SetpointsConfigView)

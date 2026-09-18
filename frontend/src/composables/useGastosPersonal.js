@@ -6,7 +6,8 @@
 // y el escritorio dirían distinto del mismo gasto.
 import { ref, computed, reactive } from 'vue'
 import { listMovimientos, createMovimiento, updateMovimiento, deleteMovimiento,
-         listCategoriasContables, listLotes } from '../lib/api'
+         listCategoriasContables, createCategoriaContable, updateCategoriaContable,
+         listUnidadesNegocio, listLotes } from '../lib/api'
 import { hoyISO, toISO } from '../utils/dates.js'
 
 // Sectores que le aplican: cultivo y lo general. Con los de dispensario y buffet la lista se
@@ -16,7 +17,10 @@ const LOTES_ABIERTOS = ['enraizado', 'vegetativo', 'floracion', 'cosecha', 'en_m
 
 export function formVacio(categoriaId = '') {
   return { id: null, descripcion: '', monto_ars: null, categoria_contable_id: categoriaId,
-           fecha: hoyISO(), medio_pago: 'efectivo', lote_id: null }
+           fecha: hoyISO(), medio_pago: 'efectivo', lote_id: null,
+           // Lo de «más detalles»: opcional, pero lo que hace que un gasto sirva después
+           // (cuánto salió el litro, a quién se lo compró, con qué comprobante).
+           proveedor: '', cantidad: null, unidad: '', comprobante_tipo: '', comprobante_numero: '', notas: '' }
 }
 
 export function useGastosPersonal() {
@@ -88,7 +92,10 @@ export function useGastosPersonal() {
   function editar(g) {
     Object.assign(form, { id: g.id, descripcion: g.descripcion, monto_ars: Number(g.monto_ars),
                           categoria_contable_id: g.categoria_contable_id || '', fecha: g.fecha,
-                          medio_pago: g.medio_pago || 'efectivo', lote_id: g.lote?.id || null })
+                          medio_pago: g.medio_pago || 'efectivo', lote_id: g.lote?.id || null,
+                          proveedor: g.proveedor || '', cantidad: g.cantidad ?? null, unidad: g.unidad || '',
+                          comprobante_tipo: g.comprobante_tipo || '', comprobante_numero: g.comprobante_numero || '',
+                          notas: g.notas || '' })
     error.value = null
   }
 
@@ -99,6 +106,9 @@ export function useGastosPersonal() {
       tipo: 'egreso', descripcion: form.descripcion, monto_ars: form.monto_ars,
       categoria_contable_id: form.categoria_contable_id, fecha: form.fecha,
       medio_pago: form.medio_pago, lote_id: form.lote_id || null, pagado: true,
+      proveedor: form.proveedor || null, cantidad: form.cantidad || null, unidad: form.cantidad ? (form.unidad || null) : null,
+      comprobante_tipo: form.comprobante_tipo || null, comprobante_numero: form.comprobante_numero || null,
+      notas: form.notas || null,
     }
     try {
       if (form.id) await updateMovimiento(form.id, payload)
@@ -116,6 +126,31 @@ export function useGastosPersonal() {
     await Promise.all([cargar(), cargarAnio()])
   }
 
+  // ── Tipos de gasto ──
+  // Son las categorías contables de siempre, del sector Cultivo. El cultivador las nombra como
+  // quiere («Luz», «Nutrientes», «Carpa»): un tipo que no existe no se puede elegir, y el que
+  // no se puede elegir se anota como «Otro» y después no dice nada.
+  let sectorCultivoId = null
+  async function sectorCultivo() {
+    if (sectorCultivoId) return sectorCultivoId
+    const { data } = await listUnidadesNegocio()
+    sectorCultivoId = (data || []).find(u => u.tipo === 'cultivo')?.id || (data || [])[0]?.id || null
+    return sectorCultivoId
+  }
+  async function crearTipo(nombre) {
+    const { data } = await createCategoriaContable({ nombre: nombre.trim(), tipo: 'egreso', comportamiento: 'general', unidad_negocio_id: await sectorCultivo() })
+    await cargarCatalogo()
+    return data
+  }
+  async function renombrarTipo(cat, nombre) {
+    await updateCategoriaContable(cat.id, { nombre: nombre.trim() })
+    await cargarCatalogo()
+  }
+  async function activarTipo(cat, activa) {
+    await updateCategoriaContable(cat.id, { activa })
+    await cargarCatalogo()
+  }
+
   function ars(n) { return '$' + Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 }) }
   function fechaCorta(f) { return f ? new Date(f + 'T00:00:00').toLocaleDateString('es-AR', { day: 'numeric', month: 'short' }) : '' }
 
@@ -124,6 +159,7 @@ export function useGastosPersonal() {
     cargando, gastos, totalMes, totalAnio, categorias, lotes, lotesAbiertos,
     cargar, cargarAnio, cargarCatalogo, cargarTodo,
     form, guardando, error, nuevo, editar, guardar, borrar,
+    crearTipo, renombrarTipo, activarTipo,
     ars, fechaCorta,
   }
 }

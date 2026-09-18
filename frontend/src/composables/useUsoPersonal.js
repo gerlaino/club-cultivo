@@ -20,5 +20,12 @@ export function useUsoPersonal() {
     ? { de: 'de tu cultivo', la: 'tu cultivo', toda: 'todo tu cultivo', tu: 'tu cultivo' }
     : { de: 'de la organización', la: 'la organización', toda: 'toda la organización', tu: 'tu organización' }))
 
-  return { esPersonal, org }
+  // «Sala» es la palabra de una organización con cuartos numerados. El que cultiva en casa tiene
+  // una carpa o un espacio, y así se lo nombra (pedido de Germán, 18-sep-2026). Los identificadores
+  // (`Sala`, `sala_id`, rutas) no cambian: es texto visible, misma regla que Club → Organización.
+  const sala = computed(() => (esPersonal.value
+    ? { una: 'espacio de cultivo', unas: 'espacios de cultivo', Una: 'Espacio de cultivo', Unas: 'Espacios de cultivo', corta: 'espacio', cortas: 'espacios', Corta: 'Espacio', Cortas: 'Espacios' }
+    : { una: 'sala', unas: 'salas', Una: 'Sala', Unas: 'Salas', corta: 'sala', cortas: 'salas', Corta: 'Sala', Cortas: 'Salas' }))
+
+  return { esPersonal, org, sala }
 }
