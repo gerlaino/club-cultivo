@@ -5,14 +5,14 @@
       <p class="mpf__sub">Lo que cosechaste y cuánto queda.</p>
     </header>
 
-    <div v-if="cargando" class="mpf__loading"><i class="bi bi-arrow-repeat mpf__spin"></i> Cargando…</div>
+    <div v-if="f.cargando.value" class="mpf__loading"><i class="bi bi-arrow-repeat mpf__spin"></i> Cargando…</div>
 
     <template v-else>
       <!-- Lo que está entre la cosecha y el frasco. Pesar es lo que crea el stock. -->
-      <section v-if="porPesar.length" class="mpf__section">
+      <section v-if="f.porPesar.value.length" class="mpf__section">
         <h2 class="mpf__section-title">Por pesar</h2>
         <div class="mpf__list">
-          <RouterLink v-for="l in porPesar" :key="l.id"
+          <RouterLink v-for="l in f.porPesar.value" :key="l.id"
                       :to="l.estado === 'en_manicura' ? `/m/mnc/lotes/${l.id}` : `/m/lote-m/${l.id}`" class="mpf__card mpf__card--pesar">
             <span class="mpf__card-ico"><i class="bi" :class="icono(l.estado)"></i></span>
             <span class="mpf__card-txt">
@@ -26,13 +26,13 @@
 
       <section class="mpf__section">
         <h2 class="mpf__section-title">En el frasco</h2>
-        <div v-if="!frascos.length" class="mpf__empty">
+        <div v-if="!f.frascos.value.length" class="mpf__empty">
           <i class="bi bi-archive"></i>
           <p class="mpf__empty-title">Todavía no hay nada enfrascado</p>
           <p class="mpf__empty-hint">Cuando coseches y peses un lote, aparece acá con sus gramos.</p>
         </div>
         <div v-else class="mpf__list">
-          <div v-for="s in frascos" :key="s.id" class="mpf__card">
+          <div v-for="s in f.frascos.value" :key="s.id" class="mpf__card">
             <span class="mpf__card-ico"><i class="bi bi-archive"></i></span>
             <span class="mpf__card-txt">
               <span class="mpf__card-nombre">{{ s.genetica_nombre || s.lote?.genetica?.nombre || s.nombre_producto || s.numero_lote_producto }}</span>
@@ -47,10 +47,10 @@
         </div>
       </section>
 
-      <section v-if="agotados.length" class="mpf__section">
+      <section v-if="f.agotados.value.length" class="mpf__section">
         <h2 class="mpf__section-title">Terminados</h2>
         <div class="mpf__list">
-          <div v-for="s in agotados" :key="s.id" class="mpf__card mpf__card--off">
+          <div v-for="s in f.agotados.value.slice(0, 10)" :key="s.id" class="mpf__card mpf__card--off">
             <span class="mpf__card-ico"><i class="bi bi-archive"></i></span>
             <span class="mpf__card-txt">
               <span class="mpf__card-nombre">{{ s.genetica_nombre || s.lote?.genetica?.nombre || s.numero_lote_producto }}</span>
@@ -62,62 +62,24 @@
     </template>
 
     <!-- Consumo propio: cuánto sacaste del frasco. -->
-    <MobileSheet v-model="sheet" :title="consumo.stock ? `Consumí de ${consumo.stock.genetica_nombre || consumo.stock.numero_lote_producto || 'este frasco'}` : ''">
-      <form v-if="consumo.stock" class="mpf__form" @submit.prevent="confirmarConsumo">
-        <p class="mpf__form-hint">Quedan <b>{{ fmt(consumo.stock.cantidad) }} {{ consumo.stock.unidad || 'g' }}</b>.</p>
-        <label class="mpf__field">
-          <span class="mpf__label">Cuánto</span>
-          <span class="mpf__input-row">
-            <input v-model.number="consumo.cantidad" type="number" inputmode="decimal" step="0.1" min="0.1"
-                   :max="consumo.stock.cantidad" class="mpf__input mpf__input--num" placeholder="0" autofocus />
-            <span class="mpf__input-u">{{ consumo.stock.unidad || 'g' }}</span>
-          </span>
-        </label>
-        <label class="mpf__field">
-          <span class="mpf__label">Cuándo</span>
-          <input v-model="consumo.fecha" type="date" class="mpf__input" :max="hoy" />
-        </label>
-        <label class="mpf__field">
-          <span class="mpf__label">Nota <span class="mpf__opt">(opcional)</span></span>
-          <input v-model.trim="consumo.nota" type="text" class="mpf__input" placeholder="Para dormir, con amigos…" maxlength="120" />
-        </label>
-        <p v-if="consumo.error" class="mpf__error">{{ consumo.error }}</p>
-        <p class="mpf__resumen" v-if="consumo.cantidad > 0">
-          Salen {{ fmt(consumo.cantidad) }} {{ consumo.stock.unidad || 'g' }}; quedan {{ fmt(Math.max(0, consumo.stock.cantidad - consumo.cantidad)) }}.
-        </p>
-        <div class="mpf__form-actions">
-          <button type="button" class="mpf__btn mpf__btn--ghost" @click="sheet = false">Cancelar</button>
-          <button type="submit" class="mpf__btn mpf__btn--primary" :disabled="!(consumo.cantidad > 0) || consumo.guardando">
-            {{ consumo.guardando ? 'Guardando…' : 'Anotar' }}
-          </button>
-        </div>
-      </form>
+    <MobileSheet v-model="sheet" :title="f.consumo.stock ? `Consumí de ${f.consumo.stock.genetica_nombre || f.consumo.stock.numero_lote_producto || 'este frasco'}` : ''">
+      <ConsumoForm v-if="f.consumo.stock" :consumo="f.consumo" :hoy="f.hoy" @guardar="confirmarConsumo" @cancelar="sheet = false" />
     </MobileSheet>
   </div>
 </template>
 
 <script setup>
-// Los frascos del cultivador de casa: lo cosechado, cuánto queda y lo que sacó para él.
-// El stock es el mismo `Stock` de una organización; lo distinto es la salida —consumo propio,
-// que en una organización no existe porque lo trazable sale sólo por dispensación.
-import { ref, computed, reactive, onMounted } from 'vue'
-// `historial`: la lista completa. El listado por defecto trae sólo lo asignado a una sede, y un
-// frasco recién pesado puede estar todavía sin sede: acá tiene que verse igual.
-import { listStocksHistorial, listLotes, consumirStock } from '../../lib/api'
+// Los frascos del cultivador de casa, en el teléfono. El estado vive en `useFrascosPersonal`
+// (compartido con el escritorio); acá sólo la presentación.
+import { ref, onMounted } from 'vue'
+import { useFrascosPersonal, formaLabel, fmt } from '../../composables/useFrascosPersonal.js'
 import { useToast } from '../../composables/useToast.js'
-import { hoyISO } from '../../utils/dates.js'
 import { ESTADO_META } from '../../lib/loteHelpers.js'
 import MobileSheet from '../../components/mobile/MobileSheet.vue'
+import ConsumoForm from '../../components/personal/ConsumoForm.vue'
 
-const toast    = useToast()
-const cargando = ref(true)
-const stocks   = ref([])
-const lotes    = ref([])
-const hoy      = hoyISO()
-
-const frascos  = computed(() => stocks.value.filter(s => Number(s.cantidad) > 0 && s.estado !== 'agotado'))
-const agotados = computed(() => stocks.value.filter(s => !(Number(s.cantidad) > 0) || s.estado === 'agotado').slice(0, 10))
-const porPesar = computed(() => lotes.value.filter(l => ['cosecha', 'en_manicura'].includes(l.estado)))
+const f     = useFrascosPersonal()
+const toast = useToast()
 
 function meta(estado) { return ESTADO_META[estado] || { label: estado } }
 // Íconos por estado del lote (Bootstrap Icons, no emoji: el emoji depende de la fuente del
@@ -128,41 +90,17 @@ const ICONO_ESTADO = {
 }
 function icono(estado) { return ICONO_ESTADO[estado] || 'bi-box-seam' }
 
-function fmt(n) { const v = Number(n || 0); return Number.isInteger(v) ? String(v) : v.toFixed(1) }
-const FORMAS = { flor: 'Flor', flor_seca: 'Flor seca', preroll: 'Prerolls', aceite: 'Aceite', hash: 'Hash', prensado: 'Prensado', comestible: 'Comestible', capsula: 'Cápsulas' }
-function formaLabel(f) { return FORMAS[f] || f }
-
-// ── Consumo ──
-const sheet   = ref(false)
-const consumo = reactive({ stock: null, cantidad: null, fecha: hoy, nota: '', error: null, guardando: false })
-
-function abrirConsumo(s) {
-  Object.assign(consumo, { stock: s, cantidad: null, fecha: hoy, nota: '', error: null, guardando: false })
-  sheet.value = true
-}
-
+const sheet = ref(false)
+function abrirConsumo(s) { f.prepararConsumo(s); sheet.value = true }
 async function confirmarConsumo() {
-  if (!(consumo.cantidad > 0)) return
-  consumo.guardando = true
-  consumo.error = null
-  try {
-    const { data } = await consumirStock(consumo.stock.id, { cantidad: consumo.cantidad, fecha: consumo.fecha, nota: consumo.nota })
-    const i = stocks.value.findIndex(s => s.id === data.id)
-    if (i >= 0) stocks.value[i] = data
+  const data = await f.confirmarConsumo()
+  if (data) {
     sheet.value = false
-    toast.success(`Anotado: ${fmt(consumo.cantidad)} ${data.unidad || 'g'}`)
-  } catch (e) {
-    consumo.error = e?.response?.data?.error || 'No se pudo anotar'
-  } finally { consumo.guardando = false }
+    toast.success(`Anotado: ${fmt(f.consumo.cantidad)} ${data.unidad || 'g'}`)
+  }
 }
 
-onMounted(async () => {
-  try {
-    const [st, lt] = await Promise.allSettled([listStocksHistorial(), listLotes()])
-    if (st.status === 'fulfilled') stocks.value = st.value.data || []
-    if (lt.status === 'fulfilled') lotes.value  = lt.value.data || []
-  } finally { cargando.value = false }
-})
+onMounted(() => f.cargar())
 </script>
 
 <style scoped>
@@ -202,22 +140,4 @@ onMounted(async () => {
 .mpf__empty-title { margin: .3rem 0 0; font-size: .92rem; font-weight: 700; color: var(--c-slate-900); }
 .mpf__empty-hint { margin: 0; font-size: .8rem; }
 
-/* Sheet */
-.mpf__form { display: flex; flex-direction: column; gap: .8rem; padding-bottom: .5rem; }
-.mpf__form-hint { margin: 0; font-size: .85rem; color: var(--c-slate-600); }
-.mpf__field { display: flex; flex-direction: column; gap: .3rem; }
-.mpf__label { font-size: .76rem; font-weight: 700; color: var(--c-slate-600); text-transform: uppercase; letter-spacing: .04em; }
-.mpf__opt { font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--c-slate-400); }
-.mpf__input { width: 100%; padding: .7rem .8rem; border: 1.5px solid var(--c-slate-200); border-radius: 10px; font: inherit; font-size: 1rem; background: #fff; }
-.mpf__input:focus { outline: none; border-color: var(--c-leaf-500, #5A8A72); }
-.mpf__input-row { display: flex; align-items: center; gap: .5rem; }
-.mpf__input--num { font-size: 1.6rem; font-weight: 700; text-align: right; }
-.mpf__input-u { font-size: 1rem; font-weight: 600; color: var(--c-slate-500); }
-.mpf__error { margin: 0; font-size: .82rem; color: #b91c1c; }
-.mpf__resumen { margin: 0; font-size: .85rem; color: var(--c-slate-700); }
-.mpf__form-actions { display: flex; gap: .5rem; }
-.mpf__btn { flex: 1; padding: .8rem; border-radius: 12px; font-size: .95rem; font-weight: 700; border: none; }
-.mpf__btn--ghost { background: var(--c-slate-100); color: var(--c-slate-700); }
-.mpf__btn--primary { background: var(--c-leaf-800, #1A3D2E); color: #fff; }
-.mpf__btn--primary:disabled { opacity: .5; }
 </style>

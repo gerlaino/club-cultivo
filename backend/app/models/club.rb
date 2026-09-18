@@ -170,10 +170,11 @@ class Club < ApplicationRecord
   # módulos viejos guardados.
   MODULOS_PERSONAL = %w[cultivo iot ia chatbot].freeze
 
-  # Con qué nace: Cultivo y el ambiente. El IoT va incluido en el precio del plan (ver
-  # `Precios`) porque es el gancho del producto para el que cultiva en casa: un sensor de
-  # $10.000 y la app le dice cómo viene el VPD. La IA se contrata aparte, como en los otros.
-  FEATURES_PERSONAL = { 'cultivo' => true, 'iot' => true }.freeze
+  # Con qué nace: Cultivo, el ambiente y la IA con su chatbot — TODO adentro del precio (ver
+  # `Precios`), porque los tres son el gancho del producto para el que cultiva en casa: un
+  # sensor de $10.000 y la app le dice cómo viene el VPD; una pregunta y le contesta cuándo
+  # pasar a floración con SUS datos delante (decisión de Germán, 18-sep-2026).
+  FEATURES_PERSONAL = { 'cultivo' => true, 'iot' => true, 'ia' => true, 'chatbot' => true }.freeze
 
   # Deja en `features` sólo lo que el uso personal puede tener. Apagar siempre se acepta.
   def self.acotar_a_personal(features)

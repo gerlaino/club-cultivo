@@ -22,11 +22,11 @@
           :to="t.to" class="atb__tab"
           :class="{ 'atb__tab--active': isTabActive(t) }"
         >
-          {{ t.label }}
+          {{ labelDe(t, club.data) }}
           <span v-if="t.badge && badgeFor(t.badge)" class="atb__tab-badge">{{ badgeFor(t.badge) }}</span>
         </RouterLink>
       </nav>
-      <span v-else class="atb__page-title">{{ activeGroup.label }}</span>
+      <span v-else class="atb__page-title">{{ labelDe(activeGroup, club.data) }}</span>
 
       <!-- Right actions -->
       <div class="atb__right">
@@ -117,7 +117,7 @@ import { useClubStore } from '../../stores/club.js'
 import { useAmbienteStore } from '../../stores/ambiente.js'
 import { useAlertasBell } from '../../composables/useAlertasBell.js'
 import { useAlertasInternas } from '../../composables/useAlertasInternas.js'
-import { detectGroup, entradaVisible, useNavContext } from '../../composables/useNavContext.js'
+import { detectGroup, entradaVisible, labelDe, useNavContext } from '../../composables/useNavContext.js'
 import DsDropdown         from '../../design-system/components/Dropdown.vue'
 import DsAvatar           from '../../design-system/components/Avatar.vue'
 import { Bell, BellRing, BellOff, Menu, HelpCircle, Sparkles } from 'lucide-vue-next'

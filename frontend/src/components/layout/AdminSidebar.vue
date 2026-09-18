@@ -13,10 +13,10 @@
         v-for="g in visibleGroups" :key="g.key"
         :to="g.to" class="asb__link"
         :class="{ 'asb__link--active': activeKey === g.key }"
-        :title="collapsed ? g.label : undefined"
+        :title="collapsed ? labelDe(g, club.data) : undefined"
       >
         <component :is="ICONS[g.key]" :size="18" :stroke-width="1.75" class="asb__link-ico" />
-        <span class="asb__label">{{ g.label }}</span>
+        <span class="asb__label">{{ labelDe(g, club.data) }}</span>
         <span v-if="groupBadge(g)" class="asb__badge">{{ groupBadge(g) }}</span>
       </RouterLink>
     </nav>
@@ -37,7 +37,7 @@ import {
   CheckSquare, BarChart3, Settings, PanelLeftClose, PanelLeftOpen, Wine, Building2, Warehouse,
   Calculator, UserCog, Store,
 } from 'lucide-vue-next'
-import { NAV_GROUPS, detectGroup, entradaVisible, useNavContext } from '../../composables/useNavContext.js'
+import { NAV_GROUPS, detectGroup, entradaVisible, labelDe, useNavContext } from '../../composables/useNavContext.js'
 import { useClubStore } from '../../stores/club.js'
 
 const route = useRoute()

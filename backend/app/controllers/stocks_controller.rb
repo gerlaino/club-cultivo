@@ -525,6 +525,9 @@ class StocksController < ApplicationController
         # corrige la fecha de una dispensa ya cargada), y la pantalla mostraba sólo `created_at`
         # — o sea, el día en que se tocó el sistema. Nula en todo lo que no es una dispensa.
         fecha_dispensacion: m.dispensacion&.fecha_dispensacion,
+        # Y la del hecho para el resto (cierre, consumo): `stock_movimientos.fecha`, que puede no
+        # ser la de carga. Nula en los movimientos viejos que no la tienen.
+        fecha:           m.fecha,
       }
     }
   end

@@ -109,7 +109,8 @@ const routes = [
   {
     path: "/contabilidad",
     name: "contabilidad",
-    component: () => import("../views/ContabilidadView.vue"),
+    // En uso personal es «Gastos» (ver ContabilidadDispatch).
+    component: () => import("../views/ContabilidadDispatch.vue"),
     meta: { requiresAuth: true },
     beforeEnter: requiresPermission("movimientos_contables", "index"),
   },
@@ -585,7 +586,8 @@ const routes = [
     path: '/admin/stock',
     alias: '/admin/stocks/pendientes',
     name: 'admin-stock',
-    component: () => import('../views/admin/AdminStocksPendientesView.vue'),
+    // En uso personal es «Frascos» (ver StockDispatch).
+    component: () => import('../views/StockDispatch.vue'),
     meta: { requiresAuth: true },
     beforeEnter: (to, from, next) => {
       const auth = useAuthStore()
@@ -1223,7 +1225,7 @@ const FEATURE_POR_PREFIJO = [
 
 // Lo que NO EXISTE en uso personal. El menú ya lo esconde, pero la URL sigue entrando: /usuarios
 // abriría un formulario que el backend rechaza y /sedes le hablaría de algo que no tiene.
-const SOLO_ORGANIZACION_PREFIJOS = ['/sedes', '/usuarios']
+const SOLO_ORGANIZACION_PREFIJOS = ['/sedes', '/usuarios', '/documentos', '/insumos']
 
 export function soloDeOrganizacion(path) {
   return SOLO_ORGANIZACION_PREFIJOS.some(p => path === p || path.startsWith(p + '/'))

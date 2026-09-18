@@ -56,15 +56,19 @@ export const NAV_GROUPS = [
   {
     key: 'produccion', label: 'Producción', to: '/admin/stock', feature: 'cultivo',
     tabs: [
-      { to: '/admin/stock', label: 'Stock' },
+      // En uso personal la pantalla es «Frascos» (ver StockDispatch): sin sedes ni mostrador.
+      { to: '/admin/stock', label: 'Stock', labelPersonal: 'Frascos' },
       { to: '/admin/cosechado', label: 'Cosecha' },
-      { to: '/admin/pesajes-manicura', label: 'Manicura', badge: 'aprob' },
+      // La cola de pesajes que OTROS mandan a confirmar: en uso personal no hay otros.
+      { to: '/admin/pesajes-manicura', label: 'Manicura', badge: 'aprob', soloOrganizacion: true },
     ],
   },
   {
     // Depósito — sección propia: es transversal (insumos de cultivo, generales y salón) y se
     // usa a diario, así que va de primer nivel en vez de enterrado como sub-pestaña.
-    key: 'deposito', label: 'Depósito', to: '/insumos', tabs: [],
+    // En uso personal no hay depósito: lo que compra es un gasto y punto (sectores, stock de
+    // insumos y «Comprar → Nuevo movimiento» son de una organización con más de un cuarto).
+    key: 'deposito', label: 'Depósito', to: '/insumos', tabs: [], soloOrganizacion: true,
   },
   {
     // Contabilidad es de PRIMER NIVEL y sin bandera: toda organización tiene gastos, contrate lo
@@ -72,7 +76,8 @@ export const NAV_GROUPS = [
     // dispensa, así que una organización de sólo Cultivo no la veía en el menú… pero llegaba
     // igual desde Depósito ("＋ Comprar"), que es transversal. El resultado era una sección que
     // existe, funciona y está escondida — y encima accesible por una puerta lateral.
-    key: 'contabilidad', label: 'Contabilidad', to: '/contabilidad', tabs: [],
+    // …y en uso personal se llama «Gastos», que es lo único que hay adentro (ContabilidadDispatch).
+    key: 'contabilidad', label: 'Contabilidad', labelPersonal: 'Gastos', to: '/contabilidad', tabs: [],
   },
   {
     // Reservas y cuenta corriente sí son de la suite de dispensa: una organización de sólo
@@ -108,7 +113,8 @@ export const NAV_GROUPS = [
       // el que entra es el admin del club, no un auditor.
       { to: '/auditor', label: 'Informes' },
       { to: '/ariccame', label: 'ARICCAME', feature: 'ariccame' },
-      { to: '/documentos', label: 'Documentos' },
+      // Documentos legales de la entidad: al cultivador de casa no le aplican.
+      { to: '/documentos', label: 'Documentos', soloOrganizacion: true },
     ],
   },
   {
@@ -140,6 +146,12 @@ export function entradaVisible(entrada, clubData) {
   if (entrada.feature && clubData?.features?.[entrada.feature] !== true) return false
   if (entrada.soloOrganizacion && clubData?.personal) return false
   return true
+}
+
+// Cómo se llama esta entrada para ESTA organización: algunas cambian de nombre en uso personal
+// («Contabilidad» → «Gastos») porque adentro hay otra pantalla.
+export function labelDe(entrada, clubData) {
+  return (clubData?.personal && entrada.labelPersonal) || entrada.label
 }
 
 // Grupo activo según la ruta: el tab cuyo `to` es el prefijo más largo del path gana
