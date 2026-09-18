@@ -55,6 +55,11 @@ RSpec.describe 'Uso personal', type: :request do
         expect(club.sedes.first.nombre).to eq('Mi cultivo')
         expect(club.sedes.first.tipo).to eq('produccion')
         expect(club.depositos.count).to be_positive
+        # Y con qué anotar el primer gasto desde el teléfono: el catálogo corto, sin lo de una
+        # organización (sueldos, aportes de socios).
+        nombres = club.categorias_contables.pluck(:nombre)
+        expect(nombres).to include('Sustrato', 'Electricidad', 'Equipamiento')
+        expect(nombres).not_to include('Sueldos', 'Aportes de socios')
       end
     end
 

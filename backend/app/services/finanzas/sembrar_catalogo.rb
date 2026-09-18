@@ -24,10 +24,13 @@ module Finanzas
     # ocupa el selector con cosas que no usan y esconde las suyas.
     #
     # `con_arbol` se conserva sólo para los specs que necesitan un catálogo de ejemplo.
+    # `con_arbol: true` siembra el catálogo de una organización; `:personal`, el corto del
+    # cultivador de casa.
     def call(con_arbol: false)
       ActsAsTenant.with_tenant(@club) do
         @unidades = sembrar_unidades
-        sembrar_arbol if con_arbol
+        sembrar_arbol          if con_arbol == true
+        sembrar_arbol_personal if con_arbol == :personal
       end
       true
     end
@@ -110,6 +113,24 @@ module Finanzas
         cat('Mercadería buffet', 'egreso',  @unidades['bar'], comportamiento: 'mercaderia')
         cat('Venta buffet',      'ingreso', @unidades['bar'])
       end
+    end
+
+    # El catálogo del USO PERSONAL: lo que compra alguien que cultiva en casa, y nada más. Sin
+    # sueldos, alquiler ni aportes de socios: cargar es ELEGIR, y una lista de veinte cosas que
+    # nunca va a comprar es un peaje en cada gasto. Se siembra con el alta, para que el primer
+    # gasto desde el teléfono tenga de dónde elegir sin pasar por el catálogo del escritorio.
+    def sembrar_arbol_personal
+      cultivo = @unidades['cultivo']
+      admin   = @unidades['administracion']
+      otro    = @unidades['otro']
+
+      %w[Fertilizante Sustrato Macetas Semillas].each { |n| cat(n, 'egreso', cultivo, comportamiento: 'insumo') }
+      cat('Sanidad vegetal', 'egreso', cultivo, comportamiento: 'insumo')
+      cat('Electricidad',    'egreso', cultivo, clave: 'electricidad')
+      cat('Agua',            'egreso', cultivo, clave: 'agua')
+      cat('Equipamiento',    'egreso', cultivo)                          # luces, carpa, extractor
+      cat('Mantenimiento',   'egreso', admin, clave: 'mantenimiento')
+      cat('Otro',            'egreso', otro,  clave: 'otro')
     end
 
     # Categoría de primer (y único) nivel. Si trae `clave`, reutiliza la fila existente —así

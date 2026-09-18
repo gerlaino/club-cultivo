@@ -6,8 +6,10 @@ import Avatar from '../components/Avatar.vue'
 import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import { usePlan } from '../composables/usePlan.js'
+import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 
 const club  = useClubStore()
+const { esPersonal } = useUsoPersonal()
 
 // El plan real: dos planes (Básico / Total). Sale de `GET /plan`, que ya existía.
 const { fetchPlan, planLabel, esTrial, limites, uso, usuariosPorRol } = usePlan()
@@ -176,8 +178,8 @@ function showToast(type, msg) {
     <!-- Header sticky -->
     <div class="pv__header">
       <div>
-        <h1 class="pv__title">Preferencias de la organización</h1>
-        <p class="pv__sub">Identidad, contacto, domicilio legal y datos regulatorios</p>
+        <h1 class="pv__title">{{ esPersonal ? 'Preferencias' : 'Preferencias de la organización' }}</h1>
+        <p class="pv__sub">{{ esPersonal ? 'Cómo se llama tu cultivo, tu contacto y tu zona horaria' : 'Identidad, contacto, domicilio legal y datos regulatorios' }}</p>
       </div>
       <button class="pv__btn-save" :disabled="club.saving || pristine" @click="save">
         <DsSpinner v-if="club.saving" :size="15" />
@@ -202,7 +204,7 @@ function showToast(type, msg) {
         <div class="pv__card">
           <div class="pv__card-header">
             <div class="pv__card-icon" style="background:rgba(124,58,237,.1);color:#7c3aed"><i class="bi bi-palette"></i></div>
-            <div><div class="pv__card-title">Identidad visual</div><div class="pv__card-sub">Logo y nombre de la organización</div></div>
+            <div><div class="pv__card-title">Identidad visual</div><div class="pv__card-sub">{{ esPersonal ? 'Logo y nombre de tu cultivo' : 'Logo y nombre de la organización' }}</div></div>
           </div>
           <div class="pv__card-body">
             <div class="pv__logo-wrap">
@@ -224,7 +226,7 @@ function showToast(type, msg) {
             </div>
 
             <div class="pv__field">
-              <label class="pv__label">Nombre de la organización <span class="pv__req">*</span></label>
+              <label class="pv__label">{{ esPersonal ? 'Nombre de tu cultivo' : 'Nombre de la organización' }} <span class="pv__req">*</span></label>
               <input class="pv__input" :class="{ 'pv__input--err': errors.name }" v-model.trim="form.name" @input="onChange" placeholder="Ej: Verde Esperanza" />
               <span v-if="errors.name" class="pv__err">{{ errors.name }}</span>
             </div>
@@ -235,7 +237,10 @@ function showToast(type, msg) {
               <span class="pv__hint">Usado en documentos oficiales y trazabilidad REPROCANN</span>
             </div>
 
-            <div class="pv__field">
+            <!-- El tipo de organización, el domicilio legal y los datos regulatorios son de una
+                 ENTIDAD que presenta informes. El cultivador de casa no tiene ninguna de las tres
+                 cosas, y pedírselas es hablarle de otro. -->
+            <div v-if="!esPersonal" class="pv__field">
               <label class="pv__label">
                 Tipo de organización
                 <span v-if="!form.tipo_organizacion" class="pv__falta">Falta completar</span>
@@ -303,7 +308,7 @@ function showToast(type, msg) {
         <div class="pv__card">
           <div class="pv__card-header">
             <div class="pv__card-icon" style="background:rgba(3,105,161,.1);color:#0369a1"><i class="bi bi-envelope"></i></div>
-            <div><div class="pv__card-title">Contacto</div><div class="pv__card-sub">Datos visibles para los socios de la organización</div></div>
+            <div><div class="pv__card-title">Contacto</div><div class="pv__card-sub">{{ esPersonal ? 'Tu mail y tu teléfono' : 'Datos visibles para los socios de la organización' }}</div></div>
           </div>
           <div class="pv__card-body">
             <div class="pv__grid">
@@ -331,7 +336,7 @@ function showToast(type, msg) {
         </div>
 
         <!-- Domicilio -->
-        <div class="pv__card pv__card--mt">
+        <div v-if="!esPersonal" class="pv__card pv__card--mt">
           <div class="pv__card-header">
             <div class="pv__card-icon" style="background:rgba(21,128,61,.1);color:#15803d"><i class="bi bi-geo-alt"></i></div>
             <div><div class="pv__card-title">Domicilio legal</div><div class="pv__card-sub">Requerido para informes REPROCANN y trazabilidad</div></div>
@@ -355,7 +360,7 @@ function showToast(type, msg) {
         </div>
 
         <!-- Datos legales -->
-        <div class="pv__card pv__card--mt">
+        <div v-if="!esPersonal" class="pv__card pv__card--mt">
           <div class="pv__card-header">
             <div class="pv__card-icon" style="background:rgba(180,83,9,.1);color:#b45309"><i class="bi bi-shield-check"></i></div>
             <div><div class="pv__card-title">Datos legales y regulatorios</div><div class="pv__card-sub">Para el informe semestral REPROCANN — todos opcionales</div></div>

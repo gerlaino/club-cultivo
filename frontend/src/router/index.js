@@ -981,6 +981,10 @@ const routes = [
       // Roles sin shell mobile (dispensador, medico, etc.) van a su home desktop.
       { path: '', redirect: () => {
           const role = useAuthStore().user?.role
+          // Uso personal: el admin tiene su propio inicio. `club.data` puede no haber llegado
+          // todavía en el primer arranque; en ese caso cae al home de admin, que en personal
+          // redirige solo (ver MAdminHomeView).
+          if (role === 'admin' && useClubStore().data?.personal) return '/m/personal/hoy'
           const homes = {
             admin:      '/m/admin/home',
             supervisor: '/m/admin/home', // supervisor comparte rutas mobile de admin
@@ -1037,6 +1041,12 @@ const routes = [
 
       // ── Admin / Supervisor ──
       { path: 'admin/home',    component: () => import('../views/mobile/MAdminHomeView.vue') },
+
+      // ── Uso personal (el admin del plan personal) ──
+      { path: 'personal/hoy',     component: () => import('../views/mobile/MPersonalHomeView.vue') },
+      { path: 'personal/cultivo', component: () => import('../views/mobile/MPersonalCultivoView.vue') },
+      { path: 'personal/frascos', component: () => import('../views/mobile/MPersonalFrascosView.vue') },
+      { path: 'personal/gastos',  component: () => import('../views/mobile/MPersonalGastosView.vue') },
       { path: 'admin/sedes',   component: () => import('../views/mobile/MSedesView.vue') },
       { path: 'admin/tareas',  component: () => import('../views/mobile/MTareasView.vue') },
       { path: 'admin/aprobar', component: () => import('../views/mobile/MAdminAprobacionView.vue') },
@@ -1211,6 +1221,14 @@ const FEATURE_POR_PREFIJO = [
   ['/configuracion/portal', 'vista_paciente'],
 ]
 
+// Lo que NO EXISTE en uso personal. El menú ya lo esconde, pero la URL sigue entrando: /usuarios
+// abriría un formulario que el backend rechaza y /sedes le hablaría de algo que no tiene.
+const SOLO_ORGANIZACION_PREFIJOS = ['/sedes', '/usuarios']
+
+export function soloDeOrganizacion(path) {
+  return SOLO_ORGANIZACION_PREFIJOS.some(p => path === p || path.startsWith(p + '/'))
+}
+
 const MODULO_LABEL = {
   cultivo: 'La suite de Cultivo', produccion_dispensa: 'La suite de Producción y dispensa',
   bar: 'El Buffet', eventos: 'Eventos', delivery: 'Delivery', iot: 'Ambiente / IoT',
@@ -1369,6 +1387,17 @@ router.beforeEach(async (to) => {
       )
       return ROLE_HOME[role] || '/'
     }
+  }
+
+  // Uso personal: la cuenta es la persona y la sede es su casa. Sin cartel: no es un módulo
+  // que le falte, es una pantalla que en su caso no significa nada.
+  if (auth.isAuthenticated && !to.meta.public && soloDeOrganizacion(to.path)) {
+    const club = useClubStore()
+    // Acá SÍ se espera a las preferencias: escribir /usuarios a mano es una carga en frío, y
+    // sin esto la regla pasaba de largo justo en el único caso en que hace falta. Sólo en
+    // estas dos rutas, y con el error tragado: si no llegan, se deja pasar y el backend decide.
+    if (!club.data) await club.fetch().catch(() => {})
+    if (club.data?.personal) return ROLE_HOME[role] || '/'
   }
 
   return true;

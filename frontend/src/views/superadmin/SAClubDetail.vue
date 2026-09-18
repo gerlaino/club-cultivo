@@ -275,8 +275,10 @@ function formatDateTime(f) {
 // Dos planes: el plan dice CUÁNTO, nunca QUÉ. Los límites salen del catálogo del backend —
 // duplicarlos acá era garantía de que la pantalla dijera un número y el sistema aplicara otro.
 const PLAN_META = {
-  basico: { label: 'Básico', color: '#15803d', bg: '#dcfce7' },
-  total:  { label: 'Total',  color: '#7c3aed', bg: '#ede9fe' },
+  basico:   { label: 'Básico',       color: '#15803d', bg: '#dcfce7' },
+  total:    { label: 'Total',        color: '#7c3aed', bg: '#ede9fe' },
+  // El cultivador de casa: no es «una organización chica», y la ficha lo dice desde arriba.
+  personal: { label: 'Uso personal', color: '#3f6212', bg: '#ecfccb' },
 }
 const PLANES = ref([])
 function planMeta(p) { return PLAN_META[p] || PLAN_META.basico }

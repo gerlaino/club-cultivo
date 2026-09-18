@@ -28,10 +28,12 @@ const fecha = computed(() => {
 })
 
 const texto = computed(() => {
-  if (dias.value < 0)   return `El plan de la organización venció el ${fecha.value}. La app sigue andando: hablá con Cultivo Espacial para renovarlo.`
-  if (dias.value === 0) return `El plan de la organización vence hoy. Hablá con Cultivo Espacial para renovarlo.`
-  if (dias.value === 1) return `El plan de la organización vence mañana (${fecha.value}). Hablá con Cultivo Espacial para renovarlo.`
-  return `El plan de la organización vence el ${fecha.value}, en ${dias.value} días. Hablá con Cultivo Espacial para renovarlo.`
+  // Al cultivador de casa el plan es suyo, no «de la organización».
+  const quien = planData.value?.personal ? 'Tu plan' : 'El plan de la organización'
+  if (dias.value < 0)   return `${quien} venció el ${fecha.value}. La app sigue andando: hablá con Cultivo Espacial para renovarlo.`
+  if (dias.value === 0) return `${quien} vence hoy. Hablá con Cultivo Espacial para renovarlo.`
+  if (dias.value === 1) return `${quien} vence mañana (${fecha.value}). Hablá con Cultivo Espacial para renovarlo.`
+  return `${quien} vence el ${fecha.value}, en ${dias.value} días. Hablá con Cultivo Espacial para renovarlo.`
 })
 </script>
 

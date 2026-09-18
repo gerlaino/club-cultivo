@@ -5,7 +5,7 @@
     <div class="tv__header">
       <div class="tv__header-left">
         <h1 class="tv__title">Tareas</h1>
-        <p class="tv__desc">Asignación y seguimiento de tareas operativas de la organización</p>
+        <p class="tv__desc">{{ esPersonal ? 'Lo que toca hacer en tu cultivo' : 'Asignación y seguimiento de tareas operativas de la organización' }}</p>
         <p class="tv__sub">{{ fechaHoy }} · {{ saludo }}</p>
       </div>
       <div class="tv__header-right">
@@ -307,6 +307,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 import { logger } from '../utils/logger.js'
 import { useAuthStore } from '../stores/auth'
 import { useTareasStore } from '../stores/tareas'
@@ -319,6 +320,7 @@ import DsSpinner from '../design-system/components/Spinner.vue'
 import { useConfirm } from '../composables/useConfirm.js'
 import EmptyState from '../components/ui/EmptyState.vue'
 import { formatFechaLarga } from '../utils/fecha.js'
+const { esPersonal } = useUsoPersonal()
 
 const authStore   = useAuthStore()
 const tareasStore = useTareasStore()

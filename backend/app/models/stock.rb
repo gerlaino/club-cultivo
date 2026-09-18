@@ -330,6 +330,24 @@ class Stock < ApplicationRecord
     end
   end
 
+  # Consumo propio: el cultivador de casa saca del frasco para él. Baja el stock, deja el
+  # movimiento con fecha (cuándo lo consumió, no cuándo lo anotó) y si el frasco queda en cero
+  # se agota, con lo que el lote se finaliza solo como con cualquier otra salida.
+  def consumir!(cantidad:, usuario:, fecha: Time.zone.today, nota: nil)
+    cantidad = cantidad.to_d
+    raise ArgumentError, 'La cantidad tiene que ser mayor a cero' if cantidad <= 0
+    raise ArgumentError, "Sólo quedan #{self.cantidad.to_f} #{unidad} de #{etiqueta}" if cantidad > self.cantidad.to_d
+
+    transaction do
+      stock_movimientos.create!(tipo: 'consumo', gramos: -cantidad, usuario: usuario, fecha: fecha,
+                                notas: nota.presence || 'Consumo propio')
+      self.usuario_movimiento = usuario
+      self.fecha_movimiento   = fecha
+      restante = self.cantidad.to_d - cantidad
+      update!(cantidad: restante, estado: restante.zero? ? 'agotado' : estado)
+    end
+  end
+
   def cantidad_disponible_real
     # OJO: los envíos pendientes/en viaje YA se descontaron de `cantidad` al crearse la
     # dispensación (after_create :decrementar_stock). NO se vuelven a restar acá (eso era un

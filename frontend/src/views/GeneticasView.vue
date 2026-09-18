@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 import { useRouter, useRoute } from 'vue-router'
 import { listGeneticas, updateGenetica, deleteGenetica } from '../lib/api.js'
 import { useAuthStore } from '../stores/auth.js'
@@ -8,6 +9,7 @@ import { useToast } from '../composables/useToast.js'
 import EmptyState from '../components/ui/EmptyState.vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import GeneticaEditarModal from '../components/GeneticaEditarModal.vue'
+const { org: orgTxt } = useUsoPersonal()
 
 const router = useRouter()
 const route  = useRoute()
@@ -148,7 +150,7 @@ onMounted(async () => {
     <div class="gv__header">
       <div>
         <h1 class="gv__title">Genéticas</h1>
-        <p class="gv__sub">Catálogo de genéticas de la organización</p>
+        <p class="gv__sub">Catálogo de genéticas {{ orgTxt.de }}</p>
       </div>
       <button v-if="canEdit" class="gv__btn-new" @click="openCreate">
         <i class="bi bi-plus-lg"></i> Nueva genética

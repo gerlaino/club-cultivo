@@ -37,7 +37,7 @@ import {
   CheckSquare, BarChart3, Settings, PanelLeftClose, PanelLeftOpen, Wine, Building2, Warehouse,
   Calculator, UserCog, Store,
 } from 'lucide-vue-next'
-import { NAV_GROUPS, detectGroup, useNavContext } from '../../composables/useNavContext.js'
+import { NAV_GROUPS, detectGroup, entradaVisible, useNavContext } from '../../composables/useNavContext.js'
 import { useClubStore } from '../../stores/club.js'
 
 const route = useRoute()
@@ -67,10 +67,9 @@ const ICONS = {
   config:    Settings,
 }
 
-// Grupos visibles: oculta los que dependen de un feature flag apagado de la organización (ej. Salón).
-const visibleGroups = computed(() =>
-  NAV_GROUPS.filter(g => !g.feature || club.data?.features?.[g.feature])
-)
+// Grupos visibles: oculta los que dependen de un feature flag apagado de la organización (ej.
+// Salón) y los que no aplican al uso personal (Sedes, Equipo).
+const visibleGroups = computed(() => NAV_GROUPS.filter(g => entradaVisible(g, club.data)))
 
 const activeKey = computed(() => detectGroup(route.path).key)
 

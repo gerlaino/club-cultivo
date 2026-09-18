@@ -5,8 +5,9 @@
 # que le pide «crear una sede» le habla de otra cosa. Se la creamos con el nombre que la
 # describe y lo mandamos directo a lo suyo, que son las salas y el lote.
 #
-# Sólo la sede. Las salas NO se siembran: cuántas tiene y de qué tipo (una carpa mixta o vege +
-# flora) es la primera decisión real de su cultivo, y es suya.
+# Sólo la sede y el catálogo de gastos (corto, el suyo). Las salas NO se siembran: cuántas tiene
+# y de qué tipo (una carpa mixta o vege + flora) es la primera decisión real de su cultivo, y
+# es suya.
 module Clubs
   class SembrarPersonal
     NOMBRE_SEDE = 'Mi cultivo'.freeze
@@ -22,6 +23,7 @@ module Clubs
 
         sede = @club.sedes.create!(nombre: NOMBRE_SEDE, tipo: 'produccion', created_by: @por)
         Finanzas::SembrarDepositos.new(@club).call
+        Finanzas::SembrarCatalogo.new(@club).call(con_arbol: :personal)
         sede
       end
     end

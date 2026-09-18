@@ -50,6 +50,7 @@ export function usePlan() {
   const PLAN_COLORS = {
     basico:     { bg: '#e8f5e9', text: '#2e7d32', border: '#a5d6a7' },
     total:      { bg: '#f3e5f5', text: '#6a1b9a', border: '#ce93d8' },
+    personal:   { bg: '#ecfccb', text: '#3f6212', border: '#bef264' },
     semilla:    { bg: '#e8f5e9', text: '#2e7d32', border: '#a5d6a7' },
     brote:      { bg: '#e3f2fd', text: '#1565c0', border: '#90caf9' },
     cosecha:    { bg: '#fff8e1', text: '#f57f17', border: '#ffe082' },

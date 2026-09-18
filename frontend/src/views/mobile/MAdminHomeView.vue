@@ -80,15 +80,24 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
+import { useClubStore } from '../../stores/club'
 import { useStatsStore } from '../../stores/stats.js'
 import { getTareasDashboard, listPesajesManicuraAdmin, listStocksPendientes,
          getAnalyticsDispensador } from '../../lib/api.js'
 import CajaMostradorCard from '../../components/dashboards/CajaMostradorCard.vue'
 
 const auth  = useAuthStore()
+const club  = useClubStore()
 const stats = useStatsStore()
+const router = useRouter()
+
+// Uso personal: este inicio es el de una organización (aprobaciones, REPROCANN de pacientes,
+// caja). El cultivador de casa tiene el suyo. Se resuelve acá y no sólo en el redirect de `/m`
+// porque `club.data` puede llegar después del primer render.
+watch(() => club.data?.personal, (p) => { if (p && auth.user?.role === 'admin') router.replace('/m/personal/hoy') }, { immediate: true })
 
 const nombre = computed(() => auth.user?.first_name || 'Hola')
 const saludo = computed(() => {

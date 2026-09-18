@@ -3,7 +3,7 @@
     <header class="aud-home__head">
       <h1 class="aud-home__title">Reportes</h1>
       <p class="aud-home__sub">
-        Todos se descargan en PDF y Excel, con el membrete de la organización y los datos de la fecha
+        Todos se descargan en PDF y Excel, con {{ esPersonal ? 'tu nombre' : 'el membrete de la organización' }} y los datos de la fecha
         en que los generás.
       </p>
     </header>
@@ -11,10 +11,10 @@
     <!-- Agrupados por para qué sirven, no por qué módulo los produce: el que entra acá
          viene con una pregunta ("¿estamos en regla?", "¿cómo viene la producción?"), no
          con ganas de recorrer un catálogo. -->
-    <section v-for="grupo in GRUPOS" :key="grupo.titulo" class="aud-grupo">
+    <section v-for="grupo in grupos" :key="grupo.titulo" class="aud-grupo">
       <div class="aud-grupo__head">
         <h2 class="aud-grupo__title">{{ grupo.titulo }}</h2>
-        <p class="aud-grupo__desc">{{ grupo.desc }}</p>
+        <p class="aud-grupo__desc">{{ esPersonal && grupo.descPersonal ? grupo.descPersonal : grupo.desc }}</p>
       </div>
       <div class="aud-home__cards">
         <RouterLink v-for="inf in grupo.informes" :key="inf.to" :to="inf.to" class="aud-card">
@@ -29,10 +29,20 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import {
   FileCheck, Sprout, Package, FileBadge, FileSignature, Target, Search, TrendingDown,
 } from 'lucide-vue-next'
+import { useClubStore } from '../../stores/club'
 
+const club = useClubStore()
+const esPersonal = computed(() => club.data?.personal === true)
+
+// Cada informe dice de qué suite es (`feature`) y si es de una ORGANIZACIÓN
+// (`soloOrganizacion`): el REPROCANN de pacientes, la declaración semestral y el INASE se
+// presentan ante un organismo en nombre de una entidad. Al cultivador de casa no le aplican, y
+// una organización de sólo Cultivo tampoco tiene a quién dispensar — el índice le ofrecía
+// pantallas que el backend después le rechaza.
 const GRUPOS = [
   {
     titulo: 'Cumplimiento',
@@ -42,33 +52,34 @@ const GRUPOS = [
       // este informe ya hacía, así que eran dos pantallas para un solo dato.
       { to: '/auditor/reprocann', icon: FileCheck, label: 'REPROCANN y cumplimiento',
         desc: 'Estado del certificado de cada paciente, la tasa al día y las alertas abiertas.',
-        pregunta: '¿Está todo el mundo en regla?' },
+        pregunta: '¿Está todo el mundo en regla?', feature: 'produccion_dispensa' },
       { to: '/auditor/inase', icon: FileBadge, label: 'INASE',
         desc: 'Variedades cosechadas en el período, con su vinculación al Catálogo y el origen del material.',
-        pregunta: '¿Qué variedades declaro?' },
+        pregunta: '¿Qué variedades declaro?', feature: 'cultivo', soloOrganizacion: true },
       // EL documento que se presenta. No estaba en la lista y en la nav se llamaba «REPROCANN»,
       // igual que el informe de arriba.
       { to: '/informe-semestral', icon: FileSignature, label: 'Declaración jurada semestral',
         desc: 'Pacientes registrados al cierre, cultivo y entregas del semestre. Para presentar ante REPROCANN.',
-        pregunta: '¿Qué presento este semestre?' },
+        pregunta: '¿Qué presento este semestre?', feature: 'produccion_dispensa' },
     ],
   },
   {
     titulo: 'Operación',
     desc: 'Cómo viene la organización puertas adentro.',
+    descPersonal: 'Cómo viene tu cultivo.',
     informes: [
       // Sedes se fusionó acá: era el mismo conteo de plantas partido por sede, y una organización de
       // una sola sede abría un informe de una fila.
       { to: '/auditor/produccion', icon: Sprout, label: 'Producción',
         desc: 'Lotes, plantas y gramos del período, con el desglose por sede.',
-        pregunta: '¿Cuánto estamos produciendo, y dónde?' },
+        pregunta: '¿Cuánto estamos produciendo, y dónde?', feature: 'cultivo' },
       { to: '/auditor/dispensaciones', icon: Package, label: 'Dispensaciones',
         desc: 'Entregas, gramos y pacientes atendidos.',
-        pregunta: '¿Cuánto sale y a cuántos?' },
+        pregunta: '¿Cuánto sale y a cuántos?', feature: 'produccion_dispensa' },
       // La contracara de producción: ningún otro informe dice cuánto se cayó en el camino.
       { to: '/auditor/perdidas', icon: TrendingDown, label: 'Pérdidas',
         desc: 'Plantas descartadas con su motivo, merma y vencido en góndola.',
-        pregunta: '¿Cuánto se perdió, y por qué?' },
+        pregunta: '¿Cuánto se perdió, y por qué?', feature: 'cultivo' },
     ],
   },
   {
@@ -77,13 +88,27 @@ const GRUPOS = [
     informes: [
       { to: '/auditor/plan-vs-real', icon: Target, label: 'Plan vs. real',
         desc: 'Lo que se esperaba de cada lote contra lo que dio.',
-        pregunta: '¿Le acertamos a los objetivos?' },
+        pregunta: '¿Le acertamos a los objetivos?', feature: 'cultivo' },
       { to: '/auditor/trazabilidad', icon: Search, label: 'Trazabilidad',
         desc: 'El recorrido completo de un lote, de la semilla a la entrega.',
-        pregunta: '¿De dónde salió esto?' },
+        pregunta: '¿De dónde salió esto?', feature: 'cultivo' },
     ],
   },
 ]
+
+// Sin las features cargadas todavía se muestra todo: rebotar por una carrera de carga es peor,
+// y el backend sigue siendo la barrera.
+function visible(inf) {
+  const data = club.data
+  if (!data?.features) return true
+  if (inf.feature && data.features[inf.feature] !== true) return false
+  if (inf.soloOrganizacion && data.personal) return false
+  return true
+}
+
+const grupos = computed(() =>
+  GRUPOS.map(g => ({ ...g, informes: g.informes.filter(visible) })).filter(g => g.informes.length)
+)
 </script>
 
 <style scoped>

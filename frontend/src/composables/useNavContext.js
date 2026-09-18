@@ -16,7 +16,8 @@ export const NAV_GROUPS = [
     // `multi_sede` y después de la suite `cultivo`, y las dos veces la sección desapareció del
     // menú para clubes que sí la necesitaban. Un club con una sola sede igual quiere entrar a
     // verla; no hay nada que esconder acá.
-    key: 'sedes', label: 'Sedes', to: '/sedes',
+    // …salvo en USO PERSONAL: la sede es su casa, se sembró con el alta y no se le nombra.
+    key: 'sedes', label: 'Sedes', to: '/sedes', soloOrganizacion: true,
     tabs: [],
   },
   {
@@ -24,7 +25,8 @@ export const NAV_GROUPS = [
     // alguien, cambiarle el rol o ver sus horas es gestión de personas, se hace seguido y se
     // busca por su nombre. Su ruta (/usuarios) ya era de primer nivel; la pestaña sólo la
     // escondía adentro de ocho.
-    key: 'equipo', label: 'Equipo', to: '/usuarios', tabs: [],
+    // En uso personal no hay equipo: la cuenta es la persona.
+    key: 'equipo', label: 'Equipo', to: '/usuarios', tabs: [], soloOrganizacion: true,
   },
   {
     key: 'cultivo', label: 'Cultivo', to: '/salas', feature: 'cultivo',
@@ -130,6 +132,15 @@ export const NAV_GROUPS = [
     ],
   },
 ]
+
+// ¿Este grupo o tab se muestra a ESTA organización? Dos preguntas en un solo lugar: si el
+// módulo está contratado (`feature`) y si aplica al uso personal (`soloOrganizacion`). El
+// sidebar y el topbar la hacen los dos, y escrita dos veces un día dicen distinto.
+export function entradaVisible(entrada, clubData) {
+  if (entrada.feature && clubData?.features?.[entrada.feature] !== true) return false
+  if (entrada.soloOrganizacion && clubData?.personal) return false
+  return true
+}
 
 // Grupo activo según la ruta: el tab cuyo `to` es el prefijo más largo del path gana
 // (así /auditor/trazabilidad cae en Reportes y resalta Informes, que es su tab).
