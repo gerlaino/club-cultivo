@@ -47,7 +47,8 @@ describe('El aviso de caja sin cerrar', () => {
   it('se puede prender y elegir la hora', async () => {
     const w = await montar()
 
-    const check = w.find('.spc__check input')
+    // El de la caja, no el de los hitos del cultivo, que también es un `.spc__check`.
+    const check = w.find('.spc__check:not(.spc__check--hitos) input')
     expect(check.exists()).toBe(true)
     await check.setValue(true)
 
@@ -66,7 +67,7 @@ describe('El aviso de caja sin cerrar', () => {
       config: { cierre_mostrador: { activo: true, hora: '21:00', por_sede: { 10: '20:00' } } },
     })
 
-    expect(w.find('.spc__check input').element.checked).toBe(true)
+    expect(w.find('.spc__check:not(.spc__check--hitos) input').element.checked).toBe(true)
     expect(w.find('input[type="time"]').element.value).toBe('21:00')
   })
 
@@ -75,7 +76,7 @@ describe('El aviso de caja sin cerrar', () => {
   it('no aparece si la organización no tiene ninguna sede que atienda', async () => {
     const w = await montar({ sedes: [VIVERO] })
 
-    expect(w.find('.spc__check').exists()).toBe(false)
+    expect(w.find('.spc__check:not(.spc__check--hitos)').exists()).toBe(false)
   })
 
   // Una organización con dos sedes puede cerrar a horas distintas, y es justo donde más sirve:

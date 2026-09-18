@@ -53,6 +53,74 @@ class AlertaDetectorService
       detectar_cosecha_pendiente(lote)
       detectar_tareas_vencidas(lote)
     end
+
+    # Los hitos miran también el curado (el resto lo excluye porque ya no hay ambiente que medir).
+    return unless hitos_activos?
+
+    @club.lotes.where.not(estado: 'finalizado').includes(:lote_eventos).find_each { |lote| detectar_hitos(lote) }
+  end
+
+  # ── Lo que VIENE: los hitos del ciclo ─────────────────────────────────────────────────
+  #
+  # El resto de los detectores avisan de lo que ya pasó (se venció, se salió de rango). El
+  # cultivador de casa necesita lo contrario: saber con días de anticipación que su lote llega
+  # a los días de vege que se propuso (¿paso a floración?), que se acerca la cosecha estimada
+  # (revisar tricomas), que el secado cumple los días, que el curado ya lleva tres semanas.
+  # Salen de los objetivos que el lote YA tiene y nadie miraba hasta que pasaban.
+  #
+  # Prendido en uso personal (`Club#personal?`) o por `alertas_config['hitos_cultivo']`. Cada
+  # hito se avisa UNA sola vez por lote (dedup por `contexto.hito`, sin ventana de tiempo).
+  DIAS_ANTES_HITO   = 3
+  DIAS_SECADO_HITO  = 10
+  DIAS_CURADO_HITO  = 21
+
+  def hitos_activos?
+    cfg = @club.alertas_config || {}
+    return cfg['hitos_cultivo'] != false if @club.personal?
+    cfg['hitos_cultivo'] == true
+  end
+
+  def dias_antes_hito = ((@club.alertas_config || {})['hitos_dias_antes'] || DIAS_ANTES_HITO).to_i
+
+  def detectar_hitos(lote)
+    desde = lote.fecha_estado_actual
+    return if desde.blank?
+
+    case lote.estado
+    when 'vegetativo'
+      if lote.dias_vegetativo_objetivo.present?
+        hito(lote, 'vege_objetivo', desde + lote.dias_vegetativo_objetivo.days,
+             "#{lote.codigo} llega a los #{lote.dias_vegetativo_objetivo} días de vegetativo el %s. ¿Pasa a floración?")
+      end
+    when 'floracion'
+      inicio = lote.fecha_inicio_floracion || desde
+      if lote.dias_floracion_objetivo.present?
+        hito(lote, 'cosecha_estimada', inicio + lote.dias_floracion_objetivo.days,
+             "#{lote.codigo} tiene la cosecha estimada para el %s. Mirá los tricomas: lechosos con algo de ámbar es el punto.")
+      end
+    when 'cosecha'
+      hito(lote, 'secado', desde + (lote.dias_cosecha_objetivo.presence || DIAS_SECADO_HITO).to_i.days,
+           "#{lote.codigo} cumple los días de secado el %s. Si las ramas quiebran, está para manicurar.")
+    when 'curado'
+      hito(lote, 'curado', desde + DIAS_CURADO_HITO.days,
+           "#{lote.codigo} lleva tres semanas de curado el %s: ya podés pesarlo y disfrutarlo.")
+    end
+  end
+
+  # Avisa cuando la fecha está a `dias_antes` o menos (también si ya pasó y nunca se avisó).
+  def hito(lote, clave, fecha, plantilla)
+    return if (fecha - Date.current).to_i > dias_antes_hito
+    return if @club.alertas_internas.where(tipo: 'hito_cultivo', lote_id: lote.id)
+                                    .where("contexto->>'hito' = ?", clave).exists?
+
+    fecha_txt = I18n.l(fecha, format: '%-d de %B') rescue fecha.to_s
+    alerta = @club.alertas_internas.create!(
+      tipo: 'hito_cultivo', lote: lote, severidad: 'info', destinada_a_role: 'admin',
+      mensaje: format(plantilla, fecha_txt),
+      contexto: { hito: clave, fecha: fecha.to_s }
+    )
+    PushNotificationService.notify_admins_async(@club, title: 'Lo que viene en tu cultivo', body: alerta.mensaje, url: "/lotes/#{lote.id}")
+    alerta
   end
 
   def crear_alerta(tipo:, lote: nil, severidad:, mensaje:, contexto: {})

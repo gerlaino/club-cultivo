@@ -22,6 +22,7 @@ class AlertaInterna < ApplicationRecord
     temperatura_fuera_rango humedad_fuera_rango
     temperatura_sustrato_fuera_rango
     cosecha_pendiente tarea_vencida_cultivo estado_critico_lote
+    hito_cultivo
   ].freeze
 
   TIPOS       = (TIPOS_OPERATIVOS + TIPOS_CULTIVO).freeze
@@ -49,7 +50,7 @@ class AlertaInterna < ApplicationRecord
   # Se deriva de `tipo` + `contexto` (+ lote_id). El frontend mapea entidad.tipo → ruta.
   # Devuelve { tipo:, id: } o nil si la alerta no apunta a un recurso navegable.
   ENTIDAD_POR_TIPO = {
-    'cosecha_pendiente' => 'lote', 'estado_critico_lote' => 'lote',
+    'cosecha_pendiente' => 'lote', 'estado_critico_lote' => 'lote', 'hito_cultivo' => 'lote',
     'sin_registro_ambiental' => 'lote', 'ph_fuera_rango' => 'lote', 'ec_fuera_rango' => 'lote',
     'temperatura_fuera_rango' => 'lote', 'humedad_fuera_rango' => 'lote',
     'tarea_vencida_cultivo' => 'tarea',

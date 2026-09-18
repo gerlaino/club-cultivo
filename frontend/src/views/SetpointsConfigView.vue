@@ -198,6 +198,27 @@
           </template>
         </fieldset>
 
+        <!-- Lo que VIENE: los hitos del ciclo, avisados con anticipación. En uso personal viene
+             prendido; una organización lo prende si quiere. -->
+        <fieldset class="spc__fieldset">
+          <legend class="spc__legend">Lo que viene en el cultivo</legend>
+          <p class="spc__field-desc">
+            Avisa antes de que un lote llegue a sus días de vegetativo (¿pasa a floración?), a la cosecha
+            estimada (revisar tricomas), a los días de secado y a las tres semanas de curado. Una vez por hito.
+          </p>
+          <label class="spc__check spc__check--hitos">
+            <input v-model="configForm.hitos_cultivo" type="checkbox" />
+            <span>Avisarme de los hitos del ciclo</span>
+          </label>
+          <div v-if="configForm.hitos_cultivo" class="spc__field">
+            <label class="spc__label">Con cuánta anticipación</label>
+            <div class="spc__input-wrap">
+              <input v-model.number="configForm.hitos_dias_antes" type="number" min="0" max="14" class="spc__input spc__input--sm" />
+              <span class="spc__input-suffix">días antes</span>
+            </div>
+          </div>
+        </fieldset>
+
         <div class="spc__form-footer">
           <button type="submit" class="spc__btn-primary" :disabled="guardandoAlertas">
             {{ guardandoAlertas ? 'Guardando…' : 'Guardar configuración' }}
@@ -427,6 +448,8 @@ const guardandoAlertas = ref(false)
 const configForm = ref({
   dias_sin_registro: { vegetativo: 3, floracion: 2, cosecha: 1 },
   cosecha_pendiente_umbral_dias: 0,
+  hitos_cultivo: false,
+  hitos_dias_antes: 3,
   postcosecha_dias: 0,
   postcosecha_modo: 'avisar',
   postcosecha_manicura_default_id: null,
@@ -472,6 +495,9 @@ async function cargarPreferences() {
         cosecha:    ac.dias_sin_registro.cosecha     ?? 1,
       }
     }
+    // En uso personal viene prendido salvo que se apague explícitamente (misma regla que el backend).
+    configForm.value.hitos_cultivo = ac.hitos_cultivo !== undefined ? ac.hitos_cultivo === true : esPersonal.value
+    if (ac.hitos_dias_antes !== undefined) configForm.value.hitos_dias_antes = Number(ac.hitos_dias_antes) || 0
     if (ac.cosecha_pendiente_umbral_dias !== undefined) {
       configForm.value.cosecha_pendiente_umbral_dias = ac.cosecha_pendiente_umbral_dias
     }
@@ -499,6 +525,8 @@ async function guardarAlertas() {
       alertas_config: {
         dias_sin_registro: configForm.value.dias_sin_registro,
         cosecha_pendiente_umbral_dias: configForm.value.cosecha_pendiente_umbral_dias,
+        hitos_cultivo: configForm.value.hitos_cultivo,
+        hitos_dias_antes: configForm.value.hitos_dias_antes,
         postcosecha_dias: configForm.value.postcosecha_dias,
         postcosecha_modo: configForm.value.postcosecha_modo,
         postcosecha_manicura_default_id: configForm.value.postcosecha_manicura_default_id || null,
@@ -531,6 +559,8 @@ onMounted(() => {
   display: flex; align-items: center; gap: .5rem; margin-bottom: .85rem;
   font-size: .875rem; color: var(--c-ink-700, #3A3F44); cursor: pointer;
 }
+/* Marcador del checkbox de los hitos: lo distingue del de la caja en las pruebas. */
+.spc__check--hitos { margin-bottom: .5rem; }
 .spc__excepciones { margin-top: 1rem; display: flex; flex-direction: column; gap: .5rem; }
 .spc__excepcion { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
 .spc__excepcion-sede { min-width: 9rem; font-size: .875rem; color: var(--c-ink-900, #1A1D1F); }
