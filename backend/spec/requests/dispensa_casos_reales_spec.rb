@@ -96,7 +96,7 @@ RSpec.describe 'Dispensación — casos reales', type: :request do
     # cobra en el momento. Lo que sí tiene que pasar es que al crédito no le caiga MÁS de lo
     # que el paciente tiene disponible, o el club regalaría mercadería sin darse cuenta.
     it 'al crédito le cae como mucho lo que el paciente tiene disponible' do
-      paciente.create_cuenta_corriente!(club: club, limite_credito: 5_000, saldo_disponible: 0)
+      paciente.cuenta_corriente!.tap { |c| c.update!(limite_credito: 5_000, saldo_disponible: 0) }
 
       dispensar(stock_id: stock.id, cantidad: 50, fecha_dispensacion: Time.zone.today,
                 medio_pago: 'cuenta_corriente', aporte_socio_ars: 50_000)
@@ -118,7 +118,7 @@ RSpec.describe 'Dispensación — casos reales', type: :request do
 
     # "No abona" sí es un tope duro: es el club regalando, y no puede pasarse del límite.
     it '"no abona" se frena cuando no alcanza el crédito' do
-      paciente.create_cuenta_corriente!(club: club, limite_credito: 1_000, saldo_disponible: 0)
+      paciente.cuenta_corriente!.tap { |c| c.update!(limite_credito: 1_000, saldo_disponible: 0) }
 
       dispensar(stock_id: stock.id, cantidad: 50, fecha_dispensacion: Time.zone.today,
                 medio_pago: 'no_abona', aporte_socio_ars: 50_000)

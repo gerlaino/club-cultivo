@@ -56,10 +56,27 @@ RSpec.describe Dispensaciones::RegistrarCobro do
       expect(dispensacion.reload.cobros).to be_empty
     end
 
-    it 'bloquea cuenta corriente si el socio no tiene cuenta habilitada' do
+    it 'bloquea cuenta corriente si el socio no tiene crédito habilitado' do
       res = registrar(medio: 'cuenta_corriente', monto: 50_000)
       expect(res.ok?).to be false
-      expect(res.error).to match(/no tiene cuenta corriente/i)
+      expect(res.error).to match(/no tiene crédito habilitado/i)
+    end
+
+    # El saldo a favor se consume por su propio medio, sin asiento (la plata ya entró al libro).
+    it 'saldo_a_favor consume lo que tiene a favor, sin asiento contable' do
+      paciente.cuenta_corriente!.update!(saldo_disponible: 30_000, limite_credito: 0)
+      expect { registrar(medio: 'saldo_a_favor', monto: 30_000) }.not_to change(MovimientoContable, :count)
+      cobro = dispensacion.reload.cobros.last
+      expect(cobro.medio).to eq('saldo_a_favor')
+      expect(cobro.pagado).to be true
+      expect(paciente.cuenta_corriente.reload.saldo_disponible).to eq(0)
+    end
+
+    it 'bloquea saldo_a_favor por más de lo que tiene' do
+      paciente.cuenta_corriente!.update!(saldo_disponible: 1_000)
+      res = registrar(medio: 'saldo_a_favor', monto: 5_000)
+      expect(res.ok?).to be false
+      expect(res.error).to match(/a favor/)
     end
 
     it 'bloquea un cobro que supera el saldo pendiente' do

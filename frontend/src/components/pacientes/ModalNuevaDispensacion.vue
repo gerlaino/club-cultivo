@@ -324,25 +324,28 @@ watch(stocksVisibles, (lista) => {
 
 
 // ── Cuenta corriente ARS ───────────────────────────────────────────────────────
-const tieneCc  = computed(() => props.limiteCc !== null && props.limiteCc > 0)
+// TODO PACIENTE TIENE CUENTA CORRIENTE (Germán, 18-sep-2026), y son dos cosas distintas:
+//   · SALDO A FAVOR: lo que dejó a cuenta —el vuelto que no había, lo que pagó de más— y se le
+//     descuenta solo en la próxima dispensa. Lo tiene cualquiera.
+//   · PODER DEBER (`limite_credito` > 0): lo habilita el admin por paciente, como siempre.
+// Antes «tiene cuenta corriente» era sólo lo segundo, y sin límite no había dónde dejar el vuelto.
+const puedeDeber   = computed(() => props.limiteCc !== null && props.limiteCc > 0)
+const saldoAFavor  = computed(() => Math.max(0, props.saldoCc ?? 0))
 const ccMargen = computed(() => (props.saldoCc ?? 0) + (props.limiteCc ?? 0))
-// Lo que DEBE hoy (saldo negativo). Es hasta donde se puede pagar de más: lo de más baja la
-// deuda, nunca queda «a favor» (decisión de Germán, 16/17-sep: no hay plata a favor, la cuenta
-// corriente es lo que debe).
+// Lo que DEBE hoy (saldo negativo).
 const deudaCc  = computed(() => Math.max(0, -(props.saldoCc ?? 0)))
+// «No usar el saldo esta vez»: a veces el paciente lo quiere guardar. Por defecto se descuenta.
+const usarSaldo = ref(true)
 
 // El crédito solo aplica cuando el medio de pago consume crédito.
 const esMedioCredito = computed(() => ['cuenta_corriente', 'no_abona'].includes(form.value.medio_pago))
 const esCuentaCorriente = computed(() => form.value.medio_pago === 'cuenta_corriente')
 const esNoAbona         = computed(() => form.value.medio_pago === 'no_abona')
-// Sin cuenta corriente + pago cash: el aporte queda fijo al total (no se puede pagar de
-// más/menos porque no hay dónde acreditar/debitar la diferencia).
-const aporteBloqueado = computed(() => !tieneCc.value && !esMedioCredito.value)
 // Panel de crédito: visible a quien dispensa cuando elige cuenta corriente; admin/sup siempre.
 const usaCredito = computed(() => pagoDividido.value
   ? (lineasPago.value.some(l => l.medio === 'cuenta_corriente' && Number(l.monto) > 0) || restoPago.value > 0.009)
   : esMedioCredito.value)
-const mostrarPanelCredito = computed(() => !form.value.es_regalo && tieneCc.value && (usaCredito.value || puedeVerCredito.value))
+const mostrarPanelCredito = computed(() => !form.value.es_regalo && puedeDeber.value && (usaCredito.value || puedeVerCredito.value))
 
 const margenPos = computed(() => Math.max(0, ccMargen.value))
 // Cuenta corriente: el crédito cubre lo que puede; la diferencia se cobra ahora.
@@ -357,13 +360,13 @@ const restoACobrar = computed(() => {
 
 // Solo "no abona" se bloquea por crédito (no paga nada ahora → tiene que entrar entero).
 const ccInsuficiente = computed(() => {
-  if (!tieneCc.value || !esNoAbona.value) return false
+  if (!puedeDeber.value || !esNoAbona.value) return false
   const aporte = Number(form.value.aporte_socio_ars)
   return aporte > 0 && aporte > ccMargen.value
 })
 
 const estadoCc = computed(() => {
-  if (!tieneCc.value) return null
+  if (!puedeDeber.value) return null
   if (ccInsuficiente.value)  return 'insuficiente'
   if (restoACobrar.value > 0) return 'critico'
   if (ccMargen.value <= 0)   return 'agotado'
@@ -638,13 +641,28 @@ const restoAlDelivery = computed(() => lineasPago.value.some(l => l.medio === 'c
 // Lo que cobra el repartidor: el total menos lo que se paga por los otros medios. Nunca negativo.
 const montoContraEntrega = computed(() => {
   const otros = lineasPago.value.filter(l => l.medio !== 'contra_entrega').reduce((a, l) => a + (Number(l.monto) || 0), 0)
-  return Math.max(0, Math.round((totalACobrar.value - otros) * 100) / 100)
+  return Math.max(0, Math.round((aCobrarAhora.value - otros) * 100) / 100)
 })
 
 // LO QUE HAY QUE COBRAR ACÁ Y AHORA. Entregando una reserva es el RESTO —la seña ya se cobró
-// cuando se apartó el producto—, no el total de lo que se lleva.
-const totalACobrar = computed(() =>
-  modoReserva.value ? restoReserva.value : (Number(precioFinal.value) || 0))
+// cuando se apartó el producto—, no el total de lo que se lleva. Si administración pisó el
+// aporte a mano, ése es el total.
+const totalACobrar = computed(() => {
+  if (modoReserva.value) return restoReserva.value
+  const aporte = Number(form.value.aporte_socio_ars)
+  if (puedeEditarAporte.value && aporte > 0) return aporte
+  return Number(precioFinal.value) || 0
+})
+
+// EL SALDO A FAVOR SE DESCUENTA PRIMERO, y el backend hace exactamente lo mismo
+// (`saldo_a_favor_aplicable`): lo que tiene, hasta lo que hay que cobrar. No aplica a la seña de
+// una reserva ni a un regalo, y se puede destildar.
+const saldoAplicado = computed(() => {
+  if (!usarSaldo.value || form.value.es_regalo || form.value.es_reserva || saldoAFavor.value <= 0) return 0
+  return Math.min(saldoAFavor.value, totalACobrar.value)
+})
+// Lo que queda por cobrar por los medios de pago, después del saldo.
+const aCobrarAhora = computed(() => Math.round((totalACobrar.value - saldoAplicado.value) * 100) / 100)
 
 // Dividir aplica a lo que se cobra ACÁ: un regalo no se cobra y contra entrega lo cobra el
 // repartidor en la puerta.
@@ -665,27 +683,46 @@ const totalAsignado = computed(() =>
 // Lo que falta asignar. El backend lo manda solo a cuenta corriente, así que hay que decirlo
 // en pantalla: si no, el paciente se va debiendo plata que nadie escribió en ningún lado.
 const restoPago = computed(() =>
-  Math.round((totalACobrar.value - totalAsignado.value) * 100) / 100)
+  Math.round((aCobrarAhora.value - totalAsignado.value) * 100) / 100)
+// LO QUE PAGA DE MÁS QUEDA A FAVOR (Germán, 18-sep-2026): es el vuelto que no se pudo dar. Se
+// dice antes de confirmar, con el número, porque un dedazo acá se vuelve un crédito.
 const excedentePago = computed(() => Math.max(0, -restoPago.value))
+// Cómo queda su cuenta después de lo que paga de más: primero baja la deuda, lo que pasa queda a favor.
+const aFavorDespues = computed(() => Math.max(0, excedentePago.value - deudaCc.value))
 // La cuenta corriente cubre lo que FALTA: nunca puede ser la línea que sobra. «Efectivo 30.000
 // + cuenta corriente 10.000» sobre 30.000 pasó en producción —el paciente había pagado 40.000
 // en efectivo y la segunda línea se cargó mal— y acreditaba plata que nadie puso. El backend
 // lo rechaza; acá se dice antes.
-// Paga de más y no debe (o debe menos): el backend lo rechaza; acá se dice antes.
-const excedeDeuda = computed(() => pagoDividido.value && excedentePago.value > deudaCc.value + 0.009)
-
 const ccSobra = computed(() => {
   if (!pagoDividido.value || excedentePago.value <= 0.009) return false
   const sinCc = lineasPago.value.filter(l => l.medio !== 'cuenta_corriente' && l.medio !== 'contra_entrega')
                                 .reduce((a, l) => a + (Number(l.monto) || 0), 0)
   const enCc  = lineasPago.value.filter(l => l.medio === 'cuenta_corriente').reduce((a, l) => a + (Number(l.monto) || 0), 0)
-  return enCc > 0 && enCc > Math.max(0, totalACobrar.value - sinCc) + 0.009
+  return enCc > 0 && enCc > Math.max(0, aCobrarAhora.value - sinCc) + 0.009
 })
+
+// ── Un solo medio: «Paga con» ─────────────────────────────────────────────────────
+// El caso de todos los días: el paciente paga con un billete más grande y no hay vuelto, o
+// transfirió de más. Un campo con lo que ENTREGA (vacío = justo), y la oración de abajo dice
+// qué pasa con la diferencia. Sólo en efectivo/transferencia con un solo medio: con el pago
+// partido cada línea ya lleva su monto.
+const montoRecibido = ref(null)
+const pideMontoRecibido = computed(() =>
+  !pagoDividido.value && !form.value.es_regalo && !form.value.es_reserva &&
+  ['efectivo', 'transferencia'].includes(form.value.medio_pago) && aCobrarAhora.value > 0)
+// Lo que se cobra por el medio único: lo recibido, o justo lo que hay que cobrar.
+const montoUnico = computed(() => {
+  const r = Number(montoRecibido.value)
+  return pideMontoRecibido.value && r > 0 ? r : aCobrarAhora.value
+})
+const excedenteUnico = computed(() => pideMontoRecibido.value ? Math.max(0, Math.round((montoUnico.value - aCobrarAhora.value) * 100) / 100) : 0)
+const faltanteUnico  = computed(() => pideMontoRecibido.value ? Math.max(0, Math.round((aCobrarAhora.value - montoUnico.value) * 100) / 100) : 0)
+const aFavorDespuesUnico = computed(() => Math.max(0, excedenteUnico.value - deudaCc.value))
 
 // Un medio por línea: repetirlo no significa nada y sólo confunde el desglose.
 const mediosLibres = computed(() => MEDIOS_COBRO.filter(m =>
   !lineasPago.value.some(l => l.medio === m.valor) &&
-  (m.valor !== 'cuenta_corriente' || tieneCc.value)))
+  (m.valor !== 'cuenta_corriente' || puedeDeber.value)))
 // Cambiar una línea a «contra entrega» marca el envío; y nunca dos líneas del mismo medio —si el
 // usuario llegara a repetirlo, la segunda se saca—.
 watch(lineasPago, (ls) => {
@@ -707,7 +744,8 @@ function activarPagoDividido() {
   }
   // Arranca con lo que ya estaba elegido y el total puesto: dividir es partir algo que ya existe.
   const primero = MEDIOS_COBRO.some(m => m.valor === form.value.medio_pago) ? form.value.medio_pago : 'efectivo'
-  lineasPago.value = [{ medio: primero, monto: totalACobrar.value || null }]
+  lineasPago.value = [{ medio: primero, monto: aCobrarAhora.value || null }]
+  montoRecibido.value = null
   pagoDividido.value = true
   agregarLineaPago()
 }
@@ -785,8 +823,6 @@ const precioFinal = computed(() => {
 })
 
 watch(precioFinal, (val) => { if (val != null) form.value.aporte_socio_ars = Math.round(val) })
-// Al quedar bloqueado (socio sin CC), forzar el aporte al total exacto.
-watch(aporteBloqueado, (locked) => { if (locked && precioFinal.value != null) form.value.aporte_socio_ars = Math.round(precioFinal.value) })
 // Al pasar a cuenta corriente el campo se esconde: si venía editado a mano, ese número quedaría
 // escondido y sin forma de corregirlo. Lo que se financia es el total.
 watch(esCuentaCorriente, (cc) => { if (cc && precioFinal.value != null) form.value.aporte_socio_ars = Math.round(precioFinal.value) })
@@ -795,6 +831,8 @@ watch(() => props.modelValue, (open) => {
   if (open) {
     form.value = emptyForm()
     items.value = []
+    usarSaldo.value = true
+    montoRecibido.value = null
     // En el teléfono se abre siempre por el principio: qué se lleva.
     paso.value = 1
     formError.value = null
@@ -865,8 +903,11 @@ async function handleSubmit() {
   // ── Rama ENTREGAR RESERVA: convierte la reserva en dispensación, cobra el resto ──
   if (modoReserva.value) {
     const cobrarDelivery = cobraDelivery.value
-    if (!cobrarDelivery && !pagoDividido.value && form.value.medio_pago === 'cuenta_corriente' && !tieneCc.value) {
-      formError.value = 'El paciente no tiene crédito configurado para cobrar por cuenta corriente'; saving.value = false; return
+    if (!cobrarDelivery && !pagoDividido.value && form.value.medio_pago === 'cuenta_corriente' && !puedeDeber.value) {
+      formError.value = 'El paciente no tiene crédito habilitado para quedar debiendo'; saving.value = false; return
+    }
+    if (!cobrarDelivery && faltanteUnico.value > 0.009 && !puedeDeber.value) {
+      formError.value = `Faltan ${fmt(faltanteUnico.value)} y el paciente no tiene crédito habilitado para quedar debiendo.`; saving.value = false; return
     }
     if (form.value.con_envio && !form.value.delivery_id) {
       formError.value = 'Seleccioná un delivery para asignar el envío'; saving.value = false; return
@@ -882,12 +923,14 @@ async function handleSubmit() {
       // repartidor, se mandan las líneas que se cobran ahora y el backend deja el saldo.
       if ((!cobrarDelivery || pagoDividido.value) && restoReserva.value > 0) {
         // Una línea o varias: es el mismo array que manda la dispensa, y lo que sobra sin asignar
-        // lo resuelve el backend contra la cuenta corriente, como siempre.
+        // lo resuelve el backend contra la cuenta corriente, como siempre. El saldo a favor lo
+        // descuenta el backend antes de las líneas; acá se manda lo que queda.
         payload.cobros = pagoDividido.value
           ? lineasPago.value.filter(l => l.medio !== 'contra_entrega' && Number(l.monto) > 0)
                             .map(l => ({ medio: l.medio, monto: Number(l.monto).toFixed(2) }))
-          : [{ medio: form.value.medio_pago, monto: Number(restoReserva.value).toFixed(2) }]
+          : (montoUnico.value > 0 ? [{ medio: form.value.medio_pago, monto: Number(montoUnico.value).toFixed(2) }] : [])
       }
+      payload.usar_saldo_a_favor = usarSaldo.value
       if (form.value.con_envio) {
         payload.delivery_id       = form.value.delivery_id
         payload.direccion_origen  = form.value.direccion_origen
@@ -959,8 +1002,16 @@ async function handleSubmit() {
         : 'El aporte del paciente debe ser mayor a $0.'
       saving.value = false; return
     }
-    if (!cobraDelivery.value && form.value.medio_pago === 'cuenta_corriente' && !tieneCc.value) {
-      formError.value = 'El paciente no tiene crédito configurado para cobrar por cuenta corriente'
+    if (!cobraDelivery.value && form.value.medio_pago === 'cuenta_corriente' && !puedeDeber.value && aCobrarAhora.value > 0) {
+      formError.value = 'El paciente no tiene crédito habilitado para quedar debiendo'
+      saving.value = false; return
+    }
+    if (!cobraDelivery.value && faltanteUnico.value > 0.009 && !puedeDeber.value) {
+      formError.value = `Faltan ${fmt(faltanteUnico.value)} y el paciente no tiene crédito habilitado para quedar debiendo.`
+      saving.value = false; return
+    }
+    if (cobraDelivery.value && saldoAplicado.value > 0 && aCobrarAhora.value <= 0.009) {
+      formError.value = 'El saldo a favor cubre el total: no queda nada para que cobre el repartidor. Sacá «contra entrega» o destildá el saldo.'
       saving.value = false; return
     }
     if (!cobraDelivery.value && ccInsuficiente.value) {
@@ -968,15 +1019,6 @@ async function handleSubmit() {
         ? `Crédito insuficiente. Disponible: ${fmt(ccMargen.value)} — requerido: ${fmt(form.value.aporte_socio_ars)}`
         : 'Crédito insuficiente. Consultá con un administrador.'
       formError.value = msg
-      saving.value = false; return
-    }
-    // Solo un socio con cuenta corriente puede pagar un monto ≠ al total: el excedente se le
-    // acredita, el faltante queda a cuenta. Sin CC (y pagando en efectivo/transferencia), el
-    // aporte debe ser exactamente el total.
-    if (!cobraDelivery.value && !tieneCc.value && !esMedioCredito.value &&
-        precioFinal.value != null &&
-        Math.abs((Number(form.value.aporte_socio_ars) || 0) - Math.round(precioFinal.value)) > 0.01) {
-      formError.value = 'El paciente no tiene cuenta corriente: el monto debe ser igual al total. Sólo con cuenta corriente puede pagar de menos (queda a cuenta) o de más para bajar una deuda.'
       saving.value = false; return
     }
   }
@@ -991,18 +1033,12 @@ async function handleSubmit() {
     }
     // Lo que falte lo manda el backend a cuenta corriente. Sin cuenta corriente no hay dónde
     // dejarlo y la dispensa se rechazaría del otro lado: mejor decirlo acá.
-    if (restoPago.value > 0.009 && !tieneCc.value && !restoAlDelivery.value) {
-      formError.value = `Faltan ${fmt(restoPago.value)} por asignar y el paciente no tiene cuenta corriente donde dejarlos.`
+    if (restoPago.value > 0.009 && !puedeDeber.value && !restoAlDelivery.value) {
+      formError.value = `Faltan ${fmt(restoPago.value)} por asignar y el paciente no tiene crédito habilitado para quedar debiendo.`
       saving.value = false; return
     }
     if (ccSobra.value) {
       formError.value = 'La cuenta corriente sólo cubre lo que falta. Si pagó de más, cargalo en el medio con el que pagó.'
-      saving.value = false; return
-    }
-    if (excedeDeuda.value) {
-      formError.value = deudaCc.value > 0
-        ? `Paga ${fmt(excedentePago.value)} de más y sólo debe ${fmt(deudaCc.value)}: cobrale hasta ${fmt(deudaCc.value)} de más.`
-        : `Paga ${fmt(excedentePago.value)} de más y no debe nada: cobrale el total exacto.`
       saving.value = false; return
     }
     const enCc = lineas.filter(l => l.medio === 'cuenta_corriente').reduce((a, l) => a + Number(l.monto), 0)
@@ -1048,7 +1084,17 @@ async function handleSubmit() {
       payload.cobros = lineasPago.value
         .filter(l => l.medio !== 'contra_entrega' && Number(l.monto) > 0)
         .map(l => ({ medio: l.medio, monto: Number(l.monto).toFixed(2) }))
+    } else if (pideMontoRecibido.value && (excedenteUnico.value > 0.009 || faltanteUnico.value > 0.009 || saldoAplicado.value > 0)) {
+      // Paga con un billete más grande, o de menos, o con saldo a favor de por medio: se manda
+      // lo que ENTREGA como línea, y el backend hace el resto (a favor / a cuenta).
+      payload.cobros = [{ medio: form.value.medio_pago, monto: Number(montoUnico.value).toFixed(2) }]
+    } else if (saldoAplicado.value > 0 && aCobrarAhora.value <= 0.009 && !cobraDelivery.value) {
+      // El saldo cubre todo: no hay medio de pago, sólo el saldo.
+      payload.medio_pago = 'saldo_a_favor'
+      payload.cobros = []
     }
+    // El backend descuenta el saldo a favor antes que cualquier línea, salvo que se destilde.
+    payload.usar_saldo_a_favor = usarSaldo.value
     if (modoCambio.value) payload.reemplaza_a_id = props.cambioDe.id
     else if (form.value.es_regalo) payload.es_regalo = true
     // El total lo calcula el server (descuento paciente + dispensa). Solo admin/supervisor
@@ -1534,12 +1580,11 @@ async function handleSubmit() {
                  en su lugar es el panel de crédito, que lo dice como es: "se carga al crédito". -->
             <div v-if="puedeEditarAporte && !esCuentaCorriente && !modoCambio" class="mnd__field">
               <label class="mnd__label">Aporte del paciente
-                <span class="mnd__opt">{{ aporteBloqueado ? 'ARS — fijo al total (socio sin cuenta corriente)' : 'ARS — editable' }}</span>
+                <span class="mnd__opt">ARS — editable</span>
               </label>
               <div class="mnd__input-suffix-wrap">
                 <span class="mnd__input-prefix">$</span>
                 <input v-model.number="form.aporte_socio_ars" type="number" min="0" step="1"
-                       :readonly="aporteBloqueado"
                        class="mnd__input mnd__input--with-prefix" placeholder="0" />
               </div>
             </div>
@@ -1565,6 +1610,25 @@ async function handleSubmit() {
               <i class="bi bi-exclamation-triangle-fill"></i>
               Crédito insuficiente — disponible: {{ fmt(ccMargen) }}, requerido: {{ fmt(form.aporte_socio_ars) }}
             </div>
+          </div>
+
+          <!-- SALDO A FAVOR: se descuenta solo, y se dice con el número antes de cobrar. -->
+          <div v-if="saldoAFavor > 0 && !form.es_regalo && !form.es_reserva" class="mnd__afavor" :class="{ 'mnd__afavor--off': !usarSaldo }">
+            <div class="mnd__afavor-row">
+              <span class="mnd__afavor-label"><i class="bi bi-piggy-bank"></i> Tiene <strong>{{ fmt(saldoAFavor) }}</strong> a favor</span>
+              <label class="mnd__afavor-check">
+                <input type="checkbox" v-model="usarSaldo" /> Descontarlo ahora
+              </label>
+            </div>
+            <div v-if="usarSaldo && saldoAplicado > 0" class="mnd__afavor-detalle">
+              <template v-if="aCobrarAhora <= 0.009">
+                Cubre el total con su saldo: <strong>no paga nada</strong> y le quedan {{ fmt(saldoAFavor - saldoAplicado) }} a favor.
+              </template>
+              <template v-else>
+                Se descuentan {{ fmt(saldoAplicado) }} — <strong>le queda por pagar {{ fmt(aCobrarAhora) }}</strong>.
+              </template>
+            </div>
+            <div v-else-if="!usarSaldo" class="mnd__afavor-detalle">Esta vez no se usa: paga el total y el saldo queda para la próxima.</div>
           </div>
 
           <!-- Fecha + pago -->
@@ -1602,30 +1666,54 @@ async function handleSubmit() {
             </div>
             <div v-if="!form.es_regalo && !pagoDividido" class="mnd__field">
               <label class="mnd__label">{{ modoReserva ? 'Medio de pago del resto' : (form.es_reserva ? 'Medio de pago de la seña' : 'Medio de pago') }}</label>
-              <select v-model="form.medio_pago" class="mnd__input">
+              <select v-model="form.medio_pago" class="mnd__input" :disabled="saldoAplicado > 0 && aCobrarAhora <= 0.009">
                 <option value="efectivo">Efectivo</option>
                 <option value="transferencia">Transferencia</option>
                 <!-- Cuenta corriente y contra-entrega no aplican a la seña de una reserva -->
-                <option v-if="!form.es_reserva" value="cuenta_corriente" :disabled="!tieneCc">Cuenta corriente{{ !tieneCc ? ' (sin límite configurado)' : '' }}</option>
+                <option v-if="!form.es_reserva" value="cuenta_corriente" :disabled="!puedeDeber">Cuenta corriente{{ !puedeDeber ? ' (sin crédito habilitado)' : '' }}</option>
                 <option v-if="!form.es_reserva" value="contra_entrega">Contra entrega (cobra el delivery)</option>
               </select>
               <button v-if="puedeDividirPago" type="button" class="mnd__dividir-btn" @click="activarPagoDividido">
                 <i class="bi bi-scissors"></i> Pagar de varias formas
               </button>
             </div>
+            <!-- PAGA CON: lo que entrega. Vacío es justo. Más, queda a favor; menos, a cuenta. -->
+            <div v-if="pideMontoRecibido" class="mnd__field">
+              <label class="mnd__label">Paga con <span class="mnd__opt">si da de más, le queda a favor</span></label>
+              <div class="mnd__input-suffix-wrap">
+                <span class="mnd__input-prefix">$</span>
+                <input v-model.number="montoRecibido" type="number" min="0" step="1"
+                       class="mnd__input mnd__input--with-prefix" :placeholder="String(Math.round(aCobrarAhora))" />
+              </div>
+            </div>
+          </div>
+
+          <!-- Qué pasa con lo que entrega, con un solo medio. -->
+          <div v-if="pideMontoRecibido && excedenteUnico > 0.009" class="mnd__pagos-resto">
+            Paga <strong>{{ fmt(excedenteUnico) }}</strong> de más —
+            <template v-if="deudaCc > 0 && aFavorDespuesUnico <= 0.009">baja su deuda de {{ fmt(deudaCc) }} a {{ fmt(deudaCc - excedenteUnico) }}.</template>
+            <template v-else-if="deudaCc > 0">salda su deuda de {{ fmt(deudaCc) }} y <strong>le quedan {{ fmt(aFavorDespuesUnico) }} a favor</strong>.</template>
+            <template v-else><strong>le quedan {{ fmt(aFavorDespuesUnico) }} a favor</strong> para la próxima.</template>
+          </div>
+          <div v-else-if="pideMontoRecibido && faltanteUnico > 0.009" class="mnd__pagos-resto" :class="{ 'mnd__pagos-resto--mal': !puedeDeber }">
+            <template v-if="puedeDeber">Faltan <strong>{{ fmt(faltanteUnico) }}</strong> — se le cargan a la cuenta corriente.</template>
+            <template v-else>Faltan <strong>{{ fmt(faltanteUnico) }}</strong> y el paciente no tiene crédito habilitado: cobrale el total.</template>
           </div>
 
           <!-- Pago dividido: una dispensa cobrada en varias partes. Cada línea es un `Cobro`. -->
           <div v-if="pagoDividido" class="mnd__pagos">
             <div class="mnd__pagos-hd">
               <span class="mnd__pagos-title"><i class="bi bi-scissors"></i> Cómo se paga</span>
-              <span class="mnd__pagos-total">Total {{ fmt(precioFinal) }}</span>
+              <span class="mnd__pagos-total">
+                <template v-if="saldoAplicado > 0">A cobrar {{ fmt(aCobrarAhora) }} <span class="mnd__pagos-total-nota">({{ fmt(totalACobrar) }} − {{ fmt(saldoAplicado) }} a favor)</span></template>
+                <template v-else>Total {{ fmt(totalACobrar) }}</template>
+              </span>
             </div>
 
             <div v-for="(l, i) in lineasPago" :key="i" class="mnd__pago-linea">
               <select v-model="l.medio" class="mnd__input mnd__pago-medio">
                 <option v-for="m in MEDIOS_COBRO" :key="m.valor" :value="m.valor"
-                        :disabled="m.valor !== l.medio && (lineasPago.some(o => o.medio === m.valor) || (m.valor === 'cuenta_corriente' && !tieneCc))">
+                        :disabled="m.valor !== l.medio && (lineasPago.some(o => o.medio === m.valor) || (m.valor === 'cuenta_corriente' && !puedeDeber))">
                   {{ m.label }}
                 </option>
               </select>
@@ -1660,29 +1748,23 @@ async function handleSubmit() {
             <div v-else-if="restoAlDelivery" class="mnd__pagos-resto mnd__pagos-resto--ok">
               <i class="bi bi-truck"></i> El repartidor cobra <strong>{{ fmt(montoContraEntrega) }}</strong> al entregar.
             </div>
-            <div v-else-if="restoPago > 0.009" class="mnd__pagos-resto" :class="{ 'mnd__pagos-resto--mal': !tieneCc }">
-              <template v-if="tieneCc">
+            <div v-else-if="restoPago > 0.009" class="mnd__pagos-resto" :class="{ 'mnd__pagos-resto--mal': !puedeDeber }">
+              <template v-if="puedeDeber">
                 Faltan <strong>{{ fmt(restoPago) }}</strong> — se le cargan a la cuenta corriente.
               </template>
               <template v-else>
-                Faltan <strong>{{ fmt(restoPago) }}</strong> y el paciente no tiene cuenta corriente: asigná el total.
+                Faltan <strong>{{ fmt(restoPago) }}</strong> y el paciente no tiene crédito habilitado: asigná el total.
               </template>
             </div>
             <div v-else-if="ccSobra" class="mnd__pagos-resto mnd__pagos-resto--mal">
               La cuenta corriente sólo cubre lo que falta. Si pagó de más, cargalo en el medio con el que pagó
               (efectivo o transferencia): queda a favor.
             </div>
-            <div v-else-if="excedeDeuda" class="mnd__pagos-resto mnd__pagos-resto--mal">
-              <template v-if="deudaCc > 0">
-                Paga <strong>{{ fmt(excedentePago) }}</strong> de más y sólo debe {{ fmt(deudaCc) }}: cobrale hasta {{ fmt(deudaCc) }} de más.
-              </template>
-              <template v-else>
-                Paga <strong>{{ fmt(excedentePago) }}</strong> de más y no debe nada: cobrale el total exacto.
-              </template>
-              Si trajo de más, dale el vuelto: no hay saldo a favor.
-            </div>
             <div v-else-if="excedentePago > 0.009" class="mnd__pagos-resto">
-              Paga <strong>{{ fmt(excedentePago) }}</strong> de más — baja su deuda de {{ fmt(deudaCc) }} a {{ fmt(deudaCc - excedentePago) }}.
+              Paga <strong>{{ fmt(excedentePago) }}</strong> de más —
+              <template v-if="deudaCc > 0 && aFavorDespues <= 0.009">baja su deuda de {{ fmt(deudaCc) }} a {{ fmt(deudaCc - excedentePago) }}.</template>
+              <template v-else-if="deudaCc > 0">salda su deuda de {{ fmt(deudaCc) }} y <strong>le quedan {{ fmt(aFavorDespues) }} a favor</strong>.</template>
+              <template v-else><strong>le quedan {{ fmt(aFavorDespues) }} a favor</strong> para la próxima.</template>
             </div>
             <div v-else class="mnd__pagos-resto mnd__pagos-resto--ok">
               <i class="bi bi-check-circle-fill"></i> Cubre el total exacto.
@@ -1904,6 +1986,7 @@ async function handleSubmit() {
 .mnd__pagos-hd { display: flex; align-items: center; justify-content: space-between; }
 .mnd__pagos-title { font-size: .78rem; font-weight: 800; color: var(--c-slate-700); display: flex; align-items: center; gap: .35rem; }
 .mnd__pagos-total { font-size: .78rem; font-weight: 800; color: var(--c-slate-900); font-family: monospace; }
+.mnd__pagos-total-nota { font-weight: 500; color: var(--c-slate-500); }
 
 .mnd__pago-linea { display: flex; align-items: center; gap: .4rem; }
 .mnd__pago-medio { flex: 1 1 auto; min-width: 0; }
@@ -2189,6 +2272,16 @@ async function handleSubmit() {
 .mnd__cc-saldo--bajo { color: #dc2626; }
 .mnd__cc-tras { font-size: .72rem; color: var(--c-slate-500); }
 .mnd__cc-warn { font-size: .75rem; font-weight: 600; color: #dc2626; display: flex; align-items: center; gap: .3rem; }
+
+/* Saldo a favor: se descuenta solo y se dice con el número. Mismo cuerpo que el panel de crédito. */
+.mnd__afavor { border-radius: 10px; padding: .7rem .9rem; border: 1.5px solid #bbf7d0; background: #f0fdf4; display: flex; flex-direction: column; gap: .3rem; }
+.mnd__afavor--off { background: var(--c-slate-50); border-color: var(--c-slate-200); }
+.mnd__afavor-row { display: flex; align-items: center; justify-content: space-between; gap: .5rem; flex-wrap: wrap; }
+.mnd__afavor-label { font-size: .78rem; font-weight: 700; color: #374151; display: flex; align-items: center; gap: .35rem; }
+.mnd__afavor-label strong { color: #15803d; font-family: monospace; font-size: .9rem; }
+.mnd__afavor-check { font-size: .74rem; color: var(--c-slate-700); display: flex; align-items: center; gap: .35rem; cursor: pointer; margin: 0; }
+.mnd__afavor-detalle { font-size: .74rem; color: var(--c-slate-600); }
+.mnd__afavor-detalle strong { color: var(--c-slate-900); }
 
 /* Delivery */
 .mnd__delivery-toggle { display: flex; align-items: center; justify-content: space-between; padding: .75rem; border: 1.5px solid var(--c-slate-200); border-radius: 10px; cursor: pointer; background: #fafbfc; transition: background .15s; gap: .75rem; }

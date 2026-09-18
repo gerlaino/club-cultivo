@@ -1,5 +1,37 @@
 # Changelog
 
+## Septiembre 2026 (cg) — Todo paciente tiene cuenta corriente, y lo que paga de más queda a favor
+
+- **Cambio de regla, decisión de Germán (18-sep), que REVIERTE la del 17 («no hay plata a
+  favor»).** La razón es el VUELTO: a veces no hay cambio y se le deja al paciente a cuenta.
+  Ahora lo que paga de más —en el mostrador, por transferencia, al repartidor— queda **a favor**
+  en su cuenta corriente, asentado como «Aporte socio» (entra al libro y a la caja, se revierte
+  con la dispensa), y **en la próxima dispensa se le descuenta solo**.
+- **Todo paciente nace con cuenta corriente** (`Paciente#crear_cuenta_corriente!`, migración de
+  datos para los existentes). Son DOS cosas y estaban en un solo flag: tener **saldo** (a favor)
+  es de todos; poder **deber** (`limite_credito` > 0) lo habilita el admin por paciente, como
+  siempre. El modal parte `tieneCc` en `saldoAFavor` y `puedeDeber`; el texto dice «sin crédito
+  habilitado» en vez de «sin cuenta corriente».
+- **Medio nuevo `saldo_a_favor` en `Cobro`** (y en `Dispensacion::MEDIOS_PAGO`): `pagado: true`,
+  debita la cuenta y **no asienta** —esa plata entró al libro el día que se dejó—, ni entra al
+  arqueo (no está en `MEDIOS_PAGADOS`). `aplicar_lineas_cobro!` lo aplica PRIMERO (hasta lo que
+  hay que cobrar), después las líneas, el resto a cuenta corriente si tiene crédito, y lo que
+  sobra a favor sin tope. Se destilda con `usar_saldo_a_favor: false`. **No se aplica al editar
+  una dispensa ni en la puerta** (`usar_saldo: false`): lo de la puerta ya se descontó al armar
+  el paquete. La entrega de una reserva también lo descuenta, aun con contra entrega.
+  `rake contabilidad:auditar` resta lo pagado con saldo del asiento esperado.
+- **En el modal**: franja «Tiene $X a favor · Descontarlo ahora» (tilde prendido) con «le queda
+  por pagar $Y», arriba del medio de pago; con el saldo cubriendo todo, «no paga nada» y el medio
+  se apaga. **Campo «Paga con»** en efectivo/transferencia con un solo medio: vacío es justo; de
+  más, «le quedan $X a favor»; de menos, a cuenta si tiene crédito. El pago dividido muestra «A
+  cobrar $Y ($T − $X a favor)» y el excedente dice cómo queda la cuenta. **«Registrar pago» en la
+  ficha** ya no tiene tope: se llama «Dejar plata a favor» cuando no debe, y el saldo se muestra
+  siempre (antes sólo con crédito habilitado). El portal muestra la cuenta sólo si está **en
+  uso** (`CuentaCorriente#en_uso?`): crédito, saldo o movimientos.
+- Trampa de specs: la factory `:cuenta_corriente` REUSA la del paciente (`initialize_with`) y los
+  `CuentaCorriente.create!` a mano pasaron a `paciente.cuenta_corriente!.tap { update! }` — una
+  segunda fila con `has_one` se encontraba al azar.
+
 ## Septiembre 2026 (cf) — Solapa «Direcciones»: varias por paciente, con nombre y una por defecto
 
 - **`direcciones_pacientes`** (pedido de Germán, 17-sep): un paciente tiene N direcciones de

@@ -8,13 +8,10 @@ RSpec.describe 'Dispensacion con credito_gramos', type: :request do
   let(:lote)     { create(:lote, club: club, sala: sala) }
   let(:paciente) { create(:paciente, club: club, created_by: admin) }
   let!(:cc) do
-    CuentaCorriente.create!(
-      paciente: paciente, club: club,
-      saldo_disponible: 0, limite_credito: 0,
+    paciente.cuenta_corriente!.tap { |c| c.update!(saldo_disponible: 0, limite_credito: 0,
       credito_gramos_activo: true,
       saldo_disponible_g: 100.0,
-      limite_credito_g:   100.0,
-    )
+      limite_credito_g:   100.0) }
   end
   let!(:stock) do
     Stock.create!(

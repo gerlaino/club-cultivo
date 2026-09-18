@@ -5,11 +5,15 @@ module Dispensaciones
   # contabilidad (asiento + débito de cuenta corriente) en una sola transacción.
   #
   #   efectivo / transferencia → ingreso real (pagado: true). No toca cuenta corriente.
+  #   saldo_a_favor            → consume lo que el paciente tenía a favor (pagado: true, SIN
+  #                              asiento: esa plata entró al libro el día que la dejó). Debita.
   #   cuenta_corriente         → deuda (pagado: false). Debita el cupo del socio.
   #
   # Reglas (bloquea cuando corresponde):
   #   - No se puede cobrar más que el saldo pendiente de la dispensa.
-  #   - cuenta_corriente exige cuenta corriente activa (limite_credito > 0).
+  #   - saldo_a_favor exige tener ESE saldo a favor (saldo_disponible >= monto).
+  #   - cuenta_corriente exige crédito habilitado (limite_credito > 0): es DEUDA. El saldo a favor
+  #     se consume antes y por su propio medio, así que acá el saldo ya es <= 0.
   #   - cuenta_corriente exige cupo suficiente (saldo_disponible + limite >= monto).
   class RegistrarCobro
     Result = Struct.new(:ok, :cobro, :error, keyword_init: true) do
@@ -54,8 +58,9 @@ module Dispensaciones
         )
         cobro.comprobante.attach(@comprobante) if @comprobante.present?
         # El asiento del efectivo de entrega se difiere hasta la recepción de caja.
-        asiento_contable(cobro) unless diferido_a_rendicion?
-        debitar_cuenta_corriente(cobro) if @medio == 'cuenta_corriente'
+        # El saldo a favor no asienta: su ingreso fue el «Aporte socio» del día que se dejó.
+        asiento_contable(cobro) unless diferido_a_rendicion? || @medio == 'saldo_a_favor'
+        debitar_cuenta_corriente(cobro) if %w[cuenta_corriente saldo_a_favor].include?(@medio)
       end
       Result.new(ok: true, cobro: cobro)
     rescue => e
@@ -71,9 +76,13 @@ module Dispensaciones
       saldo = @dispensacion.monto_sin_cobrar
       return "El cobro ($#{@monto.to_f}) supera el saldo pendiente ($#{saldo.to_f}) de la dispensa." if @monto > saldo + 0.001
 
+      if @medio == 'saldo_a_favor'
+        a_favor = [cuenta_corriente&.saldo_disponible.to_d || 0.to_d, 0.to_d].max
+        return "El paciente tiene $#{a_favor.to_f} a favor, no $#{@monto.to_f}." if @monto > a_favor + 0.001
+      end
       if @medio == 'cuenta_corriente'
         cc = cuenta_corriente
-        return 'El socio no tiene cuenta corriente habilitada para dejar saldo en cuenta.' unless cc&.tiene_credito?
+        return 'El paciente no tiene crédito habilitado para quedar debiendo.' unless cc&.tiene_credito?
         return 'Crédito insuficiente: el monto a dejar en cuenta supera el cupo disponible del socio.' unless cc.puede_dispensar?(@monto)
       end
       nil
@@ -154,7 +163,8 @@ module Dispensaciones
         monto:          -@monto,
         saldo_anterior: anterior,
         saldo_nuevo:    nuevo,
-        descripcion:    "Dispensación: #{@dispensacion.cantidad}#{@dispensacion.stock&.unidad} #{@dispensacion.stock&.forma_producto} (a cuenta)",
+        descripcion:    "Dispensación: #{@dispensacion.cantidad}#{@dispensacion.stock&.unidad} #{@dispensacion.stock&.forma_producto} " \
+                        "(#{@medio == 'saldo_a_favor' ? 'con saldo a favor' : 'a cuenta'})",
         dispensacion:   @dispensacion,
         created_by:     @usuario,
       )

@@ -11,10 +11,7 @@ RSpec.describe 'Dispensacion debitar cuenta corriente', type: :request do
   let(:lote)     { create(:lote, club: club, sala: sala) }
   let(:paciente) { create(:paciente, club: club, created_by: admin) }
   let!(:cc) do
-    CuentaCorriente.create!(
-      paciente: paciente, club: club,
-      saldo_disponible: 500, limite_credito: 500
-    )
+    paciente.cuenta_corriente!.tap { |c| c.update!(saldo_disponible: 500, limite_credito: 500) }
   end
   let!(:stock) do
     Stock.create!(

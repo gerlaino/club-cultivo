@@ -53,7 +53,7 @@ namespace :e2e do
         pac = Paciente.create!(club: club, nombre: "Paciente#{i}", apellido: 'E2E',
                                dni: "9000000#{i}", email: "paciente#{i}@e2e.test",
                                fecha_nacimiento: 30.years.ago.to_date, created_by: admin)
-        CuentaCorriente.create!(club: club, paciente: pac, saldo_disponible: 0, limite_credito: 100_000)
+        pac.cuenta_corriente!.update!(limite_credito: 100_000)
       end
 
       puts "Club e2e ##{club.id} listo · sede ##{sede.id} · flor ##{flor.id} (1000 g)"

@@ -15,6 +15,9 @@ class SuperAdmin::CatalogoController < SuperAdmin::BaseController
           precio_mensual: Precios.plan(clave),
           limites:  PlanEnforcer::RECURSOS.to_h { |r| [r, l[r]] },
           usuarios_por_rol: l[:usuarios_por_rol],
+          # `false` = plan de una sola persona: el alta no ofrece equipo ni módulos.
+          equipo:   l[:equipo] != false,
+          personal: clave == 'personal',
           # Cada tope con la suite a la que le importa. El wizard elige los módulos ANTES que el
           # plan, así que puede mostrar sólo los topes que aplican: nombrarle salas y plantas a
           # una organización que no compró Cultivo es la mitad de la tarjeta en ruido, y no hay
@@ -35,6 +38,9 @@ class SuperAdmin::CatalogoController < SuperAdmin::BaseController
       # wizard mostraba Delivery y Correo APAGADOS y la organización se creaba con los dos
       # prendidos. La pantalla decía una cosa y pasaba otra.
       features_por_defecto: Club::FEATURES_POR_DEFECTO,
+      # Con qué nace un uso personal, y lo único que puede tener.
+      features_personal:    Club::FEATURES_PERSONAL,
+      modulos_personal:     Club::MODULOS_PERSONAL,
       moneda: Precios::MONEDA,
       suites: Club::SUITES.map { |k, v| { clave: k, label: v[:label], desc: v[:desc], precio_mensual: Precios.suite(k) } },
       addons: Club::ADDONS.map { |k, v|

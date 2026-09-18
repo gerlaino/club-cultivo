@@ -94,7 +94,7 @@ Ninguno se considera cerrado; todos son candidatos a revisión.
 3. **Cultivo** — genéticas, lotes (estados/fases), plantas con QR, pesadas, plan de trabajo (+ generación IA), tareas (recurrentes + automáticas por fase), fotos, análisis de laboratorio.
 4. **Manicura / post-cosecha** — pesajes, flujo de aprobación admin, curado, stocks de manicura.
 5. **Stock** — por sede, movimientos, QR/etiquetas, aprobaciones pendientes.
-6. **Dispensaciones** — **multi-stock**: una dispensa abarca varias líneas (`DispensacionItem`); UI = carrito en `ModalNuevaDispensacion` (abierto desde la ficha del socio y el historial; la vista `/dispensar` se eliminó). Medios de pago (efectivo/transferencia/cuenta corriente/no abona/contra-entrega), validación de crédito, descuento sobre el total, reservas (apartar stock a futuro, **fecha ≥ mañana**; **con carrito desde el 15-sep-2026**: `ReservaItem`, misma regla que `DispensacionItem` —la fila es primera línea + suma, lo apartado se lee de las líneas—), CSV. **Edición multi-ítem** (cantidad + precio por línea) con reconciliación de stock/cc; **precio manual por ítem** (admin/sup). (`limite_dispensacion_mensual_g` existe en el schema pero **no es una feature en uso** — ver Dominio.)
+6. **Dispensaciones** — **multi-stock**: una dispensa abarca varias líneas (`DispensacionItem`); UI = carrito en `ModalNuevaDispensacion` (abierto desde la ficha del socio y el historial; la vista `/dispensar` se eliminó). Medios de pago (efectivo/transferencia/cuenta corriente/no abona/contra-entrega), validación de crédito, descuento sobre el total, reservas (apartar stock a futuro, **fecha ≥ mañana**; **con carrito desde el 15-sep-2026**: `ReservaItem`, misma regla que `DispensacionItem` —la fila es primera línea + suma, lo apartado se lee de las líneas—), CSV. **Edición multi-ítem** (cantidad + precio por línea) con reconciliación de stock/cc; **precio manual por ítem** (admin/sup). **Todo paciente tiene cuenta corriente** (18-sep-2026): lo que paga de más queda a favor y se descuenta solo en la próxima; deber sigue pidiendo límite. (`limite_dispensacion_mensual_g` existe en el schema pero **no es una feature en uso** — ver Dominio.)
 6b. **Mostrador** (`/mostrador`) — **el punto de venta del dispensario**, hermano de `Barra`.
     NO es un módulo contratable ni un interruptor: viene con Producción y dispensa, y **es dónde
     opera el dispensador**.
@@ -701,6 +701,17 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 
 ### Lo que NO hay que romper
 
+- **TODO PACIENTE TIENE CUENTA CORRIENTE, Y LO QUE PAGA DE MÁS QUEDA A FAVOR** (18-sep-2026,
+  decisión de Germán que REVIRTIÓ la del 17: «no hay plata a favor» es legacy si aparece en un
+  comentario viejo). La razón es el vuelto: sin cambio, se le deja a cuenta y **en la próxima
+  dispensa se descuenta solo**, dicho en el modal con el número y con un tilde para no usarlo.
+  Son DOS cosas: tener **saldo** es de todos (la cuenta nace con el paciente,
+  `Paciente#crear_cuenta_corriente!`); poder **deber** (`limite_credito` > 0) lo habilita el admin.
+  El saldo se consume por su propio medio, **`saldo_a_favor`** (`Cobro`): pagado, debita, **sin
+  asiento** —la plata entró al libro como «Aporte socio» el día que se dejó— y fuera del arqueo.
+  `aplicar_lineas_cobro!` lo aplica PRIMERO; una línea `cuenta_corriente` es siempre deuda.
+  **No se aplica al editar ni en la puerta** (`usar_saldo: false`). La cuenta en cero y sin
+  historia no se le muestra al paciente (`CuentaCorriente#en_uso?`).
 - **LOS AJUSTES DE CONTEO SE NETEAN POR CIERRE** (sep-2026, Germán: «si me equivoqué al tipear no
   hubo esa diferencia real»). Trazabilidad y Pérdidas suman los `ajuste` con el mismo
   `turno_mostrador_id` y frasco; neto cero no aparece. `CorregirCierre` pide `causa`

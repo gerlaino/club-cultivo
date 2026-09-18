@@ -176,30 +176,120 @@ RSpec.describe 'Dispensaciones con cobros (pagos partidos / contra-entrega)', ty
       expect(cc.reload.saldo_disponible).to eq(-20_000)   # el aporte se revirtió con la dispensa
     end
 
-    it 'sin deuda: no se puede pagar de más, y lo dice' do
-      create(:cuenta_corriente, paciente: paciente, club: club, saldo_disponible: 0, limite_credito: 80_000)
+    # HAY PLATA A FAVOR (Germán, 18-sep-2026): el vuelto que no se pudo dar queda a cuenta.
+    it 'sin deuda: lo de más queda A FAVOR, asentado como aporte y en la caja' do
+      cc = create(:cuenta_corriente, paciente: paciente, club: club, saldo_disponible: 0, limite_credito: 0)
       sign_in_as(dispensador)
       crear(cobros: [{ medio: 'efectivo', monto: 120_000 }])
 
-      expect(response).to have_http_status(:unprocessable_entity)
-      expect(JSON.parse(response.body).values.flatten.join).to include('no debe nada')
-      expect(Dispensacion.count).to eq(0)
+      expect(response).to have_http_status(:created)
+      d = Dispensacion.last
+      expect(d.cobros.pagados.sum(:monto_ars)).to eq(100_000)
+      expect(cc.reload.saldo_disponible).to eq(20_000)
+      aporte = d.movimientos_contables.find_by(categoria: 'aporte_socio')
+      expect(aporte.monto_ars).to eq(20_000)
+      expect(aporte.descripcion).to include('queda a favor')
     end
 
-    it 'con menos deuda que lo pagado de más: rebota diciendo hasta cuánto' do
-      create(:cuenta_corriente, paciente: paciente, club: club, saldo_disponible: -5_000, limite_credito: 80_000)
+    it 'con menos deuda que lo pagado de más: cruza el cero y queda a favor' do
+      cc = create(:cuenta_corriente, paciente: paciente, club: club, saldo_disponible: -5_000, limite_credito: 80_000)
       sign_in_as(dispensador)
       crear(cobros: [{ medio: 'efectivo', monto: 120_000 }])
 
-      expect(response).to have_http_status(:unprocessable_entity)
-      expect(JSON.parse(response.body).values.flatten.join).to include('sólo debe $5.000')
+      expect(response).to have_http_status(:created)
+      expect(cc.reload.saldo_disponible).to eq(15_000)
     end
 
-    it 'sin cuenta corriente: bloquea (no hay dónde acreditar el excedente)' do
+    it 'un paciente anterior al alta automática de la cuenta también puede pagar de más' do
+      paciente.cuenta_corriente.destroy!
+      expect(paciente.reload.cuenta_corriente).to be_nil
       sign_in_as(dispensador)
       crear(cobros: [{ medio: 'efectivo', monto: 120_000 }])
+      expect(response).to have_http_status(:created)
+      expect(paciente.reload.cuenta_corriente.saldo_disponible).to eq(20_000)
+    end
+  end
+
+  # EL SALDO A FAVOR SE DESCUENTA SOLO en la próxima dispensa, por su propio medio y SIN asiento:
+  # esa plata entró al libro el día que se dejó.
+  context 'saldo a favor: se descuenta solo' do
+    let!(:cc) { create(:cuenta_corriente, paciente: paciente, club: club, saldo_disponible: 30_000, limite_credito: 0) }
+
+    it 'cubre lo que puede y el resto se cobra por el medio elegido' do
+      sign_in_as(dispensador)
+      crear(cobros: [{ medio: 'efectivo', monto: 70_000 }])
+
+      expect(response).to have_http_status(:created)
+      d = Dispensacion.last
+      expect(d.saldo_pendiente).to eq(0)
+      expect(d.cobros.find_by(medio: 'saldo_a_favor').monto_ars).to eq(30_000)
+      expect(d.cobros.find_by(medio: 'efectivo').monto_ars).to eq(70_000)
+      expect(d.cobros.a_credito).to be_empty
+      expect(d.medio_pago).to eq('mixto')
+      expect(cc.reload.saldo_disponible).to eq(0)
+      # Asienta sólo lo que entró HOY: los 30.000 ya estaban en el libro como aporte.
+      expect(d.movimientos_contables.sum(:monto_ars)).to eq(70_000)
+      expect(d.movimientos_contables.where(pagado: false)).to be_empty
+    end
+
+    it 'con un solo medio (sin `cobros`) también: el efectivo es el total menos el saldo' do
+      sign_in_as(dispensador)
+      crear(medio_pago: 'efectivo')
+      expect(response).to have_http_status(:created)
+      d = Dispensacion.last
+      expect(d.cobros.find_by(medio: 'saldo_a_favor').monto_ars).to eq(30_000)
+      expect(d.cobros.find_by(medio: 'efectivo').monto_ars).to eq(70_000)
+      expect(cc.reload.saldo_disponible).to eq(0)
+    end
+
+    it 'si el saldo cubre todo, no hace falta cobrar nada' do
+      cc.update!(saldo_disponible: 150_000)
+      sign_in_as(dispensador)
+      crear(medio_pago: 'saldo_a_favor')
+      expect(response).to have_http_status(:created)
+      d = Dispensacion.last
+      expect(d.saldo_pendiente).to eq(0)
+      expect(d.medio_pago).to eq('saldo_a_favor')
+      expect(d.movimientos_contables).to be_empty
+      expect(cc.reload.saldo_disponible).to eq(50_000)
+    end
+
+    it 'con `usar_saldo_a_favor: false` no se toca el saldo' do
+      sign_in_as(dispensador)
+      crear(cobros: [{ medio: 'efectivo', monto: 100_000 }], usar_saldo_a_favor: false)
+      expect(response).to have_http_status(:created)
+      expect(Dispensacion.last.cobros.where(medio: 'saldo_a_favor')).to be_empty
+      expect(cc.reload.saldo_disponible).to eq(30_000)
+    end
+
+    it 'lo que no cubre el saldo ni el efectivo necesita crédito habilitado' do
+      sign_in_as(dispensador)
+      crear(cobros: [{ medio: 'efectivo', monto: 50_000 }])   # faltan 20.000 y límite 0
       expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body).values.flatten.join).to include('crédito habilitado')
       expect(Dispensacion.count).to eq(0)
+      expect(cc.reload.saldo_disponible).to eq(30_000)
+    end
+
+    it 'al cancelar, el saldo a favor vuelve' do
+      sign_in_as(dispensador)
+      crear(cobros: [{ medio: 'efectivo', monto: 70_000 }])
+      d = Dispensacion.last
+      delete '/api/users/sign_out'
+      sign_in_as(admin)
+      patch "/dispensaciones/#{d.id}/cancelar_entrega", params: { motivo: 'test' }, headers: auth_headers
+      expect(response).to have_http_status(:ok)
+      expect(cc.reload.saldo_disponible).to eq(30_000)
+    end
+
+    it 'con contra entrega, el saldo se descuenta ahora y el repartidor cobra el resto' do
+      sign_in_as(dispensador)
+      crear(cobrar_en_entrega: true, con_envio: true, delivery_id: delivery.id, usar_domicilio_paciente: true)
+      expect(response).to have_http_status(:created)
+      d = Dispensacion.last
+      expect(d.cobros.find_by(medio: 'saldo_a_favor').monto_ars).to eq(30_000)
+      expect(d.saldo_pendiente).to eq(70_000)
+      expect(cc.reload.saldo_disponible).to eq(0)
     end
   end
 

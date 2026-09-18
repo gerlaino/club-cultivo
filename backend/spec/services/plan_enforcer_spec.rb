@@ -16,9 +16,10 @@ RSpec.describe PlanEnforcer do
   # salir, así el spec no depende del orden.
   around { |ejemplo| ActsAsTenant.with_tenant(club) { ejemplo.run } }
 
-  describe 'los dos planes' do
-    it 'sólo existen básico y total' do
-      expect(described_class::PLANES.keys).to contain_exactly('basico', 'total')
+  describe 'los planes' do
+    # Dos de organización y, desde sep-2026, el personal: el cultivador de casa.
+    it 'existen básico, total y personal' do
+      expect(described_class::PLANES.keys).to contain_exactly('basico', 'total', 'personal')
     end
 
     it 'el total no limita nada' do

@@ -127,23 +127,16 @@ class CuentaCorrientesController < ApplicationController
 
   # POST /pacientes/:paciente_id/cuenta_corriente/registrar_pago
   # Registra un pago real del socio: crea el asiento de ingreso (aporte_socio) —que aparece en
-  # el libro contable y acredita la cuenta corriente, bajando la deuda—. Disponible para mostrador.
+  # el libro contable y acredita la cuenta corriente: baja la deuda, y lo que pase de la deuda
+  # queda A FAVOR—. Disponible para mostrador.
   #
-  # NO HAY PLATA A FAVOR (decisión de Germán, 17-sep-2026): la cuenta corriente es lo que el
-  # paciente DEBE, y nada más. Se paga hasta la deuda; si trae de más, se le da el vuelto. Un
-  # saldo positivo dejaba después dispensas anotadas «a crédito» como si debiera cuando ya había
-  # pagado — un registro que decía algo falso. Si algún club necesita prepagos, se diseña con su
-  # propio asiento y su propio consumo, no como efecto colateral de un pago.
+  # HAY PLATA A FAVOR (decisión de Germán, 18-sep-2026, que revirtió la del 17). Es el mismo hecho
+  # que pagar de más en una dispensa: el paciente adelanta plata y se le descuenta sola en la
+  # próxima (`aplicar_lineas_cobro!`). Un solo criterio para las dos puertas.
   def registrar_pago
     cc    = find_or_create_cc
     monto = params[:monto].to_d
     return render json: { error: "El monto debe ser mayor a 0" }, status: :unprocessable_entity unless monto > 0
-
-    deuda = [-cc.saldo_disponible.to_d, 0].max
-    if monto > deuda + 0.001
-      msj = deuda.positive? ? "Debe #{pesos(deuda)}: se registra hasta eso. Si trajo de más, dale el vuelto."                             : 'No debe nada: no hay pago que registrar. Si quiere adelantar plata, no hay saldo a favor.'
-      return render json: { error: msj }, status: :unprocessable_entity
-    end
 
     sede_id = params[:sede_id].presence ||
               current_user.sedes_ids_asignadas.first ||
@@ -193,11 +186,9 @@ class CuentaCorrientesController < ApplicationController
     render json: { error: "No autorizado" }, status: :forbidden
   end
 
-  def pesos(n) = ActiveSupport::NumberHelper.number_to_currency(n, unit: '$', precision: 0, delimiter: '.', separator: ',')
 
   def find_or_create_cc
-    @paciente.cuenta_corriente ||
-      @paciente.create_cuenta_corriente!(club: current_user.club, saldo_disponible: 0, limite_credito: 0)
+    @paciente.cuenta_corriente!
   end
 
   def build_default_cc

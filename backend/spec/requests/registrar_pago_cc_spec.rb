@@ -7,10 +7,8 @@ RSpec.describe 'Registrar pago en cuenta corriente', type: :request do
   let(:admin)    { create(:user, :admin, club: club) }
   let(:sede)     { create(:sede, club: club, created_by: admin) }
   let(:paciente) { create(:paciente, club: club, created_by: admin) }
-  let!(:cc) do
-    CuentaCorriente.create!(paciente: paciente, club: club,
-                            saldo_disponible: -5_000, limite_credito: 10_000)
-  end
+  # La cuenta nace con el paciente: acá se le pone la deuda.
+  let!(:cc) { paciente.cuenta_corriente.tap { |c| c.update!(saldo_disponible: -5_000, limite_credito: 10_000) } }
 
   before { sede; sign_in_as(admin) }
 
@@ -33,22 +31,21 @@ RSpec.describe 'Registrar pago en cuenta corriente', type: :request do
     expect(cc.reload.saldo_disponible.to_f).to eq(0.0)
   end
 
-  # NO HAY PLATA A FAVOR (Germán, 17-sep-2026): la cuenta corriente es lo que debe. Se registra
-  # hasta la deuda; si trajo de más, se le da el vuelto.
-  it 'no se puede pagar más que la deuda, y dice hasta cuánto' do
+  # HAY PLATA A FAVOR (Germán, 18-sep-2026, revirtió la regla del 17): adelantar plata es el
+  # mismo hecho que pagar de más en una dispensa, y se descuenta sola en la próxima.
+  it 'pagar más que la deuda deja el resto a favor' do
     registrar(monto: 7_000)
 
-    expect(response).to have_http_status(:unprocessable_entity)
-    expect(JSON.parse(response.body)['error']).to include('Debe $5.000')
-    expect(cc.reload.saldo_disponible.to_f).to eq(-5_000.0)
+    expect(response).to have_http_status(:created)
+    expect(cc.reload.saldo_disponible.to_f).to eq(2_000.0)
   end
 
-  it 'sin deuda no hay pago que registrar' do
+  it 'sin deuda, el pago entero queda a favor' do
     cc.update!(saldo_disponible: 0)
     registrar(monto: 1_000)
 
-    expect(response).to have_http_status(:unprocessable_entity)
-    expect(JSON.parse(response.body)['error']).to include('No debe nada')
+    expect(response).to have_http_status(:created)
+    expect(cc.reload.saldo_disponible.to_f).to eq(1_000.0)
   end
 
   it 'suma a los ingresos del libro' do
@@ -69,10 +66,7 @@ RSpec.describe 'Registrar pago — dispensador', type: :request do
   let(:sede)        { create(:sede, club: club, created_by: admin, tipo: 'mixta') }
   let(:dispensador) { create(:user, :dispensador, club: club) }
   let(:paciente)    { create(:paciente, club: club, created_by: admin) }
-  let!(:cc) do
-    CuentaCorriente.create!(paciente: paciente, club: club,
-                            saldo_disponible: -3_000, limite_credito: 10_000)
-  end
+  let!(:cc) { paciente.cuenta_corriente.tap { |c| c.update!(saldo_disponible: -3_000, limite_credito: 10_000) } }
 
   before do
     sede
@@ -98,10 +92,8 @@ RSpec.describe 'Registrar pago — se ata a la caja del mostrador abierta', type
   let(:admin)    { create(:user, :admin, club: club) }
   let(:sede)     { create(:sede, club: club, created_by: admin, tipo: 'social') }
   let(:paciente) { create(:paciente, club: club, created_by: admin) }
-  let!(:cc) do
-    CuentaCorriente.create!(paciente: paciente, club: club,
-                            saldo_disponible: -5_000, limite_credito: 10_000)
-  end
+  # La cuenta nace con el paciente: acá se le pone la deuda.
+  let!(:cc) { paciente.cuenta_corriente.tap { |c| c.update!(saldo_disponible: -5_000, limite_credito: 10_000) } }
 
   def registrar(monto:, medio: 'efectivo')
     sign_in_as(admin)

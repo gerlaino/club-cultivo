@@ -71,15 +71,18 @@
       </div>
 
       <!-- ── Estado de cuenta ───────────────────────────────── -->
-      <div v-if="(cc.limite_credito ?? 0) > 0" class="scc__estado-card">
+      <!-- TODO PACIENTE TIENE CUENTA (sep-2026): el saldo se muestra siempre —es donde cae el vuelto
+           que no se pudo dar—; «puede retirar aún» y la barra, sólo con crédito habilitado. -->
+      <div class="scc__estado-card">
         <div class="scc__estado-row">
           <div class="scc__estado-block" :class="cc.saldo_disponible < 0 ? 'scc__estado-block--deuda' : ''">
-            <span class="scc__estado-label">{{ cc.saldo_disponible < 0 ? 'Deuda actual' : (cc.saldo_disponible > 0 ? 'Saldo a favor' : 'Sin deuda') }}</span>
+            <span class="scc__estado-label">{{ cc.saldo_disponible < 0 ? 'Deuda actual' : (cc.saldo_disponible > 0 ? 'Saldo a favor' : 'Sin deuda ni saldo') }}</span>
             <span class="scc__estado-val" :class="cc.saldo_disponible < 0 ? 'scc__val--deuda' : cc.saldo_disponible > 0 ? 'scc__val--ok' : 'scc__val--zero'">
               {{ cc.saldo_disponible < 0 ? '−' : '' }}{{ fmtARS(Math.abs(cc.saldo_disponible)) }}
             </span>
+            <span v-if="cc.saldo_disponible > 0" class="scc__estado-nota">Se le descuenta solo en la próxima dispensa.</span>
           </div>
-          <div class="scc__estado-block">
+          <div v-if="(cc.limite_credito ?? 0) > 0" class="scc__estado-block">
             <span class="scc__estado-label">Puede retirar aún</span>
             <span class="scc__estado-val" :class="!cc.limite_credito ? 'scc__val--zero' : ccMargen <= 0 ? 'scc__val--deuda' : ccMargen < cc.limite_credito * 0.2 ? 'scc__val--warn' : 'scc__val--ok'">
               {{ fmtARS(Math.max(0, ccMargen)) }}
@@ -97,9 +100,10 @@
           <span class="scc__progreso-pct">{{ ccPorcentaje }}% del crédito utilizado</span>
         </div>
 
-        <!-- Registrar pago — disponible para admin y dispensador -->
+        <!-- Registrar pago — disponible para admin y dispensador. Paga la deuda, o adelanta
+             plata que queda a favor. -->
         <button v-if="puedeCobrar" class="scc__pago-btn" @click="abrirPago">
-          <i class="bi bi-cash-coin"></i> Registrar pago
+          <i class="bi bi-cash-coin"></i> {{ ccDeudaActual > 0 ? 'Registrar pago' : 'Dejar plata a favor' }}
         </button>
       </div>
 
@@ -127,7 +131,7 @@
     <Teleport to="body">
       <div v-modal="() => pagoOpen = false" v-if="pagoOpen" class="scc__modal-overlay" @click.self="pagoOpen = false">
         <div class="scc__modal">
-          <h3 class="scc__modal-title">Registrar pago</h3>
+          <h3 class="scc__modal-title">{{ ccDeudaActual > 0 ? 'Registrar pago' : 'Dejar plata a favor' }}</h3>
           <p v-if="ccDeudaActual > 0" class="scc__modal-deuda">
             Deuda actual: <strong>{{ fmtARS(ccDeudaActual) }}</strong>
           </p>
@@ -142,16 +146,16 @@
             <option value="transferencia">Transferencia</option>
             <option value="mercado_pago">Mercado Pago</option>
           </select>
-          <!-- No hay plata a favor: la cuenta corriente es lo que debe. Se registra hasta la
-               deuda; si trajo de más, se le da el vuelto. -->
-          <p v-if="pagoMonto > ccDeudaActual + 0.009" class="scc__modal-hint scc__modal-hint--mal">
-            <template v-if="ccDeudaActual > 0">Debe {{ fmtARS(ccDeudaActual) }}: se registra hasta eso. Si trajo de más, dale el vuelto.</template>
-            <template v-else>No debe nada: no hay pago que registrar.</template>
+          <!-- HAY PLATA A FAVOR (Germán, 18-sep-2026): lo que pase de la deuda queda a favor y se
+               descuenta solo en la próxima dispensa. Se dice con el número. -->
+          <p v-if="pagoMonto > ccDeudaActual + 0.009" class="scc__modal-hint">
+            <template v-if="ccDeudaActual > 0">Salda la deuda de {{ fmtARS(ccDeudaActual) }} y le quedan <strong>{{ fmtARS(pagoMonto - ccDeudaActual) }} a favor</strong> para la próxima dispensa.</template>
+            <template v-else>No debe nada: quedan <strong>{{ fmtARS(pagoMonto) }} a favor</strong> para la próxima dispensa.</template>
           </p>
           <div class="scc__modal-actions">
             <button class="scc__discard-btn" :disabled="pagando" @click="pagoOpen = false">Cancelar</button>
-            <button class="scc__save-btn" :disabled="pagando || !(pagoMonto > 0) || pagoMonto > ccDeudaActual + 0.009" @click="confirmarPago">
-              {{ pagando ? 'Registrando…' : 'Registrar pago' }}
+            <button class="scc__save-btn" :disabled="pagando || !(pagoMonto > 0)" @click="confirmarPago">
+              {{ pagando ? 'Registrando…' : (ccDeudaActual > 0 ? 'Registrar pago' : 'Dejar a favor') }}
             </button>
           </div>
         </div>
@@ -379,7 +383,6 @@ watch(() => props.refreshKey, (v, old) => { if (v !== old) loadCC() })
 .scc__modal { background: #fff; border-radius: 14px; padding: 1.5rem; width: 100%; max-width: 380px; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
 .scc__modal-title { font-size: 1.05rem; font-weight: 800; color: var(--c-slate-900); margin: 0 0 .5rem; }
 .scc__modal-deuda { font-size: .82rem; color: #b45309; margin: 0 0 1rem; }
-.scc__modal-hint--mal { color: #b91c1c; }
 .scc__modal-label { display: block; font-size: .75rem; font-weight: 700; color: var(--c-slate-500); margin: .75rem 0 .3rem; }
 .scc__modal-hint { font-size: .78rem; color: #15803d; margin: .6rem 0 0; }
 .scc__modal-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1.25rem; }
@@ -418,6 +421,7 @@ watch(() => props.refreshKey, (v, old) => { if (v !== old) loadCC() })
 .scc__estado-row { display: flex; gap: 1rem; }
 .scc__estado-block { flex: 1; display: flex; flex-direction: column; gap: .2rem; }
 .scc__estado-label { font-size: .7rem; font-weight: 600; color: var(--c-slate-500); text-transform: uppercase; letter-spacing: .04em; }
+.scc__estado-nota { display: block; font-size: .72rem; color: #15803d; margin-top: .2rem; }
 .scc__estado-val   { font-size: 1.4rem; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: var(--c-slate-900); }
 .scc__val--ok   { color: #15803d; }
 .scc__val--zero { color: var(--c-slate-400); }

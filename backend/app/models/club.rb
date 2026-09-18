@@ -148,8 +148,36 @@ class Club < ApplicationRecord
   end
 
   # Los roles que ESTA organización puede dar de alta hoy, según lo que tenga contratado.
+  # En uso personal no hay ninguno: la cuenta es la persona, y ofrecer un rol sería ofrecer
+  # un formulario que el plan rechaza.
   def roles_para_alta(base = ROLES_ALTA_CLUB)
+    return [] if personal?
     base.reject { |rol| modulo_faltante_para_rol(rol) }
+  end
+
+  # ── Uso personal ─────────────────────────────────────────────────────────────────────────
+  # El cultivador de casa. Es el plan `personal` de `PlanEnforcer` y nada más: no hay columna
+  # «tipo» porque serían dos perillas que tienen que coincidir. Lo que cambia con esto es
+  # QUÉ puede tener (sólo Cultivo y lo que lo extiende), quién entra (nadie más que él) y cómo
+  # se le habla («tu cultivo», no «la organización»). Todo lo demás —lotes, plantas, salas,
+  # stock, tareas, gastos, informes— es el mismo código que usa una organización.
+  def personal? = PlanEnforcer.normalizar(plan) == 'personal'
+
+  # Lo único que un uso personal puede tener prendido. Sin pacientes no hay dispensa, y sin
+  # dispensa nada de lo que cuelga de ella tiene sentido. El candado se aplica en el controller
+  # del super admin (como `sin_addons_huerfanos`): por la API se saltea siempre, y como
+  # validación de modelo volvería inguardable a quien pase de organización a personal con
+  # módulos viejos guardados.
+  MODULOS_PERSONAL = %w[cultivo iot ia chatbot].freeze
+
+  # Con qué nace: Cultivo y el ambiente. El IoT va incluido en el precio del plan (ver
+  # `Precios`) porque es el gancho del producto para el que cultiva en casa: un sensor de
+  # $10.000 y la app le dice cómo viene el VPD. La IA se contrata aparte, como en los otros.
+  FEATURES_PERSONAL = { 'cultivo' => true, 'iot' => true }.freeze
+
+  # Deja en `features` sólo lo que el uso personal puede tener. Apagar siempre se acepta.
+  def self.acotar_a_personal(features)
+    features.to_h.reject { |clave, valor| valor == true && !MODULOS_PERSONAL.include?(clave.to_s) }
   end
 
   ROLES_META = {
@@ -658,8 +686,11 @@ class Club < ApplicationRecord
   # `ia_tier` sigue en la tabla y en la auditoría, pero ya no lo lee nadie: la columna se queda
   # para no perder el historial de lo que se le había puesto a cada organización.
   IA_TIERS = {
-    'basico' => { label: 'Básico', limite_hora: 20, limite_mes:   500, color: '#64748b' },
-    'total'  => { label: 'Total',  limite_hora: 60, limite_mes: 2_000, color: '#0891b2' },
+    'basico'   => { label: 'Básico',   limite_hora: 20, limite_mes:   500, color: '#64748b' },
+    'total'    => { label: 'Total',    limite_hora: 60, limite_mes: 2_000, color: '#0891b2' },
+    # Una persona: el freno horario es de ráfaga y el mensual alcanza para un plan de trabajo
+    # por lote y el registro por voz de todos los días.
+    'personal' => { label: 'Personal', limite_hora: 10, limite_mes:   150, color: '#65a30d' },
   }.freeze
 
   def ia_config

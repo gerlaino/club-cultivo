@@ -56,6 +56,11 @@ class Paciente < ApplicationRecord
 
   before_validation :normalize_dni!
   before_create     :assign_carnet_token
+  # TODO PACIENTE NACE CON CUENTA CORRIENTE (decisión de Germán, 18-sep-2026). Es la cuenta donde
+  # cae el vuelto que no se pudo dar y lo que pagó de más, y se descuenta sola en la próxima. Nace
+  # con límite 0: tener SALDO (a favor) es de todos; poder DEBER (`limite_credito`) lo decide el
+  # admin por paciente, como siempre. Son dos cosas y estaban en un solo flag.
+  after_create      :crear_cuenta_corriente!
   after_create_commit :dispatch_webhook
 
   validates :nombre, :apellido, :dni, :dni_normalizado, :fecha_nacimiento, presence: true
@@ -199,6 +204,20 @@ class Paciente < ApplicationRecord
 
   def saldo_cc
     cuenta_corriente&.saldo_disponible&.to_f
+  end
+
+  # Lo que tiene A FAVOR (saldo positivo). Cero si debe o no tiene cuenta.
+  def saldo_a_favor
+    [saldo_cc.to_f, 0.0].max
+  end
+
+  # La cuenta corriente, creándola si es un paciente anterior al alta automática.
+  def cuenta_corriente!
+    cuenta_corriente || crear_cuenta_corriente!
+  end
+
+  def crear_cuenta_corriente!
+    create_cuenta_corriente!(club_id: club_id, saldo_disponible: 0, limite_credito: 0)
   end
 
   def limite_cc

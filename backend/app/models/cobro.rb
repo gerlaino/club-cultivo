@@ -1,12 +1,17 @@
 # Una línea de cobro de una dispensación. Una dispensa puede tener varias:
 # parte en efectivo, parte en transferencia, y el resto a cuenta corriente (deuda).
 #   efectivo / transferencia → pagado: true  (entró plata, es ingreso real)
+#   saldo_a_favor            → pagado: true  (la plata YA había entrado: es lo que el paciente
+#                              dejó a cuenta la vez que pagó de más, y ahora lo consume. No lleva
+#                              asiento —el ingreso fue el «Aporte socio» de aquel día— ni entra al
+#                              cajón hoy: por eso no está en MEDIOS_PAGADOS, que es lo que arquea.)
 #   cuenta_corriente         → pagado: false (queda en cuenta del socio, deuda)
 # La suma de los cobros nunca debe superar el total (aporte_socio_ars) de la dispensa.
 class Cobro < ApplicationRecord
   include Restorable
-  MEDIOS    = %w[efectivo transferencia cuenta_corriente].freeze
+  MEDIOS    = %w[efectivo transferencia saldo_a_favor cuenta_corriente].freeze
   CONTEXTOS = %w[creacion entrega contabilidad].freeze
+  # Lo que entró al cajón o a la cuenta bancaria EN ESTE cobro: lo que suma el arqueo.
   MEDIOS_PAGADOS = %w[efectivo transferencia].freeze
 
   belongs_to :dispensacion
@@ -51,6 +56,6 @@ class Cobro < ApplicationRecord
   private
 
   def set_pagado_por_medio
-    self.pagado = MEDIOS_PAGADOS.include?(medio)
+    self.pagado = !a_credito?
   end
 end

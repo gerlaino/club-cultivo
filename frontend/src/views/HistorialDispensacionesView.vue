@@ -278,7 +278,7 @@ function formatHora(ts) {
   return new Date(ts).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })
 }
 function medioPagoLabel(m) {
-  const L = { efectivo: 'Efectivo', transferencia: 'Transf.', debito: 'Débito', credito: 'Crédito', cuenta_corriente: 'Cta. cte.', no_abona: 'No abona', credito_gramos: 'Gramos', mixto: 'Mixto', regalo: 'Regalo', cambio: 'Cambio' }
+  const L = { efectivo: 'Efectivo', transferencia: 'Transf.', debito: 'Débito', credito: 'Crédito', cuenta_corriente: 'Cta. cte.', saldo_a_favor: 'A favor', no_abona: 'No abona', credito_gramos: 'Gramos', mixto: 'Mixto', regalo: 'Regalo', cambio: 'Cambio' }
   return L[m] || m || '—'
 }
 // Qué decir en el badge de pago. No siempre es el medio: si es contra entrega y todavía
@@ -300,7 +300,7 @@ function pagoBadge(d) {
 }
 
 function medioPagoClass(m) {
-  const C = { efectivo: 'hd__pago--verde', transferencia: 'hd__pago--azul', debito: 'hd__pago--azul', credito: 'hd__pago--morado', cuenta_corriente: 'hd__pago--amber', no_abona: 'hd__pago--gris', credito_gramos: 'hd__pago--morado', mixto: 'hd__pago--azul', regalo: 'hd__pago--morado', cambio: 'hd__pago--morado' }
+  const C = { efectivo: 'hd__pago--verde', transferencia: 'hd__pago--azul', debito: 'hd__pago--azul', credito: 'hd__pago--morado', cuenta_corriente: 'hd__pago--amber', saldo_a_favor: 'hd__pago--verde', no_abona: 'hd__pago--gris', credito_gramos: 'hd__pago--morado', mixto: 'hd__pago--azul', regalo: 'hd__pago--morado', cambio: 'hd__pago--morado' }
   return C[m] || 'hd__pago--gris'
 }
 function descuentoPct(d) {

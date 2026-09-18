@@ -16,7 +16,7 @@ RSpec.describe 'Delivery con el período contable cerrado', type: :request do
   let(:sede)  { create(:sede, club: club, tipo: 'mixta') }
   let(:lote)  { ActsAsTenant.with_tenant(club) { create(:lote, club: club, sala: create(:sala, club: club, sede: sede)) } }
   let(:paciente) { create(:paciente, club: club) }
-  let!(:cc)   { CuentaCorriente.create!(paciente: paciente, club: club, saldo_disponible: 0, limite_credito: 100_000) }
+  let!(:cc)   { paciente.cuenta_corriente!.tap { |c| c.update!(saldo_disponible: 0, limite_credito: 100_000) } }
 
   let!(:stock) do
     ActsAsTenant.with_tenant(club) do

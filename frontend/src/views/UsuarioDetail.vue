@@ -288,7 +288,7 @@ function cambiarMesStats(delta) {
   cargarStats()
   cargarJornadas()
 }
-const MEDIO_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia', cuenta_corriente: 'Cuenta corriente', no_abona: 'No abona', credito_gramos: 'Crédito gramos' }
+const MEDIO_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia', cuenta_corriente: 'Cuenta corriente', saldo_a_favor: 'Saldo a favor', no_abona: 'No abona', credito_gramos: 'Crédito gramos' }
 
 // ── Historial de actividad (audit log, read-only) ─────────────────────────
 // Solo admin: el endpoint es admin-only (require_admin!). No es editable ni borrable.
