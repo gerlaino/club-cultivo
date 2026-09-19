@@ -77,7 +77,7 @@
               <i v-if="modoSeleccion && esSeleccionable(t)" class="bi tl__chip-check" :class="isSel(t.id) ? 'bi-check-square-fill' : 'bi-square'"></i>
               <span v-else class="tl__chip-dot"></span>
               <span class="tl__chip-titulo">{{ t.titulo }}</span>
-              <span v-if="t.asignada_a" class="tl__chip-user" :title="t.asignada_a.nombre">{{ initials(t.asignada_a.nombre) }}</span>
+              <span v-if="t.asignada_a && !esPersonal" class="tl__chip-user" :title="t.asignada_a.nombre">{{ initials(t.asignada_a.nombre) }}</span>
               <i v-if="t.estado === 'completada'" class="bi bi-check-circle-fill tl__chip-ico tl__chip-ico--done"></i>
               <i v-else-if="t.estado === 'en_progreso'" class="bi bi-play-circle-fill tl__chip-ico tl__chip-ico--prog"></i>
             </div>
@@ -103,7 +103,7 @@
             </div>
             <div class="tl__tarea-meta">
               {{ TIPO_LABELS[t.tipo] || t.tipo }}
-              <span v-if="t.asignada_a"> · {{ t.asignada_a.nombre }}</span>
+              <span v-if="t.asignada_a && !esPersonal"> · {{ t.asignada_a.nombre }}</span>
               <span v-if="t.creada_por"> · creada por {{ t.creada_por.nombre }}</span>
             </div>
           </div>
@@ -261,6 +261,12 @@ import { listTareas, updateTarea, createRegistroAmbiental, createLoteEvento, com
 import { useTareasStore } from '../stores/tareas'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
+// `toISO` arma la fecha con los componentes LOCALES (ver utils/dates). Acá había quedado una
+// función local del mismo nombre que se llamaba a sí misma: la ficha de todo lote explotaba
+// con «Maximum call stack size exceeded» apenas montaba la solapa de tareas.
+import { toISO } from '../utils/dates.js'
+import { useUsoPersonal } from '../composables/useUsoPersonal.js'
+const { esPersonal } = useUsoPersonal()
 import DsSpinner from '../design-system/components/Spinner.vue'
 import LoteAplicarPlanModal from './lotes/LoteAplicarPlanModal.vue'
 
@@ -409,10 +415,6 @@ function getMondayOf(date) {
   const day = d.getDay()
   d.setDate(d.getDate() - (day === 0 ? 6 : day - 1))
   return d
-}
-
-function toISO(date) {
-  return toISO(date)
 }
 
 const hoyISO       = toISO(new Date())
