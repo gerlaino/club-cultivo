@@ -56,8 +56,23 @@ export default defineConfig({
           { src: 'logo-ce-redondo.png', sizes: '500x500', type: 'image/png', purpose: 'any' },
         ],
       },
+      // SÓLO LA CÁSCARA se precachea. Con `**/*` el teléfono bajaba la app ENTERA al instalar y
+      // de nuevo en cada deploy: 430 archivos, 8,8 MB, con html2pdf, jspdf, el lector de códigos
+      // y las 230 pantallas de escritorio que un celu jamás abre. Hasta que eso no terminaba el
+      // service worker no estaba activo (push «no terminó de instalarse») y cada deploy era una
+      // descarga y una recarga encima de quien estaba trabajando (19-sep-2026). El resto se
+      // cachea al usarse (`CacheFirst` sobre /assets/ en `sw.js`: son archivos con hash,
+      // inmutables) y `MobileShell` precalienta las pantallas del rol después de entrar.
       injectManifest: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        globPatterns: [
+          'index.html',
+          'assets/index-*.{js,css}',
+          'assets/vendor-vue-*.js',
+          'assets/*.woff2',
+          // Los PNG del logo van por `includeAssets` (sólo el del manifest): hay cuatro copias
+          // en `public/`, 1,9 MB, y el resto se cachea al usarse.
+          '*.{ico,svg}',
+        ],
       },
 
     })

@@ -35,7 +35,7 @@
             <!-- El mismo interruptor que el escritorio. Sin esto el teléfono sólo tenía el pedido
                  automático de los 4 segundos: si el alta fallaba no había cómo reintentar ni
                  forma de enterarse de por qué (19-sep-2026). -->
-            <button v-if="pushDisponible" class="msh__menu-item" :disabled="pushLoading" @click="togglePush">
+            <button v-if="pushDisponible || iosSinInstalar" class="msh__menu-item" :disabled="pushLoading" @click="togglePush">
               <i class="bi" :class="pushSubscribed ? 'bi-bell-fill' : 'bi-bell-slash'"></i>
               {{ pushSubscribed ? 'Notificaciones activas' : 'Activar notificaciones' }}
             </button>
@@ -131,7 +131,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { useClubStore }  from '../../stores/club'
@@ -365,9 +365,10 @@ async function doLogout() {
 onMounted(() => { if (auth.user?.role === 'delivery') cajaDelivery.cargar() })
 
 // ── Push (sin cambios de comportamiento) ────────────────────────
-// `disponible` y no `supported`: sin clave VAPID del servidor no hay a qué suscribirse, y
-// pedirle permiso al teléfono para nada quemaba la única oportunidad de preguntar.
-const { disponible: pushDisponible, subscribed: pushSubscribed, loading: pushLoading,
+// Ya no se pide permiso solo a los 4 segundos: pedirlo sin contexto —y, en iPhone, fuera de
+// un toque— fallaba en silencio y quemaba la única oportunidad de preguntar. Se activa desde
+// el menú, con un toque y con un toast que dice qué pasó.
+const { disponible: pushDisponible, iosSinInstalar, subscribed: pushSubscribed, loading: pushLoading,
         subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications()
 
 // Igual que en `AdminTopBar`: nunca mudo. Si no se pudo, el toast dice por qué.
@@ -381,16 +382,29 @@ async function togglePush() {
   }
   menuOpen.value = false
 }
+// La píldora «Sin conexión» (`OfflineIndicator`, hermana de este shell en `App.vue`) vive
+// pegada al borde de abajo y acá abajo está la barra de solapas: se la sube mientras el shell
+// esté montado. Va en `:root` porque no es descendiente.
+onMounted(() => document.documentElement.style.setProperty('--oi-bottom', 'calc(72px + env(safe-area-inset-bottom))'))
+onUnmounted(() => document.documentElement.style.removeProperty('--oi-bottom'))
+
+// ── Precalentar las pantallas del rol ─────────────────────────────────
+// El service worker ya no baja la app entera al instalar (ver `vite.config.js`): guarda lo que
+// se usa. Para que lo offline de manicura y delivery siga andando sin haber pasado antes por
+// cada pantalla, apenas entra —y con el teléfono desocupado— se piden los chunks de su menú.
+// Es un `import()` que el navegador resuelve y el service worker cachea; si falla, no pasa nada.
 onMounted(() => {
-  const key = `push_asked_${auth.user?.id || 'u'}`
-  if (!pushDisponible.value || localStorage.getItem(key)) return
-  setTimeout(async () => {
-    if (pushSubscribed.value) return
-    const resultado = await pushSubscribe()
-    // Se anota que ya se preguntó sólo si se llegó a preguntar: un servidor sin clave o un
-    // error de red no cuentan, para volver a intentar la próxima vez.
-    if (resultado === true || resultado === 'denegado' || resultado === 'rechazado') localStorage.setItem(key, '1')
-  }, 4000)
+  const precalentar = () => {
+    navItems.value.forEach(item => {
+      try {
+        router.resolve(item.to).matched.forEach(r => {
+          Object.values(r.components || {}).forEach(c => { if (typeof c === 'function') c().catch(() => {}) })
+        })
+      } catch {}
+    })
+  }
+  if ('requestIdleCallback' in window) requestIdleCallback(precalentar, { timeout: 8000 })
+  else setTimeout(precalentar, 3000)
 })
 </script>
 

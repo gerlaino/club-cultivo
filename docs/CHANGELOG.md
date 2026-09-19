@@ -1,5 +1,32 @@
 # Changelog
 
+## Septiembre 2026 (cj) — La PWA bajaba la app entera al teléfono: 430 archivos, 8,8 MB, en cada deploy
+
+- **Causa del «se traba» y del «no terminó de instalarse» (19-sep, iPhone de Germán).** El
+  service worker precacheaba `**/*.{js,css,…}`: 430 archivos, 8,8 MB, con html2pdf (956 K),
+  jspdf, html2canvas, el lector de códigos de barras (452 K), los gráficos y las 230 pantallas
+  de escritorio. Hasta que eso no terminaba de bajar el SW no estaba activo (push: «no terminó
+  de instalarse»), y cada deploy era volver a bajarlo y recargar encima de quien trabajaba —
+  cuatro deploys en una hora, cuatro recargas.
+- **Ahora se precachea sólo la cáscara: 9 archivos, 1,1 MB** (`vite.config.js`
+  `globPatterns`), y el resto se cachea **al usarse** (`CacheFirst` sobre `/assets/`, imágenes y
+  fuentes en `sw.js`: archivos con hash, inmutables). `MobileShell` **precalienta las pantallas
+  del menú del rol** después de entrar (`router.resolve` + `import()` en idle), así lo offline
+  de manicura y delivery sigue andando sin haber pasado por cada pantalla. Verificado con
+  Chromium + 3G lento (400 kbit/s): login visible a los 9 s con el SW ya activo; sin señal, las
+  tres solapas del delivery abren con lo cacheado y cero errores.
+- **La API espera 4 s, no 10** (`networkTimeoutSeconds`): con señal floja cada pantalla se
+  colgaba diez segundos antes de mostrar lo guardado.
+- **Sin pedido automático de permiso a los 4 segundos** en el teléfono: pedirlo sin contexto —y
+  en iPhone fuera de un toque— fallaba en silencio y quemaba la única oportunidad. Se activa
+  desde el menú.
+- **iPhone desde Safari sin instalar**: Apple no da push ahí. El botón aparece igual y el toast
+  dice cómo (Compartir → «Agregar a inicio»), en vez de esconderse (`iosSinInstalar`).
+- **La píldora «Sin conexión» tapaba la solapa del medio** de la barra inferior (vivía a 1rem
+  del borde). `MobileShell` la sube con `--oi-bottom` en `:root` mientras está montado. Se
+  descubrió probando offline con Playwright: «Sin conexión intercepts pointer events».
+- Los 4 PNG del logo (1,9 MB, uno de 728 K por duplicado) tampoco van en el precache.
+
 ## Septiembre 2026 (ci) — Push: «Activar notificaciones» no hacía nada en producción
 
 - **Causa raíz, verificada en el bundle de producción:** la clave pública VAPID salía de

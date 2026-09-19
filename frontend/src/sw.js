@@ -1,7 +1,7 @@
 import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from 'workbox-precaching'
 import { clientsClaim } from 'workbox-core'
 import { registerRoute, NavigationRoute } from 'workbox-routing'
-import { NetworkFirst } from 'workbox-strategies'
+import { NetworkFirst, CacheFirst } from 'workbox-strategies'
 import { ExpirationPlugin } from 'workbox-expiration'
 import { CacheableResponsePlugin } from 'workbox-cacheable-response'
 
@@ -44,6 +44,22 @@ registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html'), {
 // Network-first para la API.
 // VITE_API_URL puede ser absoluta (https://api…) o relativa (/api, mismo origen).
 // Si es relativa, new URL() tiraría error → API_ORIGIN null y matcheamos por pathname.
+// Lo que NO está en el precache (todo salvo la cáscara: ver `vite.config.js`) se baja la
+// primera vez que se usa y queda. Son archivos con hash en el nombre: si cambia el contenido
+// cambia la URL, así que se pueden guardar sin fecha de vencimiento corta. Sin esto, cada deploy
+// era bajar la app entera al teléfono.
+registerRoute(
+  ({ url, request }) => request.method === 'GET' && url.origin === self.location.origin &&
+                        (url.pathname.startsWith('/assets/') || request.destination === 'image' || request.destination === 'font'),
+  new CacheFirst({
+    cacheName: 'assets-cache',
+    plugins: [
+      new ExpirationPlugin({ maxEntries: 400, maxAgeSeconds: 60 * 60 * 24 * 60, purgeOnQuotaError: true }),
+      new CacheableResponsePlugin({ statuses: [0, 200] }),
+    ],
+  })
+)
+
 const API_ORIGIN = (() => {
   const v = import.meta.env.VITE_API_URL
   if (!v) return null
@@ -70,7 +86,9 @@ registerRoute(
       new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 }),
       new CacheableResponsePlugin({ statuses: [0, 200] }),
     ],
-    networkTimeoutSeconds: 10,
+    // 4 y no 10: con señal floja, cada pantalla se quedaba colgada diez segundos antes de
+    // mostrar lo que ya tenía guardado.
+    networkTimeoutSeconds: 4,
   })
 )
 

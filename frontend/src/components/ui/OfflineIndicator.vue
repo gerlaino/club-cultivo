@@ -57,8 +57,11 @@ const guardados = computed(() => queue.total + entregas.value.length)
 </template>
 
 <style scoped>
+/* `--oi-bottom` lo fija el envoltorio del teléfono (`MobileShell`): la píldora vivía a 1rem del
+   borde, justo ENCIMA de la barra de solapas, y sin señal tapaba la del medio. Se descubrió
+   probando la navegación offline con Playwright: «Sin conexión intercepts pointer events». */
 .oi {
-  position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%);
+  position: fixed; bottom: var(--oi-bottom, 1rem); left: 50%; transform: translateX(-50%);
   display: inline-flex; align-items: center; gap: .5rem;
   padding: .5rem 1rem; border-radius: 999px;
   font-size: .78rem; font-weight: 600; z-index: 9999;

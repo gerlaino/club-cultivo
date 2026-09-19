@@ -19,6 +19,7 @@ function urlBase64ToUint8Array(base64) {
 // `MOTIVOS`, para que quien lo muestre no invente el suyo.
 export const MOTIVOS = {
   no_soportado:   'Este navegador no soporta notificaciones push.',
+  ios_instalar:   'En iPhone las notificaciones sólo funcionan con la app agregada a la pantalla de inicio: en Safari tocá Compartir → «Agregar a inicio» y abrila desde ahí.',
   no_configurado: 'Las notificaciones push no están configuradas en este servidor.',
   sin_sw:         'La app no terminó de instalarse en este navegador. Recargá la página y probá de nuevo.',
   denegado:       'El navegador tiene las notificaciones bloqueadas para esta app: hay que permitirlas desde la configuración del sitio.',
@@ -40,6 +41,12 @@ function swListo() {
 export function usePushNotifications() {
   const auth       = useAuthStore()
   const supported  = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window
+  // iPhone desde Safari, sin instalar: Apple no da push ahí (recién con la app en la pantalla de
+  // inicio aparece `PushManager`). Se distingue del «no soportado» genérico para poder decirle
+  // a la persona qué hacer, en vez de esconder el botón.
+  const esIOS         = /iPhone|iPad|iPod/.test(navigator.userAgent)
+  const standalone    = window.matchMedia?.('(display-mode: standalone)')?.matches || navigator.standalone === true
+  const iosSinInstalar = esIOS && !standalone && !('PushManager' in window)
   const subscribed = ref(false)
   const loading    = ref(false)
   const denied     = ref(false)
@@ -59,6 +66,7 @@ export function usePushNotifications() {
 
   // Devuelve `true` si quedó suscripto, o la clave del motivo (`MOTIVOS`) si no.
   async function subscribe() {
+    if (iosSinInstalar)  return 'ios_instalar'
     if (!supported)      return 'no_soportado'
     if (!vapidKey.value) return 'no_configurado'
     loading.value = true
@@ -118,5 +126,5 @@ export function usePushNotifications() {
 
   onMounted(checkStatus)
 
-  return { supported, disponible, subscribed, loading, denied, subscribe, unsubscribe, checkStatus }
+  return { supported, disponible, iosSinInstalar, subscribed, loading, denied, subscribe, unsubscribe, checkStatus }
 }
