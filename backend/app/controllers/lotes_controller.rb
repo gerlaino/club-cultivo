@@ -1060,6 +1060,7 @@ class LotesController < ApplicationController
       costo_insumos:      costos&.costo_insumos.to_f,
       costo_energia:      costos&.costo_energia.to_f,
       costo_mano_obra:    costos&.costo_mano_obra.to_f,
+      costo_otros:        costos&.costo_otros.to_f,
       costo_prorrateado:  costos&.costo_prorrateado.to_f,
       costo_por_gramo:    costos&.costo_por_gramo&.to_f,
       notas_costo:        costos&.notas,

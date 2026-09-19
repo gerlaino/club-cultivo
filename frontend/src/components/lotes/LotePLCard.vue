@@ -75,7 +75,8 @@
             <span v-if="pl.costo_insumos">Insumos {{ formatARS(pl.costo_insumos) }}</span>
             <span v-if="pl.costo_energia">Energía {{ formatARS(pl.costo_energia) }}</span>
             <span v-if="pl.costo_mano_obra">M.O. {{ formatARS(pl.costo_mano_obra) }}</span>
-            <span v-if="pl.costo_prorrateado">Otros {{ formatARS(pl.costo_prorrateado) }}</span>
+            <span v-if="pl.costo_otros">Otros {{ formatARS(pl.costo_otros) }}</span>
+            <span v-if="pl.costo_prorrateado">Prorrateado {{ formatARS(pl.costo_prorrateado) }}</span>
             <span v-if="pl.gramos_en_stock > 0">{{ pl.gramos_en_stock.toFixed(1) }} g en stock</span>
           </div>
           <div v-if="!pl.tiene_costos" class="plc__hints">
@@ -103,6 +104,7 @@
               <span v-if="pl.costo_insumos">Insumos {{ formatARS(pl.costo_insumos) }}</span>
               <span v-if="pl.costo_energia">Energía {{ formatARS(pl.costo_energia) }}</span>
               <span v-if="pl.costo_mano_obra">M.O. {{ formatARS(pl.costo_mano_obra) }}</span>
+              <span v-if="pl.costo_otros">Otros {{ formatARS(pl.costo_otros) }}</span>
               <span v-if="pl.costo_prorrateado">Prorr. {{ formatARS(pl.costo_prorrateado) }}</span>
             </div>
             <span v-else class="plc__col-none">Sin costos cargados</span>

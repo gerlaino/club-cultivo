@@ -80,6 +80,8 @@
         <dt>Insumos</dt><dd>{{ formatARS(costoLote.costo_insumos || 0) }}</dd>
         <dt>Energía</dt><dd>{{ formatARS(costoLote.costo_energia || 0) }}</dd>
         <dt>Mano de obra</dt><dd>{{ formatARS(costoLote.costo_mano_obra || 0) }}</dd>
+        <dt v-if="costoLote.costo_otros">Otros gastos</dt>
+        <dd v-if="costoLote.costo_otros">{{ formatARS(costoLote.costo_otros || 0) }}</dd>
         <dt v-if="costoLote.costo_prorrateado">Prorrateado</dt>
         <dd v-if="costoLote.costo_prorrateado">{{ formatARS(costoLote.costo_prorrateado || 0) }}</dd>
         <dt class="lcc__dl-total">Total</dt>

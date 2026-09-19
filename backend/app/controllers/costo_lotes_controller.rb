@@ -80,6 +80,7 @@ class CostoLotesController < ApplicationController
       costo_insumos:    c.costo_insumos.to_f,
       costo_energia:    c.costo_energia.to_f,
       costo_mano_obra:  c.costo_mano_obra.to_f,
+      costo_otros:      c.costo_otros.to_f,
       costo_prorrateado: c.costo_prorrateado.to_f,
       costo_total:      c.costo_total.to_f,
       gramos_producidos: c.gramos_producidos&.to_f,
