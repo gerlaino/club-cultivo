@@ -34,7 +34,6 @@ export function formatFechaLarga(d) {
   return date.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-/** Hoy como ISO YYYY-MM-DD */
-export function hoyISO() {
-  return hoyISO()
-}
+/** Hoy como ISO YYYY-MM-DD (fecha LOCAL, ver utils/dates). Se re-exporta de ahí: la copia
+ *  de acá había quedado llamándose a sí misma. */
+export { hoyISO } from './dates.js'
