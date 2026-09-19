@@ -24,8 +24,15 @@
   (incógnito no tiene Push API) → permiso → `POST /push_subscriptions 201` → suscripción en el
   navegador → `PushNotificationJob.perform_now` aceptado por FCM. Specs: `me_push_vapid_spec`,
   `usePushNotifications.test.js`.
-- **Pendiente de Germán:** cargar las tres `VAPID_*` en Render (web service y worker, el mismo
-  par). Sin eso el backend sigue sin mandar (`PushNotificationJob` hace `return`).
+- **Segunda causa, del backend, encontrada corriéndolo a mano en Render con las claves ya
+  cargadas: `PushNotificationJob` moría con `NoTenantSet`.** El job llega por id, sin club, y
+  desde `require_tenant = true` (TEN-01c, jul-2026) el `PushSubscription.find_by` a secas
+  explotaba antes de mandar nada — en el worker, en silencio, 3 reintentos y a muertos. O sea:
+  aunque alguien hubiera estado suscripto, ningún push salió jamás. Ahora busca la suscripción
+  con `without_tenant` y manda con `with_tenant(sub.club)`. `push_notification_job_spec` corre
+  el job COMO SIDEKIQ (sin `test_tenant`): rojo con el job viejo, verde con el nuevo. Los otros
+  dos jobs sin tenant (`PurgarAdjuntosEntrega`, `JwtDenylistCleanup`) andan.
+- `VAPID_*` cargadas en Render el 19-sep (`cultivo-staging-api` y `club-cultivo-worker`).
 
 ## Septiembre 2026 (ch) — Uso personal: el ambiente, la IA y el chatbot se eligen, y el alta habla de una persona
 

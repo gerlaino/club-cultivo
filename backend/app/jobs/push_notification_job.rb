@@ -5,9 +5,19 @@ class PushNotificationJob < ApplicationJob
   def perform(subscription_id, title:, body:, url: '/')
     return unless ENV['VAPID_PUBLIC_KEY'].present? && ENV['VAPID_PRIVATE_KEY'].present?
 
-    sub = PushSubscription.find_by(id: subscription_id, active: true)
+    # Sin tenant a propósito: el job llega por id, sin club, y con `require_tenant` el `find_by`
+    # a secas moría con `NoTenantSet` antes de mandar nada — en el worker, en silencio, tres
+    # reintentos y a la cola de muertos. Desde que se prendió `require_tenant` (auditoría
+    # TEN-01c) NO SALIÓ UN SOLO PUSH; se descubrió el 19-sep-2026 corriéndolo a mano en Render.
+    sub = ActsAsTenant.without_tenant { PushSubscription.find_by(id: subscription_id, active: true) }
     return unless sub
 
+    ActsAsTenant.with_tenant(sub.club) { enviar(sub, title, body, url) }
+  end
+
+  private
+
+  def enviar(sub, title, body, url)
     WebPush.payload_send(
       # `tag` distinto por aviso: el service worker se lo pasa a `showNotification`, y con el
       # mismo tag el teléfono REEMPLAZA la notificación anterior en vez de sumar una. Dos alertas
