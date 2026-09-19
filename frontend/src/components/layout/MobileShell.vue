@@ -32,6 +32,13 @@
             <button class="msh__menu-item" @click="irPerfil">
               <i class="bi bi-person"></i> Mi perfil
             </button>
+            <!-- El mismo interruptor que el escritorio. Sin esto el teléfono sólo tenía el pedido
+                 automático de los 4 segundos: si el alta fallaba no había cómo reintentar ni
+                 forma de enterarse de por qué (19-sep-2026). -->
+            <button v-if="pushDisponible" class="msh__menu-item" :disabled="pushLoading" @click="togglePush">
+              <i class="bi" :class="pushSubscribed ? 'bi-bell-fill' : 'bi-bell-slash'"></i>
+              {{ pushSubscribed ? 'Notificaciones activas' : 'Activar notificaciones' }}
+            </button>
             <button class="msh__menu-item msh__menu-item--danger" @click="doLogout">
               <i class="bi bi-box-arrow-right"></i> Cerrar sesión
             </button>
@@ -129,7 +136,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { useClubStore }  from '../../stores/club'
 import { useCajaDeliveryStore } from '../../stores/cajaDelivery.js'
-import { usePushNotifications } from '../../composables/usePushNotifications.js'
+import { usePushNotifications, MOTIVOS } from '../../composables/usePushNotifications.js'
 import { useToast } from '../../composables/useToast.js'
 import { listSalas } from '../../lib/api.js'
 import MobileSheet from '../mobile/MobileSheet.vue'
@@ -360,7 +367,20 @@ onMounted(() => { if (auth.user?.role === 'delivery') cajaDelivery.cargar() })
 // ── Push (sin cambios de comportamiento) ────────────────────────
 // `disponible` y no `supported`: sin clave VAPID del servidor no hay a qué suscribirse, y
 // pedirle permiso al teléfono para nada quemaba la única oportunidad de preguntar.
-const { disponible: pushDisponible, subscribed: pushSubscribed, subscribe: pushSubscribe } = usePushNotifications()
+const { disponible: pushDisponible, subscribed: pushSubscribed, loading: pushLoading,
+        subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications()
+
+// Igual que en `AdminTopBar`: nunca mudo. Si no se pudo, el toast dice por qué.
+async function togglePush() {
+  if (pushSubscribed.value) {
+    const r = await pushUnsubscribe()
+    r === true ? toast.info('Notificaciones desactivadas en este dispositivo') : toast.error(MOTIVOS[r] || MOTIVOS.error)
+  } else {
+    const r = await pushSubscribe()
+    r === true ? toast.success('Notificaciones activadas en este dispositivo') : toast.error(MOTIVOS[r] || MOTIVOS.error)
+  }
+  menuOpen.value = false
+}
 onMounted(() => {
   const key = `push_asked_${auth.user?.id || 'u'}`
   if (!pushDisponible.value || localStorage.getItem(key)) return

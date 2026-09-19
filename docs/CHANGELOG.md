@@ -40,6 +40,9 @@
   navegador y devuelve `true`/motivo, y el toast mira el resultado. `push_subscriptions_spec`.
   Visto en Chromium con perfil persistente: activar (201) → desactivar (204, navegador sin
   suscripción) → activar (201).
+- **El teléfono tiene el mismo interruptor en su menú** (`MobileShell`, con los mismos
+  toasts). Antes sólo tenía el pedido automático de los 4 segundos: si el alta fallaba no
+  había cómo reintentar ni forma de saber por qué.
 
 ## Septiembre 2026 (ch) — Uso personal: el ambiente, la IA y el chatbot se eligen, y el alta habla de una persona
 
