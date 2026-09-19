@@ -52,6 +52,15 @@ class MeController < ApplicationController
                                # A qué sedes se asigna cada rol: la pantalla ofrece sólo eso.
                                'sedes_por_rol'         => Sede::TIPOS_POR_ROL }
 
+    # La clave pública VAPID con la que el navegador se suscribe a las notificaciones push. Viaja
+    # acá y NO en el build del frontend: hasta el 19-sep-2026 salía de `VITE_VAPID_PUBLIC_KEY`,
+    # que en Render nadie pasaba al `npm run build`, y Vite compilaba `subscribe()` como
+    # `return false` — «Activar notificaciones» no hacía nada y nunca hubo una suscripción a la
+    # que mandarle un push. El backend es el único que tiene el par (`PushNotificationJob`), así
+    # que es el que dice con cuál suscribirse; `nil` = este servidor no manda push y la pantalla
+    # no ofrece el botón.
+    data['push_vapid_public_key'] = ENV['VAPID_PUBLIC_KEY'].presence
+
     render json: data
   end
 end

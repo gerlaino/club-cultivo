@@ -80,7 +80,7 @@
 
                 <!-- Push notifications toggle -->
                 <button
-                  v-if="pushSupported && !pushDenied"
+                  v-if="pushDisponible && !pushDenied"
                   class="atb__user-item atb__push-item"
                   :class="{ 'atb__push-item--on': pushSubscribed }"
                   @click="togglePush"
@@ -121,7 +121,8 @@ import { detectGroup, entradaVisible, labelDe, useNavContext } from '../../compo
 import DsDropdown         from '../../design-system/components/Dropdown.vue'
 import DsAvatar           from '../../design-system/components/Avatar.vue'
 import { Bell, BellRing, BellOff, Menu, HelpCircle, Sparkles } from 'lucide-vue-next'
-import { usePushNotifications } from '../../composables/usePushNotifications.js'
+import { usePushNotifications, MOTIVOS } from '../../composables/usePushNotifications.js'
+import { useToast }       from '../../composables/useToast.js'
 import HelpDrawer         from '../HelpDrawer.vue'
 import ChatbotAdmin       from '../ChatbotAdmin.vue'
 import NotificationDrawer from '../ui/NotificationDrawer.vue'
@@ -133,6 +134,7 @@ const router   = useRouter()
 const auth     = useAuthStore()
 const club     = useClubStore()
 const ambStore = useAmbienteStore()
+const toast    = useToast()
 
 useAlertasBell()
 const { noLeidas: internasNoLeidas } = useAlertasInternas()
@@ -144,7 +146,7 @@ const notifOpen  = ref(false)
 const helpDot    = ref(false)
 
 const {
-  supported: pushSupported,
+  disponible: pushDisponible,
   subscribed: pushSubscribed,
   loading: pushLoading,
   denied: pushDenied,
@@ -152,8 +154,17 @@ const {
   unsubscribe: pushUnsubscribe,
 } = usePushNotifications()
 
+// El botón nunca se queda mudo: si no se pudo, dice por qué (antes `subscribe()` devolvía
+// `false` sin pedir permiso y parecía roto).
 async function togglePush() {
-  pushSubscribed.value ? await pushUnsubscribe() : await pushSubscribe()
+  if (pushSubscribed.value) {
+    await pushUnsubscribe()
+    toast.info('Notificaciones desactivadas en este dispositivo')
+    return
+  }
+  const resultado = await pushSubscribe()
+  if (resultado === true) toast.success('Notificaciones activadas en este dispositivo')
+  else toast.error(MOTIVOS[resultado] || MOTIVOS.error)
 }
 
 onMounted(() => {

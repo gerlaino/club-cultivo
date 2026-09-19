@@ -358,14 +358,18 @@ async function doLogout() {
 onMounted(() => { if (auth.user?.role === 'delivery') cajaDelivery.cargar() })
 
 // ── Push (sin cambios de comportamiento) ────────────────────────
-const { supported: pushSupported, subscribed: pushSubscribed, subscribe: pushSubscribe } = usePushNotifications()
+// `disponible` y no `supported`: sin clave VAPID del servidor no hay a qué suscribirse, y
+// pedirle permiso al teléfono para nada quemaba la única oportunidad de preguntar.
+const { disponible: pushDisponible, subscribed: pushSubscribed, subscribe: pushSubscribe } = usePushNotifications()
 onMounted(() => {
   const key = `push_asked_${auth.user?.id || 'u'}`
-  if (!pushSupported || localStorage.getItem(key)) return
+  if (!pushDisponible.value || localStorage.getItem(key)) return
   setTimeout(async () => {
     if (pushSubscribed.value) return
-    const granted = await pushSubscribe()
-    if (granted !== false) localStorage.setItem(key, '1')
+    const resultado = await pushSubscribe()
+    // Se anota que ya se preguntó sólo si se llegó a preguntar: un servidor sin clave o un
+    // error de red no cuentan, para volver a intentar la próxima vez.
+    if (resultado === true || resultado === 'denegado' || resultado === 'rechazado') localStorage.setItem(key, '1')
   }, 4000)
 })
 </script>

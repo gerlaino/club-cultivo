@@ -1,5 +1,61 @@
 # Changelog
 
+## Septiembre 2026 (ci) — Push: «Activar notificaciones» no hacía nada en producción
+
+- **Causa raíz, verificada en el bundle de producción:** la clave pública VAPID salía de
+  `import.meta.env.VITE_VAPID_PUBLIC_KEY`, que `render-build.sh` nunca pasaba al `npm run build`
+  (sólo `VITE_API_URL`; el `.env.local` que la tenía es gitignoreado). Vite la compiló como
+  `undefined` y eliminó el código muerto: `subscribe()` quedó como `async function(){return!1}`.
+  El botón no pedía permiso ni decía nada, nunca se creó una `PushSubscription`, y por eso las
+  alertas sólo se vieron en la campanita (in-app, por cable) y jamás llegó un push al teléfono.
+- **Ahora la clave la manda el backend en `/me` (`push_vapid_public_key`)**, que es el único que
+  tiene el par (`PushNotificationJob`). Sin clave en el servidor → `nil` → el botón **no se
+  ofrece** (`disponible`), y la PWA no pide permiso al teléfono para nada. Cambiar la clave ya
+  no exige rebuild.
+- **El botón nunca más se queda mudo:** `subscribe()` devuelve `true` o un motivo (`MOTIVOS`:
+  no soportado, no configurado, sin service worker, permiso bloqueado/rechazado, error) y el
+  menú lo dice con un toast. `navigator.serviceWorker.ready` nunca rechaza: sin SW (dev server,
+  o instalación fallida) dejaba el botón deshabilitado para siempre — ahora con techo de 8 s.
+- `MobileShell`: la suscripción automática mira `disponible`, y anota «ya pregunté» sólo si
+  llegó a preguntar (un servidor sin clave o un error de red no queman el único intento).
+- `rake web_push:generate_keys` ya no habla de un `.env.local` del frontend. `DEPLOY.md`: el par
+  va en el web service Y en el worker.
+- Verificado de punta a punta en local: build + `vite preview` con perfil persistente de Chromium
+  (incógnito no tiene Push API) → permiso → `POST /push_subscriptions 201` → suscripción en el
+  navegador → `PushNotificationJob.perform_now` aceptado por FCM. Specs: `me_push_vapid_spec`,
+  `usePushNotifications.test.js`.
+- **Pendiente de Germán:** cargar las tres `VAPID_*` en Render (web service y worker, el mismo
+  par). Sin eso el backend sigue sin mandar (`PushNotificationJob` hace `return`).
+
+## Septiembre 2026 (ch) — Uso personal: el ambiente, la IA y el chatbot se eligen, y el alta habla de una persona
+
+- **Nacían los cuatro prendidos y el alta no tenía nada que decidir** (`FEATURES_PERSONAL`
+  era Cultivo + IoT + IA + chatbot; la lista «Se puede sumar» del paso 2 quedaba vacía).
+  Pedido de Germán (19-sep): poder sumar o no cada uno. Ahora **`Club::FEATURES_PERSONAL`
+  es sólo Cultivo**, y el paso «Qué tiene» ofrece Ambiente/IoT, Asistente IA y Chatbot como
+  interruptores, **apagados de entrada**. El chatbot sin IA no se prende (candado en pantalla
+  y `Club.acotar_a_personal` lo apaga en el backend, también al pasar una org a personal).
+- **Cuánto vale cada uno en personal está PENDIENTE de Germán**: `Precios::INCLUIDO_EN_PERSONAL`
+  sigue teniendo los tres adentro, así que prenderlos **no cambia el número** ($12.000, un solo
+  renglón). Los precios de organización no sirven (la IA sola vale más que el plan). Cuando lo
+  decida: tabla de precios personales en `Precios`, el catálogo la manda, el alta la muestra.
+- **El alta del uso personal ya no es el de una organización con campos escondidos.** Cuatro
+  pasos propios (`PASOS_PERSONAL`; el template pregunta por `pasoClave`, no por el número):
+  **Quién cultiva** (nombre, apellido, mail, teléfono, ciudad…; sin nombre de organización ni
+  razón social: el cultivo se llama «Cultivo de <nombre>», editable desde la ficha) → **Qué
+  tiene** → **Vigencia y acceso** (el plan es uno solo, así que se funde con vigencia, prueba y
+  contraseña) → **Resumen**.
+- **La persona entra con su mail**, no con `admin@cultivo_de_juan.com`
+  (`Club#crear_usuarios_default!` → `login_para`: en personal el login del admin es
+  `email_personal`). El controller corta ANTES de guardar si falta el mail o ya tiene cuenta
+  (`crear_usuarios_default!` saltea el login repetido en silencio y quedaba un uso personal sin
+  nadie adentro).
+- **La ficha de un uso personal sólo ofrece lo que puede tener** (`serialize_club_detail` filtra
+  suites/add-ons por `MODULOS_PERSONAL`). Mostraba todo y el backend descartaba en silencio.
+- Specs: `uso_personal_spec` (alta con cada combinación, chatbot huérfano, mail obligatorio y
+  repetido, ficha acotada), `saClubNuevo.test.js` (bloque «alta de uso personal»). Visto
+  renderizado con Playwright: los cuatro pasos, la creación y la ficha.
+
 ## Septiembre 2026 (cg) — Todo paciente tiene cuenta corriente, y lo que paga de más queda a favor
 
 - **Cambio de regla, decisión de Germán (18-sep), que REVIERTE la del 17 («no hay plata a

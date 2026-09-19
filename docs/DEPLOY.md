@@ -86,7 +86,7 @@ dosificación, vía de administración, observaciones y DNI.
 | `S3_*` / `AWS_*` | Fotos, PDFs y documentos clínicos |
 | `SMTP_HOST` · `SMTP_USER` · `SMTP_PASS` | Ningún correo de plataforma |
 | `MAIL_FROM` | Remitente; por defecto `noreply@cultivoespacial.com` |
-| `VAPID_PUBLIC_KEY` · `VAPID_PRIVATE_KEY` · `VAPID_EMAIL` | Notificaciones push |
+| `VAPID_PUBLIC_KEY` · `VAPID_PRIVATE_KEY` · `VAPID_EMAIL` | Notificaciones push. **El mismo par en el web service y en el worker**; se generan con `rake web_push:generate_keys`. La pública viaja al navegador por `/me`: el build del frontend no lleva nada |
 | `ANTHROPIC_API_KEY` | Asistente, análisis de lote, plan de trabajo, lectura de CSV |
 | `SIDEKIQ_PASSWORD` | El panel `/sidekiq` queda con la clave `changeme` |
 | `EXTRA_CORS_ORIGINS` | Orígenes extra, separados por coma (para la transición de dominio) |
