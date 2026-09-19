@@ -126,7 +126,7 @@ class AlertaDetectorService
   def crear_alerta(tipo:, lote: nil, severidad:, mensaje:, contexto: {})
     return if alerta_reciente?(tipo, lote&.id, contexto)
 
-    @club.alertas_internas.create!(
+    alerta = @club.alertas_internas.create!(
       tipo:             tipo,
       lote:             lote,
       severidad:        severidad,
@@ -134,7 +134,30 @@ class AlertaDetectorService
       destinada_a_role: 'admin',
       contexto:         contexto
     )
+    # Y AL TELÉFONO. La alerta quedaba en la campana y en el canal —o sea, se veía si alguien
+    # tenía la app abierta—, pero una humedad fuera de rango a las tres de la mañana no espera a
+    # que alguien la abra. Con la PWA instalada, esto es lo que suena. Sólo lo que pide acción
+    # (warning/error); la ventana de dedup de 20 h ya evita que el mismo aviso llegue diez veces.
+    if %w[warning error].include?(severidad.to_s)
+      PushNotificationService.notify_admins_async(@club, title: titulo_push(tipo), body: mensaje,
+                                                  url: lote ? "/lotes/#{lote.id}" : '/')
+    end
+    alerta
   end
+
+  TITULOS_PUSH = {
+    'sin_registro_ambiental'   => 'Sin registro ambiental',
+    'temperatura_fuera_rango'  => 'Temperatura fuera de rango',
+    'humedad_fuera_rango'      => 'Humedad fuera de rango',
+    'ph_fuera_rango'           => 'pH fuera de rango',
+    'ec_fuera_rango'           => 'EC fuera de rango',
+    'cosecha_pendiente'        => 'Cosecha pendiente',
+    'tarea_vencida_cultivo'    => 'Tarea vencida',
+    'estado_critico_lote'      => 'Lote en estado crítico',
+    'saldo_cc_bajo'            => 'Saldo bajo',
+  }.freeze
+
+  def titulo_push(tipo) = TITULOS_PUSH[tipo.to_s] || 'Alerta del cultivo'
 
   def alerta_reciente?(tipo, lote_id, contexto)
     scope = @club.alertas_internas

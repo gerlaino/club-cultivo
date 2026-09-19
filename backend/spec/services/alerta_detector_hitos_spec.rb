@@ -64,3 +64,19 @@ RSpec.describe AlertaDetectorService, '— hitos del cultivo' do
     end
   end
 end
+
+# Las alertas del cultivo que piden acción también van al teléfono: en la campana sólo las ve
+# quien tiene la app abierta.
+RSpec.describe AlertaDetectorService, '— push al teléfono' do
+  let(:club) { create(:club, plan: 'personal', features: Club::FEATURES_PERSONAL) }
+  let(:sala) { create(:sala, club: club) }
+
+  it 'una alerta warning/error del cultivo manda push a los admins' do
+    create(:lote, club: club, sala: sala, estado: 'vegetativo', start_date: 30.days.ago)
+    # Sin registro ambiental en 30 días → warning.
+    expect(PushNotificationService).to receive(:notify_admins_async).at_least(:once)
+      .with(club, hash_including(title: 'Sin registro ambiental'))
+
+    described_class.new(club).detectar!
+  end
+end

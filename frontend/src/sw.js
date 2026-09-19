@@ -88,7 +88,9 @@ self.addEventListener('push', (event) => {
       badge:   '/logo-ce-redondo.png',
       data:    { url: data.url || '/' },
       vibrate: [100, 50, 100],
-      tag:     data.tag || 'ce-notif',
+      // Sin tag fijo: con uno compartido cada push reemplazaba al anterior y de tres alertas
+      // seguidas quedaba una. El backend manda uno distinto por aviso.
+      ...(data.tag ? { tag: data.tag } : {}),
     })
   )
 })
