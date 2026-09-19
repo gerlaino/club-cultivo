@@ -17,6 +17,7 @@ class CostoLote < ApplicationRecord
       costo_insumos.to_d,
       costo_energia.to_d,
       costo_mano_obra.to_d,
+      costo_otros.to_d,
       costo_prorrateado.to_d,
       # Desprendimientos (ver `Lotes::Desprender`): el gasto queda entero y con su lote original en
       # el libro —un gasto real de $10.000 no son dos de $5.000, no hay dos facturas—, así que el

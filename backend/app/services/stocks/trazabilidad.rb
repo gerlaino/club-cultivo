@@ -26,7 +26,7 @@ module Stocks
 
     # Salidas que se nombran en la cuenta, en el orden en que se muestran: primero lo que sigue
     # existiendo en otra fila, después lo consumido con motivo, la pérdida al final.
-    TIPOS_SALIDA = %w[transferencia produccion consumo_evento salida ajuste merma].freeze
+    TIPOS_SALIDA = %w[transferencia produccion consumo_evento consumo salida ajuste merma].freeze
 
     def initialize(stock:, completo: false)
       @stock    = stock
@@ -388,6 +388,7 @@ module Stocks
                   when 'transferencia' then "#{g} #{u} siguen en #{ss.filter_map { |s| s[:destino]&.[](:numero) }.uniq.join(', ').presence || 'otra sede'}."
                   when 'produccion'    then "#{g} #{u} se convirtieron en #{ss.filter_map { |s| s[:destino]&.[](:numero) }.uniq.join(', ').presence || 'un derivado'}."
                   when 'consumo_evento' then "#{g} #{u} se consumieron en un evento."
+                  when 'consumo'       then "#{g} #{u} se consumieron."
                   when 'salida'        then "#{g} #{u} salieron (#{ss.filter_map { |s| s[:detalle] }.uniq.join('; ').presence || 'sin motivo anotado'})."
                   when 'ajuste'        then "#{g} #{u} se ajustaron en un conteo."
                   when 'merma'         then "#{g} #{u} son merma."

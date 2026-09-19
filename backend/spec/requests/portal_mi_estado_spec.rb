@@ -66,7 +66,7 @@ RSpec.describe 'Portal — lo que hay que avisarle al paciente', type: :request 
 
     it 'avisa si debe' do
       ActsAsTenant.with_tenant(club) do
-        CuentaCorriente.create!(paciente: paciente, club: club, limite_credito: 10_000, saldo_disponible: -3_200)
+        paciente.cuenta_corriente!.tap { |c| c.update!(limite_credito: 10_000, saldo_disponible: -3_200) }
       end
 
       aviso = entrar_como(paciente)['avisos'].find { |a| a['tipo'] == 'saldo_pendiente' }
@@ -76,7 +76,7 @@ RSpec.describe 'Portal — lo que hay que avisarle al paciente', type: :request 
     # Tener plata a favor no es algo que haya que avisar arriba de todo.
     it 'NO avisa si tiene saldo a favor' do
       ActsAsTenant.with_tenant(club) do
-        CuentaCorriente.create!(paciente: paciente, club: club, limite_credito: 10_000, saldo_disponible: 5_000)
+        paciente.cuenta_corriente!.tap { |c| c.update!(limite_credito: 10_000, saldo_disponible: 5_000) }
       end
 
       expect(entrar_como(paciente)['avisos']).to be_empty

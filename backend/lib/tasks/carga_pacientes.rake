@@ -154,8 +154,7 @@ namespace :pacientes do
       unless simular
         ActiveRecord::Base.transaction do
           crear.each do |_fila, paciente|
-            paciente.save!
-            paciente.create_cuenta_corriente!(club: club, saldo_disponible: 0, limite_credito: 0)
+            paciente.save!  # la cuenta corriente nace con el paciente
           end
           actualizar.each { |_fila, paciente, _c| paciente.save! }
         end

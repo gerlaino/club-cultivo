@@ -167,12 +167,18 @@ class DispensacionesController < ApplicationController
     # arreglando a qué caja va lo que cobra administración. Cuenta corriente y gramos siguen por
     # el camino legacy: tienen su propia aritmética de crédito parcial.
     medio_unico = params.dig(:dispensacion, :medio_pago).to_s
+    # Lo que el paciente tiene a favor se descuenta primero (`aplicar_lineas_cobro!`): con eso
+    # la dispensa va SIEMPRE por cobros, también «cuenta corriente» a secas —el saldo cubre lo
+    # que puede y el resto queda debiendo, con las mismas reglas que una línea más—.
+    a_favor = es_regalo ? 0.to_d : saldo_a_favor_aplicable(@dispensacion)
     if lineas_cobro.empty? && !@dispensacion.cobrar_en_entrega &&
        %w[efectivo transferencia].include?(medio_unico) && @dispensacion.aporte_socio_ars.to_d > 0
-      lineas_cobro = [{ medio: medio_unico, monto: @dispensacion.aporte_socio_ars.to_d }]
+      lineas_cobro = [{ medio: medio_unico, monto: @dispensacion.aporte_socio_ars.to_d - a_favor }].reject { |l| l[:monto] <= 0 }
     end
 
-    usa_cobros   = @dispensacion.cobrar_en_entrega || lineas_cobro.present?
+    # (Cubierto entero por el saldo, el modal manda `medio_pago: 'saldo_a_favor'` y ninguna línea.)
+    usa_cobros   = @dispensacion.cobrar_en_entrega || lineas_cobro.present? ||
+                   (a_favor > 0 && !%w[no_abona credito_gramos].include?(medio_unico))
 
     cc = @paciente.cuenta_corriente
 
@@ -195,14 +201,14 @@ class DispensacionesController < ApplicationController
       # CONTRA ENTREGA CON UNA PARTE YA PAGA: las líneas que vienen se cobran ahora y el resto
       # queda pendiente para el repartidor. Si las líneas cubren todo, no hay nada que cobrar en
       # la puerta y «contra entrega» está de más.
-      if @dispensacion.cobrar_en_entrega && lineas_cobro.present? &&
-         lineas_cobro.sum { |l| l[:monto].to_d } >= @dispensacion.aporte_socio_ars.to_d - 0.001
+      if @dispensacion.cobrar_en_entrega && (lineas_cobro.present? || a_favor > 0) &&
+         lineas_cobro.sum { |l| l[:monto].to_d } + a_favor >= @dispensacion.aporte_socio_ars.to_d - 0.001
         return render json: { error: 'Lo cobrado ahora cubre el total: no queda nada para que cobre el repartidor. Sacá «contra entrega» o bajá lo que se paga ahora.' }, status: :unprocessable_entity
       end
       begin
         ActiveRecord::Base.transaction do
           @dispensacion.save!
-          aplicar_lineas_cobro!(@dispensacion, lineas_cobro, 'creacion', dejar_saldo: @dispensacion.cobrar_en_entrega) if lineas_cobro.present? || !@dispensacion.cobrar_en_entrega
+          aplicar_lineas_cobro!(@dispensacion, lineas_cobro, 'creacion', dejar_saldo: @dispensacion.cobrar_en_entrega) if lineas_cobro.present? || a_favor > 0 || !@dispensacion.cobrar_en_entrega
           afinar_medio_pago!(@dispensacion)
         end
       rescue ActiveRecord::RecordInvalid => e
@@ -349,7 +355,7 @@ class DispensacionesController < ApplicationController
         elsif %w[efectivo transferencia].include?(@dispensacion.medio_pago) && @dispensacion.aporte_socio_ars.to_d > 0
           # Mismo camino que la creación: el cobro y su asiento, enganchado a la caja.
           @dispensacion.caja_turno_elegida_id = caja_elegida_param || caja_anterior
-          aplicar_lineas_cobro!(@dispensacion, [{ medio: @dispensacion.medio_pago, monto: @dispensacion.aporte_socio_ars.to_d }], 'creacion')
+          aplicar_lineas_cobro!(@dispensacion, [{ medio: @dispensacion.medio_pago, monto: @dispensacion.aporte_socio_ars.to_d }], 'creacion', usar_saldo: false)
         else
           crear_movimiento_contable(@dispensacion)
           debitar_cuenta_corriente(@dispensacion) if @dispensacion.a_credito? && cc
@@ -508,7 +514,7 @@ class DispensacionesController < ApplicationController
         # Lo que no cubra en efectivo/transf queda a cuenta corriente (si hay cupo).
         # Las legacy (usa_cobros? = false) ya están saldadas y no entran acá.
         if @dispensacion.usa_cobros? || cobros_param.present?
-          aplicar_lineas_cobro!(@dispensacion, cobros_param, 'entrega')
+          aplicar_lineas_cobro!(@dispensacion, cobros_param, 'entrega', usar_saldo: false)
           afinar_medio_pago!(@dispensacion)
         end
         @dispensacion.comprobante_entrega.attach(params[:comprobante_entrega]) if params[:comprobante_entrega].present?

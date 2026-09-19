@@ -57,8 +57,7 @@ RSpec.describe 'Dispensacion regalo (entrega gratis)', type: :request do
     end
 
     it 'no toca la cuenta corriente del paciente' do
-      cc = CuentaCorriente.create!(paciente: paciente, club: club,
-                                   saldo_disponible: 0, limite_credito: 5000)
+      cc = paciente.cuenta_corriente!.tap { |c| c.update!(saldo_disponible: 0, limite_credito: 5000) }
       expect { regalar }.not_to change { cc.reload.movimientos.count }
     end
   end

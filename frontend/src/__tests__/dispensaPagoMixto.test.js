@@ -100,7 +100,7 @@ describe('Dispensar — pago dividido', () => {
     expect(w.vm.mediosLibres.map((m) => m.valor)).not.toContain(usados[1])
   })
 
-  it('sin cuenta corriente, ese medio no se ofrece', async () => {
+  it('sin crédito habilitado, ese medio no se ofrece', async () => {
     const w = await montar({ limiteCc: 0 })
     await conCarrito(w)
     w.vm.activarPagoDividido()
@@ -139,8 +139,8 @@ describe('Dispensar — pago dividido', () => {
     expect(w.vm.formError).toContain('sólo cubre lo que falta')
   })
 
-  // SE PUEDE PAGAR DE MÁS SÓLO PARA BAJAR DEUDA (Germán, 16-sep): lo de más nunca queda «a
-  // favor». Para adelantar plata está «Cargar crédito» en la ficha.
+  // LO QUE PAGA DE MÁS QUEDA A FAVOR (Germán, 18-sep-2026): es el vuelto que no se pudo dar. Se
+  // dice con el número antes de mandar; el backend lo acredita.
   it('con deuda, pagar de más la baja, y lo dice', async () => {
     const w = await montar({ saldoCc: -3000 })
     await conCarrito(w)
@@ -149,31 +149,35 @@ describe('Dispensar — pago dividido', () => {
     await w.vm.$nextTick()
 
     expect(w.vm.excedentePago).toBe(1000)
-    expect(w.vm.excedeDeuda).toBe(false)
+    expect(w.vm.aFavorDespues).toBe(0)
     expect(w.find('.mnd__pagos-resto').text().replace(/\s/g, ' ')).toMatch(/baja su deuda de \$ ?3\.000 a \$ ?2\.000/)
   })
 
-  it('sin deuda, pagar de más rebota antes de mandar', async () => {
-    const w = await montar({ saldoCc: 0 })
+  it('sin deuda, pagar de más queda a favor, lo dice y manda', async () => {
+    const w = await montar({ saldoCc: 0, limiteCc: 0 })
     await conCarrito(w)
     w.vm.activarPagoDividido()
     w.vm.lineasPago = [{ medio: 'efectivo', monto: 6000 }]
     await w.vm.$nextTick()
 
-    expect(w.vm.excedeDeuda).toBe(true)
-    expect(w.find('.mnd__pagos-resto--mal').text()).toContain('no debe nada')
+    expect(w.vm.aFavorDespues).toBe(1000)
+    expect(w.find('.mnd__pagos-resto--mal').exists()).toBe(false)
+    expect(w.find('.mnd__pagos-resto').text().replace(/\s/g, ' ')).toMatch(/le quedan \$ ?1\.000 a favor/)
     await w.vm.handleSubmit()
-    expect(createDispensacion).not.toHaveBeenCalled()
+    expect(createDispensacion).toHaveBeenCalled()
+    const payload = createDispensacion.mock.calls[0][1]
+    expect(payload.cobros).toEqual([{ medio: 'efectivo', monto: '6000.00' }])
+    expect(payload.usar_saldo_a_favor).toBe(true)
   })
 
-  it('con menos deuda que lo pagado de más, dice hasta cuánto', async () => {
+  it('con menos deuda que lo pagado de más, cruza el cero y lo dice', async () => {
     const w = await montar({ saldoCc: -400 })
     await conCarrito(w)
     w.vm.activarPagoDividido()
     w.vm.lineasPago = [{ medio: 'efectivo', monto: 6000 }]
     await w.vm.$nextTick()
 
-    expect(w.find('.mnd__pagos-resto--mal').text().replace(/\s/g, ' ')).toMatch(/sólo debe \$ ?400/)
+    expect(w.find('.mnd__pagos-resto').text().replace(/\s/g, ' ')).toMatch(/salda su deuda de \$ ?400 y le quedan \$ ?600 a favor/)
   })
 
   it('manda una línea de cobro por medio, y no un medio_pago único', async () => {
@@ -219,7 +223,8 @@ describe('Dispensar — pago dividido', () => {
   })
 
   // El backend rechazaría igual, pero recién después de mandar: el mostrador se entera tarde.
-  it('sin cuenta corriente, no deja dejar plata sin asignar', async () => {
+  // Sin CRÉDITO habilitado (todos tienen cuenta corriente, pero deber lo habilita el admin).
+  it('sin crédito habilitado, no deja dejar plata sin asignar', async () => {
     const w = await montar({ limiteCc: 0 })
     await conCarrito(w)
     w.vm.activarPagoDividido()
@@ -230,7 +235,7 @@ describe('Dispensar — pago dividido', () => {
     await new Promise((r) => setTimeout(r, 0))
 
     expect(createDispensacion).not.toHaveBeenCalled()
-    expect(w.vm.formError).toContain('no tiene cuenta corriente')
+    expect(w.vm.formError).toContain('no tiene crédito habilitado')
   })
 
   it('no deja mandar a cuenta corriente más de lo que hay de crédito', async () => {
@@ -404,5 +409,138 @@ describe('Entregar una reserva — cobrar el resto en partes', () => {
     for (let i = 0; i < 6; i++) await new Promise((r) => setTimeout(r, 0))
 
     expect(w.find('.mnd__dividir-btn').exists()).toBe(false)
+  })
+})
+
+// AC (Germán, 18-sep-2026): todos los pacientes tienen cuenta corriente; lo que pagan de más
+// —el vuelto que no había— queda a favor, y en la próxima dispensa se les descuenta SOLO,
+// dicho claro en el mismo modal, con la opción de no usarlo esta vez.
+describe('Dispensar — saldo a favor', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('se muestra, se descuenta solo y dice cuánto queda por pagar', async () => {
+    const w = await montar({ saldoCc: 2000, limiteCc: 0 })
+    await conCarrito(w)   // $5.000
+    await w.vm.$nextTick()
+
+    expect(w.vm.saldoAplicado).toBe(2000)
+    expect(w.vm.aCobrarAhora).toBe(3000)
+    const t = w.find('.mnd__afavor').text().replace(/\s/g, ' ')
+    expect(t).toMatch(/Tiene \$ ?2\.000 a favor/)
+    expect(t).toMatch(/le queda por pagar \$ ?3\.000/)
+  })
+
+  it('con un solo medio, manda lo que queda como línea y el flag para descontar el saldo', async () => {
+    const w = await montar({ saldoCc: 2000, limiteCc: 0 })
+    await conCarrito(w)
+    await w.vm.handleSubmit()
+    const payload = createDispensacion.mock.calls[0][1]
+    expect(payload.cobros).toEqual([{ medio: 'efectivo', monto: '3000.00' }])
+    expect(payload.usar_saldo_a_favor).toBe(true)
+  })
+
+  it('si el saldo cubre todo, no paga nada y el medio es el saldo', async () => {
+    const w = await montar({ saldoCc: 9000, limiteCc: 0 })
+    await conCarrito(w)
+    await w.vm.$nextTick()
+    expect(w.vm.aCobrarAhora).toBe(0)
+    expect(w.find('.mnd__afavor').text()).toContain('no paga nada')
+    await w.vm.handleSubmit()
+    const payload = createDispensacion.mock.calls[0][1]
+    expect(payload.medio_pago).toBe('saldo_a_favor')
+    expect(payload.cobros).toEqual([])
+  })
+
+  it('se puede no usar esta vez: paga el total y el saldo no viaja', async () => {
+    const w = await montar({ saldoCc: 2000, limiteCc: 0 })
+    await conCarrito(w)
+    w.vm.usarSaldo = false
+    await w.vm.$nextTick()
+    expect(w.vm.saldoAplicado).toBe(0)
+    expect(w.vm.aCobrarAhora).toBe(5000)
+    await w.vm.handleSubmit()
+    const payload = createDispensacion.mock.calls[0][1]
+    expect(payload.usar_saldo_a_favor).toBe(false)
+    expect(payload.cobros).toBeUndefined()
+    expect(payload.medio_pago).toBe('efectivo')
+  })
+
+  it('con el pago partido, el total a cobrar ya descuenta el saldo', async () => {
+    const w = await montar({ saldoCc: 2000, limiteCc: 0 })
+    await conCarrito(w)
+    w.vm.activarPagoDividido()
+    await w.vm.$nextTick()
+    expect(w.vm.lineasPago[0].monto).toBe(3000)
+    expect(w.find('.mnd__pagos-total').text().replace(/\s/g, ' ')).toMatch(/A cobrar \$ ?3\.000/)
+  })
+
+  it('el saldo no se aplica a la seña de una reserva ni a un regalo', async () => {
+    const w = await montar({ saldoCc: 2000, limiteCc: 0 })
+    await conCarrito(w)
+    w.vm.form.es_regalo = true
+    await w.vm.$nextTick()
+    expect(w.vm.saldoAplicado).toBe(0)
+    expect(w.find('.mnd__afavor').exists()).toBe(false)
+  })
+})
+
+// «Paga con»: el billete más grande. Vacío es justo; de más queda a favor; de menos, a cuenta
+// sólo si tiene crédito habilitado.
+describe('Dispensar — paga con', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('vacío: cobra justo y no manda líneas', async () => {
+    const w = await montar({ saldoCc: 0, limiteCc: 0 })
+    await conCarrito(w)
+    expect(w.vm.pideMontoRecibido).toBe(true)
+    await w.vm.handleSubmit()
+    const payload = createDispensacion.mock.calls[0][1]
+    expect(payload.cobros).toBeUndefined()
+    expect(payload.medio_pago).toBe('efectivo')
+  })
+
+  it('paga con un billete más grande: dice cuánto le queda a favor y manda lo recibido', async () => {
+    const w = await montar({ saldoCc: 0, limiteCc: 0 })
+    await conCarrito(w)
+    w.vm.montoRecibido = 6000
+    await w.vm.$nextTick()
+    expect(w.vm.excedenteUnico).toBe(1000)
+    expect(w.find('.mnd__pagos-resto').text().replace(/\s/g, ' ')).toMatch(/le quedan \$ ?1\.000 a favor/)
+    await w.vm.handleSubmit()
+    const payload = createDispensacion.mock.calls[0][1]
+    expect(payload.cobros).toEqual([{ medio: 'efectivo', monto: '6000.00' }])
+  })
+
+  it('paga con menos y sin crédito habilitado: no manda y lo dice', async () => {
+    const w = await montar({ saldoCc: 0, limiteCc: 0 })
+    await conCarrito(w)
+    w.vm.montoRecibido = 4000
+    await w.vm.$nextTick()
+    expect(w.find('.mnd__pagos-resto--mal').text()).toContain('no tiene crédito habilitado')
+    await w.vm.handleSubmit()
+    expect(createDispensacion).not.toHaveBeenCalled()
+    expect(w.vm.formError).toContain('no tiene crédito habilitado')
+  })
+
+  it('paga con menos y con crédito: lo que falta queda a cuenta y manda lo recibido', async () => {
+    const w = await montar({ saldoCc: 0, limiteCc: 50000 })
+    await conCarrito(w)
+    w.vm.montoRecibido = 4000
+    await w.vm.$nextTick()
+    expect(w.find('.mnd__pagos-resto').text().replace(/\s/g, ' ')).toMatch(/Faltan \$ ?1\.000/)
+    await w.vm.handleSubmit()
+    const payload = createDispensacion.mock.calls[0][1]
+    expect(payload.cobros).toEqual([{ medio: 'efectivo', monto: '4000.00' }])
+  })
+
+  it('no aparece con contra entrega, cuenta corriente ni regalo', async () => {
+    const w = await montar({ saldoCc: 0, limiteCc: 50000 })
+    await conCarrito(w)
+    w.vm.form.medio_pago = 'cuenta_corriente'
+    await w.vm.$nextTick()
+    expect(w.vm.pideMontoRecibido).toBe(false)
+    w.vm.form.medio_pago = 'contra_entrega'
+    await w.vm.$nextTick()
+    expect(w.vm.pideMontoRecibido).toBe(false)
   })
 })

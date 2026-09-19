@@ -1,11 +1,13 @@
 <script setup>
 import { ref, computed, watch, onMounted } from "vue";
+import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 import { useSalasStore } from "../stores/salas";
 import { useAuthStore } from "../stores/auth";
 import { listSedes, getAnalyticsComparativaSalas } from "../lib/api";
 import ModalCrearSala from '../components/salas/ModalCrearSala.vue'
 import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
+const { org: orgTxt, sala: salaTxt, esPersonal } = useUsoPersonal()
 
 const salas = useSalasStore();
 const auth  = useAuthStore();
@@ -206,15 +208,15 @@ async function confirmDelete(s) {
     <!-- Header -->
     <div class="slv__header">
       <div class="slv__header-left">
-        <h1 class="slv__title">Salas de cultivo</h1>
-        <p class="slv__sub">Gestioná los espacios físicos de la organización</p>
+        <h1 class="slv__title">{{ salaTxt.Unas }}</h1>
+        <p class="slv__sub">Gestioná los espacios físicos {{ orgTxt.de }}</p>
       </div>
       <div style="display:flex;gap:.5rem;align-items:center;">
         <button class="slv__btn-outline" :class="{ 'slv__btn-outline--on': showComparativa }" @click="toggleComparativa">
           <i class="bi bi-bar-chart-line"></i> Comparativa
         </button>
         <button v-if="canCreate" class="slv__btn-primary" @click="showCreate = true">
-          <i class="bi bi-plus-lg"></i> Nueva sala
+          <i class="bi bi-plus-lg"></i> {{ salaTxt.Corta === 'Sala' ? 'Nueva sala' : 'Nuevo espacio' }}
         </button>
       </div>
     </div>
@@ -232,7 +234,7 @@ async function confirmDelete(s) {
           <table class="slv__comp-table">
             <thead>
               <tr>
-                <th>Sala</th>
+                <th>{{ salaTxt.Corta }}</th>
                 <th>Cultivos</th>
                 <th>Total producido</th>
                 <th>Kg / planta</th>
@@ -277,7 +279,7 @@ async function confirmDelete(s) {
         <div class="slv__kpi-icon">🏠</div>
         <div class="slv__kpi-body">
           <div class="slv__kpi-val">{{ stats.total }}</div>
-          <div class="slv__kpi-lbl">Total salas</div>
+          <div class="slv__kpi-lbl">Total {{ salaTxt.cortas }}</div>
         </div>
       </div>
       <div class="slv__kpi slv__kpi--accent">
@@ -311,7 +313,7 @@ async function confirmDelete(s) {
 
     <!-- Toolbar -->
     <div class="slv__toolbar">
-      <input type="search" class="slv__search" placeholder="Buscar sala…" v-model.trim="q" />
+      <input type="search" class="slv__search" :placeholder="`Buscar ${salaTxt.corta}…`" v-model.trim="q" />
       <select class="slv__select" v-model="filterState">
         <option value="">Todos los estados</option>
         <option value="activa">Activa</option>
@@ -343,9 +345,9 @@ async function confirmDelete(s) {
     <div v-else-if="!salas.items.length" class="slv__empty">
       <div class="slv__empty-icon">🏗️</div>
       <p class="slv__empty-title">No hay salas todavía</p>
-      <p v-if="canCreate" class="slv__empty-sub">Creá la primera sala para organizar el cultivo.</p>
+      <p v-if="canCreate" class="slv__empty-sub">Creá {{ salaTxt.Corta === 'Sala' ? 'la primera sala' : 'el primer espacio' }} para organizar el cultivo.</p>
       <button v-if="canCreate" class="slv__btn-primary" @click="showCreate = true">
-        <i class="bi bi-plus-lg"></i> Nueva sala
+        <i class="bi bi-plus-lg"></i> {{ salaTxt.Corta === 'Sala' ? 'Nueva sala' : 'Nuevo espacio' }}
       </button>
     </div>
     <div v-else-if="!paginated.length" class="slv__empty">
@@ -373,7 +375,7 @@ async function confirmDelete(s) {
             <span class="slv__state-pill" :style="stateStyle(s.state)">{{ stateLabel(s.state) }}</span>
           </div>
 
-          <div v-if="s.sede" class="slv__card-sede">
+          <div v-if="s.sede && !esPersonal" class="slv__card-sede">
             <i class="bi bi-building"></i> {{ s.sede.nombre }}
           </div>
 
@@ -392,7 +394,7 @@ async function confirmDelete(s) {
           <p v-if="s.notes" class="slv__card-notes">{{ s.notes }}</p>
 
           <div class="slv__card-footer">
-            <span v-if="s.created_by_name" class="slv__card-author">
+            <span v-if="s.created_by_name && !esPersonal" class="slv__card-author">
               <i class="bi bi-person"></i> {{ s.created_by_name }}
             </span>
             <div v-if="canEdit" class="slv__card-actions" @click.prevent>
@@ -413,10 +415,10 @@ async function confirmDelete(s) {
       <table class="slv__table">
         <thead>
           <tr>
-            <th>Sala</th>
+            <th>{{ salaTxt.Corta }}</th>
             <th>Estado</th>
             <th>Plantas</th>
-            <th>Sede</th>
+            <th v-if="!esPersonal">Sede</th>
             <th></th>
           </tr>
         </thead>
@@ -435,7 +437,7 @@ async function confirmDelete(s) {
               <span class="slv__state-pill" :style="stateStyle(s.state)">{{ stateLabel(s.state) }}</span>
             </td>
             <td class="slv__table-nums">{{ s.plantas_totales ?? 0 }}</td>
-            <td class="slv__table-sede">{{ s.sede?.nombre || '—' }}</td>
+            <td v-if="!esPersonal" class="slv__table-sede">{{ s.sede?.nombre || '—' }}</td>
             <td>
               <div v-if="canEdit" class="slv__table-acts">
                 <button class="slv__icon-btn" @click="startEdit(s)"><i class="bi bi-pencil"></i></button>

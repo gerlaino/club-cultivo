@@ -20,7 +20,10 @@ class StockMovimiento < ApplicationRecord
   # regalado. NO es merma. Distinguirlos importa: el informe de Pérdidas cuenta `merma`, así que
   # anotar una entrega como merma declara destruido algo que está intacto en otro lado — y para
   # un auditor, producto que "se perdió" sin explicación es peor que producto que salió.
-  TIPOS = %w[produccion transferencia dispensacion ajuste merma salida consumo_evento].freeze
+  # `consumo` (sep-2026) es el CULTIVADOR DE CASA: lo que saca del frasco para él. No dispensa
+  # —no hay paciente— y no es `salida` (el producto no se fue a otro lado, se usó) ni `merma`.
+  # Es la única puerta de salida del uso personal, y la trazabilidad lo cuenta como consumido.
+  TIPOS = %w[produccion transferencia dispensacion ajuste merma salida consumo_evento consumo].freeze
 
   validates :tipo,   inclusion: { in: TIPOS }
   validates :gramos, numericality: { other_than: 0 }

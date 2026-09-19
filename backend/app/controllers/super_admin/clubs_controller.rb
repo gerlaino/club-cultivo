@@ -18,20 +18,30 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     # Un club nuevo nace con las suites y los add-ons terminados, salvo que el alta mande otra
     # cosa: crearlo con features vacío significaría, con el gating real, una organización que no puede
     # hacer nada.
-    attrs['features'] = sin_addons_huerfanos(Club::FEATURES_POR_DEFECTO.merge(attrs['features'] || {}))
     # El plan no viaja en `club_params` (ver el comentario ahí), pero el alta sí lo elige.
     attrs['plan'] = PlanEnforcer.normalizar(params.dig(:club, :plan))
+    attrs['features'] = if attrs['plan'] == 'personal'
+                          # Uso personal: nace con lo suyo y no puede tener otra cosa. El alta
+                          # ni siquiera pregunta por módulos, pero por la API llega lo que sea.
+                          Club.acotar_a_personal(Club::FEATURES_PERSONAL.merge(attrs['features'] || {}))
+                        else
+                          sin_addons_huerfanos(Club::FEATURES_POR_DEFECTO.merge(attrs['features'] || {}))
+                        end
     club = Club.new(attrs)
     if club.save
       # Sólo los roles que el alta ofrece. No alcanza con sacarlos de la pantalla: el endpoint
       # acepta lo que le manden y un rol no ofrecido entraría igual por la API.
       # …y sólo los que le sirven a lo que acaba de contratar: un cultivador en una organización
-      # sin Cultivo loguea a una app sin una sola pantalla.
+      # sin Cultivo loguea a una app sin una sola pantalla. (En uso personal `roles_para_alta`
+      # es vacío y queda sólo el admin, que es la persona.)
       roles    = (Array(params[:roles_a_crear]).map(&:to_s) & club.roles_para_alta(Club::ROLES_ALTA))
                  .presence || Club::ROLES_DEFAULT
       password = params[:password_inicial].presence || User.password_temporal
       usuarios = club.crear_usuarios_default!(roles: roles, password: password, admin: admin_params)
       club.crear_geneticas_default!
+      # El cultivador de casa no tiene «sedes»: tiene su casa. Se la creamos para que no arranque
+      # en una pantalla que le pide algo que no sabe qué es, y arranque en las salas.
+      Clubs::SembrarPersonal.new(club, por: usuarios.first).call if club.personal?
       render json: {
         club:     serialize_club_detail(club),
         usuarios: usuarios.map { |u| { id: u.id, email: u.email, role: u.role } },
@@ -58,6 +68,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     # fecha y sus adicionales tienen que seguir andando con ella. Corriendo esto primero, dar de
     # baja Producción y dispensa cortaba hoy mismo el Delivery que la organización ya pagó.
     attrs['features'] = sin_addons_huerfanos(attrs['features']) if attrs.key?('features')
+    attrs['features'] = Club.acotar_a_personal(attrs['features']) if attrs.key?('features') && @club.personal?
 
     if @club.update(attrs)
       render json: serialize_club_detail(@club.reload).merge(bajas_programadas: bajas)
@@ -259,11 +270,23 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
                     status: :unprocessable_entity
     end
 
+    # Pasar a personal no puede dejar un equipo adentro: es un plan de UNA persona, y quien ya
+    # tiene gente dada de alta no es un cultivador de casa. Se rechaza con el motivo en vez de
+    # dejar entrando a usuarios que el plan dice que no existen.
+    if plan == 'personal' && @club.users.del_equipo.where.not(role: 'admin').exists?
+      return render json: { error: 'El plan Personal es para una sola persona y esta organización tiene equipo cargado. ' \
+                                   'Hay que dar de baja a los demás usuarios antes de cambiarla.' },
+                    status: :unprocessable_entity
+    end
+
     @club.update!(
       plan:             plan,
       plan_activo_hasta: hasta.present? ? Date.parse(hasta) : nil,
       plan_trial:       trial == true || trial == 'true',
       )
+    # Y los módulos que el uso personal no puede tener se apagan en el acto: no es una baja
+    # comercial con fecha, es que dejaron de tener sentido (no hay a quién dispensar).
+    @club.update!(features: Club.acotar_a_personal(@club.features)) if @club.personal?
     render json: serialize_club_detail(@club)
   end
 
@@ -430,6 +453,8 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       state:            c.state,
       country:          c.country,
       plan:             c.plan,
+      # La lista y la ficha lo muestran distinto: un uso personal no es «una organización chica».
+      personal:         c.personal?,
       plan_trial:       c.plan_trial,
       plan_activo_hasta: c.plan_activo_hasta,
       usuarios_count:   c.users.del_equipo.count,

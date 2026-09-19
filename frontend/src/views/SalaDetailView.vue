@@ -3,6 +3,7 @@ import { onMounted, onUnmounted, ref, computed, watch } from "vue"
 import { logger } from '../utils/logger.js'
 import { useRoute, useRouter } from "vue-router"
 import { useSalasStore } from "../stores/salas"
+import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 import { useLotesStore } from "../stores/lotes"
 import { useAuthStore } from "../stores/auth"
 import { useClubStore } from "../stores/club"
@@ -213,10 +214,14 @@ async function confirmarCambioDeFaseDeSala(data) {
   return confirm({ ...textoCambioDeFase(data), variant: 'danger' })
 }
 
+// En uso personal la palabra es «espacio» (ver useUsoPersonal); los identificadores no cambian.
+const { esPersonal, sala: salaTxt } = useUsoPersonal()
+
 const salaAcciones = computed(() => {
   const items = []
+  const nombre = salaTxt.value.corta
   if (canEdit.value || isCultivador.value) {
-    items.push({ emoji: '🌿', label: 'Registrar sala', onClick: () => { lecturaOpen.value = true } })
+    items.push({ emoji: '🌿', label: `Registrar ${nombre}`, onClick: () => { lecturaOpen.value = true } })
     // Los lotes que enraízan viven en un propagador con otro clima —la sala marca 60% de humedad y
     // adentro hay 90%—, así que su registro va aparte y solo aparece si hay alguno.
     if (hayEnraizando.value) {
@@ -229,12 +234,12 @@ const salaAcciones = computed(() => {
   }
   if (canCambiarFase.value) {
     const hacia = sala.value?.kind === 'vegetativo' ? 'Floración' : 'Vegetativo'
-    items.push({ emoji: '🔄', label: `Pasar sala a ${hacia}`, onClick: () => ejecutarCambioFase(), disabled: cambiarFaseLoading.value })
+    items.push({ emoji: '🔄', label: `Pasar ${nombre} a ${hacia}`, onClick: () => ejecutarCambioFase(), disabled: cambiarFaseLoading.value })
   }
   if (canEdit.value) {
-    items.push({ emoji: '✏️', label: 'Editar sala', onClick: openEditSala })
+    items.push({ emoji: '✏️', label: `Editar ${nombre}`, onClick: openEditSala })
     items.push({ divider: true })
-    items.push({ emoji: '🗑️', label: 'Eliminar sala', danger: true, onClick: eliminarSala, disabled: deleting.value })
+    items.push({ emoji: '🗑️', label: `Eliminar ${nombre}`, danger: true, onClick: eliminarSala, disabled: deleting.value })
   }
   return items
 })
@@ -517,7 +522,7 @@ const sdTotalPages   = computed(() => Math.max(1, Math.ceil(itemsSorted.value.le
 watch(itemsSorted, () => { sdPage.value = 1 })
 
 const breadcrumbs = computed(() => {
-  if (isCultivador.value) return []
+  if (isCultivador.value || esPersonal.value) return []
   const crumbs = [{ label:"Sedes", to:{ name:"sedes" } }]
   if (sala.value?.sede) crumbs.push({ label:sala.value.sede.nombre, to:{ name:"sede-detail", params:{ id:sala.value.sede.id } } })
   return crumbs
@@ -957,7 +962,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
             </button>
             <div v-show="lotesExpanded" class="sd__section-body sd__section-body--flush">
               <div v-if="lotes.loading" class="sd__placeholder">Cargando lotes…</div>
-              <EmptyState v-else-if="!items.length" icon="📦" title="Sin lotes todavía" message="Esta sala no tiene lotes asignados." compact>
+              <EmptyState v-else-if="!items.length" icon="📦" :title="'Sin lotes todavía'" :message="esPersonal ? 'Este espacio no tiene lotes todavía.' : 'Esta sala no tiene lotes asignados.'" compact>
                 <template #actions>
                   <button v-if="(canEdit || isCultivador) && !esSalaManicura" class="sd__btn-outline" @click="openCreate">Crear primer lote</button>
                   <button v-else-if="puedeCargarLote" class="sd__btn-outline" style="color:#b45309;border-color:#fde68a" @click="showCargarLote=true">

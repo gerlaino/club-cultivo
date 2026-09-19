@@ -21,7 +21,7 @@ const alertasInternas = computed(() => internas.noLeidas.value.slice(0, 5))
 
 const SENSOR_ICON   = { temperatura: '🌡️', humedad: '💧', vpd: '🌫️', co2: '🌬️', ec: '⚡', ph: '🧪' }
 const INTERNA_ICON  = {
-  sin_registro_ambiental: '📋', cosecha_pendiente: '🌿', tarea_vencida_cultivo: '📌',
+  sin_registro_ambiental: '📋', cosecha_pendiente: '🌿', hito_cultivo: '📅', tarea_vencida_cultivo: '📌',
   saldo_cc_bajo: '💳', saldo_gramos_bajo: '⚖️', documento_vencido: '📄',
   reprocann_vencido: '📄', reprocann_por_vencer: '⏰', manicura_aprobacion_pendiente: '✂️',
   manicura_aprobada: '✅', manicura_rechazada: '↩️', manicura_eliminada: '🗑️', manicura_reabierta: '✏️',

@@ -23,6 +23,7 @@ export function resolverRutaAlerta(tipo, contexto = {}) {
     case 'sin_registro_ambiental':
     case 'cosecha_pendiente':
     case 'estado_critico_lote':
+    case 'hito_cultivo':
       return c.lote_id ? `/lotes/${c.lote_id}` : null
 
     case 'ph_fuera_rango':
@@ -66,6 +67,7 @@ const TIPO_LABELS = {
   temperatura_fuera_rango:         'Temperatura fuera de rango',
   humedad_fuera_rango:             'Humedad fuera de rango',
   cosecha_pendiente:               'Cosecha pendiente',
+  hito_cultivo:                    'Lo que viene',
   tarea_vencida_cultivo:           'Tarea vencida',
   estado_critico_lote:             'Estado crítico en lote',
   stock_bajo:                      'Stock bajo',
@@ -97,6 +99,7 @@ const META = {
   temperatura_fuera_rango:         { component: Thermometer,   bg: '#fef2f2', color: '#dc2626' },
   humedad_fuera_rango:             { component: AlertCircle,   bg: '#eff6ff', color: '#2563eb' },
   cosecha_pendiente:               { component: Calendar,      bg: '#f0fdf4', color: '#16a34a' },
+  hito_cultivo:                    { component: Calendar,      bg: '#ecfccb', color: '#3f6212' },
   tarea_vencida_cultivo:           { component: ClipboardCheck,bg: '#fef2f2', color: '#dc2626' },
   estado_critico_lote:             { component: ShieldAlert,   bg: '#fef2f2', color: '#dc2626' },
   stock_bajo:                      { component: Package,       bg: '#fffbeb', color: '#d97706' },

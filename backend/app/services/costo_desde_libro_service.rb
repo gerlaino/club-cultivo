@@ -13,6 +13,16 @@ class CostoDesdeLibroService
     costo_mano_obra: %w[sueldo honorario mantenimiento],
   }.freeze
 
+  # Lo que NO es un gasto del lote aunque llegue con `lote_id`: movimientos de caja e ingresos
+  # mal tipificados. Todo lo demás que no cae en los tres cajones de arriba —alquiler, seguro,
+  # administrativo, `otro`, los tipos que crea el usuario— va a `costo_otros`: antes no iba a
+  # ningún lado y el costo por gramo salía sin la lámpara ni la carpa.
+  CATEGORIAS_NO_COSTO = %w[
+    aporte_socio dispensacion subvencion bar
+    salida_caja retiro_caja devolucion_caja diferencia_caja ingreso_caja
+    a_cuenta_repartidor devolucion_a_cuenta devolucion_paciente
+  ].freeze
+
   def initialize(lote:, actualizado_por: nil)
     @lote            = lote
     @actualizado_por = actualizado_por
@@ -26,6 +36,8 @@ class CostoDesdeLibroService
     MAPEO_CATEGORIAS.each do |campo, categorias|
       costo[campo] = egresos.where(categoria: categorias).sum(:monto_ars)
     end
+    mapeadas = MAPEO_CATEGORIAS.values.flatten
+    costo.costo_otros = egresos.where.not(categoria: mapeadas + CATEGORIAS_NO_COSTO).sum(:monto_ars)
 
     # Costo real de insumos consumidos del depósito e imputados a este lote (Bloque 2).
     # Se suma a los egresos de insumo cargados directo con lote (ambas fuentes conviven).

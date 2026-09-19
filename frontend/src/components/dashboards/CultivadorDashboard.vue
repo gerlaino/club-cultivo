@@ -9,6 +9,9 @@
       </div>
     </div>
 
+    <!-- Uso personal: qué falta para arrancar (sala, lote). La calcula el backend. -->
+    <PuestaEnMarcha v-if="personal" />
+
     <!-- Alertas críticas -->
     <DsBanner
       v-for="a in alertasCriticas.slice(0, 2)"
@@ -39,13 +42,13 @@
       <div class="cvd__kpi-card">
         <div class="cvd__kpi-ico"><Sprout :size="18" :stroke-width="1.75" /></div>
         <div class="cvd__kpi-val">{{ totalPlantas }}</div>
-        <div class="cvd__kpi-lbl">Plantas a cargo</div>
+        <div class="cvd__kpi-lbl">{{ personal ? 'Plantas' : 'Plantas a cargo' }}</div>
         <div class="cvd__kpi-sub">{{ plantasVeg }} veg · {{ plantasFlor }} flor</div>
       </div>
       <div class="cvd__kpi-card">
         <div class="cvd__kpi-ico"><LayoutGrid :size="18" :stroke-width="1.75" /></div>
         <div class="cvd__kpi-val">{{ salasActivas.length }}</div>
-        <div class="cvd__kpi-lbl">Salas activas</div>
+        <div class="cvd__kpi-lbl">{{ personal ? 'Espacios activos' : 'Salas activas' }}</div>
         <div class="cvd__kpi-sub">de {{ salas.length }} en total</div>
       </div>
       <!-- El "N listos para avanzar" era un número muerto: ahora abre cuáles son. -->
@@ -199,7 +202,7 @@
     <div class="cvd__section">
       <button class="cvd__section-toggle" @click="salasExpanded = !salasExpanded">
         <div class="cvd__section-toggle-left">
-          <h2 class="cvd__section-title">Mis salas</h2>
+          <h2 class="cvd__section-title">{{ personal ? 'Mis espacios' : 'Mis salas' }}</h2>
           <span v-if="salas.length" class="cvd__section-badge">{{ salas.length }}</span>
         </div>
         <ChevronRight :size="16" class="cvd__section-chevron" :class="{ 'cvd__section-chevron--open': salasExpanded }" />
@@ -210,8 +213,10 @@
         </div>
         <DsEmpty
           v-else-if="salas.length === 0"
-          title="Sin salas activas"
-          description="No hay salas de vegetativo o floración en tu sede. Pedile al admin que cree una sala."
+          :title="personal ? 'Todavía no tenés un espacio de cultivo' : 'Sin salas activas'"
+          :description="personal
+            ? 'Una carpa, un cuarto: creá tu primer espacio en Cultivo → Espacios y de ahí arranca el lote.'
+            : 'No hay salas de vegetativo o floración en tu sede. Pedile al admin que cree una sala.'"
         />
         <div v-else class="cvd__salas-grid">
           <RouterLink
@@ -380,6 +385,11 @@ import DsEmpty    from '../../design-system/components/EmptyState.vue'
 import DsSkeleton from '../../design-system/components/Skeleton.vue'
 import LeafHerbarium from '../../design-system/icons/LeafHerbarium.vue'
 import RegistrarLecturaSheet from '../cultivador/RegistrarLecturaSheet.vue'
+import PuestaEnMarcha from '../PuestaEnMarcha.vue'
+
+// `personal`: el admin de un uso personal aterriza acá (ver DashboardView). Cambia el texto y
+// suma la puesta en marcha; el resto es la misma pantalla.
+defineProps({ personal: { type: Boolean, default: false } })
 import { LayoutGrid, Sprout, GitBranch, AlertTriangle, ChevronRight } from 'lucide-vue-next'
 
 const router        = useRouter()

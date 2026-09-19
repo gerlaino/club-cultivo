@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
@@ -7,6 +8,7 @@ import AplicarPlanModal       from '../components/plan-trabajo/AplicarPlanModal.
 import EditarPlantillaModal   from '../components/plan-trabajo/EditarPlantillaModal.vue'
 import ExportarCalendarioModal from '../components/plan-trabajo/ExportarCalendarioModal.vue'
 import { listPlanTrabajos, deletePlanTrabajo, getPlanTrabajo, exportPlanCSV, listAplicaciones, cancelarAplicacion, publicarPlanTrabajo } from '../lib/api.js'
+const { esPersonal } = useUsoPersonal()
 
 const toast   = useToast()
 const confirm = useConfirm()
@@ -133,7 +135,7 @@ function toggleHistorialApl() {
 const OBJETIVO_LABEL = { Lote: 'Lote', Sala: 'Sala' }
 
 function describirObjetivo(a) {
-  if (!a.objetivo_tipo) return 'Toda la organización'
+  if (!a.objetivo_tipo) return esPersonal.value ? 'Todo el cultivo' : 'Toda la organización'
   const tipo = OBJETIVO_LABEL[a.objetivo_tipo] || a.objetivo_tipo
   return a.objetivo_nombre ? `${tipo} · ${a.objetivo_nombre}` : tipo
 }
@@ -291,7 +293,7 @@ onMounted(() => {
       <div class="ptv__apl-hdr">
         <div>
           <h2 class="ptv__apl-title">Planes aplicados</h2>
-          <p class="ptv__subtitle">Aplicaciones de plantillas sobre lotes, salas o la organización</p>
+          <p class="ptv__subtitle">Aplicaciones de plantillas sobre lotes, salas o {{ esPersonal ? 'todo el cultivo' : 'la organización' }}</p>
         </div>
         <button class="ptv__btn-secondary" @click="toggleHistorialApl">
           {{ verHistorialApl ? 'Ver solo activos' : 'Ver historial' }}

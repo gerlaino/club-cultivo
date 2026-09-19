@@ -79,6 +79,7 @@ class TrazabilidadDocument < BaseDocument
     "transferencia"  => "Traslado a otra sede",
     "produccion"     => "Elaboración de un derivado",
     "consumo_evento" => "Consumo en evento",
+    "consumo"        => "Consumo propio",
     "salida"         => "Salida",
     "ajuste"         => "Ajuste de conteo",
     "merma"          => "Merma",

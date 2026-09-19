@@ -237,15 +237,35 @@ RSpec.describe Paciente, type: :model do
       end
     end
 
-    context 'paciente sin CuentaCorriente' do
+    # TODO PACIENTE NACE CON CUENTA CORRIENTE (sep-2026): saldo 0 y sin crédito. Tener saldo es
+    # de todos; poder deber lo decide el admin.
+    context 'paciente recién creado' do
       let(:paciente) { create_paciente }
 
-      it '#saldo_cc devuelve nil' do
-        expect(paciente.saldo_cc).to be_nil
+      it 'nace con cuenta corriente en cero y sin límite' do
+        expect(paciente.cuenta_corriente).to be_present
+        expect(paciente.saldo_cc).to eq(0.0)
+        expect(paciente.limite_cc).to eq(0.0)
+        expect(paciente.cuenta_corriente.tiene_credito?).to be(false)
       end
 
-      it '#limite_cc devuelve nil' do
+      it '#saldo_a_favor es lo positivo del saldo' do
+        expect(paciente.saldo_a_favor).to eq(0.0)
+        paciente.cuenta_corriente.update!(saldo_disponible: -500)
+        expect(paciente.reload.saldo_a_favor).to eq(0.0)
+        paciente.cuenta_corriente.update!(saldo_disponible: 800)
+        expect(paciente.reload.saldo_a_favor).to eq(800.0)
+      end
+    end
+
+    context 'paciente anterior al alta automática (sin CuentaCorriente)' do
+      let(:paciente) { create_paciente.tap { |p| p.cuenta_corriente.destroy!; p.reload } }
+
+      it '#saldo_cc devuelve nil y #cuenta_corriente! la crea' do
+        expect(paciente.saldo_cc).to be_nil
         expect(paciente.limite_cc).to be_nil
+        expect { paciente.cuenta_corriente! }.to change(CuentaCorriente, :count).by(1)
+        expect(paciente.saldo_cc).to eq(0.0)
       end
     end
   end

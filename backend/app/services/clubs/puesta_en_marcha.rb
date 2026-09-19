@@ -17,8 +17,12 @@ module Clubs
 
     def call
       pasos = []
-      pasos << paso('sedes', 'Crear la primera sede', @club.sedes.count.positive?,
-                    'Todo cuelga de una sede: salas, mostrador, depósitos.', '/sedes')
+      # En uso personal la sede se siembra con el alta («Mi cultivo») y no se le nombra: para
+      # el que cultiva en casa no existe la palabra.
+      unless @club.personal?
+        pasos << paso('sedes', 'Crear la primera sede', @club.sedes.count.positive?,
+                      'Todo cuelga de una sede: salas, mostrador, depósitos.', '/sedes')
+      end
 
       if @club.suite?('cultivo')
         pasos << paso('salas', 'Crear una sala de cultivo', @club.salas.count.positive?,
@@ -37,9 +41,12 @@ module Clubs
                       'Sin casilla no salen los avisos ni los accesos al portal.', '/configuracion/correo')
       end
 
-      pasos << paso('equipo', 'Que entre alguien más que el admin',
-                    @club.users.del_equipo.where.not(role: 'admin').where.not(visto_at: nil).exists?,
-                    'Un cultivador, un dispensador: la app se prueba operando.', '/usuarios')
+      # Sin equipo no hay a quién esperar: el uso personal es una sola persona.
+      unless @club.personal?
+        pasos << paso('equipo', 'Que entre alguien más que el admin',
+                      @club.users.del_equipo.where.not(role: 'admin').where.not(visto_at: nil).exists?,
+                      'Un cultivador, un dispensador: la app se prueba operando.', '/usuarios')
+      end
 
       hechos = pasos.count { |p| p[:hecho] }
       { completa: hechos == pasos.size, hechos: hechos, total: pasos.size, pasos: pasos }

@@ -14,10 +14,7 @@ RSpec.describe 'Contabilidad de caja', type: :request do
   let(:lote)     { create(:lote, club: club, sala: sala) }
   let(:paciente) { create(:paciente, club: club, created_by: admin) }
   let!(:cc) do
-    CuentaCorriente.create!(
-      paciente: paciente, club: club,
-      saldo_disponible: 0, limite_credito: 50_000
-    )
+    paciente.cuenta_corriente!.tap { |c| c.update!(saldo_disponible: 0, limite_credito: 50_000) }
   end
   let!(:stock) do
     Stock.create!(

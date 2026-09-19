@@ -7,7 +7,7 @@ RSpec.describe 'PATCH /dispensaciones/:id — edición con reversa', type: :requ
   let(:sala)     { create(:sala, club: club, sede: sede, created_by: admin) }
   let(:lote)     { create(:lote, club: club, sala: sala) }
   let(:paciente) { create(:paciente, club: club, created_by: admin) }
-  let!(:cc)      { CuentaCorriente.create!(paciente: paciente, club: club, saldo_disponible: 0, limite_credito: 100_000) }
+  let!(:cc)      { paciente.cuenta_corriente!.tap { |c| c.update!(saldo_disponible: 0, limite_credito: 100_000) } }
   let!(:stock)   { Stock.create!(sede: sede, lote: lote, origen: 'lote', forma_producto: 'flor_seca', unidad: 'g', cantidad: 100, precio_sugerido_ars: 100) }
 
   before { sign_in_as(admin) }
@@ -35,6 +35,20 @@ RSpec.describe 'PATCH /dispensaciones/:id — edición con reversa', type: :requ
       patch "/dispensaciones/#{d.id}", params: { dispensacion: { cantidad: 999, aporte_socio_ars: 100 } }, headers: auth_headers, as: :json
       expect(response).to have_http_status(:unprocessable_entity)
       expect(stock.reload.cantidad.to_f).to eq(90.0)  # sin cambios (rollback)
+    end
+  end
+
+  # Editar NO descuenta el saldo a favor: re-cobrar el total con el saldo aplicado dejaría un
+  # cobro `saldo_a_favor` y un «pagó de más» que se anulan, o sea ruido en la cuenta y en el libro.
+  context 'editar con saldo a favor' do
+    it 'no toca el saldo ni deja cobros de más' do
+      d = crear(medio_pago: 'efectivo', usar_saldo_a_favor: false)
+      cc.update!(saldo_disponible: 700)   # lo dejó a favor DESPUÉS de esta dispensa
+      patch "/dispensaciones/#{d.id}", params: { dispensacion: { cantidad: 20, aporte_socio_ars: 2000 } }, headers: auth_headers, as: :json
+      expect(response).to have_http_status(:ok), response.body
+      expect(d.reload.cobros.where(medio: 'saldo_a_favor')).to be_empty
+      expect(d.movimientos_contables.where(categoria: 'aporte_socio')).to be_empty
+      expect(cc.reload.saldo_disponible.to_f).to eq(700.0)
     end
   end
 

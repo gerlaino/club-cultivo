@@ -28,8 +28,8 @@
             </span>
           </div>
 
-          <!-- Responsable -->
-          <div class="imm__field">
+          <!-- Responsable. En uso personal es él: se completa solo y no se pregunta. -->
+          <div v-if="!esPersonal" class="imm__field">
             <label class="imm__label">
               Responsable
               <span class="imm__optional">requerido</span>
@@ -99,6 +99,8 @@
 import { ref, watch } from 'vue'
 import { Scissors, X } from 'lucide-vue-next'
 import { listUsers, asignarManicurador } from '../../lib/api.js'
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
+import { useAuthStore } from '../../stores/auth'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { useToast } from '../../composables/useToast.js'
 
@@ -109,6 +111,8 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'avanzado'])
 
 const toast = useToast()
+const { esPersonal } = useUsoPersonal()
+const auth  = useAuthStore()
 const form  = ref({ responsable_id: null, peso_humedo_g: null, notas: '' })
 const error          = ref(null)
 const saving         = ref(false)
@@ -121,11 +125,11 @@ const roleLabel = (r) => ROLE_LABELS[r] || r
 watch(() => props.modelValue, async (visible) => {
   if (!visible) return
   resetForm()
-  await cargarUsuarios()
+  if (!esPersonal.value) await cargarUsuarios()
 })
 
 function resetForm() {
-  form.value = { responsable_id: null, peso_humedo_g: null, notas: '' }
+  form.value = { responsable_id: esPersonal.value ? (auth.user?.id || null) : null, peso_humedo_g: null, notas: '' }
   error.value = null
 }
 

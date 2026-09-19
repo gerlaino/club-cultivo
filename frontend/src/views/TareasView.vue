@@ -5,7 +5,7 @@
     <div class="tv__header">
       <div class="tv__header-left">
         <h1 class="tv__title">Tareas</h1>
-        <p class="tv__desc">Asignación y seguimiento de tareas operativas de la organización</p>
+        <p class="tv__desc">{{ esPersonal ? 'Lo que toca hacer en tu cultivo' : 'Asignación y seguimiento de tareas operativas de la organización' }}</p>
         <p class="tv__sub">{{ fechaHoy }} · {{ saludo }}</p>
       </div>
       <div class="tv__header-right">
@@ -97,7 +97,8 @@
                   :title="t.origen_plan?.titulo ? `Plan: ${t.origen_plan.titulo}` : 'Del plan de trabajo'"
                 >Plan</span>
                 <span v-if="t.parent_tarea_id || t.recurrente" class="sem__recurrente" title="Tarea recurrente">🔁</span>
-                <span v-if="t.asignada_a" class="sem__asig" :title="t.asignada_a.nombre">
+                <!-- En uso personal es siempre él: la inicial no dice nada. -->
+                <span v-if="t.asignada_a && !esPersonal" class="sem__asig" :title="t.asignada_a.nombre">
                   {{ t.asignada_a.nombre.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase() }}
                 </span>
               </div>
@@ -170,7 +171,7 @@
                   <span v-if="t.lote" class="pend__chip">{{ t.lote.codigo }}</span>
                   <span v-if="t.origen_plan_id" class="pend__chip pend__chip--plan">Plan</span>
                 </span>
-                <span v-if="t.asignada_a" class="pend__asig" :title="t.asignada_a.nombre">
+                <span v-if="t.asignada_a && !esPersonal" class="pend__asig" :title="t.asignada_a.nombre">
                   {{ iniciales(t.asignada_a.nombre) }}
                 </span>
                 <i class="bi bi-chevron-right pend__chev"></i>
@@ -230,7 +231,7 @@
                 <span class="tv__panel-key">Prioridad</span>
                 <span>{{ tareaDetalle.prioridad }}</span>
               </div>
-              <div v-if="tareaDetalle.asignada_a" class="tv__panel-row">
+              <div v-if="tareaDetalle.asignada_a && !esPersonal" class="tv__panel-row">
                 <span class="tv__panel-key">Asignada a</span>
                 <span>{{ tareaDetalle.asignada_a.nombre }}</span>
               </div>
@@ -307,6 +308,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 import { logger } from '../utils/logger.js'
 import { useAuthStore } from '../stores/auth'
 import { useTareasStore } from '../stores/tareas'
@@ -319,6 +321,7 @@ import DsSpinner from '../design-system/components/Spinner.vue'
 import { useConfirm } from '../composables/useConfirm.js'
 import EmptyState from '../components/ui/EmptyState.vue'
 import { formatFechaLarga } from '../utils/fecha.js'
+const { esPersonal } = useUsoPersonal()
 
 const authStore   = useAuthStore()
 const tareasStore = useTareasStore()

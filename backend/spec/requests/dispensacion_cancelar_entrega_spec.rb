@@ -7,7 +7,7 @@ RSpec.describe 'PATCH /dispensaciones/:id/cancelar_entrega', type: :request do
   let(:sala)     { create(:sala, club: club, sede: sede, created_by: admin) }
   let(:lote)     { create(:lote, club: club, sala: sala) }
   let(:paciente) { create(:paciente, club: club, created_by: admin) }
-  let!(:cc)      { CuentaCorriente.create!(paciente: paciente, club: club, saldo_disponible: 0, limite_credito: 100_000) }
+  let!(:cc)      { paciente.cuenta_corriente!.tap { |c| c.update!(saldo_disponible: 0, limite_credito: 100_000) } }
   let!(:stock)   { Stock.create!(sede: sede, lote: lote, origen: 'lote', forma_producto: 'flor_seca', unidad: 'g', cantidad: 100, precio_sugerido_ars: 100) }
 
   before { sign_in_as(admin) }

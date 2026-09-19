@@ -13,9 +13,21 @@ class PlanEnforcer
   # `usuarios` tampoco es un número: pasó a ser UNO POR ROL en el plan Básico (ver
   # `usuarios_por_rol`). Un tope global no decía nada —"5 usuarios" no se puede vender ni
   # explicar— y dejaba dar de alta cinco cultivadores y ningún dispensador.
+  #
+  # `personal` (sep-2026) es el cultivador de casa: UNA persona, un espacio, dos salas a lo sumo
+  # (vegetativo y floración, o una sola mixta), sin pacientes y SIN EQUIPO. `equipo: false` es
+  # lo que lo distingue de un Básico chico: no es que tenga pocos usuarios, es que no hay nadie
+  # más que él, así que ni siquiera el admin —que en los otros planes queda fuera del cupo—
+  # puede dar de alta a otro. Plantas y lotes sin tope, como en Total: el REPROCANN de
+  # autocultivo tiene su límite, pero eso es un aviso, no un candado (decisión de Germán).
+  # Es un plan y no una columna aparte a propósito: el plan ya dice cuánto, y tener «tipo»
+  # y «plan» por separado son dos perillas que tienen que coincidir. Lo único que rompe la
+  # regla de «el plan dice CUÁNTO, nunca QUÉ» es que además acota los módulos a Cultivo — y
+  # ese candado vive en el controller del super admin, no acá (`Club::MODULOS_PERSONAL`).
   PLANES = {
-    'basico' => { label: 'Básico', sedes: 1,   salas: 3,   lotes: nil, plantas: 450, pacientes: 50,  usuarios: nil, usuarios_por_rol: 1   },
-    'total'  => { label: 'Total',  sedes: nil, salas: nil, lotes: nil, plantas: nil, pacientes: nil, usuarios: nil, usuarios_por_rol: nil },
+    'basico'   => { label: 'Básico',   sedes: 1,   salas: 3,   lotes: nil, plantas: 450, pacientes: 50,  usuarios: nil, usuarios_por_rol: 1,   equipo: true  },
+    'total'    => { label: 'Total',    sedes: nil, salas: nil, lotes: nil, plantas: nil, pacientes: nil, usuarios: nil, usuarios_por_rol: nil, equipo: true  },
+    'personal' => { label: 'Personal', sedes: 1,   salas: 2,   lotes: nil, plantas: nil, pacientes: 0,   usuarios: nil, usuarios_por_rol: nil, equipo: false },
   }.freeze
 
   PLAN_POR_DEFECTO = 'basico'.freeze
@@ -105,6 +117,10 @@ class PlanEnforcer
   # necesite. Qué roles puede tener depende de los módulos contratados y eso lo decide
   # `Club#roles_para_alta`, que es otra pregunta: acá sólo se cuenta CUÁNTOS de ese rol.
   def puede_crear_usuario?(rol = nil)
+    # Sin equipo no entra nadie más, tampoco otro admin: en el uso personal la cuenta ES la
+    # persona.
+    return false unless equipo?
+
     tope = @limite[:usuarios_por_rol]
     return true if tope.nil?
     # Sin rol no hay nada que contar. Que el rol sea válido lo valida el controller, que además
@@ -126,6 +142,11 @@ class PlanEnforcer
 
   def usuarios_por_rol = @limite[:usuarios_por_rol]
 
+  # ¿El plan admite más gente que quien lo contrató?
+  def equipo? = @limite[:equipo] != false
+
+  def personal? = @plan == 'personal'
+
   def info
     {
       plan:         @plan,
@@ -136,6 +157,10 @@ class PlanEnforcer
       # Aparte de los topes numéricos: el de usuarios no es un número, es "uno de cada rol".
       # Va suelto para que la pantalla lo pueda decir con palabras en vez de con una barra.
       usuarios_por_rol: @limite[:usuarios_por_rol],
+      # `false` = la cuenta es de una sola persona: la pantalla esconde «Equipo» entero en vez
+      # de mostrar un formulario que el backend va a rechazar.
+      equipo:       equipo?,
+      personal:     personal?,
       uso:          uso,
     }
   end
@@ -181,6 +206,13 @@ class PlanEnforcer
   def self.error_limite_rol(rol, plan: nil, tope: 1)
     label    = Club::ROLES_META.dig(rol.to_s, :label) || rol.to_s
     plan_txt = plan.present? ? "El plan #{plan}" : 'Tu plan'
+    # Sin equipo el mensaje no puede hablar de cupos: no es que se llenó, es que no hay.
+    if tope.nil?
+      msg = "#{plan_txt} es para una sola persona: no se puede sumar a nadie más. " \
+            'Si tu cultivo creció y necesitás equipo, escribinos y lo pasamos a un plan de organización.'
+      return { error: 'limite_plan', errors: [msg], mensaje: msg, recurso: 'usuarios', rol: rol.to_s,
+               limite: 0, plan: plan, upgrade: true }
+    end
     msg = "#{plan_txt} incluye #{tope == 1 ? 'un' : tope} #{label.downcase}#{tope == 1 ? '' : 's'} " \
           'y la organización ya lo tiene. Para sumar otro hay que ampliar el plan: escribinos y lo cambiamos.'
     { error: 'limite_plan', errors: [msg], mensaje: msg, recurso: 'usuarios', rol: rol.to_s,

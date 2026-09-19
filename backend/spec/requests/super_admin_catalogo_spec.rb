@@ -17,10 +17,13 @@ RSpec.describe 'SuperAdmin catálogo', type: :request do
   describe 'GET /super_admin/catalogo' do
     before { sign_in_as(super_admin) }
 
-    it 'devuelve los dos planes con sus límites' do
+    it 'devuelve los planes con sus límites' do
       planes = catalogo['planes']
 
-      expect(planes.map { |p| p['clave'] }).to contain_exactly('basico', 'total')
+      # Dos de organización y el personal (sep-2026), que viaja marcado como tal y sin equipo.
+      expect(planes.map { |p| p['clave'] }).to contain_exactly('basico', 'total', 'personal')
+      personal = planes.find { |p| p['clave'] == 'personal' }
+      expect(personal).to include('personal' => true, 'equipo' => false)
 
       basico = planes.find { |p| p['clave'] == 'basico' }
       expect(basico['limites']['salas']).to    eq(3)
@@ -84,12 +87,12 @@ RSpec.describe 'SuperAdmin catálogo', type: :request do
     # Los tramos de IA estaban escritos a mano en el template del panel, con los topes POR HORA
     # copiados en un array (`[20,60,200]`). Cambiar un tramo acá dejaba a la pantalla mostrando
     # y guardando el número viejo: la misma duplicación que ya había pasado con los módulos.
-    it 'devuelve los tramos de IA con sus dos topes' do
+    it 'devuelve los tramos de IA, uno por plan' do
       tiers = catalogo['ia_tiers']
 
-      # DOS, y con la clave del plan: el tramo de IA sale del plan y no de una perilla aparte,
+      # Uno POR PLAN, con su clave: el tramo de IA sale del plan y no de una perilla aparte,
       # que era la misma decisión escrita en dos lugares que dejaban de coincidir.
-      expect(tiers.map { |t| t['clave'] }).to eq(%w[basico total])
+      expect(tiers.map { |t| t['clave'] }).to eq(%w[basico total personal])
       expect(tiers).to all(include('label' => be_present, 'limite_hora' => be_present,
                                    'limite_mes' => be_present))
     end

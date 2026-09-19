@@ -260,6 +260,10 @@ class PreferencesController < ApplicationController
       vista_paciente_activa:                   club.vista_paciente_activa,
       benchmark_opt_in:             club.benchmark_opt_in,
       features:                     club.features_expandidas,
+      # Uso personal: el frontend cambia el envoltorio entero (menú, PWA, vocabulario) y la
+      # regla de qué es personal vive en el plan, así que viaja resuelta desde acá.
+      personal:                     club.personal?,
+      plan:                         PlanEnforcer.normalizar(club.plan),
       smtp_configured:              club.smtp_configured?,
       smtp_host:                    club.smtp_host,
       smtp_port:                    club.smtp_port || 587,

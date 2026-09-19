@@ -14,8 +14,8 @@
 
       <div v-if="!salas.length" class="msd__empty">
         <i class="bi bi-grid-3x3-gap msd__empty-icon"></i>
-        <p>{{ cultiva ? 'Sin salas en esta sede' : 'En un dispensario no se cultiva' }}</p>
-        <button v-if="puedeCrearSalas" class="msd__empty-cta" @click="showNuevaSala = true"><i class="bi bi-plus-lg"></i> Crear primera sala</button>
+        <p>{{ cultiva ? (esPersonal ? 'Todavía no tenés un espacio de cultivo' : 'Sin salas en esta sede') : 'En un dispensario no se cultiva' }}</p>
+        <button v-if="puedeCrearSalas" class="msd__empty-cta" @click="showNuevaSala = true"><i class="bi bi-plus-lg"></i> {{ esPersonal ? 'Crear mi espacio' : 'Crear primera sala' }}</button>
         <p v-else-if="cultiva" class="msd__empty-hint">Las salas las crea un administrador.</p>
         <p v-else class="msd__empty-hint">Las salas van en una sede de producción o mixta.</p>
       </div>
@@ -53,6 +53,8 @@ import { getSede, listSalas } from '../../lib/api'
 import { useAuthStore } from '../../stores/auth'
 import { useToast } from '../../composables/useToast.js'
 import ModalCrearSala from '../../components/salas/ModalCrearSala.vue'
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
+const { esPersonal } = useUsoPersonal()
 
 const route = useRoute()
 const auth  = useAuthStore()

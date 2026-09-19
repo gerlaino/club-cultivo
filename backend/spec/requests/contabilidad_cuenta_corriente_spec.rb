@@ -20,7 +20,7 @@ RSpec.describe 'Contabilidad — una dispensa a cuenta corriente no es plata que
   let(:paciente) do
     ActsAsTenant.with_tenant(club) do
       p = create(:paciente, club: club)
-      p.create_cuenta_corriente!(club: club, saldo_disponible: 0, limite_credito: 100_000)
+      p.cuenta_corriente!.tap { |c| c.update!(saldo_disponible: 0, limite_credito: 100_000) }
       p
     end
   end

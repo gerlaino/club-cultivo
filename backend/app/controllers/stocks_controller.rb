@@ -3,9 +3,9 @@ class StocksController < ApplicationController
   before_action :authenticate_user!
   before_action :require_lectura_stock!,        only: [:index, :inventario, :show, :movimientos]
   before_action :require_auditor_lectura!,      only: [:trazabilidad]
-  before_action :require_escritura_stock!,      only: [:create, :update, :asignar, :ajuste, :descartar, :producir]
+  before_action :require_escritura_stock!,      only: [:create, :update, :asignar, :ajuste, :descartar, :consumir, :producir]
   before_action :require_admin_o_supervisor!,   only: [:show_by_qr, :destroy]
-  before_action :set_stock, only: [:asignar, :show, :trazabilidad, :update, :ajuste, :descartar, :producir, :movimientos, :destroy]
+  before_action :set_stock, only: [:asignar, :show, :trazabilidad, :update, :ajuste, :descartar, :consumir, :producir, :movimientos, :destroy]
 
   # Sin variedad, un stock entra al inventario sin decir QUÉ es, y mirando el registro después no
   # hay forma de saberlo: la dispensación, la etiqueta y la trazabilidad quedan con un hueco que
@@ -469,6 +469,29 @@ class StocksController < ApplicationController
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
 
+  # POST /stocks/:id/consumir — consumo propio (uso personal).
+  #
+  # El cultivador de casa no dispensa: consume. Es la única salida parcial de un frasco que no
+  # pasa por una dispensación, y existe SÓLO para el plan personal: en una organización, lo
+  # trazable sale del inventario por dispensación y nada más (regla de oro), así que abrirle esta
+  # puerta sería la segunda salida para el mismo ítem que la regla prohíbe.
+  def consumir
+    unless current_user.club.personal?
+      return render json: { error: 'El consumo propio es del uso personal. En una organización el producto sale por dispensación.' },
+                    status: :forbidden
+    end
+
+    fecha = fecha_de_cierre(params[:fecha])
+    return render json: { error: fecha }, status: :unprocessable_entity if fecha.is_a?(String)
+
+    @stock.consumir!(cantidad: params[:cantidad], usuario: current_user, fecha: fecha, nota: params[:nota].to_s.strip)
+    render json: serialize_stock(@stock.reload)
+  rescue ArgumentError => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
   # DELETE /stocks/:id
   # Borra el stock arrastrando lo reversible (reservas/dispensaciones pendientes con
   # su rollback). Bloquea si hay entregadas o período contable cerrado.
@@ -502,6 +525,9 @@ class StocksController < ApplicationController
         # corrige la fecha de una dispensa ya cargada), y la pantalla mostraba sólo `created_at`
         # — o sea, el día en que se tocó el sistema. Nula en todo lo que no es una dispensa.
         fecha_dispensacion: m.dispensacion&.fecha_dispensacion,
+        # Y la del hecho para el resto (cierre, consumo): `stock_movimientos.fecha`, que puede no
+        # ser la de carga. Nula en los movimientos viejos que no la tienen.
+        fecha:           m.fecha,
       }
     }
   end

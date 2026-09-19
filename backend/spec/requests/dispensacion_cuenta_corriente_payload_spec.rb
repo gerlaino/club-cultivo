@@ -32,8 +32,8 @@ RSpec.describe 'La CC del paciente en el payload de la dispensa', type: :request
 
   context 'el paciente tiene crédito habilitado' do
     let!(:cc) do
-      CuentaCorriente.create!(paciente: paciente, club: club, saldo_disponible: -2_000,
-                              limite_credito: 50_000)
+      paciente.cuenta_corriente!.tap { |c| c.update!(saldo_disponible: -2_000,
+                              limite_credito: 50_000) }
     end
 
     it 'el historial lo dice' do
@@ -50,10 +50,13 @@ RSpec.describe 'La CC del paciente en el payload de la dispensa', type: :request
     end
   end
 
-  context 'el paciente NO tiene cuenta corriente' do
-    it 'viaja en nil, que es lo que apaga la opción' do
+  # Todo paciente nace con cuenta corriente (sep-2026), con límite 0: lo que apaga la opción de
+  # quedar debiendo es el límite en cero, no la ausencia de cuenta.
+  context 'el paciente NO tiene crédito habilitado' do
+    it 'viaja el límite en cero, que es lo que apaga la opción' do
       get '/dispensaciones', params: { fecha: Time.zone.today.to_s }, headers: auth_headers
-      expect(json['dispensaciones'].first['paciente_limite_cc']).to be_nil
+      expect(json['dispensaciones'].first['paciente_limite_cc']).to eq(0.0)
+      expect(json['dispensaciones'].first['paciente_saldo_cc']).to eq(0.0)
     end
   end
 end

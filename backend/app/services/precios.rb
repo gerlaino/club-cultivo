@@ -16,9 +16,15 @@ module Precios
   MONEDA = 'ARS'.freeze
 
   PLANES = {
-    'basico' => 40_000,
-    'total'  => 90_000,
+    'basico'   => 40_000,
+    'total'    => 90_000,
+    # Uso personal: UN número, con todo adentro (ver `INCLUIDO_EN_PERSONAL`). Provisorio como
+    # los demás.
+    'personal' => 12_000,
   }.freeze
+
+  # Lo que el plan personal trae adentro y no se cobra como línea aparte.
+  INCLUIDO_EN_PERSONAL = %w[cultivo iot ia chatbot].freeze
 
   SUITES = {
     'cultivo'             => 30_000,
@@ -52,11 +58,13 @@ module Precios
 
     Club::SUITES.each_key do |k|
       next unless club.suite?(k)
+      next if club.personal? && INCLUIDO_EN_PERSONAL.include?(k)
       lineas << { tipo: 'suite', clave: k, label: Club::SUITES.dig(k, :label), monto: suite(k) }
     end
 
     Club::ADDONS.each_key do |k|
       next unless club.feature?(k)
+      next if club.personal? && INCLUIDO_EN_PERSONAL.include?(k)
       lineas << { tipo: 'addon', clave: k, label: Club::ADDONS.dig(k, :label), monto: addon(k) }
     end
 

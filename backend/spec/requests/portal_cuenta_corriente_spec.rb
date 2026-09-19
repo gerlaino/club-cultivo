@@ -25,7 +25,9 @@ RSpec.describe 'Portal — cuenta corriente del paciente', type: :request do
   def ver = get '/api/portal/cuenta_corriente'
   def datos = JSON.parse(response.body)['data']
 
-  it 'sin cuenta abierta, lo dice y no inventa un saldo en cero' do
+  # Todo paciente nace con cuenta corriente (sep-2026): la que está en cero y sin historia es la
+  # que nadie usó, y para el paciente es como no tenerla.
+  it 'con la cuenta sin usar, lo dice y no inventa un saldo en cero' do
     sign_in_as(con_cuenta)
     ver
 
@@ -37,7 +39,7 @@ RSpec.describe 'Portal — cuenta corriente del paciente', type: :request do
   context 'con cuenta abierta' do
     let!(:cc) do
       ActsAsTenant.with_tenant(club) do
-        CuentaCorriente.create!(paciente: paciente, club: club, limite_credito: 10_000, saldo_disponible: -2_500)
+        paciente.cuenta_corriente!.tap { |c| c.update!(limite_credito: 10_000, saldo_disponible: -2_500) }
       end
     end
 
@@ -78,7 +80,7 @@ RSpec.describe 'Portal — cuenta corriente del paciente', type: :request do
     it 'la de otro paciente no se ve: no hay id en la URL que cambiar' do
       ajeno = ActsAsTenant.with_tenant(club) do
         otro = create(:paciente, club: club, created_by: admin)
-        CuentaCorriente.create!(paciente: otro, club: club, limite_credito: 99_999, saldo_disponible: 0)
+        otro.cuenta_corriente!.tap { |c| c.update!(limite_credito: 99_999, saldo_disponible: 0) }
       end
 
       sign_in_as(con_cuenta)

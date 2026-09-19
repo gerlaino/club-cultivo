@@ -2,7 +2,7 @@
   <div class="plc">
     <!-- Header -->
     <div class="plc__header">
-      <span class="plc__title">Ganancia del lote</span>
+      <span class="plc__title">{{ esPersonal ? 'Costo del lote' : 'Ganancia del lote' }}</span>
       <button class="plc__btn-edit" @click="openCostoForm">
         <Pencil :size="13" :stroke-width="2" />
         {{ costoLote ? 'Editar costos' : 'Cargar costos' }}
@@ -61,8 +61,31 @@
       </div>
 
       <template v-else-if="pl">
+        <!-- USO PERSONAL: no vende, así que no hay margen ni ingresos. La pregunta es una sola:
+             cuánto costó el lote y cuánto cada gramo. -->
+        <template v-if="esPersonal">
+          <div class="plc__margen-banner plc__margen-banner--pos">
+            <div class="plc__margen-main">
+              <span class="plc__margen-label">Costó</span>
+              <span class="plc__margen-val">{{ formatARS(pl.costo_total) }}</span>
+            </div>
+            <span v-if="pl.costo_por_gramo" class="plc__margen-pct">{{ formatARS(pl.costo_por_gramo) }}/g</span>
+          </div>
+          <div v-if="pl.tiene_costos" class="plc__col-detail plc__col-detail--solo">
+            <span v-if="pl.costo_insumos">Insumos {{ formatARS(pl.costo_insumos) }}</span>
+            <span v-if="pl.costo_energia">Energía {{ formatARS(pl.costo_energia) }}</span>
+            <span v-if="pl.costo_mano_obra">M.O. {{ formatARS(pl.costo_mano_obra) }}</span>
+            <span v-if="pl.costo_otros">Otros {{ formatARS(pl.costo_otros) }}</span>
+            <span v-if="pl.costo_prorrateado">Prorrateado {{ formatARS(pl.costo_prorrateado) }}</span>
+            <span v-if="pl.gramos_en_stock > 0">{{ pl.gramos_en_stock.toFixed(1) }} g en stock</span>
+          </div>
+          <div v-if="!pl.tiene_costos" class="plc__hints">
+            <span class="plc__hint">Anotá gastos «para este lote» en Gastos y el costo por gramo sale solo.</span>
+          </div>
+        </template>
+
         <!-- Margen banner -->
-        <div class="plc__margen-banner" :class="pl.margen >= 0 ? 'plc__margen-banner--pos' : 'plc__margen-banner--neg'">
+        <div v-if="!esPersonal" class="plc__margen-banner" :class="pl.margen >= 0 ? 'plc__margen-banner--pos' : 'plc__margen-banner--neg'">
           <div class="plc__margen-main">
             <span class="plc__margen-label">Margen bruto</span>
             <span class="plc__margen-val">{{ formatARS(pl.margen) }}</span>
@@ -73,7 +96,7 @@
         </div>
 
         <!-- Costos vs Ingresos -->
-        <div class="plc__split">
+        <div v-if="!esPersonal" class="plc__split">
           <div class="plc__col">
             <span class="plc__col-label">Costos</span>
             <span class="plc__col-val">{{ formatARS(pl.costo_total) }}</span>
@@ -81,6 +104,7 @@
               <span v-if="pl.costo_insumos">Insumos {{ formatARS(pl.costo_insumos) }}</span>
               <span v-if="pl.costo_energia">Energía {{ formatARS(pl.costo_energia) }}</span>
               <span v-if="pl.costo_mano_obra">M.O. {{ formatARS(pl.costo_mano_obra) }}</span>
+              <span v-if="pl.costo_otros">Otros {{ formatARS(pl.costo_otros) }}</span>
               <span v-if="pl.costo_prorrateado">Prorr. {{ formatARS(pl.costo_prorrateado) }}</span>
             </div>
             <span v-else class="plc__col-none">Sin costos cargados</span>
@@ -97,7 +121,7 @@
         </div>
 
         <!-- Métricas por gramo -->
-        <div v-if="pl.costo_por_gramo || pl.ingreso_por_gramo" class="plc__gpg">
+        <div v-if="!esPersonal && (pl.costo_por_gramo || pl.ingreso_por_gramo)" class="plc__gpg">
           <div v-if="pl.costo_por_gramo" class="plc__gpg-item">
             <span class="plc__gpg-label">Costo/g</span>
             <span class="plc__gpg-val">{{ formatARS(pl.costo_por_gramo) }}</span>
@@ -113,14 +137,14 @@
         </div>
 
         <!-- Advertencias -->
-        <div v-if="!pl.tiene_costos || !pl.tiene_ingresos" class="plc__hints">
+        <div v-if="!esPersonal && (!pl.tiene_costos || !pl.tiene_ingresos)" class="plc__hints">
           <span v-if="!pl.tiene_costos" class="plc__hint">Cargá los costos para ver cuánto dejó</span>
           <span v-if="!pl.tiene_ingresos" class="plc__hint">El margen mejorará cuando se registren dispensaciones con precio</span>
         </div>
       </template>
 
       <div v-else class="plc__empty">
-        <span>Cargá los costos para saber cuánto dejó este lote</span>
+        <span>{{ esPersonal ? 'Anotá gastos «para este lote» y acá ves cuánto costó cada gramo' : 'Cargá los costos para saber cuánto dejó este lote' }}</span>
       </div>
     </template>
   </div>
@@ -132,10 +156,12 @@ import { Pencil } from 'lucide-vue-next'
 import { useLoteCostos } from '../../composables/useLoteCostos.js'
 import { getLotePL } from '../../lib/api.js'
 import { formatARS } from '../../lib/formatters.js'
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
 
 const props = defineProps({
   loteId: { type: Number, required: true },
 })
+const { esPersonal } = useUsoPersonal()
 
 const {
   costoLote, showCostoForm, savingCosto, costoForm,
@@ -240,6 +266,7 @@ onMounted(async () => {
 .plc__col-val { font-size: 1rem; font-weight: 800; color: var(--c-slate-900); }
 .plc__col-val--green { color: #15803d; }
 .plc__col-detail { display: flex; flex-direction: column; gap: .1rem; margin-top: .15rem; }
+.plc__col-detail--solo { padding: 0 .25rem .5rem; font-size: .78rem; color: var(--c-slate-500); }
 .plc__col-detail span { font-size: .7rem; color: var(--c-slate-500); }
 .plc__col-none { font-size: .72rem; color: var(--c-slate-300); font-style: italic; }
 .plc__divider { width: 1px; background: var(--c-slate-200); flex-shrink: 0; }

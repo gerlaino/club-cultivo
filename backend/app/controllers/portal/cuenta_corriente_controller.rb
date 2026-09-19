@@ -1,15 +1,16 @@
 module Portal
   # Su cuenta corriente: cuánto tiene, cuánto debe y qué movimientos la explican.
   #
-  # Aparece SÓLO si la organización le abrió cuenta. Un paciente que paga siempre al contado no
-  # tiene ninguna, y mostrarle una sección vacía con "saldo $0" le hace creer que debe algo o que
-  # le falta cargar plata.
+  # Aparece SÓLO si la cuenta dice algo (`CuentaCorriente#en_uso?`): tiene crédito, saldo o
+  # movimientos. Desde sep-2026 TODO paciente nace con cuenta corriente —es donde cae el vuelto que
+  # no se pudo dar—, pero a quien paga siempre al contado y justo, una sección con "saldo $0" le
+  # hace creer que debe algo o que le falta cargar plata.
   #
   # Más adelante se acredita saldo desde acá; por ahora es lectura.
   class CuentaCorrienteController < BaseController
     def show
       cc = ficha&.cuenta_corriente
-      return render json: { data: { tiene: false } } if cc.nil?
+      return render json: { data: { tiene: false } } unless cc&.en_uso?
 
       render json: {
         data: {

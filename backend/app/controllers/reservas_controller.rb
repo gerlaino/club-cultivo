@@ -216,7 +216,8 @@ class ReservasController < ApplicationController
         # Cobro del resto con el motor nuevo (efectivo/transf/cuenta + contra-entrega).
         # Si es contra-entrega, el delivery lo cobra al entregar.
         # Con contra entrega, lo que venga se cobra ahora y el resto queda para el repartidor.
-        aplicar_lineas_cobro!(dispensacion, cobros_param, 'creacion', dejar_saldo: cobrar_en_entrega) if cobros_param.present? || !cobrar_en_entrega
+        # (Y el saldo a favor, si tiene: se descuenta ahora también con contra entrega.)
+        aplicar_lineas_cobro!(dispensacion, cobros_param, 'creacion', dejar_saldo: cobrar_en_entrega) if cobros_param.present? || !cobrar_en_entrega || saldo_a_favor_aplicable(dispensacion) > 0
         afinar_medio_pago!(dispensacion)
         @reserva.update!(dispensacion: dispensacion)
       end

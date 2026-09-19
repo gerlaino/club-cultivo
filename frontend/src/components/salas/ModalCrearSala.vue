@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useSalasStore } from '../../stores/salas'
 import { listSedes } from '../../lib/api'
 import DsSpinner from '../../design-system/components/Spinner.vue'
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
 
 const props = defineProps({
   sedeIdFija: { type: Number, default: null }, // Si viene de SedeDetailView, la sede está fija
@@ -11,6 +12,7 @@ const props = defineProps({
 const emit = defineEmits(['created', 'close'])
 
 const salas = useSalasStore()
+const { esPersonal } = useUsoPersonal()
 const sedes = ref([])
 const saving = ref(false)
 const error  = ref(null)
@@ -18,6 +20,9 @@ const error  = ref(null)
 // Las salas son SOLO de cultivo. 'cosecha' y 'manicura' se retiraron del alta: la cosecha
 // es un evento → post-cosecha, y la manicura se trabaja por estado del lote (en_manicura),
 // no en una sala. Esos kinds siguen válidos en el backend para salas ya existentes.
+// Tampoco «mixta» en uso personal (decisión de Germán, 18-sep-2026): un espacio está en UNA
+// fase y cambia de fase cuando el cultivo avanza —nunca vege y flora a la vez—. Una carpa sola
+// se crea como vegetativo y se pasa a floración con «Cambiar fase».
 const KINDS = [
   { value: 'vegetativo', label: 'Vegetativo' },
   { value: 'floracion',  label: 'Floración'  },
@@ -65,6 +70,8 @@ onMounted(async () => {
   const { data } = await listSedes()
   sedes.value = data || []
   if (props.sedeIdFija) form.value.sede_id = props.sedeIdFija
+  // Uso personal: la única sede es su casa. Se completa sola, sin preguntar.
+  else if (esPersonal.value && !form.value.sede_id) form.value.sede_id = sedes.value[0]?.id || null
 })
 </script>
 
@@ -79,7 +86,7 @@ onMounted(async () => {
             <i class="bi bi-grid-3x3-gap"></i>
           </div>
           <div>
-            <h2 class="mcr__title">Nueva sala</h2>
+            <h2 class="mcr__title">{{ esPersonal ? 'Nuevo espacio de cultivo' : 'Nueva sala' }}</h2>
             <p class="mcr__sub">
               <template v-if="sedeIdFija && sedeSeleccionada">
                 En <strong>{{ sedeSeleccionada.nombre }}</strong>
@@ -137,8 +144,8 @@ onMounted(async () => {
             </div>
           </div>
 
-          <!-- Sede (solo si no está fija) -->
-          <div v-if="!sedeIdFija" class="mcr__field mcr__field--full">
+          <!-- Sede (solo si no está fija; en uso personal es su casa y no se pregunta) -->
+          <div v-if="!sedeIdFija && !esPersonal" class="mcr__field mcr__field--full">
             <label class="mcr__label">Sede <span class="mcr__req">*</span></label>
             <select class="mcr__input" :class="{ 'mcr__input--err': errors.sede_id }" v-model="form.sede_id">
               <option :value="null" disabled>Seleccioná una sede</option>
@@ -169,7 +176,7 @@ onMounted(async () => {
           <button class="mcr__btn-primary" :disabled="saving" @click="handleSubmit">
             <DsSpinner v-if="saving" :size="14" />
             <i v-else class="bi bi-plus-lg"></i>
-            {{ saving ? 'Creando…' : 'Crear sala' }}
+            {{ saving ? 'Creando…' : (esPersonal ? 'Crear espacio' : 'Crear sala') }}
           </button>
         </div>
 

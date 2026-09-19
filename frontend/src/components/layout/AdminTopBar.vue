@@ -22,11 +22,11 @@
           :to="t.to" class="atb__tab"
           :class="{ 'atb__tab--active': isTabActive(t) }"
         >
-          {{ t.label }}
+          {{ labelDe(t, club.data) }}
           <span v-if="t.badge && badgeFor(t.badge)" class="atb__tab-badge">{{ badgeFor(t.badge) }}</span>
         </RouterLink>
       </nav>
-      <span v-else class="atb__page-title">{{ activeGroup.label }}</span>
+      <span v-else class="atb__page-title">{{ labelDe(activeGroup, club.data) }}</span>
 
       <!-- Right actions -->
       <div class="atb__right">
@@ -35,7 +35,7 @@
              hecho para el cultivador con el teléfono, y acá taparía justo los datos contra los
              que se quiere contrastar la respuesta. -->
         <button v-if="club.data?.features?.chatbot" class="atb__icon-btn" @click="chatOpen = true"
-                aria-label="Preguntale a tu organización" title="Preguntale a tu organización">
+                :aria-label="club.data?.personal ? 'Preguntale a tu cultivo' : 'Preguntale a tu organización'" :title="club.data?.personal ? 'Preguntale a tu cultivo' : 'Preguntale a tu organización'">
           <Sparkles :size="20" :stroke-width="1.75" />
         </button>
 
@@ -117,7 +117,7 @@ import { useClubStore } from '../../stores/club.js'
 import { useAmbienteStore } from '../../stores/ambiente.js'
 import { useAlertasBell } from '../../composables/useAlertasBell.js'
 import { useAlertasInternas } from '../../composables/useAlertasInternas.js'
-import { detectGroup, useNavContext } from '../../composables/useNavContext.js'
+import { detectGroup, entradaVisible, labelDe, useNavContext } from '../../composables/useNavContext.js'
 import DsDropdown         from '../../design-system/components/Dropdown.vue'
 import DsAvatar           from '../../design-system/components/Avatar.vue'
 import { Bell, BellRing, BellOff, Menu, HelpCircle, Sparkles } from 'lucide-vue-next'
@@ -175,7 +175,7 @@ const { badgeFor } = useNavContext()
 const activeGroup = computed(() => detectGroup(route.path))
 // Tabs visibles: oculta las que dependen de un feature flag apagado de la organización (insumos, bar…)
 const visibleTabs = computed(() =>
-  (activeGroup.value.tabs || []).filter(t => !t.feature || club.data?.features?.[t.feature])
+  (activeGroup.value.tabs || []).filter(t => entradaVisible(t, club.data))
 )
 function isTabActive(t) {
   let best = null, len = -1

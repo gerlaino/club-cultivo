@@ -232,6 +232,8 @@ onMounted(async () => {
 
         <!-- Qué contrató: las suites, y cuántos add-ons encima. -->
         <div class="sac__suites">
+          <!-- Uso personal: se lee de un vistazo, antes que las suites. -->
+          <span v-if="c.personal" class="sac__plan-pill" style="background:#ecfccb;color:#3f6212">Personal</span>
           <span v-for="k in suitesDe(c)" :key="k" class="sac__plan-pill"
                 :style="{ background: SUITE_META[k].bg, color: SUITE_META[k].color }">
             {{ SUITE_META[k].label }}

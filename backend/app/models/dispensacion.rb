@@ -27,7 +27,7 @@ class Dispensacion < ApplicationRecord
   ESTADOS_ENVIO = %w[pendiente en_viaje entregado fallido cancelada].freeze
   # `cambio`: la dispensa que reemplaza a una anulada por producto defectuoso. Lo que se lleva ya
   # lo pagó en la original: no cobra, no asienta, no toca la cuenta corriente; sólo baja stock.
-  MEDIOS_PAGO   = %w[efectivo transferencia cuenta_corriente no_abona credito_gramos mixto regalo cambio].freeze
+  MEDIOS_PAGO   = %w[efectivo transferencia saldo_a_favor cuenta_corriente no_abona credito_gramos mixto regalo cambio].freeze
 
   belongs_to :paciente
   belongs_to :user

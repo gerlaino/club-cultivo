@@ -92,11 +92,14 @@ class AuditoriaContable
       # dispensa mixta lleva dos asientos y está perfecta.
       en_la_calle = d.cobros.select { |c| c.medio == 'efectivo' && c.contexto == 'entrega' && !c.rendido }
                      .sum { |c| c.monto_ars.to_d }
+      # Lo pagado con SALDO A FAVOR tampoco asienta: esa plata entró al libro el día que el
+      # paciente la dejó (como «Aporte socio»), y asentarla otra vez la contaría dos veces.
+      con_saldo = d.cobros.select { |c| c.medio == 'saldo_a_favor' }.sum { |c| c.monto_ars.to_d }
       esperado =
         if d.cobrar_en_entrega? && d.cobros.empty?
           0.to_d
         else
-          d.aporte_socio_ars.to_d - en_la_calle
+          d.aporte_socio_ars.to_d - en_la_calle - con_saldo
         end
       # Sin el «Aporte socio» del pago de más: es plata del paciente que queda a favor, atada a
       # la dispensa para poder revertirla, pero no es el ingreso de ESTA dispensa.

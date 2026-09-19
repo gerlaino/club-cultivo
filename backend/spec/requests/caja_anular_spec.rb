@@ -141,7 +141,7 @@ RSpec.describe 'Anular una caja abierta por error', type: :request do
 
     ActsAsTenant.with_tenant(club) do
       pac = create(:paciente, club: club)
-      pac.create_cuenta_corriente!(club: club, saldo_disponible: 0, limite_credito: 50_000)
+      pac.cuenta_corriente!.tap { |c| c.update!(saldo_disponible: 0, limite_credito: 50_000) }
       Dispensacion.create!(paciente: pac, user: ana, stock: stock, sede: sede, cantidad: 5,
                            medio_pago: 'cuenta_corriente', aporte_socio_ars: 500,
                            fecha_dispensacion: Time.zone.today)

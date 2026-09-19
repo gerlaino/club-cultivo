@@ -9,7 +9,10 @@ class PushNotificationJob < ApplicationJob
     return unless sub
 
     WebPush.payload_send(
-      message:  JSON.generate({ title: title, body: body, url: url }),
+      # `tag` distinto por aviso: el service worker se lo pasa a `showNotification`, y con el
+      # mismo tag el teléfono REEMPLAZA la notificación anterior en vez de sumar una. Dos alertas
+      # seguidas dejaban una sola a la vista.
+      message:  JSON.generate({ title: title, body: body, url: url, tag: "ce-#{SecureRandom.hex(6)}" }),
       endpoint: sub.endpoint,
       p256dh:   sub.p256dh_key,
       auth:     sub.auth_key,

@@ -200,6 +200,7 @@ Rails.application.routes.draw do
         get  :trazabilidad
         post :ajuste
         post :descartar
+        post :consumir
         post :producir
         get  :movimientos
       end

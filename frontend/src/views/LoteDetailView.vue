@@ -6,6 +6,7 @@ import { useLotesStore }  from "../stores/lotes"
 import { usePlantsStore } from "../stores/plants"
 import { useAuthStore }   from "../stores/auth"
 import { useClubStore }   from "../stores/club"
+import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 import { getLoteHistorial, registrarTrasplante, listSedes, deleteLote, createSala, listAnalisisLaboratorio, createAnalisisLaboratorio, deleteAnalisisLaboratorio, createLoteEvento, updateLoteEvento, deleteLoteEvento, deleteRegistroAmbiental, deleteTarea } from "../lib/api"
 import { useQRCode } from '../composables/useQRCode.js'
 import { LAYOUT_LOTE, dibujarEtiquetaLote } from '../lib/pdfEtiquetas.js'
@@ -55,6 +56,8 @@ const canEdit  = computed(() =>
 const canAdmin = computed(() => ['admin', 'supervisor'].includes(auth.role))
 const esAdmin  = computed(() => auth.role === 'admin')
 const isCultivador = computed(() => auth.role === 'cultivador')
+// Uso personal: sin sede en la miga (es su casa) — ver useUsoPersonal.
+const { esPersonal } = useUsoPersonal()
 
 const { generatePNG } = useQRCode()
 const generandoQR = ref(false)
@@ -389,8 +392,8 @@ onUnmounted(() => {
   <div class="ld">
 
     <Breadcrumb :items="[
-      ...(!isCultivador ? [{ label: 'Sedes', to: { name: 'sedes' } }] : []),
-      ...(!isCultivador && lote?.sala?.sede ? [{ label: lote.sala.sede.nombre, to: { name: 'sede-detail', params: { id: lote.sala.sede.id } } }] : []),
+      ...(!isCultivador && !esPersonal ? [{ label: 'Sedes', to: { name: 'sedes' } }] : []),
+      ...(!isCultivador && !esPersonal && lote?.sala?.sede ? [{ label: lote.sala.sede.nombre, to: { name: 'sede-detail', params: { id: lote.sala.sede.id } } }] : []),
       ...(lote?.sala ? [{ label: lote.sala.nombre, to: { name: 'sala-detail', params: { id: lote.sala.id } } }] : []),
       { label: lote?.codigo || `Lote #${id}` },
     ]" />

@@ -215,7 +215,7 @@ RSpec.describe 'Reservas', type: :request do
     end
 
     it 'editar la seña sincroniza el asiento contable y la cuenta corriente' do
-      cc = CuentaCorriente.create!(paciente: paciente, club: club, saldo_disponible: 0, limite_credito: 5000)
+      cc = paciente.cuenta_corriente!.tap { |c| c.update!(saldo_disponible: 0, limite_credito: 5000) }
       post "/pacientes/#{paciente.id}/reservas",
            params: { reserva: { stock_id: stock.id, cantidad: 10, sena_ars: 300,
                                 aporte_estimado_ars: 2000, fecha_entrega_estimada: 3.days.from_now.to_date } },
@@ -276,13 +276,37 @@ RSpec.describe 'Reservas', type: :request do
     end
 
     it 'paga parte en efectivo y el resto queda en cuenta corriente' do
-      cc = CuentaCorriente.create!(paciente: paciente2, club: club, saldo_disponible: 0, limite_credito: 600)
+      cc = paciente2.cuenta_corriente!.tap { |c| c.update!(saldo_disponible: 0, limite_credito: 600) }
       patch "/reservas/#{reserva.id}/entregar", params: { cobros: [{ medio: 'efectivo', monto: 400 }] }, headers: auth_headers
       expect(response).to have_http_status(:ok)
       disp = reserva.reload.dispensacion
       expect(disp.aporte_socio_ars.to_f).to eq(1000.0)
       expect(disp.monto_credito_ars.to_f).to eq(600.0)   # 400 efectivo + 600 a cuenta
       expect(cc.reload.saldo_disponible.to_f).to eq(-600.0)
+    end
+
+    # El saldo a favor se descuenta también al entregar una reserva, y aunque el resto vaya
+    # contra entrega: el repartidor cobra lo que queda después del saldo.
+    it 'con saldo a favor y contra entrega, el saldo se descuenta ahora y el repartidor cobra el resto' do
+      cc = paciente2.cuenta_corriente!.tap { |c| c.update!(saldo_disponible: 300, limite_credito: 0) }
+      patch "/reservas/#{reserva.id}/entregar",
+            params: { con_envio: true, delivery_id: delivery.id, usar_domicilio_paciente: true, cobrar_en_entrega: true },
+            headers: auth_headers
+      expect(response).to have_http_status(:ok), response.body
+      disp = reserva.reload.dispensacion
+      expect(disp.cobros.find_by(medio: 'saldo_a_favor').monto_ars.to_f).to eq(300.0)
+      expect(disp.saldo_pendiente.to_f).to eq(700.0)
+      expect(cc.reload.saldo_disponible.to_f).to eq(0.0)
+    end
+
+    it 'con saldo a favor que cubre el resto, no hay nada que cobrar' do
+      cc = paciente2.cuenta_corriente!.tap { |c| c.update!(saldo_disponible: 5000, limite_credito: 0) }
+      patch "/reservas/#{reserva.id}/entregar", params: { medio_pago: 'saldo_a_favor', cobros: [] }, headers: auth_headers
+      expect(response).to have_http_status(:ok), response.body
+      disp = reserva.reload.dispensacion
+      expect(disp.saldo_pendiente.to_f).to eq(0.0)
+      expect(disp.medio_pago).to eq('saldo_a_favor')
+      expect(cc.reload.saldo_disponible.to_f).to eq(4000.0)
     end
   end
 

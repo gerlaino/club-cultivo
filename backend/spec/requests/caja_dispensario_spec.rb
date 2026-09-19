@@ -83,7 +83,7 @@ RSpec.describe 'Caja del mostrador de dispensa', type: :request do
         stock = create(:stock, club: club, sede: sede, lote: lote, forma_producto: 'flor_seca',
                                cantidad: 500, precio_sugerido_ars: 100)
         pac = create(:paciente, club: club)
-        pac.create_cuenta_corriente!(club: club, saldo_disponible: 0, limite_credito: 50_000)
+        pac.cuenta_corriente!.tap { |c| c.update!(saldo_disponible: 0, limite_credito: 50_000) }
         # El dispensador entrega de lo que está sobre la mesa, así que primero hay mostrador: la
         # mesa la carga administración y ana abre contándola.
         t = abrir_mostrador!(sede, usuario: admin, recibe: ana, fondo: 10_000)

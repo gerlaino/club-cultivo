@@ -10,7 +10,7 @@ RSpec.describe 'Deudores (cuentas corrientes)', type: :request do
   def paciente_con_cc(nombre, saldo, limite: 50_000)
     ActsAsTenant.with_tenant(club) do
       p = create(:paciente, club: club, nombre: nombre, apellido: 'Test', created_by: admin)
-      CuentaCorriente.create!(club: club, paciente: p, saldo_disponible: saldo, limite_credito: limite)
+      p.cuenta_corriente!.tap { |c| c.update!(saldo_disponible: saldo, limite_credito: limite) }
       p
     end
   end
@@ -53,7 +53,7 @@ RSpec.describe 'Deudores (cuentas corrientes)', type: :request do
     otro = create(:club)
     ActsAsTenant.with_tenant(otro) do
       p = create(:paciente, club: otro, created_by: create(:user, :admin, club: otro))
-      CuentaCorriente.create!(club: otro, paciente: p, saldo_disponible: -9_999)
+      p.cuenta_corriente!.tap { |c| c.update!(saldo_disponible: -9_999) }
     end
 
     get '/api/cuentas_corrientes'

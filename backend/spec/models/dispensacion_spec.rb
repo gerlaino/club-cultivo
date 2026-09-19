@@ -88,10 +88,7 @@ RSpec.describe Dispensacion, type: :model do
 
   describe 'validación credito_suficiente (medio_pago: cuenta_corriente)' do
     before do
-      CuentaCorriente.create!(
-        paciente: paciente, club: club,
-        saldo_disponible: 200, limite_credito: 200
-      )
+      paciente.cuenta_corriente!.tap { |c| c.update!(saldo_disponible: 200, limite_credito: 200) }
     end
 
     it 'acepta si el aporte está dentro del crédito disponible' do
@@ -356,12 +353,9 @@ RSpec.describe Dispensacion, type: :model do
 
   describe 'validación gramos_suficientes (medio_pago: credito_gramos)' do
     before do
-      CuentaCorriente.create!(
-        paciente: paciente, club: club,
-        credito_gramos_activo: true,
+      paciente.cuenta_corriente!.tap { |c| c.update!(credito_gramos_activo: true,
         saldo_disponible_g:    50,
-        limite_credito_g:      50,
-      )
+        limite_credito_g:      50) }
     end
 
     it 'acepta si la cantidad está dentro del saldo en gramos' do

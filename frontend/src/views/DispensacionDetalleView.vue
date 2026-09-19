@@ -32,6 +32,8 @@ const MEDIO_PAGO = {
   efectivo:         { label: 'Efectivo',          cls: 'is-efectivo' },
   transferencia:    { label: 'Transferencia',     cls: 'is-transf' },
   cuenta_corriente: { label: 'Cuenta corriente',  cls: 'is-cc' },
+  saldo_a_favor:    { label: 'Saldo a favor',      cls: 'is-efectivo' },
+  mixto:            { label: 'Varios medios',      cls: 'is-transf' },
   no_abona:         { label: 'No abona',           cls: 'is-cc' },
   contra_entrega:   { label: 'Contra entrega',     cls: 'is-transf' },
 }

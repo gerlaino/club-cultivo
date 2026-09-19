@@ -11,7 +11,7 @@
             </div>
             <div>
               <h2 class="mt-title">{{ editando ? 'Editar tarea' : 'Nueva tarea' }}</h2>
-              <p class="mt-subtitle">Paso {{ currentStep + 1 }} de {{ STEPS.length }} — {{ STEPS[currentStep].label }}</p>
+              <p class="mt-subtitle">Paso {{ currentStep - primerPaso + 1 }} de {{ pasosVisibles.length }} — {{ STEPS[currentStep].label }}</p>
             </div>
           </div>
           <button class="mt-close" @click="$emit('cerrar')">
@@ -21,17 +21,17 @@
 
         <!-- Stepper -->
         <div class="mt-stepper">
-          <template v-for="(s, i) in STEPS" :key="s.key">
+          <template v-for="(s, j) in pasosVisibles" :key="s.key">
             <div class="mt-step-item"
-                 :class="{ 'mt-step--done': i < currentStep, 'mt-step--active': i === currentStep }"
-                 @click="i < currentStep && (currentStep = i)">
+                 :class="{ 'mt-step--done': j + primerPaso < currentStep, 'mt-step--active': j + primerPaso === currentStep }"
+                 @click="j + primerPaso < currentStep && (currentStep = j + primerPaso)">
               <div class="mt-step-dot">
-                <i v-if="i < currentStep" class="bi bi-check-lg"></i>
-                <span v-else>{{ i + 1 }}</span>
+                <i v-if="j + primerPaso < currentStep" class="bi bi-check-lg"></i>
+                <span v-else>{{ j + 1 }}</span>
               </div>
               <span class="mt-step-lbl">{{ s.label }}</span>
             </div>
-            <div v-if="i < STEPS.length - 1" class="mt-step-line" :class="{ 'mt-step-line--done': i < currentStep }"></div>
+            <div v-if="j < pasosVisibles.length - 1" class="mt-step-line" :class="{ 'mt-step-line--done': j + primerPaso < currentStep }"></div>
           </template>
         </div>
 
@@ -254,7 +254,7 @@
         <!-- Footer -->
         <div class="mt-footer">
           <button class="mt-btn-ghost" @click="retroceder">
-            {{ currentStep === 0 ? 'Cancelar' : '← Atrás' }}
+            {{ currentStep === primerPaso ? 'Cancelar' : '← Atrás' }}
           </button>
           <button v-if="currentStep < STEPS.length - 1"
                   class="mt-btn-primary"
@@ -282,6 +282,7 @@ import { getUserSalasAsignadas } from '../lib/api.js'
 import AppDatePicker from './ui/AppDatePicker.vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import { hoyISO, toISO } from '../utils/dates.js'
+import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 
 const props = defineProps({
   show:         { type: Boolean, default: false },
@@ -296,17 +297,23 @@ const authStore   = useAuthStore()
 const tareasStore = useTareasStore()
 const guardando      = ref(false)
 const errorGlobal    = ref('')
-const currentStep    = ref(0)
-const conRepeticion  = ref(false)
-const busquedaUsuario = ref('')
-const mostrarSala    = ref(false)
-const repeticion     = ref({ dias: [], hasta: '' })
-
 const STEPS = [
   { key: 'asignacion', label: 'Asignación' },
   { key: 'tarea',      label: 'Tarea' },
   { key: 'horario',    label: 'Horario' },
 ]
+const currentStep    = ref(0)
+// USO PERSONAL: no hay a quién asignar —es él— así que el paso «¿A quién?» no existe. Se salta
+// el primer paso y la tarea queda a su nombre; los índices de los pasos no cambian, sólo el
+// piso desde el que se cuenta (`primerPaso`).
+const { esPersonal } = useUsoPersonal()
+const primerPaso = computed(() => (esPersonal.value ? 1 : 0))
+const pasosVisibles = computed(() => STEPS.slice(primerPaso.value))
+const conRepeticion  = ref(false)
+const busquedaUsuario = ref('')
+const mostrarSala    = ref(false)
+const repeticion     = ref({ dias: [], hasta: '' })
+
 
 const TIPOS = [
   { value: 'riego',       label: 'Riego',      emoji: '💧', bg: '#e8f5e9' },
@@ -366,7 +373,7 @@ function toggleDia(v) {
 }
 
 function retroceder() {
-  if (currentStep.value > 0) currentStep.value--
+  if (currentStep.value > primerPaso.value) currentStep.value--
   else emit('cerrar')
 }
 
@@ -425,7 +432,7 @@ async function seleccionarUsuario(u) {
 watch(() => props.show, (val) => {
   if (!val) return
   errorGlobal.value     = ''
-  currentStep.value     = 0
+  currentStep.value     = primerPaso.value
   conRepeticion.value   = false
   busquedaUsuario.value = ''
   salasDelUsuario.value = []
@@ -448,6 +455,8 @@ watch(() => props.show, (val) => {
     mostrarSala.value = false
     form.value = formVacio()
   }
+  // A su nombre: sin esto la tarea nacía «sin asignar» y no le llegaba el push de la mañana.
+  if (esPersonal.value && !form.value.asignada_a_id) form.value.asignada_a_id = authStore.user?.id || ''
 })
 
 async function guardar() {

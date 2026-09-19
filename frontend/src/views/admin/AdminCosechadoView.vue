@@ -3,8 +3,8 @@
 
     <div class="acs__header">
       <div>
-        <h1 class="acs__title">Cosechas pendientes</h1>
-        <p class="acs__sub">Lotes cosechados esperando ser asignados a un manicurador.</p>
+        <h1 class="acs__title">{{ esPersonal ? 'Cosechas por manicurar' : 'Cosechas pendientes' }}</h1>
+        <p class="acs__sub">{{ esPersonal ? 'Lo que cosechaste y todavía no pasó por la manicura. Cuando la termines, pesás y va al frasco.' : 'Lotes cosechados esperando ser asignados a un manicurador.' }}</p>
       </div>
       <button class="acs__btn-refresh" :disabled="loading" @click="cargar">
         <RefreshCw :size="15" :stroke-width="2" :class="{ 'acs__spin': loading }" />
@@ -19,7 +19,7 @@
     <div v-else-if="!lotes.length" class="acs__empty">
       <Scissors :size="40" :stroke-width="1.25" />
       <p class="acs__empty-title">Sin cosechas pendientes</p>
-      <p class="acs__empty-sub">Cuando el cultivador finalice una cosecha aparecerá aquí.</p>
+      <p class="acs__empty-sub">{{ esPersonal ? 'Cuando coseches un lote aparece acá.' : 'Cuando el cultivador finalice una cosecha aparecerá aquí.' }}</p>
     </div>
 
     <table v-else class="acs__table">
@@ -62,7 +62,13 @@
           </td>
           <td class="acs__fecha">{{ fmtFecha(lote.updated_at) }}</td>
           <td class="acs__actions" @click.stop>
-            <button class="acs__btn-asignar" @click="abrirModal(lote)">
+            <!-- Uso personal: la manicura la hace él. No hay a quién asignar, así que el botón
+                 la empieza directo. -->
+            <button v-if="esPersonal" class="acs__btn-asignar" :disabled="saving" @click="empezarManicura(lote)">
+              <Scissors :size="14" :stroke-width="2" />
+              Empezar la manicura
+            </button>
+            <button v-else class="acs__btn-asignar" @click="abrirModal(lote)">
               <UserCheck :size="14" :stroke-width="2" />
               Asignar manicurador
             </button>
@@ -149,6 +155,8 @@ import DsSpinner from '../../design-system/components/Spinner.vue'
 import { RefreshCw, Scissors, UserCheck, Scale, Dna, X, AlertCircle } from 'lucide-vue-next'
 import { listLotes, listUsers, asignarManicurador } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
+import { useAuthStore } from '../../stores/auth'
 
 const toast = useToast()
 
@@ -203,6 +211,21 @@ async function cargarManicuradores() {
   } finally {
     loadingManicuradores.value = false
   }
+}
+
+const { esPersonal } = useUsoPersonal()
+const auth = useAuthStore()
+
+// Uso personal: se asigna a sí mismo y el lote pasa a manicura en el acto.
+async function empezarManicura(lote) {
+  saving.value = true
+  try {
+    await asignarManicurador(lote.id, auth.user.id)
+    toast.success(`${lote.codigo} en manicura: cuando termines, pesalo desde el lote`)
+    await cargar()
+  } catch (e) {
+    toast.error(e.response?.data?.error || 'No se pudo empezar la manicura')
+  } finally { saving.value = false }
 }
 
 function abrirModal(lote) {

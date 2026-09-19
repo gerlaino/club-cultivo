@@ -41,7 +41,8 @@ class StatsController < ApplicationController
   # sala de cultivo activa. Para el widget del dashboard.
   def ambiente_salas
     club  = current_user.club
-    salas = club.salas.where(kind: %w[vegetativo floracion]).order(:nombre)
+    # Y `mixta`: la carpa única del cultivador de casa hace vege y flora en el mismo lugar.
+    salas = club.salas.where(kind: %w[vegetativo floracion mixta]).order(:nombre)
     data = salas.filter_map do |s|
       temp = LecturaAmbiental.de_sala(s.id).del_tipo('temperatura').order(medido_at: :desc).first
       hum  = LecturaAmbiental.de_sala(s.id).del_tipo('humedad').order(medido_at: :desc).first

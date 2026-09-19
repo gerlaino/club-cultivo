@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from "vue"
+import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 import { useRoute, useRouter } from "vue-router"
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { useContabilidadStore } from "../stores/contabilidad"
@@ -16,6 +17,7 @@ import DsSpinner from '../design-system/components/Spinner.vue'
 // Categorías integradas como sección de Contabilidad (config del hub contable)
 import FinanzasCatalogoView from './admin/FinanzasCatalogoView.vue'
 import { hoyISO, toISO, formatFechaCorta } from '../utils/dates.js'
+const { org: orgTxt } = useUsoPersonal()
 
 const store   = useContabilidadStore()
 const auth    = useAuthStore()
@@ -1001,7 +1003,7 @@ onMounted(async () => {
           Mostrando datos de
           <strong>{{ sedes.find(s => s.id === dashboardSede)?.nombre }}</strong>
           <button class="cv__dash-context-clear" @click="cambiarSedeDashboard(null)">
-            Ver toda la organización <i class="bi bi-x"></i>
+            Ver {{ orgTxt.toda }} <i class="bi bi-x"></i>
           </button>
         </div>
 

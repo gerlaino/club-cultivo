@@ -153,7 +153,7 @@ const ROLE_LABELS = {
   admin: 'Administración', supervisor: 'Supervisión', cultivador: 'Cultivo',
   manicura: 'Manicura', delivery: 'Delivery', dispensador: 'Dispensa',
 }
-const roleLabel = computed(() => ROLE_LABELS[role.value] || '')
+const roleLabel = computed(() => (club.data?.personal && role.value === 'admin' ? 'Mi cultivo' : ROLE_LABELS[role.value] || ''))
 
 const isDetalle = computed(() =>
   /\/m\/(sede|sala-m|lote-m|planta|mnc\/lotes)\//.test(route.path)
@@ -239,6 +239,22 @@ const NAV = {
 }
 NAV.supervisor = NAV.admin
 
+// USO PERSONAL: el admin ES el cultivador, y su barra es la de quien hace todo — hoy, el
+// cultivo, los frascos y los gastos. Es otra PRESENTACIÓN del mismo estado (mismos stores,
+// mismas pantallas de sala/lote/planta): lo que no tiene es lo de una organización, porque no
+// hay equipo que aprobar ni pacientes que atender. Cuatro destinos y el FAB: sin «Más».
+NAV.personal = { fab: true, items: [
+  { to: '/m/personal/hoy',     icon: 'bi-sun',           label: 'Hoy' },
+  // Entra directo a sus salas (una sola sede, la casa); se resalta también dentro de una sala,
+  // un lote o una planta, que es donde vive el recorrido.
+  { to: '/m/personal/cultivo', icon: 'bi-diagram-3',     label: 'Cultivo', match: ['/m/sede/', '/m/sala-m/', '/m/lote-m/', '/m/planta/', '/m/mnc/'] },
+  { to: '/m/personal/stock',   icon: 'bi-archive',       label: 'Stock' },
+  { to: '/m/personal/gastos',  icon: 'bi-receipt',       label: 'Gastos' },
+] }
+
+// Qué barra corresponde: el rol, salvo en uso personal, donde el admin lleva la suya.
+const navKey = computed(() => (role.value === 'admin' && club.data?.personal ? 'personal' : role.value))
+
 // Un destino se ofrece sólo si la organización tiene lo que ese destino necesita. Misma regla que el
 // menú de escritorio (useNavContext), para que las dos superficies no se desincronicen.
 function tieneFeature(item) {
@@ -246,7 +262,7 @@ function tieneFeature(item) {
 }
 
 const navItems = computed(() => {
-  const base = (NAV[role.value]?.items || []).filter(tieneFeature)
+  const base = (NAV[navKey.value]?.items || []).filter(tieneFeature)
   if (role.value === 'dispensador' && club.data?.features?.bar) {
     return [...base, { to: '/bar', icon: 'bi-cup-hot', label: 'Buffet' }]
   }
@@ -270,7 +286,7 @@ const navOverflow = computed(() => {
 const masOpen = ref(false)
 const masActivo = computed(() => navOverflow.value.some(i => isActive(i)))
 function irA(item) { masOpen.value = false; router.push(item.to) }
-const showFab  = computed(() => !!NAV[role.value]?.fab)
+const showFab  = computed(() => !!NAV[navKey.value]?.fab)
 // Con FAB, repartimos las tabs a cada lado del botón central.
 const navLeft  = computed(() => navVisibles.value.slice(0, 2))
 const navRight = computed(() => navVisibles.value.slice(2))
@@ -278,7 +294,8 @@ const navRight = computed(() => navVisibles.value.slice(2))
 watch(() => route.path, () => { menuOpen.value = false })
 
 function isActive(item) {
-  return route.path === item.to || route.path.startsWith(item.to + '/')
+  if (route.path === item.to || route.path.startsWith(item.to + '/')) return true
+  return (item.match || []).some(p => route.path.startsWith(p))
 }
 
 // ── FAB: acciones de creación ───────────────────────────────────
@@ -303,7 +320,7 @@ const fabActions = computed(() => {
   ]
   // Crear una SALA es decisión de infraestructura, no del que está en el pasillo.
   if (!esCultivador) {
-    acciones.push({ key: 'sala', label: 'Crear sala', icon: 'bi-grid-3x3-gap',
+    acciones.push({ key: 'sala', label: club.data?.personal ? 'Crear espacio' : 'Crear sala', icon: 'bi-grid-3x3-gap',
                     tint: 'var(--c-sky-100)', color: 'var(--c-sky-600)', onClick: abrirNuevaSala })
     acciones.push({ key: 'scan', label: 'Escanear QR', icon: 'bi-qr-code-scan',
                     tint: '#ede9fe', color: '#7c3aed', onClick: irEscanear })

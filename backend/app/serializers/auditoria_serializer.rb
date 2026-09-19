@@ -76,7 +76,7 @@ class AuditoriaSerializer
     },
     'medio_pago' => {
       'efectivo' => 'efectivo', 'transferencia' => 'transferencia',
-      'cuenta_corriente' => 'cuenta corriente', 'no_abona' => 'no abona',
+      'cuenta_corriente' => 'cuenta corriente', 'saldo_a_favor' => 'saldo a favor', 'no_abona' => 'no abona',
       'credito_gramos' => 'crédito en gramos', 'mixto' => 'mixto', 'regalo' => 'regalo', 'cambio' => 'cambio',
     },
   }.freeze

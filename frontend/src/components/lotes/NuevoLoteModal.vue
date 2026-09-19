@@ -45,12 +45,12 @@
                 <option v-for="e in estadosHeredadoPermitidos" :key="e.value" :value="e.value">{{ e.label }}</option>
               </select>
               <span v-if="motivoEstadoAcotado" class="nlm__hint">{{ motivoEstadoAcotado }}</span>
-              <span v-else class="nlm__hint">Define en qué salas puede entrar.</span>
+              <span v-else class="nlm__hint">Define en qué {{ salaTxt.cortas }} puede entrar.</span>
             </div>
           </template>
 
           <!-- Lote cosechado: no va a una sala de cultivo, se ubica por sede y se ve en Cosecha -->
-          <div v-if="esCosechado" class="nlm__field">
+          <div v-if="esCosechado && !esPersonal" class="nlm__field">
             <label class="nlm__label">Sede <span class="nlm__req">*</span></label>
             <select class="nlm__input" :class="{ 'nlm__input--err': errors.sede_id }" v-model="sedeId">
               <option value="" disabled>Seleccioná una sede…</option>
@@ -73,9 +73,9 @@
               </select>
             </div>
             <div class="nlm__field">
-              <label class="nlm__label">Sala <span class="nlm__req">*</span></label>
+              <label class="nlm__label">{{ salaTxt.Corta }} <span class="nlm__req">*</span></label>
               <select class="nlm__input" :class="{ 'nlm__input--err': errors.sala_id }" v-model="salaId">
-                <option value="" disabled>Seleccioná una sala…</option>
+                <option value="" disabled>Seleccioná {{ salaTxt.Corta === 'Sala' ? 'una sala' : 'un espacio' }}…</option>
                 <option v-for="s in salasOfrecidas" :key="s.id" :value="s.id">{{ s.nombre }}</option>
               </select>
               <span v-if="faltaElegirSede" class="nlm__hint">
@@ -94,7 +94,7 @@
                 </span>
                 <div v-else class="nlm__crear-sala">
                   <input v-model.trim="nombreSalaNueva" type="text" class="nlm__input"
-                         :placeholder="`Nombre de la sala de ${kindNecesarioLabel}`"
+                         :placeholder="`Nombre ${salaTxt.Corta === 'Sala' ? 'de la sala' : 'del espacio'} de ${kindNecesarioLabel}`"
                          maxlength="60" @keydown.enter.prevent="crearSalaInline" />
                   <div class="nlm__crear-sala-acts">
                     <button type="button" class="nlm__btn-ghost nlm__btn-ghost--sm"
@@ -294,6 +294,8 @@ import { useAuthStore } from '../../stores/auth'
 import { getLoteProximoCodigo, listGeneticas, listPlants, createLoteHeredado, createLoteCosechadoEnSede, listSedes, createSala } from '../../lib/api.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
+const { sala: salaTxt, esPersonal } = useUsoPersonal()
 
 // Fecha local en ISO (yyyy-mm-dd) SIN pasar por UTC — toISOString() convierte a
 // UTC y de tarde/noche en Argentina (UTC-3) devolvía el día siguiente.
@@ -628,6 +630,8 @@ watch(() => props.show, async (open) => {
   tipoCreacion.value  = salaVieneDeAntes.value ? 'existente' : 'nuevo'
   listSedes().then(({ data }) => {
     sedes.value = (data || []).filter(s => ['produccion', 'mixta'].includes(s.tipo))
+    // Uso personal: la única sede es su casa y no se pregunta.
+    if (esPersonal.value && sedes.value.length && !sedeId.value) sedeId.value = sedes.value[0].id
     if (sedes.value.length === 1) sedeId.value = sedes.value[0].id
   }).catch(() => { sedes.value = [] })
   heredadoEstado.value = estadosHeredadoPermitidos.value[0]?.value ?? 'enraizado'
