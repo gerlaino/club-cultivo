@@ -33,6 +33,13 @@
   el job COMO SIDEKIQ (sin `test_tenant`): rojo con el job viejo, verde con el nuevo. Los otros
   dos jobs sin tenant (`PurgarAdjuntosEntrega`, `JwtDenylistCleanup`) andan.
 - `VAPID_*` cargadas en Render el 19-sep (`cultivo-staging-api` y `club-cultivo-worker`).
+- **Tercera: «desactivar» pegaba a una ruta que no existía.** `resources … only: [:destroy]`
+  pedía `/push_subscriptions/:id`; el navegador no conoce el id, manda su endpoint, y el
+  `DELETE /push_subscriptions` daba 404 → la suscripción seguía viva y el toast decía
+  «desactivadas». Ahora la ruta es por endpoint, `unsubscribe()` desuscribe primero el
+  navegador y devuelve `true`/motivo, y el toast mira el resultado. `push_subscriptions_spec`.
+  Visto en Chromium con perfil persistente: activar (201) → desactivar (204, navegador sin
+  suscripción) → activar (201).
 
 ## Septiembre 2026 (ch) — Uso personal: el ambiente, la IA y el chatbot se eligen, y el alta habla de una persona
 

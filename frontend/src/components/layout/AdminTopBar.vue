@@ -158,8 +158,9 @@ const {
 // `false` sin pedir permiso y parecía roto).
 async function togglePush() {
   if (pushSubscribed.value) {
-    await pushUnsubscribe()
-    toast.info('Notificaciones desactivadas en este dispositivo')
+    const resultado = await pushUnsubscribe()
+    if (resultado === true) toast.info('Notificaciones desactivadas en este dispositivo')
+    else toast.error(MOTIVOS[resultado] || MOTIVOS.error)
     return
   }
   const resultado = await pushSubscribe()

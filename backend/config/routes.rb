@@ -109,7 +109,11 @@ Rails.application.routes.draw do
     post '/asistente/parsear',       to: 'asistente#parsear'
     post '/asistente/ejecutar',      to: 'asistente#ejecutar'
 
-    resources :push_subscriptions, only: [:create, :destroy]
+    resources :push_subscriptions, only: [:create]
+    # Se da de baja por endpoint, no por id: el navegador no conoce el id, conoce su endpoint.
+    # Con `only: [:destroy]` la ruta pedía `/push_subscriptions/:id`, el frontend pegaba sin id,
+    # 404, y «desactivar» dejaba la suscripción viva mientras el toast decía lo contrario.
+    delete '/push_subscriptions', to: 'push_subscriptions#destroy'
     resources :webhooks do
       resources :webhook_deliveries, only: [:index], shallow: true
     end

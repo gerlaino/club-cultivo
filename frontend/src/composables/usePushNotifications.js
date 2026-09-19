@@ -93,19 +93,24 @@ export function usePushNotifications() {
     }
   }
 
+  // Devuelve `true` si quedó desuscripto. Primero el navegador y después el servidor: si el
+  // servidor falla, el endpoint ya está muerto y el job lo apaga solo al primer 410.
   async function unsubscribe() {
-    if (!supported) return
+    if (!supported) return 'no_soportado'
     loading.value = true
     try {
       const reg = await swListo()
       const sub = await reg.pushManager.getSubscription()
       if (sub) {
-        await api.delete('/push_subscriptions', { data: { endpoint: sub.endpoint } })
         await sub.unsubscribe()
+        await api.delete('/push_subscriptions', { data: { endpoint: sub.endpoint } })
       }
       subscribed.value = false
+      return true
     } catch (e) {
       console.error('[push] unsubscribe error:', e)
+      await checkStatus()
+      return e?.message === 'sin_sw' ? 'sin_sw' : 'error'
     } finally {
       loading.value = false
     }
