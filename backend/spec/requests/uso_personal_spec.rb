@@ -16,17 +16,80 @@ RSpec.describe 'Uso personal', type: :request do
                 # Por la API llega lo que sea: nada de esto puede quedar prendido.
                 features: { 'produccion_dispensa' => true, 'delivery' => true, 'bar' => true, 'ia' => true } },
         roles_a_crear: %w[admin cultivador manicura],
-        admin: { first_name: 'Germán', last_name: 'L', email: 'german@ejemplo.com' },
+        admin: { first_name: 'Germán', last_name: 'L', email_personal: 'german@ejemplo.com' },
       }
     end
 
-    it 'nace con Cultivo, IoT y la IA con su chatbot' do
+    it 'nace con Cultivo y lo que el alta le sumó' do
       post '/api/super_admin/clubs', params: alta, as: :json
       expect(response).to have_http_status(:created), response.body
 
       club = Club.find(json.dig('club', 'id'))
       expect(club).to be_personal
-      %w[cultivo iot ia chatbot].each { |m| expect(club.feature?(m)).to be(true), "#{m} tendría que venir adentro" }
+      expect(club.feature?('cultivo')).to be true
+      expect(club.feature?('ia')).to be true
+      # Lo que no pidió no viene: el ambiente y el chatbot se eligen uno por uno.
+      expect(club.feature?('iot')).to be false
+      expect(club.feature?('chatbot')).to be false
+    end
+
+    it 'sin pedir nada nace sólo con Cultivo' do
+      alta[:club][:features] = {}
+      post '/api/super_admin/clubs', params: alta, as: :json
+
+      club = Club.find(json.dig('club', 'id'))
+      expect(club.features.select { |_, v| v == true }.keys).to eq(%w[cultivo])
+    end
+
+    it 'puede sumar el ambiente, la IA y el chatbot' do
+      alta[:club][:features] = { 'iot' => true, 'ia' => true, 'chatbot' => true }
+      post '/api/super_admin/clubs', params: alta, as: :json
+
+      club = Club.find(json.dig('club', 'id'))
+      %w[cultivo iot ia chatbot].each { |m| expect(club.feature?(m)).to be(true), "#{m} tendría que estar prendido" }
+    end
+
+    it 'el chatbot sin el Asistente IA no queda prendido' do
+      alta[:club][:features] = { 'chatbot' => true }
+      post '/api/super_admin/clubs', params: alta, as: :json
+
+      club = Club.find(json.dig('club', 'id'))
+      expect(club.feature?('chatbot')).to be false
+    end
+
+    # La cuenta es la persona: entra con su mail, no con `admin@slug.com`.
+    it 'la persona entra con su mail' do
+      post '/api/super_admin/clubs', params: alta, as: :json
+
+      expect(json['usuarios'].map { |u| u['email'] }).to eq(%w[german@ejemplo.com])
+      admin = User.find_by!(email: 'german@ejemplo.com')
+      expect(admin.role).to eq('admin')
+      expect(admin.email_personal).to eq('german@ejemplo.com')
+      expect(admin.first_name).to eq('Germán')
+    end
+
+    it 'sin mail no hay con qué entrar' do
+      alta[:admin][:email_personal] = ''
+      expect { post '/api/super_admin/clubs', params: alta, as: :json }.not_to change(Club, :count)
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(json['errors'].join).to include('mail')
+    end
+
+    it 'un mail que ya tiene cuenta no puede abrir otra' do
+      create(:user, email: 'german@ejemplo.com')
+      expect { post '/api/super_admin/clubs', params: alta, as: :json }.not_to change(Club, :count)
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(json['errors'].join).to include('ya tiene una cuenta')
+    end
+
+    it 'la ficha sólo le ofrece lo que puede tener' do
+      post '/api/super_admin/clubs', params: alta, as: :json
+      get "/api/super_admin/clubs/#{json.dig('club', 'id')}"
+
+      expect(json['suites'].map { |s| s['clave'] }).to eq(%w[cultivo])
+      expect(json['addons'].map { |a| a['clave'] }).to match_array(%w[iot ia chatbot])
     end
 
     it 'no puede tener dispensa ni nada que cuelgue de ella' do
@@ -110,6 +173,8 @@ RSpec.describe 'Uso personal', type: :request do
       personal = json['planes'].find { |p| p['clave'] == 'personal' }
       expect(personal).to include('equipo' => false, 'personal' => true)
       expect(json['modulos_personal']).to include('cultivo', 'iot')
+      # Con qué nace: sólo Cultivo. El resto lo elige el alta.
+      expect(json['features_personal']).to eq('cultivo' => true)
     end
   end
 
@@ -173,8 +238,10 @@ RSpec.describe 'Uso personal', type: :request do
   end
 
   describe 'lo que paga' do
+    # Cuánto vale cada adicional en personal está pendiente: hasta entonces, prenderlos no
+    # cambia el número.
     it 'es un solo número con todo adentro' do
-      club = create(:club, plan: 'personal', features: Club::FEATURES_PERSONAL)
+      club = create(:club, plan: 'personal', features: { 'cultivo' => true, 'iot' => true, 'ia' => true, 'chatbot' => true })
       lineas = Precios.de(club)[:lineas]
 
       expect(lineas.map { |l| l[:clave] }).to eq(%w[personal])

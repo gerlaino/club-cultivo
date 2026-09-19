@@ -23,6 +23,15 @@ const CATALOGO = {
       clave: 'total', label: 'Total', usuarios_por_rol: null,
       limites: {}, recursos: [], resumen: ['sedes sin límite'],
     },
+    {
+      clave: 'personal', label: 'Personal', usuarios_por_rol: null, equipo: false, personal: true,
+      precio_mensual: 12000, limites: { sedes: 1, salas: 2 },
+      recursos: [
+        { clave: 'sedes', label: 'sedes', valor: 1, texto: '1 sede',      suite: null },
+        { clave: 'salas', label: 'salas', valor: 2, texto: '2 espacios', suite: 'cultivo' },
+      ],
+      resumen: ['1 sede', '2 espacios'],
+    },
   ],
   suites: [
     { clave: 'cultivo', label: 'Cultivo', desc: 'Lotes y plantas.' },
@@ -32,6 +41,7 @@ const CATALOGO = {
     { clave: 'iot',      label: 'Ambiente / IoT', desc: 'Sensores.',  pack: 'cultivo' },
     { clave: 'delivery', label: 'Delivery',       desc: 'Reparto.',   pack: 'produccion_dispensa' },
     { clave: 'ia',       label: 'Asistente IA',   desc: 'Por voz.',   pack: null },
+    { clave: 'chatbot',  label: 'Chatbot del admin', desc: 'Pregunta.', pack: null, requiere: 'El Asistente IA tiene que estar activo.' },
   ],
   incluidos: [
     { clave: 'medico', label: 'Módulo médico', desc: 'Turnos.',
@@ -39,6 +49,8 @@ const CATALOGO = {
   ],
   en_construccion: [],
   features_por_defecto: { cultivo: true, produccion_dispensa: true, delivery: true },
+  features_personal:    { cultivo: true },
+  modulos_personal:     ['cultivo', 'iot', 'ia', 'chatbot'],
   roles_alta: [
     { clave: 'admin',       label: 'Admin',       desc: 'Todo',    requiere_modulo: null },
     { clave: 'cultivador',  label: 'Cultivador',  desc: 'Plantas', requiere_modulo: 'cultivo' },
@@ -76,7 +88,7 @@ describe('SAClubNuevo — alta de organización', () => {
   it('los módulos se eligen ANTES que el plan', async () => {
     const w = await montar()
 
-    expect(w.vm.PASOS).toEqual(['Identidad', 'Módulos', 'Plan', 'Acceso', 'Resumen'])
+    expect(w.vm.pasos.map(p => p.label)).toEqual(['Identidad', 'Módulos', 'Plan', 'Acceso', 'Resumen'])
   })
 
   it('cada adicional va debajo de la suite que extiende, no en una lista plana', async () => {
@@ -86,7 +98,7 @@ describe('SAClubNuevo — alta de organización', () => {
     expect(grupos.find(g => g.clave === 'cultivo').items.map(a => a.clave)).toEqual(['iot'])
     expect(grupos.find(g => g.clave === 'produccion_dispensa').items.map(a => a.clave)).toEqual(['delivery'])
     // Los que sirven a las dos van al final, no colgados de una.
-    expect(grupos.find(g => g.clave === 'transversal').items.map(a => a.clave)).toEqual(['ia'])
+    expect(grupos.find(g => g.clave === 'transversal').items.map(a => a.clave)).toEqual(['ia', 'chatbot'])
     // El módulo incluido va DENTRO del grupo de su suite, no en una sección aparte.
     expect(grupos.find(g => g.clave === 'produccion_dispensa').incluidos.map(i => i.clave)).toEqual(['medico'])
   })
@@ -161,7 +173,7 @@ describe('SAClubNuevo — alta de organización', () => {
     // Todas las claves viajan, también las apagadas: una ausente se completa con el default
     // del backend y aparecería prendida.
     expect(Object.keys(w.vm.form.features).sort())
-      .toEqual(['cultivo', 'delivery', 'ia', 'iot', 'produccion_dispensa'])
+      .toEqual(['chatbot', 'cultivo', 'delivery', 'ia', 'iot', 'produccion_dispensa'])
   })
 
   // Se tilda Cultivador, se vuelve atrás y se saca Cultivo: el rol queda tildado en una tarjeta
@@ -189,5 +201,128 @@ describe('SAClubNuevo — alta de organización', () => {
     expect(txt).toContain('Módulo médico')
     // La contraseña vacía significa "se genera una", no "sin contraseña".
     expect(txt).toContain('se genera una')
+  })
+})
+
+// Uso personal (19-sep-2026): una persona y su cultivo. No hay organización que nombrar, y el
+// ambiente, la IA y el chatbot se eligen uno por uno — antes nacían los tres prendidos y no
+// había nada que decidir.
+describe('SAClubNuevo — alta de uso personal', () => {
+  const montarPersonal = async () => {
+    const w = await montar()
+    w.vm.elegirTipo('personal')
+    await w.vm.$nextTick()
+    return w
+  }
+  const completarPersona = (w) => {
+    w.vm.adminPersona = { first_name: 'Juan', last_name: 'Pérez', email_personal: 'juan@gmail.com' }
+  }
+
+  it('tiene sus propios pasos: la persona primero y sin paso de plan', async () => {
+    const w = await montarPersonal()
+
+    expect(w.vm.pasos.map(p => p.label)).toEqual(['Quién cultiva', 'Qué tiene', 'Vigencia y acceso', 'Resumen'])
+  })
+
+  it('no pide nombre de organización: pide a la persona, y el cultivo se llama como ella', async () => {
+    const w = await montarPersonal()
+    const txt = w.text()
+
+    expect(txt).not.toContain('Nombre de la organización')
+    expect(txt).not.toContain('Razón social')
+    expect(w.find('input[placeholder="Juan"]').exists()).toBe(true)
+    expect(w.find('input[placeholder="Pérez"]').exists()).toBe(true)
+    expect(w.find('input[placeholder="juan@gmail.com"]').exists()).toBe(true)
+
+    completarPersona(w)
+    await w.vm.$nextTick()
+    expect(w.text()).toContain('Cultivo de Juan')
+  })
+
+  it('sin nombre, apellido y mail no avanza: es con lo que entra', async () => {
+    const w = await montarPersonal()
+    w.vm.siguiente()
+    expect(w.vm.paso).toBe(1)
+
+    w.vm.adminPersona = { first_name: 'Juan', last_name: 'Pérez', email_personal: 'no-es-un-mail' }
+    w.vm.siguiente()
+    expect(w.vm.paso).toBe(1)
+
+    completarPersona(w)
+    w.vm.siguiente()
+    expect(w.vm.paso).toBe(2)
+  })
+
+  it('ofrece ambiente, IA y chatbot como interruptores, apagados de entrada', async () => {
+    const w = await montarPersonal()
+
+    expect(w.vm.addonsPersonal.map(a => a.clave)).toEqual(['iot', 'ia', 'chatbot'])
+    expect(w.vm.form.features.cultivo).toBe(true)
+    expect(w.vm.form.features.iot).toBe(false)
+    expect(w.vm.form.features.ia).toBe(false)
+    expect(w.vm.form.features.chatbot).toBe(false)
+    // Lo que una organización compra aparte no se ofrece.
+    expect(w.vm.addonsPersonal.map(a => a.clave)).not.toContain('delivery')
+  })
+
+  it('el chatbot no se prende sin el Asistente IA, y se apaga con él', async () => {
+    const w = await montarPersonal()
+    const chatbot = CATALOGO.addons.find(a => a.clave === 'chatbot')
+    const ia      = CATALOGO.addons.find(a => a.clave === 'ia')
+
+    expect(w.vm.bloqueoPersonal(chatbot)).toContain('Asistente IA')
+    w.vm.togglePersonal(chatbot)
+    expect(w.vm.form.features.chatbot).toBe(false)
+
+    w.vm.togglePersonal(ia)
+    expect(w.vm.bloqueoPersonal(chatbot)).toBeNull()
+    w.vm.togglePersonal(chatbot)
+    expect(w.vm.form.features.chatbot).toBe(true)
+
+    w.vm.togglePersonal(ia)
+    expect(w.vm.form.features.chatbot).toBe(false)
+  })
+
+  // Cuánto vale cada adicional en personal está pendiente: hasta que se decida, prenderlos no
+  // cambia el número (igual que `Precios.de`).
+  it('el precio es el del plan, se le sume lo que se le sume', async () => {
+    const w = await montarPersonal()
+    w.vm.form.features.iot = true
+    w.vm.form.features.ia  = true
+    await w.vm.$nextTick()
+
+    expect(w.vm.precioMensual).toBe(12000)
+  })
+
+  it('manda al backend el plan personal, el nombre del cultivo y el mail de la persona', async () => {
+    const w = await montarPersonal()
+    completarPersona(w)
+    w.vm.form.features.iot = true
+    await irAlPaso(w, 4)
+
+    await w.vm.handleSubmit()
+
+    const enviado = createSuperAdminClub.mock.calls.at(-1)[0]
+    expect(enviado.club.plan).toBe('personal')
+    expect(enviado.club.name).toBe('Cultivo de Juan')
+    expect(enviado.club.email).toBe('juan@gmail.com')
+    expect(enviado.club.features).toMatchObject({ cultivo: true, iot: true, ia: false, chatbot: false })
+    expect(enviado.admin).toEqual({ first_name: 'Juan', last_name: 'Pérez', email_personal: 'juan@gmail.com' })
+    expect(enviado.roles_a_crear).toEqual(['admin'])
+  })
+
+  it('el resumen habla de la persona y de lo que le sumó', async () => {
+    const w = await montarPersonal()
+    completarPersona(w)
+    w.vm.form.features.iot = true
+    await irAlPaso(w, 4)
+
+    const txt = w.text()
+    expect(txt).toContain('Juan Pérez')
+    expect(txt).toContain('juan@gmail.com')
+    expect(txt).toContain('Cultivo de Juan')
+    expect(txt).toContain('Ambiente / IoT')
+    expect(txt).toContain('Crear uso personal')
+    expect(txt).not.toContain('Delivery')
   })
 })

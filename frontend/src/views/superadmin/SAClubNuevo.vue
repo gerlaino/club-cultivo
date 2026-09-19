@@ -15,7 +15,23 @@ const router = useRouter()
 // organización que capaz sólo compró Producción y dispensa — la mitad de esos topes no aplican
 // y desde ahí no había forma de saber cuáles. Y "N usuarios" recién significa algo cuando ya se
 // sabe qué roles va a tener.
-const PASOS = ['Identidad', 'Módulos', 'Plan', 'Acceso', 'Resumen']
+// Cada paso tiene una clave: el template pregunta por la clave, no por el número, porque el
+// uso personal tiene otros pasos (ver `pasos`).
+const PASOS_ORG = [
+  { clave: 'identidad', label: 'Identidad' },
+  { clave: 'modulos',   label: 'Módulos' },
+  { clave: 'plan',      label: 'Plan' },
+  { clave: 'acceso',    label: 'Acceso' },
+  { clave: 'resumen',   label: 'Resumen' },
+]
+// Uso personal: la persona va primero (es la cuenta), lo que tiene se elige con tres
+// interruptores, y el plan —que es uno solo— se funde con la vigencia y la contraseña.
+const PASOS_PERSONAL = [
+  { clave: 'identidad', label: 'Quién cultiva' },
+  { clave: 'modulos',   label: 'Qué tiene' },
+  { clave: 'acceso',    label: 'Vigencia y acceso' },
+  { clave: 'resumen',   label: 'Resumen' },
+]
 
 const paso    = ref(1)
 const saving  = ref(false)
@@ -45,6 +61,8 @@ const rolesAlta      = computed(() => catalogo.value?.roles_alta || [])
 // Lo que manda al backend es el plan `personal`: no hay otra bandera.
 const tipo       = ref('organizacion')
 const esPersonal = computed(() => tipo.value === 'personal')
+const pasos      = computed(() => (esPersonal.value ? PASOS_PERSONAL : PASOS_ORG))
+const pasoClave  = computed(() => pasos.value[paso.value - 1]?.clave)
 
 function elegirTipo(nuevo) {
   if (tipo.value === nuevo) return
@@ -63,12 +81,26 @@ function elegirTipo(nuevo) {
   }
 }
 
-// Los adicionales que un uso personal puede sumar por fuera de lo que ya trae.
+// Los adicionales que un uso personal puede sumar por fuera de lo que ya trae: el ambiente,
+// la IA y su chatbot, uno por uno (19-sep-2026: nacían los tres prendidos y no había nada que
+// decidir).
 const addonsPersonal = computed(() => {
   const permitidos = catalogo.value?.modulos_personal || []
   const incluidos  = catalogo.value?.features_personal || {}
   return addons.value.filter(a => permitidos.includes(a.clave) && !incluidos[a.clave])
 })
+// El chatbot sin el Asistente IA no contesta nada: el backend lo apaga solo
+// (`Club.acotar_a_personal`) y acá no se ofrece prenderlo.
+function bloqueoPersonal(addon) {
+  if (addon.clave === 'chatbot' && form.value.features.ia !== true) return 'Necesita el Asistente IA.'
+  return null
+}
+function togglePersonal(addon) {
+  if (bloqueoPersonal(addon)) return
+  const prender = form.value.features[addon.clave] !== true
+  form.value.features[addon.clave] = prender
+  if (addon.clave === 'ia' && !prender) form.value.features.chatbot = false
+}
 // Lo que viene adentro del plan personal, para decirlo.
 const incluidosPersonal = computed(() => {
   const incluidos = catalogo.value?.features_personal || {}
@@ -192,13 +224,10 @@ const planElegido = computed(() => planes.value.find(p => p.clave === form.value
 // la misma cuenta que hace `Precios.de` en el backend; acá sólo se muestra antes de crear.
 const precioMensual = computed(() => {
   const plan = planElegido.value?.precio_mensual || 0
-  // Uso personal: un solo número, con Cultivo y Ambiente adentro; sólo suma lo que agregó.
-  if (esPersonal.value) {
-    const incluidos = catalogo.value?.features_personal || {}
-    const extra = addons.value.filter(x => form.value.features[x.clave] === true && !incluidos[x.clave])
-                              .reduce((t, x) => t + (x.precio_mensual || 0), 0)
-    return plan + extra
-  }
+  // Uso personal: un solo número. Cuánto vale cada adicional en personal está PENDIENTE
+  // (los precios de organización no sirven: la IA sola vale más que el plan), así que hasta
+  // que se decida prenderlos no cambia el número — igual que `Precios.de` en el backend.
+  if (esPersonal.value) return plan
   const s = suites.value.filter(x => form.value.features[x.clave] === true).reduce((t, x) => t + (x.precio_mensual || 0), 0)
   const a = addons.value.filter(x => form.value.features[x.clave] === true).reduce((t, x) => t + (x.precio_mensual || 0), 0)
   return plan + s + a
@@ -238,7 +267,11 @@ const rolesSeleccionados = ref(['admin'])
 // organización y el usuario nacía como "Admin <club>" sin mail personal, así que «olvidé mi
 // contraseña» no tenía a dónde escribirle. El mail se precarga con el de contacto del paso 1:
 // es la misma persona en casi todas las altas, y se puede cambiar.
+// En uso personal la persona ES la cuenta y va en el paso 1: entra con `email_personal`, sin
+// identificador inventado, y de ella sale el nombre del cultivo («Cultivo de Juan»).
 const adminPersona = ref({ first_name: '', last_name: '', email_personal: '' })
+const nombrePersona = computed(() => [adminPersona.value.first_name, adminPersona.value.last_name].filter(Boolean).join(' '))
+const nombreCultivo = computed(() => `Cultivo de ${adminPersona.value.first_name || nombrePersona.value || '…'}`)
 const passwordInicial    = ref('')
 const passwordCopiada    = ref(false)
 
@@ -279,7 +312,7 @@ onMounted(async () => {
 
 // ── Slug preview ──────────────────────────────────────────────────────
 const slugPreview = computed(() =>
-  form.value.name.toLowerCase()
+  (esPersonal.value ? nombreCultivo.value : form.value.name).toLowerCase()
     .normalize('NFD').replace(/[̀-ͯ]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '') || 'slug'
@@ -290,22 +323,32 @@ function emailRol(rol) { return `${rol}@${slugPreview.value}.com` }
 // ── Validación ────────────────────────────────────────────────────────
 const errores = ref({})
 
+const MAIL_OK = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
 function validarPaso1() {
   const e = {}
-  if (!form.value.name.trim())  e.name  = 'El nombre es requerido'
-  if (!form.value.email.trim()) e.email = 'El email es requerido'
-  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.value.email)) e.email = 'Email inválido'
+  if (esPersonal.value) {
+    // La persona es la cuenta: sin nombre no hay cómo llamarla, sin mail no hay con qué entrar.
+    if (!adminPersona.value.first_name.trim()) e.first_name = 'El nombre es requerido'
+    if (!adminPersona.value.last_name.trim())  e.last_name  = 'El apellido es requerido'
+    if (!adminPersona.value.email_personal.trim()) e.email = 'El mail es requerido: es con lo que entra'
+    else if (!MAIL_OK.test(adminPersona.value.email_personal)) e.email = 'Email inválido'
+  } else {
+    if (!form.value.name.trim())  e.name  = 'El nombre es requerido'
+    if (!form.value.email.trim()) e.email = 'El email es requerido'
+    else if (!MAIL_OK.test(form.value.email)) e.email = 'Email inválido'
+  }
   errores.value = e
   return !Object.keys(e).length
 }
 
 function siguiente() {
-  if (paso.value === 3 && !adminPersona.value.email_personal) adminPersona.value.email_personal = form.value.email
-  if (paso.value === 1 && !validarPaso1()) return
+  if (pasoClave.value === 'plan' && !adminPersona.value.email_personal) adminPersona.value.email_personal = form.value.email
+  if (pasoClave.value === 'identidad' && !validarPaso1()) return
   // Sin ninguna suite la organización entra y no puede hacer nada: es el error más caro del
   // alta, porque se descubre recién cuando el cliente entra a trabajar.
-  if (paso.value === 2 && !haySuite.value) return
-  if (paso.value < PASOS.length) paso.value++
+  if (pasoClave.value === 'modulos' && !haySuite.value) return
+  if (paso.value < pasos.value.length) paso.value++
 }
 function anterior() { if (paso.value > 1) paso.value-- }
 
@@ -315,6 +358,12 @@ async function handleSubmit() {
   error.value  = null
   try {
     const club = { ...form.value }
+    if (esPersonal.value) {
+      // No hay organización que nombrar: el cultivo se llama como la persona y el contacto es
+      // ella misma (se puede cambiar después desde la ficha).
+      club.name  = nombreCultivo.value
+      club.email = adminPersona.value.email_personal
+    }
     Object.keys(club).forEach(k => { if (club[k] === '') delete club[k] })
     const { data } = await createSuperAdminClub({
       club,
@@ -394,7 +443,7 @@ async function handleSubmit() {
         <h1 class="cnv__title">{{ esPersonal ? 'Nuevo uso personal' : 'Nueva organización' }}</h1>
         <div class="cnv__stepper">
           <div
-            v-for="(nombre, i) in PASOS" :key="nombre"
+            v-for="(p, i) in pasos" :key="p.clave"
             class="cnv__step"
             :class="{ 'cnv__step--done': paso > i + 1, 'cnv__step--active': paso === i + 1 }"
           >
@@ -402,19 +451,19 @@ async function handleSubmit() {
               <Check v-if="paso > i + 1" :size="12" :stroke-width="3" />
               <span v-else>{{ i + 1 }}</span>
             </div>
-            <span class="cnv__step-label">{{ nombre }}</span>
+            <span class="cnv__step-label">{{ p.label }}</span>
           </div>
-          <div class="cnv__step-line" :style="{ width: `${((paso - 1) / (PASOS.length - 1)) * 100}%` }"></div>
+          <div class="cnv__step-line" :style="{ width: `${((paso - 1) / (pasos.length - 1)) * 100}%` }"></div>
         </div>
       </div>
 
       <!-- ─── Paso 1: Identidad ─── -->
-      <div v-if="paso === 1" class="cnv__panel">
+      <div v-if="pasoClave === 'identidad'" class="cnv__panel">
         <div class="cnv__panel-header">
           <div class="cnv__panel-ico"><Building2 :size="18" :stroke-width="1.75" /></div>
           <div>
             <div class="cnv__panel-title">{{ esPersonal ? 'Quién cultiva' : 'Identidad de la organización' }}</div>
-            <div class="cnv__panel-sub">Datos de identificación y contacto</div>
+            <div class="cnv__panel-sub">{{ esPersonal ? 'La persona es la cuenta: entra con su mail' : 'Datos de identificación y contacto' }}</div>
           </div>
         </div>
         <div class="cnv__panel-body">
@@ -439,30 +488,55 @@ async function handleSubmit() {
               <span class="cnv__suite-check">{{ esPersonal ? '✓' : '' }}</span>
               <span class="cnv__suite-txt">
                 <span class="cnv__suite-name">Uso personal</span>
-                <span class="cnv__suite-desc">Una persona y su cultivo: sólo Cultivo y Ambiente, sin equipo ni pacientes.</span>
+                <span class="cnv__suite-desc">Una persona y su cultivo: sin equipo ni pacientes. Se le puede sumar ambiente, IA y chatbot.</span>
               </span>
             </button>
           </div>
 
           <div class="cnv__grid">
-            <div class="cnv__field cnv__field--full">
-              <label class="cnv__label">{{ esPersonal ? 'Nombre del cultivo' : 'Nombre de la organización' }} <span class="cnv__req">*</span></label>
-              <input v-model.trim="form.name" class="cnv__input" :class="{ 'cnv__input--err': errores.name }"
-                     :placeholder="esPersonal ? 'Cultivo de Juan' : 'Club Medicinal del Sur'" />
-              <span v-if="errores.name" class="cnv__err">{{ errores.name }}</span>
-              <span v-else class="cnv__hint">Slug: <code>{{ slugPreview }}</code></span>
-            </div>
-            <div v-if="!esPersonal" class="cnv__field cnv__field--full">
-              <label class="cnv__label">Razón social</label>
-              <input v-model.trim="form.legal_name" class="cnv__input"
-                     placeholder="Asociación Civil Club Medicinal del Sur" />
-            </div>
-            <div class="cnv__field">
-              <label class="cnv__label">Email de contacto <span class="cnv__req">*</span></label>
-              <input v-model.trim="form.email" type="email" class="cnv__input" :class="{ 'cnv__input--err': errores.email }"
-                     placeholder="contacto@clubmedicinal.org" />
-              <span v-if="errores.email" class="cnv__err">{{ errores.email }}</span>
-            </div>
+            <!-- Uso personal: no hay organización que nombrar. La persona va acá, con su mail
+                 de verdad, que es con lo que entra. El cultivo se llama como ella. -->
+            <template v-if="esPersonal">
+              <div class="cnv__field">
+                <label class="cnv__label">Nombre <span class="cnv__req">*</span></label>
+                <input v-model.trim="adminPersona.first_name" class="cnv__input" :class="{ 'cnv__input--err': errores.first_name }"
+                       placeholder="Juan" autocomplete="off" />
+                <span v-if="errores.first_name" class="cnv__err">{{ errores.first_name }}</span>
+              </div>
+              <div class="cnv__field">
+                <label class="cnv__label">Apellido <span class="cnv__req">*</span></label>
+                <input v-model.trim="adminPersona.last_name" class="cnv__input" :class="{ 'cnv__input--err': errores.last_name }"
+                       placeholder="Pérez" autocomplete="off" />
+                <span v-if="errores.last_name" class="cnv__err">{{ errores.last_name }}</span>
+              </div>
+              <div class="cnv__field cnv__field--full">
+                <label class="cnv__label">Mail <span class="cnv__req">*</span></label>
+                <input v-model.trim="adminPersona.email_personal" type="email" class="cnv__input" :class="{ 'cnv__input--err': errores.email }"
+                       placeholder="juan@gmail.com" autocomplete="off" />
+                <span v-if="errores.email" class="cnv__err">{{ errores.email }}</span>
+                <span v-else class="cnv__hint">Entra con este mail; ahí le llega «olvidé mi contraseña». Su cultivo se va a llamar <strong>{{ nombreCultivo }}</strong> (se cambia desde la ficha).</span>
+              </div>
+            </template>
+            <template v-else>
+              <div class="cnv__field cnv__field--full">
+                <label class="cnv__label">Nombre de la organización <span class="cnv__req">*</span></label>
+                <input v-model.trim="form.name" class="cnv__input" :class="{ 'cnv__input--err': errores.name }"
+                       placeholder="Club Medicinal del Sur" />
+                <span v-if="errores.name" class="cnv__err">{{ errores.name }}</span>
+                <span v-else class="cnv__hint">Slug: <code>{{ slugPreview }}</code></span>
+              </div>
+              <div class="cnv__field cnv__field--full">
+                <label class="cnv__label">Razón social</label>
+                <input v-model.trim="form.legal_name" class="cnv__input"
+                       placeholder="Asociación Civil Club Medicinal del Sur" />
+              </div>
+              <div class="cnv__field">
+                <label class="cnv__label">Email de contacto <span class="cnv__req">*</span></label>
+                <input v-model.trim="form.email" type="email" class="cnv__input" :class="{ 'cnv__input--err': errores.email }"
+                       placeholder="contacto@clubmedicinal.org" />
+                <span v-if="errores.email" class="cnv__err">{{ errores.email }}</span>
+              </div>
+            </template>
             <div class="cnv__field">
               <label class="cnv__label">Teléfono</label>
               <input v-model.trim="form.phone" class="cnv__input" placeholder="+54 9 11 1234-5678" />
@@ -494,17 +568,17 @@ async function handleSubmit() {
       <!-- ─── Paso 2: Módulos ───
            Va ANTES que el plan porque el plan es una consecuencia: recién sabiendo qué compró
            se puede mostrar contra qué topes mide y qué roles tiene sentido darle de alta. -->
-      <div v-if="paso === 2" class="cnv__panel">
+      <div v-if="pasoClave === 'modulos'" class="cnv__panel">
         <div class="cnv__panel-header">
           <div class="cnv__panel-ico cnv__panel-ico--purple"><Zap :size="18" :stroke-width="1.75" /></div>
           <div>
             <div class="cnv__panel-title">Qué puede hacer</div>
-            <div class="cnv__panel-sub">{{ esPersonal ? 'Viene con Cultivo y Ambiente; se le puede sumar la IA' : 'Primero la suite; después lo que se le suma encima' }}</div>
+            <div class="cnv__panel-sub">{{ esPersonal ? 'Viene con Cultivo; el ambiente, la IA y el chatbot se le suman uno por uno' : 'Primero la suite; después lo que se le suma encima' }}</div>
           </div>
         </div>
         <div v-if="esPersonal" class="cnv__panel-body">
-          <!-- Uso personal: no se eligen suites. Cultivo y Ambiente vienen adentro del plan, y
-               lo único que se decide es si suma la IA. -->
+          <!-- Uso personal: no se eligen suites. Cultivo viene adentro del plan; lo que se
+               decide es si suma el ambiente, la IA y el chatbot. -->
           <div class="cnv__section-label">Viene adentro</div>
           <div v-for="inc in incluidosPersonal" :key="inc.clave" class="cnv__incluido">
             <Check :size="14" :stroke-width="3" class="cnv__incluido-ico" />
@@ -519,17 +593,18 @@ async function handleSubmit() {
             <div
               v-for="a in addonsPersonal" :key="a.clave"
               class="cnv__feat-toggle"
-              :class="{ 'cnv__feat-toggle--on': form.features[a.clave], 'cnv__feat-toggle--warn': a.incompleto }"
-              @click="form.features[a.clave] = !form.features[a.clave]"
+              :class="{ 'cnv__feat-toggle--on': form.features[a.clave], 'cnv__feat-toggle--warn': a.incompleto, 'cnv__feat-toggle--lock': !!bloqueoPersonal(a) }"
+              @click="togglePersonal(a)"
             >
               <div class="cnv__feat-left">
                 <div>
-                  <div class="cnv__feat-name">
-                    {{ a.label }}
-                    <span v-if="a.precio_mensual" class="cnv__precio">{{ formatARS(a.precio_mensual) }}/mes</span>
-                  </div>
+                  <!-- Sin precio a propósito: cuánto vale cada uno en personal está pendiente. -->
+                  <div class="cnv__feat-name">{{ a.label }}</div>
                   <div class="cnv__feat-desc">{{ a.desc }}</div>
-                  <div v-if="a.requiere && form.features[a.clave]" class="cnv__feat-requiere">
+                  <div v-if="bloqueoPersonal(a)" class="cnv__feat-requiere">
+                    <Lock :size="11" :stroke-width="2.5" /> {{ bloqueoPersonal(a) }}
+                  </div>
+                  <div v-else-if="a.requiere && form.features[a.clave]" class="cnv__feat-requiere">
                     <AlertTriangle :size="11" :stroke-width="2.5" /> {{ a.requiere }}
                   </div>
                 </div>
@@ -647,7 +722,7 @@ async function handleSubmit() {
            El plan dice CUÁNTO, y sólo se muestran los topes que le importan a lo que acaba de
            contratar: nombrarle salas y plantas a una organización sin Cultivo es media tarjeta
            en ruido, y desde ahí no hay forma de saber cuáles cuentan. -->
-      <div v-if="paso === 3" class="cnv__panel">
+      <div v-if="pasoClave === 'plan'" class="cnv__panel">
         <div class="cnv__panel-header">
           <div class="cnv__panel-ico cnv__panel-ico--purple"><Gauge :size="18" :stroke-width="1.75" /></div>
           <div>
@@ -703,15 +778,40 @@ async function handleSubmit() {
       </div>
 
       <!-- ─── Paso 4: Acceso inicial ─── -->
-      <div v-if="paso === 4" class="cnv__panel">
+      <div v-if="pasoClave === 'acceso'" class="cnv__panel">
         <div class="cnv__panel-header">
           <div class="cnv__panel-ico cnv__panel-ico--blue"><Users :size="18" :stroke-width="1.75" /></div>
           <div>
-            <div class="cnv__panel-title">Con qué entran</div>
-            <div class="cnv__panel-sub">Qué usuarios se crean y con qué contraseña</div>
+            <div class="cnv__panel-title">{{ esPersonal ? 'Vigencia y acceso' : 'Con qué entran' }}</div>
+            <div class="cnv__panel-sub">{{ esPersonal ? 'Hasta cuándo, si es una prueba, y con qué contraseña entra' : 'Qué usuarios se crean y con qué contraseña' }}</div>
           </div>
         </div>
         <div class="cnv__panel-body">
+
+          <!-- Uso personal: el plan es uno solo, así que no tiene paso propio. Acá queda lo que
+               sí se decide de él: hasta cuándo y si es una prueba. -->
+          <template v-if="esPersonal">
+            <div class="cnv__section-label">Plan Personal</div>
+            <p class="cnv__hint" style="margin:0 0 .75rem">
+              {{ formatARS(planElegido?.precio_mensual || 0) }}/mes ·
+              {{ [...topesDe(planElegido || {}).map(r => r.texto), 'una sola persona, sin equipo'].join(' · ') }}
+            </p>
+            <div class="cnv__row-2" style="margin-bottom:1.5rem">
+              <div class="cnv__field">
+                <label class="cnv__label">Vigente hasta</label>
+                <AppDatePicker v-model="form.plan_activo_hasta" />
+                <span class="cnv__hint">Dejá vacío para sin vencimiento</span>
+              </div>
+              <label class="cnv__toggle">
+                <input v-model="form.plan_trial" type="checkbox" class="cnv__toggle__input" />
+                <div class="cnv__toggle__track"><div class="cnv__toggle__thumb"></div></div>
+                <div>
+                  <div class="cnv__toggle__label">Período de prueba</div>
+                  <div class="cnv__hint">Muestra el cartel "Trial" en su panel</div>
+                </div>
+              </label>
+            </div>
+          </template>
 
           <!-- En claro y a propósito: es temporal y hay que poder dictársela al club. Detrás
                de puntitos había que acordarse de lo que uno mismo acababa de tipear. -->
@@ -729,17 +829,25 @@ async function handleSubmit() {
             </div>
             <span class="cnv__hint">
               <strong>Dejalo vacío y se genera una sola.</strong> Es dictable por teléfono (sin
-              ceros ni eles) y te la mostramos al crear la organización. La misma para todos los
-              usuarios que se creen; cada uno la cambia al entrar.
+              ceros ni eles) y te la mostramos al crear{{ esPersonal ? 'lo' : ' la organización' }}.
+              <template v-if="!esPersonal">La misma para todos los usuarios que se creen; cada uno la cambia al entrar.</template>
+              <template v-else>La cambia al entrar.</template>
             </span>
           </div>
 
-          <div class="cnv__section-label">{{ esPersonal ? 'Quién cultiva' : 'Quién es el admin' }}</div>
-          <p class="cnv__hint" style="margin:0 0 .6rem">
+          <template v-if="esPersonal">
+            <p class="cnv__hint">
+              Entra con <code>{{ adminPersona.email_personal }}</code>. En uso personal la cuenta es la
+              persona: se crea sólo su usuario y no se puede sumar a nadie más después. Si el cultivo
+              crece y necesita equipo, se lo pasa a un plan de organización desde la ficha.
+            </p>
+          </template>
+          <div v-else class="cnv__section-label">Quién es el admin</div>
+          <p v-if="!esPersonal" class="cnv__hint" style="margin:0 0 .6rem">
             Entra con <code>{{ emailRol('admin') }}</code>, que es un usuario, no una casilla. Su mail
             de verdad es a donde le llega el link de «olvidé mi contraseña».
           </p>
-          <div class="cnv__grid-3" style="margin-bottom:1.5rem">
+          <div v-if="!esPersonal" class="cnv__grid-3" style="margin-bottom:1.5rem">
             <div class="cnv__field">
               <label class="cnv__label">Nombre</label>
               <input v-model.trim="adminPersona.first_name" type="text" class="cnv__input" placeholder="Juan" autocomplete="off" />
@@ -754,14 +862,7 @@ async function handleSubmit() {
             </div>
           </div>
 
-          <template v-if="esPersonal">
-            <p class="cnv__hint">
-              En uso personal la cuenta es la persona: se crea sólo su usuario y no se puede sumar
-              a nadie más después. Si el cultivo crece y necesita equipo, se lo pasa a un plan de
-              organización desde la ficha.
-            </p>
-          </template>
-          <div v-else class="cnv__section-label">Usuarios a crear</div>
+          <div v-if="!esPersonal" class="cnv__section-label">Usuarios a crear</div>
           <div v-if="!esPersonal" class="cnv__roles-grid">
             <div
               v-for="r in rolesDisponibles" :key="r.clave"
@@ -798,7 +899,7 @@ async function handleSubmit() {
       <!-- ─── Paso 5: Resumen ───
            El paso que faltaba. Se creaba a ciegas: nunca se veía junto qué contrató, contra qué
            topes y con qué usuarios, que es lo único que hay que revisar antes de apretar. -->
-      <div v-if="paso === 5" class="cnv__panel">
+      <div v-if="pasoClave === 'resumen'" class="cnv__panel">
         <div class="cnv__panel-header">
           <div class="cnv__panel-ico"><Check :size="18" :stroke-width="2" /></div>
           <div>
@@ -810,10 +911,11 @@ async function handleSubmit() {
 
           <div class="cnv__res">
             <div class="cnv__res-row">
-              <span class="cnv__res-k">{{ esPersonal ? 'Uso personal' : 'Organización' }}</span>
+              <span class="cnv__res-k">{{ esPersonal ? 'Quién cultiva' : 'Organización' }}</span>
               <span class="cnv__res-v">
-                <strong>{{ form.name }}</strong>
-                <span class="cnv__res-sub">{{ form.email }} · <code>{{ slugPreview }}</code></span>
+                <strong>{{ esPersonal ? nombrePersona : form.name }}</strong>
+                <span v-if="esPersonal" class="cnv__res-sub">{{ adminPersona.email_personal }} · su cultivo: <strong>{{ nombreCultivo }}</strong></span>
+                <span v-else class="cnv__res-sub">{{ form.email }} · <code>{{ slugPreview }}</code></span>
               </span>
             </div>
 
@@ -821,12 +923,12 @@ async function handleSubmit() {
               <span class="cnv__res-k">Qué puede hacer</span>
               <span class="cnv__res-v">
                 <strong>{{ contratado.suites.join(' + ') || 'Ninguna suite' }}</strong>
-                <span v-if="esPersonal" class="cnv__res-sub">Sólo Cultivo: sin pacientes, sin dispensa, sin equipo.</span>
+                <span v-if="esPersonal" class="cnv__res-sub">Sin pacientes, sin dispensa, sin equipo.</span>
                 <span v-if="contratado.incluidos.length" class="cnv__res-sub">
                   Incluye: {{ contratado.incluidos.join(', ') }}
                 </span>
                 <span class="cnv__res-sub">
-                  Adicionales: {{ contratado.addons.join(', ') || 'ninguno' }}
+                  {{ esPersonal ? 'Le sumó' : 'Adicionales' }}: {{ contratado.addons.join(', ') || (esPersonal ? 'nada' : 'ninguno') }}
                 </span>
               </span>
             </div>
@@ -849,18 +951,19 @@ async function handleSubmit() {
               <span class="cnv__res-v">
                 <strong>{{ formatARS(precioMensual) }} por mes</strong>
                 <span class="cnv__res-sub">
-                  {{ form.plan_trial ? 'En prueba: no factura hasta que salga del trial.' : (esPersonal ? 'Plan Personal con Cultivo y Ambiente adentro, más lo que sumó.' : 'Plan + suites + adicionales, a precio de lista.') }}
+                  {{ form.plan_trial ? 'En prueba: no factura hasta que salga del trial.' : (esPersonal ? 'Plan Personal, un solo número con lo que le sumó adentro.' : 'Plan + suites + adicionales, a precio de lista.') }}
                 </span>
               </span>
             </div>
 
             <div class="cnv__res-row">
-              <span class="cnv__res-k">Con qué entran</span>
+              <span class="cnv__res-k">{{ esPersonal ? 'Con qué entra' : 'Con qué entran' }}</span>
               <span class="cnv__res-v">
-                <strong>{{ rolesACrear.length }} usuario{{ rolesACrear.length === 1 ? '' : 's' }}</strong>
-                <span class="cnv__res-sub">{{ rolesACrear.join(', ') }}</span>
-                <span class="cnv__res-sub">
-                  Admin: {{ [adminPersona.first_name, adminPersona.last_name].filter(Boolean).join(' ') || 'sin nombre' }}
+                <strong v-if="esPersonal">{{ adminPersona.email_personal }}</strong>
+                <strong v-else>{{ rolesACrear.length }} usuario{{ rolesACrear.length === 1 ? '' : 's' }}</strong>
+                <span v-if="!esPersonal" class="cnv__res-sub">{{ rolesACrear.join(', ') }}</span>
+                <span v-if="!esPersonal" class="cnv__res-sub">
+                  Admin: {{ nombrePersona || 'sin nombre' }}
                   · {{ adminPersona.email_personal || 'sin mail personal' }}
                 </span>
                 <span class="cnv__res-sub">
@@ -880,14 +983,14 @@ async function handleSubmit() {
           <ChevronLeft :size="16" :stroke-width="2" /> Anterior
         </button>
         <div class="cnv__nav-spacer"></div>
-        <button v-if="paso < PASOS.length" class="cnv__btn-primary"
-                :disabled="paso === 2 && !haySuite" @click="siguiente">
+        <button v-if="paso < pasos.length" class="cnv__btn-primary"
+                :disabled="pasoClave === 'modulos' && !haySuite" @click="siguiente">
           Siguiente <ChevronRight :size="16" :stroke-width="2" />
         </button>
         <button v-else class="cnv__btn-primary" :disabled="saving" @click="handleSubmit">
           <DsSpinner v-if="saving" :size="15" />
           <Check v-else :size="16" :stroke-width="2.5" />
-          {{ saving ? 'Creando…' : 'Crear organización' }}
+          {{ saving ? 'Creando…' : (esPersonal ? 'Crear uso personal' : 'Crear organización') }}
         </button>
       </div>
 

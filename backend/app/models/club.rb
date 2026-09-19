@@ -170,15 +170,19 @@ class Club < ApplicationRecord
   # módulos viejos guardados.
   MODULOS_PERSONAL = %w[cultivo iot ia chatbot].freeze
 
-  # Con qué nace: Cultivo, el ambiente y la IA con su chatbot — TODO adentro del precio (ver
-  # `Precios`), porque los tres son el gancho del producto para el que cultiva en casa: un
-  # sensor de $10.000 y la app le dice cómo viene el VPD; una pregunta y le contesta cuándo
-  # pasar a floración con SUS datos delante (decisión de Germán, 18-sep-2026).
-  FEATURES_PERSONAL = { 'cultivo' => true, 'iot' => true, 'ia' => true, 'chatbot' => true }.freeze
+  # Con qué nace: sólo Cultivo. El ambiente, la IA y su chatbot se deciden uno por uno en el
+  # alta (decisión de Germán, 19-sep-2026: nacían los cuatro prendidos y no había nada que
+  # elegir). Cuánto se cobra cada uno en personal está pendiente: hoy `Precios` los sigue
+  # teniendo adentro del plan.
+  FEATURES_PERSONAL = { 'cultivo' => true }.freeze
 
-  # Deja en `features` sólo lo que el uso personal puede tener. Apagar siempre se acepta.
+  # Deja en `features` sólo lo que el uso personal puede tener. Apagar siempre se acepta. El
+  # chatbot sin el Asistente IA no contesta nada, así que se apaga con él: en una organización
+  # eso es un cartel («requiere»); acá no hay ficha larga donde leerlo.
   def self.acotar_a_personal(features)
-    features.to_h.reject { |clave, valor| valor == true && !MODULOS_PERSONAL.include?(clave.to_s) }
+    acotado = features.to_h.reject { |clave, valor| valor == true && !MODULOS_PERSONAL.include?(clave.to_s) }
+    acotado = acotado.reject { |clave, valor| clave.to_s == 'chatbot' && valor == true && acotado['ia'] != true }
+    acotado
   end
 
   ROLES_META = {
@@ -280,11 +284,16 @@ class Club < ApplicationRecord
   # «olvidé mi contraseña» no tenía a dónde escribirle y el reset decía "le llegó por mail" a una
   # dirección de un dominio ajeno. Sin `email_personal` explícito, el del admin es el de contacto
   # de la organización: es la misma persona en el 99% de las altas.
+  #
+  # En uso personal el admin entra CON SU MAIL: la cuenta es la persona y no hay «organización»
+  # detrás de la que inventar un identificador (`admin@cultivo_de_juan.com` era un dato más para
+  # dictarle por teléfono a alguien que ya tiene su mail). Si ese mail ya tiene cuenta en la
+  # plataforma, el alta lo rechaza antes de llegar acá (`ClubsController#create`).
   def crear_usuarios_default!(roles: ROLES_DEFAULT, password: nil, admin: {})
     password ||= User.password_temporal
     admin    = (admin || {}).to_h.with_indifferent_access
     roles.select { |r| ROLES_VALIDOS_CLUB.include?(r) }.map do |rol|
-      login = "#{rol}@#{slug}.com"
+      login = login_para(rol, admin)
       next if User.exists?(email: login)
 
       attrs = { club: self, role: rol, email: login, password: password,
@@ -296,6 +305,11 @@ class Club < ApplicationRecord
       end
       User.create!(attrs)
     end.compact
+  end
+
+  def login_para(rol, admin)
+    return admin[:email_personal].to_s.strip.downcase if rol == 'admin' && personal? && admin[:email_personal].present?
+    "#{rol}@#{slug}.com"
   end
 
   def crear_geneticas_default!

@@ -311,6 +311,17 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 
 ### Lo que NO hay que romper
 
+- **USO PERSONAL = PLAN `personal`, Y NACE SÓLO CON CULTIVO** (19-sep-2026). Es UNA persona
+  sin equipo ni pacientes (`Club#personal?`, `PlanEnforcer` personal); lo único que puede tener
+  es `Club::MODULOS_PERSONAL` (cultivo, iot, ia, chatbot) y el ambiente, la IA y el chatbot **se
+  eligen uno por uno en el alta, apagados de entrada** (`FEATURES_PERSONAL` es sólo Cultivo;
+  antes nacían los cuatro y no había nada que decidir). Chatbot sin IA se apaga solo
+  (`Club.acotar_a_personal`). **La persona entra con su mail** (`login_para`), no con
+  `admin@slug.com`; el alta no pide nombre de organización: el cultivo se llama «Cultivo de
+  <nombre>». **Precio de cada adicional en personal: PENDIENTE de Germán** —hasta entonces
+  `Precios::INCLUIDO_EN_PERSONAL` los deja adentro de los $12.000 y prenderlos no cambia nada.
+  Las pantallas del personal son las del cultivador y del admin con lo de «otras personas /
+  otras sedes» escondido, NUNCA pantallas simplificadas nuevas (decisión del 18-sep).
 - **TODO PACIENTE TIENE CUENTA CORRIENTE, Y LO QUE PAGA DE MÁS QUEDA A FAVOR** (18-sep-2026,
   decisión de Germán que REVIRTIÓ la del 17: «no hay plata a favor» es legacy si aparece en un
   comentario viejo). La razón es el vuelto: sin cambio, se le deja a cuenta y **en la próxima

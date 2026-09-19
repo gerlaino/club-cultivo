@@ -21,12 +21,25 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     # El plan no viaja en `club_params` (ver el comentario ahí), pero el alta sí lo elige.
     attrs['plan'] = PlanEnforcer.normalizar(params.dig(:club, :plan))
     attrs['features'] = if attrs['plan'] == 'personal'
-                          # Uso personal: nace con lo suyo y no puede tener otra cosa. El alta
-                          # ni siquiera pregunta por módulos, pero por la API llega lo que sea.
+                          # Uso personal: nace con Cultivo y lo que el alta le sumó (ambiente, IA,
+                          # chatbot), y no puede tener otra cosa: por la API llega lo que sea.
                           Club.acotar_a_personal(Club::FEATURES_PERSONAL.merge(attrs['features'] || {}))
                         else
                           sin_addons_huerfanos(Club::FEATURES_POR_DEFECTO.merge(attrs['features'] || {}))
                         end
+    # En uso personal la persona entra con su mail (ver `Club#crear_usuarios_default!`): sin
+    # mail no hay con qué entrar, y si ya tiene cuenta el alta no puede crearle otra. Se corta
+    # ANTES de guardar el club, porque `crear_usuarios_default!` saltea el login repetido en
+    # silencio y quedaría un uso personal sin nadie adentro.
+    if attrs['plan'] == 'personal'
+      mail = admin_params['email_personal'].to_s.strip.downcase
+      if mail.blank? || !mail.match?(URI::MailTo::EMAIL_REGEXP)
+        return render json: { errors: ['Hace falta el mail de quien cultiva: es con lo que entra'] }, status: :unprocessable_entity
+      end
+      if User.exists?(email: mail)
+        return render json: { errors: ["#{mail} ya tiene una cuenta en la plataforma"] }, status: :unprocessable_entity
+      end
+    end
     club = Club.new(attrs)
     if club.save
       # Sólo los roles que el alta ofrece. No alcanza con sacarlos de la pantalla: el endpoint
@@ -388,6 +401,12 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
   # saltea siempre.
   #
   # Apagar siempre se acepta: hay que poder limpiar una organización que los tenga guardados.
+  # Qué módulos se le pueden mostrar como opción: a una organización todos, a un uso personal
+  # sólo los suyos.
+  def ofrecible?(club, clave)
+    !club.personal? || Club::MODULOS_PERSONAL.include?(clave.to_s)
+  end
+
   def sin_addons_huerfanos(features)
     features.to_h.reject do |clave, valor|
       pack = Club.pack_de_addon(clave)
@@ -549,8 +568,10 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       # parezca que la baja no se guardó.
       features_baja:   c.features_baja,
       pulse_configurado: c.pulse_configurado?,
-      suites:          Club::SUITES.map { |k, v| { clave: k, label: v[:label], desc: v[:desc], activa: c.suite?(k) } },
-      addons:          Club::ADDONS.map { |k, v|
+      # Un uso personal sólo ve lo que puede tener (`MODULOS_PERSONAL`): la ficha ofrecía todas
+      # las suites y adicionales, y el backend descartaba en silencio lo que no corresponde.
+      suites:          Club::SUITES.select { |k, _| ofrecible?(c, k) }.map { |k, v| { clave: k, label: v[:label], desc: v[:desc], activa: c.suite?(k) } },
+      addons:          Club::ADDONS.select { |k, _| ofrecible?(c, k) }.map { |k, v|
         { clave: k, label: v[:label], desc: v[:desc], requiere: v[:requiere],
           # A qué suite le sirve. Sin esto la pantalla era una lista plana de diez cosas y no se
           # entendía para qué era cada una.
@@ -567,7 +588,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
           activo: c.incluido_por_suite?(k) }.merge(estado_modulo(c, k))
       },
       # Lo que todavía no existe. Se lista para que nadie lo prometa creyendo que está.
-      en_construccion: Club::EN_CONSTRUCCION.map { |k, v|
+      en_construccion: Club::EN_CONSTRUCCION.select { |k, _| ofrecible?(c, k) }.map { |k, v|
         { clave: k, label: v[:label], desc: v[:desc], requiere: v[:requiere], activo: false }
       },
       plan_info:       PlanEnforcer.new(c).info,

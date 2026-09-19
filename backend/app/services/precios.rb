@@ -23,7 +23,11 @@ module Precios
     'personal' => 12_000,
   }.freeze
 
-  # Lo que el plan personal trae adentro y no se cobra como línea aparte.
+  # Lo que el plan personal no cobra como línea aparte. Desde el 19-sep-2026 el ambiente, la IA
+  # y el chatbot se ELIGEN en el alta (`Club::FEATURES_PERSONAL` es sólo Cultivo), pero cuánto
+  # vale cada uno en personal está PENDIENTE de Germán: hasta que lo decida, prenderlos no
+  # cambia el número. Los precios de organización (IoT $20.000, IA $25.000) no sirven acá:
+  # son más que el plan entero.
   INCLUIDO_EN_PERSONAL = %w[cultivo iot ia chatbot].freeze
 
   SUITES = {
