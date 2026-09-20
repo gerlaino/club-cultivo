@@ -73,7 +73,9 @@ test('el día del mostrador, de punta a punta', async ({ page }) => {
 
   // ── 3. Cuenta UN producto a mitad del turno, sin cerrar ────────────────────
   // Cerrar y reabrir con quince frascos son veinte minutos: el control que cuesta eso no se hace.
-  await page.locator('.tmo__contar').first().click()
+  // Vive detrás de «⋯» (13-sep): es un gesto excepcional, no un botón de todos los días.
+  await page.locator('.tmo__mas').first().click()
+  await page.locator('.tmo__menu-item', { hasText: 'Contar este producto' }).click()
   // Misma regla que el arqueo: lo esperado no aparece hasta que el conteo está escrito.
   await expect(page.locator('.cti__comparacion')).toHaveCount(0)
   await page.locator('.cti__input').first().fill('296')
@@ -142,8 +144,9 @@ test('el dispensador ve los cierres que hizo, en el calendario', async ({ page }
   await expect(page.locator('.trn__dia.is-sel')).toHaveCount(1)
   await expect(page.locator('.trn__panel .trn__cierre').first()).toBeVisible()
   await expect(page.locator('.trn__panel .trn__hecho').first()).toBeVisible()
-  // Corregir un conteo ajusta el inventario real: eso es de administración.
-  await expect(page.getByRole('button', { name: /Corregir/ })).toHaveCount(0)
+  // Quien cerró corrige el suyo (un dedazo no espera al admin); «Ya lo miré» sigue siendo de
+  // administración.
+  await expect(page.getByRole('button', { name: /Corregir/ })).toHaveCount(1)
   await expect(page.getByRole('button', { name: 'Ya lo miré' })).toHaveCount(0)
 
   expect(errores, errores.join('\n')).toEqual([])

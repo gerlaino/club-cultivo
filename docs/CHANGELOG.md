@@ -1,5 +1,31 @@
 # Changelog
 
+## Septiembre 2026 (ct) — PWA personal: el «+» del día, el lote dice qué viene, precios personales
+
+- **El «+» en personal es «Hoy»**: Regar / Registrar ambiente / Foto / Tarea primero, crear
+  después. Anotar un riego eran cuatro toques; ahora dos, y con un solo lote no pregunta cuál
+  (con varios, hoja para elegir). Regar → ficha del lote con el diario abierto en Riego; ambiente
+  → el espacio con el registro abierto en Ambiental (`accionInicial` en los dos modales; el
+  `watch` de apertura pasó a `immediate` porque en el teléfono el modal se monta ya abierto y
+  no disparaba). Foto: la cámara se abre desde el toque y se sube desde el shell (Chrome no
+  deja abrir el selector sin gesto). Tarea: `ModalTarea` en el teléfono, apuntada al único lote.
+- **El lote dice qué viene**: `Lote#proximo_paso` (modelo, spec en `lote_relojes_spec`) →
+  «Faltan 8 días para floración» en el inicio, en la tarjeta de la sala y en el hero de la ficha
+  del teléfono. Sin objetivo cargado no dice nada.
+- **Precio de los adicionales en personal** (provisorio, a pedido de Germán para no trabar):
+  ambiente $4.000, IA $5.000, chatbot $3.000 (`Precios::ADDONS_PERSONAL`); el catálogo trae
+  `precio_mensual_personal` y el alta lo muestra y suma. `INCLUIDO_EN_PERSONAL` queda en Cultivo.
+- **Genéticas en personal sin ruido de organización**: el modal no pide «consejos de la
+  organización» ni «se declara ante el INASE», ni dice «(interna)»; la lista no tiene KPI, orden,
+  filtro ni columna INASE («Sin declarar» en cada fila).
+- **«Mi perfil» en la PWA instalada rebotaba al inicio**: el guard mantiene a los roles mobile
+  bajo `/m` y `/m/perfil` no existía. Ahora existe (misma vista). «Club ID» → «ID de organización».
+- **`RegistroSalaModal`** en personal dice «Registrar el espacio» / «de este espacio», y el aviso
+  ya no se parte en tres columnas en el teléfono. La ficha del lote dice «Espacio», no «Sala».
+- **e2e `mostrador.spec.js` verde de nuevo (4/4)**: el seed tomaba «la primera» genética y otro
+  escenario había dejado «E2E Haze» (ahora busca por nombre); «Contar este producto» vive detrás
+  de «⋯» desde el 13-sep; quien cerró puede corregir su conteo.
+
 ## Septiembre 2026 (cs) — PWA personal: recorrido como usuario y lo que apareció
 
 - **Genéticas: el catálogo INASE es compartido y de sólo lectura.** Las globales son filas de

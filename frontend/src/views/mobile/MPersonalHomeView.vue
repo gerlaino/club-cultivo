@@ -105,6 +105,7 @@
           <span class="mph__lote-txt">
             <span class="mph__lote-nombre">{{ l.genetica?.nombre || l.strain || l.codigo }}</span>
             <span class="mph__lote-sub">{{ l.codigo }} · {{ l.plants_count || 0 }} {{ l.plants_count === 1 ? 'planta' : 'plantas' }}</span>
+            <span v-if="textoProximoPaso(l)" class="mph__lote-prox" :class="{ 'mph__lote-prox--ya': l.proximo_paso.faltan_dias <= 0 }">{{ textoProximoPaso(l) }}</span>
           </span>
           <span class="mph__lote-fase">
             <span class="mph__lote-estado" :style="{ color: meta(l.estado).color }">{{ meta(l.estado).label }}</span>
@@ -127,6 +128,7 @@
           <span class="mph__lote-txt">
             <span class="mph__lote-nombre">{{ l.genetica?.nombre || l.strain || l.codigo }}</span>
             <span class="mph__lote-sub">{{ l.codigo }}<template v-if="l.estado === 'en_manicura'"> · por pesar</template></span>
+            <span v-if="textoProximoPaso(l)" class="mph__lote-prox" :class="{ 'mph__lote-prox--ya': l.proximo_paso.faltan_dias <= 0 }">{{ textoProximoPaso(l) }}</span>
           </span>
           <span class="mph__lote-fase">
             <span class="mph__lote-estado" :style="{ color: meta(l.estado).color }">{{ meta(l.estado).label }}</span>
@@ -153,7 +155,7 @@ import { useAmbienteStore } from '../../stores/ambiente'
 import { useToast }         from '../../composables/useToast.js'
 import { getAmbienteSalas, getFotosRecientes } from '../../lib/api'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
-import { ESTADO_META }      from '../../lib/loteHelpers.js'
+import { ESTADO_META, textoProximoPaso } from '../../lib/loteHelpers.js'
 import PuestaEnMarcha       from '../../components/PuestaEnMarcha.vue'
 
 const auth     = useAuthStore()
@@ -336,6 +338,8 @@ useRecargaEnCambios('fotos', async () => { fotosRecientes.value = (await getFoto
 .mph__lote-txt { display: flex; flex-direction: column; gap: .1rem; min-width: 0; flex: 1; }
 .mph__lote-nombre { font-size: .9rem; font-weight: 700; color: var(--c-ink-900, #1a1d1f); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mph__lote-sub { font-size: .74rem; color: var(--c-ink-500, #6b7280); }
+.mph__lote-prox { font-size: .74rem; font-weight: 600; color: var(--c-leaf-700, #2d4a3e); }
+.mph__lote-prox--ya { color: var(--c-amber-700, #b45309); }
 .mph__lote-fase { display: flex; flex-direction: column; align-items: flex-end; gap: .1rem; flex-shrink: 0; }
 .mph__lote-estado { font-size: .74rem; font-weight: 700; }
 .mph__lote-dias { font-size: .72rem; color: var(--c-ink-500, #6b7280); }

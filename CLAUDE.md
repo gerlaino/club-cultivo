@@ -125,14 +125,15 @@ mensual por plan (`Ia::Uso`, `ia_llamadas`, créditos `IaRecarga`).
 - **Seguridad**: no hay contraseña por defecto; `render file:` no existe en modo API; `/me` no se
   cachea; el helper de specs prefija `/api` a todo.
 
-## Dónde retomar (20-sep-2026)
+## Dónde retomar (20-sep-2026, tarde)
 
-**Todo pusheado y en producción (`master`, último `113b1e89`).** Bloques (ch) a (cs) del
-CHANGELOG, dos días de trabajo: alta de uso personal rediseñada · push arreglado de raíz (clave
-por `/me`, job sin tenant, baja por endpoint, botón en el teléfono) · PWA de 8,8 MB a 1,1 MB ·
-notificaciones por persona en dos familias + «Recordarme» por tarea · «algo cambió» por
-ActionCable en toda la app · galería de fotos por semana · recetas de nutrientes · catálogo INASE
-compartido de sólo lectura · varios bugs de la PWA personal.
+**En producción `master` `48cf1d35`; SIN COMMITEAR el bloque (ct)** (ver `docs/CHANGELOG.md`):
+el «+» de la PWA personal («Hoy»: Regar / Registrar ambiente / Foto / Tarea) · el lote dice qué
+viene (`Lote#proximo_paso` → «Faltan 8 días para floración») · precios provisorios de los
+adicionales personales (`Precios::ADDONS_PERSONAL`: ambiente 4.000, IA 5.000, chatbot 3.000) ·
+genéticas sin ruido regulatorio en personal · `/m/perfil` (rebotaba al inicio en la PWA) ·
+e2e `mostrador.spec.js` verde otra vez (4/4). Todo verificado: rspec en lo tocado, vitest
+2217/0, build, Playwright sobre `casa_german`.
 
 **Reglas nuevas que gobiernan código nuevo** (detalle en `docs/REGLAS_Y_DECISIONES.md`):
 - Todo modelo de dominio nuevo lleva `include Transmite` + `transmite_como '<recurso>'`; toda
@@ -141,24 +142,25 @@ compartido de sólo lectura · varios bugs de la PWA personal.
 - Push: lo que no está en `Notificaciones::Catalogo` no se ofrece ni se manda; todo disparador
   nuevo dice `tipo:`. «Te piden algo» prendido; «Recordatorios» opt-in (en personal, ciclo y
   cosecha prendidos). En pantalla se dice «Próximos pasos del ciclo», nunca «hitos».
-- Uso personal nace sólo con Cultivo; ambiente/IA/chatbot se eligen en el alta. **Precio de esos
-  adicionales en personal: PENDIENTE de Germán** (`Precios::INCLUIDO_EN_PERSONAL` los deja adentro).
+- Uso personal nace sólo con Cultivo; ambiente/IA/chatbot se eligen en el alta, cada uno con su
+  precio de personal (provisorios). En personal no hay nada regulatorio ni de pacientes.
+- El «qué viene» del lote lo calcula el backend (`proximo_paso`); sin objetivo, nil. Los modales
+  de registro aceptan `accionInicial` y su `watch` de apertura es `immediate`.
+- La foto rápida se saca desde el toque (sin gesto el navegador no abre la cámara).
 - Nutriente = insumo; receta = dosis por litro; aplicar al regar descuenta y cuesta, **nunca
   bloquea por stock**; «fertilizó sin especificar» es válido. Personal: «Mis nutrientes».
 - Genéticas globales (INASE) son compartidas: sólo lectura desde una organización; personal ve
-  sólo las suyas.
-- La regla del enraizado (incubadora con su clima) vale también en personal.
+  sólo las suyas. La regla del enraizado (incubadora con su clima) vale también en personal.
 
-**Próxima tanda acordada (PWA personal, chica):** ① el «+» ofrece Regar / Registrar ambiente /
-Foto / Tarea y con un solo lote adivina el destino (hoy anotar un riego son cuatro toques) ·
-② el lote dice qué viene («faltan 8 días para floración») en su tarjeta y en el inicio. Ideas
-sin acordar: resumen al cerrar el ciclo, sacar «Escanear QR» del «+» en personal, plan de
-tareas base al crear un lote.
+**Ideas sin acordar (PWA personal):** resumen al cerrar el ciclo · sacar «Escanear QR» del «+»
+en personal · plan de tareas base al crear un lote · **`RegistroSalaModal` no encola sin señal**
+(el del lote sí: mismo hecho, distinta puerta; hallazgo del 20-sep).
 
 **Pendientes más adelante (Germán decidió posponer):** auto-registro + trial 30 días · app en las
 tiendas (Capacitor, push nativo) · `image_processing`/libvips para miniaturas de la galería.
-**Pendientes viejos:** borrar `pacientes.envio_*` · 2 e2e de `mostrador.spec.js` rotos desde el
-8-sep (preguntar cómo quedó Merma) · si el repartidor cobra de más también queda a favor.
+**Pendientes viejos:** borrar `pacientes.envio_*` (siguen en el esquema; nadie las lee; es
+migración → pedido explícito). El «repartidor cobra de más → a favor» YA está (pasa por
+`aplicar_lineas_cobro!`).
 **De Germán (no código):** rotar el secreto de Render · `rake seguridad:usuarios_con_password_default`
 · `rake stocks:balance_descuadrado` · `rake auditorias:limpiar_blobs` · confirmar que el push por
 worker llega al iPhone (el directo ya llegó) · destrabar notificaciones en su Chrome (candado).

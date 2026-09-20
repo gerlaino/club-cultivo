@@ -111,6 +111,9 @@ class LoteSerializer
       # que la fecha y los días de la tabla no pueden contradecirse.
       fecha_estado_actual: fecha_estado_actual,
       historial_estados:   historial_estados,
+      # Qué viene y en cuántos días (`{ fase, fecha, faltan_dias }` o nil). Regla en el modelo:
+      # la tarjeta del teléfono y el inicio sólo la muestran.
+      proximo_paso:        lote.proximo_paso,
       # Panorama completo: "45 días de ciclo + 12 enraizando". Las métricas usan dias_ciclo.
       dias_enraizado:     dias_enraizado,
       dias_ciclo:         dias_ciclo,

@@ -250,6 +250,31 @@ class Lote < ApplicationRecord
     f ? (Time.zone.today - f).to_i : nil
   end
 
+  # Qué viene y cuándo, para decirlo en la tarjeta: «faltan 8 días para floración». Se cuenta
+  # desde que entró al estado actual (`fecha_estado_actual`) más los días objetivo de esa fase,
+  # que el lote hereda de la genética al crearse. En floración manda `fecha_cosecha_estimada`
+  # si alguien la fijó a mano: es la misma prioridad que usan los informes de producción.
+  #
+  # nil cuando no hay con qué contar (sin objetivo cargado) o cuando lo que sigue no tiene
+  # días: enraizando se prende cuando prende, y de manicura/curado en adelante no hay reloj.
+  # `faltan_dias` puede ser negativo: se pasó del objetivo, y la pantalla lo dice así.
+  def proximo_paso
+    fase, objetivo = case estado
+                     when 'vegetativo' then ['floracion', dias_vegetativo_objetivo]
+                     when 'floracion'  then ['cosecha',   dias_floracion_objetivo]
+                     when 'cosecha'    then ['curado',    dias_cosecha_objetivo]
+                     end
+    return nil unless fase
+
+    fecha = fecha_cosecha_estimada if estado == 'floracion'
+    if fecha.nil?
+      desde = fecha_estado_actual
+      return nil unless desde && objetivo.to_i.positive?
+      fecha = desde + objetivo.to_i.days
+    end
+    { fase: fase, fecha: fecha, faltan_dias: (fecha - Time.zone.today).to_i }
+  end
+
   # Foto de portada del lote (para el slot del layout de la sala): la marcada como portada si
   # sigue adjunta, o la última subida si no hay marcada. nil si el lote no tiene fotos.
   def foto_portada_attachment

@@ -45,6 +45,8 @@ class SuperAdmin::CatalogoController < SuperAdmin::BaseController
       suites: Club::SUITES.map { |k, v| { clave: k, label: v[:label], desc: v[:desc], precio_mensual: Precios.suite(k) } },
       addons: Club::ADDONS.map { |k, v|
         { clave: k, label: v[:label], desc: v[:desc], requiere: v[:requiere], precio_mensual: Precios.addon(k),
+          # Lo que vale en un uso personal (0 si no se ofrece ahí): el alta muestra éste.
+          precio_mensual_personal: Precios.addon_personal(k),
           pack: v[:pack], pack_label: v[:pack] && Club::SUITES.dig(v[:pack], :label),
           bloqueado: Club.addon_bloqueado?(k), motivo_bloqueo: Club::ADDONS_BLOQUEADOS[k],
           incompleto: Club::ADDONS_INCOMPLETOS.include?(k) }

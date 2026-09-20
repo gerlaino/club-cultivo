@@ -30,11 +30,13 @@ namespace :e2e do
                                               tipo: 'mixta', direccion: 'Calle Falsa 123', activa: true)
       sala = club.salas.first || Sala.create!(club: club, sede: sede, nombre: 'Sala E2E',
                                               kind: 'floracion', created_by: admin)
-      gen  = club.geneticas.where.not(club_id: nil).first ||
+      # Por NOMBRE, no «la primera»: otros escenarios (`e2e:cultivo`) dejan sus propias
+      # genéticas y lotes en la org, y `.first` traía «E2E Haze» a una prueba que espera Kush.
+      gen  = club.geneticas.find_by(nombre: 'E2E Kush') ||
              Genetica.create!(club: club, nombre: 'E2E Kush', created_by: admin)
-      lote = club.lotes.first || Lote.create!(club: club, sala: sala, sede: sede, genetica: gen,
-                                              codigo: 'L-E2E-001', estado: 'floracion',
-                                              start_date: 60.days.ago.to_date)
+      lote = club.lotes.find_by(codigo: 'L-E2E-001') ||
+             Lote.create!(club: club, sala: sala, sede: sede, genetica: gen,
+                          codigo: 'L-E2E-001', estado: 'floracion', start_date: 60.days.ago.to_date)
 
       # Dos productos: la flor va a la mesa, el preroll queda en el depósito. El segundo existe
       # para probar que el carrito del dispensador SÓLO ofrece lo que está arriba.

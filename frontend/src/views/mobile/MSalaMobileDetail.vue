@@ -14,7 +14,7 @@
 
     <!-- Acciones -->
     <div class="msal__actions">
-      <button class="msal__btn-registrar" @click="showRegistroSala = true">
+      <button class="msal__btn-registrar" @click="abrirRegistro()">
         <i class="bi bi-pencil-square"></i>
         {{ esPersonal ? 'Registrar el espacio' : 'Registrar sala' }}
       </button>
@@ -47,6 +47,7 @@
             <span class="msal__dot">·</span>
             <span>{{ lote.plants_count || 0 }} plantas</span>
           </div>
+          <div v-if="textoProximoPaso(lote)" class="msal__card-prox">{{ textoProximoPaso(lote) }}</div>
         </div>
         <i class="bi bi-chevron-right msal__chevron"></i>
       </RouterLink>
@@ -56,6 +57,7 @@
     <RegistroSalaModal
       v-model="showRegistroSala"
       :sala="sala"
+      :accion-inicial="accionInicial"
     />
 
     <!-- Sheet: Más acciones -->
@@ -143,7 +145,8 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { textoProximoPaso } from '../../lib/loteHelpers.js'
 import { getSala, listLotes, createSalaNota, createLote, listGeneticas,
          listFotosSala, uploadFotoSala } from '../../lib/api'
 import { useToast }       from '../../composables/useToast'
@@ -152,7 +155,8 @@ import SheetBottom        from '../../components/cultivador/SheetBottom.vue'
 import RegistroSalaModal  from '../../components/salas/RegistroSalaModal.vue'
 import { hoyISO } from '../../utils/dates.js'
 
-const route = useRoute()
+const route  = useRoute()
+const router = useRouter()
 const { esPersonal } = useUsoPersonal()
 const toast = useToast()
 const id    = Number(route.params.id)
@@ -162,6 +166,10 @@ const lotes   = ref([])
 const loading = ref(true)
 
 const showRegistroSala = ref(false)
+// Desde el botón se elige adentro; desde el «+» del teléfono llega `?accion=ambiental` y abre
+// derecho en ese formulario.
+const accionInicial    = ref(null)
+function abrirRegistro(accion = null) { accionInicial.value = accion; showRegistroSala.value = true }
 const showAcciones     = ref(false)
 const showNuevoLote    = ref(false)
 const showNota         = ref(false)
@@ -291,6 +299,12 @@ onMounted(async () => {
     if (geneticasRes.status === 'fulfilled') geneticas.value = geneticasRes.value.data || []
   } catch {} finally { loading.value = false }
   cargarFotos()
+  // Llegó desde el «+» con una acción: abre el registro en ese formulario y limpia la URL.
+  const accion = route.query.accion
+  if (accion && sala.value) {
+    router.replace({ path: route.path })
+    abrirRegistro(String(accion))
+  }
 })
 </script>
 
@@ -331,6 +345,7 @@ onMounted(async () => {
 .msal__codigo { font-size: .92rem; font-weight: 800; color: var(--c-slate-900); font-family: monospace; }
 .msal__badge { font-size: .62rem; font-weight: 700; padding: .2em .55em; border-radius: 999px; }
 .msal__card-meta { font-size: .72rem; color: var(--c-slate-500); display: flex; gap: .3rem; }
+.msal__card-prox { font-size: .72rem; font-weight: 600; color: var(--c-leaf-700, #2d4a3e); margin-top: .15rem; }
 .msal__dot { color: #d1d5db; }
 .msal__chevron { color: #d1d5db; font-size: .8rem; padding-right: .875rem; flex-shrink: 0; }
 

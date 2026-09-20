@@ -151,6 +151,9 @@ const props = defineProps({
   lote:        { type: Object,  default: null },
   registrosHoy:{ type: Array,   default: () => [] },
   plants:      { type: Array,   default: () => [] },
+  // Abrir ya en el formulario de UNA acción («riego»): es lo que hace el «+» del teléfono.
+  // Sin esto, «Regar» era llegar al paso 1 y volver a elegir Riego.
+  accionInicial: { type: String, default: null },
 })
 const emit = defineEmits(['update:modelValue', 'saved'])
 
@@ -228,7 +231,13 @@ watch(() => props.modelValue, (open) => {
   if (props.lote?.tamanio_maceta) {
     formData.value.trasplante.maceta_origen_l = props.lote.tamanio_maceta
   }
-})
+  if (props.accionInicial && accionesDisponibles.value.some(a => a.id === props.accionInicial)) {
+    seleccionadas.value = [props.accionInicial]
+    paso.value = 2
+  }
+// `immediate`: en el teléfono la ficha se dibuja recién con el lote cargado, y si llega con
+// `?accion=` el modal se monta YA abierto; sin esto la apertura no pasaba por acá.
+}, { immediate: true })
 
 const fechaHoy = new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })
 

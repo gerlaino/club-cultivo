@@ -293,7 +293,7 @@ onMounted(() => { fetchProfile(); fetchNotificaciones() })
             <dl class="pfl__dl">
               <div class="pfl__dl-row"><dt>ID usuario</dt><dd class="pfl__mono">#{{ me?.id }}</dd></div>
               <div class="pfl__dl-row"><dt>Rol</dt><dd>{{ roleLabel(me?.role) }}</dd></div>
-              <div class="pfl__dl-row"><dt>Club ID</dt><dd class="pfl__mono">#{{ me?.club_id }}</dd></div>
+              <div class="pfl__dl-row"><dt>ID de organización</dt><dd class="pfl__mono">#{{ me?.club_id }}</dd></div>
             </dl>
           </div>
 

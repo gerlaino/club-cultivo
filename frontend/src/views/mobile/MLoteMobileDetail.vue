@@ -15,6 +15,7 @@
       <div class="mlot__hero-estado">{{ estadoEmoji(lote.estado) }} {{ estadoLabel(lote.estado) }}</div>
       <h2 class="mlot__hero-codigo">{{ lote.codigo }}</h2>
       <div class="mlot__hero-gen">{{ lote.genetica?.nombre || 'Sin genética' }}</div>
+      <div v-if="textoProximoPaso(lote)" class="mlot__hero-prox"><i class="bi bi-arrow-right-short"></i>{{ textoProximoPaso(lote) }}</div>
 
       <div class="mlot__stats">
         <div class="mlot__stat">
@@ -27,7 +28,7 @@
         </div>
         <div class="mlot__stat" v-if="lote.sala?.nombre">
           <span class="mlot__stat-num mlot__stat-num--sm">{{ lote.sala.nombre }}</span>
-          <span class="mlot__stat-lbl">Sala</span>
+          <span class="mlot__stat-lbl">{{ salaTxt.Corta }}</span>
         </div>
         <div class="mlot__stat" v-else-if="lote.tamanio_maceta">
           <span class="mlot__stat-num">{{ lote.tamanio_maceta }}L</span>
@@ -38,7 +39,7 @@
 
     <!-- CTA principal: diario del lote -->
     <div class="mlot__cta-wrap">
-      <button class="mlot__cta" @click="showRegistrar = true">
+      <button class="mlot__cta" @click="abrirDiario()">
         <i class="bi bi-journal-plus"></i>
         <div class="mlot__cta-txt">
           <span class="mlot__cta-title">Registrar en el diario</span>
@@ -104,7 +105,7 @@
     </div>
 
     <!-- Modal registro lote (reutiliza el de la web) -->
-    <RegistroLoteModal v-model="showRegistrar" :lote="lote" :plants="plantas" @saved="recargarLote" />
+    <RegistroLoteModal v-model="showRegistrar" :lote="lote" :plants="plantas" :accion-inicial="accionInicial" @saved="recargarLote" />
 
     <ModalCosechaPartial
       v-if="showCosecha && lote"
@@ -200,7 +201,7 @@
 </template>
 
 <script setup>
-import { MACETA_OPCIONES } from '../../lib/loteHelpers.js'
+import { MACETA_OPCIONES, textoProximoPaso } from '../../lib/loteHelpers.js'
 import LoteGaleria from '../../components/lotes/LoteGaleria.vue'
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -209,6 +210,7 @@ import {
   avanzarFaseLote, updateLote, deleteLote,
 } from '../../lib/api'
 import { useToast }        from '../../composables/useToast'
+import { useUsoPersonal }  from '../../composables/useUsoPersonal.js'
 import SheetBottom         from '../../components/cultivador/SheetBottom.vue'
 import RegistroLoteModal   from '../../components/lotes/registro/RegistroLoteModal.vue'
 import ModalCosechaPartial from '../../components/salas/ModalCosechaPartial.vue'
@@ -216,6 +218,7 @@ import ModalCosechaPartial from '../../components/salas/ModalCosechaPartial.vue'
 const route  = useRoute()
 const router = useRouter()
 const toast  = useToast()
+const { sala: salaTxt } = useUsoPersonal()
 const id     = Number(route.params.id)
 
 const lote    = ref(null)
@@ -223,6 +226,10 @@ const plantas = ref([])
 const loading         = ref(true)
 const loadingPlantas  = ref(false)
 const showRegistrar   = ref(false)
+// Con qué acción abre el diario. Desde el botón, ninguna (se elige adentro); desde el «+» del
+// teléfono llega en la URL (`?accion=riego`) y se abre derecho en ese formulario.
+const accionInicial   = ref(null)
+function abrirDiario(accion = null) { accionInicial.value = accion; showRegistrar.value = true }
 const showAcciones    = ref(false)
 const showAvanzarFase = ref(false)
 const showCosecha     = ref(false)
@@ -381,6 +388,13 @@ onMounted(async () => {
     lote.value    = loteRes.data
     plantas.value = plantasRes.data?.data || plantasRes.data || []
   } catch {} finally { loading.value = false }
+  // Llegó desde el «+» con una acción: se abre el diario en ese formulario y se limpia la URL,
+  // para que recargar o volver no lo abra de nuevo.
+  const accion = route.query.accion
+  if (accion && lote.value) {
+    router.replace({ path: route.path })
+    abrirDiario(String(accion))
+  }
 })
 </script>
 
@@ -406,6 +420,7 @@ onMounted(async () => {
 .mlot__hero-estado { font-size: .68rem; font-weight: 700; color: rgba(255,255,255,.72); text-transform: uppercase; letter-spacing: .06em; }
 .mlot__hero-codigo { font-family: var(--font-display, sans-serif); font-size: 1.7rem; font-weight: 700; margin: .15rem 0 .1rem; }
 .mlot__hero-gen { font-size: .85rem; color: rgba(255,255,255,.7); }
+.mlot__hero-prox { margin-top: .35rem; font-size: .8rem; font-weight: 600; color: #fff; display: inline-flex; align-items: center; gap: .1rem; background: rgba(255,255,255,.14); border-radius: 999px; padding: .15rem .6rem .15rem .35rem; }
 
 .mlot__stats { display: flex; gap: .5rem; margin-top: 1.1rem; }
 .mlot__stat {

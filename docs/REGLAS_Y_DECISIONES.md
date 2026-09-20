@@ -336,10 +336,32 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   antes nacían los cuatro y no había nada que decidir). Chatbot sin IA se apaga solo
   (`Club.acotar_a_personal`). **La persona entra con su mail** (`login_para`), no con
   `admin@slug.com`; el alta no pide nombre de organización: el cultivo se llama «Cultivo de
-  <nombre>». **Precio de cada adicional en personal: PENDIENTE de Germán** —hasta entonces
-  `Precios::INCLUIDO_EN_PERSONAL` los deja adentro de los $12.000 y prenderlos no cambia nada.
+  <nombre>». **Cada adicional en personal tiene SU precio** (`Precios::ADDONS_PERSONAL`,
+  20-sep-2026: ambiente $4.000, IA $5.000, chatbot $3.000, PROVISORIOS — Germán pidió poner
+  uno para no trabar y ajustarlo después); `INCLUIDO_EN_PERSONAL` es sólo Cultivo. El catálogo
+  del super admin los manda como `precio_mensual_personal` y el alta los muestra y suma.
   Las pantallas del personal son las del cultivador y del admin con lo de «otras personas /
   otras sedes» escondido, NUNCA pantallas simplificadas nuevas (decisión del 18-sep).
+- **EN PERSONAL NO HAY NADA REGULATORIO NI DE PACIENTES EN GENÉTICAS** (20-sep-2026): el modal
+  no pide «consejos de la organización» (los lee el paciente en el pasaporte, que no existe) ni
+  «se declara ante el INASE como» (no presenta informes y no ve el catálogo); la lista no tiene
+  KPI/orden/filtro/columna INASE ni «Sin declarar». Es visibilidad con `esPersonal`; el backend
+  ya filtraba.
+- **EL LOTE DICE QUÉ VIENE, Y EL NÚMERO LO MANDA EL BACKEND** (20-sep-2026): `Lote#proximo_paso`
+  = `{ fase, fecha, faltan_dias }`, desde `fecha_estado_actual` + el objetivo de la fase que el
+  lote hereda de la genética (vegetativo→floración, floración→cosecha con `fecha_cosecha_estimada`
+  primero si está fijada, cosecha→curado). **Sin objetivo no inventa un número** (nil);
+  enraizando no tiene reloj. Viaja en el serializer y `textoProximoPaso()` (`loteHelpers.js`) le
+  pone palabras: «Faltan 8 días para floración», «Hoy toca…», «… venció hace 3 días».
+- **EL «+» DEL TELÉFONO EN PERSONAL SE LLAMA «HOY» Y OFRECE PRIMERO LO DE TODOS LOS DÍAS**
+  (20-sep-2026): Regar / Registrar ambiente / Foto / Tarea, después Crear lote / Crear espacio /
+  Escanear. Con un solo lote (o espacio) no pregunta cuál; con varios, una hoja para elegir.
+  Regar y ambiente llegan por URL (`?accion=riego` al lote, `?accion=ambiental` al espacio) y
+  los modales de registro abren YA en ese formulario (`accionInicial`; el `watch` de apertura es
+  `immediate` porque el modal puede montarse abierto). **La foto se saca desde el toque del
+  «+»**: el navegador no deja abrir la cámara «sola» después de navegar, así que se sube desde
+  el shell (de hoy, sin etiqueta) y recién después va al lote. El ambiente es del ESPACIO, no
+  del lote. Tarea en el teléfono abre `ModalTarea` (antes no había forma de crear una).
 - **TODO PACIENTE TIENE CUENTA CORRIENTE, Y LO QUE PAGA DE MÁS QUEDA A FAVOR** (18-sep-2026,
   decisión de Germán que REVIRTIÓ la del 17: «no hay plata a favor» es legacy si aparece en un
   comentario viejo). La razón es el vuelto: sin cambio, se le deja a cuenta y **en la próxima

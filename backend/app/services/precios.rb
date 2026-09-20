@@ -18,17 +18,24 @@ module Precios
   PLANES = {
     'basico'   => 40_000,
     'total'    => 90_000,
-    # Uso personal: UN número, con todo adentro (ver `INCLUIDO_EN_PERSONAL`). Provisorio como
-    # los demás.
+    # Uso personal: la base trae el Cultivo (`INCLUIDO_EN_PERSONAL`); lo demás se suma con su
+    # propio precio (`ADDONS_PERSONAL`). Provisorio como los demás.
     'personal' => 12_000,
   }.freeze
 
-  # Lo que el plan personal no cobra como línea aparte. Desde el 19-sep-2026 el ambiente, la IA
-  # y el chatbot se ELIGEN en el alta (`Club::FEATURES_PERSONAL` es sólo Cultivo), pero cuánto
-  # vale cada uno en personal está PENDIENTE de Germán: hasta que lo decida, prenderlos no
-  # cambia el número. Los precios de organización (IoT $20.000, IA $25.000) no sirven acá:
-  # son más que el plan entero.
-  INCLUIDO_EN_PERSONAL = %w[cultivo iot ia chatbot].freeze
+  # Lo que el plan personal no cobra como línea aparte: nace con Cultivo y Cultivo va adentro.
+  INCLUIDO_EN_PERSONAL = %w[cultivo].freeze
+
+  # Cuánto vale cada adicional en un uso personal. Los precios de organización (IoT $20.000,
+  # IA $25.000) no sirven acá: son más que el plan entero. Números PROVISORIOS (20-sep-2026,
+  # Germán pidió poner uno para no trabar y ajustarlo después): con los tres prendidos paga
+  # el doble de la base, no cinco veces. Lo que no está acá no se vende en personal
+  # (`Club::MODULOS_PERSONAL`) y cuesta 0.
+  ADDONS_PERSONAL = {
+    'iot'     => 4_000,
+    'ia'      => 5_000,
+    'chatbot' => 3_000,
+  }.freeze
 
   SUITES = {
     'cultivo'             => 30_000,
@@ -51,6 +58,7 @@ module Precios
   def self.plan(clave)  = PLANES.fetch(PlanEnforcer.normalizar(clave), 0)
   def self.suite(clave) = SUITES.fetch(clave.to_s, 0)
   def self.addon(clave) = ADDONS.fetch(clave.to_s, 0)
+  def self.addon_personal(clave) = ADDONS_PERSONAL.fetch(clave.to_s, 0)
 
   # El desglose de una organización: qué paga y por qué, con el total. Es lo que se muestra en
   # la ficha y lo que suma el panel.
@@ -69,7 +77,8 @@ module Precios
     Club::ADDONS.each_key do |k|
       next unless club.feature?(k)
       next if club.personal? && INCLUIDO_EN_PERSONAL.include?(k)
-      lineas << { tipo: 'addon', clave: k, label: Club::ADDONS.dig(k, :label), monto: addon(k) }
+      monto = club.personal? ? addon_personal(k) : addon(k)
+      lineas << { tipo: 'addon', clave: k, label: Club::ADDONS.dig(k, :label), monto: monto }
     end
 
     { lineas: lineas, total: lineas.sum { |l| l[:monto] }, moneda: MONEDA }

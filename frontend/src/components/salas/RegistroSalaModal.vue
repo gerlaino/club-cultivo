@@ -6,7 +6,7 @@
         <!-- Header -->
         <div class="rls__header">
           <div class="rls__header-left">
-            <h2 class="rls__title">🌿 Registrar sala</h2>
+            <h2 class="rls__title">🌿 Registrar {{ esPersonal ? 'el espacio' : 'sala' }}</h2>
             <span class="rls__subtitle">{{ sala?.nombre }} · {{ fechaHoy }}</span>
           </div>
           <div class="rls__header-right">
@@ -21,8 +21,9 @@
         </div>
 
         <!-- Aviso propagación -->
+        <!-- `display: block`, no flex: con flex el texto se partía en tres columnas en el teléfono. -->
         <div class="rls__info-bar">
-          El registro se aplicará a <strong>todos los lotes activos</strong> de esta sala.
+          El registro se aplicará a <strong>todos los lotes activos</strong> de {{ esPersonal ? 'este espacio' : 'esta sala' }}.
         </div>
 
         <!-- Body -->
@@ -154,6 +155,7 @@ import { ref, computed, watch } from 'vue'
 import { registrarSala } from '../../lib/api.js'
 import { useToast }      from '../../composables/useToast.js'
 import { useClubStore }  from '../../stores/club'
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
 import DsSpinner         from '../../design-system/components/Spinner.vue'
 import AsistenteVoz      from '../AsistenteVoz.vue'
 import RiegoForm    from '../lotes/registro/RiegoForm.vue'
@@ -166,11 +168,14 @@ import LimpiezaForm from '../lotes/registro/LimpiezaForm.vue'
 const props = defineProps({
   modelValue: { type: Boolean, default: false },
   sala:       { type: Object,  default: null },
+  // Abrir ya en el formulario de UNA acción («ambiental»): lo usa el «+» del teléfono.
+  accionInicial: { type: String, default: null },
 })
 const emit = defineEmits(['update:modelValue', 'saved'])
 
 const toast = useToast()
 const club  = useClubStore()
+const { esPersonal } = useUsoPersonal()
 
 const voiceEnabled     = computed(() => club.data?.features?.ia)
 const contextoAsistente = computed(() => props.sala ? {
@@ -234,7 +239,11 @@ watch(() => props.modelValue, (open) => {
   seleccionadas.value = []
   error.value = null
   formData.value = emptyFormData()
-})
+  if (props.accionInicial && ACCIONES.some(a => a.id === props.accionInicial)) {
+    seleccionadas.value = [props.accionInicial]
+    paso.value = 2
+  }
+}, { immediate: true })  // puede montarse ya abierto (ver RegistroLoteModal)
 
 const fechaHoy = new Date().toLocaleDateString('es-AR', { day: 'numeric', month: 'long' })
 
@@ -397,7 +406,7 @@ async function guardar() {
 }
 .rls__close:hover { background: var(--c-ink-300); color: var(--c-ink-900); }
 .rls__info-bar {
-  display: flex; align-items: center; gap: var(--sp-2);
+  display: block; line-height: 1.4;
   padding: var(--sp-3) var(--sp-6);
   background: #eff6ff; border-bottom: 1px solid #bfdbfe;
   font-size: var(--fs-13); color: #1e40af; flex-shrink: 0;

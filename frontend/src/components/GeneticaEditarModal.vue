@@ -161,8 +161,9 @@
             </div>
 
             <!-- Declaración ante el INASE. No aparece para las variedades que YA están
-                 inscriptas: esas no se declaran contra nada, son el destino. -->
-            <div v-if="!editingInase" class="gem-form__field gem-form__field--full">
+                 inscriptas: esas no se declaran contra nada, son el destino. Tampoco en uso
+                 personal: no presenta informes regulatorios y no ve el catálogo INASE. -->
+            <div v-if="!editingInase && !esPersonal" class="gem-form__field gem-form__field--full">
               <label class="gem-form__label">
                 Se declara ante el INASE como
                 <span class="gem-form__label-hint">(opcional)</span>
@@ -191,12 +192,13 @@
 
             <!-- Descripción -->
             <div class="gem-form__field gem-form__field--full">
-              <label class="gem-form__label">Descripción <span class="gem-form__label-hint">(interna)</span></label>
+              <label class="gem-form__label">Descripción <span v-if="!esPersonal" class="gem-form__label-hint">(interna)</span></label>
               <textarea v-model.trim="form.descripcion" class="gem-form__input gem-form__textarea" rows="3" placeholder="Características, efectos, sabor, aromas…"></textarea>
             </div>
 
-            <!-- Consejos de la organización -->
-            <div class="gem-form__field gem-form__field--full">
+            <!-- Consejos de la organización: los lee el paciente en el pasaporte de dispensa.
+                 En uso personal no hay pacientes ni pasaporte, así que no se pide. -->
+            <div v-if="!esPersonal" class="gem-form__field gem-form__field--full">
               <label class="gem-form__label">Consejos de la organización <span class="gem-form__label-hint">👁 visible al paciente</span></label>
               <textarea v-model.trim="form.consejos_club" class="gem-form__input gem-form__textarea" rows="3" placeholder="Guardado ideal, qué hacer al recibir el producto, recomendaciones…"></textarea>
             </div>
@@ -219,8 +221,10 @@
 import { ref, onMounted } from 'vue'
 import api, { getGenetica, createGenetica, updateGenetica, listGeneticas } from '../lib/api.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 
 const emit = defineEmits(['saved'])
+const { esPersonal } = useUsoPersonal()
 
 const TIPO_META = {
   indica:  { label: 'Índica',  color: '#6f42c1' },

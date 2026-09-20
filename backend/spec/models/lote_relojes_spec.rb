@@ -158,3 +158,48 @@ RSpec.describe Lote, 'los relojes del ciclo' do
     end
   end
 end
+# «Faltan 8 días para floración»: lo que la tarjeta del teléfono dice del lote. Se cuenta desde
+# que entró al estado actual más el objetivo de esa fase; sin objetivo no se inventa nada.
+RSpec.describe Lote, '#proximo_paso' do
+  let(:club)  { create(:club) }
+  let(:admin) { create(:user, :admin, club: club) }
+  let(:sede)  { create(:sede, club: club, created_by: admin) }
+  let(:sala)  { create(:sala, club: club, sede: sede, created_by: admin, kind: 'mixta') }
+
+  def en_estado(estado, hace:, **attrs)
+    lote = create(:lote, club: club, sala: sala, estado: estado, start_date: (hace + 10).days.ago.to_date,
+                         tamanio_maceta: 3, **attrs)
+    lote.lote_eventos.create!(tipo: 'cambio_estado', estado_anterior: 'enraizado', estado_nuevo: estado,
+                              registrado_en: hace.days.ago, club: club, user: admin)
+    lote
+  end
+
+  it 'en vegetativo cuenta los días que faltan para floración desde que prendió' do
+    lote = en_estado('vegetativo', hace: 22, dias_vegetativo_objetivo: 30)
+    expect(lote.proximo_paso).to eq(fase: 'floracion', fecha: 8.days.from_now.to_date, faltan_dias: 8)
+  end
+
+  it 'en floración cuenta para la cosecha, y se pasa en negativo' do
+    lote = en_estado('floracion', hace: 63, dias_floracion_objetivo: 60)
+    expect(lote.proximo_paso).to include(fase: 'cosecha', faltan_dias: -3)
+  end
+
+  it 'en floración manda la fecha de cosecha fijada a mano, como en los informes' do
+    lote = en_estado('floracion', hace: 10, dias_floracion_objetivo: 60, fecha_cosecha_estimada: 5.days.from_now.to_date)
+    expect(lote.proximo_paso).to include(fase: 'cosecha', faltan_dias: 5)
+  end
+
+  it 'secando cuenta para el curado' do
+    lote = en_estado('cosecha', hace: 4, dias_cosecha_objetivo: 14)
+    expect(lote.proximo_paso).to include(fase: 'curado', faltan_dias: 10)
+  end
+
+  it 'sin objetivo no inventa un número' do
+    expect(en_estado('vegetativo', hace: 5, dias_vegetativo_objetivo: nil).proximo_paso).to be_nil
+  end
+
+  it 'enraizando no tiene reloj: prende cuando prende' do
+    lote = create(:lote, club: club, sala: sala, estado: 'enraizado', start_date: 5.days.ago.to_date, dias_vegetativo_objetivo: 30)
+    expect(lote.proximo_paso).to be_nil
+  end
+end

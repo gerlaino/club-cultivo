@@ -194,3 +194,19 @@ export function phaseBannerMsg(estado) {
   if (['en_manicura', 'manicura', 'curado', 'cerrado'].includes(estado)) return 'Este lote pasó tu turno. Otro rol toma desde acá.'
   return null
 }
+
+// «Faltan 8 días para floración»: qué viene y cuándo, en una frase. El número lo manda el
+// backend (`Lote#proximo_paso`: desde que entró a la fase más el objetivo de la genética);
+// acá sólo se le pone palabras. null si el lote no tiene con qué contar.
+const PROXIMO_PASO_LABEL = { floracion: 'floración', cosecha: 'la cosecha', curado: 'el curado' }
+export function textoProximoPaso(lote) {
+  const p = lote?.proximo_paso
+  if (!p?.fase) return null
+  const que = PROXIMO_PASO_LABEL[p.fase] || p.fase
+  const n   = p.faltan_dias
+  if (n > 1)   return `Faltan ${n} días para ${que}`
+  if (n === 1) return `Mañana toca ${que}`
+  if (n === 0) return `Hoy toca ${que}`
+  const pasados = -n
+  return `${que.charAt(0).toUpperCase()}${que.slice(1)} venció hace ${pasados} ${pasados === 1 ? 'día' : 'días'}`
+}

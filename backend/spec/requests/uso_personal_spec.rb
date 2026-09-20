@@ -268,14 +268,24 @@ RSpec.describe 'Uso personal', type: :request do
   end
 
   describe 'lo que paga' do
-    # Cuánto vale cada adicional en personal está pendiente: hasta entonces, prenderlos no
-    # cambia el número.
-    it 'es un solo número con todo adentro' do
-      club = create(:club, plan: 'personal', features: { 'cultivo' => true, 'iot' => true, 'ia' => true, 'chatbot' => true })
+    it 'con sólo Cultivo es la base, y Cultivo no se cobra aparte' do
+      club = create(:club, plan: 'personal', features: { 'cultivo' => true })
       lineas = Precios.de(club)[:lineas]
 
       expect(lineas.map { |l| l[:clave] }).to eq(%w[personal])
       expect(Precios.de(club)[:total]).to eq(Precios.plan('personal'))
+    end
+
+    # Cada adicional que elige en el alta suma con SU precio de personal, no con el de
+    # organización (la IA de organización sola vale más que el plan entero).
+    it 'cada adicional suma su precio de personal' do
+      club = create(:club, plan: 'personal', features: { 'cultivo' => true, 'iot' => true, 'ia' => true, 'chatbot' => true })
+      lineas = Precios.de(club)[:lineas]
+
+      expect(lineas.map { |l| l[:clave] }).to match_array(%w[personal iot ia chatbot])
+      expect(Precios.de(club)[:total]).to eq(
+        Precios.plan('personal') + Precios.addon_personal('iot') + Precios.addon_personal('ia') + Precios.addon_personal('chatbot'))
+      expect(Precios.addon_personal('ia')).to be < Precios.addon('ia')
     end
 
     it 'tiene su propio tramo de IA' do

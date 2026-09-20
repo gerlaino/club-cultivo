@@ -119,14 +119,31 @@
       </div>
     </MobileSheet>
 
-    <!-- FAB → hoja de acciones rápidas -->
-    <MobileSheet v-model="fabOpen" title="Crear">
+    <!-- FAB → hoja de acciones rápidas. En uso personal se llama «Hoy»: lo primero que ofrece
+         es lo que se hace todos los días (regar, ambiente, foto), no crear cosas. -->
+    <MobileSheet v-model="fabOpen" :title="esPersonal ? 'Hoy' : 'Crear'">
       <MobileActionGrid :actions="fabActions" />
     </MobileSheet>
+
+    <!-- Con más de un lote (o espacio) hay que decir cuál. Con uno solo, este paso no existe. -->
+    <MobileSheet v-model="eleccionOpen" :title="eleccion?.titulo || '¿Dónde?'">
+      <div class="msh__mas">
+        <button v-for="op in eleccion?.opciones || []" :key="op.id" class="msh__mas-item" @click="elegir(op)">
+          <i class="bi" :class="op.icon"></i>
+          <span>{{ op.label }}<small v-if="op.sub" class="msh__mas-sub">{{ op.sub }}</small></span>
+          <i class="bi bi-chevron-right msh__mas-arr"></i>
+        </button>
+      </div>
+    </MobileSheet>
+    <!-- La cámara se abre desde el toque (el navegador no deja abrirla «sola» después de navegar),
+         así que la foto se sube desde acá y recién después se va al lote. -->
+    <input ref="inputFoto" type="file" accept="image/*" capture="environment" style="display:none" @change="subirFotoRapida" />
 
     <!-- Modales de creación reutilizados del desktop -->
     <NuevoLoteModal :show="showNuevoLote" :salas="salas" @close="showNuevoLote = false" @created="onCreado" />
     <ModalCrearSala v-if="showNuevaSala" @close="showNuevaSala = false" @created="onCreado" />
+    <ModalTarea v-if="esPersonal" :show="showNuevaTarea" :tarea-inicial="tareaInicial" :salas="salas" :lotes="lotesActivos"
+                @guardada="onTareaCreada" @cerrar="showNuevaTarea = false" />
   </div>
 </template>
 
@@ -138,11 +155,15 @@ import { useClubStore }  from '../../stores/club'
 import { useCajaDeliveryStore } from '../../stores/cajaDelivery.js'
 import { usePushNotifications, MOTIVOS } from '../../composables/usePushNotifications.js'
 import { useToast } from '../../composables/useToast.js'
-import { listSalas } from '../../lib/api.js'
+import { listSalas, uploadFotoLote } from '../../lib/api.js'
+import { useLotesStore } from '../../stores/lotes.js'
+import { useTareasStore } from '../../stores/tareas.js'
+import { hoyISO } from '../../utils/dates.js'
 import MobileSheet from '../mobile/MobileSheet.vue'
 import MobileActionGrid from '../mobile/MobileActionGrid.vue'
 import NuevoLoteModal from '../lotes/NuevoLoteModal.vue'
 import ModalCrearSala from '../salas/ModalCrearSala.vue'
+import ModalTarea from '../ModalTarea.vue'
 
 const route  = useRoute()
 const router = useRouter()
@@ -151,6 +172,7 @@ const club   = useClubStore()
 const toast  = useToast()
 
 const role = computed(() => auth.user?.role || '')
+const esPersonal = computed(() => club.data?.personal === true)
 
 // Qué build está corriendo en ESTE dispositivo. Lo inyecta vite.config desde el commit.
 const BUILD    = __APP_BUILD__
@@ -307,7 +329,7 @@ function isActive(item) {
 
 // ── FAB: acciones de creación ───────────────────────────────────
 const menuOpen = ref(false)
-function irPerfil() { menuOpen.value = false; router.push('/perfil') }
+function irPerfil() { menuOpen.value = false; router.push('/m/perfil') }
 
 const fabOpen      = ref(false)
 const showNuevoLote = ref(false)
@@ -325,6 +347,16 @@ const fabActions = computed(() => {
     { key: 'lote', label: 'Crear lote', icon: 'bi-box-seam',
       tint: 'var(--c-leaf-100)', color: 'var(--c-leaf-700)', onClick: abrirNuevoLote },
   ]
+  // Uso personal: primero lo de todos los días. Anotar un riego eran cuatro toques (Cultivo →
+  // espacio → lote → Registrar → Riego); ahora son dos, y con un solo lote no pregunta cuál.
+  if (esPersonal.value) {
+    acciones.unshift(
+      { key: 'riego',    label: 'Regar',              icon: 'bi-droplet-fill',     tint: '#dbeafe', color: '#1d4ed8', onClick: () => conLote('riego') },
+      { key: 'ambiente', label: 'Registrar ambiente', icon: 'bi-thermometer-half', tint: '#fef3c7', color: '#b45309', onClick: () => conSala('ambiental') },
+      { key: 'foto',     label: 'Foto',               icon: 'bi-camera-fill',      tint: '#fce7f3', color: '#be185d', onClick: () => conLote('foto') },
+      { key: 'tarea',    label: 'Tarea',              icon: 'bi-check2-square',    tint: '#ede9fe', color: '#7c3aed', onClick: abrirNuevaTarea },
+    )
+  }
   // Crear una SALA es decisión de infraestructura, no del que está en el pasillo.
   if (!esCultivador) {
     acciones.push({ key: 'sala', label: club.data?.personal ? 'Crear espacio' : 'Crear sala', icon: 'bi-grid-3x3-gap',
@@ -338,6 +370,99 @@ const fabActions = computed(() => {
 function irEscanear() {
   fabOpen.value = false
   router.push('/m/scan')
+}
+
+// ── Acciones del día (uso personal) ─────────────────────────────
+// Los lotes y espacios se traen al abrir el «+», no al tocar la acción: la cámara sólo se abre
+// dentro del toque, y un `await` en el medio lo pierde.
+const lotesStore  = useLotesStore()
+const tareasStore = useTareasStore()
+const EN_PIE = ['enraizado', 'vegetativo', 'floracion']
+const lotesActivos = computed(() => (lotesStore.items || []).filter(l => l.estado !== 'finalizado'))
+const lotesEnPie   = computed(() => lotesActivos.value.filter(l => EN_PIE.includes(l.estado)))
+watch(fabOpen, async (abierto) => {
+  if (!abierto || !esPersonal.value) return
+  const pedidos = []
+  if (!lotesStore.items?.length) pedidos.push(lotesStore.fetch({ silencioso: true }))
+  if (!salas.value.length) pedidos.push(listSalas().then(({ data }) => { salas.value = data || [] }).catch(() => {}))
+  await Promise.allSettled(pedidos)
+})
+
+const eleccionOpen = ref(false)
+const eleccion     = ref(null)   // { titulo, opciones: [{ id, label, sub, icon, ir }] }
+const inputFoto    = ref(null)
+const fotoLoteId   = ref(null)
+
+function nombreLote(l) { return l.genetica?.nombre || l.strain || l.codigo }
+
+// Regar y foto son de UN lote: si hay uno solo en pie se va derecho; si hay varios se pregunta.
+function conLote(accion) {
+  fabOpen.value = false
+  const candidatos = accion === 'foto' ? lotesActivos.value : lotesEnPie.value
+  if (!candidatos.length) {
+    toast.info(accion === 'foto' ? 'No hay ningún lote al que sacarle una foto.' : 'No hay ningún lote en pie para regar. Creá uno con «Crear lote».')
+    return
+  }
+  const ir = (l) => {
+    if (accion === 'foto') { fotoLoteId.value = l.id; inputFoto.value?.click(); return }
+    router.push({ path: `/m/lote-m/${l.id}`, query: { accion } })
+  }
+  if (candidatos.length === 1) return ir(candidatos[0])
+  eleccion.value = {
+    titulo: accion === 'foto' ? '¿Foto de qué lote?' : '¿Qué lote regaste?',
+    opciones: candidatos.map(l => ({ id: l.id, label: nombreLote(l), sub: `${l.codigo} · ${l.plants_count || 0} plantas`, icon: 'bi-box-seam', ir: () => ir(l) })),
+  }
+  eleccionOpen.value = true
+}
+
+// El ambiente es del ESPACIO (la carpa tiene un clima, no cada lote): va a la sala y su
+// registro se aplica a todos los lotes que tiene adentro.
+function conSala(accion) {
+  fabOpen.value = false
+  const candidatas = salas.value.filter(s => s.activa !== false)
+  if (!candidatas.length) { toast.info('Primero creá un espacio de cultivo.'); return }
+  const ir = (s) => router.push({ path: `/m/sala-m/${s.id}`, query: { accion } })
+  if (candidatas.length === 1) return ir(candidatas[0])
+  eleccion.value = {
+    titulo: '¿De qué espacio?',
+    opciones: candidatas.map(s => ({ id: s.id, label: s.nombre, sub: null, icon: 'bi-grid-3x3-gap', ir: () => ir(s) })),
+  }
+  eleccionOpen.value = true
+}
+function elegir(op) { eleccionOpen.value = false; op.ir() }
+
+// La foto rápida no pide fecha ni etiqueta: es de hoy y del lote elegido. Los detalles se
+// editan después desde la galería, que es donde se ven.
+async function subirFotoRapida(e) {
+  const file = e.target.files?.[0]
+  e.target.value = ''
+  const loteId = fotoLoteId.value
+  if (!file || !loteId) return
+  const fd = new FormData()
+  fd.append('imagen', file)
+  fd.append('tomada_el', hoyISO())
+  try {
+    await uploadFotoLote(loteId, fd)
+    toast.success('Foto guardada')
+    router.push(`/m/lote-m/${loteId}`)
+  } catch (err) {
+    toast.error(err?.response?.data?.errors?.[0] || err?.response?.data?.error || 'No se pudo guardar la foto')
+  }
+}
+
+// Una tarea nueva. Con un solo lote en pie nace ya apuntada a él y a su espacio.
+const showNuevaTarea = ref(false)
+const tareaInicial   = ref(null)
+function abrirNuevaTarea() {
+  fabOpen.value = false
+  const unico = lotesEnPie.value.length === 1 ? lotesEnPie.value[0] : null
+  tareaInicial.value = unico ? { lote_id: unico.id, sala_id: unico.sala_id || unico.sala?.id || '' } : null
+  showNuevaTarea.value = true
+}
+function onTareaCreada() {
+  showNuevaTarea.value = false
+  toast.success('Tarea creada')
+  tareasStore.fetchDashboard?.().catch?.(() => {})
 }
 
 async function abrirNuevoLote() {
@@ -560,6 +685,8 @@ onMounted(() => {
 }
 
 /* ── FAB central ── */
+.msh__mas-sub { display: block; font-size: .72rem; font-weight: 400; color: var(--c-ink-500, #6b7280); }
+
 .msh__fab {
   flex-shrink: 0;
   width: 60px; height: 60px;

@@ -224,10 +224,14 @@ const planElegido = computed(() => planes.value.find(p => p.clave === form.value
 // la misma cuenta que hace `Precios.de` en el backend; acá sólo se muestra antes de crear.
 const precioMensual = computed(() => {
   const plan = planElegido.value?.precio_mensual || 0
-  // Uso personal: un solo número. Cuánto vale cada adicional en personal está PENDIENTE
-  // (los precios de organización no sirven: la IA sola vale más que el plan), así que hasta
-  // que se decida prenderlos no cambia el número — igual que `Precios.de` en el backend.
-  if (esPersonal.value) return plan
+  // Uso personal: la base trae el Cultivo; cada adicional suma con SU precio de personal
+  // (`precio_mensual_personal`, que el catálogo trae aparte porque el de organización no
+  // sirve: la IA sola vale más que el plan). Misma cuenta que `Precios.de`.
+  if (esPersonal.value) {
+    return plan + addonsPersonal.value
+      .filter(a => form.value.features[a.clave] === true)
+      .reduce((t, a) => t + (a.precio_mensual_personal || 0), 0)
+  }
   const s = suites.value.filter(x => form.value.features[x.clave] === true).reduce((t, x) => t + (x.precio_mensual || 0), 0)
   const a = addons.value.filter(x => form.value.features[x.clave] === true).reduce((t, x) => t + (x.precio_mensual || 0), 0)
   return plan + s + a
@@ -598,8 +602,10 @@ async function handleSubmit() {
             >
               <div class="cnv__feat-left">
                 <div>
-                  <!-- Sin precio a propósito: cuánto vale cada uno en personal está pendiente. -->
-                  <div class="cnv__feat-name">{{ a.label }}</div>
+                  <div class="cnv__feat-name">
+                    {{ a.label }}
+                    <span v-if="a.precio_mensual_personal" class="cnv__precio">{{ formatARS(a.precio_mensual_personal) }}/mes</span>
+                  </div>
                   <div class="cnv__feat-desc">{{ a.desc }}</div>
                   <div v-if="bloqueoPersonal(a)" class="cnv__feat-requiere">
                     <Lock :size="11" :stroke-width="2.5" /> {{ bloqueoPersonal(a) }}
@@ -951,7 +957,7 @@ async function handleSubmit() {
               <span class="cnv__res-v">
                 <strong>{{ formatARS(precioMensual) }} por mes</strong>
                 <span class="cnv__res-sub">
-                  {{ form.plan_trial ? 'En prueba: no factura hasta que salga del trial.' : (esPersonal ? 'Plan Personal, un solo número con lo que le sumó adentro.' : 'Plan + suites + adicionales, a precio de lista.') }}
+                  {{ form.plan_trial ? 'En prueba: no factura hasta que salga del trial.' : (esPersonal ? 'Plan Personal con Cultivo adentro, más lo que le sumó.' : 'Plan + suites + adicionales, a precio de lista.') }}
                 </span>
               </span>
             </div>

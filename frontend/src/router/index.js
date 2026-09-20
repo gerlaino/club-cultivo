@@ -1012,6 +1012,10 @@ const routes = [
 
       // ── Horas (manicura / cultivador) ──
       { path: 'horas', component: () => import('../views/MisHorasView.vue') },
+      // El perfil es el mismo que en escritorio (es responsive y no depende de ningún layout).
+      // Sin esta entrada, «Mi perfil» del menú de la PWA instalada rebotaba al inicio: el guard
+      // mantiene a los roles mobile bajo `/m`, y `/perfil` no tenía equivalente acá.
+      { path: 'perfil', component: () => import('../views/PerfilView.vue') },
 
       // ── Cultivador ──
       { path: 'cultivador/sedes',  component: () => import('../views/mobile/MSedesView.vue') },

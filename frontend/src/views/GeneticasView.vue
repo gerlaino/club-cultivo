@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 import { useRouter, useRoute } from 'vue-router'
 import { listGeneticas, updateGenetica, deleteGenetica } from '../lib/api.js'
@@ -9,7 +9,10 @@ import { useToast } from '../composables/useToast.js'
 import EmptyState from '../components/ui/EmptyState.vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import GeneticaEditarModal from '../components/GeneticaEditarModal.vue'
-const { org: orgTxt } = useUsoPersonal()
+// En uso personal no hay catálogo INASE (ve sólo sus genéticas) ni informes que declarar:
+// todo lo regulatorio de esta pantalla —KPI, orden, filtro y la columna «Sin declarar»— es ruido
+// y se esconde. El backend ya filtra; acá sólo se deja de nombrar.
+const { org: orgTxt, esPersonal } = useUsoPersonal()
 
 const router = useRouter()
 const route  = useRoute()
@@ -30,6 +33,8 @@ const filterTipo        = ref('')
 const filterOrigen      = ref('')  // '' | 'inase' | 'propias'
 const filterDisponible  = ref(true) // true = solo disponibles (default), false = todas
 const sortBy            = ref('inase_first')
+// Sin INASE, «INASE primero» es ordenar por nombre con otro nombre: se elige ése directo.
+watch(esPersonal, (p) => { if (p && sortBy.value === 'inase_first') sortBy.value = 'nombre_asc' }, { immediate: true })
 
 const TIPO_META = {
   indica:    { label: 'Índica',    color: '#6f42c1', bg: 'rgba(111,66,193,.12)' },
@@ -77,7 +82,7 @@ const filtered = computed(() => {
 })
 
 const hasFilters = computed(() => search.value.trim() || filterTipo.value || filterOrigen.value || !filterDisponible.value)
-function clearFilters() { search.value = ''; filterTipo.value = ''; filterOrigen.value = ''; filterDisponible.value = true; sortBy.value = 'inase_first' }
+function clearFilters() { search.value = ''; filterTipo.value = ''; filterOrigen.value = ''; filterDisponible.value = true; sortBy.value = esPersonal.value ? 'nombre_asc' : 'inase_first' }
 
 // El modal de crear/editar vive en el componente GeneticaEditarModal (compartido con
 // el detalle). Estos wrappers delegan al componente vía su ref.
@@ -160,7 +165,7 @@ onMounted(async () => {
     <!-- Stats row -->
     <div class="gv__stats">
       <span>🌿 <strong>{{ kpis.total }}</strong> genéticas</span>
-      <span>🏛️ <strong>{{ kpis.inase }}</strong> INASE</span>
+      <span v-if="!esPersonal">🏛️ <strong>{{ kpis.inase }}</strong> INASE</span>
       <span>💜 <strong>{{ kpis.indica }}</strong> Índica</span>
       <span>💚 <strong>{{ kpis.sativa }}</strong> Sativa</span>
       <span>🧡 <strong>{{ kpis.hibrida }}</strong> Híbrida</span>
@@ -175,7 +180,7 @@ onMounted(async () => {
           <input v-model="search" class="gv__search" placeholder="Buscar por nombre, criador, origen…" />
         </div>
         <select v-model="sortBy" class="gv__sort">
-          <option value="inase_first">INASE primero</option>
+          <option v-if="!esPersonal" value="inase_first">INASE primero</option>
           <option value="nombre_asc">Nombre A-Z</option>
           <option value="thc_desc">Mayor THC</option>
           <option value="plantas_desc">Más plantas</option>
@@ -192,8 +197,8 @@ onMounted(async () => {
             <button class="gv__pill" :class="{ 'gv__pill--active': !filterDisponible }" @click="filterDisponible = false">Todas</button>
           </div>
         </div>
-        <div class="gv__filter-sep"></div>
-        <div class="gv__filter-group">
+        <div v-if="!esPersonal" class="gv__filter-sep"></div>
+        <div v-if="!esPersonal" class="gv__filter-group">
           <span class="gv__filter-label">Origen</span>
           <div class="gv__pills">
             <button class="gv__pill" :class="{ 'gv__pill--active': !filterOrigen }" @click="filterOrigen = ''">Todas</button>
@@ -243,7 +248,7 @@ onMounted(async () => {
         <thead>
           <tr>
             <th>Nombre</th>
-            <th title="Registrada INASE">INASE</th>
+            <th v-if="!esPersonal" title="Registrada INASE">INASE</th>
             <th>Tipo</th>
             <th>THC · CBD</th>
             <th title="Días objetivo de vegetativo">Veg. obj.</th>
@@ -265,7 +270,7 @@ onMounted(async () => {
             <td>
               <span class="gen-nombre">{{ gen.nombre }}</span>
             </td>
-            <td>
+            <td v-if="!esPersonal">
               <span v-if="gen.registrada_inase" class="gen-inase-col" title="Registrada en el INASE">🏛️</span>
               <!-- Declarada contra una variedad inscripta: en los informes regulatorios sale
                    con ESE nombre, así que conviene verlo sin abrir la ficha. -->
