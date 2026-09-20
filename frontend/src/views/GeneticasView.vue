@@ -305,8 +305,12 @@ onMounted(async () => {
             <td>
               <span :class="gen.plantas_count > 0 ? 'gen-plantas' : 'gen-empty'">{{ gen.plantas_count || 0 }}</span>
             </td>
+            <!-- Las del catálogo INASE (globales) son compartidas por todas las organizaciones:
+                 se miran, no se tocan. El toggle sobre una global se la prendía a todos. -->
             <td v-if="canEdit" @click.stop>
+              <span v-if="gen.global" class="gen-empty" title="Catálogo INASE, compartido: cargá la tuya y declarala como ésta">catálogo</span>
               <button
+                v-else
                 class="gen-toggle"
                 :class="gen.disponible ? 'gen-toggle--on' : 'gen-toggle--off'"
                 @click="toggleDisponible(gen)"
@@ -314,7 +318,7 @@ onMounted(async () => {
               >{{ gen.disponible ? 'Sí' : 'No' }}</button>
             </td>
             <td v-if="canEdit" @click.stop>
-              <div class="gen-actions">
+              <div v-if="!gen.global" class="gen-actions">
                 <button class="gen-edit-btn" @click="openEdit(gen)" title="Editar">
                   <i class="bi bi-pencil"></i>
                 </button>

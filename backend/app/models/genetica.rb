@@ -43,6 +43,8 @@ class Genetica < ApplicationRecord
   validates :categoria_inase, inclusion: { in: CATEGORIAS_INASE }, allow_nil: true
   validates :registrada_inase, inclusion: { in: [true], message: 'debe ser true para genéticas globales' }, if: :global?
 
+  def global? = global == true
+
   scope :activas,      -> { where(activa: true) }
   scope :disponibles,  -> { where(disponible: true) }
   scope :visibles_paciente, -> { activas.where(visible_paciente: true) }

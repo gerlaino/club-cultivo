@@ -3,6 +3,7 @@ class GeneticasController < ApplicationController
   before_action -> { require_feature!(:cultivo) }
   before_action :require_admin_for_write!, only: [:create, :update, :destroy, :destroy_foto]
   before_action :set_genetica, only: [:show, :update, :destroy, :destroy_foto, :resenas]
+  before_action :solo_propias_para_escribir!, only: [:update, :destroy, :destroy_foto]
 
   # GET /geneticas
   # Params opcionales:
@@ -11,7 +12,10 @@ class GeneticasController < ApplicationController
   def index
     club = current_user.club
 
-    scope = if params[:solo_club].present?
+    # El catálogo INASE (filas globales, compartidas) se lista SÓLO para una organización, como
+    # referencia para declarar. Al cultivador de casa no le sirve y lo confunde: «me trajo una
+    # genética de otro usuario» (Germán, 20-sep-2026).
+    scope = if params[:solo_club].present? || club&.personal?
       Genetica.where(club_id: club.id)
     else
       base = Genetica.where(global: true, registrada_inase: true)
@@ -91,6 +95,15 @@ class GeneticasController < ApplicationController
   end
 
   private
+
+  # Una genética global es del catálogo INASE, compartido por TODAS las organizaciones: no se
+  # edita, no se apaga y no se le tocan las fotos desde una organización. Hasta acá `update`
+  # aceptaba `disponible` sobre una global, así que cualquier admin la marcaba disponible para
+  # todos los demás — y un uso personal nuevo aparecía con «una genética de otro usuario».
+  def solo_propias_para_escribir!
+    return unless @genetica&.global?
+    render json: { error: 'Esta genética es del catálogo INASE, compartido por todas las organizaciones: no se edita desde acá. Cargá la tuya y declarala como ésta.' }, status: :forbidden
+  end
 
   def set_genetica
     club = current_user.club

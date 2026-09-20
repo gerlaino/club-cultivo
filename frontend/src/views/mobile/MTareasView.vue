@@ -170,6 +170,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { toISO } from '../../utils/dates.js'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { useSemanaTareas } from '../../composables/useSemanaTareas.js'
 import { useToast } from '../../composables/useToast.js'
@@ -181,9 +182,9 @@ const toast = useToast()
 
 // ── Calendario ────────────────────────────────────────────────────
 
-function toISO(d) {
-  return toISO(d)
-}
+// `toISO` de `utils/dates.js` (hora local, nunca `toISOString`). Estaba escrito como una
+// función que se llamaba a sí misma: la pantalla de tareas del teléfono explotaba al abrir
+// («Maximum call stack size exceeded»), igual que la ficha del lote el 10-sep.
 
 function addDays(d, n) {
   const r = new Date(d)
