@@ -1122,7 +1122,9 @@ onMounted(async () => {
 /* Hero header */
 .scd__hero {
   background: #fff; border: 1px solid var(--c-slate-200); border-radius: 16px;
-  overflow: hidden;
+  /* Sin `overflow: hidden`: recortaba el menú «···» (que se abre hacia abajo, fuera del
+     hero) y quedaba tapado por las solapas. El borde redondeado no lo necesita. */
+  position: relative; z-index: 2;
 }
 .scd__back {
   display: inline-flex; align-items: center; gap: .35rem;
