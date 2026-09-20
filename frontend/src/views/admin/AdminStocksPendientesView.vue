@@ -785,6 +785,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import { useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import Paginator from '../../components/ui/Paginator.vue'
@@ -895,6 +896,21 @@ function onStockActualizado(data) {
   }, 1200)
 }
 useStockChannel(onStockActualizado)
+// El canal viejo sólo avisa dispensas. Todo lo demás que mueve stock (ajustes, mermas, consumo,
+// producción, pesajes, asignaciones) llega por «algo cambió»: pendientes e inventario se
+// re-piden sin esqueleto.
+async function cargarPendientes() {
+  try {
+    const { data } = await listStocksPendientes()
+    const nuevos = data || []
+    nuevos.forEach(s => { asignaciones.value[s.id] ??= ''; cantidades.value[s.id] ??= '' })
+    pendientes.value = nuevos
+  } catch {}
+}
+useRecargaEnCambios(['stocks', 'pesajes'], async () => {
+  liveConectado.value = true
+  await Promise.all([cargarPendientes(), cargarInventario({ silencioso: true })])
+})
 
 // ── Umbral configurable ────────────────────────────────────────────────────────
 async function guardarUmbral() {

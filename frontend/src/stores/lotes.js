@@ -32,8 +32,10 @@ export const useLotesStore = defineStore("lotes", {
   },
 
   actions: {
-    async fetch() {
-      this.loading = true; this.error = null;
+    // `silencioso`: re-pedir sin prender `loading`. Lo usa el refresco por cable: la pantalla
+    // ya tiene datos, y un spinner encima de una lista que sólo cambia un número es un parpadeo.
+    async fetch({ silencioso = false } = {}) {
+      if (!silencioso) { this.loading = true; this.error = null; }
       try {
         const { data } = await listLotes();
         this.items = data || [];
@@ -45,8 +47,8 @@ export const useLotesStore = defineStore("lotes", {
       }
     },
 
-    async fetchBySala(salaId) {
-      this.loading = true; this.error = null;
+    async fetchBySala(salaId, { silencioso = false } = {}) {
+      if (!silencioso) { this.loading = true; this.error = null; }
       try {
         const { data } = await listLotes(salaId);
         this.itemsBySala.set(String(salaId), data || []);
@@ -56,6 +58,15 @@ export const useLotesStore = defineStore("lotes", {
       } finally {
         this.loading = false;
       }
+    },
+
+    // Cuando el backend avisa que un lote cambió: se re-pide sólo lo que ya está cargado.
+    async refrescar() {
+      const tareas = [];
+      if (this.items.length) tareas.push(this.fetch({ silencioso: true }));
+      for (const salaId of this.itemsBySala.keys()) tareas.push(this.fetchBySala(salaId, { silencioso: true }));
+      if (this.current?.id) tareas.push(this.fetchOne(this.current.id, { silencioso: true }).catch(() => {}));
+      await Promise.all(tareas);
     },
 
     async createInSala(salaId, payload) {
@@ -74,8 +85,8 @@ export const useLotesStore = defineStore("lotes", {
       }
     },
 
-    async fetchOne(id) {
-      this.loading = true; this.error = null; this.current = null;
+    async fetchOne(id, { silencioso = false } = {}) {
+      if (!silencioso) { this.loading = true; this.error = null; this.current = null; }
       try {
         const { data } = await getLote(id);
         this.current = data;

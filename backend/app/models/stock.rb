@@ -1,4 +1,6 @@
 class Stock < ApplicationRecord
+  include Transmite
+  transmite_como 'stocks'
   include Restorable
   include Auditable
   # La cantidad ya se rastrea en stock_movimientos (con usuario y motivo): auditarla acá sería

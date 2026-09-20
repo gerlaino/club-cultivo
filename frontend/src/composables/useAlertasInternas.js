@@ -1,6 +1,5 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { createConsumer } from '@rails/actioncable'
-import { cableUrl } from '../lib/cable.js'
+import { consumidorCable } from '../lib/cableConsumer.js'
 import { getAlertasInternas, marcarAlertaInterna, marcarTodasAlertasLeidas } from '../lib/api.js'
 import { useAuthStore } from '../stores/auth.js'
 
@@ -38,8 +37,7 @@ function onVisibility() {
 function conectarWS() {
   if (consumer) return
   try {
-    consumer = createConsumer(cableUrl())
-    consumer.subscriptions.create('AlertasInternasChannel', {
+    consumer = consumidorCable().subscriptions.create('AlertasInternasChannel', {
       received(data) {
         const current = alertas.value ?? []
         if (!current.find(a => a.id === data.id)) {
@@ -55,7 +53,7 @@ function conectarWS() {
 
 function desconectarWS() {
   if (!consumer) return
-  consumer.disconnect()
+  try { consumer.unsubscribe() } catch {}
   consumer = null
 }
 

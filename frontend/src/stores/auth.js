@@ -1,3 +1,4 @@
+import { engancharCambios, soltarCambios } from '../lib/cambiosStores.js';
 import { defineStore } from "pinia";
 import { signIn, signOut, me, clearAuthToken } from "../lib/api";
 import { useClubStore } from "../stores/club.js";
@@ -114,7 +115,12 @@ export const useAuthStore = defineStore("auth", {
       this.error = null;
       try {
         const { data } = await me();
-        if (epoch === authEpoch) this.user = data;
+        if (epoch === authEpoch) {
+          this.user = data;
+          // Con usuario y organización: los stores se refrescan solos con lo que avisa el
+          // backend (`ClubChannel`). El super admin sin contexto no tiene organización que escuchar.
+          if (data?.club_id) engancharCambios();
+        }
       } catch {
         // Una respuesta vieja no borra una sesión nueva.
         if (epoch === authEpoch) this.user = null;
@@ -225,6 +231,7 @@ export const useAuthStore = defineStore("auth", {
         this.user = null;
         this.bootstrapped = true;
         clearAuthToken();
+        soltarCambios();   // nada de lo anotado vale para el próximo usuario; se cierra el WebSocket
         const { planData } = usePlan();
         planData.value = null;
         // Borra TODOS los cachés del service worker (incl. el SW viejo aún instalado

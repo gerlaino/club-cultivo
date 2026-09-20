@@ -365,6 +365,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import { useRouter }        from 'vue-router'
 import { useAuthStore }     from '../../stores/auth'
 import { useClubStore }     from '../../stores/club'
@@ -460,8 +461,8 @@ function addDays(iso, n) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
 }
 
-async function cargarSemana() {
-  loadingSem.value = true
+async function cargarSemana({ silencioso = false } = {}) {
+  if (!silencioso) loadingSem.value = true
   try {
     const { data } = await getTareasSemana(desdeRef.value)
     semana.value = data
@@ -469,6 +470,9 @@ async function cargarSemana() {
     loadingSem.value = false
   }
 }
+// Salas y lotes se refrescan solos por sus stores; la semana de trabajo y las alertas van acá.
+useRecargaEnCambios('tareas', () => cargarSemana({ silencioso: true }))
+useRecargaEnCambios(['lotes', 'ambiente'], () => ambienteStore.cargarAlertas())
 function semAnterior()  { desdeRef.value = addDays(desdeRef.value, -7); cargarSemana() }
 function semSiguiente() { desdeRef.value = addDays(desdeRef.value,  7); cargarSemana() }
 function irHoy()        { desdeRef.value = isoLunes(); cargarSemana() }

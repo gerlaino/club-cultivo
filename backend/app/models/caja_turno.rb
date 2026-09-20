@@ -12,6 +12,8 @@
 #
 # Una sola caja activa por punto (índice único parcial + validación).
 class CajaTurno < ApplicationRecord
+  include Transmite
+  transmite_como 'cajas'
   acts_as_tenant(:club)
 
   # La caja se audita porque es plata: quién abrió con cuánto, quién confirmó el fondo, quién

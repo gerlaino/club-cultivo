@@ -104,6 +104,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
 import { listLotes } from '../lib/api.js'
 import { ChevronRight, ChevronLeft, Leaf } from 'lucide-vue-next'
 
@@ -161,14 +162,16 @@ function diasCosechado(lote) {
   return `${dias} día${dias === 1 ? '' : 's'}`
 }
 
-onMounted(async () => {
+async function cargar({ silencioso = false } = {}) {
   try {
     const { data } = await listLotes({ cosechados: true })
     lotes.value = data || []
   } finally {
-    loading.value = false
+    if (!silencioso) loading.value = false
   }
-})
+}
+onMounted(cargar)
+useRecargaEnCambios(['lotes', 'pesajes', 'stocks'], () => cargar({ silencioso: true }))
 </script>
 
 <style scoped>

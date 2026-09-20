@@ -1,4 +1,6 @@
 class Dispensacion < ApplicationRecord
+  include Transmite
+  transmite_como 'dispensaciones'
   include Restorable
   include Auditable
   self.table_name = 'dispensaciones'

@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
 import { RouterLink, useRouter } from 'vue-router'
 import { getDispensacion } from '../lib/api.js'
 import { formaLabel, formatARS, formatFecha } from '../lib/formatters.js'
@@ -24,6 +25,8 @@ async function cargar() {
   }
 }
 onMounted(cargar)
+// Se actualiza sola cuando esta dispensa cambia (anulación, cobro, envío) desde otra pantalla.
+useRecargaEnCambios('dispensaciones', cargar, { filtro: ev => !ev.id || Number(ev.id) === Number(props.id) })
 
 const items   = computed(() => disp.value?.items?.length ? disp.value.items : [])
 const resenas = computed(() => disp.value?.resenas || [])

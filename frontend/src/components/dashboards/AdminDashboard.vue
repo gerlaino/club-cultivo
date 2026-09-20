@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import { useRouter } from 'vue-router'
 import Chart from 'chart.js/auto'
 import {
@@ -445,36 +446,45 @@ onMounted(async () => {
 
   // Etapa 2: el dashboard propiamente dicho.
   try {
-    const [contableRes, manicuraRes, dispRes, stocksRes, floracionRes, lotesRes, dispHoyRes, ejecutivoRes] =
-      await Promise.allSettled([
-        getContableDashboard(),
-        listPesajesManicuraAdmin(),
-        getAnalyticsDispensador(),
-        listStocksPendientes(),
-        listLotes({ estado: 'floracion', limit: 20 }),
-        listLotes({ limit: 8 }),
-        listDispensacionesFecha({ fecha: todayISO }),
-        getAnalyticsEjecutivo(),
-      ])
-    await Promise.allSettled([statsStore.fetchAll(), tareasStore.fetchDashboard()])
-    getAmbienteSalas().then(r => { ambiente.value = r.data || { salas: [], con_sensores: false } }).catch(() => {})
-
-    if (contableRes.status   === 'fulfilled') contable.value               = contableRes.value.data
-    if (manicuraRes.status   === 'fulfilled') pesajesPorConfirmar.value     = manicuraRes.value.data  || []
-    if (dispRes.status       === 'fulfilled') analyticsDisp.value          = dispRes.value.data
-    if (stocksRes.status     === 'fulfilled') stocksPendientes.value       = stocksRes.value.data   || []
-    if (floracionRes.status  === 'fulfilled') lotesEnFloracion.value       = floracionRes.value.data || []
-    if (lotesRes.status      === 'fulfilled') lotesActivos.value           = lotesRes.value.data    || []
-    if (dispHoyRes.status    === 'fulfilled') dispensacionesHoy.value      = dispHoyRes.value.data  || []
-    if (ejecutivoRes.status  === 'fulfilled') ejecutivo.value              = ejecutivoRes.value.data
-    else erroresCarga.value.push('resumen anual')
-
-    if (contable.value?.mes_actual?.por_semana?.length)
-      initChart(contable.value.mes_actual.por_semana)
+    await cargarTablero()
   } finally {
     loading.value = false
   }
 })
+
+// Lo que el tablero muestra, en una sola pasada. Se llama al entrar y cada vez que el backend
+// avisa que algo operativo cambió («algo cambió»): el tablero es la pantalla que más tiempo
+// queda abierta, y era la que más mentía.
+async function cargarTablero() {
+  const [contableRes, manicuraRes, dispRes, stocksRes, floracionRes, lotesRes, dispHoyRes, ejecutivoRes] =
+    await Promise.allSettled([
+      getContableDashboard(),
+      listPesajesManicuraAdmin(),
+      getAnalyticsDispensador(),
+      listStocksPendientes(),
+      listLotes({ estado: 'floracion', limit: 20 }),
+      listLotes({ limit: 8 }),
+      listDispensacionesFecha({ fecha: todayISO }),
+      getAnalyticsEjecutivo(),
+    ])
+  await Promise.allSettled([statsStore.fetchAll({ silencioso: true }), tareasStore.fetchDashboard({ silencioso: true })])
+  getAmbienteSalas().then(r => { ambiente.value = r.data || { salas: [], con_sensores: false } }).catch(() => {})
+
+  if (contableRes.status   === 'fulfilled') contable.value               = contableRes.value.data
+  if (manicuraRes.status   === 'fulfilled') pesajesPorConfirmar.value     = manicuraRes.value.data  || []
+  if (dispRes.status       === 'fulfilled') analyticsDisp.value          = dispRes.value.data
+  if (stocksRes.status     === 'fulfilled') stocksPendientes.value       = stocksRes.value.data   || []
+  if (floracionRes.status  === 'fulfilled') lotesEnFloracion.value       = floracionRes.value.data || []
+  if (lotesRes.status      === 'fulfilled') lotesActivos.value           = lotesRes.value.data    || []
+  if (dispHoyRes.status    === 'fulfilled') dispensacionesHoy.value      = dispHoyRes.value.data  || []
+  if (ejecutivoRes.status  === 'fulfilled') ejecutivo.value              = ejecutivoRes.value.data
+  else if (!erroresCarga.value.includes('resumen anual')) erroresCarga.value.push('resumen anual')
+
+  if (contable.value?.mes_actual?.por_semana?.length)
+    initChart(contable.value.mes_actual.por_semana)
+}
+useRecargaEnCambios(['stocks', 'lotes', 'plantas', 'pesajes', 'dispensaciones', 'mostrador', 'cajas', 'contabilidad', 'tareas'],
+                    () => { if (setupListo.value && sedes.value.length) return cargarTablero() }, { espera: 1000 })
 
 onUnmounted(() => { if (chartInstance) chartInstance.destroy() })
 

@@ -1,4 +1,6 @@
 class Lote < ApplicationRecord
+  include Transmite
+  transmite_como 'lotes'
   include RestorableInterface
   include Auditable
   no_auditar :plants_count # contador de cache: cambia solo al agregar/quitar plantas (ruido)

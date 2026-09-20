@@ -19,6 +19,7 @@ import { getMostrador, cargarMostrador, abrirMostrador, cerrarMostrador, contarM
 import { useAuthStore } from '../stores/auth.js'
 import { useSedeStore } from '../stores/sede.js'
 import { useStockChannel } from './useStockChannel.js'
+import { useRecargaEnCambios } from './useRecargaEnCambios.js'
 import { useToast } from './useToast.js'
 
 // La merma y las rendiciones son información de GESTIÓN, y la mesa la gobierna administración.
@@ -364,6 +365,11 @@ export function useMostrador () {
 
     clearTimeout(recargaPendiente)
     recargaPendiente = setTimeout(cargar, 300)
+  })
+  // Y por «algo cambió»: mesa, turno, stock o dispensa de esta sede. Es lo que hace que dos
+  // personas mirando el mismo mostrador vean lo mismo sin recargar.
+  useRecargaEnCambios(['mostrador', 'stocks', 'dispensaciones'], () => cargar(), {
+    filtro: ev => !ev.sede_id || !sedeId.value || ev.sede_id === sedeId.value,
   })
 
   watch(sedeId, () => { cargado.value = false; cantidades.value = {}; cargar() }, { immediate: true })

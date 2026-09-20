@@ -9,6 +9,8 @@
 # stock sigue siendo una sola con su ST-xx y su QR: lo trazable sale del inventario por
 # dispensación, nunca por cambiar de estante.
 class MostradorItem < ApplicationRecord
+  include Transmite
+  transmite_como 'mostrador'
   acts_as_tenant(:club)
 
   belongs_to :club

@@ -1,4 +1,6 @@
 class PesajeManicura < ApplicationRecord
+  include Transmite
+  transmite_como 'pesajes'
   include Restorable
   self.table_name = 'pesajes_manicura'
 

@@ -9,6 +9,7 @@
 // Vive en su propia solapa y NO en el inicio: el inicio es a dónde va ahora. Acá entra cuando la
 // pregunta es la plata, que es dos o tres veces por día.
 import { computed, onMounted } from 'vue'
+import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import { Wallet, Package } from 'lucide-vue-next'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import RendicionCajaCard from '../../components/RendicionCajaCard.vue'
@@ -27,6 +28,7 @@ const hora = (iso) => (iso ? new Date(iso).toLocaleTimeString('es-AR', { hour: '
 const cargar = () => store.cargar()
 
 onMounted(cargar)
+useRecargaEnCambios(['dispensaciones', 'cajas'], cargar)
 </script>
 
 <template>

@@ -1,4 +1,6 @@
 class Tarea < ApplicationRecord
+  include Transmite
+  transmite_como 'tareas'
   include Restorable
   # ── Asociaciones ──────────────────────────────────────────────
   belongs_to :club

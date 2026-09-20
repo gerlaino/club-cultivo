@@ -10,6 +10,8 @@
 # Cerrar caja es el mismo gesto al revés, y sirve tanto para el arqueo del mediodía como para el
 # cambio de turno: cierra uno, abre el otro con lo que dice que hay.
 class TurnoMostrador < ApplicationRecord
+  include Transmite
+  transmite_como 'mostrador'
   acts_as_tenant(:club)
 
   # Se audita por el mismo motivo que la caja de plata: acá se decide quién abrió, quién recibió,

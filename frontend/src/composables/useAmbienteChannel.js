@@ -1,15 +1,12 @@
 import { onMounted, onUnmounted } from 'vue'
-import { createConsumer } from '@rails/actioncable'
-import { cableUrl } from '../lib/cable.js'
+import { consumidorCable } from '../lib/cableConsumer.js'
 
 export function useAmbienteChannel(salaId, onLectura) {
-  let consumer     = null
   let subscription = null
 
   onMounted(() => {
     try {
-      consumer     = createConsumer(cableUrl())
-      subscription = consumer.subscriptions.create(
+      subscription = consumidorCable().subscriptions.create(
         { channel: 'AmbienteChannel', sala_id: salaId },
         {
           received(data) {
@@ -24,7 +21,5 @@ export function useAmbienteChannel(salaId, onLectura) {
 
   onUnmounted(() => {
     subscription?.unsubscribe()
-    consumer?.disconnect()
-    consumer = null
   })
 }

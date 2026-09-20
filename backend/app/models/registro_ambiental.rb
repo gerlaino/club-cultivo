@@ -1,4 +1,6 @@
 class RegistroAmbiental < ApplicationRecord
+  include Transmite
+  transmite_como 'ambiente'
   self.table_name = 'registros_ambientales'
 
   belongs_to :lote

@@ -257,6 +257,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { Scale, Scissors, Leaf, Calendar, Package, CheckCircle, Clock, X, MessageCircle, List, Trash2, RotateCcw, Plus } from 'lucide-vue-next'
 import { listPesajesManicuraAdmin, confirmarPesajeManicura, deletePesajeManicura, reabrirPesajeManicura, listStocks, listLotes } from '../../lib/api.js'
@@ -431,6 +432,7 @@ function fmtDate(d) {
 }
 
 onMounted(cargar)
+useRecargaEnCambios(['pesajes', 'stocks'], cargar)
 </script>
 
 <style scoped>

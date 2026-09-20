@@ -10,6 +10,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useClubStore } from '../../stores/club'
 import { getEnviosDelDia } from '../../lib/api.js'
 import { useStockChannel } from '../../composables/useStockChannel.js'
+import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 
 const props = defineProps({
   compacto: { type: Boolean, default: false },
@@ -35,6 +36,7 @@ async function cargar() {
 
 onMounted(cargar)
 useStockChannel(null, (ev) => { if (ev?.tipo === 'envio_actualizado') cargar() })
+useRecargaEnCambios('dispensaciones', () => cargar())
 
 const ESTADO = {
   pendiente: { label: 'Pendiente',  clase: 'pend' },

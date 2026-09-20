@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { Package, Bike, CheckCircle2, XCircle, MapPin, Phone, User, FileText, ChevronRight, ChevronDown, Send, Route, Navigation, PenLine, Trash2, Lock, Check } from 'lucide-vue-next'
 import { getMisPaquetes, iniciarViaje, ordenarRuta } from '../../lib/api.js'
@@ -238,8 +239,10 @@ function abrirEnMaps() {
   window.open(url, '_blank', 'noopener')
 }
 
-async function load() {
-  loading.value = true
+useRecargaEnCambios('dispensaciones', () => load({ silencioso: true }))
+
+async function load({ silencioso = false } = {}) {
+  if (!silencioso) loading.value = true
   try {
     const { data } = await getMisPaquetes()
     paquetes.value = data.dispensaciones || []

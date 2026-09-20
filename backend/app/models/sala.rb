@@ -1,5 +1,7 @@
 # backend/app/models/sala.rb
 class Sala < ApplicationRecord
+  include Transmite
+  transmite_como 'salas'
   include RestorableInterface
   belongs_to :deleted_by, class_name: "User", optional: true
   belongs_to :club

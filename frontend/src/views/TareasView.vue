@@ -308,6 +308,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
 import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 import { logger } from '../utils/logger.js'
 import { useAuthStore } from '../stores/auth'
@@ -398,8 +399,10 @@ function lunasActual() {
 }
 const desdeRef = ref(lunasActual())
 
-async function cargarSemana() {
-  loadingSem.value = true
+useRecargaEnCambios('tareas', () => cargarSemana({ silencioso: true }))
+
+async function cargarSemana({ silencioso = false } = {}) {
+  if (!silencioso) loadingSem.value = true
   try {
     const { data } = await getTareasSemana(desdeRef.value)
     semana.value = data

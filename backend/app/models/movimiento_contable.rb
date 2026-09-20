@@ -1,5 +1,7 @@
 # backend/app/models/movimiento_contable.rb
 class MovimientoContable < ApplicationRecord
+  include Transmite
+  transmite_como 'contabilidad'
   include Restorable
   include Auditable
 

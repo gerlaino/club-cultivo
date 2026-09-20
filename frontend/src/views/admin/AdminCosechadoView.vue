@@ -151,6 +151,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
+import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { RefreshCw, Scissors, UserCheck, Scale, Dna, X, AlertCircle } from 'lucide-vue-next'
 import { listLotes, listUsers, asignarManicurador } from '../../lib/api.js'
@@ -256,6 +257,7 @@ async function confirmar() {
 }
 
 onMounted(cargar)
+useRecargaEnCambios(['lotes', 'pesajes', 'stocks'], cargar)
 </script>
 
 <style scoped>

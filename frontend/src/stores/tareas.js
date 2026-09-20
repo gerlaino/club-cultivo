@@ -41,12 +41,15 @@ export const useTareasStore = defineStore('tareas', () => {
 
   // ── Actions ────────────────────────────────────────────────────
 
-  async function fetchDashboard() {
-    loading.value = true
-    error.value   = null
+  // Con qué parámetros se pidió el listado por última vez, para re-pedirlo igual por cable.
+  let ultimosParams = null
+
+  async function fetchDashboard({ silencioso = false } = {}) {
+    if (!silencioso) { loading.value = true; error.value = null }
     try {
       const res        = await getTareasDashboard()
       dashboard.value  = { hoy: [], pendientes: [], vencidas: [], proximas: [], stats: {}, ...res.data }
+      dashboardCargado = true
     } catch (e) {
       error.value = e.response?.data?.error || 'Error al cargar el dashboard'
     } finally {
@@ -54,9 +57,9 @@ export const useTareasStore = defineStore('tareas', () => {
     }
   }
 
-  async function fetchTareas(params = {}) {
-    loading.value = true
-    error.value   = null
+  async function fetchTareas(params = {}, { silencioso = false } = {}) {
+    if (!silencioso) { loading.value = true; error.value = null }
+    ultimosParams = params
     try {
       const res   = await listTareas(params)
       tareas.value = res.data
@@ -66,6 +69,15 @@ export const useTareasStore = defineStore('tareas', () => {
       loading.value = false
     }
   }
+
+  // Refresco por cable: lo que ya se pidió, sin spinner.
+  async function refrescar() {
+    const tareas = []
+    if (dashboardCargado) tareas.push(fetchDashboard({ silencioso: true }))
+    if (ultimosParams) tareas.push(fetchTareas(ultimosParams, { silencioso: true }))
+    await Promise.all(tareas)
+  }
+  let dashboardCargado = false
 
   async function create(data) {
     const res    = await createTarea(data)
@@ -168,7 +180,7 @@ export const useTareasStore = defineStore('tareas', () => {
     tareas, dashboard, semana, loading, error,
     tareasDeHoy, stats, hayVencidas, pendientes,
     hoyPendientes, hoyEnProgreso, hoyCompletadas,
-    fetchDashboard, fetchTareas,
+    fetchDashboard, fetchTareas, refrescar,
     create, update, remove, iniciar, completar, completarMasivo, cancelar,
     fetchSemana, cancelarSerie
   }

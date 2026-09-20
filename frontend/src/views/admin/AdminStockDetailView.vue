@@ -703,6 +703,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import { useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import {
@@ -798,6 +799,9 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+// Este frasco cambió desde otra pantalla (mostrador, dispensa, ajuste): se re-pide solo.
+useRecargaEnCambios('stocks', () => recargar(), { filtro: ev => !ev.id || String(ev.id) === String(route.params.id) })
 
 async function recargar() {
   const id = route.params.id

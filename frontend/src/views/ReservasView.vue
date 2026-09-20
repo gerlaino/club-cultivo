@@ -98,6 +98,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import ModalNuevaDispensacion from '../components/pacientes/ModalNuevaDispensacion.vue'
 import ModalEditarReserva from '../components/pacientes/ModalEditarReserva.vue'
@@ -226,6 +227,7 @@ async function anularSena(r) {
 }
 
 onMounted(cargar)
+useRecargaEnCambios(['reservas', 'stocks'], cargar)
 </script>
 
 <style scoped>

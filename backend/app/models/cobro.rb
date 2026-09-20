@@ -8,6 +8,8 @@
 #   cuenta_corriente         → pagado: false (queda en cuenta del socio, deuda)
 # La suma de los cobros nunca debe superar el total (aporte_socio_ars) de la dispensa.
 class Cobro < ApplicationRecord
+  include Transmite
+  transmite_como 'dispensaciones'
   include Restorable
   MEDIOS    = %w[efectivo transferencia saldo_a_favor cuenta_corriente].freeze
   CONTEXTOS = %w[creacion entrega contabilidad].freeze

@@ -14,8 +14,8 @@ export const usePlantsStore = defineStore("plants", {
       state.itemsByLote[String(loteId)] || [],
   },
   actions: {
-    async fetchByLote(loteId) {
-      this.loading = true; this.error = null;
+    async fetchByLote(loteId, { silencioso = false } = {}) {
+      if (!silencioso) { this.loading = true; this.error = null; }
       try {
         const { data } = await listPlants({ lote_id: loteId });
         this.itemsByLote[String(loteId)] = data || [];
@@ -26,6 +26,15 @@ export const usePlantsStore = defineStore("plants", {
         this.loading = false;
       }
     },
+    // Refresco por cable: sólo los lotes cuyas plantas ya se pidieron, sin spinner.
+    async refrescar(evento) {
+      const lotes = Object.keys(this.itemsByLote);
+      await Promise.all(lotes.map(l => this.fetchByLote(l, { silencioso: true })));
+      if (this.current?.id && (!evento?.id || evento.id === this.current.id)) {
+        try { this.current = (await getPlant(this.current.id)).data; } catch {}
+      }
+    },
+
     async fetchOne(id) {
       this.loading = true; this.error = null; this.current = null;
       try {

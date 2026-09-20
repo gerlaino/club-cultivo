@@ -92,6 +92,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
 import { RouterLink } from 'vue-router'
 import { listStocks } from '../lib/api.js'
 import { formaLabel, formatARS } from '../lib/formatters.js'
@@ -154,6 +155,7 @@ function onStockActualizado(data) {
 }
 
 useStockChannel(onStockActualizado)
+useRecargaEnCambios(['stocks', 'mostrador'], () => { liveConectado.value = true; return recargar() })
 
 onMounted(async () => {
   liveConectado.value = true

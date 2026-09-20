@@ -1,4 +1,6 @@
 class Plant < ApplicationRecord
+  include Transmite
+  transmite_como 'plantas'
   include RestorableInterface
   include Auditable
   belongs_to :deleted_by, class_name: "User", optional: true

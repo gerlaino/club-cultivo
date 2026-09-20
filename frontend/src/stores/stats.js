@@ -32,10 +32,9 @@ export const useStatsStore = defineStore('stats', {
   },
 
   actions: {
-    async fetchAll() {
+    async fetchAll({ silencioso = false } = {}) {
       if (this.loading) return
-      this.loading = true
-      this.error   = null
+      if (!silencioso) { this.loading = true; this.error = null }
       try {
         const { data } = await api.get('/stats')
         this.data = data
@@ -45,6 +44,9 @@ export const useStatsStore = defineStore('stats', {
         this.loading = false
       }
     },
+
+    // Refresco por cable: sólo si ya se cargó una vez.
+    async refrescar() { if (this.data) await this.fetchAll({ silencioso: true }) },
 
     // Ocupación de una sala específica
     getOcupacionSala(salaId) {

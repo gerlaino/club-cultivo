@@ -5,6 +5,8 @@
 # opcionalmente registra una seña. Recién al ENTREGARLA se crea la Dispensacion real, que
 # corre todas sus validaciones (REPROCANN/crédito/stock) y callbacks financieros.
 class Reserva < ApplicationRecord
+  include Transmite
+  transmite_como 'reservas'
   include Restorable
   include Auditable # sin campos cifrados → se audita completa (crear/editar/entregar/cancelar)
   ESTADOS          = %w[pendiente entregada cancelada vencida].freeze

@@ -152,6 +152,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
 import { useRoute } from 'vue-router'
 import { getLote, getLoteEventos, getRegistrosAmbientales, listTareas } from '../lib/api.js'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
@@ -202,7 +203,7 @@ function formatFechaHora(d) {
   return new Date(d).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-onMounted(async () => {
+async function cargar({ silencioso = false } = {}) {
   try {
     const { data } = await getLote(id)
     lote.value    = data
@@ -210,10 +211,10 @@ onMounted(async () => {
   } catch {
     error.value = 'No se pudo cargar el lote cosechado.'
   } finally {
-    loading.value = false
+    if (!silencioso) loading.value = false
   }
 
-  loadingEventos.value = true
+  if (!silencioso) loadingEventos.value = true
   try {
     const [evRes, regRes] = await Promise.all([
       getLoteEventos(id),
@@ -228,7 +229,7 @@ onMounted(async () => {
     loadingEventos.value = false
   }
 
-  loadingTareas.value = true
+  if (!silencioso) loadingTareas.value = true
   try {
     const { data } = await listTareas({ lote_id: id })
     tareas.value = (data || []).sort((a, b) => {
@@ -241,7 +242,11 @@ onMounted(async () => {
   } finally {
     loadingTareas.value = false
   }
-})
+}
+onMounted(cargar)
+// Un pesaje, una planta o el stock de este lote que cambian desde otra pantalla: se re-pide.
+useRecargaEnCambios(['lotes', 'plantas', 'pesajes', 'stocks'], () => cargar({ silencioso: true }),
+                    { filtro: ev => ev.recurso !== 'lotes' || String(ev.id) === String(id) })
 </script>
 
 <style scoped>

@@ -1,4 +1,6 @@
 class StockMovimiento < ApplicationRecord
+  include Transmite
+  transmite_como 'stocks'
   include Restorable
   belongs_to :stock
   belongs_to :dispensacion, optional: true

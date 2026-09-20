@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import { RouterLink, useRoute } from 'vue-router'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import Lightbox from '../../components/ui/Lightbox.vue'
@@ -308,8 +309,12 @@ function urgenciaReserva(r) {
 }
 const URGENCIA_LABEL = { vencida: 'Vencida', hoy: 'Hoy', proxima: 'Próxima' }
 
-async function load() {
-  loading.value = true
+// Un paquete que el repartidor entrega, un fallo, una dispensa nueva con envío: la lista se
+// actualiza sola mientras administración la mira.
+useRecargaEnCambios(['dispensaciones', 'reservas'], () => load({ silencioso: true }))
+
+async function load({ silencioso = false } = {}) {
+  if (!silencioso) loading.value = true
   try {
     const params = {}
     // 'pendiente_envio' es sintético (paraguas): se filtra client-side, no es un estado real.

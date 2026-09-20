@@ -1,5 +1,38 @@
 # Changelog
 
+## Septiembre 2026 (cm) — «Algo cambió»: las pantallas se actualizan solas
+
+- **Pedido de Germán (20-sep):** «si registro eventos debe verse reflejado en todos lados, sin
+  refrescar, así como los movimientos de stock, mostrador, etc.». Lo que había: cuatro canales
+  con payload a mano (dispensa, mostrador, IoT, alertas) y seis pantallas escuchando; todo lo
+  demás (ajustes, pesajes, lotes, tareas, reservas, cajas, registros manuales) exigía recargar.
+  Y un bug: `useStockChannel` sólo registraba el callback del PRIMER componente montado.
+- **Un canal por organización (`ClubChannel`, stream `club_<id>` desde `current_user`, nunca
+  de un parámetro) y un concern `Transmite`** en 15 modelos de dominio (Stock, StockMovimiento,
+  Lote, Plant, Tarea, Reserva, Dispensacion, Cobro, MostradorItem, TurnoMostrador, CajaTurno,
+  RegistroAmbiental, MovimientoContable, PesajeManicura, Sala): `after_commit` →
+  `{ recurso, accion, id, sede_id, por, at }`. No viaja el dato: quien escucha **re-pide** lo que
+  muestra, así siempre ve lo que el backend serializa para ella. Un cable caído no rompe el
+  guardado. Paranoia pone `deleted_at` con `update_columns`: si está fechado, es «borrado».
+- **Frontend: UN WebSocket** (`lib/cableConsumer.js`; antes tres por pestaña) y un registro de
+  handlers por recurso (`lib/cambios.js`: `alCambiar`, `alCambiarAgrupado` con debounce y sin
+  pisar una recarga en vuelo). **Los stores se refrescan solos** (`lib/cambiosStores.js`: lotes,
+  salas, plantas, tareas, stats) con `refrescar()` **silencioso** —sin prender `loading`, para
+  que una lista que sólo cambia un número no parpadee—. Se engancha al tener usuario (`fetchMe`)
+  y se suelta al cerrar sesión. Las pantallas que piden directo a la API se anotan con
+  `useRecargaEnCambios(recursos, cargar, { filtro })`: mostrador (admin y dispensador),
+  inventario y pendientes, ficha del frasco, historial y detalle de dispensa, reservas, pesajes,
+  cosechado (lista y ficha), despachos y caja del delivery, tareas (semana), tableros de admin
+  y cultivador. `useStockChannel`, `useAmbienteChannel` y alertas pasan al consumer único; el
+  canal viejo de stock sigue emitiendo, ya no es la única fuente.
+- **Verificado con dos navegadores sobre el mismo servidor**: una tarea creada por API aparece
+  sola en `/tareas`; un reconteo cambia la cantidad y el historial en la ficha del frasco; una
+  carga a la mesa se ve en el mostrador del admin y en el del dispensador a la vez. Cero errores
+  de consola. Specs: `transmite_spec` (acciones, sede, `por`, aislamiento, cable caído),
+  `club_channel_spec` (stream propio, rechazo sin organización).
+- Trampa de dev: el cable es `async` (un proceso), así que la prueba de dos pestañas vale sólo
+  contra el mismo servidor; en producción es Redis y lo que emite el worker también llega.
+
 ## Septiembre 2026 (cl) — «Registrar ambiente» ofrece la incubadora cuando hay lotes enraizando
 
 - «Registrar ambiente» desde la tarjeta del espacio moría con «Error al guardar» (Lover, 19-sep).

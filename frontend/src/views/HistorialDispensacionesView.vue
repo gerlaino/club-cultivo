@@ -1,5 +1,6 @@
 <script setup>
 import { ref, watch, computed, onMounted } from 'vue'
+import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { listDispensacionesFecha, exportDispensacionesCSV, listPacientes, getPaciente, listSedes, anularDispensacion } from '../lib/api.js'
 import { formaLabel, formatARS, formatFecha } from '../lib/formatters.js'
@@ -238,6 +239,9 @@ function buildParams() {
   if (!verTodoElClub.value)  p.alcance      = alcance.value
   return p
 }
+
+// Una dispensa nueva, anulada o cobrada desde otra pantalla (mostrador, delivery) aparece sola.
+useRecargaEnCambios(['dispensaciones', 'stocks'], () => cargar())
 
 async function cargar() {
   if (!desde.value && !hasta.value) return

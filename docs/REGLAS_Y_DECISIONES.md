@@ -311,6 +311,12 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 
 ### Lo que NO hay que romper
 
+- **TODO MODELO DE DOMINIO NUEVO LLEVA `include Transmite` + `transmite_como '<recurso>'`**
+  (20-sep-2026), y toda pantalla nueva que pida directo a la API se anota con
+  `useRecargaEnCambios`. Es lo que hace que lo que uno registra se vea en todos lados sin
+  recargar. No inventar otro canal ni otro payload: el aviso no lleva datos, la pantalla re-pide.
+  Los `refrescar()` de los stores son SILENCIOSOS (sin `loading`): un spinner encima de una
+  lista que cambia un número es un parpadeo.
 - **PUSH: LO QUE NO SE OFRECE NO SE MANDA** (20-sep-2026). `Notificaciones::Catalogo` es la única
   lista de avisos al teléfono: por rol, por módulo contratado, con default y con `personal`.
   `PushNotificationService` exige `tipo:` en todo disparador nuevo y filtra con

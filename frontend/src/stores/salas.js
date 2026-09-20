@@ -27,8 +27,8 @@ export const useSalasStore = defineStore("salas", {
   },
 
   actions: {
-    async fetch() {
-      this.loading = true; this.error = null;
+    async fetch({ silencioso = false } = {}) {
+      if (!silencioso) { this.loading = true; this.error = null; }
       try {
         const { data } = await listSalas();
         this.items = data || [];
@@ -40,8 +40,8 @@ export const useSalasStore = defineStore("salas", {
       }
     },
 
-    async fetchSala(id) {
-      this.loading = true; this.error = null; this.currentSala = null;
+    async fetchSala(id, { silencioso = false } = {}) {
+      if (!silencioso) { this.loading = true; this.error = null; this.currentSala = null; }
       try {
         const { data } = await getSala(id);
         this.currentSala = data;
@@ -53,6 +53,14 @@ export const useSalasStore = defineStore("salas", {
       } finally {
         this.loading = false;
       }
+    },
+
+    // Refresco por cable: lo que ya está cargado, sin spinner.
+    async refrescar() {
+      const tareas = [];
+      if (this.items.length) tareas.push(this.fetch({ silencioso: true }));
+      if (this.currentSala?.id) tareas.push(this.fetchSala(this.currentSala.id, { silencioso: true }).catch(() => {}));
+      await Promise.all(tareas);
     },
 
     async create(payload) {
