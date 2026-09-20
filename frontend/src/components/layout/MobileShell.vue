@@ -131,7 +131,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { useClubStore }  from '../../stores/club'
@@ -349,6 +349,11 @@ function abrirNuevaSala() {
   fabOpen.value = false
   showNuevaSala.value = true
 }
+// Lo que el shell sabe abrir, para quien viva adentro: la puesta en marcha del inicio abre el
+// modal de espacio o de lote en vez de mandar a `/salas`, que en el teléfono no existe (el
+// guard rebotaba al inicio y el paso parecía no hacer nada).
+provide('accionesMobile', { abrirNuevaSala, abrirNuevoLote })
+
 function onCreado() {
   showNuevoLote.value = false
   showNuevaSala.value = false

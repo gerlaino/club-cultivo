@@ -1,5 +1,15 @@
 # Changelog
 
+## Septiembre 2026 (cr) — PWA: la puesta en marcha abre el modal, no rebota al inicio
+
+- «Crear un espacio de cultivo» en el inicio del teléfono mandaba a `/salas`, que no vive bajo
+  `/m`: el guard de la PWA devolvía al inicio y el paso parecía no hacer nada (Germán, 20-sep).
+  Ahora `MobileShell` provee (`accionesMobile`) lo que sabe abrir y `PuestaEnMarcha` lo usa: el
+  paso «espacio» abre el modal de crear espacio, «primer lote» el de lote; «variedad» navega a
+  `/m/geneticas`, que sí existe. En escritorio sigue el enlace. La tarjeta se actualiza sola
+  al crear (por «algo cambió»). El modal, en personal, habla de espacio («Ponele nombre: la
+  carpa, el armario, el balcón», «Fase del espacio», «Ej: Carpa 1»), no de sala.
+
 ## Septiembre 2026 (cq) — Recetas de nutrientes: armar, aplicar al regar, descontar, avisar, comparar
 
 - **Punto 3 del plan contra Grow with Jane (20-sep).** Lo que había: el depósito con insumos

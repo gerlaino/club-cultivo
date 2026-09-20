@@ -3,20 +3,33 @@
 // (`Clubs::PuestaEnMarcha`) mirando los datos —es la misma que ve el super admin en la ficha—
 // y acá sólo se muestra, hasta que esté completa. Se puede plegar por viewer (localStorage):
 // el admin que ya sabe qué le falta no necesita la tarjeta abierta cada mañana.
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, inject } from 'vue'
 import { getPuestaEnMarcha } from '../lib/api.js'
+import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
 
 const datos    = ref(null)
+// Lo que el shell del teléfono sabe abrir (ver `MobileShell`); en escritorio no hay nada.
+const acciones = inject('accionesMobile', null)
+function accionDe(p) {
+  if (!acciones) return null
+  if (p.clave === 'salas') return acciones.abrirNuevaSala
+  if (p.clave === 'lotes') return acciones.abrirNuevoLote
+  return null
+}
 const plegada  = ref(false)
 const CLAVE    = 'puesta_en_marcha_plegada'
 
-onMounted(async () => {
+// Se actualiza sola cuando aparece el espacio, el lote o la variedad (sin recargar).
+useRecargaEnCambios(['salas', 'lotes', 'recetas', 'stocks'], cargar)
+
+onMounted(cargar)
+async function cargar() {
   try {
     const { data } = await getPuestaEnMarcha()
     datos.value = data
   } catch { /* sin permiso o sin red: la tarjeta simplemente no aparece */ }
   try { plegada.value = localStorage.getItem(CLAVE) === '1' } catch { /* sin storage: arranca abierta */ }
-})
+}
 
 function plegar() {
   plegada.value = !plegada.value
@@ -36,7 +49,10 @@ function plegar() {
       <li v-for="p in datos.pasos" :key="p.clave" class="pem__item" :class="{ 'pem__item--hecho': p.hecho }">
         <span class="pem__check" aria-hidden="true">{{ p.hecho ? '✓' : '' }}</span>
         <div class="pem__txt">
-          <RouterLink v-if="!p.hecho" :to="p.ruta" class="pem__label">{{ p.label }} →</RouterLink>
+          <!-- En el teléfono, «crear un espacio» y «abrir el primer lote» abren el modal: la
+               pantalla de escritorio a la que apunta `ruta` no vive bajo /m. -->
+          <button v-if="!p.hecho && accionDe(p)" type="button" class="pem__label pem__label--btn" @click="accionDe(p)()">{{ p.label }} →</button>
+          <RouterLink v-else-if="!p.hecho" :to="p.ruta" class="pem__label">{{ p.label }} →</RouterLink>
           <span v-else class="pem__label">{{ p.label }}</span>
           <span v-if="!p.hecho" class="pem__detalle">{{ p.detalle }}</span>
         </div>
@@ -62,4 +78,5 @@ function plegar() {
 a.pem__label:hover { color: var(--c-leaf-800, #1A3D2E); text-decoration: underline; }
 .pem__item--hecho .pem__label { color: var(--c-slate-400); font-weight: 600; text-decoration: line-through; }
 .pem__detalle { font-size: .74rem; color: var(--c-slate-500); }
+.pem__label--btn { background: none; border: 0; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; }
 </style>

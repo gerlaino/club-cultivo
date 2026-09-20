@@ -60,7 +60,7 @@ async function handleSubmit() {
     emit('created')
     emit('close')
   } catch (e) {
-    error.value = e?.response?.data?.errors?.join(', ') || 'Error al crear la sala'
+    error.value = e?.response?.data?.errors?.join(', ') || (esPersonal.value ? 'No se pudo crear el espacio' : 'Error al crear la sala')
   } finally {
     saving.value = false
   }
@@ -91,7 +91,7 @@ onMounted(async () => {
               <template v-if="sedeIdFija && sedeSeleccionada">
                 En <strong>{{ sedeSeleccionada.nombre }}</strong>
               </template>
-              <template v-else>Completá los datos de la sala</template>
+              <template v-else>{{ esPersonal ? 'Ponele nombre: la carpa, el armario, el balcón' : 'Completá los datos de la sala' }}</template>
             </p>
           </div>
           <button class="mcr__close" @click="$emit('close')">
@@ -111,7 +111,7 @@ onMounted(async () => {
             <input
               class="mcr__input" :class="{ 'mcr__input--err': errors.nombre }"
               v-model.trim="form.nombre"
-              placeholder="Ej: Sala A — Vegetativo"
+              :placeholder="esPersonal ? 'Ej: Carpa 1' : 'Ej: Sala A — Vegetativo'"
               autofocus
             />
             <span v-if="errors.nombre" class="mcr__err">{{ errors.nombre }}</span>
@@ -119,7 +119,7 @@ onMounted(async () => {
 
           <!-- Tipo de sala (selector visual) -->
           <div class="mcr__field mcr__field--full">
-            <label class="mcr__label">Tipo de sala</label>
+            <label class="mcr__label">{{ esPersonal ? 'Fase del espacio' : 'Tipo de sala' }}</label>
             <div class="mcr__kinds">
               <button
                 v-for="k in KINDS"
