@@ -11,6 +11,7 @@ import { exportLotesCSV } from '../lib/api.js';
 import DsSpinner from '../design-system/components/Spinner.vue'
 import NuevoLoteModal from '../components/lotes/NuevoLoteModal.vue'
 import BloqueoProgreso from '../components/ui/BloqueoProgreso.vue'
+import { textoProximoPasoCorto } from '../lib/loteHelpers.js'
 import { useSeleccion } from '../composables/useSeleccion.js'
 import { useEtiquetasQR } from '../composables/useEtiquetasQR.js'
 import { useClubStore } from '../stores/club.js'
@@ -558,6 +559,8 @@ async function exportarCSV() {
                 {{ l.dias_en_estado }}d
               </span>
               <span v-else class="lv-empty">—</span>
+              <!-- Qué viene y cuándo (lo manda el backend: `proximo_paso`). -->
+              <span v-if="textoProximoPasoCorto(l)" class="lv-prox" :class="{ 'lv-prox--ya': l.proximo_paso.faltan_dias <= 0 }">{{ textoProximoPasoCorto(l) }}</span>
             </td>
             <td data-label="Desde">
               <span v-if="l.fecha_estado_actual" class="lv-num lv-num--muted">{{ fechaCorta(l.fecha_estado_actual) }}</span>
@@ -863,6 +866,8 @@ async function exportarCSV() {
 .lv-dias-dot--rojo { background: #dc2626; }
 .lv-sala { color: var(--c-slate-500); font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lv-num { font-weight: 600; color: #374151; }
+.lv-prox { display: block; font-size: .7rem; font-weight: 600; color: var(--c-leaf-700, #2d4a3e); white-space: nowrap; }
+.lv-prox--ya { color: var(--c-amber-700, #b45309); }
 .lv-empty { color: var(--c-slate-300); }
 
 .lv-actions { display: flex; align-items: center; gap: .25rem; opacity: 0; transition: opacity .15s; }

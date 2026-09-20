@@ -6,7 +6,7 @@
     <div class="rc__head">
       <div>
         <div class="rc__title">Cómo salió</div>
-        <div class="rc__sub">{{ r.estado === 'finalizado' ? 'Ciclo cerrado' : 'Curando · el ciclo terminó' }}<template v-if="r.anterior"> · vs. {{ r.anterior.lotes === 1 ? 'tu ciclo anterior' : `tus ${r.anterior.lotes} ciclos anteriores` }} con esta genética</template></div>
+        <div class="rc__sub">{{ r.estado === 'finalizado' ? 'Ciclo cerrado' : 'Curando · el ciclo terminó' }}<template v-if="r.anterior"> · vs. {{ r.anterior.lotes === 1 ? 'tu ciclo anterior' : `tus ${r.anterior.lotes} ciclos anteriores` }}{{ r.anterior.misma_genetica ? ' con esta genética' : ' (otras genéticas)' }}</template></div>
       </div>
       <!-- Bootstrap Icons, no emoji: el emoji depende de la fuente del teléfono. -->
       <span class="rc__ico"><i class="bi bi-flag-fill"></i></span>

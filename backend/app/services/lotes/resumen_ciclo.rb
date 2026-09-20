@@ -76,12 +76,14 @@ module Lotes
     end
 
     # Los ciclos cerrados anteriores de la misma genética, promediados como lo hace la analítica
-    # (suma ÷ suma, nunca promedio de promedios).
+    # (suma ÷ suma, nunca promedio de promedios). Sin ninguno de la misma genética se compara
+    # contra TODOS los cerrados (`misma_genetica: false`, y la tarjeta lo dice): el primer ciclo
+    # de una variedad nueva tiene igual contra qué mirarse.
     def anterior
-      return nil if @lote.genetica_id.blank?
-
-      otros = @club.lotes.where(genetica_id: @lote.genetica_id, estado: CERRADOS)
-                   .where('rendimiento_real_g > 0').where.not(id: @lote.id)
+      cerrados = @club.lotes.where(estado: CERRADOS).where('rendimiento_real_g > 0').where.not(id: @lote.id)
+      otros    = @lote.genetica_id.present? ? cerrados.where(genetica_id: @lote.genetica_id) : cerrados.none
+      misma    = otros.any?
+      otros    = cerrados unless misma
       return nil if otros.none?
 
       u  = Analitica::Universo.new(club: @club, lotes: otros)
@@ -91,6 +93,7 @@ module Lotes
       costeados = @con_costo ? u.lotes.select { |l| l.costo_lote&.costo_total.to_f.positive? && l.rendimiento_real_g.to_f.positive? } : []
       {
         lotes:        u.lotes.size,
+        misma_genetica: misma,
         g_por_planta: cosech.positive? ? (gramos / cosech).round(1) : nil,
         dias_total:   totales.any? ? (totales.sum / totales.size).round(1) : nil,
         costo_por_gramo: costeados.any? ? (costeados.sum { |l| l.costo_lote.costo_total.to_f } / costeados.sum { |l| l.rendimiento_real_g.to_f }).round(2) : nil,

@@ -199,6 +199,17 @@ export function phaseBannerMsg(estado) {
 // backend (`Lote#proximo_paso`: desde que entró a la fase más el objetivo de la genética);
 // acá sólo se le pone palabras. null si el lote no tiene con qué contar.
 const PROXIMO_PASO_LABEL = { floracion: 'floración', cosecha: 'la cosecha', curado: 'el curado' }
+// La misma frase, corta, para una celda de tabla: «Flora en 8 d», «Cosecha hoy», «Cosecha hace 3 d».
+const PROXIMO_PASO_CORTO = { floracion: 'Flora', cosecha: 'Cosecha', curado: 'Curado' }
+export function textoProximoPasoCorto(lote) {
+  const p = lote?.proximo_paso
+  if (!p?.fase) return null
+  const que = PROXIMO_PASO_CORTO[p.fase] || p.fase
+  const n   = p.faltan_dias
+  if (n > 0)   return `${que} en ${n} d`
+  if (n === 0) return `${que} hoy`
+  return `${que} hace ${-n} d`
+}
 export function textoProximoPaso(lote) {
   const p = lote?.proximo_paso
   if (!p?.fase) return null

@@ -355,7 +355,8 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   pone palabras: «Faltan 8 días para floración», «Hoy toca…», «… venció hace 3 días».
 - **EL «+» DEL TELÉFONO EN PERSONAL SE LLAMA «HOY» Y OFRECE PRIMERO LO DE TODOS LOS DÍAS**
   (20-sep-2026): Regar / Registrar ambiente / Foto / Tarea, después Crear lote / Crear espacio /
-  Escanear (**Escanear se queda**: Germán, 20-sep — manicurar por planta o por lote desde el
+  Escanear. **El cultivador de una organización tiene el mismo «Hoy»** (sin Tarea): los dos
+  riegan, y el backend ya le acota lotes y salas (**Escanear se queda**: Germán, 20-sep — manicurar por planta o por lote desde el
   QR es el detalle que hace sentir profesional al aficionado). Con un solo lote (o espacio) no
   pregunta cuál; con varios, una hoja para elegir.
   Regar y ambiente llegan por URL (`?accion=riego` al lote, `?accion=ambiental` al espacio) y

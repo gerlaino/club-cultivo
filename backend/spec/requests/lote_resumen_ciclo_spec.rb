@@ -55,7 +55,18 @@ RSpec.describe 'Lote — resumen del ciclo', type: :request do
 
     get "/lotes/#{lote.id}/resumen_ciclo", headers: auth_headers
     # 102 y no 112: como en la analítica, el enraizado sin evento de entrada no se cuenta.
-    expect(json['anterior']).to include('lotes' => 1, 'g_por_planta' => 50.0, 'dias_total' => 102.0)
+    expect(json['anterior']).to include('lotes' => 1, 'misma_genetica' => true, 'g_por_planta' => 50.0, 'dias_total' => 102.0)
+  end
+
+  # El primer ciclo de una variedad nueva también tiene contra qué mirarse: todos los cerrados.
+  it 'sin ciclos de la misma genética compara contra todos, y lo dice' do
+    ciclo_cerrado(codigo: 'L-0', gramos: 200)
+    otra = create(:genetica, club: club, nombre: 'Otra')
+    lote = ciclo_cerrado(codigo: 'L-1', gramos: 312)
+    lote.update!(genetica: otra)
+
+    get "/lotes/#{lote.id}/resumen_ciclo", headers: auth_headers
+    expect(json['anterior']).to include('lotes' => 1, 'misma_genetica' => false, 'g_por_planta' => 50.0)
   end
 
   it 'un lote todavía en cultivo no está cerrado y no tiene gramos' do

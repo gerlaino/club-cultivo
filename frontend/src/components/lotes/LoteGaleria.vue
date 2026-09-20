@@ -9,7 +9,7 @@
         <span v-if="diaActual" class="lg__dia">día {{ diaActual }} del lote</span>
         <!-- Cuántas fotos le quedan al plan (lo manda el backend). Se dice cuando empieza a
              importar: a partir del 80 %, y en rojo al llegar, que es cuando la cámara se apaga. -->
-        <span v-if="cupoTexto" class="lg__cupo" :class="{ 'lg__cupo--lleno': cupoLleno }" :title="cupoLleno ? 'Llegaste al tope de fotos de tu plan: borrá alguna o escribinos para ampliarlo' : ''">{{ cupoTexto }}</span>
+        <span v-if="cupoTexto" class="lg__cupo" :class="{ 'lg__cupo--alerta': cupoAlerta, 'lg__cupo--lleno': cupoLleno }" :title="cupoLleno ? 'Llegaste al tope de fotos de tu plan: borrá alguna o escribinos para ampliarlo' : ''">{{ cupoTexto }}</span>
       </div>
       <div class="lg__head-right">
         <button v-if="fotos.length >= 2" class="lg__btn-ghost" :class="{ 'lg__btn-ghost--on': comparando }" @click="toggleComparar">
@@ -209,12 +209,14 @@ const inputArchivo = ref(null)
 // El cupo de fotos del plan: `{ usadas, tope }`, `tope` nulo = sin límite.
 const cupo = ref(null)
 const cupoLleno = computed(() => !!cupo.value?.tope && cupo.value.usadas >= cupo.value.tope)
+// Se dice siempre (Germán, 20-sep: mejor saberlo desde la primera foto que descubrirlo al
+// llegar); cambia de color a partir del 80 % y al llegar.
+const cupoAlerta = computed(() => !!cupo.value?.tope && cupo.value.usadas >= cupo.value.tope * 0.8)
 const cupoTexto = computed(() => {
   const c = cupo.value
   if (!c?.tope) return null
   if (c.usadas >= c.tope) return `${c.tope} de ${c.tope} fotos: tope del plan`
-  if (c.usadas >= c.tope * 0.8) return `${c.usadas} de ${c.tope} fotos`
-  return null
+  return `${c.usadas} de ${c.tope} fotos del plan`
 })
 
 async function cargar() {
@@ -372,8 +374,9 @@ async function portada(f) {
 .lg__head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
 .lg__head-left { display: flex; align-items: center; gap: .5rem; }
 .lg__head-right { display: flex; align-items: center; gap: .4rem; }
-.lg__cupo { font-size: .72rem; color: var(--c-amber-700, #b45309); font-weight: 600; }
-.lg__cupo--lleno { color: var(--c-red-700, #b91c1c); }
+.lg__cupo { font-size: .72rem; color: var(--c-ink-500, #6b7280); font-weight: 500; }
+.lg__cupo--alerta { color: var(--c-amber-700, #b45309); font-weight: 600; }
+.lg__cupo--lleno  { color: var(--c-red-700, #b91c1c); font-weight: 600; }
 .lg__emoji { font-size: 1.1rem; }
 .lg__title { font-weight: 700; font-size: .95rem; color: var(--c-ink-900); }
 .lg__pill { background: var(--c-leaf-100, #E5EFE9); color: var(--c-leaf-800, #1A3D2E); border-radius: 999px; padding: .05rem .5rem; font-size: .72rem; font-weight: 700; }

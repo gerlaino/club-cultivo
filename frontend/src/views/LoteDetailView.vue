@@ -19,7 +19,7 @@ import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import { ArrowRight, ChevronRight } from 'lucide-vue-next'
 import { em, sm, pgm, growLabel, lightLabel, macetaLabel, fotoperiodoLabel, formatDate, formatDateTime,
-  capitalizarFase, phaseBannerMsg, CICLO_BASE, POST_HARVEST_ESTADOS } from '../lib/loteHelpers.js'
+  capitalizarFase, phaseBannerMsg, CICLO_BASE, POST_HARVEST_ESTADOS, textoProximoPaso } from '../lib/loteHelpers.js'
 import DesprenderLoteModal  from '../components/lotes/DesprenderLoteModal.vue'
 import LoteHistorialSection from '../components/lotes/LoteHistorialSection.vue'
 import LoteHistorialModal   from '../components/lotes/LoteHistorialModal.vue'
@@ -415,6 +415,7 @@ onUnmounted(() => {
               {{ em(lote.estado).label }}
               <span v-if="lote.dias_en_estado != null" class="ld__estado-dias">· día {{ lote.dias_en_estado }}</span>
             </span>
+            <span v-if="textoProximoPaso(lote)" class="ld__prox" :class="{ 'ld__prox--ya': lote.proximo_paso.faltan_dias <= 0 }"><i class="bi bi-arrow-right-short"></i>{{ textoProximoPaso(lote) }}</span>
           </div>
           <p class="ld__subtitle">
             <span v-if="lote.genetica">🌿 {{ lote.genetica.nombre }}</span>
@@ -996,6 +997,8 @@ onUnmounted(() => {
 .ld__title { font-size: 1.8rem; font-weight: 800; margin: 0; letter-spacing: -.04em; }
 .ld__estado-pill { font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; padding: .28em .75em; border-radius: 999px; }
 .ld__estado-dias { font-weight: 700; opacity: .75; margin-left: .15em; }
+.ld__prox { display: inline-flex; align-items: center; font-size: .8rem; font-weight: 600; color: var(--c-leaf-700, #2d4a3e); background: var(--c-leaf-100, #e8f0eb); border-radius: 999px; padding: .15rem .6rem .15rem .3rem; }
+.ld__prox--ya { color: var(--c-amber-700, #b45309); background: #fef3c7; }
 .ld__subtitle { font-size: .85rem; color: #60725d; margin: 0; display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }
 .ld__subtitle-sep { color: var(--c-slate-300); }
 .ld__strain-fallback { font-style: italic; color: var(--c-slate-400); }

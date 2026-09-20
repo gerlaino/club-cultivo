@@ -121,7 +121,7 @@
 
     <!-- FAB → hoja de acciones rápidas. En uso personal se llama «Hoy»: lo primero que ofrece
          es lo que se hace todos los días (regar, ambiente, foto), no crear cosas. -->
-    <MobileSheet v-model="fabOpen" :title="esPersonal ? 'Hoy' : 'Crear'">
+    <MobileSheet v-model="fabOpen" :title="ofreceHoy ? 'Hoy' : 'Crear'">
       <MobileActionGrid :actions="fabActions" />
     </MobileSheet>
 
@@ -174,6 +174,9 @@ const toast  = useToast()
 
 const role = computed(() => auth.user?.role || '')
 const esPersonal = computed(() => club.data?.personal === true)
+// Quién tiene «lo de todos los días» en el «+»: el cultivador de casa y el cultivador de una
+// organización. Los dos riegan; el admin de una organización no está en el pasillo.
+const ofreceHoy  = computed(() => esPersonal.value || role.value === 'cultivador')
 
 // Qué build está corriendo en ESTE dispositivo. Lo inyecta vite.config desde el commit.
 const BUILD    = __APP_BUILD__
@@ -348,15 +351,19 @@ const fabActions = computed(() => {
     { key: 'lote', label: 'Crear lote', icon: 'bi-box-seam',
       tint: 'var(--c-leaf-100)', color: 'var(--c-leaf-700)', onClick: abrirNuevoLote },
   ]
-  // Uso personal: primero lo de todos los días. Anotar un riego eran cuatro toques (Cultivo →
-  // espacio → lote → Registrar → Riego); ahora son dos, y con un solo lote no pregunta cuál.
-  if (esPersonal.value) {
+  // Primero lo de todos los días. Anotar un riego eran cuatro toques (Cultivo → espacio →
+  // lote → Registrar → Riego); ahora son dos, y con un solo lote no pregunta cuál. Para el
+  // cultivador de una organización igual (20-sep): el backend ya le devuelve sólo los lotes y
+  // salas suyas. «Tarea» sólo en personal: en una organización las crea administración.
+  if (ofreceHoy.value) {
     acciones.unshift(
       { key: 'riego',    label: 'Regar',              icon: 'bi-droplet-fill',     tint: '#dbeafe', color: '#1d4ed8', onClick: () => conLote('riego') },
       { key: 'ambiente', label: 'Registrar ambiente', icon: 'bi-thermometer-half', tint: '#fef3c7', color: '#b45309', onClick: () => conSala('ambiental') },
       { key: 'foto',     label: 'Foto',               icon: 'bi-camera-fill',      tint: '#fce7f3', color: '#be185d', onClick: () => conLote('foto') },
-      { key: 'tarea',    label: 'Tarea',              icon: 'bi-check2-square',    tint: '#ede9fe', color: '#7c3aed', onClick: abrirNuevaTarea },
     )
+    if (esPersonal.value) {
+      acciones.splice(3, 0, { key: 'tarea', label: 'Tarea', icon: 'bi-check2-square', tint: '#ede9fe', color: '#7c3aed', onClick: abrirNuevaTarea })
+    }
   }
   // Crear una SALA es decisión de infraestructura, no del que está en el pasillo.
   if (!esCultivador) {
@@ -382,7 +389,7 @@ const EN_PIE = ['enraizado', 'vegetativo', 'floracion']
 const lotesActivos = computed(() => (lotesStore.items || []).filter(l => l.estado !== 'finalizado'))
 const lotesEnPie   = computed(() => lotesActivos.value.filter(l => EN_PIE.includes(l.estado)))
 watch(fabOpen, async (abierto) => {
-  if (!abierto || !esPersonal.value) return
+  if (!abierto || !ofreceHoy.value) return
   const pedidos = []
   if (!lotesStore.items?.length) pedidos.push(lotesStore.fetch({ silencioso: true }))
   if (!salas.value.length) pedidos.push(listSalas().then(({ data }) => { salas.value = data || [] }).catch(() => {}))
@@ -394,14 +401,19 @@ const eleccion     = ref(null)   // { titulo, opciones: [{ id, label, sub, icon,
 const inputFoto    = ref(null)
 const fotoLoteId   = ref(null)
 
-function nombreLote(l) { return l.genetica?.nombre || l.strain || l.codigo }
+// En casa se conoce el lote por su genética («la Ananda»); en una organización, por el código.
+function nombreLote(l) { return esPersonal.value ? (l.genetica?.nombre || l.strain || l.codigo) : l.codigo }
+function subLote(l) {
+  const plantas = `${l.plants_count || 0} plantas`
+  return esPersonal.value ? `${l.codigo} · ${plantas}` : [l.genetica?.nombre || l.strain, l.sala?.nombre, plantas].filter(Boolean).join(' · ')
+}
 
 // Regar y foto son de UN lote: si hay uno solo en pie se va derecho; si hay varios se pregunta.
 function conLote(accion) {
   fabOpen.value = false
   const candidatos = accion === 'foto' ? lotesActivos.value : lotesEnPie.value
   if (!candidatos.length) {
-    toast.info(accion === 'foto' ? 'No hay ningún lote al que sacarle una foto.' : 'No hay ningún lote en pie para regar. Creá uno con «Crear lote».')
+    toast.info(accion === 'foto' ? 'No hay ningún lote al que sacarle una foto.' : 'No hay ningún lote en pie para regar.')
     return
   }
   const ir = (l) => {
@@ -411,7 +423,7 @@ function conLote(accion) {
   if (candidatos.length === 1) return ir(candidatos[0])
   eleccion.value = {
     titulo: accion === 'foto' ? '¿Foto de qué lote?' : '¿Qué lote regaste?',
-    opciones: candidatos.map(l => ({ id: l.id, label: nombreLote(l), sub: `${l.codigo} · ${l.plants_count || 0} plantas`, icon: 'bi-box-seam', ir: () => ir(l) })),
+    opciones: candidatos.map(l => ({ id: l.id, label: nombreLote(l), sub: subLote(l), icon: 'bi-box-seam', ir: () => ir(l) })),
   }
   eleccionOpen.value = true
 }
@@ -421,11 +433,11 @@ function conLote(accion) {
 function conSala(accion) {
   fabOpen.value = false
   const candidatas = salas.value.filter(s => s.activa !== false)
-  if (!candidatas.length) { toast.info('Primero creá un espacio de cultivo.'); return }
+  if (!candidatas.length) { toast.info(esPersonal.value ? 'Primero creá un espacio de cultivo.' : 'No tenés ninguna sala asignada.'); return }
   const ir = (s) => router.push({ path: `/m/sala-m/${s.id}`, query: { accion } })
   if (candidatas.length === 1) return ir(candidatas[0])
   eleccion.value = {
-    titulo: '¿De qué espacio?',
+    titulo: esPersonal.value ? '¿De qué espacio?' : '¿De qué sala?',
     opciones: candidatas.map(s => ({ id: s.id, label: s.nombre, sub: null, icon: 'bi-grid-3x3-gap', ir: () => ir(s) })),
   }
   eleccionOpen.value = true

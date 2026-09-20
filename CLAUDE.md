@@ -152,6 +152,9 @@ e2e `mostrador.spec.js` verde otra vez (4/4). Todo verificado: rspec en lo tocad
 - Genéticas globales (INASE) son compartidas: sólo lectura desde una organización; personal ve
   sólo las suyas. La regla del enraizado (incubadora con su clima) vale también en personal.
 
+**(cw), repaso por rol:** el cultivador de organización tiene el «Hoy» del «+» · «faltan N días»
+también en escritorio · «Cómo salió» sin plata para cultivador y con fallback a otras genéticas ·
+cupo de fotos visible siempre. `cultivador@e2e.test` existe en la org `e2e` local (dos salas).
 **Bloques (cu) y (cv), mismo día:** registro del espacio sin señal · fuera `pacientes.envio_*` ·
 «Cómo salió» (`Lotes::ResumenCiclo`, desde curado) · fotos achicadas en el teléfono + tope por
 plan (300/1.000/3.000, 8 MB) · plan de auto-registro escrito en `docs/PLAN_AUTOREGISTRO.md`.

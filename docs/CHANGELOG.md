@@ -1,5 +1,22 @@
 # Changelog
 
+## Septiembre 2026 (cw) — Repaso por rol: el cultivador también tiene su «Hoy», y «qué viene» en escritorio
+
+- **El «+» «Hoy» también para el cultivador de una organización** (Regar / Registrar ambiente /
+  Foto; Tarea no: en una organización las crea administración). El backend ya le devuelve sólo
+  sus lotes y salas; con varios, la hoja de elegir muestra el código primero (en casa, la
+  genética). Verificado con `cultivador@e2e.test` (nuevo en el seed local, dos salas).
+- **«Faltan N días para floración» en escritorio**: tabla de lotes (bajo los días en fase, como
+  «Flora en 8 d»), tarjeta del lote en la sala y hero de la ficha (`textoProximoPasoCorto`).
+- **«Cómo salió» compara contra todos los ciclos cerrados** cuando no hay ninguno de la misma
+  genética (`misma_genetica: false`, y la tarjeta dice «otras genéticas»): el primer ciclo de una
+  variedad nueva también tiene contra qué mirarse.
+- **El cupo de fotos se ve siempre** en la galería («12 de 300 fotos del plan»), gris; ámbar
+  desde el 80 %, rojo al llegar. Mejor saberlo desde la primera foto que descubrirlo al tope.
+- El registro rápido de ambiente desde el «+» ya abre directo en temperatura/humedad (sin la
+  pantalla de estado general y plagas); esos dos quedan con su valor por defecto, como cuando
+  se elige sólo «Ambiental» en el modal completo.
+
 ## Septiembre 2026 (cv) — «Cómo salió», fotos que se achican y tienen tope, plan de auto-registro
 
 - **«Cómo salió»** (`Lotes::ResumenCiclo`, `GET /lotes/:id/resumen_ciclo`, tarjeta

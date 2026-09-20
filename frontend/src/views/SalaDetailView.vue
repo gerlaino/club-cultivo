@@ -11,6 +11,7 @@ import ModalCargarLote        from '../components/salas/ModalCargarLote.vue'
 import ModalCrearLoteCosecha  from '../components/salas/ModalCrearLoteCosecha.vue'
 import NuevoLoteModal         from '../components/lotes/NuevoLoteModal.vue'
 import RegistroSalaModal      from '../components/salas/RegistroSalaModal.vue'
+import { textoProximoPasoCorto } from '../lib/loteHelpers.js'
 import RegistroEnraizadoModal from '../components/salas/RegistroEnraizadoModal.vue'
 import ActionsDropdown        from '../components/ui/ActionsDropdown.vue'
 import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, getLoteProximoCodigo, createLoteHeredado, cambiarFaseSala, moverLotes, listFotosSala, deleteFotoSala } from '../lib/api.js'
@@ -1008,7 +1009,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                         <span class="sd__lote-codigo">{{ l.codigo }}</span>
                         <span class="sd__lote-badge" :style="{ background: estadoMeta(l.estado).color+'18', color: estadoMeta(l.estado).color }">{{ estadoMeta(l.estado).label }}</span>
                       </div>
-                      <div class="sd__lote-dias" v-if="diasDesdeInicio(l.start_date) !== null">{{ diasDesdeInicio(l.start_date) }}d</div>
+                      <div class="sd__lote-dias" v-if="diasDesdeInicio(l.start_date) !== null">{{ diasDesdeInicio(l.start_date) }}d<template v-if="textoProximoPasoCorto(l)"> · {{ textoProximoPasoCorto(l) }}</template></div>
                     </div>
                     <div class="sd__lote-meta">
                       <span v-if="l.plants_count">🪴 {{ l.plants_count }} plantas</span>
