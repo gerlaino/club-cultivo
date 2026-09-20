@@ -27,25 +27,54 @@
               </select>
             </div>
 
-            <!-- Inputs de lectura -->
-            <div v-if="salaId" class="rls__grid">
-              <div class="rls__field">
-                <label class="rls__label">Temperatura (°C)</label>
-                <input class="rls__input" type="number" step="0.1" v-model="form.temperatura" placeholder="23.5" inputmode="decimal" />
+            <!-- Inputs de lectura del espacio. Van a los lotes en vegetativo/floración; lo que
+                 enraíza NO: vive en una incubadora con su propio microclima aunque esté
+                 adentro de la carpa (regla del enraizado), y tiene su bloque abajo. -->
+            <template v-if="salaId">
+              <div v-if="hayEnCultivo" class="rls__grid">
+                <div class="rls__field">
+                  <label class="rls__label">Temperatura (°C)</label>
+                  <input class="rls__input" type="number" step="0.1" v-model="form.temperatura" placeholder="23.5" inputmode="decimal" />
+                </div>
+                <div class="rls__field">
+                  <label class="rls__label">Humedad (%)</label>
+                  <input class="rls__input" type="number" step="0.1" v-model="form.humedad" placeholder="60" inputmode="decimal" />
+                </div>
+                <div class="rls__field">
+                  <label class="rls__label">CO₂ (ppm)</label>
+                  <input class="rls__input" type="number" step="1" v-model="form.co2" placeholder="1100" inputmode="numeric" />
+                </div>
+                <div class="rls__field">
+                  <label class="rls__label">Luz / PPFD (μmol)</label>
+                  <input class="rls__input" type="number" step="1" v-model="form.ppfd" placeholder="600" inputmode="numeric" />
+                </div>
               </div>
-              <div class="rls__field">
-                <label class="rls__label">Humedad (%)</label>
-                <input class="rls__input" type="number" step="0.1" v-model="form.humedad" placeholder="60" inputmode="decimal" />
+
+              <!-- Incubadora: sólo si hay lotes enraizando en este espacio. -->
+              <div v-if="enraizando" class="rls__incubadora" :class="{ 'rls__incubadora--sola': !hayEnCultivo }">
+                <div class="rls__section">
+                  <i class="bi bi-egg"></i>
+                  Incubadora · {{ enraizando }} lote{{ enraizando === 1 ? '' : 's' }} enraizando
+                </div>
+                <p class="rls__hint">Tiene su propio clima aunque esté adentro del espacio: se registra aparte.</p>
+                <div class="rls__grid">
+                  <div class="rls__field">
+                    <label class="rls__label">Temperatura (°C)</label>
+                    <input class="rls__input" type="number" step="0.1" v-model="inc.temperatura" placeholder="25" inputmode="decimal" />
+                  </div>
+                  <div class="rls__field">
+                    <label class="rls__label">Humedad (%)</label>
+                    <input class="rls__input" type="number" step="0.1" v-model="inc.humedad" placeholder="85" inputmode="decimal" />
+                  </div>
+                  <div class="rls__field">
+                    <label class="rls__label">Temp. sustrato (°C)</label>
+                    <input class="rls__input" type="number" step="0.1" v-model="inc.temperatura_sustrato" placeholder="24" inputmode="decimal" />
+                  </div>
+                </div>
               </div>
-              <div class="rls__field">
-                <label class="rls__label">CO₂ (ppm)</label>
-                <input class="rls__input" type="number" step="1" v-model="form.co2" placeholder="1100" inputmode="numeric" />
-              </div>
-              <div class="rls__field">
-                <label class="rls__label">Luz / PPFD (μmol)</label>
-                <input class="rls__input" type="number" step="1" v-model="form.ppfd" placeholder="600" inputmode="numeric" />
-              </div>
-            </div>
+
+              <p v-if="!hayEnCultivo && !enraizando" class="rls__hint">No hay lotes en cultivo en este espacio.</p>
+            </template>
 
           </div>
 
@@ -69,7 +98,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import DsSpinner   from '../../design-system/components/Spinner.vue'
 import { useSalasStore } from '../../stores/salas.js'
 import { useLotesStore } from '../../stores/lotes.js'
-import { registrarSala } from '../../lib/api.js'
+import { registrarSala, registrarEnraizado } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 
 const props = defineProps({
@@ -90,32 +119,46 @@ const toast      = useToast()
 const salaId  = ref('')
 const guardando = ref(false)
 const form = ref({ temperatura: '', humedad: '', co2: '', ppfd: '' })
+// La incubadora (lotes enraizando) va aparte: otro microclima, otra puerta (`registrar_enraizado`).
+const inc  = ref({ temperatura: '', humedad: '', temperatura_sustrato: '' })
+
+const lotesDeLaSala = computed(() => lotesStore.items.filter(l => String(l.sala_id) === String(salaId.value)))
+const enraizando    = computed(() => lotesDeLaSala.value.filter(l => l.estado === 'enraizado').length)
+const hayEnCultivo  = computed(() => lotesDeLaSala.value.some(l => ['vegetativo', 'floracion'].includes(l.estado)))
 
 const salas      = computed(() => salasStore.items.filter(s => s.state === 'activa'))
 const salaFijada = computed(() => !!props.salaIdInicial)
 const salaNombre = computed(() =>
   salasStore.items.find(s => String(s.id) === String(salaId.value))?.nombre || '')
 
-const canSubmit = computed(() =>
-  salaId.value &&
-  (form.value.temperatura || form.value.humedad || form.value.co2 || form.value.ppfd)
-)
+const hayLecturaSala = computed(() => hayEnCultivo.value && !!(form.value.temperatura || form.value.humedad || form.value.co2 || form.value.ppfd))
+const hayLecturaInc  = computed(() => enraizando.value > 0 && !!(inc.value.temperatura || inc.value.humedad || inc.value.temperatura_sustrato))
+const canSubmit = computed(() => salaId.value && (hayLecturaSala.value || hayLecturaInc.value))
 
+function numeros(obj) {
+  const out = {}
+  for (const [k, v] of Object.entries(obj)) if (v !== '' && v != null) out[k] = parseFloat(v)
+  return out
+}
+
+// Cada bloque va a su puerta: el espacio a `registrar_sala` (todos los lotes en vegetativo o
+// floración), la incubadora a `registrar_enraizado` (los que enraízan). Se puede cargar uno,
+// el otro o los dos en la misma pasada.
 async function guardar() {
   if (!canSubmit.value) return
   guardando.value = true
   try {
-    const payload = {}
-    if (form.value.temperatura) payload.temperatura = parseFloat(form.value.temperatura)
-    if (form.value.humedad)     payload.humedad     = parseFloat(form.value.humedad)
-    if (form.value.co2)         payload.co2         = parseFloat(form.value.co2)
-    if (form.value.ppfd)        payload.ppfd        = parseFloat(form.value.ppfd)
-    // registrar_sala aplica la lectura a TODOS los lotes activos de la sala (los que enraízan
-    // van por su propia puerta: viven en un propagador con otro microclima).
-    const { data } = await registrarSala(salaId.value, payload)
-    const n = data?.lotes_afectados ?? data?.registros?.length
-    toast.success(n ? `Ambiente registrado en ${salaNombre.value} · ${n} lote(s)`
-                    : `Ambiente registrado en ${salaNombre.value}`)
+    const partes = []
+    if (hayLecturaSala.value) {
+      const { data } = await registrarSala(salaId.value, numeros(form.value))
+      const n = data?.lotes_afectados ?? data?.registros?.length
+      partes.push(n ? `${n} lote(s)` : 'espacio')
+    }
+    if (hayLecturaInc.value) {
+      const { data } = await registrarEnraizado(salaId.value, numeros(inc.value))
+      partes.push(`incubadora · ${data?.lotes_afectados ?? enraizando.value} enraizando`)
+    }
+    toast.success(`Ambiente registrado en ${salaNombre.value} · ${partes.join(' · ')}`)
     open.value = false
     resetForm()
   } catch (e) {
@@ -129,12 +172,15 @@ async function guardar() {
 
 function resetForm() {
   form.value = { temperatura: '', humedad: '', co2: '', ppfd: '' }
+  inc.value  = { temperatura: '', humedad: '', temperatura_sustrato: '' }
   if (!salaFijada.value) salaId.value = ''
 }
 
 watch(() => props.modelValue, (isOpen) => {
   if (isOpen) {
     if (!salasStore.items.length) salasStore.fetch()
+    // Hace falta saber qué hay en la sala para ofrecer la incubadora.
+    if (!lotesStore.items.length) lotesStore.fetch()
     if (props.salaIdInicial) {
       // Alcanza con fijar la sala: la pantalla es reactiva sobre `salaId`. Acá se llamaba a
       // `onSalaChange()`, que no existe — abrir la hoja desde una sala tiraba ReferenceError.
@@ -231,6 +277,12 @@ onUnmounted(() => document.removeEventListener('keydown', escapeHandler, true))
 .rls-modal-enter-active, .rls-modal-leave-active { transition: opacity .2s, transform .2s; }
 .rls-modal-enter-from, .rls-modal-leave-to { opacity: 0; }
 .rls-modal-enter-from .rls__modal, .rls-modal-leave-to .rls__modal { transform: scale(.95); }
+
+/* Incubadora */
+.rls__incubadora { margin-top: var(--sp-2); padding-top: var(--sp-4); border-top: 1px dashed var(--c-ink-300); }
+.rls__incubadora--sola { margin-top: 0; padding-top: 0; border-top: 0; }
+.rls__section { display: flex; align-items: center; gap: var(--sp-2); font-weight: 700; font-size: .9rem; color: var(--c-ink-900); margin-bottom: var(--sp-1); }
+.rls__hint { font-size: .78rem; color: var(--c-ink-500); margin: 0 0 var(--sp-3); }
 
 /* Fields */
 .rls__field { margin-bottom: var(--sp-4); }

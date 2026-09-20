@@ -1,14 +1,19 @@
 # Changelog
 
-## Septiembre 2026 (cl) — Uso personal: la lectura del espacio llega a lo que enraíza
+## Septiembre 2026 (cl) — «Registrar ambiente» ofrece la incubadora cuando hay lotes enraizando
 
 - «Registrar ambiente» desde la tarjeta del espacio moría con «Error al guardar» (Lover, 19-sep).
-  Dos causas: la carpa tenía su único lote **enraizando** y `registrar_sala` lo excluye (regla de
-  organización: el propagador tiene otro microclima, va por «Registrar enraizado»), y el modal
-  leía `errors[0]` cuando el backend contestó `error`, así que el motivo no se veía.
-- **En uso personal una carpa es una carpa**: la lectura del espacio vale para todo lo que hay
-  adentro, enraizando incluido (no tiene propagador aparte ni la otra puerta a mano). En
-  organización no cambia nada. `RegistrarLecturaSheet` muestra `error` o `errors`, lo que venga.
+  El único lote estaba **enraizando** y `registrar_sala` lo excluye a propósito —la incubadora
+  tiene su propio microclima aunque esté adentro de la carpa (regla del enraizado, que **vale
+  igual en uso personal**: Germán, 20-sep)—, pero el modal no tenía esa puerta y encima leía
+  `errors[0]` cuando el backend contestó `error`, así que el motivo no se veía.
+- **Ahora el mismo modal tiene el bloque «Incubadora · N lotes enraizando»** (temperatura,
+  humedad, temperatura del sustrato) que va a `registrar_enraizado`; el bloque del espacio va a
+  `registrar_sala`. Se cargan uno, el otro o los dos en la misma pasada; si el espacio sólo
+  tiene lotes enraizando, se ve sólo la incubadora. `RegistrarLecturaSheet` muestra `error` o
+  `errors`, lo que venga. El backend no cambió.
+- Spec en `uso_personal_spec`: la del espacio no toca lo que enraíza y lo dice; la de la
+  incubadora sí llega.
 
 ## Septiembre 2026 (ck) — Cada persona elige qué avisos le llegan al teléfono
 

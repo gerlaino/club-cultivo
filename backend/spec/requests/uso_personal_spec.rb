@@ -237,9 +237,9 @@ RSpec.describe 'Uso personal', type: :request do
     end
   end
 
-  # Una carpa es una carpa: el cultivador de casa no tiene propagador aparte ni la puerta
-  # «Registrar enraizado» a mano. Con su único lote enraizando, la lectura de la sala moría con
-  # «Error al guardar» (19-sep-2026, Lover).
+  # La incubadora tiene su propio microclima aunque esté adentro de la carpa (Germán, 20-sep):
+  # la regla del enraizado vale igual en uso personal. La lectura del espacio no lo toca y lo
+  # dice; la de la incubadora va por su puerta.
   describe 'registrar el ambiente del espacio' do
     let(:club)  { create(:club, plan: 'personal', features: Club::FEATURES_PERSONAL) }
     let(:admin) { create(:user, :admin, club: club) }
@@ -247,13 +247,22 @@ RSpec.describe 'Uso personal', type: :request do
     let(:sala)  { create(:sala, club: club, sede: sede, created_by: admin, kind: 'vegetativo') }
     before { sign_in_as(admin) }
 
-    it 'llega también a lo que está enraizando' do
+    it 'la del espacio no toca lo que enraíza, y dice por qué' do
       enraizando = create(:lote, club: club, sala: sala, estado: 'enraizado')
 
       post "/api/salas/#{sala.id}/registrar_sala", params: { registro_ambiental: { temperatura: 24, humedad: 83 } }
 
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(JSON.parse(response.body)['error']).to include('enraizando')
+      expect(enraizando.registros_ambientales.count).to eq(0)
+    end
+
+    it 'la de la incubadora llega a lo que enraíza' do
+      enraizando = create(:lote, club: club, sala: sala, estado: 'enraizado')
+
+      post "/api/salas/#{sala.id}/registrar_enraizado", params: { registro_ambiental: { temperatura: 26, humedad: 90 } }
+
       expect(response).to have_http_status(:created), response.body
-      expect(JSON.parse(response.body)['lotes_afectados']).to eq(1)
       expect(enraizando.registros_ambientales.count).to eq(1)
     end
   end
