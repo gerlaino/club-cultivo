@@ -1,5 +1,35 @@
 # Changelog
 
+## Septiembre 2026 (co) — Notificaciones: dos familias, «Recordarme» por tarea, y adiós «hitos»
+
+- **Germán (20-sep):** «las alertas por default son las que requieren tu visto; las de tareas y
+  demás las configura el usuario, quizás desde la tarea». Y: «simple y completo». Queda así:
+  - **«Te piden algo»** (prendidas): pesaje para confirmar · reponer en el mostrador · caja sin
+    cerrar · tarea nueva asignada · plan por vencer.
+  - **«Recordatorios»** (lo que la app deduce sola; apagados de entrada en una organización):
+    recordatorios de tareas (prendido: los pidió la persona) · próximos pasos del ciclo · cosecha
+    pendiente · tarea vencida · lote crítico · ambiente fuera de rango · saldo bajo. **En uso
+    personal vienen prendidos los próximos pasos y la cosecha** (`default_personal`): no hay
+    nadie más que le avise, y es lo que lo hace sentir profesional. Cada familia con su
+    explicación en la pantalla (`Catalogo::GRUPOS`).
+- **«Recordarme» en la tarea** (`tareas.recordatorio`: `mismo_dia` / `dia_antes`, a las 8, hora
+  de la app): tilde en el paso «¿Cuándo?» del modal, con las dos opciones; le llega a quien
+  esté asignada. `RecordatoriosTareasJob` cada 15 min; una sola vez
+  (`recordatorio_enviado_at`), y si cambian la fecha o el recordatorio vuelve a contar.
+  **Reemplaza al «resumen de tareas del día» de las 8:00** (`TareasDiariasPushJob` y su cron,
+  borrados): era genérico; esto es lo que la persona pidió, cuando lo pidió.
+- **«Hitos» no se dice más** en pantalla: es «Próximos pasos del ciclo» (Mi perfil y
+  Configuración → Alertas), con la explicación de qué es: cuándo un lote llega a sus días de
+  vegetativo (¿pasa a floración?), a la cosecha estimada (mirar tricomas), al fin del secado y
+  del curado; avisa unos días antes, una vez por paso y por lote. Los identificadores
+  (`hitos_cultivo`, `hito_cultivo`) no cambian.
+- **Notificaciones bloqueadas en el navegador**: el botón no desaparece; dice «bloqueadas», al
+  tocarlo explica cómo permitirlas (candado → Notificaciones → Permitir) y vuelve a «Activar»
+  solo al volver a la pestaña. El permiso se lee antes de esperar al service worker.
+- Specs: `recordatorios_tareas_job_spec` (mismo día, día antes, una sola vez, cambio de fecha,
+  completada, apagado por la persona), `notificaciones_preferencias_spec` (familias, defaults
+  org/personal). Visto renderizado: modal de tarea y perfil de uso personal.
+
 ## Septiembre 2026 (cn) — Puesta en marcha: «Cargar una variedad» antes del primer lote
 
 - Pedido de Germán (20-sep): sin una genética propia y disponible el alta del lote ofrece «Sin

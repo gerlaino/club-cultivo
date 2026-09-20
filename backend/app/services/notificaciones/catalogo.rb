@@ -4,55 +4,69 @@
 # eso; `PushNotificationService` pregunta `User#quiere_push?(tipo)` antes de encolar. Si un tipo
 # no está acá, no se ofrece y no se manda: no hay avisos «de fábrica» que nadie pueda apagar.
 #
-# Regla que ordena la lista (Germán, 20-sep-2026): cada persona ve SÓLO los avisos que su rol
-# puede recibir y SÓLO de los módulos que su organización tiene. Una manicura ve una fila; un
-# admin de una organización con dispensa ve diez; el cultivador de casa ve las de cultivo.
+# Dos familias, y nada más (Germán, 20-sep-2026):
+#   · «Te piden algo»: alguien hizo algo y espera tu visto. Prendidas de entrada.
+#   · «Recordatorios»: lo que el sistema deduce solo. Apagadas de entrada en una organización
+#     —es lo que cansa si no lo pediste—; en uso personal, prendidos los del ciclo y la
+#     cosecha: no hay nadie más que le avise, y es lo que lo hace sentir profesional.
 #
-# Campos: `roles` = quién lo recibe en una organización · `feature` = módulo que tiene que
-# estar contratado (nil = siempre) · `personal` = si al cultivador de casa (que es admin) se le
-# ofrece; por defecto, sí cuando `roles` incluye admin · `default` = prendido de entrada, o el
-# nombre de un módulo que lo decide (ambiente: sólo con IoT tiene sentido de entrada).
+# Cada persona ve SÓLO los avisos que su rol puede recibir y SÓLO de los módulos que su
+# organización tiene. Campos: `roles` = quién lo recibe en una organización · `feature` =
+# módulo que tiene que estar contratado (nil = siempre) · `personal` = si al cultivador de casa
+# (que es admin) se le ofrece; por defecto, sí cuando `roles` incluye admin · `default` =
+# prendido de entrada · `default_personal` = ídem en uso personal (si no está, vale `default`).
 module Notificaciones
   module Catalogo
     EQUIPO = %w[admin cultivador supervisor manicura dispensador delivery].freeze
 
+    TE_PIDEN = 'Te piden algo'
+    RECORD   = 'Recordatorios'
+
+    GRUPOS = {
+      TE_PIDEN => 'Alguien hizo algo y espera tu visto. Vienen prendidos.',
+      RECORD   => 'Lo que la app deduce sola de tus datos. Prendé los que te sirvan.',
+    }.freeze
+
     TIPOS = [
-      { clave: 'hitos_cultivo',    grupo: 'Cultivo', label: 'Lo que viene en tu cultivo',
-        desc: 'Días de vegetativo cumplidos, cosecha estimada, fin de secado y de curado.',
-        roles: %w[admin], feature: 'cultivo', default: true },
-      { clave: 'ambiente',         grupo: 'Cultivo', label: 'Ambiente',
-        desc: 'Sin registro ambiental, o temperatura, humedad, pH o EC fuera de rango.',
-        roles: %w[admin], feature: 'cultivo', default: 'iot' },
-      { clave: 'cosecha_pendiente', grupo: 'Cultivo', label: 'Cosecha pendiente',
-        desc: 'Un lote pasó su fecha estimada de cosecha.',
-        roles: %w[admin], feature: 'cultivo', default: true },
-      { clave: 'tarea_vencida',    grupo: 'Cultivo', label: 'Tarea vencida',
-        desc: 'Una tarea del cultivo quedó sin hacer.',
-        roles: %w[admin], feature: 'cultivo', default: true },
-      { clave: 'lote_critico',     grupo: 'Cultivo', label: 'Lote en estado crítico',
-        desc: 'Un lote con plantas enfermas o con problemas serios.',
-        roles: %w[admin], feature: 'cultivo', default: true },
-      { clave: 'pesaje_para_confirmar', grupo: 'Post-cosecha', label: 'Pesaje para confirmar',
+      # ── Te piden algo ────────────────────────────────────────────────────────────────
+      { clave: 'pesaje_para_confirmar', grupo: TE_PIDEN, label: 'Pesaje para confirmar',
         desc: 'La manicura envió un pesaje y espera tu confirmación.',
         roles: %w[admin], feature: 'cultivo', personal: false, default: true },
-      { clave: 'caja_sin_cerrar',  grupo: 'Mostrador', label: 'Caja sin cerrar',
-        desc: 'Pasó la hora límite y hay una caja del mostrador abierta.',
-        roles: %w[admin], feature: 'produccion_dispensa', default: true },
-      { clave: 'reposicion_mostrador', grupo: 'Mostrador', label: 'Reponer en el mostrador',
+      { clave: 'reposicion_mostrador', grupo: TE_PIDEN, label: 'Reponer en el mostrador',
         desc: 'Quien atiende pidió reponer un producto.',
         roles: %w[admin supervisor], feature: 'produccion_dispensa', default: true },
-      { clave: 'saldo_cc_bajo',    grupo: 'Pacientes', label: 'Saldo bajo',
-        desc: 'La cuenta corriente (o el crédito en gramos) de un paciente quedó por debajo del umbral.',
+      { clave: 'caja_sin_cerrar',  grupo: TE_PIDEN, label: 'Caja sin cerrar',
+        desc: 'Pasó la hora límite y hay una caja del mostrador abierta.',
         roles: %w[admin], feature: 'produccion_dispensa', default: true },
-      { clave: 'plan_vence',       grupo: 'Cuenta', label: 'Plan por vencer',
-        desc: 'Una semana antes y el día que vence.',
-        roles: %w[admin], feature: nil, default: true },
-      { clave: 'tarea_asignada',   grupo: 'Tareas', label: 'Tarea nueva asignada a vos',
+      { clave: 'tarea_asignada',   grupo: TE_PIDEN, label: 'Tarea nueva asignada a vos',
         desc: 'Cuando alguien te asigna una tarea.',
         roles: EQUIPO, feature: nil, personal: false, default: true },
-      { clave: 'tareas_del_dia',   grupo: 'Tareas', label: 'Resumen de tareas del día',
-        desc: 'A las 8:00, cuántas tareas tenés para hoy.',
-        roles: %w[cultivador], feature: nil, personal: true, default: true },
+      { clave: 'plan_vence',       grupo: TE_PIDEN, label: 'Plan por vencer',
+        desc: 'Una semana antes y el día que vence.',
+        roles: %w[admin], feature: nil, default: true },
+
+      # ── Recordatorios ────────────────────────────────────────────────────────────────
+      { clave: 'recordatorio_tarea', grupo: RECORD, label: 'Recordatorios de tareas',
+        desc: 'Los que marcás con «Recordarme» al crear una tarea: te llegan ese día o el día antes, a las 8.',
+        roles: EQUIPO, feature: nil, personal: true, default: true },
+      { clave: 'hitos_cultivo',    grupo: RECORD, label: 'Próximos pasos del ciclo',
+        desc: 'Cuándo un lote llega a sus días de vegetativo (¿pasa a floración?), a la cosecha estimada (mirar tricomas), al fin del secado y del curado. Te avisa unos días antes.',
+        roles: %w[admin], feature: 'cultivo', default: false, default_personal: true },
+      { clave: 'cosecha_pendiente', grupo: RECORD, label: 'Cosecha pendiente',
+        desc: 'Un lote pasó su fecha estimada de cosecha y sigue en floración.',
+        roles: %w[admin], feature: 'cultivo', default: false, default_personal: true },
+      { clave: 'tarea_vencida',    grupo: RECORD, label: 'Tarea vencida',
+        desc: 'Una tarea del cultivo quedó sin hacer.',
+        roles: %w[admin], feature: 'cultivo', default: false },
+      { clave: 'lote_critico',     grupo: RECORD, label: 'Lote en estado crítico',
+        desc: 'Un lote con plantas enfermas o con problemas serios.',
+        roles: %w[admin], feature: 'cultivo', default: false },
+      { clave: 'ambiente',         grupo: RECORD, label: 'Ambiente fuera de rango',
+        desc: 'Temperatura, humedad, pH o EC fuera de lo que configuraste, o un espacio sin registro.',
+        roles: %w[admin], feature: 'cultivo', default: false },
+      { clave: 'saldo_cc_bajo',    grupo: RECORD, label: 'Saldo bajo de un paciente',
+        desc: 'La cuenta corriente (o el crédito en gramos) de un paciente quedó por debajo del umbral.',
+        roles: %w[admin], feature: 'produccion_dispensa', default: false },
     ].freeze
 
     CLAVES = TIPOS.map { |t| t[:clave] }.freeze
@@ -71,8 +85,8 @@ module Notificaciones
     end
 
     def self.default_de(tipo, club)
-      d = tipo[:default]
-      d.is_a?(String) ? club.feature?(d) : d == true
+      d = club.personal? ? tipo.fetch(:default_personal, tipo[:default]) : tipo[:default]
+      d == true
     end
   end
 end

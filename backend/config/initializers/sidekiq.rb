@@ -78,10 +78,12 @@ Sidekiq.configure_server do |config|
         'class' => 'VencimientoReservasJob',
         'description' => 'Vence reservas de dispensa pasadas de fecha (libera stock) y avisa las que se entregan hoy'
       },
-      'tareas_diarias_push' => {
-        'cron'  => '0 8 * * *',
-        'class' => 'TareasDiariasPushJob',
-        'description' => 'Envía push notification con resumen de tareas del día a cada cultivador'
+      # Reemplaza al «resumen de tareas del día» de las 8:00: ahora cada tarea lleva su propio
+      # «Recordarme» (Germán, 20-sep-2026). Cada 15 minutos se mandan los que tocan.
+      'recordatorios_tareas' => {
+        'cron'  => '*/15 * * * *',
+        'class' => 'RecordatoriosTareasJob',
+        'description' => 'Manda el push «Recordarme» de las tareas cuyo momento llegó (ese día o el día antes, a las 8)'
       },
       'informe_semestral_recordatorio_1' => {
         'cron'  => '0 8 1 6 *',

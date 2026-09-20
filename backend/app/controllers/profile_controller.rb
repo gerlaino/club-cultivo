@@ -69,6 +69,7 @@ class ProfileController < ApplicationController
       tipos: Notificaciones::Catalogo.para(current_user).map { |t|
         { clave: t[:clave], grupo: t[:grupo], label: t[:label], desc: t[:desc], activo: current_user.quiere_push?(t[:clave]) }
       },
+      grupos: Notificaciones::Catalogo::GRUPOS,
       no_molestar: current_user.no_molestar?,
       no_molestar_desde: User::NO_MOLESTAR_DESDE,
       no_molestar_hasta: User::NO_MOLESTAR_HASTA,

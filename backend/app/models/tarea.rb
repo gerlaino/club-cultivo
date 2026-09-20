@@ -47,6 +47,27 @@ class Tarea < ApplicationRecord
   validates :estado,    inclusion: { in: ESTADOS }
   validates :prioridad, inclusion: { in: PRIORIDADES }
   validates :frecuencia, inclusion: { in: FRECUENCIAS }, allow_nil: true
+
+  # «Recordarme»: un push a quien está asignada, ese día o el día antes, a las 8 (hora de la
+  # app). Reemplaza al resumen genérico de las 8:00: es preciso y lo pide quien crea la tarea.
+  RECORDATORIOS = %w[mismo_dia dia_antes].freeze
+  validates :recordatorio, inclusion: { in: RECORDATORIOS }, allow_blank: true
+  before_save :normalizar_recordatorio
+  HORA_RECORDATORIO = 8
+
+  # Las que tienen un recordatorio que todavía no salió.
+  scope :con_recordatorio_pendiente, -> { activas.where.not(recordatorio: [nil, '']).where(recordatorio_enviado_at: nil).where.not(fecha_programada: nil) }
+
+  # Cuándo le toca salir, o nil si no tiene.
+  def recordatorio_en
+    return nil if recordatorio.blank? || fecha_programada.blank?
+    dia = recordatorio == 'dia_antes' ? fecha_programada - 1 : fecha_programada
+    Time.zone.local(dia.year, dia.month, dia.day, HORA_RECORDATORIO)
+  end
+
+  def recordatorio_pendiente?(ahora = Time.zone.now)
+    activa? && recordatorio_enviado_at.nil? && recordatorio_en.present? && recordatorio_en <= ahora
+  end
   validates :horas_estimadas, numericality: { greater_than: 0, allow_nil: true }
   validates :horas_reales,    numericality: { greater_than: 0, allow_nil: true }
 
@@ -206,6 +227,12 @@ class Tarea < ApplicationRecord
   end
 
   private
+
+  # Cambió la fecha o el recordatorio: vuelve a contar como no enviado. Un tilde vacío es nil.
+  def normalizar_recordatorio
+    self.recordatorio = nil if recordatorio.blank?
+    self.recordatorio_enviado_at = nil if will_save_change_to_recordatorio? || will_save_change_to_fecha_programada?
+  end
 
   def push_asignacion_nueva
     PushNotificationService.notify_user_async(

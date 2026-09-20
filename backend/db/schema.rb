@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_20_100000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_20_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -2257,6 +2257,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_20_100000) do
     t.string "origen_plan_titulo"
     t.datetime "deleted_at"
     t.bigint "deleted_by_id"
+    t.string "recordatorio"
+    t.datetime "recordatorio_enviado_at"
     t.index ["aplicacion_plan_id"], name: "index_tareas_on_aplicacion_plan_id"
     t.index ["asignada_a_id", "estado"], name: "index_tareas_on_asignada_a_id_and_estado"
     t.index ["asignada_a_id"], name: "index_tareas_on_asignada_a_id"
@@ -2272,6 +2274,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_20_100000) do
     t.index ["parent_tarea_id"], name: "index_tareas_on_parent_tarea_id"
     t.index ["plan_tarea_id"], name: "index_tareas_on_plan_tarea_id"
     t.index ["plant_id"], name: "index_tareas_on_plant_id"
+    t.index ["recordatorio", "fecha_programada"], name: "index_tareas_recordatorios_pendientes", where: "((recordatorio IS NOT NULL) AND (recordatorio_enviado_at IS NULL))"
     t.index ["sala_id"], name: "index_tareas_on_sala_id"
   end
 

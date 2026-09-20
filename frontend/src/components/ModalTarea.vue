@@ -189,6 +189,22 @@
               <AppDatePicker v-model="form.fecha_programada" />
             </div>
 
+            <!-- «Recordarme»: un push a quien está asignada, ese día o el día antes, a las 8.
+                 Reemplaza al resumen genérico de las 8:00: lo pide quien crea la tarea. -->
+            <div class="mt-field mt-recordar">
+              <label class="mt-recordar__check">
+                <input type="checkbox" :checked="!!form.recordatorio" @change="form.recordatorio = $event.target.checked ? 'mismo_dia' : ''" />
+                <span><i class="bi bi-bell"></i> Recordarme</span>
+              </label>
+              <div v-if="form.recordatorio" class="mt-recordar__opciones">
+                <button type="button" class="mt-recordar__op" :class="{ 'mt-recordar__op--active': form.recordatorio === 'mismo_dia' }" @click="form.recordatorio = 'mismo_dia'">Ese día a las 8</button>
+                <button type="button" class="mt-recordar__op" :class="{ 'mt-recordar__op--active': form.recordatorio === 'dia_antes' }" @click="form.recordatorio = 'dia_antes'">El día antes a las 8</button>
+              </div>
+              <div v-if="form.recordatorio" class="mt-recordar__hint">
+                Le llega al teléfono {{ form.asignada_a_id && String(form.asignada_a_id) !== String(authStore.user?.id) ? 'de quien la tenga asignada' : 'a vos' }}, si tiene las notificaciones activadas.
+              </div>
+            </div>
+
             <!-- Toggle única / recurrente -->
             <div class="mt-modo-tabs">
               <button type="button" class="mt-modo-tab"
@@ -408,6 +424,7 @@ function formVacio() {
     titulo: '', descripcion: '', tipo: 'riego', prioridad: 'normal',
     asignada_a_id: '', sala_id: '', lote_id: '',
     fecha_programada: hoyISO(),
+    recordatorio: '',
   }
 }
 const form = ref(formVacio())
@@ -450,6 +467,7 @@ watch(() => props.show, (val) => {
       sala_id:          t.sala_id || t.sala?.id || '',
       lote_id:          t.lote_id || t.lote?.id || '',
       fecha_programada: t.fecha_programada || hoyISO(),
+      recordatorio:     t.recordatorio || '',
     }
   } else {
     mostrarSala.value = false
@@ -469,6 +487,7 @@ async function guardar() {
     asignada_a_id: form.value.asignada_a_id || null,
     sala_id:       form.value.sala_id || null,
     lote_id:       form.value.lote_id || null,
+    recordatorio:  form.value.recordatorio || null,
   }
 
   guardando.value = true
@@ -703,6 +722,13 @@ async function guardar() {
 .mt-input--fecha { font-size: .95rem; font-weight: 600; }
 
 /* Segmented toggle: única / se repite */
+.mt-recordar { gap: .5rem; }
+.mt-recordar__check { display: inline-flex; align-items: center; gap: .5rem; font-weight: 600; font-size: .9rem; cursor: pointer; }
+.mt-recordar__check input { width: 18px; height: 18px; accent-color: var(--c-leaf-600, #3F6452); }
+.mt-recordar__opciones { display: flex; gap: .4rem; flex-wrap: wrap; }
+.mt-recordar__op { border: 1.5px solid var(--c-slate-200, #e2e8f0); background: #fff; border-radius: 999px; padding: .35rem .8rem; font-size: .8rem; font-weight: 600; color: #475569; cursor: pointer; }
+.mt-recordar__op--active { border-color: var(--c-leaf-600, #3F6452); background: var(--c-leaf-50, #F4F8F5); color: var(--c-leaf-800, #1A3D2E); }
+.mt-recordar__hint { font-size: .75rem; color: #64748b; }
 .mt-modo-tabs {
   display: flex; gap: 0; background: #f4f8f4; border: 1.5px solid #d4e6d4;
   border-radius: 11px; padding: 3px; overflow: clip;

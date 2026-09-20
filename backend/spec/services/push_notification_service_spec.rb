@@ -50,14 +50,14 @@ RSpec.describe PushNotificationService do
 
     it 'a las 7 se posterga hasta las 8 de hoy' do
       travel_to Time.zone.local(2026, 9, 21, 7, 0) do
-        described_class.notify_user_async(admin, tipo: 'hitos_cultivo', title: 'Hito', body: 'x')
+        described_class.notify_user_async(admin, tipo: 'pesaje_para_confirmar', title: 'Pesaje', body: 'x')
         expect(Time.zone.at(encolados.first[:at])).to eq(Time.zone.local(2026, 9, 21, 8, 0))
       end
     end
 
     it 'a las 15 va en el acto' do
       travel_to Time.zone.local(2026, 9, 21, 15, 0) do
-        described_class.notify_user_async(admin, tipo: 'hitos_cultivo', title: 'Hito', body: 'x')
+        described_class.notify_user_async(admin, tipo: 'pesaje_para_confirmar', title: 'Pesaje', body: 'x')
         expect(encolados.first[:at]).to be_nil
       end
     end

@@ -201,14 +201,16 @@
         <!-- Lo que VIENE: los hitos del ciclo, avisados con anticipación. En uso personal viene
              prendido; una organización lo prende si quiere. -->
         <fieldset class="spc__fieldset">
-          <legend class="spc__legend">Lo que viene en el cultivo</legend>
+          <legend class="spc__legend">Próximos pasos del ciclo</legend>
           <p class="spc__field-desc">
-            Avisa antes de que un lote llegue a sus días de vegetativo (¿pasa a floración?), a la cosecha
-            estimada (revisar tricomas), a los días de secado y a las tres semanas de curado. Una vez por hito.
+            La app calcula sola cuándo cada lote llega a sus días de vegetativo (¿pasa a floración?), a la
+            cosecha estimada (mirar los tricomas), al fin del secado y a las tres semanas de curado, y lo
+            avisa unos días antes. Una vez por paso y por lote. Si te llega al teléfono lo decidís en
+            Mi perfil → Notificaciones.
           </p>
           <label class="spc__check spc__check--hitos">
             <input v-model="configForm.hitos_cultivo" type="checkbox" />
-            <span>Avisarme de los hitos del ciclo</span>
+            <span>Avisar los próximos pasos del ciclo</span>
           </label>
           <div v-if="configForm.hitos_cultivo" class="spc__field">
             <label class="spc__label">Con cuánta anticipación</label>

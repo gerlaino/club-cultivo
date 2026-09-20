@@ -376,6 +376,7 @@ onMounted(() => { fetchProfile(); fetchNotificaciones() })
 
             <div v-for="g in notifGrupos" :key="g.nombre" class="pfl__notif-grupo">
               <div class="pfl__card-section-title">{{ g.nombre }}</div>
+              <p v-if="notif.grupos?.[g.nombre]" class="pfl__hint pfl__notif-grupo-desc">{{ notif.grupos[g.nombre] }}</p>
               <label v-for="t in g.tipos" :key="t.clave" class="pfl__notif-row">
                 <input type="checkbox" class="pfl__switch" :checked="t.activo" :disabled="notifGuardando === t.clave" @change="toggleTipo(t)" />
                 <span class="pfl__notif-txt">
@@ -561,7 +562,8 @@ onMounted(() => { fetchProfile(); fetchNotificaciones() })
 .pfl__notif-dispositivo { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .85rem 1rem; border-radius: 10px; background: var(--c-slate-50); border: 1px solid var(--c-slate-200); margin-bottom: 1rem; }
 .pfl__notif-dispositivo .pfl__btn-secondary { white-space: nowrap; flex: none; }
 @media (max-width: 480px) { .pfl__notif-dispositivo { flex-direction: column; align-items: stretch; } }
-.pfl__notif-grupo { margin-top: .75rem; }
+.pfl__notif-grupo { margin-top: 1rem; }
+.pfl__notif-grupo-desc { margin: -.35rem 0 .35rem; }
 .pfl__notif-row { display: flex; align-items: flex-start; gap: .75rem; padding: .55rem 0; border-top: 1px solid var(--c-slate-100); cursor: pointer; }
 .pfl__notif-row:first-of-type { border-top: 0; }
 .pfl__notif-txt { display: flex; flex-direction: column; gap: .1rem; }

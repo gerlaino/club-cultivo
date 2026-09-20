@@ -299,7 +299,8 @@ class TareasController < ApplicationController
       :asignada_a_id, :sala_id, :lote_id, :plant_id,
       :fecha_programada, :horas_estimadas, :horas_reales,
       :notas_completado, :horas_aplicadas_al_lote,
-      :recurrente, :frecuencia, :intervalo, :recurrencia_hasta, :recurrencia_veces
+      :recurrente, :frecuencia, :intervalo, :recurrencia_hasta, :recurrencia_veces,
+      :recordatorio
     )
   end
 
@@ -337,6 +338,7 @@ class TareasController < ApplicationController
       estado: t.estado,
       prioridad: t.prioridad,
       fecha_programada: t.fecha_programada,
+      recordatorio:     t.recordatorio,
       fecha_completada: t.fecha_completada,
       horas_estimadas: t.horas_estimadas,
       horas_reales: t.horas_reales,
