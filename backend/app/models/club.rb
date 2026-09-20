@@ -25,6 +25,7 @@ class Club < ApplicationRecord
   has_many :users
   has_many :salas,                dependent: :destroy
   has_many :lotes,                dependent: :destroy
+  has_many :lote_fotos,           dependent: :destroy
   has_many :pacientes,            class_name: 'Paciente', dependent: :destroy
   has_many :reservas,             dependent: :destroy
   has_many :geneticas,            dependent: :destroy
@@ -320,6 +321,12 @@ class Club < ApplicationRecord
   end
 
   def eliminado? = deleted_at.present?
+
+  # Etiquetas de fotos que esta organización ya usó fuera de las sugeridas: se ofrecen en la
+  # galería para no tipearlas de nuevo.
+  def lote_fotos_etiquetas
+    lote_fotos.pluck(:etiquetas).flatten.uniq - LoteFoto::ETIQUETAS_SUGERIDAS
+  end
 
   # Cuándo entró alguien del EQUIPO por última vez (`users.visto_at`, granularidad de una
   # hora). El paciente que mira su portal no cuenta: la pregunta es si la organización trabaja.

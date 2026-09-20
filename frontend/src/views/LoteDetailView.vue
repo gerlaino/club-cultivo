@@ -25,7 +25,7 @@ import LoteHistorialSection from '../components/lotes/LoteHistorialSection.vue'
 import LoteHistorialModal   from '../components/lotes/LoteHistorialModal.vue'
 import LotePlantasSection   from '../components/lotes/LotePlantasSection.vue'
 import LotePlanVsReal       from '../components/lotes/LotePlanVsReal.vue'
-import LoteFotosSection     from '../components/lotes/LoteFotosSection.vue'
+import LoteGaleria          from '../components/lotes/LoteGaleria.vue'
 import LoteEditarModal      from '../components/lotes/LoteEditarModal.vue'
 import LotePLCard           from '../components/lotes/LotePLCard.vue'
 import DsBanner from '../design-system/components/Banner.vue'
@@ -649,8 +649,10 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- 6. Fotos -->
-          <LoteFotosSection :lote-id="id" :can-edit="canEdit" />
+          <!-- 6. Fotos: la galería por semana de vida, con comparar. -->
+          <div class="ld__card">
+            <LoteGaleria :lote-id="id" :can-edit="canEdit" :plantas="plantList" />
+          </div>
 
         </div>
 

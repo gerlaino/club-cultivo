@@ -52,7 +52,9 @@ class Lote < ApplicationRecord
   has_many :stocks,                dependent: :nullify
   # class_name explícito: Rails inferiría "PesajesManicura" (clase inexistente)
   has_many :pesajes_manicura,      class_name: 'PesajeManicura', dependent: :destroy
-  has_many_attached :fotos
+  # Las fotos son `LoteFoto` (fila por foto, con día/fase/etiquetas/nota) desde el 20-sep-2026.
+  # `has_many_attached :fotos` quedó migrado a ellas (ver `CrearLoteFotos`).
+  has_many :lote_fotos, dependent: :destroy
   has_many :notas,      as: :noteable,              dependent: :destroy
   # class_name explícito: el nombre ya es "singular", Rails no lo inferiría bien.
   has_many :analisis_laboratorio, class_name: 'AnalisisLaboratorio', dependent: :destroy
@@ -190,6 +192,16 @@ class Lote < ApplicationRecord
     ultimo&.registrado_en&.to_date || start_date
   end
 
+  # En qué estado estaba el lote un día dado, según sus cambios de fase. Para fechar una foto
+  # vieja con la fase de ESE día y no con la de hoy. Antes del primer cambio registrado vale el
+  # estado anterior de ese cambio; sin cambios, el estado actual.
+  def estado_en(fecha)
+    cambios = lote_eventos.select { |e| e.tipo == 'cambio_estado' && e.registrado_en }.sort_by(&:registrado_en)
+    return estado if cambios.empty?
+    ultimo = cambios.reverse.find { |e| e.registrado_en.to_date <= fecha }
+    ultimo ? ultimo.estado_nuevo : (cambios.first.estado_anterior.presence || estado)
+  end
+
   def dias_en_estado
     desde = fecha_estado_actual
     desde ? (Time.zone.today - desde).to_i : nil
@@ -241,10 +253,14 @@ class Lote < ApplicationRecord
   # Foto de portada del lote (para el slot del layout de la sala): la marcada como portada si
   # sigue adjunta, o la última subida si no hay marcada. nil si el lote no tiene fotos.
   def foto_portada_attachment
-    return nil unless fotos.attached?
-    atts = fotos.attachments.to_a
-    (foto_portada_blob_id && atts.find { |a| a.blob_id == foto_portada_blob_id }) ||
-      atts.max_by { |a| [a.created_at, a.id] }
+    foto = foto_portada || lote_fotos.cronologicas.last
+    foto&.imagen&.attachment
+  end
+
+  # La `LoteFoto` marcada como portada (`foto_portada_blob_id` apunta al blob), si sigue.
+  def foto_portada
+    return nil if foto_portada_blob_id.blank?
+    lote_fotos.joins(:imagen_attachment).find_by(active_storage_attachments: { blob_id: foto_portada_blob_id })
   end
 
   def progreso_ciclo

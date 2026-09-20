@@ -355,7 +355,7 @@ class SalasController < ApplicationController
   end
 
   def serialize_sala_detail(s)
-    lotes_all = s.lotes.includes(:genetica, fotos_attachments: :blob).order(start_date: :desc, created_at: :desc)
+    lotes_all = s.lotes.includes(:genetica, lote_fotos: { imagen_attachment: :blob }).order(start_date: :desc, created_at: :desc)
     lote_ids  = lotes_all.map(&:id)
 
     # Conteo VIVO de plantas por lote (excluye descartadas; el default scope ya excluye

@@ -1,5 +1,30 @@
 # Changelog
 
+## Septiembre 2026 (cp) — Ver crecer la planta: galería del lote por semana, comparar, etiquetas
+
+- **Contra Grow with Jane (20-sep), punto 2 del plan.** Las fotos del lote eran adjuntos sueltos
+  con la descripción escondida en el metadata del blob: no se podían ordenar por el día del
+  cultivo, ni etiquetar, ni saber en qué fase se sacaron. Nadie «veía crecer» nada.
+- **`LoteFoto`** (tabla `lote_fotos`: lote, planta opcional, `tomada_el`, `fase`, `etiquetas`,
+  `nota`, imagen en Active Storage). El backend manda día y semana de vida, y la **fase del día
+  en que se sacó** (`Lote#estado_en(fecha)`, por los cambios de fase; una foto vieja no dice
+  «Curado»). Migración de lo existente al MISMO blob (sin re-subir); `foto_portada_blob_id`
+  sigue valiendo. Etiquetas sugeridas (general, hoja, cogollo, raíz, problema, riego,
+  trasplante, cosecha) más las propias, que quedan para la próxima.
+- **`LoteGaleria.vue`** (escritorio y teléfono, misma pieza): grilla **por semana de vida** con
+  la fase, «Sacar foto» (cámara) y subir, filtro por etiqueta, abrir grande con ficha (día,
+  semana, fase, planta, etiquetas, nota) y editar/portada/eliminar desde ahí, **Comparar** dos
+  fotos lado a lado con los días de diferencia. La foto **con nota entra a la línea de tiempo**
+  del lote (con miniatura); la que no, vive en la galería. Se actualiza sola por «algo cambió».
+- **Inicio del teléfono (uso personal): «Últimas fotos»**, la última de cada lote en cultivo
+  (`GET /lotes/fotos_recientes`). El botón rápido «Foto» de la ficha móvil abre la cámara de la
+  galería en vez de subir un adjunto suelto.
+- Sin `image_processing` en el Gemfile no hay miniaturas: la grilla usa la imagen con
+  `loading="lazy"`. Cuando se sume la gema (libvips en Render), `thumb_url` ya está para eso.
+- Specs: `fotos_lote_galeria_spec` (día/semana/fase, botón rápido, orden, etiquetas propias,
+  edición, planta de otro lote, línea de tiempo, recientes, aislamiento), portada reescrita.
+  Visto renderizado en escritorio y teléfono; la migración probada con una foto vieja sembrada.
+
 ## Septiembre 2026 (co) — Notificaciones: dos familias, «Recordarme» por tarea, y adiós «hitos»
 
 - **Germán (20-sep):** «las alertas por default son las que requieren tu visto; las de tareas y

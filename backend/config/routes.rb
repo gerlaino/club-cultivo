@@ -146,6 +146,8 @@ Rails.application.routes.draw do
         get :export_csv
         get :proximo_codigo
         get 'por_qr/:codigo_qr', action: :por_qr
+        # La última foto de cada lote en cultivo: «tu última foto» en el inicio del teléfono.
+        get :fotos_recientes
         post :mover   # mover uno o varios lotes a otra sala (incluso de otra sede)
       end
       resource :costo, controller: :costo_lotes, only: [:show, :create, :update] do
@@ -153,7 +155,7 @@ Rails.application.routes.draw do
       end
       resources :registros_ambientales, only: [:index, :create, :destroy]
       resources :lote_eventos,          only: [:index, :create, :update, :destroy]
-      resources :fotos, only: [:index, :create, :destroy], controller: 'fotos_lote' do
+      resources :fotos, only: [:index, :create, :update, :destroy], controller: 'fotos_lote' do
         member { patch :portada }
       end
       resources :notas, only: [:index, :create]

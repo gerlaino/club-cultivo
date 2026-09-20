@@ -70,6 +70,12 @@
            lugar. Y las plantas se dan de alta con el lote, no de a una desde su ficha. -->
     </div>
 
+    <!-- Fotos: la misma galería que en escritorio (por semana, comparar, etiquetas). El botón
+         rápido «Foto» de arriba abre la cámara de esta galería. -->
+    <div class="mlot__galeria">
+      <LoteGaleria ref="galeria" :lote-id="id" :can-edit="true" :plantas="plantas" />
+    </div>
+
     <!-- Plantas -->
     <div class="mlot__section-title">
       Plantas <span class="mlot__count">{{ plantas.length }}</span>
@@ -192,17 +198,17 @@
       </div>
     </SheetBottom>
 
-    <input ref="fotoInput" type="file" accept="image/*" capture="environment" style="display:none" @change="subirFoto" />
   </div>
 </template>
 
 <script setup>
 import { MACETA_OPCIONES } from '../../lib/loteHelpers.js'
+import LoteGaleria from '../../components/lotes/LoteGaleria.vue'
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   getLote, listPlants,
-  avanzarFaseLote, updateLote, deleteLote, uploadFotoLote,
+  avanzarFaseLote, updateLote, deleteLote,
 } from '../../lib/api'
 import { useToast }        from '../../composables/useToast'
 import SheetBottom         from '../../components/cultivador/SheetBottom.vue'
@@ -232,7 +238,6 @@ const editError       = ref(null)
 const eliminarError   = ref(null)
 const pagina          = ref(1)
 const POR_PAG         = 12
-const fotoInput       = ref(null)
 const nuevaFase       = ref('')
 // Maceta del trasplante al prender (enraizado → vegetativo). Ver LoteDetailView: misma regla.
 const faseMaceta      = ref('')
@@ -363,17 +368,10 @@ async function confirmarEliminar() {
   }
 }
 
-function abrirFoto() { fotoInput.value?.click() }
-async function subirFoto(e) {
-  const file = e.target.files?.[0]
-  if (!file) return
-  try {
-    const fd = new FormData(); fd.append('foto', file)
-    await uploadFotoLote(id, fd)
-    toast.success('Foto subida')
-  } catch { toast.error('Error al subir la foto') }
-  e.target.value = ''
-}
+// «Foto» abre la cámara de la galería: la foto queda con su día, fase y etiquetas, no como
+// un adjunto suelto que después nadie encontraba.
+const galeria = ref(null)
+function abrirFoto() { galeria.value?.abrirCamara() }
 
 async function cargarPlantas() {
   try {
@@ -451,6 +449,7 @@ onMounted(async () => {
 .mlot__qa-lbl { font-size: .68rem; font-weight: 600; color: var(--c-ink-900, #1a1d1f); text-align: center; }
 
 /* Plantas */
+.mlot__galeria { padding: .9rem 1.1rem 0; }
 .mlot__section-title { font-size: .72rem; font-weight: 700; color: var(--c-ink-500, #6b7280); text-transform: uppercase; letter-spacing: .06em; padding: 1.1rem 1.1rem .6rem; display: flex; align-items: center; gap: .5rem; }
 .mlot__count { background: var(--c-leaf-100, #e8f0eb); color: var(--c-leaf-700, #2d4a3e); border-radius: 999px; padding: .05rem .5rem; font-size: .7rem; }
 .mlot__muted { padding: .75rem 1.1rem; color: var(--c-ink-500, #6b7280); font-size: .82rem; text-align: center; }

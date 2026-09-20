@@ -71,6 +71,7 @@
                   </div>
                 </div>
                 <div v-if="it.detalle" class="lhm__row-desc">{{ it.detalle }}</div>
+                <img v-if="it.metadata?.imagen_url" :src="it.metadata.imagen_url" class="lhm__row-img" alt="" loading="lazy" />
                 <div v-if="it.usuario" class="lhm__row-meta">{{ it.usuario }}</div>
               </template>
             </div>
@@ -207,4 +208,5 @@ watch(() => props.modelValue, (open) => { if (!open) { editandoId.value = null; 
 
 .lhm__foot { padding: .75rem 1.25rem; border-top: 1px solid var(--c-slate-100); }
 .lhm__count { font-size: .75rem; color: var(--c-slate-400); }
+.lhm__row-img { display: block; margin-top: .35rem; width: 120px; height: 120px; object-fit: cover; border-radius: 8px; }
 </style>

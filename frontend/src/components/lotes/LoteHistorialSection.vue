@@ -18,6 +18,7 @@
             <span class="lhs__row-fecha">{{ formatDateTime(it.fecha) }}</span>
           </div>
           <div v-if="it.detalle" class="lhs__row-desc">{{ it.detalle }}</div>
+          <img v-if="it.metadata?.imagen_url" :src="it.metadata.imagen_url" class="lhs__row-img" alt="" loading="lazy" />
           <div v-if="it.usuario" class="lhs__row-meta">{{ it.usuario }}</div>
         </div>
       </div>
@@ -67,6 +68,7 @@ const historialPagina = computed(() => {
 .lhs__row-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }
 .lhs__row-titulo { font-size: .82rem; font-weight: 600; color: #1a1a1a; }
 .lhs__row-detalle { color: var(--c-slate-500); font-weight: 600; }
+.lhs__row-img { display: block; margin-top: .35rem; width: 96px; height: 96px; object-fit: cover; border-radius: 8px; }
 .lhs__row-fecha { font-size: .7rem; color: var(--c-slate-400); white-space: nowrap; flex-shrink: 0; }
 .lhs__row-desc { font-size: .78rem; color: var(--c-slate-600); margin-top: .2rem; }
 .lhs__row-meta { font-size: .72rem; color: var(--c-slate-400); margin-top: .15rem; }

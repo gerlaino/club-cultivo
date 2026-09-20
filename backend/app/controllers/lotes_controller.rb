@@ -931,6 +931,19 @@ class LotesController < ApplicationController
   # ordenada por fecha. Es la fuente única del historial (reemplaza al timeline) y
   # la base de los informes scopeables. `editable`/`deletable` indican qué se puede
   # gestionar desde el historial (solo eventos manuales de lote).
+  # GET /lotes/fotos_recientes — la última foto de cada lote en cultivo (para «tu última foto»
+  # en el inicio del teléfono). Sólo lotes que la persona ve.
+  def fotos_recientes
+    lotes = current_user.club.lotes.where(estado: Lote::CULTIVO_ESTADOS).includes(:sala)
+    lotes = lotes.where(sala_id: current_user.salas_ids_en_sedes_asignadas) if current_user.limitado_por_sede?
+    ids   = LoteFoto.where(lote_id: lotes.select(:id)).group(:lote_id).maximum(:id).values
+    fotos = LoteFoto.where(id: ids).includes(:lote, imagen_attachment: :blob).sort_by { |f| -f.id }
+    render json: fotos.map { |f|
+      { id: f.id, lote_id: f.lote_id, lote_codigo: f.lote.codigo, sala: f.lote.sala&.nombre,
+        url: url_for(f.imagen), tomada_el: f.tomada_el, dia: f.dia_de_vida, fase: f.fase, nota: f.nota }
+    }
+  end
+
   def historial
     items = []
 
@@ -990,6 +1003,17 @@ class LotesController < ApplicationController
         titulo: "Pesada (#{fase_label(p.fase_origen)} → #{fase_label(p.fase_destino)})",
         detalle: pesos.join(' · ').presence, categoria: nil, metadata: {},
         usuario: p.registrado_por&.nombre_completo, editable: false, deletable: false,
+      }
+    end
+
+    # Las fotos con nota entran a la línea de tiempo (las que no tienen nota viven en la
+    # galería: en el historial serían ruido).
+    @lote.lote_fotos.where.not(nota: [nil, '']).includes(:user, imagen_attachment: :blob).find_each do |f|
+      items << {
+        kind: 'foto', source: 'lote_foto', id: f.id, fecha: f.tomada_el.in_time_zone, emoji: '📷',
+        titulo: f.nota, detalle: (f.dia_de_vida ? "Día #{f.dia_de_vida}" : nil), categoria: nil,
+        metadata: { imagen_url: url_for(f.imagen) }, usuario: f.user&.nombre_completo,
+        editable: false, deletable: false,
       }
     end
 

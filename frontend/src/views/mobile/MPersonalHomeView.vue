@@ -73,6 +73,21 @@
       </div>
     </section>
 
+    <!-- ── Tu última foto de cada lote: ver crecer la planta desde el inicio ── -->
+    <section v-if="fotosRecientes.length" class="mph__section">
+      <div class="mph__section-head">
+        <h2 class="mph__section-title">Últimas fotos</h2>
+      </div>
+      <div class="mph__fotos">
+        <RouterLink v-for="f in fotosRecientes" :key="f.id" :to="`/m/lote-m/${f.lote_id}`" class="mph__foto">
+          <img :src="f.url" :alt="f.nota || f.lote_codigo" loading="lazy" />
+          <span class="mph__foto-cap">
+            <b>{{ f.lote_codigo }}</b>{{ f.dia ? ` · día ${f.dia}` : '' }}
+          </span>
+        </RouterLink>
+      </div>
+    </section>
+
     <!-- ── Lotes en curso ── -->
     <section class="mph__section">
       <div class="mph__section-head">
@@ -136,7 +151,8 @@ import { useLotesStore }    from '../../stores/lotes'
 import { useSalasStore }    from '../../stores/salas'
 import { useAmbienteStore } from '../../stores/ambiente'
 import { useToast }         from '../../composables/useToast.js'
-import { getAmbienteSalas } from '../../lib/api'
+import { getAmbienteSalas, getFotosRecientes } from '../../lib/api'
+import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import { ESTADO_META }      from '../../lib/loteHelpers.js'
 import PuestaEnMarcha       from '../../components/PuestaEnMarcha.vue'
 
@@ -160,6 +176,7 @@ const fechaLarga = computed(() => {
 
 const cargando = ref(true)
 const ambiente = ref([])
+const fotosRecientes = ref([])
 const tieneIot = computed(() => club.data?.features?.iot === true)
 
 // Hoy + lo vencido, que sigue siendo de hoy hasta que se haga.
@@ -226,9 +243,12 @@ onMounted(async () => {
       salas.fetch(),
       ambienteStore.cargarAlertas(),
       getAmbienteSalas().then(r => { ambiente.value = r.data?.salas || [] }),
+      getFotosRecientes().then(r => { fotosRecientes.value = r.data || [] }).catch(() => {}),
     ])
   } finally { cargando.value = false }
 })
+// Una foto sacada desde la ficha del lote aparece acá sin recargar.
+useRecargaEnCambios('fotos', async () => { fotosRecientes.value = (await getFotosRecientes()).data || [] })
 </script>
 
 <style scoped>
@@ -303,6 +323,10 @@ onMounted(async () => {
 
 /* Lotes */
 .mph__lotes { display: flex; flex-direction: column; gap: .45rem; }
+.mph__fotos { display: flex; gap: .5rem; overflow-x: auto; padding-bottom: .25rem; scroll-snap-type: x mandatory; }
+.mph__foto { flex: 0 0 132px; scroll-snap-align: start; position: relative; border-radius: 12px; overflow: hidden; aspect-ratio: 1; background: var(--c-ink-100, #f3f4f6); }
+.mph__foto img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mph__foto-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: .3rem .5rem; font-size: .68rem; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.6)); }
 .mph__lote {
   display: flex; align-items: center; gap: .7rem; padding: .7rem .8rem;
   background: #fff; border: 1px solid var(--c-leaf-100, #e8f0eb); border-radius: 14px; text-decoration: none;

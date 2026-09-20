@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_20_120000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_20_140000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -334,7 +334,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_20_120000) do
     t.index ["cerrada_por_id"], name: "index_caja_turnos_on_cerrada_por_id"
     t.index ["cierre_solicitado_por_id"], name: "index_caja_turnos_on_cierre_solicitado_por_id"
     t.index ["club_id"], name: "index_caja_turnos_on_club_id"
-    t.index ["punto_type", "punto_id"], name: "index_caja_turnos_activa_por_punto", unique: true, where: "((estado)::text = ANY (ARRAY[('abierta'::character varying)::text, ('pendiente_cierre'::character varying)::text]))"
+    t.index ["punto_type", "punto_id"], name: "index_caja_turnos_activa_por_punto", unique: true, where: "((estado)::text = ANY ((ARRAY['abierta'::character varying, 'pendiente_cierre'::character varying])::text[]))"
     t.index ["sede_id"], name: "index_caja_turnos_on_sede_id"
   end
 
@@ -1296,6 +1296,25 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_20_120000) do
     t.index ["sala_origen_id"], name: "index_lote_eventos_on_sala_origen_id"
     t.index ["tipo"], name: "index_lote_eventos_on_tipo"
     t.index ["user_id"], name: "index_lote_eventos_on_user_id"
+  end
+
+  create_table "lote_fotos", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "lote_id", null: false
+    t.bigint "plant_id"
+    t.bigint "user_id"
+    t.date "tomada_el", null: false
+    t.string "fase"
+    t.jsonb "etiquetas", default: [], null: false
+    t.string "nota"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_lote_fotos_on_club_id"
+    t.index ["etiquetas"], name: "index_lote_fotos_on_etiquetas", using: :gin
+    t.index ["lote_id", "tomada_el"], name: "index_lote_fotos_on_lote_id_and_tomada_el"
+    t.index ["lote_id"], name: "index_lote_fotos_on_lote_id"
+    t.index ["plant_id"], name: "index_lote_fotos_on_plant_id"
+    t.index ["user_id"], name: "index_lote_fotos_on_user_id"
   end
 
   create_table "lotes", force: :cascade do |t|
@@ -2643,6 +2662,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_20_120000) do
   add_foreign_key "lote_eventos", "salas", column: "sala_origen_id"
   add_foreign_key "lote_eventos", "users"
   add_foreign_key "lote_eventos", "users", column: "deleted_by_id"
+  add_foreign_key "lote_fotos", "clubs"
+  add_foreign_key "lote_fotos", "lotes"
+  add_foreign_key "lote_fotos", "plants"
+  add_foreign_key "lote_fotos", "users"
   add_foreign_key "lotes", "clubs"
   add_foreign_key "lotes", "geneticas", on_delete: :nullify
   add_foreign_key "lotes", "lotes", column: "lote_origen_id"

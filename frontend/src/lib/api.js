@@ -772,6 +772,9 @@ export const listFotosSala   = (salaId)           => api.get(`/salas/${salaId}/f
 export const uploadFotoSala  = (salaId, formData) => api.post(`/salas/${salaId}/fotos`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
 export const deleteFotoSala  = (salaId, fotoId)   => api.delete(`/salas/${salaId}/fotos/${fotoId}`)
 export const deleteFotoLote  = (loteId, fotoId)   => api.delete(`/lotes/${loteId}/fotos/${fotoId}`)
+export const updateFotoLote  = (loteId, fotoId, payload) => api.patch(`/lotes/${loteId}/fotos/${fotoId}`, payload)
+// La última foto de cada lote en cultivo («tu última foto» en el inicio del teléfono).
+export const getFotosRecientes = ()                => api.get('/lotes/fotos_recientes')
 export const setFotoPortadaLote = (loteId, fotoId) => api.patch(`/lotes/${loteId}/fotos/${fotoId}/portada`)
 
 // ── Super Admin ──────────────────────────────────────────────────────
