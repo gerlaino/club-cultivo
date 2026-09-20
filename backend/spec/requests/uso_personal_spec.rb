@@ -237,6 +237,27 @@ RSpec.describe 'Uso personal', type: :request do
     end
   end
 
+  # Una carpa es una carpa: el cultivador de casa no tiene propagador aparte ni la puerta
+  # «Registrar enraizado» a mano. Con su único lote enraizando, la lectura de la sala moría con
+  # «Error al guardar» (19-sep-2026, Lover).
+  describe 'registrar el ambiente del espacio' do
+    let(:club)  { create(:club, plan: 'personal', features: Club::FEATURES_PERSONAL) }
+    let(:admin) { create(:user, :admin, club: club) }
+    let(:sede)  { create(:sede, club: club, nombre: 'Mi cultivo', tipo: 'produccion') }
+    let(:sala)  { create(:sala, club: club, sede: sede, created_by: admin, kind: 'vegetativo') }
+    before { sign_in_as(admin) }
+
+    it 'llega también a lo que está enraizando' do
+      enraizando = create(:lote, club: club, sala: sala, estado: 'enraizado')
+
+      post "/api/salas/#{sala.id}/registrar_sala", params: { registro_ambiental: { temperatura: 24, humedad: 83 } }
+
+      expect(response).to have_http_status(:created), response.body
+      expect(JSON.parse(response.body)['lotes_afectados']).to eq(1)
+      expect(enraizando.registros_ambientales.count).to eq(1)
+    end
+  end
+
   describe 'lo que paga' do
     # Cuánto vale cada adicional en personal está pendiente: hasta entonces, prenderlos no
     # cambia el número.

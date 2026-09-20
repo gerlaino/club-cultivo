@@ -1,5 +1,15 @@
 # Changelog
 
+## Septiembre 2026 (cl) — Uso personal: la lectura del espacio llega a lo que enraíza
+
+- «Registrar ambiente» desde la tarjeta del espacio moría con «Error al guardar» (Lover, 19-sep).
+  Dos causas: la carpa tenía su único lote **enraizando** y `registrar_sala` lo excluye (regla de
+  organización: el propagador tiene otro microclima, va por «Registrar enraizado»), y el modal
+  leía `errors[0]` cuando el backend contestó `error`, así que el motivo no se veía.
+- **En uso personal una carpa es una carpa**: la lectura del espacio vale para todo lo que hay
+  adentro, enraizando incluido (no tiene propagador aparte ni la otra puerta a mano). En
+  organización no cambia nada. `RegistrarLecturaSheet` muestra `error` o `errors`, lo que venga.
+
 ## Septiembre 2026 (ck) — Cada persona elige qué avisos le llegan al teléfono
 
 - **Pedido de Germán (20-sep):** poder elegir qué llega y qué no, «simple: ponete en cada rol,

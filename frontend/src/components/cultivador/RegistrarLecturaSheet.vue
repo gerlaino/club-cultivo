@@ -119,7 +119,9 @@ async function guardar() {
     open.value = false
     resetForm()
   } catch (e) {
-    toast.error(e?.response?.data?.errors?.[0] || 'Error al guardar')
+    // El backend contesta con `error` (un motivo) o con `errors` (validaciones): las dos se
+    // muestran. «Error al guardar» a secas escondía «los lotes están enraizando».
+    toast.error(e?.response?.data?.error || e?.response?.data?.errors?.[0] || 'Error al guardar')
   } finally {
     guardando.value = false
   }

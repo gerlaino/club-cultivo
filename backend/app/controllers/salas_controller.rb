@@ -143,7 +143,11 @@ class SalasController < ApplicationController
     # marca 60% de humedad y adentro hay 90%) y su registro entra por `registrar_enraizado`. Sin
     # esta exclusión el lote enraizando acumula dos lecturas contradictorias del mismo momento y
     # las alertas y la analítica promedian un ambiente que no existió.
-    lotes_activos = @sala.lotes.where(estado: Lote::CULTIVO_ESTADOS).where.not(estado: 'enraizado')
+    # …salvo en USO PERSONAL: una carpa es una carpa. El cultivador de casa no tiene un
+    # propagador aparte ni la puerta «Registrar enraizado» a mano, y con el único lote enraizando
+    # su primera lectura moría con «Error al guardar» (19-sep-2026, Lover).
+    lotes_activos = @sala.lotes.where(estado: Lote::CULTIVO_ESTADOS)
+    lotes_activos = lotes_activos.where.not(estado: 'enraizado') unless current_user.club.personal?
 
     if lotes_activos.empty?
       # Si los únicos lotes de la sala están enraizando, decirlo: "no hay lotes activos" haría
