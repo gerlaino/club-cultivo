@@ -35,9 +35,9 @@
             <!-- El mismo interruptor que el escritorio. Sin esto el teléfono sólo tenía el pedido
                  automático de los 4 segundos: si el alta fallaba no había cómo reintentar ni
                  forma de enterarse de por qué (19-sep-2026). -->
-            <button v-if="pushDisponible || iosSinInstalar" class="msh__menu-item" :disabled="pushLoading" @click="togglePush">
+            <button v-if="pushDisponible || iosSinInstalar" class="msh__menu-item" :class="{ 'msh__menu-item--blocked': pushDenied }" :disabled="pushLoading" @click="togglePush">
               <i class="bi" :class="pushSubscribed ? 'bi-bell-fill' : 'bi-bell-slash'"></i>
-              {{ pushSubscribed ? 'Notificaciones activas' : 'Activar notificaciones' }}
+              {{ pushDenied ? 'Notificaciones bloqueadas' : (pushSubscribed ? 'Notificaciones activas' : 'Activar notificaciones') }}
             </button>
             <button class="msh__menu-item msh__menu-item--danger" @click="doLogout">
               <i class="bi bi-box-arrow-right"></i> Cerrar sesión
@@ -368,11 +368,12 @@ onMounted(() => { if (auth.user?.role === 'delivery') cajaDelivery.cargar() })
 // Ya no se pide permiso solo a los 4 segundos: pedirlo sin contexto —y, en iPhone, fuera de
 // un toque— fallaba en silencio y quemaba la única oportunidad de preguntar. Se activa desde
 // el menú, con un toque y con un toast que dice qué pasó.
-const { disponible: pushDisponible, iosSinInstalar, subscribed: pushSubscribed, loading: pushLoading,
+const { disponible: pushDisponible, iosSinInstalar, subscribed: pushSubscribed, loading: pushLoading, denied: pushDenied,
         subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications()
 
 // Igual que en `AdminTopBar`: nunca mudo. Si no se pudo, el toast dice por qué.
 async function togglePush() {
+  if (pushDenied.value) { toast.error(MOTIVOS.denegado, { timeout: 9000 }); menuOpen.value = false; return }
   if (pushSubscribed.value) {
     const r = await pushUnsubscribe()
     r === true ? toast.info('Notificaciones desactivadas en este dispositivo') : toast.error(MOTIVOS[r] || MOTIVOS.error)
@@ -494,6 +495,7 @@ onMounted(() => {
 }
 .msh__menu-item:active { background: var(--c-slate-50); }
 .msh__menu-item--danger { color: #dc2626; border-top: 1px solid var(--c-slate-100); }
+.msh__menu-item--blocked { color: #b91c1c; }
 .msh-menu-enter-active, .msh-menu-leave-active { transition: opacity .15s; }
 .msh-menu-enter-from, .msh-menu-leave-to { opacity: 0; }
 

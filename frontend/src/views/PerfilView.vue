@@ -175,7 +175,7 @@ function initials(first, last) {
 const toast = useToast()
 const notif = ref(null)
 const notifGuardando = ref(null)
-const { disponible: pushDisponible, iosSinInstalar, subscribed: pushSubscribed, loading: pushLoading,
+const { disponible: pushDisponible, iosSinInstalar, subscribed: pushSubscribed, loading: pushLoading, denied: pushDenied,
         subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications()
 
 const notifGrupos = computed(() => {
@@ -217,6 +217,7 @@ async function toggleNoMolestar() {
 // El mismo interruptor de «este dispositivo» que hay en el menú: acá es donde se viene a
 // buscar cuando algo no llega.
 async function togglePushDispositivo() {
+  if (pushDenied.value) { toast.error(MOTIVOS.denegado, { timeout: 9000 }); return }
   if (pushSubscribed.value) {
     const r = await pushUnsubscribe()
     r === true ? toast.info('Notificaciones desactivadas en este dispositivo') : toast.error(MOTIVOS[r] || MOTIVOS.error)
@@ -360,14 +361,16 @@ onMounted(() => { fetchProfile(); fetchNotificaciones() })
             <!-- Este dispositivo -->
             <div class="pfl__notif-dispositivo">
               <div>
-                <div class="pfl__notif-label">{{ pushSubscribed ? 'Este dispositivo recibe avisos' : 'Este dispositivo no recibe avisos' }}</div>
+                <div class="pfl__notif-label">{{ pushDenied ? 'Este navegador tiene las notificaciones bloqueadas' : (pushSubscribed ? 'Este dispositivo recibe avisos' : 'Este dispositivo no recibe avisos') }}</div>
                 <div class="pfl__hint">
-                  {{ iosSinInstalar ? 'En iPhone hay que agregar la app a la pantalla de inicio.' : (pushSubscribed ? 'Cada teléfono o computadora se activa por separado.' : 'Activalo para que los avisos de abajo te lleguen acá.') }}
+                  {{ pushDenied ? 'Tocá el candado a la izquierda de la dirección → Notificaciones → Permitir. Al volver, el botón cambia solo.'
+                     : iosSinInstalar ? 'En iPhone hay que agregar la app a la pantalla de inicio.'
+                     : (pushSubscribed ? 'Cada teléfono o computadora se activa por separado.' : 'Activalo para que los avisos de abajo te lleguen acá.') }}
                 </div>
               </div>
-              <button v-if="pushDisponible || iosSinInstalar" class="pfl__btn-secondary" :disabled="pushLoading" @click="togglePushDispositivo">
+              <button v-if="pushDisponible || iosSinInstalar" class="pfl__btn-secondary" :disabled="pushLoading || pushDenied" @click="togglePushDispositivo">
                 <i class="bi" :class="pushSubscribed ? 'bi-bell-slash' : 'bi-bell'"></i>
-                {{ pushSubscribed ? 'Desactivar acá' : 'Activar acá' }}
+                {{ pushDenied ? 'Bloqueadas' : (pushSubscribed ? 'Desactivar acá' : 'Activar acá') }}
               </button>
             </div>
 

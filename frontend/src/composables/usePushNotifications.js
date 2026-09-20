@@ -1,4 +1,4 @@
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import api from '../lib/api.js'
 import { useAuthStore } from '../stores/auth'
 
@@ -22,7 +22,7 @@ export const MOTIVOS = {
   ios_instalar:   'En iPhone las notificaciones sólo funcionan con la app agregada a la pantalla de inicio: en Safari tocá Compartir → «Agregar a inicio» y abrila desde ahí.',
   no_configurado: 'Las notificaciones push no están configuradas en este servidor.',
   sin_sw:         'La app no terminó de instalarse en este navegador. Recargá la página y probá de nuevo.',
-  denegado:       'El navegador tiene las notificaciones bloqueadas para esta app: hay que permitirlas desde la configuración del sitio.',
+  denegado:       'Este navegador tiene las notificaciones bloqueadas para la app. Para permitirlas: tocá el candado (o el ícono de ajustes) a la izquierda de la dirección, entrá a «Notificaciones» y elegí «Permitir». Después volvé acá y tocá de nuevo.',
   rechazado:      'No se dio permiso para notificar.',
   error:          'No se pudo activar. Probá de nuevo; si sigue, avisá.',
 }
@@ -56,11 +56,13 @@ export function usePushNotifications() {
 
   async function checkStatus() {
     if (!supported) return
+    // El permiso se lee ANTES de esperar al service worker: es síncrono y es lo que decide
+    // si el botón dice «bloqueadas». Esperar al SW para saberlo dejaba el texto viejo.
+    denied.value = Notification.permission === 'denied'
     try {
-      const reg = await navigator.serviceWorker.ready
+      const reg = await swListo()
       const sub = await reg.pushManager.getSubscription()
       subscribed.value = !!sub
-      denied.value = Notification.permission === 'denied'
     } catch {}
   }
 
@@ -124,7 +126,12 @@ export function usePushNotifications() {
     }
   }
 
-  onMounted(checkStatus)
+  // Se vuelve a mirar cada vez que la persona vuelve a la pestaña: si fue a desbloquear las
+  // notificaciones en la configuración del navegador, el botón tiene que volver a «Activar»
+  // solo, sin recargar.
+  const alVolver = () => { if (!document.hidden) checkStatus() }
+  onMounted(() => { checkStatus(); document.addEventListener('visibilitychange', alVolver); window.addEventListener('focus', alVolver) })
+  onUnmounted(() => { document.removeEventListener('visibilitychange', alVolver); window.removeEventListener('focus', alVolver) })
 
   return { supported, disponible, iosSinInstalar, subscribed, loading, denied, subscribe, unsubscribe, checkStatus }
 }

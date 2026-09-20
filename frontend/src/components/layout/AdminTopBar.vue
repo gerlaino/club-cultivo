@@ -79,17 +79,20 @@
                 </RouterLink>
 
                 <!-- Push notifications toggle -->
+                <!-- Si el navegador las tiene BLOQUEADAS el botón no desaparece: dice que están
+                     bloqueadas y al tocarlo explica cómo destrabarlas. Esconderlo dejaba a la
+                     persona sin saber qué pasó (19-sep-2026). -->
                 <button
-                  v-if="pushDisponible && !pushDenied"
+                  v-if="pushDisponible"
                   class="atb__user-item atb__push-item"
-                  :class="{ 'atb__push-item--on': pushSubscribed }"
+                  :class="{ 'atb__push-item--on': pushSubscribed, 'atb__push-item--blocked': pushDenied }"
                   @click="togglePush"
                   :disabled="pushLoading"
                 >
                   <BellRing v-if="pushSubscribed" :size="14" :stroke-width="2" />
                   <BellOff  v-else                :size="14" :stroke-width="2" />
-                  <span>{{ pushSubscribed ? 'Notificaciones activas' : 'Activar notificaciones' }}</span>
-                  <span class="atb__push-dot" :class="pushSubscribed ? 'atb__push-dot--on' : 'atb__push-dot--off'"></span>
+                  <span>{{ pushDenied ? 'Notificaciones bloqueadas' : (pushSubscribed ? 'Notificaciones activas' : 'Activar notificaciones') }}</span>
+                  <span class="atb__push-dot" :class="pushSubscribed ? 'atb__push-dot--on' : (pushDenied ? 'atb__push-dot--blocked' : 'atb__push-dot--off')"></span>
                 </button>
 
                 <div class="atb__divider"></div>
@@ -157,6 +160,7 @@ const {
 // El botón nunca se queda mudo: si no se pudo, dice por qué (antes `subscribe()` devolvía
 // `false` sin pedir permiso y parecía roto).
 async function togglePush() {
+  if (pushDenied.value) { toast.error(MOTIVOS.denegado, { timeout: 9000 }); return }
   if (pushSubscribed.value) {
     const resultado = await pushUnsubscribe()
     if (resultado === true) toast.info('Notificaciones desactivadas en este dispositivo')
@@ -395,4 +399,6 @@ async function handleLogout() {
 }
 .atb__push-dot--on  { background: var(--c-leaf-500); }
 .atb__push-dot--off { background: var(--c-ink-300); }
+.atb__push-dot--blocked { background: #dc2626; }
+.atb__push-item--blocked { color: #b91c1c; }
 </style>
