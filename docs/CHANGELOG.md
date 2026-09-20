@@ -1,5 +1,23 @@
 # Changelog
 
+## Septiembre 2026 (cs) — PWA personal: recorrido como usuario y lo que apareció
+
+- **Genéticas: el catálogo INASE es compartido y de sólo lectura.** Las globales son filas de
+  todas las organizaciones; cualquier admin podía marcarlas «disponible» (o apagarlas) y se lo
+  cambiaba a todos: un uso personal nuevo aparecía con «una genética de otro usuario» (Germán,
+  20-sep). `update`/`destroy`/`destroy_foto` sobre una global → 403; en la lista no tienen
+  toggle ni acciones («catálogo»); **el cultivador de casa ve sólo las suyas**; migración que
+  devuelve las globales a `disponible: false, activa: true`. `geneticas_catalogo_compartido_spec`.
+- **`/m/tareas` explotaba** («Maximum call stack size exceeded»): `toISO` local que se llamaba a
+  sí mismo, el mismo bug de la ficha del lote del 10-sep. Test `funcionSeLlamaASiMisma` que
+  barre `src` buscando `function x() { return x(…) }`.
+- **La solapa Cultivo del teléfono salía en blanco**: la vista hacía `router.replace` a la sede
+  en `onMounted`, adentro de la transición `out-in` del shell. La redirección pasó al
+  `beforeEnter` de la ruta.
+- Pulido de vocabulario y ruido en personal: sin chip «Produccion» en la sede, «1 lote»,
+  «Registrar el espacio», y sin el botón «Foto» duplicado en la ficha del lote (la galería ya
+  tiene «Sacar foto»).
+
 ## Septiembre 2026 (cr) — PWA: la puesta en marcha abre el modal, no rebota al inicio
 
 - «Crear un espacio de cultivo» en el inicio del teléfono mandaba a `/salas`, que no vive bajo

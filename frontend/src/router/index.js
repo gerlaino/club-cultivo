@@ -1057,7 +1057,19 @@ const routes = [
 
       // ── Uso personal (el admin del plan personal) ──
       { path: 'personal/hoy',     component: () => import('../views/mobile/MPersonalHomeView.vue') },
-      { path: 'personal/cultivo', component: () => import('../views/mobile/MPersonalCultivoView.vue') },
+      // La solapa Cultivo del cultivador de casa ES su sede (tiene una sola). La redirección va
+      // ACÁ y no en la vista: una vista que hace `router.replace` en `onMounted` dentro de la
+      // transición `out-in` del shell dejaba la pantalla en blanco (20-sep-2026).
+      { path: 'personal/cultivo', component: () => import('../views/mobile/MPersonalCultivoView.vue'),
+        beforeEnter: async () => {
+          try {
+            const { listSedes } = await import('../lib/api.js')
+            const { data } = await listSedes()
+            const sede = (data || [])[0]
+            if (sede) return `/m/sede/${sede.id}`
+          } catch { /* sin red: la vista explica que falta la sede */ }
+          return true
+        } },
       { path: 'personal/stock',   component: () => import('../views/mobile/MPersonalFrascosView.vue') },
       { path: 'personal/gastos',  component: () => import('../views/mobile/MPersonalGastosView.vue') },
       { path: 'admin/sedes',   component: () => import('../views/mobile/MSedesView.vue') },

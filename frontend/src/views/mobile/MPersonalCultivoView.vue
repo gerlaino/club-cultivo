@@ -14,21 +14,10 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { listSedes } from '../../lib/api'
-
-const router   = useRouter()
-const cargando = ref(true)
-
-onMounted(async () => {
-  try {
-    const { data } = await listSedes()
-    const sede = (data || [])[0]
-    if (sede) { router.replace(`/m/sede/${sede.id}`); return }
-  } catch { /* sin red: se muestra el vacío */ }
-  cargando.value = false
-})
+// La redirección a la sede la hace el router (`beforeEnter` de esta ruta): acá sólo se llega
+// cuando no hay sede, así que no hay nada que cargar.
+import { ref } from 'vue'
+const cargando = ref(false)
 </script>
 
 <style scoped>

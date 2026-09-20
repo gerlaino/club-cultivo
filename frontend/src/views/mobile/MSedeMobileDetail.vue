@@ -5,7 +5,8 @@
       <header class="msd__header">
         <div class="msd__header-txt">
           <h1 class="msd__title">{{ sede.nombre }}</h1>
-          <span class="msd__tipo">{{ sede.tipo }}</span>
+          <!-- «Produccion» es de organización; el cultivador de casa tiene su casa y punto. -->
+          <span v-if="!esPersonal" class="msd__tipo">{{ sede.tipo }}</span>
         </div>
         <!-- Crear sala vive en el botón "+" de la barra: acá era una segunda puerta al mismo
              lugar. Se conserva el CTA del estado vacío, que es otra cosa —cuando no hay ninguna,
@@ -33,7 +34,7 @@
             <div class="msd__card-meta">
               <span>{{ kindLabel(sala.kind) }}</span>
               <span v-if="sala.lotes_activos_count" class="msd__dot">·</span>
-              <span v-if="sala.lotes_activos_count">{{ sala.lotes_activos_count }} lotes</span>
+              <span v-if="sala.lotes_activos_count">{{ sala.lotes_activos_count }} {{ sala.lotes_activos_count === 1 ? 'lote' : 'lotes' }}</span>
             </div>
           </div>
           <span class="msd__estado" :class="`msd__estado--${sala.state}`"></span>

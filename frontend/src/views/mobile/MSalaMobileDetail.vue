@@ -16,7 +16,7 @@
     <div class="msal__actions">
       <button class="msal__btn-registrar" @click="showRegistroSala = true">
         <i class="bi bi-pencil-square"></i>
-        Registrar sala
+        {{ esPersonal ? 'Registrar el espacio' : 'Registrar sala' }}
       </button>
       <button class="msal__btn-acciones" @click="showAcciones = true">
         <i class="bi bi-three-dots-vertical"></i>
@@ -147,11 +147,13 @@ import { useRoute } from 'vue-router'
 import { getSala, listLotes, createSalaNota, createLote, listGeneticas,
          listFotosSala, uploadFotoSala } from '../../lib/api'
 import { useToast }       from '../../composables/useToast'
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
 import SheetBottom        from '../../components/cultivador/SheetBottom.vue'
 import RegistroSalaModal  from '../../components/salas/RegistroSalaModal.vue'
 import { hoyISO } from '../../utils/dates.js'
 
 const route = useRoute()
+const { esPersonal } = useUsoPersonal()
 const toast = useToast()
 const id    = Number(route.params.id)
 

@@ -49,11 +49,9 @@
     </div>
 
     <!-- Acciones de campo -->
+    <!-- «Foto» vive en la galería de abajo («Sacar foto»): dos botones para lo mismo, uno arriba
+         del otro, era ruido. -->
     <div class="mlot__quick">
-      <button class="mlot__qa" @click="abrirFoto">
-        <span class="mlot__qa-ico" style="background:#ede9fe;color:#7c3aed"><i class="bi bi-camera"></i></span>
-        <span class="mlot__qa-lbl">Foto</span>
-      </button>
       <!-- En floración lo que sigue es COSECHAR, y la cosecha se registra con pesada: ofrecer
            «Avanzar fase → Cosecha» era proponer lo que el backend rechaza («usá el formulario de
            cosecha»), con el error apareciendo después de confirmar. Es el mismo modal que en el
@@ -368,10 +366,7 @@ async function confirmarEliminar() {
   }
 }
 
-// «Foto» abre la cámara de la galería: la foto queda con su día, fase y etiquetas, no como
-// un adjunto suelto que después nadie encontraba.
 const galeria = ref(null)
-function abrirFoto() { galeria.value?.abrirCamara() }
 
 async function cargarPlantas() {
   try {
