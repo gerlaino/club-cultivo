@@ -1,4 +1,5 @@
 class PlantsController < ApplicationController
+  include CupoDeFotos
   include ManicuraJornadaGuard
 
   before_action :authenticate_user!
@@ -191,6 +192,7 @@ class PlantsController < ApplicationController
     unless params[:foto].present?
       return render json: { error: 'No se recibió ninguna foto' }, status: :unprocessable_entity
     end
+    return if rechazar_foto_si_no_cabe!(params[:foto])
     begin
       @plant.fotos.attach(params[:foto])
     rescue RedisClient::CannotConnectError, Redis::CannotConnectError => e

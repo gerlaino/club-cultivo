@@ -85,6 +85,6 @@ class SuperAdmin::CatalogoController < SuperAdmin::BaseController
 
   RECURSO_LABEL = {
     sedes: 'sedes', salas: 'salas', lotes: 'lotes',
-    plantas: 'plantas', pacientes: 'pacientes', usuarios: 'usuarios',
+    plantas: 'plantas', pacientes: 'pacientes', usuarios: 'usuarios', fotos: 'fotos',
   }.freeze
 end

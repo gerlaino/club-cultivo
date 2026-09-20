@@ -159,6 +159,7 @@ import { listSalas, uploadFotoLote } from '../../lib/api.js'
 import { useLotesStore } from '../../stores/lotes.js'
 import { useTareasStore } from '../../stores/tareas.js'
 import { hoyISO } from '../../utils/dates.js'
+import { achicarImagen } from '../../lib/imagenes.js'
 import MobileSheet from '../mobile/MobileSheet.vue'
 import MobileActionGrid from '../mobile/MobileActionGrid.vue'
 import NuevoLoteModal from '../lotes/NuevoLoteModal.vue'
@@ -439,14 +440,15 @@ async function subirFotoRapida(e) {
   const loteId = fotoLoteId.value
   if (!file || !loteId) return
   const fd = new FormData()
-  fd.append('imagen', file)
+  fd.append('imagen', await achicarImagen(file))
   fd.append('tomada_el', hoyISO())
   try {
     await uploadFotoLote(loteId, fd)
     toast.success('Foto guardada')
     router.push(`/m/lote-m/${loteId}`)
   } catch (err) {
-    toast.error(err?.response?.data?.errors?.[0] || err?.response?.data?.error || 'No se pudo guardar la foto')
+    // El 402 del tope de fotos trae `mensaje` (qué plan, cuál es el tope, qué hacer).
+    toast.error(err?.response?.data?.mensaje || err?.response?.data?.errors?.[0] || err?.response?.data?.error || 'No se pudo guardar la foto')
   }
 }
 

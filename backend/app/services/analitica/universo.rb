@@ -16,10 +16,13 @@ module Analitica
 
     attr_reader :club, :desde, :hasta
 
-    def initialize(club:, desde: nil, hasta: nil)
+    # `lotes:` fija el conjunto a mano (el resumen de UN ciclo lo usa para pedirle las fases y
+    # las plantas de ese lote con el mismo cálculo que la analítica, en vez de repetirlo).
+    def initialize(club:, desde: nil, hasta: nil, lotes: nil)
       @club  = club
       @desde = desde
       @hasta = hasta
+      @lotes = lotes&.to_a
     end
 
     def lotes

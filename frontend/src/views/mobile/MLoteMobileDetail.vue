@@ -69,6 +69,9 @@
            lugar. Y las plantas se dan de alta con el lote, no de a una desde su ficha. -->
     </div>
 
+    <!-- «Cómo salió»: el cierre del ciclo, cuando lo hay. -->
+    <div class="mlot__galeria"><ResumenCiclo :lote-id="id" :estado="lote.estado" /></div>
+
     <!-- Fotos: la misma galería que en escritorio (por semana, comparar, etiquetas). El botón
          rápido «Foto» de arriba abre la cámara de esta galería. -->
     <div class="mlot__galeria">
@@ -203,6 +206,7 @@
 <script setup>
 import { MACETA_OPCIONES, textoProximoPaso } from '../../lib/loteHelpers.js'
 import LoteGaleria from '../../components/lotes/LoteGaleria.vue'
+import ResumenCiclo from '../../components/lotes/ResumenCiclo.vue'
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {

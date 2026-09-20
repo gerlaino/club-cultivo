@@ -5,6 +5,7 @@
 # que la galería necesita para agrupar por semana y filtrar por etiqueta; la pantalla no calcula
 # días ni fases: los manda el backend.
 class FotosLoteController < ApplicationController
+  include CupoDeFotos
   before_action :authenticate_user!
   before_action -> { require_feature!(:cultivo) }
   before_action :set_lote
@@ -19,12 +20,15 @@ class FotosLoteController < ApplicationController
       etiquetas_usadas: current_user.club.lote_fotos_etiquetas,
       inicio:     @lote.start_date,
       dia_actual: @lote.start_date ? (Time.zone.today - @lote.start_date).to_i + 1 : nil,
+      # Cuántas fotos le quedan al plan: la galería lo dice y apaga la cámara al llegar.
+      cupo:       PlanEnforcer.new(current_user.club).cupo_fotos,
     }
   end
 
   def create
     imagen = params[:imagen] || params[:foto]
     return render json: { error: 'No se recibió ninguna foto' }, status: :unprocessable_entity if imagen.blank?
+    return if rechazar_foto_si_no_cabe!(imagen)
 
     foto = @lote.lote_fotos.new(foto_params.merge(club: current_user.club, user: current_user))
     foto.imagen.attach(imagen)

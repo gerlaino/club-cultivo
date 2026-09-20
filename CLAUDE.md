@@ -152,15 +152,15 @@ e2e `mostrador.spec.js` verde otra vez (4/4). Todo verificado: rspec en lo tocad
 - Genéticas globales (INASE) son compartidas: sólo lectura desde una organización; personal ve
   sólo las suyas. La regla del enraizado (incubadora con su clima) vale también en personal.
 
-**Ideas sin acordar (PWA personal):** resumen al cerrar el ciclo · sacar «Escanear QR» del «+»
-en personal · plan de tareas base al crear un lote · **`RegistroSalaModal` no encola sin señal**
-(el del lote sí: mismo hecho, distinta puerta; hallazgo del 20-sep).
+**Bloques (cu) y (cv), mismo día:** registro del espacio sin señal · fuera `pacientes.envio_*` ·
+«Cómo salió» (`Lotes::ResumenCiclo`, desde curado) · fotos achicadas en el teléfono + tope por
+plan (300/1.000/3.000, 8 MB) · plan de auto-registro escrito en `docs/PLAN_AUTOREGISTRO.md`.
+Decisiones de Germán: el QR se queda en el «+» (manicurar por planta/lote) · plan de trabajo
+queda como está (cada uno arma y aplica) · precios personales provisorios hasta tener valores.
 
-**Pendientes más adelante (Germán decidió posponer):** auto-registro + trial 30 días · app en las
-tiendas (Capacitor, push nativo) · `image_processing`/libvips para miniaturas de la galería.
-**Pendientes viejos:** borrar `pacientes.envio_*` (siguen en el esquema; nadie las lee; es
-migración → pedido explícito). El «repartidor cobra de más → a favor» YA está (pasa por
-`aplicar_lineas_cobro!`).
+**Pendientes más adelante (Germán decidió posponer):** auto-registro + trial 30 días (plan armado,
+sólo personal, sin flags) · app en las tiendas (cuando haya clientes fijos) · miniaturas con
+libvips (ya no urge: las fotos se achican al subir). No quedan pendientes viejos de código.
 **De Germán (no código):** rotar el secreto de Render · `rake seguridad:usuarios_con_password_default`
 · `rake stocks:balance_descuadrado` · `rake auditorias:limpiar_blobs` · confirmar que el push por
 worker llega al iPhone (el directo ya llegó) · destrabar notificaciones en su Chrome (candado).

@@ -154,6 +154,7 @@ import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
 import SheetBottom        from '../../components/cultivador/SheetBottom.vue'
 import RegistroSalaModal  from '../../components/salas/RegistroSalaModal.vue'
 import { hoyISO } from '../../utils/dates.js'
+import { achicarImagen } from '../../lib/imagenes.js'
 
 const route  = useRoute()
 const router = useRouter()
@@ -257,12 +258,12 @@ async function subirFoto(e) {
   subiendoFoto.value = true
   try {
     const fd = new FormData()
-    fd.append('foto', file)
+    fd.append('foto', await achicarImagen(file))
     await uploadFotoSala(id, fd)
     toast.success('Foto guardada')
     await cargarFotos()
   } catch (err) {
-    toast.error(err?.response?.data?.error || 'No se pudo subir la foto')
+    toast.error(err?.response?.data?.mensaje || err?.response?.data?.error || 'No se pudo subir la foto')
   } finally { subiendoFoto.value = false }
 }
 

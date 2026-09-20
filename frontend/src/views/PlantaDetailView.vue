@@ -7,6 +7,7 @@ import { usePlantsStore } from '../stores/plants'
 import { useAuthStore }   from '../stores/auth'
 import { useClubStore }   from '../stores/club'
 import { getPlantActivities, createPlantActivity, updatePlant, descartarPlant, deletePlant, registrarPesoPlanta, addPlantFoto, removePlantFoto } from '../lib/api'
+import { achicarImagen } from '../lib/imagenes.js'
 import { useManicuraJornada } from '../composables/useManicuraJornada'
 import Breadcrumb            from '../components/ui/Breadcrumb.vue'
 import EmptyState            from '../components/ui/EmptyState.vue'
@@ -288,14 +289,14 @@ async function confirmarSubidaFoto() {
   uploadingFoto.value = true
   try {
     const fd = new FormData()
-    fd.append('foto', fotoUploadFile.value)
+    fd.append('foto', await achicarImagen(fotoUploadFile.value))
     if (fotoUploadDescripcion.value.trim()) fd.append('descripcion', fotoUploadDescripcion.value.trim())
     const { data } = await addPlantFoto(planta.value.id, fd)
     if (data) fotos.value.unshift(data)
     fotosExpanded.value     = true
     showFotoUploadModal.value = false
   } catch (e) {
-    toast.error(e?.response?.data?.error || 'Error al subir la foto')
+    toast.error(e?.response?.data?.mensaje || e?.response?.data?.error || 'Error al subir la foto')
   } finally {
     uploadingFoto.value = false
     fotoUploadFile.value = null

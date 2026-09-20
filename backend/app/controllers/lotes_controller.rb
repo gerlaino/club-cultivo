@@ -2,7 +2,7 @@ class LotesController < ApplicationController
   before_action :authenticate_user!
   before_action -> { require_feature!(:cultivo) }
   before_action :require_admin_cultivador_o_manicura
-  before_action :set_lote, only: [:show, :trazabilidad, :update, :completar_datos, :destroy, :transiciones, :avanzar_fase, :cosechar_plantas, :timeline, :historial, :asignar_manicurador, :devolver_manicura, :reevaluar_manicura, :registrar_trasplante, :desprender]
+  before_action :set_lote, only: [:show, :trazabilidad, :resumen_ciclo, :update, :completar_datos, :destroy, :transiciones, :avanzar_fase, :cosechar_plantas, :timeline, :historial, :asignar_manicurador, :devolver_manicura, :reevaluar_manicura, :registrar_trasplante, :desprender]
   before_action :require_export_role!, only: [:export_csv]
   before_action :set_sala, only: [:index, :create], if: -> { params[:sala_id].present? }
 
@@ -69,6 +69,13 @@ class LotesController < ApplicationController
   # que salieron de él. La de un frasco vive en `stocks#trazabilidad`.
   def trazabilidad
     render json: Lotes::Trazabilidad.new(lote: @lote).call
+  end
+
+  # GET /lotes/:id/resumen_ciclo — «Cómo salió»: gramos, g/planta, días por fase, costo,
+  # fotos del día 1 y del final, y contra qué compararlo (los ciclos anteriores de la misma
+  # genética). Se puede pedir en cualquier estado; la tarjeta lo muestra al cerrar.
+  def resumen_ciclo
+    render json: Lotes::ResumenCiclo.new(@lote, url_helper: ->(att) { url_for(att) }).call
   end
 
   # GET /lotes/por_qr/:codigo_qr

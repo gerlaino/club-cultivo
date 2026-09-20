@@ -129,6 +129,9 @@
             <span class="mph__lote-nombre">{{ l.genetica?.nombre || l.strain || l.codigo }}</span>
             <span class="mph__lote-sub">{{ l.codigo }}<template v-if="l.estado === 'en_manicura'"> · por pesar</template></span>
             <span v-if="textoProximoPaso(l)" class="mph__lote-prox" :class="{ 'mph__lote-prox--ya': l.proximo_paso.faltan_dias <= 0 }">{{ textoProximoPaso(l) }}</span>
+            <!-- Ya pesado: los gramos y la puerta a la tarjeta completa. Sin días acá: `dias_ciclo`
+                 sigue corriendo en curado y contradecía el total de la tarjeta. -->
+            <span v-else-if="l.rendimiento_real_g > 0" class="mph__lote-prox">{{ Math.round(l.rendimiento_real_g) }} g secos · ver cómo salió</span>
           </span>
           <span class="mph__lote-fase">
             <span class="mph__lote-estado" :style="{ color: meta(l.estado).color }">{{ meta(l.estado).label }}</span>

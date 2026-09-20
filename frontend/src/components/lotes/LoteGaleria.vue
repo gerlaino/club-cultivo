@@ -7,16 +7,19 @@
         <span class="lg__title">Fotos</span>
         <span v-if="fotos.length" class="lg__pill">{{ fotos.length }}</span>
         <span v-if="diaActual" class="lg__dia">día {{ diaActual }} del lote</span>
+        <!-- Cuántas fotos le quedan al plan (lo manda el backend). Se dice cuando empieza a
+             importar: a partir del 80 %, y en rojo al llegar, que es cuando la cámara se apaga. -->
+        <span v-if="cupoTexto" class="lg__cupo" :class="{ 'lg__cupo--lleno': cupoLleno }" :title="cupoLleno ? 'Llegaste al tope de fotos de tu plan: borrá alguna o escribinos para ampliarlo' : ''">{{ cupoTexto }}</span>
       </div>
       <div class="lg__head-right">
         <button v-if="fotos.length >= 2" class="lg__btn-ghost" :class="{ 'lg__btn-ghost--on': comparando }" @click="toggleComparar">
           <i class="bi bi-layout-split"></i> {{ comparando ? 'Salir de comparar' : 'Comparar' }}
         </button>
-        <button v-if="canEdit" class="lg__btn-primary" :disabled="subiendo" @click="abrirCamara">
+        <button v-if="canEdit" class="lg__btn-primary" :disabled="subiendo || cupoLleno" @click="abrirCamara">
           <DsSpinner v-if="subiendo" :size="12" />
           <i v-else class="bi bi-camera-fill"></i> Sacar foto
         </button>
-        <button v-if="canEdit" class="lg__btn-ghost" :disabled="subiendo" @click="abrirArchivo" title="Elegir de la galería del dispositivo">
+        <button v-if="canEdit" class="lg__btn-ghost" :disabled="subiendo || cupoLleno" @click="abrirArchivo" title="Elegir de la galería del dispositivo">
           <i class="bi bi-upload"></i>
         </button>
       </div>
@@ -182,6 +185,7 @@ import { useConfirm } from '../../composables/useConfirm.js'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import { getLoteFotos, uploadFotoLote, updateFotoLote, deleteFotoLote, setFotoPortadaLote } from '../../lib/api.js'
 import { hoyISO } from '../../utils/dates.js'
+import { achicarImagen } from '../../lib/imagenes.js'
 
 const props = defineProps({
   loteId:  { type: [Number, String], required: true },
@@ -202,11 +206,23 @@ const subiendo  = ref(false)
 const inputCamara  = ref(null)
 const inputArchivo = ref(null)
 
+// El cupo de fotos del plan: `{ usadas, tope }`, `tope` nulo = sin límite.
+const cupo = ref(null)
+const cupoLleno = computed(() => !!cupo.value?.tope && cupo.value.usadas >= cupo.value.tope)
+const cupoTexto = computed(() => {
+  const c = cupo.value
+  if (!c?.tope) return null
+  if (c.usadas >= c.tope) return `${c.tope} de ${c.tope} fotos: tope del plan`
+  if (c.usadas >= c.tope * 0.8) return `${c.usadas} de ${c.tope} fotos`
+  return null
+})
+
 async function cargar() {
   try {
     const { data } = await getLoteFotos(props.loteId)
     fotos.value = data.fotos || []
     diaActual.value = data.dia_actual
+    cupo.value = data.cupo || null
     etiquetasCatalogo.value = data.etiquetas || []
     etiquetasUsadas.value   = data.etiquetas_usadas || []
   } catch { fotos.value = [] } finally { cargado.value = true }
@@ -287,10 +303,11 @@ const etiquetasOfrecidas = computed(() => [
 function abrirCamara()  { inputCamara.value?.click() }
 defineExpose({ abrirCamara })
 function abrirArchivo() { inputArchivo.value?.click() }
-function onArchivo(e) {
-  const archivo = e.target.files?.[0]
+async function onArchivo(e) {
+  const original = e.target.files?.[0]
   e.target.value = ''
-  if (!archivo) return
+  if (!original) return
+  const archivo = await achicarImagen(original)
   form.value = { id: null, archivo, preview: URL.createObjectURL(archivo), tomada_el: hoyISO(), plant_id: '', etiquetas: ['general'], nota: '' }
 }
 function editar(f) {
@@ -323,11 +340,12 @@ async function guardar() {
       if (form.value.nota) fd.append('nota', form.value.nota)
       const { data } = await uploadFotoLote(props.loteId, fd)
       fotos.value.push(data)
+      if (cupo.value) cupo.value = { ...cupo.value, usadas: cupo.value.usadas + 1 }
       toast.success('Foto guardada')
     }
     cerrarForm()
   } catch (e) {
-    toast.error(e?.response?.data?.errors?.[0] || e?.response?.data?.error || 'No se pudo guardar la foto')
+    toast.error(e?.response?.data?.mensaje || e?.response?.data?.errors?.[0] || e?.response?.data?.error || 'No se pudo guardar la foto')
   } finally { subiendo.value = false }
 }
 async function eliminar(f) {
@@ -354,6 +372,8 @@ async function portada(f) {
 .lg__head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
 .lg__head-left { display: flex; align-items: center; gap: .5rem; }
 .lg__head-right { display: flex; align-items: center; gap: .4rem; }
+.lg__cupo { font-size: .72rem; color: var(--c-amber-700, #b45309); font-weight: 600; }
+.lg__cupo--lleno { color: var(--c-red-700, #b91c1c); }
 .lg__emoji { font-size: 1.1rem; }
 .lg__title { font-weight: 700; font-size: .95rem; color: var(--c-ink-900); }
 .lg__pill { background: var(--c-leaf-100, #E5EFE9); color: var(--c-leaf-800, #1A3D2E); border-radius: 999px; padding: .05rem .5rem; font-size: .72rem; font-weight: 700; }

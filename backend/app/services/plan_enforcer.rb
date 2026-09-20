@@ -24,11 +24,21 @@ class PlanEnforcer
   # y «plan» por separado son dos perillas que tienen que coincidir. Lo único que rompe la
   # regla de «el plan dice CUÁNTO, nunca QUÉ» es que además acota los módulos a Cultivo — y
   # ese candado vive en el controller del super admin, no acá (`Club::MODULOS_PERSONAL`).
+  #
+  # `fotos` (20-sep-2026) es el único tope que también tiene el plan Total, y no contradice
+  # «Total no limita nada»: los demás miden la capacidad del CULTIVO; las fotos miden
+  # almacenamiento, que se paga por GB guardado y bajado. Sin techo, un cultivo de años llena
+  # el bucket con fotos que nadie vuelve a mirar. Personal: 300 (unos tres ciclos con una foto
+  # por día). Cuenta las de lotes, salas y plantas juntas. Los números son provisorios (Germán).
   PLANES = {
-    'basico'   => { label: 'Básico',   sedes: 1,   salas: 3,   lotes: nil, plantas: 450, pacientes: 50,  usuarios: nil, usuarios_por_rol: 1,   equipo: true  },
-    'total'    => { label: 'Total',    sedes: nil, salas: nil, lotes: nil, plantas: nil, pacientes: nil, usuarios: nil, usuarios_por_rol: nil, equipo: true  },
-    'personal' => { label: 'Personal', sedes: 1,   salas: 2,   lotes: nil, plantas: nil, pacientes: 0,   usuarios: nil, usuarios_por_rol: nil, equipo: false },
+    'basico'   => { label: 'Básico',   sedes: 1,   salas: 3,   lotes: nil, plantas: 450, pacientes: 50,  usuarios: nil, fotos: 1_000, usuarios_por_rol: 1,   equipo: true  },
+    'total'    => { label: 'Total',    sedes: nil, salas: nil, lotes: nil, plantas: nil, pacientes: nil, usuarios: nil, fotos: 3_000, usuarios_por_rol: nil, equipo: true  },
+    'personal' => { label: 'Personal', sedes: 1,   salas: 2,   lotes: nil, plantas: nil, pacientes: 0,   usuarios: nil, fotos: 300,   usuarios_por_rol: nil, equipo: false },
   }.freeze
+
+  # Tamaño máximo de UNA foto. El teléfono ya la achica antes de subir (`lib/imagenes.js`, a
+  # ~250 KB); esto es la red para lo que llega por otra puerta.
+  FOTO_MAX_BYTES = 8.megabytes
 
   PLAN_POR_DEFECTO = 'basico'.freeze
 
@@ -43,7 +53,7 @@ class PlanEnforcer
   }.freeze
 
   # Qué se limita, en el orden en que se le muestra al super admin.
-  RECURSOS = %i[sedes salas lotes plantas pacientes usuarios].freeze
+  RECURSOS = %i[sedes salas lotes plantas pacientes usuarios fotos].freeze
 
   # A qué suite le importa cada tope. Sirve para no nombrarle salas y plantas a una organización
   # que no compró Cultivo: el alta elige los módulos ANTES que el plan, así que se puede mostrar
@@ -55,6 +65,7 @@ class PlanEnforcer
     plantas:   'cultivo',
     pacientes: 'produccion_dispensa',
     usuarios:  nil,
+    fotos:     'cultivo',
   }.freeze
 
   # Normaliza cualquier valor guardado en `clubs.plan` a uno de los dos planes vigentes.
@@ -100,6 +111,25 @@ class PlanEnforcer
     return true if @limite[:plantas].nil?
     actuales = Plant.joins(:lote).where(lotes: { club_id: @club.id }).count
     actuales + cantidad <= @limite[:plantas]
+  end
+
+  # Una foto más, de lote, sala o planta: las tres cuentan contra el mismo techo.
+  def puede_subir_foto?
+    return true if @limite[:fotos].nil?
+    fotos_usadas < @limite[:fotos]
+  end
+
+  def fotos_usadas
+    lotes    = LoteFoto.where(club_id: @club.id).count
+    salas    = ActiveStorage::Attachment.where(record_type: 'Sala', name: 'fotos', record_id: @club.salas.select(:id)).count
+    plantas  = ActiveStorage::Attachment.where(record_type: 'Plant', name: 'fotos',
+                                               record_id: Plant.joins(:lote).where(lotes: { club_id: @club.id }).select(:id)).count
+    lotes + salas + plantas
+  end
+
+  # Qué le queda de fotos, para que la pantalla lo diga antes de abrir la cámara.
+  def cupo_fotos
+    { usadas: fotos_usadas, tope: @limite[:fotos] }
   end
 
   def puede_crear_paciente?
@@ -181,6 +211,7 @@ class PlanEnforcer
       plantas:   Plant.joins(:lote).where(lotes: { club_id: @club.id }).count,
       pacientes: @club.pacientes.count,
       usuarios:  @club.users.del_equipo.count,
+      fotos:     fotos_usadas,
     }
   end
 

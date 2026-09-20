@@ -35,7 +35,9 @@ RSpec.describe 'SuperAdmin catálogo', type: :request do
       expect(basico['usuarios_por_rol']).to    eq(1)
 
       total = planes.find { |p| p['clave'] == 'total' }
-      expect(total['limites'].values).to all(be_nil)
+      # Salvo las fotos, que miden almacenamiento y no capacidad del cultivo.
+      expect(total['limites'].except('fotos').values).to all(be_nil)
+      expect(total['limites']['fotos']).to be > 0
       expect(total['usuarios_por_rol']).to be_nil
     end
 
@@ -45,7 +47,8 @@ RSpec.describe 'SuperAdmin catálogo', type: :request do
       expect(basico['resumen']).to include('1 sedes', '3 salas', '450 plantas')
 
       total = catalogo['planes'].find { |p| p['clave'] == 'total' }
-      expect(total['resumen']).to all(match(/sin límite/))
+      expect(total['resumen'].reject { |r| r.include?('fotos') }).to all(match(/sin límite/))
+      expect(total['resumen']).to include(match(/\d+ fotos/))
     end
 
     it 'separa los módulos en los cajones que el panel muestra' do

@@ -26,6 +26,7 @@ import LoteHistorialModal   from '../components/lotes/LoteHistorialModal.vue'
 import LotePlantasSection   from '../components/lotes/LotePlantasSection.vue'
 import LotePlanVsReal       from '../components/lotes/LotePlanVsReal.vue'
 import LoteGaleria          from '../components/lotes/LoteGaleria.vue'
+import ResumenCiclo         from '../components/lotes/ResumenCiclo.vue'
 import LoteEditarModal      from '../components/lotes/LoteEditarModal.vue'
 import LotePLCard           from '../components/lotes/LotePLCard.vue'
 import DsBanner from '../design-system/components/Banner.vue'
@@ -648,6 +649,9 @@ onUnmounted(() => {
               </div>
             </div>
           </div>
+
+          <!-- «Cómo salió»: el cierre del ciclo (sólo en curado/cerrado). -->
+          <ResumenCiclo :lote-id="id" :estado="lote.estado" class="ld__card--mt" />
 
           <!-- 6. Fotos: la galería por semana de vida, con comparar. -->
           <div class="ld__card">

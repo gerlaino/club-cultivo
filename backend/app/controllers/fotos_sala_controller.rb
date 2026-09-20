@@ -1,6 +1,7 @@
 # Fotos de una SALA: el estado del cuarto, el montaje, un problema que hay que mostrar. Es el mismo
 # patrón que `FotosLoteController`, sin portada —una sala no se muestra en el layout de otra—.
 class FotosSalaController < ApplicationController
+  include CupoDeFotos
   before_action :authenticate_user!
   before_action -> { require_feature!(:cultivo) }
   before_action :set_sala
@@ -11,6 +12,7 @@ class FotosSalaController < ApplicationController
 
   def create
     return render json: { error: 'No se recibió ninguna foto' }, status: :unprocessable_entity if params[:foto].blank?
+    return if rechazar_foto_si_no_cabe!(params[:foto])
 
     begin
       @sala.fotos.attach(params[:foto])

@@ -1,5 +1,27 @@
 # Changelog
 
+## Septiembre 2026 (cv) — «Cómo salió», fotos que se achican y tienen tope, plan de auto-registro
+
+- **«Cómo salió»** (`Lotes::ResumenCiclo`, `GET /lotes/:id/resumen_ciclo`, tarjeta
+  `ResumenCiclo.vue` en la ficha del teléfono y del escritorio, desde `curado`): gramos, g/planta,
+  días de ciclo y $/g en grande, los días por fase como barra, plantas/riegos/costo en una línea,
+  foto del día 1 y la última, y **vs. los ciclos cerrados anteriores de la misma genética**
+  («+12 %»; sin anteriores no compara). Fases y plantas salen de `Analitica::Universo` (ahora
+  acepta `lotes:`), no de un cálculo aparte. En el inicio personal, el lote curado dice «312 g
+  secos · ver cómo salió». Opción A de las tres que se le mostraron a Germán; la imagen para
+  compartir (C) queda para cuando entren las miniaturas.
+- **Las fotos se achican antes de subir** (`lib/imagenes.js`: 1600 px, JPEG 82 %, respeta el
+  EXIF): una foto del teléfono pasa de 3–6 MB a ~250 KB. En las cuatro puertas (galería del
+  lote, foto rápida del «+», sala, planta). Sin canvas, sube el original.
+- **Tope de fotos por plan** (`PlanEnforcer`: personal 300, básico 1.000, total 3.000 —
+  provisorios; es el único tope que también tiene Total: mide almacenamiento, no capacidad del
+  cultivo) y **8 MB por archivo**. Concern `CupoDeFotos` en las tres puertas (402 `limite_plan`
+  con `cupo`); la galería muestra «287 de 300 fotos» desde el 80 % y apaga la cámara al llegar.
+  `fotos` entró a `RECURSOS`: el super admin lo ve en la tarjeta del plan.
+- **Auto-registro + trial 30 días: plan armado y pospuesto** (`docs/PLAN_AUTOREGISTRO.md`):
+  sólo personal, nace sin flags, verificación por mail, corte al día 31 con «Escribinos»,
+  organizaciones dejan sus datos. App en las tiendas: no hasta tener clientes fijos.
+
 ## Septiembre 2026 (cu) — El registro del espacio también se guarda sin señal; fuera `pacientes.envio_*`
 
 - **`RegistroSalaModal` entra a la cola** (`registrarSalaOffline`, tipo `registro_sala`): es el

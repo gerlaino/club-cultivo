@@ -368,6 +368,19 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   (`registrarLecturaOffline`) y el de la sala/espacio (`registrarSalaOffline`). La lista de lo
   que entra a la cola sigue siendo de dominio (`lib/offlineApi.js`): ambiente, registro diario,
   pesaje del manicura, entrega del repartidor. Dispensar, fotos, crear cosas y tareas, NO.
+- **LAS FOTOS SE ACHICAN EN EL TELÉFONO Y TIENEN TOPE POR PLAN** (20-sep-2026): toda puerta
+  por la que entra una foto pasa por `achicarImagen()` (`lib/imagenes.js`, test que lo barre)
+  y por `CupoDeFotos` en el backend (tope del plan en `PlanEnforcer::PLANES[..][:fotos]`, 8 MB
+  por archivo). Las de lote, sala y planta cuentan contra el mismo número. Las miniaturas en
+  el servidor (libvips) siguen pospuestas: con el achicado dejaron de ser urgentes.
+- **«CÓMO SALIÓ» ES LA TARJETA DEL CIERRE** (20-sep-2026): `Lotes::ResumenCiclo` junta lo que
+  ya estaba calculado (nunca un cálculo nuevo: fases y plantas de `Analitica::Universo`, costo
+  de `CostoLote`, nutrición de los registros) y compara sólo contra ciclos cerrados de la misma
+  genética; sin anteriores, no compara. Aparece desde `curado`. El inicio no repite días de
+  ciclo (`dias_ciclo` sigue corriendo en curado y contradecía el total).
+- **AUTO-REGISTRO: SÓLO PERSONAL, PELADO, Y POSPUESTO** (20-sep-2026): plan en
+  `docs/PLAN_AUTOREGISTRO.md`. Organizaciones no se registran solas. **App en las tiendas: no
+  hasta tener un flujo fijo de clientes** (Germán).
 - **PLAN DE TRABAJO EN PERSONAL: LO QUE HAY** (20-sep-2026): Tareas → Plan de trabajo, plantilla
   con tareas por día relativo/recurrencia, se aplica sobre lote, espacio o todo el cultivo
   (`AplicacionPlan` genera `Tarea`s). Decisión de Germán: **por ahora cada uno arma su plan y lo

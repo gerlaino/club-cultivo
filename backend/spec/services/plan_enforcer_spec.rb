@@ -22,11 +22,13 @@ RSpec.describe PlanEnforcer do
       expect(described_class::PLANES.keys).to contain_exactly('basico', 'total', 'personal')
     end
 
-    it 'el total no limita nada' do
-      described_class::RECURSOS.each do |recurso|
+    # Salvo las fotos: no miden capacidad del cultivo sino almacenamiento, que se paga por GB.
+    it 'el total no limita nada del cultivo' do
+      (described_class::RECURSOS - [:fotos]).each do |recurso|
         expect(described_class::PLANES['total'][recurso]).to be_nil,
                                                              "el plan total no debería limitar #{recurso}"
       end
+      expect(described_class::PLANES['total'][:fotos]).to be > described_class::PLANES['personal'][:fotos]
     end
 
     # `lotes` NO se limita: el lote es una unidad de organización, no de capacidad, y ponerle

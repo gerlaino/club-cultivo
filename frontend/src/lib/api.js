@@ -924,6 +924,8 @@ export const getStockMovimientos  = (id)                  => api.get(`/stocks/${
 export const getSedeStocks        = (sedeId, params = {}) => api.get(`/sedes/${sedeId}/stocks`, { params })
 export const getStockTrazabilidad = (id)                  => api.get(`/stocks/${id}/trazabilidad`)
 export const getLoteTrazabilidad  = (id)                  => api.get(`/lotes/${id}/trazabilidad`)
+// «Cómo salió»: el resumen del ciclo (gramos, g/planta, días por fase, costo, fotos, vs. anterior).
+export const getLoteResumenCiclo  = (id)                  => api.get(`/lotes/${id}/resumen_ciclo`)
 
 // ── ARICCAME ──────────────────────────────────────────────────────────────────
 export const listAriccameRegistros = (params = {}) => api.get('/ariccame_registros', { params })
