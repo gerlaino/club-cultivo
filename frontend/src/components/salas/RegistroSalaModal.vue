@@ -152,7 +152,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { registrarSala } from '../../lib/api.js'
+import { registrarSalaOffline } from '../../lib/offlineApi.js'
 import { useToast }      from '../../composables/useToast.js'
 import { useClubStore }  from '../../stores/club'
 import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
@@ -363,9 +363,13 @@ async function guardar() {
   error.value  = null
   try {
     const payload = buildPayload()
-    const { data } = await registrarSala(props.sala.id, payload)
-    const n = data.lotes_afectados
-    toast.success(`Registro guardado en ${n} lote${n !== 1 ? 's' : ''}`)
+    const res = await registrarSalaOffline(props.sala.id, payload)
+    if (res?.queued) {
+      toast.info('Sin señal: el registro queda guardado y se manda solo cuando vuelva.')
+    } else {
+      const n = res.data.lotes_afectados
+      toast.success(`Registro guardado en ${n} lote${n !== 1 ? 's' : ''}`)
+    }
     emit('update:modelValue', false)
     emit('saved')
   } catch (e) {

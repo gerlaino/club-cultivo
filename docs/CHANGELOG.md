@@ -1,5 +1,21 @@
 # Changelog
 
+## Septiembre 2026 (cu) — El registro del espacio también se guarda sin señal; fuera `pacientes.envio_*`
+
+- **`RegistroSalaModal` entra a la cola** (`registrarSalaOffline`, tipo `registro_sala`): es el
+  mismo hecho que el registro del lote por la otra puerta, y el cultivador de casa —que registra
+  por «espacio»— se quedaba con un error de red y sin lo que escribió. Toast propio («queda
+  guardado y se manda solo»). Test en `sinConexion.test.js` que lo deja escrito.
+- **Migración `BorrarEnvioDePacientes`**: las seis columnas `envio_*` de `pacientes` (la
+  dirección de entrega vieja, reemplazada por `DireccionPaciente` el 17-sep) se van. Nadie las
+  leía ni escribía; en dev había 0 filas con dato. Las de `dispensaciones` siguen: son la foto de
+  a dónde se mandó cada paquete. Pedido de Germán (20-sep).
+- Decisiones del repaso (20-sep): **«Escanear QR» se queda** en el «+» de personal (manicurar por
+  planta o por lote es lo que hace sentir profesional al aficionado) · el **plan de trabajo** ya
+  existe en personal (Tareas → Plan de trabajo: plantilla por día relativo y aplicar sobre lote,
+  espacio o todo el cultivo) y por ahora queda así, sin plan automático al crear un lote · los
+  **precios de los adicionales personales quedan provisorios** hasta que haya valores reales.
+
 ## Septiembre 2026 (ct) — PWA personal: el «+» del día, el lote dice qué viene, precios personales
 
 - **El «+» en personal es «Hoy»**: Regar / Registrar ambiente / Foto / Tarea primero, crear

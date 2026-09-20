@@ -96,6 +96,15 @@ describe('Qué se guarda sin señal', () => {
     }
   })
 
+  // El registro de la SALA es el mismo hecho que el del lote por la otra puerta: el cultivador
+  // de casa registra por «espacio», y se quedaba con un error de red y sin lo que escribió.
+  it('el registro de la sala se encola igual que el del lote', () => {
+    expect(leer('components/salas/RegistroSalaModal.vue')).toContain('registrarSalaOffline')
+    expect(leer('components/salas/RegistroSalaModal.vue')).not.toContain("from '../../lib/api.js'")
+    expect(offlineApi).toContain("'registro_sala'")
+    expect(offlineApi).toContain('/registrar_sala')
+  })
+
   // Está frente a la balanza y ya pesó: perder el número significa volver a pesar todo. No genera
   // stock —espera la confirmación del admin—, y esa confirmación es la red que atrapa un duplicado.
   it('el pesaje del manicura se encola', () => {

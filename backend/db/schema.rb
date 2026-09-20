@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_20_180000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_20_210000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1598,12 +1598,6 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_20_180000) do
     t.string "domicilio_depto"
     t.string "domicilio_barrio"
     t.string "domicilio_ciudad"
-    t.string "envio_calle"
-    t.string "envio_altura"
-    t.string "envio_piso"
-    t.string "envio_depto"
-    t.string "envio_barrio"
-    t.string "envio_ciudad"
     t.datetime "aprobado_at"
     t.bigint "aprobado_por_id"
     t.bigint "user_id"

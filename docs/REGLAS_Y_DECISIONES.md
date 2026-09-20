@@ -355,13 +355,23 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   pone palabras: «Faltan 8 días para floración», «Hoy toca…», «… venció hace 3 días».
 - **EL «+» DEL TELÉFONO EN PERSONAL SE LLAMA «HOY» Y OFRECE PRIMERO LO DE TODOS LOS DÍAS**
   (20-sep-2026): Regar / Registrar ambiente / Foto / Tarea, después Crear lote / Crear espacio /
-  Escanear. Con un solo lote (o espacio) no pregunta cuál; con varios, una hoja para elegir.
+  Escanear (**Escanear se queda**: Germán, 20-sep — manicurar por planta o por lote desde el
+  QR es el detalle que hace sentir profesional al aficionado). Con un solo lote (o espacio) no
+  pregunta cuál; con varios, una hoja para elegir.
   Regar y ambiente llegan por URL (`?accion=riego` al lote, `?accion=ambiental` al espacio) y
   los modales de registro abren YA en ese formulario (`accionInicial`; el `watch` de apertura es
   `immediate` porque el modal puede montarse abierto). **La foto se saca desde el toque del
   «+»**: el navegador no deja abrir la cámara «sola» después de navegar, así que se sube desde
   el shell (de hoy, sin etiqueta) y recién después va al lote. El ambiente es del ESPACIO, no
   del lote. Tarea en el teléfono abre `ModalTarea` (antes no había forma de crear una).
+- **SIN SEÑAL SE ENCOLA EL REGISTRO DIARIO POR LAS DOS PUERTAS** (20-sep-2026): el del lote
+  (`registrarLecturaOffline`) y el de la sala/espacio (`registrarSalaOffline`). La lista de lo
+  que entra a la cola sigue siendo de dominio (`lib/offlineApi.js`): ambiente, registro diario,
+  pesaje del manicura, entrega del repartidor. Dispensar, fotos, crear cosas y tareas, NO.
+- **PLAN DE TRABAJO EN PERSONAL: LO QUE HAY** (20-sep-2026): Tareas → Plan de trabajo, plantilla
+  con tareas por día relativo/recurrencia, se aplica sobre lote, espacio o todo el cultivo
+  (`AplicacionPlan` genera `Tarea`s). Decisión de Germán: **por ahora cada uno arma su plan y lo
+  aplica cuando quiere**; no hay plan automático al crear un lote. No está en el teléfono.
 - **TODO PACIENTE TIENE CUENTA CORRIENTE, Y LO QUE PAGA DE MÁS QUEDA A FAVOR** (18-sep-2026,
   decisión de Germán que REVIRTIÓ la del 17: «no hay plata a favor» es legacy si aparece en un
   comentario viejo). La razón es el vuelto: sin cambio, se le deja a cuenta y **en la próxima

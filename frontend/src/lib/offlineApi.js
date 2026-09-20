@@ -3,8 +3,9 @@
  *
  * No todo entra acá, y la lista es una decisión de DOMINIO, no de implementación:
  *
- *   SÍ  · Registro de ambiente (lectura de sala o de lote). No mueve stock ni plata: si se duplica
- *         o llega tarde, es un dato más en una serie temporal.
+ *   SÍ  · Registro de ambiente (lectura de sala o de lote) y el registro diario del lote o de la
+ *         sala. No mueve stock ni plata: si se duplica o llega tarde, es un dato más en una
+ *         serie temporal.
  *   SÍ  · Pesaje del manicura enviado a confirmar. Está parado frente a la balanza y ya pesó;
  *         perder el número significa volver a pesar todo. **No genera stock**: queda esperando que
  *         el admin lo confirme, y esa confirmación es la red que atrapa cualquier duplicado.
@@ -18,7 +19,7 @@
  * pierde es la FIRMA del paciente, que no se puede volver a pedir porque la persona ya se fue.
  */
 import { useSyncQueueStore } from '../stores/syncQueue.js'
-import { createRegistroAmbiental, createLecturaAmbiental, createPesajeManicura } from './api.js'
+import { createRegistroAmbiental, createLecturaAmbiental, createPesajeManicura, registrarSala } from './api.js'
 
 // ── Helpers ────────────────────────────────────────────────
 function esErrorDeRed(e) {
@@ -63,6 +64,29 @@ export async function registrarLecturaOffline({ salaId, loteId, payload, tipo, v
           payload: { lectura_ambiental: { tipo, valor, unidad, medido_at, fuente: 'manual' } },
         })
       }
+      return { offline: true, queued: true }
+    }
+    throw e
+  }
+}
+
+// ── Registro de la sala / del espacio offline-aware ───────
+/**
+ * El mismo hecho que el registro del lote (riego, ambiente, plagas, luz…), por la otra puerta:
+ * se anota una vez en la sala y el backend lo aplica a todos sus lotes. Hasta el 20-sep-2026
+ * sólo el del lote entraba a la cola; el cultivador de casa, que registra por «espacio», se
+ * quedaba con un error de red y sin lo que acababa de escribir. Misma regla, mismo tratamiento.
+ */
+export async function registrarSalaOffline(salaId, payload) {
+  try {
+    return await registrarSala(salaId, payload)
+  } catch (e) {
+    if (esErrorDeRed(e)) {
+      const queue = useSyncQueueStore()
+      encolar(queue, 'registro_sala', {
+        url:     `/salas/${salaId}/registrar_sala`,
+        payload: { registro_ambiental: payload },
+      })
       return { offline: true, queued: true }
     }
     throw e
