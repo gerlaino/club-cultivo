@@ -61,7 +61,7 @@ class CierreMostradorPendienteJob < ApplicationJob
     # A esa hora el admin no está mirando la app: la campana sola se lee al día siguiente, que es
     # exactamente lo que esta alerta existe para evitar.
     PushNotificationService.notify_admins_async(
-      club, title: 'Caja sin cerrar', body: texto, url: "/mostrador?sede=#{mostrador.sede_id}"
+      club, tipo: 'caja_sin_cerrar', title: 'Caja sin cerrar', body: texto, url: "/mostrador?sede=#{mostrador.sede_id}"
     )
   end
 

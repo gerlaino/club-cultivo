@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_19_100000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_20_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -2399,6 +2399,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_19_100000) do
     t.bigint "deleted_by_id"
     t.string "email_personal"
     t.datetime "visto_at"
+    t.jsonb "notificaciones_config", default: {}, null: false
     t.index ["club_id", "visto_at"], name: "index_users_on_club_id_and_visto_at"
     t.index ["club_id"], name: "index_users_on_club_id"
     t.index ["deleted_at"], name: "index_users_on_deleted_at"

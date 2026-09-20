@@ -20,6 +20,7 @@ class TareasDiariasPushJob < ApplicationJob
 
         PushNotificationService.notify_user_async(
           usuario,
+          tipo:  'tareas_del_dia',
           title: titulo,
           body:  resumen,
           url:   '/m/cultivador/tareas'

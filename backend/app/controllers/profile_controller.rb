@@ -40,7 +40,40 @@ class ProfileController < ApplicationController
     end
   end
 
+  # ── Notificaciones al teléfono ─────────────────────────────────────────────
+  # El backend manda la lista YA filtrada para esta persona (rol + módulos de su organización)
+  # con el valor vigente de cada una; la pantalla sólo la muestra. Ver `Notificaciones::Catalogo`.
+  def notificaciones
+    render json: serialize_notificaciones
+  end
+
+  # Se aceptan sólo claves que a esta persona se le ofrecen: una clave ajena por la API no
+  # queda guardada (ni serviría: no ofrecido = no se manda).
+  def actualizar_notificaciones
+    cfg    = (current_user.notificaciones_config || {}).deep_dup
+    tipos  = (cfg['tipos'] ||= {})
+    claves = Notificaciones::Catalogo.para(current_user).map { |t| t[:clave] }
+    (params[:tipos] || {}).each do |clave, valor|
+      next unless claves.include?(clave.to_s)
+      tipos[clave.to_s] = ActiveModel::Type::Boolean.new.cast(valor) == true
+    end
+    cfg['no_molestar'] = ActiveModel::Type::Boolean.new.cast(params[:no_molestar]) == true if params.key?(:no_molestar)
+    current_user.update!(notificaciones_config: cfg)
+    render json: serialize_notificaciones
+  end
+
   private
+
+  def serialize_notificaciones
+    {
+      tipos: Notificaciones::Catalogo.para(current_user).map { |t|
+        { clave: t[:clave], grupo: t[:grupo], label: t[:label], desc: t[:desc], activo: current_user.quiere_push?(t[:clave]) }
+      },
+      no_molestar: current_user.no_molestar?,
+      no_molestar_desde: User::NO_MOLESTAR_DESDE,
+      no_molestar_hasta: User::NO_MOLESTAR_HASTA,
+    }
+  end
 
   def profile_params
     params.require(:user).permit(:first_name, :last_name, :dni, :birth_date, :email, :email_personal, :phone)

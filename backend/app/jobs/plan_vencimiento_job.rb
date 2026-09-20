@@ -36,7 +36,7 @@ class PlanVencimientoJob < ApplicationJob
       club: club, tipo: tipo, mensaje: texto, severidad: dias.zero? ? 'error' : 'warning',
       destinada_a_role: 'admin', contexto: { vence: club.plan_activo_hasta.to_s, dias: dias }
     )
-    PushNotificationService.notify_admins_async(club, title: dias.zero? ? 'Tu plan vence hoy' : 'Tu plan vence en una semana',
+    PushNotificationService.notify_admins_async(club, tipo: 'plan_vence', title: dias.zero? ? 'Tu plan vence hoy' : 'Tu plan vence en una semana',
                                                       body: texto, url: '/configuracion/club')
 
     # Y por mail, por la casilla de la plataforma, a cada admin con una casilla real: la campana

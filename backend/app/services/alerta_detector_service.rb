@@ -119,7 +119,7 @@ class AlertaDetectorService
       mensaje: format(plantilla, fecha_txt),
       contexto: { hito: clave, fecha: fecha.to_s }
     )
-    PushNotificationService.notify_admins_async(@club, title: 'Lo que viene en tu cultivo', body: alerta.mensaje, url: "/lotes/#{lote.id}")
+    PushNotificationService.notify_admins_async(@club, tipo: 'hitos_cultivo', title: 'Lo que viene en tu cultivo', body: alerta.mensaje, url: "/lotes/#{lote.id}")
     alerta
   end
 
@@ -139,7 +139,7 @@ class AlertaDetectorService
     # que alguien la abra. Con la PWA instalada, esto es lo que suena. Sólo lo que pide acción
     # (warning/error); la ventana de dedup de 20 h ya evita que el mismo aviso llegue diez veces.
     if %w[warning error].include?(severidad.to_s)
-      PushNotificationService.notify_admins_async(@club, title: titulo_push(tipo), body: mensaje,
+      PushNotificationService.notify_admins_async(@club, tipo: tipo_push(tipo), title: titulo_push(tipo), body: mensaje,
                                                   url: lote ? "/lotes/#{lote.id}" : '/')
     end
     alerta
@@ -158,6 +158,22 @@ class AlertaDetectorService
   }.freeze
 
   def titulo_push(tipo) = TITULOS_PUSH[tipo.to_s] || 'Alerta del cultivo'
+
+  # De la alerta interna a la preferencia de la persona (`Notificaciones::Catalogo`): las
+  # cinco del ambiente son UN interruptor, «Ambiente».
+  TIPO_PUSH = {
+    'sin_registro_ambiental'  => 'ambiente',
+    'temperatura_fuera_rango' => 'ambiente',
+    'humedad_fuera_rango'     => 'ambiente',
+    'ph_fuera_rango'          => 'ambiente',
+    'ec_fuera_rango'          => 'ambiente',
+    'cosecha_pendiente'       => 'cosecha_pendiente',
+    'tarea_vencida_cultivo'   => 'tarea_vencida',
+    'estado_critico_lote'     => 'lote_critico',
+    'saldo_cc_bajo'           => 'saldo_cc_bajo',
+    'saldo_gramos_bajo'       => 'saldo_cc_bajo',
+  }.freeze
+  def tipo_push(tipo) = TIPO_PUSH[tipo.to_s] || tipo.to_s
 
   def alerta_reciente?(tipo, lote_id, contexto)
     scope = @club.alertas_internas

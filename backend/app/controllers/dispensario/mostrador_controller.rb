@@ -211,6 +211,7 @@ module Dispensario
       )
       PushNotificationService.notify_roles_async(
         @mostrador.club, 'admin', 'supervisor',
+        tipo: 'reposicion_mostrador',
         title: 'Reponer en el mostrador', body: texto,
         url: "/mostrador?sede=#{@mostrador.sede_id}"
       )

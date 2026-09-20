@@ -209,6 +209,9 @@ export const deleteGenetica = (id) => api.delete(`/geneticas/${id}`);
 export const getProfile       = () => api.get("/profile");
 export const updateProfile    = (payload) => api.patch("/profile", { user: payload });
 export const updateMyPassword = (payload) => api.patch("/profile/password", { user: payload });
+// Qué avisos quiere en el teléfono: la lista viene ya filtrada para esta persona.
+export const getMisNotificaciones    = () => api.get("/profile/notificaciones");
+export const updateMisNotificaciones = (payload) => api.patch("/profile/notificaciones", payload);
 export const uploadAvatar     = (file) => {
   const fd = new FormData();
   fd.append("avatar", file);

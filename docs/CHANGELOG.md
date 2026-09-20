@@ -1,5 +1,34 @@
 # Changelog
 
+## Septiembre 2026 (ck) — Cada persona elige qué avisos le llegan al teléfono
+
+- **Pedido de Germán (20-sep):** poder elegir qué llega y qué no, «simple: ponete en cada rol,
+  cada configuración tiene que tener sentido». La regla que ordena todo: **cada persona ve
+  SÓLO los avisos que su rol puede recibir y SÓLO de los módulos que su organización tiene**;
+  lo que no se ofrece no se manda. Una manicura ve una fila; un admin con dispensa ve once; el
+  cultivador de casa ve las de cultivo más el resumen del día, sin manicura ni «tarea asignada»
+  (se la asigna él mismo).
+- **Un catálogo, `Notificaciones::Catalogo`** (clave, grupo, texto, roles, módulo, default,
+  `personal`): la pantalla pide `para(user)` y muestra eso; `PushNotificationService` recibe el
+  `tipo` y pregunta `User#quiere_push?` ANTES de encolar. Los 8 disparadores dicen su tipo; las
+  cinco alertas de ambiente son UN interruptor («Ambiente», apagado de entrada sin IoT). Sin
+  tipo (una prueba desde consola) se manda siempre.
+- **«No molestar» de 22 a 8**: lo que cae ahí no se pierde, se encola para las 8
+  (`PushNotificationJob.set(wait_until:)`). Un solo interruptor, sin horas a elegir.
+- **Dónde:** *Mi perfil → Notificaciones* (escritorio y teléfono, misma pantalla), con el
+  interruptor de «este dispositivo» arriba, porque ahí se viene a buscar cuando algo no llega.
+  Cada cambio se guarda al tocarlo. `GET/PATCH /profile/notificaciones`; una clave ajena por la
+  API no se guarda.
+- **DB:** `users.notificaciones_config` jsonb (`{ tipos: { clave: bool }, no_molestar: bool }`).
+  Lo no guardado vale su default.
+- La campanita no se configura: es el registro. Lo que hoy no manda push (REPROCANN por vencer,
+  stock bajo, reservas vencidas) no se agregó: sumar uno es una fila en el catálogo.
+- Specs: `notificaciones_preferencias_spec` (qué ve cada rol, defaults, guardar),
+  `push_notification_service_spec` (prendido/apagado/no ofrecido/sin tipo/no molestar).
+  Visto renderizado (admin en escritorio, delivery en teléfono) con persistencia tras recargar.
+  Trampa de dev: una columna nueva no aparece en el servidor hasta reiniciarlo (caché de
+  esquema): el `UPDATE` sólo tocaba `updated_at`.
+
 ## Septiembre 2026 (cj) — La PWA bajaba la app entera al teléfono: 430 archivos, 8,8 MB, en cada deploy
 
 - **Causa del «se traba» y del «no terminó de instalarse» (19-sep, iPhone de Germán).** El

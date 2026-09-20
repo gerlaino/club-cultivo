@@ -1,9 +1,11 @@
 <script setup>
 import { onMounted, reactive, ref, computed } from 'vue'
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
-import { getProfile, updateProfile, updateMyPassword, uploadAvatar } from '../lib/api'
+import { getProfile, updateProfile, updateMyPassword, uploadAvatar, getMisNotificaciones, updateMisNotificaciones } from '../lib/api'
 import { useAuthStore } from '../stores/auth'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import { useToast } from '../composables/useToast.js'
+import { usePushNotifications, MOTIVOS } from '../composables/usePushNotifications.js'
 
 const auth = useAuthStore()
 
@@ -167,7 +169,64 @@ function initials(first, last) {
   return ((first?.[0] || '') + (last?.[0] || '')).toUpperCase() || '?'
 }
 
-onMounted(fetchProfile)
+// ── Notificaciones al teléfono ──────────────────────────────────────────
+// La lista la manda el backend YA filtrada para esta persona (su rol, los módulos de su
+// organización): la pantalla no decide qué ofrecer. Cada interruptor se guarda al tocarlo.
+const toast = useToast()
+const notif = ref(null)
+const notifGuardando = ref(null)
+const { disponible: pushDisponible, iosSinInstalar, subscribed: pushSubscribed, loading: pushLoading,
+        subscribe: pushSubscribe, unsubscribe: pushUnsubscribe } = usePushNotifications()
+
+const notifGrupos = computed(() => {
+  const grupos = []
+  for (const t of notif.value?.tipos || []) {
+    let g = grupos.find(x => x.nombre === t.grupo)
+    if (!g) { g = { nombre: t.grupo, tipos: [] }; grupos.push(g) }
+    g.tipos.push(t)
+  }
+  return grupos
+})
+
+async function fetchNotificaciones() {
+  try { notif.value = (await getMisNotificaciones()).data } catch { notif.value = null }
+}
+
+async function toggleTipo(t) {
+  notifGuardando.value = t.clave
+  try {
+    notif.value = (await updateMisNotificaciones({ tipos: { [t.clave]: !t.activo } })).data
+  } catch {
+    toast.error('No se pudo guardar. Probá de nuevo.')
+  } finally {
+    notifGuardando.value = null
+  }
+}
+
+async function toggleNoMolestar() {
+  notifGuardando.value = 'no_molestar'
+  try {
+    notif.value = (await updateMisNotificaciones({ no_molestar: !notif.value.no_molestar })).data
+  } catch {
+    toast.error('No se pudo guardar. Probá de nuevo.')
+  } finally {
+    notifGuardando.value = null
+  }
+}
+
+// El mismo interruptor de «este dispositivo» que hay en el menú: acá es donde se viene a
+// buscar cuando algo no llega.
+async function togglePushDispositivo() {
+  if (pushSubscribed.value) {
+    const r = await pushUnsubscribe()
+    r === true ? toast.info('Notificaciones desactivadas en este dispositivo') : toast.error(MOTIVOS[r] || MOTIVOS.error)
+  } else {
+    const r = await pushSubscribe()
+    r === true ? toast.success('Notificaciones activadas en este dispositivo') : toast.error(MOTIVOS[r] || MOTIVOS.error)
+  }
+}
+
+onMounted(() => { fetchProfile(); fetchNotificaciones() })
 </script>
 
 <template>
@@ -286,6 +345,52 @@ onMounted(fetchProfile)
                 <input v-model.trim="form.email_personal" type="email" class="pfl__input" placeholder="tu@gmail.com" />
                 <div class="pfl__hint">Tu mail real, donde la organización puede contactarte.</div>
               </div>
+            </div>
+          </div>
+
+          <!-- Notificaciones al teléfono -->
+          <div v-if="notif" class="pfl__card pfl__card--form">
+            <div class="pfl__card-header">
+              <div>
+                <div class="pfl__card-title">Notificaciones</div>
+                <div class="pfl__card-desc">Qué avisos te llegan al teléfono. En la campanita de la app está todo igual.</div>
+              </div>
+            </div>
+
+            <!-- Este dispositivo -->
+            <div class="pfl__notif-dispositivo">
+              <div>
+                <div class="pfl__notif-label">{{ pushSubscribed ? 'Este dispositivo recibe avisos' : 'Este dispositivo no recibe avisos' }}</div>
+                <div class="pfl__hint">
+                  {{ iosSinInstalar ? 'En iPhone hay que agregar la app a la pantalla de inicio.' : (pushSubscribed ? 'Cada teléfono o computadora se activa por separado.' : 'Activalo para que los avisos de abajo te lleguen acá.') }}
+                </div>
+              </div>
+              <button v-if="pushDisponible || iosSinInstalar" class="pfl__btn-secondary" :disabled="pushLoading" @click="togglePushDispositivo">
+                <i class="bi" :class="pushSubscribed ? 'bi-bell-slash' : 'bi-bell'"></i>
+                {{ pushSubscribed ? 'Desactivar acá' : 'Activar acá' }}
+              </button>
+            </div>
+
+            <div v-for="g in notifGrupos" :key="g.nombre" class="pfl__notif-grupo">
+              <div class="pfl__card-section-title">{{ g.nombre }}</div>
+              <label v-for="t in g.tipos" :key="t.clave" class="pfl__notif-row">
+                <input type="checkbox" class="pfl__switch" :checked="t.activo" :disabled="notifGuardando === t.clave" @change="toggleTipo(t)" />
+                <span class="pfl__notif-txt">
+                  <span class="pfl__notif-label">{{ t.label }}</span>
+                  <span class="pfl__hint">{{ t.desc }}</span>
+                </span>
+              </label>
+            </div>
+
+            <div class="pfl__notif-grupo">
+              <div class="pfl__card-section-title">Horario</div>
+              <label class="pfl__notif-row">
+                <input type="checkbox" class="pfl__switch" :checked="notif.no_molestar" :disabled="notifGuardando === 'no_molestar'" @change="toggleNoMolestar" />
+                <span class="pfl__notif-txt">
+                  <span class="pfl__notif-label">No molestar de {{ notif.no_molestar_desde }} a {{ notif.no_molestar_hasta }}</span>
+                  <span class="pfl__hint">Lo que caiga en ese horario se entrega a las {{ notif.no_molestar_hasta }}; no se pierde.</span>
+                </span>
+              </label>
             </div>
           </div>
 
@@ -450,6 +555,19 @@ onMounted(fetchProfile)
 .pfl__avatar-hint  { font-size: .7rem; color: var(--c-slate-400); }
 
 /* Account info */
+.pfl__notif-dispositivo { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .85rem 1rem; border-radius: 10px; background: var(--c-slate-50); border: 1px solid var(--c-slate-200); margin-bottom: 1rem; }
+.pfl__notif-dispositivo .pfl__btn-secondary { white-space: nowrap; flex: none; }
+@media (max-width: 480px) { .pfl__notif-dispositivo { flex-direction: column; align-items: stretch; } }
+.pfl__notif-grupo { margin-top: .75rem; }
+.pfl__notif-row { display: flex; align-items: flex-start; gap: .75rem; padding: .55rem 0; border-top: 1px solid var(--c-slate-100); cursor: pointer; }
+.pfl__notif-row:first-of-type { border-top: 0; }
+.pfl__notif-txt { display: flex; flex-direction: column; gap: .1rem; }
+.pfl__notif-label { font-size: .88rem; font-weight: 600; color: var(--c-slate-800); }
+.pfl__switch { appearance: none; width: 38px; height: 22px; border-radius: 999px; background: var(--c-slate-300); position: relative; flex: none; margin-top: .15rem; cursor: pointer; transition: background .15s; }
+.pfl__switch::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.pfl__switch:checked { background: var(--c-leaf-600); }
+.pfl__switch:checked::after { transform: translateX(16px); }
+.pfl__switch:disabled { opacity: .6; }
 .pfl__card-section-title { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--c-slate-400); margin-bottom: .75rem; }
 .pfl__dl     { display: flex; flex-direction: column; gap: .5rem; }
 .pfl__dl-row { display: flex; justify-content: space-between; align-items: center; font-size: .82rem; }

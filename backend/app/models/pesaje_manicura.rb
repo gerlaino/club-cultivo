@@ -200,6 +200,7 @@ class PesajeManicura < ApplicationRecord
   def notificar_admins_pendiente(peso)
     PushNotificationService.notify_admins_async(
       club,
+      tipo:  'pesaje_para_confirmar',
       title: "Pesaje para confirmar",
       body:  "#{manicurador.first_name} envió #{plantas_count} plantas · #{peso}g del lote #{lote.codigo}",
       url:   '/admin/pesajes-manicura',

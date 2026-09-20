@@ -208,6 +208,7 @@ class Tarea < ApplicationRecord
   def push_asignacion_nueva
     PushNotificationService.notify_user_async(
       asignada_a,
+      tipo:  'tarea_asignada',
       title: "Nueva tarea asignada",
       body:  titulo,
       url:   '/m/cultivador/tareas'

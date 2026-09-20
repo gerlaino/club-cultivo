@@ -242,6 +242,33 @@ class User < ApplicationRecord
 
   def atiende_mostrador? = role.to_s == 'dispensador'
 
+  # ── Qué avisos quiere en el teléfono ──────────────────────────────────────
+  # `notificaciones_config`: `{ 'tipos' => { clave => true/false }, 'no_molestar' => bool }`.
+  # Lo que no está guardado vale su default del catálogo. Un tipo que a esta persona no se le
+  # ofrece (por rol o por módulo) NO se manda, diga lo que diga la config: ofrecer y mandar
+  # son la misma lista (`Notificaciones::Catalogo.para`).
+  def quiere_push?(clave)
+    tipo = Notificaciones::Catalogo.para(self).find { |t| t[:clave] == clave.to_s }
+    return false unless tipo
+    guardado = (notificaciones_config || {}).dig('tipos', clave.to_s)
+    guardado.nil? ? Notificaciones::Catalogo.default_de(tipo, club) : guardado == true
+  end
+
+  def no_molestar? = (notificaciones_config || {})['no_molestar'] == true
+
+  # «No molestar» de 22 a 8: hasta cuándo se posterga un push que cae adentro, o nil si va ya.
+  # En la zona horaria de la app (`Time.zone`, Buenos Aires).
+  NO_MOLESTAR_DESDE = 22
+  NO_MOLESTAR_HASTA = 8
+  def push_diferido_hasta(ahora = Time.zone.now)
+    return nil unless no_molestar?
+    if ahora.hour >= NO_MOLESTAR_DESDE
+      (ahora + 1.day).change(hour: NO_MOLESTAR_HASTA)
+    elsif ahora.hour < NO_MOLESTAR_HASTA
+      ahora.change(hour: NO_MOLESTAR_HASTA)
+    end
+  end
+
   def salas_ids_en_sedes_asignadas
     sedes = sedes_ids_asignadas
     scope = Sala.where(club_id: club_id)

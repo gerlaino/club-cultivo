@@ -366,6 +366,9 @@ Rails.application.routes.draw do
     resource :profile, only: [:show, :update], controller: "profile" do
       patch :password
       patch :avatar
+      # Qué avisos quiere en el teléfono (ver `Notificaciones::Catalogo`).
+      get   :notificaciones
+      patch :notificaciones, action: :actualizar_notificaciones
     end
 
     resource :preferences, only: [:show, :update], controller: "preferences" do

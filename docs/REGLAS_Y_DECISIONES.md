@@ -311,6 +311,12 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 
 ### Lo que NO hay que romper
 
+- **PUSH: LO QUE NO SE OFRECE NO SE MANDA** (20-sep-2026). `Notificaciones::Catalogo` es la única
+  lista de avisos al teléfono: por rol, por módulo contratado, con default y con `personal`.
+  `PushNotificationService` exige `tipo:` en todo disparador nuevo y filtra con
+  `User#quiere_push?`; un aviso sin fila en el catálogo no se ofrece en *Mi perfil* y no llega.
+  La campanita (`AlertaInterna`) NO se configura: es el registro. «No molestar» es 22–8 fijo.
+  Cada persona ve sólo lo suyo: no armar una lista larga «por las dudas».
 - **USO PERSONAL = PLAN `personal`, Y NACE SÓLO CON CULTIVO** (19-sep-2026). Es UNA persona
   sin equipo ni pacientes (`Club#personal?`, `PlanEnforcer` personal); lo único que puede tener
   es `Club::MODULOS_PERSONAL` (cultivo, iot, ia, chatbot) y el ambiente, la IA y el chatbot **se
