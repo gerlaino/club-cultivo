@@ -127,7 +127,7 @@ mensual por plan (`Ia::Uso`, `ia_llamadas`, créditos `IaRecarga`).
 
 ## Dónde retomar (20-sep-2026, tarde)
 
-**En producción `master` `48cf1d35`; SIN COMMITEAR el bloque (ct)** (ver `docs/CHANGELOG.md`):
+**Todo pusheado y en producción (`master`, último `2120ed5d`), bloque (ct)** (ver `docs/CHANGELOG.md`):
 el «+» de la PWA personal («Hoy»: Regar / Registrar ambiente / Foto / Tarea) · el lote dice qué
 viene (`Lote#proximo_paso` → «Faltan 8 días para floración») · precios provisorios de los
 adicionales personales (`Precios::ADDONS_PERSONAL`: ambiente 4.000, IA 5.000, chatbot 3.000) ·
