@@ -11,6 +11,7 @@ class Insumo < ApplicationRecord
   belongs_to :deposito, optional: true # dónde vive (reemplaza al enum `tipo`; se backfillea)
   has_many :insumo_compras,  dependent: :destroy
   has_many :insumo_consumos, dependent: :destroy
+  has_many :receta_items,    dependent: :destroy
 
   # Se levanta al querer revertir una compra que ya fue consumida/distribuida.
   Consumido = Class.new(StandardError)
@@ -35,6 +36,16 @@ class Insumo < ApplicationRecord
     else self
     end
   }
+
+  # Para cuántas aplicaciones más alcanza, según lo que se descontó por riego las últimas
+  # veces. Nil si nunca se aplicó con receta: no hay con qué estimar.
+  def aplicaciones_estimadas
+    ultimos = insumo_consumos.where.not(registro_ambiental_id: nil).order(created_at: :desc).limit(5).pluck(:cantidad)
+    return nil if ultimos.empty?
+    promedio = ultimos.sum.to_d / ultimos.size
+    return nil if promedio <= 0
+    (stock_actual.to_d / promedio).floor
+  end
 
   def valorizado_ars
     (stock_actual.to_d * costo_promedio_ars.to_d).round(2)
@@ -145,7 +156,7 @@ class Insumo < ApplicationRecord
   # Consumo: descuenta stock e imputa el costo (al promedio actual) al lote/sala. Refleja el
   # costo en el CostoLote. Devuelve la InsumoConsumo. Lanza si no hay stock suficiente.
   def registrar_consumo!(cantidad:, created_by:, lote: nil, sala: nil,
-                         fecha: Date.current, notas: nil)
+                         fecha: Date.current, notas: nil, registro_ambiental: nil)
     cantidad = cantidad.to_d
     raise ArgumentError, 'La cantidad debe ser mayor a 0' if cantidad <= 0
     raise ArgumentError, 'Stock insuficiente'             if cantidad > stock_actual.to_d
@@ -158,7 +169,7 @@ class Insumo < ApplicationRecord
       c = insumo_consumos.create!(
         club: club, created_by: created_by,
         cantidad: cantidad, costo_imputado_ars: costo_imputado,
-        lote: lote, sala: sala, fecha: fecha, notas: notas
+        lote: lote, sala: sala, fecha: fecha, notas: notas, registro_ambiental: registro_ambiental
       )
       # El costo del lote se recalcula para reflejar el consumo imputado.
       CostoDesdeLibroService.new(lote: lote, actualizado_por: created_by).call if lote
@@ -172,7 +183,7 @@ class Insumo < ApplicationRecord
   # Consumo repartido en partes iguales entre varios lotes (y/o una sala). Ej: "3 L a los lotes
   # OG-24 y GG-11" → 1,5 L a cada uno, cada uno con su costo imputado. Atómico.
   def registrar_consumo_repartido!(cantidad:, created_by:, lotes: [], sala: nil,
-                                   fecha: Date.current, notas: nil)
+                                   fecha: Date.current, notas: nil, registro_ambiental: nil)
     total  = cantidad.to_d
     lotes  = Array(lotes).compact
     raise ArgumentError, 'La cantidad debe ser mayor a 0' if total <= 0
@@ -180,13 +191,13 @@ class Insumo < ApplicationRecord
 
     transaction do
       if lotes.empty?
-        [registrar_consumo!(cantidad: total, created_by: created_by, sala: sala, fecha: fecha, notas: notas)]
+        [registrar_consumo!(cantidad: total, created_by: created_by, sala: sala, fecha: fecha, notas: notas, registro_ambiental: registro_ambiental)]
       else
         base = (total / lotes.size).round(3)
         lotes.each_with_index.map do |lote, i|
           # el último absorbe el redondeo para que la suma sea exacta
           cant = i == lotes.size - 1 ? (total - base * (lotes.size - 1)) : base
-          registrar_consumo!(cantidad: cant, created_by: created_by, lote: lote, sala: sala, fecha: fecha, notas: notas)
+          registrar_consumo!(cantidad: cant, created_by: created_by, lote: lote, sala: sala, fecha: fecha, notas: notas, registro_ambiental: registro_ambiental)
         end
       end
     end
@@ -287,11 +298,14 @@ class Insumo < ApplicationRecord
                            .where("contexto ->> 'insumo_id' = ?", id.to_s)
                            .where('created_at > ?', 12.hours.ago).exists?
 
+    mensaje = "Reponer #{nombre}: quedan #{cantidad_legible(stock_actual)} #{unidad_medida} (mínimo #{cantidad_legible(stock_minimo)})."
     club.alertas_internas.create!(
       tipo: 'stock_bajo', severidad: 'warning', destinada_a_role: 'admin',
-      mensaje: "Reponer #{nombre}: quedan #{stock_actual.to_f.round(2)} #{unidad_medida} (mínimo #{stock_minimo.to_f.round(2)}).",
-      contexto: { 'insumo_id' => id, 'origen' => 'insumo' }
+      mensaje: mensaje, contexto: { 'insumo_id' => id, 'origen' => 'insumo' }
     )
+    # Y al teléfono, si la persona lo quiere («Reponer nutrientes o insumos»).
+    PushNotificationService.notify_roles_async(club, 'admin', 'supervisor', tipo: 'reponer_insumos',
+                                               title: 'Queda poco', body: mensaje, url: '/insumos')
   rescue StandardError => e
     Rails.logger.error "[Insumo] aviso de reposición: #{e.message}"
   end

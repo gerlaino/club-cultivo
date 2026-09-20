@@ -126,6 +126,18 @@ const routes = [
     },
   },
   {
+    // Recetas de nutrientes (org: desde Depósito; personal: «Nutrientes y recetas» en Cultivo).
+    path: "/recetas",
+    name: "recetas",
+    component: () => import("../views/RecetasView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: (to, from, next) => {
+      const auth = useAuthStore()
+      if (["admin", "supervisor", "cultivador"].includes(auth.user?.role)) next()
+      else next("/")
+    },
+  },
+  {
     path: "/insumos",
     name: "insumos",
     component: () => import("../views/admin/InsumosView.vue"),
@@ -1144,12 +1156,12 @@ const ROLE_ALLOWED_PREFIX = {
   delivery:    ['/delivery', '/m', ...COMUNES],
 
   // Cultivo: salas, lotes, plantas y lo que rodea al trabajo diario del cuarto.
-  cultivador: ['/', '/salas', '/lotes', '/plantas', '/geneticas', '/tareas', '/plan-trabajo',
+  cultivador: ['/', '/salas', '/lotes', '/plantas', '/geneticas', '/recetas', '/tareas', '/plan-trabajo',
                '/historial-cultivador', '/cosechado', '/dispositivos', '/reglas-ambientales',
                '/m', ...ETIQUETAS, ...COMUNES],
 
   // Supervisa el cultivo de sus sedes y además dispensa.
-  supervisor: ['/', '/salas', '/lotes', '/plantas', '/geneticas', '/tareas', '/plan-trabajo',
+  supervisor: ['/', '/salas', '/lotes', '/plantas', '/geneticas', '/recetas', '/tareas', '/plan-trabajo',
                '/historial-cultivador', '/cosechado', '/dispositivos', '/reglas-ambientales',
                '/pacientes', '/socios', '/historial', '/admin/stock', '/admin/pesajes-manicura',
                '/insumos', '/sedes', '/analitica', '/reservas', '/mostrador', '/m',

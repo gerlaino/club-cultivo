@@ -1,5 +1,44 @@
 # Changelog
 
+## Septiembre 2026 (cq) — Recetas de nutrientes: armar, aplicar al regar, descontar, avisar, comparar
+
+- **Punto 3 del plan contra Grow with Jane (20-sep).** Lo que había: el depósito con insumos
+  (stock, costo promedio, mínimo, «Consumir» a lotes) y el registro de riego con «fertilizó»
+  como texto libre — dos mundos que no se hablaban: quien regaba escribía «Canna A 2 ml/L» y el
+  depósito no se enteraba; el costo del lote sólo bajaba yendo aparte a Insumos.
+- **El nutriente ES un insumo** (no hay entidad nueva). **Receta** (`recetas`, `receta_items`):
+  nombre, fase, productos con dosis exacta en **ml/L o g/L** (decisión de Germán: nada de
+  «tapitas»), pH/EC objetivo, notas; se duplica y se archiva. Sin plantillas «de fábrica».
+- **Aplicar al regar**, en las tres puertas (ficha del lote, sala, diario del teléfono):
+  «¿Se fertilizó?» → *Con receta* (receta + litros → lista calculada, cada renglón editable) ·
+  *Productos sueltos* · *Sin especificar* («se fertilizó pero no se especificó cómo», decisión
+  de Germán: queda el texto, no descuenta). `Nutricion::Aplicar` descuenta cada producto del
+  depósito (en sala: una vez, repartido entre sus lotes), imputa el costo al lote y deja en el
+  registro una **copia** (`nutricion`): editar la receta después no cambia el historial.
+  Borrar el registro devuelve lo descontado. **NO bloquea por stock** (Germán: «quizás no fue
+  cargado pero el cultivador tiene todo»): por producto, «descontar lo que hay y dejar en 0»
+  o «no descontar este»; lo que faltó queda anotado.
+- **Queda poco**: `Insumo#aplicaciones_estimadas` («alcanza para ~6 riegos», con el promedio de
+  las últimas aplicaciones) y el aviso de reposición también al teléfono (tipo
+  `reponer_insumos` en Recordatorios; prendido de entrada en personal).
+- **Pantalla `/recetas`** (Cultivo → «Recetas»; en Depósito, botón «Recetas»). **En uso personal
+  se llama «Nutrientes y recetas»** y lleva arriba «Mis nutrientes»: los insumos con otras
+  palabras (sin «depósito», «sede» ni «pool»), «Nutriente» para dar de alta y **«Repuse»** que
+  carga la compra y la deja como gasto (precio 0 = sólo cantidad, sin gasto:
+  `insumos#comprar`). **Desde Gastos, la otra puerta**: «Es un nutriente o insumo del cultivo»
+  → existente o nuevo + cantidad → la compra queda en los dos lados (mismo `destino: deposito`
+  que usa una organización). Vocabulario por usuario final en cada pantalla.
+- **Comparar entre cultivos**: cada receta muestra dónde se usó (lotes, riegos, litros, $, $ por
+  planta); Analítica → «Dónde y cómo» tiene el corte **Receta** y la columna **$ nutr./planta**;
+  el historial del lote dice «Vege 2 · 20 L · $2.800» en cada riego.
+- DB: `recetas`, `receta_items`, `registros_ambientales.{receta_id,litros,nutricion}`,
+  `insumo_consumos.registro_ambiental_id`. Ojo inflector: `Receta` lleva `self.table_name` y
+  las FK van con `to_table` (buscaba «receta» y «registro_ambientals»).
+- Specs: `recetas_nutrientes_spec` (armar, dosis, aplicar al lote y a la sala, faltante en
+  los dos modos, corrección a mano, sueltos, sin especificar, borrar devuelve, editar receta no
+  cambia la copia, dónde se usó, riegos estimados, aislamiento). Visto renderizado como uso
+  personal: nutrientes → receta → riego con faltante → stock y gasto.
+
 ## Septiembre 2026 (cp) — Ver crecer la planta: galería del lote por semana, comparar, etiquetas
 
 - **Contra Grow with Jane (20-sep), punto 2 del plan.** Las fotos del lote eran adjuntos sueltos

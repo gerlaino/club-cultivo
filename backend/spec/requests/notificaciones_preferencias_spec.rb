@@ -20,7 +20,7 @@ RSpec.describe 'Mi perfil → Notificaciones', type: :request do
     it 'el admin de una organización con cultivo y dispensa ve todo lo suyo' do
       expect(claves_de(create(:user, :admin, club: club))).to match_array(
         %w[pesaje_para_confirmar reposicion_mostrador caja_sin_cerrar tarea_asignada plan_vence
-           recordatorio_tarea hitos_cultivo cosecha_pendiente tarea_vencida lote_critico ambiente saldo_cc_bajo]
+           recordatorio_tarea hitos_cultivo cosecha_pendiente tarea_vencida lote_critico ambiente reponer_insumos saldo_cc_bajo]
       )
     end
 
@@ -36,7 +36,7 @@ RSpec.describe 'Mi perfil → Notificaciones', type: :request do
     end
 
     it 'el supervisor ve la reposición y su tarea' do
-      expect(claves_de(create(:user, :supervisor, club: club))).to match_array(%w[reposicion_mostrador tarea_asignada recordatorio_tarea])
+      expect(claves_de(create(:user, :supervisor, club: club))).to match_array(%w[reposicion_mostrador tarea_asignada recordatorio_tarea reponer_insumos])
     end
 
     it 'la manicura ve dos filas: la tarea que le asignan y sus recordatorios' do
@@ -46,7 +46,7 @@ RSpec.describe 'Mi perfil → Notificaciones', type: :request do
     it 'el cultivador de casa ve lo de cultivo y sus recordatorios, sin manicura ni tareas asignadas por otro' do
       personal = create(:club, plan: 'personal', features: { 'cultivo' => true, 'iot' => true })
       claves = claves_de(create(:user, :admin, club: personal))
-      expect(claves).to match_array(%w[plan_vence recordatorio_tarea hitos_cultivo cosecha_pendiente tarea_vencida lote_critico ambiente])
+      expect(claves).to match_array(%w[plan_vence recordatorio_tarea hitos_cultivo cosecha_pendiente tarea_vencida lote_critico ambiente reponer_insumos])
     end
 
     it 'viene en dos familias, con su explicación' do

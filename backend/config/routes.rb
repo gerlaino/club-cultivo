@@ -138,6 +138,9 @@ Rails.application.routes.draw do
       end
     end
 
+    # Recetas de nutrientes: se arman acá y se aplican al regar (ver `Nutricion::Aplicar`).
+    resources :recetas, only: [:index, :show, :create, :update, :destroy]
+
     resources :lotes, only: [:index, :show, :update, :destroy, :create] do
       # Separar parte de un lote a uno nuevo (típico: al prender, la mitad a 3L y la mitad a 5L).
       member { post :desprender }

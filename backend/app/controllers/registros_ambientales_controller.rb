@@ -21,7 +21,9 @@ class RegistrosAmbientalesController < ApplicationController
     end
 
     if registro.save
-      render json: serialize(registro), status: :created
+      # «Aplicar receta»: descuenta del depósito, cuesta al lote, deja la copia en el registro.
+      faltantes = aplicar_nutricion!([registro], sala: nil)
+      render json: serialize(registro.reload).merge(faltantes: faltantes), status: :created
     else
       render json: { errors: registro.errors.full_messages }, status: :unprocessable_entity
     end
@@ -39,6 +41,18 @@ class RegistrosAmbientalesController < ApplicationController
   end
 
   private
+
+  # `nutricion: { receta_id, litros, items: [{ insumo_id, cantidad, modo_faltante }] }`.
+  # Sin receta ni items no hay nada que aplicar: «se fertilizó pero no se especificó cómo».
+  def aplicar_nutricion!(registros, sala:)
+    n = params[:nutricion].presence || params.dig(:registro_ambiental, :nutricion)
+    return [] if n.blank? || (n[:receta_id].blank? && n[:items].blank?)
+    receta = n[:receta_id].present? ? current_user.club.recetas.find(n[:receta_id]) : nil
+    items  = n[:items].respond_to?(:map) ? n[:items].map { |i| i.to_unsafe_h.symbolize_keys } : nil
+    res = Nutricion::Aplicar.new(club: current_user.club, usuario: current_user, registros: registros,
+                                 litros: n[:litros], receta: receta, items: items, sala: sala).call
+    res.faltantes
+  end
 
   def set_lote
     @lote = current_user.club.lotes.find(params[:lote_id])
@@ -66,6 +80,9 @@ class RegistrosAmbientalesController < ApplicationController
   def serialize(r)
     {
       id:                   r.id,
+      nutricion:            r.nutricion,
+      receta_id:            r.receta_id,
+      litros:               r.litros,
       temperatura:          r.temperatura,
       humedad:              r.humedad,
       vpd:                  r.vpd,

@@ -160,6 +160,8 @@ class SalasController < ApplicationController
     end
 
     count = 0
+    registros = []
+    faltantes = []
     ActiveRecord::Base.transaction do
       lotes_activos.each do |lote|
         registro = lote.registros_ambientales.build(sala_registro_params)
@@ -167,11 +169,20 @@ class SalasController < ApplicationController
         registro.club          = current_user.club
         registro.registrado_en = Time.current
         registro.save!
+        registros << registro
         count += 1
+      end
+      # «Aplicar receta» a la sala: se descuenta UNA vez y el costo se reparte entre sus lotes.
+      n = params[:nutricion].presence || params.dig(:registro_ambiental, :nutricion)
+      if n.present? && (n[:receta_id].present? || n[:items].present?)
+        receta = n[:receta_id].present? ? current_user.club.recetas.find(n[:receta_id]) : nil
+        items  = n[:items].respond_to?(:map) ? n[:items].map { |i| i.to_unsafe_h.symbolize_keys } : nil
+        faltantes = Nutricion::Aplicar.new(club: current_user.club, usuario: current_user, registros: registros,
+                                           litros: n[:litros], receta: receta, items: items, sala: @sala).call.faltantes
       end
     end
 
-    render json: { lotes_afectados: count }, status: :created
+    render json: { lotes_afectados: count, faltantes: faltantes }, status: :created
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end

@@ -975,7 +975,11 @@ class LotesController < ApplicationController
       chips << "#{r.humedad}%"      if r.humedad
       chips << "pH #{r.ph}"         if r.ph
       chips << "EC #{r.ec}"         if r.ec
-      chips << 'fertilización'      if r.fertilizacion
+      if (n = r.nutricion.presence)
+        chips << "#{n['receta_nombre'] || 'productos sueltos'} · #{n['litros'].to_f.round(1)} L#{n['costo_ars'].to_f.positive? ? " · $#{n['costo_ars'].to_f.round(0)}" : ''}"
+      elsif r.fertilizacion
+        chips << "fertilización#{r.notas_fertilizacion.present? ? " (#{r.notas_fertilizacion})" : ''}"
+      end
       items << {
         kind: 'registro', source: 'registro_ambiental', id: r.id, fecha: r.registrado_en,
         emoji: '📋', titulo: 'Registro del lote',

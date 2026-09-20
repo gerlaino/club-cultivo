@@ -38,7 +38,7 @@ const data    = ref({ geneticas: null, fases: null, donde_y_como: null, costo: n
 
 const FASE_LABEL = { enraizado: 'Enraizado', vegetativo: 'Vegetativo', floracion: 'Floración', cosecha: 'Secado',
                      en_manicura: 'Manicura', curado: 'Curado', total: 'Total a frasco' }
-const CORTES = [{ id: 'sala', label: 'Sala' }, { id: 'metodo', label: 'Método' }, { id: 'luz', label: 'Luz' }]
+const CORTES = [{ id: 'sala', label: 'Sala' }, { id: 'metodo', label: 'Método' }, { id: 'luz', label: 'Luz' }, { id: 'receta', label: 'Receta' }]
 
 async function cargar() {
   loading.value = true
@@ -233,14 +233,14 @@ async function exportPdf() {
         <div v-else class="an__card">
           <div class="an__card-header">
             <span class="an__card-title">g/planta por {{ CORTES.find(c => c.id === corte)?.label.toLowerCase() }}</span>
-            <span class="an__card-hint">{{ corte === 'sala' ? 'la sala donde FLORECIÓ cada lote' : 'según lo cargado en cada lote' }} · el ambiente es el de la sala durante la floración</span>
+            <span class="an__card-hint">{{ corte === 'sala' ? 'la sala donde FLORECIÓ cada lote' : corte === 'receta' ? 'la receta con la que más se regó cada lote' : 'según lo cargado en cada lote' }} · el ambiente es el de la sala durante la floración</span>
           </div>
           <div class="an__table-wrap">
             <table class="an__table">
               <thead>
                 <tr>
                   <th>{{ CORTES.find(c => c.id === corte)?.label }}</th><th class="an__th-r">Lotes</th><th class="an__th-r">Plantas</th>
-                  <th class="an__th-r">g/planta</th><th class="an__th-r">Floración</th>
+                  <th class="an__th-r">g/planta</th><th class="an__th-r">$ nutr./planta</th><th class="an__th-r">Floración</th>
                   <th class="an__th-r">VPD flora</th><th class="an__th-r">Temp flora</th><th class="an__th-r">Hum. flora</th><th></th>
                 </tr>
               </thead>
@@ -250,6 +250,7 @@ async function exportPdf() {
                   <td class="an__td-r">{{ f.lotes }}</td>
                   <td class="an__td-r">{{ f.plantas }}</td>
                   <td class="an__td-r an__td-bold">{{ fmt(f.g_por_planta) }}</td>
+                  <td class="an__td-r">{{ f.nutrientes_por_planta != null ? `$ ${fmt(f.nutrientes_por_planta, 0)}` : '—' }}</td>
                   <td class="an__td-r">{{ dias(f.floracion_dias) }}</td>
                   <td class="an__td-r">{{ f.ambiente?.vpd != null ? fmt(f.ambiente.vpd, 2) : '—' }}</td>
                   <td class="an__td-r">{{ f.ambiente?.temperatura != null ? `${fmt(f.ambiente.temperatura)} °C` : '—' }}</td>

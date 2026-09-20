@@ -8,7 +8,9 @@ module Analitica
   # Hoy los sensores no están conectados (Germán, 13-sep): el bloque queda preparado y dice «sin
   # lecturas» hasta que lleguen.
   class DondeYComo
-    CORTES   = %w[sala metodo luz].freeze
+    # `receta`: con qué receta de nutrientes se regó más veces cada lote (20-sep-2026). Es la
+    # pregunta que hace un cultivador: «¿con qué receta rindió más?».
+    CORTES   = %w[sala metodo luz receta].freeze
     AMBIENTE = %w[temperatura humedad vpd].freeze
 
     def initialize(universo, corte: 'sala')
@@ -34,6 +36,8 @@ module Analitica
           g_por_planta: cosech.positive? ? (gramos / cosech).round(1) : nil,
           floracion_dias: flo.any? ? (flo.sum / flo.size).round(0) : nil,
           ambiente:     amb,
+          # Lo gastado en nutrientes con receta, por planta cosechada.
+          nutrientes_por_planta: cosech.positive? ? (ls.sum { |l| costo_nutrientes(l) } / cosech).round(0) : nil,
         }
       end
       mejor = filas.select { |f| f[:suficientes] && f[:g_por_planta] }.max_by { |f| f[:g_por_planta] }
@@ -53,13 +57,33 @@ module Analitica
       when 'sala'   then @u.floracion[l.id][:sala_id]
       when 'metodo' then l.grow_type.presence
       when 'luz'    then l.light_type.presence
+      when 'receta' then receta_principal(l)&.first
       end
+    end
+
+    # La receta con la que más veces se regó el lote: [id, nombre]. Nil si nunca aplicó una.
+    def receta_principal(l)
+      @recetas ||= {}
+      return @recetas[l.id] if @recetas.key?(l.id)
+      conteo = RegistroAmbiental.where(lote_id: l.id).where.not(receta_id: nil).group(:receta_id).count
+      @recetas[l.id] = if conteo.empty? then nil
+                       else id = conteo.max_by { |_, c| c }.first; [id, Receta.unscoped.find_by(id: id)&.nombre]
+                       end
+    end
+
+    def costo_nutrientes(l)
+      @costos ||= {}
+      @costos[l.id] ||= RegistroAmbiental.where(lote_id: l.id).where.not(nutricion: nil).pluck(:nutricion).sum { |n| n.to_h['costo_ars'].to_f }
     end
 
     def nombre(clave, ls)
       return 'Sin dato' if clave.nil?
 
-      @corte == 'sala' ? @u.floracion[ls.first.id][:sala] : clave.to_s.tr('_', ' ').capitalize
+      case @corte
+      when 'sala'   then @u.floracion[ls.first.id][:sala]
+      when 'receta' then receta_principal(ls.first)&.last || 'Sin receta'
+      else clave.to_s.tr('_', ' ').capitalize
+      end
     end
 
     # Promedio, por lote, de las lecturas de su sala durante SU floración; y el promedio de esos

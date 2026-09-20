@@ -311,6 +311,12 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 
 ### Lo que NO hay que romper
 
+- **EL NUTRIENTE ES UN INSUMO; LA RECETA SE APLICA AL REGAR Y NO BLOQUEA POR STOCK** (20-sep-2026).
+  No hay entidad «producto»: recetas → `Insumo`. Aplicar (`Nutricion::Aplicar`) descuenta,
+  cuesta al lote y deja copia en `registros_ambientales.nutricion`; si falta, la persona elige
+  por producto (descontar lo que hay / no descontar), nunca se frena el riego. Dosis sólo en
+  ml/L y g/L. «Fertilizó sin especificar» es válido y no toca el depósito. En uso personal el
+  depósito se llama «Mis nutrientes» y comprar es un gasto (dos puertas, un solo asiento).
 - **TODO MODELO DE DOMINIO NUEVO LLEVA `include Transmite` + `transmite_como '<recurso>'`**
   (20-sep-2026), y toda pantalla nueva que pida directo a la API se anota con
   `useRecargaEnCambios`. Es lo que hace que lo que uno registra se vea en todos lados sin

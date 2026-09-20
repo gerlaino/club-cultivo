@@ -206,7 +206,7 @@ function emptyFormData() {
     estado_general:   'bueno',
     plagas_observadas:'ninguna',
     observaciones:    '',
-    riego:      { ph: null, ph_runoff: null, ec: null, volumen: null, fertilizo: false, producto: '', dosis: null, semana_nutricion: null, metodo_nutricion: '', observaciones: '' },
+    riego:      { ph: null, ph_runoff: null, ec: null, volumen: null, fertilizo: false, producto: '', dosis: null, semana_nutricion: null, metodo_nutricion: '', observaciones: '', modo_nutricion: '', receta_id: null, litros: null, items: [], nutricion: null },
     poda:       { tipos: [], intensidad: '', plantas_intervenidas: null, observaciones: '' },
     plagas:     { resultado: 'ninguna', tipos_detectados: [], accion_tomada: '', plantas_afectadas: null, producto_usado: '' },
     ambiental:  { temperatura: null, temperatura_sustrato: null, humedad: null, co2: null, csvFile: null },
@@ -276,8 +276,15 @@ function buildPayload() {
     if (r.fertilizo) {
       payload.tareas_realizadas.push('nutricion')
       payload.fertilizacion = true
-      const parts = [r.producto, r.dosis ? `${r.dosis}ml/L` : null, r.semana_nutricion ? `sem.${r.semana_nutricion}` : null, r.metodo_nutricion || null].filter(Boolean)
-      payload.notas_fertilizacion = parts.join(' · ')
+      // Con receta o productos sueltos viaja `nutricion` y el backend descuenta del depósito
+      // (`Nutricion::Aplicar`); sin especificar, queda el texto de siempre.
+      if (r.nutricion && r.modo_nutricion !== 'sin') {
+        payload.nutricion = r.nutricion
+        payload.notas_fertilizacion = [r.metodo_nutricion || null].filter(Boolean).join(' · ')
+      } else {
+        const parts = [r.producto, r.dosis ? `${r.dosis}ml/L` : null, r.semana_nutricion ? `sem.${r.semana_nutricion}` : null, r.metodo_nutricion || null].filter(Boolean)
+        payload.notas_fertilizacion = parts.join(' · ') || 'sin especificar'
+      }
     }
     if (r.volumen)       extra.push(`Riego: ${r.volumen}L`)
     if (r.observaciones) extra.push(r.observaciones)

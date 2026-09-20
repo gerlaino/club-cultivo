@@ -6,6 +6,7 @@ class InsumoConsumo < ApplicationRecord
 
   belongs_to :club
   belongs_to :insumo
+  belongs_to :registro_ambiental, optional: true
   belongs_to :lote, optional: true
   belongs_to :sala, optional: true
   belongs_to :created_by, class_name: 'User'

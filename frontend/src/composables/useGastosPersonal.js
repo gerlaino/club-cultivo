@@ -5,7 +5,7 @@
 // hay ingresos, cajas, cuotas ni sectores. Si la regla viviera dos veces, un día el teléfono
 // y el escritorio dirían distinto del mismo gasto.
 import { ref, computed, reactive } from 'vue'
-import { listMovimientos, createMovimiento, updateMovimiento, deleteMovimiento,
+import { listInsumos, listDepositos, listMovimientos, createMovimiento, updateMovimiento, deleteMovimiento,
          listCategoriasContables, createCategoriaContable, updateCategoriaContable,
          listUnidadesNegocio, listLotes } from '../lib/api'
 import { hoyISO, toISO } from '../utils/dates.js'
@@ -20,11 +20,26 @@ export function formVacio(categoriaId = '') {
            fecha: hoyISO(), medio_pago: 'efectivo', lote_id: null,
            // Lo de «más detalles»: opcional, pero lo que hace que un gasto sirva después
            // (cuánto salió el litro, a quién se lo compró, con qué comprobante).
-           proveedor: '', cantidad: null, unidad: '', comprobante_tipo: '', comprobante_numero: '', notas: '' }
+           proveedor: '', cantidad: null, unidad: '', comprobante_tipo: '', comprobante_numero: '', notas: '',
+           // «Es un nutriente»: la compra queda en Nutrientes con su cantidad (misma puerta que
+           // «Repuse» desde Cultivo → Nutrientes y recetas). `insumo_id` existente o `insumo_nombre`.
+           es_insumo: false, insumo_id: null, insumo_nombre: '', insumo_unidad: 'mililitro' }
 }
 
 export function useGastosPersonal() {
   const hoy = hoyISO()
+
+  // Nutrientes que ya existen (para «Repuse» desde el gasto) y el depósito de cultivo donde
+  // viven: el uso personal tiene uno solo, sembrado con el alta.
+  const insumos = ref([])
+  const depositoCultivoId = ref(null)
+  async function cargarInsumos() {
+    try {
+      const [i, d] = await Promise.allSettled([listInsumos({ tipo: 'cultivo', activos: 'true' }), listDepositos()])
+      if (i.status === 'fulfilled') insumos.value = i.value.data?.insumos || i.value.data || []
+      if (d.status === 'fulfilled') depositoCultivoId.value = (d.value.data || []).find(x => x.clave_sistema === 'cultivo')?.id || (d.value.data || [])[0]?.id || null
+    } catch {}
+  }
 
   // ── Mes ──
   const mes = ref(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
@@ -78,7 +93,7 @@ export function useGastosPersonal() {
     if (lts.status === 'fulfilled') lotes.value = lts.value.data || []
   }
 
-  function cargarTodo() { return Promise.all([cargar(), cargarAnio(), cargarCatalogo()]) }
+  function cargarTodo() { return Promise.all([cargar(), cargarAnio(), cargarCatalogo(), cargarInsumos()]) }
 
   // ── Alta / edición ──
   const form      = reactive(formVacio())
@@ -104,6 +119,12 @@ export function useGastosPersonal() {
     error.value = null
     const payload = {
       tipo: 'egreso', descripcion: form.descripcion, monto_ars: form.monto_ars,
+      // El gasto entra también al stock de nutrientes: mismo mecanismo que en una organización
+      // («Comprar» al depósito), con el único depósito de cultivo del uso personal.
+      ...(form.es_insumo && form.cantidad && depositoCultivoId.value ? { destino: {
+        tipo: 'deposito', deposito_id: depositoCultivoId.value, cantidad: form.cantidad,
+        ...(form.insumo_id ? { insumo_id: form.insumo_id } : { nombre: form.insumo_nombre || form.descripcion, unidad_medida: form.insumo_unidad }),
+      } } : {}),
       categoria_contable_id: form.categoria_contable_id, fecha: form.fecha,
       medio_pago: form.medio_pago, lote_id: form.lote_id || null, pagado: true,
       proveedor: form.proveedor || null, cantidad: form.cantidad || null, unidad: form.cantidad ? (form.unidad || null) : null,
@@ -156,7 +177,7 @@ export function useGastosPersonal() {
 
   return {
     hoy, mes, mesLabel, esMesActual, moverMes,
-    cargando, gastos, totalMes, totalAnio, categorias, lotes, lotesAbiertos,
+    cargando, gastos, totalMes, totalAnio, categorias, lotes, lotesAbiertos, insumos,
     cargar, cargarAnio, cargarCatalogo, cargarTodo,
     form, guardando, error, nuevo, editar, guardar, borrar,
     crearTipo, renombrarTipo, activarTipo,

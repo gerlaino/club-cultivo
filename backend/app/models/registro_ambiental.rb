@@ -6,6 +6,11 @@ class RegistroAmbiental < ApplicationRecord
   belongs_to :lote
   belongs_to :user
   belongs_to :club
+  belongs_to :receta, optional: true
+  has_many   :insumo_consumos, dependent: :nullify
+  # Lo descontado del depósito por «aplicar receta» vuelve si se borra el registro. `prepend`:
+  # antes de que `dependent: :nullify` desate los consumos y no quede qué revertir.
+  before_destroy :revertir_nutricion, prepend: true
   acts_as_tenant(:club)
 
   has_one_attached :archivo_csv
@@ -115,5 +120,11 @@ class RegistroAmbiental < ApplicationRecord
     hr  = humedad.to_f
     svp = 0.6108 * Math.exp(17.27 * t / (t + 237.3))
     self.vpd = (svp * (1 - hr / 100.0)).round(3)
+  end
+
+  private
+
+  def revertir_nutricion
+    Nutricion::Aplicar.revertir!(self)
   end
 end

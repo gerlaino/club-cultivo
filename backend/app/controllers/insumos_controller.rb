@@ -53,6 +53,12 @@ class InsumosController < ApplicationController
   # POST /insumos/:id/comprar  { cantidad, costo_total_ars, proveedor?, fecha?, sede_id?, generar_egreso? }
   def comprar
     sede = params[:sede_id].present? ? current_user.club.sedes.find_by(id: params[:sede_id]) : nil
+    # «Ya lo tenía y no sé cuánto pagué» (uso personal, «Repuse» con precio 0): se carga la
+    # cantidad sin compra ni gasto. Una compra de verdad lleva precio y queda en el libro.
+    if params[:costo_total_ars].to_d <= 0
+      @insumo.reponer_stock!(cantidad: params.require(:cantidad).to_d)
+      return render json: serialize(@insumo.reload), status: :created
+    end
     compra = @insumo.registrar_compra!(
       cantidad:        params.require(:cantidad),
       costo_total_ars: params.require(:costo_total_ars),
@@ -247,6 +253,8 @@ class InsumosController < ApplicationController
       valorizado_ars:     i.valorizado_ars.to_f,
       stock_minimo:       i.stock_minimo.to_f,
       stock_bajo:         i.stock_bajo?,
+      # Para cuántos riegos más alcanza, según lo descontado por receta las últimas veces.
+      aplicaciones_estimadas: i.aplicaciones_estimadas,
       activo:             i.activo,
       tipo:               i.tipo,
       categoria_contable_id: i.categoria_contable_id,

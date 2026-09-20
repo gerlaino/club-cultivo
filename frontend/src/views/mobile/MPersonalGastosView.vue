@@ -46,7 +46,7 @@
     <p class="mpg__pie">Tocá un gasto para corregirlo. El costo por lote está en <RouterLink to="/contabilidad">Gastos</RouterLink> del escritorio.</p>
 
     <MobileSheet v-model="sheet" :title="g.form.id ? 'Corregir gasto' : 'Nuevo gasto'">
-      <GastoForm :form="g.form" :categorias="g.categorias.value" :lotes="g.lotesAbiertos.value" :hoy="g.hoy"
+      <GastoForm :form="g.form" :categorias="g.categorias.value" :lotes="g.lotesAbiertos.value" :insumos="g.insumos.value" :hoy="g.hoy"
                  :error="g.error.value" :guardando="g.guardando.value" :crear-tipo="g.crearTipo"
                  @guardar="guardar" @cancelar="sheet = false" />
       <button v-if="g.form.id" type="button" class="mpg__borrar" :disabled="g.guardando.value" @click="borrar">Borrar este gasto</button>

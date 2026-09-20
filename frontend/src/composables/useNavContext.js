@@ -35,6 +35,9 @@ export const NAV_GROUPS = [
       { to: '/lotes', label: 'Lotes' },
       { to: '/plantas', label: 'Plantas' },
       { to: '/geneticas', label: 'Genéticas' },
+      // Recetas de nutrientes: en organización se arman con lo del depósito; el cultivador de
+      // casa no tiene depósito, así que acá viven también sus nutrientes.
+      { to: '/recetas', label: 'Recetas', labelPersonal: 'Nutrientes y recetas' },
     ],
   },
   {

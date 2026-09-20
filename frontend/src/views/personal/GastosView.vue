@@ -127,7 +127,7 @@
             <h2 class="gp__modal-title">{{ g.form.id ? 'Corregir gasto' : 'Nuevo gasto' }}</h2>
             <button type="button" class="gp__icon" aria-label="Cerrar" @click="modal = false"><i class="bi bi-x-lg"></i></button>
           </div>
-          <GastoForm :form="g.form" :categorias="g.categorias.value" :lotes="g.lotesAbiertos.value" :hoy="g.hoy"
+          <GastoForm :form="g.form" :categorias="g.categorias.value" :lotes="g.lotesAbiertos.value" :insumos="g.insumos.value" :hoy="g.hoy"
                      :error="g.error.value" :guardando="g.guardando.value" :crear-tipo="g.crearTipo"
                      @guardar="guardar" @cancelar="modal = false" />
         </div>

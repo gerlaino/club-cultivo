@@ -61,6 +61,40 @@
       </select>
     </label>
 
+    <!-- Es un nutriente: el gasto además carga la cantidad en Cultivo → Nutrientes y recetas,
+         para que al regar con receta se descuente y avise cuando quede poco. -->
+    <label class="gf__check">
+      <input v-model="f.es_insumo" type="checkbox" />
+      <span>Es un nutriente o insumo del cultivo <span class="gf__opt">(se suma a lo que tenés)</span></span>
+    </label>
+    <div v-if="f.es_insumo" class="gf__insumo">
+      <label class="gf__field">
+        <span class="gf__label">¿Cuál?</span>
+        <select v-model="f.insumo_id" class="gf__input">
+          <option :value="null">Uno nuevo…</option>
+          <option v-for="i in insumos" :key="i.id" :value="i.id">{{ i.nombre }} · quedan {{ Number(i.stock_actual).toLocaleString('es-AR') }} {{ ({ mililitro: 'ml', gramo: 'g' })[i.unidad_medida] || i.unidad_medida }}</option>
+        </select>
+      </label>
+      <div v-if="!f.insumo_id" class="gf__row-2">
+        <label class="gf__field">
+          <span class="gf__label">Nombre</span>
+          <input v-model.trim="f.insumo_nombre" type="text" class="gf__input" :placeholder="f.descripcion || 'Bio-Grow'" maxlength="80" />
+        </label>
+        <label class="gf__field">
+          <span class="gf__label">Se mide en</span>
+          <select v-model="f.insumo_unidad" class="gf__input">
+            <option value="mililitro">mililitros</option>
+            <option value="gramo">gramos</option>
+          </select>
+        </label>
+      </div>
+      <label class="gf__field">
+        <span class="gf__label">Cantidad que compraste ({{ unidadInsumo }})</span>
+        <input v-model.number="f.cantidad" type="number" inputmode="decimal" step="1" min="0" class="gf__input" placeholder="1000" required />
+        <span v-if="unitario" class="gf__hint">{{ unitario }}</span>
+      </label>
+    </div>
+
     <button type="button" class="gf__mas" @click="masDetalles = !masDetalles">
       <i class="bi" :class="masDetalles ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
       {{ masDetalles ? 'Menos detalles' : 'Más detalles' }}
@@ -124,6 +158,7 @@ const props = defineProps({
   form:       { type: Object,   required: true },
   categorias: { type: Array,    default: () => [] },
   lotes:      { type: Array,    default: () => [] },
+  insumos:    { type: Array,    default: () => [] },
   hoy:        { type: String,   required: true },
   error:      { type: String,   default: null },
   guardando:  { type: Boolean,  default: false },
@@ -136,6 +171,10 @@ defineEmits(['guardar', 'cancelar'])
 // acá a propósito, para que el teléfono y el escritorio editen el mismo objeto.
 const f = props.form
 const loteElegido = computed(() => props.lotes.find(l => l.id === f.lote_id))
+const unidadInsumo = computed(() => {
+  const u = f.insumo_id ? props.insumos.find(i => i.id === f.insumo_id)?.unidad_medida : f.insumo_unidad
+  return u === 'gramo' ? 'g' : (u === 'mililitro' ? 'ml' : (u || ''))
+})
 function ars(n) { return '$' + Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 0 }) }
 
 // ── Tipo nuevo, sin salir del gasto ──
@@ -197,4 +236,7 @@ const resumenDetalles = computed(() => [
 .gf__btn--ghost { background: var(--c-slate-100); color: var(--c-slate-700); }
 .gf__btn--primary { background: var(--c-leaf-800, #1A3D2E); color: #fff; }
 .gf__btn--primary:disabled { opacity: .5; }
+.gf__check { display: flex; align-items: center; gap: .5rem; font-size: .88rem; font-weight: 600; cursor: pointer; }
+.gf__check input { width: 18px; height: 18px; accent-color: var(--c-leaf-600, #3F6452); }
+.gf__insumo { display: flex; flex-direction: column; gap: .6rem; padding: .7rem .8rem; border: 1px dashed var(--c-ink-300, #d1d5db); border-radius: 10px; background: var(--c-leaf-50, #F4F8F5); }
 </style>

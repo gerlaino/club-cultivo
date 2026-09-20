@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_20_140000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_20_160000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -334,7 +334,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_20_140000) do
     t.index ["cerrada_por_id"], name: "index_caja_turnos_on_cerrada_por_id"
     t.index ["cierre_solicitado_por_id"], name: "index_caja_turnos_on_cierre_solicitado_por_id"
     t.index ["club_id"], name: "index_caja_turnos_on_club_id"
-    t.index ["punto_type", "punto_id"], name: "index_caja_turnos_activa_por_punto", unique: true, where: "((estado)::text = ANY ((ARRAY['abierta'::character varying, 'pendiente_cierre'::character varying])::text[]))"
+    t.index ["punto_type", "punto_id"], name: "index_caja_turnos_activa_por_punto", unique: true, where: "((estado)::text = ANY (ARRAY[('abierta'::character varying)::text, ('pendiente_cierre'::character varying)::text]))"
     t.index ["sede_id"], name: "index_caja_turnos_on_sede_id"
   end
 
@@ -1160,12 +1160,14 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_20_140000) do
     t.datetime "deleted_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.bigint "registro_ambiental_id"
     t.index ["club_id", "lote_id"], name: "index_insumo_consumos_on_club_id_and_lote_id"
     t.index ["club_id"], name: "index_insumo_consumos_on_club_id"
     t.index ["created_by_id"], name: "index_insumo_consumos_on_created_by_id"
     t.index ["deleted_at"], name: "index_insumo_consumos_on_deleted_at"
     t.index ["insumo_id"], name: "index_insumo_consumos_on_insumo_id"
     t.index ["lote_id"], name: "index_insumo_consumos_on_lote_id"
+    t.index ["registro_ambiental_id"], name: "index_insumo_consumos_on_registro_ambiental_id"
     t.index ["sala_id"], name: "index_insumo_consumos_on_sala_id"
   end
 
@@ -1882,6 +1884,36 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_20_140000) do
     t.index ["user_id"], name: "index_push_subscriptions_on_user_id"
   end
 
+  create_table "receta_items", force: :cascade do |t|
+    t.bigint "receta_id", null: false
+    t.bigint "insumo_id", null: false
+    t.decimal "dosis", precision: 10, scale: 3, null: false
+    t.string "unidad", default: "ml_l", null: false
+    t.integer "orden", default: 0, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["insumo_id"], name: "index_receta_items_on_insumo_id"
+    t.index ["receta_id"], name: "index_receta_items_on_receta_id"
+  end
+
+  create_table "recetas", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "created_by_id"
+    t.string "nombre", null: false
+    t.string "fase"
+    t.decimal "ph_objetivo", precision: 4, scale: 2
+    t.decimal "ec_objetivo", precision: 5, scale: 2
+    t.text "notas"
+    t.boolean "activa", default: true, null: false
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id", "nombre"], name: "index_recetas_on_club_id_and_nombre"
+    t.index ["club_id"], name: "index_recetas_on_club_id"
+    t.index ["created_by_id"], name: "index_recetas_on_created_by_id"
+    t.index ["deleted_at"], name: "index_recetas_on_deleted_at"
+  end
+
   create_table "registros_ambientales", force: :cascade do |t|
     t.bigint "lote_id", null: false
     t.bigint "user_id", null: false
@@ -1917,8 +1949,12 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_20_140000) do
     t.string "fitosanitario"
     t.string "fitosanitario_motivo"
     t.integer "carencia_dias"
+    t.bigint "receta_id"
+    t.decimal "litros", precision: 8, scale: 2
+    t.jsonb "nutricion"
     t.index ["club_id"], name: "index_registros_ambientales_on_club_id"
     t.index ["lote_id"], name: "index_registros_ambientales_on_lote_id"
+    t.index ["receta_id"], name: "index_registros_ambientales_on_receta_id"
     t.index ["registrado_en"], name: "index_registros_ambientales_on_registrado_en"
     t.index ["user_id"], name: "index_registros_ambientales_on_user_id"
   end
@@ -2642,6 +2678,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_20_140000) do
   add_foreign_key "insumo_consumos", "clubs"
   add_foreign_key "insumo_consumos", "insumos"
   add_foreign_key "insumo_consumos", "lotes"
+  add_foreign_key "insumo_consumos", "registros_ambientales", column: "registro_ambiental_id"
   add_foreign_key "insumo_consumos", "salas"
   add_foreign_key "insumo_consumos", "users", column: "created_by_id"
   add_foreign_key "insumos", "categorias_contables", column: "categoria_contable_id"
@@ -2758,8 +2795,13 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_20_140000) do
   add_foreign_key "plants", "users", column: "deleted_by_id"
   add_foreign_key "push_subscriptions", "clubs"
   add_foreign_key "push_subscriptions", "users"
+  add_foreign_key "receta_items", "insumos"
+  add_foreign_key "receta_items", "recetas"
+  add_foreign_key "recetas", "clubs"
+  add_foreign_key "recetas", "users", column: "created_by_id"
   add_foreign_key "registros_ambientales", "clubs"
   add_foreign_key "registros_ambientales", "lotes"
+  add_foreign_key "registros_ambientales", "recetas"
   add_foreign_key "registros_ambientales", "users"
   add_foreign_key "reglas_ambientales", "salas"
   add_foreign_key "reglas_ambientales", "users", column: "deleted_by_id"
