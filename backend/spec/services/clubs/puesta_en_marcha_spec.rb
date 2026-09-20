@@ -13,7 +13,7 @@ RSpec.describe Clubs::PuestaEnMarcha do
 
     expect(r[:completa]).to be(false)
     expect(r[:hechos]).to   eq(0)
-    expect(r[:pasos].map { |p| p[:clave] }).to eq(%w[sedes salas lotes pacientes correo equipo])
+    expect(r[:pasos].map { |p| p[:clave] }).to eq(%w[sedes salas geneticas lotes pacientes correo equipo])
     expect(r[:pasos]).to all(include(:label, :detalle, :ruta))
   end
 
@@ -31,6 +31,18 @@ RSpec.describe Clubs::PuestaEnMarcha do
 
     hechos = pasos[:pasos].select { |p| p[:hecho] }.map { |p| p[:clave] }
     expect(hechos).to contain_exactly('sedes', 'salas')
+  end
+
+  # Sin una variedad propia y disponible el alta del lote ofrece «Sin genéticas disponibles»:
+  # el paso va ANTES del lote. Las del catálogo INASE no cuentan (son de consulta, de todos).
+  it '«cargar una variedad» pide una propia, activa y disponible' do
+    ActsAsTenant.with_tenant(club) do
+      expect(pasos[:pasos].find { |p| p[:clave] == 'geneticas' }[:hecho]).to be false
+      g = Genetica.create!(club: club, nombre: 'Casera', tipo: 'hibrida', disponible: false)
+      expect(pasos[:pasos].find { |p| p[:clave] == 'geneticas' }[:hecho]).to be false
+      g.update!(disponible: true)
+      expect(pasos[:pasos].find { |p| p[:clave] == 'geneticas' }[:hecho]).to be true
+    end
   end
 
   it '«que entre alguien más» se cumple cuando alguien del equipo que no es admin entró' do

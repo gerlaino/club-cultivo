@@ -25,8 +25,14 @@ module Clubs
       end
 
       if @club.suite?('cultivo')
-        pasos << paso('salas', 'Crear una sala de cultivo', @club.salas.count.positive?,
-                      'Sin sala no hay dónde poner un lote.', '/salas')
+        pasos << paso('salas', @club.personal? ? 'Crear un espacio de cultivo' : 'Crear una sala de cultivo',
+                      @club.salas.count.positive?,
+                      @club.personal? ? 'Sin espacio no hay dónde poner un lote.' : 'Sin sala no hay dónde poner un lote.', '/salas')
+        # Sin una variedad propia y disponible el alta del lote ofrece «Sin genéticas disponibles»
+        # y ahí se trababa la puesta en marcha (Germán, 20-sep-2026). Las del catálogo INASE son
+        # de consulta: nacen no disponibles y son de todos, no se prenden por organización.
+        pasos << paso('geneticas', 'Cargar una variedad', @club.geneticas.activas.disponibles.exists?,
+                      'Con nombre y, si la sabés, su genética. Sin una variedad disponible no se abre un lote.', '/geneticas')
         pasos << paso('lotes', 'Abrir el primer lote', @club.lotes.count.positive?,
                       'Con el lote arrancan las tareas, las fases y la trazabilidad.', '/lotes')
       end

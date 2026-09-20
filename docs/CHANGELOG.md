@@ -1,5 +1,13 @@
 # Changelog
 
+## Septiembre 2026 (cn) — Puesta en marcha: «Cargar una variedad» antes del primer lote
+
+- Pedido de Germán (20-sep): sin una genética propia y disponible el alta del lote ofrece «Sin
+  genéticas disponibles» y ahí se trababa la puesta en marcha. Las nueve del catálogo INASE son
+  de consulta —nacen `disponible: false` y son de todos—, así que no cuentan. Paso `geneticas`
+  en `Clubs::PuestaEnMarcha`, entre salas y lotes, con ruta a `/geneticas`; en uso personal la
+  sala se llama «espacio». El componente pinta lo que manda el backend, sin tocar.
+
 ## Septiembre 2026 (cm) — «Algo cambió»: las pantallas se actualizan solas
 
 - **Pedido de Germán (20-sep):** «si registro eventos debe verse reflejado en todos lados, sin
