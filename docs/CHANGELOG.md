@@ -18,6 +18,9 @@
   cultivo) y **8 MB por archivo**. Concern `CupoDeFotos` en las tres puertas (402 `limite_plan`
   con `cupo`); la galería muestra «287 de 300 fotos» desde el 80 % y apaga la cámara al llegar.
   `fotos` entró a `RECURSOS`: el super admin lo ve en la tarjeta del plan.
+- **Repaso por rol (mismo día):** el cultivador de una organización recibía el costo en «Cómo
+  salió» (la plata es de administración, como la P&L): el backend lo manda sólo a admin/supervisor.
+  Y el tope de fotos, a quien no contrata, le dice «avisale a tu administrador», no «escribinos».
 - **Auto-registro + trial 30 días: plan armado y pospuesto** (`docs/PLAN_AUTOREGISTRO.md`):
   sólo personal, nace sin flags, verificación por mail, corte al día 31 con «Escribinos»,
   organizaciones dejan sus datos. App en las tiendas: no hasta tener clientes fijos.

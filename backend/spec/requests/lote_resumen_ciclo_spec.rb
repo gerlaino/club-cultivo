@@ -64,6 +64,24 @@ RSpec.describe 'Lote — resumen del ciclo', type: :request do
     expect(json).to include('cerrado' => false, 'gramos' => nil, 'g_por_planta' => nil)
   end
 
+  # La plata es de administración, como la tarjeta P&L: el cultivador ve el ciclo sin pesos.
+  it 'al cultivador le llega sin costo' do
+    lote = ciclo_cerrado(codigo: 'L-1', gramos: 312)
+    ActsAsTenant.with_tenant(club) { CostoLote.create!(lote: lote, club: club, costo_insumos: 40_000, gramos_producidos: 312) }
+    cultivador = create(:user, :cultivador, club: club)
+    ActsAsTenant.with_tenant(club) { cultivador.salas << sala if cultivador.respond_to?(:salas) }
+
+    sign_in_as(admin)
+    get "/lotes/#{lote.id}/resumen_ciclo", headers: auth_headers
+    expect(json['costo']).to include('total' => 40_000.0)
+
+    sign_in_as(cultivador)
+    get "/lotes/#{lote.id}/resumen_ciclo", headers: auth_headers
+    expect(response).to have_http_status(:ok), response.body
+    expect(json['costo']).to be_nil
+    expect(json['gramos']).to eq(312.0)
+  end
+
   it 'no muestra el ciclo de otra organización' do
     lote = ciclo_cerrado(codigo: 'L-1', gramos: 312)
     otro_club = create(:club)

@@ -75,7 +75,8 @@ class LotesController < ApplicationController
   # fotos del día 1 y del final, y contra qué compararlo (los ciclos anteriores de la misma
   # genética). Se puede pedir en cualquier estado; la tarjeta lo muestra al cerrar.
   def resumen_ciclo
-    render json: Lotes::ResumenCiclo.new(@lote, url_helper: ->(att) { url_for(att) }).call
+    render json: Lotes::ResumenCiclo.new(@lote, url_helper: ->(att) { url_for(att) },
+                                         con_costo: current_user.admin? || current_user.supervisor?).call
   end
 
   # GET /lotes/por_qr/:codigo_qr

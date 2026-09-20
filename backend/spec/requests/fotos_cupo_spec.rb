@@ -48,6 +48,16 @@ RSpec.describe 'Fotos — cupo del plan', type: :request do
     expect(response).to have_http_status(:payment_required)
   end
 
+  # Quien no contrata no negocia el plan: al cultivador se le pide que avise, no que escriba.
+  it 'al cultivador el tope le habla de su administrador' do
+    stub_const('PlanEnforcer::PLANES', PlanEnforcer::PLANES.deep_merge('personal' => { fotos: 0 }))
+    cultivador = create(:user, :cultivador, club: club)
+    sign_in_as(cultivador)
+    post "/lotes/#{lote.id}/fotos", params: { imagen: imagen, tomada_el: '2026-09-15' }, headers: auth_headers
+    expect(response).to have_http_status(:payment_required)
+    expect(json['mensaje']).to include('administrador')
+  end
+
   it 'una foto de más de 8 MB no entra, y lo dice' do
     stub_const('PlanEnforcer::FOTO_MAX_BYTES', 10)
     post "/lotes/#{lote.id}/fotos", params: { imagen: imagen('x' * 11), tomada_el: '2026-09-15' }, headers: auth_headers

@@ -13,10 +13,13 @@ module Lotes
   class ResumenCiclo
     CERRADOS = %w[curado finalizado].freeze
 
-    def initialize(lote, url_helper: nil)
+    # `con_costo`: la plata es de administración (misma regla que la tarjeta P&L del lote); un
+    # cultivador o un manicura ven el ciclo sin pesos. Lo decide el controller por el rol.
+    def initialize(lote, url_helper: nil, con_costo: true)
       @lote = lote
       @club = lote.club
       @url  = url_helper
+      @con_costo = con_costo
     end
 
     def call
@@ -35,7 +38,7 @@ module Lotes
                       descartadas: pl[:descartadas].to_i },
         g_por_planta: (gramos.positive? && cosechadas.positive?) ? (gramos / cosechadas).round(1) : nil,
         dias:       fases.slice('enraizado', 'vegetativo', 'floracion', 'cosecha', 'en_manicura', 'total'),
-        costo:      costo && costo.costo_total.to_f.positive? ? {
+        costo:      @con_costo && costo && costo.costo_total.to_f.positive? ? {
           total:     costo.costo_total.to_f.round(2),
           por_gramo: costo.costo_por_gramo&.to_f&.round(2),
           nutricion: costo_nutricion,
@@ -85,12 +88,12 @@ module Lotes
       gramos = u.lotes.sum { |l| l.rendimiento_real_g.to_f }
       cosech = u.lotes.sum { |l| u.plantas.dig(l.id, :cosechadas).to_i }
       totales = u.lotes.filter_map { |l| u.fases.dig(l.id, 'total') }
-      con_costo = u.lotes.select { |l| l.costo_lote&.costo_total.to_f.positive? && l.rendimiento_real_g.to_f.positive? }
+      costeados = @con_costo ? u.lotes.select { |l| l.costo_lote&.costo_total.to_f.positive? && l.rendimiento_real_g.to_f.positive? } : []
       {
         lotes:        u.lotes.size,
         g_por_planta: cosech.positive? ? (gramos / cosech).round(1) : nil,
         dias_total:   totales.any? ? (totales.sum / totales.size).round(1) : nil,
-        costo_por_gramo: con_costo.any? ? (con_costo.sum { |l| l.costo_lote.costo_total.to_f } / con_costo.sum { |l| l.rendimiento_real_g.to_f }).round(2) : nil,
+        costo_por_gramo: costeados.any? ? (costeados.sum { |l| l.costo_lote.costo_total.to_f } / costeados.sum { |l| l.rendimiento_real_g.to_f }).round(2) : nil,
       }
     end
   end

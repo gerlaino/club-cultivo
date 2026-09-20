@@ -21,9 +21,15 @@ module CupoDeFotos
     enforcer = PlanEnforcer.new(current_user.club)
     return nil if enforcer.puede_subir_foto?
 
-    info = enforcer.info
-    render json: PlanEnforcer.error_limite('fotos', info[:limites][:fotos], plan: info[:label])
-                             .merge(cupo: enforcer.cupo_fotos), status: :payment_required
+    info  = enforcer.info
+    error = PlanEnforcer.error_limite('fotos', info[:limites][:fotos], plan: info[:label])
+    # «Escribinos y lo cambiamos» es para quien contrata. Un cultivador no elige el plan: le
+    # pedimos que avise, no que negocie.
+    unless current_user.admin? || current_user.supervisor?
+      msg = "Tu organización llegó al tope de #{info[:limites][:fotos]} fotos de su plan. Avisale a tu administrador para ampliarlo o borrá fotos viejas."
+      error = error.merge(errors: [msg], mensaje: msg)
+    end
+    render json: error.merge(cupo: enforcer.cupo_fotos), status: :payment_required
     true
   end
 end
