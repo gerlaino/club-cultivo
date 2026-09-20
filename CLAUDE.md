@@ -1,6 +1,6 @@
 # CLAUDE.md — Cultivo Espacial (repo `club-cultivo`)
 
-> Briefing de sesión, corto a propósito (18-sep-2026). Si contradice al código, el código manda.
+> Briefing de sesión, corto a propósito (20-sep-2026). Si contradice al código, el código manda.
 > El detalle histórico vive en `docs/`: `REGLAS_Y_DECISIONES.md` (todas las reglas «que no hay que
 > romper», decisiones de Germán y retomadas viejas), `MODULOS_DETALLE.md` (cada módulo como quedó),
 > `CHANGELOG.md` (bloque por bloque), `DEPLOY.md`, `SECURITY_AUDIT.md`, `GUIA_USUARIOS.md`.
@@ -125,32 +125,54 @@ mensual por plan (`Ia::Uso`, `ia_llamadas`, créditos `IaRecarga`).
 - **Seguridad**: no hay contraseña por defecto; `render file:` no existe en modo API; `/me` no se
   cachea; el helper de specs prefija `/api` a todo.
 
-## Dónde retomar (18-sep-2026)
+## Dónde retomar (20-sep-2026)
 
-**Hecho hoy, sin commitear: «Plata a favor»** (bloque (cg) del CHANGELOG, memoria
-`project_plata_a_favor.md`). Backend + modal + ficha + portal, 3309 rspec (rojos ajenos:
-`delivery_periodo_cerrado_spec:132` y 2 de `super_admin_catalogo_spec` que trae la rama
-`uso-personal`), 2170 vitest, visto renderizado.
+**Todo pusheado y en producción (`master`, último `113b1e89`).** Bloques (ch) a (cs) del
+CHANGELOG, dos días de trabajo: alta de uso personal rediseñada · push arreglado de raíz (clave
+por `/me`, job sin tenant, baja por endpoint, botón en el teléfono) · PWA de 8,8 MB a 1,1 MB ·
+notificaciones por persona en dos familias + «Recordarme» por tarea · «algo cambió» por
+ActionCable en toda la app · galería de fotos por semana · recetas de nutrientes · catálogo INASE
+compartido de sólo lectura · varios bugs de la PWA personal.
 
-**PROBLEMA ABIERTO — dos sesiones en el mismo working tree.** Otra sesión trabaja `uso-personal`
-(plan personal) **en esta misma carpeta** y su commit `c1fa9eb6` arrastró un snapshot parcial de
-plata a favor. HEAD está en `uso-personal`; `master` en `ec2d5c22`. Plan acordado, **pendiente de
-que Germán avise que la otra sesión terminó**: ① patch de plata a favor contra `master`
-(separar a mano los hunks de `dispensaciones_controller.rb` y `dispensacion.rb`), checkout master,
-aplicar, specs, commit con su OK · ② rehacer `uso-personal` desde ese master con sólo sus archivos
-(incl. `useUsoPersonal.js`, hoy sin trackear) · ③ la otra sesión pasa a un `git worktree`.
+**Reglas nuevas que gobiernan código nuevo** (detalle en `docs/REGLAS_Y_DECISIONES.md`):
+- Todo modelo de dominio nuevo lleva `include Transmite` + `transmite_como '<recurso>'`; toda
+  pantalla que pide directo a la API se anota con `useRecargaEnCambios`. El aviso no lleva
+  datos: la pantalla re-pide. Los `refrescar()` de los stores son silenciosos.
+- Push: lo que no está en `Notificaciones::Catalogo` no se ofrece ni se manda; todo disparador
+  nuevo dice `tipo:`. «Te piden algo» prendido; «Recordatorios» opt-in (en personal, ciclo y
+  cosecha prendidos). En pantalla se dice «Próximos pasos del ciclo», nunca «hitos».
+- Uso personal nace sólo con Cultivo; ambiente/IA/chatbot se eligen en el alta. **Precio de esos
+  adicionales en personal: PENDIENTE de Germán** (`Precios::INCLUIDO_EN_PERSONAL` los deja adentro).
+- Nutriente = insumo; receta = dosis por litro; aplicar al regar descuenta y cuesta, **nunca
+  bloquea por stock**; «fertilizó sin especificar» es válido. Personal: «Mis nutrientes».
+- Genéticas globales (INASE) son compartidas: sólo lectura desde una organización; personal ve
+  sólo las suyas.
+- La regla del enraizado (incubadora con su clima) vale también en personal.
 
-**Pendientes de código:** borrar `pacientes.envio_*` (migración) · 2 e2e de `mostrador.spec.js` rotos
-desde el 8-sep (preguntar a Germán cómo quedó Merma, no reescribir mirando el código) · si el
-repartidor cobra de más en la puerta también queda a favor (decisión pendiente).
-**Pendientes de Germán (no código):** rotar el secreto de Render · `rake seguridad:usuarios_con_password_default`
-· `rake stocks:balance_descuadrado` · `rake auditorias:limpiar_blobs` · declarar genéticas INASE a mano ·
-que su socio dé de alta una organización sin ayuda.
+**Próxima tanda acordada (PWA personal, chica):** ① el «+» ofrece Regar / Registrar ambiente /
+Foto / Tarea y con un solo lote adivina el destino (hoy anotar un riego son cuatro toques) ·
+② el lote dice qué viene («faltan 8 días para floración») en su tarjeta y en el inicio. Ideas
+sin acordar: resumen al cerrar el ciclo, sacar «Escanear QR» del «+» en personal, plan de
+tareas base al crear un lote.
+
+**Pendientes más adelante (Germán decidió posponer):** auto-registro + trial 30 días · app en las
+tiendas (Capacitor, push nativo) · `image_processing`/libvips para miniaturas de la galería.
+**Pendientes viejos:** borrar `pacientes.envio_*` · 2 e2e de `mostrador.spec.js` rotos desde el
+8-sep (preguntar cómo quedó Merma) · si el repartidor cobra de más también queda a favor.
+**De Germán (no código):** rotar el secreto de Render · `rake seguridad:usuarios_con_password_default`
+· `rake stocks:balance_descuadrado` · `rake auditorias:limpiar_blobs` · confirmar que el push por
+worker llega al iPhone (el directo ya llegó) · destrabar notificaciones en su Chrome (candado).
 
 ## Trampas del entorno
 
 `localhost:5173` puede ser `vite preview` (sirve `dist/`: build antes de Playwright) — hoy es el dev
 server de docker. rack-attack: 5 logins/min (la e2e hace 7; en dev localhost no se throttlea). No
 contaminar la org `e2e`. `npm run build | tail` esconde el exit code. La suite e2e es inestable en
-conjunto; cada archivo pasa solo. `ClubNota`/`DireccionPaciente` llevan `self.table_name`.
-Factory `:cuenta_corriente` reusa la del paciente; en specs `paciente.cuenta_corriente!.tap { update! }`.
+conjunto; cada archivo pasa solo. `ClubNota`/`DireccionPaciente`/`Receta` llevan `self.table_name`
+(el inflector inglés) y las FK nuevas van con `to_table`. Factory `:cuenta_corriente` reusa la del
+paciente; en specs `paciente.cuenta_corriente!.tap { update! }`. rack-attack en dev SÍ throttlea
+tras muchas pruebas: `Rack::Attack.cache.store.clear`. Una columna nueva no aparece en el dev
+server hasta `docker compose restart backend` (caché de esquema). Datos locales del uso personal:
+club `casa_german`, `admin@casa_german.com` / `E2eTest2026!` (con nutrientes, receta y fotos de
+prueba). Push en Chromium headless: perfil persistente (`launchPersistentContext`) y
+`channel: 'chromium'`; el incógnito no tiene Push API.
