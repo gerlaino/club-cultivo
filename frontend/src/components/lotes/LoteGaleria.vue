@@ -356,7 +356,10 @@ async function eliminar(f) {
   try {
     await deleteFotoLote(props.loteId, f.id)
     lightbox.value = false
+    // Si esa misma foto estaba abierta para editar, el formulario se cierra con ella.
+    if (form.value?.id === f.id) cerrarForm()
     fotos.value = fotos.value.filter(x => x.id !== f.id)
+    if (cupo.value) cupo.value = { ...cupo.value, usadas: Math.max(0, cupo.value.usadas - 1) }
     toast.success('Foto eliminada')
   } catch { toast.error('No se pudo eliminar') }
 }

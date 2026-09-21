@@ -68,3 +68,30 @@ describe('ConfirmDialog', () => {
     w.unmount()
   })
 })
+
+// El «¿seguro?» va ARRIBA de cualquier overlay de la app. Quedó debajo del lightbox de fotos
+// (9999) y de su barra de acciones (10001): se podía tocar «Editar» con el cartel de eliminar
+// abierto (Germán, 21-sep). Este test lee los z-index reales de `src` para que no vuelva a pasar.
+describe('El cartel de confirmación siempre gana', () => {
+  it('su z-index supera al de todo overlay que no sea la barra de carga', async () => {
+    const { readFileSync, readdirSync, statSync } = await import('node:fs')
+    const { resolve, dirname } = await import('node:path')
+    const { fileURLToPath } = await import('node:url')
+    const SRC = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+    const archivos = []
+    const walk = (d) => readdirSync(d).forEach(n => { const p = resolve(d, n); statSync(p).isDirectory() ? walk(p) : (/\.(vue|css)$/.test(n) && archivos.push(p)) })
+    walk(SRC)
+
+    const dialog = readFileSync(resolve(SRC, 'components/ui/ConfirmDialog.vue'), 'utf8')
+    const propio = Number(dialog.match(/\.cd-overlay\s*\{[^}]*z-index:\s*(\d+)/)[1])
+
+    const masAltos = []
+    for (const f of archivos) {
+      if (f.endsWith('ConfirmDialog.vue') || f.endsWith('App.vue')) continue   // App.vue: la barra de carga (99999)
+      for (const m of readFileSync(f, 'utf8').matchAll(/z-index:\s*(\d+)/g)) {
+        if (Number(m[1]) >= propio) masAltos.push(`${f.replace(SRC, '')}: ${m[1]}`)
+      }
+    }
+    expect(masAltos, `Hay overlays por encima del cartel de confirmación (${propio}):\n${masAltos.join('\n')}`).toEqual([])
+  })
+})

@@ -369,6 +369,10 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   (`registrarLecturaOffline`) y el de la sala/espacio (`registrarSalaOffline`). La lista de lo
   que entra a la cola sigue siendo de dominio (`lib/offlineApi.js`): ambiente, registro diario,
   pesaje del manicura, entrega del repartidor. Dispensar, fotos, crear cosas y tareas, NO.
+- **`ConfirmDialog` ES LO MÁS ALTO DE LA PANTALLA** (21-sep-2026): `z-index: 20000`, y nada
+  salvo la barra de carga de ruta (99999) puede estar por encima; `ConfirmDialog.test.js` barre
+  los z-index de `src` y falla si aparece uno. Un «¿seguro?» debajo de un overlay deja lo de
+  atrás tocable.
 - **LAS FOTOS SE ACHICAN EN EL TELÉFONO Y TIENEN TOPE POR PLAN** (20-sep-2026): toda puerta
   por la que entra una foto pasa por `achicarImagen()` (`lib/imagenes.js`, test que lo barre)
   y por `CupoDeFotos` en el backend (tope del plan en `PlanEnforcer::PLANES[..][:fotos]`, 8 MB

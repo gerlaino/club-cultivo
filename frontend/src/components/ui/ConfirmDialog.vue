@@ -42,8 +42,12 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 </template>
 
 <style scoped>
+/* ARRIBA DE TODO, sin excepción. Un «¿seguro?» que queda debajo de un lightbox (9999) o de su
+   barra de acciones (10001) deja la pantalla de atrás tocable: se apretaba «Editar» con el
+   cartel de eliminar abierto, y al confirmar seguía el modal de edición (Germán, 21-sep). El
+   único que va más alto es la barra de carga de ruta (99999), que no se toca. */
 .cd-overlay {
-  position: fixed; inset: 0; z-index: 9998;
+  position: fixed; inset: 0; z-index: 20000;
   background: rgba(0,0,0,.45);
   display: flex; align-items: center; justify-content: center;
   padding: 1rem;

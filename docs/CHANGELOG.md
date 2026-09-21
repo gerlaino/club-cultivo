@@ -1,5 +1,15 @@
 # Changelog
 
+## Septiembre 2026 (cx) — El «¿seguro?» siempre arriba
+
+- **El cartel de confirmación quedaba DEBAJO del lightbox de fotos** (9998 contra 9999 y la
+  barra de acciones en 10001): con «Eliminar foto» abierto se podía tocar «Editar», se abría
+  el modal de edición y al confirmar seguía ahí (Germán, 21-sep). `ConfirmDialog` pasa a
+  `z-index: 20000` —lo único más alto es la barra de carga de ruta— y un test lee los z-index
+  reales de `src` para que ningún overlay vuelva a taparlo. El mismo agujero existía en
+  `SocioDetailView`, `StockQrView` y el wizard (9999). La galería además cierra el formulario
+  de edición si se borra la foto que estaba editando y descuenta del cupo.
+
 ## Septiembre 2026 (cw) — Repaso por rol: el cultivador también tiene su «Hoy», y «qué viene» en escritorio
 
 - **El «+» «Hoy» también para el cultivador de una organización** (Regar / Registrar ambiente /
