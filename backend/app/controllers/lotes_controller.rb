@@ -526,7 +526,7 @@ class LotesController < ApplicationController
     require "csv"
     csv_data = CSV.generate(col_sep: ";", encoding: "UTF-8") do |csv|
       csv << [
-        "Código", "Estado", "Genética", "Sala", "Sede",
+        "Código", "Estado", "Genética", "Automática", "Sala", "Sede",
         "Plantas", "Plantas obj.", "Plantas cosechadas",
         "Rendimiento obj. (g)", "Rendimiento real (g)", "Desviación (%)",
         "Costo total", "Costo/gramo",
@@ -540,6 +540,7 @@ class LotesController < ApplicationController
           l.codigo,
           l.estado,
           l.genetica&.nombre,
+          l.automatica? ? 'Sí' : 'No',
           l.sala&.nombre,
           l.sala&.sede&.nombre,
           l.plants_count,

@@ -115,11 +115,14 @@
                  vive en vegetativo todo el ciclo, se cosecha desde ahí, y el reloj es «semilla a
                  cosecha». Anotar la floración queda opcional en el lote. -->
             <div class="gem-form__field gem-form__field--full">
-              <label class="gem-form__toggle">
-                <input v-model="form.automatica" type="checkbox" class="gem-form__toggle-input" :disabled="editingInase" />
+              <label class="gem-form__toggle" :title="conPlantas ? 'Tiene plantas activas: no se cambia' : ''">
+                <input v-model="form.automatica" type="checkbox" class="gem-form__toggle-input" :disabled="editingInase || conPlantas" />
                 <span class="gem-form__toggle-track"></span>
                 <span class="gem-form__toggle-label">Automática <span class="gem-form__label-hint">florece sola, sin pasar a 12/12</span></span>
               </label>
+              <!-- El backend lo rechaza igual (`Genetica#automatica_no_cambia_con_lotes_en_curso`);
+                   acá se dice antes, para no ofrecer lo que va a fallar. -->
+              <p v-if="conPlantas" class="gem-form__hint">Esta genética tiene {{ plantasActivas }} {{ plantasActivas === 1 ? 'planta activa' : 'plantas activas' }}: si es automática o no ya no se cambia. Para la próxima tanda, creá una genética nueva (por ejemplo «Auto {{ form.nombre }}»).</p>
             </div>
             <div v-if="form.automatica" class="gem-form__field gem-form__field--full">
               <label class="gem-form__label">Semilla a cosecha (días) <span class="gem-form__label-hint">lo que dice el banco</span></label>
@@ -234,7 +237,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import api, { getGenetica, createGenetica, updateGenetica, listGeneticas } from '../lib/api.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import { useUsoPersonal } from '../composables/useUsoPersonal.js'
@@ -252,6 +255,9 @@ const showModal    = ref(false)
 const saving       = ref(false)
 const editingId    = ref(null)
 const editingInase = ref(false)
+// Plantas activas de la genética que se edita: con alguna, el tilde de automática se congela.
+const plantasActivas = ref(0)
+const conPlantas = computed(() => !!editingId.value && plantasActivas.value > 0)
 const formError    = ref(null)
 const formErrors   = ref({})
 const fotoFile     = ref(null)
@@ -304,6 +310,7 @@ function quitarFoto() {
 function openCreate() {
   editingId.value    = null
   editingInase.value = false
+  plantasActivas.value = 0
   form.value         = emptyForm()
   formErrors.value   = {}
   formError.value    = null
@@ -321,6 +328,7 @@ async function openEdit(genOrId) {
   if (!gen) return
   editingId.value    = gen.id
   editingInase.value = !!gen.registrada_inase
+  plantasActivas.value = Number(gen.plantas_count || 0)
   form.value = {
     nombre:           gen.nombre           || '',
     tipo:             gen.tipo             || '',

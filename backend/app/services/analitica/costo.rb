@@ -14,7 +14,7 @@ module Analitica
         total:        agregado(con_costo).merge(lotes_sin_costo: @u.lotes.size - con_costo.size),
         por_sede:     con_costo.group_by { |l| @u.sede_de(l) }.map { |sede, ls| agregado(ls).merge(nombre: sede&.nombre || 'Sin sede') }
                                .sort_by { |f| f[:costo_por_gramo] || Float::INFINITY },
-        por_genetica: con_costo.group_by(&:genetica).map { |g, ls| agregado(ls).merge(nombre: g&.nombre || 'Sin variedad') }
+        por_genetica: con_costo.group_by(&:genetica).map { |g, ls| agregado(ls).merge(nombre: g&.nombre || 'Sin variedad', automatica: g&.automatica == true) }
                                .sort_by { |f| f[:costo_por_gramo] || Float::INFINITY },
       }
     end

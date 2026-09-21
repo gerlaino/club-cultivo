@@ -64,7 +64,8 @@ class GeneticasController < ApplicationController
     # Campos protegidos para genéticas INASE (vienen con info previa, incl. los días por fase)
     permitted = if @genetica.registrada_inase?
                   genetica_params.except(:nombre, :tipo, :thc, :cbd, :criador, :registrada_inase,
-                                         :tiempo_floracion, :dias_vegetativo_objetivo, :dias_cosecha_objetivo)
+                                         :tiempo_floracion, :dias_vegetativo_objetivo, :dias_cosecha_objetivo,
+                                         :automatica, :dias_ciclo_objetivo)
                 else
                   genetica_params
                 end

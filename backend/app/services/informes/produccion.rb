@@ -84,7 +84,7 @@ module Informes
       {
         id:        lote.id,
         codigo:    lote.codigo,
-        genetica:  lote.genetica&.nombre,
+        genetica:  lote.genetica && (lote.genetica.automatica ? "#{lote.genetica.nombre} (auto)" : lote.genetica.nombre),
         sede:      lote.sede&.nombre,
         fecha:     fecha.to_date,
         plantas:   plantas,
@@ -195,15 +195,18 @@ module Informes
       hoy = Time.zone.today
 
       lotes.map do |l|
+        # La auto no tiene floración objetivo: su fecha es el ciclo desde la germinación
+        # (`proximo_paso`, la misma cuenta que la tarjeta).
         fecha = l.fecha_cosecha_estimada ||
-                (l.fecha_inicio_floracion && l.dias_floracion_objetivo &&
-                 l.fecha_inicio_floracion + l.dias_floracion_objetivo.days)
+                (l.automatica? ? l.proximo_paso&.dig(:fecha) :
+                 (l.fecha_inicio_floracion && l.dias_floracion_objetivo &&
+                  l.fecha_inicio_floracion + l.dias_floracion_objetivo.days))
         n = plantas[l.id].to_i
         ref = gpp[l.genetica_id]
         {
           id:        l.id,
           codigo:    l.codigo,
-          genetica:  l.genetica&.nombre,
+          genetica:  l.genetica && (l.genetica.automatica ? "#{l.genetica.nombre} (auto)" : l.genetica.nombre),
           sala:      l.sala&.nombre,
           plantas:   n,
           fecha:     fecha,

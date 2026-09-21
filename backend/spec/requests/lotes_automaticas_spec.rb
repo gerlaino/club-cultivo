@@ -75,3 +75,45 @@ RSpec.describe 'Lotes de genética automática', type: :request do
     expect(json['sala_id']).to eq(flora.id)
   end
 end
+
+# Cambiar el tilde con lotes en curso los dejaría con un ciclo que no es el suyo: no se edita,
+# se crea otra genética (Germán, 21-sep-2026).
+RSpec.describe 'Genética automática — editar el tilde', type: :request do
+  include AuthHelpers
+  def json = JSON.parse(response.body)
+
+  let(:club)  { create(:club) }
+  let(:admin) { create(:user, :admin, club: club) }
+  let(:sede)  { create(:sede, club: club, created_by: admin) }
+  let(:sala)  { create(:sala, club: club, sede: sede, created_by: admin) }
+  let(:gen)   { create(:genetica, club: club, nombre: 'Kush') }
+
+  before { sign_in_as(admin) }
+
+  it 'con un lote en curso no deja cambiarlo, y dice qué hacer' do
+    create(:lote, club: club, sala: sala, genetica: gen, estado: 'vegetativo', start_date: 10.days.ago.to_date, tamanio_maceta: 3)
+    patch "/geneticas/#{gen.id}", params: { genetica: { automatica: true, dias_ciclo_objetivo: 75 } }, headers: auth_headers
+    expect(response).to have_http_status(:unprocessable_entity)
+    expect(response.body).to include('1 lote en curso').and include('genética nueva')
+    expect(gen.reload.automatica).to eq(false)
+  end
+
+  it 'sin lotes en curso (o sólo finalizados) sí se cambia' do
+    create(:lote, club: club, sala: nil, sede: sede, genetica: gen, estado: 'finalizado', start_date: 200.days.ago.to_date, tamanio_maceta: 3)
+    patch "/geneticas/#{gen.id}", params: { genetica: { automatica: true, dias_ciclo_objetivo: 75 } }, headers: auth_headers
+    expect(response).to have_http_status(:ok), response.body
+    expect(gen.reload).to have_attributes(automatica: true, dias_ciclo_objetivo: 75)
+  end
+
+  it 'el CSV de lotes dice si es automática, y Plan vs. real mide a la auto por el ciclo entero' do
+    auto = create(:genetica, club: club, nombre: 'Auto K', automatica: true, dias_ciclo_objetivo: 75)
+    lote = create(:lote, club: club, sala: sala, genetica: auto, estado: 'vegetativo', start_date: 40.days.ago.to_date,
+                         tamanio_maceta: 7, dias_ciclo_objetivo: 75)
+    get '/lotes/export_csv', headers: auth_headers
+    expect(response.body).to include('Automática').and include("#{lote.codigo};vegetativo;Auto K;Sí")
+
+    get '/informes/plan_vs_real', headers: auth_headers
+    fila = json['viene'].find { |f| f['id'] == lote.id }
+    expect(fila).to include('genetica' => 'Auto K (auto)', 'automatica' => true, 'dias_plan' => 75, 'dias_hoy' => 40)
+  end
+end

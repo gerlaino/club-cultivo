@@ -82,23 +82,40 @@ module Informes
       }
     end
 
+    # El nombre de la genética en el informe dice si es automática: «Auto Ananda (auto)». Va en
+    # el mismo string para que pantalla, PDF y Excel lo lean sin una columna nueva.
+    def nombre_genetica(l)
+      return nil unless l.genetica
+      l.genetica.automatica ? "#{l.genetica.nombre} (auto)" : l.genetica.nombre
+    end
+
     def fila_salio(l, ent)
       dias = dias_reales(ent)
       g_plan = l.rendimiento_objetivo_g&.to_f
       g_real = l.rendimiento_real_g&.to_f
       plantas = l.plants_count_cosechadas || l.plants_count
       desv_g = desvio(g_real, g_plan)
-      desv_f = l.dias_floracion_objetivo && dias[:floracion] ? dias[:floracion] - l.dias_floracion_objetivo : nil
+      # Una automática no se compara por floración (no la decide nadie) sino por el ciclo entero
+      # contra lo que prometía el banco.
+      if l.automatica?
+        cos = ent['cosecha'] || ent['en_manicura'] || ent['curado'] || ent['finalizado']
+        ciclo_real = cos && l.start_date ? (cos - l.start_date).to_i : nil
+        desv_f = l.dias_ciclo_objetivo && ciclo_real ? ciclo_real - l.dias_ciclo_objetivo : nil
+        que = 'ciclo'
+      else
+        desv_f = l.dias_floracion_objetivo && dias[:floracion] ? dias[:floracion] - l.dias_floracion_objetivo : nil
+        que = 'floración'
+      end
       veredicto = []
       veredicto << (desv_g.abs <= TOLERANCIA_GRAMOS_PCT ? 'gramos ✓' : "#{desv_g.positive? ? '+' : ''}#{desv_g} % gramos") if desv_g
-      veredicto << (desv_f.abs <= TOLERANCIA_DIAS ? 'floración ✓' : "floración #{desv_f.positive? ? '+' : ''}#{desv_f} días") if desv_f
+      veredicto << (desv_f.abs <= TOLERANCIA_DIAS ? "#{que} ✓" : "#{que} #{desv_f.positive? ? '+' : ''}#{desv_f} días") if desv_f
       cumplio = if desv_g.nil? && desv_f.nil?
                   nil
                 else
                   (desv_g.nil? || desv_g.abs <= TOLERANCIA_GRAMOS_PCT) && (desv_f.nil? || desv_f.abs <= TOLERANCIA_DIAS)
                 end
       {
-        id: l.id, codigo: l.codigo, genetica: l.genetica&.nombre, estado: l.estado,
+        id: l.id, codigo: l.codigo, genetica: nombre_genetica(l), automatica: l.automatica?, estado: l.estado,
         fecha_cosecha: ent['cosecha'] || ent['en_manicura'] || ent['curado'],
         plantas: plantas, plantas_plan: l.plants_count_objetivo,
         g_plan: g_plan, g_real: g_real, desvio_g_pct: desv_g,
@@ -117,16 +134,23 @@ module Informes
       ents  = entradas(lotes.map(&:id))
       hoy   = Time.zone.today
       lotes.map do |l|
-        plan = l.estado == 'floracion' ? l.dias_floracion_objetivo : (l.estado == 'vegetativo' ? l.dias_vegetativo_objetivo : nil)
-        llevo = l.dias_en_estado
-        cosecha = l.fecha_cosecha_estimada || (ents[l.id]['floracion'] && l.dias_floracion_objetivo && ents[l.id]['floracion'] + l.dias_floracion_objetivo.days)
+        if l.automatica?
+          # La auto se mide contra el ciclo entero desde la germinación, en el estado que esté.
+          plan    = l.dias_ciclo_objetivo
+          llevo   = l.dias_desde_inicio
+          cosecha = l.fecha_cosecha_estimada || (l.start_date && plan && l.start_date + plan.days)
+        else
+          plan = l.estado == 'floracion' ? l.dias_floracion_objetivo : (l.estado == 'vegetativo' ? l.dias_vegetativo_objetivo : nil)
+          llevo = l.dias_en_estado
+          cosecha = l.fecha_cosecha_estimada || (ents[l.id]['floracion'] && l.dias_floracion_objetivo && ents[l.id]['floracion'] + l.dias_floracion_objetivo.days)
+        end
         pasado = plan && llevo ? llevo - plan : nil
         como = if pasado.nil? then 'sin plan para comparar'
                elsif pasado > TOLERANCIA_DIAS then "#{pasado} días pasado del plan y sigue en #{Lote::ESTADOS.include?(l.estado) ? l.estado : ''}"
                elsif pasado > 0 then "#{pasado} días sobre el plan"
                else 'en fecha'
                end
-        { id: l.id, codigo: l.codigo, genetica: l.genetica&.nombre, sala: l.sala&.nombre, estado: l.estado,
+        { id: l.id, codigo: l.codigo, genetica: nombre_genetica(l), automatica: l.automatica?, sala: l.sala&.nombre, estado: l.estado,
           dias_plan: plan, dias_hoy: llevo, cosecha_planeada: cosecha, pasado_dias: pasado, como_viene: como,
           plantas: l.plants_count }
       end.sort_by { |f| [-(f[:pasado_dias] || -999), f[:codigo]] }
@@ -155,7 +179,7 @@ module Informes
           d = flo_real - g.tiempo_floracion
           frase << (d.abs <= TOLERANCIA_DIAS ? 'en el tiempo de la ficha' : "tarda #{d.abs} días #{d.positive? ? 'más' : 'menos'}")
         end
-        { genetica: g.nombre, lotes: ls.size,
+        { genetica: g.automatica ? "#{g.nombre} (auto)" : g.nombre, automatica: g.automatica, lotes: ls.size,
           g_por_planta_ficha: g.rendimiento, g_por_planta_real: gpp_real,
           floracion_ficha: g.tiempo_floracion, floracion_real: flo_real,
           frase: frase.join(' · ').presence || 'sin ficha para comparar' }

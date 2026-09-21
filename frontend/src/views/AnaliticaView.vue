@@ -173,7 +173,7 @@ async function exportPdf() {
               </thead>
               <tbody>
                 <tr v-for="g in geneticas" :key="g.genetica_id" :class="{ 'an__row--pocos': !g.suficientes }">
-                  <td class="an__td-bold">{{ g.nombre }}<span v-if="!g.suficientes" class="an__pocos">{{ g.lotes === 1 ? 'un solo lote: sin conclusión' : 'pocos lotes: sin conclusión' }}</span></td>
+                  <td class="an__td-bold">{{ g.nombre }}<span v-if="g.automatica" class="chip-auto">Auto</span><span v-if="!g.suficientes" class="an__pocos">{{ g.lotes === 1 ? 'un solo lote: sin conclusión' : 'pocos lotes: sin conclusión' }}</span></td>
                   <td class="an__td-r">{{ g.lotes }}</td>
                   <td class="an__td-r">{{ g.plantas }}</td>
                   <td class="an__td-r an__td-bold">{{ fmt(g.g_por_planta) }}</td>
@@ -295,7 +295,7 @@ async function exportPdf() {
                 <thead><tr><th>{{ key === 'por_sede' ? 'Sede' : 'Genética' }}</th><th class="an__th-r">Lotes</th><th class="an__th-r">Gramos</th><th class="an__th-r">$/g</th></tr></thead>
                 <tbody>
                   <tr v-for="f in costo[key]" :key="f.nombre" :class="{ 'an__row--pocos': !f.suficientes }">
-                    <td class="an__td-bold">{{ f.nombre }}</td>
+                    <td class="an__td-bold">{{ f.nombre }}<span v-if="f.automatica" class="chip-auto">Auto</span></td>
                     <td class="an__td-r">{{ f.lotes }}</td>
                     <td class="an__td-r">{{ fmt(f.gramos, 0) }}</td>
                     <td class="an__td-r an__td-bold">{{ ars(f.costo_por_gramo) }}</td>

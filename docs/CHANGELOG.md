@@ -14,6 +14,15 @@
   mezclan). Fotoperiodo mostrado 18/6 también en floración. El asistente IA recibe «AUTOMÁTICA…»
   en el contexto del lote. «Cómo salió» une vege+flora en «Ciclo». Migración
   `GeneticasAutomaticas`; `lotes_automaticas_spec` fija las reglas contra el AC.
+- **Cabos que faltaban (mismo día, pedido de Germán):** el tilde **no se cambia con lotes en
+  curso** (`Genetica#automatica_no_cambia_con_lotes_en_curso`: «tiene 1 lote en curso, creá una
+  genética nueva»; el modal lo congela antes, con plantas activas) y las globales INASE no lo
+  editan desde una organización. **Informes**: Producción y Plan vs. real nombran «Auto K (auto)»
+  (mismo string para pantalla, PDF y Excel), Plan vs. real mide a la auto **por el ciclo entero**
+  (semilla a cosecha) tanto en «cómo salió» como en «cómo viene», y la cosecha próxima de una auto
+  sale del ciclo, no de una floración que no tiene. **CSV de lotes** con columna «Automática».
+  **Analítica** Genéticas y Costo con el chip. Criterio: chip sólo en las autos en pantalla;
+  columna donde el archivo se lee sin colores.
 - Sobre el diseño: son dos ejes (cómo florece / regular-feminizada); el segundo queda para
   después (sexar en semana 4–6, descartes por macho).
 

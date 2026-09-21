@@ -36,6 +36,10 @@ class Genetica < ApplicationRecord
   CATEGORIAS_INASE = %w[semilla_feminizada semilla_regular material_vegetativo hibrido].freeze
 
   validates :nombre, presence: true
+  # Cambiar si es automática con lotes en curso los dejaría con un ciclo que no es el suyo
+  # (cosecha desde vege, reloj de semilla a cosecha, sala). Decisión de Germán (21-sep-2026):
+  # no se edita; para la próxima tanda se crea una genética nueva.
+  validate :automatica_no_cambia_con_lotes_en_curso, if: :automatica_changed?
   validates :slug,   presence: true, uniqueness: { scope: :club_id }
   validates :thc, numericality: { greater_than_or_equal_to: 0, less_than_or_equal_to: 100, allow_nil: true }
   validates :cbd, numericality: { greater_than_or_equal_to: 0, less_than_or_equal_to: 100, allow_nil: true }
@@ -155,4 +159,13 @@ class Genetica < ApplicationRecord
     end
     self.slug = candidate
   end
+
+  def automatica_no_cambia_con_lotes_en_curso
+    en_curso = Lote.where(genetica_id: id).where.not(estado: 'finalizado').count
+    return if en_curso.zero?
+
+    errors.add(:automatica, "no se puede cambiar: esta genética tiene #{en_curso} #{en_curso == 1 ? 'lote en curso' : 'lotes en curso'}. " \
+                            'Creá una genética nueva (por ejemplo «Auto …») para los próximos lotes.')
+  end
+
 end

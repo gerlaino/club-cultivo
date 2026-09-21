@@ -24,6 +24,7 @@ module Analitica
         {
           genetica_id:   gid,
           nombre:        g.nombre,
+          automatica:    g.automatica,
           lotes:         ls.size,
           suficientes:   @u.suficientes?(ls.size),
           plantas:       cosech,
