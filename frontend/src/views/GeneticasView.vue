@@ -268,7 +268,7 @@ onMounted(async () => {
             @click="router.push({ name: 'genetica-detalle', params: { id: gen.id } })"
           >
             <td>
-              <span class="gen-nombre">{{ gen.nombre }}</span>
+              <span class="gen-nombre">{{ gen.nombre }}</span><span v-if="gen.automatica" class="chip-auto" title="Automática: florece sola">Auto</span>
             </td>
             <td v-if="!esPersonal">
               <span v-if="gen.registrada_inase" class="gen-inase-col" title="Registrada en el INASE">🏛️</span>

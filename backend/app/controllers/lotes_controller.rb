@@ -122,6 +122,7 @@ class LotesController < ApplicationController
       @lote.dias_vegetativo_objetivo ||= @lote.genetica.dias_vegetativo_objetivo
       @lote.dias_floracion_objetivo  ||= @lote.genetica.tiempo_floracion
       @lote.dias_cosecha_objetivo    ||= @lote.genetica.dias_cosecha_objetivo
+      @lote.dias_ciclo_objetivo      ||= @lote.genetica.dias_ciclo_objetivo
     end
 
     # Estados creables: ciclo previo a stock + cosechado. secado/curado/finalizado
@@ -591,19 +592,19 @@ class LotesController < ApplicationController
     nueva_fase = params[:nueva_fase]
 
     # Cultivador avanza floración → cosecha registrando plantas cosechadas
-    if current_user.cultivador? && @lote.estado == 'floracion' && nueva_fase == 'cosecha'
+    if current_user.cultivador? && @lote.puede_cosechar? && nueva_fase == 'cosecha'
       estado_anterior  = @lote.estado
       sala_anterior_id = @lote.sala_id
       ActiveRecord::Base.transaction do
         @lote.pesadas.create!(
-          fase_origen:        'floracion',
+          fase_origen:        estado_anterior,
           fase_destino:       'cosecha',
           plantas_cosechadas: pesada_attrs[:plantas_cosechadas]&.to_i,
           registrado_por:     current_user,
           registrado_at:      Time.current,
           notas:              pesada_attrs[:notas],
         )
-        @lote.avanzar_fase!(sala_id: params[:sala_id], usuario: current_user)
+        @lote.avanzar_fase!(sala_id: params[:sala_id], usuario: current_user, hacia: 'cosecha')
         @lote.lote_eventos.create!(
           tipo:            'cambio_estado',
           estado_anterior: estado_anterior,
@@ -778,6 +779,8 @@ class LotesController < ApplicationController
     if @lote.estado == 'floracion'
       return render json: { error: 'La cosecha debe registrarse con datos de pesada. Usá el formulario de cosecha.' }, status: :unprocessable_entity
     end
+    # Automática en vegetativo: «avanzar» es anotar que empezó a florecer (opcional, se queda
+    # en su sala); cosechar va por el formulario de cosecha, como siempre.
     estado_anterior  = @lote.estado
     sala_anterior_id = @lote.sala_id
     # tamanio_maceta y prendieron: solo aplican al prender (enraizado → vegetativo). La maceta la
@@ -811,7 +814,7 @@ class LotesController < ApplicationController
   # Body: { plantas_ids: [1,2,3], peso_total_g: 150.0, pasada: "A" }
   def cosechar_plantas
     authorize @lote, :avanzar_fase?
-    raise ArgumentError, 'El lote no está en floración' unless @lote.estado == 'floracion'
+    raise ArgumentError, 'El lote no está en floración' unless @lote.puede_cosechar?
     raise ArgumentError, 'Función no disponible — ejecutá las migraciones pendientes' unless Plant.column_names.include?('pasada_cosecha')
 
     plantas_ids  = Array(params[:plantas_ids]).map(&:to_i)
@@ -820,8 +823,8 @@ class LotesController < ApplicationController
 
     raise ArgumentError, 'Seleccioná al menos una planta' if plantas_ids.empty?
 
-    plantas = @lote.plants.where(id: plantas_ids, state: 'floracion')
-    raise ArgumentError, "No se encontraron plantas en floración con esos IDs" if plantas.empty?
+    plantas = @lote.plants.where(id: plantas_ids, state: @lote.estados_plantas_cosechables)
+    raise ArgumentError, "No se encontraron plantas para cosechar con esos IDs" if plantas.empty?
 
     plantas_count = plantas.count
 
@@ -836,7 +839,7 @@ class LotesController < ApplicationController
       @lote.update_column(:plants_count_cosechadas, @lote.plants.where(state: 'cosechado').count)
 
       @lote.pesadas.create!(
-        fase_origen:        'floracion',
+        fase_origen:        @lote.estado,
         fase_destino:       'cosecha',
         plantas_cosechadas: plantas_count,
         peso_humedo_g:      peso_total_g,
@@ -858,7 +861,7 @@ class LotesController < ApplicationController
       if @lote.plants.where.not(state: %w[cosechado descartada]).none?
         estado_anterior  = @lote.estado
         sala_anterior_id = @lote.sala_id
-        @lote.avanzar_fase!(sala_id: params[:sala_id], usuario: current_user)
+        @lote.avanzar_fase!(sala_id: params[:sala_id], usuario: current_user, hacia: 'cosecha')
         @lote.lote_eventos.create!(
           tipo:            'cambio_estado',
           estado_anterior: estado_anterior,
@@ -1164,7 +1167,7 @@ class LotesController < ApplicationController
   def lote_params
     params.require(:lote).permit(
       :start_date, :estado, :origen, :planta_madre_id, :plants_count, :strain, :notes,
-      :grow_type, :light_type, :genetica_id, :semanas_floracion, :dias_vegetativo_objetivo, :dias_floracion_objetivo, :dias_cosecha_objetivo, :tamanio_maceta,
+      :grow_type, :light_type, :genetica_id, :semanas_floracion, :dias_vegetativo_objetivo, :dias_floracion_objetivo, :dias_cosecha_objetivo, :dias_ciclo_objetivo, :tamanio_maceta,
       :plants_count_objetivo, :rendimiento_objetivo_g, :fecha_cosecha_estimada,
       :rendimiento_real_g, :plants_count_cosechadas,
       :fotoperiodo, :fotoperiodo_vegetativo,
@@ -1177,7 +1180,7 @@ class LotesController < ApplicationController
   def lote_update_params
     params.require(:lote).permit(
       :estado, :start_date, :origen, :planta_madre_id, :plants_count, :strain, :notes,
-      :grow_type, :light_type, :genetica_id, :semanas_floracion, :dias_vegetativo_objetivo, :dias_floracion_objetivo, :dias_cosecha_objetivo, :tamanio_maceta,
+      :grow_type, :light_type, :genetica_id, :semanas_floracion, :dias_vegetativo_objetivo, :dias_floracion_objetivo, :dias_cosecha_objetivo, :dias_ciclo_objetivo, :tamanio_maceta,
       :plants_count_objetivo, :rendimiento_objetivo_g, :fecha_cosecha_estimada,
       :rendimiento_real_g, :plants_count_cosechadas,
       :fotoperiodo, :fotoperiodo_vegetativo,

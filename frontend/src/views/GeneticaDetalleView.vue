@@ -232,6 +232,7 @@ function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
                   {{ tipoMeta.label }}
                 </span>
                 <span v-if="gen.registrada_inase" class="gdv__badge gdv__badge--inase">🏛️ INASE</span>
+                <span v-if="gen.automatica" class="gdv__badge gdv__badge--auto" title="Florece sola, sin pasar a 12/12; se cosecha desde vegetativo">⚡ Automática{{ gen.dias_ciclo_objetivo ? ` · ${gen.dias_ciclo_objetivo} días de semilla a cosecha` : '' }}</span>
                 <span v-if="!gen.activa"     class="gdv__badge gdv__badge--muted">Inactiva</span>
                 <span v-if="!gen.disponible" class="gdv__badge gdv__badge--muted">No disponible</span>
               </div>
@@ -587,6 +588,7 @@ function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
 .gdv__badges    { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; margin-bottom: .5rem; }
 .gdv__badge { display: inline-flex; align-items: center; padding: .2rem .6rem; border-radius: 99px; font-size: .75rem; font-weight: 600; }
 .gdv__badge--inase { background: #fef9c3; color: #854d0e; border: 1px solid #fde047; }
+.gdv__badge--auto  { background: var(--c-amber-100, #fef3c7); color: #92400e; border: 1px solid #fcd34d; }
 .gdv__badge--muted  { background: var(--c-slate-100); color: var(--c-slate-500); border: 1px solid var(--c-slate-200); }
 .gdv__nombre { font-size: 1.75rem; font-weight: 800; color: var(--c-slate-900); margin: 0 0 .25rem; }
 .gdv__sub    { font-size: .82rem; color: var(--c-slate-500); display: flex; gap: .4rem; flex-wrap: wrap; }

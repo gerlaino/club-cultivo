@@ -79,6 +79,11 @@ class LoteSerializer
       fase:                 lote.estado,
       proxima_fase_posible: proxima_fase,
       puede_transicionar:   puede_transicion,
+      # Automática: florece sola, se queda en su sala y se cosecha desde vegetativo. La
+      # pantalla ofrece «Cosechar» donde `puede_cosechar` lo diga, no según el estado.
+      automatica:           lote.automatica?,
+      puede_cosechar:       lote.puede_cosechar?,
+      dias_ciclo_objetivo:  lote.dias_ciclo_objetivo,
       start_date:           lote.start_date,
       plants_count:            lote.plants_count,
       plantas_seleccion_count: lote.plants.where(es_seleccion: true).count,
@@ -104,7 +109,7 @@ class LoteSerializer
       # `nombre_visible` lleva la variedad declarada entre paréntesis: es lo que va en etiquetas
       # y pantallas internas. En los informes regulatorios se usa `nombre_declarado`, que es sólo
       # el del INASE.
-      genetica:           lote.genetica ? { id: lote.genetica.id, nombre: lote.genetica.nombre, nombre_visible: lote.genetica.nombre_visible, tipo: lote.genetica.tipo, registrada_inase: lote.genetica.registrada_inase } : nil,
+      genetica:           lote.genetica ? { id: lote.genetica.id, nombre: lote.genetica.nombre, nombre_visible: lote.genetica.nombre_visible, tipo: lote.genetica.tipo, registrada_inase: lote.genetica.registrada_inase, automatica: lote.genetica.automatica } : nil,
       dias_desde_inicio:  lote.dias_desde_inicio,
       dias_en_estado:     dias_en_estado,
       # Desde cuándo está en el estado actual. Sale del MISMO cálculo que `dias_en_estado`, así

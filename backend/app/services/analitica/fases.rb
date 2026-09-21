@@ -24,6 +24,9 @@ module Analitica
         {
           genetica_id: gid,
           nombre:      g.nombre,
+          # Automática: sus «días de vegetativo» son el ciclo entero si nadie anotó la floración.
+          # Va por genética, así que no se mezcla con las fotoperiódicas; la pantalla lo marca.
+          automatica:  g.automatica,
           lotes:       ls.size,
           suficientes: @u.suficientes?(ls.size),
           prendio_pct: tot.positive? ? (((tot - nop) * 100.0) / tot).round(1) : nil,

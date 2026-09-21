@@ -210,7 +210,7 @@ async function exportPdf() {
               </thead>
               <tbody>
                 <tr v-for="f in fases.filas" :key="f.genetica_id" :class="{ 'an__row--pocos': !f.suficientes }">
-                  <td class="an__td-bold">{{ f.nombre }}<span class="an__origen">{{ f.origen_label }}</span><span v-if="!f.suficientes" class="an__pocos">pocos lotes: sin conclusión</span></td>
+                  <td class="an__td-bold">{{ f.nombre }}<span v-if="f.automatica" class="chip-auto" title="Automática: sin floración anotada, el vegetativo es el ciclo entero">Auto</span><span class="an__origen">{{ f.origen_label }}</span><span v-if="!f.suficientes" class="an__pocos">pocos lotes: sin conclusión</span></td>
                   <td class="an__td-r">{{ f.lotes }}</td>
                   <td class="an__td-r">{{ pc(f.prendio_pct) }}</td>
                   <td v-for="x in fases.fases" :key="x" class="an__td-r"><span class="an__fase" :class="`an__fase--${x}`">{{ dias(f.dias[x]) }}</span></td>

@@ -10,7 +10,7 @@
       </div>
       <div class="lps__toggle-right" @click.stop>
         <button
-          v-if="(canEdit || isCultivador) && lote.estado === 'floracion' && plantasActivas.length > 0"
+          v-if="(canEdit || isCultivador) && lote.puede_cosechar && plantasActivas.length > 0"
           class="lps__btn-sm lps__btn-sm--cosecha"
           title="Registrar cosecha parcial"
           @click="$emit('cosechar')"

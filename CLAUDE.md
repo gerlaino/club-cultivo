@@ -114,7 +114,9 @@ mensual por plan (`Ia::Uso`, `ia_llamadas`, créditos `IaRecarga`).
   todo paquete que vuelve se desarma; `entregar`/`reportar_fallo` no se gatean por módulo.
 - **Cultivo**: estado del lote ⇔ tipo de sala (`Lote::KINDS_SALA_POR_ESTADO`, viaja en `/me`);
   poner en maceta es prender; floración→vegetativo con lotes es DESHACER; no hay «finalizar lote»
-  (se cierra el stock). En un dispensario no se cultiva.
+  (se cierra el stock). En un dispensario no se cultiva. **Genética automática** (tilde): el lote
+  se queda en vege todo el ciclo, se cosecha desde vegetativo (`puede_cosechar`), floración
+  opcional, reloj «semilla a cosecha».
 - **Informes**: por línea y por unidad; nunca `updated_at` como fecha; la descarga pide el mismo
   período que la pantalla; se descargan siempre y «para presentar» valida; no vincular genéticas al
   INASE automáticamente; el pie del PDF no lleva marca de plataforma.
@@ -152,6 +154,8 @@ e2e `mostrador.spec.js` verde otra vez (4/4). Todo verificado: rspec en lo tocad
 - Genéticas globales (INASE) son compartidas: sólo lectura desde una organización; personal ve
   sólo las suyas. La regla del enraizado (incubadora con su clima) vale también en personal.
 
+**(cy) 21-sep:** genéticas automáticas (tilde + semilla a cosecha; cosecha desde vege; floración
+opcional; chip «Auto»). `casa_german` tiene «Auto Ananda» y CASA-02 para verlo.
 **(cw), repaso por rol:** el cultivador de organización tiene el «Hoy» del «+» · «faltan N días»
 también en escritorio · «Cómo salió» sin plata para cultivador y con fallback a otras genéticas ·
 cupo de fotos visible siempre. `cultivador@e2e.test` existe en la org `e2e` local (dos salas).

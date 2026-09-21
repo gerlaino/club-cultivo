@@ -1,5 +1,22 @@
 # Changelog
 
+## Septiembre 2026 (cy) — Genéticas automáticas
+
+- **Un tilde «Automática» en la genética** (+ «semilla a cosecha (días)», lo que dice el banco).
+  Decisión de Germán (21-sep): la auto florece sola, no depende de bajar la luz. Lo que cambia:
+  el lote **vive en la sala de vegetativo todo el ciclo** (`sala_admite_el_estado` la exime),
+  **se cosecha desde vegetativo** (`Lote#puede_cosechar?`, `avanzar_fase!(hacia: 'cosecha')`,
+  `transicionar!` admite el salto), **anotar «empezó a florecer» es opcional** y no la mueve de
+  sala ni le pide 12/12 (la tarea automática «ajustar a 12/12» no se crea), y **el reloj es
+  uno**: «Faltan 35 días para la cosecha (ciclo de 75)» desde la germinación. El lote hereda
+  `dias_ciclo_objetivo` de la genética (y al desprender). Chip «Auto» en listas, tarjetas,
+  fichas y en Analítica → Fases (sus días de vege son el ciclo entero: van por genética, no se
+  mezclan). Fotoperiodo mostrado 18/6 también en floración. El asistente IA recibe «AUTOMÁTICA…»
+  en el contexto del lote. «Cómo salió» une vege+flora en «Ciclo». Migración
+  `GeneticasAutomaticas`; `lotes_automaticas_spec` fija las reglas contra el AC.
+- Sobre el diseño: son dos ejes (cómo florece / regular-feminizada); el segundo queda para
+  después (sexar en semana 4–6, descartes por macho).
+
 ## Septiembre 2026 (cx) — El «¿seguro?» siempre arriba
 
 - **El cartel de confirmación quedaba DEBAJO del lightbox de fotos** (9998 contra 9999 y la

@@ -39,6 +39,8 @@ class TareasAutoService
   def call
     plantillas = SUGERENCIAS[@estado]
     return unless plantillas
+    # La automática florece con la misma luz: «ajustar a 12/12» sería una tarea para hacer daño.
+    plantillas = plantillas.reject { |t| t[:tipo] == 'ajuste_luz' } if @lote.automatica?
 
     # Cultivador responsable del lote o quien disparó la transición
     asignado = @lote.sala&.responsable || @user

@@ -33,6 +33,8 @@ module Lotes
       {
         cerrado:    CERRADOS.include?(@lote.estado),
         estado:     @lote.estado,
+        # Automática: la tarjeta muestra el ciclo entero, no vege/flora por separado.
+        automatica: @lote.automatica?,
         gramos:     gramos.positive? ? gramos.round(1) : nil,
         plantas:    { total: pl[:total].to_i, cosechadas: cosechadas, no_prendieron: pl[:no_prendio].to_i,
                       descartadas: pl[:descartadas].to_i },

@@ -105,6 +105,7 @@ module Lotes
         dias_vegetativo_objetivo: @lote.dias_vegetativo_objetivo,
         dias_floracion_objetivo:  @lote.dias_floracion_objetivo,
         dias_cosecha_objetivo:    @lote.dias_cosecha_objetivo,
+        dias_ciclo_objetivo:      @lote.dias_ciclo_objetivo,
         lote_origen_id: @lote.id,
         split_at:       Time.current,
       )

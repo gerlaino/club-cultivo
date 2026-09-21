@@ -535,7 +535,7 @@ async function exportarCSV() {
               <span class="lv-codigo">{{ l.codigo }}</span>
             </td>
             <td data-label="Genética">
-              <span v-if="l.genetica?.nombre" class="lv-genetica">{{ l.genetica.nombre }}</span>
+              <span v-if="l.genetica?.nombre" class="lv-genetica">{{ l.genetica.nombre }}<span v-if="l.automatica" class="chip-auto">Auto</span></span>
               <span v-else-if="l.strain" class="lv-strain">{{ l.strain }}</span>
               <span v-else class="lv-empty">—</span>
               <span v-if="l.genetica?.tipo" class="lv-tipo" :class="`lv-tipo--${l.genetica.tipo}`">{{ tipoLabel(l.genetica.tipo) }}</span>

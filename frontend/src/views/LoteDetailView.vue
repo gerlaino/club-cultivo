@@ -418,7 +418,7 @@ onUnmounted(() => {
             <span v-if="textoProximoPaso(lote)" class="ld__prox" :class="{ 'ld__prox--ya': lote.proximo_paso.faltan_dias <= 0 }"><i class="bi bi-arrow-right-short"></i>{{ textoProximoPaso(lote) }}</span>
           </div>
           <p class="ld__subtitle">
-            <span v-if="lote.genetica">🌿 {{ lote.genetica.nombre }}</span>
+            <span v-if="lote.genetica">🌿 {{ lote.genetica.nombre }}<span v-if="lote.automatica" class="ld__auto" title="Automática: florece sola, se cosecha desde vegetativo">Auto</span></span>
             <span v-else-if="lote.strain" class="ld__strain-fallback">🌿 {{ lote.strain }}</span>
             <span v-if="lote.sala" class="ld__subtitle-sep">·</span>
             <span v-if="lote.sala">📍 {{ lote.sala.nombre }}</span>
@@ -464,7 +464,7 @@ onUnmounted(() => {
           >
             <DsSpinner v-if="transicionandoRapido" :size="14" />
             <ArrowRight v-else :size="15" :stroke-width="1.75" />
-            Avanzar a {{ capitalizarFase(lote.proxima_fase_posible) }}
+            {{ lote.automatica && lote.estado === 'vegetativo' ? 'Empezó a florecer (opcional)' : `Avanzar a ${capitalizarFase(lote.proxima_fase_posible)}` }}
           </button>
           <button
             v-if="lote.codigo_qr"
@@ -673,7 +673,7 @@ onUnmounted(() => {
               <dt>Tipo cultivo</dt><dd>{{ growLabel(lote.grow_type) }}</dd>
               <dt>Luminaria</dt><dd>{{ lightLabel(lote.light_type) }}</dd>
               <dt>Genética</dt><dd>{{ lote.genetica?.nombre || lote.strain || '—' }}</dd>
-              <dt>Fotoperiodo</dt><dd>{{ fotoperiodoLabel(lote.estado, lote.fotoperiodo) }}</dd>
+              <dt>Fotoperiodo</dt><dd>{{ fotoperiodoLabel(lote.estado, lote.fotoperiodo, lote.automatica) }}</dd>
               <dt>Vegetativo objetivo</dt><dd>{{ lote.dias_vegetativo_objetivo ? lote.dias_vegetativo_objetivo + ' días' : '—' }}</dd>
               <dt>Floración objetivo</dt><dd>{{ lote.dias_floracion_objetivo ? lote.dias_floracion_objetivo + ' días' : '—' }}</dd>
               <dt>Cosecha objetivo</dt><dd>{{ lote.dias_cosecha_objetivo ? lote.dias_cosecha_objetivo + ' días' : '—' }}</dd>
@@ -997,6 +997,7 @@ onUnmounted(() => {
 .ld__title { font-size: 1.8rem; font-weight: 800; margin: 0; letter-spacing: -.04em; }
 .ld__estado-pill { font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; padding: .28em .75em; border-radius: 999px; }
 .ld__estado-dias { font-weight: 700; opacity: .75; margin-left: .15em; }
+.ld__auto { margin-left: .4rem; font-size: .62rem; font-weight: 800; letter-spacing: .06em; background: #fef3c7; color: #92400e; border-radius: 999px; padding: .1rem .45rem; vertical-align: middle; }
 .ld__prox { display: inline-flex; align-items: center; font-size: .8rem; font-weight: 600; color: var(--c-leaf-700, #2d4a3e); background: var(--c-leaf-100, #e8f0eb); border-radius: 999px; padding: .15rem .6rem .15rem .3rem; }
 .ld__prox--ya { color: var(--c-amber-700, #b45309); background: #fef3c7; }
 .ld__subtitle { font-size: .85rem; color: #60725d; margin: 0; display: flex; align-items: center; gap: .4rem; flex-wrap: wrap; }

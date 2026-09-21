@@ -423,6 +423,7 @@ class AsistenteController < BaseController
 
     lote = planta.lote
     cepa = lote.genetica&.nombre || lote.strain || 'desconocida'
+    cepa += ' (AUTOMÁTICA: florece sola con 18/6, no se pasa a 12/12, sin trasplantes ni podas fuertes)' if lote.automatica?
 
     ctx  = "\n═══ PLANTA: #{planta.nombre} ═══\n"
     ctx += "Cepa: #{cepa} | Estadío del lote: #{lote.estado} | Sala: #{lote.sala&.nombre || '—'}\n"
@@ -483,6 +484,7 @@ class AsistenteController < BaseController
     return '' unless lote
 
     cepa = lote.genetica&.nombre || lote.strain || 'desconocida'
+    cepa += ' (AUTOMÁTICA: florece sola con 18/6, no se pasa a 12/12, sin trasplantes ni podas fuertes)' if lote.automatica?
 
     ctx  = "\n═══ LOTE: #{lote.codigo} ═══\n"
     ctx += "Cepa: #{cepa} | Estadío: #{lote.estado} | Sala: #{lote.sala&.nombre || '—'}\n"
@@ -538,6 +540,7 @@ class AsistenteController < BaseController
       ctx += "ESTADO POR LOTE:\n"
       lotes.each do |l|
         cepa  = l.genetica&.nombre || l.strain || '—'
+        cepa += ' (auto)' if l.automatica?
         ctx  += "  #{l.codigo} | #{cepa} | #{l.estado} | #{l.plants_count || 0} plantas\n"
         ultimo = l.registros_ambientales.order(registrado_en: :desc).first
         if ultimo

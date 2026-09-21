@@ -1006,7 +1006,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                     <div class="sd__lote-head">
                       <div class="sd__lote-title-row">
                         <span class="sd__lote-emoji">{{ estadoMeta(l.estado).emoji }}</span>
-                        <span class="sd__lote-codigo">{{ l.codigo }}</span>
+                        <span class="sd__lote-codigo">{{ l.codigo }}</span><span v-if="l.automatica" class="chip-auto">Auto</span>
                         <span class="sd__lote-badge" :style="{ background: estadoMeta(l.estado).color+'18', color: estadoMeta(l.estado).color }">{{ estadoMeta(l.estado).label }}</span>
                       </div>
                       <div class="sd__lote-dias" v-if="diasDesdeInicio(l.start_date) !== null">{{ diasDesdeInicio(l.start_date) }}d<template v-if="textoProximoPasoCorto(l)"> · {{ textoProximoPasoCorto(l) }}</template></div>

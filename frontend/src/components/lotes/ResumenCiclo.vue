@@ -93,7 +93,17 @@ const FASES = [
   { clave: 'cosecha',     label: 'Secado',    color: '#d97706' },
   { clave: 'en_manicura', label: 'Manicura',  color: '#78350f' },
 ]
-const fases = computed(() => FASES.filter(f => r.value?.dias?.[f.clave] > 0).map(f => ({ ...f, dias: r.value.dias[f.clave] })))
+const fases = computed(() => {
+  const d = r.value?.dias || {}
+  const lista = FASES.filter(f => d[f.clave] > 0).map(f => ({ ...f, dias: d[f.clave] }))
+  if (!r.value?.automatica) return lista
+  // Automática: vege y flora (si la anotó) son un solo ciclo en pie; se muestran juntos.
+  const enPie = lista.filter(f => ['vegetativo', 'floracion'].includes(f.clave))
+  const resto = lista.filter(f => !['enraizado', 'vegetativo', 'floracion'].includes(f.clave))
+  const enraiz = lista.filter(f => f.clave === 'enraizado')
+  const ciclo = enPie.length ? [{ clave: 'ciclo', label: 'Ciclo', color: '#16a34a', dias: enPie.reduce((t, f) => t + f.dias, 0) }] : []
+  return [...enraiz, ...ciclo, ...resto]
+})
 
 // «+12 %» contra el promedio anterior. `masEsMejor` decide el color: más gramos es bueno, más
 // días o más pesos no.

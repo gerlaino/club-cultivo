@@ -37,7 +37,7 @@
         <div class="msal__card-stripe" :style="{ background: estadoColor(lote.estado) }"></div>
         <div class="msal__card-body">
           <div class="msal__card-top">
-            <span class="msal__codigo">{{ lote.codigo }}</span>
+            <span class="msal__codigo">{{ lote.codigo }}</span><span v-if="lote.automatica" class="chip-auto">Auto</span>
             <span class="msal__badge" :style="{ background: estadoColor(lote.estado)+'20', color: estadoColor(lote.estado) }">
               {{ estadoLabel(lote.estado) }}
             </span>

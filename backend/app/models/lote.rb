@@ -40,6 +40,19 @@ class Lote < ApplicationRecord
   # Se valida sólo cuando la sala o el estado cambian: si en producción quedó algún lote
   # inconsistente de antes, no se lo deja trabado para el resto de las ediciones.
   validate :sala_admite_el_estado, if: -> { sala_id_changed? || estado_changed? }
+
+  # ── Automáticas ────────────────────────────────────────────────────────────
+  # La genética automática florece sola y no depende de la luz: no hay «pasar a floración» que
+  # decidir, el lote vive en la sala de vegetativo todo el ciclo y se cosecha desde ahí. La
+  # floración se puede ANOTAR igual (opcional, sin mover de sala): sirve para comparar «esta
+  # arrancó a florecer al día 24 y la otra al 31». Decisión de Germán, 21-sep-2026.
+  def automatica? = genetica&.automatica == true
+
+  # Desde dónde puede cosecharse: floración siempre; en una automática, también vegetativo.
+  def puede_cosechar? = estado == 'floracion' || (automatica? && estado == 'vegetativo')
+
+  # Estados de las plantas que se cosechan (las de una automática pueden seguir en vegetativo).
+  def estados_plantas_cosechables = automatica? ? %w[floracion vegetativo] : %w[floracion]
   belongs_to :genetica,    optional: true
   belongs_to :manicurador,   class_name: 'User',  optional: true
   belongs_to :planta_madre,  class_name: 'Plant', optional: true
@@ -259,6 +272,14 @@ class Lote < ApplicationRecord
   # días: enraizando se prende cuando prende, y de manicura/curado en adelante no hay reloj.
   # `faltan_dias` puede ser negativo: se pasó del objetivo, y la pantalla lo dice así.
   def proximo_paso
+    # Automática en cultivo: un solo reloj, de la germinación a la cosecha («cosecha cerca del
+    # día 75»). No hay «faltan N días para floración»: florece cuando florece.
+    if automatica? && %w[vegetativo floracion].include?(estado)
+      return nil unless start_date && dias_ciclo_objetivo.to_i.positive?
+      fecha = fecha_cosecha_estimada || (start_date + dias_ciclo_objetivo.to_i.days)
+      return { fase: 'cosecha', fecha: fecha, faltan_dias: (fecha - Time.zone.today).to_i, automatica: true }
+    end
+
     fase, objetivo = case estado
                      when 'vegetativo' then ['floracion', dias_vegetativo_objetivo]
                      when 'floracion'  then ['cosecha',   dias_floracion_objetivo]
@@ -311,10 +332,12 @@ class Lote < ApplicationRecord
   # Avance rápido sin pesada — usado por el cultivador desde el botón "Avanzar fase".
   # Si sala_id se provee, mueve el lote a esa sala. Si no, intenta auto-detectar:
   # si existe exactamente una sala activa del tipo destino en el club, la elige.
-  def avanzar_fase!(sala_id: nil, usuario: nil, tamanio_maceta: nil, prendieron: nil)
+  # `hacia: 'cosecha'` es el atajo de la automática: de vegetativo directo a cosecha.
+  def avanzar_fase!(sala_id: nil, usuario: nil, tamanio_maceta: nil, prendieron: nil, hacia: nil)
     idx = AVANCE.index(estado)
     raise ArgumentError, 'Lote no puede transicionar en este estado' unless idx.present? && idx < AVANCE.length - 1
     nueva_fase = AVANCE[idx + 1] # enraizado→vegetativo→floración→cosecha
+    nueva_fase = 'cosecha' if hacia.to_s == 'cosecha' && puede_cosechar?
     ActiveRecord::Base.transaction do
       # El prendimiento se declara al salir del enraizado: es el único momento en que el dato existe
       # y se sabe con certeza, mirando la bandeja.
@@ -334,6 +357,9 @@ class Lote < ApplicationRecord
       else
         sala_nueva = if sala_id.present?
           club.salas.activas.find_by(id: sala_id)
+        elsif automatica? && nueva_fase == 'floracion'
+          # La automática que empieza a florecer se queda donde está: no cambia de luz ni de sala.
+          nil
         else
           candidatas = club.salas.activas.de_tipo(nueva_fase).to_a
           candidatas.length == 1 ? candidatas.first : nil
@@ -358,8 +384,10 @@ class Lote < ApplicationRecord
     idx_nueva  = CICLO_FASES.index(nueva_fase)
 
     raise "El lote (estado '#{estado}') no está en el ciclo de transición" if idx_actual.nil?
+    # La automática puede saltar vegetativo → cosecha: no pasa por una floración decidida.
+    salto_de_automatica = automatica? && estado == 'vegetativo' && nueva_fase == 'cosecha'
     raise "Solo se puede avanzar al paso siguiente (esperado: #{CICLO_FASES[idx_actual + 1]})" \
-      unless idx_nueva == idx_actual + 1
+      unless idx_nueva == idx_actual + 1 || salto_de_automatica
 
     registrado_por = pesada_attrs[:registrado_por] || pesada_attrs['registrado_por']
     raise ArgumentError, "registrado_por es obligatorio" unless registrado_por
@@ -645,6 +673,8 @@ class Lote < ApplicationRecord
     # `kind` es lo que manda; `tipo` es el campo legacy que algunas salas todavía usan.
     kind = sala.kind.presence || sala.tipo
     return if kind.blank? || permitidos.include?(kind)
+    # La automática en floración sigue en su sala de vegetativo: florece con 18/6.
+    return if automatica? && estado == 'floracion' && KINDS_SALA_POR_ESTADO['vegetativo'].include?(kind)
 
     # El mensaje tiene que decir la salida: el que avanza un lote a floración desde una sala de
     # vegetativo no hizo nada raro, le falta mover el lote primero.

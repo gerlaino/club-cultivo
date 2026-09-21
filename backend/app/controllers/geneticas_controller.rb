@@ -158,6 +158,7 @@ class GeneticasController < ApplicationController
     params.require(:genetica).permit(
       :nombre, :tipo, :thc, :cbd, :descripcion, :consejos_club,
       :origen, :tiempo_floracion, :dias_vegetativo_objetivo, :dias_cosecha_objetivo, :rendimiento,
+      :automatica, :dias_ciclo_objetivo,
       :altura, :dificultad, :activa, :disponible,
       :registrada_inase, :numero_registro_inase, :fecha_registro_inase, :categoria_inase,
       :criador, :terpenos, :visible_paciente, :declarada_como_id
@@ -180,6 +181,8 @@ class GeneticasController < ApplicationController
       tiempo_floracion:         genetica.tiempo_floracion,
       dias_vegetativo_objetivo: genetica.dias_vegetativo_objetivo,
       dias_cosecha_objetivo:    genetica.dias_cosecha_objetivo,
+      automatica:               genetica.automatica,
+      dias_ciclo_objetivo:      genetica.dias_ciclo_objetivo,
       dificultad:             genetica.dificultad,
       disponible:             genetica.disponible,
       activa:                 genetica.activa,
@@ -287,6 +290,8 @@ class GeneticasController < ApplicationController
       tiempo_floracion:       genetica.tiempo_floracion,
       dias_vegetativo_objetivo: genetica.dias_vegetativo_objetivo,
       dias_cosecha_objetivo:    genetica.dias_cosecha_objetivo,
+      automatica:             genetica.automatica,
+      dias_ciclo_objetivo:    genetica.dias_ciclo_objetivo,
       rendimiento:            genetica.rendimiento,
       altura:                 genetica.altura,
       dificultad:             genetica.dificultad,

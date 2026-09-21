@@ -160,10 +160,11 @@ export function macetaLabel(m) {
 
 // Fotoperíodo (horas luz/oscuridad). Usa el valor cargado si existe; si no, lo
 // deriva del estado: vegetativo/germinación/esqueje = 18/6, floración = 12/12.
-export function fotoperiodoLabel(estado, stored) {
+// Una automática no cambia de luz: 18/6 también en floración.
+export function fotoperiodoLabel(estado, stored, automatica = false) {
   if (stored) return stored
   if (['enraizado', 'vegetativo'].includes(estado)) return '18/6'
-  if (estado === 'floracion') return '12/12'
+  if (estado === 'floracion') return automatica ? '18/6' : '12/12'
   return '—'
 }
 
@@ -215,6 +216,8 @@ export function textoProximoPaso(lote) {
   if (!p?.fase) return null
   const que = PROXIMO_PASO_LABEL[p.fase] || p.fase
   const n   = p.faltan_dias
+  // Automática en cultivo: el reloj es el ciclo entero, y conviene decir de dónde sale el número.
+  if (p.automatica && lote.dias_ciclo_objetivo && n > 1) return `Faltan ${n} días para la cosecha (ciclo de ${lote.dias_ciclo_objetivo})`
   if (n > 1)   return `Faltan ${n} días para ${que}`
   if (n === 1) return `Mañana toca ${que}`
   if (n === 0) return `Hoy toca ${que}`

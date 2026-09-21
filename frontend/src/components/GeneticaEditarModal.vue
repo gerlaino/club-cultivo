@@ -111,6 +111,22 @@
               <div v-if="formErrors.cbd" class="gem-form__field-error">{{ formErrors.cbd }}</div>
             </div>
 
+            <!-- Automática: florece sola, sin cambiar la luz. Un solo tilde (Germán, 21-sep): el lote
+                 vive en vegetativo todo el ciclo, se cosecha desde ahí, y el reloj es «semilla a
+                 cosecha». Anotar la floración queda opcional en el lote. -->
+            <div class="gem-form__field gem-form__field--full">
+              <label class="gem-form__toggle">
+                <input v-model="form.automatica" type="checkbox" class="gem-form__toggle-input" :disabled="editingInase" />
+                <span class="gem-form__toggle-track"></span>
+                <span class="gem-form__toggle-label">Automática <span class="gem-form__label-hint">florece sola, sin pasar a 12/12</span></span>
+              </label>
+            </div>
+            <div v-if="form.automatica" class="gem-form__field gem-form__field--full">
+              <label class="gem-form__label">Semilla a cosecha (días) <span class="gem-form__label-hint">lo que dice el banco</span></label>
+              <input v-model.number="form.dias_ciclo_objetivo" type="number" min="1" class="gem-form__input" placeholder="75" :disabled="editingInase" />
+              <p class="gem-form__hint">Con esto el lote dice «cosecha cerca del día 75». Los días de vegetativo y floración de abajo son opcionales: sólo sirven si anotás cuándo empezó a florecer.</p>
+            </div>
+
             <!-- Días objetivo por fase / Rendimiento / Altura -->
             <div class="gem-form__field">
               <label class="gem-form__label">Vegetativo (días)</label>
@@ -257,6 +273,7 @@ function emptyForm() {
     nombre: '', tipo: '', thc: null, cbd: null,
     descripcion: '', consejos_club: '', origen: '', criador: '', terpenos: '',
     tiempo_floracion: null, dias_vegetativo_objetivo: null, dias_cosecha_objetivo: null,
+    automatica: false, dias_ciclo_objetivo: null,
     rendimiento: null, altura: null, disponible: true, declarada_como_id: null,
   }
 }
@@ -317,6 +334,8 @@ async function openEdit(genOrId) {
     tiempo_floracion: gen.tiempo_floracion ?? null,
     dias_vegetativo_objetivo: gen.dias_vegetativo_objetivo ?? null,
     dias_cosecha_objetivo:    gen.dias_cosecha_objetivo    ?? null,
+    automatica:               gen.automatica === true,
+    dias_ciclo_objetivo:      gen.dias_ciclo_objetivo      ?? null,
     rendimiento:      gen.rendimiento      ?? null,
     altura:           gen.altura           ?? null,
     disponible:       gen.disponible       ?? true,

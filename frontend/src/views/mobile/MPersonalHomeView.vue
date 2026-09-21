@@ -103,7 +103,7 @@
         <RouterLink v-for="l in lotesEnCurso" :key="l.id" :to="`/m/lote-m/${l.id}`" class="mph__lote">
           <span class="mph__lote-ico" :style="{ background: meta(l.estado).bg, color: meta(l.estado).color }"><i class="bi" :class="icono(l.estado)"></i></span>
           <span class="mph__lote-txt">
-            <span class="mph__lote-nombre">{{ l.genetica?.nombre || l.strain || l.codigo }}</span>
+            <span class="mph__lote-nombre">{{ l.genetica?.nombre || l.strain || l.codigo }}<span v-if="l.automatica" class="chip-auto">Auto</span></span>
             <span class="mph__lote-sub">{{ l.codigo }} · {{ l.plants_count || 0 }} {{ l.plants_count === 1 ? 'planta' : 'plantas' }}</span>
             <span v-if="textoProximoPaso(l)" class="mph__lote-prox" :class="{ 'mph__lote-prox--ya': l.proximo_paso.faltan_dias <= 0 }">{{ textoProximoPaso(l) }}</span>
           </span>

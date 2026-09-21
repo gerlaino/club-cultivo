@@ -18,20 +18,20 @@
 
           <!-- Sin plantas -->
           <div v-if="!plantasEnFloracion.length && !sinPlantasIndividuales" class="mcp-empty">
-            No hay plantas en floración en este lote. No hay nada para cosechar.
+            No hay plantas {{ enPie }} en este lote. No hay nada para cosechar.
           </div>
 
           <!-- ── PASO 1 — Total o parcial ── -->
           <template v-else-if="paso === 1">
             <p class="mcp-paso-hint">
-              {{ sinPlantasIndividuales ? lote.plants_count : plantasEnFloracion.length }} plantas en floración.
+              {{ sinPlantasIndividuales ? lote.plants_count : plantasEnFloracion.length }} plantas {{ enPie }}.
               ¿Qué querés cosechar?
             </p>
             <div class="mcp-choices">
               <button type="button" class="mcp-choice" @click="elegir('total')">
                 <span class="mcp-choice-ico">🌾</span>
                 <span class="mcp-choice-tit">Cosechar todo el lote</span>
-                <span class="mcp-choice-sub">Las {{ sinPlantasIndividuales ? lote.plants_count : plantasEnFloracion.length }} plantas en floración</span>
+                <span class="mcp-choice-sub">Las {{ sinPlantasIndividuales ? lote.plants_count : plantasEnFloracion.length }} plantas {{ enPie }}</span>
               </button>
               <button type="button" class="mcp-choice" @click="elegir('parcial')">
                 <span class="mcp-choice-ico">✂️</span>
@@ -176,7 +176,11 @@ const pasada        = ref(props.pasadaInicial)
 const guardando     = ref(false)
 const error         = ref('')
 
-const plantasEnFloracion = computed(() => props.plantas.filter(p => p.state === 'floracion'))
+// Las de una automática se cosechan desde vegetativo: florecieron sin cambiar de estado.
+const ESTADOS_COSECHABLES = computed(() => (props.lote?.automatica ? ['floracion', 'vegetativo'] : ['floracion']))
+const plantasEnFloracion = computed(() => props.plantas.filter(p => ESTADOS_COSECHABLES.value.includes(p.state)))
+// A una automática no se le dice «en floración»: puede estar cosechándose desde vegetativo.
+const enPie = computed(() => (props.lote?.automatica ? 'en pie' : 'en floración'))
 
 // Hay lotes que llevan sólo un CONTADOR de plantas, sin registro individual de cada una.
 // Antes esos abrían un formulario completamente distinto; ahora es el mismo modal, con un

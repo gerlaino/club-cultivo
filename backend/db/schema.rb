@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_20_210000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_21_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -334,7 +334,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_20_210000) do
     t.index ["cerrada_por_id"], name: "index_caja_turnos_on_cerrada_por_id"
     t.index ["cierre_solicitado_por_id"], name: "index_caja_turnos_on_cierre_solicitado_por_id"
     t.index ["club_id"], name: "index_caja_turnos_on_club_id"
-    t.index ["punto_type", "punto_id"], name: "index_caja_turnos_activa_por_punto", unique: true, where: "((estado)::text = ANY ((ARRAY['abierta'::character varying, 'pendiente_cierre'::character varying])::text[]))"
+    t.index ["punto_type", "punto_id"], name: "index_caja_turnos_activa_por_punto", unique: true, where: "((estado)::text = ANY (ARRAY[('abierta'::character varying)::text, ('pendiente_cierre'::character varying)::text]))"
     t.index ["sede_id"], name: "index_caja_turnos_on_sede_id"
   end
 
@@ -1061,6 +1061,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_20_210000) do
     t.bigint "deleted_by_id"
     t.text "consejos_club"
     t.bigint "declarada_como_id"
+    t.boolean "automatica", default: false, null: false
+    t.integer "dias_ciclo_objetivo"
     t.index ["activa"], name: "index_geneticas_on_activa"
     t.index ["club_id", "activa"], name: "index_geneticas_on_club_id_and_activa"
     t.index ["club_id", "slug"], name: "index_geneticas_on_club_id_and_slug", unique: true
@@ -1365,6 +1367,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_20_210000) do
     t.datetime "split_at"
     t.decimal "costo_heredado_ars", precision: 12, scale: 2, default: "0.0", null: false
     t.decimal "costo_cedido_ars", precision: 12, scale: 2, default: "0.0", null: false
+    t.integer "dias_ciclo_objetivo"
     t.index ["club_id"], name: "index_lotes_on_club_id"
     t.index ["codigo"], name: "index_lotes_on_codigo"
     t.index ["codigo_qr"], name: "index_lotes_on_codigo_qr", unique: true, where: "(codigo_qr IS NOT NULL)"

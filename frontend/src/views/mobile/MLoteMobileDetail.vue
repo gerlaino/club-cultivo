@@ -12,7 +12,7 @@
     <!-- Hero -->
     <div class="mlot__hero" :style="{ background: estadoGradient(lote.estado) }">
       <button class="mlot__hero-more" @click="showAcciones = true" aria-label="Más"><i class="bi bi-three-dots"></i></button>
-      <div class="mlot__hero-estado">{{ estadoEmoji(lote.estado) }} {{ estadoLabel(lote.estado) }}</div>
+      <div class="mlot__hero-estado">{{ estadoEmoji(lote.estado) }} {{ estadoLabel(lote.estado) }}<span v-if="lote.automatica" class="mlot__auto">Auto</span></div>
       <h2 class="mlot__hero-codigo">{{ lote.codigo }}</h2>
       <div class="mlot__hero-gen">{{ lote.genetica?.nombre || 'Sin genética' }}</div>
       <div v-if="textoProximoPaso(lote)" class="mlot__hero-prox"><i class="bi bi-arrow-right-short"></i>{{ textoProximoPaso(lote) }}</div>
@@ -57,13 +57,17 @@
            «Avanzar fase → Cosecha» era proponer lo que el backend rechaza («usá el formulario de
            cosecha»), con el error apareciendo después de confirmar. Es el mismo modal que en el
            escritorio, así la regla vive una sola vez. -->
-      <button class="mlot__qa" v-if="lote.estado === 'floracion'" @click="showCosecha = true">
+      <!-- `puede_cosechar` lo dice el backend: floración siempre; en una automática, también
+           vegetativo (florece sola y se cosecha desde ahí). -->
+      <button class="mlot__qa" v-if="lote.puede_cosechar" @click="showCosecha = true">
         <span class="mlot__qa-ico" style="background:#fee2e2;color:#b91c1c"><i class="bi bi-scissors"></i></span>
         <span class="mlot__qa-lbl">Cosechar</span>
       </button>
-      <button class="mlot__qa" v-else-if="faseSiguiente" @click="abrirAvanzarFase">
+      <!-- En una automática en vegetativo, «avanzar» es anotar que empezó a florecer: opcional
+           y no la mueve de sala. -->
+      <button class="mlot__qa" v-if="faseSiguiente && lote.estado !== 'floracion'" @click="abrirAvanzarFase">
         <span class="mlot__qa-ico" style="background:var(--c-leaf-100);color:var(--c-leaf-700)"><i class="bi bi-arrow-up-circle"></i></span>
-        <span class="mlot__qa-lbl">Avanzar fase</span>
+        <span class="mlot__qa-lbl">{{ lote.automatica && lote.estado === 'vegetativo' ? 'Empezó a florecer' : 'Avanzar fase' }}</span>
       </button>
       <!-- Escanear vive en el botón "+" de la barra: repetirlo acá era una segunda puerta al mismo
            lugar. Y las plantas se dan de alta con el lote, no de a una desde su ficha. -->
@@ -424,6 +428,7 @@ onMounted(async () => {
 .mlot__hero-estado { font-size: .68rem; font-weight: 700; color: rgba(255,255,255,.72); text-transform: uppercase; letter-spacing: .06em; }
 .mlot__hero-codigo { font-family: var(--font-display, sans-serif); font-size: 1.7rem; font-weight: 700; margin: .15rem 0 .1rem; }
 .mlot__hero-gen { font-size: .85rem; color: rgba(255,255,255,.7); }
+.mlot__auto { margin-left: .5rem; font-size: .62rem; font-weight: 800; letter-spacing: .06em; background: rgba(255,255,255,.18); border-radius: 999px; padding: .1rem .45rem; }
 .mlot__hero-prox { margin-top: .35rem; font-size: .8rem; font-weight: 600; color: #fff; display: inline-flex; align-items: center; gap: .1rem; background: rgba(255,255,255,.14); border-radius: 999px; padding: .15rem .6rem .15rem .35rem; }
 
 .mlot__stats { display: flex; gap: .5rem; margin-top: 1.1rem; }
