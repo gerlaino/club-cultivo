@@ -373,10 +373,17 @@ const estadoObjetivo = computed(() =>
 // va a nacer el lote. Con varias sedes, la sede se elige primero: mezclar las salas de todas
 // obliga a saber de memoria cuál pertenece a dónde, y un lote creado en la sala equivocada
 // después hay que moverlo a mano.
+// La genética elegida, para saber si es automática: una auto en floración vive en la sala de
+// vegetativo (florece con 18/6), así que ahí también se ofrecen esas salas. Es la misma
+// excepción que hace el backend en `Lote#sala_admite_el_estado`.
+const geneticaElegida = computed(() => geneticas.value.find(g => String(g.id) === String(form.value.genetica_id)))
 const salasOfrecidas = computed(() => {
   if (faltaElegirSede.value) return []
 
-  const permitidos = KINDS_POR_ESTADO.value[estadoObjetivo.value] || []
+  let permitidos = KINDS_POR_ESTADO.value[estadoObjetivo.value] || []
+  if (estadoObjetivo.value === 'floracion' && geneticaElegida.value?.automatica) {
+    permitidos = [...new Set([...permitidos, ...(KINDS_POR_ESTADO.value.vegetativo || [])])]
+  }
   // Las creadas recién viven en local hasta que el padre recargue: si no, la sala que acabás de
   // crear no aparece en el combo y parece que no se creó.
   return [...(props.salas || []), ...salasCreadas.value].filter(s => {

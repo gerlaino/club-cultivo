@@ -92,6 +92,23 @@ describe('NuevoLoteModal — lote existente', () => {
     w.unmount()
   })
 
+  // Una automática en floración vive en la sala de vege (florece con 18/6): misma excepción
+  // que hace el backend en `Lote#sala_admite_el_estado` (21-sep-2026).
+  it('con una genética automática, un lote en floración también puede nacer en una sala de vege', async () => {
+    const w = await abrir()
+    w.vm.geneticas = [{ id: 7, nombre: 'Auto K', tipo: 'hibrida', automatica: true }, { id: 8, nombre: 'Foto K', tipo: 'indica', automatica: false }]
+    w.vm.tipoCreacion = 'existente'
+    w.vm.heredadoEstado = 'floracion'
+    w.vm.form.genetica_id = 7
+    await new Promise(r => setTimeout(r, 0))
+    expect(w.vm.salasOfrecidas.map(s => s.nombre).sort()).toEqual(['Flora 1', 'Vege 1'])
+
+    w.vm.form.genetica_id = 8
+    await new Promise(r => setTimeout(r, 0))
+    expect(w.vm.salasOfrecidas.map(s => s.nombre)).toEqual(['Flora 1'])
+    w.unmount()
+  })
+
   // El filtro de la LISTA no alcanza: si ya había una sala elegida y después se cambia el
   // estado, la sala vieja se queda pegada en el form.
   it('cambiar el estado descarta una sala que ya no corresponde', async () => {

@@ -23,6 +23,8 @@
   sale del ciclo, no de una floración que no tiene. **CSV de lotes** con columna «Automática».
   **Analítica** Genéticas y Costo con el chip. Criterio: chip sólo en las autos en pantalla;
   columna donde el archivo se lee sin colores.
+- El alta de un lote «desde uno existente» en floración con una genética automática ofrece
+  también las salas de vegetativo (`NuevoLoteModal`, misma excepción que el backend); test.
 - Sobre el diseño: son dos ejes (cómo florece / regular-feminizada); el segundo queda para
   después (sexar en semana 4–6, descartes por macho).
 
