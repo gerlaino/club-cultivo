@@ -237,11 +237,14 @@
                     <span v-if="s.descripcion">{{ s.descripcion }}</span>
                     <span v-else class="stk__inv-td-mono">—</span>
                   </td>
+                  <!-- EL PRECIO SUGERIDO, POR UNIDAD: el mismo que usa el carrito de la dispensa. Sin
+                       precio se dice, apagado: es justo lo que el admin viene a buscar mirando. -->
+                  <td v-if="!esPersonal" class="stk__inv-num stk__inv-td-precio" :class="{ 'stk__inv-td-precio--sin': !s.precio_sugerido_ars }">
+                    <template v-if="s.precio_sugerido_ars">{{ formatARS(s.precio_sugerido_ars) }}/{{ s.unidad || 'g' }}</template>
+                    <template v-else>Sin precio</template>
+                  </td>
                   <td class="stk__inv-num stk__inv-td-cosechado">
                     {{ s.cantidad_inicial != null ? s.cantidad_inicial.toFixed(1) + (s.unidad || 'g') : '—' }}
-                  </td>
-                  <td class="stk__inv-num stk__inv-td-actual" :class="{ 'stk__inv-td-bajo': s.forma_producto === 'flor_seca' && disponible(s) < umbralValor }">
-                    {{ disponible(s).toFixed(1) }}{{ s.unidad || 'g' }}
                   </td>
                   <!-- DÓNDE ESTÁ EL PRODUCTO, que es otra pregunta que cuánto hay. Siempre, y
                        también en cero apagado: un número que aparece de la nada el día que alguien
@@ -249,11 +252,8 @@
                   <td v-if="!esPersonal" class="stk__inv-num stk__inv-td-mesa" :class="{ 'stk__inv-td-mesa--cero': !s.en_mostrador_g }">
                     {{ (s.en_mostrador_g || 0).toFixed(1) }}{{ s.unidad || 'g' }}
                   </td>
-                  <!-- EL PRECIO SUGERIDO, POR UNIDAD: el mismo que usa el carrito de la dispensa. Sin
-                       precio se dice, apagado: es justo lo que el admin viene a buscar mirando. -->
-                  <td v-if="!esPersonal" class="stk__inv-num stk__inv-td-precio" :class="{ 'stk__inv-td-precio--sin': !s.precio_sugerido_ars }">
-                    <template v-if="s.precio_sugerido_ars">{{ formatARS(s.precio_sugerido_ars) }}/{{ s.unidad || 'g' }}</template>
-                    <template v-else>Sin precio</template>
+                  <td class="stk__inv-num stk__inv-td-actual" :class="{ 'stk__inv-td-bajo': s.forma_producto === 'flor_seca' && disponible(s) < umbralValor }">
+                    {{ disponible(s).toFixed(1) }}{{ s.unidad || 'g' }}
                   </td>
                 </tr>
               </tbody>
@@ -969,10 +969,10 @@ const COLUMNAS_INV_TODAS = [
   { campo: 'sede',             label: 'Sede',            dir: 'asc',  org: true },
   { campo: 'ingreso',          label: 'Ingresó',         dir: 'desc' },
   { campo: 'observaciones',    label: 'Observaciones',   dir: 'asc' },
-  { campo: 'cantidad_inicial', label: 'Cantidad inicial', dir: 'desc', num: true },
-  { campo: 'actual',           label: 'Actual',          dir: 'desc', num: true },
-  { campo: 'mostrador',        label: 'Mostrador',       dir: 'desc', num: true, org: true },
   { campo: 'precio',           label: '$ sugerido',      dir: 'desc', num: true, org: true },
+  { campo: 'cantidad_inicial', label: 'Cantidad inicial', dir: 'desc', num: true },
+  { campo: 'mostrador',        label: 'Mostrador',       dir: 'desc', num: true, org: true },
+  { campo: 'actual',           label: 'Actual',          dir: 'desc', num: true },
 ]
 const COLUMNAS_INV = computed(() => COLUMNAS_INV_TODAS.filter(c => !c.org || !esPersonal.value))
 // Vacío = como venía: lo último que entró arriba.
