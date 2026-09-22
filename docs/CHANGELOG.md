@@ -1,5 +1,19 @@
 # Changelog
 
+## Septiembre 2026 (dc) — Los m² donde faltaban: edición, tablas y analítica
+
+- Repaso pedido por Germán: el alta tenía el campo, **la edición y las tablas no**. Ahora los m²
+  del espacio se editan desde la ficha de la sala y desde la lista de salas, la tarjeta de la
+  lista los muestra, y la ficha tiene su KPI («1,2 m² · 1,2 m² libres», o «sin cargar: no se
+  calcula el g/m²»). En el teléfono, el hero de la sala los dice.
+- **Editar un lote** (organizaciones) permite cambiar los m² que ocupa, con el techo de la sala
+  a la vista. En personal no se ofrece, como en el alta.
+- **Ficha del lote**: fila «Superficie» con los m² y el g/m², o «sin m² cargados»; y los días
+  objetivo ahora muestran «Ciclo objetivo» en las automáticas en vez de vege/flora.
+- **Analítica → Genéticas**: columna **g/m²** (sobre los lotes que tienen metros, con «N sin m²»
+  al lado) y el CSV con g/m², lotes sin m² y si la genética es automática.
+- **CSV de lotes**: columnas «m²» y «g/m²».
+
 ## Septiembre 2026 (db) — Un ajuste no crea producto
 
 - **«Ajustar gramos» podía SUMAR a un frasco que vino de una cosecha** (Germán, 22-sep): eso es

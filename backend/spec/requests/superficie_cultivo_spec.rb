@@ -63,6 +63,14 @@ RSpec.describe 'Superficie de cultivo (m²)', type: :request do
     expect(lote.rendimiento_g_m2.to_f).to eq(450.0)
   end
 
+  it 'el CSV de lotes lleva los m² y el g/m²' do
+    create(:lote, club: club, sala: carpa, genetica: gen, estado: 'curado', start_date: 100.days.ago.to_date,
+                  codigo: 'L-CSV', tamanio_maceta: 7, rendimiento_real_g: 900, m2_ocupados: 2)
+    get '/lotes/export_csv', headers: auth_headers
+    expect(response.body.lines.first).to include('m²;g/m²')
+    expect(response.body).to include('L-CSV').and include(';2.0;450.0;')
+  end
+
   it 'el informe sale igual sin metros, comparando contra la ficha en g/m² y avisando qué falta' do
     con = create(:lote, club: club, sala: carpa, genetica: gen, estado: 'curado', start_date: 100.days.ago.to_date,
                         tamanio_maceta: 7, rendimiento_real_g: 900, plants_count_cosechadas: 4, m2_ocupados: 2)

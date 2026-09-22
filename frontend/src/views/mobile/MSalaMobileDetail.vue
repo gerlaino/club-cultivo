@@ -9,6 +9,10 @@
         <span>{{ sala.sede?.nombre }}</span>
         <span v-if="lotes.length" class="msal__sep">·</span>
         <span v-if="lotes.length">{{ lotes.length }} lote{{ lotes.length !== 1 ? 's' : '' }}</span>
+        <template v-if="sala.m2">
+          <span class="msal__sep">·</span>
+          <span>{{ sala.m2 }} m²</span>
+        </template>
       </div>
     </div>
 

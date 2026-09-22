@@ -176,6 +176,7 @@ function openEditSala() {
     kind:       sala.value.kind       || '',
     state:      sala.value.state      || 'activa',
     pots_count: sala.value.pots_count ?? '',
+    m2:         sala.value.m2         ?? null,
     notes:      sala.value.notes      || '',
   }
   editSalaError.value = null
@@ -882,6 +883,19 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 
       <!-- KPIs -->
       <div class="sd__kpis">
+        <!-- Superficie: cuánto mide y cuánto está ocupado por los lotes de adentro. Si no se
+             cargó, se dice, porque sin eso no hay g/m² (22-sep-2026). -->
+        <div class="sd__kpi">
+          <div class="sd__kpi-icon">📐</div>
+          <div class="sd__kpi-body">
+            <div class="sd__kpi-value">{{ sala.m2 ? `${sala.m2} m²` : '—' }}</div>
+            <div class="sd__kpi-label">Superficie</div>
+            <div class="sd__kpi-sub">
+              <template v-if="sala.m2">{{ sala.m2_libres ?? sala.m2 }} m² libres</template>
+              <template v-else>sin cargar: no se calcula el g/m²</template>
+            </div>
+          </div>
+        </div>
         <div class="sd__kpi">
           <div class="sd__kpi-icon">🌿</div>
           <div class="sd__kpi-body">
@@ -1386,6 +1400,13 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                   <option value="mantenimiento">En mantenimiento</option>
                   <option value="cerrada">Cerrada</option>
                 </select>
+              </div>
+              <div class="sd__field">
+                <!-- Los metros del espacio: con esto el rendimiento se puede leer en g/m². -->
+                <label class="sd__label">Superficie de cultivo (m²)</label>
+                <input type="number" min="0" step="0.1" class="sd__input" v-model.number="editSalaForm.m2"
+                       :placeholder="esPersonal ? '1' : '4'" />
+                <span class="sd__hint">Opcional. Sirve para comparar el rendimiento contra la ficha de la genética.</span>
               </div>
               <div class="sd__field sd__field--full">
                 <label class="sd__label">Notas</label>

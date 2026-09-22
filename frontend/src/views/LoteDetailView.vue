@@ -674,8 +674,20 @@ onUnmounted(() => {
               <dt>Luminaria</dt><dd>{{ lightLabel(lote.light_type) }}</dd>
               <dt>Genética</dt><dd>{{ lote.genetica?.nombre || lote.strain || '—' }}</dd>
               <dt>Fotoperiodo</dt><dd>{{ fotoperiodoLabel(lote.estado, lote.fotoperiodo, lote.automatica) }}</dd>
-              <dt>Vegetativo objetivo</dt><dd>{{ lote.dias_vegetativo_objetivo ? lote.dias_vegetativo_objetivo + ' días' : '—' }}</dd>
-              <dt>Floración objetivo</dt><dd>{{ lote.dias_floracion_objetivo ? lote.dias_floracion_objetivo + ' días' : '—' }}</dd>
+              <!-- Superficie y rendimiento por metro: `m2_efectivos` es nil cuando comparte sala
+                   sin declarar los suyos, y ahí se dice en vez de mostrar un número inventado. -->
+              <dt>Superficie</dt>
+              <dd>
+                <template v-if="lote.m2_efectivos">{{ lote.m2_efectivos }} m²<template v-if="lote.rendimiento_g_m2"> · {{ lote.rendimiento_g_m2 }} g/m²</template></template>
+                <template v-else>sin m² cargados</template>
+              </dd>
+              <template v-if="lote.automatica">
+                <dt>Ciclo objetivo</dt><dd>{{ lote.dias_ciclo_objetivo ? lote.dias_ciclo_objetivo + ' días' : '—' }}</dd>
+              </template>
+              <template v-else>
+                <dt>Vegetativo objetivo</dt><dd>{{ lote.dias_vegetativo_objetivo ? lote.dias_vegetativo_objetivo + ' días' : '—' }}</dd>
+                <dt>Floración objetivo</dt><dd>{{ lote.dias_floracion_objetivo ? lote.dias_floracion_objetivo + ' días' : '—' }}</dd>
+              </template>
               <dt>Cosecha objetivo</dt><dd>{{ lote.dias_cosecha_objetivo ? lote.dias_cosecha_objetivo + ' días' : '—' }}</dd>
               <dt>Inicio</dt><dd>{{ formatDate(lote.start_date) }}</dd>
               <dt>Día del ciclo</dt>

@@ -529,6 +529,7 @@ class LotesController < ApplicationController
         "Código", "Estado", "Genética", "Automática", "Sala", "Sede",
         "Plantas", "Plantas obj.", "Plantas cosechadas",
         "Rendimiento obj. (g)", "Rendimiento real (g)", "Desviación (%)",
+        "m²", "g/m²",
         "Costo total", "Costo/gramo",
         "Inicio", "Creado"
       ]
@@ -549,6 +550,8 @@ class LotesController < ApplicationController
           l.rendimiento_objetivo_g&.to_f,
           l.rendimiento_real_g&.to_f,
           desv,
+          l.m2_efectivos&.to_f,
+          l.rendimiento_g_m2&.to_f,
           l.costo_lote&.costo_total&.to_f,
           l.costo_lote&.costo_por_gramo&.to_f,
           l.start_date&.strftime("%d/%m/%Y"),

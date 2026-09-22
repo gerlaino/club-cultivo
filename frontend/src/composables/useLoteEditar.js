@@ -40,6 +40,9 @@ export function useLoteEditar(loteId) {
       // variedad tuvieran objetivos distintos sin ninguna razón.
       // El backend serializa decimal(4,1) como "5.0"; el <select> usa "5". Normalizar para que matchee.
       tamanio_maceta:    l.tamanio_maceta != null && l.tamanio_maceta !== '' ? String(parseFloat(l.tamanio_maceta)) : '',
+      // Los m² que ocupa: sólo tienen sentido cuando comparte sala con otros lotes (en casa hay
+      // un espacio y un lote, y alcanza con el de la sala).
+      m2_ocupados:       l.m2_ocupados       ?? null,
       notes:             l.notes             || '',
     }
     editLoteError.value = null
@@ -56,6 +59,7 @@ export function useLoteEditar(loteId) {
         ...rest,
         // '' = bandeja de enraizado (el que enraíza no tiene maceta). Va como null, no como 0.
         tamanio_maceta:    rest.tamanio_maceta || null,
+        m2_ocupados:       rest.m2_ocupados || null,
       }
       if (!payload.genetica_id) delete payload.genetica_id
       if (!payload.light_type)  delete payload.light_type

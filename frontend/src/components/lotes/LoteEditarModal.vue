@@ -93,6 +93,16 @@
               </span>
             </div>
 
+            <!-- Los m² que ocupa el lote dentro de la sala: con esto sale el g/m². Sólo en
+                 organizaciones —en casa hay un espacio y un lote, y alcanza el de la sala— y
+                 sólo mientras está en cultivo (al cosechar se congelan). -->
+            <div v-if="!esPersonal" class="lem__field">
+              <label class="lem__label">m² que ocupa <span class="lem__opt">opcional</span></label>
+              <input type="number" min="0" step="0.1" class="lem__input" v-model.number="editLoteForm.m2_ocupados"
+                     :placeholder="lote?.sala?.m2 ? `de los ${lote.sala.m2} m² de ${lote.sala.nombre}` : 'la sala no tiene m² cargados'" />
+              <span class="lem__hint">Con esto el rendimiento se puede leer en g/m². La suma de los lotes no puede pasar los metros de la sala.</span>
+            </div>
+
             <div class="lem__field">
               <label class="lem__label">Tipo de luz</label>
               <select class="lem__input" v-model="editLoteForm.light_type">
@@ -163,6 +173,7 @@
 </template>
 
 <script setup>
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
 import { watch, computed } from 'vue'
 import { useLoteEditar } from '../../composables/useLoteEditar.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
@@ -173,6 +184,7 @@ const props = defineProps({
   lote:   { type: Object,  default: null },
   loteId: { type: Number,  required: true },
 })
+const { esPersonal } = useUsoPersonal()
 const emit = defineEmits(['update:open', 'saved'])
 
 const {

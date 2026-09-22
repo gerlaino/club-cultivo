@@ -30,6 +30,12 @@ module Analitica
           plantas:       cosech,
           gramos:        gramos.round(1),
           g_por_planta:  cosech.positive? ? (gramos / cosech).round(1) : nil,
+          # g/m²: sobre los lotes que declararon superficie (suma ÷ suma). `nil` si ninguno la
+          # tiene, y `lotes_sin_m2` dice cuántos quedaron afuera: el número no se ensucia ni se
+          # inventa. Es la unidad en la que viene la ficha del banco.
+          g_m2:          (con_m2 = ls.select { |l| l.m2_efectivos.to_f.positive? }).any? ?
+                           (con_m2.sum { |l| l.rendimiento_real_g.to_f } / con_m2.sum { |l| l.m2_efectivos.to_f }).round(1) : nil,
+          lotes_sin_m2:  ls.size - ls.count { |l| l.m2_efectivos.to_f.positive? },
           # Prendió: de todas las que arrancaron, cuántas enraizaron. Se perdió en el ciclo: de las
           # que prendieron, cuántas se descartaron después (plaga, macho, rotura…).
           prendio_pct:   total.positive? ? ((prendieron * 100.0) / total).round(1) : nil,

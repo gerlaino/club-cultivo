@@ -171,6 +171,7 @@ function startEdit(s) {
   editForm.value = {
     id: s.id, nombre: s.nombre || '', state: s.state || 'activa',
     kind: s.kind || '', notes: s.notes || '', sede_id: s.sede?.id || null,
+    m2: s.m2 ?? null,
   };
   editErrors.value = {};
   showEdit.value   = true;
@@ -389,6 +390,12 @@ async function confirmDelete(s) {
               <i class="bi bi-flower2"></i>
               {{ s.plantas_totales ?? 0 }} planta{{ s.plantas_totales !== 1 ? 's' : '' }}
             </span>
+            <template v-if="s.m2">
+              <span class="slv__card-stat-sep">·</span>
+              <span class="slv__card-stat" :title="s.m2_libres != null ? `${s.m2_libres} m² libres` : ''">
+                <i class="bi bi-bounding-box"></i> {{ s.m2 }} m²
+              </span>
+            </template>
           </div>
 
           <p v-if="s.notes" class="slv__card-notes">{{ s.notes }}</p>
@@ -519,6 +526,11 @@ async function confirmDelete(s) {
                 </div>
               </div>
               <div class="slv__field">
+                <!-- Los metros del espacio: sin esto no se puede decir el rendimiento en g/m². -->
+                <label class="slv__label">Superficie de cultivo <span class="slv__opt">(m², opcional)</span></label>
+                <input class="slv__input" type="number" min="0" step="0.1" v-model.number="editForm.m2" placeholder="4" />
+              </div>
+              <div class="slv__field">
                 <label class="slv__label">Notas</label>
                 <textarea class="slv__input slv__textarea" rows="2" v-model.trim="editForm.notes"></textarea>
               </div>
@@ -594,6 +606,7 @@ async function confirmDelete(s) {
 .slv__card-head { display: flex; align-items: flex-start; gap: .6rem; }
 .slv__card-kind-icon { font-size: 1.5rem; line-height: 1; flex-shrink: 0; }
 .slv__card-meta { flex: 1; min-width: 0; }
+.slv__opt { font-weight: 500; color: var(--c-slate-400); }
 .slv__card-nombre { font-weight: 700; color: #0f2611; font-size: .95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .slv__card-tipo   { font-size: .75rem; color: #60725d; }
 .slv__card-sede   { font-size: .78rem; color: #60725d; display: flex; align-items: center; gap: .3rem; }

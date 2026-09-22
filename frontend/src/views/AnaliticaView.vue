@@ -165,7 +165,9 @@ async function exportPdf() {
               <thead>
                 <tr>
                   <th>Genética</th><th class="an__th-r">Lotes</th><th class="an__th-r">Plantas</th>
-                  <th class="an__th-r">g/planta</th><th class="an__th-bar"></th><th class="an__th-r">Flor seca</th>
+                  <th class="an__th-r">g/planta</th><th class="an__th-bar"></th>
+                  <th class="an__th-r" title="Sobre los lotes que tienen los m² del espacio cargados">g/m²</th>
+                  <th class="an__th-r">Flor seca</th>
                   <th class="an__th-r" title="De todas las plantas que arrancaron, cuántas enraizaron">Prendió</th>
                   <th class="an__th-r" title="De las que prendieron, cuántas se descartaron después">Se perdió en el ciclo</th>
                   <th class="an__th-r" title="Del arranque a que existe el frasco">Ciclo</th>
@@ -178,6 +180,9 @@ async function exportPdf() {
                   <td class="an__td-r">{{ g.plantas }}</td>
                   <td class="an__td-r an__td-bold">{{ fmt(g.g_por_planta) }}</td>
                   <td class="an__td-bar"><div class="an__bar"><i :style="{ width: pct(g.g_por_planta, maxGpp) + '%' }"></i></div></td>
+                  <td class="an__td-r" :title="g.lotes_sin_m2 ? `${g.lotes_sin_m2} lote(s) sin m² cargados quedan afuera` : ''">
+                    {{ g.g_m2 != null ? fmt(g.g_m2) : '—' }}<span v-if="g.lotes_sin_m2" class="an__pocos an__pocos--inline">{{ g.lotes_sin_m2 }} sin m²</span>
+                  </td>
                   <td class="an__td-r">{{ fmt(g.gramos, 0) }} g</td>
                   <td class="an__td-r">{{ pc(g.prendio_pct) }}</td>
                   <td class="an__td-r" :class="{ 'an__td-warn': g.perdida_pct > 10 }">{{ pc(g.perdida_pct) }}</td>
@@ -355,6 +360,8 @@ async function exportPdf() {
 .an__row--pocos .an__bar i { background: var(--c-slate-300); }
 .an__row--mejor td { background: var(--c-leaf-50); }
 .an__pocos, .an__origen { display: block; font-size: .7rem; font-weight: 500; color: var(--c-slate-400); margin-top: 2px; }
+/* En la celda de g/m² el aviso va al lado del número, no debajo. */
+.an__pocos--inline { display: inline; margin: 0 0 0 .35rem; font-size: .68rem; }
 .an__fase { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: .78rem; font-weight: 600; background: var(--c-slate-100); color: var(--c-slate-700); }
 .an__fase--floracion { background: var(--c-amber-100); color: var(--c-amber-500); }
 .an__fase--vegetativo, .an__fase--enraizado { background: var(--c-leaf-100); color: var(--c-leaf-800); }
