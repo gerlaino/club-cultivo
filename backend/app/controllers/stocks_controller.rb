@@ -322,6 +322,27 @@ class StocksController < ApplicationController
     end
     return render json: { error: 'La cantidad ingresada no cambia el stock (delta 0)' }, status: :unprocessable_entity if gramos.zero?
 
+    # UN AJUSTE NO CREA PRODUCTO (22-sep-2026, Germán). En un stock que viene de una cosecha la
+    # cantidad está justificada por el pesaje: sumar gramos acá sería cannabis que aparece de la
+    # nada y rompe la trazabilidad —la misma regla que «contar no crea stock» en el mostrador—.
+    # Si el pesaje estaba mal, se corrige el pesaje (`pesajes_manicura#reajustar_peso`), que
+    # arregla el peso confirmado Y el stock, y deja dicho de dónde salió el gramo.
+    # Lo comprado afuera sí se puede subir: ahí el respaldo es la factura, no un pesaje.
+    if gramos.positive? && @stock.regulatorio?
+      return render json: {
+        error: 'Un ajuste no puede sumar gramos a un stock que viene de una cosecha: esa cantidad ' \
+               'sale del pesaje. Si el pesaje estaba mal, corregilo en el lote (Manicura → reajustar peso) ' \
+               'y el stock se actualiza solo.',
+        corregir_en: 'pesaje', lote_id: @stock.lote_id,
+      }, status: :unprocessable_entity
+    end
+
+    # Una merma o una pérdida sólo bajan: si el número sube, es un reconteo, y hay que decirlo así.
+    if gramos.positive? && %w[merma perdida].include?(tipo_ajuste)
+      return render json: { error: "Una #{tipo_ajuste} no puede sumar gramos. Si contaste de más, elegí «reconteo»." },
+                    status: :unprocessable_entity
+    end
+
     nueva_cantidad = @stock.cantidad.to_f + gramos
     return render json: { error: "La cantidad resultante sería negativa (#{nueva_cantidad.round(2)}g)" }, status: :unprocessable_entity if nueva_cantidad < 0
 

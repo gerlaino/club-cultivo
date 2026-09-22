@@ -369,6 +369,12 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   (`registrarLecturaOffline`) y el de la sala/espacio (`registrarSalaOffline`). La lista de lo
   que entra a la cola sigue siendo de dominio (`lib/offlineApi.js`): ambiente, registro diario,
   pesaje del manicura, entrega del repartidor. Dispensar, fotos, crear cosas y tareas, NO.
+- **UN AJUSTE DE STOCK NO CREA PRODUCTO** (22-sep-2026, Germán): en un stock regulatorio
+  (`Stock#regulatorio?`: lote o derivado) la cantidad la justifica el pesaje, así que «Ajustar
+  gramos» **sólo puede bajar**; para que suba se corrige el pesaje (`reajustar_peso`), que
+  arregla peso confirmado + stock con un movimiento que nombra el lote. `compra_externa` sí
+  puede subir (respaldo: la factura). Merma y pérdida nunca suman: eso es un reconteo. Es la
+  misma familia que «contar no crea stock» en el mostrador.
 - **EL RENDIMIENTO SE MIDE EN g/m², Y LOS METROS NO BLOQUEAN NADA** (22-sep-2026, Germán):
   `geneticas.rendimiento` es g/m² (como el banco); el real sale de `salas.m2` y, en
   organizaciones, `lotes.m2_ocupados` (la suma de los lotes no puede pasar la sala). Un lote

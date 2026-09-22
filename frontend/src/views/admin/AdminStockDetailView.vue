@@ -452,7 +452,7 @@
                   </label>
                   <div class="sd__input-row">
                     <select v-if="ajustarForm.tipo === 'reconteo'" class="sd__input sd__input--modo" v-model="ajustarForm.modo" aria-label="Qué hacés">
-                      <option value="agregar">+ Agregar</option>
+                      <option v-if="!vieneDeCosecha" value="agregar">+ Agregar</option>
                       <option value="quitar">− Quitar</option>
                       <option value="recontar">= Recontar</option>
                     </select>
@@ -467,6 +467,15 @@
                   <textarea class="sd__input sd__textarea" rows="2" v-model="ajustarForm.motivo" placeholder="Describí el motivo del ajuste…"></textarea>
                 </div>
               </div>
+              <!-- Si el reconteo da MÁS en un frasco de cosecha, se explica dónde se corrige en
+                   vez de dejar apretar y mostrar el error del backend. -->
+              <div v-if="vieneDeCosecha && ajustarSuma" class="sd__alert sd__alert--info">
+                En un frasco que vino de la cosecha, los gramos salen del pesaje del lote. Si pesaste de
+                más, corregilo en
+                <RouterLink v-if="stock?.lote_id" :to="`/lotes/${stock.lote_id}`" class="sd__alert-link">el lote {{ stock.lote_codigo || '' }}</RouterLink>
+                <template v-else>el lote</template>
+                (Manicura → reajustar peso) y el stock se actualiza solo.
+              </div>
               <div v-if="ajustarPreview !== null" class="sd__ajuste-preview" :class="ajustarDelta >= 0 ? 'sd__ajuste-preview--pos' : 'sd__ajuste-preview--neg'">
                 <span>Queda: <strong>{{ ajustarPreview.toFixed(2) }}g</strong></span>
                 <span class="sd__ajuste-delta">{{ ajustarDelta >= 0 ? '+' : '' }}{{ ajustarDelta.toFixed(2) }}g</span>
@@ -474,7 +483,7 @@
             </div>
             <div class="sd__modal-ft">
               <button class="sd__btn-ghost" @click="showAjustar = false">Cancelar</button>
-              <button class="sd__btn-primary" :disabled="ajustando" @click="ejecutarAjustar">
+              <button class="sd__btn-primary" :disabled="ajustando || (vieneDeCosecha && ajustarSuma)" @click="ejecutarAjustar">
                 <DsSpinner v-if="ajustando" :size="12" />
                 <i v-else class="bi bi-check-lg"></i>
                 Confirmar ajuste
@@ -950,6 +959,12 @@ const ajustando    = ref(false)
 // pérdida siempre quitan; con reconteo se elige.
 const ajustarModo = computed(() => ajustarForm.value.tipo === 'reconteo' ? ajustarForm.value.modo : 'quitar')
 
+// Un frasco que vino de una cosecha no puede SUMAR gramos por un ajuste: esa cantidad la
+// justifica el pesaje. El backend lo rechaza; acá directamente no se ofrece «+ Agregar»
+// (22-sep-2026). Lo comprado afuera sí, porque ahí el respaldo es la factura.
+const vieneDeCosecha = computed(() => !!stock.value && stock.value.origen !== 'compra_externa')
+const ajustarSuma    = computed(() => ajustarDelta.value > 0)
+
 // El delta que va al backend, con signo. En «recontar» es total − actual.
 const ajustarDelta = computed(() => {
   const c = ajustarForm.value.cantidad
@@ -1267,6 +1282,9 @@ function badgeVencLabel(s) {
 .sd__input-row .sd__input { border-radius: 7px 0 0 7px; }
 .sd__input-suf { background: var(--c-slate-100); border: 1.5px solid var(--c-slate-200); border-left: none; border-radius: 0 7px 7px 0; padding: .5rem .75rem; font-size: .82rem; font-weight: 600; color: var(--c-slate-500); }
 .sd__alert     { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; border-radius: 7px; padding: .55rem .75rem; font-size: .82rem; margin-bottom: 1rem; }
+/* No es un error: es la explicación de por dónde va ese cambio. */
+.sd__alert--info { background: var(--c-amber-100, #fef3c7); border-color: #fcd34d; color: #92400e; }
+.sd__alert-link  { color: inherit; font-weight: 700; text-decoration: underline; }
 .sd__edit-ft   { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1rem; }
 
 /* ── Actions ──────────────────────────────────────────────────────────────── */

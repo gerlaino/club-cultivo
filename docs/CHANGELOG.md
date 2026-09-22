@@ -1,5 +1,18 @@
 # Changelog
 
+## Septiembre 2026 (db) — Un ajuste no crea producto
+
+- **«Ajustar gramos» podía SUMAR a un frasco que vino de una cosecha** (Germán, 22-sep): eso es
+  cannabis que aparece de la nada y rompe la trazabilidad —la misma regla que «contar no crea
+  stock» en el mostrador, por otra puerta—. Ahora un ajuste positivo sobre un stock regulatorio
+  (`lote` / `derivado_lote`) se rechaza y **dice por dónde se corrige**: el pesaje del lote
+  (`pesajes_manicura#reajustar_peso`, que ya arregla el peso confirmado Y el stock y deja el
+  movimiento con el código del lote). Bajar sigue pudiéndose: se pierde producto, no se inventa.
+- **Lo comprado afuera sí puede subir**: ahí el respaldo es la factura, no un pesaje.
+- **Una merma o una pérdida no pueden sumar** en ningún caso: si hay más, es un reconteo.
+- La pantalla no ofrece «+ Agregar» en un frasco de cosecha y, si el reconteo da de más,
+  explica dónde corregirlo con enlace al lote en vez de dejar apretar y mostrar un error.
+
 ## Septiembre 2026 (da) — Los metros del espacio: el rendimiento se compara en g/m²
 
 - **El rendimiento de la genética es g/m²**, no g/planta (Germán, 22-sep: «el techo lo pone la
