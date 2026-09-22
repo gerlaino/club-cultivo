@@ -369,6 +369,9 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   (`registrarLecturaOffline`) y el de la sala/espacio (`registrarSalaOffline`). La lista de lo
   que entra a la cola sigue siendo de dominio (`lib/offlineApi.js`): ambiente, registro diario,
   pesaje del manicura, entrega del repartidor. Dispensar, fotos, crear cosas y tareas, NO.
+- **LO QUE SE HACE TODOS LOS DÍAS TIENE QUE ESTAR EN EL TELÉFONO** (22-sep-2026): cambiar la fase
+  del espacio y editarlo (nombre, m²) existían sólo en escritorio, y el cultivador de casa vive en
+  la PWA. Cuando una acción del día quede sólo en escritorio, es un bug, no una omisión.
 - **UN AJUSTE DE STOCK NO CREA PRODUCTO** (22-sep-2026, Germán): en un stock regulatorio
   (`Stock#regulatorio?`: lote o derivado) la cantidad la justifica el pesaje, así que «Ajustar
   gramos» **sólo puede bajar**; para que suba se corrige el pesaje (`reajustar_peso`), que

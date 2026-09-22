@@ -1,5 +1,15 @@
 # Changelog
 
+## Septiembre 2026 (dd) — El espacio, desde el teléfono
+
+- Recorrido de uso personal (Germán, 22-sep): **«Pasar a Floración» vivía SÓLO en el escritorio**.
+  Un cultivador de casa tiene UNA carpa que pasa de vegetativo a floración —la operación más
+  común de su espacio— y en el teléfono no existía. Ahora está en «Más», con el mismo endpoint y
+  la misma confirmación (`textoCambioDeFase`) que la ficha de escritorio.
+- **Editar el espacio desde el teléfono**: nombre y m². Sin esto, quien no cargó los metros al
+  crear no tenía forma de agregarlos desde la PWA (y el g/m² no salía nunca).
+- Los m² del espacio se ven en el encabezado de su ficha en el teléfono.
+
 ## Septiembre 2026 (dc) — Los m² donde faltaban: edición, tablas y analítica
 
 - Repaso pedido por Germán: el alta tenía el campo, **la edición y las tablas no**. Ahora los m²

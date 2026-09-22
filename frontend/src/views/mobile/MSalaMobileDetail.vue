@@ -82,6 +82,39 @@
           <span class="msal__accion-lbl">Agregar nota</span>
           <i class="bi bi-chevron-right msal__accion-arr"></i>
         </button>
+        <!-- Pasar el espacio de vegetativo a floración: la operación más común de una carpa, y
+             hasta el 22-sep-2026 vivía SÓLO en el escritorio. El que cultiva en casa está en el
+             teléfono. Mismo endpoint y misma confirmación que la ficha de escritorio. -->
+        <button v-if="puedeCambiarFase" class="msal__accion-item" :disabled="cambiandoFase" @click="cambiarFase()">
+          <span class="msal__accion-ico">🔄</span>
+          <span class="msal__accion-lbl">Pasar a {{ faseLabel(faseDestino) }}</span>
+          <i class="bi bi-chevron-right msal__accion-arr"></i>
+        </button>
+        <button v-if="puedeEditar" class="msal__accion-item" @click="abrirEditar">
+          <span class="msal__accion-ico">✏️</span>
+          <span class="msal__accion-lbl">Editar {{ salaTxt.corta }}</span>
+          <i class="bi bi-chevron-right msal__accion-arr"></i>
+        </button>
+      </div>
+    </SheetBottom>
+
+    <!-- Sheet: editar el espacio. Nombre y metros: lo único que cambia con el tiempo. La fase
+         va por «Pasar a …», que mueve los lotes y avisa. -->
+    <SheetBottom v-model="showEditar" :title="`Editar ${salaTxt.corta}`">
+      <div class="msal__sheet-body">
+        <div class="msal__field">
+          <label class="msal__label">Nombre</label>
+          <input v-model.trim="editForm.nombre" class="msal__input" />
+        </div>
+        <div class="msal__field">
+          <label class="msal__label">¿Cuánto mide? <span class="msal__opt">(m², opcional)</span></label>
+          <input v-model.number="editForm.m2" type="number" min="0" step="0.1" class="msal__input" :placeholder="esPersonal ? '1' : '4'" />
+          <p class="msal__hint">Con esto el rendimiento se puede leer en g/m² y compararse con la ficha de la genética.</p>
+        </div>
+        <p v-if="editError" class="msal__error">{{ editError }}</p>
+        <button class="msal__btn-guardar" :disabled="guardandoEdit || !editForm.nombre" @click="guardarEditar">
+          {{ guardandoEdit ? 'Guardando…' : 'Guardar' }}
+        </button>
       </div>
     </SheetBottom>
 
@@ -158,11 +191,15 @@ import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
 import SheetBottom        from '../../components/cultivador/SheetBottom.vue'
 import RegistroSalaModal  from '../../components/salas/RegistroSalaModal.vue'
 import { hoyISO } from '../../utils/dates.js'
+import { updateSala, cambiarFaseSala } from '../../lib/api'
+import { textoCambioDeFase } from '../../lib/textoCambioDeFase.js'
+import { useConfirm } from '../../composables/useConfirm.js'
+import { useAuthStore } from '../../stores/auth'
 import { achicarImagen } from '../../lib/imagenes.js'
 
 const route  = useRoute()
 const router = useRouter()
-const { esPersonal } = useUsoPersonal()
+const { esPersonal, sala: salaTxt } = useUsoPersonal()
 const toast = useToast()
 const id    = Number(route.params.id)
 
@@ -171,6 +208,68 @@ const lotes   = ref([])
 const loading = ref(true)
 
 const showRegistroSala = ref(false)
+const { confirm } = useConfirm()
+const auth = useAuthStore()
+
+// ── Cambiar la fase del espacio y editarlo, desde el teléfono ────────────────
+// La regla de quién puede y sobre qué salas es la misma que en escritorio.
+const puedeCambiarFase = computed(() =>
+  ['admin', 'supervisor', 'cultivador'].includes(auth.user?.role) &&
+  ['vegetativo', 'floracion'].includes(sala.value?.kind))
+const puedeEditar  = computed(() => ['admin', 'supervisor'].includes(auth.user?.role) || esPersonal.value)
+const faseDestino  = computed(() => (sala.value?.kind === 'vegetativo' ? 'floracion' : 'vegetativo'))
+const faseLabel    = (f) => ({ vegetativo: 'Vegetativo', floracion: 'Floración' }[f] || f)
+const cambiandoFase = ref(false)
+
+async function cambiarFase(confirmado = false) {
+  cambiandoFase.value = true
+  try {
+    const { data } = await cambiarFaseSala(id, confirmado ? { confirmar_cambio_fase: true } : {})
+    showAcciones.value = false
+    sala.value = { ...sala.value, kind: data.nueva_fase }
+    try { lotes.value = ((await listLotes(id)).data || []).filter(l => l.estado !== 'finalizado') } catch { /* la fase ya cambió */ }
+    toast.success(data.lotes_afectados
+      ? `${salaTxt.value.Corta} en ${faseLabel(data.nueva_fase)} — ${data.lotes_afectados} lote${data.lotes_afectados === 1 ? '' : 's'}`
+      : `${salaTxt.value.Corta} en ${faseLabel(data.nueva_fase)}`)
+  } catch (e) {
+    const data = e?.response?.data
+    if (data?.requiere_confirmacion) {
+      cambiandoFase.value = false
+      if (await confirm({ ...textoCambioDeFase(data), variant: 'danger' })) return cambiarFase(true)
+      return
+    }
+    toast.error(data?.error || data?.errors?.[0] || 'No se pudo cambiar la fase.')
+  } finally {
+    cambiandoFase.value = false
+  }
+}
+
+const showEditar    = ref(false)
+const editForm      = ref({ nombre: '', m2: null })
+const editError     = ref('')
+const guardandoEdit = ref(false)
+
+function abrirEditar() {
+  editForm.value = { nombre: sala.value?.nombre || '', m2: sala.value?.m2 ?? null }
+  editError.value = ''
+  showAcciones.value = false
+  showEditar.value = true
+}
+
+async function guardarEditar() {
+  guardandoEdit.value = true
+  editError.value = ''
+  try {
+    const { data } = await updateSala(id, { nombre: editForm.value.nombre, m2: editForm.value.m2 || null })
+    sala.value = { ...sala.value, ...data }
+    showEditar.value = false
+    toast.success('Guardado ✓')
+  } catch (e) {
+    editError.value = e?.response?.data?.error || e?.response?.data?.errors?.[0] || 'No se pudo guardar'
+  } finally {
+    guardandoEdit.value = false
+  }
+}
 // Desde el botón se elige adentro; desde el «+» del teléfono llega `?accion=ambiental` y abre
 // derecho en ese formulario.
 const accionInicial    = ref(null)
@@ -388,6 +487,12 @@ onMounted(async () => {
 .msal__input:focus { border-color: #1b5e20; }
 .msal__textarea { resize: none; font-family: inherit; }
 .msal__row2 { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+.msal__hint { font-size: .72rem; color: var(--c-slate-400); line-height: 1.35; }
+.msal__btn-guardar {
+  width: 100%; padding: .8rem; border: none; border-radius: 12px; background: #1b5e20; color: #fff;
+  font-size: .9rem; font-weight: 700; cursor: pointer;
+}
+.msal__btn-guardar:disabled { opacity: .5; }
 .msal__error {
   background: #fef2f2; color: #dc2626;
   border: 1px solid #fecaca; border-radius: 8px;
