@@ -127,50 +127,49 @@ mensual por plan (`Ia::Uso`, `ia_llamadas`, créditos `IaRecarga`).
 - **Seguridad**: no hay contraseña por defecto; `render file:` no existe en modo API; `/me` no se
   cachea; el helper de specs prefija `/api` a todo.
 
-## Dónde retomar (20-sep-2026, tarde)
+## Dónde retomar (22-sep-2026)
 
-**Todo pusheado y en producción (`master`, último `2120ed5d`), bloque (ct)** (ver `docs/CHANGELOG.md`):
-el «+» de la PWA personal («Hoy»: Regar / Registrar ambiente / Foto / Tarea) · el lote dice qué
-viene (`Lote#proximo_paso` → «Faltan 8 días para floración») · precios provisorios de los
-adicionales personales (`Precios::ADDONS_PERSONAL`: ambiente 4.000, IA 5.000, chatbot 3.000) ·
-genéticas sin ruido regulatorio en personal · `/m/perfil` (rebotaba al inicio en la PWA) ·
-e2e `mostrador.spec.js` verde otra vez (4/4). Todo verificado: rspec en lo tocado, vitest
-2217/0, build, Playwright sobre `casa_german`.
+**Todo pusheado y en producción (`master`, último `47efc39a`).** Bloques (ct) a (dd) del
+CHANGELOG, tres días: PWA personal (el «+» «Hoy», «qué viene» del lote, «Cómo salió», fotos
+achicadas + tope por plan, `/m/perfil`) · **genéticas automáticas** · **m² y g/m²** · **el ajuste
+de stock no crea producto** · `ConfirmDialog` arriba de todo.
 
 **Reglas nuevas que gobiernan código nuevo** (detalle en `docs/REGLAS_Y_DECISIONES.md`):
 - Todo modelo de dominio nuevo lleva `include Transmite` + `transmite_como '<recurso>'`; toda
   pantalla que pide directo a la API se anota con `useRecargaEnCambios`. El aviso no lleva
   datos: la pantalla re-pide. Los `refrescar()` de los stores son silenciosos.
 - Push: lo que no está en `Notificaciones::Catalogo` no se ofrece ni se manda; todo disparador
-  nuevo dice `tipo:`. «Te piden algo» prendido; «Recordatorios» opt-in (en personal, ciclo y
-  cosecha prendidos). En pantalla se dice «Próximos pasos del ciclo», nunca «hitos».
-- Uso personal nace sólo con Cultivo; ambiente/IA/chatbot se eligen en el alta, cada uno con su
-  precio de personal (provisorios). En personal no hay nada regulatorio ni de pacientes.
-- El «qué viene» del lote lo calcula el backend (`proximo_paso`); sin objetivo, nil. Los modales
-  de registro aceptan `accionInicial` y su `watch` de apertura es `immediate`.
-- La foto rápida se saca desde el toque (sin gesto el navegador no abre la cámara).
-- Nutriente = insumo; receta = dosis por litro; aplicar al regar descuenta y cuesta, **nunca
-  bloquea por stock**; «fertilizó sin especificar» es válido. Personal: «Mis nutrientes».
-- Genéticas globales (INASE) son compartidas: sólo lectura desde una organización; personal ve
-  sólo las suyas. La regla del enraizado (incubadora con su clima) vale también en personal.
+  nuevo dice `tipo:`. En pantalla se dice «Próximos pasos del ciclo», nunca «hitos».
+- **Automáticas**: tilde en la genética + «ciclo completo» (arranca AL IR A MACETA, el enraizado
+  va aparte); vive en la sala de vege todo el ciclo, se cosecha desde vegetativo
+  (`puede_cosechar`), floración opcional; la tabla sala⇔estado de las autos es UNA y viaja en
+  `/me`. El tilde no se cambia con lotes en curso.
+- **Rendimiento en g/m²**: `salas.m2` + `lotes.m2_ocupados` (por lote sólo en organizaciones; la
+  suma no puede pasar la sala). Sin metros NO se bloquea nada y los informes salen igual: se
+  avisa. Al cosechar, los metros se congelan en el lote.
+- **Un ajuste de stock no crea producto**: en stock regulatorio sólo baja; para que suba se
+  corrige el pesaje (`reajustar_peso`). `compra_externa` sí sube. Merma/pérdida nunca suman.
+- **Lo que se hace todos los días tiene que estar en el teléfono** (cambiar la fase del espacio,
+  editarlo, regar, ambiente, foto). Si una acción del día quedó sólo en escritorio, es un bug.
+- `ConfirmDialog` es lo más alto de la pantalla (z-index 20000); hay un test que barre `src`.
+- Fotos: se achican al subir (`lib/imagenes.js`) y tienen tope por plan; nutriente = insumo;
+  genéticas globales (INASE) de sólo lectura.
 
-**(cy) 21-sep:** genéticas automáticas (tilde + semilla a cosecha; cosecha desde vege; floración
-opcional; chip «Auto»). `casa_german` tiene «Auto Ananda» y CASA-02 para verlo.
-**(cw), repaso por rol:** el cultivador de organización tiene el «Hoy» del «+» · «faltan N días»
-también en escritorio · «Cómo salió» sin plata para cultivador y con fallback a otras genéticas ·
-cupo de fotos visible siempre. `cultivador@e2e.test` existe en la org `e2e` local (dos salas).
-**Bloques (cu) y (cv), mismo día:** registro del espacio sin señal · fuera `pacientes.envio_*` ·
-«Cómo salió» (`Lotes::ResumenCiclo`, desde curado) · fotos achicadas en el teléfono + tope por
-plan (300/1.000/3.000, 8 MB) · plan de auto-registro escrito en `docs/PLAN_AUTOREGISTRO.md`.
-Decisiones de Germán: el QR se queda en el «+» (manicurar por planta/lote) · plan de trabajo
-queda como está (cada uno arma y aplica) · precios personales provisorios hasta tener valores.
+**Pendiente de decisión (Germán):** valores reales de precios personales (4.000/5.000/3.000) y
+del tope de fotos (300/1.000/3.000) · **lo del «olvidé mi contraseña» en producción: falta saber
+qué mensaje mostró la pantalla y con qué usuario** (sospecha: SMTP/`APP_HOST` sin cargar en
+Render, o usuario sin mail real).
 
-**Pendientes más adelante (Germán decidió posponer):** auto-registro + trial 30 días (plan armado,
-sólo personal, sin flags) · app en las tiendas (cuando haya clientes fijos) · miniaturas con
-libvips (ya no urge: las fotos se achican al subir). No quedan pendientes viejos de código.
-**De Germán (no código):** rotar el secreto de Render · `rake seguridad:usuarios_con_password_default`
-· `rake stocks:balance_descuadrado` · `rake auditorias:limpiar_blobs` · confirmar que el push por
-worker llega al iPhone (el directo ya llegó) · destrabar notificaciones en su Chrome (candado).
+**Ideas de valor bajo, anotadas:** «Cómo salió» como lista en Analítica · la tarjeta en la ficha
+de escritorio del cultivador · plan de trabajo en el teléfono · regular/feminizada (el otro eje
+de la genética: sexar en semana 4–6, descartes por macho).
+
+**Pospuesto por Germán, con plan escrito:** auto-registro personal + trial
+(`docs/PLAN_AUTOREGISTRO.md`; antes necesita `APP_HOST`) · app en las tiendas (cuando haya
+clientes fijos) · miniaturas con libvips (ya no urge).
+**De Germán (no código):** rotar el secreto de Render · `APP_HOST` + SMTP en Render ·
+`rake seguridad:usuarios_con_password_default` · `rake stocks:balance_descuadrado` ·
+`rake auditorias:limpiar_blobs` · confirmar el push por worker al iPhone · el candado de Chrome.
 
 ## Trampas del entorno
 
