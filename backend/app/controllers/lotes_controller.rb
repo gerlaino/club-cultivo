@@ -330,8 +330,8 @@ class LotesController < ApplicationController
     # que no decía cuál lote era el problema.
     kind_destino = destino.kind.presence || destino.tipo
     incompatibles = lotes.reject do |l|
-      estado_final = (fase_destino.present? && !Plant::ESTADOS_ENRAIZANDO.include?(l.estado)) ? fase_destino : l.estado
-      permitidos = Lote::KINDS_SALA_POR_ESTADO[estado_final]
+      estado_final = fase_al_mover(l, fase_destino)
+      permitidos = Lote.kinds_sala_para(estado_final, automatica: l.automatica?)
       permitidos.blank? || kind_destino.blank? || permitidos.include?(kind_destino)
     end
     if incompatibles.any?
@@ -352,17 +352,17 @@ class LotesController < ApplicationController
         next if sala_anterior&.id == destino.id   # ya está ahí: no ensuciamos la historia
 
         attrs = { sala_id: destino.id, sede_id: destino.sede_id }
-        enraizando = Plant::ESTADOS_ENRAIZANDO.include?(estado_anterior)
-        cambia = fase_destino.present? && fase_destino != estado_anterior && !enraizando
-        attrs[:estado] = fase_destino if cambia
+        fase_final = fase_al_mover(lote, fase_destino)
+        cambia = fase_final != estado_anterior
+        attrs[:estado] = fase_final if cambia
         lote.update!(attrs)
 
         if cambia
-          plant_state = Lote::FASE_A_PLANT_STATE[fase_destino]
+          plant_state = Lote::FASE_A_PLANT_STATE[fase_final]
           if plant_state
             plantas += lote.plants.where.not(state: %w[descartada cosechado]).update_all(state: plant_state)
           end
-          cambiaron_fase << { codigo: lote.codigo, de: estado_anterior, a: fase_destino }
+          cambiaron_fase << { codigo: lote.codigo, de: estado_anterior, a: fase_final }
         end
 
         lote.lote_eventos.create!(
@@ -374,7 +374,7 @@ class LotesController < ApplicationController
           sala_origen:     sala_anterior,
           sala_destino:    destino,
           estado_anterior: cambia ? estado_anterior : nil,
-          estado_nuevo:    cambia ? fase_destino : nil,
+          estado_nuevo:    cambia ? fase_final : nil,
           descripcion:     [
             "Movido de #{sala_anterior&.nombre || 'sin sala'} a #{destino.nombre}",
             (sala_anterior&.sede_id != destino.sede_id ? "(cambio de sede)" : nil),
@@ -1258,6 +1258,17 @@ class LotesController < ApplicationController
         registrado_en:   fecha_cosecha.to_time,
       )
     end
+  end
+
+  # En qué fase queda un lote al entrar a una sala. Una sala de fase definida la impone
+  # (vege→flora al mudarlo, flora→vege es DESHACER), salvo que el lote esté enraizando (no
+  # cambia por mudarse) o sea una AUTOMÁTICA en floración yendo a vege: ella florece ahí mismo,
+  # mudarla no la devuelve a vegetativo.
+  def fase_al_mover(lote, fase_destino)
+    return lote.estado if fase_destino.blank?
+    return lote.estado if Plant::ESTADOS_ENRAIZANDO.include?(lote.estado)
+    return lote.estado if lote.automatica? && lote.estado == 'floracion' && fase_destino == 'vegetativo'
+    fase_destino
   end
 
   def require_admin_cultivador_o_manicura

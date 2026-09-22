@@ -374,7 +374,9 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   de sala, no pide 12/12), el reloj es «semilla a cosecha» (`dias_ciclo_objetivo`). Las reglas
   viven en `Lote` (`automatica?`, `puede_cosechar?`, `estados_plantas_cosechables`) y viajan en el
   serializer (`automatica`, `puede_cosechar`): la pantalla ofrece «Cosechar» donde el backend lo
-  dice, nunca por el estado. Regular/feminizada es OTRO eje y queda para después.
+  dice, nunca por el estado. La tabla sala⇔estado de las autos es UNA
+  (`KINDS_SALA_POR_ESTADO_AUTOMATICA`, viaja en `/me`): el front elige tabla, no escribe la
+  excepción. Regular/feminizada es OTRO eje y queda para después.
 - **`ConfirmDialog` ES LO MÁS ALTO DE LA PANTALLA** (21-sep-2026): `z-index: 20000`, y nada
   salvo la barra de carga de ruta (99999) puede estar por encima; `ConfirmDialog.test.js` barre
   los z-index de `src` y falla si aparece uno. Un «¿seguro?» debajo de un overlay deja lo de

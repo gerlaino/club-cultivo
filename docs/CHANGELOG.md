@@ -24,7 +24,12 @@
   **Analítica** Genéticas y Costo con el chip. Criterio: chip sólo en las autos en pantalla;
   columna donde el archivo se lee sin colores.
 - El alta de un lote «desde uno existente» en floración con una genética automática ofrece
-  también las salas de vegetativo (`NuevoLoteModal`, misma excepción que el backend); test.
+  también las salas de vegetativo. **Una sola tabla**: `Lote::KINDS_SALA_POR_ESTADO_AUTOMATICA`
+  + `Lote.kinds_sala_para(estado, automatica:)`, usada por la validación del modelo, por mover
+  en bloque y enviada en `/me` (`kinds_sala_por_estado_automatica`); el modal sólo elige qué
+  tabla aplica según la genética (la primera versión escribía la excepción en el front, y era
+  la regla en dos lados). Mover en bloque a una sala de vege ya no devuelve a vegetativo a una
+  automática en floración (a una fotoperiódica sí: es DESHACER). Specs en `/me`, mover y modal.
 - Sobre el diseño: son dos ejes (cómo florece / regular-feminizada); el segundo queda para
   después (sexar en semana 4–6, descartes por macho).
 

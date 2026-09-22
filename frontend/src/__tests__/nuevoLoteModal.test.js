@@ -92,10 +92,16 @@ describe('NuevoLoteModal — lote existente', () => {
     w.unmount()
   })
 
-  // Una automática en floración vive en la sala de vege (florece con 18/6): misma excepción
-  // que hace el backend en `Lote#sala_admite_el_estado` (21-sep-2026).
+  // Una automática en floración vive en la sala de vege (florece con 18/6). La tabla la manda el
+  // BACKEND en /me (`kinds_sala_por_estado_automatica`); el modal sólo elige cuál usar según la
+  // genética, nunca escribe la excepción (21-sep-2026). Sin la tabla, cae a la común.
   it('con una genética automática, un lote en floración también puede nacer en una sala de vege', async () => {
     const w = await abrir()
+    const { useAuthStore } = await import('../stores/auth.js')
+    useAuthStore().user = { id: 1, role: 'admin', reglas_cultivo: {
+      kinds_sala_por_estado:            { enraizado: ['vegetativo', 'mixta'], vegetativo: ['vegetativo', 'mixta'], floracion: ['floracion', 'mixta'] },
+      kinds_sala_por_estado_automatica: { enraizado: ['vegetativo', 'mixta'], vegetativo: ['vegetativo', 'mixta'], floracion: ['floracion', 'mixta', 'vegetativo'] },
+    } }
     w.vm.geneticas = [{ id: 7, nombre: 'Auto K', tipo: 'hibrida', automatica: true }, { id: 8, nombre: 'Foto K', tipo: 'indica', automatica: false }]
     w.vm.tipoCreacion = 'existente'
     w.vm.heredadoEstado = 'floracion'

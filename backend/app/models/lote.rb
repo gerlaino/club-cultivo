@@ -37,6 +37,17 @@ class Lote < ApplicationRecord
     'floracion'  => %w[floracion mixta],
   }.freeze
 
+  # La misma tabla para una genética AUTOMÁTICA: florece con 18/6, así que en floración sigue
+  # valiendo la sala de vegetativo. UNA tabla, no una excepción escrita en cada lugar: la usan
+  # la validación del modelo, el mover en bloque y —vía `/me`— el alta de lote en la pantalla.
+  KINDS_SALA_POR_ESTADO_AUTOMATICA = KINDS_SALA_POR_ESTADO.merge(
+    'floracion' => (KINDS_SALA_POR_ESTADO['floracion'] + KINDS_SALA_POR_ESTADO['vegetativo']).uniq,
+  ).freeze
+
+  def self.kinds_sala_para(estado, automatica: false)
+    (automatica ? KINDS_SALA_POR_ESTADO_AUTOMATICA : KINDS_SALA_POR_ESTADO)[estado]
+  end
+
   # Se valida sólo cuando la sala o el estado cambian: si en producción quedó algún lote
   # inconsistente de antes, no se lo deja trabado para el resto de las ediciones.
   validate :sala_admite_el_estado, if: -> { sala_id_changed? || estado_changed? }
@@ -668,13 +679,11 @@ class Lote < ApplicationRecord
   end
 
   def sala_admite_el_estado
-    permitidos = KINDS_SALA_POR_ESTADO[estado]
+    permitidos = Lote.kinds_sala_para(estado, automatica: automatica?)
     return if permitidos.blank? || sala.blank?
     # `kind` es lo que manda; `tipo` es el campo legacy que algunas salas todavía usan.
     kind = sala.kind.presence || sala.tipo
     return if kind.blank? || permitidos.include?(kind)
-    # La automática en floración sigue en su sala de vegetativo: florece con 18/6.
-    return if automatica? && estado == 'floracion' && KINDS_SALA_POR_ESTADO['vegetativo'].include?(kind)
 
     # El mensaje tiene que decir la salida: el que avanza un lote a floración desde una sala de
     # vegetativo no hizo nada raro, le falta mover el lote primero.

@@ -68,6 +68,19 @@ RSpec.describe 'Lotes de genética automática', type: :request do
     expect(json['proximo_paso']).to include('fase' => 'cosecha', 'automatica' => true)
   end
 
+  # Mudar a una sala de vege a una fotoperiódica en floración es DESHACER (vuelve a vegetativo);
+  # a una automática no la devuelve a nada: ella florece ahí mismo.
+  it 'mover en bloque a una sala de vege: la automática en floración sigue en floración, la fotoperiódica vuelve a vege' do
+    auto_flor = lote_en_vege(auto).tap { |l| l.update!(estado: 'floracion') }
+    foto_flor = create(:lote, club: club, sala: flora, genetica: foto, estado: 'floracion', start_date: 40.days.ago.to_date, tamanio_maceta: 7)
+    otra_vege = create(:sala, club: club, sede: sede, created_by: admin, kind: 'vegetativo', nombre: 'Vege 2')
+
+    post '/lotes/mover', params: { lote_ids: [auto_flor.id, foto_flor.id], sala_id: otra_vege.id }, headers: auth_headers
+    expect(response).to have_http_status(:ok), response.body
+    expect(auto_flor.reload).to have_attributes(sala_id: otra_vege.id, estado: 'floracion')
+    expect(foto_flor.reload).to have_attributes(sala_id: otra_vege.id, estado: 'vegetativo')
+  end
+
   it 'una fotoperiódica que pasa a floración sí se muda a la sala de floración' do
     lote = lote_en_vege(foto)
     post "/lotes/#{lote.id}/avanzar_fase", headers: auth_headers

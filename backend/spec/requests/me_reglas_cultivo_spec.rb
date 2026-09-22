@@ -41,3 +41,19 @@ RSpec.describe 'GET /me — reglas de cultivo', type: :request do
     expect(reglas.keys).to match_array(Lote::CULTIVO_ESTADOS)
   end
 end
+
+# La misma tabla para una genética automática: la pantalla elige cuál usar según la genética
+# y no escribe la excepción (21-sep-2026). Es la que valida el modelo y la que usa mover.
+RSpec.describe 'GET /me — la tabla de salas de las automáticas', type: :request do
+  include AuthHelpers
+  let(:club)  { create(:club) }
+  let(:admin) { create(:user, :admin, club: club) }
+  before { sign_in_as(admin); get '/me', headers: auth_headers }
+
+  it 'viaja aparte, y en floración también vale la sala de vege' do
+    tabla = JSON.parse(response.body).dig('reglas_cultivo', 'kinds_sala_por_estado_automatica')
+    expect(tabla).to eq(Lote::KINDS_SALA_POR_ESTADO_AUTOMATICA.stringify_keys)
+    expect(tabla['floracion']).to include('vegetativo', 'floracion', 'mixta')
+    expect(tabla['vegetativo']).to eq(Lote::KINDS_SALA_POR_ESTADO['vegetativo'])
+  end
+end

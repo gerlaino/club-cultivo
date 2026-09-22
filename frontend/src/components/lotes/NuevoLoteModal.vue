@@ -365,6 +365,12 @@ const KINDS_POR_ESTADO_FALLBACK = {
 const KINDS_POR_ESTADO = computed(() =>
   useAuthStore().user?.reglas_cultivo?.kinds_sala_por_estado || KINDS_POR_ESTADO_FALLBACK
 )
+// Para una genética automática el backend manda su propia tabla (en floración sigue valiendo
+// la sala de vege). Si no llegó, se usa la común: mejor ofrecer de menos que ofrecer lo que el
+// backend va a rechazar.
+const KINDS_POR_ESTADO_AUTOMATICA = computed(() =>
+  useAuthStore().user?.reglas_cultivo?.kinds_sala_por_estado_automatica || KINDS_POR_ESTADO.value
+)
 
 const estadoObjetivo = computed(() =>
   tipoCreacion.value === 'existente' ? heredadoEstado.value : 'enraizado')
@@ -373,17 +379,13 @@ const estadoObjetivo = computed(() =>
 // va a nacer el lote. Con varias sedes, la sede se elige primero: mezclar las salas de todas
 // obliga a saber de memoria cuál pertenece a dónde, y un lote creado en la sala equivocada
 // después hay que moverlo a mano.
-// La genética elegida, para saber si es automática: una auto en floración vive en la sala de
-// vegetativo (florece con 18/6), así que ahí también se ofrecen esas salas. Es la misma
-// excepción que hace el backend en `Lote#sala_admite_el_estado`.
+// La genética elegida decide qué tabla de salas aplica (la común o la de automáticas).
 const geneticaElegida = computed(() => geneticas.value.find(g => String(g.id) === String(form.value.genetica_id)))
 const salasOfrecidas = computed(() => {
   if (faltaElegirSede.value) return []
 
-  let permitidos = KINDS_POR_ESTADO.value[estadoObjetivo.value] || []
-  if (estadoObjetivo.value === 'floracion' && geneticaElegida.value?.automatica) {
-    permitidos = [...new Set([...permitidos, ...(KINDS_POR_ESTADO.value.vegetativo || [])])]
-  }
+  const tabla = geneticaElegida.value?.automatica ? KINDS_POR_ESTADO_AUTOMATICA.value : KINDS_POR_ESTADO.value
+  const permitidos = tabla[estadoObjetivo.value] || []
   // Las creadas recién viven en local hasta que el padre recargue: si no, la sala que acabás de
   // crear no aparece en el combo y parece que no se creó.
   return [...(props.salas || []), ...salasCreadas.value].filter(s => {
