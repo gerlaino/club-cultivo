@@ -98,8 +98,10 @@ module Informes
       # Una automática no se compara por floración (no la decide nadie) sino por el ciclo entero
       # contra lo que prometía el banco.
       if l.automatica?
-        cos = ent['cosecha'] || ent['en_manicura'] || ent['curado'] || ent['finalizado']
-        ciclo_real = cos && l.start_date ? (cos - l.start_date).to_i : nil
+        # El ciclo de una auto va de la maceta a la cosecha; el enraizado se informa aparte.
+        cos     = ent['cosecha'] || ent['en_manicura'] || ent['curado'] || ent['finalizado']
+        arranco = ent['vegetativo'] || l.start_date
+        ciclo_real = cos && arranco ? (cos - arranco).to_i : nil
         desv_f = l.dias_ciclo_objetivo && ciclo_real ? ciclo_real - l.dias_ciclo_objetivo : nil
         que = 'ciclo'
       else
@@ -135,10 +137,11 @@ module Informes
       hoy   = Time.zone.today
       lotes.map do |l|
         if l.automatica?
-          # La auto se mide contra el ciclo entero desde la germinación, en el estado que esté.
+          # La auto se mide contra su ciclo (de la maceta a la cosecha), en el estado que esté.
           plan    = l.dias_ciclo_objetivo
-          llevo   = l.dias_desde_inicio
-          cosecha = l.fecha_cosecha_estimada || (l.start_date && plan && l.start_date + plan.days)
+          llevo   = l.dias_ciclo
+          desde   = l.fecha_inicio_vegetativo
+          cosecha = l.fecha_cosecha_estimada || (desde && plan && desde + plan.days)
         else
           plan = l.estado == 'floracion' ? l.dias_floracion_objetivo : (l.estado == 'vegetativo' ? l.dias_vegetativo_objetivo : nil)
           llevo = l.dias_en_estado

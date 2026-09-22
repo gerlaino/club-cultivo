@@ -124,18 +124,22 @@
                    acá se dice antes, para no ofrecer lo que va a fallar. -->
               <p v-if="conPlantas" class="gem-form__hint">Esta genética tiene {{ plantasActivas }} {{ plantasActivas === 1 ? 'planta activa' : 'plantas activas' }}: si es automática o no ya no se cambia. Para la próxima tanda, creá una genética nueva (por ejemplo «Auto {{ form.nombre }}»).</p>
             </div>
+            <!-- En una automática el ciclo es UNO y arranca al ir a maceta: pedir vegetativo y
+                 floración por separado son dos números que después no se usan en ningún lado
+                 (el reloj, Plan vs. real y «Cómo salió» miran el ciclo). El enraizado se
+                 informa aparte, y no se declara: se mide solo. Germán, 22-sep-2026. -->
             <div v-if="form.automatica" class="gem-form__field gem-form__field--full">
-              <label class="gem-form__label">Semilla a cosecha (días) <span class="gem-form__label-hint">lo que dice el banco</span></label>
+              <label class="gem-form__label">Ciclo completo (días) <span class="gem-form__label-hint">desde que va a maceta, sin contar el enraizado</span></label>
               <input v-model.number="form.dias_ciclo_objetivo" type="number" min="1" class="gem-form__input" placeholder="75" :disabled="editingInase" />
-              <p class="gem-form__hint">Con esto el lote dice «cosecha cerca del día 75». Los días de vegetativo y floración de abajo son opcionales: sólo sirven si anotás cuándo empezó a florecer.</p>
+              <p class="gem-form__hint">El lote va a decir «faltan N días para la cosecha (ciclo de {{ form.dias_ciclo_objetivo || 75 }})», contando desde que prendió. Los días de enraizado se miden solos y se informan aparte.</p>
             </div>
 
             <!-- Días objetivo por fase / Rendimiento / Altura -->
-            <div class="gem-form__field">
+            <div v-if="!form.automatica" class="gem-form__field">
               <label class="gem-form__label">Vegetativo (días)</label>
               <input v-model.number="form.dias_vegetativo_objetivo" type="number" min="1" class="gem-form__input" placeholder="30" :disabled="editingInase" />
             </div>
-            <div class="gem-form__field">
+            <div v-if="!form.automatica" class="gem-form__field">
               <label class="gem-form__label">Floración (días)</label>
               <input v-model.number="form.tiempo_floracion" type="number" min="1" class="gem-form__input" placeholder="60" :disabled="editingInase" />
             </div>

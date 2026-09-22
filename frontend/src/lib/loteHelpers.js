@@ -216,7 +216,7 @@ export function textoProximoPaso(lote) {
   if (!p?.fase) return null
   const que = PROXIMO_PASO_LABEL[p.fase] || p.fase
   const n   = p.faltan_dias
-  // Automática en cultivo: el reloj es el ciclo entero, y conviene decir de dónde sale el número.
+  // Automática: el reloj es el ciclo (desde que va a maceta), y conviene decir de dónde sale.
   if (p.automatica && lote.dias_ciclo_objetivo && n > 1) return `Faltan ${n} días para la cosecha (ciclo de ${lote.dias_ciclo_objetivo})`
   if (n > 1)   return `Faltan ${n} días para ${que}`
   if (n === 1) return `Mañana toca ${que}`

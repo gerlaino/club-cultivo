@@ -32,10 +32,24 @@ RSpec.describe 'Lotes de genética automática', type: :request do
     expect(json).to include('automatica' => true, 'dias_ciclo_objetivo' => 75, 'puede_cosechar' => true)
   end
 
-  it 'el reloj es uno: cosecha cerca del día 75 desde la germinación, aunque siga en vegetativo' do
-    lote = lote_en_vege(auto)
+  it 'el reloj es uno y arranca al ir a maceta, no en la semilla' do
+    # Sembrado hace 52 días, prendió a los 12: lleva 40 de ciclo, faltan 35 de los 75.
+    lote = create(:lote, club: club, sala: vege, genetica: auto, estado: 'vegetativo',
+                         start_date: 52.days.ago.to_date, tamanio_maceta: 7, dias_ciclo_objetivo: 75)
+    lote.lote_eventos.create!(tipo: 'cambio_estado', estado_anterior: 'enraizado', estado_nuevo: 'vegetativo',
+                              registrado_en: 40.days.ago, club: club, user: admin)
+
     get "/lotes/#{lote.id}", headers: auth_headers
     expect(json['proximo_paso']).to include('fase' => 'cosecha', 'faltan_dias' => 35, 'automatica' => true)
+    # Y el enraizado se informa aparte: 12 días, fuera del ciclo.
+    expect(json).to include('dias_enraizado' => 12, 'dias_ciclo' => 40)
+  end
+
+  it 'mientras enraíza todavía no hay reloj: el ciclo no arrancó' do
+    lote = create(:lote, club: club, sala: vege, genetica: auto, estado: 'enraizado',
+                         start_date: 5.days.ago.to_date, dias_ciclo_objetivo: 75)
+    get "/lotes/#{lote.id}", headers: auth_headers
+    expect(json['proximo_paso']).to be_nil
   end
 
   it 'una fotoperiódica en vegetativo NO puede cosecharse: primero floración' do

@@ -374,7 +374,9 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   de sala, no pide 12/12), el reloj es «semilla a cosecha» (`dias_ciclo_objetivo`). Las reglas
   viven en `Lote` (`automatica?`, `puede_cosechar?`, `estados_plantas_cosechables`) y viajan en el
   serializer (`automatica`, `puede_cosechar`): la pantalla ofrece «Cosechar» donde el backend lo
-  dice, nunca por el estado. La tabla sala⇔estado de las autos es UNA
+  dice, nunca por el estado. **El ciclo de la auto arranca AL IR A MACETA** (22-sep-2026), no en
+  la semilla: mismo criterio que `dias_ciclo`; el enraizado se informa aparte y no se declara.
+  A una automática NO se le piden días de vegetativo ni de floración. La tabla sala⇔estado de las autos es UNA
   (`KINDS_SALA_POR_ESTADO_AUTOMATICA`, viaja en `/me`): el front elige tabla, no escribe la
   excepción. Regular/feminizada es OTRO eje y queda para después.
 - **`ConfirmDialog` ES LO MÁS ALTO DE LA PANTALLA** (21-sep-2026): `z-index: 20000`, y nada

@@ -1,5 +1,19 @@
 # Changelog
 
+## Septiembre 2026 (cz) — El ciclo de una automática arranca al ir a maceta
+
+- **Corrección del día anterior** (Germán, 22-sep): el reloj de la auto contaba desde la
+  semilla. Arranca **cuando va a maceta** (prender), que es el mismo criterio de
+  `dias_ciclo`/`dias_enraizado` del resto de la app: el enraizado es un tramo aparte y se
+  informa aparte («12 días enraizando + 40 de ciclo»). Mientras enraíza no hay reloj: no
+  arrancó. Cambia `Lote#proximo_paso` y Plan vs. real (el ciclo real va de la entrada a
+  vegetativo a la cosecha).
+- **En una automática no se piden vegetativo ni floración**: el formulario de la genética
+  muestra sólo «Ciclo completo (días) — desde que va a maceta, sin contar el enraizado» y
+  «Cosecha (días)». Eran dos números que no se usaban en ningún lado (ni el reloj, ni Plan vs.
+  real, ni «Cómo salió», que ya unía vege+flora en «Ciclo»). La ficha de la genética muestra
+  «Ciclo obj.» en lugar de «Veg. obj. / Flor. obj.».
+
 ## Septiembre 2026 (cy) — Genéticas automáticas
 
 - **Un tilde «Automática» en la genética** (+ «semilla a cosecha (días)», lo que dice el banco).

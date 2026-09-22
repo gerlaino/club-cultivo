@@ -232,7 +232,7 @@ function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
                   {{ tipoMeta.label }}
                 </span>
                 <span v-if="gen.registrada_inase" class="gdv__badge gdv__badge--inase">🏛️ INASE</span>
-                <span v-if="gen.automatica" class="gdv__badge gdv__badge--auto" title="Florece sola, sin pasar a 12/12; se cosecha desde vegetativo">⚡ Automática{{ gen.dias_ciclo_objetivo ? ` · ${gen.dias_ciclo_objetivo} días de semilla a cosecha` : '' }}</span>
+                <span v-if="gen.automatica" class="gdv__badge gdv__badge--auto" title="Florece sola, sin pasar a 12/12; se cosecha desde vegetativo">⚡ Automática{{ gen.dias_ciclo_objetivo ? ` · ciclo de ${gen.dias_ciclo_objetivo} días` : '' }}</span>
                 <span v-if="!gen.activa"     class="gdv__badge gdv__badge--muted">Inactiva</span>
                 <span v-if="!gen.disponible" class="gdv__badge gdv__badge--muted">No disponible</span>
               </div>
@@ -264,14 +264,22 @@ function onGeneticaSaved() { cargar() }  // recarga el detalle tras guardar
                 <button v-else class="gdv__completar" @click="editar">＋ Cargar</button>
               </div>
             </div>
-            <div class="kpi-cell">
-              <div class="kpi-cell__label">Veg. obj.</div>
-              <div class="kpi-cell__value">{{ gen.dias_vegetativo_objetivo ? gen.dias_vegetativo_objetivo + 'd' : '—' }}</div>
+            <!-- En una automática el ciclo es uno solo (desde que va a maceta): vege y flora
+                 por separado no dicen nada. -->
+            <div v-if="gen.automatica" class="kpi-cell">
+              <div class="kpi-cell__label">Ciclo obj.</div>
+              <div class="kpi-cell__value">{{ gen.dias_ciclo_objetivo ? gen.dias_ciclo_objetivo + 'd' : '—' }}</div>
             </div>
-            <div class="kpi-cell">
-              <div class="kpi-cell__label">Flor. obj.</div>
-              <div class="kpi-cell__value">{{ gen.tiempo_floracion ? gen.tiempo_floracion + 'd' : '—' }}</div>
-            </div>
+            <template v-else>
+              <div class="kpi-cell">
+                <div class="kpi-cell__label">Veg. obj.</div>
+                <div class="kpi-cell__value">{{ gen.dias_vegetativo_objetivo ? gen.dias_vegetativo_objetivo + 'd' : '—' }}</div>
+              </div>
+              <div class="kpi-cell">
+                <div class="kpi-cell__label">Flor. obj.</div>
+                <div class="kpi-cell__value">{{ gen.tiempo_floracion ? gen.tiempo_floracion + 'd' : '—' }}</div>
+              </div>
+            </template>
             <div class="kpi-cell">
               <div class="kpi-cell__label">Cos. obj.</div>
               <div class="kpi-cell__value">{{ gen.dias_cosecha_objetivo ? gen.dias_cosecha_objetivo + 'd' : '—' }}</div>

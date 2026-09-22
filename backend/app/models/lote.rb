@@ -283,11 +283,14 @@ class Lote < ApplicationRecord
   # días: enraizando se prende cuando prende, y de manicura/curado en adelante no hay reloj.
   # `faltan_dias` puede ser negativo: se pasó del objetivo, y la pantalla lo dice así.
   def proximo_paso
-    # Automática en cultivo: un solo reloj, de la germinación a la cosecha («cosecha cerca del
-    # día 75»). No hay «faltan N días para floración»: florece cuando florece.
+    # Automática en cultivo: un solo reloj hasta la cosecha. **El ciclo arranca cuando va a
+    # maceta** (prender), no en la semilla: el enraizado es un tramo aparte y se informa aparte
+    # («12 días enraizando + 78 de ciclo»), igual que `dias_enraizado`/`dias_ciclo`. Decisión de
+    # Germán, 22-sep-2026. Mientras enraíza todavía no hay reloj: no arrancó.
     if automatica? && %w[vegetativo floracion].include?(estado)
-      return nil unless start_date && dias_ciclo_objetivo.to_i.positive?
-      fecha = fecha_cosecha_estimada || (start_date + dias_ciclo_objetivo.to_i.days)
+      desde = fecha_inicio_vegetativo
+      return nil unless desde && dias_ciclo_objetivo.to_i.positive?
+      fecha = fecha_cosecha_estimada || (desde + dias_ciclo_objetivo.to_i.days)
       return { fase: 'cosecha', fecha: fecha, faltan_dias: (fecha - Time.zone.today).to_i, automatica: true }
     end
 
