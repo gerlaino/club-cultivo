@@ -249,6 +249,12 @@
                   <td v-if="!esPersonal" class="stk__inv-num stk__inv-td-mesa" :class="{ 'stk__inv-td-mesa--cero': !s.en_mostrador_g }">
                     {{ (s.en_mostrador_g || 0).toFixed(1) }}{{ s.unidad || 'g' }}
                   </td>
+                  <!-- EL PRECIO SUGERIDO, POR UNIDAD: el mismo que usa el carrito de la dispensa. Sin
+                       precio se dice, apagado: es justo lo que el admin viene a buscar mirando. -->
+                  <td v-if="!esPersonal" class="stk__inv-num stk__inv-td-precio" :class="{ 'stk__inv-td-precio--sin': !s.precio_sugerido_ars }">
+                    <template v-if="s.precio_sugerido_ars">{{ formatARS(s.precio_sugerido_ars) }}/{{ s.unidad || 'g' }}</template>
+                    <template v-else>Sin precio</template>
+                  </td>
                 </tr>
               </tbody>
             </table>
@@ -797,7 +803,7 @@ import {
 } from '../../lib/api.js'
 
 const router = useRouter()
-import { unidadDe } from '../../lib/formatters.js'
+import { unidadDe, formatARS } from '../../lib/formatters.js'
 import { useToast } from '../../composables/useToast.js'
 import { MOTIVOS_FINALIZACION, ayudaDe } from '../../composables/useStockFinalizacion.js'
 import { useStockChannel } from '../../composables/useStockChannel.js'
@@ -966,6 +972,7 @@ const COLUMNAS_INV_TODAS = [
   { campo: 'cantidad_inicial', label: 'Cantidad inicial', dir: 'desc', num: true },
   { campo: 'actual',           label: 'Actual',          dir: 'desc', num: true },
   { campo: 'mostrador',        label: 'Mostrador',       dir: 'desc', num: true, org: true },
+  { campo: 'precio',           label: '$ sugerido',      dir: 'desc', num: true, org: true },
 ]
 const COLUMNAS_INV = computed(() => COLUMNAS_INV_TODAS.filter(c => !c.org || !esPersonal.value))
 // Vacío = como venía: lo último que entró arriba.
@@ -1757,6 +1764,8 @@ function formatDate(dateStr) {
 .stk__inv-td-actual { font-weight: 800; color: #15803d; white-space: nowrap; }
 .stk__inv-td-mesa { font-weight: 700; color: var(--c-slate-700); white-space: nowrap; }
 .stk__inv-td-mesa--cero { font-weight: 500; color: var(--c-slate-400); }
+.stk__inv-td-precio { font-weight: 700; color: var(--c-slate-700); white-space: nowrap; }
+.stk__inv-td-precio--sin { font-weight: 500; color: var(--c-slate-400); }
 .stk__inv-td-bajo { color: #dc2626 !important; }
 @media (max-width: 640px) {
   /* 5, no 4: la columna Código se sumó adelante y corrió a Lote un lugar. */

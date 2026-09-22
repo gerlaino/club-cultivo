@@ -104,6 +104,21 @@ RSpec.describe 'Inventario — ordenar por columna', type: :request do
     expect(orden('ingreso', 'asc')).to eq(%w[ST-26-0002 ST-26-0001])
   end
 
+  # El que no tiene precio queda al final en los dos sentidos: ordenando por precio se busca el
+  # número, y los vacíos arriba taparían la primera pantalla.
+  it 'por precio sugerido, y el que no tiene queda al final aunque se ordene al revés' do
+    ActsAsTenant.with_tenant(club) do
+      externo.update_column(:precio_sugerido_ars, 4_000)
+      del_lote.update_column(:precio_sugerido_ars, 3_000)
+    end
+    expect(orden('precio', 'desc')).to eq(%w[ST-26-0001 ST-26-0002])
+    expect(orden('precio', 'asc')).to  eq(%w[ST-26-0002 ST-26-0001])
+
+    ActsAsTenant.with_tenant(club) { del_lote.update_column(:precio_sugerido_ars, nil) }
+    expect(orden('precio', 'asc')).to  eq(%w[ST-26-0001 ST-26-0002])
+    expect(orden('precio', 'desc')).to eq(%w[ST-26-0001 ST-26-0002])
+  end
+
   it 'por lote, y el que no tiene queda al final aunque se ordene al revés' do
     expect(orden('lote', 'asc')).to  eq(%w[ST-26-0002 ST-26-0001])
     expect(orden('lote', 'desc')).to eq(%w[ST-26-0002 ST-26-0001])     # el externo, sin lote, no sube

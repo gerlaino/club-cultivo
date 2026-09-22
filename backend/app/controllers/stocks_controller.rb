@@ -826,6 +826,7 @@ class StocksController < ApplicationController
     'ingreso'          => 'stocks.created_at',
     'observaciones'    => 'stocks.descripcion',
     'cantidad_inicial' => 'stocks.cantidad_inicial',
+    'precio'           => 'stocks.precio_sugerido_ars',
     # 'actual' y 'mostrador' NO están acá: se ordenan en Ruby (ver ORDEN_EN_RUBY). Dejar la
     # entrada `'actual' => 'stocks.cantidad'` era una segunda respuesta a la misma pregunta,
     # esperando a que alguien la usara y ordenara por el frasco entero.
