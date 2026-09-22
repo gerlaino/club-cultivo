@@ -152,11 +152,17 @@ class StocksController < ApplicationController
     Stock.precargar_apartados(flor)
     reservado_flor  = flor.sum { |s| s.apartado_para_reservas.to_f }
     flor_disponible = flor.sum { |s| s.disponible_para_entregar.to_f }
+    # Dónde está esa flor: guardada o sobre la mesa. Los dos juntos son lo que hay; los KPIs del
+    # Depósito los muestran por separado y no los recalculan en el navegador.
+    flor_en_deposito = flor.sum { |s| s.en_deposito.to_f }
+    flor_en_mesa     = flor.sum { |s| s.apartado_para_mostrador.to_f }
 
     hoy = Time.zone.today
     totales = {
       total_g:         flor_disponible,
       reservado_g:     reservado_flor,   # flor seca apartada en reservas pendientes
+      en_deposito_g:   flor_en_deposito,
+      en_mesa_g:       flor_en_mesa,
       items:           scope.count,
       sedes_con_stock: scope.where.not(sede_id: nil).distinct.count(:sede_id),
       # Cantidad de ítems de inventario derivado (preroll, hash, aceite…), que no cuentan en
@@ -813,8 +819,8 @@ class StocksController < ApplicationController
   # POR QUÉ COLUMNA SE PUEDE ORDENAR. Lista blanca: el parámetro entra en un `ORDER BY`, así que
   # no puede venir del cliente sin filtrar.
   #
-  # Las columnas que SÍ existen en SQL se ordenan en la consulta. Las dos que se calculan
-  # —«Actual» y «Mostrador»— van por ORDEN_EN_RUBY, acá abajo.
+  # Las columnas que SÍ existen en SQL se ordenan en la consulta. Las que se calculan
+  # —«Depósito», «Reserva», «Mostrador» y «Actual»— van por ORDEN_EN_RUBY, acá abajo.
   ORDEN_INVENTARIO = {
     'codigo'           => 'stocks.numero_lote_producto',
     'tipo'             => 'stocks.forma_producto',
@@ -825,7 +831,7 @@ class StocksController < ApplicationController
     'sede'             => 'sedes.nombre',
     'ingreso'          => 'stocks.created_at',
     'observaciones'    => 'stocks.descripcion',
-    'cantidad_inicial' => 'stocks.cantidad_inicial',
+    'cantidad_inicial' => 'stocks.cantidad_inicial',   # sólo en uso personal (no hay mesa)
     'precio'           => 'stocks.precio_sugerido_ars',
     # 'actual' y 'mostrador' NO están acá: se ordenan en Ruby (ver ORDEN_EN_RUBY). Dejar la
     # entrada `'actual' => 'stocks.cantidad'` era una segunda respuesta a la misma pregunta,
@@ -848,6 +854,8 @@ class StocksController < ApplicationController
   ORDEN_EN_RUBY = {
     'actual'    => ->(s) { s.disponible_para_entregar.to_d },
     'mostrador' => ->(s) { s.apartado_para_mostrador.to_d },
+    'deposito'  => ->(s) { s.en_deposito },
+    'reserva'   => ->(s) { s.apartado_para_reservas.to_d },
   }.freeze
 
   def ordenar_por_disponible(scope, page, per)
@@ -943,6 +951,8 @@ class StocksController < ApplicationController
       # (un badge), pero el inventario tiene que poder DECIR dónde está el producto: sin esto, un
       # stock entero cargado al mostrador se veía como si no quedara nada.
       en_mostrador_g: s.apartado_para_mostrador.to_f,
+      # Y el resto del frasco, que está guardado. Las dos columnas juntas son lo que hay.
+      en_deposito_g:  s.en_deposito.to_f,
       dias_para_vencimiento:    s.dias_para_vencimiento,
       estado_vencimiento:       s.estado_vencimiento,
       created_at:               s.created_at,

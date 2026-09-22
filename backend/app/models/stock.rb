@@ -202,6 +202,17 @@ class Stock < ApplicationRecord
   # Cargar el mostrador NO genera `StockMovimiento`: el gramo no salió de la organización ni
   # cambió de sede, sigue siendo esta misma fila. Lo único que cambia es quién responde por él, y
   # ese rastro vive en `MostradorMovimiento`.
+  # LO QUE HAY EN EL DEPÓSITO: el frasco menos lo que está sobre alguna mesa. Es un LUGAR, igual
+  # que la mesa: depósito + mostrador = lo que hay físicamente. Lo reservado a un paciente no se
+  # resta acá —la reserva sale de la mesa, ya está adentro del mostrador— y lo que salió en un
+  # paquete tampoco, porque la dispensa ya lo descontó de `cantidad`.
+  #
+  # No es `cantidad_inicial`: eso es lo que ENTRÓ y no baja nunca. Mostrado como «Depósito», a la
+  # primera dispensa la columna ya mentía.
+  def en_deposito
+    [cantidad.to_d - apartado_para_mostrador.to_d, 0.to_d].max
+  end
+
   def apartado_para_mostrador
     return @apartado_mostrador_precargado if defined?(@apartado_mostrador_precargado)
     return 0.to_d unless MostradorItem.table_exists?

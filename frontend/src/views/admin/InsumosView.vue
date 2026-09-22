@@ -421,7 +421,9 @@ async function revertirCompra(compra) {
 </script>
 
 <template>
-  <div class="dp">
+  <!-- La solapa Dispensación muestra la tabla de Stock entera (13 columnas): en 920 px las
+       cantidades —lo que se viene a mirar— quedaban cortadas a la derecha. -->
+  <div class="dp" :class="{ 'dp--ancho': esDispensacion }">
     <header class="dp__head">
       <div>
         <h1 class="dp__title">Depósito</h1>
@@ -788,6 +790,7 @@ async function revertirCompra(compra) {
 
 <style scoped>
 .dp { padding: 2rem 1.75rem 3rem; max-width: 920px; margin: 0 auto; color: var(--c-slate-900); }
+.dp--ancho { max-width: none; }
 .dp__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
 .dp__title { font-size: 1.6rem; font-weight: 800; letter-spacing: -.035em; margin: 0 0 .2rem; display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
 .dp__sede-filtro { border: 1.5px solid var(--c-slate-200); border-radius: 9px; padding: .5rem .7rem; font-size: .84rem; font-weight: 600; color: var(--c-slate-700); background: #fff; cursor: pointer; }

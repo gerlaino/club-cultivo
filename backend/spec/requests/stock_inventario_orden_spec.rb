@@ -119,6 +119,47 @@ RSpec.describe 'Inventario — ordenar por columna', type: :request do
     expect(orden('precio', 'desc')).to eq(%w[ST-26-0001 ST-26-0002])
   end
 
+  # «Depósito» es el frasco menos la mesa, NO la cantidad inicial: el de lote entró con 1.000 y
+  # tiene 900, 880 de ellos sobre la mesa — en el depósito quedan 20, contra los 40 del externo.
+  # Ordenando por lo que entró, el de lote saldría primero.
+  describe 'por depósito y por reserva' do
+    before do
+      ActsAsTenant.with_tenant(club) do
+        MostradorItem.create!(club: club, mostrador: centro.mostrador!, stock: del_lote, cantidad: 880)
+        Reserva.create!(club: club, paciente: create(:paciente, club: club), user: admin,
+                        stock: del_lote, cantidad: 15, fecha_entrega_estimada: 3.days.from_now.to_date)
+      end
+    end
+
+    it 'el depósito es lo que no está sobre la mesa, y la respuesta lo trae' do
+      expect(orden('deposito', 'desc')).to eq(%w[ST-26-0001 ST-26-0002])   # 40, 20
+      expect(orden('deposito', 'asc')).to  eq(%w[ST-26-0002 ST-26-0001])
+
+      get '/api/stocks/inventario', headers: auth_headers
+      fila = JSON.parse(response.body)['stocks'].find { |s| s['numero_lote_producto'] == 'ST-26-0002' }
+      expect(fila['en_deposito_g']).to eq(20.0)
+      expect(fila['en_mostrador_g']).to eq(880.0)
+      expect(fila['reservado']).to eq(15.0)
+      # Depósito + mesa = lo que hay; la reserva está adentro de la mesa, no se suma aparte.
+      expect(fila['en_deposito_g'] + fila['en_mostrador_g']).to eq(fila['cantidad'])
+    end
+
+    # Los KPIs del Depósito: dónde está la flor, sumado en el backend. Sólo flor seca (el
+    # externo es preroll, no suma gramos).
+    it 'los totales dicen cuánta flor está guardada y cuánta sobre la mesa' do
+      get '/api/stocks/inventario', headers: auth_headers
+      totales = JSON.parse(response.body)['totales']
+      expect(totales['en_deposito_g']).to eq(20.0)
+      expect(totales['en_mesa_g']).to eq(880.0)
+      expect(totales['reservado_g']).to eq(15.0)
+    end
+
+    it 'por reserva' do
+      expect(orden('reserva', 'desc')).to eq(%w[ST-26-0002 ST-26-0001])   # 15, 0
+      expect(orden('reserva', 'asc')).to  eq(%w[ST-26-0001 ST-26-0002])
+    end
+  end
+
   it 'por lote, y el que no tiene queda al final aunque se ordene al revés' do
     expect(orden('lote', 'asc')).to  eq(%w[ST-26-0002 ST-26-0001])
     expect(orden('lote', 'desc')).to eq(%w[ST-26-0002 ST-26-0001])     # el externo, sin lote, no sube

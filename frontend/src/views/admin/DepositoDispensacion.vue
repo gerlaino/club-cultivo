@@ -2,66 +2,56 @@
 // Depósito de Dispensación (solo lectura): la flor seca y sus derivados (modelo Stock). NO se
 // edita acá — el stock entra por Cosecha/Manicura y sale por Dispensación. Esta vista lo trae a
 // la pantalla de Depósito para verlo junto a los demás. Respeta el filtro de sede del padre.
-import { ref, computed, watch, onMounted } from 'vue'
-import { listStocks } from '../../lib/api.js'
+//
+// LA MISMA TABLA QUE LA PANTALLA DE STOCK (`TablaInventarioStock`), con las mismas columnas y el
+// mismo endpoint (`/stocks/inventario`): eran dos tablas del mismo stock que decían cosas
+// distintas, y ésta calculaba «En depósito» en el navegador. Los KPIs también vienen del backend
+// —con la tabla paginada, sumar las filas daría sólo lo de la página—.
+import { ref, watch, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
+import { listStockInventario } from '../../lib/api.js'
+import { useAuthStore } from '../../stores/auth.js'
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
+import TablaInventarioStock from '../../components/stock/TablaInventarioStock.vue'
+import Paginator from '../../components/ui/Paginator.vue'
 
 const props = defineProps({ sedeId: { type: [Number, null], default: null } })
 
-const stocks  = ref([])
-const loading = ref(false)
+const router  = useRouter()
+const auth    = useAuthStore()
+// La ficha del stock es sólo del admin: a los demás la fila no los lleva a ningún lado.
+const esAdmin = auth.user?.role === 'admin'
+const { esPersonal } = useUsoPersonal()
 
-const FORMA_LABEL = {
-  flor_seca: 'Flor seca', hash: 'Hash', aceite: 'Aceite', tintura: 'Tintura',
-  crema: 'Crema', capsula: 'Cápsulas', comestible: 'Comestible', prensado: 'Prensado',
-  preroll: 'Prerolls', otro: 'Otro', externo: 'Externo',
-}
-const formaLabel = (f) => FORMA_LABEL[f] || f || '—'
-const nOf = (n) => Number(n || 0)
-const fmtG = (n) => `${nOf(n).toLocaleString('es-AR', { maximumFractionDigits: 1 })}`
+const stocks  = ref([])
+const totales = ref({})
+const total   = ref(0)
+const page    = ref(1)
+const perPage = ref(25)
+const orden   = ref({ campo: '', dir: 'desc' })
+const loading = ref(false)
 
 async function cargar() {
   loading.value = true
   try {
-    const { data } = await listStocks(props.sedeId != null ? { sede_id: props.sedeId } : {})
-    stocks.value = Array.isArray(data) ? data : (data?.stocks || [])
-  } catch { stocks.value = [] }
+    const params = { page: page.value, per_page: perPage.value }
+    if (props.sedeId != null) params.sede_id = props.sedeId
+    if (orden.value.campo) { params.orden = orden.value.campo; params.dir = orden.value.dir }
+    const { data } = await listStockInventario(params)
+    stocks.value  = data?.stocks || []
+    totales.value = data?.totales || {}
+    total.value   = data?.meta?.total || 0
+  } catch { stocks.value = []; totales.value = {}; total.value = 0 }
   finally { loading.value = false }
 }
 onMounted(cargar)
-watch(() => props.sedeId, cargar)
+watch(() => props.sedeId, () => { page.value = 1; cargar() })
 
-// Nombre legible de cada renglón: genética/lote cuando hay; si no, la descripción.
-function nombre(s) {
-  return s.genetica_nombre || s.descripcion || (s.lote_codigo ? `Lote ${s.lote_codigo}` : formaLabel(s.forma_producto))
-}
+function onOrden (o) { orden.value = o; page.value = 1; cargar() }
+function onPage (p) { page.value = p; cargar() }
+function onPerPage (n) { perPage.value = n; page.value = 1; cargar() }
 
-const flor = computed(() => stocks.value.filter(s => s.forma_producto === 'flor_seca'))
-const derivados = computed(() => stocks.value.filter(s => s.forma_producto !== 'flor_seca'))
-
-// ES UNA PANTALLA DE DEPÓSITO: dice cuánto hay GUARDADO y cuánto está sobre la mesa, por
-// separado. Antes «Disponible» leía `cantidad_disponible_real` —que resta la mesa— y «Reservado»
-// leía `gramos_reservados` —que la suma—, así que un frasco subido entero al mostrador se leía
-// «Disponible 0 · Reservado 46» y el KPI de flor bajaba a cero: el producto no se perdió, cambió
-// de lugar, y la pantalla tiene que poder decir dónde está.
-const enDeposito = (s) => Math.max(0, nOf(s.cantidad) - nOf(s.en_mostrador_g))
-const kpis = computed(() => ({
-  florEnDeposito: flor.value.reduce((a, s) => a + enDeposito(s), 0),
-  florEnMesa:     flor.value.reduce((a, s) => a + nOf(s.en_mostrador_g), 0),
-  florReservada:  flor.value.reduce((a, s) => a + nOf(s.reservado), 0),
-  derivados:      derivados.value.length,
-}))
-
-// Orden de presentación: flor seca primero, después derivados; dentro, por vencimiento próximo.
-const ordenados = computed(() =>
-  [...stocks.value].sort((a, b) => {
-    if ((a.forma_producto === 'flor_seca') !== (b.forma_producto === 'flor_seca'))
-      return a.forma_producto === 'flor_seca' ? -1 : 1
-    return (a.dias_para_vencimiento ?? 1e9) - (b.dias_para_vencimiento ?? 1e9)
-  }))
-
-const vencCls = (s) =>
-  s.estado_vencimiento === 'vencido' ? 'is-venc'
-  : s.estado_vencimiento === 'por_vencer' ? 'is-porvencer' : ''
+const fmtG = (n) => Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })
 </script>
 
 <template>
@@ -71,22 +61,24 @@ const vencCls = (s) =>
       <span>Solo lectura. La flor entra por <b>Cosecha/Manicura</b> y sale por <b>Dispensación</b> — desde acá no se edita.</span>
     </div>
 
+    <!-- ES UNA PANTALLA DE DEPÓSITO: dice cuánto hay GUARDADO y cuánto está sobre la mesa, por
+         separado. El producto que sube al mostrador no se perdió, cambió de lugar. -->
     <div class="dd__summary">
       <div class="dd__kpi">
         <span class="dd__kpi-label">Flor seca en depósito</span>
-        <span class="dd__kpi-val">{{ fmtG(kpis.florEnDeposito) }} <small>g</small></span>
+        <span class="dd__kpi-val">{{ fmtG(totales.en_deposito_g) }} <small>g</small></span>
       </div>
       <div class="dd__kpi">
         <span class="dd__kpi-label">Sobre la mesa</span>
-        <span class="dd__kpi-val">{{ fmtG(kpis.florEnMesa) }} <small>g</small></span>
+        <span class="dd__kpi-val">{{ fmtG(totales.en_mesa_g) }} <small>g</small></span>
       </div>
       <div class="dd__kpi">
         <span class="dd__kpi-label">Reservada a pacientes</span>
-        <span class="dd__kpi-val">{{ fmtG(kpis.florReservada) }} <small>g</small></span>
+        <span class="dd__kpi-val">{{ fmtG(totales.reservado_g) }} <small>g</small></span>
       </div>
       <div class="dd__kpi">
         <span class="dd__kpi-label">Derivados</span>
-        <span class="dd__kpi-val">{{ kpis.derivados }} <small>items</small></span>
+        <span class="dd__kpi-val">{{ totales.derivados_items || 0 }} <small>items</small></span>
       </div>
     </div>
 
@@ -95,39 +87,16 @@ const vencCls = (s) =>
       No hay stock de dispensación en este alcance. La flor aparece acá cuando se cosecha y asigna.
     </div>
 
-    <div v-else class="dd__table-wrap">
-      <table class="dd__table">
-        <thead>
-          <tr>
-            <th>Producto</th>
-            <th>Forma</th>
-            <th>Lote / origen</th>
-            <th class="ta-r">En depósito</th>
-            <th class="ta-r">Sobre la mesa</th>
-            <th class="ta-r">Reservado</th>
-            <th>Vencimiento</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="s in ordenados" :key="s.id">
-            <td><span class="dd__name">{{ nombre(s) }}</span></td>
-            <td><span class="dd__forma">{{ formaLabel(s.forma_producto) }}</span></td>
-            <td class="mut">{{ s.lote_codigo || (s.origen === 'compra_externa' ? 'Externo' : '—') }}</td>
-            <td class="ta-r num"><b>{{ fmtG(enDeposito(s)) }}</b> <small class="mut">{{ s.unidad || 'g' }}</small></td>
-            <td class="ta-r num mut">{{ nOf(s.en_mostrador_g) ? fmtG(s.en_mostrador_g) + ' ' + (s.unidad || 'g') : '—' }}</td>
-            <td class="ta-r num mut">{{ nOf(s.reservado) ? fmtG(s.reservado) + ' ' + (s.unidad || 'g') : '—' }}</td>
-            <td :class="vencCls(s)">
-              <template v-if="s.fecha_vencimiento_est">
-                {{ s.fecha_vencimiento_est }}
-                <small v-if="s.estado_vencimiento === 'vencido'"> · vencido</small>
-                <small v-else-if="s.estado_vencimiento === 'por_vencer'"> · {{ s.dias_para_vencimiento }}d</small>
-              </template>
-              <span v-else class="mut">—</span>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+    <template v-else>
+      <TablaInventarioStock
+        :stocks="stocks" :orden="orden" :es-personal="esPersonal" :abrible="esAdmin"
+        @update:orden="onOrden" @abrir="s => router.push(`/admin/stock/${s.id}`)"
+      />
+      <Paginator
+        :page="page" :per-page="perPage" :total="total"
+        @update:page="onPage" @update:per-page="onPerPage"
+      />
+    </template>
   </div>
 </template>
 
@@ -142,19 +111,6 @@ const vencCls = (s) =>
 .dd__kpi-val { font-size: 1.35rem; font-weight: 800; letter-spacing: -.03em; color: var(--c-slate-900); font-variant-numeric: tabular-nums; }
 .dd__kpi-val small { font-size: .8rem; font-weight: 600; color: var(--c-slate-400); }
 
-.dd__table-wrap { overflow-x: auto; border: 1px solid #e8edf2; border-radius: 13px; box-shadow: 0 1px 2px rgb(15 23 42 / .04); }
-.dd__table { width: 100%; border-collapse: collapse; font-size: .88rem; background: #fff; }
-.dd__table thead th { text-align: left; font-size: .68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--c-slate-400); font-weight: 700; padding: .7rem 1rem; border-bottom: 1.5px solid #eef2f6; white-space: nowrap; }
-.dd__table td { padding: .7rem 1rem; border-bottom: 1px solid var(--c-slate-100); vertical-align: middle; }
-.dd__table tbody tr:hover { background: var(--c-slate-50); }
-.dd__table tbody tr:last-child td { border-bottom: none; }
-.dd__table .ta-r { text-align: right; }
-.dd__name { font-weight: 650; color: var(--c-slate-900); }
-.dd__forma { display: inline-block; font-size: .72rem; font-weight: 600; color: #1b5e20; background: rgb(27 94 32 / .07); border-radius: 999px; padding: .15rem .55rem; }
-.num { font-variant-numeric: tabular-nums; }
-.mut { color: var(--c-slate-400); }
-.is-porvencer { color: #b45309; font-weight: 600; }
-.is-venc { color: #dc2626; font-weight: 600; }
 
 .dd__empty { color: var(--c-slate-400); padding: 2.5rem; text-align: center; font-size: .9rem; }
 .dd__empty--box { background: #fbfcfd; border: 1px dashed var(--c-slate-200); border-radius: 14px; }

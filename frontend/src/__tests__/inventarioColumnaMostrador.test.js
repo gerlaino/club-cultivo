@@ -19,7 +19,8 @@ const FILA = {
   cantidad_disponible_real: 0,        // el frasco entero está sobre la mesa
   disponible_para_entregar: 18,       // …y se puede entregar igual
   en_mostrador: true, en_mostrador_g: 18,
-  gramos_reservados: 18, reservado: 0, apartados_evento: [],
+  en_deposito_g: 0,                   // lo calcula el backend: el frasco menos la mesa
+  gramos_reservados: 18, reservado: 4, apartados_evento: [],
   sede: { id: 1, nombre: 'Pagola' }, lote: null, genetica: { id: 2, nombre: 'Fruti Punchi' },
   created_at: '2026-09-08T12:00:00Z', descripcion: null,
 }
@@ -74,7 +75,27 @@ describe('Inventario: dónde está el producto', () => {
     const w = await montar()
     const encabezados = w.findAll('.stk__inv-th-btn').map(b => b.text().replace(/[▲▼]/g, '').trim())
     expect(encabezados).toContain('Mostrador')
-    expect(w.find('.stk__inv-td-mesa').text()).toBe('18.0g')
+    expect(w.findAll('.stk__inv-td-mesa').at(-1).text()).toBe('18.0g')
+    w.unmount()
+  })
+
+  // «DEPÓSITO» NO ES LA CANTIDAD INICIAL. Entraron 100 g y quedan 18, todos sobre la mesa: en el
+  // depósito no hay nada. Con la cantidad inicial la columna diría 100 g guardados que no existen.
+  it('«Depósito» dice lo que está guardado (el número del backend), no lo que entró', async () => {
+    const w = await montar()
+    const encabezados = w.findAll('.stk__inv-th-btn').map(b => b.text().replace(/[▲▼]/g, '').trim())
+    expect(encabezados).toContain('Depósito')
+    expect(encabezados).not.toContain('Cantidad inicial')
+    expect(w.find('.stk__inv-td-deposito').text()).toBe('0.0g')
+    w.unmount()
+  })
+
+  // La reserva sale de la mesa: va al lado de Mostrador y no se suma aparte.
+  it('«Reserva» dice cuánto está apartado a nombre de pacientes', async () => {
+    const w = await montar()
+    const encabezados = w.findAll('.stk__inv-th-btn').map(b => b.text().replace(/[▲▼]/g, '').trim())
+    expect(encabezados.slice(-4)).toEqual(['Depósito', 'Reserva', 'Mostrador', 'Actual'])
+    expect(w.find('.stk__inv-td-reserva').text()).toBe('4.0g')
     w.unmount()
   })
 
