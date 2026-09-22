@@ -327,7 +327,7 @@ class SalasController < ApplicationController
 
   def sala_params
     params.require(:sala).permit(
-      :nombre, :state, :kind, :notes, :pots_count, :sede_id,
+      :nombre, :state, :kind, :notes, :pots_count, :sede_id, :m2,
       :camera_stream_url, :camera_snapshot_url, :responsable_id,
       # Cuánto más fría está la hoja que el aire: define el VPD que se muestra.
       :leaf_temp_offset
@@ -344,6 +344,10 @@ class SalasController < ApplicationController
       kind:                 s.kind,
       notes:                s.notes,
       pots_count:           s.pots_count,   # posiciones físicas para el Layout (no es capacidad)
+      # Superficie de cultivo y cuánto queda libre: con esto se calcula el g/m².
+      m2:                   s.m2&.to_f,
+      m2_ocupados_lotes:    s.m2 ? s.m2_ocupados_por_lotes.to_f : nil,
+      m2_libres:            s.m2_libres&.to_f,
       leaf_temp_offset:     s.leaf_temp_offset&.to_f,
       # Conteo LIVE (no el denormalizado plants_count/plantas_totales que driftea): plantas
       # vivas en los lotes de la sala.

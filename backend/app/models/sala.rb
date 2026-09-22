@@ -54,6 +54,8 @@ class Sala < ApplicationRecord
   end
 
   public
+  # Superficie de cultivo, para poder decir g/m². Opcional: sin ella no se bloquea nada.
+  validates :m2, numericality: { greater_than: 0 }, allow_nil: true
   validates :pots_count,  numericality: { only_integer: true, greater_than_or_equal_to: 0 }, allow_nil: true
   validates :plants_max,  numericality: { only_integer: true, greater_than_or_equal_to: 0 }, allow_nil: true
 
@@ -115,4 +117,16 @@ class Sala < ApplicationRecord
   def created_by_name
     [created_by&.first_name, created_by&.last_name].compact.join(" ").presence || created_by&.email || "Sistema"
   end
+
+  # Cuántos m² de esta sala están declarados por sus lotes activos, y cuántos quedan libres.
+  # `nil` cuando la sala no tiene superficie cargada: no hay contra qué medir.
+  def m2_ocupados_por_lotes(excepto: nil)
+    lotes.activos.where.not(id: excepto).sum(:m2_ocupados).to_d
+  end
+
+  def m2_libres(excepto: nil)
+    return nil if m2.blank?
+    [m2.to_d - m2_ocupados_por_lotes(excepto: excepto), 0].max
+  end
+
 end

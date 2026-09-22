@@ -52,6 +52,15 @@ class Lote < ApplicationRecord
   # inconsistente de antes, no se lo deja trabado para el resto de las ediciones.
   validate :sala_admite_el_estado, if: -> { sala_id_changed? || estado_changed? }
 
+  # Los m² que ocupa el lote. Opcionales: sin ellos se crea igual y lo único que falta es el
+  # g/m². Lo que NO puede pasar es que los lotes de una sala sumen más que la sala.
+  validates :m2_ocupados, numericality: { greater_than: 0 }, allow_nil: true
+  validate  :m2_entran_en_la_sala, if: -> { m2_ocupados.present? && (m2_ocupados_changed? || sala_id_changed?) }
+  # Al cosechar, el lote SALE de la sala (libera el slot) y con eso perdería la superficie justo
+  # cuando se informa el rendimiento. Se congela en el lote, como el costo o la copia de la
+  # receta: el dato es del ciclo que ya pasó y no puede depender de dónde está hoy.
+  before_update :congelar_m2_al_salir_de_la_sala
+
   # ── Automáticas ────────────────────────────────────────────────────────────
   # La genética automática florece sola y no depende de la luz: no hay «pasar a floración» que
   # decidir, el lote vive en la sala de vegetativo todo el ciclo y se cosecha desde ahí. La
@@ -308,6 +317,23 @@ class Lote < ApplicationRecord
       fecha = desde + objetivo.to_i.days
     end
     { fase: fase, fecha: fecha, faltan_dias: (fecha - Time.zone.today).to_i }
+  end
+
+  # ── Superficie y rendimiento por metro ─────────────────────────────────────
+  # Los m² contra los que se mide este lote: los suyos si se declararon; si no, los de la sala
+  # cuando es el único lote activo ahí (ahí no hay nada que repartir). `nil` si no se sabe: el
+  # g/m² no se inventa, la pantalla dice que faltan los metros.
+  def m2_efectivos
+    return m2_ocupados.to_d if m2_ocupados.present?
+    return nil if sala.nil? || sala.m2.blank?
+    sala.lotes.activos.where.not(id: id).exists? ? nil : sala.m2.to_d
+  end
+
+  # Gramos por metro cuadrado: lo que se compara contra la ficha de la genética.
+  def rendimiento_g_m2
+    m2 = m2_efectivos
+    return nil if m2.nil? || m2.zero? || rendimiento_real_g.to_f <= 0
+    (rendimiento_real_g.to_d / m2).round(1)
   end
 
   # Foto de portada del lote (para el slot del layout de la sala): la marcada como portada si
@@ -693,6 +719,32 @@ class Lote < ApplicationRecord
     destino = KINDS_SALA_POR_ESTADO[estado].first
     errors.add(:sala, "es de #{kind} y el lote está en #{estado}: movelo a una sala de #{destino} " \
                       "(o a una mixta) antes de este cambio")
+  end
+
+  def congelar_m2_al_salir_de_la_sala
+    return unless will_save_change_to_sala_id? && sala_id.nil? && m2_ocupados.blank?
+
+    anterior = Sala.unscoped.find_by(id: sala_id_was)
+    return if anterior.nil? || anterior.m2.blank?
+    # Mismo criterio que `m2_efectivos`: si compartía la sala con otro lote activo, no hay nada
+    # que atribuirle y el g/m² queda sin calcular (mejor vacío que inventado).
+    return if anterior.lotes.activos.where.not(id: id).exists?
+
+    self.m2_ocupados = anterior.m2
+  end
+
+  # La suma de los lotes de una sala no puede pasar la superficie de la sala. Sólo se controla
+  # cuando la sala declaró sus metros: sin ese dato no hay techo contra el cual medir.
+  def m2_entran_en_la_sala
+    return if sala.nil? || sala.m2.blank?
+
+    libres = sala.m2_libres(excepto: id)
+    return if m2_ocupados.to_d <= libres
+
+    errors.add(:m2_ocupados,
+               "no entra: #{sala.nombre} tiene #{sala.m2.to_f.round(2)} m² y ya hay " \
+               "#{sala.m2_ocupados_por_lotes(excepto: id).to_f.round(2)} m² ocupados por otros lotes " \
+               "(quedan #{libres.to_f.round(2)} m²)")
   end
 
   def maceta_al_prender

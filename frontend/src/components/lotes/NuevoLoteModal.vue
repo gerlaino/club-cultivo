@@ -248,6 +248,18 @@
                  tiene maceta todavía. Se elige al prender, en el avance a vegetativo, que es cuando
                  la planta va a maceta de verdad. Pedirla al crear invitaba a cargar un dato que no
                  existe. (Un lote HEREDADO ya viene de una fase avanzada: ahí sí se puede indicar.) -->
+            <!-- Los m² que ocupa el lote. Sólo en una organización: existe porque varios lotes
+                 comparten una sala y hay que repartir la superficie. En casa hay un espacio y un
+                 lote, así que alcanza con los metros del espacio (Germán, 22-sep-2026). -->
+            <div v-if="!esPersonal && salaElegida" class="nlm__field">
+              <label class="nlm__label">m² que ocupa <span class="nlm__label-opt">(opcional)</span></label>
+              <input class="nlm__input" v-model.number="form.m2_ocupados" type="number" min="0" step="0.1"
+                     :placeholder="m2LibresSala != null ? `hasta ${m2LibresSala}` : 'sin metros en la sala'" />
+              <p v-if="m2LibresSala != null" class="nlm__hint">
+                {{ salaElegida.nombre }} tiene {{ salaElegida.m2 }} m² y quedan <strong>{{ m2LibresSala }}</strong> libres.
+              </p>
+              <p v-else class="nlm__hint">Esta sala no tiene metros cargados: sin eso no se calcula el rendimiento por m².</p>
+            </div>
             <div v-if="tipoCreacion === 'existente'" class="nlm__field">
               <label class="nlm__label">Tamaño de maceta <span class="nlm__label-opt">(actual)</span></label>
               <select class="nlm__input" v-model="form.tamanio_maceta">
@@ -379,6 +391,11 @@ const estadoObjetivo = computed(() =>
 // va a nacer el lote. Con varias sedes, la sede se elige primero: mezclar las salas de todas
 // obliga a saber de memoria cuál pertenece a dónde, y un lote creado en la sala equivocada
 // después hay que moverlo a mano.
+// La sala elegida y cuántos metros le quedan libres: lo manda el backend (`m2_libres`), que es
+// el mismo número contra el que valida. La pantalla nunca lo recalcula.
+const salaElegida  = computed(() => salasOfrecidas.value.find(s => String(s.id) === String(salaId.value)) || null)
+const m2LibresSala = computed(() => (salaElegida.value?.m2 ? Number(salaElegida.value.m2_libres ?? salaElegida.value.m2) : null))
+
 // La genética elegida decide qué tabla de salas aplica (la común o la de automáticas).
 const geneticaElegida = computed(() => geneticas.value.find(g => String(g.id) === String(form.value.genetica_id)))
 const salasOfrecidas = computed(() => {
@@ -526,7 +543,7 @@ function emptyForm() {
     origen: 'semilla',
     planta_madre_ids: [], plants_count: 1,
     start_date: localISO(),
-    genetica_id: '', grow_type: 'sustrato', light_type: '', tamanio_maceta: '', notes: '',
+    genetica_id: '', grow_type: 'sustrato', light_type: '', tamanio_maceta: '', m2_ocupados: null, notes: '',
   }
 }
 
@@ -596,6 +613,7 @@ async function crear() {
     if (!payload.genetica_id)     delete payload.genetica_id
     if (!payload.light_type)      delete payload.light_type
     if (!payload.tamanio_maceta)  delete payload.tamanio_maceta
+    if (!payload.m2_ocupados)     delete payload.m2_ocupados
     if (!payload.planta_madre_ids?.length) delete payload.planta_madre_ids
 
     const dias = {

@@ -39,6 +39,10 @@ module Lotes
         plantas:    { total: pl[:total].to_i, cosechadas: cosechadas, no_prendieron: pl[:no_prendio].to_i,
                       descartadas: pl[:descartadas].to_i },
         g_por_planta: (gramos.positive? && cosechadas.positive?) ? (gramos / cosechadas).round(1) : nil,
+        # g/m²: el número que se compara contra la ficha. nil = faltan los metros del espacio,
+        # y la tarjeta lo dice en vez de inventarlo.
+        g_m2:         @lote.rendimiento_g_m2&.to_f,
+        m2:           @lote.m2_efectivos&.to_f,
         dias:       fases.slice('enraizado', 'vegetativo', 'floracion', 'cosecha', 'en_manicura', 'total'),
         costo:      @con_costo && costo && costo.costo_total.to_f.positive? ? {
           total:     costo.costo_total.to_f.round(2),

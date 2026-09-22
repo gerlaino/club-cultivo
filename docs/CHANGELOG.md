@@ -1,5 +1,27 @@
 # Changelog
 
+## Septiembre 2026 (da) — Los metros del espacio: el rendimiento se compara en g/m²
+
+- **El rendimiento de la genética es g/m²**, no g/planta (Germán, 22-sep: «el techo lo pone la
+  luz sobre el metro, no cuántas plantas pongas»). Ya estaba cargado así (450, 420, 380…) y la
+  ficha de la genética ya lo mostraba en g/m²; **lo que estaba mal era Plan vs. real**, que lo
+  comparaba contra g/planta y decía «rinde 87 % menos que su ficha» para todas. Ahora compara
+  **g/m² real contra la ficha** (suma de gramos ÷ suma de metros) y deja el g/planta al lado
+  como dato secundario (el REPROCANN cuenta plantas, no metros). El modal de la genética dice
+  la unidad.
+- **Superficie**: `salas.m2` («¿cuánto mide?», una vez) y `lotes.m2_ocupados` (opcional, **sólo
+  en organizaciones**: existe porque varios lotes comparten una sala; en casa hay un espacio y
+  un lote y alcanza con el de la sala). La suma de los lotes **no puede pasar** los metros de
+  la sala, y el error dice cuántos quedan libres. Un lote solo en su sala usa los metros de la
+  sala; si comparte y no declaró los suyos, no se inventa nada.
+- **Nada bloquea**: se crean espacios y lotes sin metros y **los informes salen igual**. Donde
+  falta, se dice: aviso arriba de Plan vs. real («3 de 7 lotes cosechados no tienen los m²…»),
+  «· 2 sin m²» en la fila de la genética y «sin m² cargados» en «Cómo salió», que suma el
+  número nuevo: **260 g/m² en 1,2 m²**.
+- **Al cosechar, los metros quedan congelados en el lote**: el lote sale de la sala al cortarse
+  y perdía la referencia justo cuando se informa el rendimiento (mismo criterio que el costo o
+  la copia de la receta). `superficie_cultivo_spec` fija las cuatro reglas.
+
 ## Septiembre 2026 (cz) — El ciclo de una automática arranca al ir a maceta
 
 - **Corrección del día anterior** (Germán, 22-sep): el reloj de la auto contaba desde la

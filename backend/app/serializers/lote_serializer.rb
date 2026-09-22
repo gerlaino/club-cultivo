@@ -84,6 +84,11 @@ class LoteSerializer
       automatica:           lote.automatica?,
       puede_cosechar:       lote.puede_cosechar?,
       dias_ciclo_objetivo:  lote.dias_ciclo_objetivo,
+      # Superficie: la declarada, la que efectivamente se usa para medir (nil = no se sabe) y
+      # el rendimiento por metro, que es como se compara contra la ficha de la genética.
+      m2_ocupados:          lote.m2_ocupados&.to_f,
+      m2_efectivos:         lote.m2_efectivos&.to_f,
+      rendimiento_g_m2:     lote.rendimiento_g_m2&.to_f,
       start_date:           lote.start_date,
       plants_count:            lote.plants_count,
       plantas_seleccion_count: lote.plants.where(es_seleccion: true).count,

@@ -146,17 +146,33 @@ RSpec.describe 'Informes — los totales tienen que cerrar', type: :request do
       expect(v['como_viene']).to include('10 días pasado del plan')
     end
 
-    # La ficha de la genética es de donde el lote hereda el objetivo: si todos sus lotes rinden
-    # menos, es la ficha la que hay que corregir.
-    it 'compara lo que rinde cada genética con su ficha' do
-      genetica.update!(rendimiento: 40, tiempo_floracion: 60)
+    # La ficha de la genética está en g/m² (22-sep-2026), que es como la publica el banco: se
+    # compara contra los gramos por metro, no por planta. El g/planta queda como dato al lado.
+    it 'compara lo que rinde cada genética con su ficha, en g/m²' do
+      genetica.update!(rendimiento: 400, tiempo_floracion: 60)
+      sala.update!(m2: 1)
       cosechado!(g_plan: 400, g_real: 300, plantas: 10, flora_dias: 70)
 
       get '/api/informes/plan_vs_real'
 
       x = json['geneticas'].first
-      expect(x['g_por_planta_real']).to eq(30.0)
+      expect(x['g_m2_real']).to eq(300.0)        # 300 g en 1 m²
+      expect(x['g_por_planta_real']).to eq(30.0) # y el dato por planta, al lado
       expect(x['frase']).to eq('rinde 25.0 % menos que su ficha · tarda 10 días más')
+    end
+
+    # Sin los metros del espacio el informe SALE IGUAL: no compara contra la ficha y lo dice.
+    it 'sin m² cargados no inventa la comparación, la explica' do
+      genetica.update!(rendimiento: 400, tiempo_floracion: 60)
+      cosechado!(g_plan: 400, g_real: 300, plantas: 10, flora_dias: 70)
+
+      get '/api/informes/plan_vs_real'
+
+      x = json['geneticas'].first
+      expect(x['g_m2_real']).to be_nil
+      expect(x['lotes_sin_m2']).to eq(1)
+      expect(x['frase']).to include('sin los m² del espacio no se puede comparar')
+      expect(json['aviso_sin_metros']).to include('lotes' => 1, 'de' => 1)
     end
   end
 

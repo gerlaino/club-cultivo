@@ -27,6 +27,9 @@ module Informes
         salio:     salio,
         viene:     viene,
         geneticas: geneticas,
+        # `nil` cuando no falta ninguno: la pantalla y el PDF muestran el aviso sólo si hay algo
+        # que avisar, y el informe sale igual en los dos casos.
+        aviso_sin_metros: aviso_sin_metros,
         tolerancia: { gramos_pct: TOLERANCIA_GRAMOS_PCT, dias: TOLERANCIA_DIAS },
       }
     end
@@ -159,6 +162,18 @@ module Informes
       end.sort_by { |f| [-(f[:pasado_dias] || -999), f[:codigo]] }
     end
 
+    # Cuántos lotes del informe no tienen metros declarados: el aviso de arriba de la pantalla
+    # y del PDF. No bloquea nada — el informe sale igual, con lo que se puede calcular.
+    def aviso_sin_metros
+      lotes = @club.lotes.where('rendimiento_real_g > 0').includes(:sala).to_a
+      sin   = lotes.count { |l| l.m2_efectivos.to_f <= 0 }
+      return nil if sin.zero?
+
+      { lotes: sin, de: lotes.size,
+        texto: "#{sin} de #{lotes.size} lotes cosechados no tienen los m² del espacio cargados: " \
+               'esos no entran en el rendimiento por metro. Cargalos en la sala (o en el lote, si comparte espacio).' }
+    end
+
     # ── 3. Qué dice la genética ──────────────────────────────────────────────
 
     # Sobre TODOS los lotes cerrados de la organización (no sólo los del período): la ficha se
@@ -171,19 +186,31 @@ module Informes
 
         con_pl = ls.select { |l| l.plants_count_cosechadas.to_i.positive? }
         gpp_real = con_pl.any? ? (con_pl.sum { |l| l.rendimiento_real_g.to_f } / con_pl.sum { |l| l.plants_count_cosechadas }).round(1) : nil
+        # La ficha del banco está en g/m², así que se compara contra g/m² REAL: gramos ÷ metros
+        # de los lotes que declararon superficie. Sumas, no promedio de promedios. Los que no
+        # tienen metros no se descartan en silencio: se cuentan y el informe lo dice.
+        con_m2   = ls.select { |l| l.m2_efectivos.to_f.positive? }
+        sin_m2   = ls.size - con_m2.size
+        gm2_real = con_m2.any? ? (con_m2.sum { |l| l.rendimiento_real_g.to_f } / con_m2.sum { |l| l.m2_efectivos.to_f }).round(1) : nil
         flos = ls.filter_map { |l| dias_reales(ents[l.id])[:floracion] }
         flo_real = promedio(flos)
         frase = []
-        if gpp_real && g.rendimiento.to_f.positive?
-          d = desvio(gpp_real, g.rendimiento.to_f)
+        if gm2_real && g.rendimiento.to_f.positive?
+          d = desvio(gm2_real, g.rendimiento.to_f)
           frase << (d.abs <= TOLERANCIA_GRAMOS_PCT ? 'rinde lo que dice su ficha' : "rinde #{d.abs} % #{d.negative? ? 'menos' : 'más'} que su ficha")
+        elsif g.rendimiento.to_f.positive? && sin_m2.positive?
+          frase << 'sin los m² del espacio no se puede comparar con la ficha'
         end
         if flo_real && g.tiempo_floracion.to_i.positive?
           d = flo_real - g.tiempo_floracion
           frase << (d.abs <= TOLERANCIA_DIAS ? 'en el tiempo de la ficha' : "tarda #{d.abs} días #{d.positive? ? 'más' : 'menos'}")
         end
         { genetica: g.automatica ? "#{g.nombre} (auto)" : g.nombre, automatica: g.automatica, lotes: ls.size,
-          g_por_planta_ficha: g.rendimiento, g_por_planta_real: gpp_real,
+          # La ficha está en g/m²; `g_por_planta_real` queda como dato secundario (el REPROCANN
+          # cuenta plantas, no metros).
+          g_m2_ficha: g.rendimiento, g_m2_real: gm2_real,
+          lotes_sin_m2: sin_m2,
+          g_por_planta_real: gpp_real,
           floracion_ficha: g.tiempo_floracion, floracion_real: flo_real,
           frase: frase.join(' · ').presence || 'sin ficha para comparar' }
       end.sort_by { |x| -x[:lotes] }

@@ -33,6 +33,7 @@ const form = ref({
   state:      'activa',
   kind:       'vegetativo',
   sede_id:    props.sedeIdFija || null,
+  m2:         null,
   notes:      '',
 })
 
@@ -132,8 +133,16 @@ onMounted(async () => {
             </div>
           </div>
 
-          <!-- Estado + Pots en grilla -->
+          <!-- Estado + superficie -->
           <div class="mcr__grid">
+            <!-- Los metros del espacio: con esto el rendimiento se puede decir en g/m², que es
+                 como lo publica el banco. Opcional: sin esto no se bloquea nada, sólo no se
+                 calcula (Germán, 22-sep-2026). -->
+            <div class="mcr__field">
+              <label class="mcr__label">{{ esPersonal ? '¿Cuánto mide?' : 'Superficie de cultivo' }} <span class="mcr__opt">(m², opcional)</span></label>
+              <input class="mcr__input" v-model.number="form.m2" type="number" min="0" step="0.1" :placeholder="esPersonal ? '1' : '4'" />
+              <span class="mcr__hint">Sirve para comparar el rendimiento en g/m² contra la ficha de la genética.</span>
+            </div>
             <div class="mcr__field">
               <label class="mcr__label">Estado inicial</label>
               <select class="mcr__input" v-model="form.state">
@@ -254,7 +263,7 @@ onMounted(async () => {
 .mcr__textarea { resize: vertical; min-height: 68px; }
 .mcr__err  { font-size: .72rem; color: #dc2626; font-weight: 600; }
 .mcr__hint { font-size: .72rem; color: var(--c-slate-400); }
-.mcr__hint { font-size: .72rem; color: var(--c-slate-400); }
+.mcr__opt  { font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--c-slate-400); }
 
 /* Kinds selector */
 .mcr__kinds { display: flex; flex-wrap: wrap; gap: .4rem; }

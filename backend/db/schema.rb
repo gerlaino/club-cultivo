@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_21_100000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_22_100000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1368,6 +1368,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_21_100000) do
     t.decimal "costo_heredado_ars", precision: 12, scale: 2, default: "0.0", null: false
     t.decimal "costo_cedido_ars", precision: 12, scale: 2, default: "0.0", null: false
     t.integer "dias_ciclo_objetivo"
+    t.decimal "m2_ocupados", precision: 8, scale: 2
     t.index ["club_id"], name: "index_lotes_on_club_id"
     t.index ["codigo"], name: "index_lotes_on_codigo"
     t.index ["codigo_qr"], name: "index_lotes_on_codigo_qr", unique: true, where: "(codigo_qr IS NOT NULL)"
@@ -2147,6 +2148,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_21_100000) do
     t.bigint "responsable_id"
     t.bigint "deleted_by_id"
     t.decimal "leaf_temp_offset", precision: 4, scale: 2, default: "-2.0", null: false
+    t.decimal "m2", precision: 8, scale: 2
     t.index ["club_id"], name: "index_salas_on_club_id"
     t.index ["created_by_id"], name: "index_salas_on_created_by_id"
     t.index ["deleted_at"], name: "index_salas_on_deleted_at"

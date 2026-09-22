@@ -369,6 +369,13 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   (`registrarLecturaOffline`) y el de la sala/espacio (`registrarSalaOffline`). La lista de lo
   que entra a la cola sigue siendo de dominio (`lib/offlineApi.js`): ambiente, registro diario,
   pesaje del manicura, entrega del repartidor. Dispensar, fotos, crear cosas y tareas, NO.
+- **EL RENDIMIENTO SE MIDE EN g/m², Y LOS METROS NO BLOQUEAN NADA** (22-sep-2026, Germán):
+  `geneticas.rendimiento` es g/m² (como el banco); el real sale de `salas.m2` y, en
+  organizaciones, `lotes.m2_ocupados` (la suma de los lotes no puede pasar la sala). Un lote
+  solo en su sala hereda los metros de la sala; si comparte y no los declaró, **no se inventa**
+  (`Lote#m2_efectivos` → nil) y la pantalla dice que faltan. Al cosechar se CONGELAN en el lote.
+  En uso personal no se pide el m² por lote: alcanza el del espacio. Sin metros se crea todo y
+  los informes salen igual, con aviso.
 - **GENÉTICA AUTOMÁTICA = UN TILDE, Y EL LOTE SE COSECHA DESDE VEGETATIVO** (21-sep-2026, Germán):
   florece sola, vive en la sala de vege todo el ciclo, «empezó a florecer» es opcional (no mueve
   de sala, no pide 12/12), el reloj es «semilla a cosecha» (`dias_ciclo_objetivo`). Las reglas

@@ -147,8 +147,11 @@
               <label class="gem-form__label">Cosecha (días)</label>
               <input v-model.number="form.dias_cosecha_objetivo" type="number" min="1" class="gem-form__input" placeholder="14" :disabled="editingInase" />
             </div>
+            <!-- En g/m², que es como lo publica el banco y como se compara: el techo lo pone la
+                 luz sobre el metro, no la cantidad de plantas (Germán, 22-sep-2026). Antes decía
+                 sólo «Rendimiento (g)» y el informe lo comparaba contra g/planta: mentía. -->
             <div class="gem-form__field">
-              <label class="gem-form__label">Rendimiento (g)</label>
+              <label class="gem-form__label">Rendimiento <span class="gem-form__label-hint">g/m²</span></label>
               <input v-model.number="form.rendimiento" type="number" min="0" class="gem-form__input" placeholder="450" />
             </div>
             <div class="gem-form__field">

@@ -1168,7 +1168,7 @@ class LotesController < ApplicationController
   def lote_params
     params.require(:lote).permit(
       :start_date, :estado, :origen, :planta_madre_id, :plants_count, :strain, :notes,
-      :grow_type, :light_type, :genetica_id, :semanas_floracion, :dias_vegetativo_objetivo, :dias_floracion_objetivo, :dias_cosecha_objetivo, :dias_ciclo_objetivo, :tamanio_maceta,
+      :grow_type, :light_type, :genetica_id, :semanas_floracion, :dias_vegetativo_objetivo, :dias_floracion_objetivo, :dias_cosecha_objetivo, :dias_ciclo_objetivo, :m2_ocupados, :tamanio_maceta,
       :plants_count_objetivo, :rendimiento_objetivo_g, :fecha_cosecha_estimada,
       :rendimiento_real_g, :plants_count_cosechadas,
       :fotoperiodo, :fotoperiodo_vegetativo,
@@ -1181,7 +1181,7 @@ class LotesController < ApplicationController
   def lote_update_params
     params.require(:lote).permit(
       :estado, :start_date, :origen, :planta_madre_id, :plants_count, :strain, :notes,
-      :grow_type, :light_type, :genetica_id, :semanas_floracion, :dias_vegetativo_objetivo, :dias_floracion_objetivo, :dias_cosecha_objetivo, :dias_ciclo_objetivo, :tamanio_maceta,
+      :grow_type, :light_type, :genetica_id, :semanas_floracion, :dias_vegetativo_objetivo, :dias_floracion_objetivo, :dias_cosecha_objetivo, :dias_ciclo_objetivo, :m2_ocupados, :tamanio_maceta,
       :plants_count_objetivo, :rendimiento_objetivo_g, :fecha_cosecha_estimada,
       :rendimiento_real_g, :plants_count_cosechadas,
       :fotoperiodo, :fotoperiodo_vegetativo,

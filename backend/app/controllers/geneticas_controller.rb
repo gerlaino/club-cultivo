@@ -293,7 +293,10 @@ class GeneticasController < ApplicationController
       dias_cosecha_objetivo:    genetica.dias_cosecha_objetivo,
       automatica:             genetica.automatica,
       dias_ciclo_objetivo:    genetica.dias_ciclo_objetivo,
+      # SIEMPRE en g/m² (22-sep-2026): es como lo publican los bancos y como se compara —el
+      # techo lo pone la luz sobre el metro, no la cantidad de plantas—.
       rendimiento:            genetica.rendimiento,
+      rendimiento_unidad:     'g/m2',
       altura:                 genetica.altura,
       dificultad:             genetica.dificultad,
       disponible:             genetica.disponible,

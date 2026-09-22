@@ -27,6 +27,12 @@
         <span class="rc__num-l">de ciclo</span>
         <span v-if="delta(r.dias?.total, r.anterior?.dias_total)" class="rc__delta" :class="deltaClase(r.dias?.total, r.anterior?.dias_total, false)">{{ delta(r.dias?.total, r.anterior?.dias_total) }}</span>
       </div>
+      <!-- El número que el cultivador compara con la ficha del banco. Sin los metros del
+           espacio no se inventa: se dice que faltan. -->
+      <div class="rc__num">
+        <span class="rc__num-v">{{ r.g_m2 != null ? fmt(r.g_m2) : '—' }}<small v-if="r.g_m2 != null">g/m²</small></span>
+        <span class="rc__num-l">{{ r.g_m2 != null ? `en ${fmt(r.m2)} m²` : 'sin m² cargados' }}</span>
+      </div>
       <div v-if="r.costo" class="rc__num">
         <span class="rc__num-v">{{ r.costo.por_gramo != null ? formatARS(r.costo.por_gramo) : '—' }}</span>
         <span class="rc__num-l">por gramo</span>

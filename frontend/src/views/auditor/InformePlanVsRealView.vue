@@ -90,17 +90,28 @@
 
       <!-- ── 3. Qué dice la genética ────────────────────────────────────────── -->
       <section class="inf__section">
+        <!-- El informe sale igual sin los metros: lo que falta se dice, no se bloquea
+             (Germán, 22-sep-2026). -->
+        <div v-if="data.aviso_sin_metros" class="inf__aviso">
+          {{ data.aviso_sin_metros.texto }}
+        </div>
         <div class="inf__section-head">
           <h2 class="inf__section-title">Qué dice la genética</h2>
           <span class="inf__section-marco">lo que rinde de verdad en esta organización, contra su ficha · sobre todos sus lotes cerrados</span>
         </div>
         <table v-if="data.geneticas.length" class="inf__table">
-          <thead><tr><th>Genética</th><th class="num">Lotes cerrados</th><th class="num">g/planta ficha</th><th class="num">g/planta real</th><th class="num">Floración ficha / real</th><th></th></tr></thead>
+          <!-- La ficha del banco está en g/m² y contra eso se compara. El g/planta queda al lado
+               como dato secundario: el REPROCANN cuenta plantas, no metros. -->
+          <thead><tr><th>Genética</th><th class="num">Lotes cerrados</th><th class="num">g/m² ficha</th><th class="num">g/m² real</th><th class="num">g/planta real</th><th class="num">Floración ficha / real</th><th></th></tr></thead>
           <tbody>
             <tr v-for="x in data.geneticas" :key="x.genetica">
               <td>{{ x.genetica }}</td>
               <td class="num">{{ x.lotes }}</td>
-              <td class="num">{{ x.g_por_planta_ficha ?? '—' }}</td>
+              <td class="num">{{ x.g_m2_ficha ?? '—' }}</td>
+              <td class="num">
+                {{ x.g_m2_real != null ? g(x.g_m2_real) : '—' }}
+                <span v-if="x.lotes_sin_m2" class="inf__sinm2" :title="`${x.lotes_sin_m2} de sus lotes no tienen los m² cargados y no entran en este número`">· {{ x.lotes_sin_m2 }} sin m²</span>
+              </td>
               <td class="num">{{ x.g_por_planta_real != null ? g(x.g_por_planta_real) : '—' }}</td>
               <td class="num">{{ x.floracion_ficha ?? '—' }} / {{ x.floracion_real ?? '—' }}</td>
               <td class="inf__frase-gen">{{ x.frase }}</td>
@@ -155,6 +166,12 @@ onMounted(cargar)
 </script>
 
 <style scoped>
+.inf__aviso {
+  margin: 0 0 var(--sp-4); padding: .7rem .9rem;
+  background: var(--c-amber-100); border-left: 3px solid var(--c-amber-500); border-radius: 0 8px 8px 0;
+  font-size: var(--fs-13); color: var(--c-ink-800); line-height: 1.55;
+}
+.inf__sinm2 { font-size: var(--fs-12); color: var(--c-amber-700, #b45309); font-weight: 600; white-space: nowrap; }
 .inf { padding: var(--sp-6); max-width: 960px; margin: 0 auto; }
 .inf__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-6); gap: var(--sp-4); flex-wrap: wrap; }
 .inf__head-actions { display: flex; align-items: center; gap: var(--sp-2); }
