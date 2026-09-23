@@ -5,6 +5,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import Lightbox from '../../components/ui/Lightbox.vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
+import CamposDevolucion from '../../components/dispensaciones/CamposDevolucion.vue'
 import {
   PackageCheck, Truck, CheckCircle2, XCircle, User, MapPin,
   Phone, FileText, RefreshCw, ChevronDown, ChevronUp, AlertCircle,
@@ -461,15 +462,33 @@ async function confirmarFallo() {
 }
 
 // ── Cancelar entrega (revierte + queda registrada como cancelada) ──
-const cancelarModal = ref({ open: false, id: null, codigo: '', paciente: '', motivo: '' })
+// Lo que el paciente ya había pagado NO se borra (23-sep-2026): queda a favor suyo, o
+// administración se lo devuelve en el momento. Contra entrega no hay nada que preguntar.
+const cancelarModal = ref({ open: false, id: null, codigo: '', paciente: '', motivo: '', pagado: 0, sedeId: null,
+                            plata: 'a_favor', medio: 'efectivo', caja: null, errorDev: '' })
 function abrirCancelar(d) {
-  cancelarModal.value = { open: true, id: d.id, codigo: d.codigo_paquete || `#${d.id}`, paciente: d.paciente?.nombre || '', motivo: '' }
+  cancelarModal.value = {
+    open: true, id: d.id, codigo: d.codigo_paquete || `#${d.id}`, paciente: d.paciente?.nombre || d.paciente_nombre || '', motivo: '',
+    pagado: Number(d.pagado_ars || 0), sedeId: d.sede_id ?? d.sede?.id ?? null,
+    plata: 'a_favor', medio: 'efectivo', caja: null, errorDev: '',
+  }
 }
+const puedeConfirmarCancelar = computed(() =>
+  !saving.value && !(cancelarModal.value.plata === 'devolver' && cancelarModal.value.errorDev))
 async function confirmarCancelar() {
+  if (!puedeConfirmarCancelar.value) return
   saving.value = true
+  const m = cancelarModal.value
   try {
-    await cancelarEntregaDispensacion(cancelarModal.value.id, cancelarModal.value.motivo || null)
-    toast.success('Entrega cancelada — producto devuelto al stock')
+    const opciones = m.pagado > 0 && m.plata === 'devolver'
+      ? { plata: 'devolver', devolucion: { medio: m.medio, ...(m.medio === 'efectivo' ? { caja_turno_id: m.caja } : {}) } }
+      : {}
+    const { data } = await cancelarEntregaDispensacion(m.id, m.motivo || null, opciones)
+    toast.success(data?.devuelto_ars > 0
+      ? `Entrega cancelada — se le devolvieron ${fmtMoneda(data.devuelto_ars)}`
+      : data?.a_favor_ars > 0
+        ? `Entrega cancelada — le quedan ${fmtMoneda(data.a_favor_ars)} a favor`
+        : 'Entrega cancelada — producto devuelto al stock')
     cancelarModal.value.open = false
     await load()
   } catch (e) { toast.error(e.response?.data?.errors?.[0] || e.response?.data?.error || 'No se pudo cancelar') }
@@ -984,19 +1003,43 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
 
     <!-- Modal cancelar entrega (admin) -->
     <Teleport to="body">
-      <div v-modal="() => cancelarModal.open = false" v-if="cancelarModal.open" class="dsp__overlay" @click.self="cancelarModal.open = false">
+      <!-- Se decide qué pasa con plata: no se cierra tocando afuera. -->
+      <div v-modal="() => cancelarModal.open = false" v-if="cancelarModal.open" class="dsp__overlay">
         <div class="dsp__modal">
           <h3 class="dsp__modal-title">Cancelar entrega</h3>
           <p class="dsp__modal-sub">{{ cancelarModal.codigo }} · {{ cancelarModal.paciente }}</p>
           <div class="dsp__modal-warn">
             <AlertCircle :size="14" :stroke-width="2" />
-            Se devuelve el producto al stock y se revierte el cobro. La dispensación queda registrada como <strong>cancelada</strong>.
+            <span v-if="cancelarModal.pagado > 0">
+              El producto vuelve al stock. El paciente ya había pagado <strong>{{ fmtMoneda(cancelarModal.pagado) }}</strong>: esa plata no se borra.
+            </span>
+            <span v-else>
+              El producto vuelve al stock. No había pagado nada: no hay plata que devolver. La dispensación queda registrada como <strong>cancelada</strong>.
+            </span>
           </div>
+          <template v-if="cancelarModal.pagado > 0">
+            <label class="dsp__modal-label">¿Qué se hace con lo que pagó?</label>
+            <div class="dsp__plata" role="radiogroup" aria-label="Qué se hace con lo que pagó">
+              <button type="button" class="dsp__plata-op" :class="{ 'is-on': cancelarModal.plata === 'a_favor' }" id="cancelar-a-favor"
+                      role="radio" :aria-checked="cancelarModal.plata === 'a_favor'" @click="cancelarModal.plata = 'a_favor'">
+                <strong>Queda a favor</strong>
+                <span>Se le descuenta solo en la próxima dispensa.</span>
+              </button>
+              <button type="button" class="dsp__plata-op" :class="{ 'is-on': cancelarModal.plata === 'devolver' }" id="cancelar-devolver"
+                      role="radio" :aria-checked="cancelarModal.plata === 'devolver'" @click="cancelarModal.plata = 'devolver'">
+                <strong>Devolvérsela</strong>
+                <span>Sale la plata ahora, o queda pendiente si es transferencia.</span>
+              </button>
+            </div>
+            <CamposDevolucion v-if="cancelarModal.plata === 'devolver'" class="dsp__devolucion" :monto="cancelarModal.pagado" :sede-id="cancelarModal.sedeId"
+                              v-model:medio="cancelarModal.medio" v-model:caja="cancelarModal.caja"
+                              @update:error="e => cancelarModal.errorDev = e" />
+          </template>
           <label class="dsp__modal-label">Motivo <span class="dsp__opt">opcional</span></label>
           <textarea v-model.trim="cancelarModal.motivo" class="dsp__modal-input" rows="2" placeholder="Ej: el paciente canceló el pedido…"></textarea>
           <div class="dsp__modal-foot">
             <button class="dsp__btn-ghost" @click="cancelarModal.open = false">Volver</button>
-            <button class="dsp__btn-fallo" :disabled="saving" @click="confirmarCancelar">
+            <button class="dsp__btn-fallo" :disabled="!puedeConfirmarCancelar" @click="confirmarCancelar">
               <DsSpinner v-if="saving" :size="12" /> Cancelar entrega
             </button>
           </div>
@@ -1489,6 +1532,13 @@ onUnmounted(() => document.removeEventListener('click', cerrarMenu))
 .dsp__req { color: #dc2626; }
 .dsp__modal-input { width: 100%; box-sizing: border-box; background: var(--c-slate-50); border: 1.5px solid var(--c-slate-200); border-radius: 9px; padding: .55rem .8rem; font-size: .85rem; color: var(--c-slate-900); outline: none; resize: vertical; }
 .dsp__modal-warn { display: flex; align-items: flex-start; gap: .4rem; background: #fffbeb; border: 1px solid #fde68a; color: #92400e; border-radius: 9px; padding: .55rem .7rem; font-size: .78rem; margin-bottom: .75rem; }
+.dsp__plata { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; margin-bottom: .6rem; }
+@media (max-width: 480px) { .dsp__plata { grid-template-columns: 1fr; } }
+.dsp__plata-op { display: flex; flex-direction: column; gap: .15rem; text-align: left; background: #fff; border: 1.5px solid var(--c-slate-200); border-radius: 10px; padding: .55rem .7rem; cursor: pointer; font-family: inherit; }
+.dsp__plata-op strong { font-size: .84rem; color: var(--c-slate-900); }
+.dsp__plata-op span { font-size: .74rem; color: var(--c-slate-500); line-height: 1.35; }
+.dsp__devolucion { margin-bottom: .75rem; }
+.dsp__plata-op.is-on { border-color: var(--c-leaf-700); background: var(--c-leaf-50); }
 
 /* Historial de la entrega */
 .dsp__historial { margin-top: var(--sp-3); padding-top: var(--sp-3); border-top: 1px solid var(--c-slate-100); }

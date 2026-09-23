@@ -37,6 +37,10 @@ class DispensacionSerializer
       cobrar_en_entrega:   d.cobrar_en_entrega,
       total_cobrado:       d.total_cobrado.to_f,
       saldo_pendiente:     d.saldo_pendiente.to_f,
+      # Lo que el paciente ya pagó y entró de verdad: lo que le queda a favor si el paquete no se
+      # entrega. Sólo para los envíos que todavía se pueden cancelar (lo pregunta el diálogo de
+      # Despachos); el resto no paga la consulta.
+      pagado_ars:          (%w[pendiente en_viaje fallido].include?(d.estado_envio) ? Dispensaciones::Cancelar.cobrado_de(d).to_f : nil),
       cobros:              d.cobros.recientes.map { |c| CobroSerializer.serialize(c) },
       comprobante_entrega_url: (d.comprobante_entrega.attached? ? Rails.application.routes.url_helpers.rails_blob_path(d.comprobante_entrega, only_path: true) : nil),
       con_envio:       d.con_envio,

@@ -271,6 +271,7 @@ Rails.application.routes.draw do
           post  :cargar
           post  :ajuste
           post  :registrar_pago
+          post  :devolver
           patch :set_limite
           patch :toggle_gramos
           patch :set_limite_g

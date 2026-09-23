@@ -7,7 +7,7 @@ module Dispensaciones
   # alternativa era escribir la reversa dos veces, y dos reversas de la misma cosa dejan de
   # coincidir a la primera corrección.
   class Cancelar
-    Result = Struct.new(:ok, :dispensacion, :error, keyword_init: true) do
+    Result = Struct.new(:ok, :dispensacion, :error, :a_favor_ars, :devuelto_ars, keyword_init: true) do
       def ok? = ok
     end
 
@@ -20,8 +20,12 @@ module Dispensaciones
     # nada más: el producto sano vuelve a la mesa y no hay nada que cambiar). `devolucion` dice
     # CÓMO vuelve la plata: `{ medio:, caja_turno_id: }` — el paciente pudo pagar por
     # transferencia y llevarse efectivo, o al revés. Sin `medio`, por donde pagó.
+    #
+    # `plata` (sólo `no_entregado`): qué se hace con lo que el paciente ya había pagado por el
+    # paquete. `a_favor` (por defecto) o `devolver` — esto último sólo administración, y la plata
+    # vuelve por `devolucion` igual que en una devolución.
     def initialize(dispensacion:, usuario:, motivo: 'error_carga', nota: nil, descartar_producto: false,
-                   resolucion: nil, devolucion: {}, evento: true)
+                   resolucion: nil, devolucion: {}, evento: true, plata: 'a_favor')
       @d          = dispensacion
       @usuario    = usuario
       @motivo     = motivo.to_s
@@ -30,6 +34,7 @@ module Dispensaciones
       @resolucion = resolucion.presence&.to_s
       @devolucion = (devolucion || {}).to_h.symbolize_keys
       @evento     = evento
+      @plata      = plata.to_s
     end
 
     def call
@@ -42,6 +47,10 @@ module Dispensaciones
       else
         @resolucion = nil
       end
+      return err('Decí qué se hace con lo que pagó: queda a favor o se le devuelve.') unless %w[a_favor devolver].include?(@plata)
+      if @plata == 'devolver' && !(@usuario&.admin? || @usuario&.supervisor?)
+        return err('Sólo administración puede devolver plata: queda a favor del paciente.')
+      end
 
       ActiveRecord::Base.transaction do
         revertir_gramos
@@ -52,6 +61,8 @@ module Dispensaciones
           # caja esa noche—. Si se devuelve, se escribe el egreso al lado; si se cambia el
           # producto, lo que pagó cubre lo que se lleva después (`Dispensacion#cambio?`).
           asentar_devolucion if @resolucion == 'devolver_plata'
+        elsif no_entregado?
+          dejar_a_favor_lo_cobrado
         else
           # Nunca pasó: el asiento se borra y los cobros (con sus comprobantes) se van con él.
           revertir_asientos
@@ -64,17 +75,77 @@ module Dispensaciones
                    motivo_anulacion: @motivo, nota_anulacion: @nota, resolucion_anulacion: @resolucion,
                    anulada_por: @usuario, anulada_at: Time.current)
       end
-      Result.new(ok: true, dispensacion: @d)
+      Result.new(ok: true, dispensacion: @d, a_favor_ars: @a_favor.to_d, devuelto_ars: @devuelto.to_d)
     rescue => e
       err(e.message)
     end
 
-    MEDIOS_DEVOLUCION = %w[efectivo transferencia mercado_pago].freeze
+    MEDIOS_DEVOLUCION = Devoluciones::CajaDeSalida::MEDIOS
+
+    # LO QUE EL PACIENTE YA PAGÓ POR ESTA DISPENSA Y ENTRÓ DE VERDAD: los ingresos cobrados
+    # (efectivo, transferencia) atados a ella. No cuenta el excedente («Aporte socio», que ya
+    # quedó a favor el día que lo pagó) ni lo que se pagó con plata a favor o a cuenta corriente,
+    # que la reversa de la cuenta corriente devuelve sola. Es lo que queda a favor si el paquete
+    # no se entrega, y lo que la rendición le muestra a quien la recibe.
+    def self.cobrado_de(dispensacion)
+      dispensacion.movimientos_contables
+                  .select { |m| m.es_ingreso? && m.pagado && m.categoria != 'aporte_socio' }
+                  .sum(&:monto_ars).to_d
+    end
 
     private
 
     def err(msg) = Result.new(ok: false, error: msg)
     def devolucion? = Dispensacion::MOTIVOS_CON_DEVOLUCION.include?(@motivo)
+    def no_entregado? = @motivo == 'no_entregado'
+
+    # EL PAQUETE QUE NO SE ENTREGÓ: LO QUE YA SE PAGÓ NO SE BORRA (Germán, 23-sep-2026).
+    #
+    # Antes se deshacía como un error de carga: se borraban el asiento y los cobros. Para un
+    # paquete contra entrega está bien —no entró nada—, pero uno pagado por adelantado perdía la
+    # plata: el ingreso desaparecía del libro, el cobro del arqueo (y la caja cerraba con un
+    # sobrante que nadie explicaba) y el paciente no quedaba con nada a favor.
+    #
+    # Ahora, lo que ENTRÓ se queda donde está —el ingreso en el libro, el cobro en su caja— y el
+    # paciente lo tiene A FAVOR: se le descuenta solo en la próxima dispensa. Es la opción segura
+    # y no pide decidir nada, porque quien recibe la rendición del repartidor suele ser el
+    # dispensador. Si administración prefiere devolverlo, lo hace acá mismo (`plata: 'devolver'`)
+    # o después desde la cuenta corriente, con `CuentasCorrientes::DevolverSaldo`.
+    #
+    # Lo que NO entró se deshace como siempre: la deuda a cuenta corriente y lo pagado con plata
+    # a favor vuelven con `revertir_cuenta_corriente`, y su asiento pendiente se borra.
+    def dejar_a_favor_lo_cobrado
+      @a_favor = self.class.cobrado_de(@d)
+      @d.movimientos_contables.each do |m|
+        next if m.es_ingreso? && m.pagado
+        m.cerrado? ? contra_asentar(m) : m.destroy!
+      end
+      @d.cobros.where.not(medio: Cobro::MEDIOS_PAGADOS).destroy_all
+      return if @a_favor <= 0
+
+      cc       = @d.paciente.cuenta_corriente!
+      anterior = cc.saldo_disponible.to_d
+      nuevo    = anterior + @a_favor
+      cc.update!(saldo_disponible: nuevo)
+      cc.movimientos.create!(
+        tipo: 'a_favor', unidad: 'ars', monto: @a_favor,
+        saldo_anterior: anterior, saldo_nuevo: nuevo,
+        descripcion: "Dispensación ##{@d.id} no entregada — lo que pagó queda a favor",
+        dispensacion: @d, created_by: @usuario,
+      )
+      devolver_lo_cobrado if @plata == 'devolver'
+    end
+
+    def devolver_lo_cobrado
+      caja = @devolucion.key?(:caja_turno_id) ? { caja_turno_id: @devolucion[:caja_turno_id] } : {}
+      res = CuentasCorrientes::DevolverSaldo.call(
+        paciente: @d.paciente, usuario: @usuario, monto: @a_favor,
+        medio: @devolucion[:medio].presence || 'efectivo', caja: caja, dispensacion: @d,
+      )
+      raise ArgumentError, res.error unless res.ok?
+
+      @devuelto = @a_favor
+    end
 
     def registrar_evento
       @d.historial_envio = (@d.historial_envio || []) + [{
@@ -124,29 +195,12 @@ module Dispensaciones
       medios.include?('efectivo') || medios.size != 1 ? 'efectivo' : medios.first
     end
 
-    # DE QUÉ CAJA SALE EL EFECTIVO. La elegida (administración) o la abierta en la sede de la
-    # dispensa (quien atiende, que devuelve de su cajón). Con caja, TIENE QUE ALCANZAR: devolver
-    # $8.500 de un cajón con $5.000 es un faltante inventado esa noche — se devuelve por
-    # transferencia o se trae plata. Sin ninguna caja (administración, de su bolsillo) se
-    # escribe igual y no entra a ningún arqueo, como cualquier pago en efectivo del admin.
+    # De qué caja sale el efectivo: la regla vive en `Devoluciones::CajaDeSalida`.
     def caja_de_donde_sale!(monto)
-      caja = if @devolucion.key?(:caja_turno_id)
-               id = @devolucion[:caja_turno_id]
-               return nil if id.blank?
-
-               c = CajaTurno.unscoped.abiertas.where(club_id: @d.club_id, punto_type: CajaTurno::PUNTO_MOSTRADOR).find_by(id: id)
-               raise ArgumentError, 'Esa caja no está abierta.' if c.nil?
-               c
-             else
-               CajaTurno.abierta_en_sede(club_id: @d.club_id, sede_id: @d.sede_id)
-             end
-      return nil if caja.nil?
-
-      hay = caja.efectivo_esperado_ars.to_d
-      if hay < monto
-        raise ArgumentError, "En la caja hay #{fmt(hay)} y hay que devolver #{fmt(monto)}: devolvé por transferencia, o ingresá plata a la caja primero."
-      end
-      caja
+      Devoluciones::CajaDeSalida.call(
+        club_id: @d.club_id, sede_id: @d.sede_id, monto: monto,
+        eligio_caja: @devolucion.key?(:caja_turno_id), caja_turno_id: @devolucion[:caja_turno_id],
+      )
     end
 
     def fmt(n) = ActionController::Base.helpers.number_to_currency(n, unit: '$', separator: ',', delimiter: '.', precision: 0)

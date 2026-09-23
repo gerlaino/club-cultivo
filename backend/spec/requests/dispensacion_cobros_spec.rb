@@ -173,7 +173,10 @@ RSpec.describe 'Dispensaciones con cobros (pagos partidos / contra-entrega)', ty
       sign_in_as(admin)
       patch "/dispensaciones/#{d.id}/cancelar_entrega", params: { motivo: 'test' }, headers: auth_headers
       expect(response).to have_http_status(:ok)
-      expect(cc.reload.saldo_disponible).to eq(-20_000)   # el aporte se revirtió con la dispensa
+      # LO QUE PAGÓ NO SE BORRA (23-sep-2026). Antes volvía a deber 20.000, como si los 120.000
+      # en efectivo no hubieran entrado. Entraron: los 20.000 de más ya saldaron su deuda y los
+      # 100.000 del paquete que no recibió le quedan a favor.
+      expect(cc.reload.saldo_disponible).to eq(100_000)
     end
 
     # HAY PLATA A FAVOR (Germán, 18-sep-2026): el vuelto que no se pudo dar queda a cuenta.
@@ -271,7 +274,9 @@ RSpec.describe 'Dispensaciones con cobros (pagos partidos / contra-entrega)', ty
       expect(cc.reload.saldo_disponible).to eq(30_000)
     end
 
-    it 'al cancelar, el saldo a favor vuelve' do
+    # Vuelve el saldo que usó Y le queda a favor el efectivo que puso (23-sep-2026): recupera
+    # todo lo que pagó. Antes sólo volvían los 30.000 y los 70.000 en efectivo desaparecían.
+    it 'al cancelar, el saldo a favor vuelve y el efectivo que puso queda a favor' do
       sign_in_as(dispensador)
       crear(cobros: [{ medio: 'efectivo', monto: 70_000 }])
       d = Dispensacion.last
@@ -279,7 +284,7 @@ RSpec.describe 'Dispensaciones con cobros (pagos partidos / contra-entrega)', ty
       sign_in_as(admin)
       patch "/dispensaciones/#{d.id}/cancelar_entrega", params: { motivo: 'test' }, headers: auth_headers
       expect(response).to have_http_status(:ok)
-      expect(cc.reload.saldo_disponible).to eq(30_000)
+      expect(cc.reload.saldo_disponible).to eq(100_000)
     end
 
     it 'con contra entrega, el saldo se descuenta ahora y el repartidor cobra el resto' do
@@ -296,7 +301,9 @@ RSpec.describe 'Dispensaciones con cobros (pagos partidos / contra-entrega)', ty
   context 'cancelación revierte los cobros y la cuenta corriente' do
     let!(:cc) { create(:cuenta_corriente, paciente: paciente, club: club, saldo_disponible: 0, limite_credito: 80_000) }
 
-    it 'al cancelar, se borran los cobros y se revierte la deuda' do
+    # La deuda a cuenta corriente se revierte y su cobro se va; el efectivo que ENTRÓ se queda
+    # —el cobro en su caja, porque el billete está en el cajón— y le queda a favor al paciente.
+    it 'al cancelar, se revierte la deuda y lo que pagó en efectivo queda a favor' do
       sign_in_as(dispensador)
       crear(cobros: [{ medio: 'efectivo', monto: 40_000 }])   # resto 60.000 a cuenta
       d = Dispensacion.last
@@ -307,8 +314,8 @@ RSpec.describe 'Dispensaciones con cobros (pagos partidos / contra-entrega)', ty
       patch "/dispensaciones/#{d.id}/cancelar_entrega", params: { motivo: 'test' }, headers: auth_headers
       expect(response).to have_http_status(:ok)
       expect(d.reload.estado_envio).to eq('cancelada')
-      expect(d.cobros).to be_empty
-      expect(cc.reload.saldo_disponible).to eq(0)   # deuda revertida
+      expect(d.cobros.pluck(:medio, :monto_ars)).to eq([['efectivo', 40_000]])
+      expect(cc.reload.saldo_disponible).to eq(40_000)   # deuda revertida + lo pagado, a favor
     end
   end
 end

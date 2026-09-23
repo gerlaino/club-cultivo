@@ -296,7 +296,7 @@ const ALL_TABS = [
   { key: 'info',             label: 'Datos',            icon: User,          primary: true },
   { key: 'reprocann',        label: 'REPROCANN',         icon: ShieldCheck,   primary: true },
   { key: 'dispensaciones',   label: 'Dispensaciones',    icon: Pill,          primary: true },
-  { key: 'cuenta_corriente', label: 'Cuenta corriente',  icon: Wallet,        roles: ['admin', 'dispensador'], primary: true },
+  { key: 'cuenta_corriente', label: 'Cuenta corriente',  icon: Wallet,        roles: ['admin', 'supervisor', 'dispensador'], primary: true },
   // A dónde se le mandan los paquetes: varias, con nombre y una por defecto (Germán, 17-sep).
   { key: 'direcciones',      label: 'Direcciones',       icon: MapPin,        roles: ['admin', 'supervisor', 'medico', 'dispensador'] },
   { key: 'turnos',           label: 'Turnos',            icon: CalendarDays,  roles: ['admin', 'medico'] },

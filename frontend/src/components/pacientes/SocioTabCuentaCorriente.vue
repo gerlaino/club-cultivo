@@ -105,6 +105,12 @@
         <button v-if="puedeCobrar" class="scc__pago-btn" @click="abrirPago">
           <i class="bi bi-cash-coin"></i> {{ ccDeudaActual > 0 ? 'Registrar pago' : 'Dejar plata a favor' }}
         </button>
+        <!-- DEVOLVER LO QUE TIENE A FAVOR (23-sep-2026): sólo administración. Es la salida de la
+             plata que quedó a favor —pagó de más, o pagó un paquete que no se le pudo entregar—
+             cuando el paciente la pide en vez de usarla en la próxima. -->
+        <button v-if="puedeDevolver && cc.saldo_disponible > 0" class="scc__devolver-btn" @click="abrirDevolver">
+          <i class="bi bi-arrow-return-left"></i> Devolver plata
+        </button>
       </div>
 
       <!-- ── Historial ──────────────────────────────────────── -->
@@ -161,6 +167,33 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- Modal devolver plata a favor. Se cuenta plata: no se cierra tocando afuera. -->
+    <Teleport to="body">
+      <div v-modal="() => devOpen = false" v-if="devOpen" class="scc__modal-overlay">
+        <div class="scc__modal" role="dialog" aria-modal="true" aria-labelledby="scc-dev-titulo">
+          <h3 id="scc-dev-titulo" class="scc__modal-title">Devolver plata</h3>
+          <p class="scc__modal-favor">Tiene <strong>{{ fmtARS(cc.saldo_disponible) }}</strong> a favor.</p>
+          <label class="scc__modal-label" for="scc-dev-monto">Cuánto se le devuelve</label>
+          <div class="scc__draft-input">
+            <input id="scc-dev-monto" type="number" min="0" :max="cc.saldo_disponible" step="100" v-model.number="devMonto" class="scc__input" />
+            <span class="scc__input-unit">ARS</span>
+          </div>
+          <p v-if="devMonto > cc.saldo_disponible + 0.009" class="scc__modal-err">
+            No se le puede devolver más de lo que tiene a favor.
+          </p>
+          <label class="scc__modal-label">Cómo</label>
+          <CamposDevolucion :monto="Number(devMonto) || 0" v-model:medio="devMedio" v-model:caja="devCaja"
+                            @update:error="e => devError = e" />
+          <div class="scc__modal-actions">
+            <button class="scc__discard-btn" :disabled="devolviendo" @click="devOpen = false">Cancelar</button>
+            <button class="scc__save-btn" :disabled="!puedeConfirmarDev" @click="confirmarDevolver">
+              {{ devolviendo ? 'Devolviendo…' : `Devolver ${fmtARS(devMonto || 0)}` }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -169,7 +202,8 @@ import { ref, computed, watch, onMounted } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { useSocioCuentaCorriente } from '../../composables/useSocioCuentaCorriente.js'
 import { useToast } from '../../composables/useToast.js'
-import { setLimiteCC, updatePaciente, registrarPagoCC } from '../../lib/api.js'
+import { setLimiteCC, updatePaciente, registrarPagoCC, devolverSaldoCC } from '../../lib/api.js'
+import CamposDevolucion from '../dispensaciones/CamposDevolucion.vue'
 import { usePacientesStore } from '../../stores/pacientes'
 import { useAuthStore } from '../../stores/auth.js'
 
@@ -216,6 +250,44 @@ async function confirmarPago() {
     toastErr(e?.response?.data?.error || 'No se pudo registrar el pago')
   } finally {
     pagando.value = false
+  }
+}
+
+// ── Devolver plata a favor (sólo administración) ───────────
+// El backend valida lo mismo (`CuentasCorrientes::DevolverSaldo`); acá sólo no se ofrece.
+const puedeDevolver = computed(() => !props.readonly && ['admin', 'supervisor'].includes(auth.user?.role))
+const devOpen     = ref(false)
+const devMonto    = ref(null)
+const devMedio    = ref('efectivo')
+const devCaja     = ref(null)
+const devError    = ref('')
+const devolviendo = ref(false)
+const puedeConfirmarDev = computed(() =>
+  !devolviendo.value && devMonto.value > 0 && devMonto.value <= (cc.value?.saldo_disponible ?? 0) + 0.009 && !devError.value)
+
+function abrirDevolver() {
+  devMonto.value = cc.value?.saldo_disponible ?? null
+  devMedio.value = 'efectivo'
+  devCaja.value  = null
+  devError.value = ''
+  devOpen.value  = true
+}
+
+async function confirmarDevolver() {
+  if (!puedeConfirmarDev.value) return
+  devolviendo.value = true
+  try {
+    const payload = { monto: devMonto.value, medio: devMedio.value }
+    if (devMedio.value === 'efectivo') payload.caja_turno_id = devCaja.value
+    const { data } = await devolverSaldoCC(props.socioId, payload)
+    cc.value = data
+    devOpen.value = false
+    await store.fetchOne(props.socioId)
+    toastOk(`Se le devolvieron ${fmtARS(payload.monto)}`)
+  } catch (e) {
+    toastErr(e?.response?.data?.error || 'No se pudo devolver')
+  } finally {
+    devolviendo.value = false
   }
 }
 
@@ -375,6 +447,12 @@ watch(() => props.refreshKey, (v, old) => { if (v !== old) loadCC() })
   background: #15803d; color: #fff; border: none; border-radius: 9px;
   padding: .6rem 1rem; font-size: .85rem; font-weight: 700; cursor: pointer; transition: background .15s;
 }
+.scc__devolver-btn {
+  margin-top: .5rem; width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  background: #fff; color: var(--c-slate-700); border: 1.5px solid var(--c-slate-200); border-radius: 9px;
+  padding: .55rem 1rem; font-size: .85rem; font-weight: 700; cursor: pointer; transition: border-color .15s;
+}
+.scc__devolver-btn:hover { border-color: var(--c-slate-400); }
 .scc__pago-btn:hover { background: #166534; }
 .scc__modal-overlay {
   position: fixed; inset: 0; background: rgba(15,23,42,.45); z-index: 900;
@@ -384,6 +462,8 @@ watch(() => props.refreshKey, (v, old) => { if (v !== old) loadCC() })
 .scc__modal-title { font-size: 1.05rem; font-weight: 800; color: var(--c-slate-900); margin: 0 0 .5rem; }
 .scc__modal-deuda { font-size: .82rem; color: #b45309; margin: 0 0 1rem; }
 .scc__modal-label { display: block; font-size: .75rem; font-weight: 700; color: var(--c-slate-500); margin: .75rem 0 .3rem; }
+.scc__modal-favor { font-size: .84rem; color: var(--c-slate-600); margin: 0 0 .25rem; }
+.scc__modal-err { font-size: .78rem; color: var(--c-rust-600); font-weight: 600; margin: .4rem 0 0; }
 .scc__modal-hint { font-size: .78rem; color: #15803d; margin: .6rem 0 0; }
 .scc__modal-actions { display: flex; justify-content: flex-end; gap: .5rem; margin-top: 1.25rem; }
 
@@ -450,6 +530,8 @@ watch(() => props.refreshKey, (v, old) => { if (v !== old) loadCC() })
 .scc__mov-tipo--carga  { background: #f0fdf4; color: #15803d; }
 .scc__mov-tipo--debito { background: #fef2f2; color: #dc2626; }
 .scc__mov-tipo--ajuste { background: #fffbeb; color: #b45309; }
+.scc__mov-tipo--a_favor    { background: #f0fdf4; color: #15803d; }
+.scc__mov-tipo--devolucion { background: var(--c-slate-100); color: var(--c-slate-600); }
 .scc__mov-tipo--pago   { background: #eff6ff; color: #2563eb; }
 .scc__mov-desc   { grid-column: 2; grid-row: 1; color: var(--c-slate-600); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .scc__mov-monto  { grid-column: 3; grid-row: 1; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.01em; text-align: right; white-space: nowrap; }

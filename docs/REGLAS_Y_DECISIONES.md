@@ -416,6 +416,18 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   con tareas por día relativo/recurrencia, se aplica sobre lote, espacio o todo el cultivo
   (`AplicacionPlan` genera `Tarea`s). Decisión de Germán: **por ahora cada uno arma su plan y lo
   aplica cuando quiere**; no hay plan automático al crear un lote. No está en el teléfono.
+- **EL PAQUETE QUE NO SE ENTREGA NO BORRA LA PLATA: QUEDA A FAVOR** (23-sep-2026, Germán). Antes
+  `no_entregado` se deshacía como un error de carga y un paquete **pagado por adelantado** perdía
+  la plata: el ingreso salía del libro, el cobro del arqueo y el paciente no quedaba con nada. Ahora
+  (`Cancelar#dejar_a_favor_lo_cobrado`) lo que ENTRÓ (ingresos pagados de la dispensa, sin el
+  «Aporte socio» del excedente) se queda —ingreso en el libro, cobro en su caja— y el paciente lo
+  tiene **a favor** (movimiento de cuenta corriente `a_favor`, sin asiento). Lo que no entró (deuda,
+  plata a favor usada) se revierte como siempre. **Nadie decide al recibir la rendición** —suele
+  recibirla el dispensador—: queda a favor y la tarjeta se lo dice. **Devolver es de
+  administración** (admin/supervisor): al cancelar la entrega a mano (`plata: 'devolver'`) o desde
+  la cuenta corriente, «Devolver plata» (`CuentasCorrientes::DevolverSaldo`: movimiento
+  `devolucion` + egreso `devolucion_paciente`; nunca más de lo que tiene a favor). La caja de la que
+  sale el efectivo tiene que alcanzar, y la regla vive en `Devoluciones::CajaDeSalida`.
 - **TODO PACIENTE TIENE CUENTA CORRIENTE, Y LO QUE PAGA DE MÁS QUEDA A FAVOR** (18-sep-2026,
   decisión de Germán que REVIRTIÓ la del 17: «no hay plata a favor» es legacy si aparece en un
   comentario viejo). La razón es el vuelto: sin cambio, se le deja a cuenta y **en la próxima

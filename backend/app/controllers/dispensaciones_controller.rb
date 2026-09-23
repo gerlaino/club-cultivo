@@ -594,11 +594,18 @@ class DispensacionesController < ApplicationController
     registrar_evento_envio(@dispensacion, 'cancelado', motivo: nota)
     # La reversa vive en `Dispensaciones::Cancelar`: la usa también la rendición del repartidor
     # cuando vuelve un paquete, y escribirla dos veces es cómo dejan de coincidir.
+    #
+    # Lo que ya había pagado queda A FAVOR del paciente, salvo que administración elija
+    # devolvérselo en el momento (`plata: 'devolver'`, con `devolucion: { medio, caja_turno_id }`).
+    devolucion = params[:devolucion].respond_to?(:permit) ? params[:devolucion].permit(:medio, :caja_turno_id).to_h : {}
     res = Dispensaciones::Cancelar.call(dispensacion: @dispensacion, usuario: current_user,
-                                        motivo: 'no_entregado', nota: nota, evento: false)
+                                        motivo: 'no_entregado', nota: nota, evento: false,
+                                        plata: params[:plata].presence || 'a_favor', devolucion: devolucion)
     return render json: { errors: [res.error] }, status: :unprocessable_entity unless res.ok?
 
-    render json: serialize_dispensacion_delivery(@dispensacion)
+    render json: serialize_dispensacion_delivery(@dispensacion).merge(
+      a_favor_ars: res.a_favor_ars.to_f, devuelto_ars: res.devuelto_ars.to_f
+    )
   end
 
   # PATCH /dispensaciones/:id/anular

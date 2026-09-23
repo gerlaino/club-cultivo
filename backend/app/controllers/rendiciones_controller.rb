@@ -164,6 +164,10 @@ class RendicionesController < ApplicationController
       id: d.id, paciente: d.paciente&.nombre_completo,
       cantidad: d.cantidad.to_f, unidad: d.stock&.unidad || 'g',
       producto: d.stock&.etiqueta, motivo_fallo: d.motivo_fallo,
+      # Lo que el paciente ya había pagado por este paquete. Al recibir la rendición queda A
+      # FAVOR suyo: quien recibe (casi siempre el dispensador) no decide nada, pero tiene que
+      # saberlo, porque es lo que le va a decir al paciente cuando vuelva.
+      pagado_ars: Dispensaciones::Cancelar.cobrado_de(d).to_f,
     }
   end
 

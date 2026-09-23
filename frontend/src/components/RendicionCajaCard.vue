@@ -148,10 +148,19 @@
           <p v-for="p in r.devoluciones" :key="p.id" class="rnd__paquete">
             <b>{{ fmtCant(p.cantidad) }} {{ p.unidad }}</b> de {{ p.producto }} — {{ p.paciente }}
             <em v-if="p.motivo_fallo">· {{ p.motivo_fallo }}</em>
+            <!-- Lo que ya había pagado no se borra: le queda a favor. Quien recibe no decide nada,
+                 pero es lo que le va a decir al paciente cuando vuelva. -->
+            <span v-if="p.pagado_ars > 0" class="rnd__paquete-favor">
+              Había pagado ${{ fmt(p.pagado_ars) }}: le quedan a favor.
+            </span>
           </p>
           <p class="rnd__paquetes-hint">
             Se desarman y el producto vuelve al mostrador. Cuando se despache de nuevo, se arma
             en el momento.
+            <template v-if="r.devoluciones.some(p => p.pagado_ars > 0)">
+              Lo que ya se pagó queda a favor de cada paciente y se le descuenta solo en la
+              próxima; si hay que devolverlo, lo hace administración desde su cuenta corriente.
+            </template>
           </p>
         </div>
       </div>
@@ -370,6 +379,7 @@ onMounted(async () => {
 .rnd__paquetes-lbl  { margin: 0 0 6px; font-size: var(--fs-13); font-weight: 600; color: var(--c-ink-900); }
 .rnd__paquete { margin: 0; padding: 3px 0; font-size: var(--fs-13); color: var(--c-ink-700); }
 .rnd__paquete em { font-style: normal; color: var(--c-ink-500); }
+.rnd__paquete-favor { display: block; font-size: var(--fs-12, .75rem); color: var(--c-leaf-800); font-weight: 600; }
 .rnd__paquetes-hint { margin: 6px 0 0; font-size: var(--fs-12); color: var(--c-ink-500); }
 
 /* No se da por perdida: existe y está con una persona. El texto tiene que decir eso. */

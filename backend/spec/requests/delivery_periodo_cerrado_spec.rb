@@ -36,6 +36,10 @@ RSpec.describe 'Delivery con el período contable cerrado', type: :request do
                            medio_pago: medio, aporte_socio_ars: 1_000, fecha_dispensacion: fecha_pedido,
                            cobrar_en_entrega: cobrar_en_entrega, con_envio: true, estado_envio: estado,
                            delivery_id: juan.id, direccion_envio: 'Falsa 123', contacto_nombre: 'X')
+             # Al crear, el modelo lo arranca en 'pendiente' (`generar_codigo_paquete`): el estado
+             # pedido se pone después. Sin esto el «fallido» nunca lo era y la rendición no lo
+             # recogía (el test de «no rebota» fallaba por eso, desde antes del 23-sep).
+             .tap { |d| d.update_columns(estado_envio: estado) }
     end
   end
 
@@ -82,8 +86,12 @@ RSpec.describe 'Delivery con el período contable cerrado', type: :request do
     end
   end
 
+  # LO QUE YA SE PAGÓ NO SE BORRA (23-sep-2026): queda a favor del paciente. Antes, con el mes
+  # abierto se borraba el ingreso, y con el mes cerrado se escribía un egreso «Devolución» que no
+  # correspondía a ninguna plata que saliera — en los dos casos el paciente se quedaba sin nada.
+  # Lo que protegía el #572 sigue valiendo: con el mes cerrado, cancelar y rendir NO rebotan.
   describe 'cancelar un fallido pagado por adelantado en un mes ya cerrado (el #572 de Germán)' do
-    it 'cancela igual: el asiento viejo queda y la devolución se asienta HOY, al lado' do
+    it 'cancela igual: el asiento viejo queda y lo que pagó le queda a favor' do
       d = paquete!(estado: 'fallido', cobrar_en_entrega: false)
       ActsAsTenant.with_tenant(club) do
         Dispensaciones::RegistrarCobro.call(dispensacion: d, club: club, usuario: admin,
@@ -101,17 +109,11 @@ RSpec.describe 'Delivery con el período contable cerrado', type: :request do
       expect(response).to have_http_status(:ok), response.body
       expect(d.reload.estado_envio).to eq('cancelada')
       expect(stock.reload.cantidad).to eq(1_000)
-
-      movs = d.movimientos_contables.order(:id)
-      expect(movs.map(&:id)).to include(viejo.id)             # el mes cerrado no se toca
-      contra = movs.where(tipo: 'egreso').sole
-      expect(contra.fecha).to eq(hoy)
-      expect(contra.monto_ars).to eq(1_000)
-      expect(contra.medio_pago).to eq('transferencia')
-      expect(contra.descripcion).to match(/Devolución/)
+      expect(d.movimientos_contables.order(:id).map(&:id)).to eq([viejo.id]) # el mes cerrado no se toca
+      expect(cc.reload.saldo_disponible).to eq(1_000)
     end
 
-    it 'con el período abierto se borra como siempre, sin contra-asiento' do
+    it 'con el período abierto, el ingreso tampoco se borra: la plata entró' do
       d = paquete!(estado: 'fallido', cobrar_en_entrega: false)
       ActsAsTenant.with_tenant(club) do
         Dispensaciones::RegistrarCobro.call(dispensacion: d, club: club, usuario: admin,
@@ -122,14 +124,15 @@ RSpec.describe 'Delivery con el período contable cerrado', type: :request do
       patch "/dispensaciones/#{d.id}/cancelar_entrega", headers: auth_headers, as: :json
 
       expect(response).to have_http_status(:ok), response.body
-      expect(d.reload.movimientos_contables).to be_empty
+      expect(d.reload.movimientos_contables.sum(:monto_ars)).to eq(1_000)
+      expect(cc.reload.saldo_disponible).to eq(1_000)
     end
   end
 
   describe 'recibir la rendición con un fallido del mes cerrado' do
     # El paquete que vuelve se cancela al recibir la rendición (`devolver_paquetes!`). Con el
     # candado viejo, un fallido pagado por adelantado hacía rebotar la rendición ENTERA.
-    it 'no rebota' do
+    it 'no rebota, y lo que había pagado queda a favor' do
       pagado  = paquete!(estado: 'fallido', cobrar_en_entrega: false)
       ActsAsTenant.with_tenant(club) do
         Dispensaciones::RegistrarCobro.call(dispensacion: pagado, club: club, usuario: admin,
@@ -148,7 +151,8 @@ RSpec.describe 'Delivery con el período contable cerrado', type: :request do
 
       expect(response).to have_http_status(:ok), response.body
       expect(pagado.reload.estado_envio).to eq('cancelada')
-      expect(pagado.movimientos_contables.where(tipo: 'egreso').count).to eq(1)
+      expect(pagado.movimientos_contables.where(tipo: 'egreso')).to be_empty
+      expect(cc.reload.saldo_disponible).to eq(1_000)
     end
   end
 

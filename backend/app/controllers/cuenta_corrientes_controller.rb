@@ -168,6 +168,21 @@ class CuentaCorrientesController < ApplicationController
     render json: { error: e.message }, status: :unprocessable_entity
   end
 
+  # POST /pacientes/:paciente_id/cuenta_corriente/devolver
+  # Le devuelve al paciente plata que tiene a favor: baja la cuenta corriente y escribe el egreso
+  # «devolución a paciente». Sólo administración (admin/supervisor). Body: { monto, medio,
+  # caja_turno_id? } — con `caja_turno_id` presente (aunque vacío) se usa esa caja o ninguna.
+  def devolver
+    caja = params.key?(:caja_turno_id) ? { caja_turno_id: params[:caja_turno_id].presence } : {}
+    res = CuentasCorrientes::DevolverSaldo.call(
+      paciente: @paciente, usuario: current_user, monto: params[:monto],
+      medio: params[:medio], caja: caja, nota: params[:nota],
+    )
+    return render json: { error: res.error }, status: :unprocessable_entity unless res.ok?
+
+    render json: serialize(@paciente.cuenta_corriente.reload), status: :created
+  end
+
   private
 
   def set_paciente

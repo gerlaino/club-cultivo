@@ -317,6 +317,8 @@ export const getCuentaCorriente  = (pacienteId)         => api.get(`/pacientes/$
 export const cargarCreditoCC     = (pacienteId, payload) => api.post(`/pacientes/${pacienteId}/cuenta_corriente/cargar`, payload)
 export const ajustarCC           = (pacienteId, payload) => api.post(`/pacientes/${pacienteId}/cuenta_corriente/ajuste`, payload)
 export const registrarPagoCC     = (pacienteId, payload) => api.post(`/pacientes/${pacienteId}/cuenta_corriente/registrar_pago`, payload)
+// Devolverle plata que tiene a favor (admin/supervisor). payload: { monto, medio, caja_turno_id? }
+export const devolverSaldoCC     = (pacienteId, payload) => api.post(`/pacientes/${pacienteId}/cuenta_corriente/devolver`, payload)
 export const setLimiteCC         = (pacienteId, limite)  => api.patch(`/pacientes/${pacienteId}/cuenta_corriente/set_limite`, { limite_credito: limite })
 
 export const exportPacientesCSV  = (params = {}) => api.get('/pacientes/export_csv', { params, responseType: 'blob' })
@@ -363,7 +365,9 @@ export const entregarPaquete  = (id, { notasEntrega, firmaData, cobros = [], com
 }
 export const reportarFallo    = (id, motivoFallo)   => api.patch(`/dispensaciones/${id}/reportar_fallo`, { motivo_fallo: motivoFallo })
 export const reprogramarPaquete = (id)             => api.patch(`/dispensaciones/${id}/reprogramar`)
-export const cancelarEntregaDispensacion = (id, motivo) => api.patch(`/dispensaciones/${id}/cancelar_entrega`, { motivo })
+// `plata`: 'a_favor' (por defecto) o 'devolver', con `devolucion: { medio, caja_turno_id? }`.
+export const cancelarEntregaDispensacion = (id, motivo, { plata, devolucion } = {}) =>
+  api.patch(`/dispensaciones/${id}/cancelar_entrega`, { motivo, ...(plata ? { plata } : {}), ...(devolucion ? { devolucion } : {}) })
 export const listDeliveryUsers  = ()                => api.get('/usuarios', { params: { role: 'delivery' } })
 // Endpoint propio (no /usuarios, que es sólo de admin): el dispensador necesita esta lista
 // para poder despachar y no puede leer el índice de usuarios del club.
