@@ -100,23 +100,21 @@ module Dispensaciones
       return if monto.to_d <= 0
 
       medio_pago = medio || 'efectivo'
+      # Con el envío partido, la parte del producto es el monto menos la del envío.
       return if MovimientoContable.exists?(dispensacion_id: @disp.id, categoria: 'dispensacion',
-                                           medio_pago: medio_pago, monto_ars: monto)
+                                           medio_pago: medio_pago, monto_ars: monto - @disp.parte_envio_de(monto))
 
-      MovimientoContable.create!(
+      Dispensaciones::Asiento.crear!(dispensacion: @disp, monto: monto, attrs: {
         club:             club,
         sede_id:          @disp.sede_id,
-        dispensacion:     @disp,
         created_by:       @usuario,
         tipo:             'recupero_costo',
-        categoria:        'dispensacion',
         descripcion:      descripcion,
-        monto_ars:        monto,
         fecha:            @disp.fecha_dispensacion,
         pagado:           pagado,
         medio_pago:       medio_pago,
         comprobante_tipo: 'sin_comprobante',
-      )
+      })
     end
   end
 end

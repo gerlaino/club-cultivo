@@ -89,16 +89,17 @@ module Rendiciones
     def asentar_y_rendir!(cobro, caja)
       d     = cobro.dispensacion
       quien = @rendicion.delivery.first_name.presence || @rendicion.delivery.email
-      MovimientoContable.create!(
-        club: @rendicion.club, sede_id: d&.sede_id, dispensacion: d, paciente: d&.paciente,
-        created_by: @receptor, tipo: 'recupero_costo', categoria: 'dispensacion',
+      # Producto y envío, cada uno a su categoría (`Dispensaciones::Asiento`).
+      Dispensaciones::Asiento.crear!(dispensacion: d, monto: cobro.monto_ars, attrs: {
+        club: @rendicion.club, sede_id: d&.sede_id, paciente: d&.paciente,
+        created_by: @receptor, tipo: 'recupero_costo',
         descripcion: "Recepción de caja (#{quien}) — Dispensación ##{d&.id}",
         # Con fecha de HOY, no la del pedido: la plata entra al cajón cuando se rinde. Fechada con
         # el pedido caía en el mes anterior, y si ese mes ya estaba cerrado la rendición entera
         # rebotaba. Mismo criterio que `RegistrarCobro#fecha_del_asiento`.
-        monto_ars: cobro.monto_ars, fecha: Time.zone.today,
+        fecha: Time.zone.today,
         pagado: true, medio_pago: 'efectivo', comprobante_tipo: 'sin_comprobante'
-      )
+      })
       cobro.update!(rendido: true, rendido_at: Time.current, caja_turno: caja)
     end
 

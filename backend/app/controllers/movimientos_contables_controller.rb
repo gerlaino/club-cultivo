@@ -96,6 +96,10 @@ class MovimientosContablesController < ApplicationController
 
     render json: {
       sede_filtro:  params[:sede_id].presence,
+      # LAS CATEGORÍAS DEL SISTEMA, con su nombre en pantalla. La vista tenía su propia copia y se
+      # quedaba atrás cada vez que aparecía una (le faltaban «Devolución a paciente», las de la
+      # caja…, y se mostraba la clave cruda). Una sola lista: `MovimientoContable::CATEGORIA_LABELS`.
+      categorias_sistema: MovimientoContable::CATEGORIA_LABELS.map { |value, label| { value: value, label: label } },
       mes_actual: {
         ingresos:       mes_actual.ingresos.sum(:monto_ars).to_f,
         egresos:        mes_actual.egresos.sum(:monto_ars).to_f,

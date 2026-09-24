@@ -79,13 +79,13 @@ class MovimientoContable < ApplicationRecord
 
   CATEGORIAS = %w[
     insumo electricidad agua alquiler sueldo mantenimiento
-    honorario seguro admin aporte_socio dispensacion subvencion bar
+    honorario seguro admin aporte_socio dispensacion envio subvencion bar
     salida_caja retiro_caja devolucion_caja diferencia_caja ingreso_caja
     a_cuenta_repartidor devolucion_a_cuenta devolucion_paciente otro
   ].freeze
 
   CATEGORIA_LABELS = {
-    "bar"           => "Bar / Salón",
+    "bar"           => "Buffet",
     "insumo"        => "Insumo / Materia prima",
     "electricidad"  => "Electricidad",
     "agua"          => "Agua",
@@ -97,6 +97,9 @@ class MovimientoContable < ApplicationRecord
     "admin"         => "Gasto administrativo",
     "aporte_socio"  => "Aporte socio",
     "dispensacion"  => "Recupero dispensación",
+    # Lo que se cobró por llevar el paquete (23-sep-2026): aparte del producto, para que el
+    # recupero de la dispensación no se infle con los envíos.
+    "envio"         => "Envíos",
     "subvencion"    => "Subvención / Donación",
     # De la caja de turno del mostrador. `salida_caja` es plata que salió del cajón durante el
     # turno; `diferencia_caja` es lo que no apareció (o sobró) al arquear.

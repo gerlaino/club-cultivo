@@ -46,6 +46,8 @@ async function montar () {
   w.vm.agregarItem()
   w.vm.form.con_envio = true
   w.vm.form.delivery_id = 7
+  // El valor del envío es obligatorio (23-sep-2026): bonificado, que acá no es lo que se prueba.
+  w.vm.form.costo_envio = 0
   w.vm.form.contacto_nombre = 'Augusto'
   await flushPromises()
   return w

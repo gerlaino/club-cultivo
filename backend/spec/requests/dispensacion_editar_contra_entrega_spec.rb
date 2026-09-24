@@ -29,7 +29,7 @@ RSpec.describe 'Editar dispensación: contra entrega', type: :request do
   end
 
   it 'una que va por delivery pagada en efectivo pasa a contra entrega: se deshace el cobro y queda pendiente' do
-    d = dispensar(con_envio: true, delivery_id: delivery.id, direccion_origen: 'domicilio')
+    d = dispensar(con_envio: true, costo_envio_ars: 0, delivery_id: delivery.id, direccion_origen: 'domicilio')
     expect(d.cobros.count).to eq(1)
     expect(d.movimientos_contables.count).to eq(1)
 
@@ -44,7 +44,7 @@ RSpec.describe 'Editar dispensación: contra entrega', type: :request do
   end
 
   it 'y vuelve a efectivo mientras el repartidor no cobró: se cobra ahora y se asienta' do
-    d = dispensar(con_envio: true, delivery_id: delivery.id, direccion_origen: 'domicilio', cobrar_en_entrega: true)
+    d = dispensar(con_envio: true, costo_envio_ars: 0, delivery_id: delivery.id, direccion_origen: 'domicilio', cobrar_en_entrega: true)
     expect(d.cobrar_en_entrega).to be(true)
     expect(d.cobros).to be_empty
 
@@ -69,7 +69,7 @@ RSpec.describe 'Editar dispensación: contra entrega', type: :request do
   end
 
   it 'con el paquete ya entregado, no' do
-    d = dispensar(con_envio: true, delivery_id: delivery.id, direccion_origen: 'domicilio')
+    d = dispensar(con_envio: true, costo_envio_ars: 0, delivery_id: delivery.id, direccion_origen: 'domicilio')
     d.update_columns(estado_envio: 'entregado')
 
     editar(d, { medio_pago: 'contra_entrega' })

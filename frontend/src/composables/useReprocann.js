@@ -88,7 +88,7 @@ export function reprocannCategoria(p, hoy = new Date()) {
 }
 
 const BADGES = {
-  pendiente:     { label: 'En trámite', level: 'caution' },
+  pendiente:     { label: 'Pendiente de aprobación', level: 'caution' },
   sin_reprocann: null,                  // sin nada que informar: la vista muestra "—"
   vencido:       { label: 'Vencido',    level: 'danger'  },
   por_vencer:    { label: null,         level: 'warning' }, // el label son los días restantes

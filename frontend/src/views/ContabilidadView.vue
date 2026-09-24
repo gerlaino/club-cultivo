@@ -381,23 +381,11 @@ function mesLabel(m) {
   return m
 }
 
-const CATEGORIAS = [
-  { value: "insumo",        label: "Insumo / Materia prima",   tipo: "egreso"  },
-  { value: "electricidad",  label: "Electricidad",             tipo: "egreso"  },
-  { value: "agua",          label: "Agua",                     tipo: "egreso"  },
-  { value: "alquiler",      label: "Alquiler",                 tipo: "egreso"  },
-  { value: "sueldo",        label: "Sueldo / Staff",           tipo: "egreso"  },
-  { value: "mantenimiento", label: "Mantenimiento",            tipo: "egreso"  },
-  { value: "honorario",     label: "Honorario profesional",    tipo: "egreso"  },
-  { value: "seguro",        label: "Seguro",                   tipo: "egreso"  },
-  { value: "admin",         label: "Gasto administrativo",     tipo: "egreso"  },
-  { value: "aporte_socio",  label: "Aporte socio",             tipo: "ingreso" },
-  { value: "dispensacion",  label: "Recupero dispensación",    tipo: "ingreso" },
-  { value: "subvencion",    label: "Subvención / Donación",    tipo: "ingreso" },
-  { value: "bar",           label: "Buffet",              tipo: "ambos"   },
-  { value: "otro",          label: "Otro",                     tipo: "ambos"   },
-]
-function catLabel(cat) { return CATEGORIAS.find(c => c.value === cat)?.label || cat || "—" }
+// Las categorías del sistema y sus nombres los manda el servidor en el tablero
+// (`categorias_sistema`, de `MovimientoContable::CATEGORIA_LABELS`). Había una copia acá que se
+// quedaba atrás y mostraba la clave cruda de las que le faltaban.
+const CATEGORIAS = computed(() => store.dashboard?.categorias_sistema || [])
+function catLabel(cat) { return CATEGORIAS.value.find(c => c.value === cat)?.label || cat || "—" }
 
 // Detalle de un movimiento (modal informativo): qué, quién, cuándo, dónde, y link al bar si aplica.
 const detalleMov = ref(null)
@@ -424,7 +412,7 @@ const ultimosFiltrados = computed(() => {
   const filtered = q
     ? list.filter(m =>
       m.descripcion?.toLowerCase().includes(q) ||
-      catLabel(m.categoria).toLowerCase().includes(q) ||
+      (m.categoria_label || catLabel(m.categoria)).toLowerCase().includes(q) ||
       m.tipo?.toLowerCase().includes(q)
     )
     : list
@@ -1512,7 +1500,7 @@ onMounted(async () => {
                para un movimiento colgado de una subcategoría era el nombre de la SUB ("Kawsay")
                bajo el rótulo "Categoría": la madre no aparecía en ninguna parte y el rótulo
                mentía. "Unidad" además era jerga: en toda la app se llama Sector. -->
-          <dt>Categoría</dt><dd>{{ detalleMov.categoria_madre || catLabel(detalleMov.categoria) }}</dd>
+          <dt>Categoría</dt><dd>{{ detalleMov.categoria_madre || detalleMov.categoria_label || catLabel(detalleMov.categoria) }}</dd>
           <dt v-if="detalleMov.subcategoria">Subcategoría</dt><dd v-if="detalleMov.subcategoria">{{ detalleMov.subcategoria }}</dd>
           <dt>Sector</dt><dd>{{ detalleMov.unidad_negocio?.nombre || 'Sin sector' }}</dd>
           <dt>Depósito</dt><dd>{{ detalleMov.deposito?.nombre || 'Sin depósito' }}</dd>

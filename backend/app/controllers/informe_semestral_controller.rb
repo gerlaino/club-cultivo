@@ -53,7 +53,7 @@ class InformeSemestralController < ApplicationController
   end
 
   ESTADO_LABEL = { 'vigente' => 'Vigente', 'por_vencer' => 'Vigente', 'vencido' => 'Vencido',
-                   'pendiente' => 'En trámite', 'sin_reprocann' => 'Sin número' }.freeze
+                   'pendiente' => 'Pendiente de aprobación', 'sin_reprocann' => 'Sin número' }.freeze
 
   def xlsx(datos, anio, semestre)
     pac = datos[:pacientes]
@@ -63,7 +63,7 @@ class InformeSemestralController < ApplicationController
       'Pacientes registrados'   => pac[:registrados],
       'Vigentes al cierre'      => pac[:vigentes],
       'Vencidos al cierre'      => pac[:vencidos],
-      'En trámite'              => pac[:en_tramite],
+      'Pendientes de aprobación' => pac[:en_tramite],
       'Sin registro (no se presentan)' => pac[:sin_registro],
       'Lotes cosechados'        => datos[:cultivo][:cosechados][:lotes],
       'Flor seca cosechada (g)' => datos[:cultivo][:cosechados][:gramos],

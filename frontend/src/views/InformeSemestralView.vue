@@ -55,7 +55,7 @@ async function descargar(formato = 'pdf', paraPresentar = false) {
   }
 }
 
-const ESTADO = { vigente: 'Vigente', por_vencer: 'Vigente', vencido: 'Vencido', pendiente: 'En trámite', sin_reprocann: 'Sin número' }
+const ESTADO = { vigente: 'Vigente', por_vencer: 'Vigente', vencido: 'Vencido', pendiente: 'Pendiente de aprobación', sin_reprocann: 'Sin número' }
 const estadoLabel = (e) => ESTADO[e] || e
 const estadoClase = (e) => ({ vigente: 'ok', por_vencer: 'ok', vencido: 'bad', pendiente: 'warn', sin_reprocann: 'warn' }[e] || '')
 const fmtG = (g) => `${Number(g || 0).toLocaleString('es-AR', { maximumFractionDigits: 1 })} g`
@@ -144,7 +144,7 @@ onMounted(cargar)
           <div class="inf__kpi"><span class="inf__kpi-valor">{{ informe.pacientes.registrados }}</span><span class="inf__kpi-label">Registrados</span></div>
           <div class="inf__kpi inf__kpi--ok"><span class="inf__kpi-valor">{{ informe.pacientes.vigentes }}</span><span class="inf__kpi-label">Vigentes al cierre</span></div>
           <div class="inf__kpi" :class="{ 'inf__kpi--bad': informe.pacientes.vencidos > 0 }"><span class="inf__kpi-valor">{{ informe.pacientes.vencidos }}</span><span class="inf__kpi-label">Vencidos al cierre</span></div>
-          <div class="inf__kpi"><span class="inf__kpi-valor">{{ informe.pacientes.en_tramite }}</span><span class="inf__kpi-label">En trámite</span></div>
+          <div class="inf__kpi"><span class="inf__kpi-valor">{{ informe.pacientes.en_tramite }}</span><span class="inf__kpi-label">Pendientes de aprobación</span></div>
           <div class="inf__kpi"><span class="inf__kpi-valor">{{ informe.pacientes.sin_registro }}</span><span class="inf__kpi-label">Sin registro<br><small>no se presentan; se informa el número</small></span></div>
         </div>
 

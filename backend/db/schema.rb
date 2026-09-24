@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_22_100000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_23_150000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -721,6 +721,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_22_100000) do
     t.string "resolucion_anulacion"
     t.bigint "reemplaza_a_id"
     t.string "direccion_etiqueta"
+    t.decimal "costo_envio_ars", precision: 10, scale: 2
     t.index ["anulada_por_id"], name: "index_dispensaciones_on_anulada_por_id"
     t.index ["ariccame_reportada"], name: "index_dispensaciones_on_ariccame_reportada", where: "(ariccame_reportada = false)"
     t.index ["codigo_paquete"], name: "index_dispensaciones_on_codigo_paquete", unique: true
@@ -741,6 +742,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_22_100000) do
     t.index ["token"], name: "index_dispensaciones_on_token", unique: true
     t.index ["turno_mostrador_id"], name: "index_dispensaciones_on_turno_mostrador_id"
     t.index ["user_id"], name: "index_dispensaciones_on_user_id"
+    t.check_constraint "costo_envio_ars IS NULL OR costo_envio_ars >= 0::numeric", name: "dispensaciones_costo_envio_no_negativo"
   end
 
   create_table "disponibilidad_medicos", force: :cascade do |t|

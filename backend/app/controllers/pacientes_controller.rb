@@ -89,7 +89,8 @@ class PacientesController < ApplicationController
     # La LISTA nunca expone datos clínicos: allowlist estricta de campos no clínicos.
     data = pacientes.map do |p|
       p.as_json(only: campos_visibles, methods: metodos_lista)
-       .merge('ultima_dispensacion' => ultimas[p.id])
+       .merge('ultima_dispensacion' => ultimas[p.id],
+              'suspendido' => Paciente.suspendido?(es_paciente: p.es_paciente, ultima_dispensacion: ultimas[p.id]))
     end
 
     render json: {
@@ -125,6 +126,8 @@ class PacientesController < ApplicationController
     json['reprocann_documento_url'] = url_for(@paciente.reprocann_documento) if @paciente.reprocann_documento.attached?
 
     ultima = @paciente.dispensaciones.includes(:stock).recientes.first
+    json['suspendido'] = Paciente.suspendido?(es_paciente: @paciente.es_paciente,
+                                              ultima_dispensacion: @paciente.dispensaciones.no_canceladas.maximum(:fecha_dispensacion))
     json['ultima_dispensacion'] = ultima ? {
       fecha:          ultima.fecha_dispensacion,
       cantidad:       ultima.cantidad,
@@ -503,7 +506,7 @@ class PacientesController < ApplicationController
     ultimas   = Dispensacion.no_canceladas
                             .where(paciente_id: nomina.select(:id))
                             .group(:paciente_id).maximum(:fecha_dispensacion)
-    inactivos = ultimas.count { |_id, fecha| fecha.present? && fecha < 90.days.ago.to_date }
+    inactivos = ultimas.count { |_id, fecha| Paciente.suspendido?(es_paciente: true, ultima_dispensacion: fecha, hoy: hoy) }
 
     {
       total:      nomina.count,

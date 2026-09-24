@@ -18,7 +18,7 @@ RSpec.describe 'Caja del delivery: efectivo en tránsito', type: :request do
     sign_in_as(dispensador)
     post "/pacientes/#{paciente.id}/dispensaciones",
          params: { dispensacion: { stock_id: stock.id, cantidad: 1, cobrar_en_entrega: true,
-                                   con_envio: true, delivery_id: delivery.id, usar_domicilio_paciente: true } },
+                                   con_envio: true, costo_envio_ars: 0, delivery_id: delivery.id, usar_domicilio_paciente: true } },
          headers: auth_headers
     expect(response).to have_http_status(:created)
     d = Dispensacion.last
@@ -57,7 +57,7 @@ RSpec.describe 'Caja del delivery: efectivo en tránsito', type: :request do
     sign_in_as(dispensador)
     post "/pacientes/#{paciente.id}/dispensaciones",
          params: { dispensacion: { stock_id: stock.id, cantidad: 1, cobrar_en_entrega: true,
-                                   con_envio: true, delivery_id: delivery.id, usar_domicilio_paciente: true } },
+                                   con_envio: true, costo_envio_ars: 0, delivery_id: delivery.id, usar_domicilio_paciente: true } },
          headers: auth_headers
     d = Dispensacion.last
 

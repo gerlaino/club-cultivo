@@ -11,7 +11,7 @@
 # asunto del Ministerio de Salud (decisión de Germán, sep-2026).
 class InformeSemestralDocument < BaseDocument
   ESTADO = { 'vigente' => 'Vigente', 'por_vencer' => 'Vigente', 'vencido' => 'Vencido',
-             'pendiente' => 'En trámite', 'sin_reprocann' => 'Sin número' }.freeze
+             'pendiente' => 'Pendiente de aprobación', 'sin_reprocann' => 'Sin número' }.freeze
   NIVEL  = { 'vigente' => :ok, 'por_vencer' => :ok, 'vencido' => :crit, 'pendiente' => :warn, 'sin_reprocann' => :warn }.freeze
 
   def initialize(club:, usuario:, datos:, salvedad_inase: nil)
@@ -76,7 +76,7 @@ class InformeSemestralDocument < BaseDocument
       { label: "Registrados",       valor: p[:registrados] },
       { label: "Vigentes al cierre", valor: p[:vigentes], tono: :ok },
       { label: "Vencidos al cierre", valor: p[:vencidos], tono: (p[:vencidos].to_i.positive? ? :crit : nil) },
-      { label: "En trámite",        valor: p[:en_tramite] },
+      { label: "Pendientes de aprobación", valor: p[:en_tramite] },
       { label: "Sin registro",      valor: p[:sin_registro] },
     ])
     nota(pdf, "«Sin registro» son pacientes de la organización que no iniciaron el trámite: se informa el " \

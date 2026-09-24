@@ -20,7 +20,7 @@ RSpec.describe 'Dispensación con envío — dirección', type: :request do
   def crear(envio_attrs)
     post "/pacientes/#{paciente.id}/dispensaciones",
          params: { dispensacion: { stock_id: stock.id, cantidad: 5, medio_pago: 'efectivo',
-                                   aporte_socio_ars: 500, con_envio: true, delivery_id: delivery.id }.merge(envio_attrs) },
+                                   aporte_socio_ars: 500, con_envio: true, costo_envio_ars: 0, delivery_id: delivery.id }.merge(envio_attrs) },
          headers: auth_headers
   end
 
@@ -134,7 +134,7 @@ RSpec.describe 'Dispensación con envío — dirección', type: :request do
     it '«otra» con guardar también anda con el carrito multi-producto' do
       post "/pacientes/#{paciente.id}/dispensaciones",
            params: { dispensacion: { items: [{ stock_id: stock.id, cantidad: 5 }], medio_pago: 'efectivo', aporte_socio_ars: 500,
-                                     con_envio: true, delivery_id: delivery.id, direccion_origen: 'otra',
+                                     con_envio: true, costo_envio_ars: 0, delivery_id: delivery.id, direccion_origen: 'otra',
                                      envio_calle: 'Balbastro', envio_altura: '1265', envio_ciudad: 'CABA', envio_etiqueta: 'Hobby',
                                      guardar_como_envio: true, contacto_nombre: 'Example' } },
            headers: auth_headers

@@ -36,6 +36,8 @@ module Portal
         gramos: dispensa.cantidad_total.to_f,
         # Lo que aportó por esa entrega. `aporte_socio_ars` es el total de la dispensa.
         total:  dispensa.aporte_socio_ars.to_f,
+        # Cuánto de ese total fue el envío (nil = sin envío; 0 = bonificado).
+        envio:  dispensa.costo_envio_ars&.to_f,
         items:  dispensa.items.map { |i|
           { genetica: i.stock&.genetica&.nombre, cantidad: i.cantidad.to_f,
             forma: i.stock&.forma_producto, unidad: i.stock&.unidad }

@@ -118,16 +118,65 @@
       </div>
     </SheetBottom>
 
-    <!-- Sheet: Crear lote -->
+    <!-- Sheet: Crear lote. Nuevo o «ya lo tenía» (23-sep-2026): el teléfono sólo sabía crear uno
+         que arrancaba hoy, y ni eso — mandaba el estado `semilla`, que no existe, y el backend lo
+         rechazaba siempre. La regla es la del escritorio (`NuevoLoteModal`), con la sala fija. -->
     <SheetBottom v-model="showNuevoLote" title="Crear lote">
       <div class="msal__sheet-body">
-        <div class="msal__info-box" v-if="sala">
-          Estado inicial: <strong>{{ estadoLabel(estadoInicialLote) }}</strong>
-          · Fecha inicio: <strong>hoy</strong>
+        <div class="msal__seg" role="radiogroup" aria-label="Qué lote es">
+          <button type="button" class="msal__seg-b" :class="{ 'is-on': tipoLote === 'nuevo' }" id="msal-lote-nuevo"
+                  role="radio" :aria-checked="tipoLote === 'nuevo'" :disabled="salaVieneDeAntes"
+                  @click="!salaVieneDeAntes && (tipoLote = 'nuevo')">Lote nuevo</button>
+          <button type="button" class="msal__seg-b" :class="{ 'is-on': tipoLote === 'existente' }" id="msal-lote-existente"
+                  role="radio" :aria-checked="tipoLote === 'existente'" @click="tipoLote = 'existente'">Ya lo tenía</button>
         </div>
+        <p v-if="salaVieneDeAntes" class="msal__hint">
+          En {{ salaTxt.Corta === 'Sala' ? 'una sala' : 'un espacio' }} de floración un lote no nace: viene de antes. Contá cuánto lleva.
+        </p>
+
         <div class="msal__field">
-          <label class="msal__label">Cantidad de plantas <span class="msal__opt">opcional</span></label>
-          <input v-model.number="loteForm.plants_count" type="number" min="0" max="5000" class="msal__input" placeholder="0" />
+          <label class="msal__label">¿Cómo {{ tipoLote === 'nuevo' ? 'arranca' : 'arrancó' }}?</label>
+          <div class="msal__pills">
+            <button type="button" class="msal__pill" :class="{ 'is-on': loteForm.origen === 'semilla' }" @click="loteForm.origen = 'semilla'">🌱 Semilla</button>
+            <button type="button" class="msal__pill" :class="{ 'is-on': loteForm.origen === 'esqueje' }" @click="loteForm.origen = 'esqueje'">🪴 Esqueje</button>
+          </div>
+        </div>
+
+        <template v-if="tipoLote === 'existente'">
+          <div class="msal__field">
+            <label class="msal__label" for="msal-estado">¿En qué fase está?</label>
+            <select id="msal-estado" v-model="heredadoEstado" class="msal__input" :disabled="estadosPermitidos.length === 1">
+              <option v-for="e in estadosPermitidos" :key="e.value" :value="e.value">{{ e.label }}</option>
+            </select>
+          </div>
+          <div class="msal__dias">
+            <div class="msal__field">
+              <label class="msal__label" for="msal-dias-raiz">Días enraizando</label>
+              <input id="msal-dias-raiz" v-model.number="heredadoDias.semilla_esqueje" type="number" min="0" max="999" inputmode="numeric" class="msal__input" />
+            </div>
+            <div v-if="['vegetativo', 'floracion'].includes(heredadoEstado)" class="msal__field">
+              <label class="msal__label" for="msal-dias-vege">Días en vegetativo</label>
+              <input id="msal-dias-vege" v-model.number="heredadoDias.vegetativo" type="number" min="0" max="999" inputmode="numeric" class="msal__input" />
+            </div>
+            <div v-if="heredadoEstado === 'floracion'" class="msal__field">
+              <label class="msal__label" for="msal-dias-flora">Días en floración</label>
+              <input id="msal-dias-flora" v-model.number="heredadoDias.floracion" type="number" min="0" max="999" inputmode="numeric" class="msal__input" />
+            </div>
+          </div>
+          <p class="msal__hint">
+            <template v-if="inicioEstimado">Arrancó el <strong>{{ inicioEstimado }}</strong>, según los días que cargaste.</template>
+            <template v-else>Cargá cuántos días lleva en cada fase: con eso se calcula cuándo arrancó.</template>
+          </p>
+        </template>
+        <div v-else class="msal__field">
+          <label class="msal__label" for="msal-inicio">Fecha de inicio</label>
+          <input id="msal-inicio" v-model="loteForm.start_date" type="date" :max="hoy" class="msal__input" />
+          <span class="msal__hint">Arranca enraizando.</span>
+        </div>
+
+        <div class="msal__field">
+          <label class="msal__label" for="msal-plantas">Cantidad de plantas</label>
+          <input id="msal-plantas" v-model.number="loteForm.plants_count" type="number" min="1" max="5000" inputmode="numeric" class="msal__input" placeholder="1" />
         </div>
         <div class="msal__field">
           <label class="msal__label">Genética <span class="msal__opt">opcional</span></label>
@@ -184,7 +233,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { textoProximoPaso } from '../../lib/loteHelpers.js'
-import { getSala, listLotes, createSalaNota, createLote, listGeneticas,
+import { getSala, listLotes, createSalaNota, createLote, createLoteHeredado, listGeneticas,
          listFotosSala, uploadFotoSala } from '../../lib/api'
 import { useToast }       from '../../composables/useToast'
 import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
@@ -285,24 +334,56 @@ const notaContenido    = ref('')
 const fotoInput        = ref(null)
 
 const geneticas    = ref([])
-const KIND_TO_ESTADO = { floracion: 'floracion' }
-const KINDS_CON_ORIGEN = ['vegetativo', 'madre', 'clon', 'mixta']
-const estadoInicialLote = computed(() => {
+// ── Crear lote: nuevo o «ya lo tenía» ─────────────────────────────────────────
+// Un lote NUEVO nace ENRAIZANDO, venga de semilla o de esqueje (el origen es un eje aparte de la
+// fase), y por eso no puede nacer en una sala de floración. Uno que YA EXISTÍA entra en la fase en
+// que está —sólo las que esta sala admite— con los días que lleva en cada una, y el backend
+// calcula desde cuándo (`heredado`). La tabla sala⇔fase la manda el backend en /me.
+const hoy = hoyISO()
+const ESTADOS_HEREDADO = [
+  { value: 'enraizado',  label: 'Enraizando' },
+  { value: 'vegetativo', label: 'Vegetativo' },
+  { value: 'floracion',  label: 'Floración' },
+]
+const KINDS_POR_ESTADO_FALLBACK = {
+  enraizado:  ['vegetativo', 'mixta', 'clon', 'madre'],
+  vegetativo: ['vegetativo', 'mixta', 'clon', 'madre'],
+  floracion:  ['floracion',  'mixta'],
+}
+const tipoLote       = ref('nuevo')
+const heredadoEstado = ref('vegetativo')
+const heredadoDias   = ref({ semilla_esqueje: 0, vegetativo: 0, floracion: 0 })
+const salaVieneDeAntes = computed(() => sala.value?.kind === 'floracion')
+const geneticaElegida  = computed(() => geneticas.value.find(g => String(g.id) === String(loteForm.value.genetica_id)))
+const estadosPermitidos = computed(() => {
+  const reglas = auth.user?.reglas_cultivo || {}
+  const tabla  = (geneticaElegida.value?.automatica && reglas.kinds_sala_por_estado_automatica) ||
+                 reglas.kinds_sala_por_estado || KINDS_POR_ESTADO_FALLBACK
   const kind = sala.value?.kind
-  return KINDS_CON_ORIGEN.includes(kind) ? 'semilla' : (KIND_TO_ESTADO[kind] || 'vegetativo')
+  const ok = ESTADOS_HEREDADO.filter(e => (tabla[e.value] || []).includes(kind))
+  return ok.length ? ok : ESTADOS_HEREDADO
+})
+const inicioEstimado = computed(() => {
+  const e = heredadoEstado.value, d = heredadoDias.value
+  let total = Number(d.semilla_esqueje) || 0
+  if (['vegetativo', 'floracion'].includes(e)) total += Number(d.vegetativo) || 0
+  if (e === 'floracion') total += Number(d.floracion) || 0
+  if (total <= 0) return ''
+  const f = new Date(); f.setDate(f.getDate() - total)
+  return f.toLocaleDateString('es-AR', { day: 'numeric', month: 'long', year: 'numeric' })
 })
 
 function emptyLoteForm() {
   return {
-    estado:       estadoInicialLote.value,
+    origen:       'semilla',
     start_date:   hoyISO(),
-    plants_count: 0,
+    plants_count: 1,
     genetica_id:  '',
     grow_type:    'sustrato',
     notes:        '',
   }
 }
-const loteForm = ref({ estado: 'vegetativo', start_date: '', plants_count: 0, genetica_id: '', grow_type: 'sustrato', notes: '' })
+const loteForm = ref(emptyLoteForm())
 
 const KIND_GRADIENT = {
   vegetativo: 'linear-gradient(135deg,#0f2417,#1b5e20)',
@@ -328,16 +409,33 @@ const estadoLabel  = e => EL[e] || e || '—'
 function abrirNuevoLote() {
   loteForm.value  = emptyLoteForm()
   loteError.value = null
+  tipoLote.value  = salaVieneDeAntes.value ? 'existente' : 'nuevo'
+  heredadoDias.value   = { semilla_esqueje: 0, vegetativo: 0, floracion: 0 }
+  heredadoEstado.value = estadosPermitidos.value.find(e => e.value === (sala.value?.kind === 'floracion' ? 'floracion' : 'vegetativo'))?.value
+                         || estadosPermitidos.value[0].value
   showAcciones.value  = false
   showNuevoLote.value = true
 }
 
 async function guardarNuevoLote() {
+  const n = Number(loteForm.value.plants_count)
+  if (!Number.isInteger(n) || n < 1) { loteError.value = 'Poné cuántas plantas tiene: al menos 1.'; return }
   savingLote.value = true; loteError.value = null
   try {
     const payload = { ...loteForm.value }
     if (!payload.genetica_id) delete payload.genetica_id
-    const { data } = await createLote(sala.value.id, payload)
+    let data
+    if (tipoLote.value === 'existente') {
+      delete payload.start_date
+      const d = heredadoDias.value
+      ;({ data } = await createLoteHeredado(sala.value.id, { ...payload, estado: heredadoEstado.value }, {
+        dias_semilla_esqueje: Number(d.semilla_esqueje) || 0,
+        dias_vegetativo:      Number(d.vegetativo) || 0,
+        dias_floracion:       Number(d.floracion) || 0,
+      }))
+    } else {
+      ;({ data } = await createLote(sala.value.id, { ...payload, estado: 'enraizado' }))
+    }
     lotes.value.unshift(data)
     toast.success('Lote creado')
     showNuevoLote.value = false
@@ -505,6 +603,15 @@ onMounted(async () => {
   font-size: .95rem; font-weight: 700; cursor: pointer;
 }
 .msal__btn-confirmar:disabled { opacity: .6; }
+.msal__seg { display: grid; grid-template-columns: 1fr 1fr; border: 1.5px solid var(--c-slate-200); border-radius: 10px; overflow: hidden; }
+.msal__seg-b { background: #fff; border: none; padding: .6rem .5rem; font-size: .85rem; font-weight: 700; color: var(--c-slate-600); font-family: inherit; }
+.msal__seg-b + .msal__seg-b { border-left: 1.5px solid var(--c-slate-200); }
+.msal__seg-b.is-on { background: #1b5e20; color: #fff; }
+.msal__seg-b:disabled { opacity: .45; }
+.msal__pills { display: flex; gap: .5rem; }
+.msal__pill { flex: 1; background: #fff; border: 1.5px solid var(--c-slate-200); border-radius: 9px; padding: .55rem; font-size: .85rem; font-weight: 600; color: var(--c-slate-700); font-family: inherit; }
+.msal__pill.is-on { border-color: #1b5e20; background: #f0fdf4; color: #1b5e20; }
+.msal__dias { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: .5rem; }
 .msal__info-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 9px; padding: .6rem .875rem; font-size: .8rem; color: #15803d; }
 </style>
 

@@ -22,7 +22,7 @@ RSpec.describe 'Orden de entrega secuencial', type: :request do
   def crear_despacho(orden:)
     post "/pacientes/#{paciente.id}/dispensaciones",
          params: { dispensacion: { stock_id: stock.id, cantidad: 5, medio_pago: 'efectivo', aporte_socio_ars: 500,
-                                   con_envio: true, delivery_id: delivery.id, usar_domicilio_paciente: true } },
+                                   con_envio: true, costo_envio_ars: 0, delivery_id: delivery.id, usar_domicilio_paciente: true } },
          headers: auth_headers
     expect(response).to have_http_status(:created)
     d = Dispensacion.last

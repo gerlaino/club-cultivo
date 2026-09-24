@@ -140,10 +140,14 @@ const diasDesdeUltima = (s) => {
 }
 // "No viene hace tiempo": tiene tratamiento abierto pero hace más de tres meses que no retira.
 // El que nunca dispensó no entra: ese es un alta reciente, no un abandono.
+// SUSPENDIDO POR POCO MOVIMIENTO (23-sep-2026): lo dice el backend fila por fila
+// (`Paciente.suspendido?`); el cálculo local queda de respaldo si la fila no lo trae.
 const esInactivo = (s) => {
+  if (typeof s.suspendido === 'boolean') return s.suspendido
   const d = diasDesdeUltima(s)
   return d !== null && d > DIAS_INACTIVO
 }
+const TIP_SUSPENDIDO = 'Suspendido por poco movimiento: hace más de 90 días que no retira. Puede retirar igual, y vuelve a activo solo cuando lo haga.'
 
 // Los números los cuenta el BACKEND sobre todo el padrón (`meta.kpis`). Contarlos acá sobre
 // `store.items` era contar la página: con el listado paginado de a 20, una organización de 38 pacientes
@@ -255,7 +259,7 @@ async function exportarCSV() {
            lo único de esta pantalla sobre lo que hay que hacer algo hoy. -->
       <button v-if="kpis.inactivos" class="sv__kpi sv__kpi--warn" :class="{ 'sv__kpi--active': filterEstado === 'inactivos' }" @click="filterEstado = 'inactivos'">
         <div class="sv__kpi-val">{{ kpis.inactivos }}</div>
-        <div class="sv__kpi-lbl">Sin retirar +90d</div>
+        <div class="sv__kpi-lbl">Suspendidos · +90 días sin retirar</div>
       </button>
       <button class="sv__kpi sv__kpi--warn" :class="{ 'sv__kpi--active': filterEstado === 'proximos' }" @click="filterEstado = 'proximos'">
         <div class="sv__kpi-val">{{ kpis.proximos }}</div>
@@ -406,9 +410,11 @@ async function exportarCSV() {
               <!-- Pendiente de admisión gana sobre activo/inactivo: es la información que
                    cambia lo que se puede hacer con esa persona hoy. -->
               <span v-if="!s.aprobado_at" class="sv-estado sv-estado--pend">Sin aprobar</span>
-              <span v-else class="sv-estado" :class="s.es_paciente ? 'sv-estado--on' : 'sv-estado--off'">
-                {{ s.es_paciente ? 'Activo' : 'Inactivo' }}
+              <span v-else-if="!s.es_paciente" class="sv-estado sv-estado--off">Inactivo</span>
+              <span v-else-if="esInactivo(s)" class="sv-estado sv-estado--susp" :title="TIP_SUSPENDIDO">
+                <i class="bi bi-hourglass-split"></i> Suspendido
               </span>
+              <span v-else class="sv-estado sv-estado--on">Activo</span>
             </td>
             <!-- El estado y la fecha van en columnas separadas: apilados en una sola, el badge
                  y el vencimiento competían por el mismo ancho y ninguno se leía.
@@ -554,6 +560,8 @@ async function exportarCSV() {
 .sv-estado { display: inline-block; font-size: .7rem; font-weight: 700; padding: .15em .55em; border-radius: 999px; white-space: nowrap; }
 .sv-estado--on  { background: #f0fdf4; color: #15803d; }
 .sv-estado--off { background: var(--c-slate-100); color: var(--c-slate-500); }
+/* Suspendido: un aviso, no una baja. Distinto de Inactivo a la vista (Germán: «bien distintivo»). */
+.sv-estado--susp { background: var(--c-amber-100); color: var(--c-amber-500); border: 1px dashed var(--c-amber-500); cursor: help; }
 /* Ámbar, el mismo tono que el KPI: es algo que espera una acción, no un estado estable. */
 .sv-estado--pend { background: #fffbeb; color: #b45309; }
 .sv-mono  { font-family: monospace; font-size: .82rem; color: #374151; }

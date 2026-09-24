@@ -76,7 +76,9 @@ const selectorDireccion = ref(null)
 function envioVacio() {
   return { delivery_id: null, direccion_origen: 'domicilio', envio_calle: '', envio_altura: '', envio_piso: '',
            envio_depto: '', envio_barrio: '', envio_ciudad: '', envio_etiqueta: '', guardar_como_envio: false,
-           contacto_nombre: '', contacto_telefono: '', notas_envio: '' }
+           contacto_nombre: '', contacto_telefono: '', notas_envio: '',
+           // Obligatorio también al mandarla después (23-sep-2026): 0 = bonificado.
+           costo_envio: '' }
 }
 
 async function mandarPorDelivery() {
@@ -90,6 +92,7 @@ async function mandarPorDelivery() {
     guardar_como_envio: e.direccion_origen === 'otra' && e.guardar_como_envio,
     contacto_nombre: e.contacto_nombre || undefined, contacto_telefono: e.contacto_telefono || undefined,
     notas_envio: e.notas_envio || undefined,
+    costo_envio_ars: Number(e.costo_envio).toFixed(2),
   })
 }
 
@@ -123,10 +126,26 @@ function buildForm(d) {
     fecha_dispensacion: d.fecha_dispensacion || '',
     // Una contra entrega sin cobrar se muestra como tal, no como el «efectivo» placeholder.
     medio_pago:         (d.cobrar_en_entrega && !(d.cobros?.length)) ? 'contra_entrega' : (d.medio_pago || 'efectivo'),
-    aporte_socio_ars:   d.aporte_socio_ars ?? null,
+    // SÓLO LOS PRODUCTOS: el total de la dispensa trae adentro el envío, y el backend suma el
+    // envío sobre lo que se mande acá. Precargado con el total, guardar sin tocar nada contaba
+    // el envío dos veces.
+    aporte_socio_ars:   d.subtotal_productos_ars ?? d.aporte_socio_ars ?? null,
+    // El valor del envío, si va por delivery (null en las anteriores al 23-sep).
+    costo_envio:        d.costo_envio_ars ?? '',
     observaciones:      d.observaciones || '',
   }
 }
+
+// ¿Se puede corregir el valor del envío? Si va por delivery y el paquete no cerró.
+const editaEnvio = computed(() => !!props.dispensacion?.con_envio && !paqueteCerrado.value)
+const envioActual = computed(() => {
+  if (agregarEnvio.value) return Math.max(0, Number(envio.value.costo_envio) || 0)
+  if (props.dispensacion?.con_envio) return Math.max(0, Number(form.value.costo_envio) || 0)
+  return 0
+})
+const conEnvioEnForm = computed(() => !!props.dispensacion?.con_envio || agregarEnvio.value)
+// Lo que paga el paciente: productos + envío.
+const totalConEnvio = computed(() => (Number(form.value.aporte_socio_ars) || 0) + envioActual.value)
 
 // Total sugerido = suma de (cantidad × precio) por ítem. El aporte lo pre-llena pero el
 // admin puede pisarlo (override).
@@ -172,8 +191,15 @@ async function handleSubmit() {
 
   if (agregarEnvio.value) {
     if (!envio.value.delivery_id) { formError.value = 'Elegí un repartidor para el envío'; saving.value = false; return }
+    if (envio.value.costo_envio === '' || envio.value.costo_envio == null) { formError.value = 'Poné el valor del envío: 0 si va bonificado.'; saving.value = false; return }
+    if (Number(envio.value.costo_envio) < 0) { formError.value = 'El valor del envío no puede ser negativo.'; saving.value = false; return }
     const errorDireccion = selectorDireccion.value?.validar?.()
     if (errorDireccion) { formError.value = errorDireccion; saving.value = false; return }
+  }
+
+  if (editaEnvio.value && form.value.costo_envio !== '' && Number(form.value.costo_envio) < 0) {
+    formError.value = 'El valor del envío no puede ser negativo.'
+    saving.value = false; return
   }
 
   // Contra entrega pide que la dispensa YA vaya por delivery: si se la manda en esta misma
@@ -192,6 +218,8 @@ async function handleSubmit() {
       medio_pago:         form.value.medio_pago,
       aporte_socio_ars:   form.value.aporte_socio_ars,
       observaciones:      form.value.observaciones || null,
+      // El envío sólo si va por delivery y hay un valor (las viejas pueden no tenerlo).
+      ...(editaEnvio.value && form.value.costo_envio !== '' ? { costo_envio_ars: Number(form.value.costo_envio).toFixed(2) } : {}),
     })
     // Después de guardar lo financiero: si eso rebotó, no se manda nada a la calle.
     if (agregarEnvio.value && !envioPrimero) await mandarPorDelivery()
@@ -249,12 +277,26 @@ async function handleSubmit() {
 
           <!-- Aporte -->
           <div class="med__field">
-            <label class="med__label">Aporte del paciente <span class="med__opt">ARS</span></label>
+            <label class="med__label">{{ conEnvioEnForm ? 'Aporte por los productos' : 'Aporte del paciente' }} <span class="med__opt">ARS{{ conEnvioEnForm ? ', sin el envío' : '' }}</span></label>
             <div class="med__input-suffix-wrap">
               <span class="med__input-prefix">$</span>
               <input v-model.number="form.aporte_socio_ars" type="number" min="0" step="1"
                      class="med__input med__input--with-prefix" placeholder="0" />
             </div>
+          </div>
+
+          <!-- El valor del envío, corregible mientras el paquete no cerró (23-sep-2026). -->
+          <div v-if="editaEnvio" class="med__field">
+            <label class="med__label" for="med-costo-envio">Valor del envío <span class="med__opt">0 = bonificado</span></label>
+            <div class="med__input-suffix-wrap">
+              <span class="med__input-prefix">$</span>
+              <input id="med-costo-envio" v-model="form.costo_envio" type="number" min="0" step="1" inputmode="numeric"
+                     class="med__input med__input--with-prefix" placeholder="0" />
+            </div>
+          </div>
+          <div v-if="conEnvioEnForm" class="med__items-total">
+            Total con envío <strong>{{ fmt(totalConEnvio) }}</strong>
+            <span v-if="envioActual === 0 && (editaEnvio ? form.costo_envio !== '' : envio.costo_envio !== '')" class="med__opt">(envío bonificado)</span>
           </div>
 
           <!-- CC info -->
@@ -290,7 +332,7 @@ async function handleSubmit() {
                 </option>
               </select>
               <p v-if="form.medio_pago === 'contra_entrega' && dispensacion.medio_pago !== 'contra_entrega'" class="med__opt" style="margin-top:.3rem">
-                Se deshace lo cobrado: el repartidor cobra {{ fmt(form.aporte_socio_ars) }} en la puerta.
+                Se deshace lo cobrado: el repartidor cobra {{ fmt(totalConEnvio) }} en la puerta.
               </p>
             </div>
           </div>
@@ -326,6 +368,19 @@ async function handleSubmit() {
                     <option :value="null">Seleccioná un repartidor…</option>
                     <option v-for="u in entregadores" :key="u.id" :value="u.id">{{ u.nombre || u.email }}</option>
                   </select>
+                </div>
+                <div class="med__field">
+                  <label class="med__label" for="med-envio-costo">Valor del envío <span class="med__req">*</span></label>
+                  <div class="med__input-suffix-wrap">
+                    <span class="med__input-prefix">$</span>
+                    <input id="med-envio-costo" v-model="envio.costo_envio" type="number" min="0" step="1" inputmode="numeric"
+                           class="med__input med__input--with-prefix" placeholder="0 si va bonificado" />
+                  </div>
+                  <p class="med__opt" style="margin-top:.3rem">
+                    <template v-if="envio.costo_envio === ''">Obligatorio. Poné 0 si va bonificado.</template>
+                    <template v-else-if="Number(envio.costo_envio) > 0">Lo cobrado no se toca: el envío lo cobra el repartidor en la puerta.</template>
+                    <template v-else>Envío bonificado: no se le cobra.</template>
+                  </p>
                 </div>
                 <SelectorDireccionEntrega ref="selectorDireccion" :model-value="envio" :socio-id="dispensacion.paciente_id"
                                           @update:model-value="Object.assign(envio, $event)" />

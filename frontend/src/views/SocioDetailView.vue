@@ -394,11 +394,17 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
                 {{ reprocannStatus.label }}
               </span>
               <span v-else class="sd__repro-badge sd__repro-badge--none">Sin REPROCANN</span>
+              <!-- «Sin aprobar», como en la lista: «Pendiente de aprobación» es el REPROCANN (23-sep-2026). -->
               <span v-if="pendienteAprobacion" class="sd__repro-badge sd__repro-badge--pend">
-                Pendiente de aprobación
+                Sin aprobar
               </span>
-              <span v-if="s.es_paciente" class="sd__status-badge sd__status-badge--active">En tratamiento</span>
-              <span v-else class="sd__status-badge">Inactivo</span>
+              <!-- Activo · Suspendido (poco movimiento, lo dice el backend) · Inactivo (baja). -->
+              <span v-if="!s.es_paciente" class="sd__status-badge">Inactivo</span>
+              <span v-else-if="s.suspendido" class="sd__status-badge sd__status-badge--susp"
+                    title="Suspendido por poco movimiento: hace más de 90 días que no retira. Puede retirar igual, y vuelve a activo solo cuando lo haga.">
+                <i class="bi bi-hourglass-split"></i> Suspendido
+              </span>
+              <span v-else class="sd__status-badge sd__status-badge--active">Activo</span>
             </div>
           </div>
         </div>
@@ -431,7 +437,7 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
       <div v-if="pendienteAprobacion" class="sd__alerta sd__alerta--pend">
         <UserCheck :size="16" />
         <div class="sd__alerta-txt">
-          <strong>Pendiente de aprobación</strong> — Se cargó desde el mostrador. No puede recibir
+          <strong>Sin aprobar</strong> — Se cargó desde el mostrador. No puede recibir
           dispensaciones ni reservas hasta que se apruebe el alta.
           <template v-if="!puedeAprobar"> Pedíselo a un administrador o al médico.</template>
         </div>
@@ -590,10 +596,11 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
               </div>
             </div>
             <div class="sd__info-item">
-              <div class="sd__info-label">Estado del tratamiento</div>
+              <div class="sd__info-label">Estado del paciente</div>
               <div class="sd__info-val">
-                <span v-if="s.es_paciente" style="color:#15803d;font-weight:600">✓ En tratamiento activo</span>
-                <span v-else class="sd__val-empty">Inactivo</span>
+                <span v-if="!s.es_paciente" class="sd__val-empty">Inactivo — no puede retirar</span>
+                <span v-else-if="s.suspendido" class="sd__val-susp">Suspendido por poco movimiento (+90 días sin retirar)</span>
+                <span v-else style="color:#15803d;font-weight:600">✓ Activo</span>
               </div>
             </div>
           </div>
@@ -860,6 +867,8 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 .sd__repro-badge--pend { background: rgba(180,83,9,.12); color: #b45309; }
 .sd__status-badge { font-size: .7rem; font-weight: 600; padding: .22em .65em; border-radius: 6px; background: var(--c-slate-100); color: var(--c-slate-500); }
 .sd__status-badge--active { background: rgba(21,128,61,.1); color: #15803d; }
+.sd__status-badge--susp { background: var(--c-amber-100); color: var(--c-amber-500); border: 1px dashed var(--c-amber-500); cursor: help; }
+.sd__val-susp { color: var(--c-amber-500); font-weight: 600; }
 
 /* Alertas */
 .sd__alerta { display: flex; align-items: flex-start; gap: .75rem; padding: .875rem 1.1rem; border-radius: 12px; font-size: .875rem; margin-bottom: 1.25rem; }

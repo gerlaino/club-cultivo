@@ -88,8 +88,9 @@
               <div class="sem__field sem__field--full">
                 <label class="sem__label">
                   <input v-model="editForm.es_paciente" type="checkbox" class="sem__check" />
-                  En tratamiento activo
+                  Activo
                 </label>
+                <span class="sem__hint">Sin el tilde queda <strong>inactivo</strong>: no puede retirar ni figura en los informes REPROCANN.</span>
               </div>
             </div>
           </div>

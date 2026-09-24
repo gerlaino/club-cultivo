@@ -24,7 +24,7 @@ RSpec.describe 'Rutas de entrega', type: :request do
   def crear_despacho
     post "/pacientes/#{paciente.id}/dispensaciones",
          params: { dispensacion: { stock_id: stock.id, cantidad: 5, medio_pago: 'efectivo',
-                                   aporte_socio_ars: 500, con_envio: true, delivery_id: delivery.id,
+                                   aporte_socio_ars: 500, con_envio: true, costo_envio_ars: 0, delivery_id: delivery.id,
                                    usar_domicilio_paciente: true } },
          headers: auth_headers
     expect(response).to have_http_status(:created), "crear despacho falló: #{response.body}"
@@ -79,7 +79,7 @@ RSpec.describe 'Rutas de entrega', type: :request do
     sign_in_as(otro_disp)
     post "/pacientes/#{otro_pac.id}/dispensaciones",
          params: { dispensacion: { stock_id: otro_stock.id, cantidad: 1, medio_pago: 'efectivo', aporte_socio_ars: 100,
-                                   con_envio: true, delivery_id: otro_deliv.id, usar_domicilio_paciente: true } },
+                                   con_envio: true, costo_envio_ars: 0, delivery_id: otro_deliv.id, usar_domicilio_paciente: true } },
          headers: auth_headers
     ajeno = Dispensacion.last
 

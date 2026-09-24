@@ -95,6 +95,11 @@ function lineaProducto(it) {
             <span class="dd__kpi-lbl">Total</span>
             <span class="dd__kpi-val">{{ formatARS(total) }}</span>
           </div>
+          <!-- El envío, aparte (23-sep-2026): el total lo incluye. -->
+          <div class="dd__kpi" v-if="disp.costo_envio_ars != null">
+            <span class="dd__kpi-lbl">Envío</span>
+            <span class="dd__kpi-val">{{ disp.envio_bonificado ? 'Bonificado' : formatARS(disp.costo_envio_ars) }}</span>
+          </div>
           <div class="dd__kpi">
             <span class="dd__kpi-lbl">Cobrado</span>
             <span class="dd__kpi-val dd__kpi-val--green">{{ formatARS(cobrado) }}</span>

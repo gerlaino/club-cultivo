@@ -24,7 +24,7 @@ RSpec.describe 'Envíos del día', type: :request do
     sign_in_as(quien)
     post "/api/pacientes/#{paciente.id}/dispensaciones",
          params: { dispensacion: { stock_id: stock.id, cantidad: 1, medio_pago: 'efectivo', aporte_socio_ars: 100,
-                                   fecha_dispensacion: fecha.to_s, con_envio: con_envio, delivery_id: delivery.id,
+                                   fecha_dispensacion: fecha.to_s, con_envio: con_envio, costo_envio_ars: 0, delivery_id: delivery.id,
                                    direccion_origen: 'domicilio', contacto_nombre: 'X' } }, as: :json
     expect(response).to have_http_status(:created), response.body
     Dispensacion.find(json['id'])

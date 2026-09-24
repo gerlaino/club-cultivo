@@ -292,6 +292,10 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
             <template v-else>{{ d.cantidad }}{{ d.stock?.unidad || 'g' }}</template>
           </div>
           <div v-if="d.aporte_socio_ars" class="dv__item-aporte">{{ fmt(d.aporte_socio_ars) }}</div>
+          <!-- El total incluye el envío: se dice cuánto fue (23-sep-2026). -->
+          <div v-if="d.costo_envio_ars != null" class="dv__item-envio">
+            {{ d.envio_bonificado ? 'Envío bonificado' : `incluye envío ${fmt(d.costo_envio_ars)}` }}
+          </div>
           <div v-if="d.usuario?.nombre" class="dv__item-usuario">{{ d.usuario.nombre }}</div>
         </div>
         <div v-if="(canEdit || canAnular || d.token) && !d.anulada" class="dv__item-actions">
@@ -411,6 +415,7 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
 .dv__item-right { text-align: right; flex-shrink: 0; min-width: 80px; }
 .dv__item-cantidad { font-size: 1.05rem; font-weight: 800; color: #1b5e20; letter-spacing: -.03em; }
 .dv__item-aporte { font-size: .72rem; color: var(--c-slate-500); margin-top: .1rem; }
+.dv__item-envio { font-size: .7rem; color: var(--c-slate-500); }
 .dv__item-usuario { font-size: .7rem; color: var(--c-slate-400); }
 .dv__item-actions { display: flex; gap: .3rem; flex-shrink: 0; }
 .dv__icon-btn { width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--c-slate-200); background: var(--c-slate-50); color: var(--c-slate-500); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: .75rem; transition: all .15s; flex-shrink: 0; }

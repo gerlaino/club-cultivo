@@ -152,8 +152,24 @@ class DispensacionesController < ApplicationController
       @dispensacion.es_regalo         = false
       @dispensacion.cobrar_en_entrega = false
       @dispensacion.monto_credito_ars = 0
+      # El envío de un cambio no se cobra: el producto llegó mal.
+      @dispensacion.costo_envio_ars   = 0 if @dispensacion.con_envio
       @dispensacion.save!
       return render json: serialize_dispensacion(@dispensacion), status: :created
+    end
+
+    # EL VALOR DEL ENVÍO (23-sep-2026): obligatorio con envío —0 es bonificado, se permite—, lo
+    # carga quien hace la dispensa (dispensador incluido) y se SUMA al total. El descuento del
+    # paciente no lo toca: se aplicó arriba, sólo a los productos. Un regalo no cobra nada, y
+    # tampoco el envío.
+    if @dispensacion.con_envio
+      costo = es_regalo ? 0.to_d : costo_envio_param
+      return render json: { error: costo_envio_error }, status: :unprocessable_entity if costo.nil? || costo.negative?
+
+      @dispensacion.costo_envio_ars  = costo
+      @dispensacion.aporte_socio_ars = @dispensacion.aporte_socio_ars.to_d + costo
+    else
+      @dispensacion.costo_envio_ars = nil
     end
 
     @dispensacion.cobrar_en_entrega = !es_regalo && (ActiveModel::Type::Boolean.new.cast(params.dig(:dispensacion, :cobrar_en_entrega)) || false)
@@ -241,7 +257,17 @@ class DispensacionesController < ApplicationController
     attrs = dispensacion_params_update
     items_param = params.dig(:dispensacion, :items)
     # Cambios sin impacto financiero (fecha, observaciones, sede, delivery…): update directo.
-    financiero = items_param.present? || (attrs.keys.map(&:to_s) & %w[cantidad stock_id aporte_socio_ars medio_pago]).any?
+    # Cambiar el valor del envío cambia el total: es financiero.
+    envio_nuevo = params[:dispensacion]&.key?(:costo_envio_ars) ? costo_envio_param : :sin_cambio
+    if envio_nuevo != :sin_cambio
+      if !@dispensacion.con_envio
+        return render json: { error: 'Esta dispensación no va por delivery: no tiene envío que cobrar.' }, status: :unprocessable_entity
+      end
+      return render json: { error: costo_envio_error }, status: :unprocessable_entity if envio_nuevo.nil? || envio_nuevo.negative?
+      envio_nuevo = :sin_cambio if envio_nuevo == @dispensacion.costo_envio_ars
+    end
+    financiero = items_param.present? || envio_nuevo != :sin_cambio ||
+                 (attrs.keys.map(&:to_s) & %w[cantidad stock_id aporte_socio_ars medio_pago]).any?
     unless financiero
       if @dispensacion.update(attrs)
         return render json: serialize_dispensacion(@dispensacion)
@@ -282,6 +308,7 @@ class DispensacionesController < ApplicationController
     end
 
     cc = @dispensacion.paciente.cuenta_corriente
+    envio_viejo = @dispensacion.costo_envio_ars
     begin
       ActiveRecord::Base.transaction do
         # 1) revertir efectos actuales
@@ -340,6 +367,17 @@ class DispensacionesController < ApplicationController
           if @dispensacion.cantidad.to_d > disp_real
             raise "Stock insuficiente: hay #{disp_real.round(2)}#{@dispensacion.stock.unidad || 'g'} disponibles"
           end
+        end
+
+        # EL ENVÍO SE CONSERVA AL RECALCULAR. Si el total se rearmó (líneas nuevas, o
+        # administración lo pisó) es sólo producto; si no, trae adentro el envío viejo. Sobre
+        # los productos se suma el envío: el nuevo si vino, el que tenía si no.
+        if @dispensacion.con_envio && !(envio_viejo.nil? && envio_nuevo == :sin_cambio)
+          rearmado  = items_param.present? || attrs.key?(:aporte_socio_ars)
+          productos = @dispensacion.aporte_socio_ars.to_d - (rearmado ? 0 : envio_viejo.to_d)
+          envio     = envio_nuevo == :sin_cambio ? envio_viejo.to_d : envio_nuevo
+          @dispensacion.costo_envio_ars  = envio
+          @dispensacion.aporte_socio_ars = productos + envio
         end
 
         if (err = validar_y_calcular_credito(@dispensacion, cc))
@@ -478,6 +516,20 @@ class DispensacionesController < ApplicationController
     end
 
     p = params.require(:dispensacion)
+    # El valor del envío también se pide acá. Lo cobrado no se toca: si el envío cuesta algo, se
+    # suma al total y lo cobra el repartidor en la puerta. Eso sólo vale para una dispensa que
+    # se cobra por cobros; una a cuenta corriente o en gramos tiene su propia aritmética y ahí el
+    # envío va bonificado o se cobra aparte.
+    costo = costo_envio_param
+    return render json: { error: costo_envio_error }, status: :unprocessable_entity if costo.nil? || costo.negative?
+    if costo.positive?
+      unless @dispensacion.usa_cobros?
+        return render json: { error: 'Esta dispensa se cobró a cuenta: el envío va bonificado (0) o se cobra aparte.' }, status: :unprocessable_entity
+      end
+      @dispensacion.aporte_socio_ars  = @dispensacion.aporte_socio_ars.to_d + costo
+      @dispensacion.cobrar_en_entrega = true
+    end
+    @dispensacion.costo_envio_ars = costo
     @dispensacion.assign_attributes(
       con_envio: true, delivery_id: p[:delivery_id],
       contacto_nombre: p[:contacto_nombre].presence, contacto_telefono: p[:contacto_telefono].presence,
@@ -915,6 +967,18 @@ class DispensacionesController < ApplicationController
       # lee `Envios::DireccionDeEntrega` directo de `params[:dispensacion]`.
     )
   end
+
+  # El valor del envío que mandó la pantalla: nil si no vino o no es un número.
+  def costo_envio_param
+    raw = params.dig(:dispensacion, :costo_envio_ars)
+    return nil if raw.nil? || raw.to_s.strip.empty?
+
+    BigDecimal(raw.to_s.strip.tr(',', '.'))
+  rescue ArgumentError
+    nil
+  end
+
+  def costo_envio_error = 'Poné el valor del envío: 0 si va bonificado. No puede ser negativo.'
 
   def dispensacion_params_update
     params.require(:dispensacion).permit(

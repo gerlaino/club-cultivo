@@ -75,13 +75,28 @@ describe('Editar dispensación — mandar por delivery', () => {
     await flushPromises()
     w.vm.envio.delivery_id = 7
     w.vm.envio.notas_envio = 'tocar timbre'
+    w.vm.envio.costo_envio = 400
     await w.vm.handleSubmit()
     await flushPromises()
 
     expect(updateDispensacion).toHaveBeenCalled()
     expect(agregarEnvioDispensacion).toHaveBeenCalledWith(90, expect.objectContaining({
-      delivery_id: 7, direccion_origen: 'domicilio', notas_envio: 'tocar timbre',
+      delivery_id: 7, direccion_origen: 'domicilio', notas_envio: 'tocar timbre', costo_envio_ars: '400.00',
     }))
+  })
+
+  // El valor del envío es obligatorio también al mandarla después (23-sep-2026).
+  it('sin el valor del envío no manda nada', async () => {
+    const w = await montar()
+    await w.find('.med__envio-toggle').trigger('click')
+    await flushPromises()
+    w.vm.envio.delivery_id = 7
+    await w.vm.handleSubmit()
+    await flushPromises()
+
+    expect(updateDispensacion).not.toHaveBeenCalled()
+    expect(agregarEnvioDispensacion).not.toHaveBeenCalled()
+    expect(w.vm.formError).toMatch(/valor del envío/)
   })
 
   it('si lo financiero rebota, el envío no se manda', async () => {
@@ -90,9 +105,11 @@ describe('Editar dispensación — mandar por delivery', () => {
     await w.find('.med__envio-toggle').trigger('click')
     await flushPromises()
     w.vm.envio.delivery_id = 7
+    w.vm.envio.costo_envio = 0
     await w.vm.handleSubmit()
     await flushPromises()
 
+    expect(updateDispensacion).toHaveBeenCalled()
     expect(agregarEnvioDispensacion).not.toHaveBeenCalled()
   })
 
@@ -123,6 +140,7 @@ describe('Editar dispensación — mandar por delivery', () => {
     await w.find('.med__envio-toggle').trigger('click')
     await flushPromises()
     w.vm.envio.delivery_id = 7
+    w.vm.envio.costo_envio = 0
     w.vm.form.medio_pago = 'contra_entrega'
     await w.vm.handleSubmit()
     await flushPromises()
@@ -139,5 +157,42 @@ describe('Editar dispensación — mandar por delivery', () => {
   it('sin el add-on de Delivery no aparece nada de esto', async () => {
     const w = await montar(DISPENSA, { delivery: false })
     expect(w.text()).not.toContain('Mandar por delivery')
+  })
+})
+
+// EL ENVÍO NO SE CUENTA DOS VECES (23-sep-2026). El total de la dispensa trae adentro el envío,
+// y el backend suma el envío sobre el aporte que se manda: precargado con el total, guardar sin
+// tocar nada subía el total en el valor del envío.
+describe('Editar dispensación — el valor del envío', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  const CON_ENVIO = {
+    ...DISPENSA, con_envio: true, estado_envio: 'pendiente',
+    aporte_socio_ars: 1500, subtotal_productos_ars: 1000, costo_envio_ars: 500, envio_bonificado: false,
+  }
+
+  it('guardar sin tocar nada manda los productos y el mismo envío', async () => {
+    const w = await montar(CON_ENVIO)
+    await w.vm.handleSubmit()
+    await flushPromises()
+
+    const body = updateDispensacion.mock.calls[0][1]
+    expect(body.aporte_socio_ars).toBe(1000)
+    expect(body.costo_envio_ars).toBe('500.00')
+    expect(w.text()).toContain('Total con envío')
+  })
+
+  it('se puede corregir mientras el paquete no cerró', async () => {
+    const w = await montar(CON_ENVIO)
+    await w.find('#med-costo-envio').setValue(0)
+    await w.vm.handleSubmit()
+    await flushPromises()
+
+    expect(updateDispensacion.mock.calls[0][1].costo_envio_ars).toBe('0.00')
+  })
+
+  it('con el paquete entregado, no', async () => {
+    const w = await montar({ ...CON_ENVIO, estado_envio: 'entregado' })
+    expect(w.find('#med-costo-envio').exists()).toBe(false)
   })
 })

@@ -28,7 +28,7 @@ RSpec.describe 'Dispensación: agregar envío después', type: :request do
     expect(d.con_envio).to be(false)
 
     patch "/api/dispensaciones/#{d.id}/agregar_envio",
-          params: { dispensacion: { delivery_id: delivery.id, direccion_origen: 'domicilio', notas_envio: 'tocar timbre' } }, as: :json
+          params: { dispensacion: { delivery_id: delivery.id, costo_envio_ars: 0, direccion_origen: 'domicilio', notas_envio: 'tocar timbre' } }, as: :json
 
     expect(response).to have_http_status(:ok), response.body
     d.reload
@@ -47,7 +47,7 @@ RSpec.describe 'Dispensación: agregar envío después', type: :request do
     monto_antes  = d.aporte_socio_ars
 
     patch "/api/dispensaciones/#{d.id}/agregar_envio",
-          params: { dispensacion: { delivery_id: delivery.id, direccion_origen: 'domicilio' } }, as: :json
+          params: { dispensacion: { delivery_id: delivery.id, costo_envio_ars: 0, direccion_origen: 'domicilio' } }, as: :json
 
     d.reload
     expect(d.cobros.count).to     eq(cobros_antes)
@@ -58,7 +58,7 @@ RSpec.describe 'Dispensación: agregar envío después', type: :request do
   it 'el repartidor lo ve en su lista' do
     d = dispensar_sin_envio
     patch "/api/dispensaciones/#{d.id}/agregar_envio",
-          params: { dispensacion: { delivery_id: delivery.id, direccion_origen: 'domicilio' } }, as: :json
+          params: { dispensacion: { delivery_id: delivery.id, costo_envio_ars: 0, direccion_origen: 'domicilio' } }, as: :json
 
     sign_in_as(delivery)
     get '/api/dispensaciones/mis_paquetes'
@@ -68,8 +68,8 @@ RSpec.describe 'Dispensación: agregar envío después', type: :request do
 
   it 'una que ya va por delivery no se vuelve a agregar' do
     d = dispensar_sin_envio
-    patch "/api/dispensaciones/#{d.id}/agregar_envio", params: { dispensacion: { delivery_id: delivery.id, direccion_origen: 'domicilio' } }, as: :json
-    patch "/api/dispensaciones/#{d.id}/agregar_envio", params: { dispensacion: { delivery_id: delivery.id, direccion_origen: 'domicilio' } }, as: :json
+    patch "/api/dispensaciones/#{d.id}/agregar_envio", params: { dispensacion: { delivery_id: delivery.id, costo_envio_ars: 0, direccion_origen: 'domicilio' } }, as: :json
+    patch "/api/dispensaciones/#{d.id}/agregar_envio", params: { dispensacion: { delivery_id: delivery.id, costo_envio_ars: 0, direccion_origen: 'domicilio' } }, as: :json
 
     expect(response).to have_http_status(:unprocessable_entity)
   end
@@ -86,7 +86,7 @@ RSpec.describe 'Dispensación: agregar envío después', type: :request do
     d = dispensar_sin_envio
     club.update!(features: club.features.merge('delivery' => false))
 
-    patch "/api/dispensaciones/#{d.id}/agregar_envio", params: { dispensacion: { delivery_id: delivery.id, direccion_origen: 'domicilio' } }, as: :json
+    patch "/api/dispensaciones/#{d.id}/agregar_envio", params: { dispensacion: { delivery_id: delivery.id, costo_envio_ars: 0, direccion_origen: 'domicilio' } }, as: :json
 
     expect(response).to have_http_status(:forbidden)
   end

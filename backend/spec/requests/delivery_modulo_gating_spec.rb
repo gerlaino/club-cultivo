@@ -40,7 +40,7 @@ RSpec.describe 'Delivery: el módulo se aplica en la API', type: :request do
   def crear_despacho
     post "/pacientes/#{paciente.id}/dispensaciones",
          params: { dispensacion: { stock_id: stock.id, cantidad: 5, medio_pago: 'efectivo',
-                                   aporte_socio_ars: 500, con_envio: true,
+                                   aporte_socio_ars: 500, con_envio: true, costo_envio_ars: 0,
                                    delivery_id: repartidor.id, usar_domicilio_paciente: true } },
          headers: auth_headers
     expect(response).to have_http_status(:created), "crear despacho falló: #{response.body}"
@@ -75,7 +75,7 @@ RSpec.describe 'Delivery: el módulo se aplica en la API', type: :request do
     it 'rechaza CREAR una dispensación con envío: el checkbox dejaba de significar algo' do
       d = Dispensacion.new(paciente: paciente, user: admin, stock: stock, cantidad: 1,
                            medio_pago: 'efectivo', fecha_dispensacion: Date.current,
-                           con_envio: true, delivery_id: repartidor.id,
+                           con_envio: true, costo_envio_ars: 0, delivery_id: repartidor.id,
                            direccion_envio: 'Av. Siempreviva 742', contacto_nombre: 'Quien recibe')
 
       expect(d).not_to be_valid

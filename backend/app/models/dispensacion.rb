@@ -162,6 +162,30 @@ class Dispensacion < ApplicationRecord
   scope :no_canceladas,  ->                     { where("dispensaciones.estado_envio IS NULL OR dispensaciones.estado_envio != 'cancelada'") }
   def cancelada? = estado_envio == 'cancelada'
 
+  # EL VALOR DEL ENVÍO (23-sep-2026). Va DENTRO del total (`aporte_socio_ars`, lo que paga el
+  # paciente) y guardado aparte para poder decir «Productos · Envío · Total» y asentarlo en su
+  # propia categoría. NULL = sin envío (o anterior a esto); 0 = bonificado; negativo, nunca.
+  # Que sea OBLIGATORIO al crear con envío lo exige la puerta (el controller): las demás formas de
+  # crear una dispensa con envío (los specs, los datos viejos) no lo traen.
+  validates :costo_envio_ars, numericality: { greater_than_or_equal_to: 0 }, allow_nil: true
+
+  def envio_bonificado? = con_envio? && !costo_envio_ars.nil? && costo_envio_ars.to_d.zero?
+
+  # Lo que suman los productos: el total sin el envío.
+  def subtotal_productos_ars = aporte_socio_ars.to_d - costo_envio_ars.to_d
+
+  # QUÉ PARTE DE UN COBRO ES ENVÍO. Los cobros no dicen qué pagan (una parte ahora y el resto en
+  # la puerta), así que cada uno se reparte EN PROPORCIÓN al total, sin pasarse de lo que del
+  # envío queda por asentar. Lo usa el asiento (`Dispensaciones::Asiento`).
+  def parte_envio_de(monto)
+    envio = costo_envio_ars.to_d
+    total = aporte_socio_ars.to_d
+    return 0.to_d if envio <= 0 || total <= 0
+
+    ya = MovimientoContable.where(dispensacion_id: id, categoria: 'envio').sum(:monto_ars).to_d
+    [(monto.to_d * envio / total).round(2), [envio - ya, 0.to_d].max].min
+  end
+
   # POR QUÉ se anuló una dispensa. Son hechos distintos y se deshacen distinto
   # (`Dispensaciones::Cancelar`):
   #   · error_carga          — nunca pasó: el producto no salió y la plata no entró. Se BORRA el

@@ -146,6 +146,8 @@ function emptyForm() {
     stock_id: null, cantidad: null, descuento_pct: 0, aporte_socio_ars: null,
     fecha_dispensacion: today, observaciones: '', medio_pago: 'efectivo', es_regalo: false,
     con_envio: false, delivery_id: null, direccion_envio: '',
+    // El valor del envío (23-sep-2026): obligatorio con envío, 0 = bonificado. Vacío = sin cargar.
+    costo_envio: '',
     contacto_nombre: '', contacto_telefono: '', notas_envio: '',
     // A dónde va el paquete, POR NOMBRE: `domicilio` (REPROCANN) · `envio` · `otra` (tipeada).
     // Antes era un booleano «usar domicilio» que en el backend resolvía a la de envío si estaba
@@ -347,22 +349,35 @@ const usaCredito = computed(() => pagoDividido.value
   : esMedioCredito.value)
 const mostrarPanelCredito = computed(() => !form.value.es_regalo && puedeDeber.value && (usaCredito.value || puedeVerCredito.value))
 
+// EL VALOR DEL ENVÍO (Germán, 23-sep-2026). Lo carga quien hace la dispensa, es obligatorio con
+// envío —0 es bonificado— y se SUMA al total: el paciente paga productos + envío, y el pago
+// dividido, el saldo a favor, la contra entrega y el crédito trabajan sobre ese total. El
+// descuento no lo toca. No se pide en un regalo ni en un cambio (no se cobran), ni al entregar
+// una reserva (la cobra su propio circuito).
+const pideEnvio = computed(() =>
+  form.value.con_envio && !form.value.es_regalo && !form.value.es_reserva && !modoReserva.value && !modoCambio.value)
+const envioCargado = computed(() => form.value.costo_envio !== '' && form.value.costo_envio != null)
+const envioArs = computed(() => (pideEnvio.value ? Math.max(0, Number(form.value.costo_envio) || 0) : 0))
+const envioBonificado = computed(() => pideEnvio.value && envioCargado.value && envioArs.value === 0)
+// Lo que paga el paciente: el aporte (productos) más el envío.
+const totalConEnvio = computed(() => (Number(form.value.aporte_socio_ars) || 0) + envioArs.value)
+
 const margenPos = computed(() => Math.max(0, ccMargen.value))
 // Cuenta corriente: el crédito cubre lo que puede; la diferencia se cobra ahora.
 const montoACredito = computed(() => {
   if (!esMedioCredito.value) return 0
-  return Math.min(Number(form.value.aporte_socio_ars) || 0, margenPos.value)
+  return Math.min(totalConEnvio.value, margenPos.value)
 })
 const restoACobrar = computed(() => {
   if (!esCuentaCorriente.value) return 0
-  return Math.max(0, (Number(form.value.aporte_socio_ars) || 0) - margenPos.value)
+  return Math.max(0, totalConEnvio.value - margenPos.value)
 })
 
 // Solo "no abona" se bloquea por crédito (no paga nada ahora → tiene que entrar entero).
 const ccInsuficiente = computed(() => {
   if (!puedeDeber.value || !esNoAbona.value) return false
-  const aporte = Number(form.value.aporte_socio_ars)
-  return aporte > 0 && aporte > ccMargen.value
+  const total = totalConEnvio.value
+  return total > 0 && total > ccMargen.value
 })
 
 const estadoCc = computed(() => {
@@ -650,8 +665,8 @@ const montoContraEntrega = computed(() => {
 const totalACobrar = computed(() => {
   if (modoReserva.value) return restoReserva.value
   const aporte = Number(form.value.aporte_socio_ars)
-  if (puedeEditarAporte.value && aporte > 0) return aporte
-  return Number(precioFinal.value) || 0
+  if (puedeEditarAporte.value && aporte > 0) return aporte + envioArs.value
+  return (Number(precioFinal.value) || 0) + envioArs.value
 })
 
 // EL SALDO A FAVOR SE DESCUENTA PRIMERO, y el backend hace exactamente lo mismo
@@ -1016,7 +1031,7 @@ async function handleSubmit() {
     }
     if (!cobraDelivery.value && ccInsuficiente.value) {
       const msg = puedeVerCredito.value
-        ? `Crédito insuficiente. Disponible: ${fmt(ccMargen.value)} — requerido: ${fmt(form.value.aporte_socio_ars)}`
+        ? `Crédito insuficiente. Disponible: ${fmt(ccMargen.value)} — requerido: ${fmt(totalConEnvio.value)}`
         : 'Crédito insuficiente. Consultá con un administrador.'
       formError.value = msg
       saving.value = false; return
@@ -1051,6 +1066,8 @@ async function handleSubmit() {
 
   if (form.value.con_envio) {
     if (!form.value.delivery_id) { formError.value = 'Seleccioná un delivery para asignar el envío'; saving.value = false; return }
+    if (pideEnvio.value && !envioCargado.value) { formError.value = 'Poné el valor del envío: 0 si va bonificado.'; saving.value = false; return }
+    if (pideEnvio.value && Number(form.value.costo_envio) < 0) { formError.value = 'El valor del envío no puede ser negativo.'; saving.value = false; return }
     const errorDireccion = selectorDireccion.value?.validar?.()
     if (errorDireccion) { formError.value = errorDireccion; saving.value = false; return }
   }
@@ -1105,6 +1122,8 @@ async function handleSubmit() {
     if (form.value.con_envio) {
       payload.cobrar_en_entrega = cobraDelivery.value
       payload.delivery_id       = form.value.delivery_id
+      // Regalo y cambio no lo cobran (el backend lo pone en 0).
+      if (pideEnvio.value) payload.costo_envio_ars = envioArs.value.toFixed(2)
       payload.direccion_origen  = form.value.direccion_origen
       payload.guardar_como_envio = form.value.direccion_origen === 'otra' && form.value.guardar_como_envio
       payload.envio_etiqueta    = form.value.envio_etiqueta || undefined
@@ -1567,10 +1586,20 @@ async function handleSubmit() {
                   <span>Descuento esta dispensa {{ descDispensaPct }}%</span>
                   <span>- {{ fmt(precioBase * descDispensaPct / 100) }}</span>
                 </div>
-                <div class="mnd__precio-row mnd__precio-row--total"><span>{{ modoCambio ? 'Valor de lo que se lleva' : 'Total' }}</span><span>{{ fmt(precioFinal) }}</span></div>
+                <div class="mnd__precio-row" :class="{ 'mnd__precio-row--total': !pideEnvio }"><span>{{ modoCambio ? 'Valor de lo que se lleva' : (pideEnvio ? 'Productos' : 'Total') }}</span><span>{{ fmt(precioFinal) }}</span></div>
               </template>
               <!-- Dispensador: solo el total final (sin desglose ni descuento del paciente) -->
-              <div v-else class="mnd__precio-row mnd__precio-row--total"><span>{{ modoCambio ? 'Valor de lo que se lleva' : 'Total a cobrar' }}</span><span>{{ fmt(precioFinal) }}</span></div>
+              <div v-else class="mnd__precio-row" :class="{ 'mnd__precio-row--total': !pideEnvio }"><span>{{ modoCambio ? 'Valor de lo que se lleva' : (pideEnvio ? 'Productos' : 'Total a cobrar') }}</span><span>{{ fmt(precioFinal) }}</span></div>
+              <!-- El envío, aparte del producto, y el total que paga (23-sep-2026). -->
+              <template v-if="pideEnvio">
+                <div class="mnd__precio-row mnd__precio-row--envio">
+                  <span><i class="bi bi-bicycle"></i> Envío</span>
+                  <span v-if="!envioCargado" class="mnd__envio-falta">sin cargar</span>
+                  <span v-else-if="envioBonificado" class="mnd__envio-bonif">Bonificado</span>
+                  <span v-else>{{ fmt(envioArs) }}</span>
+                </div>
+                <div class="mnd__precio-row mnd__precio-row--total"><span>Total a cobrar</span><span>{{ fmt(totalACobrar) }}</span></div>
+              </template>
             </div>
             <!-- Override del aporte: solo admin/supervisor.
                  En CUENTA CORRIENTE no se muestra: el paciente no está aportando nada en este
@@ -1579,8 +1608,8 @@ async function handleSubmit() {
                  monto se sigue calculando igual —el asiento contable no cambia—; lo que se ve
                  en su lugar es el panel de crédito, que lo dice como es: "se carga al crédito". -->
             <div v-if="puedeEditarAporte && !esCuentaCorriente && !modoCambio" class="mnd__field">
-              <label class="mnd__label">Aporte del paciente
-                <span class="mnd__opt">ARS — editable</span>
+              <label class="mnd__label">{{ pideEnvio ? 'Aporte por los productos' : 'Aporte del paciente' }}
+                <span class="mnd__opt">ARS — editable{{ pideEnvio ? ', sin el envío' : '' }}</span>
               </label>
               <div class="mnd__input-suffix-wrap">
                 <span class="mnd__input-prefix">$</span>
@@ -1597,7 +1626,7 @@ async function handleSubmit() {
               <span class="mnd__cc-saldo" :class="{ 'mnd__cc-saldo--bajo': ccMargen <= 0 }">{{ fmt(ccMargen) }}</span>
             </div>
             <!-- Cuenta corriente: cuánto cae al crédito y cuánto se cobra ahora -->
-            <template v-if="esCuentaCorriente && Number(form.aporte_socio_ars) > 0">
+            <template v-if="esCuentaCorriente && totalConEnvio > 0">
               <div class="mnd__cc-tras">Se carga al crédito: <strong>{{ fmt(montoACredito) }}</strong></div>
               <div v-if="restoACobrar > 0" class="mnd__cc-warn">
                 <i class="bi bi-cash-coin"></i>
@@ -1608,7 +1637,7 @@ async function handleSubmit() {
             <!-- No abona: tiene que entrar entero en el crédito -->
             <div v-if="ccInsuficiente" class="mnd__cc-warn">
               <i class="bi bi-exclamation-triangle-fill"></i>
-              Crédito insuficiente — disponible: {{ fmt(ccMargen) }}, requerido: {{ fmt(form.aporte_socio_ars) }}
+              Crédito insuficiente — disponible: {{ fmt(ccMargen) }}, requerido: {{ fmt(totalConEnvio) }}
             </div>
           </div>
 
@@ -1855,6 +1884,25 @@ async function handleSubmit() {
               El delivery se asigna al entregar la reserva.
             </div>
 
+            <!-- EL VALOR DEL ENVÍO: obligatorio, 0 = bonificado. Se suma al total. -->
+            <div v-if="pideEnvio" class="mnd__field">
+              <label class="mnd__label" for="mnd-costo-envio">Valor del envío <span class="mnd__req">*</span></label>
+              <div class="mnd__input-suffix-wrap">
+                <span class="mnd__input-prefix">$</span>
+                <input id="mnd-costo-envio" v-model="form.costo_envio" type="number" min="0" step="1" inputmode="numeric"
+                       class="mnd__input mnd__input--with-prefix" placeholder="0 si va bonificado" />
+              </div>
+              <span class="mnd__field-hint">
+                <template v-if="!envioCargado">Obligatorio. Poné 0 si va bonificado.</template>
+                <template v-else-if="Number(form.costo_envio) < 0">No puede ser negativo.</template>
+                <template v-else-if="envioBonificado">Envío bonificado: no se le cobra.</template>
+                <template v-else>Se suma al total: el paciente paga {{ fmt(totalACobrar) }}.</template>
+              </span>
+            </div>
+            <div v-else-if="form.es_regalo || modoCambio" class="mnd__field-hint" style="margin-bottom:.5rem">
+              El envío va bonificado: {{ form.es_regalo ? 'es un regalo' : 'es un cambio' }}.
+            </div>
+
             <!-- A dónde va: las direcciones del paciente con el texto, y «otra». Mismo componente
                  que al editar una dispensa para mandarla por delivery. -->
             <SelectorDireccionEntrega ref="selectorDireccion" :model-value="form" :socio-id="socioId"
@@ -2064,7 +2112,7 @@ async function handleSubmit() {
   .mnd__tabla-wrap { display: none; }
   .mnd__stock-list { display: flex; }
 }
-.mnd__stock-row { display: flex; align-items: center; gap: .75rem; padding: .6rem .875rem; border-radius: 10px; border: 1.5px solid var(--c-slate-200); background: #fafbfc; cursor: pointer; text-align: left; transition: all .12s; width: 100%; }
+.mnd__stock-row { flex-shrink: 0; display: flex; align-items: center; gap: .75rem; padding: .6rem .875rem; border-radius: 10px; border: 1.5px solid var(--c-slate-200); background: #fafbfc; cursor: pointer; text-align: left; transition: all .12s; width: 100%; }
 .mnd__stock-row:hover { border-color: #86efac; background: #f0fdf4; }
 .mnd__stock-row--active { border-color: #1b5e20; background: #f0fdf4; }
 .mnd__stock-emoji { font-size: 1.1rem; flex-shrink: 0; }
@@ -2258,6 +2306,10 @@ async function handleSubmit() {
 .mnd__precio-box { background: var(--c-slate-50); border: 1px solid var(--c-slate-200); border-radius: 9px; padding: .6rem .875rem; display: flex; flex-direction: column; gap: .25rem; }
 .mnd__precio-row { display: flex; justify-content: space-between; align-items: center; font-size: .8rem; color: #374151; }
 .mnd__precio-row--desc { color: var(--c-slate-500); }
+.mnd__precio-row--envio { color: var(--c-slate-600); }
+.mnd__precio-row--envio .bi { margin-right: .25rem; }
+.mnd__envio-bonif { color: var(--c-leaf-700); font-weight: 700; }
+.mnd__envio-falta { color: var(--c-rust-600); font-weight: 600; font-style: italic; }
 .mnd__precio-row--total { font-weight: 700; font-size: .875rem; color: var(--c-slate-900); border-top: 1px solid var(--c-slate-200); padding-top: .25rem; margin-top: .1rem; }
 
 /* CC panels */

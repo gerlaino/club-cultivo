@@ -265,6 +265,7 @@ describe('Dispensar — pago dividido', () => {
       w.vm.activarPagoDividido()
       w.vm.lineasPago = [{ medio: 'transferencia', monto: 3000 }, { medio: 'contra_entrega', monto: null }]
       w.vm.form.delivery_id = 7
+      w.vm.form.costo_envio = 0 // obligatorio con envío (23-sep-2026); bonificado, no es lo que se prueba
       await w.vm.$nextTick()
 
       expect(w.vm.montoContraEntrega).toBe(2000)

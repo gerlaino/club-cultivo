@@ -89,7 +89,7 @@ RSpec.describe 'Entregar una reserva — el medio de pago', type: :request do
     let(:reserva) { crear_reserva(sena: 0, estimado: 1000, medio: 'efectivo') }
 
     it 'tampoco nace como mixto: todavía no se cobró nada' do
-      entregar(reserva, cobrar_en_entrega: true, con_envio: true,
+      entregar(reserva, cobrar_en_entrega: true, con_envio: true, costo_envio_ars: 0,
                         envio_calle: 'Rivadavia', envio_altura: '5066',
                         contacto_nombre: paciente.nombre_completo)
 
@@ -119,7 +119,7 @@ RSpec.describe 'Contra entrega — el medio de pago', type: :request do
 
   def dispensar(extra = {})
     post "/api/pacientes/#{paciente.id}/dispensaciones",
-         params: { dispensacion: { stock_id: stock.id, cantidad: 5, con_envio: true,
+         params: { dispensacion: { stock_id: stock.id, cantidad: 5, con_envio: true, costo_envio_ars: 0,
                                    envio_calle: 'Rivadavia', envio_altura: '5066',
                                    contacto_nombre: paciente.nombre_completo }.merge(extra) },
          as: :json

@@ -5,7 +5,7 @@
 RECORDATORIO: el plazo para presentar la declaración ante REPROCANN vence en 30 días.
 <% end %>
 <% pac = @datos[:pacientes]; ent = @datos[:entregas]; cul = @datos[:cultivo][:cosechados] %>
-PACIENTES REGISTRADOS al <%= @datos[:periodo][:al].strftime('%d/%m/%Y') %>: <%= pac[:registrados] %> (<%= pac[:vigentes] %> vigentes, <%= pac[:vencidos] %> vencidos, <%= pac[:en_tramite] %> en trámite)
+PACIENTES REGISTRADOS al <%= @datos[:periodo][:al].strftime('%d/%m/%Y') %>: <%= pac[:registrados] %> (<%= pac[:vigentes] %> vigentes, <%= pac[:vencidos] %> vencidos, <%= pac[:en_tramite] %> pendientes de aprobación)
 <% if pac[:sin_registro] > 0 %>Sin registro (no se presentan): <%= pac[:sin_registro] %><% end %>
 
 CULTIVO: <%= cul[:lotes] %> lotes cosechados · <%= cul[:gramos].round(1) %> g de flor seca

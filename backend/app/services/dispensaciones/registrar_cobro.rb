@@ -135,21 +135,19 @@ module Dispensaciones
              "#{@dispensacion.paciente.nombre} #{@dispensacion.paciente.apellido}"
       sufijo = cobro.a_credito? ? ' (cuenta corriente)' : " (#{cobro.medio})"
 
-      MovimientoContable.create!(
+      # Producto a «Recupero dispensación» y envío a «Envíos», en proporción (`Asiento`).
+      Dispensaciones::Asiento.crear!(dispensacion: @dispensacion, monto: @monto, attrs: {
         club:             @club,
         sede_id:          @dispensacion.sede_id,
-        dispensacion:     @dispensacion,
         paciente:         @dispensacion.paciente,
         created_by:       @usuario,
         tipo:             'recupero_costo',
-        categoria:        'dispensacion',
         descripcion:      base + sufijo,
-        monto_ars:        @monto,
         fecha:            fecha_del_asiento,
         pagado:           cobro.pagado,
         medio_pago:       @medio,
         comprobante_tipo: 'sin_comprobante',
-      )
+      })
     end
 
     def debitar_cuenta_corriente(cobro)

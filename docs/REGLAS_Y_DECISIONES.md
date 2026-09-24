@@ -416,6 +416,25 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   con tareas por día relativo/recurrencia, se aplica sobre lote, espacio o todo el cultivo
   (`AplicacionPlan` genera `Tarea`s). Decisión de Germán: **por ahora cada uno arma su plan y lo
   aplica cuando quiere**; no hay plan automático al crear un lote. No está en el teléfono.
+- **EL PACIENTE: ACTIVO · SUSPENDIDO · INACTIVO, Y EL REPROCANN APARTE** (23-sep-2026, Germán).
+  Inactivo = `es_paciente: false`, a mano: es la BAJA (no retira, no figura en el informe
+  REPROCANN). Suspendido = activo que hace más de `Paciente::DIAS_SIN_MOVIMIENTO` (90) días que no
+  retira: lo calcula `Paciente.suspendido?` (lista, ficha y contador), **no bloquea** y se va solo
+  al retirar; el que nunca retiró no está suspendido. En pantalla, ámbar punteado con tooltip
+  «Suspendido por poco movimiento». El REPROCANN es otro eje: vigente · por vencer · vencido · en
+  trámite · sin REPROCANN. Entregar a quien no tiene REPROCANN se permite y el informe lo muestra
+  («entregas sin REPROCANN vigente»): no se esconde.
+- **EL ENVÍO TIENE VALOR, Y VA DENTRO DEL TOTAL** (23-sep-2026, Germán, opción A). Columna
+  `dispensaciones.costo_envio_ars`: NULL = sin envío (o anterior), 0 = **bonificado**, negativo nunca
+  (check en la base). **Obligatorio al crear con envío** y al «mandar por delivery» después
+  (`agregar_envio`); lo carga quien dispensa, dispensador incluido. Se **suma** a
+  `aporte_socio_ars`, que sigue siendo lo que paga el paciente —cobros, contra entrega, arqueo y
+  rendición no cambian—; el descuento del paciente NO lo toca. En el libro va a su categoría
+  **«Envíos»** (`envio`, tipo ingreso): cada cobro se parte en proporción entre producto y envío,
+  y los tres lugares que asientan lo hacen por `Dispensaciones::Asiento`. Regalo y cambio: envío en
+  0. Al editar, el total rearmado es sólo producto y el envío se suma encima (el modal precarga
+  `subtotal_productos_ars`, no el total). La entrega de una **reserva** con envío todavía no pide
+  valor.
 - **EL PAQUETE QUE NO SE ENTREGA NO BORRA LA PLATA: QUEDA A FAVOR** (23-sep-2026, Germán). Antes
   `no_entregado` se deshacía como un error de carga y un paquete **pagado por adelantado** perdía
   la plata: el ingreso salía del libro, el cobro del arqueo y el paciente no quedaba con nada. Ahora

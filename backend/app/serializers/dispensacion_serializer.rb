@@ -21,6 +21,11 @@ class DispensacionSerializer
       cantidad:            d.cantidad.to_f,
       precio_unitario_ars: d.precio_unitario_ars&.to_f,
       aporte_socio_ars:    d.aporte_socio_ars&.to_f,
+      # El envío, aparte (23-sep-2026): `aporte_socio_ars` es el total y lo incluye. nil = sin
+      # envío o anterior a esto; 0 = bonificado.
+      costo_envio_ars:        d.costo_envio_ars&.to_f,
+      envio_bonificado:       d.envio_bonificado?,
+      subtotal_productos_ars: d.subtotal_productos_ars.to_f,
       descuento_paciente_pct: d.descuento_paciente_pct&.to_f,
       descuento_dispensa_pct: d.descuento_dispensa_pct&.to_f,
       descuento_otorgado_por: (d.descuento_dispensa_pct.to_f > 0 && d.user) ? (d.user.first_name || d.user.email) : nil,
@@ -112,6 +117,11 @@ class DispensacionSerializer
       # Privacidad del delivery: NO se expone qué ni cuánto lleva (cantidad/stock/items).
       # Solo lo necesario para entregar y cobrar contra-entrega (monto, saldo, contacto).
       aporte_socio_ars:   d.aporte_socio_ars&.to_f,
+      # El envío, aparte (23-sep-2026): `aporte_socio_ars` es el total y lo incluye. nil = sin
+      # envío o anterior a esto; 0 = bonificado.
+      costo_envio_ars:        d.costo_envio_ars&.to_f,
+      envio_bonificado:       d.envio_bonificado?,
+      subtotal_productos_ars: d.subtotal_productos_ars.to_f,
       cobrar_en_entrega:  d.cobrar_en_entrega,
       saldo_pendiente:    d.saldo_pendiente.to_f,
       total_cobrado:      d.total_cobrado.to_f,
@@ -162,7 +172,7 @@ class DispensacionSerializer
     # a todas por igual (siempre hay al menos un ítem).
     if d.items.empty?
       return [] unless d.stock
-      subtotal = d.precio_unitario_ars&.to_f ? (d.precio_unitario_ars.to_f * d.cantidad.to_f).round(2) : d.aporte_socio_ars.to_f
+      subtotal = d.precio_unitario_ars&.to_f ? (d.precio_unitario_ars.to_f * d.cantidad.to_f).round(2) : d.subtotal_productos_ars.to_f
       return [{
         id:                  nil,
         stock_id:            d.stock_id,

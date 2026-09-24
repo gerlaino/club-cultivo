@@ -55,7 +55,7 @@ RSpec.describe 'Dispensaciones con cobros (pagos partidos / contra-entrega)', ty
 
     it 'crea sin cobros (saldo = total) y el delivery cobra efectivo + resto a cuenta' do
       sign_in_as(dispensador)
-      crear(cobrar_en_entrega: true, con_envio: true, delivery_id: delivery.id, usar_domicilio_paciente: true)
+      crear(cobrar_en_entrega: true, con_envio: true, costo_envio_ars: 0, delivery_id: delivery.id, usar_domicilio_paciente: true)
       expect(response).to have_http_status(:created)
       d = Dispensacion.last
       expect(d.cobrar_en_entrega).to be true
@@ -80,7 +80,7 @@ RSpec.describe 'Dispensaciones con cobros (pagos partidos / contra-entrega)', ty
     it 'con una parte ya paga, la asienta ahora y el repartidor cobra sólo el resto' do
       sign_in_as(dispensador)
       crear(cobros: [{ medio: 'transferencia', monto: 60_000 }], cobrar_en_entrega: true,
-            con_envio: true, delivery_id: delivery.id, usar_domicilio_paciente: true)
+            con_envio: true, costo_envio_ars: 0, delivery_id: delivery.id, usar_domicilio_paciente: true)
       expect(response).to have_http_status(:created), response.body
       d = Dispensacion.last
       expect(d.cobros.pluck(:medio, :monto_ars)).to eq([['transferencia', 60_000]])
@@ -101,7 +101,7 @@ RSpec.describe 'Dispensaciones con cobros (pagos partidos / contra-entrega)', ty
     it 'si lo cobrado ahora cubre el total, contra entrega no tiene sentido y lo dice' do
       sign_in_as(dispensador)
       crear(cobros: [{ medio: 'transferencia', monto: 100_000 }], cobrar_en_entrega: true,
-            con_envio: true, delivery_id: delivery.id, usar_domicilio_paciente: true)
+            con_envio: true, costo_envio_ars: 0, delivery_id: delivery.id, usar_domicilio_paciente: true)
       expect(response).to have_http_status(:unprocessable_entity)
       expect(JSON.parse(response.body)['error']).to match(/cubre el total/)
       expect(Dispensacion.count).to eq(0)
@@ -109,7 +109,7 @@ RSpec.describe 'Dispensaciones con cobros (pagos partidos / contra-entrega)', ty
 
     it 'acepta los cobros en forma de hash (multipart, cuando se sube foto)' do
       sign_in_as(dispensador)
-      crear(cobrar_en_entrega: true, con_envio: true, delivery_id: delivery.id, usar_domicilio_paciente: true)
+      crear(cobrar_en_entrega: true, con_envio: true, costo_envio_ars: 0, delivery_id: delivery.id, usar_domicilio_paciente: true)
       d = Dispensacion.last
       delete '/api/users/sign_out'
       sign_in_as(delivery)
@@ -289,7 +289,7 @@ RSpec.describe 'Dispensaciones con cobros (pagos partidos / contra-entrega)', ty
 
     it 'con contra entrega, el saldo se descuenta ahora y el repartidor cobra el resto' do
       sign_in_as(dispensador)
-      crear(cobrar_en_entrega: true, con_envio: true, delivery_id: delivery.id, usar_domicilio_paciente: true)
+      crear(cobrar_en_entrega: true, con_envio: true, costo_envio_ars: 0, delivery_id: delivery.id, usar_domicilio_paciente: true)
       expect(response).to have_http_status(:created)
       d = Dispensacion.last
       expect(d.cobros.find_by(medio: 'saldo_a_favor').monto_ars).to eq(30_000)

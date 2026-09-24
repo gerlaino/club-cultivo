@@ -11,7 +11,7 @@ describe('clasificación REPROCANN', () => {
     const p = { reprocann_estado: 'pendiente', reprocann_numero: null, reprocann_vencimiento: null }
 
     expect(reprocannCategoria(p)).toBe('pendiente')
-    expect(reprocannBadge(p).label).toBe('En trámite')
+    expect(reprocannBadge(p).label).toBe('Pendiente de aprobación')
   })
 
   it('un pendiente con la fecha ya vencida sigue en trámite, no vencido', () => {

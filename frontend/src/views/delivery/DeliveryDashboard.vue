@@ -667,6 +667,10 @@ onMounted(load)
                 <span>A cobrar</span>
                 <strong>{{ fmtMoneda(saldoACobrar) }}</strong>
               </div>
+              <!-- Que sepa que el envío va adentro: es lo primero que pregunta el paciente. -->
+              <p v-if="Number(modalEntregar.costo_envio_ars) > 0" class="dlv__cobro-envio">
+                Incluye el envío: {{ fmtMoneda(modalEntregar.costo_envio_ars) }}
+              </p>
               <div class="dlv__cobro-grid">
                 <label class="dlv__cobro-cell">
                   <span>Efectivo</span>
@@ -956,6 +960,7 @@ onMounted(load)
 /* Cobro en la entrega */
 .dlv__cobro { border: 1.5px solid var(--c-slate-200); border-radius: 12px; padding: .75rem; margin-bottom: 1rem; }
 .dlv__cobro-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: .6rem; font-size: .82rem; color: var(--c-slate-600); }
+.dlv__cobro-envio { margin: -.2rem 0 .5rem; font-size: .78rem; color: var(--c-slate-500); }
 .dlv__cobro-head strong { font-size: 1.1rem; font-weight: 800; color: var(--c-slate-900); font-variant-numeric: tabular-nums; }
 .dlv__cobro-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
 .dlv__cobro-cell { display: flex; flex-direction: column; gap: 3px; min-width: 0; font-size: .72rem; font-weight: 600; color: var(--c-slate-500); }

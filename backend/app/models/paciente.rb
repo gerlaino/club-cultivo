@@ -170,6 +170,16 @@ class Paciente < ApplicationRecord
   # - 'activo' cuya fecha ya pasó → 'vencido' (rojo): cert aprobado que caducó.
   # - 'pendiente' NO se pisa aunque la fecha esté vencida: significa que hay un
   #   trámite de renovación en curso (se muestra ámbar, no rojo).
+  # SUSPENDIDO POR POCO MOVIMIENTO (Germán, 23-sep-2026): está activo pero hace más de
+  # DIAS_SIN_MOVIMIENTO días que no retira. No se marca a mano ni bloquea nada: es un aviso, y
+  # deja de estarlo solo el día que vuelve a retirar. El que nunca retiró no está suspendido (es
+  # un alta reciente, no un abandono). La regla vive acá: la lista, la ficha y el contador la usan.
+  DIAS_SIN_MOVIMIENTO = 90
+
+  def self.suspendido?(es_paciente:, ultima_dispensacion:, hoy: Time.zone.today)
+    es_paciente && ultima_dispensacion.present? && ultima_dispensacion < hoy - DIAS_SIN_MOVIMIENTO
+  end
+
   def reprocann_estado_efectivo
     if reprocann_estado.to_s == 'activo' &&
        reprocann_vencimiento.present? && reprocann_vencimiento < Time.zone.today
