@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, reactive, ref, computed } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { getProfile, updateProfile, updateMyPassword, uploadAvatar, getMisNotificaciones, updateMisNotificaciones } from '../lib/api'
 import { useAuthStore } from '../stores/auth'
@@ -8,6 +9,8 @@ import { useToast } from '../composables/useToast.js'
 import { usePushNotifications, MOTIVOS } from '../composables/usePushNotifications.js'
 
 const auth = useAuthStore()
+const route  = useRoute()
+const router = useRouter()
 
 const me            = ref(null)
 const avatarPreview = ref(null)
@@ -188,8 +191,28 @@ const notifGrupos = computed(() => {
   return grupos
 })
 
+const notifCargadas = ref(false)
 async function fetchNotificaciones() {
   try { notif.value = (await getMisNotificaciones()).data } catch { notif.value = null }
+  finally { notifCargadas.value = true }
+}
+
+// ── Solapas ─────────────────────────────────────────────────────────────
+// La solapa vive en la URL (`?solapa=notificaciones`): al recargar se queda donde estaba y un
+// aviso puede abrir directo la que corresponde. «Notificaciones» sólo existe si hay avisos para
+// elegir (lo decide el backend); pedida sin avisos, cae en «Datos personales».
+const solapas = computed(() => [
+  { id: 'datos',          label: 'Datos personales', corto: 'Datos', icon: 'bi-person' },
+  ...(notif.value || !notifCargadas.value ? [{ id: 'notificaciones', label: 'Notificaciones', icon: 'bi-bell' }] : []),
+  { id: 'seguridad',      label: 'Seguridad',        icon: 'bi-shield-lock' },
+])
+const solapa = computed(() => {
+  const pedida = route.query.solapa
+  return solapas.value.some(x => x.id === pedida) ? pedida : 'datos'
+})
+function irASolapa(id) {
+  if (id === solapa.value) return
+  router.replace({ query: { ...route.query, solapa: id === 'datos' ? undefined : id } })
 }
 
 async function toggleTipo(t) {
@@ -263,7 +286,8 @@ onMounted(() => { fetchProfile(); fetchNotificaciones() })
         <!-- ── Columna izquierda ── -->
         <div class="pfl__aside">
 
-          <!-- Avatar card -->
+          <!-- Quién sos: foto, nombre y rol. Queda fija al lado de las solapas. La tarjeta «Cuenta»
+               (ID de usuario y de organización) se sacó: eran números internos. -->
           <div class="pfl__card pfl__avatar-card">
             <div class="pfl__avatar-wrap" @click="onPickAvatar">
               <img v-if="avatarPreview" :src="avatarPreview" class="pfl__avatar-img" alt="Avatar" />
@@ -274,9 +298,11 @@ onMounted(() => { fetchProfile(); fetchNotificaciones() })
               </div>
             </div>
 
-            <h5 class="pfl__avatar-name">{{ form.first_name }} {{ form.last_name }}</h5>
-            <p class="pfl__avatar-email">{{ form.email }}</p>
-            <span class="pfl__role-badge">{{ roleLabel(me?.role) }}</span>
+            <div class="pfl__avatar-info">
+              <h5 class="pfl__avatar-name">{{ form.first_name }} {{ form.last_name }}</h5>
+              <p class="pfl__avatar-email">{{ form.email }}</p>
+              <span class="pfl__role-badge">{{ roleLabel(me?.role) }}</span>
+            </div>
 
             <input id="avatarInput" type="file" accept="image/jpeg,image/png,image/webp" style="display:none" @change="onFileChange" />
 
@@ -287,23 +313,22 @@ onMounted(() => { fetchProfile(); fetchNotificaciones() })
             <div class="pfl__avatar-hint">JPG, PNG o WebP · máx 5 MB</div>
           </div>
 
-          <!-- Info de cuenta -->
-          <div class="pfl__card">
-            <div class="pfl__card-section-title">Cuenta</div>
-            <dl class="pfl__dl">
-              <div class="pfl__dl-row"><dt>ID usuario</dt><dd class="pfl__mono">#{{ me?.id }}</dd></div>
-              <div class="pfl__dl-row"><dt>Rol</dt><dd>{{ roleLabel(me?.role) }}</dd></div>
-              <div class="pfl__dl-row"><dt>ID de organización</dt><dd class="pfl__mono">#{{ me?.club_id }}</dd></div>
-            </dl>
-          </div>
-
         </div>
 
         <!-- ── Columna derecha ── -->
         <div class="pfl__main">
 
+          <div class="pfl__tabs" role="tablist">
+            <button v-for="t in solapas" :key="t.id" type="button" role="tab" class="pfl__tab"
+                    :class="{ 'pfl__tab--on': solapa === t.id }" :aria-selected="solapa === t.id"
+                    @click="irASolapa(t.id)">
+              <i class="bi" :class="t.icon"></i>
+              <span class="pfl__tab-largo">{{ t.label }}</span><span class="pfl__tab-corto">{{ t.corto || t.label }}</span>
+            </button>
+          </div>
+
           <!-- Datos personales -->
-          <div class="pfl__card pfl__card--form">
+          <div v-if="solapa === 'datos'" class="pfl__card pfl__card--form">
             <div class="pfl__card-header">
               <div>
                 <div class="pfl__card-title">Datos personales</div>
@@ -350,7 +375,9 @@ onMounted(() => { fetchProfile(); fetchNotificaciones() })
           </div>
 
           <!-- Notificaciones al teléfono -->
-          <div v-if="notif" class="pfl__card pfl__card--form">
+          <div v-else-if="solapa === 'notificaciones'" class="pfl__card pfl__card--form">
+            <div v-if="!notif" class="pfl__loading pfl__loading--inline"><DsSpinner /></div>
+            <template v-else>
             <div class="pfl__card-header">
               <div>
                 <div class="pfl__card-title">Notificaciones</div>
@@ -396,10 +423,11 @@ onMounted(() => { fetchProfile(); fetchNotificaciones() })
                 </span>
               </label>
             </div>
+            </template>
           </div>
 
           <!-- Seguridad -->
-          <div class="pfl__card pfl__card--form">
+          <div v-else class="pfl__card pfl__card--form">
             <div class="pfl__card-header">
               <div>
                 <div class="pfl__card-title">Seguridad</div>
@@ -539,6 +567,8 @@ onMounted(() => { fetchProfile(); fetchNotificaciones() })
 /* 2-col body */
 .pfl__body  { display: grid; grid-template-columns: 280px 1fr; gap: 1.5rem; align-items: start; }
 @media (max-width: 768px) { .pfl__body { grid-template-columns: 1fr; } }
+/* Sin esto la fila de solapas (que scrollea de costado) estiraba la columna más allá de la pantalla. */
+.pfl__body > * { min-width: 0; }
 
 /* Cards */
 .pfl__card { background: #fff; border: 1.5px solid var(--c-slate-200); border-radius: 14px; padding: 1.25rem; margin-bottom: 1rem; }
@@ -553,12 +583,35 @@ onMounted(() => { fetchProfile(); fetchNotificaciones() })
 .pfl__avatar-wrap:hover .pfl__avatar-overlay { opacity: 1; }
 .pfl__avatar-loading { position: absolute; inset: 0; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; border-radius: 50%; }
 .pfl__avatar-name  { font-weight: 700; font-size: 1rem; color: var(--c-slate-900); margin: 0 0 .2rem; }
-.pfl__avatar-email { font-size: .82rem; color: var(--c-slate-500); margin: 0 0 .5rem; }
+.pfl__avatar-info { min-width: 0; }
+.pfl__avatar-email { font-size: .82rem; color: var(--c-slate-500); margin: 0 0 .5rem; overflow-wrap: anywhere; }
 .pfl__role-badge   { display: inline-block; background: #1a3d2e; color: #fff; border-radius: 99px; padding: .25rem .8rem; font-size: .75rem; font-weight: 600; margin-bottom: .75rem; }
 .pfl__avatar-btn   { width: 100%; margin-bottom: .25rem; }
 .pfl__avatar-hint  { font-size: .7rem; color: var(--c-slate-400); }
 
-/* Account info */
+/* Solapas */
+.pfl__tabs { display: flex; gap: .25rem; border-bottom: 1.5px solid var(--c-slate-200); margin-bottom: 1rem; overflow-x: auto; scrollbar-width: none; }
+.pfl__tab { display: inline-flex; align-items: center; gap: .4rem; white-space: nowrap; background: none; border: 0; border-bottom: 2.5px solid transparent; margin-bottom: -1.5px; padding: .55rem .85rem; font-size: .875rem; font-weight: 600; color: var(--c-slate-500); cursor: pointer; }
+.pfl__tab:hover { color: var(--c-slate-900); }
+.pfl__tab--on { color: #1a3d2e; border-bottom-color: #1a3d2e; }
+.pfl__loading--inline { min-height: 120px; }
+.pfl__tab-corto { display: none; }
+
+/* Teléfono: la foto queda chica, al lado del nombre, arriba de las solapas. */
+@media (max-width: 768px) {
+  .pfl__avatar-card { display: grid; grid-template-columns: 64px 1fr; column-gap: .9rem; align-items: center; text-align: left; padding: .9rem 1rem; }
+  .pfl__avatar-wrap { width: 64px; height: 64px; margin: 0; grid-row: span 2; }
+  .pfl__avatar-placeholder { font-size: 1.3rem; }
+  .pfl__role-badge { margin-bottom: .35rem; }
+  .pfl__avatar-btn { width: auto; justify-self: start; padding: .3rem .7rem; font-size: .76rem; }
+  .pfl__avatar-hint { display: none; }
+  .pfl__body { gap: .25rem; }
+  /* Las tres tienen que entrar: una solapa cortada a la mitad no se lee como solapa. */
+  .pfl__tab { flex: 1; justify-content: center; padding: .55rem .4rem; }
+  .pfl__tab-largo { display: none; }
+  .pfl__tab-corto { display: inline; }
+}
+
 .pfl__notif-dispositivo { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .85rem 1rem; border-radius: 10px; background: var(--c-slate-50); border: 1px solid var(--c-slate-200); margin-bottom: 1rem; }
 .pfl__notif-dispositivo .pfl__btn-secondary { white-space: nowrap; flex: none; }
 @media (max-width: 480px) { .pfl__notif-dispositivo { flex-direction: column; align-items: stretch; } }
@@ -574,11 +627,6 @@ onMounted(() => { fetchProfile(); fetchNotificaciones() })
 .pfl__switch:checked::after { transform: translateX(16px); }
 .pfl__switch:disabled { opacity: .6; }
 .pfl__card-section-title { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--c-slate-400); margin-bottom: .75rem; }
-.pfl__dl     { display: flex; flex-direction: column; gap: .5rem; }
-.pfl__dl-row { display: flex; justify-content: space-between; align-items: center; font-size: .82rem; }
-.pfl__dl-row dt { color: var(--c-slate-500); font-weight: 400; }
-.pfl__dl-row dd { margin: 0; color: var(--c-slate-900); font-weight: 500; }
-.pfl__mono { font-family: monospace; }
 
 /* Card headers */
 .pfl__card-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1.25rem; }
