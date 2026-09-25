@@ -24,7 +24,31 @@
         </div>
         <button class="rc__btn-ghost" @click="nuevoNutriente"><i class="bi bi-plus-lg"></i> Nutriente</button>
       </div>
-      <div v-if="!insumos.length" class="rc__empty">Todavía no cargaste ninguno. Con «Nutriente» lo das de alta; con «Repuse» cargás lo que compraste.</div>
+      <!-- Solapas: los que se usan y los archivados (se archiva lo que ya se usó o está en una
+           receta y no se puede borrar). Desde «Archivados» se vuelven a activar. -->
+      <div class="rc__tabs" role="tablist">
+        <button role="tab" class="rc__tab" :class="{ 'rc__tab--on': solapa === 'activos' }" :aria-selected="solapa === 'activos'" @click="solapa = 'activos'">
+          En uso <span class="rc__tab-n">{{ insumos.length }}</span>
+        </button>
+        <button role="tab" class="rc__tab" :class="{ 'rc__tab--on': solapa === 'archivados' }" :aria-selected="solapa === 'archivados'" @click="solapa = 'archivados'">
+          Archivados <span class="rc__tab-n">{{ archivados.length }}</span>
+        </button>
+      </div>
+      <template v-if="solapa === 'archivados'">
+        <div v-if="!archivados.length" class="rc__empty">No hay nutrientes archivados. Se archiva uno cuando ya lo usaste y no se puede borrar.</div>
+        <div v-else class="rc__nutrientes">
+          <div v-for="i in archivados" :key="i.id" class="rc__nutriente rc__nutriente--archivado">
+            <div class="rc__nutriente-main">
+              <span class="rc__nutriente-nombre">{{ i.nombre }}</span>
+              <span class="rc__nutriente-stock">quedan <b>{{ num(i.stock_actual) }} {{ u(i.unidad_medida) }}</b></span>
+            </div>
+            <button class="rc__btn-ghost rc__btn-ghost--sm" :disabled="reactivando === i.id" @click="reactivarNutriente(i)">
+              <i class="bi bi-arrow-counterclockwise"></i> Reactivar
+            </button>
+          </div>
+        </div>
+      </template>
+      <div v-else-if="!insumos.length" class="rc__empty">Todavía no cargaste ninguno. Con «Nutriente» lo das de alta; con «Repuse» cargás lo que compraste.</div>
       <div v-else class="rc__nutrientes">
         <div v-for="i in insumos" :key="i.id" class="rc__nutriente" :class="{ 'rc__nutriente--bajo': i.stock_bajo }">
           <div class="rc__nutriente-main">
@@ -35,7 +59,12 @@
               <template v-if="i.stock_bajo"> · <span class="rc__bajo">queda poco</span></template>
             </span>
           </div>
-          <button class="rc__btn-ghost rc__btn-ghost--sm" @click="reponer(i)"><i class="bi bi-cart-plus"></i> Repuse</button>
+          <div class="rc__nutriente-acts">
+            <button class="rc__btn-ghost rc__btn-ghost--sm" @click="reponer(i)"><i class="bi bi-cart-plus"></i> Repuse</button>
+            <button class="rc__icon" title="Editar" :aria-label="`Editar ${i.nombre}`" @click="editarNutriente(i)"><i class="bi bi-pencil"></i></button>
+            <button class="rc__icon" title="Corregir cantidad" :aria-label="`Corregir cantidad de ${i.nombre}`" @click="corregirNutriente(i)"><i class="bi bi-clipboard-check"></i></button>
+            <button class="rc__icon rc__icon--danger" title="Eliminar" :aria-label="`Eliminar ${i.nombre}`" @click="eliminarNutriente(i)"><i class="bi bi-trash"></i></button>
+          </div>
         </div>
       </div>
     </section>
@@ -109,7 +138,7 @@
               <div v-for="(it, i) in form.items" :key="i" class="rc__item-row">
                 <select v-model="it.insumo_id" class="rc__input rc__input--grow">
                   <option value="" disabled>{{ esPersonal ? 'Nutriente' : 'Producto del depósito' }}</option>
-                  <option v-for="ins in insumos" :key="ins.id" :value="ins.id">{{ ins.nombre }}</option>
+                  <option v-for="ins in opcionesDeReceta" :key="ins.id" :value="ins.id">{{ ins.nombre }}{{ ins.activo === false ? ' (archivado)' : '' }}</option>
                 </select>
                 <input v-model.number="it.dosis" type="number" step="0.01" min="0" class="rc__input rc__input--num" placeholder="2" />
                 <select v-model="it.unidad" class="rc__input rc__input--u">
@@ -223,6 +252,77 @@
         </div>
       </div>
     </Teleport>
+
+    <!-- ── Modal editar nutriente ── -->
+    <Teleport to="body">
+      <div v-modal="() => nutEdit = null" v-if="nutEdit" class="rc__overlay">
+        <div class="rc__modal rc__modal--sm">
+          <div class="rc__modal-head">
+            <h3 class="rc__modal-title">Editar {{ nutEdit.nombreOriginal }}</h3>
+            <button class="rc__x" @click="nutEdit = null"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div class="rc__modal-body">
+            <div v-if="formError" class="rc__error">{{ formError }}</div>
+            <label class="rc__field">
+              <span class="rc__label">Nombre</span>
+              <input v-model.trim="nutEdit.nombre" class="rc__input" maxlength="80" />
+            </label>
+            <label class="rc__field">
+              <span class="rc__label">Se mide en</span>
+              <select v-model="nutEdit.unidad_medida" class="rc__input" :disabled="nutEdit.con_movimientos">
+                <option value="mililitro">mililitros (líquido)</option>
+                <option value="gramo">gramos (polvo)</option>
+              </select>
+              <!-- Con compras o riegos cargados el backend no deja cambiarla: lo cargado se leería en otra medida. -->
+              <span v-if="nutEdit.con_movimientos" class="rc__hint">No se puede cambiar: ya tiene compras o riegos cargados en esta unidad.</span>
+            </label>
+            <label class="rc__field">
+              <span class="rc__label">Avisame cuando queden menos de <span class="rc__opt">opcional</span></span>
+              <input v-model.number="nutEdit.stock_minimo" type="number" min="0" class="rc__input" placeholder="100" />
+            </label>
+          </div>
+          <div class="rc__modal-foot">
+            <button class="rc__btn-ghost" @click="nutEdit = null">Cancelar</button>
+            <button class="rc__btn-primary" :disabled="guardando" @click="guardarEdicionNutriente">
+              <DsSpinner v-if="guardando" :size="14" /><span v-else>Guardar</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- ── Modal corregir cantidad ── -->
+    <Teleport to="body">
+      <div v-modal="() => nutConteo = null" v-if="nutConteo" class="rc__overlay">
+        <div class="rc__modal rc__modal--sm">
+          <div class="rc__modal-head">
+            <h3 class="rc__modal-title">Corregir cantidad de {{ nutConteo.nombre }}</h3>
+            <button class="rc__x" @click="nutConteo = null"><i class="bi bi-x-lg"></i></button>
+          </div>
+          <div class="rc__modal-body">
+            <div v-if="formError" class="rc__error">{{ formError }}</div>
+            <span class="rc__hint">Hoy figura que quedan <b>{{ num(nutConteo.actual) }} {{ u(nutConteo.unidad_medida) }}</b>.</span>
+            <label class="rc__field">
+              <span class="rc__label">¿Cuánto queda de verdad? ({{ u(nutConteo.unidad_medida) }})</span>
+              <input v-model.number="nutConteo.nuevo" type="number" min="0" step="any" class="rc__input" />
+            </label>
+            <div class="rc__field">
+              <span class="rc__label">¿Por qué?</span>
+              <label class="rc__radio"><input v-model="nutConteo.motivo" type="radio" value="correccion" /> Me equivoqué al cargar</label>
+              <label class="rc__radio"><input v-model="nutConteo.motivo" type="radio" value="merma" /> Se derramó, se venció o se tiró</label>
+            </div>
+            <!-- La merma sólo baja (el backend la rechaza si sube): si hay más, es un error de carga. -->
+            <span v-if="conteoMermaSube" class="rc__hint rc__hint--warn">Si hay más de lo que figura no es una pérdida: elegí «Me equivoqué al cargar».</span>
+          </div>
+          <div class="rc__modal-foot">
+            <button class="rc__btn-ghost" @click="nutConteo = null">Cancelar</button>
+            <button class="rc__btn-primary" :disabled="guardando || !conteoValido" @click="guardarConteo">
+              <DsSpinner v-if="guardando" :size="14" /><span v-else>Corregir</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -237,13 +337,18 @@ import { useToast } from '../composables/useToast.js'
 import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
 import { formatARS } from '../lib/formatters.js'
-import { listRecetas, getReceta, createReceta, updateReceta, listInsumos, createInsumo, comprarInsumo } from '../lib/api.js'
+import { listRecetas, getReceta, createReceta, updateReceta, listInsumos, createInsumo, comprarInsumo, updateInsumo, reconteoInsumo, deleteInsumo } from '../lib/api.js'
+import { useConfirm } from '../composables/useConfirm.js'
 
 const toast = useToast()
+const { confirm } = useConfirm()
 const { esPersonal } = useUsoPersonal()
 
 const recetas  = ref([])
-const insumos  = ref([])
+const todosInsumos = ref([])
+const insumos    = computed(() => todosInsumos.value.filter(i => i.activo !== false))
+const archivados = computed(() => todosInsumos.value.filter(i => i.activo === false))
+const solapa     = ref('activos')
 const cargando = ref(true)
 const litrosPor = ref({})
 const num = v => (v == null ? '—' : Number(v).toLocaleString('es-AR', { maximumFractionDigits: 2 }))
@@ -252,9 +357,10 @@ const u = x => U[x] || x || ''
 
 async function cargar() {
   try {
-    const [r, i] = await Promise.all([listRecetas(), listInsumos({ tipo: 'cultivo', activos: 'true' })])
+    // Todos, activos y archivados: la solapa «Archivados» los muestra para reactivarlos.
+    const [r, i] = await Promise.all([listRecetas(), listInsumos({ tipo: 'cultivo' })])
     recetas.value = r.data || []
-    insumos.value = i.data?.insumos || i.data || []
+    todosInsumos.value = i.data?.insumos || i.data || []
   } catch { toast.error('No se pudieron cargar las recetas') } finally { cargando.value = false }
 }
 onMounted(cargar)
@@ -326,6 +432,94 @@ async function guardarNutriente() {
   } catch (e) { formError.value = e?.response?.data?.errors?.join(', ') || e?.response?.data?.error || 'No se pudo guardar' }
   finally { guardando.value = false }
 }
+// Editar: nombre, unidad (sólo sin movimientos) y el aviso de «queda poco».
+const nutEdit = ref(null)
+function editarNutriente(i) {
+  formError.value = null
+  nutEdit.value = { id: i.id, nombreOriginal: i.nombre, nombre: i.nombre, unidad_medida: i.unidad_medida,
+                    stock_minimo: i.stock_minimo || null, con_movimientos: i.con_movimientos }
+}
+async function guardarEdicionNutriente() {
+  formError.value = null
+  if (!nutEdit.value.nombre) { formError.value = 'Ponele un nombre'; return }
+  guardando.value = true
+  try {
+    const payload = { nombre: nutEdit.value.nombre, stock_minimo: nutEdit.value.stock_minimo || 0 }
+    if (!nutEdit.value.con_movimientos) payload.unidad_medida = nutEdit.value.unidad_medida
+    await updateInsumo(nutEdit.value.id, payload)
+    toast.success('Nutriente guardado')
+    nutEdit.value = null
+    await cargar()
+  } catch (e) { formError.value = e?.response?.data?.errors?.join(', ') || e?.response?.data?.error || 'No se pudo guardar' }
+  finally { guardando.value = false }
+}
+
+// Corregir la cantidad: queda como reconteo con motivo, no como un número pisado a mano.
+const nutConteo = ref(null)
+function corregirNutriente(i) {
+  formError.value = null
+  nutConteo.value = { id: i.id, nombre: i.nombre, unidad_medida: i.unidad_medida, actual: Number(i.stock_actual), nuevo: Number(i.stock_actual), motivo: 'correccion' }
+}
+const conteoMermaSube = computed(() => nutConteo.value?.motivo === 'merma' && Number(nutConteo.value.nuevo) > nutConteo.value.actual)
+const conteoValido = computed(() => {
+  const c = nutConteo.value
+  return c && c.nuevo !== '' && c.nuevo != null && Number(c.nuevo) >= 0 && Number(c.nuevo) !== c.actual && !conteoMermaSube.value
+})
+async function guardarConteo() {
+  formError.value = null
+  guardando.value = true
+  try {
+    await reconteoInsumo(nutConteo.value.id, { nuevo_stock: nutConteo.value.nuevo, motivo: nutConteo.value.motivo })
+    toast.success('Cantidad corregida')
+    nutConteo.value = null
+    await cargar()
+  } catch (e) { formError.value = e?.response?.data?.error || e?.response?.data?.errors?.join(', ') || 'No se pudo corregir' }
+  finally { guardando.value = false }
+}
+
+// Eliminar: si nunca se usó, se borra. Si ya se usó o está en una receta, el backend no deja
+// (se perdería el historial, o la receta quedaría con un producto menos) y se ofrece archivar.
+async function eliminarNutriente(i) {
+  const ok = await confirm({ title: `¿Eliminar ${i.nombre}?`, message: 'Si nunca lo usaste, se borra. Si lo compraste con precio, el gasto se anula.', confirmText: 'Eliminar' })
+  if (!ok) return
+  try {
+    await deleteInsumo(i.id)
+    toast.success('Nutriente eliminado')
+    await cargar()
+  } catch (e) {
+    const data = e?.response?.data || {}
+    if (!data.puede_archivar) { toast.error(data.error || 'No se pudo eliminar'); return }
+    const archivar = await confirm({
+      title: `${i.nombre} no se puede eliminar`,
+      message: `${data.error}\n\nArchivado deja de aparecer en la lista y no se ofrece en recetas nuevas; lo que ya se registró queda como estaba.`,
+      confirmText: 'Archivar', variant: 'warning',
+    })
+    if (!archivar) return
+    try {
+      await updateInsumo(i.id, { activo: false })
+      toast.success('Nutriente archivado')
+      await cargar()
+    } catch { toast.error('No se pudo archivar') }
+  }
+}
+// Una receta nueva ofrece sólo los que están en uso; una que ya tiene uno archivado lo sigue
+// mostrando, o la fila de ese producto quedaba en blanco al editarla.
+const opcionesDeReceta = computed(() => {
+  const enLaReceta = new Set((form.value?.items || []).map(it => it.insumo_id))
+  return todosInsumos.value.filter(i => i.activo !== false || enLaReceta.has(i.id))
+})
+
+const reactivando = ref(null)
+async function reactivarNutriente(i) {
+  reactivando.value = i.id
+  try {
+    await updateInsumo(i.id, { activo: true })
+    toast.success(`${i.nombre} vuelve a estar en uso`)
+    await cargar()
+    if (!archivados.value.length) solapa.value = 'activos'
+  } catch { toast.error('No se pudo reactivar') }
+  finally { reactivando.value = null }
+}
 </script>
 
 <style scoped>
@@ -346,6 +540,16 @@ async function guardarNutriente() {
 .rc__nutrientes { display: flex; flex-direction: column; gap: .4rem; }
 .rc__nutriente { display: flex; justify-content: space-between; align-items: center; gap: .75rem; padding: .55rem .75rem; border: 1px solid var(--c-ink-100); border-radius: 10px; }
 .rc__nutriente--bajo { border-color: #fcd34d; background: #fffbeb; }
+.rc__tabs { display: flex; gap: .25rem; border-bottom: 1.5px solid var(--c-ink-100); margin: 0 0 .6rem; }
+.rc__tab { background: none; border: 0; border-bottom: 2.5px solid transparent; margin-bottom: -1.5px; padding: .4rem .7rem; font-size: .84rem; font-weight: 600; color: var(--c-ink-500); cursor: pointer; display: inline-flex; align-items: center; gap: .35rem; }
+.rc__tab--on { color: var(--c-leaf-800, #1A3D2E); border-bottom-color: var(--c-leaf-800, #1A3D2E); }
+.rc__tab-n { background: var(--c-ink-100); color: var(--c-ink-700); border-radius: 999px; padding: 0 .45rem; font-size: .72rem; }
+.rc__nutriente--archivado { background: var(--c-ink-100); }
+.rc__nutriente--archivado .rc__nutriente-nombre { color: var(--c-ink-700); }
+.rc__nutriente-acts { display: flex; align-items: center; gap: .15rem; flex-shrink: 0; }
+.rc__icon--danger:hover { background: #fef2f2; color: #dc2626; }
+.rc__radio { display: flex; align-items: center; gap: .45rem; font-size: .88rem; cursor: pointer; }
+.rc__hint--warn { color: #b45309; font-weight: 600; }
 .rc__nutriente-main { display: flex; flex-direction: column; }
 .rc__nutriente-nombre { font-weight: 700; }
 .rc__nutriente-stock { font-size: .8rem; color: var(--c-ink-500); }

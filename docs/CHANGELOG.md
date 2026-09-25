@@ -1,5 +1,20 @@
 # Changelog
 
+## Septiembre 2026 (df) — Editar, corregir y eliminar un nutriente
+
+- **«Mis nutrientes» no tenía cómo editar ni borrar** (Germán, 25-sep): sólo alta y «Repuse».
+  Ahora cada uno tiene **Editar** (nombre, unidad y aviso de «queda poco»), **Corregir cantidad**
+  (reconteo con motivo: «me equivoqué al cargar» o «se derramó, se venció o se tiró»; la pérdida
+  sólo baja) y **Eliminar**.
+- **Eliminar un nutriente que está en una receta lo sacaba EN SILENCIO de la receta**
+  (`receta_items dependent: :destroy`): el próximo riego descontaba otra mezcla. Ahora el backend
+  no lo borra, dice en qué receta está y ofrece archivar (`puede_archivar`). Lo mismo si ya se usó.
+- **La unidad no se cambia con compras o riegos cargados** (`Insumo#unidad_fija_con_movimientos`):
+  1000 ml pasaban a leerse como 1000 g. El serializer manda `con_movimientos` y la pantalla la
+  muestra bloqueada con el motivo.
+- **Solapa «Archivados»** en «Mis nutrientes», con **Reactivar**. Una receta nueva no ofrece los
+  archivados; una que ya tiene uno lo sigue mostrando («(archivado)») para no dejar la fila en blanco.
+
 ## Septiembre 2026 (de) — Trasplante con su fecha, enraizado con su método, tabla de lotes única
 
 - **El trasplante fechado en el pasado prendía el lote HOY** (Germán, 24-sep): el evento de

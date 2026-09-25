@@ -25,6 +25,13 @@ class Insumo < ApplicationRecord
   validates :tipo, inclusion: { in: TIPOS }
   validates :stock_actual, :costo_promedio_ars, :stock_minimo,
             numericality: { greater_than_or_equal_to: 0 }
+  # Con compras o consumos, cambiar la unidad reinterpreta lo cargado: 1000 ml pasan a leerse
+  # como 1000 g, y el costo promedio y las dosis de las recetas quedan contra otra medida.
+  validate :unidad_fija_con_movimientos, on: :update
+
+  def con_movimientos?
+    insumo_compras.exists? || insumo_consumos.exists?
+  end
 
   scope :activos,    -> { where(activo: true) }
   scope :stock_bajo, -> { where('stock_minimo > 0 AND stock_actual <= stock_minimo') }
@@ -314,5 +321,12 @@ class Insumo < ApplicationRecord
   def cantidad_legible(valor)
     d = valor.to_d
     d == d.to_i ? d.to_i.to_s : d.to_s('F')
+  end
+
+  private
+
+  def unidad_fija_con_movimientos
+    return unless will_save_change_to_unidad_medida? && con_movimientos?
+    errors.add(:unidad_medida, 'no se puede cambiar: ya tiene compras o riegos cargados en la unidad de antes')
   end
 end

@@ -165,9 +165,19 @@ class InsumosController < ApplicationController
   # en ese caso se desactiva (PATCH activo:false), no se borra. Si solo tuvo compras, revierte sus
   # asientos contables antes de borrar (la plata vuelve).
   def destroy
+    # Borrarlo lo sacaba EN SILENCIO de las recetas (`receta_items dependent: :destroy`): la
+    # receta quedaba con un producto menos y el próximo riego descontaba otra mezcla.
+    recetas = Receta.where(id: @insumo.receta_items.select(:receta_id)).order(:nombre).pluck(:nombre)
+    if recetas.any?
+      return render json: {
+        error: "Está en #{recetas.size == 1 ? 'la receta' : 'las recetas'} #{recetas.map { |n| "«#{n}»" }.to_sentence(two_words_connector: ' y ', last_word_connector: ' y ')}. Sacalo de ahí para eliminarlo, o archivalo.",
+        recetas: recetas, puede_archivar: true,
+      }, status: :unprocessable_entity
+    end
     if @insumo.insumo_consumos.exists?
       return render json: {
-        error: 'Este insumo ya tiene movimientos de salida (consumos o mermas). Desactivalo para conservar el historial, o revertí esos movimientos primero.'
+        error: 'Este insumo ya tiene movimientos de salida (consumos o mermas). Desactivalo para conservar el historial, o revertí esos movimientos primero.',
+        puede_archivar: true,
       }, status: :unprocessable_entity
     end
     # Si falta stock respecto de lo comprado, parte se transfirió a otra sede o se reservó para un
@@ -176,7 +186,8 @@ class InsumosController < ApplicationController
     comprado = @insumo.insumo_compras.sum(:cantidad).to_d
     if @insumo.stock_actual.to_d < comprado
       return render json: {
-        error: 'Parte del stock salió por transferencia o quedó reservado para un evento. Desactivalo en vez de eliminarlo (eliminar descuadraría la contabilidad).'
+        error: 'Parte del stock salió por transferencia o quedó reservado para un evento. Desactivalo en vez de eliminarlo (eliminar descuadraría la contabilidad).',
+        puede_archivar: true,
       }, status: :unprocessable_entity
     end
     ActiveRecord::Base.transaction do
@@ -256,6 +267,9 @@ class InsumosController < ApplicationController
       # Para cuántos riegos más alcanza, según lo descontado por receta las últimas veces.
       aplicaciones_estimadas: i.aplicaciones_estimadas,
       activo:             i.activo,
+      # Con compras o riegos la unidad ya no se cambia (ver Insumo#unidad_fija_con_movimientos):
+      # la pantalla no la ofrece.
+      con_movimientos:    i.con_movimientos?,
       tipo:               i.tipo,
       categoria_contable_id: i.categoria_contable_id,
       categoria:          serialize_categoria(i.categoria_contable),
