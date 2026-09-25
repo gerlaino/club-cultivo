@@ -16,11 +16,16 @@ class ProfileController < ApplicationController
     end
   end
 
+  # Sin pedir la actual (decisión de Germán, 25-sep-2026: más simple). Lo que la reemplaza: al
+  # cambiarla se cortan las sesiones abiertas en otros dispositivos (la huella de `User#jwt_payload`)
+  # y llega un mail avisando, para que quien no fue se entere.
   def password
-    unless current_user.valid_password?(params.dig(:user, :current_password).to_s)
-      return render json: { errors: ["La contraseña actual no es correcta"] }, status: :unprocessable_entity
-    end
     if current_user.update(password_params)
+      # El token de ESTA sesión se armó al autenticar, con la huella vieja: volver a fijar el
+      # usuario lo rearma con la nueva (lo manda devise-jwt, ver `dispatch_requests`). Sin esto,
+      # quien cambia la contraseña queda afuera en el pedido siguiente.
+      bypass_sign_in(current_user, scope: :user)
+      AccesoMailer.contrasena_cambiada(user: current_user).deliver_later if current_user.email_real.present?
       render json: { message: "Contraseña actualizada" }, status: :ok
     else
       render json: { errors: current_user.errors.full_messages }, status: :unprocessable_entity

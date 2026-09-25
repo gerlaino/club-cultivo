@@ -1,5 +1,19 @@
 # Changelog
 
+## Septiembre 2026 (dh) — Perfil con solapas; la contraseña se cambia sin la actual
+
+- **Mi perfil con solapas** (Datos personales · Notificaciones · Seguridad), la solapa en la URL
+  (`?solapa=`); la foto con nombre y rol queda fija al costado. Se sacó la tarjeta «Cuenta» (IDs
+  internos). «Notificaciones» sólo aparece si la persona tiene avisos para elegir. En el teléfono
+  las tres entran en el ancho («Datos»).
+- **Cambiar la contraseña ya no pide la actual** (decisión de Germán, 25-sep, opción A). Lo que la
+  reemplaza: **cambiarla corta las sesiones en los demás dispositivos** —cada token lleva la huella
+  de la contraseña (`User#jwt_payload` → `pwd`) y `JwtDenylist.jwt_revoked?` vence los que tienen
+  otra; los tokens viejos sin huella valen hasta expirar— y **llega un mail avisando**
+  (`AccesoMailer#contrasena_cambiada`, al mail real, con el link a «Olvidé mi contraseña»). Quien
+  la cambia sigue adentro: `bypass_sign_in` rearma su token y devise-jwt lo manda
+  (`dispatch_requests` incluye `PATCH /api/profile/password`).
+
 ## Septiembre 2026 (dg) — Suelo vivo: las camas de cultivo
 
 Plan y decisiones en `docs/PLAN_SUELO_VIVO.md` (Germán, 22/25-sep: «ok a todo» + los días de

@@ -1,0 +1,8 @@
+Hola <%= @user.first_name.presence || '' %>,
+
+La contraseña de tu usuario <%= @user.email %><% if @club %> de <%= @club.name %><% end %> en Cultivo Espacial se cambió el <%= @cuando %>. Se cerró la sesión en los demás dispositivos.
+
+Si fuiste vos, no tenés que hacer nada.
+
+Si NO fuiste vos, elegí una contraseña nueva desde acá y avisale al administrador de tu organización:
+<%= @link %>

@@ -26,6 +26,20 @@ class User < ApplicationRecord
   devise :database_authenticatable, :recoverable, :rememberable, :validatable,
          :jwt_authenticatable, jwt_revocation_strategy: JwtDenylist
 
+  # Cada sesión lleva la huella de la contraseña con la que se abrió (`pwd`). Al cambiarla, las
+  # sesiones con la huella vieja dejan de valer (`JwtDenylist.jwt_revoked?`): la compu que quedó
+  # logueada o el teléfono perdido quedan afuera. No es la contraseña ni su hash: es un recorte
+  # del SHA-256 del hash, que no sirve para nada fuera de esta comparación.
+  # Sin `super`: el `jwt_payload` de warden-jwt_auth es sólo una interfaz documentada, no un
+  # método heredado, y llamarlo rompía EN SILENCIO la entrega del token al iniciar sesión.
+  def jwt_payload
+    { 'pwd' => huella_contrasena }
+  end
+
+  def huella_contrasena
+    Digest::SHA256.hexdigest(encrypted_password.to_s)[0, 16]
+  end
+
   enum :role, {
     super_admin:  'super_admin',
     admin:        'admin',

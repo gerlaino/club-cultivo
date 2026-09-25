@@ -12,6 +12,17 @@ class AccesoMailer < ApplicationMailer
     mail(to: user.email_real, subject: 'Elegí una contraseña nueva — Cultivo Espacial')
   end
 
+  # Aviso de que la contraseña cambió. Como el perfil ya no pide la actual para cambiarla, esto es
+  # lo que le avisa al dueño si no fue él (y le dice cómo recuperarla).
+  def contrasena_cambiada(user:)
+    @user   = user
+    @club   = user.club
+    @cuando = Time.current.in_time_zone('America/Argentina/Buenos_Aires').strftime('%d/%m/%Y a las %H:%M')
+    @link   = "#{App.base_url}/olvide-contrasena"
+    adjuntar_logo(@club) if @club
+    mail(to: user.email_real, subject: 'Tu contraseña cambió — Cultivo Espacial')
+  end
+
   # El plan vence (en `dias` días) o venció hoy (`dias == 0`). Va al admin de la organización.
   def plan_vence(user:, club:, dias:)
     @user  = user

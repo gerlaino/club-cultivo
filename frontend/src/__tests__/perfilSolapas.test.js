@@ -7,10 +7,10 @@ import { reactive } from 'vue'
 // Notificaciones, Seguridad». Acordado: la foto con nombre y rol queda fija al costado, la tarjeta
 // «Cuenta» (IDs internos) se va, la solapa vive en la URL y «Notificaciones» aparece sólo si la
 // persona tiene avisos para elegir.
-const api = vi.hoisted(() => ({ getMisNotificaciones: vi.fn() }))
+const api = vi.hoisted(() => ({ getMisNotificaciones: vi.fn(), updateMyPassword: vi.fn(() => Promise.resolve({ data: {} })) }))
 vi.mock('../lib/api', () => ({
   getProfile: vi.fn(() => Promise.resolve({ data: { data: { id: 7, club_id: 3, role: 'admin', first_name: 'Germán', last_name: 'L', email: 'admin@x.com' } } })),
-  updateProfile: vi.fn(), updateMyPassword: vi.fn(), uploadAvatar: vi.fn(), updateMisNotificaciones: vi.fn(),
+  updateProfile: vi.fn(), updateMyPassword: (...a) => api.updateMyPassword(...a), uploadAvatar: vi.fn(), updateMisNotificaciones: vi.fn(),
   getMisNotificaciones: (...a) => api.getMisNotificaciones(...a),
 }))
 const ruta = vi.hoisted(() => ({ route: null, replace: vi.fn() }))
@@ -47,13 +47,13 @@ describe('Perfil con solapas', () => {
     expect(tabs(w)).toEqual(['Datos personales', 'Notificaciones', 'Seguridad'])
     expect(w.find('.pfl__tab--on .pfl__tab-largo').text()).toBe('Datos personales')
     expect(w.text()).toContain('Usuario de ingreso')
-    expect(w.text()).not.toContain('Contraseña actual')
+    expect(w.text()).not.toContain('Nueva contraseña')
   })
 
   it('la solapa sale de la URL: ?solapa=seguridad abre la contraseña', async () => {
     const w = await montar({ solapa: 'seguridad' })
 
-    expect(w.text()).toContain('Contraseña actual')
+    expect(w.text()).toContain('Nueva contraseña')
     expect(w.text()).not.toContain('Usuario de ingreso')
   })
 
@@ -78,5 +78,19 @@ describe('Perfil con solapas', () => {
     expect(w.find('.pfl__avatar-card').text()).toContain('Germán')
     expect(w.text()).not.toContain('ID de organización')
     expect(w.text()).not.toContain('ID usuario')
+  })
+
+  // AC (Germán, 25-sep-2026): «directamente pongamos la nueva contraseña, no exijamos la actual».
+  it('Seguridad no pide la contraseña actual: con la nueva y su confirmación alcanza', async () => {
+    const w = await montar({ solapa: 'seguridad' })
+    expect(w.text()).not.toContain('Contraseña actual')
+
+    const [nueva, confirmar] = w.findAll('input[type="password"]')
+    await nueva.setValue('NuevaClave2026!')
+    await confirmar.setValue('NuevaClave2026!')
+    await w.find('.pfl__form-actions .pfl__btn-primary').trigger('click')
+    await flushPromises()
+
+    expect(api.updateMyPassword).toHaveBeenCalledWith({ password: 'NuevaClave2026!', password_confirmation: 'NuevaClave2026!' })
   })
 })

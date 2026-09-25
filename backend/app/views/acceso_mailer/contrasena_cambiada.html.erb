@@ -1,0 +1,16 @@
+<p style="font-size:16px; color:#0f172a; margin:0 0 12px;">Hola <%= @user.first_name.presence || '' %>,</p>
+<p style="font-size:14px; color:#334155; line-height:1.6; margin:0 0 12px;">
+  La contraseña de tu usuario <strong><%= @user.email %></strong>
+  <% if @club %>de <strong><%= @club.name %></strong><% end %> en Cultivo Espacial se cambió el <strong><%= @cuando %></strong>.
+  Se cerró la sesión en los demás dispositivos.
+</p>
+<p style="font-size:14px; color:#334155; line-height:1.6; margin:0 0 12px;">Si fuiste vos, no tenés que hacer nada.</p>
+<p style="font-size:14px; color:#334155; line-height:1.6; margin:0 0 8px;">
+  <strong>Si no fuiste vos</strong>, elegí una contraseña nueva y avisale al administrador de tu organización:
+</p>
+<p style="margin:20px 0;">
+  <a href="<%= @link %>" style="display:inline-block; background:#1b5e20; color:#ffffff; text-decoration:none; padding:12px 20px; border-radius:8px; font-weight:bold; font-size:14px;">Elegir otra contraseña</a>
+</p>
+<p style="font-size:12px; color:#94a3b8; margin:16px 0 0; word-break:break-all;">
+  Si el botón no funciona, copiá esta dirección en el navegador:<br><%= @link %>
+</p>

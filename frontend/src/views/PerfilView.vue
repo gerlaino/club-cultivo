@@ -22,7 +22,6 @@ const error         = ref(null)
 const okMsg         = ref(null)
 const pError        = ref(null)
 const pOkMsg        = ref(null)
-const showCurrent   = ref(false)
 const showNew       = ref(false)
 const showConfirm   = ref(false)
 
@@ -37,13 +36,11 @@ const form = reactive({
 })
 
 const pass = reactive({
-  current_password:      '',
   password:              '',
   password_confirmation: '',
 })
 
 const passErrors = reactive({
-  current_password:      '',
   password:              '',
   password_confirmation: '',
 })
@@ -68,10 +65,8 @@ const strengthWidth = computed(() => `${(passwordStrength.value.score / 5) * 100
 
 function validatePassword() {
   let ok = true
-  passErrors.current_password      = ''
   passErrors.password              = ''
   passErrors.password_confirmation = ''
-  if (!pass.current_password.trim()) { passErrors.current_password = 'Ingresá tu contraseña actual'; ok = false }
   if (pass.password.length < 8)      { passErrors.password = 'Mínimo 8 caracteres'; ok = false }
   else if (passwordStrength.value.score < 2) { passErrors.password = 'La contraseña es muy débil'; ok = false }
   if (pass.password !== pass.password_confirmation) { passErrors.password_confirmation = 'Las contraseñas no coinciden'; ok = false }
@@ -155,7 +150,7 @@ async function onChangePassword() {
   try {
     await updateMyPassword({ ...pass })
     pOkMsg.value = '✓ Contraseña actualizada correctamente'
-    Object.assign(pass, { current_password: '', password: '', password_confirmation: '' })
+    Object.assign(pass, { password: '', password_confirmation: '' })
     setTimeout(() => { pOkMsg.value = null }, 4000)
   } catch (e) {
     pError.value = e?.response?.data?.errors?.join(', ') || 'Error al actualizar la contraseña'
@@ -431,7 +426,7 @@ onMounted(() => { fetchProfile(); fetchNotificaciones() })
             <div class="pfl__card-header">
               <div>
                 <div class="pfl__card-title">Seguridad</div>
-                <div class="pfl__card-desc">Actualizá tu contraseña de acceso</div>
+                <div class="pfl__card-desc">Elegí una contraseña nueva. Al cambiarla se cierra tu sesión en los otros dispositivos y te llega un mail avisando.</div>
               </div>
             </div>
 
@@ -447,25 +442,6 @@ onMounted(() => { fetchProfile(); fetchNotificaciones() })
             </div>
 
             <div class="pfl__form-grid">
-
-              <!-- Contraseña actual -->
-              <div class="pfl__field pfl__field--full">
-                <label class="pfl__label">Contraseña actual <span class="pfl__required">*</span></label>
-                <div class="pfl__input-row">
-                  <input
-                    v-model="pass.current_password"
-                    :type="showCurrent ? 'text' : 'password'"
-                    class="pfl__input"
-                    :class="{ 'pfl__input--error': passErrors.current_password }"
-                    placeholder="Tu contraseña actual"
-                    autocomplete="current-password"
-                  />
-                  <button class="pfl__eye-btn" type="button" @click="showCurrent=!showCurrent">
-                    <i :class="showCurrent ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
-                  </button>
-                </div>
-                <div v-if="passErrors.current_password" class="pfl__field-error">{{ passErrors.current_password }}</div>
-              </div>
 
               <!-- Nueva contraseña -->
               <div class="pfl__field">

@@ -327,7 +327,10 @@ Devise.setup do |config|
             'La app no arranca sin el secreto de firma JWT — no hay fallback. ' \
             'Definila en el entorno: backend/.env (dev/docker) o las env vars del deploy (prod).')
     jwt.dispatch_requests = [
-      ['POST', %r{^/users/sign_in$}]
+      ['POST', %r{^/users/sign_in$}],
+      # Cambiar la contraseña vence las sesiones con la huella vieja (`JwtDenylist`), incluida
+      # la propia: por eso la respuesta trae un token nuevo y quien la cambió sigue adentro.
+      ['PATCH', %r{^/api/profile/password$}],
     ]
     jwt.revocation_requests = [
       ['DELETE', %r{^/users/sign_out$}]
