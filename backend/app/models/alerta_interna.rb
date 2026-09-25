@@ -22,7 +22,7 @@ class AlertaInterna < ApplicationRecord
     temperatura_fuera_rango humedad_fuera_rango
     temperatura_sustrato_fuera_rango
     cosecha_pendiente tarea_vencida_cultivo estado_critico_lote
-    hito_cultivo
+    hito_cultivo hito_cama
   ].freeze
 
   TIPOS       = (TIPOS_OPERATIVOS + TIPOS_CULTIVO).freeze

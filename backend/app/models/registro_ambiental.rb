@@ -28,6 +28,9 @@ class RegistroAmbiental < ApplicationRecord
   # distintas, y así se puede cruzar con el % de prendimiento que ya medimos.
   ENRAIZANTES = %w[gel polvo liquido miel_canela ninguno otro].freeze
   PLAGAS    = %w[ninguna leve moderada severa].freeze
+  # Qué agua se usó al regar (suelo vivo: el cloro mata la vida del suelo). La lista es una sola,
+  # la de la cama.
+  validates :agua, inclusion: { in: CamaRegistro::AGUAS }, allow_blank: true
   TAREAS    = %w[riego nutricion poda defoliacion scrog_lst revision_plagas limpieza_sala ajuste_luz registro_ambiental].freeze
 
   validates :registrado_en,  presence: true

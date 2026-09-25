@@ -56,7 +56,20 @@ class MeController < ApplicationController
                                # A qué sedes se asigna cada rol: la pantalla ofrece sólo eso.
                                'sedes_por_rol'         => Sede::TIPOS_POR_ROL,
                                # Dónde puede enraizar un lote: el desplegable ofrece esto.
-                               'metodos_enraizado'     => Lote::METODOS_ENRAIZADO }
+                               'metodos_enraizado'     => Lote::METODOS_ENRAIZADO,
+                               # Suelo vivo: para qué es cada receta y en qué se dosifica, qué se le
+                               # hace a una cama, qué agua, y qué tareas de un plan no aplican en cama.
+                               'suelo_vivo' => {
+                                 'usos_receta'        => Receta::USOS,
+                                 'usos_receta_labels' => Receta::USO_LABELS,
+                                 'unidades_por_uso'   => Receta::UNIDADES_POR_USO,
+                                 'unidad_labels'      => RecetaItem::UNIDAD_LABELS,
+                                 'base_unidad'        => Receta::BASE_UNIDAD,
+                                 'tipos_registro'     => CamaRegistro::TIPOS,
+                                 'tipos_registro_labels' => CamaRegistro::TIPO_LABELS,
+                                 'aguas'              => CamaRegistro::AGUAS,
+                                 'tareas_no_aplican'  => Tarea::NO_APLICAN_EN_CAMA,
+                               } }
 
     # La clave pública VAPID con la que el navegador se suscribe a las notificaciones push. Viaja
     # acá y NO en el build del frontend: hasta el 19-sep-2026 salía de `VITE_VAPID_PUBLIC_KEY`,

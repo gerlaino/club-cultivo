@@ -3,7 +3,9 @@ import { useToast } from './useToast.js'
 import { useLotesStore } from '../stores/lotes'
 import { usePlantsStore } from '../stores/plants'
 import { useAuthStore } from '../stores/auth'
-import { transicionarLote, avanzarFaseLote } from '../lib/api'
+import { transicionarLote, avanzarFaseLote, cambiarFaseSala } from '../lib/api'
+import { useConfirm } from './useConfirm.js'
+import { textoCambioDeFase } from '../lib/textoCambioDeFase.js'
 import { MACETA_OPCIONES } from '../lib/loteHelpers'
 
 const ESTADO_META = {
@@ -41,8 +43,9 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
   // trasplante que define riego, frecuencia y cuándo toca el próximo cambio de maceta.
   const avanzarMaceta = ref('')
   const MACETAS = MACETA_OPCIONES
+  // En una cama no hay maceta: la tierra es la cama (siembra directa o ya plantado).
   const faltaMaceta = computed(() =>
-    lotes.current?.estado === 'enraizado' && !avanzarMaceta.value)
+    lotes.current?.estado === 'enraizado' && !lotes.current?.en_cama && !avanzarMaceta.value)
 
   // Cuántas prendieron, al salir del enraizado. Se pide como NÚMERO porque nadie descarta 18
   // esquejes de 128 uno por uno: sin este dato el % de prendimiento da 100% siempre.
@@ -101,8 +104,45 @@ export function useLoteTransiciones(loteId, { onPhaseChange = null, sedes = null
     showTransicionModal.value = true
   }
 
+  // Suelo vivo: plantado en una cama el lote no se muda, y la luz es del espacio. Si la fase
+  // siguiente no la admite su espacio, lo que cambia es el ESPACIO (con todos sus lotes): es la
+  // misma regla y la misma confirmación que «Cambiar fase» de la sala (el backend manda
+  // `avanza_con_el_espacio`).
+  const { confirm } = useConfirm()
+  async function avanzarConElEspacio(lote, confirmado = false) {
+    const salaNombre = lote.sala?.nombre || 'el espacio'
+    if (!confirmado) {
+      const ok = await confirm({
+        title: `La luz es de ${salaNombre}`,
+        message: `El lote está plantado en la ${lote.cama?.nombre || 'cama'} y no se muda. Para pasarlo a floración, ` +
+                 `${salaNombre} pasa a floración (12/12) con todos sus lotes.`,
+        confirmText: `Pasar ${salaNombre} a floración`, variant: 'warning',
+      })
+      if (!ok) return
+    }
+    transicionandoRapido.value = true
+    try {
+      await cambiarFaseSala(lote.sala_id, confirmado ? { confirmar_cambio_fase: true } : {})
+      await lotes.fetchOne(lote.id)
+      toast.success(`${salaNombre} en floración`)
+      onPhaseChange?.()
+      await plants.fetchByLote(loteId)
+    } catch (e) {
+      const data = e?.response?.data
+      if (data?.requiere_confirmacion && !confirmado) {
+        transicionandoRapido.value = false
+        if (await confirm({ ...textoCambioDeFase(data), variant: 'danger' })) return avanzarConElEspacio(lote, true)
+        return
+      }
+      toast.error(data?.error || data?.errors?.[0] || 'No se pudo cambiar la fase del espacio')
+    } finally {
+      transicionandoRapido.value = false
+    }
+  }
+
   async function handleAvanzarFase() {
     const lote = lotes.current
+    if (lote?.avanza_con_el_espacio) return avanzarConElEspacio(lote)
     if (lote?.proxima_fase_posible === 'cosecha') {
       // La cosecha ya no requiere una sala de cosecha: es un evento → post-cosecha.
       // Un solo modal, tenga o no plantas individuales cargadas: antes se abrían dos

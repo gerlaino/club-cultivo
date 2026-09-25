@@ -1,5 +1,59 @@
 # Changelog
 
+## Septiembre 2026 (dg) — Suelo vivo: las camas de cultivo
+
+Plan y decisiones en `docs/PLAN_SUELO_VIVO.md` (Germán, 22/25-sep: «ok a todo» + los días de
+descanso los pone el usuario). Personal y organizaciones.
+
+- **La cama es una entidad** (`Cama`, `CamaCiclo`, `CamaRegistro`, `AnalisisSuelo`; migración
+  `CrearCamasSueloVivo`). Medidas (largo × ancho × profundidad → m² y litros de tierra), mezcla de
+  armado (copia), cocción, descanso, retiro. **El estado se calcula** (retirada → en uso →
+  cocinando → descansando → lista). **Los números de cultivo los pone el cultivador** (semanas de
+  cocción, días de descanso, cada cuántos días toca top dress): sin número no hay reloj.
+- **m² coherentes**: camas + lotes sin cama ≤ la sala; los lotes de una cama ≤ la cama (un lote en
+  cama ocupa metros de la CAMA, no del espacio). Achicar la sala por debajo de lo ocupado se frena.
+- **Plantar en la cama es el último trasplante** (`POST /lotes/:id/plantar_en_cama`): si enraizaba,
+  prende ese día; siembra directa (nace en la cama, enraizando) prende al avanzar SIN maceta. En la
+  cama no hay más trasplantes (lote, planta, tarea: el backend los rechaza). La planta no se muda
+  (mover/editar sala) y **para florar cambia la fase del ESPACIO**: `avanzar_fase!` y
+  `transicionar!` comparten `Lote#validar_avance_en_cama!`; la ficha lleva a «Cambiar fase» con su
+  confirmación (`avanza_con_el_espacio`).
+- **Ciclo y descanso**: el ciclo de la cama se abre al plantar y se cierra cuando sale el ÚLTIMO
+  lote; ahí la cama descansa los días que tiene cargados (sin días: sin fecha). Plantar en una cama
+  que descansa o se cocina **avisa, no bloquea**, y corta el descanso. Un ciclo que queda sin lotes
+  ni registros (corrección, borrado) se borra y no pone a descansar la cama. Corregir la cama de un
+  lote sólo en cultivo y sin registros de suelo en su ciclo.
+- **Se alimenta el suelo**: `Receta#uso` (riego/té · top_dress por m² · mezcla por litro de
+  tierra) con sus unidades; top dress, té al suelo, cobertura, mulch, inoculación, medición y nota
+  como `CamaRegistro` (`Camas::Registrar` → `Nutricion::Aplicar` generalizado). La plata va a los
+  lotes del ciclo repartida por m² (`registrar_consumo_repartido!` con `pesos`); con la cama vacía
+  (armado, descanso) queda en la cama. «Regar la cama» (`POST /camas/:id/regar`): con plantas, un
+  registro por lote; descansando, en la cama. El riego de un lote en cama no pide pH/EC: «¿Le diste
+  té?» y qué agua (`registros_ambientales.agua`).
+- **Conversión de unidades en las recetas** (`RecetaItem#factor_a_insumo`): la dosis se pasa a la
+  unidad del insumo (g → kg, ml → L). Sin esto un top dress de 100 g/m² descontaba 100 kg de una
+  bolsa cargada en kilos — y **ya pasaba con el riego** si el fertilizante estaba en litros. El
+  serializer manda `factor` y la pantalla multiplica por eso. «Mis nutrientes» suma litros y kilos.
+- **Trazabilidad «¿qué comió esta flor?»** (`Lotes::Suelo`): cama, mezcla y TODO lo que se le puso
+  a la tierra hasta la cosecha, con lo del ciclo marcado, en la trazabilidad del lote y del frasco;
+  `ResumenAplicaciones` suma lo del ciclo; el pasaporte del paciente dice «cultivada en suelo vivo».
+  «Cómo salió» compara con el ciclo anterior de la misma cama (g/m²). Analítica: corte **Cama** y
+  columna g/m²; «Método» = suelo vivo sale de la cama.
+- **Tareas y plan**: al cosechar en cama la tarea es «cortar al ras y dejar las raíces», no
+  «limpiar la sala»; un plan aplicado a un lote en cama saltea trasplantes y fertilizaciones y dice
+  cuántas (`Tarea.aplica_a_lote?`). Aviso al teléfono `camas` (lista, fin del descanso, toca top
+  dress) en el catálogo, para admin y quien cultiva esa sala. El asistente sabe que es suelo vivo.
+- **Pantallas**: sección «Camas» en la ficha del espacio (escritorio y teléfono), ficha de cama
+  (`/camas/:id` = `/m/cama-m/:id`), alta/edición, alimentar, regar, descanso, análisis de suelo,
+  plantar en la cama, cama en alta/edición de lote y en desprender. En el «+»: «Alimentar la cama» y
+  «Regar» pregunta cama o lote. La plata de la cama la ve administración (`con_costo`).
+- **De paso**: «Aplicar plan» a un lote **nunca funcionó** (`preview_plan`/`aplicar_plan` no
+  cargaban el lote: siempre error) · la trazabilidad mostraba las fechas sin hora un día antes (UTC)
+  · borrados `NutricionForm.vue` y `QuickActivity.vue`, que no importaba nadie.
+- 47 rspec nuevos (`suelo_vivo_camas_spec`, `suelo_vivo_cama_spec`), 12 vitest; verificado con
+  Playwright sobre `casa_german` (escritorio y 390 px): camas A (en uso con CASA-01) y B
+  (descansando 30 días).
+
 ## Septiembre 2026 (df) — Editar, corregir y eliminar un nutriente
 
 - **«Mis nutrientes» no tenía cómo editar ni borrar** (Germán, 25-sep): sólo alta y «Repuse».

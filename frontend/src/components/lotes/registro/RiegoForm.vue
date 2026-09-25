@@ -5,6 +5,16 @@
         <label class="rf__label">Volumen <span class="rf__unit">L</span></label>
         <input type="number" step="0.5" min="0" class="rf__input" v-model.number="f.volumen" placeholder="20" />
       </div>
+      <!-- Suelo vivo: no se corrige el pH ni la EC del agua (el suelo amortigua). Lo que importa
+           es el agua: el cloro de la red castiga la vida del suelo. -->
+      <div v-if="sueloVivo" class="rf__field rf__field--full">
+        <label class="rf__label">Agua <span class="rf__optional">opcional</span></label>
+        <div class="rf__radios">
+          <button v-for="a in aguas" :key="a" type="button" class="rf__radio-btn" :class="{ 'rf__radio-btn--sel': f.agua === a }"
+                  @click="patch({ agua: f.agua === a ? '' : a })">{{ aguaLabel(a) }}</button>
+        </div>
+      </div>
+      <template v-if="!sueloVivo">
       <div class="rf__field">
         <label class="rf__label">pH entrada</label>
         <input type="number" step="0.1" min="0" max="14" class="rf__input" v-model.number="f.ph" placeholder="6.2" />
@@ -17,6 +27,7 @@
         <label class="rf__label">EC <span class="rf__unit">mS/cm</span></label>
         <input type="number" step="0.1" min="0" class="rf__input" v-model.number="f.ec" placeholder="1.8" />
       </div>
+      </template>
     </div>
 
     <label class="rf__toggle-row">
@@ -24,7 +35,7 @@
         <input type="checkbox" v-model="f.fertilizo" class="rf__toggle-input" />
         <div class="rf__toggle-thumb"></div>
       </div>
-      <span class="rf__toggle-label">¿Se fertilizó?</span>
+      <span class="rf__toggle-label">{{ sueloVivo ? '¿Le diste té?' : '¿Se fertilizó?' }}</span>
     </label>
 
     <div v-if="f.fertilizo" class="rf__fertilizacion">
@@ -113,7 +124,7 @@
         </div>
       </template>
 
-      <div class="rf__field rf__field--full">
+      <div v-if="!sueloVivo" class="rf__field rf__field--full">
         <label class="rf__label">Método de aplicación</label>
         <div class="rf__radios">
           <button v-for="m in METODOS" :key="m.value" type="button"
@@ -141,14 +152,22 @@ import { computed, ref, watch, onMounted } from 'vue'
 import { listRecetas, listInsumos } from '../../../lib/api.js'
 import { formatARS } from '../../../lib/formatters.js'
 import { useUsoPersonal } from '../../../composables/useUsoPersonal.js'
+import { reglasSueloVivo, aguaLabel, ultimaAgua } from '../../../lib/camas.js'
 
-const props = defineProps({ modelValue: { type: Object, default: () => ({}) } })
+const props = defineProps({
+  modelValue: { type: Object, default: () => ({}) },
+  // Lote plantado en una cama de suelo vivo: sin pH/EC, «¿le diste té?», y el agua.
+  sueloVivo:  { type: Boolean, default: false },
+})
 const emit  = defineEmits(['update:modelValue'])
 const f     = computed({
   get: () => props.modelValue,
   set: v  => emit('update:modelValue', v),
 })
 const { esPersonal } = useUsoPersonal()
+const aguas = reglasSueloVivo().aguas
+// La última agua que se eligió (comodidad de quien usa este teléfono).
+if (props.sueloVivo && props.modelValue.agua == null) emit('update:modelValue', { ...props.modelValue, agua: ultimaAgua() })
 
 const MODOS = [
   { value: 'receta',  label: '📋 Con receta' },
@@ -168,7 +187,8 @@ async function cargar() {
   if (cargado.value) return
   cargado.value = true
   try {
-    const [r, i] = await Promise.all([listRecetas(), listInsumos({ tipo: 'cultivo', activos: 'true' })])
+    // Sólo las de riego: un top dress (por m²) o una mezcla (por litro de suelo) no van en el agua.
+    const [r, i] = await Promise.all([listRecetas('riego'), listInsumos({ tipo: 'cultivo', activos: 'true' })])
     recetas.value = (r.data || []).filter(x => x.activa !== false)
     insumos.value = i.data?.insumos || i.data || []
     // Sin recetas ni productos no hay nada que descontar: el modo por defecto es «sin especificar».
@@ -219,7 +239,9 @@ const insumosDisponibles = computed(() => insumos.value.filter(i => !(f.value.it
 const lineas = computed(() => {
   const l = Number(litros.value) || 0
   const base = modo.value === 'receta' && receta.value
-    ? receta.value.items.map(it => ({ insumo_id: it.insumo_id, nombre: it.nombre, dosis: it.dosis, unidad_label: it.unidad_label, unidad_insumo: it.unidad_insumo, stock_actual: it.stock_actual, calculada: l ? +(Number(it.dosis) * l).toFixed(2) : null }))
+    // `factor`: de la unidad de la dosis a la del insumo (ml → L si el bidón está en litros). Lo
+    // manda el backend, que es el que descuenta.
+    ? receta.value.items.map(it => ({ insumo_id: it.insumo_id, nombre: it.nombre, dosis: it.dosis, unidad_label: it.unidad_label, unidad_insumo: it.unidad_insumo, stock_actual: it.stock_actual, calculada: l ? +(Number(it.dosis) * l * (Number(it.factor) || 1)).toFixed(3) : null }))
     : modo.value === 'sueltos'
       ? (f.value.items || []).map(x => { const i = insumos.value.find(y => y.id === x.insumo_id) || {}; return { insumo_id: x.insumo_id, nombre: i.nombre, dosis: null, unidad_label: null, unidad_insumo: i.unidad_medida, stock_actual: i.stock_actual, calculada: null } })
       : []

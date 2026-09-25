@@ -1,8 +1,14 @@
-# «Aplicar receta» al regar. Recibe el/los registros de riego recién creados (uno por lote: la
-# sala reparte), la receta o los productos sueltos, los litros y —si la persona los tocó— las
-# cantidades finales. Descuenta cada producto del depósito, imputa el costo a los lotes y deja
-# en cada registro una COPIA de lo aplicado (`nutricion`), para que editar la receta después no
-# cambie el historial.
+# «Aplicar receta». Dos puertas, una sola regla:
+#
+# - **Al regar** (`registros:`): el/los registros de riego recién creados (uno por lote: la sala
+#   reparte). La base de la receta son los litros.
+# - **Al suelo de una cama** (`cama_registro:`): top dress, té al suelo, mezcla de armado,
+#   cobertura, mulch, inoculación (suelo vivo, ver `CamaRegistro`). La base es la que corresponda
+#   al uso de la receta: m² (top dress), litros de suelo (mezcla) o litros (té). El costo va a los
+#   lotes en cultivo de la cama en ese ciclo, repartido por sus m²; sin lotes, queda en la cama.
+#
+# En los dos casos: descuenta cada producto del depósito, imputa el costo y deja en el registro una
+# COPIA de lo aplicado (`nutricion`), para que editar la receta después no cambie el historial.
 #
 # NO BLOQUEA POR STOCK (Germán, 20-sep-2026): el riego ya pasó, y capaz el envase está en la
 # mesada sin haberse cargado la compra. Si falta, por producto: `descontar_disponible` (baja lo
@@ -14,20 +20,25 @@ module Nutricion
     MODOS_FALTANTE = %w[descontar_disponible no_descontar].freeze
 
     # items: [{ insumo_id:, cantidad:, modo_faltante: }] — cantidad ya en la unidad del insumo
-    #        (ml o g). Si no viene, se calcula de la receta con los litros.
-    def initialize(club:, usuario:, registros:, litros:, receta: nil, items: nil, sala: nil)
+    #        (ml o g). Si no viene, se calcula de la receta con la base.
+    # base:  la cantidad contra la que se multiplica la dosis. Sin ella, los litros.
+    def initialize(club:, usuario:, registros: [], litros: nil, receta: nil, items: nil, sala: nil,
+                   cama_registro: nil, base: nil)
       @club, @usuario, @registros = club, usuario, Array(registros)
       @litros  = litros.to_d
+      @base    = (base.presence || litros).to_d
       @receta  = receta
       @items   = items
       @sala    = sala
+      @cama_registro = cama_registro
     end
 
     def call
       lista = lineas
       return Resultado.new(nutricion: nil, faltantes: []) if lista.empty?
 
-      lotes = @registros.map(&:lote).compact.uniq
+      lotes = lotes_que_pagan
+      pesos = pesos_de(lotes)
       aplicados = []
       faltantes = []
 
@@ -44,9 +55,10 @@ module Nutricion
           costo = 0.to_d
           if descontar > 0
             consumos = insumo.registrar_consumo_repartido!(
-              cantidad: descontar, created_by: @usuario, lotes: lotes, sala: @sala,
-              fecha: @registros.first.registrado_en.to_date, notas: "Receta#{@receta ? " «#{@receta.nombre}»" : ''}",
-              registro_ambiental: @registros.first
+              cantidad: descontar, created_by: @usuario, lotes: lotes, sala: @sala || @cama_registro&.cama&.sala,
+              fecha: fecha, notas: notas,
+              registro_ambiental: @registros.first,
+              cama: @cama_registro&.cama, cama_registro: @cama_registro, pesos: pesos
             )
             costo = consumos.sum { |c| c.costo_imputado_ars.to_d }
           end
@@ -57,19 +69,28 @@ module Nutricion
         end
 
         copia = {
-          'receta_id' => @receta&.id, 'receta_nombre' => @receta&.nombre,
+          'receta_id' => @receta&.id, 'receta_nombre' => @receta&.nombre, 'uso' => @receta&.uso,
           'ph_objetivo' => @receta&.ph_objetivo&.to_f, 'ec_objetivo' => @receta&.ec_objetivo&.to_f,
-          'litros' => @litros.to_f, 'items' => aplicados,
+          'litros' => @litros.to_f, 'base' => @base.to_f, 'base_unidad' => base_unidad,
+          'items' => aplicados,
           'costo_ars' => aplicados.sum { |a| a['costo_ars'] }.round(2),
+          # A quién se le cargó la plata (lote → pesos), para que la ficha lo diga.
+          'lotes' => lotes.map { |lo| { 'id' => lo.id, 'codigo' => lo.codigo } },
         }
-        @registros.each { |r| r.update_columns(receta_id: @receta&.id, litros: @litros, nutricion: copia) }
+        if @cama_registro
+          @cama_registro.update_columns(receta_id: @receta&.id, nutricion: copia)
+        else
+          @registros.each { |r| r.update_columns(receta_id: @receta&.id, litros: @litros, nutricion: copia) }
+        end
         Resultado.new(nutricion: copia, faltantes: faltantes)
       end
     end
 
-    # Al borrar un registro de riego, lo descontado vuelve al depósito y el costo sale del lote.
+    # Al borrar un registro (de riego o de la cama), lo descontado vuelve al depósito y el costo
+    # sale del lote.
     def self.revertir!(registro)
-      consumos = InsumoConsumo.where(registro_ambiental_id: registro.id).includes(:insumo, :lote).to_a
+      columna = registro.is_a?(CamaRegistro) ? :cama_registro_id : :registro_ambiental_id
+      consumos = InsumoConsumo.where(columna => registro.id).includes(:insumo, :lote).to_a
       return if consumos.empty?
       ActiveRecord::Base.transaction do
         consumos.each do |c|
@@ -77,7 +98,7 @@ module Nutricion
           lote = c.lote
           # El consumo es paranoico (queda la fila): se desata del registro antes, o la FK
           # frena el borrado del registro.
-          c.update_columns(registro_ambiental_id: nil)
+          c.update_columns(columna => nil)
           c.destroy!
           CostoDesdeLibroService.new(lote: lote, actualizado_por: registro.user).call if lote
         end
@@ -86,8 +107,34 @@ module Nutricion
 
     private
 
+    # Riego: los lotes de los registros. Cama: los del ciclo en el que cayó el registro (los que
+    # estaban en la cama ese día); sin ciclo —cama vacía, armado, descanso—, nadie: queda en la cama.
+    def lotes_que_pagan
+      return @registros.map(&:lote).compact.uniq unless @cama_registro
+      ciclo = @cama_registro.cama_ciclo
+      return [] if ciclo.nil?
+      ciclo.lotes.where(estado: Lote::CULTIVO_ESTADOS).to_a.presence || ciclo.lotes.to_a
+    end
+
+    def pesos_de(lotes)
+      return nil unless @cama_registro
+      lotes.to_h { |l| [l.id, l.m2_ocupados.to_d] }
+    end
+
+    def fecha = (@cama_registro || @registros.first).registrado_en.to_date
+
+    def notas
+      que = @cama_registro ? CamaRegistro::TIPO_LABELS[@cama_registro.tipo] : 'Receta'
+      "#{que}#{@receta ? " «#{@receta.nombre}»" : ''}#{@cama_registro ? " · #{@cama_registro.cama.nombre}" : ''}"
+    end
+
+    def base_unidad
+      return 'L' unless @receta
+      Receta::BASE_UNIDAD[@receta.uso]
+    end
+
     def lineas
-      base = @receta ? @receta.calcular(@litros) : []
+      base = @receta ? @receta.calcular(@base) : []
       return base.map { |b| b.merge(modo_faltante: 'descontar_disponible') } if @items.blank?
 
       @items.map do |it|

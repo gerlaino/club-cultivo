@@ -210,13 +210,15 @@ const emit = defineEmits(['update:modelValue', 'saved'])
 const toast = useToast()
 const club  = useClubStore()
 
-const ACCIONES = [
+const TODAS_LAS_ACCIONES = [
   { id: 'riego',     emoji: '💧', label: 'Riego' },
   { id: 'poda',      emoji: '✂️', label: 'Poda' },
   { id: 'plagas',    emoji: '🔍', label: 'Rev. Plagas' },
   { id: 'medicion',  emoji: '🌡️', label: 'Medición' },
   { id: 'trasplante',emoji: '🪴', label: 'Trasplante' },
 ]
+// Plantada en una cama de suelo vivo no hay trasplantes (el backend también lo rechaza).
+const ACCIONES = computed(() => (props.planta?.lote?.en_cama ? TODAS_LAS_ACCIONES.filter(a => a.id !== 'trasplante') : TODAS_LAS_ACCIONES))
 
 const ESTADO_SALUD = {
   excelente: { color: '#15803d', emoji: '🟢' },
@@ -232,7 +234,7 @@ const PLAGAS_META = {
   severa:   { color: '#dc2626', emoji: '🚨' },
 }
 
-function getAccion(id) { return ACCIONES.find(a => a.id === id) }
+function getAccion(id) { return TODAS_LAS_ACCIONES.find(a => a.id === id) }
 
 const paso          = ref(1)
 const seleccionadas = ref([])

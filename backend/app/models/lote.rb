@@ -55,7 +55,9 @@ class Lote < ApplicationRecord
   # Los m² que ocupa el lote. Opcionales: sin ellos se crea igual y lo único que falta es el
   # g/m². Lo que NO puede pasar es que los lotes de una sala sumen más que la sala.
   validates :m2_ocupados, numericality: { greater_than: 0 }, allow_nil: true
-  validate  :m2_entran_en_la_sala, if: -> { m2_ocupados.present? && (m2_ocupados_changed? || sala_id_changed?) }
+  validate  :m2_entran_en_la_sala, if: -> { cama_id.nil? && m2_ocupados.present? && (m2_ocupados_changed? || sala_id_changed?) }
+  # En una cama, los metros del lote son de la cama: la suma de sus lotes no puede pasarla.
+  validate  :m2_entran_en_la_cama, if: -> { cama_id.present? && m2_ocupados.present? && (m2_ocupados_changed? || cama_id_changed?) }
   # Al cosechar, el lote SALE de la sala (libera el slot) y con eso perdería la superficie justo
   # cuando se informa el rendimiento. Se congela en el lote, como el costo o la copia de la
   # receta: el dato es del ciclo que ya pasó y no puede depender de dónde está hoy.
@@ -91,6 +93,13 @@ class Lote < ApplicationRecord
   has_many :notas,      as: :noteable,              dependent: :destroy
   # class_name explícito: el nombre ya es "singular", Rails no lo inferiría bien.
   has_many :analisis_laboratorio, class_name: 'AnalisisLaboratorio', dependent: :destroy
+
+  # ── Suelo vivo ─────────────────────────────────────────────────────────────
+  # En qué cama creció y en qué ciclo de esa cama (ver `Cama`, `docs/PLAN_SUELO_VIVO.md`). Se
+  # conservan al cosechar: son historia, como los m² congelados. Mientras el lote está en
+  # cultivo, SU SALA ES LA DE LA CAMA (la planta no se muda: tiene las raíces ahí).
+  belongs_to :cama,       optional: true
+  belongs_to :cama_ciclo, optional: true
 
   # Secuencia: enraizado → vegetativo → floración → cosecha → en_manicura
   # (admin asigna manicura) → curado (se confirma el pesaje + se crea el stock; acá
@@ -154,6 +163,17 @@ class Lote < ApplicationRecord
   # asigna en este guardado. Un registro viejo mal no puede quedar imposible de corregir.
   before_validation :prender_al_ponerlo_en_maceta
   after_save        :registrar_prendido_por_maceta, if: -> { @prendio_por_maceta }
+
+  # PLANTAR EN LA CAMA ES EL ÚLTIMO TRASPLANTE. La misma regla que la maceta, con la cama: un lote
+  # que enraizaba en la bandeja y se planta en la cama PRENDE. La siembra directa (el lote nace en
+  # la cama, enraizando) no prende al crearse: germina ahí y prende cuando avanza.
+  before_validation :tomar_la_sala_de_la_cama
+  before_validation :prender_al_plantarlo_en_la_cama
+  validate  :cama_valida, if: -> { cama_id.present? && (cama_id_changed? || sala_id_changed? || estado_changed?) }
+  validate  :cama_corregible, if: -> { persisted? && cama_id_changed? && cama_id_was.present? }
+  before_save :ocupar_la_cama, if: -> { will_save_change_to_cama_id? }
+  after_save  :registrar_plantado_en_la_cama, if: -> { @plantado_en_cama }
+  after_save  :liberar_la_cama, if: -> { saved_change_to_estado? || saved_change_to_cama_id? }
   # Quién puso el lote en maceta, para los caminos que no vienen de un request (servicios,
   # rakes). En un request alcanza con `Current.user`.
   attr_accessor :actor_del_prendido
@@ -210,6 +230,9 @@ class Lote < ApplicationRecord
       # Se limpian acá (no es reversible, pero una manicura sin lote no tiene sentido).
       pesajes_manicura.where(estado: %w[borrador enviado]).destroy_all
       update_column(:deleted_at, Time.current)
+      # `update_column` saltea `liberar_la_cama`: si era el último lote de la cama, el ciclo se
+      # cierra acá (la cama pasa a descansar).
+      cama&.cerrar_ciclo_si_vacia!
     end
   end
 
@@ -358,6 +381,13 @@ class Lote < ApplicationRecord
   # g/m² no se inventa, la pantalla dice que faltan los metros.
   def m2_efectivos
     return m2_ocupados.to_d if m2_ocupados.present?
+    # En una cama: los metros de la cama si fue el único lote de su ciclo (con otro al lado, no hay
+    # cómo repartir sin inventar).
+    if cama
+      return nil if cama.m2.nil?
+      compañeros = cama_ciclo ? cama_ciclo.lotes.where.not(id: id) : cama.lotes_en_cultivo.where.not(id: id)
+      return compañeros.exists? ? nil : cama.m2
+    end
     return nil if sala.nil? || sala.m2.blank?
     sala.lotes.activos.where.not(id: id).exists? ? nil : sala.m2.to_d
   end
@@ -427,6 +457,8 @@ class Lote < ApplicationRecord
         # Cosecha: el lote sale de la sala de cultivo (libera el slot) y conserva la sede.
         attrs[:sede]    = sede || sala&.sede
         attrs[:sala_id] = nil
+      elsif cama
+        validar_avance_en_cama!(nueva_fase, sala_id)
       else
         sala_nueva = if sala_id.present?
           club.salas.activas.find_by(id: sala_id)
@@ -492,6 +524,8 @@ class Lote < ApplicationRecord
       if POST_COSECHA.include?(nueva_fase)
         attrs[:sede]    = sede || sala&.sede
         attrs[:sala_id] = nil
+      elsif cama
+        validar_avance_en_cama!(nueva_fase, sala_id)
       elsif sala_id.present?
         sala_nueva = club.salas.activas.find_by(id: sala_id)
         attrs[:sala] = sala_nueva if sala_nueva
@@ -728,6 +762,28 @@ class Lote < ApplicationRecord
     stocks.where.not(estado: 'agotado').where('cantidad > 0')
   end
 
+  # Cómo se cultiva: en una cama es suelo vivo, siempre (sale de la cama, no se tipea). Sin cama,
+  # lo que diga el lote (sustrato / hidroponía). Lo usan la analítica y el serializer.
+  def metodo_cultivo = cama_id.present? ? 'suelo_vivo' : grow_type.presence
+
+  def en_cama? = cama_id.present?
+
+  # PLANTADO EN UNA CAMA no se muda (tiene las raíces en la tierra). La luz es del espacio: si la
+  # sala no admite la fase nueva, lo que cambia es el ESPACIO, con todos sus lotes adentro
+  # (`Salas::CambiarFase`), no este lote solo. Una regla para las dos puertas del avance
+  # (`avanzar_fase!` del cultivador y `transicionar!` de administración).
+  def validar_avance_en_cama!(nueva_fase, sala_id = nil)
+    if sala_id.present? && sala_id.to_i != cama.sala_id
+      raise ArgumentError, "El lote está plantado en la #{cama.nombre}: no se muda de espacio."
+    end
+    permitidos = Lote.kinds_sala_para(nueva_fase, automatica: automatica?)
+    kind = cama.sala.kind.presence || cama.sala.tipo
+    return unless permitidos.present? && kind.present? && !permitidos.include?(kind)
+
+    raise ArgumentError, "La luz es del espacio: para pasar a #{nueva_fase == 'floracion' ? 'floración' : nueva_fase} " \
+                         "cambiá la fase de «#{cama.sala.nombre}» (pasan juntos todos los lotes de ahí)."
+  end
+
   private
 
   def finalizado_exige_stock_agotado
@@ -756,6 +812,13 @@ class Lote < ApplicationRecord
 
   def congelar_m2_al_salir_de_la_sala
     return unless will_save_change_to_sala_id? && sala_id.nil? && m2_ocupados.blank?
+    # En una cama los metros son los de la cama (si estuvo solo en su ciclo): `m2_efectivos` ya
+    # los resuelve desde la cama, que no se mueve. Congelarlos igual los deja fijos aunque después
+    # alguien edite la medida de la cama.
+    if cama
+      self.m2_ocupados = m2_efectivos
+      return
+    end
 
     anterior = Sala.unscoped.find_by(id: sala_id_was)
     return if anterior.nil? || anterior.m2.blank?
@@ -781,8 +844,9 @@ class Lote < ApplicationRecord
   end
 
   def maceta_al_prender
-    return if tamanio_maceta.present?
-    errors.add(:tamanio_maceta, 'es obligatorio al pasar a vegetativo: el esqueje que prendió va a maceta')
+    # En la cama no hay maceta: la tierra es la cama (siembra directa o plantado desde la bandeja).
+    return if tamanio_maceta.present? || cama_id.present?
+    errors.add(:tamanio_maceta, 'es obligatorio al pasar a vegetativo: el esqueje que prendió va a maceta (o plantalo en una cama)')
   end
 
   # Ver el comentario del callback. `new_record?` entra a propósito: es el caso del lote hijo de
@@ -820,6 +884,103 @@ class Lote < ApplicationRecord
       club:            club,
       registrado_en:   prendido_en || Time.current,
     )
+  end
+
+  # ── Suelo vivo: el lote en la cama ────────────────────────────────────────
+
+  # Al plantar (o corregir la cama) la sala pasa a ser la de la cama. Sólo cuando cambia la cama:
+  # después, cambiar la sala de un lote plantado es un error que valida `cama_valida`.
+  def tomar_la_sala_de_la_cama
+    return unless cama_id_changed? && cama && CULTIVO_ESTADOS.include?(estado)
+    self.sala_id = cama.sala_id
+    self.sede_id = cama.sala.sede_id if cama.sala.sede_id
+  end
+
+  def prender_al_plantarlo_en_la_cama
+    return if new_record? || !cama_id_changed? || cama_id_was.present? || cama_id.nil?
+    @plantado_en_cama = true
+    return unless estado == 'enraizado'
+
+    self.estado = 'vegetativo'
+    @prendio_en_cama = true
+  end
+
+  def cama_valida
+    if cama.club_id != club_id
+      errors.add(:cama, 'no es de esta organización')
+    elsif cama.retirada_el.present? && cama_id_changed?
+      errors.add(:cama, 'está retirada: no se puede plantar en ella')
+    elsif CULTIVO_ESTADOS.include?(estado) && sala_id != cama.sala_id
+      errors.add(:sala, "no se puede cambiar: el lote está plantado en la #{cama.nombre} (las raíces están ahí)")
+    end
+  end
+
+  # Corregir la cama de un lote (se cargó en la equivocada) sólo mientras está en cultivo y nadie
+  # le cargó nada a esa cama en este ciclo: si ya hay top dress o tés, pasarían al otro lado mal
+  # atribuidos (Germán, 25-sep, D5).
+  def cama_corregible
+    unless CULTIVO_ESTADOS.include?(estado_was.presence || estado)
+      return errors.add(:cama, 'no se puede cambiar después de la cosecha: es la historia del lote')
+    end
+    return if cama_ciclo_id_was.nil?
+    return unless CamaRegistro.where(cama_ciclo_id: cama_ciclo_id_was).exists?
+
+    errors.add(:cama, 'no se puede corregir: ya hay registros de suelo en este ciclo de la cama')
+  end
+
+  def m2_entran_en_la_cama
+    return if cama.nil? || cama.m2.nil?
+    otros = cama.lotes_en_cultivo.where.not(id: id).sum(:m2_ocupados).to_d
+    libres = [cama.m2 - otros, 0].max
+    return if m2_ocupados.to_d <= libres
+
+    errors.add(:m2_ocupados, "no entra: la #{cama.nombre} mide #{cama.m2.to_f.round(2)} m² y quedan " \
+                             "#{libres.to_f.round(2)} m² libres")
+  end
+
+  # Entrar a la cama es entrar a su ciclo: el abierto, o uno nuevo (que corta el descanso). Salir
+  # de ella (corrección a otra cama o a ninguna) suelta el ciclo.
+  def ocupar_la_cama
+    if cama.nil?
+      self.cama_ciclo = nil
+      return
+    end
+    return unless CULTIVO_ESTADOS.include?(estado)
+
+    fecha = new_record? && start_date.present? && start_date <= Time.zone.today ? start_date : Time.zone.today
+    fecha = prendido_en.to_date if prendido_en
+    self.cama_ciclo = cama.ciclo_para_plantar!(fecha)
+  end
+
+  # Lo que queda en la historia al plantar un lote que ya existía (venía en vasito o en bandeja).
+  def registrar_plantado_en_la_cama
+    @plantado_en_cama = false
+    prendio = @prendio_en_cama
+    @prendio_en_cama = false
+    usuario = actor_del_prendido || Current.user
+    cuando  = prendido_en || Time.current
+    plants.where.not(state: %w[descartada cosechado]).update_all(state: 'vegetativo') if prendio
+    return if usuario.nil?
+
+    if prendio
+      lote_eventos.create!(tipo: 'cambio_estado', estado_anterior: 'enraizado', estado_nuevo: 'vegetativo',
+                           descripcion: "Prendió: se plantó en la #{cama.nombre}", user: usuario, club: club,
+                           registrado_en: cuando)
+    else
+      lote_eventos.create!(tipo: 'actividad', categoria: 'trasplante', user: usuario, club: club, registrado_en: cuando,
+                           descripcion: "Se plantó en la #{cama.nombre}",
+                           metadata: { 'maceta_origen_l' => tamanio_maceta&.to_f, 'destino' => 'cama',
+                                       'cama_id' => cama_id, 'cama' => cama.nombre }.compact)
+    end
+  end
+
+  # Cuando el lote deja de estar en cultivo (cosecha, descarte) o se lo corrige a otra cama, la
+  # cama de la que salió cierra su ciclo si quedó vacía y pasa a descansar.
+  def liberar_la_cama
+    ids = []
+    ids << cama_id if cama_id && saved_change_to_estado? && !CULTIVO_ESTADOS.include?(estado)
+    ids << saved_change_to_cama_id.first if saved_change_to_cama_id? && saved_change_to_cama_id.first
+    ids.uniq.each { |cid| Cama.find_by(id: cid)&.cerrar_ciclo_si_vacia! }
   end
 
   def generar_codigo_qr

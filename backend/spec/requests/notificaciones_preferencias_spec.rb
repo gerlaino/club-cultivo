@@ -20,7 +20,7 @@ RSpec.describe 'Mi perfil → Notificaciones', type: :request do
     it 'el admin de una organización con cultivo y dispensa ve todo lo suyo' do
       expect(claves_de(create(:user, :admin, club: club))).to match_array(
         %w[pesaje_para_confirmar reposicion_mostrador caja_sin_cerrar tarea_asignada plan_vence
-           recordatorio_tarea hitos_cultivo cosecha_pendiente tarea_vencida lote_critico ambiente reponer_insumos saldo_cc_bajo]
+           recordatorio_tarea hitos_cultivo camas cosecha_pendiente tarea_vencida lote_critico ambiente reponer_insumos saldo_cc_bajo]
       )
     end
 
@@ -31,8 +31,9 @@ RSpec.describe 'Mi perfil → Notificaciones', type: :request do
       expect(claves).not_to include('caja_sin_cerrar', 'reposicion_mostrador', 'saldo_cc_bajo')
     end
 
-    it 'el cultivador ve sus tareas y nada del admin' do
-      expect(claves_de(create(:user, :cultivador, club: club))).to match_array(%w[tarea_asignada recordatorio_tarea])
+    # Las camas de suelo vivo las trabaja quien cultiva: el aviso de sus camas le llega también a él.
+    it 'el cultivador ve sus tareas, el aviso de sus camas y nada del admin' do
+      expect(claves_de(create(:user, :cultivador, club: club))).to match_array(%w[tarea_asignada recordatorio_tarea camas])
     end
 
     it 'el supervisor ve la reposición y su tarea' do
@@ -46,7 +47,7 @@ RSpec.describe 'Mi perfil → Notificaciones', type: :request do
     it 'el cultivador de casa ve lo de cultivo y sus recordatorios, sin manicura ni tareas asignadas por otro' do
       personal = create(:club, plan: 'personal', features: { 'cultivo' => true, 'iot' => true })
       claves = claves_de(create(:user, :admin, club: personal))
-      expect(claves).to match_array(%w[plan_vence recordatorio_tarea hitos_cultivo cosecha_pendiente tarea_vencida lote_critico ambiente reponer_insumos])
+      expect(claves).to match_array(%w[plan_vence recordatorio_tarea hitos_cultivo camas cosecha_pendiente tarea_vencida lote_critico ambiente reponer_insumos])
     end
 
     it 'viene en dos familias, con su explicación' do

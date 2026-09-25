@@ -33,6 +33,10 @@ import DsBanner from '../design-system/components/Banner.vue'
 import IniciarManicuraModal   from '../components/lotes/IniciarManicuraModal.vue'
 import CompletarManicuraModal  from '../components/lotes/CompletarManicuraModal.vue'
 import RegistroLoteModal       from '../components/lotes/registro/RegistroLoteModal.vue'
+import PlantarEnCamaModal      from '../components/camas/PlantarEnCamaModal.vue'
+import RegistroCamaModal       from '../components/camas/RegistroCamaModal.vue'
+import RegarCamaModal          from '../components/camas/RegarCamaModal.vue'
+import { getCama }             from '../lib/api.js'
 import ActionsDropdown         from '../components/ui/ActionsDropdown.vue'
 import { useLoteTransiciones }     from '../composables/useLoteTransiciones.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
@@ -279,6 +283,17 @@ const contextoAsistente = computed(() => lote.value ? {
 // ── Registro modal (nuevo) ────────────────────────────────
 const showRegistroModalNew = ref(false)
 
+// ── Suelo vivo ────────────────────────────────────────────
+const plantarOpen = ref(false)
+const camaModal   = ref(null)
+const camaDelLote = ref(null)
+async function abrirCama(que) {
+  try { camaDelLote.value = (await getCama(lote.value.cama.id)).data } catch { toast.error('No se pudo abrir la cama'); return }
+  camaModal.value = que
+}
+function onPlantado(data) { plantarOpen.value = false; lotes.current = data; loadHistorial() }
+function onCamaGuardada() { camaModal.value = null; loadHistorial(); lotes.fetchOne(id); graficosKey.value++ }
+
 // ── Acciones dropdown ─────────────────────────────────────
 const loteAcciones = computed(() => {
   const items = []
@@ -287,6 +302,15 @@ const loteAcciones = computed(() => {
   // otra. Solo en cultivo y con más de una planta (desprender el lote entero lo dejaría vacío).
   if (puedeDesprender.value) {
     items.push({ emoji: '🪴', label: 'Separar plantas a otro lote', onClick: () => { desprenderOpen.value = true } })
+  }
+  // Suelo vivo: el último trasplante (a una cama), y lo que se le hace a la cama del lote.
+  const enCultivo = ['enraizado', 'vegetativo', 'floracion'].includes(lote.value?.estado)
+  if (enCultivo && !lote.value?.en_cama) {
+    items.push({ emoji: '🧱', label: 'Plantar en una cama', onClick: () => { plantarOpen.value = true } })
+  }
+  if (enCultivo && lote.value?.en_cama) {
+    items.push({ emoji: '🧺', label: `Alimentar la ${lote.value.cama.nombre}`, onClick: () => abrirCama('alimentar') })
+    items.push({ emoji: '💧', label: `Regar la ${lote.value.cama.nombre}`, onClick: () => abrirCama('regar') })
   }
   if (canEdit.value) {
     items.push({ emoji: '✏️', label: 'Editar lote', onClick: () => editarOpen.value = true })
@@ -422,6 +446,10 @@ onUnmounted(() => {
             <span v-else-if="lote.strain" class="ld__strain-fallback">🌿 {{ lote.strain }}</span>
             <span v-if="lote.sala" class="ld__subtitle-sep">·</span>
             <span v-if="lote.sala">📍 {{ lote.sala.nombre }}</span>
+            <template v-if="lote.cama">
+              <span class="ld__subtitle-sep">·</span>
+              <RouterLink :to="`/camas/${lote.cama.id}`" class="ld__origen">🧱 {{ lote.cama.nombre }}<template v-if="lote.cama.ciclo_numero"> · ciclo {{ lote.cama.ciclo_numero }}</template></RouterLink>
+            </template>
             <span v-if="lote.start_date" class="ld__subtitle-sep">·</span>
             <span v-if="lote.start_date">📅 inicio {{ formatDate(lote.start_date) }}</span>
             <!-- De dónde salió, si nació desprendiéndose de otro lote. Sin esto el sufijo del
@@ -669,8 +697,13 @@ onUnmounted(() => {
             <div class="ld__card-header"><span class="ld__card-title">⚙️ Datos técnicos</span></div>
             <dl class="ld__dl">
               <dt>Plantas</dt><dd><strong>{{ lote.plants_count ?? 0 }}</strong></dd>
-              <dt>Maceta</dt><dd>{{ macetaLabel(lote.tamanio_maceta) }}</dd>
-              <dt>Tipo cultivo</dt><dd>{{ growLabel(lote.grow_type) }}<template v-if="lote.sustrato_especifico"> · {{ lote.sustrato_especifico }}</template></dd>
+              <template v-if="lote.en_cama">
+                <dt>Cultivo</dt><dd>Suelo vivo · <RouterLink :to="`/camas/${lote.cama.id}`">{{ lote.cama.nombre }}</RouterLink><template v-if="lote.cama.ciclo_numero"> (ciclo {{ lote.cama.ciclo_numero }})</template></dd>
+              </template>
+              <template v-else>
+                <dt>Maceta</dt><dd>{{ macetaLabel(lote.tamanio_maceta) }}</dd>
+                <dt>Tipo cultivo</dt><dd>{{ growLabel(lote.grow_type) }}<template v-if="lote.sustrato_especifico"> · {{ lote.sustrato_especifico }}</template></dd>
+              </template>
               <template v-if="lote.metodo_enraizado">
                 <dt>Enraizó en</dt><dd>{{ metodoEnraizadoLabel(lote.metodo_enraizado) }}</dd>
               </template>
@@ -745,12 +778,20 @@ onUnmounted(() => {
       @delete="onDeleteEvento"
     />
 
+    <!-- ══ Suelo vivo: plantar en la cama, alimentarla, regarla ══ -->
+    <PlantarEnCamaModal v-if="plantarOpen" :lote="lote" @close="plantarOpen = false" @plantado="onPlantado" />
+    <RegistroCamaModal v-if="camaModal === 'alimentar' && camaDelLote" :camas="[camaDelLote]" :cama-id="camaDelLote.id" cama-fija
+                       @close="camaModal = null" @guardado="onCamaGuardada" />
+    <RegarCamaModal v-if="camaModal === 'regar' && camaDelLote" :camas="[camaDelLote]" :cama-id="camaDelLote.id" cama-fija
+                    @close="camaModal = null" @guardado="onCamaGuardada" />
+
     <!-- ══ Modal Registro del Lote (nuevo) ══ -->
     <RegistroLoteModal
       v-model="showRegistroModalNew"
       :lote="lote"
       :plants="plantasActivas"
       @saved="loadHistorial(); lotes.fetchOne(id); graficosKey++"
+      @alimentar-cama="abrirCama('alimentar')"
     />
 
     <!-- ══ Modal Avanzar Fase ══ -->
@@ -790,7 +831,7 @@ onUnmounted(() => {
             </div>
 
             <!-- Mismo pedido que en el avance del cultivador: el esqueje que prendió va a maceta. -->
-            <div v-if="lote?.estado === 'enraizado'" class="ld__field">
+            <div v-if="lote?.estado === 'enraizado' && !lote?.en_cama" class="ld__field">
               <label class="ld__label">Maceta a la que va <span style="color:#dc2626">*</span></label>
               <select v-model="avanzarMaceta" class="ld__input">
                 <option value="">— Elegí el tamaño —</option>
@@ -922,7 +963,7 @@ onUnmounted(() => {
           <div class="ld__modal-body">
             <!-- El esqueje que prendió va a maceta. Solo se pide en este salto (enraizado →
                  vegetativo): más adelante la maceta ya está puesta. -->
-            <div v-if="lote?.estado === 'enraizado'" class="ld__field">
+            <div v-if="lote?.estado === 'enraizado' && !lote?.en_cama" class="ld__field">
               <label class="ld__label">Maceta a la que va <span style="color:#dc2626">*</span></label>
               <select v-model="avanzarMaceta" class="ld__input">
                 <option value="">— Elegí el tamaño —</option>

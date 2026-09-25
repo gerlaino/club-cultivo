@@ -41,6 +41,7 @@ class AplicacionPlanesController < ApplicationController
     objetivo_id   = params[:objetivo_id].presence&.to_i
 
     tareas_creadas = 0
+    tareas_omitidas = 0
 
     ActiveRecord::Base.transaction do
       @aplicacion = @club.aplicacion_planes.create!(
@@ -71,6 +72,11 @@ class AplicacionPlanesController < ApplicationController
           lote_id = objetivo_id
           lote    = Lote.find_by(id: objetivo_id)
           sala_id ||= lote&.sala_id
+          # En una cama: sin trasplantes ni fertilizaciones del riego (`Tarea.aplica_a_lote?`).
+          unless Tarea.aplica_a_lote?(pt.tipo, lote)
+            tareas_omitidas += 1
+            next
+          end
         end
 
         # Resolver a quién asignar: si hay roles sugeridos → un task por usuario del rol
@@ -107,7 +113,7 @@ class AplicacionPlanesController < ApplicationController
       @aplicacion.update!(tareas_creadas: tareas_creadas)
     end
 
-    render json: serialize_full(@aplicacion.reload), status: :created
+    render json: serialize_full(@aplicacion.reload).merge(tareas_omitidas: tareas_omitidas), status: :created
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Plan no encontrado' }, status: :not_found
   rescue Date::Error, ArgumentError

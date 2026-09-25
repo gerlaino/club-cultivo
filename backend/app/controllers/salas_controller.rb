@@ -92,6 +92,11 @@ class SalasController < ApplicationController
   end
 
   def destroy
+    # Las camas tienen historia (qué se le puso al suelo, qué lotes crecieron): un espacio con
+    # camas no se borra. Primero se retiran o se mudan.
+    if @sala.camas.vigentes.exists?
+      return render json: { error: 'El espacio tiene camas: retiralas o mudalas antes de borrarlo' }, status: :unprocessable_entity
+    end
     @sala.soft_delete!
     head :no_content
   end
@@ -320,7 +325,7 @@ class SalasController < ApplicationController
       :ml_nutrientes_litro, :notas_nutricion,
       :fertilizacion, :notas_fertilizacion,
       :estado_general, :plagas_observadas,
-      :observaciones, :fuente,
+      :observaciones, :fuente, :agua,
       tareas_realizadas: []
     )
   end
@@ -347,7 +352,10 @@ class SalasController < ApplicationController
       # Superficie de cultivo y cuánto queda libre: con esto se calcula el g/m².
       m2:                   s.m2&.to_f,
       m2_ocupados_lotes:    s.m2 ? s.m2_ocupados_por_lotes.to_f : nil,
+      # Suelo vivo: las camas también ocupan el espacio (y sus lotes ocupan la cama, no el espacio).
+      m2_ocupados_camas:    s.m2 ? s.m2_ocupados_por_camas.to_f : nil,
       m2_libres:            s.m2_libres&.to_f,
+      camas_count:          s.camas.vigentes.count,
       leaf_temp_offset:     s.leaf_temp_offset&.to_f,
       # Conteo LIVE (no el denormalizado plants_count/plantas_totales que driftea): plantas
       # vivas en los lotes de la sala.
@@ -431,8 +439,10 @@ class SalasController < ApplicationController
 
     serialize_sala(s).merge(
       lotes: lotes_all.map { |l|
-        { id: l.id, codigo: l.codigo, estado: l.estado, plants_count: plantas_vivas.(l.id) }
+        { id: l.id, codigo: l.codigo, estado: l.estado, plants_count: plantas_vivas.(l.id), cama_id: l.cama_id }
       },
+      # Suelo vivo: las camas del espacio, con su estado y su «qué viene».
+      camas: s.camas.vigentes.order(:nombre).map { |c| CamaSerializer.resumen(c) },
       lotes_historial:,
       historial_kpis:,
       ambiente_actual: ambiente_actual(s),

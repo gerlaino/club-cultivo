@@ -154,14 +154,18 @@ module Public
       end
 
       nutricion = resumen.dig(:nutricion, :productos) || []
+      # Suelo vivo: lo que recibió la tierra en el ciclo de esta flor (sólo nombres de producto).
+      suelo = resumen[:suelo]
+      nutricion = (nutricion + Array(suelo&.dig(:productos))).uniq
 
       # Si no hay NADA que contar, se devuelve nil y la pantalla no dibuja una sección vacía que
       # sugiera que falta información.
-      return nil if resumen[:fitosanitarios].empty? && nutricion.empty? && labs.empty?
+      return nil if resumen[:fitosanitarios].empty? && nutricion.empty? && labs.empty? && suelo.nil?
 
       {
         fitosanitarios: resumen[:fitosanitarios],
         nutricion:      nutricion,
+        suelo_vivo:     suelo.present?,
         analisis:       labs.first,
       }
     end

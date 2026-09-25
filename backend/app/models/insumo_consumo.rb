@@ -9,6 +9,10 @@ class InsumoConsumo < ApplicationRecord
   belongs_to :registro_ambiental, optional: true
   belongs_to :lote, optional: true
   belongs_to :sala, optional: true
+  # Lo que se le puso a una cama de suelo vivo (ver `CamaRegistro`): sin lote cuando la cama
+  # estaba vacía (armado, recarga en el descanso) — queda como inversión de la cama.
+  belongs_to :cama, optional: true
+  belongs_to :cama_registro, optional: true
   belongs_to :created_by, class_name: 'User'
 
   validates :cantidad, numericality: { greater_than: 0 }

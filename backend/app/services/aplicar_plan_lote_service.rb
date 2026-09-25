@@ -15,6 +15,11 @@ class AplicarPlanLoteService
     calcular_propuestas
   end
 
+  # Las del plan que no aplican a este lote (en una cama: trasplantes y fertilizaciones).
+  def omitidas
+    @omitidas || (calcular_propuestas && @omitidas)
+  end
+
   def aplicar!
     propuestas = calcular_propuestas
     creadas    = []
@@ -81,7 +86,9 @@ class AplicarPlanLoteService
       end
     end
 
-    tareas.sort_by { |t| t[:fecha] }
+    todas = tareas.sort_by { |t| t[:fecha] }
+    aplican, @omitidas = todas.partition { |t| Tarea.aplica_a_lote?(t[:tipo], @lote) }
+    aplican
   end
 
   def serializar(pt, fecha)

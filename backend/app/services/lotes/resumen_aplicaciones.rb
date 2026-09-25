@@ -16,7 +16,7 @@ module Lotes
       return vacio if lote.nil?
 
       registros = lote.registros_ambientales.order(:registrado_en)
-      return vacio if registros.empty?
+      return vacio.merge(suelo: suelo_del_ciclo) if registros.empty?
 
       {
         registros:     registros.size,
@@ -33,6 +33,9 @@ module Lotes
         # plegado: un auditor puede necesitar ver registro por registro, pero abrirlo por defecto
         # convierte el informe en sesenta filas que nadie lee.
         detalle:       detalle(registros),
+        # Suelo vivo: lo que se le puso a la cama durante el ciclo del lote (top dress, tés al
+        # suelo, cobertura…). La historia completa de la cama está en la trazabilidad.
+        suelo:         suelo_del_ciclo,
       }
     end
 
@@ -41,6 +44,17 @@ module Lotes
     attr_reader :lote
 
     def vacio = { registros: 0, actividades: {}, nutricion: {}, fitosanitarios: [], plagas: [], detalle: [] }
+
+    def suelo_del_ciclo
+      return nil unless lote.cama_ciclo
+      regs = lote.cama_ciclo.registros.to_a
+      {
+        cama: lote.cama.nombre, ciclo: lote.cama_ciclo.numero,
+        veces: regs.map(&:tipo).tally,
+        productos: regs.flat_map { |r| Array(r.nutricion.to_h['items']).map { |i| i['nombre'] } }.compact.uniq,
+        detalles: regs.filter_map { |r| r.detalle.presence }.uniq,
+      }
+    end
 
     # Un registro por fila, con lo que efectivamente se anotó. Los campos vacíos NO viajan: una
     # tabla llena de guiones es más difícil de leer que una con menos columnas.
@@ -76,7 +90,10 @@ module Lotes
         veces:     con_fert.size,
         # Los productos que se nombraron, sin repetir. Es lo que alguien quiere saber: no cuántas
         # veces se fertilizó sino CON QUÉ.
-        productos: con_fert.filter_map { |r| r.notas_fertilizacion.presence&.strip }.uniq,
+        # Con receta, los productos están en la copia de lo aplicado (`nutricion`); sin receta,
+        # en el texto.
+        productos: (con_fert.filter_map { |r| r.notas_fertilizacion.presence&.strip } +
+                    registros.flat_map { |r| Array(r.nutricion.to_h['items']).map { |i| i['nombre'] } }).compact.uniq,
         enraizantes: registros.filter_map { |r| r.producto_enraizante.presence&.strip }.uniq,
       }
     end

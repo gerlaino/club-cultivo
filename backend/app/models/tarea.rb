@@ -19,6 +19,14 @@ class Tarea < ApplicationRecord
   # ── Enums ──────────────────────────────────────────────────────
   TIPOS       = %w[riego poda medicion limpieza cosecha trasplante inspeccion otro
                    nutricion defoliacion scrog_lst ajuste_luz revision_plagas].freeze
+  # En una cama de suelo vivo no hay trasplantes y no se fertiliza el riego (se alimenta el suelo):
+  # un plan de trabajo aplicado a un lote plantado en una cama saltea estas tareas y lo dice
+  # (Germán, 25-sep, D10). La regla es una para las dos puertas del plan.
+  NO_APLICAN_EN_CAMA = %w[trasplante nutricion].freeze
+
+  def self.aplica_a_lote?(tipo, lote)
+    !(lote&.en_cama? && NO_APLICAN_EN_CAMA.include?(tipo.to_s))
+  end
   ESTADOS     = %w[pendiente en_progreso completada cancelada].freeze
 
   # Mapeo de tareas_realizadas (RegistroAmbiental) a tipo de Tarea

@@ -311,6 +311,18 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 
 ### Lo que NO hay que romper
 
+- **SUELO VIVO: LA CAMA ES UNA ENTIDAD Y VIVE MÁS QUE LOS LOTES** (25-sep-2026, plan en
+  `docs/PLAN_SUELO_VIVO.md`). El estado de la cama se CALCULA (no se guarda). Los números de
+  cultivo (cocción, descanso, frecuencia de top dress) los pone el cultivador: la app no trae
+  ninguno de fábrica. Camas + lotes sin cama ≤ la sala; lotes de la cama ≤ la cama. En la cama no
+  hay trasplantes ni maceta; plantar en la cama prende; la planta no se muda y para florar cambia
+  la fase del ESPACIO (`Lote#validar_avance_en_cama!`, las dos puertas). La cama descansa cuando
+  sale el ÚLTIMO lote; plantar en una que descansa avisa y NO bloquea. Lo del suelo es
+  `CamaRegistro` (con lotes, la plata va a los lotes del ciclo por m²; vacía, queda en la cama); el
+  riego con plantas es del lote. Una genética en dos camas son dos lotes (desprender con cama).
+- **LA DOSIS SE CONVIERTE A LA UNIDAD DEL INSUMO** (25-sep-2026): `RecetaItem#factor_a_insumo`
+  (g↔kg, ml↔L; sin equivalencia, 1). La pantalla multiplica por el `factor` que manda el backend;
+  nunca recalcular por su cuenta. Cada `Receta#uso` admite sus unidades (`UNIDADES_POR_USO`, en `/me`).
 - **EL NUTRIENTE ES UN INSUMO; LA RECETA SE APLICA AL REGAR Y NO BLOQUEA POR STOCK** (20-sep-2026).
   No hay entidad «producto»: recetas → `Insumo`. Aplicar (`Nutricion::Aplicar`) descuenta,
   cuesta al lote y deja copia en `registros_ambientales.nutricion`; si falta, la persona elige

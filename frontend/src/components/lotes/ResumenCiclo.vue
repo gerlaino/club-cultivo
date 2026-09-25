@@ -50,6 +50,17 @@
       </div>
     </div>
 
+    <!-- Suelo vivo: ¿el suelo mejora? El mismo metro de tierra, cosecha tras cosecha. -->
+    <div v-if="r.cama" class="rc__cama">
+      <i class="bi bi-bricks"></i>
+      <span>
+        {{ r.cama.nombre }} · ciclo {{ r.cama.ciclo }}<template v-if="r.cama.g_m2 != null">: <strong>{{ fmt(r.cama.g_m2) }} g/m²</strong></template>
+        <template v-if="r.cama.anterior?.g_m2 != null"> (ciclo {{ r.cama.anterior.ciclo }}: {{ fmt(r.cama.anterior.g_m2) }})</template>
+        <span v-if="r.cama.g_m2 != null && delta(r.cama.g_m2, r.cama.anterior?.g_m2)" class="rc__delta" :class="deltaClase(r.cama.g_m2, r.cama.anterior?.g_m2, true)">{{ delta(r.cama.g_m2, r.cama.anterior?.g_m2) }}</span>
+        <template v-if="r.cama.aplicaciones_suelo"> · {{ r.cama.aplicaciones_suelo }} {{ r.cama.aplicaciones_suelo === 1 ? 'cosa' : 'cosas' }} al suelo en el ciclo</template>
+      </span>
+    </div>
+
     <div class="rc__detalle">
       <span>{{ r.plantas.cosechadas }} {{ r.plantas.cosechadas === 1 ? 'planta cosechada' : 'plantas cosechadas' }}<template v-if="r.plantas.no_prendieron"> · {{ r.plantas.no_prendieron }} no {{ r.plantas.no_prendieron === 1 ? 'prendió' : 'prendieron' }}</template></span>
       <span v-if="r.registros.total">{{ r.registros.riegos }} {{ r.registros.riegos === 1 ? 'riego' : 'riegos' }} · {{ r.registros.total }} {{ r.registros.total === 1 ? 'registro' : 'registros' }}</span>
@@ -127,6 +138,8 @@ function deltaClase(ahora, antes, masEsMejor) {
 </script>
 
 <style scoped>
+.rc__cama { display: flex; gap: .5rem; align-items: flex-start; font-size: var(--fs-13); color: var(--c-slate-700); background: var(--c-leaf-50); border-radius: var(--r-md); padding: .5rem .7rem; margin-top: .6rem; }
+.rc__cama .bi { color: var(--c-leaf-700); }
 .rc { background: linear-gradient(160deg, #f0fdf4, #fff); border: 1px solid var(--c-leaf-100, #e8f0eb); border-radius: 16px; padding: 1rem; display: grid; gap: .85rem; }
 .rc__head { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; }
 .rc__title { font-family: var(--font-display); font-weight: 800; font-size: 1.05rem; color: var(--c-ink-900, #1a1d1f); }

@@ -12,8 +12,8 @@
 
         <div class="dsp__body">
           <p class="dsp__nota">
-            Desde que van a macetas distintas dejan de ser el mismo grupo: cambia el riego, la
-            frecuencia y cuándo toca el próximo trasplante. Por eso se separan en dos lotes.
+            Desde que van a macetas (o camas) distintas dejan de ser el mismo grupo: cambia el riego, la
+            frecuencia y lo que se le pone a la tierra. Por eso se separan en dos lotes.
           </p>
           <div v-if="error" class="dsp__alert">{{ error }}</div>
 
@@ -55,7 +55,17 @@
             <span class="dsp__hint">{{ elegidas.size }} elegidas de {{ vivas }}</span>
           </div>
 
-          <div class="dsp__field">
+          <!-- Suelo vivo: las plantas que se separan pueden ir a una cama (una genética en dos camas
+               son dos lotes, uno por cama). Si enraizaban, plantarlas en la cama las prende. -->
+          <div v-if="camas.length" class="dsp__field">
+            <label class="dsp__label">¿A dónde van?</label>
+            <select v-model="camaId" class="dsp__input">
+              <option :value="null">{{ lote?.en_cama ? `— Se quedan en la ${lote.cama?.nombre} —` : '— A maceta —' }}</option>
+              <option v-for="c in camas" :key="c.id" :value="c.id">🧱 {{ c.nombre }} · {{ c.sala_nombre }} ({{ estadoCama(c.estado).label.toLowerCase() }})</option>
+            </select>
+            <span v-if="avisoCama" class="dsp__hint dsp__hint--aviso">{{ avisoCama }}</span>
+          </div>
+          <div v-if="!camaId && !lote?.en_cama" class="dsp__field">
             <label class="dsp__label">Maceta del lote nuevo</label>
             <select v-model="maceta" class="dsp__input">
               <option value="">— Deja la misma ({{ lote?.tamanio_maceta || '—' }} L) —</option>
@@ -91,7 +101,8 @@
 <script setup>
 import { MACETA_OPCIONES } from '../../lib/loteHelpers.js'
 import { ref, computed, watch } from 'vue'
-import { desprenderLote, listPlants } from '../../lib/api.js'
+import { desprenderLote, listPlants, listCamas } from '../../lib/api.js'
+import { estadoCama, avisoAlPlantar } from '../../lib/camas.js'
 import { useToast } from '../../composables/useToast.js'
 
 const props = defineProps({
@@ -107,6 +118,9 @@ const MACETAS = MACETA_OPCIONES
 const cantidad = ref(null)
 const maceta   = ref('')
 const motivo   = ref('')
+const camas    = ref([])
+const camaId   = ref(null)
+const avisoCama = computed(() => avisoAlPlantar(camas.value.find(c => c.id === camaId.value)))
 const saving   = ref(false)
 const error    = ref(null)
 
@@ -165,7 +179,8 @@ const codigoPrevisto = computed(() => `${(props.lote?.codigo || '').replace(/-[B
 
 watch(() => props.modelValue, (v) => {
   if (v) {
-    cantidad.value = null; maceta.value = ''; motivo.value = ''; error.value = null
+    cantidad.value = null; maceta.value = ''; motivo.value = ''; error.value = null; camaId.value = null
+    listCamas().then(({ data }) => { camas.value = (data || []).filter(c => c.id !== props.lote?.cama?.id) }).catch(() => { camas.value = [] })
     // Siempre arranca por cantidad: es el caso normal, y en enraizado es el único posible.
     modo.value = 'cantidad'; elegidas.value = new Set(); busqueda.value = ''; plantas.value = []
   }
@@ -179,7 +194,8 @@ async function guardar() {
     const payload = modo.value === 'elegir'
       ? { plant_ids: [...elegidas.value] }
       : { cantidad: cantidad.value }
-    if (maceta.value) payload.tamanio_maceta = maceta.value
+    if (camaId.value) payload.cama_id = camaId.value
+    else if (maceta.value) payload.tamanio_maceta = maceta.value
     if (motivo.value) payload.motivo = motivo.value
     const { data } = await desprenderLote(props.lote.id, payload)
     toast.success(`${cuantas.value} plantas separadas a ${data.lote_nuevo.codigo}`)
@@ -221,6 +237,7 @@ async function guardar() {
 }
 .dsp__input:focus { outline: none; border-color: #16a34a; }
 .dsp__hint  { font-size: .7rem; color: var(--c-slate-400); }
+.dsp__hint.dsp__hint--aviso { color: var(--c-rust-600); font-weight: 600; }
 .dsp__alert { background: #fee2e2; color: #b91c1c; padding: .5rem .7rem; border-radius: 8px; font-size: .78rem; }
 
 .dsp__btn {

@@ -34,6 +34,10 @@ module Lotes
     end
 
     def call
+      # Suelo vivo: plantado en la cama no hay más trasplantes (las raíces están en la tierra).
+      if @lote.en_cama?
+        return Result.new(ok: false, error: "El lote está plantado en la #{@lote.cama.nombre}: en la cama no hay trasplantes.")
+      end
       return Result.new(ok: false, error: 'Indicá la maceta destino (en litros).') if @destino <= 0
 
       dia = @fecha.present? ? (Date.parse(@fecha.to_s) rescue nil) : Time.zone.today

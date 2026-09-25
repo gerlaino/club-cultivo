@@ -30,6 +30,10 @@
           <span class="mlot__stat-num mlot__stat-num--sm">{{ lote.sala.nombre }}</span>
           <span class="mlot__stat-lbl">{{ salaTxt.Corta }}</span>
         </div>
+        <div class="mlot__stat" v-if="lote.cama">
+          <span class="mlot__stat-num mlot__stat-num--sm">{{ lote.cama.nombre }}</span>
+          <span class="mlot__stat-lbl">Cama{{ lote.cama.ciclo_numero ? ` · ciclo ${lote.cama.ciclo_numero}` : '' }}</span>
+        </div>
         <div class="mlot__stat" v-else-if="lote.tamanio_maceta">
           <span class="mlot__stat-num">{{ lote.tamanio_maceta }}L</span>
           <span class="mlot__stat-lbl">Maceta</span>
@@ -43,7 +47,7 @@
         <i class="bi bi-journal-plus"></i>
         <div class="mlot__cta-txt">
           <span class="mlot__cta-title">Registrar en el diario</span>
-          <span class="mlot__cta-sub">Riego, pH/EC, ambiente, plagas, foto</span>
+          <span class="mlot__cta-sub">{{ lote.en_cama ? 'Riego, ambiente, plagas, poda' : 'Riego, pH/EC, ambiente, plagas, foto' }}</span>
         </div>
         <i class="bi bi-chevron-right mlot__cta-arr"></i>
       </button>
@@ -65,9 +69,18 @@
       </button>
       <!-- En una automática en vegetativo, «avanzar» es anotar que empezó a florecer: opcional
            y no la mueve de sala. -->
-      <button class="mlot__qa" v-if="faseSiguiente && lote.estado !== 'floracion'" @click="abrirAvanzarFase">
+      <button class="mlot__qa" v-if="faseSiguiente && lote.estado !== 'floracion'" :disabled="savingFase" @click="lote.avanza_con_el_espacio ? avanzarConElEspacio() : abrirAvanzarFase()">
         <span class="mlot__qa-ico" style="background:var(--c-leaf-100);color:var(--c-leaf-700)"><i class="bi bi-arrow-up-circle"></i></span>
-        <span class="mlot__qa-lbl">{{ lote.automatica && lote.estado === 'vegetativo' ? 'Empezó a florecer' : 'Avanzar fase' }}</span>
+        <span class="mlot__qa-lbl">{{ lote.avanza_con_el_espacio ? `Pasar ${lote.sala?.nombre || 'el espacio'} a floración` : (lote.automatica && lote.estado === 'vegetativo' ? 'Empezó a florecer' : 'Avanzar fase') }}</span>
+      </button>
+      <!-- Suelo vivo: lo que se le hace a la tierra es de la cama (top dress, té, cobertura). -->
+      <button class="mlot__qa" v-if="lote.en_cama && enCultivo" @click="abrirCama('alimentar')">
+        <span class="mlot__qa-ico" style="background:var(--c-amber-100);color:var(--c-slate-900)"><i class="bi bi-basket"></i></span>
+        <span class="mlot__qa-lbl">Alimentar la cama</span>
+      </button>
+      <button class="mlot__qa" v-if="lote.en_cama && enCultivo" @click="abrirCama('regar')">
+        <span class="mlot__qa-ico" style="background:var(--c-sky-100);color:var(--c-sky-600)"><i class="bi bi-droplet"></i></span>
+        <span class="mlot__qa-lbl">Regar la cama</span>
       </button>
       <!-- Escanear vive en el botón "+" de la barra: repetirlo acá era una segunda puerta al mismo
            lugar. Y las plantas se dan de alta con el lote, no de a una desde su ficha. -->
@@ -112,7 +125,13 @@
     </div>
 
     <!-- Modal registro lote (reutiliza el de la web) -->
-    <RegistroLoteModal v-model="showRegistrar" :lote="lote" :plants="plantas" :accion-inicial="accionInicial" @saved="recargarLote" />
+    <RegistroLoteModal v-model="showRegistrar" :lote="lote" :plants="plantas" :accion-inicial="accionInicial" @saved="recargarLote"
+                       @alimentar-cama="abrirCama('alimentar')" />
+    <RegistroCamaModal v-if="camaModal === 'alimentar' && camaDelLote" :camas="[camaDelLote]" :cama-id="camaDelLote.id" cama-fija
+                       @close="camaModal = null" @guardado="onCamaGuardada" />
+    <RegarCamaModal v-if="camaModal === 'regar' && camaDelLote" :camas="[camaDelLote]" :cama-id="camaDelLote.id" cama-fija
+                    @close="camaModal = null" @guardado="onCamaGuardada" />
+    <PlantarEnCamaModal v-if="showPlantar" :lote="lote" @close="showPlantar = false" @plantado="onPlantado" />
 
     <ModalCosechaPartial
       v-if="showCosecha && lote"
@@ -127,6 +146,16 @@
     <!-- Sheet: Más (editar / eliminar) -->
     <SheetBottom v-model="showAcciones" title="Más acciones">
       <div class="mlot__accion-list">
+        <button v-if="hayCamas && enCultivo && !lote.en_cama" class="mlot__accion-item" @click="showAcciones = false; showPlantar = true">
+          <span class="mlot__accion-ico"><i class="bi bi-bricks"></i></span>
+          <span class="mlot__accion-lbl">Plantar en una cama</span>
+          <i class="bi bi-chevron-right mlot__accion-arr"></i>
+        </button>
+        <button v-if="lote.cama" class="mlot__accion-item" @click="router.push(`/m/cama-m/${lote.cama.id}`)">
+          <span class="mlot__accion-ico"><i class="bi bi-bricks"></i></span>
+          <span class="mlot__accion-lbl">Ver la {{ lote.cama.nombre }}</span>
+          <i class="bi bi-chevron-right mlot__accion-arr"></i>
+        </button>
         <button class="mlot__accion-item" @click="abrirEditarLote">
           <span class="mlot__accion-ico"><i class="bi bi-pencil"></i></span>
           <span class="mlot__accion-lbl">Editar lote</span>
@@ -156,7 +185,8 @@
                  class="mlot__input" :placeholder="`de ${lote.plants_count || 0}`" />
         </div>
         <!-- El esqueje que prendió va a maceta: sin ese dato el lote no puede pasar a vegetativo. -->
-        <div v-if="lote.estado === 'enraizado'" class="mlot__field">
+        <p v-if="lote.estado === 'enraizado' && lote.en_cama" class="mlot__sheet-desc">Germinó en la {{ lote.cama?.nombre }}: no hay maceta.</p>
+        <div v-if="lote.estado === 'enraizado' && !lote.en_cama" class="mlot__field">
           <label class="mlot__label">Maceta a la que va *</label>
           <select v-model="faseMaceta" class="mlot__input">
             <option value="">— Elegí el tamaño —</option>
@@ -222,6 +252,12 @@ import { useUsoPersonal }  from '../../composables/useUsoPersonal.js'
 import SheetBottom         from '../../components/cultivador/SheetBottom.vue'
 import RegistroLoteModal   from '../../components/lotes/registro/RegistroLoteModal.vue'
 import ModalCosechaPartial from '../../components/salas/ModalCosechaPartial.vue'
+import RegistroCamaModal   from '../../components/camas/RegistroCamaModal.vue'
+import RegarCamaModal      from '../../components/camas/RegarCamaModal.vue'
+import PlantarEnCamaModal  from '../../components/camas/PlantarEnCamaModal.vue'
+import { getCama, listCamas, cambiarFaseSala } from '../../lib/api'
+import { useConfirm } from '../../composables/useConfirm.js'
+import { textoCambioDeFase } from '../../lib/textoCambioDeFase.js'
 
 const route  = useRoute()
 const router = useRouter()
@@ -256,8 +292,9 @@ const nuevaFase       = ref('')
 const faseMaceta      = ref('')
 const fasePrendieron  = ref('')
 const MACETAS = MACETA_OPCIONES
+// En una cama no hay maceta (siembra directa): sólo cuántas prendieron.
 const faltaMaceta = computed(() =>
-  lote.value?.estado === 'enraizado' && (!faseMaceta.value || fasePrendieron.value === ''))
+  lote.value?.estado === 'enraizado' && ((!lote.value?.en_cama && !faseMaceta.value) || fasePrendieron.value === ''))
 
 const editForm   = ref({ codigo: '', descripcion: '' })
 
@@ -386,6 +423,44 @@ async function confirmarEliminar() {
 
 const galeria = ref(null)
 
+// ── Suelo vivo ───────────────────────────────────────────────────────────────
+const enCultivo   = computed(() => ['enraizado', 'vegetativo', 'floracion'].includes(lote.value?.estado))
+const hayCamas    = ref(false)
+const showPlantar = ref(false)
+const camaModal   = ref(null)
+const camaDelLote = ref(null)
+const { confirm } = useConfirm()
+async function abrirCama(que) {
+  try { camaDelLote.value = (await getCama(lote.value.cama.id)).data } catch { toast.error('No se pudo abrir la cama'); return }
+  camaModal.value = que
+}
+function onCamaGuardada() { camaModal.value = null; recargarLote() }
+function onPlantado(data) { showPlantar.value = false; lote.value = data; cargarPlantas() }
+// Plantado en una cama no se muda: para florar, florece el ESPACIO con todos sus lotes (misma
+// regla y misma confirmación que «Pasar a floración» del espacio).
+async function avanzarConElEspacio(confirmado = false) {
+  const nombre = lote.value.sala?.nombre || 'el espacio'
+  if (!confirmado && !(await confirm({
+    title: `La luz es de ${nombre}`,
+    message: `El lote está plantado en la ${lote.value.cama?.nombre || 'cama'} y no se muda. ${nombre} pasa a floración (12/12) con todos sus lotes.`,
+    confirmText: `Pasar a floración`, variant: 'warning',
+  }))) return
+  savingFase.value = true
+  try {
+    await cambiarFaseSala(lote.value.sala_id, confirmado ? { confirmar_cambio_fase: true } : {})
+    toast.success(`${nombre} en floración`)
+    await recargarLote()
+  } catch (e) {
+    const data = e?.response?.data
+    if (data?.requiere_confirmacion && !confirmado) {
+      savingFase.value = false
+      if (await confirm({ ...textoCambioDeFase(data), variant: 'danger' })) return avanzarConElEspacio(true)
+      return
+    }
+    toast.error(data?.error || 'No se pudo cambiar la fase del espacio')
+  } finally { savingFase.value = false }
+}
+
 async function cargarPlantas() {
   try {
     const { data } = await listPlants({ lote_id: id })
@@ -399,6 +474,7 @@ onMounted(async () => {
     lote.value    = loteRes.data
     plantas.value = plantasRes.data?.data || plantasRes.data || []
   } catch {} finally { loading.value = false }
+  listCamas().then(({ data }) => { hayCamas.value = (data || []).length > 0 }).catch(() => {})
   // Llegó desde el «+» con una acción: se abre el diario en ese formulario y se limpia la URL,
   // para que recargar o volver no lo abra de nuevo.
   const accion = route.query.accion

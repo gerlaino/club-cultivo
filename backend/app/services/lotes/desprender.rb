@@ -14,6 +14,10 @@ module Lotes
   # apunta a él con `lote_origen_id`.
   #
   # PLATA: ver `costo_heredado_ars` más abajo y la migración `DesprenderLotes`.
+  #
+  # SUELO VIVO: `cama_id` manda al hijo a una cama (una genética en dos camas son dos lotes, uno
+  # por cama: Germán, 25-sep, D4). Si el padre enraizaba, plantarlas en la cama las prende, igual
+  # que ponerlas en maceta. Sin `cama_id`, el hijo se queda en la cama del padre si tenía.
   class Desprender
     Result = Struct.new(:ok, :error, :lote_nuevo, keyword_init: true) do
       def ok? = ok
@@ -24,16 +28,23 @@ module Lotes
     # plant_ids: cuáles se van (con QR por planta, elegir CUÁLES importa — si el sistema las elige
     # solo, las etiquetas físicas dejan de coincidir con los datos). Si no vienen, se toman las
     # últimas `cantidad` sin trazas individuales.
-    def initialize(lote:, usuario:, plant_ids: nil, cantidad: nil, tamanio_maceta: nil, motivo: nil)
+    def initialize(lote:, usuario:, plant_ids: nil, cantidad: nil, tamanio_maceta: nil, motivo: nil, cama_id: nil)
       @lote           = lote
       @usuario        = usuario
       @plant_ids      = Array(plant_ids).map(&:to_i).uniq.presence
       @cantidad       = cantidad.presence&.to_i
       @tamanio_maceta = tamanio_maceta.presence&.to_d
       @motivo         = motivo.presence
+      @cama           = cama_id.present? ? lote.club.camas.find_by(id: cama_id) : nil
+      @cama_pedida    = cama_id.present?
     end
 
     def call
+      return Result.new(ok: false, error: 'Cama no encontrada') if @cama_pedida && @cama.nil?
+      if @cama && @tamanio_maceta
+        return Result.new(ok: false, error: 'En la cama no hay maceta: elegí una de las dos.')
+      end
+
       vivas = @lote.plants.where.not(state: 'descartada')
       elegidas = seleccionar(vivas)
       return Result.new(ok: false, error: @error) if @error
@@ -100,8 +111,9 @@ module Lotes
         grow_type:      @lote.grow_type,
         light_type:     @lote.light_type,
         fotoperiodo:    @lote.fotoperiodo,
-        # Lo único que cambia a propósito (y el motivo de separarlas).
-        tamanio_maceta: @tamanio_maceta || @lote.tamanio_maceta,
+        # Lo único que cambia a propósito (y el motivo de separarlas): la maceta o la cama.
+        tamanio_maceta: @cama ? nil : (@tamanio_maceta || @lote.tamanio_maceta),
+        cama_id:        @cama&.id || @lote.cama_id,
         dias_vegetativo_objetivo: @lote.dias_vegetativo_objetivo,
         dias_floracion_objetivo:  @lote.dias_floracion_objetivo,
         dias_cosecha_objetivo:    @lote.dias_cosecha_objetivo,
@@ -111,6 +123,9 @@ module Lotes
       )
       hijo.tamanio_maceta_inicial = @lote.tamanio_maceta_inicial if @lote.tamanio_maceta_inicial
       hijo.costo_heredado_ars     = repartir_costo(total_vivas, cuantas)
+      # Plantarlas en la cama las prende (como la maceta): la siembra directa es otra cosa (nace en
+      # la cama), acá vienen de la bandeja.
+      hijo.estado = 'vegetativo' if @cama && hijo.estado == 'enraizado'
       hijo.save!
       @lote.update!(costo_cedido_ars: @lote.costo_cedido_ars.to_d + hijo.costo_heredado_ars)
       hijo
@@ -162,6 +177,7 @@ module Lotes
     def registrar_eventos(hijo, cuantas)
       detalle = "#{cuantas} plantas separadas a #{hijo.codigo}"
       detalle += " · maceta #{@tamanio_maceta.to_f}L" if @tamanio_maceta
+      detalle += " · a la #{@cama.nombre}" if @cama
       detalle += " · #{@motivo}" if @motivo
 
       @lote.lote_eventos.create!(
@@ -172,6 +188,7 @@ module Lotes
         tipo: 'actividad', categoria: 'otro',
         descripcion: "Desprendido de #{@lote.codigo} con #{cuantas} plantas" \
                      "#{@tamanio_maceta ? " · maceta #{@tamanio_maceta.to_f}L" : ''}" \
+                     "#{@cama ? " · plantadas en la #{@cama.nombre}" : ''}" \
                      "#{hijo.costo_heredado_ars.to_d.positive? ? " · se lleva $#{hijo.costo_heredado_ars.to_f} de costo" : ''}",
         user: @usuario, club: @lote.club, registrado_en: Time.current,
       )
@@ -182,7 +199,7 @@ module Lotes
       if hijo.estado != @lote.estado
         hijo.lote_eventos.create!(
           tipo: 'cambio_estado', estado_anterior: @lote.estado, estado_nuevo: hijo.estado,
-          descripcion: "Prendió al separarse: pasó a maceta de #{hijo.tamanio_maceta.to_f} L",
+          descripcion: @cama ? "Prendió al separarse: se plantó en la #{@cama.nombre}" : "Prendió al separarse: pasó a maceta de #{hijo.tamanio_maceta.to_f} L",
           user: @usuario, club: @lote.club, registrado_en: Time.current,
         )
       end

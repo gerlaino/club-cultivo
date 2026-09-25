@@ -155,7 +155,7 @@ import { useClubStore }  from '../../stores/club'
 import { useCajaDeliveryStore } from '../../stores/cajaDelivery.js'
 import { usePushNotifications, MOTIVOS } from '../../composables/usePushNotifications.js'
 import { useToast } from '../../composables/useToast.js'
-import { listSalas, uploadFotoLote } from '../../lib/api.js'
+import { listSalas, uploadFotoLote, listCamas } from '../../lib/api.js'
 import { useLotesStore } from '../../stores/lotes.js'
 import { useTareasStore } from '../../stores/tareas.js'
 import { hoyISO } from '../../utils/dates.js'
@@ -189,7 +189,7 @@ const ROLE_LABELS = {
 const roleLabel = computed(() => (club.data?.personal && role.value === 'admin' ? 'Mi cultivo' : ROLE_LABELS[role.value] || ''))
 
 const isDetalle = computed(() =>
-  /\/m\/(sede|sala-m|lote-m|planta|mnc\/lotes)\//.test(route.path)
+  /\/m\/(sede|sala-m|lote-m|cama-m|planta|mnc\/lotes)\//.test(route.path)
 )
 
 const clubInitials = computed(() => {
@@ -280,7 +280,7 @@ NAV.personal = { fab: true, items: [
   { to: '/m/personal/hoy',     icon: 'bi-sun',           label: 'Hoy' },
   // Entra directo a sus salas (una sola sede, la casa); se resalta también dentro de una sala,
   // un lote o una planta, que es donde vive el recorrido.
-  { to: '/m/personal/cultivo', icon: 'bi-diagram-3',     label: 'Cultivo', match: ['/m/sede/', '/m/sala-m/', '/m/lote-m/', '/m/planta/', '/m/mnc/'] },
+  { to: '/m/personal/cultivo', icon: 'bi-diagram-3',     label: 'Cultivo', match: ['/m/sede/', '/m/sala-m/', '/m/lote-m/', '/m/cama-m/', '/m/planta/', '/m/mnc/'] },
   { to: '/m/personal/stock',   icon: 'bi-archive',       label: 'Stock' },
   { to: '/m/personal/gastos',  icon: 'bi-receipt',       label: 'Gastos' },
 ] }
@@ -357,12 +357,16 @@ const fabActions = computed(() => {
   // salas suyas. «Tarea» sólo en personal: en una organización las crea administración.
   if (ofreceHoy.value) {
     acciones.unshift(
-      { key: 'riego',    label: 'Regar',              icon: 'bi-droplet-fill',     tint: '#dbeafe', color: '#1d4ed8', onClick: () => conLote('riego') },
+      { key: 'riego',    label: 'Regar',              icon: 'bi-droplet-fill',     tint: '#dbeafe', color: '#1d4ed8', onClick: conRiego },
       { key: 'ambiente', label: 'Registrar ambiente', icon: 'bi-thermometer-half', tint: '#fef3c7', color: '#b45309', onClick: () => conSala('ambiental') },
       { key: 'foto',     label: 'Foto',               icon: 'bi-camera-fill',      tint: '#fce7f3', color: '#be185d', onClick: () => conLote('foto') },
     )
     if (esPersonal.value) {
       acciones.splice(3, 0, { key: 'tarea', label: 'Tarea', icon: 'bi-check2-square', tint: '#ede9fe', color: '#7c3aed', onClick: abrirNuevaTarea })
+    }
+    // Suelo vivo: alimentar la cama es de todos los días (y tiene que estar en el teléfono).
+    if (camasHoy.value.length) {
+      acciones.splice(1, 0, { key: 'alimentar', label: 'Alimentar la cama', icon: 'bi-basket-fill', tint: 'var(--c-amber-100)', color: 'var(--c-slate-900)', onClick: () => conCama('alimentar') })
     }
   }
   // Crear una SALA es decisión de infraestructura, no del que está en el pasillo.
@@ -393,8 +397,43 @@ watch(fabOpen, async (abierto) => {
   const pedidos = []
   if (!lotesStore.items?.length) pedidos.push(lotesStore.fetch({ silencioso: true }))
   if (!salas.value.length) pedidos.push(listSalas().then(({ data }) => { salas.value = data || [] }).catch(() => {}))
+  pedidos.push(listCamas().then(({ data }) => { camasHoy.value = data || [] }).catch(() => {}))
   await Promise.allSettled(pedidos)
 })
+
+// ── Suelo vivo ───────────────────────────────────────────────────
+const camasHoy = ref([])
+// El riego en suelo vivo es por CAMA (el gesto real: «regar la cama A»). Si hay camas, se ofrecen
+// primero; los lotes que no están en una cama se riegan como siempre.
+function conRiego() {
+  const camas = camasHoy.value.filter(c => c.estado !== 'retirada')
+  if (!camas.length) return conLote('riego')
+  fabOpen.value = false
+  const sueltos = lotesEnPie.value.filter(l => !l.en_cama)
+  const opciones = [
+    ...camas.map(c => ({ id: `c${c.id}`, label: c.nombre, sub: `${c.sala_nombre} · ${c.lotes.length ? `${c.lotes.length} ${c.lotes.length === 1 ? 'lote' : 'lotes'}` : 'sin plantas'}`,
+                         icon: 'bi-bricks', ir: () => router.push({ path: `/m/cama-m/${c.id}`, query: { accion: 'regar' } }) })),
+    ...sueltos.map(l => ({ id: `l${l.id}`, label: nombreLote(l), sub: subLote(l), icon: 'bi-box-seam',
+                           ir: () => router.push({ path: `/m/lote-m/${l.id}`, query: { accion: 'riego' } }) })),
+  ]
+  if (opciones.length === 1) return opciones[0].ir()
+  eleccion.value = { titulo: '¿Qué regaste?', opciones }
+  eleccionOpen.value = true
+}
+function conCama(accion) {
+  fabOpen.value = false
+  const camas = camasHoy.value.filter(c => c.estado !== 'retirada')
+  const ir = (c) => router.push({ path: `/m/cama-m/${c.id}`, query: { accion } })
+  // Con una sola cama en uso, derecho a esa: es la que se alimenta.
+  const enUso = camas.filter(c => c.estado === 'en_uso')
+  if (camas.length === 1) return ir(camas[0])
+  if (enUso.length === 1 && camas.length === enUso.length) return ir(enUso[0])
+  eleccion.value = {
+    titulo: '¿Qué cama?',
+    opciones: camas.map(c => ({ id: c.id, label: c.nombre, sub: `${c.sala_nombre} · ${c.estado_label}`, icon: 'bi-bricks', ir: () => ir(c) })),
+  }
+  eleccionOpen.value = true
+}
 
 const eleccionOpen = ref(false)
 const eleccion     = ref(null)   // { titulo, opciones: [{ id, label, sub, icon, ir }] }

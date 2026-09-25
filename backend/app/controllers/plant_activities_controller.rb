@@ -38,6 +38,12 @@ class PlantActivitiesController < ApplicationController
       occurred_at:   Time.current
     )
 
+    # Suelo vivo: una planta de un lote plantado en una cama no se trasplanta más.
+    if activity.activity_type == 'transplant' && @plant.lote&.en_cama?
+      return render json: { error: "La planta está en la #{@plant.lote.cama.nombre}: en la cama no hay trasplantes." },
+                    status: :unprocessable_entity
+    end
+
     # Actualizar campos denormalizados en la planta
     if activity.activity_type == 'registro_planta' && activity.metadata.present?
       meta = activity.metadata

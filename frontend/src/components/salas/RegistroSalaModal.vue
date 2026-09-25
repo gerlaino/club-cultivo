@@ -105,7 +105,10 @@
                   <span>{{ getAccion(accionId)?.emoji }} {{ getAccion(accionId)?.label }}</span>
                 </div>
                 <div class="rls__seccion-body">
-                  <RiegoForm     v-if="accionId === 'riego'"     v-model="formData.riego" />
+                  <p v-if="accionId === 'riego' && sala?.camas?.length" class="rsm__cama-hint">
+                    🧱 En suelo vivo el riego va por cama: para regar una sola, «Regar» en su tarjeta. Esto riega todos los lotes del {{ esPersonal ? 'espacio' : 'cuarto' }}.
+                  </p>
+                  <RiegoForm     v-if="accionId === 'riego'"     v-model="formData.riego" :suelo-vivo="todoEnCamas" />
                   <PodaForm      v-if="accionId === 'poda'"      v-model="formData.poda" :total-plantas="sala?.plantas_totales" />
                   <PlagasForm    v-if="accionId === 'plagas'"    v-model="formData.plagas" />
                   <AmbientalForm v-if="accionId === 'ambiental'" v-model="formData.ambiental" />
@@ -178,6 +181,12 @@ const club  = useClubStore()
 const { esPersonal } = useUsoPersonal()
 
 const voiceEnabled     = computed(() => club.data?.features?.ia)
+// Suelo vivo: si TODOS los lotes en cultivo del espacio están plantados en camas, el riego no
+// pide pH/EC (en suelo vivo no se corrigen) y pregunta el agua.
+const todoEnCamas = computed(() => {
+  const enCultivo = (props.sala?.lotes || []).filter(l => ['enraizado', 'vegetativo', 'floracion'].includes(l.estado))
+  return !!props.sala?.camas?.length && enCultivo.length > 0 && enCultivo.every(l => l.cama_id)
+})
 const contextoAsistente = computed(() => props.sala ? {
   tipo:        'sala',
   sala_id:     props.sala.id,
@@ -279,6 +288,7 @@ function buildPayload() {
   if (sel.includes('riego')) {
     const r = fd.riego
     payload.tareas_realizadas.push('riego')
+    if (r.agua)      payload.agua     = r.agua
     if (r.ph)        payload.ph       = r.ph
     if (r.ph_runoff) payload.ph_runoff = r.ph_runoff
     if (r.ec)        payload.ec        = r.ec
@@ -381,6 +391,7 @@ async function guardar() {
 </script>
 
 <style scoped>
+.rsm__cama-hint { font-size: var(--fs-12); color: var(--c-slate-600); background: var(--c-leaf-50); border-radius: var(--r-md); padding: .45rem .65rem; margin: 0 0 .6rem; }
 .rls__overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.45); backdrop-filter: blur(3px);
   display: flex; align-items: center; justify-content: center;

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_24_222357) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_25_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -106,6 +106,36 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_24_222357) do
     t.index ["deleted_by_id"], name: "index_analisis_laboratorio_on_deleted_by_id"
     t.index ["genetica_id"], name: "index_analisis_laboratorio_on_genetica_id"
     t.index ["lote_id"], name: "index_analisis_laboratorio_on_lote_id"
+  end
+
+  create_table "analisis_suelo", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "cama_id", null: false
+    t.bigint "user_id", null: false
+    t.date "fecha", null: false
+    t.string "laboratorio"
+    t.decimal "ph", precision: 4, scale: 2
+    t.decimal "ce", precision: 6, scale: 2
+    t.decimal "materia_organica_pct", precision: 5, scale: 2
+    t.decimal "nitrogeno_pct", precision: 6, scale: 3
+    t.decimal "fosforo_ppm", precision: 8, scale: 2
+    t.decimal "potasio_ppm", precision: 8, scale: 2
+    t.decimal "calcio_ppm", precision: 8, scale: 2
+    t.decimal "magnesio_ppm", precision: 8, scale: 2
+    t.decimal "cic", precision: 6, scale: 2
+    t.decimal "relacion_cn", precision: 6, scale: 2
+    t.decimal "plomo_ppm", precision: 8, scale: 3
+    t.decimal "cadmio_ppm", precision: 8, scale: 3
+    t.decimal "arsenico_ppm", precision: 8, scale: 3
+    t.decimal "mercurio_ppm", precision: 8, scale: 3
+    t.text "notas"
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["cama_id"], name: "index_analisis_suelo_on_cama_id"
+    t.index ["club_id"], name: "index_analisis_suelo_on_club_id"
+    t.index ["deleted_at"], name: "index_analisis_suelo_on_deleted_at"
+    t.index ["user_id"], name: "index_analisis_suelo_on_user_id"
   end
 
   create_table "aplicacion_planes", force: :cascade do |t|
@@ -336,6 +366,77 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_24_222357) do
     t.index ["club_id"], name: "index_caja_turnos_on_club_id"
     t.index ["punto_type", "punto_id"], name: "index_caja_turnos_activa_por_punto", unique: true, where: "((estado)::text = ANY (ARRAY[('abierta'::character varying)::text, ('pendiente_cierre'::character varying)::text]))"
     t.index ["sede_id"], name: "index_caja_turnos_on_sede_id"
+  end
+
+  create_table "cama_ciclos", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "cama_id", null: false
+    t.integer "numero", null: false
+    t.date "desde", null: false
+    t.date "hasta"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["cama_id", "numero"], name: "index_cama_ciclos_on_cama_id_and_numero", unique: true
+    t.index ["cama_id"], name: "index_cama_ciclos_on_cama_id"
+    t.index ["club_id"], name: "index_cama_ciclos_on_club_id"
+  end
+
+  create_table "cama_registros", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "cama_id", null: false
+    t.bigint "cama_ciclo_id"
+    t.bigint "user_id", null: false
+    t.bigint "receta_id"
+    t.string "tipo", null: false
+    t.datetime "registrado_en", null: false
+    t.boolean "recarga", default: false, null: false
+    t.string "detalle"
+    t.decimal "cantidad", precision: 10, scale: 2
+    t.string "unidad"
+    t.decimal "litros", precision: 8, scale: 2
+    t.string "agua"
+    t.decimal "humedad_suelo", precision: 5, scale: 1
+    t.decimal "temperatura_suelo", precision: 5, scale: 1
+    t.jsonb "nutricion"
+    t.text "observaciones"
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["cama_ciclo_id"], name: "index_cama_registros_on_cama_ciclo_id"
+    t.index ["cama_id", "registrado_en"], name: "index_cama_registros_on_cama_id_and_registrado_en"
+    t.index ["cama_id"], name: "index_cama_registros_on_cama_id"
+    t.index ["club_id"], name: "index_cama_registros_on_club_id"
+    t.index ["deleted_at"], name: "index_cama_registros_on_deleted_at"
+    t.index ["receta_id"], name: "index_cama_registros_on_receta_id"
+    t.index ["user_id"], name: "index_cama_registros_on_user_id"
+  end
+
+  create_table "camas", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "sala_id", null: false
+    t.bigint "created_by_id"
+    t.string "nombre", null: false
+    t.decimal "largo_m", precision: 6, scale: 2
+    t.decimal "ancho_m", precision: 6, scale: 2
+    t.decimal "profundidad_cm", precision: 6, scale: 1
+    t.date "armada_el"
+    t.integer "semanas_coccion"
+    t.date "cocina_hasta"
+    t.integer "dias_descanso"
+    t.integer "frecuencia_top_dress_dias"
+    t.date "descansa_desde"
+    t.date "descansa_hasta"
+    t.date "retirada_el"
+    t.jsonb "mezcla"
+    t.text "notas"
+    t.datetime "deleted_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_camas_on_club_id"
+    t.index ["created_by_id"], name: "index_camas_on_created_by_id"
+    t.index ["deleted_at"], name: "index_camas_on_deleted_at"
+    t.index ["sala_id", "nombre"], name: "index_camas_nombre_unico_por_sala", unique: true, where: "(deleted_at IS NULL)"
+    t.index ["sala_id"], name: "index_camas_on_sala_id"
   end
 
   create_table "categorias_contables", force: :cascade do |t|
@@ -1165,6 +1266,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_24_222357) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.bigint "registro_ambiental_id"
+    t.bigint "cama_id"
+    t.bigint "cama_registro_id"
+    t.index ["cama_id"], name: "index_insumo_consumos_on_cama_id"
+    t.index ["cama_registro_id"], name: "index_insumo_consumos_on_cama_registro_id"
     t.index ["club_id", "lote_id"], name: "index_insumo_consumos_on_club_id_and_lote_id"
     t.index ["club_id"], name: "index_insumo_consumos_on_club_id"
     t.index ["created_by_id"], name: "index_insumo_consumos_on_created_by_id"
@@ -1372,6 +1477,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_24_222357) do
     t.integer "dias_ciclo_objetivo"
     t.decimal "m2_ocupados", precision: 8, scale: 2
     t.string "metodo_enraizado"
+    t.bigint "cama_id"
+    t.bigint "cama_ciclo_id"
+    t.index ["cama_ciclo_id"], name: "index_lotes_on_cama_ciclo_id"
+    t.index ["cama_id"], name: "index_lotes_on_cama_id"
     t.index ["club_id"], name: "index_lotes_on_club_id"
     t.index ["codigo"], name: "index_lotes_on_codigo"
     t.index ["codigo_qr"], name: "index_lotes_on_codigo_qr", unique: true, where: "(codigo_qr IS NOT NULL)"
@@ -1909,6 +2018,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_24_222357) do
     t.datetime "deleted_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "uso", default: "riego", null: false
     t.index ["club_id", "nombre"], name: "index_recetas_on_club_id_and_nombre"
     t.index ["club_id"], name: "index_recetas_on_club_id"
     t.index ["created_by_id"], name: "index_recetas_on_created_by_id"
@@ -1953,6 +2063,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_24_222357) do
     t.bigint "receta_id"
     t.decimal "litros", precision: 8, scale: 2
     t.jsonb "nutricion"
+    t.string "agua"
     t.index ["club_id"], name: "index_registros_ambientales_on_club_id"
     t.index ["lote_id"], name: "index_registros_ambientales_on_lote_id"
     t.index ["receta_id"], name: "index_registros_ambientales_on_receta_id"
@@ -2516,6 +2627,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_24_222357) do
   add_foreign_key "analisis_laboratorio", "geneticas"
   add_foreign_key "analisis_laboratorio", "lotes"
   add_foreign_key "analisis_laboratorio", "users", column: "deleted_by_id"
+  add_foreign_key "analisis_suelo", "camas"
+  add_foreign_key "analisis_suelo", "clubs"
+  add_foreign_key "analisis_suelo", "users"
   add_foreign_key "aplicacion_planes", "clubs"
   add_foreign_key "aplicacion_planes", "plan_trabajos"
   add_foreign_key "aplicacion_planes", "users", column: "aplicado_por_id"
@@ -2561,6 +2675,16 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_24_222357) do
   add_foreign_key "caja_turnos", "users", column: "apertura_confirmada_por_id"
   add_foreign_key "caja_turnos", "users", column: "cerrada_por_id"
   add_foreign_key "caja_turnos", "users", column: "cierre_solicitado_por_id"
+  add_foreign_key "cama_ciclos", "camas"
+  add_foreign_key "cama_ciclos", "clubs"
+  add_foreign_key "cama_registros", "cama_ciclos"
+  add_foreign_key "cama_registros", "camas"
+  add_foreign_key "cama_registros", "clubs"
+  add_foreign_key "cama_registros", "recetas"
+  add_foreign_key "cama_registros", "users"
+  add_foreign_key "camas", "clubs"
+  add_foreign_key "camas", "salas"
+  add_foreign_key "camas", "users", column: "created_by_id"
   add_foreign_key "categorias_contables", "categorias_contables", column: "parent_id"
   add_foreign_key "categorias_contables", "clubs"
   add_foreign_key "categorias_contables", "sedes"
@@ -2677,6 +2801,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_24_222357) do
   add_foreign_key "insumo_compras", "insumos"
   add_foreign_key "insumo_compras", "movimientos_contables", column: "movimiento_contable_id"
   add_foreign_key "insumo_compras", "users", column: "created_by_id"
+  add_foreign_key "insumo_consumos", "cama_registros"
+  add_foreign_key "insumo_consumos", "camas"
   add_foreign_key "insumo_consumos", "clubs"
   add_foreign_key "insumo_consumos", "insumos"
   add_foreign_key "insumo_consumos", "lotes"
@@ -2705,6 +2831,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_24_222357) do
   add_foreign_key "lote_fotos", "lotes"
   add_foreign_key "lote_fotos", "plants"
   add_foreign_key "lote_fotos", "users"
+  add_foreign_key "lotes", "cama_ciclos"
+  add_foreign_key "lotes", "camas"
   add_foreign_key "lotes", "clubs"
   add_foreign_key "lotes", "geneticas", on_delete: :nullify
   add_foreign_key "lotes", "lotes", column: "lote_origen_id"

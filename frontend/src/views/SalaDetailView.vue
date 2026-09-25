@@ -10,6 +10,8 @@ import { useClubStore } from "../stores/club"
 import ModalCargarLote        from '../components/salas/ModalCargarLote.vue'
 import ModalCrearLoteCosecha  from '../components/salas/ModalCrearLoteCosecha.vue'
 import NuevoLoteModal         from '../components/lotes/NuevoLoteModal.vue'
+import CamasSeccion           from '../components/camas/CamasSeccion.vue'
+import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
 import RegistroSalaModal      from '../components/salas/RegistroSalaModal.vue'
 import LotesTabla             from '../components/lotes/LotesTabla.vue'
 import RegistroEnraizadoModal from '../components/salas/RegistroEnraizadoModal.vue'
@@ -244,6 +246,12 @@ const salaAcciones = computed(() => {
   }
   return items
 })
+
+async function recargarConCamas() {
+  await Promise.all([salas.fetchSala(salaId), lotes.fetchBySala(salaId)])
+}
+// Lo que otro registra en una cama (o el backend al cosechar: la cama pasa a descansar) se ve acá.
+useRecargaEnCambios(['camas'], recargarConCamas)
 
 function salaEscapeHandler(e) {
   if (e.key !== 'Escape') return
@@ -949,6 +957,11 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Suelo vivo: las camas del espacio. Con plantas o sin ellas, cada una guarda su historia. -->
+      <div v-if="!esSalaManicura && (sala.camas?.length || canEdit || isCultivador)" class="sd__camas">
+        <CamasSeccion :sala="sala" @cambio="recargarConCamas" />
       </div>
 
       <!-- Tabs -->
@@ -1689,6 +1702,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 .sd__cam-empty { color: var(--c-slate-400); font-size: .8rem; font-style: italic; text-align: center; padding: .5rem 0; }
 
 /* ── Tabs ─────────────────────────────────────────────────── */
+.sd__camas { margin: 0 0 1.25rem; }
 .sd__tabs { display: flex; gap: .4rem; margin-bottom: 1rem; }
 .sd__tab {
   padding: .45rem 1rem; background: #f4f8f4; border: 1.5px solid #d4e6d4;

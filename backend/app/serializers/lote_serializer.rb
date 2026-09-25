@@ -115,6 +115,17 @@ class LoteSerializer
       strain:             lote.strain,
       notes:              lote.notes,
       grow_type:                 lote.grow_type,
+      # Suelo vivo: en una cama el método es «suelo vivo» (sale de la cama, no se tipea) y NO hay
+      # maceta ni trasplante. La pantalla esconde lo que no aplica mirando `en_cama`.
+      metodo_cultivo:            lote.metodo_cultivo,
+      en_cama:                   lote.en_cama?,
+      cama:                      (c = lote.cama) && {
+        id: c.id, nombre: c.nombre, estado: c.estado, m2: c.m2&.to_f, sala_id: c.sala_id,
+        ciclo_numero: lote.cama_ciclo&.numero,
+      },
+      # Plantado en una cama, el lote no se muda: para pasar a floración cambia la fase del ESPACIO
+      # (con todos sus lotes). La pantalla lleva a «Cambiar fase del espacio» en vez de avanzar.
+      avanza_con_el_espacio:     avanza_con_el_espacio?(lote, proxima_fase),
       metodo_enraizado:          lote.metodo_enraizado,
       # Lo que el formulario de trasplante trae marcado (la regla vive en el modelo).
       medio_al_trasplantar:      lote.medio_al_trasplantar,
@@ -229,6 +240,8 @@ class LoteSerializer
       end
 
       salas_base = lote.club.salas.activas
+      # En una cama el lote no se muda: la única «sala destino» es la suya.
+      salas_base = salas_base.where(id: lote.cama.sala_id) if lote.en_cama?
       salas_base = case proxima_fase
         when 'cosecha'    then salas_base.where('tipo = ? OR kind = ?', 'cosecha', 'cosecha')
         when 'vegetativo' then salas_base.where('tipo = ? OR kind = ?', 'vegetativo', 'vegetativo')
@@ -251,5 +264,14 @@ class LoteSerializer
     end
 
     result
+  end
+
+  # En una cama, si la fase siguiente no la admite el espacio (floración en una sala de vege), lo
+  # que se da vuelta es el espacio. La regla de qué admite cada sala es la del modelo.
+  def self.avanza_con_el_espacio?(lote, proxima_fase)
+    return false unless lote.en_cama? && proxima_fase.present? && lote.sala
+    permitidos = Lote.kinds_sala_para(proxima_fase, automatica: lote.automatica?)
+    kind = lote.sala.kind.presence || lote.sala.tipo
+    permitidos.present? && kind.present? && !permitidos.include?(kind)
   end
 end

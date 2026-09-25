@@ -10,7 +10,8 @@ module Analitica
   class DondeYComo
     # `receta`: con qué receta de nutrientes se regó más veces cada lote (20-sep-2026). Es la
     # pregunta que hace un cultivador: «¿con qué receta rindió más?».
-    CORTES   = %w[sala metodo luz receta].freeze
+    # `cama`: suelo vivo — la misma cama, cosecha tras cosecha, y cama contra cama (25-sep-2026).
+    CORTES   = %w[sala metodo luz receta cama].freeze
     AMBIENTE = %w[temperatura humedad vpd].freeze
 
     def initialize(universo, corte: 'sala')
@@ -34,6 +35,9 @@ module Analitica
           plantas:      cosech,
           gramos:       gramos.round(1),
           g_por_planta: cosech.positive? ? (gramos / cosech).round(1) : nil,
+          # g/m² de los lotes que saben sus metros (suma ÷ suma). En suelo vivo es LA comparación:
+          # el techo lo pone la cama, no la cantidad de plantas.
+          g_m2:         g_m2_de(ls),
           floracion_dias: flo.any? ? (flo.sum / flo.size).round(0) : nil,
           ambiente:     amb,
           # Lo gastado en nutrientes con receta, por planta cosechada.
@@ -55,10 +59,18 @@ module Analitica
     def clave(l)
       case @corte
       when 'sala'   then @u.floracion[l.id][:sala_id]
-      when 'metodo' then l.grow_type.presence
+      # El método sale de la cama para los lotes en cama (suelo vivo): no se tipea.
+      when 'metodo' then l.metodo_cultivo
+      when 'cama'   then l.cama_id
       when 'luz'    then l.light_type.presence
       when 'receta' then receta_principal(l)&.first
       end
+    end
+
+    def g_m2_de(ls)
+      con_m2 = ls.select { |l| l.rendimiento_real_g.to_f.positive? && l.m2_efectivos.to_f.positive? }
+      return nil if con_m2.empty?
+      (con_m2.sum { |l| l.rendimiento_real_g.to_f } / con_m2.sum { |l| l.m2_efectivos.to_f }).round(1)
     end
 
     # La receta con la que más veces se regó el lote: [id, nombre]. Nil si nunca aplicó una.
@@ -82,6 +94,7 @@ module Analitica
       case @corte
       when 'sala'   then @u.floracion[ls.first.id][:sala]
       when 'receta' then receta_principal(ls.first)&.last || 'Sin receta'
+      when 'cama'   then (c = Cama.unscoped.find_by(id: clave)) ? "#{c.nombre} · #{c.sala&.nombre}" : 'Cama'
       else clave.to_s.tr('_', ' ').capitalize
       end
     end

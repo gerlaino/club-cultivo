@@ -194,6 +194,9 @@ const visibleTabs = computed(() =>
   (activeGroup.value.tabs || []).filter(t => entradaVisible(t, club.data))
 )
 function isTabActive(t) {
+  // Una pantalla alias del grupo (la ficha de una cama) resalta la pestaña a la que pertenece.
+  const alias = (activeGroup.value.alias || []).find(a => route.path === a.to || route.path.startsWith(a.to + '/'))
+  if (alias) return t.to === alias.tab
   let best = null, len = -1
   for (const x of visibleTabs.value) {
     if ((route.path === x.to || route.path.startsWith(x.to + '/')) && x.to.length > len) {

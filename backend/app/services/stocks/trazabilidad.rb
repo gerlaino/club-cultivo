@@ -76,6 +76,8 @@ module Stocks
           genetica: lote.genetica && genetica_payload(lote.genetica),
         },
         aplicaciones:         Lotes::ResumenAplicaciones.new(lote).call,
+        # Suelo vivo: del frasco a la cama y a todo lo que se le puso (nil sin cama).
+        suelo:                Lotes::Suelo.new(lote).call,
         analisis_laboratorio: analisis(lote),
         pesada:               pesada_payload,
         plantas:              plantas,

@@ -85,6 +85,13 @@
               </table>
             </div>
 
+            <!-- Suelo vivo: en una cama no hay trasplantes y el suelo se alimenta aparte, así que
+                 esas tareas del plan no se crean (y se dice cuántas y por qué). -->
+            <p v-if="preview.omitidas?.length" class="apm__hint">
+              {{ preview.omitidas.length }} {{ preview.omitidas.length === 1 ? 'tarea no aplica' : 'tareas no aplican' }}
+              ({{ [...new Set(preview.omitidas.map(t => t.tipo === 'trasplante' ? 'trasplantes' : 'fertilizaciones'))].join(' y ') }}):
+              {{ preview.motivo_omitidas }}.
+            </p>
             <p v-if="preview.total === 0" class="apm__hint apm__hint--warn">
               El plan no generó tareas para este lote. Verificá que tenga plan-tareas configuradas.
             </p>

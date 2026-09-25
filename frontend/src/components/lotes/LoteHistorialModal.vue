@@ -16,6 +16,7 @@
             v-else
             :medio-sugerido="lote?.medio_al_trasplantar || lote?.grow_type || 'sustrato'"
             :metodo-enraizado="lote?.estado === 'enraizado' ? lote?.metodo_enraizado : null"
+            :en-cama="!!lote?.en_cama"
             @crear="(p) => { $emit('crear', p); formAbierto = false }"
             @trasplante="(p) => { $emit('trasplante', p); formAbierto = false }"
             @cancelar="formAbierto = false"

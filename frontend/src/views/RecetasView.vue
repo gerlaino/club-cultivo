@@ -72,7 +72,7 @@
     <!-- ── Recetas ── -->
     <div v-if="cargando" class="rc__empty"><DsSpinner :size="18" /></div>
     <div v-else-if="!recetas.length" class="rc__card rc__empty">
-      Ninguna receta todavía. Una receta es la mezcla que usás para una fase: qué productos y cuánto por litro. Al regar la aplicás con los litros que preparaste.
+      Ninguna receta todavía. Una receta dice qué productos y cuánto: por litro de agua (riego o té), por m² (top dress de una cama de suelo vivo) o por litro de tierra (la mezcla para armar una cama).
     </div>
     <div v-else class="rc__grid">
       <article v-for="r in recetas" :key="r.id" class="rc__receta" :class="{ 'rc__receta--off': !r.activa }">
@@ -80,6 +80,7 @@
           <div>
             <h3 class="rc__receta-nombre">{{ r.nombre }}</h3>
             <div class="rc__receta-meta">
+              <span v-if="r.uso && r.uso !== 'riego'" class="rc__chip rc__chip--uso">{{ r.uso_label }}</span>
               <span v-if="r.fase_label" class="rc__chip">{{ r.fase_label }}</span>
               <span v-if="r.ph_objetivo" class="rc__chip rc__chip--soft">pH {{ r.ph_objetivo }}</span>
               <span v-if="r.ec_objetivo" class="rc__chip rc__chip--soft">EC {{ r.ec_objetivo }}</span>
@@ -97,9 +98,9 @@
         </ul>
         <!-- Calculadora: para cuántos litros -->
         <div class="rc__calc">
-          <label>Para <input type="number" min="0" step="0.5" class="rc__calc-input" v-model.number="litrosPor[r.id]" placeholder="20" /> L</label>
+          <label>Para <input type="number" min="0" step="0.5" class="rc__calc-input" v-model.number="litrosPor[r.id]" :placeholder="r.uso === 'top_dress' ? '1' : r.uso === 'mezcla' ? '300' : '20'" /> {{ r.base_unidad || 'L' }}</label>
           <span v-if="litrosPor[r.id]" class="rc__calc-res">
-            <template v-for="(it, i) in r.items" :key="it.id">{{ i ? ' · ' : '' }}{{ it.nombre }} {{ num(Number(it.dosis) * litrosPor[r.id]) }} {{ it.unidad_insumo === 'gramo' ? 'g' : 'ml' }}</template>
+            <template v-for="(it, i) in r.items" :key="it.id">{{ i ? ' · ' : '' }}{{ it.nombre }} {{ num(Number(it.dosis) * litrosPor[r.id] * (Number(it.factor) || 1)) }} {{ u(it.unidad_insumo) }}</template>
           </span>
         </div>
         <p v-if="r.notas" class="rc__notas">{{ r.notas }}</p>
@@ -117,24 +118,35 @@
           </div>
           <div class="rc__modal-body">
             <div v-if="formError" class="rc__error">{{ formError }}</div>
+            <!-- Para qué es: el agua del riego (y los tés), el top dress de una cama de suelo vivo
+                 (por m²) o la mezcla con la que se arma una cama (por litro de tierra). Cada uno
+                 con sus unidades: la regla la manda el backend en /me. -->
+            <div class="rc__field">
+              <span class="rc__label">¿Para qué es?</span>
+              <div class="rc__usos">
+                <button v-for="uso in usos" :key="uso" type="button" class="rc__uso" :class="{ 'rc__uso--on': form.uso === uso }"
+                        :disabled="!!form.id && form.uso !== uso" @click="elegirUso(uso)">{{ reglas.usos_receta_labels[uso] }}</button>
+              </div>
+              <span v-if="form.id" class="rc__hint">El uso no se cambia en una receta que ya existe: duplicala.</span>
+            </div>
             <div class="rc__row">
               <label class="rc__field rc__field--grow">
                 <span class="rc__label">Nombre</span>
                 <input v-model.trim="form.nombre" class="rc__input" placeholder="Vege semana 2" maxlength="80" />
               </label>
-              <label class="rc__field">
+              <label v-if="form.uso !== 'mezcla'" class="rc__field">
                 <span class="rc__label">Fase</span>
                 <select v-model="form.fase" class="rc__input">
                   <option value="">—</option>
                   <option value="vegetativo">Vegetativo</option>
                   <option value="floracion">Floración</option>
-                  <option value="lavado">Lavado</option>
+                  <option v-if="form.uso === 'riego'" value="lavado">Lavado</option>
                   <option value="otra">Otra</option>
                 </select>
               </label>
             </div>
             <div class="rc__field">
-              <span class="rc__label">Productos y dosis por litro</span>
+              <span class="rc__label">Productos y dosis {{ form.uso === 'top_dress' ? 'por m²' : form.uso === 'mezcla' ? 'por litro de tierra' : 'por litro' }}</span>
               <div v-for="(it, i) in form.items" :key="i" class="rc__item-row">
                 <select v-model="it.insumo_id" class="rc__input rc__input--grow">
                   <option value="" disabled>{{ esPersonal ? 'Nutriente' : 'Producto del depósito' }}</option>
@@ -142,15 +154,14 @@
                 </select>
                 <input v-model.number="it.dosis" type="number" step="0.01" min="0" class="rc__input rc__input--num" placeholder="2" />
                 <select v-model="it.unidad" class="rc__input rc__input--u">
-                  <option value="ml_l">ml/L</option>
-                  <option value="g_l">g/L</option>
+                  <option v-for="un in unidadesDelUso" :key="un" :value="un">{{ reglas.unidad_labels[un] }}</option>
                 </select>
                 <button type="button" class="rc__icon" @click="quitarItem(i)"><i class="bi bi-x"></i></button>
               </div>
               <button type="button" class="rc__link" @click="agregarItem"><i class="bi bi-plus"></i> Agregar producto</button>
               <span v-if="!insumos.length" class="rc__hint">{{ esPersonal ? 'Primero cargá un nutriente (arriba).' : 'Primero cargá los productos en el depósito.' }}</span>
             </div>
-            <div class="rc__row">
+            <div v-if="form.uso === 'riego'" class="rc__row">
               <label class="rc__field">
                 <span class="rc__label">pH objetivo <span class="rc__opt">opcional</span></span>
                 <input v-model.number="form.ph_objetivo" type="number" step="0.1" min="0" max="14" class="rc__input" placeholder="6.0" />
@@ -184,8 +195,20 @@
             <button class="rc__x" @click="uso = null"><i class="bi bi-x-lg"></i></button>
           </div>
           <div class="rc__modal-body">
-            <p v-if="!uso.uso.lotes.length" class="rc__hint">Todavía no se aplicó en ningún riego.</p>
-            <template v-else>
+            <p v-if="!uso.uso.lotes.length && !uso.uso.camas?.length" class="rc__hint">Todavía no se aplicó.</p>
+            <!-- Suelo vivo: las camas donde se aplicó (top dress, mezcla, té al suelo). -->
+            <template v-if="uso.uso.camas?.length">
+              <table class="rc__table">
+                <thead><tr><th>Cama</th><th>Aplicaciones</th><th>$ en la cama</th></tr></thead>
+                <tbody>
+                  <tr v-for="c in uso.uso.camas" :key="c.id">
+                    <td><RouterLink :to="`/camas/${c.id}`">{{ c.nombre }}</RouterLink></td>
+                    <td>{{ c.aplicaciones }}</td><td>{{ formatARS(c.costo_ars) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </template>
+            <template v-if="uso.uso.lotes.length">
               <p class="rc__hint">{{ uso.uso.aplicaciones }} aplicaciones · {{ formatARS(uso.uso.costo_total_ars) }} en total</p>
               <table class="rc__table">
                 <thead><tr><th>Lote</th><th>Estado</th><th>Riegos</th><th>Litros</th><th>$ nutrientes</th><th>$ / planta</th></tr></thead>
@@ -223,7 +246,9 @@
                 <span class="rc__label">Se mide en</span>
                 <select v-model="nutForm.unidad_medida" class="rc__input">
                   <option value="mililitro">mililitros (líquido)</option>
+                  <option value="litro">litros (bidón, humus, té)</option>
                   <option value="gramo">gramos (polvo)</option>
+                  <option value="kilogramo">kilos (bolsas de harina, enmiendas)</option>
                 </select>
               </label>
               <label class="rc__field">
@@ -233,7 +258,7 @@
             </template>
             <div class="rc__row">
               <label class="rc__field">
-                <span class="rc__label">{{ nutForm.id ? 'Cuánto compraste' : 'Cuánto tenés' }} ({{ nutForm.unidad_medida === 'gramo' ? 'g' : 'ml' }})</span>
+                <span class="rc__label">{{ nutForm.id ? 'Cuánto compraste' : 'Cuánto tenés' }} ({{ u(nutForm.unidad_medida) }})</span>
                 <input v-model.number="nutForm.cantidad" type="number" min="0" step="1" class="rc__input" placeholder="1000" />
               </label>
               <label class="rc__field">
@@ -339,6 +364,7 @@ import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
 import { formatARS } from '../lib/formatters.js'
 import { listRecetas, getReceta, createReceta, updateReceta, listInsumos, createInsumo, comprarInsumo, updateInsumo, reconteoInsumo, deleteInsumo } from '../lib/api.js'
 import { useConfirm } from '../composables/useConfirm.js'
+import { reglasSueloVivo } from '../lib/camas.js'
 
 const toast = useToast()
 const { confirm } = useConfirm()
@@ -370,29 +396,39 @@ useRecargaEnCambios(['recetas', 'stocks'], cargar)
 const form = ref(null)
 const formError = ref(null)
 const guardando = ref(false)
-const vacio = () => ({ id: null, nombre: '', fase: '', ph_objetivo: null, ec_objetivo: null, notas: '', items: [{ insumo_id: '', dosis: null, unidad: 'ml_l' }] })
+const reglas = reglasSueloVivo()
+const usos = reglas.usos_receta
+const unidadesDelUso = computed(() => reglas.unidades_por_uso[form.value?.uso || 'riego'] || ['ml_l', 'g_l'])
+function elegirUso(uso) {
+  form.value.uso = uso
+  const ok = reglas.unidades_por_uso[uso] || []
+  form.value.items.forEach(it => { if (!ok.includes(it.unidad)) it.unidad = ok[0] })
+  if (uso !== 'riego') { form.value.ph_objetivo = null; form.value.ec_objetivo = null }
+  if (uso === 'mezcla') form.value.fase = ''
+}
+const vacio = () => ({ id: null, uso: 'riego', nombre: '', fase: '', ph_objetivo: null, ec_objetivo: null, notas: '', items: [{ insumo_id: '', dosis: null, unidad: 'ml_l' }] })
 function nueva() { formError.value = null; form.value = vacio() }
 function editar(r) {
   formError.value = null
-  form.value = { id: r.id, nombre: r.nombre, fase: r.fase || '', ph_objetivo: r.ph_objetivo, ec_objetivo: r.ec_objetivo, notas: r.notas || '',
+  form.value = { id: r.id, uso: r.uso || 'riego', nombre: r.nombre, fase: r.fase || '', ph_objetivo: r.ph_objetivo, ec_objetivo: r.ec_objetivo, notas: r.notas || '',
                  items: r.items.map(it => ({ id: it.id, insumo_id: it.insumo_id, dosis: Number(it.dosis), unidad: it.unidad })) }
 }
 function duplicar(r) {
   formError.value = null
-  form.value = { ...vacio(), nombre: `${r.nombre} (copia)`, fase: r.fase || '', ph_objetivo: r.ph_objetivo, ec_objetivo: r.ec_objetivo, notas: r.notas || '',
+  form.value = { ...vacio(), uso: r.uso || 'riego', nombre: `${r.nombre} (copia)`, fase: r.fase || '', ph_objetivo: r.ph_objetivo, ec_objetivo: r.ec_objetivo, notas: r.notas || '',
                  items: r.items.map(it => ({ insumo_id: it.insumo_id, dosis: Number(it.dosis), unidad: it.unidad })) }
 }
-function agregarItem() { form.value.items.push({ insumo_id: '', dosis: null, unidad: 'ml_l' }) }
+function agregarItem() { form.value.items.push({ insumo_id: '', dosis: null, unidad: unidadesDelUso.value[0] }) }
 function quitarItem(i) { const it = form.value.items[i]; if (it.id) { it._destroy = true; form.value.items = form.value.items.filter(x => x !== it).concat([it]) } else form.value.items.splice(i, 1) }
 function cerrar() { form.value = null }
 async function guardar() {
   formError.value = null
   const vivos = form.value.items.filter(it => !it._destroy)
   if (!form.value.nombre) { formError.value = 'Ponele un nombre'; return }
-  if (!vivos.length || vivos.some(it => !it.insumo_id || !it.dosis)) { formError.value = 'Cada producto lleva su dosis por litro'; return }
+  if (!vivos.length || vivos.some(it => !it.insumo_id || !it.dosis)) { formError.value = 'Cada producto lleva su dosis'; return }
   guardando.value = true
   try {
-    const payload = { nombre: form.value.nombre, fase: form.value.fase || null, ph_objetivo: form.value.ph_objetivo || null, ec_objetivo: form.value.ec_objetivo || null, notas: form.value.notas || null,
+    const payload = { uso: form.value.uso || 'riego', nombre: form.value.nombre, fase: form.value.fase || null, ph_objetivo: form.value.ph_objetivo || null, ec_objetivo: form.value.ec_objetivo || null, notas: form.value.notas || null,
                       receta_items_attributes: form.value.items.map((it, i) => ({ id: it.id, insumo_id: it.insumo_id, dosis: it.dosis, unidad: it.unidad, orden: i, _destroy: it._destroy || false })) }
     if (form.value.id) await updateReceta(form.value.id, payload); else await createReceta(payload)
     toast.success(form.value.id ? 'Receta guardada' : 'Receta creada')
@@ -560,6 +596,11 @@ async function reactivarNutriente(i) {
 .rc__receta-head { display: flex; justify-content: space-between; gap: .5rem; align-items: flex-start; }
 .rc__receta-nombre { margin: 0; font-size: 1.05rem; font-weight: 800; }
 .rc__receta-meta { display: flex; gap: .3rem; flex-wrap: wrap; margin-top: .3rem; }
+.rc__chip--uso { background: var(--c-amber-100) !important; color: var(--c-slate-900) !important; }
+.rc__usos { display: flex; flex-wrap: wrap; gap: .4rem; }
+.rc__uso { padding: .4rem .8rem; border: 1.5px solid var(--c-slate-200); border-radius: var(--r-md); background: var(--c-slate-50); font-size: var(--fs-13); font-weight: 600; color: var(--c-slate-600); cursor: pointer; }
+.rc__uso--on { border-color: var(--c-leaf-700); background: var(--c-leaf-50); color: var(--c-leaf-800); }
+.rc__uso:disabled { opacity: .45; cursor: not-allowed; }
 .rc__chip { background: var(--c-leaf-100, #E5EFE9); color: var(--c-leaf-800); border-radius: 999px; padding: .1rem .55rem; font-size: .72rem; font-weight: 700; }
 .rc__chip--soft { background: var(--c-ink-100); color: var(--c-ink-700); }
 .rc__chip--off { background: #fee2e2; color: #991b1b; }

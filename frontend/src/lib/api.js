@@ -185,6 +185,29 @@ export const registrarTrasplante = (id, payload) => api.post(`/lotes/${id}/regis
 // ahí no son el mismo grupo: cambia el riego, la frecuencia y el próximo trasplante.
 export const desprenderLote = (id, payload) => api.post(`/lotes/${id}/desprender`, payload);
 export const deleteLote = (id) => api.delete(`/lotes/${id}`);
+// Suelo vivo: el último trasplante, a una cama (si enraizaba, prende).
+export const plantarEnCama = (id, payload) => api.post(`/lotes/${id}/plantar_en_cama`, payload);
+
+// -------- CAMAS (suelo vivo) --------
+// La cama vive más que los lotes: se arma con su mezcla, se alimenta, descansa entre cosechas.
+export const listCamas          = (params = {})      => api.get('/camas', { params })
+export const getCama            = (id)               => api.get(`/camas/${id}`)
+export const createCama         = (payload, mezcla)  => api.post('/camas', { cama: payload, mezcla: mezcla || undefined })
+export const updateCama         = (id, payload)      => api.patch(`/camas/${id}`, { cama: payload })
+export const deleteCama         = (id)               => api.delete(`/camas/${id}`)
+// { dias } | { hasta } | { sin_fecha: true } — los días los decide el cultivador cada vez.
+export const descansarCama      = (id, payload)      => api.post(`/camas/${id}/descansar`, payload)
+export const terminarDescansoCama = (id)             => api.post(`/camas/${id}/terminar_descanso`)
+export const terminarCoccionCama  = (id)             => api.post(`/camas/${id}/terminar_coccion`)
+export const retirarCama        = (id)               => api.post(`/camas/${id}/retirar`)
+// Riego por cama: con plantas va a cada lote; descansando, a la cama.
+export const regarCama          = (id, payload)      => api.post(`/camas/${id}/regar`, payload)
+export const listRegistrosCama  = (id, params = {})  => api.get(`/camas/${id}/registros`, { params })
+export const createRegistroCama = (id, registro, nutricion) => api.post(`/camas/${id}/registros`, { registro, nutricion: nutricion || undefined })
+export const deleteRegistroCama = (id, registroId)   => api.delete(`/camas/${id}/registros/${registroId}`)
+export const listAnalisisSuelo  = (id)               => api.get(`/camas/${id}/analisis`)
+export const createAnalisisSuelo = (id, formData)    => api.post(`/camas/${id}/analisis`, formData, { headers: { 'Content-Type': 'multipart/form-data' } })
+export const deleteAnalisisSuelo = (id, analisisId)  => api.delete(`/camas/${id}/analisis/${analisisId}`)
 export const getLoteProximoCodigo = () => api.get('/lotes/proximo_codigo')
 export const createLoteHeredado = (salaId, lotePayload, diasParams) =>
   api.post(`/salas/${salaId}/lotes`, { lote: lotePayload, heredado: true, ...diasParams })
@@ -523,7 +546,8 @@ export const createInsumo    = (payload)     => api.post('/insumos', { insumo: p
 export const updateInsumo    = (id, payload) => api.put(`/insumos/${id}`, { insumo: payload })
 export const comprarInsumo   = (id, payload) => api.post(`/insumos/${id}/comprar`, payload)
 // Recetas de nutrientes: se arman acá y se aplican al regar (`nutricion` en el registro).
-export const listRecetas     = ()            => api.get('/recetas')
+// `uso`: 'riego' (y tés) · 'top_dress' · 'mezcla'. Sin uso, todas.
+export const listRecetas     = (uso = null)  => api.get('/recetas', { params: uso ? { uso } : undefined })
 export const getReceta       = (id)          => api.get(`/recetas/${id}`)
 export const createReceta    = (payload)     => api.post('/recetas', { receta: payload })
 export const updateReceta    = (id, payload) => api.patch(`/recetas/${id}`, { receta: payload })

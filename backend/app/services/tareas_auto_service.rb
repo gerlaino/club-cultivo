@@ -29,6 +29,16 @@ class TareasAutoService
     ],
   }.freeze
 
+  # En una cama de suelo vivo, dos de las sugerencias dicen lo contrario de lo que hay que hacer:
+  # no se mide EC/pH del sustrato (el suelo no se corrige con sales) y después de cosechar NO se
+  # limpia: se corta al ras y las raíces quedan en la tierra, que es de lo que vive la cama.
+  REEMPLAZOS_EN_CAMA = {
+    'Medir EC y pH del sustrato' =>
+      { tipo: 'medicion', titulo: 'Revisar humedad del suelo y el mulch', prioridad: 'alta', dias_offset: 0 },
+    'Limpiar y preparar sala post-cosecha' =>
+      { tipo: 'limpieza', titulo: 'Cortar al ras y dejar las raíces; tapar la cama con mulch', prioridad: 'normal', dias_offset: 1 },
+  }.freeze
+
   def initialize(lote:, estado_nuevo:, user:, club:)
     @lote        = lote
     @estado      = estado_nuevo
@@ -41,6 +51,7 @@ class TareasAutoService
     return unless plantillas
     # La automática florece con la misma luz: «ajustar a 12/12» sería una tarea para hacer daño.
     plantillas = plantillas.reject { |t| t[:tipo] == 'ajuste_luz' } if @lote.automatica?
+    plantillas = plantillas.map { |t| REEMPLAZOS_EN_CAMA[t[:titulo]] || t } if @lote.en_cama?
 
     # Cultivador responsable del lote o quien disparó la transición
     asignado = @lote.sala&.responsable || @user

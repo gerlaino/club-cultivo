@@ -9,6 +9,13 @@ Ninguno se considera cerrado; todos son candidatos a revisión.
 1. **Socios/Pacientes** — alta, REPROCANN (número, vencimiento, renovaciones, críticos), documentos con firma digital, cuenta corriente, notas, mailer con historial. **El alta desde el mostrador (dispensador/supervisor) queda PENDIENTE de aprobación**: existe y se completa, pero no recibe dispensaciones ni reservas hasta que admin o médico la aprueben. El bloqueo vive en los modelos `Dispensacion` y `Reserva`, no en la UI. Un alta nace **aprobada** salvo que venga del mostrador (al revés, una importación de padrón dejaba a todos sin poder retirar).
 2. **Módulo médico** — turnos, disponibilidad, check-ins, fichas, indicaciones médicas, prescripción PDF.
 3. **Cultivo** — genéticas, lotes (estados/fases), plantas con QR, pesadas, plan de trabajo (+ generación IA), tareas (recurrentes + automáticas por fase), fotos, análisis de laboratorio.
+3b. **Suelo vivo — camas** (25-sep-2026; `docs/PLAN_SUELO_VIVO.md`, CHANGELOG (dg)) — `Cama`
+    (medidas, mezcla, cocción, descanso, retiro; estado calculado), `CamaCiclo` (de que entra el
+    primer lote a que sale el último: g/m² ciclo a ciclo), `CamaRegistro` (top dress, té al suelo,
+    cobertura, mulch, inoculación, riego en descanso, medición, nota), `AnalisisSuelo`. Recetas por
+    uso (riego · top dress · mezcla) con conversión de unidades. Pantallas: sección «Camas» del
+    espacio, ficha `/camas/:id` (= `/m/cama-m/:id`), alimentar/regar/descanso desde la cama, el lote
+    y el «+». Trazabilidad `Lotes::Suelo`.
 4. **Manicura / post-cosecha** — pesajes, flujo de aprobación admin, curado, stocks de manicura.
 5. **Stock** — por sede, movimientos, QR/etiquetas, aprobaciones pendientes.
 6. **Dispensaciones** — **multi-stock**: una dispensa abarca varias líneas (`DispensacionItem`); UI = carrito en `ModalNuevaDispensacion` (abierto desde la ficha del socio y el historial; la vista `/dispensar` se eliminó). Medios de pago (efectivo/transferencia/cuenta corriente/no abona/contra-entrega), validación de crédito, descuento sobre el total, reservas (apartar stock a futuro, **fecha ≥ mañana**; **con carrito desde el 15-sep-2026**: `ReservaItem`, misma regla que `DispensacionItem` —la fila es primera línea + suma, lo apartado se lee de las líneas—), CSV. **Edición multi-ítem** (cantidad + precio por línea) con reconciliación de stock/cc; **precio manual por ítem** (admin/sup). **Todo paciente tiene cuenta corriente** (18-sep-2026): lo que paga de más queda a favor y se descuenta solo en la próxima; deber sigue pidiendo límite. (`limite_dispensacion_mensual_g` existe en el schema pero **no es una feature en uso** — ver Dominio.)

@@ -11,6 +11,8 @@ class Sala < ApplicationRecord
   belongs_to :responsable, class_name: "User", optional: true
 
   has_many :lotes, dependent: :destroy
+  # Camas de suelo vivo (ver `Cama`). Una sala con camas no se borra: las camas tienen historia.
+  has_many :camas, dependent: :restrict_with_error
   has_many :sala_cultivadores, class_name: 'SalaCultivador', foreign_key: 'sala_id', dependent: :destroy
   has_many :cultivadores, through: :sala_cultivadores, source: :user
   has_many :notas, as: :noteable, dependent: :destroy
@@ -36,6 +38,12 @@ class Sala < ApplicationRecord
 
   private
 
+  def m2_alcanza_para_lo_ocupado
+    ocupado = m2_ocupados
+    return if m2.to_d >= ocupado
+    errors.add(:m2, "no alcanza: las camas y los lotes de este espacio ya ocupan #{ocupado.round(2).to_s('F').tr('.', ',')} m²")
+  end
+
   def set_default_state
     self.state ||= 'activa'
   end
@@ -56,6 +64,8 @@ class Sala < ApplicationRecord
   public
   # Superficie de cultivo, para poder decir g/m². Opcional: sin ella no se bloquea nada.
   validates :m2, numericality: { greater_than: 0 }, allow_nil: true
+  # Achicar el espacio por debajo de lo que ya ocupan sus camas y lotes dejaría las cuentas rotas.
+  validate  :m2_alcanza_para_lo_ocupado, if: -> { persisted? && m2.present? && will_save_change_to_m2? }
   validates :pots_count,  numericality: { only_integer: true, greater_than_or_equal_to: 0 }, allow_nil: true
   validates :plants_max,  numericality: { only_integer: true, greater_than_or_equal_to: 0 }, allow_nil: true
 
@@ -118,15 +128,25 @@ class Sala < ApplicationRecord
     [created_by&.first_name, created_by&.last_name].compact.join(" ").presence || created_by&.email || "Sistema"
   end
 
-  # Cuántos m² de esta sala están declarados por sus lotes activos, y cuántos quedan libres.
-  # `nil` cuando la sala no tiene superficie cargada: no hay contra qué medir.
+  # LA SUPERFICIE SE REPARTE ENTRE CAMAS Y LOTES SIN CAMA. Un lote que está en una cama ocupa
+  # metros DE LA CAMA, no del espacio: contarlo dos veces haría que una carpa de 1,44 m² con una
+  # cama de 1,2 × 1,2 no admitiera ningún lote. Una sola cuenta para todas las puertas (lote, cama,
+  # edición de la sala).
   def m2_ocupados_por_lotes(excepto: nil)
-    lotes.activos.where.not(id: excepto).sum(:m2_ocupados).to_d
+    lotes.activos.where(cama_id: nil).where.not(id: excepto).sum(:m2_ocupados).to_d
   end
 
-  def m2_libres(excepto: nil)
+  def m2_ocupados_por_camas(excepto_cama: nil)
+    camas.vigentes.where.not(id: excepto_cama).to_a.sum { |c| c.m2.to_d }
+  end
+
+  def m2_ocupados(excepto: nil, excepto_cama: nil)
+    m2_ocupados_por_lotes(excepto: excepto) + m2_ocupados_por_camas(excepto_cama: excepto_cama)
+  end
+
+  def m2_libres(excepto: nil, excepto_cama: nil)
     return nil if m2.blank?
-    [m2.to_d - m2_ocupados_por_lotes(excepto: excepto), 0].max
+    [m2.to_d - m2_ocupados(excepto: excepto, excepto_cama: excepto_cama), 0].max
   end
 
 end

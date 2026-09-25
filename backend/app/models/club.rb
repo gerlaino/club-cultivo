@@ -24,6 +24,7 @@ class Club < ApplicationRecord
   belongs_to :deleted_by, class_name: "User", optional: true
   has_many :users
   has_many :salas,                dependent: :destroy
+  has_many :camas,                dependent: :destroy
   has_many :lotes,                dependent: :destroy
   has_many :lote_fotos,           dependent: :destroy
   has_many :recetas,              dependent: :destroy

@@ -30,6 +30,9 @@ export const NAV_GROUPS = [
   },
   {
     key: 'cultivo', label: 'Cultivo', to: '/salas', feature: 'cultivo',
+    // Pantallas del grupo que no son una pestaña: la ficha de una cama de suelo vivo se abre
+    // desde su espacio, así que resalta «Salas/Espacios».
+    alias: [{ to: '/camas', tab: '/salas' }],
     tabs: [
       { to: '/salas', label: 'Salas', labelPersonal: 'Espacios' },
       { to: '/lotes', label: 'Lotes' },
@@ -163,7 +166,7 @@ export function detectGroup(path) {
   let best = null, bestLen = -1
   for (const g of NAV_GROUPS) {
     // Candidatos: el `to` del grupo (para grupos sin tabs, ej. Salón) + los `to` de sus tabs.
-    const tos = [g.to, ...g.tabs.map(t => t.to)]
+    const tos = [g.to, ...g.tabs.map(t => t.to), ...(g.alias || []).map(a => a.to)]
     for (const to of tos) {
       if (to && to !== '/' && (path === to || path.startsWith(to + '/')) && to.length > bestLen) {
         best = g; bestLen = to.length

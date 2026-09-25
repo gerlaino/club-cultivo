@@ -2,7 +2,7 @@
   <div class="raf">
     <div class="raf__row">
       <select v-model="form.categoria" class="raf__sel">
-        <option v-for="t in CATEGORIAS" :key="t.value" :value="t.value">{{ t.emoji }} {{ t.label }}</option>
+        <option v-for="t in categorias" :key="t.value" :value="t.value">{{ t.emoji }} {{ t.label }}</option>
       </select>
       <AppDatePicker v-model="form.fecha" :max="hoy" class="raf__date" />
     </div>
@@ -24,11 +24,11 @@
     <p v-if="form.categoria === 'trasplante' && metodoEnraizado" class="raf__hint">Viene de: {{ metodoEnraizadoLabel(metodoEnraizado) }}</p>
     <div v-else-if="form.categoria === 'fertilizacion'" class="raf__row">
       <input v-model="form.producto" type="text" class="raf__input" maxlength="120" placeholder="Producto / fórmula" />
-      <input v-model.number="form.ec" type="number" step="0.1" min="0" class="raf__num" placeholder="EC" />
+      <input v-if="!enCama" v-model.number="form.ec" type="number" step="0.1" min="0" class="raf__num" placeholder="EC" />
     </div>
     <div v-else-if="form.categoria === 'riego'" class="raf__row">
       <input v-model.number="form.volumen" type="number" step="0.1" min="0" class="raf__num" placeholder="Volumen (L)" />
-      <input v-model.number="form.ec" type="number" step="0.1" min="0" class="raf__num" placeholder="EC" />
+      <input v-if="!enCama" v-model.number="form.ec" type="number" step="0.1" min="0" class="raf__num" placeholder="EC" />
     </div>
 
     <input v-if="form.categoria !== 'trasplante'" v-model="form.descripcion" type="text"
@@ -50,7 +50,10 @@ import { metodoEnraizadoLabel } from '../../lib/loteHelpers.js'
 const props = defineProps({
   medioSugerido:   { type: String, default: 'sustrato' },
   metodoEnraizado: { type: String, default: null },
+  // Plantado en una cama de suelo vivo: sin trasplantes ni EC del riego.
+  enCama:          { type: Boolean, default: false },
 })
+const categorias = computed(() => (props.enCama ? CATEGORIAS.filter(c => c.value !== 'trasplante') : CATEGORIAS))
 const emit = defineEmits(['crear', 'trasplante', 'cancelar'])
 
 const hoy = hoyISO()

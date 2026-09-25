@@ -237,7 +237,22 @@
               <p v-else-if="!geneticas.length" class="nlm__hint"><i class="bi bi-info-circle"></i> No tenés genéticas marcadas como disponibles. <a href="/geneticas" class="nlm__link">Activá o registrá una</a> para asignarla.</p>
             </div>
 
-            <div class="nlm__field">
+            <!-- Suelo vivo: en una cama o en maceta/bandeja. En la cama no hay maceta ni tipo de
+                 cultivo (es suelo vivo), y plantar en una cama que descansa o se cocina avisa pero
+                 no se bloquea (Germán, 22-sep). -->
+            <div v-if="camasSala.length && !esCosechado" class="nlm__field nlm__field--full">
+              <label class="nlm__label">¿Dónde {{ tipoCreacion === 'nuevo' ? 'arranca' : 'está' }}?</label>
+              <div class="nlm__camas">
+                <button type="button" class="nlm__cama" :class="{ 'nlm__cama--on': !form.cama_id }" @click="form.cama_id = null">🪴 Maceta o bandeja</button>
+                <button v-for="c in camasSala" :key="c.id" type="button" class="nlm__cama" :class="{ 'nlm__cama--on': form.cama_id === c.id }" @click="form.cama_id = c.id">
+                  🧱 {{ c.nombre }} <span class="nlm__cama-est">{{ estadoCama(c.estado).label }}</span>
+                </button>
+              </div>
+              <p v-if="avisoCama" class="nlm__hint nlm__hint--aviso"><i class="bi bi-exclamation-triangle"></i> {{ avisoCama }}</p>
+              <p v-else-if="camaElegida && tipoCreacion === 'nuevo'" class="nlm__hint">Siembra directa en la cama: germina ahí y no hay trasplantes.</p>
+            </div>
+
+            <div v-if="!camaElegida" class="nlm__field">
               <label class="nlm__label">Tipo de cultivo</label>
               <select class="nlm__input" v-model="form.grow_type">
                 <option value="sustrato">Sustrato</option>
@@ -246,7 +261,7 @@
             </div>
             <!-- Dónde enraíza: incubadora (hidro), jiffy o taco. Sólo si nace enraizando: al ir a
                  maceta cambia de medio, y sirve para comparar qué método prende mejor. -->
-            <div v-if="estadoObjetivo === 'enraizado' && metodosEnraizado.length" class="nlm__field">
+            <div v-if="estadoObjetivo === 'enraizado' && metodosEnraizado.length && !camaElegida" class="nlm__field">
               <label class="nlm__label">¿Dónde enraíza? <span class="nlm__label-opt">(opcional)</span></label>
               <select class="nlm__input" v-model="form.metodo_enraizado">
                 <option value="">Sin especificar</option>
@@ -260,7 +275,16 @@
             <!-- Los m² que ocupa el lote. Sólo en una organización: existe porque varios lotes
                  comparten una sala y hay que repartir la superficie. En casa hay un espacio y un
                  lote, así que alcanza con los metros del espacio (Germán, 22-sep-2026). -->
-            <div v-if="!esPersonal && salaElegida" class="nlm__field">
+            <div v-if="!esPersonal && camaElegida" class="nlm__field">
+              <label class="nlm__label">m² que ocupa en la cama <span class="nlm__label-opt">(opcional)</span></label>
+              <input class="nlm__input" v-model.number="form.m2_ocupados" type="number" min="0" step="0.1"
+                     :placeholder="m2LibresCama != null ? `hasta ${m2LibresCama}` : 'la cama no tiene medidas'" />
+              <p class="nlm__hint">
+                <template v-if="m2LibresCama != null">La {{ camaElegida.nombre }} mide {{ camaElegida.m2 }} m² y quedan <strong>{{ m2LibresCama }}</strong> libres.</template>
+                <template v-else>Sin medidas de la cama no se calcula el rendimiento por m².</template>
+              </p>
+            </div>
+            <div v-else-if="!esPersonal && salaElegida" class="nlm__field">
               <label class="nlm__label">m² que ocupa <span class="nlm__label-opt">(opcional)</span></label>
               <input class="nlm__input" v-model.number="form.m2_ocupados" type="number" min="0" step="0.1"
                      :placeholder="m2LibresSala != null ? `hasta ${m2LibresSala}` : 'sin metros en la sala'" />
@@ -269,7 +293,7 @@
               </p>
               <p v-else class="nlm__hint">Esta sala no tiene metros cargados: sin eso no se calcula el rendimiento por m².</p>
             </div>
-            <div v-if="tipoCreacion === 'existente'" class="nlm__field">
+            <div v-if="tipoCreacion === 'existente' && !camaElegida" class="nlm__field">
               <label class="nlm__label">Tamaño de maceta <span class="nlm__label-opt">(actual)</span></label>
               <select class="nlm__input" v-model="form.tamanio_maceta">
                 <option value="">Sin especificar</option>
@@ -312,7 +336,8 @@
 import { ref, computed, watch } from 'vue'
 import { useLotesStore } from '../../stores/lotes'
 import { useAuthStore } from '../../stores/auth'
-import { getLoteProximoCodigo, listGeneticas, listPlants, createLoteHeredado, createLoteCosechadoEnSede, listSedes, createSala } from '../../lib/api.js'
+import { getLoteProximoCodigo, listGeneticas, listPlants, createLoteHeredado, createLoteCosechadoEnSede, listSedes, createSala, listCamas } from '../../lib/api.js'
+import { estadoCama, avisoAlPlantar } from '../../lib/camas.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
 import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
@@ -555,8 +580,26 @@ function emptyForm() {
     planta_madre_ids: [], plants_count: 1,
     start_date: localISO(),
     genetica_id: '', grow_type: 'sustrato', metodo_enraizado: '', light_type: '', tamanio_maceta: '', m2_ocupados: null, notes: '',
+    cama_id: null,
   }
 }
+
+// ── Suelo vivo: las camas de la sala elegida ─────────────────────────────────
+// La ficha de la sala ya las trae; si la sala se elige acá, se piden.
+const camasSala = ref([])
+const camaElegida = computed(() => camasSala.value.find(c => c.id === form.value.cama_id) || null)
+const avisoCama = computed(() => avisoAlPlantar(camaElegida.value))
+const m2LibresCama = computed(() => {
+  const c = camaElegida.value
+  if (!c?.m2) return null
+  return +Math.max(0, Number(c.m2) - Number(c.m2_ocupados_lotes || 0)).toFixed(2)
+})
+watch(effectiveSala, async (s) => {
+  form.value.cama_id = null
+  if (!s?.id) { camasSala.value = []; return }
+  if (Array.isArray(s.camas)) { camasSala.value = s.camas.filter(c => c.estado !== 'retirada'); return }
+  try { camasSala.value = (await listCamas({ sala_id: s.id })).data || [] } catch { camasSala.value = [] }
+}, { immediate: true })
 
 async function setOrigen(valor) {
   form.value.origen = valor
@@ -627,6 +670,9 @@ async function crear() {
     if (!payload.m2_ocupados)     delete payload.m2_ocupados
     if (!payload.metodo_enraizado || payload.estado !== 'enraizado') delete payload.metodo_enraizado
     if (!payload.planta_madre_ids?.length) delete payload.planta_madre_ids
+    // En una cama no hay maceta ni tipo de cultivo (es suelo vivo, lo dice la cama).
+    if (payload.cama_id) { delete payload.grow_type; delete payload.tamanio_maceta; delete payload.metodo_enraizado }
+    else delete payload.cama_id
 
     const dias = {
       dias_semilla_esqueje: heredadoDias.value.semilla_esqueje || 0,
@@ -698,6 +744,14 @@ watch(salaId, () => {
 </script>
 
 <style scoped>
+.nlm__camas { display: flex; flex-wrap: wrap; gap: .4rem; }
+.nlm__cama {
+  padding: .45rem .8rem; border: 1.5px solid var(--c-slate-200); border-radius: var(--r-md); background: var(--c-slate-50);
+  font-size: var(--fs-13); font-weight: 600; color: var(--c-slate-700); cursor: pointer; display: inline-flex; gap: .35rem; align-items: center;
+}
+.nlm__cama--on { border-color: var(--c-leaf-700); background: var(--c-leaf-50); color: var(--c-leaf-800); }
+.nlm__cama-est { font-size: var(--fs-12); font-weight: 500; color: var(--c-slate-500); }
+.nlm__hint.nlm__hint--aviso { color: var(--c-rust-600); font-weight: 600; }
 .nlm__overlay { position: fixed; inset: 0; background: rgba(15,23,42,.45); z-index: 800; display: flex; align-items: center; justify-content: center; padding: 1rem; }
 .nlm__modal { background: #fff; border-radius: 16px; width: 100%; max-width: 620px; max-height: 92vh; display: flex; flex-direction: column; box-shadow: 0 20px 60px rgba(0,0,0,.2); }
 .nlm__header { display: flex; align-items: flex-start; justify-content: space-between; padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--c-slate-100); }

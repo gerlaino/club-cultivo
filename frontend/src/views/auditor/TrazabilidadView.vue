@@ -357,6 +357,63 @@
           </div>
         </div>
 
+        <!-- Nodo SUELO (suelo vivo): la cama donde creció, con qué se armó y TODO lo que se le puso
+             a la tierra hasta la cosecha (en no-till lo de hace dos ciclos sigue en el suelo), con
+             lo de su ciclo marcado. Si una enmienda vino contaminada, acá se ve qué flores tocó. -->
+        <template v-if="data.suelo">
+          <div class="trz__arrow"><i class="bi bi-arrow-down"></i></div>
+          <div class="trz__node trz__node--aplic">
+            <div class="trz__node-head">
+              <span class="trz__node-badge trz__node-badge--aplic">🧱 SUELO VIVO</span>
+              <span class="trz__node-code">{{ data.suelo.cama.nombre }}<template v-if="data.suelo.ciclo"> · ciclo {{ data.suelo.ciclo.numero }}</template></span>
+            </div>
+            <div class="trz__node-body">
+              <div class="trz__fields">
+                <div class="trz__field">
+                  <span class="trz__field-lbl">Cama</span>
+                  <span class="trz__field-val">{{ data.suelo.cama.nombre }}<template v-if="data.suelo.cama.sala"> · {{ data.suelo.cama.sala }}</template><template v-if="data.suelo.cama.m2"> · {{ String(data.suelo.cama.m2).replace('.', ',') }} m²</template><template v-if="data.suelo.cama.armada_el"> · armada el {{ fecha(data.suelo.cama.armada_el) }}</template></span>
+                </div>
+                <div v-if="data.suelo.mezcla?.items?.length" class="trz__field">
+                  <span class="trz__field-lbl">Mezcla de armado</span>
+                  <span class="trz__field-val">{{ data.suelo.mezcla.items.map(i => i.nombre).join(' · ') }}</span>
+                </div>
+                <div v-if="data.suelo.productos?.length" class="trz__field">
+                  <span class="trz__field-lbl">Lo que recibió la tierra (hasta el {{ fecha(data.suelo.hasta) }})</span>
+                  <span class="trz__field-val">{{ data.suelo.productos.map(p => `${p.nombre} (${p.veces}×)`).join(' · ') }}</span>
+                </div>
+              </div>
+              <div v-if="data.suelo.registros?.length" class="trz__detalle">
+                <button type="button" class="trz__detalle-btn" @click="sueloAbierto = !sueloAbierto">
+                  <i :class="sueloAbierto ? 'bi bi-chevron-down' : 'bi bi-chevron-right'"></i>
+                  Ver los {{ data.suelo.registros.length }} registros del suelo
+                </button>
+                <div v-if="sueloAbierto" class="trz__detalle-lista">
+                  <div v-for="r in data.suelo.registros" :key="r.id" class="trz__detalle-row" :class="{ 'trz__detalle-row--ciclo': r.del_ciclo }">
+                    <span class="trz__detalle-fecha">{{ fecha(r.registrado_en) }}</span>
+                    <span class="trz__detalle-cuerpo">
+                      <strong>{{ r.tipo_label }}</strong><span v-if="r.del_ciclo"> · este ciclo</span>
+                      <span v-if="r.detalle"> · {{ r.detalle }}</span>
+                      <span v-if="r.nutricion?.items?.length"> · {{ r.nutricion.items.map(i => `${i.nombre} ${cantidadSuelo(i)}`).join(', ') }}</span>
+                      <span v-if="r.observaciones"> · {{ r.observaciones }}</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div v-if="data.suelo.analisis?.length" class="trz__lab">
+                <div class="trz__fito-tit">🧪 Análisis de suelo</div>
+                <div v-for="a in data.suelo.analisis" :key="a.id" class="trz__fito-row">
+                  <span>{{ fecha(a.fecha) }}</span>
+                  <span v-if="a.ph != null"> · pH {{ a.ph }}</span>
+                  <span v-if="a.materia_organica_pct != null"> · MO {{ a.materia_organica_pct }}%</span>
+                  <span v-if="a.plomo_ppm != null"> · Pb {{ a.plomo_ppm }} ppm</span>
+                  <span v-if="a.cadmio_ppm != null"> · Cd {{ a.cadmio_ppm }} ppm</span>
+                  <span v-if="a.laboratorio"> · {{ a.laboratorio }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+
         <div v-if="data.aplicaciones?.registros" class="trz__arrow"><i class="bi bi-arrow-down"></i></div>
 
         <!-- Nodo 3: QUÉ SE LE APLICÓ.
@@ -632,7 +689,16 @@ const ACTIVIDAD_LABELS = {
 }
 const actividadLabel = (a) => ACTIVIDAD_LABELS[a] || String(a).replaceAll('_', ' ')
 
-const fecha = (f) => (f ? new Date(f).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '')
+// Una fecha SIN hora («2026-09-25») se lee como día local: `new Date('2026-09-25')` es medianoche
+// UTC, que en Argentina es el día anterior, y la trazabilidad mostraba todo corrido un día.
+const fecha = (f) => {
+  if (!f) return ''
+  const soloDia = typeof f === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(f)
+  const d = soloDia ? new Date(`${f}T12:00:00`) : new Date(f)
+  return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+const UNIDAD_CORTA = { mililitro: 'ml', gramo: 'g', litro: 'L', kilogramo: 'kg', unidad: 'un' }
+const cantidadSuelo = (i) => `${Number(i.descontado ?? i.cantidad).toLocaleString('es-AR', { maximumFractionDigits: 3 })} ${UNIDAD_CORTA[i.unidad] || i.unidad || ''}`
 
 const query       = ref('')
 const loading     = ref(false)
@@ -707,6 +773,7 @@ const sugerencias = computed(() => {
 const unidad = computed(() => data.value?.stock?.unidad || 'g')
 const esExterno = computed(() => data.value?.stock?.origen === 'compra_externa' && !data.value?.lote)
 const ultimoAnalisis = computed(() => data.value?.analisis_laboratorio?.[0] || null)
+const sueloAbierto = ref(false)
 
 const origenLabel = computed(() => {
   if (esExterno.value) return 'Compra externa'
@@ -1015,6 +1082,7 @@ const formatDate = d => d
 .trz__detalle-btn { background: none; border: none; padding: 0; cursor: pointer; font-size: .78rem; color: #5b21b6; display: flex; align-items: center; gap: .35rem; font-family: inherit; }
 .trz__detalle-btn:hover { text-decoration: underline; }
 .trz__detalle-lista { margin-top: .5rem; display: flex; flex-direction: column; gap: .3rem; max-height: 340px; overflow-y: auto; }
+.trz__detalle-row--ciclo { background: var(--c-leaf-50); }
 .trz__detalle-row { display: flex; gap: .6rem; font-size: .78rem; line-height: 1.45; padding-bottom: .3rem; border-bottom: 1px solid rgba(0,0,0,.05); }
 .trz__detalle-fecha { flex-shrink: 0; opacity: .6; font-variant-numeric: tabular-nums; }
 .trz__detalle-cuerpo { min-width: 0; overflow-wrap: anywhere; }

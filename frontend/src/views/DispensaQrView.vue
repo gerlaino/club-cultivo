@@ -88,8 +88,12 @@
                 No se le aplicó ningún tratamiento fitosanitario.
               </div>
 
+              <div v-if="data.cultivo.suelo_vivo" class="dqr__cultivo-row">
+                <span class="dqr__cultivo-lbl">Suelo</span>
+                <span>Cultivada en suelo vivo</span>
+              </div>
               <div v-if="data.cultivo.nutricion?.length" class="dqr__cultivo-row">
-                <span class="dqr__cultivo-lbl">Nutrición</span>
+                <span class="dqr__cultivo-lbl">{{ data.cultivo.suelo_vivo ? 'Lo que recibió' : 'Nutrición' }}</span>
                 <span>{{ data.cultivo.nutricion.join(' · ') }}</span>
               </div>
 

@@ -63,7 +63,21 @@
               </select>
             </div>
 
-            <div class="lem__field">
+            <!-- Suelo vivo: la cama del lote. Corregirla es para un error de carga (la planta no se
+                 muda: tiene las raíces en la tierra); el backend no deja si ya hay registros de suelo
+                 en el ciclo. -->
+            <div v-if="lote?.en_cama" class="lem__field lem__field--full">
+              <label class="lem__label">Cama <span class="lem__opt">suelo vivo</span></label>
+              <select class="lem__input" v-model="editLoteForm.cama_id" :disabled="!enCultivo">
+                <option v-for="c in camasCorregibles" :key="c.id" :value="c.id">{{ c.nombre }}{{ c.sala_nombre ? ` · ${c.sala_nombre}` : '' }}</option>
+                <option :value="null">No está en una cama (me equivoqué)</option>
+              </select>
+              <span class="lem__hint">
+                {{ enCultivo ? 'Sólo para corregir una carga equivocada: plantado en la cama, no se muda.' : 'Después de la cosecha la cama es historia del lote.' }}
+              </span>
+            </div>
+
+            <div v-if="!lote?.en_cama" class="lem__field">
               <label class="lem__label">Tipo de cultivo</label>
               <select class="lem__input" v-model="editLoteForm.grow_type">
                 <option value="">Sin especificar</option>
@@ -72,7 +86,7 @@
               </select>
             </div>
 
-            <div v-if="metodosEnraizado.length" class="lem__field">
+            <div v-if="metodosEnraizado.length && !lote?.en_cama" class="lem__field">
               <label class="lem__label">¿Dónde enraizó?</label>
               <select class="lem__input" v-model="editLoteForm.metodo_enraizado">
                 <option value="">Sin especificar</option>
@@ -84,7 +98,7 @@
                  bandeja y no tiene maceta; ponerlo en maceta ES prenderlo. Por eso enraizado
                  ofrece "Bandeja" y elegir litros avisa que el lote pasa a vegetativo (el backend
                  lo hace igual, venga de acá, del trasplante o de un desprendimiento). -->
-            <div class="lem__field">
+            <div v-if="!lote?.en_cama" class="lem__field">
               <label class="lem__label">Tamaño de maceta</label>
               <select class="lem__input" v-model="editLoteForm.tamanio_maceta">
                 <option v-if="enraizando" value="">🌱 Bandeja de enraizado</option>
@@ -107,8 +121,8 @@
             <div v-if="!esPersonal" class="lem__field">
               <label class="lem__label">m² que ocupa <span class="lem__opt">opcional</span></label>
               <input type="number" min="0" step="0.1" class="lem__input" v-model.number="editLoteForm.m2_ocupados"
-                     :placeholder="lote?.sala?.m2 ? `de los ${lote.sala.m2} m² de ${lote.sala.nombre}` : 'la sala no tiene m² cargados'" />
-              <span class="lem__hint">Con esto el rendimiento se puede leer en g/m². La suma de los lotes no puede pasar los metros de la sala.</span>
+                     :placeholder="lote?.en_cama ? (lote.cama?.m2 ? `de los ${lote.cama.m2} m² de la ${lote.cama.nombre}` : 'la cama no tiene medidas') : (lote?.sala?.m2 ? `de los ${lote.sala.m2} m² de ${lote.sala.nombre}` : 'la sala no tiene m² cargados')" />
+              <span class="lem__hint">{{ lote?.en_cama ? 'La suma de los lotes de la cama no puede pasar la cama.' : 'Con esto el rendimiento se puede leer en g/m². La suma de los lotes no puede pasar los metros de la sala.' }}</span>
             </div>
 
             <div class="lem__field">
@@ -182,12 +196,13 @@
 
 <script setup>
 import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
-import { watch, computed } from 'vue'
+import { watch, computed, ref } from 'vue'
 import { useLoteEditar } from '../../composables/useLoteEditar.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
 import { useAuthStore } from '../../stores/auth'
 import { opcionesMetodoEnraizado } from '../../lib/loteHelpers.js'
+import { listCamas } from '../../lib/api.js'
 
 const props = defineProps({
   open:   { type: Boolean, default: false },
@@ -215,6 +230,17 @@ const faseAlcanzada = (fase) =>
   ORDEN_FASES.indexOf(editLoteForm.value.estado) >= ORDEN_FASES.indexOf(fase)
 
 const enraizando = computed(() => editLoteForm.value.estado === 'enraizado')
+const enCultivo  = computed(() => ['enraizado', 'vegetativo', 'floracion'].includes(props.lote?.estado))
+// Las camas a las que se puede corregir (las vigentes que ve este usuario), con la actual siempre.
+const camasCorregibles = ref([])
+watch(() => [props.open, props.lote?.en_cama], async ([abierto, enCama]) => {
+  if (!abierto || !enCama) return
+  const actual = props.lote.cama ? [{ id: props.lote.cama.id, nombre: props.lote.cama.nombre, sala_nombre: props.lote.sala?.nombre }] : []
+  try {
+    const { data } = await listCamas()
+    camasCorregibles.value = [...actual, ...(data || []).filter(c => c.id !== props.lote.cama?.id)]
+  } catch { camasCorregibles.value = actual }
+}, { immediate: true })
 // Elegir litros estando enraizado = prendió. El backend hace la promoción; acá se avisa antes
 // de guardar para que no sea una sorpresa.
 const pasaAVegetativo = computed(() => enraizando.value && !!editLoteForm.value.tamanio_maceta)

@@ -45,6 +45,8 @@ export function useLoteEditar(loteId) {
       // un espacio y un lote, y alcanza con el de la sala).
       m2_ocupados:       l.m2_ocupados       ?? null,
       notes:             l.notes             || '',
+      // Suelo vivo: la cama se CORRIGE acá (se cargó en la equivocada); plantar es otra acción.
+      cama_id:           l.cama?.id          ?? null,
     }
     editLoteError.value = null
     showEditLote.value  = true
@@ -65,6 +67,14 @@ export function useLoteEditar(loteId) {
       }
       if (!payload.genetica_id) delete payload.genetica_id
       if (!payload.light_type)  delete payload.light_type
+      // En una cama no hay maceta ni tipo de cultivo; la cama viaja sólo si se corrigió.
+      const actual = lotes.current
+      if (actual?.en_cama) {
+        delete payload.tamanio_maceta; delete payload.grow_type; delete payload.metodo_enraizado
+        if (payload.cama_id === (actual.cama?.id ?? null)) delete payload.cama_id
+      } else {
+        delete payload.cama_id
+      }
       const fechas_fase = {}
       if (fecha_vegetativo) fechas_fase.vegetativo = fecha_vegetativo
       if (fecha_floracion)  fechas_fase.floracion  = fecha_floracion

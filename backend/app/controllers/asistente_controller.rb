@@ -435,8 +435,12 @@ class AsistenteController < BaseController
     ctx += "  Copas: #{planta.num_colas || 'no registrado'}\n"
     ctx += "  Salud: #{planta.estado_salud || 'no evaluada'}\n"
     ctx += "  Hojas: #{planta.color_hojas || 'no evaluado'}\n"
-    ctx += "  Maceta: #{lote.tamanio_maceta ? "#{lote.tamanio_maceta}L" : 'desconocida'}"
-    ctx += " | Sustrato: #{lote.sustrato_especifico}" if lote.sustrato_especifico.present?
+    if lote.en_cama?
+      ctx += ctx_suelo_vivo(lote, sangria: '  ')
+    else
+      ctx += "  Maceta: #{lote.tamanio_maceta ? "#{lote.tamanio_maceta}L" : 'desconocida'}"
+      ctx += " | Sustrato: #{lote.sustrato_especifico}" if lote.sustrato_especifico.present?
+    end
     ctx += "\n\n"
 
     acts = planta.activities.order(occurred_at: :desc).limit(6)
@@ -479,6 +483,25 @@ class AsistenteController < BaseController
     ctx
   end
 
+  # SUELO VIVO: sin esto el asistente recomendaba «bajá el pH del agua», sales o un trasplante a
+  # una planta que vive en una cama. Le decimos qué es y qué NO se hace, más lo último que se le
+  # puso al suelo.
+  def ctx_suelo_vivo(lote, sangria: '')
+    cama = lote.cama
+    ctx  = "#{sangria}SUELO VIVO en la #{cama.nombre} (ciclo #{lote.cama_ciclo&.numero || '—'} de esa cama"
+    ctx += ", #{cama.m2.to_f.round(2)} m²" if cama.m2
+    ctx += "). NO recomendar corregir el pH ni la EC del agua, ni fertilizantes de síntesis/sales, ni trasplantes: " \
+           "en suelo vivo se alimenta el suelo (top dress, tés, cobertura, mulch) y la respuesta es lenta (2–3 semanas).\n"
+    ult = cama.registros.where(tipo: %w[top_dress te armado]).first
+    if ult
+      productos = Array(ult.nutricion.to_h['items']).map { |i| i['nombre'] }.compact
+      ctx += "#{sangria}Último alimento del suelo: #{CamaRegistro::TIPO_LABELS[ult.tipo]} el #{ult.registrado_en.strftime('%d/%m')}"
+      ctx += " (#{productos.join(', ')})" if productos.any?
+      ctx += ".\n"
+    end
+    ctx
+  end
+
   def ctx_lote(contexto)
     lote = current_user.club.lotes.find_by(id: contexto[:lote_id] || contexto['lote_id'])
     return '' unless lote
@@ -492,8 +515,12 @@ class AsistenteController < BaseController
     ctx += " | Semana #{semanas_desde(lote.start_date)} desde inicio" if lote.start_date
     ctx += " | Floración estimada: #{lote.dias_floracion_objetivo} días" if lote.dias_floracion_objetivo
     ctx += "\n"
-    ctx += "Maceta: #{lote.tamanio_maceta}L" if lote.tamanio_maceta
-    ctx += " | Sustrato: #{lote.sustrato_especifico}" if lote.sustrato_especifico.present?
+    if lote.en_cama?
+      ctx += ctx_suelo_vivo(lote)
+    else
+      ctx += "Maceta: #{lote.tamanio_maceta}L" if lote.tamanio_maceta
+      ctx += " | Sustrato: #{lote.sustrato_especifico}" if lote.sustrato_especifico.present?
+    end
     ctx += " | Fotoperiodo: #{lote.fotoperiodo}" if lote.fotoperiodo.present?
     ctx += "\n\n"
 

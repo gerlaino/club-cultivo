@@ -363,6 +363,8 @@ class PlantsController < ApplicationController
         codigo: plant.lote.codigo,
         estado: plant.lote.estado,
         sala:   plant.lote.sala ? { id: plant.lote.sala.id, nombre: plant.lote.sala.nombre } : nil,
+        # Suelo vivo: plantada en una cama no se trasplanta (la pantalla esconde el trasplante).
+        en_cama: plant.lote.en_cama?,
       },
       genetica:      g ? { id: g.id, nombre: g.nombre, nombre_visible: g.nombre_visible, tipo: g.tipo } : nil,
       created_at:    plant.created_at,
@@ -388,6 +390,8 @@ class PlantsController < ApplicationController
         genetica_id:     plant.lote.genetica_id,
         manicurador_id:  plant.lote.manicurador_id,
         plants_count:    plant.lote.plants_count,
+        en_cama:         plant.lote.en_cama?,
+        cama:            plant.lote.cama && { id: plant.lote.cama.id, nombre: plant.lote.cama.nombre },
         # Los lotes finalizados quedan sin sala (sala_id: nil) — nil-safe para no romper.
         sala: plant.lote.sala ? {
           id:     plant.lote.sala.id,

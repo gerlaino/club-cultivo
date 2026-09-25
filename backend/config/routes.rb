@@ -138,12 +138,27 @@ Rails.application.routes.draw do
       end
     end
 
+    # Suelo vivo: las camas, lo que se le hace al suelo y sus análisis (ver `Cama`).
+    resources :camas, only: [:index, :show, :create, :update, :destroy] do
+      member do
+        post :descansar           # empezar (o reprogramar) el descanso
+        post :terminar_descanso
+        post :terminar_coccion    # «ya está lista»
+        post :retirar             # se desarmó: queda su historia
+        post :regar               # riego por cama: a sus lotes, o a la cama si descansa
+      end
+      resources :registros, controller: 'cama_registros', only: [:index, :create, :destroy]
+      resources :analisis,  controller: 'analisis_suelo', only: [:index, :create, :destroy]
+    end
+
     # Recetas de nutrientes: se arman acá y se aplican al regar (ver `Nutricion::Aplicar`).
     resources :recetas, only: [:index, :show, :create, :update, :destroy]
 
     resources :lotes, only: [:index, :show, :update, :destroy, :create] do
       # Separar parte de un lote a uno nuevo (típico: al prender, la mitad a 3L y la mitad a 5L).
       member { post :desprender }
+      # Suelo vivo: el último trasplante, a una cama (si enraizaba, prende).
+      member { post :plantar_en_cama }
       member { get :trazabilidad }
       # «Cómo salió»: el resumen del ciclo cuando termina (`Lotes::ResumenCiclo`).
       member { get :resumen_ciclo }

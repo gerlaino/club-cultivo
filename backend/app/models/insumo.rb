@@ -163,7 +163,8 @@ class Insumo < ApplicationRecord
   # Consumo: descuenta stock e imputa el costo (al promedio actual) al lote/sala. Refleja el
   # costo en el CostoLote. Devuelve la InsumoConsumo. Lanza si no hay stock suficiente.
   def registrar_consumo!(cantidad:, created_by:, lote: nil, sala: nil,
-                         fecha: Date.current, notas: nil, registro_ambiental: nil)
+                         fecha: Date.current, notas: nil, registro_ambiental: nil,
+                         cama: nil, cama_registro: nil)
     cantidad = cantidad.to_d
     raise ArgumentError, 'La cantidad debe ser mayor a 0' if cantidad <= 0
     raise ArgumentError, 'Stock insuficiente'             if cantidad > stock_actual.to_d
@@ -176,7 +177,8 @@ class Insumo < ApplicationRecord
       c = insumo_consumos.create!(
         club: club, created_by: created_by,
         cantidad: cantidad, costo_imputado_ars: costo_imputado,
-        lote: lote, sala: sala, fecha: fecha, notas: notas, registro_ambiental: registro_ambiental
+        lote: lote, sala: sala, fecha: fecha, notas: notas, registro_ambiental: registro_ambiental,
+        cama: cama, cama_registro: cama_registro
       )
       # El costo del lote se recalcula para reflejar el consumo imputado.
       CostoDesdeLibroService.new(lote: lote, actualizado_por: created_by).call if lote
@@ -187,24 +189,33 @@ class Insumo < ApplicationRecord
     consumo
   end
 
-  # Consumo repartido en partes iguales entre varios lotes (y/o una sala). Ej: "3 L a los lotes
-  # OG-24 y GG-11" → 1,5 L a cada uno, cada uno con su costo imputado. Atómico.
+  # Consumo repartido entre varios lotes (y/o una sala, y/o una cama). Ej: "3 L a los lotes OG-24 y
+  # GG-11" → 1,5 L a cada uno, cada uno con su costo imputado. Atómico.
+  # `pesos` ({ lote_id => m² }): reparte en proporción (lo que se le pone a una cama con dos lotes se
+  # reparte por los metros que ocupa cada uno). Sin pesos, o con alguno en cero, en partes iguales.
   def registrar_consumo_repartido!(cantidad:, created_by:, lotes: [], sala: nil,
-                                   fecha: Date.current, notas: nil, registro_ambiental: nil)
+                                   fecha: Date.current, notas: nil, registro_ambiental: nil,
+                                   cama: nil, cama_registro: nil, pesos: nil)
     total  = cantidad.to_d
     lotes  = Array(lotes).compact
     raise ArgumentError, 'La cantidad debe ser mayor a 0' if total <= 0
     raise ArgumentError, 'Stock insuficiente'             if total > stock_actual.to_d
 
+    comunes = { created_by: created_by, sala: sala, fecha: fecha, notas: notas,
+                registro_ambiental: registro_ambiental, cama: cama, cama_registro: cama_registro }
     transaction do
       if lotes.empty?
-        [registrar_consumo!(cantidad: total, created_by: created_by, sala: sala, fecha: fecha, notas: notas, registro_ambiental: registro_ambiental)]
+        [registrar_consumo!(cantidad: total, **comunes)]
       else
-        base = (total / lotes.size).round(3)
+        ps = lotes.map { |l| pesos.to_h[l.id].to_d }
+        ps = Array.new(lotes.size, 1.to_d) if ps.any? { |p| p <= 0 }
+        suma = ps.sum
+        asignado = 0.to_d
         lotes.each_with_index.map do |lote, i|
           # el último absorbe el redondeo para que la suma sea exacta
-          cant = i == lotes.size - 1 ? (total - base * (lotes.size - 1)) : base
-          registrar_consumo!(cantidad: cant, created_by: created_by, lote: lote, sala: sala, fecha: fecha, notas: notas, registro_ambiental: registro_ambiental)
+          cant = i == lotes.size - 1 ? (total - asignado) : (total * ps[i] / suma).round(3)
+          asignado += cant
+          registrar_consumo!(cantidad: cant, lote: lote, **comunes)
         end
       end
     end

@@ -267,6 +267,14 @@ const routes = [
     props: (r) => ({ id: Number(r.params.id) }),
     beforeEnter: requiresPermission("salas", "show"),
   },
+  // Suelo vivo: la ficha de una cama (la misma pantalla sirve en el teléfono, en /m/cama-m/:id).
+  {
+    path: "/camas/:id",
+    name: "cama-detail",
+    component: () => import("../views/CamaDetailView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: requiresPermission("salas", "show"),
+  },
   {
     path: "/salas/:id/ambiente",
     name: "sala-ambiente",
@@ -1084,6 +1092,7 @@ const routes = [
       { path: 'sede/:id',   component: () => import('../views/mobile/MSedeMobileDetail.vue') },
       { path: 'sala-m/:id', component: () => import('../views/mobile/MSalaMobileDetail.vue') },
       { path: 'lote-m/:id', component: () => import('../views/mobile/MLoteMobileDetail.vue') },
+      { path: 'cama-m/:id', component: () => import('../views/CamaDetailView.vue') },
       { path: 'planta/:id', component: () => import('../views/mobile/MPlantaDetailView.vue') },
 
       // ── Manicura ──
@@ -1172,12 +1181,12 @@ const ROLE_ALLOWED_PREFIX = {
   delivery:    ['/delivery', '/m', ...COMUNES],
 
   // Cultivo: salas, lotes, plantas y lo que rodea al trabajo diario del cuarto.
-  cultivador: ['/', '/salas', '/lotes', '/plantas', '/geneticas', '/recetas', '/tareas', '/plan-trabajo',
+  cultivador: ['/', '/salas', '/camas', '/lotes', '/plantas', '/geneticas', '/recetas', '/tareas', '/plan-trabajo',
                '/historial-cultivador', '/cosechado', '/dispositivos', '/reglas-ambientales',
                '/m', ...ETIQUETAS, ...COMUNES],
 
   // Supervisa el cultivo de sus sedes y además dispensa.
-  supervisor: ['/', '/salas', '/lotes', '/plantas', '/geneticas', '/recetas', '/tareas', '/plan-trabajo',
+  supervisor: ['/', '/salas', '/camas', '/lotes', '/plantas', '/geneticas', '/recetas', '/tareas', '/plan-trabajo',
                '/historial-cultivador', '/cosechado', '/dispositivos', '/reglas-ambientales',
                '/pacientes', '/socios', '/historial', '/admin/stock', '/admin/pesajes-manicura',
                '/insumos', '/sedes', '/analitica', '/reservas', '/mostrador', '/m',
@@ -1225,6 +1234,7 @@ const FEATURE_POR_PREFIJO = [
   ['/mostrador',            'produccion_dispensa'],
   ['/m/mostrador',          'produccion_dispensa'],
   ['/salas',                'cultivo'],
+  ['/camas',                'cultivo'],
   ['/lotes',                'cultivo'],
   ['/plantas',              'cultivo'],
   ['/geneticas',            'cultivo'],
@@ -1371,9 +1381,9 @@ router.beforeEach(async (to) => {
   ) {
     // Si es una página de detalle conocida, redirigir a su equivalente /m/
     // para que quede dentro del MobileShell con bottom nav
-    const detalleMatch = to.path.match(/^\/(salas|lotes|plantas)\/(\d+)/)
+    const detalleMatch = to.path.match(/^\/(salas|lotes|plantas|camas)\/(\d+)/)
     if (detalleMatch) {
-      const map = { salas: 'sala-m', lotes: 'lote-m', plantas: 'planta' }
+      const map = { salas: 'sala-m', lotes: 'lote-m', plantas: 'planta', camas: 'cama-m' }
       return `/m/${map[detalleMatch[1]]}/${detalleMatch[2]}`
     }
     // Ruta de manicura → equivalente mobile

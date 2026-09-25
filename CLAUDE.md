@@ -127,14 +127,20 @@ mensual por plan (`Ia::Uso`, `ia_llamadas`, créditos `IaRecarga`).
 - **Seguridad**: no hay contraseña por defecto; `render file:` no existe en modo API; `/me` no se
   cachea; el helper de specs prefija `/api` a todo.
 
-## Dónde retomar (22-sep-2026)
+## Dónde retomar (25-sep-2026)
 
-**Todo pusheado y en producción (`master`, último `47efc39a`).** Bloques (ct) a (dd) del
-CHANGELOG, tres días: PWA personal (el «+» «Hoy», «qué viene» del lote, «Cómo salió», fotos
-achicadas + tope por plan, `/m/perfil`) · **genéticas automáticas** · **m² y g/m²** · **el ajuste
-de stock no crea producto** · `ConfirmDialog` arriba de todo.
+**SUELO VIVO HECHO Y SIN COMMITEAR** (bloque (dg) del CHANGELOG, plan en `docs/PLAN_SUELO_VIVO.md`):
+camas con medidas/mezcla/cocción/descanso, ciclos, registros del suelo, análisis de suelo, recetas
+por uso con conversión de unidades, plantar en la cama, trazabilidad «qué comió esta flor». Migración
+nueva `CrearCamasSueloVivo` (corre sola al deployar). Verificado: rspec completo, vitest, build y
+Playwright sobre `casa_german` (Cama A en uso con CASA-01, Cama B descansando). Falta que Germán lo
+pruebe y pida el commit. Antes: todo pusheado hasta `93e91f4c`.
 
 **Reglas nuevas que gobiernan código nuevo** (detalle en `docs/REGLAS_Y_DECISIONES.md`):
+- **Suelo vivo**: la cama vive más que los lotes; estado calculado; los números de cultivo los pone
+  el cultivador; en la cama no hay trasplantes y la planta no se muda (florece el ESPACIO); plantar
+  en una cama que descansa avisa, no bloquea. La dosis se convierte a la unidad del insumo
+  (`RecetaItem#factor_a_insumo`): la pantalla usa el `factor` del backend.
 - Todo modelo de dominio nuevo lleva `include Transmite` + `transmite_como '<recurso>'`; toda
   pantalla que pide directo a la API se anota con `useRecargaEnCambios`. El aviso no lleva
   datos: la pantalla re-pide. Los `refrescar()` de los stores son silenciosos.

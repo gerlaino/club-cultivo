@@ -48,6 +48,13 @@
                 </button>
               </div>
 
+              <!-- Suelo vivo: lo que se le hace a la TIERRA (top dress, té al suelo, cobertura, mulch)
+                   es de la cama, no del lote: se registra ahí, y queda en la historia de sus lotes. -->
+              <button v-if="lote?.en_cama && ['enraizado', 'vegetativo', 'floracion'].includes(lote?.estado)" type="button"
+                      class="rls__cama-link" @click="alimentarCama">
+                🧺 Alimentar la {{ lote.cama?.nombre || 'cama' }} <span>top dress, té al suelo, cobertura, mulch →</span>
+              </button>
+
               <!-- Estado general (siempre en paso 1) -->
               <div class="rls__seccion-titulo" style="margin-top: var(--sp-5)">Estado general</div>
               <div class="rls__radio-group">
@@ -84,7 +91,7 @@
                   <span>{{ getAccion(accionId)?.emoji }} {{ getAccion(accionId)?.label }}</span>
                 </div>
                 <div class="rls__seccion-body">
-                  <RiegoForm      v-if="accionId === 'riego'"     v-model="formData.riego" />
+                  <RiegoForm      v-if="accionId === 'riego'"     v-model="formData.riego" :suelo-vivo="!!lote?.en_cama" />
                   <PodaForm       v-if="accionId === 'poda'"      v-model="formData.poda" :total-plantas="lote?.plants_count" />
                   <PlagasForm     v-if="accionId === 'plagas'"    v-model="formData.plagas" />
                   <AmbientalForm  v-if="accionId === 'ambiental'" v-model="formData.ambiental" :estado-lote="lote?.estado" />
@@ -136,6 +143,7 @@ import { ref, computed, watch } from 'vue'
 import { registrarTrasplante, createRegistroAmbiental } from '../../../lib/api'
 import { hoyISO } from '../../../utils/dates.js'
 import { registrarLecturaOffline } from '../../../lib/offlineApi.js'
+import { recordarAgua } from '../../../lib/camas.js'
 import { useToast }   from '../../../composables/useToast.js'
 import { useClubStore } from '../../../stores/club'
 import DsSpinner      from '../../../design-system/components/Spinner.vue'
@@ -157,7 +165,8 @@ const props = defineProps({
   // Sin esto, «Regar» era llegar al paso 1 y volver a elegir Riego.
   accionInicial: { type: String, default: null },
 })
-const emit = defineEmits(['update:modelValue', 'saved'])
+const emit = defineEmits(['update:modelValue', 'saved', 'alimentar-cama'])
+function alimentarCama() { emit('update:modelValue', false); emit('alimentar-cama') }
 
 const toast = useToast()
 const club  = useClubStore()
@@ -181,6 +190,8 @@ const accionesDisponibles = computed(() => {
   if (['cosecha', 'en_manicura', 'curado', 'finalizado'].includes(props.lote?.estado)) {
     return ACCIONES.filter(a => ACCIONES_POST_COSECHA.includes(a.id))
   }
+  // Plantado en una cama no hay más trasplantes (las raíces están en la tierra).
+  if (props.lote?.en_cama) return ACCIONES.filter(a => a.id !== 'trasplante')
   return ACCIONES
 })
 
@@ -283,6 +294,7 @@ function buildPayload() {
   if (sel.includes('riego')) {
     const r = fd.riego
     payload.tareas_realizadas.push('riego')
+    if (r.agua)     payload.agua     = r.agua
     if (r.ph)       payload.ph       = r.ph
     if (r.ph_runoff)payload.ph_runoff = r.ph_runoff
     if (r.ec)       payload.ec       = r.ec
@@ -412,6 +424,7 @@ async function guardar() {
       }
     }
 
+    if (sel.includes('riego')) recordarAgua(fd.riego?.agua)
     const n = seleccionadas.value.length
     toast.success(`Registro guardado · ${n} acción${n !== 1 ? 'es' : ''}`)
     emit('update:modelValue', false)
@@ -425,6 +438,11 @@ async function guardar() {
 </script>
 
 <style scoped>
+.rls__cama-link {
+  width: 100%; margin-top: var(--sp-4); text-align: left; background: var(--c-leaf-50); border: 1.5px dashed var(--c-leaf-600);
+  border-radius: var(--r-md); padding: .7rem .9rem; font-weight: 700; color: var(--c-leaf-800); cursor: pointer; font-size: var(--fs-14);
+}
+.rls__cama-link span { display: block; font-weight: 500; font-size: var(--fs-12); color: var(--c-slate-600); }
 /* ── Overlay + Modal ───────────────────────────────────────────────────────── */
 .rls__overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.45); backdrop-filter: blur(3px);

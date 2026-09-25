@@ -25,6 +25,8 @@ module Lotes
           },
         },
         aplicaciones:         Lotes::ResumenAplicaciones.new(l).call,
+        # Suelo vivo: la cama, su mezcla y todo lo que se le puso hasta la cosecha (nil sin cama).
+        suelo:                Lotes::Suelo.new(l).call,
         analisis_laboratorio: l.analisis_laboratorio.order(fecha_analisis: :desc).map { |a|
           { fecha: a.fecha_analisis, laboratorio: a.laboratorio, thc_pct: a.thc_pct&.to_f,
             cbd_pct: a.cbd_pct&.to_f, cbg_pct: a.cbg_pct&.to_f, terpenos: a.terpenos_principales }

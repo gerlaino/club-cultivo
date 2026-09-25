@@ -54,6 +54,10 @@ class AlertaDetectorService
       detectar_tareas_vencidas(lote)
     end
 
+    # Las camas de suelo vivo: lista, fin del descanso, toca top dress. Van siempre (se filtra por
+    # persona en `Notificaciones::Catalogo`, tipo `camas`): sin números del cultivador no hay aviso.
+    @club.camas.vigentes.includes(:sala).find_each { |cama| detectar_cama(cama) }
+
     # Los hitos miran también el curado (el resto lo excluye porque ya no hay ambiente que medir).
     return unless hitos_activos?
 
@@ -105,6 +109,56 @@ class AlertaDetectorService
       hito(lote, 'curado', desde + DIAS_CURADO_HITO.days,
            "#{lote.codigo} lleva tres semanas de curado el %s: ya podés pesarlo y disfrutarlo.")
     end
+  end
+
+  # ── Camas de suelo vivo ─────────────────────────────────────────────────────────────
+  # Lo que dice `Cama#proximo_paso`, el día que llega (o después, si nunca se avisó). Una vez por
+  # cama, por aviso y por fecha: un descanso reprogramado vuelve a avisar en su nueva fecha.
+  TEXTOS_CAMA = {
+    'lista'        => '%<cama>s (%<sala>s) terminó de cocinarse: ya se puede plantar.',
+    'fin_descanso' => '%<cama>s (%<sala>s) terminó su descanso: está lista para plantar.',
+    'top_dress'    => 'A %<cama>s (%<sala>s) le toca top dress (van %<dias>s días del último).',
+  }.freeze
+
+  # Una cama recién lista ya no está «cocinando» ni «descansando» (el día de la fecha el estado
+  # pasa a lista): por eso esos dos avisos miran la FECHA en que terminó, no el paso que viene.
+  # Sólo si terminó hace poco: un descanso de hace dos meses no se avisa hoy.
+  VENTANA_AVISO_CAMA = 7
+
+  def paso_para_avisar(cama)
+    hoy = Date.current
+    case cama.estado(hoy)
+    when 'en_uso'
+      paso = cama.proximo_paso(hoy)
+      paso if paso && paso[:tipo] == 'top_dress'
+    when 'lista'
+      reciente = ->(f) { f && f <= hoy && f >= hoy - VENTANA_AVISO_CAMA }
+      if reciente.(cama.descansa_hasta) then { tipo: 'fin_descanso', fecha: cama.descansa_hasta }
+      elsif reciente.(cama.cocina_hasta) then { tipo: 'lista', fecha: cama.cocina_hasta }
+      end
+    end
+  end
+
+  def detectar_cama(cama)
+    paso = paso_para_avisar(cama)
+    return if paso.nil? || paso[:fecha].nil? || paso[:fecha] > Date.current
+
+    clave = "#{paso[:tipo]}:#{paso[:fecha]}"
+    return if @club.alertas_internas.where(tipo: 'hito_cama').where("contexto->>'cama_id' = ?", cama.id.to_s)
+                                    .where("contexto->>'hito' = ?", clave).exists?
+
+    dias = paso[:ultimo] ? (Date.current - paso[:ultimo]).to_i : nil
+    alerta = @club.alertas_internas.create!(
+      tipo: 'hito_cama', severidad: 'info', destinada_a_role: 'admin',
+      mensaje: format(TEXTOS_CAMA[paso[:tipo]], cama: cama.nombre, sala: cama.sala&.nombre, dias: dias),
+      contexto: { cama_id: cama.id, hito: clave }
+    )
+    # A administración y a quien cultiva ESA sala (no a todos los cultivadores de la organización).
+    destinatarios = @club.users.where(role: 'admin').to_a + (cama.sala ? cama.sala.cultivadores.to_a : [])
+    destinatarios.uniq.each do |u|
+      PushNotificationService.notify_user_async(u, tipo: 'camas', title: 'Tus camas', body: alerta.mensaje, url: "/camas/#{cama.id}")
+    end
+    alerta
   end
 
   # Avisa cuando la fecha está a `dias_antes` o menos (también si ya pasó y nunca se avisó).

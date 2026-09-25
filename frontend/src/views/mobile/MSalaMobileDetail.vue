@@ -28,6 +28,12 @@
       </button>
     </div>
 
+    <!-- Suelo vivo: las camas del espacio (alimentar, regar, descanso). Sólo si hay: la primera
+         se crea desde «Más». -->
+    <div v-if="sala.camas?.length" class="msal__camas">
+      <CamasSeccion :sala="sala" @cambio="recargarSala" />
+    </div>
+
     <!-- Lotes de esta sala -->
     <div class="msal__section-title">Lotes activos</div>
     <div v-if="!lotes.length" class="msal__empty">Sin lotes activos</div>
@@ -70,6 +76,11 @@
         <button class="msal__accion-item" @click="abrirNuevoLote">
           <span class="msal__accion-ico">➕</span>
           <span class="msal__accion-lbl">Crear lote</span>
+          <i class="bi bi-chevron-right msal__accion-arr"></i>
+        </button>
+        <button v-if="puedeCrearCama" class="msal__accion-item" @click="abrirNuevaCama">
+          <span class="msal__accion-ico">🧱</span>
+          <span class="msal__accion-lbl">Nueva cama (suelo vivo)</span>
           <i class="bi bi-chevron-right msal__accion-arr"></i>
         </button>
         <button class="msal__accion-item" @click="abrirFoto">
@@ -133,6 +144,18 @@
         <p v-if="salaVieneDeAntes" class="msal__hint">
           En {{ salaTxt.Corta === 'Sala' ? 'una sala' : 'un espacio' }} de floración un lote no nace: viene de antes. Contá cuánto lleva.
         </p>
+
+        <!-- Suelo vivo: en una cama o en maceta/bandeja. En la cama no hay maceta (siembra directa,
+             o ya plantado); plantar en una cama que descansa o se cocina avisa, no bloquea. -->
+        <div v-if="camasVigentes.length" class="msal__field">
+          <label class="msal__label">¿Dónde está?</label>
+          <div class="msal__pills">
+            <button type="button" class="msal__pill" :class="{ 'is-on': !loteForm.cama_id }" @click="loteForm.cama_id = null">🪴 Maceta o bandeja</button>
+            <button v-for="c in camasVigentes" :key="c.id" type="button" class="msal__pill" :class="{ 'is-on': loteForm.cama_id === c.id }" @click="loteForm.cama_id = c.id">🧱 {{ c.nombre }}</button>
+          </div>
+          <p v-if="avisoCama" class="msal__hint msal__hint--aviso">{{ avisoCama }}</p>
+          <p v-else-if="loteForm.cama_id && tipoLote === 'nuevo'" class="msal__hint">Siembra directa en la cama: germina ahí y no hay trasplantes.</p>
+        </div>
 
         <div class="msal__field">
           <label class="msal__label">¿Cómo {{ tipoLote === 'nuevo' ? 'arranca' : 'arrancó' }}?</label>
@@ -223,6 +246,8 @@
       </div>
     </template>
 
+    <CamaFormModal v-if="showNuevaCama" :sala="sala" @close="showNuevaCama = false" @guardada="camaCreada" />
+
     <!-- Input foto oculto -->
     <input ref="fotoInput" type="file" accept="image/*" capture="environment" style="display:none" @change="subirFoto" />
   </div>
@@ -245,6 +270,10 @@ import { textoCambioDeFase } from '../../lib/textoCambioDeFase.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useAuthStore } from '../../stores/auth'
 import { achicarImagen } from '../../lib/imagenes.js'
+import CamasSeccion from '../../components/camas/CamasSeccion.vue'
+import CamaFormModal from '../../components/camas/CamaFormModal.vue'
+import { avisoAlPlantar } from '../../lib/camas.js'
+import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 
 const route  = useRoute()
 const router = useRouter()
@@ -381,8 +410,22 @@ function emptyLoteForm() {
     genetica_id:  '',
     grow_type:    'sustrato',
     notes:        '',
+    cama_id:      null,
   }
 }
+
+// ── Suelo vivo ───────────────────────────────────────────────────────────────
+const camasVigentes = computed(() => (sala.value?.camas || []).filter(c => c.estado !== 'retirada'))
+const avisoCama = computed(() => avisoAlPlantar(camasVigentes.value.find(c => c.id === loteForm.value.cama_id)))
+const puedeCrearCama = computed(() => ['admin', 'supervisor', 'cultivador'].includes(auth.user?.role))
+const showNuevaCama = ref(false)
+function abrirNuevaCama() { showAcciones.value = false; showNuevaCama.value = true }
+async function recargarSala() {
+  try { sala.value = (await getSala(id)).data } catch { /* queda lo que había */ }
+  try { lotes.value = ((await listLotesDeSala(id)).data || []).filter(l => l.estado !== 'finalizado') } catch { /* idem */ }
+}
+function camaCreada(c) { showNuevaCama.value = false; toast.success(`${c.nombre} creada`); recargarSala() }
+useRecargaEnCambios(['camas'], recargarSala)
 const loteForm = ref(emptyLoteForm())
 
 const KIND_GRADIENT = {
@@ -424,6 +467,8 @@ async function guardarNuevoLote() {
   try {
     const payload = { ...loteForm.value }
     if (!payload.genetica_id) delete payload.genetica_id
+    if (!payload.cama_id) delete payload.cama_id
+    else delete payload.grow_type
     let data
     if (tipoLote.value === 'existente') {
       delete payload.start_date
@@ -437,6 +482,7 @@ async function guardarNuevoLote() {
       ;({ data } = await createLote(sala.value.id, { ...payload, estado: 'enraizado' }))
     }
     lotes.value.unshift(data)
+    if (payload.cama_id) recargarSala()
     toast.success('Lote creado')
     showNuevoLote.value = false
   } catch (e) {
@@ -537,6 +583,8 @@ onMounted(async () => {
   -webkit-tap-highlight-color: transparent;
 }
 
+.msal__camas { padding: .25rem 1rem .5rem; }
+.msal__hint.msal__hint--aviso { color: var(--c-rust-600); font-weight: 600; }
 .msal__section-title { font-size: .7rem; font-weight: 700; color: var(--c-slate-400); text-transform: uppercase; letter-spacing: .06em; padding: .75rem 1rem .5rem; }
 .msal__empty { padding: .75rem 1rem; color: var(--c-slate-400); font-size: .82rem; text-align: center; }
 .msal__list { display: flex; flex-direction: column; gap: .5rem; padding: 0 1rem; }

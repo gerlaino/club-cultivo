@@ -2,7 +2,7 @@ class LotesController < ApplicationController
   before_action :authenticate_user!
   before_action -> { require_feature!(:cultivo) }
   before_action :require_admin_cultivador_o_manicura
-  before_action :set_lote, only: [:show, :trazabilidad, :resumen_ciclo, :update, :completar_datos, :destroy, :transiciones, :avanzar_fase, :cosechar_plantas, :timeline, :historial, :asignar_manicurador, :devolver_manicura, :reevaluar_manicura, :registrar_trasplante, :desprender]
+  before_action :set_lote, only: [:show, :trazabilidad, :resumen_ciclo, :update, :completar_datos, :destroy, :transiciones, :avanzar_fase, :cosechar_plantas, :timeline, :historial, :asignar_manicurador, :devolver_manicura, :reevaluar_manicura, :registrar_trasplante, :desprender, :plantar_en_cama, :preview_plan, :aplicar_plan]
   before_action :require_export_role!, only: [:export_csv]
   before_action :set_sala, only: [:index, :create], if: -> { params[:sala_id].present? }
 
@@ -99,6 +99,17 @@ class LotesController < ApplicationController
     unless enforcer.puede_crear_lote?
       info = enforcer.info
       return render json: PlanEnforcer.error_limite('lotes', info[:limites][:lotes], plan: info[:label]), status: :payment_required
+    end
+
+    # Suelo vivo: plantado en una cama, la sala es la de la cama. Si vinieron las dos y no
+    # coinciden, es un error de la pantalla: mejor frenarlo que plantar en otro lado.
+    if (cama_id = params.dig(:lote, :cama_id)).present?
+      cama = current_user.club.camas.al_alcance_de(current_user).find_by(id: cama_id)
+      return render json: { errors: ['Cama no encontrada'] }, status: :unprocessable_entity unless cama
+      if @sala && @sala.id != cama.sala_id
+        return render json: { errors: ["La #{cama.nombre} está en otro espacio"] }, status: :unprocessable_entity
+      end
+      @sala ||= cama.sala
     end
 
     # Lote cosechado: no usa sala de cultivo. Viene con sede_id y se trackea por estado
@@ -319,6 +330,14 @@ class LotesController < ApplicationController
       return render json: { error: 'Ninguno de los lotes elegidos está en una sala de cultivo' },
                     status: :unprocessable_entity
     end
+    # Plantado en una cama no se muda: tiene las raíces en la tierra.
+    en_cama = lotes.select(&:en_cama?)
+    if en_cama.any?
+      return render json: {
+        error: "Estos lotes están plantados en una cama y no se mudan: #{en_cama.map(&:codigo).join(', ')}.",
+        lotes_rechazados: en_cama.map { |l| { id: l.id, codigo: l.codigo, estado: l.estado } },
+      }, status: :unprocessable_entity
+    end
 
     # Solo las salas de fase definida imponen fase. Una sala mixta/madre/clon no reescribe nada:
     # ahí conviven fases distintas a propósito.
@@ -406,10 +425,14 @@ class LotesController < ApplicationController
       return render json: { error: 'No autorizado' }, status: :forbidden
     end
 
+    if params[:cama_id].present? && !current_user.club.camas.al_alcance_de(current_user).exists?(id: params[:cama_id])
+      return render json: { error: 'Cama no encontrada' }, status: :not_found
+    end
+
     res = Lotes::Desprender.call(
       lote: @lote, usuario: current_user,
       plant_ids: params[:plant_ids], cantidad: params[:cantidad],
-      tamanio_maceta: params[:tamanio_maceta], motivo: params[:motivo],
+      tamanio_maceta: params[:tamanio_maceta], motivo: params[:motivo], cama_id: params[:cama_id],
     )
     return render json: { error: res.error }, status: :unprocessable_entity unless res.ok?
 
@@ -417,6 +440,37 @@ class LotesController < ApplicationController
       lote_origen: LoteSerializer.serialize(@lote.reload),
       lote_nuevo:  LoteSerializer.serialize(res.lote_nuevo.reload),
     }, status: :created
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  # POST /lotes/:id/plantar_en_cama  { cama_id, fecha }
+  # El último trasplante: el lote (en bandeja o en vasito) va a una cama de suelo vivo. Si
+  # enraizaba, prende. Plantar en una cama que descansa o se cocina NO se bloquea (la pantalla
+  # avisa antes: Germán, 22-sep). Las reglas viven en el modelo (`Lote#prender_al_plantarlo_en_la_cama`,
+  # `#ocupar_la_cama`), así que valen también para editar el lote.
+  def plantar_en_cama
+    unless %w[admin supervisor cultivador].include?(current_user.role)
+      return render json: { error: 'No autorizado' }, status: :forbidden
+    end
+    return render json: { error: 'El lote ya está plantado en una cama' }, status: :unprocessable_entity if @lote.en_cama?
+    unless Lote::CULTIVO_ESTADOS.include?(@lote.estado)
+      return render json: { error: 'Sólo se planta un lote en cultivo' }, status: :unprocessable_entity
+    end
+
+    cama = current_user.club.camas.al_alcance_de(current_user).find_by(id: params[:cama_id])
+    return render json: { error: 'Cama no encontrada' }, status: :not_found unless cama
+
+    dia = params[:fecha].present? ? (Date.parse(params[:fecha].to_s) rescue nil) : Time.zone.today
+    return render json: { error: 'La fecha no es válida' }, status: :unprocessable_entity if dia.nil?
+    return render json: { error: 'La fecha no puede ser futura' }, status: :unprocessable_entity if dia > Time.zone.today
+
+    # La sala es la de la cama, y tiene que admitir el estado del lote (con el que queda: si
+    # enraizaba, prende a vegetativo).
+    @lote.actor_del_prendido = current_user
+    @lote.prendido_en        = dia.in_time_zone.change(hour: 12)
+    @lote.update!(cama: cama)
+    render json: LoteSerializer.serialize(@lote.reload, include_plants: true)
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
@@ -528,7 +582,7 @@ class LotesController < ApplicationController
     require "csv"
     csv_data = CSV.generate(col_sep: ";", encoding: "UTF-8") do |csv|
       csv << [
-        "Código", "Estado", "Genética", "Automática", "Sala", "Sede",
+        "Código", "Estado", "Genética", "Automática", "Sala", "Sede", "Cama", "Ciclo de la cama",
         "Plantas", "Plantas obj.", "Plantas cosechadas",
         "Rendimiento obj. (g)", "Rendimiento real (g)", "Desviación (%)",
         "m²", "g/m²",
@@ -546,6 +600,8 @@ class LotesController < ApplicationController
           l.automatica? ? 'Sí' : 'No',
           l.sala&.nombre,
           l.sala&.sede&.nombre,
+          l.cama&.nombre,
+          l.cama_ciclo&.numero,
           l.plants_count,
           l.plants_count_objetivo,
           l.plants_count_cosechadas,
@@ -751,11 +807,15 @@ class LotesController < ApplicationController
       return render json: { error: 'Sin permiso' }, status: :forbidden
     end
     plan = current_user.club.plan_trabajos.publicados.find(params[:plan_trabajo_id])
-    tareas = AplicarPlanLoteService.new(lote: @lote, plan: plan, ejecutado_por: current_user, fecha_inicio: params[:fecha_inicio]).preview
+    servicio = AplicarPlanLoteService.new(lote: @lote, plan: plan, ejecutado_por: current_user, fecha_inicio: params[:fecha_inicio])
+    tareas = servicio.preview
     render json: {
       plan:   { id: plan.id, titulo: plan.titulo, duracion_dias: plan.duracion_dias },
       tareas: tareas,
       total:  tareas.size,
+      # En una cama: los trasplantes y las fertilizaciones del plan no se crean (y se dice cuántas).
+      omitidas: servicio.omitidas,
+      motivo_omitidas: servicio.omitidas.any? ? "El lote está en la #{@lote.cama&.nombre}: no hay trasplantes y el suelo se alimenta aparte" : nil,
     }
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Plan no encontrado' }, status: :not_found
@@ -769,8 +829,9 @@ class LotesController < ApplicationController
       return render json: { error: 'Sin permiso' }, status: :forbidden
     end
     plan = current_user.club.plan_trabajos.publicados.find(params[:plan_trabajo_id])
-    creadas = AplicarPlanLoteService.new(lote: @lote, plan: plan, ejecutado_por: current_user, fecha_inicio: params[:fecha_inicio]).aplicar!
-    render json: { tareas_creadas: creadas.size }
+    servicio = AplicarPlanLoteService.new(lote: @lote, plan: plan, ejecutado_por: current_user, fecha_inicio: params[:fecha_inicio])
+    creadas = servicio.aplicar!
+    render json: { tareas_creadas: creadas.size, tareas_omitidas: servicio.omitidas.size }
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Plan no encontrado' }, status: :not_found
   rescue Date::Error
@@ -1178,7 +1239,7 @@ class LotesController < ApplicationController
       :rendimiento_real_g, :plants_count_cosechadas,
       :fotoperiodo, :fotoperiodo_vegetativo,
       :tamanio_maceta_inicial, :fecha_trasplante,
-      :ph_riego, :fertilizacion_descripcion, :sistema_hidro, :sustrato_especifico,
+      :ph_riego, :fertilizacion_descripcion, :sistema_hidro, :sustrato_especifico, :cama_id,
       planta_madre_ids: []
     )
   end
@@ -1191,7 +1252,7 @@ class LotesController < ApplicationController
       :rendimiento_real_g, :plants_count_cosechadas,
       :fotoperiodo, :fotoperiodo_vegetativo,
       :tamanio_maceta_inicial, :fecha_trasplante,
-      :ph_riego, :fertilizacion_descripcion, :sistema_hidro, :sustrato_especifico,
+      :ph_riego, :fertilizacion_descripcion, :sistema_hidro, :sustrato_especifico, :cama_id,
       planta_madre_ids: []
     )
   end

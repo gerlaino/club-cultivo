@@ -52,6 +52,7 @@ module Lotes
         registros:  registros,
         fotos:      fotos,
         anterior:   anterior,
+        cama:       cama,
       }
     end
 
@@ -60,7 +61,24 @@ module Lotes
     # Lo que se gastó en nutrientes según los riegos con receta o productos (copia congelada en
     # cada registro: `nutricion.costo_ars`).
     def costo_nutricion
-      @lote.registros_ambientales.where.not(nutricion: nil).sum { |r| r.nutricion.to_h['costo_ars'].to_f }.round(2)
+      riegos = @lote.registros_ambientales.where.not(nutricion: nil).sum { |r| r.nutricion.to_h['costo_ars'].to_f }
+      # Lo que se le puso a la cama en el ciclo también es de este lote (repartido por m²).
+      suelo  = InsumoConsumo.where(lote_id: @lote.id).where.not(cama_registro_id: nil).sum(:costo_imputado_ars).to_f
+      (riegos + suelo).round(2)
+    end
+
+    # Suelo vivo: el ciclo de la cama en el que creció, contra el ciclo anterior de la MISMA cama.
+    # Es la pregunta del que cultiva en suelo vivo: ¿mi suelo mejora cosecha tras cosecha?
+    def cama
+      ciclo = @lote.cama_ciclo
+      return nil unless @lote.cama && ciclo
+      previo = @lote.cama.ciclos.where('numero < ?', ciclo.numero).where.not(hasta: nil).order(:numero).last
+      {
+        id: @lote.cama.id, nombre: @lote.cama.nombre, ciclo: ciclo.numero,
+        g_m2: ciclo.g_m2&.to_f,
+        anterior: previo && { ciclo: previo.numero, g_m2: previo.g_m2&.to_f },
+        aplicaciones_suelo: ciclo.registros.count,
+      }
     end
 
     # `tareas_realizadas` es jsonb: `@>` pregunta si la lista contiene «riego».
