@@ -62,6 +62,25 @@ class LoteSerializer
       .map { |estado, fecha| { estado: estado, fecha: fecha } }
       .sort_by { |h| h[:fecha] }
 
+    # Cuántos días estuvo en cada fase, para el detalle de la tabla («Enraizado 29 d · Vegetativo
+    # 49 d»). Va en el orden en que pasó, no con la última entrada a cada estado como
+    # `historial_estados`: un lote que volvió atrás estuvo dos veces en vegetativo, y los dos
+    # tramos cuentan. El primero no tiene evento de entrada —el lote nació así—: arranca en
+    # `start_date` con el estado del que salió en el primer cambio. El último es la fase actual.
+    cambios = eventos.select { |e| e.tipo == 'cambio_estado' && e.estado_nuevo.present? && e.registrado_en.present? }
+                     .sort_by(&:registrado_en)
+    tramos = cambios.map { |e| { estado: e.estado_nuevo, fecha: e.registrado_en.to_date } }
+    inicial = cambios.first&.estado_anterior
+    if inicial.present? && lote.start_date && lote.start_date <= tramos.first[:fecha]
+      tramos.unshift({ estado: inicial, fecha: lote.start_date })
+    end
+    tramos = tramos.chunk_while { |a, b| a[:estado] == b[:estado] }.map(&:first)
+    fases = tramos.each_with_index.map do |t, i|
+      hasta = tramos[i + 1]&.dig(:fecha)
+      { estado: t[:estado], desde: t[:fecha], hasta: hasta,
+        dias: ((hasta || Date.current) - t[:fecha]).to_i, actual: hasta.nil? }
+    end
+
     result = {
       id:                   lote.id,
       club_id:              lote.club_id,
@@ -96,6 +115,9 @@ class LoteSerializer
       strain:             lote.strain,
       notes:              lote.notes,
       grow_type:                 lote.grow_type,
+      metodo_enraizado:          lote.metodo_enraizado,
+      # Lo que el formulario de trasplante trae marcado (la regla vive en el modelo).
+      medio_al_trasplantar:      lote.medio_al_trasplantar,
       light_type:                lote.light_type,
       semanas_floracion:         lote.semanas_floracion, # deprecado
       dias_vegetativo_objetivo:  lote.dias_vegetativo_objetivo,
@@ -121,6 +143,7 @@ class LoteSerializer
       # que la fecha y los días de la tabla no pueden contradecirse.
       fecha_estado_actual: fecha_estado_actual,
       historial_estados:   historial_estados,
+      fases:               fases,
       # Qué viene y en cuántos días (`{ fase, fecha, faltan_dias }` o nil). Regla en el modelo:
       # la tarjeta del teléfono y el inicio sólo la muestran.
       proximo_paso:        lote.proximo_paso,

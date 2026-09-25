@@ -176,7 +176,34 @@ RSpec.describe Lote, '#proximo_paso' do
 
   it 'en vegetativo cuenta los días que faltan para floración desde que prendió' do
     lote = en_estado('vegetativo', hace: 22, dias_vegetativo_objetivo: 30)
-    expect(lote.proximo_paso).to eq(fase: 'floracion', fecha: 8.days.from_now.to_date, faltan_dias: 8)
+    expect(lote.proximo_paso).to include(fase: 'floracion', fecha: 8.days.from_now.to_date, faltan_dias: 8)
+  end
+
+  # AC (Germán): «Floración venció hace 33 días» no se entendía: no decía contra qué. La pantalla
+  # tiene que poder decir «la genética pide 45 de vege; lleva 78».
+  describe 'de dónde sale el número' do
+    let(:genetica) { create(:genetica, club: club, dias_vegetativo_objetivo: 45, tiempo_floracion: 60) }
+
+    it 'dice cuántos días pide y cuántos lleva en la fase' do
+      lote = en_estado('vegetativo', hace: 78, genetica: genetica, dias_vegetativo_objetivo: 45)
+      expect(lote.proximo_paso).to include(faltan_dias: -33, objetivo_dias: 45, lleva_dias: 78)
+    end
+
+    it 'si el lote conserva el número de la genética, lo atribuye a la genética' do
+      lote = en_estado('vegetativo', hace: 78, genetica: genetica, dias_vegetativo_objetivo: 45)
+      expect(lote.proximo_paso[:objetivo_origen]).to eq('genetica')
+    end
+
+    it 'si al lote le cambiaron el número, no dice que lo pide la genética' do
+      lote = en_estado('vegetativo', hace: 78, genetica: genetica, dias_vegetativo_objetivo: 50)
+      expect(lote.proximo_paso[:objetivo_origen]).to eq('lote')
+    end
+
+    it 'con fecha de cosecha fijada a mano no inventa días objetivo' do
+      lote = en_estado('floracion', hace: 10, genetica: genetica, dias_floracion_objetivo: 60,
+                                    fecha_cosecha_estimada: 5.days.from_now.to_date)
+      expect(lote.proximo_paso).to include(objetivo_dias: nil, objetivo_origen: 'fecha_estimada', lleva_dias: 10)
+    end
   end
 
   it 'en floración cuenta para la cosecha, y se pasa en negativo' do

@@ -18,7 +18,7 @@ import EmptyState from '../components/ui/EmptyState.vue'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import { ArrowRight, ChevronRight } from 'lucide-vue-next'
-import { em, sm, pgm, growLabel, lightLabel, macetaLabel, fotoperiodoLabel, formatDate, formatDateTime,
+import { em, sm, pgm, growLabel, metodoEnraizadoLabel, lightLabel, macetaLabel, fotoperiodoLabel, formatDate, formatDateTime,
   capitalizarFase, phaseBannerMsg, CICLO_BASE, POST_HARVEST_ESTADOS, textoProximoPaso } from '../lib/loteHelpers.js'
 import DesprenderLoteModal  from '../components/lotes/DesprenderLoteModal.vue'
 import LoteHistorialSection from '../components/lotes/LoteHistorialSection.vue'
@@ -670,7 +670,10 @@ onUnmounted(() => {
             <dl class="ld__dl">
               <dt>Plantas</dt><dd><strong>{{ lote.plants_count ?? 0 }}</strong></dd>
               <dt>Maceta</dt><dd>{{ macetaLabel(lote.tamanio_maceta) }}</dd>
-              <dt>Tipo cultivo</dt><dd>{{ growLabel(lote.grow_type) }}</dd>
+              <dt>Tipo cultivo</dt><dd>{{ growLabel(lote.grow_type) }}<template v-if="lote.sustrato_especifico"> · {{ lote.sustrato_especifico }}</template></dd>
+              <template v-if="lote.metodo_enraizado">
+                <dt>Enraizó en</dt><dd>{{ metodoEnraizadoLabel(lote.metodo_enraizado) }}</dd>
+              </template>
               <dt>Luminaria</dt><dd>{{ lightLabel(lote.light_type) }}</dd>
               <dt>Genética</dt><dd>{{ lote.genetica?.nombre || lote.strain || '—' }}</dd>
               <dt>Fotoperiodo</dt><dd>{{ fotoperiodoLabel(lote.estado, lote.fotoperiodo, lote.automatica) }}</dd>
@@ -735,6 +738,7 @@ onUnmounted(() => {
       v-model="verHistorialOpen"
       :historial="historial"
       :can-admin="esAdmin"
+      :lote="lote"
       @crear="onCrearEvento"
       @trasplante="onTrasplante"
       @editar="onEditarEvento"

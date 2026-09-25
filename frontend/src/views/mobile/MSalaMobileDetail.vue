@@ -233,7 +233,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { textoProximoPaso } from '../../lib/loteHelpers.js'
-import { getSala, listLotes, createSalaNota, createLote, createLoteHeredado, listGeneticas,
+import { getSala, listLotesDeSala, createSalaNota, createLote, createLoteHeredado, listGeneticas,
          listFotosSala, uploadFotoSala } from '../../lib/api'
 import { useToast }       from '../../composables/useToast'
 import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
@@ -276,7 +276,7 @@ async function cambiarFase(confirmado = false) {
     const { data } = await cambiarFaseSala(id, confirmado ? { confirmar_cambio_fase: true } : {})
     showAcciones.value = false
     sala.value = { ...sala.value, kind: data.nueva_fase }
-    try { lotes.value = ((await listLotes(id)).data || []).filter(l => l.estado !== 'finalizado') } catch { /* la fase ya cambió */ }
+    try { lotes.value = ((await listLotesDeSala(id)).data || []).filter(l => l.estado !== 'finalizado') } catch { /* la fase ya cambió */ }
     toast.success(data.lotes_afectados
       ? `${salaTxt.value.Corta} en ${faseLabel(data.nueva_fase)} — ${data.lotes_afectados} lote${data.lotes_afectados === 1 ? '' : 's'}`
       : `${salaTxt.value.Corta} en ${faseLabel(data.nueva_fase)}`)
@@ -494,7 +494,7 @@ async function guardarNota() {
 
 onMounted(async () => {
   try {
-    const [salaRes, lotesRes, geneticasRes] = await Promise.allSettled([getSala(id), listLotes(id), listGeneticas()])
+    const [salaRes, lotesRes, geneticasRes] = await Promise.allSettled([getSala(id), listLotesDeSala(id), listGeneticas()])
     if (salaRes.status === 'fulfilled') sala.value = salaRes.value.data
     if (lotesRes.status === 'fulfilled')
       lotes.value = (lotesRes.value.data || []).filter(l => l.estado !== 'finalizado')

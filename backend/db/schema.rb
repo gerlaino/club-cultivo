@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_23_150000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_24_222357) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1371,6 +1371,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_23_150000) do
     t.decimal "costo_cedido_ars", precision: 12, scale: 2, default: "0.0", null: false
     t.integer "dias_ciclo_objetivo"
     t.decimal "m2_ocupados", precision: 8, scale: 2
+    t.string "metodo_enraizado"
     t.index ["club_id"], name: "index_lotes_on_club_id"
     t.index ["codigo"], name: "index_lotes_on_codigo"
     t.index ["codigo_qr"], name: "index_lotes_on_codigo_qr", unique: true, where: "(codigo_qr IS NOT NULL)"

@@ -14,6 +14,8 @@
           </button>
           <RegistrarActividadForm
             v-else
+            :medio-sugerido="lote?.medio_al_trasplantar || lote?.grow_type || 'sustrato'"
+            :metodo-enraizado="lote?.estado === 'enraizado' ? lote?.metodo_enraizado : null"
             @crear="(p) => { $emit('crear', p); formAbierto = false }"
             @trasplante="(p) => { $emit('trasplante', p); formAbierto = false }"
             @cancelar="formAbierto = false"
@@ -96,6 +98,8 @@ const props = defineProps({
   modelValue: { type: Boolean, default: false },
   historial:  { type: Array,   default: () => [] },
   canAdmin:   { type: Boolean, default: false },
+  // Para que el trasplante traiga marcado el medio en que queda.
+  lote:       { type: Object,  default: null },
 })
 const emit = defineEmits(['update:modelValue', 'editar', 'delete', 'crear', 'trasplante'])
 

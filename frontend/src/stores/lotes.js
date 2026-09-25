@@ -2,6 +2,7 @@ import { logger } from '../utils/logger.js'
 import { defineStore } from "pinia";
 import {
   listLotes,
+  listLotesDeSala,
   createLote,
   getLote,
   updateLote,
@@ -41,7 +42,8 @@ export const useLotesStore = defineStore("lotes", {
         this.items = data || [];
       } catch (e) {
         logger.error("Lotes.fetch", e);
-        this.error = e?.response?.data?.error || e.message;
+        // Un refresco silencioso que falla no pinta un error encima de una lista que se ve bien.
+        if (!silencioso) this.error = e?.response?.data?.error || e.message;
       } finally {
         this.loading = false;
       }
@@ -50,11 +52,11 @@ export const useLotesStore = defineStore("lotes", {
     async fetchBySala(salaId, { silencioso = false } = {}) {
       if (!silencioso) { this.loading = true; this.error = null; }
       try {
-        const { data } = await listLotes(salaId);
+        const { data } = await listLotesDeSala(salaId);
         this.itemsBySala.set(String(salaId), data || []);
       } catch (e) {
         logger.error("Lotes.fetchBySala", e);
-        this.error = e?.response?.data?.error || e.message;
+        if (!silencioso) this.error = e?.response?.data?.error || e.message;
       } finally {
         this.loading = false;
       }

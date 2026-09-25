@@ -152,6 +152,14 @@ export function pgm(p) { return PLAGAS_META[p]       || { color: '#94a3b8', emoj
 
 export function growLabel(g)  { return { sustrato: 'Sustrato', hidroponia: 'Hidroponia' }[g] || g || '—' }
 export function lightLabel(l) { return { led: 'LED', hps: 'HPS', cmh: 'CMH', natural: 'Natural', mixta: 'Mixta' }[l] || l || '—' }
+
+// Dónde enraíza el lote. QUÉ métodos existen lo manda el backend (`/me` →
+// `reglas_cultivo.metodos_enraizado`); acá sólo se les pone nombre.
+const METODO_ENRAIZADO_LABELS = { incubadora: 'Incubadora (hidroponía)', jiffy: 'Jiffy', taco: 'Taco / lana de roca' }
+export function metodoEnraizadoLabel(m) { return METODO_ENRAIZADO_LABELS[m] || m || '—' }
+export function opcionesMetodoEnraizado(reglasCultivo) {
+  return (reglasCultivo?.metodos_enraizado || []).map(v => ({ value: v, label: metodoEnraizadoLabel(v) }))
+}
 export function macetaLabel(m) {
   if (m == null || m === '') return '—'
   const key = String(parseFloat(m))   // "15.0" -> "15", "0.5" -> "0.5"
@@ -202,6 +210,9 @@ export function phaseBannerMsg(estado) {
 const PROXIMO_PASO_LABEL = { floracion: 'floración', cosecha: 'la cosecha', curado: 'el curado' }
 // La misma frase, corta, para una celda de tabla: «Flora en 8 d», «Cosecha hoy», «Cosecha hace 3 d».
 const PROXIMO_PASO_CORTO = { floracion: 'Flora', cosecha: 'Cosecha', curado: 'Curado' }
+// Pasado el objetivo se dice lo que hay que HACER («Cosechar · tocaba hace 32 d»): «Cosecha hace
+// 32 d» se leía como que ya se había cosechado.
+const PROXIMO_PASO_ACCION_CORTA = { floracion: 'Pasar a flora', cosecha: 'Cosechar', curado: 'Curar' }
 export function textoProximoPasoCorto(lote) {
   const p = lote?.proximo_paso
   if (!p?.fase) return null
@@ -209,7 +220,25 @@ export function textoProximoPasoCorto(lote) {
   const n   = p.faltan_dias
   if (n > 0)   return `${que} en ${n} d`
   if (n === 0) return `${que} hoy`
-  return `${que} hace ${-n} d`
+  return `${PROXIMO_PASO_ACCION_CORTA[p.fase] || que} · tocaba hace ${-n} d`
+}
+
+// «Pasar a floración: tocaba hace 33 días (la genética pide 45 de vege; lleva 78)». Antes decía
+// «Floración venció hace 33 días» y no se sabía contra qué. Los números y de dónde salen los manda
+// el backend (`Lote#proximo_paso`).
+const PROXIMO_PASO_ACCION = { floracion: 'Pasar a floración', cosecha: 'Cosechar', curado: 'Pasar a curado' }
+// La fase en la que está el lote, según lo que viene después.
+const FASE_ANTERIOR = { floracion: 'vege', cosecha: 'floración', curado: 'secado' }
+function porQueToca(p) {
+  const quien = p.objetivo_origen === 'genetica' ? 'la genética pide' : 'el plan del lote pide'
+  const lleva = p.lleva_dias != null ? `; lleva ${p.lleva_dias}` : ''
+  if (p.objetivo_origen === 'fecha_estimada') {
+    const f = p.fecha ? parseDate(p.fecha)?.toLocaleDateString('es-AR', { day: 'numeric', month: 'numeric' }) : null
+    return f ? `cosecha estimada para el ${f}${lleva ? `${lleva} de ${FASE_ANTERIOR[p.fase]}` : ''}` : null
+  }
+  if (!p.objetivo_dias) return null
+  if (p.automatica) return `${quien} un ciclo de ${p.objetivo_dias}${lleva}`
+  return `${quien} ${p.objetivo_dias} de ${FASE_ANTERIOR[p.fase] || 'esta fase'}${lleva}`
 }
 export function textoProximoPaso(lote) {
   const p = lote?.proximo_paso
@@ -222,5 +251,7 @@ export function textoProximoPaso(lote) {
   if (n === 1) return `Mañana toca ${que}`
   if (n === 0) return `Hoy toca ${que}`
   const pasados = -n
-  return `${que.charAt(0).toUpperCase()}${que.slice(1)} venció hace ${pasados} ${pasados === 1 ? 'día' : 'días'}`
+  const accion  = PROXIMO_PASO_ACCION[p.fase] || `${que.charAt(0).toUpperCase()}${que.slice(1)}`
+  const razon   = porQueToca(p)
+  return `${accion}: tocaba hace ${pasados} ${pasados === 1 ? 'día' : 'días'}${razon ? ` (${razon})` : ''}`
 }

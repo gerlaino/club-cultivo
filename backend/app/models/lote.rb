@@ -112,6 +112,9 @@ class Lote < ApplicationRecord
   # Estados post-cosecha: el lote NO tiene sala (se ve por estado en Cosecha/Manicura).
   POST_COSECHA  = %w[cosecha en_manicura curado finalizado].freeze
   TIPOS_CULTIVO = %w[sustrato hidroponia].freeze
+  # Dónde enraíza. La incubadora es hidroponía: al ir al vasito cambia de medio (pasa a sustrato),
+  # y por eso el trasplante que la prende sugiere sustrato (`medio_al_trasplantar`).
+  METODOS_ENRAIZADO = %w[incubadora jiffy taco].freeze
   TIPOS_LUZ     = %w[led hps cmh natural mixta].freeze
   SUSTRATOS     = %w[tierra coco perlita mezcla rockwool fibra_coco].freeze
   FOTOPERIODOS  = %w[20/4 18/6 16/8 12/12 auto].freeze
@@ -120,6 +123,7 @@ class Lote < ApplicationRecord
   validates :estado,            inclusion: { in: ESTADOS }, allow_blank: false
   validates :plants_count,      numericality: { only_integer: true, greater_than_or_equal_to: 0 }, allow_nil: true
   validates :grow_type,         inclusion: { in: TIPOS_CULTIVO }, allow_blank: true
+  validates :metodo_enraizado,  inclusion: { in: METODOS_ENRAIZADO }, allow_blank: true
   validates :light_type,        inclusion: { in: TIPOS_LUZ },     allow_blank: true
   validates :tamanio_maceta,    numericality: { greater_than: 0 }, allow_nil: true
   validates :semanas_floracion, numericality: { only_integer: true, greater_than: 0 }, allow_nil: true # deprecado
@@ -153,6 +157,9 @@ class Lote < ApplicationRecord
   # Quién puso el lote en maceta, para los caminos que no vienen de un request (servicios,
   # rakes). En un request alcanza con `Current.user`.
   attr_accessor :actor_del_prendido
+  # Cuándo prendió de verdad: un trasplante cargado con fecha pasada fecha el cambio de fase ese
+  # día, no el día en que se cargó. Sin él (edición a mano), es ahora.
+  attr_accessor :prendido_en
 
   before_create :generar_codigo
   before_create :generar_codigo_qr
@@ -283,6 +290,15 @@ class Lote < ApplicationRecord
     f ? (Time.zone.today - f).to_i : nil
   end
 
+  # En qué medio queda después de un trasplante, para que el formulario lo traiga marcado. El que
+  # sale de la incubadora o del jiffy va al vasito con sustrato (Germán, 24-sep-2026); el taco de
+  # lana de roca puede seguir en hidro, así que ahí y en cualquier otro trasplante se queda en lo
+  # que ya estaba. Es una sugerencia: el trasplante manda el medio que se eligió.
+  def medio_al_trasplantar
+    return 'sustrato' if estado == 'enraizado' && %w[incubadora jiffy].include?(metodo_enraizado)
+    grow_type.presence || 'sustrato'
+  end
+
   # Qué viene y cuándo, para decirlo en la tarjeta: «faltan 8 días para floración». Se cuenta
   # desde que entró al estado actual (`fecha_estado_actual`) más los días objetivo de esa fase,
   # que el lote hereda de la genética al crearse. En floración manda `fecha_cosecha_estimada`
@@ -299,25 +315,42 @@ class Lote < ApplicationRecord
     if automatica? && %w[vegetativo floracion].include?(estado)
       desde = fecha_inicio_vegetativo
       return nil unless desde && dias_ciclo_objetivo.to_i.positive?
-      fecha = fecha_cosecha_estimada || (desde + dias_ciclo_objetivo.to_i.days)
-      return { fase: 'cosecha', fecha: fecha, faltan_dias: (fecha - Time.zone.today).to_i, automatica: true }
+      if fecha_cosecha_estimada
+        return paso('cosecha', fecha_cosecha_estimada, desde, nil, 'fecha_estimada').merge(automatica: true)
+      end
+      return paso('cosecha', desde + dias_ciclo_objetivo.to_i.days, desde, dias_ciclo_objetivo.to_i,
+                  origen_objetivo(dias_ciclo_objetivo, genetica&.dias_ciclo_objetivo)).merge(automatica: true)
     end
 
-    fase, objetivo = case estado
-                     when 'vegetativo' then ['floracion', dias_vegetativo_objetivo]
-                     when 'floracion'  then ['cosecha',   dias_floracion_objetivo]
-                     when 'cosecha'    then ['curado',    dias_cosecha_objetivo]
-                     end
+    fase, objetivo, de_genetica = case estado
+                                  when 'vegetativo' then ['floracion', dias_vegetativo_objetivo, genetica&.dias_vegetativo_objetivo]
+                                  when 'floracion'  then ['cosecha',   dias_floracion_objetivo,  genetica&.tiempo_floracion]
+                                  when 'cosecha'    then ['curado',    dias_cosecha_objetivo,    genetica&.dias_cosecha_objetivo]
+                                  end
     return nil unless fase
 
-    fecha = fecha_cosecha_estimada if estado == 'floracion'
-    if fecha.nil?
-      desde = fecha_estado_actual
-      return nil unless desde && objetivo.to_i.positive?
-      fecha = desde + objetivo.to_i.days
-    end
-    { fase: fase, fecha: fecha, faltan_dias: (fecha - Time.zone.today).to_i }
+    desde = fecha_estado_actual
+    return paso(fase, fecha_cosecha_estimada, desde, nil, 'fecha_estimada') if estado == 'floracion' && fecha_cosecha_estimada
+    return nil unless desde && objetivo.to_i.positive?
+
+    paso(fase, desde + objetivo.to_i.days, desde, objetivo.to_i, origen_objetivo(objetivo, de_genetica))
   end
+
+  # «Pasar a floración: tocaba hace 33 días (la genética pide 45 de vege; lleva 78)». Sin de dónde
+  # sale el número, «venció hace 33 días» no se entendía. `objetivo_origen`: 'genetica' si el lote
+  # conserva el número que heredó, 'lote' si se lo cambiaron, 'fecha_estimada' si manda una fecha
+  # de cosecha fijada a mano (ahí no hay días objetivo).
+  def paso(fase, fecha, desde, objetivo, origen)
+    { fase: fase, fecha: fecha, faltan_dias: (fecha - Time.zone.today).to_i,
+      objetivo_dias: objetivo, objetivo_origen: origen,
+      lleva_dias: desde ? (Time.zone.today - desde).to_i : nil }
+  end
+  private :paso
+
+  def origen_objetivo(del_lote, de_genetica)
+    de_genetica.present? && de_genetica.to_i == del_lote.to_i ? 'genetica' : 'lote'
+  end
+  private :origen_objetivo
 
   # ── Superficie y rendimiento por metro ─────────────────────────────────────
   # Los m² contra los que se mide este lote: los suyos si se declararon; si no, los de la sala
@@ -785,7 +818,7 @@ class Lote < ApplicationRecord
       descripcion:     "Prendió: pasó a maceta de #{tamanio_maceta.to_f} L",
       user:            usuario,
       club:            club,
-      registrado_en:   Time.current,
+      registrado_en:   prendido_en || Time.current,
     )
   end
 

@@ -11,7 +11,7 @@ import ModalCargarLote        from '../components/salas/ModalCargarLote.vue'
 import ModalCrearLoteCosecha  from '../components/salas/ModalCrearLoteCosecha.vue'
 import NuevoLoteModal         from '../components/lotes/NuevoLoteModal.vue'
 import RegistroSalaModal      from '../components/salas/RegistroSalaModal.vue'
-import { textoProximoPasoCorto } from '../lib/loteHelpers.js'
+import LotesTabla             from '../components/lotes/LotesTabla.vue'
 import RegistroEnraizadoModal from '../components/salas/RegistroEnraizadoModal.vue'
 import ActionsDropdown        from '../components/ui/ActionsDropdown.vue'
 import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, getLoteProximoCodigo, createLoteHeredado, cambiarFaseSala, moverLotes, listFotosSala, deleteFotoSala } from '../lib/api.js'
@@ -84,7 +84,6 @@ async function borrarFoto(f) {
 }
 
 const ESTADOS_LOTE = ["enraizado","vegetativo","floracion","cosecha","curado","finalizado"]
-const DIAS_CICLO   = { semilla:7, esqueje:7, vegetativo:45, floracion:65, cosecha:10, curado:14, finalizado:0 }
 
 // ── Genéticas ──────────────────────────────────────────────
 const geneticas = ref([])
@@ -459,7 +458,6 @@ const ESTADO_META = {
   finalizado:  { label:"Finalizado",  color:"#1b5e20", emoji:"✅" },
 }
 function estadoMeta(e) { return ESTADO_META[e] || { label:e, color:"#64748b", emoji:"📦" } }
-function growLabel(g)  { return { sustrato:"Sustrato", hidroponia:"Hidroponia" }[g] || g || "—" }
 function kindLabel(k)  { return { vegetativo:"Vegetativo", floracion:"Floración", mixta:"Mixta", madre:"Madres", clon:"Clones", manicura:"Manicura" }[k] || k || "—" }
 
 function salaEstadoStyle(state) {
@@ -470,18 +468,6 @@ function formatDate(d) {
   const date = new Date(d)
   return isNaN(date.getTime()) ? "—" : date.toLocaleDateString("es-AR", { day:"numeric", month:"long", year:"numeric" })
 }
-function diasDesdeInicio(startDate) {
-  if (!startDate) return null
-  return Math.floor((Date.now() - new Date(startDate)) / 86400000)
-}
-function progresoCiclo(lote) {
-  if (!lote.start_date) return 0
-  const dias  = diasDesdeInicio(lote.start_date)
-  const total = DIAS_CICLO[lote.estado] || 60
-  if (["cosecha","en_manicura","curado","finalizado"].includes(lote.estado)) return 100
-  return Math.min(Math.round((dias / total) * 100), 99)
-}
-
 // Buscar por código y filtrar por estado. Con una sala de 30 lotes, tildar de a uno para mover
 // media sala no es una opción.
 const sdQuery  = ref('')
@@ -509,6 +495,15 @@ function alternarTodos() {
                       : movibles.value.forEach(l => s.add(l.id))
   selMover.value = s
 }
+const seleccionMover = computed(() => ({
+  esta:         (l) => selMover.value.has(l.id),
+  alternar:     (l) => alternarMover(l.id),
+  puede:        esMovible,
+  todo:         todosElegidos.value,
+  algo:         !todosElegidos.value && movibles.value.some(l => selMover.value.has(l.id)),
+  alternarTodo: alternarTodos,
+  tituloTodo:   `Elegir los ${movibles.value.length} lotes para mover`,
+}))
 // Fases de LOTE para el filtro. Ojo: ESTADOS_SALA (más arriba) es otra cosa — el estado de la sala
 // misma (activa/mantenimiento/cerrada).
 const FASES_FILTRO = [
@@ -1010,43 +1005,11 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
               </div>
 
               <div v-else class="sd__lotes">
-                <div v-for="l in itemsPaginados" :key="l.id" class="sd__lote-wrap">
-                <label v-if="puedeMover && esMovible(l)" class="sd__lote-cb" @click.stop>
-                  <input type="checkbox" :checked="selMover.has(l.id)" @change="alternarMover(l.id)" />
-                </label>
-                <RouterLink :to="{ name:'lote-detail', params:{ id:l.id } }" class="sd__lote">
-                  <div class="sd__lote-stripe" :style="{ background: estadoMeta(l.estado).color }"></div>
-                  <div class="sd__lote-content">
-                    <div class="sd__lote-head">
-                      <div class="sd__lote-title-row">
-                        <span class="sd__lote-emoji">{{ estadoMeta(l.estado).emoji }}</span>
-                        <span class="sd__lote-codigo">{{ l.codigo }}</span><span v-if="l.automatica" class="chip-auto">Auto</span>
-                        <span class="sd__lote-badge" :style="{ background: estadoMeta(l.estado).color+'18', color: estadoMeta(l.estado).color }">{{ estadoMeta(l.estado).label }}</span>
-                      </div>
-                      <div class="sd__lote-dias" v-if="diasDesdeInicio(l.start_date) !== null">{{ diasDesdeInicio(l.start_date) }}d<template v-if="textoProximoPasoCorto(l)"> · {{ textoProximoPasoCorto(l) }}</template></div>
-                    </div>
-                    <div class="sd__lote-meta">
-                      <span v-if="l.plants_count">🪴 {{ l.plants_count }} plantas</span>
-                      <span v-if="l.tamanio_maceta">🪣 {{ l.tamanio_maceta }}L</span>
-                      <span v-if="l.estado === 'floracion' && l.plantas_cosechadas_count > 0"
-                            class="sd__cosecha-parcial">
-                        🌸 {{ (l.plants_count || 0) - l.plantas_cosechadas_count }} en floración · ✅ {{ l.plantas_cosechadas_count }} cosechadas
-                      </span>
-                      <span v-if="l.genetica?.nombre" class="sd__lote-gen">🌿 {{ l.genetica.nombre }}</span>
-                      <span v-else-if="l.strain" class="sd__lote-strain">🌿 {{ l.strain }}</span>
-                      <span v-if="l.grow_type">⚗️ {{ growLabel(l.grow_type) }}</span>
-                      <span v-if="l.start_date">📅 {{ l.start_date }}</span>
-                    </div>
-                    <div class="sd__lote-progress-wrap">
-                      <div class="sd__lote-progress-track">
-                        <div class="sd__lote-progress-fill" :style="{ width: progresoCiclo(l)+'%', background: estadoMeta(l.estado).color }"></div>
-                      </div>
-                      <span class="sd__lote-progress-pct">{{ progresoCiclo(l) }}%</span>
-                    </div>
-                  </div>
-                  <i class="bi bi-chevron-right sd__lote-arrow"></i>
-                </RouterLink>
-                </div>
+                <LotesTabla
+                  :lotes="itemsPaginados"
+                  :mostrar-sala="false"
+                  :seleccion="puedeMover && movibles.length ? seleccionMover : null"
+                />
                 <!-- Barra de mover: aparece solo con algo seleccionado -->
                 <Teleport to="body">
                   <div v-if="selMover.size" class="sd__movbar">
@@ -1515,10 +1478,6 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 .sd__selall input { width: 15px; height: 15px; accent-color: #1b5e20; cursor: pointer; }
 .sd__lotes-search { flex: 1; min-width: 160px; padding: 7px 11px; border: 1px solid var(--c-slate-200); border-radius: 8px; font-size: 13px; }
 .sd__lotes-filter { padding: 7px 11px; border: 1px solid var(--c-slate-200); border-radius: 8px; font-size: 13px; background: #fff; }
-.sd__lote-wrap { display: flex; align-items: center; gap: 8px; }
-.sd__lote-wrap > .sd__lote { flex: 1; min-width: 0; }
-.sd__lote-cb { display: flex; align-items: center; padding: 0 2px 0 6px; cursor: pointer; }
-.sd__lote-cb input { width: 16px; height: 16px; cursor: pointer; accent-color: #1b5e20; }
 .sd__movbar {
   position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 900;
   display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
@@ -1546,26 +1505,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 .sd__amb-vpd--bajo { background: #dbeafe; color: #1d4ed8; }
 .sd__amb-vpd--alto { background: #fef3c7; color: #b45309; }
 .sd__amb-vpd--malo { background: #fee2e2; color: #dc2626; }
-.sd__lote { display: flex; align-items: stretch; text-decoration: none; color: inherit; border-bottom: 1px solid #f0fdf4; transition: background .15s; }
-.sd__lote:last-child { border-bottom: none; }
-.sd__lote:hover { background: #f9fdf9; }
-.sd__lote-stripe { width: 4px; flex-shrink: 0; }
-.sd__lote-content { flex: 1; padding: .9rem 1rem; min-width: 0; }
-.sd__lote-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .5rem; margin-bottom: .35rem; }
-.sd__lote-title-row { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; }
-.sd__lote-emoji { font-size: .95rem; }
-.sd__lote-codigo { font-size: .9rem; font-weight: 700; color: #1a1a1a; }
 .sd__lote-badge { font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; padding: .2em .6em; border-radius: 6px; }
-.sd__lote-dias { font-size: .72rem; font-weight: 700; color: #60725d; background: #e8f5e9; padding: .2em .6em; border-radius: 6px; white-space: nowrap; flex-shrink: 0; }
-.sd__lote-meta { display: flex; gap: .6rem; flex-wrap: wrap; font-size: .73rem; color: var(--c-slate-400); margin-bottom: .5rem; }
-.sd__lote-gen    { color: #3F6452; font-weight: 600; }
-.sd__lote-strain { color: var(--c-slate-400); font-style: italic; }
-.sd__cosecha-parcial { color: #15803d; font-weight: 600; }
-.sd__lote-progress-wrap { display: flex; align-items: center; gap: .6rem; }
-.sd__lote-progress-track { flex: 1; height: 3px; background: #e8f5e9; border-radius: 999px; overflow: hidden; }
-.sd__lote-progress-fill { height: 100%; border-radius: 999px; transition: width .5s ease; }
-.sd__lote-progress-pct { font-size: .65rem; color: var(--c-slate-400); font-weight: 600; flex-shrink: 0; }
-.sd__lote-arrow { color: #a7d7a9; font-size: .75rem; align-self: center; padding-right: 1rem; flex-shrink: 0; }
 .sd__lotes-pager { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: .75rem 1rem; border-top: 1px solid #e8f5e9; }
 .sd__pager-btn { background: #fff; border: 1.5px solid #d4e6d4; color: #2d6a4f; padding: .3rem .7rem; border-radius: 7px; font-size: .82rem; font-weight: 600; cursor: pointer; transition: all .15s; }
 .sd__pager-btn:hover:not(:disabled) { border-color: #1b5e20; color: #1b5e20; }

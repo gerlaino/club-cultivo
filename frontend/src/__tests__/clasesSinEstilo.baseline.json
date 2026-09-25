@@ -125,8 +125,6 @@
     "ld__main"
   ],
   "views/LotesView.vue": [
-    "lv-num--muted",
-    "lv-table__row",
     "lv__kpi--active-neutral"
   ],
   "views/PerfilView.vue": [

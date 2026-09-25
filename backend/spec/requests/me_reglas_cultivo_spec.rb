@@ -57,3 +57,15 @@ RSpec.describe 'GET /me — la tabla de salas de las automáticas', type: :reque
     expect(tabla['vegetativo']).to eq(Lote::KINDS_SALA_POR_ESTADO['vegetativo'])
   end
 end
+
+# Dónde puede enraizar un lote (24-sep-2026): el desplegable ofrece la lista que valida el modelo.
+RSpec.describe 'GET /me — métodos de enraizado', type: :request do
+  include AuthHelpers
+  let(:club)  { create(:club) }
+  let(:admin) { create(:user, :admin, club: club) }
+  before { sign_in_as(admin); get '/me', headers: auth_headers }
+
+  it 'viajan los mismos que acepta el lote' do
+    expect(JSON.parse(response.body).dig('reglas_cultivo', 'metodos_enraizado')).to eq(Lote::METODOS_ENRAIZADO)
+  end
+end

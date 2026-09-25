@@ -317,8 +317,11 @@ const plantasPagina = computed(() => {
   return plantas.value.slice(start, start + POR_PAG)
 })
 
+// Las plantas también: un trasplante que prende el lote las pasa a vegetativo, y la lista seguía
+// diciendo «Enraiz.» hasta salir y volver a entrar.
 async function recargarLote() {
   try { const { data } = await getLote(id); lote.value = data } catch {}
+  await cargarPlantas()
 }
 
 function abrirAvanzarFase() {

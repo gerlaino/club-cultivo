@@ -17,7 +17,7 @@ const api = vi.hoisted(() => ({
 }))
 vi.mock('../lib/api', () => ({
   getSala: (...a) => api.getSala(...a),
-  listLotes: vi.fn(() => Promise.resolve({ data: [] })),
+  listLotesDeSala: vi.fn(() => Promise.resolve({ data: [] })),
   listGeneticas: vi.fn(() => Promise.resolve({ data: [] })),
   listFotosSala: vi.fn(() => Promise.resolve({ data: [] })),
   createLote: (...a) => api.createLote(...a),

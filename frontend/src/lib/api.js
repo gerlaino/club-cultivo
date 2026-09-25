@@ -48,12 +48,11 @@ api.interceptors.response.use(
 
     if (status === 401 && !url.includes('/users/sign_in')) {
       let loggingOut = false;
+      let auth = null;
       try {
         const { useAuthStore } = await import("../stores/auth");
-        const auth = useAuthStore();
+        auth = useAuthStore();
         loggingOut = auth.loggingOut;
-        auth.user = null;
-        auth.bootstrapped = true;
       } catch {}
 
       // El 401 del bootstrap (/me) NO fuerza redirect acá: el router.beforeEach ya manda
@@ -64,7 +63,16 @@ api.interceptors.response.use(
       // no debe caer en la página del anterior.
       const esBootstrap = url.replace(/\?.*$/, '').endsWith('/me');
       const path = window.location.pathname;
-      if (!esBootstrap && !loggingOut && !path.startsWith('/login')) {
+      // Si la página se va a ir (redirect al login, o el logout que ya recarga), el usuario no
+      // se borra: la recarga limpia todo, y borrarlo antes dibujaba un instante la pantalla sin
+      // rol («pedile un rol al administrador»). Sólo se borra cuando la página se queda: el
+      // /me del arranque, que es lo que el guard del router necesita para mandar al login.
+      const seVa = !esBootstrap && !path.startsWith('/login');
+      if (auth && !seVa && !loggingOut) {
+        auth.user = null;
+        auth.bootstrapped = true;
+      }
+      if (seVa && !loggingOut) {
         const retorno = encodeURIComponent(path + window.location.search);
         // Qué request se comió el 401: el JWT dura 12 h y no se renueva, así que el primero en
         // encontrarlo suele ser un poll de fondo (la campana late cada 60 s) y no algo que la
@@ -82,13 +90,15 @@ api.interceptors.response.use(
       try {
         sessionStorage.setItem('login_error', error.response.data.error || '');
       } catch {}
-      try {
-        const { useAuthStore } = await import("../stores/auth");
-        const auth = useAuthStore();
-        auth.user = null;
-        auth.bootstrapped = true;
-      } catch {}
-      if (!window.location.pathname.startsWith('/login')) {
+      // Igual que con el 401: si la página se va al login, el usuario no se borra antes.
+      if (window.location.pathname.startsWith('/login')) {
+        try {
+          const { useAuthStore } = await import("../stores/auth");
+          const auth = useAuthStore();
+          auth.user = null;
+          auth.bootstrapped = true;
+        } catch {}
+      } else {
         anotarReload('http-403-modulo-rol', { pedido: url });
         window.location.href = '/login';
       }
@@ -159,10 +169,10 @@ export const registrarSala    = (id, payload)     => api.post(`/salas/${id}/regi
 export const registrarEnraizado = (salaId, payload) => api.post(`/salas/${salaId}/registrar_enraizado`, { registro_ambiental: payload });
 
 // -------- LOTES --------
-export const listLotes = (params = null) => {
-  if (typeof params === 'number') return api.get(`/salas/${params}/lotes`)
-  return api.get('/lotes', { params: params || undefined })
-}
+export const listLotes = (params = null) => api.get('/lotes', { params: params || undefined })
+// Aparte y no «listLotes(número)»: el store guarda las salas con la clave como texto, y un "12"
+// caía como filtros y axios reventaba con «target must be an object».
+export const listLotesDeSala = (salaId) => api.get(`/salas/${salaId}/lotes`)
 export const getLote      = (id)         => api.get(`/lotes/${id}`)
 export const getLotePorQR = (codigoQr)   => api.get(`/lotes/por_qr/${codigoQr}`)
 export const createLote = (salaId, payload) => api.post(`/salas/${salaId}/lotes`, { lote: payload });

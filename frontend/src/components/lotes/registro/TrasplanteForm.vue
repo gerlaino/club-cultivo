@@ -1,16 +1,21 @@
 <template>
   <div class="tf__wrap">
+    <div class="tf__field">
+      <label class="tf__label">Fecha del trasplante</label>
+      <AppDatePicker v-model="f.fecha" :max="hoy" />
+    </div>
+
     <div class="tf__grid">
       <div class="tf__field">
         <label class="tf__label">Maceta origen <span class="tf__unit">L</span></label>
         <div v-if="f.maceta_origen_l" class="tf__current">
           {{ f.maceta_origen_l }}L
         </div>
-        <input v-else type="number" step="0.5" min="0" class="tf__input" v-model.number="f.maceta_origen_l" placeholder="7" />
+        <input v-else type="number" step="any" min="0" class="tf__input" v-model.number="f.maceta_origen_l" placeholder="7" />
       </div>
       <div class="tf__field">
         <label class="tf__label">Maceta destino <span class="tf__unit">L</span> <span class="tf__req">*</span></label>
-        <input type="number" step="0.5" min="0.5" class="tf__input" v-model.number="f.maceta_destino_l" placeholder="11" />
+        <input type="number" step="any" min="0.1" class="tf__input" v-model.number="f.maceta_destino_l" placeholder="0.335" />
       </div>
     </div>
 
@@ -20,23 +25,29 @@
       <span class="tf__prev-val tf__prev-val--dest">{{ f.maceta_destino_l }}L</span>
     </div>
 
+    <!-- De la incubadora (hidro) al vasito cambia el medio: se dice acá y queda en el historial.
+         Lo que viene marcado lo sugiere el backend (`medio_al_trasplantar`). -->
     <div class="tf__field">
-      <label class="tf__label">Sustrato</label>
+      <label class="tf__label">¿En qué medio queda?</label>
+      <p v-if="enraizando && metodoEnraizado" class="tf__hint">Viene de: {{ metodoEnraizadoLabel(metodoEnraizado) }}</p>
       <div class="tf__radios">
-        <button v-for="s in SUSTRATOS" :key="s.value" type="button"
-                class="tf__radio-btn" :class="{ 'tf__radio-btn--sel': f.sustrato === s.value }"
-                @click="f.sustrato = s.value">
-          {{ s.label }}
+        <button v-for="m in MEDIOS" :key="m.value" type="button"
+                class="tf__radio-btn" :class="{ 'tf__radio-btn--sel': f.medio === m.value }"
+                @click="f.medio = m.value">
+          {{ m.label }}
         </button>
       </div>
     </div>
 
-    <div v-if="f.sustrato === 'diferente'" class="tf__field">
-      <label class="tf__label">¿Cuál sustrato?</label>
-      <input type="text" class="tf__input" v-model.trim="f.sustrato_descripcion" placeholder="Ej: coco + perlita 70/30" />
+    <div v-if="f.medio === 'sustrato'" class="tf__field">
+      <label class="tf__label">¿Qué sustrato? <span class="tf__optional">opcional</span></label>
+      <input type="text" class="tf__input" v-model.trim="f.sustrato_descripcion" placeholder="Ej: turba + perlita" />
     </div>
 
-    <div class="tf__field">
+    <!-- Enraizando pasan todas: poner en maceta prende el lote entero. Para pasar sólo algunas
+         se separan con Desprender (el backend lo rechaza, así que acá no se ofrece). -->
+    <p v-if="enraizando" class="tf__hint">Pasan todas las plantas del lote. Para pasar sólo algunas a maceta, separalas con «Desprender».</p>
+    <div v-else class="tf__field">
       <label class="tf__label">¿Cuántas plantas?</label>
       <div class="tf__radios">
         <button type="button" class="tf__radio-btn" :class="{ 'tf__radio-btn--sel': f.todas_plantas }"
@@ -50,7 +61,7 @@
       </div>
     </div>
 
-    <div v-if="f.todas_plantas === false" class="tf__field">
+    <div v-if="!enraizando && f.todas_plantas === false" class="tf__field">
       <label class="tf__label">Seleccioná las plantas trasplantadas</label>
       <div v-if="plants.length" class="tf__plant-list">
         <label v-for="p in plants" :key="p.id" class="tf__plant-row" :class="{ 'tf__plant-row--sel': f.plantas_seleccionadas.includes(p.id) }">
@@ -87,12 +98,19 @@
 
 <script setup>
 import { computed } from 'vue'
+import AppDatePicker from '../../ui/AppDatePicker.vue'
+import { hoyISO } from '../../../utils/dates.js'
+import { metodoEnraizadoLabel } from '../../../lib/loteHelpers.js'
 
 const props = defineProps({
   modelValue:  { type: Object,  default: () => ({}) },
   totalPlantas:{ type: Number,  default: null },
   plants:      { type: Array,   default: () => [] },
+  // Enraizando: el trasplante lo prende, pasan todas y se muestra de dónde viene.
+  enraizando:  { type: Boolean, default: false },
+  metodoEnraizado: { type: String, default: null },
 })
+const hoy = hoyISO()
 const emit = defineEmits(['update:modelValue'])
 const f = computed({
   get: () => props.modelValue,
@@ -115,9 +133,9 @@ const PLANT_COLORS = {
 }
 function plantaColor(state) { return PLANT_COLORS[state] || '#9ca3af' }
 
-const SUSTRATOS = [
-  { value: 'mismo',     label: '🪱 Mismo sustrato' },
-  { value: 'diferente', label: '🔄 Diferente sustrato' },
+const MEDIOS = [
+  { value: 'sustrato',   label: '🪱 Sustrato' },
+  { value: 'hidroponia', label: '💧 Hidroponía' },
 ]
 const RAICES = [
   { value: 'excelente', label: 'Excelente', emoji: '🟢', color: '#15803d' },
@@ -132,6 +150,7 @@ const RAICES = [
 .tf__grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); }
 .tf__field { display: flex; flex-direction: column; gap: .3rem; }
 .tf__field--full { grid-column: 1 / -1; }
+.tf__hint { margin: 0; font-size: .75rem; color: var(--c-ink-500); }
 .tf__label { font-size: .72rem; font-weight: 700; color: var(--c-ink-700); text-transform: uppercase; letter-spacing: .04em; display: flex; align-items: baseline; gap: 4px; }
 .tf__unit { font-size: .65rem; color: var(--c-ink-500); font-weight: 400; text-transform: none; letter-spacing: 0; }
 .tf__req { color: var(--c-rust-600); font-weight: 700; }

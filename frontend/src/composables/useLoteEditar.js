@@ -32,6 +32,7 @@ export function useLoteEditar(loteId) {
       fecha_cosecha:     l.fecha_cosechado          || '',
       genetica_id:       l.genetica?.id      || '',
       grow_type:         l.grow_type         || '',
+      metodo_enraizado:  l.metodo_enraizado  || '',
       light_type:        l.light_type        || '',
       // Los días objetivo NO se editan acá: son de la GENÉTICA (una Lemon florece lo que florece,
       // no lo que decida un lote). El lote guarda su copia como foto del momento en que se creó
@@ -60,6 +61,7 @@ export function useLoteEditar(loteId) {
         // '' = bandeja de enraizado (el que enraíza no tiene maceta). Va como null, no como 0.
         tamanio_maceta:    rest.tamanio_maceta || null,
         m2_ocupados:       rest.m2_ocupados || null,
+        metodo_enraizado:  rest.metodo_enraizado || null,
       }
       if (!payload.genetica_id) delete payload.genetica_id
       if (!payload.light_type)  delete payload.light_type

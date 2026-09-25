@@ -126,5 +126,57 @@ RSpec.describe 'Poner en maceta prende el lote', type: :model do
 
       expect(lote.reload.estado).to eq('vegetativo')
     end
+
+    # AC (Germán): "el lote pasa a vegetación pero queda con la fecha actual y no la del
+    # trasplante". El trasplante se carga días después de hecho: prendió el día del trasplante.
+    it 'con fecha pasada, el lote queda en vegetativo desde ese día y no desde que se cargó' do
+      lote = lote_enraizando
+      dia  = 5.days.ago.to_date
+
+      Lotes::RegistrarTrasplante.call(lote: lote, usuario: admin, destino: '0.335', fecha: dia.to_s)
+
+      lote.reload
+      evento = lote.lote_eventos.find_by(tipo: 'cambio_estado', estado_nuevo: 'vegetativo')
+      expect(evento.registrado_en.to_date).to eq(dia)
+      expect(lote.fecha_inicio_vegetativo).to eq(dia)
+    end
+
+    it 'el cambio de fase y el trasplante quedan el mismo día en la historia' do
+      lote = lote_enraizando
+
+      Lotes::RegistrarTrasplante.call(lote: lote, usuario: admin, destino: '1', fecha: 3.days.ago.to_date.to_s)
+
+      trasplante = lote.lote_eventos.find_by(categoria: 'trasplante')
+      prendido   = lote.lote_eventos.find_by(tipo: 'cambio_estado', estado_nuevo: 'vegetativo')
+      expect(prendido.registrado_en).to eq(trasplante.registrado_en)
+    end
+
+    it 'una fecha ilegible no se vuelve "hoy": se rechaza y el lote sigue enraizando' do
+      lote = lote_enraizando
+
+      res = Lotes::RegistrarTrasplante.call(lote: lote, usuario: admin, destino: '1', fecha: 'cualquiera')
+
+      expect(res).not_to be_ok
+      expect(lote.reload.estado).to eq('enraizado')
+      expect(lote.lote_eventos.count).to eq(0)
+    end
+
+    it 'una fecha futura se rechaza' do
+      lote = lote_enraizando
+
+      res = Lotes::RegistrarTrasplante.call(lote: lote, usuario: admin, destino: '1', fecha: 2.days.from_now.to_date.to_s)
+
+      expect(res).not_to be_ok
+      expect(lote.reload.estado).to eq('enraizado')
+    end
+
+    # Poner la maceta a mano desde la edición no trae fecha: prendió cuando se guardó.
+    it 'editando la maceta a mano, el cambio de fase es de hoy' do
+      lote = lote_enraizando
+
+      lote.update!(tamanio_maceta: 1)
+
+      expect(lote.reload.fecha_inicio_vegetativo).to eq(Time.zone.today)
+    end
   end
 end

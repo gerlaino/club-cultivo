@@ -9,7 +9,8 @@
     <DispensadorDashboard v-else-if="auth.user?.role === 'dispensador'"                             :key="auth.user?.id" />
     <LegalDashboard       v-else-if="auth.user?.role === 'abogado' || auth.user?.role === 'auditor'" :key="auth.user?.id" />
     <SupervisorDashboard  v-else-if="auth.user?.role === 'supervisor'"                               :key="auth.user?.id" />
-    <DefaultDashboard     v-else                                                                     :key="auth.user?.id" />
+    <!-- Sólo con usuario: sin él, «pedile un rol al administrador» aparecía un instante al salir. -->
+    <DefaultDashboard     v-else-if="auth.user"                                                      :key="auth.user?.id" />
   </div>
 </template>
 

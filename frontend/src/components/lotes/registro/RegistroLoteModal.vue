@@ -90,7 +90,8 @@
                   <AmbientalForm  v-if="accionId === 'ambiental'" v-model="formData.ambiental" :estado-lote="lote?.estado" />
                   <LuzForm        v-if="accionId === 'luz'"       v-model="formData.luz" />
                   <LimpiezaForm   v-if="accionId === 'limpieza'"  v-model="formData.limpieza" />
-                  <TrasplanteForm v-if="accionId === 'trasplante'" v-model="formData.trasplante" :total-plantas="lote?.plants_count" :plants="plants" />
+                  <TrasplanteForm v-if="accionId === 'trasplante'" v-model="formData.trasplante" :total-plantas="lote?.plants_count" :plants="plants"
+                                  :enraizando="lote?.estado === 'enraizado'" :metodo-enraizado="lote?.metodo_enraizado" />
                 </div>
               </div>
 
@@ -132,7 +133,8 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import { updateLote, createPlantActivity, createRegistroAmbiental } from '../../../lib/api'
+import { registrarTrasplante, createRegistroAmbiental } from '../../../lib/api'
+import { hoyISO } from '../../../utils/dates.js'
 import { registrarLecturaOffline } from '../../../lib/offlineApi.js'
 import { useToast }   from '../../../composables/useToast.js'
 import { useClubStore } from '../../../stores/club'
@@ -215,7 +217,7 @@ function emptyFormData() {
     ambiental:  { temperatura: null, temperatura_sustrato: null, humedad: null, co2: null, csvFile: null },
     luz:        { horas_luz: null, espectro: '', intensidad: null, cambio_altura: false, distancia: null },
     limpieza:   { tipo: 'rutinaria', producto_usado: '' },
-    trasplante: { maceta_origen_l: null, maceta_destino_l: null, sustrato: 'mismo', sustrato_descripcion: '', todas_plantas: true, plantas_seleccionadas: [], estado_raices: '', observaciones: '' },
+    trasplante: { fecha: hoyISO(), maceta_origen_l: null, maceta_destino_l: null, medio: 'sustrato', sustrato_descripcion: '', todas_plantas: true, plantas_seleccionadas: [], estado_raices: '', observaciones: '' },
   }
 }
 
@@ -231,6 +233,8 @@ watch(() => props.modelValue, (open) => {
   if (props.lote?.tamanio_maceta) {
     formData.value.trasplante.maceta_origen_l = props.lote.tamanio_maceta
   }
+  // El medio en que queda lo sugiere el backend (de la incubadora al vasito: sustrato).
+  formData.value.trasplante.medio = props.lote?.medio_al_trasplantar || props.lote?.grow_type || 'sustrato'
   if (props.accionInicial && accionesDisponibles.value.some(a => a.id === props.accionInicial)) {
     seleccionadas.value = [props.accionInicial]
     paso.value = 2
@@ -370,12 +374,19 @@ async function guardar() {
       const t = fd.trasplante
       if (!t.maceta_destino_l) { error.value = 'Ingresá el tamaño de maceta destino'; saving.value = false; return }
       if (!t.todas_plantas && !t.plantas_seleccionadas.length) { error.value = 'Seleccioná al menos una planta para trasplantar'; saving.value = false; return }
-      await updateLote(props.lote.id, { tamanio_maceta: parseFloat(t.maceta_destino_l) })
-      if (!t.todas_plantas && t.plantas_seleccionadas.length) {
-        for (const plantId of t.plantas_seleccionadas) {
-          await createPlantActivity(plantId, { tipo: 'trasplante', descripcion: `Trasplante a maceta ${t.maceta_destino_l}L` })
-        }
-      }
+      // La misma puerta que el historial del lote: fecha, medio, raíces y observaciones quedan en
+      // el historial, y si venía enraizando, lo prende ese día. Antes acá se cambiaba la maceta a
+      // mano y todo lo demás que pregunta el formulario se tiraba.
+      await registrarTrasplante(props.lote.id, {
+        fecha:            t.fecha,
+        maceta_origen_l:  t.maceta_origen_l || undefined,
+        maceta_destino_l: parseFloat(t.maceta_destino_l),
+        medio:            t.medio || undefined,
+        sustrato:         t.medio === 'sustrato' ? (t.sustrato_descripcion || undefined) : undefined,
+        estado_raices:    t.estado_raices || undefined,
+        observaciones:    t.observaciones || undefined,
+        plant_ids:        t.todas_plantas ? undefined : t.plantas_seleccionadas,
+      })
     }
 
     // Registro ambiental

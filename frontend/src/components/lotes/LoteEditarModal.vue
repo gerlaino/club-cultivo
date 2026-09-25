@@ -72,6 +72,14 @@
               </select>
             </div>
 
+            <div v-if="metodosEnraizado.length" class="lem__field">
+              <label class="lem__label">¿Dónde enraizó?</label>
+              <select class="lem__input" v-model="editLoteForm.metodo_enraizado">
+                <option value="">Sin especificar</option>
+                <option v-for="m in metodosEnraizado" :key="m.value" :value="m.value">{{ m.label }}</option>
+              </select>
+            </div>
+
             <!-- Maceta y estado son la misma cosa dicha de dos formas: el que enraíza vive en
                  bandeja y no tiene maceta; ponerlo en maceta ES prenderlo. Por eso enraizado
                  ofrece "Bandeja" y elegir litros avisa que el lote pasa a vegetativo (el backend
@@ -178,6 +186,8 @@ import { watch, computed } from 'vue'
 import { useLoteEditar } from '../../composables/useLoteEditar.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
+import { useAuthStore } from '../../stores/auth'
+import { opcionesMetodoEnraizado } from '../../lib/loteHelpers.js'
 
 const props = defineProps({
   open:   { type: Boolean, default: false },
@@ -185,6 +195,7 @@ const props = defineProps({
   loteId: { type: Number,  required: true },
 })
 const { esPersonal } = useUsoPersonal()
+const metodosEnraizado = computed(() => opcionesMetodoEnraizado(useAuthStore().user?.reglas_cultivo))
 const emit = defineEmits(['update:open', 'saved'])
 
 const {

@@ -42,6 +42,47 @@ RSpec.describe 'Fechas de estadío del lote', type: :model do
     expect(fechas).to eq(fechas.sort)
   end
 
+  # AC (Germán): en la tabla, ver ahí mismo los días de las fases ya pasadas.
+  describe 'días por fase' do
+    def lote_enraizado_que_florecio
+      ActsAsTenant.with_tenant(club) do
+        lote = create(:lote, club: club, estado: 'floracion', start_date: 60.days.ago.to_date)
+        LoteEvento.create!(lote: lote, club: club, user: admin, tipo: 'cambio_estado',
+                           estado_anterior: 'enraizado', estado_nuevo: 'vegetativo', registrado_en: 45.days.ago)
+        LoteEvento.create!(lote: lote, club: club, user: admin, tipo: 'cambio_estado',
+                           estado_anterior: 'vegetativo', estado_nuevo: 'floracion', registrado_en: 12.days.ago)
+        lote
+      end
+    end
+
+    it 'cuenta cada fase desde que entró hasta que salió, arrancando por la de nacimiento' do
+      fases = LoteSerializer.serialize(lote_enraizado_que_florecio)[:fases]
+
+      expect(fases.map { |f| [f[:estado], f[:dias]] })
+        .to eq([['enraizado', 15], ['vegetativo', 33], ['floracion', 12]])
+    end
+
+    it 'marca como actual sólo la fase en la que está' do
+      fases = LoteSerializer.serialize(lote_enraizado_que_florecio)[:fases]
+
+      expect(fases.map { |f| f[:actual] }).to eq([false, false, true])
+      expect(fases.last[:hasta]).to be_nil
+    end
+
+    it 'un lote que volvió atrás muestra los dos tramos en vegetativo' do
+      fases = LoteSerializer.serialize(lote_con_historia)[:fases]
+
+      expect(fases.map { |f| [f[:estado], f[:dias]] })
+        .to eq([['vegetativo', 20], ['floracion', 10], ['vegetativo', 10]])
+    end
+
+    it 'un lote sin cambios de fase no inventa tramos' do
+      lote = ActsAsTenant.with_tenant(club) { create(:lote, club: club, start_date: 5.days.ago.to_date) }
+
+      expect(LoteSerializer.serialize(lote)[:fases]).to eq([])
+    end
+  end
+
   # Los lotes viejos y los heredados no tienen eventos: caen en start_date en vez de quedar en
   # blanco, igual que ya hacía `dias_en_estado`.
   it 'un lote sin eventos usa su fecha de inicio' do

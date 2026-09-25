@@ -244,6 +244,15 @@
                 <option value="hidroponia">Hidroponia</option>
               </select>
             </div>
+            <!-- Dónde enraíza: incubadora (hidro), jiffy o taco. Sólo si nace enraizando: al ir a
+                 maceta cambia de medio, y sirve para comparar qué método prende mejor. -->
+            <div v-if="estadoObjetivo === 'enraizado' && metodosEnraizado.length" class="nlm__field">
+              <label class="nlm__label">¿Dónde enraíza? <span class="nlm__label-opt">(opcional)</span></label>
+              <select class="nlm__input" v-model="form.metodo_enraizado">
+                <option value="">Sin especificar</option>
+                <option v-for="m in metodosEnraizado" :key="m.value" :value="m.value">{{ m.label }}</option>
+              </select>
+            </div>
             <!-- La maceta NO se pide acá: un lote nuevo nace ENRAIZANDO, en taco o bandeja, y no
                  tiene maceta todavía. Se elige al prender, en el avance a vegetativo, que es cuando
                  la planta va a maceta de verdad. Pedirla al crear invitaba a cargar un dato que no
@@ -307,6 +316,7 @@ import { getLoteProximoCodigo, listGeneticas, listPlants, createLoteHeredado, cr
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
 import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
+import { opcionesMetodoEnraizado } from '../../lib/loteHelpers.js'
 const { sala: salaTxt, esPersonal } = useUsoPersonal()
 
 // Fecha local en ISO (yyyy-mm-dd) SIN pasar por UTC — toISOString() convierte a
@@ -386,6 +396,7 @@ const KINDS_POR_ESTADO_AUTOMATICA = computed(() =>
 
 const estadoObjetivo = computed(() =>
   tipoCreacion.value === 'existente' ? heredadoEstado.value : 'enraizado')
+const metodosEnraizado = computed(() => opcionesMetodoEnraizado(useAuthStore().user?.reglas_cultivo))
 
 // Las salas que se ofrecen son las de LA SEDE ELEGIDA y del tipo que admite el estado en que
 // va a nacer el lote. Con varias sedes, la sede se elige primero: mezclar las salas de todas
@@ -543,7 +554,7 @@ function emptyForm() {
     origen: 'semilla',
     planta_madre_ids: [], plants_count: 1,
     start_date: localISO(),
-    genetica_id: '', grow_type: 'sustrato', light_type: '', tamanio_maceta: '', m2_ocupados: null, notes: '',
+    genetica_id: '', grow_type: 'sustrato', metodo_enraizado: '', light_type: '', tamanio_maceta: '', m2_ocupados: null, notes: '',
   }
 }
 
@@ -614,6 +625,7 @@ async function crear() {
     if (!payload.light_type)      delete payload.light_type
     if (!payload.tamanio_maceta)  delete payload.tamanio_maceta
     if (!payload.m2_ocupados)     delete payload.m2_ocupados
+    if (!payload.metodo_enraizado || payload.estado !== 'enraizado') delete payload.metodo_enraizado
     if (!payload.planta_madre_ids?.length) delete payload.planta_madre_ids
 
     const dias = {

@@ -1,4 +1,5 @@
 // Helpers compartidos del historial unificado del lote (sección inline + modal).
+import { growLabel, metodoEnraizadoLabel } from './loteHelpers.js'
 
 // Categorías de "Registrar actividad". El trasplante está acá (entrada unificada),
 // pero internamente se guarda por planta + maceta vía el endpoint de trasplante.
@@ -53,7 +54,17 @@ export function metaDetalle(it) {
   if (m.maceta_origen_l != null && m.maceta_destino_l != null) parts.push(`${m.maceta_origen_l ?? '?'}L → ${m.maceta_destino_l}L`)
   else if (m.maceta_destino_l != null) parts.push(`a ${m.maceta_destino_l}L`)
   if (m.plantas != null) parts.push(`${m.plantas} plantas`)
+  // Trasplante que cambió de medio (de la incubadora al vasito con sustrato).
+  if (m.medio_destino && m.medio_origen && m.medio_origen !== m.medio_destino) {
+    parts.push(`${nombreMedio(m.medio_origen)} → ${nombreMedio(m.medio_destino)}`)
+  }
+  if (m.sustrato) parts.push(m.sustrato)
+  if (m.estado_raices) parts.push(`raíces: ${m.estado_raices}`)
   return parts.join(' · ')
+}
+
+function nombreMedio(v) {
+  return v === 'sustrato' || v === 'hidroponia' ? growLabel(v) : metodoEnraizadoLabel(v)
 }
 
 export function placeholderFor(categoria) {

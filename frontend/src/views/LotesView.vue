@@ -10,8 +10,9 @@ import { useConfirm } from '../composables/useConfirm.js';
 import { exportLotesCSV } from '../lib/api.js';
 import DsSpinner from '../design-system/components/Spinner.vue'
 import NuevoLoteModal from '../components/lotes/NuevoLoteModal.vue'
+import LotesTabla from '../components/lotes/LotesTabla.vue'
+import { opcionesMetodoEnraizado } from '../lib/loteHelpers.js'
 import BloqueoProgreso from '../components/ui/BloqueoProgreso.vue'
-import { textoProximoPasoCorto } from '../lib/loteHelpers.js'
 import { useSeleccion } from '../composables/useSeleccion.js'
 import { useEtiquetasQR } from '../composables/useEtiquetasQR.js'
 import { useClubStore } from '../stores/club.js'
@@ -38,6 +39,7 @@ onMounted(() => {
 });
 onUnmounted(() => document.removeEventListener('keydown', lotesEscapeHandler, true));
 
+const metodosEnraizado = computed(() => opcionesMetodoEnraizado(auth.user?.reglas_cultivo));
 const canEdit = computed(() => ["admin","cultivador"].includes(auth.role));
 const canExport = computed(() => ["admin","auditor","supervisor","cultivador"].includes(auth.role));
 
@@ -65,45 +67,6 @@ const EN_CICLO = ["enraizado","vegetativo","floracion","cosecha","en_manicura"];
 
 function em(e)           { return ESTADO_META[e] || { label: e||"—", dot:"#94a3b8", bg:"#f1f5f9", text:"#64748b", bar:"#94a3b8", icon:"•" }; }
 function estadoLabel(e)  { return em(e).label; }
-function growLabel(g)    { return { sustrato:"Sustrato", hidroponia:"Hidroponia" }[g] || g || "—"; }
-function tipoLabel(t)    { return { sativa:"Sativa", indica:"Índica", hibrida:"Híbrida" }[t] || t; }
-// L1: nivel de avance de la fase actual vs objetivo de la genética (verde/amarillo/rojo).
-const FASE_OBJ = { vegetativo: "dias_vegetativo_objetivo", floracion: "dias_floracion_objetivo", cosecha: "dias_cosecha_objetivo" };
-const FASE_LBL = { vegetativo: "vegetativo", floracion: "floración", cosecha: "cosecha" };
-function objetivoFase(l) { return FASE_OBJ[l.estado] ? l[FASE_OBJ[l.estado]] : null; }
-function diasNivel(l) {
-  const obj = objetivoFase(l), d = l.dias_en_estado;
-  if (!obj || obj <= 0 || d == null) return null;
-  const r = d / obj;
-  return r > 1.1 ? "rojo" : (r >= 0.9 ? "amarillo" : "verde");
-}
-function diasTitle(l) {
-  const obj = objetivoFase(l);
-  return obj ? `${l.dias_en_estado}/${obj} días en ${FASE_LBL[l.estado] || l.estado}` : "";
-}
-function lightLabel(l)   { return { led:"LED", hps:"HPS", cmh:"CMH", natural:"Natural", mixta:"Mixta" }[l] || l || "—"; }
-function salaName(id)    { return salas.items.find(s => String(s.id) === String(id))?.nombre || `Sala #${id}`; }
-// Post-cosecha el lote no vive en una sala: mostramos su etapa como "ubicación".
-const SALA_POST = { cosecha: "Cosechado", en_manicura: "En manicura", curado: "Curado", finalizado: "Finalizado" };
-function salaCelda(l)    { return l.sala_id ? salaName(l.sala_id) : (SALA_POST[l.estado] || "—"); }
-function diasDesdeInicio(d) { return d ? Math.floor((Date.now() - new Date(d)) / 86_400_000) : null; }
-
-// dd/mm/aa: la columna va al lado de los días y se compara de un vistazo, no se lee en prosa.
-// `T00:00:00` fuerza hora LOCAL: sin eso, un `2026-08-11` se parsea como UTC y en Argentina
-// (UTC−3) se muestra el día anterior.
-function fechaCorta(d) {
-  if (!d) return '—'
-  const f = /^\d{4}-\d{2}-\d{2}$/.test(d) ? new Date(`${d}T00:00:00`) : new Date(d)
-  return f.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: '2-digit' })
-}
-
-// La línea de tiempo del lote, para el tooltip del badge de estado.
-function historialTitle(l) {
-  const h = l.historial_estados || []
-  if (!h.length) return `Desde ${fechaCorta(l.fecha_estado_actual)}`
-  return h.map(e => `${em(e.estado).label}: ${fechaCorta(e.fecha)}`).join('\n')
-}
-
 // ---------- Stats ----------
 const stats = computed(() => {
   const all = store.items;
@@ -192,6 +155,15 @@ watch([sorted, perPage], () => { if (page.value > totalPages.value) page.value =
 // creaste 12 lotes, filtrás y los imprimís de una en vez de entrar a cada uno.
 const sel = useSeleccion(computed(() => store.items), sorted);
 const etiquetas = useEtiquetasQR();
+const seleccionTabla = computed(() => ({
+  esta:          (l) => sel.esta(l.id),
+  alternar:      (l) => sel.alternar(l.id),
+  todo:          sel.todoFiltradoElegido.value,
+  algo:          sel.algoFiltradoElegido.value,
+  alternarTodo:  () => sel.alternarTodoFiltrado(),
+  deshabilitada: etiquetas.ocupado.value,
+  tituloTodo:    sel.todoFiltradoElegido.value ? 'Deseleccionar' : `Seleccionar los ${sorted.value.length} lotes filtrados`,
+}));
 
 async function configEtiquetas() {
   if (!club.data) { try { await club.fetch() } catch { /* la organización es opcional en la etiqueta */ } }
@@ -314,7 +286,7 @@ function startEdit(l) {
     id: l.id, codigo: l.codigo||"", estado: l.estado||"vegetativo",
     plants_count: l.plants_count??0,
     start_date: l.start_date ? l.start_date.slice(0,10) : hoyISO(),
-    strain: l.strain||"", grow_type: l.grow_type||"sustrato", light_type: l.light_type||"",
+    strain: l.strain||"", grow_type: l.grow_type||"sustrato", metodo_enraizado: l.metodo_enraizado||"", light_type: l.light_type||"",
     notes: l.notes||"", sala_id: l.sala_id||"",
     tamanio_maceta: l.tamanio_maceta ?? null,
   };
@@ -332,6 +304,7 @@ async function submitEdit() {
   if (Object.keys(e).length) return;
   try {
     const { id, codigo, sala_id, ...payload } = editForm.value;
+    payload.metodo_enraizado = payload.metodo_enraizado || null;
     await store.update(id, payload, sala_id);
     showEdit.value = false;
   } catch {}
@@ -473,118 +446,14 @@ async function exportarCSV() {
 
     <!-- Tabla -->
     <div v-else class="lv__table-wrap">
-      <table class="lv-table">
-        <thead>
-          <tr>
-            <th class="lv-th--cb">
-              <input
-                type="checkbox" class="lv-cb"
-                :checked="sel.todoFiltradoElegido.value"
-                :indeterminate.prop="sel.algoFiltradoElegido.value"
-                :disabled="etiquetas.ocupado.value"
-                :title="sel.todoFiltradoElegido.value ? 'Deseleccionar' : `Seleccionar los ${sorted.length} lotes filtrados`"
-                @change="sel.alternarTodoFiltrado()"
-              />
-            </th>
-            <th>Estado</th>
-            <th class="lv-th--sort" @click="sortBy = sortBy === 'codigo_asc' ? 'fecha_desc' : 'codigo_asc'">
-              Código <span class="lv-sort-icon">{{ sortBy === 'codigo_asc' ? '↑' : '↕' }}</span>
-            </th>
-            <th>Genética</th>
-            <th>Sala</th>
-            <th class="lv-th--sort" @click="sortBy = sortBy === 'plantas_desc' ? 'fecha_desc' : 'plantas_desc'">
-              Plantas <span class="lv-sort-icon">{{ sortBy === 'plantas_desc' ? '↓' : '↕' }}</span>
-            </th>
-            <th>Maceta</th>
-            <th title="Días en la fase actual">En fase</th>
-            <!-- "12d en fase" solo no dice nada: hay que poder ver desde cuándo. -->
-            <th title="Fecha en que entró a la fase actual">Desde</th>
-            <th class="lv-th--sort" @click="sortBy = sortBy === 'fecha_asc' ? 'fecha_desc' : 'fecha_asc'"
-                title="Días totales desde el inicio del lote">
-              Total <span class="lv-sort-icon">{{ sortBy.startsWith('fecha') ? (sortBy === 'fecha_asc' ? '↑' : '↓') : '↕' }}</span>
-            </th>
-            <th v-if="canEdit"></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="l in paginated"
-            :key="l.id"
-            class="lv-table__row"
-            @click="$router.push({ name: 'lote-detail', params: { id: l.id } })"
-          >
-            <td class="lv-td--cb" @click.stop>
-              <input
-                type="checkbox" class="lv-cb"
-                :checked="sel.esta(l.id)"
-                :disabled="etiquetas.ocupado.value"
-                :aria-label="`Seleccionar ${l.codigo}`"
-                @change="sel.alternar(l.id)"
-              />
-            </td>
-            <td data-label="Estado">
-              <!-- El historial va en el `title` y no en columnas: son siete estadíos y en la
-                   mayoría de las filas estarían casi todos vacíos. Acá está a un hover, sin
-                   ensanchar una tabla que ya tiene diez columnas. -->
-              <span class="lv-badge" :style="{ background: em(l.estado).bg, color: em(l.estado).text }"
-                    :title="historialTitle(l)">
-                {{ em(l.estado).icon }} {{ em(l.estado).label }}
-              </span>
-            </td>
-            <td data-label="Código">
-              <span class="lv-codigo">{{ l.codigo }}</span>
-            </td>
-            <td data-label="Genética">
-              <span v-if="l.genetica?.nombre" class="lv-genetica">{{ l.genetica.nombre }}<span v-if="l.automatica" class="chip-auto">Auto</span></span>
-              <span v-else-if="l.strain" class="lv-strain">{{ l.strain }}</span>
-              <span v-else class="lv-empty">—</span>
-              <span v-if="l.genetica?.tipo" class="lv-tipo" :class="`lv-tipo--${l.genetica.tipo}`">{{ tipoLabel(l.genetica.tipo) }}</span>
-            </td>
-            <td data-label="Sala">
-              <span class="lv-sala">{{ salaCelda(l) }}</span>
-            </td>
-            <td data-label="Plantas">
-              <span class="lv-num">{{ l.plants_count ?? 0 }}</span>
-            </td>
-            <td data-label="Maceta">
-              <span v-if="l.tamanio_maceta" class="lv-num">{{ l.tamanio_maceta }}L</span>
-              <span v-else class="lv-empty">—</span>
-            </td>
-            <!-- El semáforo cuelga de los días EN FASE (que es contra lo que hay objetivo), no de
-                 los totales. Antes el punto y el número estaban en la misma celda midiendo cosas
-                 distintas: el color decía "fase" y el número decía "ciclo". -->
-            <td data-label="En fase">
-              <span v-if="l.dias_en_estado != null" class="lv-num">
-                <span v-if="diasNivel(l)" class="lv-dias-dot" :class="`lv-dias-dot--${diasNivel(l)}`" :title="diasTitle(l)"></span>
-                {{ l.dias_en_estado }}d
-              </span>
-              <span v-else class="lv-empty">—</span>
-              <!-- Qué viene y cuándo (lo manda el backend: `proximo_paso`). -->
-              <span v-if="textoProximoPasoCorto(l)" class="lv-prox" :class="{ 'lv-prox--ya': l.proximo_paso.faltan_dias <= 0 }">{{ textoProximoPasoCorto(l) }}</span>
-            </td>
-            <td data-label="Desde">
-              <span v-if="l.fecha_estado_actual" class="lv-num lv-num--muted">{{ fechaCorta(l.fecha_estado_actual) }}</span>
-              <span v-else class="lv-empty">—</span>
-            </td>
-            <td data-label="Total">
-              <span v-if="diasDesdeInicio(l.start_date) !== null" class="lv-num lv-num--muted">
-                {{ diasDesdeInicio(l.start_date) }}d
-              </span>
-              <span v-else class="lv-empty">—</span>
-            </td>
-            <td v-if="canEdit" @click.stop>
-              <div class="lv-actions">
-                <button class="lv-action-btn" title="Editar" @click="startEdit(l)">
-                  <i class="bi bi-pencil"></i>
-                </button>
-                <button class="lv-action-btn lv-action-btn--danger" title="Eliminar" @click="confirmDelete(l)">
-                  <i class="bi bi-trash"></i>
-                </button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+      <LotesTabla
+        :lotes="paginated"
+        v-model:sort-by="sortBy"
+        :seleccion="seleccionTabla"
+        :puede-editar="canEdit"
+        @editar="startEdit"
+        @eliminar="confirmDelete"
+      />
       <div class="lv__table-footer">
         <div class="lv__pagination" v-if="totalPages > 1">
           <button class="lv__page-btn" :disabled="page <= 1" @click="page--">«</button>
@@ -647,6 +516,13 @@ async function exportarCSV() {
                 <select class="lm-input" v-model="editForm.grow_type">
                   <option value="sustrato">Sustrato</option>
                   <option value="hidroponia">Hidroponia</option>
+                </select>
+              </div>
+              <div v-if="metodosEnraizado.length" class="lm-field">
+                <label class="lm-label">¿Dónde enraizó?</label>
+                <select class="lm-input" v-model="editForm.metodo_enraizado">
+                  <option value="">Sin especificar</option>
+                  <option v-for="m in metodosEnraizado" :key="m.value" :value="m.value">{{ m.label }}</option>
                 </select>
               </div>
               <div class="lm-field">
@@ -726,9 +602,6 @@ async function exportarCSV() {
 
 <style scoped>
 /* Selección para etiquetas en tanda */
-.lv-th--cb, .lv-td--cb { width: 34px; padding-right: 0; }
-.lv-cb { width: 15px; height: 15px; accent-color: #1b5e20; cursor: pointer; margin: 0; }
-.lv-cb:disabled { cursor: default; opacity: .5; }
 
 .lv-selbar {
   position: fixed; bottom: 1.25rem; left: 50%; transform: translateX(-50%); z-index: 1035;
@@ -841,41 +714,10 @@ async function exportarCSV() {
 .lv__alert   { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: .875rem 1rem; border-radius: 10px; font-size: .875rem; margin-bottom: 1rem; }
 
 /* ── Tabla ───────────────────────────────────────────── */
-.lv__table-wrap { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; margin-bottom: 0; }
-.lv-table { width: 100%; border-collapse: collapse; font-size: .875rem; }
-.lv-table thead th { padding: 10px 12px; text-align: left; font-weight: 600; color: #6b7280; border-bottom: 2px solid #e5e7eb; white-space: nowrap; background: #fafafa; }
-.lv-th--sort { cursor: pointer; user-select: none; }
-.lv-th--sort:hover { color: #1b5e20; }
-.lv-sort-icon { font-size: .75rem; color: var(--c-slate-300); margin-left: .2rem; }
-.lv-table tbody tr { border-bottom: 1px solid #f3f4f6; transition: background .1s; cursor: pointer; }
-.lv-table tbody tr:last-child { border-bottom: none; }
-.lv-table tbody tr:hover { background: var(--c-slate-50); }
-.lv-table td { padding: 10px 12px; vertical-align: middle; }
-
-.lv-badge { display: inline-flex; align-items: center; gap: .25rem; padding: 3px 8px; border-radius: 5px; font-size: .75rem; font-weight: 700; white-space: nowrap; }
-.lv-codigo { font-weight: 700; color: var(--c-slate-900); font-family: monospace; font-size: .85rem; }
-.lv-genetica { font-weight: 600; color: #3F6452; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lv-strain { font-style: italic; color: var(--c-slate-500); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lv-tipo { display: inline-block; margin-left: .4rem; font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding: .1em .45em; border-radius: 999px; vertical-align: middle; }
-.lv-tipo--sativa { background: #fef3c7; color: #b45309; }
-.lv-tipo--indica { background: #ede9fe; color: #6d28d9; }
-.lv-tipo--hibrida { background: #dcfce7; color: #15803d; }
-.lv-dias-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px; vertical-align: middle; }
-.lv-dias-dot--verde { background: #16a34a; }
-.lv-dias-dot--amarillo { background: #f59e0b; }
-.lv-dias-dot--rojo { background: #dc2626; }
-.lv-sala { color: var(--c-slate-500); font-size: .82rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lv-num { font-weight: 600; color: #374151; }
-.lv-prox { display: block; font-size: .7rem; font-weight: 600; color: var(--c-leaf-700, #2d4a3e); white-space: nowrap; }
-.lv-prox--ya { color: var(--c-amber-700, #b45309); }
-.lv-empty { color: var(--c-slate-300); }
-
-.lv-actions { display: flex; align-items: center; gap: .25rem; opacity: 0; transition: opacity .15s; }
-.lv-table tbody tr:hover .lv-actions { opacity: 1; }
-.lv-action-btn { background: none; border: none; cursor: pointer; padding: 5px 7px; border-radius: 6px; color: #6b7280; font-size: .875rem; transition: all .15s; }
-.lv-action-btn:hover { background: var(--c-slate-100); color: var(--c-slate-900); }
-.lv-action-btn--danger:hover { background: #fef2f2; color: #dc2626; }
-
+.lv__table-wrap { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 0; }
+/* Sin overflow:hidden: el cartelito de días por fase se cortaba en las últimas filas. */
+.lv__table-wrap :deep(thead th:first-child) { border-top-left-radius: 12px; }
+.lv__table-wrap :deep(thead th:last-child) { border-top-right-radius: 12px; }
 .lv__table-footer { display: flex; align-items: center; justify-content: space-between; padding: .6rem 1rem; border-top: 1px solid var(--c-slate-100); }
 .lv__pagination { display: flex; align-items: center; gap: .5rem; }
 .lv__page-btn { background: #fff; border: 1.5px solid var(--c-slate-200); border-radius: 7px; padding: .3rem .65rem; font-size: .82rem; color: #374151; cursor: pointer; transition: all .15s; }
@@ -884,75 +726,9 @@ async function exportarCSV() {
 .lv__page-info { font-size: .8rem; color: var(--c-slate-500); font-weight: 600; }
 .lv__count { font-size: .75rem; color: var(--c-slate-400); }
 
-/* ── Mobile: tabla → cards ───────────────────────────── */
+/* ── Mobile: la tabla se vuelve tarjetas (ver LotesTabla) ── */
 @media (max-width: 640px) {
-  .lv__table-wrap { background: transparent; border: none; border-radius: 0; overflow: visible; }
-  .lv-table { display: block; }
-  .lv-table thead { display: none; }
-  .lv-table tbody { display: flex; flex-direction: column; gap: .6rem; }
-
-  .lv-table tbody tr {
-    display: block;
-    background: #fff;
-    border: 1px solid #e5e7eb !important;
-    border-bottom: 1px solid #e5e7eb !important;
-    border-radius: 12px;
-    padding: .875rem 1rem .875rem 1rem;
-    position: relative;
-    transition: box-shadow .15s;
-  }
-  .lv-table tbody tr:hover { background: #fff; box-shadow: 0 2px 12px rgba(0,0,0,.07); }
-
-  /* Todas las celdas: flex con label */
-  .lv-table td {
-    display: flex;
-    align-items: center;
-    gap: .4rem;
-    padding: .18rem 0;
-    border: none;
-    font-size: .84rem;
-    min-width: 0;
-    width: 100%;
-  }
-  .lv-table td::before {
-    content: attr(data-label);
-    font-size: .65rem;
-    font-weight: 700;
-    color: var(--c-slate-400);
-    text-transform: uppercase;
-    letter-spacing: .04em;
-    min-width: 68px;
-    flex-shrink: 0;
-  }
-
-  /* Estado: sin label, badge prominente */
-  .lv-table td[data-label="Estado"] {
-    padding-bottom: .45rem;
-    margin-bottom: .1rem;
-    border-bottom: 1px solid var(--c-slate-100);
-  }
-  .lv-table td[data-label="Estado"]::before { content: none; }
-
-  /* Código: sin label, grande */
-  .lv-table td[data-label="Código"]::before { content: none; }
-  .lv-codigo { font-size: .95rem; }
-
-  /* Acciones: posición absoluta top-right */
-  .lv-table td:last-child {
-    position: absolute;
-    top: .75rem;
-    right: .75rem;
-    padding: 0;
-    display: flex;
-    align-items: center;
-  }
-  .lv-table td:last-child::before { content: none; }
-  .lv-actions { opacity: 1; }
-
-  /* Padding-right para que el contenido no choque con acciones */
-  .lv-table td[data-label="Estado"],
-  .lv-table td[data-label="Código"] { padding-right: 5rem; }
-
+  .lv__table-wrap { background: transparent; border: none; border-radius: 0; }
   .lv__table-footer { padding: .6rem .25rem; }
 }
 

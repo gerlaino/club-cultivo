@@ -12,7 +12,7 @@ import AmbienteChart from '../components/ambiente/AmbienteChart.vue'
 import LecturaManualForm from '../components/ambiente/LecturaManualForm.vue'
 import AlertaBadge from '../components/ambiente/AlertaBadge.vue'
 import Breadcrumb from '../components/ui/Breadcrumb.vue'
-import { getSala, listLotes, getSalaAmbienteHistorico, listDispositivos } from '../lib/api.js'
+import { getSala, listLotesDeSala, getSalaAmbienteHistorico, listDispositivos } from '../lib/api.js'
 import { RouterLink } from 'vue-router'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import { paraInputDatetime } from '../utils/dates.js'
@@ -91,7 +91,7 @@ onMounted(async () => {
   try {
     await Promise.all([
       getSala(salaId).then(r  => { sala.value  = r.data }),
-      listLotes(salaId).then(r => { lotes.value = Array.isArray(r.data) ? r.data : (r.data?.items || []) }),
+      listLotesDeSala(salaId).then(r => { lotes.value = Array.isArray(r.data) ? r.data : (r.data?.items || []) }),
       store.cargarSetpoints(),
     ])
   } catch {

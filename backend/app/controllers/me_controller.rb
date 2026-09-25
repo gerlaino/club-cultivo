@@ -54,7 +54,9 @@ class MeController < ApplicationController
                                # según la genética; no escribe la excepción.
                                'kinds_sala_por_estado_automatica' => Lote::KINDS_SALA_POR_ESTADO_AUTOMATICA,
                                # A qué sedes se asigna cada rol: la pantalla ofrece sólo eso.
-                               'sedes_por_rol'         => Sede::TIPOS_POR_ROL }
+                               'sedes_por_rol'         => Sede::TIPOS_POR_ROL,
+                               # Dónde puede enraizar un lote: el desplegable ofrece esto.
+                               'metodos_enraizado'     => Lote::METODOS_ENRAIZADO }
 
     # La clave pública VAPID con la que el navegador se suscribe a las notificaciones push. Viaja
     # acá y NO en el build del frontend: hasta el 19-sep-2026 salía de `VITE_VAPID_PUBLIC_KEY`,

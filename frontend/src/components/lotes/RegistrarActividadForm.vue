@@ -9,10 +9,19 @@
 
     <!-- Campos según categoría -->
     <div v-if="form.categoria === 'trasplante'" class="raf__row">
-      <input v-model.number="form.macetaOrigen" type="number" step="0.5" min="0" class="raf__num" placeholder="Maceta origen (L)" />
+      <input v-model.number="form.macetaOrigen" type="number" step="any" min="0" class="raf__num" placeholder="Maceta origen (L)" />
       <span class="raf__arrow">→</span>
-      <input v-model.number="form.macetaDestino" type="number" step="0.5" min="0.1" class="raf__num" placeholder="Maceta destino (L) *" />
+      <input v-model.number="form.macetaDestino" type="number" step="any" min="0.1" class="raf__num" placeholder="Maceta destino (L) *" />
     </div>
+    <!-- En qué medio queda: de la incubadora (hidro) al vasito pasa a sustrato. Lo sugiere el backend. -->
+    <div v-if="form.categoria === 'trasplante'" class="raf__row">
+      <select v-model="form.medio" class="raf__sel raf__sel--medio" aria-label="Medio en que queda">
+        <option value="sustrato">🪱 Queda en sustrato</option>
+        <option value="hidroponia">💧 Queda en hidroponía</option>
+      </select>
+      <input v-if="form.medio === 'sustrato'" v-model.trim="form.sustrato" type="text" class="raf__input" maxlength="120" placeholder="¿Qué sustrato? (opcional)" />
+    </div>
+    <p v-if="form.categoria === 'trasplante' && metodoEnraizado" class="raf__hint">Viene de: {{ metodoEnraizadoLabel(metodoEnraizado) }}</p>
     <div v-else-if="form.categoria === 'fertilizacion'" class="raf__row">
       <input v-model="form.producto" type="text" class="raf__input" maxlength="120" placeholder="Producto / fórmula" />
       <input v-model.number="form.ec" type="number" step="0.1" min="0" class="raf__num" placeholder="EC" />
@@ -36,11 +45,16 @@ import { ref, computed } from 'vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
 import { CATEGORIAS, placeholderFor } from '../../lib/historialHelpers.js'
 import { hoyISO } from '../../utils/dates.js'
+import { metodoEnraizadoLabel } from '../../lib/loteHelpers.js'
 
+const props = defineProps({
+  medioSugerido:   { type: String, default: 'sustrato' },
+  metodoEnraizado: { type: String, default: null },
+})
 const emit = defineEmits(['crear', 'trasplante', 'cancelar'])
 
 const hoy = hoyISO()
-const blank = () => ({ categoria: 'riego', fecha: hoy, descripcion: '', producto: '', ec: null, volumen: null, macetaOrigen: null, macetaDestino: null })
+const blank = () => ({ categoria: 'riego', fecha: hoy, descripcion: '', producto: '', ec: null, volumen: null, macetaOrigen: null, macetaDestino: null, medio: props.medioSugerido, sustrato: '' })
 const form = ref(blank())
 
 const placeholderDescripcion = computed(() => placeholderFor(form.value.categoria))
@@ -54,7 +68,10 @@ function guardar() {
   if (!formValido.value) return
   const f = form.value
   if (f.categoria === 'trasplante') {
-    emit('trasplante', { fecha: f.fecha, maceta_origen_l: f.macetaOrigen || undefined, maceta_destino_l: f.macetaDestino })
+    emit('trasplante', {
+      fecha: f.fecha, maceta_origen_l: f.macetaOrigen || undefined, maceta_destino_l: f.macetaDestino,
+      medio: f.medio, sustrato: f.medio === 'sustrato' ? (f.sustrato || undefined) : undefined,
+    })
     form.value = blank()
     return
   }
@@ -74,6 +91,8 @@ function guardar() {
 <style scoped>
 .raf { display: flex; flex-direction: column; gap: .5rem; }
 .raf__row { display: flex; gap: .5rem; align-items: center; }
+.raf__sel.raf__sel--medio { flex: 0 0 auto; width: auto; min-width: 190px; }
+.raf__hint { margin: 0; font-size: .75rem; color: var(--c-slate-500); }
 .raf__sel { flex: 1; min-width: 0; border: 1.5px solid var(--c-slate-300); border-radius: 8px; padding: .45rem .55rem; font-size: .82rem; color: var(--c-slate-900); background: #fff; }
 .raf__date { flex: 1; min-width: 0; }
 .raf__input { width: 100%; box-sizing: border-box; border: 1.5px solid var(--c-slate-300); border-radius: 8px; padding: .5rem .65rem; font-size: .85rem; color: var(--c-slate-900); outline: none; }

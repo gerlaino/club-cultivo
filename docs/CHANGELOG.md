@@ -1,5 +1,39 @@
 # Changelog
 
+## Septiembre 2026 (de) — Trasplante con su fecha, enraizado con su método, tabla de lotes única
+
+- **El trasplante fechado en el pasado prendía el lote HOY** (Germán, 24-sep): el evento de
+  trasplante tenía la fecha cargada, pero el cambio enraizado→vegetativo que dispara se grababa con
+  `Time.current`, y de ahí salen días de ciclo, próximos pasos e informes. Ahora el cambio de fase
+  lleva la fecha del trasplante (`Lote#prendido_en`). Una fecha ilegible ya no se vuelve «hoy»: se
+  rechaza; una futura, también. Para los lotes ya cargados: `rake lotes:corregir_fecha_prendido`
+  (muestra; con `CONFIRMAR=1` corrige).
+- **Método de enraizado** (`lotes.metodo_enraizado`: incubadora / jiffy / taco; migración nueva). Se
+  elige al crear o editar un lote que enraíza y viaja en `/me` (`reglas_cultivo.metodos_enraizado`).
+  El trasplante pregunta **en qué medio queda**: de la incubadora o del jiffy al vasito viene
+  marcado «sustrato» (`Lote#medio_al_trasplantar`); el historial dice «Incubadora (hidroponía) →
+  Sustrato», el sustrato, las raíces y las observaciones.
+- **El trasplante del teléfono tiraba lo que preguntaba** (sustrato, raíces, observaciones, plantas
+  elegidas) y cambiaba la maceta a mano, sin historial ni fecha. Ahora pasa por la misma puerta que
+  el de escritorio (`Lotes::RegistrarTrasplante`), con fecha. Enraizando pasan todas: para pasar
+  sólo algunas a maceta se usa Desprender (el backend lo rechaza y la pantalla no lo ofrece). Los
+  campos de maceta aceptan 0,335 L (tenían mínimo 0,5).
+- **Tabla de lotes única** (`components/lotes/LotesTabla.vue`) en /lotes y adentro de la sala, que
+  tenía tarjetas con otra información. Íconos en los encabezados; **días por fase** al pasar el
+  mouse por el estado (las fases pasadas) y con la flechita (todas, con fechas). Los días los manda
+  el backend (`fases` en el serializer), recorriendo los cambios en orden: un lote que volvió atrás
+  muestra los dos tramos.
+- **«Floración venció hace 33 días» → «Pasar a floración: tocaba hace 33 días (la genética pide 45
+  de vege; lleva 78)»**. El backend manda `objetivo_dias`, `lleva_dias` y `objetivo_origen`
+  (genética / lote / fecha estimada) en `proximo_paso`; si el lote ya no tiene el número de su
+  genética, no se lo atribuye. En la tabla: «Cosechar · tocaba hace 32 d».
+- **«target must be an object»** en la lista de lotes: el refresco por cable pedía los lotes de cada
+  sala con la clave como texto y `listLotes("12")` lo mandaba como filtros. `listLotesDeSala` aparte,
+  y un refresco silencioso que falla ya no pinta error.
+- **La pantalla «pedile un rol al administrador» asomaba un instante** al cerrar sesión o al vencer
+  la sesión: se borraba el usuario antes de recargar. Ya no se borra si la página se va.
+- **Dominio propio en vivo**: `cultivoespacial.com` → `cultivo-staging-api`, `www` redirige.
+
 ## Septiembre 2026 (dd) — El espacio, desde el teléfono
 
 - Recorrido de uso personal (Germán, 22-sep): **«Pasar a Floración» vivía SÓLO en el escritorio**.

@@ -228,7 +228,9 @@ export const useAuthStore = defineStore("auth", {
         await signOut();
       } catch (_) {
       } finally {
-        this.user = null;
+        // El usuario NO se borra acá: la recarga de abajo limpia Pinia. Borrarlo antes dejaba
+        // la pantalla sin rol mientras se vacían los cachés, y asomaba «pedile un rol al
+        // administrador» antes del login.
         this.bootstrapped = true;
         clearAuthToken();
         soltarCambios();   // nada de lo anotado vale para el próximo usuario; se cierra el WebSocket
