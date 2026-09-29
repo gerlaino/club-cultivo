@@ -53,44 +53,57 @@ export function useEtiquetasQR() {
   const titulo = computed(() =>
     accion.value === 'descargar' ? 'Generando el PDF…' : 'Generando etiquetas…')
 
+  // El config trae los ítems de UNA pieza, o `tandas`: varias piezas en el mismo PDF (las etiquetas
+  // de los lotes y las banderitas de sus plantas). Devuelve null si no queda nada para etiquetar.
   async function resolver(config) {
-    return typeof config === 'function' ? await config() : config
+    const cfg = typeof config === 'function' ? await config() : config
+    if (!cfg) return null
+    const tandas = (cfg.tandas || [cfg]).filter(t => t?.items?.length)
+    return tandas.length ? { ...cfg, tandas } : null
   }
 
   /**
-   * Arma el PDF etiqueta por etiqueta.
+   * Arma el PDF etiqueta por etiqueta. Cada tanda es una pieza con su propio layout:
    * @param {Array}    items    ítems a etiquetar
    * @param {Function} urlDe    (item) => URL que codifica el QR
    * @param {Object}   layout   LAYOUT_LOTE | LAYOUT_PLANTA (medidas en mm)
    * @param {Function} dibujar  (doc, x, y, datos) => void
    * @param {Function} datosDe  (item, qrDataUrl) => datos para dibujar
    * @param {Function} [ordenPor] (item) => clave compuesta con la que se ordena la plancha
+   *
+   * Cada tanda arranca en hoja nueva y con SU orientación (la etiqueta de lote va apaisada, la
+   * banderita vertical): nunca se mezclan dos piezas en la misma hoja, que suelen ir en papel distinto.
    */
-  async function construirPdf({ items: sinOrdenar, urlDe, layout, dibujar, datosDe, ordenPor }) {
+  async function construirPdf({ tandas }) {
     const { jsPDF } = await import('jspdf')
 
-    const items  = ordenarItems(sinOrdenar, ordenPor)
+    const ordenadas = tandas.map(t => ({ ...t, items: ordenarItems(t.items, t.ordenPor) }))
     hechas.value = 0
-    total.value  = items.length
+    total.value  = ordenadas.reduce((s, t) => s + t.items.length, 0)
 
-    const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: layout.orientacion })
-    const pagina = A4[layout.orientacion]
-    const { cols, porPagina } = grillaDe(layout, pagina)
+    let doc = null
+    for (const { items, urlDe, layout, dibujar, datosDe } of ordenadas) {
+      if (!doc) doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: layout.orientacion })
+      else doc.addPage('a4', layout.orientacion)
 
-    for (let i = 0; i < items.length; i++) {
-      if (i > 0 && i % porPagina === 0) doc.addPage()
+      const pagina = A4[layout.orientacion]
+      const { cols, porPagina } = grillaDe(layout, pagina)
 
-      const enPagina = i % porPagina
-      const col = enPagina % cols
-      const fila = Math.floor(enPagina / cols)
-      const x = layout.margen + col * (layout.ancho + layout.gap)
-      const y = layout.margen + fila * (layout.alto + layout.gap)
+      for (let i = 0; i < items.length; i++) {
+        if (i > 0 && i % porPagina === 0) doc.addPage('a4', layout.orientacion)
 
-      // Las opciones del QR (corrección de error, zona muda, color) viven en el layout: cambian
-      // según dónde va a vivir la pieza. Ver el comentario en pdfEtiquetas.js.
-      const qr = await generatePNG(urlDe(items[i]), layout.qr)
-      dibujar(doc, x, y, datosDe(items[i], qr))
-      hechas.value++
+        const enPagina = i % porPagina
+        const col = enPagina % cols
+        const fila = Math.floor(enPagina / cols)
+        const x = layout.margen + col * (layout.ancho + layout.gap)
+        const y = layout.margen + fila * (layout.alto + layout.gap)
+
+        // Las opciones del QR (corrección de error, zona muda, color) viven en el layout: cambian
+        // según dónde va a vivir la pieza. Ver el comentario en pdfEtiquetas.js.
+        const qr = await generatePNG(urlDe(items[i]), layout.qr)
+        dibujar(doc, x, y, datosDe(items[i], qr))
+        hechas.value++
+      }
     }
 
     return doc
@@ -113,7 +126,7 @@ height:100vh;margin:0;color:#3A3F44">
 
     try {
       const cfg = await resolver(config)
-      if (!cfg?.items?.length) { win?.close(); return { ok: false, vacio: true } }
+      if (!cfg) { win?.close(); return { ok: false, vacio: true } }
 
       const doc = await construirPdf(cfg)
       doc.autoPrint()                       // el visor abre el diálogo de impresión solo
@@ -143,7 +156,7 @@ height:100vh;margin:0;color:#3A3F44">
     accion.value  = 'descargar'
     try {
       const cfg = await resolver(config)
-      if (!cfg?.items?.length) return { ok: false, vacio: true }
+      if (!cfg) return { ok: false, vacio: true }
 
       const doc = await construirPdf(cfg)
       doc.save(`${cfg.archivo || 'etiquetas'}.pdf`)

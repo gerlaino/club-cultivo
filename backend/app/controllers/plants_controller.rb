@@ -40,6 +40,10 @@ class PlantsController < ApplicationController
       # del lote al que navega, independientemente de si está en sala_cultivadores.
       return render json: [] unless current_user.club.lotes.exists?(id: params[:lote_id])
       plants = plants.where(lote_id: params[:lote_id])
+    elsif params[:lote_ids].present?
+      # Las plantas de varios lotes de una: las banderitas de los lotes elegidos en /lotes. Acá sí
+      # va el alcance: la lista de lotes lo aplica, y un id de otro lote simplemente no trae nada.
+      plants = plants.merge(Lote.al_alcance_de(current_user)).where(lote_id: Array(params[:lote_ids]))
     else
       # Mismo criterio que la lista de lotes: sin él, un cultivador sin sedes asignadas veía
       # todos los lotes y ninguna planta.

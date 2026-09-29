@@ -8,11 +8,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 const paginas  = { n: 1 }
 const imagenes = []
 const guardados = []
+const orientaciones = []   // la de cada hoja, en orden
 
 vi.mock('jspdf', () => ({
   jsPDF: class {
-    constructor() { paginas.n = 1 }
-    addPage() { paginas.n++ }
+    constructor(opts) { paginas.n = 1; orientaciones.length = 0; orientaciones.push(opts?.orientation) }
+    addPage(_formato, orientacion) { paginas.n++; orientaciones.push(orientacion ?? orientaciones.at(-1)) }
     addImage(data, fmt, x, y) { imagenes.push({ data, x, y, pagina: paginas.n }) }
     text() {}
     setFont() {}; setFontSize() {}; setTextColor() {}; setDrawColor() {}
@@ -101,6 +102,43 @@ describe('la tanda no pierde etiquetas', () => {
     expect(imagenes).toHaveLength(11)           // la etiqueta de lote lleva UN QR
     expect(paginas.n).toBe(2)
     expect(imagenes.filter(i => i.pagina === 1)).toHaveLength(9)
+  })
+
+  // Lotes + sus plantas en un solo PDF: cada pieza arranca en hoja nueva y con SU orientación, y
+  // ninguna etiqueta se pierde al pasar de una tanda a la otra.
+  it('dos tandas: los lotes en apaisada, después las plantas en vertical, en hojas aparte', async () => {
+    const lotes = Array.from({ length: 2 }, (_, i) => ({ codigo: `L-${i}`, codigo_qr: `l${i}` }))
+    const et = useEtiquetasQR()
+    await et.descargar(() => ({
+      tandas: [
+        { items: lotes, urlDe: (l) => `https://x/l/${l.codigo_qr}`, layout: LAYOUT_LOTE, dibujar: dibujarEtiquetaLote,
+          datosDe: (l, qr) => ({ qrDataUrl: qr, codigo: l.codigo, genetica: 'G', estado: 'E', plantas: 1 }) },
+        { items: plantas(12), urlDe: (p) => `https://x/p/${p.codigo_qr}`, layout: LAYOUT_PLANTA, dibujar: dibujarBanderitaPlanta,
+          datosDe: (p, qr) => ({ qrDataUrl: qr, nombre: p.nombre }) },
+      ],
+      archivo: 'mixto',
+    }))
+
+    expect(et.total.value).toBe(14)
+    expect(et.hechas.value).toBe(14)
+    // Hoja 1: los 2 lotes. Hojas 2 y 3: 10 + 2 banderitas (dos QR cada una).
+    expect(orientaciones).toEqual(['landscape', 'portrait', 'portrait'])
+    expect(imagenes.filter(i => i.pagina === 1).map(i => i.data)).toEqual(['data:image/png;base64,https://x/l/l0', 'data:image/png;base64,https://x/l/l1'])
+    expect(imagenes.filter(i => i.pagina === 2)).toHaveLength(20)
+    expect(imagenes.filter(i => i.pagina === 3)).toHaveLength(4)
+    expect(guardados).toEqual(['mixto.pdf'])
+  })
+
+  it('una tanda vacía no abre una hoja en blanco', async () => {
+    const et = useEtiquetasQR()
+    await et.descargar(() => ({
+      tandas: [
+        { items: [], layout: LAYOUT_LOTE },
+        { items: plantas(3), urlDe: (p) => `https://x/p/${p.codigo_qr}`, layout: LAYOUT_PLANTA, dibujar: dibujarBanderitaPlanta,
+          datosDe: (p, qr) => ({ qrDataUrl: qr, nombre: p.nombre }) },
+      ],
+    }))
+    expect(orientaciones).toEqual(['portrait'])
   })
 
   it('si no hay ítems no genera nada', async () => {

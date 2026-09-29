@@ -1,5 +1,17 @@
 # Changelog
 
+## Septiembre 2026 (di) — Etiquetas de lotes con las banderitas de sus plantas
+
+- En `/lotes`, «Imprimir etiquetas» abre un modal (`EtiquetasLotesModal`) con dos tildes:
+  **etiquetas de los lotes** y **banderitas de sus plantas**, con cuántas va a imprimir de cada una.
+  Sale un solo PDF: primero los lotes (A4 apaisada) y después las plantas (A4 vertical), lote por
+  lote. Cada tipo de etiqueta arranca en hoja nueva, porque suelen ir en papel distinto.
+- **Las descartadas no se imprimen; las cosechadas sí** (decisión de Germán, 29-sep: para
+  reimprimir los QR de un lote cosechado). Se avisa cuántas quedan afuera y cuántas no tienen QR.
+- `useEtiquetasQR` acepta `tandas` (varios tipos de etiqueta en el mismo PDF); el config de un
+  solo tipo sigue funcionando igual. `GET /plants` acepta `lote_ids[]`, con el mismo alcance que la
+  lista de lotes.
+
 ## Septiembre 2026 (dh) — Perfil con solapas; la contraseña se cambia sin la actual
 
 - **Mi perfil con solapas** (Datos personales · Notificaciones · Seguridad), la solapa en la URL

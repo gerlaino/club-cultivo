@@ -12,12 +12,9 @@ import DsSpinner from '../design-system/components/Spinner.vue'
 import NuevoLoteModal from '../components/lotes/NuevoLoteModal.vue'
 import LotesTabla from '../components/lotes/LotesTabla.vue'
 import { opcionesMetodoEnraizado } from '../lib/loteHelpers.js'
-import BloqueoProgreso from '../components/ui/BloqueoProgreso.vue'
+import EtiquetasLotesModal from '../components/lotes/EtiquetasLotesModal.vue'
 import { useSeleccion } from '../composables/useSeleccion.js'
-import { useEtiquetasQR } from '../composables/useEtiquetasQR.js'
-import { useClubStore } from '../stores/club.js'
 import { useToast } from '../composables/useToast.js'
-import { LAYOUT_LOTE, dibujarEtiquetaLote } from '../lib/pdfEtiquetas.js'
 
 import { moverLotes } from '../lib/api.js'
 import { hoyISO } from '../utils/dates.js'
@@ -25,7 +22,6 @@ import { hoyISO } from '../utils/dates.js'
 const store = useLotesStore();
 const salas = useSalasStore();
 const auth  = useAuthStore();
-const club  = useClubStore();
 const toast = useToast();
 const { confirm } = useConfirm();
 
@@ -152,42 +148,25 @@ watch([sorted, perPage], () => { if (page.value > totalPages.value) page.value =
 
 // ---------- Etiquetas QR en tanda ----------
 // Se etiqueta lo SELECCIONADO, y "seleccionar todo" toma todo lo filtrado (no la página): recién
-// creaste 12 lotes, filtrás y los imprimís de una en vez de entrar a cada uno.
+// creaste 12 lotes, filtrás y los imprimís de una en vez de entrar a cada uno. El modal pregunta si
+// van también las banderitas de sus plantas (ver EtiquetasLotesModal).
 const sel = useSeleccion(computed(() => store.items), sorted);
-const etiquetas = useEtiquetasQR();
+const showEtiquetas = ref(false);
 const seleccionTabla = computed(() => ({
   esta:          (l) => sel.esta(l.id),
   alternar:      (l) => sel.alternar(l.id),
   todo:          sel.todoFiltradoElegido.value,
   algo:          sel.algoFiltradoElegido.value,
   alternarTodo:  () => sel.alternarTodoFiltrado(),
-  deshabilitada: etiquetas.ocupado.value,
+  deshabilitada: showEtiquetas.value,
   tituloTodo:    sel.todoFiltradoElegido.value ? 'Deseleccionar' : `Seleccionar los ${sorted.value.length} lotes filtrados`,
 }));
 
-async function configEtiquetas() {
-  if (!club.data) { try { await club.fetch() } catch { /* la organización es opcional en la etiqueta */ } }
-  return {
-    items:   sel.seleccionados.value.filter(l => l.codigo_qr),
-    urlDe:   (l) => `${window.location.origin}/l/${l.codigo_qr}`,
-    layout:  LAYOUT_LOTE,
-    dibujar: dibujarEtiquetaLote,
-    ordenPor: (l) => [l.codigo ?? ''],
-    datosDe: (l, qr) => ({
-      qrDataUrl: qr,
-      codigo:    l.codigo,
-      genetica:  l.genetica?.nombre_visible || l.genetica?.nombre || l.strain,
-      estado:    estadoLabel(l.estado),
-      inicio:    l.start_date,
-      plantas:   l.plants_count ?? 0,
-      clubName:  club.data?.name || '',
-    }),
-    archivo: `etiquetas-lotes-${sel.cantidad.value}`,
-  };
+// El trabajo terminó: la selección (y su barra) no tienen más razón de estar.
+function onEtiquetasHechas() {
+  showEtiquetas.value = false;
+  sel.limpiar();
 }
-
-// Los lotes sin codigo_qr no pueden etiquetarse (no hay a dónde apuntar el QR).
-const seleccionSinQR = computed(() => sel.seleccionados.value.filter(l => !l.codigo_qr).length);
 
 // ── Mover lotes de sala, desde acá ────────────────────────────────────────────
 // El lote TOMA LA FASE de la sala destino: una sala en floración da 12/12, así que lo que entra ahí
@@ -233,21 +212,6 @@ async function confirmarMover() {
   } finally { moviendo.value = false }
 }
 
-// Se pasa la FUNCIÓN (no el config resuelto) para que el composable abra la ventana de impresión
-// antes de cualquier await; si no, el bloqueador de popups se la come.
-async function imprimirEtiquetas() {
-  const r = await etiquetas.imprimir(configEtiquetas);
-  if (r.vacio) toast.warning('Ningún lote seleccionado tiene código QR');
-  else if (!r.ok && r.error) toast.error('No se pudieron generar las etiquetas');
-  else if (r.viaDescarga) toast.warning('El navegador bloqueó la ventana: se descargó el PDF');
-  if (r.ok) sel.limpiar();   // el trabajo terminó: la selección (y su barra) no tienen más razón de estar
-}
-async function descargarEtiquetas() {
-  const r = await etiquetas.descargar(configEtiquetas);
-  if (r.vacio) toast.warning('Ningún lote seleccionado tiene código QR');
-  else if (!r.ok && r.error) toast.error('No se pudieron generar las etiquetas');
-  else if (r.ok) { toast.success('PDF descargado'); sel.limpiar(); }
-}
 
 // ---------- Form ----------
 function emptyForm() {
@@ -564,10 +528,7 @@ async function exportarCSV() {
           {{ sel.cantidad.value }} {{ sel.cantidad.value === 1 ? 'lote' : 'lotes' }}
           <small v-if="sel.fueraDelFiltro.value">({{ sel.fueraDelFiltro.value }} fuera del filtro actual)</small>
         </span>
-        <span v-if="seleccionSinQR" class="lv-selbar__warn" :title="`${seleccionSinQR} sin código QR: no se pueden etiquetar`">
-          <i class="bi bi-exclamation-triangle-fill"></i> {{ seleccionSinQR }} sin QR
-        </span>
-        <button class="lv-selbar__ghost" :disabled="etiquetas.ocupado.value" @click="sel.limpiar()">Limpiar</button>
+        <button class="lv-selbar__ghost" @click="sel.limpiar()">Limpiar</button>
         <!-- Mover también acá, y no solo desde la ficha de la sala: /lotes es donde se ven TODOS
              juntos, y es el único lugar desde el que se puede agarrar lotes de salas distintas y
              mandarlos a la misma. Desde la sala solo se pueden mover los de esa sala. -->
@@ -580,21 +541,19 @@ async function exportarCSV() {
         <button v-if="puedeMover && salaDestino" class="lv-selbar__btn" :disabled="moviendo" @click="confirmarMover">
           {{ moviendo ? 'Moviendo…' : 'Mover' }}
         </button>
-        <button class="lv-selbar__btn" :disabled="etiquetas.ocupado.value" @click="descargarEtiquetas">
-          <i class="bi bi-download"></i> Descargar
-        </button>
-        <button class="lv-selbar__btn lv-selbar__btn--main" :disabled="etiquetas.ocupado.value" @click="imprimirEtiquetas">
+        <button class="lv-selbar__btn lv-selbar__btn--main" @click="showEtiquetas = true">
           <i class="bi bi-printer"></i> Imprimir etiquetas
         </button>
       </div>
     </Teleport>
 
-    <!-- Mientras genera no se puede tocar nada (ni cambiar el filtro a mitad de camino) -->
-    <BloqueoProgreso
-      :visible="etiquetas.ocupado.value"
-      :titulo="etiquetas.titulo.value"
-      :hechas="etiquetas.hechas.value"
-      :total="etiquetas.total.value"
+    <!-- Lotes y, si se quiere, las banderitas de sus plantas. Mientras genera tapa todo con el
+         progreso: no se puede cambiar el filtro a mitad de camino. -->
+    <EtiquetasLotesModal
+      :show="showEtiquetas"
+      :lotes="sel.seleccionados.value"
+      @close="showEtiquetas = false"
+      @hecho="onEtiquetasHechas"
     />
 
   </div>
