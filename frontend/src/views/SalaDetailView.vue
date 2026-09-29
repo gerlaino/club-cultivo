@@ -14,6 +14,7 @@ import CamasSeccion           from '../components/camas/CamasSeccion.vue'
 import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
 import RegistroSalaModal      from '../components/salas/RegistroSalaModal.vue'
 import LotesTabla             from '../components/lotes/LotesTabla.vue'
+import EtiquetasLotesModal    from '../components/lotes/EtiquetasLotesModal.vue'
 import RegistroEnraizadoModal from '../components/salas/RegistroEnraizadoModal.vue'
 import ActionsDropdown        from '../components/ui/ActionsDropdown.vue'
 import { listGeneticas, listPlants, updateSala, getSalaAmbiente, deleteSala, getLoteProximoCodigo, createLoteHeredado, cambiarFaseSala, moverLotes, listFotosSala, deleteFotoSala } from '../lib/api.js'
@@ -345,7 +346,7 @@ const kpis = computed(() => {
 // destino**. Una sala en floración da 12/12, así que lo que entre ahí pasa a florecer. Es
 // irreversible en el sentido de que no se "des-florece" una planta, por eso el diálogo enumera
 // lote por lote qué va a cambiar, en vez de un "¿estás seguro?" genérico.
-const selMover  = ref(new Set())
+const selLotes  = ref(new Set())
 const moviendo  = ref(false)
 const salaDestinoId = ref(null)
 const showMover = ref(false)
@@ -353,11 +354,20 @@ const showMover = ref(false)
 const puedeMover = computed(() => canEdit.value || isCultivador.value)
 const esMovible  = (l) => ESTADOS_ACTIVOS_CULTIVADOR.includes(l.estado)
 function alternarMover(id) {
-  const s = new Set(selMover.value)
+  const s = new Set(selLotes.value)
   s.has(id) ? s.delete(id) : s.add(id)
-  selMover.value = s
+  selLotes.value = s
 }
-const lotesAMover = computed(() => items.value.filter(l => selMover.value.has(l.id)))
+// La selección sirve para dos cosas: mover e imprimir etiquetas. Se puede tildar cualquier lote
+// (las etiquetas de un lote cosechado también se reimprimen), pero sólo se mueven los que siguen en
+// cultivo: los demás ya no viven en una sala.
+const lotesElegidos = computed(() => items.value.filter(l => selLotes.value.has(l.id)))
+const lotesAMover   = computed(() => lotesElegidos.value.filter(esMovible))
+const showEtiquetas = ref(false)
+function onEtiquetasHechas() {
+  showEtiquetas.value = false
+  selLotes.value = new Set()
+}
 
 const salasDestino = computed(() =>
   (salas.items || []).filter(s => s.id !== sala.value?.id && s.state === 'activa'))
@@ -399,10 +409,10 @@ async function confirmarMover() {
 
   moviendo.value = true
   try {
-    const { data } = await moverLotes([...selMover.value], d.id)
+    const { data } = await moverLotes(lotesAMover.value.map(l => l.id), d.id)
     const extra = data.cambios_de_fase?.length ? ` · ${data.cambios_de_fase.length} cambiaron de fase` : ''
     toast.success(`${data.movidos} lote(s) movidos a ${d.nombre}${extra}`)
-    selMover.value = new Set(); showMover.value = false; salaDestinoId.value = null
+    selLotes.value = new Set(); showMover.value = false; salaDestinoId.value = null
     await Promise.all([salas.fetchSala(salaId), lotes.fetchBySala(salaId)])
     cargarFotosSala()
   } catch (e) {
@@ -494,23 +504,22 @@ const itemsSorted = computed(() => {
 
 // "Seleccionar todo" toma lo FILTRADO, no la página: filtrás enraizado y entran todos, aunque la
 // lista muestre 10. Misma regla que la selección de etiquetas.
-const movibles = computed(() => itemsSorted.value.filter(esMovible))
 const todosElegidos = computed(() =>
-  movibles.value.length > 0 && movibles.value.every(l => selMover.value.has(l.id)))
+  itemsSorted.value.length > 0 && itemsSorted.value.every(l => selLotes.value.has(l.id)))
 function alternarTodos() {
-  const s = new Set(selMover.value)
-  todosElegidos.value ? movibles.value.forEach(l => s.delete(l.id))
-                      : movibles.value.forEach(l => s.add(l.id))
-  selMover.value = s
+  const s = new Set(selLotes.value)
+  todosElegidos.value ? itemsSorted.value.forEach(l => s.delete(l.id))
+                      : itemsSorted.value.forEach(l => s.add(l.id))
+  selLotes.value = s
 }
-const seleccionMover = computed(() => ({
-  esta:         (l) => selMover.value.has(l.id),
-  alternar:     (l) => alternarMover(l.id),
-  puede:        esMovible,
-  todo:         todosElegidos.value,
-  algo:         !todosElegidos.value && movibles.value.some(l => selMover.value.has(l.id)),
-  alternarTodo: alternarTodos,
-  tituloTodo:   `Elegir los ${movibles.value.length} lotes para mover`,
+const seleccionLotes = computed(() => ({
+  esta:          (l) => selLotes.value.has(l.id),
+  alternar:      (l) => alternarMover(l.id),
+  todo:          todosElegidos.value,
+  algo:          !todosElegidos.value && itemsSorted.value.some(l => selLotes.value.has(l.id)),
+  alternarTodo:  alternarTodos,
+  deshabilitada: showEtiquetas.value,
+  tituloTodo:    `Seleccionar los ${itemsSorted.value.length} lotes`,
 }))
 // Fases de LOTE para el filtro. Ojo: ESTADOS_SALA (más arriba) es otra cosa — el estado de la sala
 // misma (activa/mantenimiento/cerrada).
@@ -1000,9 +1009,9 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
               <template v-else>
               <!-- Buscar / filtrar / seleccionar todo -->
               <div v-if="items.length > 3 || sdQuery || sdEstado" class="sd__lotes-tools">
-                <label v-if="puedeMover && movibles.length" class="sd__selall">
+                <label v-if="itemsSorted.length" class="sd__selall">
                   <input type="checkbox" :checked="todosElegidos" @change="alternarTodos" />
-                  Todos<span v-if="sdEstado || sdQuery"> los filtrados</span> ({{ movibles.length }})
+                  Todos<span v-if="sdEstado || sdQuery"> los filtrados</span> ({{ itemsSorted.length }})
                 </label>
                 <input v-model="sdQuery" class="sd__lotes-search" placeholder="Buscar por código o genética…" />
                 <select v-model="sdEstado" class="sd__lotes-filter">
@@ -1021,24 +1030,35 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                 <LotesTabla
                   :lotes="itemsPaginados"
                   :mostrar-sala="false"
-                  :seleccion="puedeMover && movibles.length ? seleccionMover : null"
+                  :seleccion="seleccionLotes"
                 />
-                <!-- Barra de mover: aparece solo con algo seleccionado -->
+                <!-- Barra de la selección: mover (sólo lo que sigue en cultivo) e imprimir etiquetas -->
                 <Teleport to="body">
-                  <div v-if="selMover.size" class="sd__movbar">
-                    <span class="sd__movbar-txt">{{ selMover.size }} lote{{ selMover.size === 1 ? '' : 's' }}</span>
-                    <select v-model="salaDestinoId" class="sd__movbar-sel">
-                      <option :value="null">Mover a…</option>
-                      <option v-for="s in salasDestino" :key="s.id" :value="s.id">
-                        {{ s.nombre }}<template v-if="s.kind"> ({{ kindLabel(s.kind) }})</template><template v-if="s.sede?.nombre"> · {{ s.sede.nombre }}</template>
-                      </option>
-                    </select>
-                    <button class="sd__movbar-ghost" @click="selMover = new Set()">Cancelar</button>
-                    <button class="sd__movbar-btn" :disabled="!salaDestino || moviendo" @click="confirmarMover">
-                      {{ moviendo ? 'Moviendo…' : 'Mover' }}
+                  <div v-if="selLotes.size" class="sd__movbar">
+                    <span class="sd__movbar-txt">{{ selLotes.size }} lote{{ selLotes.size === 1 ? '' : 's' }}</span>
+                    <template v-if="puedeMover && lotesAMover.length">
+                      <select v-model="salaDestinoId" class="sd__movbar-sel">
+                        <option :value="null">Mover{{ lotesAMover.length < selLotes.size ? ` ${lotesAMover.length}` : '' }} a…</option>
+                        <option v-for="s in salasDestino" :key="s.id" :value="s.id">
+                          {{ s.nombre }}<template v-if="s.kind"> ({{ kindLabel(s.kind) }})</template><template v-if="s.sede?.nombre"> · {{ s.sede.nombre }}</template>
+                        </option>
+                      </select>
+                      <button v-if="salaDestino" class="sd__movbar-btn" :disabled="moviendo" @click="confirmarMover">
+                        {{ moviendo ? 'Moviendo…' : 'Mover' }}
+                      </button>
+                    </template>
+                    <button class="sd__movbar-ghost" @click="selLotes = new Set()">Cancelar</button>
+                    <button class="sd__movbar-btn" @click="showEtiquetas = true">
+                      <i class="bi bi-printer"></i> Imprimir etiquetas
                     </button>
                   </div>
                 </Teleport>
+                <EtiquetasLotesModal
+                  :show="showEtiquetas"
+                  :lotes="lotesElegidos"
+                  @close="showEtiquetas = false"
+                  @hecho="onEtiquetasHechas"
+                />
 
                 <div v-if="sdTotalPages > 1" class="sd__lotes-pager">
                   <button class="sd__pager-btn" :disabled="sdPage <= 1" @click="sdPage--">«</button>

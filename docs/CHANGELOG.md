@@ -9,6 +9,9 @@
   lote, debajo las de sus plantas, el lote siguiente. Ninguna etiqueta se parte entre dos hojas, y
   la del lote no queda sola al pie: si no entra con su primera planta, pasa con ellas a la hoja
   siguiente. Con un solo tilde sale la plancha de siempre (9 lotes apaisada / 10 banderitas).
+- **También en la ficha de la sala** (`SalaDetailView`): la selección de lotes, que era sólo para
+  mover y sólo de los que siguen en cultivo, ahora toma cualquier lote de la sala; la barra ofrece
+  «Mover» (aplica sólo a los que están en cultivo) e «Imprimir etiquetas» (el mismo modal).
 - **Las descartadas no se imprimen; las cosechadas sí** (decisión de Germán, 29-sep: para
   reimprimir los QR de un lote cosechado). Se avisa cuántas quedan afuera y cuántas no tienen QR.
 - `useEtiquetasQR` acepta `secuencia` (piezas de distinto alto de corrido, con
