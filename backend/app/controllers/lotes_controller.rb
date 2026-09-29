@@ -1047,12 +1047,14 @@ class LotesController < ApplicationController
       end
     end
 
-    @lote.registros_ambientales.includes(:user).find_each do |r|
+    @lote.registros_ambientales.includes(:user, :dispositivo).find_each do |r|
       chips = []
       chips << "#{r.temperatura}°C" if r.temperatura
       chips << "#{r.humedad}%"      if r.humedad
       chips << "pH #{r.ph}"         if r.ph
       chips << "EC #{r.ec}"         if r.ec
+      # El riego automático no trae otra cosa que los litros: sin este chip la línea quedaba vacía.
+      chips << "riego #{r.litros.to_f.round(1)} L" if r.litros && r.nutricion.blank? && Array(r.tareas_realizadas).include?('riego')
       if (n = r.nutricion.presence)
         chips << "#{n['receta_nombre'] || 'productos sueltos'} · #{n['litros'].to_f.round(1)} L#{n['costo_ars'].to_f.positive? ? " · $#{n['costo_ars'].to_f.round(0)}" : ''}"
       elsif r.fertilizacion
@@ -1060,9 +1062,9 @@ class LotesController < ApplicationController
       end
       items << {
         kind: 'registro', source: 'registro_ambiental', id: r.id, fecha: r.registrado_en,
-        emoji: '📋', titulo: 'Registro del lote',
+        emoji: (r.fuente == 'dispositivo' ? '💧' : '📋'), titulo: (r.fuente == 'dispositivo' ? 'Riego automático' : 'Registro del lote'),
         detalle: [chips.join(' · '), r.observaciones].reject(&:blank?).join(' — ').presence,
-        categoria: nil, metadata: {}, usuario: r.user&.nombre_completo,
+        categoria: nil, metadata: {}, usuario: r.autor_nombre,
         editable: false, deletable: true,
       }
     end

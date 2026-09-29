@@ -57,6 +57,8 @@ class MeController < ApplicationController
                                'sedes_por_rol'         => Sede::TIPOS_POR_ROL,
                                # Dónde puede enraizar un lote: el desplegable ofrece esto.
                                'metodos_enraizado'     => Lote::METODOS_ENRAIZADO,
+                               # Cómo se dice el arranque según el origen (semilla germina).
+                               'arranque_por_origen'   => Lote::ARRANQUE_POR_ORIGEN,
                                # Suelo vivo: para qué es cada receta y en qué se dosifica, qué se le
                                # hace a una cama, qué agua, y qué tareas de un plan no aplican en cama.
                                'suelo_vivo' => {

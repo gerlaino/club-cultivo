@@ -12,7 +12,7 @@
     <!-- Hero -->
     <div class="mlot__hero" :style="{ background: estadoGradient(lote.estado) }">
       <button class="mlot__hero-more" @click="showAcciones = true" aria-label="Más"><i class="bi bi-three-dots"></i></button>
-      <div class="mlot__hero-estado">{{ estadoEmoji(lote.estado) }} {{ estadoLabel(lote.estado) }}<span v-if="lote.automatica" class="mlot__auto">Auto</span></div>
+      <div class="mlot__hero-estado">{{ estadoEmoji(lote.estado) }} {{ estadoLoteLabel(lote) }}<span v-if="lote.automatica" class="mlot__auto">Auto</span></div>
       <h2 class="mlot__hero-codigo">{{ lote.codigo }}</h2>
       <div class="mlot__hero-gen">{{ lote.genetica?.nombre || 'Sin genética' }}</div>
       <div v-if="textoProximoPaso(lote)" class="mlot__hero-prox"><i class="bi bi-arrow-right-short"></i>{{ textoProximoPaso(lote) }}</div>
@@ -172,15 +172,15 @@
     <!-- Sheet: Avanzar fase -->
     <SheetBottom v-model="showAvanzarFase" title="Avanzar fase">
       <div class="mlot__sheet-body">
-        <p class="mlot__sheet-desc">Fase actual: <strong>{{ estadoLabel(lote.estado) }}</strong></p>
+        <p class="mlot__sheet-desc">Fase actual: <strong>{{ estadoLoteLabel(lote) }}</strong></p>
         <div class="mlot__destino" v-if="faseSiguiente">
-          <span class="mlot__destino-de">{{ estadoEmoji(lote.estado) }} {{ estadoLabel(lote.estado) }}</span>
+          <span class="mlot__destino-de">{{ estadoEmoji(lote.estado) }} {{ estadoLoteLabel(lote) }}</span>
           <i class="bi bi-arrow-right"></i>
           <span class="mlot__destino-a">{{ faseSiguiente.emoji }} {{ faseSiguiente.label }}</span>
         </div>
         <!-- Cuántas prendieron: sin este número el % de prendimiento da 100% siempre. -->
         <div v-if="lote.estado === 'enraizado'" class="mlot__field">
-          <label class="mlot__label">¿Cuántas prendieron? *</label>
+          <label class="mlot__label">¿Cuántas {{ lote.origen === 'semilla' ? 'germinaron' : 'prendieron' }}? *</label>
           <input v-model="fasePrendieron" type="number" min="0" :max="lote.plants_count"
                  class="mlot__input" :placeholder="`de ${lote.plants_count || 0}`" />
         </div>
@@ -238,7 +238,7 @@
 </template>
 
 <script setup>
-import { MACETA_OPCIONES, textoProximoPaso } from '../../lib/loteHelpers.js'
+import { MACETA_OPCIONES, textoProximoPaso, estadoLoteLabel } from '../../lib/loteHelpers.js'
 import LoteGaleria from '../../components/lotes/LoteGaleria.vue'
 import ResumenCiclo from '../../components/lotes/ResumenCiclo.vue'
 import { ref, computed, onMounted } from 'vue'
@@ -305,7 +305,7 @@ const EG = {
   en_manicura:'linear-gradient(150deg,#1c1000,#78350f)',
   curado:     'linear-gradient(150deg,#0c1a33,#1d4ed8)',
 }
-const EE = { germinacion:'🌱', esqueje:'🪴', vegetativo:'🍃', floracion:'🌸', cosecha:'✂️', en_manicura:'✂️', curado:'🫙' }
+const EE = { enraizado:'🌱', vegetativo:'🍃', floracion:'🌸', cosecha:'✂️', en_manicura:'✂️', curado:'🫙' }
 const EL = { enraizado: 'Enraizado', vegetativo:'Vegetativo', floracion:'Floración', cosecha:'Cosecha', en_manicura:'Manicura', curado:'Curado' }
 const PC = { germinacion:'#64748b', esqueje:'#0891b2', vegetativo:'#16a34a', floracion:'#9333ea', cosecha:'#dc2626', en_manicura:'#d97706', curado:'#2563eb', cosechado:'#dc2626', descartada:'#94a3b8' }
 const PL = { enraizado:'Enraiz.', vegetativo:'Veget.', floracion:'Florac.', cosecha:'Cosecha', en_manicura:'Manicura', curado:'Curado', cosechado:'Cosechado', descartada:'Descartada' }

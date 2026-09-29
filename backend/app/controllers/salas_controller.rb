@@ -410,6 +410,8 @@ class SalasController < ApplicationController
         id:                 l.id,
         codigo:             l.codigo,
         estado:             l.estado,
+        estado_label:       l.estado_label,
+        origen:             l.origen,
         start_date:         l.start_date,
         plants_count:       plantas_vivas.(l.id),
         genetica_nombre:    l.genetica&.nombre,
@@ -439,7 +441,7 @@ class SalasController < ApplicationController
 
     serialize_sala(s).merge(
       lotes: lotes_all.map { |l|
-        { id: l.id, codigo: l.codigo, estado: l.estado, plants_count: plantas_vivas.(l.id), cama_id: l.cama_id }
+        { id: l.id, codigo: l.codigo, estado: l.estado, estado_label: l.estado_label, plants_count: plantas_vivas.(l.id), cama_id: l.cama_id }
       },
       # Suelo vivo: las camas del espacio, con su estado y su «qué viene».
       camas: s.camas.vigentes.order(:nombre).map { |c| CamaSerializer.resumen(c) },

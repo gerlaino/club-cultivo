@@ -42,7 +42,7 @@
               <label class="nlm__label">Estado actual del lote <span class="nlm__req">*</span></label>
               <select class="nlm__input" v-model="heredadoEstado"
                       :disabled="estadosHeredadoPermitidos.length === 1">
-                <option v-for="e in estadosHeredadoPermitidos" :key="e.value" :value="e.value">{{ e.label }}</option>
+                <option v-for="e in estadosHeredadoPermitidos" :key="e.value" :value="e.value">{{ e.value === 'enraizado' ? arranque.estado : e.label }}</option>
               </select>
               <span v-if="motivoEstadoAcotado" class="nlm__hint">{{ motivoEstadoAcotado }}</span>
               <span v-else class="nlm__hint">Define en qué {{ salaTxt.cortas }} puede entrar.</span>
@@ -130,7 +130,7 @@
                    el DOM no pueda quedar a mitad de camino sea cual sea la causa. -->
               <div class="nlm__field" :key="`dias-raiz-${heredadoEstado}`">
                 <label class="nlm__label">
-                  Días enraizando
+                  Días {{ arranque.verbo }}
                   <span v-if="['vegetativo','floracion','cosecha'].includes(heredadoEstado)" class="nlm__label-opt">(completados)</span>
                 </label>
                 <input type="number" min="0" max="999" step="1" class="nlm__input" v-model.number="heredadoDias.semilla_esqueje" />
@@ -262,7 +262,7 @@
             <!-- Dónde enraíza: incubadora (hidro), jiffy o taco. Sólo si nace enraizando: al ir a
                  maceta cambia de medio, y sirve para comparar qué método prende mejor. -->
             <div v-if="estadoObjetivo === 'enraizado' && metodosEnraizado.length && !camaElegida" class="nlm__field">
-              <label class="nlm__label">¿Dónde enraíza? <span class="nlm__label-opt">(opcional)</span></label>
+              <label class="nlm__label">{{ arranque.donde }} <span class="nlm__label-opt">(opcional)</span></label>
               <select class="nlm__input" v-model="form.metodo_enraizado">
                 <option value="">Sin especificar</option>
                 <option v-for="m in metodosEnraizado" :key="m.value" :value="m.value">{{ m.label }}</option>
@@ -341,7 +341,7 @@ import { estadoCama, avisoAlPlantar } from '../../lib/camas.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
 import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
-import { opcionesMetodoEnraizado } from '../../lib/loteHelpers.js'
+import { opcionesMetodoEnraizado, arranquePorOrigen } from '../../lib/loteHelpers.js'
 const { sala: salaTxt, esPersonal } = useUsoPersonal()
 
 // Fecha local en ISO (yyyy-mm-dd) SIN pasar por UTC — toISOString() convierte a
@@ -422,6 +422,8 @@ const KINDS_POR_ESTADO_AUTOMATICA = computed(() =>
 const estadoObjetivo = computed(() =>
   tipoCreacion.value === 'existente' ? heredadoEstado.value : 'enraizado')
 const metodosEnraizado = computed(() => opcionesMetodoEnraizado(useAuthStore().user?.reglas_cultivo))
+// Semilla germina, esqueje enraíza: el estado es el mismo, cambia cómo se dice. Lo manda `/me`.
+const arranque = computed(() => arranquePorOrigen(useAuthStore().user?.reglas_cultivo, form.value.origen))
 
 // Las salas que se ofrecen son las de LA SEDE ELEGIDA y del tipo que admite el estado en que
 // va a nacer el lote. Con varias sedes, la sede se elige primero: mezclar las salas de todas

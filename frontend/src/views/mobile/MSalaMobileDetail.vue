@@ -49,7 +49,7 @@
           <div class="msal__card-top">
             <span class="msal__codigo">{{ lote.codigo }}</span><span v-if="lote.automatica" class="chip-auto">Auto</span>
             <span class="msal__badge" :style="{ background: estadoColor(lote.estado)+'20', color: estadoColor(lote.estado) }">
-              {{ estadoLabel(lote.estado) }}
+              {{ estadoLoteLabel(lote) }}
             </span>
           </div>
           <div class="msal__card-meta">
@@ -257,7 +257,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { textoProximoPaso } from '../../lib/loteHelpers.js'
+import { textoProximoPaso, estadoLoteLabel } from '../../lib/loteHelpers.js'
 import { getSala, listLotesDeSala, createSalaNota, createLote, createLoteHeredado, listGeneticas,
          listFotosSala, uploadFotoSala } from '../../lib/api'
 import { useToast }       from '../../composables/useToast'

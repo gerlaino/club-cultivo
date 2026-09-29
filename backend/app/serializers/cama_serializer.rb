@@ -20,7 +20,7 @@ class CamaSerializer
       # Lo que ocupan sus lotes: la pantalla precarga los m² libres al plantar otro.
       m2_ocupados_lotes: en_cultivo.sum { |l| l.m2_ocupados.to_f }.round(2),
       lotes: en_cultivo.map { |l|
-        { id: l.id, codigo: l.codigo, estado: l.estado, genetica: l.genetica&.nombre,
+        { id: l.id, codigo: l.codigo, estado: l.estado, estado_label: l.estado_label, genetica: l.genetica&.nombre,
           plants_count: l.plants_count, m2_ocupados: l.m2_ocupados&.to_f, automatica: l.automatica? }
       },
       notas: c.notas,

@@ -127,16 +127,19 @@ mensual por plan (`Ia::Uso`, `ia_llamadas`, créditos `IaRecarga`).
 - **Seguridad**: no hay contraseña por defecto; `render file:` no existe en modo API; `/me` no se
   cachea; el helper de specs prefija `/api` a todo.
 
-## Dónde retomar (25-sep-2026)
+## Dónde retomar (29-sep-2026)
 
-**SUELO VIVO HECHO Y SIN COMMITEAR** (bloque (dg) del CHANGELOG, plan en `docs/PLAN_SUELO_VIVO.md`):
-camas con medidas/mezcla/cocción/descanso, ciclos, registros del suelo, análisis de suelo, recetas
-por uso con conversión de unidades, plantar en la cama, trazabilidad «qué comió esta flor». Migración
-nueva `CrearCamasSueloVivo` (corre sola al deployar). Verificado: rspec completo, vitest, build y
-Playwright sobre `casa_german` (Cama A en uso con CASA-01, Cama B descansando). Falta que Germán lo
-pruebe y pida el commit. Antes: todo pusheado hasta `93e91f4c`.
+**Bloque (dj) pusheado**: «Germinación» para lotes de semilla que no fueron a maceta (la palabra, no
+la fase) y `POST /webhooks/riegos` (el ESP32 del balcón anota sus riegos en los lotes de su sala,
+firmados «Automático»; migración `RiegoAutomaticoEnRegistros`). El firmware vive en el repo aparte
+`~/Projects/cultivo-espacial-esp32`. Suelo vivo (dg) ya está pusheado. Para el balcón de Germán
+falta: prender IoT en `casa_german` de producción, crear sala + dispositivo Genérico y cargar el
+token en el aparato.
 
 **Reglas nuevas que gobiernan código nuevo** (detalle en `docs/REGLAS_Y_DECISIONES.md`):
+- **Semilla germina, esqueje enraíza**: es la palabra, no la fase (`estado_label` del backend). Un
+  riego de un aparato lo firma el aparato: el autor de un registro se muestra con
+  `RegistroAmbiental#autor_nombre`, nunca `r.user.…`.
 - **Suelo vivo**: la cama vive más que los lotes; estado calculado; los números de cultivo los pone
   el cultivador; en la cama no hay trasplantes y la planta no se muda (florece el ESPACIO); plantar
   en una cama que descansa avisa, no bloquea. La dosis se convierte a la unidad del insumo

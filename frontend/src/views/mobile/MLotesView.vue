@@ -34,7 +34,7 @@
           <div class="ml__card-top">
             <span class="ml__codigo">{{ lote.codigo }}</span>
             <span class="ml__badge" :style="{ background: estadoColor(lote.estado) + '22', color: estadoColor(lote.estado) }">
-              {{ estadoLabel(lote.estado) }}
+              {{ estadoLoteLabel(lote) }}
             </span>
           </div>
           <div class="ml__card-meta">
@@ -103,6 +103,7 @@
 </template>
 
 <script setup>
+import { estadoLoteLabel } from '../../lib/loteHelpers.js'
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { listLotes, listSalas, listGeneticas, getLoteProximoCodigo, createLote } from '../../lib/api'

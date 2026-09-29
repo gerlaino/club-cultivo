@@ -29,6 +29,7 @@ Rails.application.routes.draw do
   # Webhooks externos — sin prefijo /api para URLs fijas de hardware
   namespace :webhooks do
     post 'lecturas', to: 'lecturas#create'
+    post 'riegos',   to: 'riegos#create'
   end
 
   # ══════════════════════════════════════════════════════════════

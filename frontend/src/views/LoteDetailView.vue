@@ -18,7 +18,7 @@ import EmptyState from '../components/ui/EmptyState.vue'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import { ArrowRight, ChevronRight } from 'lucide-vue-next'
-import { em, sm, pgm, growLabel, metodoEnraizadoLabel, lightLabel, macetaLabel, fotoperiodoLabel, formatDate, formatDateTime,
+import { em, estadoLoteLabel, verboArranque, sm, pgm, growLabel, metodoEnraizadoLabel, lightLabel, macetaLabel, fotoperiodoLabel, formatDate, formatDateTime,
   capitalizarFase, phaseBannerMsg, CICLO_BASE, POST_HARVEST_ESTADOS, textoProximoPaso } from '../lib/loteHelpers.js'
 import DesprenderLoteModal  from '../components/lotes/DesprenderLoteModal.vue'
 import LoteHistorialSection from '../components/lotes/LoteHistorialSection.vue'
@@ -436,7 +436,7 @@ onUnmounted(() => {
             <span class="ld__hero-emoji">{{ em(lote.estado).emoji }}</span>
             <h1 class="ld__title">{{ lote.codigo }}</h1>
             <span class="ld__estado-pill" :style="{ background: em(lote.estado).bg, color: em(lote.estado).color }">
-              {{ em(lote.estado).label }}
+              {{ estadoLoteLabel(lote) }}
               <span v-if="lote.dias_en_estado != null" class="ld__estado-dias">· día {{ lote.dias_en_estado }}</span>
             </span>
             <span v-if="textoProximoPaso(lote)" class="ld__prox" :class="{ 'ld__prox--ya': lote.proximo_paso.faltan_dias <= 0 }"><i class="bi bi-arrow-right-short"></i>{{ textoProximoPaso(lote) }}</span>
@@ -470,9 +470,9 @@ onUnmounted(() => {
                  panorama ("día 28 de ciclo + 12 enraizando"). -->
             <span v-if="lote.dias_ciclo != null || lote.dias_enraizado != null" class="ld__subtitle-sep">·</span>
             <span v-if="lote.dias_ciclo != null" class="ld__dias-badge">Día {{ lote.dias_ciclo }} de ciclo</span>
-            <span v-else-if="lote.dias_enraizado != null" class="ld__dias-badge">Enraizando · día {{ lote.dias_enraizado }}</span>
+            <span v-else-if="lote.dias_enraizado != null" class="ld__dias-badge">{{ verboArranque(lote).replace(/^./, c => c.toUpperCase()) }} · día {{ lote.dias_enraizado }}</span>
             <span v-if="lote.dias_ciclo != null && lote.dias_enraizado" class="ld__dias-extra">
-              + {{ lote.dias_enraizado }}d enraizando
+              + {{ lote.dias_enraizado }}d {{ verboArranque(lote) }}
             </span>
           </p>
         </div>
@@ -532,7 +532,7 @@ onUnmounted(() => {
           <div v-for="(etapa, i) in cicloPasos" :key="etapa" class="ld__ciclo-step"
                :class="{ 'ld__ciclo-step--done': i < cicloIndex, 'ld__ciclo-step--current': i === cicloIndex, 'ld__ciclo-step--pending': i > cicloIndex }">
             <div class="ld__ciclo-dot"><span class="ld__ciclo-emoji">{{ em(etapa).emoji }}</span></div>
-            <div class="ld__ciclo-label">{{ em(etapa).label }}</div>
+            <div class="ld__ciclo-label">{{ etapa === 'enraizado' && lote.etiqueta_arranque ? lote.etiqueta_arranque : em(etapa).label }}</div>
             <div v-if="i < cicloPasos.length - 1" class="ld__ciclo-connector" :class="{ 'ld__ciclo-connector--done': i < cicloIndex }"></div>
           </div>
         </div>
@@ -705,7 +705,7 @@ onUnmounted(() => {
                 <dt>Tipo cultivo</dt><dd>{{ growLabel(lote.grow_type) }}<template v-if="lote.sustrato_especifico"> · {{ lote.sustrato_especifico }}</template></dd>
               </template>
               <template v-if="lote.metodo_enraizado">
-                <dt>Enraizó en</dt><dd>{{ metodoEnraizadoLabel(lote.metodo_enraizado) }}</dd>
+                <dt>{{ lote.origen === 'semilla' ? 'Germinó en' : 'Enraizó en' }}</dt><dd>{{ metodoEnraizadoLabel(lote.metodo_enraizado) }}</dd>
               </template>
               <dt>Luminaria</dt><dd>{{ lightLabel(lote.light_type) }}</dd>
               <dt>Genética</dt><dd>{{ lote.genetica?.nombre || lote.strain || '—' }}</dd>
@@ -728,11 +728,11 @@ onUnmounted(() => {
               <dt>Inicio</dt><dd>{{ formatDate(lote.start_date) }}</dd>
               <dt>Día del ciclo</dt>
               <dd>
-                {{ lote.dias_ciclo != null ? 'día ' + lote.dias_ciclo : 'todavía enraizando' }}
-                <small v-if="lote.dias_enraizado" class="ld__dd-nota">+ {{ lote.dias_enraizado }}d enraizando</small>
+                {{ lote.dias_ciclo != null ? 'día ' + lote.dias_ciclo : 'todavía ' + verboArranque(lote) }}
+                <small v-if="lote.dias_enraizado" class="ld__dd-nota">+ {{ lote.dias_enraizado }}d {{ verboArranque(lote) }}</small>
               </dd>
               <dt>Edad de la planta</dt><dd>{{ lote.dias_desde_inicio != null ? 'día ' + lote.dias_desde_inicio : '—' }}</dd>
-              <dt>Día en {{ em(lote.estado).label.toLowerCase() }}</dt><dd>{{ lote.dias_en_estado != null ? 'día ' + lote.dias_en_estado : '—' }}</dd>
+              <dt>Día en {{ estadoLoteLabel(lote).toLowerCase() }}</dt><dd>{{ lote.dias_en_estado != null ? 'día ' + lote.dias_en_estado : '—' }}</dd>
             </dl>
           </div>
 
@@ -802,7 +802,7 @@ onUnmounted(() => {
             <div>
               <h3 class="ld__modal-title">🔄 Avanzar fase</h3>
               <p class="ld__modal-sub">
-                {{ lote?.codigo }} · {{ em(lote?.estado).emoji }} {{ em(lote?.estado).label }}
+                {{ lote?.codigo }} · {{ em(lote?.estado).emoji }} {{ estadoLoteLabel(lote) }}
                 <span style="color:#94a3b8"> → </span>
                 {{ em(lote?.proxima_fase_posible).emoji }} {{ em(lote?.proxima_fase_posible).label }}
               </p>
@@ -955,7 +955,7 @@ onUnmounted(() => {
                 {{ em(lote?.estado).emoji }} → {{ em(lote?.proxima_fase_posible).emoji }} Avanzar fase
               </h3>
               <p class="ld__modal-sub">
-                {{ lote?.codigo }} · {{ em(lote?.estado).label }} → {{ em(lote?.proxima_fase_posible).label }}
+                {{ lote?.codigo }} · {{ estadoLoteLabel(lote) }} → {{ em(lote?.proxima_fase_posible).label }}
               </p>
             </div>
             <button class="ld__modal-close" @click="showAvanzarSalaModal = false"><i class="bi bi-x-lg"></i></button>

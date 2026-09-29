@@ -109,7 +109,7 @@ class PlantActivitiesController < ApplicationController
         fuente:               r.fuente,
       }.compact,
       occurred_at: r.registrado_en,
-      usuario:     r.user&.nombre_completo || 'Sistema',
+      usuario:     r.autor_nombre,
       created_at:  r.created_at,
       _heredado:   true,
     }

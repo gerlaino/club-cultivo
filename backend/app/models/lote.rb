@@ -112,6 +112,10 @@ class Lote < ApplicationRecord
   # 'secado' YA NO es un estado: es una métrica (días de cosecha→stock). Ver dias_secado.
   ESTADOS       = %w[enraizado vegetativo floracion cosecha en_manicura curado finalizado].freeze
   ORIGENES      = %w[semilla esqueje].freeze # de dónde viene la planta (NO es una fase)
+  ETIQUETAS_ESTADO = {
+    'enraizado' => 'Enraizado', 'vegetativo' => 'Vegetativo', 'floracion' => 'Floración',
+    'cosecha' => 'Cosecha', 'en_manicura' => 'En manicura', 'curado' => 'Curado', 'finalizado' => 'Finalizado',
+  }.freeze
   # Secuencia de avance con sala (el botón "avanzar fase" va al siguiente): germinación →
   # enraizado → vegetativo → floración → cosecha. El enraizado avanza sin pesada.
   AVANCE        = %w[enraizado vegetativo floracion cosecha].freeze
@@ -191,6 +195,26 @@ class Lote < ApplicationRecord
   def estado_inicial_para_origen
     'enraizado'
   end
+
+  # Cómo se dice el estado. El estado es UNO para semilla y esqueje (colapso del 31-jul), pero una
+  # semilla que está abriendo no «enraíza»: germina (Germán, 29-sep-2026). Cambia la palabra, no
+  # la fase — setpoints, reglas e informes siguen viendo `enraizado`. Viaja en `/me`
+  # (`reglas_cultivo.arranque_por_origen`) para el alta, donde el lote todavía no existe.
+  ARRANQUE_POR_ORIGEN = {
+    'semilla' => { 'estado' => 'Germinación', 'verbo' => 'germinando', 'donde' => '¿Dónde germina?' },
+    'esqueje' => { 'estado' => 'Enraizado',   'verbo' => 'enraizando', 'donde' => '¿Dónde enraíza?' },
+  }.freeze
+
+  def self.etiqueta_estado(estado, origen)
+    return ARRANQUE_POR_ORIGEN.dig(origen, 'estado') || 'Enraizado' if estado == 'enraizado'
+    ETIQUETAS_ESTADO[estado] || estado.to_s.humanize
+  end
+
+  def estado_label   = self.class.etiqueta_estado(estado, origen)
+  # El tramo antes de la maceta, en gerundio: «germinando · día 3», «+ 12d enraizando».
+  def verbo_arranque = ARRANQUE_POR_ORIGEN.dig(origen, 'verbo') || 'enraizando'
+  # El nombre del tramo aunque ya haya pasado (la línea del ciclo lo sigue mostrando).
+  def etiqueta_arranque = self.class.etiqueta_estado('enraizado', origen)
 
   default_scope { where(deleted_at: nil) }
 

@@ -311,6 +311,16 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 
 ### Lo que NO hay que romper
 
+- **SEMILLA GERMINA, ESQUEJE ENRAÍZA: ES LA PALABRA, NO LA FASE** (29-sep-2026). El estado es uno
+  (`enraizado`); lo que se muestra sale del backend (`estado_label`, `Lote::ARRANQUE_POR_ORIGEN`,
+  en `/me` para el alta). No volver a partir el estado ni escribir la palabra en el front según el
+  origen.
+- **UN RIEGO DE UN APARATO LO FIRMA EL APARATO** (29-sep-2026). `registros_ambientales.user_id` es
+  opcional SÓLO para `fuente: 'dispositivo'` con `dispositivo_id`; en pantalla «Automático ·
+  <nombre>». Todo lo que muestre el autor de un registro usa `RegistroAmbiental#autor_nombre`, no
+  `r.user.nombre_completo` (revienta con nil). El riego va a los lotes en cultivo de la sala del
+  dispositivo, sin enraizando ni cama, y es idempotente por (dispositivo, momento).
+
 - **SUELO VIVO: LA CAMA ES UNA ENTIDAD Y VIVE MÁS QUE LOS LOTES** (25-sep-2026, plan en
   `docs/PLAN_SUELO_VIVO.md`). El estado de la cama se CALCULA (no se guarda). Los números de
   cultivo (cocción, descanso, frecuencia de top dress) los pone el cultivador: la app no trae

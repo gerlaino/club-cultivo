@@ -1,4 +1,5 @@
 <script setup>
+import { estadoLoteLabel } from '../lib/loteHelpers.js'
 import { onMounted, onUnmounted, ref, computed, watch } from "vue"
 import { logger } from '../utils/logger.js'
 import { useRoute, useRouter } from "vue-router"
@@ -1159,7 +1160,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                     <td>{{ l.rendimiento_real_g != null ? l.rendimiento_real_g + ' g' : '—' }}</td>
                     <td>
                       <span class="sd__lote-badge" :style="{ background: estadoMeta(l.estado).color + '18', color: estadoMeta(l.estado).color }">
-                        {{ estadoMeta(l.estado).label }}
+                        {{ estadoLoteLabel(l) }}
                       </span>
                     </td>
                   </tr>

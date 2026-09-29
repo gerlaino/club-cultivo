@@ -145,6 +145,17 @@ export function desglosarCiclo(diasPorEstado = {}) {
 }
 
 export function em(e)  { return ESTADO_META[e]       || { label: e || '—', color: '#64748b', bg: '#f1f5f9', emoji: '•' } }
+// Cómo se dice el estado de UN lote. Lo decide el backend (`estado_label`): el estado `enraizado`
+// es uno solo, pero una semilla que todavía no fue a maceta dice «Germinación» (Germán,
+// 29-sep-2026). Sin `estado_label` (payloads viejos), la palabra del estado.
+export function estadoLoteLabel(lote) { return lote?.estado_label || em(lote?.estado).label }
+// El tramo antes de la maceta, en gerundio («germinando», «enraizando»). También del backend.
+export function verboArranque(lote)   { return lote?.verbo_arranque || 'enraizando' }
+// Lo mismo para el alta, donde el lote todavía no existe: sale de `/me` (reglas_cultivo).
+export function arranquePorOrigen(reglasCultivo, origen) {
+  return reglasCultivo?.arranque_por_origen?.[origen]
+    || { estado: 'Enraizado', verbo: 'enraizando', donde: '¿Dónde enraíza?' }
+}
 
 export function pm(s)  { return PLANT_STATE_META[s]  || { label: s || '—', color: '#64748b', emoji: '🌿' } }
 export function sm(s)  { return ESTADO_SALUD_META[s] || { color: '#94a3b8', emoji: '⚪' } }

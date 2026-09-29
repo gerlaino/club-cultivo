@@ -4,7 +4,10 @@ class RegistroAmbiental < ApplicationRecord
   self.table_name = 'registros_ambientales'
 
   belongs_to :lote
-  belongs_to :user
+  # Sin autor sólo cuando lo registró un aparato (el riego del ESP32): entonces lo firma el
+  # dispositivo y en pantalla dice «Automático · <nombre>». Una persona siempre firma.
+  belongs_to :user, optional: true
+  belongs_to :dispositivo, optional: true
   belongs_to :club
   belongs_to :receta, optional: true
   has_many   :insumo_consumos, dependent: :nullify
@@ -23,7 +26,7 @@ class RegistroAmbiental < ApplicationRecord
   ESTADOS   = %w[excelente bueno regular malo critico].freeze
   ESPECTROS = %w[veg bloom auto mixto].freeze
   FASES     = %w[crecimiento floracion engorde lavado].freeze
-  FUENTES   = %w[manual csv_bluelab sensor_mqtt asistente_voz].freeze
+  FUENTES   = %w[manual csv_bluelab sensor_mqtt asistente_voz dispositivo].freeze
   # Producto enraizante, ESTRUCTURADO: distintos geles/polvos tienen tasas de prendimiento
   # distintas, y así se puede cruzar con el % de prendimiento que ya medimos.
   ENRAIZANTES = %w[gel polvo liquido miel_canela ninguno otro].freeze
@@ -34,6 +37,7 @@ class RegistroAmbiental < ApplicationRecord
   TAREAS    = %w[riego nutricion poda defoliacion scrog_lst revision_plagas limpieza_sala ajuste_luz registro_ambiental].freeze
 
   validates :registrado_en,  presence: true
+  validate  :con_autor, on: :create
   validates :punto_medicion, inclusion: { in: PUNTOS_MEDICION }
   validates :estado_general, inclusion: { in: ESTADOS }, allow_blank: true
   validates :fuente,         inclusion: { in: FUENTES }, allow_blank: true
@@ -54,6 +58,13 @@ class RegistroAmbiental < ApplicationRecord
   scope :recientes, -> { order(registrado_en: :desc) }
   scope :del_lote,  ->(lote_id) { where(lote_id: lote_id) }
 
+  # Quién lo hizo, para el historial. Un dispositivo dado de baja deja de encontrarse (el default
+  # scope esconde los borrados) y el registro sigue diciendo que fue automático.
+  def autor_nombre
+    return user.nombre_completo if user
+    dispositivo ? "Automático · #{dispositivo.nombre_amigable}" : 'Automático'
+  end
+
   COLUMNAS_AMBIENTALES = {
     temperatura:          'temperatura',
     humedad:              'humedad',
@@ -68,6 +79,10 @@ class RegistroAmbiental < ApplicationRecord
   }.freeze
 
   private
+
+  def con_autor
+    errors.add(:user, 'es obligatorio') if user_id.blank? && dispositivo_id.blank?
+  end
 
   # Un lote ENRAIZANDO vive adentro del propagador: su ambiente es el del domo, no el del cuarto.
   # No es una preferencia de quien carga el dato, es dónde está físicamente la planta — por eso se

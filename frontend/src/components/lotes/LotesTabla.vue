@@ -4,7 +4,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSalasStore } from '../../stores/salas'
-import { textoProximoPasoCorto, textoProximoPaso } from '../../lib/loteHelpers.js'
+import { textoProximoPasoCorto, textoProximoPaso, estadoLoteLabel } from '../../lib/loteHelpers.js'
 
 const props = defineProps({
   lotes:      { type: Array, required: true },
@@ -141,7 +141,7 @@ function abrir(l) { router.push({ name: 'lote-detail', params: { id: l.id } }) }
           <td data-label="Estado">
             <span class="lt-estado">
               <span class="lt-badge" :style="{ background: em(l.estado).bg, color: em(l.estado).text }">
-                {{ em(l.estado).icon }} {{ em(l.estado).label }}
+                {{ em(l.estado).icon }} {{ estadoLoteLabel(l) }}
               </span>
               <!-- Al pasar el mouse: los días de las fases que ya pasaron. -->
               <span class="lt-pop" role="tooltip">

@@ -219,6 +219,7 @@ class SedesController < ApplicationController
                 id:         l.id,
                 codigo:     l.codigo,
                 estado:     l.estado,
+                estado_label: l.estado_label,
                 strain:     l.strain,
                 start_date: l.start_date,
                 plants_count: l.plants.count,
