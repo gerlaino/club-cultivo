@@ -32,7 +32,14 @@
 
             <!-- PASO 1: Selección -->
             <div v-if="paso === 1" key="paso1" class="rps__paso rps__paso--sel">
-              <p class="rps__paso-hint">¿Qué realizaste hoy? Seleccioná una o más acciones</p>
+              <!-- El riego NO es de una planta (Germán, 29-sep-2026: «nunca se riega una sola planta,
+                   siempre todas o gran parte del lote»). Se registra para el lote: descuenta del
+                   depósito, cuesta al lote y suma a su agua y su nutrición. Antes este formulario
+                   ofrecía receta y productos y guardaba sólo un texto en la planta. -->
+              <button v-if="planta?.lote?.id && ['enraizado', 'vegetativo', 'floracion'].includes(planta.lote.estado)" type="button" class="rps__riego-lote" @click="regarLote">
+                💧 Riego <span>se registra para todo el lote {{ planta.lote.codigo }} →</span>
+              </button>
+              <p class="rps__paso-hint">¿Qué más realizaste hoy? Seleccioná una o más acciones</p>
 
               <div class="rps__acciones-grid">
                 <button
@@ -82,7 +89,6 @@
                   <span>{{ getAccion(accionId)?.emoji }} {{ getAccion(accionId)?.label }}</span>
                 </div>
                 <div class="rps__seccion-body">
-                  <RiegoForm     v-if="accionId === 'riego'"     v-model="formData.riego" :lote-id="planta?.lote?.id || planta?.lote_id" />
                   <PlagasForm    v-if="accionId === 'plagas'"    v-model="formData.plagas" />
                   <MedicionForm  v-if="accionId === 'medicion'"  v-model="formData.medicion" />
                   <!-- Poda: simple para planta individual -->
@@ -167,7 +173,6 @@ import { useToast }    from '../../composables/useToast.js'
 import { useClubStore } from '../../stores/club'
 import DsSpinner       from '../../design-system/components/Spinner.vue'
 import AsistenteVoz    from '../AsistenteVoz.vue'
-import RiegoForm       from '../lotes/registro/RiegoForm.vue'
 import PlagasForm      from '../lotes/registro/PlagasForm.vue'
 
 // Medición inline (EC/pH/temperatura) — simple, no existe como sub-form separado
@@ -205,13 +210,13 @@ const props = defineProps({
   planta:       { type: Object,  default: null },
   registrosHoy: { type: Array,   default: () => [] },
 })
-const emit = defineEmits(['update:modelValue', 'saved'])
+const emit = defineEmits(['update:modelValue', 'saved', 'regar-lote'])
+function regarLote() { emit('update:modelValue', false); emit('regar-lote') }
 
 const toast = useToast()
 const club  = useClubStore()
 
 const TODAS_LAS_ACCIONES = [
-  { id: 'riego',     emoji: '💧', label: 'Riego' },
   { id: 'poda',      emoji: '✂️', label: 'Poda' },
   { id: 'plagas',    emoji: '🔍', label: 'Rev. Plagas' },
   { id: 'medicion',  emoji: '🌡️', label: 'Medición' },
@@ -234,7 +239,8 @@ const PLAGAS_META = {
   severa:   { color: '#dc2626', emoji: '🚨' },
 }
 
-function getAccion(id) { return TODAS_LAS_ACCIONES.find(a => a.id === id) }
+// «riego» ya no es una acción de la planta, pero un riego de planta de antes puede estar en «Hoy ya registraste».
+function getAccion(id) { return TODAS_LAS_ACCIONES.find(a => a.id === id) || (id === 'riego' ? { id, emoji: '💧', label: 'Riego' } : null) }
 
 const paso          = ref(1)
 const seleccionadas = ref([])
@@ -246,7 +252,6 @@ function emptyFormData() {
     estado_general:    'bueno',
     plagas_observadas: 'ninguna',
     observaciones:     '',
-    riego:     { ph: null, ph_runoff: null, ec: null, volumen: null, fertilizo: false, producto: '', dosis: null },
     plagas:    { resultado: 'ninguna', tipos_detectados: [], accion_tomada: '', plantas_afectadas: null, producto_usado: '' },
     medicion:  { ph: null, ph_runoff: null, ec: null, temperatura_sustrato: null },
     poda:      { tipo: 'defoliacion', observaciones: '' },
@@ -333,16 +338,6 @@ async function guardar() {
 
     // Riego, Poda, Plagas → actividades con descripción
     const actividadesExtra = []
-    if (sel.includes('riego')) {
-      const r = fd.riego
-      const desc = [
-        r.volumen ? `${r.volumen}L` : null,
-        r.ph ? `pH ${r.ph}` : null,
-        r.ec ? `EC ${r.ec}` : null,
-        r.fertilizo ? `Nutrición: ${r.producto || ''}` : null,
-      ].filter(Boolean).join(' · ')
-      actividadesExtra.push({ activity_type: 'riego', description: desc || 'Riego' })
-    }
     if (sel.includes('poda')) {
       actividadesExtra.push({
         activity_type: 'poda',
@@ -372,6 +367,8 @@ async function guardar() {
 </script>
 
 <style scoped>
+.rps__riego-lote { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; width: 100%; margin-bottom: .75rem; background: var(--c-sky-100); border: 1px solid var(--c-sky-100); color: var(--c-sky-600); border-radius: 10px; padding: .65rem .85rem; font-size: .9rem; font-weight: 700; cursor: pointer; text-align: left; }
+.rps__riego-lote span { font-weight: 500; font-size: .78rem; }
 /* Mismo estilo que RegistroLoteModal */
 .rps__overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.45); backdrop-filter: blur(3px);

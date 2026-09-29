@@ -15,6 +15,7 @@ import EmptyState            from '../components/ui/EmptyState.vue'
 import Lightbox              from '../components/ui/Lightbox.vue'
 import ActionsDropdown       from '../components/ui/ActionsDropdown.vue'
 import RegistroPlantaModal   from '../components/plants/RegistroPlantaModal.vue'
+import RegistroLoteModal     from '../components/lotes/registro/RegistroLoteModal.vue'
 import { useToast }      from '../composables/useToast.js'
 import { useConfirm }   from '../composables/useConfirm.js'
 import { useBluelabBLE } from '../composables/useBluelabBLE.js'
@@ -470,6 +471,8 @@ const canManicura = computed(() =>
 
 // ── Nuevo modal registro planta ───────────────────────────
 const showRegistroPlanta = ref(false)
+// El riego es del lote: desde la planta se abre el registro de riego de su lote.
+const showRiegoLote = ref(false)
 
 // ── Editar planta ──────────────────────────────────────────
 const showEditarPlanta = ref(false)
@@ -1269,9 +1272,16 @@ onMounted(async () => {
     <!-- ══ Modal Registro de Planta (nuevo) ══ -->
     <RegistroPlantaModal
       v-model="showRegistroPlanta"
+      @regar-lote="showRiegoLote = true"
       :planta="planta"
       :registros-hoy="registrosHoyPlanta"
       @saved="loadActivities"
+    />
+    <RegistroLoteModal
+      v-if="planta?.lote"
+      v-model="showRiegoLote"
+      :lote="planta.lote"
+      accion-inicial="riego"
     />
 
     <!-- ══ Modal Editar Planta ══ -->

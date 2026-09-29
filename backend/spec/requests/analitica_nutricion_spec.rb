@@ -90,9 +90,11 @@ RSpec.describe 'Analítica: nutrición lote contra lote', type: :request do
     expect(d['lotes'].size).to eq(4)
   end
 
-  it 'el selector ofrece sólo los lotes con alguna fertilización' do
+  it 'el selector ofrece sólo los lotes con alguna fertilización o riego con volumen' do
+    regado = create(:lote, club: club, sala: sala, estado: 'vegetativo')
+    post "/lotes/#{regado.id}/registros_ambientales", params: { registro_ambiental: { volumen_l: 10, tareas_realizadas: ['riego'] } }, headers: auth_headers, as: :json
     get '/analytics/nutricion_lotes', headers: auth_headers
-    expect(json['lotes'].map { |l| l['id'] }).to match_array([cerrado.id, en_curso.id])
+    expect(json['lotes'].map { |l| l['id'] }).to match_array([cerrado.id, en_curso.id, regado.id])
     expect(json['lotes'].first).to include('genetica' => 'Kush', 'genetica_id' => gen.id)
   end
 

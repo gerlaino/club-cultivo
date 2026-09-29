@@ -72,6 +72,30 @@ describe('Analítica → Nutrición', () => {
     expect(api.getAnaliticaNutricion).toHaveBeenLastCalledWith({ lote_ids: [1, 2, 3] })
   })
 
+  it('el agua por planta, o «sin volumen cargado» (nunca 0)', async () => {
+    const conAgua = { ...DATA, lotes: [
+      { ...DATA.lotes[0], totales: { ...DATA.lotes[0].totales, agua_l: 120, agua_por_planta: 30, riegos: 8, riegos_con_volumen: 8 } },
+      DATA.lotes[1]] }
+    api.getAnaliticaNutricion.mockResolvedValue({ data: conAgua })
+    api.getAnaliticaNutricionLotes.mockResolvedValue({ data: { lotes: CANDIDATOS } })
+    const C = (await import('../components/analitica/AnaliticaNutricion.vue')).default
+    const w = mount(C, { global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } } })
+    await flushPromises()
+    const agua = w.findAll('tbody tr').find(r => r.text().startsWith('Agua')).findAll('td').map(td => td.text())
+    expect(agua[1]).toContain('30 L/planta')
+    expect(agua[2]).toContain('sin volumen cargado')
+  })
+
+  it('la curva por semana se cambia entre EC y agua', async () => {
+    const Chart = (await import('chart.js/auto')).default
+    const w = await montar()
+    Chart.mockClear()
+    await w.findAll('.anu__curva').find(b => b.text() === 'Agua').trigger('click')
+    await flushPromises()
+    expect(Chart).toHaveBeenCalled()
+    expect(Chart.mock.calls.at(-1)[1].options.scales.y.title.text).toBe('L/planta')
+  })
+
   it('el CSV lleva una columna por lote', async () => {
     const w = await montar()
     const { headers, rows } = w.vm.csv()

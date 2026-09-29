@@ -46,6 +46,24 @@ class RegistroAmbiental < ApplicationRecord
   validates :co2,            numericality: { greater_than: 0 }, allow_nil: true
   validates :horas_luz,      numericality: { greater_than_or_equal_to: 0, less_than_or_equal_to: 24 }, allow_nil: true
   validates :ppfd,           numericality: { greater_than_or_equal_to: 0 }, allow_nil: true
+  # Litros de agua que recibió ESTE lote en el riego (con o sin nutrientes).
+  validates :volumen_l,      numericality: { greater_than: 0, less_than: 100_000 }, allow_nil: true
+
+  # Un riego para varios lotes (la sala entera, la cama): se carga el TOTAL y a cada lote le toca
+  # su parte, con la misma regla que los nutrientes y el costo (`Insumo.partes_de`: iguales).
+  # Germán, 29-sep-2026: por ahora el volumen es de la sala; más adelante se va a cargar por lote.
+  def self.repartir_volumen!(registros, total)
+    total = total.to_d
+    return if registros.empty? || total <= 0
+    partes = Insumo.partes_de(registros.map(&:lote))
+    asignado = 0.to_d
+    registros.each_with_index do |r, i|
+      # el último absorbe el redondeo para que la suma dé el total
+      v = i == registros.size - 1 ? (total - asignado) : (total * partes[r.lote_id]).round(2)
+      asignado += v
+      r.update_columns(volumen_l: v)
+    end
+  end
 
   before_validation :punto_segun_estado_del_lote, on: :create
   before_save  :calcular_vpd

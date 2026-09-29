@@ -2,7 +2,8 @@
   <div class="rf__wrap">
     <div class="rf__grid">
       <div class="rf__field">
-        <label class="rf__label">Volumen <span class="rf__unit">L</span></label>
+        <!-- En la sala es el TOTAL: el backend le da a cada lote su parte (Germán, 29-sep-2026). -->
+        <label class="rf__label">{{ salaId ? 'Volumen total de la sala' : 'Volumen' }} <span class="rf__unit">L</span></label>
         <input type="number" step="0.5" min="0" class="rf__input" v-model.number="f.volumen" placeholder="20" />
       </div>
       <!-- Suelo vivo: no se corrige el pH ni la EC del agua (el suelo amortigua). Lo que importa

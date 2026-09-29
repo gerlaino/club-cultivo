@@ -68,9 +68,30 @@ describe('Nutrición del lote en la ficha', () => {
     expect((await montar(DATA, 'cultivador')).text()).not.toContain('Comparar con otros lotes')
   })
 
+  it('el agua: total y por planta, y cuántos riegos tienen el volumen cargado', async () => {
+    const w = await montar({ ...DATA, totales: { ...DATA.totales, agua_l: 120, agua_por_planta: 30, riegos: 8, riegos_con_volumen: 6 } })
+    expect(w.text()).toContain('120 L')
+    expect(w.text()).toContain('30 L/planta')
+    expect(w.text()).toContain('6 de 8 riegos tienen el volumen cargado')
+  })
+
+  it('sin volumen cargado no inventa «0 L» de agua', async () => {
+    const w = await montar()
+    expect(w.text()).not.toContain('de agua')
+  })
+
   it('sin aplicaciones dice cómo se carga', async () => {
-    const w = await montar({ ...DATA, aplicaciones: [] })
-    expect(w.text()).toContain('Todavía no se registró ninguna fertilización')
+    const w = await montar({ ...DATA, aplicaciones: [], totales: { ...DATA.totales, aplicaciones: 0 } })
+    expect(w.text()).toContain('Todavía no se registró ningún riego con volumen ni fertilización')
+  })
+
+  it('regado con agua sola (sin fertilizaciones) muestra el agua, no «vacío»', async () => {
+    const w = await montar({ ...DATA, aplicaciones: [], por_fase: {},
+      totales: { aplicaciones: 0, litros: 0, productos: [], agua_l: 42, agua_por_planta: 14, riegos: 3, riegos_con_volumen: 3, costo_ars: 0 } })
+    expect(w.text()).not.toContain('Todavía no se registró')
+    expect(w.text()).toContain('42 L')
+    expect(w.text()).toContain('14 L/planta')
+    expect(w.text()).not.toContain('Ver las')
   })
 })
 

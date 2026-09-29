@@ -9,14 +9,14 @@
           <button type="button" class="anu__quitar" :aria-label="`Quitar ${l.codigo}`" @click="quitar(l.id)"><i class="bi bi-x"></i></button>
         </span>
         <select v-if="ids.length < MAXIMO" class="anu__agregar" value="" aria-label="Agregar un lote" @change="agregar($event.target.value); $event.target.value = ''">
-          <option value="" disabled>{{ disponibles.length ? '＋ Agregar un lote…' : 'No hay más lotes con fertilizaciones' }}</option>
+          <option value="" disabled>{{ disponibles.length ? '＋ Agregar un lote…' : 'No hay más lotes con riegos o fertilizaciones' }}</option>
           <option v-for="l in disponibles" :key="l.id" :value="l.id">{{ l.codigo }} · {{ l.genetica || 'sin genética' }} · {{ l.estado_label }}</option>
         </select>
         <button v-if="mismaGenetica.length" type="button" class="anu__link" @click="sumarMismaGenetica">
           ＋ los de la misma genética ({{ mismaGenetica.length }})
         </button>
       </div>
-      <p class="anu__hint">De 2 a {{ MAXIMO }} lotes con alguna fertilización registrada. Uno en curso entra igual, sin rendimiento.</p>
+      <p class="anu__hint">De 2 a {{ MAXIMO }} lotes con riegos o fertilizaciones registrados. Uno en curso entra igual, sin rendimiento.</p>
     </div>
 
     <div v-if="cargando && !data" class="an__empty">Cargando…</div>
@@ -51,6 +51,10 @@
 
               <tr class="anu__grupo"><td :colspan="cols">Lo que recibió</td></tr>
               <tr><td>Aplicaciones</td><td v-for="l in data.lotes" :key="l.id" class="an__td-r">{{ l.totales.aplicaciones }}<small v-if="l.totales.sin_cantidades" class="anu__gris" title="Cargadas como texto: no entran en las cantidades"> ({{ l.totales.sin_cantidades }} sin cantidades)</small></td></tr>
+              <tr><td>Agua</td><td v-for="l in data.lotes" :key="l.id" class="an__td-r">
+                <template v-if="l.totales.agua_l != null">{{ fmt(l.totales.agua_por_planta, 1) }} L/planta<small class="anu__total">{{ fmt(l.totales.agua_l, 1) }} L · {{ l.totales.riegos_con_volumen }} de {{ l.totales.riegos }} riegos con volumen</small></template>
+                <span v-else class="anu__gris">sin volumen cargado</span>
+              </td></tr>
               <tr><td>Solución</td><td v-for="l in data.lotes" :key="l.id" class="an__td-r">{{ fmt(l.totales.litros_por_planta, 2) }} L/planta<small class="anu__total">{{ fmt(l.totales.litros, 1) }} L</small></td></tr>
               <tr v-for="p in data.productos" :key="p.clave">
                 <td>{{ p.nombre }}</td>
@@ -84,10 +88,14 @@
 
       <div class="an__card">
         <div class="an__card-header">
-          <span class="an__card-title">EC por semana</span>
+          <span class="an__card-title">Por semana
+            <span class="anu__curvas">
+              <button v-for="c in CURVAS" :key="c.id" type="button" class="anu__curva" :class="{ 'anu__curva--on': curva === c.id }" @click="curva = c.id">{{ c.label }}</button>
+            </span>
+          </span>
           <span class="an__card-hint">semana de la fase: V3 = tercera de vege, F2 = segunda de floración. Alineadas al arranque de la floración.</span>
         </div>
-        <div v-if="!data.semanas.length" class="an__empty">Ninguno de estos lotes tiene EC medida.</div>
+        <div v-if="!data.semanas.length" class="an__empty">Ninguno de estos lotes tiene EC ni volumen de agua cargados.</div>
         <div v-else class="anu__chart"><canvas ref="canvas" /></div>
       </div>
     </template>
@@ -104,6 +112,9 @@ import Chart from 'chart.js/auto'
 import { getAnaliticaNutricion, getAnaliticaNutricionLotes } from '../../lib/api.js'
 
 const MAXIMO = 4
+// Qué se dibuja por semana: la EC medida o el agua por planta (`por_semana` del backend).
+const CURVAS = [{ id: 'ec', label: 'EC', campo: 'ec', eje: 'EC' }, { id: 'agua', label: 'Agua', campo: 'agua_por_planta', eje: 'L/planta' }]
+const curva = ref('ec')
 const route = useRoute()
 const router = useRouter()
 
@@ -141,6 +152,7 @@ async function cargar() {
   finally { cargando.value = false }
 }
 watch(ids, cargar)
+watch(curva, dibujar)
 onMounted(async () => {
   try { candidatos.value = (await getAnaliticaNutricionLotes()).data?.lotes || [] } catch { candidatos.value = [] }
   cargar()
@@ -159,18 +171,19 @@ function dibujar() {
   chart?.destroy(); chart = null
   if (!canvas.value || !data.value?.semanas?.length) return
   const labels = data.value.semanas
+  const c = CURVAS.find(x => x.id === curva.value)
   chart = new Chart(canvas.value, {
     type: 'line',
     data: {
       labels,
       datasets: data.value.lotes.map(l => {
-        const porSemana = Object.fromEntries(l.por_semana.map(w => [w.semana_label, w.ec]))
+        const porSemana = Object.fromEntries(l.por_semana.map(w => [w.semana_label, w[c.campo]]))
         return { label: l.codigo, data: labels.map(s => porSemana[s] ?? null), borderColor: color(l.id), backgroundColor: color(l.id),
                  borderWidth: 2, pointRadius: 3, tension: 0.3, spanGaps: true }
       }),
     },
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } },
-               scales: { y: { title: { display: true, text: 'EC' } } } },
+               scales: { y: { title: { display: true, text: c.eje } } } },
   })
 }
 
@@ -183,7 +196,8 @@ function csv() {
   const rows = [
     fila('Genética', l => l.genetica), fila('Plantas', l => l.plantas),
     fila('Días vegetativo', l => l.dias?.vegetativo), fila('Días floración', l => l.dias?.floracion),
-    fila('Aplicaciones', l => l.totales.aplicaciones), fila('Litros de solución', l => l.totales.litros),
+    fila('Aplicaciones', l => l.totales.aplicaciones), fila('Agua (L)', l => l.totales.agua_l), fila('Agua L/planta', l => l.totales.agua_por_planta),
+    fila('Litros de solución', l => l.totales.litros),
     fila('L/planta', l => l.totales.litros_por_planta),
     ...d.productos.map(p => fila(`${p.nombre} (${u(p.unidad)} total)`, l => l.por_producto[p.clave]?.cantidad)),
     fila('EC vege', l => l.por_fase?.vegetativo?.ec), fila('EC floración', l => l.por_fase?.floracion?.ec), fila('pH', l => l.totales.ph),
@@ -231,5 +245,8 @@ const dias = n => (n == null ? '—' : `${Math.round(n)} d`)
 .anu__total { display: block; font-size: .7rem; color: var(--c-slate-400); }
 .anu__gris { color: var(--c-slate-400); }
 .anu__fuerte { font-weight: 700; }
+.anu__curvas { display: inline-flex; gap: .25rem; margin-left: .6rem; }
+.anu__curva { border: 1px solid var(--c-slate-200); background: var(--c-slate-50); border-radius: 999px; padding: .05rem .55rem; font-size: .72rem; font-weight: 600; color: var(--c-slate-500); cursor: pointer; }
+.anu__curva--on { background: var(--c-leaf-700); border-color: var(--c-leaf-700); color: var(--c-leaf-50); }
 .anu__chart { position: relative; height: 280px; padding: .5rem 1rem 1rem; }
 </style>

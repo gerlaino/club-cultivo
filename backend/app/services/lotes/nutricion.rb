@@ -13,8 +13,9 @@ module Lotes
   #   con la misma regla.
   # - Lo que se cargó como texto (la fertilización «sin especificar», las actividades viejas del
   #   historial) entra marcado `sin_cantidades`: no se inventa ningún número.
-  # - Los litros son los de la solución preparada (la columna `litros`). El volumen de agua sola
-  #   se guarda como texto y no se suma.
+  # - Los `litros` son los de la solución preparada (la receta). El AGUA es otra cosa: todo lo que
+  #   se regó, con o sin nutrientes (`volumen_l`, desde el 29-sep-2026; lo viejo se recupera del
+  #   texto con `rake riegos:volumen_desde_texto`). Un riego sin volumen cargado no suma agua.
   class Nutricion
     FASE_CORTA = { 'enraizado' => 'E', 'vegetativo' => 'V', 'floracion' => 'F', 'cosecha' => 'C',
                    'en_manicura' => 'M', 'curado' => 'Cu' }.freeze
@@ -196,6 +197,9 @@ module Lotes
         con_cantidades: con.size,
         sin_cantidades: apps.size - con.size,
         riegos:         registros.count { |r| Array(r.tareas_realizadas).include?('riego') },
+        agua_l:         agua(registros),
+        agua_por_planta: plantas.positive? && agua(registros) ? (agua(registros) / plantas).round(2) : nil,
+        riegos_con_volumen: registros.count(&:volumen_l),
         litros:         litros.round(2),
         litros_por_planta: plantas.positive? ? (litros / plantas).round(2) : nil,
         costo_ars:      costo.round(2),
@@ -225,6 +229,7 @@ module Lotes
       apps.group_by { |a| a[:fase] }.to_h do |fase, as|
         regs = registros.select { |r| fase_en(r.registrado_en.to_date) == fase }
         [fase, { aplicaciones: as.size, litros: as.sum { |a| a[:litros].to_f }.round(2),
+                 agua_l: agua(regs),
                  costo_ars: as.sum { |a| a[:costo_ars].to_f }.round(2),
                  ec: promedio(regs.map { |r| r.ec&.to_f }), ph: promedio(regs.map { |r| r.ph&.to_f }),
                  productos: por_producto(as.reject { |a| a[:sin_cantidades] }) }]
@@ -235,10 +240,12 @@ module Lotes
     # los riegos con receta), en el orden del ciclo.
     def por_semana
       orden = Lotes::Nutricion::FASE_CORTA.keys
-      registros.select { |r| r.ec || r.ph }.group_by { |r| cuando(r.registrado_en).values_at(:fase, :semana) }
+      registros.select { |r| r.ec || r.ph || r.volumen_l }.group_by { |r| cuando(r.registrado_en).values_at(:fase, :semana) }
                .map { |(fase, semana), rs|
+                 a = agua(rs)
                  { fase: fase, semana: semana, semana_label: "#{FASE_CORTA[fase] || fase}#{semana}",
                    ec: promedio(rs.map { |r| r.ec&.to_f }), ph: promedio(rs.map { |r| r.ph&.to_f }),
+                   agua_l: a, agua_por_planta: a && plantas.positive? ? (a / plantas).round(2) : nil,
                    mediciones: rs.size }
                }
                .sort_by { |w| [orden.index(w[:fase]) || 99, w[:semana]] }
@@ -250,6 +257,12 @@ module Lotes
       when Array then obj.map { |v| sin_costo(v) }
       else obj
       end
+    end
+
+    # Litros de agua de esos registros; nil si ninguno tiene el volumen cargado (no es «0 L»).
+    def agua(regs)
+      con = regs.select(&:volumen_l)
+      con.any? ? con.sum { |r| r.volumen_l.to_f }.round(2) : nil
     end
 
     def promedio(vals)

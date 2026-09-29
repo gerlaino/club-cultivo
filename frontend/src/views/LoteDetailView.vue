@@ -589,12 +589,12 @@ onUnmounted(() => {
             </div>
           </div>
 
-          <!-- Nutrición: qué recibió el lote (productos, cantidades, EC/pH, plata) -->
+          <!-- Riego y nutrición: qué recibió el lote (agua, productos, cantidades, EC/pH, plata) -->
           <div class="ld__section ld__section--mt">
             <button class="ld__section-toggle" @click="nutricionExpanded = !nutricionExpanded">
               <div class="ld__section-toggle-left">
                 <span class="ld__section-emoji">🧪</span>
-                <span class="ld__section-title">Nutrición</span>
+                <span class="ld__section-title">Riego y nutrición</span>
               </div>
               <i class="bi ld__chevron" :class="nutricionExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
             </button>

@@ -153,7 +153,7 @@ class CamasController < ApplicationController
     faltantes = []
     ActiveRecord::Base.transaction do
       lotes.each do |lote|
-        # El volumen del riego va en el texto, como en el registro del lote («Riego: 20L»): la
+        # El texto dice el total de la cama; la parte de cada lote va en `volumen_l` (abajo). La
         # columna `litros` es la de la receta preparada, y la pone `Nutricion::Aplicar`.
         texto = ["Riego de la #{@cama.nombre}: #{litros.to_s('F').sub(/\.0\z/, '')} L en toda la cama",
                  params[:observaciones].presence].compact.join("\n")
@@ -164,6 +164,8 @@ class CamasController < ApplicationController
           tareas_realizadas: ['riego'],
         )
       end
+      # Los litros son de toda la cama: a cada lote, su parte (la regla de sus nutrientes).
+      RegistroAmbiental.repartir_volumen!(registros, litros)
       if n.present? && (n[:receta_id].present? || n[:items].present?)
         receta = n[:receta_id].present? ? current_user.club.recetas.find(n[:receta_id]) : nil
         if receta && receta.uso != 'riego'

@@ -110,6 +110,14 @@
       :planta="planta"
       :registros-hoy="registrosHoy"
       @saved="recargarActividades"
+      @regar-lote="showRiegoLote = true"
+    />
+    <!-- El riego es del lote: desde la planta se abre el registro de riego de su lote. -->
+    <RegistroLoteModal
+      v-if="planta?.lote"
+      v-model="showRiegoLote"
+      :lote="planta.lote"
+      accion-inicial="riego"
     />
 
   </div>
@@ -122,6 +130,7 @@ import { getPlant, getPlantActivities } from '../../lib/api'
 import { estadoPlantaLabel } from '../../lib/loteHelpers'
 import { useToast }          from '../../composables/useToast'
 import RegistroPlantaModal   from '../../components/plants/RegistroPlantaModal.vue'
+import RegistroLoteModal     from '../../components/lotes/registro/RegistroLoteModal.vue'
 
 const route  = useRoute()
 
@@ -140,6 +149,7 @@ const planta     = ref(null)
 const activities = ref([])
 const loading    = ref(true)
 const showRegistrar = ref(false)
+const showRiegoLote = ref(false)
 const showAcciones  = ref(false)
 
 const EC = { semilla:'#64748b', esqueje:'#0891b2', vegetativo:'#16a34a', floracion:'#9333ea', cosecha:'#dc2626', en_manicura:'#d97706', curado:'#2563eb' }

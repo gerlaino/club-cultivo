@@ -2,20 +2,25 @@
   <div class="lns">
     <div v-if="cargando && !data" class="lns__vacio">Cargando…</div>
     <div v-else-if="error" class="lns__vacio">{{ error }}</div>
-    <div v-else-if="!data?.aplicaciones?.length" class="lns__vacio">
-      Todavía no se registró ninguna fertilización. Se carga al regar: «Registrar lote» → Riego → «Fertilicé».
+    <!-- Vacío sólo si no hay NADA: un lote regado con agua sola igual tiene qué mostrar. -->
+    <div v-else-if="!data?.aplicaciones?.length && data?.totales?.agua_l == null" class="lns__vacio">
+      Todavía no se registró ningún riego con volumen ni fertilización. Se carga al regar: «Registrar lote» → Riego.
     </div>
     <template v-else>
       <!-- El resumen: qué recibió en todo el ciclo -->
       <div class="lns__stats">
-        <div class="lns__stat"><span class="lns__stat-n">{{ t.aplicaciones }}</span><span class="lns__stat-l">aplicaciones</span></div>
-        <div class="lns__stat">
+        <div class="lns__stat"><span class="lns__stat-n">{{ t.aplicaciones }}</span><span class="lns__stat-l">{{ t.aplicaciones === 1 ? 'fertilización' : 'fertilizaciones' }}</span></div>
+        <div v-if="t.aplicaciones" class="lns__stat">
           <span class="lns__stat-n">{{ num(t.litros) }} L</span>
           <span class="lns__stat-l">de solución<template v-if="t.litros_por_planta != null"> · {{ num(t.litros_por_planta) }} L/planta</template></span>
         </div>
+        <div v-if="t.agua_l != null" class="lns__stat">
+          <span class="lns__stat-n">{{ num(t.agua_l) }} L</span>
+          <span class="lns__stat-l">de agua<template v-if="t.agua_por_planta != null"> · {{ num(t.agua_por_planta) }} L/planta</template></span>
+        </div>
         <div v-if="t.ec != null" class="lns__stat"><span class="lns__stat-n">{{ num(t.ec) }}</span><span class="lns__stat-l">EC promedio</span></div>
         <div v-if="t.ph != null" class="lns__stat"><span class="lns__stat-n">{{ num(t.ph) }}</span><span class="lns__stat-l">pH promedio</span></div>
-        <div v-if="data.con_costo" class="lns__stat">
+        <div v-if="data.con_costo && t.aplicaciones" class="lns__stat">
           <span class="lns__stat-n">{{ formatARS(t.costo_ars) }}</span>
           <span class="lns__stat-l">en nutrientes<template v-if="t.costo_por_planta != null"> · {{ formatARS(t.costo_por_planta) }}/planta</template><template v-if="t.costo_por_gramo != null"> · {{ formatARS(t.costo_por_gramo) }}/g</template></span>
         </div>
@@ -42,12 +47,13 @@
         <div class="lns__sub">Por fase</div>
         <div class="lns__tabla-wrap">
           <table class="lns__tabla">
-            <thead><tr><th>Fase</th><th class="r">Aplic.</th><th class="r">Litros</th><th class="r">EC</th><th class="r">pH</th><th v-if="data.con_costo" class="r">$</th></tr></thead>
+            <thead><tr><th>Fase</th><th class="r">Aplic.</th><th class="r">Agua</th><th class="r">Solución</th><th class="r">EC</th><th class="r">pH</th><th v-if="data.con_costo" class="r">$</th></tr></thead>
             <tbody>
               <tr v-for="f in fases" :key="f.fase">
                 <td>{{ FASE_LABEL[f.fase] || f.fase }}</td>
                 <td class="r">{{ f.aplicaciones }}</td>
-                <td class="r">{{ num(f.litros) }}</td>
+                <td class="r">{{ f.agua_l != null ? `${num(f.agua_l)} L` : '—' }}</td>
+                <td class="r">{{ num(f.litros) }} L</td>
                 <td class="r">{{ f.ec != null ? num(f.ec) : '—' }}</td>
                 <td class="r">{{ f.ph != null ? num(f.ph) : '—' }}</td>
                 <td v-if="data.con_costo" class="r">{{ formatARS(f.costo_ars) }}</td>
@@ -57,14 +63,15 @@
         </div>
       </div>
 
-      <p class="lns__nota">
-        Litros de solución preparada con receta o productos sueltos; el agua sola no se suma.
+      <p v-if="t.aplicaciones || t.riegos_con_volumen < t.riegos" class="lns__nota">
+        Agua: todo lo regado, con o sin nutrientes<template v-if="t.riegos_con_volumen < t.riegos"> ({{ t.riegos_con_volumen }} de {{ t.riegos }} riegos tienen el volumen cargado)</template>.
+        Solución: lo preparado con receta o productos sueltos.
         Lo compartido (la sala regada entera, la cama) cuenta la parte de este lote.
         <template v-if="t.sin_cantidades"> {{ t.sin_cantidades }} {{ t.sin_cantidades === 1 ? 'fertilización quedó' : 'fertilizaciones quedaron' }} como texto, sin cantidades.</template>
       </p>
 
       <!-- Aplicación por aplicación, plegado -->
-      <button type="button" class="lns__toggle" @click="abierto = !abierto">
+      <button v-if="data.aplicaciones.length" type="button" class="lns__toggle" @click="abierto = !abierto">
         <i :class="abierto ? 'bi bi-chevron-down' : 'bi bi-chevron-right'"></i>
         Ver las {{ data.aplicaciones.length }} aplicaciones una por una
       </button>

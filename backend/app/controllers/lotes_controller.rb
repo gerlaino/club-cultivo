@@ -1060,6 +1060,7 @@ class LotesController < ApplicationController
       chips << "#{r.humedad}%"      if r.humedad
       chips << "pH #{r.ph}"         if r.ph
       chips << "EC #{r.ec}"         if r.ec
+      chips << "agua #{Lotes::Nutricion.num(r.volumen_l)} L" if r.volumen_l
       if (n = r.nutricion.presence)
         # Lo que recibió ESTE lote (su parte si se regó la sala entera) y, por producto, la
         # salvedad si no salió del depósito (`Lotes::Nutricion`).

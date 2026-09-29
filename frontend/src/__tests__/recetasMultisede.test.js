@@ -78,6 +78,13 @@ describe('Regar: los productos son los de la sede donde se riega', () => {
     expect(api.listInsumos).toHaveBeenCalledWith(expect.objectContaining({ lote_id: 55 }))
   })
 
+  it('en la sala, el volumen se pide como TOTAL de la sala', async () => {
+    const w = await montarRiego({ salaId: 9 }, RECETA)
+    expect(w.text()).toContain('Volumen total de la sala')
+    const w2 = await montarRiego({ loteId: 55 }, RECETA)
+    expect(w2.text()).not.toContain('Volumen total de la sala')
+  })
+
   it('desde una sala, con la sala', async () => {
     await montarRiego({ salaId: 9 }, RECETA)
     expect(api.listRecetas).toHaveBeenCalledWith('riego', { sala_id: 9 })

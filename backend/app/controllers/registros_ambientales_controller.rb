@@ -72,7 +72,7 @@ class RegistrosAmbientalesController < ApplicationController
       # fertilización a propósito: en un producto medicinal, un fungicida y el bloom no pueden
       # terminar en el mismo campo de texto.
       :fitosanitario, :fitosanitario_motivo, :carencia_dias,
-      :observaciones, :fuente, :agua, :registrado_en,
+      :observaciones, :fuente, :agua, :registrado_en, :volumen_l,
       tareas_realizadas: []
     )
   end

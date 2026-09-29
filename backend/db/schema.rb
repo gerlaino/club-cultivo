@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_29_040000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_29_200000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -2064,6 +2064,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_29_040000) do
     t.decimal "litros", precision: 8, scale: 2
     t.jsonb "nutricion"
     t.string "agua"
+    t.decimal "volumen_l", precision: 10, scale: 2
     t.index ["club_id"], name: "index_registros_ambientales_on_club_id"
     t.index ["lote_id"], name: "index_registros_ambientales_on_lote_id"
     t.index ["receta_id"], name: "index_registros_ambientales_on_receta_id"

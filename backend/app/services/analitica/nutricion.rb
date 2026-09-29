@@ -37,9 +37,9 @@ module Analitica
       }
     end
 
-    # Los lotes que tienen algo para comparar (alguna fertilización), para el selector.
+    # Los lotes que tienen algo para comparar (alguna fertilización o un riego con volumen).
     def self.candidatos(club)
-      con_reg  = RegistroAmbiental.where(club_id: club.id).where('nutricion IS NOT NULL OR fertilizacion = true').distinct.pluck(:lote_id)
+      con_reg  = RegistroAmbiental.where(club_id: club.id).where('nutricion IS NOT NULL OR fertilizacion = true OR volumen_l IS NOT NULL').distinct.pluck(:lote_id)
       con_cama = club.lotes.where(cama_ciclo_id: CamaRegistro.where(club_id: club.id).where.not(nutricion: nil).select(:cama_ciclo_id)).pluck(:id)
       con_act  = LoteEvento.where(club_id: club.id, tipo: 'actividad', categoria: 'fertilizacion').distinct.pluck(:lote_id)
       club.lotes.where(id: (con_reg + con_cama + con_act).uniq).includes(:genetica).order(start_date: :desc).map do |l|

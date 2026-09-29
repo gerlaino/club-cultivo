@@ -177,6 +177,8 @@ class SalasController < ApplicationController
         registros << registro
         count += 1
       end
+      # El volumen que se carga en la sala es el TOTAL: a cada lote, su parte.
+      RegistroAmbiental.repartir_volumen!(registros, params.dig(:registro_ambiental, :volumen_l)) if params.dig(:registro_ambiental, :volumen_l).present?
       # «Aplicar receta» a la sala: se descuenta UNA vez y el costo se reparte entre sus lotes.
       n = params[:nutricion].presence || params.dig(:registro_ambiental, :nutricion)
       if n.present? && (n[:receta_id].present? || n[:items].present?)

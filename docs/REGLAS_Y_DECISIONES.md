@@ -359,7 +359,17 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 - **EL RIEGO Y LA FERTILIZACIÓN TIENEN UNA SOLA PUERTA** (29-sep-2026): el registro de riego
   (`RiegoForm`). «Registrar actividad» del historial ya no ofrece Riego ni Fertilización (cargaba
   texto suelto en `LoteEvento` y la nutrición quedaba sin cantidades): abre el registro de riego.
-  Lo viejo se sigue viendo, «sin cantidades».
+  Lo viejo se sigue viendo, «sin cantidades». **El riego no es de una planta** (Germán: «nunca se
+  riega una sola planta, siempre todas o gran parte del lote»): el registro de la planta no ofrece
+  Riego (guardaba un texto con receta y todo); su botón abre el riego del LOTE.
+- **EL AGUA DEL RIEGO ES UN NÚMERO** (`registros_ambientales.volumen_l`, 29-sep-2026): lo que
+  recibió ESE lote. En el riego de la sala (y en el de la cama con lotes) se carga el TOTAL y a
+  cada lote le toca su parte con la regla de sus nutrientes (`RegistroAmbiental.repartir_volumen!`,
+  `Insumo.partes_de`: iguales); la etiqueta dice «Volumen total de la sala». Decisión de Germán:
+  por ahora es de la sala; más adelante se va a cargar por lote (el número ya vive en cada lote).
+  Un riego sin volumen NO cuenta como 0 L («sin volumen cargado»). Ya no se escribe «Riego: 20L»
+  en el texto; lo viejo se pasa con `rake riegos:volumen_desde_texto` (en seco sin `CONFIRMAR=1`).
+  `litros` sigue siendo la solución preparada con receta: no es lo mismo que el agua.
 - **TODO MODELO DE DOMINIO NUEVO LLEVA `include Transmite` + `transmite_como '<recurso>'`**
   (20-sep-2026), y toda pantalla nueva que pida directo a la API se anota con
   `useRecargaEnCambios`. Es lo que hace que lo que uno registra se vea en todos lados sin

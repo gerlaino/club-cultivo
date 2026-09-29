@@ -1,5 +1,20 @@
 # Changelog
 
+## Septiembre 2026 (dp) — El agua del riego
+
+- **Volumen del riego como número** (`registros_ambientales.volumen_l`, migración): el formulario
+  ya lo pedía y lo guardaba como texto («Riego: 20L»). En la sala se carga el total («Volumen total
+  de la sala») y cada lote recibe su parte; igual en la cama con lotes.
+- **Riego y nutrición** (la sección de la ficha, ex «Nutrición»): agua total y por planta, por fase;
+  un lote regado con agua sola ya no aparece «vacío». El historial dice «agua 15 L».
+- **Analítica → Nutrición**: fila «Agua» (L/planta, cuántos riegos tienen volumen) y la curva por
+  semana se cambia entre EC y agua. El selector ofrece también los lotes regados sin fertilizar.
+- **El riego desde una planta es del lote**: el registro de la planta mostraba receta, productos y
+  faltantes y guardaba sólo un texto. Ahora su botón «Riego» abre el riego del lote (escritorio y
+  teléfono), que descuenta, cuesta y suma como cualquier riego.
+- `rake riegos:volumen_desde_texto [CONFIRMAR=1] [CLUB_ID=]`: pasa lo viejo del texto al número,
+  repartiendo los riegos de sala. **Manual, una vez, después del deploy.**
+
 ## Septiembre 2026 (do) — Recetas por sede y qué recibió cada lote
 
 - **La receta descuenta del depósito de la sede donde se aplica** (`Insumo#equivalente_en`). La

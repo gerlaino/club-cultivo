@@ -305,7 +305,8 @@ function buildPayload() {
         payload.notas_fertilizacion = parts.join(' · ') || 'sin especificar'
       }
     }
-    if (r.volumen)       extra.push(`Riego: ${r.volumen}L`)
+    // El volumen va como número (`volumen_l`), no en el texto: se suma y se compara.
+    if (r.volumen)       payload.volumen_l = r.volumen
     if (r.observaciones) extra.push(r.observaciones)
   }
 
