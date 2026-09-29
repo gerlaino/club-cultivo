@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_29_030000) do
+ActiveRecord::Schema[7.2].define(version: 2026_09_29_040000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -2027,7 +2027,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_29_030000) do
 
   create_table "registros_ambientales", force: :cascade do |t|
     t.bigint "lote_id", null: false
-    t.bigint "user_id"
+    t.bigint "user_id", null: false
     t.bigint "club_id", null: false
     t.decimal "temperatura", precision: 5, scale: 2
     t.decimal "humedad", precision: 5, scale: 2
@@ -2064,9 +2064,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_29_030000) do
     t.decimal "litros", precision: 8, scale: 2
     t.jsonb "nutricion"
     t.string "agua"
-    t.bigint "dispositivo_id"
     t.index ["club_id"], name: "index_registros_ambientales_on_club_id"
-    t.index ["dispositivo_id"], name: "index_registros_ambientales_on_dispositivo_id"
     t.index ["lote_id"], name: "index_registros_ambientales_on_lote_id"
     t.index ["receta_id"], name: "index_registros_ambientales_on_receta_id"
     t.index ["registrado_en"], name: "index_registros_ambientales_on_registrado_en"
@@ -2932,7 +2930,6 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_29_030000) do
   add_foreign_key "recetas", "clubs"
   add_foreign_key "recetas", "users", column: "created_by_id"
   add_foreign_key "registros_ambientales", "clubs"
-  add_foreign_key "registros_ambientales", "dispositivos"
   add_foreign_key "registros_ambientales", "lotes"
   add_foreign_key "registros_ambientales", "recetas"
   add_foreign_key "registros_ambientales", "users"

@@ -12,8 +12,6 @@ class Dispositivo < ApplicationRecord
   # cualquier uso de la asociación —incluido el `dependent: :nullify` al BORRAR un
   # dispositivo— tiraba NameError: dar de baja un sensor desde la UI devolvía 500.
   has_many   :lecturas_ambientales, class_name: 'LecturaAmbiental', dependent: :nullify
-  # Los riegos que registró (webhook de riegos). Si se borra el aparato, el riego sigue en el lote.
-  has_many   :registros_ambientales, class_name: 'RegistroAmbiental', dependent: :nullify
 
   encrypts :metadata, deterministic: false
 

@@ -129,17 +129,12 @@ mensual por plan (`Ia::Uso`, `ia_llamadas`, créditos `IaRecarga`).
 
 ## Dónde retomar (29-sep-2026)
 
-**Bloque (dj) pusheado**: «Germinación» para lotes de semilla que no fueron a maceta (la palabra, no
-la fase) y `POST /webhooks/riegos` (el ESP32 del balcón anota sus riegos en los lotes de su sala,
-firmados «Automático»; migración `RiegoAutomaticoEnRegistros`). El firmware vive en el repo aparte
-`~/Projects/cultivo-espacial-esp32`. Suelo vivo (dg) ya está pusheado. Para el balcón de Germán
-falta: prender IoT en `casa_german` de producción, crear sala + dispositivo Genérico y cargar el
-token en el aparato.
+**Bloques (dj) y (dk) pusheados**: «Germinación» para lotes de semilla que no fueron a maceta (la
+palabra, no la fase). Un webhook de riegos de dispositivos se agregó y se retiró el mismo día
+(migración `RetirarRiegoAutomaticoDeRegistros`): **lo personal de Germán no es producto**.
 
 **Reglas nuevas que gobiernan código nuevo** (detalle en `docs/REGLAS_Y_DECISIONES.md`):
-- **Semilla germina, esqueje enraíza**: es la palabra, no la fase (`estado_label` del backend). Un
-  riego de un aparato lo firma el aparato: el autor de un registro se muestra con
-  `RegistroAmbiental#autor_nombre`, nunca `r.user.…`.
+- **Semilla germina, esqueje enraíza**: es la palabra, no la fase (`estado_label` del backend).
 - **Suelo vivo**: la cama vive más que los lotes; estado calculado; los números de cultivo los pone
   el cultivador; en la cama no hay trasplantes y la planta no se muda (florece el ESPACIO); plantar
   en una cama que descansa avisa, no bloquea. La dosis se convierte a la unidad del insumo

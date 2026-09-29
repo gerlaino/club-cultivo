@@ -315,11 +315,10 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   (`enraizado`); lo que se muestra sale del backend (`estado_label`, `Lote::ARRANQUE_POR_ORIGEN`,
   en `/me` para el alta). No volver a partir el estado ni escribir la palabra en el front según el
   origen.
-- **UN RIEGO DE UN APARATO LO FIRMA EL APARATO** (29-sep-2026). `registros_ambientales.user_id` es
-  opcional SÓLO para `fuente: 'dispositivo'` con `dispositivo_id`; en pantalla «Automático ·
-  <nombre>». Todo lo que muestre el autor de un registro usa `RegistroAmbiental#autor_nombre`, no
-  `r.user.nombre_completo` (revienta con nil). El riego va a los lotes en cultivo de la sala del
-  dispositivo, sin enraizando ni cama, y es idempotente por (dispositivo, momento).
+- **LO PERSONAL DE GERMÁN NO ES PRODUCTO** (29-sep-2026). Él usa Cultivo Espacial para su cultivo
+  como cualquier usuario; lo que arme para sí (p. ej. un controlador de riego propio) no se
+  convierte en endpoints, migraciones ni features sin que lo pida como feature. El webhook de
+  riegos se agregó y se retiró el mismo día por esto.
 
 - **SUELO VIVO: LA CAMA ES UNA ENTIDAD Y VIVE MÁS QUE LOS LOTES** (25-sep-2026, plan en
   `docs/PLAN_SUELO_VIVO.md`). El estado de la cama se CALCULA (no se guarda). Los números de

@@ -109,7 +109,7 @@ class RegistrosAmbientalesController < ApplicationController
       nombre_archivo_csv:   r.nombre_archivo_csv,
       tiene_csv:            r.archivo_csv.attached?,
       registrado_en:        r.registrado_en,
-      usuario:              r.autor_nombre,
+      usuario:              r.user.nombre_completo,
       created_at:           r.created_at
     }
   end

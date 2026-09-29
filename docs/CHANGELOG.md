@@ -1,6 +1,13 @@
 # Changelog
 
-## Septiembre 2026 (dj) — «Germinación» para las semillas; el riego del ESP32 queda en el lote
+## Septiembre 2026 (dk) — Se retira el webhook de riegos de dispositivos
+
+- `POST /webhooks/riegos` (bloque dj) se sacó el mismo día, sin haberse usado: no es una feature
+  del producto (Germán, 29-sep). Migración `RetirarRiegoAutomaticoDeRegistros` deshace
+  `RiegoAutomaticoEnRegistros`: `registros_ambientales.user_id` vuelve a ser obligatorio y se va
+  `dispositivo_id`. Los dispositivos siguen mandando lecturas por `/webhooks/lecturas`, como antes.
+
+## Septiembre 2026 (dj) — «Germinación» para las semillas
 
 - **Una semilla que todavía no fue a maceta dice «Germinación»**, no «Enraizado» (Germán, 29-sep).
   El estado sigue siendo UNO (`enraizado`, colapso del 31-jul): cambia la palabra, no la fase;
@@ -11,17 +18,9 @@
   `verboArranque(lote)` y `arranquePorOrigen(reglas, origen)` en `loteHelpers.js`, aplicados en la
   ficha (escritorio y teléfono), la lista, la sala, el inicio del uso personal y el alta
   («¿Dónde germina?», «Días germinando», «¿Cuántas germinaron?»).
-- **`POST /webhooks/riegos`** (`{ dispositivo_id, ml_por_maceta, timestamp }`, header
-  `X-Webhook-Token`): el aparato que maneja la bomba avisa que regó y queda un riego en cada lote en
-  cultivo de su sala (ni los que enraízan ni los de una cama), con `litros = ml × plantas vivas`.
-  Es un `RegistroAmbiental` con `tareas_realizadas: ['riego']`, `fuente: 'dispositivo'`, **sin
-  usuario** y con `dispositivo_id`: en el historial dice «Riego automático · Automático · <nombre>»
-  (decisión de Germán, 29-sep: «Automático» antes que firmarlo a nombre de un admin). Sincrónico:
-  201 quedó, 200 reintento del mismo `timestamp` (idempotente), 422 no hay dónde anotarlo, 401/403
-  como lecturas. La autenticación de los dos webhooks salió a `Webhooks::AutenticaDispositivo`.
-- **Migración `RiegoAutomaticoEnRegistros`**: `registros_ambientales.user_id` pasa a opcional y se
-  agrega `dispositivo_id`. Una persona sigue firmando siempre (`RegistroAmbiental#con_autor`).
-- El firmware del ESP32 vive en un repo aparte (`cultivo-espacial-esp32`).
+- Se agregó y se retiró en el día un webhook de riegos de dispositivos (ver dk).
+- `Dispositivo` requiere `bcrypt`: generar un token por consola antes de cualquier login explotaba
+  (Devise lo carga recién al primer login).
 
 ## Septiembre 2026 (di) — Etiquetas de lotes con las banderitas de sus plantas
 
