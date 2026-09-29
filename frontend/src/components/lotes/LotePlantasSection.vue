@@ -273,7 +273,7 @@ import { createPlant } from '../../lib/api'
 import { useEtiquetasQR } from '../../composables/useEtiquetasQR.js'
 import BloqueoProgreso from '../ui/BloqueoProgreso.vue'
 import { useToast } from '../../composables/useToast.js'
-import { pm, em, STATE_MAP } from '../../lib/loteHelpers.js'
+import { pm, em, STATE_MAP, estadoPlantaLabel } from '../../lib/loteHelpers.js'
 import { LAYOUT_PLANTA, dibujarBanderitaPlanta } from '../../lib/pdfEtiquetas.js'
 import EmptyState from '../ui/EmptyState.vue'
 import Paginator  from '../ui/Paginator.vue'
@@ -314,7 +314,7 @@ function estadoPlanta(p) {
   if (p.state === 'cosechado' && ['en_manicura', 'curado', 'finalizado'].includes(props.lote?.estado)) {
     return em(props.lote.estado)
   }
-  return pm(p.state)
+  return { ...pm(p.state), label: estadoPlantaLabel(p) }
 }
 const showAddPlanta  = ref(false)
 const savingPlanta   = ref(false)

@@ -8,6 +8,7 @@ import { useAuthStore }   from '../stores/auth'
 import { useClubStore }   from '../stores/club'
 import { getPlantActivities, createPlantActivity, updatePlant, descartarPlant, deletePlant, registrarPesoPlanta, addPlantFoto, removePlantFoto } from '../lib/api'
 import { achicarImagen } from '../lib/imagenes.js'
+import { estadoPlantaLabel } from '../lib/loteHelpers.js'
 import { useManicuraJornada } from '../composables/useManicuraJornada'
 import Breadcrumb            from '../components/ui/Breadcrumb.vue'
 import EmptyState            from '../components/ui/EmptyState.vue'
@@ -615,7 +616,7 @@ onMounted(async () => {
             <span class="pd__hero-emoji">{{ em(planta.state).emoji }}</span>
             <h1 class="pd__title">{{ planta.nombre || `Planta #${planta.id}` }}</h1>
             <span class="pd__estado-pill" :style="{ background: em(planta.state).bg, color: em(planta.state).color }">
-              {{ em(planta.state).label }}
+              {{ estadoPlantaLabel(planta) }}
             </span>
             <span v-if="planta.estado_salud" class="pd__salud-pill" :style="{ color: sm(planta.estado_salud).color }">
               {{ sm(planta.estado_salud).emoji }} {{ sm(planta.estado_salud).label }}

@@ -228,7 +228,7 @@ class LoteSerializer
     if include_plants
       has_pasada_col = Plant.column_names.include?('pasada_cosecha')
       result[:plants] = lote.plants.order(:nombre).map { |p|
-        { id: p.id, nombre: p.nombre, codigo_qr: p.codigo_qr, state: p.state,
+        { id: p.id, nombre: p.nombre, codigo_qr: p.codigo_qr, state: p.state, estado_label: p.estado_label,
           es_seleccion: p.es_seleccion,
           fecha_cosecha:  p.fecha_cosecha,
           pasada_cosecha: has_pasada_col ? p.pasada_cosecha : nil }

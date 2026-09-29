@@ -15,7 +15,7 @@
     <!-- Hero -->
     <div class="mpd__hero">
       <div class="mpd__hero-estado" :style="{ background: estadoColor(planta.state) }">
-        {{ estadoEmoji(planta.state) }} {{ estadoLabel(planta.state) }}
+        {{ estadoEmoji(planta.state) }} {{ estadoPlantaLabel(planta) }}
       </div>
       <h2 class="mpd__hero-nombre">{{ planta.nombre || planta.codigo_qr }}</h2>
       <div class="mpd__hero-meta">
@@ -119,6 +119,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getPlant, getPlantActivities } from '../../lib/api'
+import { estadoPlantaLabel } from '../../lib/loteHelpers'
 import { useToast }          from '../../composables/useToast'
 import RegistroPlantaModal   from '../../components/plants/RegistroPlantaModal.vue'
 

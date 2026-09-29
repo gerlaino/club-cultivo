@@ -42,7 +42,7 @@
           </div>
         </div>
         <span class="mp__estado-label" :style="{ color: estadoColor(p.state) }">
-          {{ estadoLabel(p.state) }}
+          {{ estadoPlantaLabel(p) }}
         </span>
         <i class="bi bi-chevron-right mp__chevron"></i>
       </RouterLink>
@@ -60,7 +60,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { listPlants, listLotes } from '../../lib/api'
-import { PLANT_STATES, pm } from '../../lib/loteHelpers'
+import { PLANT_STATES, pm, estadoPlantaLabel } from '../../lib/loteHelpers'
 import { useAuthStore } from '../../stores/auth'
 
 const router = useRouter()

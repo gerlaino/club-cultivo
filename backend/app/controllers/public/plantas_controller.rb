@@ -16,6 +16,7 @@ module Public
         nombre:      plant.nombre,
         codigo_qr:   plant.codigo_qr,
         estado:      plant.state,
+        estado_label: plant.estado_label,
         lote: {
           id:     plant.lote.id,
           codigo: plant.lote.codigo,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { estadoLoteLabel, verboArranque, arranquePorOrigen } from '../lib/loteHelpers.js'
+import { estadoLoteLabel, estadoPlantaLabel, verboArranque, arranquePorOrigen } from '../lib/loteHelpers.js'
 
 // El estado `enraizado` es uno solo para semilla y esqueje; una semilla dice «Germinación»
 // (Germán, 29-sep-2026). La palabra la decide el backend: la pantalla la muestra.
@@ -28,5 +28,16 @@ describe('arranquePorOrigen (alta, sale de /me)', () => {
   })
   it('sin reglas cargadas cae a enraizado', () => {
     expect(arranquePorOrigen(undefined, 'semilla').estado).toBe('Enraizado')
+  })
+})
+
+// La planta sigue la misma regla que su lote (Germán, 29-sep): semilla «Germinando», esqueje «Enraizado».
+describe('estadoPlantaLabel', () => {
+  it('usa la palabra del backend en el arranque', () => {
+    expect(estadoPlantaLabel({ state: 'enraizado', estado_label: 'Germinando' })).toBe('Germinando')
+  })
+  it('sin estado_label, la palabra del estado', () => {
+    expect(estadoPlantaLabel({ state: 'enraizado' })).toBe('Enraizado')
+    expect(estadoPlantaLabel({ state: 'floracion', estado_label: null })).toBe('Floración')
   })
 })

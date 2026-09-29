@@ -66,7 +66,7 @@
           <div class="qr__plant-codigo-big">{{ plantaInfo?.nombre }}</div>
           <div class="qr__plant-estado-badge" :class="`qr__plant-estado-badge--${plantaInfo?.estado}`">
             <span class="qr__plant-estado-dot"></span>
-            {{ estadoPlantaLabel(plantaInfo?.estado) }}
+            {{ plantaInfo?.estado_label || estadoPlantaLabel(plantaInfo?.estado) }}
           </div>
           <div v-if="plantaInfo?.lote?.codigo" class="qr__plant-lote-ref">
             <span class="qr__plant-lote-label">Lote</span>

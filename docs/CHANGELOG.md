@@ -1,5 +1,54 @@
 # Changelog
 
+## Septiembre 2026 (dn) — Informe de stock; gastos personales en cuotas
+
+- **Informe de stock** (`/auditor/stock`, `Informes::Inventario`; opción A de Germán, 29-sep): qué
+  hay hoy por unidad y origen (queda, sobre una mesa, comprometido, libre) y cuánto vale a costo y
+  a precio de venta; una fila por stock con lo del período (ingresó, dispensado, merma, otras
+  salidas, ajustes) y lo de hoy; qué vence en 30 días; qué no sale hace más de un mes. Propio y
+  externo. Filtros: origen, saldo (con saldo / agotados), productos, genéticas, lotes, sedes.
+  - «Libre» es `disponible_para_entregar` (la mesa es un lugar, no un compromiso): el mismo número
+    que valida la dispensa. Lo dispensado sale de las líneas, como en Dispensaciones.
+  - INGRESÓ no cuenta dos veces: un stock nacido en el período ingresó su `cantidad_inicial`; uno
+    anterior, sus movimientos positivos de producción o traslado.
+  - La última salida de una dispensa es SU fecha, no la del movimiento (que se fecha al cargarla).
+  - Sin merch ni bebidas. La plata sí se suma; en el resumen del PDF va abreviada («$ 579 mil»).
+- **Gastos del uso personal en cuotas** (teléfono y escritorio, `GastoForm`): «En un pago / En
+  cuotas» al anotar. Es la misma `CompraCuotas` de una organización (una cuota por mes; las futuras
+  aparecen al llegar su mes). En cuotas no se ofrece lote ni nutriente: la compra no los guarda.
+  Revierte la regla vieja de `useGastosPersonal` («no hay cuotas»).
+
+## Septiembre 2026 (dm) — Informes a medida (fase 1) y el stock externo
+
+Decisión de Germán (29-sep): el admin arma el informe que necesita —estos lotes, estos pacientes,
+sólo el stock externo— en vez de tener un informe por combinación. Fase 1: Producción y Dispensaciones.
+
+- **`Informes::Filtros`**: lotes, pacientes, genéticas, sedes, quién dispensó, productos y origen
+  (todo / propio / externo). Un filtro que no vino es «todos»; uno con ids ajenos queda VACÍO (no
+  se ignora). Cada informe aplica los suyos y la pantalla ofrece sólo esos. Mismos parámetros en
+  pantalla, PDF y Excel.
+- **Un informe filtrado lo dice**: «Filtrado — Lotes: L-26-001 · sólo stock externo» en la
+  pantalla, en el PDF (debajo del período, en negrita) y en el subtítulo del Excel.
+- `GET /informes/filtros`: las opciones de la organización (del paciente, nombre y DNI parcial).
+- **Producción: «Stock externo»** (el nombre de siempre en la app, no otro) — lo que ENTRÓ en el período (`compra_externa`,
+  fecha = alta del stock, cantidad = `cantidad_inicial`), sin merch ni bebidas, por unidad y APARTE
+  de lo cosechado. Una organización que sólo carga stock y dispensa no lo veía en ningún informe.
+  Con filtro de lotes no entra (el stock externo no tiene lote). El tope del plan no se muestra filtrado.
+- **Dispensaciones**: lo de la dispensa (paciente, sede, quién) se filtra en la consulta; lo de
+  cada línea (lote, genética, producto, origen) línea por línea — de una dispensa mixta, «sólo stock
+  externo» deja la línea del externo. El período anterior se filtra igual.
+- Pendiente (fase 2): Pérdidas, Plan vs real, INASE y REPROCANN. Los regulatorios «para
+  presentar» no se filtran.
+
+## Septiembre 2026 (dl) — El escáner lee la banderita; la planta de semilla dice «Germinando»
+
+- **Escáner de la PWA** (`MScanView`): decodifica el recuadro a la definición real de la cámara
+  (antes lo achicaba a 400×400) y mira el 80% del lado menor. El QR de la banderita de planta
+  (21mm) quedaba en ~1,5 px por módulo y no se leía; el del lote (36mm) sí.
+- **La planta en el arranque dice «Germinando» si es de semilla y «Enraizado» si es esqueje**, igual
+  que su lote (`Plant#estado_label`, del backend; manda el origen del LOTE). Lo usan la ficha del
+  lote, Plantas (web y teléfono), la ficha de la planta y la página del QR.
+
 ## Septiembre 2026 (dk) — Se retira el webhook de riegos de dispositivos
 
 - `POST /webhooks/riegos` (bloque dj) se sacó el mismo día, sin haberse usado: no es una feature

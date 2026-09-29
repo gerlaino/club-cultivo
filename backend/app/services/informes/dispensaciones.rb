@@ -20,10 +20,11 @@ module Informes
 
     Linea = Struct.new(:dispensacion, :stock, :cantidad, :genetica, :forma, :unidad, keyword_init: true)
 
-    def initialize(club:, desde:, hasta:)
-      @club  = club
-      @desde = desde
-      @hasta = hasta
+    def initialize(club:, desde:, hasta:, filtros: nil)
+      @club    = club
+      @desde   = desde
+      @hasta   = hasta
+      @filtros = filtros || Filtros.new(club: club)
     end
 
     def call
@@ -36,6 +37,7 @@ module Informes
         productos: productos(lineas, anterior),
         pacientes: pacientes(lineas),
         canales:   canales(lineas),
+        filtros:   @filtros.to_h,
       }
     end
 
@@ -48,7 +50,14 @@ module Informes
       disps = Dispensacion.no_canceladas
                           .where(paciente_id: Paciente.unscoped.where(club_id: @club.id).select(:id))
                           .where(fecha_dispensacion: desde..hasta)
-                          .includes(:paciente, :sede, items: { stock: :genetica })
+                          .includes(:paciente, :sede, stock: :lote, items: { stock: %i[genetica lote] })
+      # Lo que es de la DISPENSA (a quién, dónde, quién) se filtra en la consulta; lo que es de cada
+      # LÍNEA (qué lote, genética, producto, origen) línea por línea: una misma dispensa puede
+      # llevar flor propia y un preroll de stock externo, y el filtro «externo» tiene que dejar sólo el
+      # preroll, no la dispensa entera.
+      disps = disps.where(paciente_id: @filtros.paciente_ids) if @filtros.paciente_ids
+      disps = disps.where(sede_id: @filtros.sede_ids)         if @filtros.sede_ids
+      disps = disps.where(user_id: @filtros.dispensador_ids)  if @filtros.dispensador_ids
       disps.flat_map do |d|
         items = d.items.to_a
         if items.any?
@@ -58,7 +67,23 @@ module Informes
         else
           []
         end
+      end.select { |l| entra?(l) }
+    end
+
+    # ¿La línea pasa los filtros de producto? Sin stock (se borró) no se sabe de qué lote ni de qué
+    # origen era: con esos filtros puestos, no entra.
+    def entra?(l)
+      st = l.stock
+      return false if @filtros.formas && !@filtros.formas.include?(l.forma)
+      return false if @filtros.lote_ids && !@filtros.lote_ids.include?(st&.lote_id)
+      if @filtros.genetica_ids
+        gen = st&.genetica_id || st&.lote&.genetica_id
+        return false unless @filtros.genetica_ids.include?(gen)
       end
+      return true if @filtros.origen == 'todo'
+      return false unless st
+
+      (st.origen == 'compra_externa') == (@filtros.origen == 'externo')
     end
 
     def linea(d, stock, cantidad, genetica_nombre)

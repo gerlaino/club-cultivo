@@ -31,7 +31,7 @@
 <script setup>
 import { computed } from 'vue'
 import {
-  FileCheck, Sprout, Package, FileBadge, FileSignature, Target, Search, TrendingDown,
+  FileCheck, Sprout, Package, FileBadge, FileSignature, Target, Search, TrendingDown, Boxes,
 } from 'lucide-vue-next'
 import { useClubStore } from '../../stores/club'
 
@@ -76,6 +76,11 @@ const GRUPOS = [
       { to: '/auditor/dispensaciones', icon: Package, label: 'Dispensaciones',
         desc: 'Entregas, gramos y pacientes atendidos.',
         pregunta: '¿Cuánto sale y a cuántos?', feature: 'produccion_dispensa' },
+      // El producto, stock por stock: propio y externo. Una organización que sólo compra y
+      // dispensa no tenía ningún informe que mostrara lo que tiene.
+      { to: '/auditor/stock', icon: Boxes, label: 'Stock',
+        desc: 'Qué hay hoy y cuánto vale, qué pasó con cada stock en el período, qué vence y qué no se mueve.',
+        pregunta: '¿Qué tengo, y qué pasó con cada cosa?', feature: 'produccion_dispensa' },
       // La contracara de producción: ningún otro informe dice cuánto se cayó en el camino.
       { to: '/auditor/perdidas', icon: TrendingDown, label: 'Pérdidas',
         desc: 'Plantas descartadas con su motivo, merma y vencido en góndola.',

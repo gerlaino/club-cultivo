@@ -448,6 +448,8 @@ Rails.application.routes.draw do
     end
 
     scope '/informes', controller: :informes do
+      # Con qué se puede filtrar un informe (lotes, pacientes, genéticas…). Ver `Informes::Filtros`.
+      get :filtros, action: :filtros_opciones
       get :reprocann
       get :produccion
       get :dispensaciones,  action: :dispensaciones
@@ -457,6 +459,7 @@ Rails.application.routes.draw do
       get :plan_vs_real
       get :inase
       get :perdidas
+      get :stock          # los stocks con su información (`Informes::Inventario`)
     end
 
     # Papelera — historial de borrados / restauración (admin + super_admin)

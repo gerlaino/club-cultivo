@@ -32,10 +32,11 @@ module Informes
       'floracion'  => :dias_floracion_objetivo,
     }.freeze
 
-    def initialize(club:, desde:, hasta:)
-      @club  = club
-      @desde = desde
-      @hasta = hasta
+    def initialize(club:, desde:, hasta:, filtros: nil)
+      @club    = club
+      @desde   = desde
+      @hasta   = hasta
+      @filtros = filtros || Filtros.new(club: club)
     end
 
     def call
@@ -48,7 +49,22 @@ module Informes
         hoy:      hoy,
         por_sede: por_sede,
         proximas: proximas,
+        externo:  externo,
+        filtros:  @filtros.to_h,
       }
+    end
+
+    # Los lotes que entran al informe: los de la organización, acotados por los filtros. «Sólo stock
+    # externo» no tiene lotes: el stock externo entra sin lote (`compra_externa`).
+    def lotes_base
+      @lotes_base ||= begin
+        rel = @club.lotes
+        rel = rel.none unless @filtros.propio?
+        rel = rel.where(id: @filtros.lote_ids)         if @filtros.lote_ids
+        rel = rel.where(genetica_id: @filtros.genetica_ids) if @filtros.genetica_ids
+        rel = rel.where(sede_id: @filtros.sede_ids)    if @filtros.sede_ids
+        rel
+      end
     end
 
     # ── 1. Lo que se cosechó ───────────────────────────────────────────────────
@@ -56,11 +72,11 @@ module Informes
     # Un lote «se cosechó» en la fecha de su PRIMER paso post-cosecha (cosecha, o en_manicura /
     # curado / finalizado para los lotes viejos que no registraron el corte). Nunca `updated_at`.
     def cosechado_en(desde, hasta)
-      fechas = LoteEvento.where(lote_id: @club.lotes.select(:id), tipo: 'cambio_estado',
+      fechas = LoteEvento.where(lote_id: lotes_base.select(:id), tipo: 'cambio_estado',
                                 estado_nuevo: POST_COSECHA)
                          .group(:lote_id).minimum(:registrado_en)
       ids = fechas.select { |_, f| f >= desde && f <= hasta }.keys
-      lotes = @club.lotes.where(id: ids).includes(:genetica, :sede, :lote_eventos).order(:codigo)
+      lotes = lotes_base.where(id: ids).includes(:genetica, :sede, :lote_eventos).order(:codigo)
 
       filas = lotes.map { |l| fila_cosechado(l, fechas[l.id]) }
       con_peso = filas.select { |f| f[:gramos].to_f.positive? }
@@ -107,11 +123,11 @@ module Informes
     # ── 2. Hoy en el cultivo ───────────────────────────────────────────────────
 
     def hoy
-      lotes = @club.lotes.where(estado: EN_PIE + EN_PROCESO).includes(:lote_eventos)
-      plantas_por_estado = Plant.en_pie.joins(:lote).where(lotes: { club_id: @club.id })
+      lotes = lotes_base.where(estado: EN_PIE + EN_PROCESO).includes(:lote_eventos)
+      plantas_por_estado = Plant.en_pie.joins(:lote).where(lotes: { id: lotes_base.select(:id) })
                                 .group('lotes.estado').count
       cortadas_por_estado = Plant.where(state: PLANTA_CORTADA).joins(:lote)
-                                 .where(lotes: { club_id: @club.id, estado: CON_PLANTAS_CORTADAS })
+                                 .where(lotes: { id: lotes_base.select(:id), estado: CON_PLANTAS_CORTADAS })
                                  .group('lotes.estado').count
 
       por_estado = Lote::ESTADOS.filter_map do |estado|
@@ -163,6 +179,9 @@ module Informes
     # que hoy cuenta todas las plantas que existen, no sólo las en pie—. Si acá se mostrara otro,
     # el informe diría «queda lugar» y el alta rebotaría.
     def plan
+      # El tope del plan es de TODA la organización: contra un recorte no significa nada.
+      return nil if @filtros.activo?
+
       enforcer = PlanEnforcer.new(@club)
       info = enforcer.info
       tope = info[:limites][:plantas]
@@ -172,11 +191,14 @@ module Informes
     end
 
     def por_sede
-      @club.sedes.includes(:salas).map do |s|
-        plantas = Plant.en_pie.joins(lote: :sala).where(salas: { sede_id: s.id }).count
+      sedes = @club.sedes.includes(:salas)
+      sedes = sedes.where(id: @filtros.sede_ids) if @filtros.sede_ids
+      sedes.map do |s|
+        plantas = Plant.en_pie.joins(lote: :sala).where(salas: { sede_id: s.id })
+                       .where(lote_id: lotes_base.select(:id)).count
         # Flor seca solamente: los derivados (hash, preroll) tienen su propia unidad y no se
-        # suman como gramos.
-        flor = Stock.where(sede_id: s.id, forma_producto: 'flor_seca').disponibles.sum(:cantidad).to_f
+        # suman como gramos. Con el externo adentro salvo que se pida sólo lo propio.
+        flor = stock_filtrado.where(sede_id: s.id, forma_producto: 'flor_seca').disponibles.sum(:cantidad).to_f
         { id: s.id, nombre: s.nombre, salas: s.salas.cultivo.count,
           plantas: plantas, stock_disponible: flor.round(1) }
       end
@@ -189,7 +211,7 @@ module Informes
     # El estimado en gramos sale del g/planta HISTÓRICO de esa genética en esta organización;
     # sin historia no se estima y la fila lo dice — un número inventado se lee como promesa.
     def proximas
-      lotes = @club.lotes.where(estado: 'floracion').includes(:genetica, :sala, :lote_eventos)
+      lotes = lotes_base.where(estado: 'floracion').includes(:genetica, :sala, :lote_eventos)
       plantas = Plant.en_pie.where(lote_id: lotes.map(&:id)).group(:lote_id).count
       gpp = gramos_por_planta_historico
       hoy = Time.zone.today
@@ -215,6 +237,54 @@ module Informes
           estimado:  ref && n.positive? ? (ref * n).round : nil,
         }
       end.sort_by { |p| [p[:fecha] ? 0 : 1, p[:fecha] || hoy] }
+    end
+
+    # El stock que entra al informe según los filtros: propio (de lote o derivado), externo o
+    # ambos; de esos lotes, genéticas y sedes.
+    def stock_filtrado
+      rel = Stock.where(club_id: @club.id)
+      rel = rel.where.not(origen: 'compra_externa') unless @filtros.externo?
+      rel = rel.where(origen: 'compra_externa')     unless @filtros.propio?
+      rel = rel.where(lote_id: @filtros.lote_ids)   if @filtros.lote_ids
+      rel = rel.where(genetica_id: @filtros.genetica_ids) if @filtros.genetica_ids
+      rel = rel.where(sede_id: @filtros.sede_ids)   if @filtros.sede_ids
+      rel
+    end
+
+    # ── 4. El stock externo ────────────────────────────────────────────────────
+
+    # El stock externo que ENTRÓ en el período (`compra_externa`): una organización que recién empieza
+    # y sólo carga stock y dispensa no cosecha nada, y sin esto su producto no aparecía en ningún
+    # informe. Va APARTE de lo cosechado: sumarlo arruinaría los gramos por planta.
+    #
+    # La fecha es el alta del stock (no hay otra: la compra ES el alta) y la cantidad la que
+    # ingresó (`cantidad_inicial`), no lo que queda. Sin merch ni bebidas (forma `externo`): el
+    # informe es de producto. Por unidad, nunca sumado entre unidades. Con filtro de lotes no
+    # entra: el stock externo no tiene lote.
+    def externo
+      return { stocks: [], por_unidad: [] } if !@filtros.externo? || @filtros.lote_ids
+
+      stocks = stock_filtrado.where(origen: 'compra_externa').where.not(forma_producto: 'externo')
+                             .where(created_at: @desde.beginning_of_day..@hasta.end_of_day)
+                             .includes(:genetica, :sede).order(:created_at)
+      filas = stocks.map do |s|
+        {
+          id:         s.id,
+          fecha:      s.created_at.to_date,
+          proveedor:  s.proveedor,
+          producto:   s.forma_producto,
+          genetica:   s.genetica&.nombre || s.descripcion,
+          sede:       s.sede&.nombre,
+          cantidad:   (s.cantidad_inicial || s.cantidad).to_f.round(2),
+          disponible: s.cantidad.to_f.round(2),
+          unidad:     s.unidad,
+        }
+      end
+      {
+        stocks:     filas,
+        por_unidad: filas.group_by { |f| f[:unidad] }
+                         .map { |u, fs| { unidad: u, cantidad: fs.sum { |f| f[:cantidad] }.round(2) } },
+      }
     end
 
     # Por genética: gramos ÷ plantas cosechadas, sobre los lotes de esta organización que ya

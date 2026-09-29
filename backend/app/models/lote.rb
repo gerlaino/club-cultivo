@@ -201,8 +201,9 @@ class Lote < ApplicationRecord
   # la fase — setpoints, reglas e informes siguen viendo `enraizado`. Viaja en `/me`
   # (`reglas_cultivo.arranque_por_origen`) para el alta, donde el lote todavía no existe.
   ARRANQUE_POR_ORIGEN = {
-    'semilla' => { 'estado' => 'Germinación', 'verbo' => 'germinando', 'donde' => '¿Dónde germina?' },
-    'esqueje' => { 'estado' => 'Enraizado',   'verbo' => 'enraizando', 'donde' => '¿Dónde enraíza?' },
+    # `planta`: el badge de UNA planta en ese tramo (ver `Plant#estado_label`).
+    'semilla' => { 'estado' => 'Germinación', 'verbo' => 'germinando', 'donde' => '¿Dónde germina?', 'planta' => 'Germinando' },
+    'esqueje' => { 'estado' => 'Enraizado',   'verbo' => 'enraizando', 'donde' => '¿Dónde enraíza?', 'planta' => 'Enraizado' },
   }.freeze
 
   def self.etiqueta_estado(estado, origen)

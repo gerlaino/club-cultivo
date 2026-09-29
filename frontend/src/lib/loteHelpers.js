@@ -158,6 +158,10 @@ export function arranquePorOrigen(reglasCultivo, origen) {
 }
 
 export function pm(s)  { return PLANT_STATE_META[s]  || { label: s || '—', color: '#64748b', emoji: '🌿' } }
+// Cómo se dice el estado de UNA planta. En el arranque lo decide el backend (`estado_label`): la de
+// semilla «Germinando», el esqueje «Enraizado» (Germán, 29-sep-2026). Fuera de ese tramo, o en
+// payloads que no lo traen, la palabra del estado.
+export function estadoPlantaLabel(p) { return p?.estado_label || pm(p?.state ?? p?.estado).label }
 export function sm(s)  { return ESTADO_SALUD_META[s] || { color: '#94a3b8', emoji: '⚪' } }
 export function pgm(p) { return PLAGAS_META[p]       || { color: '#94a3b8', emoji: '—' } }
 

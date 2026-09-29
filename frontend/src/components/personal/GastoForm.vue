@@ -16,6 +16,22 @@
       </span>
     </label>
 
+    <!-- En un pago o en cuotas. Sólo al anotar: una cuota ya anotada se corrige de a una. -->
+    <div v-if="!f.id" class="gf__field">
+      <span class="gf__label">Cómo lo pagás</span>
+      <span class="gf__seg" role="group">
+        <button type="button" class="gf__seg-b" :class="{ 'gf__seg-b--on': f.plan !== 'cuotas' }" @click="f.plan = 'unico'">En un pago</button>
+        <button type="button" class="gf__seg-b" :class="{ 'gf__seg-b--on': f.plan === 'cuotas' }" @click="f.plan = 'cuotas'">En cuotas</button>
+      </span>
+      <template v-if="enCuotas">
+        <span class="gf__input-row">
+          <input v-model.number="f.cuotas_total" type="number" inputmode="numeric" min="2" max="60" step="1" class="gf__input gf__input--corto" required />
+          <span class="gf__hint">cuotas<template v-if="cuota"> de <b>{{ ars(cuota) }}</b> por mes</template></span>
+        </span>
+        <span class="gf__hint">El monto de arriba es el total. Cada cuota se anota en su mes.</span>
+      </template>
+    </div>
+
     <!-- El tipo: se elige, y si no está se crea acá mismo. Mandarlo al catálogo del escritorio
          para agregar «Nutrientes» es perder el gasto que estaba anotando. -->
     <div class="gf__field">
@@ -41,8 +57,9 @@
 
     <div class="gf__row-2">
       <label class="gf__field">
-        <span class="gf__label">Cuándo</span>
-        <input v-model="f.fecha" type="date" class="gf__input" :max="hoy" required />
+        <span class="gf__label">{{ enCuotas ? 'Primera cuota' : 'Cuándo' }}</span>
+        <!-- La primera cuota puede ser el mes que viene (la tarjeta cierra después). -->
+        <input v-model="f.fecha" type="date" class="gf__input" :max="enCuotas ? null : hoy" required />
       </label>
       <label class="gf__field">
         <span class="gf__label">Cómo pagaste</span>
@@ -53,7 +70,10 @@
         </select>
       </label>
     </div>
-    <label class="gf__field">
+    <!-- En cuotas no se imputa a un lote ni carga nutrientes: la compra en cuotas no tiene esos
+         datos, y ofrecerlos para tirarlos al guardar es el peor error. -->
+    <p v-if="enCuotas" class="gf__hint">En cuotas no se imputa a un lote ni suma a tus nutrientes.</p>
+    <label v-if="!enCuotas" class="gf__field">
       <span class="gf__label">Para un lote <span class="gf__opt">(opcional)</span></span>
       <select v-model="f.lote_id" class="gf__input">
         <option :value="null">Del cultivo en general</option>
@@ -63,11 +83,11 @@
 
     <!-- Es un nutriente: el gasto además carga la cantidad en Cultivo → Nutrientes y recetas,
          para que al regar con receta se descuente y avise cuando quede poco. -->
-    <label class="gf__check">
+    <label v-if="!enCuotas" class="gf__check">
       <input v-model="f.es_insumo" type="checkbox" />
       <span>Es un nutriente o insumo del cultivo <span class="gf__opt">(se suma a lo que tenés)</span></span>
     </label>
-    <div v-if="f.es_insumo" class="gf__insumo">
+    <div v-if="f.es_insumo && !enCuotas" class="gf__insumo">
       <label class="gf__field">
         <span class="gf__label">¿Cuál?</span>
         <select v-model="f.insumo_id" class="gf__input">
@@ -138,7 +158,11 @@
     </div>
 
     <p v-if="error" class="gf__error">{{ error }}</p>
-    <p v-if="f.monto_ars > 0 && f.descripcion" class="gf__resumen">
+    <p v-if="enCuotas && f.monto_ars > 0 && f.descripcion && cuota" class="gf__resumen">
+      Salen <b>{{ ars(f.monto_ars) }}</b> por {{ f.descripcion }} en <b>{{ f.cuotas_total }} cuotas</b> de {{ ars(cuota) }},
+      la primera en {{ mesDe(f.fecha) }}.
+    </p>
+    <p v-else-if="!enCuotas && f.monto_ars > 0 && f.descripcion" class="gf__resumen">
       Salen <b>{{ ars(f.monto_ars) }}</b> por {{ f.descripcion }}<template v-if="loteElegido">, a cuenta del lote {{ loteElegido.codigo }}</template>.
       <template v-if="loteElegido"> Entra en su costo por gramo.</template>
     </p>
@@ -170,6 +194,15 @@ defineEmits(['guardar', 'cancelar'])
 // El formulario ES el estado del composable (un `reactive` que el padre le presta): se escribe
 // acá a propósito, para que el teléfono y el escritorio editen el mismo objeto.
 const f = props.form
+const enCuotas = computed(() => !f.id && f.plan === 'cuotas')
+const cuota = computed(() => {
+  const n = Number(f.cuotas_total)
+  return enCuotas.value && n >= 2 && f.monto_ars > 0 ? f.monto_ars / n : null
+})
+function mesDe(iso) {
+  if (!iso) return ''
+  return new Date(`${iso}T00:00:00`).toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })
+}
 const loteElegido = computed(() => props.lotes.find(l => l.id === f.lote_id))
 const unidadInsumo = computed(() => {
   const u = f.insumo_id ? props.insumos.find(i => i.id === f.insumo_id)?.unidad_medida : f.insumo_unidad
@@ -236,6 +269,9 @@ const resumenDetalles = computed(() => [
 .gf__btn--ghost { background: var(--c-slate-100); color: var(--c-slate-700); }
 .gf__btn--primary { background: var(--c-leaf-800, #1A3D2E); color: #fff; }
 .gf__btn--primary:disabled { opacity: .5; }
+.gf__seg { display: inline-flex; background: var(--c-slate-100); border-radius: 10px; padding: 3px; gap: 3px; align-self: flex-start; }
+.gf__seg-b { border: none; background: none; padding: .5rem .9rem; border-radius: 8px; font: inherit; font-size: .88rem; font-weight: 700; color: var(--c-slate-600); cursor: pointer; }
+.gf__seg-b--on { background: #fff; color: var(--c-leaf-800, #1A3D2E); box-shadow: 0 1px 3px rgb(15 23 42 / .12); }
 .gf__check { display: flex; align-items: center; gap: .5rem; font-size: .88rem; font-weight: 600; cursor: pointer; }
 .gf__check input { width: 18px; height: 18px; accent-color: var(--c-leaf-600, #3F6452); }
 .gf__insumo { display: flex; flex-direction: column; gap: .6rem; padding: .7rem .8rem; border: 1px dashed var(--c-ink-300, #d1d5db); border-radius: 10px; background: var(--c-leaf-50, #F4F8F5); }

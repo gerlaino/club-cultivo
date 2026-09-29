@@ -16,12 +16,15 @@
 class InformeDocument < BaseDocument
   # Ancho útil de la caja en A4 vertical con los márgenes de BaseDocument. Las columnas
   # tienen que sumar exactamente esto: Prawn no acepta ni de más ni de menos.
+  # `filtros`: qué recorte se pidió («Lotes: L-26-001 · sólo lo comprado»). Va debajo del período,
+  # en negrita: un informe filtrado que no lo dice se lee como el total de la organización.
   def initialize(club:, usuario:, titulo:, secciones:, kpis: nil, periodo: nil, nota: nil,
-                 tipo_code: "INF", salvedad_inase: nil)
+                 tipo_code: "INF", salvedad_inase: nil, filtros: nil)
     @kpis      = kpis
     @secciones = secciones
     @periodo   = periodo
     @nota      = nota
+    @filtros   = filtros
     super(club: club, usuario: usuario, titulo: titulo,
           tipo_doc: titulo, tipo_code: tipo_code, salvedad_inase: salvedad_inase)
   end
@@ -31,6 +34,11 @@ class InformeDocument < BaseDocument
       pdf.fill_color GRAY
       pdf.font(SANS) { pdf.text "Período: #{@periodo}", size: 9 }
       pdf.fill_color INK
+      pdf.move_down 8
+    end
+
+    if @filtros.present?
+      pdf.font(SANS) { pdf.text "Filtrado — #{@filtros}", size: 9, style: :bold }
       pdf.move_down 8
     end
 

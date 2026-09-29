@@ -134,14 +134,22 @@ onMounted(async () => {
       highlightCodeOutline: false,
       preferredCamera: 'environment',
       maxScansPerSecond: 8,
-      // Región de escaneo = el recuadro central (~62% del lado menor), centrada.
+      // Región de escaneo: el centro de la imagen, algo más grande que el recuadro que se dibuja
+      // (80% del lado menor), para que un QR que asoma del recuadro también se lea.
+      //
+      // Y SIN ACHICAR: se decodifica a la definición real de la cámara. Antes se reducía a 400×400,
+      // y el QR de la banderita de planta (21mm, 41×41 módulos) quedaba en ~1,5 px por módulo a la
+      // distancia normal: el del lote (36mm) pasaba y el de la planta no se leía nunca. Acercar el
+      // teléfono no lo salva — muchas cámaras no enfocan a menos de 12-20 cm. El tope de 1080 es
+      // para no mandarle al worker un recuadro de 4K en los teléfonos que lo dan.
       calculateScanRegion: (v) => {
-        const lado = Math.round(Math.min(v.videoWidth, v.videoHeight) * 0.62)
+        const lado = Math.round(Math.min(v.videoWidth, v.videoHeight) * 0.8)
+        const util = Math.min(lado, 1080)
         return {
           x: Math.round((v.videoWidth - lado) / 2),
           y: Math.round((v.videoHeight - lado) / 2),
           width: lado, height: lado,
-          downScaledWidth: 400, downScaledHeight: 400,
+          downScaledWidth: util, downScaledHeight: util,
         }
       },
     })

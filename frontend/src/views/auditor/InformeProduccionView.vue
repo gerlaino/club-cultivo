@@ -13,6 +13,8 @@
       </div>
     </div>
 
+    <FiltrosInforme class="inf__filtros" :usa="['lotes', 'geneticas', 'sedes', 'origen']" @change="cambiarFiltros" />
+
     <div v-if="loading" class="inf__loading">Cargando…</div>
 
     <!-- TRES BLOQUES EN TRES MARCOS DE TIEMPO: el período elegido gobierna sólo el primero. Los
@@ -20,6 +22,8 @@
          que un lote curado el mes pasado parezca contradecir al KPI de arriba. -->
     <div v-else-if="data" ref="hoja" class="inf__hoja">
       <p v-if="data.resena" class="inf__resena">{{ data.resena }}</p>
+      <!-- Un informe filtrado lo dice arriba de todo (y el PDF y el Excel también). -->
+      <p v-if="data.filtros?.activo" class="inf__filtrado"><i class="bi bi-funnel-fill"></i> Filtrado — {{ data.filtros.descripcion }}</p>
 
       <!-- ── 1. Lo que se cosechó ─────────────────────────────────────────── -->
       <section class="inf__section">
@@ -172,6 +176,39 @@
         <p v-else class="inf__empty">No hay lotes en floración.</p>
       </section>
 
+      <!-- ── Stock externo ────────────────────────────────────────────────── -->
+      <!-- Aparte de lo cosechado: sumarlo arruinaría los gramos por planta. Una organización que
+           sólo carga stock externo y dispensa ve su producto acá. -->
+      <section class="inf__section">
+        <div class="inf__section-head">
+          <h2 class="inf__section-title">Stock externo</h2>
+          <span class="inf__section-marco">lo que entró en el período elegido</span>
+        </div>
+        <div v-if="externo.por_unidad?.length" class="inf__kpis">
+          <div v-for="u in externo.por_unidad" :key="u.unidad" class="inf__kpi">
+            <span class="inf__kpi-valor">{{ formatCantidad(u.cantidad, u.unidad) }}</span>
+            <span class="inf__kpi-label">Stock externo ({{ u.unidad }})</span>
+          </div>
+        </div>
+        <table v-if="externo.stocks?.length" class="inf__table">
+          <thead>
+            <tr><th>Fecha</th><th>Proveedor</th><th>Producto</th><th>Genética</th><th>Sede</th><th class="num">Ingresó</th><th class="num">Queda</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="c in externo.stocks" :key="c.id">
+              <td>{{ formatFechaCorta(c.fecha) }}</td>
+              <td>{{ c.proveedor || '—' }}</td>
+              <td>{{ nombreForma(c.producto) }}</td>
+              <td>{{ c.genetica || '—' }}</td>
+              <td>{{ c.sede || '—' }}</td>
+              <td class="num">{{ formatCantidad(c.cantidad, c.unidad) }}</td>
+              <td class="num">{{ formatCantidad(c.disponible, c.unidad) }}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-else class="inf__empty">No entró stock externo en el período elegido.</p>
+      </section>
+
       <!-- ── Por sede ─────────────────────────────────────────────────────── -->
       <section class="inf__section">
         <div class="inf__section-head">
@@ -200,16 +237,20 @@ import { Sprout } from 'lucide-vue-next'
 import api from '../../lib/api.js'
 import { useInformePdf } from '../../composables/useInformePdf.js'
 import SelectorPeriodo from '../../components/informes/SelectorPeriodo.vue'
+import FiltrosInforme from '../../components/informes/FiltrosInforme.vue'
 import { formatFechaCorta } from '../../utils/dates.js'
 
 const { hoja, exporting, exportarPdf, exportarXlsx } = useInformePdf('informe_produccion')
-// Los MISMOS parámetros para la pantalla y para la descarga.
-const params  = ref({ periodo: 'mes_actual' })
+// Los MISMOS parámetros para la pantalla y para la descarga: período + filtros.
+const periodo = ref({ periodo: 'mes_actual' })
+const filtros = ref({})
+const params  = computed(() => ({ ...periodo.value, ...filtros.value }))
 const loading = ref(false)
 const data    = ref(null)
 
 const per = computed(() => data.value?.periodo || {})
 const hoy = computed(() => data.value?.hoy || {})
+const externo = computed(() => data.value?.externo || {})
 
 async function cargar() {
   loading.value = true
@@ -238,7 +279,10 @@ const textoDelta = (v, anterior) => {
 const claseDelta = (v) => v == null || v === 0 ? 'inf__kpi-delta--flat' : v > 0 ? 'inf__kpi-delta--up' : 'inf__kpi-delta--down'
 const enDias = (d) => d < 0 ? `hace ${-d} días` : d === 0 ? 'hoy' : d === 1 ? 'mañana' : `en ${d} días`
 
-function cambiarPeriodo(p) { params.value = p; cargar() }
+function cambiarPeriodo(p) { periodo.value = p; cargar() }
+function cambiarFiltros(f) { filtros.value = f; cargar() }
+const formatCantidad = (c, u) => `${Number(c).toLocaleString('es-AR')} ${u}`
+const nombreForma = (f) => { const t = String(f || '').replace(/_/g, ' '); return t.charAt(0).toUpperCase() + t.slice(1) }
 
 onMounted(cargar)
 </script>
@@ -251,6 +295,8 @@ onMounted(cargar)
 .inf__pdf:disabled { opacity: .5; cursor: not-allowed; }
 .inf__title { font-size: var(--fs-20); font-weight: 700; color: var(--c-ink-900); display: flex; align-items: center; gap: var(--sp-2); margin: 0; }
 .inf__periodo { background: var(--c-ink-100); border: 1.5px solid var(--c-ink-300); border-radius: var(--r-md); padding: 6px 12px; font-size: var(--fs-14); color: var(--c-ink-900); }
+.inf__filtros { margin: calc(-1 * var(--sp-3)) 0 var(--sp-5); }
+.inf__filtrado { margin: 0 0 var(--sp-5); padding: .55rem .9rem; background: var(--c-leaf-100); color: var(--c-leaf-800); border-radius: var(--r-md); font-size: var(--fs-13); font-weight: 600; }
 .inf__loading { color: var(--c-ink-500); padding: var(--sp-8); text-align: center; }
 .inf__empty { color: var(--c-ink-500); padding: var(--sp-4); font-size: var(--fs-13); }
 .inf__nota { color: var(--c-ink-500); font-size: var(--fs-13); margin: var(--sp-2) 0 0; }

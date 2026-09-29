@@ -2,12 +2,16 @@
 // Es el mismo `MovimientoContable` de una organización —por eso el costo por lote y el
 // informe de costo salen solos— reducido a lo que él hace: anotar lo que compró, ver el mes y
 // el año, corregir, borrar. Por acá SÓLO SALE PLATA (misma regla que «Nuevo movimiento»): no
-// hay ingresos, cajas, cuotas ni sectores. Si la regla viviera dos veces, un día el teléfono
-// y el escritorio dirían distinto del mismo gasto.
+// hay ingresos, cajas ni sectores. Si la regla viviera dos veces, un día el teléfono y el
+// escritorio dirían distinto del mismo gasto.
+//
+// CUOTAS SÍ (Germán, 29-sep-2026): la lámpara en 6 cuotas es un gasto de todos los días. Es la
+// misma compra en cuotas de una organización (`CompraCuotas`): una cuota por mes, cada una en el
+// mes que le toca; las futuras aparecen solas cuando llega su mes.
 import { ref, computed, reactive } from 'vue'
 import { listInsumos, listDepositos, listMovimientos, createMovimiento, updateMovimiento, deleteMovimiento,
          listCategoriasContables, createCategoriaContable, updateCategoriaContable,
-         listUnidadesNegocio, listLotes } from '../lib/api'
+         listUnidadesNegocio, listLotes, listSedes, createCompraCuotas } from '../lib/api'
 import { hoyISO, toISO } from '../utils/dates.js'
 
 // Sectores que le aplican: cultivo y lo general. Con los de dispensario y buffet la lista se
@@ -23,7 +27,9 @@ export function formVacio(categoriaId = '') {
            proveedor: '', cantidad: null, unidad: '', comprobante_tipo: '', comprobante_numero: '', notas: '',
            // «Es un nutriente»: la compra queda en Nutrientes con su cantidad (misma puerta que
            // «Repuse» desde Cultivo → Nutrientes y recetas). `insumo_id` existente o `insumo_nombre`.
-           es_insumo: false, insumo_id: null, insumo_nombre: '', insumo_unidad: 'mililitro' }
+           es_insumo: false, insumo_id: null, insumo_nombre: '', insumo_unidad: 'mililitro',
+           // En un pago o en cuotas (sólo al anotar: una cuota ya anotada se corrige de a una).
+           plan: 'unico', cuotas_total: 3 }
 }
 
 export function useGastosPersonal() {
@@ -85,8 +91,11 @@ export function useGastosPersonal() {
     } catch { /* el del año es contexto: sin él la pantalla sirve igual */ }
   }
 
+  // La sede del cultivador de casa (tiene una sola): la compra en cuotas la pide.
+  const sedeId = ref(null)
   async function cargarCatalogo() {
-    const [cats, lts] = await Promise.allSettled([listCategoriasContables({ activas: 'true', tipo: 'egreso' }), listLotes()])
+    const [cats, lts, sds] = await Promise.allSettled([listCategoriasContables({ activas: 'true', tipo: 'egreso' }), listLotes(), listSedes()])
+    if (sds.status === 'fulfilled') sedeId.value = (sds.value.data || [])[0]?.id || null
     if (cats.status === 'fulfilled') {
       categorias.value = (cats.value.data || []).filter(c => !c.unidad_negocio || SECTORES_PERSONAL.includes(c.unidad_negocio.tipo))
     }
@@ -114,6 +123,18 @@ export function useGastosPersonal() {
     error.value = null
   }
 
+  // En cuotas: la compra genera una cuota por mes desde la fecha elegida. No lleva lote ni carga
+  // nutrientes —la compra en cuotas no tiene esos campos—; el formulario no los ofrece.
+  async function guardarEnCuotas() {
+    const cat = categorias.value.find(c => c.id === form.categoria_contable_id)
+    await createCompraCuotas({
+      sede_id: sedeId.value, descripcion: form.descripcion, monto_total_ars: form.monto_ars,
+      categoria: cat?.clave_efectiva || 'otro', categoria_contable_id: form.categoria_contable_id,
+      cuotas_total: form.cuotas_total, fecha_primera_cuota: form.fecha, medio_pago: form.medio_pago,
+      proveedor: form.proveedor || null, notas: form.notas || null,
+    })
+  }
+
   async function guardar() {
     guardando.value = true
     error.value = null
@@ -132,8 +153,9 @@ export function useGastosPersonal() {
       notas: form.notas || null,
     }
     try {
-      if (form.id) await updateMovimiento(form.id, payload)
-      else         await createMovimiento(payload)
+      if (form.id)                        await updateMovimiento(form.id, payload)
+      else if (form.plan === 'cuotas')    await guardarEnCuotas()
+      else                                await createMovimiento(payload)
       await Promise.all([cargar(), cargarAnio()])
       return true
     } catch (e) {

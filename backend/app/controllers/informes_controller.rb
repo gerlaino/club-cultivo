@@ -14,6 +14,28 @@ class InformesController < ApplicationController
     'anio'         => -> { [Time.zone.today.beginning_of_year, Time.zone.today.end_of_year] },
   }.freeze
 
+  # GET /informes/filtros — con qué se puede filtrar: los lotes, pacientes, genéticas, sedes,
+  # personas que dispensaron y productos de ESTA organización. Del paciente va el nombre y los
+  # últimos tres del DNI (lo mismo que muestra la pantalla del informe), nunca el documento entero.
+  def filtros_opciones
+    club = current_user.club
+    lotes = club.lotes.includes(:genetica).order(codigo: :desc)
+    gen_ids = (lotes.map(&:genetica_id) + Stock.where(club_id: club.id).distinct.pluck(:genetica_id)).compact.uniq
+    disp_ids = Dispensacion.where(paciente_id: Paciente.unscoped.where(club_id: club.id).select(:id)).distinct.pluck(:user_id)
+
+    render json: {
+      lotes:     lotes.map { |l| { id: l.id, codigo: l.codigo, genetica: l.genetica&.nombre, estado: l.estado } },
+      pacientes: Paciente.unscoped.where(club_id: club.id, deleted_at: nil).map { |p|
+        { id: p.id, nombre: p.nombre_completo, dni_ultimos_3: p.dni_normalizado.to_s.last(3) }
+      }.sort_by { |p| p[:nombre].to_s },
+      geneticas: Genetica.unscoped.where(id: gen_ids).order(:nombre).map { |g| { id: g.id, nombre: g.nombre } },
+      sedes:     club.sedes.order(:nombre).map { |s| { id: s.id, nombre: s.nombre } },
+      dispensadores: User.where(club_id: club.id, id: disp_ids).map { |u| { id: u.id, nombre: u.nombre_completo } }
+                         .sort_by { |u| u[:nombre].to_s },
+      formas:    (Stock::FORMAS_PRODUCTO - ['externo']).map { |f| { valor: f, nombre: f.tr('_', ' ').capitalize } },
+    }
+  end
+
   # EL DNI VA COMPLETO EN LO QUE SE DESCARGA Y PARCIAL EN LA PANTALLA.
   #
   # Son dos usos distintos: la pantalla la mira cualquiera que pase por atrás y con los últimos
@@ -60,6 +82,7 @@ class InformesController < ApplicationController
   # cultivadas incluidas, y bloquea la descarga por una variedad que no está en ningún lado.
   def responder_informe(titulo:, datos:, kpis:, secciones:, nombre:, periodo: nil, nota: nil,
                         resena: nil, exige_declaracion_inase: false, ids_inase: nil)
+    filtrado = datos.dig(:filtros, :descripcion)
     respond_to do |format|
       format.json { render json: datos.merge(resena: resena) }
       format.pdf do
@@ -67,7 +90,7 @@ class InformesController < ApplicationController
         next if exige_declaracion_inase && bloquear_descarga_si_falta_declarar!(ids: ids_inase)
 
         pdf = InformeDocument.new(club: current_user.club, usuario: current_user, titulo: titulo,
-                                  kpis: kpis, secciones: secciones, periodo: periodo, nota: nota,
+                                  kpis: kpis, secciones: secciones, periodo: periodo, nota: nota, filtros: filtrado,
                                   salvedad_inase: (salvedad_inase(ids: ids_inase) if exige_declaracion_inase)).render
         send_data pdf, filename: "#{nombre}_#{Time.zone.today.strftime('%Y%m%d')}.pdf",
                   type: 'application/pdf', disposition: 'attachment'
@@ -82,7 +105,7 @@ class InformesController < ApplicationController
         resumen = kpis.to_h { |k| [k[:label], k[:valor]] }
         resumen['Variedades sin acreditar ante el INASE'] = pendientes.join(', ') if pendientes
         xlsx = XlsxExport.new(
-          club: current_user.club, titulo: titulo, subtitulo: periodo,
+          club: current_user.club, titulo: titulo, subtitulo: [periodo, ("Filtrado — #{filtrado}" if filtrado)].compact.join(' · '),
           headers: principal[:headers], rows: principal[:rows],
           formatos: principal[:formatos], totales: principal[:totales],
           resumen: resumen,
@@ -100,12 +123,15 @@ class InformesController < ApplicationController
   def produccion
     club  = current_user.club
     desde, hasta = periodo_rango
-    datos = Informes::Produccion.new(club: club, desde: desde, hasta: hasta).call
+    datos = Informes::Produccion.new(club: club, desde: desde, hasta: hasta, filtros: filtros).call
+    externo = datos[:externo]
     per   = datos[:periodo]
     hoy   = datos[:hoy]
 
     fmt_g   = ->(g) { g.nil? ? '—' : "#{ActiveSupport::NumberHelper.number_to_delimited(g.round(1), delimiter: '.', separator: ',')} g" }
     fmt_var = ->(v) { v.nil? ? 'sin período anterior' : "#{v.positive? ? '+' : ''}#{v} %" }
+    # «100 un», «1.250,5 g»: sin «.0» y con separadores de acá.
+    fmt_c   = ->(c, u) { "#{ActiveSupport::NumberHelper.number_to_delimited(c.to_f.round(1).to_s.sub(/\.0\z/, ''), delimiter: '.', separator: ',')} #{u}" }
 
     responder_informe(
       titulo: 'Informe de producción', nombre: 'informe_produccion',
@@ -119,7 +145,7 @@ class InformesController < ApplicationController
         # No «Lotes cosechados» como en la pantalla: en esta fila ya está el del período, y dos
         # KPIs con el mismo nombre y distinto número al lado se leen como un error.
         { label: 'Cosechados sin terminar', valor: hoy[:lotes_en_proceso] },
-      ],
+      ] + externo[:por_unidad].map { |u| { label: 'Stock externo', valor: fmt_c.call(u[:cantidad], u[:unidad]) } },
       secciones: [
         {
           titulo: 'Lotes cosechados en el período',
@@ -175,6 +201,18 @@ class InformesController < ApplicationController
           vacio: 'No hay lotes en floración.',
         },
         {
+          # Aparte de lo cosechado: sumarlo arruinaría los gramos por planta.
+          titulo: 'Stock externo que entró en el período',
+          headers: ['Fecha', 'Proveedor', 'Producto', 'Genética', 'Sede', 'Ingresó', 'Queda'],
+          rows: externo[:stocks].map { |s|
+            [fmt_fecha(s[:fecha]), s[:proveedor] || '—', s[:producto].to_s.tr('_', ' ').capitalize,
+             s[:genetica] || '—', s[:sede] || '—', fmt_c.call(s[:cantidad], s[:unidad]), fmt_c.call(s[:disponible], s[:unidad])]
+          },
+          aligns: { 5 => :right, 6 => :right },
+          col_min: { 0 => 58, 1 => 80, 2 => 62, 3 => 80, 4 => 62, 5 => 56, 6 => 56 },
+          vacio: 'No entró stock externo en el período elegido.',
+        },
+        {
           titulo: 'Por sede',
           headers: ['Sede', 'Salas', 'Plantas en cultivo', 'Flor seca (g)'],
           rows: datos[:por_sede].map { |s| [s[:nombre], s[:salas], s[:plantas], s[:stock_disponible]] },
@@ -192,7 +230,7 @@ class InformesController < ApplicationController
   def dispensaciones
     club  = current_user.club
     desde, hasta = periodo_rango
-    datos = Informes::Dispensaciones.new(club: club, desde: desde, hasta: hasta).call
+    datos = Informes::Dispensaciones.new(club: club, desde: desde, hasta: hasta, filtros: filtros).call
     salio = datos[:salio]
 
     fmt_u   = ->(c, u) { "#{ActiveSupport::NumberHelper.number_to_delimited(c.to_f.round(1).to_s.sub(/\.0\z/, ''), delimiter: '.', separator: ',')} #{u}" }
@@ -265,6 +303,100 @@ class InformesController < ApplicationController
         },
       ],
       nota: 'Contiene datos personales de pacientes: tratar como información sensible.',
+    )
+  end
+
+  # Los stocks con su información: qué hay hoy (y cuánto vale), qué le pasó a cada uno en el
+  # período, qué vence y qué no se mueve. El cálculo vive en `Informes::Inventario`.
+  def stock
+    club  = current_user.club
+    desde, hasta = periodo_rango
+    datos = Informes::Inventario.new(club: club, desde: desde, hasta: hasta, filtros: filtros).call
+    hoy   = datos[:hoy]
+
+    num   = ->(c) { ActiveSupport::NumberHelper.number_to_delimited(c.to_f.round(2).to_s.sub(/\.0\z/, ''), delimiter: '.', separator: ',') }
+    # En el resumen del PDF la plata va abreviada: «$ 1.198.000» no entra en la franja de KPIs.
+    plata = lambda do |v|
+      v = v.to_f
+      if v >= 1_000_000 then "$ #{ActiveSupport::NumberHelper.number_to_rounded(v / 1_000_000, precision: 1, delimiter: '.', separator: ',', strip_insignificant_zeros: true)} M"
+      elsif v >= 10_000 then "$ #{(v / 1000).round} mil"
+      else "$ #{ActiveSupport::NumberHelper.number_to_delimited(v.round, delimiter: '.')}"
+      end
+    end
+    prod  = ->(f) { "#{f[:producto].to_s.tr('_', ' ').capitalize} (#{f[:unidad]})" }
+    origen = ->(o) { o == 'externo' ? 'Externo' : 'Propio' }
+
+    responder_informe(
+      titulo: 'Informe de stock', nombre: 'informe_stock',
+      resena: 'Qué hay hoy de cada producto —cuánto está sobre una mesa, cuánto comprometido y cuánto libre para entregar— y cuánto vale; qué le pasó a cada stock en el período elegido; qué vence pronto y qué hace más de un mes que no sale. Cada unidad en lo suyo: gramos, unidades y mililitros no se suman entre sí.',
+      datos: datos, periodo: etiqueta_periodo(desde, hasta),
+      kpis: hoy[:por_unidad].group_by { |x| x[:unidad] }.map { |u, xs|
+              { label: "Queda (#{u})", valor: "#{num.call(xs.sum { |x| x[:queda] })} #{u}", tono: :ok }
+            } +
+            # Sin «stocks con saldo»: el dato está en la tabla y con un cuadro más la plata no entra.
+            [{ label: 'Valor a costo',    valor: plata.call(hoy[:valor_costo]) },
+             { label: 'Valor de venta',   valor: plata.call(hoy[:valor_venta]) }],
+      secciones: [
+        {
+          # Primera a propósito: es la que va al Excel.
+          titulo: 'Stock por stock (en el período y hoy)',
+          headers: ['Stock', 'Producto', 'Genética', 'De dónde', 'Ingresó', 'Dispens.', 'Merma', 'Otras sal.', 'Queda', 'Libre'],
+          rows: datos[:stocks].map { |f|
+            [f[:numero] || "##{f[:id]}", prod.call(f), f[:genetica] || '—',
+             "#{origen.call(f[:origen])} · #{f[:de_donde].presence || '—'}",
+             num.call(f[:ingreso]), num.call(f[:dispensado]), num.call(f[:merma]), num.call(f[:otras_salidas]),
+             num.call(f[:queda]), num.call(f[:libre])]
+          },
+          aligns: { 4 => :right, 5 => :right, 6 => :right, 7 => :right, 8 => :right, 9 => :right },
+          # La primera columna se lleva lo que sobra (ver `InformeDocument#anchos`): ~60 pt para el código.
+          col_min: { 1 => 52, 2 => 50, 3 => 72, 4 => 42, 5 => 44, 6 => 36, 7 => 42, 8 => 40, 9 => 40 },
+          vacio: 'No hay stock con saldo ni con movimientos en el período elegido.',
+        },
+        {
+          titulo: 'Hoy, por producto',
+          headers: ['Unidad', 'Origen', 'Stocks', 'Queda', 'En una mesa', 'Comprometido', 'Libre'],
+          rows: hoy[:por_unidad].map { |x|
+            [x[:unidad], origen.call(x[:origen]), x[:stocks], num.call(x[:queda]), num.call(x[:en_mesa]),
+             num.call(x[:comprometido]), num.call(x[:libre])]
+          },
+          aligns: { 2 => :right, 3 => :right, 4 => :right, 5 => :right, 6 => :right },
+          col_min: { 1 => 50, 2 => 40, 3 => 50, 4 => 58, 5 => 70, 6 => 50 },
+          vacio: 'No hay stock con saldo.',
+        },
+        {
+          titulo: 'En el período, por unidad',
+          headers: ['Unidad', 'Ingresó', 'Dispensado', 'Merma', 'Otras salidas', 'Ajustes'],
+          rows: datos[:periodo].map { |x|
+            [x[:unidad], num.call(x[:ingreso]), num.call(x[:dispensado]), num.call(x[:merma]),
+             num.call(x[:otras_salidas]), num.call(x[:ajustes])]
+          },
+          aligns: { 1 => :right, 2 => :right, 3 => :right, 4 => :right, 5 => :right },
+          col_min: { 1 => 52, 2 => 60, 3 => 46, 4 => 64, 5 => 52 },
+          vacio: 'No hubo movimientos en el período elegido.',
+        },
+        {
+          titulo: 'Vence pronto',
+          headers: ['Stock', 'Producto', 'Genética', 'Queda', 'Vence'],
+          rows: datos[:vencen].map { |f|
+            [f[:numero] || "##{f[:id]}", prod.call(f), f[:genetica] || '—', num.call(f[:queda]),
+             f[:dias_para_vencer].negative? ? "#{fmt_fecha(f[:vence])} (vencido)" : "#{fmt_fecha(f[:vence])} (#{f[:dias_para_vencer]} d)"]
+          },
+          aligns: { 3 => :right },
+          vacio: 'Nada con saldo vence en los próximos 30 días.',
+        },
+        {
+          titulo: "Sin salida hace más de #{Informes::Inventario::DIAS_SIN_MOVIMIENTO} días",
+          headers: ['Stock', 'Producto', 'Genética', 'Queda', 'Última salida', 'Días quieto'],
+          rows: datos[:sin_movimiento].map { |f|
+            [f[:numero] || "##{f[:id]}", prod.call(f), f[:genetica] || '—', num.call(f[:queda]),
+             f[:nunca_salio] ? 'nunca' : fmt_fecha(f[:ultima_salida]), f[:dias_quieto]]
+          },
+          aligns: { 3 => :right, 5 => :right },
+          vacio: 'Todo lo que tiene saldo salió en el último mes.',
+        },
+      ],
+      nota: (hoy[:sin_costo].positive? || hoy[:sin_precio].positive?) ?
+              "El valor no incluye #{hoy[:sin_costo]} stock(s) sin costo cargado y #{hoy[:sin_precio]} sin precio de venta." : nil,
     )
   end
 
@@ -610,6 +742,11 @@ class InformesController < ApplicationController
   # Los cuatro períodos de siempre, o un rango a elección (`desde`/`hasta`): «del 1 al 15» es lo
   # que pide un auditor. Vale para todos los informes que pasan por acá. Un rango dado vuelta se
   # endereza; sin `hasta`, hasta hoy.
+  # Los filtros del informe (ver `Informes::Filtros`): los mismos parámetros en pantalla y descarga.
+  def filtros
+    @filtros ||= Informes::Filtros.desde_params(params, current_user.club)
+  end
+
   def periodo_rango
     if params[:desde].present?
       desde = Date.parse(params[:desde].to_s)

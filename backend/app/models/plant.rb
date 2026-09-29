@@ -38,6 +38,15 @@ class Plant < ApplicationRecord
   # el caso, este permite contarlo.
   MOTIVOS_DESCARTE = %w[no_prendio plaga enfermedad macho hermafrodita estres rotura otro].freeze
 
+  # Cómo se dice el arranque de ESTA planta: la de semilla «Germinando», el esqueje «Enraizado»
+  # (misma regla que `Lote#estado_label`: cambia la palabra, no la fase). Fuera de ese tramo es nil
+  # y la pantalla usa su palabra de siempre. Manda el origen del LOTE: el alta de una planta suelta
+  # trae `semilla` por defecto aunque el lote sea de esquejes.
+  def estado_label
+    return nil unless state == 'enraizado'
+    Lote::ARRANQUE_POR_ORIGEN.dig(lote&.origen || origen, 'planta') || 'Enraizado'
+  end
+
   validates :nombre,    presence: true
   validates :state,     inclusion: { in: STATES }
   validates :codigo_qr, uniqueness: true, allow_nil: true

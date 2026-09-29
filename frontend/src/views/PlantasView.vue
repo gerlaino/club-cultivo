@@ -3,7 +3,7 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { logger } from '../utils/logger.js'
 import { useRouter } from 'vue-router'
 import { listPlants, listLotes, getPlantsKpis } from '../lib/api.js'
-import { em } from '../lib/loteHelpers.js'
+import { em, estadoPlantaLabel } from '../lib/loteHelpers.js'
 import { useAuthStore } from '../stores/auth.js'
 import EmptyState from '../components/ui/EmptyState.vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
@@ -47,7 +47,7 @@ function plantaMeta(p) {
     const m = em(p.lote.estado)
     return { label: m.label, icon: m.emoji, bg: m.bg, color: m.color, bar: m.color }
   }
-  return sm(p.state)
+  return { ...sm(p.state), label: estadoPlantaLabel(p) }
 }
 
 // KPIs server-side (GET /plants/kpis): activas (veg+flor), cosechadas, en manicura, descartadas.

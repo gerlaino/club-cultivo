@@ -22,6 +22,7 @@ class PlantsController < ApplicationController
       nombre:    plant.nombre,
       codigo_qr: plant.codigo_qr,
       estado:    plant.state,
+      estado_label: plant.estado_label,
       lote: {
         id:     plant.lote.id,
         codigo: plant.lote.codigo,
@@ -352,6 +353,7 @@ class PlantsController < ApplicationController
       nombre:       plant.nombre,
       codigo_qr:    plant.codigo_qr,
       state:        plant.state,
+      estado_label: plant.estado_label,
       origen:       plant.origen,
       es_seleccion: plant.es_seleccion,
       peso_seco:    plant.peso_seco,
@@ -383,6 +385,7 @@ class PlantsController < ApplicationController
       nombre:    plant.nombre,
       codigo_qr: plant.codigo_qr,
       state:     plant.state,
+      estado_label: plant.estado_label,
       origen:    plant.origen,
       es_seleccion: plant.es_seleccion,
       foto_url:  foto_url(plant),

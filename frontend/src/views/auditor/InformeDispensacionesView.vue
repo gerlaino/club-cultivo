@@ -13,9 +13,13 @@
       </div>
     </div>
 
+    <FiltrosInforme class="inf__filtros" :usa="['pacientes', 'lotes', 'geneticas', 'formas', 'sedes', 'dispensadores', 'origen']" @change="cambiarFiltros" />
+
     <div v-if="loading" class="inf__loading">Cargando…</div>
     <div v-else-if="data" ref="hoja" class="inf__hoja">
       <p v-if="data.resena" class="inf__resena">{{ data.resena }}</p>
+      <!-- Un informe filtrado lo dice arriba de todo (y el PDF y el Excel también). -->
+      <p v-if="data.filtros?.activo" class="inf__filtrado"><i class="bi bi-funnel-fill"></i> Filtrado — {{ data.filtros.descripcion }}</p>
 
       <!-- ── 1. Lo que salió ──────────────────────────────────────────────── -->
       <section class="inf__section">
@@ -134,12 +138,16 @@ import { Package } from 'lucide-vue-next'
 import api from '../../lib/api.js'
 import { useInformePdf } from '../../composables/useInformePdf.js'
 import SelectorPeriodo from '../../components/informes/SelectorPeriodo.vue'
+import FiltrosInforme from '../../components/informes/FiltrosInforme.vue'
 
 const { hoja, exporting, exportarPdf, exportarXlsx } = useInformePdf('informe_dispensaciones')
 
 // Los MISMOS parámetros para la pantalla y para la descarga: antes el PDF bajaba siempre «mes
 // actual» aunque en pantalla estuviera el trimestre.
-const params  = ref({ periodo: 'mes_actual' })
+// Los MISMOS parámetros para la pantalla y para la descarga: período + filtros.
+const periodo = ref({ periodo: 'mes_actual' })
+const filtros = ref({})
+const params  = computed(() => ({ ...periodo.value, ...filtros.value }))
 const loading = ref(false)
 const data    = ref(null)
 const salio   = computed(() => data.value?.salio || { por_unidad: [], entregas: {}, pacientes: {}, regalos: [] })
@@ -153,7 +161,8 @@ async function cargar() {
     loading.value = false
   }
 }
-function cambiarPeriodo(p) { params.value = p; cargar() }
+function cambiarPeriodo(p) { periodo.value = p; cargar() }
+function cambiarFiltros(f) { filtros.value = f; cargar() }
 
 const FORMAS = { flor_seca: 'Flor seca', hash: 'Hash', aceite: 'Aceite', tintura: 'Tintura', crema: 'Crema',
   capsula: 'Cápsula', comestible: 'Comestible', prensado: 'Prensado', preroll: 'Preroll', otro: 'Otro', externo: 'Externo' }
@@ -185,6 +194,8 @@ onMounted(cargar)
 .inf__pdf:disabled { opacity: .5; cursor: not-allowed; }
 .inf__title { font-size: var(--fs-20); font-weight: 700; color: var(--c-ink-900); display: flex; align-items: center; gap: var(--sp-2); margin: 0; }
 .inf__periodo { background: var(--c-ink-100); border: 1.5px solid var(--c-ink-300); border-radius: var(--r-md); padding: 6px 12px; font-size: var(--fs-14); color: var(--c-ink-900); }
+.inf__filtros { margin: calc(-1 * var(--sp-3)) 0 var(--sp-5); }
+.inf__filtrado { margin: 0 0 var(--sp-5); padding: .55rem .9rem; background: var(--c-leaf-100); color: var(--c-leaf-800); border-radius: var(--r-md); font-size: var(--fs-13); font-weight: 600; }
 .inf__loading { color: var(--c-ink-500); padding: var(--sp-8); text-align: center; }
 .inf__empty { color: var(--c-ink-500); padding: var(--sp-4); font-size: var(--fs-13); }
 .inf__nota { color: var(--c-ink-500); font-size: var(--fs-13); margin: var(--sp-2) 0 0; }

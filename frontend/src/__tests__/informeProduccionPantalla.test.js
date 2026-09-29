@@ -109,9 +109,17 @@ describe('Informe de Producción — la pantalla muestra lo que el backend manda
     expect(filas[1].text()).toContain('sin historia para estimar')
   })
 
+  // Por título y no por posición: las secciones se suman (el stock externo entró antes de Por sede).
+  const porTitulo = (t) => wrapper.findAll('.inf__section').find(s => s.find('.inf__section-title').text() === t)
+
   it('la sección Por sede está en la pantalla, no sólo en el archivo', () => {
-    const texto = seccion(3).text()
+    const texto = porTitulo('Por sede').text()
     expect(texto).toContain('Sede Centro')
     expect(texto).toContain('890 g')
+  })
+
+  // AC (Germán, 29-sep): el stock externo aparece; si no entró nada, se dice.
+  it('la sección Stock externo está, y dice cuando no entró nada', () => {
+    expect(porTitulo('Stock externo').text()).toContain('No entró stock externo')
   })
 })

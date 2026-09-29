@@ -941,6 +941,7 @@ const routes = [
       { path: 'plan-vs-real', name: 'auditor-plan-vs-real', component: () => import('../views/auditor/InformePlanVsRealView.vue') },
       { path: 'inase', name: 'auditor-inase', component: () => import('../views/auditor/InformeInaseView.vue') },
       { path: 'perdidas', name: 'auditor-perdidas', component: () => import('../views/auditor/InformePerdidasView.vue') },
+      { path: 'stock', name: 'auditor-stock', component: () => import('../views/auditor/InformeStockView.vue') },
       { path: 'trazabilidad', name: 'auditor-trazabilidad', component: () => import('../views/auditor/TrazabilidadView.vue') },
     ],
   },
