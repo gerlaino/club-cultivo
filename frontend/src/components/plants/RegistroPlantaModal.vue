@@ -82,7 +82,7 @@
                   <span>{{ getAccion(accionId)?.emoji }} {{ getAccion(accionId)?.label }}</span>
                 </div>
                 <div class="rps__seccion-body">
-                  <RiegoForm     v-if="accionId === 'riego'"     v-model="formData.riego" />
+                  <RiegoForm     v-if="accionId === 'riego'"     v-model="formData.riego" :lote-id="planta?.lote?.id || planta?.lote_id" />
                   <PlagasForm    v-if="accionId === 'plagas'"    v-model="formData.plagas" />
                   <MedicionForm  v-if="accionId === 'medicion'"  v-model="formData.medicion" />
                   <!-- Poda: simple para planta individual -->

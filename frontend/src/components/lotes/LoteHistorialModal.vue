@@ -19,6 +19,7 @@
             :en-cama="!!lote?.en_cama"
             @crear="(p) => { $emit('crear', p); formAbierto = false }"
             @trasplante="(p) => { $emit('trasplante', p); formAbierto = false }"
+            @riego="$emit('riego'); formAbierto = false"
             @cancelar="formAbierto = false"
           />
         </div>
@@ -102,7 +103,7 @@ const props = defineProps({
   // Para que el trasplante traiga marcado el medio en que queda.
   lote:       { type: Object,  default: null },
 })
-const emit = defineEmits(['update:modelValue', 'editar', 'delete', 'crear', 'trasplante'])
+const emit = defineEmits(['update:modelValue', 'editar', 'delete', 'crear', 'trasplante', 'riego'])
 
 const formAbierto = ref(false)
 const busqueda   = ref('')

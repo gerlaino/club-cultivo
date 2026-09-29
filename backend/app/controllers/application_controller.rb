@@ -267,4 +267,12 @@ class ApplicationController < ActionController::API
     request.headers['Authorization'] = "Bearer #{token}" if token.present?
   end
 
+  # La sede de lo que se está por regar/alimentar (`?sala_id=` o `?lote_id=`): de su depósito
+  # salen los productos (`Insumo#equivalente_en`). Nil sin contexto: la lista de siempre.
+  def sede_del_cultivo_param
+    sala = current_user.club.salas.find_by(id: params[:sala_id]) if params[:sala_id].present?
+    sala ||= current_user.club.lotes.find_by(id: params[:lote_id])&.sala if params[:lote_id].present?
+    sala&.sede
+  end
+
 end

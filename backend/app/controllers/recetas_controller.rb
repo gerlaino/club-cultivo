@@ -12,11 +12,12 @@ class RecetasController < ApplicationController
     recetas = current_user.club.recetas.includes(receta_items: :insumo).order(activa: :desc, nombre: :asc)
     # `?uso=top_dress`: el formulario de la cama pide sólo las que le sirven.
     recetas = recetas.de_uso(params[:uso]) if Receta::USOS.include?(params[:uso].to_s)
-    render json: recetas.map { |r| serialize(r) }
+    sede = sede_del_cultivo_param
+    render json: recetas.map { |r| serialize(r, sede: sede) }
   end
 
   def show
-    render json: serialize(@receta, con_uso: true)
+    render json: serialize(@receta, con_uso: true, sede: sede_del_cultivo_param)
   end
 
   def create
@@ -60,22 +61,26 @@ class RecetasController < ApplicationController
                                    receta_items_attributes: [:id, :insumo_id, :dosis, :unidad, :orden, :_destroy])
   end
 
-  def serialize(r, con_uso: false)
+  # Con `sede:` (el formulario de riego manda `sala_id`/`lote_id`), cada producto es el de esa sede:
+  # su id y su stock. Si allá no lo hay, va el de la receta con stock 0 y `sin_en_sede`.
+  def serialize(r, con_uso: false, sede: nil)
+    aca = r.receta_items.to_h { |it| [it.id, it.insumo.equivalente_en(sede)] }
     base = {
       id: r.id, nombre: r.nombre, fase: r.fase, fase_label: Receta::FASE_LABELS[r.fase],
       uso: r.uso, uso_label: Receta::USO_LABELS[r.uso], base_unidad: Receta::BASE_UNIDAD[r.uso],
       ph_objetivo: r.ph_objetivo, ec_objetivo: r.ec_objetivo, notas: r.notas, activa: r.activa,
       items: r.receta_items.map { |it|
-        { id: it.id, insumo_id: it.insumo_id, nombre: it.insumo.nombre, dosis: it.dosis, unidad: it.unidad,
+        suyo = aca[it.id]
+        { id: it.id, insumo_id: (suyo || it.insumo).id, nombre: it.insumo.nombre, dosis: it.dosis, unidad: it.unidad,
           unidad_label: RecetaItem::UNIDAD_LABELS[it.unidad], unidad_insumo: it.insumo.unidad_medida,
-          stock_actual: it.insumo.stock_actual, orden: it.orden,
+          stock_actual: suyo ? suyo.stock_actual : 0, sin_en_sede: suyo.nil?, orden: it.orden,
           # Cuánto de la unidad del insumo es una unidad de la dosis (g → kg: 0,001). La pantalla
           # multiplica por esto; la regla vive acá (`RecetaItem#factor_a_insumo`).
           factor: it.factor_a_insumo.to_f }
       },
       # Para 1 unidad de base (litro, m² o litro de suelo), ya en la unidad del insumo: con esto
       # la pantalla calcula cualquier cantidad sin volver a pedir.
-      por_litro: r.receta_items.map { |it| { insumo_id: it.insumo_id, dosis: it.dosis, factor: it.factor_a_insumo.to_f } },
+      por_litro: r.receta_items.map { |it| { insumo_id: (aca[it.id] || it.insumo).id, dosis: it.dosis, factor: it.factor_a_insumo.to_f } },
     }
     con_uso ? base.merge(uso: uso_de(r)) : base
   end

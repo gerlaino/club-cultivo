@@ -425,6 +425,17 @@ class AnalyticsController < ApplicationController
     render json: Analitica::Costo.new(universo).call.merge(periodo: periodo_analitica_etiqueta)
   end
 
+  # GET /api/analytics/nutricion?lote_ids[]=1&lote_ids[]=2 — lado a lado (`Analitica::Nutricion`).
+  # Sólo lotes de esta organización: un id ajeno no aparece.
+  def nutricion
+    render json: Analitica::Nutricion.new(club: current_user.club, lote_ids: Array(params[:lote_ids])).call
+  end
+
+  # GET /api/analytics/nutricion_lotes — con qué lotes se puede comparar.
+  def nutricion_lotes
+    render json: { lotes: Analitica::Nutricion.candidatos(current_user.club) }
+  end
+
   # GET /api/analytics/ejecutivo
   # Resumen anual — KPIs del año en curso vs año anterior
   def ejecutivo

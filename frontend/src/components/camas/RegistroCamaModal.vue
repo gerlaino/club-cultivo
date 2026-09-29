@@ -50,7 +50,7 @@
 
     <template v-if="CON_PRODUCTOS.includes(tipo)">
       <p class="cm-seccion">Productos</p>
-      <InsumosAplicados :key="`${tipo}-${camaId}`" v-model="insumos" :uso="usoDeReceta"
+      <InsumosAplicados :key="`${tipo}-${camaId}`" v-model="insumos" :uso="usoDeReceta" :sala-id="cama?.sala_id"
                         :base-default="baseDefault" :base-ayuda="baseAyuda" @nutricion="n => (nutricion = n)" />
       <p v-if="tipo === 'top_dress' && !cama?.m2" class="cm-hint">Sin medidas de la cama no hay m² contra qué calcular la receta: cargá los m² alimentados o productos sueltos.</p>
     </template>

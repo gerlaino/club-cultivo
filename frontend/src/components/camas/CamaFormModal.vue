@@ -69,7 +69,7 @@
         <button type="button" class="cm-chip" :class="{ 'cm-chip--on': !yaArmada }" @click="yaArmada = false">La armo ahora</button>
         <button type="button" class="cm-chip" :class="{ 'cm-chip--on': yaArmada }" @click="yaArmada = true">Ya estaba armada</button>
       </div>
-      <InsumosAplicados v-if="!yaArmada" v-model="mezcla" uso="mezcla" :base-default="litros"
+      <InsumosAplicados v-if="!yaArmada" :key="form.sala_id" v-model="mezcla" uso="mezcla" :sala-id="form.sala_id" :base-default="litros"
                         base-ayuda="Litros de tierra de la cama: salen de las medidas."
                         @nutricion="n => (nutricion = n)" />
       <p v-else class="cm-hint">No se descuenta nada del {{ esPersonal ? 'stock' : 'depósito' }}. La historia de la cama empieza hoy.</p>

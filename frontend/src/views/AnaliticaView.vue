@@ -15,6 +15,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { getAnaliticaGeneticas, getAnaliticaFases, getAnaliticaDondeYComo, getAnaliticaCosto } from '../lib/api.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import SelectorPeriodo from '../components/informes/SelectorPeriodo.vue'
+import AnaliticaNutricion from '../components/analitica/AnaliticaNutricion.vue'
 import { hoyISO } from '../utils/dates.js'
 
 const route  = useRoute()
@@ -25,6 +26,8 @@ const TABS = [
   { id: 'fases',        label: 'Fases',        pregunta: '¿Cuánto tarda cada fase?' },
   { id: 'donde_y_como', label: 'Dónde y cómo', pregunta: '¿En qué sala, con qué método, con qué ambiente?' },
   { id: 'costo',        label: 'Costo',        pregunta: '¿Cuánto cuesta producir un gramo?' },
+  // Lotes elegidos, no el universo del período: qué recibió cada uno y cómo rindió (29-sep-2026).
+  { id: 'nutricion',    label: 'Nutrición',    pregunta: '¿Qué recibió cada lote y cómo rindió?' },
 ]
 // Las rutas viejas siguen entrando: cada solapa retirada cae en la que contesta su pregunta.
 const ALIAS = { ciclos: 'fases', prendimiento: 'fases', perdidas: 'geneticas', comparativa: 'donde_y_como',
@@ -33,6 +36,7 @@ const tab     = ref(ALIAS[route.query.tab] || (TABS.some(t => t.id === route.que
 const params  = ref({ periodo: 'todo' })
 const corte   = ref('sala')
 const loading = ref(false)
+const nutricionRef = ref(null)
 const error   = ref('')
 const data    = ref({ geneticas: null, fases: null, donde_y_como: null, costo: null })
 
@@ -102,6 +106,8 @@ function exportCsv() {
   } else if (tab.value === 'donde_y_como') {
     headers = [CORTES.find(c => c.id === corte.value)?.label, 'Lotes', 'Plantas', 'g/planta', 'g/m²', 'Floración (días)', 'VPD flora', 'Temp flora', 'Humedad flora']
     rows = (donde.value?.filas || []).map(f => [f.nombre, f.lotes, f.plantas, f.g_por_planta, f.g_m2, f.floracion_dias, f.ambiente?.vpd, f.ambiente?.temperatura, f.ambiente?.humedad])
+  } else if (tab.value === 'nutricion') {
+    ({ headers, rows } = nutricionRef.value?.csv() || { headers: [], rows: [] })
   } else {
     headers = ['Corte', 'Nombre', 'Lotes', 'Costo total', 'Gramos', '$/g']
     rows = [...(costo.value?.por_sede || []).map(f => ['Sede', f.nombre, f.lotes, f.costo_total, f.gramos, f.costo_por_gramo]),
@@ -134,10 +140,11 @@ async function exportPdf() {
     <div class="an__header">
       <div>
         <h1 class="an__title">Analítica</h1>
-        <p class="an__sub">{{ pregunta }} · sobre los lotes cerrados con rendimiento<template v-if="periodo"> · {{ periodo.etiqueta }} · {{ periodo.lotes }} lotes</template></p>
+        <p v-if="tab === 'nutricion'" class="an__sub">{{ pregunta }} · sobre los lotes que elijas, cerrados o en curso</p>
+        <p v-else class="an__sub">{{ pregunta }} · sobre los lotes cerrados con rendimiento<template v-if="periodo"> · {{ periodo.etiqueta }} · {{ periodo.lotes }} lotes</template></p>
       </div>
       <div class="an__header-right">
-        <SelectorPeriodo inicial="todo" con-todo @change="cambiarPeriodo" />
+        <SelectorPeriodo v-show="tab !== 'nutricion'" inicial="todo" con-todo @change="cambiarPeriodo" />
         <button class="an__export-btn" :disabled="loading" @click="exportCsv"><i class="bi bi-filetype-csv"></i> CSV</button>
         <button class="an__export-btn an__export-btn--pdf" :disabled="loading" @click="exportPdf"><i class="bi bi-file-earmark-pdf"></i> PDF</button>
       </div>
@@ -278,6 +285,9 @@ async function exportPdf() {
       </template>
 
       <!-- ══ COSTO · ¿cuánto cuesta producir un gramo? ════════════════════════ -->
+      <!-- ══ NUTRICIÓN · ¿qué recibió cada lote y cómo rindió? ═════════════════ -->
+      <AnaliticaNutricion v-else-if="tab === 'nutricion'" ref="nutricionRef" />
+
       <template v-else-if="tab === 'costo'">
         <div v-if="!costo || !costo.total.lotes" class="an__empty">Todavía no hay lotes cerrados con costo cargado en este período.</div>
         <template v-else>

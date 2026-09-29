@@ -95,7 +95,7 @@ export function lineasDeReceta(receta, base, overrides = [], insumos = []) {
   const desdeReceta = receta
     ? receta.items.map(it => ({
         insumo_id: it.insumo_id, nombre: it.nombre, dosis: it.dosis, unidad_label: it.unidad_label,
-        unidad_insumo: it.unidad_insumo, stock_actual: it.stock_actual,
+        unidad_insumo: it.unidad_insumo, stock_actual: it.stock_actual, sin_en_sede: !!it.sin_en_sede,
         calculada: b ? +(Number(it.dosis) * b * (Number(it.factor) || 1)).toFixed(3) : null,
       }))
     : (overrides || []).map(x => {

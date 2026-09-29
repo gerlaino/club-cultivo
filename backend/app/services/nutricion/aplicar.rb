@@ -7,7 +7,8 @@
 #   al uso de la receta: m² (top dress), litros de suelo (mezcla) o litros (té). El costo va a los
 #   lotes en cultivo de la cama en ese ciclo, repartido por sus m²; sin lotes, queda en la cama.
 #
-# En los dos casos: descuenta cada producto del depósito, imputa el costo y deja en el registro una
+# En los dos casos: descuenta cada producto del depósito DE LA SEDE donde se aplica (la receta es
+# de la organización; `Insumo#equivalente_en`), imputa el costo y deja en el registro una
 # COPIA de lo aplicado (`nutricion`), para que editar la receta después no cambie el historial.
 #
 # NO BLOQUEA POR STOCK (Germán, 20-sep-2026): el riego ya pasó, y capaz el envase está en la
@@ -39,17 +40,20 @@ module Nutricion
 
       lotes = lotes_que_pagan
       pesos = pesos_de(lotes)
+      partes = Insumo.partes_de(lotes, pesos)
       aplicados = []
       faltantes = []
 
       ActiveRecord::Base.transaction do
         lista.each do |l|
-          insumo = @club.insumos.find(l[:insumo_id])
+          # El de la sede donde se aplica (nil: esa sede no lo tiene, todo es faltante).
+          insumo = l[:insumo]
           pedido = l[:cantidad].to_d
-          disponible = insumo.stock_actual.to_d
+          disponible = insumo ? insumo.stock_actual.to_d : 0.to_d
           descontar = pedido
           if pedido > disponible
-            faltantes << { insumo_id: insumo.id, nombre: insumo.nombre, faltante: (pedido - disponible).round(2).to_f, unidad: insumo.unidad_medida }
+            faltantes << { insumo_id: l[:insumo_id], nombre: l[:nombre], faltante: (pedido - disponible).round(2).to_f,
+                           unidad: l[:unidad_insumo], sin_en_sede: insumo.nil? }
             descontar = l[:modo_faltante] == 'no_descontar' ? 0.to_d : disponible
           end
           costo = 0.to_d
@@ -62,10 +66,12 @@ module Nutricion
             )
             costo = consumos.sum { |c| c.costo_imputado_ars.to_d }
           end
-          aplicados << { 'insumo_id' => insumo.id, 'nombre' => insumo.nombre, 'unidad' => insumo.unidad_medida,
+          aplicados << { 'insumo_id' => insumo&.id, 'nombre' => l[:nombre], 'unidad' => l[:unidad_insumo],
                          'dosis' => l[:dosis]&.to_f, 'dosis_unidad' => l[:unidad],
                          'cantidad' => pedido.to_f, 'descontado' => descontar.to_f,
                          'faltante' => [(pedido - descontar), 0].max.to_f, 'costo_ars' => costo.to_f }
+          motivo = motivo_sin_descontar(insumo, pedido, descontar, l[:modo_faltante])
+          aplicados.last['motivo'] = motivo if motivo
         end
 
         copia = {
@@ -75,7 +81,8 @@ module Nutricion
           'items' => aplicados,
           'costo_ars' => aplicados.sum { |a| a['costo_ars'] }.round(2),
           # A quién se le cargó la plata (lote → pesos), para que la ficha lo diga.
-          'lotes' => lotes.map { |lo| { 'id' => lo.id, 'codigo' => lo.codigo } },
+          # `parte`: lo que le tocó a cada uno (`Insumo.partes_de`), para contar lo que recibió.
+          'lotes' => lotes.map { |lo| { 'id' => lo.id, 'codigo' => lo.codigo, 'parte' => partes[lo.id].to_f.round(6) } },
         }
         if @cama_registro
           @cama_registro.update_columns(receta_id: @receta&.id, nutricion: copia)
@@ -121,6 +128,14 @@ module Nutricion
       lotes.to_h { |l| [l.id, l.m2_ocupados.to_d] }
     end
 
+    # Por qué no se descontó (todo o parte): es la salvedad que muestra la historia del lote. La
+    # app no sabe si el producto se usó; sabe que no salió del depósito.
+    def motivo_sin_descontar(insumo, pedido, descontar, modo)
+      return nil if descontar >= pedido
+      return 'sin_en_sede' if insumo.nil?
+      modo == 'no_descontar' ? 'no_descontar' : 'sin_stock'
+    end
+
     def fecha = (@cama_registro || @registros.first).registrado_en.to_date
 
     def notas
@@ -133,13 +148,26 @@ module Nutricion
       Receta::BASE_UNIDAD[@receta.uso]
     end
 
+    # La sede de la sala donde se aplica: de su depósito se descuenta. Sin sala o sin sede (una
+    # organización de una sola sede, datos viejos), el insumo tal cual.
+    def sede
+      return @sede if defined?(@sede)
+      sala = @sala || @cama_registro&.cama&.sala || @registros.first&.lote&.sala
+      @sede = sala&.sede
+    end
+
+    # `items` puede traer el insumo de la receta (el de otra sede) o el de esta: los dos se
+    # resuelven al de esta sede.
     def lineas
-      base = @receta ? @receta.calcular(@base) : []
+      base = @receta ? @receta.calcular(@base, sede: sede) : []
       return base.map { |b| b.merge(modo_faltante: 'descontar_disponible') } if @items.blank?
 
       @items.map do |it|
-        ref = base.find { |b| b[:insumo_id] == it[:insumo_id].to_i } || {}
-        { insumo_id: it[:insumo_id].to_i, cantidad: it[:cantidad].presence || ref[:cantidad],
+        pedido = @club.insumos.find(it[:insumo_id])
+        insumo = pedido.equivalente_en(sede)
+        ref = base.find { |b| b[:insumo_id] == pedido.id || (insumo && b[:insumo]&.id == insumo.id) } || {}
+        { insumo_id: pedido.id, insumo: insumo, nombre: pedido.nombre, unidad_insumo: pedido.unidad_medida,
+          cantidad: it[:cantidad].presence || ref[:cantidad],
           dosis: ref[:dosis], unidad: ref[:unidad],
           modo_faltante: MODOS_FALTANTE.include?(it[:modo_faltante].to_s) ? it[:modo_faltante].to_s : 'descontar_disponible' }
       end.select { |l| l[:cantidad].to_d > 0 }

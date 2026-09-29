@@ -547,7 +547,8 @@ export const updateInsumo    = (id, payload) => api.put(`/insumos/${id}`, { insu
 export const comprarInsumo   = (id, payload) => api.post(`/insumos/${id}/comprar`, payload)
 // Recetas de nutrientes: se arman acá y se aplican al regar (`nutricion` en el registro).
 // `uso`: 'riego' (y tés) · 'top_dress' · 'mezcla'. Sin uso, todas.
-export const listRecetas     = (uso = null)  => api.get('/recetas', { params: uso ? { uso } : undefined })
+// `contexto` ({ sala_id } o { lote_id }): cada producto viene resuelto al depósito de esa sede.
+export const listRecetas     = (uso = null, contexto = {}) => api.get('/recetas', { params: { ...(uso ? { uso } : {}), ...contexto } })
 export const getReceta       = (id)          => api.get(`/recetas/${id}`)
 export const createReceta    = (payload)     => api.post('/recetas', { receta: payload })
 export const updateReceta    = (id, payload) => api.patch(`/recetas/${id}`, { receta: payload })
@@ -910,6 +911,8 @@ export const transicionarLote  = (loteId, payload) => api.post(`/lotes/${loteId}
 export const avanzarFaseLote   = (loteId, payload = {}) => api.post(`/lotes/${loteId}/avanzar_fase`, payload)
 export const getLoteTimeline  = (loteId)          => api.get(`/lotes/${loteId}/timeline`)
 export const getLoteHistorial = (loteId)          => api.get(`/lotes/${loteId}/historial`)
+// «¿Qué recibió este lote?» (`Lotes::Nutricion`): aplicaciones, totales, por fase y por semana.
+export const getLoteNutricion = (loteId)         => api.get(`/lotes/${loteId}/nutricion`)
 export const previewLotePlan  = (loteId, planId, fechaInicio)  => api.get(`/lotes/${loteId}/preview_plan`, { params: { plan_trabajo_id: planId, fecha_inicio: fechaInicio || undefined } })
 export const aplicarLotePlan  = (loteId, planId, fechaInicio)  => api.post(`/lotes/${loteId}/aplicar_plan`, { plan_trabajo_id: planId, fecha_inicio: fechaInicio || undefined })
 
@@ -988,6 +991,9 @@ export const getAnaliticaGeneticas        = (params = {}) => api.get('/analytics
 export const getAnaliticaFases            = (params = {}) => api.get('/analytics/fases',        { params })
 export const getAnaliticaDondeYComo       = (params = {}) => api.get('/analytics/donde_y_como', { params })
 export const getAnaliticaCosto            = (params = {}) => api.get('/analytics/costo',        { params })
+// Qué recibió cada lote y cómo rindió (`Analitica::Nutricion`): { lote_ids: [..] }, de 2 a 4.
+export const getAnaliticaNutricion        = (params = {}) => api.get('/analytics/nutricion',    { params })
+export const getAnaliticaNutricionLotes   = ()            => api.get('/analytics/nutricion_lotes')
 export const getAnalyticsDispensador      = ()            => api.get('/analytics/dispensador')
 export const getAnalyticsPL               = ()            => api.get('/analytics/pl_lotes')
 export const getAnalyticsEjecutivo        = ()            => api.get('/analytics/ejecutivo')

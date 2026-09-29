@@ -17,6 +17,8 @@ class InsumosController < ApplicationController
     scope = scope.where(deposito_id: params[:deposito_id]) if params[:deposito_id].present?
     scope = scope.por_tipo(params[:tipo]) if params[:tipo].present? # compat: se reemplaza por deposito_id
     scope = scope.de_sede(params[:sede_id]) if params[:sede_id].present?
+    # `?sala_id=`/`?lote_id=`: lo que se puede usar ahí (su sede + el pool), para el riego.
+    scope = scope.para_sede(sede_del_cultivo_param&.id) if params[:sala_id].present? || params[:lote_id].present?
     render json: {
       insumos:         scope.order(:nombre).map { |i| serialize(i) },
       valorizado_total: scope.sum { |i| i.valorizado_ars }.round(2),

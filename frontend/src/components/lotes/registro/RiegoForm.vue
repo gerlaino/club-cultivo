@@ -94,12 +94,13 @@
             <button v-if="modo === 'sueltos'" type="button" class="rf__quitar" @click="quitarSuelto(l.insumo_id)"><i class="bi bi-x"></i></button>
           </div>
           <div v-if="l.faltante > 0" class="rf__falta">
-            Faltan {{ num(l.faltante) }} {{ u(l.unidad_insumo) }} en el {{ esPersonal ? 'stock' : 'depósito' }}. ¿Qué hacemos?
-            <div class="rf__falta-ops">
+            <template v-if="l.sin_en_sede">No hay {{ l.nombre }} en el depósito de esta sede: el riego se registra sin descontarlo.</template>
+            <template v-else>Faltan {{ num(l.faltante) }} {{ u(l.unidad_insumo) }} en el {{ esPersonal ? 'stock' : 'depósito' }}. ¿Qué hacemos?</template>
+            <div v-if="!l.sin_en_sede" class="rf__falta-ops">
               <button type="button" class="rf__radio-btn rf__radio-btn--xs" :class="{ 'rf__radio-btn--sel': l.modo_faltante !== 'no_descontar' }" @click="setModoFaltante(l.insumo_id, 'descontar_disponible')">Descontar lo que hay y dejar en 0</button>
               <button type="button" class="rf__radio-btn rf__radio-btn--xs" :class="{ 'rf__radio-btn--sel': l.modo_faltante === 'no_descontar' }" @click="setModoFaltante(l.insumo_id, 'no_descontar')">No descontar este</button>
             </div>
-            <span class="rf__hint">El riego se registra igual: si el envase está en la mesada, cargá la compra después.</span>
+            <span v-if="!l.sin_en_sede" class="rf__hint">El riego se registra igual: si el envase está en la mesada, cargá la compra después.</span>
           </div>
         </div>
         <div v-if="costoEstimado" class="rf__costo">≈ {{ formatARS(costoEstimado) }} en nutrientes para este riego</div>
@@ -158,6 +159,9 @@ const props = defineProps({
   modelValue: { type: Object, default: () => ({}) },
   // Lote plantado en una cama de suelo vivo: sin pH/EC, «¿le diste té?», y el agua.
   sueloVivo:  { type: Boolean, default: false },
+  // Dónde se riega: los productos salen del depósito de SU sede (el backend los resuelve).
+  salaId:     { type: [Number, String], default: null },
+  loteId:     { type: [Number, String], default: null },
 })
 const emit  = defineEmits(['update:modelValue'])
 const f     = computed({
@@ -188,7 +192,8 @@ async function cargar() {
   cargado.value = true
   try {
     // Sólo las de riego: un top dress (por m²) o una mezcla (por litro de suelo) no van en el agua.
-    const [r, i] = await Promise.all([listRecetas('riego'), listInsumos({ tipo: 'cultivo', activos: 'true' })])
+    const donde = props.salaId ? { sala_id: props.salaId } : (props.loteId ? { lote_id: props.loteId } : {})
+    const [r, i] = await Promise.all([listRecetas('riego', donde), listInsumos({ tipo: 'cultivo', activos: 'true', ...donde })])
     recetas.value = (r.data || []).filter(x => x.activa !== false)
     insumos.value = i.data?.insumos || i.data || []
     // Sin recetas ni productos no hay nada que descontar: el modo por defecto es «sin especificar».
@@ -241,7 +246,7 @@ const lineas = computed(() => {
   const base = modo.value === 'receta' && receta.value
     // `factor`: de la unidad de la dosis a la del insumo (ml → L si el bidón está en litros). Lo
     // manda el backend, que es el que descuenta.
-    ? receta.value.items.map(it => ({ insumo_id: it.insumo_id, nombre: it.nombre, dosis: it.dosis, unidad_label: it.unidad_label, unidad_insumo: it.unidad_insumo, stock_actual: it.stock_actual, calculada: l ? +(Number(it.dosis) * l * (Number(it.factor) || 1)).toFixed(3) : null }))
+    ? receta.value.items.map(it => ({ insumo_id: it.insumo_id, nombre: it.nombre, dosis: it.dosis, unidad_label: it.unidad_label, unidad_insumo: it.unidad_insumo, stock_actual: it.stock_actual, sin_en_sede: it.sin_en_sede, calculada: l ? +(Number(it.dosis) * l * (Number(it.factor) || 1)).toFixed(3) : null }))
     : modo.value === 'sueltos'
       ? (f.value.items || []).map(x => { const i = insumos.value.find(y => y.id === x.insumo_id) || {}; return { insumo_id: x.insumo_id, nombre: i.nombre, dosis: null, unidad_label: null, unidad_insumo: i.unidad_medida, stock_actual: i.stock_actual, calculada: null } })
       : []

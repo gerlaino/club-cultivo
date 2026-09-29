@@ -1,5 +1,23 @@
 # Changelog
 
+## Septiembre 2026 (do) — Recetas por sede y qué recibió cada lote
+
+- **La receta descuenta del depósito de la sede donde se aplica** (`Insumo#equivalente_en`). La
+  receta apuntaba a la fila de insumo de UNA sede y regar en otra descontaba de la primera. Ahora
+  se busca el mismo producto (nombre + unidad) en la sede de la sala, o en el pool; si esa sede no
+  lo tiene, queda como faltante «no hay en esta sede» y no se toca otra sede. Las cuatro puertas
+  (lote, sala, riego de cama, top dress). `/recetas` e `/insumos` aceptan `?sala_id=`/`?lote_id=`;
+  el selector de Recetas ofrece cada producto una vez.
+- **«¿Qué recibió este lote?»** (`Lotes::Nutricion`, `GET /lotes/:id/nutricion`): sección
+  «Nutrición» en la ficha (totales por producto y por fase, EC/pH, plata para administración, cada
+  aplicación con su semana de fase). El chip del historial y la trazabilidad dicen qué productos y
+  cuánto, con la salvedad si no se descontó (`motivo` en la copia). Lo compartido cuenta la parte
+  del lote (`Insumo.partes_de`, la misma regla que el costo).
+- **Analítica → Nutrición** (`Analitica::Nutricion`): 2 a 4 lotes lado a lado (lo recibido por
+  producto, costo, rendimiento) y la curva de EC por semana de fase; CSV y PDF.
+- **Una sola puerta para el riego**: «Registrar actividad» del historial ya no carga riego ni
+  fertilización como texto; abre el registro de riego.
+
 ## Septiembre 2026 (dn) — Informe de stock; gastos personales en cuotas
 
 - **Informe de stock** (`/auditor/stock`, `Informes::Inventario`; opción A de Germán, 29-sep): qué

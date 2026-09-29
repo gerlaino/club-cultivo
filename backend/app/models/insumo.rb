@@ -44,6 +44,22 @@ class Insumo < ApplicationRecord
     end
   }
 
+  # Lo que puede usar una sede: lo suyo y el pool sin sede. Sin sede, todo.
+  scope :para_sede,  ->(sede_id) { sede_id.present? ? where(sede_id: [sede_id, nil]) : self }
+
+  # EL MISMO PRODUCTO EN OTRA SEDE (29-sep-2026). La receta es de la organización y apunta a UNA
+  # fila de insumo, pero cada sede tiene su depósito: regar en la sede B descontaba del bidón de
+  # la sede A. Del que se descuenta lo decide la sala donde se aplica: el de esa sede con el mismo
+  # nombre y unidad (el criterio de `transferir_a!`, que así lo crea), y si no, el del pool.
+  # Nil si esa sede no lo tiene: el riego no se frena, queda como faltante.
+  def equivalente_en(sede)
+    return self if sede.nil? || sede_id == sede.id
+    candidatos = club.insumos.activos.where(unidad_medida: unidad_medida)
+                     .where('LOWER(TRIM(nombre)) = ?', nombre.to_s.strip.downcase)
+                     .order(Arel.sql("CASE WHEN tipo = 'cultivo' THEN 0 ELSE 1 END"), :id)
+    candidatos.find_by(sede_id: sede.id) || (sede_id.nil? ? self : candidatos.find_by(sede_id: nil))
+  end
+
   # Para cuántas aplicaciones más alcanza, según lo que se descontó por riego las últimas
   # veces. Nil si nunca se aplicó con receta: no hay con qué estimar.
   def aplicaciones_estimadas
@@ -193,6 +209,16 @@ class Insumo < ApplicationRecord
   # GG-11" → 1,5 L a cada uno, cada uno con su costo imputado. Atómico.
   # `pesos` ({ lote_id => m² }): reparte en proporción (lo que se le pone a una cama con dos lotes se
   # reparte por los metros que ocupa cada uno). Sin pesos, o con alguno en cero, en partes iguales.
+  # Qué parte de una aplicación le toca a cada lote: por los pesos (los m² en una cama) o, si
+  # alguno falta, en partes iguales. Es la regla del reparto del consumo Y la que lee la nutrición
+  # del lote (`Lotes::Nutricion`): una sola. { lote_id => fracción }.
+  def self.partes_de(lotes, pesos = nil)
+    ps = lotes.map { |l| pesos.to_h[l.id].to_d }
+    ps = Array.new(lotes.size, 1.to_d) if ps.any? { |p| p <= 0 }
+    suma = ps.sum
+    lotes.each_with_index.to_h { |l, i| [l.id, ps[i] / suma] }
+  end
+
   def registrar_consumo_repartido!(cantidad:, created_by:, lotes: [], sala: nil,
                                    fecha: Date.current, notas: nil, registro_ambiental: nil,
                                    cama: nil, cama_registro: nil, pesos: nil)
@@ -207,13 +233,11 @@ class Insumo < ApplicationRecord
       if lotes.empty?
         [registrar_consumo!(cantidad: total, **comunes)]
       else
-        ps = lotes.map { |l| pesos.to_h[l.id].to_d }
-        ps = Array.new(lotes.size, 1.to_d) if ps.any? { |p| p <= 0 }
-        suma = ps.sum
+        partes = Insumo.partes_de(lotes, pesos)
         asignado = 0.to_d
         lotes.each_with_index.map do |lote, i|
           # el último absorbe el redondeo para que la suma sea exacta
-          cant = i == lotes.size - 1 ? (total - asignado) : (total * ps[i] / suma).round(3)
+          cant = i == lotes.size - 1 ? (total - asignado) : (total * partes[lote.id]).round(3)
           asignado += cant
           registrar_consumo!(cantidad: cant, lote: lote, **comunes)
         end

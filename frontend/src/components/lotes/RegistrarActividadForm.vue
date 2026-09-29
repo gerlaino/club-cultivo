@@ -1,5 +1,11 @@
 <template>
   <div class="raf">
+    <!-- El riego y la fertilización tienen UNA puerta (29-sep-2026): el registro de riego, que
+         descuenta del depósito y guarda qué y cuánto. Acá se cargaba texto suelto y la nutrición
+         del lote quedaba sin cantidades. -->
+    <button type="button" class="raf__riego" @click="$emit('riego')">
+      💧 Riego o fertilización <span>abre el registro de riego →</span>
+    </button>
     <div class="raf__row">
       <select v-model="form.categoria" class="raf__sel">
         <option v-for="t in categorias" :key="t.value" :value="t.value">{{ t.emoji }} {{ t.label }}</option>
@@ -22,14 +28,6 @@
       <input v-if="form.medio === 'sustrato'" v-model.trim="form.sustrato" type="text" class="raf__input" maxlength="120" placeholder="¿Qué sustrato? (opcional)" />
     </div>
     <p v-if="form.categoria === 'trasplante' && metodoEnraizado" class="raf__hint">Viene de: {{ metodoEnraizadoLabel(metodoEnraizado) }}</p>
-    <div v-else-if="form.categoria === 'fertilizacion'" class="raf__row">
-      <input v-model="form.producto" type="text" class="raf__input" maxlength="120" placeholder="Producto / fórmula" />
-      <input v-if="!enCama" v-model.number="form.ec" type="number" step="0.1" min="0" class="raf__num" placeholder="EC" />
-    </div>
-    <div v-else-if="form.categoria === 'riego'" class="raf__row">
-      <input v-model.number="form.volumen" type="number" step="0.1" min="0" class="raf__num" placeholder="Volumen (L)" />
-      <input v-if="!enCama" v-model.number="form.ec" type="number" step="0.1" min="0" class="raf__num" placeholder="EC" />
-    </div>
 
     <input v-if="form.categoria !== 'trasplante'" v-model="form.descripcion" type="text"
            class="raf__input" maxlength="200" :placeholder="placeholderDescripcion" @keyup.enter="guardar" />
@@ -53,11 +51,12 @@ const props = defineProps({
   // Plantado en una cama de suelo vivo: sin trasplantes ni EC del riego.
   enCama:          { type: Boolean, default: false },
 })
-const categorias = computed(() => (props.enCama ? CATEGORIAS.filter(c => c.value !== 'trasplante') : CATEGORIAS))
-const emit = defineEmits(['crear', 'trasplante', 'cancelar'])
+const SIN_ACA = ['riego', 'fertilizacion']   // van por el registro de riego (botón de arriba)
+const categorias = computed(() => CATEGORIAS.filter(c => !SIN_ACA.includes(c.value) && !(props.enCama && c.value === 'trasplante')))
+const emit = defineEmits(['crear', 'trasplante', 'cancelar', 'riego'])
 
 const hoy = hoyISO()
-const blank = () => ({ categoria: 'riego', fecha: hoy, descripcion: '', producto: '', ec: null, volumen: null, macetaOrigen: null, macetaDestino: null, medio: props.medioSugerido, sustrato: '' })
+const blank = () => ({ categoria: 'poda', fecha: hoy, descripcion: '', macetaOrigen: null, macetaDestino: null, medio: props.medioSugerido, sustrato: '' })
 const form = ref(blank())
 
 const placeholderDescripcion = computed(() => placeholderFor(form.value.categoria))
@@ -78,13 +77,9 @@ function guardar() {
     form.value = blank()
     return
   }
-  const metadata = {}
-  if (f.ec != null && f.ec !== '')          metadata.ec = Number(f.ec)
-  if (f.volumen != null && f.volumen !== '') metadata.volumen_l = Number(f.volumen)
-  if (f.categoria === 'fertilizacion' && f.producto.trim()) metadata.producto = f.producto.trim()
   emit('crear', {
     tipo: 'actividad', categoria: f.categoria,
-    descripcion: f.descripcion.trim() || null, metadata,
+    descripcion: f.descripcion.trim() || null, metadata: {},
     registrado_en: `${f.fecha}T12:00:00`,
   })
   form.value = blank()
@@ -92,6 +87,8 @@ function guardar() {
 </script>
 
 <style scoped>
+.raf__riego { display: flex; align-items: baseline; justify-content: space-between; gap: .5rem; width: 100%; margin-bottom: .6rem; background: var(--c-sky-100); border: 1px solid var(--c-sky-100); color: var(--c-sky-600); border-radius: 8px; padding: .5rem .75rem; font-size: .82rem; font-weight: 700; cursor: pointer; text-align: left; }
+.raf__riego span { font-weight: 500; font-size: .75rem; }
 .raf { display: flex; flex-direction: column; gap: .5rem; }
 .raf__row { display: flex; gap: .5rem; align-items: center; }
 .raf__sel.raf__sel--medio { flex: 0 0 auto; width: auto; min-width: 190px; }

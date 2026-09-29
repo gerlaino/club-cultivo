@@ -22,6 +22,7 @@ import { em, estadoLoteLabel, verboArranque, sm, pgm, growLabel, metodoEnraizado
   capitalizarFase, phaseBannerMsg, CICLO_BASE, POST_HARVEST_ESTADOS, textoProximoPaso } from '../lib/loteHelpers.js'
 import DesprenderLoteModal  from '../components/lotes/DesprenderLoteModal.vue'
 import LoteHistorialSection from '../components/lotes/LoteHistorialSection.vue'
+import LoteNutricionSection from '../components/lotes/LoteNutricionSection.vue'
 import LoteHistorialModal   from '../components/lotes/LoteHistorialModal.vue'
 import LotePlantasSection   from '../components/lotes/LotePlantasSection.vue'
 import LotePlanVsReal       from '../components/lotes/LotePlanVsReal.vue'
@@ -256,6 +257,7 @@ async function eliminarAnalisis(a) {
 const plantasExpanded   = ref(true)
 const historialExpanded = ref(true)
 const graficosExpanded  = ref(true)
+const nutricionExpanded = ref(true)
 const graficosKey       = ref(0)
 
 // ── Plantas ────────────────────────────────────────────────
@@ -282,6 +284,9 @@ const contextoAsistente = computed(() => lote.value ? {
 
 // ── Registro modal (nuevo) ────────────────────────────────
 const showRegistroModalNew = ref(false)
+// El riego (con o sin fertilización) tiene UNA puerta: el historial abre este modal en Riego.
+const riegoDesdeHistorial = ref(false)
+watch(showRegistroModalNew, v => { if (!v) riegoDesdeHistorial.value = false })
 
 // ── Suelo vivo ────────────────────────────────────────────
 const plantarOpen = ref(false)
@@ -584,6 +589,20 @@ onUnmounted(() => {
             </div>
           </div>
 
+          <!-- Nutrición: qué recibió el lote (productos, cantidades, EC/pH, plata) -->
+          <div class="ld__section ld__section--mt">
+            <button class="ld__section-toggle" @click="nutricionExpanded = !nutricionExpanded">
+              <div class="ld__section-toggle-left">
+                <span class="ld__section-emoji">🧪</span>
+                <span class="ld__section-title">Nutrición</span>
+              </div>
+              <i class="bi ld__chevron" :class="nutricionExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
+            </button>
+            <div v-show="nutricionExpanded" class="ld__section-body">
+              <LoteNutricionSection :lote-id="id" :version="historial" />
+            </div>
+          </div>
+
           <!-- Gráficos ambientales -->
           <div class="ld__section ld__section--mt">
             <button class="ld__section-toggle" @click="graficosExpanded = !graficosExpanded">
@@ -774,6 +793,7 @@ onUnmounted(() => {
       :lote="lote"
       @crear="onCrearEvento"
       @trasplante="onTrasplante"
+      @riego="verHistorialOpen = false; riegoDesdeHistorial = true; showRegistroModalNew = true"
       @editar="onEditarEvento"
       @delete="onDeleteEvento"
     />
@@ -789,6 +809,7 @@ onUnmounted(() => {
     <RegistroLoteModal
       v-model="showRegistroModalNew"
       :lote="lote"
+      :accion-inicial="riegoDesdeHistorial ? 'riego' : null"
       :plants="plantasActivas"
       @saved="loadHistorial(); lotes.fetchOne(id); graficosKey++"
       @alimentar-cama="abrirCama('alimentar')"

@@ -47,12 +47,13 @@
           <button v-if="modo === 'sueltos'" type="button" class="ia__quitar" :aria-label="`Quitar ${l.nombre}`" @click="quitar(l.insumo_id)"><i class="bi bi-x"></i></button>
         </div>
         <div v-if="l.faltante > 0" class="ia__falta">
-          Faltan {{ fmtNum(l.faltante, 3) }} {{ unidadCorta(l.unidad_insumo) }} en el {{ esPersonal ? 'stock' : 'depósito' }}.
-          <div class="ia__falta-ops">
+          <template v-if="l.sin_en_sede">No hay {{ l.nombre }} en el depósito de esta sede: se registra sin descontarlo.</template>
+          <template v-else>Faltan {{ fmtNum(l.faltante, 3) }} {{ unidadCorta(l.unidad_insumo) }} en el {{ esPersonal ? 'stock' : 'depósito' }}.</template>
+          <div v-if="!l.sin_en_sede" class="ia__falta-ops">
             <button type="button" class="ia__modo ia__modo--xs" :class="{ 'ia__modo--on': l.modo_faltante !== 'no_descontar' }" @click="setFaltante(l.insumo_id, 'descontar_disponible')">Descontar lo que hay</button>
             <button type="button" class="ia__modo ia__modo--xs" :class="{ 'ia__modo--on': l.modo_faltante === 'no_descontar' }" @click="setFaltante(l.insumo_id, 'no_descontar')">No descontar este</button>
           </div>
-          <span class="ia__hint">Se registra igual: si la bolsa está en el galpón, cargá la compra después.</span>
+          <span v-if="!l.sin_en_sede" class="ia__hint">Se registra igual: si la bolsa está en el galpón, cargá la compra después.</span>
         </div>
       </div>
     </div>
@@ -75,6 +76,8 @@ const props = defineProps({
   uso:         { type: String, default: null },
   baseDefault: { type: Number, default: null },
   baseAyuda:   { type: String, default: null },
+  // La sala de la cama: los productos salen del depósito de SU sede (el backend los resuelve).
+  salaId:      { type: [Number, String], default: null },
 })
 const emit = defineEmits(['update:modelValue', 'nutricion'])
 const { esPersonal } = useUsoPersonal()
@@ -94,9 +97,10 @@ const recetas = ref([])
 const insumos = ref([])
 onMounted(async () => {
   try {
+    const donde = props.salaId ? { sala_id: props.salaId } : {}
     const [r, i] = await Promise.all([
-      props.uso ? listRecetas(props.uso) : Promise.resolve({ data: [] }),
-      listInsumos({ tipo: 'cultivo', activos: 'true' }),
+      props.uso ? listRecetas(props.uso, donde) : Promise.resolve({ data: [] }),
+      listInsumos({ tipo: 'cultivo', activos: 'true', ...donde }),
     ])
     recetas.value = (r.data || []).filter(x => x.activa !== false)
     insumos.value = i.data?.insumos || i.data || []

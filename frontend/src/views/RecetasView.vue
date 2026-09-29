@@ -540,9 +540,23 @@ async function eliminarNutriente(i) {
 }
 // Una receta nueva ofrece sólo los que están en uso; una que ya tiene uno archivado lo sigue
 // mostrando, o la fila de ese producto quedaba en blanco al editarla.
+// Con varias sedes, el mismo producto (nombre y unidad) está en el depósito de cada una: se ofrece
+// UNA vez. Da igual cuál se guarde: al regar se descuenta el de la sede de la sala (el backend,
+// `Insumo#equivalente_en`, con este mismo criterio).
+const claveProducto = i => `${String(i.nombre || '').trim().toLowerCase()}|${i.unidad_medida}`
 const opcionesDeReceta = computed(() => {
   const enLaReceta = new Set((form.value?.items || []).map(it => it.insumo_id))
-  return todosInsumos.value.filter(i => i.activo !== false || enLaReceta.has(i.id))
+  const porProducto = new Map()
+  for (const i of todosInsumos.value) {
+    if (i.activo === false && !enLaReceta.has(i.id)) continue
+    const k = claveProducto(i)
+    const ya = porProducto.get(k)
+    if (!ya) porProducto.set(k, i)
+    // El que ya está en la receta es el que se muestra (si no, su fila quedaba en blanco).
+    else if (enLaReceta.has(i.id) && !enLaReceta.has(ya.id)) porProducto.set(k, i)
+    else if (enLaReceta.has(i.id)) porProducto.set(`${k}#${i.id}`, i)
+  }
+  return [...porProducto.values()]
 })
 
 const reactivando = ref(null)

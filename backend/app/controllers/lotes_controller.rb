@@ -2,7 +2,7 @@ class LotesController < ApplicationController
   before_action :authenticate_user!
   before_action -> { require_feature!(:cultivo) }
   before_action :require_admin_cultivador_o_manicura
-  before_action :set_lote, only: [:show, :trazabilidad, :resumen_ciclo, :update, :completar_datos, :destroy, :transiciones, :avanzar_fase, :cosechar_plantas, :timeline, :historial, :asignar_manicurador, :devolver_manicura, :reevaluar_manicura, :registrar_trasplante, :desprender, :plantar_en_cama, :preview_plan, :aplicar_plan]
+  before_action :set_lote, only: [:show, :trazabilidad, :resumen_ciclo, :nutricion, :update, :completar_datos, :destroy, :transiciones, :avanzar_fase, :cosechar_plantas, :timeline, :historial, :asignar_manicurador, :devolver_manicura, :reevaluar_manicura, :registrar_trasplante, :desprender, :plantar_en_cama, :preview_plan, :aplicar_plan]
   before_action :require_export_role!, only: [:export_csv]
   before_action :set_sala, only: [:index, :create], if: -> { params[:sala_id].present? }
 
@@ -77,6 +77,12 @@ class LotesController < ApplicationController
   def resumen_ciclo
     render json: Lotes::ResumenCiclo.new(@lote, url_helper: ->(att) { url_for(att) },
                                          con_costo: current_user.admin? || current_user.supervisor?).call
+  end
+
+  # GET /lotes/:id/nutricion — qué recibió el lote: aplicaciones, totales por producto y por
+  # fase, EC/pH por semana. La plata, como en «Cómo salió», sólo para administración.
+  def nutricion
+    render json: Lotes::Nutricion.new(@lote, con_costo: current_user.admin? || current_user.supervisor?).call
   end
 
   # GET /lotes/por_qr/:codigo_qr
@@ -1047,6 +1053,7 @@ class LotesController < ApplicationController
       end
     end
 
+    nutri = Lotes::Nutricion.new(@lote)
     @lote.registros_ambientales.includes(:user).find_each do |r|
       chips = []
       chips << "#{r.temperatura}°C" if r.temperatura
@@ -1054,7 +1061,14 @@ class LotesController < ApplicationController
       chips << "pH #{r.ph}"         if r.ph
       chips << "EC #{r.ec}"         if r.ec
       if (n = r.nutricion.presence)
-        chips << "#{n['receta_nombre'] || 'productos sueltos'} · #{n['litros'].to_f.round(1)} L#{n['costo_ars'].to_f.positive? ? " · $#{n['costo_ars'].to_f.round(0)}" : ''}"
+        # Lo que recibió ESTE lote (su parte si se regó la sala entera) y, por producto, la
+        # salvedad si no salió del depósito (`Lotes::Nutricion`).
+        parte = nutri.parte_de_copia(n, @lote.id)
+        prods = nutri.productos_de_copia(n, @lote.id).map { |p| Lotes::Nutricion.linea_producto(p) }
+        chips << ["#{n['receta_nombre'] || 'productos sueltos'} · #{Lotes::Nutricion.num(n['litros'].to_f * parte)} L" \
+                  "#{parte < 1 ? ' (su parte de la sala)' : ''}" \
+                  "#{n['costo_ars'].to_f.positive? ? " · $#{(n['costo_ars'].to_f * parte).round(0)}" : ''}",
+                  prods.join(', ').presence].compact.join(': ')
       elsif r.fertilizacion
         chips << "fertilización#{r.notas_fertilizacion.present? ? " (#{r.notas_fertilizacion})" : ''}"
       end

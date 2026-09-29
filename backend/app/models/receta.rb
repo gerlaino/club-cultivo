@@ -3,7 +3,7 @@
 # opcionales, para comparar con lo medido.
 #
 # Es del club (no de una sede): la receta es conocimiento; el depósito del que se descuenta lo
-# decide la sala donde se aplica. Sin plantillas «de fábrica»: cada marca tiene su tabla.
+# decide la sala donde se aplica (`Insumo#equivalente_en`). Sin plantillas «de fábrica»: cada marca tiene su tabla.
 class Receta < ApplicationRecord
   self.table_name = 'recetas'   # el inflector no conoce «receta»: sin esto busca la tabla «receta»
   include Transmite
@@ -49,11 +49,13 @@ class Receta < ApplicationRecord
 
   scope :de_uso, ->(uso) { where(uso: uso) }
 
-  # Cuánto de cada producto para N (litros de agua, m² o litros de suelo, según el uso).
-  def calcular(litros)
+  # Cuánto de cada producto para N (litros de agua, m² o litros de suelo, según el uso). Con
+  # `sede:`, `insumo` es el de esa sede (`Insumo#equivalente_en`; nil si allá no lo hay).
+  def calcular(litros, sede: nil)
     l = litros.to_d
     receta_items.includes(:insumo).map do |it|
-      { insumo_id: it.insumo_id, nombre: it.insumo.nombre, dosis: it.dosis, unidad: it.unidad,
+      { insumo_id: it.insumo_id, insumo: it.insumo.equivalente_en(sede),
+        nombre: it.insumo.nombre, dosis: it.dosis, unidad: it.unidad,
         cantidad: (it.dosis.to_d * l * it.factor_a_insumo).round(3), unidad_insumo: it.insumo.unidad_medida }
     end
   end

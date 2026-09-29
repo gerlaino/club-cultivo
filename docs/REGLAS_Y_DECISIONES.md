@@ -338,6 +338,28 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   por producto (descontar lo que hay / no descontar), nunca se frena el riego. Dosis sólo en
   ml/L y g/L. «Fertilizó sin especificar» es válido y no toca el depósito. En uso personal el
   depósito se llama «Mis nutrientes» y comprar es un gasto (dos puertas, un solo asiento).
+- **LA RECETA ES DE LA ORGANIZACIÓN; DESCUENTA DEL DEPÓSITO DE LA SEDE DONDE SE APLICA** (29-sep-2026).
+  Cada `RecetaItem` apunta a UNA fila de insumo (de una sede), y regar en otra sede descontaba de
+  la primera. Ahora `Insumo#equivalente_en(sede)` resuelve el mismo producto en la sede de la sala
+  (nombre sin mayúsculas/espacios + unidad, el criterio de `transferir_a!`; si no, el del pool sin
+  sede). Si esa sede no lo tiene: faltante `sin_en_sede`, no se descuenta NADA de otra sede y el
+  riego se registra igual. Lo usan las cuatro puertas (`Nutricion::Aplicar`). La pantalla de riego
+  pide `/recetas` e `/insumos` con `?sala_id=`/`?lote_id=` y ve el id y el stock de SU sede; el
+  selector de Recetas ofrece cada producto una vez. Nunca descontar de otra sede «porque había».
+- **LO QUE RECIBIÓ UN LOTE LO SUMA UNO SOLO: `Lotes::Nutricion`** (29-sep-2026). Lo leen la sección
+  «Nutrición» de la ficha, el chip del historial, la trazabilidad y la comparativa
+  (`Analitica::Nutricion`, Analítica → Nutrición). Cuenta lo APLICADO (la copia), no lo descontado;
+  lo que no salió del depósito lleva `motivo` en la copia (`sin_en_sede`/`sin_stock`/
+  `no_descontar`) y se dice «sin descontar: …», nunca «0 ml» ni «no se usó» (la app no lo sabe).
+  Lo compartido cuenta la PARTE del lote con la misma regla que el costo (`Insumo.partes_de`:
+  iguales en un riego de sala, m² en la cama; viaja en la copia como `lotes[].parte`). Lo cargado
+  como texto entra «sin cantidades»: no se inventan números. La semana es de la FASE (V3, F2):
+  los lotes se comparan alineados al arranque de la floración. Los litros son los de la solución
+  preparada; el agua sola es texto y no se suma. La plata, sólo admin/supervisor.
+- **EL RIEGO Y LA FERTILIZACIÓN TIENEN UNA SOLA PUERTA** (29-sep-2026): el registro de riego
+  (`RiegoForm`). «Registrar actividad» del historial ya no ofrece Riego ni Fertilización (cargaba
+  texto suelto en `LoteEvento` y la nutrición quedaba sin cantidades): abre el registro de riego.
+  Lo viejo se sigue viendo, «sin cantidades».
 - **TODO MODELO DE DOMINIO NUEVO LLEVA `include Transmite` + `transmite_como '<recurso>'`**
   (20-sep-2026), y toda pantalla nueva que pida directo a la API se anota con
   `useRecargaEnCambios`. Es lo que hace que lo que uno registra se vea en todos lados sin

@@ -27,7 +27,7 @@
     </div>
 
     <label class="cm-check"><input v-model="conTe" type="checkbox" /> Le di té con el riego</label>
-    <InsumosAplicados v-if="conTe" v-model="insumos" uso="riego" :base-default="litros || null"
+    <InsumosAplicados v-if="conTe" :key="camaId" v-model="insumos" uso="riego" :sala-id="cama?.sala_id" :base-default="litros || null"
                       base-ayuda="Litros de té preparados (si fue todo el riego, los mismos)." @nutricion="n => (nutricion = n)" />
 
     <p class="cm-hint">

@@ -72,6 +72,8 @@ Rails.application.routes.draw do
       get :fases
       get :donde_y_como
       get :costo
+      get :nutricion             # qué recibió cada lote y cómo rindió: 2 a 4 lotes lado a lado
+      get :nutricion_lotes       # los lotes con alguna fertilización, para elegir cuáles comparar
       get :prendimiento          # % de esquejes/plántulas que enraizaron, global y por genética
       get :dispensador
       get :pl_lotes
@@ -162,6 +164,8 @@ Rails.application.routes.draw do
       member { get :trazabilidad }
       # «Cómo salió»: el resumen del ciclo cuando termina (`Lotes::ResumenCiclo`).
       member { get :resumen_ciclo }
+      # «¿Qué recibió este lote?»: cada aplicación de nutrientes y los totales (`Lotes::Nutricion`).
+      member { get :nutricion }
       collection do
         get :export_csv
         get :proximo_codigo

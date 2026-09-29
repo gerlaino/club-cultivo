@@ -108,7 +108,7 @@
                   <p v-if="accionId === 'riego' && sala?.camas?.length" class="rsm__cama-hint">
                     🧱 En suelo vivo el riego va por cama: para regar una sola, «Regar» en su tarjeta. Esto riega todos los lotes del {{ esPersonal ? 'espacio' : 'cuarto' }}.
                   </p>
-                  <RiegoForm     v-if="accionId === 'riego'"     v-model="formData.riego" :suelo-vivo="todoEnCamas" />
+                  <RiegoForm     v-if="accionId === 'riego'"     v-model="formData.riego" :suelo-vivo="todoEnCamas" :sala-id="sala?.id" />
                   <PodaForm      v-if="accionId === 'poda'"      v-model="formData.poda" :total-plantas="sala?.plantas_totales" />
                   <PlagasForm    v-if="accionId === 'plagas'"    v-model="formData.plagas" />
                   <AmbientalForm v-if="accionId === 'ambiental'" v-model="formData.ambiental" />

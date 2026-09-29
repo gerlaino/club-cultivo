@@ -184,7 +184,9 @@ function descripcion(r) {
   const partes = []
   if (r.detalle) partes.push(r.detalle)
   const items = r.nutricion?.items || []
-  if (items.length) partes.push(items.map(i => `${i.nombre} ${fmtNum(i.descontado ?? i.cantidad, 3)} ${unidadCorta(i.unidad)}`).join(', '))
+  // Lo APLICADO, con la salvedad si no salió del depósito (antes se leía «0 g»).
+  if (items.length) partes.push(items.map(i => `${i.nombre} ${fmtNum(i.cantidad ?? i.descontado, 3)} ${unidadCorta(i.unidad)}` +
+    (i.descontado != null && Number(i.descontado) < Number(i.cantidad) ? ' (sin descontar)' : '')).join(', '))
   if (r.nutricion?.receta_nombre) partes.push(`receta «${r.nutricion.receta_nombre}»`)
   if (r.litros) partes.push(`${fmtNum(r.litros)} L`)
   if (r.agua) partes.push(`agua ${aguaLabel(r.agua).toLowerCase()}`)

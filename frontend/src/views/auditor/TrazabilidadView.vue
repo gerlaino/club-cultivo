@@ -445,6 +445,11 @@
                 <span class="trz__field-lbl">Nutrición ({{ data.aplicaciones.nutricion.veces }} aplicaciones)</span>
                 <span class="trz__field-val">{{ data.aplicaciones.nutricion.productos.join(' · ') }}</span>
               </div>
+              <!-- Cuánto de cada producto en todo el ciclo (lo cargado con receta o productos sueltos). -->
+              <div class="trz__field" v-if="data.aplicaciones.nutricion?.totales?.length">
+                <span class="trz__field-lbl">Total aplicado</span>
+                <span class="trz__field-val">{{ data.aplicaciones.nutricion.totales.map(p => `${p.nombre} ${cant(p.cantidad)} ${UNIDAD_CORTA[p.unidad] || p.unidad}`).join(' · ') }}</span>
+              </div>
               <div class="trz__field" v-if="data.aplicaciones.nutricion?.enraizantes?.length">
                 <span class="trz__field-lbl">Enraizante</span>
                 <span class="trz__field-val">{{ data.aplicaciones.nutricion.enraizantes.join(' · ') }}</span>
@@ -474,6 +479,7 @@
                   <span class="trz__detalle-fecha">{{ fecha(r.fecha) }}</span>
                   <span class="trz__detalle-cuerpo">
                     <span v-if="r.actividades?.length">{{ r.actividades.map(actividadLabel).join(', ') }}</span>
+                    <span v-if="r.receta"> · {{ r.receta }}<template v-if="r.productos?.length">: {{ r.productos.join(', ') }}</template></span>
                     <span v-if="r.fertilizacion"> · {{ r.fertilizacion }}</span>
                     <span v-if="r.fitosanitario" class="trz__detalle-fito"> · {{ r.fitosanitario }}</span>
                     <span v-if="r.plagas"> · plaga: {{ r.plagas }}</span>
@@ -698,7 +704,10 @@ const fecha = (f) => {
   return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 const UNIDAD_CORTA = { mililitro: 'ml', gramo: 'g', litro: 'L', kilogramo: 'kg', unidad: 'un' }
-const cantidadSuelo = (i) => `${Number(i.descontado ?? i.cantidad).toLocaleString('es-AR', { maximumFractionDigits: 3 })} ${UNIDAD_CORTA[i.unidad] || i.unidad || ''}`
+const cant = (v) => Number(v || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })
+// Lo APLICADO, no lo descontado: un producto que no salió del depósito se veía como «0 g».
+const cantidadSuelo = (i) => `${Number(i.cantidad ?? i.descontado).toLocaleString('es-AR', { maximumFractionDigits: 3 })} ${UNIDAD_CORTA[i.unidad] || i.unidad || ''}` +
+  (i.descontado != null && Number(i.descontado) < Number(i.cantidad) ? ' (sin descontar)' : '')
 
 const query       = ref('')
 const loading     = ref(false)

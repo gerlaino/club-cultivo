@@ -43,6 +43,8 @@ module Lotes
 
     attr_reader :lote
 
+    def nutri = @nutri ||= Lotes::Nutricion.new(lote, con_costo: false)
+
     def vacio = { registros: 0, actividades: {}, nutricion: {}, fitosanitarios: [], plagas: [], detalle: [] }
 
     def suelo_del_ciclo
@@ -68,6 +70,10 @@ module Lotes
           temperatura:    r.temperatura&.to_f,
           humedad:        r.humedad&.to_f,
           fertilizacion:  r.notas_fertilizacion.presence,
+          # Con receta o productos sueltos: qué y cuánto recibió el lote en ese riego, con la
+          # salvedad si no salió del depósito (`Lotes::Nutricion`).
+          receta:         r.nutricion.presence && (r.nutricion['receta_nombre'] || 'Productos sueltos'),
+          productos:      (nutri.productos_de_copia(r.nutricion, lote.id).map { |p| Lotes::Nutricion.linea_producto(p) } if r.nutricion.present?),
           fitosanitario:  r.fitosanitario.presence,
           plagas:         (r.plagas_observadas if r.plagas_observadas.present? && r.plagas_observadas != 'ninguna'),
           observaciones:  r.observaciones.presence,
@@ -95,6 +101,8 @@ module Lotes
         productos: (con_fert.filter_map { |r| r.notas_fertilizacion.presence&.strip } +
                     registros.flat_map { |r| Array(r.nutricion.to_h['items']).map { |i| i['nombre'] } }).compact.uniq,
         enraizantes: registros.filter_map { |r| r.producto_enraizante.presence&.strip }.uniq,
+        # Cuánto de cada uno recibió el lote en todo el ciclo (lo que tiene cantidades).
+        totales:   nutri.call[:totales][:productos],
       }
     end
 

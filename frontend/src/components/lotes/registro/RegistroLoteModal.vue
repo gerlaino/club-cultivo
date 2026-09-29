@@ -91,7 +91,7 @@
                   <span>{{ getAccion(accionId)?.emoji }} {{ getAccion(accionId)?.label }}</span>
                 </div>
                 <div class="rls__seccion-body">
-                  <RiegoForm      v-if="accionId === 'riego'"     v-model="formData.riego" :suelo-vivo="!!lote?.en_cama" />
+                  <RiegoForm      v-if="accionId === 'riego'"     v-model="formData.riego" :suelo-vivo="!!lote?.en_cama" :lote-id="lote?.id" />
                   <PodaForm       v-if="accionId === 'poda'"      v-model="formData.poda" :total-plantas="lote?.plants_count" />
                   <PlagasForm     v-if="accionId === 'plagas'"    v-model="formData.plagas" />
                   <AmbientalForm  v-if="accionId === 'ambiental'" v-model="formData.ambiental" :estado-lote="lote?.estado" />
