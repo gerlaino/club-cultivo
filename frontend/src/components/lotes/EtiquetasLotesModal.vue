@@ -4,7 +4,7 @@ import { listPlants } from '../../lib/api.js'
 import { em } from '../../lib/loteHelpers.js'
 import { useClubStore } from '../../stores/club.js'
 import { useToast } from '../../composables/useToast.js'
-import { useEtiquetasQR } from '../../composables/useEtiquetasQR.js'
+import { useEtiquetasQR, ordenarItems } from '../../composables/useEtiquetasQR.js'
 import BloqueoProgreso from '../ui/BloqueoProgreso.vue'
 import { LAYOUT_LOTE, dibujarEtiquetaLote, LAYOUT_PLANTA, dibujarBanderitaPlanta } from '../../lib/pdfEtiquetas.js'
 
@@ -111,10 +111,31 @@ function config() {
     },
   }
 
-  const tandas = [conLotes.value && tandaLotes, conPlantas.value && tandaPlantas].filter(Boolean)
   const n = props.lotes.length
   const que = conLotes.value && conPlantas.value ? 'lotes-y-plantas' : conLotes.value ? 'lotes' : 'plantas'
-  return { tandas, archivo: `etiquetas-${que}-${n}-${n === 1 ? 'lote' : 'lotes'}` }
+  const archivo = `etiquetas-${que}-${n}-${n === 1 ? 'lote' : 'lotes'}`
+
+  // Con las dos cosas: intercalado y de corrido (decisión de Germán, 29-sep) — la etiqueta del
+  // lote, las de sus plantas, el lote siguiente. Es lo más claro con cualquier papel: se corta y
+  // cada lote queda junto. Un lote sin QR no lleva etiqueta pero sus plantas salen en su lugar.
+  if (conLotes.value && conPlantas.value) {
+    const plantasDe = new Map()
+    for (const p of plantasConQR.value) {
+      const id = p.lote?.id
+      if (!plantasDe.has(id)) plantasDe.set(id, [])
+      plantasDe.get(id).push(p)
+    }
+    const secuencia = []
+    for (const l of ordenarItems(props.lotes, (x) => [x.codigo ?? ''])) {
+      const suyas = ordenarItems(plantasDe.get(l.id) || [], tandaPlantas.ordenPor)
+      if (l.codigo_qr) secuencia.push({ item: l, pieza: tandaLotes, pegadoAlSiguiente: suyas.length > 0 })
+      for (const p of suyas) secuencia.push({ item: p, pieza: tandaPlantas })
+    }
+    return { secuencia, archivo }
+  }
+
+  // Una sola cosa: su plancha de siempre (9 lotes por hoja apaisada, 10 banderitas por vertical).
+  return { tandas: [conLotes.value ? tandaLotes : tandaPlantas], archivo }
 }
 
 async function imprimir() {
@@ -171,8 +192,8 @@ function cerrar() { if (!etiquetas.ocupado.value) emit('close') }
           </label>
 
           <p v-if="conLotes && conPlantas" class="elm__nota">
-            Salen en un solo PDF: primero los lotes (A4 apaisada), después las plantas (A4 vertical),
-            lote por lote.
+            Salen de corrido: la etiqueta de cada lote y debajo las de sus plantas, después el lote
+            siguiente.
           </p>
         </div>
 

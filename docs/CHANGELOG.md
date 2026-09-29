@@ -4,12 +4,16 @@
 
 - En `/lotes`, «Imprimir etiquetas» abre un modal (`EtiquetasLotesModal`) con dos tildes:
   **etiquetas de los lotes** y **banderitas de sus plantas**, con cuántas va a imprimir de cada una.
-  Sale un solo PDF: primero los lotes (A4 apaisada) y después las plantas (A4 vertical), lote por
-  lote. Cada tipo de etiqueta arranca en hoja nueva, porque suelen ir en papel distinto.
+  Con los dos tildes sale **intercalado y de corrido** en A4 vertical (decisión de Germán, 29-sep:
+  «qr del lote, qrs de sus plantas, y así»; el papel depende de cada organización): la etiqueta del
+  lote, debajo las de sus plantas, el lote siguiente. Ninguna etiqueta se parte entre dos hojas, y
+  la del lote no queda sola al pie: si no entra con su primera planta, pasa con ellas a la hoja
+  siguiente. Con un solo tilde sale la plancha de siempre (9 lotes apaisada / 10 banderitas).
 - **Las descartadas no se imprimen; las cosechadas sí** (decisión de Germán, 29-sep: para
   reimprimir los QR de un lote cosechado). Se avisa cuántas quedan afuera y cuántas no tienen QR.
-- `useEtiquetasQR` acepta `tandas` (varios tipos de etiqueta en el mismo PDF); el config de un
-  solo tipo sigue funcionando igual. `GET /plants` acepta `lote_ids[]`, con el mismo alcance que la
+- `useEtiquetasQR` acepta `secuencia` (piezas de distinto alto de corrido, con
+  `pegadoAlSiguiente`) y `tandas` (varias planchas en hojas aparte); el config de un solo tipo
+  sigue funcionando igual. `GET /plants` acepta `lote_ids[]`, con el mismo alcance que la
   lista de lotes.
 
 ## Septiembre 2026 (dh) — Perfil con solapas; la contraseña se cambia sin la actual

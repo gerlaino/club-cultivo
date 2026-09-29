@@ -143,6 +143,12 @@ describe('la tanda no pierde etiquetas', () => {
 
   it('si no hay ítems no genera nada', async () => {
     const et = useEtiquetasQR()
+    const r  = await et.descargar(() => ({ secuencia: [] }))
+    expect(r).toMatchObject({ ok: false, vacio: true })
+  })
+
+  it('si no hay ítems (una sola pieza) no genera nada', async () => {
+    const et = useEtiquetasQR()
     const r  = await et.descargar(configPlantas([]))
     expect(r).toMatchObject({ ok: false, vacio: true })
     expect(guardados).toHaveLength(0)
@@ -242,5 +248,69 @@ describe('la plancha sale ordenada por lote y número', () => {
     }))
     expect(imagenes.map(i => i.data.split('/l/')[1]))
       .toEqual(['L-26-009', 'L-26-048', 'L-26-061', 'L-26-100'])
+  })
+})
+
+// Lote, sus plantas, el lote siguiente — de corrido en A4 vertical (AC de Germán, 29-sep). Lo que
+// no puede pasar: una etiqueta partida entre dos hojas, o la del lote sola al pie de una hoja y
+// sus plantas en la siguiente.
+describe('de corrido: lote, sus plantas, el lote siguiente', () => {
+  beforeEach(() => { imagenes.length = 0; guardados.length = 0; paginas.n = 1 })
+
+  // Piezas con el alto real de cada layout, que anotan dónde se dibujaron.
+  const dibujadas = []
+  const pieza = (layout, tipo) => ({
+    layout, urlDe: (x) => `https://x/${x.id}`, datosDe: (x) => x,
+    dibujar: (_doc, x, y, d) => dibujadas.push({ id: d.id, tipo, y, alto: layout.alto, pagina: paginas.n }),
+  })
+  const LOTE   = pieza(LAYOUT_LOTE, 'lote')
+  const PLANTA = pieza(LAYOUT_PLANTA, 'planta')
+  const lote   = (id, conPlantas = true) => ({ item: { id }, pieza: LOTE, pegadoAlSiguiente: conPlantas })
+  const planta = (id) => ({ item: { id }, pieza: PLANTA })
+
+  async function generar(secuencia) {
+    dibujadas.length = 0
+    const et = useEtiquetasQR()
+    const r = await et.descargar(() => ({ secuencia, archivo: 'corrido' }))
+    return { r, et }
+  }
+
+  it('respeta el orden dado y todo va en A4 vertical', async () => {
+    const { r, et } = await generar([lote('A'), planta('A1'), planta('A2'), lote('B'), planta('B1')])
+    expect(r.ok).toBe(true)
+    expect(dibujadas.map(d => d.id)).toEqual(['A', 'A1', 'A2', 'B', 'B1'])
+    expect(et.total.value).toBe(5)
+    expect(orientaciones.every(o => o === 'portrait')).toBe(true)
+  })
+
+  it('ninguna etiqueta queda partida entre dos hojas', async () => {
+    const seq = []
+    for (const l of ['A', 'B', 'C', 'D']) {
+      seq.push(lote(l))
+      for (let i = 1; i <= 6; i++) seq.push(planta(`${l}${i}`))
+    }
+    await generar(seq)
+
+    expect(dibujadas).toHaveLength(28)
+    expect(paginas.n).toBeGreaterThan(1)
+    // A4 = 297mm de alto, 8mm de margen.
+    for (const d of dibujadas) expect(d.y + d.alto).toBeLessThanOrEqual(297 - 8)
+  })
+
+  it('la etiqueta del lote no queda sola al pie: pasa a la hoja siguiente con su primera planta', async () => {
+    // 7 banderitas dejan lugar para la etiqueta del lote (60mm) pero no para ella + una banderita.
+    const sueltas = Array.from({ length: 7 }, (_, i) => planta(`X${i}`))
+    await generar([...sueltas, lote('B'), planta('B1')])
+
+    const b  = dibujadas.find(d => d.id === 'B')
+    const b1 = dibujadas.find(d => d.id === 'B1')
+    expect(b.pagina).toBe(2)
+    expect(b1.pagina).toBe(2)
+  })
+
+  it('un lote sin plantas sí puede ir al pie de la hoja', async () => {
+    const sueltas = Array.from({ length: 7 }, (_, i) => planta(`X${i}`))
+    await generar([...sueltas, lote('B', false)])
+    expect(dibujadas.find(d => d.id === 'B').pagina).toBe(1)
   })
 })

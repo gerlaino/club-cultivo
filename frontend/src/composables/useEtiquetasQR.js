@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
 import { useQRCode } from './useQRCode.js'
-import { grillaDe, A4 } from '../lib/pdfEtiquetas.js'
+import { grillaDe, A4, FLUJO } from '../lib/pdfEtiquetas.js'
 
 /**
  * Etiquetas QR en tanda (plantas o lotes) → **PDF**, con progreso y bloqueo de pantalla.
@@ -30,7 +30,7 @@ import { grillaDe, A4 } from '../lib/pdfEtiquetas.js'
 const COLLATOR = new Intl.Collator('es', { numeric: true, sensitivity: 'base' })
 
 /** Ordena una copia por la clave compuesta que devuelve `ordenPor` (ej: [lote, nombre]). */
-function ordenarItems(items, ordenPor) {
+export function ordenarItems(items, ordenPor) {
   if (typeof ordenPor !== 'function') return items
   return [...items].sort((a, b) => {
     const ka = ordenPor(a) || [], kb = ordenPor(b) || []
@@ -53,13 +53,44 @@ export function useEtiquetasQR() {
   const titulo = computed(() =>
     accion.value === 'descargar' ? 'Generando el PDF…' : 'Generando etiquetas…')
 
-  // El config trae los ítems de UNA pieza, o `tandas`: varias piezas en el mismo PDF (las etiquetas
-  // de los lotes y las banderitas de sus plantas). Devuelve null si no queda nada para etiquetar.
+  // El config trae una de tres formas. Devuelve null si no queda nada para etiquetar.
+  //  · los ítems de UNA pieza (items + layout…): una plancha en grilla.
+  //  · `tandas`: varias piezas, cada una en su grilla y en hojas aparte.
+  //  · `secuencia`: piezas distintas DE CORRIDO y en el orden dado — la etiqueta del lote, sus
+  //    plantas, el lote siguiente. Cada entrada es { item, pieza, pegadoAlSiguiente? }.
   async function resolver(config) {
     const cfg = typeof config === 'function' ? await config() : config
     if (!cfg) return null
+    if (cfg.secuencia) return cfg.secuencia.length ? cfg : null
     const tandas = (cfg.tandas || [cfg]).filter(t => t?.items?.length)
     return tandas.length ? { ...cfg, tandas } : null
+  }
+
+  // De corrido, una pieza debajo de la otra. Dos reglas de corte de hoja:
+  //  · ninguna etiqueta se parte entre dos hojas: si no entra entera, va a la siguiente;
+  //  · `pegadoAlSiguiente` (la etiqueta del lote) no queda sola al pie de la hoja: si abajo no entra
+  //    también la primera de sus plantas, pasa con ellas a la hoja siguiente.
+  async function construirSecuencia(doc, secuencia) {
+    const pagina = A4[FLUJO.orientacion]
+    const limite = pagina.alto - FLUJO.margen
+    let y = FLUJO.margen
+
+    for (let i = 0; i < secuencia.length; i++) {
+      const { item, pieza, pegadoAlSiguiente } = secuencia[i]
+      const siguiente = secuencia[i + 1]
+      let necesita = pieza.layout.alto
+      if (pegadoAlSiguiente && siguiente) necesita += FLUJO.gap + siguiente.pieza.layout.alto
+
+      if (y > FLUJO.margen && y + necesita > limite) {
+        doc.addPage('a4', FLUJO.orientacion)
+        y = FLUJO.margen
+      }
+
+      const qr = await generatePNG(pieza.urlDe(item), pieza.layout.qr)
+      pieza.dibujar(doc, FLUJO.margen, y, pieza.datosDe(item, qr))
+      y += pieza.layout.alto + FLUJO.gap
+      hechas.value++
+    }
   }
 
   /**
@@ -74,8 +105,16 @@ export function useEtiquetasQR() {
    * Cada tanda arranca en hoja nueva y con SU orientación (la etiqueta de lote va apaisada, la
    * banderita vertical): nunca se mezclan dos piezas en la misma hoja, que suelen ir en papel distinto.
    */
-  async function construirPdf({ tandas }) {
+  async function construirPdf({ tandas, secuencia }) {
     const { jsPDF } = await import('jspdf')
+
+    if (secuencia) {
+      hechas.value = 0
+      total.value  = secuencia.length
+      const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: FLUJO.orientacion })
+      await construirSecuencia(doc, secuencia)
+      return doc
+    }
 
     const ordenadas = tandas.map(t => ({ ...t, items: ordenarItems(t.items, t.ordenPor) }))
     hechas.value = 0

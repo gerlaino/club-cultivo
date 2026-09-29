@@ -20,7 +20,8 @@ vi.mock('../stores/club.js', () => ({
 // Se captura el config que la pantalla le pasa al generador: lo que importa es QUÉ se manda a
 // imprimir, no cómo dibuja jsPDF (eso lo cubre etiquetasTanda.test.js).
 let configPedido = null
-vi.mock('../composables/useEtiquetasQR.js', () => ({
+vi.mock('../composables/useEtiquetasQR.js', async (original) => ({
+  ...(await original()),
   useEtiquetasQR: () => ({
     ocupado: ref(false), titulo: computed(() => ''), hechas: ref(0), total: ref(0),
     imprimir:  async (cfg) => { configPedido = await cfg(); return { ok: true } },
@@ -54,7 +55,9 @@ async function montar(lotes) {
 
 const botonImprimir = () => $$('.elm__btn--main')[0]
 const checks = () => $$('.elm__opt input[type=checkbox]')
-const nombresPlantas = () => configPedido.tandas.find(t => t.layout.orientacion === 'portrait').items.map(p => p.nombre)
+// Lo que sale, en orden: 'LOTE L-26-001', 'L-26-001-P001', …
+const secuencia = () => configPedido.secuencia.map(({ item }) => item.nombre ?? `LOTE ${item.codigo}`)
+const nombresPlantas = () => secuencia().filter(s => !s.startsWith('LOTE'))
 
 describe('EtiquetasLotesModal', () => {
   beforeEach(() => {
@@ -70,15 +73,52 @@ describe('EtiquetasLotesModal', () => {
     expect(listPlants).toHaveBeenCalledWith({ lote_ids: [1, 2] })
   })
 
-  it('un lote: salen su etiqueta y las banderitas de sus plantas, en ese orden', async () => {
+  it('un lote: sale su etiqueta y debajo las de sus plantas, en orden', async () => {
     listPlants.mockResolvedValue({ data: [planta(2, LOTE_A, 'floracion'), planta(1, LOTE_A, 'floracion')] })
     await montar([LOTE_A])
 
     botonImprimir().click(); await tick()
 
-    expect(configPedido.tandas.map(t => t.layout.orientacion)).toEqual(['landscape', 'portrait'])
-    expect(configPedido.tandas[0].items.map(l => l.codigo)).toEqual(['L-26-001'])
-    expect(nombresPlantas()).toEqual(expect.arrayContaining(['L-26-001-P001', 'L-26-001-P002']))
+    expect(secuencia()).toEqual(['LOTE L-26-001', 'L-26-001-P001', 'L-26-001-P002'])
+    // La etiqueta del lote no queda sola al pie de una hoja: va pegada a su primera planta.
+    expect(configPedido.secuencia[0].pegadoAlSiguiente).toBe(true)
+  })
+
+  // AC (Germán, 29-sep): «qr del lote, qr de las plantas de ese lote, y así sucesivamente».
+  it('varios lotes: intercalados, cada lote seguido de SUS plantas', async () => {
+    // Llegan mezcladas y con los lotes elegidos en otro orden.
+    listPlants.mockResolvedValue({ data: [
+      planta(4, LOTE_B, 'cosechado'), planta(1, LOTE_A, 'floracion'),
+      planta(3, LOTE_B, 'cosechado'), planta(2, LOTE_A, 'floracion'),
+    ] })
+    await montar([LOTE_B, LOTE_A])
+
+    botonImprimir().click(); await tick()
+
+    expect(secuencia()).toEqual([
+      'LOTE L-26-001', 'L-26-001-P001', 'L-26-001-P002',
+      'LOTE L-26-002', 'L-26-002-P003', 'L-26-002-P004',
+    ])
+  })
+
+  it('un lote sin plantas sale igual, y no se pega a las del lote siguiente', async () => {
+    listPlants.mockResolvedValue({ data: [planta(1, LOTE_B, 'cosechado')] })
+    await montar([LOTE_A, LOTE_B])
+
+    botonImprimir().click(); await tick()
+
+    expect(secuencia()).toEqual(['LOTE L-26-001', 'LOTE L-26-002', 'L-26-002-P001'])
+    expect(configPedido.secuencia[0].pegadoAlSiguiente).toBe(false)
+  })
+
+  it('un lote sin QR no lleva etiqueta, pero sus plantas salen en su lugar', async () => {
+    const sinQR = { ...LOTE_A, codigo_qr: null }
+    listPlants.mockResolvedValue({ data: [planta(1, sinQR, 'floracion'), planta(2, LOTE_B, 'floracion')] })
+    await montar([sinQR, LOTE_B])
+
+    botonImprimir().click(); await tick()
+
+    expect(secuencia()).toEqual(['L-26-001-P001', 'LOTE L-26-002', 'L-26-002-P002'])
   })
 
   it('las descartadas quedan afuera y las cosechadas entran', async () => {
@@ -95,18 +135,7 @@ describe('EtiquetasLotesModal', () => {
     expect(nombresPlantas()).toEqual(['L-26-001-P001', 'L-26-002-P003'])
   })
 
-  // Semántica por lote: si SÓLO UNO de los lotes elegidos tiene plantas, esas salen igual.
-  it('varios lotes y sólo uno con plantas: salen las de ese lote y las etiquetas de los dos', async () => {
-    listPlants.mockResolvedValue({ data: [planta(5, LOTE_B, 'cosechado')] })
-    await montar([LOTE_A, LOTE_B])
-
-    botonImprimir().click(); await tick()
-
-    expect(configPedido.tandas[0].items).toHaveLength(2)
-    expect(nombresPlantas()).toEqual(['L-26-002-P005'])
-  })
-
-  it('destildando las plantas salen sólo los lotes', async () => {
+  it('destildando las plantas salen sólo los lotes, en su plancha apaisada', async () => {
     listPlants.mockResolvedValue({ data: [planta(1, LOTE_A, 'floracion')] })
     await montar([LOTE_A])
 
@@ -118,7 +147,7 @@ describe('EtiquetasLotesModal', () => {
     expect(configPedido.tandas[0].layout.orientacion).toBe('landscape')
   })
 
-  it('destildando los lotes salen sólo las plantas', async () => {
+  it('destildando los lotes salen sólo las plantas, en su plancha vertical', async () => {
     listPlants.mockResolvedValue({ data: [planta(1, LOTE_A, 'floracion')] })
     await montar([LOTE_A])
 
@@ -144,7 +173,7 @@ describe('EtiquetasLotesModal', () => {
     await montar([LOTE_A])
 
     botonImprimir().click(); await tick()
-    const t = configPedido.tandas[1]
-    expect(t.datosDe(t.items[0], 'qr')).toMatchObject({ lote: 'L-26-001', genetica: 'Lemon', inicio: '2026-07-01' })
+    const { item, pieza } = configPedido.secuencia[1]
+    expect(pieza.datosDe(item, 'qr')).toMatchObject({ lote: 'L-26-001', genetica: 'Lemon', inicio: '2026-07-01' })
   })
 })

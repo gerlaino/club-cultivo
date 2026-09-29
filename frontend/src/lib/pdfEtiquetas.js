@@ -295,6 +295,11 @@ export function grillaDe(layout, pagina) {
   return { cols, filas, porPagina: cols * filas }
 }
 
+// ─── Etiquetas de corrido (lote, sus plantas, el lote siguiente…) ────────────────
+// Piezas de distinto alto una debajo de la otra, en A4 vertical: la etiqueta de lote (93mm) entra
+// a lo ancho igual que la banderita (160mm). Mismo margen que la plancha de banderitas.
+export const FLUJO = { orientacion: 'portrait', margen: 8, gap: 2 }
+
 export const A4 = {
   portrait:  { ancho: 210, alto: 297 },
   landscape: { ancho: 297, alto: 210 },
