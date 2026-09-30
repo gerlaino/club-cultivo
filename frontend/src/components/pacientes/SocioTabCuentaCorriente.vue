@@ -73,6 +73,7 @@
       <!-- ── Estado de cuenta ───────────────────────────────── -->
       <!-- TODO PACIENTE TIENE CUENTA (sep-2026): el saldo se muestra siempre —es donde cae el vuelto
            que no se pudo dar—; «puede retirar aún» y la barra, sólo con crédito habilitado. -->
+      <div class="scc__seccion-title scc__seccion-title--saldo">Saldo</div>
       <div class="scc__estado-card">
         <div class="scc__estado-row">
           <div class="scc__estado-block" :class="cc.saldo_disponible < 0 ? 'scc__estado-block--deuda' : ''">
@@ -115,7 +116,7 @@
 
       <!-- ── Historial ──────────────────────────────────────── -->
       <div class="scc__historial">
-        <div class="scc__historial-title">Historial de movimientos</div>
+        <div class="scc__seccion-title">Historial de movimientos</div>
         <div v-if="!cc.movimientos?.length" class="scc__empty">Sin movimientos registrados</div>
         <div v-else class="scc__movs">
           <div v-for="m in cc.movimientos" :key="m.id" class="scc__mov">
@@ -518,7 +519,8 @@ watch(() => props.refreshKey, (v, old) => { if (v !== old) loadCC() })
 
 /* ── Historial ───────────────────────────────────────────── */
 .scc__historial       { margin-top: 1rem; }
-.scc__historial-title { font-size: .7rem; font-weight: 700; color: var(--c-slate-400); text-transform: uppercase; letter-spacing: .07em; margin-bottom: .75rem; }
+.scc__seccion-title { font-size: .7rem; font-weight: 700; color: var(--c-slate-400); text-transform: uppercase; letter-spacing: .07em; margin-bottom: .75rem; }
+.scc__seccion-title--saldo { margin-top: 1rem; }
 .scc__movs { display: flex; flex-direction: column; gap: 0; border: 1.5px solid var(--c-slate-200); border-radius: 12px; overflow: hidden; }
 .scc__mov {
   display: grid; grid-template-columns: auto 1fr auto;
