@@ -157,6 +157,23 @@ export function arranquePorOrigen(reglasCultivo, origen) {
     || { estado: 'Enraizado', verbo: 'enraizando', donde: '¿Dónde enraíza?' }
 }
 
+// El filtro por fase dice las MISMAS palabras que las filas: el estado `enraizado` es uno solo,
+// pero una semilla que no fue a maceta se ve «Germinación» y un esqueje «Enraizado» (Germán,
+// 30-sep-2026: filtraba «Enraizado» y aparecían filas que decían «Germinación»). Las palabras
+// salen de `/me` (`arranque_por_origen`). `fases`: las demás, en orden.
+export function opcionesFiltroFase(reglasCultivo, fases) {
+  const [semilla, esqueje] = ['semilla', 'esqueje'].map(o => arranquePorOrigen(reglasCultivo, o).estado)
+  return fases.flatMap(f => (f === 'enraizado'
+    ? [{ v: 'germinacion', l: semilla }, { v: 'enraizado', l: esqueje }]
+    : [{ v: f, l: em(f).label }]))
+}
+export function coincideFiltroFase(lote, filtro) {
+  if (!filtro) return true
+  if (filtro === 'germinacion') return lote.estado === 'enraizado' && lote.origen === 'semilla'
+  if (filtro === 'enraizado')   return lote.estado === 'enraizado' && lote.origen !== 'semilla'
+  return lote.estado === filtro
+}
+
 export function pm(s)  { return PLANT_STATE_META[s]  || { label: s || '—', color: '#64748b', emoji: '🌿' } }
 // Cómo se dice el estado de UNA planta. En el arranque lo decide el backend (`estado_label`): la de
 // semilla «Germinando», el esqueje «Enraizado» (Germán, 29-sep-2026). Fuera de ese tramo, o en

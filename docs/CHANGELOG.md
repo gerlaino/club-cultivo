@@ -12,6 +12,9 @@
 - **El riego desde una planta es del lote**: el registro de la planta mostraba receta, productos y
   faltantes y guardaba sólo un texto. Ahora su botón «Riego» abre el riego del lote (escritorio y
   teléfono), que descuenta, cuesta y suma como cualquier riego.
+- **El filtro por fase dice «Germinación» y «Enraizado» por separado** (sala y lista de Lotes,
+  `opcionesFiltroFase`/`coincideFiltroFase`): filtrar «Enraizado» traía filas que decían
+  «Germinación». Las palabras salen de `/me` (`arranque_por_origen`).
 - `rake riegos:volumen_desde_texto [CONFIRMAR=1] [CLUB_ID=]`: pasa lo viejo del texto al número,
   repartiendo los riegos de sala. **Manual, una vez, después del deploy.**
 

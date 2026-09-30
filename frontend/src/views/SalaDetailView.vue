@@ -1,5 +1,5 @@
 <script setup>
-import { estadoLoteLabel } from '../lib/loteHelpers.js'
+import { estadoLoteLabel, opcionesFiltroFase, coincideFiltroFase } from '../lib/loteHelpers.js'
 import { onMounted, onUnmounted, ref, computed, watch } from "vue"
 import { logger } from '../utils/logger.js'
 import { useRoute, useRouter } from "vue-router"
@@ -496,7 +496,7 @@ const itemsFiltrados = computed(() => {
   return items.value.filter(l =>
     (!q || (l.codigo || '').toLowerCase().includes(q) ||
            (l.genetica?.nombre || l.strain || '').toLowerCase().includes(q)) &&
-    (!sdEstado.value || l.estado === sdEstado.value))
+    coincideFiltroFase(l, sdEstado.value))
 })
 const itemsSorted = computed(() => {
   const order = ["vegetativo","floracion","enraizado","cosecha","curado","finalizado"]
@@ -524,11 +524,8 @@ const seleccionLotes = computed(() => ({
 }))
 // Fases de LOTE para el filtro. Ojo: ESTADOS_SALA (más arriba) es otra cosa — el estado de la sala
 // misma (activa/mantenimiento/cerrada).
-const FASES_FILTRO = [
-  { v: 'enraizado',  l: 'Enraizado' },
-  { v: 'vegetativo', l: 'Vegetativo' },
-  { v: 'floracion',  l: 'Floración' },
-]
+// El arranque se parte en las dos palabras que se ven en las filas (Germinación / Enraizado).
+const FASES_FILTRO = computed(() => opcionesFiltroFase(auth.user?.reglas_cultivo, ['enraizado', 'vegetativo', 'floracion']))
 
 const SD_PER_PAGE    = 10
 const sdPage         = ref(1)

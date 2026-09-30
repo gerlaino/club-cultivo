@@ -11,7 +11,7 @@ import { exportLotesCSV } from '../lib/api.js';
 import DsSpinner from '../design-system/components/Spinner.vue'
 import NuevoLoteModal from '../components/lotes/NuevoLoteModal.vue'
 import LotesTabla from '../components/lotes/LotesTabla.vue'
-import { opcionesMetodoEnraizado } from '../lib/loteHelpers.js'
+import { opcionesMetodoEnraizado, opcionesFiltroFase, coincideFiltroFase } from '../lib/loteHelpers.js'
 import EtiquetasLotesModal from '../components/lotes/EtiquetasLotesModal.vue'
 import { useSeleccion } from '../composables/useSeleccion.js'
 import { useToast } from '../composables/useToast.js'
@@ -36,6 +36,8 @@ onMounted(() => {
 onUnmounted(() => document.removeEventListener('keydown', lotesEscapeHandler, true));
 
 const metodosEnraizado = computed(() => opcionesMetodoEnraizado(auth.user?.reglas_cultivo));
+// Las mismas palabras que las filas: el arranque es «Germinación» (semilla) o «Enraizado» (esqueje).
+const opcionesFase = computed(() => opcionesFiltroFase(auth.user?.reglas_cultivo, ESTADOS));
 const canEdit = computed(() => ["admin","cultivador"].includes(auth.role));
 const canExport = computed(() => ["admin","auditor","supervisor","cultivador"].includes(auth.role));
 
@@ -117,7 +119,7 @@ const filtered = computed(() => {
     const matchEstado  = !filterEstado.value
       || (filterEstado.value === "cosechados" ? COSECHADOS.includes(l.estado)
           : filterEstado.value === "en_ciclo" ? EN_CICLO.includes(l.estado)
-          : l.estado === filterEstado.value);
+          : coincideFiltroFase(l, filterEstado.value));
     const matchSala    = !filterSala.value   || String(l.sala_id) === filterSala.value;
     const matchGrow    = !filterGrow.value   || l.grow_type === filterGrow.value;
     return matchTab && matchText && matchEstado && matchSala && matchGrow;
@@ -380,7 +382,7 @@ async function exportarCSV() {
         @change="onFiltroEstado($event.target.value)"
       >
         <option value="">Todos los estados</option>
-        <option v-for="e in ESTADOS" :key="e" :value="e">{{ estadoLabel(e) }}</option>
+        <option v-for="e in opcionesFase" :key="e.v" :value="e.v">{{ e.l }}</option>
       </select>
       <select class="lv__select" v-model="filterSala">
         <option value="">Todas las salas</option>
