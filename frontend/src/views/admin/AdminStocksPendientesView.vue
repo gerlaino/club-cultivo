@@ -205,6 +205,27 @@
       </div>
 
       <!-- ── Tab: Historial ─────────────────────────────────────── -->
+      <!-- ── Tab: Vacíos ─────────────────────────────────────────── -->
+      <!-- Frascos abiertos en 0 g: se dispensó lo último y se eligió no cerrarlos, para volver a
+           llenarlos con otra cosecha. Se cierran acá; si era el último del lote, el lote se finaliza. -->
+      <div v-if="tabActiva === 'vacios'">
+        <p class="stk__vac-hint">Quedaron abiertos al dispensar lo último, para volver a llenarlos con otra cosecha. Cerralos cuando ya no se usen: si es el último frasco del lote, el lote se finaliza.</p>
+        <div class="stk__pa-list">
+          <div v-for="s in vacios" :key="s.id" class="stk__pa-card">
+            <div class="stk__pa-left">
+              <div class="stk__pa-forma">{{ s.numero_lote_producto || `Frasco #${s.id}` }} · {{ formaLabel(s.forma_producto) }}</div>
+              <div class="stk__pa-chips">
+                <span v-if="s.lote_codigo" class="stk__chip stk__chip--lote">{{ s.lote_codigo }}</span>
+                <span v-if="s.genetica_nombre" class="stk__chip stk__chip--gen">{{ s.genetica_nombre }}</span>
+                <span v-if="s.sede?.nombre" class="stk__chip stk__chip--muted">{{ s.sede.nombre }}</span>
+                <span class="stk__chip stk__chip--muted">vacío {{ timeAgo(s.updated_at) }}</span>
+              </div>
+            </div>
+            <button class="stk__vac-cerrar" :disabled="cerrandoVacio === s.id" @click="cerrarVacio(s)">Cerrar</button>
+          </div>
+        </div>
+      </div>
+
       <div v-if="tabActiva === 'historial'">
         <div v-if="loadingHistorial" class="stk__loading">
           <DsSpinner />
@@ -720,18 +741,20 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
+import { useConfirm } from '../../composables/useConfirm.js'
 import { useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import Paginator from '../../components/ui/Paginator.vue'
 import TablaInventarioStock from '../../components/stock/TablaInventarioStock.vue'
 import {
   listStocksPendientes, listStocks, listStocksHistorial, listStockInventario,
-  asignarStock, ajustarStock, descartarStock, getStockMovimientos,
+  asignarStock, ajustarStock, descartarStock, getStockMovimientos, listStocksVacios,
   listSedes, createStock, updateStock,
   getPreferences, updatePreferences, listGeneticas,
 } from '../../lib/api.js'
 
 const router = useRouter()
+const { confirm } = useConfirm()
 import { unidadDe } from '../../lib/formatters.js'
 import { useToast } from '../../composables/useToast.js'
 import { MOTIVOS_FINALIZACION, ayudaDe } from '../../composables/useStockFinalizacion.js'
@@ -795,6 +818,8 @@ watch(esPersonal, (p) => { if (p && tabActiva.value === 'por_asignar') tabActiva
 const TABS = computed(() => [
   ...(esPersonal.value ? [] : [{ key: 'por_asignar', label: '⏳ Por asignar', count: pendientes.value.length }]),
   { key: 'inventario',  label: '📦 Inventario',  count: invTotal.value },
+  // Sólo si hay: frascos que quedaron abiertos en 0 g al dispensar lo último sin cerrarlos.
+  ...(vacios.value.length ? [{ key: 'vacios', label: '🫙 Vacíos', count: vacios.value.length }] : []),
   { key: 'historial',   label: '📋 Historial',   count: null },
 ])
 
@@ -844,8 +869,32 @@ async function cargarPendientes() {
 }
 useRecargaEnCambios(['stocks', 'pesajes'], async () => {
   liveConectado.value = true
-  await Promise.all([cargarPendientes(), cargarInventario({ silencioso: true })])
+  await Promise.all([cargarPendientes(), cargarInventario({ silencioso: true }), cargarVacios()])
 })
+
+// ── Frascos vacíos (abiertos en 0 g) ──────────────────────────────────────────
+const vacios        = ref([])
+const cerrandoVacio = ref(null)
+async function cargarVacios() {
+  try { vacios.value = (await listStocksVacios()).data || [] } catch { /* queda lo que había */ }
+  if (tabActiva.value === 'vacios' && !vacios.value.length) tabActiva.value = 'inventario'
+}
+async function cerrarVacio(s) {
+  const ok = await confirm({
+    title: 'Cerrar el frasco',
+    message: `¿Cerrar ${s.numero_lote_producto || 'el frasco'}? Ya no se va a poder llenar de nuevo. Si es el último frasco abierto del lote ${s.lote_codigo || ''}, el lote se finaliza.`,
+    confirmText: 'Cerrar', variant: 'danger',
+  })
+  if (!ok) return
+  cerrandoVacio.value = s.id
+  try {
+    await descartarStock(s.id, {})
+    toast.success(`${s.numero_lote_producto || 'Frasco'} cerrado`)
+    await cargarVacios()
+  } catch (e) {
+    toast.error(e.response?.data?.error || 'No se pudo cerrar')
+  } finally { cerrandoVacio.value = null }
+}
 
 // ── Umbral configurable ────────────────────────────────────────────────────────
 async function guardarUmbral() {
@@ -940,7 +989,7 @@ onMounted(async () => {
     umbralValor.value = rPref.data?.data?.umbral_stock_g ?? rPref.data?.umbral_stock_g ?? 50
     pendientes.value.forEach(s => { asignaciones.value[s.id] = ''; cantidades.value[s.id] = '' })
     if (!pendientes.value.length) tabActiva.value = 'inventario'
-    await cargarInventario()
+    await Promise.all([cargarInventario(), cargarVacios()])
     liveConectado.value = true
   } catch { toast.error('Error al cargar stocks') }
   finally { loading.value = false }
@@ -1827,4 +1876,7 @@ function formatDate(dateStr) {
 }
 .stk__merma-ico { font-size: 1rem; flex-shrink: 0; }
 .stk__merma-txt { font-size: .82rem; color: #92400e; }
+.stk__vac-hint { font-size: var(--fs-13); color: var(--c-ink-700); margin: 0 0 var(--sp-3); }
+.stk__vac-cerrar { padding: .45rem .9rem; border-radius: var(--r-md); border: 1.5px solid var(--c-ink-300); background: #fff; color: var(--c-ink-900); font-weight: 600; cursor: pointer; }
+.stk__vac-cerrar:hover:not(:disabled) { border-color: var(--c-rust-600, #b91c1c); color: var(--c-rust-600, #b91c1c); }
 </style>

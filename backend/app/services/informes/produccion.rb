@@ -57,14 +57,7 @@ module Informes
     # Los lotes que entran al informe: los de la organización, acotados por los filtros. «Sólo stock
     # externo» no tiene lotes: el stock externo entra sin lote (`compra_externa`).
     def lotes_base
-      @lotes_base ||= begin
-        rel = @club.lotes
-        rel = rel.none unless @filtros.propio?
-        rel = rel.where(id: @filtros.lote_ids)         if @filtros.lote_ids
-        rel = rel.where(genetica_id: @filtros.genetica_ids) if @filtros.genetica_ids
-        rel = rel.where(sede_id: @filtros.sede_ids)    if @filtros.sede_ids
-        rel
-      end
+      @lotes_base ||= @filtros.acotar_lotes(@club.lotes)
     end
 
     # ── 1. Lo que se cosechó ───────────────────────────────────────────────────
@@ -242,13 +235,7 @@ module Informes
     # El stock que entra al informe según los filtros: propio (de lote o derivado), externo o
     # ambos; de esos lotes, genéticas y sedes.
     def stock_filtrado
-      rel = Stock.where(club_id: @club.id)
-      rel = rel.where.not(origen: 'compra_externa') unless @filtros.externo?
-      rel = rel.where(origen: 'compra_externa')     unless @filtros.propio?
-      rel = rel.where(lote_id: @filtros.lote_ids)   if @filtros.lote_ids
-      rel = rel.where(genetica_id: @filtros.genetica_ids) if @filtros.genetica_ids
-      rel = rel.where(sede_id: @filtros.sede_ids)   if @filtros.sede_ids
-      rel
+      @filtros.acotar_stocks(Stock.where(club_id: @club.id))
     end
 
     # ── 4. El stock externo ────────────────────────────────────────────────────

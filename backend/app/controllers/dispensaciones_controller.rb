@@ -86,6 +86,8 @@ class DispensacionesController < ApplicationController
   # POST /pacientes/:paciente_id/dispensaciones
   def create
     @dispensacion      = @paciente.dispensaciones.build(dispensacion_params)
+    # «¿Cerrar el frasco?» → no: queda abierto y vacío (ver `Dispensacion#dejar_abiertos`).
+    @dispensacion.dejar_abiertos = params.dig(:dispensacion, :dejar_abiertos)
     @dispensacion.user = current_user
     @dispensacion.sede_id ||= @dispensacion.stock&.sede_id
 
@@ -321,6 +323,7 @@ class DispensacionesController < ApplicationController
         caja_anterior = cobro_simple&.caja_turno_id
         cobro_simple&.destroy!
         @dispensacion.cobros.reset
+        stocks_previos = @dispensacion.items.filter_map(&:stock) # por si la edición cambia de frasco
         @dispensacion.send(:incrementar_stock)   # devuelve al stock la cantidad vieja
         @dispensacion.stock.reload
         cc&.reload
@@ -387,6 +390,9 @@ class DispensacionesController < ApplicationController
         @dispensacion.save!
         sincronizar_item_legacy!(@dispensacion) unless items_param.present?  # la línea espejo refleja stock/cantidad nuevos
         @dispensacion.send(:decrementar_stock)   # descuenta la cantidad nueva (por línea)
+        # Si la dispensa editada saca menos que antes, al frasco que había vaciado le queda producto:
+        # se reabre (y su lote). Recién acá, después de devolver y volver a descontar.
+        (stocks_previos + @dispensacion.items.reload.filter_map(&:stock)).uniq.each { |st| st.reabrir_si_tiene_producto!(usuario: current_user) }
         if @dispensacion.cobrar_en_entrega?
           # Contra entrega: no entró un peso todavía. El cobro y el asiento los hace el
           # repartidor al entregar; acá no se asienta nada.

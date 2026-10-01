@@ -117,7 +117,9 @@
                      mesa de manicura, ir y volver a la vista de cada planta era un viaje por
                      planta. Tocar el nombre sigue abriendo la vista del QR. -->
                 <td class="mnl__td mnl__td--peso" @click.stop>
-                  <template v-if="puedeRegistrar && !(parseFloat(planta.peso_seco) > 0)">
+                  <!-- Sólo las que todavía se pesan: una descartada no se pesa, y una con pesada en
+                       otra jornada tampoco (el backend las rechaza). -->
+                  <template v-if="puedeRegistrar && planta.state !== 'descartada' && !(parseFloat(planta.peso_seco) > 0) && !planta.tiene_pesada">
                     <input
                       type="number" inputmode="decimal" min="0.1" step="0.1"
                       class="mnl__peso-input"
@@ -133,7 +135,14 @@
                   <span v-else :class="parseFloat(planta.peso_seco) > 0 ? 'mnl__peso--ok' : 'mnl__peso--none'">
                     {{ parseFloat(planta.peso_seco) > 0 ? parseFloat(planta.peso_seco).toFixed(1) : '—' }}
                     <span v-if="planta.peso_es_promedio" class="mnl__prom">(prom)</span>
+                    <span v-if="planta.sin_enviar" class="mnl__sin-enviar" title="Sin señal: se manda sola al volver">sin enviar</span>
                   </span>
+                  <!-- En la jornada abierta, una planta pesada por error se saca sin borrar todo. -->
+                  <button v-if="puedeRegistrar && enJornadaAbierta(planta)" type="button" class="mnl__quitar"
+                          :disabled="quitando === planta.id" :aria-label="`Quitar ${planta.nombre} de la jornada`"
+                          title="Quitar de la jornada" @click="quitarDeJornada(planta)">
+                    <X :size="13" :stroke-width="2.5" />
+                  </button>
                 </td>
                 <td class="mnl__td mnl__td--estado">
                   <span class="mnl__chip" :class="plantaChip(planta).cls">{{ plantaChip(planta).label }}</span>
@@ -154,7 +163,7 @@
         <div v-if="pesajeBorrador" class="mnl__jornada">
           <div class="mnl__jornada-info">
             <span class="mnl__jornada-lbl">Jornada en curso</span>
-            <span class="mnl__jornada-kpi">{{ pesajeBorrador.plantas_registradas || 0 }} plantas · {{ (pesajeBorrador.peso_calculado_g || 0).toFixed(1) }}g</span>
+            <span class="mnl__jornada-kpi">{{ pesajeBorrador.plantas_registradas || 0 }} {{ pesajeBorrador.plantas_registradas === 1 ? 'planta' : 'plantas' }} · {{ (pesajeBorrador.peso_calculado_g || 0).toFixed(1) }}g</span>
           </div>
           <div class="mnl__jornada-acts">
             <button class="mnl__pj-del" :disabled="borrando === pesajeBorrador.id" title="Descartar jornada" @click="borrarPesaje(pesajeBorrador)">
@@ -177,7 +186,7 @@
         <div v-if="pesajesHistorial.length" class="mnl__hist">
           <div v-for="p in pesajesHistorial" :key="p.id" class="mnl__hist-row">
             <span class="mnl__hist-date">{{ fmtDate(p.fecha_pesaje) }}</span>
-            <span class="mnl__hist-info">{{ p.plantas_count || p.plantas_registradas || 0 }} plantas · {{ (p.peso_total_g || p.peso_calculado_g || 0).toFixed(1) }}g</span>
+            <span class="mnl__hist-info">{{ p.plantas_count || p.plantas_registradas || 0 }} {{ (p.plantas_count || p.plantas_registradas) === 1 ? 'planta' : 'plantas' }} · {{ (p.peso_total_g || p.peso_calculado_g || 0).toFixed(1) }}g</span>
             <span class="mnl__badge" :class="badgeClass(p.estado)">{{ pesajeEstadoLabel(p.estado) }}</span>
             <button v-if="p.estado === 'enviado'" class="mnl__hist-act" :disabled="reabriendo === p.id" title="Reabrir para corregir" @click="reabrirPesaje(p)">
               <Undo2 :size="13" />
@@ -218,7 +227,7 @@
               </div>
 
               <div v-if="restoCount > 0" class="mnl-field">
-                <label class="mnl-label">Peso conjunto del resto <span class="mnl-opt">{{ restoCount }} plantas sin peso individual</span></label>
+                <label class="mnl-label">Peso conjunto del resto <span class="mnl-opt">{{ restoCount }} {{ restoCount === 1 ? 'planta' : 'plantas' }} sin peso individual</span></label>
                 <div class="mnl-input-row">
                   <input v-model.number="adminForm.restoPeso" type="number" step="0.1" min="0" class="mnl-input" placeholder="0.0" />
                   <span class="mnl-suffix">g</span>
@@ -228,6 +237,11 @@
               <div class="mnl-field">
                 <label class="mnl-label">Contenedor <span class="mnl-opt">solo flor seca</span></label>
                 <div v-if="loadingDirecto" class="mnl-hint">Cargando contenedores…</div>
+                <!-- Repartido en varios frascos: copones en uno, bajos en otro (todo del mismo lote). -->
+                <template v-else-if="repartirDirecto">
+                  <RepartoFrascos v-model="repartoDirecto" :contenedores="contenedores" :peso-total="totalDirecto" />
+                  <button type="button" class="mnl-link" @click="repartirDirecto = false">Mandar todo a un solo frasco</button>
+                </template>
                 <div v-else class="mnl-cont-list">
                   <button type="button" class="mnl-cont" :class="{ 'mnl-cont--sel': adminForm.stock_id === null }" @click="adminForm.stock_id = null">
                     <span class="mnl-cont__radio"><span v-if="adminForm.stock_id === null" class="mnl-cont__dot" /></span>
@@ -237,9 +251,10 @@
                   <button v-for="s in contenedores" :key="s.id" type="button" class="mnl-cont" :class="{ 'mnl-cont--sel': adminForm.stock_id === s.id }" @click="adminForm.stock_id = s.id">
                     <span class="mnl-cont__radio"><span v-if="adminForm.stock_id === s.id" class="mnl-cont__dot" /></span>
                     <Package :size="15" :stroke-width="2" />
-                    <span class="mnl-cont__txt">{{ s.numero_lote_producto || `Contenedor #${s.id}` }} · {{ (s.cantidad || 0).toFixed(0) }}g · {{ s.sede?.nombre || 'Sin asignar' }}</span>
+                    <span class="mnl-cont__txt">{{ s.numero_lote_producto || `Contenedor #${s.id}` }} · {{ (s.cantidad || 0).toFixed(0) }}g · {{ s.sede?.nombre || 'Sin asignar' }}<template v-if="s.estado === 'agotado'"> · vacío, se vuelve a usar</template></span>
                   </button>
                 </div>
+                <button v-if="!repartirDirecto && !loadingDirecto" type="button" class="mnl-link" @click="empezarRepartoDirecto">Repartir en varios frascos (copones, bajos…)</button>
               </div>
 
               <div class="mnl-field">
@@ -254,7 +269,7 @@
 
               <div class="mnl-actions">
                 <button type="button" class="mnl-btn-cancel" @click="cerrarModal">Cancelar</button>
-                <button type="submit" class="mnl-btn-ok" :disabled="savingBatch || !hayPesoDirecto">
+                <button type="submit" class="mnl-btn-ok" :disabled="savingBatch || !hayPesoDirecto || (repartirDirecto && !repartoDirectoCuadra)">
                   <DsSpinner v-if="savingBatch" :size="14" />
                   <CheckCircle v-else :size="13" :stroke-width="2" />
                   Registrar y generar stock
@@ -361,9 +376,11 @@ import { ChevronLeft, Scissors, Leaf, Scale, Send, X, RefreshCw, RotateCw, Packa
 import {
   getLote, listPlants, registrarDirectoManicura, listStocks, listSedes,
   listPesajesManicura, enviarPesajeManicura, deletePesajeManicura, reabrirPesajeManicura,
-  devolverManicura, reevaluarManicura, registrarPesoPlanta,
+  devolverManicura, reevaluarManicura, quitarPlantaPesajeManicura,
 } from '../../lib/api.js'
-import { registrarPesajeManicuraOffline } from '../../lib/offlineApi.js'
+import { registrarPesajeManicuraOffline, registrarPesoPlantaOffline } from '../../lib/offlineApi.js'
+import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
+import RepartoFrascos from '../../components/manicura/RepartoFrascos.vue'
 import { useToast } from '../../composables/useToast.js'
 import { useManicuraJornada } from '../../composables/useManicuraJornada.js'
 import { useConfirm } from '../../composables/useConfirm.js'
@@ -384,17 +401,14 @@ const borrando   = ref(null)
 
 const pesajeBorrador   = computed(() => pesajes.value.find(p => p.estado === 'borrador'))
 const pesajesHistorial = computed(() => pesajes.value.filter(p => p.estado !== 'borrador'))
-const pesajesConfirmadosCount = computed(() =>
-  pesajes.value.filter(p => p.estado === 'confirmado')
-    .reduce((s, p) => s + (p.plantas_count || p.plantas_registradas || 0), 0)
-)
 
 async function cerrarYEnviar() {
   const p = pesajeBorrador.value
   if (!p || enviando.value) return
-  // Aviso si quedan plantas sin pesar (no cerrar parcial sin querer).
-  const total = lote.value?.plants_count
-  const cubiertas = pesajesConfirmadosCount.value + (p.plantas_registradas || 0)
+  // Aviso si quedan plantas sin pesar (no cerrar parcial sin querer). Sobre las plantas VIVAS:
+  // contando las descartadas decía «1 de 4… las 3 restantes» con una sola por pesar de verdad.
+  const total = plantasActivas.value.length
+  const cubiertas = total - plantasSinPesar.value.length
   if (total && cubiertas < total) {
     const ok = await confirm({
       title: 'Cerrar pesaje incompleto',
@@ -425,11 +439,33 @@ async function reabrirPesaje(p) {
   } finally { reabriendo.value = null }
 }
 
+// La planta está en la jornada abierta (la que todavía se puede corregir).
+const enJornadaAbierta = (planta) => !!pesajeBorrador.value?.plant_ids?.includes(planta.id)
+const quitando = ref(null)
+async function quitarDeJornada(planta) {
+  const j = pesajeBorrador.value
+  if (!j) return
+  const ok = await confirm({
+    title: 'Quitar de la jornada',
+    message: `¿Sacar ${planta.nombre || 'esta planta'} de la jornada? Vuelve a quedar sin pesar; lo demás de la jornada sigue igual.`,
+    confirmText: 'Quitar', variant: 'danger',
+  })
+  if (!ok) return
+  quitando.value = planta.id
+  try {
+    await quitarPlantaPesajeManicura(id, j.id, planta.id)
+    toast.success(`${planta.nombre || 'La planta'} quedó sin pesar`)
+    await cargar({ silencioso: true })
+  } catch (e) {
+    toast.error(e.response?.data?.error || 'No se pudo quitar')
+  } finally { quitando.value = null }
+}
+
 async function borrarPesaje(p) {
   if (p.estado === 'confirmado') return
   const ok = await confirm({
     title: 'Borrar pesaje',
-    message: `¿Borrar este pesaje del ${fmtDate(p.fecha_pesaje)}? Esta acción no se puede deshacer.`,
+    message: `¿Borrar este pesaje del ${fmtDate(p.fecha_pesaje)}? Sus plantas vuelven a quedar sin pesar. No se puede deshacer.`,
     confirmText: 'Borrar', variant: 'danger',
   })
   if (!ok) return
@@ -577,6 +613,26 @@ const restoCount = computed(() =>
   plantasSinPesar.value.length -
   plantasSinPesar.value.filter(p => parseFloat(adminForm.value.pesos[p.id]) > 0).length
 )
+// Lo que se va a registrar: los pesos individuales más el del resto. Es lo que tiene que sumar el
+// reparto en frascos (el backend valida lo mismo).
+const totalDirecto = computed(() => {
+  const ind = plantasSinPesar.value.reduce((s, p) => s + (parseFloat(adminForm.value.pesos[p.id]) || 0), 0)
+  const resto = restoCount.value > 0 ? (parseFloat(adminForm.value.restoPeso) || 0) : 0
+  return +(ind + resto).toFixed(2)
+})
+const repartirDirecto = ref(false)
+const repartoDirecto  = ref([])
+const repartoDirectoCuadra = computed(() => {
+  const suma = repartoDirecto.value.reduce((s, f) => s + (Number(f.gramos) || 0), 0)
+  return repartoDirecto.value.length > 1 && repartoDirecto.value.every(f => Number(f.gramos) > 0) && Math.abs(suma - totalDirecto.value) < 0.01
+})
+function empezarRepartoDirecto() {
+  repartirDirecto.value = true
+  repartoDirecto.value = [
+    { stock_id: null, descripcion: 'Copones', gramos: null },
+    { stock_id: null, descripcion: 'Bajos', gramos: null },
+  ]
+}
 const hayPesoDirecto = computed(() =>
   plantasSinPesar.value.some(p => parseFloat(adminForm.value.pesos[p.id]) > 0) ||
   (parseFloat(adminForm.value.restoPeso) > 0 && restoCount.value > 0)
@@ -596,20 +652,27 @@ const estadoBadgeClass = computed(() => ({
 }))
 const estadoLabel = computed(() => ESTADO_LABEL[lote.value?.estado] || lote.value?.estado || '—')
 
-async function cargar() {
-  loading.value = true
+// `silencioso`: la recarga por un aviso de cambios (el admin confirmó o reabrió una jornada, otra
+// pantalla pesó una planta) no muestra el spinner ni saca de la pantalla si falla.
+async function cargar({ silencioso = false } = {}) {
+  if (!silencioso) loading.value = true
   try {
     const [lr, pr, psj] = await Promise.all([getLote(id), listPlants({ lote_id: id }), listPesajesManicura(id)])
     lote.value    = lr.data
     plantas.value = pr.data || []
     pesajes.value = psj.data || []
   } catch {
+    if (silencioso) return
     toast.error('Error al cargar el lote')
     router.push('/mnc/pendientes')
   } finally {
     loading.value = false
   }
 }
+// El aviso de un pesaje trae el id del pesaje, no del lote: los de pesajes recargan siempre (en
+// silencio y agrupados); los de lotes, sólo si son de este.
+useRecargaEnCambios(['pesajes', 'lotes'], () => cargar({ silencioso: true }),
+                    { filtro: ev => ev?.recurso !== 'lotes' || ev.id === Number(id) })
 
 function irAPlanta(p) { router.push(`/p/${p.codigo_qr}`) }
 
@@ -624,12 +687,19 @@ async function guardarPesoEnCelda(planta, ev) {
   if (!v || v <= 0 || guardandoPeso.value === planta.id) return
   guardandoPeso.value = planta.id
   try {
-    const res = await registrarConJornada(id, (extra) => registrarPesoPlanta(planta.id, { peso_seco_g: v, ...extra }))
+    const res = await registrarConJornada(id, (extra) => registrarPesoPlantaOffline(planta.id, { peso_seco_g: v, ...extra }))
     if (!res) return // la manicura canceló la pregunta de la jornada
     // La fila cambia sola: el número queda escrito y el foco pasa a la siguiente sin pesar.
     planta.peso_seco = v
     planta.tiene_pesada = true
     delete pesoEscrito.value[planta.id]
+    if (res.queued) {
+      // Sin señal: queda en el teléfono y se manda solo. La fila lo dice hasta que llegue.
+      planta.sin_enviar = true
+      toast.info(`Sin señal: ${planta.nombre || 'la planta'} (${v} g) quedó guardada en el teléfono y se manda sola`)
+      if (ev) siguienteSinPesar(ev.target)
+      return
+    }
     toast.success(`${planta.nombre || 'Planta'}: ${v} g`)
     if (ev) siguienteSinPesar(ev.target)
     listPesajesManicura(id).then(r => { pesajes.value = r.data || [] }).catch(() => {})
@@ -656,13 +726,14 @@ async function abrirModal() {
       pesos: Object.fromEntries(plantasSinPesar.value.map(p => [p.id, null])),
       restoPeso: null, stock_id: null, sede_id: null,
     }
+    repartirDirecto.value = false
+    repartoDirecto.value  = []
     modalOpen.value = true
     loadingDirecto.value = true
     try {
-      const [cs, ss] = await Promise.all([listStocks({ lote_id: id }), listSedes()])
-      contenedores.value = (cs.data || []).filter(s =>
-        s.forma_producto === 'flor_seca' && ['pendiente_asignacion', 'asignado'].includes(s.estado)
-      )
+      // También los frascos que ya se vaciaron: se vuelven a usar y se reabren al recibir el peso.
+      const [cs, ss] = await Promise.all([listStocks({ lote_id: id, incluir_vacios: 1 }), listSedes()])
+      contenedores.value = (cs.data || []).filter(s => s.forma_producto === 'flor_seca')
       sedes.value = ss.data || []
     } catch {
       contenedores.value = []; sedes.value = []
@@ -690,7 +761,9 @@ async function submitDirecto() {
     if (parseFloat(adminForm.value.restoPeso) > 0 && restoCount.value > 0) {
       payload.resto = { plantas_count: restoCount.value, peso_total_g: parseFloat(adminForm.value.restoPeso) }
     }
-    if (adminForm.value.stock_id) payload.stock_id = adminForm.value.stock_id
+    if (repartirDirecto.value) {
+      payload.destinos = repartoDirecto.value.map(f => ({ stock_id: f.stock_id || undefined, gramos: f.gramos, descripcion: f.stock_id ? undefined : (f.descripcion || undefined) }))
+    } else if (adminForm.value.stock_id) payload.stock_id = adminForm.value.stock_id
     if (adminForm.value.sede_id)  payload.sede_id  = adminForm.value.sede_id
 
     const { data } = await registrarDirectoManicura(id, payload)
@@ -871,6 +944,11 @@ onActivated(cargar)
 .mnl__td--num    { text-align: center; font-size: .72rem; font-weight: 700; color: var(--c-slate-400); }
 .mnl__td--nombre { font-weight: 600; color: var(--c-slate-900); }
 .mnl__td--qr     { font-size: .72rem; color: var(--c-slate-400); }
+/* En el teléfono el código QR largo empujaba el estado de la planta fuera de la pantalla: se
+   esconde (está en la banderita, y tocar la fila abre la vista del QR). */
+@media (max-width: 560px) {
+  .mnl__th--qr, .mnl__td--qr { display: none; }
+}
 .mnl__td--peso   { text-align: right; font-weight: 700; font-size: .85rem; }
 .mnl__peso-input {
   width: 5.5rem; text-align: right; font: inherit; font-weight: 700; font-size: .9rem;
@@ -892,6 +970,9 @@ onActivated(cargar)
 }
 .mnl__chip--done    { background: #dcfce7; color: #15803d; }
 .mnl__chip--pending { background: var(--c-slate-100); color: var(--c-slate-400); }
+.mnl__sin-enviar { margin-left: .3rem; font-size: .66rem; font-weight: 700; color: var(--c-amber-500); text-transform: uppercase; }
+.mnl__quitar { margin-left: .35rem; display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--c-ink-300); background: #fff; color: var(--c-ink-500); cursor: pointer; vertical-align: middle; }
+.mnl__quitar:hover:not(:disabled) { color: var(--c-rust-600, #b91c1c); border-color: var(--c-rust-600, #b91c1c); }
 .mnl__chip--descartada { background: #fef2f2; color: #b91c1c; }
 .mnl__chip--prom    { background: #fef3c7; color: #b45309; }
 
@@ -1075,4 +1156,5 @@ onActivated(cargar)
 
 .mnl-fade-enter-active, .mnl-fade-leave-active { transition: opacity .2s; }
 .mnl-fade-enter-from,  .mnl-fade-leave-to      { opacity: 0; }
+.mnl-link { display: inline-block; margin-top: .45rem; background: none; border: 0; padding: 0; color: var(--brand-primary); font-size: .82rem; font-weight: 600; cursor: pointer; text-decoration: underline; }
 </style>

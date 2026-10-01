@@ -70,8 +70,9 @@
               <span class="mpv__akpi-val">{{ (pesajeBorrador.peso_calculado_g || 0).toFixed(1) }}<span class="mpv__akpi-unit">g</span></span>
               <span class="mpv__akpi-lbl">Peso acumulado</span>
             </div>
-            <div v-if="loteSeleccionado.plants_count" class="mpv__akpi">
-              <span class="mpv__akpi-val">{{ Math.max(0, loteSeleccionado.plants_count - (pesajesConfirmadosCount)) }}</span>
+            <!-- Lo dice el backend (`manicura.sin_pesar`): sin las descartadas, y contando toda jornada. -->
+            <div v-if="loteSeleccionado.manicura" class="mpv__akpi">
+              <span class="mpv__akpi-val">{{ loteSeleccionado.manicura.sin_pesar }}</span>
               <span class="mpv__akpi-lbl">Restantes</span>
             </div>
           </div>
@@ -163,6 +164,7 @@ import DsSpinner from '../../design-system/components/Spinner.vue'
 import { Scale, Wind, Plus, Send, List, CheckCircle, CalendarPlus, Trash2, Undo2 } from 'lucide-vue-next'
 import {
   listLotes,
+  getLote,
   listPesajesManicura,
   createPesajeManicura,
   enviarPesajeManicura,
@@ -171,6 +173,7 @@ import {
 } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
 import { useConfirm } from '../../composables/useConfirm.js'
+import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 
 const toast = useToast()
 const { confirm } = useConfirm()
@@ -189,11 +192,6 @@ const pesajeBorrador = computed(() =>
 )
 const pesajesHistorial = computed(() =>
   pesajes.value.filter(p => p.estado !== 'borrador')
-)
-const pesajesConfirmadosCount = computed(() =>
-  pesajes.value
-    .filter(p => p.estado === 'confirmado')
-    .reduce((s, p) => s + (p.plantas_count || p.plantas_registradas || 0), 0)
 )
 
 async function cargarLotes() {
@@ -217,16 +215,17 @@ async function seleccionarLote(lote) {
   await cargarPesajes()
 }
 
-async function cargarPesajes() {
+async function cargarPesajes({ silencioso = false } = {}) {
   if (!loteSeleccionado.value) return
-  loadingPesajes.value = true
+  if (!silencioso) loadingPesajes.value = true
   try {
     const { data } = await listPesajesManicura(loteSeleccionado.value.id)
     pesajes.value = data || []
     const borrador = pesajes.value.find(p => p.estado === 'borrador')
-    notasBorrador.value = borrador?.notas || ''
+    // En una recarga por aviso no se pisan las notas que la manicura está escribiendo.
+    if (!silencioso) notasBorrador.value = borrador?.notas || ''
   } catch {
-    pesajes.value = []
+    if (!silencioso) pesajes.value = []
   } finally {
     loadingPesajes.value = false
   }
@@ -252,8 +251,12 @@ async function cerrarDia() {
 
   // Aviso si quedan plantas sin pesar: cerrar el pesaje lo manda a confirmar y las
   // restantes quedan para un pesaje nuevo (evita cerrar parcial sin querer).
-  const total = loteSeleccionado.value?.plants_count
-  const cubiertas = pesajesConfirmadosCount.value + (p.plantas_registradas || 0)
+  // Sobre las plantas que se pesan (sin descartadas), con el número del backend y AL DÍA: la lista
+  // de lotes pudo cargarse antes de pesar las de hoy.
+  let pm = loteSeleccionado.value?.manicura
+  try { pm = (await getLote(loteSeleccionado.value.id)).data?.manicura || pm } catch { /* queda el de la lista */ }
+  const total = pm?.plantas
+  const cubiertas = pm ? pm.pesadas : 0
   if (total && cubiertas < total) {
     const ok = await confirm({
       title: 'Cerrar pesaje incompleto',
@@ -330,6 +333,8 @@ function badgeClass(estado) {
 }
 
 onMounted(cargarLotes)
+// Lo que confirma o reabre el admin se ve sin recargar.
+useRecargaEnCambios('pesajes', () => cargarPesajes({ silencioso: true }))
 </script>
 
 <style scoped>

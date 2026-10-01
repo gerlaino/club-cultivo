@@ -30,7 +30,10 @@ async function montarRecetas(recetas = []) {
   setActivePinia(createPinia())
   const V = (await import('../views/RecetasView.vue')).default
   const w = mount(V, { global: { stubs: { teleport: true, RouterLink: true }, directives: { modal: {} } }, attachTo: document.body })
-  await flushPromises()
+  // Hasta que pidió las dos listas y las pintó: con un solo `flushPromises`, en una corrida
+  // cargada el formulario a veces abría sin productos (falló así el 1-oct-2026).
+  await vi.waitFor(() => expect(api.listInsumos).toHaveBeenCalled())
+  await flushPromises(); await flushPromises()
   return w
 }
 const opcionesProducto = w => w.find('.rc__item-row select').findAll('option').filter(o => o.attributes('value') !== '')
@@ -41,6 +44,7 @@ describe('Recetas con varias sedes: el selector de productos', () => {
   it('el mismo producto de dos sedes se ofrece una sola vez', async () => {
     const w = await montarRecetas()
     await w.findAll('button').find(b => b.text().includes('Nueva receta')).trigger('click')
+    await flushPromises()
     const textos = opcionesProducto(w).map(o => o.text())
     expect(textos.filter(t => t.startsWith('Bio-Grow'))).toHaveLength(1)
     expect(textos).toContain('Cal-Mag')

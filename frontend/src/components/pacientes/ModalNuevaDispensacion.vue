@@ -904,6 +904,19 @@ function composeDireccion() {
   return [l1, pd, form.value.envio_barrio, form.value.envio_ciudad].filter(Boolean).join(', ') || undefined
 }
 
+// Los frascos de los que esta dispensa se lleva TODO lo que tienen (sumando las líneas del mismo).
+function frascosQueTerminan() {
+  const porStock = new Map()
+  for (const it of items.value) {
+    const prev = porStock.get(it.stock.id) || { stock: it.stock, total: 0 }
+    prev.total += Number(it.cantidad) || 0
+    porStock.set(it.stock.id, prev)
+  }
+  return [...porStock.values()]
+    .filter(({ stock, total }) => stock.cantidad_frasco != null && total >= Number(stock.cantidad_frasco) - 0.0001)
+    .map(({ stock }) => stock)
+}
+
 async function handleSubmit() {
   if (saving.value) return
   saving.value = true
@@ -1136,6 +1149,26 @@ async function handleSubmit() {
       payload.contacto_nombre   = form.value.contacto_nombre || undefined
       payload.contacto_telefono = form.value.contacto_telefono || undefined
       payload.notas_envio       = form.value.notas_envio || undefined
+    }
+    // LO ÚLTIMO DE UN FRASCO (Germán, 1-oct-2026): en vez de cerrarlo directo, se pregunta. Si no
+    // se cierra, queda abierto y vacío para rellenarlo con otra jornada de manicura; lo cierra
+    // después administración (Stock → Vacíos). «Lo último» es el frasco ENTERO —depósito y mesa—
+    // (`cantidad_frasco` del backend), no sólo lo que está sobre la mesa.
+    const terminan = frascosQueTerminan()
+    if (terminan.length) {
+      const nombres = terminan.map(st => st.numero_lote_producto || `#${st.id}`).join(', ')
+      const una = terminan.length === 1
+      const eleccion = await confirm({
+        title:       una ? 'Se termina el frasco' : 'Se terminan los frascos',
+        message:     `Con esta dispensa sale lo último ${una ? 'del frasco' : 'de los frascos'} ${nombres}. ` +
+                     `¿${una ? 'Lo cerrás' : 'Los cerrás'}? Si ${una ? 'queda abierto' : 'quedan abiertos'}, ` +
+                     `${una ? 'queda vacío' : 'quedan vacíos'} para volver a llenarlo${una ? '' : 's'} con otra cosecha.`,
+        confirmText: una ? 'Cerrar el frasco' : 'Cerrarlos',
+        neutralText: una ? 'Dejarlo abierto' : 'Dejarlos abiertos',
+        cancelText:  'Volver',
+      })
+      if (!eleccion) { saving.value = false; return }
+      if (eleccion === 'neutral') payload.dejar_abiertos = terminan.map(st => st.id)
     }
     await createDispensacion(props.socioId, payload)
     cerrar()

@@ -62,7 +62,11 @@ class LotesController < ApplicationController
 
   # GET /lotes/:id
   def show
-    render json: LoteSerializer.serialize(@lote, include_plants: true, include_cycle_data: true)
+    render json: LoteSerializer.serialize(@lote, include_plants: true, include_cycle_data: true).merge(
+      # Riego por planta: cuántos litros era un pulso la última vez, para no volver a preguntarlo.
+      litros_por_pulso: RiegoPlanta.joins(:registro_ambiental).where(registros_ambientales: { lote_id: @lote.id })
+                                   .where.not(litros_por_pulso: nil).order(created_at: :desc).pick(:litros_por_pulso)&.to_f,
+    )
   end
 
   # GET /lotes/:id/trazabilidad — la cadena del lote, cortada hasta donde llegó, y los frascos
@@ -1054,13 +1058,15 @@ class LotesController < ApplicationController
     end
 
     nutri = Lotes::Nutricion.new(@lote)
-    @lote.registros_ambientales.includes(:user).find_each do |r|
+    @lote.registros_ambientales.includes(:user, riego_plantas: :plant).find_each do |r|
       chips = []
       chips << "#{r.temperatura}°C" if r.temperatura
       chips << "#{r.humedad}%"      if r.humedad
       chips << "pH #{r.ph}"         if r.ph
       chips << "EC #{r.ec}"         if r.ec
       chips << "agua #{Lotes::Nutricion.num(r.volumen_l)} L" if r.volumen_l
+      # Riego por planta: a cuáles y cuánto a cada una.
+      chips << RiegoPlantaSerializer.resumen(r.riego_plantas) if r.riego_plantas.any?
       if (n = r.nutricion.presence)
         # Lo que recibió ESTE lote (su parte si se regó la sala entera) y, por producto, la
         # salvedad si no salió del depósito (`Lotes::Nutricion`).

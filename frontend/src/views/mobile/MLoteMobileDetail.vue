@@ -95,6 +95,11 @@
       <LoteGaleria ref="galeria" :lote-id="id" :can-edit="true" :plantas="plantas" />
     </div>
 
+    <!-- Riego y nutrición: lo mismo que en el escritorio (qué recibió el lote). Se riega todos
+         los días, así que lo que se registró tiene que verse acá también. -->
+    <div class="mlot__section-title">Riego y nutrición</div>
+    <div class="mlot__nutricion"><LoteNutricionSection :lote-id="id" :version="lote" :con-comparar="false" /></div>
+
     <!-- Plantas -->
     <div class="mlot__section-title">
       Plantas <span class="mlot__count">{{ plantas.length }}</span>
@@ -241,6 +246,7 @@
 import { MACETA_OPCIONES, textoProximoPaso, estadoLoteLabel } from '../../lib/loteHelpers.js'
 import LoteGaleria from '../../components/lotes/LoteGaleria.vue'
 import ResumenCiclo from '../../components/lotes/ResumenCiclo.vue'
+import LoteNutricionSection from '../../components/lotes/LoteNutricionSection.vue'
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -548,6 +554,7 @@ onMounted(async () => {
 
 /* Plantas */
 .mlot__galeria { padding: .9rem 1.1rem 0; }
+.mlot__nutricion { padding: 0 1.1rem; }
 .mlot__section-title { font-size: .72rem; font-weight: 700; color: var(--c-ink-500, #6b7280); text-transform: uppercase; letter-spacing: .06em; padding: 1.1rem 1.1rem .6rem; display: flex; align-items: center; gap: .5rem; }
 .mlot__count { background: var(--c-leaf-100, #e8f0eb); color: var(--c-leaf-700, #2d4a3e); border-radius: 999px; padding: .05rem .5rem; font-size: .7rem; }
 .mlot__muted { padding: .75rem 1.1rem; color: var(--c-ink-500, #6b7280); font-size: .82rem; text-align: center; }

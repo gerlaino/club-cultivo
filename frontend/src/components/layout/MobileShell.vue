@@ -157,6 +157,8 @@ import { usePushNotifications, MOTIVOS } from '../../composables/usePushNotifica
 import { useToast } from '../../composables/useToast.js'
 import { listSalas, uploadFotoLote, listCamas } from '../../lib/api.js'
 import { useLotesStore } from '../../stores/lotes.js'
+import { useNavContext } from '../../composables/useNavContext.js'
+import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import { useTareasStore } from '../../stores/tareas.js'
 import { hoyISO } from '../../utils/dates.js'
 import { achicarImagen } from '../../lib/imagenes.js'
@@ -203,7 +205,15 @@ const clubInitials = computed(() => {
 // inicio a propósito —esa pantalla es a dónde va ahora— pero si nada se lo dice, se va a su casa
 // con la recaudación. Un punto, no un número: acá no se cuenta plata, se avisa que hay.
 const cajaDelivery = useCajaDeliveryStore()
-const conPunto = (item) => item.punto === 'caja_delivery' && cajaDelivery.llevaEfectivo
+// El punto avisa que hay algo esperando: la plata que lleva el repartidor, o pesajes de manicura
+// por confirmar (el mismo contador que la barra del escritorio, al día por los avisos de cambios).
+const { aprobPendientes, refreshBadges } = useNavContext()
+const conPunto = (item) =>
+  (item.punto === 'caja_delivery' && cajaDelivery.llevaEfectivo) ||
+  (item.punto === 'pesajes' && aprobPendientes.value > 0)
+const veAprobar = computed(() => ['admin', 'supervisor'].includes(auth.user?.role))
+onMounted(() => { if (veAprobar.value) refreshBadges() })
+useRecargaEnCambios('pesajes', () => { if (veAprobar.value) refreshBadges() })
 
 // ── Navegación por rol ──────────────────────────────────────────
 const NAV = {
@@ -227,7 +237,7 @@ const NAV = {
   admin: { fab: true, items: [
     { to: '/m/admin/home',    icon: 'bi-grid-1x2',      label: 'Inicio'  },
     { to: '/m/admin/sedes',   icon: 'bi-diagram-3',     label: 'Cultivo',   feature: 'cultivo' },
-    { to: '/m/admin/aprobar', icon: 'bi-patch-check',   label: 'Aprobar',   feature: 'cultivo' },
+    { to: '/m/admin/aprobar', icon: 'bi-patch-check',   label: 'Aprobar',   feature: 'cultivo', punto: 'pesajes' },
     { to: '/m/admin/tareas',  icon: 'bi-check2-square', label: 'Tareas'  },
     { to: '/m/historial',     icon: 'bi-clock-history', label: 'Dispensas', feature: 'produccion_dispensa' },
     { to: '/m/pacientes',     icon: 'bi-people',        label: 'Pacientes', feature: 'produccion_dispensa' },

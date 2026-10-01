@@ -242,6 +242,22 @@ class PlantsController < ApplicationController
       end
     end
 
+    # Una planta se pesa en UNA jornada, y una descartada no se pesa (1-oct-2026). Se mira contra la
+    # jornada en la que caería este peso: corregir dentro de la misma sigue permitido.
+    destino = if pesaje_manicura_id.present?
+      lote.pesajes_manicura.where(estado: 'borrador', manicurador_id: current_user.id).find_by(id: pesaje_manicura_id)
+    else
+      lote.pesajes_manicura.where(estado: 'borrador', manicurador_id: current_user.id).order(created_at: :desc).first
+    end
+    if (motivo = PesajeManicura.motivo_no_se_pesa(@plant, salvo: destino))
+      # El reintento de la cola sin señal: si la primera vez SÍ llegó (se perdió la respuesta) y la
+      # jornada ya se envió, la planta figura «ya pesada» con este mismo peso. No es una falla: la
+      # cola lo da por enviado (`ya_registrado`) en vez de avisarle a la manicura de un error falso.
+      previa = PesajeManicura.pesada_en_otra_jornada(@plant, salvo: destino)
+      mismo  = previa && previa.peso_seco_g.to_d == peso_seco.to_d
+      return render json: { error: motivo, ya_pesada: true, ya_registrado: mismo }, status: :unprocessable_entity
+    end
+
     ActiveRecord::Base.transaction do
       plant_attrs = { peso_seco: peso_seco }
       plant_attrs[:peso_humedo] = peso_humedo if peso_humedo&.positive?
@@ -253,8 +269,7 @@ class PlantsController < ApplicationController
       pesaje = if pesaje_manicura_id.present?
         lote.pesajes_manicura.where(estado: 'borrador', manicurador_id: current_user.id).find(pesaje_manicura_id)
       else
-        lote.pesajes_manicura.where(estado: 'borrador', manicurador_id: current_user.id).order(created_at: :desc).first ||
-          lote.pesajes_manicura.create!(manicurador: current_user, club: lote.club, fecha_pesaje: Date.current)
+        destino || lote.pesajes_manicura.create!(manicurador: current_user, club: lote.club, fecha_pesaje: Time.zone.today)
       end
 
       pp = pesaje.pesadas_plantas.find_or_initialize_by(plant_id: @plant.id)
@@ -271,8 +286,9 @@ class PlantsController < ApplicationController
         planta:    { id: @plant.id, nombre: @plant.nombre, codigo_qr: @plant.codigo_qr,
                      peso_seco: @plant.peso_seco.to_f, peso_humedo: @plant.peso_humedo&.to_f },
         pesaje:    { id: pesaje.id, peso_total_g: total_peso.to_f, plantas_count: count },
-        progreso:  { pesadas: count, total: lote.plants.count,
-                     peso_total_g: total_peso.to_f, completado: count >= lote.plants.count },
+        # El progreso es del LOTE (las pesadas de todas sus jornadas) contra sus plantas sin
+        # descartar: con las descartadas en el total, «completado» no llegaba nunca.
+        progreso:  progreso_manicura(lote),
       }
     end
   end
@@ -286,6 +302,24 @@ class PlantsController < ApplicationController
   end
 
   private
+
+  # Todo del LOTE, como lo muestra la pantalla al abrir: plantas pesadas en cualquier jornada,
+  # contra las no descartadas, y los gramos de todas sus pesadas (`pesaje.peso_total_g` es el de
+  # esta jornada).
+  def progreso_manicura(lote)
+    pm    = lote.progreso_manicura
+    gramos = PesadaPlanta.joins(:pesaje_manicura).where(pesajes_manicura: { lote_id: lote.id }).sum(:peso_seco_g)
+    { pesadas: pm[:pesadas], total: pm[:plantas], peso_total_g: gramos.to_f, completado: pm[:sin_pesar].zero? }
+  end
+
+  # En qué jornada de manicura está pesada la planta (la pantalla no ofrece «Editar» si ya se
+  # confirmó: ahí se corrige reajustando el pesaje). nil si no está pesada.
+  def jornada_pesaje(plant)
+    pp = PesajeManicura.pesada_en_otra_jornada(plant)
+    pp && { id: pp.pesaje_manicura_id, estado: pp.pesaje_manicura.estado, fecha: pp.pesaje_manicura.fecha_pesaje,
+            mia: pp.pesaje_manicura.manicurador_id == current_user.id }
+  end
+
 
   # Tras borrar/descartar plantas de un lote en manicura, re-evaluar si ya se puede finalizar
   # (el flujo normal solo lo dispara al confirmar un pesaje). No-op si el lote no está en_manicura.
@@ -413,6 +447,7 @@ class PlantsController < ApplicationController
       fecha_cosecha:          plant.fecha_cosecha,
       peso_seco:              plant.peso_seco,
       peso_humedo:            plant.peso_humedo,
+      jornada_pesaje:         jornada_pesaje(plant),
       notas:                  plant.notas,
       dias_desde_germinacion: plant.fecha_germinacion ? (Time.zone.today - plant.fecha_germinacion).to_i : nil,
       dias_en_vegetativo:     (plant.fecha_vegetativo && plant.fecha_floracion) ? (plant.fecha_floracion - plant.fecha_vegetativo).to_i : nil,

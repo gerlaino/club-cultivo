@@ -404,7 +404,7 @@ class InformesController < ApplicationController
   def plan_vs_real
     club = current_user.club
     desde, hasta = periodo_rango
-    datos = Informes::PlanVsReal.new(club: club, desde: desde, hasta: hasta).call
+    datos = Informes::PlanVsReal.new(club: club, desde: desde, hasta: hasta, filtros: filtros).call
     sa = datos[:salio]
 
     pct  = ->(v) { v.nil? ? '—' : "#{v.positive? ? '+' : ''}#{v} %" }
@@ -461,7 +461,7 @@ class InformesController < ApplicationController
   def perdidas
     club = current_user.club
     desde, hasta = periodo_rango
-    datos = Informes::Perdidas.new(club: club, desde: desde, hasta: hasta).call
+    datos = Informes::Perdidas.new(club: club, desde: desde, hasta: hasta, filtros: filtros).call
     pl = datos[:plantas]
     pr = datos[:producto]
 
@@ -515,7 +515,7 @@ class InformesController < ApplicationController
   # cálculo vive en `Informes::Inase`; acá sólo se arma cómo se muestra en el PDF y el Excel.
   def inase
     desde, hasta = periodo_rango
-    datos = Informes::Inase.new(club: current_user.club, desde: desde, hasta: hasta).call
+    datos = Informes::Inase.new(club: current_user.club, desde: desde, hasta: hasta, filtros: filtros_salvo_para_presentar).call
     k = datos[:kpis]
 
     fmt_g  = ->(g) { "#{ActiveSupport::NumberHelper.number_to_delimited(g.to_f.round(1), delimiter: '.', separator: ',')} g" }
@@ -580,7 +580,7 @@ class InformesController < ApplicationController
   def reprocann_data(club, desde: nil, hasta: nil)
     desde ||= Time.zone.today.beginning_of_month.beginning_of_day
     hasta ||= Time.zone.today.end_of_month.end_of_day
-    servicio = Informes::Reprocann.new(club: club, desde: desde, hasta: hasta)
+    servicio = Informes::Reprocann.new(club: club, desde: desde, hasta: hasta, filtros: filtros_salvo_para_presentar)
     # Este informe le habla AL ORGANISMO: declara la población registrada en REPROCANN. Por eso
     # sólo entran los pacientes que tienen registro —vigente, vencido o en trámite—. Que existan
     # pacientes sin REPROCANN es un pendiente interno de la organización, no algo que se presenta: eso se
@@ -643,6 +643,7 @@ class InformesController < ApplicationController
       # los conteos que ya se calculan acá arriba. Vive adentro de REPROCANN, que es de lo que
       # habla.
       cumplimiento:           cumplimiento_data(club, conteos),
+      filtros:                filtros_salvo_para_presentar&.to_h || { activo: false, descripcion: nil },
     }
   end
 
@@ -700,6 +701,7 @@ class InformesController < ApplicationController
     XlsxExport.new(
       club:    club,
       titulo:  'Informe REPROCANN',
+      subtitulo: ("Filtrado — #{data.dig(:filtros, :descripcion)}" if data.dig(:filtros, :descripcion)),
       headers: ['Paciente', 'DNI', 'Estado', 'Vencimiento'],
       rows:    rows,
       anchos:  [14, 16, 28, 16],
@@ -743,6 +745,13 @@ class InformesController < ApplicationController
   # que pide un auditor. Vale para todos los informes que pasan por acá. Un rango dado vuelta se
   # endereza; sin `hasta`, hasta hoy.
   # Los filtros del informe (ver `Informes::Filtros`): los mismos parámetros en pantalla y descarga.
+  # LO QUE SE PRESENTA NO SE FILTRA (29-sep-2026): el INASE y el REPROCANN «para presentar» son
+  # de la organización entera. Un filtro que se colara ahí haría presentar una nómina recortada
+  # como si fuera la completa.
+  def filtros_salvo_para_presentar
+    para_presentar? ? nil : filtros
+  end
+
   def filtros
     @filtros ||= Informes::Filtros.desde_params(params, current_user.club)
   end

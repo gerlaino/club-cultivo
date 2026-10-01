@@ -11,6 +11,7 @@ class PlantActivitiesController < ApplicationController
     # (ej. "Planta X descartada"): eso es de otras plantas y se ve en la vista del lote.
     activities = @plant.activities.order(occurred_at: :desc).limit(50)
     registros  = @plant.lote.registros_ambientales
+                       .includes(:riego_plantas)
                        .order(registrado_en: :desc)
                        .limit(50)
     # Excluimos el trasplante a nivel lote: cada planta ya tiene su propio PlantActivity de
@@ -22,7 +23,7 @@ class PlantActivitiesController < ApplicationController
                        .limit(60)
 
     merged = activities.map { |a| serialize(a) } +
-             registros.map  { |r| serialize_registro(r) } +
+             registros.filter_map { |r| serialize_registro(r) } +
              eventos.map    { |e| serialize_evento(e) }
 
     merged.sort_by! { |e| e[:occurred_at] || '' }.reverse!
@@ -89,25 +90,38 @@ class PlantActivitiesController < ApplicationController
     }
   end
 
+  # RIEGO POR PLANTA (30-sep-2026): si el riego eligió plantas, la que no estaba no lo hereda —ni
+  # el riego, ni lo que se le dio en el agua (nutrientes, pH/EC de la solución)—; le queda lo del
+  # aire, y si no queda nada, el registro no aparece. La que estaba lo ve con SU cantidad.
+  RIEGO_TAREAS = %w[riego nutricion].freeze
+
   def serialize_registro(r)
+    mia       = r.riego_plantas.find { |rp| rp.plant_id == @plant.id }
+    no_regada = r.riego_plantas.any? && mia.nil?
+    tareas    = r.tareas_realizadas || []
+    tareas   -= RIEGO_TAREAS if no_regada
+    meta = {
+      tareas_realizadas:    tareas,
+      fertilizacion:        no_regada ? nil : r.fertilizacion,
+      notas_fertilizacion:  no_regada ? nil : r.notas_fertilizacion,
+      temperatura:          r.temperatura,
+      humedad:              r.humedad,
+      ph:                   no_regada ? nil : r.ph,
+      ec:                   no_regada ? nil : r.ec,
+      co2:                  r.co2,
+      ppfd:                 r.ppfd,
+      estado_general:       r.estado_general,
+      plagas_observadas:    r.plagas_observadas,
+      fuente:               r.fuente,
+      riego_planta:         mia && RiegoPlantaSerializer.call(mia),
+    }.compact
+    return nil if no_regada && tareas.empty? && meta.except(:tareas_realizadas, :fuente).empty?
+
     {
       id:            "ra_#{r.id}",
       activity_type: 'registro_ambiental_lote',
-      description:   r.observaciones,
-      metadata: {
-        tareas_realizadas:    r.tareas_realizadas,
-        fertilizacion:        r.fertilizacion,
-        notas_fertilizacion:  r.notas_fertilizacion,
-        temperatura:          r.temperatura,
-        humedad:              r.humedad,
-        ph:                   r.ph,
-        ec:                   r.ec,
-        co2:                  r.co2,
-        ppfd:                 r.ppfd,
-        estado_general:       r.estado_general,
-        plagas_observadas:    r.plagas_observadas,
-        fuente:               r.fuente,
-      }.compact,
+      description:   no_regada ? nil : r.observaciones,
+      metadata:      meta,
       occurred_at: r.registrado_en,
       usuario:     r.user&.nombre_completo || 'Sistema',
       created_at:  r.created_at,

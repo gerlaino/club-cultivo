@@ -115,6 +115,10 @@ class LoteSerializer
       plants_count:            lote.plants_count,
       plantas_seleccion_count: lote.plants.where(es_seleccion: true).count,
       plantas_cosechadas_count: lote.estado == 'floracion' ? lote.plants.where(state: 'cosechado').count : nil,
+      # En manicura: las plantas que se pesan (sin las descartadas), cuántas ya están en alguna
+      # jornada y cuántas faltan. Las pantallas de la manicura muestran ESTE número; contando con
+      # `plants_count` (que incluye las descartadas) decían «faltan 3» con una sola por pesar.
+      manicura:           lote.estado == 'en_manicura' ? lote.progreso_manicura : nil,
       strain:             lote.strain,
       notes:              lote.notes,
       grow_type:                 lote.grow_type,

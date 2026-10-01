@@ -47,6 +47,67 @@ RSpec.describe 'Volumen de agua del riego', type: :request do
     expect(total.to_f).to eq(10.0)
   end
 
+  describe '«Cargar por lote» en el riego de la sala (30-sep-2026)' do
+    def regar_por_lote(volumenes, total: nil)
+      post "/salas/#{sala.id}/registrar_sala",
+           params: { registro_ambiental: { volumen_l: total, volumenes: volumenes, tareas_realizadas: ['riego'] }.compact },
+           headers: auth_headers, as: :json
+    end
+
+    it 'cada lote queda con lo que se le cargó, no con la parte pareja' do
+      otro = create(:lote, club: club, sala: sala, estado: 'vegetativo')
+      lote
+      regar_por_lote({ lote.id => 25, otro.id => 15 }, total: 40)
+      expect(response).to have_http_status(:created), response.body
+      expect(vol(lote)).to eq([25.0])
+      expect(vol(otro)).to eq([15.0])
+    end
+
+    it 'un lote sin número queda «sin volumen cargado», no con 0 ni con una parte del resto' do
+      otro = create(:lote, club: club, sala: sala, estado: 'vegetativo')
+      lote
+      regar_por_lote({ lote.id => 10, otro.id => '' })
+      expect(response).to have_http_status(:created), response.body
+      expect(vol(lote)).to eq([10.0])
+      expect(ActsAsTenant.with_tenant(club) { otro.registros_ambientales.pluck(:volumen_l) }).to eq([nil])
+    end
+
+    it 'con un solo lote en la sala también vale' do
+      regar_por_lote({ lote.id => 8 })
+      expect(response).to have_http_status(:created), response.body
+      expect(vol(lote)).to eq([8.0])
+    end
+
+    it 'un lote que no recibe el riego (enraizando, u otra sala) se rechaza y no se guarda nada' do
+      enraizando = create(:lote, club: club, sala: sala, estado: 'enraizado')
+      lote
+      regar_por_lote({ lote.id => 10, enraizando.id => 5 })
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(ActsAsTenant.with_tenant(club) { lote.registros_ambientales.count }).to eq(0)
+    end
+
+    it 'un lote de otra organización no se puede nombrar' do
+      otro_club = create(:club)
+      ajeno = ActsAsTenant.with_tenant(otro_club) do
+        a = create(:user, :admin, club: otro_club)
+        s2 = create(:sede, club: otro_club, created_by: a)
+        create(:lote, club: otro_club, sala: create(:sala, club: otro_club, sede: s2, created_by: a), estado: 'vegetativo')
+      end
+      lote
+      regar_por_lote({ lote.id => 10, ajeno.id => 5 })
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(ActsAsTenant.with_tenant(otro_club) { ajeno.registros_ambientales.count }).to eq(0)
+    end
+
+    it 'la sala le dice a la pantalla qué lotes reciben su riego' do
+      create(:lote, club: club, sala: sala, estado: 'enraizado', codigo: 'ENR-1')
+      lote
+      get "/salas/#{sala.id}", headers: auth_headers
+      por_codigo = json['lotes'].to_h { |l| [l['codigo'], l['recibe_registro_sala']] }
+      expect(por_codigo).to include(lote.codigo => true, 'ENR-1' => false)
+    end
+  end
+
   it 'en la cama con lotes, los litros de toda la cama se reparten' do
     post '/camas', params: { cama: { sala_id: sala.id, nombre: 'Cama A', largo_m: 2, ancho_m: 1, profundidad_cm: 30 } }, headers: auth_headers, as: :json
     cama = json

@@ -8,6 +8,8 @@ class RegistroAmbiental < ApplicationRecord
   belongs_to :club
   belongs_to :receta, optional: true
   has_many   :insumo_consumos, dependent: :nullify
+  # Riego por planta: qué plantas recibieron este riego y cuánto (vacío = todo el lote parejo).
+  has_many   :riego_plantas, dependent: :delete_all
   # Lo descontado del depósito por «aplicar receta» vuelve si se borra el registro. `prepend`:
   # antes de que `dependent: :nullify` desate los consumos y no quede qué revertir.
   before_destroy :revertir_nutricion, prepend: true
@@ -61,6 +63,23 @@ class RegistroAmbiental < ApplicationRecord
       # el último absorbe el redondeo para que la suma dé el total
       v = i == registros.size - 1 ? (total - asignado) : (total * partes[r.lote_id]).round(2)
       asignado += v
+      r.update_columns(volumen_l: v)
+    end
+  end
+
+  # «Cargar por lote» (Germán, 30-sep-2026): en vez del total, lo que recibió cada lote. `por_lote`
+  # es { lote_id => litros }; un lote sin número queda «sin volumen cargado» (no es 0 L). Un lote
+  # que no recibió este riego no se acepta: el número iría a parar a ningún registro.
+  def self.asignar_volumenes!(registros, por_lote)
+    por_lote = por_lote.to_h.transform_keys(&:to_i)
+    ajenos = por_lote.keys - registros.map(&:lote_id)
+    raise ArgumentError, 'Uno de los lotes no recibe este riego' if ajenos.any?
+
+    registros.each do |r|
+      v = por_lote[r.lote_id].presence&.to_d
+      next if v.nil? || v <= 0
+      raise ArgumentError, 'El volumen de un lote no puede pasar los 100.000 L' if v >= 100_000
+      # `update_columns`, como el reparto: volver a guardar el registro re-propagaría su ambiente.
       r.update_columns(volumen_l: v)
     end
   end

@@ -122,8 +122,10 @@ module Stocks
     # ninguno registró planta por planta se cae al lote, diciéndolo (`atribucion`).
     def pesadas_plantas
       @pesadas_plantas ||= begin
-        filas = PesadaPlanta.includes(:plant)
-                            .where(pesaje_manicura_id: frasco_de_origen.pesajes_manicura.select(:id)).to_a
+        # Los pesajes de este frasco: los que apuntan a él y los repartidos que le dejaron una
+        # parte (copones en uno, bajos en otro: las mismas plantas en los dos frascos).
+        ids = frasco_de_origen.pesajes_manicura.pluck(:id) | frasco_de_origen.pesaje_destinos.pluck(:pesaje_manicura_id)
+        filas = PesadaPlanta.includes(:plant).where(pesaje_manicura_id: ids).to_a
         filas += pesada.pesadas_plantas.includes(:plant).to_a if pesada
         filas
       end
@@ -261,9 +263,21 @@ module Stocks
         # movimiento explica» sobre un frasco que cerraba (Germán, 13-sep). Ese movimiento es el
         # ORIGEN y se dice como tal (`fraccionado_desde`), no como salida ni como entrada.
         movs.reject! { |m| m.id == movimiento_de_nacimiento&.id }
+        # LO QUE ENTRÓ POR PESAJE TAMPOCO (1-oct-2026). Confirmar un pesaje de manicura suma el
+        # peso a `cantidad_inicial` Y deja un movimiento `produccion` positivo; reajustarlo hace lo
+        # mismo con un `ajuste`. Contarlos además de la inicial sumaba el peso dos veces y un
+        # frasco recién pesado decía «Faltan 100 g que ningún movimiento explica».
+        movs.reject! { |m| ya_en_la_inicial?(m) }
         sueltos, de_cierre = movs.partition { |m| m.tipo != 'ajuste' || m.turno_mostrador_id.nil? }
         sueltos.map { |m| salida(m) } + ajustes_neteados(de_cierre)
       end
+    end
+
+    # Los únicos `produccion` positivos son los del pesaje (el derivado nace con su cantidad y el
+    # movimiento del origen es negativo); el reajuste de un pesaje se reconoce por su nota.
+    def ya_en_la_inicial?(m)
+      (m.tipo == 'produccion' && m.gramos.to_d.positive?) ||
+        (m.tipo == 'ajuste' && m.notas.to_s.start_with?(PesajeManicura::NOTA_REAJUSTE))
     end
 
     def salida(m)

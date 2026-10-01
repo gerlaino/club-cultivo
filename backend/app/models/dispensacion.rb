@@ -122,6 +122,11 @@ class Dispensacion < ApplicationRecord
   # —el mostrador sólo puede levantar lo libre— y exigirle que salga del turno haría imposible
   # entregar una reserva.
   attr_accessor :desde_reserva
+  # Frascos que quedan ABIERTOS aunque esta dispensa se lleve lo último (Germán, 1-oct-2026): la
+  # pantalla pregunta «¿cerrar el frasco?» y, si no, queda vacío para rellenarlo (otra jornada de
+  # manicura). Sin esto —reservas, API— se cierra como siempre.
+  attr_writer :dejar_abiertos
+  def dejar_abiertos = Array(@dejar_abiertos).map(&:to_i)
 
   before_validation { self.fecha_dispensacion ||= Date.current }
   before_validation :sincronizar_mirror_desde_items, if: :lineas_explicitas?
@@ -278,6 +283,9 @@ class Dispensacion < ApplicationRecord
 
   after_create        :asegurar_item_espejo
   after_create        :decrementar_stock
+  # Corregirle la fecha a una dispensa (sin tocar montos) no rehace sus movimientos de stock: se
+  # los mueve al día nuevo, que es cuando salió el producto.
+  after_update        :refechar_movimientos_de_stock, if: :saved_change_to_fecha_dispensacion?
   after_create_commit :encolar_reporte_ariccame
   after_create_commit :dispatch_webhook
   after_create_commit :broadcast_stock_actualizado
@@ -499,6 +507,9 @@ class Dispensacion < ApplicationRecord
           gramos:         -it.cantidad,
           usuario:        user,
           dispensacion_id: id,
+          # El día de la DISPENSA, no el de la carga (1-oct-2026): una entrega del 10 de agosto
+          # cargada hoy aparecía como salida de este mes en todo lo que corta por período.
+          fecha:          fecha_dispensacion,
           notas:          [
             "Dispensación ##{id} — #{paciente&.nombre_completo}",
             it.evento_bar && "desde lo apartado para «#{it.evento_bar.nombre}»",
@@ -510,7 +521,9 @@ class Dispensacion < ApplicationRecord
         # disparador de que el lote cierre su ciclo. `decrement!` solo baja la cantidad: sin
         # esta llamada el stock quedaba 'asignado' en cero y el lote nunca pasaba a
         # 'finalizado', que es lo que ensuciaba los informes de trazabilidad.
-        it.stock.reload.marcar_agotado_si_vacio!(usuario: user)
+        # Salvo que quien dispensa haya elegido dejarlo abierto (vacío, para rellenar): ahí lo
+        # cierra después el admin, y con eso el lote.
+        it.stock.reload.marcar_agotado_si_vacio!(usuario: user) unless dejar_abiertos.include?(it.stock_id)
       end
     end
   end
@@ -781,7 +794,10 @@ class Dispensacion < ApplicationRecord
   #     devolvió abierto). El movimiento de dispensa se reemplaza por uno de MERMA con la misma
   #     cantidad: el frasco no cambia, la mesa no se toca —el producto salió de ahí y no vuelve—
   #     y en la trazabilidad baja «dispensado» y sube «merma», que es lo que pasó.
-  public def revertir_stock!(vuelve: true, usuario: nil, nota: nil)
+  # `reabrir`: si el frasco había quedado agotado y le vuelve producto, se reabre (y su lote). Lo pide
+  # la ANULACIÓN; la edición no, porque devuelve y vuelve a descontar en el mismo paso, y reabrir
+  # en el medio haría pasar el lote a curado y de nuevo a finalizado. La edición reabre al final.
+  public def revertir_stock!(vuelve: true, usuario: nil, nota: nil, reabrir: false)
     items.with_deleted.each do |it|
       next unless it.stock
       ActiveRecord::Base.transaction do
@@ -792,6 +808,10 @@ class Dispensacion < ApplicationRecord
         movs.where("notas LIKE ?", "Dispensación ##{id} —%").destroy_all if borrados.empty?
         if vuelve
           desimputar_del_mostrador(it)
+          # El producto volvió: si el frasco había quedado agotado por esta dispensa, se reabre (y su
+          # lote, si se había finalizado). Antes quedaba «agotado» con gramos adentro y la lista de
+          # stock lo escondía.
+          it.stock.reabrir_si_tiene_producto!(usuario: usuario || user) if reabrir
         else
           it.stock.decrement!(:cantidad, it.cantidad)
           it.stock.stock_movimientos.create!(
@@ -804,6 +824,10 @@ class Dispensacion < ApplicationRecord
     end
   end
   private
+
+  def refechar_movimientos_de_stock
+    StockMovimiento.where(dispensacion_id: id, tipo: 'dispensacion').update_all(fecha: fecha_dispensacion)
+  end
 
   def generar_codigo_paquete
     self.codigo_paquete = "PKG-#{Time.zone.today.strftime('%Y%m%d')}-#{SecureRandom.hex(3).upcase}"

@@ -14,7 +14,7 @@ class PesajesManicuraController < ApplicationController
 
   before_action -> { require_feature!(:cultivo) }
   before_action :set_lote, except: [:index_admin]
-  before_action :set_pesaje, only: [:show, :enviar, :confirmar, :destroy, :reabrir, :reajustar_peso]
+  before_action :set_pesaje, only: [:show, :enviar, :confirmar, :destroy, :reabrir, :reajustar_peso, :quitar_planta]
 
   # GET /lotes/:lote_id/pesajes_manicura
   # Trabajo de equipo: todos los que pueden ver el lote ven TODOS los pesajes (para
@@ -136,8 +136,11 @@ class PesajesManicuraController < ApplicationController
     pesos      = params[:pesos] || []
     resto_peso = params.dig(:resto, :peso_total_g).to_d
 
+    # Repartido en varios frascos (copones, bajos): [{ stock_id | nada = nuevo, gramos, descripcion }].
+    destinos = params[:destinos].presence
+
     ActiveRecord::Base.transaction do
-      stock  = resolver_stock_destino!
+      stock  = destinos ? nil : resolver_stock_destino!
       pesaje = @lote.pesajes_manicura.create!(manicurador: current_user, club: current_user.club, fecha_pesaje: Time.zone.today)
 
       # Pesos individuales (medidos).
@@ -146,6 +149,9 @@ class PesajesManicuraController < ApplicationController
         peso = pp[:peso_seco_g].to_d
         next if peso <= 0
         plant = @lote.plants.find(pp[:plant_id])
+        if (motivo = PesajeManicura.motivo_no_se_pesa(plant, salvo: pesaje))
+          raise ArgumentError, motivo
+        end
         plant.update!(peso_seco: peso)
         pesaje.pesadas_plantas.create!(plant: plant, peso_seco_g: peso, es_promedio: false)
         individuales_ids << plant.id
@@ -160,9 +166,13 @@ class PesajesManicuraController < ApplicationController
 
       raise ArgumentError, 'Cargá al menos un peso (individual o del resto)' unless pesaje.pesadas_plantas.exists?
 
-      pesaje.confirmar_directo!(confirmado_por: current_user, stock: stock)
+      pesaje.confirmar_directo!(confirmado_por: current_user, stock: stock, destinos: destinos)
+      frascos = pesaje.destinos_efectivos!.map(&:stock)
+      # La sede elegida va a los frascos que todavía no tienen (los nuevos del reparto), igual que
+      # con un solo frasco (`resolver_stock_destino!`).
+      frascos.each { |st| asignar_sede_si_falta!(st) } if destinos
       @lote.reload.check_and_finalize_manicura!(finalizador: current_user)
-      render json: { stock_id: stock.id, lote_estado: @lote.reload.estado }, status: :created
+      render json: { stock_id: frascos.first&.id, stock_ids: frascos.map(&:id), lote_estado: @lote.reload.estado }, status: :created
     end
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Planta o contenedor no encontrado' }, status: :not_found
@@ -187,8 +197,17 @@ class PesajesManicuraController < ApplicationController
     lote_codigo = @pesaje.lote.codigo
     peso_decl   = @pesaje.peso_total_g || @pesaje.peso_calculado_g
 
-    @pesaje.pesadas_plantas.destroy_all
-    @pesaje.destroy
+    # Las plantas de esta jornada vuelven a quedar SIN PESAR (1-oct-2026). Se borraban las pesadas
+    # pero la planta seguía con su peso: la pantalla la daba por pesada y no ofrecía pesarla,
+    # «cargar el resto» la salteaba, y el lote no cerraba nunca porque esa planta no tenía pesada.
+    # Las que además están pesadas en otra jornada conservan su peso (es el de esa otra).
+    ActiveRecord::Base.transaction do
+      plant_ids = @pesaje.pesadas_plantas.pluck(:plant_id)
+      @pesaje.pesadas_plantas.destroy_all
+      @pesaje.destroy!
+      en_otra = PesadaPlanta.joins(:pesaje_manicura).where(pesajes_manicura: { lote_id: lote_id }).select(:plant_id)
+      Plant.where(id: plant_ids).where.not(id: en_otra).update_all(peso_seco: nil, peso_humedo: nil, updated_at: Time.current)
+    end
 
     if notificar
       AlertaInterna.create!(
@@ -203,6 +222,30 @@ class PesajesManicuraController < ApplicationController
     end
 
     head :no_content
+  end
+
+  # DELETE /lotes/:lote_id/pesajes_manicura/:id/plantas/:plant_id
+  # Saca UNA planta de la jornada abierta (se escaneó la que no era): borrar la jornada entera
+  # para corregir una planta era perder todo lo demás. La planta vuelve a quedar sin pesar.
+  # Sólo en borrador; una enviada se reabre primero, y una confirmada ya está en el stock.
+  def quitar_planta
+    unless @pesaje.manicurador_id == current_user.id || current_user.admin? || current_user.supervisor?
+      return render json: { error: 'No autorizado' }, status: :forbidden
+    end
+    # Con candado: no puede cruzarse con un «Cerrar y enviar» de la misma jornada.
+    error = nil
+    @pesaje.with_lock do
+      next error = [:unprocessable_entity, 'Sólo se sacan plantas de una jornada abierta: si está enviada, reabrila primero'] unless @pesaje.borrador?
+
+      pp = @pesaje.pesadas_plantas.find_by(plant_id: params[:plant_id])
+      next error = [:not_found, 'Esa planta no está en esta jornada'] unless pp
+
+      pp.destroy!
+      pp.plant.update!(peso_seco: nil, peso_humedo: nil)
+    end
+    return render json: { error: error[1] }, status: error[0] if error
+
+    render json: PesajeManicuraSerializer.serialize(@pesaje.reload, include_plantas: true)
   end
 
   # POST /lotes/:lote_id/pesajes_manicura/:id/reabrir
@@ -257,12 +300,18 @@ class PesajesManicuraController < ApplicationController
       confirmado_por:    current_user,
       peso_confirmado_g: peso,
       stock_id:          params[:stock_id],
+      # Repartido en varios frascos (copones, bajos): [{ stock_id | nada = nuevo, gramos, descripcion }].
+      destinos:          params[:destinos].presence,
     )
     render json: PesajeManicuraSerializer.serialize(@pesaje.reload, include_plantas: true)
   rescue ActionController::ParameterMissing => e
     render json: { error: "Falta: #{e.param}" }, status: :unprocessable_entity
   rescue ArgumentError, RuntimeError => e
-    render json: { error: e.message }, status: :unprocessable_entity
+    # Lo confirmó otra persona (o el mismo, con un doble toque): la pantalla lo saca de la lista
+    # en vez de mostrarlo como un error.
+    ya = @pesaje.reload.confirmado?
+    render json: { error: ya ? "Este pesaje ya fue confirmado#{" por #{@pesaje.confirmado_por&.first_name}" if @pesaje.confirmado_por}" : e.message,
+                   ya_confirmado: ya }, status: :unprocessable_entity
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Stock no encontrado para este lote' }, status: :not_found
   rescue ActiveRecord::RecordInvalid => e
@@ -279,6 +328,7 @@ class PesajesManicuraController < ApplicationController
     @pesaje.reajustar_peso_confirmado!(
       nuevo_peso: params.require(:peso_confirmado_g),
       usuario:    current_user,
+      stock_id:   params[:stock_id], # el frasco que se corrige, si el pesaje se repartió
     )
     render json: PesajeManicuraSerializer.serialize(@pesaje.reload, include_plantas: true)
   rescue ActionController::ParameterMissing => e
@@ -310,8 +360,9 @@ class PesajesManicuraController < ApplicationController
 
   def distribuir_resto!(pesaje, peso_total, count: nil, solo_ids: nil, excluir_ids: [])
     return 0 if peso_total <= 0
-    restantes = pesaje.lote.plants.where.not(id: excluir_ids)
-                      .where('peso_seco IS NULL OR peso_seco <= 0')
+    # Ni descartadas ni pesadas en otra jornada (1-oct-2026): el resto repartía gramos entre
+    # plantas descartadas, que no existen para el cierre del lote.
+    restantes = PesajeManicura.plantas_sin_pesar(pesaje.lote, salvo: pesaje).where.not(id: excluir_ids)
     restantes = restantes.where(id: solo_ids) if solo_ids.present?
     restantes = restantes.order(:id).to_a
     restantes = restantes.first(count) if count && count.positive? && solo_ids.blank?
@@ -331,6 +382,7 @@ class PesajesManicuraController < ApplicationController
   # sede_id y el contenedor no tiene sede, lo asigna a esa sede.
   def resolver_stock_destino!
     stock = if params[:stock_id].present?
+      # Puede estar vacío (agotado): se reabre al recibir el peso (`PesajeManicura#aplicar_a_stock!`).
       current_user.club.stocks.where(lote_id: @lote.id, forma_producto: 'flor_seca').find(params[:stock_id])
     else
       current_user.club.stocks.create!(
@@ -338,6 +390,11 @@ class PesajesManicuraController < ApplicationController
         forma_producto: 'flor_seca', estado: 'pendiente_asignacion', cantidad: 0, unidad: 'g',
       )
     end
+    asignar_sede_si_falta!(stock)
+    stock
+  end
+
+  def asignar_sede_si_falta!(stock)
     if params[:sede_id].present? && stock.sede_id.nil?
       sede = current_user.club.sedes.find(params[:sede_id])
       stock.update!(sede: sede, estado: 'asignado')
@@ -346,7 +403,6 @@ class PesajesManicuraController < ApplicationController
       # nacía «por asignar» en una pantalla que para él no existe.
       stock.update!(sede: current_user.club.sedes.first, estado: 'asignado')
     end
-    stock
   end
 
   def set_lote

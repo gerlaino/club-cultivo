@@ -95,7 +95,8 @@ RSpec.describe 'Analítica: nutrición lote contra lote', type: :request do
     post "/lotes/#{regado.id}/registros_ambientales", params: { registro_ambiental: { volumen_l: 10, tareas_realizadas: ['riego'] } }, headers: auth_headers, as: :json
     get '/analytics/nutricion_lotes', headers: auth_headers
     expect(json['lotes'].map { |l| l['id'] }).to match_array([cerrado.id, en_curso.id, regado.id])
-    expect(json['lotes'].first).to include('genetica' => 'Kush', 'genetica_id' => gen.id)
+    # Por id, no «el primero»: el orden entre lotes del mismo día no está fijado (falló así el 1-oct-2026).
+    expect(json['lotes'].find { |l| l['id'] == cerrado.id }).to include('genetica' => 'Kush', 'genetica_id' => gen.id)
   end
 
   it 'es de administración: el cultivador no entra' do

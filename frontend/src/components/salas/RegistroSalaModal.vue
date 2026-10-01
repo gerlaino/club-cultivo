@@ -108,7 +108,7 @@
                   <p v-if="accionId === 'riego' && sala?.camas?.length" class="rsm__cama-hint">
                     🧱 En suelo vivo el riego va por cama: para regar una sola, «Regar» en su tarjeta. Esto riega todos los lotes del {{ esPersonal ? 'espacio' : 'cuarto' }}.
                   </p>
-                  <RiegoForm     v-if="accionId === 'riego'"     v-model="formData.riego" :suelo-vivo="todoEnCamas" :sala-id="sala?.id" />
+                  <RiegoForm     v-if="accionId === 'riego'"     v-model="formData.riego" :suelo-vivo="todoEnCamas" :sala-id="sala?.id" :lotes="lotesQueRiegan" />
                   <PodaForm      v-if="accionId === 'poda'"      v-model="formData.poda" :total-plantas="sala?.plantas_totales" />
                   <PlagasForm    v-if="accionId === 'plagas'"    v-model="formData.plagas" />
                   <AmbientalForm v-if="accionId === 'ambiental'" v-model="formData.ambiental" />
@@ -187,6 +187,8 @@ const todoEnCamas = computed(() => {
   const enCultivo = (props.sala?.lotes || []).filter(l => ['enraizado', 'vegetativo', 'floracion'].includes(l.estado))
   return !!props.sala?.camas?.length && enCultivo.length > 0 && enCultivo.every(l => l.cama_id)
 })
+// Los que reciben el riego de la sala: lo dice el backend (sin los que enraízan).
+const lotesQueRiegan = computed(() => (props.sala?.lotes || []).filter(l => l.recibe_registro_sala))
 const contextoAsistente = computed(() => props.sala ? {
   tipo:        'sala',
   sala_id:     props.sala.id,
@@ -231,7 +233,7 @@ function emptyFormData() {
     fitosanitario_motivo: '',
     carencia_dias: null,
     observaciones:     '',
-    riego:      { ph: null, ph_runoff: null, ec: null, volumen: null, fertilizo: false, producto: '', dosis: null, semana_nutricion: null, metodo_nutricion: '', observaciones: '', modo_nutricion: '', receta_id: null, litros: null, items: [], nutricion: null },
+    riego:      { ph: null, ph_runoff: null, ec: null, volumen: null, por_lote: false, volumenes: {}, fertilizo: false, producto: '', dosis: null, semana_nutricion: null, metodo_nutricion: '', observaciones: '', modo_nutricion: '', receta_id: null, litros: null, items: [], nutricion: null },
     poda:       { tipos: [], intensidad: '', plantas_intervenidas: null, observaciones: '' },
     plagas:     { resultado: 'ninguna', tipos_detectados: [], accion_tomada: '', plantas_afectadas: null, producto_usado: '' },
     ambiental:  { temperatura: null, temperatura_sustrato: null, humedad: null, co2: null },
@@ -307,6 +309,11 @@ function buildPayload() {
     }
     // El volumen va como número (`volumen_l`), no en el texto: se suma y se compara.
     if (r.volumen)       payload.volumen_l = r.volumen
+    // «Cargar por lote»: lo de cada uno; el backend no reparte el total.
+    if (r.por_lote) {
+      const vs = Object.fromEntries(Object.entries(r.volumenes || {}).filter(([, v]) => Number(v) > 0))
+      if (Object.keys(vs).length) payload.volumenes = vs
+    }
     if (r.observaciones) extra.push(r.observaciones)
   }
 

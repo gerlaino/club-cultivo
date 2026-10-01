@@ -151,7 +151,7 @@ class SalasController < ApplicationController
     # También en uso personal (Germán, 20-sep-2026): la incubadora tiene su propio microclima
     # aunque esté adentro de la carpa. Lo que cambió es la puerta: el modal del teléfono ofrece
     # el bloque «Incubadora» cuando hay lotes enraizando (`RegistrarLecturaSheet`).
-    lotes_activos = @sala.lotes.where(estado: Lote::CULTIVO_ESTADOS).where.not(estado: 'enraizado')
+    lotes_activos = @sala.lotes.reciben_registro_de_sala
 
     if lotes_activos.empty?
       # Si los únicos lotes de la sala están enraizando, decirlo: "no hay lotes activos" haría
@@ -177,8 +177,13 @@ class SalasController < ApplicationController
         registros << registro
         count += 1
       end
-      # El volumen que se carga en la sala es el TOTAL: a cada lote, su parte.
-      RegistroAmbiental.repartir_volumen!(registros, params.dig(:registro_ambiental, :volumen_l)) if params.dig(:registro_ambiental, :volumen_l).present?
+      # El volumen: lo de cada lote si se cargó por lote; si no, el TOTAL y a cada lote su parte.
+      por_lote = params.dig(:registro_ambiental, :volumenes)
+      if por_lote.present?
+        RegistroAmbiental.asignar_volumenes!(registros, por_lote.to_unsafe_h)
+      elsif params.dig(:registro_ambiental, :volumen_l).present?
+        RegistroAmbiental.repartir_volumen!(registros, params.dig(:registro_ambiental, :volumen_l))
+      end
       # «Aplicar receta» a la sala: se descuenta UNA vez y el costo se reparte entre sus lotes.
       n = params[:nutricion].presence || params.dig(:registro_ambiental, :nutricion)
       if n.present? && (n[:receta_id].present? || n[:items].present?)
@@ -190,6 +195,8 @@ class SalasController < ApplicationController
     end
 
     render json: { lotes_afectados: count, faltantes: faltantes }, status: :created
+  rescue ArgumentError => e
+    render json: { error: e.message }, status: :unprocessable_entity
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
@@ -443,7 +450,9 @@ class SalasController < ApplicationController
 
     serialize_sala(s).merge(
       lotes: lotes_all.map { |l|
-        { id: l.id, codigo: l.codigo, estado: l.estado, estado_label: l.estado_label, plants_count: plantas_vivas.(l.id), cama_id: l.cama_id }
+        { id: l.id, codigo: l.codigo, estado: l.estado, estado_label: l.estado_label, plants_count: plantas_vivas.(l.id), cama_id: l.cama_id,
+          # Los que reciben el registro de la sala (y su riego): la pantalla ofrece «por lote» sólo con éstos.
+          recibe_registro_sala: Lote::ESTADOS_REGISTRO_SALA.include?(l.estado) }
       },
       # Suelo vivo: las camas del espacio, con su estado y su «qué viene».
       camas: s.camas.vigentes.order(:nombre).map { |c| CamaSerializer.resumen(c) },

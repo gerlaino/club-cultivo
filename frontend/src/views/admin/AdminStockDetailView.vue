@@ -184,6 +184,8 @@
                     v-model.number="editForm.cantidad_inicial" placeholder="0.0" />
                   <template v-else>
                     <input type="number" class="sd__input" :value="editForm.cantidad_inicial" disabled />
+                    <!-- También en un frasco vacío: si el pesaje real era más, el frasco recibe la
+                         diferencia y se reabre (y su lote, si se había finalizado). -->
                     <span class="sd__hint">Viene de la suma de los pesajes del lote. Para corregirla, editá el peso del pesaje.</span>
                     <button type="button" class="sd__btn-link" @click="abrirReajustePesaje">
                       <i class="bi bi-pencil"></i> Editar pesaje del lote
@@ -298,6 +300,15 @@
                   <div class="sd__action-sub">Lo que sacaste del frasco, con fecha</div>
                 </div>
               </button>
+              <!-- Separar los bajos de los copones (o lo que sea) de un frasco ya creado: cada frasco
+                   nuevo con su nombre y su precio, todo del mismo lote. -->
+              <button class="sd__action" @click="abrirSeparar" :disabled="stock.agotado || !(Number(stock.separable) > 0)">
+                <span class="sd__action-ico sd__action-ico--blue"><i class="bi bi-layout-split"></i></span>
+                <div class="sd__action-txt">
+                  <div class="sd__action-lbl">Separar en frascos</div>
+                  <div class="sd__action-sub">Copones en uno, bajos en otro: cada uno con su nombre y su precio</div>
+                </div>
+              </button>
               <button v-if="!esPersonal" class="sd__action" @click="openRepartir" :disabled="stock.agotado || !stock.sede_id">
                 <span class="sd__action-ico sd__action-ico--blue"><i class="bi bi-arrows-angle-expand"></i></span>
                 <div class="sd__action-txt">
@@ -319,7 +330,16 @@
                 </div>
               </button>
               <div class="sd__actions-sep"></div>
-              <button class="sd__action sd__action--danger" @click="showDescartar = true" :disabled="stock.agotado">
+              <!-- Vacío y abierto (se dispensó lo último sin cerrarlo): se cierra sin motivo, porque
+                   no sale nada. Con producto, «Finalizar» pide qué pasó con lo que queda. -->
+              <button v-if="frascoVacioAbierto" class="sd__action sd__action--danger" @click="cerrarVacio" :disabled="descartando">
+                <span class="sd__action-ico sd__action-ico--red"><i class="bi bi-flag"></i></span>
+                <div class="sd__action-txt">
+                  <div class="sd__action-lbl">Cerrar el frasco</div>
+                  <div class="sd__action-sub">Está vacío: deja de poder llenarse, y si es el último del lote, el lote se finaliza</div>
+                </div>
+              </button>
+              <button v-else class="sd__action sd__action--danger" @click="showDescartar = true" :disabled="stock.agotado">
                 <span class="sd__action-ico sd__action-ico--red"><i class="bi bi-flag"></i></span>
                 <div class="sd__action-txt">
                   <div class="sd__action-lbl">Finalizar stock</div>
@@ -601,6 +621,58 @@
       </Transition>
     </Teleport>
 
+    <!-- ── Modal: Separar en frascos ─────────────────────────────────── -->
+    <Teleport to="body">
+      <Transition name="sd-fade">
+        <div v-modal="() => showSeparar = false" v-if="showSeparar" class="sd__overlay" @click.self="showSeparar = false">
+          <div class="sd__modal">
+            <div class="sd__modal-hd">
+              <div class="sd__modal-ico"><i class="bi bi-layout-split"></i></div>
+              <div>
+                <h2 class="sd__modal-title">Separar en frascos</h2>
+                <p class="sd__modal-sub">Se pueden separar hasta {{ fmtCant(stock?.separable) }} {{ unidad }}<template v-if="Number(stock?.separable) < Number(stock?.cantidad)"> (lo que está sobre la mesa o reservado se queda acá)</template></p>
+              </div>
+              <button class="sd__modal-close" @click="showSeparar = false"><i class="bi bi-x-lg"></i></button>
+            </div>
+            <div class="sd__modal-body">
+              <div v-if="separarError" class="sd__alert">{{ separarError }}</div>
+              <div class="sd__field">
+                <label class="sd__label">Nombre de este frasco <span class="sd__opt">opcional</span></label>
+                <input type="text" maxlength="40" class="sd__input" v-model="separarForm.origen" placeholder="Ej: Copones" />
+              </div>
+              <div v-for="(f, i) in separarForm.frascos" :key="i" class="sd__separar-fila">
+                <input type="text" maxlength="40" class="sd__input" v-model="f.descripcion" placeholder="Nombre: bajos, popcorn…" :aria-label="`Nombre del frasco nuevo ${i + 1}`" />
+                <div class="sd__input-row">
+                  <input type="number" min="0.1" step="0.1" class="sd__input" v-model.number="f.gramos" placeholder="0" :aria-label="`Cantidad del frasco nuevo ${i + 1}`" />
+                  <span class="sd__input-suf">{{ unidad }}</span>
+                </div>
+                <div class="sd__input-row">
+                  <span class="sd__input-suf">$</span>
+                  <input type="number" min="0" step="1" class="sd__input" v-model.number="f.precio" :placeholder="String(stock?.precio_sugerido_ars ?? '')" :aria-label="`Precio del frasco nuevo ${i + 1}`" />
+                  <span class="sd__input-suf">/{{ unidad }}</span>
+                </div>
+                <button v-if="separarForm.frascos.length > 1" type="button" class="sd__separar-quitar" :aria-label="`Quitar frasco nuevo ${i + 1}`" @click="separarForm.frascos.splice(i, 1)">×</button>
+              </div>
+              <button v-if="separarForm.frascos.length < 10" type="button" class="sd__btn-link" @click="separarForm.frascos.push({ descripcion: '', gramos: null, precio: null })">+ Otro frasco</button>
+              <p class="sd__separar-resumen" :class="{ 'sd__separar-resumen--mal': separarExcede }">
+                Se separan {{ fmtCant(separarTotal) }} {{ unidad }} · quedan {{ fmtCant(Number(stock?.cantidad) - separarTotal) }} {{ unidad }} en este frasco
+                <template v-if="separarExcede"> · es más de lo que se puede separar</template>
+              </p>
+              <p class="sd__hint">Todo sigue siendo del mismo lote: la trazabilidad de cada frasco dice de dónde salió. Sin precio, el nuevo usa el de este.</p>
+            </div>
+            <div class="sd__modal-ft">
+              <button class="sd__btn-ghost" @click="showSeparar = false">Cancelar</button>
+              <button class="sd__btn-primary" :disabled="separando || !separarValido" @click="ejecutarSeparar">
+                <DsSpinner v-if="separando" :size="12" />
+                <i v-else class="bi bi-layout-split"></i>
+                Separar
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
+    </Teleport>
+
     <!-- ── Modal: Procesar derivado ──────────────────────────────────── -->
     <Teleport to="body">
       <Transition name="sd-fade">
@@ -693,7 +765,8 @@
               <div v-for="p in pesajesLote" :key="p.id" class="sd__reajuste-row">
                 <div class="sd__reajuste-info">
                   <strong>{{ p.lote_codigo || ('Pesaje #' + p.id) }}</strong>
-                  <span>confirmado: {{ Number(p.peso_confirmado_g).toFixed(1) }}g</span>
+                  <!-- Si el pesaje se repartió (copones/bajos), lo que le tocó a ESTE frasco. -->
+                  <span>a este frasco: {{ Number(p._gramosFrasco).toFixed(1) }}g<template v-if="p._repartido"> (de {{ Number(p.peso_confirmado_g).toFixed(1) }}g repartidos)</template></span>
                 </div>
                 <div class="sd__input-row sd__reajuste-input">
                   <input type="number" min="0.1" step="0.1" class="sd__input" v-model.number="p._nuevoPeso" />
@@ -718,7 +791,7 @@ import DsSpinner from '../../design-system/components/Spinner.vue'
 import {
   getStock, updateStock, asignarStock, ajustarStock, descartarStock, deleteStock,
   getStockMovimientos, listSedes, producirStock,
-  listPesajesManicura, reajustarPesoPesajeManicura, listGeneticas,
+  listPesajesManicura, reajustarPesoPesajeManicura, listGeneticas, separarStock,
 } from '../../lib/api.js'
 import { unidadDe } from '../../lib/formatters.js'
 import { useToast } from '../../composables/useToast.js'
@@ -864,9 +937,16 @@ async function abrirReajustePesaje() {
   reajusteError.value = null
   try {
     const { data } = await listPesajesManicura(stock.value.lote_id)
+    // Los pesajes que le dejaron algo a ESTE frasco (también los repartidos en varios), con lo que
+    // le tocó a éste: eso es lo que se corrige.
     pesajesLote.value = (data || [])
-      .filter(p => p.estado === 'confirmado' && p.stock_id === stock.value.id)
-      .map(p => ({ ...p, _nuevoPeso: Number(p.peso_confirmado_g) }))
+      .filter(p => p.estado === 'confirmado')
+      .map(p => {
+        const destinos = p.destinos?.length ? p.destinos : (p.stock_id ? [{ stock_id: p.stock_id, gramos: p.peso_confirmado_g }] : [])
+        const mio = destinos.find(d => d.stock_id === stock.value.id)
+        return mio && { ...p, _gramosFrasco: Number(mio.gramos), _nuevoPeso: Number(mio.gramos), _repartido: destinos.length > 1 }
+      })
+      .filter(Boolean)
     showReajustePesaje.value = true
   } catch {
     toast.error('No se pudieron cargar los pesajes del lote')
@@ -878,10 +958,10 @@ async function guardarReajuste(pesaje) {
   reajusteSaving.value = true
   reajusteError.value  = null
   try {
-    await reajustarPesoPesajeManicura(stock.value.lote_id, pesaje.id, pesaje._nuevoPeso)
+    await reajustarPesoPesajeManicura(stock.value.lote_id, pesaje.id, pesaje._nuevoPeso, stock.value.id)
     await recargar()
     showReajustePesaje.value = false
-    toast.success('Pesaje reajustado — stock actualizado')
+    toast.success('Pesaje reajustado — el frasco y el lote quedaron al día')
   } catch (e) {
     reajusteError.value = e?.response?.data?.error || 'No se pudo reajustar'
   } finally {
@@ -1010,6 +1090,24 @@ const descartarForm  = ref({ motivo: '', detalle: '', fecha: hoyISO })
 const descartarError = ref(null)
 const descartando    = ref(false)
 
+const frascoVacioAbierto = computed(() => !!stock.value && stock.value.estado !== 'agotado' && Number(stock.value.cantidad) <= 0)
+async function cerrarVacio() {
+  const ok = await confirm({
+    title: 'Cerrar el frasco',
+    message: `¿Cerrar ${stock.value.numero_lote_producto || 'el frasco'}? Ya no se va a poder llenar de nuevo. Si es el último frasco abierto del lote, el lote se finaliza.`,
+    confirmText: 'Cerrar', variant: 'danger',
+  })
+  if (!ok) return
+  descartando.value = true
+  try {
+    await descartarStock(stock.value.id, {})
+    toast.success('Frasco cerrado')
+    await recargar()
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo cerrar')
+  } finally { descartando.value = false }
+}
+
 async function ejecutarDescartar() {
   descartarError.value = null
   const motivo = descartarForm.value.motivo
@@ -1024,6 +1122,45 @@ async function ejecutarDescartar() {
   } catch (e) {
     descartarError.value = e?.response?.data?.error || 'Error al descartar'
   } finally { descartando.value = false }
+}
+
+// ── Separar en frascos ─────────────────────────────────────────────────────────
+// «Pesé el lote entero, se creó un frasco, y ahora separo los bajos de los copones» (1-oct-2026).
+// El backend (`Stocks::Separar`) valida lo mismo: sólo lo guardado y libre, y algo queda acá.
+const showSeparar  = ref(false)
+const separando    = ref(false)
+const separarError = ref(null)
+const separarForm  = ref({ origen: '', frascos: [] })
+const separarTotal = computed(() => +separarForm.value.frascos.reduce((s, f) => s + (Number(f.gramos) || 0), 0).toFixed(2))
+const separarExcede = computed(() => separarTotal.value > Number(stock.value?.separable || 0) + 0.0001 ||
+                                     separarTotal.value >= Number(stock.value?.cantidad || 0))
+const separarValido = computed(() => separarForm.value.frascos.length > 0 &&
+                                     separarForm.value.frascos.every(f => Number(f.gramos) > 0) && !separarExcede.value)
+const fmtCant = (n) => Number(n || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 })
+function abrirSeparar() {
+  separarForm.value = { origen: stock.value?.descripcion || '', frascos: [{ descripcion: 'Bajos', gramos: null, precio: null }] }
+  separarError.value = null
+  showSeparar.value = true
+}
+async function ejecutarSeparar() {
+  if (separando.value || !separarValido.value) return
+  separando.value = true
+  separarError.value = null
+  try {
+    const { data } = await separarStock(stock.value.id, {
+      descripcion_origen: separarForm.value.origen,
+      frascos: separarForm.value.frascos.map(f => ({
+        descripcion: f.descripcion || undefined, gramos: f.gramos,
+        precio_sugerido_ars: f.precio === null || f.precio === '' ? undefined : f.precio,
+      })),
+    })
+    showSeparar.value = false
+    const nums = (data.nuevos || []).map(n => n.numero_lote_producto).join(', ')
+    toast.success(`Separado en ${data.nuevos?.length || 0} ${data.nuevos?.length === 1 ? 'frasco nuevo' : 'frascos nuevos'}: ${nums}`)
+    await recargar()
+  } catch (e) {
+    separarError.value = e?.response?.data?.error || e?.response?.data?.errors?.[0] || 'No se pudo separar'
+  } finally { separando.value = false }
 }
 
 // ── Repartir ───────────────────────────────────────────────────────────────────
@@ -1498,4 +1635,10 @@ function badgeVencLabel(s) {
 .sd__reajuste-info strong { font-size: .85rem; color: #1e293b; }
 .sd__reajuste-info span { font-size: .75rem; color: var(--c-slate-500); }
 .sd__reajuste-input { width: 120px; flex-shrink: 0; }
+.sd__separar-fila { display: grid; grid-template-columns: 1fr 120px 130px auto; gap: .5rem; align-items: center; margin-top: .6rem; }
+@media (max-width: 560px) { .sd__separar-fila { grid-template-columns: 1fr 1fr; } }
+.sd__separar-quitar { background: none; border: 0; color: var(--c-ink-500); font-size: 1.1rem; cursor: pointer; }
+.sd__separar-resumen { margin: .75rem 0 .25rem; font-size: .85rem; font-weight: 600; color: var(--c-ink-700); }
+.sd__separar-resumen--mal { color: var(--c-amber-500); }
+.sd__opt { font-size: .7rem; font-weight: 500; color: var(--c-ink-500); text-transform: none; }
 </style>

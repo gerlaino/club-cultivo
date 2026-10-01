@@ -6,6 +6,9 @@
  *   SÍ  · Registro de ambiente (lectura de sala o de lote) y el registro diario del lote o de la
  *         sala. No mueve stock ni plata: si se duplica o llega tarde, es un dato más en una
  *         serie temporal.
+ *   SÍ  · El peso de UNA planta (escaneada o escrito en la tabla), igual que el pesaje por lote:
+ *         va a una jornada que todavía no es stock (1-oct-2026; antes sólo el de lote se encolaba
+ *         y pesar planta por planta sin señal daba error).
  *   SÍ  · Pesaje del manicura enviado a confirmar. Está parado frente a la balanza y ya pesó;
  *         perder el número significa volver a pesar todo. **No genera stock**: queda esperando que
  *         el admin lo confirme, y esa confirmación es la red que atrapa cualquier duplicado.
@@ -19,7 +22,7 @@
  * pierde es la FIRMA del paciente, que no se puede volver a pedir porque la persona ya se fue.
  */
 import { useSyncQueueStore } from '../stores/syncQueue.js'
-import { createRegistroAmbiental, createLecturaAmbiental, createPesajeManicura, registrarSala } from './api.js'
+import { createRegistroAmbiental, createLecturaAmbiental, createPesajeManicura, registrarSala, registrarPesoPlanta } from './api.js'
 
 // ── Helpers ────────────────────────────────────────────────
 function esErrorDeRed(e) {
@@ -113,6 +116,29 @@ export async function registrarPesajeManicuraOffline(loteId, payload) {
       const queue = useSyncQueueStore()
       encolar(queue, 'pesaje_manicura', {
         url:     `/lotes/${loteId}/pesajes_manicura`,
+        payload: { ...payload, force_new: true },
+      })
+      return { offline: true, queued: true }
+    }
+    throw e
+  }
+}
+
+// ── Peso de una planta offline-aware ──────────────────────
+/**
+ * El peso de UNA planta, desde la vista del QR o escrito en la tabla del lote. Mismo criterio que el
+ * pesaje por lote: `force_new` en el reintento (una cola no puede contestar «¿seguir la jornada
+ * anterior o empezar otra?»), y si la primera vez sí había llegado, el backend contesta
+ * `ya_registrado` y la cola lo da por enviado. La planta es la clave: una planta, una jornada.
+ */
+export async function registrarPesoPlantaOffline(plantId, payload) {
+  try {
+    return await registrarPesoPlanta(plantId, payload)
+  } catch (e) {
+    if (esErrorDeRed(e)) {
+      const queue = useSyncQueueStore()
+      encolar(queue, 'peso_planta', {
+        url:     `/plants/${plantId}/registrar_peso`,
         payload: { ...payload, force_new: true },
       })
       return { offline: true, queued: true }

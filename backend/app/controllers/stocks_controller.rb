@@ -3,9 +3,9 @@ class StocksController < ApplicationController
   before_action :authenticate_user!
   before_action :require_lectura_stock!,        only: [:index, :inventario, :show, :movimientos]
   before_action :require_auditor_lectura!,      only: [:trazabilidad]
-  before_action :require_escritura_stock!,      only: [:create, :update, :asignar, :ajuste, :descartar, :consumir, :producir]
+  before_action :require_escritura_stock!,      only: [:create, :update, :asignar, :ajuste, :descartar, :consumir, :producir, :separar]
   before_action :require_admin_o_supervisor!,   only: [:show_by_qr, :destroy]
-  before_action :set_stock, only: [:asignar, :show, :trazabilidad, :update, :ajuste, :descartar, :consumir, :producir, :movimientos, :destroy]
+  before_action :set_stock, only: [:asignar, :show, :trazabilidad, :update, :ajuste, :descartar, :consumir, :producir, :movimientos, :destroy, :separar]
 
   # Sin variedad, un stock entra al inventario sin decir QUÉ es, y mirando el registro después no
   # hay forma de saberlo: la dispensación, la etiqueta y la trazabilidad quedan con un hueco que
@@ -24,6 +24,14 @@ class StocksController < ApplicationController
       return render json: stocks.map { |s| serialize_stock(s) }
     end
 
+    # FRASCOS VACÍOS ABIERTOS (1-oct-2026): quedaron así al dispensar lo último sin cerrarlos. La
+    # pestaña «Vacíos» de Stock los lista para cerrarlos (o rellenarlos con otra jornada).
+    if params[:vacios].present?
+      stocks = Stock.where(club_id: current_user.club_id).where.not(estado: 'agotado').where('cantidad <= 0')
+      stocks = stocks.where(sede_id: current_user.sedes_visibles_ids + [nil]) if current_user.limitado_por_sede?
+      return render json: stocks.includes(:lote, :genetica, :sede).order(updated_at: :desc).map { |s| serialize_stock(s) }
+    end
+
     if params[:historial].present?
       stocks = Stock.where(club_id: current_user.club_id)
                     .includes(:lote, :genetica, :sede)
@@ -35,12 +43,16 @@ class StocksController < ApplicationController
     # Contenedores de un lote: usado al confirmar pesajes de manicura para elegir a qué
     # contenedor sumar. Incluye los pendiente_asignacion (recién creados, sin sede), que
     # el listado general excluye. Solo flor_seca: el resto son derivados (inventario).
+    # `incluir_vacios=1` (al confirmar un pesaje): también los frascos de flor del lote que ya se
+    # vaciaron —se vuelven a usar y se reabren al recibir el peso (Germán, 1-oct-2026)—.
     if params[:lote_id].present?
-      stocks = Stock.where(club_id: current_user.club_id, lote_id: params[:lote_id])
-                    .disponibles
-                    .where(estado: %w[pendiente_asignacion asignado], forma_producto: 'flor_seca')
-                    .includes(:lote, :genetica, :sede)
-                    .order(created_at: :desc)
+      stocks = Stock.where(club_id: current_user.club_id, lote_id: params[:lote_id], forma_producto: 'flor_seca')
+      stocks = if ActiveModel::Type::Boolean.new.cast(params[:incluir_vacios])
+                 stocks # abiertos con producto, abiertos vacíos y cerrados: todos se pueden rellenar
+               else
+                 stocks.disponibles.where(estado: %w[pendiente_asignacion asignado])
+               end
+      stocks = stocks.includes(:lote, :genetica, :sede).order(created_at: :desc)
       return render json: stocks.map { |s| serialize_stock(s) }
     end
 
@@ -201,7 +213,9 @@ class StocksController < ApplicationController
         # Si se puede corregir QUÉ ES. La pantalla no tiene que ofrecer un selector que el backend
         # va a rechazar, ni esconderlo sin decir por qué.
         puede_cambiar_forma: cerradas.zero?,
-        dispensas_cerradas:  cerradas
+        dispensas_cerradas:  cerradas,
+        # Cuánto se puede separar a otros frascos (lo guardado y libre: `Stock#separable`).
+        separable:           @stock.agotado? ? 0.0 : @stock.separable.to_f,
       ),
     }
   end
@@ -466,14 +480,25 @@ class StocksController < ApplicationController
     motivo  = params[:motivo].to_s.strip
     detalle = params[:detalle].to_s.strip
 
-    unless Stock::MOTIVOS_FINALIZACION.key?(motivo)
-      return render json: { error: "Elegí qué pasó con el stock: #{Stock::MOTIVOS_FINALIZACION.values.join(', ')}." },
-                    status: :unprocessable_entity
-    end
     return render json: { error: 'El stock ya está agotado' }, status: :unprocessable_entity if @stock.agotado?
 
     fecha = fecha_de_cierre(params[:fecha])
     return render json: { error: fecha }, status: :unprocessable_entity if fecha.is_a?(String)
+
+    # UN FRASCO VACÍO SE CIERRA SIN MOTIVO (1-oct-2026): quedó abierto al dispensar lo último (para
+    # rellenarlo) y el admin lo da por terminado. No sale nada —no hay movimiento de 0 g, que el
+    # modelo no admite— y con eso, si era el último, se finaliza el lote.
+    if @stock.cantidad.to_d <= 0
+      @stock.usuario_movimiento = current_user
+      @stock.fecha_movimiento   = fecha
+      @stock.update!(estado: 'agotado')
+      return render json: serialize_stock(@stock.reload)
+    end
+
+    unless Stock::MOTIVOS_FINALIZACION.key?(motivo)
+      return render json: { error: "Elegí qué pasó con el stock: #{Stock::MOTIVOS_FINALIZACION.values.join(', ')}." },
+                    status: :unprocessable_entity
+    end
 
     gramos_finalizados = @stock.cantidad.to_f
     etiqueta = Stock::MOTIVOS_FINALIZACION[motivo]
@@ -492,6 +517,18 @@ class StocksController < ApplicationController
       @stock.update!(cantidad: 0, estado: 'agotado')
     end
     render json: serialize_stock(@stock.reload)
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
+  # POST /stocks/:id/separar — partir un frasco en varios (copones, bajos…): ver `Stocks::Separar`.
+  # { frascos: [{ descripcion, gramos, precio_sugerido_ars }], descripcion_origen: 'Copones' }
+  def separar
+    r = Stocks::Separar.new(stock: @stock, frascos: params[:frascos], usuario: current_user,
+                            descripcion_origen: params.key?(:descripcion_origen) ? params[:descripcion_origen].to_s : nil).call
+    render json: { origen: serialize_stock(r.origen), nuevos: r.nuevos.map { |n| serialize_stock(n) } }, status: :created
+  rescue ArgumentError => e
+    render json: { error: e.message }, status: :unprocessable_entity
   rescue ActiveRecord::RecordInvalid => e
     render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
@@ -890,6 +927,9 @@ class StocksController < ApplicationController
       club_id:                 s.club_id,
       sede_id:                 s.sede_id,
       estado:                  s.estado,
+      # Lo que tiene el frasco ENTERO (depósito + mesa). Al mostrador `cantidad` le llega pisada con
+      # lo de la mesa; éste no: es el que dice si una dispensa se lleva lo último del frasco.
+      cantidad_frasco:         s.cantidad.to_f,
       origen:                  s.origen,
       lote_id:                 s.lote_id,
       lote_codigo:             s.lote_codigo,

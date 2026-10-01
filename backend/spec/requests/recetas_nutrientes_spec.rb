@@ -146,6 +146,19 @@ RSpec.describe 'Recetas de nutrientes', type: :request do
       expect(costos.map { |_, c| c.to_f }.sum).to eq(40.0)
       expect(costos.map(&:first)).to match_array([lote.id, otro.id])
     end
+
+    # AC (30-sep-2026): el agua cargada por lote dice cuánta solución recibió cada uno.
+    it 'con el agua cargada por lote, los nutrientes se reparten como el agua' do
+      r = crear_receta
+      otro = create(:lote, club: club, sala: sala, estado: 'vegetativo')
+      lote
+      post "/salas/#{sala.id}/registrar_sala",
+           params: { registro_ambiental: { fertilizacion: true, volumen_l: 20, volumenes: { lote.id => 15, otro.id => 5 } },
+                     nutricion: { receta_id: r['id'], litros: 20 } }, headers: auth_headers, as: :json
+      expect(response).to have_http_status(:created), response.body
+      costos = ActsAsTenant.with_tenant(club) { InsumoConsumo.where(insumo_id: grow.id).to_h { |c| [c.lote_id, c.cantidad.to_f] } }
+      expect(costos).to eq(lote.id => 30.0, otro.id => 10.0)
+    end
   end
 
   it 'dónde se usó: lotes, litros y plata' do

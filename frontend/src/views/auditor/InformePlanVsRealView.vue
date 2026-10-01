@@ -13,9 +13,13 @@
       </div>
     </div>
 
+    <FiltrosInforme class="inf__filtros" :usa="['lotes', 'geneticas', 'sedes']" @change="cambiarFiltros" />
+
     <div v-if="loading" class="inf__loading">Cargando…</div>
     <div v-else-if="data" ref="hoja" class="inf__hoja">
       <p v-if="data.resena" class="inf__resena">{{ data.resena }}</p>
+      <!-- Un informe filtrado lo dice arriba de todo (y el PDF y el Excel también). -->
+      <p v-if="data.filtros?.activo" class="inf__filtrado"><i class="bi bi-funnel-fill"></i> Filtrado — {{ data.filtros.descripcion }}</p>
 
       <!-- ── 1. Cómo salió ──────────────────────────────────────────────────── -->
       <section class="inf__section">
@@ -130,12 +134,16 @@ import { BarChart2 } from 'lucide-vue-next'
 import api from '../../lib/api.js'
 import { useInformePdf } from '../../composables/useInformePdf.js'
 import SelectorPeriodo from '../../components/informes/SelectorPeriodo.vue'
+import FiltrosInforme from '../../components/informes/FiltrosInforme.vue'
 import { ESTADO_META } from '../../lib/loteHelpers.js'
 
 const { hoja, exporting, exportarPdf, exportarXlsx } = useInformePdf('informe_plan_vs_real', 'plan_vs_real')
 
 // Los MISMOS parámetros para la pantalla y para la descarga.
-const params  = ref({ periodo: 'mes_actual' })
+// Los MISMOS parámetros para la pantalla y para la descarga: período + filtros.
+const periodo = ref({ periodo: 'mes_actual' })
+const filtros = ref({})
+const params  = computed(() => ({ ...periodo.value, ...filtros.value }))
 const loading = ref(false)
 const data    = ref(null)
 const sa = computed(() => data.value?.salio || { lotes: [], gramos: {}, gramos_por_planta: {}, floracion: {}, vegetativo: {}, cumplieron: 0, evaluables: 0 })
@@ -149,7 +157,8 @@ async function cargar() {
     loading.value = false
   }
 }
-function cambiarPeriodo(p) { params.value = p; cargar() }
+function cambiarPeriodo(p) { periodo.value = p; cargar() }
+function cambiarFiltros(f) { filtros.value = f; cargar() }
 
 const nombreEstado = (e) => ESTADO_META[e]?.label || e
 const g   = (v) => `${Number(v).toLocaleString('es-AR', { maximumFractionDigits: 1 })} g`
@@ -226,4 +235,6 @@ onMounted(cargar)
   .inf__table { display: block; overflow-x: auto; }
   .inf__table th, .inf__table td { white-space: nowrap; }
 }
+.inf__filtros { margin: calc(-1 * var(--sp-3)) 0 var(--sp-5); }
+.inf__filtrado { margin: 0 0 var(--sp-5); padding: .55rem .9rem; background: var(--c-leaf-100); color: var(--c-leaf-800); border-radius: var(--r-md); font-size: var(--fs-13); font-weight: 600; }
 </style>

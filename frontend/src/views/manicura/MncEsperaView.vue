@@ -64,6 +64,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { Clock, Scale, ChevronRight } from 'lucide-vue-next'
 import { listLotes } from '../../lib/api.js'
+import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 
 const lotes   = ref([])
 const loading = ref(true)
@@ -74,19 +75,22 @@ const paginados  = computed(() => lotes.value.slice((page.value - 1) * PER_PAGE,
 const totalPages = computed(() => Math.max(1, Math.ceil(lotes.value.length / PER_PAGE)))
 watch(lotes, () => { page.value = 1 })
 
-async function cargar() {
-  loading.value = true
+async function cargar({ silencioso = false } = {}) {
+  if (!silencioso) loading.value = true
   try {
     const { data } = await listLotes({ pesaje_enviado: true })
     lotes.value = Array.isArray(data) ? data : (data?.data || [])
   } catch {
-    lotes.value = []
+    if (!silencioso) lotes.value = []
   } finally {
     loading.value = false
   }
 }
 
 onMounted(cargar)
+// Cuando el admin confirma (o reabre), el lote sale de acá solo: es la pantalla donde la manicura
+// espera esa respuesta.
+useRecargaEnCambios(['pesajes', 'lotes'], () => cargar({ silencioso: true }))
 </script>
 
 <style scoped>

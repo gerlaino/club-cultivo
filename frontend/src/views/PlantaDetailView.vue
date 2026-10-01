@@ -6,7 +6,7 @@ import { LAYOUT_PLANTA, dibujarBanderitaPlanta } from '../lib/pdfEtiquetas.js'
 import { usePlantsStore } from '../stores/plants'
 import { useAuthStore }   from '../stores/auth'
 import { useClubStore }   from '../stores/club'
-import { getPlantActivities, createPlantActivity, updatePlant, descartarPlant, deletePlant, registrarPesoPlanta, addPlantFoto, removePlantFoto } from '../lib/api'
+import { getPlantActivities, createPlantActivity, updatePlant, descartarPlant, deletePlant, registrarPesoPlanta, addPlantFoto, removePlantFoto, quitarPlantaPesajeManicura } from '../lib/api'
 import { achicarImagen } from '../lib/imagenes.js'
 import { estadoPlantaLabel } from '../lib/loteHelpers.js'
 import { useManicuraJornada } from '../composables/useManicuraJornada'
@@ -453,7 +453,11 @@ async function saveManicura() {
       (extra) => registrarPesoPlanta(id, { peso_seco_g: pesoManicura.value, ...extra }))
     if (!res) return // la manicura canceló
     const { data } = res
-    if (plants.current) plants.current.peso_seco = data?.planta?.peso_seco ?? pesoManicura.value
+    if (plants.current) {
+      plants.current.peso_seco = data?.planta?.peso_seco ?? pesoManicura.value
+      // Quedó en la jornada abierta de quien pesa: desde acá se la puede sacar.
+      plants.current.jornada_pesaje = { id: data?.pesaje?.id, estado: 'borrador', mia: true }
+    }
     manicuraSaved.value = true
     editandoManicura.value = false // vuelve a modo lectura con el peso ya guardado
     toast.success('Peso registrado en el pesaje del lote')
@@ -464,10 +468,35 @@ async function saveManicura() {
   }
 }
 
+// Las mismas que acepta el backend: manicura, admin o supervisor; lote en manicura; y una
+// descartada no se pesa.
 const canManicura = computed(() =>
-  ['manicura', 'admin'].includes(auth.user?.role) &&
-  ['en_manicura'].includes(planta.value?.lote?.estado)
+  ['manicura', 'admin', 'supervisor'].includes(auth.user?.role) &&
+  ['en_manicura'].includes(planta.value?.lote?.estado) &&
+  planta.value?.state !== 'descartada'
 )
+const jornadaConfirmada = computed(() => planta.value?.jornada_pesaje?.estado === 'confirmado')
+const jornadaAbiertaMia = computed(() => planta.value?.jornada_pesaje?.estado === 'borrador' && planta.value?.jornada_pesaje?.mia)
+const quitandoManicura  = ref(false)
+async function quitarDeJornada() {
+  const j = planta.value?.jornada_pesaje
+  if (!j || quitandoManicura.value) return
+  const ok = await confirm({
+    title: 'Quitar de la jornada',
+    message: `¿Sacar ${planta.value.nombre} de la jornada? Vuelve a quedar sin pesar.`,
+    confirmText: 'Quitar', variant: 'danger',
+  })
+  if (!ok) return
+  quitandoManicura.value = true
+  try {
+    await quitarPlantaPesajeManicura(planta.value.lote.id, j.id, planta.value.id)
+    if (plants.current) Object.assign(plants.current, { peso_seco: null, peso_humedo: null, jornada_pesaje: null })
+    pesoManicura.value = null
+    toast.success(`${planta.value.nombre} quedó sin pesar`)
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo quitar')
+  } finally { quitandoManicura.value = false }
+}
 
 // ── Nuevo modal registro planta ───────────────────────────
 const showRegistroPlanta = ref(false)
@@ -663,7 +692,15 @@ onMounted(async () => {
         <div v-if="pesoGuardado && !editandoManicura" class="pd__mnc-done">
           <span class="pd__mnc-done-val">{{ parseFloat(planta.peso_seco).toFixed(1) }}<small>g</small></span>
           <span class="pd__mnc-done-lbl"><i class="bi bi-check-circle-fill"></i> Peso guardado</span>
-          <button class="pd__mnc-edit" @click="editarManicura"><i class="bi bi-pencil"></i> Editar</button>
+          <!-- Jornada confirmada: el peso ya está en el stock; lo corrige administración. -->
+          <span v-if="jornadaConfirmada" class="pd__mnc-nota">Jornada confirmada: si está mal, lo corrige administración desde el pesaje.</span>
+          <template v-else>
+            <button class="pd__mnc-edit" @click="editarManicura"><i class="bi bi-pencil"></i> Editar</button>
+            <!-- Se pesó la que no era: sacarla de la jornada abierta sin borrar todo lo demás. -->
+            <button v-if="jornadaAbiertaMia" class="pd__mnc-cancel" :disabled="quitandoManicura" @click="quitarDeJornada">
+              <i class="bi bi-x-circle"></i> Quitar de la jornada
+            </button>
+          </template>
         </div>
 
         <!-- Sin pesar o editando: input + Guardar -->
@@ -789,6 +826,8 @@ onMounted(async () => {
                           <div v-if="a.metadata?.ph"          class="pd__metrica"><span>🧪</span><span>pH {{ a.metadata.ph }}</span></div>
                           <div v-if="a.metadata?.ec"          class="pd__metrica"><span>⚡</span><span>EC {{ a.metadata.ec }}</span></div>
                           <div v-if="a.metadata?.co2"         class="pd__metrica"><span>💨</span><span>{{ a.metadata.co2 }} ppm</span></div>
+                          <!-- Riego por planta: lo que recibió ESTA planta. -->
+                          <div v-if="a.metadata?.riego_planta" class="pd__metrica"><span>💧</span><span>{{ a.metadata.riego_planta.texto }}</span></div>
                         </div>
                         <div v-if="a.description" class="pd__act-desc">{{ a.description }}</div>
                       </template>
@@ -1448,6 +1487,7 @@ onMounted(async () => {
 .pd__mnc-done-val { font-size: 1.4rem; font-weight: 800; color: #15803d; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 .pd__mnc-done-val small { font-size: .8rem; font-weight: 600; color: #4b8b5e; margin-left: 1px; }
 .pd__mnc-done-lbl { font-size: .74rem; color: #15803d; font-weight: 600; display: inline-flex; align-items: center; gap: .3rem; }
+.pd__mnc-nota { font-size: .76rem; color: var(--c-ink-700); }
 .pd__mnc-edit {
   margin-left: auto; display: inline-flex; align-items: center; gap: .35rem;
   background: #fff; border: 1.5px solid #cbe3d1; color: #15803d; font-weight: 600;

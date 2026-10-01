@@ -137,6 +137,49 @@ RSpec.describe Stocks::Trazabilidad do
       expect(t[:frase]).to include('La cuenta cierra.')
     end
 
+    # AC (1-oct-2026): un frasco que nació del pesaje de manicura cierra su cuenta. El pesaje suma a
+    # la cantidad inicial Y deja un movimiento de producción; contar los dos inventaba un faltante.
+    describe 'un frasco que nació del pesaje de manicura' do
+      let(:frasco) { Stock.create!(sede: sede, lote: lote, origen: 'lote', forma_producto: 'flor_seca', unidad: 'g', cantidad: 0) }
+
+      def pesar!(gramos)
+        pesaje = lote.pesajes_manicura.create!(manicurador: admin, club: club, fecha_pesaje: Time.zone.today)
+        pesaje.pesadas_plantas.create!(plant: create(:plant, lote: lote), peso_seco_g: gramos, es_promedio: false)
+        pesaje.confirmar_directo!(confirmado_por: admin, stock: frasco)
+      end
+
+      it 'recién pesado: entraron 100, quedan 100, la cuenta cierra' do
+        pesar!(100)
+        t = traza(frasco.reload)
+        expect(t[:totales]).to include(gramos_producidos: 100.0, entradas_g: 0.0, sin_explicar_g: 0.0)
+        expect(t[:salidas]).to be_empty
+        expect(t[:frase]).to include('La cuenta cierra.')
+      end
+
+      it 'con dos jornadas de pesaje y una dispensa, también cierra' do
+        pesar!(60)
+        pesar!(40)
+        dispensar([[frasco.reload, 25]])
+        t = traza(frasco.reload)
+        expect(t[:totales]).to include(gramos_producidos: 100.0, gramos_dispensados: 25.0, cantidad_disponible_g: 75.0, sin_explicar_g: 0.0)
+      end
+
+      it 'reajustar el pesaje (para arriba o para abajo) tampoco inventa nada' do
+        pesaje = pesar!(100)
+        pesaje.reajustar_peso_confirmado!(nuevo_peso: 120, usuario: admin)
+        expect(traza(frasco.reload)[:totales]).to include(gramos_producidos: 120.0, sin_explicar_g: 0.0)
+        pesaje.reajustar_peso_confirmado!(nuevo_peso: 90, usuario: admin)
+        t = traza(frasco.reload)
+        expect(t[:totales]).to include(gramos_producidos: 90.0, otras_salidas_g: 0.0, sin_explicar_g: 0.0)
+      end
+
+      it 'un faltante de verdad se sigue viendo' do
+        pesar!(100)
+        frasco.reload.update!(cantidad: 95)
+        expect(traza(frasco.reload)[:totales][:sin_explicar_g]).to eq(5.0)
+      end
+    end
+
     it 'lo que ningún movimiento explica se dice, y la cuenta no cierra' do
       flor.update!(cantidad: 90) # bajó sin movimiento ni dispensa
 

@@ -222,6 +222,10 @@ class Lote < ApplicationRecord
   # Los que están enraizando: viven en un propagador con su propio clima (la sala marca 60% de
   # humedad y adentro hay 90%), así que el registro de la sala no les corresponde.
   scope :enraizando, -> { where(estado: 'enraizado') }
+  # Los que reciben el registro (y el riego) de la sala: todo lo que está en cultivo MENOS lo que
+  # enraíza, que tiene su propio microclima y entra por `registrar_enraizado`.
+  ESTADOS_REGISTRO_SALA = (CULTIVO_ESTADOS - %w[enraizado]).freeze
+  scope :reciben_registro_de_sala, -> { where(estado: ESTADOS_REGISTRO_SALA) }
   scope :activos,     -> { where.not(estado: 'finalizado') }
   scope :en_ciclo,    -> { where(estado: CICLO_FASES + ['finalizado']) }
   scope :finalizados, -> { where(estado: 'finalizado') }
@@ -678,6 +682,26 @@ class Lote < ApplicationRecord
   # Cuando todas las plantas están procesadas, el lote pasa a 'curado' (el stock de
   # flor_seca ya lo creó PesajeManicura#confirmar — acá empieza el curado). El lote
   # llega a 'finalizado' recién cuando se agota su stock (ver finalizar_si_stock_agotado!).
+  # Cuántas plantas se pesan en la manicura (no descartadas), cuántas ya están en alguna jornada y
+  # cuántas faltan. Una sola cuenta para todas las pantallas (y para el progreso del QR).
+  def progreso_manicura
+    vivas   = plants.where.not(state: 'descartada')
+    pesadas = PesadaPlanta.joins(:pesaje_manicura).where(pesajes_manicura: { lote_id: id })
+                          .where(plant_id: vivas.select(:id)).distinct.count(:plant_id)
+    total = vivas.count
+    { plantas: total, pesadas: pesadas, sin_pesar: [total - pesadas, 0].max }
+  end
+
+  # Lo que rindió el lote = la suma de sus pesajes confirmados. Se fija al cerrar la manicura
+  # (`check_and_finalize_manicura!`); si después se reajusta un pesaje, se vuelve a sumar. Mientras
+  # está en manicura no se toca: el cierre lo calcula.
+  def recalcular_rendimiento_manicura!
+    return if estado == 'en_manicura'
+    return unless pesajes_manicura.confirmados.exists?
+
+    update!(rendimiento_real_g: pesajes_manicura.confirmados.sum(:peso_confirmado_g).to_d)
+  end
+
   def check_and_finalize_manicura!(finalizador: nil)
     return unless estado == 'en_manicura'
 
@@ -751,6 +775,9 @@ class Lote < ApplicationRecord
     # Mismo criterio que la validación (`stock_remanente`), para que las dos no puedan
     # divergir: si una dice "cerrado" y la otra "queda producto", el lote no se guarda nunca.
     return if stock_remanente.exists? || stocks.empty?
+    # Y además, ningún frasco ABIERTO aunque esté vacío (1-oct-2026): quedó así al dispensar lo
+    # último sin cerrarlo, para rellenarlo. El lote se finaliza cuando el admin cierra el último.
+    return if stocks.where.not(estado: 'agotado').exists?
 
     # El evento necesita autor: `lote_eventos.user_id` es NOT NULL en la base. Todos los
     # caminos reales lo traen (la dispensación pasa su `user`, el ajuste de inventario pasa

@@ -194,6 +194,8 @@ Rails.application.routes.draw do
           post  :confirmar
           post  :reabrir
           patch :reajustar_peso
+          # Sacar una planta mal elegida de la jornada ABIERTA (vuelve a quedar sin pesar).
+          delete 'plantas/:plant_id', action: :quitar_planta, as: :quitar_planta
         end
       end
       member do
@@ -232,6 +234,7 @@ Rails.application.routes.draw do
         post :descartar
         post :consumir
         post :producir
+        post :separar    # partir un frasco en varios (copones, bajos…)
         get  :movimientos
       end
     end

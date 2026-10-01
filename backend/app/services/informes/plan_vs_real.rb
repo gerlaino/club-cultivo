@@ -16,10 +16,12 @@ module Informes
     TOLERANCIA_GRAMOS_PCT = 10
     TOLERANCIA_DIAS       = 7
 
-    def initialize(club:, desde:, hasta:)
-      @club  = club
-      @desde = desde
-      @hasta = hasta
+    # Filtros (fase 2, 30-sep-2026): lotes, genéticas y sedes, en los tres bloques.
+    def initialize(club:, desde:, hasta:, filtros: nil)
+      @club    = club
+      @desde   = desde
+      @hasta   = hasta
+      @filtros = filtros || Filtros.new(club: club)
     end
 
     def call
@@ -31,10 +33,15 @@ module Informes
         # que avisar, y el informe sale igual en los dos casos.
         aviso_sin_metros: aviso_sin_metros,
         tolerancia: { gramos_pct: TOLERANCIA_GRAMOS_PCT, dias: TOLERANCIA_DIAS },
+        filtros:    @filtros.to_h,
       }
     end
 
     private
+
+    def lotes_base
+      @filtros.acotar_lotes(@club.lotes)
+    end
 
     # Fecha de entrada a cada estado, por lote: la PRIMERA vez que entró.
     def entradas(lotes_ids)
@@ -54,7 +61,7 @@ module Informes
     # ── 1. Cómo salió ────────────────────────────────────────────────────────
 
     def salio
-      lotes = @club.lotes.includes(:genetica).to_a
+      lotes = lotes_base.includes(:genetica).to_a
       ents  = entradas(lotes.map(&:id))
       cosechados = lotes.select do |l|
         f = ents[l.id]['cosecha'] || ents[l.id]['en_manicura'] || ents[l.id]['curado'] || ents[l.id]['finalizado']
@@ -135,7 +142,7 @@ module Informes
     # ── 2. Cómo viene ────────────────────────────────────────────────────────
 
     def viene
-      lotes = @club.lotes.where(estado: Lote::CULTIVO_ESTADOS).includes(:genetica, :sala).to_a
+      lotes = lotes_base.where(estado: Lote::CULTIVO_ESTADOS).includes(:genetica, :sala).to_a
       ents  = entradas(lotes.map(&:id))
       hoy   = Time.zone.today
       lotes.map do |l|
@@ -165,7 +172,7 @@ module Informes
     # Cuántos lotes del informe no tienen metros declarados: el aviso de arriba de la pantalla
     # y del PDF. No bloquea nada — el informe sale igual, con lo que se puede calcular.
     def aviso_sin_metros
-      lotes = @club.lotes.where('rendimiento_real_g > 0').includes(:sala).to_a
+      lotes = lotes_base.where('rendimiento_real_g > 0').includes(:sala).to_a
       sin   = lotes.count { |l| l.m2_efectivos.to_f <= 0 }
       return nil if sin.zero?
 
@@ -179,7 +186,7 @@ module Informes
     # Sobre TODOS los lotes cerrados de la organización (no sólo los del período): la ficha se
     # compara contra la historia entera, que es lo que la corrige.
     def geneticas
-      lotes = @club.lotes.where('rendimiento_real_g > 0').where.not(genetica_id: nil).includes(:genetica).to_a
+      lotes = lotes_base.where('rendimiento_real_g > 0').where.not(genetica_id: nil).includes(:genetica).to_a
       ents  = entradas(lotes.map(&:id))
       lotes.group_by(&:genetica).filter_map do |g, ls|
         next if g.nil?

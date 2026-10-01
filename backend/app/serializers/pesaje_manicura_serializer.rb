@@ -26,6 +26,8 @@ class PesajeManicuraSerializer
       peso_confirmado_g: pesaje.peso_confirmado_g&.to_f,
       plantas_count:     pesaje.plantas_count || plantas_count_real,
       plantas_registradas: plantas_count_real,
+      # Qué plantas tiene esta jornada (la pantalla ofrece «Quitar» en las de la jornada abierta).
+      plant_ids:         pesaje.pesadas_plantas.loaded? ? pesaje.pesadas_plantas.map(&:plant_id) : pesaje.pesadas_plantas.pluck(:plant_id),
       notas:             pesaje.notas,
       enviado_at:        pesaje.enviado_at,
       confirmado_at:     pesaje.confirmado_at,
@@ -41,6 +43,18 @@ class PesajeManicuraSerializer
         estado:              pesaje.stock.estado,
         sede_nombre:         pesaje.stock.sede&.nombre,
       }
+    end
+
+    # A qué frascos fue (uno, o varios si se repartió). Un pesaje viejo sin filas: su `stock`.
+    if pesaje.confirmado?
+      filas = pesaje.destinos.includes(:stock).to_a
+      result[:destinos] = if filas.any?
+        filas.map { |d| { stock_id: d.stock_id, numero: d.stock&.numero_lote_producto, descripcion: d.stock&.descripcion, gramos: d.gramos.to_f } }
+      elsif pesaje.stock
+        [{ stock_id: pesaje.stock_id, numero: pesaje.stock.numero_lote_producto, descripcion: pesaje.stock.descripcion, gramos: pesaje.peso_confirmado_g.to_f }]
+      else
+        []
+      end
     end
 
     if include_plantas

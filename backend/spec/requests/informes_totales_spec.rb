@@ -111,8 +111,11 @@ RSpec.describe 'Informes — los totales tienen que cerrar', type: :request do
     def cosechado!(g_plan:, g_real:, flora_plan: 60, flora_dias: 60, plantas: 10)
       l = lote!(estado: 'curado', rendimiento_objetivo_g: g_plan, rendimiento_real_g: g_real,
                 dias_floracion_objetivo: flora_plan, plants_count_cosechadas: plantas)
-      l.lote_eventos.create!(tipo: 'cambio_estado', estado_nuevo: 'floracion', club: club, user: admin, registrado_en: (flora_dias + 2).days.ago)
-      l.lote_eventos.create!(tipo: 'cambio_estado', estado_nuevo: 'cosecha', club: club, user: admin, registrado_en: 2.days.ago)
+      # La cosecha, dentro del mes actual SIEMPRE: «hace 2 días» caía en el mes anterior los días
+      # 1 y 2 y el informe de «mes_actual» salía vacío (falló el 1-oct-2026).
+      cosecha = Time.zone.now.beginning_of_month
+      l.lote_eventos.create!(tipo: 'cambio_estado', estado_nuevo: 'floracion', club: club, user: admin, registrado_en: cosecha - flora_dias.days)
+      l.lote_eventos.create!(tipo: 'cambio_estado', estado_nuevo: 'cosecha', club: club, user: admin, registrado_en: cosecha)
       l
     end
 

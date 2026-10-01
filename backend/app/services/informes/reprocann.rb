@@ -11,10 +11,13 @@ module Informes
   class Reprocann
     LISTA_PANTALLA = 200
 
-    def initialize(club:, desde:, hasta:)
-      @club  = club
-      @desde = desde
-      @hasta = hasta
+    # Filtros (fase 2, 30-sep-2026): sólo pacientes — acota la nómina, sus entregas y sus
+    # pendientes. «Para presentar» y la declaración semestral no se filtran (no los pasan).
+    def initialize(club:, desde:, hasta:, filtros: nil)
+      @club    = club
+      @desde   = desde
+      @hasta   = hasta
+      @filtros = filtros
     end
 
     # LA POBLACIÓN, en un solo lugar: la preguntan el informe REPROCANN y la declaración semestral,
@@ -25,6 +28,7 @@ module Informes
     # lo mismo hoy que dentro de un año.
     def activos(al: nil)
       scope = Paciente.for_club(@club.id).where(es_paciente: true)
+      scope = scope.where(id: @filtros.paciente_ids) if @filtros&.paciente_ids
       return scope if al.nil?
 
       fin = al.to_date.end_of_day

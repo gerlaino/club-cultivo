@@ -11,10 +11,12 @@
         <!-- DOS documentos, no dos modos del mismo archivo. Presentar es un acto aparte que la app
              no hace: el PDF de arriba sale siempre para que la organización vea su realidad; éste
              valida que todo lo que aparece esté vinculado al INASE y no sale si falta algo. -->
+        <!-- Lo que se presenta es la organización entera: sale sin filtros aunque la pantalla
+             esté filtrada (el backend no los aplica), y el botón lo dice. -->
         <button class="inf__pdf" :disabled="!data || exporting"
-                title="Valida que todas las variedades del informe estén vinculadas al INASE"
+                :title="data?.filtros?.activo ? 'Sale completo, sin los filtros: lo que se presenta es la organización entera' : 'Valida que todas las variedades del informe estén vinculadas al INASE'"
                 @click="exportarPdf({ ...params, para_presentar: 1 })">
-          <i class="bi bi-patch-check"></i> Para presentar
+          <i class="bi bi-patch-check"></i> Para presentar<template v-if="data?.filtros?.activo"> (completo)</template>
         </button>
         <button class="inf__pdf" :disabled="!data || exporting" @click="exportarXlsx(params)">
           <i class="bi bi-file-earmark-spreadsheet"></i> Excel
@@ -22,10 +24,14 @@
       </div>
     </div>
 
+    <FiltrosInforme class="inf__filtros" :usa="['lotes', 'geneticas', 'sedes']" @change="cambiarFiltros" />
+
     <div v-if="loading" class="inf__loading">Cargando…</div>
 
     <div v-else-if="data" ref="hoja" class="inf__hoja">
       <p v-if="data.resena" class="inf__resena">{{ data.resena }}</p>
+      <!-- Un informe filtrado lo dice arriba de todo (y el PDF y el Excel también). -->
+      <p v-if="data.filtros?.activo" class="inf__filtrado"><i class="bi bi-funnel-fill"></i> Filtrado — {{ data.filtros.descripcion }}</p>
 
       <!-- UN AVISO, sólo si hay algo, y sólo sobre lo que SALE en este informe. No un KPI en grande
            en un documento que se presenta (decisión de Germán, sep-2026). Es la misma lista que la
@@ -130,15 +136,19 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { FileBadge } from 'lucide-vue-next'
 import api from '../../lib/api.js'
 import { useInformePdf } from '../../composables/useInformePdf.js'
 import SelectorPeriodo from '../../components/informes/SelectorPeriodo.vue'
+import FiltrosInforme from '../../components/informes/FiltrosInforme.vue'
 
 const loading = ref(false)
 const data    = ref(null)
-const params  = ref({ periodo: 'anio' })
+// Los MISMOS parámetros para la pantalla y para la descarga: período + filtros.
+const periodo = ref({ periodo: 'anio' })
+const filtros = ref({})
+const params  = computed(() => ({ ...periodo.value, ...filtros.value }))
 const { hoja, exporting, exportarPdf, exportarXlsx } = useInformePdf('informe_inase')
 
 const formatGramos = (g) => g != null ? `${Number(g).toLocaleString('es-AR')} g` : '—'
@@ -153,7 +163,8 @@ async function cargar() {
   }
 }
 
-function cambiarPeriodo(p) { params.value = p; cargar() }
+function cambiarPeriodo(p) { periodo.value = p; cargar() }
+function cambiarFiltros(f) { filtros.value = f; cargar() }
 
 onMounted(cargar)
 </script>
@@ -197,4 +208,6 @@ onMounted(cargar)
 .inf__obtentor { color: var(--c-ink-500); }
 .inf__acredita { font-size: var(--fs-12); color: var(--c-ink-500); margin-top: 2px; }
 .inf__sin-vinculo { display: inline-block; margin-left: var(--sp-2); padding: 1px 7px; border-radius: 999px; background: var(--c-amber-100); color: var(--c-amber-500); font-size: var(--fs-11); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+.inf__filtros { margin: calc(-1 * var(--sp-3)) 0 var(--sp-5); }
+.inf__filtrado { margin: 0 0 var(--sp-5); padding: .55rem .9rem; background: var(--c-leaf-100); color: var(--c-leaf-800); border-radius: var(--r-md); font-size: var(--fs-13); font-weight: 600; }
 </style>

@@ -89,7 +89,7 @@
             <span><Scissors :size="13" :stroke-width="2" /> {{ p.manicurador_nombre }}</span>
             <span><Calendar :size="13" :stroke-width="2" /> {{ fmtDate(p.fecha_pesaje) }}</span>
             <span v-if="p.plantas_registradas">
-              <Package :size="13" :stroke-width="2" /> {{ p.plantas_registradas }} plantas
+              <Package :size="13" :stroke-width="2" /> {{ p.plantas_registradas }} {{ p.plantas_registradas === 1 ? 'planta' : 'plantas' }}
             </span>
           </div>
 
@@ -189,6 +189,11 @@
               <div class="apm-field">
                 <label class="apm-label">Contenedor de stock <span class="apm-label-note">(solo flor seca)</span></label>
                 <div v-if="loadingStocks" class="apm-hint">Cargando contenedores…</div>
+                <!-- Repartido en varios frascos: copones en uno, bajos en otro (todo del mismo lote). -->
+                <template v-else-if="repartir">
+                  <RepartoFrascos v-model="reparto" :contenedores="contenedores" :peso-total="Number(form.peso_confirmado_g) || 0" />
+                  <button type="button" class="apm-link" @click="repartir = false">Mandar todo a un solo frasco</button>
+                </template>
                 <div v-else class="apm-cont-list">
                   <!-- Crear nuevo -->
                   <button
@@ -222,14 +227,18 @@
                         <span class="apm-cont__tag apm-cont__tag--gen"><Leaf :size="11" :stroke-width="2" /> {{ s.genetica_nombre || '—' }}</span>
                         <span class="apm-cont__tag">Lote {{ s.lote_codigo || s.lote?.codigo || '—' }}</span>
                         <span class="apm-cont__tag">{{ s.sede?.nombre || (s.estado === 'pendiente_asignacion' ? 'Sin asignar' : 'Sin sede') }}</span>
+                        <span v-if="s.estado === 'agotado'" class="apm-cont__tag apm-cont__tag--vacio">Vacío · se vuelve a usar</span>
                       </span>
                     </span>
                   </button>
                 </div>
-                <span class="apm-hint">
-                  <template v-if="form.stock_id">Se sumará el peso al contenedor seleccionado.</template>
-                  <template v-else>Se creará un contenedor nuevo de flor seca para este lote.</template>
-                </span>
+                <template v-if="!repartir && !loadingStocks">
+                  <span class="apm-hint">
+                    <template v-if="form.stock_id">Se sumará el peso al contenedor seleccionado.</template>
+                    <template v-else>Se creará un contenedor nuevo de flor seca para este lote.</template>
+                  </span>
+                  <button type="button" class="apm-link" @click="empezarReparto">Repartir en varios frascos (copones, bajos…)</button>
+                </template>
               </div>
 
               <div v-if="modalError" class="apm-error">{{ modalError }}</div>
@@ -239,11 +248,11 @@
                 <button
                   type="submit"
                   class="apm-btn-ok"
-                  :disabled="saving || !form.peso_confirmado_g || form.peso_confirmado_g <= 0"
+                  :disabled="saving || !form.peso_confirmado_g || form.peso_confirmado_g <= 0 || (repartir && !repartoCuadra)"
                 >
                   <DsSpinner v-if="saving" :size="14" />
                   <CheckCircle v-else :size="13" :stroke-width="2" />
-                  Confirmar y generar stock
+                  {{ repartir ? `Confirmar en ${reparto.length} frascos` : 'Confirmar y generar stock' }}
                 </button>
               </div>
             </form>
@@ -262,6 +271,7 @@ import DsSpinner from '../../design-system/components/Spinner.vue'
 import { Scale, Scissors, Leaf, Calendar, Package, CheckCircle, Clock, X, MessageCircle, List, Trash2, RotateCcw, Plus } from 'lucide-vue-next'
 import { listPesajesManicuraAdmin, confirmarPesajeManicura, deletePesajeManicura, reabrirPesajeManicura, listStocks, listLotes } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import RepartoFrascos from '../../components/manicura/RepartoFrascos.vue'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useAuthStore } from '../../stores/auth'
 import CompletarManicuraModal from '../../components/lotes/CompletarManicuraModal.vue'
@@ -297,15 +307,24 @@ const saving        = ref(false)
 const modalError    = ref('')
 
 const form = ref({ peso_confirmado_g: null, stock_id: null })
+// Reparto en varios frascos (copones, bajos…): filas { stock_id | null = nuevo, descripcion, gramos }.
+const repartir = ref(false)
+const reparto  = ref([])
+const repartoCuadra = computed(() => {
+  const suma = reparto.value.reduce((s, f) => s + (Number(f.gramos) || 0), 0)
+  return reparto.value.length > 1 && reparto.value.every(f => Number(f.gramos) > 0) && Math.abs(suma - Number(form.value.peso_confirmado_g || 0)) < 0.01
+})
+function empezarReparto() {
+  repartir.value = true
+  reparto.value = [
+    { stock_id: null, descripcion: 'Copones', gramos: null },
+    { stock_id: null, descripcion: 'Bajos', gramos: null },
+  ]
+}
 
-// El backend (GET /stocks?lote_id) ya devuelve solo los contenedores flor_seca del lote
-// en estado pendiente_asignacion/asignado; filtramos de nuevo por las dudas.
-const contenedores = computed(() =>
-  stocks.value.filter(s =>
-    s.forma_producto === 'flor_seca' &&
-    ['pendiente_asignacion', 'asignado'].includes(s.estado)
-  )
-)
+// Los frascos de flor del lote, también los que ya se vaciaron (`incluir_vacios`): se vuelven a
+// usar y el backend los reabre al recibir el peso.
+const contenedores = computed(() => stocks.value.filter(s => s.forma_producto === 'flor_seca'))
 
 async function cargar() {
   loading.value = true
@@ -335,11 +354,13 @@ async function abrirConfirmacion(p) {
     peso_confirmado_g: p.peso_total_g || p.peso_calculado_g || null,
     stock_id: null,
   }
+  repartir.value = false
+  reparto.value  = []
   modalError.value = ''
   modalOpen.value  = true
   loadingStocks.value = true
   try {
-    const { data } = await listStocks({ lote_id: p.lote_id })
+    const { data } = await listStocks({ lote_id: p.lote_id, incluir_vacios: 1 })
     stocks.value = data || []
   } catch {
     stocks.value = []
@@ -400,7 +421,7 @@ async function eliminar(p) {
 }
 
 async function confirmar() {
-  if (!form.value.peso_confirmado_g || form.value.peso_confirmado_g <= 0) return
+  if (saving.value || !form.value.peso_confirmado_g || form.value.peso_confirmado_g <= 0) return
   saving.value     = true
   modalError.value = ''
   try {
@@ -409,16 +430,25 @@ async function confirmar() {
       pesajeActivo.value.id,
       {
         peso_confirmado_g: form.value.peso_confirmado_g,
-        stock_id:          form.value.stock_id || undefined,
+        ...(repartir.value
+          ? { destinos: reparto.value.map(f => ({ stock_id: f.stock_id || undefined, gramos: f.gramos, descripcion: f.stock_id ? undefined : (f.descripcion || undefined) })) }
+          : { stock_id: form.value.stock_id || undefined }),
       }
     )
-    const stockLabel = form.value.stock_id
-      ? `sumado al stock existente`
-      : `nuevo contenedor creado`
+    const stockLabel = repartir.value
+      ? `repartido en ${reparto.value.length} frascos`
+      : form.value.stock_id ? `sumado al stock existente` : `nuevo contenedor creado`
     toast.success(`Pesaje de ${pesajeActivo.value.lote_codigo} confirmado — ${form.value.peso_confirmado_g}g · ${stockLabel}`)
     cerrarModal()
     cargar()
   } catch (e) {
+    // Ya lo confirmó otra persona: no es un error de quien está acá, se saca de la lista.
+    if (e.response?.data?.ya_confirmado) {
+      toast.info(e.response.data.error)
+      cerrarModal()
+      cargar()
+      return
+    }
     modalError.value = e.response?.data?.error || e.response?.data?.errors?.[0] || 'Error al confirmar'
   } finally {
     saving.value = false
@@ -685,4 +715,6 @@ useRecargaEnCambios(['pesajes', 'stocks'], cargar)
 /* Transition */
 .apm-fade-enter-active, .apm-fade-leave-active { transition: opacity .2s; }
 .apm-fade-enter-from,  .apm-fade-leave-to      { opacity: 0; }
+.apm-cont__tag--vacio { background: var(--c-amber-100); color: var(--c-slate-900); }
+.apm-link { display: inline-block; margin-top: .45rem; background: none; border: 0; padding: 0; color: var(--brand-primary); font-size: .82rem; font-weight: 600; cursor: pointer; text-decoration: underline; }
 </style>

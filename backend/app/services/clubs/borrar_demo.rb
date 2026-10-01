@@ -63,6 +63,9 @@ module Clubs
         ['dispensacion_items',           'dispensacion_id',     disp_ids],
         ['cobros',                       'dispensacion_id',     disp_ids],
         ['pesadas_plantas',              'pesada_id',           pesada_ids],
+        # Las del pesaje de manicura cuelgan de `pesaje_manicura_id`, no de `pesada_id`: por la
+        # planta se alcanzan las dos (un demo con manicura no se podía regenerar, 1-oct-2026).
+        ['pesadas_plantas',              'plant_id',            plant_ids],
         ['stock_movimientos',            'stock_id',            stock_ids],
         ['plant_activities',             'plant_id',            plant_ids],
         ['cuenta_corriente_movimientos', 'cuenta_corriente_id', cc_ids],

@@ -1,5 +1,115 @@
 # Changelog
 
+## Octubre 2026 (dt) — Copones y bajos en frascos distintos, el frasco vacío se cierra a mano, manicura sin señal
+
+- **Repartir un pesaje en varios frascos** (tabla `pesaje_destinos`, migración): al confirmar, el
+  admin reparte el peso —«Copones 70 g, Bajos 30 g»— en frascos nuevos (con nombre, en
+  `stocks.descripcion`) o existentes del lote; la suma tiene que ser el peso confirmado
+  (`PesajeManicura#normalizar_destinos`). Todo del mismo lote: la trazabilidad de cada frasco
+  nombra las mismas plantas y cada cuenta cierra. El reajuste es POR FRASCO (`stock_id`) y mueve el
+  peso del pesaje y el rendimiento del lote. Los pesajes viejos se leen como un único destino.
+  También en «registrar directo» del admin (pesa y confirma en un paso): la suma es lo pesado.
+- **Separar un frasco ya creado** (`POST /stocks/:id/separar`, `Stocks::Separar`): «pesé el lote
+  entero, confirmé, y ahora separo los bajos de los copones». Ficha del frasco → «Separar en
+  frascos»: cada frasco nuevo con nombre, cantidad y precio (sin precio hereda el del original),
+  misma sede, lote, genética y fecha de elaboración; el original se puede renombrar. Es el mismo
+  traslado que «Repartir» (la trazabilidad dice «fraccionado de» / «siguió en» y cierra). Sólo lo
+  guardado y libre (`Stock#separable`: sin lo de la mesa, reservado o apartado), y algo tiene que
+  quedar en el original.
+- **Lo último de un frasco ya no lo cierra solo**: el modal de dispensa pregunta «¿Cerrás el
+  frasco?» (`cantidad_frasco`: el frasco entero, depósito + mesa). «Dejarlo abierto» manda
+  `dejar_abiertos` y el frasco queda vacío y abierto para rellenarlo; Stock → «Vacíos» los lista
+  con «Cerrar», que no pide motivo (no sale nada) y finaliza el lote si era su último frasco
+  abierto. Sin elegir (reservas, API) se cierra como siempre.
+- **El lote espera a sus frascos**: `finalizar_si_stock_agotado!` no finaliza mientras quede un
+  frasco abierto aunque esté vacío («el frasco se finaliza cuando el admin lo finaliza»).
+- **Pesar una planta sin señal** (escaneada o en la tabla) se guarda en el teléfono y se manda
+  sola (`registrarPesoPlantaOffline`); la fila dice «sin enviar». Si la primera vez sí había
+  llegado, el backend contesta `ya_registrado` y la cola no lo marca fallido.
+- **Más pantallas al día solas**: «En espera de aprobación», «Cosechas asignadas», «Por pesar»,
+  jornadas, el progreso del QR, y un punto en «Aprobar» del teléfono con pesajes por confirmar.
+- «Quitar de la jornada» también en la ficha de escritorio de la planta. La pantalla de jornadas
+  del teléfono contaba las descartadas en «Restantes» y en «Vas a enviar X de Y»: ahora usa
+  `lote.manicura` (plantas, pesadas, sin_pesar), una sola cuenta en el backend.
+
+## Octubre 2026 (ds) — Manicura: el pesaje no puede fallar
+
+Revisión completa del pesaje de manicura (Germán: «no podemos fallar ahí»). Lo que estaba abierto:
+- **Confirmar dos veces sumaba dos veces**: `confirmar!`, `enviar!` y el reajuste van con
+  `with_lock`; la segunda confirmación responde «ya fue confirmado por X» (`ya_confirmado: true`)
+  y las pantallas del admin (escritorio y teléfono) la sacan de la lista en vez de mostrar un error.
+- **Una planta, una jornada**: pesar una planta que ya está en otra jornada (QR, ficha, «registrar
+  directo») se rechaza diciendo cómo corregirla — misma jornada: se vuelve a pesar; enviada: se
+  reabre; confirmada: administración reajusta (`PesajeManicura.motivo_no_se_pesa`). La ficha de la
+  planta trae `jornada_pesaje` y la pantalla no ofrece «Editar» sobre una jornada confirmada.
+- **Las descartadas no se pesan**: «cargar el resto» les repartía gramos y el QR las aceptaba
+  (`PesajeManicura.plantas_sin_pesar`). El progreso de la manicura ya no las cuenta en el total
+  (antes «completado» no llegaba nunca) y suma los gramos del LOTE.
+- **Borrar una jornada deja sus plantas sin pesar**: antes conservaban el peso, la pantalla no
+  ofrecía pesarlas, «el resto» las salteaba y el lote quedaba trabado en manicura para siempre.
+- **Reajustar después del cierre corrige el rendimiento del lote** (`Lote#recalcular_rendimiento_manicura!`):
+  Producción, Plan vs real, INASE y g/planta mostraban el peso viejo. Para abajo, no puede quedar
+  en menos de lo que ya salió del frasco, y lo dice con números.
+- **El pesaje va a un frasco de flor seca del lote**, en «confirmar» y en «registrar directo».
+- **Un frasco vacío se vuelve a usar** (Germán: «hoy se dispensó todo, mañana manicuro y lo pongo
+  en ese frasco»): `Stock#reabrir_si_tiene_producto!` lo saca de «agotado» cuando le vuelve
+  producto —otra jornada pesada ahí, un reajuste para arriba, una dispensa anulada cuyo producto
+  vuelve, una dispensa editada para menos— y si su lote se había finalizado, vuelve a curado.
+  Antes la anulación lo dejaba «agotado» con gramos y la lista de stock lo escondía. Al confirmar,
+  `GET /stocks?lote_id=&incluir_vacios=1` ofrece los vacíos marcados «vacío, se vuelve a usar».
+- **Sacar una planta de la jornada abierta** (`DELETE …/pesajes_manicura/:id/plantas/:plant_id`):
+  «Quitar» en la tabla del lote y en la vista del QR; antes había que borrar la jornada entera.
+- **Todo al día sin recargar**: el contador de «Manicura» de la barra del admin, la lista de
+  aprobación del teléfono y la vista del lote de la manicura escuchan los avisos de `pesajes`.
+- «Completar manicura» (ficha del lote) ofrecía descartadas y ya pesadas, y con una jornada enviada
+  daba «Error al registrar» en vez de preguntar seguir/nueva.
+- Recorrida como usuario final (manicura en el teléfono + dos admins): la tabla del lote ofrecía
+  cargarle peso a una DESCARTADA y escondía el estado detrás del código QR en 390 px (la columna QR
+  se oculta en el teléfono); «Cerrar y enviar» decía «1 de 4… las 3 restantes» contando la
+  descartada; escanear una descartada avisa que no se pesa (en gris, no en el verde de «guardado»).
+- `Clubs::BorrarDemo` no alcanzaba las pesadas del pesaje de manicura: un demo con manicura no se
+  podía regenerar (`rake club:demo`). Spec nuevo (no tenía ninguno).
+- Specs que dependían del día: `informes_totales_spec` fechaba la cosecha «hace 2 días» con período
+  «mes actual» y fallaba los días 1 y 2; `recetasMultisede.test.js` abría el formulario antes de
+  tener los productos en una corrida cargada.
+- **`rake manicura:diagnostico`** (sólo lee): plantas pesadas en dos jornadas (con los gramos de
+  más), plantas trabadas, rendimientos que no son la suma de sus pesajes, frascos agotados con
+  producto y pesajes en frascos que no son de flor. `CORREGIR_TRABADAS=1` destraba las trabadas y
+  `CORREGIR_AGOTADOS=1` reabre los frascos agotados con producto.
+
+## Octubre 2026 (dr) — La cuenta del frasco de manicura y la fecha del movimiento de dispensa
+
+- **Trazabilidad de un frasco pesado en manicura**: decía «Faltan 100 g que ningún movimiento
+  explica» sobre un frasco intacto. Confirmar un pesaje suma a `cantidad_inicial` Y deja un
+  movimiento `produccion` positivo (reajustarlo, lo mismo con un `ajuste`); `Stocks::Trazabilidad`
+  contaba las dos cosas. Ahora esos movimientos no son una entrada más (`ya_en_la_inicial?`; el
+  reajuste se reconoce por `PesajeManicura::NOTA_REAJUSTE`). Los datos no cambian: cambia la cuenta.
+- **El movimiento de stock de una dispensa lleva la fecha de la dispensa** (`fecha: fecha_dispensacion`),
+  no la del día de carga; corregirle sólo la fecha a una dispensa mueve sus movimientos
+  (`refechar_movimientos_de_stock`). Lo viejo: `rake stocks:fechar_movimientos_de_dispensa`
+  (en seco; `CONFIRMAR=1` escribe; idempotente).
+
+## Septiembre 2026 (dq) — Riego por lote y por planta, «Riego y nutrición» en el teléfono, informes a medida (fase 2)
+
+- **Agua por lote en el riego de la sala** (sin migración): «Cargar por lote» abre un número por lote
+  y el total es la suma; por defecto sigue siendo el total repartido. Sólo los lotes que reciben el
+  registro de la sala (`recibe_registro_sala`, sin los que enraízan; `Lote.reciben_registro_de_sala`).
+  Un lote sin número queda «sin volumen cargado». Los nutrientes de ese riego se reparten como el
+  agua (`Nutricion::Aplicar#pesos_de`): la solución va en el agua.
+- **Riego por planta** (tabla `riego_plantas`, migración): en el riego del LOTE, «Por plantas» arma
+  tandas —plantas + cuánto recibió cada una, en litros o en pulsos con «1 pulso = X L»—, como en la
+  cosecha o el pesaje. Sólo plantas en pie, cada una en una tanda (`Riegos::PorPlanta`). El volumen
+  del lote es la suma. El historial del lote dice «en 3 plantas: 2 con 1 pulso (0,25 L), 1 con 2
+  pulsos (0,5 L)»; la planta regada ve su cantidad y la no regada no hereda ese riego (sí el aire).
+  La ficha del lote recuerda cuántos litros era un pulso (`litros_por_pulso` en `GET /lotes/:id`).
+- **«Riego y nutrición» en la vista del lote del teléfono** (`LoteNutricionSection`, sin «Comparar»).
+- **Informes a medida, fase 2**: Pérdidas (lotes, genéticas, sedes, origen), Plan vs real (lotes,
+  genéticas, sedes), INASE (lotes, genéticas, sedes) y REPROCANN (pacientes). «Para presentar» sale
+  COMPLETO aunque la pantalla esté filtrada (`filtros_salvo_para_presentar`), y el botón lo dice.
+  El recorte de lotes y stock vive en `Informes::Filtros#acotar_lotes` / `#acotar_stocks`.
+- **Fix: la sede de un lote en cultivo** es la de su sala (`lotes.sede_id` se llena al salir de la
+  sala): el filtro por sede de Producción (fase 1) dejaba afuera todo lo que estaba en vege/flora.
+
 ## Septiembre 2026 (dp) — El agua del riego
 
 - **Volumen del riego como número** (`registros_ambientales.volumen_l`, migración): el formulario

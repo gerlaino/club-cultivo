@@ -21,16 +21,20 @@ module Informes
   class Inase
     ORIGENES = Plant::ORIGENES   # semilla esqueje
 
-    def initialize(club:, desde:, hasta:)
-      @club  = club
-      @desde = desde
-      @hasta = hasta
+    # Filtros (fase 2, 30-sep-2026): lotes, genéticas y sedes. «Para presentar» no se filtra: el
+    # controller no los pasa, porque lo que se presenta al organismo es la organización entera.
+    def initialize(club:, desde:, hasta:, filtros: nil)
+      @club    = club
+      @desde   = desde
+      @hasta   = hasta
+      @filtros = filtros || Filtros.new(club: club)
     end
 
     def call
-      cosechados = Produccion.new(club: @club, desde: @desde, hasta: @hasta).cosechado_en(@desde, @hasta)
-      lotes_cosechados = @club.lotes.where(id: cosechados[:lotes].map { |f| f[:id] })
-      lotes_en_pie     = incluye_hoy? ? @club.lotes.where(estado: Lote::CULTIVO_ESTADOS) : @club.lotes.none
+      cosechados = Produccion.new(club: @club, desde: @desde, hasta: @hasta, filtros: @filtros).cosechado_en(@desde, @hasta)
+      base = @filtros.acotar_lotes(@club.lotes)
+      lotes_cosechados = base.where(id: cosechados[:lotes].map { |f| f[:id] })
+      lotes_en_pie     = incluye_hoy? ? base.where(estado: Lote::CULTIVO_ESTADOS) : @club.lotes.none
 
       variedades = agrupar(lotes_cosechados, plantas: :cosechadas)
       en_cultivo = agrupar(lotes_en_pie,     plantas: :en_pie)
@@ -55,6 +59,7 @@ module Informes
           plantas_en_pie:    en_cultivo.sum { |v| v[:plantas] },
           lotes_en_pie:      en_cultivo.sum { |v| v[:lotes] },
         },
+        filtros: @filtros.to_h,
       }
     end
 

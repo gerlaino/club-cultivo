@@ -934,7 +934,10 @@ export const enviarPesajeManicura     = (loteId, id)       => api.post(`/lotes/$
 export const deletePesajeManicura      = (loteId, id)       => api.delete(`/lotes/${loteId}/pesajes_manicura/${id}`)
 export const reabrirPesajeManicura     = (loteId, id)       => api.post(`/lotes/${loteId}/pesajes_manicura/${id}/reabrir`)
 export const confirmarPesajeManicura  = (loteId, id, payload) => api.post(`/lotes/${loteId}/pesajes_manicura/${id}/confirmar`, payload)
-export const reajustarPesoPesajeManicura = (loteId, id, peso) => api.patch(`/lotes/${loteId}/pesajes_manicura/${id}/reajustar_peso`, { peso_confirmado_g: peso })
+// Saca UNA planta de la jornada abierta (se pesó la que no era): vuelve a quedar sin pesar.
+export const quitarPlantaPesajeManicura = (loteId, id, plantId) => api.delete(`/lotes/${loteId}/pesajes_manicura/${id}/plantas/${plantId}`)
+// `stockId`: el frasco que se corrige (si el pesaje se repartió en varios, el backend lo exige).
+export const reajustarPesoPesajeManicura = (loteId, id, peso, stockId) => api.patch(`/lotes/${loteId}/pesajes_manicura/${id}/reajustar_peso`, { peso_confirmado_g: peso, stock_id: stockId })
 export const listPesajesManicuraAdmin = (params = {})      => api.get('/pesajes_manicura', { params })
 
 // ── Lecturas ambientales ──────────────────────────────────────────────────────
@@ -957,6 +960,10 @@ export const updateStock          = (id, payload)         => api.patch(`/stocks/
 export const asignarStock         = (id, payload)         => api.post(`/stocks/${id}/asignar`, payload)
 export const ajustarStock         = (id, payload)         => api.post(`/stocks/${id}/ajuste`, payload)
 export const descartarStock       = (id, payload)         => api.post(`/stocks/${id}/descartar`, payload)
+// Partir un frasco en varios (copones, bajos…): { frascos: [{ descripcion, gramos, precio_sugerido_ars }], descripcion_origen }
+export const separarStock         = (id, payload)         => api.post(`/stocks/${id}/separar`, payload)
+// Frascos abiertos en 0 g (se dispensó lo último sin cerrarlos): Stock → «Vacíos».
+export const listStocksVacios     = ()                    => api.get('/stocks', { params: { vacios: 1 } })
 // Consumo propio: sólo en uso personal (el backend lo rechaza en una organización).
 export const consumirStock        = (id, payload)         => api.post(`/stocks/${id}/consumir`, payload)
 export const producirStock        = (id, payload)         => api.post(`/stocks/${id}/producir`, payload)

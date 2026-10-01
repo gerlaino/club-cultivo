@@ -63,4 +63,14 @@ describe('Informe de Pérdidas — la pantalla muestra lo que el backend manda',
   it('no hay stock vencido: no existe', () => {
     expect(wrapper.text()).not.toMatch(/vencid/i)
   })
+
+  // Fase 2 de filtros (30-sep-2026).
+  it('ofrece lotes, genéticas, sedes y origen, y filtrado lo dice', async () => {
+    expect(wrapper.findComponent({ name: 'FiltrosInforme' }).props('usa')).toEqual(['lotes', 'geneticas', 'sedes', 'origen'])
+    apiGet.mockResolvedValue({ data: { ...PAYLOAD, filtros: { activo: true, descripcion: 'Sedes: Norte' } } })
+    wrapper.findComponent({ name: 'FiltrosInforme' }).vm.$emit('change', { sede_ids: [3] })
+    await flushPromises()
+    expect(apiGet.mock.calls.at(-1)[1].params).toMatchObject({ periodo: 'mes_actual', sede_ids: [3] })
+    expect(wrapper.find('.inf__filtrado').text()).toContain('Filtrado — Sedes: Norte')
+  })
 })

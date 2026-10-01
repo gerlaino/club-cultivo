@@ -21,6 +21,8 @@ class Stock < ApplicationRecord
   # `class_name` explícito: Rails infiere 'PesajesManicura' del nombre de la asociación (el
   # singular de "manicura" no existe) y revienta al tocarla. Mismo caso que :pesadas_plantas.
   has_many :pesajes_manicura, class_name: 'PesajeManicura', dependent: :nullify
+  # Los pesajes que vinieron a este frasco, también los repartidos en varios (copones y bajos).
+  has_many :pesaje_destinos, dependent: :delete_all
   has_many :stock_movimientos, dependent: :destroy
   has_many :dispensaciones, class_name: 'Dispensacion', dependent: :nullify
   has_many :reservas, dependent: :nullify
@@ -161,6 +163,13 @@ class Stock < ApplicationRecord
   # una query por producto. El carrito mostraba y validaba contra `cantidad` —el frasco entero—
   # así que ofrecía los 15 g que ya tienen dueño y el backend los rechazaba al confirmar, que es
   # el peor error posible: parece culpa del usuario.
+  # Lo que se puede SEPARAR a otro frasco (copones/bajos, 1-oct-2026): lo guardado y libre. Lo que
+  # está sobre la mesa o reservado a un paciente (las reservas salen de la mesa: el mayor de los
+  # dos) y lo apartado para un evento se queda en este frasco, para no dejarlos sin producto.
+  def separable
+    [cantidad.to_d - apartado_para_mesa_y_reservas - apartado_para_eventos.to_d, 0.to_d].max
+  end
+
   def disponible_para_entregar
     [cantidad.to_d - apartado_para_eventos.to_d - apartado_para_reservas, 0.to_d].max
   end
@@ -508,6 +517,30 @@ class Stock < ApplicationRecord
 
     self.usuario_movimiento = usuario
     update!(estado: 'agotado')
+  end
+
+  # LO CONTRARIO (1-oct-2026): a un frasco agotado le volvió producto —otra jornada de manicura
+  # pesada en el mismo frasco, un pesaje reajustado para arriba, una dispensa anulada cuyo producto
+  # vuelve—. Deja de estar agotado (si no, la lista de stock lo esconde y nadie ve ese producto), y
+  # si su lote se había finalizado por haberse agotado, el lote vuelve a curado: ya no es cierto que
+  # no le quede nada.
+  def reabrir_si_tiene_producto!(usuario: nil)
+    reload
+    return unless cantidad.to_d.positive?
+
+    update!(estado: sede_id ? 'asignado' : 'pendiente_asignacion') if agotado?
+    l = lote
+    return unless l&.estado == 'finalizado'
+
+    l.update!(estado: 'curado')
+    autor = usuario || l.club.users.find_by(role: 'admin')
+    return unless autor # el evento exige autor; sin él, el lote igual queda bien
+
+    l.lote_eventos.create!(
+      tipo: 'cambio_estado', estado_anterior: 'finalizado', estado_nuevo: 'curado',
+      descripcion: "Volvió producto al frasco #{numero_lote_producto} — el lote vuelve a curado.",
+      user: autor, club: l.club, registrado_en: Time.current,
+    )
   end
 
   def finalizar_lote_si_agotado

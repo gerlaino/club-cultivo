@@ -70,4 +70,26 @@ describe('REPROCANN — la pantalla muestra lo que el backend manda', () => {
     await wrapper.findAll('.inf__btn')[0].trigger('click')
     expect(descargarArchivo.mock.calls[0][1].params).toMatchObject({ periodo: 'trimestre' })
   })
+
+  // Fase 2 de filtros (30-sep-2026): por pacientes; lo que se presenta sale completo.
+  it('ofrece filtrar sólo por pacientes', () => {
+    expect(wrapper.findComponent({ name: 'FiltrosInforme' }).props('usa')).toEqual(['pacientes'])
+  })
+
+  it('los filtros viajan a la pantalla y a la descarga; filtrado lo dice', async () => {
+    apiGet.mockResolvedValue({ data: { ...PAYLOAD, filtros: { activo: true, descripcion: 'Pacientes: Ana Vencida' } } })
+    wrapper.findComponent({ name: 'FiltrosInforme' }).vm.$emit('change', { paciente_ids: [7] })
+    await flushPromises()
+    expect(apiGet.mock.calls.at(-1)[1].params).toMatchObject({ paciente_ids: [7] })
+    expect(wrapper.find('.inf__filtrado').text()).toContain('Filtrado — Pacientes: Ana Vencida')
+    await wrapper.findAll('.inf__btn')[0].trigger('click')
+    expect(descargarArchivo.mock.calls.at(-1)[1].params).toMatchObject({ paciente_ids: [7] })
+  })
+
+  it('filtrado, «Para presentar» dice que sale completo', async () => {
+    apiGet.mockResolvedValue({ data: { ...PAYLOAD, filtros: { activo: true, descripcion: 'Pacientes: Ana Vencida' } } })
+    wrapper.findComponent({ name: 'FiltrosInforme' }).vm.$emit('change', { paciente_ids: [7] })
+    await flushPromises()
+    expect(wrapper.findAll('.inf__btn')[2].text()).toContain('Para presentar (completo)')
+  })
 })

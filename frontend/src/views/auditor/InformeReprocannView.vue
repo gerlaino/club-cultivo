@@ -11,13 +11,17 @@
           <Sheet :size="15" :stroke-width="2" /> Excel
         </button>
         <!-- Presentar es un acto aparte y la app no lo hace: sólo este botón valida el INASE. -->
+        <!-- La nómina que se presenta es completa: sale sin filtros aunque la pantalla esté
+             filtrada (el backend no los aplica), y el botón lo dice. -->
         <button class="inf__btn" :disabled="descargando"
-                title="Valida que todas las variedades estén acreditadas ante el INASE"
+                :title="data?.filtros?.activo ? 'Sale completo, sin los filtros: la nómina que se presenta es la de toda la organización' : 'Valida que todas las variedades estén acreditadas ante el INASE'"
                 @click="descargar('pdf', true)">
-          <FileCheck :size="15" :stroke-width="2" /> Para presentar
+          <FileCheck :size="15" :stroke-width="2" /> Para presentar<template v-if="data?.filtros?.activo"> (completo)</template>
         </button>
       </div>
     </div>
+
+    <FiltrosInforme class="inf__filtros" :usa="['pacientes']" @change="cambiarFiltros" />
 
     <div v-if="loading" class="inf__loading">Cargando…</div>
 
@@ -25,6 +29,8 @@
       <!-- Qué contesta este informe. Sin esto hay que deducirlo de los números, y
            dos informes que cortan el mismo dato distinto parecen contradecirse. -->
       <p v-if="data.resena" class="inf__resena">{{ data.resena }}</p>
+      <!-- Un informe filtrado lo dice arriba de todo (y el PDF y el Excel también). -->
+      <p v-if="data.filtros?.activo" class="inf__filtrado"><i class="bi bi-funnel-fill"></i> Filtrado — {{ data.filtros.descripcion }}</p>
       <div class="inf__kpis">
         <div class="inf__kpi">
           <span class="inf__kpi-valor">{{ data.total_pacientes }}</span>
@@ -131,10 +137,14 @@ import { descargarArchivo } from '../../lib/descargas.js'
 import { useToast } from '../../composables/useToast.js'
 import { hoyISO } from '../../utils/dates.js'
 import SelectorPeriodo from '../../components/informes/SelectorPeriodo.vue'
+import FiltrosInforme from '../../components/informes/FiltrosInforme.vue'
 
 const toast = useToast()
 // Los MISMOS parámetros para la pantalla y para la descarga.
-const params = ref({ periodo: 'mes_actual' })
+// Los MISMOS parámetros para la pantalla y para la descarga: período + filtros.
+const periodo = ref({ periodo: 'mes_actual' })
+const filtros = ref({})
+const params  = computed(() => ({ ...periodo.value, ...filtros.value }))
 const loading = ref(false)
 const data    = ref(null)
 const descargando = ref(false)
@@ -166,7 +176,8 @@ async function cargar() {
   }
 }
 
-function cambiarPeriodo(p) { params.value = p; cargar() }
+function cambiarPeriodo(p) { periodo.value = p; cargar() }
+function cambiarFiltros(f) { filtros.value = f; cargar() }
 // La nómina es la población registrada ENTERA (vencidos incluidos: están registrados), por
 // vencimiento. Los sin registro se informan aparte.
 const ORDEN = { vencido: 0, por_vencer: 1, pendiente: 2, vigente: 3, vigente_sin_vencimiento: 4 }
@@ -234,4 +245,6 @@ onMounted(cargar)
 .inf__link { color: #15803d; font-size: var(--fs-13); }
 .inf__ok { color: #2D8A6B; font-size: var(--fs-14); }
 .inf__mas { color: var(--c-ink-500); font-size: var(--fs-13); font-style: italic; }
+.inf__filtros { margin: calc(-1 * var(--sp-3)) 0 var(--sp-5); }
+.inf__filtrado { margin: 0 0 var(--sp-5); padding: .55rem .9rem; background: var(--c-leaf-100); color: var(--c-leaf-800); border-radius: var(--r-md); font-size: var(--fs-13); font-weight: 600; }
 </style>

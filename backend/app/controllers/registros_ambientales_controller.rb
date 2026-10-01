@@ -20,13 +20,20 @@ class RegistrosAmbientalesController < ApplicationController
       registro.nombre_archivo_csv = params[:archivo_csv].original_filename
     end
 
-    if registro.save
+    faltantes = nil
+    ActiveRecord::Base.transaction do
+      raise ActiveRecord::RecordInvalid, registro unless registro.save
+      # Riego por planta: las tandas definen qué plantas y cuánto; el volumen es la suma.
+      tandas = params.dig(:registro_ambiental, :plantas)
+      Riegos::PorPlanta.new(registro: registro, tandas: tandas).call if tandas.present?
       # «Aplicar receta»: descuenta del depósito, cuesta al lote, deja la copia en el registro.
       faltantes = aplicar_nutricion!([registro], sala: nil)
-      render json: serialize(registro.reload).merge(faltantes: faltantes), status: :created
-    else
-      render json: { errors: registro.errors.full_messages }, status: :unprocessable_entity
     end
+    render json: serialize(registro.reload).merge(faltantes: faltantes), status: :created
+  rescue ArgumentError => e
+    render json: { error: e.message }, status: :unprocessable_entity
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
   end
 
   def destroy
@@ -110,6 +117,8 @@ class RegistrosAmbientalesController < ApplicationController
       tiene_csv:            r.archivo_csv.attached?,
       registrado_en:        r.registrado_en,
       usuario:              r.user.nombre_completo,
+      volumen_l:            r.volumen_l,
+      plantas:              r.riego_plantas.includes(:plant).map { |rp| RiegoPlantaSerializer.call(rp) },
       created_at:           r.created_at
     }
   end

@@ -123,9 +123,12 @@ module Nutricion
       ciclo.lotes.where(estado: Lote::CULTIVO_ESTADOS).to_a.presence || ciclo.lotes.to_a
     end
 
+    # Cómo se reparte entre lotes: en la cama, por sus m²; al regar, por el agua que recibió cada
+    # uno (la solución va en el agua). Con el total repartido parejo da lo mismo que «iguales»; si
+    # algún lote quedó sin volumen, `Insumo.partes_de` vuelve a iguales.
     def pesos_de(lotes)
-      return nil unless @cama_registro
-      lotes.to_h { |l| [l.id, l.m2_ocupados.to_d] }
+      return lotes.to_h { |l| [l.id, l.m2_ocupados.to_d] } if @cama_registro
+      @registros.to_h { |r| [r.lote_id, r.volumen_l.to_d] }
     end
 
     # Por qué no se descontó (todo o parte): es la salvedad que muestra la historia del lote. La

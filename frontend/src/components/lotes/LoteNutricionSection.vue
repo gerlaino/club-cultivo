@@ -97,7 +97,7 @@
       </div>
 
       <!-- La analítica es de administración (el backend la cierra al resto): no se ofrece. -->
-      <RouterLink v-if="veAnalitica" :to="{ path: '/analitica', query: { tab: 'nutricion', lotes: String(loteId) } }" class="lns__comparar">
+      <RouterLink v-if="veAnalitica && conComparar" :to="{ path: '/analitica', query: { tab: 'nutricion', lotes: String(loteId) } }" class="lns__comparar">
         Comparar con otros lotes <i class="bi bi-arrow-right"></i>
       </RouterLink>
     </template>
@@ -118,6 +118,8 @@ const props = defineProps({
   loteId:  { type: [Number, String], required: true },
   // Cambia cuando se recarga el historial (se registró algo): se vuelve a pedir.
   version: { type: [Array, Number, String, Object], default: null },
+  // En el teléfono no se ofrece: la Analítica es una pantalla de escritorio.
+  conComparar: { type: Boolean, default: true },
 })
 
 const data = ref(null)

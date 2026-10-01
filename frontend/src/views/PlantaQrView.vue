@@ -208,11 +208,27 @@
           </div>
         </div>
 
-        <!-- Ya pesada: lectura + Editar (no se pisa el peso sin querer) -->
-        <div v-if="pesoAnterior && !editando" class="qr__peso-done">
+        <!-- Descartada: no se pesa (el backend tampoco lo acepta). -->
+        <div v-if="plantaDetalle?.state === 'descartada'" class="qr__peso-done qr__peso-done--bloqueada">
+          <div class="qr__peso-done-lbl"><i class="bi bi-slash-circle"></i> Esta planta está descartada: no se pesa.</div>
+        </div>
+
+        <!-- Ya pesada: lectura + Editar (no se pisa el peso sin querer). Si su jornada ya se
+             confirmó, el peso está en el stock: lo corrige administración reajustando el pesaje. -->
+        <div v-else-if="pesoAnterior && !editando" class="qr__peso-done">
           <div class="qr__peso-done-val">{{ Number(pesoAnterior).toFixed(1) }}<small>g</small></div>
-          <div class="qr__peso-done-lbl"><i class="bi bi-check-circle-fill"></i> Peso seco guardado</div>
-          <button class="qr__btn-editar" @click="editando = true"><i class="bi bi-pencil"></i> Editar</button>
+          <div v-if="sinEnviar" class="qr__peso-done-lbl qr__peso-done-lbl--pendiente"><i class="bi bi-cloud-slash"></i> Sin señal: guardado en el teléfono, se manda solo</div>
+          <div v-else class="qr__peso-done-lbl"><i class="bi bi-check-circle-fill"></i> Peso seco guardado</div>
+          <p v-if="jornadaConfirmada" class="qr__peso-done-nota">
+            La jornada ya se confirmó. Si el peso está mal, avisale a administración: lo corrige desde el pesaje.
+          </p>
+          <template v-else>
+            <button class="qr__btn-editar" @click="editando = true"><i class="bi bi-pencil"></i> Editar</button>
+            <!-- Se escaneó la que no era: sacarla de la jornada abierta sin borrar todo lo demás. -->
+            <button v-if="jornadaAbiertaMia" class="qr__btn-quitar" :disabled="quitando" @click="quitarDeJornada">
+              <i class="bi bi-x-circle"></i> Quitar de la jornada
+            </button>
+          </template>
         </div>
 
         <!-- Formulario -->
@@ -267,12 +283,16 @@ import { useAuthStore } from '../stores/auth'
 import { useClubStore } from '../stores/club'
 import { usePermissions } from '../composables/usePermissions'
 import { usePWA } from '../composables/usePWA'
-import { getPlant, listPlants, registrarPesoPlanta, getPlantaPorQR } from '../lib/api'
+import { getPlant, listPlants, getPlantaPorQR, quitarPlantaPesajeManicura } from '../lib/api'
 import { useManicuraJornada } from '../composables/useManicuraJornada'
+import { useConfirm } from '../composables/useConfirm'
+import { registrarPesoPlantaOffline } from '../lib/offlineApi.js'
+import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 
 const route  = useRoute()
 const { registrarConJornada } = useManicuraJornada()
+const { confirm } = useConfirm()
 const router = useRouter()
 const { isPWA } = usePWA()
 const auth   = useAuthStore()
@@ -414,9 +434,49 @@ async function iniciarPesaje() {
   }
 }
 
+// Pesada en una jornada que ya se confirmó (lo dice el backend: `jornada_pesaje`).
+const jornadaConfirmada = computed(() => plantaDetalle.value?.jornada_pesaje?.estado === 'confirmado')
+// En la jornada abierta de quien está pesando: se puede sacar de ahí.
+const jornadaAbiertaMia = computed(() => {
+  const j = plantaDetalle.value?.jornada_pesaje
+  return j?.estado === 'borrador' && j?.mia
+})
+const quitando = ref(false)
+const sinEnviar = ref(false)
+async function quitarDeJornada() {
+  const j = plantaDetalle.value?.jornada_pesaje
+  if (!j || quitando.value) return
+  const ok = await confirm({
+    title: 'Quitar de la jornada',
+    message: `¿Sacar ${plantaDetalle.value.nombre} de la jornada? Vuelve a quedar sin pesar.`,
+    confirmText: 'Quitar', variant: 'danger',
+  })
+  if (!ok) return
+  quitando.value = true
+  registroError.value = null
+  try {
+    await quitarPlantaPesajeManicura(plantaDetalle.value.lote.id, j.id, plantaDetalle.value.id)
+    plantaDetalle.value = { ...plantaDetalle.value, peso_seco: null, peso_humedo: null, jornada_pesaje: null }
+    pesoAnterior.value = null
+    pesoInput.value = ''
+    pesoHumedoInput.value = ''
+    await cargarProgreso(plantaDetalle.value)
+  } catch (e) {
+    registroError.value = e?.response?.data?.error || 'No se pudo quitar'
+  } finally { quitando.value = false }
+}
+
+// El progreso del lote, al día si otra persona pesa o el admin confirma mientras esta pantalla
+// está abierta (sólo mientras se está pesando).
+useRecargaEnCambios('pesajes', () => {
+  if (estado.value === 'manicura_pesaje' && plantaDetalle.value) cargarProgreso(plantaDetalle.value)
+})
+
 async function cargarProgreso(detalle) {
   try {
-    const { data: plantas } = await listPlants({ lote_id: detalle.lote.id })
+    const { data: todas } = await listPlants({ lote_id: detalle.lote.id })
+    // Las descartadas no se pesan: con ellas en el total, «completado» no llegaba nunca.
+    const plantas  = todas.filter(p => p.state !== 'descartada')
     const total    = plantas.length
     // peso_seco llega como string (decimal de Rails): parseamos antes de comparar/sumar,
     // si no el reduce concatena strings y el .toFixed del render explota.
@@ -443,9 +503,20 @@ async function registrarPeso() {
   if (pesoHumedo > 0) payload.peso_humedo_g = pesoHumedo
   try {
     const res = await registrarConJornada(plantaDetalle.value.lote?.id,
-      (extra) => registrarPesoPlanta(plantaDetalle.value.id, { ...payload, ...extra }))
+      (extra) => registrarPesoPlantaOffline(plantaDetalle.value.id, { ...payload, ...extra }))
     if (!res) return // la manicura canceló
+    if (res.queued) {
+      // Sin señal: el peso queda en el teléfono y se manda solo al volver la señal.
+      pesoAnterior.value = peso
+      editando.value     = false
+      sinEnviar.value    = true
+      return
+    }
+    sinEnviar.value = false
     const { data } = res
+    // Quedó en la jornada abierta de quien pesa: desde acá se la puede sacar.
+    plantaDetalle.value = { ...plantaDetalle.value, peso_seco: peso,
+      jornada_pesaje: { id: data.pesaje?.id, estado: 'borrador', mia: true } }
     pesoAnterior.value = peso
     editando.value     = false
     progreso.value     = data.progreso
@@ -609,6 +680,13 @@ function irAlDashboard() { router.push('/') }
 .qr__peso-done-val { font-size: 2.2rem; font-weight: 800; color: #15803d; letter-spacing: -.02em; line-height: 1; font-variant-numeric: tabular-nums; }
 .qr__peso-done-val small { font-size: 1rem; font-weight: 600; color: #4b8b5e; margin-left: 2px; }
 .qr__peso-done-lbl { font-size: .8rem; font-weight: 600; color: #15803d; display: inline-flex; align-items: center; gap: .3rem; }
+.qr__btn-quitar { margin-top: .5rem; background: none; border: 0; color: var(--c-ink-500); font-size: .82rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: .3rem; }
+.qr__btn-quitar:hover:not(:disabled) { color: var(--c-rust-600, #b91c1c); }
+.qr__peso-done-lbl--pendiente { color: var(--c-amber-500); }
+.qr__peso-done-nota { font-size: .8rem; color: var(--c-ink-700); margin: .5rem 0 0; text-align: center; }
+/* Descartada: es un aviso, no un éxito — gris, no el verde de «guardado». */
+.qr__peso-done--bloqueada { background: var(--c-ink-100); border-color: var(--c-ink-300); color: var(--c-ink-700); }
+.qr__peso-done--bloqueada .qr__peso-done-lbl { color: var(--c-ink-700); }
 .qr__btn-editar { margin-top: .5rem; display: inline-flex; align-items: center; gap: .35rem; background: #fff; border: 1.5px solid #cbe3d1; color: #15803d; font-weight: 700; font-size: .85rem; padding: .55rem 1rem; border-radius: 10px; cursor: pointer; }
 .qr__btn-editar:hover { border-color: #16a34a; }
 .qr__btn-cancelar { background: none; border: none; color: var(--c-slate-400); font-weight: 600; font-size: .85rem; cursor: pointer; padding: .4rem; }

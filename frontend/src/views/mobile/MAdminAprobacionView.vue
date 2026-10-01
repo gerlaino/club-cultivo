@@ -30,7 +30,7 @@
 
         <div class="maa__card-meta">
           <span v-if="p.lote_genetica">🌿 {{ p.lote_genetica }}</span>
-          <span>🪴 {{ p.plantas_count }} plantas</span>
+          <span>🪴 {{ p.plantas_count }} {{ p.plantas_count === 1 ? 'planta' : 'plantas' }}</span>
         </div>
 
         <div class="maa__pesada">
@@ -81,6 +81,11 @@
             <div class="maa__field">
               <label class="maa__label">A dónde va</label>
               <div v-if="cargandoContenedores" class="maa__hint">Buscando frascos de este lote…</div>
+              <!-- Repartido en varios frascos: copones en uno, bajos en otro (todo del mismo lote). -->
+              <template v-else-if="repartir">
+                <RepartoFrascos v-model="reparto" :contenedores="contenedores" :peso-total="Number(pesoConfirmado) || 0" />
+                <button type="button" class="maa__link" @click="repartir = false">Mandar todo a un solo frasco</button>
+              </template>
               <div v-else class="maa__cont-list">
                 <button type="button" class="maa__cont" :class="{ 'maa__cont--sel': stockDestino === null }" @click="stockDestino = null">
                   <span class="maa__cont-radio"><span v-if="stockDestino === null" class="maa__cont-dot"></span></span>
@@ -94,21 +99,24 @@
                   <span class="maa__cont-radio"><span v-if="stockDestino === s.id" class="maa__cont-dot"></span></span>
                   <span class="maa__cont-body">
                     <span class="maa__cont-title">{{ s.numero_lote_producto || `Frasco #${s.id}` }} <b>{{ Number(s.cantidad || 0).toFixed(0) }} g</b></span>
-                    <span class="maa__cont-meta">{{ s.sede?.nombre || (s.estado === 'pendiente_asignacion' ? 'Sin asignar' : 'Sin sede') }}<span v-if="s.fecha_elaboracion"> · del {{ fecha(s.fecha_elaboracion) }}</span></span>
+                    <span class="maa__cont-meta">{{ s.sede?.nombre || (s.estado === 'pendiente_asignacion' ? 'Sin asignar' : 'Sin sede') }}<span v-if="s.fecha_elaboracion"> · del {{ fecha(s.fecha_elaboracion) }}</span><span v-if="s.estado === 'agotado'" class="maa__cont-vacio"> · vacío, se vuelve a usar</span></span>
                   </span>
                 </button>
               </div>
-              <span class="maa__hint">{{ stockDestino ? 'El peso se suma al frasco elegido.' : 'Se crea un frasco nuevo de flor seca para este lote.' }}</span>
+              <template v-if="!repartir && !cargandoContenedores">
+                <span class="maa__hint">{{ stockDestino ? 'El peso se suma al frasco elegido.' : 'Se crea un frasco nuevo de flor seca para este lote.' }}</span>
+                <button type="button" class="maa__link" @click="empezarReparto">Repartir en varios frascos (copones, bajos…)</button>
+              </template>
             </div>
             <div v-if="errorMsg" class="maa__error">{{ errorMsg }}</div>
             <button
               class="maa__btn-confirmar maa__btn-confirmar--green"
-              :disabled="confirmando || !pesoConfirmado || pesoConfirmado <= 0"
+              :disabled="confirmando || !pesoConfirmado || pesoConfirmado <= 0 || (repartir && !repartoCuadra)"
               @click="confirmar"
             >
               <i v-if="!confirmando" class="bi bi-check-circle-fill"></i>
               <i v-else class="bi bi-arrow-repeat maa__spin"></i>
-              {{ stockDestino ? 'Confirmar y sumar al frasco' : 'Confirmar y generar stock' }}
+              {{ repartir ? `Confirmar en ${reparto.length} frascos` : (stockDestino ? 'Confirmar y sumar al frasco' : 'Confirmar y generar stock') }}
             </button>
           </div>
         </div>
@@ -119,9 +127,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { listPesajesManicuraAdmin, confirmarPesajeManicura, reabrirPesajeManicura, listStocks } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import RepartoFrascos from '../../components/manicura/RepartoFrascos.vue'
+import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 
 const toast   = useToast()
 const pesajes = ref([])
@@ -137,30 +147,50 @@ const errorMsg       = ref('')
 const contenedores        = ref([])
 const cargandoContenedores = ref(false)
 const stockDestino        = ref(null)   // null = frasco nuevo
+// Reparto en varios frascos (copones, bajos…): filas { stock_id | null = nuevo, descripcion, gramos }.
+const repartir = ref(false)
+const reparto  = ref([])
+const repartoCuadra = computed(() => {
+  const suma = reparto.value.reduce((s, f) => s + (Number(f.gramos) || 0), 0)
+  return reparto.value.length > 1 && reparto.value.every(f => Number(f.gramos) > 0) && Math.abs(suma - Number(pesoConfirmado.value || 0)) < 0.01
+})
+function empezarReparto() {
+  repartir.value = true
+  reparto.value = [
+    { stock_id: null, descripcion: 'Copones', gramos: null },
+    { stock_id: null, descripcion: 'Bajos', gramos: null },
+  ]
+}
 
 const fecha = (f) => (f ? new Date(f).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' }) : '')
 
 async function cargarContenedores(loteId) {
   cargandoContenedores.value = true
   stockDestino.value = null
+  repartir.value = false
+  reparto.value = []
   try {
-    const { data } = await listStocks({ lote_id: loteId })
-    contenedores.value = (data || []).filter(s =>
-      s.forma_producto === 'flor_seca' && ['pendiente_asignacion', 'asignado'].includes(s.estado))
+    // También los frascos que ya se vaciaron: se vuelven a usar y se reabren al recibir el peso.
+    const { data } = await listStocks({ lote_id: loteId, incluir_vacios: 1 })
+    contenedores.value = (data || []).filter(s => s.forma_producto === 'flor_seca')
   } catch {
     contenedores.value = []
   } finally { cargandoContenedores.value = false }
 }
 
-async function cargar() {
-  loading.value = true
+// `silencioso`: la recarga por un aviso de cambios no muestra el spinner (sería un parpadeo
+// encima de la lista) y, si falla, deja lo que había.
+async function cargar({ silencioso = false } = {}) {
+  if (!silencioso) loading.value = true
   try {
     const { data } = await listPesajesManicuraAdmin()
     pesajes.value = data || []
   } catch {
-    pesajes.value = []
+    if (!silencioso) pesajes.value = []
   } finally { loading.value = false }
 }
+// Lo que manda la manicura aparece solo, y lo que confirma otro admin desaparece solo.
+useRecargaEnCambios('pesajes', () => cargar({ silencioso: true }))
 
 function abrirConfirmacion(p) {
   pesajeActivo.value   = p
@@ -179,20 +209,32 @@ async function confirmar() {
   if (!pesajeActivo.value || !pesoConfirmado.value || pesoConfirmado.value <= 0) {
     errorMsg.value = 'El peso debe ser mayor a 0'; return
   }
+  if (confirmando.value) return
   confirmando.value = true
   errorMsg.value    = ''
   try {
     await confirmarPesajeManicura(pesajeActivo.value.lote_id, pesajeActivo.value.id, {
       peso_confirmado_g: pesoConfirmado.value,
-      stock_id:          stockDestino.value || undefined,
+      ...(repartir.value
+        ? { destinos: reparto.value.map(f => ({ stock_id: f.stock_id || undefined, gramos: f.gramos, descripcion: f.stock_id ? undefined : (f.descripcion || undefined) })) }
+        : { stock_id: stockDestino.value || undefined }),
     })
-    const destino = stockDestino.value
-      ? `sumado a ${contenedores.value.find(s => s.id === stockDestino.value)?.numero_lote_producto || 'el frasco'}`
-      : 'frasco nuevo'
+    const destino = repartir.value
+      ? `repartido en ${reparto.value.length} frascos`
+      : stockDestino.value
+        ? `sumado a ${contenedores.value.find(s => s.id === stockDestino.value)?.numero_lote_producto || 'el frasco'}`
+        : 'frasco nuevo'
     toast.success(`Pesaje de ${pesajeActivo.value.lote_codigo} confirmado — ${pesoConfirmado.value}g · ${destino}`)
     cerrarConfirmacion()
     cargar()
   } catch (e) {
+    // Ya lo confirmó otra persona: no es un error de quien está acá, se saca de la lista.
+    if (e.response?.data?.ya_confirmado) {
+      toast.info(e.response.data.error)
+      cerrarConfirmacion()
+      cargar()
+      return
+    }
     errorMsg.value = e.response?.data?.error || e.response?.data?.errors?.[0] || 'Error al confirmar'
   } finally { confirmando.value = false }
 }
@@ -360,4 +402,6 @@ onMounted(cargar)
 .maa-sheet-enter-active .maa__sheet, .maa-sheet-leave-active .maa__sheet { transition: transform .25s ease; }
 .maa-sheet-enter-from, .maa-sheet-leave-to { opacity: 0; }
 .maa-sheet-enter-from .maa__sheet, .maa-sheet-leave-to .maa__sheet { transform: translateY(100%); }
+.maa__cont-vacio { color: var(--c-amber-500); font-weight: 600; }
+.maa__link { display: inline-block; margin-top: .45rem; background: none; border: 0; padding: 0; color: var(--brand-primary); font-size: .82rem; font-weight: 600; cursor: pointer; text-decoration: underline; }
 </style>

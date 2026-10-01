@@ -66,6 +66,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { Scissors, Wind, Package, ChevronRight, User } from 'lucide-vue-next'
 import { listLotes } from '../../lib/api.js'
+import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import { useAuthStore } from '../../stores/auth'
 
 const auth     = useAuthStore()
@@ -80,19 +81,21 @@ const paginados  = computed(() => lotes.value.slice((page.value - 1) * PER_PAGE,
 const totalPages = computed(() => Math.max(1, Math.ceil(lotes.value.length / PER_PAGE)))
 watch(lotes, () => { page.value = 1 })
 
-async function cargar() {
-  loading.value = true
+async function cargar({ silencioso = false } = {}) {
+  if (!silencioso) loading.value = true
   try {
     const { data } = await listLotes()
     lotes.value = (data || []).filter(l => l.estado === 'en_manicura')
   } catch {
-    lotes.value = []
+    if (!silencioso) lotes.value = []
   } finally {
     loading.value = false
   }
 }
 
 onMounted(cargar)
+// Una cosecha que le asignan aparece sola, y la que cierra la manicura se va sola.
+useRecargaEnCambios(['lotes', 'pesajes'], () => cargar({ silencioso: true }))
 </script>
 
 <style scoped>

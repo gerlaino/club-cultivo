@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_09_29_200000) do
+ActiveRecord::Schema[7.2].define(version: 2026_10_01_200000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1815,6 +1815,19 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_29_200000) do
     t.index ["plant_id"], name: "index_pesadas_plantas_on_plant_id"
   end
 
+  create_table "pesaje_destinos", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "pesaje_manicura_id", null: false
+    t.bigint "stock_id", null: false
+    t.decimal "gramos", precision: 10, scale: 2, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_pesaje_destinos_on_club_id"
+    t.index ["pesaje_manicura_id", "stock_id"], name: "index_pesaje_destinos_on_pesaje_manicura_id_and_stock_id", unique: true
+    t.index ["pesaje_manicura_id"], name: "index_pesaje_destinos_on_pesaje_manicura_id"
+    t.index ["stock_id"], name: "index_pesaje_destinos_on_stock_id"
+  end
+
   create_table "pesajes_manicura", force: :cascade do |t|
     t.bigint "lote_id", null: false
     t.bigint "manicurador_id", null: false
@@ -2212,6 +2225,21 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_29_200000) do
     t.index ["stock_id", "estado"], name: "index_reservas_on_stock_id_and_estado"
     t.index ["stock_id"], name: "index_reservas_on_stock_id"
     t.index ["user_id"], name: "index_reservas_on_user_id"
+  end
+
+  create_table "riego_plantas", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "registro_ambiental_id", null: false
+    t.bigint "plant_id", null: false
+    t.decimal "volumen_l", precision: 10, scale: 2, null: false
+    t.decimal "pulsos", precision: 8, scale: 2
+    t.decimal "litros_por_pulso", precision: 8, scale: 3
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_riego_plantas_on_club_id"
+    t.index ["plant_id"], name: "index_riego_plantas_on_plant_id"
+    t.index ["registro_ambiental_id", "plant_id"], name: "index_riego_plantas_on_registro_ambiental_id_and_plant_id", unique: true
+    t.index ["registro_ambiental_id"], name: "index_riego_plantas_on_registro_ambiental_id"
   end
 
   create_table "rutas_entrega", force: :cascade do |t|
@@ -2901,6 +2929,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_29_200000) do
   add_foreign_key "pesadas_plantas", "pesajes_manicura", column: "pesaje_manicura_id"
   add_foreign_key "pesadas_plantas", "plants"
   add_foreign_key "pesadas_plantas", "users", column: "deleted_by_id"
+  add_foreign_key "pesaje_destinos", "clubs"
+  add_foreign_key "pesaje_destinos", "pesajes_manicura", column: "pesaje_manicura_id"
+  add_foreign_key "pesaje_destinos", "stocks"
   add_foreign_key "pesajes_manicura", "clubs"
   add_foreign_key "pesajes_manicura", "lotes"
   add_foreign_key "pesajes_manicura", "stocks"
@@ -2956,6 +2987,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_09_29_200000) do
   add_foreign_key "reservas", "stocks"
   add_foreign_key "reservas", "users"
   add_foreign_key "reservas", "users", column: "deleted_by_id"
+  add_foreign_key "riego_plantas", "clubs"
+  add_foreign_key "riego_plantas", "plants"
+  add_foreign_key "riego_plantas", "registros_ambientales", column: "registro_ambiental_id"
   add_foreign_key "rutas_entrega", "clubs"
   add_foreign_key "rutas_entrega", "users", column: "deleted_by_id"
   add_foreign_key "rutas_entrega", "users", column: "delivery_id"

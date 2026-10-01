@@ -91,7 +91,8 @@
                   <span>{{ getAccion(accionId)?.emoji }} {{ getAccion(accionId)?.label }}</span>
                 </div>
                 <div class="rls__seccion-body">
-                  <RiegoForm      v-if="accionId === 'riego'"     v-model="formData.riego" :suelo-vivo="!!lote?.en_cama" :lote-id="lote?.id" />
+                  <RiegoForm      v-if="accionId === 'riego'"     v-model="formData.riego" :suelo-vivo="!!lote?.en_cama" :lote-id="lote?.id"
+                                  :plantas="plantasEnPie" :litros-por-pulso="lote?.litros_por_pulso ?? null" />
                   <PodaForm       v-if="accionId === 'poda'"      v-model="formData.poda" :total-plantas="lote?.plants_count" />
                   <PlagasForm     v-if="accionId === 'plagas'"    v-model="formData.plagas" />
                   <AmbientalForm  v-if="accionId === 'ambiental'" v-model="formData.ambiental" :estado-lote="lote?.estado" />
@@ -166,6 +167,10 @@ const props = defineProps({
   accionInicial: { type: String, default: null },
 })
 const emit = defineEmits(['update:modelValue', 'saved', 'alimentar-cama'])
+// Riego por planta: las que están en pie (las mismas que acepta el backend, `Plant.en_pie`).
+// Si quien abre no pasó las plantas, las de la ficha del lote.
+const EN_PIE = ['enraizado', 'vegetativo', 'floracion']
+const plantasEnPie = computed(() => (props.plants.length ? props.plants : (props.lote?.plants || [])).filter(p => EN_PIE.includes(p.state)))
 function alimentarCama() { emit('update:modelValue', false); emit('alimentar-cama') }
 
 const toast = useToast()
@@ -222,7 +227,7 @@ function emptyFormData() {
     estado_general:   'bueno',
     plagas_observadas:'ninguna',
     observaciones:    '',
-    riego:      { ph: null, ph_runoff: null, ec: null, volumen: null, fertilizo: false, producto: '', dosis: null, semana_nutricion: null, metodo_nutricion: '', observaciones: '', modo_nutricion: '', receta_id: null, litros: null, items: [], nutricion: null },
+    riego:      { ph: null, ph_runoff: null, ec: null, volumen: null, por_plantas: null, fertilizo: false, producto: '', dosis: null, semana_nutricion: null, metodo_nutricion: '', observaciones: '', modo_nutricion: '', receta_id: null, litros: null, items: [], nutricion: null },
     poda:       { tipos: [], intensidad: '', plantas_intervenidas: null, observaciones: '' },
     plagas:     { resultado: 'ninguna', tipos_detectados: [], accion_tomada: '', plantas_afectadas: null, producto_usado: '' },
     ambiental:  { temperatura: null, temperatura_sustrato: null, humedad: null, co2: null, csvFile: null },
@@ -313,6 +318,15 @@ function buildPayload() {
     }
     // El volumen va como número (`volumen_l`), no en el texto: se suma y se compara.
     if (r.volumen)       payload.volumen_l = r.volumen
+    // Por plantas: las tandas (el backend guarda cada planta y el volumen del lote es la suma).
+    if (r.por_plantas) {
+      const lpp = r.por_plantas.litros_por_pulso
+      payload.plantas = r.por_plantas.tandas.filter(t => t.plant_ids.length).map(t => (
+        t.unidad === 'pulsos'
+          ? { plant_ids: t.plant_ids, pulsos: t.cantidad, litros_por_pulso: lpp }
+          : { plant_ids: t.plant_ids, litros: t.cantidad }
+      ))
+    }
     if (r.observaciones) extra.push(r.observaciones)
   }
 
@@ -383,6 +397,16 @@ async function guardar() {
     const sel = seleccionadas.value
 
     // Trasplante: API separada
+    // Riego por plantas: lo mismo que va a rechazar el backend, dicho antes de mandar.
+    const pp = sel.includes('riego') && fd.riego.por_plantas
+    if (pp) {
+      const conPlantas = pp.tandas.filter(t => t.plant_ids.length)
+      const falla = !conPlantas.length ? 'Elegí al menos una planta regada'
+        : conPlantas.some(t => !(Number(t.cantidad) > 0)) ? 'Decí cuánta agua recibió cada planta'
+        : conPlantas.some(t => t.unidad === 'pulsos') && !(Number(pp.litros_por_pulso) > 0) ? 'Decí cuántos litros es un pulso'
+        : null
+      if (falla) { error.value = falla; saving.value = false; return }
+    }
     if (sel.includes('trasplante')) {
       const t = fd.trasplante
       if (!t.maceta_destino_l) { error.value = 'Ingresá el tamaño de maceta destino'; saving.value = false; return }

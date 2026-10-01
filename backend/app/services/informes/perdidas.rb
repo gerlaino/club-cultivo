@@ -12,10 +12,13 @@ module Informes
   class Perdidas
     LISTA_PANTALLA = 100
 
-    def initialize(club:, desde:, hasta:)
-      @club  = club
-      @desde = desde
-      @hasta = hasta
+    # Filtros (fase 2, 30-sep-2026): lotes, genéticas, sedes y origen. Las plantas son de los
+    # lotes que entran; el producto, de los frascos que entran (un frasco externo no tiene lote).
+    def initialize(club:, desde:, hasta:, filtros: nil)
+      @club    = club
+      @desde   = desde
+      @hasta   = hasta
+      @filtros = filtros || Filtros.new(club: club)
     end
 
     def call
@@ -31,6 +34,7 @@ module Informes
       {
         plantas:  resumen_plantas(plantas, plantas_ant),
         producto: resumen_producto(producto, producto_ant),
+        filtros:  @filtros.to_h,
       }
     end
 
@@ -40,7 +44,7 @@ module Informes
     # Sin actividad (descartes viejos, o cargados por fuera) se cae a `updated_at` y la fila lo dice.
     # Sin join por sala: una planta descartada es del lote, esté donde esté.
     def plantas_en(desde, hasta)
-      lotes_ids = @club.lotes.select(:id)
+      lotes_ids = lotes_base.select(:id)
       descartadas = Plant.where(lote_id: lotes_ids, state: 'descartada').includes(lote: [:genetica, :costo_lote]).to_a
       fechas = PlantActivity.where(plant_id: descartadas.map(&:id), activity_type: 'state_change')
                             .where("description ILIKE 'Descartada%'")
@@ -57,6 +61,10 @@ module Informes
       end
     end
 
+    def lotes_base
+      @lotes_base ||= @filtros.acotar_lotes(@club.lotes)
+    end
+
     # Lo que costó producir el lote, prorrateado por planta. Sin costo cargado, nil: no se inventa.
     def costo_por_planta(lote)
       return nil unless lote&.costo_lote&.costo_total.to_f.positive? && lote.plants_count.to_i.positive?
@@ -65,7 +73,7 @@ module Informes
     end
 
     def resumen_plantas(actual, anterior)
-      en_cultivo = Plant.en_pie.where(lote_id: @club.lotes.select(:id)).count
+      en_cultivo = Plant.en_pie.where(lote_id: lotes_base.select(:id)).count
       con_costo  = actual.select { |p| p[:costo_ars] }
       por_motivo = actual.group_by { |p| p[:motivo] }.map do |motivo, ps|
         { motivo: motivo, plantas: ps.size,
@@ -92,7 +100,7 @@ module Informes
     # y las diferencias de conteo del mostrador NETEADAS por cierre y frasco —un error corregido
     # no aparece— más los ajustes en menos que no son del mostrador. Nunca una suma cruzada.
     def producto_en(desde, hasta)
-      movs = StockMovimiento.joins(:stock).where(stocks: { club_id: @club.id })
+      movs = StockMovimiento.where(stock_id: @filtros.acotar_stocks(Stock.where(club_id: @club.id)).select(:id))
                             .where(tipo: %w[merma ajuste]).en_periodo(desde, hasta)
                             .includes(stock: :genetica).to_a
       merma   = movs.select { |m| m.tipo == 'merma' && m.gramos.to_d.negative? }

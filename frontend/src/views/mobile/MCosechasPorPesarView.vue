@@ -47,6 +47,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { listLotes } from '../../lib/api'
+import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 
 const cosechas = ref([])
 const loading  = ref(false)
@@ -54,13 +55,15 @@ const loading  = ref(false)
 const EL = { en_manicura: 'Manicura activa' }
 const estadoLabel = e => EL[e] || e
 
-onMounted(async () => {
-  loading.value = true
+async function cargar({ silencioso = false } = {}) {
+  if (!silencioso) loading.value = true
   try {
     const { data } = await listLotes()
     cosechas.value = (data || []).filter(l => ['en_manicura'].includes(l.estado))
   } catch {} finally { loading.value = false }
-})
+}
+onMounted(cargar)
+useRecargaEnCambios(['lotes', 'pesajes'], () => cargar({ silencioso: true }))
 </script>
 
 <style scoped>

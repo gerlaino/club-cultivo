@@ -39,6 +39,7 @@ import {
 } from 'lucide-vue-next'
 import { NAV_GROUPS, detectGroup, entradaVisible, labelDe, useNavContext } from '../../composables/useNavContext.js'
 import { useClubStore } from '../../stores/club.js'
+import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 
 const route = useRoute()
 const club = useClubStore()
@@ -78,6 +79,9 @@ function groupBadge(g) {
 }
 
 onMounted(refreshBadges)
+// El contador de «Manicura» (pesajes por confirmar) y el de tareas, al día sin recargar: antes
+// sólo se recalculaban al montar y al cambiar de pantalla, y quedaban viejos.
+useRecargaEnCambios(['pesajes', 'tareas'], refreshBadges)
 watch(() => route.path, (path, prev) => {
   // Refresca el badge al entrar/salir de manicura o tareas.
   const tocar = ['/admin/pesajes-manicura', '/tareas']

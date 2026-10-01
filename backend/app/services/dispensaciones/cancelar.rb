@@ -69,7 +69,7 @@ module Dispensaciones
           @d.cobros.destroy_all
         end
         # El producto vuelve al stock —y a la mesa, si corresponde— o sale como merma.
-        @d.revertir_stock!(vuelve: !@descarta, usuario: @usuario, nota: @nota)
+        @d.revertir_stock!(vuelve: !@descarta, usuario: @usuario, nota: @nota, reabrir: true)
         registrar_evento if @evento
         @d.update!(estado_envio: 'cancelada', historial_envio: @d.historial_envio,
                    motivo_anulacion: @motivo, nota_anulacion: @nota, resolucion_anulacion: @resolucion,

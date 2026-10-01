@@ -101,13 +101,18 @@ RSpec.describe Lote, 'finalizado exige que no quede producto' do
       expect(evento.descripcion).to include('Stock agotado')
     end
 
-    # Un stock 'asignado' que quedó en cero es lo mismo que uno agotado: si no, un redondeo
-    # dejaba el lote sin poder cerrar nunca.
-    it 'cierra aunque un stock en cero haya quedado sin marcar como agotado' do
-      stock_del_lote(cantidad: 0, estado: 'asignado')
+    # REGLA NUEVA (Germán, 1-oct-2026): «el frasco se finaliza cuando el admin lo finaliza». Un
+    # frasco que quedó abierto en cero (se dispensó lo último sin cerrarlo, para rellenarlo) NO es
+    # uno cerrado: el lote espera. Antes se lo trataba como agotado; el miedo era que el lote no
+    # pudiera cerrar nunca, y ya no pasa: el frasco aparece en Stock → «Vacíos» con «Cerrar».
+    it 'con un frasco abierto en cero el lote espera; al cerrarlo el admin, se finaliza' do
+      vacio = stock_del_lote(cantidad: 0, estado: 'asignado')
 
       lote.finalizar_si_stock_agotado!(usuario: admin)
+      expect(lote.reload.estado).to eq('curado')
 
+      vacio.usuario_movimiento = admin
+      vacio.update!(estado: 'agotado')
       expect(lote.reload.estado).to eq('finalizado')
     end
   end

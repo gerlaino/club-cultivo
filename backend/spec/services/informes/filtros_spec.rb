@@ -202,4 +202,15 @@ RSpec.describe 'Informes con filtros' do
       expect(x[:anterior]).to be_nil
     end
   end
+
+  # La sede de un lote en cultivo es la de su sala (`lotes.sede_id` se llena al salir de la sala).
+  describe 'la sede de un lote' do
+    it 'un lote en vegetativo entra por la sede de su sala; uno cosechado, por la suya' do
+      en_sala   = create(:lote, club: club, sala: sala, estado: 'vegetativo')
+      cosechado = create(:lote, club: club, sala: sala, estado: 'vegetativo')
+      cosechado.update_columns(sede_id: otra_sede.id, sala_id: nil, estado: 'curado')
+      expect(filtros(sede_ids: [sede.id]).acotar_lotes(club.lotes)).to contain_exactly(en_sala)
+      expect(filtros(sede_ids: [otra_sede.id]).acotar_lotes(club.lotes)).to contain_exactly(cosechado)
+    end
+  end
 end

@@ -1,10 +1,33 @@
 <template>
   <div class="rf__wrap">
+    <!-- Riego del lote: todo el lote, o por plantas en tandas (Germán, 30-sep-2026). -->
+    <div v-if="ofrecePorPlantas" class="rf__modos">
+      <button type="button" class="rf__radio-btn" :class="{ 'rf__radio-btn--sel': !porPlantas }" @click="setPorPlantas(false)">Todo el lote</button>
+      <button type="button" class="rf__radio-btn" :class="{ 'rf__radio-btn--sel': porPlantas }" @click="setPorPlantas(true)">Por plantas</button>
+    </div>
+    <RiegoPorPlantas v-if="porPlantas" :model-value="f.por_plantas" :plantas="plantas" class="rf__por-plantas" @update:model-value="setTandas" />
+
     <div class="rf__grid">
-      <div class="rf__field">
-        <!-- En la sala es el TOTAL: el backend le da a cada lote su parte (Germán, 29-sep-2026). -->
-        <label class="rf__label">{{ salaId ? 'Volumen total de la sala' : 'Volumen' }} <span class="rf__unit">L</span></label>
-        <input type="number" step="0.5" min="0" class="rf__input" v-model.number="f.volumen" placeholder="20" />
+      <div v-if="!porPlantas" class="rf__field" :class="{ 'rf__field--full': porLote }">
+        <!-- En la sala es el TOTAL: el backend le da a cada lote su parte (Germán, 29-sep-2026).
+             O, con «Cargar por lote» (30-sep), lo de cada uno y el total es la suma. -->
+        <label class="rf__label">{{ porLote ? 'Volumen de cada lote' : (salaId ? `Volumen total ${delEspacio}` : 'Volumen') }} <span class="rf__unit">L</span></label>
+        <template v-if="!porLote">
+          <input type="number" step="0.5" min="0" class="rf__input" v-model.number="f.volumen" placeholder="20" />
+          <button v-if="lotes.length > 1" type="button" class="rf__link" @click="setPorLote(true)">Cargar por lote</button>
+        </template>
+        <template v-else>
+          <div class="rf__por-lote">
+            <div v-for="l in lotes" :key="l.id" class="rf__por-lote-fila">
+              <span class="rf__por-lote-codigo">{{ l.codigo }}</span>
+              <input type="number" step="0.5" min="0" class="rf__input rf__input--sm" :value="f.volumenes?.[l.id] ?? ''"
+                     :aria-label="`Volumen de ${l.codigo}`" @input="setVolumenLote(l.id, $event.target.value)" />
+              <span class="rf__linea-unidad">L</span>
+            </div>
+            <div class="rf__por-lote-total">Total: {{ num(f.volumen) }} L</div>
+          </div>
+          <button type="button" class="rf__link" @click="setPorLote(false)">Cargar el total {{ delEspacio }}</button>
+        </template>
       </div>
       <!-- Suelo vivo: no se corrige el pH ni la EC del agua (el suelo amortigua). Lo que importa
            es el agua: el cloro de la red castiga la vida del suelo. -->
@@ -155,6 +178,7 @@ import { listRecetas, listInsumos } from '../../../lib/api.js'
 import { formatARS } from '../../../lib/formatters.js'
 import { useUsoPersonal } from '../../../composables/useUsoPersonal.js'
 import { reglasSueloVivo, aguaLabel, ultimaAgua } from '../../../lib/camas.js'
+import RiegoPorPlantas from './RiegoPorPlantas.vue'
 
 const props = defineProps({
   modelValue: { type: Object, default: () => ({}) },
@@ -163,6 +187,13 @@ const props = defineProps({
   // Dónde se riega: los productos salen del depósito de SU sede (el backend los resuelve).
   salaId:     { type: [Number, String], default: null },
   loteId:     { type: [Number, String], default: null },
+  // Riego de sala: los lotes que lo reciben (`recibe_registro_sala` del backend). Con más de
+  // uno se ofrece «Cargar por lote».
+  lotes:      { type: Array, default: () => [] },
+  // Riego de un lote: sus plantas en pie. Con más de una se ofrece «Por plantas».
+  plantas:    { type: Array, default: () => [] },
+  // Cuántos litros era un pulso la última vez en este lote (lo manda el backend).
+  litrosPorPulso: { type: Number, default: null },
 })
 const emit  = defineEmits(['update:modelValue'])
 const f     = computed({
@@ -170,6 +201,7 @@ const f     = computed({
   set: v  => emit('update:modelValue', v),
 })
 const { esPersonal } = useUsoPersonal()
+const delEspacio = computed(() => (esPersonal.value ? 'del espacio' : 'de la sala'))
 const aguas = reglasSueloVivo().aguas
 // La última agua que se eligió (comodidad de quien usa este teléfono).
 if (props.sueloVivo && props.modelValue.agua == null) emit('update:modelValue', { ...props.modelValue, agua: ultimaAgua() })
@@ -205,6 +237,32 @@ watch(() => f.value.fertilizo, (v) => { if (v) cargar() }, { immediate: true })
 onMounted(() => { if (f.value.fertilizo) cargar() })
 
 function patch(cambios) { emit('update:modelValue', { ...props.modelValue, ...cambios }) }
+
+// «Cargar por lote»: el total deja de escribirse y pasa a ser la suma. Un lote sin número queda
+// «sin volumen cargado» (el backend no lo toma como 0).
+const porLote = computed(() => !!f.value.por_lote && props.lotes.length > 1)
+function sumaVolumenes(vs) {
+  const t = Object.values(vs || {}).reduce((a, v) => a + (Number(v) || 0), 0)
+  return t > 0 ? +t.toFixed(2) : null
+}
+function setPorLote(on) {
+  if (on) patch({ por_lote: true, volumenes: {}, volumen: null })
+  else patch({ por_lote: false, volumenes: {}, volumen: null })
+}
+// «Por plantas»: las tandas mandan y el volumen es su total.
+const ofrecePorPlantas = computed(() => !props.salaId && props.plantas.length > 1)
+const porPlantas = computed(() => ofrecePorPlantas.value && !!f.value.por_plantas)
+function setPorPlantas(on) {
+  patch({
+    por_plantas: on ? { tandas: [{ plant_ids: [], cantidad: null, unidad: 'pulsos' }], litros_por_pulso: props.litrosPorPulso, total_l: null } : null,
+    volumen: null,
+  })
+}
+function setTandas(v) { patch({ por_plantas: v, volumen: v.total_l ?? null }) }
+function setVolumenLote(id, v) {
+  const volumenes = { ...(f.value.volumenes || {}), [id]: v === '' ? null : Number(v) }
+  patch({ volumenes, volumen: sumaVolumenes(volumenes) })
+}
 const modo   = computed(() => f.value.modo_nutricion || 'sin')
 const receta = computed(() => recetas.value.find(r => String(r.id) === String(f.value.receta_id)) || null)
 // Los litros de la mezcla son el volumen del riego, salvo que se diga otra cosa.
@@ -311,6 +369,12 @@ watch([lineas, litros, modo, receta], () => {
 .rf__falta-ops { display: flex; flex-wrap: wrap; gap: .35rem; }
 .rf__radio-btn--xs { padding: .3rem .6rem; font-size: .76rem; }
 .rf__costo { font-size: .78rem; color: var(--c-ink-700); text-align: right; }
+.rf__por-plantas { margin-bottom: var(--sp-3); }
+.rf__link { align-self: flex-start; background: none; border: 0; padding: 0; color: var(--brand-primary); font-size: .78rem; font-weight: 600; cursor: pointer; text-decoration: underline; }
+.rf__por-lote { display: flex; flex-direction: column; gap: .35rem; }
+.rf__por-lote-fila { display: flex; align-items: center; gap: .5rem; }
+.rf__por-lote-codigo { flex: 1; min-width: 0; font-size: var(--fs-14); font-weight: 600; color: var(--c-ink-900); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rf__por-lote-total { font-size: .78rem; color: var(--c-ink-700); font-weight: 600; text-align: right; }
 .rf__fertilizacion { background: var(--c-leaf-50, #F4F8F5); border: 1px solid var(--c-leaf-100, #E8F0EB); border-radius: var(--r-lg); padding: var(--sp-3); margin-bottom: var(--sp-3); }
 
 /* Estas tres nunca se escribieron: los botones de método de aplicación salían con el borde

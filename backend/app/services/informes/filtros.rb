@@ -52,6 +52,30 @@ module Informes
     def propio?  = @origen != 'externo'
     def externo? = @origen != 'propio'
 
+    # Los lotes que entran: acotados por lote, genética y sede. «Sólo stock externo» no tiene
+    # lotes: el stock externo entra sin lote (`compra_externa`).
+    def acotar_lotes(rel)
+      rel = rel.none unless propio?
+      rel = rel.where(id: @lote_ids)              if @lote_ids
+      rel = rel.where(genetica_id: @genetica_ids) if @genetica_ids
+      rel = rel.where(id: Lote.unscoped.left_joins(:sala).where('COALESCE(lotes.sede_id, salas.sede_id) IN (?)', @sede_ids).select(:id)) if @sede_ids
+      rel
+    end
+
+    # LA SEDE DE UN LOTE: la suya si ya salió de la sala (cosecha) o vive en una cama; si no, la de
+    # su sala. `lotes.sede_id` está vacío mientras cultiva, y filtrar sólo por esa columna dejaba
+    # afuera todo lo que estaba en vegetativo o floración.
+
+    # El stock que entra: propio (de lote o derivado), externo o los dos; y por lote, genética y sede.
+    def acotar_stocks(rel)
+      rel = rel.where.not(origen: 'compra_externa') unless externo?
+      rel = rel.where(origen: 'compra_externa')     unless propio?
+      rel = rel.where(lote_id: @lote_ids)           if @lote_ids
+      rel = rel.where(genetica_id: @genetica_ids)   if @genetica_ids
+      rel = rel.where(sede_id: @sede_ids)           if @sede_ids
+      rel
+    end
+
     # «Lotes: L-26-001, L-26-004 · 12 pacientes · sólo stock externo». nil sin filtros.
     def descripcion
       return nil unless activo?

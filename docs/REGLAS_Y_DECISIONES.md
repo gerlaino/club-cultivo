@@ -370,6 +370,14 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   Un riego sin volumen NO cuenta como 0 L («sin volumen cargado»). Ya no se escribe «Riego: 20L»
   en el texto; lo viejo se pasa con `rake riegos:volumen_desde_texto` (en seco sin `CONFIRMAR=1`).
   `litros` sigue siendo la solución preparada con receta: no es lo mismo que el agua.
+  **Por lote (30-sep-2026)**: en el riego de la sala, «Cargar por lote» carga lo de cada uno y el
+  total es la suma (sin número = «sin volumen cargado»); los nutrientes se reparten como el agua.
+- **EL RIEGO POR PLANTA SE CARGA DESDE EL LOTE** (Germán, 30-sep-2026: «NO poner riego en el
+  detalle de una planta, pero sí elegir qué planta del lote fue regada, como con la cosecha»).
+  Tandas de plantas con su cantidad, en litros o pulsos (`riego_plantas`: volumen_l siempre;
+  pulsos y litros_por_pulso si se cargó así). Sólo plantas en pie, cada una en una tanda. El
+  volumen del registro del lote es la suma. La planta que no estaba no hereda ese riego ni lo del
+  agua (nutrientes, pH/EC); sí lo del aire.
 - **TODO MODELO DE DOMINIO NUEVO LLEVA `include Transmite` + `transmite_como '<recurso>'`**
   (20-sep-2026), y toda pantalla nueva que pida directo a la API se anota con
   `useRecargaEnCambios`. Es lo que hace que lo que uno registra se vea en todos lados sin
@@ -640,6 +648,35 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   **sólo las variedades de ESA cadena**. **NO se vinculan genéticas automáticamente**:
   `declarada_como` **renombra la planta en el informe regulatorio**, así que vincular a ciegas es
   una declaración falsa firmada por un rake.
+- **EL PESAJE DE MANICURA** (1-oct-2026, «no podemos fallar ahí»): una planta se pesa en UNA
+  jornada (corregir: misma jornada, reabrirla o reajustar si se confirmó); una descartada no se
+  pesa; borrar una jornada (o «Quitar» una planta de la abierta) la deja sin pesar;
+  confirmar/enviar/reajustar/quitar van con candado; el destino es un frasco de flor seca del lote;
+  reajustar después del cierre recalcula el rendimiento del lote. `rake manicura:diagnostico`
+  encuentra lo que haya quedado mal de antes.
+- **EL FRASCO SE CIERRA CUANDO EL ADMIN LO CIERRA** (Germán, 1-oct-2026). Dispensar lo último
+  pregunta «¿cerrás el frasco?»; si no, queda abierto y vacío (Stock → Vacíos) y el lote NO se
+  finaliza hasta que se cierre su último frasco abierto. Cerrar uno vacío no pide motivo.
+- **UN PESAJE SE PUEDE REPARTIR EN VARIOS FRASCOS** (copones/bajos, 1-oct-2026): la suma es el
+  peso confirmado; todo del mismo lote; el reajuste es por frasco. `pesaje_destinos` es la fuente;
+  `pesajes_manicura.stock_id` queda como el primero por compatibilidad.
+- **UN FRASCO SE PUEDE SEPARAR EN VARIOS** (1-oct-2026): sólo lo guardado y libre (lo de la mesa,
+  reservado o apartado se queda), algo queda en el original, y es un traslado (transferencia en
+  las dos puntas): no sale nada del inventario y la trazabilidad no se corta.
+- **UN FRASCO VACÍO AL QUE LE VUELVE PRODUCTO SE REABRE** (1-oct-2026): deja de estar agotado y su
+  lote, si se había finalizado por eso, vuelve a curado (`Stock#reabrir_si_tiene_producto!`). Vale
+  para otra jornada pesada en ese frasco, un reajuste para arriba, una anulación cuyo producto
+  vuelve y una edición para menos. La edición reabre recién al final, nunca en el medio.
+- **UN MOVIMIENTO SE FECHA CUANDO PASÓ** (1-oct-2026): el de una dispensa, con `fecha_dispensacion`
+  (y si se le corrige la fecha, se mueve). **Lo que ya está en `cantidad_inicial` no es una entrada
+  más** en la cuenta del frasco: ni el nacimiento por fraccionado, ni el `produccion` del pesaje de
+  manicura, ni el `ajuste` de su reajuste.
+- **LO QUE SE PRESENTA NO SE FILTRA** (29/30-sep-2026). Los informes se arman a medida
+  (`Informes::Filtros`: un filtro ausente es «todos», uno con ids ajenos deja el informe vacío, el
+  filtrado lo dice en pantalla, PDF y Excel), pero el INASE y el REPROCANN «para presentar» salen
+  completos aunque la pantalla esté filtrada (`filtros_salvo_para_presentar`), y el botón dice
+  «(completo)». La sede de un lote es `COALESCE(lotes.sede_id, salas.sede_id)`: mientras cultiva,
+  `lotes.sede_id` está vacío.
 - **EL PIE DE LOS PDF NO LLEVA LA MARCA DE LA PLATAFORMA.** El documento es de la organización y
   lo firma ella; quién lo generó es asunto nuestro, no del auditor que lo recibe.
 - **CON `responseType: 'blob'` EL ERROR TAMBIÉN LLEGA COMO BLOB**, así que ni el interceptor de

@@ -24,6 +24,11 @@ class ReprocannDocument < BaseDocument
   end
 
   def cuerpo(pdf)
+    # Filtrado (sólo sin «para presentar»): que se lea como un recorte, no como la nómina completa.
+    if (f = @data.dig(:filtros, :descripcion)).present?
+      pdf.font(SANS) { pdf.text "Filtrado — #{f}", size: 9, style: :bold }
+      pdf.move_down 8
+    end
     titulo_seccion(pdf, "Resumen de situación")
     stat_strip(pdf, [
       { label: "Pacientes activos", valor: @data[:total_pacientes] },

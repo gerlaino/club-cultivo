@@ -97,6 +97,7 @@
 import { ref, computed, watch } from 'vue'
 import { CheckCheck, X } from 'lucide-vue-next'
 import { createPesajeManicura, registrarDirectoManicura, listPlants } from '../../lib/api.js'
+import { useManicuraJornada } from '../../composables/useManicuraJornada'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { useAuthStore } from '../../stores/auth.js'
 
@@ -119,6 +120,7 @@ const confirmaSolo = computed(() =>
   (!props.lote?.manicurador_id || props.lote.manicurador_id === auth.user?.id))
 
 // Selección de plantas: se listan las pendientes (sin peso) y se eligen las manicuradas.
+const { registrarConJornada } = useManicuraJornada()
 const pendientes    = ref([])
 const selectedIds   = ref([])
 const loadingPlantas = ref(false)
@@ -146,8 +148,10 @@ async function cargarPlantas() {
   loadingPlantas.value = true
   try {
     const { data } = await listPlants({ lote_id: props.lote.id })
-    // Pendientes = sin peso seco todavía (las ya pesadas no se re-reparten).
-    pendientes.value = (data || []).filter(p => !(parseFloat(p.peso_seco) > 0))
+    // Pendientes = las que todavía se pesan: ni descartadas, ni con peso, ni con una pesada en
+    // otra jornada (el mismo criterio que el backend, `PesajeManicura.plantas_sin_pesar`).
+    pendientes.value = (data || []).filter(p =>
+      p.state !== 'descartada' && !(parseFloat(p.peso_seco) > 0) && !p.tiene_pesada)
     selectedIds.value = pendientes.value.map(p => p.id) // por defecto, todas
   } catch {
     pendientes.value = []
@@ -170,13 +174,17 @@ async function confirmar() {
       })
       data = d
     } else {
-      const { data: d } = await createPesajeManicura(props.lote.id, {
+      // Con una jornada enviada sin confirmar, pregunta si seguir esa o empezar otra (como el
+      // resto de las pantallas de pesaje) en vez de mostrar un error.
+      const res = await registrarConJornada(props.lote.id, (extra) => createPesajeManicura(props.lote.id, {
         plant_ids:    selectedIds.value,
         peso_total_g: form.value.peso_seco_g,
         notas:        form.value.notas || undefined,
         enviar:       true,
-      })
-      data = d
+        ...extra,
+      }))
+      if (!res) return // eligió cancelar
+      data = res.data
     }
     emit('completado', data)
     cerrar()
