@@ -439,6 +439,11 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   arregla peso confirmado + stock con un movimiento que nombra el lote. `compra_externa` sí
   puede subir (respaldo: la factura). Merma y pérdida nunca suman: eso es un reconteo. Es la
   misma familia que «contar no crea stock» en el mostrador.
+- **EL REPROCANN TIENE TRES ESTADOS** (2-oct-2026, Germán): sin registro, pendiente de aprobación
+  y **vigente** (guardado como `activo`, por historia). «Vencido» sale de la fecha
+  (`reprocann_estado_efectivo`), no se guarda. «Inactivo» NO es un estado del REPROCANN:
+  activo/inactivo es el PACIENTE en la organización (`es_paciente`, el tilde «Activo»). El backend
+  rechaza cualquier otro valor al cambiarlo (`Paciente::REPROCANN_ESTADOS`).
 - **LO QUE ENTRA A UN STOCK EXTERNO ES «ENTRÓ MERCADERÍA», NO UN RECONTEO** (1-oct-2026, socio
   de Germán): llega más de lo mismo y se SUMA AL MISMO STOCK (Germán: «es la misma») con un
   movimiento `ingreso` fechado el día en que ENTRÓ (puede ser anterior a hoy: el informe de

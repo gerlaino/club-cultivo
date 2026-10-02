@@ -19,7 +19,7 @@ RSpec.describe 'El DNI en los informes', type: :request do
   let!(:paciente) do
     ActsAsTenant.with_tenant(club) do
       create(:paciente, club: club, nombre: 'Juana', apellido: 'Pérez', dni: '30111222',
-                        reprocann_estado: 'vigente', reprocann_numero: 'RP-1',
+                        reprocann_estado: 'activo', reprocann_numero: 'RP-1',
                         reprocann_vencimiento: 6.months.from_now.to_date)
     end
   end

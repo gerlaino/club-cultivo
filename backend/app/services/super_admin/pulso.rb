@@ -178,40 +178,14 @@ module SuperAdmin
 
     # ── Salud de la plataforma ────────────────────────────────────────────
     #
-    # Lo que hoy se descubría corriendo un rake a mano (`sidekiq:health`, 79 días sin worker
-    # que nadie vio) o entrando al bucket: el último backup, y qué cron no corrió cuando tenía
-    # que correr.
+    # El resumen para la portada: el último backup, la cola y qué cron no corrió. El detalle
+    # completo (servidores, recursos, verificación de backups) vive en el panel de Estado; los
+    # números salen de los mismos servicios (`Infra::Cola`, `Backups::Ultimo`), no de una copia.
     def salud
-      { iot_mudo: iot_mudo, sidekiq: sidekiq, backup: Backups::Ultimo.call, cron: cron }
-    end
-
-    # Cada job programado con su última corrida. `atrasado` cuando pasó más del doble de su
-    # período sin encolarse: un cron que no corre no avisa, y este panel es el único lugar
-    # donde se puede ver.
-    def cron
-      require 'sidekiq/cron/job'
-      Sidekiq::Cron::Job.all.map do |j|
-        ultima   = j.last_enqueue_time
-        periodo  = periodo_de(j.cron)
-        atrasado = periodo.present? && (ultima.nil? || ultima < Time.current - (periodo * 2))
-        { nombre: j.name, cron: j.cron, descripcion: j.description, ultima: ultima, atrasado: atrasado }
-      end.sort_by { |c| [c[:atrasado] ? 0 : 1, c[:nombre]] }
-    rescue StandardError => e
-      Rails.logger.warn("[Pulso] cron no disponible: #{e.class} #{e.message}")
-      []
-    end
-
-    # Cuánto tarda en volver a correr, a partir del cron. Con lo justo para los que hay: por
-    # minutos, por hora, por día, por semana. Lo anual (los informes semestrales) no se vigila.
-    def periodo_de(cron)
-      m, h, dom, mon, dow = cron.to_s.split
-      return nil if mon != '*' || dom != '*'
-      return 1.week if dow != '*'
-      return 1.day  if h != '*'
-      return 1.hour if m != '*' && !m.start_with?('*/')
-      return m.delete_prefix('*/').to_i.minutes if m.start_with?('*/')
-
-      nil
+      cola = Infra::Cola.new
+      t    = cola.trabajos
+      sidekiq = t[:disponible] ? t.slice(:disponible, :encolados, :fallidos, :muertos, :workers) : t.slice(:disponible, :error)
+      { iot_mudo: iot_mudo, sidekiq: sidekiq, backup: Backups::Ultimo.call, cron: cola.cron }
     end
 
     # Un club con el IoT contratado y las sondas calladas está pagando por nada y no se entera.
@@ -229,23 +203,6 @@ module SuperAdmin
 
         resumen(club).merge(ultima_lectura: ultima)
       end
-    end
-
-    def sidekiq
-      require 'sidekiq/api'
-      stats = Sidekiq::Stats.new
-      {
-        disponible: true,
-        encolados:  stats.enqueued,
-        fallidos:   stats.failed,
-        muertos:    Sidekiq::DeadSet.new.size,
-        workers:    Sidekiq::ProcessSet.new.size,
-      }
-    rescue StandardError => e
-      # Sin Redis el panel no puede reventar: que no haya cola es un dato, no un error de la
-      # página.
-      Rails.logger.warn("[Pulso] Sidekiq no disponible: #{e.class} #{e.message}")
-      { disponible: false, error: 'No se pudo consultar la cola de trabajos.' }
     end
 
     # ── Adopción ──────────────────────────────────────────────────────────

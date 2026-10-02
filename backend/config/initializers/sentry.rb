@@ -19,7 +19,7 @@ if ENV["SENTRY_DSN"].present?
     # El health check lo pega el monitor externo cada minuto: medirlo es ruido y gasta la cuota.
     config.traces_sampler = lambda do |ctx|
       name = ctx.dig(:transaction_context, :name).to_s
-      next 0.0 if name.match?(%r{\A/(api/)?(up|salud)\z}) || name.include?("HealthController")
+      next 0.0 if name.match?(%r{\A/(api/)?(up|salud(/backup)?)\z}) || name.include?("HealthController")
 
       config.traces_sample_rate
     end

@@ -64,6 +64,15 @@ class Paciente < ApplicationRecord
   after_create_commit :dispatch_webhook
 
   validates :nombre, :apellido, :dni, :dni_normalizado, :fecha_nacimiento, presence: true
+
+  # LOS ESTADOS DEL REPROCANN SON TRES (2-oct-2026): sin registro, pendiente de aprobación y
+  # vigente (`activo`, por historia). «Vencido» sale de la fecha (`reprocann_estado_efectivo`).
+  # «Inactivo» se ofrecía y no es un estado del REPROCANN —activo/inactivo es el PACIENTE en la
+  # organización, `es_paciente`—: ya no se puede guardar. Sólo se valida al CAMBIAR, así los que lo
+  # tienen de antes no se traban hasta pasar `rake reprocann:sin_inactivo`.
+  REPROCANN_ESTADOS = %w[sin_registro pendiente activo].freeze
+  validates :reprocann_estado, inclusion: { in: REPROCANN_ESTADOS, message: 'no es un estado de REPROCANN' },
+                               allow_blank: true, if: :reprocann_estado_changed?
   # Unicidad DENTRO de la organización, no en toda la plataforma.
   #
   # Era global, leyendo el requisito del REPROCANN (una persona se registra con UN cultivador a

@@ -11,7 +11,8 @@ RSpec.describe 'Pacientes — lo que ve el dispensador', type: :request do
   let!(:paciente) do
     ActsAsTenant.with_tenant(club) do
       create(:paciente, club: club, created_by: admin, nombre: 'Ana', apellido: 'Pérez',
-                        reprocann_estado: 'vencido', reprocann_vencimiento: 10.days.ago,
+                        # Vencido no se guarda: es vigente (`activo`) con la fecha pasada.
+                        reprocann_estado: 'activo', reprocann_vencimiento: 10.days.ago,
                         reprocann_numero: 'RC-123')
     end
   end
@@ -52,8 +53,8 @@ RSpec.describe 'Pacientes — lo que ve el dispensador', type: :request do
       get '/api/pacientes'
 
       fila = JSON.parse(response.body)['data'].first
-      expect(fila['reprocann_estado']).to eq('vencido')
-      expect(fila['reprocann_estado_efectivo']).to be_present
+      expect(fila['reprocann_estado']).to eq('activo')
+      expect(fila['reprocann_estado_efectivo']).to eq('vencido')
     end
   end
   # Escanear el carnet en el mostrador tiene que traer AL PACIENTE, no la página pública del

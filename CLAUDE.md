@@ -3,7 +3,8 @@
 > Briefing de sesión, corto a propósito (20-sep-2026). Si contradice al código, el código manda.
 > El detalle histórico vive en `docs/`: `REGLAS_Y_DECISIONES.md` (todas las reglas «que no hay que
 > romper», decisiones de Germán y retomadas viejas), `MODULOS_DETALLE.md` (cada módulo como quedó),
-> `CHANGELOG.md` (bloque por bloque), `DEPLOY.md`, `SECURITY_AUDIT.md`, `GUIA_USUARIOS.md`.
+> `CHANGELOG.md` (bloque por bloque), `DEPLOY.md`, `INFRA.md` (operar la plataforma: panel de
+> Estado, backups, manuales y pasos a mano), `SECURITY_AUDIT.md`, `GUIA_USUARIOS.md`.
 > **Antes de tocar un módulo, grep en `docs/REGLAS_Y_DECISIONES.md` por su nombre.**
 
 ## Qué es

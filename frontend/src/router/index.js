@@ -706,6 +706,7 @@ const routes = [
       { path: 'clubs/:id', name: 'sa-club-detail', component: () => import('../views/superadmin/SAClubDetail.vue') },
       { path: 'usuarios', name: 'sa-usuarios', component: () => import('../views/superadmin/SAUsuarios.vue') },
       { path: 'informes', name: 'sa-informes', component: () => import('../views/superadmin/SAInformes.vue') },
+      { path: 'estado', name: 'sa-estado', component: () => import('../views/superadmin/SAEstado.vue') },
       // El perfil vive DENTRO del shell de plataforma: la vista es la misma que usa el resto de
       // la app, pero /perfil no es hija de este layout y mandaba al super admin a una pantalla
       // pelada, sin forma de volver.

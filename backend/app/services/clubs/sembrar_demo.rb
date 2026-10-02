@@ -586,7 +586,8 @@ module Clubs
         # REPROCANN en los tres estados: sin vencimientos próximos, los informes de cumplimiento y
         # el panel de "críticos" salen vacíos, que es justo lo que hay que poder mostrar.
         estado, vence = case i % 10
-                        when 0, 1 then ['vencido',  hoy - @rng.rand(5..60)]
+                        # Vencido no es un estado guardado: es vigente con la fecha pasada.
+                        when 0, 1 then ['activo',   hoy - @rng.rand(5..60)]
                         when 2, 3 then ['activo',   hoy + @rng.rand(5..30)]   # por vencer
                         else           ['activo',   hoy + @rng.rand(60..300)]
                         end

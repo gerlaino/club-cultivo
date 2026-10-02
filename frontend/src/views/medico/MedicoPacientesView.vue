@@ -188,8 +188,7 @@
                 <select v-model="form.reprocann_estado">
                   <option value="sin_registro">Sin registro</option>
                   <option value="pendiente">Pendiente aprobación</option>
-                  <option value="activo">Activo</option>
-                  <option value="inactivo">Inactivo</option>
+                  <option value="activo">Vigente</option>
                 </select>
               </div>
             </div>

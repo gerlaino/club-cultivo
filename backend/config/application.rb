@@ -69,7 +69,9 @@ module App
     # Please, add to the `ignore` list any other `lib` subdirectories that do
     # not contain `.rb` files, or that should not be reloaded or eager loaded.
     # Common ones are `templates`, `generators`, or `middleware`, for example.
-    config.autoload_lib(ignore: %w[assets tasks])
+    # `club_backup.rb` se carga con `require`, no por autoload: lo usa también el cron de backups,
+    # que corre sin bootear la app (ver el archivo).
+    config.autoload_lib(ignore: %w[assets tasks club_backup.rb])
 
     # Configuration for the application, engines, and railties goes here.
     #

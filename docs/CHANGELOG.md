@@ -1,5 +1,31 @@
 # Changelog
 
+## Octubre 2026 (dw) — Panel de Estado, backups verificados, tests en cada push, y REPROCANN sin «Inactivo»
+
+- **Super admin → Estado** (`GET /super_admin/estado`, `Infra::Estado`): una frase y un semáforo,
+  los avisos con qué hacer, una tarjeta por servidor de Render (qué es, si anda, último cambio,
+  memoria y CPU de las últimas 24 h contra lo que da el plan, costo estimado), base/Redis/worker
+  vistos desde adentro, la fila de trabajos, las tareas programadas, los backups y cuánto usa cada
+  organización. Producción se reconoce por `RENDER_SERVICE_ID` y por `DATABASE_URL`/`REDIS_URL`,
+  no por el nombre. Lee Render con `RENDER_API_KEY` (sólo lectura).
+- **Un solo lugar para cada chequeo**: `Infra::Chequeos` (lo usan `/salud` y el panel),
+  `Infra::Cola` (sacado de Pulso), `lib/club_backup.rb` (la configuración del bucket que estaba
+  escrita dos veces, en el rake y en el panel, y ya se había separado: el panel caía a la región
+  `auto`).
+- **Backups**: `rake backup:verificar` baja la copia del día y comprueba que se lea y tenga las
+  tablas clave (cron diario, resultado en el panel); `GET /salud/backup` para un monitor externo
+  (503 si no hubo backup en 26 h). El panel avisa si los backups comparten bucket con las fotos.
+- **CI en GitHub** (`.github/workflows/ci.yml`): RSpec + Vitest + build en cada push. Con
+  Render en «After CI Checks Pass», un push en rojo no llega a producción.
+- **`docs/INFRA.md`**: la infraestructura explicada simple, los manuales de «qué hacer si…» y los
+  pasos a mano.
+- **REPROCANN**: el formulario del paciente (crear, editar y el del médico) ofrecía «Activo /
+  Inactivo» como estado del REPROCANN. Ahora es Sin registro / Pendiente de aprobación /
+  **Vigente** (el valor guardado sigue siendo `activo`); «Inactivo» no existe —activo/inactivo es
+  el paciente en la organización— y el backend ya no lo acepta. `rake reprocann:sin_inactivo` pasa
+  los que quedaron (con número → vigente, sin número → sin registro). La organización demo ya no
+  guarda «vencido» como estado (sale de la fecha).
+
 ## Octubre 2026 (dv) — «Entró mercadería»: el informe dice lo que entró cada mes, aunque el stock sea de antes
 
 - **El problema** (socio de Germán): el informe de stock externo mostraba los stocks CREADOS en el

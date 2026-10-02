@@ -5,6 +5,7 @@ Rails.application.routes.draw do
   get  "/up", to: "health#show"
   # Chequeo profundo (base, Redis, worker) para el monitor externo; /up queda para Render.
   get  "/salud", to: "health#salud"
+  get  "/salud/backup", to: "health#backup"
   # Root sirve la SPA (index.html copiado a public/). Si no hay build, spa_fallback
   # responde 404 — por eso el health check de Render debe apuntar a /up, no a /.
   root to: "application#spa_fallback"
@@ -743,6 +744,8 @@ Rails.application.routes.draw do
       # El panel de quien vende la plataforma: vencimientos, módulos a medias, clubes en
       # silencio y salud. Los agregados (plantas, lotes, pacientes) viven en informes.
       get :pulso,    to: 'stats#pulso'
+      # Servidores, backups, cola y tamaño de cada organización: ¿anda todo? (docs/INFRA.md)
+      get :estado,   to: 'estado#show'
       get 'informes/plataforma', to: 'informes#plataforma'
     end
   end

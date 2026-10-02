@@ -254,6 +254,8 @@ onMounted(async () => {
         <div class="sad__section-head">
           <Activity :size="15" :stroke-width="2" />
           <span class="sad__section-title">Salud</span>
+          <!-- El resumen; servidores, recursos y backups en detalle, en Estado. -->
+          <RouterLink :to="{ name: 'sa-estado' }" class="sad__ver-estado">Ver el estado completo →</RouterLink>
         </div>
         <div class="sad__salud">
           <div class="sad__salud-item" :class="{ 'sad__salud-item--mal': !sidekiq.disponible || sidekiq.workers === 0 }">
@@ -439,4 +441,6 @@ onMounted(async () => {
 .sad__adop-v { font-size: .8rem; font-weight: 800; color: var(--c-slate-900); }
 /* Contratado pero sin andar: la diferencia es el trabajo pendiente. */
 .sad__adop-v--gap { color: #b45309; }
+.sad__ver-estado { margin-left: auto; font-size: var(--fs-12); font-weight: 600; color: var(--c-leaf-700); text-decoration: none; }
+.sad__ver-estado:hover { text-decoration: underline; }
 </style>

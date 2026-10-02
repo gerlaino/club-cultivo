@@ -1,5 +1,8 @@
 # Despliegue — ambientes, variables y cómo no romper el que anda
 
+> **La guía simple para operar (qué hay, cómo se ve si anda, qué hacer si se rompe, y los pasos
+> a mano en los paneles) es `docs/INFRA.md`.** Esto es el detalle técnico.
+
 > Escrito el 20-ago-2026 a partir del código, no de memoria: cada variable de acá está leída de
 > algún `ENV[...]` del repo. Si agregás una nueva, sumala a este archivo en el mismo commit.
 
@@ -93,6 +96,8 @@ dosificación, vía de administración, observaciones y DNI.
 | `ARICCAME_SIMULAR` | En cualquier ambiente que no sea producción debe ser `true` |
 | `SENTRY_DSN` | Sin ella no se mide nada: ni tiempos ni errores de producción (ver §9). En el web service **y** en el worker |
 | `SENTRY_TRACES_SAMPLE_RATE` | Qué fracción de los pedidos se mide (por defecto `0.2`). Subirla gasta la cuota gratis de Sentry |
+| `SENTRY_URL` | Opcional: el link al proyecto en Sentry, para el botón del panel de Estado |
+| `RENDER_API_KEY` | Sin ella el panel de Estado no muestra los servidores, su memoria ni el costo (sólo lo de adentro de la app). Sólo en `cultivo-staging-api` |
 
 ### 3.4 Desde dónde se acepta una conexión
 

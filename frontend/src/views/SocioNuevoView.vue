@@ -66,8 +66,10 @@ const form = ref({
 const REPROCANN_ESTADOS = [
   { value: 'sin_registro', label: 'Sin registro',         color: '#94a3b8', bg: '#f8fafc' },
   { value: 'pendiente',    label: 'Pendiente de aprobación', color: '#b45309', bg: '#fffbeb' },
-  { value: 'activo',       label: 'Activo',               color: '#15803d', bg: '#f0fdf4' },
-  { value: 'inactivo',     label: 'Inactivo',             color: '#dc2626', bg: '#fef2f2' },
+  // «Vigente», no «Activo» (2-oct-2026): activo/inactivo es el PACIENTE en la organización (el tilde
+  // de abajo), no su REPROCANN. El valor guardado sigue siendo `activo`. «Inactivo» no es un estado
+  // del REPROCANN y se sacó; «Vencido» lo calcula la fecha solo (`reprocann_estado_efectivo`).
+  { value: 'activo',       label: 'Vigente',              color: '#15803d', bg: '#f0fdf4' },
 ]
 
 const reprocannVencimientoSugerido = computed(() => {

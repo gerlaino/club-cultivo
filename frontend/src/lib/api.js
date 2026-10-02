@@ -830,6 +830,8 @@ export const setFotoPortadaLote = (loteId, fotoId) => api.patch(`/lotes/${loteId
 export const getSuperAdminCatalogo = ()           => api.get('/super_admin/catalogo')
 // El panel del dueño: vencimientos, módulos a medias, clubes en silencio y salud.
 export const getSuperAdminPulso    = ()           => api.get('/super_admin/pulso')
+// El panel de Estado: servidores, backups, cola y tamaño de cada organización (Infra::Estado).
+export const getSuperAdminEstado = () => api.get('/super_admin/estado')
 // Qué le hicimos NOSOTROS a este club: plan, módulos, suspensión, baja.
 export const getHistorialClub      = (id)         => api.get(`/super_admin/clubs/${id}/historial`)
 // Los agregados de la plataforma (plantas, lotes, pacientes) viven acá, no en el panel.

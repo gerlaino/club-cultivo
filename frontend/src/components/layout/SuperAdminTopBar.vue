@@ -76,6 +76,7 @@ const tabs = [
   { name: 'sa-clubs',     label: 'Organizaciones',   coincide: ['sa-clubs', 'sa-club-nuevo', 'sa-club-detail'] },
   { name: 'sa-usuarios',  label: 'Usuarios', coincide: ['sa-usuarios'] },
   { name: 'sa-informes',  label: 'Informes', coincide: ['sa-informes'] },
+  { name: 'sa-estado',    label: 'Estado',   coincide: ['sa-estado'] },
 ]
 
 // La ficha y el alta de una organización son parte de "Clubes": si sólo se comparara la ruta exacta, la

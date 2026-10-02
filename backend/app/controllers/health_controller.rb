@@ -9,29 +9,23 @@ class HealthController < ApplicationController
   # GET /salud — para el monitor EXTERNO (UptimeRobot / Better Stack): ¿anda todo lo que la app
   # necesita? 200 si sí, 503 si algo no. Es público a propósito (el monitor no se loguea), por eso
   # dice sólo «ok»/«caído» por pieza: ni versiones, ni hosts, ni datos de nadie.
+  #
+  # Qué es «anda» lo decide `Infra::Chequeos`, lo mismo que mira el panel de plataforma.
   def salud
-    chequeos = {
-      base:   chequear { ActiveRecord::Base.connection.select_value('SELECT 1') == 1 },
-      redis:  chequear { Sidekiq.redis { |r| r.call('PING') } == 'PONG' },
-      worker: chequear { worker_vivo? },
-    }
-    todo_ok = chequeos.values.all?('ok')
+    piezas   = Infra::Chequeos.call
+    chequeos = piezas.transform_values { |p| p[:estado] == 'mal' ? 'caído' : 'ok' }
+    todo_ok  = chequeos.values.all?('ok')
     render json: { ok: todo_ok, chequeos: chequeos, time: Time.current },
            status: todo_ok ? :ok : :service_unavailable
   end
 
-  private
-
-  def chequear
-    yield ? 'ok' : 'caído'
-  rescue StandardError
-    'caído'
-  end
-
-  # Sin un proceso de Sidekiq vivo los jobs se encolan y nadie los corre, sin ningún error visible
-  # (pasó 79 días en producción). El latido de Sidekiq es cada ~10 s: un minuto sin latir es caído.
-  def worker_vivo?
-    require 'sidekiq/api'
-    Sidekiq::ProcessSet.new.any? { |p| Time.now.to_i - p['beat'].to_i < 60 }
+  # GET /salud/backup — para un SEGUNDO monitor externo: ¿hubo backup en las últimas 26 horas?
+  # Un cron que se rompe no avisa (pasó: semanas sin backup). Con esto el monitor manda el mail.
+  # Mismo criterio que el panel (`Backups::Ultimo`). Sin bucket configurado no hay qué vigilar.
+  def backup
+    b  = Backups::Ultimo.call
+    ok = b[:estado] == 'ok'
+    render json: { ok: ok, estado: b[:estado], horas_desde: b[:horas_desde], time: Time.current },
+           status: ok ? :ok : :service_unavailable
   end
 end
