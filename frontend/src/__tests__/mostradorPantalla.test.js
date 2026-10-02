@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount, flushPromises } from '@vue/test-utils'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { mount, flushPromises, enableAutoUnmount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 // `MostradorView` lee `?sede=` para saber a qué sede llegar desde "Cajas del día": sin este
@@ -94,6 +94,11 @@ async function montar (rol = 'admin', extra = {}) {
 
 const fila  = (w, n) => w.findAll('.tmo__table tbody tr')[n]
 const filas = (w) => w.findAll('.tmo__table tbody tr')
+
+// Cada pantalla se desmonta al terminar su caso. El menú de la fila se dibuja en el <body>: sin
+// esto quedaba el de un caso anterior, `document.body.querySelector` lo encontraba primero y el
+// clic iba a un componente viejo. Pasaba o fallaba según la velocidad de la máquina (falló en CI).
+enableAutoUnmount(afterEach)
 
 beforeEach(() => {
   setActivePinia(createPinia())
