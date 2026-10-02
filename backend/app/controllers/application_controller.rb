@@ -10,6 +10,7 @@ class ApplicationController < ActionController::API
   before_action :set_current_user
   before_action :marcar_visto!
   before_action :set_tenant_from_current_user
+  before_action :etiquetar_sentry
   before_action :check_club_activo!
   before_action :check_rol_habilitado!
   before_action :block_auditor_writes!
@@ -255,6 +256,16 @@ class ApplicationController < ActionController::API
   end
 
   # Expone el usuario del request a la capa de modelos (concern Auditable)
+  # Para saber en Sentry QUÉ organización y QUÉ rol anda lento. Sólo ids y el rol: nada que
+  # identifique a una persona (ver config/initializers/sentry.rb).
+  def etiquetar_sentry
+    return unless defined?(Sentry) && Sentry.initialized?
+
+    Sentry.set_tags(club_id: current_user&.club_id, rol: current_user&.role)
+  rescue StandardError
+    nil
+  end
+
   def set_current_user
     Current.user = current_user if respond_to?(:current_user, true)
   rescue StandardError

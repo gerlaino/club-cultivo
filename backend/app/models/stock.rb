@@ -124,7 +124,22 @@ class Stock < ApplicationRecord
   # Lo que ya salió en un paquete y todavía no se entregó. Es la única parte de lo comprometido
   # que de verdad está "en delivery".
   def en_delivery_g
-    dispensaciones.where(estado_envio: %w[pendiente en_viaje]).sum(:cantidad).to_f
+    return @en_delivery_precargado if defined?(@en_delivery_precargado)
+
+    dispensaciones.where(estado_envio: EN_DELIVERY).sum(:cantidad).to_f
+  end
+
+  EN_DELIVERY = %w[pendiente en_viaje].freeze
+
+  # Lo mismo para una lista entera, en una consulta (los listados lo muestran por renglón).
+  def self.precargar_en_delivery(stocks)
+    lista = Array(stocks)
+    return lista if lista.empty?
+
+    saldos = Dispensacion.where(stock_id: lista.map(&:id), estado_envio: EN_DELIVERY)
+                         .group(:stock_id).sum(:cantidad)
+    lista.each { |s| s.instance_variable_set(:@en_delivery_precargado, saldos[s.id].to_f) }
+    lista
   end
 
   # Lo apartado a nombre de un paciente que todavía no lo retiró.

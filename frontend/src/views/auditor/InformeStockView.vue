@@ -63,6 +63,29 @@
         <p v-else class="inf__empty">No hay stock con saldo.</p>
       </section>
 
+      <!-- ── Lo que entró, por genética ─────────────────────────────────────── -->
+      <!-- Lo que se presenta: «en septiembre entraron tantos gramos de cada genética». Suma las
+           altas del período y la mercadería que llegó a stocks que ya existían. -->
+      <section class="inf__section">
+        <div class="inf__section-head">
+          <h2 class="inf__section-title">Lo que entró</h2>
+          <span class="inf__section-marco">en el período elegido, por genética</span>
+        </div>
+        <table v-if="data.ingresos?.length" class="inf__table">
+          <thead><tr><th>Genética</th><th>Producto</th><th>Origen</th><th class="num">Stocks</th><th class="num">Entró</th></tr></thead>
+          <tbody>
+            <tr v-for="x in data.ingresos" :key="`${x.genetica}-${x.producto}-${x.unidad}-${x.origen}`">
+              <td>{{ x.genetica || '—' }}</td>
+              <td>{{ nombreProducto(x.producto) }} <span class="inf__dias">({{ x.unidad }})</span></td>
+              <td><span class="inf__badge" :class="{ 'inf__badge--ext': x.origen === 'externo' }">{{ nombreOrigen(x.origen) }}</span></td>
+              <td class="num">{{ x.stocks }}</td>
+              <td class="num"><strong>{{ cant(x.ingreso, x.unidad) }}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+        <p v-else class="inf__empty">No entró producto en el período elegido.</p>
+      </section>
+
       <!-- ── 2. Stock por stock ─────────────────────────────────────────────── -->
       <section class="inf__section">
         <div class="inf__section-head">

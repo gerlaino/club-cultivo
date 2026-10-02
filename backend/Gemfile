@@ -55,6 +55,9 @@ group :development, :test do
   gem "rubocop-rails-omakase", require: false
 
   gem 'letter_opener'
+
+  # Consultas repetidas (N+1) y precargas de más: avisa en el log de desarrollo y de los specs.
+  gem "bullet", "~> 8.0"
 end
 
 
@@ -80,6 +83,12 @@ gem 'twilio-ruby', '~> 7.0'
 
 # Rate limiting
 gem "rack-attack", "~> 6.7"
+
+# Rendimiento y errores de producción (cuánto tarda cada pedido y qué consultas hace). Queda
+# apagado mientras no haya SENTRY_DSN; nunca manda datos personales (ver config/initializers/sentry.rb).
+gem "sentry-ruby",    "~> 5.22"
+gem "sentry-rails",   "~> 5.22"
+gem "sentry-sidekiq", "~> 5.22"
 
 group :test do
   gem "rspec-rails", "~> 7.0"

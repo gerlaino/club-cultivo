@@ -13,8 +13,6 @@ class MovimientosContablesController < ApplicationController
   # Params opcionales: desde, hasta, tipo, categoria, sede_id, lote_id, page, per_page
   def index
     scope = current_user.club.movimientos_contables
-                        .includes(:sede, :lote, :dispensacion, :created_by, :categoria_contable, :unidad_negocio,
-                                  caja_turno: :sede)
                         .recientes
 
     scope = filtrar(scope)
@@ -34,7 +32,7 @@ class MovimientosContablesController < ApplicationController
     items    = scope.offset((page - 1) * per_page).limit(per_page)
 
     render json: {
-      movimientos: items.map { |m| serialize(m) },
+      movimientos: serializar_movimientos(items),
       totales:     totales,
       pagination:  { page: page, per_page: per_page, total: total,
                      total_pages: (total.to_f / per_page).ceil },
@@ -130,7 +128,7 @@ class MovimientosContablesController < ApplicationController
       # la calle. No bloquean el cierre —decisión de Germán, sep-2026—: lo que se cobre o se
       # cancele después cae en el período siguiente, y la pantalla lo avisa antes de cerrar.
       envios_en_la_calle_al_cierre: envios_en_la_calle_hasta(club, (hoy - 1.month).end_of_month),
-      ultimos_movimientos: scope.sin_cuotas_futuras.recientes.limit(10).map { |m| serialize(m) },
+      ultimos_movimientos: serializar_movimientos(scope.sin_cuotas_futuras.recientes.limit(10)),
     }
   end
 
@@ -674,15 +672,31 @@ class MovimientosContablesController < ApplicationController
 
   # El depósito no es una columna del movimiento: se llega por la compra de insumo que generó.
   # `@depositos_por_movimiento` lo precarga de una para el listado (si no, es un N+1 por fila).
+  # Lo que `serialize` lee de cada movimiento, precargado para una lista entera.
+  PRECARGA_SERIALIZE = [:sede, :lote, :created_by, :unidad_negocio, :paciente,
+                        { categoria_contable: :parent }, { caja_turno: :sede }].freeze
+
+  # UNA LISTA SE SERIALIZA ASÍ: precarga las asociaciones y el depósito de las compras sólo de
+  # estos movimientos. Antes el depósito se buscaba cargando TODAS las compras de insumos de la
+  # historia de la organización en cada pedido: la pantalla tardaba más cada mes aunque mostrara
+  # los mismos diez renglones (1-oct-2026).
+  def serializar_movimientos(movimientos)
+    lista = movimientos.to_a
+    ActiveRecord::Associations::Preloader.new(records: lista, associations: PRECARGA_SERIALIZE).call
+    @depositos_por_movimiento = depositos_de_movimientos(lista.map(&:id))
+    lista.map { |m| serialize(m) }
+  end
+
   def deposito_de(m)
-    @depositos_por_movimiento ||= begin
-      compras = InsumoCompra.where.not(movimiento_contable_id: nil).includes(insumo: :deposito)
-      compras.each_with_object({}) do |c, acc|
-        dep = c.insumo&.deposito
-        acc[c.movimiento_contable_id] = { id: dep.id, nombre: dep.nombre } if dep
-      end
+    (@depositos_por_movimiento || depositos_de_movimientos([m.id]))[m.id]
+  end
+
+  def depositos_de_movimientos(ids)
+    InsumoCompra.where(movimiento_contable_id: ids).includes(insumo: :deposito)
+                .each_with_object({}) do |c, acc|
+      dep = c.insumo&.deposito
+      acc[c.movimiento_contable_id] = { id: dep.id, nombre: dep.nombre } if dep
     end
-    @depositos_por_movimiento[m.id]
   end
 
   def serialize(m)
@@ -933,7 +947,7 @@ class MovimientosContablesController < ApplicationController
     ]
     CSV.generate(col_sep: ";", encoding: "UTF-8") do |csv|
       csv << headers
-      scope.each do |m|
+      scope.includes(:sede, :lote, :created_by).each do |m|
         csv << [
           m.id, m.fecha, m.tipo_label, m.categoria_label, m.descripcion,
           m.monto_ars.to_f, m.sede&.nombre, m.lote&.codigo,

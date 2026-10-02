@@ -53,7 +53,9 @@ module Dispensario
       limite  = [[(params[:limite] || 10).to_i, 1].max, 50].min
 
       render json: {
-        cajas: escala.recientes.offset((pagina - 1) * limite).limit(limite).map { |c| serialize(c) },
+        cajas: escala.recientes.offset((pagina - 1) * limite).limit(limite)
+                     .includes(:sede, :abierta_por, :apertura_confirmada_por, :cierre_solicitado_por, :cerrada_por)
+                     .map { |c| serialize(c) },
         meta:  { pagina: pagina, limite: limite, total: escala.count },
       }
     rescue ArgumentError

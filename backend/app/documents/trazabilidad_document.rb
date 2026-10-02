@@ -63,7 +63,8 @@ class TrazabilidadDocument < BaseDocument
     return if ss.empty?
 
     u = @d.dig(:stock, :unidad).presence || "g"
-    titulo_seccion(pdf, "Salió por otro lado")
+    # Con mercadería que entró después del alta la lista ya no es sólo de salidas.
+    titulo_seccion(pdf, ss.any? { |m| m[:gramos].to_f.positive? } ? "Otros movimientos del frasco" : "Salió por otro lado")
     styled_table(pdf, ["Fecha", "Qué pasó", "Destino", "Cantidad"],
                  ss.map { |m|
                    [fecha(m[:fecha]), "#{TIPOS[m[:tipo]] || m[:tipo]}#{m[:detalle].present? ? " · #{m[:detalle]}" : ''}",
@@ -83,6 +84,7 @@ class TrazabilidadDocument < BaseDocument
     "salida"         => "Salida",
     "ajuste"         => "Ajuste de conteo",
     "merma"          => "Merma",
+    "ingreso"        => "Entró mercadería",
   }.freeze
 
   ESTADOS = {

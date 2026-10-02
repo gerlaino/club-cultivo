@@ -202,14 +202,26 @@ class InformesController < ApplicationController
         },
         {
           # Aparte de lo cosechado: sumarlo arruinaría los gramos por planta.
-          titulo: 'Stock externo que entró en el período',
-          headers: ['Fecha', 'Proveedor', 'Producto', 'Genética', 'Sede', 'Ingresó', 'Queda'],
-          rows: externo[:stocks].map { |s|
-            [fmt_fecha(s[:fecha]), s[:proveedor] || '—', s[:producto].to_s.tr('_', ' ').capitalize,
-             s[:genetica] || '—', s[:sede] || '—', fmt_c.call(s[:cantidad], s[:unidad]), fmt_c.call(s[:disponible], s[:unidad])]
+          # Lo que se presenta: cuánto entró de cada genética. El detalle va abajo, línea por línea.
+          titulo: 'Stock externo que entró en el período, por genética',
+          headers: ['Genética', 'Producto', 'Entró', 'Altas', 'Ingresos'],
+          rows: externo[:por_genetica].map { |g|
+            [g[:genetica] || '—', g[:producto].to_s.tr('_', ' ').capitalize, fmt_c.call(g[:cantidad], g[:unidad]),
+             g[:altas], g[:ingresos]]
           },
-          aligns: { 5 => :right, 6 => :right },
-          col_min: { 0 => 58, 1 => 80, 2 => 62, 3 => 80, 4 => 62, 5 => 56, 6 => 56 },
+          aligns: { 2 => :right, 3 => :right, 4 => :right },
+          vacio: 'No entró stock externo en el período elegido.',
+        },
+        {
+          titulo: 'Stock externo que entró en el período, línea por línea',
+          headers: ['Fecha', 'Cómo entró', 'Proveedor', 'Producto', 'Genética', 'Sede', 'Entró', 'Queda hoy'],
+          rows: externo[:stocks].map { |s|
+            [fmt_fecha(s[:fecha]), s[:tipo] == 'alta' ? 'Alta' : 'Ingreso', s[:proveedor] || '—',
+             s[:producto].to_s.tr('_', ' ').capitalize, s[:genetica] || '—', s[:sede] || '—',
+             fmt_c.call(s[:cantidad], s[:unidad]), fmt_c.call(s[:disponible], s[:unidad])]
+          },
+          aligns: { 6 => :right, 7 => :right },
+          col_min: { 0 => 58, 1 => 46, 2 => 72, 3 => 58, 4 => 72, 5 => 56, 6 => 52, 7 => 52 },
           vacio: 'No entró stock externo en el período elegido.',
         },
         {
@@ -373,6 +385,16 @@ class InformesController < ApplicationController
           aligns: { 1 => :right, 2 => :right, 3 => :right, 4 => :right, 5 => :right },
           col_min: { 1 => 52, 2 => 60, 3 => 46, 4 => 64, 5 => 52 },
           vacio: 'No hubo movimientos en el período elegido.',
+        },
+        {
+          # «En septiembre entraron tantos gramos de cada genética»: lo que se presenta.
+          titulo: 'Lo que entró en el período, por genética',
+          headers: ['Genética', 'Producto', 'Origen', 'Stocks', 'Entró'],
+          rows: datos[:ingresos].map { |x|
+            [x[:genetica] || '—', prod.call(x), origen.call(x[:origen]), x[:stocks], num.call(x[:ingreso])]
+          },
+          aligns: { 3 => :right, 4 => :right },
+          vacio: 'No entró producto en el período elegido.',
         },
         {
           titulo: 'Vence pronto',

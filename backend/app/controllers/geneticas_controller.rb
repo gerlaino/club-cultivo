@@ -24,7 +24,10 @@ class GeneticasController < ApplicationController
 
     scope = scope.where(activa: true)
     scope = scope.where(disponible: true) if params[:disponible].present?
-    geneticas = scope.order(nombre: :asc)
+    # Todo lo que la fila necesita, de una vez para la lista entera: la foto, la variedad declarada
+    # y las plantas en curso. De a una eran cuatro consultas por genética (1-oct-2026).
+    geneticas = scope.order(nombre: :asc).with_attached_fotos.includes(:declarada_como).to_a
+    @plantas_por_genetica = plantas_en_curso(club, geneticas.map(&:id))
     render json: geneticas.map { |g| serialize_genetica(g, club) }
   end
 
@@ -126,12 +129,20 @@ class GeneticasController < ApplicationController
   # ESTADO DEL LOTE (no por el de la planta, que queda congelado en 'cosechado'):
   # cuentan las de lotes pre-curado, salvo plantas descartadas.
   def plantas_count(genetica, club)
-    return 0 unless club
+    return @plantas_por_genetica[genetica.id].to_i if @plantas_por_genetica
+
+    plantas_en_curso(club, [genetica.id])[genetica.id].to_i
+  end
+
+  # Plantas vivas de lotes en curso, por genética. Una consulta para la lista entera.
+  def plantas_en_curso(club, genetica_ids)
+    return {} unless club
+
     Plant.joins(:lote)
-         .where(lotes: { club_id: club.id, genetica_id: genetica.id })
+         .where(lotes: { club_id: club.id, genetica_id: genetica_ids })
          .where.not(lotes: { estado: %w[curado finalizado] })
          .where.not(plants: { state: 'descartada' })
-         .count
+         .group('lotes.genetica_id').count
   end
 
   def foto_url(genetica)

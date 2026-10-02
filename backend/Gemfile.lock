@@ -107,6 +107,9 @@ GEM
     brakeman (7.1.0)
       racc
     builder (3.3.0)
+    bullet (8.2.0)
+      activesupport (>= 3.0.0)
+      uniform_notifier (~> 1.11)
     caxlsx (4.5.0)
       htmlentities (~> 4.3, >= 4.3.4)
       marcel (~> 1.0)
@@ -367,6 +370,15 @@ GEM
     ruby-rc4 (0.1.5)
     rubyzip (2.4.1)
     securerandom (0.4.1)
+    sentry-rails (5.28.1)
+      railties (>= 5.0)
+      sentry-ruby (~> 5.28.1)
+    sentry-ruby (5.28.1)
+      bigdecimal
+      concurrent-ruby (~> 1.0, >= 1.0.2)
+    sentry-sidekiq (5.28.1)
+      sentry-ruby (~> 5.28.1)
+      sidekiq (>= 3.0)
     shoulda-matchers (6.5.0)
       activesupport (>= 5.2.0)
     sidekiq (7.3.10)
@@ -393,6 +405,7 @@ GEM
     unicode-display_width (3.2.0)
       unicode-emoji (~> 4.1)
     unicode-emoji (4.1.0)
+    uniform_notifier (1.18.0)
     uri (1.1.1)
     useragent (0.16.11)
     warden (1.2.9)
@@ -419,6 +432,7 @@ DEPENDENCIES
   aws-sdk-s3 (~> 1.0)
   bootsnap
   brakeman
+  bullet (~> 8.0)
   caxlsx (~> 4.1)
   database_cleaner-active_record (~> 2.1)
   debug
@@ -443,6 +457,9 @@ DEPENDENCIES
   roo (~> 2.10)
   rspec-rails (~> 7.0)
   rubocop-rails-omakase
+  sentry-rails (~> 5.22)
+  sentry-ruby (~> 5.22)
+  sentry-sidekiq (~> 5.22)
   shoulda-matchers (~> 6.0)
   sidekiq (~> 7.0)
   sidekiq-cron (~> 1.9)

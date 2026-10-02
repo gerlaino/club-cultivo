@@ -244,33 +244,53 @@ module Informes
     # y sólo carga stock y dispensa no cosecha nada, y sin esto su producto no aparecía en ningún
     # informe. Va APARTE de lo cosechado: sumarlo arruinaría los gramos por planta.
     #
-    # La fecha es el alta del stock (no hay otra: la compra ES el alta) y la cantidad la que
-    # ingresó (`cantidad_inicial`), no lo que queda. Sin merch ni bebidas (forma `externo`): el
-    # informe es de producto. Por unidad, nunca sumado entre unidades. Con filtro de lotes no
-    # entra: el stock externo no tiene lote.
+    # Entra de dos maneras, y las dos son «lo que entró en el mes»:
+    #   · ALTA: el stock se creó en el período → su `cantidad_inicial`, con la fecha del alta.
+    #   · INGRESO: llegó más de lo mismo a un stock que ya existía (movimiento `ingreso`) → con LA
+    #     FECHA EN QUE ENTRÓ, sea cual sea el mes en que se creó el stock.
+    # Hasta el 1-oct-2026 sólo contaba el alta: en septiembre todo era nuevo y salió bien; en
+    # octubre lo que se cargó sobre los stocks de septiembre no aparecía en ningún mes.
+    #
+    # Sin merch ni bebidas (forma `externo`): el informe es de producto. Por unidad, nunca sumado
+    # entre unidades; y por genética, que es como se presenta. Con filtro de lotes no entra: el
+    # stock externo no tiene lote.
     def externo
-      return { stocks: [], por_unidad: [] } if !@filtros.externo? || @filtros.lote_ids
+      return { stocks: [], por_unidad: [], por_genetica: [] } if !@filtros.externo? || @filtros.lote_ids
 
-      stocks = stock_filtrado.where(origen: 'compra_externa').where.not(forma_producto: 'externo')
-                             .where(created_at: @desde.beginning_of_day..@hasta.end_of_day)
-                             .includes(:genetica, :sede).order(:created_at)
-      filas = stocks.map do |s|
-        {
-          id:         s.id,
-          fecha:      s.created_at.to_date,
-          proveedor:  s.proveedor,
-          producto:   s.forma_producto,
-          genetica:   s.genetica&.nombre || s.descripcion,
-          sede:       s.sede&.nombre,
-          cantidad:   (s.cantidad_inicial || s.cantidad).to_f.round(2),
-          disponible: s.cantidad.to_f.round(2),
-          unidad:     s.unidad,
-        }
-      end
+      base  = stock_filtrado.where(origen: 'compra_externa').where.not(forma_producto: 'externo')
+      altas = base.where(created_at: @desde.beginning_of_day..@hasta.end_of_day)
+                  .includes(:genetica, :sede).to_a
+      ingresos = StockMovimiento.where(tipo: 'ingreso', stock_id: base.select(:id))
+                                .en_periodo(@desde, @hasta).includes(stock: [:genetica, :sede]).to_a
+
+      filas = altas.map { |s| fila_externo(s, 'alta', s.created_at.to_date, s.cantidad_inicial || s.cantidad) } +
+              ingresos.map { |m| fila_externo(m.stock, 'ingreso', m.fecha || m.created_at.to_date, m.gramos, mov_id: m.id) }
+      filas.sort_by! { |f| [f[:fecha], f[:tipo] == 'alta' ? 0 : 1, f[:stock_id]] }
       {
-        stocks:     filas,
-        por_unidad: filas.group_by { |f| f[:unidad] }
-                         .map { |u, fs| { unidad: u, cantidad: fs.sum { |f| f[:cantidad] }.round(2) } },
+        stocks:       filas,
+        por_unidad:   filas.group_by { |f| f[:unidad] }
+                           .map { |u, fs| { unidad: u, cantidad: fs.sum { |f| f[:cantidad] }.round(2) } },
+        por_genetica: filas.group_by { |f| [f[:genetica], f[:producto], f[:unidad]] }
+                           .map { |(g, prod, u), fs|
+                             { genetica: g, producto: prod, unidad: u, cantidad: fs.sum { |f| f[:cantidad] }.round(2),
+                               altas: fs.count { |f| f[:tipo] == 'alta' }, ingresos: fs.count { |f| f[:tipo] == 'ingreso' } }
+                           }.sort_by { |r| [r[:genetica].to_s, r[:producto].to_s] },
+      }
+    end
+
+    def fila_externo(s, tipo, fecha, cantidad, mov_id: nil)
+      {
+        id:         mov_id ? "ingreso-#{mov_id}" : "alta-#{s.id}",
+        stock_id:   s.id,
+        tipo:       tipo,
+        fecha:      fecha,
+        proveedor:  s.proveedor,
+        producto:   s.forma_producto,
+        genetica:   s.genetica&.nombre || s.descripcion,
+        sede:       s.sede&.nombre,
+        cantidad:   cantidad.to_f.round(2),
+        disponible: s.cantidad.to_f.round(2),
+        unidad:     s.unidad,
       }
     end
 

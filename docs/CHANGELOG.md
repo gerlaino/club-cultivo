@@ -1,5 +1,45 @@
 # Changelog
 
+## Octubre 2026 (dv) — «Entró mercadería»: el informe dice lo que entró cada mes, aunque el stock sea de antes
+
+- **El problema** (socio de Germán): el informe de stock externo mostraba los stocks CREADOS en el
+  mes con lo que traían al crearse. En septiembre todo era nuevo y salió bien; en octubre le cargó
+  más a los stocks de septiembre (con «Ajustar → Reconteo → + Agregar», el único camino) y eso no
+  aparecía como ingreso en ningún mes.
+- **«Entró mercadería»** en «Ajustar» de un stock externo (primera opción; también con el stock
+  agotado): cantidad, fecha en que entró (hoy por defecto, nunca futura) y nota. Suma al mismo
+  stock, deja un movimiento `ingreso` (tipo nuevo, sin migración), no toca `cantidad_inicial` y
+  reabre el frasco si estaba agotado. Un stock de cosecha lo rechaza. El reconteo perdió
+  «+ Agregar» (queda Quitar / Recontar).
+- **Informes**: producción → «Stock externo» = altas del período + ingresos del período, con un
+  resumen **por genética** arriba y el detalle con «Cómo entró» (Alta / Ingreso); informe de stock →
+  la columna «Ingresó» suma los ingresos y hay una sección nueva «Lo que entró» por genética. PDF y
+  Excel igual.
+- **Trazabilidad**: lo que entró después del alta suma en «Entró» (con su detalle) y ya no aparece
+  dentro de «Salió por otro lado»; la frase dice «Después entraron X g más en N ingresos».
+  `rake stocks:balance_descuadrado` no lo cuenta como descuadre.
+- **`rake stocks:ingresos_desde_reconteo`**: lista los reconteos positivos de stock externo; con
+  `EXCLUIR=id,id` (lo que sí fue una corrección) y `CONFIRMAR=1` los pasa a `ingreso`. No toca
+  cantidades.
+
+## Octubre 2026 (du) — Monitoreo y rendimiento: las pantallas del día no tardan más porque la organización creció
+
+- **Consultas por renglón eliminadas** en lo que se usa todos los días: `GET /geneticas` (plantas,
+  foto y variedad declarada de a una: ~4 consultas por genética), el carrito de dispensa y el
+  inventario (`StocksController#serializar_lista`: sede, organización con logo, lote y su
+  genética, repartos en curso y eventos, de una vez para la lista — `Stock.precargar_en_delivery`
+  nuevo), la mesa del mostrador (lote y genética de cada frasco), el historial de cajas y el libro
+  contable. El libro además cargaba **todas** las compras de insumos de la historia en cada pedido
+  para decir a qué depósito entró cada una: ahora sólo las de los movimientos que se muestran.
+- **`spec/requests/rendimiento_listados_spec.rb`**: cada listado se mide con 2 y con 17 filas; si
+  las consultas crecen con las filas, falla. Con el código anterior fallaban los seis casos.
+- **`GET /salud`** para un monitor externo (base, Redis, worker de Sidekiq; 503 si algo cae).
+  `/up` queda igual para Render.
+- **Sentry** (`sentry-ruby/rails/sidekiq`): tiempos y errores de producción, apagado sin
+  `SENTRY_DSN`, sin datos personales; etiqueta cada pedido con `club_id` y `rol`.
+- **Bullet** en desarrollo (y en specs con `BULLET=1`).
+- Puesta en marcha y criterio en `docs/DEPLOY.md` §9.
+
 ## Octubre 2026 (dt) — Copones y bajos en frascos distintos, el frasco vacío se cierra a mano, manicura sin señal
 
 - **Repartir un pesaje en varios frascos** (tabla `pesaje_destinos`, migración): al confirmar, el

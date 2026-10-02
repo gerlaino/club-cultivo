@@ -31,7 +31,7 @@ module Dispensario
         # depósito queda) o deshabilitado diciendo que no queda. Desaparecer de la lista era no
         # saber si se acabó o si nunca estuvo. Aparte de `mesa` a propósito: la mesa es lo que se
         # cuenta y de lo que se dispensa, y acá no hay nada de eso.
-        agotados:    @mostrador.agotados.map { |mi| serialize_item(mi).merge(agotado: true) },
+        agotados:    agotados.map { |mi| serialize_item(mi).merge(agotado: true) },
         # El turno de caja, si hay uno abierto. Nil = nadie está atendiendo, y eso NO significa
         # que la mesa esté vacía.
         turno:       serialize_turno(turno),
@@ -360,9 +360,20 @@ module Dispensario
     def mesa
       @mesa ||= begin
         items = @mostrador.sobre_la_mesa.to_a
-        Stock.precargar_apartados(items.map(&:stock).compact)
+        precargar_stocks(items.map(&:stock).compact)
         items
       end
+    end
+
+    def agotados
+      @mostrador.agotados.tap { |items| precargar_stocks(items.map(&:stock).compact) }
+    end
+
+    # Lo que `serialize_stock` y la señal de reponer leen de cada frasco, de una vez para toda la
+    # lista: sin esto el lote y la genética se pedían renglón por renglón (1-oct-2026).
+    def precargar_stocks(stocks)
+      ActiveRecord::Associations::Preloader.new(records: stocks, associations: [:genetica, { lote: :genetica }]).call
+      Stock.precargar_apartados(stocks)
     end
 
     def serialize_item(mi)
@@ -472,8 +483,8 @@ module Dispensario
       candidatos = current_user.club.stocks
                                .where(sede_id: @mostrador.sede_id, estado: 'asignado')
                                .para_dispensa.disponibles
-                               .includes(:lote, :genetica).to_a
-      Stock.precargar_apartados(candidatos)
+                               .to_a
+      precargar_stocks(candidatos)
       libres = candidatos.select { |s| s.cantidad_disponible_real.to_d.positive? }
 
       # Lo de la mesa entra por fuera del scope y no sólo por fuera del `select`: un stock que

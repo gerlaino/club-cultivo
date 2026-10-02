@@ -284,11 +284,12 @@
           <div class="sd__card sd__card--acciones">
             <h2 class="sd__card-title">Acciones</h2>
             <div class="sd__actions">
-              <button class="sd__action" @click="showAjustar = true" :disabled="stock.agotado">
+              <!-- A un externo agotado le puede llegar mercadería: ahí el botón sigue andando. -->
+              <button class="sd__action" @click="abrirAjustar" :disabled="stock.agotado && !esExterno">
                 <span class="sd__action-ico sd__action-ico--green"><i class="bi bi-sliders"></i></span>
                 <div class="sd__action-txt">
                   <div class="sd__action-lbl">Ajustar gramos</div>
-                  <div class="sd__action-sub">Merma, pérdida o reconteo</div>
+                  <div class="sd__action-sub">{{ esExterno ? 'Entró mercadería, merma, pérdida o reconteo' : 'Merma, pérdida o reconteo' }}</div>
                 </div>
               </button>
               <!-- Uso personal: la única salida de un frasco es consumirlo. Va primero porque es
@@ -454,6 +455,9 @@
                 <div class="sd__field">
                   <label class="sd__label">Tipo de ajuste <span class="sd__req">*</span></label>
                   <select class="sd__input" v-model="ajustarForm.tipo">
+                    <!-- Llegó más de lo mismo (1-oct-2026). Antes se cargaba como reconteo
+                         «+ Agregar» y los informes no lo veían como ingreso. -->
+                    <option v-if="esExterno" value="ingreso">Entró mercadería</option>
                     <option value="merma">Merma (pérdida de proceso)</option>
                     <option value="perdida">Pérdida / daño / robo</option>
                     <option value="reconteo">Reconteo (corrección de inventario)</option>
@@ -465,14 +469,14 @@
                      para quien pesó el frasco entero. -->
                 <div class="sd__field">
                   <label class="sd__label">
-                    <template v-if="ajustarModo === 'recontar'">Cantidad exacta que tenés ahora</template>
+                    <template v-if="esIngreso">Cuánto entró</template>
+                    <template v-else-if="ajustarModo === 'recontar'">Cantidad exacta que tenés ahora</template>
                     <template v-else-if="ajustarModo === 'quitar'">Gramos que se quitan</template>
                     <template v-else>Gramos que se agregan</template>
                     <span class="sd__req">*</span>
                   </label>
                   <div class="sd__input-row">
                     <select v-if="ajustarForm.tipo === 'reconteo'" class="sd__input sd__input--modo" v-model="ajustarForm.modo" aria-label="Qué hacés">
-                      <option v-if="!vieneDeCosecha" value="agregar">+ Agregar</option>
                       <option value="quitar">− Quitar</option>
                       <option value="recontar">= Recontar</option>
                     </select>
@@ -482,9 +486,19 @@
                     <span class="sd__input-suf">g</span>
                   </div>
                 </div>
+                <!-- La fecha en que ENTRÓ, no la de hoy: el informe de septiembre se arma en octubre
+                     y lo que llegó el 28 tiene que caer en septiembre. -->
+                <div v-if="esIngreso" class="sd__field">
+                  <label class="sd__label">Fecha en que entró <span class="sd__req">*</span></label>
+                  <input type="date" class="sd__input" v-model="ajustarForm.fecha" :max="hoyISO" />
+                </div>
                 <div class="sd__field sd__field--full">
-                  <label class="sd__label">Motivo <span class="sd__req">*</span></label>
-                  <textarea class="sd__input sd__textarea" rows="2" v-model="ajustarForm.motivo" placeholder="Describí el motivo del ajuste…"></textarea>
+                  <label class="sd__label">
+                    <template v-if="esIngreso">Nota <span class="sd__opt">opcional</span></template>
+                    <template v-else>Motivo <span class="sd__req">*</span></template>
+                  </label>
+                  <textarea class="sd__input sd__textarea" rows="2" v-model="ajustarForm.motivo"
+                    :placeholder="esIngreso ? 'Remito, factura, lo que sirva para encontrarlo después…' : 'Describí el motivo del ajuste…'"></textarea>
                 </div>
               </div>
               <!-- Si el reconteo da MÁS en un frasco de cosecha, se explica dónde se corrige en
@@ -506,7 +520,7 @@
               <button class="sd__btn-primary" :disabled="ajustando || (vieneDeCosecha && ajustarSuma)" @click="ejecutarAjustar">
                 <DsSpinner v-if="ajustando" :size="12" />
                 <i v-else class="bi bi-check-lg"></i>
-                Confirmar ajuste
+                {{ esIngreso ? 'Registrar ingreso' : 'Confirmar ajuste' }}
               </button>
             </div>
           </div>
@@ -1031,13 +1045,26 @@ async function guardarEdit() {
 
 // ── Ajustar ────────────────────────────────────────────────────────────────────
 const showAjustar  = ref(false)
-const ajustarForm  = ref({ tipo: 'merma', modo: 'agregar', cantidad: null, motivo: '' })
+const formAjusteVacio = () => ({ tipo: esExterno.value ? 'ingreso' : 'merma', modo: 'quitar', cantidad: null, motivo: '', fecha: hoyISO })
+const ajustarForm  = ref({ tipo: 'merma', modo: 'quitar', cantidad: null, motivo: '', fecha: null })
 const ajustarError = ref(null)
 const ajustando    = ref(false)
 
-// Qué se escribe en el campo: cuánto se agrega, cuánto se quita, o el total contado. Merma y
-// pérdida siempre quitan; con reconteo se elige.
-const ajustarModo = computed(() => ajustarForm.value.tipo === 'reconteo' ? ajustarForm.value.modo : 'quitar')
+// Qué se escribe en el campo: cuánto entró, cuánto se quita, o el total contado. Merma y
+// pérdida siempre quitan; con reconteo se elige entre quitar y recontar.
+//
+// SUMAR ES «ENTRÓ MERCADERÍA», NO UN RECONTEO (1-oct-2026). El reconteo tenía «+ Agregar» y era
+// por donde se cargaba lo que llegaba: los informes lo leían como una corrección de conteo y lo
+// que entró en octubre a un stock de septiembre no aparecía como ingreso en ningún mes. Un conteo
+// que da de más se sigue corrigiendo con «Recontar».
+const esIngreso   = computed(() => ajustarForm.value.tipo === 'ingreso')
+const ajustarModo = computed(() => esIngreso.value ? 'agregar' : ajustarForm.value.tipo === 'reconteo' ? ajustarForm.value.modo : 'quitar')
+
+function abrirAjustar() {
+  ajustarForm.value  = formAjusteVacio()
+  ajustarError.value = null
+  showAjustar.value  = true
+}
 
 // Un frasco que vino de una cosecha no puede SUMAR gramos por un ajuste: esa cantidad la
 // justifica el pesaje. El backend lo rechaza; acá directamente no se ofrece «+ Agregar»
@@ -1060,6 +1087,7 @@ const ajustarPreview = computed(() =>
 async function ejecutarAjustar() {
   ajustarError.value = null
   const motivo = ajustarForm.value.motivo.trim()
+  if (esIngreso.value) return registrarIngreso(motivo)
   if (!motivo) { ajustarError.value = 'El motivo es obligatorio'; return }
   if (ajustarForm.value.cantidad == null || ajustarForm.value.cantidad < 0) {
     ajustarError.value = ajustarModo.value === 'recontar' ? 'Ingresá la cantidad exacta que tenés ahora' : 'Ingresá cuántos gramos'; return
@@ -1072,11 +1100,25 @@ async function ejecutarAjustar() {
     // los clientes viejos.
     await ajustarStock(stock.value.id, { tipo: ajustarForm.value.tipo, gramos: ajustarDelta.value, motivo })
     showAjustar.value = false
-    ajustarForm.value = { tipo: 'merma', modo: 'agregar', cantidad: null, motivo: '' }
     await recargar()
     toast.success('Stock ajustado')
   } catch (e) {
     ajustarError.value = e?.response?.data?.error || e?.response?.data?.errors?.[0] || 'Error al ajustar'
+  } finally { ajustando.value = false }
+}
+
+async function registrarIngreso(nota) {
+  const cantidad = ajustarForm.value.cantidad
+  if (!(cantidad > 0)) { ajustarError.value = 'Ingresá cuánto entró'; return }
+  if (!ajustarForm.value.fecha) { ajustarError.value = 'Elegí la fecha en que entró'; return }
+  ajustando.value = true
+  try {
+    await ajustarStock(stock.value.id, { tipo: 'ingreso', gramos: cantidad, fecha: ajustarForm.value.fecha, motivo: nota })
+    showAjustar.value = false
+    await recargar()
+    toast.success('Ingreso registrado')
+  } catch (e) {
+    ajustarError.value = e?.response?.data?.error || e?.response?.data?.errors?.[0] || 'No se pudo registrar el ingreso'
   } finally { ajustando.value = false }
 }
 
@@ -1279,7 +1321,7 @@ const FORMA_ICO = {
 }
 const ORIGEN_MAP = { lote: 'Producción propia', derivado_lote: 'Derivado de lote', compra_externa: 'Compra externa' }
 const ESTADO_MAP = { pendiente_asignacion: 'Por asignar', asignado: 'Asignado', agotado: 'Agotado' }
-const MOV_TIPO_MAP = { produccion: 'Producción', transferencia: 'Transferencia', dispensacion: 'Dispensación', ajuste: 'Ajuste', merma: 'Merma', consumo_evento: 'Consumo en evento', consumo: 'Consumo', salida: 'Salida' }
+const MOV_TIPO_MAP = { ingreso: 'Entró mercadería', produccion: 'Producción', transferencia: 'Transferencia', dispensacion: 'Dispensación', ajuste: 'Ajuste', merma: 'Merma', consumo_evento: 'Consumo en evento', consumo: 'Consumo', salida: 'Salida' }
 
 function formaLabel(f)    { return FORMA_MAP[f]  || f || 'Stock' }
 function formaIco(f)      { return FORMA_ICO[f]  || '📦' }

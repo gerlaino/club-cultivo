@@ -25,7 +25,11 @@ class StockMovimiento < ApplicationRecord
   # `consumo` (sep-2026) es el CULTIVADOR DE CASA: lo que saca del frasco para él. No dispensa
   # —no hay paciente— y no es `salida` (el producto no se fue a otro lado, se usó) ni `merma`.
   # Es la única puerta de salida del uso personal, y la trazabilidad lo cuenta como consumido.
-  TIPOS = %w[produccion transferencia dispensacion ajuste merma salida consumo_evento consumo].freeze
+  # `ingreso` (1-oct-2026) es MERCADERÍA QUE ENTRÓ a un stock externo que ya existía: «llegó más
+  # de lo mismo». Se cargaba como reconteo «+ Agregar», y por eso no aparecía en ningún informe
+  # como ingreso. Sólo en stock `compra_externa` (lo de cosecha entra por el pesaje) y no toca
+  # `cantidad_inicial`: el inicial es lo que entró AL CREARLO, los informes suman los ingresos aparte.
+  TIPOS = %w[produccion transferencia dispensacion ajuste merma salida consumo_evento consumo ingreso].freeze
 
   validates :tipo,   inclusion: { in: TIPOS }
   validates :gramos, numericality: { other_than: 0 }

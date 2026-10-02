@@ -439,6 +439,14 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   arregla peso confirmado + stock con un movimiento que nombra el lote. `compra_externa` sí
   puede subir (respaldo: la factura). Merma y pérdida nunca suman: eso es un reconteo. Es la
   misma familia que «contar no crea stock» en el mostrador.
+- **LO QUE ENTRA A UN STOCK EXTERNO ES «ENTRÓ MERCADERÍA», NO UN RECONTEO** (1-oct-2026, socio
+  de Germán): llega más de lo mismo y se SUMA AL MISMO STOCK (Germán: «es la misma») con un
+  movimiento `ingreso` fechado el día en que ENTRÓ (puede ser anterior a hoy: el informe de
+  septiembre se arma en octubre). No toca `cantidad_inicial` (lo que entró al crearlo). Los informes
+  (producción → externo, stock → «Ingresó» y «Lo que entró») suman altas del período + ingresos del
+  período, por genética. El reconteo ya no tiene «+ Agregar»: un conteo que da de más es
+  «Recontar», y es una corrección, no un ingreso. Lo cargado antes como reconteo se pasa con
+  `rake stocks:ingresos_desde_reconteo` (lista, EXCLUIR, CONFIRMAR).
 - **EL RENDIMIENTO SE MIDE EN g/m², Y LOS METROS NO BLOQUEAN NADA** (22-sep-2026, Germán):
   `geneticas.rendimiento` es g/m² (como el banco); el real sale de `salas.m2` y, en
   organizaciones, `lotes.m2_ocupados` (la suma de los lotes no puede pasar la sala). Un lote

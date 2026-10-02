@@ -18,7 +18,9 @@ module Informes
   #   · INGRESÓ no se cuenta dos veces. El pesaje de manicura suma a `cantidad_inicial` Y deja un
   #     movimiento `produccion`; un fraccionado nace con `cantidad_inicial` Y una transferencia
   #     positiva. Por eso: un stock que nació en el período ingresó su `cantidad_inicial`; uno de
-  #     antes, lo que le entró por movimientos positivos de producción o traslado.
+  #     antes, lo que le entró por movimientos positivos de producción o traslado. Y en los dos
+  #     casos, la mercadería que llegó después a un stock externo (`ingreso`), que no está en el
+  #     inicial.
   #   · Sin merch ni bebidas (forma `externo`): es un informe de producto.
   class Inventario
     DIAS_SIN_MOVIMIENTO = 30
@@ -41,6 +43,7 @@ module Informes
         hoy:            hoy(filas),
         stocks:         filas,
         periodo:        periodo(filas),
+        ingresos:       ingresos_por_genetica(filas),
         sin_movimiento: sin_movimiento(filas),
         vencen:         vencen(filas),
         filtros:        @filtros.to_h,
@@ -87,6 +90,9 @@ module Informes
                   else
                     movs.select { |m| %w[produccion transferencia].include?(m.tipo) && m.gramos.positive? }.sum(&:gramos).to_d
                   end
+      # La mercadería que llegó a un stock externo ya existente NO está en el inicial: se suma
+      # siempre, haya nacido el stock en el período o antes.
+      ingreso  += movs.select { |m| m.tipo == 'ingreso' }.sum(&:gramos).to_d
       queda        = s.cantidad.to_d
       comprometido = s.apartado_para_eventos.to_d + s.apartado_para_reservas.to_d
       costo  = s.costo_unitario_ars
@@ -180,6 +186,15 @@ module Informes
         { unidad: u, ingreso: suma(fs, :ingreso), dispensado: suma(fs, :dispensado),
           merma: suma(fs, :merma), otras_salidas: suma(fs, :otras_salidas), ajustes: suma(fs, :ajustes) }
       end
+    end
+
+    # Lo que entró en el período, por genética: es como se presenta («en septiembre entraron
+    # 500 g de Gorilla y 200 de Amnesia»). Por producto y unidad, nunca sumado entre unidades.
+    def ingresos_por_genetica(filas)
+      filas.select { |f| f[:ingreso].positive? }
+           .group_by { |f| [f[:genetica], f[:producto], f[:unidad], f[:origen]] }
+           .map { |(g, prod, u, o), fs| { genetica: g, producto: prod, unidad: u, origen: o, stocks: fs.size, ingreso: suma(fs, :ingreso) } }
+           .sort_by { |r| [r[:origen], r[:genetica].to_s, r[:producto].to_s] }
     end
 
     # ── 3. Lo que no se mueve y lo que vence ───────────────────────────────────

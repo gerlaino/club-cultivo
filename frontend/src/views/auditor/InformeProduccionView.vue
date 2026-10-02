@@ -190,13 +190,30 @@
             <span class="inf__kpi-label">Stock externo ({{ u.unidad }})</span>
           </div>
         </div>
+        <!-- Lo que se presenta: cuánto entró de cada genética. Abajo, el detalle línea por línea:
+             las altas del período y la mercadería que llegó a stocks que ya existían. -->
+        <table v-if="externo.por_genetica?.length" class="inf__table">
+          <thead>
+            <tr><th>Genética</th><th>Producto</th><th class="num">Entró</th><th class="num">Altas</th><th class="num">Ingresos</th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="g in externo.por_genetica" :key="`${g.genetica}-${g.producto}-${g.unidad}`">
+              <td>{{ g.genetica || '—' }}</td>
+              <td>{{ nombreForma(g.producto) }}</td>
+              <td class="num"><strong>{{ formatCantidad(g.cantidad, g.unidad) }}</strong></td>
+              <td class="num">{{ g.altas }}</td>
+              <td class="num">{{ g.ingresos }}</td>
+            </tr>
+          </tbody>
+        </table>
         <table v-if="externo.stocks?.length" class="inf__table">
           <thead>
-            <tr><th>Fecha</th><th>Proveedor</th><th>Producto</th><th>Genética</th><th>Sede</th><th class="num">Ingresó</th><th class="num">Queda</th></tr>
+            <tr><th>Fecha</th><th>Cómo entró</th><th>Proveedor</th><th>Producto</th><th>Genética</th><th>Sede</th><th class="num">Entró</th><th class="num">Queda hoy</th></tr>
           </thead>
           <tbody>
             <tr v-for="c in externo.stocks" :key="c.id">
               <td>{{ formatFechaCorta(c.fecha) }}</td>
+              <td>{{ c.tipo === 'ingreso' ? 'Ingreso' : 'Alta' }}</td>
               <td>{{ c.proveedor || '—' }}</td>
               <td>{{ nombreForma(c.producto) }}</td>
               <td>{{ c.genetica || '—' }}</td>
@@ -325,6 +342,8 @@ onMounted(cargar)
 .inf__bar i { display: block; height: 100%; background: var(--c-leaf-500); }
 
 .inf__table { width: 100%; border-collapse: collapse; font-size: var(--fs-14); }
+/* El resumen por genética y el detalle línea por línea van uno debajo del otro. */
+.inf__table + .inf__table { margin-top: var(--sp-5); }
 .inf__table th { text-align: left; padding: var(--sp-2) var(--sp-3); background: var(--c-ink-100); font-weight: 600; color: var(--c-ink-700); border-bottom: 1px solid var(--c-ink-300); font-size: var(--fs-12); }
 .inf__table td { padding: var(--sp-2) var(--sp-3); border-bottom: 1px solid var(--c-ink-100); color: var(--c-ink-900); vertical-align: top; }
 .inf__table .num { text-align: right; font-variant-numeric: tabular-nums; }

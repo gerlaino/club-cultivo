@@ -27,6 +27,9 @@ module Stocks
     # Salidas que se nombran en la cuenta, en el orden en que se muestran: primero lo que sigue
     # existiendo en otra fila, después lo consumido con motivo, la pérdida al final.
     TIPOS_SALIDA = %w[transferencia produccion consumo_evento consumo salida ajuste merma].freeze
+    # Y lo que entró después del alta: mercadería que llegó a un stock externo (`ingreso`). Va en
+    # la misma lista porque la cuenta suma toda entrada positiva a lo que entró.
+    TIPOS_MOVIMIENTO = (TIPOS_SALIDA + %w[ingreso]).freeze
 
     def initialize(stock:, completo: false)
       @stock    = stock
@@ -255,7 +258,7 @@ module Stocks
     # entregas ya se cuentan por línea. Un ajuste positivo es una ENTRADA y se lista como tal.
     def salidas_del_frasco
       @salidas ||= begin
-        movs = @stock.stock_movimientos.where(tipo: TIPOS_SALIDA)
+        movs = @stock.stock_movimientos.where(tipo: TIPOS_MOVIMIENTO)
                      .includes(:stock_resultante, :sede_destino).order(:fecha, :created_at).to_a
         # EL MOVIMIENTO CON EL QUE NACIÓ NO ES UNA ENTRADA MÁS. Un frasco fraccionado desde otro
         # nace con su `cantidad_inicial` Y con una transferencia positiva que dice de dónde vino:
@@ -287,7 +290,7 @@ module Stocks
         tipo:    m.tipo,
         gramos:  m.gramos.to_f.round(2),
         fecha:   m.fecha || m.created_at&.to_date,
-        detalle: m.notas.to_s.sub(/\A\[PRODUCCIÓN\]\s*/, '').presence,
+        detalle: m.notas.to_s.sub(/\A\[(PRODUCCIÓN|INGRESO)\]\s*/, '').presence,
         destino: dest && { id: dest.id, numero: dest.numero_lote_producto, forma: dest.forma_producto,
                            sede: (m.sede_destino || dest.sede)&.nombre },
       }
@@ -397,6 +400,11 @@ module Stocks
                  "comprados a #{@stock.proveedor}"
                end
       partes << "Entraron #{n.call(t[:gramos_producidos])} #{u}#{origen && " #{origen}"}."
+      ingresos = salidas_del_frasco.select { |s| s[:tipo] == 'ingreso' }
+      if ingresos.any?
+        partes << "Después entraron #{n.call(ingresos.sum { |s| s[:gramos] })} #{u} más en " \
+                  "#{ingresos.size} #{ingresos.size == 1 ? 'ingreso' : 'ingresos'}."
+      end
       partes << "#{n.call(t[:gramos_dispensados])} #{u} fueron a #{t[:dispensaciones_count]} #{t[:dispensaciones_count] == 1 ? 'entrega' : 'entregas'}." if t[:gramos_dispensados].positive?
       salidas_del_frasco.select { |s| s[:gramos].negative? }.group_by { |s| s[:tipo] }.each do |tipo, ss|
         g = n.call(ss.sum { |s| s[:gramos].abs })

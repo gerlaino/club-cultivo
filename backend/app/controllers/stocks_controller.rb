@@ -21,7 +21,7 @@ class StocksController < ApplicationController
     if params[:pendientes].present?
       stocks = Stock.joins(:lote).where(lotes: { club_id: current_user.club_id })
                    .pendientes_asignacion.includes(:lote)
-      return render json: stocks.map { |s| serialize_stock(s) }
+      return render json: serializar_lista(stocks)
     end
 
     # FRASCOS VACÍOS ABIERTOS (1-oct-2026): quedaron así al dispensar lo último sin cerrarlos. La
@@ -29,7 +29,7 @@ class StocksController < ApplicationController
     if params[:vacios].present?
       stocks = Stock.where(club_id: current_user.club_id).where.not(estado: 'agotado').where('cantidad <= 0')
       stocks = stocks.where(sede_id: current_user.sedes_visibles_ids + [nil]) if current_user.limitado_por_sede?
-      return render json: stocks.includes(:lote, :genetica, :sede).order(updated_at: :desc).map { |s| serialize_stock(s) }
+      return render json: serializar_lista(stocks.order(updated_at: :desc))
     end
 
     if params[:historial].present?
@@ -37,7 +37,7 @@ class StocksController < ApplicationController
                     .includes(:lote, :genetica, :sede)
                     .order(created_at: :desc)
                     .limit(500)
-      return render json: stocks.map { |s| serialize_stock(s) }
+      return render json: serializar_lista(stocks)
     end
 
     # Contenedores de un lote: usado al confirmar pesajes de manicura para elegir a qué
@@ -52,8 +52,7 @@ class StocksController < ApplicationController
                else
                  stocks.disponibles.where(estado: %w[pendiente_asignacion asignado])
                end
-      stocks = stocks.includes(:lote, :genetica, :sede).order(created_at: :desc)
-      return render json: stocks.map { |s| serialize_stock(s) }
+      return render json: serializar_lista(stocks.order(created_at: :desc))
     end
 
     # El inventario que se ve es el de las SEDES ASIGNADAS. Un dispensador de la Finca Norte
@@ -85,7 +84,7 @@ class StocksController < ApplicationController
 
     # Una query para todo el listado en vez de una por producto: abajo se serializa cada uno con
     # `cantidad_disponible_real`, que pregunta por el apartado del mostrador.
-    Stock.precargar_apartados(stocks)
+    precargar_para_serializar(stocks)
 
     # QUIEN ATIENDE VE LA MESA, NUNCA EL DEPÓSITO.
     #
@@ -123,7 +122,7 @@ class StocksController < ApplicationController
       }
     end
 
-    render json: stocks.map { |s| serialize_stock(s) }
+    render json: serializar_lista(stocks)
   end
 
 
@@ -199,7 +198,7 @@ class StocksController < ApplicationController
              end
 
     render json: {
-      stocks:  stocks.map { |s| serialize_stock(s) },
+      stocks:  serializar_lista(stocks),
       meta:    { total: totales[:items], page: page, per_page: per },
       totales: totales,
     }
@@ -328,10 +327,13 @@ class StocksController < ApplicationController
   # Body: { tipo: merma|reconteo|perdida, cantidad_real: float, motivo: string }
   # Se ingresa la cantidad EXACTA actual; el backend calcula el delta a aplicar.
   # (compat: si llega `gramos`, se toma como delta directo.)
+  #
+  # tipo: ingreso → { gramos: float > 0, fecha: 'YYYY-MM-DD' (opcional, hoy), motivo (opcional) }
   def ajuste
     tipo_ajuste = params[:tipo].presence
     motivo      = params[:motivo].to_s.strip
 
+    return ingresar_mercaderia(motivo) if tipo_ajuste == 'ingreso'
     return render json: { error: 'Tipo de ajuste inválido' }, status: :unprocessable_entity unless %w[merma reconteo perdida].include?(tipo_ajuste)
     return render json: { error: 'El motivo es obligatorio' }, status: :unprocessable_entity if motivo.blank?
 
@@ -708,6 +710,46 @@ class StocksController < ApplicationController
 
   private
 
+  # «ENTRÓ MERCADERÍA» (1-oct-2026): llegó más de lo mismo a un stock externo que ya existía.
+  #
+  # Se cargaba como reconteo «+ Agregar» y los informes lo veían como una corrección de conteo:
+  # lo que entró en octubre a un stock creado en septiembre no aparecía como ingreso en ningún
+  # mes. Ahora es un movimiento `ingreso` con LA FECHA EN QUE ENTRÓ —que puede ser anterior a hoy:
+  # el informe de septiembre se arma en octubre— y los informes lo suman a lo ingresado.
+  #
+  # Sólo en stock externo: lo de cosecha entra por el pesaje (un ajuste no crea producto).
+  def ingresar_mercaderia(nota)
+    if @stock.regulatorio?
+      return render json: { error: 'A un stock que viene de una cosecha no le entra mercadería: sus gramos salen del pesaje del lote.' },
+                    status: :unprocessable_entity
+    end
+
+    gramos = params[:gramos].to_d
+    return render json: { error: 'Ingresá cuánto entró' }, status: :unprocessable_entity unless gramos.positive?
+
+    fecha = params[:fecha].present? ? Date.iso8601(params[:fecha].to_s) : Time.zone.today
+    if fecha > Time.zone.today
+      return render json: { error: 'La fecha de ingreso no puede ser futura' }, status: :unprocessable_entity
+    end
+
+    ActiveRecord::Base.transaction do
+      @stock.with_lock do
+        @stock.update!(cantidad: @stock.cantidad.to_d + gramos)
+        @stock.stock_movimientos.create!(
+          tipo: 'ingreso', gramos: gramos, fecha: fecha, usuario: current_user,
+          notas: ['[INGRESO]', nota.presence].compact.join(' ')
+        )
+      end
+      # Un frasco que se había vaciado vuelve a tener producto: deja de estar agotado.
+      @stock.reabrir_si_tiene_producto!(usuario: current_user)
+    end
+    render json: serialize_stock(@stock.reload)
+  rescue Date::Error
+    render json: { error: 'Fecha inválida' }, status: :unprocessable_entity
+  rescue ActiveRecord::RecordInvalid => e
+    render json: { errors: e.record.errors.full_messages }, status: :unprocessable_entity
+  end
+
   # LO QUE HAY SOBRE LA MESA de los mostradores que este usuario atiende, por stock.
   #
   # Es el estado del mostrador, no lo que se contó al abrir: si el admin bajó producto a media
@@ -919,6 +961,30 @@ class StocksController < ApplicationController
     current_user.club.sedes.find(sid)
   rescue ActiveRecord::RecordNotFound
     nil
+  end
+
+  # UN LISTADO SE SERIALIZA ASÍ, NUNCA CON `map { serialize_stock }` A SECAS.
+  #
+  # `serialize_stock` toca, por cada frasco, su sede, su organización (con el logo), su lote y la
+  # genética del lote, sus repartos en curso, sus eventos y los tres apartados. Sin precargar eran
+  # tres consultas por renglón en el carrito de dispensa: la pantalla tardaba más a medida que la
+  # organización crecía (1-oct-2026, `spec/requests/rendimiento_listados_spec.rb`).
+  def serializar_lista(stocks)
+    lista = precargar_para_serializar(stocks.to_a)
+    lista.map { |s| serialize_stock(s) }
+  end
+
+  def precargar_para_serializar(stocks)
+    lista = Array(stocks)
+    return lista if lista.empty?
+
+    ActiveRecord::Associations::Preloader.new(
+      records: lista,
+      associations: [:sede, :genetica, { lote: :genetica }, { club: { logo_attachment: :blob } },
+                     { provisiones_evento: :evento_bar }]
+    ).call
+    Stock.precargar_apartados(lista)
+    Stock.precargar_en_delivery(lista)
   end
 
   def serialize_stock(s)

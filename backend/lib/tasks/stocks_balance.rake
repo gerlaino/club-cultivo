@@ -29,11 +29,21 @@ namespace :stocks do
         next
       end
 
-      puts "#{scope.count} stock(s) con el balance descuadrado:\n\n"
+      # La mercadería que ENTRÓ después a un stock externo (`ingreso`) no está en el inicial y
+      # tiene origen: no es un descuadre.
+      ingresos = StockMovimiento.unscoped.where(stock_id: scope.select(:id), tipo: 'ingreso', deleted_at: nil)
+                                .group(:stock_id).sum(:gramos)
+      scope = scope.to_a.reject { |s| s.cantidad.to_d <= s.cantidad_inicial.to_d + ingresos[s.id].to_d }
+      if scope.empty?
+        puts 'Ningún stock tiene más cantidad que la producida. El balance cierra en todos.'
+        next
+      end
+
+      puts "#{scope.size} stock(s) con el balance descuadrado:\n\n"
       total = 0.to_d
 
-      scope.order(:club_id, :id).each do |s|
-        sintoma = s.cantidad.to_d - s.cantidad_inicial.to_d
+      scope.sort_by { |s| [s.club_id, s.id] }.each do |s|
+        sintoma = s.cantidad.to_d - s.cantidad_inicial.to_d - ingresos[s.id].to_d
         total += sintoma
         puts "  ##{s.id} #{s.numero_lote_producto} · #{nombre_club(s.club_id)}"
         puts "     producido #{s.cantidad_inicial.to_f} · hoy #{s.cantidad.to_f} · " \
@@ -47,7 +57,7 @@ namespace :stocks do
         # dejaría el stock por debajo de lo real, y un rake que empeora al repetirse no se usa.
         ya_corregido = correcciones_previas(s)
         entro_mal    = sospechosos.sum { |m| m.gramos.to_d } - ya_corregido
-        otras       = entradas_positivas(s) - sospechosos
+        otras       = entradas_positivas(s).reject { |m| m.tipo == 'ingreso' } - sospechosos
 
         if sospechosos.any?
           puts "     entró por #{sospechosos.size} conteo(s) del mostrador, #{entro_mal.round(3).to_f} a devolver:"

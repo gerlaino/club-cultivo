@@ -91,6 +91,8 @@ dosificación, vía de administración, observaciones y DNI.
 | `SIDEKIQ_PASSWORD` | El panel `/sidekiq` queda con la clave `changeme` |
 | `EXTRA_CORS_ORIGINS` | Orígenes extra, separados por coma (para la transición de dominio) |
 | `ARICCAME_SIMULAR` | En cualquier ambiente que no sea producción debe ser `true` |
+| `SENTRY_DSN` | Sin ella no se mide nada: ni tiempos ni errores de producción (ver §9). En el web service **y** en el worker |
+| `SENTRY_TRACES_SAMPLE_RATE` | Qué fracción de los pedidos se mide (por defecto `0.2`). Subirla gasta la cuota gratis de Sentry |
 
 ### 3.4 Desde dónde se acepta una conexión
 
@@ -327,3 +329,53 @@ columna con un teléfono adentro y no actualiza el anonimizador, ese test falla.
   reintroducir el problema que se acaba de sacar de raíz.
 - **No es un botón, es una rutina.** Cada corrida es un `pg_restore` completo que deja
   preproducción inutilizable un rato. Es algo de una vez por mes, no de todos los días.
+
+---
+
+## 9. Monitoreo: si algo se cayó, qué anda lento y cuánto cuesta
+
+Son tres preguntas distintas y cada una tiene su lugar (1-oct-2026):
+
+| Pregunta | Dónde | Quién la ve |
+|---|---|---|
+| ¿Cuánta CPU/memoria usa? ¿Cuánto se factura? | **Panel de Render** (Metrics de cada servicio, Billing) | Quien esté invitado al equipo de Render |
+| ¿Se cayó algo? | **Monitor externo** contra `GET /salud` | Quien reciba la alerta |
+| ¿Qué pantalla anda lenta y por qué? | **Sentry** (Performance) | Quien esté en el proyecto de Sentry |
+
+Lo de los costos y recursos **no** se copia al super admin: ya lo dice Render, y si la app se
+cae, el panel que avisa se cae con ella. El monitor tiene que vivir afuera.
+
+### `/up` y `/salud` no son lo mismo
+
+- `GET /up` — el health check de **Render**. Sólo dice que el proceso responde. Tiene que seguir
+  así: si Render lo ve caer, reinicia la web, y reiniciarla porque Redis anda mal no arregla nada.
+- `GET /salud` — para el **monitor externo**. Chequea la base, Redis y que haya un worker de
+  Sidekiq latiendo; 200 si todo anda, 503 si algo no. Es público y sólo dice `ok`/`caído` por
+  pieza. El worker importa: en 2026 pasaron 79 días sin worker y nadie se enteró.
+
+### Puesta en marcha (una vez)
+
+1. **Sentry**: crear cuenta en sentry.io (el plan gratis alcanza), un proyecto **Rails**, copiar el
+   DSN y cargar `SENTRY_DSN` en `cultivo-staging-api` **y** en `club-cultivo-worker`. Opcional:
+   `SENTRY_ENVIRONMENT=production`. El release se toma solo de `RENDER_GIT_COMMIT`.
+2. **Monitor**: en UptimeRobot o Better Stack (gratis), un monitor HTTP cada 1–5 min contra
+   `https://cultivoespacial.com/salud`, que alerte si no es 200. Mandar la alerta a Germán y al socio.
+3. **Render**: invitar al socio al equipo para que vea Metrics y Billing.
+
+### Qué manda Sentry, y qué no
+
+Datos de salud: `send_default_pii` está apagado (sin cookies, cuerpo del pedido, IP ni usuario),
+los parámetros pasan por `filter_parameters` más DNI/nombre/teléfono/dirección, y `before_send`
+borra el cuerpo del pedido por si acaso (`config/initializers/sentry.rb`). Cada pedido lleva sólo
+dos etiquetas: `club_id` y `rol`, para saber QUÉ organización y QUÉ rol anda lento. `/up` y
+`/salud` no se miden (gastarían la cuota).
+
+### Cómo se busca lo lento en el código
+
+- **Bullet** (desarrollo, siempre prendido): avisa en `log/bullet.log` cuando una pantalla hace una
+  consulta por renglón. Para barrer toda la API: `BULLET=1 bundle exec rspec spec/requests` y
+  leer `log/bullet.log`.
+- **`spec/requests/rendimiento_listados_spec.rb`**: mide cuántas consultas hace cada listado del
+  día con 2 filas y con 17. Si crece con las filas, falla. Toda pantalla de uso diario que liste
+  algo debería tener su caso ahí.
+

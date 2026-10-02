@@ -181,13 +181,22 @@
       <div v-if="data.totales" class="trz__balance">
         <div class="trz__bal-item">
           <span class="trz__bal-lbl">Entró</span>
-          <span class="trz__bal-val">{{ data.totales.gramos_producidos }} {{ unidad }}</span>
+          <span class="trz__bal-val">{{ entroTotal }} {{ unidad }}</span>
           <!-- Un frasco fraccionado de otro nació de ESE frasco: se dice antes que el proveedor o
                las plantas, que son el origen del frasco madre. -->
           <span v-if="data.stock.fraccionado_desde" class="trz__bal-pct">fraccionado de <a href="#" class="trz__link" @click.prevent="buscar(data.stock.fraccionado_desde.id)">{{ data.stock.fraccionado_desde.numero }}</a></span>
           <span v-else-if="data.totales.plantas_origen" class="trz__bal-pct">de {{ data.totales.plantas_origen }} plantas</span>
           <span v-else-if="data.stock.producido_desde" class="trz__bal-pct">de {{ data.stock.producido_desde.gramos }} g de {{ data.stock.producido_desde.numero }}</span>
           <span v-else-if="data.stock.proveedor" class="trz__bal-pct">comprado a {{ data.stock.proveedor }}</span>
+          <!-- Lo que entró DESPUÉS del alta (mercadería que llegó, un conteo que dio de más):
+               es entrada, y listarlo entre las salidas lo restaba a la vista. -->
+          <ul v-if="entradas.length" class="trz__bal-sub">
+            <li><span>al darlo de alta</span><span class="trz__bal-sub-g">{{ data.totales.gramos_producidos }} {{ unidad }}</span></li>
+            <li v-for="m in entradas" :key="m.id">
+              <span>{{ salidaLabel(m) }}</span>
+              <span class="trz__bal-sub-g">+{{ m.gramos }} {{ unidad }}</span>
+            </li>
+          </ul>
         </div>
         <span class="trz__bal-op">−</span>
         <div class="trz__bal-item">
@@ -199,8 +208,8 @@
         <div class="trz__bal-item trz__bal-item--salidas">
           <span class="trz__bal-lbl">Salió por otro lado</span>
           <span class="trz__bal-val">{{ data.totales.otras_salidas_g }} {{ unidad }}</span>
-          <ul v-if="data.salidas?.length" class="trz__bal-sub">
-            <li v-for="m in data.salidas" :key="m.id" :class="{ 'trz__bal-sub--merma': m.tipo === 'merma' }">
+          <ul v-if="salidas.length" class="trz__bal-sub">
+            <li v-for="m in salidas" :key="m.id" :class="{ 'trz__bal-sub--merma': m.tipo === 'merma' }">
               <span>{{ salidaLabel(m) }}</span>
               <span class="trz__bal-sub-g">{{ Math.abs(m.gramos) }} {{ unidad }}</span>
             </li>
@@ -674,8 +683,13 @@ const estadoPlanta = (e) => PLANT_STATE_META[e]?.label || e
 // un derivado no son pérdida: son el mismo producto en otra fila.
 const SALIDA_LABELS = {
   transferencia: 'traslado', produccion: 'a derivado', consumo_evento: 'consumo en evento',
-  salida: 'salida', ajuste: 'ajuste de conteo', merma: 'merma',
+  salida: 'salida', ajuste: 'ajuste de conteo', merma: 'merma', ingreso: 'entró mercadería',
 }
+// El backend manda entradas y salidas en una sola lista (`salidas`): se separan por el signo.
+const entradas = computed(() => (data.value?.salidas || []).filter(m => m.gramos > 0))
+const salidas  = computed(() => (data.value?.salidas || []).filter(m => m.gramos < 0))
+const entroTotal = computed(() =>
+  Math.round(((data.value?.totales?.gramos_producidos || 0) + (data.value?.totales?.entradas_g || 0)) * 100) / 100)
 function salidaLabel(m) {
   const base = SALIDA_LABELS[m.tipo] || m.tipo
   if (m.destino?.numero) {

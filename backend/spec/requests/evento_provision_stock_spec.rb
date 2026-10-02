@@ -131,10 +131,12 @@ RSpec.describe 'Provisión de eventos con Stock', type: :request do
     # uso interno— y `merma` sólo para lo destruido. Nació porque una organización que sólo
     # produce no tenía ninguna salida legítima: descartaba, y eso declaraba destruido producto
     # que estaba intacto en otro lado. Y `consumo` (sep-2026) es el USO PERSONAL: el cultivador
-    # de casa saca del frasco para él; el endpoint lo rechaza en una organización.
+    # de casa saca del frasco para él; el endpoint lo rechaza en una organización. `ingreso`
+    # (1-oct-2026) es una ENTRADA: mercadería que llegó a un stock externo; tampoco vende nada.
     it 'el mostrador no puede vender stock trazable' do
       expect(StockMovimiento::TIPOS).to contain_exactly(
-        'produccion', 'transferencia', 'dispensacion', 'ajuste', 'merma', 'salida', 'consumo_evento', 'consumo'
+        'produccion', 'transferencia', 'dispensacion', 'ajuste', 'merma', 'salida', 'consumo_evento', 'consumo',
+        'ingreso'
       )
       # No hay tipo "venta": una venta del POS mueve productos del bar, nunca Stock.
       expect(StockMovimiento::TIPOS).not_to include('venta')

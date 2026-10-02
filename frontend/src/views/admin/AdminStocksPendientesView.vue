@@ -1376,7 +1376,7 @@ const movimientos        = ref([])
 const loadingMovimientos = ref(false)
 
 function movTipoLabel(tipo) {
-  return { produccion: 'Producción', transferencia: 'Transferencia', dispensacion: 'Dispensación', ajuste: 'Ajuste', merma: 'Merma', consumo_evento: 'Consumo en evento' }[tipo] || tipo
+  return { ingreso: 'Entró mercadería', produccion: 'Producción', transferencia: 'Transferencia', dispensacion: 'Dispensación', ajuste: 'Ajuste', merma: 'Merma', consumo_evento: 'Consumo en evento' }[tipo] || tipo
 }
 
 async function openMovimientos(s) {

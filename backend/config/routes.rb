@@ -3,6 +3,8 @@ Rails.application.routes.draw do
 
   # Health check (usar este path en Render): responde JSON aunque no haya SPA buildeada.
   get  "/up", to: "health#show"
+  # Chequeo profundo (base, Redis, worker) para el monitor externo; /up queda para Render.
+  get  "/salud", to: "health#salud"
   # Root sirve la SPA (index.html copiado a public/). Si no hay build, spa_fallback
   # responde 404 — por eso el health check de Render debe apuntar a /up, no a /.
   root to: "application#spa_fallback"
