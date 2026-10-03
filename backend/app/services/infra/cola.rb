@@ -37,17 +37,33 @@ module Infra
 
     # Cada job programado con su última corrida. `atrasado` cuando pasó más del doble de su
     # período sin encolarse.
+    #
+    # Cada vez que el worker arranca (cada deploy) vuelve a registrar las tareas y la «última
+    # corrida» queda vacía. Por eso «nunca corrió» se cuenta desde que arrancó el worker: si arrancó
+    # hace 50 minutos, una tarea diaria que no corrió no está atrasada. Sin esto, después de cada
+    # deploy el panel marcaba todas como atrasadas (2-oct-2026).
     def cron
       require 'sidekiq/cron/job'
+      arranque = arranque_del_worker
       Sidekiq::Cron::Job.all.map do |j|
         ultima   = j.last_enqueue_time
         periodo  = self.class.periodo_de(j.cron)
-        atrasado = periodo.present? && (ultima.nil? || ultima < Time.current - (periodo * 2))
+        desde    = ultima || arranque
+        atrasado = periodo.present? && (desde.nil? || desde < Time.current - (periodo * 2))
         { nombre: j.name, cron: j.cron, descripcion: j.description, ultima: ultima, atrasado: atrasado }
       end.sort_by { |c| [c[:atrasado] ? 0 : 1, c[:nombre]] }
     rescue StandardError => e
       Rails.logger.warn("[infra] cron no disponible: #{e.class} #{e.message}")
       []
+    end
+
+    # Cuándo arrancó el worker más viejo que está vivo. Nil si no hay ninguno.
+    def arranque_del_worker
+      require 'sidekiq/api'
+      inicio = Sidekiq::ProcessSet.new.map { |p| p['started_at'].to_f }.select(&:positive?).min
+      inicio && Time.zone.at(inicio)
+    rescue StandardError
+      nil
     end
 
     # Cuánto tarda en volver a correr, a partir del cron. Con lo justo para los que hay: por

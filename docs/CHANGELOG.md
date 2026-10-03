@@ -1,5 +1,18 @@
 # Changelog
 
+## Octubre 2026 (dx) — Las notificaciones push no salían: el worker no atendía su fila
+
+- `PushNotificationJob`, `RecordatoriosTareasJob` y `OutgoingWebhookJob` van a la fila `medium`, que
+  `config/sidekiq.yml` no listaba desde junio: esperaban para siempre, sin error. En producción
+  había 6 push trabadas desde hacía 14 días (se borraron a mano antes de este deploy para que no
+  llegaran viejas). Ahora el worker la atiende y `spec/config/sidekiq_filas_spec.rb` compara los
+  `queue_as` reales contra lo que atiende el worker.
+- Panel de Estado: la base de producción se reconoce también por nombre y usuario de
+  `DATABASE_URL` (el id solo no la reconoció y la ofreció entre las que sobran); una base nunca
+  aparece como «se puede borrar» sin advertencia; las tareas programadas cuentan «nunca corrió»
+  desde que arrancó el worker (cada deploy borra la última corrida y daba falsa alarma).
+- Redis de producción pasado a `noeviction` (lo hizo Germán en Render).
+
 ## Octubre 2026 (dw) — Panel de Estado, backups verificados, tests en cada push, y REPROCANN sin «Inactivo»
 
 - **Super admin → Estado** (`GET /super_admin/estado`, `Infra::Estado`): una frase y un semáforo,

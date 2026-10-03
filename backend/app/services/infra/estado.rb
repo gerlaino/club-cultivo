@@ -123,7 +123,14 @@ module Infra
 
       a = s[:servidores].select { |x| x[:en_produccion] && %w[mal atencion].include?(x[:estado]) }
                         .map { |x| aviso(x[:estado], "#{x[:titulo]}: #{x[:estado_texto]}.", "Render → #{x[:nombre]}.") }
-      prendidos_de_mas = s[:servidores].reject { |x| x[:en_produccion] || x[:estado] == 'apagado' }
+      prendidos_de_mas = s[:servidores].reject { |x| x[:en_produccion] || x[:estado] == 'apagado' || x[:tipo] == 'base' }
+      bases_otras = s[:servidores].select { |x| x[:tipo] == 'base' && !x[:en_produccion] }
+      # Una base NUNCA va en «se pueden borrar» a secas: si la detección de cuál es la de producción
+      # se equivoca (pasó el 2-oct-2026), el consejo sería borrar la base de la app.
+      if bases_otras.any?
+        a << aviso('info', "Hay #{bases_otras.size} base#{bases_otras.size == 1 ? '' : 's'} de datos que no parece#{bases_otras.size == 1 ? '' : 'n'} ser la de la app: #{bases_otras.map { |x| x[:nombre] }.join(', ')}.",
+                   'NO borrar sin antes confirmar en Render → cultivo-staging-api → Environment que DATABASE_URL no apunta a ella.')
+      end
       if prendidos_de_mas.any?
         a << aviso('info', "Hay #{prendidos_de_mas.size} servicio#{prendidos_de_mas.size == 1 ? '' : 's'} en Render que no son de producción: #{prendidos_de_mas.map { |x| x[:nombre] }.join(', ')}.",
                    'Si no se usan, borrarlos (docs/INFRA.md, paso 6).')

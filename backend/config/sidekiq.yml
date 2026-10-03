@@ -1,6 +1,10 @@
 :concurrency: 5
 :queues:
+  # TODA fila que use un job (`queue_as`) tiene que estar acá, o sus trabajos esperan para siempre
+  # sin error: `medium` (push, recordatorios de tareas, webhooks) faltó desde junio y las push no
+  # salían (2-oct-2026). Lo vigila `spec/config/sidekiq_filas_spec.rb`.
   - [ambiente, 3]
   - [notifications, 2]
   - [mailers, 2]
+  - [medium, 2]
   - [default, 1]

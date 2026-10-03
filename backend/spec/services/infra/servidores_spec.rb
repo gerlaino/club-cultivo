@@ -56,6 +56,17 @@ RSpec.describe Infra::Servidores do
     expect(tarjeta(r, 'redis')).to include(en_produccion: true, precio_usd: 10)
   end
 
+  it 'si el id no coincide, la reconoce por el nombre de la base y el usuario (2-oct-2026)' do
+    ENV['DATABASE_URL'] = 'postgresql://cultivo_user:x@otro-host-a/cultivo_db'
+    api = RenderFalso.new(postgres: [
+      { 'id' => 'dpg-zzz', 'name' => 'club-cultivo-staging-db', 'databaseName' => 'cultivo_db', 'databaseUser' => 'cultivo_user', 'status' => 'available' },
+      { 'id' => 'dpg-pre', 'name' => 'cultivo-pre-db', 'databaseName' => 'cultivo_pre', 'databaseUser' => 'cultivo_pre', 'status' => 'available' },
+    ])
+    r = llamar(api)
+    expect(tarjeta(r, 'club-cultivo-staging-db')[:en_produccion]).to be(true)
+    expect(tarjeta(r, 'cultivo-pre-db')[:en_produccion]).to be(false)
+  end
+
   it 'un deploy que falló es «para mirar» y lo dice en castellano' do
     api = RenderFalso.new(servicios: [web('srv-prod', 'cultivo-staging-api')], deploys: { 'srv-prod' => { 'status' => 'build_failed' } })
     t = tarjeta(llamar(api), 'cultivo-staging-api')

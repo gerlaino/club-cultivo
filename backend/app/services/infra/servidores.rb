@@ -94,9 +94,9 @@ module Infra
     end
 
     def bases
-      host = host_de(ENV['DATABASE_URL'])
+      url = parse(ENV['DATABASE_URL'])
       @api.postgres.map do |p|
-        prod  = host.present? && host.include?(p['id'].to_s)
+        prod  = de_produccion?(p, url)
         plan  = norm(p['plan'])
         datos = PLANES.dig('base', plan) || {}
         apagada = p['suspended'] == 'suspended'
@@ -188,6 +188,25 @@ module Infra
       URI.parse(url.to_s).host.to_s
     rescue URI::InvalidURIError
       ''
+    end
+
+    def parse(url)
+      URI.parse(url.to_s)
+    rescue URI::InvalidURIError
+      nil
+    end
+
+    # ¿Es la base a la que está conectada la app? Por el id en el host (`dpg-…-a`), y si eso no
+    # alcanza, por el nombre de la base y el usuario de `DATABASE_URL`: el 2-oct-2026 el id solo
+    # no la reconoció y el panel la ofreció entre las que «se pueden borrar».
+    def de_produccion?(p, url)
+      return false if url.nil? || url.host.blank?
+
+      id = p['id'].to_s
+      return true if id.present? && url.host.include?(id)
+
+      nombre = url.path.to_s.delete_prefix('/')
+      nombre.present? && nombre == p['databaseName'].to_s && url.user.to_s == p['databaseUser'].to_s
     end
   end
 end
