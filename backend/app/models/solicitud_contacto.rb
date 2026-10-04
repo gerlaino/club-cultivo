@@ -14,6 +14,7 @@ class SolicitudContacto < ApplicationRecord
   }.freeze
 
   belongs_to :atendida_por, class_name: 'User', optional: true
+  has_many :respuestas, -> { order(:created_at) }, class_name: 'ConsultaRespuesta', dependent: :destroy
 
   validates :tipo,   inclusion: { in: TIPOS.keys }
   validates :nombre, presence: true, length: { maximum: 120 }

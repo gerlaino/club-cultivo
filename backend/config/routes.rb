@@ -715,7 +715,9 @@ Rails.application.routes.draw do
 
     namespace :super_admin do
       # Lo que llegó por el formulario de /bienvenida.
-      resources :consultas, only: [:index, :update]
+      resources :consultas, only: [:index, :update] do
+        post :respuestas, on: :member, action: :responder
+      end
       resources :clubs, only: [:index, :show, :create, :update, :destroy] do
         # Un Club Modelo con datos inventados, para mostrarle la app a un prospecto. Era un
         # rake (`club:demo`); desde el panel se genera en segundo plano.

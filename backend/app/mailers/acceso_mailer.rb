@@ -58,4 +58,12 @@ class AccesoMailer < ApplicationMailer
     @s = solicitud
     mail(to: solicitud.email, subject: "Recibimos tu #{solicitud.tipo == 'baja' ? 'pedido' : 'consulta'} (#{solicitud.codigo}) — Cultivo Espacial")
   end
+
+  # La respuesta del super admin a una consulta de /bienvenida. Sale por la casilla de la plataforma;
+  # si la persona contesta, le llega a esa casilla.
+  def respuesta_consulta(respuesta:)
+    @r = respuesta
+    @s = respuesta.solicitud_contacto
+    mail(to: @s.email, subject: "Re: tu #{@s.tipo == 'baja' ? 'pedido' : 'consulta'} (#{@s.codigo}) — Cultivo Espacial")
+  end
 end

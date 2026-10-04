@@ -382,8 +382,11 @@ onBeforeUnmount(() => {
   overflow-x: hidden;
 }
 .hb *, .hb *::before, .hb *::after { box-sizing: border-box; }
-.hb__wrap { width: 100%; max-width: 1120px; margin: 0 auto; padding: 0 16px; }
-@media (min-width: 720px) { .hb__wrap { padding: 0 32px; } }
+.hb__wrap { width: 100%; max-width: var(--hb-ancho); margin: 0 auto; padding: 0 var(--hb-relleno); }
+/* UN solo ancho para todas las secciones (Germán: parejo, homogéneo). La planta de la portada se
+   alinea con el borde derecho de este mismo ancho (`--hb-borde`). */
+.hb { --hb-ancho: 1320px; --hb-relleno: 16px; --hb-borde: max(var(--hb-relleno), calc((100% - var(--hb-ancho)) / 2 + var(--hb-relleno))); }
+@media (min-width: 720px) { .hb { --hb-relleno: 40px; } }
 
 /* ── Tipografía ── */
 .hb__ceja { margin: 0 0 12px; font: 500 12px var(--hb-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--hb-tinta-2); }

@@ -7,9 +7,9 @@
 // sin costo, y a quien escribió ya se le dio su código de trámite.
 import { ref, computed, onMounted } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { listConsultas, marcarConsulta } from '../../lib/api.js'
+import { listConsultas, marcarConsulta, responderConsulta } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
-import { Inbox, Mail, Phone, Building2, CheckCircle2, RotateCcw } from 'lucide-vue-next'
+import { Inbox, Mail, Phone, Building2, CheckCircle2, RotateCcw, Reply, Send, Clock, AlertTriangle } from 'lucide-vue-next'
 
 const toast = useToast()
 const datos = ref(null)
@@ -41,6 +41,27 @@ async function marcar (c, atendida) {
     toast.error('No se pudo guardar.')
   } finally {
     guardando.value = null
+  }
+}
+
+// Responder: se abre un recuadro por consulta. La respuesta sale por el correo de la plataforma.
+const respondiendo = ref(null)
+const borrador = ref('')
+const enviando = ref(false)
+function abrirRespuesta (c) { respondiendo.value = c.id; borrador.value = '' }
+async function enviarRespuesta (c) {
+  if (!borrador.value.trim()) return
+  enviando.value = true
+  try {
+    const { data } = await responderConsulta(c.id, borrador.value.trim())
+    if (!c.atendida_at && data.atendida_at) datos.value.pendientes -= 1
+    Object.assign(c, data)
+    respondiendo.value = null
+    toast.success('Respuesta enviada.')
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo enviar.')
+  } finally {
+    enviando.value = false
   }
 }
 
@@ -79,7 +100,29 @@ onMounted(cargar)
         <p v-if="c.tipo === 'baja' && !c.atendida_at" class="cq__nota">
           Arrepentimiento o baja: se procesa sin costo y sin pedir explicaciones.
         </p>
+        <!-- Lo que ya se le contestó, con si salió o no por el correo. -->
+        <ul v-if="c.respuestas?.length" class="cq__resp">
+          <li v-for="r in c.respuestas" :key="r.id">
+            <div class="cq__resp-h">
+              <Reply :size="13" /> {{ r.autor || 'Plataforma' }} · {{ cuando(r.created_at) }}
+              <span v-if="r.enviada_at" class="cq__resp-ok"><CheckCircle2 :size="12" /> Enviada</span>
+              <span v-else-if="r.error" class="cq__resp-err" :title="r.error"><AlertTriangle :size="12" /> No salió: revisá el correo de la plataforma</span>
+              <span v-else class="cq__resp-pend"><Clock :size="12" /> Enviando…</span>
+            </div>
+            <p>{{ r.texto }}</p>
+          </li>
+        </ul>
+
+        <div v-if="respondiendo === c.id" class="cq__redactar">
+          <textarea v-model="borrador" rows="4" maxlength="5000" :placeholder="`Respuesta para ${c.nombre} (le llega a ${c.email})`"></textarea>
+          <div class="cq__redactar-acc">
+            <button class="cq__btn cq__btn--sec" :disabled="enviando" @click="respondiendo = null">Cancelar</button>
+            <button class="cq__btn" :disabled="enviando || !borrador.trim()" @click="enviarRespuesta(c)"><Send :size="14" /> Enviar respuesta</button>
+          </div>
+        </div>
+
         <div class="cq__acc">
+          <button v-if="respondiendo !== c.id" class="cq__btn cq__btn--sec" @click="abrirRespuesta(c)"><Reply :size="14" /> Responder</button>
           <span v-if="c.atendida_at" class="cq__hecha"><CheckCircle2 :size="14" /> Atendida {{ cuando(c.atendida_at) }}<template v-if="c.atendida_por"> por {{ c.atendida_por }}</template></span>
           <button v-if="!c.atendida_at" class="cq__btn" :disabled="guardando === c.id" @click="marcar(c, true)">
             <CheckCircle2 :size="15" /> Marcar atendida
@@ -119,5 +162,16 @@ onMounted(cargar)
 .cq__hecha { display: inline-flex; align-items: center; gap: .3rem; font-size: var(--fs-13, 13px); color: var(--c-leaf-700); margin-right: auto; }
 .cq__btn { display: inline-flex; align-items: center; gap: .35rem; min-height: 38px; background: var(--c-leaf-700); color: #fff; border: none; border-radius: var(--r-md); padding: 6px 14px; font-size: var(--fs-14); font-weight: 600; cursor: pointer; }
 .cq__btn--sec { background: #fff; color: var(--c-leaf-700); border: 1.5px solid var(--c-ink-300); }
+.cq__resp { list-style: none; margin: 0; padding: 0 0 0 var(--sp-3); border-left: 2px solid var(--c-leaf-100); display: flex; flex-direction: column; gap: var(--sp-2); }
+.cq__resp p { margin: 2px 0 0; white-space: pre-line; font-size: var(--fs-14); color: var(--c-ink-900); }
+.cq__resp-h { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem; font-size: var(--fs-12); color: var(--c-slate-500); }
+.cq__resp-ok, .cq__resp-err, .cq__resp-pend { display: inline-flex; align-items: center; gap: .2rem; font-weight: 600; }
+.cq__resp-ok { color: var(--c-leaf-700); }
+.cq__resp-err { color: var(--c-rust-600); }
+.cq__resp-pend { color: var(--c-slate-500); }
+.cq__redactar { display: flex; flex-direction: column; gap: var(--sp-2); }
+.cq__redactar textarea { font: inherit; font-size: var(--fs-14); border: 1.5px solid var(--c-slate-200); border-radius: var(--r-md); padding: var(--sp-3); resize: vertical; }
+.cq__redactar textarea:focus { outline: none; border-color: var(--c-leaf-700); }
+.cq__redactar-acc { display: flex; justify-content: flex-end; gap: var(--sp-2); }
 .cq__btn:disabled { opacity: .55; cursor: default; }
 </style>

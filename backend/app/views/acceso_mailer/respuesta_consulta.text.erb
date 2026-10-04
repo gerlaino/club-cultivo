@@ -1,0 +1,10 @@
+Hola <%= @s.nombre %>,
+
+<%= @r.texto %>
+
+<%= @r.autor&.first_name.presence || 'El equipo' %> · Cultivo Espacial
+Código de trámite: <%= @s.codigo %>
+<% if @s.mensaje.present? %>
+
+> <%= @s.mensaje.gsub("\n", "\n> ") %>
+<% end %>

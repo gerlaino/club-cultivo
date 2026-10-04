@@ -837,6 +837,7 @@ export const getSuperAdminEstado = () => api.get('/super_admin/estado')
 // La bandeja de lo que llegó por el formulario de /bienvenida.
 export const listConsultas     = ()                  => api.get('/super_admin/consultas')
 export const marcarConsulta    = (id, atendida)      => api.patch(`/super_admin/consultas/${id}`, { atendida })
+export const responderConsulta = (id, texto)         => api.post(`/super_admin/consultas/${id}/respuestas`, { texto })
 
 // /bienvenida: autoregistro de uso personal y contacto. Sin sesión.
 export const getRegistroInfo        = ()        => api.get('/public/registro')

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_10_04_200000) do
+ActiveRecord::Schema[7.2].define(version: 2026_10_04_210000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -630,6 +630,18 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_04_200000) do
     t.index ["created_by_id"], name: "index_compras_cuotas_on_created_by_id"
     t.index ["deleted_at"], name: "index_compras_cuotas_on_deleted_at"
     t.index ["sede_id"], name: "index_compras_cuotas_on_sede_id"
+  end
+
+  create_table "consulta_respuestas", force: :cascade do |t|
+    t.bigint "solicitud_contacto_id", null: false
+    t.bigint "user_id", null: false
+    t.text "texto", null: false
+    t.datetime "enviada_at"
+    t.string "error"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["solicitud_contacto_id"], name: "index_consulta_respuestas_on_solicitud_contacto_id"
+    t.index ["user_id"], name: "index_consulta_respuestas_on_user_id"
   end
 
   create_table "conversaciones_asistente", force: :cascade do |t|
@@ -2770,6 +2782,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_04_200000) do
   add_foreign_key "compras_cuotas", "clubs"
   add_foreign_key "compras_cuotas", "sedes"
   add_foreign_key "compras_cuotas", "users", column: "created_by_id"
+  add_foreign_key "consulta_respuestas", "solicitudes_contacto", column: "solicitud_contacto_id"
+  add_foreign_key "consulta_respuestas", "users"
   add_foreign_key "conversaciones_asistente", "clubs"
   add_foreign_key "conversaciones_asistente", "users"
   add_foreign_key "costo_lotes", "clubs"

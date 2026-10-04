@@ -1,5 +1,19 @@
 # Changelog
 
+## Octubre 2026 (ea) — Responder consultas desde el super admin, y la portada afinada
+
+- **Responder una consulta** (Super admin → Consultas → «Responder»): la respuesta sale por el correo
+  de la PLATAFORMA (hoy Gmail; mañana el corporativo cambiando sólo las variables de Render), a
+  quien escribió y a nadie más, con su código de trámite. Queda guardada (`consulta_respuestas`)
+  como historial, la consulta pasa a atendida, y la bandeja dice si salió, si se está enviando o si
+  falló (`EnviarRespuestaConsultaJob` anota `enviada_at` o `error`). Si la persona contesta, le
+  llega a la casilla de correo, no a la app.
+- **Portada**: un solo ancho de página (1320 px) para todas las secciones; la planta corre sola en
+  bucle sin controles, un poco más lenta (28 s) para que cada evento se lea; el contador y el evento
+  van juntos al lado de la maceta; al final la planta se desvanece y queda lo cosechado, grande, en
+  su lugar (`COSECHA` en `PlantaCreciendo.vue`: se cambia el archivo cuando llegue la foto de la
+  vara). Se sumó la defoliación como evento.
+
 ## Octubre 2026 (dz) — La página pública en dirección «Herbario», con una planta que crece
 
 - **/bienvenida rediseñada** (dirección «Herbario» de la propuesta del 29-sep, en verdes suaves):
