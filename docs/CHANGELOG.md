@@ -1,5 +1,19 @@
 # Changelog
 
+## Octubre 2026 (dz) — La página pública en dirección «Herbario», con una planta que crece
+
+- **/bienvenida rediseñada** (dirección «Herbario» de la propuesta del 29-sep, en verdes suaves):
+  Fraunces + Public Sans + JetBrains Mono (`lib/fuentesHerbario.js`, sólo en páginas públicas), sin
+  logo en el encabezado, dos puertas como fichas, sección «Llevala en el bolsillo» (teléfono con la
+  ficha del lote, 3 pasos y «Instalar» cuando el navegador lo ofrece), apariciones al hacer scroll.
+- **La planta que crece** (`components/public/PlantaCreciendo.vue`): 7 fotos fotorrealistas de la
+  misma planta (generadas con IA por Germán), sin fondo y alineadas por la maceta
+  (`public/planta/`), con fundido entre etapas, deslizador de días, reproducción automática al
+  aparecer, tarjetas «En la app» por etapa y el cogollo seco en una lupa al final. En pantallas
+  anchas es el fondo de la portada, de borde a borde. Reemplaza al dibujo hecho en código.
+- **Registro, Términos y Privacidad** con el mismo estilo y botón **Volver** (desde el registro se
+  abren en otra pestaña: «Volver» la cierra).
+
 ## Octubre 2026 (dy) — /bienvenida con dos puertas, autoregistro de uso personal, sesión de 7 días, y «Regar» desde la ficha
 
 - **/bienvenida**: dos puertas. «Para tu cultivo en casa» → `/registro` (30 días gratis, sin

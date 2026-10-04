@@ -1,362 +1,303 @@
 <template>
-  <div class="ld">
+  <div class="hb">
 
-    <!-- Fondo: mismo cosmos del login, con la paleta del design system -->
-    <div class="ld__bg" aria-hidden="true">
-      <div class="ld__nebula ld__nebula--1"></div>
-      <div class="ld__nebula ld__nebula--2"></div>
-      <div class="ld__nebula ld__nebula--3"></div>
-      <span class="ld__star" style="top:6%;left:11%;width:2px;height:2px;animation-duration:3s"></span>
-      <span class="ld__star" style="top:13%;left:34%;width:1.5px;height:1.5px;animation-duration:4s;animation-delay:-1s"></span>
-      <span class="ld__star" style="top:4%;left:57%;width:2px;height:2px;animation-duration:2.5s;animation-delay:-.5s"></span>
-      <span class="ld__star" style="top:20%;left:74%;width:1px;height:1px;animation-duration:3.5s;animation-delay:-2s"></span>
-      <span class="ld__star" style="top:9%;left:88%;width:2px;height:2px;animation-duration:3.8s;animation-delay:-1.2s"></span>
-      <svg class="ld__chala ld__chala--a" viewBox="0 0 100 160" fill="none">
-        <path d="M50 8C44 22 38 42 40 65C42 80 47 88 50 92C53 88 58 80 60 65C62 42 56 22 50 8Z" fill="rgba(90,138,114,.10)"/>
-        <path d="M48 35C38 28 24 26 16 32C20 40 32 44 44 40Z" fill="rgba(90,138,114,.08)"/>
-        <path d="M52 35C62 28 76 26 84 32C80 40 68 44 56 40Z" fill="rgba(90,138,114,.08)"/>
-        <path d="M46 55C34 50 20 52 12 60C17 68 30 70 44 64Z" fill="rgba(90,138,114,.06)"/>
-        <path d="M54 55C66 50 80 52 88 60C83 68 70 70 56 64Z" fill="rgba(90,138,114,.06)"/>
-        <path d="M50 92L50 155" stroke="rgba(90,138,114,.09)" stroke-width="2.5" stroke-linecap="round"/>
-      </svg>
-      <svg class="ld__chala ld__chala--b" viewBox="0 0 100 160" fill="none">
-        <path d="M50 8C44 22 38 42 40 65C42 80 47 88 50 92C53 88 58 80 60 65C62 42 56 22 50 8Z" fill="rgba(168,201,181,.06)"/>
-        <path d="M48 35C38 28 24 26 16 32C20 40 32 44 44 40Z" fill="rgba(168,201,181,.05)"/>
-        <path d="M52 35C62 28 76 26 84 32C80 40 68 44 56 40Z" fill="rgba(168,201,181,.05)"/>
-        <path d="M50 92L50 155" stroke="rgba(168,201,181,.06)" stroke-width="2" stroke-linecap="round"/>
-      </svg>
-    </div>
-
-    <!-- ── Header ───────────────────────────────────────────── -->
-    <header class="ld__header">
-      <div class="ld__wrap ld__header-in">
-        <RouterLink to="/bienvenida" class="ld__brand">
-          <img src="/logo-ce-redondo.png" alt="" class="ld__brand-img" />
-          <span class="ld__brand-txt">Cultivo Espacial</span>
-        </RouterLink>
-        <nav class="ld__nav">
-          <a href="#empezar"     class="ld__nav-a">En casa</a>
-          <a href="#capacidades" class="ld__nav-a">Organizaciones</a>
-          <a href="#contacto"    class="ld__nav-a">Contacto</a>
+    <!-- ── Encabezado ─────────────────────────────────────── -->
+    <header class="hb__top">
+      <div class="hb__wrap hb__top-in">
+        <RouterLink to="/bienvenida" class="hb__marca">Cultivo Espacial</RouterLink>
+        <nav class="hb__nav" aria-label="Secciones">
+          <a href="#empezar">En casa</a>
+          <a href="#organizaciones">Organizaciones</a>
+          <a href="#contacto" @click="tipo = 'organizacion'">Contacto</a>
         </nav>
-        <RouterLink to="/login" class="ld__login">Ingresar</RouterLink>
-        <RouterLink to="/registro" class="ld__probar">Probar gratis</RouterLink>
+        <RouterLink to="/login" class="hb__ingresar">Ingresar</RouterLink>
+        <RouterLink to="/registro" class="hb__btn hb__btn--chico">Probar gratis</RouterLink>
       </div>
     </header>
 
-    <!-- ── Hero ─────────────────────────────────────────────── -->
-    <section class="ld__hero">
-      <div class="ld__wrap ld__hero-in">
-        <span class="ld__badge"><span class="ld__bdot"></span>De la genética a la entrega</span>
-
-        <h1 class="ld__h1">
-          Todo lo que cultivás,<br /><em>bajo control</em>
-        </h1>
-
-        <p class="ld__lead">
-          Para tu cultivo en casa y para las organizaciones que cultivan: clubes, investigación y
-          producción. Cada planta, cada ciclo y cada gramo, registrados y demostrables.
-        </p>
-
-        <div class="ld__cta">
-          <RouterLink to="/registro" class="ld__btn ld__btn--primary">
-            Probar gratis en mi cultivo
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
-            </svg>
-          </RouterLink>
-          <a href="#contacto" class="ld__btn ld__btn--ghost" @click="tipo = 'organizacion'">Soy una organización</a>
+    <!-- ── Portada: el texto y la lámina ──────────────────── -->
+    <!-- En pantallas anchas la planta es el fondo de la portada, de borde a borde, y el texto va
+         encima a la izquierda. En el teléfono, el texto y debajo la planta. -->
+    <section class="hb__portada" :class="{ 'hb__portada--ancha': ancha }">
+      <PlantaCreciendo v-if="ancha" :key="'ancha'" portada />
+      <div class="hb__wrap hb__portada-in">
+        <div class="hb__portada-txt">
+          <p class="hb__ceja">Cuaderno de cultivo · de la semilla al frasco</p>
+          <h1 class="hb__h1">Cada planta tiene su historia. <em>Escribila mientras crece.</em></h1>
+          <p class="hb__bajada">
+            Riegos, nutrientes, fotos, fases y cosecha, anotados en el teléfono en el momento en que
+            pasan. Para tu cultivo en casa y para las organizaciones que cultivan y dispensan.
+          </p>
+          <div class="hb__acciones">
+            <RouterLink to="/registro" class="hb__btn">
+              Empezar gratis en mi cultivo
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            </RouterLink>
+            <a href="#organizaciones" class="hb__btn hb__btn--linea">Soy una organización</a>
+          </div>
+          <p class="hb__nota">{{ diasPrueba }} días gratis · sin tarjeta · entrás en el momento</p>
         </div>
-        <p class="ld__cta-nota">{{ diasPrueba }} días gratis, sin tarjeta. Entrás en el momento.</p>
-
-        <!-- Los tres pilares -->
-        <div class="ld__pilares">
-          <div class="ld__pilar">
-            <span class="ld__pilar-t">Cultivo</span>
-            <span class="ld__pilar-d">Genéticas, lotes, plantas y ambiente</span>
-          </div>
-          <span class="ld__psep" aria-hidden="true"></span>
-          <div class="ld__pilar">
-            <span class="ld__pilar-t">Producción</span>
-            <span class="ld__pilar-d">Cosecha, post-cosecha, stock y entrega</span>
-          </div>
-          <span class="ld__psep" aria-hidden="true"></span>
-          <div class="ld__pilar">
-            <span class="ld__pilar-t">Cumplimiento</span>
-            <span class="ld__pilar-d">Informes que salen de la misma data</span>
-          </div>
-        </div>
+      </div>
+      <div v-if="!ancha" class="hb__lamina">
+        <PlantaCreciendo :key="'angosta'" />
       </div>
     </section>
 
-    <!-- ── Dos puertas ──────────────────────────────────────── -->
-    <!-- Quien cultiva en casa entra SOLO y en el momento; una organización necesita armado
-         (sedes, roles, módulos) y por eso deja sus datos. Las dos con precio «consultanos». -->
-    <section class="ld__sec ld__sec--alt" id="empezar">
-      <div class="ld__wrap">
-        <span class="ld__kicker">Cómo empezar</span>
-        <h2 class="ld__h2">Elegí tu puerta</h2>
-        <div class="ld__puertas">
-          <article class="ld__puerta ld__puerta--casa">
-            <span class="ld__puerta-tag">Uso personal</span>
-            <h3 class="ld__puerta-t">Para tu cultivo en casa</h3>
-            <p class="ld__puerta-d">Tu carpa, tu balcón o tu cama de suelo vivo, ordenados en el teléfono.</p>
-            <ul class="ld__puerta-l">
+    <!-- ── Dos puertas ────────────────────────────────────── -->
+    <section class="hb__sec" id="empezar">
+      <div class="hb__wrap">
+        <header class="hb__sec-h">
+          <p class="hb__ceja">Cómo empezar</p>
+          <h2 class="hb__h2">Dos maneras de usarla</h2>
+        </header>
+
+        <div class="hb__fichas">
+          <article class="hb__ficha hb__ficha--casa hb-rev">
+            <div class="hb__ficha-cab">
+              <span class="hb__ficha-n">N.º 01</span>
+              <span class="hb__ficha-tipo">Uso personal</span>
+            </div>
+            <h3 class="hb__h3">Tu cultivo en casa</h3>
+            <p class="hb__ficha-d">Carpa, balcón o cama de suelo vivo. Autos o fotoperiódicas. Todo en el teléfono.</p>
+            <ul class="hb__lista">
               <li v-for="x in enCasa" :key="x">{{ x }}</li>
             </ul>
-            <div class="ld__puerta-precio">
-              <strong>{{ diasPrueba }} días gratis</strong>, sin tarjeta · después, consultanos el precio
+            <div class="hb__ficha-pie">
+              <p><strong>{{ diasPrueba }} días gratis</strong>, sin tarjeta. Después, consultanos el precio.</p>
+              <RouterLink to="/registro" class="hb__btn">Crear mi cuenta</RouterLink>
             </div>
-            <RouterLink to="/registro" class="ld__btn ld__btn--primary">Crear mi cuenta gratis</RouterLink>
           </article>
 
-          <article class="ld__puerta">
-            <span class="ld__puerta-tag">Organizaciones</span>
-            <h3 class="ld__puerta-t">Para tu organización</h3>
-            <p class="ld__puerta-d">Asociaciones, fundaciones, investigación y producción.</p>
-            <ul class="ld__puerta-l">
+          <article class="hb__ficha hb-rev" id="organizaciones">
+            <div class="hb__ficha-cab">
+              <span class="hb__ficha-n">N.º 02</span>
+              <span class="hb__ficha-tipo">Organizaciones</span>
+            </div>
+            <h3 class="hb__h3">Tu organización</h3>
+            <p class="hb__ficha-d">Asociaciones, fundaciones, investigación y producción: del cultivo al mostrador.</p>
+            <ul class="hb__lista">
               <li v-for="x in enOrganizacion" :key="x">{{ x }}</li>
             </ul>
-            <div class="ld__puerta-precio">Precio según tu organización · consultanos</div>
-            <a href="#contacto" class="ld__btn ld__btn--ghost" @click="tipo = 'organizacion'">Escribinos</a>
+            <div class="hb__ficha-pie">
+              <p>Te armamos la cuenta a medida. <strong>Precio: consultanos.</strong></p>
+              <a href="#contacto" class="hb__btn hb__btn--linea" @click="tipo = 'organizacion'">Escribinos</a>
+            </div>
           </article>
         </div>
       </div>
     </section>
 
-    <!-- ── La cadena ────────────────────────────────────────── -->
-    <section class="ld__sec" id="capacidades">
-      <div class="ld__wrap">
-        <span class="ld__kicker">La cadena</span>
-        <h2 class="ld__h2">Una sola línea de tiempo, de la madre a quien la recibe</h2>
-        <p class="ld__sub">
-          No son módulos sueltos que después hay que conciliar. Cada eslabón hereda la trazabilidad
-          del anterior, así que preguntarle al sistema de dónde salió un gramo es una consulta, no una
-          investigación.
-        </p>
+    <!-- ── En el bolsillo: el teléfono y la instalación ───── -->
+    <section class="hb__bolsillo" id="bolsillo">
+      <div class="hb__wrap hb__bolsillo-in">
+        <div class="hb__bolsillo-txt hb-rev">
+          <p class="hb__ceja hb__ceja--claro">La app</p>
+          <h2 class="hb__h2">Llevala en el bolsillo</h2>
+          <p>
+            Se instala en el teléfono desde el navegador, sin tiendas y en segundos. Abrís tu lote,
+            tocás «Registrar» y listo: riego, foto, ambiente. Te avisa cuando le toca algo a la planta.
+          </p>
+          <ul class="hb__pasos">
+            <li><span>1</span> Creá tu cuenta gratis</li>
+            <li><span>2</span> Cargá tu espacio y tu primer lote</li>
+            <li><span>3</span> Instalala y anotá desde la planta</li>
+          </ul>
+          <div class="hb__acciones">
+            <RouterLink to="/registro" class="hb__btn hb__btn--claro">Probala gratis</RouterLink>
+            <button v-if="instalable" type="button" class="hb__btn hb__btn--linea-claro" @click="instalar">Instalar en este dispositivo</button>
+          </div>
+          <p class="hb__instalar-ayuda">
+            En iPhone: <b>Compartir</b> → <b>Agregar a inicio</b>. En Android: menú <b>⋮</b> → <b>Instalar app</b>.
+          </p>
+        </div>
 
-        <ol class="ld__chain">
-          <li v-for="(p, i) in cadena" :key="p.t" class="ld__link">
-            <span class="ld__link-n">{{ String(i + 1).padStart(2, '0') }}</span>
-            <span class="ld__link-t">{{ p.t }}</span>
-            <span class="ld__link-d">{{ p.d }}</span>
-          </li>
-        </ol>
+        <!-- Un teléfono con la ficha del lote, como se ve de verdad en la app. -->
+        <div class="hb__tel hb-rev" aria-hidden="true">
+          <div class="hb__tel-pantalla">
+            <div class="hb__tel-hero">
+              <span class="hb__tel-fase">VEGETATIVO <i>AUTO</i></span>
+              <b class="hb__tel-cod">L-26-002</b>
+              <span class="hb__tel-gen">King’s Juice</span>
+              <span class="hb__tel-falta">→ Faltan 46 días para la cosecha</span>
+              <div class="hb__tel-stats">
+                <div><b>3</b><small>Plantas</small></div>
+                <div><b>31</b><small>Días</small></div>
+                <div><b>Balcón</b><small>Espacio</small></div>
+                <div><b>10 L</b><small>Maceta</small></div>
+              </div>
+            </div>
+            <div class="hb__tel-cta">Registrar en el diario<small>Riego, pH/EC, ambiente, foto</small></div>
+            <div class="hb__tel-feed">
+              <div v-for="r in telFeed" :key="r.t" class="hb__tel-item"><span><component :is="r.i" :size="16" :stroke-width="1.8" /></span><div><b>{{ r.t }}</b><small>{{ r.s }}</small></div></div>
+            </div>
+            <div class="hb__tel-nav">
+              <span>Hoy</span><span class="hb__tel-nav--on">Cultivo</span><b>+</b><span>Stock</span><span>Gastos</span>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
 
-    <!-- ── Capacidades ──────────────────────────────────────── -->
-    <section class="ld__sec ld__sec--alt">
-      <div class="ld__wrap">
-        <div class="ld__feats">
-          <article class="ld__feat">
-            <div class="ld__feat-ico">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
-                <rect x="3" y="14" width="7" height="7" rx="1" /><path d="M14 17.5h7M17.5 14v7" />
-              </svg>
-            </div>
-            <h3 class="ld__feat-t">Trazabilidad de punta a punta</h3>
-            <p class="ld__feat-d">
-              Cada planta con su QR, desde la madre o la semilla hasta quien la recibe. Escaneás una
-              etiqueta y tenés el expediente completo: origen, sala, riegos, pesadas y destino.
-            </p>
-          </article>
-
-          <article class="ld__feat">
-            <div class="ld__feat-ico">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path d="M3 3v18h18" /><path d="M7 15l4-5 3 3 5-7" />
-              </svg>
-            </div>
-            <h3 class="ld__feat-t">El ciclo, medido</h3>
-            <p class="ld__feat-d">
-              Ambiente, riego, fases y rendimiento por lote y por genética. Sensores, setpoints por
-              fase y alertas — para comparar corridas y saber qué cambió entre una y otra.
-            </p>
-          </article>
-
-          <article class="ld__feat">
-            <div class="ld__feat-ico">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" /><path d="M14 2v6h6" />
-                <path d="M9 15l2 2 4-4" />
-              </svg>
-            </div>
-            <h3 class="ld__feat-t">Cumplimiento cuando hace falta</h3>
-            <p class="ld__feat-d">
-              REPROCANN y ARICCAME salen de la misma data que ya cargaste operando, sin cargar nada
-              dos veces. El informe es una salida del sistema, no un trabajo aparte.
-            </p>
-          </article>
-
-          <article class="ld__feat">
-            <div class="ld__feat-ico">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" />
-                <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
-              </svg>
-            </div>
-            <h3 class="ld__feat-t">Una vista por cada oficio</h3>
-            <p class="ld__feat-d">
-              Quien cultiva, quien manicura, quien dispensa, quien reparte y quien audita ven cosas
-              distintas. Once roles, cada uno con su pantalla y sus permisos.
-            </p>
+    <!-- ── Principios ─────────────────────────────────────── -->
+    <section class="hb__sec hb__sec--claro">
+      <div class="hb__wrap">
+        <header class="hb__sec-h">
+          <p class="hb__ceja">Cómo está pensada</p>
+          <h2 class="hb__h2">Un cuaderno de campo, no una planilla</h2>
+        </header>
+        <div class="hb__principios">
+          <article v-for="(p, i) in principios" :key="p.t" class="hb__principio hb-rev" :style="{ transitionDelay: `${i * 90}ms` }">
+            <span class="hb__principio-n">{{ String(i + 1).padStart(2, '0') }}</span>
+            <h3 class="hb__h3">{{ p.t }}</h3>
+            <p>{{ p.d }}</p>
           </article>
         </div>
       </div>
     </section>
 
-    <!-- ── Para quién ───────────────────────────────────────── -->
-    <section class="ld__sec" id="quienes">
-      <div class="ld__wrap">
-        <span class="ld__kicker">Para quién</span>
-        <h2 class="ld__h2">Si lo que cultivás hay que poder demostrarlo</h2>
-        <p class="ld__sub">
-          Un club, un laboratorio y un productor no comparten normativa, pero comparten el problema:
-          saber qué pasó con cada planta y poder mostrarlo ante quien pregunte.
-        </p>
-
-        <div class="ld__whos">
-          <article v-for="w in publicos" :key="w.t" class="ld__who">
-            <h3 class="ld__who-t">{{ w.t }}</h3>
-            <p class="ld__who-d">{{ w.d }}</p>
-          </article>
-        </div>
-      </div>
-    </section>
-
-    <!-- ── Módulos ──────────────────────────────────────────── -->
-    <section class="ld__sec ld__sec--alt" id="modulos">
-      <div class="ld__wrap">
-        <span class="ld__kicker">Módulos</span>
-        <h2 class="ld__h2">Lo que ya viene resuelto</h2>
-        <div class="ld__mods">
-          <span v-for="m in modulos" :key="m" class="ld__mod">{{ m }}</span>
-        </div>
-      </div>
-    </section>
-
-    <!-- ── Contacto ─────────────────────────────────────────── -->
-    <section class="ld__sec ld__sec--alt" id="contacto">
-      <div class="ld__wrap ld__contacto">
-        <div>
-          <span class="ld__kicker">Contacto</span>
-          <h2 class="ld__h2">Escribinos</h2>
-          <p class="ld__sub">
+    <!-- ── Contacto ───────────────────────────────────────── -->
+    <section class="hb__sec" id="contacto">
+      <div class="hb__wrap hb__contacto">
+        <div class="hb__contacto-txt">
+          <p class="hb__ceja">Contacto</p>
+          <h2 class="hb__h2">Escribinos</h2>
+          <p>
             Si sos una organización, contanos qué hacen y te armamos la cuenta. Si cultivás en casa y
             preferís hablar antes de probar, también. Te respondemos por mail.
           </p>
-          <p class="ld__sub ld__contacto-baja" v-if="tipo === 'baja'">
-            <strong>Botón de arrepentimiento:</strong> si contrataste en los últimos 10 días, podés
-            revocarlo sin costo ni explicaciones. También sirve para pedir la baja en cualquier momento.
+          <p v-if="tipo === 'baja'" class="hb__aviso">
+            <strong>Botón de arrepentimiento.</strong> Si contrataste en los últimos 10 días, lo podés
+            revocar sin costo ni explicaciones; también sirve para pedir la baja en cualquier momento.
             Te damos un código de trámite en el momento.
           </p>
         </div>
 
-        <div v-if="enviado" class="ld__form ld__form--ok" role="status">
-          <h3 class="ld__puerta-t">¡Gracias, {{ enviado.nombre }}!</h3>
+        <div v-if="enviado" class="hb__hoja" role="status">
+          <h3 class="hb__h3">Gracias, {{ enviado.nombre }}.</h3>
           <p>Recibimos tu {{ enviado.tipo === 'baja' ? 'pedido' : 'mensaje' }}. Te respondemos a <strong>{{ enviado.email }}</strong>.</p>
-          <p>Código de trámite: <strong class="ld__codigo">{{ enviado.codigo }}</strong></p>
+          <p class="hb__codigo">Código de trámite · <strong>{{ enviado.codigo }}</strong></p>
         </div>
 
-        <form v-else class="ld__form" novalidate @submit.prevent="enviar">
-          <div class="ld__tipos" role="radiogroup" aria-label="Sobre qué nos escribís">
+        <form v-else class="hb__hoja" novalidate @submit.prevent="enviar">
+          <div class="hb__tipos" role="radiogroup" aria-label="Sobre qué nos escribís">
             <button v-for="t in TIPOS" :key="t.id" type="button" role="radio" :aria-checked="tipo === t.id"
-                    class="ld__tipo" :class="{ 'ld__tipo--on': tipo === t.id }" @click="tipo = t.id">{{ t.label }}</button>
+                    class="hb__tipo" :class="{ 'hb__tipo--on': tipo === t.id }" @click="tipo = t.id">{{ t.label }}</button>
           </div>
-          <label class="ld__campo">
+          <label class="hb__campo">
             <span>Nombre</span>
             <input v-model="form.nombre" type="text" maxlength="120" autocomplete="name" required />
           </label>
-          <label class="ld__campo">
+          <label class="hb__campo">
             <span>Mail</span>
             <input v-model.trim="form.email" type="email" maxlength="160" autocomplete="email" required />
           </label>
-          <label v-if="tipo === 'organizacion'" class="ld__campo">
+          <label v-if="tipo === 'organizacion'" class="hb__campo">
             <span>Organización</span>
             <input v-model="form.organizacion" type="text" maxlength="160" autocomplete="organization" />
           </label>
-          <label class="ld__campo">
-            <span>Teléfono / WhatsApp <em>opcional</em></span>
+          <label class="hb__campo">
+            <span>Teléfono o WhatsApp <em>opcional</em></span>
             <input v-model="form.telefono" type="tel" maxlength="40" autocomplete="tel" />
           </label>
-          <label class="ld__campo">
-            <span>{{ tipo === 'baja' ? 'Qué cuenta (mail con el que entrás) y cualquier detalle' : 'Mensaje' }} <em v-if="tipo !== 'baja'">opcional</em></span>
+          <label class="hb__campo">
+            <span>{{ tipo === 'baja' ? 'Con qué mail entrás, y lo que quieras agregar' : 'Mensaje' }} <em v-if="tipo !== 'baja'">opcional</em></span>
             <textarea v-model="form.mensaje" rows="4" maxlength="3000"></textarea>
           </label>
-          <input v-model="form.sitio" type="text" name="sitio" class="ld__trampa" tabindex="-1" autocomplete="off" aria-hidden="true" />
-          <p v-if="errorContacto" class="ld__form-error">{{ errorContacto }}</p>
-          <button type="submit" class="ld__btn ld__btn--primary" :disabled="enviando || !form.nombre || !form.email">
+          <!-- Campo trampa: una persona no lo ve; un robot lo completa y el backend lo descarta. -->
+          <input v-model="form.sitio" type="text" name="sitio" class="hb__trampa" tabindex="-1" autocomplete="off" aria-hidden="true" />
+          <p v-if="errorContacto" class="hb__error">{{ errorContacto }}</p>
+          <button type="submit" class="hb__btn" :disabled="enviando || !form.nombre || !form.email">
             {{ enviando ? 'Enviando…' : (tipo === 'baja' ? 'Enviar pedido' : 'Enviar') }}
           </button>
-          <p class="ld__form-legal">
-            Usamos tus datos sólo para responderte. Ver la <RouterLink to="/privacidad">Política de privacidad</RouterLink>.
-          </p>
+          <p class="hb__legal">Usamos tus datos sólo para responderte. <RouterLink to="/privacidad">Política de privacidad</RouterLink>.</p>
         </form>
       </div>
     </section>
 
-    <!-- ── Cierre ───────────────────────────────────────────── -->
-    <section class="ld__sec ld__final">
-      <div class="ld__wrap ld__final-in">
-        <h2 class="ld__h2 ld__h2--center">Cada planta tiene su historia</h2>
-        <p class="ld__sub ld__sub--center">Guardarla no debería costarte una planilla.</p>
-        <div class="ld__cta ld__cta--center">
-          <RouterLink to="/registro" class="ld__btn ld__btn--primary ld__btn--lg">
-            Probar gratis
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-              <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
-            </svg>
-          </RouterLink>
-          <RouterLink to="/login" class="ld__btn ld__btn--ghost ld__btn--lg">Ingresar</RouterLink>
-        </div>
-      </div>
-    </section>
-
-    <footer class="ld__footer">
-      <div class="ld__wrap ld__footer-in">
-        <span>© {{ yr }} Cultivo Espacial</span>
-        <span class="ld__footer-sep" aria-hidden="true">·</span>
-        <RouterLink to="/terminos" class="ld__footer-a">Términos y condiciones</RouterLink>
-        <span class="ld__footer-sep" aria-hidden="true">·</span>
-        <RouterLink to="/privacidad" class="ld__footer-a">Privacidad</RouterLink>
-        <span class="ld__footer-sep" aria-hidden="true">·</span>
-        <!-- Res. SCI 424/2020: el botón de arrepentimiento tiene que estar a la vista en la página. -->
-        <a href="#contacto" class="ld__footer-a ld__footer-a--arrep" @click="tipo = 'baja'">Botón de arrepentimiento</a>
+    <!-- ── Pie ────────────────────────────────────────────── -->
+    <footer class="hb__pie">
+      <div class="hb__wrap hb__pie-in">
+        <span class="hb__pie-marca">Cultivo Espacial</span>
+        <nav class="hb__pie-nav" aria-label="Legales">
+          <RouterLink to="/terminos">Términos y condiciones</RouterLink>
+          <RouterLink to="/privacidad">Privacidad</RouterLink>
+          <!-- Res. SCI 424/2020: el botón de arrepentimiento, a la vista en la página. -->
+          <a href="#contacto" class="hb__pie-arrep" @click="tipo = 'baja'">Botón de arrepentimiento</a>
+          <RouterLink to="/login">Ingresar</RouterLink>
+        </nav>
+        <span class="hb__pie-copy">© {{ yr }}</span>
       </div>
     </footer>
-
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, nextTick } from 'vue'
+// LA PÁGINA PÚBLICA, en la dirección «Herbario» (propuesta de rediseño del 29-sep-2026): papel
+// cálido, tinta verde, títulos en Fraunces, datos en mono. La pieza central es una lámina de
+// herbario (`LaminaPlanta`): el producto es un cuaderno de campo de cada planta.
+//
+// Dos puertas (Germán, 4-oct-2026): uso personal se registra solo (/registro); una organización
+// deja sus datos y la cuenta se arma a mano. Precio de las dos: «consultanos». Los días de prueba
+// los dice el backend.
+import { ref, reactive, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
+import PlantaCreciendo from '../components/public/PlantaCreciendo.vue'
+import { Droplets, Camera, BellRing } from 'lucide-vue-next'
 import { getRegistroInfo, enviarContacto } from '../lib/api.js'
+import { cargarFuentesHerbario } from '../lib/fuentesHerbario.js'
+
+cargarFuentesHerbario()
 
 const route = useRoute()
 const yr = new Date().getFullYear()
-
-// Los días de prueba los dice el backend (`GET /public/registro`); 30 mientras carga.
 const diasPrueba = ref(30)
 
+
 const enCasa = [
-  'Tu espacio, tus lotes y cada planta, desde la semilla',
-  'Riegos y nutrientes con la dosis que le diste',
-  'Fotos por semana, para comparar',
+  'Tus espacios, tus lotes y cada planta, desde la semilla',
+  'Riegos y nutrientes, con la dosis que le diste',
+  'Fotos por semana, para comparar cómo viene',
   'Los próximos pasos del ciclo, con aviso al teléfono',
-  'Autos y fotoperiódicas, maceta o suelo vivo',
-  'Cosecha, frascos y lo que gastaste',
+  'Cosecha, frascos y cuánto te costó cada gramo',
 ]
 const enOrganizacion = [
   'Pacientes, REPROCANN y cuenta corriente',
-  'Dispensario con caja y cierre',
-  'Trazabilidad de cada planta con QR',
-  'Informes que pide la normativa, de la misma data',
+  'Mostrador con caja y cierre, y delivery',
+  'Trazabilidad de cada planta con su QR',
+  'Los informes que pide la normativa, de la misma data',
   'Una pantalla por oficio: cultivo, manicura, mostrador',
-  'Varias sedes, delivery y portal del paciente',
 ]
+const principios = [
+  { t: 'Se anota una vez', d: 'Lo que registrás regando es lo que después sale en el informe, en el costo por lote y en la etiqueta del frasco. Nada se carga dos veces.' },
+  { t: 'Tus datos son tuyos', d: 'No los vendemos ni los usamos para publicidad, y te los llevás cuando quieras. Sin un ecosistema que te pueda dejar afuera.' },
+  { t: 'Va con vos al cultivo', d: 'Pensada para el teléfono, con la mano sucia de tierra: lo de todos los días está a dos toques, y la manicura funciona aun sin señal.' },
+]
+
+const telFeed = [
+  { i: Droplets, t: 'Riego 1,2 L · pH 6,3', s: 'Hoy, 9:40' },
+  { i: Camera,   t: 'Foto · semana 5', s: 'Ayer' },
+  { i: BellRing, t: 'Próximo paso: empieza a florecer', s: 'En 5 días' },
+]
+
+// Portada ancha (planta de fondo) o angosta (apilada). Se decide por el ancho y se re-arma si cambia.
+const consultaAncha = typeof window !== 'undefined' ? window.matchMedia('(min-width: 960px)') : null
+const ancha = ref(!!consultaAncha?.matches)
+const alCambiarAncho = (e) => { ancha.value = e.matches }
+
+// ── Instalar como app (Chrome/Android ofrecen el evento; en iPhone se explica a mano) ──
+const instalable = ref(false)
+let promptInstalar = null
+function alPedirInstalar (e) { e.preventDefault(); promptInstalar = e; instalable.value = true }
+async function instalar () {
+  if (!promptInstalar) return
+  promptInstalar.prompt()
+  try { await promptInstalar.userChoice } catch {}
+  promptInstalar = null
+  instalable.value = false
+}
+
+// ── Aparecer al hacer scroll (sutil; nada si «reducir movimiento») ──
+let revelador = null
 
 // ── Contacto ───────────────────────────────────────────────
 const TIPOS = [
@@ -386,307 +327,243 @@ async function enviar () {
 }
 
 onMounted(async () => {
+  window.addEventListener('beforeinstallprompt', alPedirInstalar)
+  consultaAncha?.addEventListener('change', alCambiarAncho)
+  const quieto = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  const elementos = document.querySelectorAll('.hb .hb-rev')
+  if (quieto || !('IntersectionObserver' in window)) {
+    elementos.forEach(el => el.classList.add('hb-rev--on'))
+  } else {
+    revelador = new IntersectionObserver((entradas) => entradas.forEach(e => {
+      if (e.isIntersecting) { e.target.classList.add('hb-rev--on'); revelador.unobserve(e.target) }
+    }), { threshold: 0.15 })
+    elementos.forEach(el => revelador.observe(el))
+  }
   // Desde los Términos se llega con `#contacto` (y `?tipo=baja`): el router no hace scroll solo.
   if (route.hash) { await nextTick(); document.querySelector(route.hash)?.scrollIntoView() }
   try { diasPrueba.value = (await getRegistroInfo()).data.dias_prueba } catch {}
 })
-
-const cadena = [
-  { t: 'Genética',   d: 'Cepa, origen y perfil. Todo lo que se siembra arranca acá.' },
-  { t: 'Lote',       d: 'Plantas de la misma cepa en el mismo ciclo, con sus fases y su sala.' },
-  { t: 'Planta',     d: 'Etiqueta QR propia, actividades, riegos, fotos y su historia completa.' },
-  { t: 'Cosecha',    d: 'Pesadas, secado y curado, con el peso que entra y el que sale.' },
-  { t: 'Stock',      d: 'Por sede y por depósito, con movimientos y aprobaciones.' },
-  { t: 'Entrega',    d: 'Dispensación o delivery, con comprobante y firma.' },
-]
-
-const publicos = [
-  {
-    t: 'En casa',
-    d: 'Quien cultiva para sí: el ciclo completo en el teléfono, con recordatorios, fotos y la cuenta de lo que rindió cada planta.',
-  },
-  {
-    t: 'Clubes',
-    d: 'Socios y pacientes, cuenta corriente, dispensaciones, reservas, delivery, turnos médicos y los informes que pide la normativa argentina.',
-  },
-  {
-    t: 'Investigación',
-    d: 'Ensayos comparables: fenotipado por genética, condiciones de ambiente registradas, análisis de laboratorio y rendimiento por corrida.',
-  },
-  {
-    t: 'Producción',
-    d: 'Costo por lote, rendimiento real, pérdidas, stock multi-sede y contabilidad — para saber qué produce cada metro cuadrado.',
-  },
-]
-
-const modulos = [
-  'Genéticas', 'Lotes y plantas', 'Salas y sedes', 'Ambiente e IoT', 'Plan de trabajo',
-  'Tareas', 'Post-cosecha', 'Stock multi-sede', 'Dispensaciones', 'Reservas', 'Delivery',
-  'Turnos médicos', 'Análisis de laboratorio', 'Contabilidad', 'Costo por lote', 'Analítica',
-  'Informes de cumplimiento', 'Etiquetas QR', 'Audit log', 'App móvil',
-]
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeinstallprompt', alPedirInstalar)
+  consultaAncha?.removeEventListener('change', alCambiarAncho)
+  revelador?.disconnect()
+})
 </script>
 
 <style scoped>
-*, *::before, *::after { box-sizing: border-box; }
+/* La paleta de la dirección «Herbario», una sola vez: el resto de la página usa estos nombres. */
+.hb {
+  /* Verdes suaves (Germán, 4-oct: «volver al verde, más delicados»): fondo menta muy claro,
+     tinta verde bosque, acentos salvia y menta. El ámbar queda sólo para detalles (pistilos). */
+  --hb-papel: #EEF5EF;
+  --hb-papel-claro: #F8FBF7;
+  --hb-tinta: #15301F;
+  --hb-tinta-2: #4E6858;
+  --hb-regla: #CDE0D2;
+  --hb-verde: #2E6B4A;
+  --hb-verde-osc: #1F5137;
+  --hb-bosque: #173A2A;
+  --hb-salvia: #BCD8C3;
+  --hb-salvia-suave: #DCEDE1;
+  --hb-menta: #9FD1B0;
+  --hb-ambar: #B98532;
+  --hb-tierra: #8A6E55;
+  --hb-error: #9B2C1E;
+  --hb-serif: 'Fraunces', Georgia, serif;
+  --hb-sans: 'Public Sans', system-ui, sans-serif;
+  --hb-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-.ld {
-  position: relative;
+  /* Por encima del patrón de fondo del login (`.route-login body::before`, en theme.css). */
+  position: relative; z-index: 0;
   min-height: 100vh;
-  background: var(--c-leaf-900, #0F2A1E);
-  color: #fff;
-  font-family: var(--font-ui, 'Inter', system-ui, sans-serif);
+  background: var(--hb-papel);
+  color: var(--hb-tinta);
+  font: 16px/1.6 var(--hb-sans);
   overflow-x: hidden;
 }
+.hb *, .hb *::before, .hb *::after { box-sizing: border-box; }
+.hb__wrap { width: 100%; max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+@media (min-width: 720px) { .hb__wrap { padding: 0 32px; } }
 
-/* ── Fondo ─────────────────────────────────────────────── */
-.ld__bg {
-  position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0;
+/* ── Tipografía ── */
+.hb__ceja { margin: 0 0 12px; font: 500 12px var(--hb-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--hb-tinta-2); }
+.hb__h1 {
+  margin: 0; font-family: var(--hb-serif); font-weight: 600; letter-spacing: -.02em;
+  font-size: clamp(2.3rem, 5.6vw, 4.2rem); line-height: 1.04; text-wrap: balance;
+  font-variation-settings: 'opsz' 144;
+}
+.hb__h1 em { font-style: italic; font-weight: 400; color: var(--hb-verde); }
+.hb__h2 { margin: 0; font-family: var(--hb-serif); font-weight: 600; font-size: clamp(1.7rem, 3.6vw, 2.5rem); line-height: 1.1; letter-spacing: -.015em; text-wrap: balance; }
+.hb__h3 { margin: 0; font-family: var(--hb-serif); font-weight: 600; font-size: 1.45rem; line-height: 1.2; }
+
+/* ── Botones ── */
+.hb__btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  min-height: 48px; padding: .8rem 1.35rem; border-radius: 999px;
+  background: var(--hb-verde); color: var(--hb-papel-claro); border: 1.5px solid var(--hb-verde);
+  font: 600 15px var(--hb-sans); text-decoration: none; cursor: pointer;
+  transition: background .2s, transform .2s;
+}
+.hb__btn:hover { background: var(--hb-verde-osc); transform: translateY(-1px); }
+.hb__btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.hb__btn--linea { background: transparent; color: var(--hb-verde); }
+.hb__btn--linea:hover { background: var(--hb-salvia-suave); }
+.hb__btn--chico { min-height: 38px; padding: .45rem 1rem; font-size: 14px; }
+.hb a:focus-visible, .hb button:focus-visible, .hb input:focus-visible, .hb textarea:focus-visible { outline: 2px solid var(--hb-verde); outline-offset: 2px; }
+
+/* ── Encabezado ── */
+.hb__top { position: sticky; top: 0; z-index: 20; background: color-mix(in srgb, var(--hb-papel) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--hb-regla); }
+.hb__top-in { display: flex; align-items: center; gap: 18px; height: 64px; }
+.hb__marca { color: var(--hb-tinta); text-decoration: none; font: 600 19px var(--hb-serif); letter-spacing: -.01em; white-space: nowrap; }
+.hb__nav { display: flex; gap: 22px; margin-left: auto; }
+.hb__nav a { color: var(--hb-tinta-2); text-decoration: none; font-size: 15px; }
+.hb__nav a:hover { color: var(--hb-tinta); }
+.hb__ingresar { display: inline-flex; align-items: center; min-height: 38px; color: var(--hb-tinta); text-decoration: none; font-weight: 600; font-size: 15px; }
+@media (max-width: 760px) {
+  .hb__nav { display: none; }
+  .hb__ingresar { margin-left: auto; }
+  .hb__top-in { gap: 12px; }
+  .hb__marca { font-size: 17px; }
+}
+
+/* ── Portada ── */
+.hb__portada {
+  position: relative; overflow: hidden;
+  padding: clamp(32px, 6vw, 72px) 0 8px;
   background:
-    radial-gradient(ellipse 70% 60% at 50% 0%, rgba(45, 74, 62, .55) 0%, transparent 60%),
-    radial-gradient(ellipse 80% 50% at 80% 30%, rgba(26, 61, 46, .5) 0%, transparent 55%),
-    linear-gradient(180deg, #0F2A1E 0%, #0B1F16 55%, #0F2A1E 100%);
+    radial-gradient(60% 70% at 80% 30%, color-mix(in srgb, var(--hb-menta) 32%, transparent) 0%, transparent 70%),
+    radial-gradient(50% 60% at 0% 100%, color-mix(in srgb, var(--hb-salvia) 38%, transparent) 0%, transparent 70%);
 }
-.ld__nebula { position: absolute; border-radius: 50%; filter: blur(90px); animation: ld-neb linear infinite; }
-.ld__nebula--1 { width: 520px; height: 520px; background: rgba(45,74,62,.35);  top: -120px; right: 4%;  animation-duration: 26s; }
-.ld__nebula--2 { width: 420px; height: 420px; background: rgba(90,138,114,.14); top: 45%;   left: -80px; animation-duration: 32s; animation-delay: -9s; }
-.ld__nebula--3 { width: 360px; height: 360px; background: rgba(26,61,46,.45);   bottom: 5%;  right: 18%; animation-duration: 22s; animation-delay: -5s; }
-@keyframes ld-neb { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-22px) scale(1.05); } }
+/* Ancha: ocupa la pantalla y la planta es el fondo; el texto, encima y a la izquierda. */
+.hb__portada--ancha { min-height: max(660px, calc(100svh - 64px)); display: flex; align-items: center; padding: 0; }
+.hb__portada--ancha .hb__portada-in { position: relative; z-index: 2; pointer-events: none; padding-bottom: 90px; }
+.hb__portada--ancha .hb__portada-txt { pointer-events: auto; max-width: 540px; }
+.hb__portada-txt { min-width: 0; }
+.hb__bajada { margin: 22px 0 0; max-width: 34em; font-size: 1.12rem; color: var(--hb-tinta-2); }
+.hb__acciones { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+.hb__nota { margin: 14px 0 0; font: 13px var(--hb-mono); color: var(--hb-tinta-2); }
+/* Angosta: la planta debajo del texto, sin recuadro. */
+.hb__lamina { max-width: 480px; margin: 18px auto 0; padding: 0 16px 24px; }
 
-.ld__star { position: absolute; border-radius: 50%; background: #fff; opacity: .5; animation: ld-twinkle ease-in-out infinite; }
-@keyframes ld-twinkle { 0%,100% { opacity: .6; transform: scale(1); } 50% { opacity: .1; transform: scale(.6); } }
+/* ── Secciones ── */
+.hb__sec { padding: clamp(56px, 8vw, 104px) 0; }
+.hb__sec--claro { background: var(--hb-papel-claro); border-block: 1px solid var(--hb-regla); }
+.hb__sec-h { margin-bottom: clamp(28px, 4vw, 44px); }
 
-.ld__chala { position: absolute; pointer-events: none; animation: ld-sway ease-in-out infinite; transform-origin: 50% 99%; }
-.ld__chala--a { width: 210px; height: 336px; right: 2%; top: 4%;  animation-duration: 11s; }
-.ld__chala--b { width: 150px; height: 240px; left: 3%;  top: 22%; animation-duration: 15s; animation-delay: -6s; }
-@keyframes ld-sway {
-  0%   { transform: rotate(-4deg); }
-  50%  { transform: rotate(-1deg) translateY(4px); }
-  100% { transform: rotate(-4deg); }
+/* ── Fichas (dos puertas) ── */
+.hb__fichas { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); gap: 24px; }
+.hb__ficha { position: relative; display: flex; flex-direction: column; gap: 14px; padding: 26px 24px 24px; background: var(--hb-papel-claro); border: 1px solid var(--hb-regla); scroll-margin-top: 84px; }
+.hb__ficha--casa { border: 1.5px solid var(--hb-verde); box-shadow: 6px 6px 0 var(--hb-salvia); }
+.hb__ficha-cab { display: flex; justify-content: space-between; gap: 12px; font: 500 12px var(--hb-mono); letter-spacing: .1em; text-transform: uppercase; color: var(--hb-tinta-2); border-bottom: 1px dashed var(--hb-regla); padding-bottom: 10px; }
+.hb__ficha--casa .hb__ficha-tipo { color: var(--hb-verde); }
+.hb__ficha-n { color: var(--hb-tinta); }
+.hb__ficha-d { margin: 0; color: var(--hb-tinta-2); }
+.hb__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; flex: 1; }
+.hb__lista li { position: relative; padding-left: 26px; }
+.hb__lista li::before {
+  content: ''; position: absolute; left: 2px; top: .45em; width: 12px; height: 12px;
+  background: var(--hb-verde);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M1 11C1 5 5 1 11 1c0 6-4 10-10 10z'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M1 11C1 5 5 1 11 1c0 6-4 10-10 10z'/%3E%3C/svg%3E") center / contain no-repeat;
 }
-@media (prefers-reduced-motion: reduce) {
-  .ld__nebula, .ld__star, .ld__chala { animation: none; }
-}
+.hb__ficha-pie { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; border-top: 1px solid var(--hb-regla); padding-top: 16px; }
+.hb__ficha-pie p { margin: 0; font-size: 14px; color: var(--hb-tinta-2); flex: 1 1 200px; }
+.hb__ficha-pie strong { color: var(--hb-tinta); }
 
-/* ── Estructura ────────────────────────────────────────── */
-.ld__wrap { width: 100%; max-width: 1080px; margin: 0 auto; padding: 0 var(--sp-6, 24px); }
-.ld__sec  { position: relative; z-index: 1; padding: clamp(56px, 8vw, 104px) 0; }
-.ld__sec--alt { background: rgba(0, 0, 0, .18); border-block: 1px solid rgba(255,255,255,.05); }
+/* ── Aparecer al hacer scroll ── */
+.hb-rev { opacity: 0; transform: translateY(18px); transition: opacity .7s ease, transform .7s cubic-bezier(.2,.7,.2,1); }
+.hb-rev--on { opacity: 1; transform: none; }
+.hb__ficha { transition: opacity .7s ease, transform .7s cubic-bezier(.2,.7,.2,1), box-shadow .25s; }
+.hb__ficha.hb-rev--on:hover { transform: translateY(-3px); }
 
-/* ── Header ────────────────────────────────────────────── */
-.ld__header {
-  position: sticky; top: 0; z-index: 20;
-  background: rgba(15, 42, 30, .72);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(255,255,255,.06);
-}
-.ld__header-in { display: flex; align-items: center; gap: var(--sp-6, 24px); height: 62px; }
-.ld__brand { display: flex; align-items: center; gap: var(--sp-2, 8px); text-decoration: none; color: #fff; }
-.ld__brand-img { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; }
-.ld__brand-txt { font-family: var(--font-display, 'General Sans', sans-serif); font-weight: 700; font-size: var(--fs-16, 16px); letter-spacing: -.01em; }
-.ld__nav { display: flex; gap: var(--sp-5, 20px); margin-left: auto; }
-.ld__nav-a { color: rgba(255,255,255,.6); text-decoration: none; font-size: var(--fs-14, 14px); font-weight: 500; transition: color var(--t-base, .2s); }
-.ld__nav-a:hover { color: #fff; }
-.ld__login {
-  padding: .5rem 1.05rem; border-radius: var(--r-pill, 9999px);
-  border: 1px solid rgba(168,201,181,.3); color: var(--c-leaf-300, #A8C9B5);
-  font-size: var(--fs-13, 13px); font-weight: 600; text-decoration: none;
-  transition: all var(--t-base, .2s); white-space: nowrap;
-}
-.ld__login:hover { background: rgba(168,201,181,.12); border-color: rgba(168,201,181,.55); color: #fff; }
-@media (max-width: 720px) { .ld__nav { display: none; } .ld__login { margin-left: auto; } }
+/* ── En el bolsillo ── */
+.hb__bolsillo { background: var(--hb-bosque); color: var(--hb-papel-claro); padding: clamp(56px, 8vw, 100px) 0; overflow: hidden; }
+.hb__bolsillo-in { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, .8fr); gap: clamp(32px, 6vw, 80px); align-items: center; }
+.hb__bolsillo-txt > p:not(.hb__ceja):not(.hb__instalar-ayuda) { margin: 16px 0 0; color: color-mix(in srgb, var(--hb-papel-claro) 78%, transparent); max-width: 32em; }
+.hb__ceja--claro { color: var(--hb-menta); }
+.hb__pasos { list-style: none; margin: 22px 0 0; padding: 0; display: grid; gap: 10px; }
+.hb__pasos li { display: flex; align-items: center; gap: 12px; }
+.hb__pasos span { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--hb-menta); color: var(--hb-menta); font: 500 13px var(--hb-mono); flex-shrink: 0; }
+.hb__btn--claro { background: var(--hb-menta); border-color: var(--hb-menta); color: var(--hb-bosque); }
+.hb__btn--claro:hover { background: var(--hb-papel-claro); }
+.hb__btn--linea-claro { background: transparent; border-color: color-mix(in srgb, var(--hb-papel-claro) 50%, transparent); color: var(--hb-papel-claro); }
+.hb__btn--linea-claro:hover { background: rgb(255 255 255 / .08); }
+.hb__instalar-ayuda { margin: 16px 0 0; font-size: 13px; color: color-mix(in srgb, var(--hb-papel-claro) 60%, transparent); }
+.hb__instalar-ayuda b { color: var(--hb-papel-claro); font-weight: 600; }
+@media (max-width: 860px) { .hb__bolsillo-in { grid-template-columns: minmax(0, 1fr); } }
 
-/* ── Hero ──────────────────────────────────────────────── */
-.ld__hero { position: relative; z-index: 1; padding: clamp(56px, 10vw, 120px) 0 clamp(40px, 6vw, 72px); }
-.ld__hero-in { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-5, 20px); }
+.hb__tel {
+  justify-self: center; width: min(300px, 100%); aspect-ratio: 9 / 18.5; padding: 10px;
+  border-radius: 44px; background: #0c1a12; box-shadow: 0 40px 80px -30px rgb(0 0 0 / .6), inset 0 0 0 2px rgb(255 255 255 / .08);
+  transform: rotate(-3deg);
+}
+.hb__tel.hb-rev--on { transform: rotate(-3deg); }
+.hb__tel-pantalla { height: 100%; border-radius: 34px; overflow: hidden; background: var(--hb-papel-claro); color: var(--hb-tinta); display: flex; flex-direction: column; font-family: var(--hb-sans); }
+.hb__tel-hero { background: linear-gradient(160deg, #1F4A33, #2E6B4A); color: #fff; padding: 34px 16px 16px; border-radius: 0 0 22px 22px; display: flex; flex-direction: column; gap: 3px; }
+.hb__tel-fase { font: 600 10px var(--hb-mono); letter-spacing: .08em; opacity: .9; }
+.hb__tel-fase i { font-style: normal; background: rgb(255 255 255 / .18); border-radius: 99px; padding: 1px 6px; margin-left: 4px; }
+.hb__tel-cod { font: 700 24px var(--hb-sans); letter-spacing: -.01em; }
+.hb__tel-gen { font-size: 12px; opacity: .8; }
+.hb__tel-falta { margin-top: 6px; font-size: 11px; background: rgb(255 255 255 / .12); border-radius: 99px; padding: 4px 10px; align-self: flex-start; }
+.hb__tel-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; margin-top: 10px; }
+.hb__tel-stats div { background: rgb(255 255 255 / .1); border-radius: 10px; padding: 6px 2px; text-align: center; display: flex; flex-direction: column; }
+.hb__tel-stats b { font-size: 13px; }
+.hb__tel-stats small { font-size: 9px; opacity: .75; }
+.hb__tel-cta { margin: 12px 12px 0; background: var(--hb-bosque); color: #fff; border-radius: 14px; padding: 10px 12px; font: 600 13px var(--hb-sans); display: flex; flex-direction: column; }
+.hb__tel-cta small { font-weight: 400; font-size: 10.5px; opacity: .75; }
+.hb__tel-feed { padding: 10px 12px; display: grid; gap: 8px; }
+.hb__tel-item { display: flex; gap: 9px; align-items: center; background: #fff; border: 1px solid var(--hb-regla); border-radius: 12px; padding: 8px 10px; font-size: 12px; }
+.hb__tel-item > span { width: 28px; height: 28px; flex-shrink: 0; display: grid; place-items: center; border-radius: 8px; background: var(--hb-salvia-suave); color: var(--hb-verde); }
+.hb__tel-item div { display: flex; flex-direction: column; }
+.hb__tel-item small { color: var(--hb-tinta-2); font-size: 10.5px; }
+.hb__tel-nav { margin-top: auto; display: flex; align-items: center; justify-content: space-around; padding: 10px 8px 14px; border-top: 1px solid var(--hb-regla); font-size: 10.5px; color: var(--hb-tinta-2); }
+.hb__tel-nav--on { color: var(--hb-verde); font-weight: 700; }
+.hb__tel-nav b { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--hb-verde); color: #fff; font-size: 20px; font-weight: 400; margin-top: -18px; box-shadow: 0 6px 14px -6px rgb(46 107 74 / .8); }
 
-.ld__badge {
-  display: inline-flex; align-items: center; gap: .45rem;
-  border: 1px solid rgba(168,201,181,.28); background: rgba(168,201,181,.08);
-  color: var(--c-leaf-300, #A8C9B5);
-  font-size: var(--fs-12, 12px); font-weight: 700;
-  padding: .38em .95em; border-radius: var(--r-pill, 9999px);
-  text-transform: uppercase; letter-spacing: .08em;
-}
-.ld__bdot { width: 6px; height: 6px; border-radius: 50%; background: var(--c-leaf-500, #5A8A72); animation: ld-pulse 2s ease infinite; }
-@keyframes ld-pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.7); } }
-
-.ld__h1 {
-  font-family: var(--font-display, 'General Sans', sans-serif);
-  font-size: clamp(2.4rem, 6.5vw, 4.1rem);
-  font-weight: 800; line-height: 1.04; letter-spacing: -.045em; margin: 0;
-}
-.ld__h1 em {
-  font-style: normal;
-  background: linear-gradient(135deg, var(--c-leaf-300, #A8C9B5) 0%, var(--c-leaf-500, #5A8A72) 85%);
-  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
-}
-.ld__lead { max-width: 46ch; font-size: clamp(.95rem, 1.6vw, 1.1rem); line-height: var(--lh-loose, 1.7); color: rgba(255,255,255,.62); margin: 0; }
-
-.ld__cta { display: flex; flex-wrap: wrap; gap: var(--sp-3, 12px); margin-top: var(--sp-2, 8px); }
-.ld__btn {
-  display: inline-flex; align-items: center; justify-content: center; gap: .45rem;
-  padding: .8rem 1.4rem; border-radius: var(--r-xl, 12px);
-  font-size: var(--fs-14, 14px); font-weight: 700; text-decoration: none;
-  transition: all var(--t-base, .2s); border: 1px solid transparent;
-}
-.ld__btn--primary {
-  background: linear-gradient(135deg, var(--c-leaf-500, #5A8A72) 0%, var(--c-leaf-600, #3F6452) 100%);
-  color: #fff; box-shadow: 0 6px 20px rgba(15,42,30,.5);
-}
-.ld__btn--primary:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(15,42,30,.62); }
-.ld__btn--ghost { color: rgba(255,255,255,.72); border-color: rgba(255,255,255,.14); }
-.ld__btn--ghost:hover { background: rgba(255,255,255,.06); color: #fff; }
-.ld__btn--lg { padding: .95rem 1.8rem; font-size: var(--fs-16, 16px); }
-
-.ld__pilares {
-  display: flex; align-items: stretch; gap: var(--sp-4, 16px);
-  margin-top: var(--sp-8, 32px); width: 100%;
-  background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.07);
-  border-radius: var(--r-xl, 12px); padding: var(--sp-5, 20px) var(--sp-6, 24px);
-}
-.ld__pilar { flex: 1; display: flex; flex-direction: column; gap: .2rem; }
-.ld__pilar-t { font-family: var(--font-display, sans-serif); font-size: var(--fs-16, 16px); font-weight: 700; color: var(--c-leaf-300, #A8C9B5); }
-.ld__pilar-d { font-size: var(--fs-13, 13px); color: rgba(255,255,255,.42); line-height: var(--lh-base, 1.5); }
-.ld__psep { width: 1px; background: rgba(255,255,255,.08); flex-shrink: 0; }
-@media (max-width: 720px) {
-  .ld__pilares { flex-direction: column; gap: var(--sp-4, 16px); }
-  .ld__psep { width: 100%; height: 1px; }
+/* ── Principios ── */
+.hb__principios { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 0; border-top: 1px solid var(--hb-tinta); }
+.hb__principio { padding: 22px 22px 8px 0; display: flex; flex-direction: column; gap: 10px; }
+.hb__principio + .hb__principio { padding-left: 22px; border-left: 1px solid var(--hb-regla); }
+.hb__principio p { margin: 0; color: var(--hb-tinta-2); }
+.hb__principio-n { font: 500 36px var(--hb-serif); color: var(--hb-ambar); line-height: 1; }
+@media (max-width: 860px) {
+  .hb__principio, .hb__principio + .hb__principio { padding: 20px 0; border-left: none; border-bottom: 1px solid var(--hb-regla); }
 }
 
-/* ── Tipografía de sección ─────────────────────────────── */
-.ld__kicker {
-  display: inline-block; font-size: var(--fs-12, 12px); font-weight: 800;
-  text-transform: uppercase; letter-spacing: .12em; color: var(--c-leaf-500, #5A8A72);
-  margin-bottom: var(--sp-3, 12px);
+/* ── Contacto ── */
+.hb__contacto { display: grid; grid-template-columns: minmax(0, .8fr) minmax(0, 1fr); gap: clamp(28px, 5vw, 64px); align-items: start; scroll-margin-top: 84px; }
+.hb__contacto-txt p:not(.hb__ceja) { color: var(--hb-tinta-2); margin: 16px 0 0; }
+.hb__aviso { border-left: 3px solid var(--hb-ambar); padding-left: 12px; }
+@media (max-width: 860px) { .hb__contacto { grid-template-columns: minmax(0, 1fr); } }
+.hb__hoja {
+  display: flex; flex-direction: column; gap: 14px; padding: 24px;
+  background: var(--hb-papel-claro); border: 1px solid var(--hb-regla);
 }
-.ld__h2 {
-  font-family: var(--font-display, 'General Sans', sans-serif);
-  font-size: clamp(1.5rem, 3.4vw, 2.2rem); font-weight: 700;
-  line-height: 1.16; letter-spacing: -.03em; margin: 0 0 var(--sp-4, 16px);
-  max-width: 22ch;
+.hb__hoja p { margin: 0; }
+.hb__codigo { font: 14px var(--hb-mono); }
+.hb__tipos { display: flex; flex-wrap: wrap; gap: 8px; }
+.hb__tipo { min-height: 38px; border: 1px solid var(--hb-regla); background: var(--hb-papel-claro); color: var(--hb-tinta-2); border-radius: 999px; padding: .4rem .95rem; font: 500 14px var(--hb-sans); cursor: pointer; }
+.hb__tipo--on { background: var(--hb-tinta); border-color: var(--hb-tinta); color: var(--hb-papel-claro); }
+.hb__campo { display: flex; flex-direction: column; gap: 5px; font: 500 12px var(--hb-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--hb-tinta-2); }
+.hb__campo em { font-style: normal; text-transform: none; letter-spacing: 0; opacity: .75; }
+.hb__campo input, .hb__campo textarea {
+  font: 16px var(--hb-sans); text-transform: none; letter-spacing: 0; color: var(--hb-tinta);
+  background: var(--hb-papel-claro); border: 1px solid var(--hb-regla); border-radius: 6px; padding: .7rem .8rem; resize: vertical;
 }
-.ld__h2--center { max-width: none; text-align: center; }
-.ld__sub { max-width: 62ch; font-size: var(--fs-16, 16px); line-height: var(--lh-loose, 1.7); color: rgba(255,255,255,.5); margin: 0; }
-.ld__sub--center { text-align: center; margin-inline: auto; }
+.hb__campo input:focus, .hb__campo textarea:focus { border-color: var(--hb-verde); outline: none; box-shadow: 0 0 0 3px var(--hb-salvia-suave); }
+.hb__trampa { position: absolute; left: -10000px; width: 1px; height: 1px; opacity: 0; }
+.hb__hoja .hb__btn { align-self: flex-start; }
+.hb__error { color: var(--hb-error); font-size: 14px; }
+.hb__legal { font-size: 13px; color: var(--hb-tinta-2); }
+.hb__legal a { color: var(--hb-verde); }
 
-/* ── Cadena ────────────────────────────────────────────── */
-.ld__chain {
-  list-style: none; margin: var(--sp-10, 40px) 0 0; padding: 0;
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(168px, 1fr)); gap: var(--sp-3, 12px);
-  counter-reset: none;
-}
-.ld__link {
-  position: relative;
-  display: flex; flex-direction: column; gap: .3rem;
-  background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06);
-  border-radius: var(--r-lg, 8px); padding: var(--sp-4, 16px);
-  transition: all var(--t-base, .2s);
-}
-.ld__link:hover { background: rgba(90,138,114,.1); border-color: rgba(90,138,114,.28); }
-.ld__link-n { font-family: var(--font-mono, monospace); font-size: var(--fs-12, 12px); color: var(--c-leaf-500, #5A8A72); font-weight: 600; }
-.ld__link-t { font-family: var(--font-display, sans-serif); font-size: var(--fs-16, 16px); font-weight: 700; color: #fff; }
-.ld__link-d { font-size: var(--fs-13, 13px); line-height: var(--lh-base, 1.5); color: rgba(255,255,255,.42); }
-
-/* ── Features ──────────────────────────────────────────── */
-.ld__feats { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--sp-5, 20px); }
-.ld__feat {
-  background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.07);
-  border-radius: var(--r-xl, 12px); padding: var(--sp-6, 24px);
-  transition: all var(--t-base, .2s);
-}
-.ld__feat:hover { border-color: rgba(90,138,114,.3); background: rgba(90,138,114,.07); }
-.ld__feat-ico {
-  width: 40px; height: 40px; border-radius: var(--r-lg, 8px);
-  background: rgba(90,138,114,.16); color: var(--c-leaf-300, #A8C9B5);
-  display: flex; align-items: center; justify-content: center; margin-bottom: var(--sp-4, 16px);
-}
-.ld__feat-t { font-family: var(--font-display, sans-serif); font-size: var(--fs-18, 18px); font-weight: 700; margin: 0 0 var(--sp-2, 8px); letter-spacing: -.02em; }
-.ld__feat-d { font-size: var(--fs-14, 14px); line-height: var(--lh-loose, 1.7); color: rgba(255,255,255,.48); margin: 0; }
-
-/* ── Para quién ────────────────────────────────────────── */
-.ld__whos { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--sp-5, 20px); margin-top: var(--sp-10, 40px); }
-.ld__who { border-top: 2px solid rgba(90,138,114,.45); padding-top: var(--sp-4, 16px); }
-.ld__who-t { font-family: var(--font-display, sans-serif); font-size: var(--fs-20, 20px); font-weight: 700; margin: 0 0 var(--sp-2, 8px); letter-spacing: -.02em; }
-.ld__who-d { font-size: var(--fs-14, 14px); line-height: var(--lh-loose, 1.7); color: rgba(255,255,255,.48); margin: 0; }
-
-/* ── Módulos ───────────────────────────────────────────── */
-.ld__mods { display: flex; flex-wrap: wrap; gap: var(--sp-2, 8px); margin-top: var(--sp-6, 24px); }
-.ld__mod {
-  font-size: var(--fs-13, 13px); font-weight: 500; color: rgba(255,255,255,.62);
-  background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.07);
-  border-radius: var(--r-pill, 9999px); padding: .45em 1em;
-  transition: all var(--t-base, .2s);
-}
-.ld__mod:hover { color: #fff; border-color: rgba(168,201,181,.35); background: rgba(168,201,181,.1); }
-
-/* ── Cierre ────────────────────────────────────────────── */
-.ld__final-in { display: flex; flex-direction: column; align-items: center; gap: var(--sp-5, 20px); text-align: center; }
-
-/* ── Header: probar ─────────────────────────────────────── */
-.ld__probar {
-  padding: .5rem 1.05rem; border-radius: var(--r-pill, 9999px);
-  background: var(--c-leaf-500, #5A8A72); color: #fff;
-  font-size: var(--fs-13, 13px); font-weight: 700; text-decoration: none; white-space: nowrap;
-}
-.ld__probar:hover { background: var(--c-leaf-600, #3F6452); }
-@media (max-width: 720px) { .ld__login { margin-left: auto; } .ld__header-in { gap: var(--sp-3, 12px); } }
-@media (max-width: 380px) { .ld__login { display: none; } .ld__probar { margin-left: auto; } }
-.ld__cta-nota { margin: 0; font-size: var(--fs-13, 13px); color: rgba(255,255,255,.5); }
-.ld__cta--center { justify-content: center; }
-
-/* ── Dos puertas ───────────────────────────────────────── */
-.ld__puertas { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: var(--sp-5, 20px); margin-top: var(--sp-8, 32px); }
-.ld__puerta {
-  display: flex; flex-direction: column; gap: var(--sp-3, 12px);
-  background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.08);
-  border-radius: var(--r-xl, 12px); padding: var(--sp-6, 24px);
-}
-.ld__puerta--casa { border-color: rgba(168,201,181,.35); background: rgba(90,138,114,.10); }
-.ld__puerta-tag { align-self: flex-start; font-size: var(--fs-12, 12px); font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--c-leaf-300, #A8C9B5); }
-.ld__puerta-t { font-family: var(--font-display, sans-serif); font-size: var(--fs-20, 20px); font-weight: 700; margin: 0; letter-spacing: -.02em; }
-.ld__puerta-d { margin: 0; font-size: var(--fs-14, 14px); color: rgba(255,255,255,.55); line-height: 1.6; }
-.ld__puerta-l { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: .35rem; font-size: var(--fs-14, 14px); color: rgba(255,255,255,.78); line-height: 1.5; flex: 1; }
-.ld__puerta-precio { font-size: var(--fs-13, 13px); color: rgba(255,255,255,.6); border-top: 1px solid rgba(255,255,255,.08); padding-top: var(--sp-3, 12px); }
-.ld__puerta-precio strong { color: #fff; }
-.ld__puerta .ld__btn { align-self: flex-start; }
-
-/* ── Contacto ──────────────────────────────────────────── */
-.ld__contacto { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--sp-8, 32px); align-items: start; }
-.ld__contacto-baja { margin-top: var(--sp-4, 16px); color: rgba(255,255,255,.75); }
-.ld__form {
-  display: flex; flex-direction: column; gap: var(--sp-3, 12px);
-  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
-  border-radius: var(--r-xl, 12px); padding: var(--sp-5, 20px);
-}
-.ld__form--ok p { margin: 0; color: rgba(255,255,255,.75); font-size: var(--fs-14, 14px); line-height: 1.6; }
-.ld__codigo { font-family: var(--font-mono, monospace); color: var(--c-leaf-300, #A8C9B5); }
-.ld__tipos { display: flex; flex-wrap: wrap; gap: var(--sp-2, 8px); }
-.ld__tipo {
-  border: 1px solid rgba(255,255,255,.16); background: transparent; color: rgba(255,255,255,.7);
-  border-radius: var(--r-pill, 9999px); padding: .45rem .9rem; font-size: var(--fs-13, 13px); font-weight: 600; cursor: pointer;
-}
-.ld__tipo--on { background: var(--c-leaf-500, #5A8A72); border-color: var(--c-leaf-500, #5A8A72); color: #fff; }
-.ld__campo { display: flex; flex-direction: column; gap: .3rem; font-size: var(--fs-12, 12px); font-weight: 700; color: rgba(255,255,255,.6); text-transform: uppercase; letter-spacing: .06em; }
-.ld__campo em { font-style: normal; font-weight: 500; text-transform: none; letter-spacing: 0; color: rgba(255,255,255,.4); }
-.ld__campo input, .ld__campo textarea {
-  font: inherit; font-size: var(--fs-16, 16px); font-weight: 400; text-transform: none; letter-spacing: 0;
-  color: #fff; background: rgba(0,0,0,.25); border: 1px solid rgba(255,255,255,.14);
-  border-radius: var(--r-lg, 8px); padding: .65rem .8rem; outline: none; resize: vertical;
-}
-.ld__campo input:focus, .ld__campo textarea:focus { border-color: var(--c-leaf-300, #A8C9B5); }
-.ld__trampa { position: absolute; left: -10000px; width: 1px; height: 1px; opacity: 0; }
-.ld__form .ld__btn { border: none; cursor: pointer; }
-.ld__form .ld__btn:disabled { opacity: .5; cursor: not-allowed; }
-.ld__form-error { margin: 0; color: #fecaca; font-size: var(--fs-13, 13px); }
-.ld__form-legal { margin: 0; font-size: var(--fs-12, 12px); color: rgba(255,255,255,.4); }
-.ld__form-legal a { color: var(--c-leaf-300, #A8C9B5); }
-
-/* ── Footer ────────────────────────────────────────────── */
-.ld__footer-a { color: rgba(255,255,255,.45); text-decoration: none; }
-.ld__footer-a:hover { color: #fff; }
-.ld__footer-a--arrep { color: var(--c-leaf-300, #A8C9B5); font-weight: 600; }
-.ld__footer { position: relative; z-index: 1; border-top: 1px solid rgba(255,255,255,.06); padding: var(--sp-6, 24px) 0; }
-.ld__footer-in { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-2, 8px); font-size: var(--fs-13, 13px); color: rgba(255,255,255,.3); }
-.ld__footer-sep { color: rgba(255,255,255,.18); }
+/* ── Pie ── */
+.hb__pie { border-top: 1px solid var(--hb-tinta); padding: 28px 0 36px; }
+.hb__pie-in { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; font-size: 14px; color: var(--hb-tinta-2); }
+.hb__pie-marca { font: 600 17px var(--hb-serif); color: var(--hb-tinta); }
+.hb__pie-nav { display: flex; flex-wrap: wrap; gap: 8px 20px; }
+.hb__pie-nav a { color: var(--hb-tinta-2); text-decoration: none; }
+.hb__pie-nav a:hover { color: var(--hb-tinta); text-decoration: underline; }
+.hb__pie-arrep { color: var(--hb-verde) !important; font-weight: 600; }
+.hb__pie-copy { margin-left: auto; font: 13px var(--hb-mono); }
 </style>

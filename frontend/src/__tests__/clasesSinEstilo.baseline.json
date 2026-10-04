@@ -117,9 +117,6 @@
     "hd__search-ico",
     "hd__td-producto"
   ],
-  "views/LandingView.vue": [
-    "ld__final"
-  ],
   "views/LoteDetailView.vue": [
     "ld__hero-left",
     "ld__main"
