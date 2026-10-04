@@ -13,7 +13,7 @@
              :style="{ opacity: opacidades[i] * (1 - final) }" :fetchpriority="i < 2 ? 'high' : 'low'" decoding="async" />
         <!-- El final: la planta se va y queda lo cosechado, solo y grande, en su lugar. -->
         <figure class="pc__cosecha" :style="{ opacity: final, transform: `scale(${0.9 + 0.1 * final})` }" :aria-hidden="final < 0.5">
-          <img :src="COSECHA" alt="Lo cosechado: un cogollo seco y curado" draggable="false" />
+          <img :src="COSECHA" alt="Lo cosechado: la vara, con su cola, recién cortada" draggable="false" />
         </figure>
 
         <!-- El contador, al lado de la maceta, y (en la portada) lo que anotó la app ese día, pegado. -->
@@ -68,8 +68,8 @@ defineProps({ portada: { type: Boolean, default: false } })
 const MAX = 90
 
 // Lo que queda al final, en lugar de la planta (Germán: terminar mostrando lo cosechado, no la
-// maceta). Cuando llegue la foto de la vara cosechada, se cambia sólo este archivo.
-const COSECHA = '/planta/cogollo.webp'
+// maceta): la vara cosechada, de pie sobre su tallo.
+const COSECHA = '/planta/vara.webp'
 
 // Qué foto corresponde a qué día del ciclo.
 const ETAPAS = [
@@ -135,7 +135,7 @@ const final = computed(() => suave((dia.value - 82) / 4))
 // hay controles (Germán: empieza y termina, sola). Lento a propósito: cada evento («Defoliación», «Tricomas lechosos») tiene que alcanzar a leerse.
 const raiz = ref(null)
 const detenido = ref(false)   // sólo con «reducir movimiento»: queda quieta
-const DURACION_MS = 28000
+const DURACION_MS = 22000
 const ESPERA_FINAL_MS = 3200
 let raf = null
 let ultimo = 0
@@ -202,7 +202,7 @@ onBeforeUnmount(() => { frenar(); observador?.disconnect() })
 
 /* El final: lo cosechado ocupa el lugar de la planta, apoyado en el piso y a la derecha del
    contador (que está pegado a la izquierda de donde estaba la maceta). */
-.pc__cosecha { position: absolute; left: 31%; right: 0; bottom: 3%; top: 18%; margin: 0; display: flex; align-items: flex-end; justify-content: center; pointer-events: none; transform-origin: 50% 100%; }
+.pc__cosecha { position: absolute; left: 31%; right: 0; bottom: 2.7%; top: 2%; margin: 0; display: flex; align-items: flex-end; justify-content: center; pointer-events: none; transform-origin: 50% 100%; }
 .pc__cosecha img { width: 100%; height: 100%; object-fit: contain; object-position: bottom center; filter: drop-shadow(0 24px 30px rgb(21 48 31 / .28)); }
 
 /* La tarjeta «En la app»: el mismo verde oscuro que la ficha del lote en el teléfono. */
@@ -225,7 +225,7 @@ onBeforeUnmount(() => { frenar(); observador?.disconnect() })
 .pc--portada { position: absolute; inset: 0; display: block; }
 .pc--portada .pc__columna {
   /* Un poco más a la derecha que el borde del contenido, para que no se acerque al texto. */
-  position: absolute; right: max(8px, calc(var(--hb-borde, 32px) - 4vw)); top: 20px; bottom: 60px;
+  position: absolute; right: max(8px, calc(var(--hb-borde, 32px) - 6.5vw)); top: 20px; bottom: 60px;
   aspect-ratio: 900 / 1100;
 }
 .pc--portada .pc__planta { flex: 1; min-height: 0; aspect-ratio: auto; }
