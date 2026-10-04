@@ -115,6 +115,8 @@ api.interceptors.response.use(
         const auth = useAuthStore();
         auth.clubSuspendido = true;
         auth.clubSuspendidoMotivo = error.response.data.motivo || null;
+        auth.clubSuspendidoPersonal = !!error.response.data.personal;
+        auth.clubSuspendidoEmail = error.response.data.email || null;
       } catch {}
       return Promise.reject(error);
     }
@@ -832,6 +834,16 @@ export const getSuperAdminCatalogo = ()           => api.get('/super_admin/catal
 export const getSuperAdminPulso    = ()           => api.get('/super_admin/pulso')
 // El panel de Estado: servidores, backups, cola y tamaño de cada organización (Infra::Estado).
 export const getSuperAdminEstado = () => api.get('/super_admin/estado')
+// La bandeja de lo que llegó por el formulario de /bienvenida.
+export const listConsultas     = ()                  => api.get('/super_admin/consultas')
+export const marcarConsulta    = (id, atendida)      => api.patch(`/super_admin/consultas/${id}`, { atendida })
+
+// /bienvenida: autoregistro de uso personal y contacto. Sin sesión.
+export const getRegistroInfo        = ()        => api.get('/public/registro')
+export const registrarPersonal      = (payload) => api.post('/public/registro', payload)
+export const confirmarMailRegistro  = (token)   => api.post('/public/registro/confirmar', { token })
+export const reenviarConfirmacion   = (email)   => api.post('/public/registro/reenviar', { email })
+export const enviarContacto         = (payload) => api.post('/public/contacto', payload)
 // Qué le hicimos NOSOTROS a este club: plan, módulos, suspensión, baja.
 export const getHistorialClub      = (id)         => api.get(`/super_admin/clubs/${id}/historial`)
 // Los agregados de la plataforma (plantas, lotes, pacientes) viven acá, no en el panel.

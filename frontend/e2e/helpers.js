@@ -37,6 +37,7 @@ export const USUARIOS = {
   admin:       'admin@e2e.test',
   dispensador: 'dispensador@e2e.test',
   delivery:    'delivery@e2e.test',
+  cultivador:  'cultivador@e2e.test',
 }
 
 export async function entrar (page, quien) {

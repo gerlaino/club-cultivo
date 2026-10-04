@@ -82,6 +82,9 @@ export const useAuthStore = defineStore("auth", {
     clubSuspendido: false,
     // Por qué (`no_pago` · `lo_pidio` · `prueba_terminada` · `otro`): el cartel lo dice.
     clubSuspendidoMotivo: null,
+    // Uso personal: el cartel dice «tu cuenta» y no «la organización».
+    clubSuspendidoPersonal: false,
+    clubSuspendidoEmail: null,   // sólo si se pausó por no confirmar el mail
   }),
   getters: {
     isAuthenticated: (s) => !!s.user,

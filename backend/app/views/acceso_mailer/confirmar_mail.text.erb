@@ -1,0 +1,9 @@
+Hola <%= @user.first_name.presence || '' %>,
+
+Gracias por probar Cultivo Espacial. Tu cuenta ya está andando; sólo falta confirmar que este mail es tuyo:
+
+<%= @link %>
+
+Si no lo confirmás en <%= @dias %> días, la cuenta se pausa hasta que lo hagas. No se borra nada.
+
+Si no creaste una cuenta en Cultivo Espacial, ignorá este mail.

@@ -22,6 +22,12 @@ Sidekiq.configure_server do |config|
         'class' => 'AplicarBajasModulosJob',
         'description' => 'Apaga los módulos cuya baja programada ya venció y ordena lo que dejan colgando'
       },
+      'corte_autoregistro' => {
+        # Antes de que la persona arranque el día: si se pausa, que sea al abrir la app.
+        'cron'  => '15 5 * * *',
+        'class' => 'CorteAutoregistroJob',
+        'description' => 'Pausa los usos personales autoregistrados sin mail confirmado (7 días) o con la prueba terminada'
+      },
       'plan_vencimiento' => {
         'cron'  => '30 8 * * *',
         'class' => 'PlanVencimientoJob',

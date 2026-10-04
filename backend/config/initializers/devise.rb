@@ -24,7 +24,10 @@ Devise.setup do |config|
   # Configure the e-mail address which will be shown in Devise::Mailer,
   # note that it will be overwritten if you use your own mailer class
   # with default "from" parameter.
-  config.mailer_sender = 'please-change-me-at-config-initializers-devise@example.com'
+  # Si algún mail sale por Devise, que salga con el remitente de la plataforma (`MAIL_FROM`) y no con
+  # el de ejemplo del generador (`…@example.com`), que los servidores de correo rechazan. Hoy
+  # «olvidé mi contraseña» NO pasa por acá: lo manda `AccesoMailer` (2-oct-2026).
+  config.mailer_sender = ->(*) { Club::PLATFORM_FROM }
 
   # Configure the class responsible to send e-mails.
   # config.mailer = 'Devise::Mailer'
@@ -335,6 +338,7 @@ Devise.setup do |config|
     jwt.revocation_requests = [
       ['DELETE', %r{^/users/sign_out$}]
     ]
-    jwt.expiration_time = 12.hours.to_i
+    # Por inactividad, no fija: ver `App::SESION_DURACION`.
+    jwt.expiration_time = App::SESION_DURACION.to_i
   end
 end

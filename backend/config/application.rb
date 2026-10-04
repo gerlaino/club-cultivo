@@ -60,6 +60,16 @@ module App
     host.empty? ? 'http://localhost:3001' : "https://#{host}"
   end
 
+  # ── Cuánto dura una sesión ──────────────────────────────────────────────────
+  #
+  # Hasta el 4-oct-2026 eran 12 horas FIJAS desde el login: si entrabas a las 9, a las 21 te sacaba
+  # aunque hubieras usado la app toda la tarde. Ahora es por INACTIVIDAD: cada pedido con más de
+  # `SESION_RENOVAR_CADA` de antigüedad recibe un token nuevo (`ApplicationController#renovar_sesion`),
+  # así que sólo te saca si pasás `SESION_DURACION` sin entrar (Germán eligió 7 días).
+  # Lo leen el token (devise.rb), la cookie (`JwtCookieMiddleware`) y la limpieza de tokens cerrados.
+  SESION_DURACION     = 7.days
+  SESION_RENOVAR_CADA = 1.hour
+
   class Application < Rails::Application
     config.middleware.use ActionDispatch::Cookies
     config.middleware.use ActionDispatch::Session::CookieStore, key: "_club_session"

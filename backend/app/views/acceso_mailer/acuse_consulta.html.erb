@@ -1,0 +1,10 @@
+<p style="font-size:16px; color:#0f172a; margin:0 0 12px;">Hola <%= @s.nombre %>,</p>
+<p style="font-size:14px; color:#334155; line-height:1.6; margin:0 0 12px;">
+  <% if @s.tipo == 'baja' %>
+    Recibimos tu pedido de arrepentimiento / baja. Lo vamos a procesar sin costo y te avisamos cuando esté hecho.
+  <% else %>
+    Recibimos tu consulta. Te vamos a responder a este mail lo antes posible.
+  <% end %>
+</p>
+<p style="font-size:14px; color:#334155; margin:0 0 12px;">Código de trámite: <strong><%= @s.codigo %></strong></p>
+<p style="font-size:12px; color:#94a3b8; margin:16px 0 0;">Cultivo Espacial</p>

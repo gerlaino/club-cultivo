@@ -82,6 +82,16 @@ class MeController < ApplicationController
     # no ofrece el botón.
     data['push_vapid_public_key'] = ENV['VAPID_PUBLIC_KEY'].presence
 
+    # Uso personal que se registró solo: la app le pide confirmar el mail (con la fecha en que se
+    # pausaría) y le dice hasta cuándo es la prueba. Nil para todos los demás.
+    reg = u.club&.registro_personal if u.admin?
+    data['autoregistro'] = reg && {
+      'email'          => reg.email,
+      'mail_confirmado' => reg.confirmado?,
+      'pausa_el'       => reg.pausa_el,
+      'prueba_hasta'   => (u.club.plan_activo_hasta if u.club.plan_trial?),
+    }
+
     render json: data
   end
 end

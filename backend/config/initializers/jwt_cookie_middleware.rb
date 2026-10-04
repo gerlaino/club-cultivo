@@ -23,7 +23,7 @@ class JwtCookieMiddleware
       cookie_opts = {
         value:     jwt,
         path:      '/',
-        expires:   Time.now + 12 * 3600,
+        expires:   Time.now + App::SESION_DURACION,   # lo mismo que el token (se renueva con él)
         httponly:  true,
         secure:    ENV.fetch('RAILS_ENV', 'development') == 'production',
         # Lax: la SPA se sirve del mismo origen que la API (Rails sirve el index.html),

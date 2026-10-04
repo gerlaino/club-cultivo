@@ -169,9 +169,14 @@ Render, o usuario sin mail real).
 de escritorio del cultivador · plan de trabajo en el teléfono · regular/feminizada (el otro eje
 de la genética: sexar en semana 4–6, descartes por macho).
 
-**Pospuesto por Germán, con plan escrito:** auto-registro personal + trial
-(`docs/PLAN_AUTOREGISTRO.md`; antes necesita `APP_HOST`) · app en las tiendas (cuando haya
-clientes fijos) · miniaturas con libvips (ya no urge).
+**Bloque (dy), 4-oct-2026:** /bienvenida con dos puertas, **autoregistro personal** (entra al
+toque, confirma el mail en 7 días o se pausa; prueba de 30 días), contacto con bandeja en super
+admin y botón de arrepentimiento, Términos y Privacidad (`views/legal/`, datos del titular «a
+completar» en `titular.js`), **sesión por inactividad de 7 días** (`App::SESION_DURACION`). El
+autoregistro depende de que el correo de producción ande (Gmail + `APP_HOST`).
+
+**Pospuesto por Germán:** app en las tiendas (cuando haya clientes fijos) · miniaturas con
+libvips (ya no urge).
 **De Germán (no código):** rotar el secreto de Render · `APP_HOST` + SMTP en Render ·
 `rake seguridad:usuarios_con_password_default` · `rake stocks:balance_descuadrado` ·
 `rake auditorias:limpiar_blobs` · confirmar el push por worker al iPhone · el candado de Chrome.

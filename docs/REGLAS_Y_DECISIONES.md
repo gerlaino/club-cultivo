@@ -483,9 +483,20 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   de `CostoLote`, nutrición de los registros) y compara sólo contra ciclos cerrados de la misma
   genética; sin anteriores, no compara. Aparece desde `curado`. El inicio no repite días de
   ciclo (`dias_ciclo` sigue corriendo en curado y contradecía el total).
-- **AUTO-REGISTRO: SÓLO PERSONAL, PELADO, Y POSPUESTO** (20-sep-2026): plan en
-  `docs/PLAN_AUTOREGISTRO.md`. Organizaciones no se registran solas. **App en las tiendas: no
-  hasta tener un flujo fijo de clientes** (Germán).
+- **AUTO-REGISTRO: SÓLO PERSONAL, Y ENTRA AL TOQUE** (4-oct-2026, Germán, plan A; reemplaza al
+  «pospuesto» del 20-sep): la persona se registra sola en `/registro` y entra en el momento; el
+  mail se confirma DESPUÉS (7 días desde que el mail SALIÓ, si no se pausa; si nunca salió, no se
+  pausa). Prueba de 30 días; al terminar se pausa con `prueba_terminada` y la activa el super admin
+  a mano. Las pausas son la suspensión de siempre y **sólo tocan a los autoregistrados**
+  (`RegistroPersonal`). Organizaciones NO se registran solas: dejan una consulta
+  (`SolicitudContacto`), que se guarda siempre aunque el correo falle. Precio en la página:
+  «consultanos» (personal y organización). Queda constancia de qué versión de los términos aceptó
+  cada uno (`Legal::TERMINOS_VERSION`): si el texto cambia, se sube la versión. El botón de
+  arrepentimiento está siempre en el pie y da código de trámite. **App en las tiendas: no hasta
+  tener un flujo fijo de clientes** (Germán).
+- **LA SESIÓN VENCE POR INACTIVIDAD, A LOS 7 DÍAS** (4-oct-2026, Germán): nunca más un vencimiento
+  fijo desde el login. `App::SESION_DURACION` la leen el token, la cookie y la limpieza de tokens
+  cerrados; no se escribe la duración en otro lado.
 - **PLAN DE TRABAJO EN PERSONAL: LO QUE HAY** (20-sep-2026): Tareas → Plan de trabajo, plantilla
   con tareas por día relativo/recurrencia, se aplica sobre lote, espacio o todo el cultivo
   (`AplicacionPlan` genera `Tarea`s). Decisión de Germán: **por ahora cada uno arma su plan y lo

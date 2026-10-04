@@ -53,6 +53,13 @@ Rails.application.routes.draw do
     post 'd/:token/ver',    to: 'public/dispensas#ver'
     post 'd/:token/resena', to: 'public/dispensas#resena' # reseña del paciente (gate por DNI)
 
+    # /bienvenida: autoregistro de uso personal y el formulario de contacto (ver los controllers).
+    get  'public/registro',           to: 'public/registro#show'
+    post 'public/registro',           to: 'public/registro#create'
+    post 'public/registro/confirmar', to: 'public/registro#confirmar'
+    post 'public/registro/reenviar',  to: 'public/registro#reenviar'
+    post 'public/contacto',           to: 'public/contacto#create'
+
     devise_for :users,
                path: '',
                path_names: { sign_in: 'users/sign_in', sign_out: 'users/sign_out' },
@@ -707,6 +714,8 @@ Rails.application.routes.draw do
     end
 
     namespace :super_admin do
+      # Lo que llegó por el formulario de /bienvenida.
+      resources :consultas, only: [:index, :update]
       resources :clubs, only: [:index, :show, :create, :update, :destroy] do
         # Un Club Modelo con datos inventados, para mostrarle la app a un prospecto. Era un
         # rake (`club:demo`); desde el panel se genera en segundo plano.

@@ -1,0 +1,8 @@
+<%= @s.tipo_label %> — <%= @s.nombre %>
+Mail: <%= @s.email %>
+<% if @s.telefono.present? %>Teléfono: <%= @s.telefono %>
+<% end %><% if @s.organizacion.present? %>Organización: <%= @s.organizacion %>
+<% end %>
+<%= @s.mensaje %>
+
+Panel: <%= @link %>

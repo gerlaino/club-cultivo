@@ -33,4 +33,29 @@ class AccesoMailer < ApplicationMailer
     asunto = dias.zero? ? "El plan de #{club.name} vence hoy" : "El plan de #{club.name} vence en #{dias} días"
     mail(to: user.email_real, subject: "#{asunto} — Cultivo Espacial")
   end
+
+  # Autoregistro de uso personal: el link para confirmar el mail. La cuenta YA anda; esto sólo
+  # evita que se pause a los `RegistroPersonal::GRACIA` días.
+  def confirmar_mail(registro:, token:)
+    @user  = registro.user
+    @link  = "#{App.base_url}/registro/confirmar?token=#{token}"
+    @dias  = (RegistroPersonal::GRACIA / 1.day).to_i
+    mail(to: registro.email, subject: 'Confirmá tu mail — Cultivo Espacial')
+  end
+
+  # Alguien dejó una consulta en /bienvenida. Va a cada super admin por separado (nunca `To:`
+  # múltiple), y es un aviso: la consulta ya está guardada en el panel.
+  def nueva_consulta(solicitud:, para:)
+    @s = solicitud
+    @link = "#{App.base_url}/super-admin/consultas"
+    mail(to: para, reply_to: solicitud.email,
+         subject: "Consulta nueva (#{solicitud.tipo_label}): #{solicitud.nombre} — Cultivo Espacial")
+  end
+
+  # El acuse para quien escribió, con su código de trámite. Para el arrepentimiento es lo que pide
+  # la Res. SCI 424/2020; para el resto, que sepa que llegó.
+  def acuse_consulta(solicitud:)
+    @s = solicitud
+    mail(to: solicitud.email, subject: "Recibimos tu #{solicitud.tipo == 'baja' ? 'pedido' : 'consulta'} (#{solicitud.codigo}) — Cultivo Espacial")
+  end
 end

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_10_01_200000) do
+ActiveRecord::Schema[7.2].define(version: 2026_10_04_200000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -2085,6 +2085,24 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_01_200000) do
     t.index ["user_id"], name: "index_registros_ambientales_on_user_id"
   end
 
+  create_table "registros_personales", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "user_id", null: false
+    t.string "email", null: false
+    t.string "token_digest", null: false
+    t.datetime "mail_enviado_at"
+    t.datetime "confirmado_at"
+    t.string "terminos_version", null: false
+    t.datetime "terminos_aceptados_at", null: false
+    t.string "ip"
+    t.string "user_agent"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_registros_personales_on_club_id"
+    t.index ["token_digest"], name: "index_registros_personales_on_token_digest", unique: true
+    t.index ["user_id"], name: "index_registros_personales_on_user_id"
+  end
+
   create_table "reglas_ambientales", force: :cascade do |t|
     t.bigint "club_id", null: false
     t.bigint "sala_id"
@@ -2346,6 +2364,22 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_01_200000) do
     t.index ["deleted_at"], name: "index_setpoints_fase_on_deleted_at"
     t.index ["deleted_by_id"], name: "index_setpoints_fase_on_deleted_by_id"
     t.index ["genetica_id"], name: "index_setpoints_fase_on_genetica_id"
+  end
+
+  create_table "solicitudes_contacto", force: :cascade do |t|
+    t.string "tipo", null: false
+    t.string "nombre", null: false
+    t.string "email", null: false
+    t.string "telefono"
+    t.string "organizacion"
+    t.text "mensaje"
+    t.string "ip"
+    t.datetime "atendida_at"
+    t.bigint "atendida_por_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["atendida_at"], name: "index_solicitudes_contacto_on_atendida_at"
+    t.index ["atendida_por_id"], name: "index_solicitudes_contacto_on_atendida_por_id"
   end
 
   create_table "stock_movimientos", force: :cascade do |t|
@@ -2965,6 +2999,8 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_01_200000) do
   add_foreign_key "registros_ambientales", "lotes"
   add_foreign_key "registros_ambientales", "recetas"
   add_foreign_key "registros_ambientales", "users"
+  add_foreign_key "registros_personales", "clubs"
+  add_foreign_key "registros_personales", "users"
   add_foreign_key "reglas_ambientales", "salas"
   add_foreign_key "reglas_ambientales", "users", column: "deleted_by_id"
   add_foreign_key "rendiciones_caja", "caja_turnos"
@@ -3006,6 +3042,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_01_200000) do
   add_foreign_key "sedes", "users", column: "deleted_by_id"
   add_foreign_key "setpoints_fase", "geneticas"
   add_foreign_key "setpoints_fase", "users", column: "deleted_by_id"
+  add_foreign_key "solicitudes_contacto", "users", column: "atendida_por_id"
   add_foreign_key "stock_movimientos", "sedes", column: "sede_destino_id"
   add_foreign_key "stock_movimientos", "sedes", column: "sede_origen_id"
   add_foreign_key "stock_movimientos", "stocks"

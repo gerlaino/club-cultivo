@@ -255,7 +255,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { textoProximoPaso, estadoLoteLabel } from '../../lib/loteHelpers.js'
 import { getSala, listLotesDeSala, createSalaNota, createLote, createLoteHeredado, listGeneticas,
@@ -547,13 +547,18 @@ onMounted(async () => {
     if (geneticasRes.status === 'fulfilled') geneticas.value = geneticasRes.value.data || []
   } catch {} finally { loading.value = false }
   cargarFotos()
-  // Llegó desde el «+» con una acción: abre el registro en ese formulario y limpia la URL.
-  const accion = route.query.accion
-  if (accion && sala.value) {
-    router.replace({ path: route.path })
-    abrirRegistro(String(accion))
-  }
+  atenderAccion()
 })
+
+// Llegó desde el «+» con una acción: abre el registro en ese formulario y limpia la URL.
+// También si ya estaba en esta ficha (el «+» cambia sólo la query y no se vuelve a montar).
+function atenderAccion() {
+  const accion = route.query.accion
+  if (!accion || !sala.value) return
+  router.replace({ path: route.path })
+  abrirRegistro(String(accion))
+}
+watch(() => route.query.accion, atenderAccion)
 </script>
 
 <style scoped>

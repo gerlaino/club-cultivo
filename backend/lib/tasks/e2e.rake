@@ -25,6 +25,8 @@ namespace :e2e do
       admin = usuario_e2e!(club, 'admin',       'Ada',  'Admin')
       usuario_e2e!(club, 'dispensador', 'Dana', 'Dispensa')
       usuario_e2e!(club, 'delivery',    'Beto', 'Reparto')
+      # El del teléfono de cultivo: el «+» con «Regar» sólo se le ofrece a él (y en uso personal).
+      usuario_e2e!(club, 'cultivador',  'Cata', 'Cultivo')
 
       sede = club.sedes.first || Sede.create!(club: club, created_by: admin, nombre: 'Sede E2E',
                                               tipo: 'mixta', direccion: 'Calle Falsa 123', activa: true)
@@ -59,7 +61,7 @@ namespace :e2e do
       end
 
       puts "Club e2e ##{club.id} listo · sede ##{sede.id} · flor ##{flor.id} (1000 g)"
-      puts "  admin@e2e.test · dispensador@e2e.test · delivery@e2e.test — clave #{CLAVE_E2E}"
+      puts "  admin@e2e.test · dispensador@e2e.test · delivery@e2e.test · cultivador@e2e.test — clave #{CLAVE_E2E}"
     end
   end
 

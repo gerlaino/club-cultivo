@@ -76,6 +76,7 @@ const tabs = [
   { name: 'sa-clubs',     label: 'Organizaciones',   coincide: ['sa-clubs', 'sa-club-nuevo', 'sa-club-detail'] },
   { name: 'sa-usuarios',  label: 'Usuarios', coincide: ['sa-usuarios'] },
   { name: 'sa-informes',  label: 'Informes', coincide: ['sa-informes'] },
+  { name: 'sa-consultas', label: 'Consultas', coincide: ['sa-consultas'] },
   { name: 'sa-estado',    label: 'Estado',   coincide: ['sa-estado'] },
 ]
 

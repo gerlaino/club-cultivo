@@ -57,9 +57,12 @@
 
     <!-- Contenido -->
     <main class="msh__main">
-      <RouterView v-slot="{ Component }">
+      <!-- `key` por la ruta (sin la query): pasar de un lote a otro desde el «+» es la MISMA
+           pantalla con otro id, y sin esto Vue la reusaba con el lote viejo. La query no cuenta:
+           `?accion=` la atiende la pantalla sin volver a montarse. -->
+      <RouterView v-slot="{ Component, route: r }">
         <Transition name="msh-page" mode="out-in">
-          <component :is="Component" />
+          <component :is="Component" :key="r.path" />
         </Transition>
       </RouterView>
     </main>

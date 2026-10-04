@@ -1,0 +1,7 @@
+Hola <%= @s.nombre %>,
+
+<% if @s.tipo == 'baja' %>Recibimos tu pedido de arrepentimiento / baja. Lo vamos a procesar sin costo y te avisamos cuando esté hecho.<% else %>Recibimos tu consulta. Te vamos a responder a este mail lo antes posible.<% end %>
+
+Código de trámite: <%= @s.codigo %>
+
+Cultivo Espacial

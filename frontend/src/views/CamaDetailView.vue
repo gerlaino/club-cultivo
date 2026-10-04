@@ -218,6 +218,13 @@ async function cargar() {
   }
 }
 watch(id, cargar, { immediate: true })
+// Ya estaba en esta cama y tocó «Regar»/«Alimentar» en el «+»: cambia sólo la query y la
+// pantalla no se vuelve a montar, así que el modal se abre acá.
+watch(() => route.query.accion, (accion) => {
+  if (accion !== 'alimentar' && accion !== 'regar') return
+  modal.value = accion
+  router.replace({ path: route.path })
+})
 useRecargaEnCambios(['camas', 'lotes'], cargar)
 
 function abrirRegistro(tipo) { tipoInicial.value = tipo; modal.value = 'alimentar' }

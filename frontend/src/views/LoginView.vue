@@ -144,6 +144,8 @@
             </button>
           </form>
 
+          <p class="lv__nuevo">¿Cultivás en casa y no tenés cuenta? <RouterLink to="/registro">Probá gratis</RouterLink></p>
+
           <div class="lv__foot">
             <div class="lv__secure"><span class="lv__dot"></span>Conexión cifrada · SSL</div>
             <span class="lv__copy">© {{ yr }}</span>
@@ -401,6 +403,9 @@ async function onSubmit() {
 @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.4;transform:scale(.7)} }
 
 .lv__olvide { align-self: flex-end; margin-top: -.3rem; font-size: .72rem; font-weight: 600; color: var(--c-slate-500); text-decoration: none; }
+.lv__nuevo { margin: .2rem 0 0; text-align: center; font-size: .78rem; color: var(--c-slate-500); }
+.lv__nuevo a { color: var(--c-leaf-700, #2d5a45); font-weight: 700; text-decoration: none; }
+.lv__nuevo a:hover { text-decoration: underline; }
 .lv__olvide:hover { color: var(--c-leaf-800, #1A3D2E); text-decoration: underline; }
 
 .lv__back {

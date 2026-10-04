@@ -1,5 +1,46 @@
 # Changelog
 
+## Octubre 2026 (dy) — /bienvenida con dos puertas, autoregistro de uso personal, sesión de 7 días, y «Regar» desde la ficha
+
+- **/bienvenida**: dos puertas. «Para tu cultivo en casa» → `/registro` (30 días gratis, sin
+  tarjeta); «Para tu organización» → formulario de contacto. Precio de las dos: «consultanos».
+  Pie con Términos, Privacidad y **botón de arrepentimiento** (Res. SCI 424/2020).
+- **Autoregistro (plan A de Germán)**: `POST /api/public/registro` (`Registros::CrearPersonal`) arma
+  lo mismo que el alta de uso personal del super admin (club `personal` con sólo Cultivo, admin que
+  entra con su mail, sede «Mi cultivo», genéticas globales) con `plan_trial` y 30 días, y la persona
+  entra en el momento. El mail se confirma DESPUÉS: `EnviarConfirmacionRegistroJob` lo manda y anota
+  cuándo salió; a los 7 días de recibido sin confirmar, `CorteAutoregistroJob` (cron 5:15) pausa la
+  cuenta (suspensión `mail_sin_confirmar`, el link la despausa). Si el mail nunca salió, no corre
+  ningún reloj. Terminada la prueba sin activar → suspensión `prueba_terminada` (sólo a los
+  autoregistrados). Constancia de los términos en `registros_personales` (versión, fecha, IP).
+  Frenos: rack-attack (3 registros/h por IP) y campo trampa.
+- **Contacto**: `POST /api/public/contacto` guarda `SolicitudContacto` (organización, uso personal,
+  arrepentimiento/baja), le da a quien escribe un código de trámite (`CE-000123`, también por mail) y
+  avisa al super admin por push (`consulta_nueva`, primer aviso de plataforma del catálogo) y por
+  mail. Bandeja nueva: Super admin → **Consultas**.
+- **Términos y Política de privacidad** (`/terminos`, `/privacidad`): borrador con Ley 24.240
+  (arrepentimiento, baja, cláusulas), Ley 25.326 (datos sensibles con consentimiento expreso,
+  transferencia internacional, derechos, leyenda de la AAIP, encargado de tratamiento para
+  organizaciones), Ley 27.350/REPROCANN. Los datos del titular (razón social, CUIT, domicilio,
+  jurisdicción) están en `views/legal/titular.js` y se ven «[a completar]» hasta cargarlos.
+  `Legal::TERMINOS_VERSION` es la versión que queda guardada con cada registro.
+- **Sesión por inactividad**: el token valía 12 h fijas desde el login. Ahora dura 7 días SIN USO
+  (`App::SESION_DURACION`): cada pedido con un token de más de una hora recibe uno nuevo
+  (`ApplicationController#renovar_sesion`; cookie en la web, header en la app nativa). Los tokens
+  cerrados se olvidan recién cuando vencen (`JwtDenylist.expired` por `exp`).
+- **La causa de que la sesión se cerrara sola (bug desde el 25-sep)**: `JwtDenylist.jwt_revoked?`
+  llamaba a `super`, que no existe (devise-jwt define el método en la propia clase). Todo pedido
+  autenticado SÓLO con el token —la web cuando el navegador ya no tenía la cookie de sesión de
+  Rails, como el iPhone al cerrar la PWA, y la app nativa— reventaba, y la pantalla mandaba al
+  login. Specs con el token solo, logout y cambio de contraseña.
+- **«+ → Regar» parado en la ficha del lote no hacía nada**: la ficha leía `?accion=` sólo al
+  montarse. Ahora lote, espacio y cama atienden el cambio de query, y el `RouterView` del teléfono
+  se monta de nuevo al cambiar de lote (antes, regar OTRO lote desde una ficha mostraba el viejo).
+  e2e `regarDesdeElMas.spec.js` (con `cultivador@e2e.test` en el seed).
+- **Automática en vegetativo**: «Empezó a florecer» salió de los botones principales (parecía un
+  paso obligatorio del ciclo); queda en «Más acciones» como «Anotar que empezó a florecer»
+  (teléfono y escritorio).
+
 ## Octubre 2026 (dx) — Las notificaciones push no salían: el worker no atendía su fila
 
 - `PushNotificationJob`, `RecordatoriosTareasJob` y `OutgoingWebhookJob` van a la fila `medium`, que

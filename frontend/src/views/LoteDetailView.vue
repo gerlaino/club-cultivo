@@ -300,9 +300,15 @@ function onPlantado(data) { plantarOpen.value = false; lotes.current = data; loa
 function onCamaGuardada() { camaModal.value = null; loadHistorial(); lotes.fetchOne(id); graficosKey.value++ }
 
 // ── Acciones dropdown ─────────────────────────────────────
+const autoEnVege = computed(() => !!lote.value?.automatica && lote.value?.estado === 'vegetativo')
 const loteAcciones = computed(() => {
   const items = []
   items.push({ emoji: '📋', label: 'Registrar lote', onClick: () => { showRegistroModalNew.value = true } })
+  // Automática en vegetativo: se cosecha desde acá; que empezó a florecer es sólo una anotación
+  // opcional, no un botón principal que parezca un paso obligatorio (4-oct-2026, Germán).
+  if (autoEnVege.value && lote.value?.puede_transicionar && lote.value?.proxima_fase_posible) {
+    items.push({ emoji: '🌸', label: 'Anotar que empezó a florecer', onClick: () => handleAvanzarFase() })
+  }
   // Separar parte del lote: típicamente al prender, cuando la mitad va a una maceta y la mitad a
   // otra. Solo en cultivo y con más de una planta (desprender el lote entero lo dejaría vacío).
   if (puedeDesprender.value) {
@@ -490,14 +496,14 @@ onUnmounted(() => {
             <i class="bi bi-check2-circle"></i>Registrar pesaje
           </button>
           <button
-            v-if="(canEdit || isCultivador) && lote.puede_transicionar && lote.proxima_fase_posible"
+            v-if="(canEdit || isCultivador) && lote.puede_transicionar && lote.proxima_fase_posible && !autoEnVege"
             class="ld__btn-transicion"
             :disabled="transicionandoRapido"
             @click="handleAvanzarFase"
           >
             <DsSpinner v-if="transicionandoRapido" :size="14" />
             <ArrowRight v-else :size="15" :stroke-width="1.75" />
-            {{ lote.automatica && lote.estado === 'vegetativo' ? 'Empezó a florecer (opcional)' : `Avanzar a ${capitalizarFase(lote.proxima_fase_posible)}` }}
+            Avanzar a {{ capitalizarFase(lote.proxima_fase_posible) }}
           </button>
           <button
             v-if="lote.codigo_qr"

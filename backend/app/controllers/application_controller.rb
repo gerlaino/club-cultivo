@@ -12,6 +12,7 @@ class ApplicationController < ActionController::API
   before_action :set_tenant_from_current_user
   before_action :etiquetar_sentry
   before_action :check_club_activo!
+  after_action  :renovar_sesion
   before_action :check_rol_habilitado!
   before_action :block_auditor_writes!
   before_action :block_observer_writes!
@@ -99,8 +100,12 @@ class ApplicationController < ActionController::API
     elsif club.suspendido?
       # `activo` existía en la tabla y no lo miraba nadie: suspender una organización no la suspendía.
       # Con el motivo: el cartel de la organización dice por qué y qué hacer, no un 403 pelado.
+      # `personal`: el cartel le habla a la persona («tu cuenta»), no a una organización.
       render json: { error: 'Esta organización está suspendida. Contactate con soporte para reactivarla.',
-                     club_suspendido: true, motivo: club.suspension_motivo }, status: :forbidden
+                     club_suspendido: true, motivo: club.suspension_motivo, personal: club.personal?,
+                     # Para «reenviar el link» desde el cartel: es el mail de la propia cuenta.
+                     email: (club.registro_personal&.email if club.suspension_motivo == 'mail_sin_confirmar') }.compact,
+             status: :forbidden
     end
   end
 
@@ -270,6 +275,28 @@ class ApplicationController < ActionController::API
     Current.user = current_user if respond_to?(:current_user, true)
   rescue StandardError
     Current.user = nil
+  end
+
+  # La sesión vence por INACTIVIDAD (`App::SESION_DURACION`): si el token con el que vino este
+  # pedido tiene más de `App::SESION_RENOVAR_CADA`, la respuesta lleva uno nuevo. En la web
+  # `JwtCookieMiddleware` lo pasa a la cookie; la app nativa lo toma del header (ya lo hacía).
+  #
+  # El token viejo NO se revoca: la pantalla manda varios pedidos a la vez con el mismo token, y
+  # revocarlo dejaría a los que están en vuelo con un 401. Vence solo.
+  def renovar_sesion
+    return unless current_user && response.status < 400
+    return if request.path.end_with?('/users/sign_out', '/users/sign_in')
+
+    token = request.headers['Authorization'].to_s.sub(/\ABearer /i, '')
+    return if token.empty?
+
+    payload = Warden::JWTAuth::TokenDecoder.new.call(token)
+    return if Time.zone.at(payload['iat'].to_i) > App::SESION_RENOVAR_CADA.ago
+
+    nuevo, = Warden::JWTAuth::UserEncoder.new.call(current_user, :user, nil)
+    response.headers['Authorization'] = "Bearer #{nuevo}"
+  rescue JWT::DecodeError
+    nil
   end
 
   def inject_jwt_from_cookie

@@ -1,7 +1,8 @@
 # Plan: auto-registro con prueba de 30 días (sólo uso personal)
 
-> Acordado con Germán el 20-sep-2026 y **pospuesto**: se hace cuando él lo levante. Este
-> documento deja el plan armado para no volver a pensarlo. Nada de esto está implementado.
+> **HECHO el 4-oct-2026, con un cambio: plan A** — la persona entra al toque y confirma el mail
+> después (7 días de gracia), en vez de confirmar antes de crear nada. Ver el bloque (dy) del
+> CHANGELOG y `docs/REGLAS_Y_DECISIONES.md`. Lo de abajo es el plan original, como referencia.
 
 ## La decisión
 

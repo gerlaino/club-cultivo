@@ -23,6 +23,8 @@ class Club < ApplicationRecord
 
   belongs_to :deleted_by, class_name: "User", optional: true
   has_many :users
+  # Sólo los usos personales que se registraron solos desde /bienvenida.
+  has_one :registro_personal, dependent: :destroy
   has_many :salas,                dependent: :destroy
   has_many :camas,                dependent: :destroy
   has_many :lotes,                dependent: :destroy
@@ -844,6 +846,9 @@ class Club < ApplicationRecord
     'no_pago'          => 'No pagó',
     'lo_pidio'         => 'Lo pidió la organización',
     'prueba_terminada' => 'Terminó la prueba',
+    # Uso personal autoregistrado que no confirmó el mail en los 7 días (`RegistroPersonal`). Se
+    # despausa sola cuando toca el link.
+    'mail_sin_confirmar' => 'No confirmó el mail',
     'otro'             => 'Otro',
   }.freeze
 

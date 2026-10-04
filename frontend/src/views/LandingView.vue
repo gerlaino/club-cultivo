@@ -35,11 +35,12 @@
           <span class="ld__brand-txt">Cultivo Espacial</span>
         </RouterLink>
         <nav class="ld__nav">
-          <a href="#capacidades" class="ld__nav-a">Qué hace</a>
-          <a href="#quienes"     class="ld__nav-a">Para quién</a>
-          <a href="#modulos"     class="ld__nav-a">Módulos</a>
+          <a href="#empezar"     class="ld__nav-a">En casa</a>
+          <a href="#capacidades" class="ld__nav-a">Organizaciones</a>
+          <a href="#contacto"    class="ld__nav-a">Contacto</a>
         </nav>
         <RouterLink to="/login" class="ld__login">Ingresar</RouterLink>
+        <RouterLink to="/registro" class="ld__probar">Probar gratis</RouterLink>
       </div>
     </header>
 
@@ -53,19 +54,20 @@
         </h1>
 
         <p class="ld__lead">
-          Una plataforma para toda organización que cultiva: clubes, investigación y producción.
-          Cada planta, cada ciclo y cada gramo, registrados y demostrables.
+          Para tu cultivo en casa y para las organizaciones que cultivan: clubes, investigación y
+          producción. Cada planta, cada ciclo y cada gramo, registrados y demostrables.
         </p>
 
         <div class="ld__cta">
-          <RouterLink to="/login" class="ld__btn ld__btn--primary">
-            Ingresar
+          <RouterLink to="/registro" class="ld__btn ld__btn--primary">
+            Probar gratis en mi cultivo
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
               <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
             </svg>
           </RouterLink>
-          <a href="#capacidades" class="ld__btn ld__btn--ghost">Ver qué hace</a>
+          <a href="#contacto" class="ld__btn ld__btn--ghost" @click="tipo = 'organizacion'">Soy una organización</a>
         </div>
+        <p class="ld__cta-nota">{{ diasPrueba }} días gratis, sin tarjeta. Entrás en el momento.</p>
 
         <!-- Los tres pilares -->
         <div class="ld__pilares">
@@ -83,6 +85,41 @@
             <span class="ld__pilar-t">Cumplimiento</span>
             <span class="ld__pilar-d">Informes que salen de la misma data</span>
           </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Dos puertas ──────────────────────────────────────── -->
+    <!-- Quien cultiva en casa entra SOLO y en el momento; una organización necesita armado
+         (sedes, roles, módulos) y por eso deja sus datos. Las dos con precio «consultanos». -->
+    <section class="ld__sec ld__sec--alt" id="empezar">
+      <div class="ld__wrap">
+        <span class="ld__kicker">Cómo empezar</span>
+        <h2 class="ld__h2">Elegí tu puerta</h2>
+        <div class="ld__puertas">
+          <article class="ld__puerta ld__puerta--casa">
+            <span class="ld__puerta-tag">Uso personal</span>
+            <h3 class="ld__puerta-t">Para tu cultivo en casa</h3>
+            <p class="ld__puerta-d">Tu carpa, tu balcón o tu cama de suelo vivo, ordenados en el teléfono.</p>
+            <ul class="ld__puerta-l">
+              <li v-for="x in enCasa" :key="x">{{ x }}</li>
+            </ul>
+            <div class="ld__puerta-precio">
+              <strong>{{ diasPrueba }} días gratis</strong>, sin tarjeta · después, consultanos el precio
+            </div>
+            <RouterLink to="/registro" class="ld__btn ld__btn--primary">Crear mi cuenta gratis</RouterLink>
+          </article>
+
+          <article class="ld__puerta">
+            <span class="ld__puerta-tag">Organizaciones</span>
+            <h3 class="ld__puerta-t">Para tu organización</h3>
+            <p class="ld__puerta-d">Asociaciones, fundaciones, investigación y producción.</p>
+            <ul class="ld__puerta-l">
+              <li v-for="x in enOrganizacion" :key="x">{{ x }}</li>
+            </ul>
+            <div class="ld__puerta-precio">Precio según tu organización · consultanos</div>
+            <a href="#contacto" class="ld__btn ld__btn--ghost" @click="tipo = 'organizacion'">Escribinos</a>
+          </article>
         </div>
       </div>
     </section>
@@ -200,17 +237,80 @@
       </div>
     </section>
 
+    <!-- ── Contacto ─────────────────────────────────────────── -->
+    <section class="ld__sec ld__sec--alt" id="contacto">
+      <div class="ld__wrap ld__contacto">
+        <div>
+          <span class="ld__kicker">Contacto</span>
+          <h2 class="ld__h2">Escribinos</h2>
+          <p class="ld__sub">
+            Si sos una organización, contanos qué hacen y te armamos la cuenta. Si cultivás en casa y
+            preferís hablar antes de probar, también. Te respondemos por mail.
+          </p>
+          <p class="ld__sub ld__contacto-baja" v-if="tipo === 'baja'">
+            <strong>Botón de arrepentimiento:</strong> si contrataste en los últimos 10 días, podés
+            revocarlo sin costo ni explicaciones. También sirve para pedir la baja en cualquier momento.
+            Te damos un código de trámite en el momento.
+          </p>
+        </div>
+
+        <div v-if="enviado" class="ld__form ld__form--ok" role="status">
+          <h3 class="ld__puerta-t">¡Gracias, {{ enviado.nombre }}!</h3>
+          <p>Recibimos tu {{ enviado.tipo === 'baja' ? 'pedido' : 'mensaje' }}. Te respondemos a <strong>{{ enviado.email }}</strong>.</p>
+          <p>Código de trámite: <strong class="ld__codigo">{{ enviado.codigo }}</strong></p>
+        </div>
+
+        <form v-else class="ld__form" novalidate @submit.prevent="enviar">
+          <div class="ld__tipos" role="radiogroup" aria-label="Sobre qué nos escribís">
+            <button v-for="t in TIPOS" :key="t.id" type="button" role="radio" :aria-checked="tipo === t.id"
+                    class="ld__tipo" :class="{ 'ld__tipo--on': tipo === t.id }" @click="tipo = t.id">{{ t.label }}</button>
+          </div>
+          <label class="ld__campo">
+            <span>Nombre</span>
+            <input v-model="form.nombre" type="text" maxlength="120" autocomplete="name" required />
+          </label>
+          <label class="ld__campo">
+            <span>Mail</span>
+            <input v-model.trim="form.email" type="email" maxlength="160" autocomplete="email" required />
+          </label>
+          <label v-if="tipo === 'organizacion'" class="ld__campo">
+            <span>Organización</span>
+            <input v-model="form.organizacion" type="text" maxlength="160" autocomplete="organization" />
+          </label>
+          <label class="ld__campo">
+            <span>Teléfono / WhatsApp <em>opcional</em></span>
+            <input v-model="form.telefono" type="tel" maxlength="40" autocomplete="tel" />
+          </label>
+          <label class="ld__campo">
+            <span>{{ tipo === 'baja' ? 'Qué cuenta (mail con el que entrás) y cualquier detalle' : 'Mensaje' }} <em v-if="tipo !== 'baja'">opcional</em></span>
+            <textarea v-model="form.mensaje" rows="4" maxlength="3000"></textarea>
+          </label>
+          <input v-model="form.sitio" type="text" name="sitio" class="ld__trampa" tabindex="-1" autocomplete="off" aria-hidden="true" />
+          <p v-if="errorContacto" class="ld__form-error">{{ errorContacto }}</p>
+          <button type="submit" class="ld__btn ld__btn--primary" :disabled="enviando || !form.nombre || !form.email">
+            {{ enviando ? 'Enviando…' : (tipo === 'baja' ? 'Enviar pedido' : 'Enviar') }}
+          </button>
+          <p class="ld__form-legal">
+            Usamos tus datos sólo para responderte. Ver la <RouterLink to="/privacidad">Política de privacidad</RouterLink>.
+          </p>
+        </form>
+      </div>
+    </section>
+
     <!-- ── Cierre ───────────────────────────────────────────── -->
     <section class="ld__sec ld__final">
       <div class="ld__wrap ld__final-in">
         <h2 class="ld__h2 ld__h2--center">Cada planta tiene su historia</h2>
         <p class="ld__sub ld__sub--center">Guardarla no debería costarte una planilla.</p>
-        <RouterLink to="/login" class="ld__btn ld__btn--primary ld__btn--lg">
-          Ingresar a la plataforma
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
-          </svg>
-        </RouterLink>
+        <div class="ld__cta ld__cta--center">
+          <RouterLink to="/registro" class="ld__btn ld__btn--primary ld__btn--lg">
+            Probar gratis
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
+            </svg>
+          </RouterLink>
+          <RouterLink to="/login" class="ld__btn ld__btn--ghost ld__btn--lg">Ingresar</RouterLink>
+        </div>
       </div>
     </section>
 
@@ -218,7 +318,12 @@
       <div class="ld__wrap ld__footer-in">
         <span>© {{ yr }} Cultivo Espacial</span>
         <span class="ld__footer-sep" aria-hidden="true">·</span>
-        <span>Trazabilidad de cultivo y producción</span>
+        <RouterLink to="/terminos" class="ld__footer-a">Términos y condiciones</RouterLink>
+        <span class="ld__footer-sep" aria-hidden="true">·</span>
+        <RouterLink to="/privacidad" class="ld__footer-a">Privacidad</RouterLink>
+        <span class="ld__footer-sep" aria-hidden="true">·</span>
+        <!-- Res. SCI 424/2020: el botón de arrepentimiento tiene que estar a la vista en la página. -->
+        <a href="#contacto" class="ld__footer-a ld__footer-a--arrep" @click="tipo = 'baja'">Botón de arrepentimiento</a>
       </div>
     </footer>
 
@@ -226,7 +331,65 @@
 </template>
 
 <script setup>
+import { ref, reactive, onMounted, nextTick } from 'vue'
+import { useRoute } from 'vue-router'
+import { getRegistroInfo, enviarContacto } from '../lib/api.js'
+
+const route = useRoute()
 const yr = new Date().getFullYear()
+
+// Los días de prueba los dice el backend (`GET /public/registro`); 30 mientras carga.
+const diasPrueba = ref(30)
+
+const enCasa = [
+  'Tu espacio, tus lotes y cada planta, desde la semilla',
+  'Riegos y nutrientes con la dosis que le diste',
+  'Fotos por semana, para comparar',
+  'Los próximos pasos del ciclo, con aviso al teléfono',
+  'Autos y fotoperiódicas, maceta o suelo vivo',
+  'Cosecha, frascos y lo que gastaste',
+]
+const enOrganizacion = [
+  'Pacientes, REPROCANN y cuenta corriente',
+  'Dispensario con caja y cierre',
+  'Trazabilidad de cada planta con QR',
+  'Informes que pide la normativa, de la misma data',
+  'Una pantalla por oficio: cultivo, manicura, mostrador',
+  'Varias sedes, delivery y portal del paciente',
+]
+
+// ── Contacto ───────────────────────────────────────────────
+const TIPOS = [
+  { id: 'organizacion', label: 'Organización' },
+  { id: 'personal',     label: 'Uso personal' },
+  { id: 'baja',         label: 'Arrepentimiento / baja' },
+]
+const tipo = ref(TIPOS.some(t => t.id === route.query.tipo) ? route.query.tipo : 'organizacion')
+const form = reactive({ nombre: '', email: '', organizacion: '', telefono: '', mensaje: '', sitio: '' })
+const enviando = ref(false)
+const errorContacto = ref(null)
+const enviado = ref(null)
+
+async function enviar () {
+  errorContacto.value = null
+  enviando.value = true
+  try {
+    const { data } = await enviarContacto({ ...form, tipo: tipo.value, organizacion: tipo.value === 'organizacion' ? form.organizacion : '' })
+    enviado.value = { nombre: form.nombre.split(' ')[0], email: form.email, tipo: tipo.value, codigo: data?.codigo }
+  } catch (e) {
+    errorContacto.value = e?.response?.status === 429
+      ? 'Llegaron muchos mensajes desde esta conexión. Probá en un rato o escribinos por mail.'
+      : (e?.response?.data?.error || 'No se pudo enviar. Revisá tu conexión y probá de nuevo.')
+  } finally {
+    enviando.value = false
+  }
+}
+
+onMounted(async () => {
+  // Desde los Términos se llega con `#contacto` (y `?tipo=baja`): el router no hace scroll solo.
+  if (route.hash) { await nextTick(); document.querySelector(route.hash)?.scrollIntoView() }
+  try { diasPrueba.value = (await getRegistroInfo()).data.dias_prueba } catch {}
+})
 
 const cadena = [
   { t: 'Genética',   d: 'Cepa, origen y perfil. Todo lo que se siembra arranca acá.' },
@@ -238,6 +401,10 @@ const cadena = [
 ]
 
 const publicos = [
+  {
+    t: 'En casa',
+    d: 'Quien cultiva para sí: el ciclo completo en el teléfono, con recordatorios, fotos y la cuenta de lo que rindió cada planta.',
+  },
   {
     t: 'Clubes',
     d: 'Socios y pacientes, cuenta corriente, dispensaciones, reservas, delivery, turnos médicos y los informes que pide la normativa argentina.',
@@ -456,7 +623,69 @@ const modulos = [
 /* ── Cierre ────────────────────────────────────────────── */
 .ld__final-in { display: flex; flex-direction: column; align-items: center; gap: var(--sp-5, 20px); text-align: center; }
 
+/* ── Header: probar ─────────────────────────────────────── */
+.ld__probar {
+  padding: .5rem 1.05rem; border-radius: var(--r-pill, 9999px);
+  background: var(--c-leaf-500, #5A8A72); color: #fff;
+  font-size: var(--fs-13, 13px); font-weight: 700; text-decoration: none; white-space: nowrap;
+}
+.ld__probar:hover { background: var(--c-leaf-600, #3F6452); }
+@media (max-width: 720px) { .ld__login { margin-left: auto; } .ld__header-in { gap: var(--sp-3, 12px); } }
+@media (max-width: 380px) { .ld__login { display: none; } .ld__probar { margin-left: auto; } }
+.ld__cta-nota { margin: 0; font-size: var(--fs-13, 13px); color: rgba(255,255,255,.5); }
+.ld__cta--center { justify-content: center; }
+
+/* ── Dos puertas ───────────────────────────────────────── */
+.ld__puertas { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: var(--sp-5, 20px); margin-top: var(--sp-8, 32px); }
+.ld__puerta {
+  display: flex; flex-direction: column; gap: var(--sp-3, 12px);
+  background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.08);
+  border-radius: var(--r-xl, 12px); padding: var(--sp-6, 24px);
+}
+.ld__puerta--casa { border-color: rgba(168,201,181,.35); background: rgba(90,138,114,.10); }
+.ld__puerta-tag { align-self: flex-start; font-size: var(--fs-12, 12px); font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--c-leaf-300, #A8C9B5); }
+.ld__puerta-t { font-family: var(--font-display, sans-serif); font-size: var(--fs-20, 20px); font-weight: 700; margin: 0; letter-spacing: -.02em; }
+.ld__puerta-d { margin: 0; font-size: var(--fs-14, 14px); color: rgba(255,255,255,.55); line-height: 1.6; }
+.ld__puerta-l { margin: 0; padding-left: 1.1rem; display: flex; flex-direction: column; gap: .35rem; font-size: var(--fs-14, 14px); color: rgba(255,255,255,.78); line-height: 1.5; flex: 1; }
+.ld__puerta-precio { font-size: var(--fs-13, 13px); color: rgba(255,255,255,.6); border-top: 1px solid rgba(255,255,255,.08); padding-top: var(--sp-3, 12px); }
+.ld__puerta-precio strong { color: #fff; }
+.ld__puerta .ld__btn { align-self: flex-start; }
+
+/* ── Contacto ──────────────────────────────────────────── */
+.ld__contacto { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: var(--sp-8, 32px); align-items: start; }
+.ld__contacto-baja { margin-top: var(--sp-4, 16px); color: rgba(255,255,255,.75); }
+.ld__form {
+  display: flex; flex-direction: column; gap: var(--sp-3, 12px);
+  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
+  border-radius: var(--r-xl, 12px); padding: var(--sp-5, 20px);
+}
+.ld__form--ok p { margin: 0; color: rgba(255,255,255,.75); font-size: var(--fs-14, 14px); line-height: 1.6; }
+.ld__codigo { font-family: var(--font-mono, monospace); color: var(--c-leaf-300, #A8C9B5); }
+.ld__tipos { display: flex; flex-wrap: wrap; gap: var(--sp-2, 8px); }
+.ld__tipo {
+  border: 1px solid rgba(255,255,255,.16); background: transparent; color: rgba(255,255,255,.7);
+  border-radius: var(--r-pill, 9999px); padding: .45rem .9rem; font-size: var(--fs-13, 13px); font-weight: 600; cursor: pointer;
+}
+.ld__tipo--on { background: var(--c-leaf-500, #5A8A72); border-color: var(--c-leaf-500, #5A8A72); color: #fff; }
+.ld__campo { display: flex; flex-direction: column; gap: .3rem; font-size: var(--fs-12, 12px); font-weight: 700; color: rgba(255,255,255,.6); text-transform: uppercase; letter-spacing: .06em; }
+.ld__campo em { font-style: normal; font-weight: 500; text-transform: none; letter-spacing: 0; color: rgba(255,255,255,.4); }
+.ld__campo input, .ld__campo textarea {
+  font: inherit; font-size: var(--fs-16, 16px); font-weight: 400; text-transform: none; letter-spacing: 0;
+  color: #fff; background: rgba(0,0,0,.25); border: 1px solid rgba(255,255,255,.14);
+  border-radius: var(--r-lg, 8px); padding: .65rem .8rem; outline: none; resize: vertical;
+}
+.ld__campo input:focus, .ld__campo textarea:focus { border-color: var(--c-leaf-300, #A8C9B5); }
+.ld__trampa { position: absolute; left: -10000px; width: 1px; height: 1px; opacity: 0; }
+.ld__form .ld__btn { border: none; cursor: pointer; }
+.ld__form .ld__btn:disabled { opacity: .5; cursor: not-allowed; }
+.ld__form-error { margin: 0; color: #fecaca; font-size: var(--fs-13, 13px); }
+.ld__form-legal { margin: 0; font-size: var(--fs-12, 12px); color: rgba(255,255,255,.4); }
+.ld__form-legal a { color: var(--c-leaf-300, #A8C9B5); }
+
 /* ── Footer ────────────────────────────────────────────── */
+.ld__footer-a { color: rgba(255,255,255,.45); text-decoration: none; }
+.ld__footer-a:hover { color: #fff; }
+.ld__footer-a--arrep { color: var(--c-leaf-300, #A8C9B5); font-weight: 600; }
 .ld__footer { position: relative; z-index: 1; border-top: 1px solid rgba(255,255,255,.06); padding: var(--sp-6, 24px) 0; }
 .ld__footer-in { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--sp-2, 8px); font-size: var(--fs-13, 13px); color: rgba(255,255,255,.3); }
 .ld__footer-sep { color: rgba(255,255,255,.18); }

@@ -70,6 +70,33 @@ const routes = [
     meta: { public: true, fullscreen: true },
   },
 
+  // Autoregistro de uso personal (sólo sin sesión) y la confirmación del mail (con o sin sesión:
+  // el link se abre donde sea). Términos y privacidad, públicos.
+  {
+    path: "/registro",
+    name: "registro",
+    component: () => import("../views/RegistroView.vue"),
+    meta: { guestOnly: true, fullscreen: true },
+  },
+  {
+    path: "/registro/confirmar",
+    name: "registro-confirmar",
+    component: () => import("../views/ConfirmarMailView.vue"),
+    meta: { public: true, fullscreen: true },
+  },
+  {
+    path: "/terminos",
+    name: "terminos",
+    component: () => import("../views/legal/TerminosView.vue"),
+    meta: { public: true, fullscreen: true },
+  },
+  {
+    path: "/privacidad",
+    name: "privacidad",
+    component: () => import("../views/legal/PrivacidadView.vue"),
+    meta: { public: true, fullscreen: true },
+  },
+
   // Dashboard
   {
     path: "/",
@@ -707,6 +734,7 @@ const routes = [
       { path: 'usuarios', name: 'sa-usuarios', component: () => import('../views/superadmin/SAUsuarios.vue') },
       { path: 'informes', name: 'sa-informes', component: () => import('../views/superadmin/SAInformes.vue') },
       { path: 'estado', name: 'sa-estado', component: () => import('../views/superadmin/SAEstado.vue') },
+      { path: 'consultas', name: 'sa-consultas', component: () => import('../views/superadmin/SAConsultas.vue') },
       // El perfil vive DENTRO del shell de plataforma: la vista es la misma que usa el resto de
       // la app, pero /perfil no es hija de este layout y mandaba al super admin a una pantalla
       // pelada, sin forma de volver.
@@ -1333,7 +1361,8 @@ router.beforeEach(async (to) => {
   // Las públicas por token (carnet, dispensa, genética) y la landing, por lo mismo: rendir ya.
   const noEsperaBootstrap =
     /^\/(c|d|g)\//.test(to.path) || to.path === '/bienvenida' || to.path === '/login' ||
-    to.path === '/olvide-contrasena' || to.path === '/restablecer';
+    to.path === '/olvide-contrasena' || to.path === '/restablecer' ||
+    to.path.startsWith('/registro') || to.path === '/terminos' || to.path === '/privacidad';
 
   if (noEsperaBootstrap) {
     auth.ensureBootstrapped();

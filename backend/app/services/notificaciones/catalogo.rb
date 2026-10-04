@@ -44,6 +44,10 @@ module Notificaciones
       { clave: 'plan_vence',       grupo: TE_PIDEN, label: 'Plan por vencer',
         desc: 'Una semana antes y el día que vence.',
         roles: %w[admin], feature: nil, default: true },
+      # De la PLATAFORMA: le llega al super admin, que no tiene organización.
+      { clave: 'consulta_nueva',   grupo: TE_PIDEN, label: 'Consulta nueva desde la página',
+        desc: 'Alguien dejó sus datos en cultivoespacial.com (organización, uso personal o arrepentimiento).',
+        roles: %w[super_admin], feature: nil, personal: false, default: true },
 
       # ── Recordatorios ────────────────────────────────────────────────────────────────
       { clave: 'recordatorio_tarea', grupo: RECORD, label: 'Recordatorios de tareas',
@@ -82,6 +86,9 @@ module Notificaciones
     # Los que ESTA persona puede elegir: por su rol (o por ser el cultivador de casa) y por
     # los módulos de su organización.
     def self.para(user)
+      # El super admin no tiene organización: le tocan los avisos de la plataforma.
+      return TIPOS.select { |t| t[:roles].include?('super_admin') } if user.super_admin?
+
       club = user.club
       return [] if club.nil?
       TIPOS.select do |t|
@@ -91,7 +98,7 @@ module Notificaciones
     end
 
     def self.default_de(tipo, club)
-      d = club.personal? ? tipo.fetch(:default_personal, tipo[:default]) : tipo[:default]
+      d = club&.personal? ? tipo.fetch(:default_personal, tipo[:default]) : tipo[:default]
       d == true
     end
   end

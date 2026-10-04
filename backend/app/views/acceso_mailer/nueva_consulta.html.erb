@@ -1,0 +1,6 @@
+<p style="font-size:15px; color:#0f172a; margin:0 0 12px;"><strong><%= @s.tipo_label %></strong> — <%= @s.nombre %></p>
+<p style="font-size:14px; color:#334155; line-height:1.6; margin:0 0 4px;">Mail: <%= @s.email %></p>
+<% if @s.telefono.present? %><p style="font-size:14px; color:#334155; margin:0 0 4px;">Teléfono: <%= @s.telefono %></p><% end %>
+<% if @s.organizacion.present? %><p style="font-size:14px; color:#334155; margin:0 0 4px;">Organización: <%= @s.organizacion %></p><% end %>
+<% if @s.mensaje.present? %><p style="font-size:14px; color:#334155; line-height:1.6; margin:12px 0; white-space:pre-line;"><%= @s.mensaje %></p><% end %>
+<p style="font-size:13px; margin:16px 0 0;"><a href="<%= @link %>">Ver en el panel</a> · Respondiendo este mail le contestás a quien escribió.</p>

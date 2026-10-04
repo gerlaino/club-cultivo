@@ -31,6 +31,20 @@ unless Rails.env.test?
       req.ip if req.path.match?(%r{\A/api/password\z}) && (req.post? || req.put?)
     end
 
+    # Autoregistro: cada alta crea una organización entera. 3 por hora por IP alcanza para una
+    # persona que se equivocó; frena a quien quiere llenar la base de cuentas basura.
+    throttle('registro/ip', limit: 3, period: 1.hour) do |req|
+      req.ip if req.path == '/api/public/registro' && req.post?
+    end
+    # Reenviar la confirmación manda un mail: mismo criterio que «olvidé mi contraseña».
+    throttle('registro_reenviar/ip', limit: 3, period: 10.minutes) do |req|
+      req.ip if req.path == '/api/public/registro/reenviar' && req.post?
+    end
+    # El formulario de contacto avisa por push y por mail a la plataforma.
+    throttle('contacto/ip', limit: 5, period: 1.hour) do |req|
+      req.ip if req.path == '/api/public/contacto' && req.post?
+    end
+
     # Gate por DNI del pasaporte de dispensa: evita probar DNIs a lo bruto.
     throttle('dispensa_ver/ip', limit: 10, period: 1.minute) do |req|
       req.ip if req.path.match?(%r{\A/api/d/[^/]+/ver\z}) && req.post?

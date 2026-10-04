@@ -67,11 +67,12 @@
         <span class="mlot__qa-ico" style="background:#fee2e2;color:#b91c1c"><i class="bi bi-scissors"></i></span>
         <span class="mlot__qa-lbl">Cosechar</span>
       </button>
-      <!-- En una automática en vegetativo, «avanzar» es anotar que empezó a florecer: opcional
-           y no la mueve de sala. -->
-      <button class="mlot__qa" v-if="faseSiguiente && lote.estado !== 'floracion'" :disabled="savingFase" @click="lote.avanza_con_el_espacio ? avanzarConElEspacio() : abrirAvanzarFase()">
+      <!-- En una automática en vegetativo no hay fase que avanzar: florece sola y se cosecha
+           desde acá. Anotar que empezó a florecer es un dato opcional y vive en «Más acciones»;
+           como botón principal parecía un paso obligatorio del ciclo (4-oct-2026, Germán). -->
+      <button class="mlot__qa" v-if="faseSiguiente && lote.estado !== 'floracion' && !autoEnVege" :disabled="savingFase" @click="lote.avanza_con_el_espacio ? avanzarConElEspacio() : abrirAvanzarFase()">
         <span class="mlot__qa-ico" style="background:var(--c-leaf-100);color:var(--c-leaf-700)"><i class="bi bi-arrow-up-circle"></i></span>
-        <span class="mlot__qa-lbl">{{ lote.avanza_con_el_espacio ? `Pasar ${lote.sala?.nombre || 'el espacio'} a floración` : (lote.automatica && lote.estado === 'vegetativo' ? 'Empezó a florecer' : 'Avanzar fase') }}</span>
+        <span class="mlot__qa-lbl">{{ lote.avanza_con_el_espacio ? `Pasar ${lote.sala?.nombre || 'el espacio'} a floración` : 'Avanzar fase' }}</span>
       </button>
       <!-- Suelo vivo: lo que se le hace a la tierra es de la cama (top dress, té, cobertura). -->
       <button class="mlot__qa" v-if="lote.en_cama && enCultivo" @click="abrirCama('alimentar')">
@@ -161,6 +162,12 @@
           <span class="mlot__accion-lbl">Ver la {{ lote.cama.nombre }}</span>
           <i class="bi bi-chevron-right mlot__accion-arr"></i>
         </button>
+        <button v-if="autoEnVege && faseSiguiente" class="mlot__accion-item" :disabled="savingFase"
+                @click="showAcciones = false; lote.avanza_con_el_espacio ? avanzarConElEspacio() : abrirAvanzarFase()">
+          <span class="mlot__accion-ico"><i class="bi bi-flower1"></i></span>
+          <span class="mlot__accion-lbl">Anotar que empezó a florecer</span>
+          <i class="bi bi-chevron-right mlot__accion-arr"></i>
+        </button>
         <button class="mlot__accion-item" @click="abrirEditarLote">
           <span class="mlot__accion-ico"><i class="bi bi-pencil"></i></span>
           <span class="mlot__accion-lbl">Editar lote</span>
@@ -247,7 +254,7 @@ import { MACETA_OPCIONES, textoProximoPaso, estadoLoteLabel } from '../../lib/lo
 import LoteGaleria from '../../components/lotes/LoteGaleria.vue'
 import ResumenCiclo from '../../components/lotes/ResumenCiclo.vue'
 import LoteNutricionSection from '../../components/lotes/LoteNutricionSection.vue'
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   getLote, listPlants,
@@ -279,6 +286,8 @@ const showRegistrar   = ref(false)
 // Con qué acción abre el diario. Desde el botón, ninguna (se elige adentro); desde el «+» del
 // teléfono llega en la URL (`?accion=riego`) y se abre derecho en ese formulario.
 const accionInicial   = ref(null)
+// Automática en vegetativo: se cosecha desde acá, florecer es sólo una anotación.
+const autoEnVege = computed(() => !!lote.value?.automatica && lote.value?.estado === 'vegetativo')
 function abrirDiario(accion = null) { accionInicial.value = accion; showRegistrar.value = true }
 const showAcciones    = ref(false)
 const showAvanzarFase = ref(false)
@@ -481,14 +490,19 @@ onMounted(async () => {
     plantas.value = plantasRes.data?.data || plantasRes.data || []
   } catch {} finally { loading.value = false }
   listCamas().then(({ data }) => { hayCamas.value = (data || []).length > 0 }).catch(() => {})
-  // Llegó desde el «+» con una acción: se abre el diario en ese formulario y se limpia la URL,
-  // para que recargar o volver no lo abra de nuevo.
-  const accion = route.query.accion
-  if (accion && lote.value) {
-    router.replace({ path: route.path })
-    abrirDiario(String(accion))
-  }
+  atenderAccion()
 })
+
+// Llegó desde el «+» con una acción: se abre el diario en ese formulario y se limpia la URL,
+// para que recargar o volver no lo abra de nuevo. También si ya estaba en esta ficha: el «+»
+// cambia sólo la query y la pantalla no se vuelve a montar (antes «Regar» no hacía nada).
+function atenderAccion() {
+  const accion = route.query.accion
+  if (!accion || !lote.value) return
+  router.replace({ path: route.path })
+  abrirDiario(String(accion))
+}
+watch(() => route.query.accion, atenderAccion)
 </script>
 
 <style scoped>

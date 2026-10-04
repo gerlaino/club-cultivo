@@ -15,6 +15,7 @@ import PlanBadge from "./components/PlanBadge.vue";
 import AvisoVencimientoPlan from "./components/AvisoVencimientoPlan.vue";
 import ToastProvider from "./components/ui/ToastProvider.vue"
 import OrganizacionSuspendida from './components/OrganizacionSuspendida.vue';
+import AvisoAutoregistro from './components/AvisoAutoregistro.vue';
 import ConfirmDialog from "./components/ui/ConfirmDialog.vue";
 import OfflineIndicator from "./components/ui/OfflineIndicator.vue";
 import { useOfflineSync } from "./composables/useOfflineSync.js";
@@ -185,6 +186,8 @@ onMounted(async () => {
   <!-- Tapa todo: con la organización suspendida el backend 403-ea la API entera y cualquier
        pantalla que quede debajo sólo puede mostrar huecos. -->
   <OrganizacionSuspendida v-if="auth.clubSuspendido" />
+  <!-- Uso personal autoregistrado: confirmar el mail / fin de la prueba. -->
+  <AvisoAutoregistro v-if="auth.isAuthenticated && !auth.clubSuspendido && !$route.meta.fullscreen" />
   <ToastProvider />
   <ConfirmDialog />
   <OfflineIndicator />
