@@ -179,6 +179,33 @@ class Dispensacion < ApplicationRecord
   # Lo que suman los productos: el total sin el envío.
   def subtotal_productos_ars = aporte_socio_ars.to_d - costo_envio_ars.to_d
 
+  # LAS LÍNEAS SUMAN EL TOTAL (5-oct-2026). Administración puede pisar el aporte a mano; antes el
+  # total cambiaba y cada línea se quedaba con su precio de lista: cuatro productos que sumaban
+  # $171.000 en una dispensa de $80.000, y la analítica por genética contaba plata que nunca
+  # entró. El total escrito a mano se reparte en las líneas en proporción a lo que valía cada
+  # una (sin precio, por cantidad); la última absorbe el redondeo. No guarda: arregla las líneas
+  # en memoria y las guarda quien guarda la dispensa.
+  def repartir_en_lineas(total)
+    lineas = items.reject(&:marked_for_destruction?)
+    total  = total.to_d
+    return if lineas.empty? || total <= 0
+
+    suma = lineas.sum { |it| it.precio_unitario_ars.to_d * it.cantidad.to_d }
+    return if (suma - total).abs < 0.01
+
+    if suma.positive?
+      factor = total / suma
+      lineas.each { |it| it.precio_unitario_ars = (it.precio_unitario_ars.to_d * factor).round(2) }
+    else
+      por_unidad = total / lineas.sum { |it| it.cantidad.to_d }
+      lineas.each { |it| it.precio_unitario_ars = por_unidad.round(2) }
+    end
+    ultima = lineas.last
+    resto  = total - lineas[0..-2].sum { |it| it.precio_unitario_ars * it.cantidad.to_d }
+    ultima.precio_unitario_ars = (resto / ultima.cantidad.to_d).round(2)
+    self.precio_unitario_ars   = lineas.first.precio_unitario_ars
+  end
+
   # QUÉ PARTE DE UN COBRO ES ENVÍO. Los cobros no dicen qué pagan (una parte ahora y el resto en
   # la puerta), así que cada uno se reparte EN PROPORCIÓN al total, sin pasarse de lo que del
   # envío queda por asentar. Lo usa el asiento (`Dispensaciones::Asiento`).

@@ -153,6 +153,15 @@ const totalSugerido = computed(() =>
   Math.round((form.value.items || []).reduce((s, it) => s + (Number(it.cantidad) || 0) * (Number(it.precio) || 0), 0))
 )
 function recalc() { form.value.aporte_socio_ars = totalSugerido.value }
+// EL AJUSTE A MANO SE VE (5-oct-2026): si administración pisó el total, la diferencia con los
+// productos es una fila propia y el backend la reparte en las líneas para que sumen el total.
+const ajusteManual = computed(() => {
+  if (!puedeEditarPrecio.value) return 0
+  const aporte = Number(form.value.aporte_socio_ars)
+  if (!(aporte > 0)) return 0
+  const dif = aporte - totalSugerido.value
+  return Math.abs(dif) >= 1 ? dif : 0
+})
 function quitarItem(i) {
   if (form.value.items.length <= 1) return
   form.value.items.splice(i, 1)
@@ -272,11 +281,15 @@ async function handleSubmit() {
             </div>
           </div>
           <div class="med__items-total">Total productos <strong>{{ fmt(totalSugerido) }}</strong></div>
+          <div v-if="ajusteManual" class="med__items-total">
+            Ajuste manual <strong>{{ ajusteManual < 0 ? '-' : '+' }} {{ fmt(Math.abs(ajusteManual)) }}</strong>
+          </div>
 
           <div class="med__divider"></div>
 
-          <!-- Aporte -->
-          <div class="med__field">
+          <!-- Aporte: sólo administración lo pisa (el backend ignora el de cualquier otro rol, así
+               que la pantalla no lo ofrece). -->
+          <div v-if="puedeEditarPrecio" class="med__field">
             <label class="med__label">{{ conEnvioEnForm ? 'Aporte por los productos' : 'Aporte del paciente' }} <span class="med__opt">ARS{{ conEnvioEnForm ? ', sin el envío' : '' }}</span></label>
             <div class="med__input-suffix-wrap">
               <span class="med__input-prefix">$</span>

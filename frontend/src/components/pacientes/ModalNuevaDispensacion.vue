@@ -838,6 +838,18 @@ const precioFinal = computed(() => {
 })
 
 watch(precioFinal, (val) => { if (val != null) form.value.aporte_socio_ars = Math.round(val) })
+
+// EL AJUSTE A MANO SE VE (5-oct-2026). Si administración pisa el aporte, el «Total» del recuadro
+// es lo que se cobra —no el precio de lista— y la diferencia aparece como una fila propia. El
+// backend la reparte en las líneas (`Dispensacion#repartir_en_lineas`) para que sumen el total.
+const ajusteManual = computed(() => {
+  if (!puedeEditarAporte.value || esCuentaCorriente.value || modoCambio.value || precioFinal.value == null) return 0
+  const aporte = Number(form.value.aporte_socio_ars)
+  if (!(aporte > 0)) return 0
+  const dif = aporte - Math.round(precioFinal.value)
+  return Math.abs(dif) >= 1 ? dif : 0
+})
+const totalProductos = computed(() => (precioFinal.value ?? 0) + ajusteManual.value)
 // Al pasar a cuenta corriente el campo se esconde: si venía editado a mano, ese número quedaría
 // escondido y sin forma de corregirlo. Lo que se financia es el total.
 watch(esCuentaCorriente, (cc) => { if (cc && precioFinal.value != null) form.value.aporte_socio_ars = Math.round(precioFinal.value) })
@@ -1619,7 +1631,11 @@ async function handleSubmit() {
                   <span>Descuento esta dispensa {{ descDispensaPct }}%</span>
                   <span>- {{ fmt(precioBase * descDispensaPct / 100) }}</span>
                 </div>
-                <div class="mnd__precio-row" :class="{ 'mnd__precio-row--total': !pideEnvio }"><span>{{ modoCambio ? 'Valor de lo que se lleva' : (pideEnvio ? 'Productos' : 'Total') }}</span><span>{{ fmt(precioFinal) }}</span></div>
+                <div v-if="ajusteManual" class="mnd__precio-row mnd__precio-row--desc">
+                  <span>Ajuste manual</span>
+                  <span>{{ ajusteManual < 0 ? '-' : '+' }} {{ fmt(Math.abs(ajusteManual)) }}</span>
+                </div>
+                <div class="mnd__precio-row" :class="{ 'mnd__precio-row--total': !pideEnvio }"><span>{{ modoCambio ? 'Valor de lo que se lleva' : (pideEnvio ? 'Productos' : 'Total') }}</span><span>{{ fmt(totalProductos) }}</span></div>
               </template>
               <!-- Dispensador: solo el total final (sin desglose ni descuento del paciente) -->
               <div v-else class="mnd__precio-row" :class="{ 'mnd__precio-row--total': !pideEnvio }"><span>{{ modoCambio ? 'Valor de lo que se lleva' : (pideEnvio ? 'Productos' : 'Total a cobrar') }}</span><span>{{ fmt(precioFinal) }}</span></div>

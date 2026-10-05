@@ -125,4 +125,68 @@ RSpec.describe 'Dispensación multi-stock', type: :request do
       expect(d.reload.items.first.cantidad).to eq(10)
     end
   end
+
+  # Administración pisa el total a mano (5-oct-2026, caso real: cuatro productos que sumaban
+  # $171.000 en una dispensa de $80.000). Lo que se pide: las líneas suman el total cobrado.
+  describe 'aporte a mano de administración' do
+    before { sign_in_as(admin) }
+
+    def suma_lineas(d) = d.items.reload.sum { |it| it.subtotal_ars }
+
+    it 'reparte el total escrito a mano entre las líneas, en proporción a su precio' do
+      crear([{ stock_id: stock_a.id, cantidad: 10 }, { stock_id: stock_b.id, cantidad: 5 }],
+            aporte_socio_ars: 1000)                          # lista: 10*100 + 5*200 = 2000
+
+      expect(response).to have_http_status(:created)
+      d = Dispensacion.last
+      expect(d.aporte_socio_ars).to eq(1000)
+      expect(suma_lineas(d)).to eq(1000)
+      expect(d.items.find_by(stock: stock_a).precio_unitario_ars).to eq(50)
+      expect(d.items.find_by(stock: stock_b).precio_unitario_ars).to eq(100)
+    end
+
+    it 'también sube: el total a mano por encima de la lista se reparte igual' do
+      crear([{ stock_id: stock_a.id, cantidad: 3 }, { stock_id: stock_b.id, cantidad: 3 }],
+            aporte_socio_ars: 1000)                          # lista: 900; no divide justo
+      d = Dispensacion.last
+      expect(d.aporte_socio_ars).to eq(1000)
+      expect(suma_lineas(d)).to be_within(0.01).of(1000)
+    end
+
+    it 'sin tocar el aporte, cada línea queda con su precio de lista' do
+      crear([{ stock_id: stock_a.id, cantidad: 10 }, { stock_id: stock_b.id, cantidad: 5 }],
+            aporte_socio_ars: 2000)
+      d = Dispensacion.last
+      expect(d.items.find_by(stock: stock_a).precio_unitario_ars).to eq(100)
+      expect(d.items.find_by(stock: stock_b).precio_unitario_ars).to eq(200)
+    end
+
+    it 'con un solo producto, el precio por unidad es el que sale del total' do
+      crear([{ stock_id: stock_a.id, cantidad: 4 }], aporte_socio_ars: 300)
+      d = Dispensacion.last
+      expect(d.items.first.precio_unitario_ars).to eq(75)
+      expect(suma_lineas(d)).to eq(300)
+    end
+
+    it 'al editar con el aporte pisado, las líneas nuevas también suman el total' do
+      crear([{ stock_id: stock_a.id, cantidad: 10 }])
+      d = Dispensacion.last
+      patch "/dispensaciones/#{d.id}",
+            params: { dispensacion: { items: [{ stock_id: stock_a.id, cantidad: 10 }, { stock_id: stock_b.id, cantidad: 5 }],
+                                      aporte_socio_ars: 1500 } },
+            headers: auth_headers
+      expect(response).to have_http_status(:ok)
+      expect(d.reload.aporte_socio_ars).to eq(1500)
+      expect(suma_lineas(d)).to eq(1500)
+    end
+
+    it 'el dispensador no puede pisar el total: las líneas y el total son los de lista' do
+      sign_in_as(dispensador)
+      crear([{ stock_id: stock_a.id, cantidad: 10 }, { stock_id: stock_b.id, cantidad: 5 }],
+            aporte_socio_ars: 1000)
+      d = Dispensacion.last
+      expect(d.aporte_socio_ars).to eq(2000)
+      expect(suma_lineas(d)).to eq(2000)
+    end
+  end
 end

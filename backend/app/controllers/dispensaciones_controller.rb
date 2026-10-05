@@ -126,6 +126,8 @@ class DispensacionesController < ApplicationController
         precio_unit_desc = (precio_unit_base * (1 - desc_total / 100)).round(2)
         @dispensacion.precio_unitario_ars = precio_unit_desc
         @dispensacion.aporte_socio_ars    = override_admin ? @dispensacion.aporte_socio_ars : (precio_unit_desc * cantidad).round(2)
+        # Total a mano: el precio por unidad es el que resulta de ese total (la línea espejo lo copia).
+        @dispensacion.precio_unitario_ars = (@dispensacion.aporte_socio_ars.to_d / cantidad).round(2) if override_admin && cantidad > 0
       elsif override_admin && cantidad > 0
         # Stock sin precio configurado: admin fija el total a mano.
         @dispensacion.precio_unitario_ars ||= (@dispensacion.aporte_socio_ars.to_d / cantidad).round(2)
@@ -900,6 +902,7 @@ class DispensacionesController < ApplicationController
     disp.sede_id            ||= disp.items.first&.stock&.sede_id
     disp.precio_unitario_ars  = disp.items.first&.precio_unitario_ars
     disp.aporte_socio_ars     = override_admin ? disp.aporte_socio_ars : total.round(2)
+    disp.repartir_en_lineas(disp.aporte_socio_ars) if override_admin
   end
 
   # Evento del que sale la línea, cuando el dispensador marcó "dispensar desde lo reservado".
