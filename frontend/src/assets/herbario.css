@@ -100,3 +100,73 @@
 button.hb-link { background: none; border: none; padding: 0; font: inherit; font-weight: 600; cursor: pointer; align-self: flex-start; }
 
 .hb-pie { margin: 0; font-size: .82rem; color: var(--hb-tinta-2); text-align: center; line-height: 1.7; border-top: 1px dashed var(--hb-regla); padding-top: 12px; }
+
+/* ── Las páginas de afuera con encabezado y secciones (/bienvenida, casa, proyectos, contacto) ──
+   La raíz lleva `herbario hb-sitio` (la pone `components/public/PaginaPublica.vue`). Estas clases
+   eran del <style scoped> de la portada; ahora las usan las cuatro páginas. */
+.hb-sitio {
+  /* UN solo ancho para todas las secciones (Germán: parejo, homogéneo). */
+  --hb-ancho: 1320px; --hb-relleno: 16px;
+  --hb-borde: max(var(--hb-relleno), calc((100% - var(--hb-ancho)) / 2 + var(--hb-relleno)));
+  /* Por encima del patrón de fondo de las rutas a pantalla completa (`.route-login body::before`). */
+  position: relative; z-index: 0; min-height: 100vh;
+  background: var(--hb-papel); color: var(--hb-tinta);
+  font: 16px/1.6 var(--hb-sans); overflow-x: hidden;
+}
+@media (min-width: 720px) { .hb-sitio { --hb-relleno: 40px; } }
+.hb-sitio *, .hb-sitio *::before, .hb-sitio *::after { box-sizing: border-box; }
+.hb-sitio a:focus-visible, .hb-sitio button:focus-visible, .hb-sitio input:focus-visible, .hb-sitio textarea:focus-visible { outline: 2px solid var(--hb-verde); outline-offset: 2px; }
+
+.hb__wrap { width: 100%; max-width: var(--hb-ancho); margin: 0 auto; padding: 0 var(--hb-relleno); }
+
+/* Tipografía */
+.hb__ceja { margin: 0 0 12px; font: 500 12px var(--hb-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--hb-tinta-2); }
+.hb__ceja--claro { color: var(--hb-menta); }
+.hb__h1 {
+  margin: 0; font-family: var(--hb-serif); font-weight: 600; letter-spacing: -.02em;
+  font-size: clamp(2.3rem, 5.6vw, 4.2rem); line-height: 1.04; text-wrap: balance;
+  font-variation-settings: 'opsz' 144;
+}
+.hb__h1 em { font-style: italic; font-weight: 400; color: var(--hb-verde); }
+.hb__h2 { margin: 0; font-family: var(--hb-serif); font-weight: 600; font-size: clamp(1.7rem, 3.6vw, 2.5rem); line-height: 1.1; letter-spacing: -.015em; text-wrap: balance; }
+.hb__h3 { margin: 0; font-family: var(--hb-serif); font-weight: 600; font-size: 1.45rem; line-height: 1.2; }
+.hb__bajada { margin: 22px 0 0; max-width: 34em; font-size: 1.12rem; color: var(--hb-tinta-2); }
+.hb__acciones { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+.hb__nota { margin: 14px 0 0; font: 13px var(--hb-mono); color: var(--hb-tinta-2); }
+
+/* Botones */
+.hb__btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  min-height: 48px; padding: .8rem 1.35rem; border-radius: 999px;
+  background: var(--hb-verde); color: var(--hb-papel-claro); border: 1.5px solid var(--hb-verde);
+  font: 600 15px var(--hb-sans); text-decoration: none; cursor: pointer;
+  transition: background .2s, transform .2s;
+}
+.hb__btn:hover { background: var(--hb-verde-osc); transform: translateY(-1px); }
+.hb__btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.hb__btn--linea { background: transparent; color: var(--hb-verde); }
+.hb__btn--linea:hover { background: var(--hb-salvia-suave); }
+.hb__btn--chico { min-height: 38px; padding: .45rem 1rem; font-size: 14px; }
+.hb__btn--claro { background: var(--hb-menta); border-color: var(--hb-menta); color: var(--hb-bosque); }
+.hb__btn--claro:hover { background: var(--hb-papel-claro); }
+.hb__btn--linea-claro { background: transparent; border-color: color-mix(in srgb, var(--hb-papel-claro) 50%, transparent); color: var(--hb-papel-claro); }
+.hb__btn--linea-claro:hover { background: rgb(255 255 255 / .08); }
+
+/* Secciones */
+.hb__sec { padding: clamp(56px, 8vw, 104px) 0; scroll-margin-top: 64px; }
+.hb__sec--claro { background: var(--hb-papel-claro); border-block: 1px solid var(--hb-regla); }
+.hb__sec-h { margin-bottom: clamp(28px, 4vw, 44px); }
+
+/* Lista con hojita */
+.hb__lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.hb__lista li { position: relative; padding-left: 26px; }
+.hb__lista li::before {
+  content: ''; position: absolute; left: 2px; top: .45em; width: 12px; height: 12px;
+  background: var(--hb-verde);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M1 11C1 5 5 1 11 1c0 6-4 10-10 10z'/%3E%3C/svg%3E") center / contain no-repeat;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M1 11C1 5 5 1 11 1c0 6-4 10-10 10z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* Aparecer al hacer scroll (lo prende `PaginaPublica`; nada si «reducir movimiento») */
+.hb-rev { opacity: 0; transform: translateY(18px); transition: opacity .7s ease, transform .7s cubic-bezier(.2,.7,.2,1); }
+.hb-rev--on { opacity: 1; transform: none; }

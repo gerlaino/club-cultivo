@@ -5,7 +5,7 @@
     <div class="ma__lect">
       <div v-for="l in LECTURA" :key="l.que"><span>{{ l.que }}</span><b>{{ l.valor }}</b></div>
     </div>
-    <p class="ma__t">VPD · Flora 2 <span>últimas 24 h · kPa</span></p>
+    <p class="ma__t">VPD · {{ espacio }} <span>últimas 24 h · kPa</span></p>
     <svg class="ma__plot" :viewBox="`0 0 ${W} ${H}`" role="img" :aria-label="descripcion" @mouseleave="hover = null">
       <rect class="ma__banda" x="0" :y="y(BANDA[1])" :width="W" :height="y(BANDA[0]) - y(BANDA[1])" />
       <text class="ma__banda-t" x="6" :y="y(BANDA[1]) + 13">Rango de la fase · 1,0–1,5</text>
@@ -32,6 +32,8 @@
 
 <script setup>
 import { ref } from 'vue'
+
+defineProps({ espacio: { type: String, default: 'Flora 2' } })
 
 const LECTURA = [
   { que: 'Temperatura', valor: '26,1 °C' },

@@ -183,7 +183,7 @@ Uno por vez. Si algo no coincide con lo que ves en la pantalla, mandá una captu
    es la de producción** (la de producción dice «Base de datos» y está arriba).
 3. Para cada servicio muerto: Render → el servicio → **Settings → Delete**.
 
-### Paso 7 — Que sólo se publique lo que pasó los tests · 2 min
+### Paso 7 — Que sólo se publique lo que pasó los tests · 2 min · ✅ HECHO 5-oct-2026
 1. Esperá a que el próximo push muestre los tests en **GitHub → Actions** en verde (✓).
 2. **Render → `cultivo-staging-api` → Settings → Auto-Deploy** → **After CI Checks Pass**.
 3. Lo mismo en **`club-cultivo-worker`**.

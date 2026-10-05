@@ -2,7 +2,7 @@
   <!-- Las pesadas de una cosecha: el peso que entra a cada etapa y la merma calculada, y abajo
        dónde quedó el stock. -->
   <div class="mp">
-    <p class="mp__t">Cosecha L-26-002 <span>14 de octubre</span></p>
+    <p class="mp__t">Cosecha {{ casa ? 'de la carpa' : 'L-26-002' }} <span>14 de octubre</span></p>
     <div v-for="(e, i) in ETAPAS" :key="e.que" class="mp__fila">
       <span class="mp__que">{{ e.que }}</span>
       <div class="mp__riel"><div class="mp__barra" :style="{ width: `${(e.g / ETAPAS[0].g) * 100}%`, animationDelay: `${i * 220}ms` }"></div></div>
@@ -10,24 +10,30 @@
       <span class="mp__merma">{{ i ? `−${merma(i)} %` : '' }}</span>
     </div>
 
-    <p class="mp__t mp__t--stock">Stock que quedó <span>por sede</span></p>
+    <!-- En casa no hay sedes: lo que quedó son tus frascos. -->
+    <p class="mp__t mp__t--stock">{{ casa ? 'Tus frascos' : 'Stock que quedó' }} <span>{{ casa ? 'curado' : 'por sede' }}</span></p>
     <div class="mp__sedes">
-      <div v-for="s in SEDES" :key="s.sede" class="mp__sede">
-        <span>{{ s.sede }}</span><b>{{ s.g }} g</b><small>{{ s.frascos }} frascos</small>
+      <div v-for="s in (casa ? FRASCOS : SEDES)" :key="s.sede" class="mp__sede">
+        <span>{{ s.sede }}</span><b>{{ s.g }} g</b><small>{{ s.frascos }}</small>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-const ETAPAS = [
-  { que: 'Húmedo', g: 1840 },
-  { que: 'Seco',   g: 412 },
-  { que: 'Curado', g: 398 },
-]
+const props = defineProps({ casa: { type: Boolean, default: false } })
+
+// Una organización cosecha un lote entero; en casa, tres plantas.
+const ETAPAS = props.casa
+  ? [{ que: 'Húmedo', g: 620 }, { que: 'Seco', g: 141 }, { que: 'Curado', g: 136 }]
+  : [{ que: 'Húmedo', g: 1840 }, { que: 'Seco', g: 412 }, { que: 'Curado', g: 398 }]
 const SEDES = [
-  { sede: 'Palermo',   g: 214, frascos: 42 },
-  { sede: 'Caballito', g: 184, frascos: 36 },
+  { sede: 'Palermo',   g: 214, frascos: '42 unidades de 5 g' },
+  { sede: 'Caballito', g: 184, frascos: '36 unidades de 5 g' },
+]
+const FRASCOS = [
+  { sede: 'King’s Juice', g: 88, frascos: '2 frascos · 14-oct' },
+  { sede: 'Gorilla Glue', g: 48, frascos: '1 frasco · 14-oct' },
 ]
 const fmt = (n) => n.toLocaleString('es-AR')
 const merma = (i) => ((1 - ETAPAS[i].g / ETAPAS[i - 1].g) * 100).toLocaleString('es-AR', { maximumFractionDigits: 1 })

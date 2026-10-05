@@ -1,5 +1,30 @@
 # Changelog
 
+## Octubre 2026 (eb) — La página pública partida por público, y producción se publica sola
+
+- **Login y Recuperar acceso en «Herbario»** (en vivo desde `d1f76091`), como Registro. Los colores y
+  las piezas de formulario (`hb-*`) viven una sola vez en `frontend/src/assets/herbario.css`; antes
+  estaban copiados en cada página.
+- **/bienvenida** queda con la planta y dos opciones: **Autocultivo** y **Tengo un proyecto**. Cada
+  público entra a SU página, para que nadie lea lo del otro:
+  - `/bienvenida/autocultivo` (`/casa` redirige): 5 solapas con muestras dibujadas (el reloj del
+    ciclo, cosecha y frascos, ambiente, asistente IA, el costo por gramo), «Llevala en el bolsillo»,
+    sus preguntas frecuentes y el cierre en el registro.
+  - `/bienvenida/proyectos`: **el consultorio y el turnero con sección propia** (el diferencial:
+    agenda sobre el horario del médico, historia clínica con notas privadas, indicación con aviso de
+    vencimiento, prescripción en PDF), 8 solapas (trazabilidad, cultivo, cosecha y stock, mostrador
+    y caja, delivery, ambiente, IA, informes), «Una vista por oficio», preguntas y el formulario.
+    En proyectos no se dice «frasco»: es stock.
+  - `/contacto`: el formulario solo. Ahí apunta el **botón de arrepentimiento** del pie de todas
+    las páginas (Res. 424/2020), los Términos y los carteles de la app.
+- Todo lo que se afirma existe hoy en el código; lo que se vende aparte dice «Se suma aparte», y no
+  se nombra lo simulado (ARICCAME), lo que está en prueba (chatbot) ni lo que está en construcción
+  (portal del paciente). Contenido de cada público en `components/public/contenido.js`; los **packs
+  con precio** tienen lugar (`PACKS_*`) y no aparecen hasta que se carguen.
+- **Producción se publica sola con el CI en verde** («After CI Checks Pass» en web y worker). Dos
+  pushes habían quedado sin publicar: lo que se publicaba solo era `club-cultivo-1`, el sitio
+  estático viejo. Pushear ahora ES deployar (`docs/DEPLOY.md` §5).
+
 ## Octubre 2026 (ea) — Responder consultas desde el super admin, y la portada afinada
 
 - **Responder una consulta** (Super admin → Consultas → «Responder»): la respuesta sale por el correo

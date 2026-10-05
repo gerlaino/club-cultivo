@@ -17,7 +17,7 @@ const ESLABONES = [
   { que: 'Lote',     cual: 'L-26-002',            det: '12 plantas · Vege 1 → Flora 2' },
   { que: 'Planta',   cual: 'P-0142',              det: 'QR propio · 64 registros' },
   { que: 'Cosecha',  cual: '14 de octubre',       det: '1.840 g húmedo → 412 g seco' },
-  { que: 'Frasco',   cual: 'F-118 · 5 g',         det: 'Sede Palermo' },
+  { que: 'Stock',    cual: 'S-118 · 5 g',         det: 'Sede Palermo' },
   { que: 'Entrega',  cual: 'Paciente N.º 0231',   det: '5 g · con firma' },
 ]
 </script>

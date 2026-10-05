@@ -72,7 +72,8 @@ dispensación/stock/cuenta corriente/fases de lote, correr sus specs de integrac
 - Tests contra el AC, no contra la implementación; nunca `allow_any_instance_of`; un test que
   repite la lista de memoria no prueba nada (leer la fuente real).
 - Git: **directo en `master`**, sin branches salvo pedido. **No commitear ni pushear sin que Germán
-  lo pida.** No deployar en horario de dispensario (tarde/noche ART).
+  lo pida.** No pushear en horario de dispensario (tarde/noche ART):
+  producción se publica sola cuando el CI sale verde (`docs/DEPLOY.md` §5).
 - `Time.zone.today`, nunca `Date.today`. `Date#all_month` es rango de Dates (corta a medianoche).
 
 ## Roles (enum `User#role`)

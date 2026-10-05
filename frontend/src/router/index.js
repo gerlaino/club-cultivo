@@ -69,6 +69,28 @@ const routes = [
     component: () => import("../views/LandingView.vue"),
     meta: { public: true, fullscreen: true },
   },
+  // Cada público, su página (5-oct-2026): la portada es de todos y de ahí se entra a la suya.
+  {
+    path: "/bienvenida/autocultivo",
+    name: "landing-autocultivo",
+    component: () => import("../views/LandingAutocultivoView.vue"),
+    meta: { public: true, fullscreen: true },
+  },
+  // El primer nombre de esa página (5-oct, mismo día): por si alguien guardó el link.
+  { path: "/bienvenida/casa", redirect: "/bienvenida/autocultivo" },
+  {
+    path: "/bienvenida/proyectos",
+    name: "landing-proyectos",
+    component: () => import("../views/LandingProyectosView.vue"),
+    meta: { public: true, fullscreen: true },
+  },
+  // El formulario de contacto solo: acá apunta el botón de arrepentimiento de todas las páginas.
+  {
+    path: "/contacto",
+    name: "contacto",
+    component: () => import("../views/ContactoView.vue"),
+    meta: { public: true, fullscreen: true },
+  },
 
   // Autoregistro de uso personal (sólo sin sesión) y la confirmación del mail (con o sin sesión:
   // el link se abre donde sea). Términos y privacidad, públicos.
@@ -1360,7 +1382,8 @@ router.beforeEach(async (to) => {
   // El formulario no necesita saber si había sesión previa — necesita dejarte entrar.
   // Las públicas por token (carnet, dispensa, genética) y la landing, por lo mismo: rendir ya.
   const noEsperaBootstrap =
-    /^\/(c|d|g)\//.test(to.path) || to.path === '/bienvenida' || to.path === '/login' ||
+    /^\/(c|d|g)\//.test(to.path) || to.path === '/bienvenida' || to.path.startsWith('/bienvenida/') ||
+    to.path === '/contacto' || to.path === '/login' ||
     to.path === '/olvide-contrasena' || to.path === '/restablecer' ||
     to.path.startsWith('/registro') || to.path === '/terminos' || to.path === '/privacidad';
 

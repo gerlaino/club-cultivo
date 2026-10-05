@@ -23,7 +23,7 @@
     <footer class="lg__footer">
       <div class="lg__wrap lg__footer-in">
         <span>© {{ yr }} Cultivo Espacial</span>
-        <RouterLink :to="{ path: '/bienvenida', hash: '#contacto', query: { tipo: 'baja' } }">Botón de arrepentimiento</RouterLink>
+        <RouterLink :to="{ path: '/contacto', query: { tipo: 'baja' } }">Botón de arrepentimiento</RouterLink>
         <a :href="`mailto:${TITULAR.mail}`">{{ TITULAR.mail }}</a>
       </div>
     </footer>

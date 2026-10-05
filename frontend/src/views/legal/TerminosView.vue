@@ -65,7 +65,7 @@
         <strong>Arrepentimiento:</strong> podés revocar la aceptación del servicio dentro de los 10 días corridos desde
         que lo contrataste o desde que estuvo disponible, lo último que ocurra, sin costo y sin dar explicaciones
         (art. 34 de la Ley 24.240 de Defensa del Consumidor y art. 1110 del Código Civil y Comercial). Lo pedís desde el
-        <RouterLink :to="{ path: '/bienvenida', hash: '#contacto', query: { tipo: 'baja' } }">botón de arrepentimiento</RouterLink>
+        <RouterLink :to="{ path: '/contacto', query: { tipo: 'baja' } }">botón de arrepentimiento</RouterLink>
         de nuestra página, que está siempre a la vista, o por mail. Al pedirlo desde la página te damos en el momento
         un código de trámite (por mail, dentro de las 24 horas). Si hubieras pagado algo, te lo devolvemos completo.
       </li>

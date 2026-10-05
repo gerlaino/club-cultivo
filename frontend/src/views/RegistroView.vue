@@ -10,7 +10,7 @@
         <img src="/logo-ce-redondo.png" alt="Cultivo Espacial" />
       </RouterLink>
 
-      <p class="hb-ceja">Uso personal · cuenta nueva</p>
+      <p class="hb-ceja">Autocultivo · cuenta nueva</p>
       <h1 class="hb-titulo">Probalo en tu cultivo</h1>
       <p class="hb-bajada">
         <template v-if="info">{{ info.dias_prueba }} días gratis, sin tarjeta.</template>
@@ -63,7 +63,7 @@
 
       <p class="hb-pie">
         ¿Ya tenés cuenta? <RouterLink to="/login" class="hb-link">Ingresá</RouterLink>
-        · ¿Es para una organización? <RouterLink :to="{ path: '/bienvenida', hash: '#contacto' }" class="hb-link">Escribinos</RouterLink>
+        · ¿Es para un proyecto? <RouterLink :to="{ path: '/bienvenida/proyectos', hash: '#contacto' }" class="hb-link">Escribinos</RouterLink>
       </p>
     </div>
   </div>

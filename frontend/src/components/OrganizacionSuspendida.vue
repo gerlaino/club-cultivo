@@ -60,7 +60,7 @@ async function salir() {
       </template>
       <p v-else class="susp__text">
         Ante cualquier duda, escribinos a <a href="mailto:cultivoespacial.arg@gmail.com">cultivoespacial.arg@gmail.com</a>
-        o desde <a href="/bienvenida#contacto">la página de Cultivo Espacial</a>.
+        o desde <a href="/contacto">la página de Cultivo Espacial</a>.
       </p>
       <p class="susp__resguardo">
         <i class="bi bi-shield-check"></i>

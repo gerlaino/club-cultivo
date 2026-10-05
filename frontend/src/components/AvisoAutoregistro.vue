@@ -47,7 +47,7 @@ async function reenviar() {
       <template v-if="pruebaCorta">
         <span :class="{ 'aar__sep': faltaMail }">
           {{ diasPrueba > 0 ? `Te quedan ${diasPrueba} ${diasPrueba === 1 ? 'día' : 'días'} de prueba.` : 'Hoy termina tu prueba.' }}
-          <a href="/bienvenida#contacto">Consultanos para seguir</a>.
+          <a href="/contacto?tipo=personal">Consultanos para seguir</a>.
         </span>
       </template>
     </div>

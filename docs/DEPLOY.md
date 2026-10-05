@@ -215,9 +215,17 @@ campos cifrados de un dump de producción tal cual. Por eso el clon se anonimiza
 
 **Preproducción despliega sola** con cada push a `master` (`autoDeploy: true` en `render.yaml`).
 
-**Producción NO.** Su auto-deploy va **apagado**: cuando preproducción está verificada, se aprieta
-Deploy a mano. Es lo que da el "subo, pruebo, y recién ahí lo paso" sin sumar ramas — encaja con
-trabajar directo en `master`.
+**Producción también, pero sólo con los tests en verde** (desde el 5-oct-2026): `cultivo-staging-api`
+y `club-cultivo-worker` tienen Auto-Deploy en **After CI Checks Pass**. Cada push a `master` corre el
+CI de GitHub (`.github/workflows/ci.yml`: RSpec, Vitest y build) y, si sale verde, Render publica los
+dos solos, unos 10 minutos después del push. Si sale en rojo, no se publica nada.
+
+Consecuencia: **pushear ES deployar**. La regla de no deployar en horario de dispensario (tarde/noche
+ART) pasa a ser no pushear en ese horario.
+
+> Antes estaba apagado y se apretaba Deploy a mano. Pasó que dos pushes (4 y 5-oct) quedaron sin
+> publicar y nadie se dio cuenta: el que sí se publicaba solo era `club-cultivo-1`, el sitio estático
+> viejo, que ya no sirve el dominio y confunde en el panel.
 
 Las **migraciones corren solas** dentro de `bin/render-build.sh`, con `set -o errexit`: si una falla,
 falla el deploy entero y no queda una app a medias contra una base a medias. **Los rakes NO**: esos
