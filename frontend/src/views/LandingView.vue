@@ -1,13 +1,14 @@
 <template>
-  <div class="hb">
+  <div class="hb herbario">
 
     <!-- ── Encabezado ─────────────────────────────────────── -->
     <header class="hb__top">
       <div class="hb__wrap hb__top-in">
         <RouterLink to="/bienvenida" class="hb__marca">Cultivo Espacial</RouterLink>
         <nav class="hb__nav" aria-label="Secciones">
-          <a href="#empezar">En casa</a>
+          <a href="#que-hace">Qué hace</a>
           <a href="#organizaciones">Organizaciones</a>
+          <a href="#preguntas">Preguntas</a>
           <a href="#contacto" @click="tipo = 'organizacion'">Contacto</a>
         </nav>
         <RouterLink to="/login" class="hb__ingresar">Ingresar</RouterLink>
@@ -87,6 +88,9 @@
       </div>
     </section>
 
+    <!-- ── Qué hace: una solapa por tema, con su muestra ───── -->
+    <QueHace />
+
     <!-- ── En el bolsillo: el teléfono y la instalación ───── -->
     <section class="hb__bolsillo" id="bolsillo">
       <div class="hb__wrap hb__bolsillo-in">
@@ -155,8 +159,11 @@
       </div>
     </section>
 
+    <!-- ── Preguntas frecuentes ───────────────────────────── -->
+    <PreguntasFrecuentes @contacto="tipo = 'organizacion'" />
+
     <!-- ── Contacto ───────────────────────────────────────── -->
-    <section class="hb__sec" id="contacto">
+    <section class="hb__sec hb__sec--claro" id="contacto">
       <div class="hb__wrap hb__contacto">
         <div class="hb__contacto-txt">
           <p class="hb__ceja">Contacto</p>
@@ -237,14 +244,20 @@
 // herbario (`LaminaPlanta`): el producto es un cuaderno de campo de cada planta.
 //
 // Dos puertas (Germán, 4-oct-2026): uso personal se registra solo (/registro); una organización
-// deja sus datos y la cuenta se arma a mano. Precio de las dos: «consultanos». Los días de prueba
-// los dice el backend.
+// deja sus datos y la cuenta se arma a mano. Precio de las dos: «consultanos» (no se muestran
+// precios). Los días de prueba los dice el backend.
+//
+// Qué hace + preguntas frecuentes (5-oct): la página tiene que contestar las dudas sola; el
+// contacto es para terminar de convencer, no para enterarse de qué ofrecemos.
 import { ref, reactive, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import PlantaCreciendo from '../components/public/PlantaCreciendo.vue'
+import QueHace from '../components/public/QueHace.vue'
+import PreguntasFrecuentes from '../components/public/PreguntasFrecuentes.vue'
 import { Droplets, Camera, BellRing } from 'lucide-vue-next'
 import { getRegistroInfo, enviarContacto } from '../lib/api.js'
 import { cargarFuentesHerbario } from '../lib/fuentesHerbario.js'
+import '../assets/herbario.css'
 
 cargarFuentesHerbario()
 
@@ -351,28 +364,8 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-/* La paleta de la dirección «Herbario», una sola vez: el resto de la página usa estos nombres. */
+/* La paleta de la dirección «Herbario» (`--hb-*`) viene de `assets/herbario.css`, por la clase `herbario`. */
 .hb {
-  /* Verdes suaves (Germán, 4-oct: «volver al verde, más delicados»): fondo menta muy claro,
-     tinta verde bosque, acentos salvia y menta. El ámbar queda sólo para detalles (pistilos). */
-  --hb-papel: #EEF5EF;
-  --hb-papel-claro: #F8FBF7;
-  --hb-tinta: #15301F;
-  --hb-tinta-2: #4E6858;
-  --hb-regla: #CDE0D2;
-  --hb-verde: #2E6B4A;
-  --hb-verde-osc: #1F5137;
-  --hb-bosque: #173A2A;
-  --hb-salvia: #BCD8C3;
-  --hb-salvia-suave: #DCEDE1;
-  --hb-menta: #9FD1B0;
-  --hb-ambar: #B98532;
-  --hb-tierra: #8A6E55;
-  --hb-error: #9B2C1E;
-  --hb-serif: 'Fraunces', Georgia, serif;
-  --hb-sans: 'Public Sans', system-ui, sans-serif;
-  --hb-mono: 'JetBrains Mono', ui-monospace, monospace;
-
   /* Por encima del patrón de fondo del login (`.route-login body::before`, en theme.css). */
   position: relative; z-index: 0;
   min-height: 100vh;

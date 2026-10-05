@@ -1,5 +1,5 @@
 <template>
-  <div class="lg">
+  <div class="lg herbario">
     <header class="lg__header">
       <div class="lg__wrap lg__header-in">
         <button type="button" class="lg__volver" @click="volver">
@@ -36,6 +36,7 @@
 import { useRouter } from 'vue-router'
 import { TITULAR, VIGENCIA } from './titular.js'
 import { cargarFuentesHerbario } from '../../lib/fuentesHerbario.js'
+import '../../assets/herbario.css'
 
 cargarFuentesHerbario()
 const router = useRouter()
@@ -54,10 +55,8 @@ const yr = new Date().getFullYear()
 </script>
 
 <style scoped>
-/* Misma dirección visual que la página pública («Herbario», en verdes suaves). */
+/* Misma dirección visual que la página pública («Herbario»): los `--hb-*` vienen de assets/herbario.css. */
 .lg {
-  --hb-papel: #EEF5EF; --hb-papel-claro: #F8FBF7; --hb-tinta: #15301F; --hb-tinta-2: #4E6858;
-  --hb-regla: #CDE0D2; --hb-verde: #2E6B4A; --hb-salvia-suave: #DCEDE1; --hb-bosque: #173A2A; --hb-ambar: #B98532;
   position: relative; z-index: 0; min-height: 100vh;
   background: var(--hb-papel); color: var(--hb-tinta);
   font: 16px/1.7 'Public Sans', system-ui, sans-serif;

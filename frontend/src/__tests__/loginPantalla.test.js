@@ -31,7 +31,7 @@ describe('LoginView — la pantalla siempre dice qué pasó', () => {
     auth.error = 'Usuario o contraseña incorrectos.'
     await w.vm.$nextTick()
 
-    expect(w.find('.lv__error').text()).toContain('Usuario o contraseña incorrectos.')
+    expect(w.find('.hb-error').text()).toContain('Usuario o contraseña incorrectos.')
   })
 
   // El servidor dormido: la espera es larga y legítima, pero hay que contarla.
@@ -40,7 +40,7 @@ describe('LoginView — la pantalla siempre dice qué pasó', () => {
     auth.aviso = 'El servidor estaba en reposo y está arrancando. Puede tardar unos segundos.'
     await w.vm.$nextTick()
 
-    expect(w.find('.lv__aviso').text()).toMatch(/arrancando/i)
+    expect(w.find('.hb-nota').text()).toMatch(/arrancando/i)
   })
 
   // Un error real tapa al aviso: no se muestran los dos mensajes peleándose.
@@ -50,8 +50,8 @@ describe('LoginView — la pantalla siempre dice qué pasó', () => {
     auth.error = 'Usuario o contraseña incorrectos.'
     await w.vm.$nextTick()
 
-    expect(w.find('.lv__aviso').exists()).toBe(false)
-    expect(w.find('.lv__error').exists()).toBe(true)
+    expect(w.find('.hb-nota').exists()).toBe(false)
+    expect(w.find('.hb-error').exists()).toBe(true)
   })
 
   // La regla de fondo: si el botón está girando, en la pantalla hay una línea que lo explica.
@@ -61,7 +61,7 @@ describe('LoginView — la pantalla siempre dice qué pasó', () => {
     auth.aviso = 'El servidor estaba en reposo y está arrancando.'
     await w.vm.$nextTick()
 
-    const hayTexto = w.find('.lv__aviso').exists() || w.find('.lv__error').exists()
+    const hayTexto = w.find('.hb-nota').exists() || w.find('.hb-error').exists()
     expect(hayTexto).toBe(true)
   })
 })
