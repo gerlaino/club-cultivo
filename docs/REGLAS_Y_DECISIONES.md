@@ -439,11 +439,46 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   arregla peso confirmado + stock con un movimiento que nombra el lote. `compra_externa` sí
   puede subir (respaldo: la factura). Merma y pérdida nunca suman: eso es un reconteo. Es la
   misma familia que «contar no crea stock» en el mostrador.
-- **EL REPROCANN TIENE TRES ESTADOS** (2-oct-2026, Germán): sin registro, pendiente de aprobación
-  y **vigente** (guardado como `activo`, por historia). «Vencido» sale de la fecha
-  (`reprocann_estado_efectivo`), no se guarda. «Inactivo» NO es un estado del REPROCANN:
-  activo/inactivo es el PACIENTE en la organización (`es_paciente`, el tilde «Activo»). El backend
-  rechaza cualquier otro valor al cambiarlo (`Paciente::REPROCANN_ESTADOS`).
+- **LOS ESTADOS DEL REPROCANN** (2-oct-2026, Germán; «vencido» desde el 6-oct, Javi): sin registro,
+  pendiente de aprobación (en trámite), **vigente** (guardado como `activo`, por historia) y
+  **vencido**. «Vencido» SE PUEDE GUARDAR desde el 6-oct, para cuando saben que venció aunque no
+  tengan la fecha; si está vigente con fecha y la fecha pasó, igual sale vencido solo
+  (`reprocann_estado_efectivo`). La categoría (vigente / por vencer / vencido / en trámite / sin)
+  la calcula `Paciente.reprocann_categoria` y **el backend la manda** (`reprocann_categoria`): la
+  pantalla la muestra, no la recalcula. «Inactivo» NO es un estado del REPROCANN: activo/inactivo
+  es el PACIENTE en la organización (`es_paciente`, el tilde «Activo»). El backend rechaza
+  cualquier otro valor al cambiarlo (`Paciente::REPROCANN_ESTADOS`).
+- **EL MÉDICO VE SÓLO A SUS PACIENTES VINCULADOS** (6-oct-2026, Javi y Germán): `medico_pacientes`,
+  un paciente puede tener más de un médico. La regla vive en UN lugar, `PacientePolicy::Scope`, y
+  todo controller que busca un paciente para alguien que puede ser médico usa `pacientes_visibles`
+  (nunca `club.pacientes`): lista, ficha, timeline, indicaciones, documentos, notas, turnos,
+  check-ins, CSV. Administración vincula y desvincula desde la ficha; **dar un turno vincula
+  directo**; el médico que da de alta a un paciente queda vinculado. El médico sólo aprueba altas
+  de pacientes vinculados a él. La migración vinculó a cada médico con los pacientes con los que ya
+  tenía un turno o una indicación.
+- **TURNO DADO POR ADMINISTRACIÓN: AVISO Y «LO VI»** (6-oct-2026, Javi): al darle, moverle o
+  cancelarle un turno, al médico le llega push (`turno_asignado` del catálogo) y mail (por el
+  correo de la plataforma, sin el motivo de la consulta). El turno queda sin ver (`visto_at` nil)
+  hasta que toca «Lo vi»; moverlo lo vuelve a dejar sin ver. Lo que se da el propio médico nace
+  visto. Los avisos se mandan desde los controllers, no desde el modelo: cancelar usa
+  `update_columns`, que se saltea los callbacks.
+- **«INICIÉ EL TRÁMITE»** (6-oct-2026, Javi): el médico (de sus pacientes) o administración. Pasa el
+  REPROCANN a pendiente con la fecha (`reprocann_tramite_iniciado_el`) y avisa a administración
+  (alerta `reprocann_tramite_iniciado`). «Que se replique» = es el mismo dato para toda la app, y
+  `Paciente`/`MedicoPaciente`/`Turno` transmiten en vivo (`pacientes`, `turnos`): las pantallas
+  abiertas se actualizan solas.
+- **VINCULADO / ADHERENTE** (6-oct-2026, Javi): `reprocann_vinculo`, otro eje distinto del estado.
+  Vinculado (`organizacion`) = su REPROCANN está con la organización; Adherente
+  (`otra_organizacion`) = paciente nuevo con REPROCANN vigente, vinculado a otra organización por
+  ahora. Vacío = sin dato: los que ya existían arrancan así, nadie adivina. El mostrador no lo ve
+  (como el resto del REPROCANN). PENDIENTE DE DECIDIR: si los adherentes salen en el informe REPROCANN.
+- **PENDIENTE DE ENTREVISTA / FALTÓ AL TURNO** (6-oct-2026, Germán): se calculan solos de los
+  turnos (`Pacientes::Entrevista`), nadie los marca. Pendiente = tiene un turno cuya hora pasó y el
+  médico no lo cerró (programado/confirmado): administración apura al médico. Faltó = su último
+  turno no cancelado quedó ausente y no tiene otro dado: hay que darle turno, no apurar al médico.
+  Administración ve el contador por médico («pasados sin cerrar») y el filtro en la lista.
+- **APODO** (6-oct-2026): opcional, se busca por él (padrón, médico, mostrador). Nunca sale en lo
+  regulatorio (informes, carnet).
 - **LO QUE ENTRA A UN STOCK EXTERNO ES «ENTRÓ MERCADERÍA», NO UN RECONTEO** (1-oct-2026, socio
   de Germán): llega más de lo mismo y se SUMA AL MISMO STOCK (Germán: «es la misma») con un
   movimiento `ingreso` fechado el día en que ENTRÓ (puede ser anterior a hoy: el informe de

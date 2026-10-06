@@ -11,14 +11,16 @@ import Breadcrumb from '../components/ui/Breadcrumb.vue'
 import IndicacionesMedicas from '../components/pacientes/IndicacionesMedicas.vue'
 import Dispensaciones from '../components/pacientes/Dispensaciones.vue'
 import PatientDocuments from '../components/pacientes/PacienteDocumentos.vue'
-import { getPacienteTimeline, getPacienteTurnos, updateAdminTurno, deleteAdminTurno, updatePaciente, aprobarPaciente } from '../lib/api.js'
+import { getPacienteTimeline, getPacienteTurnos, updateAdminTurno, deleteAdminTurno, updatePaciente, aprobarPaciente, iniciarTramiteReprocann } from '../lib/api.js'
 import {
   User, ShieldCheck, Pill, BookOpen, FileText, ClipboardList, Clock,
   Pencil, AlertTriangle, Info, Wallet, CreditCard, Mail, CalendarPlus,
   CalendarDays, UserCheck, RotateCcw, X, ChevronDown, Check, MoreHorizontal, FileHeart, KeyRound, MapPin
 } from 'lucide-vue-next'
 import DsDropdown from '../design-system/components/Dropdown.vue'
-import { REPROCANN_ESTADOS } from '../composables/useSocioEditar.js'
+import { REPROCANN_ESTADOS, REPROCANN_VINCULOS, vinculoLabel } from '../composables/useSocioEditar.js'
+import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
+import SocioMedicos from '../components/pacientes/SocioMedicos.vue'
 import { reprocannCategoria, reprocannDias, reprocannPlazo } from '../composables/useReprocann.js'
 import { useToast } from '../composables/useToast.js'
 import DsSpinner               from '../design-system/components/Spinner.vue'
@@ -137,6 +139,40 @@ async function guardarEstadoReprocann(payload) {
     cambiandoEstado.value = false
   }
 }
+
+// ── De quién es su REPROCANN (Vinculado / Adherente) y «Inicié el trámite» (6-oct-2026) ──
+async function cambiarVinculo(valor) {
+  if ((s.value?.reprocann_vinculo || '') === valor) return
+  await guardarEstadoReprocann({ reprocann_vinculo: valor })
+}
+
+const iniciandoTramite = ref(false)
+async function iniciarTramite() {
+  iniciandoTramite.value = true
+  try {
+    await iniciarTramiteReprocann(socioId)
+    await store.refrescarActual(socioId)
+    toast.success(isAdmin.value ? 'Trámite marcado como iniciado' : 'Trámite iniciado: administración ya está avisada')
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo marcar el trámite')
+  } finally {
+    iniciandoTramite.value = false
+  }
+}
+
+// Pendiente de entrevista / faltó al turno: lo calcula el backend de los turnos (6-oct-2026).
+const ENTREVISTA = {
+  pendiente_entrevista: { label: 'Pendiente de entrevista', ayuda: 'Tiene un turno que ya pasó y el médico no lo cerró.' },
+  falto_turno:          { label: 'Faltó al turno',          ayuda: 'Su último turno quedó ausente y no tiene otro dado: hay que darle turno de nuevo.' },
+}
+
+// «Que se replique»: si otra pantalla cambia a este paciente (el médico inicia el trámite, alguien
+// le vincula un médico, le dan un turno), esta ficha se actualiza sola, sin parpadear.
+useRecargaEnCambios('pacientes', () => store.refrescarActual(socioId), { filtro: ev => ev.id === socioId })
+useRecargaEnCambios('turnos', () => {
+  store.refrescarActual(socioId)
+  if (turnosLoaded.value) loadTurnos()
+})
 
 // ── Timeline ──────────────────────────────────────────────────────────────────
 const timeline        = ref([])
@@ -381,7 +417,10 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
             {{ (s.nombre?.[0] || '') + (s.apellido?.[0] || '') }}
           </div>
           <div class="sd__hero-info">
-            <h1 class="sd__hero-name">{{ s.nombre }} {{ s.apellido }}</h1>
+            <h1 class="sd__hero-name">
+              {{ s.nombre }} {{ s.apellido }}
+              <span v-if="s.apodo" class="sd__apodo">«{{ s.apodo }}»</span>
+            </h1>
             <div class="sd__hero-meta">
               <span>DNI {{ s.dni || '—' }}</span>
               <span v-if="edadSocio" class="sd__meta-sep">·</span>
@@ -405,6 +444,14 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
                 <i class="bi bi-hourglass-split"></i> Suspendido
               </span>
               <span v-else class="sd__status-badge sd__status-badge--active">Activo</span>
+              <span v-if="ENTREVISTA[s.entrevista]" class="sd__status-badge"
+                    :class="s.entrevista === 'pendiente_entrevista' ? 'sd__status-badge--entrevista' : 'sd__status-badge--falto'"
+                    :title="ENTREVISTA[s.entrevista].ayuda">
+                {{ ENTREVISTA[s.entrevista].label }}
+              </span>
+              <span v-if="vinculoLabel(s.reprocann_vinculo)" class="sd__status-badge sd__status-badge--vinculo">
+                {{ vinculoLabel(s.reprocann_vinculo) }}
+              </span>
             </div>
           </div>
         </div>
@@ -503,6 +550,10 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
               <div class="sd__info-val">{{ s.nombre }} {{ s.apellido }}</div>
             </div>
             <div class="sd__info-item">
+              <div class="sd__info-label">Apodo</div>
+              <div class="sd__info-val">{{ s.apodo || '—' }}</div>
+            </div>
+            <div class="sd__info-item">
               <div class="sd__info-label">DNI</div>
               <div class="sd__info-val sd__info-val--mono">{{ s.dni || '—' }}</div>
             </div>
@@ -523,6 +574,11 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
               <div class="sd__info-val">{{ s.telefono || '—' }}</div>
             </div>
           </div>
+        </div>
+        <!-- Los médicos que lo atienden (6-oct-2026). Administración vincula; el médico ve la lista. -->
+        <div v-if="club.data?.features?.medico === true && (isAdmin || isMedico)" class="sd__card sd__card--pad">
+          <SocioMedicos :paciente-id="socioId" :medicos="s.medicos || []" :puede-editar="isAdmin"
+                        @cambio="store.refrescarActual(socioId)" />
         </div>
         <div class="sd__sys-info">
           <span>ID sistema: <strong>#{{ s.id }}</strong></span>
@@ -593,6 +649,31 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
                   </span>
                 </span>
                 <span v-else class="sd__val-empty">Sin datos</span>
+              </div>
+            </div>
+            <div class="sd__info-item">
+              <div class="sd__info-label">De quién es su REPROCANN</div>
+              <div class="sd__info-val">
+                <select v-if="canEdit" class="sd__vinculo-select" :value="s.reprocann_vinculo || ''"
+                        :disabled="cambiandoEstado" aria-label="De quién es su REPROCANN"
+                        @change="cambiarVinculo($event.target.value)">
+                  <option value="">Sin dato</option>
+                  <option v-for="v in REPROCANN_VINCULOS" :key="v.value" :value="v.value">{{ v.label }} — {{ v.ayuda }}</option>
+                </select>
+                <span v-else>{{ vinculoLabel(s.reprocann_vinculo) || 'Sin dato' }}</span>
+              </div>
+            </div>
+            <div class="sd__info-item">
+              <div class="sd__info-label">Trámite</div>
+              <div class="sd__info-val sd__tramite">
+                <span v-if="s.reprocann_tramite_iniciado_el">Iniciado el {{ formatDate(s.reprocann_tramite_iniciado_el) }}</span>
+                <span v-else class="sd__val-empty">Sin trámite registrado</span>
+                <!-- «Inicié el trámite» (Javi): el médico o administración. Pasa a «en trámite» con la
+                     fecha, y el cambio se ve en toda la app. -->
+                <button v-if="canEdit && s.reprocann_estado !== 'pendiente'" type="button" class="sd__btn-tramite"
+                        :disabled="iniciandoTramite" @click="iniciarTramite">
+                  Inicié el trámite
+                </button>
               </div>
             </div>
             <div class="sd__info-item">
@@ -869,6 +950,16 @@ onUnmounted(() => { document.removeEventListener('keydown', escapeHandler, true)
 .sd__status-badge--active { background: rgba(21,128,61,.1); color: #15803d; }
 .sd__status-badge--susp { background: var(--c-amber-100); color: var(--c-amber-500); border: 1px dashed var(--c-amber-500); cursor: help; }
 .sd__val-susp { color: var(--c-amber-500); font-weight: 600; }
+.sd__apodo { font-size: 1rem; font-weight: 600; color: var(--c-slate-500); letter-spacing: 0; margin-left: .35rem; }
+.sd__status-badge--entrevista { background: var(--c-amber-100); color: var(--c-amber-500); border: 1px solid var(--c-amber-500); cursor: help; }
+.sd__status-badge--falto { background: var(--c-slate-100); color: var(--c-slate-600); border: 1px dashed var(--c-slate-400); cursor: help; }
+.sd__status-badge--vinculo { background: var(--c-leaf-50); color: var(--c-leaf-800); border: 1px solid var(--c-leaf-100); }
+.sd__card--pad { padding: 1rem 1.25rem; }
+.sd__vinculo-select { max-width: 100%; min-height: 34px; border: 1.5px solid var(--c-slate-200); border-radius: 8px; padding: 0 .5rem; font-size: .85rem; background: var(--c-paper); }
+.sd__tramite { display: flex; align-items: center; flex-wrap: wrap; gap: .6rem; }
+.sd__btn-tramite { min-height: 32px; padding: 0 .85rem; white-space: nowrap; border-radius: 8px; border: 1.5px solid var(--c-leaf-800); background: transparent; color: var(--c-leaf-800); font-weight: 700; font-size: .8rem; cursor: pointer; }
+.sd__btn-tramite:hover:not(:disabled) { background: var(--c-leaf-50); }
+.sd__btn-tramite:disabled { opacity: .5; cursor: not-allowed; }
 
 /* Alertas */
 .sd__alerta { display: flex; align-items: flex-start; gap: .75rem; padding: .875rem 1.1rem; border-radius: 12px; font-size: .875rem; margin-bottom: 1.25rem; }

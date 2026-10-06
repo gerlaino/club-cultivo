@@ -11,6 +11,8 @@ RSpec.describe 'Pacientes — role authorization matrix', type: :request do
   let(:delivery)    { create(:user, club: club, role: 'delivery') }
   let(:abogado)     { create(:user, club: club, role: 'abogado') }
   let!(:paciente)   { create(:paciente, club: club, created_by: admin, notas_clinicas: 'Historia confidencial') }
+  # El médico ve sólo a sus vinculados (6-oct-2026).
+  before { MedicoPaciente.vincular!(medico: medico, paciente: paciente) }
 
   # ── Bug 1: notas_clinicas persiste en DB ─────────────────────────────────────
   describe 'Bug 1 — notas_clinicas persistence' do

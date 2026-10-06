@@ -1,0 +1,9 @@
+Hola <%= @medico.first_name.presence || '' %>,
+
+<%= @frase %>
+
+<%= @turno.paciente&.nombre_completo %>
+<%= @cuando %>
+<% unless @cambio == 'cancelado' %>
+Entrá a tu agenda y tocá «Lo vi» para que sepan que te enteraste: <%= @link %>
+<% end %>

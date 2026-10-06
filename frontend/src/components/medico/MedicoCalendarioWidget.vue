@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { getAdminMedicoDisponibilidad, getAdminMedicoTurnos } from '../../lib/api.js'
+import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { ChevronLeft, ChevronRight, X, User2 } from 'lucide-vue-next'
 
@@ -123,6 +124,18 @@ function fmtHora(fh)          { return new Date(fh).toLocaleTimeString('es-AR', 
 function fmtFechaCompleta(fh) { return new Date(fh).toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) }
 function fmtHoraFin(fh, mins) { const d = new Date(fh); d.setMinutes(d.getMinutes() + mins); return d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }) }
 
+// ── Lo que administración necesita para apurar (6-oct-2026) ──
+// Turnos que ya pasaron y el médico no cerró (en la lista de pacientes: «pendiente de entrevista»),
+// y los que le dieron y todavía no vio.
+const sinCerrar = computed(() => turnos.value.filter(t =>
+  ['programado', 'confirmado'].includes(t.estado) && new Date(t.fecha_hora) < ahora.value))
+const sinVer = computed(() => turnos.value.filter(t => !t.visto_at && t.estado !== 'cancelado'))
+
+// Si el médico toca «Lo vi» o cierra un turno, esta agenda se actualiza sola.
+useRecargaEnCambios('turnos', async () => {
+  try { turnos.value = (await getAdminMedicoTurnos(props.medicoId)).data || [] } catch { /* idem */ }
+})
+
 // ── Load ──────────────────────────────────────────────────
 onMounted(async () => {
   try {
@@ -165,6 +178,14 @@ onUnmounted(() => clearInterval(tick))
         <div v-if="kpis.urgencias > 0" class="cw__kpi cw__kpi--danger">
           <span class="cw__kpi-val">{{ kpis.urgencias }}</span>
           <span class="cw__kpi-lbl">Urgencias</span>
+        </div>
+        <div v-if="sinCerrar.length" class="cw__kpi cw__kpi--danger" title="Turnos cuya hora ya pasó y el médico no marcó como realizados ni ausentes.">
+          <span class="cw__kpi-val">{{ sinCerrar.length }}</span>
+          <span class="cw__kpi-lbl">Pasados sin cerrar</span>
+        </div>
+        <div v-if="sinVer.length" class="cw__kpi cw__kpi--warn" title="Turnos que le dieron y todavía no tocó «Lo vi».">
+          <span class="cw__kpi-val">{{ sinVer.length }}</span>
+          <span class="cw__kpi-lbl">Sin ver por el médico</span>
         </div>
       </div>
     </div>
@@ -234,7 +255,7 @@ onUnmounted(() => clearInterval(tick))
                 v-for="t in turnosDia(dia)"
                 :key="t.id"
                 class="cw__turno"
-                :class="[`cw__turno--${t.tipo}`, `cw__turno--${t.estado}`]"
+                :class="[`cw__turno--${t.tipo}`, `cw__turno--${t.estado}`, { 'cw__turno--sinver': !t.visto_at && t.estado !== 'cancelado' }]"
                 :style="{ top: turnoTop(t) + 'px', height: turnoHeight(t) + 'px' }"
                 @click.stop="turnoDetalle = turnoDetalle?.id === t.id ? null : t"
                 :title="`${t.paciente_nombre} · ${TIPO_CFG[t.tipo]?.label} · ${fmtHora(t.fecha_hora)}`"
@@ -280,6 +301,12 @@ onUnmounted(() => clearInterval(tick))
               <dd>{{ fmtHora(turnoDetalle.fecha_hora) }} – {{ fmtHoraFin(turnoDetalle.fecha_hora, turnoDetalle.duracion_minutos) }}</dd>
               <dt>Duración</dt>
               <dd>{{ turnoDetalle.duracion_minutos }} min</dd>
+              <dt>El médico</dt>
+              <dd>
+                <span v-if="turnoDetalle.visto_at" class="cw__visto cw__visto--si">Lo vio ✓</span>
+                <span v-else-if="turnoDetalle.estado !== 'cancelado'" class="cw__visto">Todavía no lo vio</span>
+                <span v-else>—</span>
+              </dd>
               <dt v-if="turnoDetalle.motivo">Motivo</dt>
               <dd v-if="turnoDetalle.motivo">{{ turnoDetalle.motivo }}</dd>
             </dl>
@@ -295,6 +322,9 @@ onUnmounted(() => clearInterval(tick))
 
 <style scoped>
 .cw { display: flex; flex-direction: column; }
+.cw__turno--sinver { box-shadow: 0 0 0 2px var(--c-amber-500); }
+.cw__visto { font-weight: 700; color: var(--c-amber-500); }
+.cw__visto--si { color: var(--c-leaf-800); }
 
 /* Nav + KPIs */
 .cw__top { display: flex; align-items: center; gap: 1.25rem; padding: .875rem 1.25rem; border-bottom: 1px solid var(--c-slate-100); flex-wrap: wrap; }

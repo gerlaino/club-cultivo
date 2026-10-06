@@ -83,6 +83,14 @@ class ApplicationController < ActionController::API
 
   private
 
+  # Los pacientes que ESTE usuario puede leer. Para un médico, sólo sus vinculados (6-oct-2026);
+  # para el resto, lo que diga su rol. Todo controller que busca un paciente por id para alguien
+  # que puede ser médico lo busca acá, no en `club.pacientes`: si no, el médico abre por URL la
+  # ficha, las indicaciones o los documentos de un paciente que no atiende.
+  def pacientes_visibles
+    policy_scope(Paciente)
+  end
+
   def user_not_authorized
     render json: { error: "Forbidden" }, status: :forbidden
   end

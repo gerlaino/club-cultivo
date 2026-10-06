@@ -7,7 +7,9 @@ module Public
 
       return render json: { error: 'Carnet no encontrado' }, status: :not_found unless paciente
 
-      reprocann_estado = if paciente.reprocann_numero.blank?
+      reprocann_estado = if paciente.reprocann_estado == 'vencido' # marcado a mano (6-oct)
+        'vencido'
+      elsif paciente.reprocann_numero.blank?
         'sin_registro'
       elsif paciente.reprocann_vencimiento.nil?
         'vigente'

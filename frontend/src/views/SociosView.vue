@@ -11,6 +11,8 @@ import DsSpinner from '../design-system/components/Spinner.vue'
 import SocioEditarModal from '../components/pacientes/SocioEditarModal.vue'
 import { reprocannBadge, reprocannCategoria } from '../composables/useReprocann.js'
 import { hoyISO } from '../utils/dates.js'
+import { vinculoLabel } from '../composables/useSocioEditar.js'
+import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
 
 const store  = usePacientesStore()
 const auth   = useAuthStore()
@@ -38,6 +40,10 @@ const REPRO_URL = {
   vencidos: 'vencidos',
   sin_reprocann: 'sin_rep',
   pendientes: 'pendientes',
+  // ?reprocann=entrevista abre la lista filtrada (el contador de turnos sin cerrar lleva acá).
+  entrevista: 'entrevista',
+  faltaron: 'falto',
+  adherentes: 'adherentes',
   todos: 'todos',
 }
 const REPRO_URL_REVERSE = Object.fromEntries(Object.entries(REPRO_URL).map(([k,v]) => [v,k]))
@@ -184,6 +190,10 @@ const filtrados = computed(() => {
   if (filterEstado.value === 'pendientes') list = list.filter(s => reprocannCategoria(s) === 'pendiente')
   if (filterEstado.value === 'sin_rep')    list = list.filter(s => reprocannCategoria(s) === 'sin_reprocann')
   if (filterEstado.value === 'pend_aprobacion') list = list.filter(s => !s.aprobado_at)
+  // Calculados por el backend (6-oct-2026): de los turnos y del vínculo del REPROCANN.
+  if (filterEstado.value === 'entrevista') list = list.filter(s => s.entrevista === 'pendiente_entrevista')
+  if (filterEstado.value === 'falto')      list = list.filter(s => s.entrevista === 'falto_turno')
+  if (filterEstado.value === 'adherentes') list = list.filter(s => s.reprocann_vinculo === 'otra_organizacion')
   if (search.value.trim()) {
     const q = search.value.toLowerCase()
     // El DNI se compara sin puntos ni espacios de los dos lados: se escribe "90.000.027" y se
@@ -191,6 +201,7 @@ const filtrados = computed(() => {
     const qDni = q.replace(/[^\d]/g, '')
     list = list.filter(s =>
       (s.nombre + ' ' + s.apellido).toLowerCase().includes(q) ||
+      (s.apodo || '').toLowerCase().includes(q) ||
       (qDni && String(s.dni || '').replace(/[^\d]/g, '').includes(qDni)) ||
       s.email?.toLowerCase().includes(q)
     )
@@ -201,6 +212,9 @@ const filtrados = computed(() => {
 const totalPagesSv  = computed(() => Math.max(1, Math.ceil(filtrados.value.length / perPage)))
 const paginadosSv   = computed(() => filtrados.value.slice((page.value-1)*perPage, page.value*perPage))
 watch(filtrados, () => { page.value = 1 })
+
+// «Que se replique»: si otra pantalla cambia un paciente o un turno, la lista se pone al día sola.
+useRecargaEnCambios(['pacientes', 'turnos'], () => store.refrescar({ limite: LIMITE_PADRON }))
 
 onMounted(async () => {
   await cargar()
@@ -277,6 +291,22 @@ async function exportarCSV() {
         <div class="sv__kpi-val">{{ kpis.sin_rep }}</div>
         <div class="sv__kpi-lbl">Sin REPROCANN</div>
       </button>
+      <!-- Con turno que ya pasó y el médico no cerró: a quién apurar (6-oct-2026). -->
+      <button v-if="kpis.entrevista_pendiente" class="sv__kpi sv__kpi--warn"
+              :class="{ 'sv__kpi--active': filterEstado === 'entrevista' }" @click="filterEstado = 'entrevista'">
+        <div class="sv__kpi-val">{{ kpis.entrevista_pendiente }}</div>
+        <div class="sv__kpi-lbl">Pendientes de entrevista</div>
+      </button>
+      <button v-if="kpis.falto_turno" class="sv__kpi sv__kpi--gray"
+              :class="{ 'sv__kpi--active': filterEstado === 'falto' }" @click="filterEstado = 'falto'">
+        <div class="sv__kpi-val">{{ kpis.falto_turno }}</div>
+        <div class="sv__kpi-lbl">Faltaron al turno</div>
+      </button>
+      <button v-if="kpis.adherentes" class="sv__kpi sv__kpi--gray"
+              :class="{ 'sv__kpi--active': filterEstado === 'adherentes' }" @click="filterEstado = 'adherentes'">
+        <div class="sv__kpi-val">{{ kpis.adherentes }}</div>
+        <div class="sv__kpi-lbl">Adherentes</div>
+      </button>
       <!-- Cargados en el mostrador y sin admitir. Va con acento propio y no en gris: cada uno es
            alguien que hoy NO puede retirar, y depende de que alguien lo apruebe. -->
       <button v-if="kpis.pendientes_aprobacion" class="sv__kpi sv__kpi--warn"
@@ -313,7 +343,7 @@ async function exportarCSV() {
           v-model="search"
           @input="onSearchInput"
           class="sv__search"
-          placeholder="Buscar por nombre, apellido, DNI…"
+          placeholder="Buscar por nombre, apellido, apodo, DNI…"
         />
         <span v-if="search" class="sv__search-count">{{ filtrados.length }}</span>
       </div>
@@ -400,6 +430,12 @@ async function exportarCSV() {
               <!-- "Apellido, Nombre": la lista se ordena por apellido, así que es el apellido
                    lo que hay que poder recorrer con la vista para encontrar a alguien. -->
               <div class="sv-pac-nombre">{{ nombreListado(s) }}</div>
+              <div v-if="s.apodo" class="sv-pac-apodo">«{{ s.apodo }}»</div>
+              <!-- Debajo del nombre (columna ancha): en Estado no entraba y pisaba al REPROCANN. -->
+              <div v-if="s.entrevista === 'pendiente_entrevista'" class="sv-estado sv-estado--entrevista"
+                   title="Tiene un turno que ya pasó y el médico no lo cerró.">Pendiente de entrevista</div>
+              <div v-else-if="s.entrevista === 'falto_turno'" class="sv-estado sv-estado--falto"
+                   title="Su último turno quedó ausente y no tiene otro dado.">Faltó al turno</div>
             </td>
             <td><span class="sv-mono">{{ s.dni }}</span></td>
             <td>
@@ -432,6 +468,7 @@ async function exportarCSV() {
                 }"
               >{{ reprocannStatus(s)?.label }}</span>
               <span v-else class="sv-empty">Sin registro</span>
+              <div v-if="vinculoLabel(s.reprocann_vinculo)" class="sv-vinculo">{{ vinculoLabel(s.reprocann_vinculo) }}</div>
             </td>
             <td>
               <span v-if="s.reprocann_vencimiento" class="sv-rep-fecha">{{ formatDate(s.reprocann_vencimiento) }}</span>
@@ -557,11 +594,15 @@ async function exportarCSV() {
 .sv-ind--none    { background: var(--c-slate-200); }
 
 .sv-pac-nombre { font-weight: 700; color: var(--c-slate-900); font-size: .875rem; }
+.sv-pac-apodo { font-size: .76rem; color: var(--c-slate-500); }
+.sv-vinculo { margin-top: 3px; font-size: .7rem; font-weight: 600; color: var(--c-leaf-800); }
 .sv-estado { display: inline-block; font-size: .7rem; font-weight: 700; padding: .15em .55em; border-radius: 999px; white-space: nowrap; }
 .sv-estado--on  { background: #f0fdf4; color: #15803d; }
 .sv-estado--off { background: var(--c-slate-100); color: var(--c-slate-500); }
 /* Suspendido: un aviso, no una baja. Distinto de Inactivo a la vista (Germán: «bien distintivo»). */
 .sv-estado--susp { background: var(--c-amber-100); color: var(--c-amber-500); border: 1px dashed var(--c-amber-500); cursor: help; }
+.sv-estado--entrevista { display: inline-block; margin-top: 4px; background: var(--c-amber-100); color: var(--c-amber-500); border: 1px solid var(--c-amber-500); cursor: help; }
+.sv-estado--falto { display: inline-block; margin-top: 4px; background: var(--c-slate-100); color: var(--c-slate-600); border: 1px dashed var(--c-slate-400); cursor: help; }
 /* Ámbar, el mismo tono que el KPI: es algo que espera una acción, no un estado estable. */
 .sv-estado--pend { background: #fffbeb; color: #b45309; }
 .sv-mono  { font-family: monospace; font-size: .82rem; color: #374151; }

@@ -23,6 +23,9 @@ RSpec.describe 'Autorización de datos clínicos', type: :request do
   shared_examples 'endpoint clínico' do |path_proc|
     context 'permitido' do
       it 'médico recibe 200' do
+        # Su paciente: desde el 6-oct-2026 el médico ve sólo a sus vinculados (el no vinculado
+        # tiene sus casos en medico_pacientes_vinculos_spec.rb).
+        MedicoPaciente.vincular!(medico: medico, paciente: paciente)
         sign_in_as(medico)
         get instance_exec(&path_proc), as: :json
         expect(response).to have_http_status(:ok)

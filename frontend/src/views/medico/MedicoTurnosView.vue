@@ -3,7 +3,8 @@ import { toISO } from '../../utils/dates.js'
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { useRouter } from 'vue-router'
-import { getMedicoTurnos, getMedicoPacientes, createMedicoTurno, updateMedicoTurno, getMedicoDisponibilidad } from '../../lib/api.js'
+import { getMedicoTurnos, getMedicoPacientes, createMedicoTurno, updateMedicoTurno, getMedicoDisponibilidad, marcarTurnoVisto } from '../../lib/api.js'
+import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import { useToast } from '../../composables/useToast.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import TurnoDetallePanel from '../../components/TurnoDetallePanel.vue'
@@ -164,12 +165,45 @@ const kpis = computed(() => {
   }
 })
 
+// ── Lo que le dieron y no vio, y lo que ya pasó sin cerrar (6-oct-2026) ─────────
+// Sin ver: administración le dio (o le movió) un turno y el médico todavía no tocó «Lo vi».
+const sinVer = computed(() => turnos.value
+  .filter(t => !t.visto_at && t.estado !== 'cancelado')
+  .sort((a, b) => new Date(a.fecha_hora) - new Date(b.fecha_hora)))
+// Pasados sin cerrar: la hora ya pasó y sigue programado o confirmado. Es lo que administración
+// ve como «pendiente de entrevista» del paciente.
+const sinCerrar = computed(() => turnos.value
+  .filter(t => ['programado', 'confirmado'].includes(t.estado) && new Date(t.fecha_hora) < ahora.value)
+  .sort((a, b) => new Date(a.fecha_hora) - new Date(b.fecha_hora)))
+
+const marcandoVisto = ref(null)
+async function loVi(t) {
+  marcandoVisto.value = t.id
+  try {
+    const { data } = await marcarTurnoVisto(t.id)
+    const i = turnos.value.findIndex(x => x.id === t.id)
+    if (i !== -1) turnos.value[i] = { ...turnos.value[i], ...data }
+  } catch {
+    toast.error('No se pudo marcar como visto')
+  } finally {
+    marcandoVisto.value = null
+  }
+}
+function fmtDiaHora(iso) {
+  return new Date(iso).toLocaleString('es-AR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+}
+
+// Si administración le da, le mueve o le cancela un turno, la agenda se actualiza sola.
+useRecargaEnCambios('turnos', async () => {
+  try { turnos.value = (await getMedicoTurnos()).data || [] } catch { /* la próxima vez */ }
+})
+
 // ── Patient search ────────────────────────────────────────────────────────────
 const pacFiltrados = computed(() => {
   if (!searchPac.value.trim()) return pacientes.value.slice(0, 6)
   const q = searchPac.value.toLowerCase()
   return pacientes.value
-    .filter(p => `${p.nombre} ${p.apellido} ${p.dni}`.toLowerCase().includes(q))
+    .filter(p => `${p.nombre} ${p.apellido} ${p.dni} ${p.apodo || ''}`.toLowerCase().includes(q))
     .slice(0, 6)
 })
 
@@ -334,6 +368,37 @@ onUnmounted(() => clearInterval(tickInterval))
       </div>
     </div>
 
+    <!-- ── Turnos que te dieron y no viste (6-oct-2026): «Lo vi» avisa a administración ── -->
+    <section v-if="!loading && sinVer.length" class="tv__aviso tv__aviso--nuevo" aria-label="Turnos nuevos">
+      <p class="tv__aviso-t">
+        <AlertCircle :size="15" />
+        {{ sinVer.length === 1 ? 'Te dieron un turno nuevo' : `Te dieron ${sinVer.length} turnos nuevos` }}
+      </p>
+      <ul class="tv__aviso-lista">
+        <li v-for="t in sinVer" :key="t.id" class="tv__aviso-item">
+          <span><strong>{{ t.paciente_nombre }}</strong> · {{ fmtDiaHora(t.fecha_hora) }} · {{ TIPO_CFG[t.tipo]?.label }}</span>
+          <button type="button" class="tv__lovi" :disabled="marcandoVisto === t.id" @click="loVi(t)">
+            <CheckCircle2 :size="14" /> Lo vi
+          </button>
+        </li>
+      </ul>
+    </section>
+
+    <!-- ── Turnos que ya pasaron y siguen abiertos: cerrarlos (realizado / ausente) ── -->
+    <section v-if="!loading && sinCerrar.length" class="tv__aviso tv__aviso--atrasado" aria-label="Turnos sin cerrar">
+      <p class="tv__aviso-t">
+        <Clock :size="15" />
+        {{ sinCerrar.length === 1 ? 'Tenés un turno que ya pasó sin cerrar' : `Tenés ${sinCerrar.length} turnos que ya pasaron sin cerrar` }}
+        <span class="tv__aviso-sub">Marcalos como realizado o ausente.</span>
+      </p>
+      <ul class="tv__aviso-lista">
+        <li v-for="t in sinCerrar" :key="t.id" class="tv__aviso-item">
+          <span><strong>{{ t.paciente_nombre }}</strong> · {{ fmtDiaHora(t.fecha_hora) }}</span>
+          <button type="button" class="tv__aviso-abrir" @click="abrirDetalle(t)">Cerrar turno</button>
+        </li>
+      </ul>
+    </section>
+
     <!-- ── Loading ── -->
     <div v-if="loading" class="tv__loading">
       <DsSpinner :size="22" /> Cargando turnos…
@@ -425,6 +490,7 @@ onUnmounted(() => clearInterval(tickInterval))
                 :class="[
                   `tv__turno--${t.tipo}`,
                   `tv__turno--${t.estado}`,
+                  { 'tv__turno--sinver': !t.visto_at && t.estado !== 'cancelado' },
                 ]"
                 :style="{
                   top:    turnoTop(t) + 'px',
@@ -720,6 +786,18 @@ onUnmounted(() => clearInterval(tickInterval))
 .tv__turno--realizado   { opacity: .7; }
 
 .tv__turno-hora   { font-size: .62rem; font-weight: 700; color: var(--c-slate-500); line-height: 1.2; }
+.tv__turno--sinver { box-shadow: 0 0 0 2px var(--c-amber-500); }
+.tv__aviso { margin: 0 0 1rem; padding: .85rem 1rem; border-radius: 12px; border: 1px solid; }
+.tv__aviso--nuevo { background: var(--c-amber-100); border-color: var(--c-amber-500); }
+.tv__aviso--atrasado { background: var(--c-slate-50); border-color: var(--c-slate-200); }
+.tv__aviso-t { margin: 0 0 .5rem; display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; font-weight: 700; font-size: .88rem; color: var(--c-ink-950); }
+.tv__aviso-sub { font-weight: 500; color: var(--c-slate-500); }
+.tv__aviso-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: .35rem; }
+.tv__aviso-item { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; font-size: .84rem; color: var(--c-slate-700); }
+.tv__lovi, .tv__aviso-abrir { display: inline-flex; align-items: center; gap: .3rem; min-height: 32px; padding: 0 .8rem; border-radius: 8px; font-size: .8rem; font-weight: 700; cursor: pointer; }
+.tv__lovi { border: none; background: var(--c-leaf-800); color: var(--c-paper); }
+.tv__lovi:disabled { opacity: .5; cursor: not-allowed; }
+.tv__aviso-abrir { border: 1.5px solid var(--c-slate-300); background: transparent; color: var(--c-slate-700); }
 .tv__turno-nombre { font-size: .7rem; font-weight: 700; color: var(--c-slate-900); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tv__turno-tipo   { font-size: .62rem; color: var(--c-slate-500); line-height: 1.2; }
 

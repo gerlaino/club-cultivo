@@ -16,6 +16,9 @@ RSpec.describe 'Pacientes — no filtrar historia clínica a roles no clínicos'
     medicacion_habitual grupo_sanguineo
   ].freeze
 
+  # El médico ve sólo a sus vinculados (6-oct-2026).
+  before { MedicoPaciente.vincular!(medico: medico, paciente: paciente) }
+
   let!(:paciente) do
     create(:paciente, club: club, created_by: admin, es_paciente: true,
       notas_clinicas:          'Epilepsia refractaria',

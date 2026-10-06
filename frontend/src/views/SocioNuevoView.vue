@@ -9,6 +9,7 @@ import DsSpinner from '../design-system/components/Spinner.vue'
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import CredencialesNuevas from '../components/ui/CredencialesNuevas.vue'
 import { toISO } from '../utils/dates.js'
+import { REPROCANN_ESTADOS, REPROCANN_VINCULOS } from '../composables/useSocioEditar.js'
 
 const router = useRouter()
 const store  = usePacientesStore()
@@ -40,6 +41,7 @@ const todayISO        = new Date().toLocaleDateString('en-CA') // yyyy-mm-dd loc
 const form = ref({
   nombre:               '',
   apellido:             '',
+  apodo:                '',
   dni:                  '',
   fecha_nacimiento:     '',
   telefono:             '',
@@ -60,17 +62,12 @@ const form = ref({
   reprocann_numero:     '',
   reprocann_vencimiento:'',
   reprocann_estado:     'sin_registro',
+  reprocann_vinculo:    '',
   es_paciente:          true,
 })
 
-const REPROCANN_ESTADOS = [
-  { value: 'sin_registro', label: 'Sin registro',         color: '#94a3b8', bg: '#f8fafc' },
-  { value: 'pendiente',    label: 'Pendiente de aprobación', color: '#b45309', bg: '#fffbeb' },
-  // «Vigente», no «Activo» (2-oct-2026): activo/inactivo es el PACIENTE en la organización (el tilde
-  // de abajo), no su REPROCANN. El valor guardado sigue siendo `activo`. «Inactivo» no es un estado
-  // del REPROCANN y se sacó; «Vencido» lo calcula la fecha solo (`reprocann_estado_efectivo`).
-  { value: 'activo',       label: 'Vigente',              color: '#15803d', bg: '#f0fdf4' },
-]
+// Una sola lista para el alta, la ficha y el editor (antes había una copia acá).
+// REPROCANN_ESTADOS / REPROCANN_VINCULOS vienen de useSocioEditar.
 
 const reprocannVencimientoSugerido = computed(() => {
   const d = new Date()
@@ -179,6 +176,10 @@ async function handleSubmit() {
             <input v-model.trim="form.apellido" class="snv__input" :class="{ 'snv__input--err': formErrors.apellido }"
               placeholder="Ej: García" />
             <span v-if="formErrors.apellido" class="snv__err">{{ formErrors.apellido }}</span>
+          </div>
+          <div class="snv__field">
+            <label class="snv__label">Apodo <span class="snv__opt">opcional</span></label>
+            <input v-model.trim="form.apodo" class="snv__input" maxlength="60" placeholder="¿Cómo le dicen?" />
           </div>
           <div class="snv__field">
             <label class="snv__label">DNI <span class="snv__req">*</span></label>
@@ -304,6 +305,18 @@ async function handleSubmit() {
               @click="form.reprocann_estado = opt.value"
             >{{ opt.label }}</button>
           </div>
+        </div>
+
+        <div class="snv__field" style="margin-bottom:1rem">
+          <label class="snv__label">De quién es su REPROCANN</label>
+          <div class="snv__repro-estados">
+            <button type="button" class="snv__repro-btn" :class="{ 'snv__repro-btn--active': !form.reprocann_vinculo }"
+                    @click="form.reprocann_vinculo = ''">Sin dato</button>
+            <button v-for="v in REPROCANN_VINCULOS" :key="v.value" type="button" class="snv__repro-btn"
+                    :class="{ 'snv__repro-btn--active': form.reprocann_vinculo === v.value }" :title="v.ayuda"
+                    @click="form.reprocann_vinculo = v.value">{{ v.label }}</button>
+          </div>
+          <span class="snv__hint">Vinculado: su REPROCANN está con la organización. Adherente: paciente nuevo con REPROCANN vigente, vinculado a otra organización por ahora.</span>
         </div>
 
         <div class="snv__grid snv__grid--2">

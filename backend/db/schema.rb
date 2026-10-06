@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_10_04_210000) do
+ActiveRecord::Schema[7.2].define(version: 2026_10_06_120000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -1531,6 +1531,20 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_04_210000) do
     t.index ["user_id"], name: "index_mails_enviados_on_user_id"
   end
 
+  create_table "medico_pacientes", force: :cascade do |t|
+    t.bigint "club_id", null: false
+    t.bigint "medico_id", null: false
+    t.bigint "paciente_id", null: false
+    t.bigint "created_by_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["club_id"], name: "index_medico_pacientes_on_club_id"
+    t.index ["created_by_id"], name: "index_medico_pacientes_on_created_by_id"
+    t.index ["medico_id", "paciente_id"], name: "index_medico_pacientes_on_medico_id_and_paciente_id", unique: true
+    t.index ["medico_id"], name: "index_medico_pacientes_on_medico_id"
+    t.index ["paciente_id"], name: "index_medico_pacientes_on_paciente_id"
+  end
+
   create_table "mostrador_items", force: :cascade do |t|
     t.bigint "club_id", null: false
     t.bigint "mostrador_id", null: false
@@ -1730,6 +1744,9 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_04_210000) do
     t.bigint "aprobado_por_id"
     t.bigint "user_id"
     t.string "envio_etiqueta"
+    t.string "reprocann_vinculo"
+    t.date "reprocann_tramite_iniciado_el"
+    t.string "apodo"
     t.index "lower((apellido)::text)", name: "index_socios_on_lower_apellido"
     t.index "lower((nombre)::text)", name: "index_socios_on_lower_nombre"
     t.index ["aprobado_at"], name: "index_pacientes_on_aprobado_at"
@@ -2583,6 +2600,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_04_210000) do
     t.datetime "updated_at", null: false
     t.datetime "deleted_at"
     t.bigint "deleted_by_id"
+    t.datetime "visto_at"
     t.index ["club_id", "fecha_hora"], name: "index_turnos_on_club_id_and_fecha_hora"
     t.index ["club_id"], name: "index_turnos_on_club_id"
     t.index ["deleted_at"], name: "index_turnos_on_deleted_at"
@@ -2923,6 +2941,10 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_04_210000) do
   add_foreign_key "mails_enviados", "plantillas_mail", column: "plantilla_mail_id"
   add_foreign_key "mails_enviados", "users"
   add_foreign_key "mails_enviados", "users", column: "deleted_by_id"
+  add_foreign_key "medico_pacientes", "clubs"
+  add_foreign_key "medico_pacientes", "pacientes"
+  add_foreign_key "medico_pacientes", "users", column: "created_by_id"
+  add_foreign_key "medico_pacientes", "users", column: "medico_id"
   add_foreign_key "mostrador_items", "clubs"
   add_foreign_key "mostrador_items", "mostradores"
   add_foreign_key "mostrador_items", "stocks"

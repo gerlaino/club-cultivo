@@ -41,6 +41,10 @@ module Notificaciones
       { clave: 'tarea_asignada',   grupo: TE_PIDEN, label: 'Tarea nueva asignada a vos',
         desc: 'Cuando alguien te asigna una tarea.',
         roles: EQUIPO, feature: nil, personal: false, default: true },
+      # Al médico: administración le dio, le movió o le canceló un turno (6-oct-2026). También va por mail.
+      { clave: 'turno_asignado',   grupo: TE_PIDEN, label: 'Turnos que te dan',
+        desc: 'Cuando administración te da, te mueve o te cancela un turno.',
+        roles: %w[medico], feature: 'medico', personal: false, default: true },
       { clave: 'plan_vence',       grupo: TE_PIDEN, label: 'Plan por vencer',
         desc: 'Una semana antes y el día que vence.',
         roles: %w[admin], feature: nil, default: true },

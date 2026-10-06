@@ -3,7 +3,7 @@ class PacientesController < ApplicationController
   before_action -> { require_feature!(:produccion_dispensa) }
   before_action :check_pacientes_role!
   before_action :set_paciente, only: [:show, :update, :destroy, :timeline, :subir_reprocann, :eliminar_reprocann, :enviar_mail, :mails_enviados, :aprobar,
-                                          :crear_acceso_portal, :restablecer_acceso_portal]
+                                          :crear_acceso_portal, :restablecer_acceso_portal, :iniciar_tramite_reprocann]
   # Hasta ahora `mailer` era una etiqueta que no controlaba nada: no había un solo
   # `require_feature!` ni chequeo en el frontend, así que el flag se podía apagar y los mails
   # seguían saliendo. Ahora que se vende aparte, la barrera va acá — el candado en el backend,
@@ -17,8 +17,9 @@ class PacientesController < ApplicationController
   # ── ALLOWLIST de campos serializados ──────────────────────────────────────────
   # Campos NO clínicos: visibles para cualquier rol con lectura de la ficha.
   CAMPOS_NO_CLINICOS = %w[
-    id club_id nombre apellido dni dni_normalizado fecha_nacimiento es_paciente
+    id club_id nombre apellido apodo dni dni_normalizado fecha_nacimiento es_paciente
     email telefono reprocann_numero reprocann_vencimiento reprocann_estado
+    reprocann_vinculo reprocann_tramite_iniciado_el
     con_seguimiento_medico limite_dispensacion_mensual_g descuento_porcentaje carnet_token
     aprobado_at
     domicilio_calle domicilio_altura domicilio_piso domicilio_depto domicilio_barrio domicilio_ciudad
@@ -29,7 +30,8 @@ class PacientesController < ApplicationController
   # paciente está en la lista, dispensa; si no está, avisa al admin. Mostrarle vencimientos lo pone
   # a decidir sobre un caso que no le toca —y a discutirlo en el mostrador con el paciente
   # enfrente—. Los casos especiales los mira admin/supervisor, que tienen la ficha completa.
-  CAMPOS_REPROCANN = %w[reprocann_numero reprocann_vencimiento reprocann_estado].freeze
+  CAMPOS_REPROCANN = %w[reprocann_numero reprocann_vencimiento reprocann_estado
+                        reprocann_vinculo reprocann_tramite_iniciado_el].freeze
 
   # Campos CLÍNICOS / de salud: SÓLO se agregan si el rol puede ver la historia clínica
   # (allowlist medico/admin/supervisor, via PacientePolicy#ver_notas_clinicas?).
@@ -64,7 +66,8 @@ class PacientesController < ApplicationController
     # sólo igualdad exacta. La búsqueda por nombre/apellido sigue siendo LIKE.
     if query.present?
       q = "%#{query.downcase}%"
-      by_name  = scope.where("lower(nombre) LIKE :q OR lower(apellido) LIKE :q", q: q)
+      # El apodo también (6-oct-2026): «¿cómo le dicen?» es como se lo busca en el mostrador.
+      by_name  = scope.where("lower(nombre) LIKE :q OR lower(apellido) LIKE :q OR lower(apodo) LIKE :q", q: q)
       dni_term = dni.presence || query.gsub(/\D/, "")
       scope = dni_term.present? ? by_name.or(scope.where(dni_normalizado: dni_term)) : by_name
     elsif dni.present?
@@ -86,11 +89,16 @@ class PacientesController < ApplicationController
                           .where(paciente_id: pacientes.map(&:id))
                           .group(:paciente_id).maximum(:fecha_dispensacion)
 
+    # Pendiente de entrevista / faltó al turno (6-oct-2026): de los turnos, en una consulta. No es
+    # asunto del mostrador, como el REPROCANN.
+    entrevista = current_user.dispensador? ? {} : Pacientes::Entrevista.para(pacientes.map(&:id))
+
     # La LISTA nunca expone datos clínicos: allowlist estricta de campos no clínicos.
     data = pacientes.map do |p|
       p.as_json(only: campos_visibles, methods: metodos_lista)
        .merge('ultima_dispensacion' => ultimas[p.id],
-              'suspendido' => Paciente.suspendido?(es_paciente: p.es_paciente, ultima_dispensacion: ultimas[p.id]))
+              'suspendido' => Paciente.suspendido?(es_paciente: p.es_paciente, ultima_dispensacion: ultimas[p.id]),
+              'entrevista' => entrevista[p.id])
     end
 
     render json: {
@@ -115,8 +123,14 @@ class PacientesController < ApplicationController
     # Base: SÓLO campos no clínicos (allowlist), para cualquier rol con lectura.
     metodos = [:nombre_completo, :dispensado_mes_actual_g, :porcentaje_limite_mensual, :saldo_cc,
                :limite_cc, :saldo_cc_g, :limite_cc_g, :cc_gramos_activo]
-    metodos << :reprocann_estado_efectivo unless current_user.dispensador?
+    metodos += %i[reprocann_estado_efectivo reprocann_categoria] unless current_user.dispensador?
     json = @paciente.as_json(only: campos_visibles, methods: metodos)
+
+    # Los médicos que lo atienden y si tiene una entrevista pendiente (6-oct-2026). Fuera del mostrador.
+    unless current_user.dispensador?
+      json['medicos'] = @paciente.medico_pacientes.includes(:medico).map { |v| { medico_id: v.medico_id, nombre: v.medico&.nombre_completo } }
+      json['entrevista'] = Pacientes::Entrevista.para([@paciente.id])[@paciente.id]
+    end
 
     # Historia clínica: se agrega SÓLO si el rol puede verla (medico/admin/supervisor).
     if policy(@paciente).ver_notas_clinicas?
@@ -137,6 +151,19 @@ class PacientesController < ApplicationController
     json['acceso'] = acceso_json(@paciente)
 
     render json: { data: json }
+  end
+
+  # POST /pacientes/:id/iniciar_tramite_reprocann — «Inicié el trámite» (Javi, 6-oct-2026). El
+  # médico (de sus pacientes) o administración. El estado pasa a «en trámite» con la fecha, y como es
+  # el mismo campo para toda la app, se ve en todos lados; administración recibe un aviso.
+  def iniciar_tramite_reprocann
+    unless current_user.admin? || current_user.medico? || current_user.super_admin?
+      return render json: { error: 'Sólo el médico o administración.' }, status: :forbidden
+    end
+
+    @paciente.iniciar_tramite_reprocann!(por: current_user)
+    render json: { data: @paciente.as_json(only: campos_visibles,
+                                           methods: %i[nombre_completo reprocann_estado_efectivo reprocann_categoria]) }
   end
 
   # POST /pacientes/:id/acceso — crearle la cuenta del portal a alguien que no la tiene.
@@ -286,6 +313,8 @@ class PacientesController < ApplicationController
     end
 
     if paciente.save
+      # El médico que lo da de alta lo atiende: si no, lo crearía y dejaría de verlo (6-oct-2026).
+      MedicoPaciente.vincular!(medico: current_user, paciente: paciente, por: current_user) if current_user.medico?
       # La «dirección de entrega distinta» del alta es la primera dirección guardada (con su
       # nombre y por defecto). Las columnas `envio_*` de `pacientes` ya no se escriben.
       guardar_direccion_de_entrega!(paciente)
@@ -351,12 +380,15 @@ class PacientesController < ApplicationController
     hoy   = Time.zone.today
     club  = current_user.club
 
-    reprocann_vencidos = club.pacientes
+    por_fecha = club.pacientes
       .where.not(reprocann_vencimiento: nil)
       .where('reprocann_vencimiento < ?', hoy)
       .where(reprocann_estado: %w[activo pendiente])
+    # Más los marcados «Vencido» a mano (6-oct), que pueden no tener fecha: sin días que contar.
+    reprocann_vencidos = por_fecha.or(club.pacientes.where(reprocann_estado: 'vencido'))
       .select(:id, :nombre, :apellido, :reprocann_vencimiento, :reprocann_estado)
-      .map { |p| { id: p.id, nombre: p.nombre_completo, reprocann_vencimiento: p.reprocann_vencimiento, dias_vencido: (hoy - p.reprocann_vencimiento).to_i } }
+      .map { |p| { id: p.id, nombre: p.nombre_completo, reprocann_vencimiento: p.reprocann_vencimiento,
+                   dias_vencido: p.reprocann_vencimiento && p.reprocann_vencimiento < hoy ? (hoy - p.reprocann_vencimiento).to_i : nil } }
 
     reprocann_por_vencer = club.pacientes
       .where('reprocann_vencimiento > ? AND reprocann_vencimiento <= ?', hoy, 30.days.from_now)
@@ -489,11 +521,20 @@ class PacientesController < ApplicationController
   # Espeja la PRECEDENCIA de `reprocannCategoria` (frontend/src/composables/useReprocann.js):
   # primero el trámite pendiente, después la falta de certificado, y recién ahí la fecha. Si
   # las dos se separan, la tarjeta y la lista que esa tarjeta filtra dejan de coincidir.
+  def conteo_entrevista(nomina)
+    return { entrevista_pendiente: 0, falto_turno: 0 } if current_user.dispensador? # no es asunto del mostrador
+    estados = Pacientes::Entrevista.para(nomina.pluck(:id)).values
+    { entrevista_pendiente: estados.count('pendiente_entrevista'), falto_turno: estados.count('falto_turno') }
+  end
+
   def kpis_padron(scope)
     hoy    = Time.zone.today
     nomina = scope.where(es_paciente: true)
 
-    resto = nomina.where.not(reprocann_estado: 'pendiente')
+    # «Vencido» guardado a mano (6-oct) va antes que la falta de número: lo saben aunque no
+    # tengan el certificado a mano, igual que `Paciente.reprocann_categoria`.
+    vencidos_a_mano = nomina.where(reprocann_estado: 'vencido')
+    resto = nomina.where.not(reprocann_estado: %w[pendiente vencido])
     # `reprocann_numero` va cifrado (determinístico): admite IS NULL e igualdad, no LIKE.
     # Se suma el estado 'sin_registro' porque una ficha puede quedar sin número cargado o con
     # la baja declarada en el estado, y las dos cuentan como "sin REPROCANN".
@@ -515,8 +556,13 @@ class PacientesController < ApplicationController
       # del REPROCANN sino del alta, y porque cada uno es alguien que hoy NO puede retirar.
       pendientes_aprobacion: nomina.pendientes_aprobacion.count,
       pendientes: nomina.where(reprocann_estado: 'pendiente').count,
+      # Adherente / Vinculado y entrevista pendiente / faltó al turno (6-oct-2026), sobre la nómina.
+      adherentes: nomina.where(reprocann_vinculo: 'otra_organizacion').count,
+      vinculados: nomina.where(reprocann_vinculo: 'organizacion').count,
+      **conteo_entrevista(nomina),
       sin_rep:    sin_rep.count,
-      vencidos:   con_rep.where.not(reprocann_vencimiento: nil)
+      vencidos:   vencidos_a_mano.count +
+                  con_rep.where.not(reprocann_vencimiento: nil)
                          .where(reprocann_vencimiento: ...hoy).count,
       proximos:   con_rep.where(reprocann_vencimiento: hoy..(hoy + 30)).count,
       inactivos:  inactivos,
@@ -530,7 +576,7 @@ class PacientesController < ApplicationController
 
   def metodos_lista
     return [:nombre_completo] if current_user.dispensador?
-    [:nombre_completo, :reprocann_estado_efectivo]
+    [:nombre_completo, :reprocann_estado_efectivo, :reprocann_categoria]
   end
 
 
@@ -571,7 +617,8 @@ class PacientesController < ApplicationController
   end
 
   def paciente_params
-    allowed = %i[nombre apellido dni fecha_nacimiento es_paciente email telefono reprocann_numero reprocann_vencimiento reprocann_estado
+    allowed = %i[nombre apellido apodo dni fecha_nacimiento es_paciente email telefono reprocann_numero reprocann_vencimiento reprocann_estado
+                 reprocann_vinculo
                  domicilio_calle domicilio_altura domicilio_piso domicilio_depto domicilio_barrio domicilio_ciudad]
     if current_user&.admin? || current_user&.super_admin?
       allowed += %i[limite_dispensacion_mensual_g descuento_porcentaje]

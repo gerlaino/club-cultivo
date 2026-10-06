@@ -4,7 +4,7 @@ class PacienteTurnosController < ApplicationController
 
   # GET /api/pacientes/:paciente_id/turnos
   def index
-    paciente = club.pacientes.find(params[:paciente_id])
+    paciente = pacientes_visibles.find(params[:paciente_id])
     turnos   = paciente.turnos
                        .includes(:medico)
                        .order(fecha_hora: :desc)

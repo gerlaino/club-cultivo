@@ -1056,6 +1056,14 @@ export const getAdminMedicos              = ()        => api.get('/admin/medicos
 export const getAdminMedicoDisponibilidad = (id)      => api.get(`/admin/medicos/${id}/disponibilidad`)
 export const getAdminMedicoTurnos         = (id)      => api.get(`/admin/medicos/${id}/turnos`)
 export const createAdminTurno             = (id, payload) => api.post(`/admin/medicos/${id}/crear_turno`, { turno: payload })
+// «Lo vi»: el médico confirma que vio el turno que le dio administración (6-oct-2026).
+export const marcarTurnoVisto             = (id)      => api.patch(`/medico/turnos/${id}/visto`)
+// Los médicos que atienden a un paciente: administración vincula y desvincula (6-oct-2026).
+export const getPacienteMedicos           = (pacienteId)           => api.get(`/pacientes/${pacienteId}/medicos`)
+export const vincularMedico               = (pacienteId, medicoId) => api.post(`/pacientes/${pacienteId}/medicos`, { medico_id: medicoId })
+export const desvincularMedico            = (pacienteId, medicoId) => api.delete(`/pacientes/${pacienteId}/medicos/${medicoId}`)
+// «Inicié el trámite» del REPROCANN: el médico o administración.
+export const iniciarTramiteReprocann      = (pacienteId)           => api.post(`/pacientes/${pacienteId}/iniciar_tramite_reprocann`)
 export const updateAdminTurno             = (id, payload) => api.patch(`/admin/turnos/${id}`, { turno: payload })
 export const deleteAdminTurno             = (id)      => api.delete(`/admin/turnos/${id}`)
 

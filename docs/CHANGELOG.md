@@ -1,5 +1,30 @@
 # Changelog
 
+## Octubre 2026 (ec) — El bloque médico: pacientes vinculados, avisos de turno, REPROCANN y entrevistas
+
+Lo pidieron Javi y Germán (6-oct). Migración `MedicoPacientesYTurnosVistos` (corre sola al deployar).
+
+- **El médico ve SÓLO a sus pacientes vinculados** (`medico_pacientes`; un paciente puede tener varios).
+  Antes veía a todo el padrón. La regla vive en `PacientePolicy::Scope` y todo lo que un médico abre
+  por id pasa por `pacientes_visibles`: lista, ficha, timeline, indicaciones, documentos, notas,
+  turnos, check-ins. Administración vincula y desvincula desde la ficha («Médicos que lo atienden»);
+  dar un turno vincula directo; el médico que da de alta a un paciente queda vinculado. La migración
+  vinculó a cada médico con los pacientes con los que ya tenía turno o indicación.
+- **Turnos que administración le da al médico**: push (`turno_asignado`) y mail al darle, moverle o
+  cancelarle uno (`Turnos::AvisarMedico`, `TurnosMailer`; el mail sale cuando esté el SMTP). El turno
+  queda «Nuevo» en su agenda hasta que toca **«Lo vi»** (`turnos.visto_at`), y administración ve
+  «Lo vio ✓ / Todavía no lo vio» en la agenda del médico. Se validó además que el paciente y el
+  médico de un turno sean de la misma organización.
+- **REPROCANN**: «Vencido» se puede guardar a mano; **«Inicié el trámite»** (médico o administración:
+  pasa a en trámite con la fecha y avisa a administración); **Vinculado / Adherente**
+  (`reprocann_vinculo`). La categoría la manda el backend (`reprocann_categoria`) y la pantalla la
+  muestra; los contadores del médico y los de administración cuentan igual. Paciente, vínculos y
+  turnos transmiten en vivo: el cambio se ve en cada pantalla abierta.
+- **Pendiente de entrevista / Faltó al turno**: se calculan de los turnos (`Pacientes::Entrevista`).
+  Etiqueta y filtro en la lista de pacientes, en la ficha y en la lista del médico; contador «pasados
+  sin cerrar» en la agenda del médico (administración) y aviso «tenés N turnos sin cerrar» en la del médico.
+- **Apodo** opcional: se ve en la lista, la ficha y el mostrador, y se busca por él.
+
 ## Octubre 2026 (eb) — La página pública partida por público, y producción se publica sola
 
 - **Login y Recuperar acceso en «Herbario»** (en vivo desde `d1f76091`), como Registro. Los colores y

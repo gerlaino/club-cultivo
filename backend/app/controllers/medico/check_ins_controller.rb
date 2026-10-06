@@ -2,7 +2,7 @@ module Medico
   class CheckInsController < BaseController
     # POST /api/medico/check_ins
     def create
-      paciente = club.pacientes.find(check_in_params[:paciente_id])
+      paciente = pacientes_visibles.find(check_in_params[:paciente_id])
       check_in = paciente.check_ins.new(
         check_in_params.merge(club_id: club.id, via_registro: 'medico')
       )

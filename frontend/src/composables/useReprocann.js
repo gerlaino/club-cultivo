@@ -76,9 +76,15 @@ export function reprocannPlazo(p, hoy = new Date()) {
 
 // Las cinco categorías son mutuamente excluyentes y cubren todos los casos, así los
 // contadores de los filtros suman el total.
+//
+// Si el backend ya la mandó (`reprocann_categoria`, 6-oct-2026), MANDA esa: la regla vive en
+// `Paciente.reprocann_categoria` y la pantalla la muestra. El cálculo de abajo queda para los
+// datos que todavía no la traen (y espeja la misma precedencia).
 export function reprocannCategoria(p, hoy = new Date()) {
+  if (p?.reprocann_categoria) return p.reprocann_categoria
   const estado = p?.reprocann_estado_efectivo || p?.reprocann_estado
   if (estado === 'pendiente') return 'pendiente'
+  if (estado === 'vencido')   return 'vencido' // marcado a mano: lo saben aunque no haya fecha
   if (!p?.reprocann_numero)   return 'sin_reprocann'
   const d = reprocannDias(p, hoy)
   if (d === null) return 'vigente' // certificado sin fecha cargada: existe igual

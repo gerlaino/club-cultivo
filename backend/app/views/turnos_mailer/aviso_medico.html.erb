@@ -1,0 +1,13 @@
+<p style="font-size:16px; color:#0f172a; margin:0 0 12px;">Hola <%= @medico.first_name.presence || '' %>,</p>
+<p style="font-size:14px; color:#334155; line-height:1.6; margin:0 0 12px;"><%= @frase %></p>
+<p style="font-size:15px; color:#0f172a; line-height:1.6; margin:0 0 16px;">
+  <strong><%= @turno.paciente&.nombre_completo %></strong><br>
+  <%= @cuando %>
+</p>
+<% unless @cambio == 'cancelado' %>
+  <p style="font-size:14px; color:#334155; line-height:1.6; margin:0 0 12px;">
+    Entrá a tu agenda y tocá <strong>«Lo vi»</strong> para que sepan que te enteraste:
+    <a href="<%= @link %>" style="color:#2E6B4A; font-weight:600;">abrir mi agenda</a>.
+  </p>
+<% end %>
+<p style="font-size:12px; color:#94a3b8; margin:16px 0 0;">Cultivo Espacial</p>

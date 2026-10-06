@@ -9,7 +9,9 @@ RSpec.describe 'Auditable — Fase 2 (Paciente / User / Reserva)', type: :model 
   describe 'allowlists de privacidad' do
     it 'Paciente audita solo campos administrativos; nunca cifrados ni clínicos' do
       solo = Paciente.campos_auditables_solo
-      expect(solo).to contain_exactly('nombre', 'apellido', 'fecha_nacimiento', 'reprocann_vencimiento', 'reprocann_estado')
+      # Apodo, vínculo REPROCANN y fecha de inicio del trámite (6-oct-2026): administrativos, en claro.
+      expect(solo).to contain_exactly('nombre', 'apellido', 'apodo', 'fecha_nacimiento', 'reprocann_vencimiento',
+                                      'reprocann_estado', 'reprocann_vinculo', 'reprocann_tramite_iniciado_el')
       %w[dni reprocann_numero email telefono anamnesis notas_clinicas diagnostico_principal medicacion_habitual grupo_sanguineo].each do |prohibido|
         expect(solo).not_to include(prohibido)
       end

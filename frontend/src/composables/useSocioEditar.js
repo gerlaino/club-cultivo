@@ -10,7 +10,17 @@ export const REPROCANN_ESTADOS = [
   // de abajo), no su REPROCANN. El valor guardado sigue siendo `activo`. «Inactivo» no es un estado
   // del REPROCANN y se sacó; «Vencido» lo calcula la fecha solo (`reprocann_estado_efectivo`).
   { value: 'activo',       label: 'Vigente',              color: '#15803d', bg: '#f0fdf4' },
+  // «Vencido» se puede elegir a mano desde el 6-oct-2026 (Javi): saben que venció aunque no tengan
+  // la fecha. Con fecha pasada igual sale vencido solo (lo calcula el backend).
+  { value: 'vencido',      label: 'Vencido',              color: '#dc2626', bg: '#fef2f2' },
 ]
+
+// DE QUIÉN ES SU REPROCANN (6-oct-2026), aparte del estado. Vacío = sin dato.
+export const REPROCANN_VINCULOS = [
+  { value: 'organizacion',      label: 'Vinculado', ayuda: 'Su REPROCANN está con la organización.' },
+  { value: 'otra_organizacion', label: 'Adherente', ayuda: 'Paciente nuevo con REPROCANN vigente, vinculado a otra organización por ahora.' },
+]
+export const vinculoLabel = (v) => REPROCANN_VINCULOS.find(x => x.value === v)?.label || null
 
 // `socioIdRef` puede ser un número o un getter/ref: desde la LISTA de pacientes el id cambia
 // según a quién se edite, y capturarlo por valor guardaba los cambios en el paciente anterior.
@@ -29,6 +39,7 @@ export function useSocioEditar(socioIdRef) {
     editForm.value = {
       nombre:                         s?.nombre               || '',
       apellido:                       s?.apellido             || '',
+      apodo:                          s?.apodo                || '',
       dni:                            s?.dni                  || '',
       fecha_nacimiento:               s?.fecha_nacimiento     || '',
       email:                          s?.email                || '',
@@ -36,6 +47,7 @@ export function useSocioEditar(socioIdRef) {
       reprocann_numero:               s?.reprocann_numero     || '',
       reprocann_vencimiento:          s?.reprocann_vencimiento || '',
       reprocann_estado:               s?.reprocann_estado     || 'sin_registro',
+      reprocann_vinculo:              s?.reprocann_vinculo    || '',
       es_paciente:                    s?.es_paciente          ?? true,
       descuento_porcentaje:           s?.descuento_porcentaje ?? 0,
       domicilio_calle:                s?.domicilio_calle      || '',
@@ -70,7 +82,7 @@ export function useSocioEditar(socioIdRef) {
   }
 
   return {
-    REPROCANN_ESTADOS,
+    REPROCANN_ESTADOS, REPROCANN_VINCULOS,
     editOpen, editForm, editSaving, editError,
     openEdit, saveEdit,
   }

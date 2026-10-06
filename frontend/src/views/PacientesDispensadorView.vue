@@ -11,7 +11,7 @@
           v-model="query"
           class="pdv__search-input"
           type="search"
-          placeholder="Buscar por nombre o DNI…"
+          placeholder="Buscar por nombre, apodo o DNI…"
           autocomplete="off"
         />
       </div>
@@ -36,7 +36,7 @@
         @click="abrirDrawer(p)"
       >
         <div class="pdv__item-main">
-          <div class="pdv__item-name">{{ p.nombre }} {{ p.apellido }}</div>
+          <div class="pdv__item-name">{{ p.nombre }} {{ p.apellido }}<span v-if="p.apodo" class="pdv__apodo"> «{{ p.apodo }}»</span></div>
           <div class="pdv__item-meta">
             <span class="pdv__dni">{{ p.dni ?? p.numero_documento ?? '—' }}</span>
             <span v-if="p.ultima_dispensacion" class="pdv__ultima">
@@ -54,7 +54,7 @@
         <div v-if="drawerOpen" class="pdv__drawer-overlay" @click.self="drawerOpen = false">
           <div class="pdv__drawer">
             <div class="pdv__drawer-header">
-              <h2 class="pdv__drawer-name">{{ selected?.nombre }} {{ selected?.apellido }}</h2>
+              <h2 class="pdv__drawer-name">{{ selected?.nombre }} {{ selected?.apellido }}<span v-if="selected?.apodo" class="pdv__apodo"> «{{ selected.apodo }}»</span></h2>
               <button class="pdv__drawer-close" @click="drawerOpen = false">
                 <X :size="20" :stroke-width="1.75" />
               </button>
@@ -287,4 +287,5 @@ function formaLabel(f) {
   .pdv { padding: var(--sp-4); }
   .pdv__search-input { width: 100%; }
 }
+.pdv__apodo { font-weight: 500; color: var(--c-slate-500); }
 </style>

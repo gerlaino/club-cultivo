@@ -44,7 +44,7 @@
           v-model="search"
           @input="onSearch"
           class="mpv__search"
-          placeholder="Buscar por nombre, apellido o DNI…"
+          placeholder="Buscar por nombre, apellido, apodo o DNI…"
         />
         <span v-if="meta" class="mpv__search-count">{{ meta.total }}</span>
       </div>
@@ -90,7 +90,10 @@
         </div>
 
         <div class="mpv__info">
-          <div class="mpv__nombre">{{ p.nombre }} {{ p.apellido }}</div>
+          <div class="mpv__nombre">
+            {{ p.nombre }} {{ p.apellido }}
+            <span v-if="p.apodo" class="mpv__apodo">«{{ p.apodo }}»</span>
+          </div>
           <div class="mpv__meta">
             <span class="mpv__dni">{{ p.dni }}</span>
             <span v-if="edad(p.fecha_nacimiento)" class="mpv__edad">{{ edad(p.fecha_nacimiento) }} años</span>
@@ -114,6 +117,7 @@
             <div class="mpv__rep-fecha">{{ formatDate(p.reprocann_vencimiento) }}</div>
           </template>
           <span v-else class="mpv__rep-none">Sin REPROCANN</span>
+          <div v-if="vinculoLabel(p.reprocann_vinculo)" class="mpv__vinculo">{{ vinculoLabel(p.reprocann_vinculo) }}</div>
         </div>
 
         <!-- La fila entera ya abre la ficha: no hace falta un botón que lleve al mismo lado. -->
@@ -218,6 +222,8 @@ import { getMedicoPacientes } from '../../lib/api.js'
 import { logger } from '../../utils/logger.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { reprocannBadge, reprocannDias } from '../../composables/useReprocann.js'
+import { vinculoLabel } from '../../composables/useSocioEditar.js'
+import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 
 const LIMITE = 30
 
@@ -304,9 +310,9 @@ function onSearch() {
 // Una sola fuente de verdad: el backend filtra, ordena, cuenta y pagina. Antes la lista se
 // filtraba dos veces (server-side con ?query y otra vez en el cliente) sobre un JSON que traía
 // TODOS los pacientes de la organización.
-async function cargar({ reset = false } = {}) {
+async function cargar({ reset = false, silencioso = false } = {}) {
   if (reset) pagina.value = 1
-  loading.value = true
+  if (!silencioso) loading.value = true
   try {
     const { data } = await getMedicoPacientes({
       pagina: pagina.value,
@@ -319,7 +325,7 @@ async function cargar({ reset = false } = {}) {
     meta.value = data.meta || null
   } catch (e) {
     logger.error('MedicoPacientes:', e)
-    toastErr('No se pudieron cargar los pacientes')
+    if (!silencioso) toastErr('No se pudieron cargar los pacientes')
   } finally {
     loading.value = false
   }
@@ -356,8 +362,11 @@ function iniciales(p) {
 const kpis = computed(() => meta.value?.kpis || { total: 0, activos: 0, proximos: 0, vencidos: 0, sin_rep: 0 })
 const hayMas = computed(() => !!meta.value && pacientes.value.length < meta.value.total)
 
-// Lo que puso a este paciente arriba en la lista, dicho en la fila.
+// Lo que puso a este paciente arriba en la lista, dicho en la fila. Primero lo que está atrasado:
+// un turno que ya pasó y no cerró (6-oct-2026), o que faltó y hay que darle otro.
 function motivo(p) {
+  if (p.entrevista === 'pendiente_entrevista') return { texto: 'Turno pasado sin cerrar', tipo: 'atrasado' }
+  if (p.entrevista === 'falto_turno')          return { texto: 'Faltó al turno', tipo: 'falto' }
   if (p.proximo_turno_at) {
     return { texto: `Turno ${formatDate(p.proximo_turno_at)}`, tipo: 'turno' }
   }
@@ -367,6 +376,10 @@ function motivo(p) {
   }
   return null
 }
+
+// Si administración le vincula un paciente, le da un turno o alguien cambia el REPROCANN, la
+// lista se pone al día sola («que se replique»).
+useRecargaEnCambios(['pacientes', 'turnos'], () => cargar({ reset: true, silencioso: true }))
 
 onMounted(() => cargar({ reset: true }))
 </script>
@@ -496,6 +509,10 @@ onMounted(() => cargar({ reset: true }))
 }
 .mpv__motivo--turno      { background: var(--c-sky-100);  color: var(--c-sky-600); }
 .mpv__motivo--indicacion { background: var(--c-amber-100); color: var(--c-amber-500); }
+.mpv__motivo--atrasado   { background: var(--c-amber-100); color: var(--c-amber-500); border: 1px solid var(--c-amber-500); }
+.mpv__motivo--falto      { background: var(--c-slate-100); color: var(--c-slate-600); }
+.mpv__apodo   { font-weight: 500; color: var(--c-slate-500); margin-left: .25rem; }
+.mpv__vinculo { margin-top: 2px; font-size: .7rem; font-weight: 600; color: var(--c-leaf-800); }
 
 /* Paginación */
 .mpv__mas { display: flex; justify-content: center; padding: var(--sp-5) 0 var(--sp-2); }

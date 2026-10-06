@@ -95,7 +95,8 @@ RSpec.describe 'Aprobación de pacientes', type: :request do
       expect(paciente.aprobado_por_id).to eq(admin.id)
     end
 
-    it 'el médico también puede' do
+    it 'el médico también puede, si el paciente está vinculado a él' do
+      MedicoPaciente.vincular!(medico: medico, paciente: paciente)
       sign_in_as(medico)
       post "/api/pacientes/#{paciente.id}/aprobar"
       expect(response).to have_http_status(:ok)

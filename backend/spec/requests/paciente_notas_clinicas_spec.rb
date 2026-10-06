@@ -7,6 +7,8 @@ RSpec.describe 'Pacientes — notas_clinicas y timeline', type: :request do
   let(:cultivador)   { create(:user, club: club, role: 'cultivador') }
   let(:dispensador)  { create(:user, club: club, role: 'dispensador') }
   let!(:paciente)    { create(:paciente, club: club, created_by: admin, notas_clinicas: 'Paciente con epilepsia refractaria') }
+  # El médico ve sólo a sus vinculados (6-oct-2026).
+  before { MedicoPaciente.vincular!(medico: medico, paciente: paciente) }
 
   describe 'GET /pacientes/:id — notas_clinicas' do
     context 'admin' do

@@ -8,6 +8,11 @@ RSpec.describe 'Ola 5 — con_seguimiento_medico', type: :request do
 
   let!(:paciente_con)    { create(:paciente, club: club, created_by: admin, con_seguimiento_medico: true) }
   let!(:paciente_sin)    { create(:paciente, club: club, created_by: admin, con_seguimiento_medico: false) }
+  # Los dos vinculados al médico: lo que se prueba acá es que el tilde de seguimiento sigue filtrando.
+  before do
+    MedicoPaciente.vincular!(medico: medico, paciente: paciente_con)
+    MedicoPaciente.vincular!(medico: medico, paciente: paciente_sin)
+  end
 
   # ── Scope médico ────────────────────────────────────────────
   context 'médico GET /pacientes' do

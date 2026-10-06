@@ -37,7 +37,7 @@
         @click="abrir(p)"
       >
         <div class="mdis__card-main">
-          <div class="mdis__card-nombre">{{ p.nombre }} {{ p.apellido }}</div>
+          <div class="mdis__card-nombre">{{ p.nombre }} {{ p.apellido }}<span v-if="p.apodo" class="mdis__apodo"> «{{ p.apodo }}»</span></div>
           <div class="mdis__card-meta">
             <span>{{ p.dni || '—' }}</span>
             <span v-if="p.ultima_dispensacion" class="mdis__card-ultima">
@@ -251,4 +251,5 @@ function fechaCorta(f) {
   background: var(--c-leaf-600, #16a34a); color: #fff; font-size: 1rem; font-weight: 600;
   display: flex; align-items: center; justify-content: center; gap: .5rem;
 }
+.mdis__apodo { font-weight: 500; color: var(--c-slate-500); }
 </style>

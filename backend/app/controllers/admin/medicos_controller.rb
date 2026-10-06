@@ -7,6 +7,8 @@ module Admin
     # Lista todos los médicos del club con su disponibilidad resumida
     def index
       medicos = club.users.where(role: 'medico').order(:last_name, :first_name)
+      # Turnos que ya pasaron y el médico no cerró: a quién apurar (6-oct-2026).
+      @sin_cerrar = Pacientes::Entrevista.sin_cerrar_por_medico(club)
       render json: medicos.map { |m| serialize_medico(m) }
     end
 
@@ -38,6 +40,8 @@ module Admin
       )
 
       if turno.save
+        # El turno vincula solo al paciente con el médico (`Turno#vincular_paciente_con_medico`).
+        Turnos::AvisarMedico.call(turno, cambio: :nuevo, por: current_user)
         render json: serialize_turno(turno), status: :created
       else
         render json: { errors: turno.errors.full_messages }, status: :unprocessable_entity
@@ -66,6 +70,7 @@ module Admin
         last_name:       m.last_name,
         email:           m.email,
         tiene_disponibilidad: m.disponibilidad_medicos.where(club: club).activas.exists?,
+        turnos_sin_cerrar:    @sin_cerrar&.fetch(m.id, 0) || 0,
       }
     end
 
@@ -79,6 +84,7 @@ module Admin
         tipo:             t.tipo,
         estado:           t.estado,
         motivo:           t.motivo,
+        visto_at:         t.visto_at,
       }
     end
   end

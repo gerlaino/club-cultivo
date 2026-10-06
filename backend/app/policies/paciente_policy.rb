@@ -16,7 +16,10 @@ class PacientePolicy < ApplicationPolicy
     def resolve
       base = scope.for_club(user.club_id)
       if user.medico?
+        # SÓLO sus vinculados (Javi y Germán, 6-oct-2026): antes veía a todo el padrón. Es la
+        # única regla; todo lo que un médico lee de un paciente pasa por acá (`pacientes_visibles`).
         base.where(es_paciente: true, con_seguimiento_medico: true)
+            .where(id: MedicoPaciente.where(medico_id: user.id).select(:paciente_id))
       elsif user.dispensador?
         base.where(es_paciente: true)
       else

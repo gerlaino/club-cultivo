@@ -40,7 +40,7 @@ class PacienteNotasController < ApplicationController
   end
 
   def set_paciente
-    @paciente = Paciente.for_club(current_user.club_id).find(params[:paciente_id] || params[:socio_id])
+    @paciente = pacientes_visibles.find(params[:paciente_id] || params[:socio_id])
   end
 
   def nota_params

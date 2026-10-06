@@ -19,7 +19,9 @@ module Medico
       query  = params[:query].to_s.strip
       filtro = params[:filtro].presence_in(FILTROS) || 'todos'
 
-      base  = club.pacientes.where(deleted_at: nil)
+      # El médico ve SÓLO a sus vinculados (6-oct-2026): `PacientePolicy::Scope` es la única regla.
+      # Administración, que también entra acá (la turnera pide la lista), ve a todos.
+      base  = policy_scope(Paciente).where(deleted_at: nil)
       base  = filtrar_por_texto(base, query) if query.present?
       scope = filtrar_por_estado(base, filtro)
 
@@ -38,8 +40,10 @@ module Medico
                   .limit(limit)
                   .to_a
 
+      entrevista = Pacientes::Entrevista.para(pacientes.map(&:id),
+                                              medico_id: (current_user.medico? ? current_user.id : nil))
       render json: {
-        data: pacientes.map { |p| serialize_paciente_resumen(p) },
+        data: pacientes.map { |p| serialize_paciente_resumen(p, entrevista[p.id]) },
         meta: { pagina: page, limite: limit, total: total, kpis: kpis(base) },
       }
     end
@@ -54,9 +58,9 @@ module Medico
       {
         total:    base.count,
         activos:  base.where(es_paciente: true).count,
-        proximos: base.where(reprocann_vencimiento: hoy..(hoy + 30)).count,
-        vencidos: base.where(reprocann_vencimiento: ...hoy).count,
-        sin_rep:  base.where(reprocann_vencimiento: nil).count,
+        proximos: base.where(reprocann_vencimiento: hoy..(hoy + 30)).where.not(reprocann_estado: %w[pendiente vencido]).count,
+        vencidos: vencidos(base, hoy).count,
+        sin_rep:  base.where(reprocann_vencimiento: nil).where.not(reprocann_estado: 'vencido').count,
       }
     end
 
@@ -65,18 +69,27 @@ module Medico
 
       case filtro
       when 'activos'  then scope.where(es_paciente: true)
-      when 'proximos' then scope.where(reprocann_vencimiento: hoy..(hoy + 30))
-      when 'vencidos' then scope.where(reprocann_vencimiento: ...hoy)
-      when 'sin_rep'  then scope.where(reprocann_vencimiento: nil)
+      when 'proximos' then scope.where(reprocann_vencimiento: hoy..(hoy + 30)).where.not(reprocann_estado: %w[pendiente vencido])
+      when 'vencidos' then vencidos(scope, hoy)
+      when 'sin_rep'  then scope.where(reprocann_vencimiento: nil).where.not(reprocann_estado: 'vencido')
       else scope
       end
+    end
+
+    # Vencido por fecha, o marcado «Vencido» a mano aunque no tenga fecha (6-oct). Con el trámite
+    # iniciado no es vencido sino «en trámite», aunque la fecha haya pasado: la misma precedencia que
+    # `Paciente.reprocann_categoria`, así la lista del médico y la de administración cuentan igual.
+    def vencidos(scope, hoy)
+      scope.where(reprocann_vencimiento: ...hoy).where.not(reprocann_estado: 'pendiente')
+           .or(scope.where(reprocann_estado: 'vencido'))
     end
 
     # El DNI va cifrado determinístico: admite igualdad exacta, no LIKE. Mismo criterio que
     # PacientesController#index, para que buscar signifique lo mismo en las dos pantallas.
     def filtrar_por_texto(scope, query)
       q        = "%#{query.downcase}%"
-      by_name  = scope.where('lower(pacientes.nombre) LIKE :q OR lower(pacientes.apellido) LIKE :q', q: q)
+      by_name  = scope.where('lower(pacientes.nombre) LIKE :q OR lower(pacientes.apellido) LIKE :q OR ' \
+                             'lower(pacientes.apodo) LIKE :q', q: q)
       dni_term = query.gsub(/\D/, '')
 
       dni_term.present? ? by_name.or(scope.where(dni_normalizado: dni_term)) : by_name
@@ -112,7 +125,7 @@ module Medico
       ActiveRecord::Base.sanitize_sql_array(statement)
     end
 
-    def serialize_paciente_resumen(p)
+    def serialize_paciente_resumen(p, entrevista = nil)
       hoy  = Time.zone.today
       venc = p.reprocann_vencimiento
 
@@ -121,11 +134,18 @@ module Medico
         nombre:                 p.nombre,
         apellido:               p.apellido,
         nombre_completo:        "#{p.nombre} #{p.apellido}",
+        apodo:                  p.apodo,
         dni:                    p.dni,
         email:                  p.email,
         edad:                   edad(p.fecha_nacimiento, hoy),
         diagnostico_principal:  p.diagnostico_principal,
         reprocann_estado:       p.reprocann_estado,
+        # La categoría la calcula el backend y la pantalla la muestra (vigente/por vencer/vencido/…).
+        reprocann_categoria:    p.reprocann_categoria,
+        reprocann_vinculo:      p.reprocann_vinculo,
+        reprocann_tramite_iniciado_el: p.reprocann_tramite_iniciado_el,
+        # 'pendiente_entrevista' | 'falto_turno' | nil — de SUS turnos (`Pacientes::Entrevista`).
+        entrevista:             entrevista,
         reprocann_vencimiento:  venc,
         dias_hasta_vencimiento: venc ? (venc - hoy).to_i : nil,
         con_seguimiento:        p.con_seguimiento_medico,

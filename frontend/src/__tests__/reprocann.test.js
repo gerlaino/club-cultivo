@@ -140,3 +140,17 @@ describe('cuántos días faltan — por calendario, no por milisegundos', () => 
     expect(reprocannDias(pac('2026-09-01'), new Date(2026, 7, 31, 18, 0))).toBe(1)
   })
 })
+
+// AC (Javi, 6-oct-2026): faltaba «Vencido». Se guarda a mano cuando saben que venció aunque no
+// tengan la fecha, y la categoría que calcula el backend es la que se muestra en toda la app.
+describe('REPROCANN vencido a mano y la categoría del backend', () => {
+  it('«Vencido» guardado sin número ni fecha es vencido, no "sin REPROCANN"', () => {
+    expect(reprocannCategoria({ reprocann_estado: 'vencido', reprocann_numero: null, reprocann_vencimiento: null })).toBe('vencido')
+    expect(reprocannBadge({ reprocann_estado: 'vencido' })?.level).toBe('danger')
+  })
+
+  it('si el backend mandó la categoría, manda esa aunque los campos digan otra cosa', () => {
+    const p = { reprocann_categoria: 'pendiente', reprocann_estado: 'activo', reprocann_numero: 'X', reprocann_vencimiento: enDias(400) }
+    expect(reprocannCategoria(p)).toBe('pendiente')
+  })
+})

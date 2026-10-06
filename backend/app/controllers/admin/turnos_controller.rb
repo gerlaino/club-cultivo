@@ -7,6 +7,10 @@ module Admin
     def update
       turno = club.turnos.find(params[:id])
       if turno.update(turno_params)
+        cambio = if turno.saved_change_to_estado? && turno.estado == 'cancelado' then :cancelado
+                 elsif turno.saved_change_to_fecha_hora? then :movido
+                 end
+        Turnos::AvisarMedico.call(turno, cambio: cambio, por: current_user) if cambio
         render json: serialize(turno)
       else
         render json: { errors: turno.errors.full_messages }, status: :unprocessable_entity
@@ -22,6 +26,8 @@ module Admin
       # Cancelar = flip de estado; no re-validamos el turno entero (un médico/paciente
       # con referencia colgada no debe impedir cancelar). El guard de realizado? ya está.
       turno.update_columns(estado: 'cancelado', updated_at: Time.current)
+      turno.transmitir_cambio # `update_columns` se saltea los callbacks: las agendas abiertas, a mano
+      Turnos::AvisarMedico.call(turno, cambio: :cancelado, por: current_user)
       head :no_content
     end
 
@@ -51,6 +57,7 @@ module Admin
         tipo:             t.tipo,
         estado:           t.estado,
         motivo:           t.motivo,
+        visto_at:         t.visto_at,
       }
     end
   end

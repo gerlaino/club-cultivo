@@ -19,6 +19,10 @@
                 <input v-model="editForm.apellido" class="sem__input" type="text" />
               </div>
               <div class="sem__field">
+                <label class="sem__label">Apodo <span class="sem__opt">opcional</span></label>
+                <input v-model="editForm.apodo" class="sem__input" type="text" maxlength="60" placeholder="¿Cómo le dicen?" />
+              </div>
+              <div class="sem__field">
                 <label class="sem__label">DNI</label>
                 <input v-model="editForm.dni" class="sem__input" type="text" />
               </div>
@@ -53,6 +57,17 @@
                     @click="editForm.reprocann_estado = opt.value"
                   >{{ opt.label }}</button>
                 </div>
+              </div>
+              <div class="sem__field sem__field--full">
+                <label class="sem__label" style="margin-bottom:.4rem">De quién es su REPROCANN</label>
+                <div class="sem__repro-estados">
+                  <button type="button" class="sem__repro-btn" :class="{ 'sem__repro-btn--on': !editForm.reprocann_vinculo }"
+                          @click="editForm.reprocann_vinculo = ''">Sin dato</button>
+                  <button v-for="v in REPROCANN_VINCULOS" :key="v.value" type="button" class="sem__repro-btn"
+                          :class="{ 'sem__repro-btn--on': editForm.reprocann_vinculo === v.value }" :title="v.ayuda"
+                          @click="editForm.reprocann_vinculo = v.value">{{ v.label }}</button>
+                </div>
+                <span class="sem__hint">Vinculado: su REPROCANN está con la organización. Adherente: tiene REPROCANN vigente con otra organización por ahora.</span>
               </div>
               <div v-if="isAdmin" class="sem__field sem__field--full">
                 <label class="sem__label" style="margin-bottom:.4rem">
@@ -118,7 +133,7 @@
 import { ref, watch, computed } from 'vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
 import { X, Save, AlertCircle } from 'lucide-vue-next'
-import { useSocioEditar, REPROCANN_ESTADOS } from '../../composables/useSocioEditar.js'
+import { useSocioEditar, REPROCANN_ESTADOS, REPROCANN_VINCULOS } from '../../composables/useSocioEditar.js'
 import { useAuthStore } from '../../stores/auth.js'
 import { usePacientesStore } from '../../stores/pacientes'
 import DsSpinner from '../../design-system/components/Spinner.vue'
@@ -180,6 +195,7 @@ async function doSave() {
 .sem__check { width: 15px; height: 15px; accent-color: #1b5e20; }
 .sem__repro-estados { display: flex; gap: .4rem; flex-wrap: wrap; }
 .sem__repro-btn { padding: .4rem .8rem; border-radius: 7px; border: 1.5px solid var(--c-slate-200); background: var(--c-slate-50); color: var(--c-slate-500); font-size: .75rem; font-weight: 600; cursor: pointer; transition: all .15s; }
+.sem__repro-btn--on { background: var(--c-leaf-50); border-color: var(--c-leaf-800); color: var(--c-leaf-800); }
 .sem__repro-btn:hover { border-color: var(--c-slate-400); }
 .sem__opt { font-size: .68rem; font-weight: 400; color: var(--c-slate-400); text-transform: none; letter-spacing: 0; margin-left: .35rem; }
 .sem__limit-wrap { display: flex; align-items: center; gap: .4rem; }

@@ -43,6 +43,24 @@ export const usePacientesStore = defineStore("pacientes", {
       }
     },
 
+    // Refrescos SILENCIOSOS, para cuando otra pantalla cambió algo (aviso en vivo de `pacientes`):
+    // sin «cargando», sin vaciar lo que se ve y sin pisar el error de la carga de verdad.
+    async refrescar(params = {}) {
+      try {
+        const { data } = await listPacientes(params)
+        this.items = data?.data || data || []
+        this.kpis  = data?.meta?.kpis || null
+        this.total = data?.meta?.total ?? this.items.length
+      } catch { /* la próxima carga lo intenta de nuevo */ }
+    },
+
+    async refrescarActual(id) {
+      try {
+        const { data } = await getPaciente(id)
+        if (String(this.current?.id) === String(id)) this.current = data?.data || data
+      } catch { /* idem */ }
+    },
+
     async fetchOne(id) {
       this.loading = true; this.error = null; this.current = null
       try {

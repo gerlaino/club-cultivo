@@ -280,7 +280,11 @@ Rails.application.routes.draw do
         # nueva cuando la pierde. Mismo par que ya existe para el equipo.
         post 'acceso',             action: :crear_acceso_portal
         post 'acceso/restablecer', action: :restablecer_acceso_portal
+        # «Inicié el trámite» del REPROCANN: el médico o administración (6-oct-2026).
+        post :iniciar_tramite_reprocann
       end
+      # Los médicos que lo atienden: administración vincula y desvincula (6-oct-2026).
+      resources :medicos, controller: "paciente_medicos", only: [:index, :create, :destroy]
       resources :notas,        controller: "paciente_notas",    only: [:index, :create]
       # Sus direcciones de entrega con nombre y una por defecto (solapa Direcciones). El index
       # trae también el domicilio REPROCANN: es lo que lista el modal de dispensa.
@@ -345,7 +349,9 @@ Rails.application.routes.draw do
       # La ficha del paciente es SocioDetailView, que se sirve de /pacientes/:id: no hay una
       # segunda ficha "del médico" con su propio endpoint.
       resources :pacientes, only: [:index]
-      resources :turnos, only: [:index, :create, :update, :destroy]
+      resources :turnos, only: [:index, :create, :update, :destroy] do
+        member { patch :visto }
+      end
       resources :check_ins, only: [:create]
       resource  :disponibilidad, only: [:index, :update], controller: 'disponibilidad'
     end

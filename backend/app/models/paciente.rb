@@ -1,11 +1,16 @@
 class Paciente < ApplicationRecord
   include RestorableInterface
   include Auditable
+  # Un cambio en el paciente (estado del REPROCANN, vínculo, apodo…) se ve en cada pantalla abierta
+  # que lo muestra: la lista, la ficha, la del médico (Germán, 6-oct: «que se replique»).
+  include Transmite
+  transmite_como 'pacientes'
   # ALLOWLIST estricto: solo campos NO cifrados y no clínicos. Auditar dni/email/telefono/
   # reprocann_numero o cualquier campo clínico escribiría el valor DESCIFRADO en el rastro y
   # rompería el cifrado at-rest (ENC-01) + la privacidad de la historia clínica (fix AZ).
   # Lo valioso y seguro: identidad básica + vencimiento/estado REPROCANN (los críticos de la organización).
-  auditar_solo :nombre, :apellido, :fecha_nacimiento, :reprocann_vencimiento, :reprocann_estado
+  auditar_solo :nombre, :apellido, :apodo, :fecha_nacimiento, :reprocann_vencimiento, :reprocann_estado,
+               :reprocann_vinculo, :reprocann_tramite_iniciado_el
   acts_as_paranoid
   belongs_to :club
   acts_as_tenant(:club)
@@ -30,6 +35,9 @@ class Paciente < ApplicationRecord
   has_many :mails_enviados, class_name: 'MailEnviado', dependent: :destroy
   has_many :check_ins, dependent: :destroy
   has_many :turnos, dependent: :destroy
+  # Los médicos que lo atienden. El médico ve sólo a sus vinculados (`PacientePolicy::Scope`).
+  has_many :medico_pacientes, dependent: :destroy
+  has_many :medicos, through: :medico_pacientes
 
   has_one_attached :reprocann_documento
 
@@ -65,12 +73,21 @@ class Paciente < ApplicationRecord
 
   validates :nombre, :apellido, :dni, :dni_normalizado, :fecha_nacimiento, presence: true
 
-  # LOS ESTADOS DEL REPROCANN SON TRES (2-oct-2026): sin registro, pendiente de aprobación y
-  # vigente (`activo`, por historia). «Vencido» sale de la fecha (`reprocann_estado_efectivo`).
+  # LOS ESTADOS DEL REPROCANN (2-oct-2026, y «vencido» desde el 6-oct): sin registro, pendiente
+  # de aprobación (en trámite), vigente (`activo`, por historia) y vencido. «Vencido» se puede
+  # GUARDAR para cuando saben que venció aunque no tengan la fecha (Javi y Germán, 6-oct); si
+  # está vigente con fecha y la fecha pasó, igual sale vencido solo (`reprocann_estado_efectivo`).
   # «Inactivo» se ofrecía y no es un estado del REPROCANN —activo/inactivo es el PACIENTE en la
   # organización, `es_paciente`—: ya no se puede guardar. Sólo se valida al CAMBIAR, así los que lo
   # tienen de antes no se traban hasta pasar `rake reprocann:sin_inactivo`.
-  REPROCANN_ESTADOS = %w[sin_registro pendiente activo].freeze
+  REPROCANN_ESTADOS = %w[sin_registro pendiente activo vencido].freeze
+
+  # DE QUIÉN ES SU REPROCANN (6-oct-2026), otro eje distinto del estado: `organizacion` = Vinculado
+  # (el REPROCANN está con esta organización) · `otra_organizacion` = Adherente (paciente nuevo con
+  # REPROCANN vigente, vinculado a otra organización por ahora). Vacío = sin dato: los que ya
+  # existían arrancan así, nadie adivina de quién es cada uno.
+  REPROCANN_VINCULOS = %w[organizacion otra_organizacion].freeze
+  validates :reprocann_vinculo, inclusion: { in: REPROCANN_VINCULOS }, allow_blank: true
   validates :reprocann_estado, inclusion: { in: REPROCANN_ESTADOS, message: 'no es un estado de REPROCANN' },
                                allow_blank: true, if: :reprocann_estado_changed?
   # Unicidad DENTRO de la organización, no en toda la plataforma.
@@ -209,6 +226,7 @@ class Paciente < ApplicationRecord
 
   def self.reprocann_categoria(estado:, numero:, vencimiento:, hoy: Time.zone.today)
     return 'pendiente' if estado.to_s == 'pendiente'
+    return 'vencido'   if estado.to_s == 'vencido' # guardado a mano: lo saben aunque no haya fecha
     return 'sin_reprocann' if numero.blank?
     return 'vigente'    if vencimiento.blank? # certificado sin fecha cargada: existe igual
     return 'vencido'    if vencimiento < hoy
@@ -219,6 +237,22 @@ class Paciente < ApplicationRecord
   def reprocann_categoria
     self.class.reprocann_categoria(estado: reprocann_estado, numero: reprocann_numero,
                                    vencimiento: reprocann_vencimiento)
+  end
+
+  # «Inicié el trámite» (Javi, 6-oct): lo marca el médico o administración. Pasa a pendiente (en
+  # trámite), guarda el día y avisa a administración. Como es el mismo campo que leen la lista,
+  # la ficha, el mostrador y los informes, el cambio se ve en todos lados (y `Transmite` avisa a
+  # las pantallas abiertas).
+  def iniciar_tramite_reprocann!(por:, hoy: Time.zone.today)
+    update!(reprocann_estado: 'pendiente', reprocann_tramite_iniciado_el: hoy, updated_by: por)
+    return if por&.admin?
+
+    AlertaInterna.create!(
+      club: club, tipo: 'reprocann_tramite_iniciado', severidad: 'info', destinada_a_role: 'admin',
+      creada_por: por,
+      mensaje: "#{por&.nombre_completo || 'Alguien'} inició el trámite del REPROCANN de #{nombre_completo}.",
+      contexto: { paciente_id: id }
+    )
   end
 
   def saldo_cc

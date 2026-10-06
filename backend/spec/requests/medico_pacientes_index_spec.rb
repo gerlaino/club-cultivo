@@ -6,8 +6,12 @@ RSpec.describe 'GET /api/medico/pacientes', type: :request do
   let(:club)   { create(:club) }
   let(:medico) { create(:user, :medico, club: club) }
 
+  # Vinculado al médico: desde el 6-oct-2026 el médico ve SÓLO a sus vinculados (eso tiene sus
+  # propios casos en medico_pacientes_vinculos_spec.rb). Acá se prueba paginación, orden y filtros.
   def crear_paciente(apellido, **attrs)
-    create(:paciente, club: club, created_by: medico, apellido: apellido, **attrs)
+    create(:paciente, club: club, created_by: medico, apellido: apellido, **attrs).tap do |p|
+      MedicoPaciente.vincular!(medico: medico, paciente: p)
+    end
   end
 
   def get_index(params = {})

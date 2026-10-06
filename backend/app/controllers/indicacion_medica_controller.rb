@@ -14,7 +14,7 @@ class IndicacionMedicaController < ApplicationController
     end
     scope = IndicacionMedica.joins(:paciente)
                             .where(pacientes: { club_id: current_user.club_id })
-    scope = scope.where(pacientes: { con_seguimiento_medico: true }) if current_user.medico?
+    scope = scope.where(paciente_id: pacientes_visibles.select(:id)) if current_user.medico? # sus vinculados
     indicaciones = scope.order(created_at: :desc)
     render json: indicaciones.map { |i| serialize_indicacion_detail(i) }
   end
@@ -84,7 +84,7 @@ class IndicacionMedicaController < ApplicationController
   end
 
   def set_paciente
-    @paciente = current_user.club.pacientes.find(params[:paciente_id])
+    @paciente = pacientes_visibles.find(params[:paciente_id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Paciente no encontrado' }, status: :not_found
   end
@@ -92,6 +92,7 @@ class IndicacionMedicaController < ApplicationController
   def set_indicacion
     @indicacion = IndicacionMedica.joins(:paciente)
                                   .where(pacientes: { club_id: current_user.club_id })
+                                  .where(paciente_id: pacientes_visibles.select(:id))
                                   .find(params[:id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Indicación no encontrada' }, status: :not_found

@@ -120,7 +120,7 @@ class PatientDocumentsController < ApplicationController
   end
 
   def set_paciente
-    @paciente = Paciente.for_club(current_user.club_id).find(params[:paciente_id])
+    @paciente = pacientes_visibles.find(params[:paciente_id])
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Paciente no encontrado' }, status: :not_found
   end
