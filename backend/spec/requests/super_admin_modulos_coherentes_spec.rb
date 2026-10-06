@@ -85,11 +85,11 @@ RSpec.describe 'SuperAdmin: módulos y roles coherentes', type: :request do
       expect(JSON.parse(response.body)['errors'].join).to include('Cultivo')
     end
 
-    # El cupo del plan Básico es uno de cada rol. El mensaje tiene que nombrar el ROL: "permite
-    # hasta 1 usuarios" no se entiende ni se puede accionar.
-    it 'rechaza el segundo del mismo rol en el plan Básico y lo dice por su nombre' do
+    # El cupo de «Hasta 50 pacientes» es dos de cada rol. El mensaje tiene que nombrar el ROL:
+    # "permite hasta 2 usuarios" no se entiende ni se puede accionar.
+    it 'rechaza el tercero del mismo rol en «Hasta 50 pacientes» y lo dice por su nombre' do
       club = create(:club, plan: 'basico')
-      create(:user, club: club, role: 'cultivador')
+      create_list(:user, 2, club: club, role: 'cultivador')
 
       post '/api/super_admin/users',
            params: { user: { email: 'c2@y.test', role: 'cultivador', club_id: club.id } }, as: :json
@@ -98,14 +98,19 @@ RSpec.describe 'SuperAdmin: módulos y roles coherentes', type: :request do
       expect(JSON.parse(response.body)['mensaje']).to include('cultivador')
     end
 
-    it 'el plan Total no limita ninguno' do
+    # «Hasta 100 pacientes»: dos de cada rol EN CADA SEDE. Con dos sedes entran cuatro.
+    it 'en «Hasta 100 pacientes» el cupo es por sede' do
       club = create(:club, plan: 'total')
-      create(:user, club: club, role: 'cultivador')
+      ActsAsTenant.with_tenant(club) { create_list(:sede, 2, club: club) }
+      create_list(:user, 3, club: club, role: 'cultivador')
 
       post '/api/super_admin/users',
-           params: { user: { email: 'c3@y.test', role: 'cultivador', club_id: club.id } }, as: :json
-
+           params: { user: { email: 'c4@y.test', role: 'cultivador', club_id: club.id } }, as: :json
       expect(response).to have_http_status(:created)
+
+      post '/api/super_admin/users',
+           params: { user: { email: 'c5@y.test', role: 'cultivador', club_id: club.id } }, as: :json
+      expect(response).to have_http_status(:payment_required)
     end
 
     # El admin no es un puesto de trabajo: es quien contrata, y son dos socios más veces de las

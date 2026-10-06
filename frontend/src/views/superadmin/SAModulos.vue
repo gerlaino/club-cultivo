@@ -64,7 +64,7 @@ const addonsTransversales = computed(() => addons.value.filter(a => !a.pack))
 const addonsAgrupados = computed(() => {
   const grupos = suites.value
     .map(s => ({
-      titulo:    `Adicionales de ${s.label}`,
+      titulo:    `Extras de ${s.label}`,
       sinPack:   !features.value[s.clave],
       packLabel: s.label,
       items:     addonsDe(s.clave),
@@ -83,9 +83,13 @@ const addonsAgrupados = computed(() => {
 
 // Los módulos que vienen dentro de una suite se muestran como una línea DEBAJO de ella, no como
 // tarjetas aparte: no son una decisión, son parte de lo que ya se compró.
+// `incluido_en` es una lista: el Asistente IA viene con los dos packs.
 function incluidosDe(suiteClave) {
-  return incluidos.value.filter(i => i.incluido_en === suiteClave)
+  return incluidos.value.filter(i => (i.incluido_en || []).includes(suiteClave))
 }
+
+// La IA viene incluida: su configuración (tramo, créditos, consumo) se muestra si la tiene.
+const iaIncluida = computed(() => incluidos.value.some(i => i.clave === 'ia' && i.activo))
 
 function fechaCorta(f) {
   if (!f) return ''
@@ -295,6 +299,91 @@ onMounted(async () => {
       </div>
     </div>
 
+    <!-- ── Asistente IA: viene incluido en los packs (6-oct-2026), así que ya no tiene interruptor;
+         lo que se administra es el tramo, los créditos extra y lo que va consumido. ── -->
+    <div v-if="iaIncluida" class="sam__group">
+      <div class="sam__group-lbl">Asistente IA · incluido</div>
+      <div class="sam__addon sam__addon--on">
+          <!-- IA: el tramo y lo que va consumido -->
+          <div class="sam__cfg">
+            <!-- El tramo no se elige: viene con el plan. Se muestra para saber contra qué mide. -->
+            <div class="sam__tramo">
+              <span class="sam__tramo-lbl">Viene con «{{ club.ia_tramo?.label }}»</span>
+              <strong>{{ (club.ia_tramo?.limite_mes || 0).toLocaleString('es-AR') }} créditos por mes</strong>
+            </div>
+
+            <!-- Créditos vendidos aparte. Aplican a ESTE mes y no se acumulan. -->
+            <div class="sam__cfg-hd" style="margin-top:.9rem">Créditos extra</div>
+            <p class="sam__hint">
+              Se suman al tope de este mes y no se acumulan: lo que no se usa, se pierde. Se cobran
+              aparte, así que quedan registrados con fecha y con quién los cargó.
+            </p>
+            <div class="sam__recarga">
+              <input v-model="nuevaRecarga.creditos" type="number" min="1" class="sam__input sam__input--num"
+                     placeholder="Créditos" />
+              <input v-model="nuevaRecarga.nota" class="sam__input" placeholder="Para qué (opcional)" />
+              <button type="button" class="sam__btn" :disabled="recargando" @click="cargarCreditos">
+                <DsSpinner v-if="recargando" :size="13" />
+                <span v-else>Cargar</span>
+              </button>
+            </div>
+            <div v-if="(club.ia_recargas || []).length" class="sam__recargas">
+              <div v-for="r in club.ia_recargas" :key="r.id" class="sam__recarga-item">
+                <strong>+{{ r.creditos.toLocaleString('es-AR') }}</strong>
+                <span>{{ fechaHora(r.fecha) }}</span>
+                <span v-if="r.nota" class="sam__recarga-nota">{{ r.nota }}</span>
+                <span class="sam__recarga-quien">{{ r.usuario }}</span>
+              </div>
+            </div>
+
+            <!-- Cuánto va del mes. Se medía desde el 11-ago y no se veía en ninguna pantalla:
+                 se fijaba el tope sin poder mirar contra qué. -->
+            <div v-if="iaUso" class="sam__uso">
+              <div class="sam__uso-hd">
+                <span>Este mes</span>
+                <!-- CRÉDITOS, no llamadas: el tope se cuenta en créditos desde que una importación
+                     de plan de trabajo dejó de valer lo mismo que un mapeo de CSV. Mostraba
+                     `llamadas` contra un tope de créditos —dos unidades en la misma barra— y la
+                     organización se podía quedar sin IA en un número distinto al que veía acá. -->
+                <strong>{{ iaUso.creditos }} de {{ (iaUso.tope || 0).toLocaleString('es-AR') }} créditos</strong>
+              </div>
+              <div class="sam__bar">
+                <div class="sam__bar-fill" :class="{ 'sam__bar-fill--alto': iaPorcentaje >= 80 }"
+                     :style="{ width: iaPorcentaje + '%' }"></div>
+              </div>
+              <div class="sam__uso-meta">
+                <!-- Lo que se factura: cuánto del paquete comprado se consumió DE VERDAD. Sin
+                     esto sólo se sabe cuánto se le vendió, no cuánto usó. -->
+                <template v-if="iaUso.extra">
+                  <span>Del plan: <strong>{{ iaUso.base }}</strong></span>
+                  <span>·</span>
+                  <span>Extra vendido: <strong>{{ iaUso.extra }}</strong></span>
+                  <span>·</span>
+                  <span class="sam__extra-usado">Extra consumido: <strong>{{ iaUso.extra_usado }}</strong></span>
+                  <span>·</span>
+                </template>
+                <span>Costo: US$ {{ iaUso.costo_usd }}</span>
+                <span>·</span>
+                <!-- Si el hit ratio cae a 0 con el asistente en uso, algo rompió el caché del
+                     prompt: es la única forma de enterarse, porque no falla, sale más caro. -->
+                <span>Caché: {{ iaUso.cache_hit }}%</span>
+                <span>·</span>
+                <span>{{ iaUso.llamadas }} llamada{{ iaUso.llamadas === 1 ? '' : 's' }} a la API</span>
+              </div>
+              <!-- En créditos y no en cantidad: una función puede usarse poco y costar ocho veces
+                   más que otra, y contando llamadas eso no se ve. Las etiquetas salen del backend
+                   para no tener la lista de funciones escrita en dos lados. -->
+              <div v-if="(iaUso.desglose || []).length" class="sam__uso-fn">
+                <span v-for="d in iaUso.desglose" :key="d.funcion">
+                  {{ d.label }}: <strong>{{ d.creditos }}</strong>
+                  <span class="sam__uso-fn-n">({{ d.llamadas }})</span>
+                </span>
+              </div>
+            </div>
+          </div>
+      </div>
+    </div>
+
     <!-- ── Adicionales, agrupados por el pack al que le sirven ── -->
     <div class="sam__group" v-for="g in addonsAgrupados" :key="g.titulo">
       <div class="sam__group-lbl">{{ g.titulo }}</div>
@@ -311,7 +400,9 @@ onMounted(async () => {
               {{ a.label }}
               <span v-if="features[a.clave] && ESTADO[a.estado]"
                     class="sam__badge" :class="ESTADO[a.estado].clase">{{ ESTADO[a.estado].txt }}</span>
-              <span v-if="a.bloqueado" class="sam__badge sam__badge--off">no disponible</span>
+              <span v-if="a.tipo === 'incluido_proximo'" class="sam__badge sam__badge--off">viene incluido cuando esté listo</span>
+              <span v-else-if="a.bloqueado" class="sam__badge sam__badge--off">no disponible</span>
+              <span v-else-if="a.sin_lanzar" class="sam__badge sam__badge--obra">en desarrollo · sin cargo</span>
               <span v-else-if="a.incompleto" class="sam__badge sam__badge--obra">en construcción</span>
             </div>
             <div class="sam__desc">{{ a.desc }}</div>
@@ -334,84 +425,6 @@ onMounted(async () => {
         </div>
 
         <!-- La configuración aparece SOLO si el módulo está prendido y sólo la que hace falta. -->
-
-        <!-- IA: el tramo y lo que va consumido -->
-        <div v-if="a.clave === 'ia' && features.ia" class="sam__cfg">
-          <!-- El tramo no se elige: viene con el plan. Se muestra para saber contra qué mide. -->
-          <div class="sam__tramo">
-            <span class="sam__tramo-lbl">Viene con el plan {{ club.ia_tramo?.label }}</span>
-            <strong>{{ (club.ia_tramo?.limite_mes || 0).toLocaleString('es-AR') }} créditos por mes</strong>
-          </div>
-
-          <!-- Créditos vendidos aparte. Aplican a ESTE mes y no se acumulan. -->
-          <div class="sam__cfg-hd" style="margin-top:.9rem">Créditos extra</div>
-          <p class="sam__hint">
-            Se suman al tope de este mes y no se acumulan: lo que no se usa, se pierde. Se cobran
-            aparte, así que quedan registrados con fecha y con quién los cargó.
-          </p>
-          <div class="sam__recarga">
-            <input v-model="nuevaRecarga.creditos" type="number" min="1" class="sam__input sam__input--num"
-                   placeholder="Créditos" />
-            <input v-model="nuevaRecarga.nota" class="sam__input" placeholder="Para qué (opcional)" />
-            <button type="button" class="sam__btn" :disabled="recargando" @click="cargarCreditos">
-              <DsSpinner v-if="recargando" :size="13" />
-              <span v-else>Cargar</span>
-            </button>
-          </div>
-          <div v-if="(club.ia_recargas || []).length" class="sam__recargas">
-            <div v-for="r in club.ia_recargas" :key="r.id" class="sam__recarga-item">
-              <strong>+{{ r.creditos.toLocaleString('es-AR') }}</strong>
-              <span>{{ fechaHora(r.fecha) }}</span>
-              <span v-if="r.nota" class="sam__recarga-nota">{{ r.nota }}</span>
-              <span class="sam__recarga-quien">{{ r.usuario }}</span>
-            </div>
-          </div>
-
-          <!-- Cuánto va del mes. Se medía desde el 11-ago y no se veía en ninguna pantalla:
-               se fijaba el tope sin poder mirar contra qué. -->
-          <div v-if="iaUso" class="sam__uso">
-            <div class="sam__uso-hd">
-              <span>Este mes</span>
-              <!-- CRÉDITOS, no llamadas: el tope se cuenta en créditos desde que una importación
-                   de plan de trabajo dejó de valer lo mismo que un mapeo de CSV. Mostraba
-                   `llamadas` contra un tope de créditos —dos unidades en la misma barra— y la
-                   organización se podía quedar sin IA en un número distinto al que veía acá. -->
-              <strong>{{ iaUso.creditos }} de {{ (iaUso.tope || 0).toLocaleString('es-AR') }} créditos</strong>
-            </div>
-            <div class="sam__bar">
-              <div class="sam__bar-fill" :class="{ 'sam__bar-fill--alto': iaPorcentaje >= 80 }"
-                   :style="{ width: iaPorcentaje + '%' }"></div>
-            </div>
-            <div class="sam__uso-meta">
-              <!-- Lo que se factura: cuánto del paquete comprado se consumió DE VERDAD. Sin
-                   esto sólo se sabe cuánto se le vendió, no cuánto usó. -->
-              <template v-if="iaUso.extra">
-                <span>Del plan: <strong>{{ iaUso.base }}</strong></span>
-                <span>·</span>
-                <span>Extra vendido: <strong>{{ iaUso.extra }}</strong></span>
-                <span>·</span>
-                <span class="sam__extra-usado">Extra consumido: <strong>{{ iaUso.extra_usado }}</strong></span>
-                <span>·</span>
-              </template>
-              <span>Costo: US$ {{ iaUso.costo_usd }}</span>
-              <span>·</span>
-              <!-- Si el hit ratio cae a 0 con el asistente en uso, algo rompió el caché del
-                   prompt: es la única forma de enterarse, porque no falla, sale más caro. -->
-              <span>Caché: {{ iaUso.cache_hit }}%</span>
-              <span>·</span>
-              <span>{{ iaUso.llamadas }} llamada{{ iaUso.llamadas === 1 ? '' : 's' }} a la API</span>
-            </div>
-            <!-- En créditos y no en cantidad: una función puede usarse poco y costar ocho veces
-                 más que otra, y contando llamadas eso no se ve. Las etiquetas salen del backend
-                 para no tener la lista de funciones escrita en dos lados. -->
-            <div v-if="(iaUso.desglose || []).length" class="sam__uso-fn">
-              <span v-for="d in iaUso.desglose" :key="d.funcion">
-                {{ d.label }}: <strong>{{ d.creditos }}</strong>
-                <span class="sam__uso-fn-n">({{ d.llamadas }})</span>
-              </span>
-            </div>
-          </div>
-        </div>
 
         <!-- Qué va a poder contestar el chatbot en ESTA organización.
              No bloquea el toggle a propósito: con bloqueo duro no se podría prender ni para

@@ -12,9 +12,8 @@
 
     <h2>1. Quién es responsable de tus datos</h2>
     <p>
-      Si usás Cultivo Espacial para tu cultivo personal, el responsable de tus datos es el titular de la plataforma:
-      <Dato :v="TITULAR.nombre" />, CUIT <Dato :v="TITULAR.cuit" />, domicilio <Dato :v="TITULAR.domicilio" />,
-      <a :href="`mailto:${TITULAR.mail}`">{{ TITULAR.mail }}</a>.
+      Si usás Cultivo Espacial para tu cultivo personal, el responsable de tus datos es Cultivo Espacial. Para
+      cualquier consulta o pedido sobre tus datos, escribinos a <a :href="`mailto:${TITULAR.mail}`">{{ TITULAR.mail }}</a>.
     </p>
     <p>
       Si tus datos los cargó una <strong>organización</strong> de la que sos paciente o miembro, la responsable es esa
@@ -134,13 +133,12 @@
 
 <script setup>
 // Política de privacidad (borrador, 4-oct-2026). Cubre lo que pide la Ley 25.326 para una app con
-// datos de salud: responsable identificado, finalidad, consentimiento expreso para datos sensibles
+// datos de salud: responsable (Cultivo Espacial y su mail, sin nombres: ver titular.js), finalidad, consentimiento expreso para datos sensibles
 // (art. 7), transferencia internacional a los proveedores (art. 12), derechos y plazos (arts. 14–16),
 // la leyenda obligatoria de la AAIP, y el rol de encargado frente a las organizaciones (art. 25).
 //
 // La lista de proveedores tiene que coincidir con lo que la app usa de verdad: si se suma uno
 // (otro correo, otro hosting), se agrega acá.
 import LegalLayout from './LegalLayout.vue'
-import Dato from './Dato.vue'
 import { TITULAR } from './titular.js'
 </script>

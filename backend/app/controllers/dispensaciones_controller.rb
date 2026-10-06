@@ -9,11 +9,14 @@ class DispensacionesController < ApplicationController
 
   before_action :authenticate_user!
 
-  before_action -> { require_feature!(:produccion_dispensa) }
-  # Las acciones de reparto exigen el add-on Delivery, no sólo la suite.
+  # `entregar` y `reportar_fallo` quedan AFUERA de los dos candados a propósito: son los cierres
+  # de un reparto. Desde el 6-oct-2026 el Delivery viene con Producción y dispensa, así que se va
+  # cuando se da de baja ese pack — y con el candado del pack puesto, lo que estaba en viaje ese
+  # día quedaba sin nadie que pudiera cerrarlo.
+  before_action -> { require_feature!(:produccion_dispensa) }, except: %i[entregar reportar_fallo]
+  # Las acciones de reparto exigen el Delivery.
   #
-  # `entregar` y `reportar_fallo` quedan AFUERA a propósito: son los cierres. Si una baja de
-  # Delivery vence con paquetes en viaje, hay que poder registrar cómo terminaron — es la misma
+  # Si una baja vence con paquetes en viaje, hay que poder registrar cómo terminaron — es la misma
   # decisión que ya tomó `AplicarBajasModulosJob`, que suelta los pendientes y no toca lo que
   # está en la calle. Bloquear el cierre dejaría esos envíos colgados para siempre.
   before_action -> { require_feature!(:delivery) },

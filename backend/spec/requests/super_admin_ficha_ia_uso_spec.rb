@@ -51,8 +51,9 @@ RSpec.describe 'SuperAdmin: consumo de IA en la ficha', type: :request do
     expect(ficha.dig('ia_uso', 'cache_hit')).not_to be_nil
   end
 
-  context 'una organización sin el add-on de IA' do
-    let(:club) { create(:club, features: Club::FEATURES_POR_DEFECTO.dup) }
+  # La IA viene con cualquier pack (6-oct-2026): sólo una organización sin packs no la tiene.
+  context 'una organización sin IA (sin ningún pack)' do
+    let(:club) { create(:club, features: {}) }
 
     it 'no calcula nada: son seis sumas que no le sirven a nadie' do
       expect(ficha['ia_uso']).to be_nil

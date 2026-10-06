@@ -52,6 +52,12 @@ class Lote < ApplicationRecord
   # inconsistente de antes, no se lo deja trabado para el resto de las ediciones.
   validate :sala_admite_el_estado, if: -> { sala_id_changed? || estado_changed? }
 
+  # El cupo de plantas en floración del plan (`PlanEnforcer`, 6-oct-2026). Vive en el modelo y no
+  # en un controller porque al cupo se entra por muchas puertas —avanzar de fase, mover a otra
+  # sala, dar vuelta la fase del espacio, editar las fechas— y un candado en una sola dejaba
+  # florecer por las otras. Las plantas que se crean ya dentro del cupo las frena `Plant`.
+  validate :cupo_de_floracion, on: :update, if: :entra_al_cupo_de_floracion?
+
   # Los m² que ocupa el lote. Opcionales: sin ellos se crea igual y lo único que falta es el
   # g/m². Lo que NO puede pasar es que los lotes de una sala sumen más que la sala.
   validates :m2_ocupados, numericality: { greater_than: 0 }, allow_nil: true
@@ -75,6 +81,12 @@ class Lote < ApplicationRecord
 
   # Estados de las plantas que se cosechan (las de una automática pueden seguir en vegetativo).
   def estados_plantas_cosechables = automatica? ? %w[floracion vegetativo] : %w[floracion]
+
+  # ¿Sus plantas ocupan el cupo de floración del plan en este estado? Una automática lo ocupa
+  # todo el ciclo: nunca pasa a «floración» en la app.
+  def ocupa_cupo_de_floracion?(est = estado)
+    automatica? ? PlanEnforcer::ESTADOS_EN_PIE.include?(est) : est == 'floracion'
+  end
   belongs_to :genetica,    optional: true
   belongs_to :manicurador,   class_name: 'User',  optional: true
   belongs_to :planta_madre,  class_name: 'Plant', optional: true
@@ -1067,5 +1079,21 @@ class Lote < ApplicationRecord
       sala:            sala&.nombre,
       plants_count:    plants_count,
     })
+  end
+
+  def entra_al_cupo_de_floracion?
+    will_save_change_to_estado? && ocupa_cupo_de_floracion?(estado) && !ocupa_cupo_de_floracion?(estado_in_database)
+  end
+
+  # Entra el lote ENTERO: todas sus plantas vivas. Se cuentan aparte de las del resto de la
+  # organización porque, según la puerta, las plantas cambian de estado antes o después que el lote.
+  def cupo_de_floracion
+    return if club.nil?
+
+    vivas    = plants.where.not(state: %w[descartada cosechado]).count
+    enforcer = PlanEnforcer.new(club)
+    return if enforcer.cabe_en_floracion?(vivas, excluir_lote: self)
+
+    errors.add(:base, enforcer.error_floracion(vivas, excluir_lote: self)[:mensaje])
   end
 end

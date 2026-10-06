@@ -108,8 +108,9 @@ RSpec.describe 'Envíos masivos de correo', type: :request do
       expect(response).to have_http_status(:forbidden)
     end
 
-    it 'sin el módulo de correo, no se puede' do
-      club.update!(features: club.features.merge('mailer' => false))
+    # El correo viene con Producción y dispensa (6-oct-2026): sin el pack, no hay envíos.
+    it 'sin Producción y dispensa, no se puede' do
+      club.update!(features: club.features.merge('produccion_dispensa' => false))
       mandar(destino: 'pacientes', paciente_ids: [ana.id], asunto: 'H', cuerpo: 'M')
 
       expect(response).to have_http_status(:forbidden)

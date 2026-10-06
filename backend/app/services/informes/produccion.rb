@@ -166,10 +166,10 @@ module Informes
       nil
     end
 
-    # Sólo cuando el plan tiene tope (Básico). En Total no hay nada contra qué medir.
+    # Sólo cuando el plan tiene tope (desde el 6-oct-2026 lo tienen todos los escalones).
     #
-    # OJO: el número que se muestra es EL MISMO que usa `PlanEnforcer` para bloquear el alta —
-    # que hoy cuenta todas las plantas que existen, no sólo las en pie—. Si acá se mostrara otro,
+    # OJO: el número que se muestra es EL MISMO que usa `PlanEnforcer` para bloquear —las plantas
+    # en floración, más las automáticas en todo su ciclo—. Si acá se mostrara otro,
     # el informe diría «queda lugar» y el alta rebotaría.
     def plan
       # El tope del plan es de TODA la organización: contra un recorte no significa nada.

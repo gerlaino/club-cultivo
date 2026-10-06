@@ -178,16 +178,12 @@ class LotesController < ApplicationController
 
     plantas_iniciales = lote_params[:plants_count].to_i
 
-    if plantas_iniciales > 0
+    # El tope es de plantas EN FLORACIÓN (o de automáticas): un lote que nace en vegetativo no
+    # ocupa cupo todavía. La red de verdad es la validación de `Plant`.
+    if plantas_iniciales > 0 && @lote.ocupa_cupo_de_floracion?
       enforcer2 = PlanEnforcer.new(current_user.club)
-      unless enforcer2.puede_crear_planta_bulk?(plantas_iniciales)
-        info = enforcer2.info
-        restantes = (info[:limites][:plantas] || 0) - info[:uso][:plantas]
-        return render json: {
-          error: 'limite_plan',
-          mensaje: "Tu plan solo permite #{restantes} plantas más (límite: #{info[:limites][:plantas]})",
-          upgrade: true,
-        }, status: :payment_required
+      unless enforcer2.cabe_en_floracion?(plantas_iniciales)
+        return render json: enforcer2.error_floracion(plantas_iniciales), status: :payment_required
       end
     end
 

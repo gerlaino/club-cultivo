@@ -38,7 +38,7 @@ class SuperAdmin::UsersController < SuperAdmin::BaseController
     unless enforcer.puede_crear_usuario?(rol)
       info = enforcer.info
       return render json: PlanEnforcer.error_limite_rol(rol, plan: info[:label],
-                                                        tope: enforcer.usuarios_por_rol),
+                                                        tope: enforcer.tope_por_rol),
                     status: :payment_required
     end
 

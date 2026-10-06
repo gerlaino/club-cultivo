@@ -62,6 +62,27 @@ RSpec.describe 'Dispositivos', type: :request do
         expect(body['token']).to be_present
         expect(body['token'].length).to eq(64)
       end
+
+      # Lo que la pantalla muestra para copiar en el sensor (URL + token) tiene que servir tal cual:
+      # el cartel de alta armaba `/api/webhooks/lecturas/:id`, que no existe, y el sensor nunca
+      # mandaba nada.
+      it 'la URL y el token que devuelve reciben lecturas tal cual se copian' do
+        post "/dispositivos/#{dispositivo.id}/regenerar_token", headers: auth_headers
+        body = response.parsed_body
+
+        post body['webhook_url'],
+             params:  { tipo: 'temperatura', valor: 24.5, medido_at: Time.current.iso8601 },
+             headers: { 'X-Webhook-Token' => body['token'] }
+        expect(response).to have_http_status(:accepted)
+      end
+
+      it 'la lista de sensores trae la misma URL' do
+        post "/dispositivos/#{dispositivo.id}/regenerar_token", headers: auth_headers
+        url = response.parsed_body['webhook_url']
+
+        get '/dispositivos', headers: auth_headers
+        expect(response.parsed_body.find { |d| d['id'] == dispositivo.id }['webhook_url']).to eq(url)
+      end
     end
 
     context 'cultivador (forbidden)' do

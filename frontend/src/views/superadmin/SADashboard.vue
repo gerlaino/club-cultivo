@@ -10,7 +10,7 @@ import { useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { getSuperAdminPulso } from '../../lib/api.js'
 import { AlertTriangle, CalendarClock, MoonStar, Activity, Plus } from 'lucide-vue-next'
-import { formatARS } from '../../lib/formatters.js'
+import { formatPrecio } from '../../lib/formatters.js'
 
 const router  = useRouter()
 const pulso   = ref(null)
@@ -19,6 +19,8 @@ const error   = ref(null)
 
 const susc     = computed(() => pulso.value?.suscripciones || {})
 const plata    = computed(() => pulso.value?.plata || {})
+// La moneda de la lista la dice el backend (desde el 6-oct-2026, dólares).
+const precio   = (n) => formatPrecio(n, plata.value.moneda)
 const atencion = computed(() => pulso.value?.atencion || {})
 const salud    = computed(() => pulso.value?.salud || {})
 
@@ -54,12 +56,12 @@ const pendientes = computed(() => {
 
   // Con el número: «venció» sin «$120.000/mes» al lado no dice cuánto importa.
   add(susc.value.vencidos, 'perdiendo',
-    c => `El plan venció y sigue operando · ${formatARS(c.precio_mensual)}/mes`, 'Cobrar y renovar')
+    c => `El plan venció y sigue operando · ${precio(c.precio_mensual)}/mes`, 'Cobrar y renovar')
   add(atencion.value.sin_suites, 'perdiendo',
     () => 'Sin ninguna suite: entra pero no puede trabajar', 'Asignar suite')
   ;(atencion.value.suspendidos || []).forEach(c => {
     const m = SUSPENDIDA[c.motivo] || SUSPENDIDA.otro
-    p.push({ ...c, grupo: m.grupo, texto: `${m.texto} · ${formatARS(c.precio_mensual)}/mes`, accion: m.accion })
+    p.push({ ...c, grupo: m.grupo, texto: `${m.texto} · ${precio(c.precio_mensual)}/mes`, accion: m.accion })
   })
 
   // Lo que uno mismo anotó en la ficha con fecha: vencido, o en la semana.
@@ -77,7 +79,7 @@ const pendientes = computed(() => {
     'Revisar sensores')
 
   add(susc.value.vencen_7, 'avisar',
-    c => `Vence el ${fecha(c.plan_activo_hasta)} · ${formatARS(c.precio_mensual)}/mes`, 'Renovar')
+    c => `Vence el ${fecha(c.plan_activo_hasta)} · ${precio(c.precio_mensual)}/mes`, 'Renovar')
 
   return p
 })
@@ -145,19 +147,19 @@ onMounted(async () => {
            en pesos: «se está perdiendo plata» era una frase. -->
       <section class="sad__plata">
         <div class="sad__kpi">
-          <span class="sad__kpi-n">{{ formatARS(plata.mrr || 0) }}</span>
+          <span class="sad__kpi-n">{{ precio(plata.mrr || 0) }}</span>
           <span class="sad__kpi-l">por mes · {{ plata.facturables || 0 }} {{ plata.facturables === 1 ? 'organización factura' : 'organizaciones facturan' }}</span>
         </div>
         <div class="sad__kpi" :class="{ 'sad__kpi--rojo': plata.vencido_ars > 0 }">
-          <span class="sad__kpi-n">{{ formatARS(plata.vencido_ars || 0) }}</span>
+          <span class="sad__kpi-n">{{ precio(plata.vencido_ars || 0) }}</span>
           <span class="sad__kpi-l">vencido y operando · {{ plata.vencidos || 0 }}</span>
         </div>
         <div class="sad__kpi" :class="{ 'sad__kpi--ambar': plata.vence_este_mes_ars > 0 }">
-          <span class="sad__kpi-n">{{ formatARS(plata.vence_este_mes_ars || 0) }}</span>
+          <span class="sad__kpi-n">{{ precio(plata.vence_este_mes_ars || 0) }}</span>
           <span class="sad__kpi-l">vence este mes · {{ plata.vencen_este_mes || 0 }}</span>
         </div>
         <div class="sad__kpi">
-          <span class="sad__kpi-n">{{ formatARS(plata.en_prueba_ars || 0) }}</span>
+          <span class="sad__kpi-n">{{ precio(plata.en_prueba_ars || 0) }}</span>
           <span class="sad__kpi-l">en prueba · {{ (susc.trials || []).length }} a precio de lista</span>
         </div>
       </section>

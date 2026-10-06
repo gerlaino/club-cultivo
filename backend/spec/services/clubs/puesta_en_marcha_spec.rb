@@ -20,7 +20,8 @@ RSpec.describe Clubs::PuestaEnMarcha do
   it 'los pasos dependen de lo contratado: sin Cultivo no se piden salas ni lotes' do
     club.update!(features: { 'produccion_dispensa' => true })
 
-    expect(pasos[:pasos].map { |p| p[:clave] }).to eq(%w[sedes pacientes equipo])
+    # El correo viene con Producción y dispensa (6-oct-2026), así que su paso se pide igual.
+    expect(pasos[:pasos].map { |p| p[:clave] }).to eq(%w[sedes pacientes correo equipo])
   end
 
   it 'marca lo hecho mirando los datos' do

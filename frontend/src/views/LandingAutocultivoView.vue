@@ -27,7 +27,7 @@
 
     <Bolsillo />
 
-    <Packs :packs="PACKS_AUTOCULTIVO" :accion="{ label: 'Crear mi cuenta', to: '/registro' }" />
+    <Packs :packs="packs" :accion="{ label: 'Crear mi cuenta', to: '/registro' }" />
 
     <PreguntasFrecuentes titulo="Lo que nos preguntan en autocultivo" :preguntas="PREGUNTAS_AUTOCULTIVO"
                          :contacto="{ path: '/contacto', query: { tipo: 'personal' } }" />
@@ -60,12 +60,18 @@ import QueHace from '../components/public/QueHace.vue'
 import Bolsillo from '../components/public/Bolsillo.vue'
 import PreguntasFrecuentes from '../components/public/PreguntasFrecuentes.vue'
 import Packs from '../components/public/Packs.vue'
-import { TEMAS_AUTOCULTIVO, PREGUNTAS_AUTOCULTIVO, PACKS_AUTOCULTIVO } from '../components/public/contenido.js'
+import { TEMAS_AUTOCULTIVO, PREGUNTAS_AUTOCULTIVO, packsAutocultivo } from '../components/public/contenido.js'
 import { getRegistroInfo } from '../lib/api.js'
 
 const diasPrueba = ref(30)
+// El precio lo dice el backend (`Precios.lista_publica`); acá sólo las palabras.
+const packs = ref([])
 onMounted(async () => {
-  try { diasPrueba.value = (await getRegistroInfo()).data.dias_prueba } catch {}
+  try {
+    const { data } = await getRegistroInfo()
+    diasPrueba.value = data.dias_prueba
+    packs.value = packsAutocultivo(data.precios)
+  } catch {}
 })
 </script>
 

@@ -1,6 +1,13 @@
 require 'rails_helper'
 
-# AC del modelo comercial (ago-2026): DOS planes, y el plan dice CUÁNTO, nunca QUÉ.
+# AC del modelo comercial (ago-2026): el plan dice CUÁNTO, nunca QUÉ.
+#
+# LOS ESCALONES (6-oct-2026, Germán y su socio):
+#   Autocultivo ......... 9 plantas en floración, vege libre, 2 espacios.
+#   Hasta 50 pacientes .. 450 en floración, 3 salas, 1 sede, 2 usuarios de cada rol.
+#   Hasta 100 pacientes . 900 en floración, salas libres, 3 sedes, 2 de cada rol POR SEDE.
+#   Encima: packs de 10 pacientes (+10 pacientes, +90 plantas en floración) y sedes extra.
+#   El tope de floración es un candado; las automáticas cuentan todo su ciclo.
 #
 # Antes convivían dos sistemas que se contradecían: los cuatro planes viejos fijaban los
 # límites duros y las suites decidían las capacidades, así que un club "federación" sin suites
@@ -22,13 +29,12 @@ RSpec.describe PlanEnforcer do
       expect(described_class::PLANES.keys).to contain_exactly('basico', 'total', 'personal')
     end
 
-    # Salvo las fotos: no miden capacidad del cultivo sino almacenamiento, que se paga por GB.
-    it 'el total no limita nada del cultivo' do
-      (described_class::RECURSOS - [:fotos]).each do |recurso|
-        expect(described_class::PLANES['total'][recurso]).to be_nil,
-                                                             "el plan total no debería limitar #{recurso}"
-      end
-      expect(described_class::PLANES['total'][:fotos]).to be > described_class::PLANES['personal'][:fotos]
+    it 'cada escalón tiene los topes que se acordaron' do
+      expect(described_class::PLANES['personal']).to include(plantas: 9,   salas: 2,   sedes: 1, pacientes: 0, equipo: false)
+      expect(described_class::PLANES['basico']).to   include(plantas: 450, salas: 3,   sedes: 1, pacientes: 50,
+                                                             usuarios_por_rol: 2, por_sede: false)
+      expect(described_class::PLANES['total']).to    include(plantas: 900, salas: nil, sedes: 3, pacientes: 100,
+                                                             usuarios_por_rol: 2, por_sede: true)
     end
 
     # `lotes` NO se limita: el lote es una unidad de organización, no de capacidad, y ponerle
@@ -113,33 +119,112 @@ RSpec.describe PlanEnforcer do
     end
   end
 
-  describe 'plan total' do
+  describe 'Hasta 100 pacientes' do
     let(:club) { create(:club, plan: 'total') }
 
-    it 'no frena nada' do
+    it 'salas libres y tres sedes; la cuarta, no' do
       admin = create(:user, :admin, club: club)
       10.times { create(:sala, club: club, created_by: admin) }
-      create(:sede, club: club, created_by: admin)
-
+      2.times { create(:sede, club: club, created_by: admin) }
       enforcer = described_class.new(club.reload)
+      expect(enforcer.puede_crear_sala?).to be(true)
+      expect(enforcer.puede_crear_sede?).to be(true)
 
-      expect(enforcer.puede_crear_sala?).to     be(true)
-      expect(enforcer.puede_crear_sede?).to     be(true)
-      expect(enforcer.puede_crear_lote?).to     be(true)
-      expect(enforcer.puede_crear_planta?).to   be(true)
-      expect(enforcer.puede_crear_paciente?).to be(true)
-      expect(enforcer.puede_crear_usuario?('cultivador')).to be(true)
+      create(:sede, club: club, created_by: admin)
+      expect(described_class.new(club.reload).puede_crear_sede?).to be(false)
     end
   end
 
-  # El caso que motivó volver a limitar las plantas: dos lotes de mil plantas es un club que
-  # tendría que estar pagando el plan Total, y con el límite sólo en lotes pasaba por básico.
-  describe 'límite de plantas' do
-    it 'frena la carga masiva que excede el tope aunque entre en los lotes permitidos' do
-      tope = described_class::PLANES['basico'][:plantas]
+  describe 'lo comprado encima del escalón' do
+    it 'cada pack de 10 pacientes suma 10 pacientes y 90 plantas en floración' do
+      club.update!(packs_pacientes_extra: 3)
+      limites = described_class.new(club).info[:limites]
 
-      expect(described_class.new(club).puede_crear_planta_bulk?(tope + 1)).to be(false)
-      expect(described_class.new(club).puede_crear_planta_bulk?(tope)).to     be(true)
+      expect(limites[:pacientes]).to eq(50 + 30)
+      expect(limites[:plantas]).to   eq(450 + 270)
+    end
+
+    it 'cada sede extra suma una sede' do
+      admin = create(:user, :admin, club: club)
+      create(:sede, club: club, created_by: admin)
+      expect(described_class.new(club.reload).puede_crear_sede?).to be(false)
+
+      club.update!(sedes_extra: 1)
+      expect(described_class.new(club.reload).puede_crear_sede?).to be(true)
+    end
+
+    it 'el autocultivo no compra extras: sus topes no se mueven' do
+      personal = create(:club, plan: 'personal', packs_pacientes_extra: 5, sedes_extra: 2)
+      limites  = described_class.new(personal).info[:limites]
+
+      expect(limites).to include(plantas: 9, sedes: 1, pacientes: 0)
+    end
+  end
+
+  # El tope es de plantas EN FLORACIÓN: el vegetativo es libre. Es un candado, también en el
+  # autocultivo, y vale por cualquier puerta (está en los modelos).
+  describe 'el cupo de floración' do
+    let(:club)  { create(:club, plan: 'personal', features: { 'cultivo' => true }) }
+    let(:sala)  { create(:sala, club: club, kind: 'mixta') }
+    let(:auto)  { create(:genetica, club: club, automatica: true) }
+
+    def lote_con(n, estado:, genetica: nil)
+      lote = create(:lote, club: club, sala: sala, estado: estado, genetica: genetica, plants_count: n)
+      n.times { |i| create(:plant, lote: lote, club: club, state: estado, nombre: "#{lote.codigo}-#{i}") }
+      lote
+    end
+
+    it 'el vegetativo es libre' do
+      lote_con(20, estado: 'vegetativo')
+      expect(described_class.new(club).info[:uso][:plantas]).to eq(0)
+    end
+
+    it 'entran 9 en floración y la décima no' do
+      lote = lote_con(9, estado: 'floracion')
+
+      decima = Plant.new(lote: lote, club: club, state: 'floracion', nombre: 'X-10')
+      expect(decima).not_to be_valid
+      expect(decima.errors.full_messages.join).to include('9 plantas en floración')
+    end
+
+    it 'un lote de 10 en vegetativo no puede pasar a floración' do
+      lote = lote_con(10, estado: 'vegetativo')
+
+      expect(lote.update(estado: 'floracion')).to be(false)
+      expect(lote.errors.full_messages.join).to include('floración')
+    end
+
+    it 'un lote de 9 sí pasa' do
+      lote = lote_con(9, estado: 'vegetativo')
+      expect(lote.update(estado: 'floracion')).to be(true)
+    end
+
+    # Las automáticas nunca pasan a «floración» en la app: cuentan todo el ciclo.
+    it 'las automáticas cuentan aunque estén en vegetativo' do
+      lote_con(9, estado: 'vegetativo', genetica: auto)
+
+      expect(described_class.new(club).info[:uso][:plantas]).to eq(9)
+      lote = lote_con(1, estado: 'vegetativo') # una fotoperiódica en vege sigue entrando
+      expect(lote.plants.count).to eq(1)
+      expect(Plant.new(lote: club.lotes.where(genetica: auto).first, club: club,
+                       state: 'vegetativo', nombre: 'A-10')).not_to be_valid
+    end
+
+    # Semántica de la suma: alcanza con que el cupo lo llenen las de OTRO lote.
+    it 'suma las de todos los lotes: automáticas y en floración juntas' do
+      lote_con(5, estado: 'vegetativo', genetica: auto)
+      lote = lote_con(4, estado: 'vegetativo')
+
+      expect(lote.update(estado: 'floracion')).to be(true)
+      lote.plants.update_all(state: 'floracion') # lo que hace cada puerta después de mover el lote
+      expect(Plant.new(lote: lote, club: club, state: 'floracion', nombre: 'Y-5')).not_to be_valid
+    end
+
+    it 'las cosechadas y descartadas no ocupan cupo' do
+      lote = lote_con(9, estado: 'floracion')
+      lote.plants.first.update_columns(state: 'descartada')
+
+      expect(Plant.new(lote: lote, club: club, state: 'floracion', nombre: 'Z-10')).to be_valid
     end
   end
 
@@ -149,7 +234,9 @@ RSpec.describe PlanEnforcer do
   # El paciente tiene cuenta para su portal y ya gasta su propio límite (`pacientes`):
   # contándolo también acá se cobraba dos veces.
   describe 'límite de usuarios' do
-    it 'el básico deja UNO de cada rol' do
+    it '«Hasta 50 pacientes» deja DOS de cada rol' do
+      create(:user, club: club, role: 'cultivador')
+      expect(described_class.new(club.reload).puede_crear_usuario?('cultivador')).to be(true)
       create(:user, club: club, role: 'cultivador')
 
       enforcer = described_class.new(club.reload)
@@ -158,11 +245,16 @@ RSpec.describe PlanEnforcer do
       expect(enforcer.puede_crear_usuario?('dispensador')).to be(true)
     end
 
-    it 'el total no limita ningún rol' do
+    it '«Hasta 100 pacientes» deja dos de cada rol por cada sede' do
       total = create(:club, plan: 'total')
-      3.times { create(:user, club: total, role: 'cultivador') }
+      ActsAsTenant.with_tenant(total) do
+        2.times { create(:user, club: total, role: 'cultivador') }
+        expect(described_class.new(total.reload).puede_crear_usuario?('cultivador')).to be(false)
 
-      expect(described_class.new(total.reload).puede_crear_usuario?('cultivador')).to be(true)
+        create(:sede, club: total)
+        create(:sede, club: total)
+        expect(described_class.new(total.reload).puede_crear_usuario?('cultivador')).to be(true)
+      end
     end
 
     it 'no cuenta las cuentas de portal de los pacientes' do
@@ -179,8 +271,8 @@ RSpec.describe PlanEnforcer do
     end
 
     it 'informa cuántos permite por rol' do
-      expect(described_class.new(club).info[:usuarios_por_rol]).to eq(1)
-      expect(described_class.new(create(:club, plan: 'total')).info[:usuarios_por_rol]).to be_nil
+      expect(described_class.new(club).info[:usuarios_por_rol]).to eq(2)
+      expect(described_class.new(create(:club, plan: 'total')).info[:por_sede]).to be(true)
     end
   end
 
@@ -189,7 +281,7 @@ RSpec.describe PlanEnforcer do
       info = described_class.new(club).info
 
       expect(info[:plan]).to  eq('basico')
-      expect(info[:label]).to eq('Básico')
+      expect(info[:label]).to eq('Hasta 50 pacientes')
       expect(info[:limites].keys).to match_array(described_class::RECURSOS)
       expect(info[:uso].keys).to     match_array(described_class::RECURSOS)
     end
@@ -219,15 +311,13 @@ RSpec.describe PlanEnforcer do
       expect(basico.feature?(:medico)).to be(true)
     end
 
-    # El correo dejó de ser derivado y pasó a add-on contratable, así que acá NO alcanza con
-    # tener la suite: hay que tenerlo prendido. Lo que el plan sigue sin tocar es CUÁLES módulos
-    # se tienen — eso lo deciden las suites y los add-ons, no básico contra total.
-    it 'el correo ya no viene con la suite: es un add-on que se prende' do
-      basico = create(:club, plan: 'basico',
-                             features: { 'cultivo' => true, 'produccion_dispensa' => true })
-
-      expect(basico.feature?(:mailer)).to be(false)
-      expect(create(:club, plan: 'basico').feature?(:mailer)).to be(true) # nace prendido
+    # 6-oct-2026: lo terminado viene con los packs, sea cual sea el escalón.
+    it 'delivery, correo e IA vienen con los packs en cualquier escalón' do
+      %w[basico total].each do |plan|
+        c = create(:club, plan: plan, features: { 'produccion_dispensa' => true })
+        %i[delivery mailer ia medico].each { |m| expect(c.feature?(m)).to be(true), "#{plan}: #{m}" }
+      end
+      expect(create(:club, plan: 'total', features: { 'cultivo' => true }).feature?(:delivery)).to be(false)
     end
   end
 end

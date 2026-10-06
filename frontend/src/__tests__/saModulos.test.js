@@ -30,25 +30,29 @@ const club = {
                   usuario: 'super@cultivoespacial.com' }],
   pulse_configurado: false,
   whatsapp_estado: 'sin_configurar',
-  features: { cultivo: true, produccion_dispensa: true, ia: true, delivery: false, iot: false },
-  features_baja: { delivery: '2026-08-31' },
+  features: { cultivo: true, produccion_dispensa: true, chatbot: true, bar: true, iot: false },
+  features_baja: { bar: '2026-08-31' },
   suites: [
     { clave: 'cultivo', label: 'Cultivo', desc: 'Salas, lotes y plantas' },
     { clave: 'produccion_dispensa', label: 'Producción y dispensa', desc: 'Pacientes y entregas' },
   ],
   addons: [
-    { clave: 'ia',       label: 'Asistente IA', desc: 'Registro por voz', estado: 'andando', pack: null },
-    { clave: 'delivery', label: 'Delivery',     desc: 'Reparto a domicilio', estado: 'apagado',
-      pack: 'produccion_dispensa', pack_label: 'Producción y dispensa' },
+    { clave: 'chatbot',  label: 'Chatbot del admin', desc: 'Pregunta', estado: 'andando', pack: null,
+      tipo: 'extra', sin_lanzar: true },
     { clave: 'iot',      label: 'Ambiente / IoT', desc: 'Sensores', estado: 'falta_config',
       pack: 'cultivo', pack_label: 'Cultivo', falta: 'Falta cargar la API key de Pulse' },
-    { clave: 'bar',      label: 'Buffet', desc: 'Punto de venta', estado: 'apagado',
-      pack: 'produccion_dispensa', pack_label: 'Producción y dispensa', incompleto: true },
+    { clave: 'bar',      label: 'Buffet y eventos', desc: 'Punto de venta', estado: 'andando',
+      pack: 'produccion_dispensa', pack_label: 'Producción y dispensa', incompleto: true, tipo: 'extra' },
     { clave: 'whatsapp', label: 'WhatsApp', desc: 'Avisos por WhatsApp', estado: 'apagado',
-      pack: 'produccion_dispensa', pack_label: 'Producción y dispensa',
+      pack: 'produccion_dispensa', pack_label: 'Producción y dispensa', tipo: 'incluido_proximo',
       bloqueado: true, motivo_bloqueo: 'Falta dar de alta la cuenta de Twilio de la plataforma.' },
   ],
-  incluidos: [{ clave: 'medico', label: 'Módulo médico', incluido_en: 'produccion_dispensa' }],
+  // 6-oct-2026: lo terminado viene incluido (y `incluido_en` es una lista: la IA viene con los dos).
+  incluidos: [
+    { clave: 'medico',   label: 'Módulo médico', incluido_en: ['produccion_dispensa'], activo: true },
+    { clave: 'delivery', label: 'Delivery',      incluido_en: ['produccion_dispensa'], activo: true },
+    { clave: 'ia',       label: 'Asistente IA',  incluido_en: ['cultivo', 'produccion_dispensa'], activo: true },
+  ],
   en_construccion: [{ clave: 'vista_paciente', label: 'Portal del paciente' }],
   // El tope se cuenta en CRÉDITOS; `llamadas` es informativo. Van distintos a propósito en el
   // fixture: si la pantalla mezclara las unidades, estos números lo delatan.
@@ -67,7 +71,7 @@ const montarModulos = (overrides = {}) => mount(SAModulos, {
 
 /** La tarjeta de un módulo, buscada por su nombre visible. */
 const filaDe = (w, label) =>
-  w.findAll('.sam__addon').find(f => f.find('.sam__name').text().startsWith(label))
+  w.findAll('.sam__addon').find(f => f.find('.sam__name').exists() && f.find('.sam__name').text().startsWith(label))
 
 describe('SAModulos', () => {
   const montar = montarModulos
@@ -79,17 +83,19 @@ describe('SAModulos', () => {
 
     expect(w.text()).toContain('Cultivo')
     expect(w.text()).toContain('Asistente IA')
-    // 2 suites + 5 add-ons. Los incluidos NO llevan interruptor: no son una decisión.
-    expect(w.findAll('.sam__switch')).toHaveLength(7)
+    // 2 packs + 4 extras/próximos. Los incluidos NO llevan interruptor: no son una decisión.
+    expect(w.findAll('.sam__switch')).toHaveLength(6)
   })
 
   it('lo que viene dentro de una suite se muestra como parte de ella, sin interruptor', () => {
-    expect(montar().text()).toContain('Incluye: Módulo médico')
+    const txt = montar().text()
+    expect(txt).toContain('Incluye: Módulo médico, Delivery, Asistente IA')
+    expect(txt).toContain('Incluye: Asistente IA')   // también bajo Cultivo
   })
 
   it('cuenta los activos, que es lo que se factura', () => {
-    // cultivo + produccion_dispensa + ia
-    expect(montar().text()).toContain('3 activos')
+    // cultivo + produccion_dispensa + chatbot + bar
+    expect(montar().text()).toContain('4 activos')
   })
 
   it('prender un módulo guarda solo, sin botón de Guardar', async () => {
@@ -156,7 +162,7 @@ describe('SAModulos', () => {
     const w = montar()
     await new Promise(r => setTimeout(r, 0))
 
-    expect(w.text()).toContain('Viene con el plan Básico')
+    expect(w.text()).toContain('Viene con «Básico»')
     expect(w.text()).toContain('500 créditos por mes')
     expect(w.findAll('.sam__tier')).toHaveLength(0)
   })
@@ -191,24 +197,25 @@ describe('SAModulos — los adicionales van con su pack', () => {
     const w = montarModulos()
     const texto = w.text()
 
-    expect(texto).toContain('Adicionales de Cultivo')
-    expect(texto).toContain('Adicionales de Producción y dispensa')
+    expect(texto).toContain('Extras de Cultivo')
+    expect(texto).toContain('Extras de Producción y dispensa')
     expect(texto).toContain('Sirven a los dos packs')
   })
 
   it('el Buffet dice que está en construcción, y se puede prender igual para probarlo', async () => {
     const w = montarModulos()
-    const fila = filaDe(w, 'Buffet')
+    const fila = filaDe(w, 'Buffet y eventos')
 
     expect(fila.text()).toContain('en construcción')
     expect(fila.find('button[role="switch"]').attributes('disabled')).toBeUndefined()
   })
 
-  it('WhatsApp no se puede prender, y dice por qué', () => {
+  // Va a venir incluido cuando esté listo (6-oct-2026); hasta entonces no se prende.
+  it('WhatsApp no se puede prender, dice por qué y que va a venir incluido', () => {
     const w = montarModulos()
     const fila = filaDe(w, 'WhatsApp')
 
-    expect(fila.text()).toContain('no disponible')
+    expect(fila.text()).toContain('viene incluido cuando esté listo')
     expect(fila.text()).toContain('Twilio')
     expect(fila.find('button[role="switch"]').attributes('disabled')).toBeDefined()
   })
@@ -228,7 +235,7 @@ describe('SAModulos — cortar un módulo ahora', () => {
 
   it('apagar ofrece las dos: al fin del período, o cortar ahora', async () => {
     const w = montarModulos()
-    await filaDe(w, 'Asistente IA').find('.sam__switch').trigger('click')
+    await filaDe(w, 'Chatbot del admin').find('.sam__switch').trigger('click')
 
     expect(confirmar).toHaveBeenCalledWith(expect.objectContaining({ neutralText: 'Cortar ahora' }))
   })
@@ -237,22 +244,22 @@ describe('SAModulos — cortar un módulo ahora', () => {
     confirmar.mockResolvedValueOnce('neutral')
     const w = montarModulos()
 
-    await filaDe(w, 'Asistente IA').find('.sam__switch').trigger('click')
+    await filaDe(w, 'Chatbot del admin').find('.sam__switch').trigger('click')
     await Promise.resolve(); await Promise.resolve()
 
     expect(updateSuperAdminClub).toHaveBeenCalledWith(
-      3, { features: expect.objectContaining({ ia: false }) }, { corteInmediato: true }
+      3, { features: expect.objectContaining({ chatbot: false }) }, { corteInmediato: true }
     )
   })
 
   it('eligiendo la baja normal NO manda el corte inmediato', async () => {
     const w = montarModulos()
 
-    await filaDe(w, 'Asistente IA').find('.sam__switch').trigger('click')
+    await filaDe(w, 'Chatbot del admin').find('.sam__switch').trigger('click')
     await Promise.resolve(); await Promise.resolve()
 
     expect(updateSuperAdminClub).toHaveBeenCalledWith(
-      3, { features: expect.objectContaining({ ia: false }) }, { corteInmediato: false }
+      3, { features: expect.objectContaining({ chatbot: false }) }, { corteInmediato: false }
     )
   })
 })

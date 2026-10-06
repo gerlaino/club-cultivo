@@ -140,13 +140,16 @@ RSpec.describe Informes::Produccion do
       expect(fila[:mas_viejo][:excedido]).to be(false)
     end
 
-    it 'muestra la ocupación contra el tope sólo cuando el plan lo tiene' do
+    # El tope es de plantas EN FLORACIÓN (6-oct-2026): el vegetativo no cuenta.
+    it 'muestra la ocupación contra el tope de floración' do
       lote!(estado: 'vegetativo', plantas: 2)
+      expect(informe[:hoy][:plan]).to include(tope: 450, cuentan: 0)
 
-      expect(informe[:hoy][:plan]).to include(tope: 450, cuentan: 2)
+      lote!(estado: 'floracion', plantas: 3)
+      expect(informe[:hoy][:plan]).to include(tope: 450, cuentan: 3)
 
       club.update!(plan: 'total')
-      expect(informe[:hoy][:plan]).to be_nil
+      expect(informe[:hoy][:plan]).to include(tope: 900)
     end
   end
 

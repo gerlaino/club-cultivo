@@ -68,7 +68,7 @@
       </div>
     </section>
 
-    <Packs :packs="PACKS_PROYECTOS" :accion="{ label: 'Lo quiero', to: '#contacto' }" />
+    <Packs :packs="packs" :accion="{ label: 'Lo quiero', to: '#contacto' }" />
 
     <PreguntasFrecuentes titulo="Lo que nos preguntan los proyectos" :preguntas="PREGUNTAS_PROYECTOS" contacto="#contacto" />
 
@@ -101,9 +101,16 @@ import PreguntasFrecuentes from '../components/public/PreguntasFrecuentes.vue'
 import ContactoForm from '../components/public/ContactoForm.vue'
 import Packs from '../components/public/Packs.vue'
 import MuestraTurnero from '../components/public/muestras/MuestraTurnero.vue'
-import { TEMAS_PROYECTOS, PREGUNTAS_PROYECTOS, OFICIOS, PACKS_PROYECTOS } from '../components/public/contenido.js'
+import { getRegistroInfo } from '../lib/api.js'
+import { TEMAS_PROYECTOS, PREGUNTAS_PROYECTOS, OFICIOS, packsProyectos } from '../components/public/contenido.js'
 
 const CADENA = ['Genética', 'Lote', 'Planta', 'Cosecha', 'Stock', 'Entrega']
+
+// Los precios los dice el backend (`Precios.lista_publica`); acá sólo las palabras.
+const packs = ref([])
+onMounted(async () => {
+  try { packs.value = packsProyectos((await getRegistroInfo()).data.precios) } catch {}
+})
 
 // Lo que hace el módulo médico HOY (Turno, DisponibilidadMedico, IndicacionMedica, prescripción
 // PDF, alertas internas). El seguimiento de bienestar (CheckIn) existe en la base pero no tiene

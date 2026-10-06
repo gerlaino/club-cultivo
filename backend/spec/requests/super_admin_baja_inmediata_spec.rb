@@ -12,7 +12,7 @@ RSpec.describe 'Baja inmediata de un módulo', type: :request do
   after  { travel_back }
 
   let(:club) do
-    create(:club, features: { 'cultivo' => true, 'produccion_dispensa' => true, 'delivery' => true })
+    create(:club, features: { 'cultivo' => true, 'produccion_dispensa' => true, 'vista_paciente' => true })
   end
   let(:super_admin) { create(:user, :super_admin, club: nil) }
 
@@ -20,7 +20,7 @@ RSpec.describe 'Baja inmediata de un módulo', type: :request do
 
   def apagar(inmediato: false)
     patch "/api/super_admin/clubs/#{club.id}",
-          params: { club: { features: { 'delivery' => false } }, corte_inmediato: inmediato }.compact,
+          params: { club: { features: { 'vista_paciente' => false } }, corte_inmediato: inmediato }.compact,
           as: :json
   end
 
@@ -28,14 +28,14 @@ RSpec.describe 'Baja inmediata de un módulo', type: :request do
     apagar(inmediato: true)
 
     expect(response).to have_http_status(:ok)
-    expect(club.reload.feature?(:delivery)).to be(false)
+    expect(club.reload.feature?(:vista_paciente)).to be(false)
   end
 
   it 'y no deja una baja pendiente que después diga "sigue andando hasta…"' do
     apagar(inmediato: true)
 
-    expect(club.reload.baja_programada?('delivery')).to be(false)
-    expect(club.features['delivery']).not_to be(true)
+    expect(club.reload.baja_programada?('vista_paciente')).to be(false)
+    expect(club.features['vista_paciente']).not_to be(true)
   end
 
   it 'la respuesta lo informa como inmediata, para que el panel no muestre una fecha futura' do
@@ -51,8 +51,8 @@ RSpec.describe 'Baja inmediata de un módulo', type: :request do
   it 'sin pedirlo, sigue siendo una baja programada a fin de mes' do
     apagar
 
-    expect(club.reload.feature?(:delivery)).to be(true)
-    expect(club.baja_programada_para('delivery')).to eq(Date.new(2026, 8, 31))
+    expect(club.reload.feature?(:vista_paciente)).to be(true)
+    expect(club.baja_programada_para('vista_paciente')).to eq(Date.new(2026, 8, 31))
   end
 
   it 'también corta una SUITE entera, no sólo un add-on' do

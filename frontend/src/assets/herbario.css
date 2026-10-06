@@ -9,6 +9,10 @@
    Uso: la raíz de la página lleva la clase `herbario` (los tokens) y, si es un formulario de una
    sola ficha, `hb-pagina` + las piezas `hb-*` de abajo. */
 
+/* Las páginas de afuera no tienen la barra inferior de la app: sin esto, en el teléfono el `body`
+   le reservaba 64 px (assets/responsive.css) y quedaba una franja vacía debajo del pie. */
+body:has(.herbario) { padding-bottom: 0; }
+
 .herbario {
   /* Verdes suaves (Germán, 4-oct: «volver al verde, más delicados»): fondo menta muy claro,
      tinta verde bosque, acentos salvia y menta. El ámbar queda sólo para detalles (pistilos). */

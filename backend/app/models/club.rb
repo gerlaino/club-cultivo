@@ -181,13 +181,10 @@ class Club < ApplicationRecord
   # teniendo adentro del plan.
   FEATURES_PERSONAL = { 'cultivo' => true }.freeze
 
-  # Deja en `features` sólo lo que el uso personal puede tener. Apagar siempre se acepta. El
-  # chatbot sin el Asistente IA no contesta nada, así que se apaga con él: en una organización
-  # eso es un cartel («requiere»); acá no hay ficha larga donde leerlo.
+  # Deja en `features` sólo lo que el uso personal puede tener. Apagar siempre se acepta. (El
+  # chatbot ya no se apaga con la IA: desde el 6-oct-2026 el autocultivo nace con ella.)
   def self.acotar_a_personal(features)
-    acotado = features.to_h.reject { |clave, valor| valor == true && !MODULOS_PERSONAL.include?(clave.to_s) }
-    acotado = acotado.reject { |clave, valor| clave.to_s == 'chatbot' && valor == true && acotado['ia'] != true }
-    acotado
+    features.to_h.reject { |clave, valor| valor == true && !MODULOS_PERSONAL.include?(clave.to_s) }
   end
 
   ROLES_META = {
@@ -371,47 +368,65 @@ class Club < ApplicationRecord
     },
   }.freeze
 
-  # Módulos que vienen DENTRO de una suite y no se prenden ni se apagan por separado: todo club
-  # que compró la suite los tiene. El módulo médico y el correo al paciente viven de la ficha
-  # del paciente, así que un club de sólo Cultivo —que no tiene pacientes— no los ve nunca.
-  # Poder apagarlos era una perilla que no le servía a nadie y que, olvidada, dejaba al club
-  # con media ficha.
-  # `mailer` SALIÓ de acá y pasó a ADDONS. Cuando era "mandar un mail desde la ficha" no tenía
-  # sentido venderlo aparte; ahora es un espacio propio —casilla, plantillas y envíos— y sí. El
-  # movimiento va con backfill en la migración: derivado, lo tenía toda organización con la
-  # suite, y sin backfill se quedaban todas sin correo el día del deploy.
+  # Módulos que vienen DENTRO de una suite y no se prenden ni se apagan por separado: toda
+  # organización que compró la suite los tiene. Poder apagarlos era una perilla que no le servía a
+  # nadie y que, olvidada, dejaba a la organización con media ficha.
+  #
+  # Cada uno dice en QUÉ suites viene (con cualquiera de ellas alcanza). El 6-oct-2026 (Germán)
+  # el corte comercial pasó a ser: los packs cobran por tamaño (pacientes, plantas, sedes) y TODO
+  # lo que ya está terminado viene adentro — delivery, correo y el asistente IA (que en la práctica
+  # es el registro por voz) se sumaron al módulo médico. Lo único que se cobra aparte son los
+  # extras de `ADDONS` marcados `extra`. No se guardan en `features`: se derivan, así que las
+  # organizaciones que ya existían los tienen sin migrar datos.
   INCLUIDOS_EN_SUITE = {
-    'medico' => 'produccion_dispensa',
+    'medico'   => %w[produccion_dispensa],
+    'delivery' => %w[produccion_dispensa],
+    'mailer'   => %w[produccion_dispensa],
+    # En todas, también en el autocultivo (que nace con Cultivo): es el dictado por voz.
+    'ia'       => %w[cultivo produccion_dispensa],
   }.freeze
 
   INCLUIDOS_META = {
-    'medico' => { label: 'Módulo médico', desc: 'Turnos, historia clínica e indicaciones.', requiere: nil },
+    'medico'   => { label: 'Módulo médico',      desc: 'Turnos, historia clínica e indicaciones.', requiere: nil },
+    'delivery' => { label: 'Delivery',           desc: 'Reparto a domicilio: paquetes, rutas, firma de entrega y cobro contra-entrega.', requiere: nil },
+    'mailer'   => { label: 'Correo electrónico', desc: 'Casilla propia, plantillas de mail y envíos a los pacientes.', requiere: 'Casilla de la organización conectada en Configuración → Correo electrónico.' },
+    'ia'       => { label: 'Asistente IA',       desc: 'Registro por voz de salas, lotes y plantas, plan de trabajo y lectura de CSV.', requiere: nil },
+    # No se lista como incluido (no tiene tarjeta propia): viene con el Buffet, ver INCLUIDOS_EN_ADDON.
+    'eventos'  => { label: 'Eventos',            desc: 'Fiestas y catas: provisión desde depósitos, entradas y rendición.', requiere: nil },
   }.freeze
 
-  # Add-ons: se suman a una suite y SÍ se venden por separado.
+  # Módulos que vienen con un EXTRA, no con una suite. El Buffet y los Eventos se venden juntos
+  # (6-oct-2026): los Eventos ya necesitaban al Buffet para funcionar.
+  INCLUIDOS_EN_ADDON = {
+    'eventos' => 'bar',
+  }.freeze
+
+  # Lo que se suma a los packs. Dos tipos (`tipo`):
   #
-  #   `pack`     — a QUÉ suite le sirve. Sin esto la pantalla del super admin era una lista plana
-  #                de diez cosas y no se entendía para qué era cada una: el Buffet extiende la
-  #                dispensa, el IoT extiende el cultivo. `nil` = transversal, sirve a las dos.
+  #   `extra`            — se cobra aparte. Hoy están EN DESARROLLO (`EXTRAS_SIN_LANZAR`): el super
+  #                        admin los puede prender para probar o de cortesía, sin cargo.
+  #   `incluido_proximo` — va a venir INCLUIDO cuando esté terminado. Mientras tanto sigue
+  #                        bloqueado (`ADDONS_BLOQUEADOS`) y guardado como bandera propia, para no
+  #                        derivar algo que todavía no funciona.
+  #
+  #   `pack`     — a QUÉ suite le sirve. `nil` = transversal, sirve a las dos.
   #   `requiere` — de qué depende para funcionar DE VERDAD. Prenderlo no alcanza.
   ADDONS = {
-    'bar'      => { label: 'Buffet',         pack: 'produccion_dispensa', desc: 'Punto de venta, caja de turno y stock del salón.',   requiere: 'EN CONSTRUCCIÓN: se puede prender para probarlo, todavía no para vender.' },
-    'eventos'  => { label: 'Eventos',        pack: 'produccion_dispensa', desc: 'Fiestas y catas: provisión desde depósitos, entradas y rendición.', requiere: 'El Buffet tiene que estar activo.' },
-    'delivery' => { label: 'Delivery',       pack: 'produccion_dispensa', desc: 'Reparto a domicilio: paquetes, rutas, firma de entrega y cobro contra-entrega.', requiere: 'La suite de Producción y dispensa tiene que estar activa.' },
-    'mailer'   => { label: 'Correo electrónico', pack: 'produccion_dispensa', desc: 'Casilla propia, plantillas de mail y envíos a los pacientes.', requiere: 'Casilla de la organización conectada en Configuración → Correo electrónico.' },
-    'vista_paciente' => { label: 'Portal del paciente', pack: 'produccion_dispensa', desc: 'Su credencial digital con el estado del REPROCANN, sus turnos e indicación médica, sus retiros y su cuenta corriente — más el catálogo, las novedades y los eventos que publique la organización. Cada paciente que se da de alta recibe su cuenta.', requiere: 'Que la organización cargue lo suyo: sin novedades ni eventos, el paciente igual ve su credencial y lo suyo.' },
-    'whatsapp' => { label: 'WhatsApp',       pack: 'produccion_dispensa', desc: 'Avisos de entrega por WhatsApp.',                    requiere: 'Cuenta de Twilio de la organización (SID, token y número).' },
-    'ariccame' => { label: 'ARICCAME',       pack: 'produccion_dispensa', desc: 'Reporte regulatorio de dispensaciones y stock.',     requiere: 'La integración está simulada: no transmite nada.' },
+    'bar'      => { label: 'Buffet y eventos', tipo: 'extra', pack: 'produccion_dispensa', desc: 'Punto de venta, caja de turno y stock del salón; fiestas y catas con provisión desde depósitos, entradas y rendición.', requiere: 'EN CONSTRUCCIÓN: se puede prender para probarlo, todavía no para vender.' },
+    'vista_paciente' => { label: 'Portal del paciente', tipo: 'extra', pack: 'produccion_dispensa', desc: 'Su credencial digital con el estado del REPROCANN, sus turnos e indicación médica, sus retiros y su cuenta corriente — más el catálogo, las novedades y los eventos que publique la organización. Cada paciente que se da de alta recibe su cuenta.', requiere: 'Que la organización cargue lo suyo: sin novedades ni eventos, el paciente igual ve su credencial y lo suyo.' },
+    'iot'      => { label: 'Ambiente / IoT', tipo: 'extra', pack: 'cultivo', desc: 'Sensores, lecturas automáticas y reglas.', requiere: 'Hardware de la organización (Sonoff u otro) o importación por CSV.' },
+    'chatbot'  => { label: 'Chatbot del admin', tipo: 'extra', pack: nil, desc: 'El admin pregunta sobre su organización y el sistema contesta con sus propios datos. Contesta sobre lo que la organización tenga contratado: con Cultivo, rendimiento y producción; con Producción y dispensa, costos y pérdidas.', requiere: 'EN PRUEBA: contesta pocas preguntas todavía.' },
 
-    'iot'      => { label: 'Ambiente / IoT', pack: 'cultivo', desc: 'Sensores, lecturas automáticas y reglas.',           requiere: 'Hardware de la organización (Sonoff u otro) o importación por CSV.' },
-
-    # Transversales: sirven a las dos suites, y con las dos contratadas rinden más que con una.
-    'ia'       => { label: 'Asistente IA',   pack: nil, desc: 'Registro por voz de salas, lotes y plantas, plan de trabajo y lectura de CSV.', requiere: 'ANTHROPIC_API_KEY en el entorno.' },
-    # Va aparte de `ia` a propósito: el dictado por voz y el chatbot se venden distinto y se
-    # prueban distinto. Una organización puede querer que su equipo registre hablando sin abrirle
-    # a nadie una ventana que consulta la base entera.
-    'chatbot'  => { label: 'Chatbot del admin', pack: nil, desc: 'El admin pregunta sobre su organización y el sistema contesta con sus propios datos. Contesta sobre lo que la organización tenga contratado: con Cultivo, rendimiento y producción; con Producción y dispensa, costos y pérdidas.', requiere: 'El Asistente IA tiene que estar activo. EN PRUEBA: contesta pocas preguntas todavía.' },
+    'whatsapp' => { label: 'WhatsApp', tipo: 'incluido_proximo', pack: 'produccion_dispensa', desc: 'Avisos de entrega por WhatsApp.',                requiere: 'Cuenta de Twilio de la organización (SID, token y número).' },
+    'ariccame' => { label: 'ARICCAME', tipo: 'incluido_proximo', pack: 'produccion_dispensa', desc: 'Reporte regulatorio de dispensaciones y stock.', requiere: 'La integración está simulada: no transmite nada.' },
   }.freeze
+
+  # Los extras que todavía no se venden: se pueden prender (para probar, o de cortesía a quien ya
+  # los usaba) y cuestan 0 hasta que se lancen. Cuando uno se lance, sale de acá y su precio va
+  # a `Precios::EXTRAS`.
+  EXTRAS_SIN_LANZAR = %w[bar vista_paciente iot chatbot].freeze
+
+  def self.extra?(clave) = ADDONS.dig(clave.to_s, :tipo) == 'extra'
 
   # A qué suite le sirve cada add-on. `nil` = a las dos.
   def self.pack_de_addon(clave) = ADDONS.dig(clave.to_s, :pack)
@@ -443,10 +458,10 @@ class Club < ApplicationRecord
   # `vista_paciente` salió del cajón el 20-ago: el tablero del paciente que le faltaba —credencial,
   # estado del REPROCANN, turnos, indicación y retiros— está hecho. Lo único que depende de la
   # organización es cuánto publique, y eso no es un módulo a medias.
-  ADDONS_INCOMPLETOS = %w[bar eventos chatbot].freeze
+  ADDONS_INCOMPLETOS = %w[bar chatbot].freeze
 
   # Se mantiene para compatibilidad: hay clubes con las claves viejas guardadas en `features`.
-  AVAILABLE_FEATURES = (SUITES.keys + ADDONS.keys + INCLUIDOS_EN_SUITE.keys).freeze
+  AVAILABLE_FEATURES = (SUITES.keys + ADDONS.keys + INCLUIDOS_EN_SUITE.keys + INCLUIDOS_EN_ADDON.keys).freeze
 
   # Lo único que el super admin puede prender y apagar a mano. Los incluidos salen de su suite
   # y los de EN_CONSTRUCCION no existen todavía: aceptarlos por parámetro sería guardar un
@@ -470,23 +485,13 @@ class Club < ApplicationRecord
     # porque alguien probó una bandera en 2026. Se pide por su clave nueva y por ninguna otra.
   }.freeze
 
-  # Con qué nace un club nuevo: las dos suites y el Buffet, que funciona sin nada de afuera.
-  # Médico y correo no se listan porque ya vienen con Producción y dispensa. Los que dependen
-  # de algo externo (IoT, IA, WhatsApp) y los incompletos se prenden cuando el club los tenga
-  # resueltos.
+  # Con qué nace una organización nueva: los dos packs. Lo incluido (médico, delivery, correo, IA)
+  # se deriva de ellos y no se guarda; los extras se prenden a mano. El Buffet nacía prendido
+  # hasta el 6-oct-2026: pasó a ser un extra en desarrollo, y las organizaciones que ya lo tenían
+  # lo conservan.
   FEATURES_POR_DEFECTO = {
     'cultivo'             => true,
     'produccion_dispensa' => true,
-    'bar'                 => true,
-    # Delivery viene prendido por el mismo criterio que el Buffet: funciona sin nada de afuera y
-    # el alta deja destildarlo. Una organización que no reparte simplemente no da de alta
-    # repartidores; una que sí, no tiene que pedir que se lo habiliten.
-    'delivery'            => true,
-    # Correo nace prendido por el mismo motivo: hasta ayer lo tenía toda organización con la
-    # suite (era derivado), y hacer que ahora haya que acordarse de tildarlo es justo el olvido
-    # que deja al cliente con media ficha. Que sea contratable significa que se puede DAR DE
-    # BAJA, no que haya que pedirlo.
-    'mailer'              => true,
   }.freeze
 
   # Features tal como las ve el frontend: las guardadas MÁS las claves viejas derivadas.
@@ -498,14 +503,17 @@ class Club < ApplicationRecord
     # Los incluidos no se guardan: se derivan de su suite, y son verdad para todo club que la
     # tenga. Guardarlos habría dejado dos fuentes que se contradicen en cuanto alguien apague
     # la suite y se olvide del módulo.
-    INCLUIDOS_EN_SUITE.each { |modulo, suite| base[modulo] = true if base[suite] == true }
+    # Manda lo derivado, no lo guardado: una bandera vieja de `delivery` en una organización sin
+    # Producción y dispensa no prende nada (ver `feature?`).
+    INCLUIDOS_EN_SUITE.each_key { |modulo| base[modulo] = incluido_por_suite?(modulo) }
+    INCLUIDOS_EN_ADDON.each_key { |modulo| base[modulo] = incluido_por_addon?(modulo) }
     FEATURES_LEGACY.each do |viejo, nuevo|
       base[viejo] = true if base[nuevo] == true
       # Y al revés: una organización con la clave VIEJA guardada tiene la capacidad nueva. Sin
       # esto, `feature?('ia')` decía true (lo deriva de `ia_voz`) mientras esta lista decía
       # false, así que el backend dejaba pasar y la pantalla escondía el botón — el módulo
       # quedaba contratado e invisible, que es la peor de las dos respuestas.
-      base[nuevo] = true if base[viejo] == true && !EN_CONSTRUCCION.key?(nuevo)
+      base[nuevo] = true if base[viejo] == true && !EN_CONSTRUCCION.key?(nuevo) && !INCLUIDOS_EN_SUITE.key?(nuevo)
     end
     base
   end
@@ -516,8 +524,15 @@ class Club < ApplicationRecord
 
   # ¿Este módulo viene incluido en una suite que el club tiene?
   def incluido_por_suite?(key)
-    suite = INCLUIDOS_EN_SUITE[key.to_s]
-    suite.present? && features[suite] == true
+    # Con la baja de la suite ya cumplida se va también lo que venía con ella, aunque el job que
+    # baja la bandera todavía no haya corrido (la misma ventana que cierra `feature?`).
+    Array(INCLUIDOS_EN_SUITE[key.to_s]).any? { |suite| features[suite] == true && !baja_cumplida?(suite) }
+  end
+
+  # ¿Viene con un extra que la organización tiene? (los Eventos, con el Buffet)
+  def incluido_por_addon?(key)
+    addon = INCLUIDOS_EN_ADDON[key.to_s]
+    addon.present? && feature?(addon)
   end
 
   def en_construccion?(key) = EN_CONSTRUCCION.key?(key.to_s)
@@ -538,8 +553,12 @@ class Club < ApplicationRecord
     # que las limpia corre una vez por día, así que entre el vencimiento y la corrida hay una
     # ventana — acá se cierra, para que nadie siga usando un módulo que ya terminó.
     return false if baja_cumplida?(k)
+    # Lo incluido se DERIVA y nada más: hasta el 6-oct-2026 Delivery, Correo e IA se guardaban
+    # como banderas propias, y una bandera vieja no puede dejar andando el Delivery de una
+    # organización que dio de baja Producción y dispensa.
+    return incluido_por_suite?(k) if INCLUIDOS_EN_SUITE.key?(k)
+    return incluido_por_addon?(k) if INCLUIDOS_EN_ADDON.key?(k)
     return true  if features[k] == true
-    return true  if incluido_por_suite?(k)
 
     FEATURES_LEGACY_INVERSO.fetch(k, []).any? { |viejo| features[viejo] == true }
   end
@@ -712,11 +731,11 @@ class Club < ApplicationRecord
   # `ia_tier` sigue en la tabla y en la auditoría, pero ya no lo lee nadie: la columna se queda
   # para no perder el historial de lo que se le había puesto a cada organización.
   IA_TIERS = {
-    'basico'   => { label: 'Básico',   limite_hora: 20, limite_mes:   500, color: '#64748b' },
-    'total'    => { label: 'Total',    limite_hora: 60, limite_mes: 2_000, color: '#0891b2' },
+    'basico'   => { label: 'Hasta 50 pacientes',  limite_hora: 20, limite_mes:   500, color: '#64748b' },
+    'total'    => { label: 'Hasta 100 pacientes', limite_hora: 60, limite_mes: 2_000, color: '#0891b2' },
     # Una persona: el freno horario es de ráfaga y el mensual alcanza para un plan de trabajo
     # por lote y el registro por voz de todos los días.
-    'personal' => { label: 'Personal', limite_hora: 10, limite_mes:   150, color: '#65a30d' },
+    'personal' => { label: 'Autocultivo', limite_hora: 10, limite_mes:   150, color: '#65a30d' },
   }.freeze
 
   def ia_config

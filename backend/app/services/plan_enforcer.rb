@@ -14,27 +14,41 @@ class PlanEnforcer
   # `usuarios_por_rol`). Un tope global no decía nada —"5 usuarios" no se puede vender ni
   # explicar— y dejaba dar de alta cinco cultivadores y ningún dispensador.
   #
-  # `personal` (sep-2026) es el cultivador de casa: UNA persona, un espacio, dos salas a lo sumo
-  # (vegetativo y floración, o una sola mixta), sin pacientes y SIN EQUIPO. `equipo: false` es
-  # lo que lo distingue de un Básico chico: no es que tenga pocos usuarios, es que no hay nadie
-  # más que él, así que ni siquiera el admin —que en los otros planes queda fuera del cupo—
-  # puede dar de alta a otro. Plantas y lotes sin tope, como en Total: el REPROCANN de
-  # autocultivo tiene su límite, pero eso es un aviso, no un candado (decisión de Germán).
-  # Es un plan y no una columna aparte a propósito: el plan ya dice cuánto, y tener «tipo»
-  # y «plan» por separado son dos perillas que tienen que coincidir. Lo único que rompe la
-  # regla de «el plan dice CUÁNTO, nunca QUÉ» es que además acota los módulos a Cultivo — y
-  # ese candado vive en el controller del super admin, no acá (`Club::MODULOS_PERSONAL`).
+  # `personal` es el AUTOCULTIVO: una persona, un espacio, dos salas a lo sumo, sin pacientes y
+  # SIN EQUIPO. `equipo: false` es lo que lo distingue de una organización chica: no es que tenga
+  # pocos usuarios, es que no hay nadie más que él. Lo único que rompe la regla de «el plan dice
+  # CUÁNTO, nunca QUÉ» es que además acota los módulos a Cultivo — y ese candado vive en el
+  # controller del super admin, no acá (`Club::MODULOS_PERSONAL`).
   #
-  # `fotos` (20-sep-2026) es el único tope que también tiene el plan Total, y no contradice
-  # «Total no limita nada»: los demás miden la capacidad del CULTIVO; las fotos miden
-  # almacenamiento, que se paga por GB guardado y bajado. Sin techo, un cultivo de años llena
-  # el bucket con fotos que nadie vuelve a mirar. Personal: 300 (unos tres ciclos con una foto
-  # por día). Cuenta las de lotes, salas y plantas juntas. Los números son provisorios (Germán).
+  # LOS ESCALONES (6-oct-2026, Germán y su socio). Los packs cobran por TAMAÑO:
+  #
+  #   personal → Autocultivo: 9 plantas en floración, 2 espacios.
+  #   basico   → Hasta 50 pacientes: 450 plantas en floración, 3 salas, 1 sede, 2 usuarios por rol.
+  #   total    → Hasta 100 pacientes: 900 en floración, salas libres, 3 sedes, 2 usuarios por rol
+  #              EN CADA SEDE.
+  #
+  # Arriba del escalón se compran packs de 10 pacientes (cada uno suma 10 pacientes y 90 plantas
+  # en floración: las 9 por paciente del REPROCANN) y sedes extra. Esas cantidades viven en el
+  # club (`packs_pacientes_extra`, `sedes_extra`) y se suman acá: ver `limite`.
+  #
+  # `plantas` cuenta las que están EN FLORACIÓN (el vegetativo es libre), y las de una genética
+  # AUTOMÁTICA cuentan todo su ciclo, porque nunca pasan a «floración» en la app (se cosechan
+  # desde vegetativo). Es un CANDADO, también en el autocultivo (6-oct-2026: antes era un aviso).
+  # Ver `plantas_en_cupo`.
+  #
+  # `fotos` mide almacenamiento, que se paga por GB guardado y bajado. Números provisorios.
   PLANES = {
-    'basico'   => { label: 'Básico',   sedes: 1,   salas: 3,   lotes: nil, plantas: 450, pacientes: 50,  usuarios: nil, fotos: 1_000, usuarios_por_rol: 1,   equipo: true  },
-    'total'    => { label: 'Total',    sedes: nil, salas: nil, lotes: nil, plantas: nil, pacientes: nil, usuarios: nil, fotos: 3_000, usuarios_por_rol: nil, equipo: true  },
-    'personal' => { label: 'Personal', sedes: 1,   salas: 2,   lotes: nil, plantas: nil, pacientes: 0,   usuarios: nil, fotos: 300,   usuarios_por_rol: nil, equipo: false },
+    'basico'   => { label: 'Hasta 50 pacientes',  sedes: 1, salas: 3,   lotes: nil, plantas: 450, pacientes: 50,  usuarios: nil, fotos: 1_000, usuarios_por_rol: 2,   por_sede: false, equipo: true  },
+    'total'    => { label: 'Hasta 100 pacientes', sedes: 3, salas: nil, lotes: nil, plantas: 900, pacientes: 100, usuarios: nil, fotos: 3_000, usuarios_por_rol: 2,   por_sede: true,  equipo: true  },
+    'personal' => { label: 'Autocultivo',         sedes: 1, salas: 2,   lotes: nil, plantas: 9,   pacientes: 0,   usuarios: nil, fotos: 300,   usuarios_por_rol: nil, por_sede: false, equipo: false },
   }.freeze
+
+  # Un pack de pacientes extra: cuántos pacientes suma y cuántas plantas en floración por cada uno.
+  PACK_PACIENTES       = 10
+  PLANTAS_POR_PACIENTE = 9
+
+  # Los estados en los que una planta está viva en el cultivo.
+  ESTADOS_EN_PIE = %w[enraizado vegetativo floracion].freeze
 
   # Tamaño máximo de UNA foto. El teléfono ya la achica antes de subir (`lib/imagenes.js`, a
   # ~250 KB); esto es la red para lo que llega por otra puerta.
@@ -78,8 +92,25 @@ class PlanEnforcer
   def initialize(club)
     @club   = club
     @plan   = self.class.normalizar(club.plan)
-    @limite = PLANES[@plan]
+    @base   = PLANES[@plan]
+    @limite = RECURSOS.to_h { |r| [r, limite(r)] }.merge(@base.slice(:label, :usuarios_por_rol, :por_sede, :equipo))
   end
+
+  # El tope EFECTIVO de un recurso: el del escalón más lo que la organización compró encima
+  # (packs de pacientes y sedes extra). El autocultivo no compra extras.
+  def limite(recurso)
+    base = @base[recurso]
+    return base if base.nil? || personal?
+
+    case recurso
+    when :pacientes then base + packs_pacientes * PACK_PACIENTES
+    when :plantas   then base + packs_pacientes * PACK_PACIENTES * PLANTAS_POR_PACIENTE
+    when :sedes     then base + @club.sedes_extra.to_i
+    else base
+    end
+  end
+
+  def packs_pacientes = @club.packs_pacientes_extra.to_i
 
   def puede_crear_sede?
     return true if @limite[:sedes].nil?
@@ -102,15 +133,46 @@ class PlanEnforcer
     @club.lotes.count < @limite[:lotes]
   end
 
-  def puede_crear_planta?
-    return true if @limite[:plantas].nil?
-    Plant.joins(:lote).where(lotes: { club_id: @club.id }).count < @limite[:plantas]
+  # ── Plantas en floración ─────────────────────────────────────────────────
+  #
+  # Las plantas que ocupan cupo: en floración, o vivas de un lote de genética automática (que no
+  # pasa nunca a «floración» en la app). `excluir_lote` deja afuera las de un lote, para poder
+  # preguntar «¿cabe este lote entero?» sin importar si sus plantas ya cambiaron de estado o no
+  # (`Salas::CambiarFase` mueve las plantas ANTES que el lote).
+  def plantas_en_cupo(excluir_lote: nil)
+    scope = Plant.joins(:lote)
+                 .joins('LEFT JOIN geneticas ON geneticas.id = lotes.genetica_id')
+                 .where(lotes: { club_id: @club.id }, state: ESTADOS_EN_PIE)
+                 .where("plants.state = 'floracion' OR geneticas.automatica = TRUE")
+    scope = scope.where.not(lote_id: excluir_lote.id) if excluir_lote
+    scope.count
   end
 
-  def puede_crear_planta_bulk?(cantidad)
-    return true if @limite[:plantas].nil?
-    actuales = Plant.joins(:lote).where(lotes: { club_id: @club.id }).count
-    actuales + cantidad <= @limite[:plantas]
+  # ¿Entran `cantidad` plantas más al cupo de floración?
+  def cabe_en_floracion?(cantidad, excluir_lote: nil)
+    tope = @limite[:plantas]
+    return true if tope.nil? || cantidad.to_i <= 0
+
+    plantas_en_cupo(excluir_lote: excluir_lote) + cantidad.to_i <= tope
+  end
+
+  # ¿Cuántas más entran? nil = sin tope.
+  def lugar_en_floracion
+    tope = @limite[:plantas]
+    tope && [tope - plantas_en_cupo, 0].max
+  end
+
+  # El mensaje de quien choca el tope de floración: qué plan, cuál es el tope y qué hacer.
+  def error_floracion(querian = nil, excluir_lote: nil)
+    tope  = @limite[:plantas]
+    hay   = plantas_en_cupo(excluir_lote: excluir_lote)
+    plan  = @limite[:label]
+    salida = personal? ? 'Para florecer más plantas hay que cosechar o descartar alguna.' \
+                       : 'Para sumar más, hay que ampliar el plan: escribinos y lo cambiamos.'
+    detalle = querian ? " y este paso suma #{querian}" : ''
+    msg = "El plan #{plan} permite #{tope} plantas en floración. Hoy hay #{hay}#{detalle}. #{salida}"
+    { error: 'limite_plan', errors: [msg], mensaje: msg, recurso: 'plantas', limite: tope,
+      plan: plan, upgrade: !personal? }
   end
 
   # Una foto más, de lote, sala o planta: las tres cuentan contra el mismo techo.
@@ -151,7 +213,7 @@ class PlanEnforcer
     # persona.
     return false unless equipo?
 
-    tope = @limite[:usuarios_por_rol]
+    tope = tope_por_rol
     return true if tope.nil?
     # Sin rol no hay nada que contar. Que el rol sea válido lo valida el controller, que además
     # es el único que sabe si se puede asignar en esta organización.
@@ -172,6 +234,18 @@ class PlanEnforcer
 
   def usuarios_por_rol = @limite[:usuarios_por_rol]
 
+  # Cuántos de un mismo rol puede tener HOY. En «Hasta 100 pacientes» el cupo es por sede: dos de
+  # cada rol en cada sede que tenga abierta. Se cuenta contra el total de la organización (dos por
+  # sede, por la cantidad de sedes) y no sede por sede, porque un usuario puede estar en varias
+  # sedes o en ninguna (= en todas).
+  def tope_por_rol
+    tope = @limite[:usuarios_por_rol]
+    return nil if tope.nil?
+    return tope unless @limite[:por_sede]
+
+    tope * [sedes_vigentes, 1].max
+  end
+
   # ¿El plan admite más gente que quien lo contrató?
   def equipo? = @limite[:equipo] != false
 
@@ -184,9 +258,14 @@ class PlanEnforcer
       trial:        @club.plan_trial,
       activo_hasta: @club.plan_activo_hasta,
       limites:      RECURSOS.to_h { |r| [r, @limite[r]] },
-      # Aparte de los topes numéricos: el de usuarios no es un número, es "uno de cada rol".
+      # Aparte de los topes numéricos: el de usuarios no es un número, es "dos de cada rol".
       # Va suelto para que la pantalla lo pueda decir con palabras en vez de con una barra.
       usuarios_por_rol: @limite[:usuarios_por_rol],
+      usuarios_por_rol_hoy: tope_por_rol,
+      por_sede:     @limite[:por_sede],
+      # Lo comprado encima del escalón.
+      packs_pacientes_extra: personal? ? 0 : packs_pacientes,
+      sedes_extra:  personal? ? 0 : @club.sedes_extra.to_i,
       # `false` = la cuenta es de una sola persona: la pantalla esconde «Equipo» entero en vez
       # de mostrar un formulario que el backend va a rechazar.
       equipo:       equipo?,
@@ -208,7 +287,7 @@ class PlanEnforcer
       sedes:     sedes_vigentes,
       salas:     salas_vigentes,
       lotes:     @club.lotes.count,
-      plantas:   Plant.joins(:lote).where(lotes: { club_id: @club.id }).count,
+      plantas:   plantas_en_cupo,
       pacientes: @club.pacientes.count,
       usuarios:  @club.users.del_equipo.count,
       fotos:     fotos_usadas,
@@ -234,7 +313,7 @@ class PlanEnforcer
   # El tope de usuarios no es un número, así que su mensaje tampoco puede serlo: "permite hasta
   # 1 usuarios" no se entiende. Tiene que nombrar el ROL, que es lo que la persona estaba
   # tratando de dar de alta, y decir la salida.
-  def self.error_limite_rol(rol, plan: nil, tope: 1)
+  def self.error_limite_rol(rol, plan: nil, tope: 2)
     label    = Club::ROLES_META.dig(rol.to_s, :label) || rol.to_s
     plan_txt = plan.present? ? "El plan #{plan}" : 'Tu plan'
     # Sin equipo el mensaje no puede hablar de cupos: no es que se llenó, es que no hay.
@@ -245,7 +324,8 @@ class PlanEnforcer
                limite: 0, plan: plan, upgrade: true }
     end
     msg = "#{plan_txt} incluye #{tope == 1 ? 'un' : tope} #{label.downcase}#{tope == 1 ? '' : 's'} " \
-          'y la organización ya lo tiene. Para sumar otro hay que ampliar el plan: escribinos y lo cambiamos.'
+          "y la organización ya #{tope == 1 ? 'lo tiene' : 'los tiene'}. " \
+          'Para sumar otro hay que ampliar el plan: escribinos y lo cambiamos.'
     { error: 'limite_plan', errors: [msg], mensaje: msg, recurso: 'usuarios', rol: rol.to_s,
       limite: tope, plan: plan, upgrade: true }
   end

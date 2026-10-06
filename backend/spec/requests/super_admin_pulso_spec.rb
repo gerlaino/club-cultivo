@@ -20,10 +20,13 @@ RSpec.describe 'SuperAdmin pulso', type: :request do
   describe 'la plata' do
     let(:solo_cultivo) { { 'cultivo' => true } }
 
-    it 'suma el MRR de lo que factura: plan + suites + adicionales' do
-      club = create(:club, plan: 'basico', plan_trial: false, features: { 'cultivo' => true, 'iot' => true })
+    # La lista del 6-oct-2026, en dólares: un pack en «Hasta 50 pacientes» son 200, más 80 por cada
+    # pack de 10 pacientes. Los extras en desarrollo no suman.
+    it 'suma el MRR de lo que factura: escalón + packs de pacientes, sin los extras en desarrollo' do
+      club = create(:club, plan: 'basico', plan_trial: false, packs_pacientes_extra: 1,
+                           features: { 'cultivo' => true, 'iot' => true })
 
-      esperado = Precios.plan('basico') + Precios.suite('cultivo') + Precios.addon('iot')
+      esperado = 200 + 80
       expect(club.precio_mensual).to eq(esperado)
       expect(pulso['plata']['mrr']).to be >= esperado
     end
@@ -33,17 +36,17 @@ RSpec.describe 'SuperAdmin pulso', type: :request do
       create(:club, plan: 'total', plan_trial: false, features: solo_cultivo)
 
       p = pulso['plata']
-      expect(p['mrr']).to           eq(Precios.plan('total') + Precios.suite('cultivo'))
+      expect(p['mrr']).to           eq(400)
       # `>=`: la factory del super admin deja una organización propia, también en prueba.
-      expect(p['en_prueba_ars']).to be >= Precios.plan('total') + Precios.suite('cultivo')
+      expect(p['en_prueba_ars']).to be >= 400
     end
 
-    it 'lo vencido y lo que vence este mes van aparte, en pesos' do
+    it 'lo vencido y lo que vence este mes van aparte' do
       create(:club, plan: 'basico', plan_trial: false, features: solo_cultivo, plan_activo_hasta: Time.zone.today - 9)
       create(:club, plan: 'basico', plan_trial: false, features: solo_cultivo, plan_activo_hasta: Time.zone.today.end_of_month)
 
       p = pulso['plata']
-      precio = Precios.plan('basico') + Precios.suite('cultivo')
+      precio = 200
       expect(p['vencido_ars']).to        eq(precio)
       expect(p['vencidos']).to           eq(1)
       expect(p['vence_este_mes_ars']).to eq(precio)

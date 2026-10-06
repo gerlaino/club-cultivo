@@ -1,12 +1,12 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
-import { formatARS } from '../../lib/formatters.js'
+import { formatPrecio } from '../../lib/formatters.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { useRouter } from 'vue-router'
 import { Building2, Gauge, Zap, Users, ChevronRight, ChevronLeft, Check, ArrowLeft,
          AlertTriangle, Lock, Copy, Info } from 'lucide-vue-next'
-import { createSuperAdminClub, getSuperAdminCatalogo } from '../../lib/api.js'
+import { createSuperAdminClub, getSuperAdminCatalogo, getSuperAdminCotizacion } from '../../lib/api.js'
 
 const router = useRouter()
 
@@ -51,6 +51,12 @@ const addons         = computed(() => catalogo.value?.addons || [])
 const incluidos      = computed(() => catalogo.value?.incluidos || [])
 const enConstruccion = computed(() => catalogo.value?.en_construccion || [])
 const rolesAlta      = computed(() => catalogo.value?.roles_alta || [])
+const moneda         = computed(() => catalogo.value?.moneda || 'USD')
+const precio         = (n) => formatPrecio(n, moneda.value)
+// Los extras se cobran aparte (hoy todos en desarrollo, sin cargo); los `incluido_proximo`
+// (WhatsApp, ARICCAME) van a venir incluidos cuando estén listos y no tienen interruptor.
+const extras         = computed(() => addons.value.filter(a => a.tipo === 'extra'))
+const proximos       = computed(() => addons.value.filter(a => a.tipo === 'incluido_proximo'))
 
 // ── Qué se da de alta: una organización o un uso personal ─────────────────
 //
@@ -81,30 +87,24 @@ function elegirTipo(nuevo) {
   }
 }
 
-// Los adicionales que un uso personal puede sumar por fuera de lo que ya trae: el ambiente,
-// la IA y su chatbot, uno por uno (19-sep-2026: nacían los tres prendidos y no había nada que
-// decidir).
+// Los extras que un autocultivo puede sumar: el ambiente y el chatbot (6-oct-2026: la IA ya
+// viene adentro, por el registro por voz).
 const addonsPersonal = computed(() => {
   const permitidos = catalogo.value?.modulos_personal || []
-  const incluidos  = catalogo.value?.features_personal || {}
-  return addons.value.filter(a => permitidos.includes(a.clave) && !incluidos[a.clave])
+  return extras.value.filter(a => permitidos.includes(a.clave))
 })
-// El chatbot sin el Asistente IA no contesta nada: el backend lo apaga solo
-// (`Club.acotar_a_personal`) y acá no se ofrece prenderlo.
-function bloqueoPersonal(addon) {
-  if (addon.clave === 'chatbot' && form.value.features.ia !== true) return 'Necesita el Asistente IA.'
-  return null
-}
+function bloqueoPersonal() { return null }
 function togglePersonal(addon) {
-  if (bloqueoPersonal(addon)) return
-  const prender = form.value.features[addon.clave] !== true
-  form.value.features[addon.clave] = prender
-  if (addon.clave === 'ia' && !prender) form.value.features.chatbot = false
+  form.value.features[addon.clave] = form.value.features[addon.clave] !== true
 }
-// Lo que viene adentro del plan personal, para decirlo.
+// Lo que viene adentro del autocultivo: Cultivo y lo que viene con él (el Asistente IA).
 const incluidosPersonal = computed(() => {
-  const incluidos = catalogo.value?.features_personal || {}
-  return [...suites.value, ...addons.value].filter(m => incluidos[m.clave] === true)
+  const nace = catalogo.value?.features_personal || {}
+  const permitidos = catalogo.value?.modulos_personal || []
+  return [
+    ...suites.value.filter(m => nace[m.clave] === true),
+    ...incluidos.value.filter(i => permitidos.includes(i.clave) && (i.incluido_en || []).includes('cultivo')),
+  ]
 })
 // Los planes que se ofrecen: el personal sólo en uso personal, y en uso personal sólo ése.
 const planesOfrecidos = computed(() => planes.value.filter(p => !!p.personal === esPersonal.value))
@@ -122,6 +122,9 @@ const form = ref({
   plan:              'basico',
   plan_trial:        true,
   plan_activo_hasta: '',
+  // Lo comprado encima del escalón.
+  packs_pacientes_extra: 0,
+  sedes_extra:       0,
   // Se pisa con `features_por_defecto` del catálogo apenas carga. Esta copia local decía
   // `{cultivo, produccion_dispensa, bar}` mientras el backend mergeaba la suya —que además trae
   // Delivery y Correo—, así que el wizard los mostraba apagados y la organización nacía con los
@@ -131,8 +134,9 @@ const form = ref({
 
 const haySuite = computed(() => esPersonal.value || suites.value.some(s => form.value.features[s.clave] === true))
 
-// Un módulo incluido sólo entra si el club se lleva la suite que lo contiene.
-function incluidoActivo(inc) { return form.value.features[inc.incluido_en] === true }
+// Un módulo incluido entra si el club se lleva alguna de las suites que lo contienen (la IA viene
+// con las dos).
+function incluidoActivo(inc) { return (inc.incluido_en || []).some(s => form.value.features[s] === true) }
 
 // ── Los adicionales, agrupados por la suite que extienden ──────────────────
 //
@@ -143,20 +147,19 @@ const addonsAgrupados = computed(() => {
   const grupos = suites.value
     .map(s => ({
       clave:     s.clave,
-      titulo:    `Adicionales de ${s.label}`,
+      titulo:    `Extras de ${s.label}`,
       packLabel: s.label,
       // Sin la suite, el grupo entero se muestra apagado con el motivo. Ocultarlo haría creer
       // que el módulo no existe, y prenderlo dejaría un módulo contratado que no hace nada.
       sinPack:   form.value.features[s.clave] !== true,
-      incluidos: incluidos.value.filter(i => i.incluido_en === s.clave),
-      items:     addons.value.filter(a => a.pack === s.clave),
+      items:     extras.value.filter(a => a.pack === s.clave),
     }))
-    .filter(g => g.items.length || g.incluidos.length)
+    .filter(g => g.items.length)
 
-  const transversales = addons.value.filter(a => !a.pack)
+  const transversales = extras.value.filter(a => !a.pack)
   if (transversales.length) {
-    grupos.push({ clave: 'transversal', titulo: 'Sirven a las dos suites',
-                  sinPack: false, incluidos: [], items: transversales })
+    grupos.push({ clave: 'transversal', titulo: 'Extras para los dos packs',
+                  sinPack: false, items: transversales })
   }
   return grupos
 })
@@ -194,9 +197,9 @@ function toggleSuite(suite) {
 // a la que ese tope le pertenece.
 function topesDe(plan) {
   return (plan.recursos || []).filter(r => !r.suite || form.value.features[r.suite] === true)
-                              // «usuarios sin límite» es mentira en uso personal: es una sola persona,
-                              // y eso lo dice el renglón de equipo, no una cifra.
-                              .filter(r => !(plan.equipo === false && r.clave === 'usuarios'))
+                              // El de usuarios no es una cifra: lo dice `textoUsuarios` («2 de cada rol»,
+                              // «una sola persona»). Mostrar además «usuarios sin límite» se contradecía.
+                              .filter(r => r.clave !== 'usuarios')
 }
 
 // ── Los usuarios: sólo los roles que van a poder entrar ────────────────────
@@ -217,25 +220,63 @@ const rolesACrear = computed(() => {
   return rolesSeleccionados.value.filter(r => ok.includes(r))
 })
 
-// El plan Básico incluye uno de cada rol; el admin queda fuera del cupo.
+// Dos de cada rol (en «Hasta 100 pacientes», en cada sede); el admin queda fuera del cupo.
 const planElegido = computed(() => planes.value.find(p => p.clave === form.value.plan))
 
-// Cuánto va a pagar por mes: plan + suites + adicionales, con los precios del catálogo. Es
-// la misma cuenta que hace `Precios.de` en el backend; acá sólo se muestra antes de crear.
-const precioMensual = computed(() => {
-  const plan = planElegido.value?.precio_mensual || 0
-  // Uso personal: la base trae el Cultivo; cada adicional suma con SU precio de personal
-  // (`precio_mensual_personal`, que el catálogo trae aparte porque el de organización no
-  // sirve: la IA sola vale más que el plan). Misma cuenta que `Precios.de`.
-  if (esPersonal.value) {
-    return plan + addonsPersonal.value
-      .filter(a => form.value.features[a.clave] === true)
-      .reduce((t, a) => t + (a.precio_mensual_personal || 0), 0)
-  }
-  const s = suites.value.filter(x => form.value.features[x.clave] === true).reduce((t, x) => t + (x.precio_mensual || 0), 0)
-  const a = addons.value.filter(x => form.value.features[x.clave] === true).reduce((t, x) => t + (x.precio_mensual || 0), 0)
-  return plan + s + a
-})
+// Cuántos packs lleva (Cultivo, Producción y dispensa): el precio del escalón depende de eso.
+const packsElegidos = computed(() => suites.value.filter(x => form.value.features[x.clave] === true))
+function precioEscalon(plan) {
+  if (!plan?.precios) return 0
+  if (plan.personal) return Object.values(plan.precios)[0] || 0
+  return plan.precios[String(packsElegidos.value.length)] || 0
+}
+
+// Lo que suma cada pack de 10 pacientes y cada sede extra (lo dice el catálogo).
+const packPacientes = computed(() => catalogo.value?.pack_pacientes || { pacientes: 10, plantas: 90, precio_mensual: 0 })
+const sedeExtra     = computed(() => catalogo.value?.sede_extra || { precio_mensual: 0 })
+
+// Los topes del escalón con lo comprado encima, para decirlos.
+function topesEfectivos(plan) {
+  const packs = esPersonal.value ? 0 : Number(form.value.packs_pacientes_extra) || 0
+  const sedes = esPersonal.value ? 0 : Number(form.value.sedes_extra) || 0
+  return topesDe(plan).map(r => {
+    let valor = r.valor
+    if (valor != null && r.clave === 'pacientes') valor += packs * packPacientes.value.pacientes
+    if (valor != null && r.clave === 'plantas')   valor += packs * packPacientes.value.plantas
+    if (valor != null && r.clave === 'sedes')     valor += sedes
+    return { ...r, texto: valor == null ? `${r.label} sin límite` : `${valor} ${r.label}` }
+  })
+}
+function textoUsuarios(p) {
+  if (p?.equipo === false) return 'una sola persona, sin equipo'
+  if (!p?.usuarios_por_rol) return 'usuarios sin límite'
+  return `${p.usuarios_por_rol} usuarios de cada rol${p.por_sede ? ' en cada sede' : ''}`
+}
+
+// Cuánto va a pagar por mes. La cuenta la hace el backend (`Precios.cotizar`, la misma que arma
+// el desglose de una organización que ya existe): acá no se suman precios.
+const cotizacion = ref(null)
+let cotizarTimer = null
+async function cotizar() {
+  try {
+    const { data } = await getSuperAdminCotizacion({
+      plan:            form.value.plan,
+      suites:          esPersonal.value ? ['cultivo'] : packsElegidos.value.map(x => x.clave),
+      packs_pacientes: esPersonal.value ? 0 : form.value.packs_pacientes_extra,
+      sedes_extra:     esPersonal.value ? 0 : form.value.sedes_extra,
+      extras:          extras.value.filter(a => form.value.features[a.clave] === true).map(a => a.clave),
+    })
+    cotizacion.value = data
+  } catch { cotizacion.value = null }
+}
+watch(() => [form.value.plan, JSON.stringify(form.value.features), form.value.packs_pacientes_extra, form.value.sedes_extra, tipo.value],
+      () => { clearTimeout(cotizarTimer); cotizarTimer = setTimeout(cotizar, 200) })
+const precioMensual = computed(() => cotizacion.value?.total ?? 0)
+
+// Un número entero, de 0 para arriba (los dos contadores del plan).
+function sumar(campo, delta) {
+  form.value[campo] = Math.max(0, (Number(form.value[campo]) || 0) + delta)
+}
 
 // ── El resumen final ───────────────────────────────────────────────────────
 //
@@ -247,16 +288,15 @@ const contratado = computed(() => {
     addons.value.find(x => x.clave === clave)?.label || clave
   if (esPersonal.value) {
     // Lo que viene adentro del plan no es un «adicional»: se dice como incluido.
-    const dentro = catalogo.value?.features_personal || {}
     return {
       suites:    suites.value.filter(x => form.value.features[x.clave] === true).map(x => x.label),
-      addons:    addons.value.filter(x => form.value.features[x.clave] === true && !dentro[x.clave]).map(x => nombre(x.clave)),
-      incluidos: addons.value.filter(x => dentro[x.clave] === true).map(x => x.label),
+      addons:    addonsPersonal.value.filter(x => form.value.features[x.clave] === true).map(x => nombre(x.clave)),
+      incluidos: incluidosPersonal.value.filter(x => !suites.value.some(s => s.clave === x.clave)).map(x => x.label),
     }
   }
   return {
     suites: suites.value.filter(x => form.value.features[x.clave] === true).map(x => x.label),
-    addons: addons.value.filter(x => form.value.features[x.clave] === true).map(x => nombre(x.clave)),
+    addons: extras.value.filter(x => form.value.features[x.clave] === true).map(x => nombre(x.clave)),
     incluidos: incluidos.value.filter(incluidoActivo).map(i => i.label),
   }
 })
@@ -304,6 +344,7 @@ onMounted(async () => {
     const encendidos = data.features_por_defecto || {}
     const todas = [...(data.suites || []), ...(data.addons || [])]
     form.value.features = Object.fromEntries(todas.map(m => [m.clave, encendidos[m.clave] === true]))
+    cotizar()
     // La contraseña arranca VACÍA a propósito: el backend genera una dictable y la devuelve al
     // crear. Acá venía `data.password_default`, que era la credencial fija de toda la
     // plataforma y ya no existe — dejaba el campo mudo y el texto de abajo mintiendo.
@@ -363,6 +404,8 @@ async function handleSubmit() {
   try {
     const club = { ...form.value }
     if (esPersonal.value) {
+      club.packs_pacientes_extra = 0
+      club.sedes_extra = 0
       // No hay organización que nombrar: el cultivo se llama como la persona y el contacto es
       // ella misma (se puede cambiar después desde la ficha).
       club.name  = nombreCultivo.value
@@ -377,7 +420,7 @@ async function handleSubmit() {
     })
     creado.value = data
   } catch (e) {
-    error.value = e?.response?.data?.errors?.join(', ') || (esPersonal.value ? 'Error al crear el uso personal' : 'Error al crear la organización')
+    error.value = e?.response?.data?.errors?.join(', ') || (esPersonal.value ? 'Error al crear el autocultivo' : 'Error al crear la organización')
   } finally {
     saving.value = false
   }
@@ -395,7 +438,7 @@ async function handleSubmit() {
     <!-- ══ SUCCESS ══ -->
     <div v-if="creado" class="cnv__success">
       <div class="cnv__success-check"><Check :size="28" :stroke-width="2.5" /></div>
-      <h2 class="cnv__success-title">{{ creado.club.personal ? 'Uso personal creado' : 'Organización creada' }}</h2>
+      <h2 class="cnv__success-title">{{ creado.club.personal ? 'Autocultivo creado' : 'Organización creada' }}</h2>
       <p class="cnv__success-sub">
         <strong>{{ creado.club.name }}</strong> está listo.
         Se {{ creado.usuarios.length === 1 ? 'creó' : 'crearon' }}
@@ -444,7 +487,7 @@ async function handleSubmit() {
 
       <!-- Header + stepper -->
       <div class="cnv__header">
-        <h1 class="cnv__title">{{ esPersonal ? 'Nuevo uso personal' : 'Nueva organización' }}</h1>
+        <h1 class="cnv__title">{{ esPersonal ? 'Nuevo autocultivo' : 'Nueva organización' }}</h1>
         <div class="cnv__stepper">
           <div
             v-for="(p, i) in pasos" :key="p.clave"
@@ -491,8 +534,8 @@ async function handleSubmit() {
                     @click="elegirTipo('personal')">
               <span class="cnv__suite-check">{{ esPersonal ? '✓' : '' }}</span>
               <span class="cnv__suite-txt">
-                <span class="cnv__suite-name">Uso personal</span>
-                <span class="cnv__suite-desc">Una persona y su cultivo: sin equipo ni pacientes. Se le puede sumar ambiente, IA y chatbot.</span>
+                <span class="cnv__suite-name">Autocultivo</span>
+                <span class="cnv__suite-desc">Una persona y su cultivo: sin equipo ni pacientes. Viene con el Asistente IA; se le puede sumar ambiente y chatbot.</span>
               </span>
             </button>
           </div>
@@ -577,7 +620,7 @@ async function handleSubmit() {
           <div class="cnv__panel-ico cnv__panel-ico--purple"><Zap :size="18" :stroke-width="1.75" /></div>
           <div>
             <div class="cnv__panel-title">Qué puede hacer</div>
-            <div class="cnv__panel-sub">{{ esPersonal ? 'Viene con Cultivo; el ambiente, la IA y el chatbot se le suman uno por uno' : 'Primero la suite; después lo que se le suma encima' }}</div>
+            <div class="cnv__panel-sub">{{ esPersonal ? 'Viene con Cultivo y el Asistente IA; el ambiente y el chatbot se suman uno por uno' : 'Primero los packs; lo terminado viene adentro y los extras se suman encima' }}</div>
           </div>
         </div>
         <div v-if="esPersonal" class="cnv__panel-body">
@@ -588,7 +631,7 @@ async function handleSubmit() {
             <Check :size="14" :stroke-width="3" class="cnv__incluido-ico" />
             <div>
               <div class="cnv__incluido-name">{{ inc.label }}</div>
-              <div class="cnv__incluido-desc">Incluido en el plan Personal — {{ inc.desc }}</div>
+              <div class="cnv__incluido-desc">Incluido en el Autocultivo — {{ inc.desc }}</div>
             </div>
           </div>
 
@@ -604,7 +647,8 @@ async function handleSubmit() {
                 <div>
                   <div class="cnv__feat-name">
                     {{ a.label }}
-                    <span v-if="a.precio_mensual_personal" class="cnv__precio">{{ formatARS(a.precio_mensual_personal) }}/mes</span>
+                    <span v-if="a.sin_lanzar" class="cnv__precio">en desarrollo · sin cargo</span>
+                    <span v-else-if="a.precio_mensual" class="cnv__precio">{{ precio(a.precio_mensual) }}/mes</span>
                   </div>
                   <div class="cnv__feat-desc">{{ a.desc }}</div>
                   <div v-if="bloqueoPersonal(a)" class="cnv__feat-requiere">
@@ -624,8 +668,9 @@ async function handleSubmit() {
         </div>
         <div v-else class="cnv__panel-body">
 
-          <!-- Suites: lo que realmente se vende. Un club puede tomar una, la otra o las dos. -->
-          <div class="cnv__section-label">Suites</div>
+          <!-- Los packs: lo que se vende. Una organización puede tomar uno, el otro o los dos; el
+               precio sale del escalón que se elige en el paso siguiente. -->
+          <div class="cnv__section-label">Packs</div>
           <div class="cnv__suites">
             <button
               v-for="s in suites" :key="s.clave"
@@ -636,36 +681,46 @@ async function handleSubmit() {
             >
               <span class="cnv__suite-check">{{ form.features[s.clave] ? '✓' : '' }}</span>
               <span class="cnv__suite-txt">
-                <span class="cnv__suite-name">{{ s.label }} <span class="cnv__precio">{{ formatARS(s.precio_mensual) }}/mes</span></span>
+                <span class="cnv__suite-name">{{ s.label }}</span>
                 <span class="cnv__suite-desc">{{ s.desc }}</span>
               </span>
             </button>
           </div>
           <p v-if="!haySuite" class="cnv__warn">
-            Sin ninguna suite, la organización entra pero no puede operar. Elegí al menos una.
+            Sin ningún pack, la organización entra pero no puede operar. Elegí al menos uno.
           </p>
 
-          <!-- Cada adicional DEBAJO de la suite que extiende, no en una grilla plana de diez.
-               El módulo incluido va acá adentro, con candado: no es una categoría aparte, es
-               una fila más de lo que ya se compró. -->
-          <div v-for="g in addonsAgrupados" :key="g.clave" class="cnv__grupo">
-            <div class="cnv__section-label">{{ g.titulo }}</div>
-            <p v-if="g.sinPack" class="cnv__grupo-nota">
-              {{ g.packLabel }} no está contratado: estos módulos no se pueden sumar.
-            </p>
-
-            <div v-for="inc in g.incluidos" :key="inc.clave"
+          <!-- Lo que viene adentro de los packs (6-oct-2026): no se tilda, se dice. -->
+          <div class="cnv__grupo">
+            <div class="cnv__section-label">Viene incluido</div>
+            <div v-for="inc in incluidos" :key="inc.clave"
                  class="cnv__incluido" :class="{ 'cnv__incluido--off': !incluidoActivo(inc) }">
               <Check v-if="incluidoActivo(inc)" :size="14" :stroke-width="3" class="cnv__incluido-ico" />
               <Lock v-else :size="13" :stroke-width="2" class="cnv__incluido-ico" />
               <div>
                 <div class="cnv__incluido-name">{{ inc.label }}</div>
                 <div class="cnv__incluido-desc">
-                  <template v-if="incluidoActivo(inc)">Ya viene incluido — {{ inc.desc }}</template>
-                  <template v-else>Necesita la suite {{ inc.incluido_en_label }}</template>
+                  <template v-if="incluidoActivo(inc)">{{ inc.desc }}</template>
+                  <template v-else>Viene con {{ inc.incluido_en_label }}</template>
                 </div>
               </div>
             </div>
+            <div v-for="pr in proximos" :key="pr.clave" class="cnv__incluido cnv__incluido--off">
+              <Info :size="13" :stroke-width="2" class="cnv__incluido-ico" />
+              <div>
+                <div class="cnv__incluido-name">{{ pr.label }}</div>
+                <div class="cnv__incluido-desc">Próximamente, incluido — {{ pr.desc }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Los extras, DEBAJO del pack que extienden. Hoy están en desarrollo: se pueden
+               prender para probar o de cortesía, sin cargo. -->
+          <div v-for="g in addonsAgrupados" :key="g.clave" class="cnv__grupo">
+            <div class="cnv__section-label">{{ g.titulo }}</div>
+            <p v-if="g.sinPack" class="cnv__grupo-nota">
+              {{ g.packLabel }} no está contratado: estos extras no se pueden sumar.
+            </p>
 
             <div class="cnv__feat-grid">
               <div
@@ -682,7 +737,8 @@ async function handleSubmit() {
                   <div>
                     <div class="cnv__feat-name">
                       {{ a.label }}
-                      <span v-if="a.precio_mensual" class="cnv__precio">{{ formatARS(a.precio_mensual) }}/mes</span>
+                      <span v-if="a.sin_lanzar" class="cnv__precio">en desarrollo · sin cargo</span>
+                      <span v-else-if="a.precio_mensual" class="cnv__precio">{{ precio(a.precio_mensual) }}/mes</span>
                     </div>
                     <div class="cnv__feat-desc">{{ a.desc }}</div>
                     <!-- Por qué NO se puede prender. Antes esto vivía en letra chica que nadie
@@ -733,7 +789,7 @@ async function handleSubmit() {
           <div class="cnv__panel-ico cnv__panel-ico--purple"><Gauge :size="18" :stroke-width="1.75" /></div>
           <div>
             <div class="cnv__panel-title">Cuánto puede crecer</div>
-            <div class="cnv__panel-sub">{{ esPersonal ? 'El uso personal tiene un solo plan: una persona, su casa, dos espacios' : 'Los topes de lo que ya eligió. Qué puede hacer se decidió en el paso anterior' }}</div>
+            <div class="cnv__panel-sub">{{ esPersonal ? 'El autocultivo tiene un solo plan: una persona, su casa, dos espacios' : 'El escalón, y lo que se compra encima: pacientes y sedes' }}</div>
           </div>
         </div>
         <div class="cnv__panel-body">
@@ -749,19 +805,45 @@ async function handleSubmit() {
               <div class="cnv__plan-top">
                 <span class="cnv__plan-check"><Check v-if="form.plan === p.clave" :size="12" :stroke-width="3" /></span>
                 <span class="cnv__plan-name">{{ p.label }}</span>
-                <span class="cnv__precio cnv__precio--plan">{{ formatARS(p.precio_mensual) }}/mes</span>
+                <span class="cnv__precio cnv__precio--plan">{{ precio(precioEscalon(p)) }}/mes</span>
               </div>
               <ul class="cnv__plan-limites">
                 <li v-for="r in topesDe(p)" :key="r.clave">{{ r.texto }}</li>
                 <!-- El cupo de usuarios no es un número, así que no puede decirse como uno:
                      "5 usuarios" no se vende ni se explica. -->
-                <li>
-                  {{ p.equipo === false ? 'una sola persona, sin equipo'
-                     : p.usuarios_por_rol === 1 ? 'un usuario de cada rol'
-                     : (p.usuarios_por_rol ? `${p.usuarios_por_rol} usuarios por rol` : 'usuarios sin límite') }}
-                </li>
+                <li>{{ textoUsuarios(p) }}</li>
               </ul>
             </button>
+          </div>
+
+          <!-- Lo que se compra encima del escalón. -->
+          <div class="cnv__extras">
+            <div class="cnv__extra">
+              <div>
+                <div class="cnv__extra-name">Packs de {{ packPacientes.pacientes }} pacientes</div>
+                <div class="cnv__hint">Cada uno suma {{ packPacientes.pacientes }} pacientes y {{ packPacientes.plantas }} plantas en floración · {{ precio(packPacientes.precio_mensual) }}/mes</div>
+              </div>
+              <div class="cnv__stepper-num">
+                <button type="button" aria-label="Uno menos" :disabled="!form.packs_pacientes_extra" @click="sumar('packs_pacientes_extra', -1)">−</button>
+                <span>{{ form.packs_pacientes_extra }}</span>
+                <button type="button" aria-label="Uno más" @click="sumar('packs_pacientes_extra', 1)">+</button>
+              </div>
+            </div>
+            <div class="cnv__extra">
+              <div>
+                <div class="cnv__extra-name">Sedes extra</div>
+                <div class="cnv__hint">Cada una suma una sede · {{ precio(sedeExtra.precio_mensual) }}/mes</div>
+              </div>
+              <div class="cnv__stepper-num">
+                <button type="button" aria-label="Una menos" :disabled="!form.sedes_extra" @click="sumar('sedes_extra', -1)">−</button>
+                <span>{{ form.sedes_extra }}</span>
+                <button type="button" aria-label="Una más" @click="sumar('sedes_extra', 1)">+</button>
+              </div>
+            </div>
+            <p class="cnv__hint" style="margin:.25rem 0 0">
+              Con esto: {{ [...topesEfectivos(planElegido || {}).map(r => r.texto), textoUsuarios(planElegido)].join(' · ') }}
+              · <strong>{{ precio(precioMensual) }}/mes</strong>
+            </p>
           </div>
 
           <div class="cnv__row-2" style="margin-top:1.5rem">
@@ -797,9 +879,9 @@ async function handleSubmit() {
           <!-- Uso personal: el plan es uno solo, así que no tiene paso propio. Acá queda lo que
                sí se decide de él: hasta cuándo y si es una prueba. -->
           <template v-if="esPersonal">
-            <div class="cnv__section-label">Plan Personal</div>
+            <div class="cnv__section-label">Autocultivo</div>
             <p class="cnv__hint" style="margin:0 0 .75rem">
-              {{ formatARS(planElegido?.precio_mensual || 0) }}/mes ·
+              {{ precio(precioMensual) }}/mes ·
               {{ [...topesDe(planElegido || {}).map(r => r.texto), 'una sola persona, sin equipo'].join(' · ') }}
             </p>
             <div class="cnv__row-2" style="margin-bottom:1.5rem">
@@ -843,7 +925,7 @@ async function handleSubmit() {
 
           <template v-if="esPersonal">
             <p class="cnv__hint">
-              Entra con <code>{{ adminPersona.email_personal }}</code>. En uso personal la cuenta es la
+              Entra con <code>{{ adminPersona.email_personal }}</code>. En el autocultivo la cuenta es la
               persona: se crea sólo su usuario y no se puede sumar a nadie más después. Si el cultivo
               crece y necesita equipo, se lo pasa a un plan de organización desde la ficha.
             </p>
@@ -896,8 +978,8 @@ async function handleSubmit() {
             después desde la ficha.
           </p>
           <p v-if="!esPersonal && planElegido?.usuarios_por_rol" class="cnv__hint">
-            El plan {{ planElegido.label }} incluye uno de cada rol. El admin no cuenta: se pueden
-            dar de alta los que hagan falta.
+            «{{ planElegido.label }}» incluye {{ textoUsuarios(planElegido) }}. El admin no cuenta:
+            se pueden dar de alta los que hagan falta.
           </p>
         </div>
       </div>
@@ -934,7 +1016,7 @@ async function handleSubmit() {
                   Incluye: {{ contratado.incluidos.join(', ') }}
                 </span>
                 <span class="cnv__res-sub">
-                  {{ esPersonal ? 'Le sumó' : 'Adicionales' }}: {{ contratado.addons.join(', ') || (esPersonal ? 'nada' : 'ninguno') }}
+                  Extras: {{ contratado.addons.join(', ') || 'ninguno' }}
                 </span>
               </span>
             </div>
@@ -942,9 +1024,9 @@ async function handleSubmit() {
             <div class="cnv__res-row">
               <span class="cnv__res-k">Cuánto puede crecer</span>
               <span class="cnv__res-v">
-                <strong>Plan {{ planElegido?.label }}{{ form.plan_trial ? ' · en prueba' : '' }}</strong>
+                <strong>{{ planElegido?.label }}{{ form.plan_trial ? ' · en prueba' : '' }}</strong>
                 <span class="cnv__res-sub">
-                  {{ [...topesDe(planElegido || {}).map(r => r.texto), ...(esPersonal ? ['una sola persona'] : [])].join(' · ') }}
+                  {{ [...topesEfectivos(planElegido || {}).map(r => r.texto), textoUsuarios(planElegido)].join(' · ') }}
                 </span>
                 <span class="cnv__res-sub">
                   Vigencia: {{ form.plan_activo_hasta || 'sin vencimiento' }}
@@ -955,9 +1037,12 @@ async function handleSubmit() {
             <div class="cnv__res-row">
               <span class="cnv__res-k">Cuánto paga</span>
               <span class="cnv__res-v">
-                <strong>{{ formatARS(precioMensual) }} por mes</strong>
+                <strong>{{ precio(precioMensual) }} por mes</strong>
+                <span v-for="l in (cotizacion?.lineas || [])" :key="l.tipo + l.clave" class="cnv__res-sub">
+                  {{ l.label }}: {{ precio(l.monto) }}
+                </span>
                 <span class="cnv__res-sub">
-                  {{ form.plan_trial ? 'En prueba: no factura hasta que salga del trial.' : (esPersonal ? 'Plan Personal con Cultivo adentro, más lo que le sumó.' : 'Plan + suites + adicionales, a precio de lista.') }}
+                  {{ form.plan_trial ? 'En prueba: no factura hasta que salga del trial.' : 'A precio de lista.' }}
                 </span>
               </span>
             </div>
@@ -996,7 +1081,7 @@ async function handleSubmit() {
         <button v-else class="cnv__btn-primary" :disabled="saving" @click="handleSubmit">
           <DsSpinner v-if="saving" :size="15" />
           <Check v-else :size="16" :stroke-width="2.5" />
-          {{ saving ? 'Creando…' : (esPersonal ? 'Crear uso personal' : 'Crear organización') }}
+          {{ saving ? 'Creando…' : (esPersonal ? 'Crear autocultivo' : 'Crear organización') }}
         </button>
       </div>
 
@@ -1170,6 +1255,13 @@ async function handleSubmit() {
 .cnv__plan-name { font-size: .95rem; font-weight: 800; color: var(--c-slate-900); }
 .cnv__precio { font-size: .7rem; font-weight: 700; color: var(--c-slate-500); font-variant-numeric: tabular-nums; margin-left: .3rem; }
 .cnv__precio--plan { margin-left: auto; }
+.cnv__extras { margin-top: 1.25rem; display: grid; gap: .6rem; }
+.cnv__extra { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .75rem 1rem; border: 1px solid var(--c-slate-200); border-radius: 10px; }
+.cnv__extra-name { font-size: .85rem; font-weight: 700; color: var(--c-slate-900); }
+.cnv__stepper-num { display: inline-flex; align-items: center; gap: .5rem; flex-shrink: 0; }
+.cnv__stepper-num button { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--c-slate-300); background: var(--c-slate-50); font-size: 1rem; font-weight: 700; cursor: pointer; }
+.cnv__stepper-num button:disabled { opacity: .4; cursor: default; }
+.cnv__stepper-num span { min-width: 1.6rem; text-align: center; font-weight: 800; font-variant-numeric: tabular-nums; }
 .cnv__plan-limites { list-style: none; margin: 0; padding: 0; display: grid; gap: .25rem; }
 .cnv__plan-limites li { font-size: .74rem; color: var(--c-slate-500); line-height: 1.35; }
 .cnv__plan--on .cnv__plan-limites li { color: var(--c-slate-600); }

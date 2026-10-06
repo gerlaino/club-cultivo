@@ -79,13 +79,14 @@ class PlantsController < ApplicationController
 
   # POST /plants
   def create
-    enforcer = PlanEnforcer.new(current_user.club)
-    unless enforcer.puede_crear_planta?
-      info = enforcer.info
-      return render json: PlanEnforcer.error_limite('plantas', info[:limites][:plantas], plan: info[:label]), status: :payment_required
-    end
-
     lote = current_user.club.lotes.find(params[:plant][:lote_id])
+
+    # El tope es de plantas EN FLORACIÓN: sólo cuenta si el lote ya está adentro del cupo. La red
+    # de verdad es la validación de `Plant`; esto es para contestar con el mensaje y el 402.
+    enforcer = PlanEnforcer.new(current_user.club)
+    if lote.ocupa_cupo_de_floracion? && !enforcer.cabe_en_floracion?(1)
+      return render json: enforcer.error_floracion(1), status: :payment_required
+    end
 
     # Nombre autogenerado — el usuario no lo ingresa
     count  = lote.plants.count + 1

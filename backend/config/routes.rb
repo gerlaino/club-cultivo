@@ -758,6 +758,8 @@ Rails.application.routes.draw do
         member { post :reset_password }
       end
       get :catalogo, to: 'catalogo#show'
+      # La cuenta de lo que se está por dar de alta: el wizard no suma precios por su cuenta.
+      get 'catalogo/cotizar', to: 'catalogo#cotizar'
       # El panel de quien vende la plataforma: vencimientos, módulos a medias, clubes en
       # silencio y salud. Los agregados (plantas, lotes, pacientes) viven en informes.
       get :pulso,    to: 'stats#pulso'

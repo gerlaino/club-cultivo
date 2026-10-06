@@ -38,6 +38,14 @@ export function formatARS(n) {
   return new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(n)
 }
 
+// Un precio de la lista de la plataforma (`Precios` en el backend). La moneda la dice el backend
+// (`moneda` en el catálogo y en el desglose): desde el 6-oct-2026 la lista está en dólares.
+export function formatPrecio(n, moneda = 'USD') {
+  if (n == null) return '—'
+  const num = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 0 }).format(n)
+  return moneda === 'USD' ? `US$ ${num}` : new Intl.NumberFormat('es-AR', { style: 'currency', currency: moneda, maximumFractionDigits: 0 }).format(n)
+}
+
 export function formatG(g) {
   if (g == null) return '—'
   return `${Number(g).toLocaleString('es-AR', { maximumFractionDigits: 1 })} g`

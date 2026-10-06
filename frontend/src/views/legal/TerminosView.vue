@@ -16,8 +16,7 @@
     <p>
       Cultivo Espacial («la plataforma», «nosotros») es un software en internet para registrar y gestionar
       cultivos de cannabis: el de una persona para su propio uso y el de organizaciones (asociaciones,
-      fundaciones, investigación y producción). Titular: <Dato :v="TITULAR.nombre" />, CUIT <Dato :v="TITULAR.cuit" />,
-      con domicilio en <Dato :v="TITULAR.domicilio" />. Contacto: <a :href="`mailto:${TITULAR.mail}`">{{ TITULAR.mail }}</a>.
+      fundaciones, investigación y producción). Contacto: <a :href="`mailto:${TITULAR.mail}`">{{ TITULAR.mail }}</a>.
     </p>
 
     <h2>2. Aceptación</h2>
@@ -146,7 +145,7 @@
       Rigen las leyes de la República Argentina. Si sos consumidor, son competentes los tribunales de tu domicilio
       (art. 36 de la Ley 24.240), y también podés reclamar ante la autoridad de defensa del consumidor de tu jurisdicción
       o en la Ventanilla Única Federal de Defensa del Consumidor. Para organizaciones, son competentes los tribunales
-      ordinarios de <Dato :v="TITULAR.jurisdiccion" />. Antes de cualquier reclamo, escribinos: casi todo se resuelve así.
+      que fije el acuerdo comercial. Antes de cualquier reclamo, escribinos: casi todo se resuelve así.
     </p>
   </LegalLayout>
 </template>
@@ -154,14 +153,13 @@
 <script setup>
 // Términos y condiciones (borrador de Germán y Claude, 4-oct-2026). Escritos para que se entiendan
 // —con un resumen arriba, como hacen las apps que se leen de verdad— y con lo que la ley argentina
-// exige a un servicio que se contrata por internet: identificación del titular, arrepentimiento y
+// exige a un servicio que se contrata por internet: contacto (sin nombres: ver titular.js), arrepentimiento y
 // baja (Ley 24.240, Res. SCI 424/2020), y el rol de encargado frente a los datos de las
 // organizaciones (Ley 25.326). Los días de prueba los dice el backend.
 //
 // Si cambia algo que afecte a lo aceptado, subir `Legal::TERMINOS_VERSION` y `VIGENCIA`.
 import { ref, onMounted } from 'vue'
 import LegalLayout from './LegalLayout.vue'
-import Dato from './Dato.vue'
 import { TITULAR } from './titular.js'
 import { getRegistroInfo } from '../../lib/api.js'
 

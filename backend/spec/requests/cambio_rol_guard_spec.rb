@@ -59,16 +59,16 @@ RSpec.describe 'Cambio de rol — guard de despachos pendientes', type: :request
     end
 
     it 'no deja pasar a un rol cuyo módulo la organización no tiene' do
-      club.update!(features: club.features.merge('delivery' => false))
-      patch "/usuarios/#{dispensador.id}", params: { user: { role: 'delivery' } }, headers: auth_headers
+      club.update!(features: club.features.merge('cultivo' => false))
+      patch "/usuarios/#{dispensador.id}", params: { user: { role: 'cultivador' } }, headers: auth_headers
 
       expect(response).to have_http_status(:unprocessable_entity)
       expect(JSON.parse(response.body)['errors'].first).to match(/necesita el módulo/)
     end
 
-    it 'respeta el cupo del plan: en Básico no puede haber dos cultivadores por cambio de rol' do
+    it 'respeta el cupo del plan: en «Hasta 50 pacientes» no puede haber tres cultivadores por cambio de rol' do
       club.update!(plan: 'basico')
-      create(:user, :cultivador, club: club)
+      create_list(:user, 2, :cultivador, club: club)
       patch "/usuarios/#{dispensador.id}", params: { user: { role: 'cultivador' } }, headers: auth_headers
 
       expect(response).to have_http_status(:payment_required)

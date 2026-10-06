@@ -26,40 +26,54 @@ RSpec.describe 'SuperAdmin catálogo', type: :request do
       expect(personal).to include('personal' => true, 'equipo' => false)
 
       basico = planes.find { |p| p['clave'] == 'basico' }
-      expect(basico['limites']['salas']).to    eq(3)
-      expect(basico['limites']['plantas']).to  eq(450)
+      # Los escalones del 6-oct-2026.
+      expect(personal['limites']).to include('plantas' => 9, 'salas' => 2, 'pacientes' => 0)
+      expect(personal['precios'].values).to eq([8])
+
+      expect(basico['limites']).to include('sedes' => 1, 'salas' => 3, 'plantas' => 450, 'pacientes' => 50)
       # Los lotes NO se limitan: el lote organiza, no mide capacidad.
       expect(basico['limites']['lotes']).to    be_nil
-      # El de usuarios no es un número: es uno de cada rol, y viaja aparte para poder decirlo
+      # El de usuarios no es un número: es dos de cada rol, y viaja aparte para poder decirlo
       # con palabras en vez de con una barra que no significa nada.
-      expect(basico['usuarios_por_rol']).to    eq(1)
+      expect(basico['usuarios_por_rol']).to    eq(2)
+      expect(basico['por_sede']).to            be(false)
+      expect(basico['precios']).to             eq('1' => 200, '2' => 350)
 
       total = planes.find { |p| p['clave'] == 'total' }
-      # Salvo las fotos, que miden almacenamiento y no capacidad del cultivo.
-      expect(total['limites'].except('fotos').values).to all(be_nil)
-      expect(total['limites']['fotos']).to be > 0
-      expect(total['usuarios_por_rol']).to be_nil
+      expect(total['limites']).to include('sedes' => 3, 'salas' => nil, 'plantas' => 900, 'pacientes' => 100)
+      expect(total['usuarios_por_rol']).to eq(2)
+      expect(total['por_sede']).to         be(true)
+      expect(total['precios']).to          eq('1' => 400, '2' => 700)
+    end
+
+    it 'dice cuánto suma cada pack de pacientes y cada sede extra' do
+      c = catalogo
+
+      expect(c['pack_pacientes']).to eq('pacientes' => 10, 'plantas' => 90, 'precio_mensual' => 80)
+      expect(c['sede_extra']).to     eq('precio_mensual' => 50)
+      expect(c['moneda']).to         eq('USD')
     end
 
     it 'arma el resumen del plan para que el frontend no invente el vocabulario' do
       basico = catalogo['planes'].find { |p| p['clave'] == 'basico' }
 
-      expect(basico['resumen']).to include('1 sedes', '3 salas', '450 plantas')
+      expect(basico['resumen']).to include('1 sedes', '3 salas', '450 plantas en floración')
 
       total = catalogo['planes'].find { |p| p['clave'] == 'total' }
-      expect(total['resumen'].reject { |r| r.include?('fotos') }).to all(match(/sin límite/))
-      expect(total['resumen']).to include(match(/\d+ fotos/))
+      expect(total['resumen']).to include('salas sin límite', '900 plantas en floración')
     end
 
     it 'separa los módulos en los cajones que el panel muestra' do
       c = catalogo
 
       expect(c['suites'].map  { |s| s['clave'] }).to contain_exactly('cultivo', 'produccion_dispensa')
-      expect(c['addons'].map  { |a| a['clave'] }).to include('bar', 'iot', 'ia', 'whatsapp', 'mailer', 'vista_paciente')
-      # El médico no es add-on: viene dentro de la suite. El correo SÍ pasó a serlo cuando dejó
-      # de ser "mandar un mail desde la ficha" y se volvió un espacio propio que se vende.
-      expect(c['addons'].map  { |a| a['clave'] }).not_to include('medico')
-      expect(c['incluidos'].map { |i| i['clave'] }).to contain_exactly('medico')
+      # Los extras que se cobran aparte (en desarrollo) y lo que va a venir incluido cuando esté listo.
+      extras = c['addons'].select { |a| a['tipo'] == 'extra' }.map { |a| a['clave'] }
+      expect(extras).to contain_exactly('bar', 'vista_paciente', 'chatbot', 'iot')
+      expect(c['addons'].select { |a| a['tipo'] == 'incluido_proximo' }.map { |a| a['clave'] })
+        .to contain_exactly('whatsapp', 'ariccame')
+      # Lo terminado viene adentro de los packs (6-oct-2026).
+      expect(c['incluidos'].map { |i| i['clave'] }).to contain_exactly('medico', 'delivery', 'mailer', 'ia')
       # El cajón de "en construcción" está vacío hoy: `vista_paciente` salió a add-on cuando el
       # paciente pudo entrar. Que el catálogo lo siga informando (aunque vacío) es lo que hace
       # que el panel no se rompa el día que entre el próximo.
@@ -69,8 +83,11 @@ RSpec.describe 'SuperAdmin catálogo', type: :request do
     it 'dice de qué suite depende cada módulo incluido' do
       medico = catalogo['incluidos'].find { |i| i['clave'] == 'medico' }
 
-      expect(medico['incluido_en']).to       eq('produccion_dispensa')
+      expect(medico['incluido_en']).to       eq(['produccion_dispensa'])
       expect(medico['incluido_en_label']).to eq('Producción y dispensa')
+
+      ia = catalogo['incluidos'].find { |i| i['clave'] == 'ia' }
+      expect(ia['incluido_en']).to contain_exactly('cultivo', 'produccion_dispensa')
     end
 
     it 'marca los add-ons incompletos con el motivo' do
@@ -137,6 +154,53 @@ RSpec.describe 'SuperAdmin catálogo', type: :request do
 
       expect(roles).to contain_exactly('admin', 'medico', 'cultivador', 'dispensador', 'manicura')
       expect(catalogo['roles_alta']).to all(include('label' => be_present, 'desc' => be_present))
+    end
+  end
+
+  # La cuenta del alta la hace el backend: la pantalla no suma precios por su cuenta.
+  describe 'GET /super_admin/catalogo/cotizar' do
+    before { sign_in_as(super_admin) }
+
+    def cotizar(params)
+      get '/api/super_admin/catalogo/cotizar', params: params
+      JSON.parse(response.body)
+    end
+
+    it 'un pack en «Hasta 50 pacientes» son 200; los dos, 350' do
+      expect(cotizar(plan: 'basico', suites: %w[cultivo])['total']).to eq(200)
+      expect(cotizar(plan: 'basico', suites: %w[cultivo produccion_dispensa])['total']).to eq(350)
+    end
+
+    it '«Hasta 100 pacientes»: 400 un pack, 700 los dos' do
+      expect(cotizar(plan: 'total', suites: %w[produccion_dispensa])['total']).to eq(400)
+      expect(cotizar(plan: 'total', suites: %w[cultivo produccion_dispensa])['total']).to eq(700)
+    end
+
+    # El caso de la conversación: 53 pacientes no paga el escalón de 100, suma un pack de 10.
+    it '53 pacientes: el escalón de 50 más un pack de 10 (8 por paciente)' do
+      r = cotizar(plan: 'basico', suites: %w[cultivo produccion_dispensa], packs_pacientes: 1)
+      expect(r['total']).to eq(350 + 80)
+      expect(r['moneda']).to eq('USD')
+    end
+
+    it 'cada sede extra suma 50' do
+      expect(cotizar(plan: 'total', suites: %w[cultivo produccion_dispensa], sedes_extra: 2)['total']).to eq(800)
+    end
+
+    it 'el autocultivo son 8, y no compra extras' do
+      expect(cotizar(plan: 'personal', suites: %w[cultivo], packs_pacientes: 3, sedes_extra: 1)['total']).to eq(8)
+    end
+
+    it 'los extras en desarrollo se listan sin cargo' do
+      r = cotizar(plan: 'basico', suites: %w[produccion_dispensa], extras: %w[bar vista_paciente])
+      expect(r['total']).to eq(200)
+      expect(r['lineas'].map { |l| l['clave'] }).to include('bar', 'vista_paciente')
+    end
+
+    it 'un admin de organización no puede pedirla' do
+      sign_in_as(create(:user, :admin, club: club))
+      get '/api/super_admin/catalogo/cotizar', params: { plan: 'basico' }
+      expect(response).to have_http_status(:forbidden)
     end
   end
 

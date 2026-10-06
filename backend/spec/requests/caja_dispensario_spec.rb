@@ -144,6 +144,9 @@ RSpec.describe 'Caja del mostrador de dispensa', type: :request do
 
   # Lo que motivó generalizar en vez de duplicar: un solo código, dos cajas que no se tocan.
   describe 'convive con la del buffet' do
+    # El Buffet es un extra desde el 6-oct-2026: ya no viene por defecto.
+    before { club.update!(features: club.features.merge('bar' => true)) }
+
     it 'abrir la del mostrador no ocupa la del bar de la misma sede' do
       bar = ActsAsTenant.with_tenant(club) { create(:barra, club: club, sede: sede) }
       abrir!

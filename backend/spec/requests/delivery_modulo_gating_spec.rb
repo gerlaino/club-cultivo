@@ -1,7 +1,8 @@
 require 'rails_helper'
 
-# AC: Delivery se contrata aparte (11-ago), así que sin el add-on no se reparte — y eso tiene
-# que valer en la API, no sólo en el menú.
+# AC: Delivery viene INCLUIDO en Producción y dispensa (6-oct-2026; antes, desde el 11-ago, era
+# un add-on aparte). Con el pack se reparte sin tildar nada; sin el pack (porque nunca lo tuvo o
+# porque se le dio de baja) no se reparte — y eso tiene que valer en la API, no sólo en el menú.
 #
 # Cuando pasó a ser add-on se gateó el ROL, que era la puerta visible: un repartidor sin el
 # módulo no puede entrar. Pero el admin no depende del rol, así que seguía armando rutas y
@@ -31,10 +32,11 @@ RSpec.describe 'Delivery: el módulo se aplica en la API', type: :request do
                   unidad: 'g', cantidad: 100, precio_sugerido_ars: 100)
   end
 
-  # Apagar de verdad: `update_columns` saltea la baja programada, que es otra historia (ver
-  # baja_modulo_delivery_spec). Acá se prueba la organización que directamente no lo tiene.
+  # El Delivery se va con Producción y dispensa. `update_columns` saltea la baja programada, que
+  # es otra historia (ver baja_modulo_delivery_spec): acá se prueba la organización que ya no lo
+  # tiene.
   def apagar_delivery!
-    club.update_columns(features: club.features.merge('delivery' => false))
+    club.update_columns(features: club.features.merge('produccion_dispensa' => false))
   end
 
   def crear_despacho
@@ -56,14 +58,14 @@ RSpec.describe 'Delivery: el módulo se aplica en la API', type: :request do
       expect(response).to have_http_status(:forbidden)
       body = JSON.parse(response.body)
       expect(body['requiere_modulo']).to be(true)
-      expect(body['modulo']).to eq('delivery')
+      expect(body['modulo']).to eq('produccion_dispensa')
     end
 
     it 'no deja ver la lista de paquetes del día' do
       get '/api/dispensaciones/mis_paquetes'
 
       expect(response).to have_http_status(:forbidden)
-      expect(JSON.parse(response.body)['modulo']).to eq('delivery')
+      expect(JSON.parse(response.body)['modulo']).to eq('produccion_dispensa')
     end
 
     it 'no deja a quién asignarle un envío' do
@@ -82,15 +84,25 @@ RSpec.describe 'Delivery: el módulo se aplica en la API', type: :request do
       expect(d.errors.full_messages.join).to match(/Delivery no está contratado/i)
     end
 
-    it 'la dispensación de mostrador sigue funcionando: lo que se corta es el envío' do
-      sign_in_as(dispensador)
+  end
 
-      post "/pacientes/#{paciente.id}/dispensaciones",
-           params: { dispensacion: { stock_id: stock.id, cantidad: 5, medio_pago: 'efectivo',
-                                     aporte_socio_ars: 500 } },
-           headers: auth_headers
+  describe 'con Producción y dispensa' do
+    it 'el Delivery viene incluido aunque nadie lo haya tildado' do
+      club.update_columns(features: { 'produccion_dispensa' => true })
+      sign_in_as(admin)
 
-      expect(response).to have_http_status(:created), response.body
+      get '/api/dispensaciones/entregadores'
+
+      expect(response).to have_http_status(:ok), response.body
+    end
+
+    it 'una bandera vieja de Delivery no lo deja andando sin el pack' do
+      club.update_columns(features: { 'cultivo' => true, 'delivery' => true })
+      sign_in_as(admin)
+
+      get '/api/dispensaciones/entregadores'
+
+      expect(response).to have_http_status(:forbidden)
     end
   end
 
@@ -140,7 +152,7 @@ RSpec.describe 'Delivery: el módulo se aplica en la API', type: :request do
       patch '/api/dispensaciones/iniciar_viaje', params: { ids: [despacho.id] }
 
       expect(response).to have_http_status(:forbidden)
-      expect(JSON.parse(response.body)['modulo']).to eq('delivery')
+      expect(JSON.parse(response.body)['modulo']).to eq('produccion_dispensa')
     end
   end
 

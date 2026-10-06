@@ -39,7 +39,8 @@ class DispositivosController < ApplicationController
 
   def regenerar_token
     plain_token = @dispositivo.regenerar_token!
-    render json: { token: plain_token, mensaje: 'Token regenerado. Guardalo ahora, no se mostrará de nuevo.' }
+    render json: { token: plain_token, webhook_url: webhook_url(@dispositivo),
+                   mensaje: 'Token regenerado. Guardalo ahora, no se mostrará de nuevo.' }
   end
 
   private
@@ -69,7 +70,16 @@ class DispositivosController < ApplicationController
       sala_nombre:                  d.sala&.nombre,
       ultima_lectura_at:            d.ultima_lectura_at,
       token_pendiente_confirmacion: d.token_pendiente_confirmacion?,
+      webhook_url:                  webhook_url(d),
       created_at:                   d.created_at,
     }
+  end
+
+  # La dirección a la que el sensor manda sus lecturas la arma el backend y la pantalla sólo la
+  # muestra: la armaban dos componentes, cada uno a su manera, y el cartel que aparece al crear el
+  # sensor daba una que no existe (`/api/webhooks/lecturas/:id`). La ruta va sin `/api` a propósito
+  # (URL fija para el hardware, ver config/routes.rb).
+  def webhook_url(d)
+    "#{request.base_url}/webhooks/lecturas?dispositivo_id=#{d.id}"
   end
 end

@@ -33,7 +33,7 @@ module CambioDeRol
     enforcer = PlanEnforcer.new(club)
     unless enforcer.puede_crear_usuario?(nuevo_rol)
       return [:payment_required, PlanEnforcer.error_limite_rol(nuevo_rol, plan: enforcer.info[:label],
-                                                                tope: enforcer.usuarios_por_rol)]
+                                                                tope: enforcer.tope_por_rol)]
     end
 
     if user.role == 'delivery'

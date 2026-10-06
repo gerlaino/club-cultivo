@@ -205,7 +205,7 @@ export const PREGUNTAS_PROYECTOS = [
   { q: 'Tenemos todo en planillas, ¿hay que cargarlo de nuevo?',
     r: 'No. Nos pasan el padrón de pacientes, las genéticas o el stock como los tengan, y los importamos nosotros.' },
   { q: '¿Sirve si tenemos varias sedes? ¿Y si sólo dispensamos?',
-    r: 'Sí a las dos. Cada sede tiene su stock y su caja. Se contrata por partes: Cultivo, Producción y dispensa, o las dos, y arriba lo que sume (delivery, ambiente, asistente IA).' },
+    r: 'Sí a las dos. Cada sede tiene su stock y su caja. Se contrata por packs: Cultivo, Producción y dispensa, o los dos. El delivery, el correo, el módulo médico y el asistente IA vienen adentro.' },
   { q: '¿El consultorio y el turnero se pagan aparte?',
     r: 'No: el módulo médico viene con Producción y dispensa. Cada médico carga su horario, la administración da los turnos sobre esa agenda y la historia clínica vive en la misma ficha del paciente.' },
   { q: '¿Cada persona ve sólo lo suyo?',
@@ -219,11 +219,61 @@ export const PREGUNTAS_PROYECTOS = [
   { q: 'Si un día nos vamos, ¿nos llevamos los datos?',
     r: 'Sí. Nos lo piden y les armamos la exportación completa de lo que cargaron.' },
   { q: '¿Cuánto sale?',
-    r: 'Depende de qué partes usen y de cuántas personas. Escribinos, contanos qué hacen y te armamos la propuesta.' },
+    r: 'Se paga por tamaño: un pack o los dos, según cuántos pacientes y plantas en floración tengan. Los precios están en esta misma página; si su caso no entra en ninguno, escribinos.' },
 ]
 
 // ── PACKS CON PRECIO ─────────────────────────────────────────────────────────────────────────
-// Los pasa Germán. Vacíos, la sección no se muestra (`Packs.vue`). Cada uno:
-// { nombre, precio: '$ 4.000', periodo: 'por mes', para, incluye: [], destacado, accion: { label, to } }
-export const PACKS_AUTOCULTIVO = []
-export const PACKS_PROYECTOS = []
+// Los NÚMEROS salen del backend (`GET /public/registro` → `precios`, armado por `Precios` y
+// `PlanEnforcer::PLANES`): acá sólo se escriben las palabras. Sin `precios` (el backend no
+// contestó) devuelven [] y la sección no se muestra. Cada pack para `Packs.vue`:
+// { nombre, precio, periodo, para, incluye: [], destacado, accion }
+const plata = (n, moneda) => (moneda === 'USD' ? `US$ ${n}` : `$ ${n}`)
+const INCLUIDO_ORG = 'Delivery, correo, módulo médico y asistente IA incluidos'
+
+export function packsAutocultivo(precios) {
+  if (!precios?.autocultivo) return []
+  const a = precios.autocultivo
+  return [{
+    nombre: 'Autocultivo',
+    precio: plata(a.precio, precios.moneda),
+    periodo: 'por mes',
+    incluye: [
+      `Hasta ${a.plantas_floracion} plantas en floración; el vegetativo, libre`,
+      `${a.espacios} espacios de cultivo y lotes sin límite`,
+      'Registro por voz con el asistente IA',
+      'Riegos, nutrientes, fotos, cosecha y frascos',
+    ],
+    destacado: true,
+  }]
+}
+
+export function packsProyectos(precios) {
+  if (!precios?.escalones?.length) return []
+  const m = precios.moneda
+  const usuarios = (e) => `${e.usuarios_por_rol} usuarios de cada rol${e.por_sede ? ' en cada sede' : ''}`
+  const packs = precios.escalones.map((e, i) => ({
+    nombre: e.label,
+    precio: plata(e.dos_packs, m),
+    periodo: 'por mes, los dos packs',
+    para: `Cultivo o Producción y dispensa por separado: ${plata(e.un_pack, m)} cada uno.`,
+    incluye: [
+      `${e.plantas_floracion} plantas en floración; el vegetativo, libre`,
+      e.salas == null ? 'Salas y lotes sin límite' : `${e.salas} salas y lotes sin límite`,
+      `${e.sedes} ${e.sedes === 1 ? 'sede' : 'sedes'} · ${usuarios(e)}`,
+      INCLUIDO_ORG,
+    ],
+    destacado: i === precios.escalones.length - 1,
+  }))
+  const pp = precios.pack_pacientes
+  packs.push({
+    nombre: 'Para crecer',
+    precio: plata(pp.precio, m),
+    periodo: `cada ${pp.pacientes} pacientes más`,
+    para: `${plata(pp.por_paciente, m)} por paciente, de a ${pp.pacientes}: con 53 pacientes no hace falta pasar al escalón siguiente.`,
+    incluye: [
+      `Cada pack suma ${pp.pacientes} pacientes y ${pp.plantas_floracion} plantas en floración`,
+      `Sede extra: ${plata(precios.sede_extra, m)} por mes`,
+    ],
+  })
+  return packs
+}

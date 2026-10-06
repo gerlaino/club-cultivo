@@ -82,9 +82,11 @@ RSpec.describe 'Dispensación: agregar envío después', type: :request do
     expect(d.reload.con_envio).to be(false)
   end
 
-  it 'sin el add-on de Delivery no existe' do
+  # El Delivery viene con Producción y dispensa (6-oct-2026): sin el pack —dado de baja después de
+  # dispensar— no se puede agregar el envío.
+  it 'sin Producción y dispensa no existe' do
     d = dispensar_sin_envio
-    club.update!(features: club.features.merge('delivery' => false))
+    club.update!(features: club.features.merge('produccion_dispensa' => false))
 
     patch "/api/dispensaciones/#{d.id}/agregar_envio", params: { dispensacion: { delivery_id: delivery.id, costo_envio_ars: 0, direccion_origen: 'domicilio' } }, as: :json
 

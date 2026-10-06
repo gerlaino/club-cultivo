@@ -88,7 +88,6 @@ const yr = new Date().getFullYear()
 .lg__main :deep(a) { color: var(--hb-verde); font-weight: 600; }
 .lg__main :deep(.lg-resumen) { background: var(--hb-papel-claro); border: 1.5px solid var(--hb-verde); border-radius: 16px; padding: 1.1rem 1.2rem; margin-bottom: 1.6rem; }
 .lg__main :deep(.lg-resumen p:last-child), .lg__main :deep(.lg-resumen ul:last-child) { margin-bottom: 0; }
-.lg__main :deep(.lg-pendiente) { background: #F6E7C6; color: #6B4A00; border-radius: 4px; padding: 0 .3em; font-weight: 600; }
 .lg__main :deep(.lg-legal) { font-size: .86rem; color: var(--hb-tinta-2); border-left: 3px solid var(--hb-regla); padding-left: .8rem; }
 
 .lg__footer { border-top: 1px solid var(--hb-regla); padding: 1.25rem 0 2rem; }

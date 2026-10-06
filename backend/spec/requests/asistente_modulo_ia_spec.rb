@@ -63,8 +63,25 @@ RSpec.describe 'Asistente: el módulo de IA', type: :request do
     end
   end
 
-  describe 'sin el módulo' do
+  # Desde el 6-oct-2026 el asistente viene INCLUIDO en los dos packs (es el registro por voz):
+  # con cualquiera de ellos anda sin tildar nada; sin ninguno, no.
+  describe 'con un solo pack y sin tildar la IA' do
     let(:club) { create(:club, features: { 'cultivo' => true }) }
+
+    before { sign_in_as(admin) }
+
+    it 'viene incluida: dictar anda' do
+      dictar!
+      expect(response).not_to have_http_status(:forbidden)
+    end
+
+    it 'y la pantalla la ofrece' do
+      expect(features_de_la_pantalla['ia']).to be(true)
+    end
+  end
+
+  describe 'sin ningún pack' do
+    let(:club) { create(:club, features: {}) }
 
     before { sign_in_as(admin) }
 

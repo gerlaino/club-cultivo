@@ -1,17 +1,13 @@
-// QUIÉN ES EL TITULAR DE CULTIVO ESPACIAL, para los Términos y la Política de privacidad.
+// EL CONTACTO DE CULTIVO ESPACIAL, para los Términos y la Política de privacidad.
 //
-// La Ley 24.240 (art. 4) y la 25.326 piden que quien presta el servicio y quien es responsable de
-// los datos estén identificados. Lo que todavía no está definido queda en `null` y la página lo
-// muestra marcado «a completar» — nunca se inventa un CUIT o un domicilio.
+// Por decisión de Germán (6-oct-2026) las páginas públicas no muestran quiénes están detrás de la
+// plataforma: ni nombre, ni CUIT, ni domicilio. Se identifica como «Cultivo Espacial» con su mail;
+// a una organización los datos del titular le llegan en el acuerdo comercial que firma.
 //
 // Cuando cambie algo que afecte a lo que la gente aceptó, también cambia `Legal::TERMINOS_VERSION`
 // en el backend (es la versión que queda guardada con cada registro).
 export const TITULAR = {
-  nombre:        null, // razón social o nombre del titular
-  cuit:          null,
-  domicilio:     null,
-  jurisdiccion:  null, // tribunales para organizaciones (para consumidores rige su domicilio)
-  mail:          'cultivoespacial.arg@gmail.com',
+  mail: 'cultivoespacial.arg@gmail.com',
 }
 
-export const VIGENCIA = '4 de octubre de 2026'
+export const VIGENCIA = '6 de octubre de 2026'

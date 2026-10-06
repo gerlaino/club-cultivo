@@ -1,5 +1,36 @@
 # Changelog
 
+## Octubre 2026 (ee) — Los packs nuevos: escalones en USD, tope de floración, lo terminado incluido
+
+La lista que armaron Germán y su socio (6-oct). Los packs cobran por TAMAÑO y lo terminado viene adentro.
+
+- **Escalones** (`PlanEnforcer::PLANES`): Autocultivo (USD 8, 9 plantas en floración, 2 espacios),
+  Hasta 50 pacientes (200 un pack / 350 los dos; 450 en floración, 3 salas, 1 sede, 2 de cada rol),
+  Hasta 100 pacientes (400 / 700; 900 en floración, salas libres, 3 sedes, 2 de cada rol por sede).
+  Encima: packs de 10 pacientes (USD 80, +90 plantas en floración) y sedes extra (USD 50), en dos
+  columnas nuevas de `clubs` (migración `AgregarExtrasDePlanAClubs`).
+- **Tope de floración, candado**: cuenta las plantas en floración y las automáticas todo el ciclo;
+  vive en `Lote`/`Plant` (vale por avanzar fase, mover de sala, dar vuelta el espacio, crear
+  plantas). `cupo_floracion_spec` lo prueba por la API.
+- **Incluido y derivado**: delivery y correo con Producción y dispensa, Asistente IA con cualquiera
+  de los dos packs (el autocultivo nace con él). Extras en desarrollo y sin cargo: Buffet y eventos
+  (uno solo), Portal del paciente, Chatbot, Ambiente/IoT. WhatsApp y ARICCAME, «próximamente incluidos».
+- **El Delivery se va con Producción y dispensa**: `BajarModulo` ordena los repartos; los cierres
+  (`entregar`, `reportar_fallo`) quedan afuera del candado del pack, para no dejar paquetes en viaje
+  sin nadie que los cierre.
+- **Super admin**: el alta pide packs → escalón (con packs de pacientes y sedes extra) → extras; el
+  total lo calcula el backend (`GET /super_admin/catalogo/cotizar`, `Precios.cotizar`). La ficha
+  cambia los extras desde «Cambiar plan»; la configuración de la IA quedó en su propia sección. La
+  lista muestra sólo los extras contratados. «Uso personal» → «Autocultivo» en pantalla.
+- **Páginas públicas**: cada una muestra su tarjeta de precios con los números del backend
+  (`Precios.lista_publica` en `GET /public/registro`); la bienvenida cierra con las dos puertas y
+  su precio. En el teléfono quedaba una franja vacía debajo del pie: el `body` reservaba 64 px para
+  la barra de la app.
+- **Términos y Privacidad sin datos del titular** (decisión de Germán): Cultivo Espacial + mail; para
+  organizaciones, la jurisdicción la fija el acuerdo comercial. `TERMINOS_VERSION` 2026-10-06.
+- **Bug**: el cartel que aparece al crear un sensor daba una URL que no existe
+  (`/api/webhooks/lecturas/:id`); ahora la URL la arma el backend para las dos partes de la pantalla.
+
 ## Octubre 2026 (ed) — Editar una dispensa: lo que no paga va a la cuenta corriente, y la confirmación final
 
 Lo que le pasó a Javi con la #838 (Martín Blanco): el paciente pagaba $80.000 de una dispensa de

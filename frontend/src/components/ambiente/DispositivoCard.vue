@@ -29,10 +29,9 @@ const TIPO_LABEL = {
   generic:    'Genérico (HTTP)',
 }
 
-const webhookUrl = computed(() => {
-  const base = window.location.origin
-  return `${base}/webhooks/lecturas?dispositivo_id=${props.dispositivo.id}`
-})
+// La arma el backend: con `window.location.origin` salía la del frontend, que en desarrollo no es
+// la del servidor que recibe las lecturas.
+const webhookUrl = computed(() => props.dispositivo.webhook_url)
 
 const hasGuide = computed(() => ['sonoff_th', 'generic', 'shelly_plug', 'tuya_plug'].includes(props.dispositivo.tipo))
 

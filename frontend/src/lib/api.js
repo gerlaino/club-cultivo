@@ -830,6 +830,8 @@ export const setFotoPortadaLote = (loteId, fotoId) => api.patch(`/lotes/${loteId
 // Qué se puede vender (planes, suites, add-ons, incluidos, en construcción, roles del alta).
 // Sale del backend para que las pantallas no repitan la lista a mano y se desincronicen.
 export const getSuperAdminCatalogo = ()           => api.get('/super_admin/catalogo')
+// La cuenta de lo que se está por dar de alta (`Precios.cotizar`): la pantalla no suma precios.
+export const getSuperAdminCotizacion = (params)  => api.get('/super_admin/catalogo/cotizar', { params })
 // El panel del dueño: vencimientos, módulos a medias, clubes en silencio y salud.
 export const getSuperAdminPulso    = ()           => api.get('/super_admin/pulso')
 // El panel de Estado: servidores, backups, cola y tamaño de cada organización (Infra::Estado).

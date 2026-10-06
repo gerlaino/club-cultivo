@@ -45,9 +45,12 @@ class ApplicationController < ActionController::API
                 'Este módulo todavía está en construcción.'
               elsif Club::ADDONS_INCOMPLETOS.include?(clave.to_s)
                 'Este módulo todavía no está disponible.'
-              elsif (suite = Club::INCLUIDOS_EN_SUITE[clave.to_s])
+              elsif (suites = Club::INCLUIDOS_EN_SUITE[clave.to_s])
                 # Viene con la suite: lo que falta no es el módulo, es lo que lo contiene.
-                "Tu organización no tiene la suite #{Club::SUITES.dig(suite, :label)}, que es la que lo incluye."
+                nombres = suites.map { |su| Club::SUITES.dig(su, :label) }.join(' o ')
+                "Tu organización no tiene #{nombres}, que es lo que lo incluye."
+              elsif (addon = Club::INCLUIDOS_EN_ADDON[clave.to_s])
+                "Viene con #{Club::ADDONS.dig(addon, :label)}, y tu organización no lo tiene."
               else
                 'Tu organización no tiene este módulo habilitado.'
               end

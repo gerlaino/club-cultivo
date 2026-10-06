@@ -12,16 +12,19 @@ class SuperAdmin::CatalogoController < SuperAdmin::BaseController
         {
           clave:    clave,
           label:    l[:label],
-          precio_mensual: Precios.plan(clave),
+          # Cuánto cuesta el escalón según cuántos packs lleve (1 o 2). El autocultivo tiene
+          # un solo precio.
+          precios:  clave == 'personal' ? { 0 => Precios::AUTOCULTIVO } : Precios::PACKS[clave],
+          precio_mensual: Precios.escalon(clave, 1),
           limites:  PlanEnforcer::RECURSOS.to_h { |r| [r, l[r]] },
           usuarios_por_rol: l[:usuarios_por_rol],
+          # true = el cupo de usuarios es por sede (dos de cada rol EN CADA sede).
+          por_sede: l[:por_sede],
           # `false` = plan de una sola persona: el alta no ofrece equipo ni módulos.
           equipo:   l[:equipo] != false,
           personal: clave == 'personal',
-          # Cada tope con la suite a la que le importa. El wizard elige los módulos ANTES que el
-          # plan, así que puede mostrar sólo los topes que aplican: nombrarle salas y plantas a
-          # una organización que no compró Cultivo es la mitad de la tarjeta en ruido, y no hay
-          # forma de saber desde ahí cuáles cuentan.
+          # Cada tope con la suite a la que le importa: el alta muestra sólo los que aplican a lo
+          # que se eligió.
           recursos: PlanEnforcer::RECURSOS.map { |r|
             { clave: r, label: RECURSO_LABEL[r], valor: l[r],
               texto: l[r].nil? ? "#{RECURSO_LABEL[r]} sin límite" : "#{l[r]} #{RECURSO_LABEL[r]}",
@@ -33,29 +36,32 @@ class SuperAdmin::CatalogoController < SuperAdmin::BaseController
           },
         }
       },
-      # Con qué nace una organización si no se toca nada. La pantalla del alta tenía su propia
-      # copia (`{ cultivo, produccion_dispensa, bar }`) y el backend mergeaba la suya encima: el
-      # wizard mostraba Delivery y Correo APAGADOS y la organización se creaba con los dos
-      # prendidos. La pantalla decía una cosa y pasaba otra.
+      # Lo que se compra encima del escalón.
+      pack_pacientes: { pacientes: PlanEnforcer::PACK_PACIENTES,
+                        plantas: PlanEnforcer::PACK_PACIENTES * PlanEnforcer::PLANTAS_POR_PACIENTE,
+                        precio_mensual: Precios::PACK_PACIENTES },
+      sede_extra:     { precio_mensual: Precios::SEDE_EXTRA },
+      # Con qué nace una organización si no se toca nada.
       features_por_defecto: Club::FEATURES_POR_DEFECTO,
       # Con qué nace un uso personal, y lo único que puede tener.
       features_personal:    Club::FEATURES_PERSONAL,
       modulos_personal:     Club::MODULOS_PERSONAL,
       moneda: Precios::MONEDA,
-      suites: Club::SUITES.map { |k, v| { clave: k, label: v[:label], desc: v[:desc], precio_mensual: Precios.suite(k) } },
+      suites: Club::SUITES.map { |k, v| { clave: k, label: v[:label], desc: v[:desc] } },
       addons: Club::ADDONS.map { |k, v|
-        { clave: k, label: v[:label], desc: v[:desc], requiere: v[:requiere], precio_mensual: Precios.addon(k),
-          # Lo que vale en un uso personal (0 si no se ofrece ahí): el alta muestra éste.
-          precio_mensual_personal: Precios.addon_personal(k),
+        { clave: k, label: v[:label], desc: v[:desc], requiere: v[:requiere],
+          # `extra` se cobra aparte; `incluido_proximo` va a venir incluido cuando esté listo.
+          tipo: v[:tipo], sin_lanzar: Club::EXTRAS_SIN_LANZAR.include?(k),
+          precio_mensual: Precios.extra(k),
           pack: v[:pack], pack_label: v[:pack] && Club::SUITES.dig(v[:pack], :label),
           bloqueado: Club.addon_bloqueado?(k), motivo_bloqueo: Club::ADDONS_BLOQUEADOS[k],
           incompleto: Club::ADDONS_INCOMPLETOS.include?(k) }
       },
-      # Vienen dentro de una suite: se muestran para que se sepa qué entra, sin interruptor.
-      incluidos: Club::INCLUIDOS_EN_SUITE.map { |k, suite|
+      # Vienen dentro de los packs: se muestran para que se sepa qué entra, sin interruptor.
+      incluidos: Club::INCLUIDOS_EN_SUITE.map { |k, suites|
         meta = Club::INCLUIDOS_META[k]
         { clave: k, label: meta[:label], desc: meta[:desc], requiere: meta[:requiere],
-          incluido_en: suite, incluido_en_label: Club::SUITES.dig(suite, :label) }
+          incluido_en: suites, incluido_en_label: suites.map { |s| Club::SUITES.dig(s, :label) }.join(' o ') }
       },
       en_construccion: Club::EN_CONSTRUCCION.map { |k, v|
         { clave: k, label: v[:label], desc: v[:desc], requiere: v[:requiere] }
@@ -81,10 +87,22 @@ class SuperAdmin::CatalogoController < SuperAdmin::BaseController
     }
   end
 
+  # GET /super_admin/catalogo/cotizar?plan=&suites[]=&packs_pacientes=&sedes_extra=&extras[]=
+  #
+  # La cuenta de lo que se está por dar de alta. La hace `Precios.cotizar`, la misma que arma el
+  # desglose de una organización que ya existe: la pantalla no suma precios por su cuenta.
+  def cotizar
+    render json: Precios.cotizar(plan: params[:plan],
+                                 suites: Array(params[:suites]),
+                                 packs_pacientes: [params[:packs_pacientes].to_i, 0].max,
+                                 sedes_extra: [params[:sedes_extra].to_i, 0].max,
+                                 extras: Array(params[:extras]))
+  end
+
   private
 
   RECURSO_LABEL = {
     sedes: 'sedes', salas: 'salas', lotes: 'lotes',
-    plantas: 'plantas', pacientes: 'pacientes', usuarios: 'usuarios', fotos: 'fotos',
+    plantas: 'plantas en floración', pacientes: 'pacientes', usuarios: 'usuarios', fotos: 'fotos',
   }.freeze
 end

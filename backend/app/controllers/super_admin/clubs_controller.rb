@@ -20,6 +20,8 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     # hacer nada.
     # El plan no viaja en `club_params` (ver el comentario ahí), pero el alta sí lo elige.
     attrs['plan'] = PlanEnforcer.normalizar(params.dig(:club, :plan))
+    # Lo comprado encima del escalón (packs de pacientes, sedes). El autocultivo no compra extras.
+    attrs.merge!(extras_de_plan(attrs['plan'], params[:club] || {}))
     attrs['features'] = if attrs['plan'] == 'personal'
                           # Uso personal: nace con Cultivo y lo que el alta le sumó (ambiente, IA,
                           # chatbot), y no puede tener otra cosa: por la API llega lo que sea.
@@ -296,6 +298,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       plan:             plan,
       plan_activo_hasta: hasta.present? ? Date.parse(hasta) : nil,
       plan_trial:       trial == true || trial == 'true',
+      **extras_de_plan(plan, params).symbolize_keys,
       )
     # Y los módulos que el uso personal no puede tener se apagan en el acto: no es una baja
     # comercial con fecha, es que dejaron de tener sentido (no hay a quién dispensar).
@@ -343,6 +346,24 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       solo_lectura:       true,
       sin_acceso_clinico: true,
     }
+  end
+
+  # Cuántos packs de pacientes y sedes extra compró, del alta o del cambio de plan. Son parte del
+  # CUÁNTO, así que viajan con el plan y no por el update general. Si no vienen, se respeta lo
+  # que la organización ya tenía; el autocultivo no los tiene nunca.
+  def extras_de_plan(plan, desde)
+    return { 'packs_pacientes_extra' => 0, 'sedes_extra' => 0 } if plan == 'personal'
+
+    {
+      'packs_pacientes_extra' => cantidad(desde[:packs_pacientes_extra], @club&.packs_pacientes_extra),
+      'sedes_extra'           => cantidad(desde[:sedes_extra], @club&.sedes_extra),
+    }
+  end
+
+  def cantidad(valor, actual)
+    return actual.to_i if valor.nil? || valor.to_s.strip.empty?
+
+    [valor.to_i, 0].max
   end
 
   # Quién es el admin de verdad. Va aparte de `club_params` porque no es un dato de la
@@ -472,6 +493,8 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       state:            c.state,
       country:          c.country,
       plan:             c.plan,
+      packs_pacientes_extra: c.packs_pacientes_extra,
+      sedes_extra:      c.sedes_extra,
       # La lista y la ficha lo muestran distinto: un uso personal no es «una organización chica».
       personal:         c.personal?,
       plan_trial:       c.plan_trial,
@@ -491,11 +514,16 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       salud_label:      SALUD[salud_de(c)],
       # Cuánto paga por mes según la lista, y si esa plata entra (una prueba no factura).
       precio_mensual:   c.precio_mensual,
+      moneda:           Precios::MONEDA,
       factura:          c.factura?,
       # Cuándo entró alguien del equipo por última vez. Es LA métrica de churn.
       ultimo_ingreso:   c.ultimo_ingreso,
       # Qué contrató: la lista se ordena por suites, no por el plan viejo.
       features:         c.features_expandidas,
+      # Los extras que tiene prendidos, por nombre. La lista contaba las claves de `features`, que
+      # incluyen las viejas y las derivadas (médico, delivery, IA…): decía «+12» de algo que no se
+      # contrató aparte.
+      extras:           Club::ADDONS.select { |k, _| Club.extra?(k) && c.feature?(k) }.map { |_, v| v[:label] },
     }
   end
 
@@ -531,7 +559,8 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
     return 'sin_suites' if Club::SUITES.keys.none? { |s| c.suite?(s) }
 
     # Prendido ≠ andando: es la misma pregunta que responde `estado_modulo` en la ficha.
-    a_medias = (Club::ADDONS.keys + Club::INCLUIDOS_EN_SUITE.keys).any? do |m|
+    # Sólo lo contratado aparte, como la cola del panel (`SuperAdmin::Pulso#atencion`).
+    a_medias = Club::ADDONS.keys.any? do |m|
       c.feature?(m) && c.falta_para_funcionar(m).present?
     end
     a_medias ? 'a_medias' : 'ok'
@@ -573,6 +602,7 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       suites:          Club::SUITES.select { |k, _| ofrecible?(c, k) }.map { |k, v| { clave: k, label: v[:label], desc: v[:desc], activa: c.suite?(k) } },
       addons:          Club::ADDONS.select { |k, _| ofrecible?(c, k) }.map { |k, v|
         { clave: k, label: v[:label], desc: v[:desc], requiere: v[:requiere],
+          tipo: v[:tipo], sin_lanzar: Club::EXTRAS_SIN_LANZAR.include?(k),
           # A qué suite le sirve. Sin esto la pantalla era una lista plana de diez cosas y no se
           # entendía para qué era cada una.
           pack: v[:pack], pack_label: v[:pack] && Club::SUITES.dig(v[:pack], :label),
@@ -581,10 +611,10 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       },
       # Los que vienen dentro de una suite: se muestran para que se sepa qué tiene la organización,
       # pero sin interruptor — se prenden y se apagan con la suite que los contiene.
-      incluidos:       Club::INCLUIDOS_EN_SUITE.map { |k, suite|
+      incluidos:       Club::INCLUIDOS_EN_SUITE.select { |k, _| ofrecible?(c, k) }.map { |k, suites|
         meta = Club::INCLUIDOS_META[k]
         { clave: k, label: meta[:label], desc: meta[:desc], requiere: meta[:requiere],
-          incluido_en: suite, incluido_en_label: Club::SUITES.dig(suite, :label),
+          incluido_en: suites, incluido_en_label: suites.map { |su| Club::SUITES.dig(su, :label) }.join(' o '),
           activo: c.incluido_por_suite?(k) }.merge(estado_modulo(c, k))
       },
       # Lo que todavía no existe. Se lista para que nadie lo prometa creyendo que está.

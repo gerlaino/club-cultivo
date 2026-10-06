@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { formatARS } from '../../lib/formatters.js'
+import { formatPrecio } from '../../lib/formatters.js'
 import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub, suspenderClub, reactivarClub, archivarClub, desarchivarClub, clonarClub, crearNotaClub, borrarNotaClub, getSuperAdminCatalogo, getHistorialClub, resetSuperAdminUserPassword } from '../../lib/api.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
@@ -23,7 +23,7 @@ const error   = ref(null)
 
 const showPlanModal = ref(false)
 const showUserModal = ref(false)
-const planForm = ref({ plan: '', plan_activo_hasta: '', trial: false })
+const planForm = ref({ plan: '', plan_activo_hasta: '', trial: false, packs_pacientes_extra: 0, sedes_extra: 0 })
 const userForm = ref({ first_name: '', last_name: '', email: '', email_personal: '', role: 'cultivador' })
 
 // ── Restablecer la contraseña de un usuario ──────────────────────────────────
@@ -275,10 +275,10 @@ function formatDateTime(f) {
 // Dos planes: el plan dice CUÁNTO, nunca QUÉ. Los límites salen del catálogo del backend —
 // duplicarlos acá era garantía de que la pantalla dijera un número y el sistema aplicara otro.
 const PLAN_META = {
-  basico:   { label: 'Básico',       color: '#15803d', bg: '#dcfce7' },
-  total:    { label: 'Total',        color: '#7c3aed', bg: '#ede9fe' },
+  basico:   { label: 'Hasta 50 pacientes',  color: '#15803d', bg: '#dcfce7' },
+  total:    { label: 'Hasta 100 pacientes', color: '#7c3aed', bg: '#ede9fe' },
   // El cultivador de casa: no es «una organización chica», y la ficha lo dice desde arriba.
-  personal: { label: 'Uso personal', color: '#3f6212', bg: '#ecfccb' },
+  personal: { label: 'Autocultivo',         color: '#3f6212', bg: '#ecfccb' },
 }
 const PLANES = ref([])
 function planMeta(p) { return PLAN_META[p] || PLAN_META.basico }
@@ -321,6 +321,8 @@ function abrirPlanModal() {
     plan:              club.value.plan,
     plan_activo_hasta: club.value.plan_activo_hasta?.toString().slice(0, 10) || '',
     trial:             club.value.plan_trial,
+    packs_pacientes_extra: club.value.packs_pacientes_extra || 0,
+    sedes_extra:       club.value.sedes_extra || 0,
   }
   showPlanModal.value = true
 }
@@ -339,6 +341,9 @@ async function guardarPlan() {
       plan:  planForm.value.plan,
       hasta: planForm.value.plan_activo_hasta || null,
       trial: planForm.value.trial,
+      // Lo comprado encima del escalón viaja con el plan (el autocultivo no compra extras).
+      packs_pacientes_extra: planForm.value.plan === 'personal' ? 0 : planForm.value.packs_pacientes_extra,
+      sedes_extra:           planForm.value.plan === 'personal' ? 0 : planForm.value.sedes_extra,
     })
     club.value = { ...club.value, ...data }
     showPlanModal.value = false
@@ -720,11 +725,11 @@ onMounted(async () => {
               <div v-if="club.precios" class="scd__precios">
                 <div v-for="l in club.precios.lineas" :key="l.tipo + l.clave" class="scd__precio-row">
                   <span>{{ l.label }}</span>
-                  <span class="scd__precio-monto">{{ formatARS(l.monto) }}</span>
+                  <span class="scd__precio-monto">{{ formatPrecio(l.monto, club.precios.moneda) }}</span>
                 </div>
                 <div class="scd__precio-row scd__precio-row--total">
                   <span>{{ club.plan_trial ? 'Valdría por mes' : 'Por mes' }}</span>
-                  <span class="scd__precio-monto">{{ formatARS(club.precios.total) }}</span>
+                  <span class="scd__precio-monto">{{ formatPrecio(club.precios.total, club.precios.moneda) }}</span>
                 </div>
                 <p v-if="club.plan_trial" class="scd__hint">En prueba: no factura hasta que salga del trial.</p>
               </div>
@@ -999,13 +1004,26 @@ onMounted(async () => {
                   <span v-if="p.resumen" class="scd__plan-opt-limites">{{ p.resumen.join(' · ') }}</span>
                 </button>
               </div>
+              <!-- Lo que se compra encima del escalón. El autocultivo no compra extras. -->
+              <div v-if="planForm.plan !== 'personal'" class="scd__extras">
+                <label class="scd__extra">
+                  <span class="scd__lbl">Packs de 10 pacientes</span>
+                  <input v-model.number="planForm.packs_pacientes_extra" type="number" min="0" step="1" class="scd__input scd__input--num" />
+                  <span class="scd__hint">Cada uno: +10 pacientes y +90 plantas en floración</span>
+                </label>
+                <label class="scd__extra">
+                  <span class="scd__lbl">Sedes extra</span>
+                  <input v-model.number="planForm.sedes_extra" type="number" min="0" step="1" class="scd__input scd__input--num" />
+                  <span class="scd__hint">Cada una: +1 sede</span>
+                </label>
+              </div>
               <!-- Lo que el club ya tiene, para saber si el plan nuevo le queda chico. -->
               <p v-if="club.plan_info" class="scd__hint" style="margin-top:.5rem">
                 Hoy usa:
                 {{ club.plan_info.uso.sedes }} sedes ·
                 {{ club.plan_info.uso.salas }} salas ·
                 {{ club.plan_info.uso.lotes }} lotes ·
-                {{ club.plan_info.uso.plantas }} plantas ·
+                {{ club.plan_info.uso.plantas }} plantas en floración ·
                 {{ club.plan_info.uso.pacientes }} pacientes ·
                 {{ club.plan_info.uso.usuarios }} usuarios
               </p>
@@ -1436,7 +1454,10 @@ onMounted(async () => {
 .scd__modal-close:hover { background: var(--c-slate-200); }
 .scd__modal-body { padding: 1.1rem 1.35rem; display: flex; flex-direction: column; gap: .875rem; }
 .scd__modal-ft { display: flex; justify-content: flex-end; gap: .65rem; padding: .875rem 1.35rem; border-top: 1px solid var(--c-slate-100); }
-.scd__planes { display: grid; grid-template-columns: repeat(2,1fr); gap: .4rem; }
+.scd__extras { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .75rem; margin-top: .9rem; }
+.scd__extra { display: grid; gap: .25rem; }
+.scd__input--num { max-width: 120px; }
+.scd__planes { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: .4rem; }
 .scd__plan-opt { padding: .625rem .75rem; border: 1.5px solid var(--c-slate-200); border-radius: 8px; background: var(--c-slate-50); font-size: .8rem; font-weight: 600; cursor: pointer; transition: all .15s; text-align: left; color: var(--c-slate-600); display: grid; gap: .25rem; }
 .scd__plan-opt:hover { border-color: var(--c-slate-400); }
 .scd__plan-opt-name { font-size: .85rem; font-weight: 800; }

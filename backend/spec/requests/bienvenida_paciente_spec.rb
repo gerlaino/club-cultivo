@@ -111,10 +111,12 @@ RSpec.describe 'Mail de bienvenida', type: :request do
       expect(JSON.parse(response.body)['aviso']).to match(/casilla/i)
     end
 
-    it 'no manda nada si la organización dio de baja el módulo de correo' do
+    # Desde el 6-oct-2026 el correo viene incluido en Producción y dispensa y no se da de baja
+    # aparte: una bandera vieja apagada no lo corta.
+    it 'una bandera vieja de correo apagado no lo corta: viene con el pack' do
       club.update!(features: club.features.merge('mailer' => false))
 
-      expect { alta(admin, enviar: true) }.not_to change { MailEnviado.count }
+      expect { alta(admin, enviar: true) }.to change { MailEnviado.count }.by(1)
       expect(response).to have_http_status(:created)
     end
   end

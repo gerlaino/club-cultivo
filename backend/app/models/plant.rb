@@ -53,6 +53,9 @@ class Plant < ApplicationRecord
   validates :peso_seco, numericality: { greater_than: 0 }, allow_nil: true
   validates :origen,    inclusion: { in: ORIGENES }, allow_nil: true
   validates :motivo_descarte, inclusion: { in: MOTIVOS_DESCARTE }, allow_nil: true
+  # Una planta que nace ya dentro del cupo de floración del plan (en un lote en floración, o en
+  # uno de genética automática) tiene que entrar. Ver `Lote#cupo_de_floracion`.
+  validate :cupo_de_floracion, on: :create
 
   scope :por_estado,     ->(estado) { where(state: estado) }
   scope :seleccion,      -> { where(es_seleccion: true) }
@@ -91,5 +94,14 @@ class Plant < ApplicationRecord
   def generate_codigo_qr
     return if codigo_qr.present?
     self.codigo_qr = "#{club_id || lote&.club_id}-#{lote_id}-#{Time.now.to_i}-#{SecureRandom.hex(4)}"
+  end
+
+  def cupo_de_floracion
+    return if lote.nil? || lote.club.nil?
+    return unless PlanEnforcer::ESTADOS_EN_PIE.include?(state)
+    return unless state == 'floracion' || lote.automatica?
+
+    enforcer = PlanEnforcer.new(lote.club)
+    errors.add(:base, enforcer.error_floracion(1)[:mensaje]) unless enforcer.cabe_en_floracion?(1)
   end
 end

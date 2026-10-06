@@ -5,30 +5,38 @@ const createSuperAdminClub = vi.fn(() => Promise.resolve({ data: {
   club: { id: 9, name: 'Nueva' }, usuarios: [], password_inicial: 'abcd-efgh-2345',
 } }))
 
+// El catálogo con la forma del 6-oct-2026: escalones con precio por cantidad de packs, lo
+// terminado viene incluido (`incluido_en` es una lista), y los extras están en desarrollo.
 const CATALOGO = {
+  moneda: 'USD',
+  pack_pacientes: { pacientes: 10, plantas: 90, precio_mensual: 80 },
+  sede_extra:     { precio_mensual: 50 },
   planes: [
     {
-      clave: 'basico', label: 'Básico', usuarios_por_rol: 1,
+      clave: 'basico', label: 'Hasta 50 pacientes', usuarios_por_rol: 2, por_sede: false,
+      precios: { 1: 200, 2: 350 },
       limites: { sedes: 1, salas: 3, lotes: null, plantas: 450, pacientes: 50, usuarios: null },
       recursos: [
         { clave: 'sedes',     label: 'sedes',     valor: 1,   texto: '1 sedes',      suite: null },
         { clave: 'salas',     label: 'salas',     valor: 3,   texto: '3 salas',      suite: 'cultivo' },
         { clave: 'lotes',     label: 'lotes',     valor: null, texto: 'lotes sin límite', suite: 'cultivo' },
-        { clave: 'plantas',   label: 'plantas',   valor: 450, texto: '450 plantas',  suite: 'cultivo' },
+        { clave: 'plantas',   label: 'plantas en floración', valor: 450, texto: '450 plantas en floración', suite: 'cultivo' },
         { clave: 'pacientes', label: 'pacientes', valor: 50,  texto: '50 pacientes', suite: 'produccion_dispensa' },
       ],
       resumen: ['1 sedes', '3 salas'],
     },
     {
-      clave: 'total', label: 'Total', usuarios_por_rol: null,
-      limites: {}, recursos: [], resumen: ['sedes sin límite'],
+      clave: 'total', label: 'Hasta 100 pacientes', usuarios_por_rol: 2, por_sede: true,
+      precios: { 1: 400, 2: 700 },
+      limites: {}, recursos: [], resumen: ['3 sedes'],
     },
     {
-      clave: 'personal', label: 'Personal', usuarios_por_rol: null, equipo: false, personal: true,
-      precio_mensual: 12000, limites: { sedes: 1, salas: 2 },
+      clave: 'personal', label: 'Autocultivo', usuarios_por_rol: null, equipo: false, personal: true,
+      precios: { 0: 8 }, limites: { sedes: 1, salas: 2, plantas: 9 },
       recursos: [
-        { clave: 'sedes', label: 'sedes', valor: 1, texto: '1 sede',      suite: null },
-        { clave: 'salas', label: 'salas', valor: 2, texto: '2 espacios', suite: 'cultivo' },
+        { clave: 'sedes',   label: 'sedes',   valor: 1, texto: '1 sede',      suite: null },
+        { clave: 'salas',   label: 'salas',   valor: 2, texto: '2 espacios', suite: 'cultivo' },
+        { clave: 'plantas', label: 'plantas en floración', valor: 9, texto: '9 plantas en floración', suite: 'cultivo' },
       ],
       resumen: ['1 sede', '2 espacios'],
     },
@@ -38,17 +46,19 @@ const CATALOGO = {
     { clave: 'produccion_dispensa', label: 'Producción y dispensa', desc: 'Pacientes y stock.' },
   ],
   addons: [
-    { clave: 'iot',      label: 'Ambiente / IoT', desc: 'Sensores.',  pack: 'cultivo' },
-    { clave: 'delivery', label: 'Delivery',       desc: 'Reparto.',   pack: 'produccion_dispensa' },
-    { clave: 'ia',       label: 'Asistente IA',   desc: 'Por voz.',   pack: null },
-    { clave: 'chatbot',  label: 'Chatbot del admin', desc: 'Pregunta.', pack: null, requiere: 'El Asistente IA tiene que estar activo.' },
+    { clave: 'iot',      label: 'Ambiente / IoT',    desc: 'Sensores.',   pack: 'cultivo',             tipo: 'extra', sin_lanzar: true },
+    { clave: 'bar',      label: 'Buffet y eventos',  desc: 'Salón.',      pack: 'produccion_dispensa', tipo: 'extra', sin_lanzar: true },
+    { clave: 'chatbot',  label: 'Chatbot del admin', desc: 'Pregunta.',   pack: null,                  tipo: 'extra', sin_lanzar: true },
+    { clave: 'whatsapp', label: 'WhatsApp',          desc: 'Avisos.',     pack: 'produccion_dispensa', tipo: 'incluido_proximo',
+      bloqueado: true, motivo_bloqueo: 'Falta Twilio.' },
   ],
   incluidos: [
-    { clave: 'medico', label: 'Módulo médico', desc: 'Turnos.',
-      incluido_en: 'produccion_dispensa', incluido_en_label: 'Producción y dispensa' },
+    { clave: 'medico',   label: 'Módulo médico', desc: 'Turnos.',  incluido_en: ['produccion_dispensa'], incluido_en_label: 'Producción y dispensa' },
+    { clave: 'delivery', label: 'Delivery',      desc: 'Reparto.', incluido_en: ['produccion_dispensa'], incluido_en_label: 'Producción y dispensa' },
+    { clave: 'ia',       label: 'Asistente IA',  desc: 'Por voz.', incluido_en: ['cultivo', 'produccion_dispensa'], incluido_en_label: 'Cultivo o Producción y dispensa' },
   ],
   en_construccion: [],
-  features_por_defecto: { cultivo: true, produccion_dispensa: true, delivery: true },
+  features_por_defecto: { cultivo: true, produccion_dispensa: true },
   features_personal:    { cultivo: true },
   modulos_personal:     ['cultivo', 'iot', 'ia', 'chatbot'],
   roles_alta: [
@@ -58,10 +68,17 @@ const CATALOGO = {
   ],
 }
 
+// La cuenta la hace el backend (`Precios.cotizar`). El mock devuelve un número reconocible para
+// verificar que la pantalla muestra ESE y no uno propio.
+const getSuperAdminCotizacion = vi.fn(() => Promise.resolve({ data: {
+  total: 4321, moneda: 'USD', lineas: [{ tipo: 'plan', clave: 'basico', label: 'Hasta 50 pacientes · Cultivo', monto: 4321 }],
+} }))
+
 vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn() }) }))
 vi.mock('../lib/api.js', () => ({
   createSuperAdminClub:  (...a) => createSuperAdminClub(...a),
   getSuperAdminCatalogo: vi.fn(() => Promise.resolve({ data: CATALOGO })),
+  getSuperAdminCotizacion: (...a) => getSuperAdminCotizacion(...a),
 }))
 
 const SAClubNuevo = (await import('../views/superadmin/SAClubNuevo.vue')).default
@@ -74,6 +91,9 @@ const montar = async () => {
   await w.vm.$nextTick()
   return w
 }
+
+// La cotización se pide con un pequeño retardo (no una por tecla).
+const esperarCotizacion = async (w) => { await new Promise(r => setTimeout(r, 260)); await w.vm.$nextTick() }
 
 /** Avanza el wizard poniendo el paso a mano: la navegación se prueba aparte. */
 const irAlPaso = async (w, n) => { w.vm.paso = n; await w.vm.$nextTick() }
@@ -91,16 +111,40 @@ describe('SAClubNuevo — alta de organización', () => {
     expect(w.vm.pasos.map(p => p.label)).toEqual(['Identidad', 'Módulos', 'Plan', 'Acceso', 'Resumen'])
   })
 
-  it('cada adicional va debajo de la suite que extiende, no en una lista plana', async () => {
+  it('cada extra va debajo del pack que extiende, no en una lista plana', async () => {
     const w = await montar()
     const grupos = w.vm.addonsAgrupados
 
     expect(grupos.find(g => g.clave === 'cultivo').items.map(a => a.clave)).toEqual(['iot'])
-    expect(grupos.find(g => g.clave === 'produccion_dispensa').items.map(a => a.clave)).toEqual(['delivery'])
-    // Los que sirven a las dos van al final, no colgados de una.
-    expect(grupos.find(g => g.clave === 'transversal').items.map(a => a.clave)).toEqual(['ia', 'chatbot'])
-    // El módulo incluido va DENTRO del grupo de su suite, no en una sección aparte.
-    expect(grupos.find(g => g.clave === 'produccion_dispensa').incluidos.map(i => i.clave)).toEqual(['medico'])
+    expect(grupos.find(g => g.clave === 'produccion_dispensa').items.map(a => a.clave)).toEqual(['bar'])
+    // Los que sirven a los dos van al final, no colgados de uno.
+    expect(grupos.find(g => g.clave === 'transversal').items.map(a => a.clave)).toEqual(['chatbot'])
+    // Lo que va a venir incluido (WhatsApp) no es un extra: no tiene interruptor.
+    expect(grupos.flatMap(g => g.items).map(a => a.clave)).not.toContain('whatsapp')
+  })
+
+  // 6-oct-2026: lo terminado viene adentro de los packs. Se dice, no se tilda.
+  it('lo terminado viene incluido, sin interruptor, y lo que viene después se anuncia', async () => {
+    const w = await montar()
+    await irAlPaso(w, 2)
+    const txt = w.text()
+
+    expect(txt).toContain('Viene incluido')
+    expect(txt).toContain('Delivery')
+    expect(txt).toContain('Asistente IA')
+    expect(txt).toContain('Próximamente, incluido')
+    expect(txt).toContain('en desarrollo · sin cargo')
+    expect(w.vm.incluidoActivo(CATALOGO.incluidos.find(i => i.clave === 'ia'))).toBe(true)
+  })
+
+  it('la IA viene con cualquiera de los dos packs', async () => {
+    const w = await montar()
+    w.vm.form.features = { cultivo: false, produccion_dispensa: true }
+    const ia = CATALOGO.incluidos.find(i => i.clave === 'ia')
+    expect(w.vm.incluidoActivo(ia)).toBe(true)
+
+    w.vm.form.features = { cultivo: false, produccion_dispensa: false }
+    expect(w.vm.incluidoActivo(ia)).toBe(false)
   })
 
   // Se podía prender Delivery sin Producción y dispensa: quedaba un módulo contratado que no
@@ -110,22 +154,22 @@ describe('SAClubNuevo — alta de organización', () => {
     w.vm.toggleSuite(CATALOGO.suites.find(s => s.clave === 'produccion_dispensa'))
     await w.vm.$nextTick()
 
-    const delivery = CATALOGO.addons.find(a => a.clave === 'delivery')
-    expect(w.vm.bloqueoDe(delivery)).toContain('Producción y dispensa')
+    const bar = CATALOGO.addons.find(a => a.clave === 'bar')
+    expect(w.vm.bloqueoDe(bar)).toContain('Producción y dispensa')
 
     // Y no se deja prender: el candado no puede ser sólo el texto de abajo.
-    w.vm.toggleAddon(delivery)
-    expect(w.vm.form.features.delivery).toBe(false)
+    w.vm.toggleAddon(bar)
+    expect(w.vm.form.features.bar).toBe(false)
   })
 
   it('apagar una suite apaga sus adicionales', async () => {
     const w = await montar()
     w.vm.form.features.produccion_dispensa = true
-    w.vm.form.features.delivery = true
+    w.vm.form.features.bar = true
 
     w.vm.toggleSuite(CATALOGO.suites.find(s => s.clave === 'produccion_dispensa'))
 
-    expect(w.vm.form.features.delivery).toBe(false)
+    expect(w.vm.form.features.bar).toBe(false)
   })
 
   it('sin ninguna suite no se puede avanzar: la organización entraría sin poder operar', async () => {
@@ -168,12 +212,53 @@ describe('SAClubNuevo — alta de organización', () => {
   it('lo que viene prendido de fábrica lo dice el backend, no la pantalla', async () => {
     const w = await montar()
 
-    expect(w.vm.form.features.delivery).toBe(true)
-    expect(w.vm.form.features.iot).toBe(false)
+    expect(w.vm.form.features.cultivo).toBe(true)
+    expect(w.vm.form.features.produccion_dispensa).toBe(true)
+    expect(w.vm.form.features.bar).toBe(false)
     // Todas las claves viajan, también las apagadas: una ausente se completa con el default
     // del backend y aparecería prendida.
     expect(Object.keys(w.vm.form.features).sort())
-      .toEqual(['chatbot', 'cultivo', 'delivery', 'ia', 'iot', 'produccion_dispensa'])
+      .toEqual(['bar', 'chatbot', 'cultivo', 'iot', 'produccion_dispensa', 'whatsapp'])
+  })
+
+  // El precio del escalón depende de cuántos packs lleva: 200 uno, 350 los dos.
+  it('el escalón muestra su precio según cuántos packs lleva', async () => {
+    const w = await montar()
+    const basico = CATALOGO.planes[0]
+
+    expect(w.vm.precioEscalon(basico)).toBe(350)
+    w.vm.form.features.cultivo = false
+    expect(w.vm.precioEscalon(basico)).toBe(200)
+  })
+
+  it('los packs de pacientes suben pacientes y plantas en floración, y viajan a la cotización', async () => {
+    const w = await montar()
+    w.vm.sumar('packs_pacientes_extra', 1)
+    w.vm.sumar('sedes_extra', 2)
+    await esperarCotizacion(w)
+
+    const topes = Object.fromEntries(w.vm.topesEfectivos(CATALOGO.planes[0]).map(r => [r.clave, r.texto]))
+    expect(topes.pacientes).toBe('60 pacientes')
+    expect(topes.plantas).toBe('540 plantas en floración')
+    expect(topes.sedes).toBe('3 sedes')
+
+    const pedido = getSuperAdminCotizacion.mock.calls.at(-1)[0]
+    expect(pedido).toMatchObject({ plan: 'basico', packs_pacientes: 1, sedes_extra: 2 })
+    expect(pedido.suites).toEqual(['cultivo', 'produccion_dispensa'])
+    // Lo que se muestra es la cuenta del backend.
+    expect(w.vm.precioMensual).toBe(4321)
+  })
+
+  it('no deja bajar de cero', async () => {
+    const w = await montar()
+    w.vm.sumar('packs_pacientes_extra', -1)
+    expect(w.vm.form.packs_pacientes_extra).toBe(0)
+  })
+
+  it('dice el cupo de usuarios con palabras: por sede en «Hasta 100 pacientes»', async () => {
+    const w = await montar()
+    expect(w.vm.textoUsuarios(CATALOGO.planes[0])).toBe('2 usuarios de cada rol')
+    expect(w.vm.textoUsuarios(CATALOGO.planes[1])).toBe('2 usuarios de cada rol en cada sede')
   })
 
   // Se tilda Cultivador, se vuelve atrás y se saca Cultivo: el rol queda tildado en una tarjeta
@@ -192,6 +277,7 @@ describe('SAClubNuevo — alta de organización', () => {
     const w = await montar()
     w.vm.form.name = 'Club del Sur'
     w.vm.form.features = { cultivo: true, produccion_dispensa: true, iot: true }
+    await esperarCotizacion(w)
     await irAlPaso(w, 5)
 
     const txt = w.text()
@@ -199,6 +285,8 @@ describe('SAClubNuevo — alta de organización', () => {
     expect(txt).toContain('Cultivo + Producción y dispensa')
     expect(txt).toContain('Ambiente / IoT')
     expect(txt).toContain('Módulo médico')
+    expect(txt).toContain('Delivery')
+    expect(txt).toContain('US$ 4.321')
     // La contraseña vacía significa "se genera una", no "sin contraseña".
     expect(txt).toContain('se genera una')
   })
@@ -253,45 +341,32 @@ describe('SAClubNuevo — alta de uso personal', () => {
     expect(w.vm.paso).toBe(2)
   })
 
-  it('ofrece ambiente, IA y chatbot como interruptores, apagados de entrada', async () => {
+  // 6-oct-2026: nace con el Asistente IA (registro por voz); se le suman ambiente y chatbot.
+  it('viene con Cultivo y el Asistente IA, y ofrece ambiente y chatbot apagados', async () => {
     const w = await montarPersonal()
 
-    expect(w.vm.addonsPersonal.map(a => a.clave)).toEqual(['iot', 'ia', 'chatbot'])
-    expect(w.vm.form.features.cultivo).toBe(true)
+    expect(w.vm.incluidosPersonal.map(a => a.clave)).toEqual(['cultivo', 'ia'])
+    expect(w.vm.addonsPersonal.map(a => a.clave)).toEqual(['iot', 'chatbot'])
     expect(w.vm.form.features.iot).toBe(false)
-    expect(w.vm.form.features.ia).toBe(false)
     expect(w.vm.form.features.chatbot).toBe(false)
     // Lo que una organización compra aparte no se ofrece.
-    expect(w.vm.addonsPersonal.map(a => a.clave)).not.toContain('delivery')
+    expect(w.vm.addonsPersonal.map(a => a.clave)).not.toContain('bar')
   })
 
-  it('el chatbot no se prende sin el Asistente IA, y se apaga con él', async () => {
+  it('el chatbot se puede sumar solo: la IA ya viene', async () => {
     const w = await montarPersonal()
-    const chatbot = CATALOGO.addons.find(a => a.clave === 'chatbot')
-    const ia      = CATALOGO.addons.find(a => a.clave === 'ia')
-
-    expect(w.vm.bloqueoPersonal(chatbot)).toContain('Asistente IA')
-    w.vm.togglePersonal(chatbot)
-    expect(w.vm.form.features.chatbot).toBe(false)
-
-    w.vm.togglePersonal(ia)
-    expect(w.vm.bloqueoPersonal(chatbot)).toBeNull()
-    w.vm.togglePersonal(chatbot)
+    w.vm.togglePersonal(CATALOGO.addons.find(a => a.clave === 'chatbot'))
     expect(w.vm.form.features.chatbot).toBe(true)
-
-    w.vm.togglePersonal(ia)
-    expect(w.vm.form.features.chatbot).toBe(false)
   })
 
-  // Cuánto vale cada adicional en personal está pendiente: hasta que se decida, prenderlos no
-  // cambia el número (igual que `Precios.de`).
-  it('el precio es el del plan, se le sume lo que se le sume', async () => {
+  it('el precio lo cotiza el backend como autocultivo, sin extras de organización', async () => {
     const w = await montarPersonal()
     w.vm.form.features.iot = true
-    w.vm.form.features.ia  = true
-    await w.vm.$nextTick()
+    await esperarCotizacion(w)
 
-    expect(w.vm.precioMensual).toBe(12000)
+    const pedido = getSuperAdminCotizacion.mock.calls.at(-1)[0]
+    expect(pedido).toMatchObject({ plan: 'personal', packs_pacientes: 0, sedes_extra: 0, suites: ['cultivo'] })
+    expect(pedido.extras).toEqual(['iot'])
   })
 
   it('manda al backend el plan personal, el nombre del cultivo y el mail de la persona', async () => {
@@ -306,7 +381,8 @@ describe('SAClubNuevo — alta de uso personal', () => {
     expect(enviado.club.plan).toBe('personal')
     expect(enviado.club.name).toBe('Cultivo de Juan')
     expect(enviado.club.email).toBe('juan@gmail.com')
-    expect(enviado.club.features).toMatchObject({ cultivo: true, iot: true, ia: false, chatbot: false })
+    expect(enviado.club.features).toMatchObject({ cultivo: true, iot: true, chatbot: false })
+    expect(enviado.club).toMatchObject({ packs_pacientes_extra: 0, sedes_extra: 0 })
     expect(enviado.admin).toEqual({ first_name: 'Juan', last_name: 'Pérez', email_personal: 'juan@gmail.com' })
     expect(enviado.roles_a_crear).toEqual(['admin'])
   })
@@ -322,7 +398,8 @@ describe('SAClubNuevo — alta de uso personal', () => {
     expect(txt).toContain('juan@gmail.com')
     expect(txt).toContain('Cultivo de Juan')
     expect(txt).toContain('Ambiente / IoT')
-    expect(txt).toContain('Crear uso personal')
+    expect(txt).toContain('Crear autocultivo')
+    expect(txt).toContain('Asistente IA')
     expect(txt).not.toContain('Delivery')
   })
 })

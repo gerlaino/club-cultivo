@@ -270,6 +270,33 @@ cinco campos.
 
 ### El modelo comercial, que cambió de raíz
 
+> **6-oct-2026 — LA LISTA NUEVA (Germán y su socio). Manda sobre lo de abajo donde se contradigan.**
+> - **Escalones** (`PlanEnforcer::PLANES`, las claves no cambian): `personal` = **Autocultivo**
+>   (USD 8: 9 plantas en floración, vege libre, 2 espacios, lotes libres, nace con el Asistente IA);
+>   `basico` = **Hasta 50 pacientes** (450 en floración, 3 salas, 1 sede, 2 de cada rol; USD 200
+>   un pack, 350 los dos); `total` = **Hasta 100 pacientes** (900 en floración, salas libres,
+>   3 sedes, 2 de cada rol **por sede**; USD 400 un pack, 700 los dos).
+> - **Encima del escalón** (columnas `clubs.packs_pacientes_extra` y `clubs.sedes_extra`): pack de
+>   10 pacientes = USD 80 y suma 10 pacientes **y 90 plantas en floración** (9 por paciente, como el
+>   REPROCANN); sede extra = USD 50. El autocultivo no compra extras.
+> - **El tope de plantas es de plantas EN FLORACIÓN y es un CANDADO, también en el autocultivo**
+>   (antes era aviso). **Las automáticas cuentan todo su ciclo** (nunca pasan a «floración» en la
+>   app). Vive en los MODELOS (`Lote#cupo_de_floracion`, `Plant#cupo_de_floracion`), porque al cupo
+>   se entra por muchas puertas (avanzar fase, mover de sala, dar vuelta la fase del espacio,
+>   crear plantas); `PlanEnforcer#plantas_en_cupo` es la única cuenta.
+> - **Lo terminado viene INCLUIDO y se DERIVA** (`INCLUIDOS_EN_SUITE`, una lista de suites):
+>   médico, delivery y correo con Producción y dispensa; **Asistente IA con cualquiera de los dos**.
+>   Una bandera vieja guardada no prende ni apaga nada. El Delivery se va cuando se da de baja
+>   Producción y dispensa (`Clubs::BajarModulo` ordena los repartos); `entregar`/`reportar_fallo`
+>   quedan afuera también del candado del pack.
+> - **Extras** (`ADDONS` con `tipo: 'extra'`): Buffet y eventos (los eventos vienen con el Buffet,
+>   `INCLUIDOS_EN_ADDON`), Portal del paciente, Chatbot, Ambiente/IoT. **Todos en desarrollo**
+>   (`EXTRAS_SIN_LANZAR`): se prenden para probar o de cortesía y cuestan 0. WhatsApp y ARICCAME son
+>   `incluido_proximo`: van a venir incluidos y mientras tanto siguen bloqueados.
+> - **Precios en USD, una sola cuenta**: `Precios.cotizar` (la usan la ficha, el alta del super admin
+>   vía `GET /super_admin/catalogo/cotizar` y el panel) y `Precios.lista_publica` (las páginas
+>   públicas, por `GET /public/registro`). Ninguna pantalla suma precios.
+
 **Dos planes, y el plan dice CUÁNTO, nunca QUÉ.** `PlanEnforcer::PLANES` = `basico` / `total`.
 Qué puede hacer una organización lo deciden las suites, y no se cruzan. Los cuatro planes viejos
 siguen mapeados en `PLANES_LEGACY` por si aparece uno guardado.

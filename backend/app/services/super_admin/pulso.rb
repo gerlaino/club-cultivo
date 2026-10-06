@@ -101,7 +101,10 @@ module SuperAdmin
       pendientes = []
 
       clubes.each do |club|
-        (Club::ADDONS.keys + Club::INCLUIDOS_EN_SUITE.keys).each do |modulo|
+        # Sólo lo contratado aparte. Lo incluido (correo, IA…) viene en todas: el correo sin
+        # casilla cargada es configuración de la organización, no un módulo vendido que no anda,
+        # y listarlo pondría a todas en la cola.
+        Club::ADDONS.keys.each do |modulo|
           next unless club.feature?(modulo)
           falta = club.falta_para_funcionar(modulo)
           next if falta.blank?

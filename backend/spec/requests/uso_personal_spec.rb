@@ -41,20 +41,20 @@ RSpec.describe 'Uso personal', type: :request do
       expect(club.features.select { |_, v| v == true }.keys).to eq(%w[cultivo])
     end
 
-    it 'puede sumar el ambiente, la IA y el chatbot' do
-      alta[:club][:features] = { 'iot' => true, 'ia' => true, 'chatbot' => true }
+    # 6-oct-2026: el autocultivo nace con el Asistente IA (es el registro por voz).
+    it 'nace con el Asistente IA sin tildarlo' do
+      post '/api/super_admin/clubs', params: alta, as: :json
+
+      club = Club.find(json.dig('club', 'id'))
+      expect(club.feature?('ia')).to be(true)
+    end
+
+    it 'puede sumar el ambiente y el chatbot' do
+      alta[:club][:features] = { 'iot' => true, 'chatbot' => true }
       post '/api/super_admin/clubs', params: alta, as: :json
 
       club = Club.find(json.dig('club', 'id'))
       %w[cultivo iot ia chatbot].each { |m| expect(club.feature?(m)).to be(true), "#{m} tendría que estar prendido" }
-    end
-
-    it 'el chatbot sin el Asistente IA no queda prendido' do
-      alta[:club][:features] = { 'chatbot' => true }
-      post '/api/super_admin/clubs', params: alta, as: :json
-
-      club = Club.find(json.dig('club', 'id'))
-      expect(club.feature?('chatbot')).to be false
     end
 
     # La cuenta es la persona: entra con su mail, no con `admin@slug.com`.
@@ -89,7 +89,8 @@ RSpec.describe 'Uso personal', type: :request do
       get "/api/super_admin/clubs/#{json.dig('club', 'id')}"
 
       expect(json['suites'].map { |s| s['clave'] }).to eq(%w[cultivo])
-      expect(json['addons'].map { |a| a['clave'] }).to match_array(%w[iot ia chatbot])
+      expect(json['addons'].map { |a| a['clave'] }).to match_array(%w[iot chatbot])
+      expect(json['incluidos'].map { |a| a['clave'] }).to eq(%w[ia])
     end
 
     it 'no puede tener dispensa ni nada que cuelgue de ella' do
@@ -200,7 +201,7 @@ RSpec.describe 'Uso personal', type: :request do
 
     it 'tiene una sede y dos salas como mucho' do
       enforcer = PlanEnforcer.new(club)
-      expect(enforcer.info[:limites]).to include(sedes: 1, salas: 2, lotes: nil, plantas: nil, pacientes: 0)
+      expect(enforcer.info[:limites]).to include(sedes: 1, salas: 2, lotes: nil, plantas: 9, pacientes: 0)
       expect(enforcer.info).to include(equipo: false, personal: true)
     end
 
@@ -273,24 +274,21 @@ RSpec.describe 'Uso personal', type: :request do
       lineas = Precios.de(club)[:lineas]
 
       expect(lineas.map { |l| l[:clave] }).to eq(%w[personal])
-      expect(Precios.de(club)[:total]).to eq(Precios.plan('personal'))
+      expect(Precios.de(club)).to include(total: 8, moneda: 'USD')
     end
 
-    # Cada adicional que elige en el alta suma con SU precio de personal, no con el de
-    # organización (la IA de organización sola vale más que el plan entero).
-    it 'cada adicional suma su precio de personal' do
-      club = create(:club, plan: 'personal', features: { 'cultivo' => true, 'iot' => true, 'ia' => true, 'chatbot' => true })
+    # El ambiente y el chatbot están en desarrollo: se pueden prender, pero no se cobran todavía.
+    it 'los extras en desarrollo figuran sin cargo' do
+      club = create(:club, plan: 'personal', features: { 'cultivo' => true, 'iot' => true, 'chatbot' => true })
       lineas = Precios.de(club)[:lineas]
 
-      expect(lineas.map { |l| l[:clave] }).to match_array(%w[personal iot ia chatbot])
-      expect(Precios.de(club)[:total]).to eq(
-        Precios.plan('personal') + Precios.addon_personal('iot') + Precios.addon_personal('ia') + Precios.addon_personal('chatbot'))
-      expect(Precios.addon_personal('ia')).to be < Precios.addon('ia')
+      expect(lineas.map { |l| l[:clave] }).to match_array(%w[personal iot chatbot])
+      expect(Precios.de(club)[:total]).to eq(8)
     end
 
     it 'tiene su propio tramo de IA' do
       club = create(:club, plan: 'personal')
-      expect(club.ia_config[:label]).to eq('Personal')
+      expect(club.ia_config[:label]).to eq('Autocultivo')
     end
   end
 end

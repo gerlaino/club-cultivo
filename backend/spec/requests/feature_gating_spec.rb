@@ -92,16 +92,13 @@ RSpec.describe 'Gating por módulo', type: :request do
       end
     end
 
-    # Eventos existe y funciona, pero todavía no está pulido: se prende cuando lo esté.
-    it 'los eventos del Buffet no vienen activados' do
+    # Buffet y eventos se venden juntos (6-oct-2026): los eventos vienen con el Buffet, y el Buffet
+    # es un extra que no viene por defecto.
+    it 'los eventos vienen con el Buffet, y el Buffet no viene por defecto' do
+      expect(Club::FEATURES_POR_DEFECTO).not_to have_key('bar')
       expect(Club::FEATURES_POR_DEFECTO).not_to have_key('eventos')
-
-      sign_in_as(admin)
-      bar = club.bares.create!(nombre: 'Buffet', sede: create(:sede, club: club, created_by: admin, tipo: 'mixta'))
-      get "/api/bares/#{bar.id}/eventos"
-
-      expect(response).to have_http_status(:forbidden)
-      expect(JSON.parse(response.body)['modulo']).to eq('eventos')
+      expect(Club.new(features: { 'produccion_dispensa' => true, 'bar' => true }).feature?(:eventos)).to be(true)
+      expect(Club.new(features: { 'produccion_dispensa' => true, 'eventos' => true }).feature?(:eventos)).to be(false)
     end
 
     it 'el que está terminado no aparece como incompleto' do

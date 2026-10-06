@@ -28,10 +28,10 @@ RSpec.describe 'Plantillas de correo', type: :request do
       expect(claves).to match_array(PlantillaMail::VARIABLES.keys)
     end
 
-    # El add-on se puede dar de baja. Apagado, la pantalla no tiene que dar 500 ni devolver
-    # datos: tiene que decir que la organización no tiene el módulo.
-    it 'sin el add-on de correo, no hay plantillas' do
-      club.update!(features: club.features.merge('mailer' => false))
+    # El correo viene con Producción y dispensa (6-oct-2026). Sin el pack, la pantalla no tiene que
+    # dar 500 ni devolver datos: tiene que decir que la organización no tiene el módulo.
+    it 'sin Producción y dispensa, no hay plantillas' do
+      club.update!(features: club.features.merge('produccion_dispensa' => false))
       sign_in_as(admin)
 
       get '/plantillas_mail', headers: auth_headers

@@ -16,7 +16,8 @@ module Public
     def show
       render json: { dias_prueba: Registros::CrearPersonal::DIAS_PRUEBA,
                      terminos_version: Legal::TERMINOS_VERSION,
-                     password_minimo: Registros::CrearPersonal::PASSWORD_MINIMO }
+                     password_minimo: Registros::CrearPersonal::PASSWORD_MINIMO,
+                     precios: Precios.lista_publica }
     end
 
     def create

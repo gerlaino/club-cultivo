@@ -83,15 +83,21 @@ reservas; **suspendido para altas nuevas**) · manicura · dispensador (**el ún
 mostrador**: dispensa sólo lo que está sobre la mesa; crea pacientes que quedan pendientes) ·
 delivery (sólo con el add-on) · medico · abogado y auditor (no se ofrecen) · paciente (portal).
 Roles por módulo (`Club::MODULO_POR_ROL`) y por tipo de sede (`Sede::TIPOS_POR_ROL`). No existe rol
-contador. Cupo: en Básico uno de cada rol, admin exento.
+contador. Cupo: dos de cada rol (en «Hasta 100 pacientes», por sede), admin exento.
 
 ## Modelo comercial
 
-Dos planes que dicen CUÁNTO, no QUÉ (`PlanEnforcer`: básico/total; hay un `personal` en la rama
-`uso-personal`, en curso). Qué puede hacer una organización lo dicen las suites (`Club::SUITES`) y los
-add-ons (`Club::ADDONS`: delivery, correo, portal del paciente, IA, IoT…). Baja de módulo = fecha
-(fin de mes), salvo «cortar ahora». Catálogo único: `GET /super_admin/catalogo`. IA medida y con tope
-mensual por plan (`Ia::Uso`, `ia_llamadas`, créditos `IaRecarga`).
+Los planes dicen CUÁNTO, no QUÉ (`PlanEnforcer`). **Lista del 6-oct-2026, en USD** (`Precios`):
+**Autocultivo** (`personal`) 8 — 9 plantas en floración, 2 espacios; **Hasta 50 pacientes** (`basico`)
+200 un pack / 350 los dos — 450 en floración, 3 salas, 1 sede, 2 de cada rol; **Hasta 100 pacientes**
+(`total`) 400 / 700 — 900 en floración, salas libres, 3 sedes, 2 de cada rol por sede. Encima: packs de
+10 pacientes (80, +90 plantas en floración) y sedes extra (50). **El tope es de plantas EN FLORACIÓN,
+candado, y las automáticas cuentan todo el ciclo** (vive en `Lote`/`Plant`). Los packs son las suites
+(`Club::SUITES`); lo terminado viene incluido y se deriva (médico, delivery, correo; IA en los dos);
+los extras (`Club::ADDONS` `tipo: 'extra'`: Buffet y eventos, portal, chatbot, IoT) están en
+desarrollo y cuestan 0. Precios: `Precios.cotizar` es la única cuenta. Baja de módulo = fecha (fin
+de mes), salvo «cortar ahora». IA medida y con tope mensual por plan (`Ia::Uso`, `ia_llamadas`,
+créditos `IaRecarga`). Detalle en `docs/REGLAS_Y_DECISIONES.md` («El modelo comercial»).
 
 ## Reglas de dominio que gobiernan el código (las que más muerden)
 
@@ -176,8 +182,8 @@ palabra, no la fase). Un webhook de riegos de dispositivos se agregó y se retir
 - Fotos: se achican al subir (`lib/imagenes.js`) y tienen tope por plan; nutriente = insumo;
   genéticas globales (INASE) de sólo lectura.
 
-**Pendiente de decisión (Germán):** valores reales de precios personales (4.000/5.000/3.000) y
-del tope de fotos (300/1.000/3.000) · **lo del «olvidé mi contraseña» en producción: falta saber
+**Pendiente de decisión (Germán):** el tope de fotos (300/1.000/3.000) y el precio de cada extra
+el día que se lance · **lo del «olvidé mi contraseña» en producción: falta saber
 qué mensaje mostró la pantalla y con qué usuario** (sospecha: SMTP/`APP_HOST` sin cargar en
 Render, o usuario sin mail real).
 

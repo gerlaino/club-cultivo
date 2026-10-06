@@ -80,11 +80,12 @@ RSpec.describe 'La contraseña del paciente, por mail', type: :request do
       expect(JSON.parse(response.body)['credenciales']['mail_enviado']).to be(false)
     end
 
-    it 'sin el módulo de correo tampoco, y la cuenta se crea igual' do
+    # El correo viene con el pack (6-oct-2026): una bandera vieja apagada no lo corta.
+    it 'una bandera vieja de correo apagado no lo corta' do
       club.update!(features: club.features.merge('mailer' => false))
 
       expect { post "/api/pacientes/#{paciente.id}/acceso" }
-        .not_to change { ActionMailer::Base.deliveries.size }
+        .to change { ActionMailer::Base.deliveries.size }.by(1)
 
       expect(response).to have_http_status(:created)
     end

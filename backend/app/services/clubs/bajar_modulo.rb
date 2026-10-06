@@ -23,7 +23,8 @@ module Clubs
       resultado = { modulo: @clave, club_id: @club.id }
 
       ActiveRecord::Base.transaction do
-        resultado.merge!(ordenar_delivery) if @clave == 'delivery'
+        # El Delivery viene con Producción y dispensa (6-oct-2026): se va cuando se va ella.
+        resultado.merge!(ordenar_delivery) if %w[delivery produccion_dispensa].include?(@clave)
 
         @club.update!(
           features:      @club.features.except(@clave),

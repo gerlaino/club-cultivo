@@ -5,7 +5,9 @@ require 'rails_helper'
 # en el login, y nombra el módulo que falta.
 RSpec.describe 'Rol cuyo módulo está apagado', type: :request do
   def club_sin(*claves)
-    features = Club::FEATURES_POR_DEFECTO.dup
+    # Con el Buffet: desde el 6-oct-2026 es un extra y ya no viene por defecto, pero los casos de
+    # acá son de organizaciones que lo tienen.
+    features = Club::FEATURES_POR_DEFECTO.merge('bar' => true)
     claves.each { |c| features[c.to_s] = false }
     create(:club, features: features)
   end

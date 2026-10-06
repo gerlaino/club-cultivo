@@ -23,6 +23,12 @@ RSpec.describe 'Autoregistro de uso personal', type: :request do
     get '/api/public/registro'
     expect(response).to have_http_status(:ok)
     expect(response.parsed_body).to include('dias_prueba' => 30, 'terminos_version' => Legal::TERMINOS_VERSION)
+    # La lista de precios de las páginas públicas sale de acá (6-oct-2026), no escrita en la página.
+    precios = response.parsed_body['precios']
+    expect(precios).to include('moneda' => 'USD', 'sede_extra' => 50)
+    expect(precios['autocultivo']).to eq('precio' => 8, 'plantas_floracion' => 9, 'espacios' => 2)
+    expect(precios['escalones'].map { |e| [e['pacientes'], e['un_pack'], e['dos_packs']] }).to eq([[50, 200, 350], [100, 400, 700]])
+    expect(precios['pack_pacientes']).to include('pacientes' => 10, 'plantas_floracion' => 90, 'precio' => 80)
   end
 
   describe 'crear la cuenta' do

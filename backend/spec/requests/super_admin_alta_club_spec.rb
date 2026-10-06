@@ -15,6 +15,31 @@ RSpec.describe 'SuperAdmin alta de club', type: :request do
   end
 
   describe 'el plan' do
+    it 'guarda los packs de pacientes y las sedes extra, y la ficha los cobra' do
+      body = alta(club: { plan: 'basico', packs_pacientes_extra: 2, sedes_extra: 1 })
+      club = Club.find(body['club']['id'])
+
+      expect(club).to have_attributes(packs_pacientes_extra: 2, sedes_extra: 1)
+      expect(body['club']['plan_info']['limites']).to include('pacientes' => 70, 'plantas' => 630, 'sedes' => 2)
+      expect(body['club']['precios']['total']).to eq(350 + 160 + 50)
+    end
+
+    it 'un autocultivo no guarda extras aunque los manden' do
+      body = alta(club: { plan: 'personal', packs_pacientes_extra: 4, sedes_extra: 2 },
+                  admin: { first_name: 'Ana', last_name: 'Paz', email_personal: 'ana-auto@test.com' })
+
+      expect(Club.find(body['club']['id'])).to have_attributes(packs_pacientes_extra: 0, sedes_extra: 0)
+    end
+
+    it 'cambiar el plan también cambia los extras' do
+      club = Club.find(alta(club: { plan: 'basico' })['club']['id'])
+
+      patch "/api/super_admin/clubs/#{club.id}/cambiar_plan", params: { plan: 'total', packs_pacientes_extra: 3 }, as: :json
+
+      expect(response).to have_http_status(:ok)
+      expect(club.reload).to have_attributes(plan: 'total', packs_pacientes_extra: 3, sedes_extra: 0)
+    end
+
     it 'toma el plan elegido en el alta' do
       body = alta(club: { plan: 'total' })
 
@@ -67,13 +92,20 @@ RSpec.describe 'SuperAdmin alta de club', type: :request do
   end
 
   describe 'los módulos' do
-    it 'un club nuevo nace con las suites y el Buffet' do
+    # Desde el 6-oct-2026 nace con los dos packs y nada más: el Buffet pasó a ser un extra.
+    it 'un club nuevo nace con los dos packs y sin extras' do
       body = alta
 
       feats = Club.find(body['club']['id']).features
       expect(feats['cultivo']).to             be(true)
       expect(feats['produccion_dispensa']).to be(true)
-      expect(feats['bar']).to                 be(true)
+      expect(feats['bar']).not_to             be(true)
+    end
+
+    it 'trae incluidos delivery, correo e IA sin tildarlos' do
+      club = Club.find(alta['club']['id'])
+
+      %i[medico delivery mailer ia].each { |m| expect(club.feature?(m)).to be(true), m.to_s }
     end
 
     # Médico y correo no se guardan: se derivan de la suite que los incluye.
@@ -113,9 +145,10 @@ RSpec.describe 'SuperAdmin alta de club', type: :request do
     # Prendido no es lo mismo que andando: el panel tiene que poder decir la diferencia.
     it 'informa el estado real de cada módulo' do
       # `mailer` en lugar de `whatsapp`: WhatsApp pasó a los bloqueados y ya no se puede prender.
-      body = alta(club: { features: { 'cultivo' => true, 'produccion_dispensa' => true, 'mailer' => true } })
+      body = alta(club: { features: { 'cultivo' => true, 'produccion_dispensa' => true, 'bar' => true } })
 
-      correo = body['club']['addons'].find { |a| a['clave'] == 'mailer' }
+      # El correo viene incluido: se informa con los incluidos.
+      correo = body['club']['incluidos'].find { |a| a['clave'] == 'mailer' }
       expect(correo['activo']).to be(true)
       expect(correo['estado']).to eq('falta_config')
       expect(correo['falta']).to be_present

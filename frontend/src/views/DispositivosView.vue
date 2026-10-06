@@ -4,8 +4,6 @@ import { useAmbienteStore } from '../stores/ambiente.js'
 import { useToast } from '../composables/useToast.js'
 import { listSalas } from '../lib/api.js'
 
-// La URL a la que el sensor manda los datos sale de la misma base que usa la app.
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 import DispositivoCard from '../components/ambiente/DispositivoCard.vue'
 
 const store = useAmbienteStore()
@@ -74,11 +72,12 @@ async function guardar() {
     // solo, el token se genera acá y se muestran las instrucciones listas para copiar.
     if (tipoElegido.value?.auto && creado?.id) {
       try {
-        const { token } = await store.regenerarToken(creado.id)
+        // La URL la arma el backend (la de acá apuntaba a una ruta que no existe).
+        const { token, webhook_url } = await store.regenerarToken(creado.id)
         conexion.value = {
           nombre: form.value.nombre_amigable,
           tipo:   tipoElegido.value.label,
-          url:    `${API_BASE}/webhooks/lecturas/${creado.id}`,
+          url:    webhook_url,
           token,
         }
       } catch {
