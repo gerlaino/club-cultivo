@@ -433,7 +433,8 @@ class PacientesController < ApplicationController
 
     if params[:query].present?
       q = "%#{params[:query].downcase}%"
-      by_name  = scope.where("lower(nombre) LIKE :q OR lower(apellido) LIKE :q", q: q)
+      # Igual que la pantalla (con apodo): la descarga trae lo mismo que se ve.
+      by_name  = scope.where("lower(nombre) LIKE :q OR lower(apellido) LIKE :q OR lower(apodo) LIKE :q", q: q)
       dni_term = params[:query].gsub(/\D/, "")
       scope = dni_term.present? ? by_name.or(scope.where(dni_normalizado: dni_term)) : by_name
     end

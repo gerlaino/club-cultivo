@@ -27,6 +27,7 @@ class CuentasCorrientesController < ApplicationController
       {
         paciente_id:      p.id,
         nombre:           p.nombre_completo,
+        apodo:            p.apodo,
         dni:              p.dni,
         activo:           p.es_paciente,
         saldo:            saldo,

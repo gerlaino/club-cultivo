@@ -6,6 +6,7 @@ class DispensacionSerializer
       club_id:         d.sede&.club_id,
       paciente_id:     d.paciente_id,
       paciente_nombre: "#{d.paciente.nombre} #{d.paciente.apellido}",
+      paciente_apodo:  d.paciente.apodo,
       # LA CUENTA CORRIENTE VIAJA CON LA DISPENSA, no se la pasa la pantalla que la muestra.
       # El modal de edición la recibía por props y el historial no se las pasaba: al paciente con
       # crédito recién habilitado el desplegable le decía "Cuenta corriente (sin límite)" y no lo

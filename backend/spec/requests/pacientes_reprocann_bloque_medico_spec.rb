@@ -138,6 +138,23 @@ RSpec.describe 'Pacientes: REPROCANN vencido, trámite, vínculo y apodo', type:
       expect(paciente.reload.apodo).to eq('Tano')
     end
 
+    it 'la descarga CSV con búsqueda trae lo mismo que la pantalla: encuentra por apodo' do
+      paciente.update!(apodo: 'Tano', apellido: 'Rossi')
+      create(:paciente, club: club, created_by: admin, apellido: 'Otro')
+      sign_in_as(admin)
+      get '/api/pacientes/export_csv', params: { query: 'tano' }
+      expect(response.body).to include('Rossi')
+      expect(response.body).not_to include('Otro')
+    end
+
+    it 'la lista de cuentas corrientes trae el apodo, para buscarlo ahí también' do
+      paciente.update!(apodo: 'Tano')
+      sign_in_as(admin)
+      get '/api/cuentas_corrientes'
+      fila = JSON.parse(response.body)['cuentas'].find { |c| c['paciente_id'] == paciente.id }
+      expect(fila['apodo']).to eq('Tano')
+    end
+
     it 'busca por apodo en el padrón y en la lista del médico' do
       paciente.update!(apodo: 'Tano', apellido: 'Rossi')
       create(:paciente, club: club, created_by: admin, apellido: 'Otro')

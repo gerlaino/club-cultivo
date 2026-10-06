@@ -39,7 +39,7 @@ const pacientesFiltrados = computed(() => {
   const q = busqueda.value.trim().toLowerCase()
   const lista = pacientes.value
   if (!q) return lista
-  return lista.filter(p => `${p.apellido} ${p.nombre} ${p.email || ''}`.toLowerCase().includes(q))
+  return lista.filter(p => `${p.apellido} ${p.nombre} ${p.apodo || ''} ${p.email || ''}`.toLowerCase().includes(q))
 })
 
 // Quién no tiene dirección se muestra igual, apagado y con el motivo: es información operativa

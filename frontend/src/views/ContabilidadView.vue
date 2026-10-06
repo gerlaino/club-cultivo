@@ -194,7 +194,7 @@ const deudoresFiltrados = computed(() => {
   let list = deudores.value.cuentas || []
   if (deudoresSoloConDeuda.value) list = list.filter(c => c.deuda > 0)
   const q = deudoresBusqueda.value.trim().toLowerCase()
-  if (q) list = list.filter(c => c.nombre?.toLowerCase().includes(q) || String(c.dni || '').includes(q))
+  if (q) list = list.filter(c => c.nombre?.toLowerCase().includes(q) || (c.apodo || '').toLowerCase().includes(q) || String(c.dni || '').includes(q))
   const val = VALOR_DEUDOR[deudoresOrden.value.col] || VALOR_DEUDOR.deuda
   const dir = deudoresOrden.value.asc ? 1 : -1
   return [...list].sort((a, b) => {

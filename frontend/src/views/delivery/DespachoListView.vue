@@ -130,6 +130,7 @@ const despachosFiltered = computed(() => {
     list = list.filter(d =>
       d.codigo_paquete?.toLowerCase().includes(q) ||
       d.paciente_nombre?.toLowerCase().includes(q) ||
+      d.paciente_apodo?.toLowerCase().includes(q) ||
       d.direccion_envio?.toLowerCase().includes(q) ||
       d.delivery_nombre?.toLowerCase().includes(q)
     )
