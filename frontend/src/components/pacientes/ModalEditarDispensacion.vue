@@ -46,7 +46,12 @@ const fmt = n => n == null ? '—' :
 const limiteCc = computed(() => props.limiteCc ?? props.dispensacion?.paciente_limite_cc ?? null)
 const saldoCc  = computed(() => props.saldoCc  ?? props.dispensacion?.paciente_saldo_cc  ?? null)
 const tieneCc  = computed(() => limiteCc.value !== null && limiteCc.value > 0)
-const ccMargen = computed(() => (saldoCc.value ?? 0) + (limiteCc.value ?? 0))
+// Lo que ESTA dispensa ya dejó a cuenta corriente: al guardar se revierte y se vuelve a calcular,
+// así que ese cupo está libre para ella. Sin sumarlo, la pantalla mostraba menos crédito que el
+// que el backend va a usar (6-oct-2026).
+const deudaPropia = computed(() => (props.dispensacion?.cobros || [])
+  .filter(c => c.medio === 'cuenta_corriente').reduce((a, c) => a + (Number(c.monto_ars) || 0), 0))
+const ccMargen = computed(() => (saldoCc.value ?? 0) + (limiteCc.value ?? 0) + deudaPropia.value)
 
 const ccInsuficiente = computed(() => {
   if (!tieneCc.value || form.value.medio_pago !== 'cuenta_corriente') return false
@@ -124,8 +129,10 @@ function buildForm(d) {
   return {
     items,
     fecha_dispensacion: d.fecha_dispensacion || '',
-    // Una contra entrega sin cobrar se muestra como tal, no como el «efectivo» placeholder.
-    medio_pago:         (d.cobrar_en_entrega && !(d.cobros?.length)) ? 'contra_entrega' : (d.medio_pago || 'efectivo'),
+    // Una contra entrega sin cobrar se muestra como tal, no como el «efectivo» placeholder. Con
+    // una parte a cuenta corriente, el medio es con el que pagó lo otro (lo dice `pagoPrevio`).
+    medio_pago:         (d.cobrar_en_entrega && !(d.cobros?.length)) ? 'contra_entrega'
+                        : (pagoPrevio(d)?.medio || d.medio_pago || 'efectivo'),
     // SÓLO LOS PRODUCTOS: el total de la dispensa trae adentro el envío, y el backend suma el
     // envío sobre lo que se mande acá. Precargado con el total, guardar sin tocar nada contaba
     // el envío dos veces.
@@ -162,6 +169,25 @@ const ajusteManual = computed(() => {
   const dif = aporte - totalSugerido.value
   return Math.abs(dif) >= 1 ? dif : 0
 })
+// ── «Paga con» ─────────────────────────────────────────────
+// Si se cobró una parte y el resto quedó a cuenta corriente, eso es lo que hay que mostrar al
+// abrir: guardar sin mirar no puede convertir la deuda en «pagó todo» (6-oct-2026).
+function pagoPrevio(d) {
+  const cobros = d?.cobros || []
+  if (!cobros.some(c => c.medio === 'cuenta_corriente')) return null
+  const pagados = cobros.filter(c => c.medio !== 'cuenta_corriente')
+  return { medio: pagados[0]?.medio || 'cuenta_corriente', monto: pagados.reduce((a, c) => a + (Number(c.monto_ars) || 0), 0) }
+}
+const teniaDeuda = computed(() => !!pagoPrevio(props.dispensacion))
+const montoRecibido = ref(null)
+const pideMontoRecibido = computed(() => ['efectivo', 'transferencia'].includes(form.value.medio_pago) && totalConEnvio.value > 0)
+const recibido  = computed(() => {
+  const r = Number(montoRecibido.value)
+  return pideMontoRecibido.value && montoRecibido.value !== null && montoRecibido.value !== '' && r >= 0 ? r : null
+})
+const faltante  = computed(() => recibido.value === null ? 0 : Math.max(0, Math.round((totalConEnvio.value - recibido.value) * 100) / 100))
+const excedente = computed(() => recibido.value === null ? 0 : Math.max(0, Math.round((recibido.value - totalConEnvio.value) * 100) / 100))
+
 function quitarItem(i) {
   if (form.value.items.length <= 1) return
   form.value.items.splice(i, 1)
@@ -171,6 +197,8 @@ function quitarItem(i) {
 watch(() => props.modelValue, (open) => {
   if (open && props.dispensacion) {
     form.value  = buildForm(props.dispensacion)
+    const previo = pagoPrevio(props.dispensacion)
+    montoRecibido.value = previo && previo.medio !== 'cuenta_corriente' ? previo.monto : null
     formError.value = null
     agregarEnvio.value = false
     envio.value = envioVacio()
@@ -190,6 +218,11 @@ async function handleSubmit() {
 
   if (form.value.medio_pago === 'cuenta_corriente' && !(Number(form.value.aporte_socio_ars) > 0)) {
     formError.value = 'El aporte debe ser mayor a $0 cuando el medio de pago es cuenta corriente'
+    saving.value = false; return
+  }
+
+  if (faltante.value > 0.009 && !tieneCc.value) {
+    formError.value = `Faltan ${fmt(faltante.value)} y el paciente no tiene crédito habilitado para quedar debiendo.`
     saving.value = false; return
   }
 
@@ -226,6 +259,12 @@ async function handleSubmit() {
       fecha_dispensacion: form.value.fecha_dispensacion,
       medio_pago:         form.value.medio_pago,
       aporte_socio_ars:   form.value.aporte_socio_ars,
+      // Pagó otra cosa que el total: una línea con lo que pagó; el resto lo resuelve el backend.
+      // Con una parte a cuenta corriente se manda SIEMPRE: el backend no adivina.
+      ...(recibido.value !== null && (faltante.value > 0.009 || excedente.value > 0.009 || teniaDeuda.value)
+        ? { cobros: [{ medio: form.value.medio_pago, monto: recibido.value }] }
+        // Tenía deuda y vaciaron «Paga con» = pagó justo: se dice explícito.
+        : (teniaDeuda.value && pideMontoRecibido.value ? { cobros: [{ medio: form.value.medio_pago, monto: totalConEnvio.value }] } : {})),
       observaciones:      form.value.observaciones || null,
       // El envío sólo si va por delivery y hay un valor (las viejas pueden no tenerlo).
       ...(editaEnvio.value && form.value.costo_envio !== '' ? { costo_envio_ars: Number(form.value.costo_envio).toFixed(2) } : {}),
@@ -290,12 +329,17 @@ async function handleSubmit() {
           <!-- Aporte: sólo administración lo pisa (el backend ignora el de cualquier otro rol, así
                que la pantalla no lo ofrece). -->
           <div v-if="puedeEditarPrecio" class="med__field">
-            <label class="med__label">{{ conEnvioEnForm ? 'Aporte por los productos' : 'Aporte del paciente' }} <span class="med__opt">ARS{{ conEnvioEnForm ? ', sin el envío' : '' }}</span></label>
+            <!-- Es el PRECIO, no lo que paga hoy (6-oct-2026, la #838): bajarlo es un descuento. -->
+            <label class="med__label">{{ conEnvioEnForm ? 'Precio de los productos' : 'Precio total' }} <span class="med__opt">ARS{{ conEnvioEnForm ? ', sin el envío' : '' }}</span></label>
             <div class="med__input-suffix-wrap">
               <span class="med__input-prefix">$</span>
               <input v-model.number="form.aporte_socio_ars" type="number" min="0" step="1"
                      class="med__input med__input--with-prefix" placeholder="0" />
             </div>
+            <p v-if="ajusteManual < 0" class="med__ayuda">
+              Bajar el precio es un <strong>descuento</strong>. Si paga menos y el resto lo debe, dejá el precio
+              y poné cuánto paga en «Paga con».
+            </p>
           </div>
 
           <!-- El valor del envío, corregible mientras el paquete no cerró (23-sep-2026). -->
@@ -348,6 +392,24 @@ async function handleSubmit() {
                 Se deshace lo cobrado: el repartidor cobra {{ fmt(totalConEnvio) }} en la puerta.
               </p>
             </div>
+          </div>
+
+          <!-- «Paga con»: lo que pagó ahora (vacío = justo). Lo que falta va a la cuenta corriente;
+               lo que sobra queda a favor. El mismo motor que la creación (6-oct-2026). -->
+          <div v-if="pideMontoRecibido" class="med__field">
+            <label class="med__label" for="med-paga-con">Paga con <span class="med__opt">vacío = justo · {{ fmt(totalConEnvio) }}</span></label>
+            <div class="med__input-suffix-wrap">
+              <span class="med__input-prefix">$</span>
+              <input id="med-paga-con" v-model.number="montoRecibido" type="number" min="0" step="1" inputmode="numeric"
+                     class="med__input med__input--with-prefix" :placeholder="String(Math.round(totalConEnvio))" />
+            </div>
+            <p v-if="faltante > 0.009" class="med__pago-resto" :class="{ 'med__pago-resto--mal': !tieneCc }">
+              <template v-if="tieneCc">Faltan <strong>{{ fmt(faltante) }}</strong> — se le cargan a la cuenta corriente.</template>
+              <template v-else>Faltan <strong>{{ fmt(faltante) }}</strong> y el paciente no tiene crédito habilitado: cobrale el total.</template>
+            </p>
+            <p v-else-if="excedente > 0.009" class="med__pago-resto">
+              Sobran <strong>{{ fmt(excedente) }}</strong> — le quedan a favor para la próxima.
+            </p>
           </div>
 
           <!-- Observaciones -->
@@ -517,4 +579,7 @@ async function handleSubmit() {
 .med__btn-primary:disabled { opacity: .5; cursor: not-allowed; }
 .med__btn-ghost { background: #fff; color: var(--c-slate-500); border: 1.5px solid var(--c-slate-200); padding: .6rem 1.1rem; border-radius: 9px; font-size: .875rem; font-weight: 500; cursor: pointer; }
 .med__btn-ghost:hover { background: var(--c-slate-50); }
+.med__ayuda { margin: .35rem 0 0; font-size: .76rem; color: var(--c-amber-500); line-height: 1.45; }
+.med__pago-resto { margin: .4rem 0 0; padding: .45rem .65rem; border-radius: 8px; background: var(--c-leaf-50); color: var(--c-leaf-900); font-size: .8rem; }
+.med__pago-resto--mal { background: var(--c-rust-100); color: var(--c-rust-600); }
 </style>

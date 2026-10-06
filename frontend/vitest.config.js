@@ -17,6 +17,7 @@ export default mergeConfig(
       // libre el suite es estable.
       maxWorkers: 6,
       exclude: [...configDefaults.exclude, 'e2e/**'],
+      setupFiles: ['./src/test-support/setup.js'],
       root: fileURLToPath(new URL('./', import.meta.url)),
     },
   }),

@@ -477,6 +477,14 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   médico no lo cerró (programado/confirmado): administración apura al médico. Faltó = su último
   turno no cancelado quedó ausente y no tiene otro dado: hay que darle turno, no apurar al médico.
   Administración ve el contador por médico («pasados sin cerrar») y el filtro en la lista.
+- **EL «APORTE» A MANO ES EL PRECIO, NO LO QUE PAGA** (6-oct-2026, la #838): en pantalla se llama
+  «Precio total». Bajarlo es un descuento. Lo que el paciente paga hoy va en «Paga con», al crear y
+  al editar; lo que falta va a la cuenta corriente (si entra en el cupo, si no se rechaza) y lo que
+  sobra queda a favor. La edición rehace los cobros de la creación con el mismo motor
+  (`aplicar_lineas_cobro!`). «Cuenta corriente» a secas mantiene la regla vieja: cubre hasta el cupo
+  y el resto se asienta cobrado en el momento.
+- **CONFIRMACIÓN FINAL DE LA DISPENSA** (6-oct-2026): antes de crear, un resumen (qué se lleva,
+  total, cómo paga) con «Confirmar e imprimir etiqueta». Es una foto al confirmar, no una computed.
 - **APODO** (6-oct-2026): opcional, se busca por él (padrón, médico, mostrador). Nunca sale en lo
   regulatorio (informes, carnet).
 - **LO QUE ENTRA A UN STOCK EXTERNO ES «ENTRÓ MERCADERÍA», NO UN RECONTEO** (1-oct-2026, socio

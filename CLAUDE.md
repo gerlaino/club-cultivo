@@ -129,7 +129,22 @@ mensual por plan (`Ia::Uso`, `ia_llamadas`, créditos `IaRecarga`).
 - **Seguridad**: no hay contraseña por defecto; `render file:` no existe en modo API; `/me` no se
   cachea; el helper de specs prefija `/api` a todo.
 
-## Dónde retomar (29-sep-2026)
+## Dónde retomar (6-oct-2026)
+
+**En producción hasta `beffe07a`**: página pública partida (autocultivo / proyectos / contacto, el
+consultorio como diferencial), bloque médico (el médico ve SÓLO sus pacientes vinculados, aviso y
+«Lo vi» de turnos, REPROCANN vencido/trámite/adherente, pendiente de entrevista) y apodos.
+**Commiteado sin pushear — bloque (ed)**: editar una dispensa con «Paga con» (lo que no paga va a
+cuenta corriente) con guardas contra errores silenciosos, y la confirmación final con «Confirmar e
+imprimir etiqueta». Germán lo pushea fuera del horario de dispensario. Abiertos: la #838 de Martín
+Blanco (no correr `CORREGIR=1` hasta que Javi diga si fue descuento o deuda), SMTP + `APP_HOST` en
+Render (web y worker). Detalle en `docs/CHANGELOG.md` (eb)–(ed) y `docs/REGLAS_Y_DECISIONES.md`.
+
+**Regla que gobierna código nuevo (6-oct):** en una dispensa, el número que administración pisa es
+el PRECIO; lo que paga va en «Paga con». Toda edición de plata que no pueda rehacerse sin mover un
+arqueo, un saldo a favor o una rendición se rechaza con el motivo («anulala y volvé a crearla»).
+
+### Retomada anterior (29-sep-2026)
 
 **Bloques (dj) y (dk) pusheados**: «Germinación» para lotes de semilla que no fueron a maceta (la
 palabra, no la fase). Un webhook de riegos de dispositivos se agregó y se retiró el mismo día

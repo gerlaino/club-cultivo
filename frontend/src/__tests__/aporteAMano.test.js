@@ -94,10 +94,122 @@ describe('Editar dispensa — aporte a mano', () => {
     w.unmount()
   })
 
-  it('el dispensador no ve un aporte editable: el backend no se lo acepta', async () => {
+  it('el dispensador no ve un precio editable: el backend no se lo acepta', async () => {
     const w = await montar('dispensador')
-    expect(w.text()).not.toContain('Aporte del paciente')
+    expect(w.text()).not.toContain('Precio total')
     expect(w.text()).not.toContain('Ajuste manual')
+    w.unmount()
+  })
+})
+
+// AC (6-oct-2026, Javi): si el paciente paga MENOS, la diferencia va a la cuenta corriente,
+// también al editar. Se dice en pantalla y viaja como lo que pagó; el precio no se toca.
+describe('Editar dispensa — «Paga con»', () => {
+  const DISPENSA = {
+    id: 91, paciente_nombre: 'Martín Blanco', cantidad: 100, aporte_socio_ars: 171000, subtotal_productos_ars: 171000,
+    fecha_dispensacion: '2026-10-05', medio_pago: 'transferencia', observaciones: '',
+    items: [{ id: 1, stock_id: 5, cantidad: 100, precio_unitario_ars: 1710, stock: { id: 5, forma_producto: 'flor_seca', unidad: 'g' } }],
+    paciente_saldo_cc: 0, paciente_limite_cc: 300000,
+  }
+  async function montar(dispensa = DISPENSA) {
+    setActivePinia(createPinia())
+    useAuthStore().user = { role: 'admin' }
+    const Modal = (await import('../components/pacientes/ModalEditarDispensacion.vue')).default
+    const w = mount(Modal, {
+      props: { modelValue: true, dispensacion: dispensa },
+      global: { stubs: { Teleport: true, AppDatePicker: true, DsSpinner: true }, directives: { modal: vModal } },
+    })
+    await flushPromises()
+    return w
+  }
+
+  it('pagó $80.000: dice que faltan $91.000 a la cuenta corriente y manda lo que pagó, con el precio intacto', async () => {
+    const { updateDispensacion } = await import('../lib/api.js')
+    updateDispensacion.mockClear()
+    const w = await montar()
+    await w.find('#med-paga-con').setValue('80000')
+    expect(w.text()).toContain('91.000')
+    expect(w.text()).toContain('cuenta corriente')
+    await w.vm.handleSubmit()
+    const payload = updateDispensacion.mock.calls[0][1]
+    expect(payload.aporte_socio_ars).toBe(171000)
+    expect(payload.cobros).toEqual([{ medio: 'transferencia', monto: 80000 }])
+    w.unmount()
+  })
+
+  it('sin crédito habilitado, no deja guardar un pago parcial', async () => {
+    const { updateDispensacion } = await import('../lib/api.js')
+    updateDispensacion.mockClear()
+    const w = await montar({ ...DISPENSA, paciente_limite_cc: 0 })
+    await w.find('#med-paga-con').setValue('80000')
+    await w.vm.handleSubmit()
+    expect(updateDispensacion).not.toHaveBeenCalled()
+    expect(w.text()).toContain('no tiene crédito habilitado')
+    w.unmount()
+  })
+
+  it('pagando justo no manda líneas: el total por el medio elegido', async () => {
+    const { updateDispensacion } = await import('../lib/api.js')
+    updateDispensacion.mockClear()
+    const w = await montar()
+    await w.vm.handleSubmit()
+    expect(updateDispensacion.mock.calls[0][1].cobros).toBeUndefined()
+    w.unmount()
+  })
+})
+
+// AC (6-oct-2026, «no podemos errar en estos detalles»): abrir para editar una dispensa que dejó
+// una parte a cuenta corriente y guardar sin tocar nada NO puede convertirla en «pagó todo».
+describe('Editar dispensa con una parte a cuenta corriente', () => {
+  const DISPENSA = {
+    id: 92, paciente_nombre: 'Martín Blanco', cantidad: 100, aporte_socio_ars: 171000, subtotal_productos_ars: 171000,
+    fecha_dispensacion: '2026-10-05', medio_pago: 'mixto', observaciones: '',
+    items: [{ id: 1, stock_id: 5, cantidad: 100, precio_unitario_ars: 1710, stock: { id: 5, forma_producto: 'flor_seca', unidad: 'g' } }],
+    cobros: [{ medio: 'transferencia', monto_ars: 80000, pagado: true }, { medio: 'cuenta_corriente', monto_ars: 91000, pagado: false }],
+    paciente_saldo_cc: -91000, paciente_limite_cc: 200000,
+  }
+  async function montar() {
+    setActivePinia(createPinia())
+    useAuthStore().user = { role: 'admin' }
+    const Modal = (await import('../components/pacientes/ModalEditarDispensacion.vue')).default
+    const w = mount(Modal, {
+      props: { modelValue: true, dispensacion: DISPENSA },
+      global: { stubs: { Teleport: true, AppDatePicker: true, DsSpinner: true }, directives: { modal: vModal } },
+    })
+    await flushPromises()
+    return w
+  }
+
+  it('abre con lo que pagó y el medio con el que pagó, y muestra la deuda', async () => {
+    const w = await montar()
+    expect(w.vm.form.medio_pago).toBe('transferencia')
+    expect(w.vm.montoRecibido).toBe(80000)
+    expect(w.text()).toContain('91.000')
+    w.unmount()
+  })
+
+  it('el crédito disponible cuenta el cupo que esta misma dispensa libera al rehacerse', async () => {
+    const w = await montar()
+    expect(w.vm.ccMargen).toBe(200000)          // −91.000 + 200.000 + 91.000 propios
+    w.unmount()
+  })
+
+  it('guardar sin tocar nada manda lo que pagó: la deuda queda como estaba', async () => {
+    const { updateDispensacion } = await import('../lib/api.js')
+    updateDispensacion.mockClear()
+    const w = await montar()
+    await w.vm.handleSubmit()
+    expect(updateDispensacion.mock.calls[0][1].cobros).toEqual([{ medio: 'transferencia', monto: 80000 }])
+    w.unmount()
+  })
+
+  it('si vacían «Paga con» (pagó todo), lo manda explícito y no deja que el backend adivine', async () => {
+    const { updateDispensacion } = await import('../lib/api.js')
+    updateDispensacion.mockClear()
+    const w = await montar()
+    await w.find('#med-paga-con').setValue('')
+    await w.vm.handleSubmit()
+    expect(updateDispensacion.mock.calls[0][1].cobros).toEqual([{ medio: 'transferencia', monto: 171000 }])
     w.unmount()
   })
 })

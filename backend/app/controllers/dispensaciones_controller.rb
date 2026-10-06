@@ -299,9 +299,21 @@ class DispensacionesController < ApplicationController
     end
     contra_entrega_sin_cobrar = @dispensacion.cobrar_en_entrega? && @dispensacion.cobros.empty?
 
-    cobro_simple = cobro_simple_de(@dispensacion)
-    if @dispensacion.usa_cobros? && cobro_simple.nil? && !contra_entrega_sin_cobrar
-      return render json: { error: 'Esta dispensación tiene cobros registrados. Para cambiar el monto, cancelala y volvé a crearla.' }, status: :unprocessable_entity
+    # Se pueden rehacer los cobros que se hicieron al CREARLA (efectivo, transferencia, lo que quedó
+    # a cuenta corriente o se pagó con el saldo a favor): se revierten y se vuelven a cobrar con los
+    # valores nuevos. Lo que cobró después el repartidor o entró en una rendición, no: ahí se anula
+    # y se rehace.
+    cobros_previos = @dispensacion.cobros.to_a
+    if @dispensacion.usa_cobros? && !contra_entrega_sin_cobrar
+      if (motivo = motivo_no_rehacible(@dispensacion, cobros_previos))
+        return render json: { error: motivo }, status: :unprocessable_entity
+      end
+      # Tenía una parte a cuenta corriente: rehacer «todo por el medio elegido» borraría esa deuda
+      # en silencio. La pantalla manda siempre lo que pagó; si no viene, no se adivina.
+      if cobros_previos.any?(&:a_credito?) && cobros_param.empty? &&
+         %w[efectivo transferencia].include?(attrs[:medio_pago].presence || @dispensacion.medio_pago)
+        return render json: { error: 'Esta dispensa tiene una parte a cuenta corriente: decí cuánto pagó en «Paga con».' }, status: :unprocessable_entity
+      end
     end
 
     # Cambio financiero (incl. cantidad): se revierten los efectos actuales (stock,
@@ -313,6 +325,8 @@ class DispensacionesController < ApplicationController
 
     cc = @dispensacion.paciente.cuenta_corriente
     envio_viejo = @dispensacion.costo_envio_ars
+    # «Paga con»: lo que pagó ahora, por línea. Lo que no cubren va a cuenta corriente.
+    lineas_cobro_edicion = cobros_param
     begin
       ActiveRecord::Base.transaction do
         # 1) revertir efectos actuales
@@ -322,8 +336,8 @@ class DispensacionesController < ApplicationController
         @dispensacion.movimientos_contables.destroy_all
         # El cobro simple se rehace con el medio nuevo; la caja en la que cayó se conserva si
         # sigue abierta (`caja_para_cobros` la valida).
-        caja_anterior = cobro_simple&.caja_turno_id
-        cobro_simple&.destroy!
+        caja_anterior = cobros_previos.filter_map(&:caja_turno_id).first
+        cobros_previos.each(&:destroy!) unless contra_entrega_sin_cobrar
         @dispensacion.cobros.reset
         stocks_previos = @dispensacion.items.filter_map(&:stock) # por si la edición cambia de frasco
         @dispensacion.send(:incrementar_stock)   # devuelve al stock la cantidad vieja
@@ -398,10 +412,21 @@ class DispensacionesController < ApplicationController
         if @dispensacion.cobrar_en_entrega?
           # Contra entrega: no entró un peso todavía. El cobro y el asiento los hace el
           # repartidor al entregar; acá no se asienta nada.
-        elsif %w[efectivo transferencia].include?(@dispensacion.medio_pago) && @dispensacion.aporte_socio_ars.to_d > 0
-          # Mismo camino que la creación: el cobro y su asiento, enganchado a la caja.
+        elsif lineas_cobro_edicion.present? || %w[efectivo transferencia].include?(@dispensacion.medio_pago)
+          # MISMO MOTOR QUE LA CREACIÓN (6-oct-2026, lo que le pasó a Javi con la #838): «pagó
+          # $80.000 por transferencia» sobre una dispensa de $171.000 deja los $91.000 restantes
+          # como deuda en la cuenta corriente —si entran en el cupo; si no, se rechaza, igual que
+          # el «Paga con» de la creación—, y lo pagado de más queda a favor. Sin líneas, un solo
+          # medio por el total. «Cuenta corriente» a secas sigue por el camino de siempre (cubre
+          # hasta el cupo y el resto se asienta cobrado en el momento: regla vieja, a propósito).
+          lineas = lineas_cobro_edicion
+          if lineas.empty? && %w[efectivo transferencia].include?(@dispensacion.medio_pago)
+            lineas = [{ medio: @dispensacion.medio_pago, monto: @dispensacion.aporte_socio_ars.to_d }]
+          end
+          @dispensacion.update_columns(monto_credito_ars: 0)
           @dispensacion.caja_turno_elegida_id = caja_elegida_param || caja_anterior
-          aplicar_lineas_cobro!(@dispensacion, [{ medio: @dispensacion.medio_pago, monto: @dispensacion.aporte_socio_ars.to_d }], 'creacion', usar_saldo: false)
+          aplicar_lineas_cobro!(@dispensacion, lineas, 'creacion', usar_saldo: false)
+          afinar_medio_pago!(@dispensacion)
         else
           crear_movimiento_contable(@dispensacion)
           debitar_cuenta_corriente(@dispensacion) if @dispensacion.a_credito? && cc
@@ -1127,17 +1152,28 @@ class DispensacionesController < ApplicationController
     )
   end
 
-  # El único cobro de una venta simple: uno solo, de creación, en efectivo o transferencia, por
-  # el total. Cualquier otra combinación es un desglose que la edición legacy no sabe rehacer.
-  def cobro_simple_de(disp)
-    return nil if disp.cobrar_en_entrega?
+  MEDIOS_REHACIBLES = %w[efectivo transferencia cuenta_corriente].freeze
 
-    cobros = disp.cobros.to_a
-    return nil unless cobros.size == 1
+  # Por qué los cobros de esta dispensa NO se pueden revertir y volver a cobrar al editarla (nil =
+  # se puede). Cada condición tapa un error que sería silencioso:
+  #   · cobrado después (repartidor, recupero) o rendido: esa plata ya está en otra cuenta;
+  #   · con saldo a favor: la edición no vuelve a usar el saldo, y se cobraría en efectivo lo que
+  #     salió del saldo (la caja esperaría plata que nunca entró);
+  #   · dos medios pagados (efectivo y transferencia): «Paga con» de la edición es UN medio;
+  #   · en una caja que ya cerró: rehacerlo movería un arqueo firmado.
+  def motivo_no_rehacible(disp, cobros)
+    rehacer = 'Para cambiar el monto, anulala y volvé a crearla.'
+    return "Esta dispensación tiene cobros registrados. #{rehacer}" if disp.cobrar_en_entrega? || cobros.empty?
+    unless cobros.all? { |c| c.contexto == 'creacion' && MEDIOS_REHACIBLES.include?(c.medio) && c.rendicion_caja_id.nil? }
+      return "Esta dispensación tiene cobros que no se pueden rehacer (saldo a favor, cobrados después o rendidos). #{rehacer}"
+    end
+    if cobros.reject(&:a_credito?).map(&:medio).uniq.size > 1
+      return "Esta dispensación se pagó con dos medios. #{rehacer}"
+    end
+    cajas = CajaTurno.unscoped.where(id: cobros.filter_map(&:caja_turno_id))
+    return "La plata de esta dispensación ya entró en un cierre de caja. #{rehacer}" if cajas.any? { |c| !c.abierta? }
 
-    c = cobros.first
-    c if c.contexto == 'creacion' && %w[efectivo transferencia].include?(c.medio) &&
-         (c.monto_ars.to_d - disp.aporte_socio_ars.to_d).abs < 0.01
+    nil
   end
 
   # Con qué medio nace una dispensa que todavía no tiene cobros registrados. Nunca 'mixto':

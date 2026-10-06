@@ -1,5 +1,39 @@
 # Changelog
 
+## Octubre 2026 (ed) — Editar una dispensa: lo que no paga va a la cuenta corriente, y la confirmación final
+
+Lo que le pasó a Javi con la #838 (Martín Blanco): el paciente pagaba $80.000 de una dispensa de
+$171.000 y el resto tenía que quedar debiendo. Al editar no había forma —un solo medio por el
+total—, así que se bajaba el «Aporte del paciente», que en realidad es el PRECIO: quedaba un
+descuento, sin deuda, y las líneas no coincidían con el total.
+
+- **La edición usa el mismo motor de cobros que la creación** (`aplicar_lineas_cobro!`): «Paga con»
+  en el modal de edición; lo que no paga va a la cuenta corriente (si entra en el cupo; si no, se
+  rechaza con el motivo), lo que paga de más queda a favor. Los cobros de la creación se revierten
+  y se rehacen, así que una dispensa con pago parcial se puede volver a editar.
+- **Lo que la edición NO hace en silencio** (cada caso con su test, que falla sin la guarda): si
+  tenía una parte a cuenta corriente, el modal abre con lo que pagó y siempre lo manda, y el
+  backend rechaza una edición que no lo diga (no la convierte en «pagó todo»). No se rehacen
+  —se anula y se rehace la dispensa— los cobros con saldo a favor, con dos medios pagados,
+  cobrados por el repartidor o rendidos, ni los que ya entraron en un **cierre de caja** (movería
+  un arqueo firmado). El crédito disponible del modal suma el cupo que la misma dispensa libera.
+- **El campo se llama «Precio total» / «Precio de los productos»** en los dos modales, con una
+  ayuda cuando se baja: «Bajar el precio es un descuento. Si paga menos y el resto lo debe, dejá el
+  precio y poné cuánto paga en "Paga con"».
+- **Confirmación final antes de registrar una dispensa** (`ResumenDispensaModal`): qué se lleva,
+  ajuste, envío, total y cómo paga (qué va a cuenta corriente, qué queda a favor). Botones Volver ·
+  Confirmar · **Confirmar e imprimir etiqueta** (la etiqueta de siempre, `useEtiquetaDispensa`, con
+  la dispensa recién creada). Se arma como foto al confirmar: como computed redibujaba el modal y
+  pisaba la dirección de envío elegida.
+- Se mantiene, a propósito, la regla vieja de «cuenta corriente» a secas: cubre hasta el cupo y el
+  resto se asienta cobrado en el momento (la pantalla lo dice: «El crédito no alcanza — a cobrar ahora»).
+- Tests: `dispensacion_edicion_cuenta_corriente_spec` (falla con el código anterior), «Paga con» del
+  modal de edición, el resumen y la etiqueta. `vitest` tiene setup común (`src/test-support/setup.js`)
+  que confirma solo el resumen en los tests que prueban payloads.
+- **Pendiente:** la #838 sigue como está (`rake dispensas:lineas_descuadradas CLUB=14` la lista). Si
+  fue descuento, `CORREGIR=1`; si debía $91.000, se rehace: precio $171.000 y $91.000 a su cuenta
+  corriente (hay que subirle el límite: con $200.000 no entra).
+
 ## Octubre 2026 (ec) — El bloque médico: pacientes vinculados, avisos de turno, REPROCANN y entrevistas
 
 Lo pidieron Javi y Germán (6-oct). Migración `MedicoPacientesYTurnosVistos` (corre sola al deployar).

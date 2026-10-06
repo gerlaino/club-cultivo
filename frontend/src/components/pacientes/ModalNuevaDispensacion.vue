@@ -12,6 +12,8 @@ import { RouterLink, useRoute } from 'vue-router'
 import { createDispensacion, createReserva, entregarReserva, listStocks, listEntregadores,
          getMostrador, listMostradores } from '../../lib/api.js'
 import SelectorDireccionEntrega from './SelectorDireccionEntrega.vue'
+import ResumenDispensaModal from './ResumenDispensaModal.vue'
+import { useEtiquetaDispensa } from '../../composables/useEtiquetaDispensa.js'
 
 const props = defineProps({
   modelValue:     { type: Boolean, required: true },
@@ -884,6 +886,72 @@ watch(() => props.modelValue, (open) => {
 
 function cerrar() { emit('update:modelValue', false) }
 
+// ── Confirmación final con el resumen (Germán, 6-oct-2026) ─────────────────────────
+// Antes de mover stock y plata: lo que se lleva, cuánto sale y cómo paga, con los MISMOS números
+// que muestra este modal (no se recalcula nada aparte). Desde ahí se confirma, o se confirma e
+// imprime la etiqueta del paquete.
+const { imprimirEtiqueta } = useEtiquetaDispensa()
+const resumenAbierto = ref(false)
+// Una FOTO al momento de confirmar, no una computed: leída en cada render, el modal se redibujaba
+// con cada cambio de dirección y eso pisaba la tarjeta elegida.
+const resumenActual = ref({ productos: [], pagos: [] })
+let resolverResumen = null
+function pedirConfirmacion() {
+  resumenActual.value = armarResumen()
+  resumenAbierto.value = true
+  return new Promise((resolve) => { resolverResumen = resolve })
+}
+function elegirResumen(eleccion) {
+  resumenAbierto.value = false
+  resolverResumen?.(eleccion === 'volver' ? null : eleccion)
+  resolverResumen = null
+}
+const MEDIO_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia', cuenta_corriente: 'A cuenta corriente',
+                      no_abona: 'No abona (a crédito)', credito_gramos: 'Crédito en gramos' }
+function armarResumen() {
+  const productos = items.value.map(it => ({
+    cantidad: `${it.cantidad}${it.stock?.unidad || 'g'}`,
+    forma:    FORMA_LABEL[it.stock?.forma_producto] || it.stock?.forma_producto || 'Producto',
+    genetica: it.stock?.genetica?.nombre || '',
+    subtotal: precioLinea(it) * it.cantidad,
+  }))
+  const pagos = []
+  let especial = null
+  if (form.value.es_regalo) especial = 'Regalo — no se cobra'
+  else if (modoCambio.value) especial = 'Cambio — no se cobra'
+  else {
+    if (saldoAplicado.value > 0) pagos.push({ label: 'Con su saldo a favor', monto: saldoAplicado.value })
+    if (pagoDividido.value) {
+      lineasPago.value.forEach(l => {
+        const monto = l.medio === 'contra_entrega' ? montoContraEntrega.value : Number(l.monto) || 0
+        if (monto > 0) pagos.push({ label: l.medio === 'contra_entrega' ? 'Lo cobra el repartidor' : (MEDIO_LABEL[l.medio] || l.medio), monto, destacado: l.medio === 'cuenta_corriente' })
+      })
+      if (restoPago.value > 0.009 && !restoAlDelivery.value) pagos.push({ label: 'Resto a cuenta corriente', monto: restoPago.value, destacado: true })
+    } else if (form.value.medio_pago === 'contra_entrega') {
+      pagos.push({ label: 'Lo cobra el repartidor', monto: aCobrarAhora.value })
+    } else if (form.value.medio_pago === 'cuenta_corriente') {
+      if (montoACredito.value > 0) pagos.push({ label: 'A cuenta corriente', monto: montoACredito.value, destacado: true })
+      if (restoACobrar.value > 0) pagos.push({ label: 'El crédito no alcanza — se cobra ahora', monto: restoACobrar.value })
+    } else if (pideMontoRecibido.value) {
+      pagos.push({ label: MEDIO_LABEL[form.value.medio_pago] || form.value.medio_pago, monto: montoUnico.value })
+      if (faltanteUnico.value > 0.009) pagos.push({ label: 'Falta — a cuenta corriente', monto: faltanteUnico.value, destacado: true })
+      if (excedenteUnico.value > 0.009) pagos.push({ label: 'Sobra — queda a favor', monto: excedenteUnico.value })
+    } else if (aCobrarAhora.value > 0) {
+      pagos.push({ label: MEDIO_LABEL[form.value.medio_pago] || form.value.medio_pago, monto: aCobrarAhora.value })
+    }
+  }
+  return {
+    paciente: props.pacienteNombre,
+    productos,
+    ajuste:   ajusteManual.value || 0,
+    envio:    pideEnvio.value ? envioArs.value : null,
+    envioA:   pideEnvio.value ? (form.value.direccion_origen === 'otra' ? [form.value.envio_calle, form.value.envio_altura].filter(Boolean).join(' ') : 'su domicilio') : null,
+    total:    totalACobrar.value,
+    especial,
+    pagos,
+  }
+}
+
 // LO DEVUELTO, PRECARGADO — si está sobre la mesa. Lo que no esté (se agotó, quien atiende no lo
 // ve, era de otra sede) queda afuera y se elige otra cosa: precargar algo que el backend va a
 // rechazar es el peor error posible.
@@ -1182,10 +1250,14 @@ async function handleSubmit() {
       if (!eleccion) { saving.value = false; return }
       if (eleccion === 'neutral') payload.dejar_abiertos = terminan.map(st => st.id)
     }
-    await createDispensacion(props.socioId, payload)
+    // El último paso: el resumen. «Volver» deja todo como estaba para corregir.
+    const decision = await pedirConfirmacion()
+    if (!decision) { saving.value = false; return }
+    const { data: creada } = await createDispensacion(props.socioId, payload)
     cerrar()
     toast.success(modoCambio.value ? 'Cambio entregado' : 'Dispensación registrada')
     emit('saved')
+    if (decision === 'imprimir') imprimirEtiqueta(creada?.data || creada)
   } catch (e) {
     // SIN CONEXIÓN NO SE DISPENSA. Antes se encolaba y se le decía "guardada localmente — se
     // enviará al reconectarse", descontando el stock de una caché local que puede estar vieja: dos
@@ -1657,7 +1729,8 @@ async function handleSubmit() {
                  monto se sigue calculando igual —el asiento contable no cambia—; lo que se ve
                  en su lugar es el panel de crédito, que lo dice como es: "se carga al crédito". -->
             <div v-if="puedeEditarAporte && !esCuentaCorriente && !modoCambio" class="mnd__field">
-              <label class="mnd__label">{{ pideEnvio ? 'Aporte por los productos' : 'Aporte del paciente' }}
+              <!-- Es el PRECIO, no lo que paga hoy (6-oct-2026, la #838): bajarlo es un descuento. -->
+              <label class="mnd__label">{{ pideEnvio ? 'Precio de los productos' : 'Precio total' }}
                 <span class="mnd__opt">ARS — editable{{ pideEnvio ? ', sin el envío' : '' }}</span>
               </label>
               <div class="mnd__input-suffix-wrap">
@@ -1665,6 +1738,10 @@ async function handleSubmit() {
                 <input v-model.number="form.aporte_socio_ars" type="number" min="0" step="1"
                        class="mnd__input mnd__input--with-prefix" placeholder="0" />
               </div>
+              <p v-if="ajusteManual < 0" class="mnd__ayuda-precio">
+                Bajar el precio es un <strong>descuento</strong>. Si paga menos y el resto lo debe, dejá el precio
+                y poné cuánto paga en «Paga con».
+              </p>
             </div>
           </div>
 
@@ -2048,6 +2125,8 @@ async function handleSubmit() {
       </div>
     </div>
   </Teleport>
+  <!-- El resumen final (se teletransporta solo, encima del modal). -->
+  <ResumenDispensaModal :abierto="resumenAbierto" :resumen="resumenActual" @elegir="elegirResumen" />
 </template>
 
 <style scoped>
@@ -2330,6 +2409,7 @@ async function handleSubmit() {
 .mnd__field { display: flex; flex-direction: column; gap: .3rem; }
 .mnd__label { font-size: .72rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: .05em; }
 .mnd__req { color: #ef4444; }
+.mnd__ayuda-precio { margin: .35rem 0 0; font-size: .76rem; color: var(--c-amber-500); line-height: 1.45; }
 .mnd__opt { font-size: .67rem; font-weight: 400; color: var(--c-slate-400); text-transform: none; letter-spacing: 0; }
 .mnd__input { background: var(--c-slate-50); border: 1.5px solid var(--c-slate-200); border-radius: 9px; padding: .6rem .8rem; font-size: .875rem; color: var(--c-slate-900); width: 100%; box-sizing: border-box; outline: none; transition: border-color .15s; }
 .mnd__input:focus { border-color: #1b5e20; background: #fff; }
