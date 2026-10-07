@@ -142,6 +142,10 @@
          así que la foto se sube desde acá y recién después se va al lote. -->
     <input ref="inputFoto" type="file" accept="image/*" capture="environment" style="display:none" @change="subirFotoRapida" />
 
+    <!-- El asistente de voz sin contexto: lo abre «Dictar» del «+». Hasta el 7-oct el teléfono no
+         lo tenía montado en ningún lado, y para dictar había que entrar a un lote → Registrar. -->
+    <AsistenteVoz v-if="puedeDictar" :sin-trigger="true" />
+
     <!-- Modales de creación reutilizados del desktop -->
     <NuevoLoteModal :show="showNuevoLote" :salas="salas" @close="showNuevoLote = false" @created="onCreado" />
     <ModalCrearSala v-if="showNuevaSala" @close="showNuevaSala = false" @created="onCreado" />
@@ -170,6 +174,7 @@ import MobileActionGrid from '../mobile/MobileActionGrid.vue'
 import NuevoLoteModal from '../lotes/NuevoLoteModal.vue'
 import ModalCrearSala from '../salas/ModalCrearSala.vue'
 import ModalTarea from '../ModalTarea.vue'
+import AsistenteVoz from '../AsistenteVoz.vue'
 
 const route  = useRoute()
 const router = useRouter()
@@ -382,6 +387,12 @@ const fabActions = computed(() => {
       acciones.splice(1, 0, { key: 'alimentar', label: 'Alimentar la cama', icon: 'bi-basket-fill', tint: 'var(--c-amber-100)', color: 'var(--c-slate-900)', onClick: () => conCama('alimentar') })
     }
   }
+  // Dictar va PRIMERO: con una frase se anotan varias cosas a la vez («regué la Ananda, la
+  // carpa está a 26 grados y mañana revisar plagas»). Sólo con la IA y para los roles que la
+  // pueden usar (el backend rechaza al resto: `AsistenteController::ROLES_CON_IA`).
+  if (puedeDictar.value) {
+    acciones.unshift({ key: 'voz', label: 'Dictar', icon: 'bi-mic-fill', tint: 'var(--c-leaf-100)', color: 'var(--c-leaf-700)', onClick: abrirDictado })
+  }
   // Crear una SALA es decisión de infraestructura, no del que está en el pasillo.
   if (!esCultivador) {
     acciones.push({ key: 'sala', label: club.data?.personal ? 'Crear espacio' : 'Crear sala', icon: 'bi-grid-3x3-gap',
@@ -391,6 +402,13 @@ const fabActions = computed(() => {
   }
   return acciones
 })
+
+const ROLES_CON_IA = ['admin', 'cultivador', 'supervisor']
+const puedeDictar = computed(() => club.data?.features?.ia === true && ROLES_CON_IA.includes(role.value))
+function abrirDictado() {
+  fabOpen.value = false
+  window.dispatchEvent(new CustomEvent('abrir-asistente-voz'))
+}
 
 function irEscanear() {
   fabOpen.value = false

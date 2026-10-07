@@ -70,6 +70,19 @@ class AsistenteController < BaseController
     "avance_ciclo"            → cambio de estado del ciclo de un lote
     "tarea"                   → tarea futura (solo admin/supervisor)
 
+    LO QUE PASÓ vs LO QUE HAY QUE HACER:
+    - Pasado o presente ("regué", "le puse", "está amarilla") → registro o nota.
+    - Futuro o pendiente ("mañana revisar plagas", "el jueves hay que podar", "en 3 días defoliar",
+      "acordarme de…") → UNA acción "tarea" y NADA MÁS para esa actividad: no generes además un
+      registro con esa tarea en `tareas_realizadas`, porque todavía no se hizo.
+    - Cada actividad, una sola vez: no repitas la misma acción aunque la frase la nombre dos veces.
+
+    DÓNDE:
+    - Los lotes se nombran por su código (L-26-003) o por su genética ("la Ananda"): usá SIEMPRE el
+      `lote_codigo` que figura en el MAPA DEL CULTIVO. Si el nombre no está en el mapa o coincide con
+      más de un lote, no adivines: usá nota con lo que se dijo y aclaralo en el resumen.
+    - Los espacios (salas) se nombran como figuran en el mapa: va en `sala_nombre`, exacto.
+
     TAREAS FÍSICAS VÁLIDAS (array "tareas_realizadas"):
     riego | nutricion | poda | defoliacion | scrog_lst | revision_plagas | limpieza_sala | ajuste_luz
 
@@ -99,6 +112,7 @@ class AsistenteController < BaseController
         },
         {
           "tipo": "registro_ambiental_sala",
+          "sala_nombre": "Carpa grande",
           "datos": { "tareas_realizadas": ["riego"], "fertilizacion": false, "temperatura": 24.5, "humedad": 60 }
         },
         {
@@ -111,9 +125,9 @@ class AsistenteController < BaseController
           }
         },
         { "tipo": "nota_lote", "lote_codigo": "L-26-003", "datos": { "contenido": "texto" } },
-        { "tipo": "nota_sala", "datos": { "contenido": "texto" } },
+        { "tipo": "nota_sala", "sala_nombre": "Carpa grande", "datos": { "contenido": "texto" } },
         { "tipo": "avance_ciclo", "lote_codigo": "L-26-003", "datos": { "estado_nuevo": "floracion", "descripcion": "motivo" } },
-        { "tipo": "tarea", "datos": { "titulo": "Revisión plagas", "descripcion": "...", "prioridad": "alta", "sala_nombre": "Sala A", "dias_desde_hoy": 3 } }
+        { "tipo": "tarea", "datos": { "titulo": "Revisar plagas", "tipo_tarea": "revision_plagas", "descripcion": "...", "prioridad": "normal", "lote_codigo": "L-26-003", "sala_nombre": "Sala A", "dias_desde_hoy": 1, "asignar_a": "el cultivador" } }
       ]
     }
 
@@ -121,8 +135,12 @@ class AsistenteController < BaseController
     estado_general / estado_salud: excelente | bueno | regular | malo | critico
     color_hojas:   verde_oscuro | verde_claro | amarillo | marron
     plagas:        ninguna | leve | moderada | severa
-    prioridad:     baja | normal | media | alta | urgente
+    prioridad:     baja | normal | alta | urgente
     estado_nuevo:  enraizado | vegetativo | floracion | cosecha | secado | curado | finalizado
+    tipo_tarea:    riego | nutricion | poda | defoliacion | scrog_lst | revision_plagas | limpieza |
+                   ajuste_luz | medicion | inspeccion | trasplante | cosecha | otro
+    dias_desde_hoy: OBLIGATORIO en una tarea. Contalo desde la fecha de HOY que figura abajo:
+                   hoy = 0, mañana = 1, pasado mañana = 2, "el jueves" = días hasta el próximo jueves.
   PROMPT
 
   # El modelo que usa el asistente, en un solo lugar: se registra en cada llamada para poder
@@ -155,9 +173,6 @@ class AsistenteController < BaseController
     if resultado[:error]
       render json: { error: resultado[:error] }, status: :unprocessable_entity
     else
-      if es_cultivador && resultado['acciones']
-        resultado['acciones'] = resultado['acciones'].reject { |a| (a['tipo'] || a[:tipo]) == 'tarea' }
-      end
       anotar_tareas_a_cerrar!(resultado['acciones'], contexto)
       resultado['correccion_id'] = registrar_propuesta(texto, resultado['acciones'])
       sesion.agregar_intercambio(texto, resultado['resumen'].to_s) rescue nil
@@ -216,6 +231,12 @@ class AsistenteController < BaseController
     contexto = params[:contexto]
     club     = current_user.club
 
+    # Un dictado se guarda UNA vez. Si el «Guardar» llega dos veces —doble toque, o la red cortó
+    # la respuesta y la persona reintentó con el guardado ya hecho— la segunda vez se rechaza en
+    # vez de duplicar riegos y tareas. El reclamo es atómico (UPDATE … WHERE ejecutado_en IS NULL),
+    # así que dos pedidos simultáneos no pasan los dos.
+    return if dictado_ya_guardado?(params[:correccion_id])
+
     resultados = []
     errores    = []
 
@@ -223,19 +244,14 @@ class AsistenteController < BaseController
       tipo  = accion[:tipo]  || accion['tipo']
       datos = (accion[:datos] || accion['datos'] || {}).to_unsafe_h rescue {}
 
-      if tipo == 'tarea' && current_user.cultivador?
-        errores << { tipo: tipo, error: 'Los cultivadores no pueden crear tareas' }
-        next
-      end
-
       accion_e = enriquecer_con_contexto(accion, contexto, club)
 
       resultado = case tipo
                   when 'registro_ambiental'      then ejecutar_registro_ambiental(accion_e, datos, club)
-                  when 'registro_ambiental_sala' then ejecutar_registro_ambiental_sala(datos, club, contexto)
+                  when 'registro_ambiental_sala' then ejecutar_registro_ambiental_sala(accion_e, datos, club, contexto)
                   when 'registro_planta'         then ejecutar_registro_planta(accion_e, datos, club)
                   when 'tarea'                   then ejecutar_tarea(accion_e, datos, club, contexto)
-                  when 'nota_sala'               then ejecutar_nota_sala(datos, club, contexto)
+                  when 'nota_sala'               then ejecutar_nota_sala(accion_e, datos, club, contexto)
                   when 'nota_lote'               then ejecutar_nota_lote(accion_e, datos, club, contexto)
                   when 'avance_ciclo'            then ejecutar_avance_ciclo(accion_e, datos, club, contexto)
                   else { ok: false, error: "Tipo desconocido: #{tipo}" }
@@ -260,6 +276,8 @@ class AsistenteController < BaseController
       errores_detalle: errores
     }
   rescue StandardError => e
+    # Se suelta el reclamo: si falló, la persona tiene que poder reintentar.
+    liberar_dictado(params[:correccion_id])
     Rails.logger.error "AsistenteController#ejecutar error: #{e.class}: #{e.message}\n#{e.backtrace.first(5).join("\n")}"
     render json: { error: "Error interno al ejecutar acciones: #{e.message}" }, status: :internal_server_error
   end
@@ -290,10 +308,9 @@ class AsistenteController < BaseController
       case accion['tipo'] || accion[:tipo]
       when 'registro_ambiental'
         codigo = accion['lote_codigo'] || accion[:lote_codigo]
-        lote   = club.lotes.find_by(codigo: codigo) if codigo.present?
+        lote   = lotes_visibles(club).find_by(codigo: codigo) if codigo.present?
       when 'registro_ambiental_sala'
-        sala_id = contexto&.dig('sala_id') || contexto&.dig(:sala_id)
-        sala    = club.salas.find_by(id: sala_id) if sala_id.present?
+        sala = sala_de(accion, datos, club, contexto)
       end
       next unless lote || sala
 
@@ -323,6 +340,28 @@ class AsistenteController < BaseController
     # Quedarse sin la lista no puede impedir registrar: sin ella no se cierra ninguna tarea, que
     # es el lado seguro del error.
     Rails.logger.warn("[asistente] no se pudieron listar tareas a cerrar: #{e.class} #{e.message}")
+  end
+
+  # true (y ya contestó 409) si ese dictado ya se había guardado. Sin `correccion_id` (no se
+  # pudo registrar la propuesta) no hay con qué reconocerlo, y se guarda: perder un registro es
+  # peor que el caso raro de duplicarlo.
+  def dictado_ya_guardado?(correccion_id)
+    return false if correccion_id.blank?
+
+    base = AsistenteCorreccion.where(id: correccion_id, club_id: current_user.club_id)
+    return false if base.where(ejecutado_en: nil).update_all(ejecutado_en: Time.current) == 1
+    return false unless base.exists?
+
+    render json: { error: 'Este dictado ya se guardó: no se volvió a cargar.', ya_guardado: true }, status: :conflict
+    true
+  end
+
+  def liberar_dictado(correccion_id)
+    return if correccion_id.blank?
+
+    AsistenteCorreccion.where(id: correccion_id, club_id: current_user.club_id).update_all(ejecutado_en: nil)
+  rescue StandardError
+    nil
   end
 
   # Guarda lo que el modelo propuso, para después poder compararlo con lo que la persona guardó.
@@ -388,19 +427,65 @@ class AsistenteController < BaseController
   # Ojo si se toca `PROMPT_BASE`: el mínimo cacheable de Sonnet 4.6 son 1024 tokens. Si el
   # bloque estable queda por debajo, el caché deja de funcionar **en silencio** — no hay error,
   # sólo `cache_read_tokens` en 0. Por eso se registra el hit ratio.
+  # El bloque fijo (cacheado) es el prompt y el rol; el variable, la fecha de hoy, el mapa del
+  # cultivo y el contexto de donde se abrió. El MAPA va SIEMPRE: sin él, el micrófono abierto sin
+  # elegir nada no sabía qué lote era «la Ananda» ni qué espacio era «la carpa», y lo que dictabas
+  # fallaba al guardar («Lote no encontrado»). Y con él, desde adentro de un espacio se puede
+  # nombrar un lote de otro.
   def construir_prompt(contexto, es_cultivador)
-    [PROMPT_BASE + permisos_rol(es_cultivador), contexto_rico(contexto)]
+    hoy      = Time.zone.today
+    variable = "\nHOY: #{DIAS_SEMANA[hoy.wday]} #{hoy.strftime('%d/%m/%Y')}\n" + mapa_del_cultivo + contexto_rico(contexto)
+    [PROMPT_BASE + permisos_rol(es_cultivador), variable]
+  end
+
+  DIAS_SEMANA = %w[domingo lunes martes miércoles jueves viernes sábado].freeze
+
+  # Los espacios y lotes en pie, en pocas líneas. Con tope: una organización grande no puede
+  # mandar cien lotes en cada dictado (se pagan por token); los que no entran se nombran por código.
+  MAPA_MAX_LOTES = 60
+
+  def mapa_del_cultivo
+    club  = current_user.club
+    salas = salas_visibles(club).where.not(state: 'cerrada').order(:nombre).to_a
+    lotes = lotes_visibles(club).where(estado: %w[enraizado vegetativo floracion secado curado])
+                .includes(:genetica).order(:codigo).limit(MAPA_MAX_LOTES).to_a
+    return '' if salas.empty? && lotes.empty?
+
+    por_sala = lotes.group_by(&:sala_id)
+    ctx = "\n═══ MAPA DEL CULTIVO ═══\n"
+    salas.each do |sa|
+      ctx += "Espacio «#{sa.nombre}» (#{sa.kind || sa.tipo})\n"
+      Array(por_sala[sa.id]).each { |l| ctx += "  #{linea_lote(l)}\n" }
+    end
+    sueltos = lotes.reject { |l| salas.any? { |sa| sa.id == l.sala_id } }
+    sueltos.each { |l| ctx += "  #{linea_lote(l)} (sin espacio)\n" }
+    ctx += "(Hay más lotes: nombralos por código.)\n" if lotes.size == MAPA_MAX_LOTES
+    equipo = equipo_asignable(club)
+    if equipo.any? && !current_user.cultivador?
+      ctx += "EQUIPO (a quién se le puede asignar una tarea):\n"
+      equipo.each { |u| ctx += "  #{u.nombre_completo.presence || u.email} (#{u.role})\n" }
+    end
+    ctx + "═════════════════════════════════════\n"
+  end
+
+  def linea_lote(l)
+    cepa  = l.genetica&.nombre || l.strain || '—'
+    cepa += ' (auto)' if l.automatica?
+    "#{l.codigo} | #{cepa} | #{l.estado} | #{l.plants_count || 0} plantas"
   end
 
   def permisos_rol(es_cultivador)
     if es_cultivador
       "\nROL: Este usuario es CULTIVADOR.\n" \
-      "- NO generar acciones de tipo 'tarea'.\n" \
+      "- PUEDE generar 'tarea' para lo que dejó pendiente («mañana termino de defoliar»): queda\n" \
+      "  asignada a él mismo. NO pongas `asignar_a`.\n" \
       "- PUEDE generar avance_ciclo cuando lo mencione. Estados válidos para avanzar DESDE: enraizado, vegetativo, floracion, cosecha, secado.\n" \
       "- NO puede avanzar el ciclo desde 'curado' o 'finalizado' (eso lo hace el manicuro/admin).\n"
     else
       "\nROL: Este usuario es ADMIN/SUPERVISOR con permisos completos.\n" \
-      "- Puede generar avance_ciclo cuando se lo mencione explícitamente.\n"
+      "- Puede generar avance_ciclo cuando se lo mencione explícitamente.\n" \
+      "- En una tarea, si dice QUIÉN la hace («mañana el cultivador revisa plagas», «que Juan pode»),\n" \
+      "  poné en datos `asignar_a` el nombre o el rol tal como lo dijo. Si no lo dice, no lo pongas.\n"
     end
   end
 
@@ -416,8 +501,7 @@ class AsistenteController < BaseController
   end
 
   def ctx_planta(contexto)
-    planta = Plant.joins(:lote)
-                  .where(lotes: { club_id: current_user.club_id })
+    planta = Plant.where(lote_id: lotes_visibles(current_user.club).select(:id))
                   .find_by(id: contexto[:planta_id] || contexto['planta_id'])
     return '' unless planta
 
@@ -503,7 +587,7 @@ class AsistenteController < BaseController
   end
 
   def ctx_lote(contexto)
-    lote = current_user.club.lotes.find_by(id: contexto[:lote_id] || contexto['lote_id'])
+    lote = current_user.lotes_visibles(club).find_by(id: contexto[:lote_id] || contexto['lote_id'])
     return '' unless lote
 
     cepa = lote.genetica&.nombre || lote.strain || 'desconocida'
@@ -555,7 +639,7 @@ class AsistenteController < BaseController
   end
 
   def ctx_sala(contexto)
-    sala = current_user.club.salas.find_by(id: contexto[:sala_id] || contexto['sala_id'])
+    sala = salas_visibles(current_user.club).find_by(id: contexto[:sala_id] || contexto['sala_id'])
     return '' unless sala
 
     lotes = sala.lotes.where.not(estado: 'finalizado').includes(:genetica)
@@ -616,12 +700,12 @@ class AsistenteController < BaseController
     accion = accion.with_indifferent_access
 
     if accion[:lote_codigo].blank? && (contexto[:lote_id] || contexto['lote_id']).present?
-      lote = club.lotes.find_by(id: contexto[:lote_id] || contexto['lote_id'])
+      lote = lotes_visibles(club).find_by(id: contexto[:lote_id] || contexto['lote_id'])
       accion[:lote_codigo] = lote.codigo if lote
     end
 
     if accion[:planta_nombre].blank? && (contexto[:planta_id] || contexto['planta_id']).present?
-      planta = Plant.joins(:lote).where(lotes: { club_id: club.id }).find_by(id: contexto[:planta_id] || contexto['planta_id'])
+      planta = Plant.where(lote_id: lotes_visibles(club).select(:id)).find_by(id: contexto[:planta_id] || contexto['planta_id'])
       accion[:planta_nombre] = planta.nombre if planta
     end
 
@@ -687,7 +771,7 @@ class AsistenteController < BaseController
 
   def ejecutar_registro_ambiental(accion, datos, club)
     lote_codigo = accion['lote_codigo'] || accion[:lote_codigo]
-    lote = club.lotes.find_by(codigo: lote_codigo) if lote_codigo.present?
+    lote = lotes_visibles(club).find_by(codigo: lote_codigo) if lote_codigo.present?
     return { ok: false, error: "Lote '#{lote_codigo}' no encontrado" } unless lote
 
     campos = {
@@ -726,10 +810,81 @@ class AsistenteController < BaseController
     end
   end
 
-  def ejecutar_registro_ambiental_sala(datos, club, contexto)
+  # El espacio que se NOMBRÓ manda; si no se nombró, el de donde se abrió el asistente. El nombre
+  # se compara entero (sin mayúsculas ni espacios de más), no con LIKE: «Flora» no puede caer en
+  # «Flora 2».
+  def sala_de(accion, datos, club, contexto)
+    nombre = (accion['sala_nombre'] || accion[:sala_nombre] || datos['sala_nombre']).to_s.strip
+    if nombre.present?
+      return salas_visibles(club).where.not(state: 'cerrada').find_by('LOWER(TRIM(nombre)) = ?', nombre.downcase)
+    end
+
     sala_id = contexto&.dig('sala_id') || contexto&.dig(:sala_id)
-    sala    = club.salas.find_by(id: sala_id) if sala_id.present?
-    return { ok: false, error: 'Sala no encontrada en el contexto' } unless sala
+    salas_visibles(club).find_by(id: sala_id) if sala_id.present?
+  end
+
+  # A quién se le puede dar una tarea: el equipo que trabaja el cultivo (no pacientes, ni roles que
+  # no tienen tareas de cultivo).
+  ROLES_ASIGNABLES = %w[admin supervisor cultivador manicura].freeze
+
+  def equipo_asignable(club)
+    club.users.del_equipo.where(role: ROLES_ASIGNABLES).order(:first_name).to_a
+  end
+
+  # «el cultivador», «Juan», «Juan Pérez», «a mí» → [usuario, nil] o [nil, el motivo].
+  # Sin `asignar_a` → [nil, nil]: queda sin asignar, como siempre. Por rol, sólo si hay UNO de ese
+  # rol; por nombre, sólo si coincide con UNA persona. Lo ambiguo no se adivina: asignarle la
+  # tarea a otro es peor que no crearla.
+  ROL_POR_PALABRA = {
+    'cultivador' => 'cultivador', 'cultivadora' => 'cultivador',
+    'manicura' => 'manicura', 'manicurista' => 'manicura',
+    'supervisor' => 'supervisor', 'supervisora' => 'supervisor',
+    'admin' => 'admin', 'administrador' => 'admin', 'administradora' => 'admin',
+  }.freeze
+
+  def resolver_asignado(texto, club)
+    dicho = texto.to_s.strip.downcase.sub(/\A(a |al |a la |el |la )/, '').strip
+    return [nil, nil] if dicho.blank?
+    return [current_user, nil] if %w[mí mi yo vos].include?(dicho)
+
+    equipo = equipo_asignable(club)
+    if (rol = ROL_POR_PALABRA[dicho])
+      del_rol = equipo.select { |u| u.role == rol }
+      return [del_rol.first, nil] if del_rol.size == 1
+      return [nil, "No hay nadie con el rol #{rol} para asignarle la tarea"] if del_rol.empty?
+
+      return [nil, "Hay #{del_rol.size} con el rol #{rol} (#{del_rol.map { |u| u.first_name.presence || u.email }.join(', ')}): decí a cuál"]
+    end
+
+    coinciden = equipo.select do |u|
+      completo = u.nombre_completo.to_s.downcase
+      completo == dicho || u.first_name.to_s.downcase == dicho
+    end
+    return [coinciden.first, nil] if coinciden.size == 1
+    return [nil, "No encontré a «#{texto}» en el equipo para asignarle la tarea"] if coinciden.empty?
+
+    [nil, "Hay más de una persona que se llama «#{texto}»: decí el apellido"]
+  end
+
+  # Lo que ESTA persona puede ver y tocar. Un cultivador con sedes asignadas ve sólo sus salas en
+  # toda la app (`User#salas_ids_asignadas`); el asistente buscaba en la organización entera, así
+  # que por voz se podía registrar en un lote de otra sede. Con el mapa del cultivo en el prompt
+  # habría sido todavía más fácil: el mapa, y cada búsqueda, usan esto.
+  def salas_visibles(club)
+    return club.salas unless current_user.cultivador?
+
+    club.salas.where(id: current_user.salas_ids_asignadas)
+  end
+
+  def lotes_visibles(club)
+    return club.lotes unless current_user.cultivador?
+
+    club.lotes.where(sala_id: current_user.salas_ids_asignadas)
+  end
+
+  def ejecutar_registro_ambiental_sala(accion, datos, club, contexto)
+    sala = sala_de(accion, datos, club, contexto)
+    return { ok: false, error: 'No sé de qué espacio: nombralo como figura en la app' } unless sala
 
     lotes = sala.lotes.where.not(estado: 'finalizado')
     return { ok: false, error: "No hay lotes activos en #{sala.nombre}" } if lotes.empty?
@@ -779,8 +934,7 @@ class AsistenteController < BaseController
 
   def ejecutar_registro_planta(accion, datos, club)
     planta_nombre = accion['planta_nombre'] || accion[:planta_nombre]
-    planta = Plant.joins(:lote)
-                  .where(lotes: { club_id: club.id })
+    planta = Plant.where(lote_id: lotes_visibles(club).select(:id))
                   .find_by(nombre: planta_nombre) if planta_nombre.present?
     return { ok: false, error: "Planta '#{planta_nombre}' no encontrada" } unless planta
 
@@ -812,43 +966,86 @@ class AsistenteController < BaseController
     end
   end
 
+  # Una tarea dictada («mañana revisar plagas en la Ananda»).
+  #
+  # - El lote NOMBRADO manda sobre el del contexto: desde adentro de un lote se puede dictar una
+  #   tarea de otro. Antes el del contexto pisaba al nombrado.
+  # - La fecha es obligatoria: antes, si el modelo no la decía, caía a «dentro de 7 días» en
+  #   silencio. Sin fecha se rechaza y se dice.
+  # - Lleva su `tipo` (revision_plagas, riego…): con `otro`, el registro de «revisé plagas» de
+  #   mañana no la daba por hecha y quedaba pendiente para siempre.
+  # - No se duplica: si ya hay una pendiente igual (mismo tipo, lugar y día) no se crea otra. Es la
+  #   red para el dictado repetido —el motor de voz a veces entrega la frase dos veces— y para
+  #   quien la dicta de nuevo porque no vio que ya estaba.
   def ejecutar_tarea(accion, datos, club, contexto = nil)
-    sala_nombre = datos['sala_nombre']
-    sala = club.salas.find_by('LOWER(nombre) LIKE ?', "%#{sala_nombre&.downcase}%") if sala_nombre.present?
+    titulo = datos['titulo'].to_s.strip
+    return { ok: false, error: 'La tarea no tiene título' } if titulo.blank?
 
-    if sala.nil? && (contexto&.dig('sala_id') || contexto&.dig(:sala_id)).present?
-      sala = club.salas.find_by(id: contexto['sala_id'] || contexto[:sala_id])
+    dias = datos['dias_desde_hoy']
+    return { ok: false, error: "¿Para cuándo es «#{titulo}»? Decí el día (mañana, el jueves, en 3 días)" } if dias.nil? || dias.to_s !~ /\A-?\d+\z/
+
+    dias = dias.to_i
+    return { ok: false, error: "«#{titulo}» quedaba en el pasado: decí para qué día es" } if dias.negative?
+
+    # Primero el que viene en `datos` (donde el prompt pide el lote de una tarea): el de afuera
+    # puede haberlo completado `enriquecer_con_contexto` con el lote desde donde se abrió.
+    codigo = (datos['lote_codigo'].presence || accion['lote_codigo'] || accion[:lote_codigo]).to_s.strip
+    lote   = lotes_visibles(club).find_by(codigo: codigo) if codigo.present?
+    return { ok: false, error: "Lote '#{codigo}' no encontrado" } if codigo.present? && lote.nil?
+
+    if lote.nil? && (lote_id = contexto&.dig('lote_id') || contexto&.dig(:lote_id)).present?
+      lote = lotes_visibles(club).find_by(id: lote_id)
     end
 
-    lote_id = contexto&.dig('lote_id') || contexto&.dig(:lote_id)
-    lote    = club.lotes.find_by(id: lote_id) if lote_id.present?
-    lote  ||= club.lotes.find_by(codigo: datos['lote_codigo']) if datos['lote_codigo'].present?
+    sala = sala_de(accion, datos, club, contexto) || lote&.sala
+    tipo = Tarea::TIPOS.include?(datos['tipo_tarea'].to_s) ? datos['tipo_tarea'].to_s : 'otro'
+    fecha = Time.zone.today + dias
 
-    dias  = (datos['dias_desde_hoy'] || 7).to_i
-    fecha = dias.days.from_now.to_date
+    # Quién la hace. El cultivador se la asigna a sí mismo, siempre (la misma regla que
+    # `TareasController#create`): es lo que dejó pendiente. El admin/supervisor puede nombrar a
+    # alguien; si el nombre no es de nadie o es de más de uno, no se adivina.
+    if current_user.cultivador?
+      asignada = current_user
+    else
+      asignada, problema = resolver_asignado(datos['asignar_a'], club)
+      return { ok: false, error: problema } if problema
+    end
+
+    igual = club.tareas.activas.where(tipo: tipo, lote_id: lote&.id, sala_id: sala&.id, fecha_programada: fecha,
+                                      asignada_a_id: asignada&.id)
+    igual = igual.where('LOWER(TRIM(titulo)) = ?', titulo.downcase) if tipo == 'otro'
+    if (existente = igual.first)
+      return { ok: true, mensaje: "La tarea «#{existente.titulo}» del #{fecha.strftime('%d/%m')} ya estaba: no se duplicó" }
+    end
 
     tarea = club.tareas.build(
-      titulo:           datos['titulo'],
+      titulo:           titulo,
       descripcion:      datos['descripcion'],
-      prioridad:        datos['prioridad'] || 'media',
+      tipo:             tipo,
+      prioridad:        Tarea::PRIORIDADES.include?(datos['prioridad'].to_s) ? datos['prioridad'] : 'normal',
       estado:           'pendiente',
       fecha_programada: fecha,
       sala_id:          sala&.id,
       lote_id:          lote&.id,
+      asignada_a:       asignada,
       creada_por:       current_user
     )
 
     if tarea.save
-      { ok: true, mensaje: "Tarea '#{tarea.titulo}' creada para el #{fecha.strftime('%d/%m/%Y')}" }
+      donde = lote ? " · #{lote.genetica&.nombre || lote.codigo}" : (sala ? " · #{sala.nombre}" : '')
+      quien = if asignada.nil? then ''
+              elsif asignada == current_user then ' · para vos'
+              else " · para #{asignada.nombre_completo.presence || asignada.email}"
+              end
+      { ok: true, mensaje: "Tarea «#{tarea.titulo}» para el #{fecha.strftime('%d/%m')}#{donde}#{quien}" }
     else
       { ok: false, error: tarea.errors.full_messages.join(', ') }
     end
   end
 
-  def ejecutar_nota_sala(datos, club, contexto)
-    sala_id = contexto&.dig('sala_id') || contexto&.dig(:sala_id)
-    sala    = club.salas.find_by(id: sala_id) if sala_id.present?
-    return { ok: false, error: 'Sala no encontrada en el contexto' } unless sala
+  def ejecutar_nota_sala(accion, datos, club, contexto)
+    sala = sala_de(accion, datos, club, contexto)
+    return { ok: false, error: 'No sé de qué espacio: nombralo como figura en la app' } unless sala
 
     contenido = datos['contenido'].to_s.strip
     return { ok: false, error: 'Nota vacía' } if contenido.blank?
@@ -859,11 +1056,11 @@ class AsistenteController < BaseController
 
   def ejecutar_nota_lote(accion, datos, club, contexto)
     lote_codigo = accion['lote_codigo'] || accion[:lote_codigo]
-    lote = club.lotes.find_by(codigo: lote_codigo) if lote_codigo.present?
+    lote = lotes_visibles(club).find_by(codigo: lote_codigo) if lote_codigo.present?
 
     unless lote
       lote_id = contexto&.dig('lote_id') || contexto&.dig(:lote_id)
-      lote    = club.lotes.find_by(id: lote_id) if lote_id.present?
+      lote    = lotes_visibles(club).find_by(id: lote_id) if lote_id.present?
     end
 
     return { ok: false, error: 'Lote no encontrado' } unless lote
@@ -877,10 +1074,10 @@ class AsistenteController < BaseController
 
   def ejecutar_avance_ciclo(accion, datos, club, contexto)
     lote_codigo = accion['lote_codigo'] || accion[:lote_codigo]
-    lote = club.lotes.find_by(codigo: lote_codigo) if lote_codigo.present?
+    lote = lotes_visibles(club).find_by(codigo: lote_codigo) if lote_codigo.present?
     unless lote
       lote_id = contexto&.dig('lote_id') || contexto&.dig(:lote_id)
-      lote = club.lotes.find_by(id: lote_id) if lote_id.present?
+      lote = lotes_visibles(club).find_by(id: lote_id) if lote_id.present?
     end
     return { ok: false, error: 'Lote no encontrado' } unless lote
 

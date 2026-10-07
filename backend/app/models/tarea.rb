@@ -82,7 +82,9 @@ class Tarea < ApplicationRecord
   # Al completar, registrar fecha
   before_save :set_fecha_completada, if: :completando?
 
-  after_create_commit :push_asignacion_nueva, if: -> { asignada_a.present? }
+  # A quien se la asigna otro. Uno mismo no necesita que le avisen lo que acaba de anotar (el
+  # cultivador que dicta «mañana termino de defoliar» se la asigna a sí mismo).
+  after_create_commit :push_asignacion_nueva, if: -> { asignada_a.present? && asignada_a_id != creada_por_id }
 
   # ── Scopes ────────────────────────────────────────────────────
   scope :del_club,         ->(club_id) { where(club_id: club_id) }

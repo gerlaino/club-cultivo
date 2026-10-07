@@ -142,7 +142,8 @@
                   <div class="av__accion-body">
                     <div class="av__accion-tipo">{{ labelTipo(accion.tipo) }}</div>
                     <div class="av__accion-titulo">
-                      <span v-if="accion.lote_codigo" class="av__accion-ref">{{ accion.lote_codigo }}</span>
+                      <span v-if="accion.lote_codigo || accion.datos?.lote_codigo" class="av__accion-ref">{{ accion.lote_codigo || accion.datos.lote_codigo }}</span>
+                      <span v-if="accion.sala_nombre || accion.datos?.sala_nombre" class="av__accion-ref">{{ accion.sala_nombre || accion.datos.sala_nombre }}</span>
                       <span v-if="accion.planta_nombre" class="av__accion-ref">{{ accion.planta_nombre }}</span>
                       {{ descripcionAccion(accion) }}
                     </div>
@@ -265,10 +266,12 @@
                             <label>Prioridad</label>
                             <select v-model="accion.datos.prioridad">
                               <option value="baja">Baja</option><option value="normal">Normal</option>
-                              <option value="media">Media</option><option value="alta">Alta</option><option value="urgente">Urgente</option>
+                              <option value="alta">Alta</option><option value="urgente">Urgente</option>
                             </select>
                           </div>
                           <div class="av__ef"><label>Días desde hoy</label><input type="number" step="1" min="0" v-model.number="accion.datos.dias_desde_hoy" /></div>
+                          <!-- El cultivador se la asigna a sí mismo (lo decide el backend); el admin puede nombrar a alguien. -->
+                          <div v-if="!esCultivador" class="av__ef av__ef--full"><label>Para quién (opcional)</label><input type="text" v-model="accion.datos.asignar_a" placeholder="Nombre o rol, ej. el cultivador" /></div>
                         </div>
                       </template>
                     </div>
@@ -327,6 +330,11 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import api, { consumoIA } from '../lib/api'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import { useReconocimientoVoz } from '../composables/useReconocimientoVoz.js'
+import { useAuthStore } from '../stores/auth.js'
+
+const auth = useAuthStore()
+// El cultivador se asigna sus propias tareas (lo decide el backend): no se le ofrece elegir a quién.
+const esCultivador = computed(() => auth.user?.role === 'cultivador')
 
 const props = defineProps({
   contexto:   { type: Object,  default: null },
@@ -398,8 +406,9 @@ const idleTitle = computed(() => {
 
 const ejemplosContexto = computed(() => {
   if (!props.contexto) return [
-    { icono: '💧', texto: 'Regué el lote L-26-003 con EC 1.4 pH 6.2' },
-    { icono: '🌿', texto: 'La planta P012 tiene déficit de nitrógeno' },
+    // Sin contexto la IA recibe el mapa del cultivo: se nombra como en la app, no por código.
+    { icono: '💧', texto: 'Regué la carpa con EC 1.4 y pH 6.2' },
+    { icono: '📋', texto: 'Mañana revisar plagas en la Ananda' },
   ]
   const t = props.contexto.tipo
   if (t === 'lote') return [
@@ -545,6 +554,7 @@ function quitarAccion(i) { acciones.value.splice(i, 1) }
 function volverEscuchar() { paso.value = 'escuchar' }
 
 async function ejecutarAcciones() {
+  if (ejecutando.value) return   // un toque por dictado: el segundo no manda otro pedido
   ejecutando.value = true
   try {
     const accionesLimpias = acciones.value.map(({ _expandido, ...a }) => a)
@@ -560,7 +570,16 @@ async function ejecutarAcciones() {
       setTimeout(() => cerrar(), 2500)
     }
   } catch (e) {
-    errorVoz.value = e?.response?.data?.error || 'Error al guardar'
+    // 409 = ese dictado ya se había guardado (doble toque, o se cortó la respuesta y se
+    // reintentó). No es un error de quien dicta: se dice y se cierra, sin volver a cargar nada.
+    if (e?.response?.status === 409 && e?.response?.data?.ya_guardado) {
+      resultados.value = [{ tipo: 'aviso', mensaje: 'Ya estaba guardado: no se cargó dos veces.' }]
+      erroresEjecucion.value = []
+      paso.value = 'resultado'
+      setTimeout(() => cerrar(), 2500)
+    } else {
+      errorVoz.value = e?.response?.data?.error || 'Error al guardar'
+    }
   } finally {
     ejecutando.value = false
   }
@@ -614,9 +633,24 @@ function descripcionAccion(accion) {
   return d.observaciones || ''
 }
 
+function cuandoTarea(dias) {
+  if (dias === null || dias === undefined || dias === '') return 'sin día: decí para cuándo'
+  const n = Number(dias)
+  if (n === 0) return 'para hoy'
+  if (n === 1) return 'para mañana'
+  if (n === 2) return 'para pasado mañana'
+  const f = new Date(); f.setDate(f.getDate() + n)
+  return `para el ${f.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'numeric' })}`
+}
+
 function metaAccion(accion) {
   const d = accion.datos || {}
-  if (accion.tipo === 'tarea') return `Prioridad ${d.prioridad || 'media'} · en ${d.dias_desde_hoy || 7} días`
+  // El día, dicho como se dijo: «mañana», no «en 1 días». Sin día no se inventa uno: el backend
+  // la rechaza y lo dice (antes caía a 7 días en silencio).
+  if (accion.tipo === 'tarea') {
+    const quien = esCultivador.value ? ' · para vos' : (d.asignar_a ? ` · para ${d.asignar_a}` : '')
+    return `${cuandoTarea(d.dias_desde_hoy)}${quien} · prioridad ${d.prioridad || 'normal'}`
+  }
   if ((accion.tipo === 'registro_ambiental' || accion.tipo === 'registro_ambiental_sala') && d.notas_fertilizacion) return d.notas_fertilizacion
   if (accion.tipo === 'registro_planta' && d.color_hojas) return `Color: ${d.color_hojas} · Plagas: ${d.plagas || 'ninguna'}`
   return ''

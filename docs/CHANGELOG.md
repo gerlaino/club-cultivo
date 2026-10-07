@@ -1,5 +1,29 @@
 # Changelog
 
+## Octubre 2026 (ef) — Dictar desde el «+», el mapa del cultivo para la IA y tareas por voz que sirven
+
+- **«Dictar» es la primera acción del «+» («Hoy»)** en la app del teléfono (`MobileShell`): abre el
+  asistente sin contexto. Antes el teléfono no lo tenía montado y había que entrar a un lote → Registrar.
+- **La IA recibe el MAPA DEL CULTIVO en cada dictado** (espacios y lotes en pie con genética, fase y
+  plantas; tope 60 lotes) y la fecha de hoy. Sin él, el micrófono sin contexto no sabía qué era «la
+  Ananda» y lo dictado fallaba al guardar. Los registros y notas de espacio van al espacio NOMBRADO
+  (nombre exacto, «Flora» no cae en «Flora 2»), no sólo al de donde se abrió.
+- **Tareas por voz** («mañana revisar plagas en la Ananda»): con su tipo (el registro de «revisé plagas»
+  las cierra), el lote nombrado manda sobre el del contexto, la fecha es obligatoria (antes caía a 7 días
+  en silencio) y no se duplican (misma tarea, lugar y día). Bug: la prioridad por defecto era «media», que
+  no existe, y la tarea no se guardaba. El prompt separa lo que pasó (registro) de lo que hay que hacer (tarea).
+- **Un dictado se guarda una vez**: `ejecutar` reclama el dictado (`asistente_correcciones.ejecutado_en`)
+  de forma atómica; el segundo «Guardar» (doble toque, reintento con la respuesta perdida) recibe 409 y la
+  pantalla dice «Ya estaba guardado». Spec: `asistente_dictado_libre_spec`.
+- **En una organización, el asistente ve lo que ve cada uno**: el mapa y cada búsqueda (lote, espacio,
+  planta) se acotan a las salas del cultivador con sedes asignadas (`User#salas_ids_asignadas`). Antes
+  buscaba en la organización entera y por código se podía registrar en otra sede.
+- **Quién hace la tarea dictada**: el cultivador crea las suyas y quedan a su nombre (la regla de
+  `TareasController#create`; antes el asistente se las rechazaba). El admin/supervisor puede decir quién
+  («mañana el cultivador revisa plagas», «que Juan pode»): el mapa incluye el EQUIPO; por rol sólo si hay
+  uno de ese rol, por nombre sólo si coincide con una persona; lo ambiguo no se crea y pide a cuál. Sin
+  decir quién, queda sin asignar. El aviso de «tarea asignada» ya no le llega a quien se la asignó a sí mismo.
+
 ## Octubre 2026 (ee) — Los packs nuevos: escalones en USD, tope de floración, lo terminado incluido
 
 La lista que armaron Germán y su socio (6-oct). Los packs cobran por TAMAÑO y lo terminado viene adentro.
