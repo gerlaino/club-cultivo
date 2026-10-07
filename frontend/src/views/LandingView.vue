@@ -28,23 +28,6 @@
       </div>
     </section>
 
-    <!-- ── Las dos puertas, con su precio ──────────────────
-         Cierra la portada contra el pie (Germán, 6-oct: abajo quedaba una franja vacía) y adelanta
-         cuánto sale sin repetir las tarjetas, que viven adentro de cada página. -->
-    <section v-if="precios" class="lb__puertas">
-      <div class="hb__wrap lb__puertas-in">
-        <RouterLink to="/bienvenida/autocultivo" class="lb__puerta">
-          <span class="lb__puerta-q">Autocultivo</span>
-          <span class="lb__puerta-p">{{ plata(precios.autocultivo.precio) }} <small>por mes</small></span>
-          <span class="lb__puerta-d">{{ precios.autocultivo.plantas_floracion }} plantas en floración · {{ diasPrueba }} días gratis</span>
-        </RouterLink>
-        <RouterLink to="/bienvenida/proyectos" class="lb__puerta">
-          <span class="lb__puerta-q">Proyectos</span>
-          <span class="lb__puerta-p"><small>desde</small> {{ plata(desdeProyectos) }} <small>por mes</small></span>
-          <span class="lb__puerta-d">Asociaciones, fundaciones, investigación y producción</span>
-        </RouterLink>
-      </div>
-    </section>
   </PaginaPublica>
 </template>
 
@@ -56,17 +39,13 @@
 // /bienvenida/proyectos (organizaciones: la cuenta se arma a mano desde el contacto)—, para que
 // nadie lea lo del otro. Lo que antes vivía acá (qué hace, el teléfono, preguntas, contacto,
 // principios) se repartió entre esas páginas y /contacto; los packs con precios van adentro de
-// cada una. Los días de prueba los dice el backend.
-import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+// cada una (acá no se repiten: 7-oct-2026). Los días de prueba los dice el backend.
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 import PaginaPublica from '../components/public/PaginaPublica.vue'
 import PlantaCreciendo from '../components/public/PlantaCreciendo.vue'
 import { getRegistroInfo } from '../lib/api.js'
 
 const diasPrueba = ref(30)
-// Los precios los dice el backend (`Precios.lista_publica`).
-const precios = ref(null)
-const plata = (n) => (precios.value?.moneda === 'USD' ? `US$ ${n}` : `$ ${n}`)
-const desdeProyectos = computed(() => Math.min(...(precios.value?.escalones || []).map(e => e.un_pack)))
 
 // Portada ancha (planta de fondo) o angosta (apilada). Se decide por el ancho y se re-arma si cambia.
 const consultaAncha = typeof window !== 'undefined' ? window.matchMedia('(min-width: 960px)') : null
@@ -78,7 +57,6 @@ onMounted(async () => {
   try {
     const { data } = await getRegistroInfo()
     diasPrueba.value = data.dias_prueba
-    precios.value = data.precios?.autocultivo && data.precios?.escalones?.length ? data.precios : null
   } catch {}
 })
 onBeforeUnmount(() => consultaAncha?.removeEventListener('change', alCambiarAncho))
@@ -93,25 +71,13 @@ onBeforeUnmount(() => consultaAncha?.removeEventListener('change', alCambiarAnch
     radial-gradient(60% 70% at 80% 30%, color-mix(in srgb, var(--hb-menta) 32%, transparent) 0%, transparent 70%),
     radial-gradient(50% 60% at 0% 100%, color-mix(in srgb, var(--hb-salvia) 38%, transparent) 0%, transparent 70%);
 }
-/* Ancha: ocupa la pantalla y la planta es el fondo; el texto, encima y a la izquierda. */
-.hb__portada--ancha { min-height: max(600px, calc(100svh - 64px - 120px)); display: flex; align-items: center; padding: 0; }
+/* Ancha: ocupa la pantalla y la planta es el fondo; el texto, encima y a la izquierda. Llega
+   hasta el pie: la franja de precios que cerraba la portada se sacó (Germán, 7-oct: los precios
+   ya están en autocultivo y proyectos). */
+.hb__portada--ancha { min-height: max(600px, calc(100svh - 64px)); display: flex; align-items: center; padding: 0; }
 .hb__portada--ancha .hb__portada-in { position: relative; z-index: 2; pointer-events: none; padding-bottom: 90px; }
 .hb__portada--ancha .hb__portada-txt { pointer-events: auto; max-width: 540px; }
 .hb__portada-txt { min-width: 0; }
-/* ── Las dos puertas ── */
-.lb__puertas { background: var(--hb-papel-claro); border-top: 1px solid var(--hb-regla); }
-.lb__puertas-in { display: grid; grid-template-columns: 1fr 1fr; }
-.lb__puerta { display: grid; gap: 4px; padding: 22px 0; color: var(--hb-tinta); text-decoration: none; }
-.lb__puerta + .lb__puerta { border-left: 1px solid var(--hb-regla); padding-left: clamp(16px, 4vw, 48px); }
-.lb__puerta:hover .lb__puerta-q { color: var(--hb-verde); }
-.lb__puerta-q { font: 500 12px var(--hb-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--hb-tinta-2); }
-.lb__puerta-p { font: 600 1.6rem/1.1 var(--hb-serif); }
-.lb__puerta-p small { font: 400 13px var(--hb-mono); color: var(--hb-tinta-2); }
-.lb__puerta-d { font-size: 14px; color: var(--hb-tinta-2); }
-@media (max-width: 600px) {
-  .lb__puertas-in { grid-template-columns: 1fr; }
-  .lb__puerta + .lb__puerta { border-left: 0; border-top: 1px solid var(--hb-regla); padding-left: 0; }
-}
 /* Angosta: la planta debajo del texto, sin recuadro. */
 .hb__lamina { max-width: 480px; margin: 18px auto 0; padding: 0 16px 24px; }
 </style>
