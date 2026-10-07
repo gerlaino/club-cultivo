@@ -1,4 +1,5 @@
 <script setup>
+import { resumenStockFlor } from '../lib/stockFlor.js'
 import { ref, computed, watch, onMounted, onUnmounted } from "vue"
 import { useRoute, useRouter } from "vue-router"
 import { useAuthStore } from "../stores/auth"
@@ -105,10 +106,11 @@ function fmtFechaCaja(iso) {
   if (!iso) return '—'
   return new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
-// Gramos y "stock bajo" = solo flor seca (los derivados son inventario con otra unidad).
-const florSeca   = computed(() => tiendaStocks.value.filter(s => s.forma_producto === 'flor_seca'))
-const stockTotal = computed(() => florSeca.value.reduce((a, s) => a + Number(s.cantidad || 0), 0))
-const itemsBajos = computed(() => florSeca.value.filter(s => Number(s.cantidad) < umbralStockBajo.value).length)
+// Gramos y «stock bajo» = sólo flor seca, con la regla del aviso automático (`lib/stockFlor.js`).
+const stockFlor  = computed(() => resumenStockFlor(tiendaStocks.value, umbralStockBajo.value))
+const stockTotal = computed(() => stockFlor.value.total)
+const stockBajo  = computed(() => stockFlor.value.bajo)
+const frascosCasiVacios = computed(() => stockFlor.value.casiVacios)
 
 
 // ── Tienda social (stocks asignados a esta sede) ─────────────────
@@ -299,7 +301,11 @@ onMounted(async () => {
       <div v-if="tieneInv" class="sdv__kpis">
         <div class="sdv__kpi"><div class="sdv__kpi-val">{{ tiendaStocks.length }}</div><div class="sdv__kpi-lbl">Productos en stock</div></div>
         <div class="sdv__kpi"><div class="sdv__kpi-val" style="color:#0369a1">{{ stockTotal.toLocaleString('es-AR', { maximumFractionDigits: 1 }) }}g</div><div class="sdv__kpi-lbl">Gramos de flor seca</div></div>
-        <div class="sdv__kpi"><div class="sdv__kpi-val" :style="{ color: itemsBajos > 0 ? '#dc2626' : '#15803d' }">{{ itemsBajos }}</div><div class="sdv__kpi-lbl">Stock bajo (&lt;{{ umbralStockBajo }}g)</div></div>
+        <div class="sdv__kpi">
+          <div class="sdv__kpi-val" :style="{ color: stockBajo ? 'var(--c-rust-600)' : 'var(--c-leaf-600)' }">{{ stockBajo ? 'Bajo' : 'Alcanza' }}</div>
+          <div class="sdv__kpi-lbl">Stock de flor · aviso con menos de {{ umbralStockBajo }}g en total</div>
+          <div v-if="frascosCasiVacios" class="sdv__kpi-nota">{{ frascosCasiVacios }} {{ frascosCasiVacios === 1 ? 'frasco' : 'frascos' }} con menos de {{ umbralStockBajo }}g</div>
+        </div>
       </div>
 
       <div class="sdv__layout">
@@ -424,6 +430,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.sdv__kpi-nota { font-size: .72rem; color: var(--c-slate-500); margin-top: .2rem; }
 
 /* ── Historial de turnos de caja ────────────────────────────────────────────── */
 .sdv__cajas { border: 1px solid var(--c-ink-200); border-radius: 12px; background: #fff; margin-bottom: var(--sp-4); overflow: hidden; }

@@ -116,12 +116,12 @@ const stockTotalG = computed(() => {
   return flor ? (flor.cantidad_g || 0) : 0
 })
 
+// La alerta la decide el backend con el umbral de la organización (`umbral_stock_g`, el mismo del
+// aviso automático): acá había 50 g y 200 g escritos a mano (7-oct-2026).
 const stockAlerta = computed(() => {
-  const t = stockTotalG.value
-  if (t == null) return 'sin_datos'
-  if (t < 50)  return 'critico'
-  if (t < 200) return 'bajo'
-  return 'normal'
+  const ss = analyticsDisp.value?.stocks
+  if (!ss?.length) return 'sin_datos'
+  return ss.find(s => s.forma === 'flor_seca')?.alerta ? 'critico' : 'normal'
 })
 
 const deltaBalance = computed(() => {
