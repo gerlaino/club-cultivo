@@ -135,6 +135,10 @@
         <button class="mta__btn-nohecha mta__btn-full" :disabled="completando" @click="noSeHizoActiva">
           <i class="bi bi-x-circle"></i> No se hizo
         </button>
+        <!-- Borrar: misma regla que el backend (`useEliminarTarea`). -->
+        <button v-if="puedeEliminar(tareaActiva)" class="mta__btn-eliminar" :disabled="completando" @click="eliminarActiva">
+          <i class="bi bi-trash3"></i> Eliminar tarea
+        </button>
       </div>
     </SheetBottom>
 
@@ -183,6 +187,7 @@ import { toISO } from '../../utils/dates.js'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { useSemanaTareas } from '../../composables/useSemanaTareas.js'
 import { useToast } from '../../composables/useToast.js'
+import { useEliminarTarea } from '../../composables/useEliminarTarea.js'
 import { useTareasStore } from '../../stores/tareas'
 import SheetBottom        from '../../components/cultivador/SheetBottom.vue'
 
@@ -327,6 +332,18 @@ async function confirmarCompletar() {
 }
 
 const { marcarNoSeHizo } = useNoSeHizo()
+const { puedeEliminar, eliminar } = useEliminarTarea()
+async function eliminarActiva() {
+  const t = tareaActiva.value
+  if (!t) return
+  showCompletar.value = false
+  if (await eliminar(t)) {
+    const diaData = diasProcesados.value.find(x => x.fecha === diaSeleccionado.value)
+    if (diaData) diaData.tareas = diaData.tareas.filter(x => x.id !== t.id)
+  } else {
+    showCompletar.value = true
+  }
+}
 
 // Los botones de la tarjeta: lo mismo que la hoja, sin abrirla.
 const rapida = ref(null)
@@ -504,6 +521,7 @@ onMounted(async () => {
 .mta__prioridad--baja    { color: var(--c-slate-400); }
 
 .mta__card:has(.mta__acciones) { flex-wrap: wrap; }
+.mta__btn-eliminar { width: 100%; height: 44px; margin-top: .5rem; border: 0; background: none; color: var(--c-rust-600); font-weight: 600; font-size: .88rem; cursor: pointer; }
 .mta__acciones { display: flex; gap: .5rem; width: 100%; margin-top: .6rem; }
 .mta__btn-hecho, .mta__btn-nohecho { flex: 1; height: 46px; border-radius: 12px; font-weight: 700; font-size: .92rem; cursor: pointer; }
 .mta__btn-hecho { border: 0; background: var(--c-leaf-800); color: #fff; }

@@ -263,6 +263,12 @@
               <button v-if="puedeEditarTarea(tareaDetalle)" class="tv__panel-btn tv__panel-btn--ghost" @click="abrirModalEditar(tareaDetalle)">
                 <i class="bi bi-pencil"></i> Editar
               </button>
+              <button v-if="puedeEliminar(tareaDetalle)" class="tv__panel-btn tv__panel-btn--peligro" @click="eliminarDetalle">
+                <i class="bi bi-trash3"></i> Eliminar
+              </button>
+              <button v-if="puedeEliminar(tareaDetalle) && esDeSerie(tareaDetalle)" class="tv__panel-btn tv__panel-btn--peligro" @click="cortarSerieDetalle">
+                <i class="bi bi-scissors"></i> Cortar la serie
+              </button>
             </div>
           </div>
         </div>
@@ -304,6 +310,7 @@ import { storeToRefs } from 'pinia'
 import { useToast } from '../composables/useToast.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import { useConfirm } from '../composables/useConfirm.js'
+import { useEliminarTarea } from '../composables/useEliminarTarea.js'
 import { useNoSeHizo } from '../composables/useNoSeHizo.js'
 import EmptyState from '../components/ui/EmptyState.vue'
 import { formatFechaLarga } from '../utils/fecha.js'
@@ -612,6 +619,19 @@ function onTareaGuardada() {
   tareasStore.fetchDashboard()
   cargarSemana()
 }
+const { puedeEliminar, eliminar, cortarSerie, esDeSerie } = useEliminarTarea()
+async function eliminarDetalle() {
+  if (!(await eliminar(tareaDetalle.value))) return
+  tareaDetalle.value = null
+  tareasStore.fetchDashboard()
+  cargarSemana()
+}
+async function cortarSerieDetalle() {
+  if (!(await cortarSerie(tareaDetalle.value))) return
+  tareaDetalle.value = null
+  tareasStore.fetchDashboard()
+  cargarSemana()
+}
 function onTareaCompletada() {
   showModalCompletar.value = false
   tareaCompletando.value = null
@@ -640,6 +660,8 @@ function mostrarToast(mensaje, tipo = 'success') {
 </script>
 
 <style scoped>
+.tv__panel-btn--peligro { background: #fff; border: 1px solid var(--c-rust-100); color: var(--c-rust-600); }
+.tv__panel-btn--peligro:hover { background: var(--c-rust-100); }
 .tv { padding: 2rem 1.75rem 3rem; max-width: 1280px; margin: 0 auto; color: var(--c-slate-900); }
 @media (max-width: 768px) { .tv { padding: 1.25rem 1rem 2rem; } }
 
