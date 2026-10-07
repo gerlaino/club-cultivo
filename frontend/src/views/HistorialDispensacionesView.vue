@@ -4,6 +4,7 @@ import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
 import { listDispensacionesFecha, exportDispensacionesCSV, listPacientes, getPaciente, listSedes, anularDispensacion } from '../lib/api.js'
 import { formaLabel, formatARS, formatFecha } from '../lib/formatters.js'
+import { descuentoPct, descuentoArs } from '../lib/dispensaDescuento.js'
 import { RouterLink, useRouter, useRoute } from 'vue-router'
 import { Download, RefreshCw, Search, Plus, X, Filter, Pencil, Trash2, QrCode, Truck, ChevronRight, Repeat } from 'lucide-vue-next'
 import { useEtiquetaDispensa } from '../composables/useEtiquetaDispensa.js'
@@ -307,23 +308,14 @@ function medioPagoClass(m) {
   const C = { efectivo: 'hd__pago--verde', transferencia: 'hd__pago--azul', debito: 'hd__pago--azul', credito: 'hd__pago--morado', cuenta_corriente: 'hd__pago--amber', saldo_a_favor: 'hd__pago--verde', no_abona: 'hd__pago--gris', credito_gramos: 'hd__pago--morado', mixto: 'hd__pago--azul', regalo: 'hd__pago--morado', cambio: 'hd__pago--morado' }
   return C[m] || 'hd__pago--gris'
 }
-function descuentoPct(d) {
-  // Usa los descuentos explícitos (paciente + dispensa). Fallback: derivado del precio (registros viejos).
-  const dp = Number(d.descuento_paciente_pct) || 0
-  const dd = Number(d.descuento_dispensa_pct) || 0
-  if (dp + dd > 0) return Math.min(100, Math.round(dp + dd))
-  const pu = d.precio_unitario_ars
-  const ps = d.stock?.precio_sugerido_ars
-  if (!pu || !ps || pu >= ps) return null
-  return Math.round((1 - pu / ps) * 100)
-}
 function descuentoTitle(d) {
   const dp = Number(d.descuento_paciente_pct) || 0
   const dd = Number(d.descuento_dispensa_pct) || 0
   const parts = []
   if (dp > 0) parts.push(`Paciente: ${dp}%`)
-  if (dd > 0) parts.push(`Esta dispensa: ${dd}%${d.descuento_otorgado_por ? ` (otorgó ${d.descuento_otorgado_por})` : ''}`)
-  return parts.join(' · ')
+  if (dd > 0) parts.push(`Esta dispensa: ${dd}%`)
+  if (descuentoArs(d) > 0) parts.push(`Esta dispensa: ${formatARS(descuentoArs(d))}`)
+  return parts.join(' · ') + (d.descuento_otorgado_por && (dd > 0 || descuentoArs(d) > 0) ? ` (otorgó ${d.descuento_otorgado_por})` : '')
 }
 // Ítems de la dispensa (el serializer garantiza ≥1: legacy sintetiza uno desde el stock).
 function itemsDe(d) { return d.items?.length ? d.items : [] }
@@ -596,6 +588,7 @@ const FORMAS = [
                 </td>
                 <td class="hd__td-num" data-col="Desc.">
                   <span v-if="descuentoPct(d)" class="hd__desc-badge" :title="descuentoTitle(d)">-{{ descuentoPct(d) }}%</span>
+                  <span v-if="descuentoArs(d)" class="hd__desc-badge" :title="descuentoTitle(d)">-{{ formatARS(descuentoArs(d)) }}</span>
                   <span v-else class="hd__dash">—</span>
                 </td>
                 <td class="hd__td-num hd__td-monto" data-col="Monto">{{ formatARS(d.aporte_socio_ars) }}</td>

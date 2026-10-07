@@ -163,6 +163,24 @@ describe('En el escritorio', () => {
     expect(w.find('.mnd__barra-cant').exists()).toBe(false)
   })
 
+  // AC (Germán, 7-oct-2026): «en el resumen tendría que figurar la genética» y «que deje
+  // modificar la fecha como antes».
+  it('el resumen dice la variedad de cada producto y deja cambiar la fecha', async () => {
+    const w = await montar(1280, 'admin')
+    await fila(w, 'Lemon Cookie').trigger('click')
+    w.vm.form.cantidad = 2
+    await w.vm.$nextTick()
+    await w.find('.mnd__add-item').trigger('click')
+    expect(w.find('.mnd__resumen').text()).toContain('Lemon Cookie')
+    expect(w.find('.mnd__resumen-fecha').findComponent({ name: 'AppDatePicker' }).exists()
+      || w.find('.mnd__resumen-fecha app-date-picker-stub').exists()).toBe(true)
+  })
+
+  it('al dispensador la fecha no se le ofrece: entrega en el momento', async () => {
+    const w = await montar(1280, 'dispensador')
+    expect(w.find('.mnd__resumen-fecha').text()).toContain('Fecha:')
+  })
+
   it('el resumen dice qué va a pasar con la plata, en una frase', async () => {
     const w = await montar(1280, 'admin')
     await fila(w, 'Lemon Cookie').trigger('click')

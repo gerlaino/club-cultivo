@@ -1951,6 +1951,7 @@ async function handleSubmit() {
           <!-- Fecha + pago -->
           <div class="mnd__form-row">
             <div class="mnd__field">
+              <div class="mnd__fecha-input">
               <label class="mnd__label" v-if="form.es_reserva">Fecha de entrega estimada <span class="mnd__req">*</span></label>
               <label class="mnd__label" v-else-if="puedeFecharAtras">
                 Fecha <span class="mnd__opt">podés cargar una entrega de otro día</span>
@@ -1964,6 +1965,7 @@ async function handleSubmit() {
                    campo se abre y lo dice. -->
               <AppDatePicker v-else-if="puedeFecharAtras" v-model="form.fecha_dispensacion" :max="today" />
               <div v-else class="mnd__fecha-fija">{{ fmtFechaLarga(form.fecha_dispensacion) }}</div>
+              </div>
 
               <!-- NO SE PUEDE ENTREGAR ALGO QUE TODAVÍA NO EXISTÍA. Cargando historia vieja es
                    fácil poner una fecha anterior a la elaboración del producto, y eso rompe la
@@ -2128,8 +2130,12 @@ async function handleSubmit() {
         <aside v-if="enPasos" class="mnd__resumen" aria-label="Resumen">
           <div class="mnd__resumen-tit">Resumen</div>
           <div v-if="!items.length" class="mnd__resumen-vacio">El carrito está vacío.</div>
+          <!-- Con la variedad: «Flor seca · 2g» cuatro veces no dice qué se lleva (7-oct-2026). -->
           <div v-for="(it, i) in items" :key="i" class="mnd__resumen-fila">
-            <span>{{ FORMA_LABEL[it.stock.forma_producto] || it.stock.forma_producto }} · {{ it.cantidad }}{{ it.stock.unidad || 'g' }}</span>
+            <span class="mnd__resumen-prod">
+              <span>{{ FORMA_LABEL[it.stock.forma_producto] || it.stock.forma_producto }} · {{ it.cantidad }}{{ it.stock.unidad || 'g' }}</span>
+              <span v-if="generica(it.stock)" class="mnd__resumen-gen">{{ generica(it.stock) }}</span>
+            </span>
             <span class="mnd__num">{{ subtotalItem(it) > 0 ? fmt(subtotalItem(it)) : '—' }}</span>
           </div>
           <div v-if="puedeVerDescPaciente && descuentosTotal > 0" class="mnd__resumen-fila mnd__resumen-fila--desc">
@@ -2146,7 +2152,15 @@ async function handleSubmit() {
             <div class="mnd__resumen-frase-tit">Qué va a pasar</div>
             {{ fraseQueVaAPasar }}
           </div>
-          <div class="mnd__resumen-fecha">Fecha: {{ fmtFechaLarga(form.fecha_dispensacion) }}</div>
+          <!-- La fecha, a mano desde cualquier paso: administración carga entregas de otro día y
+               antes la encontraba de una; en el paso 3 estaba escondida (7-oct-2026). -->
+          <div class="mnd__resumen-fecha">
+            <template v-if="puedeFecharAtras">
+              <label class="mnd__resumen-fecha-lbl">Fecha de la entrega</label>
+              <AppDatePicker v-model="form.fecha_dispensacion" :max="today" />
+            </template>
+            <template v-else>Fecha: {{ fmtFechaLarga(form.fecha_dispensacion) }}</template>
+          </div>
         </aside>
         </div>
 
@@ -2266,11 +2280,16 @@ async function handleSubmit() {
 .mnd__resumen-total .mnd__num { font-size: 1.6rem; letter-spacing: -.02em; color: var(--c-slate-900); }
 .mnd__resumen-frase { background: #fff; border: 1px solid var(--c-leaf-300); border-radius: 12px; padding: .8rem .9rem; font-size: .85rem; line-height: 1.5; color: var(--c-slate-700); }
 .mnd__resumen-frase-tit { font-size: .72rem; font-weight: 700; color: var(--c-leaf-800); margin-bottom: .2rem; }
-.mnd__resumen-fecha { margin-top: auto; font-size: .75rem; color: var(--c-slate-500); }
+.mnd__resumen-fecha { margin-top: auto; font-size: .75rem; color: var(--c-slate-500); display: flex; flex-direction: column; gap: .3rem; }
+.mnd__resumen-fecha-lbl { font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--c-slate-500); }
+.mnd__resumen-prod { display: flex; flex-direction: column; min-width: 0; }
+.mnd__resumen-gen { font-size: .75rem; color: var(--c-slate-500); }
 .mnd__num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 @media (min-width: 901px) {
   /* Con el resumen a la vista, el total no se repite en la barra de abajo. */
   .mnd__modal--pasos .mnd__barra-total { display: none; }
+  /* La fecha se cambia desde el resumen: no dos selectores a la vez. */
+  .mnd__modal--pasos .mnd__fecha-input { display: none; }
 }
 @media (max-width: 900px) {
   .mnd__modal--pasos { max-width: 640px; }

@@ -262,11 +262,11 @@ onUnmounted(() => document.removeEventListener('keydown', dvEscapeHandler, true)
               <span v-if="!d.stock" class="dv__lote-snap" title="Stock eliminado — dato preservado">(histórico)</span>
             </span>
           </div>
-          <div v-if="Number(d.descuento_dispensa_pct) > 0 || Number(d.descuento_paciente_pct) > 0" class="dv__item-desc-info">
+          <div v-if="Number(d.descuento_dispensa_pct) > 0 || Number(d.descuento_paciente_pct) > 0 || Number(d.descuento_dispensa_ars) > 0" class="dv__item-desc-info">
             <i class="bi bi-tag"></i>
             <span v-if="Number(d.descuento_paciente_pct) > 0">paciente {{ Number(d.descuento_paciente_pct) }}%</span>
-            <span v-if="Number(d.descuento_dispensa_pct) > 0">
-              · dispensa {{ Number(d.descuento_dispensa_pct) }}%<template v-if="d.descuento_otorgado_por"> (otorgó {{ d.descuento_otorgado_por }})</template>
+            <span v-if="Number(d.descuento_dispensa_pct) > 0 || Number(d.descuento_dispensa_ars) > 0">
+              · dispensa <template v-if="Number(d.descuento_dispensa_pct) > 0">{{ Number(d.descuento_dispensa_pct) }}%</template><template v-if="Number(d.descuento_dispensa_ars) > 0"> −$ {{ Number(d.descuento_dispensa_ars).toLocaleString('es-AR') }}</template><template v-if="d.descuento_otorgado_por"> (otorgó {{ d.descuento_otorgado_por }})</template>
             </span>
           </div>
           <div v-if="d.observaciones" class="dv__item-obs">{{ d.observaciones }}</div>
