@@ -52,9 +52,9 @@
         :key="t.id + (t._atrasada ? '-a' : '')"
         class="mta__card"
         :class="[`mta__card--${t.prioridad}`, {
-          'mta__card--futura': esFutura(t) && t.estado !== 'completada',
-          'mta__card--atrasada': t._atrasada && t.estado !== 'completada',
-          'mta__card--completada': t.estado === 'completada',
+          'mta__card--futura': esFutura(t) && !cerrada(t),
+          'mta__card--atrasada': t._atrasada && !cerrada(t),
+          'mta__card--completada': cerrada(t),
         }]"
         @click="modoSeleccion ? alternarTarea(t) : abrirCompletarSheet(t)"
       >
@@ -68,9 +68,10 @@
           <div class="mta__card-titulo">{{ t.titulo }}</div>
           <div class="mta__card-meta">
             <!-- Una tarea hecha ya no está atrasada: mostrar las dos cosas juntas se contradice. -->
-            <span v-if="t._atrasada && t.estado !== 'completada'" class="mta__atrasada">⏰ Atrasada</span>
+            <span v-if="t._atrasada && !cerrada(t)" class="mta__atrasada">⏰ Atrasada</span>
             <span v-if="t.sala?.nombre" class="mta__sala">{{ t.sala.nombre }}</span>
             <span v-if="t.estado === 'completada'" class="mta__completada-badge">✓ Completada</span>
+            <span v-else-if="t.estado === 'no_realizada'" class="mta__nohecha-badge">✕ No se hizo</span>
             <span v-else-if="esFutura(t)" class="mta__prog-badge"><i class="bi bi-clock"></i> Programada</span>
             <span v-else class="mta__prioridad" :class="`mta__prioridad--${t.prioridad}`">
               {{ PRIORIDAD_LABEL[t.prioridad] || t.prioridad }}
@@ -78,13 +79,14 @@
           </div>
         </div>
         <button
-          v-if="t.estado !== 'completada' && !esFutura(t)"
+          v-if="!cerrada(t) && !esFutura(t)"
           class="mta__check"
           @click.stop="abrirCompletarSheet(t)"
         >
           <i class="bi bi-check2"></i>
         </button>
         <i v-else-if="t.estado === 'completada'" class="bi bi-check2-all mta__done-icon"></i>
+        <i v-else-if="t.estado === 'no_realizada'" class="bi bi-x-lg mta__lock-icon"></i>
         <i v-else class="bi bi-lock mta__lock-icon"></i>
       </div>
     </div>
@@ -128,6 +130,10 @@
           <i v-if="!completando" class="bi bi-check2-circle"></i>
           {{ completando ? 'Completando…' : 'Marcar como completada' }}
         </button>
+        <!-- El par: no se hizo (con motivo opcional). -->
+        <button class="mta__btn-nohecha mta__btn-full" :disabled="completando" @click="noSeHizoActiva">
+          <i class="bi bi-x-circle"></i> No se hizo
+        </button>
       </div>
     </SheetBottom>
 
@@ -170,6 +176,8 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { tareaCerrada } from '../../lib/tareaEstado.js'
+import { useNoSeHizo } from '../../composables/useNoSeHizo.js'
 import { toISO } from '../../utils/dates.js'
 import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { useSemanaTareas } from '../../composables/useSemanaTareas.js'
@@ -212,7 +220,7 @@ const dias = computed(() => {
       esHoy:       i === 3,
       nombreCorto: NOMBRES[d.getDay()],
       numero:      d.getDate(),
-      conteo:      diaData?.tareas?.filter(t => t.estado !== 'completada').length || 0,
+      conteo:      diaData?.tareas?.filter(t => !tareaCerrada(t)).length || 0,
     }
   })
 })
@@ -230,7 +238,7 @@ const modoSeleccion = ref(false)
 const seleccionadas = ref(new Set())
 const bulkEnCurso   = ref(false)
 
-const completable = (t) => t.estado !== 'completada' && t.estado !== 'cancelada' && !esFutura(t)
+const completable = (t) => !tareaCerrada(t) && !esFutura(t)
 const completablesDelDia = computed(() => tareasDelDia.value.filter(completable))
 const hayCompletables    = computed(() => completablesDelDia.value.length > 1)
 
@@ -273,8 +281,8 @@ const tareasDelDia = computed(() => {
   const tareas  = diaData?.tareas || []
   return [...tareas].sort((a, b) => {
     const P = { urgente: 0, alta: 1, normal: 2, media: 2, baja: 3 }
-    if (a.estado === 'completada' && b.estado !== 'completada') return 1
-    if (b.estado === 'completada' && a.estado !== 'completada') return -1
+    if (tareaCerrada(a) && !tareaCerrada(b)) return 1
+    if (tareaCerrada(b) && !tareaCerrada(a)) return -1
     return (P[a.prioridad] ?? 2) - (P[b.prioridad] ?? 2)
   })
 })
@@ -288,7 +296,7 @@ const completarError = ref(null)
 const completarForm  = ref({ horas_reales: null, notas_completado: '' })
 
 function abrirCompletarSheet(t) {
-  if (t.estado === 'completada') return
+  if (cerrada(t)) return
   if (esFutura(t)) return   // no se completan tareas futuras
   tareaActiva.value    = t
   completarForm.value  = { horas_reales: null, notas_completado: '' }
@@ -315,6 +323,23 @@ async function confirmarCompletar() {
   } catch (e) {
     completarError.value = e?.response?.data?.error || 'Error al completar la tarea'
   } finally { completando.value = false }
+}
+
+const { marcarNoSeHizo } = useNoSeHizo()
+// Cerrada = ya no se hace nada con ella: hecha o no hecha.
+const cerrada = tareaCerrada
+async function noSeHizoActiva() {
+  const t = tareaActiva.value
+  if (!t) return
+  showCompletar.value = false
+  const hecha = await marcarNoSeHizo(t)
+  if (hecha) {
+    const diaData = diasProcesados.value.find(x => x.fecha === diaSeleccionado.value)
+    const idx = diaData?.tareas.findIndex(x => x.id === t.id) ?? -1
+    if (idx !== -1) diaData.tareas[idx] = { ...diaData.tareas[idx], estado: 'no_realizada' }
+  } else {
+    showCompletar.value = true
+  }
 }
 
 // ── Nueva tarea ───────────────────────────────────────────────────
@@ -364,6 +389,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.mta__btn-nohecha { margin-top: .5rem; display: flex; align-items: center; justify-content: center; gap: .4rem; padding: .8rem; border-radius: 12px; border: 1px solid var(--c-slate-200); background: transparent; color: var(--c-slate-600); font-weight: 600; }
 .mta { padding: 0 0 1rem; }
 
 .mta__topbar {
@@ -445,6 +471,7 @@ onMounted(async () => {
   font-size: .7rem; color: var(--c-slate-400); flex-wrap: wrap;
 }
 .mta__completada-badge { color: #16a34a; font-weight: 700; }
+.mta__nohecha-badge { color: var(--c-slate-500); font-weight: 700; }
 .mta__prioridad { font-weight: 700; }
 .mta__prioridad--urgente { color: #dc2626; }
 .mta__prioridad--alta    { color: #d97706; }

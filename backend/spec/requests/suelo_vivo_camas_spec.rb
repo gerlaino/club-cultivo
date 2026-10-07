@@ -430,7 +430,8 @@ RSpec.describe 'Suelo vivo: camas', type: :request do
       c = crear_cama
       post '/lotes', params: { lote: { cama_id: c['id'], estado: 'vegetativo', plants_count: 1, start_date: Time.zone.today } }, headers: auth_headers, as: :json
       en_cama = json['id']
-      sin_cama = create(:lote, club: club, sala: sala)
+      # Con inicio hoy: las tareas de un plan anteriores al día en que se aplica no se crean.
+      sin_cama = create(:lote, club: club, sala: sala, start_date: Time.zone.today)
 
       post "/lotes/#{en_cama}/aplicar_plan", params: { plan_trabajo_id: plan.id }, headers: auth_headers, as: :json
       expect(json).to include('tareas_creadas' => 1, 'tareas_omitidas' => 2)

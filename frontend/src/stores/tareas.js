@@ -13,6 +13,7 @@ import {
   completarTarea,
   completarTareasMasivo,
   cancelarTarea,
+  noRealizadaTarea,
   getTareasSemana,
   cancelarSerieTarea
 } from '../lib/api'
@@ -131,6 +132,15 @@ export const useTareasStore = defineStore('tareas', () => {
     return n
   }
 
+  // «No se hizo»: sale de pendientes como si se hubiera cerrado.
+  async function noRealizada(id, motivo = '') {
+    const res = await noRealizadaTarea(id, motivo)
+    const estabaPendiente = pendientes.value.some(t => t.id === id)
+    _eliminarDeDashboard(id)
+    if (estabaPendiente && dashboard.value.stats.pendientes > 0) dashboard.value.stats.pendientes--
+    return res.data
+  }
+
   async function cancelar(id) {
     const res        = await cancelarTarea(id)
     const actualizada = res.data
@@ -181,7 +191,7 @@ export const useTareasStore = defineStore('tareas', () => {
     tareasDeHoy, stats, hayVencidas, pendientes,
     hoyPendientes, hoyEnProgreso, hoyCompletadas,
     fetchDashboard, fetchTareas, refrescar,
-    create, update, remove, iniciar, completar, completarMasivo, cancelar,
+    create, update, remove, iniciar, completar, completarMasivo, noRealizada, cancelar,
     fetchSemana, cancelarSerie
   }
 })

@@ -70,7 +70,7 @@
               v-for="t in dia.tareas"
               :key="t.id"
               class="tl__chip"
-              :class="[`tl__chip--${t.prioridad}`, { 'tl__chip--done': t.estado === 'completada', 'tl__chip--prog': t.estado === 'en_progreso', 'tl__chip--sel': isSel(t.id), 'tl__chip--selectable': modoSeleccion && esSeleccionable(t) }]"
+              :class="[`tl__chip--${t.prioridad}`, { 'tl__chip--done': ['completada', 'no_realizada'].includes(t.estado), 'tl__chip--prog': t.estado === 'en_progreso', 'tl__chip--sel': isSel(t.id), 'tl__chip--selectable': modoSeleccion && esSeleccionable(t) }]"
               @click="onTareaClick(t)"
               :title="t.titulo + (t.asignada_a ? ' · ' + t.asignada_a.nombre : '')"
             >
@@ -79,6 +79,7 @@
               <span class="tl__chip-titulo">{{ t.titulo }}</span>
               <span v-if="t.asignada_a && !esPersonal" class="tl__chip-user" :title="t.asignada_a.nombre">{{ initials(t.asignada_a.nombre) }}</span>
               <i v-if="t.estado === 'completada'" class="bi bi-check-circle-fill tl__chip-ico tl__chip-ico--done"></i>
+              <i v-else-if="t.estado === 'no_realizada'" class="bi bi-x-circle-fill tl__chip-ico" title="No se hizo"></i>
               <i v-else-if="t.estado === 'en_progreso'" class="bi bi-play-circle-fill tl__chip-ico tl__chip-ico--prog"></i>
             </div>
             <div v-if="dia.tareas.length === 0" class="tl__dia-empty"></div>
@@ -150,6 +151,9 @@
           </div>
           <div class="tl__modal-footer">
             <button class="tl__btn-ghost" @click="tareaCompletando = null">Cancelar</button>
+            <button class="tl__btn-ghost" @click="noSeHizoCompletando" :disabled="guardando">
+              <i class="bi bi-x-circle"></i> No se hizo
+            </button>
             <button class="tl__btn-success" @click="confirmarCompletar" :disabled="guardando">
               <DsSpinner v-if="guardando" :size="13" />
               <i v-else class="bi bi-check-lg"></i>Completar
@@ -257,6 +261,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { useNoSeHizo } from '../composables/useNoSeHizo.js'
 import { listTareas, updateTarea, createRegistroAmbiental, createLoteEvento, completarTareasMasivo, listAplicaciones, cancelarAplicacion } from '../lib/api.js'
 import { useTareasStore } from '../stores/tareas'
 import { useToast } from '../composables/useToast.js'
@@ -494,7 +499,7 @@ function nextSemana() {
 }
 
 function abrirTarea(t) {
-  if (t.estado === 'completada') return
+  if (['completada', 'no_realizada'].includes(t.estado)) return
   completar(t)
 }
 
@@ -520,6 +525,14 @@ function completar(t) {
   notasForm.value        = ''
   registroForm.value     = emptyRegistroForm()
   registroError.value    = null
+}
+
+const { marcarNoSeHizo } = useNoSeHizo()
+async function noSeHizoCompletando() {
+  const t = tareaCompletando.value
+  if (!t) return
+  tareaCompletando.value = null
+  if (await marcarNoSeHizo(t)) await cargarTareas()
 }
 
 async function confirmarCompletar() {

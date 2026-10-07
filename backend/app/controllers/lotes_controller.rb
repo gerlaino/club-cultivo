@@ -818,7 +818,11 @@ class LotesController < ApplicationController
     render json: {
       plan:   { id: plan.id, titulo: plan.titulo, duracion_dias: plan.duracion_dias },
       tareas: tareas,
-      total:  tareas.size,
+      total:  tareas.count { |t| !t[:en_el_pasado] },
+      # Las que caen antes de hoy no se crean: el plan arranca hoy.
+      en_el_pasado: tareas.count { |t| t[:en_el_pasado] },
+      # Las tareas aparecen en las listas esta cantidad de días antes de su fecha.
+      ventana_dias: Planes::Materializar::VENTANA_DIAS,
       # En una cama: los trasplantes y las fertilizaciones del plan no se crean (y se dice cuántas).
       omitidas: servicio.omitidas,
       motivo_omitidas: servicio.omitidas.any? ? "El lote está en la #{@lote.cama&.nombre}: no hay trasplantes y el suelo se alimenta aparte" : nil,
@@ -836,8 +840,11 @@ class LotesController < ApplicationController
     end
     plan = current_user.club.plan_trabajos.publicados.find(params[:plan_trabajo_id])
     servicio = AplicarPlanLoteService.new(lote: @lote, plan: plan, ejecutado_por: current_user, fecha_inicio: params[:fecha_inicio])
-    creadas = servicio.aplicar!
-    render json: { tareas_creadas: creadas.size, tareas_omitidas: servicio.omitidas.size }
+    previstas = servicio.preview.count { |t| !t[:en_el_pasado] }
+    aplicacion, creadas = servicio.aplicar!
+    render json: { aplicacion_id: aplicacion.id, tareas_creadas: creadas.size,
+                   tareas_previstas: previstas, tareas_omitidas: servicio.omitidas.size,
+                   ventana_dias: Planes::Materializar::VENTANA_DIAS }
   rescue ActiveRecord::RecordNotFound
     render json: { error: 'Plan no encontrado' }, status: :not_found
   rescue Date::Error

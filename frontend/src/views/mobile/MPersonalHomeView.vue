@@ -45,6 +45,11 @@
               <template v-if="t.vencida"> · venció</template>
             </span>
           </div>
+          <!-- «No se hizo»: el par del círculo de hecha. -->
+          <button type="button" class="mph__tarea-no" :disabled="completando === t.id"
+                  :aria-label="`No se hizo: ${t.titulo}`" @click="noSeHizo(t)">
+            <i class="bi bi-x-lg"></i>
+          </button>
         </li>
       </ul>
     </section>
@@ -149,6 +154,7 @@
 // cómo viene la carpa, en qué día de fase va cada lote. Mismo estado que el resto de la app
 // (stores de tareas, ambiente y lotes); lo que cambia es la presentación.
 import { ref, computed, onMounted } from 'vue'
+import { tareaCerrada } from '../../lib/tareaEstado.js'
 import { useAuthStore }     from '../../stores/auth'
 import { useClubStore }     from '../../stores/club'
 import { useTareasStore }   from '../../stores/tareas'
@@ -156,6 +162,7 @@ import { useLotesStore }    from '../../stores/lotes'
 import { useSalasStore }    from '../../stores/salas'
 import { useAmbienteStore } from '../../stores/ambiente'
 import { useToast }         from '../../composables/useToast.js'
+import { useNoSeHizo }       from '../../composables/useNoSeHizo.js'
 import { getAmbienteSalas, getFotosRecientes } from '../../lib/api'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import { ESTADO_META, textoProximoPaso, estadoLoteLabel } from '../../lib/loteHelpers.js'
@@ -188,11 +195,19 @@ const tieneIot = computed(() => club.data?.features?.iot === true)
 const tareasHoy = computed(() => {
   const d = tareas.dashboard
   const vencidas = (d.vencidas || []).map(t => ({ ...t, vencida: true }))
-  const hoy      = (d.hoy || []).filter(t => t.estado !== 'completada')
+  const hoy      = (d.hoy || []).filter(t => !tareaCerrada(t))
   return [...vencidas, ...hoy].slice(0, 8)
 })
 
 const completando = ref(null)
+const { marcarNoSeHizo } = useNoSeHizo()
+async function noSeHizo(t) {
+  completando.value = t.id
+  try {
+    if (await marcarNoSeHizo(t)) await tareas.fetchDashboard()
+  } finally { completando.value = null }
+}
+
 async function completar(t) {
   completando.value = t.id
   try {
@@ -306,6 +321,8 @@ useRecargaEnCambios('fotos', async () => { fotosRecientes.value = (await getFoto
   color: var(--c-leaf-700, #2D7D46); font-size: 1.15rem; display: grid; place-items: center; flex-shrink: 0;
 }
 .mph__tarea-check:active { transform: scale(.94); }
+.mph__tarea-no { margin-left: auto; flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--c-slate-200); background: transparent; color: var(--c-slate-400); display: flex; align-items: center; justify-content: center; font-size: .8rem; }
+.mph__tarea-no:active { transform: scale(.94); }
 .mph__tarea-txt { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
 .mph__tarea-titulo { font-size: .9rem; font-weight: 600; color: var(--c-ink-900, #1a1d1f); }
 .mph__tarea-sub { font-size: .74rem; color: var(--c-ink-500, #6b7280); }

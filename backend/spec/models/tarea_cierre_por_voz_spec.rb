@@ -19,7 +19,7 @@ RSpec.describe Tarea, 'cierre por dictado' do
   def tarea!(tipo:, asignada_a: cultivador, estado: 'pendiente', a_lote: lote)
     Tarea.create!(club: club, creada_por: admin, asignada_a: asignada_a, lote: a_lote,
                   titulo: "#{tipo} de #{a_lote&.codigo}", tipo: tipo, estado: estado,
-                  prioridad: 'normal')
+                  prioridad: 'normal', fecha_programada: Time.zone.today)
   end
 
   def candidatas(realizadas, usuario: cultivador, privilegiado: false)
@@ -63,7 +63,7 @@ RSpec.describe Tarea, 'cierre por dictado' do
     # así que decías "hice la limpieza", el modelo lo entendía bien y la tarea quedaba abierta
     # igual — ni siquiera aparecía para destildar.
     it 'propone también las tareas sin lote ni sala, que son de toda la organización' do
-      general = Tarea.create!(club: club, creada_por: admin, asignada_a: cultivador,
+      general = Tarea.create!(club: club, fecha_programada: Time.zone.today, creada_por: admin, asignada_a: cultivador,
                               titulo: 'Limpieza general', tipo: 'limpieza',
                               estado: 'pendiente', prioridad: 'normal')
 
@@ -124,7 +124,7 @@ RSpec.describe Tarea, 'cierre por dictado' do
     it 'no cierra una tarea de OTRA organización' do
       otro_club = create(:club)
       ajena = ActsAsTenant.with_tenant(otro_club) do
-        Tarea.create!(club: otro_club, creada_por: create(:user, :admin, club: otro_club),
+        Tarea.create!(club: otro_club, fecha_programada: Time.zone.today, creada_por: create(:user, :admin, club: otro_club),
                       titulo: 'riego ajeno', tipo: 'riego', estado: 'pendiente', prioridad: 'normal')
       end
 

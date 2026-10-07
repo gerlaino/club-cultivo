@@ -4,9 +4,14 @@ RSpec.describe 'KPI de tareas pendientes (vencidas + hoy, no futuras)', type: :r
   let(:club)  { create(:club) }
   let(:admin) { create(:user, :admin, club: club) }
 
+
+  # Desde el 7-oct-2026 una tarea NUEVA necesita fecha; las viejas sin fecha siguen existiendo en la
+  # base y se prueban así: se crea con fecha y se le borra, como quedaron.
   def tarea(fecha:, estado: 'pendiente')
-    Tarea.create!(club: club, creada_por: admin, titulo: "t-#{SecureRandom.hex(2)}",
-                  estado: estado, fecha_programada: fecha)
+    t = Tarea.create!(club: club, creada_por: admin, titulo: "t-#{SecureRandom.hex(2)}",
+                      estado: estado, fecha_programada: fecha || Time.zone.today)
+    t.update_column(:fecha_programada, nil) if fecha.nil?
+    t
   end
 
   before { sign_in_as(admin) }
@@ -77,7 +82,7 @@ RSpec.describe 'DELETE /api/tareas/:id (tareas completadas)', type: :request do
 
   def tarea_completada
     Tarea.create!(club: club, creada_por: admin, titulo: 'hecha', estado: 'completada',
-                  fecha_completada: Time.current)
+                  fecha_completada: Time.current, fecha_programada: Time.zone.today)
   end
 
   it 'un admin puede borrar una tarea completada' do

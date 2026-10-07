@@ -2,9 +2,10 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
-import { createAplicacion, listLotes, listSalas } from '../../lib/api.js'
+import { createAplicacion, previewAplicacion, listLotes, listSalas } from '../../lib/api.js'
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
 import { useToast } from '../../composables/useToast.js'
-import { hoyISO, toISO } from '../../utils/dates.js'
+import { hoyISO } from '../../utils/dates.js'
 
 const props = defineProps({
   plan: { type: Object, required: true },
@@ -32,11 +33,6 @@ const TIPO_SALA_LABEL = {
 }
 
 function isoHoy() { return hoyISO() }
-function addDays(iso, n) {
-  const d = new Date(iso + 'T00:00:00')
-  d.setDate(d.getDate() + n)
-  return toISO(d)
-}
 function formatFecha(iso) {
   const [y, m, d] = iso.split('-')
   return `${d}/${m}/${y}`
@@ -54,17 +50,22 @@ const lotes = ref([])
 const salas = ref([])
 const cargando = ref(false)
 
-// Computed: preview de tareas con fechas
-const tareasPreview = computed(() => {
-  if (!props.plan.plan_tareas?.length) return []
-  return [...props.plan.plan_tareas]
-    .sort((a, b) => (a.dia_relativo ?? 0) - (b.dia_relativo ?? 0))
-    .map(pt => ({
-      ...pt,
-      fecha: addDays(fechaInicio.value, pt.dia_relativo ?? 0),
-      label: pt.titulo || TIPO_LABEL[pt.tipo] || pt.tipo,
-    }))
-})
+// Las fechas las calcula el backend (`Planes::Calendario`, la misma cuenta que al aplicar). Antes
+// esta pantalla las calculaba por su cuenta: la regla vivía en dos lados.
+const { esPersonal } = useUsoPersonal()
+const preview = ref(null)
+const tareasPreview = computed(() => preview.value?.tareas || [])
+async function pedirPreview() {
+  if (!fechaInicio.value) { preview.value = null; return }
+  try {
+    const { data } = await previewAplicacion({
+      plan_trabajo_id: props.plan.id, fecha_inicio: fechaInicio.value,
+      objetivo_tipo: objetivoTipo.value || undefined, objetivo_id: objetivoId.value || undefined,
+    })
+    preview.value = data
+  } catch { preview.value = null }
+}
+watch([fechaInicio, objetivoTipo, objetivoId], pedirPreview, { immediate: true })
 
 // Computed: objetivo seleccionado (para mostrar nombre)
 const objetivoSeleccionado = computed(() => {
@@ -104,12 +105,16 @@ async function aplicar() {
 
   saving.value = true; error.value = null
   try {
-    await createAplicacion({
+    const { data } = await createAplicacion({
       plan_trabajo_id: props.plan.id,
       fecha_inicio:    fechaInicio.value,
       objetivo_tipo:   objetivoTipo.value || null,
       objetivo_id:     objetivoId.value   || null,
     })
+    const ahora = data?.tareas?.length || 0
+    const resto = data?.proximas?.length || 0
+    toast.success(`Plan aplicado: ${ahora} tarea${ahora !== 1 ? 's' : ''} para esta semana` +
+                  (resto ? `; las otras ${resto} van apareciendo ${data.ventana_dias || 7} días antes de su fecha` : ''))
     emit('applied')
   } catch (e) {
     error.value = e?.response?.data?.error || 'Error al aplicar el plan'
@@ -211,7 +216,7 @@ async function aplicar() {
           <div class="apm__preview-section">
             <div class="apm__preview-hdr">
               <i class="bi bi-calendar3"></i>
-              <span>{{ tareasPreview.length }} tarea{{ tareasPreview.length !== 1 ? 's' : '' }} se crearán</span>
+              <span>{{ preview?.total ?? 0 }} tarea{{ (preview?.total ?? 0) !== 1 ? 's' : '' }}</span>
               <span v-if="objetivoSeleccionado" class="apm__preview-objetivo">
                 en {{ objetivoSeleccionado.nombre || objetivoSeleccionado.codigo }}
               </span>
@@ -222,15 +227,20 @@ async function aplicar() {
             </div>
 
             <div v-else class="apm__preview-list">
-              <div v-for="t in tareasPreview" :key="t.id" class="apm__preview-row">
+              <div v-for="(t, i) in tareasPreview" :key="i" class="apm__preview-row" :class="{ 'apm__preview-row--pasada': t.en_el_pasado }">
                 <div class="apm__preview-fecha">{{ formatFecha(t.fecha) }}</div>
                 <div class="apm__preview-info">
                   <span class="apm__preview-tipo">{{ TIPO_LABEL[t.tipo] || t.tipo }}</span>
                   <span v-if="t.titulo" class="apm__preview-subtitulo"> — {{ t.titulo }}</span>
                 </div>
-                <div v-if="t.rol_sugerido" class="apm__preview-rol">{{ t.rol_sugerido }}</div>
+                <div v-if="t.responsable && !esPersonal" class="apm__preview-rol">{{ t.responsable }}</div>
+                <div class="apm__preview-rol">{{ t.en_el_pasado ? 'no se crea' : (t.aparece_el === isoHoy() ? 'ya' : `aparece el ${formatFecha(t.aparece_el)}`) }}</div>
               </div>
             </div>
+            <p v-if="tareasPreview.length" class="apm__preview-nota">
+              Cada tarea aparece en tus tareas {{ preview?.ventana_dias || 7 }} días antes de su fecha.
+              <template v-if="preview?.en_el_pasado">{{ preview.en_el_pasado }} quedan antes de hoy y no se crean.</template>
+            </p>
           </div>
         </div>
 
@@ -253,6 +263,8 @@ async function aplicar() {
 </template>
 
 <style scoped>
+.apm__preview-nota { margin: .6rem 0 0; font-size: .78rem; color: var(--c-slate-500); }
+.apm__preview-row--pasada { opacity: .45; }
 .apm__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 1060; padding: 1rem; backdrop-filter: blur(3px); }
 .apm__panel   { background: #fff; border-radius: 16px; width: 100%; max-width: 520px; display: flex; flex-direction: column; box-shadow: 0 24px 64px rgba(0,0,0,.15); max-height: 92vh; }
 

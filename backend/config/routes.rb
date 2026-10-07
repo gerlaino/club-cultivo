@@ -679,6 +679,8 @@ Rails.application.routes.draw do
 
     # Aplicación de plantillas de plan
     resources :aplicacion_planes, only: [:index, :create, :show, :destroy] do
+      # Qué tareas va a tener y cuándo aparece cada una, antes de aplicar (`Planes::Calendario`).
+      collection { get :preview }
       member { post :cancelar }
     end
 
@@ -698,6 +700,7 @@ Rails.application.routes.draw do
       member do
         post   :iniciar
         post   :completar
+        post   :no_realizada
         post   :cancelar
         delete :cancelar_serie
       end

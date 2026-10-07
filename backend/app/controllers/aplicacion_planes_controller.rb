@@ -23,6 +23,30 @@ class AplicacionPlanesController < ApplicationController
     render json: serialize_full(@aplicacion)
   end
 
+  # GET /api/aplicacion_planes/preview?plan_trabajo_id=&fecha_inicio=&objetivo_tipo=&objetivo_id=
+  #
+  # La misma cuenta que se usa al aplicar: la pantalla no calcula fechas por su cuenta.
+  def preview
+    plan     = @club.plan_trabajos.find(params[:plan_trabajo_id])
+    fecha    = Date.parse(params[:fecha_inicio].to_s)
+    objetivo = objetivo_de(params[:objetivo_tipo], params[:objetivo_id])
+    cal      = Planes::Calendario.new(plan: plan, fecha_inicio: fecha, objetivo: objetivo)
+    hoy      = Time.zone.today
+    tareas   = cal.ocurrencias.map do |oc|
+      { plan_tarea_id: oc.plan_tarea.id, titulo: oc.plan_tarea.titulo.presence || oc.plan_tarea.tipo.humanize,
+        tipo: oc.plan_tarea.tipo, fecha: oc.fecha, en_el_pasado: oc.fecha < hoy,
+        aparece_el: (Planes::Materializar.aparece_el(oc.fecha, hoy: hoy) unless oc.fecha < hoy),
+        responsable: oc.asignada&.nombre_completo }
+    end
+    render json: { tareas: tareas, total: tareas.count { |t| !t[:en_el_pasado] },
+                   en_el_pasado: tareas.count { |t| t[:en_el_pasado] }, omitidas: cal.omitidas.size,
+                   ventana_dias: Planes::Materializar::VENTANA_DIAS }
+  rescue ActiveRecord::RecordNotFound
+    render json: { error: 'Plan no encontrado' }, status: :not_found
+  rescue Date::Error, ArgumentError
+    render json: { error: 'Fecha inválida' }, status: :unprocessable_entity
+  end
+
   # POST /api/aplicacion_planes
   # Body: { plan_trabajo_id:, fecha_inicio:, objetivo_tipo: 'Lote'|'Sala', objetivo_id: }
   def create
@@ -36,82 +60,17 @@ class AplicacionPlanesController < ApplicationController
       return render json: { error: 'La plantilla no tiene tareas' }, status: :unprocessable_entity
     end
 
-    fecha_inicio = Date.parse(params[:fecha_inicio].to_s)
+    fecha_inicio  = Date.parse(params[:fecha_inicio].to_s)
     objetivo_tipo = params[:objetivo_tipo].presence   # 'Lote' | 'Sala' | nil
     objetivo_id   = params[:objetivo_id].presence&.to_i
+    # El objetivo se busca DENTRO de la organización: antes se guardaba el id tal cual llegaba.
+    objetivo = objetivo_de(objetivo_tipo, objetivo_id)
 
-    tareas_creadas = 0
-    tareas_omitidas = 0
-
-    ActiveRecord::Base.transaction do
-      @aplicacion = @club.aplicacion_planes.create!(
-        plan_trabajo:  plan,
-        aplicado_por:  current_user,
-        fecha_inicio:  fecha_inicio,
-        objetivo_tipo: objetivo_tipo,
-        objetivo_id:   objetivo_id,
-        estado:        'activo',
-        tareas_creadas: 0
-      )
-
-      # Pre-cargar usuarios del club por rol para no hacer N queries
-      usuarios_por_rol = @club.users.group_by(&:role)
-
-      plan.plan_tareas.includes(:responsable, :sala).each do |pt|
-        dia   = pt.dia_relativo || 0
-        fecha = fecha_inicio + dia.days
-
-        sala_id = pt.sala_id
-        lote_id = nil
-
-        if objetivo_tipo == 'Sala' && objetivo_id
-          sala_id ||= objetivo_id
-        end
-
-        if objetivo_tipo == 'Lote' && objetivo_id
-          lote_id = objetivo_id
-          lote    = Lote.find_by(id: objetivo_id)
-          sala_id ||= lote&.sala_id
-          # En una cama: sin trasplantes ni fertilizaciones del riego (`Tarea.aplica_a_lote?`).
-          unless Tarea.aplica_a_lote?(pt.tipo, lote)
-            tareas_omitidas += 1
-            next
-          end
-        end
-
-        # Resolver a quién asignar: si hay roles sugeridos → un task por usuario del rol
-        asignados = if pt.rol_sugerido.present?
-          roles = pt.rol_sugerido.split(',').map(&:strip).reject(&:blank?)
-          roles.flat_map { |rol| usuarios_por_rol[rol] || [] }.uniq
-        else
-          []
-        end
-
-        # Si hay responsable_id explícito o no se encontraron usuarios del rol → una tarea sin asignar (o al responsable)
-        asignados = [pt.responsable] if asignados.empty?
-
-        asignados.each do |usuario|
-          @club.tareas.create!(
-            titulo:             pt.titulo.presence || pt.tipo,
-            descripcion:        pt.descripcion,
-            tipo:               pt.tipo,
-            estado:             'pendiente',
-            prioridad:          pt.prioridad,
-            asignada_a_id:      usuario&.id,
-            sala_id:            sala_id,
-            lote_id:            lote_id,
-            fecha_programada:   fecha,
-            creada_por:         current_user,
-            origen_plan_id:     plan.id,
-            plan_tarea_id:      pt.id,
-            aplicacion_plan_id: @aplicacion.id
-          )
-          tareas_creadas += 1
-        end
-      end
-
-      @aplicacion.update!(tareas_creadas: tareas_creadas)
-    end
+    # Las fechas las calcula `Planes::Calendario` y las tareas aparecen una semana antes de su día
+    # (`Planes::Materializar`): aplicar ya no crea el ciclo entero de una vez.
+    calendario      = Planes::Calendario.new(plan: plan, fecha_inicio: fecha_inicio, objetivo: objetivo)
+    tareas_omitidas = (calendario.ocurrencias && calendario.omitidas.size)
+    @aplicacion, _creadas = Planes::Aplicar.call(plan: plan, por: current_user, fecha_inicio: fecha_inicio, objetivo: objetivo)
 
     render json: serialize_full(@aplicacion.reload).merge(tareas_omitidas: tareas_omitidas), status: :created
   rescue ActiveRecord::RecordNotFound
@@ -159,6 +118,14 @@ class AplicacionPlanesController < ApplicationController
     end
   end
 
+  # El lote o la sala, buscado DENTRO de la organización.
+  def objetivo_de(tipo, id)
+    case tipo.presence
+    when 'Lote' then @club.lotes.find(id)
+    when 'Sala' then @club.salas.find(id)
+    end
+  end
+
   def serialize(a)
     {
       id:             a.id,
@@ -175,8 +142,24 @@ class AplicacionPlanesController < ApplicationController
     }
   end
 
+  # Lo que todavía no apareció: las tareas se crean una semana antes de su día. Va en el detalle,
+  # para que se vea el plan entero aunque las listas sólo muestren lo próximo.
+  def proximas(a)
+    return [] unless a.estado == 'activo'
+
+    desde = Time.zone.today + Planes::Materializar::VENTANA_DIAS + 1
+    Planes::Calendario.new(plan: a.plan_trabajo, fecha_inicio: a.fecha_inicio, objetivo: a.objetivo, corte: a.created_at)
+                      .ocurrencias.select { |oc| oc.fecha >= desde }
+                      .map { |oc| { titulo: oc.plan_tarea.titulo.presence || oc.plan_tarea.tipo.humanize,
+                                    tipo: oc.plan_tarea.tipo, fecha_programada: oc.fecha,
+                                    aparece_el: Planes::Materializar.aparece_el(oc.fecha),
+                                    asignada_a: oc.asignada ? { id: oc.asignada.id, nombre: oc.asignada.nombre_completo } : nil } }
+  end
+
   def serialize_full(a)
     data = serialize(a)
+    data[:proximas]     = proximas(a)
+    data[:ventana_dias] = Planes::Materializar::VENTANA_DIAS
     data[:tareas] = a.tareas.includes(:asignada_a, :sala, :lote).map do |t|
       {
         id:               t.id,

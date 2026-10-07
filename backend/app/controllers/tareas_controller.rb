@@ -15,7 +15,7 @@ class TareasController < ApplicationController
   before_action :authenticate_user!
   before_action :check_tareas_role!
   before_action :set_club
-  before_action :set_tarea, only: [:show, :update, :destroy, :completar, :iniciar, :cancelar, :cancelar_serie]
+  before_action :set_tarea, only: [:show, :update, :destroy, :completar, :no_realizada, :iniciar, :cancelar, :cancelar_serie]
   before_action :authorize_create!, only: [:create]
   # `completar_masivo` NO está acá: completar una tarea es hacer el trabajo, no gestionarlo, y de
   # a una ya lo puede cualquiera que llegue al controller (ver `completar`). Que la misma acción
@@ -158,7 +158,7 @@ class TareasController < ApplicationController
 
   # POST /api/v1/tareas/:id/completar
   def completar
-    if @tarea.completada? || @tarea.cancelada?
+    if @tarea.cerrada?
       return render json: { error: "No se puede completar una tarea #{@tarea.estado}" }, status: :unprocessable_entity
     end
 
@@ -184,6 +184,23 @@ class TareasController < ApplicationController
       tarea: serialize_tarea(@tarea),
       tiene_horas_para_lote: @tarea.tiene_horas_para_lote?
     }
+  end
+
+  # POST /api/v1/tareas/:id/no_realizada  { motivo? }
+  #
+  # «No se hizo»: el par de «Completar», con sus mismas reglas: quien puede completar una tarea
+  # puede marcar que no se hizo, una tarea cerrada no se vuelve a cerrar, y una de más adelante
+  # todavía no llegó (no se puede no haber hecho algo que no tocaba).
+  def no_realizada
+    if @tarea.cerrada?
+      return render json: { error: "Esa tarea ya está #{@tarea.estado.tr('_', ' ')}" }, status: :unprocessable_entity
+    end
+    if @tarea.programada_a_futuro?
+      return render json: { error: 'Esa tarea es para más adelante: todavía no se puede marcar que no se hizo.' },
+                    status: :unprocessable_entity
+    end
+    @tarea.marcar_no_realizada!(motivo: params[:motivo].to_s.strip.first(500))
+    render json: serialize_tarea(@tarea)
   end
 
   # POST /api/v1/tareas/completar_masivo
@@ -225,8 +242,8 @@ class TareasController < ApplicationController
 
   # POST /api/v1/tareas/:id/cancelar
   def cancelar
-    if @tarea.completada?
-      return render json: { error: 'No se puede cancelar una tarea completada' }, status: :unprocessable_entity
+    if @tarea.completada? || @tarea.no_realizada?
+      return render json: { error: "No se puede cancelar una tarea #{@tarea.estado.tr('_', ' ')}" }, status: :unprocessable_entity
     end
 
     @tarea.update!(estado: 'cancelada')

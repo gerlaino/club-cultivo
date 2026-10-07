@@ -6,5 +6,6 @@ FactoryBot.define do
     tipo        { 'riego' }
     estado      { 'pendiente' }
     prioridad   { 'normal' }
+    fecha_programada { Time.zone.today }
   end
 end

@@ -14,7 +14,8 @@ const VARIANT_BTN = {
 function onKeydown(e) {
   if (!state.open) return
   if (e.key === 'Escape') cancel()
-  if (e.key === 'Enter')  accept()
+  // En el campo de texto, Enter es un salto de línea, no «aceptar».
+  if (e.key === 'Enter' && e.target?.tagName !== 'TEXTAREA') accept()
 }
 
 onMounted(()  => document.addEventListener('keydown', onKeydown))
@@ -28,6 +29,10 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
         <div class="cd-box" @keydown.esc="cancel">
           <div v-if="state.title" id="cd-title" class="cd-title">{{ state.title }}</div>
           <p v-if="state.message" class="cd-msg">{{ state.message }}</p>
+          <label v-if="state.campo" class="cd-campo">
+            <span class="cd-campo-lbl">{{ state.campo.label }}</span>
+            <textarea v-model="state.valor" rows="2" class="cd-campo-in" :placeholder="state.campo.placeholder || ''"></textarea>
+          </label>
           <div class="cd-actions">
             <button class="btn btn-sm" :class="state.neutralText ? 'cd-cancel-ghost' : 'btn-outline-secondary'" @click="cancel">{{ state.cancelText }}</button>
             <button v-if="state.neutralText" class="btn btn-sm btn-outline-secondary" @click="neutral">{{ state.neutralText }}</button>
@@ -42,6 +47,9 @@ onUnmounted(() => document.removeEventListener('keydown', onKeydown))
 </template>
 
 <style scoped>
+.cd-campo { display: grid; gap: .3rem; margin: 0 0 1rem; }
+.cd-campo-lbl { font-size: .78rem; font-weight: 600; color: var(--c-slate-600); }
+.cd-campo-in { width: 100%; border: 1px solid var(--c-slate-300); border-radius: 8px; padding: .5rem .6rem; font: inherit; font-size: .9rem; resize: vertical; }
 /* ARRIBA DE TODO, sin excepción. Un «¿seguro?» que queda debajo de un lightbox (9999) o de su
    barra de acciones (10001) deja la pantalla de atrás tocable: se apretaba «Editar» con el
    cartel de eliminar abierto, y al confirmar seguía el modal de edición (Germán, 21-sep). El

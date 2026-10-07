@@ -22,8 +22,8 @@
             </div>
           </div>
 
-          <!-- Responsable -->
-          <div class="ept__field">
+          <!-- Responsable (no en el autocultivo: hay una sola persona) -->
+          <div v-if="!esPersonal" class="ept__field">
             <label class="ept__label">Responsable</label>
             <select class="ept__input" v-model="form.responsable_id">
               <option :value="null">Sin asignar</option>
@@ -118,6 +118,8 @@ import { ref, watch, computed } from 'vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
 import { updatePlanTarea, deletePlanTarea } from '../../lib/api.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
+const { esPersonal } = useUsoPersonal()
 
 const props = defineProps({
   planTarea:    { type: Object, default: null },

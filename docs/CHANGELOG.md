@@ -1,5 +1,29 @@
 # Changelog
 
+## Octubre 2026 (eg) — Tareas: «No se hizo», fecha obligatoria y los planes aparecen de a poco
+
+- **«No se hizo»** (estado `no_realizada`, `POST /tareas/:id/no_realizada` con motivo opcional): el par
+  de «Completar», con sus mismas reglas (no en una de más adelante, no en una ya cerrada). Queda con su
+  motivo (`notas_completado`) y cuándo (`fecha_completada`). No es «cancelada» (que es «ya no va», p. ej.
+  al retirar un plan). Botón en la lista de tareas, el inicio del teléfono, la hoja de completar del
+  teléfono, el panel del cultivador y la ficha del lote (`useNoSeHizo`, el `ConfirmDialog` ahora acepta un
+  campo de texto). Una sola definición de «cerrada» en pantalla: `lib/tareaEstado.js`.
+- **Toda tarea nueva tiene día** (validación al crear; la pantalla trae «hoy»). Lo que se repite («todos
+  los viernes») arranca un día. Las viejas sin fecha se pueden seguir cerrando.
+- **Las pendientes sin fecha venían de publicar una PLANTILLA**: creaba sus tareas con la fecha de inicio
+  del plan, que una plantilla no tiene. Ahora publicar una plantilla no crea tareas.
+- **Una sola cuenta de fechas para los planes** (`Planes::Calendario`) en las tres puertas: aplicar desde
+  el lote (no entendía «Semana X · Día Y»: con una plantilla fallaba y con un plan común todo caía el día
+  que empezó el lote), aplicar desde la pantalla de planes (que además calculaba las fechas en el
+  navegador; ahora pide `GET /aplicacion_planes/preview`) y publicar un plan con fechas.
+- **Las tareas de un plan aparecen 7 días antes de su fecha** (`Planes::Materializar` + job diario
+  `MaterializarTareasDePlanesJob` a las 4:50): no se crea el ciclo entero de una. Nada anterior al día en
+  que se aplica; nunca dos veces la misma (tampoco vuelve una borrada o «no se hizo»); se corta si se
+  cancela el plan o termina el lote; lo que se le agrega a una plantilla después no cambia los lotes que
+  ya la tenían. El detalle de la aplicación lista lo que falta y cuándo aparece.
+- **Autocultivo**: el formulario de tarea de plantilla, editar tarea del plan y armar un plan ya no
+  muestran «Roles que ejecutan» ni «Responsable».
+
 ## Octubre 2026 (ef) — Dictar desde el «+», el mapa del cultivo para la IA y tareas por voz que sirven
 
 - **«Dictar» es la primera acción del «+» («Hoy»)** en la app del teléfono (`MobileShell`): abre el

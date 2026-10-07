@@ -139,7 +139,7 @@
                 class="cvd__sem-tarea"
                 :class="[
                   'cvd__sem-tarea--' + t.prioridad,
-                  t.estado === 'completada' && 'cvd__sem-tarea--done',
+                  tareaCerrada(t) && 'cvd__sem-tarea--done',
                   t._atrasada && 'cvd__sem-tarea--atrasada',
                 ]"
                 @click="abrirTarea(t)"
@@ -303,11 +303,11 @@
             </div>
           </div>
           <div class="cvd__panel-actions">
-            <p v-if="esTareaFutura(tareaDetalle) && tareaDetalle.estado !== 'completada'" class="cvd__futura-hint">
+            <p v-if="esTareaFutura(tareaDetalle) && !tareaCerrada(tareaDetalle)" class="cvd__futura-hint">
               <i class="bi bi-calendar-event"></i> Disponible el {{ formatFechaLarga(tareaDetalle.fecha_programada) }}
             </p>
             <button
-              v-if="tareaDetalle.estado !== 'completada' && !esTareaFutura(tareaDetalle)"
+              v-if="!['completada', 'no_realizada'].includes(tareaDetalle.estado) && !esTareaFutura(tareaDetalle)"
               class="cvd__panel-btn cvd__panel-btn--primary"
               :disabled="guardandoAccion"
               @click="finalizarTarea"
@@ -316,7 +316,16 @@
               {{ guardandoAccion ? 'Guardando…' : 'Finalizada' }}
             </button>
             <button
-              v-if="tareaDetalle.estado === 'completada'"
+              v-if="!['completada', 'no_realizada'].includes(tareaDetalle.estado) && !esTareaFutura(tareaDetalle)"
+              class="cvd__panel-btn cvd__panel-btn--ghost"
+              :disabled="guardandoAccion"
+              @click="noSeHizoDetalle"
+            >
+              <i class="bi bi-x-circle"></i>
+              No se hizo
+            </button>
+            <button
+              v-if="['completada', 'no_realizada'].includes(tareaDetalle.estado)"
               class="cvd__panel-btn cvd__panel-btn--ghost"
               :disabled="guardandoAccion"
               @click="revertirTarea"
@@ -365,6 +374,8 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { tareaCerrada } from '../../lib/tareaEstado.js'
+import { useNoSeHizo } from '../../composables/useNoSeHizo.js'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import { useRouter }        from 'vue-router'
 import { useAuthStore }     from '../../stores/auth'
@@ -432,6 +443,7 @@ function estadoMeta(estado) {
     en_progreso: { background: 'rgba(217,119,6,.1)',   color: '#d97706' },
     completada:  { background: 'rgba(21,128,61,.1)',   color: '#15803d' },
     cancelada:   { background: 'rgba(220,38,38,.1)',   color: '#dc2626' },
+    no_realizada: { background: 'rgba(100,116,139,.12)', color: '#475569' },
   }[estado] || { background: '#f1f5f9', color: '#64748b' }
 }
 
@@ -575,7 +587,7 @@ const alertasCriticas = computed(() => ambienteStore.alertasActivas.filter(a => 
 const tareasHoy = computed(() => {
   const hoyDia = semanaProcessed.value.dias?.find(d => d.fecha === hoyISO)
   if (!hoyDia) return []
-  return hoyDia.tareas.filter(t => t.estado !== 'completada' && t.estado !== 'cancelada')
+  return hoyDia.tareas.filter(t => !tareaCerrada(t))
 })
 
 const tareasVencidas = computed(() => tareasHoy.value.filter(t => t._atrasada).length)
@@ -606,6 +618,18 @@ function urgencyBg(dias) {
 }
 
 function abrirTarea(t) { tareaDetalle.value = t }
+
+const { marcarNoSeHizo } = useNoSeHizo()
+async function noSeHizoDetalle() {
+  if (!tareaDetalle.value) return
+  guardandoAccion.value = true
+  try {
+    if (await marcarNoSeHizo(tareaDetalle.value)) {
+      await cargarSemana()
+      tareaDetalle.value = null
+    }
+  } finally { guardandoAccion.value = false }
+}
 
 async function finalizarTarea() {
   if (!tareaDetalle.value) return

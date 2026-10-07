@@ -43,9 +43,8 @@
             <label class="apm__label">Fecha de inicio del plan</label>
             <AppDatePicker v-model="fechaInicio" @update:modelValue="onFechaChange" />
             <p class="apm__hint">
-              Las tareas se calculan desde esta fecha. Si el lote ya venía empezado, ponela
-              en el pasado y se generan las tareas pasadas para un registro fiel
-              (después las marcás como realizadas).
+              El plan cuenta desde esta fecha («Semana 1 · Día 1» es este día). Cada tarea aparece en
+              tus tareas {{ preview?.ventana_dias || 7 }} días antes de su fecha; lo que cae antes de hoy no se crea.
             </p>
           </div>
 
@@ -60,6 +59,7 @@
             <div class="apm__preview-meta">
               <span class="apm__badge">{{ preview.total }} tarea{{ preview.total !== 1 ? 's' : '' }}</span>
               <span class="apm__hint">Fechas calculadas desde el {{ formatDate(fechaInicio) }}</span>
+              <span v-if="preview.en_el_pasado" class="apm__hint">· {{ preview.en_el_pasado }} quedan antes de hoy y no se crean</span>
             </div>
 
             <div class="apm__table-wrap">
@@ -70,16 +70,18 @@
                     <th>Tarea</th>
                     <th>Tipo</th>
                     <th>Prioridad</th>
-                    <th>Responsable</th>
+                    <th v-if="!esPersonal">Responsable</th>
+                    <th>Aparece</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr v-for="(t, i) in preview.tareas" :key="i">
+                  <tr v-for="(t, i) in preview.tareas" :key="i" :class="{ 'apm__tr--pasada': t.en_el_pasado }">
                     <td class="apm__td-date">{{ formatDate(t.fecha) }}</td>
                     <td class="apm__td-titulo">{{ t.titulo }}</td>
                     <td><span class="apm__tipo">{{ TIPO_LABELS[t.tipo] || t.tipo }}</span></td>
                     <td><span class="apm__pri" :class="`apm__pri--${t.prioridad}`">{{ t.prioridad }}</span></td>
-                    <td class="apm__td-resp">{{ t.responsable || '—' }}</td>
+                    <td v-if="!esPersonal" class="apm__td-resp">{{ t.responsable || '—' }}</td>
+                    <td class="apm__td-date">{{ t.en_el_pasado ? 'no se crea' : (t.aparece_el === hoy ? 'ya' : formatDate(t.aparece_el)) }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -130,6 +132,7 @@ import DsSpinner from '../../design-system/components/Spinner.vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
 import { useToast } from '../../composables/useToast.js'
 import { hoyISO } from '../../utils/dates.js'
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
 
 const props = defineProps({
   lote: { type: Object, required: true },
@@ -137,6 +140,8 @@ const props = defineProps({
 const emit = defineEmits(['close', 'applied'])
 
 const toast = useToast()
+const { esPersonal } = useUsoPersonal()
+const hoy = hoyISO()
 
 const planes        = ref([])
 const planId        = ref('')
@@ -198,7 +203,10 @@ async function confirmarAplicar() {
   error.value = null
   try {
     const { data } = await aplicarLotePlan(props.lote.id, planId.value, fechaInicio.value)
-    toast.success(`${data.tareas_creadas} tarea${data.tareas_creadas !== 1 ? 's' : ''} creadas correctamente`)
+    // Lo de esta semana se crea ya; el resto aparece solo, una semana antes de su día.
+    const resto = Math.max(0, (data.tareas_previstas || 0) - (data.tareas_creadas || 0))
+    toast.success(`Plan aplicado: ${data.tareas_creadas} tarea${data.tareas_creadas !== 1 ? 's' : ''} para esta semana` +
+                  (resto ? `; las otras ${resto} van apareciendo ${data.ventana_dias || 7} días antes de su fecha` : ''))
     emit('applied', data.tareas_creadas)
   } catch (e) {
     error.value = e.response?.data?.error || 'Error al aplicar el plan.'
@@ -215,6 +223,7 @@ function formatDate(iso) {
 </script>
 
 <style scoped>
+.apm__tr--pasada { opacity: .45; }
 .apm__overlay {
   position: fixed; inset: 0; background: rgba(0,0,0,.45);
   display: flex; align-items: center; justify-content: center;

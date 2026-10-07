@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { tareaCerrada } from '../../lib/tareaEstado.js'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import { useRouter } from 'vue-router'
 import Chart from 'chart.js/auto'
@@ -197,7 +198,7 @@ function fmtARSres(n) { return '$' + (Number(n) || 0).toLocaleString('es-AR') }
 // ── ZONA 1: Alertas ─────────────────────────────────────────────────────────
 
 const tareasVencidas = computed(() =>
-  (tareasStore.dashboard?.vencidas || []).filter(t => t.estado !== 'completada')
+  (tareasStore.dashboard?.vencidas || []).filter(t => !tareaCerrada(t))
 )
 
 const alertas = computed(() => {

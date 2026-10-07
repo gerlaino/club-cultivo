@@ -479,6 +479,12 @@ watch(() => props.show, (val) => {
 
 async function guardar() {
   errorGlobal.value = ''
+  // Toda tarea nueva tiene su día (lo exige el backend desde el 7-oct-2026). Viene con «hoy»
+  // puesto; esto es por si se borró. Lo que se repite («todos los viernes») arranca ese día.
+  if (!editando.value && !form.value.fecha_programada) {
+    errorGlobal.value = 'Elegí para qué día es'
+    return
+  }
   const tipoLabel  = TIPOS.find(t => t.value === form.value.tipo)?.label || 'Tarea'
   const salaNombre = salaSeleccionada.value?.nombre || ''
   const payload = {

@@ -84,7 +84,7 @@
                 class="sem__tarea"
                 :class="[
                   'sem__tarea--' + t.prioridad,
-                  t.estado === 'completada' && 'sem__tarea--done',
+                  ['completada', 'no_realizada'].includes(t.estado) && 'sem__tarea--done',
                   t.origen_plan_id && 'sem__tarea--plan',
                 ]"
                 @click="abrirTarea(t)"
@@ -177,6 +177,16 @@
                 <i class="bi bi-chevron-right pend__chev"></i>
               </button>
 
+              <!-- «No se hizo»: el par del ✓. Sólo para lo que ya tocaba (vencidas, hoy, sin fecha). -->
+              <button
+                class="pend__nodone"
+                :disabled="enCurso.has(t.id)"
+                title="No se hizo"
+                aria-label="Marcar que no se hizo"
+                @click="noSeHizoUna(t)"
+              >
+                <i class="bi bi-x-lg"></i>
+              </button>
               <button
                 class="pend__done"
                 :disabled="enCurso.has(t.id)"
@@ -320,6 +330,7 @@ import { storeToRefs } from 'pinia'
 import { useToast } from '../composables/useToast.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import { useConfirm } from '../composables/useConfirm.js'
+import { useNoSeHizo } from '../composables/useNoSeHizo.js'
 import EmptyState from '../components/ui/EmptyState.vue'
 import { formatFechaLarga } from '../utils/fecha.js'
 const { esPersonal } = useUsoPersonal()
@@ -338,6 +349,7 @@ const lotes             = ref([])
 const usuarios          = ref([])
 const toast             = useToast()
 const { confirm }       = useConfirm()
+const { marcarNoSeHizo } = useNoSeHizo()
 
 const { loading, dashboard, stats, hayVencidas, pendientes, hoyPendientes, hoyEnProgreso, hoyCompletadas } = storeToRefs(tareasStore)
 
@@ -517,6 +529,16 @@ function toggleGrupo(g, marcar) {
 }
 
 function limpiarSeleccion() { seleccion.value.clear() }
+
+async function noSeHizoUna(t) {
+  if (enCurso.value.has(t.id)) return
+  enCurso.value.add(t.id)
+  try {
+    if (await marcarNoSeHizo(t)) { seleccion.value.delete(t.id); cargarSemana() }
+  } finally {
+    enCurso.value.delete(t.id)
+  }
+}
 
 // ✓ de la fila: cierra la tarea sin pedir horas ni notas. Para registrar horas hay
 // que entrar al detalle y usar el modal de completar.
@@ -716,6 +738,9 @@ function mostrarToast(mensaje, tipo = 'success') {
 .pend__done { flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid #d1d5db; background: #fff; color: #9ca3af; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .15s; }
 .pend__done:hover:not(:disabled) { border-color: #1b5e20; background: #1b5e20; color: #fff; }
 .pend__done:disabled { cursor: default; }
+.pend__nodone { flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid var(--c-slate-200); background: transparent; color: var(--c-slate-400); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .15s; font-size: .8rem; }
+.pend__nodone:hover:not(:disabled) { border-color: var(--c-slate-500); color: var(--c-slate-700); }
+.pend__nodone:disabled { cursor: default; }
 @media (max-width: 640px) {
   .pend__chips { display: none; }
   .pend__titulo { max-width: none; white-space: normal; }

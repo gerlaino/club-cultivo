@@ -137,7 +137,7 @@
                           <option v-for="tp in TIPOS" :key="tp.value" :value="tp.value">{{ tp.label }}</option>
                         </select>
                         <input class="npm__input" v-model="t.titulo" placeholder="Título (opcional)" />
-                        <div class="npm__resp-wrap">
+                        <div v-if="!esPersonal" class="npm__resp-wrap">
                           <input class="npm__input" v-model="t._resp_texto" @input="onRespInput(t)" @focus="t._resp_abierto = true" @blur="cerrarRespDropdown(t)" placeholder="Responsable…" :class="{ 'npm__input--resp-ok': t.responsable_id }" />
                           <div v-if="t._resp_abierto" class="npm__resp-drop">
                             <div v-for="u in filtrarUsuarios(t._resp_texto)" :key="u.id" class="npm__resp-opcion" :class="{ 'npm__resp-opcion--sel': t.responsable_id === u.id }" @mousedown.prevent="seleccionarResponsable(t, u)">{{ u.nombre_completo || u.nombre }}</div>
@@ -215,7 +215,7 @@
                       <option v-for="tp in TIPOS" :key="tp.value" :value="tp.value">{{ tp.label }}</option>
                     </select>
                     <input class="npm__input" v-model="t.titulo" placeholder="Título (opcional)" />
-                    <div class="npm__resp-wrap">
+                    <div v-if="!esPersonal" class="npm__resp-wrap">
                       <input class="npm__input" v-model="t._resp_texto" @input="onRespInput(t)" @focus="t._resp_abierto = true" @blur="cerrarRespDropdown(t)" placeholder="Responsable…" :class="{ 'npm__input--resp-ok': t.responsable_id }" />
                       <div v-if="t._resp_abierto" class="npm__resp-drop">
                         <div v-for="u in filtrarUsuarios(t._resp_texto)" :key="u.id" class="npm__resp-opcion" :class="{ 'npm__resp-opcion--sel': t.responsable_id === u.id }" @mousedown.prevent="seleccionarResponsable(t, u)">{{ u.nombre_completo || u.nombre }}</div>
@@ -341,6 +341,8 @@ import {
   interpretarArchivoPlan, listPlanTrabajos, listPlanTareas,
 } from '../../lib/api.js'
 import DsSpinner from '../../design-system/components/Spinner.vue'
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
+const { esPersonal } = useUsoPersonal()
 import { hoyISO, toISO } from '../../utils/dates.js'
 
 const props = defineProps({

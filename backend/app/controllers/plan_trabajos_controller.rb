@@ -5,7 +5,6 @@ class PlanTrabajosController < ApplicationController
   before_action :set_club
   before_action :set_plan, only: [:show, :update, :destroy, :publicar, :archivar, :export_csv]
 
-  DIAS_A_WDAY = { 'lun' => 1, 'mar' => 2, 'mie' => 3, 'jue' => 4, 'vie' => 5, 'sab' => 6, 'dom' => 0 }.freeze
 
   # GET /api/plan_trabajos
   def index
@@ -96,25 +95,16 @@ class PlanTrabajosController < ApplicationController
     tareas_creadas = 0
 
     ActiveRecord::Base.transaction do
-      @plan.plan_tareas.includes(:responsable, :sala).each do |pt|
-        if pt.es_recurrente?
-          fechas = calcular_fechas(pt)
-          primera = nil
-          fechas.each_with_index do |fecha, idx|
-            tarea = crear_tarea!(pt, fecha)
-            primera = tarea if idx.zero?
-            tareas_creadas += 1
-          end
-          pt.update!(tarea_generada_id: primera&.id)
-        else
-          fecha = pt.fecha_especifica || @plan.fecha_inicio
-          tarea = crear_tarea!(pt, fecha)
-          pt.update!(tarea_generada_id: tarea.id)
-          tareas_creadas += 1
-        end
-      end
-
       @plan.update!(estado: :publicado, publicado_en: Time.zone.now)
+      # Una PLANTILLA no crea tareas al publicarse: no tiene fechas, se aplica a un lote o a una
+      # sala. Antes las creaba igual, con la fecha de inicio del plan —que una plantilla no tiene—,
+      # y quedaban tareas pendientes SIN FECHA que nadie sabía de dónde salían.
+      # Un plan con fechas se aplica a toda la organización con la cuenta única
+      # (`Planes::Calendario`): sus tareas aparecen una semana antes de su día.
+      unless @plan.es_plantilla?
+        _aplicacion, creadas = Planes::Aplicar.call(plan: @plan, por: current_user, fecha_inicio: @plan.fecha_inicio)
+        tareas_creadas = creadas.size
+      end
     end
 
     plan_data = serialize_plan(@plan.reload)
@@ -278,37 +268,6 @@ class PlanTrabajosController < ApplicationController
     )
   rescue
     raw.slice(*%w[titulo tipo responsable_id prioridad sala_id descripcion dias_semana hora es_recurrente fecha_especifica origen_ia confirmada dia_relativo rol_sugerido])
-  end
-
-  def calcular_fechas(plan_tarea)
-    return [] if plan_tarea.dias_semana.blank?
-
-    wdays_objetivo = plan_tarea.dias_array.filter_map { |d| DIAS_A_WDAY[d] }
-    fechas = []
-    fecha  = @plan.fecha_inicio
-    while fecha <= @plan.fecha_fin
-      fechas << fecha if wdays_objetivo.include?(fecha.wday)
-      fecha += 1.day
-    end
-    fechas
-  end
-
-  def crear_tarea!(plan_tarea, fecha)
-    @club.tareas.create!(
-      titulo:             plan_tarea.titulo.presence || plan_tarea.tipo,
-      descripcion:        plan_tarea.descripcion,
-      tipo:               plan_tarea.tipo,
-      estado:             'pendiente',
-      prioridad:          plan_tarea.prioridad,
-      asignada_a_id:      plan_tarea.responsable_id,
-      sala_id:            plan_tarea.sala_id,
-      fecha_programada:   fecha,
-      recurrente:         plan_tarea.es_recurrente,
-      creada_por:         current_user,
-      origen_plan_id:     @plan.id,
-      origen_plan_titulo: @plan.titulo,
-      plan_tarea_id:      plan_tarea.id
-    )
   end
 
   def propagar_cambios(pt, scope)

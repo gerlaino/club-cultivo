@@ -15,6 +15,12 @@ Sidekiq.configure_server do |config|
         'class' => 'PurgarAdjuntosEntregaJob',
         'description' => 'Borra firma y foto de las entregas pasados 30 días (deja el rastro en la bitácora del envío)'
       },
+      'materializar_tareas_de_planes' => {
+        # Antes de que arranque el día: lo de la semana ya está en las listas al abrir la app.
+        'cron'  => '50 4 * * *',
+        'class' => 'MaterializarTareasDePlanesJob',
+        'description' => 'Crea las tareas de los planes aplicados que entran en la próxima semana'
+      },
       'aplicar_bajas_modulos' => {
         # Temprano, antes de que la organización arranque el día: el módulo se apaga sin que
         # nadie esté a mitad de una operación.

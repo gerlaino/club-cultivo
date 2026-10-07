@@ -14,9 +14,14 @@ RSpec.describe 'Completar tareas programadas a futuro', type: :request do
   let(:hoy)   { Time.zone.today }
 
   # No hay factory de Tarea; mismo patrón que tareas_pendientes_kpi_spec.
+
+  # Desde el 7-oct-2026 una tarea NUEVA necesita fecha; las viejas sin fecha siguen existiendo en la
+  # base y se prueban así: se crea con fecha y se le borra, como quedaron.
   def tarea(fecha)
-    Tarea.create!(club: club, creada_por: admin, titulo: "t-#{SecureRandom.hex(2)}",
-                  estado: 'pendiente', fecha_programada: fecha)
+    t = Tarea.create!(club: club, creada_por: admin, titulo: "t-#{SecureRandom.hex(2)}",
+                      estado: 'pendiente', fecha_programada: fecha || Time.zone.today)
+    t.update_column(:fecha_programada, nil) if fecha.nil?
+    t
   end
 
   before { sign_in_as(admin) }

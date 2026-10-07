@@ -27,7 +27,9 @@ class Tarea < ApplicationRecord
   def self.aplica_a_lote?(tipo, lote)
     !(lote&.en_cama? && NO_APLICAN_EN_CAMA.include?(tipo.to_s))
   end
-  ESTADOS     = %w[pendiente en_progreso completada cancelada].freeze
+  # `no_realizada` (7-oct-2026): llegó su día y no se hizo. No es `cancelada` —que es «ya no va»,
+  # p. ej. al retirar un plan—: es un hecho que se registra, con su motivo, y se puede contar.
+  ESTADOS     = %w[pendiente en_progreso completada cancelada no_realizada].freeze
 
   # Mapeo de tareas_realizadas (RegistroAmbiental) a tipo de Tarea
   TAREAS_REALIZADAS_MAP = {
@@ -51,6 +53,10 @@ class Tarea < ApplicationRecord
   FRECUENCIAS = %w[diaria semanal quincenal mensual].freeze
 
   validates :titulo,    presence: true, length: { maximum: 200 }
+  # Toda tarea nueva tiene su día (Germán, 7-oct-2026): las «pendientes sin fecha» quedaban en una
+  # lista aparte que nadie miraba. Lo que se repite («todos los viernes») también arranca un día.
+  # Sólo al crear: las viejas sin fecha se pueden seguir editando y cerrando.
+  validates :fecha_programada, presence: { message: 'falta: decí para qué día es' }, on: :create
   validates :tipo,      inclusion: { in: TIPOS }
   validates :estado,    inclusion: { in: ESTADOS }
   validates :prioridad, inclusion: { in: PRIORIDADES }
@@ -108,6 +114,8 @@ class Tarea < ApplicationRecord
   def en_progreso? = estado == 'en_progreso'
   def completada?  = estado == 'completada'
   def cancelada?   = estado == 'cancelada'
+  def no_realizada? = estado == 'no_realizada'
+  def cerrada?      = completada? || cancelada? || no_realizada?
   def activa?      = pendiente? || en_progreso?
   def vencida?     = fecha_programada&.past? && activa?
   # Programada para después de hoy. Una tarea sin fecha NO es futura: es "cuando se pueda",
@@ -136,13 +144,20 @@ class Tarea < ApplicationRecord
 
   # Completar tarea
   def completar!(horas_reales:, notas: nil)
-    raise "No se puede completar una tarea #{estado}" if completada? || cancelada?
+    raise "No se puede completar una tarea #{estado}" if cerrada?
     update!(
       estado: 'completada',
       horas_reales: horas_reales,
       notas_completado: notas,
       fecha_completada: Time.current
     )
+  end
+
+  # «No se hizo»: queda registrado con el motivo (opcional) y cuándo se marcó. `fecha_completada`
+  # es el momento en que la tarea se CERRÓ, sea como sea; el estado dice cómo.
+  def marcar_no_realizada!(motivo: nil)
+    raise "No se puede marcar como no hecha una tarea #{estado}" if cerrada?
+    update!(estado: 'no_realizada', notas_completado: motivo.presence, fecha_completada: Time.current)
   end
 
   # Marcar que las horas ya fueron aplicadas al lote

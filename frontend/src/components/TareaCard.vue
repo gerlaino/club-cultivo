@@ -37,13 +37,13 @@
                 <i class="bi bi-pencil me-2"></i>Editar
               </button>
             </li>
-            <li v-if="tarea.estado !== 'completada' && puedeEditar">
+            <li v-if="!tareaCerrada(tarea) && puedeEditar">
               <hr class="dropdown-divider">
               <button class="dropdown-item text-danger" @click="$emit('cancelar', tarea)">
                 <i class="bi bi-x-circle me-2"></i>Cancelar
               </button>
             </li>
-            <li v-if="(tarea.parent_tarea_id || tarea.recurrente) && tarea.estado !== 'completada' && puedeEditar">
+            <li v-if="(tarea.parent_tarea_id || tarea.recurrente) && !tareaCerrada(tarea) && puedeEditar">
               <hr class="dropdown-divider">
               <button class="dropdown-item text-danger" @click.stop="$emit('cancelar-serie', tarea)">
                 <i class="bi bi-x-circle-fill me-2"></i>Cancelar serie completa
@@ -103,6 +103,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { tareaCerrada } from '../lib/tareaEstado.js'
 import { useAuthStore } from '../stores/auth'
 
 const props = defineProps({

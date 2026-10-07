@@ -738,6 +738,8 @@ export const iniciarTarea      = (id)           => api.post(`/tareas/${id}/inici
 export const completarTarea    = (id, data)     => api.post(`/tareas/${id}/completar`, data)
 export const completarTareasMasivo = (ids)      => api.post('/tareas/completar_masivo', { ids })
 export const cancelarTarea     = (id)           => api.post(`/tareas/${id}/cancelar`)
+// «No se hizo»: el par de completar, con un motivo opcional.
+export const noRealizadaTarea  = (id, motivo)   => api.post(`/tareas/${id}/no_realizada`, { motivo })
 export const getTareasSemana    = (desde)        => api.get('/tareas/semana', { params: { desde } })
 export const cancelarSerieTarea = (id)           => api.delete(`/tareas/${id}/cancelar_serie`)
 export const getHistorial       = (params = {})  => api.get('/historial', { params })
@@ -762,6 +764,8 @@ export const deletePlanTarea          = (planId, tid)         => api.delete(`/pl
 export const listAplicaciones         = (params = {})         => api.get('/aplicacion_planes', { params })
 export const getAplicacion            = (id)                  => api.get(`/aplicacion_planes/${id}`)
 export const createAplicacion         = (data)                => api.post('/aplicacion_planes', data)
+// Qué tareas va a tener y cuándo aparece cada una (la cuenta es del backend: `Planes::Calendario`).
+export const previewAplicacion        = (params)              => api.get('/aplicacion_planes/preview', { params })
 export const cancelarAplicacion       = (id)                  => api.post(`/aplicacion_planes/${id}/cancelar`)
 export const deleteAplicacion         = (id)                  => api.delete(`/aplicacion_planes/${id}`)
 

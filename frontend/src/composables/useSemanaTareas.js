@@ -1,3 +1,4 @@
+import { tareaCerrada } from '../lib/tareaEstado.js'
 import { computed, unref } from 'vue'
 import { toISO as toISOLocal } from '../utils/dates.js'
 
@@ -18,7 +19,7 @@ const toISO = (d) => toISOLocal(new Date(d))
 export function useSemanaTareas(semana) {
   const hoyISO = toISO(new Date())
 
-  const pendiente = (t) => t.estado !== 'completada' && t.estado !== 'cancelada'
+  const pendiente = (t) => !tareaCerrada(t)
 
   const dias = computed(() => {
     const raw = unref(semana)?.dias

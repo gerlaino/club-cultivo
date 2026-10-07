@@ -1,6 +1,8 @@
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue'
 import { listUsers } from '../../lib/api.js'
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
+const { esPersonal } = useUsoPersonal()
 
 const props = defineProps({
   tarea: { type: Object, default: null },
@@ -345,8 +347,8 @@ function guardar() {
             </div>
           </div>
 
-          <!-- ── Roles ── -->
-          <div class="mpt__field">
+          <!-- ── Roles ── (en el autocultivo hay una sola persona: no hay a quién repartir) -->
+          <div v-if="!esPersonal" class="mpt__field">
             <label class="mpt__label">
               Roles que ejecutan esta tarea
               <span class="mpt__opt">referencia informativa</span>
@@ -366,7 +368,7 @@ function guardar() {
           </div>
 
           <!-- ── Responsable ── -->
-          <div class="mpt__field">
+          <div v-if="!esPersonal" class="mpt__field">
             <label class="mpt__label">Responsable <span class="mpt__opt">usuario específico — opcional</span></label>
             <select class="mpt__input" v-model="form.responsable_id">
               <option :value="null">— Sin asignar —</option>
