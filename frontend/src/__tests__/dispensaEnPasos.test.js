@@ -2,7 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
-// EN EL TELÉFONO, DOS PASOS: qué se lleva y cómo paga.
+// TRES PASOS EN TODAS LAS PANTALLAS (AC 7-oct-2026, reemplaza «dos pasos sólo en el teléfono»):
+// qué se lleva → cuánto sale → cómo paga. En el escritorio, con el resumen fijo al costado.
+//
+// Lo de abajo sigue valiendo para el teléfono: dos pasos eran los dos momentos reales del mostrador.
 //
 // Son los dos momentos reales del mostrador. El formulario completo entra en un escritorio y ahí
 // está bien —verlo de una es mejor—, pero en un teléfono el que lo usa está PARADO con alguien
@@ -66,8 +69,9 @@ describe('En el teléfono', () => {
   it('arranca en el primer paso, y lo dice', async () => {
     const w = await montar(390)
 
-    expect(w.find('.mnd__modal-title').text()).toContain('Qué se lleva')
-    expect(w.find('.mnd__modal-paso').text()).toBe('paso 1 de 2')
+    expect(w.find('.mnd__paso-btn.is-on').text()).toContain('Qué se lleva')
+    expect(w.find('.mnd__cab-sup').text()).toContain('paso 1 de 3')
+    expect(w.find('.mnd__cab-nombre').text()).toBe('Ana Gómez')
   })
 
   // Lo que rompía la experiencia: el producto arriba, la cantidad abajo y "Agregar" más abajo
@@ -109,18 +113,29 @@ describe('En el teléfono', () => {
     expect(w.find('.mnd__barra-total').text()).toContain('45.000')
   })
 
-  it('el segundo paso es el cobro, y se puede volver', async () => {
+  it('después viene cuánto sale, después cómo paga, y se puede volver', async () => {
     const w = await montar(390)
     await fila(w, 'Lemon Cookie').trigger('click')
     await w.find('.mnd__barra-cant input').setValue('25')
     await w.find('.mnd__barra-add').trigger('click')
     await w.find('.mnd__barra-seguir').trigger('click')
 
-    expect(w.find('.mnd__modal-title').text()).toContain('Cómo paga')
-    expect(w.find('.mnd__barra-seguir').text()).toContain('Registrar')
+    expect(w.find('.mnd__paso-btn.is-on').text()).toContain('Cuánto sale')
+    expect(w.find('.mnd__barra-seguir').text()).toContain('Cómo paga')
+
+    await w.find('.mnd__barra-seguir').trigger('click')
+    expect(w.find('.mnd__paso-btn.is-on').text()).toContain('Cómo paga')
+    expect(w.find('.mnd__barra-seguir').text()).toContain('Confirmar dispensa')
 
     await w.find('.mnd__barra-acc .mnd__btn-ghost').trigger('click')
-    expect(w.find('.mnd__modal-title').text()).toContain('Qué se lleva')
+    expect(w.find('.mnd__paso-btn.is-on').text()).toContain('Cuánto sale')
+  })
+
+  it('no deja saltar al cobro tocando el paso con el carrito vacío', async () => {
+    const w = await montar(390)
+    await w.findAll('.mnd__paso-btn')[2].trigger('click')
+    expect(w.find('.mnd__paso-btn.is-on').text()).toContain('Qué se lleva')
+    expect(w.find('.mnd__error').text()).toContain('al menos un producto')
   })
 
   // Lo escrito no se pierde al ir y volver: es `v-show`, no `v-if`.
@@ -137,14 +152,23 @@ describe('En el teléfono', () => {
 })
 
 describe('En el escritorio', () => {
-  // Entra entero y verlo de una es mejor: no hay pasos que atravesar para llegar al cobro.
-  it('no hay pasos: es el formulario completo', async () => {
+  it('los mismos tres pasos, con el resumen fijo al costado', async () => {
     const w = await montar(1280, 'admin')
 
-    expect(w.find('.mnd__modal-paso').exists()).toBe(false)
-    expect(w.find('.mnd__barra-acc').exists()).toBe(false)
-    expect(w.find('.mnd__modal-title').text()).toContain('Nueva dispensación')
-    // Y la cantidad sigue en su lugar de siempre, con su botón.
+    expect(w.findAll('.mnd__paso-btn')).toHaveLength(3)
+    expect(w.find('.mnd__resumen').exists()).toBe(true)
+    expect(w.find('.mnd__resumen').text()).toContain('Qué va a pasar')
+    // La cantidad, en su lugar, con su botón: en el escritorio no va a la barra de abajo.
     expect(w.find('.mnd__add-item').exists()).toBe(true)
+    expect(w.find('.mnd__barra-cant').exists()).toBe(false)
+  })
+
+  it('el resumen dice qué va a pasar con la plata, en una frase', async () => {
+    const w = await montar(1280, 'admin')
+    await fila(w, 'Lemon Cookie').trigger('click')
+    w.vm.form.cantidad = 25
+    await w.vm.$nextTick()
+    await w.find('.mnd__add-item').trigger('click')
+    expect(w.find('.mnd__resumen-frase').text()).toMatch(/Paga \$\s?45\.000 en efectivo/)
   })
 })

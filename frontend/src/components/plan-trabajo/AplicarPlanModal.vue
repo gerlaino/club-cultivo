@@ -76,6 +76,23 @@ const objetivoSeleccionado = computed(() => {
 
 const puedeAplicar = computed(() => !!fechaInicio.value)
 
+// «Así va a quedar», agrupado por semana del plan: las fechas son reales (las calcula el backend,
+// `Planes::Calendario`) y la semana sale de cuántos días pasaron desde el inicio (7-oct-2026).
+const DIA_MS = 86400000
+const porSemana = computed(() => {
+  if (!fechaInicio.value) return []
+  const inicio = new Date(fechaInicio.value + 'T00:00:00').getTime()
+  const grupos = new Map()
+  for (const t of tareasPreview.value) {
+    const dias = Math.round((new Date(t.fecha + 'T00:00:00').getTime() - inicio) / DIA_MS)
+    const s = Math.floor(Math.max(0, dias) / 7) + 1
+    if (!grupos.has(s)) grupos.set(s, [])
+    grupos.get(s).push(t)
+  }
+  return [...grupos.entries()].sort((a, b) => a[0] - b[0]).map(([semana, tareas]) => ({ semana, tareas }))
+})
+const diaCorto = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'numeric' })
+
 async function cargarLotes() {
   const { data } = await listLotes()
   lotes.value = (data?.lotes ?? data ?? [])
@@ -126,20 +143,22 @@ async function aplicar() {
 
 <template>
   <Teleport to="body">
-    <div v-modal="() => $emit('close')" class="apm__overlay" @click.self="$emit('close')">
+    <div v-modal="() => $emit('close')" class="apm__overlay">
       <div class="apm__panel">
 
         <!-- Header -->
         <div class="apm__hdr">
           <div class="apm__hdr-ico"><i class="bi bi-play-circle"></i></div>
           <div>
-            <h2 class="apm__title">Aplicar plan</h2>
+            <h2 class="apm__title">Aplicar un plan</h2>
             <p class="apm__sub">{{ plan.titulo }}</p>
           </div>
           <button class="apm__close" @click="$emit('close')"><i class="bi bi-x-lg"></i></button>
         </div>
 
-        <!-- Body -->
+        <!-- Rediseño 7-oct-2026: a la izquierda qué y desde cuándo; a la derecha cómo queda, con las
+             fechas reales, antes de confirmar. -->
+        <div class="apm__cuerpo">
         <div class="apm__body">
           <div v-if="error" class="apm__alert">{{ error }}</div>
 
@@ -212,8 +231,8 @@ async function aplicar() {
             </div>
           </div>
 
-          <!-- Preview de tareas -->
-          <div class="apm__preview-section">
+        </div>
+          <aside class="apm__preview-section" aria-label="Así va a quedar">
             <div class="apm__preview-hdr">
               <i class="bi bi-calendar3"></i>
               <span>{{ preview?.total ?? 0 }} tarea{{ (preview?.total ?? 0) !== 1 ? 's' : '' }}</span>
@@ -227,8 +246,10 @@ async function aplicar() {
             </div>
 
             <div v-else class="apm__preview-list">
-              <div v-for="(t, i) in tareasPreview" :key="i" class="apm__preview-row" :class="{ 'apm__preview-row--pasada': t.en_el_pasado }">
-                <div class="apm__preview-fecha">{{ formatFecha(t.fecha) }}</div>
+              <template v-for="g in porSemana" :key="g.semana">
+              <div class="apm__preview-semana">Semana {{ g.semana }}</div>
+              <div v-for="(t, i) in g.tareas" :key="`${g.semana}-${i}`" class="apm__preview-row" :class="{ 'apm__preview-row--pasada': t.en_el_pasado }">
+                <div class="apm__preview-fecha">{{ diaCorto(t.fecha) }}</div>
                 <div class="apm__preview-info">
                   <span class="apm__preview-tipo">{{ TIPO_LABEL[t.tipo] || t.tipo }}</span>
                   <span v-if="t.titulo" class="apm__preview-subtitulo"> — {{ t.titulo }}</span>
@@ -236,12 +257,13 @@ async function aplicar() {
                 <div v-if="t.responsable && !esPersonal" class="apm__preview-rol">{{ t.responsable }}</div>
                 <div class="apm__preview-rol">{{ t.en_el_pasado ? 'no se crea' : (t.aparece_el === isoHoy() ? 'ya' : `aparece el ${formatFecha(t.aparece_el)}`) }}</div>
               </div>
+              </template>
             </div>
             <p v-if="tareasPreview.length" class="apm__preview-nota">
               Cada tarea aparece en tus tareas {{ preview?.ventana_dias || 7 }} días antes de su fecha.
               <template v-if="preview?.en_el_pasado">{{ preview.en_el_pasado }} quedan antes de hoy y no se crean.</template>
             </p>
-          </div>
+          </aside>
         </div>
 
         <!-- Footer -->
@@ -253,7 +275,7 @@ async function aplicar() {
             @click="aplicar"
           >
             <DsSpinner v-if="saving" :size="14" />
-            {{ saving ? 'Aplicando…' : 'Aplicar plan' }}
+            {{ saving ? 'Aplicando…' : `Aplicar · ${preview?.total ?? 0} tareas` }}
           </button>
         </div>
 
@@ -263,10 +285,24 @@ async function aplicar() {
 </template>
 
 <style scoped>
+.apm__cuerpo { display: flex; flex: 1; min-height: 0; }
+.apm__cuerpo > .apm__body { flex: 1; min-width: 0; overflow-y: auto; }
+.apm__cuerpo > .apm__preview-section { width: 420px; flex-shrink: 0; border-left: 1px solid var(--c-slate-200); background: var(--c-paper); padding: 1.1rem 1.2rem; overflow-y: auto; margin: 0 !important; border-radius: 0 !important; }
+/* La lista de fechas ocupa el alto de la columna: con el tope viejo de 220 px se cortaba en la
+   semana 2. */
+.apm__cuerpo .apm__preview-list { max-height: none; overflow: visible; }
+.apm__panel { height: min(88vh, 760px); }
+@media (max-width: 860px) { .apm__panel { height: auto; } }
+.apm__preview-semana { font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--c-leaf-800); padding: .6rem 0 .2rem; }
+@media (max-width: 860px) {
+  .apm__cuerpo { flex-direction: column; overflow-y: auto; }
+  .apm__cuerpo > .apm__body { overflow: visible; }
+  .apm__cuerpo > .apm__preview-section { width: auto; border-left: 0; border-top: 1px solid var(--c-slate-200); overflow: visible; }
+}
 .apm__preview-nota { margin: .6rem 0 0; font-size: .78rem; color: var(--c-slate-500); }
 .apm__preview-row--pasada { opacity: .45; }
 .apm__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 1060; padding: 1rem; backdrop-filter: blur(3px); }
-.apm__panel   { background: #fff; border-radius: 16px; width: 100%; max-width: 520px; display: flex; flex-direction: column; box-shadow: 0 24px 64px rgba(0,0,0,.15); max-height: 92vh; }
+.apm__panel   { background: #fff; border-radius: 16px; width: 100%; max-width: 1000px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 64px rgba(0,0,0,.15); max-height: 92vh; }
 
 /* Header */
 .apm__hdr     { display: flex; align-items: center; gap: .875rem; padding: 1.25rem 1.4rem 1rem; border-bottom: 1px solid var(--c-slate-100); flex-shrink: 0; }

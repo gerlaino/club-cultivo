@@ -158,7 +158,7 @@ describe('El panel del dueño', () => {
 
     expect(t).toContain('1.240.000')
     expect(t).toContain('180.000')
-    expect(t).toContain('vencido y operando')
+    expect(t.toLowerCase()).toContain('vencido y operando')
     expect(t).toContain('320.000')
   })
 
@@ -181,13 +181,12 @@ describe('El panel del dueño', () => {
     expect(w.text()).toContain('Juan')
   })
 
-  it('salud dice el último backup y qué cron no corrió', async () => {
+  // Desde el 7-oct-2026 el backup y los cron se leen en Estado (las cuatro preguntas): el panel
+  // del negocio lleva ahí y no repite la salud con otra redacción.
+  it('la salud de la plataforma está a un clic, en Estado', async () => {
     const w = await montar()
-    const t = w.text()
-
-    expect(t).toContain('Último backup')
-    expect(t).toContain('12.3 MB')
-    expect(t).toContain('stock_bajo')
+    expect(w.text()).toContain('¿Anda todo?')
+    expect(w.find('a[href*="estado"], .sad__estado-link').exists()).toBe(true)
   })
 
   it('adopción muestra contratado · andando · usado', async () => {

@@ -524,7 +524,25 @@ class SuperAdmin::ClubsController < SuperAdmin::BaseController
       # incluyen las viejas y las derivadas (médico, delivery, IA…): decía «+12» de algo que no se
       # contrató aparte.
       extras:           Club::ADDONS.select { |k, _| Club.extra?(k) && c.feature?(k) }.map { |_, v| v[:label] },
+      # Cuánto del plan usa (7-oct-2026): la lista lo muestra en barras, y pasando el 90% es el
+      # momento de ofrecer un pack. Las plantas cuentan en floración (las automáticas, todo el ciclo).
+      topes:            topes_de(c),
     }
+  end
+
+  def topes_de(c)
+    return nil if c.deleted_at.present?
+
+    pe = PlanEnforcer.new(c)
+    ActsAsTenant.with_tenant(c) do
+      {
+        pacientes: { uso: c.pacientes.count, limite: pe.limite(:pacientes) },
+        plantas:   { uso: pe.plantas_en_cupo, limite: pe.limite(:plantas) },
+      }
+    end
+  rescue StandardError => e
+    Rails.logger.warn("[sa] topes de #{c.id}: #{e.class} #{e.message}")
+    nil
   end
 
   # El estado real del módulo, calculado en el modelo: prendido no es lo mismo que andando.

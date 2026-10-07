@@ -3,9 +3,10 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { vModal } from '../directives/modal.js'
 
-// AC (5-oct-2026): cuando administración pisa el aporte a mano, el «Total» que se ve es lo que se
-// cobra, y la diferencia con los productos aparece como «Ajuste manual». Antes el recuadro decía
-// Total $60.000 con un aporte de $22.000 abajo, y se cobraban los $22.000.
+// AC (7-oct-2026, reemplaza al del 5-oct): EL TOTAL NO SE TIPEA. Es la suma del carrito menos los
+// descuentos; para cobrar menos hay descuento en % o en PESOS, y lo que se ve es lo que se cobra.
+// El caso que originó todo sigue cubierto: $60.000 de productos cobrados $22.000 = descuento de
+// $38.000, a la vista.
 
 const STOCK = {
   id: 1, cantidad: 500, unidad: 'g', forma_producto: 'flor_seca', precio_sugerido_ars: 12000,
@@ -26,7 +27,7 @@ const { useAuthStore } = await import('../stores/auth')
 
 const filaTotal = w => w.findAll('.mnd__precio-row--total').map(r => r.text()).join(' ')
 
-describe('Nueva dispensa — aporte a mano', () => {
+describe('Nueva dispensa — el total no se tipea', () => {
   async function montar() {
     setActivePinia(createPinia())
     useAuthStore().user = { role: 'admin' }
@@ -44,25 +45,57 @@ describe('Nueva dispensa — aporte a mano', () => {
     return w
   }
 
-  it('sin tocar el aporte, el total es el de los productos y no hay ajuste', async () => {
+  it('sin descuento, el total es el de los productos y no hay campo para tipearlo', async () => {
     const w = await montar()
     expect(filaTotal(w)).toContain('60.000')
-    expect(w.text()).not.toContain('Ajuste manual')
+    expect(w.text()).not.toContain('Precio total')
+    expect(w.text()).not.toContain('editable')
   })
 
-  it('con el aporte pisado, el total es el aporte y la diferencia se ve', async () => {
+  it('con descuento en pesos, el total es la suma menos el descuento, y el descuento se ve', async () => {
     const w = await montar()
-    w.vm.form.aporte_socio_ars = 22000
+    w.vm.form.descuento_modo = 'ars'
+    w.vm.form.descuento_ars = 38000
     await w.vm.$nextTick()
     expect(filaTotal(w)).toContain('22.000')
-    expect(w.text()).toContain('Ajuste manual')
+    expect(w.text()).toContain('Descuento esta dispensa')
     expect(w.text()).toContain('38.000')
     expect(w.vm.totalACobrar).toBe(22000)                    // lo que se ve es lo que se cobra
   })
+
+  it('manda el descuento en pesos y NO un total', async () => {
+    const { createDispensacion } = await import('../lib/api.js')
+    createDispensacion.mockClear()
+    const w = await montar()
+    w.vm.form.descuento_modo = 'ars'
+    w.vm.form.descuento_ars = 38000
+    await w.vm.$nextTick()
+    await w.vm.handleSubmit()
+    expect(createDispensacion).toHaveBeenCalled()
+    const payload = createDispensacion.mock.calls[0][1]
+    expect(payload.aporte_socio_ars).toBeUndefined()
+    expect(payload.descuento_dispensa_ars).toBe('38000.00')
+  })
+
+  it('un descuento que se come todo avisa que es un regalo', async () => {
+    const w = await montar()
+    w.vm.form.descuento_modo = 'ars'
+    w.vm.form.descuento_ars = 60000
+    await w.vm.$nextTick()
+    expect(w.text()).toContain('Regalo')
+  })
+
+  it('en %, el de pesos no viaja (uno u otro)', async () => {
+    const w = await montar()
+    w.vm.form.descuento_ars = 5000                           // quedó escrito, pero el modo es %
+    w.vm.form.descuento_pct = 10
+    await w.vm.$nextTick()
+    expect(filaTotal(w)).toContain('54.000')
+  })
 })
 
-describe('Editar dispensa — aporte a mano', () => {
-  // La dispensa de la imagen: líneas que suman $171.000, total cobrado $80.000.
+describe('Editar dispensa — el total no se tipea', () => {
+  // La dispensa de la #838, anterior al 7-oct: líneas que suman $171.000, total cobrado $80.000.
   const DISPENSA = {
     id: 90, paciente_nombre: 'Martín Blanco', cantidad: 16, aporte_socio_ars: 80000, subtotal_productos_ars: 80000,
     fecha_dispensacion: '2026-10-05', medio_pago: 'efectivo', observaciones: '',
@@ -86,18 +119,48 @@ describe('Editar dispensa — aporte a mano', () => {
     return w
   }
 
-  it('administración ve la diferencia entre los productos y el total como ajuste', async () => {
+  it('una vieja con el total pisado abre con la diferencia como descuento: el precio no cambia', async () => {
     const w = await montar('admin')
     expect(w.text()).toContain('171.000')
-    expect(w.text()).toContain('Ajuste manual')
+    expect(w.text()).toContain('Descuento')
     expect(w.text()).toContain('91.000')
+    expect(w.vm.form.aporte_socio_ars).toBe(80000)
     w.unmount()
   })
 
-  it('el dispensador no ve un precio editable: el backend no se lo acepta', async () => {
+  it('guardarla sin tocar nada manda el descuento y las líneas como se cobraron, no un total', async () => {
+    const { updateDispensacion } = await import('../lib/api.js')
+    updateDispensacion.mockClear()
+    const w = await montar('admin')
+    await w.vm.handleSubmit()
+    const payload = updateDispensacion.mock.calls[0][1]
+    expect(payload.aporte_socio_ars).toBeUndefined()
+    expect(payload.descuento_dispensa_ars).toBe('91000.00')
+    expect(payload.items.map(i => i.precio_manual_ars)).toEqual([10500, 12000, 10500, 10500])
+    w.unmount()
+  })
+
+  it('una con descuento en pesos muestra las líneas al bruto y el descuento aparte', async () => {
+    // Líneas guardadas ya descontadas: 10 × 90 = 900 cobrados, con $100 de descuento.
+    const conDescuento = { ...DISPENSA, aporte_socio_ars: 900, subtotal_productos_ars: 900, descuento_dispensa_ars: 100,
+      items: [{ id: 1, stock_id: 5, cantidad: 10, precio_unitario_ars: 90, stock: { id: 5, forma_producto: 'flor_seca', unidad: 'g' } }] }
+    setActivePinia(createPinia())
+    useAuthStore().user = { role: 'admin' }
+    const Modal = (await import('../components/pacientes/ModalEditarDispensacion.vue')).default
+    const w = mount(Modal, {
+      props: { modelValue: true, dispensacion: conDescuento },
+      global: { stubs: { Teleport: true, AppDatePicker: true, DsSpinner: true }, directives: { modal: vModal } },
+    })
+    await flushPromises()
+    expect(w.vm.totalSugerido).toBe(1000)
+    expect(w.vm.form.descuento_ars).toBe(100)
+    w.unmount()
+  })
+
+  it('nadie ve un precio para tipear, tampoco el dispensador', async () => {
     const w = await montar('dispensador')
     expect(w.text()).not.toContain('Precio total')
-    expect(w.text()).not.toContain('Ajuste manual')
+    expect(w.find('.med__price-input').exists()).toBe(false)
     w.unmount()
   })
 })
@@ -132,7 +195,9 @@ describe('Editar dispensa — «Paga con»', () => {
     expect(w.text()).toContain('cuenta corriente')
     await w.vm.handleSubmit()
     const payload = updateDispensacion.mock.calls[0][1]
-    expect(payload.aporte_socio_ars).toBe(171000)
+    expect(payload.aporte_socio_ars).toBeUndefined()         // el total lo arma el backend
+    expect(payload.items[0].precio_manual_ars).toBe(1710)    // el precio, intacto
+    expect(payload.descuento_dispensa_ars).toBe('0.00')
     expect(payload.cobros).toEqual([{ medio: 'transferencia', monto: 80000 }])
     w.unmount()
   })

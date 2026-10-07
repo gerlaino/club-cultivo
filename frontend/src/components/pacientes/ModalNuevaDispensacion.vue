@@ -59,8 +59,8 @@ const sedeStore       = useSedeStore()
 // mecanismo de permisos del proyecto.
 const dispensaDelMostrador = computed(() => auth.user?.role === 'dispensador')
 
-// admin/supervisor: ven el descuento del paciente, el desglose de precio,
-// pueden pisar el aporte a mano y ven siempre el crédito.
+// admin/supervisor: ven el descuento del paciente, el desglose de precio, le ponen precio a un
+// producto que no lo tiene y ven siempre el crédito. El TOTAL no lo pisa nadie (7-oct-2026).
 const esAdminoSup = computed(() =>
   ['admin', 'supervisor', 'super_admin'].includes(auth.user?.role)
 )
@@ -99,8 +99,13 @@ onMounted(() => {
 })
 onBeforeUnmount(() => mqTelefono?.removeEventListener?.('change', onCambioAncho))
 
+// TRES PASOS EN TODAS LAS PANTALLAS (7-oct-2026, rediseño aprobado por Germán): qué se lleva →
+// cuánto sale → cómo paga, con el resumen fijo al costado en el escritorio. Antes eran dos pasos
+// sólo en el teléfono y en el escritorio un formulario largo donde el precio, el descuento y el
+// pago se mezclaban. Reservar y entregar una reserva siguen en una sola página: son flujos de
+// administración, con el producto ya definido.
 const paso = ref(1)
-const enPasos = computed(() => esTelefono.value && esDispensaInmediata.value && !modoReserva.value)
+const enPasos = computed(() => esDispensaInmediata.value && !modoReserva.value)
 // SIN `watch` ACÁ. Un `watch` corre su fuente al registrarse para tener el valor viejo, y eso
 // evaluaba `esDispensaInmediata` —que lee `form`— antes de que `form` estuviera declarado:
 // `ReferenceError: Cannot access before initialization`, y la pantalla no abría. Es la trampa de
@@ -145,7 +150,7 @@ const tomorrow = (() => { const d = new Date(); d.setDate(d.getDate() + 1); retu
 // `emptyForm` sólo necesita `today`, que ya está.
 function emptyForm() {
   return {
-    stock_id: null, cantidad: null, descuento_pct: 0, aporte_socio_ars: null,
+    stock_id: null, cantidad: null, descuento_pct: 0, descuento_ars: 0, descuento_modo: 'pct', aporte_socio_ars: null,
     fecha_dispensacion: today, observaciones: '', medio_pago: 'efectivo', es_regalo: false,
     con_envio: false, delivery_id: null, direccion_envio: '',
     // El valor del envío (23-sep-2026): obligatorio con envío, 0 = bonificado. Vacío = sin cargar.
@@ -662,12 +667,9 @@ const montoContraEntrega = computed(() => {
 })
 
 // LO QUE HAY QUE COBRAR ACÁ Y AHORA. Entregando una reserva es el RESTO —la seña ya se cobró
-// cuando se apartó el producto—, no el total de lo que se lleva. Si administración pisó el
-// aporte a mano, ése es el total.
+// cuando se apartó el producto—, no el total de lo que se lleva.
 const totalACobrar = computed(() => {
   if (modoReserva.value) return restoReserva.value
-  const aporte = Number(form.value.aporte_socio_ars)
-  if (puedeEditarAporte.value && aporte > 0) return aporte + envioArs.value
   return (Number(precioFinal.value) || 0) + envioArs.value
 })
 
@@ -831,30 +833,29 @@ const precioBase = computed(() => {
 // Descuento del paciente (de la ficha, privado) + descuento de la dispensa (puntual del modal),
 // aditivos con tope 100%. El dispensador no ve el del paciente, pero igual se refleja en el total.
 const descPacientePct = computed(() => Math.max(0, Math.min(100, Number(props.descuentoPorcentaje) || 0)))
-const descDispensaPct = computed(() => Math.max(0, Math.min(100, Number(form.value.descuento_pct) || 0)))
+// El descuento de la dispensa va en % o en pesos (7-oct-2026), uno u otro: el que no se eligió
+// no viaja. En pesos sale del total ya descontado por los % (el backend hace lo mismo).
+const descDispensaPct = computed(() => form.value.descuento_modo === 'pct'
+  ? Math.max(0, Math.min(100, Number(form.value.descuento_pct) || 0)) : 0)
 const descTotalPct    = computed(() => Math.min(100, descPacientePct.value + descDispensaPct.value))
+const precioConPct    = computed(() => precioBase.value == null ? null : precioBase.value * (1 - descTotalPct.value / 100))
+const descDispensaArs = computed(() => {
+  if (form.value.descuento_modo !== 'ars' || modoCambio.value || precioConPct.value == null) return 0
+  return Math.max(0, Number(form.value.descuento_ars) || 0)
+})
+// Un descuento en pesos que se come todo es un regalo (el backend lo rechaza): se avisa antes.
+const descuentoArsExcede = computed(() => descDispensaArs.value > 0 && descDispensaArs.value >= (precioConPct.value ?? 0))
 
+// EL TOTAL NO SE TIPEA (7-oct-2026): es la suma del carrito menos los descuentos. Antes
+// administración podía pisarlo y la diferencia salía como «ajuste manual»; para cobrar menos
+// ahora está el descuento en pesos.
 const precioFinal = computed(() => {
-  if (precioBase.value == null) return null
-  return precioBase.value * (1 - descTotalPct.value / 100)
+  if (precioConPct.value == null) return null
+  return Math.max(0, precioConPct.value - descDispensaArs.value)
 })
 
 watch(precioFinal, (val) => { if (val != null) form.value.aporte_socio_ars = Math.round(val) })
-
-// EL AJUSTE A MANO SE VE (5-oct-2026). Si administración pisa el aporte, el «Total» del recuadro
-// es lo que se cobra —no el precio de lista— y la diferencia aparece como una fila propia. El
-// backend la reparte en las líneas (`Dispensacion#repartir_en_lineas`) para que sumen el total.
-const ajusteManual = computed(() => {
-  if (!puedeEditarAporte.value || esCuentaCorriente.value || modoCambio.value || precioFinal.value == null) return 0
-  const aporte = Number(form.value.aporte_socio_ars)
-  if (!(aporte > 0)) return 0
-  const dif = aporte - Math.round(precioFinal.value)
-  return Math.abs(dif) >= 1 ? dif : 0
-})
-const totalProductos = computed(() => (precioFinal.value ?? 0) + ajusteManual.value)
-// Al pasar a cuenta corriente el campo se esconde: si venía editado a mano, ese número quedaría
-// escondido y sin forma de corregirlo. Lo que se financia es el total.
-watch(esCuentaCorriente, (cc) => { if (cc && precioFinal.value != null) form.value.aporte_socio_ars = Math.round(precioFinal.value) })
+const totalProductos = computed(() => precioFinal.value ?? 0)
 
 watch(() => props.modelValue, (open) => {
   if (open) {
@@ -908,6 +909,60 @@ function elegirResumen(eleccion) {
 }
 const MEDIO_LABEL = { efectivo: 'Efectivo', transferencia: 'Transferencia', cuenta_corriente: 'A cuenta corriente',
                       no_abona: 'No abona (a crédito)', credito_gramos: 'Crédito en gramos' }
+
+// ── Los pasos y el resumen ─────────────────────────────────────────────────────
+const PASOS = computed(() => [
+  { n: 1, titulo: 'Qué se lleva', sub: items.value.length ? `${items.value.length} ${items.value.length === 1 ? 'producto' : 'productos'}` : 'elegí del stock' },
+  { n: 2, titulo: 'Cuánto sale',  sub: precioFinal.value != null ? fmt(Math.round(totalACobrar.value)) : '—' },
+  { n: 3, titulo: modoCambio.value ? 'Confirmar' : 'Cómo paga', sub: modoCambio.value ? 'sin cobro' : (form.value.es_regalo ? 'regalo' : (pagoDividido.value ? 'varias formas' : (MEDIO_LABEL[form.value.medio_pago] || (form.value.medio_pago === 'contra_entrega' ? 'Contra entrega' : '')))) },
+])
+// No se saltea el carrito: sin productos no hay precio ni pago que mostrar.
+function irAPaso(n) {
+  if (n > 1 && !items.value.length) { formError.value = 'Agregá al menos un producto al carrito'; return }
+  formError.value = null
+  paso.value = n
+}
+const descuentosTotal = computed(() =>
+  precioBase.value == null ? 0 : Math.max(0, Math.round(precioBase.value - (precioFinal.value ?? 0))))
+
+// «QUÉ VA A PASAR», en una frase: lo que se cobra, por dónde y qué queda. Es lo que la persona
+// confirma con el paciente enfrente, y antes había que reconstruirlo leyendo cinco campos.
+const fraseQueVaAPasar = computed(() => {
+  if (!items.value.length) return 'Todavía no hay nada en el carrito.'
+  if (modoCambio.value) return `Lo cubre lo que pagó en la dispensa #${props.cambioDe.id}: no se cobra nada y el stock baja.`
+  if (form.value.es_regalo) return 'Es un regalo: no se cobra ni toca su cuenta corriente. El stock baja igual.'
+  const partes = []
+  if (saldoAplicado.value > 0) partes.push(`Se usan ${fmt(saldoAplicado.value)} que tenía a favor.`)
+  if (aCobrarAhora.value <= 0.009) { partes.push('No paga nada más.'); return partes.join(' ') }
+  const medio = (m) => ({ efectivo: 'en efectivo', transferencia: 'por transferencia', cuenta_corriente: 'a cuenta corriente', saldo_a_favor: 'con su saldo' }[m] || m)
+  if (pagoDividido.value) {
+    const lineas = lineasPago.value.filter(l => l.medio !== 'contra_entrega' && Number(l.monto) > 0)
+      .map(l => `${fmt(Number(l.monto))} ${medio(l.medio)}`)
+    if (lineas.length) partes.push(`Paga ${lineas.join(' y ')}.`)
+    if (restoAlDelivery.value && montoContraEntrega.value > 0.009) partes.push(`El repartidor cobra ${fmt(montoContraEntrega.value)} al entregar.`)
+    else if (restoPago.value > 0.009) partes.push(`Faltan ${fmt(restoPago.value)}: van a su cuenta corriente.`)
+    else if (excedentePago.value > 0.009 && aFavorDespues.value > 0.009) partes.push(`Le quedan ${fmt(aFavorDespues.value)} a favor.`)
+  } else if (form.value.medio_pago === 'contra_entrega') {
+    partes.push(`El repartidor cobra ${fmt(aCobrarAhora.value)} al entregar.`)
+  } else if (esCuentaCorriente.value) {
+    partes.push(`Queda debiendo ${fmt(aCobrarAhora.value)} en su cuenta corriente.`)
+  } else {
+    partes.push(`Paga ${fmt(montoUnico.value)} ${medio(form.value.medio_pago)}.`)
+    if (excedenteUnico.value > 0.009) {
+      partes.push(aFavorDespuesUnico.value > 0.009 ? `Le quedan ${fmt(aFavorDespuesUnico.value)} a favor.` : `Baja su deuda en ${fmt(excedenteUnico.value)}.`)
+    } else if (faltanteUnico.value > 0.009) {
+      partes.push(`Faltan ${fmt(faltanteUnico.value)}: van a su cuenta corriente.`)
+    }
+  }
+  if (hayEfectivo.value && !cobraDelivery.value) {
+    if (algoEnMesa.value || dispensaDelMostrador.value) partes.push('El efectivo entra a la caja del mostrador.')
+    else if (pideCaja.value) {
+      const c = cajasAbiertas.value.find(x => x.turno.caja_turno_id === cajaElegida.value)
+      partes.push(c ? `El efectivo entra a la caja de ${c.sede}.` : 'El efectivo no entra a ninguna caja.')
+    }
+  }
+  return partes.join(' ')
+})
 function armarResumen() {
   const productos = items.value.map(it => ({
     cantidad: `${it.cantidad}${it.stock?.unidad || 'g'}`,
@@ -943,7 +998,7 @@ function armarResumen() {
   return {
     paciente: props.pacienteNombre,
     productos,
-    ajuste:   ajusteManual.value || 0,
+    descuentoArs: descDispensaArs.value || 0,
     envio:    pideEnvio.value ? envioArs.value : null,
     envioA:   pideEnvio.value ? (form.value.direccion_origen === 'otra' ? [form.value.envio_calle, form.value.envio_altura].filter(Boolean).join(' ') : 'su domicilio') : null,
     total:    totalACobrar.value,
@@ -1187,6 +1242,7 @@ async function handleSubmit() {
       medio_pago: (form.value.es_regalo || cobraDelivery.value || pagoDividido.value) ? undefined : form.value.medio_pago, con_envio: form.value.con_envio,
       // Descuento de la dispensa (puntual). El del paciente lo aplica el server desde la ficha.
       descuento_dispensa_pct: descDispensaPct.value,
+      descuento_dispensa_ars: descDispensaArs.value ? descDispensaArs.value.toFixed(2) : undefined,
       caja_turno_id: pideCaja.value ? (cajaElegida.value || undefined) : undefined,
     }
     if (pagoDividido.value) {
@@ -1207,11 +1263,7 @@ async function handleSubmit() {
     payload.usar_saldo_a_favor = usarSaldo.value
     if (modoCambio.value) payload.reemplaza_a_id = props.cambioDe.id
     else if (form.value.es_regalo) payload.es_regalo = true
-    // El total lo calcula el server (descuento paciente + dispensa). Solo admin/supervisor
-    // pueden pisar el aporte a mano (sobre el total del carrito); el dispensador no manda aporte.
-    // En un regalo no se manda aporte (el server lo fuerza a 0).
-    else if (puedeEditarAporte.value && form.value.aporte_socio_ars != null && form.value.aporte_socio_ars !== '')
-      payload.aporte_socio_ars = Number(form.value.aporte_socio_ars).toFixed(2)
+    // El total lo calcula el server (la suma menos los descuentos): no se manda.
     if (form.value.con_envio) {
       payload.cobrar_en_entrega = cobraDelivery.value
       payload.delivery_id       = form.value.delivery_id
@@ -1290,27 +1342,45 @@ async function handleSubmit() {
     <!-- El carrito son divs, no campos, así que el chequeo genérico de "escribió algo" no lo ve:
          se pierde igual y hay que avisar antes de cerrar con ESC. -->
     <div v-modal="{ cerrar, sucio: () => items.length > 0 }" v-if="modelValue" class="mnd__overlay">
-      <div class="mnd__modal">
+      <div class="mnd__modal" :class="{ 'mnd__modal--pasos': enPasos }">
 
         <div class="mnd__modal-header">
           <!-- EN EL TELÉFONO EL TÍTULO DICE EN QUÉ PASO ESTÁ, y el paciente pasa a segunda
                línea: "Nueva dispensación para Fulano" ocupaba dos renglones para decir algo que
                la persona ya sabe —acaba de tocar a ese paciente—, y lo que no sabe es cuánto
                falta. -->
-          <h3 v-if="enPasos" class="mnd__modal-title">
-            {{ paso === 1 ? 'Qué se lleva' : (modoCambio ? 'Confirmar el cambio' : 'Cómo paga') }}
-            <span class="mnd__modal-paso">paso {{ paso }} de 2</span>
-            <span v-if="props.pacienteNombre" class="mnd__modal-title-paciente">{{ props.pacienteNombre }}</span>
-          </h3>
+          <!-- Quién, y lo que importa de su cuenta, a la vista desde el principio. -->
+          <div v-if="enPasos" class="mnd__cab">
+            <span class="mnd__cab-sup">{{ modoCambio ? `Cambio por la dispensa #${props.cambioDe.id}` : 'Nueva dispensa' }} · paso {{ paso }} de 3</span>
+            <h3 class="mnd__modal-title mnd__cab-nombre">{{ props.pacienteNombre || 'Paciente' }}</h3>
+            <div class="mnd__chips">
+              <span v-if="saldoAFavor > 0" class="mnd__chip mnd__chip--afavor">Tiene {{ fmt(saldoAFavor) }} a favor</span>
+              <span v-if="deudaCc > 0" class="mnd__chip mnd__chip--debe">Debe {{ fmt(deudaCc) }}</span>
+              <span v-if="puedeVerCredito && (props.limiteCc ?? 0) > 0" class="mnd__chip">Crédito disponible {{ fmt(ccMargen) }}</span>
+              <span v-if="puedeVerDescPaciente && descPacientePct > 0" class="mnd__chip">Descuento de su ficha {{ descPacientePct }}%</span>
+            </div>
+          </div>
           <h3 v-else class="mnd__modal-title">
             <template v-if="modoReserva">Entregar reserva<template v-if="props.pacienteNombre"> de <span class="mnd__modal-title-paciente">{{ props.pacienteNombre }}</span></template></template>
             <template v-else-if="modoCambio">Cambio por la dispensa #{{ props.cambioDe.id }}<template v-if="props.pacienteNombre"> · <span class="mnd__modal-title-paciente">{{ props.pacienteNombre }}</span></template></template>
             <template v-else>Nueva dispensación<template v-if="props.pacienteNombre"> para <span class="mnd__modal-title-paciente">{{ props.pacienteNombre }}</span></template></template>
           </h3>
-          <button class="mnd__modal-close" @click="cerrar"><i class="bi bi-x-lg"></i></button>
+          <button class="mnd__modal-close" aria-label="Cerrar" @click="cerrar"><i class="bi bi-x-lg"></i></button>
         </div>
 
+        <!-- Los tres pasos: se puede volver a cualquiera; adelante, sólo con algo en el carrito. -->
+        <nav v-if="enPasos" class="mnd__pasos" aria-label="Pasos de la dispensa">
+          <button v-for="p in PASOS" :key="p.n" type="button" class="mnd__paso-btn"
+                  :class="{ 'is-on': paso === p.n, 'is-hecho': paso > p.n }"
+                  :aria-current="paso === p.n ? 'step' : undefined" @click="irAPaso(p.n)">
+            <span class="mnd__paso-n"><i v-if="paso > p.n" class="bi bi-check-lg"></i><template v-else>{{ p.n }}</template></span>
+            <span class="mnd__paso-txt"><b>{{ p.titulo }}</b><small>{{ p.sub }}</small></span>
+          </button>
+        </nav>
+
+        <div class="mnd__cuerpo">
         <div class="mnd__modal-body">
+          <div v-if="formError" class="mnd__error"><i class="bi bi-exclamation-triangle-fill"></i> {{ formError }}</div>
 
           <!-- ══ PASO 1 EN EL TELÉFONO: QUÉ SE LLEVA ═══════════════════════════
                En el escritorio esto es un formulario largo y está bien: entra entero y se ve de
@@ -1318,7 +1388,6 @@ async function handleSubmit() {
                dos pasos son los dos momentos reales del mostrador —qué se lleva y cómo paga— y
                con `v-show` (no `v-if`) lo escrito no se pierde al ir y volver. -->
           <div v-show="!enPasos || paso === 1" class="mnd__paso">
-          <div v-if="formError" class="mnd__error"><i class="bi bi-exclamation-triangle-fill"></i> {{ formError }}</div>
 
           <!-- Seña / resto a cobrar (modo entrega de reserva) -->
           <div v-if="modoReserva" class="mnd__reserva-info">
@@ -1589,11 +1658,11 @@ async function handleSubmit() {
             </p>
           </div>
 
-          <div v-if="!modoReserva && !enPasos" class="mnd__divider"></div>
+          <div v-if="!modoReserva && !(enPasos && esTelefono)" class="mnd__divider"></div>
 
           <!-- En el teléfono el campo de cantidad está abajo, así que el aviso de que se pasó
                tiene que estar acá: si no, el botón no se habilita y no dice por qué. -->
-          <p v-if="enPasos && excederiaStock" class="mnd__warn-box">
+          <p v-if="enPasos && esTelefono && excederiaStock" class="mnd__warn-box">
             <i class="bi bi-exclamation-triangle"></i>
             Máximo {{ stockSeleccionado.cantidad }}{{ stockSeleccionado.unidad || 'g' }} disponibles
             de {{ nombreSeleccionado }}.
@@ -1603,7 +1672,7 @@ async function handleSubmit() {
                EN EL TELÉFONO ESTE BLOQUE NO VA: la cantidad vive en la barra de abajo, pegada al
                pulgar y al producto que se acaba de tocar. Tenerlo en los dos lados sería el mismo
                campo dos veces, y el de acá queda fuera de pantalla justo cuando se usa. -->
-          <div v-if="!modoReserva && !enPasos" class="mnd__form-row">
+          <div v-if="!modoReserva && !(enPasos && esTelefono)" class="mnd__form-row">
             <div class="mnd__field">
               <label class="mnd__label">Cantidad <span class="mnd__req">*</span></label>
               <div class="mnd__input-suffix-wrap">
@@ -1665,7 +1734,9 @@ async function handleSubmit() {
 
           </div>
 
-          <!-- ══ PASO 2 EN EL TELÉFONO: CÓMO PAGA ══════════════════════════════ -->
+          <!-- ══ PASO 2: CUÁNTO SALE ═══════════════════════════════════════════
+               El total no se escribe: sale del carrito menos los descuentos. Acá también el
+               regalo y el envío, que cambian lo que se cobra. -->
           <div v-show="!enPasos || paso === 2" class="mnd__paso">
 
           <!-- Cambio: lo que pagó en la anulada cubre lo que se lleva. -->
@@ -1682,11 +1753,27 @@ async function handleSubmit() {
           <!-- Descuento global: aplica a la suma del carrito, en dispensa y en reserva -->
           <div v-if="usaCarrito && !modoCambio" class="mnd__field">
             <label class="mnd__label">Descuento <span class="mnd__opt">{{ form.es_reserva ? 'esta reserva' : 'esta dispensa' }} — sobre el total</span></label>
-            <div class="mnd__input-suffix-wrap mnd__desc-input">
-              <input v-model.number="form.descuento_pct" type="number" step="1" min="0" max="100"
-                     class="mnd__input mnd__input--with-suffix" placeholder="0" />
-              <span class="mnd__input-suffix">%</span>
+            <!-- En % o en pesos (7-oct-2026): es la ÚNICA forma de cobrar menos, el total no se tipea. -->
+            <div class="mnd__desc-fila">
+              <div class="mnd__desc-modo" role="group" aria-label="Descuento en porcentaje o en pesos">
+                <button type="button" :class="{ 'is-on': form.descuento_modo === 'pct' }" :aria-pressed="form.descuento_modo === 'pct'" @click="form.descuento_modo = 'pct'">%</button>
+                <button type="button" :class="{ 'is-on': form.descuento_modo === 'ars' }" :aria-pressed="form.descuento_modo === 'ars'" @click="form.descuento_modo = 'ars'">$</button>
+              </div>
+              <div v-if="form.descuento_modo === 'pct'" class="mnd__input-suffix-wrap mnd__desc-input">
+                <input v-model.number="form.descuento_pct" type="number" step="1" min="0" max="100"
+                       class="mnd__input mnd__input--with-suffix" placeholder="0" aria-label="Descuento en porcentaje" />
+                <span class="mnd__input-suffix">%</span>
+              </div>
+              <div v-else class="mnd__input-suffix-wrap mnd__desc-input">
+                <span class="mnd__input-prefix">$</span>
+                <input v-model.number="form.descuento_ars" type="number" step="1" min="0"
+                       class="mnd__input mnd__input--with-prefix" placeholder="0" aria-label="Descuento en pesos" />
+              </div>
             </div>
+            <p v-if="descuentoArsExcede" class="mnd__ayuda-precio">
+              El descuento no puede ser todo el total: si no se cobra nada, tildá <strong>Regalo</strong>.
+            </p>
+            <p v-else class="mnd__field-hint">Si paga menos y el resto lo debe, no es un descuento: poné cuánto paga en «Paga con».</p>
           </div>
 
           <!-- Precio + aporte -->
@@ -1703,9 +1790,9 @@ async function handleSubmit() {
                   <span>Descuento esta dispensa {{ descDispensaPct }}%</span>
                   <span>- {{ fmt(precioBase * descDispensaPct / 100) }}</span>
                 </div>
-                <div v-if="ajusteManual" class="mnd__precio-row mnd__precio-row--desc">
-                  <span>Ajuste manual</span>
-                  <span>{{ ajusteManual < 0 ? '-' : '+' }} {{ fmt(Math.abs(ajusteManual)) }}</span>
+                <div v-if="descDispensaArs > 0" class="mnd__precio-row mnd__precio-row--desc">
+                  <span>Descuento esta dispensa</span>
+                  <span>- {{ fmt(descDispensaArs) }}</span>
                 </div>
                 <div class="mnd__precio-row" :class="{ 'mnd__precio-row--total': !pideEnvio }"><span>{{ modoCambio ? 'Valor de lo que se lleva' : (pideEnvio ? 'Productos' : 'Total') }}</span><span>{{ fmt(totalProductos) }}</span></div>
               </template>
@@ -1722,29 +1809,104 @@ async function handleSubmit() {
                 <div class="mnd__precio-row mnd__precio-row--total"><span>Total a cobrar</span><span>{{ fmt(totalACobrar) }}</span></div>
               </template>
             </div>
-            <!-- Override del aporte: solo admin/supervisor.
-                 En CUENTA CORRIENTE no se muestra: el paciente no está aportando nada en este
-                 momento, está usando su crédito. El campo decía "Aporte del paciente $8.000"
-                 sobre una entrega que la persona no paga, y eso se lee como que sí pagó. El
-                 monto se sigue calculando igual —el asiento contable no cambia—; lo que se ve
-                 en su lugar es el panel de crédito, que lo dice como es: "se carga al crédito". -->
-            <div v-if="puedeEditarAporte && !esCuentaCorriente && !modoCambio" class="mnd__field">
-              <!-- Es el PRECIO, no lo que paga hoy (6-oct-2026, la #838): bajarlo es un descuento. -->
-              <label class="mnd__label">{{ pideEnvio ? 'Precio de los productos' : 'Precio total' }}
-                <span class="mnd__opt">ARS — editable{{ pideEnvio ? ', sin el envío' : '' }}</span>
-              </label>
-              <div class="mnd__input-suffix-wrap">
-                <span class="mnd__input-prefix">$</span>
-                <input v-model.number="form.aporte_socio_ars" type="number" min="0" step="1"
-                       class="mnd__input mnd__input--with-prefix" placeholder="0" />
+          </div>
+
+          <!-- Regalo: entrega gratis (solo admin/supervisor, dispensa inmediata) -->
+          <label v-if="puedeEditarAporte && !form.es_reserva && !modoReserva && !modoCambio" class="mnd__regalo">
+            <input type="checkbox" v-model="form.es_regalo" />
+            <span>
+              🎁 Es un regalo <span class="mnd__opt">no cobra, no toca la cuenta corriente; el stock igual se descuenta</span>
+            </span>
+          </label>
+
+          <div class="mnd__divider"></div>
+
+          <!-- Reserva: el envío se define al entregar, no al reservar -->
+          <div v-if="form.es_reserva" class="mnd__warn-box" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af">
+            <i class="bi bi-info-circle"></i> El delivery y la dirección se definen al momento de crear la dispensación en base a la reserva.
+          </div>
+
+          <!-- Delivery (solo entrega inmediata) -->
+          <div v-if="!form.es_reserva" class="mnd__delivery-toggle" @click="form.con_envio = !form.con_envio">
+            <div class="mnd__delivery-toggle-left">
+              <i class="bi bi-bicycle" style="font-size:1rem;color:#1b5e20"></i>
+              <div>
+                <div class="mnd__delivery-toggle-title">Con envío a domicilio</div>
+                <div class="mnd__delivery-toggle-sub">Asignar un delivery y datos de entrega</div>
               </div>
-              <p v-if="ajusteManual < 0" class="mnd__ayuda-precio">
-                Bajar el precio es un <strong>descuento</strong>. Si paga menos y el resto lo debe, dejá el precio
-                y poné cuánto paga en «Paga con».
-              </p>
+            </div>
+            <div class="mnd__toggle-switch" :class="{ 'mnd__toggle-switch--on': form.con_envio }">
+              <div class="mnd__toggle-knob"></div>
             </div>
           </div>
 
+          <div v-if="form.con_envio" class="mnd__delivery-section">
+            <div v-if="!form.es_reserva" class="mnd__field">
+              <label class="mnd__label">Delivery asignado <span class="mnd__req">*</span></label>
+              <div v-if="loadingDelivery" class="mnd__loading-inline"><DsSpinner :size="13" /> Cargando…</div>
+              <div v-else-if="deliveryError" class="mnd__warn-box">
+                <i class="bi bi-exclamation-triangle"></i> {{ deliveryError }}
+                <button type="button" class="mnd__warn-retry" @click="cargarDeliveryUsers">Reintentar</button>
+              </div>
+              <div v-else-if="!deliveryUsers.length" class="mnd__warn-box">
+                <i class="bi bi-exclamation-triangle"></i> No hay nadie con rol delivery, admin o supervisor para asignar
+              </div>
+              <select v-else v-model.number="form.delivery_id" class="mnd__input">
+                <option :value="null" disabled>Seleccioná un delivery…</option>
+                <option v-for="u in deliveryUsers" :key="u.id" :value="u.id">
+                  {{ u.nombre || u.first_name || u.email }}<template v-if="u.role && u.role !== 'delivery'"> · {{ u.role }}</template>
+                </option>
+              </select>
+            </div>
+            <div v-else class="mnd__field-hint" style="margin-bottom:.5rem">
+              El delivery se asigna al entregar la reserva.
+            </div>
+
+            <!-- EL VALOR DEL ENVÍO: obligatorio, 0 = bonificado. Se suma al total. -->
+            <div v-if="pideEnvio" class="mnd__field">
+              <label class="mnd__label" for="mnd-costo-envio">Valor del envío <span class="mnd__req">*</span></label>
+              <div class="mnd__input-suffix-wrap">
+                <span class="mnd__input-prefix">$</span>
+                <input id="mnd-costo-envio" v-model="form.costo_envio" type="number" min="0" step="1" inputmode="numeric"
+                       class="mnd__input mnd__input--with-prefix" placeholder="0 si va bonificado" />
+              </div>
+              <span class="mnd__field-hint">
+                <template v-if="!envioCargado">Obligatorio. Poné 0 si va bonificado.</template>
+                <template v-else-if="Number(form.costo_envio) < 0">No puede ser negativo.</template>
+                <template v-else-if="envioBonificado">Envío bonificado: no se le cobra.</template>
+                <template v-else>Se suma al total: el paciente paga {{ fmt(totalACobrar) }}.</template>
+              </span>
+            </div>
+            <div v-else-if="form.es_regalo || modoCambio" class="mnd__field-hint" style="margin-bottom:.5rem">
+              El envío va bonificado: {{ form.es_regalo ? 'es un regalo' : 'es un cambio' }}.
+            </div>
+
+            <!-- A dónde va: las direcciones del paciente con el texto, y «otra». Mismo componente
+                 que al editar una dispensa para mandarla por delivery. -->
+            <SelectorDireccionEntrega ref="selectorDireccion" :model-value="form" :socio-id="socioId"
+                                      @update:model-value="Object.assign(form, $event)" />
+            <div class="mnd__form-row">
+              <div class="mnd__field">
+                <label class="mnd__label">Contacto <span class="mnd__req">*</span></label>
+                <input v-model.trim="form.contacto_nombre" type="text" class="mnd__input"
+                       placeholder="Nombre de quien recibe" />
+              </div>
+              <div class="mnd__field">
+                <label class="mnd__label">Teléfono <span class="mnd__opt">opcional</span></label>
+                <input v-model.trim="form.contacto_telefono" type="tel" class="mnd__input" placeholder="+54 11 …" />
+              </div>
+            </div>
+            <div class="mnd__field">
+              <label class="mnd__label">Notas de envío <span class="mnd__opt">opcional</span></label>
+              <textarea v-model.trim="form.notas_envio" class="mnd__input mnd__textarea" rows="2"
+                        placeholder="Instrucciones para el delivery…"></textarea>
+            </div>
+          </div>
+
+          </div>
+
+          <!-- ══ PASO 3: CÓMO PAGA ════════════════════════════════════════════ -->
+          <div v-show="!enPasos || paso === 3" class="mnd__paso">
           <!-- Crédito: visible a quien dispensa al elegir cuenta corriente; admin/sup siempre -->
           <div v-if="mostrarPanelCredito" class="mnd__cc-panel" :class="`mnd__cc-panel--${estadoCc || 'ok'}`">
             <div class="mnd__cc-row">
@@ -1939,14 +2101,6 @@ async function handleSubmit() {
             <span class="mnd__field-hint">Si no elegís ninguna, la venta se asienta igual pero no suma al arqueo de ningún mostrador.</span>
           </div>
 
-          <!-- Regalo: entrega gratis (solo admin/supervisor, dispensa inmediata) -->
-          <label v-if="puedeEditarAporte && !form.es_reserva && !modoReserva && !modoCambio" class="mnd__regalo">
-            <input type="checkbox" v-model="form.es_regalo" />
-            <span>
-              🎁 Es un regalo <span class="mnd__opt">no cobra, no toca la cuenta corriente; el stock igual se descuenta</span>
-            </span>
-          </label>
-
           <!-- Seña (solo reserva) -->
           <div v-if="form.es_reserva" class="mnd__field">
             <label class="mnd__label">Seña <span class="mnd__opt">opcional — se cobra ahora, el resto al entregar</span></label>
@@ -1967,91 +2121,33 @@ async function handleSubmit() {
                       placeholder="Notas adicionales…"></textarea>
           </div>
 
-          <div class="mnd__divider"></div>
-
-          <!-- Reserva: el envío se define al entregar, no al reservar -->
-          <div v-if="form.es_reserva" class="mnd__warn-box" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af">
-            <i class="bi bi-info-circle"></i> El delivery y la dirección se definen al momento de crear la dispensación en base a la reserva.
           </div>
+        </div>
 
-          <!-- Delivery (solo entrega inmediata) -->
-          <div v-if="!form.es_reserva" class="mnd__delivery-toggle" @click="form.con_envio = !form.con_envio">
-            <div class="mnd__delivery-toggle-left">
-              <i class="bi bi-bicycle" style="font-size:1rem;color:#1b5e20"></i>
-              <div>
-                <div class="mnd__delivery-toggle-title">Con envío a domicilio</div>
-                <div class="mnd__delivery-toggle-sub">Asignar un delivery y datos de entrega</div>
-              </div>
-            </div>
-            <div class="mnd__toggle-switch" :class="{ 'mnd__toggle-switch--on': form.con_envio }">
-              <div class="mnd__toggle-knob"></div>
-            </div>
+        <!-- El resumen fijo (escritorio): lo mismo que va a quedar, siempre a la vista. -->
+        <aside v-if="enPasos" class="mnd__resumen" aria-label="Resumen">
+          <div class="mnd__resumen-tit">Resumen</div>
+          <div v-if="!items.length" class="mnd__resumen-vacio">El carrito está vacío.</div>
+          <div v-for="(it, i) in items" :key="i" class="mnd__resumen-fila">
+            <span>{{ FORMA_LABEL[it.stock.forma_producto] || it.stock.forma_producto }} · {{ it.cantidad }}{{ it.stock.unidad || 'g' }}</span>
+            <span class="mnd__num">{{ subtotalItem(it) > 0 ? fmt(subtotalItem(it)) : '—' }}</span>
           </div>
-
-          <div v-if="form.con_envio" class="mnd__delivery-section">
-            <div v-if="!form.es_reserva" class="mnd__field">
-              <label class="mnd__label">Delivery asignado <span class="mnd__req">*</span></label>
-              <div v-if="loadingDelivery" class="mnd__loading-inline"><DsSpinner :size="13" /> Cargando…</div>
-              <div v-else-if="deliveryError" class="mnd__warn-box">
-                <i class="bi bi-exclamation-triangle"></i> {{ deliveryError }}
-                <button type="button" class="mnd__warn-retry" @click="cargarDeliveryUsers">Reintentar</button>
-              </div>
-              <div v-else-if="!deliveryUsers.length" class="mnd__warn-box">
-                <i class="bi bi-exclamation-triangle"></i> No hay nadie con rol delivery, admin o supervisor para asignar
-              </div>
-              <select v-else v-model.number="form.delivery_id" class="mnd__input">
-                <option :value="null" disabled>Seleccioná un delivery…</option>
-                <option v-for="u in deliveryUsers" :key="u.id" :value="u.id">
-                  {{ u.nombre || u.first_name || u.email }}<template v-if="u.role && u.role !== 'delivery'"> · {{ u.role }}</template>
-                </option>
-              </select>
-            </div>
-            <div v-else class="mnd__field-hint" style="margin-bottom:.5rem">
-              El delivery se asigna al entregar la reserva.
-            </div>
-
-            <!-- EL VALOR DEL ENVÍO: obligatorio, 0 = bonificado. Se suma al total. -->
-            <div v-if="pideEnvio" class="mnd__field">
-              <label class="mnd__label" for="mnd-costo-envio">Valor del envío <span class="mnd__req">*</span></label>
-              <div class="mnd__input-suffix-wrap">
-                <span class="mnd__input-prefix">$</span>
-                <input id="mnd-costo-envio" v-model="form.costo_envio" type="number" min="0" step="1" inputmode="numeric"
-                       class="mnd__input mnd__input--with-prefix" placeholder="0 si va bonificado" />
-              </div>
-              <span class="mnd__field-hint">
-                <template v-if="!envioCargado">Obligatorio. Poné 0 si va bonificado.</template>
-                <template v-else-if="Number(form.costo_envio) < 0">No puede ser negativo.</template>
-                <template v-else-if="envioBonificado">Envío bonificado: no se le cobra.</template>
-                <template v-else>Se suma al total: el paciente paga {{ fmt(totalACobrar) }}.</template>
-              </span>
-            </div>
-            <div v-else-if="form.es_regalo || modoCambio" class="mnd__field-hint" style="margin-bottom:.5rem">
-              El envío va bonificado: {{ form.es_regalo ? 'es un regalo' : 'es un cambio' }}.
-            </div>
-
-            <!-- A dónde va: las direcciones del paciente con el texto, y «otra». Mismo componente
-                 que al editar una dispensa para mandarla por delivery. -->
-            <SelectorDireccionEntrega ref="selectorDireccion" :model-value="form" :socio-id="socioId"
-                                      @update:model-value="Object.assign(form, $event)" />
-            <div class="mnd__form-row">
-              <div class="mnd__field">
-                <label class="mnd__label">Contacto <span class="mnd__req">*</span></label>
-                <input v-model.trim="form.contacto_nombre" type="text" class="mnd__input"
-                       placeholder="Nombre de quien recibe" />
-              </div>
-              <div class="mnd__field">
-                <label class="mnd__label">Teléfono <span class="mnd__opt">opcional</span></label>
-                <input v-model.trim="form.contacto_telefono" type="tel" class="mnd__input" placeholder="+54 11 …" />
-              </div>
-            </div>
-            <div class="mnd__field">
-              <label class="mnd__label">Notas de envío <span class="mnd__opt">opcional</span></label>
-              <textarea v-model.trim="form.notas_envio" class="mnd__input mnd__textarea" rows="2"
-                        placeholder="Instrucciones para el delivery…"></textarea>
-            </div>
+          <div v-if="puedeVerDescPaciente && descuentosTotal > 0" class="mnd__resumen-fila mnd__resumen-fila--desc">
+            <span>Descuentos</span><span class="mnd__num">− {{ fmt(descuentosTotal) }}</span>
           </div>
-
+          <div v-if="pideEnvio" class="mnd__resumen-fila">
+            <span>Envío</span><span class="mnd__num">{{ !envioCargado ? 'sin cargar' : (envioBonificado ? 'bonificado' : fmt(envioArs)) }}</span>
           </div>
+          <div class="mnd__resumen-total">
+            <span>{{ modoCambio ? 'Vale' : 'Total' }}</span>
+            <span class="mnd__num">{{ fmt(Math.round(modoCambio ? (precioFinal ?? 0) : totalACobrar)) }}</span>
+          </div>
+          <div class="mnd__resumen-frase">
+            <div class="mnd__resumen-frase-tit">Qué va a pasar</div>
+            {{ fraseQueVaAPasar }}
+          </div>
+          <div class="mnd__resumen-fecha">Fecha: {{ fmtFechaLarga(form.fecha_dispensacion) }}</div>
+        </aside>
         </div>
 
         <!-- ══ LA BARRA DE ABAJO ═════════════════════════════════════════════
@@ -2063,7 +2159,7 @@ async function handleSubmit() {
         <div class="mnd__modal-footer" :class="{ 'mnd__modal-footer--pasos': enPasos }">
 
           <!-- Paso 1: cuánto de lo que acaba de tocar, y al carrito. -->
-          <div v-if="enPasos && paso === 1 && form.stock_id" class="mnd__barra-cant">
+          <div v-if="enPasos && esTelefono && paso === 1 && form.stock_id" class="mnd__barra-cant">
             <div class="mnd__barra-prod">
               <span class="mnd__barra-nombre">{{ nombreSeleccionado }}</span>
               <span v-if="stockSeleccionado" class="mnd__barra-disp">
@@ -2086,7 +2182,7 @@ async function handleSubmit() {
           <!-- Y el resumen con el paso siguiente: el total a la vista siempre, que es lo que la
                persona le va a decir en voz alta al paciente. -->
           <div v-if="enPasos" class="mnd__barra-acc">
-            <button v-if="paso === 2" class="mnd__btn-ghost" :disabled="saving" @click="paso = 1">
+            <button v-if="paso > 1" class="mnd__btn-ghost" :disabled="saving" @click="paso = paso - 1">
               <i class="bi bi-chevron-left"></i> Atrás
             </button>
             <button v-else class="mnd__btn-ghost" :disabled="saving" @click="cerrar">Cancelar</button>
@@ -2096,15 +2192,15 @@ async function handleSubmit() {
               <em v-if="precioFinal != null">{{ fmt(Math.round(precioFinal)) }}</em>
             </span>
 
-            <button v-if="paso === 1" class="mnd__btn-primary mnd__barra-seguir"
-                    :disabled="!items.length" @click="paso = 2">
-              {{ modoCambio ? 'Seguir' : 'Cómo paga' }} <i class="bi bi-chevron-right"></i>
+            <button v-if="paso < 3" class="mnd__btn-primary mnd__barra-seguir"
+                    :disabled="!items.length" @click="irAPaso(paso + 1)">
+              {{ paso === 1 ? 'Cuánto sale' : (modoCambio ? 'Seguir' : 'Cómo paga') }} <i class="bi bi-chevron-right"></i>
             </button>
             <button v-else class="mnd__btn-primary mnd__barra-seguir"
                     :disabled="saving || cajaCerrada || productosPosteriores.length > 0 || !items.length || ccInsuficiente"
                     @click="handleSubmit">
               <DsSpinner v-if="saving" :size="14" />
-              <i v-else class="bi bi-check-lg"></i> Registrar
+              <i v-else class="bi bi-check-lg"></i> {{ modoCambio ? 'Entregar el cambio' : 'Confirmar dispensa' }}
             </button>
           </div>
 
@@ -2140,6 +2236,54 @@ async function handleSubmit() {
 .mnd__modal-close:hover { background: var(--c-slate-200); }
 
 .mnd__modal-body { padding: 1.1rem 1.25rem; flex: 1; display: flex; flex-direction: column; gap: .9rem; }
+
+/* ── Tres pasos + resumen fijo (7-oct-2026) ─────────────────────────────────── */
+.mnd__modal--pasos { max-width: 1080px; height: 92vh; overflow: hidden; }
+.mnd__cuerpo { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.mnd__modal--pasos .mnd__cuerpo { flex-direction: row; }
+.mnd__modal--pasos .mnd__modal-body { overflow-y: auto; min-width: 0; padding: 1.25rem 1.5rem; }
+.mnd__cab { display: flex; flex-direction: column; gap: .2rem; min-width: 0; }
+.mnd__cab-sup { font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--c-slate-500); }
+.mnd__cab-nombre { font-size: 1.2rem; letter-spacing: -.01em; }
+.mnd__chips { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .3rem; }
+.mnd__chip { font-size: .72rem; font-weight: 600; padding: .2rem .6rem; border-radius: 999px; background: var(--c-slate-100); color: var(--c-slate-700); }
+.mnd__chip--afavor { background: var(--c-sky-100); color: var(--c-sky-600); }
+.mnd__chip--debe { background: var(--c-amber-100); color: var(--c-gold-500); }
+.mnd__pasos { display: flex; gap: .4rem; padding: .6rem 1.25rem; background: var(--c-paper); border-bottom: 1px solid var(--c-slate-200); }
+.mnd__paso-btn { flex: 1; display: flex; align-items: center; gap: .6rem; padding: .5rem .7rem; border-radius: 11px; border: 1.5px solid transparent; background: transparent; color: var(--c-slate-600); cursor: pointer; text-align: left; min-width: 0; }
+.mnd__paso-btn.is-on { border-color: var(--c-leaf-800); background: #fff; color: var(--c-leaf-900); }
+.mnd__paso-n { width: 26px; height: 26px; border-radius: 999px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: .8rem; background: var(--c-slate-200); color: var(--c-slate-600); }
+.mnd__paso-btn.is-on .mnd__paso-n, .mnd__paso-btn.is-hecho .mnd__paso-n { background: var(--c-leaf-800); color: #fff; }
+.mnd__paso-txt { display: flex; flex-direction: column; min-width: 0; }
+.mnd__paso-txt b { font-size: .85rem; }
+.mnd__paso-txt small { font-size: .72rem; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mnd__resumen { width: 320px; flex-shrink: 0; border-left: 1px solid var(--c-slate-200); background: var(--c-paper); padding: 1.25rem; display: flex; flex-direction: column; gap: .6rem; overflow-y: auto; }
+.mnd__resumen-tit { font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--c-slate-500); }
+.mnd__resumen-vacio { font-size: .85rem; color: var(--c-slate-500); }
+.mnd__resumen-fila { display: flex; justify-content: space-between; gap: .75rem; font-size: .85rem; color: var(--c-slate-700); }
+.mnd__resumen-fila--desc { color: var(--c-leaf-600); }
+.mnd__resumen-total { display: flex; justify-content: space-between; align-items: baseline; border-top: 1px solid var(--c-slate-300); padding-top: .7rem; font-weight: 700; }
+.mnd__resumen-total .mnd__num { font-size: 1.6rem; letter-spacing: -.02em; color: var(--c-slate-900); }
+.mnd__resumen-frase { background: #fff; border: 1px solid var(--c-leaf-300); border-radius: 12px; padding: .8rem .9rem; font-size: .85rem; line-height: 1.5; color: var(--c-slate-700); }
+.mnd__resumen-frase-tit { font-size: .72rem; font-weight: 700; color: var(--c-leaf-800); margin-bottom: .2rem; }
+.mnd__resumen-fecha { margin-top: auto; font-size: .75rem; color: var(--c-slate-500); }
+.mnd__num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+@media (min-width: 901px) {
+  /* Con el resumen a la vista, el total no se repite en la barra de abajo. */
+  .mnd__modal--pasos .mnd__barra-total { display: none; }
+}
+@media (max-width: 900px) {
+  .mnd__modal--pasos { max-width: 640px; }
+  .mnd__resumen { display: none; }
+}
+@media (max-width: 480px) {
+  .mnd__modal--pasos { height: 100%; }
+  .mnd__pasos { padding: .5rem .75rem; gap: .25rem; }
+  .mnd__paso-txt small { display: none; }
+  .mnd__paso-n { width: 22px; height: 22px; }
+  .mnd__paso-btn { padding: .4rem .45rem; gap: .4rem; }
+  .mnd__paso-txt b { font-size: .75rem; }
+}
 
 /* Segmented entrega / reserva */
 .mnd__segmented { display: flex; gap: .35rem; background: var(--c-slate-100); padding: .25rem; border-radius: 10px; }
@@ -2323,7 +2467,11 @@ async function handleSubmit() {
 .mnd__add-item { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; border-radius: 9px; padding: .6rem .8rem; font-size: .82rem; font-weight: 700; cursor: pointer; transition: background .15s; white-space: nowrap; }
 .mnd__add-item:hover:not(:disabled) { background: #144a18; }
 .mnd__add-item:disabled { opacity: .45; cursor: not-allowed; }
-.mnd__desc-input { max-width: 140px; }
+.mnd__desc-input { max-width: 160px; }
+.mnd__desc-fila { display: flex; gap: .5rem; align-items: stretch; }
+.mnd__desc-modo { display: inline-flex; border: 1.5px solid var(--c-slate-200); border-radius: 9px; overflow: hidden; }
+.mnd__desc-modo button { border: 0; background: var(--c-slate-50); color: var(--c-slate-500); padding: 0 .8rem; font-weight: 600; cursor: pointer; min-width: 40px; }
+.mnd__desc-modo button.is-on { background: var(--c-leaf-800); color: #fff; }
 .mnd__cart { display: flex; flex-direction: column; gap: .35rem; }
 .mnd__cart-item { display: flex; align-items: center; gap: .6rem; padding: .5rem .7rem; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 9px; }
 .mnd__cart-emoji { font-size: 1rem; flex-shrink: 0; }

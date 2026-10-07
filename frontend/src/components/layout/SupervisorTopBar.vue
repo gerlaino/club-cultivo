@@ -105,7 +105,7 @@ const SEGMENT_LABELS = {
   analitica:       'Analítica',
   perfil:          'Mi perfil',
   configuracion:   'Configuración',
-  'plan-trabajo':  'Plan de trabajo',
+  'plan-trabajo':  'Planes',
 }
 
 const breadcrumbs = computed(() => {

@@ -1,5 +1,58 @@
 # Changelog
 
+## Octubre 2026 (ei) — Rediseño: la dispensa en tres pasos, super admin con Estado para no técnicos, tareas y planes
+
+Prototipos aprobados por Germán el 7-oct (lienzo de diseño «Cultivo Espacial — rediseños»).
+
+- **Nueva dispensa en tres pasos en TODAS las pantallas** (antes dos, sólo en el teléfono): qué se
+  lleva → cuánto sale → cómo paga. Cabecera con el paciente y su cuenta (a favor, debe, crédito,
+  descuento de la ficha); barra de pasos clickeable (no deja saltar con el carrito vacío); en el
+  escritorio, **resumen fijo al costado** con la frase «Qué va a pasar» (cuánto paga, por dónde, qué
+  le queda a favor o a cuenta corriente, a qué caja entra). La lógica del modal no cambió: es la
+  misma pantalla redistribuida. Reservar y entregar una reserva siguen en una sola página.
+- **Super admin**: barra lateral (en el teléfono, franja arriba) con un punto en Estado cuando algo
+  está para mirar; Inicio «Cómo está el negocio»; Organizaciones como tabla con **barras de uso del
+  plan** (pacientes y plantas en floración contra el tope; naranja pasando el 90%); Usuarios con
+  «Contraseña» y «Dar de baja» escritos y «Entró» (último ingreso).
+- **Estado para alguien que no programa**: semáforo + **cuatro preguntas** (¿puede entrar la gente?
+  ¿está rápida? ¿están las copias? ¿salen los mails y avisos?), cada una con qué significa y qué
+  hacer; **«Lo más lento de hoy»** (qué pantalla, en qué organización, cuánto tarda la mayoría de
+  las veces) y la velocidad hora por hora; lo técnico, detrás de «Detalle técnico».
+- **Medición de tiempos**: tabla nueva `metricas_respuesta` (migración `CrearMetricasRespuesta`),
+  agregados por hora × pedido × organización con franjas de tiempo (`Metricas::Respuesta`, un upsert
+  por pedido, nunca levanta); `Infra::Lentitud` calcula el percentil 75 y nombra las pantallas en
+  castellano. Job `PurgarMetricasRespuestaJob` (4:35) borra lo de más de 30 días. En specs no mide.
+- **Tareas**: primero «Para hoy» (vencidas, hoy, sin fecha) con botones «Hecho» / «No se hizo»
+  escritos, después «Esta semana»; sin las cuatro tarjetas de números. En el teléfono, los mismos
+  dos botones en cada tarjeta (tocarla sigue abriendo la hoja con horas y notas).
+- **Planes**: biblioteca a la izquierda y el plan elegido con su **calendario por semana**
+  (`PlanCalendario`, tipo de tarea × semana). **Armar/editar un plan** con el mismo lenguaje: tareas
+  agrupadas por semana y «Así queda» con el calendario en vivo. **Aplicar** muestra las fechas reales
+  por semana antes de confirmar («Aplicar · N tareas»). Se borraron siete componentes de
+  `plan-trabajo/` que nadie usaba (NuevoPlanModal, EditarPlanTareaModal, Semana/Mes/TrimestralPlanView,
+  ImportarCSVModal, EmptyStatePlan). En la navegación se llama «Planes».
+- **Permisos**: el cultivador ya no tiene `/plan-trabajo` en su matriz de rutas (el backend sólo deja
+  a admin/supervisor: la pantalla le ofrecía algo que después rebotaba).
+
+## Octubre 2026 (eh) — Bajas de usuario que andan y el total de una dispensa que no se tipea
+
+- **Dar de baja a una persona** (`Acceso::DarDeBaja`, las dos puertas: panel de plataforma y Equipo
+  de la organización). Desde el panel NO andaba nunca: sin organización fijada, borrar sus salas
+  asignadas reventaba con `NoTenantSet`, el controller devolvía 204 igual y la pantalla se tragaba el
+  error con un `catch {}` vacío. Ahora: baja lógica (`User` es paranoid; la historia queda), el mail
+  se libera con una marca (el índice único contaba las filas borradas y no se podía volver a dar de
+  alta a la misma persona), queda quién la dio de baja, y el motivo de un rechazo se dice. El botón
+  se ve siempre (estaba detrás del hover: en el teléfono no existía) y está también en la solapa
+  Usuarios de cada organización. Spec: `usuarios_baja_spec`.
+- **El total de una dispensa no se tipea**: es la suma del carrito menos los descuentos. El campo
+  «Precio total — editable» y la fila «Ajuste manual» se fueron; para cobrar menos, el descuento va
+  en % o en **pesos** (columna nueva `dispensaciones.descuento_dispensa_ars`, migración
+  `AgregarDescuentoEnPesosADispensaciones`). Los pesos salen de los productos y se reparten en las
+  líneas. Al editar, las líneas se muestran al bruto con el descuento aparte, y el backend las vuelve
+  al bruto antes de rearmar (si no, cada edición descontaba los mismos pesos otra vez). Las
+  anteriores con el total pisado (la #838) abren con la diferencia precargada como descuento:
+  guardar sin tocar no les cambia el precio.
+
 ## Octubre 2026 (eg) — Tareas: «No se hizo», fecha obligatoria y los planes aparecen de a poco
 
 - **«No se hizo»** (estado `no_realizada`, `POST /tareas/:id/no_realizada` con motivo opcional): el par

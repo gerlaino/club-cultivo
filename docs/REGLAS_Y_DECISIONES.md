@@ -504,8 +504,17 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   médico no lo cerró (programado/confirmado): administración apura al médico. Faltó = su último
   turno no cancelado quedó ausente y no tiene otro dado: hay que darle turno, no apurar al médico.
   Administración ve el contador por médico («pasados sin cerrar») y el filtro en la lista.
-- **EL «APORTE» A MANO ES EL PRECIO, NO LO QUE PAGA** (6-oct-2026, la #838): en pantalla se llama
-  «Precio total». Bajarlo es un descuento. Lo que el paciente paga hoy va en «Paga con», al crear y
+- **EL TOTAL NO SE TIPEA** (7-oct-2026, Germán; reemplaza la primera mitad de la regla de abajo):
+  es la suma del carrito menos los descuentos, y lo calcula el backend (un `aporte_socio_ars`
+  mandado a mano se ignora, también del admin). Para cobrar menos hay UN camino: el descuento de la
+  dispensa, en % (`descuento_dispensa_pct`) o en pesos (`descuento_dispensa_ars`, sale de los
+  productos y se reparte en las líneas). Un descuento que se come todo se rechaza: es un regalo. Al
+  editar, las líneas viajan como se cobraron y el backend las vuelve al bruto antes de rearmar
+  (sin eso, cada edición descontaba los mismos pesos otra vez); las anteriores con el total
+  pisado abren con la diferencia precargada como descuento, así guardar sin tocar no cambia el
+  precio. El único precio que se escribe es el de un producto SIN precio cargado.
+- **EL «APORTE» A MANO ES EL PRECIO, NO LO QUE PAGA** (6-oct-2026, la #838 — el campo ya no existe,
+  ver arriba): bajarlo era un descuento. Lo que el paciente paga hoy va en «Paga con», al crear y
   al editar; lo que falta va a la cuenta corriente (si entra en el cupo, si no se rechaza) y lo que
   sobra queda a favor. La edición rehace los cobros de la creación con el mismo motor
   (`aplicar_lineas_cobro!`). «Cuenta corriente» a secas mantiene la regla vieja: cubre hasta el cupo

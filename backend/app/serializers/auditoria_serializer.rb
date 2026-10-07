@@ -55,7 +55,7 @@ class AuditoriaSerializer
     'ruta_entrega_id' => 'ruta', 'indicacion_medica_id' => 'indicación médica',
     'codigo' => 'código', 'descripcion' => 'descripción', 'categoria' => 'categoría',
     'medio_pago' => 'medio de pago', 'aporte_socio_ars' => 'aporte', 'monto_credito_ars' => 'a crédito',
-    'descuento_dispensa_pct' => 'descuento', 'descuento_paciente_pct' => 'descuento del paciente',
+    'descuento_dispensa_pct' => 'descuento', 'descuento_dispensa_ars' => 'descuento en pesos', 'descuento_paciente_pct' => 'descuento del paciente',
     'fecha_dispensacion' => 'fecha', 'estado_envio' => 'estado del envío',
     'notas_entrega' => 'notas de entrega', 'motivo_fallo' => 'motivo del fallo',
     'codigo_paquete' => 'paquete', 'direccion_envio' => 'dirección de envío',

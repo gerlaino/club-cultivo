@@ -78,13 +78,14 @@
             </span>
           </div>
         </div>
-        <button
-          v-if="!cerrada(t) && !esFutura(t)"
-          class="mta__check"
-          @click.stop="abrirCompletarSheet(t)"
-        >
-          <i class="bi bi-check2"></i>
-        </button>
+        <!-- Lo de hoy se resuelve desde la tarjeta, con el pulgar (7-oct-2026): «Hecho» la cierra al
+             toque; tocar la tarjeta abre la hoja para anotar horas o una nota. -->
+        <div v-if="!cerrada(t) && !esFutura(t) && !modoSeleccion" class="mta__acciones" @click.stop>
+          <button class="mta__btn-hecho" :disabled="rapida === t.id" @click="hechoRapido(t)">
+            <i v-if="rapida === t.id" class="bi bi-hourglass"></i><template v-else>Hecho</template>
+          </button>
+          <button class="mta__btn-nohecho" :disabled="rapida === t.id" @click="noSeHizoRapido(t)">No se hizo</button>
+        </div>
         <i v-else-if="t.estado === 'completada'" class="bi bi-check2-all mta__done-icon"></i>
         <i v-else-if="t.estado === 'no_realizada'" class="bi bi-x-lg mta__lock-icon"></i>
         <i v-else class="bi bi-lock mta__lock-icon"></i>
@@ -326,6 +327,29 @@ async function confirmarCompletar() {
 }
 
 const { marcarNoSeHizo } = useNoSeHizo()
+
+// Los botones de la tarjeta: lo mismo que la hoja, sin abrirla.
+const rapida = ref(null)
+function marcarEnDia(id, estado) {
+  const diaData = diasProcesados.value.find(x => x.fecha === diaSeleccionado.value)
+  const idx = diaData?.tareas.findIndex(x => x.id === id) ?? -1
+  if (idx !== -1) diaData.tareas[idx] = { ...diaData.tareas[idx], estado }
+}
+async function hechoRapido(t) {
+  rapida.value = t.id
+  try {
+    await tareasStore.completar(t.id, undefined, '')
+    marcarEnDia(t.id, 'completada')
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo completar la tarea')
+  } finally { rapida.value = null }
+}
+async function noSeHizoRapido(t) {
+  rapida.value = t.id
+  try {
+    if (await marcarNoSeHizo(t)) marcarEnDia(t.id, 'no_realizada')
+  } finally { rapida.value = null }
+}
 // Cerrada = ya no se hace nada con ella: hecha o no hecha.
 const cerrada = tareaCerrada
 async function noSeHizoActiva() {
@@ -479,6 +503,12 @@ onMounted(async () => {
 .mta__prioridad--media   { color: #3b82f6; }
 .mta__prioridad--baja    { color: var(--c-slate-400); }
 
+.mta__card:has(.mta__acciones) { flex-wrap: wrap; }
+.mta__acciones { display: flex; gap: .5rem; width: 100%; margin-top: .6rem; }
+.mta__btn-hecho, .mta__btn-nohecho { flex: 1; height: 46px; border-radius: 12px; font-weight: 700; font-size: .92rem; cursor: pointer; }
+.mta__btn-hecho { border: 0; background: var(--c-leaf-800); color: #fff; }
+.mta__btn-nohecho { border: 1px solid var(--c-slate-300); background: #fff; color: var(--c-slate-700); font-weight: 600; }
+.mta__btn-hecho:disabled, .mta__btn-nohecho:disabled { opacity: .6; }
 .mta__check {
   padding: .75rem; color: var(--c-slate-400); background: none;
   border: none; font-size: 1.2rem; cursor: pointer; flex-shrink: 0;

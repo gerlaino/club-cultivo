@@ -117,14 +117,30 @@ const puedeContraEntrega = computed(() =>
   (props.dispensacion?.con_envio || agregarEnvio.value) && !paqueteCerrado.value)
 
 function buildForm(d) {
-  if (!d) return { items: [], fecha_dispensacion: '', medio_pago: 'efectivo', aporte_socio_ars: null, observaciones: '' }
+  if (!d) return { items: [], fecha_dispensacion: '', medio_pago: 'efectivo', aporte_socio_ars: null, descuento_ars: 0, observaciones: '' }
+  // Las líneas guardan el precio YA descontado (el descuento en pesos se reparte en ellas). Acá
+  // se muestran al bruto y el descuento va aparte, como se cargó; el backend hace la misma
+  // vuelta al guardar, para no descontar dos veces.
+  //
+  // Las anteriores al 7-oct con el total pisado a mano pueden tener líneas que NO suman lo
+  // cobrado (la #838: líneas por $171.000, cobrado $80.000). La diferencia se precarga como
+  // descuento, para que guardar sin tocar nada no le cambie el precio. Si lo cobrado era MÁS,
+  // las líneas se suben en proporción.
+  const productos = Number(d.subtotal_productos_ars ?? d.aporte_socio_ars) || 0
+  const sumaLineas = (d.items || []).reduce((a, it) => a + (Number(it.cantidad) || 0) * (Number(it.precio_unitario_ars) || 0), 0)
+  let descArs = Number(d.descuento_dispensa_ars) || 0
+  if (descArs === 0 && sumaLineas - productos >= 1) descArs = Math.round(sumaLineas - productos)
+  const subeLegacy = descArs === 0 && productos - sumaLineas >= 1 && sumaLineas > 0 ? productos / sumaLineas : 1
+  const factor    = Number(d.descuento_dispensa_ars) > 0 && productos > 0 ? (productos + descArs) / productos : 1
   const items = (d.items?.length ? d.items : []).map(it => ({
     stock_id: it.stock_id,
     forma:    it.stock?.forma_producto,
     genetica: it.genetica_nombre || it.stock?.lote?.genetica?.nombre,
     unidad:   it.stock?.unidad || 'g',
     cantidad: Number(it.cantidad) || 0,
-    precio:   Number(it.precio_unitario_ars) || 0,
+    precio:   Math.round((Number(it.precio_unitario_ars) || 0) * factor * subeLegacy * 100) / 100,
+    // El que viaja al backend: tal como se cobró (él lo vuelve al bruto).
+    precioCobrado: Math.round((Number(it.precio_unitario_ars) || 0) * subeLegacy * 100) / 100,
   }))
   return {
     items,
@@ -137,6 +153,7 @@ function buildForm(d) {
     // envío sobre lo que se mande acá. Precargado con el total, guardar sin tocar nada contaba
     // el envío dos veces.
     aporte_socio_ars:   d.subtotal_productos_ars ?? d.aporte_socio_ars ?? null,
+    descuento_ars:      descArs,
     // El valor del envío, si va por delivery (null en las anteriores al 23-sep).
     costo_envio:        d.costo_envio_ars ?? '',
     observaciones:      d.observaciones || '',
@@ -154,21 +171,14 @@ const conEnvioEnForm = computed(() => !!props.dispensacion?.con_envio || agregar
 // Lo que paga el paciente: productos + envío.
 const totalConEnvio = computed(() => (Number(form.value.aporte_socio_ars) || 0) + envioActual.value)
 
-// Total sugerido = suma de (cantidad × precio) por ítem. El aporte lo pre-llena pero el
-// admin puede pisarlo (override).
+// EL TOTAL NO SE TIPEA (7-oct-2026): es la suma de los productos menos el descuento en pesos.
+// Antes administración lo pisaba y la diferencia salía como «ajuste manual».
 const totalSugerido = computed(() =>
   Math.round((form.value.items || []).reduce((s, it) => s + (Number(it.cantidad) || 0) * (Number(it.precio) || 0), 0))
 )
-function recalc() { form.value.aporte_socio_ars = totalSugerido.value }
-// EL AJUSTE A MANO SE VE (5-oct-2026): si administración pisó el total, la diferencia con los
-// productos es una fila propia y el backend la reparte en las líneas para que sumen el total.
-const ajusteManual = computed(() => {
-  if (!puedeEditarPrecio.value) return 0
-  const aporte = Number(form.value.aporte_socio_ars)
-  if (!(aporte > 0)) return 0
-  const dif = aporte - totalSugerido.value
-  return Math.abs(dif) >= 1 ? dif : 0
-})
+const descuentoArs = computed(() => Math.max(0, Number(form.value.descuento_ars) || 0))
+const descuentoExcede = computed(() => descuentoArs.value > 0 && descuentoArs.value >= totalSugerido.value)
+function recalc() { form.value.aporte_socio_ars = Math.max(0, totalSugerido.value - descuentoArs.value) }
 // ── «Paga con» ─────────────────────────────────────────────
 // Si se cobró una parte y el resto quedó a cuenta corriente, eso es lo que hay que mostrar al
 // abrir: guardar sin mirar no puede convertir la deuda en «pagó todo» (6-oct-2026).
@@ -254,11 +264,12 @@ async function handleSubmit() {
       items: form.value.items.map(it => ({
         stock_id: it.stock_id,
         cantidad: it.cantidad,
-        ...(puedeEditarPrecio.value ? { precio_manual_ars: it.precio } : {}),
+        // El precio tal como se cobró: lo conserva aunque el producto haya cambiado de precio.
+        ...(puedeEditarPrecio.value ? { precio_manual_ars: it.precioCobrado } : {}),
       })),
       fecha_dispensacion: form.value.fecha_dispensacion,
       medio_pago:         form.value.medio_pago,
-      aporte_socio_ars:   form.value.aporte_socio_ars,
+      ...(puedeEditarPrecio.value ? { descuento_dispensa_ars: descuentoArs.value.toFixed(2) } : {}),
       // Pagó otra cosa que el total: una línea con lo que pagó; el resto lo resuelve el backend.
       // Con una parte a cuenta corriente se manda SIEMPRE: el backend no adivina.
       ...(recibido.value !== null && (faltante.value > 0.009 || excedente.value > 0.009 || teniaDeuda.value)
@@ -309,36 +320,35 @@ async function handleSubmit() {
                 <input v-model.number="it.cantidad" type="number" min="0.01" step="0.01" class="med__qty-input" @input="recalc" />
                 <span class="med__qty-unit">{{ it.unidad }}</span>
               </div>
-              <div v-if="puedeEditarPrecio" class="med__price-edit" title="Precio por unidad">
-                <span class="med__price-prefix">$</span>
-                <input v-model.number="it.precio" type="number" min="0" step="1" class="med__price-input" @input="recalc" />
-              </div>
-              <span v-else class="med__item-price">{{ fmt(it.precio) }}</span>
+              <span class="med__item-price" title="Precio por unidad">{{ fmt(it.precio) }}</span>
               <button v-if="form.items.length > 1" class="med__item-del" @click="quitarItem(i)" title="Quitar ítem">
                 <i class="bi bi-trash"></i>
               </button>
             </div>
           </div>
           <div class="med__items-total">Total productos <strong>{{ fmt(totalSugerido) }}</strong></div>
-          <div v-if="ajusteManual" class="med__items-total">
-            Ajuste manual <strong>{{ ajusteManual < 0 ? '-' : '+' }} {{ fmt(Math.abs(ajusteManual)) }}</strong>
+          <div v-if="descuentoArs > 0" class="med__items-total">
+            Descuento <strong>- {{ fmt(descuentoArs) }}</strong>
+          </div>
+          <div v-if="descuentoArs > 0" class="med__items-total">
+            Total <strong>{{ fmt(Math.max(0, totalSugerido - descuentoArs)) }}</strong>
           </div>
 
           <div class="med__divider"></div>
 
-          <!-- Aporte: sólo administración lo pisa (el backend ignora el de cualquier otro rol, así
-               que la pantalla no lo ofrece). -->
+          <!-- Para cobrar menos, un descuento: el total no se tipea (7-oct-2026). Sólo administración. -->
           <div v-if="puedeEditarPrecio" class="med__field">
-            <!-- Es el PRECIO, no lo que paga hoy (6-oct-2026, la #838): bajarlo es un descuento. -->
-            <label class="med__label">{{ conEnvioEnForm ? 'Precio de los productos' : 'Precio total' }} <span class="med__opt">ARS{{ conEnvioEnForm ? ', sin el envío' : '' }}</span></label>
+            <label class="med__label" for="med-descuento">Descuento <span class="med__opt">en pesos, sobre los productos</span></label>
             <div class="med__input-suffix-wrap">
               <span class="med__input-prefix">$</span>
-              <input v-model.number="form.aporte_socio_ars" type="number" min="0" step="1"
-                     class="med__input med__input--with-prefix" placeholder="0" />
+              <input id="med-descuento" v-model.number="form.descuento_ars" type="number" min="0" step="1"
+                     class="med__input med__input--with-prefix" placeholder="0" @input="recalc" />
             </div>
-            <p v-if="ajusteManual < 0" class="med__ayuda">
-              Bajar el precio es un <strong>descuento</strong>. Si paga menos y el resto lo debe, dejá el precio
-              y poné cuánto paga en «Paga con».
+            <p v-if="descuentoExcede" class="med__ayuda">
+              El descuento no puede ser todo el total: si no se cobra nada, anulala y hacé un regalo.
+            </p>
+            <p v-else class="med__ayuda med__ayuda--suave">
+              Si paga menos y el resto lo debe, no es un descuento: poné cuánto paga en «Paga con».
             </p>
           </div>
 
@@ -529,9 +539,6 @@ async function handleSubmit() {
 .med__item-detail { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .1rem; }
 .med__item-nombre { font-size: .82rem; font-weight: 700; color: var(--c-slate-900); }
 .med__item-gen { font-size: .72rem; color: var(--c-slate-500); font-style: italic; }
-.med__price-edit { display: flex; align-items: center; gap: .15rem; flex-shrink: 0; }
-.med__price-prefix { font-size: .78rem; color: var(--c-slate-500); font-weight: 600; }
-.med__price-input { width: 76px; text-align: right; background: var(--c-slate-50); border: 1.5px solid var(--c-slate-200); border-radius: 7px; padding: .35rem .5rem; font-size: .85rem; font-weight: 700; color: var(--c-slate-900); outline: none; }
 .med__item-price { font-size: .82rem; font-weight: 700; color: #15803d; flex-shrink: 0; }
 .med__item-del { background: none; border: none; color: #dc2626; cursor: pointer; padding: .2rem; flex-shrink: 0; font-size: .85rem; }
 .med__items-total { text-align: right; font-size: .8rem; color: var(--c-slate-500); margin-top: .5rem; }
@@ -580,6 +587,7 @@ async function handleSubmit() {
 .med__btn-ghost { background: #fff; color: var(--c-slate-500); border: 1.5px solid var(--c-slate-200); padding: .6rem 1.1rem; border-radius: 9px; font-size: .875rem; font-weight: 500; cursor: pointer; }
 .med__btn-ghost:hover { background: var(--c-slate-50); }
 .med__ayuda { margin: .35rem 0 0; font-size: .76rem; color: var(--c-amber-500); line-height: 1.45; }
+.med__ayuda--suave { color: var(--c-slate-500); }
 .med__pago-resto { margin: .4rem 0 0; padding: .45rem .65rem; border-radius: 8px; background: var(--c-leaf-50); color: var(--c-leaf-900); font-size: .8rem; }
 .med__pago-resto--mal { background: var(--c-rust-100); color: var(--c-rust-600); }
 </style>

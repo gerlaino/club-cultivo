@@ -12,7 +12,7 @@ class Dispensacion < ApplicationRecord
   # ya se cuentan solos en otro lado), token/lote_codigo/genetica_nombre (derivados del alta).
   auditar_solo :fecha_dispensacion, :paciente_id, :stock_id, :sede_id, :cantidad,
                :aporte_socio_ars, :precio_unitario_ars, :medio_pago, :monto_credito_ars,
-               :descuento_dispensa_pct, :descuento_paciente_pct, :es_regalo, :observaciones,
+               :descuento_dispensa_pct, :descuento_dispensa_ars, :descuento_paciente_pct, :es_regalo, :observaciones,
                :con_envio, :estado_envio, :delivery_id, :codigo_paquete, :direccion_envio,
                :entregado_at, :fallido_at, :motivo_fallo, :notas_entrega,
                :cobrar_en_entrega, :ruta_entrega_id, :orden_entrega

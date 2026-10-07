@@ -112,13 +112,12 @@ class ClubUsersController < ApplicationController
   end
 
   # DELETE /usuarios/:id
+  # Una baja, no un borrado: la historia de la persona queda (`Acceso::DarDeBaja`).
   def destroy
-    if @user.id == current_user.id
-      return render json: { errors: ['No podés eliminarte a vos mismo.'] }, status: :unprocessable_entity
-    end
-
-    @user.destroy!
+    Acceso::DarDeBaja.call(@user, por: current_user)
     head :no_content
+  rescue Acceso::DarDeBaja::Error => e
+    render json: { errors: [e.message] }, status: :unprocessable_entity
   end
 
 

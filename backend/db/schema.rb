@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2026_10_06_180000) do
+ActiveRecord::Schema[7.2].define(version: 2026_10_07_160000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -837,6 +837,7 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_06_180000) do
     t.bigint "reemplaza_a_id"
     t.string "direccion_etiqueta"
     t.decimal "costo_envio_ars", precision: 10, scale: 2
+    t.decimal "descuento_dispensa_ars", precision: 10, scale: 2, default: "0.0", null: false
     t.index ["anulada_por_id"], name: "index_dispensaciones_on_anulada_por_id"
     t.index ["ariccame_reportada"], name: "index_dispensaciones_on_ariccame_reportada", where: "(ariccame_reportada = false)"
     t.index ["codigo_paquete"], name: "index_dispensaciones_on_codigo_paquete", unique: true
@@ -1545,6 +1546,25 @@ ActiveRecord::Schema[7.2].define(version: 2026_10_06_180000) do
     t.index ["medico_id", "paciente_id"], name: "index_medico_pacientes_on_medico_id_and_paciente_id", unique: true
     t.index ["medico_id"], name: "index_medico_pacientes_on_medico_id"
     t.index ["paciente_id"], name: "index_medico_pacientes_on_paciente_id"
+  end
+
+  create_table "metricas_respuesta", force: :cascade do |t|
+    t.datetime "hora", null: false
+    t.string "endpoint", null: false
+    t.bigint "club_id", default: 0, null: false
+    t.integer "cantidad", default: 0, null: false
+    t.bigint "total_ms", default: 0, null: false
+    t.integer "max_ms", default: 0, null: false
+    t.integer "b0", default: 0, null: false
+    t.integer "b1", default: 0, null: false
+    t.integer "b2", default: 0, null: false
+    t.integer "b3", default: 0, null: false
+    t.integer "b4", default: 0, null: false
+    t.integer "b5", default: 0, null: false
+    t.integer "b6", default: 0, null: false
+    t.integer "b7", default: 0, null: false
+    t.index ["hora", "endpoint", "club_id"], name: "idx_metricas_respuesta_unica", unique: true
+    t.index ["hora"], name: "index_metricas_respuesta_on_hora"
   end
 
   create_table "mostrador_items", force: :cascade do |t|

@@ -126,67 +126,96 @@ RSpec.describe 'Dispensación multi-stock', type: :request do
     end
   end
 
-  # Administración pisa el total a mano (5-oct-2026, caso real: cuatro productos que sumaban
-  # $171.000 en una dispensa de $80.000). Lo que se pide: las líneas suman el total cobrado.
-  describe 'aporte a mano de administración' do
+  # EL TOTAL NO SE TIPEA (7-oct-2026). Reemplaza a «administración pisa el total» (5-oct): el
+  # total es la suma del carrito menos los descuentos, y para cobrar menos hay descuento en %
+  # o en PESOS. El caso real que lo originó sigue cubierto: cuatro productos que suman $171.000
+  # en una dispensa de $80.000 → descuento de $91.000, y las líneas suman lo cobrado.
+  describe 'descuento en pesos (el total no se pisa)' do
     before { sign_in_as(admin) }
 
     def suma_lineas(d) = d.items.reload.sum { |it| it.subtotal_ars }
 
-    it 'reparte el total escrito a mano entre las líneas, en proporción a su precio' do
+    it 'un total escrito a mano se ignora: manda la suma del carrito' do
       crear([{ stock_id: stock_a.id, cantidad: 10 }, { stock_id: stock_b.id, cantidad: 5 }],
             aporte_socio_ars: 1000)                          # lista: 10*100 + 5*200 = 2000
+      d = Dispensacion.last
+      expect(d.aporte_socio_ars).to eq(2000)
+      expect(d.items.find_by(stock: stock_a).precio_unitario_ars).to eq(100)
+    end
+
+    it 'descuenta los pesos del total y los reparte en las líneas, en proporción a su precio' do
+      crear([{ stock_id: stock_a.id, cantidad: 10 }, { stock_id: stock_b.id, cantidad: 5 }],
+            descuento_dispensa_ars: 1000)
 
       expect(response).to have_http_status(:created)
       d = Dispensacion.last
       expect(d.aporte_socio_ars).to eq(1000)
+      expect(d.descuento_dispensa_ars).to eq(1000)
       expect(suma_lineas(d)).to eq(1000)
       expect(d.items.find_by(stock: stock_a).precio_unitario_ars).to eq(50)
       expect(d.items.find_by(stock: stock_b).precio_unitario_ars).to eq(100)
     end
 
-    it 'también sube: el total a mano por encima de la lista se reparte igual' do
-      crear([{ stock_id: stock_a.id, cantidad: 3 }, { stock_id: stock_b.id, cantidad: 3 }],
-            aporte_socio_ars: 1000)                          # lista: 900; no divide justo
+    it 'con un solo producto, el precio por unidad es el que queda después del descuento' do
+      crear([{ stock_id: stock_a.id, cantidad: 4 }], descuento_dispensa_ars: 100)
       d = Dispensacion.last
-      expect(d.aporte_socio_ars).to eq(1000)
-      expect(suma_lineas(d)).to be_within(0.01).of(1000)
-    end
-
-    it 'sin tocar el aporte, cada línea queda con su precio de lista' do
-      crear([{ stock_id: stock_a.id, cantidad: 10 }, { stock_id: stock_b.id, cantidad: 5 }],
-            aporte_socio_ars: 2000)
-      d = Dispensacion.last
-      expect(d.items.find_by(stock: stock_a).precio_unitario_ars).to eq(100)
-      expect(d.items.find_by(stock: stock_b).precio_unitario_ars).to eq(200)
-    end
-
-    it 'con un solo producto, el precio por unidad es el que sale del total' do
-      crear([{ stock_id: stock_a.id, cantidad: 4 }], aporte_socio_ars: 300)
-      d = Dispensacion.last
+      expect(d.aporte_socio_ars).to eq(300)
       expect(d.items.first.precio_unitario_ars).to eq(75)
-      expect(suma_lineas(d)).to eq(300)
     end
 
-    it 'al editar con el aporte pisado, las líneas nuevas también suman el total' do
-      crear([{ stock_id: stock_a.id, cantidad: 10 }])
+    it 'se suma al descuento en %: primero el %, después los pesos' do
+      crear([{ stock_id: stock_a.id, cantidad: 10 }], descuento_dispensa_pct: 10, descuento_dispensa_ars: 100)
+      expect(Dispensacion.last.aporte_socio_ars).to eq(800)  # 1000 - 10% - $100
+    end
+
+    it 'un descuento que se come todo no se acepta: eso es un regalo' do
+      crear([{ stock_id: stock_a.id, cantidad: 10 }], descuento_dispensa_ars: 1000)
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.body).to include('regalo')
+      expect(stock_a.reload.cantidad).to eq(100)
+    end
+
+    it 'el dispensador también descuenta en pesos, como en %' do
+      sign_in_as(dispensador)
+      crear([{ stock_id: stock_a.id, cantidad: 10 }], descuento_dispensa_ars: 200)
+      expect(Dispensacion.last.aporte_socio_ars).to eq(800)
+    end
+
+    # Al editar, las líneas viajan con el precio ya descontado: sin volverlas al bruto, cada
+    # edición descontaba los mismos pesos otra vez.
+    it 'editar sin tocar el descuento no lo aplica dos veces' do
+      crear([{ stock_id: stock_a.id, cantidad: 10 }, { stock_id: stock_b.id, cantidad: 5 }],
+            descuento_dispensa_ars: 1000)
       d = Dispensacion.last
-      patch "/dispensaciones/#{d.id}",
-            params: { dispensacion: { items: [{ stock_id: stock_a.id, cantidad: 10 }, { stock_id: stock_b.id, cantidad: 5 }],
-                                      aporte_socio_ars: 1500 } },
-            headers: auth_headers
+      lineas = d.items.map { |it| { stock_id: it.stock_id, cantidad: it.cantidad, precio_manual_ars: it.precio_unitario_ars } }
+      patch "/dispensaciones/#{d.id}", params: { dispensacion: { items: lineas, observaciones: 'x' } }, headers: auth_headers
+
+      expect(response).to have_http_status(:ok)
+      expect(d.reload.aporte_socio_ars).to eq(1000)
+      expect(d.descuento_dispensa_ars).to eq(1000)
+    end
+
+    it 'editar cambiando el descuento parte del bruto, no del total ya descontado' do
+      crear([{ stock_id: stock_a.id, cantidad: 10 }, { stock_id: stock_b.id, cantidad: 5 }],
+            descuento_dispensa_ars: 1000)
+      d = Dispensacion.last
+      lineas = d.items.map { |it| { stock_id: it.stock_id, cantidad: it.cantidad, precio_manual_ars: it.precio_unitario_ars } }
+      patch "/dispensaciones/#{d.id}", params: { dispensacion: { items: lineas, descuento_dispensa_ars: 500 } }, headers: auth_headers
+
       expect(response).to have_http_status(:ok)
       expect(d.reload.aporte_socio_ars).to eq(1500)
       expect(suma_lineas(d)).to eq(1500)
     end
 
-    it 'el dispensador no puede pisar el total: las líneas y el total son los de lista' do
-      sign_in_as(dispensador)
-      crear([{ stock_id: stock_a.id, cantidad: 10 }, { stock_id: stock_b.id, cantidad: 5 }],
-            aporte_socio_ars: 1000)
+    it 'editar sumando un producto: el descuento se mantiene sobre el total nuevo' do
+      crear([{ stock_id: stock_a.id, cantidad: 10 }], descuento_dispensa_ars: 200)
       d = Dispensacion.last
-      expect(d.aporte_socio_ars).to eq(2000)
-      expect(suma_lineas(d)).to eq(2000)
+      patch "/dispensaciones/#{d.id}",
+            params: { dispensacion: { items: [{ stock_id: stock_a.id, cantidad: 10 }, { stock_id: stock_b.id, cantidad: 5 }] } },
+            headers: auth_headers
+      expect(response).to have_http_status(:ok)
+      expect(d.reload.aporte_socio_ars).to eq(1800)          # 2000 - 200
+      expect(suma_lineas(d)).to eq(1800)
     end
   end
 end

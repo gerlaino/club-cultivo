@@ -1233,7 +1233,9 @@ const ROLE_ALLOWED_PREFIX = {
   delivery:    ['/delivery', '/m', ...COMUNES],
 
   // Cultivo: salas, lotes, plantas y lo que rodea al trabajo diario del cuarto.
-  cultivador: ['/', '/salas', '/camas', '/lotes', '/plantas', '/geneticas', '/recetas', '/tareas', '/plan-trabajo',
+  // Sin '/plan-trabajo': los planes son de administración (el backend sólo deja a admin/supervisor)
+  // y la pantalla no puede ofrecer lo que el backend rechaza (7-oct-2026).
+  cultivador: ['/', '/salas', '/camas', '/lotes', '/plantas', '/geneticas', '/recetas', '/tareas',
                '/historial-cultivador', '/cosechado', '/dispositivos', '/reglas-ambientales',
                '/m', ...ETIQUETAS, ...COMUNES],
 

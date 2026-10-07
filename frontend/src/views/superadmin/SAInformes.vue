@@ -102,7 +102,7 @@ onMounted(async () => {
 <style scoped>
 /* Más angosta que el resto a propósito (son listas, no tableros): el ancho base y el centrado
    los pone `.sa-main`, esto lo achica encima. */
-.sai { padding: 1.75rem 2rem 3rem; max-width: 1000px; margin: 0 auto; }
+.sai { padding: 0; max-width: 1000px; margin: 0 auto; }
 .sai__title { font-size: 1.6rem; font-weight: 800; color: var(--c-slate-900); margin: 0 0 1.5rem; letter-spacing: -.03em; }
 
 .sai__cargando { display: flex; align-items: center; justify-content: center; gap: .75rem; padding: 4rem 0; color: var(--c-slate-500); font-size: .85rem; }

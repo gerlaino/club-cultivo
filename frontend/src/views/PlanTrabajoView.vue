@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
@@ -7,6 +7,7 @@ import DsSpinner from '../design-system/components/Spinner.vue'
 import AplicarPlanModal       from '../components/plan-trabajo/AplicarPlanModal.vue'
 import EditarPlantillaModal   from '../components/plan-trabajo/EditarPlantillaModal.vue'
 import ExportarCalendarioModal from '../components/plan-trabajo/ExportarCalendarioModal.vue'
+import PlanCalendario from '../components/plan-trabajo/PlanCalendario.vue'
 import { listPlanTrabajos, deletePlanTrabajo, getPlanTrabajo, exportPlanCSV, listAplicaciones, cancelarAplicacion, publicarPlanTrabajo } from '../lib/api.js'
 const { esPersonal } = useUsoPersonal()
 
@@ -15,6 +16,27 @@ const confirm = useConfirm()
 
 const loading    = ref(true)
 const plantillas = ref([])
+// La biblioteca a la izquierda, el plan elegido a la derecha con su calendario (7-oct-2026).
+const elegidoId = ref(null)
+const elegido = computed(() => plantillas.value.find(p => p.id === elegidoId.value) || plantillas.value[0] || null)
+// El listado trae cuántas tareas tiene cada plan, no cuáles: el calendario del elegido pide su
+// detalle (una vez por plan; se vuelve a pedir al guardarlo).
+const detalles = ref({})
+const tareasElegido = computed(() => detalles.value[elegido.value?.id]?.plan_tareas || [])
+async function cargarDetalle(id, forzar = false) {
+  if (!id || (detalles.value[id] && !forzar)) return
+  try {
+    const { data } = await getPlanTrabajo(id)
+    detalles.value = { ...detalles.value, [id]: data }
+  } catch { /* el calendario queda vacío; la lista sigue andando */ }
+}
+watch(() => elegido.value?.id, (id) => cargarDetalle(id), { immediate: true })
+const semanasDe = (plan) => {
+  const tareas = detalles.value[plan?.id]?.plan_tareas || plan?.plan_tareas
+  if (!tareas?.length) return null
+  return Math.floor(Math.max(0, ...tareas.map(t => t.dia_relativo ?? 0)) / 7) + 1
+}
+const enCursoDe = (plan) => aplicaciones.value.filter(a => a.estado === 'activo' && a.plan_trabajo?.id === plan.id).length
 
 const aplicaciones        = ref([])
 const loadingAplicaciones = ref(false)
@@ -160,7 +182,12 @@ async function quitarPlan(a) {
   }
 }
 
-function onSaved() { showEditar.value = false; cargar() }
+function onSaved() {
+  const id = planActivo.value?.id
+  showEditar.value = false
+  cargar()
+  if (id) cargarDetalle(id, true)
+}
 function onAplicado() {
   showAplicar.value = false
   toast.success('Plan aplicado — las tareas fueron creadas en el calendario')
@@ -182,130 +209,82 @@ onMounted(() => {
 </script>
 
 <template>
+  <!-- Rediseño 7-oct-2026: biblioteca de planes a la izquierda, el elegido con su calendario por
+       semana a la derecha, y abajo lo que está en curso. Antes eran tarjetas con chips «D3». -->
   <div class="ptv">
-
-    <!-- Header -->
     <div class="ptv__hdr">
       <div>
-        <h1 class="ptv__title">Planes de trabajo</h1>
-        <p class="ptv__subtitle">Plantillas reutilizables para organizar cultivos</p>
+        <h1 class="ptv__title">Planes</h1>
+        <p class="ptv__subtitle">Lo que se hace en cada semana del ciclo. Se arma una vez y se aplica a los lotes.</p>
       </div>
-      <div class="ptv__hdr-actions">
-        <button class="ptv__btn-primary" @click="abrirEditar()">
-          <i class="bi bi-plus-lg"></i> Nueva plantilla
-        </button>
-      </div>
+      <button class="ptv__btn-primary" @click="abrirEditar()"><i class="bi bi-plus-lg"></i> Plan nuevo</button>
     </div>
 
-    <!-- Loading -->
     <div v-if="loading" class="ptv__loading"><DsSpinner /></div>
 
-    <!-- Empty -->
     <div v-else-if="!plantillas.length" class="ptv__empty">
       <div class="ptv__empty-icon"><i class="bi bi-clipboard2-check"></i></div>
-      <div class="ptv__empty-title">Sin plantillas todavía</div>
-      <div class="ptv__empty-sub">Creá tu primera plantilla para organizar cultivos.</div>
-      <div class="ptv__empty-actions">
-        <button class="ptv__btn-primary" @click="abrirEditar()">
-          <i class="bi bi-plus-lg"></i> Crear plantilla
-        </button>
-      </div>
+      <div class="ptv__empty-title">Todavía no hay planes</div>
+      <div class="ptv__empty-sub">Armá el primero: qué se hace cada semana, desde que el lote entra a la sala.</div>
+      <button class="ptv__btn-primary" @click="abrirEditar()"><i class="bi bi-plus-lg"></i> Armar un plan</button>
     </div>
 
-    <!-- Lista -->
-    <div v-else class="ptv__grid">
-      <div v-for="plan in plantillas" :key="plan.id" class="ptv__card">
-        <div class="ptv__card-hdr">
-          <div class="ptv__card-info">
-            <h3 class="ptv__card-titulo">{{ plan.titulo }}</h3>
-            <p v-if="plan.notas" class="ptv__card-notas">{{ plan.notas }}</p>
-          </div>
-          <div class="ptv__card-badge">
-            <i class="bi bi-list-task"></i>
-            {{ plan.total_plan_tareas }} tarea{{ plan.total_plan_tareas !== 1 ? 's' : '' }}
-          </div>
-        </div>
+    <div v-else class="ptv__lib">
+      <nav class="ptv__lista" aria-label="Mis planes">
+        <div class="ptv__lista-tit">Mis planes</div>
+        <button v-for="plan in plantillas" :key="plan.id" type="button" class="ptv__item"
+                :class="{ 'ptv__item--on': elegido?.id === plan.id }" :aria-current="elegido?.id === plan.id ? 'true' : undefined"
+                @click="elegidoId = plan.id">
+          <span class="ptv__item-tit">{{ plan.titulo }}</span>
+          <span class="ptv__item-sub">
+            {{ plan.total_plan_tareas }} {{ plan.total_plan_tareas === 1 ? 'tarea' : 'tareas' }}<template v-if="semanasDe(plan)"> · {{ semanasDe(plan) }} sem</template>
+            <template v-if="enCursoDe(plan)"> · en curso en {{ enCursoDe(plan) }}</template>
+            <template v-if="plan.estado === 'borrador'"> · borrador</template>
+          </span>
+        </button>
+      </nav>
 
-        <!-- Preview chips -->
-        <div v-if="plan.plan_tareas?.length" class="ptv__tareas-preview">
-          <div v-for="pt in plan.plan_tareas.slice(0, 5)" :key="pt.id" class="ptv__tarea-chip">
-            <span class="ptv__tarea-dia">D{{ pt.dia_relativo ?? 0 }}</span>
-            <span class="ptv__tarea-nombre">{{ pt.titulo || TIPO_LABEL[pt.tipo] || pt.tipo }}</span>
+      <section v-if="elegido" class="ptv__detalle">
+        <div class="ptv__detalle-hdr">
+          <div class="ptv__detalle-txt">
+            <h2 class="ptv__detalle-tit">{{ elegido.titulo }}</h2>
+            <p v-if="elegido.notas" class="ptv__subtitle">{{ elegido.notas }}</p>
           </div>
-          <div v-if="plan.plan_tareas.length > 5" class="ptv__tarea-chip ptv__tarea-chip--more">
-            +{{ plan.plan_tareas.length - 5 }} más
-          </div>
-        </div>
-
-        <div class="ptv__card-footer">
-          <span class="ptv__card-meta">{{ plan.creado_por?.nombre }}</span>
           <div class="ptv__card-actions">
-
-            <!-- Aplicar -->
-            <button class="ptv__btn-apply" @click="abrirAplicar(plan)">
-              <i class="bi bi-play-fill"></i> Aplicar
-            </button>
-
-            <!-- Exportar dropdown -->
+            <button class="ptv__btn-ghost-txt" @click="abrirEditar(elegido)"><i class="bi bi-pencil"></i> Editar</button>
             <div class="ptv__export-wrap">
-              <button class="ptv__btn-ghost" @click.stop="toggleExportDropdown(plan)" title="Exportar">
-                <i class="bi bi-download"></i>
-              </button>
-              <div v-if="exportDropdownPlan?.id === plan.id" class="ptv__export-drop">
-                <button class="ptv__drop-item" @click="descargarPlantillaCSV(plan)">
-                  <i class="bi bi-filetype-csv"></i>
-                  Descargar plantilla (.csv)
-                </button>
-                <button class="ptv__drop-item" @click="abrirCalendario(plan)">
-                  <i class="bi bi-calendar3-week"></i>
-                  Exportar como calendario…
-                </button>
+              <button class="ptv__btn-ghost-txt" @click.stop="toggleExportDropdown(elegido)"><i class="bi bi-download"></i> Exportar</button>
+              <div v-if="exportDropdownPlan?.id === elegido.id" class="ptv__export-drop">
+                <button class="ptv__drop-item" @click="descargarPlantillaCSV(elegido)"><i class="bi bi-filetype-csv"></i> Descargar plantilla (.csv)</button>
+                <button class="ptv__drop-item" @click="abrirCalendario(elegido)"><i class="bi bi-calendar3-week"></i> Exportar como calendario…</button>
               </div>
             </div>
-
-            <!-- Publicar (solo borradores: un plan en borrador no se puede aplicar) -->
-            <button
-              v-if="plan.estado === 'borrador'"
-              class="ptv__btn-publicar"
-              @click="publicar(plan)"
-              title="Publicar — necesario para poder aplicarlo a un lote"
-            >
-              <i class="bi bi-send-check"></i> Publicar
-            </button>
-
-            <!-- Editar -->
-            <button class="ptv__btn-ghost" @click="abrirEditar(plan)" title="Editar">
-              <i class="bi bi-pencil"></i>
-            </button>
-
-            <!-- Eliminar -->
-            <button class="ptv__btn-danger-sm" @click="eliminar(plan)" title="Eliminar">
-              <i class="bi bi-trash3"></i>
-            </button>
-
+            <button class="ptv__btn-ghost-txt ptv__btn-ghost-txt--peligro" @click="eliminar(elegido)"><i class="bi bi-trash3"></i> Eliminar</button>
+            <!-- Un borrador no se puede aplicar: primero se publica. -->
+            <button v-if="elegido.estado === 'borrador'" class="ptv__btn-primary" @click="publicar(elegido)"
+                    title="Publicar — necesario para poder aplicarlo a un lote"><i class="bi bi-send-check"></i> Publicar</button>
+            <button v-else class="ptv__btn-primary" @click="abrirAplicar(elegido)"><i class="bi bi-play-fill"></i> Aplicar a lotes</button>
           </div>
         </div>
-      </div>
+        <PlanCalendario :tareas="tareasElegido" />
+        <p class="ptv__pie">Cada casilla dice qué toca esa semana. Para cambiarlo, «Editar».</p>
+      </section>
     </div>
 
-    <!-- ── Planes aplicados ─────────────────────────────────── -->
-    <div class="ptv__apl">
+    <!-- ── Planes en curso ─────────────────────────────────── -->
+    <section class="ptv__apl">
       <div class="ptv__apl-hdr">
         <div>
-          <h2 class="ptv__apl-title">Planes aplicados</h2>
-          <p class="ptv__subtitle">Aplicaciones de plantillas sobre lotes, salas o {{ esPersonal ? 'todo el cultivo' : 'la organización' }}</p>
+          <h2 class="ptv__apl-title">{{ verHistorialApl ? 'Todos los planes aplicados' : 'Planes en curso' }}</h2>
+          <p class="ptv__subtitle">Sobre lotes, salas o {{ esPersonal ? 'todo el cultivo' : 'la organización' }}.</p>
         </div>
-        <button class="ptv__btn-secondary" @click="toggleHistorialApl">
-          {{ verHistorialApl ? 'Ver solo activos' : 'Ver historial' }}
-        </button>
+        <button class="ptv__btn-ghost-txt" @click="toggleHistorialApl">{{ verHistorialApl ? 'Ver sólo los activos' : 'Ver historial' }}</button>
       </div>
 
       <div v-if="loadingAplicaciones" class="ptv__loading"><DsSpinner /></div>
-
-      <div v-else-if="!aplicaciones.length" class="ptv__apl-empty">
-        {{ verHistorialApl ? 'Todavía no se aplicó ninguna plantilla.' : 'No hay planes activos. Aplicá una plantilla con el botón "Aplicar".' }}
-      </div>
-
+      <p v-else-if="!aplicaciones.length" class="ptv__apl-empty">
+        {{ verHistorialApl ? 'Todavía no se aplicó ningún plan.' : 'No hay planes en curso. Elegí uno arriba y «Aplicar a lotes».' }}
+      </p>
       <div v-else class="ptv__apl-list">
         <div v-for="a in aplicaciones" :key="a.id" class="ptv__apl-row">
           <div class="ptv__apl-info">
@@ -314,59 +293,49 @@ onMounted(() => {
               <span class="ptv__apl-estado" :class="`ptv__apl-estado--${a.estado}`">{{ a.estado }}</span>
             </div>
             <div class="ptv__apl-meta">
-              <span><i class="bi bi-geo-alt"></i> {{ describirObjetivo(a) }}</span>
-              <span><i class="bi bi-calendar3"></i> {{ new Date(a.fecha_inicio).toLocaleDateString('es-AR') }}</span>
-              <span><i class="bi bi-list-task"></i> {{ a.tareas_creadas }} tareas</span>
-              <span v-if="a.aplicado_por"><i class="bi bi-person"></i> {{ a.aplicado_por.nombre }}</span>
+              <span>{{ describirObjetivo(a) }}</span>
+              <span>desde el {{ new Date(a.fecha_inicio).toLocaleDateString('es-AR') }}</span>
+              <span>{{ a.tareas_creadas }} tareas</span>
+              <span v-if="a.aplicado_por">por {{ a.aplicado_por.nombre }}</span>
             </div>
           </div>
           <div class="ptv__apl-right">
             <div class="ptv__apl-progreso" :title="`${a.porcentaje_completado}% completado`">
-              <div class="ptv__apl-progreso-bar">
-                <div class="ptv__apl-progreso-fill" :style="{ width: a.porcentaje_completado + '%' }"></div>
-              </div>
+              <div class="ptv__apl-progreso-bar"><div class="ptv__apl-progreso-fill" :style="{ width: a.porcentaje_completado + '%' }"></div></div>
               <span class="ptv__apl-progreso-pct">{{ a.porcentaje_completado }}%</span>
             </div>
-            <button
-              v-if="a.estado === 'activo'"
-              class="ptv__btn-danger-sm ptv__apl-quitar"
-              :disabled="quitandoId === a.id"
-              @click="quitarPlan(a)"
-              title="Quitar plan (cancela tareas pendientes)"
-            >
-              <i class="bi bi-x-lg"></i> Quitar
-            </button>
+            <button v-if="a.estado === 'activo'" class="ptv__btn-ghost-txt ptv__btn-ghost-txt--peligro" :disabled="quitandoId === a.id"
+                    @click="quitarPlan(a)" title="Quitar plan (cancela tareas pendientes)">Quitar</button>
           </div>
         </div>
       </div>
-    </div>
+    </section>
 
-    <!-- Modales -->
-    <EditarPlantillaModal
-      v-if="showEditar"
-      :plan="planActivo"
-      @close="showEditar = false"
-      @saved="onSaved"
-    />
-
-    <AplicarPlanModal
-      v-if="showAplicar && planActivo"
-      :plan="planActivo"
-      @close="showAplicar = false"
-      @applied="onAplicado"
-    />
-
-    <ExportarCalendarioModal
-      v-if="showCalendario && planActivo"
-      :plan="planActivo"
-      @close="showCalendario = false"
-    />
-
-
+    <EditarPlantillaModal v-if="showEditar" :plan="planActivo" @close="showEditar = false" @saved="onSaved" />
+    <AplicarPlanModal v-if="showAplicar && planActivo" :plan="planActivo" @close="showAplicar = false" @applied="onAplicado" />
+    <ExportarCalendarioModal v-if="showCalendario && planActivo" :plan="planActivo" @close="showCalendario = false" />
   </div>
 </template>
 
 <style scoped>
+.ptv { display: flex; flex-direction: column; gap: 1.2rem; }
+.ptv__lib { display: flex; gap: 1.2rem; align-items: flex-start; flex-wrap: wrap; }
+.ptv__lista { flex: 1 1 240px; max-width: 300px; display: flex; flex-direction: column; gap: .45rem; }
+.ptv__lista-tit { font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--c-slate-500); }
+.ptv__item { display: flex; flex-direction: column; gap: .15rem; text-align: left; background: #fff; border: 1px solid var(--c-slate-200); border-radius: 12px; padding: .7rem .85rem; cursor: pointer; font: inherit; }
+.ptv__item:hover { border-color: var(--c-leaf-300); }
+.ptv__item--on { border: 2px solid var(--c-leaf-800); }
+.ptv__item-tit { font-weight: 700; font-size: .9rem; color: var(--c-slate-900); }
+.ptv__item-sub { font-size: .76rem; color: var(--c-slate-500); }
+.ptv__detalle { flex: 999 1 520px; min-width: 0; background: #fff; border: 1px solid var(--c-slate-200); border-radius: 16px; padding: 1.2rem; display: flex; flex-direction: column; gap: 1rem; }
+.ptv__detalle-hdr { display: flex; align-items: flex-start; gap: .8rem; flex-wrap: wrap; }
+.ptv__detalle-txt { flex: 1; min-width: 200px; }
+.ptv__detalle-tit { margin: 0; font-size: 1.2rem; font-weight: 800; color: var(--c-slate-900); }
+.ptv__pie { margin: 0; font-size: .8rem; color: var(--c-slate-500); }
+.ptv__btn-ghost-txt { height: 40px; display: inline-flex; align-items: center; gap: .35rem; padding: 0 .85rem; border-radius: 10px; border: 1px solid var(--c-slate-300); background: #fff; color: var(--c-slate-700); font-weight: 600; font-size: .82rem; cursor: pointer; }
+.ptv__btn-ghost-txt:hover { background: var(--c-slate-50); }
+.ptv__btn-ghost-txt--peligro { color: var(--c-rust-600); }
+.ptv__card-actions { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center; }
 .ptv { padding: 2rem 1.75rem 3rem; max-width: 1100px; margin: 0 auto; font-family: system-ui, -apple-system, sans-serif; color: var(--c-slate-900); }
 @media (max-width: 768px) { .ptv { padding: 1.25rem 1rem 2rem; } }
 
@@ -377,8 +346,8 @@ onMounted(() => {
 .ptv__hdr-actions { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 
 /* Buttons */
-.ptv__btn-primary   { display: inline-flex; align-items: center; gap: .4rem; background: #1b5e20; color: #fff; border: none; padding: .6rem 1.1rem; border-radius: 9px; font-size: .82rem; font-weight: 700; cursor: pointer; transition: background .15s; }
-.ptv__btn-primary:hover { background: #144a18; }
+.ptv__btn-primary   { display: inline-flex; align-items: center; gap: .4rem; background: var(--c-leaf-800); color: #fff; border: none; height: 40px; padding: 0 1.1rem; border-radius: 9px; font-size: .82rem; font-weight: 700; cursor: pointer; transition: background .15s; }
+.ptv__btn-primary:hover { background: var(--c-leaf-900); }
 .ptv__btn-secondary { display: inline-flex; align-items: center; gap: .4rem; background: var(--c-slate-50); color: var(--c-slate-600); border: 1.5px solid var(--c-slate-200); padding: .55rem 1rem; border-radius: 9px; font-size: .82rem; font-weight: 700; cursor: pointer; transition: all .15s; }
 .ptv__btn-secondary:hover { border-color: #1b5e20; color: #1b5e20; background: #f0fdf4; }
 .ptv__btn-apply     { display: inline-flex; align-items: center; gap: .35rem; background: #1b5e20; color: #fff; border: none; padding: .45rem .9rem; border-radius: 7px; font-size: .78rem; font-weight: 700; cursor: pointer; transition: background .15s; }
@@ -450,7 +419,7 @@ onMounted(() => {
 
 /* Export dropdown */
 .ptv__export-wrap { position: relative; }
-.ptv__export-drop { position: absolute; bottom: calc(100% + 6px); right: 0; background: #fff; border: 1.5px solid var(--c-slate-200); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.12); min-width: 210px; overflow: hidden; z-index: 100; }
+.ptv__export-drop { position: absolute; top: calc(100% + 6px); right: 0; background: #fff; border: 1.5px solid var(--c-slate-200); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,.12); min-width: 210px; overflow: hidden; z-index: 100; }
 .ptv__drop-item { display: flex; align-items: center; gap: .5rem; width: 100%; padding: .6rem .875rem; font-size: .8rem; font-weight: 600; color: var(--c-slate-900); background: none; border: none; cursor: pointer; text-align: left; transition: background .1s; white-space: nowrap; }
 .ptv__drop-item:hover { background: #f0fdf4; color: #1b5e20; }
 .ptv__drop-item i { font-size: .9rem; color: var(--c-slate-500); flex-shrink: 0; }

@@ -72,8 +72,11 @@ describe('la fecha de la dispensa contra la del producto', () => {
   // Dejar apretar para que el backend rebote es el peor error posible.
   it('y no deja confirmar', async () => {
     const w = await conFecha(await montar(), '2026-08-01')
+    w.vm.paso = 3                                            // el botón de confirmar está en el último paso
+    await w.vm.$nextTick()
 
-    expect(w.find('.mnd__btn-primary').attributes('disabled')).toBeDefined()
+    expect(w.find('.mnd__barra-seguir').text()).toContain('Confirmar')
+    expect(w.find('.mnd__barra-seguir').attributes('disabled')).toBeDefined()
   })
 
   // Sin atajo: las dos salidas son corregir la fecha de la dispensa o la del producto por su

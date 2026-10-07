@@ -113,14 +113,18 @@ class DispensacionesController < ApplicationController
     @dispensacion.descuento_paciente_pct = desc_paciente
     @dispensacion.descuento_dispensa_pct = desc_dispensa
 
-    # El total lo calcula el server. Solo admin/supervisor pueden pisarlo a mano (override).
-    override_admin = (current_user.admin? || current_user.supervisor?) && @dispensacion.aporte_socio_ars.to_d > 0
-    items_param    = params.dig(:dispensacion, :items)
+    # EL TOTAL NO SE TIPEA (7-oct-2026): es la suma del carrito menos los descuentos, y lo
+    # calcula el server. Para cobrar menos hay descuento, en % o en pesos (`aplicar_descuento_en_pesos`,
+    # más abajo). Lo único que se escribe a mano es el precio de un producto SIN precio cargado
+    # (admin/supervisor, por línea). Hasta hoy administración podía pisar el total, y la
+    # diferencia salía como un «ajuste manual» que nadie sabía explicar.
+    sin_precio_admin = (current_user.admin? || current_user.supervisor?) && @dispensacion.aporte_socio_ars.to_d > 0
+    items_param      = params.dig(:dispensacion, :items)
 
     if items_param.present?
       # ── Multi-stock: una dispensa con varias líneas. El total se suma por línea, cada una
       #    con el precio de su propio stock (con el descuento total aplicado). ──
-      construir_items_multistock(@dispensacion, items_param, desc_total, override_admin)
+      construir_items_multistock(@dispensacion, items_param, desc_total)
     else
       cantidad         = @dispensacion.cantidad.to_d
       precio_unit_base = @dispensacion.stock&.precio_sugerido_ars.to_d
@@ -128,10 +132,8 @@ class DispensacionesController < ApplicationController
       if precio_unit_base > 0
         precio_unit_desc = (precio_unit_base * (1 - desc_total / 100)).round(2)
         @dispensacion.precio_unitario_ars = precio_unit_desc
-        @dispensacion.aporte_socio_ars    = override_admin ? @dispensacion.aporte_socio_ars : (precio_unit_desc * cantidad).round(2)
-        # Total a mano: el precio por unidad es el que resulta de ese total (la línea espejo lo copia).
-        @dispensacion.precio_unitario_ars = (@dispensacion.aporte_socio_ars.to_d / cantidad).round(2) if override_admin && cantidad > 0
-      elsif override_admin && cantidad > 0
+        @dispensacion.aporte_socio_ars    = (precio_unit_desc * cantidad).round(2)
+      elsif sin_precio_admin && cantidad > 0
         # Stock sin precio configurado: admin fija el total a mano.
         @dispensacion.precio_unitario_ars ||= (@dispensacion.aporte_socio_ars.to_d / cantidad).round(2)
       end
@@ -163,6 +165,12 @@ class DispensacionesController < ApplicationController
       @dispensacion.costo_envio_ars   = 0 if @dispensacion.con_envio
       @dispensacion.save!
       return render json: serialize_dispensacion(@dispensacion), status: :created
+    end
+
+    unless es_regalo
+      if (err = aplicar_descuento_en_pesos(@dispensacion, descuento_ars_param))
+        return render json: { error: err }, status: :unprocessable_entity
+      end
     end
 
     # EL VALOR DEL ENVÍO (23-sep-2026): obligatorio con envío —0 es bonificado, se permite—, lo
@@ -274,6 +282,7 @@ class DispensacionesController < ApplicationController
       envio_nuevo = :sin_cambio if envio_nuevo == @dispensacion.costo_envio_ars
     end
     financiero = items_param.present? || envio_nuevo != :sin_cambio ||
+                 params[:dispensacion]&.key?(:descuento_dispensa_ars) ||
                  (attrs.keys.map(&:to_s) & %w[cantidad stock_id aporte_socio_ars medio_pago]).any?
     unless financiero
       if @dispensacion.update(attrs)
@@ -366,7 +375,17 @@ class DispensacionesController < ApplicationController
           desc_total    = [desc_paciente + desc_dispensa, 100].min
           @dispensacion.descuento_paciente_pct = desc_paciente
           @dispensacion.descuento_dispensa_pct = desc_dispensa
-          override_admin = (current_user.admin? || current_user.supervisor?) && attrs[:aporte_socio_ars].to_d > 0
+
+          # Los precios de las líneas viajan tal como se cobraron (`precio_manual_ars`), o sea con
+          # el descuento en pesos ya repartido adentro. Se vuelven al bruto antes de rearmar: si
+          # no, cada edición descontaba los mismos pesos otra vez.
+          desc_ars_previo   = @dispensacion.descuento_dispensa_ars.to_d
+          productos_previos = @dispensacion.items.sum { |it| it.precio_unitario_ars.to_d * it.cantidad.to_d }
+          factor_bruto      = if desc_ars_previo.positive? && productos_previos.positive?
+                                (productos_previos + desc_ars_previo) / productos_previos
+                              else
+                                1.to_d
+                              end
 
           # Borrado DURO, no lógico. Las líneas superadas por una edición no son historia: son
           # un estado intermedio de la misma dispensa. Dejarlas soft-borradas hacía que
@@ -376,8 +395,12 @@ class DispensacionesController < ApplicationController
           # Mismo efecto al borrar o restaurar una dispensa ya editada.
           @dispensacion.items.each(&:really_destroy!)
           @dispensacion.items.reload
-          construir_items_multistock(@dispensacion, items_param, desc_total, override_admin)
+          construir_items_multistock(@dispensacion, items_param, desc_total, factor_manual: factor_bruto)
           raise 'La dispensación debe tener al menos un producto' if @dispensacion.items.empty?
+          desc_ars = params[:dispensacion].key?(:descuento_dispensa_ars) ? descuento_ars_param : desc_ars_previo
+          if (err = aplicar_descuento_en_pesos(@dispensacion, desc_ars))
+            raise err
+          end
           @dispensacion.cantidad = @dispensacion.items.sum { |it| it.cantidad.to_d }
           validar_stock_items!(@dispensacion)   # cada línea vs disponible (acumulado por stock)
         else
@@ -892,7 +915,9 @@ class DispensacionesController < ApplicationController
   # Arma las líneas de una dispensa multi-stock: cada `{stock_id, cantidad}` se convierte en un
   # item con el precio de su propio stock (con el descuento total ya aplicado). El total de la
   # dispensa es la suma de las líneas; las columnas legacy stock_id/cantidad las espeja el modelo.
-  def construir_items_multistock(disp, lineas, desc_total, override_admin)
+  # `factor_manual`: al editar, los precios de las líneas vuelven con el descuento en pesos
+  # adentro; el factor los devuelve al bruto (ver `update`). Al crear es 1.
+  def construir_items_multistock(disp, lineas, desc_total, factor_manual: 1)
     total = 0.to_d
     Array(lineas).each do |ln|
       st   = Stock.find_by(id: ln[:stock_id])
@@ -906,7 +931,7 @@ class DispensacionesController < ApplicationController
       # editar una dispensa. Con guardar_precio se persiste en el stock. El dispensador no
       # puede fijar precios (no manda precio_manual_ars).
       if (current_user.admin? || current_user.supervisor?) && ln[:precio_manual_ars].present?
-        manual = ln[:precio_manual_ars].to_d
+        manual = (ln[:precio_manual_ars].to_d * factor_manual).round(2)
         if manual.positive?
           base = manual
           manual_usado = true
@@ -929,8 +954,35 @@ class DispensacionesController < ApplicationController
 
     disp.sede_id            ||= disp.items.first&.stock&.sede_id
     disp.precio_unitario_ars  = disp.items.first&.precio_unitario_ars
-    disp.aporte_socio_ars     = override_admin ? disp.aporte_socio_ars : total.round(2)
-    disp.repartir_en_lineas(disp.aporte_socio_ars) if override_admin
+    disp.aporte_socio_ars     = total.round(2)
+  end
+
+  # EL DESCUENTO EN PESOS (7-oct-2026): reemplaza al total que administración tipeaba. Sale de
+  # los productos (el envío se suma después) y se reparte en las líneas para que sumen el
+  # total, porque los informes van por línea. Un descuento que se come todo es un regalo, y el
+  # regalo tiene su tilde. Devuelve el motivo si no se puede, o nil.
+  def aplicar_descuento_en_pesos(disp, monto)
+    disp.descuento_dispensa_ars = 0
+    return nil unless monto.positive?
+
+    productos = disp.aporte_socio_ars.to_d
+    return 'El descuento no puede ser igual o mayor al total: si no se cobra nada, es un regalo.' if monto >= productos
+
+    disp.descuento_dispensa_ars = monto.round(2)
+    disp.aporte_socio_ars       = (productos - disp.descuento_dispensa_ars).round(2)
+    if disp.items.any?
+      disp.repartir_en_lineas(disp.aporte_socio_ars)
+    elsif disp.cantidad.to_d.positive?
+      disp.precio_unitario_ars = (disp.aporte_socio_ars / disp.cantidad.to_d).round(2)
+    end
+    nil
+  end
+
+  def descuento_ars_param
+    raw = params.dig(:dispensacion, :descuento_dispensa_ars).to_s.strip.tr(',', '.')
+    raw.empty? ? 0.to_d : [BigDecimal(raw), 0].max
+  rescue ArgumentError
+    0.to_d
   end
 
   # Evento del que sale la línea, cuando el dispensador marcó "dispensar desde lo reservado".

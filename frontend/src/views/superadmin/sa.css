@@ -1,0 +1,56 @@
+/* Piezas comunes del panel de plataforma (7-oct-2026). Sin scope a propósito: las usan todas las
+   pantallas de super admin, y repetirlas en cada una es como se desalinean. Prefijo `sa-` para
+   no chocar con nada del resto de la app. */
+.sa-page { display: flex; flex-direction: column; gap: 1.4rem; }
+.sa-head { display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap; }
+.sa-head__txt { flex: 1; min-width: 220px; }
+.sa-sup { font-size: .8rem; color: var(--c-slate-500); }
+.sa-h1 { margin: .15rem 0 0; font-size: 1.75rem; font-weight: 800; letter-spacing: -.02em; color: var(--c-slate-900); }
+.sa-h2 { margin: 0; font-size: 1.05rem; font-weight: 700; color: var(--c-slate-900); }
+.sa-ayuda { font-size: .82rem; color: var(--c-slate-500); margin: .2rem 0 0; }
+.sa-card { background: #fff; border: 1px solid var(--c-slate-200); border-radius: 14px; padding: 1.2rem 1.25rem; }
+.sa-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .9rem; }
+.sa-kpi { background: #fff; border: 1px solid var(--c-slate-200); border-radius: 14px; padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: .3rem; }
+.sa-kpi__l { font-size: .8rem; font-weight: 600; color: var(--c-slate-500); }
+.sa-kpi__n { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 1.7rem; font-weight: 700; color: var(--c-slate-900); }
+.sa-kpi__s { font-size: .75rem; color: var(--c-slate-500); }
+.sa-kpi--rojo .sa-kpi__n { color: var(--c-rust-600); }
+.sa-kpi--ambar .sa-kpi__n { color: var(--c-gold-500); }
+.sa-btn { height: 42px; display: inline-flex; align-items: center; gap: .4rem; padding: 0 1rem; border-radius: 10px; border: 1px solid var(--c-slate-300); background: #fff; color: var(--c-slate-700); font-weight: 600; font-size: .85rem; cursor: pointer; text-decoration: none; }
+.sa-btn:hover { background: var(--c-slate-50); }
+.sa-btn--primario { background: var(--c-leaf-800); border-color: var(--c-leaf-800); color: #fff; }
+.sa-btn--primario:hover { background: var(--c-leaf-900); }
+.sa-btn--peligro { color: var(--c-rust-600); border-color: var(--c-rust-100); }
+.sa-btn--peligro:hover { background: var(--c-rust-100); }
+.sa-btn--chico { height: 34px; padding: 0 .7rem; font-size: .78rem; border-radius: 8px; }
+.sa-tag { display: inline-flex; align-items: center; font-size: .7rem; font-weight: 700; padding: .15rem .55rem; border-radius: 999px; background: var(--c-slate-100); color: var(--c-slate-700); white-space: nowrap; }
+.sa-tag--ok { background: #DCFCE7; color: #166534; }
+.sa-tag--atencion { background: var(--c-amber-100); color: #92400E; }
+.sa-tag--mal { background: var(--c-rust-100); color: #991B1B; }
+.sa-tag--info { background: var(--c-sky-100); color: #075985; }
+.sa-punto { width: 11px; height: 11px; border-radius: 11px; flex-shrink: 0; background: var(--c-slate-300); }
+.sa-punto--ok { background: #16A34A; }
+.sa-punto--atencion { background: #F59E0B; }
+.sa-punto--mal { background: #DC2626; }
+.sa-filtros { display: flex; gap: .6rem; flex-wrap: wrap; align-items: center; }
+.sa-buscar { flex: 1; min-width: 220px; height: 42px; border: 1.5px solid var(--c-slate-300); border-radius: 10px; padding: 0 .9rem; font-size: .88rem; background: #fff; box-sizing: border-box; }
+.sa-buscar:focus { outline: none; border-color: var(--c-leaf-800); }
+.sa-select { height: 42px; border: 1.5px solid var(--c-slate-300); border-radius: 10px; padding: 0 .7rem; font-size: .85rem; background: #fff; }
+.sa-chip { height: 36px; padding: 0 .85rem; border-radius: 999px; border: 1px solid var(--c-slate-300); background: #fff; color: var(--c-slate-700); font-weight: 600; font-size: .8rem; cursor: pointer; }
+.sa-chip--on { background: var(--c-leaf-800); border-color: var(--c-leaf-800); color: #fff; }
+.sa-tabla-wrap { background: #fff; border: 1px solid var(--c-slate-200); border-radius: 14px; overflow-x: auto; }
+.sa-tabla { width: 100%; border-collapse: collapse; min-width: 760px; }
+.sa-tabla th { text-align: left; padding: .7rem 1rem; background: var(--c-slate-50); font-size: .68rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--c-slate-500); white-space: nowrap; }
+.sa-tabla td { padding: .8rem 1rem; border-top: 1px solid var(--c-slate-100); font-size: .86rem; color: var(--c-slate-700); vertical-align: middle; }
+.sa-tabla tr.sa-fila-link { cursor: pointer; }
+.sa-tabla tr.sa-fila-link:hover td { background: var(--c-slate-50); }
+.sa-tabla .sa-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.sa-tabla .sa-der { text-align: right; }
+.sa-fuerte { font-weight: 700; color: var(--c-slate-900); }
+.sa-tenue { font-size: .75rem; color: var(--c-slate-500); }
+.sa-barra { display: block; height: 6px; background: var(--c-slate-100); border-radius: 6px; margin-top: .3rem; min-width: 80px; }
+.sa-barra > span { display: block; height: 6px; border-radius: 6px; background: var(--c-leaf-600); }
+.sa-barra--alta > span { background: #F59E0B; }
+.sa-vacio { font-size: .88rem; color: var(--c-slate-500); padding: 1rem 0; }
+@media (max-width: 1000px) { .sa-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 520px) { .sa-kpis { grid-template-columns: 1fr; } .sa-h1 { font-size: 1.45rem; } }

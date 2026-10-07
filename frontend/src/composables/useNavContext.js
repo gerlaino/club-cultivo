@@ -105,7 +105,7 @@ export const NAV_GROUPS = [
     key: 'tareas', label: 'Tareas', to: '/tareas',
     tabs: [
       { to: '/tareas', label: 'Tareas', badge: 'tareas' },
-      { to: '/plan-trabajo', label: 'Plan de trabajo' },
+      { to: '/plan-trabajo', label: 'Planes' },
     ],
   },
   {

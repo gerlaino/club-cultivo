@@ -177,7 +177,8 @@ describe('Editar dispensación — el valor del envío', () => {
     await flushPromises()
 
     const body = updateDispensacion.mock.calls[0][1]
-    expect(body.aporte_socio_ars).toBe(1000)
+    expect(body.aporte_socio_ars).toBeUndefined()            // el total lo arma el backend (7-oct)
+    expect(w.vm.form.aporte_socio_ars).toBe(1000)            // los productos, sin el envío
     expect(body.costo_envio_ars).toBe('500.00')
     expect(w.text()).toContain('Total con envío')
   })

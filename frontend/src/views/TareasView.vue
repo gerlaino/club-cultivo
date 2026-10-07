@@ -15,30 +15,6 @@
       </div>
     </div>
 
-    <!-- KPIs -->
-    <div class="tv__kpis">
-      <button type="button" class="tv__kpi tv__kpi--link" @click="irAPendientes" title="Ver el listado de pendientes">
-        <div class="tv__kpi-val" style="color:#64748b">{{ stats.pendientes || 0 }}</div>
-        <div class="tv__kpi-label">Pendientes <i class="bi bi-arrow-down-short"></i></div>
-        <div class="tv__kpi-bar" style="background:#64748b"></div>
-      </button>
-      <div class="tv__kpi">
-        <div class="tv__kpi-val" style="color:#d97706">{{ stats.en_progreso || 0 }}</div>
-        <div class="tv__kpi-label">En progreso</div>
-        <div class="tv__kpi-bar" style="background:#d97706"></div>
-      </div>
-      <div class="tv__kpi">
-        <div class="tv__kpi-val" style="color:#15803d">{{ stats.completadas_hoy || 0 }}</div>
-        <div class="tv__kpi-label">Completadas hoy</div>
-        <div class="tv__kpi-bar" style="background:#15803d"></div>
-      </div>
-      <div class="tv__kpi" :class="{ 'tv__kpi--alert': stats.vencidas > 0 }">
-        <div class="tv__kpi-val" :style="{ color: stats.vencidas > 0 ? '#dc2626' : '#94a3b8' }">{{ stats.vencidas || 0 }}</div>
-        <div class="tv__kpi-label">Vencidas</div>
-        <div class="tv__kpi-bar" :style="{ background: stats.vencidas > 0 ? '#dc2626' : '#e2e8f0' }"></div>
-      </div>
-    </div>
-
     <!-- Loading -->
     <div v-if="loading" class="tv__loading">
       <DsSpinner />
@@ -46,74 +22,10 @@
 
     <template v-else>
 
-      <!-- Vista Semana -->
-      <div class="tv__semana">
-        <div class="sem__nav">
-          <button class="sem__nav-btn" @click="semAnterior">
-            <i class="bi bi-chevron-left"></i>
-          </button>
-          <span class="sem__nav-label">{{ labelSemana }}</span>
-          <button class="sem__nav-btn" @click="semSiguiente">
-            <i class="bi bi-chevron-right"></i>
-          </button>
-          <button class="sem__hoy-btn" @click="irHoy">Hoy</button>
-        </div>
-
-        <div v-if="loadingSem" class="sem__loading">
-          <DsSpinner :size="40" />
-        </div>
-
-        <div v-else class="sem__grid">
-          <div
-            v-for="dia in semana.dias"
-            :key="dia.fecha"
-            class="sem__col"
-            :class="{ 'sem__col--hoy': esDiaHoy(dia.fecha), 'sem__col--pasado': esPasado(dia.fecha) }"
-          >
-            <div class="sem__col-header">
-              <div class="sem__dia-nombre">{{ dia.dia_semana?.slice(0, 3) }}</div>
-              <div class="sem__dia-num" :class="{ 'sem__dia-num--hoy': esDiaHoy(dia.fecha) }">
-                {{ new Date(dia.fecha + 'T00:00:00').getDate() }}
-              </div>
-              <div class="sem__col-count" v-if="dia.tareas.length">{{ dia.tareas.length }}</div>
-            </div>
-            <div class="sem__tareas">
-              <div
-                v-for="t in dia.tareas"
-                :key="t.id"
-                class="sem__tarea"
-                :class="[
-                  'sem__tarea--' + t.prioridad,
-                  ['completada', 'no_realizada'].includes(t.estado) && 'sem__tarea--done',
-                  t.origen_plan_id && 'sem__tarea--plan',
-                ]"
-                @click="abrirTarea(t)"
-              >
-                <span class="sem__tarea-emoji">{{ TIPO_EMOJI[t.tipo] || '📋' }}</span>
-                <span class="sem__tarea-titulo">{{ t.titulo }}</span>
-                <span
-                  v-if="t.origen_plan_id"
-                  class="sem__plan-badge"
-                  :title="t.origen_plan?.titulo ? `Plan: ${t.origen_plan.titulo}` : 'Del plan de trabajo'"
-                >Plan</span>
-                <span v-if="t.parent_tarea_id || t.recurrente" class="sem__recurrente" title="Tarea recurrente">🔁</span>
-                <!-- En uso personal es siempre él: la inicial no dice nada. -->
-                <span v-if="t.asignada_a && !esPersonal" class="sem__asig" :title="t.asignada_a.nombre">
-                  {{ t.asignada_a.nombre.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase() }}
-                </span>
-              </div>
-              <button class="sem__add" @click="nuevaTareaEnDia(dia.fecha)" title="Nueva tarea">
-                <i class="bi bi-plus"></i>
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
       <!-- Pendientes: lo accionable de hoy (vencidas + hoy + sin fecha) -->
       <section ref="pendientesEl" class="pend" :class="{ 'pend--flash': flashPendientes }">
         <div class="pend__head">
-          <h2 class="pend__title">Pendientes</h2>
+          <h2 class="pend__title">Para hoy</h2>
           <span class="pend__count">{{ pendientesActivas.length }}</span>
           <span v-if="hayTruncadas" class="pend__trunc">
             mostrando {{ pendientesActivas.length }} de {{ stats.pendientes }}
@@ -181,24 +93,86 @@
               <button
                 class="pend__nodone"
                 :disabled="enCurso.has(t.id)"
-                title="No se hizo"
-                aria-label="Marcar que no se hizo"
+                :aria-label="`Marcar que no se hizo: ${t.titulo}`"
                 @click="noSeHizoUna(t)"
-              >
-                <i class="bi bi-x-lg"></i>
-              </button>
+              >No se hizo</button>
               <button
                 class="pend__done"
                 :disabled="enCurso.has(t.id)"
-                title="Marcar como hecha"
+                :aria-label="`Marcar como hecha: ${t.titulo}`"
                 @click="completarUna(t)"
               >
-                <i class="bi" :class="enCurso.has(t.id) ? 'bi-hourglass' : 'bi-check-lg'"></i>
+                <i v-if="enCurso.has(t.id)" class="bi bi-hourglass"></i><template v-else>Hecho</template>
               </button>
             </div>
           </div>
         </div>
       </section>
+
+      <!-- Esta semana (7-oct-2026: va después de lo de hoy, que es lo que se viene a hacer). -->
+      <h2 class="tv__seccion-tit">Esta semana</h2>
+      <div class="tv__semana">
+        <div class="sem__nav">
+          <button class="sem__nav-btn" @click="semAnterior">
+            <i class="bi bi-chevron-left"></i>
+          </button>
+          <span class="sem__nav-label">{{ labelSemana }}</span>
+          <button class="sem__nav-btn" @click="semSiguiente">
+            <i class="bi bi-chevron-right"></i>
+          </button>
+          <button class="sem__hoy-btn" @click="irHoy">Hoy</button>
+        </div>
+
+        <div v-if="loadingSem" class="sem__loading">
+          <DsSpinner :size="40" />
+        </div>
+
+        <div v-else class="sem__grid">
+          <div
+            v-for="dia in semana.dias"
+            :key="dia.fecha"
+            class="sem__col"
+            :class="{ 'sem__col--hoy': esDiaHoy(dia.fecha), 'sem__col--pasado': esPasado(dia.fecha) }"
+          >
+            <div class="sem__col-header">
+              <div class="sem__dia-nombre">{{ dia.dia_semana?.slice(0, 3) }}</div>
+              <div class="sem__dia-num" :class="{ 'sem__dia-num--hoy': esDiaHoy(dia.fecha) }">
+                {{ new Date(dia.fecha + 'T00:00:00').getDate() }}
+              </div>
+              <div class="sem__col-count" v-if="dia.tareas.length">{{ dia.tareas.length }}</div>
+            </div>
+            <div class="sem__tareas">
+              <div
+                v-for="t in dia.tareas"
+                :key="t.id"
+                class="sem__tarea"
+                :class="[
+                  'sem__tarea--' + t.prioridad,
+                  ['completada', 'no_realizada'].includes(t.estado) && 'sem__tarea--done',
+                  t.origen_plan_id && 'sem__tarea--plan',
+                ]"
+                @click="abrirTarea(t)"
+              >
+                <span class="sem__tarea-emoji">{{ TIPO_EMOJI[t.tipo] || '📋' }}</span>
+                <span class="sem__tarea-titulo">{{ t.titulo }}</span>
+                <span
+                  v-if="t.origen_plan_id"
+                  class="sem__plan-badge"
+                  :title="t.origen_plan?.titulo ? `Plan: ${t.origen_plan.titulo}` : 'Del plan de trabajo'"
+                >Plan</span>
+                <span v-if="t.parent_tarea_id || t.recurrente" class="sem__recurrente" title="Tarea recurrente">🔁</span>
+                <!-- En uso personal es siempre él: la inicial no dice nada. -->
+                <span v-if="t.asignada_a && !esPersonal" class="sem__asig" :title="t.asignada_a.nombre">
+                  {{ t.asignada_a.nombre.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase() }}
+                </span>
+              </div>
+              <button class="sem__add" @click="nuevaTareaEnDia(dia.fecha)" title="Nueva tarea">
+                <i class="bi bi-plus"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
     </template>
 
@@ -581,11 +555,6 @@ async function completarSeleccionadas() {
   }
 }
 
-function irAPendientes() {
-  pendientesEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  flashPendientes.value = true
-  setTimeout(() => { flashPendientes.value = false }, 1200)
-}
 
 // La selección no debe sobrevivir a tareas que ya no están en el listado
 watch(pendientesActivas, (lista) => {
@@ -671,7 +640,7 @@ function mostrarToast(mensaje, tipo = 'success') {
 </script>
 
 <style scoped>
-.tv { padding: 2rem 1.75rem 3rem; max-width: 1280px; margin: 0 auto; font-family: system-ui, -apple-system, sans-serif; color: var(--c-slate-900); }
+.tv { padding: 2rem 1.75rem 3rem; max-width: 1280px; margin: 0 auto; color: var(--c-slate-900); }
 @media (max-width: 768px) { .tv { padding: 1.25rem 1rem 2rem; } }
 
 /* Header */
@@ -735,11 +704,13 @@ function mostrarToast(mensaje, tipo = 'success') {
 .pend__chip--plan     { background: #7c3aed; color: #fff; }
 .pend__asig { width: 20px; height: 20px; border-radius: 50%; background: #e0e7ff; color: #4338ca; font-size: .6rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; margin-left: auto; }
 .pend__chev { color: var(--c-slate-300); font-size: .85rem; flex-shrink: 0; }
-.pend__done { flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid #d1d5db; background: #fff; color: #9ca3af; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .15s; }
-.pend__done:hover:not(:disabled) { border-color: #1b5e20; background: #1b5e20; color: #fff; }
+.pend__done { flex-shrink: 0; height: 40px; padding: 0 1rem; border-radius: 10px; border: 0; background: var(--c-leaf-800); color: #fff; font-weight: 700; font-size: .85rem; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: background .15s; }
+.pend__done:hover:not(:disabled) { background: var(--c-leaf-900); }
 .pend__done:disabled { cursor: default; }
-.pend__nodone { flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; border: 1.5px solid var(--c-slate-200); background: transparent; color: var(--c-slate-400); display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .15s; font-size: .8rem; }
-.pend__nodone:hover:not(:disabled) { border-color: var(--c-slate-500); color: var(--c-slate-700); }
+.pend__nodone { flex-shrink: 0; height: 40px; padding: 0 .85rem; border-radius: 10px; border: 1px solid var(--c-slate-300); background: #fff; color: var(--c-slate-700); font-weight: 600; font-size: .85rem; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: all .15s; }
+.pend__nodone:hover:not(:disabled) { background: var(--c-slate-50); }
+.tv__seccion-tit { font-size: .9rem; font-weight: 700; margin: 1.5rem 0 .6rem; color: var(--c-slate-900); }
+@media (max-width: 560px) { .pend__nodone { padding: 0 .55rem; font-size: .78rem; } .pend__done { padding: 0 .7rem; } }
 .pend__nodone:disabled { cursor: default; }
 @media (max-width: 640px) {
   .pend__chips { display: none; }

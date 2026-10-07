@@ -21,7 +21,9 @@ module Infra
       @cola       = Cola.call
       @backup     = Backups::Ultimo.call
       @servidores = Servidores.call
-      avisos = (avisos_internos + avisos_backup + avisos_cola + avisos_servidores + avisos_monitoreo)
+      @lentitud   = Lentitud.call
+      avisos = (avisos_internos + avisos_backup + avisos_cola + avisos_servidores + avisos_monitoreo +
+                avisos_lentitud + avisos_correo)
                .sort_by { |a| ORDEN[a[:nivel]] }
       general = avisos.any? { |a| a[:nivel] == 'mal' } ? 'mal' : avisos.any? { |a| a[:nivel] == 'atencion' } ? 'atencion' : 'ok'
 
@@ -36,7 +38,15 @@ module Infra
         servidores:     @servidores,
         organizaciones: Organizaciones.call,
         monitoreo:      monitoreo,
+        lentitud:       @lentitud,
+        preguntas:      preguntas,
       }
+    end
+
+    # LAS CUATRO PREGUNTAS (7-oct-2026): lo que quiere saber alguien que no programa. Cada una con
+    # un semáforo, una frase, y —si no está bien— qué significa y qué hacer. Lo técnico queda abajo.
+    def preguntas
+      [pregunta_entra, pregunta_rapida, pregunta_copias, pregunta_avisos]
     end
 
     private
@@ -142,6 +152,110 @@ module Infra
       a = []
       a << aviso('info', 'Sentry no está prendido: no se miden los tiempos ni los errores de producción.', 'Cargar SENTRY_DSN (docs/INFRA.md, paso 1).') unless monitoreo[:sentry]
       a
+    end
+
+    def pregunta(clave, titulo, estado, etiqueta, frase, significa: nil, hacer: nil)
+      { clave: clave, titulo: titulo, estado: estado, etiqueta: etiqueta, frase: frase,
+        significa: significa, hacer: hacer }
+    end
+
+    def pregunta_entra
+      base = @chequeos[:base][:estado]
+      hoy  = User.where('visto_at >= ?', Time.current.beginning_of_day).where.not(role: 'super_admin')
+      gente = hoy.count
+      orgs  = hoy.where.not(club_id: nil).distinct.count(:club_id)
+      if base == 'mal'
+        pregunta('entra', '¿Puede entrar la gente?', 'mal', 'No',
+                 'La base de datos no responde: nadie puede trabajar.',
+                 significa: 'La app está caída para todos.', hacer: 'Render → la base de datos. Ver docs/INFRA.md, «Se cayó la app».')
+      else
+        pregunta('entra', '¿Puede entrar la gente?', 'ok', 'Sí',
+                 "La app responde. Hoy entraron #{gente} #{gente == 1 ? 'persona' : 'personas'} de #{orgs} #{orgs == 1 ? 'organización' : 'organizaciones'}.")
+      end
+    end
+
+    def pregunta_rapida
+      l = @lentitud
+      peor = l[:lentas]&.first
+      case l[:estado]
+      when 'mal', 'atencion'
+        pregunta('rapida', '¿Está rápida?', l[:estado], 'Hay algo lento',
+                 "«#{peor[:que]}» tarda #{segundos(peor[:ms])} en #{peor[:donde]} (lo normal es menos de medio segundo).",
+                 significa: 'La gente espera al abrir esa pantalla; si sigue así, se nota en el mostrador.',
+                 hacer: 'Avisale al equipo técnico con el renglón de «Lo más lento de hoy».')
+      when 'desconocido'
+        pregunta('rapida', '¿Está rápida?', 'desconocido', 'Sin datos', 'Todavía no hay tiempos medidos.')
+      else
+        frase = l[:general_ms] ? "Casi todo abre en #{segundos(l[:general_ms])} o menos." : 'Hoy todavía no hubo movimiento para medir.'
+        pregunta('rapida', '¿Está rápida?', 'ok', 'Sí', frase)
+      end
+    end
+
+    def pregunta_copias
+      b = @backup
+      if !b[:disponible]
+        pregunta('copias', '¿Están guardadas las copias?', 'atencion', 'No se sabe',
+                 'No se pudo mirar dónde se guardan las copias.', hacer: 'Revisar las variables del bucket (docs/INFRA.md, Backups).')
+      elsif b[:estado] == 'mal'
+        pregunta('copias', '¿Están guardadas las copias?', 'mal', 'No',
+                 b[:ultimo] ? "Hace #{b[:horas_desde].round} horas que no se hace una copia de los datos." : 'No hay ninguna copia de los datos.',
+                 significa: 'Si se pierde la base, se pierde lo cargado desde la última copia.',
+                 hacer: 'Render → db-backup-diario → «Trigger Run».')
+      elsif b[:estado] == 'atencion'
+        pregunta('copias', '¿Están guardadas las copias?', 'atencion', 'Atrasada',
+                 "La copia de hoy no corrió (la última es de hace #{b[:horas_desde].round} horas).", hacer: 'Render → db-backup-diario → Logs.')
+      else
+        v = b[:verificacion]
+        probada = v && v['ok'] ? ' y se probó que se puede abrir' : ''
+        pregunta('copias', '¿Están guardadas las copias?', 'ok', 'Sí',
+                 "La última copia de todos los datos es de hace #{b[:horas_desde].to_f.round} horas#{probada}.")
+      end
+    end
+
+    def pregunta_avisos
+      push = ENV['VAPID_PUBLIC_KEY'].present? && ENV['VAPID_PRIVATE_KEY'].present?
+      worker_ok = @chequeos[:worker][:estado] != 'mal'
+      if !worker_ok
+        pregunta('avisos', '¿Salen los mails y los avisos?', 'mal', 'No',
+                 'Los trabajos en segundo plano no corren: no sale ningún aviso ni mail.',
+                 hacer: 'Render → club-cultivo-worker → Logs.')
+      elsif !correo_configurado?
+        pregunta('avisos', '¿Salen los mails y los avisos?', 'mal', 'Los mails no',
+                 "#{push ? 'Los avisos al teléfono salen. ' : ''}Los mails no salen: falta cargar la casilla de correo en el servidor.",
+                 significa: '«Olvidé mi contraseña», el alta por la web y los mails a pacientes no llegan.',
+                 hacer: 'Cargar SMTP_HOST, SMTP_USER, SMTP_PASS, MAIL_FROM y APP_HOST en Render (web y worker).')
+      elsif !push
+        pregunta('avisos', '¿Salen los mails y los avisos?', 'atencion', 'Los avisos no',
+                 'Los mails salen; los avisos al teléfono no (faltan las llaves VAPID).', hacer: 'Cargar VAPID_PUBLIC_KEY y VAPID_PRIVATE_KEY.')
+      else
+        pregunta('avisos', '¿Salen los mails y los avisos?', 'ok', 'Sí', 'Los mails y los avisos al teléfono están configurados y el worker corre.')
+      end
+    end
+
+    def correo_configurado?
+      %w[SMTP_HOST SMTP_USER SMTP_PASS APP_HOST].all? { |k| ENV[k].present? }
+    end
+
+    def avisos_lentitud
+      l = @lentitud
+      return [] unless %w[mal atencion].include?(l[:estado])
+
+      peor = l[:lentas].first
+      [aviso(l[:estado], "«#{peor[:que]}» tarda #{segundos(peor[:ms])} en #{peor[:donde]}.",
+             'Avisar al equipo técnico con el renglón de «Lo más lento de hoy».')]
+    end
+
+    def avisos_correo
+      return [] if correo_configurado? || !Rails.env.production?
+
+      [aviso('mal', 'Los mails no salen: falta cargar la casilla de correo en el servidor.',
+             'Cargar SMTP_HOST, SMTP_USER, SMTP_PASS, MAIL_FROM y APP_HOST en Render (web y worker).')]
+    end
+
+    def segundos(ms)
+      return '—' if ms.nil?
+
+      ms < 1000 ? "#{ms} ms" : "#{(ms / 1000.0).round(1).to_s.tr('.', ',')} s"
     end
 
     def monitoreo

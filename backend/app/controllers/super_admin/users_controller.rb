@@ -96,11 +96,16 @@ class SuperAdmin::UsersController < SuperAdmin::BaseController
     }
   end
 
+  # Una baja, no un borrado: la historia de la persona queda (`Acceso::DarDeBaja`). Antes
+  # devolvía 204 aunque fallara —y fallaba siempre, sin organización fijada—.
   def destroy
     user = User.find(params[:id])
     return render json: { error: 'No podés eliminar un super_admin' }, status: :forbidden if user.super_admin?
-    user.destroy
+
+    Acceso::DarDeBaja.call(user, por: current_user)
     head :no_content
+  rescue Acceso::DarDeBaja::Error => e
+    render json: { error: e.message }, status: :unprocessable_entity
   end
 
   private
@@ -133,6 +138,8 @@ class SuperAdmin::UsersController < SuperAdmin::BaseController
       club_id:    u.club_id,
       club_name:  u.club&.name,
       created_at: u.created_at,
+      # Cuándo entró por última vez: en la lista se lee «hoy», «hace 3 días», «nunca».
+      visto_at:   u.visto_at,
     }
   end
 end

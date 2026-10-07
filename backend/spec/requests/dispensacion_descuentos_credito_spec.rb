@@ -78,10 +78,12 @@ RSpec.describe 'Dispensación — descuentos y crédito por medio de pago', type
     end
   end
 
-  context 'override del aporte' do
-    it 'admin puede pisar el total a mano' do
+  # El total NO se tipea (7-oct-2026): es la suma menos los descuentos. Antes administración
+  # podía pisarlo; ahora para cobrar menos hay descuento en % o en pesos.
+  context 'el total no se pisa' do
+    it 'tampoco el admin: un total escrito a mano se ignora' do
       dispensar(medio_pago: 'efectivo', aporte_socio_ars: 1234, user: admin)
-      expect(Dispensacion.last.aporte_socio_ars.to_f).to eq(1234.0)
+      expect(Dispensacion.last.aporte_socio_ars.to_f).to eq(9000.0)
     end
 
     it 'dispensador NO puede pisar el total (server recalcula)' do

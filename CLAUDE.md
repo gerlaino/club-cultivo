@@ -135,7 +135,15 @@ créditos `IaRecarga`). Detalle en `docs/REGLAS_Y_DECISIONES.md` («El modelo co
 - **Seguridad**: no hay contraseña por defecto; `render file:` no existe en modo API; `/me` no se
   cachea; el helper de specs prefija `/api` a todo.
 
-## Dónde retomar (6-oct-2026)
+## Dónde retomar (7-oct-2026)
+
+**Bloques (eh) y (ei)**: bajas de usuario que andan (`Acceso::DarDeBaja`), el total de una dispensa
+no se tipea (descuento en % o en pesos, `descuento_dispensa_ars`) y el rediseño aprobado: dispensa
+en tres pasos con resumen fijo, super admin con barra lateral y **Estado de cuatro preguntas +
+«lo más lento de hoy»** (tabla `metricas_respuesta`), tareas «Para hoy» con Hecho/No se hizo,
+planes con calendario por semana. Detalle en `docs/CHANGELOG.md` (eh)–(ei).
+
+### Retomada anterior (6-oct-2026)
 
 **En producción hasta `beffe07a`**: página pública partida (autocultivo / proyectos / contacto, el
 consultorio como diferencial), bloque médico (el médico ve SÓLO sus pacientes vinculados, aviso y
@@ -146,8 +154,9 @@ imprimir etiqueta». Germán lo pushea fuera del horario de dispensario. Abierto
 Blanco (no correr `CORREGIR=1` hasta que Javi diga si fue descuento o deuda), SMTP + `APP_HOST` en
 Render (web y worker). Detalle en `docs/CHANGELOG.md` (eb)–(ed) y `docs/REGLAS_Y_DECISIONES.md`.
 
-**Regla que gobierna código nuevo (6-oct):** en una dispensa, el número que administración pisa es
-el PRECIO; lo que paga va en «Paga con». Toda edición de plata que no pueda rehacerse sin mover un
+**Regla que gobierna código nuevo (6-oct, ajustada el 7-oct):** en una dispensa el total NO se
+tipea: es la suma del carrito menos los descuentos (% o pesos, `descuento_dispensa_ars`); lo que
+paga va en «Paga con». Toda edición de plata que no pueda rehacerse sin mover un
 arqueo, un saldo a favor o una rendición se rechaza con el motivo («anulala y volvé a crearla»).
 
 ### Retomada anterior (29-sep-2026)

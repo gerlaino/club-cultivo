@@ -20,8 +20,8 @@
           </ul>
 
           <dl class="rdm__cuentas">
-            <template v-if="resumen.ajuste">
-              <dt>Ajuste manual</dt><dd>{{ resumen.ajuste < 0 ? '−' : '+' }} {{ fmt(Math.abs(resumen.ajuste)) }}</dd>
+            <template v-if="resumen.descuentoArs">
+              <dt>Descuento</dt><dd>− {{ fmt(resumen.descuentoArs) }}</dd>
             </template>
             <template v-if="resumen.envio !== null">
               <dt>Envío</dt><dd>{{ resumen.envio === 0 ? 'Bonificado' : fmt(resumen.envio) }}</dd>
@@ -62,7 +62,7 @@
 // porque el QR es su pasaporte).
 defineProps({
   abierto: { type: Boolean, default: false },
-  // { paciente, productos: [{ cantidad, forma, genetica, subtotal }], ajuste, envio (null = sin
+  // { paciente, productos: [{ cantidad, forma, genetica, subtotal }], descuentoArs, envio (null = sin
   //   envío), envioA, total, especial (texto en lugar del total: regalo / cambio),
   //   pagos: [{ label, monto, destacado }] }
   resumen: { type: Object, required: true },

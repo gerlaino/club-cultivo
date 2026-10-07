@@ -4,7 +4,7 @@ import AppDatePicker from '../../components/ui/AppDatePicker.vue'
 import { useRoute, useRouter } from 'vue-router'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { formatPrecio } from '../../lib/formatters.js'
-import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub, suspenderClub, reactivarClub, archivarClub, desarchivarClub, clonarClub, crearNotaClub, borrarNotaClub, getSuperAdminCatalogo, getHistorialClub, resetSuperAdminUserPassword } from '../../lib/api.js'
+import { getSuperAdminClub, cambiarPlanClub, crearUsuariosDefault, createSuperAdminUser, updateSuperAdminClub, eliminarClub, restaurarClub, suspenderClub, reactivarClub, archivarClub, desarchivarClub, clonarClub, crearNotaClub, borrarNotaClub, getSuperAdminCatalogo, getHistorialClub, resetSuperAdminUserPassword, deleteSuperAdminUser } from '../../lib/api.js'
 import { useConfirm } from '../../composables/useConfirm.js'
 import { useToast } from '../../composables/useToast.js'
 import SAModulos from './SAModulos.vue'
@@ -61,6 +61,31 @@ async function resetearPassword(u) {
     toast.error(e?.response?.data?.errors?.join(', ') || 'No se pudo restablecer la contraseña')
   } finally {
     reseteando.value = null
+  }
+}
+
+// Es una BAJA: la persona no entra más y su mail queda libre, pero lo que hizo sigue en la
+// historia (dispensas, cierres, rastro). Por eso no dice «se borra todo».
+const dandoDeBaja = ref(null)
+async function darDeBaja(u) {
+  const ok = await confirm({
+    title: `¿Dar de baja a ${u.nombre || u.email}?`,
+    message: 'No va a poder entrar más y su mail queda libre para volver a usarse. ' +
+             'Lo que hizo (dispensas, cierres, registros) queda en la historia.',
+    confirmText: 'Dar de baja',
+    variant: 'danger',
+  })
+  if (!ok) return
+
+  dandoDeBaja.value = u.id
+  try {
+    await deleteSuperAdminUser(u.id)
+    club.value.usuarios = club.value.usuarios.filter(x => x.id !== u.id)
+    toast.success(`${u.nombre || u.email} quedó dado de baja.`)
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo dar de baja')
+  } finally {
+    dandoDeBaja.value = null
   }
 }
 
@@ -871,6 +896,13 @@ onMounted(async () => {
               <DsSpinner v-if="reseteando === u.id" :size="12" />
               <KeyRound v-else :size="13" :stroke-width="1.75" />
             </button>
+            <button v-if="u.role !== 'super_admin'" class="scd__user-key scd__user-baja"
+                    :disabled="dandoDeBaja === u.id"
+                    :title="`Dar de baja a ${u.email}`" :aria-label="`Dar de baja a ${u.email}`"
+                    @click="darDeBaja(u)">
+              <DsSpinner v-if="dandoDeBaja === u.id" :size="12" />
+              <i v-else class="bi bi-person-x"></i>
+            </button>
           </div>
         </div>
       </div>
@@ -1115,7 +1147,7 @@ onMounted(async () => {
 </template>
 
 <style scoped>
-.scd { padding: 2rem 2.5rem 3rem; display: flex; flex-direction: column; gap: 1rem; }
+.scd { padding: 0; display: flex; flex-direction: column; gap: 1rem; }
 /* Loading */
 .scd__loading { display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 56px); }
 
@@ -1309,8 +1341,8 @@ onMounted(async () => {
 .scd__user-name  { font-size: .8rem; font-weight: 600; color: var(--c-slate-900); }
 .scd__user-email { font-size: .68rem; color: var(--c-slate-400); font-family: monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* Restablecer contraseña: discreto, pero SIEMPRE visible. No va escondido detrás del hover
-   como el de borrar — es lo que se viene a buscar cuando alguien no puede entrar. */
+/* Restablecer contraseña y dar de baja: discretos, pero SIEMPRE visibles. Nada detrás del
+   hover: en el teléfono no existe. */
 .scd__user-key {
   width: 28px; height: 28px; flex-shrink: 0;
   border: 1px solid var(--c-slate-200); border-radius: 7px;
@@ -1320,6 +1352,7 @@ onMounted(async () => {
 }
 .scd__user-key:hover:not(:disabled) { background: #fff7ed; color: #b45309; border-color: #fed7aa; }
 .scd__user-key:disabled { opacity: .5; cursor: not-allowed; }
+.scd__user-baja:hover:not(:disabled) { background: var(--c-rust-100); color: var(--c-rust-600); border-color: var(--c-rust-100); }
 
 /* La contraseña nueva. Se muestra una vez y hay que anotarla. */
 .scd__pass {

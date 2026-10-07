@@ -3,9 +3,11 @@ import { ref, computed, onMounted, watch } from 'vue'
 import DsSpinner from '../../design-system/components/Spinner.vue'
 import { listSuperAdminUsers, listSuperAdminClubs, createSuperAdminUser, deleteSuperAdminUser, resetSuperAdminUserPassword } from '../../lib/api.js'
 import { useConfirm } from '../../composables/useConfirm.js'
+import { useToast } from '../../composables/useToast.js'
 import { ROLES as ALL_ROLES, roleMeta } from '../../constants/roles.js'
 
 const { confirm } = useConfirm()
+const toast = useToast()
 
 const ROLES = ALL_ROLES.map(r => r.value)
 
@@ -34,6 +36,15 @@ const form = ref({ email: '', email_personal: '', first_name: '', last_name: '',
 // La contraseña del último usuario creado, para poder dictarla. El endpoint la devuelve en claro a
 // propósito: es temporal y Devise pide cambiarla al entrar.
 const passwordCreada = ref(null)
+
+// «hoy», «hace 3 días», «nunca»: la pregunta es si sigue entrando, no la fecha exacta.
+function haceVisto(iso) {
+  if (!iso) return 'nunca'
+  const dias = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
+  if (dias <= 0) return 'hoy'
+  if (dias === 1) return 'ayer'
+  return dias < 30 ? `hace ${dias} días` : `hace ${Math.floor(dias / 30)} ${Math.floor(dias / 30) === 1 ? 'mes' : 'meses'}`
+}
 
 function formatDate(d) {
   if (!d) return '—'
@@ -128,13 +139,24 @@ async function handleReset(u) {
   }
 }
 
+// Es una BAJA (la historia queda) y el error se dice: antes el `catch {}` vacío escondía que
+// desde el panel no andaba nunca.
 async function handleDelete(u) {
-  const ok = await confirm({ title: `¿Eliminar a ${u.email}?`, message: 'Esta acción no se puede deshacer.', confirmText: 'Eliminar' })
+  const ok = await confirm({
+    title: `¿Dar de baja a ${u.email}?`,
+    message: 'No va a poder entrar más y su mail queda libre para volver a usarse. ' +
+             'Lo que hizo (dispensas, cierres, registros) queda en la historia.',
+    confirmText: 'Dar de baja',
+    variant: 'danger',
+  })
   if (!ok) return
   try {
     await deleteSuperAdminUser(u.id)
     users.value = users.value.filter(x => x.id !== u.id)
-  } catch {}
+    toast.success(`${u.email} quedó dado de baja.`)
+  } catch (e) {
+    toast.error(e?.response?.data?.error || 'No se pudo dar de baja')
+  }
 }
 
 onMounted(cargar)
@@ -144,11 +166,11 @@ onMounted(cargar)
   <div class="sau">
 
     <div class="sau__header">
-      <div>
-        <div class="sau__eyebrow">Gestión global</div>
-        <h1 class="sau__title">Usuarios</h1>
+      <div class="sa-head__txt">
+        <div class="sa-sup">{{ users.length }} personas en los equipos</div>
+        <h1 class="sa-h1">Usuarios</h1>
       </div>
-      <button class="sau__btn-primary" @click="showCreate = true">
+      <button class="sa-btn sa-btn--primario" @click="showCreate = true">
         <i class="bi bi-person-plus"></i> Nuevo usuario
       </button>
     </div>
@@ -190,50 +212,39 @@ onMounted(cargar)
       <DsSpinner />
     </div>
 
-    <div v-else class="sau__list">
-      <div class="sau__list-header">
-        <span>Usuario</span>
-        <span>Club</span>
-        <span>Rol</span>
-        <span>Registrado</span>
-        <span></span>
-      </div>
-      <div v-for="u in visibles" :key="u.id" class="sau__row">
-        <div class="sau__user-cell">
-          <div class="sau__avatar">{{ (u.first_name?.[0] || u.email?.[0] || '?').toUpperCase() }}</div>
-          <div>
-            <div class="sau__nombre">{{ [u.first_name, u.last_name].filter(Boolean).join(' ') || '—' }}</div>
-            <div class="sau__email">{{ u.email }}</div>
-          </div>
-        </div>
-        <div class="sau__club">
-          <RouterLink :to="{ name: 'sa-club-detail', params: { id: u.club_id } }" class="sau__club-link" v-if="u.club_name">
-            {{ u.club_name }}
-          </RouterLink>
-          <span v-else class="sau__no-club">Sin club</span>
-        </div>
-        <div>
-          <span class="sau__role-badge" :style="{ background: roleMeta(u.role).bg, color: roleMeta(u.role).color }">
-            {{ roleMeta(u.role).label }}
-          </span>
-        </div>
-        <div class="sau__date">{{ formatDate(u.created_at) }}</div>
-        <div class="sau__actions">
-          <!-- SIEMPRE visible, al revés que el de borrar: es lo que se viene a buscar acá
-               cuando alguien no puede entrar. -->
-          <button class="sau__key-btn" :disabled="reseteando === u.id"
-                  :title="`Restablecer la contraseña de ${u.email}`" @click="handleReset(u)">
-            <DsSpinner v-if="reseteando === u.id" :size="12" />
-            <i v-else class="bi bi-key"></i>
-          </button>
-          <button class="sau__delete-btn" @click="handleDelete(u)" title="Eliminar">
-            <i class="bi bi-trash"></i>
-          </button>
-        </div>
-      </div>
+    <!-- Rediseño 7-oct-2026: tabla, y las dos acciones que se vienen a buscar acá con su nombre
+         escrito (antes eran dos íconos, y el de borrar sólo aparecía al pasar el mouse). -->
+    <div v-else-if="filtrados.length" class="sa-tabla-wrap">
+      <table class="sa-tabla">
+        <thead>
+          <tr><th>Persona</th><th>Organización</th><th>Rol</th><th>Entró</th><th class="sa-der">Acciones</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="u in visibles" :key="u.id">
+            <td>
+              <span class="sa-fuerte">{{ [u.first_name, u.last_name].filter(Boolean).join(' ') || '—' }}</span><br>
+              <span class="sa-tenue">{{ u.email }}</span>
+            </td>
+            <td>
+              <RouterLink v-if="u.club_name" :to="{ name: 'sa-club-detail', params: { id: u.club_id } }" class="sau__club-link">{{ u.club_name }}</RouterLink>
+              <span v-else class="sa-tenue">Sin organización</span>
+            </td>
+            <td><span class="sa-tag" :style="{ background: roleMeta(u.role).bg, color: roleMeta(u.role).color }">{{ roleMeta(u.role).label }}</span></td>
+            <td :title="u.visto_at ? formatDate(u.visto_at) : ''">{{ haceVisto(u.visto_at) }}</td>
+            <td class="sa-der">
+              <span class="sau__acciones">
+                <button class="sa-btn sa-btn--chico" :disabled="reseteando === u.id" @click="handleReset(u)">
+                  <DsSpinner v-if="reseteando === u.id" :size="12" /> Contraseña
+                </button>
+                <button class="sa-btn sa-btn--chico sa-btn--peligro" @click="handleDelete(u)">Dar de baja</button>
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
 
-    <div v-if="!loading && !filtrados.length" class="sau__vacio">
+    <div v-if="!loading && !filtrados.length" class="sa-vacio">
       No hay usuarios que coincidan con lo que buscaste.
     </div>
 
@@ -243,11 +254,11 @@ onMounted(cargar)
         de {{ filtrados.length }} usuario{{ filtrados.length !== 1 ? 's' : '' }}
       </span>
       <div v-if="totalPaginas > 1" class="sau__pager">
-        <button class="sau__pager-btn" :disabled="pagina === 1" @click="irA(pagina - 1)">
+        <button class="sau__pager-btn" :disabled="pagina === 1" aria-label="Página anterior" @click="irA(pagina - 1)">
           <i class="bi bi-chevron-left"></i>
         </button>
         <span class="sau__pager-pos">{{ pagina }} / {{ totalPaginas }}</span>
-        <button class="sau__pager-btn" :disabled="pagina === totalPaginas" @click="irA(pagina + 1)">
+        <button class="sau__pager-btn" :disabled="pagina === totalPaginas" aria-label="Página siguiente" @click="irA(pagina + 1)">
           <i class="bi bi-chevron-right"></i>
         </button>
       </div>
@@ -313,6 +324,7 @@ onMounted(cargar)
 </template>
 
 <style scoped>
+.sau__acciones { display: inline-flex; gap: .4rem; justify-content: flex-end; }
 .sau__pass {
   display: flex; align-items: center; gap: .6rem;
   background: var(--c-amber-100); color: var(--c-slate-900);
@@ -331,7 +343,7 @@ onMounted(cargar)
 }
 .sau__pass-x:hover { color: var(--c-slate-900); }
 
-.sau { padding: 2rem 2.5rem 3rem; }
+.sau { padding: 0; }
 .sau__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.75rem; }
 .sau__eyebrow { font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .1em; color: var(--c-slate-400); margin-bottom: .35rem; }
 .sau__title { font-size: 2rem; font-weight: 800; color: var(--c-slate-900); margin: 0; letter-spacing: -.04em; }
@@ -371,8 +383,7 @@ onMounted(cargar)
 }
 .sau__key-btn:hover:not(:disabled) { background: #fff7ed; color: #b45309; border-color: #fed7aa; }
 .sau__key-btn:disabled { opacity: .5; cursor: not-allowed; }
-.sau__delete-btn { width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--c-slate-200); background: var(--c-slate-50); color: var(--c-slate-400); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: .8rem; transition: all .15s; opacity: 0; }
-.sau__row:hover .sau__delete-btn { opacity: 1; }
+.sau__delete-btn { width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--c-slate-200); background: var(--c-slate-50); color: var(--c-slate-400); display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: .8rem; transition: all .15s; }
 .sau__delete-btn:hover { background: #fef2f2; color: #dc2626; border-color: #fecaca; }
 
 .sau__footer {

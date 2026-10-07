@@ -92,21 +92,14 @@ const gruposConPendientes = computed(() =>
 
 const sinActividad = computed(() => pulso.value?.sin_actividad || [])
 const adopcion     = computed(() => (pulso.value?.adopcion || []).filter(a => a.tienen > 0))
-const sidekiq      = computed(() => salud.value.sidekiq || {})
-const backup       = computed(() => salud.value.backup || {})
-const cron         = computed(() => salud.value.cron || [])
-const cronAtrasados = computed(() => cron.value.filter(c => c.atrasado))
 
-function fechaHora(iso) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
-}
 
 function fecha(f) {
   if (!f) return '—'
   return new Date(f + 'T00:00:00').toLocaleDateString('es-AR', { day: '2-digit', month: 'short' })
 }
 
+const hoyLargo = new Date().toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' })
 function irAlClub(id) { router.push({ name: 'sa-club-detail', params: { id } }) }
 
 onMounted(async () => {
@@ -124,15 +117,13 @@ onMounted(async () => {
 <template>
   <div class="sad">
 
-    <div class="sad__head">
-      <div>
-        <h1 class="sad__title">Panel</h1>
-        <p class="sad__sub" v-if="pulso">
-          {{ pulso.totales.clubes_operando }}
-          {{ pulso.totales.clubes_operando === 1 ? "organización" : "organizaciones" }} operando
-        </p>
+    <div class="sa-head sad__head">
+      <div class="sa-head__txt">
+        <div class="sa-sup">{{ hoyLargo }}<template v-if="pulso"> · {{ pulso.totales.clubes_operando }}
+          {{ pulso.totales.clubes_operando === 1 ? "organización" : "organizaciones" }} operando</template></div>
+        <h1 class="sa-h1">Cómo está el negocio</h1>
       </div>
-      <button class="sad__btn-primary" @click="router.push({ name: 'sa-club-nuevo' })">
+      <button class="sa-btn sa-btn--primario" @click="router.push({ name: 'sa-club-nuevo' })">
         <Plus :size="16" :stroke-width="2.5" /> Nueva organización
       </button>
     </div>
@@ -145,22 +136,26 @@ onMounted(async () => {
       <!-- 0 · La plata. Cuánto entra por mes, cuánto está vencido y sigue operando (hay que
            cobrarlo) y cuánto vence este mes. Hasta sep-2026 el panel no tenía un solo número
            en pesos: «se está perdiendo plata» era una frase. -->
-      <section class="sad__plata">
-        <div class="sad__kpi">
-          <span class="sad__kpi-n">{{ precio(plata.mrr || 0) }}</span>
-          <span class="sad__kpi-l">por mes · {{ plata.facturables || 0 }} {{ plata.facturables === 1 ? 'organización factura' : 'organizaciones facturan' }}</span>
+      <section class="sa-kpis sad__plata">
+        <div class="sa-kpi">
+          <span class="sa-kpi__l">Lo que entra por mes</span>
+          <span class="sa-kpi__n">{{ precio(plata.mrr || 0) }}</span>
+          <span class="sa-kpi__s">{{ plata.facturables || 0 }} {{ plata.facturables === 1 ? 'organización pagando' : 'organizaciones pagando' }}</span>
         </div>
-        <div class="sad__kpi" :class="{ 'sad__kpi--rojo': plata.vencido_ars > 0 }">
-          <span class="sad__kpi-n">{{ precio(plata.vencido_ars || 0) }}</span>
-          <span class="sad__kpi-l">vencido y operando · {{ plata.vencidos || 0 }}</span>
+        <div class="sa-kpi" :class="{ 'sa-kpi--rojo': plata.vencido_ars > 0 }">
+          <span class="sa-kpi__l">Vencido y operando</span>
+          <span class="sa-kpi__n">{{ precio(plata.vencido_ars || 0) }}</span>
+          <span class="sa-kpi__s">{{ plata.vencidos || 0 }} sin renovar: hay que cobrar</span>
         </div>
-        <div class="sad__kpi" :class="{ 'sad__kpi--ambar': plata.vence_este_mes_ars > 0 }">
-          <span class="sad__kpi-n">{{ precio(plata.vence_este_mes_ars || 0) }}</span>
-          <span class="sad__kpi-l">vence este mes · {{ plata.vencen_este_mes || 0 }}</span>
+        <div class="sa-kpi" :class="{ 'sa-kpi--ambar': plata.vence_este_mes_ars > 0 }">
+          <span class="sa-kpi__l">Vence este mes</span>
+          <span class="sa-kpi__n">{{ precio(plata.vence_este_mes_ars || 0) }}</span>
+          <span class="sa-kpi__s">{{ plata.vencen_este_mes || 0 }} {{ plata.vencen_este_mes === 1 ? 'organización' : 'organizaciones' }}</span>
         </div>
-        <div class="sad__kpi">
-          <span class="sad__kpi-n">{{ precio(plata.en_prueba_ars || 0) }}</span>
-          <span class="sad__kpi-l">en prueba · {{ (susc.trials || []).length }} a precio de lista</span>
+        <div class="sa-kpi">
+          <span class="sa-kpi__l">En prueba</span>
+          <span class="sa-kpi__n">{{ precio(plata.en_prueba_ars || 0) }}</span>
+          <span class="sa-kpi__s">{{ (susc.trials || []).length }} a precio de lista</span>
         </div>
       </section>
 
@@ -168,7 +163,7 @@ onMounted(async () => {
       <section class="sad__section">
         <div class="sad__section-head">
           <AlertTriangle :size="15" :stroke-width="2" />
-          <span class="sad__section-title">Necesita que hagas algo</span>
+          <span class="sad__section-title">Para mirar hoy</span>
           <span class="sad__section-count">{{ pendientes.length }}</span>
         </div>
 
@@ -251,48 +246,13 @@ onMounted(async () => {
 
       </div>
 
-      <!-- 4 · Salud de la plataforma -->
-      <section class="sad__section">
-        <div class="sad__section-head">
-          <Activity :size="15" :stroke-width="2" />
-          <span class="sad__section-title">Salud</span>
-          <!-- El resumen; servidores, recursos y backups en detalle, en Estado. -->
-          <RouterLink :to="{ name: 'sa-estado' }" class="sad__ver-estado">Ver el estado completo →</RouterLink>
-        </div>
-        <div class="sad__salud">
-          <div class="sad__salud-item" :class="{ 'sad__salud-item--mal': !sidekiq.disponible || sidekiq.workers === 0 }">
-            <span class="sad__salud-l">Trabajos en segundo plano</span>
-            <span v-if="sidekiq.disponible" class="sad__salud-v">
-              {{ sidekiq.workers }} worker{{ sidekiq.workers === 1 ? '' : 's' }} ·
-              {{ sidekiq.encolados }} en cola · {{ sidekiq.muertos }} muertos
-            </span>
-            <span v-else class="sad__salud-v">Sin respuesta de la cola</span>
-          </div>
-          <!-- Lo que se descubría entrando al bucket a mano. -->
-          <div class="sad__salud-item" :class="{ 'sad__salud-item--mal': backup.disponible && backup.atrasado }">
-            <span class="sad__salud-l">Último backup</span>
-            <span v-if="!backup.disponible" class="sad__salud-v">{{ backup.motivo || 'Sin datos' }}</span>
-            <span v-else-if="!backup.ultimo" class="sad__salud-v">{{ backup.motivo }}</span>
-            <span v-else class="sad__salud-v">
-              {{ fechaHora(backup.ultimo) }} · {{ backup.tamano_mb }} MB
-              <template v-if="backup.atrasado"> · hace más de dos días</template>
-            </span>
-          </div>
-          <!-- Un cron que no corre no avisa (79 días sin worker que nadie vio). -->
-          <div class="sad__salud-item" :class="{ 'sad__salud-item--mal': cronAtrasados.length }">
-            <span class="sad__salud-l">Tareas programadas</span>
-            <span v-if="!cron.length" class="sad__salud-v">Sin datos de la cola</span>
-            <span v-else-if="!cronAtrasados.length" class="sad__salud-v">{{ cron.length }} al día</span>
-            <span v-else class="sad__salud-v">
-              {{ cronAtrasados.length }} sin correr cuando tenían que:
-              {{ cronAtrasados.map(c => c.nombre).join(', ') }}
-            </span>
-          </div>
-          <!-- El IoT mudo NO va acá: ya está arriba, en la cola, con la organización y el botón
-               para resolverlo. Repetirlo como "3 sin señal" agregaba un número que no lleva a
-               ningún lado y hacía parecer que eran dos problemas distintos. -->
-        </div>
-      </section>
+      <!-- 4 · La plataforma: el detalle vive en Estado (7-oct-2026), acá sólo el acceso. Antes se
+           repetían acá la cola, el backup y los cron, con otra redacción que la de Estado. -->
+      <RouterLink :to="{ name: 'sa-estado' }" class="sa-card sad__estado-link">
+        <Activity :size="18" :stroke-width="2" />
+        <span><b>¿Anda todo?</b> Si la gente entra, si está rápida, si se guardan las copias y si salen los mails: en Estado.</span>
+        <span class="sad__ver-estado">Ver el estado →</span>
+      </RouterLink>
 
       <!-- 5 · Adopción: la diferencia entre tener y usar es el trabajo pendiente -->
       <section v-if="adopcion.length" class="sad__section">
@@ -318,7 +278,10 @@ onMounted(async () => {
 
 <style scoped>
 /* El ancho y el centrado los pone `.sa-main` del shell, para todas las pantallas por igual. */
-.sad { padding: 1.75rem 2rem 3rem; }
+.sad { display: flex; flex-direction: column; gap: 1.2rem; }
+.sad > * { margin-top: 0 !important; margin-bottom: 0 !important; }
+.sad__estado-link { display: flex; align-items: center; gap: .8rem; text-decoration: none; color: var(--c-slate-700); font-size: .9rem; flex-wrap: wrap; }
+.sad__estado-link:hover { border-color: var(--c-leaf-300); }
 
 .sad__head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1.5rem; }
 .sad__title { font-size: 1.6rem; font-weight: 800; color: var(--c-slate-900); margin: 0; letter-spacing: -.03em; }

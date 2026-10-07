@@ -15,6 +15,11 @@ Sidekiq.configure_server do |config|
         'class' => 'PurgarAdjuntosEntregaJob',
         'description' => 'Borra firma y foto de las entregas pasados 30 días (deja el rastro en la bitácora del envío)'
       },
+      'purgar_metricas_respuesta' => {
+        'cron'  => '35 4 * * *',
+        'class' => 'PurgarMetricasRespuestaJob',
+        'description' => 'Borra los tiempos de respuesta de más de 30 días (panel de Estado)'
+      },
       'materializar_tareas_de_planes' => {
         # Antes de que arranque el día: lo de la semana ya está en las listas al abrir la app.
         'cron'  => '50 4 * * *',

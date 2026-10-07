@@ -51,12 +51,6 @@
   "components/pacientes/SocioTabTimeline.vue": [
     "stl__body"
   ],
-  "components/plan-trabajo/ImportarCSVModal.vue": [
-    "icm__resultado-info"
-  ],
-  "components/plan-trabajo/NuevoPlanModal.vue": [
-    "npm__tipo-lbl"
-  ],
   "components/plants/RegistroPlantaModal.vue": [
     "rps__paso",
     "rps__paso--detalle"
@@ -261,12 +255,6 @@
   "views/superadmin/SAClubDetail.vue": [
     "scd__card--info",
     "scd__plan-opt--active"
-  ],
-  "views/superadmin/SAClubs.vue": [
-    "sac__plan-filter--active"
-  ],
-  "views/superadmin/SAUsuarios.vue": [
-    "sau__club"
   ],
   "views/supervisor/SupervisorDashboard.vue": [
     "svd__header-text"

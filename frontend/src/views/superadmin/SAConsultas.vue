@@ -137,7 +137,7 @@ onMounted(cargar)
 </template>
 
 <style scoped>
-.cq { padding: var(--sp-6) var(--sp-4); }
+.cq { padding: 0; }
 .cq__head { margin-bottom: var(--sp-5); }
 .cq__title { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-20); font-weight: 700; color: var(--c-ink-900); margin: 0; }
 .cq__sub { margin: var(--sp-1) 0 0; font-size: var(--fs-14); color: var(--c-slate-500); }

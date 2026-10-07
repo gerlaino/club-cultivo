@@ -138,11 +138,13 @@ describe('Panel del super admin', () => {
     expect(w.text()).toContain('hace 40 días')
   })
 
-  it('informa la salud de la cola de trabajos', async () => {
+  // La salud de la plataforma vive en Estado desde el 7-oct-2026: el panel lleva ahí, no la repite.
+  it('lleva al estado de la plataforma en vez de repetirlo', async () => {
     const w = mount(SADashboard, { global: { stubs } })
     await flushPromises()
 
-    expect(w.text()).toContain('1 worker')
+    expect(w.find('.sad__estado-link').exists()).toBe(true)
+    expect(w.text()).not.toContain('1 worker')
   })
 
   // Los agregados se fueron a Informes: en el panel no le sirven a nadie.

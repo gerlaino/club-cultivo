@@ -13,13 +13,15 @@ import DsSpinner from '../../design-system/components/Spinner.vue'
 import { getSuperAdminEstado } from '../../lib/api.js'
 import {
   CheckCircle2, AlertTriangle, XCircle, Info, PowerOff, RefreshCw, Server, Database,
-  HardDrive, Cpu, Clock, Archive, ExternalLink, Building2, Gauge, ListChecks,
+  HardDrive, Cpu, Clock, Archive, ExternalLink, Building2, ListChecks,
 } from 'lucide-vue-next'
 
 const datos    = ref(null)
 const cargando = ref(true)
 const error    = ref(null)
 const verOtros = ref(false)
+// Lo técnico arranca cerrado: quien no programa lee las cuatro preguntas y listo (7-oct-2026).
+const verDetalle = ref(false)
 let timer = null
 
 async function cargar () {
@@ -62,6 +64,24 @@ const cron        = computed(() => datos.value?.cola?.cron || [])
 const backup      = computed(() => datos.value?.backup || {})
 const orgs        = computed(() => datos.value?.organizaciones || {})
 const monitoreo   = computed(() => datos.value?.monitoreo || {})
+const preguntas   = computed(() => datos.value?.preguntas || [])
+const lentitud    = computed(() => datos.value?.lentitud || { lentas: [], por_hora: [] })
+
+// «3,1 s» o «420 ms»: como lo diría una persona.
+const tiempo = (ms) => ms == null ? '—' : ms < 1000 ? `${ms} ms` : `${(ms / 1000).toLocaleString('es-AR', { maximumFractionDigits: 1 })} s`
+const tonoMs = (ms) => ms == null ? 'ok' : ms >= (lentitud.value.lento_ms || 1500) ? 'mal' : ms >= (lentitud.value.normal_ms || 500) ? 'atencion' : 'ok'
+// La barra de cada fila, contra 4 segundos (más que eso ya está lleno de lento).
+const anchoMs = (ms) => `${Math.max(3, Math.min(100, ((ms || 0) / 4000) * 100))}%`
+const barrasHora = computed(() => {
+  const lista = lentitud.value.por_hora || []
+  const tope = Math.max(...lista.map(h => h.ms || 0), lentitud.value.lento_ms || 1500)
+  return lista.map(h => ({
+    h: h.ms ? Math.max(4, (h.ms / tope) * 100) : 2,
+    tono: tonoMs(h.ms),
+    titulo: `${hora(h.hora)}: ${h.pedidos} pedidos${h.ms ? `, la mayoría en ${tiempo(h.ms)}` : ''}`,
+  }))
+})
+const SEMAFORO = { ok: 'Todo funciona', atencion: 'Funciona, con cosas para mirar', mal: 'Algo no funciona' }
 
 // ── Formatos ──
 const num = (n, dec = 0) => Number(n ?? 0).toLocaleString('es-AR', { maximumFractionDigits: dec })
@@ -107,8 +127,8 @@ function barrasBackup (lista) {
   <div class="est">
     <header class="est__head">
       <div>
-        <h1 class="est__title"><Gauge :size="22" /> Estado de la plataforma</h1>
-        <p class="est__sub">Servidores, backups y trabajos en segundo plano. Se actualiza sola cada minuto.</p>
+        <h1 class="sa-h1">Estado de la plataforma</h1>
+        <p class="sa-ayuda">Se actualiza sola cada minuto<template v-if="datos"> · última vez a las {{ hora(datos.generado_at) }}</template>.</p>
       </div>
       <button class="est__btn" :disabled="cargando" @click="cargando = true; cargar()">
         <RefreshCw :size="15" :class="{ 'est__girando': cargando }" /> Actualizar
@@ -119,15 +139,77 @@ function barrasBackup (lista) {
     <div v-else-if="error" class="est__error"><XCircle :size="18" /> {{ error }}</div>
 
     <template v-else-if="datos">
-      <!-- ── La respuesta, en una frase ─────────────────────────────────── -->
-      <section class="est__hero" :class="`est__hero--${datos.estado}`">
-        <component :is="nivel(datos.estado).icono" :size="34" />
+      <!-- ── El semáforo: una frase, sin jerga ─────────────────────────── -->
+      <section class="est__semaforo" :class="`est__semaforo--${datos.estado}`" aria-live="polite">
+        <div class="est__luces" aria-hidden="true">
+          <span :class="{ 'is-on': datos.estado === 'mal' }"></span>
+          <span :class="{ 'is-on': datos.estado === 'atencion' }"></span>
+          <span :class="{ 'is-on': datos.estado === 'ok' }"></span>
+        </div>
         <div>
-          <div class="est__frase">{{ datos.frase }}</div>
-          <div class="est__actualizado">Actualizado a las {{ hora(datos.generado_at) }}</div>
+          <div class="est__semaforo-tit">{{ SEMAFORO[datos.estado] || datos.frase }}</div>
+          <div class="est__semaforo-txt">{{ datos.frase }}</div>
         </div>
       </section>
 
+      <!-- ── Las cuatro preguntas ───────────────────────────────────────── -->
+      <div class="est__preguntas">
+        <article v-for="p in preguntas" :key="p.clave" class="est__pregunta" :class="`est__pregunta--${p.estado}`">
+          <div class="est__pregunta-head">
+            <span class="sa-punto" :class="`sa-punto--${p.estado}`"></span>
+            <h2 class="est__pregunta-tit">{{ p.titulo }}</h2>
+            <span class="sa-tag" :class="`sa-tag--${p.estado === 'desconocido' ? 'info' : p.estado}`">{{ p.etiqueta }}</span>
+          </div>
+          <p class="est__pregunta-frase">{{ p.frase }}</p>
+          <p v-if="p.significa || p.hacer" class="est__pregunta-mas">
+            <span v-if="p.significa" class="est__pregunta-parte"><b>Qué significa:</b> {{ p.significa }}</span>
+            <span v-if="p.hacer" class="est__pregunta-parte"><b>Qué hacer:</b> {{ p.hacer }}</span>
+          </p>
+        </article>
+      </div>
+
+      <!-- ── Lo más lento de hoy ────────────────────────────────────────── -->
+      <section class="sa-card">
+        <div class="est__sec-head">
+          <h2 class="sa-h2">Lo más lento de hoy</h2>
+          <span class="sa-tenue">Normal: menos de {{ tiempo(lentitud.normal_ms) }} · Lento: más de {{ tiempo(lentitud.lento_ms) }}</span>
+        </div>
+        <p v-if="!lentitud.lentas?.length" class="sa-vacio">
+          {{ lentitud.estado === 'desconocido' ? 'Todavía no hay tiempos medidos.' : 'Hoy todavía no hay suficiente movimiento para decir qué es lento.' }}
+        </p>
+        <div v-else class="sa-tabla-wrap est__tabla-lenta">
+          <table class="sa-tabla">
+            <thead><tr><th>Qué se abre</th><th>Dónde</th><th>Cuánto tarda (la mayoría de las veces)</th><th class="sa-der">Veces hoy</th></tr></thead>
+            <tbody>
+              <tr v-for="f in lentitud.lentas" :key="`${f.endpoint}-${f.donde}`">
+                <td><span class="sa-fuerte">{{ f.que }}</span><br><span class="sa-tenue">{{ f.endpoint }}</span></td>
+                <td>{{ f.donde }}</td>
+                <td>
+                  <span class="est__lento">
+                    <span class="est__lento-barra"><span :class="`est__lento--${tonoMs(f.ms)}`" :style="{ width: anchoMs(f.ms) }"></span></span>
+                    <span class="sa-num est__lento-n" :class="`est__lento-n--${tonoMs(f.ms)}`">{{ tiempo(f.ms) }}</span>
+                  </span>
+                </td>
+                <td class="sa-num sa-der">{{ num(f.veces) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div v-if="barrasHora.length" class="est__horas">
+          <div class="est__horas-tit">Velocidad en las últimas 24 horas</div>
+          <div class="est__horas-barras" role="img" :aria-label="'Velocidad por hora, últimas 24 horas'">
+            <span v-for="(b, i) in barrasHora" :key="i" :class="`est__hb--${b.tono}`" :style="{ height: `${b.h}%` }" :title="b.titulo"></span>
+          </div>
+          <div class="est__spark-pie"><span>hace 24 h</span><span>ahora</span></div>
+        </div>
+      </section>
+
+      <!-- ── Lo técnico, guardado ───────────────────────────────────────── -->
+      <button class="est__detalle-btn" :aria-expanded="verDetalle" @click="verDetalle = !verDetalle">
+        <span><b>Detalle técnico</b> <span class="sa-tenue">— todos los avisos, servidores, base, backups, tareas programadas, uso por organización</span></span>
+        <span>{{ verDetalle ? '▲' : '▼' }}</span>
+      </button>
+      <template v-if="verDetalle">
       <!-- ── Qué pasa y qué hacer ───────────────────────────────────────── -->
       <section v-if="datos.avisos.length" class="est__sec">
         <h2 class="est__h2">Qué hay que mirar</h2>
@@ -321,12 +403,53 @@ function barrasBackup (lista) {
           </li>
         </ul>
       </section>
+      </template>
     </template>
   </div>
 </template>
 
 <style scoped>
-.est { padding: var(--sp-6); }
+.est { display: flex; flex-direction: column; gap: 1.2rem; }
+.est > * { margin-top: 0 !important; margin-bottom: 0 !important; }
+.est__semaforo { display: flex; gap: 1.1rem; align-items: center; border-radius: 16px; padding: 1.1rem 1.4rem; border: 1.5px solid #86EFAC; background: #F0FDF4; flex-wrap: wrap; }
+.est__semaforo--atencion { border-color: #FCD34D; background: #FFFBEB; }
+.est__semaforo--mal { border-color: #FCA5A5; background: #FEF2F2; }
+.est__luces { display: flex; flex-direction: column; gap: 5px; background: #1f2937; border-radius: 12px; padding: 8px 7px; }
+.est__luces span { width: 15px; height: 15px; border-radius: 15px; background: #4b5563; }
+.est__luces span:nth-child(1).is-on { background: #DC2626; box-shadow: 0 0 10px #DC2626; }
+.est__luces span:nth-child(2).is-on { background: #F59E0B; box-shadow: 0 0 10px #F59E0B; }
+.est__luces span:nth-child(3).is-on { background: #16A34A; box-shadow: 0 0 10px #16A34A; }
+.est__semaforo-tit { font-size: 1.3rem; font-weight: 800; color: var(--c-slate-900); }
+.est__semaforo-txt { font-size: .92rem; color: var(--c-slate-700); margin-top: .15rem; }
+.est__preguntas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .9rem; }
+@media (max-width: 760px) { .est__preguntas { grid-template-columns: 1fr; } }
+.est__pregunta { background: #fff; border: 1px solid var(--c-slate-200); border-radius: 14px; padding: 1rem 1.15rem; display: flex; flex-direction: column; gap: .45rem; }
+.est__pregunta--atencion { border-color: #FCD34D; }
+.est__pregunta--mal { border-color: #FCA5A5; }
+.est__pregunta-head { display: flex; align-items: center; gap: .6rem; }
+.est__pregunta-tit { margin: 0; flex: 1; font-size: 1rem; font-weight: 700; color: var(--c-slate-900); }
+.est__pregunta-frase { margin: 0; font-size: .9rem; color: var(--c-slate-700); line-height: 1.5; }
+.est__pregunta-mas { margin: 0; font-size: .82rem; color: var(--c-slate-500); line-height: 1.5; }
+.est__pregunta-mas b { color: var(--c-slate-700); }
+.est__pregunta-parte { display: block; }
+.est__tabla-lenta { margin-top: .8rem; border: 0; }
+.est__lento { display: flex; align-items: center; gap: .6rem; min-width: 200px; }
+.est__lento-barra { flex: 1; height: 8px; background: var(--c-slate-100); border-radius: 8px; }
+.est__lento-barra > span { display: block; height: 8px; border-radius: 8px; }
+.est__lento--ok { background: var(--c-leaf-500); }
+.est__lento--atencion { background: #F59E0B; }
+.est__lento--mal { background: #DC2626; }
+.est__lento-n { font-weight: 700; min-width: 54px; text-align: right; }
+.est__lento-n--mal { color: #991B1B; }
+.est__lento-n--atencion { color: #92400E; }
+.est__horas { margin-top: 1rem; }
+.est__horas-tit { font-size: .82rem; font-weight: 600; color: var(--c-slate-700); margin-bottom: .4rem; }
+.est__horas-barras { display: flex; align-items: flex-end; gap: 3px; height: 72px; border-bottom: 1px solid var(--c-slate-200); }
+.est__horas-barras span { flex: 1; border-radius: 3px 3px 0 0; }
+.est__hb--ok { background: var(--c-leaf-300); }
+.est__hb--atencion { background: #F59E0B; }
+.est__hb--mal { background: #DC2626; }
+.est__detalle-btn { display: flex; justify-content: space-between; align-items: center; gap: 1rem; width: 100%; text-align: left; background: #fff; border: 1px solid var(--c-slate-200); border-radius: 14px; padding: .9rem 1.2rem; cursor: pointer; font-size: .92rem; color: var(--c-slate-900); }
 .est__head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--sp-4); flex-wrap: wrap; margin-bottom: var(--sp-5); }
 .est__title { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-20); font-weight: 700; color: var(--c-ink-900); margin: 0; }
 .est__sub { margin: var(--sp-1) 0 0; font-size: var(--fs-14); color: var(--c-slate-500); }
