@@ -141,7 +141,9 @@ créditos `IaRecarga`). Detalle en `docs/REGLAS_Y_DECISIONES.md` («El modelo co
 no se tipea (descuento en % o en pesos, `descuento_dispensa_ars`) y el rediseño aprobado: dispensa
 en tres pasos con resumen fijo, super admin con barra lateral y **Estado de cuatro preguntas +
 «lo más lento de hoy»** (tabla `metricas_respuesta`), tareas «Para hoy» con Hecho/No se hizo,
-planes con calendario por semana. Detalle en `docs/CHANGELOG.md` (eh)–(ei).
+planes con calendario por semana. Después, (ej): correcciones de la prueba en prod (descuento falso en
+la lista, eliminar tareas, stock bajo por total, informe de stock que cierra). Detalle en
+`docs/CHANGELOG.md` (eh)–(ej).
 
 ### Retomada anterior (6-oct-2026)
 

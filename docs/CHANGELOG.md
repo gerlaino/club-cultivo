@@ -1,5 +1,19 @@
 # Changelog
 
+## Octubre 2026 (ej) — Correcciones de la prueba en producción (7-oct, noche)
+
+- **Lista de dispensas**: ya no inventa un descuento comparando lo cobrado con el precio de HOY del
+  primer frasco (el «-13%» de Frutal K a $10.500/$12.000). Sólo lo cargado (`lib/dispensaDescuento.js`).
+- **Resumen de la dispensa**: la genética debajo de cada producto y la fecha editable (administración).
+- **Tareas**: se eliminan desde el detalle y la hoja del teléfono (`useEliminarTarea`, reglas del
+  backend: admin/supervisor/cultivador; una hecha, sólo admin) y se puede «Cortar la serie».
+- **Portada pública**: fuera la franja de precios; la portada llega hasta el pie.
+- **Stock bajo**: el total de flor de la sede contra el umbral (la regla de `StockBajoJob`), no
+  cuántos frascos tienen poco (`lib/stockFlor.js`); el tablero de admin usa la alerta del backend.
+- **Informe de stock**: cada fila cierra (Había + Ingresó − salidas ± Ajustes = Quedaba al final del
+  período), «no cierra» si un stock nacido en el período no cuadra, ajustes uno por uno; la descarga
+  suma Había, Ajustes y Quedaba.
+
 ## Octubre 2026 (ei) — Rediseño: la dispensa en tres pasos, super admin con Estado para no técnicos, tareas y planes
 
 Prototipos aprobados por Germán el 7-oct (lienzo de diseño «Cultivo Espacial — rediseños»).
