@@ -352,16 +352,17 @@ class InformesController < ApplicationController
         {
           # Primera a propósito: es la que va al Excel.
           titulo: 'Stock por stock (en el período y hoy)',
-          headers: ['Stock', 'Producto', 'Genética', 'De dónde', 'Ingresó', 'Dispens.', 'Merma', 'Otras sal.', 'Queda', 'Libre'],
+          # Cada fila cierra: Había + Ingresó − Dispens. − Merma − Otras ± Ajustes = Quedaba (7-oct-2026).
+          headers: ['Stock', 'Producto', 'Genética', 'De dónde', 'Había', 'Ingresó', 'Dispens.', 'Merma', 'Otras sal.', 'Ajustes', 'Quedaba', 'Libre hoy'],
           rows: datos[:stocks].map { |f|
             [f[:numero] || "##{f[:id]}", prod.call(f), f[:genetica] || '—',
              "#{origen.call(f[:origen])} · #{f[:de_donde].presence || '—'}",
-             num.call(f[:ingreso]), num.call(f[:dispensado]), num.call(f[:merma]), num.call(f[:otras_salidas]),
-             num.call(f[:queda]), num.call(f[:libre])]
+             num.call(f[:habia]), num.call(f[:ingreso]), num.call(f[:dispensado]), num.call(f[:merma]),
+             num.call(f[:otras_salidas]), num.call(f[:ajustes]), num.call(f[:quedaba]), num.call(f[:libre])]
           },
-          aligns: { 4 => :right, 5 => :right, 6 => :right, 7 => :right, 8 => :right, 9 => :right },
+          aligns: (4..11).to_h { |i| [i, :right] },
           # La primera columna se lleva lo que sobra (ver `InformeDocument#anchos`): ~60 pt para el código.
-          col_min: { 1 => 52, 2 => 50, 3 => 72, 4 => 42, 5 => 44, 6 => 36, 7 => 42, 8 => 40, 9 => 40 },
+          col_min: { 1 => 46, 2 => 46, 3 => 60, 4 => 36, 5 => 38, 6 => 38, 7 => 32, 8 => 38, 9 => 36, 10 => 40, 11 => 38 },
           vacio: 'No hay stock con saldo ni con movimientos en el período elegido.',
         },
         {
@@ -377,13 +378,13 @@ class InformesController < ApplicationController
         },
         {
           titulo: 'En el período, por unidad',
-          headers: ['Unidad', 'Ingresó', 'Dispensado', 'Merma', 'Otras salidas', 'Ajustes'],
+          headers: ['Unidad', 'Había', 'Ingresó', 'Dispensado', 'Merma', 'Otras salidas', 'Ajustes', 'Quedaba'],
           rows: datos[:periodo].map { |x|
-            [x[:unidad], num.call(x[:ingreso]), num.call(x[:dispensado]), num.call(x[:merma]),
-             num.call(x[:otras_salidas]), num.call(x[:ajustes])]
+            [x[:unidad], num.call(x[:habia]), num.call(x[:ingreso]), num.call(x[:dispensado]), num.call(x[:merma]),
+             num.call(x[:otras_salidas]), num.call(x[:ajustes]), num.call(x[:quedaba])]
           },
-          aligns: { 1 => :right, 2 => :right, 3 => :right, 4 => :right, 5 => :right },
-          col_min: { 1 => 52, 2 => 60, 3 => 46, 4 => 64, 5 => 52 },
+          aligns: (1..7).to_h { |i| [i, :right] },
+          col_min: { 1 => 46, 2 => 52, 3 => 60, 4 => 46, 5 => 64, 6 => 52, 7 => 56 },
           vacio: 'No hubo movimientos en el período elegido.',
         },
         {

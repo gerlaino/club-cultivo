@@ -22,6 +22,11 @@ module Informes
   #     casos, la mercadería que llegó después a un stock externo (`ingreso`), que no está en el
   #     inicial.
   #   · Sin merch ni bebidas (forma `externo`): es un informe de producto.
+  #   · CADA FILA CIERRA (7-oct-2026, Germán: «33 − 43 + 27 no da 193,8»): Había + Ingresó −
+  #     Dispensado − Merma − Otras salidas ± Ajustes = Quedaba. «Quedaba» es el saldo al FINAL del
+  #     período (el de hoy, deshaciendo lo que pasó después) y «Había» sale de la cuenta. Un stock
+  #     que nació en el período había 0: si con eso no cierra, la fila lo dice (`descuadre`) en vez
+  #     de esconderlo en «Había».
   class Inventario
     DIAS_SIN_MOVIMIENTO = 30
     DIAS_VENCE_PRONTO   = 30
@@ -93,7 +98,20 @@ module Informes
       # La mercadería que llegó a un stock externo ya existente NO está en el inicial: se suma
       # siempre, haya nacido el stock en el período o antes.
       ingreso  += movs.select { |m| m.tipo == 'ingreso' }.sum(&:gramos).to_d
+      dispensado = dispensado_periodo[s.id].to_d
+      merma      = movs.select { |m| m.tipo == 'merma' }.sum { |m| -m.gramos.to_d }
+      # Neto: una devolución (positiva) de un evento resta de las salidas. Lo positivo de producción
+      # y traslado ya está en «Ingresó» (o en el inicial de uno nacido acá): no se cuenta dos veces.
+      otras      = movs.select { |m| OTRAS_SALIDAS.include?(m.tipo) && !(%w[produccion transferencia].include?(m.tipo) && m.gramos.positive?) }
+                       .sum { |m| -m.gramos.to_d }
+      ajustes    = movs.select { |m| m.tipo == 'ajuste' }.sum { |m| m.gramos.to_d }
       queda        = s.cantidad.to_d
+      # Al final del período: lo de hoy, deshaciendo lo que pasó después (movimientos fechados
+      # después y dispensas con fecha posterior, contadas por línea como «Dispensado»).
+      quedaba    = queda - movimientos_despues[s.id].to_d + dispensado_despues[s.id].to_d
+      neto       = ingreso - dispensado - merma - otras + ajustes
+      habia      = nacio_aca ? 0.to_d : quedaba - neto
+      descuadre  = nacio_aca ? (quedaba - neto) : [habia, 0].min
       comprometido = s.apartado_para_eventos.to_d + s.apartado_para_reservas.to_d
       costo  = s.costo_unitario_ars
       precio = s.precio_sugerido_ars
@@ -108,11 +126,19 @@ module Informes
         sede:         s.sede&.nombre,
         alta:         s.created_at.to_date,
         ingreso:      ingreso.round(2).to_f,
-        dispensado:   dispensado_periodo[s.id].to_d.round(2).to_f,
-        merma:        movs.select { |m| m.tipo == 'merma' }.sum { |m| m.gramos.to_d.abs }.round(2).to_f,
-        otras_salidas: movs.select { |m| OTRAS_SALIDAS.include?(m.tipo) && m.gramos.negative? }
-                           .sum { |m| m.gramos.to_d.abs }.round(2).to_f,
-        ajustes:      movs.select { |m| m.tipo == 'ajuste' }.sum { |m| m.gramos.to_d }.round(2).to_f,
+        habia:        habia.round(2).to_f,
+        dispensado:   dispensado.round(2).to_f,
+        merma:        merma.round(2).to_f,
+        otras_salidas: otras.round(2).to_f,
+        ajustes:      ajustes.round(2).to_f,
+        quedaba:      quedaba.round(2).to_f,
+        # Lo que no cierra (≠ 0 sólo si los movimientos no explican el saldo): se muestra.
+        descuadre:    descuadre.abs >= 0.01 ? descuadre.round(2).to_f : nil,
+        # Los ajustes uno por uno, para ver quién, cuándo y por qué.
+        ajustes_detalle: movs.select { |m| m.tipo == 'ajuste' }.map { |m|
+          { fecha: m.fecha || m.created_at.to_date, gramos: m.gramos.to_f, notas: m.notas.presence,
+            quien: m.usuario && [m.usuario.first_name, m.usuario.last_name].compact.join(' ').presence || m.usuario&.email }
+        },
         queda:        queda.round(2).to_f,
         en_mesa:      [s.apartado_para_mostrador.to_d, queda].min.round(2).to_f,
         comprometido: [comprometido, queda].min.round(2).to_f,
@@ -129,7 +155,27 @@ module Informes
       @movimientos_periodo ||= StockMovimiento.joins(:stock).where(stocks: { club_id: @club.id })
                                               .en_periodo(@desde, @hasta)
                                               .where.not(tipo: 'dispensacion')
+                                              .includes(:usuario)
                                               .to_a.group_by(&:stock_id)
+    end
+
+    # Lo que pasó DESPUÉS del período, para volver del saldo de hoy al del final: el neto de los
+    # movimientos (sin dispensas) y lo dispensado por línea.
+    def movimientos_despues
+      @movimientos_despues ||= StockMovimiento.joins(:stock).where(stocks: { club_id: @club.id })
+                                              .where.not(tipo: 'dispensacion')
+                                              .where('COALESCE(stock_movimientos.fecha, stock_movimientos.created_at::date) > ?', @hasta.to_date)
+                                              .group(:stock_id).sum(:gramos)
+    end
+
+    def dispensado_despues
+      return {} if @hasta.to_date >= @hoy
+
+      @dispensado_despues ||= Dispensaciones.new(club: @club, desde: @hasta + 1, hasta: @hoy)
+                                            .lineas_en(@hasta.to_date + 1, @hoy)
+                                            .select(&:stock)
+                                            .group_by { |l| l.stock.id }
+                                            .transform_values { |ls| ls.sum(&:cantidad) }
     end
 
     # Lo dispensado en el período por stock, desde las líneas — respetando los filtros de la
@@ -183,8 +229,9 @@ module Informes
 
     def periodo(filas)
       filas.group_by { |f| f[:unidad] }.sort.map do |u, fs|
-        { unidad: u, ingreso: suma(fs, :ingreso), dispensado: suma(fs, :dispensado),
-          merma: suma(fs, :merma), otras_salidas: suma(fs, :otras_salidas), ajustes: suma(fs, :ajustes) }
+        { unidad: u, habia: suma(fs, :habia), ingreso: suma(fs, :ingreso), dispensado: suma(fs, :dispensado),
+          merma: suma(fs, :merma), otras_salidas: suma(fs, :otras_salidas), ajustes: suma(fs, :ajustes),
+          quedaba: suma(fs, :quedaba) }
       end
     end
 

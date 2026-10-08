@@ -35,6 +35,58 @@ RSpec.describe Informes::Inventario do
                          items_attributes: [{ stock: stock, cantidad: cantidad }])
   end
 
+  # AC (Germán, 7-oct-2026): «33 − 43 + 27 no da 193,8». Cada fila cierra:
+  # Había + Ingresó − Dispensado − Merma − Otras salidas ± Ajustes = Quedaba.
+  describe 'cada fila cierra' do
+    def cierra?(f) = (f[:habia] + f[:ingreso] - f[:dispensado] - f[:merma] - f[:otras_salidas] + f[:ajustes] - f[:quedaba]).abs < 0.01
+
+    def ajuste!(stock, gramos, fecha: Time.zone.today, notas: 'Recuento')
+      StockMovimiento.create!(stock: stock, tipo: 'ajuste', gramos: gramos, usuario: admin, notas: notas, fecha: fecha)
+      stock.update_columns(cantidad: stock.cantidad + gramos)
+    end
+
+    it 'un frasco de antes del período dice cuánto había al empezar' do
+      e = externo!(cantidad: 200)
+      e.update_columns(created_at: 3.months.ago, cantidad_inicial: 200)
+      dispensar(e, 43)
+      ajuste!(e.reload, 27)
+      f = fila(informe, e.reload)
+      expect(f).to include(habia: 200.0, dispensado: 43.0, ajustes: 27.0, quedaba: 184.0)
+      expect(cierra?(f)).to be(true)
+      expect(f[:descuadre]).to be_nil
+    end
+
+    it 'uno que nació en el período había 0' do
+      p = propio!(cantidad: 100)
+      dispensar(p, 30)
+      f = fila(informe, p.reload)
+      expect(f).to include(habia: 0.0, ingreso: 100.0, quedaba: 70.0)
+      expect(cierra?(f)).to be(true)
+    end
+
+    it 'con un período que ya terminó, «Quedaba» es el saldo de entonces, no el de hoy' do
+      p = propio!(cantidad: 100)
+      p.update_columns(created_at: 3.months.ago, cantidad_inicial: 100)
+      dispensar(p, 10, fecha: 40.days.ago.to_date)
+      dispensar(p, 25)                                    # después del período
+      ajuste!(p.reload, -5, fecha: Time.zone.today)       # también después
+      pasado = described_class.new(club: club, desde: 2.months.ago.beginning_of_month, hasta: 1.month.ago.end_of_month).call
+      f = pasado[:stocks].find { |x| x[:id] == p.id }
+      expect(f[:quedaba]).to eq(90.0)
+      expect(f[:queda]).to eq(60.0)
+      expect(cierra?(f)).to be(true)
+    end
+
+    it 'los ajustes se pueden ver uno por uno: cuándo, cuánto, quién y por qué' do
+      e = externo!(cantidad: 50)
+      ajuste!(e, 12, notas: 'Apareció un frasco en la heladera')
+      det = fila(informe, e.reload)[:ajustes_detalle]
+      expect(det.size).to eq(1)
+      expect(det.first).to include(gramos: 12.0, notas: 'Apareció un frasco en la heladera')
+      expect(det.first[:quien]).to be_present
+    end
+  end
+
   it 'lista stock propio y externo, cada uno con de dónde viene' do
     p = propio!
     e = externo!

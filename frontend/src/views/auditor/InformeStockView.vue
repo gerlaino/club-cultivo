@@ -90,41 +90,69 @@
       <section class="inf__section">
         <div class="inf__section-head">
           <h2 class="inf__section-title">Stock por stock</h2>
-          <span class="inf__section-marco">lo que pasó en el período elegido · lo que queda hoy</span>
+          <span class="inf__section-marco">en la unidad de cada producto · cada fila cierra: había + ingresó − salidas ± ajustes = quedaba</span>
         </div>
         <table v-if="data.stocks.length" class="inf__table">
           <thead>
             <tr>
               <th>Stock</th><th>Producto</th><th>Genética</th><th>De dónde</th>
-              <th class="num">Ingresó</th><th class="num">Dispensado</th><th class="num">Merma</th><th class="num">Otras salidas</th><th class="num">Ajustes</th>
-              <th class="num">Queda</th><th class="num">Libre</th>
+              <th class="num" title="Lo que tenía el día que empieza el período">Había</th>
+              <th class="num">Ingresó</th><th class="num">Dispensado</th><th class="num">Merma</th><th class="num">Otras salidas</th>
+              <th class="num" title="Suma de los ajustes manuales (+ suma, − resta). Tocá el número para verlos">Ajustes</th>
+              <th class="num" title="Lo que tenía el último día del período">Quedaba</th><th class="num" title="Lo que hoy se puede entregar">Libre hoy</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="f in data.stocks" :key="f.id">
+            <template v-for="f in data.stocks" :key="f.id">
+            <tr>
               <td class="mono">{{ f.numero || `#${f.id}` }}</td>
               <td>{{ nombreProducto(f.producto) }} <span class="inf__dias">({{ f.unidad }})</span></td>
               <td>{{ f.genetica || '—' }}</td>
               <td><span class="inf__badge" :class="{ 'inf__badge--ext': f.origen === 'externo' }">{{ nombreOrigen(f.origen) }}</span> {{ f.de_donde || '—' }}</td>
+              <td class="num">{{ num(f.habia) }}</td>
               <td class="num">{{ num(f.ingreso) }}</td>
               <td class="num">{{ num(f.dispensado) }}</td>
               <td class="num">{{ num(f.merma) }}</td>
               <td class="num">{{ num(f.otras_salidas) }}</td>
-              <td class="num">{{ num(f.ajustes) }}</td>
-              <td class="num"><strong>{{ num(f.queda) }}</strong></td>
+              <td class="num">
+                <button v-if="f.ajustes_detalle?.length" type="button" class="inf__ajustes-btn"
+                        :aria-expanded="abierto === f.id" :title="`Ver los ${f.ajustes_detalle.length} ajustes`"
+                        @click="abierto = abierto === f.id ? null : f.id">{{ f.ajustes > 0 ? '+' : '' }}{{ num(f.ajustes) }}</button>
+                <template v-else>{{ num(f.ajustes) }}</template>
+              </td>
+              <td class="num">
+                <strong>{{ num(f.quedaba) }}</strong>
+                <span v-if="f.descuadre" class="inf__descuadre" :title="`Los movimientos no explican ${num(Math.abs(f.descuadre))} ${f.unidad}: mirá la trazabilidad del stock`">no cierra</span>
+              </td>
               <td class="num">{{ num(f.libre) }}</td>
             </tr>
+            <!-- Los ajustes de ese stock, uno por uno: cuándo, cuánto, quién y por qué. -->
+            <tr v-if="abierto === f.id" class="inf__ajustes-fila">
+              <td colspan="12">
+                <ul class="inf__ajustes">
+                  <li v-for="(a, i) in f.ajustes_detalle" :key="i">
+                    <span class="mono">{{ formatFechaCorta(a.fecha) }}</span>
+                    <strong>{{ a.gramos > 0 ? '+' : '' }}{{ num(a.gramos) }} {{ f.unidad }}</strong>
+                    <span>{{ a.quien || '—' }}</span>
+                    <span class="inf__ajustes-nota">{{ a.notas || 'sin motivo anotado' }}</span>
+                  </li>
+                </ul>
+              </td>
+            </tr>
+            </template>
           </tbody>
         </table>
         <p v-else class="inf__empty">No hay stock con saldo ni con movimientos en el período elegido.</p>
 
         <table v-if="data.periodo?.length" class="inf__table inf__table--total">
-          <thead><tr><th>En el período</th><th class="num">Ingresó</th><th class="num">Dispensado</th><th class="num">Merma</th><th class="num">Otras salidas</th><th class="num">Ajustes</th></tr></thead>
+          <thead><tr><th>En el período</th><th class="num">Había</th><th class="num">Ingresó</th><th class="num">Dispensado</th><th class="num">Merma</th><th class="num">Otras salidas</th><th class="num">Ajustes</th><th class="num">Quedaba</th></tr></thead>
           <tbody>
             <tr v-for="x in data.periodo" :key="x.unidad">
               <td>Total en {{ x.unidad }}</td>
+              <td class="num">{{ num(x.habia) }}</td>
               <td class="num">{{ num(x.ingreso) }}</td><td class="num">{{ num(x.dispensado) }}</td>
               <td class="num">{{ num(x.merma) }}</td><td class="num">{{ num(x.otras_salidas) }}</td><td class="num">{{ num(x.ajustes) }}</td>
+              <td class="num">{{ num(x.quedaba) }}</td>
             </tr>
           </tbody>
         </table>
@@ -197,6 +225,8 @@ const filtros = ref({})
 const params  = computed(() => ({ ...periodo.value, ...filtros.value }))
 const loading = ref(false)
 const data    = ref(null)
+// El stock con el detalle de ajustes abierto (uno a la vez).
+const abierto = ref(null)
 
 const hoy = computed(() => data.value?.hoy || {})
 // Un KPI por unidad: lo propio y lo externo juntos, pero nunca gramos con unidades.
@@ -229,6 +259,12 @@ onMounted(cargar)
 </script>
 
 <style scoped>
+.inf__ajustes-btn { border: 0; background: none; padding: 0; font: inherit; color: var(--c-leaf-800); text-decoration: underline dotted; cursor: pointer; }
+.inf__descuadre { display: block; font-size: .68rem; font-weight: 700; color: var(--c-rust-600); }
+.inf__ajustes-fila td { background: var(--c-paper); }
+.inf__ajustes { list-style: none; margin: 0; padding: .3rem 0; display: flex; flex-direction: column; gap: .3rem; font-size: .82rem; }
+.inf__ajustes li { display: grid; grid-template-columns: 90px 90px 160px 1fr; gap: .6rem; }
+.inf__ajustes-nota { color: var(--c-slate-500); }
 .inf { padding: var(--sp-6); max-width: 1100px; margin: 0 auto; }
 .inf__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-6); gap: var(--sp-4); flex-wrap: wrap; }
 .inf__head-actions { display: flex; align-items: center; gap: var(--sp-2); flex-wrap: wrap; }
