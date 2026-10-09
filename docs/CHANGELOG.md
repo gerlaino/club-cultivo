@@ -1,5 +1,33 @@
 # Changelog
 
+## Octubre 2026 (el) — Página pública: la vitrina de lo que hace la app, organizaciones desde el administrador (9-oct)
+
+Feedback de Pablo (diseñador, conoce la app): «no representa el pedazo de sistema que tenés; lo
+super pro está escondido en la solapa de proyectos». Iterado con maquetas hasta la aprobación de
+Germán. Sólo frontend público; ni backend ni esquema.
+
+- **Portada** (`LandingView`): «Cada planta, cada gramo, cada peso. *En tus manos.*» (monitoreo y
+  control, lo común a las dos puertas); más baja, para que las puertas asomen. Puerta de
+  organizaciones grande y oscura con el panel de administración (`PanelAdmin.vue`); la de
+  autocultivo al lado, a la misma altura.
+- **Organizaciones** (`LandingOrganizacionesView`, antes `LandingProyectosView`;
+  `/bienvenida/proyectos` redirige con su `#ancla`): abre con `PanelAdmin`, el alcance en cuatro
+  datos y seis fortalezas contadas desde administración, una por fila (`Fortaleza.vue`: caja,
+  trazabilidad, cultivo con `MuestraSalas.vue` nueva, voz con la variante de organización de
+  `MuestraIa`, consultorio, informes). Fuera «Cómo arrancamos» (lo cubren las preguntas).
+- **«Una vista por rol»** (`OficiosVista`): «rol» y no «oficio», administración primero y abierta,
+  sin el sello «Sólo acá» (no nos comparamos), y delivery con **la entrega simulada**
+  (`SimulacionEntrega.vue`: la moto por el mapa, la firma, entregado y cobrado, el efectivo a
+  rendir que sube; corre sólo mientras se ve).
+- **Autocultivo**: «Tu primera cosecha, *como un profesional*». `RecorridoFases.vue`: la planta
+  crece ADENTRO del teléfono (la foto de cada fase es la de `PlantaCreciendo`: la app guarda una foto
+  por semana), con lo anotado y lo que viene; pasa sola mientras se ve. `CultivoEnPapeles.vue`: el
+  diario de fotos y el informe de la cosecha. Cierra con «¿Preferís hablar antes?».
+- **Palabras**: «organización» en la barra, el registro, `/contacto` y el formulario de contacto;
+  «fase» y no «ciclo» en lo visible (una pregunta frecuente lo decía).
+- **Borrado lo que quedó sin uso**: `QueHace`, `Bolsillo`, los `TEMAS_*` de `contenido.js` y las
+  muestras `Pesadas`, `Delivery`, `Ambiente`, `Rendimiento` y `Costo` (están en git si vuelven).
+
 ## Octubre 2026 (ek) — Autocultivo con plantas (no lotes), plantas por voz, «Mis informes» y la página pública rearmada (9-oct)
 
 Prototipos aprobados por Germán el 8-oct (lienzos «Autocultivo con plantas» y «Página pública

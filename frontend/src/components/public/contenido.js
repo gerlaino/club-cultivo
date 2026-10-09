@@ -1,91 +1,25 @@
 // LO QUE DICEN LAS PÁGINAS PÚBLICAS, por público (5-oct-2026: Germán y Javi pidieron que quien
-// entra por «Autocultivo» o por «Proyectos» vea lo suyo y no todo).
+// entra por «Autocultivo» o por «Organizaciones» vea lo suyo y no todo). Desde el 9-oct lo que
+// hace cada página vive en sus filas (`Fortaleza`, `RecorridoFases`); acá quedan las preguntas y
+// los packs.
 //
-// Regla para editar: lo que se afirma acá tiene que existir HOY en la app. Lo que se vende aparte
-// (`Club::ADDONS` con `tipo: 'extra'`: hoy, de lo que se muestra acá, sólo Ambiente/IoT) lleva
-// `addon: true` («Se suma aparte»). Delivery, correo, módulo médico y la IA vienen INCLUIDOS desde
-// el modelo comercial del 6-oct-2026: marcarlos «aparte» contradecía los precios de la misma página
-// (corregido el 9-oct). No se nombra lo que
+// Regla para editar (vale también para esas filas): lo que se afirma tiene que existir HOY en la
+// app. Lo que se vende aparte (`Club::ADDONS` con `tipo: 'extra'`, como Ambiente/IoT) no se
+// muestra como incluido. Delivery, correo, módulo médico y la IA vienen INCLUIDOS desde el modelo
+// comercial del 6-oct-2026. No se nombra lo que
 // está simulado (ARICCAME), lo que está en prueba (el chatbot) ni lo que está en construcción (el
 // portal del paciente, Germán 5-oct). Lo que depende de una persona y
 // no de la app (importar datos al arrancar, exportarlos al irse, activar después de la prueba) se
 // dice así: lo hacemos nosotros.
-import MuestraCadena from './muestras/MuestraCadena.vue'
-import MuestraCiclo from './muestras/MuestraCiclo.vue'
-import MuestraPesadas from './muestras/MuestraPesadas.vue'
-import MuestraTicket from './muestras/MuestraTicket.vue'
-import MuestraDelivery from './muestras/MuestraDelivery.vue'
-import MuestraAmbiente from './muestras/MuestraAmbiente.vue'
-import MuestraIa from './muestras/MuestraIa.vue'
-import MuestraInforme from './muestras/MuestraInforme.vue'
-import MuestraRendimiento from './muestras/MuestraRendimiento.vue'
-import MuestraCosto from './muestras/MuestraCosto.vue'
 
 // ── AUTOCULTIVO ──────────────────────────────────────────────────────────────────────────────────
 // Vocabulario de usuario final (como en el uso personal de la app): espacio, nutrientes, próximos
 // pasos. Sin pacientes, sedes ni caja.
-export const TEMAS_AUTOCULTIVO = [
-  {
-    id: 'cultivo', label: 'Tu cultivo', muestra: MuestraCiclo, muestraProps: { casa: true },
-    titulo: 'Cada planta, con su diario',
-    texto: 'Tus espacios y cada planta, desde la semilla o el esqueje. Lo que hacés queda anotado y la app te avisa lo que viene.',
-    puntos: [
-      'Autos y fotoperiódicas en la misma carpa, cada una con su reloj',
-      'Riegos, nutrientes con su dosis, pH/EC y fotos por semana',
-      'Los próximos pasos del ciclo, con aviso al teléfono',
-      'Suelo vivo: la cama vive más que las plantas',
-    ],
-  },
-  {
-    id: 'cosecha', label: 'Cosecha y frascos', muestra: MuestraPesadas, muestraProps: { casa: true },
-    titulo: 'Del secado al frasco',
-    texto: 'Pesás al cosechar, al secar y al curar: la app calcula cuánto se fue en cada etapa y te deja los frascos anotados.',
-    puntos: [
-      'Húmedo, seco y curado, con la merma de cada etapa',
-      'Cada frasco sabe de qué cosecha y de qué planta salió',
-      'Las fotos de cada cosecha, para comparar la próxima',
-    ],
-  },
-  {
-    id: 'ambiente', label: 'Ambiente', addon: true, muestra: MuestraAmbiente, muestraProps: { espacio: 'Carpa' },
-    titulo: 'Tu carpa, a la vista',
-    texto: 'Temperatura, humedad y VPD, desde un sensor o desde la planilla de tu datalogger, con aviso cuando algo se sale del rango.',
-    puntos: [
-      'Sensores conectados (Sonoff u otros) o carga por CSV',
-      'VPD calculado con la fase de tus plantas',
-      'Aviso al teléfono cuando se sale del rango',
-      'Sin sensor, lo anotás a mano desde el teléfono',
-    ],
-  },
-  {
-    id: 'ia', label: 'Por voz', muestra: MuestraIa, muestraProps: { casa: true },
-    titulo: 'Contalo y queda anotado',
-    texto: 'Con las manos en la tierra, decís lo que hiciste y el asistente lo convierte en registros. Vos confirmás antes de que se guarde.',
-    puntos: [
-      'Riegos, notas y tareas de tu espacio y tus plantas',
-      '«Puse dos semillas de Ananda en un vaso»: también carga plantas nuevas',
-      'Propone; nada se guarda sin tu confirmación',
-      'Lee la planilla del datalogger por vos',
-    ],
-  },
-  {
-    id: 'numeros', label: 'Tus números', muestra: MuestraCosto, muestraProps: { casa: true },
-    titulo: 'Cuánto te costó cada gramo',
-    texto: 'Anotás lo que gastás —semillas, sustrato, nutrientes, luz— y al cosechar la app lo divide por lo que rindió.',
-    puntos: [
-      'Tus gastos, por categoría',
-      'El costo por gramo de cada cosecha',
-      'Lo que llevás gastado en el ciclo, a la vista',
-      'Tus informes en PDF y Excel: tu cosecha, de dónde salió cada frasco y tus gastos',
-    ],
-  },
-]
-
 export const PREGUNTAS_AUTOCULTIVO = [
   { q: '¿Qué pasa cuando termina la prueba gratis?',
     r: 'No se cobra nada solo: no te pedimos tarjeta. Si querés seguir, nos escribís y la activamos. Si no, la cuenta queda en pausa y no se borra nada de lo que cargaste.' },
   { q: '¿Sirve para automáticas y para fotoperiódicas?',
-    r: 'Sí. Marcás la genética como automática y la app la cuenta de semilla a cosecha, sin pedirte el cambio a floración. Las fotoperiódicas siguen su ciclo de vege y flora.' },
+    r: 'Sí. Marcás la genética como automática y la app la cuenta de semilla a cosecha, sin pedirte el cambio a floración. Las fotoperiódicas pasan por vegetativo y floración como siempre.' },
   { q: '¿Tengo que instalar algo?',
     r: 'No hace falta una tienda de apps: se instala desde el navegador del teléfono en unos segundos y queda como una app más. También la podés usar desde la compu.' },
   { q: '¿Anda sin señal?',
@@ -98,112 +32,10 @@ export const PREGUNTAS_AUTOCULTIVO = [
     r: 'Cuando quieras, sin explicar nada. Y si contrataste hace menos de 10 días, tenés el botón de arrepentimiento al pie de la página.' },
 ]
 
-// ── PROYECTOS ────────────────────────────────────────────────────────────────────────────────
-// Asociaciones, fundaciones, investigación y producción. En pantalla «proyecto»; adentro de la
-// app la entidad sigue siendo «organización». Un proyecto NO dice «frasco» (Germán, 5-oct): es
-// stock, unidades. «Frasco» es vocabulario de casa.
-export const TEMAS_PROYECTOS = [
-  {
-    id: 'trazabilidad', label: 'Trazabilidad', muestra: MuestraCadena,
-    titulo: 'Cada gramo sabe de dónde viene',
-    texto: 'La genética, el lote, la planta, la cosecha, el stock y la entrega quedan unidos. Desde cualquier punta llegás a la otra en un toque.',
-    puntos: [
-      'Cada planta con su QR y su historia completa',
-      'Cada unidad del stock sabe de qué cosecha y de qué plantas salió',
-      'El paciente escanea el QR de su retiro y ve la genética que se llevó',
-      'Lo trazable sólo sale del inventario con una entrega: lo que falta, se ve',
-    ],
-  },
-  {
-    id: 'cultivo', label: 'Cultivo', muestra: MuestraRendimiento,
-    titulo: 'El ciclo, medido',
-    texto: 'Lotes y plantas en sus salas, de la semilla o el esqueje a la cosecha, con los próximos pasos del ciclo avisados al teléfono.',
-    puntos: [
-      'Fases por sala; autos que se quedan en vege todo el ciclo',
-      'Riegos, nutrientes con su dosis, pH/EC y fotos por semana',
-      'Tareas del día para cada cultivador, armadas según la fase',
-      'Rendimiento en g/m² por cosecha, por genética y por sala',
-    ],
-  },
-  {
-    id: 'cosecha', label: 'Cosecha y stock', muestra: MuestraPesadas,
-    titulo: 'El peso que entra y el que sale',
-    texto: 'Secado y curado con sus pesadas, la manicura con aprobación, y el stock por sede y por depósito con cada movimiento a la vista.',
-    puntos: [
-      'Húmedo, seco y curado: la merma de cada etapa, calculada',
-      'Manicura que carga aun sin señal y espera aprobación',
-      'Stock por sede y por depósito, con transferencias',
-      'Contar no crea stock: una diferencia queda como diferencia',
-    ],
-  },
-  {
-    id: 'mostrador', label: 'Mostrador y caja', muestra: MuestraTicket,
-    titulo: 'Dispensar y que la caja cierre',
-    texto: 'El mostrador entrega lo que está sobre la mesa y cobra como pague cada paciente. Quien atiende abre contando y cierra sin esperar a nadie.',
-    puntos: [
-      'Varios productos en una dispensa, varios medios de pago',
-      'Cuenta corriente: lo pagado de más se descuenta solo en la próxima',
-      'Reservas, anulación con motivo y cierre de caja firmado',
-      'El REPROCANN de cada paciente a la vista, con aviso antes de que venza',
-    ],
-  },
-  {
-    id: 'delivery', label: 'Delivery', muestra: MuestraDelivery,
-    titulo: 'Hasta la puerta del paciente',
-    texto: 'Paquetes armados desde el stock, rutas para quien reparte y la entrega confirmada con firma en el teléfono.',
-    puntos: [
-      'Rutas del día en el teléfono de quien reparte',
-      'Firma de entrega y cobro contra entrega',
-      'Lo que no se entregó vuelve al stock, desarmado',
-      'Rendición del efectivo dirigida a una persona',
-    ],
-  },
-  {
-    id: 'ambiente', label: 'Ambiente e IoT', addon: true, muestra: MuestraAmbiente,
-    titulo: 'Cada sala, a la vista',
-    texto: 'Temperatura, humedad y VPD de cada sala, desde sensores o desde la planilla de un datalogger, con aviso cuando algo se sale del rango.',
-    puntos: [
-      'Sensores conectados (Sonoff u otros) o carga por CSV',
-      'VPD calculado con la fase del lote',
-      'Rangos por sala y aviso al teléfono',
-      'Lectura a mano desde el teléfono cuando no hay sensor',
-    ],
-  },
-  {
-    id: 'ia', label: 'Asistente IA', muestra: MuestraIa,
-    titulo: 'Contalo y queda anotado',
-    texto: 'El cultivador dice lo que hizo y el asistente lo convierte en registros. Nada se guarda sin que lo confirme.',
-    puntos: [
-      'Registro por voz de salas, lotes y plantas',
-      'Propone; nada se guarda sin confirmación',
-      'Arma el plan de trabajo de la semana',
-      'Lee la planilla del datalogger',
-    ],
-  },
-  {
-    id: 'informes', label: 'Informes y números', muestra: MuestraInforme,
-    titulo: 'Lo que pide la normativa, de lo que ya cargaron',
-    texto: 'Los informes salen de la misma data que se carga operando. Nada se arma aparte el día que te lo piden.',
-    puntos: [
-      'REPROCANN, INASE, producción, inventario y pérdidas',
-      'Siempre se descargan; «para presentar» además valida',
-      'Costo por lote y costo por gramo',
-      'PDF y CSV, del mismo período que ves en pantalla',
-    ],
-  },
-]
-
-// Una vista por oficio: lo que ve cada rol al entrar (`User#role`). Médico y delivery dependen de
-// lo contratado (el módulo médico viene con Producción y dispensa; delivery es add-on).
-export const OFICIOS = [
-  { quien: 'Cultivo',        que: 'Sus salas, sus lotes y las tareas del día. Riega, registra y saca fotos desde el teléfono, al lado de la planta.' },
-  { quien: 'Manicura',       que: 'Las plantas a pesar y lo que entra al stock. Carga aun sin señal; lo que pesa espera la aprobación de administración.' },
-  { quien: 'Mostrador',      que: 'La mesa, el carrito y su caja. Dispensa lo que está sobre la mesa y cierra su caja; no ve la contabilidad.' },
-  { quien: 'Médico',         que: 'Su agenda y su horario, la historia clínica de cada paciente, sus indicaciones y las prescripciones en PDF.' },
-  { quien: 'Delivery',       que: 'Su ruta del día, los paquetes, la firma de entrega y la rendición del efectivo.' },
-  { quien: 'Administración', que: 'Todo: pacientes, stock, caja, contabilidad, informes y quién hace qué.' },
-]
-
+// ── ORGANIZACIONES ───────────────────────────────────────────────────────────────────────────
+// Asociaciones, fundaciones, investigación y producción. En pantalla «organización» desde el
+// 9-oct-2026 (antes «proyecto»); los identificadores siguen diciendo «proyectos». Una organización
+// NO dice «frasco» (Germán, 5-oct): es stock, unidades. «Frasco» es vocabulario de casa.
 export const PREGUNTAS_PROYECTOS = [
   { q: '¿Cuánto tarda arrancar?',
     r: 'Armamos la cuenta con ustedes: la organización, las sedes, quién hace qué y lo que contratan. Cuando está lista, cada persona entra con su usuario y ve lo suyo.' },

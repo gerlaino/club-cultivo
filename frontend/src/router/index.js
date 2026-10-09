@@ -79,11 +79,13 @@ const routes = [
   // El primer nombre de esa página (5-oct, mismo día): por si alguien guardó el link.
   { path: "/bienvenida/casa", redirect: "/bienvenida/autocultivo" },
   {
-    path: "/bienvenida/proyectos",
-    name: "landing-proyectos",
-    component: () => import("../views/LandingProyectosView.vue"),
+    path: "/bienvenida/organizaciones",
+    name: "landing-organizaciones",
+    component: () => import("../views/LandingOrganizacionesView.vue"),
     meta: { public: true, fullscreen: true },
   },
+  // Hasta el 9-oct-2026 la página se llamaba «proyectos»: por si alguien guardó el link (con su #ancla).
+  { path: "/bienvenida/proyectos", redirect: (to) => ({ path: "/bienvenida/organizaciones", hash: to.hash }) },
   // El formulario de contacto solo: acá apunta el botón de arrepentimiento de todas las páginas.
   {
     path: "/contacto",

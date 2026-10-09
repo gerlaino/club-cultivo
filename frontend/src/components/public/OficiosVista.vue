@@ -1,21 +1,21 @@
 <template>
-  <!-- «UNA VISTA POR OFICIO» (Germán, 8-oct-2026): al tocar un oficio se ve SU pantalla y una
-       explicación corta. Así se ve el potencial en vez de leerlo, y el consultorio (el diferencial)
-       queda como uno de los oficios, marcado «Sólo acá». Las pantallas replican las de la app con
-       datos ficticios. -->
-  <section class="hb__sec" id="oficios">
+  <!-- «UNA VISTA POR ROL» (Germán, 8-oct-2026; «rol» y no «oficio» desde el 9-oct): al tocar un
+       rol se ve SU pantalla y una explicación corta. Administración va primero y abierta: es quien
+       contrata. Delivery muestra la entrega simulada (`SimulacionEntrega`). Las pantallas replican
+       las de la app con datos ficticios. -->
+  <section class="hb__sec hb__sec--claro" id="roles">
     <div class="hb__wrap">
       <header class="hb__sec-h">
         <p class="hb__ceja">El equipo</p>
-        <h2 class="hb__h2">Una vista por oficio</h2>
-        <p class="ov__intro">Cada persona entra con su usuario y ve lo que necesita para su trabajo. Tocá un oficio y mirá su pantalla.</p>
+        <h2 class="hb__h2">Una vista por rol</h2>
+        <p class="ov__intro">Cada persona entra con su usuario y ve lo que necesita para su trabajo, nada más. Tocá un rol y mirá su pantalla.</p>
       </header>
 
       <div class="ov__grilla">
-        <div class="ov__lista" role="tablist" aria-label="Oficios">
+        <div class="ov__lista" role="tablist" aria-label="Roles">
           <button v-for="r in ROLES" :key="r.k" type="button" role="tab" class="ov__rol" :class="{ 'is-on': sel === r.k }"
                   :aria-selected="sel === r.k" :aria-controls="`ov-panel-${r.k}`" @click="sel = r.k">
-            <span class="ov__rol-cab"><b>{{ r.quien }}</b><span v-if="r.k === 'medico'" class="ov__solo">Sólo acá</span></span>
+            <span class="ov__rol-cab"><b>{{ r.quien }}</b></span>
             <span class="ov__rol-corto">{{ r.corto }}</span>
           </button>
         </div>
@@ -80,15 +80,7 @@
                   </div>
                 </template>
 
-                <template v-else-if="sel === 'delivery'">
-                  <div v-for="(p, i) in PARADAS" :key="p.n" class="ov__fila" :class="{ 'ov__fila--ahora': p.ahora }" :style="d(i)">
-                    <span class="ov__num" :class="p.cls">{{ p.n }}</span>
-                    <div class="ov__crece"><b>{{ p.q }}</b><small>{{ p.det }}</small></div>
-                    <b :class="p.cls">{{ p.e }}</b>
-                  </div>
-                  <span class="ov__b ov__b--ancho" :style="d(3)">Firmar entrega · Paciente N.º 0145</span>
-                  <div class="ov__fila" :style="d(4)"><span>Efectivo a rendir a Javier</span><b>$ 48.000</b></div>
-                </template>
+                <SimulacionEntrega v-else-if="sel === 'delivery'" />
 
                 <template v-else>
                   <div class="ov__dos" :style="d(0)"><div class="ov__dato"><small>Pacientes activos</small><b>87</b></div><div class="ov__dato"><small>Dispensado hoy</small><b>$ 412.000</b></div></div>
@@ -107,9 +99,14 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import SimulacionEntrega from './SimulacionEntrega.vue'
 
-// Lo que se dice de cada oficio existe HOY en la app (regla de `contenido.js`).
+// Lo que se dice de cada rol existe HOY en la app (regla de `contenido.js`).
 const ROLES = [
+  { k: 'admin', quien: 'Administración', corto: 'Toda la organización, y quién hace qué.', ceja: 'Administración', pantalla: 'Hoy en la organización', sub: 'Sede Palermo',
+    titulo: 'La organización entera, de un vistazo',
+    texto: 'Administración ve pacientes, stock, caja, contabilidad e informes, y lo que necesita su atención antes de que sea un problema.',
+    puntos: ['REPROCANN por vencer, con aviso', 'Pesadas y altas para aprobar', 'Informes para presentar, del mismo período que ve'] },
   { k: 'cultivo', quien: 'Cultivo', corto: 'Sus salas y las tareas del día, en el teléfono.', ceja: 'Cultivo', pantalla: 'Para hoy', sub: 'Jueves 14 · Lucía',
     titulo: 'Al lado de la planta, no en una planilla',
     texto: 'Quien cultiva ve sus salas y lo que le toca hoy. Riega, registra y saca fotos desde el teléfono, y marca cada tarea como hecha o no hecha.',
@@ -131,10 +128,6 @@ const ROLES = [
     titulo: 'Hasta la puerta del paciente',
     texto: 'Quien reparte tiene su ruta del día en el teléfono, cobra contra entrega y hace firmar. Lo que no se entregó vuelve al stock, y el efectivo se rinde a una persona.',
     puntos: ['Paquetes armados desde el stock', 'Firma y cobro en la puerta', 'Rendición dirigida, sin plata suelta'] },
-  { k: 'admin', quien: 'Administración', corto: 'Todo, y quién hace qué.', ceja: 'Administración', pantalla: 'Hoy en el proyecto', sub: 'Sede Palermo',
-    titulo: 'El proyecto entero, de un vistazo',
-    texto: 'Administración ve pacientes, stock, caja, contabilidad e informes, y lo que necesita su atención antes de que sea un problema.',
-    puntos: ['REPROCANN por vencer, con aviso', 'Pesadas y altas para aprobar', 'Informes para presentar, del mismo período que ve'] },
 ]
 const TAREAS = [['Regar Flora 2', '12 plantas · receta Floración 3'], ['Defoliar L-26-007', 'Flora 1 · semana 3'], ['Foto de la semana', 'Vege 1']]
 // Estados y tipos de `Turno`; «Sin cerrar» = turno pasado sin cerrar (pendiente de entrevista).
@@ -145,14 +138,9 @@ const TURNOS = [
   { h: '15:30', p: 'Paciente N.º 0302', tipo: 'Revisión', e: 'confirmado', lbl: 'Confirmado', ahora: true },
   { h: '16:00', p: 'Paciente N.º 0145', tipo: 'Seguimiento', e: 'programado', lbl: 'Programado' },
 ]
-const PARADAS = [
-  { n: 1, q: 'Paciente N.º 0231', det: 'Palermo · cobrado', e: 'Entregado', cls: 'ov__verde' },
-  { n: 2, q: 'Paciente N.º 0145', det: 'Villa Crespo · contra entrega $ 18.000', e: 'Ahora', cls: 'ov__ambar', ahora: true },
-  { n: 3, q: 'Paciente N.º 0098', det: 'Almagro · pagado', e: 'Pendiente', cls: 'ov__gris' },
-]
 const AVISOS = [['REPROCANN por vencer', '6 pacientes'], ['Pesadas para aprobar', '2'], ['Turnos sin cerrar', '1']]
 
-const sel = ref('cultivo')
+const sel = ref('admin')
 const rol = computed(() => ROLES.find(r => r.k === sel.value))
 // Las filas entran de a una, como en las demás muestras.
 const d = (i) => ({ animationDelay: `${120 + i * 110}ms` })
@@ -174,7 +162,6 @@ const d = (i) => ({ animationDelay: `${120 + i * 110}ms` })
 .ov__rol-cab { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .ov__rol-cab b { font-size: 1.05rem; }
 .ov__rol-corto { font-size: .9rem; color: var(--hb-tinta-2); line-height: 1.4; }
-.ov__solo { font: 600 10.5px var(--hb-mono); letter-spacing: .06em; text-transform: uppercase; padding: 2px 8px; border-radius: 99px; background: var(--hb-ambar); color: var(--hb-tinta); }
 
 .ov__panel { background: var(--hb-bosque); color: var(--hb-papel-claro); padding: clamp(20px, 3vw, 32px); display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 320px); gap: 28px; align-items: center; }
 @media (max-width: 700px) { .ov__panel { grid-template-columns: minmax(0, 1fr); } }
@@ -197,7 +184,6 @@ const d = (i) => ({ animationDelay: `${120 + i * 110}ms` })
 .ov__fila > div { display: flex; flex-direction: column; min-width: 0; }
 .ov__fila small, .ov__caja small, .ov__turno small { font-size: 10.5px; color: #3A3F44; }
 .ov__fila--on { border-color: #2D4A3E; }
-.ov__fila--ahora { border-color: #B45309; }
 .ov__fila > .ov__botones { display: flex; gap: 4px; flex-direction: row; }
 .ov__b { padding: 4px 8px; border-radius: 8px; background: #2D4A3E; color: #fff; font-size: 10.5px; font-weight: 700; white-space: nowrap; text-align: center; }
 .ov__b--linea { background: #fff; color: #1A1D1F; border: 1px solid #D1D5DB; font-weight: 600; }
@@ -222,14 +208,8 @@ const d = (i) => ({ animationDelay: `${120 + i * 110}ms` })
 .ov__estado { font: 500 9.5px var(--hb-mono); text-transform: uppercase; letter-spacing: .04em; padding: 2px 6px; border-radius: 99px; border: 1px solid #D1D5DB; color: #3A3F44; white-space: nowrap; }
 .ov__turno--pendiente .ov__estado { border-color: #9B2C1E; color: #9B2C1E; }
 .ov__turno--ahora .ov__estado { background: #2D4A3E; border-color: #2D4A3E; color: #fff; }
-.ov__num { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #fff; background: currentColor; flex-shrink: 0; }
-.ov__num.ov__verde { background: #2D4A3E; color: #fff; }
-.ov__num.ov__ambar { background: #B45309; color: #fff; }
-.ov__num.ov__gris { background: #6B7280; color: #fff; }
-.ov__crece { flex: 1; }
 .ov__verde { color: #2D4A3E; }
 .ov__ambar { color: #B45309; }
-.ov__gris { color: #6B7280; }
 .ov__mayus { text-transform: uppercase; letter-spacing: .06em; font-weight: 700; }
 @keyframes ov-entra { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .ov__tel-cuerpo > * { animation: none; opacity: 1; } }

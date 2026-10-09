@@ -6,7 +6,7 @@
           <p class="hb__ceja">Contacto</p>
           <h1 class="hb__h2">Escribinos</h1>
           <p class="ct__p">
-            Si tenés un proyecto, contanos qué hacen y te armamos la cuenta. Si autocultivás y
+            Si tenés una organización, contanos qué hacen y te armamos la cuenta. Si autocultivás y
             preferís hablar antes de probar, también. Te respondemos por mail.
           </p>
           <p class="ct__p">

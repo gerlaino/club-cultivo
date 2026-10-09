@@ -24,7 +24,7 @@
       <input v-model.trim="form.email" type="email" maxlength="160" autocomplete="email" required />
     </label>
     <label v-if="tipo === 'organizacion'" class="cf__campo">
-      <span>Organización o proyecto</span>
+      <span>Organización</span>
       <input v-model="form.organizacion" type="text" maxlength="160" autocomplete="organization" />
     </label>
     <label class="cf__campo">
@@ -56,12 +56,12 @@ import { enviarContacto } from '../../lib/api.js'
 const props = defineProps({
   // Con cuál arranca elegido.
   tipoInicial: { type: String, default: 'organizacion' },
-  // Cuáles se ofrecen. En la página de proyectos, uno solo (y entonces no se muestra el selector).
+  // Cuáles se ofrecen. En la página de organizaciones, uno solo (y entonces no se muestra el selector).
   tipos: { type: Array, default: () => ['organizacion', 'personal', 'baja'] },
 })
 
 const TIPOS = [
-  { id: 'organizacion', label: 'Proyecto u organización' },
+  { id: 'organizacion', label: 'Organización' },
   { id: 'personal',     label: 'Autocultivo' },
   { id: 'baja',         label: 'Arrepentimiento / baja' },
 ]

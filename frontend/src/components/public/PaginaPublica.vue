@@ -4,8 +4,8 @@
       <div class="hb__wrap pp__top-in">
         <RouterLink to="/bienvenida" class="pp__marca">Cultivo Espacial</RouterLink>
         <nav class="pp__nav" aria-label="Secciones">
+          <RouterLink to="/bienvenida/organizaciones">Organizaciones</RouterLink>
           <RouterLink to="/bienvenida/autocultivo">Autocultivo</RouterLink>
-          <RouterLink to="/bienvenida/proyectos">Proyectos</RouterLink>
           <RouterLink to="/contacto">Contacto</RouterLink>
         </nav>
         <RouterLink to="/login" class="pp__ingresar">Ingresar</RouterLink>
@@ -40,7 +40,7 @@
 
 <script setup>
 // EL ARMAZÓN DE LAS PÁGINAS PÚBLICAS (5-oct-2026): /bienvenida, /bienvenida/autocultivo,
-// /bienvenida/proyectos y /contacto. Encabezado, pie con el botón de arrepentimiento, las
+// /bienvenida/organizaciones y /contacto. Encabezado, pie con el botón de arrepentimiento, las
 // fuentes, los estilos compartidos (`assets/herbario.css`) y el «aparecer al hacer scroll».
 //
 // El router de la app no tiene `scrollBehavior` (cambiarlo tocaría las 150 rutas de adentro), así

@@ -5,10 +5,10 @@
       <div class="hb__wrap lc__portada-in">
         <div>
           <p class="hb__ceja">Autocultivo · uso personal</p>
-          <h1 class="hb__h1">Tus plantas, <em>anotadas mientras crecen.</em></h1>
+          <h1 class="hb__h1">Tu primera cosecha, <em>como un profesional.</em></h1>
           <p class="hb__bajada">
-            Agregás tus plantas, anotás desde el teléfono al lado de la carpa y la app te avisa lo que
-            viene. Carpa, balcón o cama de suelo vivo; autos y fotos juntas. Todo en el teléfono.
+            Desde el celular sabés qué hacer hoy, anotás lo que hacés al lado de la carpa y llegás a la
+            cosecha con todo registrado. Carpa, balcón o cama de suelo vivo; autos y fotos juntas.
           </p>
           <div class="hb__acciones">
             <RouterLink to="/registro" class="hb__btn">
@@ -24,12 +24,17 @@
       </div>
     </section>
 
-    <!-- ── Así se usa: tres pasos ─────────────────────────── -->
-    <section class="hb__sec">
+    <!-- La planta crece adentro del teléfono, fase por fase (9-oct-2026). -->
+    <RecorridoFases />
+
+    <CultivoEnPapeles />
+
+    <!-- ── Para arrancar: tres pasos ─────────────────────── -->
+    <section class="hb__sec hb__sec--claro">
       <div class="hb__wrap">
         <header class="hb__sec-h">
           <p class="hb__ceja">Así se usa</p>
-          <h2 class="hb__h2">Tres cosas, nada más</h2>
+          <h2 class="hb__h2">Para arrancar, tres cosas</h2>
         </header>
         <ol class="lc__pasos">
           <li v-for="(p, i) in PASOS" :key="p.t" class="lc__paso hb-rev" :style="{ transitionDelay: `${i * 90}ms` }">
@@ -41,58 +46,44 @@
       </div>
     </section>
 
-    <QueHace ceja="Qué hace por tu cultivo" titulo="De la semilla al frasco, sin planillas" :temas="TEMAS_AUTOCULTIVO" />
-
-    <Bolsillo />
-
     <Packs :packs="packs" :accion="{ label: 'Crear mi cuenta', to: '/registro' }" />
 
     <PreguntasFrecuentes titulo="Lo que nos preguntan en autocultivo" :preguntas="PREGUNTAS_AUTOCULTIVO"
                          contacto="#contacto" />
 
     <!-- ── Contacto: para quien prefiere hablar antes de probar ── -->
-    <section class="hb__sec" id="contacto">
+    <section class="hb__sec hb__sec--claro" id="contacto">
       <div class="hb__wrap lc__contacto">
         <div>
           <p class="hb__ceja">Contacto</p>
           <h2 class="hb__h2">¿Preferís hablar antes?</h2>
-          <p class="lc__cierre-p">Contanos cómo cultivás y te ayudamos a arrancar: tus plantas, tus nutrientes o lo que tengas anotado.</p>
+          <p class="lc__contacto-p">Contanos cómo cultivás y te ayudamos a arrancar: tus plantas, tus nutrientes o lo que tengas anotado.</p>
         </div>
         <ContactoForm tipo-inicial="personal" :tipos="['personal']" />
       </div>
     </section>
 
-    <!-- ── Cierre: crear la cuenta ────────────────────────── -->
-    <section class="hb__sec hb__sec--claro">
-      <div class="hb__wrap lc__cierre">
-        <div>
-          <p class="hb__ceja">Empezá hoy</p>
-          <h2 class="hb__h2">Probala {{ diasPrueba }} días, gratis</h2>
-          <p class="lc__cierre-p">Sin tarjeta. Entrás en el momento y el mail lo confirmás después.</p>
-        </div>
-        <div class="lc__cierre-acc">
-          <RouterLink to="/registro" class="hb__btn">Crear mi cuenta</RouterLink>
-          <a href="#contacto" class="lc__hablar">¿Preferís hablar antes? Escribinos</a>
-        </div>
-      </div>
-    </section>
   </PaginaPublica>
 </template>
 
 <script setup>
 // LA PÁGINA DE «AUTOCULTIVO» (/bienvenida/autocultivo, 5-oct-2026): sólo lo que le importa a quien cultiva
 // para sí — su espacio, sus plantas, sus frascos y sus números. Sin pacientes, sedes ni caja.
-// El contenido (solapas y preguntas) está en `components/public/contenido.js`. Termina en el
-// autoregistro (/registro); el contacto queda para quien prefiere hablar antes.
+//
+// Rearmada el 9-oct-2026 pensando en el que recién arranca: lo que lo trae es sentirse
+// profesional (saber qué hacer hoy, anotar lo que hace, llegar a la cosecha con todo registrado).
+// Por eso el recorrido por fase con la planta adentro del teléfono (`RecorridoFases`) y el diario
+// y el informe de la cosecha (`CultivoEnPapeles`). Las preguntas están en
+// `components/public/contenido.js`. Cierra con el contacto, para quien prefiere hablar antes.
 import { ref, onMounted } from 'vue'
 import PaginaPublica from '../components/public/PaginaPublica.vue'
-import QueHace from '../components/public/QueHace.vue'
-import Bolsillo from '../components/public/Bolsillo.vue'
+import RecorridoFases from '../components/public/RecorridoFases.vue'
+import CultivoEnPapeles from '../components/public/CultivoEnPapeles.vue'
 import PreguntasFrecuentes from '../components/public/PreguntasFrecuentes.vue'
 import Packs from '../components/public/Packs.vue'
 import ContactoForm from '../components/public/ContactoForm.vue'
 import TelefonoMiCultivo from '../components/public/TelefonoMiCultivo.vue'
-import { TEMAS_AUTOCULTIVO, PREGUNTAS_AUTOCULTIVO, packsAutocultivo } from '../components/public/contenido.js'
+import { PREGUNTAS_AUTOCULTIVO, packsAutocultivo } from '../components/public/contenido.js'
 import { getRegistroInfo } from '../lib/api.js'
 
 const diasPrueba = ref(30)
@@ -129,10 +120,6 @@ onMounted(async () => {
 .lc__paso-n { font: 600 2rem/1 var(--hb-serif); color: var(--hb-verde); }
 .lc__contacto { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: clamp(24px, 5vw, 64px); align-items: start; }
 @media (max-width: 860px) { .lc__contacto { grid-template-columns: minmax(0, 1fr); } }
+.lc__contacto-p { margin: 12px 0 0; color: var(--hb-tinta-2); }
 
-.lc__cierre { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 24px; }
-.lc__cierre-p { margin: 12px 0 0; color: var(--hb-tinta-2); }
-.lc__cierre-acc { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
-.lc__hablar { color: var(--hb-verde); font-weight: 600; text-decoration: none; font-size: .95rem; }
-.lc__hablar:hover { text-decoration: underline; }
 </style>

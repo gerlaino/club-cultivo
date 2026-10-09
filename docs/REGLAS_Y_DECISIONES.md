@@ -434,10 +434,17 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   Excel, en la compu y el teléfono. La pantalla dibuja la MISMA definición que el PDF
   (`responder_informe(vista: true)`): una regla, un lugar. Una cosecha del lote entero no escribe
   `fecha_cosecha` en cada planta: la fecha es la del primer paso del lote a post-cosecha.
-- **PÁGINA PÚBLICA** (9-oct-2026): la palabra es «Proyectos», no «organizaciones». Se quedan la planta
-  que crece (portada) y las muestras animadas; en autocultivo el encabezado es el CELULAR con la app.
-  El consultorio vive en «Una vista por oficio» (la pantalla de cada rol al tocarlo). Los precios salen
-  del backend; nada «Se suma aparte» que los precios dan incluido (hoy sólo Ambiente/IoT es extra).
+- **PÁGINA PÚBLICA** (9-oct-2026, bloque (el); reemplaza la versión de la mañana): la puerta se
+  llama **«Organizaciones»** (ya no «Proyectos»; `/bienvenida/proyectos` redirige a
+  `/bienvenida/organizaciones`). La portada habla de **monitoreo y control** (lo que comparten las
+  dos puertas) y enseguida muestra las dos puertas, separadas: quien cultiva en casa no tiene que
+  leer lo de las organizaciones. **Organizaciones se cuenta desde el administrador**: quien contrata
+  conduce la organización, no riega; abre con su panel y en «Una vista por rol» va primero.
+  **Autocultivo se cuenta desde el novato**: sentirse profesional (qué hacer hoy, anotar, llegar a la
+  cosecha con todo registrado). En texto visible: **«rol», no «oficio»; «fase», no «ciclo»**. Se
+  quedan la planta que crece (portada), el celular (autocultivo) y las muestras animadas, que son
+  copias de pantallas reales con datos ficticios: no se reemplazan por dibujos. Los precios salen
+  del backend; no se compara con nadie ni se afirma lo que la app no hace hoy (sensores, WhatsApp).
 - **USO PERSONAL = PLAN `personal`, Y NACE SÓLO CON CULTIVO** (19-sep-2026). Es UNA persona
   sin equipo ni pacientes (`Club#personal?`, `PlanEnforcer` personal); lo único que puede tener
   es `Club::MODULOS_PERSONAL` (cultivo, iot, ia, chatbot) y el ambiente, la IA y el chatbot **se

@@ -6,7 +6,7 @@
       <span class="mi__mic" aria-hidden="true">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg>
       </span>
-      <p>«Regué las tres de la carpa con un litro y medio cada una, pH 6,2, y les puse 2 ml de flora por litro.»</p>
+      <p>{{ DICHO }}</p>
     </div>
 
     <div class="mi__propuesta">
@@ -25,12 +25,23 @@
 </template>
 
 <script setup>
+// En casa, la carpa y sus plantas; en una organización, la sala con su receta y la tarea que el
+// dictado propone para mañana (el registro por voz también arma tareas).
 const props = defineProps({ casa: { type: Boolean, default: false } })
-const REGISTROS = [
-  { que: 'Riego',     det: '3 plantas · 1,5 L c/u · pH 6,2' },
-  { que: 'Nutriente', det: 'Flora · 2 ml/L · 4,5 L de solución' },
-  { que: 'Dónde',     det: props.casa ? 'Carpa · Gorilla 1, Gorilla 2 y Ananda 1' : 'Carpa · lote L-26-002' },
-]
+const DICHO = props.casa
+  ? '«Regué las tres de la carpa con un litro y medio cada una, pH 6,2, y les puse 2 ml de flora por litro.»'
+  : '«Regué Flora 2 con la receta de floración, litro y medio por maceta, pH 6,2. Mañana hay que defoliar el L-26-007.»'
+const REGISTROS = props.casa
+  ? [
+      { que: 'Riego',     det: '3 plantas · 1,5 L c/u · pH 6,2' },
+      { que: 'Nutriente', det: 'Flora · 2 ml/L · 4,5 L de solución' },
+      { que: 'Dónde',     det: 'Carpa · Gorilla 1, Gorilla 2 y Ananda 1' },
+    ]
+  : [
+      { que: 'Riego',  det: 'Flora 2 · 12 plantas · 1,5 L c/u · pH 6,2' },
+      { que: 'Receta', det: 'Floración 3 · descuenta del depósito' },
+      { que: 'Tarea',  det: 'Defoliar L-26-007 · mañana' },
+    ]
 </script>
 
 <style scoped>

@@ -63,7 +63,7 @@
 
       <p class="hb-pie">
         ¿Ya tenés cuenta? <RouterLink to="/login" class="hb-link">Ingresá</RouterLink>
-        · ¿Es para un proyecto? <RouterLink :to="{ path: '/bienvenida/proyectos', hash: '#contacto' }" class="hb-link">Escribinos</RouterLink>
+        · ¿Es para una organización? <RouterLink :to="{ path: '/bienvenida/organizaciones', hash: '#contacto' }" class="hb-link">Escribinos</RouterLink>
       </p>
     </div>
   </div>
