@@ -9,6 +9,7 @@ module Dispensario
   # se HEREDA del cierre anterior en vez de declararse. Ahí está el control: quien abre no elige
   # con cuánto arranca, solo puede corregirlo, y si lo corrige queda la diferencia con su nombre.
   class MostradorController < ApplicationController
+    include DescargaProfesional
     before_action :authenticate_user!
     before_action -> { require_feature!(:produccion_dispensa) }
     before_action :set_mostrador, except: [:resumen]
@@ -169,8 +170,10 @@ module Dispensario
       # `sede_id=todas` compara el club entero. La ruta sigue colgando de una sede porque es
       # como se navega, pero la pregunta "¿dónde se pierde más?" no es de una sede sola.
       objetivo = params[:todas].present? ? mostradores_del_club : @mostrador
-      render json: Mostradores::Merma.call(mostrador: objetivo,
-                                           desde: params[:desde], hasta: params[:hasta])
+      datos = Mostradores::Merma.call(mostrador: objetivo, desde: params[:desde], hasta: params[:hasta])
+      return enviar_merma(datos) if %w[xlsx pdf].include?(params[:formato])
+
+      render json: datos
     rescue ArgumentError, Date::Error
       render json: { error: 'Fecha inválida' }, status: :unprocessable_entity
     end
@@ -246,7 +249,7 @@ module Dispensario
 
       # DESCARGA: el historial de arqueos es lo que se le muestra a un contador o a un socio, y
       # eso no se hace leyendo una pantalla. Sin tope de páginas: se baja todo lo que haya.
-      return enviar_csv(escala) if params[:formato] == 'csv'
+      return enviar_arqueos(escala) if %w[xlsx pdf csv].include?(params[:formato])
 
       # EL MES ENTERO, para el calendario (sep-2026, idea de Germán): cada día con su marca y el
       # detalle al tocarlo. Un mes de un mostrador son treinta y pico de cierres: van todos, sin
@@ -587,29 +590,61 @@ module Dispensario
     # Una fila por turno con lo mismo que muestra la pantalla: cuándo, quién, cuánto se entregó,
     # qué faltó y cómo cerró la caja. Es lo que se le pasa al contador o se archiva, y eso no se
     # hace copiando de una tabla en el navegador.
-    def enviar_csv(escala)
-      require 'csv'
-      filas = CSV.generate(col_sep: ';', encoding: 'UTF-8') do |csv|
-        # El CSV sí lleva las cantidades además de los pesos: lo abre alguien que va a analizar,
-        # no a leer de un vistazo, y ahí el detalle sirve. La PANTALLA muestra sólo los pesos,
-        # porque sumar gramos con unidades da un número que no significa nada.
-        csv << ['Fecha', 'Abrió', 'Cerró', 'Atendió', 'Cerrado por', 'Productos',
-                'Entregado', 'Entregado ($)', 'Faltó', 'Faltó ($)', 'Productos con faltante',
-                'Efectivo contado ($)', 'Diferencia caja ($)', 'Revisado']
-        escala.each do |t|
-          r = serialize_turno_resumen(t)
-          csv << [
-            t.cerrado_at&.to_date, hora_corta(t.abierto_at), hora_corta(t.cerrado_at),
-            r[:atendio], r[:cerrado_por], r[:productos], r[:dispensado], r[:dispensado_ars],
-            r[:faltante], r[:faltante_ars], r[:productos_con_faltante],
-            r[:efectivo_contado_ars], r[:diferencia_caja_ars],
-            r[:revisado] ? 'sí' : 'no',
-          ]
+    # LA MERMA, PARA LLEVÁRSELA: el corte que se está mirando (`corte`: producto, sede, persona o
+    # turno), en PDF o Excel. Los números del mismo servicio que la pantalla, cada uno en su
+    # columna con nombre; la frase de la pantalla («se pierden 7 de cada 1.000») es el % de acá.
+    def enviar_merma(datos)
+      corte = %w[producto sede persona turno].include?(params[:corte]) ? params[:corte] : 'producto'
+      quien = { 'producto' => 'Frasco', 'sede' => 'Sede', 'persona' => 'Atendió', 'turno' => 'Cierre' }[corte]
+      filas = Array(datos[{ 'producto' => :por_producto, 'sede' => :por_sede, 'persona' => :por_persona, 'turno' => :por_turno }[corte]])
+      nombre = ->(f) {
+        case corte
+        when 'producto' then [f[:producto], f[:numero]].compact_blank.join(' · ')
+        when 'sede'     then f[:sede]
+        when 'persona'  then f[:persona]
+        else [f[:cerrado_at]&.in_time_zone&.strftime('%d/%m/%Y %H:%M'), f[:atendio]].compact_blank.join(' · ')
         end
-      end
+      }
+      unidad = ->(f) { corte == 'producto' ? (f[:unidad].presence || 'g') : 'g / u.' }
+      desde, hasta = params.values_at(:desde, :hasta).map { |d| (Date.parse(d) rescue nil) }
+      responder_descarga(
+        titulo: "Merma del mostrador — #{params[:todas].present? ? 'todas las sedes' : @mostrador.sede&.nombre}",
+        nombre: "merma-#{corte}", formato: params[:formato],
+        periodo: ([desde, hasta].compact.any? ? [desde, hasta].map { |d| d&.strftime('%d/%m/%Y') || '…' }.join(' al ') : nil),
+        filtros: "Por #{quien.downcase}",
+        headers: [quien, 'Faltó', 'Unidad', 'Entregado', 'Merma (%)', 'Cierres', 'A costo'],
+        formatos: %i[texto numero texto numero numero numero moneda],
+        totales: [6],
+        rows: filas.map { |f|
+          [nombre.(f), f[:faltante], unidad.(f), f[:dispensado], f[:merma_pct], f[:turnos] || 1, f[:faltante_ars]]
+        },
+        nota: 'Merma = lo que faltó al cerrar sobre lo que se entregó. Sin nada entregado no hay porcentaje: ' \
+              'si igual faltó, es producto que no está y no se vendió.',
+      )
+    end
 
-      send_data "﻿#{filas}", type: 'text/csv; charset=utf-8',
-                filename: "arqueos-#{@mostrador.sede&.nombre.to_s.parameterize}-#{Time.zone.today}.csv"
+    def enviar_arqueos(escala)
+      # Excel (con las cantidades además de los pesos: lo abre alguien que va a analizar) o PDF
+      # (para archivar o pasárselo al contador). La pantalla muestra sólo los pesos, porque sumar
+      # gramos con unidades da un número que no significa nada. Ya no hay CSV.
+      turnos = escala.to_a
+      filas = turnos.map { |t| [t, serialize_turno_resumen(t)] }
+      responder_descarga(
+        titulo: "Cierres del mostrador — #{@mostrador.sede&.nombre}", nombre: "cierres-#{@mostrador.sede&.nombre.to_s.parameterize}",
+        formato: params[:formato] == 'pdf' ? 'pdf' : 'xlsx',
+        kpis: [{ label: 'Cierres', valor: turnos.size },
+               { label: 'Con faltante', valor: filas.count { |_, r| r[:faltante].to_f.positive? } }],
+        headers: ['Fecha', 'Abrió', 'Cerró', 'Atendió', 'Cerró la caja', 'Entregado', 'Entregado ($)',
+                  'Faltó', 'Faltó ($)', 'Efectivo contado', 'Diferencia de caja', 'Revisado'],
+        columnas_pdf: [0, 1, 2, 3, 6, 8, 10, 11],
+        formatos: %i[fecha texto texto texto texto numero moneda numero moneda moneda moneda texto],
+        totales: [6, 8],
+        rows: filas.map { |t, r|
+          [t.cerrado_at&.to_date, hora_corta(t.abierto_at), hora_corta(t.cerrado_at), r[:atendio], r[:cerrado_por],
+           r[:dispensado], r[:dispensado_ars], r[:faltante], r[:faltante_ars], r[:efectivo_contado_ars],
+           r[:diferencia_caja_ars], r[:revisado] ? 'Sí' : 'No']
+        },
+      )
     end
 
     def resumen_de(sede)

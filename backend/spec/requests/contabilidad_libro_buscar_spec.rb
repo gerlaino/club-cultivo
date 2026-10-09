@@ -85,10 +85,10 @@ RSpec.describe 'GET /movimientos_contables — buscar y paginar', type: :request
     it 'respeta la búsqueda' do
       gasto('Calentador de Agua')
 
-      get '/movimientos_contables/export_csv.csv', params: { q: 'calentador' }, headers: auth_headers
+      get '/movimientos_contables/export_csv', params: { q: 'calentador' }, headers: auth_headers
       expect(response).to have_http_status(:ok)
 
-      filas = response.body.lines.grep(/Gasto de relleno|Calentador/)
+      filas = filas_xlsx(response.body).select { |f| f.any? { |c| c.to_s.match?(/Gasto de relleno|Calentador/) } }
       expect(filas.size).to eq(1)
       expect(filas.first).to include('Calentador de Agua')
     end
@@ -98,14 +98,14 @@ RSpec.describe 'GET /movimientos_contables — buscar y paginar', type: :request
                                  categoria: 'aporte_socio', descripcion: 'Un aporte',
                                  monto_ars: 5_000, fecha: Time.zone.today, pagado: true)
 
-      get '/movimientos_contables/export_csv.csv', params: { tipo: 'ingreso' }, headers: auth_headers
-      expect(response.body).to include('Un aporte')
-      expect(response.body).not_to include('Gasto de relleno')
+      get '/movimientos_contables/export_csv', params: { tipo: 'ingreso' }, headers: auth_headers
+      expect(texto_xlsx(response.body)).to include('Un aporte')
+      expect(texto_xlsx(response.body)).not_to include('Gasto de relleno')
     end
 
     it 'sin filtros los baja todos, como antes' do
-      get '/movimientos_contables/export_csv.csv', headers: auth_headers
-      expect(response.body.lines.grep(/Gasto de relleno/).size).to eq(25)
+      get '/movimientos_contables/export_csv', headers: auth_headers
+      expect(filas_xlsx(response.body).count { |f| f.any? { |c| c.to_s.include?('Gasto de relleno') } }).to eq(25)
     end
   end
 end

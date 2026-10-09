@@ -1,8 +1,9 @@
 # Reporte consolidado de Finanzas (Bloque 4): un corte del período con los números que
 # el club mira "al día de hoy" — ingresos/egresos/resultado, gastos por categoría,
 # aportaciones, dispensado en gramos, cuenta corriente por cobrar y serie para el gráfico.
-# Lectura: admin/auditor. Export CSV con rango de fechas.
+# Lectura: admin/auditor. Descarga en Excel o PDF con rango de fechas.
 class ReportesController < ApplicationController
+  include DescargaProfesional
   before_action :authenticate_user!
   before_action :require_lectura
 
@@ -27,7 +28,7 @@ class ReportesController < ApplicationController
     }
   end
 
-  # GET /finanzas/reporte/export?desde=&hasta=  (CSV del período)
+  # GET /finanzas/reporte/export?desde=&hasta=&formato=xlsx|pdf
   def export_csv
     club  = current_user.club
     desde = parse_fecha(params[:desde]) || Date.current.beginning_of_month
@@ -35,18 +36,30 @@ class ReportesController < ApplicationController
     movs  = club.movimientos_contables.includes(:sede, :unidad_negocio, :categoria_contable)
                .sin_cuotas_futuras.del_periodo(desde, hasta).recientes
 
-    require 'csv'
-    csv = CSV.generate(col_sep: ';', encoding: 'UTF-8') do |out|
-      out << %w[Fecha Tipo Categoría Unidad Descripción Monto_ARS Sede Pagado]
-      movs.each do |m|
-        out << [
-          m.fecha, m.tipo_label, (m.categoria_contable&.nombre || m.categoria_label),
-          m.unidad_negocio&.nombre, m.descripcion, m.monto_ars.to_f,
-          m.sede&.nombre, (m.pagado ? 'Sí' : 'No')
-        ]
-      end
-    end
-    send_data csv, filename: "reporte_#{desde}_#{hasta}.csv", type: 'text/csv; charset=utf-8', disposition: 'attachment'
+    # Un informe, no una planilla cruda (`DescargaProfesional`): los números del período arriba,
+    # los gastos por categoría y el detalle de movimientos, en Excel o PDF.
+    ingresos = movs.select { |m| m.tipo == 'ingreso' }.sum { |m| m.monto_ars.to_f }
+    egresos  = movs.select { |m| m.tipo == 'egreso' }.sum { |m| m.monto_ars.to_f }
+    pesos = ->(v) { pesos_ar(v) }
+    gastos = gastos_por_categoria(movs.reorder(nil))
+    responder_descarga(
+      titulo: 'Reporte de finanzas', nombre: "reporte_finanzas_#{desde}_#{hasta}",
+      periodo: "#{desde.strftime('%d/%m/%Y')} al #{hasta.strftime('%d/%m/%Y')}",
+      kpis: [{ label: 'Ingresos', valor: pesos.(ingresos) }, { label: 'Egresos', valor: pesos.(egresos) },
+             { label: 'Resultado', valor: pesos.(ingresos - egresos) },
+             { label: 'Dispensado', valor: "#{numero_ar(dispensado_gramos(club, desde, hasta), 1)} g" }],
+      antes: [{ titulo: 'Gastos por categoría', headers: ['Categoría', 'Monto'],
+                rows: gastos.map { |g| [g[:categoria_label], pesos.(g[:total])] },
+                aligns: { 1 => :right }, vacio: 'No hubo gastos en el período.' }],
+      titulo_tabla: 'Movimientos del período',
+      headers: ['Fecha', 'Tipo', 'Categoría', 'Sector', 'Descripción', 'Monto', 'Sede', 'Pagado'],
+      formatos: %i[fecha texto texto texto texto moneda texto texto],
+      totales: [5],
+      rows: movs.map { |m|
+        [m.fecha, m.tipo_label, (m.categoria_contable&.nombre || m.categoria_label), m.unidad_negocio&.nombre,
+         m.descripcion, m.tipo == 'egreso' ? -m.monto_ars.to_f : m.monto_ars.to_f, m.sede&.nombre, (m.pagado ? 'Sí' : 'No')]
+      },
+    )
   end
 
   private

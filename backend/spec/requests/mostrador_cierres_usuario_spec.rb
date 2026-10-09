@@ -220,13 +220,21 @@ RSpec.describe 'Quién ve qué del mostrador', type: :request do
       expect(segunda & primera).to be_empty
     end
 
-    it 'lo baja entero en CSV, con una fila por cierre y sin paginar' do
-      pedir(admin, { formato: 'csv' })
+    # Excel o PDF, nunca CSV (9-oct-2026). Las filas de datos son las que tienen fecha.
+    def cierres_del_excel = filas_xlsx(response.body).select { |f| f.first.to_s.match?(/\A\d+(\.\d+)?\z/) }
 
-      expect(response.headers['Content-Type']).to include('text/csv')
-      expect(response.headers['Content-Disposition']).to include('arqueos-')
-      expect(response.body.lines.size).to eq(6)          # encabezado + los cinco
-      expect(response.body).to include('Efectivo contado')
+    it 'lo baja entero en Excel, con una fila por cierre y sin paginar' do
+      pedir(admin, { formato: 'xlsx' })
+
+      expect(response.headers['Content-Type']).to include(DescargasHelper::XLSX)
+      expect(response.headers['Content-Disposition']).to include('cierres-')
+      expect(cierres_del_excel.size).to eq(5)
+      expect(texto_xlsx(response.body)).to include('Efectivo contado')
+    end
+
+    it 'y en PDF' do
+      pedir(admin, { formato: 'pdf' })
+      expect(es_pdf?(response.body)).to be(true)
     end
 
     # El que atiende ve LOS SUYOS, también al descargar: el filtro es del backend.
@@ -234,9 +242,9 @@ RSpec.describe 'Quién ve qué del mostrador', type: :request do
       otro = create(:user, :dispensador, club: club)
       un_cierre!(otro)
 
-      pedir(otro, { formato: 'csv' })
+      pedir(otro, { formato: 'xlsx' })
 
-      expect(response.body.lines.size).to eq(2)          # encabezado + el suyo
+      expect(cierres_del_excel.size).to eq(1)
     end
   end
 

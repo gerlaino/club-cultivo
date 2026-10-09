@@ -1,7 +1,9 @@
 <script setup>
 // Reporte consolidado de Finanzas (Bloque 4): rango de fechas + números del período + export.
 import { ref, computed, onMounted } from 'vue'
-import { getReporteFinanzas, exportReporteFinanzas } from '../../lib/api.js'
+import { getReporteFinanzas } from '../../lib/api.js'
+import { descargarListado } from '../../lib/descargas.js'
+import BotonesDescarga from '../../components/ui/BotonesDescarga.vue'
 import { useToast } from '../../composables/useToast.js'
 import { hoyISO } from '../../utils/dates.js'
 
@@ -29,17 +31,17 @@ async function cargar() {
 }
 onMounted(cargar)
 
-async function exportar() {
+// El reporte del período en PDF o Excel, armado en el backend (`DescargaProfesional`).
+const generando = ref(null)
+async function exportar(formato) {
+  generando.value = formato
   try {
-    const res = await exportReporteFinanzas({ desde: desde.value, hasta: hasta.value })
-    const url = window.URL.createObjectURL(new Blob([res.data]))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `reporte_${desde.value}_${hasta.value}.csv`
-    document.body.appendChild(a); a.click(); a.remove()
-    window.URL.revokeObjectURL(url)
-  } catch {
-    toast.error('No se pudo exportar')
+    await descargarListado('/finanzas/reporte/export', formato,
+      { params: { desde: desde.value, hasta: hasta.value }, nombre: `reporte_finanzas_${desde.value}_${hasta.value}` })
+  } catch (e) {
+    toast.error(e.message)
+  } finally {
+    generando.value = null
   }
 }
 
@@ -54,7 +56,7 @@ const maxSerie = computed(() => {
     <header class="rep__head">
       <div>
         <h1>Reporte de Finanzas</h1>
-        <p>El corte del período: qué entró, qué salió y el resultado. Exportable a CSV.</p>
+        <p>El corte del período: qué entró, qué salió y el resultado. Se descarga en PDF o Excel.</p>
       </div>
     </header>
 
@@ -62,7 +64,7 @@ const maxSerie = computed(() => {
       <label>Desde <input type="date" v-model="desde" class="inp" /></label>
       <label>Hasta <input type="date" v-model="hasta" class="inp" /></label>
       <button class="btn btn--primary" @click="cargar" :disabled="loading">Generar</button>
-      <button class="btn" @click="exportar" :disabled="!data">⭳ Exportar CSV</button>
+      <BotonesDescarga :disabled="!data" :generando="generando" @descargar="exportar" />
     </div>
 
     <div v-if="loading" class="rep__loading">Generando reporte…</div>

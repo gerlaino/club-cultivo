@@ -5,7 +5,9 @@ import { useRoute, useRouter } from 'vue-router'
 import { usePacientesStore } from '../stores/pacientes'
 import { useAuthStore } from '../stores/auth'
 import { useConfirm } from '../composables/useConfirm.js'
-import { exportPacientesCSV } from '../lib/api.js'
+import { descargarListado } from '../lib/descargas.js'
+import { useToast } from '../composables/useToast.js'
+import BotonesDescarga from '../components/ui/BotonesDescarga.vue'
 import EmptyState from '../components/ui/EmptyState.vue'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import SocioEditarModal from '../components/pacientes/SocioEditarModal.vue'
@@ -224,26 +226,20 @@ onMounted(async () => {
   }
 })
 
-const exporting = ref(false)
-async function exportarCSV() {
-  exporting.value = true
+// Lo mismo que la lista, en PDF o Excel (`DescargaProfesional`).
+const toast = useToast()
+const generando = ref(null)
+async function descargar(formato) {
+  generando.value = formato
   try {
     const params = {}
-    if (filterEstado.value === 'proximos') params.reprocann = 'proximos'
-    if (filterEstado.value === 'vencidos') params.reprocann = 'vencidos'
-    if (filterEstado.value === 'sin_rep')  params.reprocann = 'sin_rep'
-    if (search.value.trim())               params.query     = search.value.trim()
-    const { data } = await exportPacientesCSV(params)
-    const url = URL.createObjectURL(new Blob([data], { type: 'text/csv' }))
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `pacientes_${hoyISO()}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-  } catch {
-    // silencio
+    if (['proximos', 'vencidos', 'sin_rep'].includes(filterEstado.value)) params.reprocann = filterEstado.value
+    if (search.value.trim()) params.query = search.value.trim()
+    await descargarListado('/pacientes/export_csv', formato, { params, nombre: `pacientes_${hoyISO()}` })
+  } catch (e) {
+    toast.error(e.message)
   } finally {
-    exporting.value = false
+    generando.value = null
   }
 }
 </script>
@@ -332,7 +328,7 @@ async function exportarCSV() {
     <p v-if="sinCargar" class="sv__resena sv__resena--aviso">
       La lista muestra los primeros {{ store.items.length }} de {{ store.total }}. Los números de
       arriba cuentan el padrón completo. Buscá por nombre o DNI para llegar al resto, o descargá
-      el CSV.
+      el listado en PDF o Excel.
     </p>
 
     <!-- Búsqueda -->
@@ -347,10 +343,7 @@ async function exportarCSV() {
         />
         <span v-if="search" class="sv__search-count">{{ filtrados.length }}</span>
       </div>
-      <button v-if="canEdit" class="sv__btn-export" :disabled="exporting || !filtrados.length" @click="exportarCSV">
-        <i class="bi bi-download"></i>
-        {{ exporting ? 'Exportando…' : 'CSV' }}
-      </button>
+      <BotonesDescarga v-if="canEdit" :disabled="!filtrados.length" :generando="generando" @descargar="descargar" />
     </div>
 
     <!-- Loading -->

@@ -357,7 +357,6 @@ export const registrarPagoCC     = (pacienteId, payload) => api.post(`/pacientes
 export const devolverSaldoCC     = (pacienteId, payload) => api.post(`/pacientes/${pacienteId}/cuenta_corriente/devolver`, payload)
 export const setLimiteCC         = (pacienteId, limite)  => api.patch(`/pacientes/${pacienteId}/cuenta_corriente/set_limite`, { limite_credito: limite })
 
-export const exportPacientesCSV  = (params = {}) => api.get('/pacientes/export_csv', { params, responseType: 'blob' })
 export const listDispensaciones = (pacienteId, params = {}) => api.get(`/pacientes/${pacienteId}/dispensaciones`, { params });
 export const listDispensacionesFecha = (params = {}) => api.get('/dispensaciones', { params });
 export const getDispensacion = (id) => api.get(`/dispensaciones/${id}`);
@@ -378,7 +377,6 @@ export const updateReserva   = (id, payload)         => api.patch(`/reservas/${i
 export const deleteReserva   = (id)                  => api.delete(`/reservas/${id}`);
 
 // ── Delivery ──────────────────────────────────────────────────────────────────
-export const exportDispensacionesCSV = (params = {}) => api.get('/dispensaciones/export_csv', { params, responseType: 'blob' })
 export const getMisPaquetes   = ()                  => api.get('/dispensaciones/mis_paquetes')
 // Los envíos que despachó HOY quien pregunta, con su estado (`todos=1` para administración).
 export const getEnviosDelDia  = (params = {})       => api.get('/dispensaciones/envios_del_dia', { params })
@@ -524,9 +522,7 @@ export const listGastosRecurrentes   = (params = {}) => api.get('/gastos_recurre
 export const createGastoRecurrente   = (payload)     => api.post('/gastos_recurrentes', { gasto_recurrente: payload })
 export const updateGastoRecurrente   = (id, payload) => api.put(`/gastos_recurrentes/${id}`, { gasto_recurrente: payload })
 export const deleteGastoRecurrente   = (id)          => api.delete(`/gastos_recurrentes/${id}`)
-export const exportMovimientosCSV   = (params = {})  => api.get('/movimientos_contables/export_csv', { params, responseType: 'blob' })
 // Excel con tipos reales, totales y filtros: el CSV plano no se podía trabajar sin rearmarlo.
-export const exportMovimientosXLSX  = (params = {})  => api.get('/movimientos_contables/export_csv.xlsx', { params, responseType: 'blob' })
 // Gastos fijos del mes: los recurrentes detectados del historial (alquiler, impuestos, servicios)
 export const listMovimientosRecurrentes = (params = {}) => api.get('/movimientos_contables/recurrentes', { params })
 export const cerrarPeriodoContable  = (hasta)        => api.post('/movimientos_contables/cerrar_periodo', { hasta })
@@ -636,10 +632,6 @@ export const reabrirRevisionTurnoMostrador = (sedeId, id) => api.delete(`/sedes/
 export const getTurnoMostrador     = (sedeId, id) => api.get(`/sedes/${sedeId}/mostrador/turnos/${id}`)
 // Los turnos ya cerrados: administración los ve todos, el que atiende ve LOS SUYOS.
 export const listTurnosMostrador   = (sedeId, params = {}) => api.get(`/sedes/${sedeId}/mostrador/turnos`, { params })
-// El historial de arqueos, para llevárselo: es lo que se le pasa al contador o se archiva, y eso
-// no se hace copiando de una tabla en el navegador.
-export const descargarTurnosMostrador = (sedeId) =>
-  api.get(`/sedes/${sedeId}/mostrador/turnos`, { params: { formato: 'csv' }, responseType: 'blob' })
 // Arreglar un conteo mal cargado en un turno ya cerrado: es el único lugar del módulo donde un
 // dedazo ajusta el inventario real. No borra el movimiento viejo, asienta la diferencia.
 export const corregirTurnoMostrador = (sedeId, id, payload) =>
@@ -701,14 +693,12 @@ export const revertirCheckin   = (barId, evId, codigo)        => api.post(`/bare
 
 // ── Finanzas · reporte consolidado ─────────────────────────────────────────────
 export const getReporteFinanzas    = (params = {}) => api.get('/finanzas/reporte', { params })
-export const exportReporteFinanzas = (params = {}) => api.get('/finanzas/reporte/export', { params, responseType: 'blob' })
 
 export const getAmbienteSalas       = ()             => api.get('/stats/ambiente_salas')
 export const listComprasCuotas      = ()             => api.get('/compras_cuotas')
 export const createCompraCuotas     = (payload)      => api.post('/compras_cuotas', { compra_cuotas: payload })
 export const updateCompraCuotas     = (id, payload)  => api.patch(`/compras_cuotas/${id}`, { compra_cuotas: payload })
 export const deleteCompraCuotas     = (id)           => api.delete(`/compras_cuotas/${id}`)
-export const exportLotesCSV         = (params = {})  => api.get('/lotes/export_csv', { params, responseType: 'blob' })
 
 // ── Costo por lote ────────────────────────────────────────────────────────────
 export const getCostoLote    = (loteId)           => api.get(`/lotes/${loteId}/costo`)
@@ -756,7 +746,6 @@ export const deletePlanTrabajo        = (id)                  => api.delete(`/pl
 export const publicarPlanTrabajo      = (id)                  => api.post(`/plan_trabajos/${id}/publicar`)
 export const archivarPlanTrabajo      = (id)                  => api.post(`/plan_trabajos/${id}/archivar`)
 export const interpretarArchivoPlan   = (formData)            => api.post('/plan_trabajos/interpretar_archivo', formData, { headers: { 'Content-Type': 'multipart/form-data' } })
-export const exportPlanCSV            = (id, params = {})     => api.get(`/plan_trabajos/${id}/export_csv`, { params, responseType: 'blob' })
 export const listPlanTareas           = (planId)              => api.get(`/plan_trabajos/${planId}/plan_tareas`)
 export const createPlanTarea          = (planId, data)        => api.post(`/plan_trabajos/${planId}/plan_tareas`, { plan_tarea: data })
 export const updatePlanTarea          = (planId, tid, data, scope = 'esta') => api.patch(`/plan_trabajos/${planId}/plan_tareas/${tid}`, { plan_tarea: data, scope })

@@ -32,6 +32,8 @@ const evolucion = { desde: '2026-09-01', hasta: '2026-09-06', productos: [
 ] }
 const getEvolucionMostrador = vi.fn(() => Promise.resolve({ data: evolucion }))
 
+const descargarListado = vi.fn(() => Promise.resolve())
+vi.mock('../lib/descargas.js', () => ({ descargarListado: (...a) => descargarListado(...a) }))
 vi.mock('../lib/api.js', () => ({
   getMermaMostrador:     (...a) => getMermaMostrador(...a),
   getEvolucionMostrador: (...a) => getEvolucionMostrador(...a),
@@ -276,25 +278,19 @@ describe('Por persona', () => {
     expect(w.findAll('.mrm__fila')[1].find('.mrm__fila-sub').text()).toContain('otra persona')
   })
 
-  it('y el CSV se lleva el contexto entero', async () => {
+  // 9-oct-2026: ya no es un CSV armado acá. Se baja el corte que se está mirando, en PDF o Excel,
+  // y lo arma el backend con los mismos números.
+  it('la descarga pide al backend el corte que se está mirando, en el formato elegido', async () => {
     const w = await abrirCorte()
-    let contenido = ''
-    const BlobOriginal = globalThis.Blob
-    globalThis.Blob = function (partes, opts) { contenido = partes.join(''); return new BlobOriginal(partes, opts) }
-    const urlOriginal = URL.createObjectURL
-    URL.createObjectURL = () => 'blob:x'
-    URL.revokeObjectURL = () => {}
-    // jsdom no navega: sin esto, el click del enlace escribe un error en la salida de otro test.
-    const clickOriginal = HTMLAnchorElement.prototype.click
-    HTMLAnchorElement.prototype.click = () => {}
+    descargarListado.mockClear()
 
-    await w.findAll('.mrm__corte .mrm__btn')[0].trigger('click')
+    await w.find('.bdes__btn').trigger('click')   // PDF
 
-    globalThis.Blob = BlobOriginal
-    URL.createObjectURL = urlOriginal
-    HTMLAnchorElement.prototype.click = clickOriginal
-    expect(contenido).toContain('Ana Gómez')
-    expect(contenido).toContain('contra el promedio')
+    expect(descargarListado).toHaveBeenCalledTimes(1)
+    const [url, formato, { params }] = descargarListado.mock.calls[0]
+    expect(url).toMatch(/\/mostrador\/merma$/)
+    expect(formato).toBe('pdf')
+    expect(params.corte).toBe('persona')
   })
 })
 

@@ -138,13 +138,13 @@ RSpec.describe 'Pacientes: REPROCANN vencido, trámite, vínculo y apodo', type:
       expect(paciente.reload.apodo).to eq('Tano')
     end
 
-    it 'la descarga CSV con búsqueda trae lo mismo que la pantalla: encuentra por apodo' do
+    it 'la descarga con búsqueda trae lo mismo que la pantalla: encuentra por apodo' do
       paciente.update!(apodo: 'Tano', apellido: 'Rossi')
       create(:paciente, club: club, created_by: admin, apellido: 'Otro')
       sign_in_as(admin)
       get '/api/pacientes/export_csv', params: { query: 'tano' }
-      expect(response.body).to include('Rossi')
-      expect(response.body).not_to include('Otro')
+      expect(texto_xlsx(response.body)).to include('Rossi')
+      expect(texto_xlsx(response.body)).not_to include('Otro')
     end
 
     it 'la lista de cuentas corrientes trae el apodo, para buscarlo ahí también' do

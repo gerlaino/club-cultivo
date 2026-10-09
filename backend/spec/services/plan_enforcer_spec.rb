@@ -174,6 +174,18 @@ RSpec.describe PlanEnforcer do
       lote
     end
 
+    # 9-oct-2026: la tarjeta decía «En floración 6 de 9» con tres automáticas en vege. El uso dice
+    # de qué está hecho el cupo, y las partes suman el total.
+    it 'el uso desglosa el cupo: en floración y automáticas fuera de floración' do
+      lote_con(3, estado: 'vegetativo', genetica: auto)
+      lote_con(3, estado: 'floracion')
+      lote_con(5, estado: 'vegetativo')
+
+      info = described_class.new(club).info
+      expect(info[:uso][:plantas]).to eq(6)
+      expect(info[:plantas_desglose]).to eq(en_floracion: 3, automaticas: 3)
+    end
+
     it 'el vegetativo es libre' do
       lote_con(20, estado: 'vegetativo')
       expect(described_class.new(club).info[:uso][:plantas]).to eq(0)

@@ -47,3 +47,22 @@ export async function descargarArchivo (url, { params = {}, filename } = {}) {
     throw err
   }
 }
+
+// Un listado en PDF o Excel (`BotonesDescarga` + `DescargaProfesional` en el backend). `nombre` es
+// el nombre del archivo sin extensión; el formato le pone la suya.
+export function descargarListado (url, formato, { params = {}, nombre }) {
+  return descargarArchivo(url, { params: { ...params, formato }, filename: `${nombre}.${formato}` })
+}
+
+// Lo mismo, cuando lo que hay que mandar es una tabla armada en la pantalla (la analítica): POST.
+export async function descargarPost (url, body, filename) {
+  try {
+    const { data } = await api.post(url, body, { responseType: 'blob' })
+    bajarBlob(data, filename)
+  } catch (e) {
+    const motivo = await leerErrorDeBlob(e)
+    const err = new Error(motivo || 'No se pudo generar el archivo. Reintentá en un momento.')
+    err.conMotivo = Boolean(motivo)
+    throw err
+  }
+}

@@ -1,5 +1,26 @@
 # Changelog
 
+## Octubre 2026 (ep) — Toda descarga es un informe; la tarjeta del cupo (9-oct)
+
+Germán bajó el CSV de un plan: «esta horrible esto, no se entiende… todo tiene que estar acorde al
+profesionalismo que queremos manejar».
+- **`DescargaProfesional`** (concern): un listado sale en Excel (`XlsxExport`) o PDF
+  (`InformeDocument`), con membrete, resumen y tipos. PDF apaisado para tablas anchas, anchos por
+  contenido sin cortar palabras, fila de total en negrita, «-$ 16.500», `columnas_pdf`.
+- **Las 9 descargas, pasadas**: pacientes (sin id ni «límite mensual», REPROCANN con su categoría),
+  dispensaciones (una fila por dispensa con lo que se llevó, anuladas marcadas y fuera de los
+  totales), lotes (estado con nombre, «Cerrado sin cosecha», m² y g/m²), movimientos contables
+  (sin CSV), cierres del mostrador, merma del mostrador (el corte a la vista; antes CSV del
+  navegador), reporte de finanzas (con gastos por categoría), planes de trabajo (plantilla y con
+  fechas: «Semana 3 · día 1», qué hay que hacer, sin `rol_sugerido` ni `---`) y Analítica
+  (`POST /analytics/descargar` con la tabla de la solapa; era un CSV y un PDF-captura).
+- **Pantallas**: `BotonesDescarga` (PDF · Excel) en las nueve; los errores se dicen (antes varias
+  callaban). Textos de ayuda y onboarding sin «CSV». `Tarea::TIPO_LABELS`.
+- **Cupo de plantas**: la tarjeta «En floración 6 de 9 · las autos cuentan todo su ciclo» pasa a
+  «Cupo de plantas · 6 de 9 · 3 en floración + 3 automáticas» (`PlanEnforcer#info[:plantas_desglose]`).
+- Specs: `descargas_profesionales_spec.rb` (reemplaza `export_csv_spec`), helper `filas_xlsx`, y los
+  que leían CSV pasan a leer el Excel.
+
 ## Octubre 2026 (eo) — Planes en el calendario y tareas adelantadas (9-oct)
 
 Germán aplicó un plan y buscaba la poda el 16/10: era del 23/10, y el 16 era el día en que «aparece».

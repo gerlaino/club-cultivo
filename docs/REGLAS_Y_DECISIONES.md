@@ -338,6 +338,17 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 
 ### Lo que NO hay que romper
 
+- **TODA DESCARGA ES UN INFORME: PDF O EXCEL, NUNCA CSV** (9-oct-2026, Germán: «ningún archivo
+  descargado puede ser así, ninguno… sin importar si se presentan o si es para un autocultivo»).
+  Un listado se baja por `DescargaProfesional#responder_descarga` (`formato=pdf|xlsx`, Excel por
+  defecto): membrete, resumen, tipos reales, totales, PDF apaisado si es ancho y columnas que no
+  parten palabras (`InformeDocument` `anchos: :contenido`); `columnas_pdf` cuando el Excel lleva
+  más de lo que se lee en una hoja. En pantalla, `BotonesDescarga` + `descargarListado`. Nada de
+  columnas técnicas (`rol_sugerido`), ids internos ni estados crudos. Analítica manda su tabla a
+  `POST /analytics/descargar`. Las etiquetas para imprimir (QR, despacho) no son informes.
+- **La tarjeta del cupo dice «Cupo de plantas»** y el desglose lo manda el backend
+  (`PlanEnforcer#info[:plantas_desglose]`: en floración + automáticas). `uso` lleva sólo recursos
+  con tope.
 - **UNA TAREA DE MÁS ADELANTE SE PUEDE DAR POR HECHA, CON AVISO, Y QUEDA HECHA HOY** (9-oct-2026,
   reemplaza «el calendario no se adelanta»). `completar` y `completar_masivo` responden 409
   `tarea_futura` con la fecha; con `adelantar: true` la cierran con `fecha_completada` de hoy y la

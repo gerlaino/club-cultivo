@@ -10,8 +10,10 @@ class BaseDocument
 
   # tipo_doc: texto que se muestra en el membrete ("INFORME REPROCANN")
   # tipo_code: código corto para el folio ("RPC")
+  # apaisado: A4 horizontal, para las tablas de muchas columnas (un listado de lotes con doce).
   def initialize(club:, usuario:, titulo:, tipo_doc: nil, tipo_code: "DOC", subtitulo: nil, folio: nil,
-                 salvedad_inase: nil)
+                 salvedad_inase: nil, apaisado: false)
+    @apaisado  = apaisado
     @club      = club
     @usuario   = usuario
     @titulo    = titulo
@@ -28,6 +30,7 @@ class BaseDocument
   def render
     @pdf = Prawn::Document.new(
       page_size: "A4",
+      page_layout: @apaisado ? :landscape : :portrait,
       margin:    [MARGIN_TOP, MARGIN_LR, MARGIN_BOT, MARGIN_LR],
     )
     ReportTokens.register_fonts(@pdf)
@@ -251,6 +254,16 @@ class BaseDocument
     end
 
     # Color del texto de la columna de estado por nivel (semáforo)
+    # La fila de totales se distingue: en negrita y con una raya arriba.
+    if opts[:fila_total] && data.size > 1
+      ultima = tbl.row(data.size - 1)
+      ultima.font_style = :bold
+      ultima.background_color = WHITE
+      ultima.borders = %i[top bottom]
+      ultima.border_top_width = 0.9
+      ultima.border_top_color = FOREST
+    end
+
     if status_col && levels.any?
       levels.each_with_index do |lvl, i|
         cell = tbl.row(i + 1).column(status_col)

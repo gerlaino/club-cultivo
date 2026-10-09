@@ -1,3 +1,4 @@
+import { descargarListado } from "../lib/descargas.js";
 import { hoyISO } from '../utils/dates.js'
 import { logger } from '../utils/logger.js'
 // frontend/src/stores/contabilidad.js
@@ -8,8 +9,6 @@ import {
   createMovimiento,
   updateMovimiento,
   deleteMovimiento,
-  exportMovimientosCSV,
-  exportMovimientosXLSX,
 } from "../lib/api";
 
 export const useContabilidadStore = defineStore("contabilidad", {
@@ -146,23 +145,10 @@ export const useContabilidadStore = defineStore("contabilidad", {
       }
     },
 
-    // `formato`: 'xlsx' (por defecto) o 'csv'. El Excel trae los montos como números, las
-    // fechas como fechas, totales y filtros; el CSV queda para quien lo quiera crudo.
+    // `formato`: 'xlsx' (por defecto) o 'pdf' (`DescargaProfesional`; ya no hay CSV). Lanza el
+    // error con el mensaje para mostrar.
     async exportCSV(params = {}, formato = "xlsx") {
-      try {
-        const esXlsx   = formato === "xlsx";
-        const response = esXlsx ? await exportMovimientosXLSX(params) : await exportMovimientosCSV(params);
-        const url  = window.URL.createObjectURL(new Blob([response.data]));
-        const link = document.createElement("a");
-        link.href  = url;
-        link.setAttribute("download", `movimientos_${hoyISO()}.${esXlsx ? "xlsx" : "csv"}`);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        window.URL.revokeObjectURL(url);
-      } catch (e) {
-        logger.error("Export error", e);
-      }
+      await descargarListado("/movimientos_contables/export_csv", formato, { params, nombre: `movimientos_${hoyISO()}` });
     },
 
     // CAMBIAR UN FILTRO VUELVE A LA PÁGINA 1; CAMBIAR DE PÁGINA NO.

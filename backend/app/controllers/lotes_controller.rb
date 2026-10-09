@@ -1,4 +1,5 @@
 class LotesController < ApplicationController
+  include DescargaProfesional
   before_action :authenticate_user!
   before_action -> { require_feature!(:cultivo) }
   before_action :require_admin_cultivador_o_manicura
@@ -553,49 +554,31 @@ class LotesController < ApplicationController
       scope = scope.where('lotes.created_at <= ?', hasta.end_of_day) if hasta
     end
 
-    require "csv"
-    csv_data = CSV.generate(col_sep: ";", encoding: "UTF-8") do |csv|
-      csv << [
-        "Código", "Estado", "Genética", "Automática", "Sala", "Sede", "Cama", "Ciclo de la cama",
-        "Plantas", "Plantas obj.", "Plantas cosechadas",
-        "Rendimiento obj. (g)", "Rendimiento real (g)", "Desviación (%)",
-        "m²", "g/m²",
-        "Costo total", "Costo/gramo",
-        "Inicio", "Creado"
-      ]
-      scope.each do |l|
-        desv = if l.rendimiento_real_g.present? && l.rendimiento_objetivo_g.present? && l.rendimiento_objetivo_g > 0
-                 ((l.rendimiento_real_g.to_f - l.rendimiento_objetivo_g.to_f) / l.rendimiento_objetivo_g.to_f * 100).round(1)
-               end
-        csv << [
-          l.codigo,
-          l.estado,
-          l.genetica&.nombre,
-          l.automatica? ? 'Sí' : 'No',
-          l.sala&.nombre,
-          l.sala&.sede&.nombre,
-          l.cama&.nombre,
-          l.cama_ciclo&.numero,
-          l.plants_count,
-          l.plants_count_objetivo,
-          l.plants_count_cosechadas,
-          l.rendimiento_objetivo_g&.to_f,
-          l.rendimiento_real_g&.to_f,
-          desv,
-          l.m2_efectivos&.to_f,
-          l.rendimiento_g_m2&.to_f,
-          l.costo_lote&.costo_total&.to_f,
-          l.costo_lote&.costo_por_gramo&.to_f,
-          l.start_date&.strftime("%d/%m/%Y"),
-          l.created_at.strftime("%d/%m/%Y"),
-        ]
-      end
-    end
-
-    send_data "\xEF\xBB\xBF#{csv_data}",
-              filename:    "lotes_#{Time.zone.today}.csv",
-              type:        "text/csv; charset=utf-8",
-              disposition: "attachment"
+    # Excel o PDF (`DescargaProfesional`): los estados con su nombre, la sala con su sede y su
+    # cama en una columna, y los números de producción con su unidad en el encabezado.
+    lotes = scope.includes(:costo_lote, :cama).to_a
+    estado = ->(l) { l.cerrado_sin_cosecha? ? 'Cerrado sin cosecha' : l.estado_label }
+    donde  = ->(l) { [l.sala&.nombre, l.cama&.nombre, l.sala&.sede&.nombre].compact_blank.join(' · ').presence }
+    desv   = ->(l) {
+      next nil unless l.rendimiento_real_g.present? && l.rendimiento_objetivo_g.to_f.positive?
+      ((l.rendimiento_real_g.to_f - l.rendimiento_objetivo_g.to_f) / l.rendimiento_objetivo_g.to_f * 100).round(1)
+    }
+    cosechados = lotes.select { |l| l.rendimiento_real_g.to_f.positive? }
+    responder_descarga(
+      titulo: 'Lotes', nombre: 'lotes',
+      filtros: (Lote.etiqueta_estado(params[:estado], nil) if params[:estado].present?),
+      kpis: [{ label: 'Lotes', valor: lotes.size },
+             { label: 'Cosechados', valor: cosechados.size },
+             { label: 'Flor cosechada', valor: "#{numero_ar(cosechados.sum { |l| l.rendimiento_real_g.to_f }, 0)} g" }],
+      headers: ['Código', 'Estado', 'Genética', 'Dónde', 'Inicio', 'Plantas', 'Cosechadas',
+                'Objetivo (g)', 'Real (g)', 'Desvío (%)', 'm²', 'g/m²', 'Costo por g'],
+      formatos: %i[texto texto texto texto fecha numero numero numero numero numero numero numero moneda],
+      rows: lotes.map { |l|
+        [l.codigo, estado.(l), [l.genetica&.nombre, ('(auto)' if l.automatica?)].compact.join(' ').presence, donde.(l),
+         l.start_date, l.plants_count, l.plants_count_cosechadas, l.rendimiento_objetivo_g&.to_f,
+         l.rendimiento_real_g&.to_f, desv.(l), l.m2_efectivos&.to_f, l.rendimiento_g_m2&.to_f, l.costo_lote&.costo_por_gramo&.to_f]
+      },
+    )
   end
 
   # GET /lotes/proximo_codigo

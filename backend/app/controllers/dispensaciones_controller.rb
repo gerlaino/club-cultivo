@@ -1,4 +1,5 @@
 class DispensacionesController < ApplicationController
+  include DescargaProfesional
   include DispensacionesFinancieras
 
   # Cuándo terminó el viaje, sea como sea que haya terminado. Se usa para filtrar y ordenar el
@@ -796,37 +797,36 @@ class DispensacionesController < ApplicationController
       scope = scope.where("fecha_dispensacion <= ?", hasta) if hasta
     end
 
-    require "csv"
-    csv_data = CSV.generate(col_sep: ";", encoding: "UTF-8") do |csv|
-      csv << [
-        "ID", "Fecha", "Paciente", "DNI", "Sede",
-        "Forma producto", "Cantidad (g)", "Precio unitario (ARS)", "Aporte socio (ARS)",
-        "Medio de pago", "Lote", "Con envío", "Estado envío", "Registrado por"
-      ]
-      scope.each do |d|
-        csv << [
-          d.id,
-          d.fecha_dispensacion.strftime("%d/%m/%Y"),
-          "#{d.paciente.nombre} #{d.paciente.apellido}",
-          d.paciente.dni_normalizado,
-          d.sede&.nombre,
-          d.stock&.forma_producto,
-          d.cantidad.to_f,
-          d.precio_unitario_ars&.to_f,
-          d.aporte_socio_ars&.to_f,
-          d.medio_pago,
-          d.stock&.lote&.codigo,
-          d.con_envio ? "Sí" : "No",
-          d.estado_envio,
-          d.user&.first_name || d.user&.email,
-        ]
-      end
-    end
-
-    send_data "\xEF\xBB\xBF#{csv_data}",
-              filename:    "dispensaciones_#{Time.zone.today}.csv",
-              type:        "text/csv; charset=utf-8",
-              disposition: "attachment"
+    # Una fila por dispensa, como la pantalla: con lo que se llevó (todas sus líneas), en Excel o
+    # PDF (`DescargaProfesional`). Las anuladas se listan, dicen que lo están y no suman.
+    medio = { 'efectivo' => 'Efectivo', 'transferencia' => 'Transferencia', 'saldo_a_favor' => 'Saldo a favor',
+              'cuenta_corriente' => 'Cuenta corriente', 'no_abona' => 'No abona', 'credito_gramos' => 'Crédito en gramos',
+              'mixto' => 'Mixto', 'regalo' => 'Regalo', 'cambio' => 'Cambio' }
+    envio = { 'pendiente' => 'Por despachar', 'en_viaje' => 'En viaje', 'entregado' => 'Entregado',
+              'fallido' => 'No se entregó', 'cancelada' => 'Anulada' }
+    disps = scope.includes(items: :stock).to_a
+    vigentes = disps.reject(&:cancelada?)
+    rango = [params[:desde], params[:hasta]].map { |f| (Date.parse(f) rescue nil) }
+    periodo = rango.compact.any? ? rango.map { |f| f&.strftime('%d/%m/%Y') || '…' }.join(' al ') : nil
+    responder_descarga(
+      titulo: 'Dispensaciones', nombre: 'dispensaciones', periodo: periodo,
+      kpis: [{ label: 'Dispensas', valor: vigentes.size },
+             { label: 'Gramos entregados', valor: "#{numero_ar(vigentes.sum { |d| d.cantidad.to_f }, 1)} g" },
+             { label: 'Aportes', valor: pesos_ar(vigentes.sum { |d| d.aporte_socio_ars.to_f }) }],
+      headers: ['Fecha', 'N°', 'Paciente', 'DNI', 'Sede', 'Qué se llevó', 'Gramos', 'Aporte', 'Pagó con', 'Envío', 'Atendió'],
+      columnas_pdf: [0, 1, 2, 5, 6, 7, 8, 9],
+      formatos: %i[fecha texto texto texto texto texto numero moneda texto texto texto],
+      rows: disps.map { |d|
+        lineas = d.items.presence || [d]
+        lleva = lineas.map { |l| "#{l.stock&.etiqueta || 'Producto'} · #{numero_ar(l.cantidad, l.cantidad.to_f % 1 == 0 ? 0 : 1)} #{l.stock&.unidad.presence || 'g'}" }.join(' + ')
+        anulada = d.cancelada?
+        [d.fecha_dispensacion, "##{d.id}", "#{d.paciente&.nombre} #{d.paciente&.apellido}".strip, d.paciente&.dni_normalizado,
+         d.sede&.nombre, lleva, anulada ? 0 : d.cantidad.to_f, anulada ? 0 : d.aporte_socio_ars.to_f,
+         medio[d.medio_pago] || d.medio_pago, anulada ? 'Anulada' : (d.con_envio ? envio[d.estado_envio] || 'Con envío' : '—'),
+         [d.user&.first_name, d.user&.last_name].compact_blank.join(' ').presence || d.user&.email]
+      },
+      totales: [6, 7],
+    )
   end
 
   private

@@ -98,7 +98,7 @@ const CONTENT = {
     {
       title: 'Reportes y correo',
       items: [
-        { label: 'Exportar pacientes a CSV', text: 'En el listado de Pacientes, el botón Exportar genera un CSV con todos los datos.' },
+        { label: 'Descargar el listado de pacientes', text: 'En el listado de Pacientes, los botones PDF y Excel bajan lo que estás viendo (con la búsqueda y el filtro aplicados), con el membrete de tu organización.' },
         { label: 'Informe REPROCANN', text: 'En Reportes → Informe REPROCANN encontrás el estado de vencimientos para presentar ante ARICCAME.' },
         { label: 'Correo a pacientes', text: 'Desde la ficha de un paciente → pestaña Correo podés enviar emails. Configurá el servidor SMTP en Preferencias → Correo.' },
       ]

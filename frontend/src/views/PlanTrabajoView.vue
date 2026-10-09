@@ -4,11 +4,12 @@ import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
+import { descargarListado } from '../lib/descargas.js'
 import AplicarPlanModal       from '../components/plan-trabajo/AplicarPlanModal.vue'
 import EditarPlantillaModal   from '../components/plan-trabajo/EditarPlantillaModal.vue'
 import ExportarCalendarioModal from '../components/plan-trabajo/ExportarCalendarioModal.vue'
 import PlanCalendario from '../components/plan-trabajo/PlanCalendario.vue'
-import { listPlanTrabajos, deletePlanTrabajo, getPlanTrabajo, exportPlanCSV, listAplicaciones, cancelarAplicacion, publicarPlanTrabajo } from '../lib/api.js'
+import { listPlanTrabajos, deletePlanTrabajo, getPlanTrabajo, listAplicaciones, cancelarAplicacion, publicarPlanTrabajo } from '../lib/api.js'
 const { esPersonal } = useUsoPersonal()
 
 const toast   = useToast()
@@ -90,22 +91,15 @@ async function abrirCalendario(plan) {
   exportDropdownPlan.value = null
 }
 
-async function descargarPlantillaCSV(plan) {
+// El plan como se lee —semana por semana, qué hacer— en PDF o Excel (`DescargaProfesional`).
+async function descargarPlan(plan, formato) {
   exportDropdownPlan.value = null
   try {
-    const { data } = await exportPlanCSV(plan.id, { modo: 'plantilla' })
-    triggerDownload(data, `${slugify(plan.titulo)}-plantilla.csv`)
-    toast.success('Plantilla descargada')
-  } catch { toast.error('Error al exportar') }
+    await descargarListado(`/plan_trabajos/${plan.id}/export_csv`, formato,
+      { params: { modo: 'plantilla' }, nombre: `plan-${slugify(plan.titulo)}` })
+  } catch (e) { toast.error(e.message) }
 }
 
-function triggerDownload(blob, filename) {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url; a.download = filename
-  document.body.appendChild(a); a.click()
-  document.body.removeChild(a); URL.revokeObjectURL(url)
-}
 function slugify(s) { return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') }
 
 async function eliminar(plan) {
@@ -255,8 +249,9 @@ onMounted(() => {
             <div class="ptv__export-wrap">
               <button class="ptv__btn-ghost-txt" @click.stop="toggleExportDropdown(elegido)"><i class="bi bi-download"></i> Exportar</button>
               <div v-if="exportDropdownPlan?.id === elegido.id" class="ptv__export-drop">
-                <button class="ptv__drop-item" @click="descargarPlantillaCSV(elegido)"><i class="bi bi-filetype-csv"></i> Descargar plantilla (.csv)</button>
-                <button class="ptv__drop-item" @click="abrirCalendario(elegido)"><i class="bi bi-calendar3-week"></i> Exportar como calendario…</button>
+                <button class="ptv__drop-item" @click="descargarPlan(elegido, 'pdf')"><i class="bi bi-filetype-pdf"></i> El plan en PDF</button>
+                <button class="ptv__drop-item" @click="descargarPlan(elegido, 'xlsx')"><i class="bi bi-file-earmark-spreadsheet"></i> El plan en Excel</button>
+                <button class="ptv__drop-item" @click="abrirCalendario(elegido)"><i class="bi bi-calendar3-week"></i> Con fechas, desde un día…</button>
               </div>
             </div>
             <button class="ptv__btn-ghost-txt ptv__btn-ghost-txt--peligro" @click="eliminar(elegido)"><i class="bi bi-trash3"></i> Eliminar</button>

@@ -148,6 +148,16 @@ class PlanEnforcer
     scope.count
   end
 
+  # De qué está hecho el cupo, para decirlo en pantalla (9-oct-2026: «En floración 6 de 9» con tres
+  # automáticas en vege se leía como un error). Suma `plantas_en_cupo`.
+  def plantas_en_cupo_desglose
+    base = Plant.joins(:lote).joins('LEFT JOIN geneticas ON geneticas.id = lotes.genetica_id')
+                .where(lotes: { club_id: @club.id }, state: ESTADOS_EN_PIE)
+    en_flora = base.where(state: 'floracion').count
+    autos    = base.where.not(state: 'floracion').where(geneticas: { automatica: true }).count
+    { en_floracion: en_flora, automaticas: autos }
+  end
+
   # ¿Entran `cantidad` plantas más al cupo de floración?
   def cabe_en_floracion?(cantidad, excluir_lote: nil)
     tope = @limite[:plantas]
@@ -261,6 +271,8 @@ class PlanEnforcer
       # Aparte de los topes numéricos: el de usuarios no es un número, es "dos de cada rol".
       # Va suelto para que la pantalla lo pueda decir con palabras en vez de con una barra.
       usuarios_por_rol: @limite[:usuarios_por_rol],
+      # De qué está hecho el uso de `plantas` (va suelto: `uso` son sólo los recursos con tope).
+      plantas_desglose: plantas_en_cupo_desglose,
       usuarios_por_rol_hoy: tope_por_rol,
       por_sede:     @limite[:por_sede],
       # Lo comprado encima del escalón.

@@ -78,6 +78,8 @@ Rails.application.routes.draw do
 
     scope '/analytics', controller: :analytics do
       # La analítica: cuatro preguntas sobre los lotes cerrados (`app/services/analitica/*`).
+      # La tabla de la solapa que se está mirando, como informe (PDF o Excel).
+      post :descargar
       get :geneticas
       get :fases
       get :donde_y_como

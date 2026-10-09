@@ -1,4 +1,5 @@
 class PlanTrabajosController < ApplicationController
+  include DescargaProfesional
   before_action :authenticate_user!
   before_action -> { require_feature!(:cultivo) }
   before_action :authorize_admin_or_supervisor!
@@ -120,114 +121,45 @@ class PlanTrabajosController < ApplicationController
     render json: serialize_plan(@plan)
   end
 
-  # GET /api/plan_trabajos/:id/export_csv?modo=plantilla|calendario&fecha_inicio=YYYY-MM-DD
+  # GET /api/plan_trabajos/:id/export_csv?modo=plantilla|calendario&fecha_inicio=YYYY-MM-DD&formato=pdf|xlsx
+  #
+  # El plan como se lee: semana por semana, qué toca y qué hay que hacer, en PDF o Excel
+  # (`DescargaProfesional`). Era un CSV con `dia,tipo,titulo,rol_sugerido` y la descripción partida
+  # en celdas (Germán, 9-oct-2026: «esta horrible esto, no se entiende»).
   def export_csv
-    modo     = params[:modo].presence || 'plantilla'
-    filename = "#{@plan.titulo.parameterize}-#{modo}.csv"
-
-    csv_data = if modo == 'calendario'
-      fecha = Date.parse(params[:fecha_inicio].to_s)
-      generar_csv_calendario(@plan, fecha)
-    else
-      generar_csv_plantilla(@plan)
+    calendario = params[:modo] == 'calendario'
+    inicio     = Date.parse(params[:fecha_inicio].to_s) if calendario
+    tareas     = @plan.plan_tareas.order(:dia_relativo, :id).to_a
+    personal   = @club.personal?
+    prioridad  = { 'baja' => 'Baja', 'normal' => 'Normal', 'alta' => 'Alta', 'urgente' => 'Urgente' }
+    cuando = ->(pt) {
+      d = pt.dia_relativo.to_i
+      calendario ? (inicio + d.days) : "Semana #{d / 7 + 1} · día #{d % 7 + 1}"
+    }
+    que = ->(pt) { [Tarea::TIPO_LABELS[pt.tipo] || pt.tipo.to_s.humanize, (pt.titulo if pt.titulo.present? && pt.titulo != Tarea::TIPO_LABELS[pt.tipo])].compact.join(' — ') }
+    headers  = [calendario ? 'Fecha' : 'Cuándo', 'Tarea', 'Qué hay que hacer', 'Prioridad']
+    formatos = [calendario ? :fecha : :texto, :texto, :texto, :texto]
+    unless personal
+      headers << 'Quién'
+      formatos << :texto
     end
-
-    send_data "\xEF\xBB\xBF#{csv_data}",
-      type:        'text/csv; charset=utf-8',
-      disposition: "attachment; filename=\"#{filename}\"",
-      status:      :ok
+    responder_descarga(
+      titulo: "Plan de trabajo — #{@plan.titulo}", nombre: "plan-#{@plan.titulo.parameterize}",
+      periodo: (calendario ? "Desde el #{inicio.strftime('%d/%m/%Y')}" : 'Semanas contadas desde el inicio del lote'),
+      kpis: [{ label: 'Tareas', valor: tareas.size },
+             { label: 'Semanas', valor: tareas.map { |pt| pt.dia_relativo.to_i / 7 + 1 }.max || 0 }],
+      headers: headers, formatos: formatos, apaisado: false,
+      rows: tareas.map { |pt|
+        fila = [cuando.(pt), que.(pt), pt.descripcion.to_s.strip.gsub(/\n?---\n?/, "\n").presence, prioridad[pt.prioridad] || pt.prioridad]
+        fila << (pt.responsable&.nombre_completo || pt.rol_sugerido.to_s.split(',').map { |r| r.strip.humanize }.join(', ').presence) unless personal
+        fila
+      },
+    )
   rescue Date::Error, ArgumentError
     render json: { error: 'Fecha inválida' }, status: :unprocessable_entity
   end
 
-  # POST /api/plan_trabajos/interpretar_archivo
-  def interpretar_archivo
-    archivo = params[:archivo]
-    return render json: { error: "No se recibió archivo" }, status: :unprocessable_entity unless archivo
-
-    resultado = PlanTrabajoIaService.new(archivo, @club).interpretar
-    render json: resultado
-  rescue => e
-    Rails.logger.error "interpretar_archivo error: #{e.message}"
-    render json: { error: "Error al procesar el archivo", tareas: [], ambiguas: [], total: 0, recurrentes: 0 }, status: :unprocessable_entity
-  end
-
-  # ── Plan Tareas (nested) ──────────────────────────────────────
-
-  # GET /api/plan_trabajos/:id/plan_tareas
-  def plan_tareas_index
-    set_plan
-    render json: @plan.plan_tareas.includes(:responsable, :sala).map { |pt| serialize_plan_tarea(pt) }
-  end
-
-  # POST /api/plan_trabajos/:id/plan_tareas
-  def plan_tareas_create
-    set_plan
-    pt = @plan.plan_tareas.build(plan_tarea_params)
-    if pt.save
-      render json: serialize_plan_tarea(pt), status: :created
-    else
-      render json: { errors: pt.errors.full_messages }, status: :unprocessable_entity
-    end
-  end
-
-  # PATCH /api/plan_trabajos/:id/plan_tareas/:tid
-  def plan_tareas_update
-    set_plan
-    pt = @plan.plan_tareas.find(params[:tid])
-    scope = params[:scope] || 'esta'
-
-    if pt.update(plan_tarea_params)
-      propagar_cambios(pt, scope) if @plan.publicado?
-      render json: serialize_plan_tarea(pt)
-    else
-      render json: { errors: pt.errors.full_messages }, status: :unprocessable_entity
-    end
-  end
-
-  # DELETE /api/plan_trabajos/:id/plan_tareas/:tid
-  def plan_tareas_destroy
-    set_plan
-    pt = @plan.plan_tareas.find(params[:tid])
-    pt.destroy
-    head :no_content
-  end
-
   private
-
-  DIAS_ES = %w[Domingo Lunes Martes Miércoles Jueves Viernes Sábado].freeze
-
-  def generar_csv_plantilla(plan)
-    require 'csv'
-    CSV.generate(encoding: 'UTF-8') do |csv|
-      csv << %w[dia tipo titulo descripcion rol_sugerido prioridad]
-      plan.plan_tareas.order(:dia_relativo).each do |pt|
-        csv << [pt.dia_relativo.to_i, pt.tipo, pt.titulo, pt.descripcion, pt.rol_sugerido, pt.prioridad]
-      end
-    end
-  end
-
-  def generar_csv_calendario(plan, fecha_inicio)
-    require 'csv'
-    CSV.generate(encoding: 'UTF-8') do |csv|
-      csv << %w[semana fecha dia_semana tipo tarea descripcion rol prioridad]
-      plan.plan_tareas.order(:dia_relativo).each do |pt|
-        dia    = pt.dia_relativo.to_i
-        fecha  = fecha_inicio + dia.days
-        semana = (dia / 7) + 1
-        csv << [
-          semana,
-          fecha.strftime('%d/%m/%Y'),
-          DIAS_ES[fecha.wday],
-          pt.tipo,
-          pt.titulo.presence || pt.tipo,
-          pt.descripcion,
-          pt.rol_sugerido,
-          pt.prioridad,
-        ]
-      end
-    end
-  end
 
   def set_club
     @club = current_user.club

@@ -19,6 +19,13 @@ class Tarea < ApplicationRecord
   # ── Enums ──────────────────────────────────────────────────────
   TIPOS       = %w[riego poda medicion limpieza cosecha trasplante inspeccion otro
                    nutricion defoliacion scrog_lst ajuste_luz revision_plagas].freeze
+  # Cómo se dice cada tipo en un archivo descargado (los mismos nombres que la pantalla).
+  TIPO_LABELS = {
+    'riego' => 'Riego', 'poda' => 'Poda', 'medicion' => 'Medición', 'limpieza' => 'Limpieza',
+    'cosecha' => 'Cosecha', 'trasplante' => 'Trasplante', 'inspeccion' => 'Inspección', 'otro' => 'Otro',
+    'nutricion' => 'Nutrición', 'defoliacion' => 'Defoliación', 'scrog_lst' => 'SCROG / LST',
+    'ajuste_luz' => 'Ajuste de luz', 'revision_plagas' => 'Revisión de plagas',
+  }.freeze
   # En una cama de suelo vivo no hay trasplantes y no se fertiliza el riego (se alimenta el suelo):
   # un plan de trabajo aplicado a un lote plantado en una cama saltea estas tareas y lo dice
   # (Germán, 25-sep, D10). La regla es una para las dos puertas del plan.

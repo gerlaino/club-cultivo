@@ -17,10 +17,14 @@ import DsSpinner from '../design-system/components/Spinner.vue'
 import SelectorPeriodo from '../components/informes/SelectorPeriodo.vue'
 import AnaliticaNutricion from '../components/analitica/AnaliticaNutricion.vue'
 import { hoyISO } from '../utils/dates.js'
+import { descargarPost } from '../lib/descargas.js'
+import { useToast } from '../composables/useToast.js'
+import BotonesDescarga from '../components/ui/BotonesDescarga.vue'
 
 const route  = useRoute()
 const router = useRouter()
 
+const toast = useToast()
 const TABS = [
   { id: 'geneticas',    label: 'Genéticas',    pregunta: '¿Qué genética rinde mejor?' },
   { id: 'fases',        label: 'Fases',        pregunta: '¿Cuánto tarda cada fase?' },
@@ -93,8 +97,8 @@ const ars  = (n) => n == null ? '—' : `$ ${Math.round(Number(n)).toLocaleStrin
 const pc   = (n) => n == null ? '—' : `${fmt(n, 1)} %`
 const dias = (n) => n == null ? '—' : `${Math.round(n)} d`
 
-// ── CSV de la solapa a la vista: dato crudo, para trabajar los números ──
-function exportCsv() {
+// ── La tabla de la solapa a la vista: la misma que se muestra, para bajarla como informe ──
+function tablaDeLaSolapa() {
   let headers = [], rows = []
   if (tab.value === 'geneticas') {
     headers = ['Genética', 'Lotes', 'Plantas', 'g/planta', 'Flor seca (g)', 'Prendió %', 'Se perdió en el ciclo %', 'Ciclo (días)']
@@ -113,25 +117,33 @@ function exportCsv() {
     rows = [...(costo.value?.por_sede || []).map(f => ['Sede', f.nombre, f.lotes, f.costo_total, f.gramos, f.costo_por_gramo]),
             ...(costo.value?.por_genetica || []).map(f => ['Genética', f.nombre, f.lotes, f.costo_total, f.gramos, f.costo_por_gramo])]
   }
-  const esc = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`
-  const csv = [headers, ...rows].map(r => r.map(esc).join(';')).join('\n')
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
-  a.download = `analitica_${tab.value}_${hoyISO()}.csv`
-  a.click(); URL.revokeObjectURL(a.href)
+  // El tipo de cada columna, para que el Excel sume y el PDF escriba los números como se leen.
+  const formatos = headers.map((h, i) => {
+    const vals = rows.map(r => r[i]).filter(v => v != null && v !== '')
+    if (!vals.length || !vals.every(v => typeof v === 'number')) return 'texto'
+    return /costo|\$/i.test(h) ? 'moneda' : 'numero'
+  })
+  return { headers, rows, formatos }
 }
 
-// ÚNICO PDF que sigue siendo una captura de pantalla, y a propósito: acá el contenido son barras
-// y tablas de comparación, y para trabajar los números está el CSV.
-async function exportPdf() {
-  const el = document.getElementById('an-tab-content')
-  if (!el) return
-  const { default: html2pdf } = await import('html2pdf.js')
-  await html2pdf().set({
-    margin: [8, 8, 8, 8], filename: `analitica_${tab.value}_${hoyISO()}.pdf`,
-    image: { type: 'jpeg', quality: 0.95 }, html2canvas: { scale: 2, useCORS: true },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
-  }).from(el).save()
+// PDF o Excel de la solapa, con el membrete de la organización (9-oct-2026: era un CSV crudo y
+// un PDF que era una captura de la pantalla). La tabla es la de la pantalla; el archivo lo arma
+// el backend (`AnalyticsController#descargar`).
+const generando = ref(null)
+async function descargar(formato) {
+  generando.value = formato
+  try {
+    const t = TABS.find(x => x.id === tab.value)
+    await descargarPost('/analytics/descargar', {
+      ...tablaDeLaSolapa(), formato, nombre: tab.value,
+      titulo: `Analítica — ${t?.label}${tab.value === 'donde_y_como' ? ` (por ${CORTES.find(c => c.id === corte.value)?.label.toLowerCase()})` : ''}`,
+      periodo: periodo.value ? `${periodo.value.etiqueta} · ${periodo.value.lotes} lotes` : 'Todo el historial',
+    }, `analitica_${tab.value}_${hoyISO()}.${formato}`)
+  } catch (e) {
+    toast.error(e.message)
+  } finally {
+    generando.value = null
+  }
 }
 </script>
 
@@ -145,8 +157,7 @@ async function exportPdf() {
       </div>
       <div class="an__header-right">
         <SelectorPeriodo v-show="tab !== 'nutricion'" inicial="todo" con-todo @change="cambiarPeriodo" />
-        <button class="an__export-btn" :disabled="loading" @click="exportCsv"><i class="bi bi-filetype-csv"></i> CSV</button>
-        <button class="an__export-btn an__export-btn--pdf" :disabled="loading" @click="exportPdf"><i class="bi bi-file-earmark-pdf"></i> PDF</button>
+        <BotonesDescarga :disabled="loading" :generando="generando" @descargar="descargar" />
       </div>
     </div>
 
@@ -336,10 +347,6 @@ async function exportPdf() {
 .an__title { font-size: 1.6rem; font-weight: 800; color: var(--c-slate-900); margin: 0; letter-spacing: -.03em; }
 .an__sub { margin: .25rem 0 0; font-size: .82rem; color: var(--c-slate-500); }
 .an__header-right { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
-.an__export-btn { display: inline-flex; align-items: center; gap: .35rem; padding: .4rem .8rem; border: 1.5px solid var(--c-slate-200); border-radius: 7px; background: var(--c-slate-50); font-size: .75rem; font-weight: 600; color: var(--c-slate-500); cursor: pointer; white-space: nowrap; font-family: inherit; }
-.an__export-btn:hover:not(:disabled) { border-color: var(--c-leaf-700); color: var(--c-leaf-700); }
-.an__export-btn:disabled { opacity: .4; cursor: not-allowed; }
-.an__export-btn--pdf { color: var(--c-rust-600); border-color: var(--c-rust-100); background: #fff5f5; }
 
 .an__tabs { display: flex; gap: .25rem; flex-wrap: wrap; border-bottom: 2px solid var(--c-slate-200); margin-bottom: 1.5rem; }
 .an__tab { padding: .65rem 1rem; font-size: .875rem; font-weight: 600; color: var(--c-slate-500); background: none; border: none; border-bottom: 2.5px solid transparent; margin-bottom: -2px; cursor: pointer; white-space: nowrap; font-family: inherit; }

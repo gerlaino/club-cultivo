@@ -1,5 +1,6 @@
 # backend/app/controllers/movimientos_contables_controller.rb
 class MovimientosContablesController < ApplicationController
+  include DescargaProfesional
   before_action :authenticate_user!
   before_action :require_lectura,   only: [:index, :show, :dashboard, :export_csv, :recurrentes]
   before_action :require_escritura, only: [:create, :update, :destroy, :cerrar_periodo, :reabrir_periodo, :registrar_pago]
@@ -388,22 +389,42 @@ class MovimientosContablesController < ApplicationController
     desde = (Date.parse(params[:desde]) rescue nil) if params[:desde].present?
     hasta = (Date.parse(params[:hasta]) rescue nil) if params[:hasta].present?
 
-    respond_to do |format|
-      format.csv do
-        send_data generate_csv(scope),
-                  filename: "movimientos_contables_#{Time.zone.today}.csv",
-                  type: "text/csv; charset=utf-8", disposition: "attachment"
-      end
-      # Excel con tipos reales (montos que suman, fechas que ordenan), totales y filtros.
-      # El CSV plano no se podía trabajar sin rearmarlo a mano.
-      format.xlsx do
-        send_data movimientos_xlsx(scope, desde, hasta),
-                  filename: "movimientos_contables_#{Time.zone.today}.xlsx",
-                  type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                  disposition: "attachment"
-      end
-      format.any { send_data generate_csv(scope), filename: "movimientos_contables_#{Time.zone.today}.csv",
-                             type: "text/csv; charset=utf-8", disposition: "attachment" }
+    # Excel (todo, con tipos reales y totales) o PDF (lo que se lee en una hoja). Ya no hay CSV:
+    # ver `DescargaProfesional`. El signo en el monto hace que el total sea el resultado real.
+    movs = scope.includes(:sede, :lote, :created_by).to_a
+    ingresos = movs.select { |m| m.tipo == 'ingreso' }.sum { |m| m.monto_ars.to_f }
+    egresos  = movs.select { |m| m.tipo == 'egreso'  }.sum { |m| m.monto_ars.to_f }
+    monto = ->(m) { m.tipo == 'egreso' ? -m.monto_ars.to_f : m.monto_ars.to_f }
+    if (params[:formato].presence || params[:format]).to_s == 'pdf'
+      responder_descarga(
+        titulo: 'Movimientos contables', nombre: 'movimientos_contables', formato: 'pdf',
+        periodo: subtitulo_export(desde, hasta),
+        kpis: [{ label: 'Ingresos', valor: pesos_ar(ingresos, 2) },
+               { label: 'Egresos', valor: pesos_ar(-egresos, 2) },
+               { label: 'Resultado', valor: pesos_ar(ingresos - egresos, 2) }],
+        headers: ['Fecha', 'Tipo', 'Categoría', 'Descripción', 'Monto', 'Sede', 'Comprobante', 'Pagado'],
+        formatos: %i[fecha texto texto texto moneda texto texto texto], totales: [4],
+        rows: movs.map { |m|
+          [m.fecha, m.tipo_label, [m.unidad_negocio&.nombre, m.categoria_label].compact_blank.join(' › '),
+           m.descripcion, monto.(m), m.sede&.nombre, [m.comprobante_tipo, m.comprobante_numero].compact_blank.join(' ').presence,
+           m.pagado ? 'Sí' : 'No']
+        })
+    else
+      responder_descarga(
+        titulo: 'Movimientos contables', nombre: 'movimientos_contables', formato: 'xlsx',
+        periodo: subtitulo_export(desde, hasta),
+        kpis: [{ label: 'Ingresos', valor: ingresos }, { label: 'Egresos', valor: -egresos },
+               { label: 'Resultado', valor: ingresos - egresos }],
+        headers: ['Fecha', 'Tipo', 'Sector', 'Categoría', 'Descripción', 'Monto', 'Sede', 'Lote',
+                  'Comprobante', 'Proveedor', 'Pagado', 'Medio de pago', 'Notas', 'Cargado por'],
+        formatos: %i[fecha texto texto texto texto moneda texto texto texto texto texto texto texto texto],
+        totales: [5],
+        rows: movs.map { |m|
+          [m.fecha, m.tipo_label, m.unidad_negocio&.nombre, m.categoria_label, m.descripcion, monto.(m),
+           m.sede&.nombre, m.lote&.codigo, [m.comprobante_tipo, m.comprobante_numero].compact_blank.join(' '),
+           m.proveedor, (m.pagado ? 'Sí' : 'No'), m.medio_pago, m.notas,
+           m.created_by&.nombre_completo.presence || m.created_by&.email]
+        })
     end
   end
 
@@ -905,57 +926,4 @@ class MovimientosContablesController < ApplicationController
     end
   end
 
-  def movimientos_xlsx(scope, desde, hasta)
-    movs = scope.includes(:sede, :lote, :created_by).to_a
-    # El signo en el monto es lo que hace que el total del Excel sea el resultado real y no
-    # una suma de valores absolutos.
-    ingresos = movs.select { |m| m.tipo == 'ingreso' }.sum { |m| m.monto_ars.to_f }
-    egresos  = movs.select { |m| m.tipo == 'egreso'  }.sum { |m| m.monto_ars.to_f }
-
-    XlsxExport.new(
-      club:   current_user.club,
-      titulo: 'Movimientos contables',
-      subtitulo: subtitulo_export(desde, hasta),
-      resumen: {
-        'Ingresos'  => ingresos,
-        'Egresos'   => -egresos,
-        'Resultado' => ingresos - egresos,
-      },
-      headers: ['Fecha', 'Tipo', 'Sector', 'Categoría', 'Descripción', 'Monto', 'Sede', 'Lote',
-                'Comprobante', 'Proveedor', 'Pagado', 'Medio de pago', 'Notas', 'Cargado por'],
-      formatos: [:fecha, :texto, :texto, :texto, :texto, :moneda, :texto, :texto,
-                 :texto, :texto, :texto, :texto, :texto, :texto],
-      totales: [5],
-      rows: movs.map { |m|
-        [
-          m.fecha, m.tipo_label, m.unidad_negocio&.nombre, m.categoria_label, m.descripcion,
-          m.tipo == 'egreso' ? -m.monto_ars.to_f : m.monto_ars.to_f,
-          m.sede&.nombre, m.lote&.codigo,
-          [m.comprobante_tipo, m.comprobante_numero].compact_blank.join(' '),
-          m.proveedor, (m.pagado ? 'Sí' : 'No'), m.medio_pago, m.notas,
-          m.created_by&.nombre_completo.presence || m.created_by&.email,
-        ]
-      },
-    ).render
-  end
-
-  def generate_csv(scope)
-    require "csv"
-    headers = %w[
-      ID Fecha Tipo Categoría Descripción Monto_ARS Sede Lote
-      Comprobante_Nro Comprobante_Tipo Proveedor Pagado Medio_Pago Notas Creado_por
-    ]
-    CSV.generate(col_sep: ";", encoding: "UTF-8") do |csv|
-      csv << headers
-      scope.includes(:sede, :lote, :created_by).each do |m|
-        csv << [
-          m.id, m.fecha, m.tipo_label, m.categoria_label, m.descripcion,
-          m.monto_ars.to_f, m.sede&.nombre, m.lote&.codigo,
-          m.comprobante_numero, m.comprobante_tipo, m.proveedor,
-          m.pagado ? "Sí" : "No", m.medio_pago, m.notas,
-          m.created_by&.first_name || m.created_by&.email,
-        ]
-      end
-    end
-  end
 end

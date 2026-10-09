@@ -8,7 +8,7 @@
           <p class="mn__titulo">Informe de producción</p>
           <p class="mn__sub">1.er semestre 2026 · Organización Ejemplo</p>
         </div>
-        <span class="mn__fmt">PDF · CSV</span>
+        <span class="mn__fmt">PDF · Excel</span>
       </div>
       <table class="mn__tabla">
         <thead><tr><th>Genética</th><th>Cosechado</th><th>Entregado</th><th>En stock</th></tr></thead>

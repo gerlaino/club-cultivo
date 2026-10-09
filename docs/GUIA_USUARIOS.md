@@ -466,8 +466,11 @@ JSON, el PDF y el Excel, así los tres dicen exactamente lo mismo.
   aparte, aclarando que son estimados y no dinero realizado.
 - **Trazabilidad** — reconstruye la cadena en el orden en que se recorre: producto → genética →
   lote → plantas → entregas, con pacientes anonimizados. Es lo primero que pide un auditor.
-- **Analítica queda como captura, a propósito**: ahí el contenido son los **gráficos**, y
-  rasterizarlos es lo correcto. Para los números está el CSV de cada solapa.
+- **Analítica se baja en PDF o Excel** (desde el 9-oct-2026): la tabla de la solapa que se está
+  mirando, con el membrete de la organización. Ya no es una captura de pantalla ni un CSV.
+- **Ninguna descarga es un CSV**: pacientes, dispensas, lotes, contabilidad, cierres y merma del
+  mostrador, reporte de finanzas y planes de trabajo se bajan en PDF (para leer o presentar) o en
+  Excel (para trabajar los números).
 
 **El índice de Reportes se reorganizó por para qué sirve cada informe**, no por qué módulo lo
 produce:

@@ -7,7 +7,8 @@ import { useAuthStore }  from "../stores/auth";
 import Paginator from '../components/ui/Paginator.vue';
 import EmptyState from '../components/ui/EmptyState.vue';
 import { useConfirm } from '../composables/useConfirm.js';
-import { exportLotesCSV } from '../lib/api.js';
+import { descargarListado } from '../lib/descargas.js';
+import BotonesDescarga from '../components/ui/BotonesDescarga.vue';
 import DsSpinner from '../design-system/components/Spinner.vue'
 import NuevoLoteModal from '../components/lotes/NuevoLoteModal.vue'
 import LotesTabla from '../components/lotes/LotesTabla.vue'
@@ -287,26 +288,18 @@ async function confirmDelete(l) {
   try { await store.remove(l.id, l.sala_id); } catch {}
 }
 
-const exporting = ref(false);
-async function exportarCSV() {
-  if (exporting.value) return;
-  exporting.value = true;
+// Lo mismo que la lista, en PDF o Excel (`DescargaProfesional`).
+const generando = ref(null);
+async function descargar(formato) {
+  generando.value = formato;
   try {
     const params = {};
     if (filterEstado.value) params.estado = filterEstado.value;
-    const { data } = await exportLotesCSV(params);
-    const url  = URL.createObjectURL(new Blob([data], { type: 'text/csv;charset=utf-8;' }));
-    const link = document.createElement('a');
-    link.href  = url;
-    link.setAttribute('download', `lotes_${hoyISO()}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  } catch {
-    alert('Error al exportar');
+    await descargarListado('/lotes/export_csv', formato, { params, nombre: `lotes_${hoyISO()}` });
+  } catch (e) {
+    toast.error(e.message);
   } finally {
-    exporting.value = false;
+    generando.value = null;
   }
 }
 </script>
@@ -321,10 +314,7 @@ async function exportarCSV() {
         <p class="lv__sub">Trazabilidad de cultivos</p>
       </div>
       <div class="lv__header-actions">
-        <button v-if="canExport" class="lv__btn-export" :disabled="exporting" @click="exportarCSV">
-          <i class="bi bi-download"></i>
-          {{ exporting ? 'Exportando…' : 'CSV' }}
-        </button>
+        <BotonesDescarga v-if="canExport" :generando="generando" @descargar="descargar" />
         <button v-if="canEdit" class="lv__btn-primary" @click="openCreate">
           <i class="bi bi-plus-lg"></i> Crear lote
         </button>

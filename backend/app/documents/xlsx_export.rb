@@ -67,7 +67,8 @@ class XlsxExport
       header:  wb.styles.add_style(b: true, sz: 10, fg_color: "FFFFFF", bg_color: "15803D",
                                    alignment: { horizontal: :left, vertical: :center },
                                    border: { style: :thin, color: "FFFFFF" }),
-      texto:   wb.styles.add_style(sz: 10, border: borde),
+      # Ajusta el texto: una descripción de dos líneas se ve en dos líneas, no cortada.
+      texto:   wb.styles.add_style(sz: 10, border: borde, alignment: { wrap_text: true, vertical: :top }),
       moneda:  wb.styles.add_style(sz: 10, border: borde, format_code: '"$"#,##0.00;[Red]-"$"#,##0.00'),
       numero:  wb.styles.add_style(sz: 10, border: borde, format_code: '#,##0.##'),
       fecha:   wb.styles.add_style(sz: 10, border: borde, format_code: 'dd/mm/yyyy'),

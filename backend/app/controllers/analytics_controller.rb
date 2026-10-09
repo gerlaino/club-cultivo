@@ -1,4 +1,5 @@
 class AnalyticsController < ApplicationController
+  include DescargaProfesional
   before_action :authenticate_user!
   before_action :require_analytics_access!, except: [:dispensador]
   before_action :require_dispensador_access!, only: [:dispensador]
@@ -680,6 +681,38 @@ class AnalyticsController < ApplicationController
     { desde: desde.to_date, hasta: hasta.to_date,
       etiqueta: "cosechados entre el #{desde.strftime('%d/%m/%Y')} y el #{hasta.strftime('%d/%m/%Y')}",
       lotes: universo.lotes.size }
+  end
+
+  # POST /analytics/descargar { titulo, periodo, headers[], rows[][], formatos[], formato }
+  #
+  # LA TABLA DE LA SOLAPA, COMO INFORME (9-oct-2026). Las tablas de la analítica las arma la
+  # pantalla con lo que ya le dio cada servicio (`Analitica::*`); rehacer cada una acá sería
+  # escribir la misma tabla dos veces. Lo que no podía seguir siendo era el archivo: un CSV crudo y
+  # un PDF que era una CAPTURA de la pantalla. Esto recibe la tabla y la devuelve con el membrete
+  # de la organización (`DescargaProfesional`). Sólo arma el archivo: no lee ni guarda nada.
+  MAX_FILAS = 5_000
+  MAX_COLS  = 30
+  FORMATOS_COL = %w[texto numero moneda fecha].freeze
+
+  def descargar
+    headers = Array(params[:headers]).first(MAX_COLS).map { |h| h.to_s.first(80) }
+    return render json: { error: 'No hay tabla para descargar.' }, status: :unprocessable_entity if headers.empty?
+
+    pedidos  = Array(params[:formatos])
+    formatos = headers.each_index.map { |i| FORMATOS_COL.include?(pedidos[i].to_s) ? pedidos[i].to_sym : :texto }
+    rows = Array(params[:rows]).first(MAX_FILAS).map do |r|
+      celdas = Array(r)
+      headers.each_index.map do |i|
+        v = celdas[i]
+        next nil if v.nil? || v == ''
+        %i[numero moneda].include?(formatos[i]) && v.to_s.match?(/\A-?\d+(\.\d+)?\z/) ? v.to_f : v.to_s.first(300)
+      end
+    end
+    responder_descarga(
+      titulo: params[:titulo].to_s.first(80).presence || 'Analítica',
+      nombre: "analitica_#{params[:nombre].to_s.parameterize.first(40).presence || 'tabla'}",
+      periodo: params[:periodo].to_s.first(80).presence, headers: headers, rows: rows, formatos: formatos,
+    )
   end
 
   def require_analytics_access!

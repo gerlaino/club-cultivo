@@ -9,10 +9,7 @@
            : 'Los cierres que hiciste vos. Si mañana te preguntan por una diferencia, está acá.' }}
       </p>
       <p v-else class="trn__sub">&nbsp;</p>
-      <button v-if="turnos.length || pendientes.length" class="trn__btn trn__btn--mini trn__btn--ghost"
-              :disabled="bajando" @click="descargar">
-        {{ bajando ? 'Preparando…' : 'Descargar CSV' }}
-      </button>
+      <BotonesDescarga v-if="turnos.length || pendientes.length" :generando="bajando" @descargar="descargar" />
     </div>
 
     <!-- LA LISTA DE TRABAJO VA ARRIBA DE LA GRILLA, no enterrada en ella. Es una lista que se
@@ -129,7 +126,9 @@
 // Administración ve todos; el que atiende ve LOS SUYOS —el backend filtra, no la pantalla.
 import { ref, computed, watch } from 'vue'
 import CorregirConteo from './CorregirConteo.vue'
-import { listTurnosMostrador, revisarTurnoMostrador, descargarTurnosMostrador } from '../../lib/api.js'
+import { listTurnosMostrador, revisarTurnoMostrador } from '../../lib/api.js'
+import { descargarListado } from '../../lib/descargas.js'
+import BotonesDescarga from '../ui/BotonesDescarga.vue'
 import { useToast } from '../../composables/useToast.js'
 import { hechosDelCierre } from '../../lib/hechosDelCierre.js'
 import { hoyISO } from '../../utils/dates.js'
@@ -143,7 +142,7 @@ const pendientes = ref([])      // «para mirar», de cualquier mes
 const gestiona = ref(false)
 const cargando = ref(false)
 const cargado  = ref(false)
-const bajando  = ref(false)
+const bajando  = ref(null)
 const marcando = ref(null)
 const corrigiendo = ref(null)
 const seleccionado = ref(null)  // clave del día elegido: 'YYYY-M-D'
@@ -336,24 +335,15 @@ async function cargar () {
 }
 const recargar = () => cargar()
 
-// Se arma el archivo en el backend y se baja acá. El nombre lo pone el servidor (sede + fecha):
-// tres archivos "arqueos.csv" en la carpeta de descargas no le sirven a nadie.
-async function descargar () {
-  bajando.value = true
+// El historial de cierres en PDF o Excel, armado en el backend (`DescargaProfesional`).
+async function descargar (formato) {
+  bajando.value = formato
   try {
-    const res  = await descargarTurnosMostrador(props.sedeId)
-    const nombre = /filename="?([^"]+)"?/.exec(res.headers['content-disposition'] || '')?.[1]
-    const url  = URL.createObjectURL(new Blob([res.data], { type: 'text/csv;charset=utf-8' }))
-    const a    = document.createElement('a')
-    a.href = url
-    a.download = nombre || `arqueos-${hoyISO()}.csv`
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    URL.revokeObjectURL(url)
-  } catch {
-    toast.error('No se pudo descargar el historial.')
-  } finally { bajando.value = false }
+    await descargarListado(`/sedes/${props.sedeId}/mostrador/turnos`, formato,
+      { nombre: `cierres-mostrador-${hoyISO()}` })
+  } catch (e) {
+    toast.error(e.message)
+  } finally { bajando.value = null }
 }
 
 // Cambiar de sede vuelve al mes actual: octubre de Norte no es octubre de Centro.

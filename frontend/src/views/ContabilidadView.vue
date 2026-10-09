@@ -14,6 +14,7 @@ import ModalMovimiento from "../components/contabilidad/ModalMovimiento.vue"
 import ModalRegistrarPago from "../components/contabilidad/ModalRegistrarPago.vue"
 import EditarCompraCuotasModal from "../components/contabilidad/EditarCompraCuotasModal.vue"
 import DsSpinner from '../design-system/components/Spinner.vue'
+import BotonesDescarga from '../components/ui/BotonesDescarga.vue'
 // Categorías integradas como sección de Contabilidad (config del hub contable)
 import FinanzasCatalogoView from './admin/FinanzasCatalogoView.vue'
 import { hoyISO, toISO, formatFechaCorta } from '../utils/dates.js'
@@ -704,6 +705,7 @@ async function goToPage(p) {
 // SE BAJA LO QUE SE ESTÁ MIRANDO. Mandaba sólo las fechas: buscabas "Calentador", veías una fila
 // y el archivo traía las 27 del período. Desde el libro van TODOS los filtros de la pantalla; desde
 // el dashboard, su sede, que es el único filtro que tiene.
+const generandoLibro = ref(null)
 async function exportar(formato = "xlsx") {
   const params = {}
   if (filtroDesde.value) params.desde = filtroDesde.value
@@ -718,7 +720,14 @@ async function exportar(formato = "xlsx") {
     if (filtroSector.value)    params.unidad_negocio_id = filtroSector.value
     if (filtroSede.value)      params.sede_id           = filtroSede.value
   }
-  await store.exportCSV(params, formato)
+  generandoLibro.value = formato
+  try {
+    await store.exportCSV(params, formato)
+  } catch (e) {
+    toast.error(e.message)
+  } finally {
+    generandoLibro.value = null
+  }
 }
 
 function irALibro() {
@@ -765,12 +774,7 @@ onMounted(async () => {
         <p class="cv__sub">Libro diario · Ingresos · Egresos · Balance</p>
       </div>
       <div class="cv__header-right">
-        <button class="cv__btn-ghost" @click="exportar('xlsx')" title="Con montos que suman, totales y filtros">
-          <i class="bi bi-file-earmark-spreadsheet"></i> Exportar Excel
-        </button>
-        <button class="cv__btn-ghost" @click="exportar('csv')" title="Texto plano, para procesar en otra herramienta">
-          <i class="bi bi-download"></i> CSV
-        </button>
+        <BotonesDescarga :generando="generandoLibro" @descargar="exportar" />
         <!-- Dos puertas, porque son dos cosas distintas: "Nuevo movimiento" registra plata que
              SALE; lo que entra de forma excepcional tiene su formulario corto (cinco campos, sin
              inventario ni cuotas). Lo que entra todos los días no se carga por ninguna de las

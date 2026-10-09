@@ -1,4 +1,5 @@
 class PacientesController < ApplicationController
+  include DescargaProfesional
   before_action :authenticate_user!
   before_action -> { require_feature!(:produccion_dispensa) }
   before_action :check_pacientes_role!
@@ -441,38 +442,28 @@ class PacientesController < ApplicationController
 
     scope = scope.order(apellido: :asc, nombre: :asc)
 
-    require "csv"
-    csv_data = CSV.generate(col_sep: ";", encoding: "UTF-8") do |csv|
-      csv << [
-        "ID", "Apellido", "Nombre", "DNI", "Fecha nacimiento",
-        "Email", "Teléfono",
-        "N° REPROCANN", "Vencimiento REPROCANN", "Estado REPROCANN",
-        "Con seguimiento médico", "Límite dispensación (g/mes)",
-        "Registrado"
-      ]
-      scope.each do |p|
-        csv << [
-          p.id,
-          p.apellido,
-          p.nombre,
-          p.dni_normalizado,
-          p.fecha_nacimiento&.strftime("%d/%m/%Y"),
-          p.email,
-          p.telefono,
-          p.reprocann_numero,
-          p.reprocann_vencimiento&.strftime("%d/%m/%Y"),
-          p.reprocann_estado,
-          p.con_seguimiento_medico ? "Sí" : "No",
-          p.limite_dispensacion_mensual_g,
-          p.created_at.strftime("%d/%m/%Y"),
-        ]
-      end
-    end
-
-    send_data "\xEF\xBB\xBF#{csv_data}",
-              filename:    "pacientes_#{Time.zone.today}.csv",
-              type:        "text/csv; charset=utf-8",
-              disposition: "attachment"
+    # Lo mismo que la lista, en Excel o PDF (`DescargaProfesional`). Sin el id interno ni el
+    # «límite mensual» (no existe), y el REPROCANN con la misma categoría que la pantalla.
+    estado_rep = { 'vigente' => 'Vigente', 'por_vencer' => 'Vence en 30 días', 'vencido' => 'Vencido',
+                   'pendiente' => 'En trámite', 'sin_reprocann' => 'Sin REPROCANN' }
+    pacientes = scope.to_a
+    filtro = { 'proximos' => 'REPROCANN que vence en 30 días', 'vencidos' => 'REPROCANN vencido',
+               'sin_rep' => 'Sin REPROCANN' }[params[:reprocann]]
+    filtro = [filtro, ("búsqueda «#{params[:query]}»" if params[:query].present?)].compact.join(' · ').presence
+    responder_descarga(
+      titulo: 'Pacientes', nombre: 'pacientes', filtros: filtro,
+      kpis: [{ label: 'Pacientes', valor: pacientes.size },
+             { label: 'REPROCANN vigente', valor: pacientes.count { |p| %w[vigente por_vencer].include?(p.reprocann_categoria) } }],
+      headers: ['Apellido', 'Nombre', 'DNI', 'Nacimiento', 'Email', 'Teléfono', 'N° REPROCANN',
+                'Vence', 'REPROCANN', 'Seguimiento médico', 'Alta'],
+      columnas_pdf: [0, 1, 2, 3, 5, 6, 7, 8],
+      formatos: %i[texto texto texto fecha texto texto texto fecha texto texto fecha],
+      rows: pacientes.map { |p|
+        [p.apellido, p.nombre, p.dni_normalizado, p.fecha_nacimiento, p.email, p.telefono, p.reprocann_numero,
+         p.reprocann_vencimiento, estado_rep[p.reprocann_categoria], p.con_seguimiento_medico ? 'Sí' : 'No',
+         p.created_at.to_date]
+      },
+    )
   end
 
   # POST /pacientes/:id/enviar_mail

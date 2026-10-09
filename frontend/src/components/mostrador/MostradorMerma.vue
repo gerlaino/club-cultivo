@@ -75,7 +75,7 @@
           <button v-for="c in cortes" :key="c.id" class="mrm__periodo"
                   :class="{ 'is-on': corte === c.id }" @click="corte = c.id">{{ c.label }}</button>
         </div>
-        <button class="mrm__btn mrm__btn--mini mrm__btn--ghost" @click="bajarCsv">Bajar CSV</button>
+        <BotonesDescarga :disabled="!filas.length" :generando="generando" @descargar="descargar" />
       </div>
       <!-- El orden se dice en una línea porque no es el obvio: la cantidad no compara flor con
            prerolls, y la plata ya no manda. -->
@@ -155,6 +155,8 @@
 import { ref, computed, watch } from 'vue'
 import { getMermaMostrador, getEvolucionMostrador } from '../../lib/api.js'
 import { useToast } from '../../composables/useToast.js'
+import { descargarListado } from '../../lib/descargas.js'
+import BotonesDescarga from '../ui/BotonesDescarga.vue'
 import GraficoProducto from './GraficoProducto.vue'
 import { formaLabel } from '../../lib/formatters.js'
 
@@ -431,26 +433,23 @@ async function cargar () {
   }
 }
 
-// Se baja EL CORTE QUE SE ESTÁ MIRANDO, no un archivo con todo: quien lo abre ya eligió la
-// pregunta acá adentro. Se arma en el navegador con lo que ya está en pantalla — pedirle al
-// backend un CSV de lo mismo sería otro endpoint que mantener sincronizado.
-// EL CSV SÍ LLEVA LOS NÚMEROS SUELTOS. Lo abre alguien que va a analizar, no a leer de un
-// vistazo: ahí las columnas separadas sirven, y en la pantalla eran cinco cifras sin sujeto.
-function bajarCsv () {
-  const cab = [encabezado.value, 'Numero', 'Falto', 'Unidad', 'Contexto', 'A costo ($)']
-  const filasCsv = filas.value.map(f => [f.titulo, f.numero || '', f.faltante, f.unidad || '', f.contexto, f.ars])
-  const csv = [cab, ...filasCsv]
-    .map(fila => fila.map(c => `"${String(c ?? '').replace(/"/g, '""')}"`).join(';'))
-    .join('\n')
-  const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }))
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `merma-${corte.value}-${rango.value.desde || 'mes'}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
+// Se baja EL CORTE QUE SE ESTÁ MIRANDO, en PDF o Excel: quien lo abre ya eligió la pregunta acá
+// adentro. Lo arma el backend con los mismos números (`MostradorController#enviar_merma`); antes
+// era un CSV armado en el navegador.
+const generando = ref(null)
+async function descargar (formato) {
+  generando.value = formato
+  try {
+    const params = { ...rango.value, corte: corte.value }
+    if (todasLasSedes.value) params.todas = 1
+    await descargarListado(`/sedes/${props.sedeId}/mostrador/merma`, formato,
+      { params, nombre: `merma-${corte.value}-${rango.value.desde || 'mes'}` })
+  } catch (e) {
+    toast.error(e.message)
+  } finally {
+    generando.value = null
+  }
 }
-
-
 
 // Cambiar de sede recalcula: si no, se veían números de la sede anterior que parecen de esta.
 watch(() => props.sedeId, () => { merma.value = null; cargar() }, { immediate: true })

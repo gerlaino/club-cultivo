@@ -1,8 +1,8 @@
 <script setup>
 import { ref } from 'vue'
 import AppDatePicker from '../ui/AppDatePicker.vue'
-import DsSpinner from '../../design-system/components/Spinner.vue'
-import { exportPlanCSV } from '../../lib/api.js'
+import { descargarListado } from '../../lib/descargas.js'
+import BotonesDescarga from '../ui/BotonesDescarga.vue'
 import { useToast } from '../../composables/useToast.js'
 import { hoyISO, toISO } from '../../utils/dates.js'
 
@@ -15,7 +15,7 @@ const toast = useToast()
 function isoHoy() { return hoyISO() }
 
 const fechaInicio = ref(isoHoy())
-const descargando = ref(false)
+const descargando = ref(null)
 
 function formatFecha(iso) {
   if (!iso) return ''
@@ -33,30 +33,19 @@ function fechaEstimadaFin() {
   return formatFecha(toISO(d))
 }
 
-function triggerDownload(blob, filename) {
-  const url = URL.createObjectURL(blob)
-  const a   = document.createElement('a')
-  a.href     = url
-  a.download = filename
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
-}
-
-async function descargar() {
+async function descargar(formato) {
   if (!fechaInicio.value) return
-  descargando.value = true
+  descargando.value = formato
   try {
-    const { data } = await exportPlanCSV(props.plan.id, { modo: 'calendario', fecha_inicio: fechaInicio.value })
-    const filename = `${props.plan.titulo.toLowerCase().replace(/\s+/g, '-')}-calendario.csv`
-    triggerDownload(data, filename)
-    toast.success('Calendario descargado')
+    await descargarListado(`/plan_trabajos/${props.plan.id}/export_csv`, formato, {
+      params: { modo: 'calendario', fecha_inicio: fechaInicio.value },
+      nombre: `plan-${props.plan.titulo.toLowerCase().replace(/\s+/g, '-')}-calendario`,
+    })
     emit('close')
   } catch (e) {
-    toast.error('Error al exportar el calendario')
+    toast.error(e.message)
   } finally {
-    descargando.value = false
+    descargando.value = null
   }
 }
 </script>
@@ -100,21 +89,12 @@ async function descargar() {
             </div>
           </div>
 
-          <!-- Descripción del formato -->
+          <!-- Qué trae el archivo (9-oct-2026: era un CSV con columnas técnicas). -->
           <div class="ecm__formato">
-            <div class="ecm__formato-title">Columnas del archivo CSV:</div>
-            <div class="ecm__chips">
-              <span class="ecm__chip">semana</span>
-              <span class="ecm__chip">fecha</span>
-              <span class="ecm__chip">dia_semana</span>
-              <span class="ecm__chip">tipo</span>
-              <span class="ecm__chip">tarea</span>
-              <span class="ecm__chip">descripcion</span>
-              <span class="ecm__chip">rol</span>
-              <span class="ecm__chip">prioridad</span>
-            </div>
+            <div class="ecm__formato-title">Qué trae el archivo</div>
             <p class="ecm__formato-hint">
-              Abre en Excel o Google Sheets. La columna "semana" te permite agrupar las tareas por semana del cultivo.
+              Cada tarea con su fecha, qué hay que hacer y su prioridad, con el membrete de tu
+              organización. PDF para imprimir o compartir; Excel para ordenarlo o agregarle columnas.
             </p>
           </div>
 
@@ -123,11 +103,7 @@ async function descargar() {
         <!-- Footer -->
         <div class="ecm__footer">
           <button class="ecm__btn-ghost" @click="$emit('close')">Cancelar</button>
-          <button class="ecm__btn-primary" :disabled="!fechaInicio || descargando" @click="descargar">
-            <DsSpinner v-if="descargando" :size="14" />
-            <i v-else class="bi bi-download"></i>
-            {{ descargando ? 'Descargando…' : 'Descargar CSV' }}
-          </button>
+          <BotonesDescarga :disabled="!fechaInicio" :generando="descargando" @descargar="descargar" />
         </div>
 
       </div>

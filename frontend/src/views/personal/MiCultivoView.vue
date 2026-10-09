@@ -17,9 +17,11 @@
 
     <div class="mic__kpis">
       <div class="mic__kpi">
-        <span class="mic__kpi-l">En floración</span>
+        <!-- Lo que se cuenta es el cupo, no «en floración»: las automáticas ocupan lugar todo su
+             ciclo aunque estén en vege. El desglose lo manda el backend (`PlanEnforcer`). -->
+        <span class="mic__kpi-l">Cupo de plantas</span>
         <strong class="mic__kpi-v">{{ cupoTexto }}</strong>
-        <span class="mic__kpi-s">las autos cuentan todo su ciclo</span>
+        <span class="mic__kpi-s">{{ cupoDesglose }}</span>
       </div>
       <div class="mic__kpi">
         <span class="mic__kpi-l">Próxima cosecha</span>
@@ -144,6 +146,15 @@ const cupoTexto = computed(() => {
   const hay = uso.value?.plantas
   if (hay == null) return '—'
   return tope ? `${hay} de ${tope}` : `${hay}`
+})
+
+const cupoDesglose = computed(() => {
+  const d = planData.value?.plantas_desglose
+  if (!d) return 'en floración y automáticas'
+  const partes = []
+  if (d.en_floracion) partes.push(`${d.en_floracion} en floración`)
+  if (d.automaticas) partes.push(`${d.automaticas} ${d.automaticas === 1 ? 'automática' : 'automáticas'}`)
+  return partes.length ? partes.join(' + ') : 'ninguna en floración'
 })
 
 const LUZ = { vegetativo: '18/6 · vegetativo', floracion: '12/12 · floración', mixta: 'Mixto', clon: 'Esquejes', madre: 'Madres' }

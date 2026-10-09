@@ -2,7 +2,7 @@
 import { ref, watch, computed, onMounted } from 'vue'
 import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
-import { listDispensacionesFecha, exportDispensacionesCSV, listPacientes, getPaciente, listSedes, anularDispensacion } from '../lib/api.js'
+import { listDispensacionesFecha, listPacientes, getPaciente, listSedes, anularDispensacion } from '../lib/api.js'
 import { formaLabel, formatARS, formatFecha } from '../lib/formatters.js'
 import { descuentoPct, descuentoArs } from '../lib/dispensaDescuento.js'
 import { RouterLink, useRouter, useRoute } from 'vue-router'
@@ -14,6 +14,8 @@ import ModalAnularDispensa from '../components/dispensaciones/ModalAnularDispens
 import { useAuthStore } from '../stores/auth'
 import { useConfirm } from '../composables/useConfirm.js'
 import { useToast } from '../composables/useToast.js'
+import { descargarListado } from '../lib/descargas.js'
+import BotonesDescarga from '../components/ui/BotonesDescarga.vue'
 import { hoyISO, toISO } from '../utils/dates.js'
 
 const auth    = useAuthStore()
@@ -198,7 +200,7 @@ function alternarDetalle(id) {
 const colspanDetalle = 99   // el navegador lo clampa a la cantidad real de columnas
 
 const loading   = ref(false)
-const exporting = ref(false)
+const generando = ref(null)
 const allDisps  = ref([])
 
 const dispensaciones = computed(() => allDisps.value)
@@ -259,17 +261,17 @@ watch([desde, hasta, filtroSede, filtroMedioPago, filtroForma, filtroSocio, alca
   cargar()
 }, { immediate: true })
 
-async function exportar() {
-  exporting.value = true
+// Lo mismo que la lista, en PDF o Excel (`DescargaProfesional`).
+async function descargar(formato) {
+  generando.value = formato
   try {
-    const { data } = await exportDispensacionesCSV(buildParams())
-    const url = URL.createObjectURL(new Blob([data], { type: 'text/csv' }))
-    const a   = document.createElement('a')
-    a.href    = url
-    a.download = `dispensaciones_${desde.value}_${hasta.value}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-  } catch {} finally { exporting.value = false }
+    await descargarListado('/dispensaciones/export_csv', formato,
+      { params: buildParams(), nombre: `dispensaciones_${desde.value}_${hasta.value}` })
+  } catch (e) {
+    toast.error(e.message)
+  } finally {
+    generando.value = null
+  }
 }
 
 function setRango(dias) {
@@ -376,10 +378,7 @@ const FORMAS = [
         <button class="hd__btn-refresh" :disabled="loading" @click="cargar">
           <RefreshCw :size="14" :stroke-width="2" :class="{ 'hd__spin': loading }" />
         </button>
-        <button class="hd__btn-export" :disabled="exporting || !dispensaciones.length" @click="exportar">
-          <Download :size="14" :stroke-width="2" />
-          {{ exporting ? 'Exportando…' : 'CSV' }}
-        </button>
+        <BotonesDescarga :disabled="!dispensaciones.length" :generando="generando" @descargar="descargar" />
       </div>
     </div>
 

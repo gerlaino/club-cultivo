@@ -430,4 +430,34 @@ RSpec.describe 'La merma del mostrador', type: :request do
       expect(response).to have_http_status(:forbidden)
     end
   end
+
+  # 9-oct-2026: el corte que se está mirando se baja en PDF o Excel, armado acá (antes era un CSV
+  # que armaba el navegador).
+  describe 'la descarga' do
+    before do
+      turno!(flor_carga: 100, flor_disp: 50, flor_contado: 48, preroll_carga: 10, preroll_disp: 5, preroll_contado: 5)
+    end
+
+    def bajar(como: admin, **params)
+      sign_in_as(como)
+      get "/api/sedes/#{sede.id}/mostrador/merma", headers: auth_headers, params: params
+    end
+
+    it 'en Excel, por producto, con lo que faltó y el porcentaje' do
+      bajar(formato: 'xlsx', corte: 'producto')
+      expect(response.content_type).to include(DescargasHelper::XLSX)
+      texto = texto_xlsx(response.body)
+      expect(texto).to include('Frasco', 'Faltó', 'Merma (%)', 'Por frasco')
+    end
+
+    it 'en PDF, por persona' do
+      bajar(formato: 'pdf', corte: 'persona')
+      expect(es_pdf?(response.body)).to be(true)
+    end
+
+    it 'quien atiende no la baja' do
+      bajar(como: ana, formato: 'xlsx')
+      expect(response).to have_http_status(:forbidden)
+    end
+  end
 end

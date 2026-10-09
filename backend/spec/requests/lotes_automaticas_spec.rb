@@ -132,12 +132,13 @@ RSpec.describe 'Genética automática — editar el tilde', type: :request do
     expect(gen.reload).to have_attributes(automatica: true, dias_ciclo_objetivo: 75)
   end
 
-  it 'el CSV de lotes dice si es automática, y Plan vs. real mide a la auto por el ciclo entero' do
+  it 'la descarga de lotes dice si es automática, y Plan vs. real mide a la auto por el ciclo entero' do
     auto = create(:genetica, club: club, nombre: 'Auto K', automatica: true, dias_ciclo_objetivo: 75)
     lote = create(:lote, club: club, sala: sala, genetica: auto, estado: 'vegetativo', start_date: 40.days.ago.to_date,
                          tamanio_maceta: 7, dias_ciclo_objetivo: 75)
     get '/lotes/export_csv', headers: auth_headers
-    expect(response.body).to include('Automática').and include("#{lote.codigo};vegetativo;Auto K;Sí")
+    fila = filas_xlsx(response.body).find { |f| f.first == lote.codigo }
+    expect(fila[1..2]).to eq(['Vegetativo', 'Auto K (auto)'])
 
     get '/informes/plan_vs_real', headers: auth_headers
     fila = json['viene'].find { |f| f['id'] == lote.id }
