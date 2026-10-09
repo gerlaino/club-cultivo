@@ -5,7 +5,7 @@ require 'rails_helper'
 # la prueba sin activar, se pausa con «prueba terminada». Sólo toca a los autoregistrados.
 RSpec.describe CorteAutoregistroJob do
   def autoregistrado(email:, mail_enviado_at: nil, hasta: Time.zone.today + 30)
-    reg = Registros::CrearPersonal.new(nombre: 'Juana', email: email, password: 'clave-larga-1', acepta_terminos: true).call
+    reg = Registros::CrearPersonal.new(nombre: 'Juana', email: email, password: 'clave-larga-1', acepta_terminos: true, mayor_de_edad: true).call
     reg.update!(mail_enviado_at: mail_enviado_at)
     reg.club.update!(plan_activo_hasta: hasta)
     reg

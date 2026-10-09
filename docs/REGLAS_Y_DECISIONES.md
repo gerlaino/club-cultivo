@@ -338,6 +338,12 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 
 ### Lo que NO hay que romper
 
+- **LA EDAD EN EL AUTOREGISTRO ES UNA DECLARACIÓN PROPIA, OBLIGATORIA Y REGISTRADA** (9-oct-2026). Tilde
+  aparte de los términos («Declaro que soy mayor de 18 años»); `Registros::CrearPersonal` rechaza el
+  alta sin `mayor_de_edad` y guarda `registros_personales.mayor_edad_declarada_at`. No se verifica
+  (no hay con qué); Términos §3 dice que es responsabilidad de quien declara y que se da de baja si
+  se advierte que es menor. Los pacientes menores de una organización (REPROCANN con adulto
+  responsable) no usan la plataforma: Términos §12.
 - **TODA DESCARGA ES UN INFORME: PDF O EXCEL, NUNCA CSV** (9-oct-2026, Germán: «ningún archivo
   descargado puede ser así, ninguno… sin importar si se presentan o si es para un autocultivo»).
   Un listado se baja por `DescargaProfesional#responder_descarga` (`formato=pdf|xlsx`, Excel por

@@ -29,7 +29,11 @@
 
     <h2>3. Quién puede usarla, y para qué</h2>
     <ul>
-      <li>Personas mayores de 18 años con capacidad para contratar.</li>
+      <li>
+        Personas <strong>mayores de 18 años</strong> con capacidad para contratar. Al crear una cuenta de uso
+        personal declarás tener 18 años o más; no lo verificamos con documentos, y la declaración es tu
+        responsabilidad. Si se advierte que quien usa la cuenta es menor de edad, la cuenta se da de baja.
+      </li>
       <li>
         El <strong>uso personal</strong> es para quien cultiva para sí dentro del marco legal argentino (Ley 27.350 de
         uso medicinal del cannabis, su Decreto reglamentario 883/2020 y el Registro del Programa de Cannabis,
@@ -128,7 +132,10 @@
       de esos datos y de contar con el consentimiento de sus titulares y las autorizaciones regulatorias que su actividad
       requiera. Cultivo Espacial actúa como <strong>encargado del tratamiento</strong> por cuenta de ella (art. 25 de la
       Ley 25.326): usamos esos datos sólo para prestarle el servicio, los tratamos con confidencialidad, no los cedemos, y
-      al terminar la relación se los devolvemos o los destruimos, según nos indique.
+      al terminar la relación se los devolvemos o los destruimos, según nos indique. Una organización puede
+      registrar como paciente a una persona menor de edad cuando la normativa lo permite (por ejemplo, con un
+      adulto responsable en el REPROCANN): el paciente no usa la plataforma, y contar con las autorizaciones de
+      su representante es responsabilidad de la organización.
     </p>
 
     <h2>13. Suspensión</h2>

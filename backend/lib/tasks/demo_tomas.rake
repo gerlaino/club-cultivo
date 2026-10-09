@@ -58,7 +58,7 @@ namespace :demo do
     unless usuario
       registro = Registros::CrearPersonal.new(nombre: 'Sofía Paz', email: DEMO_AUTOCULTIVO_EMAIL,
                                               password: ENV['PASSWORD'].presence || 'DemoVideo2026!',
-                                              acepta_terminos: true).call
+                                              acepta_terminos: true, mayor_de_edad: true).call
       registro.club.update_columns(demo: true, plan_trial: false, plan_activo_hasta: nil)
       registro.update_columns(confirmado_at: Time.current)
       usuario = registro.user

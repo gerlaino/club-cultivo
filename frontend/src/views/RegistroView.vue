@@ -39,10 +39,17 @@
         <!-- Campo trampa: una persona no lo ve; un robot lo completa y el backend lo descarta. -->
         <input v-model="sitio" type="text" name="sitio" class="rg__trampa" tabindex="-1" autocomplete="off" aria-hidden="true" />
 
+        <!-- La edad es una declaración propia, aparte de los términos, y queda registrada
+             (9-oct-2026): no hay cómo verificarla, pero declararla en falso es de quien lo hace. -->
+        <label class="rg__check">
+          <input v-model="mayor" type="checkbox" :disabled="enviando" />
+          <span>Declaro que soy <strong>mayor de 18 años</strong>.</span>
+        </label>
+
         <label class="rg__check">
           <input v-model="acepta" type="checkbox" :disabled="enviando" />
           <span>
-            Soy mayor de 18 años, leí y acepto los
+            Leí y acepto los
             <RouterLink to="/terminos" target="_blank">Términos y condiciones</RouterLink>
             y la <RouterLink to="/privacidad" target="_blank">Política de privacidad</RouterLink>,
             y presto mi <strong>consentimiento expreso</strong> para que mis datos de cultivo y de
@@ -99,13 +106,14 @@ const nombre   = ref('')
 const email    = ref('')
 const password = ref('')
 const acepta   = ref(false)
+const mayor    = ref(false)
 const sitio    = ref('')
 const enviando = ref(false)
 const error    = ref(null)
 const yaExiste = ref(false)
 
 const minimo = computed(() => info.value?.password_minimo || 8)
-const puedeEnviar = computed(() => nombre.value.trim() && email.value && password.value && acepta.value)
+const puedeEnviar = computed(() => nombre.value.trim() && email.value && password.value && mayor.value && acepta.value)
 
 onMounted(async () => {
   try { info.value = (await getRegistroInfo()).data } catch {}
@@ -122,7 +130,7 @@ async function crear () {
   try {
     await registrarPersonal({
       nombre: nombre.value.trim(), email: email.value, password: password.value,
-      acepta_terminos: acepta.value, sitio: sitio.value,
+      acepta_terminos: acepta.value, mayor_de_edad: mayor.value, sitio: sitio.value,
     })
   } catch (e) {
     const status = e?.response?.status

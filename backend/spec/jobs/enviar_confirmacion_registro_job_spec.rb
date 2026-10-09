@@ -3,7 +3,7 @@ require 'rails_helper'
 # El reloj de los 7 días corre desde que el mail SALIÓ: si el correo falla, no se anota.
 RSpec.describe EnviarConfirmacionRegistroJob do
   let(:reg) do
-    Registros::CrearPersonal.new(nombre: 'Juana', email: 'j@ej.com', password: 'clave-larga-1', acepta_terminos: true).call
+    Registros::CrearPersonal.new(nombre: 'Juana', email: 'j@ej.com', password: 'clave-larga-1', acepta_terminos: true, mayor_de_edad: true).call
   end
 
   it 'manda el mail con un link que confirma, y anota cuándo salió' do

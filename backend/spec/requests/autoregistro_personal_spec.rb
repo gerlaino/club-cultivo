@@ -8,7 +8,8 @@ RSpec.describe 'Autoregistro de uso personal', type: :request do
   include ActiveJob::TestHelper
 
   let(:datos) do
-    { nombre: 'Juana Pérez', email: 'Juana@Ejemplo.com', password: 'clave-larga-1', acepta_terminos: true }
+    { nombre: 'Juana Pérez', email: 'Juana@Ejemplo.com', password: 'clave-larga-1', acepta_terminos: true,
+      mayor_de_edad: true }
   end
 
   def registrar(extra = {})
@@ -64,6 +65,23 @@ RSpec.describe 'Autoregistro de uso personal', type: :request do
       expect { registrar(acepta_terminos: false) }.not_to change(Club, :count)
       expect(response).to have_http_status(:unprocessable_entity)
       expect(response.parsed_body['error']).to match(/términos/)
+    end
+
+    # AC (9-oct-2026, Germán): decíamos «no permitimos menores» sin pedir nada aparte. Ahora la
+    # edad es una declaración propia, obligatoria, y queda registrada con su fecha.
+    it 'sin declarar que es mayor de 18 no se crea, y lo dice' do
+      expect { registrar(mayor_de_edad: false) }.not_to change(Club, :count)
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.parsed_body['error']).to include('mayores de 18')
+    end
+
+    it 'aceptar los términos no alcanza: la edad se declara aparte' do
+      expect { registrar(mayor_de_edad: nil) }.not_to change(Club, :count)
+    end
+
+    it 'la declaración queda registrada con su fecha' do
+      registrar
+      expect(RegistroPersonal.last.mayor_edad_declarada_at).to be_within(1.minute).of(Time.current)
     end
 
     it 'con un mail que ya tiene cuenta (en cualquier organización) no crea otra' do

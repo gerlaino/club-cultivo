@@ -1,5 +1,16 @@
 # Changelog
 
+## Octubre 2026 (eq) — Mayor de 18: declaración propia en el autoregistro (9-oct)
+
+Germán: «decimos que no permitimos menores de edad y no tenemos ningún bloqueo». Había un solo tilde
+que mezclaba «soy mayor de 18» con los términos y no quedaba registrado aparte.
+- **Tilde propio** «Declaro que soy mayor de 18 años», obligatorio (la pantalla no deja crear sin él
+  y el backend lo exige). Queda la fecha en `registros_personales.mayor_edad_declarada_at`
+  (migración nueva; los registros viejos quedan en nil, aceptaron el tilde combinado).
+- **Términos** v`2026-10-09b`: §3, la declaración, que no se verifica con documentos y que la cuenta
+  se da de baja si se advierte que es menor; §12, los pacientes menores de una organización.
+- Specs: `autoregistro_personal_spec.rb` (tres casos nuevos), `registroMayorDeEdad.test.js`.
+
 ## Octubre 2026 (ep) — Toda descarga es un informe; la tarjeta del cupo (9-oct)
 
 Germán bajó el CSV de un plan: «esta horrible esto, no se entiende… todo tiene que estar acorde al

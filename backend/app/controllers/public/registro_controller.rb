@@ -26,7 +26,7 @@ module Public
 
       registro = Registros::CrearPersonal.new(
         nombre: params[:nombre], email: params[:email], password: params[:password],
-        acepta_terminos: params[:acepta_terminos],
+        acepta_terminos: params[:acepta_terminos], mayor_de_edad: params[:mayor_de_edad],
         ip: request.remote_ip, user_agent: request.user_agent,
       ).call
       EnviarConfirmacionRegistroJob.perform_later(registro.id)

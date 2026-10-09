@@ -14,11 +14,15 @@ module Registros
     DIAS_PRUEBA      = 30
     PASSWORD_MINIMO  = 8
 
-    def initialize(nombre:, email:, password:, acepta_terminos:, ip: nil, user_agent: nil)
+    # `mayor_de_edad`: la declaración propia de tener 18 años o más (9-oct-2026). No se verifica
+    # —no hay con qué—: es una declaración, como en cualquier servicio sin validación de identidad,
+    # y queda registrada con su fecha. Términos (sección 3) dice qué pasa si es falsa.
+    def initialize(nombre:, email:, password:, acepta_terminos:, mayor_de_edad: false, ip: nil, user_agent: nil)
       @nombre     = nombre.to_s.strip.squish
       @email      = email.to_s.strip.downcase
       @password   = password.to_s
       @acepta     = ActiveModel::Type::Boolean.new.cast(acepta_terminos)
+      @mayor      = ActiveModel::Type::Boolean.new.cast(mayor_de_edad)
       @ip         = ip
       @user_agent = user_agent.to_s.first(255)
     end
@@ -49,6 +53,7 @@ module Registros
             club: club, user: user, email: @email,
             token_digest: RegistroPersonal.digest(SecureRandom.urlsafe_base64(32)),
             terminos_version: Legal::TERMINOS_VERSION, terminos_aceptados_at: Time.current,
+            mayor_edad_declarada_at: Time.current,
             ip: @ip, user_agent: @user_agent,
           )
         end
@@ -63,6 +68,7 @@ module Registros
       raise Error, 'El nombre es muy largo.' if @nombre.length > 80
       raise Error, 'Ese mail no parece válido.' unless @email.match?(URI::MailTo::EMAIL_REGEXP)
       raise Error, "La contraseña tiene que tener al menos #{PASSWORD_MINIMO} caracteres." if @password.length < PASSWORD_MINIMO
+      raise Error, 'La cuenta de autocultivo es para mayores de 18 años: tenés que declararlo para crearla.' unless @mayor
       raise Error, 'Para crear la cuenta tenés que aceptar los términos y la política de privacidad.' unless @acepta
       # Mismo texto exista o no en otra organización: no se le confirma a un extraño qué mails
       # tienen cuenta más de lo imprescindible, pero quien ya la tiene necesita saber qué hacer.
