@@ -139,12 +139,7 @@ class LotesController < ApplicationController
 
     # Herencia: si la genética define días objetivo por fase, el lote los toma como default
     # (se pueden sobrescribir desde el form). Floración = tiempo_floracion (ya en días).
-    if @lote.genetica
-      @lote.dias_vegetativo_objetivo ||= @lote.genetica.dias_vegetativo_objetivo
-      @lote.dias_floracion_objetivo  ||= @lote.genetica.tiempo_floracion
-      @lote.dias_cosecha_objetivo    ||= @lote.genetica.dias_cosecha_objetivo
-      @lote.dias_ciclo_objetivo      ||= @lote.genetica.dias_ciclo_objetivo
-    end
+    Lotes::Plantar.heredar_objetivos(@lote)
 
     # Estados creables: ciclo previo a stock + cosechado. secado/curado/finalizado
     # y los de manicura son post-stock o de proceso y no se cargan a mano.
@@ -158,22 +153,11 @@ class LotesController < ApplicationController
       return render json: { errors: ['La cantidad de plantas debe ser al menos 1'] }, status: :unprocessable_entity
     end
 
-    # En el path heredado el frontend no envía start_date (lo calcula crear_lote_heredado).
-    # Calculamos aquí también para que la validación de presencia no rechace el save!.
-    if params[:heredado].in?([true, 'true', '1']) && @lote.start_date.blank?
-      estado       = @lote.estado.to_s
-      dias_semilla = params[:dias_semilla_esqueje].to_i
-      dias_vege    = params[:dias_vegetativo].to_i
-      dias_flora   = params[:dias_floracion].to_i
-      dias_cos     = params[:dias_cosecha].to_i
-      total_dias   = case estado
-                     when 'enraizado' then dias_semilla
-                     when 'vegetativo'         then dias_semilla + dias_vege
-                     when 'floracion'          then dias_semilla + dias_vege + dias_flora
-                     when 'cosecha'            then dias_semilla + dias_vege + dias_flora + dias_cos
-                     else 0
-                     end
-      @lote.start_date = total_dias > 0 ? total_dias.days.ago.to_date : Time.zone.today
+    # «Ya lo tenía»: el frontend no envía start_date, lo calculan los días que lleva en cada fase.
+    # Se calcula acá también para que la validación de presencia no rechace el alta.
+    heredado = params[:heredado].in?([true, 'true', '1']) ? dias_heredados(params) : nil
+    if heredado && @lote.start_date.blank?
+      @lote.start_date = Lotes::Plantar.inicio_heredado(@lote.estado.to_s, heredado) || Time.zone.today
     end
 
     plantas_iniciales = lote_params[:plants_count].to_i
@@ -187,23 +171,7 @@ class LotesController < ApplicationController
       end
     end
 
-    ActiveRecord::Base.transaction do
-      @lote.save!
-      crear_lote_heredado(@lote, params) if params[:heredado].in?([true, 'true', '1'])
-      if plantas_iniciales > 0
-        state_inicial = estado_a_state(@lote.estado)
-        # La planta hereda la fecha de la fase de entrada = start_date del lote (no la de
-        # creación digital). Si no, un lote heredado (creado hoy pero real de hace un mes)
-        # deja las plantas con fecha de hoy → "días de fase" arranca en 0.
-        fecha_field = state_a_fecha_field(state_inicial)
-        plantas_iniciales.times do |i|
-          numero = (i + 1).to_s.rjust(3, '0')
-          attrs = { nombre: "#{@lote.codigo}-P#{numero}", state: state_inicial }
-          attrs[fecha_field] = @lote.start_date if fecha_field
-          @lote.plants.create!(attrs)
-        end
-      end
-    end
+    Lotes::Plantar.new(lote: @lote, usuario: current_user, plantas: plantas_iniciales, heredado: heredado).call
 
     render json: LoteSerializer.serialize(@lote, include_plants: true), status: :created
   rescue ActiveRecord::RecordInvalid => e
@@ -356,7 +324,7 @@ class LotesController < ApplicationController
     kind_destino = destino.kind.presence || destino.tipo
     incompatibles = lotes.reject do |l|
       estado_final = fase_al_mover(l, fase_destino)
-      permitidos = Lote.kinds_sala_para(estado_final, automatica: l.automatica?)
+      permitidos = Lote.kinds_sala_para(estado_final, automatica: l.automatica?, personal: current_user.club.personal?)
       permitidos.blank? || kind_destino.blank? || permitidos.include?(kind_destino)
     end
     if incompatibles.any?
@@ -1206,27 +1174,11 @@ class LotesController < ApplicationController
     }
   end
 
-  def estado_a_state(estado)
-    {
-      'enraizado'  => 'enraizado',
-      'vegetativo' => 'vegetativo',
-      'floracion'  => 'floracion',
-      'cosecha'    => 'cosechado',
-      'curado'     => 'cosechado',
-      'finalizado' => 'cosechado',
-    }[estado] || 'vegetativo'
-  end
+  def estado_a_state(estado) = Lotes::Plantar.state_de(estado)
 
   # Campo de fecha de la Plant que corresponde a cada state de entrada (para heredar
   # start_date del lote). 'esqueje' no tiene campo propio (dias_en_fase cae a created_at).
-  def state_a_fecha_field(state)
-    {
-      'enraizado'   => :fecha_germinacion,
-      'vegetativo'  => :fecha_vegetativo,
-      'floracion'   => :fecha_floracion,
-      'cosechado'   => :fecha_cosecha,
-    }[state]
-  end
+  def state_a_fecha_field(state) = Lotes::Plantar.fecha_de(state)
 
   def set_sala
     @sala = current_user.club.salas.find(params[:sala_id])
@@ -1287,67 +1239,9 @@ class LotesController < ApplicationController
     letra || "#{usadas.length + 1}"
   end
 
-  def crear_lote_heredado(lote, params)
-    estado         = lote.estado
-    origen         = lote.origen || 'semilla'
-    dias_semilla   = params[:dias_semilla_esqueje].to_i
-    dias_vege      = params[:dias_vegetativo].to_i
-    dias_flora     = params[:dias_floracion].to_i
-    dias_cos       = params[:dias_cosecha].to_i
-
-    total_dias = case estado
-                 when 'enraizado' then dias_semilla
-                 when 'vegetativo'         then dias_semilla + dias_vege
-                 when 'floracion'          then dias_semilla + dias_vege + dias_flora
-                 when 'cosecha'            then dias_semilla + dias_vege + dias_flora + dias_cos
-                 else 0
-                 end
-
-    return if total_dias <= 0
-
-    fecha_inicio = total_dias.days.ago.to_date
-    lote.update_column(:start_date, fecha_inicio)
-
-    estado_inicial = 'enraizado'
-
-    if %w[vegetativo floracion cosecha].include?(estado)
-      fecha_vege = fecha_inicio + dias_semilla
-      lote.lote_eventos.create!(
-        tipo:            'cambio_estado',
-        estado_anterior: estado_inicial,
-        estado_nuevo:    'vegetativo',
-        descripcion:     "#{estado_inicial.capitalize} → Vegetativo (carga heredada)",
-        user:            current_user,
-        club:            current_user.club,
-        registrado_en:   fecha_vege.to_time,
-      )
-    end
-
-    if %w[floracion cosecha].include?(estado)
-      fecha_flora = fecha_inicio + dias_semilla + dias_vege
-      lote.lote_eventos.create!(
-        tipo:            'cambio_estado',
-        estado_anterior: 'vegetativo',
-        estado_nuevo:    'floracion',
-        descripcion:     "Vegetativo → Floración (carga heredada)",
-        user:            current_user,
-        club:            current_user.club,
-        registrado_en:   fecha_flora.to_time,
-      )
-    end
-
-    if estado == 'cosecha'
-      fecha_cosecha = fecha_inicio + dias_semilla + dias_vege + dias_flora
-      lote.lote_eventos.create!(
-        tipo:            'cambio_estado',
-        estado_anterior: 'floracion',
-        estado_nuevo:    'cosecha',
-        descripcion:     "Floración → Cosecha (carga heredada)",
-        user:            current_user,
-        club:            current_user.club,
-        registrado_en:   fecha_cosecha.to_time,
-      )
-    end
+  def dias_heredados(params)
+    { semilla_esqueje: params[:dias_semilla_esqueje].to_i, vegetativo: params[:dias_vegetativo].to_i,
+      floracion: params[:dias_floracion].to_i, cosecha: params[:dias_cosecha].to_i }
   end
 
   # En qué fase queda un lote al entrar a una sala. Una sala de fase definida la impone

@@ -148,6 +148,7 @@
 
     <!-- Modales de creación reutilizados del desktop -->
     <NuevoLoteModal :show="showNuevoLote" :salas="salas" @close="showNuevoLote = false" @created="onCreado" />
+    <NuevaPlantaSheet v-if="esPersonal" v-model="showNuevaPlanta" :salas="salasDeCultivo" />
     <ModalCrearSala v-if="showNuevaSala" @close="showNuevaSala = false" @created="onCreado" />
     <ModalTarea v-if="esPersonal" :show="showNuevaTarea" :tarea-inicial="tareaInicial" :salas="salas" :lotes="lotesActivos"
                 @guardada="onTareaCreada" @cerrar="showNuevaTarea = false" />
@@ -172,6 +173,7 @@ import { achicarImagen } from '../../lib/imagenes.js'
 import MobileSheet from '../mobile/MobileSheet.vue'
 import MobileActionGrid from '../mobile/MobileActionGrid.vue'
 import NuevoLoteModal from '../lotes/NuevoLoteModal.vue'
+import NuevaPlantaSheet from '../personal/NuevaPlantaSheet.vue'
 import ModalCrearSala from '../salas/ModalCrearSala.vue'
 import ModalTarea from '../ModalTarea.vue'
 import AsistenteVoz from '../AsistenteVoz.vue'
@@ -298,7 +300,7 @@ NAV.personal = { fab: true, items: [
   { to: '/m/personal/hoy',     icon: 'bi-sun',           label: 'Hoy' },
   // Entra directo a sus salas (una sola sede, la casa); se resalta también dentro de una sala,
   // un lote o una planta, que es donde vive el recorrido.
-  { to: '/m/personal/cultivo', icon: 'bi-diagram-3',     label: 'Cultivo', match: ['/m/sede/', '/m/sala-m/', '/m/lote-m/', '/m/cama-m/', '/m/planta/', '/m/mnc/'] },
+  { to: '/m/personal/cultivo', icon: 'bi-diagram-3',     label: 'Cultivo', match: ['/m/personal/informes', '/m/sede/', '/m/sala-m/', '/m/lote-m/', '/m/cama-m/', '/m/planta/', '/m/mnc/'] },
   { to: '/m/personal/stock',   icon: 'bi-archive',       label: 'Stock' },
   { to: '/m/personal/gastos',  icon: 'bi-receipt',       label: 'Gastos' },
 ] }
@@ -366,8 +368,12 @@ const salas        = ref([])
 const fabActions = computed(() => {
   const esCultivador = role.value === 'cultivador'
   const acciones = [
-    { key: 'lote', label: 'Crear lote', icon: 'bi-box-seam',
-      tint: 'var(--c-leaf-100)', color: 'var(--c-leaf-700)', onClick: abrirNuevoLote },
+    // En autocultivo se crean PLANTAS, no lotes (9-oct-2026): el lote nace por debajo.
+    esPersonal.value
+      ? { key: 'planta', label: 'Nueva planta', icon: 'bi-flower1',
+          tint: 'var(--c-leaf-100)', color: 'var(--c-leaf-700)', onClick: abrirNuevoLote }
+      : { key: 'lote', label: 'Crear lote', icon: 'bi-box-seam',
+          tint: 'var(--c-leaf-100)', color: 'var(--c-leaf-700)', onClick: abrirNuevoLote },
   ]
   // Primero lo de todos los días. Anotar un riego eran cuatro toques (Cultivo → espacio →
   // lote → Registrar → Riego); ahora son dos, y con un solo lote no pregunta cuál. Para el
@@ -438,6 +444,8 @@ const camasHoy = ref([])
 // primero; los lotes que no están en una cama se riegan como siempre.
 function conRiego() {
   const camas = camasHoy.value.filter(c => c.estado !== 'retirada')
+  // Autocultivo: se riega la CARPA (todas sus plantas o las que elijas adentro), no un lote.
+  if (!camas.length && esPersonal.value) return conSala('riego')
   if (!camas.length) return conLote('riego')
   fabOpen.value = false
   const sueltos = lotesEnPie.value.filter(l => !l.en_cama)
@@ -552,8 +560,12 @@ function onTareaCreada() {
 async function abrirNuevoLote() {
   fabOpen.value = false
   try { const { data } = await listSalas(); salas.value = data || [] } catch { salas.value = [] }
-  showNuevoLote.value = true
+  if (esPersonal.value) showNuevaPlanta.value = true
+  else showNuevoLote.value = true
 }
+// Autocultivo: «Nueva planta» (la misma hoja que «Mi cultivo» y el espacio).
+const showNuevaPlanta = ref(false)
+const salasDeCultivo = computed(() => salas.value.filter(x => x.state !== 'cerrada' && ['vegetativo', 'floracion', 'mixta', 'clon', 'madre'].includes(x.kind)))
 function abrirNuevaSala() {
   fabOpen.value = false
   showNuevaSala.value = true

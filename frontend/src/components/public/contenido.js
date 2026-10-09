@@ -2,7 +2,10 @@
 // entra por «Autocultivo» o por «Proyectos» vea lo suyo y no todo).
 //
 // Regla para editar: lo que se afirma acá tiene que existir HOY en la app. Lo que se vende aparte
-// (`Club::ADDONS`: delivery, IoT, IA) lleva `addon: true` («Se suma aparte»). No se nombra lo que
+// (`Club::ADDONS` con `tipo: 'extra'`: hoy, de lo que se muestra acá, sólo Ambiente/IoT) lleva
+// `addon: true` («Se suma aparte»). Delivery, correo, módulo médico y la IA vienen INCLUIDOS desde
+// el modelo comercial del 6-oct-2026: marcarlos «aparte» contradecía los precios de la misma página
+// (corregido el 9-oct). No se nombra lo que
 // está simulado (ARICCAME), lo que está en prueba (el chatbot) ni lo que está en construcción (el
 // portal del paciente, Germán 5-oct). Lo que depende de una persona y
 // no de la app (importar datos al arrancar, exportarlos al irse, activar después de la prueba) se
@@ -23,11 +26,11 @@ import MuestraCosto from './muestras/MuestraCosto.vue'
 // pasos. Sin pacientes, sedes ni caja.
 export const TEMAS_AUTOCULTIVO = [
   {
-    id: 'cultivo', label: 'Tu cultivo', muestra: MuestraCiclo,
+    id: 'cultivo', label: 'Tu cultivo', muestra: MuestraCiclo, muestraProps: { casa: true },
     titulo: 'Cada planta, con su diario',
-    texto: 'Tu espacio, tus lotes y cada planta, desde la semilla o el esqueje. Lo que hacés queda anotado y la app te avisa lo que viene.',
+    texto: 'Tus espacios y cada planta, desde la semilla o el esqueje. Lo que hacés queda anotado y la app te avisa lo que viene.',
     puntos: [
-      'Autos o fotoperiódicas: cada una con su reloj',
+      'Autos y fotoperiódicas en la misma carpa, cada una con su reloj',
       'Riegos, nutrientes con su dosis, pH/EC y fotos por semana',
       'Los próximos pasos del ciclo, con aviso al teléfono',
       'Suelo vivo: la cama vive más que las plantas',
@@ -55,23 +58,25 @@ export const TEMAS_AUTOCULTIVO = [
     ],
   },
   {
-    id: 'ia', label: 'Asistente IA', addon: true, muestra: MuestraIa,
+    id: 'ia', label: 'Por voz', muestra: MuestraIa, muestraProps: { casa: true },
     titulo: 'Contalo y queda anotado',
     texto: 'Con las manos en la tierra, decís lo que hiciste y el asistente lo convierte en registros. Vos confirmás antes de que se guarde.',
     puntos: [
-      'Registro por voz de tu espacio, tus lotes y tus plantas',
+      'Riegos, notas y tareas de tu espacio y tus plantas',
+      '«Puse dos semillas de Ananda en un vaso»: también carga plantas nuevas',
       'Propone; nada se guarda sin tu confirmación',
       'Lee la planilla del datalogger por vos',
     ],
   },
   {
-    id: 'numeros', label: 'Tus números', muestra: MuestraCosto,
+    id: 'numeros', label: 'Tus números', muestra: MuestraCosto, muestraProps: { casa: true },
     titulo: 'Cuánto te costó cada gramo',
     texto: 'Anotás lo que gastás —semillas, sustrato, nutrientes, luz— y al cosechar la app lo divide por lo que rindió.',
     puntos: [
       'Tus gastos, por categoría',
       'El costo por gramo de cada cosecha',
       'Lo que llevás gastado en el ciclo, a la vista',
+      'Tus informes en PDF y Excel: tu cosecha, de dónde salió cada frasco y tus gastos',
     ],
   },
 ]
@@ -143,7 +148,7 @@ export const TEMAS_PROYECTOS = [
     ],
   },
   {
-    id: 'delivery', label: 'Delivery', addon: true, muestra: MuestraDelivery,
+    id: 'delivery', label: 'Delivery', muestra: MuestraDelivery,
     titulo: 'Hasta la puerta del paciente',
     texto: 'Paquetes armados desde el stock, rutas para quien reparte y la entrega confirmada con firma en el teléfono.',
     puntos: [
@@ -165,7 +170,7 @@ export const TEMAS_PROYECTOS = [
     ],
   },
   {
-    id: 'ia', label: 'Asistente IA', addon: true, muestra: MuestraIa,
+    id: 'ia', label: 'Asistente IA', muestra: MuestraIa,
     titulo: 'Contalo y queda anotado',
     texto: 'El cultivador dice lo que hizo y el asistente lo convierte en registros. Nada se guarda sin que lo confirme.',
     puntos: [
@@ -239,9 +244,10 @@ export function packsAutocultivo(precios) {
     periodo: 'por mes',
     incluye: [
       `Hasta ${a.plantas_floracion} plantas en floración; el vegetativo, libre`,
-      `${a.espacios} espacios de cultivo y lotes sin límite`,
+      `${a.espacios} espacios de cultivo: carpas, balcón o camas`,
       'Registro por voz con el asistente IA',
       'Riegos, nutrientes, fotos, cosecha y frascos',
+      'Tus informes en PDF y Excel',
     ],
     destacado: true,
   }]

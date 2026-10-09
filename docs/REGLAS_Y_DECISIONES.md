@@ -417,6 +417,27 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
   `User#quiere_push?`; un aviso sin fila en el catálogo no se ofrece en *Mi perfil* y no llega.
   La campanita (`AlertaInterna`) NO se configura: es el registro. «No molestar» es 22–8 fijo.
   Cada persona ve sólo lo suyo: no armar una lista larga «por las dudas».
+- **AUTOCULTIVO: PLANTAS, NO LOTES** (9-oct-2026, Germán, con Martín López probando). Quien cultiva en
+  casa crea PLANTAS (de a una o varias); el lote sigue existiendo por debajo —cosecha, stock, tope,
+  costos— y en personal NO se nombra en pantalla. **No son menos funciones: es una forma más simple de
+  hacer todo.** Revisa a propósito la regla del 19-sep («nada de pantallas simplificadas») porque
+  hay prueba real. Reglas: (1) el alta de plantas es UNA (`Lotes::Plantar`) para el formulario y el
+  dictado; (2) en personal las plantas se llaman por su genética y siguen la numeración; (3) **autos y
+  fotos conviven en la misma carpa**: una auto entra a cualquier espacio en cualquier fase (tabla
+  `KINDS_SALA_POR_ESTADO_AUTOMATICA_PERSONAL`, en `/me`) y al cambiar la luz se mueven sólo las fotos;
+  (4) **regar y alimentar NO van separados**: «Regar» dice cuánto y con qué; (5) el QR de la planta se
+  queda (etiqueta para el secado o el frasco); (6) cosechar UNA planta de las cargadas juntas es
+  `cosechar_plantas` con una; (7) por voz se crean plantas sólo en personal (`nueva_planta`; «vaso» =
+  0,335 L), y en una organización el dictado no crea lotes; (8) Dictar NO va en la web (7-oct).
+  En una organización NADA de esto cambia.
+- **«MIS INFORMES» DEL AUTOCULTIVO** (9-oct-2026): Mi cosecha, De dónde salió, Mis gastos, en PDF y
+  Excel, en la compu y el teléfono. La pantalla dibuja la MISMA definición que el PDF
+  (`responder_informe(vista: true)`): una regla, un lugar. Una cosecha del lote entero no escribe
+  `fecha_cosecha` en cada planta: la fecha es la del primer paso del lote a post-cosecha.
+- **PÁGINA PÚBLICA** (9-oct-2026): la palabra es «Proyectos», no «organizaciones». Se quedan la planta
+  que crece (portada) y las muestras animadas; en autocultivo el encabezado es el CELULAR con la app.
+  El consultorio vive en «Una vista por oficio» (la pantalla de cada rol al tocarlo). Los precios salen
+  del backend; nada «Se suma aparte» que los precios dan incluido (hoy sólo Ambiente/IoT es extra).
 - **USO PERSONAL = PLAN `personal`, Y NACE SÓLO CON CULTIVO** (19-sep-2026). Es UNA persona
   sin equipo ni pacientes (`Club#personal?`, `PlanEnforcer` personal); lo único que puede tener
   es `Club::MODULOS_PERSONAL` (cultivo, iot, ia, chatbot) y el ambiente, la IA y el chatbot **se

@@ -1,5 +1,56 @@
 # Changelog
 
+## Octubre 2026 (ek) — Autocultivo con plantas (no lotes), plantas por voz, «Mis informes» y la página pública rearmada (9-oct)
+
+Prototipos aprobados por Germán el 8-oct (lienzos «Autocultivo con plantas» y «Página pública
+rediseñada»). Motivo: Martín López, probando la app, se perdía entre lote, espacio y plantas; quien
+cultiva en casa crea plantas, de a una o varias. **No son menos funciones: es una forma más simple
+de hacer todo.** Nada de esto cambia a las organizaciones (specs de aislamiento en cada parte).
+
+- **Autos y fotos en la misma carpa (sólo personal)**: `Lote::KINDS_SALA_POR_ESTADO_AUTOMATICA_PERSONAL`
+  y `Lote.tabla_kinds_sala(automatica:, personal:)` (viaja en `/me`): una auto entra al espacio en
+  cualquier fase y con cualquier luz. `Salas::CambiarFase#sin_autos_de_casa`: al cambiar la luz se
+  mueven las fotos; las autos siguen su reloj y una auto germinando no frena el paso a 12/12.
+- **`Lotes::Plantar`** (servicio nuevo): el alta de lote + plantas, la carga «ya la tenía» y los
+  días objetivo heredados, compartida por `LotesController#create` y el dictado. En personal las
+  plantas se llaman por su genética y siguen la numeración («Ananda 3»); en una organización, como
+  siempre (`L-26-002-P001`).
+- **Plantas por voz (sólo personal)**: acción `nueva_planta` del asistente (`PROMPT_AUTOCULTIVO`):
+  «dos semillas de Ananda en la carpa chica», «un esqueje de Gorilla de 10 días en un vaso» (vaso =
+  maceta de 0,335 L). Genética o espacio que no existen se avisan, no se adivinan. Las genéticas del
+  club viajan en el mapa del cultivo.
+- **Teléfono**: «Mi cultivo» (`MPersonalCultivoView`, las carpas con sus plantas; Dictar a la vista);
+  «Nueva planta» (`components/personal/NuevaPlantaSheet.vue`, con genética nueva sin salir: nombre,
+  auto/foto y días); el espacio en personal muestra plantas, Regar · Foto · Ambiente y la luz; la
+  ficha de la planta (`MPlantaDetailView`) con Regar, Foto, Nota, etiqueta QR
+  (`composables/useEtiquetaPlanta.js`, compartido con escritorio), renombrar, descartar y
+  **cosechar esta planta**. En el «+», «Nueva planta» y «Regar» elige el espacio.
+- **Regar y alimentar no van separados**: un solo «Regar» que dice cuánto y con qué (el `RiegoForm` de siempre).
+- **Escritorio**: `/mi-cultivo` (`views/personal/MiCultivoView.vue`); en personal el grupo Cultivo abre
+  ahí y no hay solapa Lotes (`toPersonal` / `soloPersonal` en `useNavContext`).
+- **«Mis informes»** (personal): Mi cosecha, De dónde salió, Mis gastos, en PDF y Excel desde la compu
+  (`/mis-informes`) y el teléfono (`/m/personal/informes`). `Informes::Autocultivo` +
+  `InformesController#mi_cosecha/de_donde_salio/mis_gastos`; `responder_informe(vista: true)` manda
+  en el JSON la misma definición que arma el PDF, y la pantalla la dibuja (`MisInformes.vue`). Una
+  cosecha del lote entero no escribe `fecha_cosecha` en cada planta: se usa la del evento del lote.
+- **Página pública**: portada con las dos puertas (para quién, una muestra, el precio del backend) y
+  tres razones; autocultivo con el **celular de «Mi cultivo» en el encabezado** (`TelefonoMiCultivo`),
+  «Así se usa», textos sin «lote», muestras en versión casa y contacto propio; proyectos con la cadena
+  del gramo animada arriba, el botón de arriba «Hablemos», **«Una vista por oficio» con la pantalla de
+  cada rol** (`OficiosVista`; el consultorio vive ahí, «Sólo acá»), «Cómo arrancamos» y precios
+  comparables con «un pack / los dos» (`PreciosProyectos`). Fuera «precio a consultar».
+
+**Bugs silenciosos encontrados y arreglados en el camino**
+- Ficha de planta en el teléfono: «Agregar foto» y «Descartar» sólo decían «usá la web».
+- Diario de la planta: mostraba el código crudo `lote_fase` y sin detalle los riegos del lote.
+- Página pública: Delivery y el asistente IA decían «Se suma aparte» y los precios de la misma
+  página los daban incluidos (desde el 6-oct lo están); el botón «Probar gratis» de arriba mandaba a
+  las organizaciones al alta personal; «precio a consultar» al lado de los precios.
+- Formulario de contacto: etiquetas en mayúsculas monoespaciadas, difíciles de leer.
+
+Specs nuevos: `autocultivo_plantas_spec.rb` (15), `asistente_nueva_planta_spec.rb` (7),
+`informes_autocultivo_spec.rb` (10).
+
 ## Octubre 2026 (ej) — Correcciones de la prueba en producción (7-oct, noche)
 
 - **Lista de dispensas**: ya no inventa un descuento comparando lo cobrado con el precio de HOY del

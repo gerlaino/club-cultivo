@@ -80,11 +80,20 @@ class InformesController < ApplicationController
   # `ids_inase`: a qué genéticas se acota la salvedad y el candado de «Para presentar» — las que
   # APARECEN en el documento. Sin acotar, el candado mira todas las del club, archivadas y nunca
   # cultivadas incluidas, y bloquea la descarga por una variedad que no está en ningún lado.
+  # `vista`: la pantalla dibuja el informe con la MISMA definición (KPIs y tablas) que el PDF y el
+  # Excel, en vez de rearmarla por su cuenta («Mis informes» del autocultivo).
   def responder_informe(titulo:, datos:, kpis:, secciones:, nombre:, periodo: nil, nota: nil,
-                        resena: nil, exige_declaracion_inase: false, ids_inase: nil)
+                        resena: nil, exige_declaracion_inase: false, ids_inase: nil, vista: false)
     filtrado = datos.dig(:filtros, :descripcion)
     respond_to do |format|
-      format.json { render json: datos.merge(resena: resena) }
+      format.json do
+        extra = { resena: resena }
+        if vista
+          extra[:vista] = { titulo: titulo, periodo: periodo, kpis: kpis.map { |k| k.slice(:label, :valor) },
+                            secciones: secciones.map { |x| x.slice(:titulo, :headers, :rows, :vacio) } }
+        end
+        render json: datos.merge(extra)
+      end
       format.pdf do
         # Sólo frena si quien descarga dijo que es PARA PRESENTAR. Si no, sale con la salvedad.
         next if exige_declaracion_inase && bloquear_descarga_si_falta_declarar!(ids: ids_inase)
@@ -233,6 +242,95 @@ class InformesController < ApplicationController
           aligns: { 1 => :right, 2 => :right, 3 => :right },
           vacio: 'La organización todavía no tiene sedes cargadas.',
         },
+      ],
+    )
+  end
+
+  # ── «MIS INFORMES» DEL AUTOCULTIVO (9-oct-2026) ─────────────────────────────────────────────
+  # Las mismas cuentas que el resto de los informes, dichas como las dice quien cultiva en casa:
+  # plantas y frascos. Sólo en uso personal: una organización tiene Producción, Trazabilidad y
+  # Contabilidad, por lote y por sede.
+  def mi_cosecha
+    return solo_autocultivo! unless current_user.club.personal?
+
+    desde, hasta = periodo_rango
+    d = Informes::Autocultivo.new(club: current_user.club, desde: desde, hasta: hasta).mi_cosecha
+    g = ->(n) { n.nil? ? '—' : "#{num(n)} g" }
+    responder_informe(
+      titulo: 'Mi cosecha', nombre: 'mi_cosecha', datos: d, periodo: etiqueta_periodo(desde, hasta), vista: true,
+      resena: '¿Cuánto rindió cada planta y cada genética? Cuenta las plantas cosechadas en el período. Si varias se pesaron juntas, a cada una le toca su parte y se aclara.',
+      kpis: [
+        { label: 'Plantas cosechadas', valor: d[:total_plantas] },
+        { label: 'Seco', valor: g.call(d[:seco_g]), tono: :ok },
+        { label: 'Por planta', valor: g.call(d[:por_planta_g]) },
+      ],
+      secciones: [
+        { titulo: 'Planta por planta',
+          headers: ['Planta', 'Genética', 'Tipo', 'Cosechada', 'Días', 'Húmedo (g)', 'Seco (g)', ''],
+          rows: d[:plantas].map { |f| [f[:nombre], f[:genetica], f[:tipo], fmt_fecha(f[:cosechada]), f[:dias] || '—',
+                                       f[:humedo_g] || '—', f[:seco_g] || 'sin peso', f[:repartido] ? 'repartido' : ''] },
+          formatos: [:texto, :texto, :texto, :texto, :numero, :numero, :numero, :texto],
+          aligns: { 4 => :right, 5 => :right, 6 => :right },
+          vacio: 'No se cosechó ninguna planta en el período elegido.' },
+        { titulo: 'Por genética',
+          headers: ['Genética', 'Plantas', 'Seco (g)', 'Por planta (g)'],
+          rows: d[:por_genetica].map { |x| [x[:genetica], x[:plantas], x[:seco_g] || 'sin peso', x[:por_planta_g] || '—'] },
+          formatos: [:texto, :numero, :numero, :numero], aligns: { 1 => :right, 2 => :right, 3 => :right },
+          vacio: 'Sin cosechas en el período.' },
+      ],
+    )
+  end
+
+  def de_donde_salio
+    return solo_autocultivo! unless current_user.club.personal?
+
+    desde, hasta = periodo_rango
+    d = Informes::Autocultivo.new(club: current_user.club, desde: desde, hasta: hasta).de_donde_salio
+    responder_informe(
+      titulo: 'De dónde salió', nombre: 'de_donde_salio', datos: d, periodo: etiqueta_periodo(desde, hasta), vista: true,
+      resena: 'Cada frasco del período con las plantas de las que salió, su genética y el QR de cada planta: escaneándolo se abre su diario entero.',
+      kpis: [
+        { label: 'Frascos', valor: d[:total_frascos] },
+        { label: 'Gramos', valor: "#{num(d[:gramos])} g" },
+        { label: 'Plantas de origen', valor: d[:plantas_de_origen] },
+      ],
+      secciones: [
+        { titulo: 'Frasco por frasco',
+          headers: ['Frasco', 'Producto', 'Cantidad', 'Quedan', 'Plantas', 'Genética', 'Cosechada', 'QR de las plantas'],
+          rows: d[:frascos].map { |f| [f[:codigo], f[:producto], "#{num(f[:gramos])} #{f[:unidad]}", "#{num(f[:quedan])} #{f[:unidad]}",
+                                       f[:plantas].join(', ').presence || '—', f[:genetica] || '—', fmt_fecha(f[:cosechada]),
+                                       f[:qr_plantas].join(', ').presence || '—'] },
+          aligns: { 2 => :right, 3 => :right },
+          vacio: 'No se armó ningún frasco en el período elegido.' },
+      ],
+    )
+  end
+
+  def mis_gastos
+    return solo_autocultivo! unless current_user.club.personal?
+
+    desde, hasta = periodo_rango
+    d = Informes::Autocultivo.new(club: current_user.club, desde: desde, hasta: hasta).mis_gastos
+    pesos = ->(n) { n.nil? ? '—' : "$ #{ActiveSupport::NumberHelper.number_to_delimited(n.round, delimiter: '.')}" }
+    responder_informe(
+      titulo: 'Mis gastos', nombre: 'mis_gastos', datos: d, periodo: etiqueta_periodo(desde, hasta), vista: true,
+      resena: 'Lo que anotaste como gasto en el período, por mes y por tipo, y cuánto costó cada gramo: lo gastado dividido por lo que se cosechó en el mismo período.',
+      kpis: [
+        { label: 'Gastado', valor: pesos.call(d[:total]) },
+        { label: 'Seco cosechado', valor: d[:seco_g].to_f.positive? ? "#{num(d[:seco_g])} g" : '—' },
+        { label: 'Cada gramo', valor: pesos.call(d[:por_gramo]), tono: :ok },
+      ],
+      secciones: [
+        { titulo: 'Mes por mes',
+          headers: ['Mes', *d[:tipos], 'Total'],
+          rows: d[:por_mes].map { |m| [I18n.l(m[:mes], format: '%B %Y').capitalize, *d[:tipos].map { |t| pesos.call(m[:por_tipo][t]) }, pesos.call(m[:total])] },
+          aligns: (1..d[:tipos].size + 1).to_h { |i| [i, :right] },
+          vacio: 'No anotaste gastos en el período elegido.' },
+        { titulo: 'Por cosecha (gastos asignados a esas plantas)',
+          headers: ['Plantas', 'Genética', 'Gastado', 'Seco (g)', 'Cada gramo'],
+          rows: d[:por_cosecha].map { |c| [c[:plantas].join(', '), c[:genetica] || '—', pesos.call(c[:gastado]), c[:gramos] || 'sin peso', pesos.call(c[:por_gramo])] },
+          aligns: { 2 => :right, 3 => :right, 4 => :right },
+          vacio: 'Ningún gasto del período está asignado a una cosecha.' },
       ],
     )
   end
@@ -778,6 +876,12 @@ class InformesController < ApplicationController
   def filtros
     @filtros ||= Informes::Filtros.desde_params(params, current_user.club)
   end
+
+  def solo_autocultivo!
+    render json: { error: 'Este informe es del autocultivo' }, status: :not_found
+  end
+
+  def num(n) = ActiveSupport::NumberHelper.number_to_delimited(n.to_f.round(1).to_s.sub(/\.0\z/, ''), delimiter: '.', separator: ',')
 
   def periodo_rango
     if params[:desde].present?

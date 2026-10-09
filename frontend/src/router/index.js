@@ -297,6 +297,24 @@ const routes = [
     },
   },
 
+  // Autocultivo: «Mi cultivo» en la compu — los espacios con sus plantas (9-oct-2026). Es sólo del
+  // uso personal: a una organización la manda a sus salas.
+  {
+    path: "/mi-cultivo",
+    name: "mi-cultivo",
+    component: () => import("../views/personal/MiCultivoView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: () => (useClubStore().data && !useClubStore().data.personal ? '/salas' : true),
+  },
+
+  {
+    path: "/mis-informes",
+    name: "mis-informes",
+    component: () => import("../views/personal/MisInformesView.vue"),
+    meta: { requiresAuth: true },
+    beforeEnter: () => (useClubStore().data && !useClubStore().data.personal ? '/auditor' : true),
+  },
+
   // Salas
   {
     path: "/salas",
@@ -1121,19 +1139,10 @@ const routes = [
 
       // ── Uso personal (el admin del plan personal) ──
       { path: 'personal/hoy',     component: () => import('../views/mobile/MPersonalHomeView.vue') },
-      // La solapa Cultivo del cultivador de casa ES su sede (tiene una sola). La redirección va
-      // ACÁ y no en la vista: una vista que hace `router.replace` en `onMounted` dentro de la
-      // transición `out-in` del shell dejaba la pantalla en blanco (20-sep-2026).
-      { path: 'personal/cultivo', component: () => import('../views/mobile/MPersonalCultivoView.vue'),
-        beforeEnter: async () => {
-          try {
-            const { listSedes } = await import('../lib/api.js')
-            const { data } = await listSedes()
-            const sede = (data || [])[0]
-            if (sede) return `/m/sede/${sede.id}`
-          } catch { /* sin red: la vista explica que falta la sede */ }
-          return true
-        } },
+      // La solapa Cultivo del cultivador de casa: sus espacios con sus PLANTAS (9-oct-2026). Antes
+      // saltaba a la pantalla de la sede, que lista lotes; quien cultiva en casa piensa en plantas.
+      { path: 'personal/cultivo', component: () => import('../views/mobile/MPersonalCultivoView.vue') },
+      { path: 'personal/informes', component: () => import('../views/mobile/MPersonalInformesView.vue') },
       { path: 'personal/stock',   component: () => import('../views/mobile/MPersonalFrascosView.vue') },
       { path: 'personal/gastos',  component: () => import('../views/mobile/MPersonalGastosView.vue') },
       { path: 'admin/sedes',   component: () => import('../views/mobile/MSedesView.vue') },
@@ -1287,6 +1296,8 @@ export function puedeEntrar(role, path) {
 const FEATURE_POR_PREFIJO = [
   ['/mostrador',            'produccion_dispensa'],
   ['/m/mostrador',          'produccion_dispensa'],
+  ['/mi-cultivo',           'cultivo'],
+  ['/mis-informes',         'cultivo'],
   ['/salas',                'cultivo'],
   ['/camas',                'cultivo'],
   ['/lotes',                'cultivo'],

@@ -7,17 +7,44 @@
       <h2 class="msal__hero-nombre">{{ sala.nombre }}</h2>
       <div class="msal__hero-meta">
         <span>{{ sala.sede?.nombre }}</span>
-        <span v-if="lotes.length" class="msal__sep">·</span>
-        <span v-if="lotes.length">{{ lotes.length }} lote{{ lotes.length !== 1 ? 's' : '' }}</span>
+        <template v-if="esPersonal">
+          <span class="msal__sep">·</span>
+          <span>{{ plantas.length }} planta{{ plantas.length !== 1 ? 's' : '' }}</span>
+        </template>
+        <template v-else-if="lotes.length">
+          <span class="msal__sep">·</span>
+          <span>{{ lotes.length }} lote{{ lotes.length !== 1 ? 's' : '' }}</span>
+        </template>
         <template v-if="sala.m2">
           <span class="msal__sep">·</span>
           <span>{{ sala.m2 }} m²</span>
         </template>
       </div>
+      <!-- Autocultivo: la luz es de la carpa, y cambiarla es lo más común del espacio. Las fotos la
+           siguen; las autos, su propio reloj (`Salas::CambiarFase`). -->
+      <div v-if="esPersonal && puedeCambiarFase" class="msal__luz">
+        <div>
+          <span class="msal__luz-k">Luz</span>
+          <span class="msal__luz-v">{{ sala.kind === 'floracion' ? '12/12 · floración' : '18/6 · vegetativo' }}</span>
+        </div>
+        <button type="button" class="msal__luz-btn" :disabled="cambiandoFase" @click="cambiarFase()">
+          Pasar a {{ faseDestino === 'floracion' ? '12/12' : '18/6' }}
+        </button>
+      </div>
     </div>
 
     <!-- Acciones -->
-    <div class="msal__actions">
+    <!-- Autocultivo: lo de todos los días, a un toque. Regar dice cuánto y con qué (receta, nutrientes
+         sueltos o sólo agua): regar y alimentar no van separados. -->
+    <div v-if="esPersonal" class="msal__rapidas">
+      <button type="button" class="msal__rapida msal__rapida--principal" @click="abrirRegistro('riego')">
+        <i class="bi bi-droplet-fill" aria-hidden="true"></i> Regar
+      </button>
+      <button type="button" class="msal__rapida" @click="abrirFoto"><i class="bi bi-camera" aria-hidden="true"></i> Foto</button>
+      <button type="button" class="msal__rapida" @click="abrirRegistro('ambiental')"><i class="bi bi-thermometer-half" aria-hidden="true"></i> Ambiente</button>
+      <button type="button" class="msal__rapida" @click="showAcciones = true"><i class="bi bi-three-dots" aria-hidden="true"></i> Más</button>
+    </div>
+    <div v-else class="msal__actions">
       <button class="msal__btn-registrar" @click="abrirRegistro()">
         <i class="bi bi-pencil-square"></i>
         {{ esPersonal ? 'Registrar el espacio' : 'Registrar sala' }}
@@ -34,7 +61,34 @@
       <CamasSeccion :sala="sala" @cambio="recargarSala" />
     </div>
 
+    <!-- Autocultivo: las PLANTAS del espacio (el lote no se nombra). -->
+    <template v-if="esPersonal">
+      <div class="msal__section-title">Plantas</div>
+      <button v-if="!plantas.length" type="button" class="msal__vacio-btn" @click="abrirNuevoLote">Sin plantas · <strong>agregar</strong></button>
+      <div v-else class="msal__list">
+        <RouterLink v-for="p in plantas" :key="p.id" :to="`/m/planta/${p.id}`" class="msal__card">
+          <div class="msal__card-body">
+            <div class="msal__card-top">
+              <span class="msal__planta-nombre">{{ p.nombre }}</span>
+              <span class="chip-auto" v-if="loteDe(p)?.automatica">Auto</span>
+            </div>
+            <div class="msal__card-meta">
+              <span>{{ p.genetica?.nombre || '—' }}</span>
+              <span class="msal__dot">·</span>
+              <span>{{ estadoPlantaLabel(p) }}{{ p.dias_en_fase != null ? ` · día ${p.dias_en_fase}` : '' }}</span>
+            </div>
+            <div v-if="textoProximoPaso(loteDe(p))" class="msal__card-prox">{{ textoProximoPaso(loteDe(p)) }}</div>
+          </div>
+          <i class="bi bi-chevron-right msal__chevron"></i>
+        </RouterLink>
+      </div>
+      <p v-if="plantas.some(p => loteDe(p)?.automatica) && plantas.some(p => !loteDe(p)?.automatica)" class="msal__nota-auto">
+        Las autos siguen su propio reloj: al cambiar la luz se mueven sólo las fotoperiódicas.
+      </p>
+    </template>
+
     <!-- Lotes de esta sala -->
+    <template v-else>
     <div class="msal__section-title">Lotes activos</div>
     <div v-if="!lotes.length" class="msal__empty">Sin lotes activos</div>
     <div v-else class="msal__list">
@@ -62,6 +116,7 @@
         <i class="bi bi-chevron-right msal__chevron"></i>
       </RouterLink>
     </div>
+    </template>
 
     <!-- Modal registro sala (reutiliza el de la web) -->
     <RegistroSalaModal
@@ -75,7 +130,7 @@
       <div class="msal__accion-list">
         <button class="msal__accion-item" @click="abrirNuevoLote">
           <span class="msal__accion-ico">➕</span>
-          <span class="msal__accion-lbl">Crear lote</span>
+          <span class="msal__accion-lbl">{{ esPersonal ? 'Nueva planta' : 'Crear lote' }}</span>
           <i class="bi bi-chevron-right msal__accion-arr"></i>
         </button>
         <button v-if="puedeCrearCama" class="msal__accion-item" @click="abrirNuevaCama">
@@ -246,6 +301,8 @@
       </div>
     </template>
 
+    <NuevaPlantaSheet v-if="esPersonal" v-model="showNuevaPlanta" :salas="sala ? [sala] : []" :sala-id="id" @creada="recargarSala" />
+
     <CamaFormModal v-if="showNuevaCama" :sala="sala" @close="showNuevaCama = false" @guardada="camaCreada" />
 
     <!-- Input foto oculto -->
@@ -257,7 +314,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { textoProximoPaso, estadoLoteLabel } from '../../lib/loteHelpers.js'
+import { textoProximoPaso, estadoLoteLabel, estadoPlantaLabel } from '../../lib/loteHelpers.js'
 import { getSala, listLotesDeSala, createSalaNota, createLote, createLoteHeredado, listGeneticas,
          listFotosSala, uploadFotoSala } from '../../lib/api'
 import { useToast }       from '../../composables/useToast'
@@ -274,6 +331,8 @@ import CamasSeccion from '../../components/camas/CamasSeccion.vue'
 import CamaFormModal from '../../components/camas/CamaFormModal.vue'
 import { avisoAlPlantar } from '../../lib/camas.js'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
+import NuevaPlantaSheet from '../../components/personal/NuevaPlantaSheet.vue'
+import { listPlants } from '../../lib/api'
 
 const route  = useRoute()
 const router = useRouter()
@@ -306,6 +365,7 @@ async function cambiarFase(confirmado = false) {
     showAcciones.value = false
     sala.value = { ...sala.value, kind: data.nueva_fase }
     try { lotes.value = ((await listLotesDeSala(id)).data || []).filter(l => l.estado !== 'finalizado') } catch { /* la fase ya cambió */ }
+    cargarPlantas()
     toast.success(data.lotes_afectados
       ? `${salaTxt.value.Corta} en ${faseLabel(data.nueva_fase)} — ${data.lotes_afectados} lote${data.lotes_afectados === 1 ? '' : 's'}`
       : `${salaTxt.value.Corta} en ${faseLabel(data.nueva_fase)}`)
@@ -423,9 +483,11 @@ function abrirNuevaCama() { showAcciones.value = false; showNuevaCama.value = tr
 async function recargarSala() {
   try { sala.value = (await getSala(id)).data } catch { /* queda lo que había */ }
   try { lotes.value = ((await listLotesDeSala(id)).data || []).filter(l => l.estado !== 'finalizado') } catch { /* idem */ }
+  cargarPlantas()
 }
 function camaCreada(c) { showNuevaCama.value = false; toast.success(`${c.nombre} creada`); recargarSala() }
 useRecargaEnCambios(['camas'], recargarSala)
+useRecargaEnCambios(['plantas', 'lotes'], () => esPersonal.value && recargarSala())
 const loteForm = ref(emptyLoteForm())
 
 const KIND_GRADIENT = {
@@ -449,7 +511,20 @@ const kindLabel    = k => KIND_LABEL[k] || k || '—'
 const estadoColor  = e => EC[e] || '#64748b'
 const estadoLabel  = e => EL[e] || e || '—'
 
+// Autocultivo: las plantas del espacio y la hoja «Nueva planta» (el lote se crea por debajo).
+const plantas = ref([])
+const showNuevaPlanta = ref(false)
+const loteDe = (p) => lotes.value.find(l => l.id === p.lote?.id)
+async function cargarPlantas() {
+  if (!esPersonal.value) return
+  try {
+    plantas.value = ((await listPlants()).data || [])
+      .filter(p => p.lote?.sala?.id === id && ['enraizado', 'vegetativo', 'floracion'].includes(p.state))
+  } catch { /* queda lo que había */ }
+}
+
 function abrirNuevoLote() {
+  if (esPersonal.value) { showAcciones.value = false; showNuevaPlanta.value = true; return }
   loteForm.value  = emptyLoteForm()
   loteError.value = null
   tipoLote.value  = salaVieneDeAntes.value ? 'existente' : 'nuevo'
@@ -547,6 +622,7 @@ onMounted(async () => {
     if (geneticasRes.status === 'fulfilled') geneticas.value = geneticasRes.value.data || []
   } catch {} finally { loading.value = false }
   cargarFotos()
+  cargarPlantas()
   atenderAccion()
 })
 
@@ -563,6 +639,23 @@ watch(() => route.query.accion, atenderAccion)
 
 <style scoped>
 .msal { padding: 0 0 2rem; }
+.msal__luz { margin-top: 14px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 14px; background: rgba(255, 255, 255, .1); }
+.msal__luz > div { display: flex; flex-direction: column; }
+.msal__luz-k { font-size: .7rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; opacity: .75; }
+.msal__luz-v { font-weight: 700; }
+.msal__luz-btn { min-height: 44px; padding: 0 14px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, .4); background: transparent; color: inherit; font: inherit; font-weight: 600; }
+.msal__rapidas { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr; gap: 8px; padding: 14px 16px 4px; }
+.msal__rapida {
+  min-height: 60px; border-radius: 14px; border: 1px solid var(--c-leaf-100); background: var(--c-slate-50); color: var(--c-ink-900);
+  font: inherit; font-size: .82rem; font-weight: 600; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+}
+.msal__rapida i { font-size: 1.15rem; color: var(--c-leaf-700); }
+.msal__rapida--principal { border: 2px solid var(--c-leaf-700); background: var(--c-leaf-100); color: var(--c-leaf-800); }
+.msal__rapida--principal i { color: var(--c-sky-600); }
+.msal__planta-nombre { font-weight: 700; font-size: .98rem; color: var(--c-ink-900); }
+.msal__vacio-btn { margin: 0 16px; min-height: 48px; width: calc(100% - 32px); border-radius: 14px; border: 1px dashed var(--c-leaf-300); background: transparent; font: inherit; color: var(--c-ink-700); }
+.msal__vacio-btn strong { color: var(--c-leaf-700); }
+.msal__nota-auto { margin: 8px 16px 0; font-size: .82rem; color: var(--c-ink-700); }
 .msal--loading { display: flex; align-items: center; justify-content: center; min-height: 40vh; }
 .msal__spin { font-size: 2rem; color: var(--c-slate-400); animation: spin .8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }

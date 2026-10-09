@@ -50,15 +50,15 @@ module Salas
       # La sala no se da vuelta con lotes enraizando adentro: 12/12 le daría 12 horas de oscuridad
       # a esquejes que necesitan luz casi continua. La regla protege A LA PLANTA.
       if @nueva_fase == 'floracion'
-        enraizando = @sala.lotes.enraizando
-        if enraizando.exists?
-          codigos = enraizando.limit(5).pluck(:codigo).join(', ')
+        enraizando = sin_autos_de_casa(@sala.lotes.enraizando.to_a)
+        if enraizando.any?
+          codigos = enraizando.first(5).map(&:codigo).join(', ')
           return err("Esta sala tiene lotes enraizando (#{codigos}). En floración (12/12) los esquejes " \
                      'no prenden: movelos a otra sala antes de cambiar la fase.')
         end
       end
 
-      lotes = @sala.lotes.where(estado: fase_actual).to_a
+      lotes = sin_autos_de_casa(@sala.lotes.where(estado: fase_actual).to_a)
 
       if lotes.any? && !@confirmado
         return Result.new(ok: false, requiere_confirmacion: true, nueva_fase: @nueva_fase,
@@ -93,6 +93,16 @@ module Salas
     private
 
     def deshace? = @nueva_fase == 'vegetativo'
+
+    # Autocultivo: en la carpa de casa conviven autos y fotos, y la automática no sigue la luz —sigue
+    # su propio reloj—. Al cambiar la luz se mueven las fotos; las autos quedan en la fase en que
+    # estaban (y como no dependen de la luz, una auto enraizando no impide pasar la carpa a 12/12).
+    # En una organización no cambia nada: la auto vive en su sala de vege y se mueve como siempre.
+    def sin_autos_de_casa(lotes)
+      return lotes unless @sala.club&.personal?
+
+      lotes.reject(&:automatica?)
+    end
 
     def err(msg) = Result.new(ok: false, error: msg)
 

@@ -143,6 +143,36 @@ class AsistenteController < BaseController
                    hoy = 0, mañana = 1, pasado mañana = 2, "el jueves" = días hasta el próximo jueves.
   PROMPT
 
+  # AUTOCULTIVO (9-oct-2026, Germán): quien cultiva en casa también CREA plantas dictando («puse dos
+  # semillas de Ananda en la carpa chica», «un esqueje de Gorilla de 10 días en un vaso»). Sólo en uso
+  # personal: en una organización un lote nace con su código y su planilla, no de un dictado.
+  PROMPT_AUTOCULTIVO = <<~PROMPT.freeze
+
+    ═══════════════════════════════════════════
+    AUTOCULTIVO: CREAR PLANTAS
+    ═══════════════════════════════════════════
+    Esta cuenta es de autocultivo: la persona piensa en plantas, no en lotes. Si cuenta que puso,
+    sembró, germinó, cortó o tiene plantas NUEVAS (que no están en el MAPA DEL CULTIVO), generá UNA
+    acción "nueva_planta" por cada genética y espacio:
+
+    { "tipo": "nueva_planta", "sala_nombre": "Carpa chica",
+      "datos": { "genetica_nombre": "Ananda", "cantidad": 2, "origen": "semilla",
+                 "en_maceta": true, "maceta_litros": 0.335, "fase": "vegetativo", "dias": 12 } }
+
+    - genetica_nombre: EXACTO como figura en GENÉTICAS del mapa. Si no está, ponela como la dijo:
+      el sistema avisa que hay que cargarla.
+    - cantidad: cuántas («dos semillas» = 2). Si no lo dice, 1.
+    - origen: "semilla" o "esqueje" (corte, clon = esqueje). Si no lo dice, "semilla".
+    - en_maceta: true si ya está en maceta, vaso, bolsa o cama; false si está germinando (papel,
+      servilleta, vaso con agua, jiffy, propagador) o enraizando un esqueje sin maceta.
+    - maceta_litros: el tamaño en litros. «vaso» o «vasito» = 0.335. «maceta de 7» = 7.
+      «de 10 litros» = 10. Si no lo dice, no lo pongas.
+    - fase: "floracion" SOLO si dice que ya está floreciendo; si no, no lo pongas.
+    - dias: cuántos días lleva en la fase en que está («un esqueje de 10 días» = 10), sólo si lo dice.
+    - sala_nombre: el espacio donde está, exacto como en el mapa. Si hay uno solo, ese.
+    Una planta que YA está en el mapa no se crea de nuevo: lo que le pasó va en un registro.
+  PROMPT
+
   # El modelo que usa el asistente, en un solo lugar: se registra en cada llamada para poder
   # costear el consumo (`IaLlamada::PRECIOS`), y estaba escrito a mano en dos funciones.
   # (`LIMITE_LLAMADAS_POR_HORA` vivía acá y no lo usaba nadie: el tope real sale del tier del
@@ -254,6 +284,7 @@ class AsistenteController < BaseController
                   when 'nota_sala'               then ejecutar_nota_sala(accion_e, datos, club, contexto)
                   when 'nota_lote'               then ejecutar_nota_lote(accion_e, datos, club, contexto)
                   when 'avance_ciclo'            then ejecutar_avance_ciclo(accion_e, datos, club, contexto)
+                  when 'nueva_planta'            then ejecutar_nueva_planta(accion_e, datos, club, contexto)
                   else { ok: false, error: "Tipo desconocido: #{tipo}" }
                   end
 
@@ -435,7 +466,7 @@ class AsistenteController < BaseController
   def construir_prompt(contexto, es_cultivador)
     hoy      = Time.zone.today
     variable = "\nHOY: #{DIAS_SEMANA[hoy.wday]} #{hoy.strftime('%d/%m/%Y')}\n" + mapa_del_cultivo + contexto_rico(contexto)
-    [PROMPT_BASE + permisos_rol(es_cultivador), variable]
+    [PROMPT_BASE + permisos_rol(es_cultivador) + (current_user.club&.personal? ? PROMPT_AUTOCULTIVO : ''), variable]
   end
 
   DIAS_SEMANA = %w[domingo lunes martes miércoles jueves viernes sábado].freeze
@@ -449,7 +480,7 @@ class AsistenteController < BaseController
     salas = salas_visibles(club).where.not(state: 'cerrada').order(:nombre).to_a
     lotes = lotes_visibles(club).where(estado: %w[enraizado vegetativo floracion secado curado])
                 .includes(:genetica).order(:codigo).limit(MAPA_MAX_LOTES).to_a
-    return '' if salas.empty? && lotes.empty?
+    return '' if salas.empty? && lotes.empty? && !club.personal?
 
     por_sala = lotes.group_by(&:sala_id)
     ctx = "\n═══ MAPA DEL CULTIVO ═══\n"
@@ -464,6 +495,10 @@ class AsistenteController < BaseController
     if equipo.any? && !current_user.cultivador?
       ctx += "EQUIPO (a quién se le puede asignar una tarea):\n"
       equipo.each { |u| ctx += "  #{u.nombre_completo.presence || u.email} (#{u.role})\n" }
+    end
+    if club.personal?
+      gens = club.geneticas.order(:nombre).limit(80).map { |g| g.automatica ? "#{g.nombre} (auto)" : g.nombre }
+      ctx += "GENÉTICAS: #{gens.any? ? gens.join(', ') : '(ninguna cargada)'}\n"
     end
     ctx + "═════════════════════════════════════\n"
   end
@@ -1070,6 +1105,65 @@ class AsistenteController < BaseController
 
     nota = lote.notas.build(contenido: contenido, fuente: 'asistente_voz', club: club, user: current_user)
     nota.save ? { ok: true, mensaje: "Nota guardada en #{lote.codigo}" } : { ok: false, error: nota.errors.full_messages.join(', ') }
+  end
+
+  # «Puse dos semillas de Ananda en la carpa chica»: plantas nuevas, sólo en autocultivo. Usa la misma
+  # alta que el formulario (`Lotes::Plantar`): el nombre de las plantas, la carga «ya la tenía» y la
+  # regla de qué espacio admite qué fase son las mismas. Lo que no se puede resolver se dice, no se adivina.
+  VASO_LITROS = 0.335
+
+  def ejecutar_nueva_planta(accion, datos, club, contexto)
+    return { ok: false, error: 'Crear plantas por voz es de autocultivo' } unless club.personal?
+
+    genetica = genetica_por_nombre(club, datos['genetica_nombre'])
+    unless genetica
+      nombre = datos['genetica_nombre'].to_s.strip
+      return { ok: false, error: nombre.present? ? "No tenés cargada la genética «#{nombre}»: creala desde Nueva planta y volvé a dictar" : 'Falta de qué genética es' }
+    end
+
+    # Sin nombre y con un solo espacio, es ése. Con un nombre que no existe NO se cae al único: se avisa.
+    nombrado = (accion['sala_nombre'] || accion[:sala_nombre] || datos['sala_nombre']).present?
+    sala = sala_de(accion, datos, club, contexto)
+    sala ||= (unicas = salas_visibles(club).where.not(state: 'cerrada').to_a).one? ? unicas.first : nil unless nombrado
+    return { ok: false, error: '¿En qué espacio está? Nombralo como figura en tu cultivo' } unless sala
+
+    cantidad = datos['cantidad'].to_i.clamp(1, 50)
+    estado = if datos['fase'].to_s == 'floracion' then 'floracion'
+             elsif ActiveModel::Type::Boolean.new.cast(datos['en_maceta']) then 'vegetativo'
+             else 'enraizado'
+             end
+    dias = datos['dias'].to_i
+    heredado = if dias.positive?
+                 { 'enraizado' => { semilla_esqueje: dias }, 'vegetativo' => { vegetativo: dias },
+                   'floracion' => { floracion: dias } }[estado]
+               end
+    litros = datos['maceta_litros'].presence&.to_f
+
+    lote = sala.lotes.build(club: club, sede: sala.sede, genetica: genetica, estado: estado,
+                            origen: datos['origen'].to_s == 'esqueje' ? 'esqueje' : 'semilla',
+                            plants_count: cantidad, tamanio_maceta: litros&.positive? ? litros : nil,
+                            start_date: heredado ? Lotes::Plantar.inicio_heredado(estado, heredado) : Time.zone.today)
+    Lotes::Plantar.heredar_objetivos(lote)
+
+    if lote.ocupa_cupo_de_floracion?
+      enforcer = PlanEnforcer.new(club)
+      return { ok: false, error: enforcer.error_floracion(cantidad)[:mensaje] } unless enforcer.cabe_en_floracion?(cantidad)
+    end
+
+    Lotes::Plantar.new(lote: lote, usuario: current_user, plantas: cantidad, heredado: heredado).call
+    nombres = lote.plants.order(:id).pluck(:nombre)
+    { ok: true, mensaje: "#{nombres.to_sentence(two_words_connector: ' y ', last_word_connector: ' y ')} en #{sala.nombre}" }
+  rescue ActiveRecord::RecordInvalid => e
+    { ok: false, error: e.record.errors.full_messages.join(', ') }
+  end
+
+  def genetica_por_nombre(club, nombre)
+    n = nombre.to_s.strip
+    return nil if n.blank?
+
+    base = club.geneticas
+    base.where('LOWER(nombre) = ?', n.downcase).first ||
+      ((parecidas = base.where('nombre ILIKE ?', "%#{Genetica.sanitize_sql_like(n)}%").limit(2).to_a).one? ? parecidas.first : nil)
   end
 
   def ejecutar_avance_ciclo(accion, datos, club, contexto)

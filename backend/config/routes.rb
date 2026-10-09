@@ -483,6 +483,10 @@ Rails.application.routes.draw do
       get :inase
       get :perdidas
       get :stock          # los stocks con su información (`Informes::Inventario`)
+      # «Mis informes» del autocultivo (`Informes::Autocultivo`): plantas y frascos, no lotes ni sedes.
+      get :mi_cosecha
+      get :de_donde_salio
+      get :mis_gastos
     end
 
     # Papelera — historial de borrados / restauración (admin + super_admin)

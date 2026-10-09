@@ -2,7 +2,7 @@
   <!-- Los gastos de un ciclo por categoría y el costo por gramo que sale de dividirlos por lo que
        rindió. Una serie: cada barra lleva su monto al lado (son cuatro, se leen como una lista). -->
   <div class="mco">
-    <p class="mco__t">Gastos del ciclo <span>carpa · L-26-002</span></p>
+    <p class="mco__t">Gastos del ciclo <span>{{ casa ? 'carpa grande' : 'carpa · L-26-002' }}</span></p>
     <div v-for="(g, i) in GASTOS" :key="g.que" class="mco__fila">
       <span class="mco__que">{{ g.que }}</span>
       <div class="mco__riel"><div class="mco__barra" :style="{ width: `${(g.monto / MAYOR) * 100}%`, animationDelay: `${i * 150}ms` }"></div></div>
@@ -19,6 +19,7 @@
 </template>
 
 <script setup>
+defineProps({ casa: { type: Boolean, default: false } })
 const GASTOS = [
   { que: 'Semillas',          monto: 18000 },
   { que: 'Sustrato y macetas', monto: 26000 },

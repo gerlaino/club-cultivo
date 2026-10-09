@@ -44,8 +44,24 @@ class Lote < ApplicationRecord
     'floracion' => (KINDS_SALA_POR_ESTADO['floracion'] + KINDS_SALA_POR_ESTADO['vegetativo']).uniq,
   ).freeze
 
-  def self.kinds_sala_para(estado, automatica: false)
-    (automatica ? KINDS_SALA_POR_ESTADO_AUTOMATICA : KINDS_SALA_POR_ESTADO)[estado]
+  # AUTOCULTIVO (8-oct-2026, Germán): en la carpa de casa conviven autos y fotos. La automática no
+  # depende de la luz, así que entra al espacio en cualquier fase de su ciclo y con la luz que
+  # tenga la carpa (una semilla de auto se pone a germinar en una carpa que ya está en 12/12).
+  # SÓLO en uso personal: en una organización la auto sigue viviendo en su sala de vegetativo.
+  KINDS_SALA_POR_ESTADO_AUTOMATICA_PERSONAL = KINDS_SALA_POR_ESTADO_AUTOMATICA.transform_values { |kinds|
+    (kinds + %w[vegetativo floracion mixta]).uniq.freeze
+  }.freeze
+
+  def self.kinds_sala_para(estado, automatica: false, personal: false)
+    tabla_kinds_sala(automatica: automatica, personal: personal)[estado]
+  end
+
+  # La tabla entera que aplica: la usa la validación y viaja en `/me` para que la pantalla ofrezca
+  # sólo lo que el modelo va a aceptar.
+  def self.tabla_kinds_sala(automatica: false, personal: false)
+    return KINDS_SALA_POR_ESTADO unless automatica
+
+    personal ? KINDS_SALA_POR_ESTADO_AUTOMATICA_PERSONAL : KINDS_SALA_POR_ESTADO_AUTOMATICA
   end
 
   # Se valida sólo cuando la sala o el estado cambian: si en producción quedó algún lote
@@ -840,7 +856,7 @@ class Lote < ApplicationRecord
     if sala_id.present? && sala_id.to_i != cama.sala_id
       raise ArgumentError, "El lote está plantado en la #{cama.nombre}: no se muda de espacio."
     end
-    permitidos = Lote.kinds_sala_para(nueva_fase, automatica: automatica?)
+    permitidos = Lote.kinds_sala_para(nueva_fase, automatica: automatica?, personal: club&.personal?)
     kind = cama.sala.kind.presence || cama.sala.tipo
     return unless permitidos.present? && kind.present? && !permitidos.include?(kind)
 
@@ -861,7 +877,7 @@ class Lote < ApplicationRecord
   end
 
   def sala_admite_el_estado
-    permitidos = Lote.kinds_sala_para(estado, automatica: automatica?)
+    permitidos = Lote.kinds_sala_para(estado, automatica: automatica?, personal: club&.personal?)
     return if permitidos.blank? || sala.blank?
     # `kind` es lo que manda; `tipo` es el campo legacy que algunas salas todavía usan.
     kind = sala.kind.presence || sala.tipo

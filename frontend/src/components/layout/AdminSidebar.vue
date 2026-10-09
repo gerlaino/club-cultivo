@@ -11,7 +11,7 @@
     <nav class="asb__nav">
       <RouterLink
         v-for="g in visibleGroups" :key="g.key"
-        :to="g.to" class="asb__link"
+        :to="toDe(g, club.data)" class="asb__link"
         :class="{ 'asb__link--active': activeKey === g.key }"
         :title="collapsed ? labelDe(g, club.data) : undefined"
       >
@@ -37,7 +37,7 @@ import {
   CheckSquare, BarChart3, Settings, PanelLeftClose, PanelLeftOpen, Wine, Building2, Warehouse,
   Calculator, UserCog, Store,
 } from 'lucide-vue-next'
-import { NAV_GROUPS, detectGroup, entradaVisible, labelDe, useNavContext } from '../../composables/useNavContext.js'
+import { NAV_GROUPS, detectGroup, entradaVisible, labelDe, toDe, useNavContext } from '../../composables/useNavContext.js'
 import { useClubStore } from '../../stores/club.js'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 

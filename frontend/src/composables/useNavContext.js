@@ -29,13 +29,16 @@ export const NAV_GROUPS = [
     key: 'equipo', label: 'Equipo', to: '/usuarios', tabs: [], soloOrganizacion: true,
   },
   {
-    key: 'cultivo', label: 'Cultivo', to: '/salas', feature: 'cultivo',
+    // En autocultivo el grupo abre «Mi cultivo» (sus espacios con sus plantas) y no hay solapa
+    // Lotes: la persona piensa en plantas, el lote vive por debajo (9-oct-2026).
+    key: 'cultivo', label: 'Cultivo', to: '/salas', toPersonal: '/mi-cultivo', feature: 'cultivo',
     // Pantallas del grupo que no son una pestaña: la ficha de una cama de suelo vivo se abre
     // desde su espacio, así que resalta «Salas/Espacios».
     alias: [{ to: '/camas', tab: '/salas' }],
     tabs: [
+      { to: '/mi-cultivo', label: 'Mi cultivo', soloPersonal: true },
       { to: '/salas', label: 'Salas', labelPersonal: 'Espacios' },
-      { to: '/lotes', label: 'Lotes' },
+      { to: '/lotes', label: 'Lotes', soloOrganizacion: true },
       { to: '/plantas', label: 'Plantas' },
       { to: '/geneticas', label: 'Genéticas' },
       // Recetas de nutrientes: en organización se arman con lo del depósito; el cultivador de
@@ -109,8 +112,11 @@ export const NAV_GROUPS = [
     ],
   },
   {
-    key: 'reportes', label: 'Reportes', to: '/analitica',
+    // En autocultivo, Reportes abre «Mis informes» (cosecha, de dónde salió, gastos); Analítica e
+    // Informes siguen ahí, completos.
+    key: 'reportes', label: 'Reportes', to: '/analitica', toPersonal: '/mis-informes',
     tabs: [
+      { to: '/mis-informes', label: 'Mis informes', soloPersonal: true },
       { to: '/analitica', label: 'Analítica' },
       // Una sola puerta a los informes. REPROCANN y Trazabilidad estaban acá como tabs
       // sueltos Y además adentro de "Auditoría", que es el índice que ya los lista: el mismo
@@ -150,7 +156,13 @@ export const NAV_GROUPS = [
 export function entradaVisible(entrada, clubData) {
   if (entrada.feature && clubData?.features?.[entrada.feature] !== true) return false
   if (entrada.soloOrganizacion && clubData?.personal) return false
+  if (entrada.soloPersonal && !clubData?.personal) return false
   return true
+}
+
+// A dónde lleva el grupo para ESTA organización (en autocultivo, Cultivo abre «Mi cultivo»).
+export function toDe(entrada, clubData) {
+  return (clubData?.personal && entrada.toPersonal) || entrada.to
 }
 
 // Cómo se llama esta entrada para ESTA organización: algunas cambian de nombre en uso personal
@@ -166,7 +178,7 @@ export function detectGroup(path) {
   let best = null, bestLen = -1
   for (const g of NAV_GROUPS) {
     // Candidatos: el `to` del grupo (para grupos sin tabs, ej. Salón) + los `to` de sus tabs.
-    const tos = [g.to, ...g.tabs.map(t => t.to), ...(g.alias || []).map(a => a.to)]
+    const tos = [g.to, g.toPersonal, ...g.tabs.map(t => t.to), ...(g.alias || []).map(a => a.to)]
     for (const to of tos) {
       if (to && to !== '/' && (path === to || path.startsWith(to + '/')) && to.length > bestLen) {
         best = g; bestLen = to.length

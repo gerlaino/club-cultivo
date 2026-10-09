@@ -137,6 +137,7 @@
                     <span v-else-if="accion.tipo === 'registro_planta'">🌿</span>
                     <span v-else-if="accion.tipo === 'tarea'">📋</span>
                     <span v-else-if="accion.tipo === 'avance_ciclo'">🔄</span>
+                    <span v-else-if="accion.tipo === 'nueva_planta'">🌱</span>
                     <span v-else>📝</span>
                   </div>
                   <div class="av__accion-body">
@@ -245,6 +246,42 @@
                           <div class="av__ef av__ef--full">
                             <label>Notas</label>
                             <textarea v-model="accion.datos.notas" rows="2"></textarea>
+                          </div>
+                        </div>
+                      </template>
+
+                      <!-- Autocultivo: plantas nuevas dictadas. Lo mismo que pide «Nueva planta». -->
+                      <template v-else-if="accion.tipo === 'nueva_planta'">
+                        <div class="av__editor-grid">
+                          <div class="av__ef">
+                            <label>Genética</label>
+                            <input v-model.trim="accion.datos.genetica_nombre" type="text" />
+                          </div>
+                          <div class="av__ef">
+                            <label>Cuántas</label>
+                            <input v-model.number="accion.datos.cantidad" type="number" min="1" max="50" inputmode="numeric" />
+                          </div>
+                          <div class="av__ef">
+                            <label>Arranca de</label>
+                            <select v-model="accion.datos.origen">
+                              <option value="semilla">Semilla</option>
+                              <option value="esqueje">Esqueje</option>
+                            </select>
+                          </div>
+                          <div class="av__ef">
+                            <label>¿Ya está en maceta?</label>
+                            <select v-model="accion.datos.en_maceta">
+                              <option :value="false">No, germinando / enraizando</option>
+                              <option :value="true">Sí</option>
+                            </select>
+                          </div>
+                          <div v-if="accion.datos.en_maceta" class="av__ef">
+                            <label>Maceta (litros)</label>
+                            <input v-model.number="accion.datos.maceta_litros" type="number" min="0" step="0.001" inputmode="decimal" />
+                          </div>
+                          <div class="av__ef">
+                            <label>Días que lleva</label>
+                            <input v-model.number="accion.datos.dias" type="number" min="0" inputmode="numeric" />
                           </div>
                         </div>
                       </template>
@@ -605,6 +642,7 @@ function labelTipo(tipo) {
     nota_sala:               'Nota de sala',
     nota_lote:               'Nota de lote',
     avance_ciclo:            'Avance de ciclo',
+    nueva_planta:            'Nueva planta',
   }[tipo] || tipo
 }
 
@@ -630,6 +668,10 @@ function descripcionAccion(accion) {
   if (accion.tipo === 'tarea') return d.titulo || 'Tarea sin título'
   if (accion.tipo === 'nota_sala' || accion.tipo === 'nota_lote') return d.contenido || 'Nota'
   if (accion.tipo === 'avance_ciclo') return d.estado_nuevo ? `→ ${d.estado_nuevo}` : 'Avance de estado'
+  if (accion.tipo === 'nueva_planta') {
+    const n = Number(d.cantidad) || 1
+    return `${n > 1 ? `${n} × ` : ''}${d.genetica_nombre || 'sin genética'} · ${d.origen === 'esqueje' ? 'esqueje' : 'semilla'}`
+  }
   return d.observaciones || ''
 }
 
@@ -653,6 +695,14 @@ function metaAccion(accion) {
   }
   if ((accion.tipo === 'registro_ambiental' || accion.tipo === 'registro_ambiental_sala') && d.notas_fertilizacion) return d.notas_fertilizacion
   if (accion.tipo === 'registro_planta' && d.color_hojas) return `Color: ${d.color_hojas} · Plagas: ${d.plagas || 'ninguna'}`
+  if (accion.tipo === 'nueva_planta') {
+    const litros = Number(d.maceta_litros)
+    const donde = d.fase === 'floracion' ? 'floreciendo'
+      : d.en_maceta ? `en maceta${litros ? ` de ${litros.toLocaleString('es-AR', { maximumFractionDigits: 3 })} L` : ''}`
+      : (d.origen === 'esqueje' ? 'enraizando' : 'germinando')
+    const dias = Number(d.dias) ? ` · ${d.dias} días` : ''
+    return `${donde}${dias}`
+  }
   return ''
 }
 </script>
@@ -759,6 +809,7 @@ function metaAccion(accion) {
 .av__accion--registro_ambiental_sala { border-color:#bae6fd; background:#f0f9ff; }
 .av__accion--nota_sala,.av__accion--nota_lote { border-color:#e0e7ff; }
 .av__accion--avance_ciclo { border-color:#d1fae5; background:#f0fdf4; }
+.av__accion--nueva_planta { border-color: var(--c-leaf-300); background: var(--c-leaf-50); }
 .av__accion-icono { font-size:20px; flex-shrink:0; margin-top:1px; }
 .av__accion-body  { flex:1; min-width:0; }
 .av__accion-tipo  { font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.07em; color:#6b8f71; margin-bottom:4px; }

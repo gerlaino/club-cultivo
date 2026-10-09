@@ -2,7 +2,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQRCode } from '../composables/useQRCode'
-import { LAYOUT_PLANTA, dibujarBanderitaPlanta } from '../lib/pdfEtiquetas.js'
+import { useEtiquetaPlanta } from '../composables/useEtiquetaPlanta.js'
 import { usePlantsStore } from '../stores/plants'
 import { useAuthStore }   from '../stores/auth'
 import { useClubStore }   from '../stores/club'
@@ -77,31 +77,8 @@ async function descargarQRsvg() { await downloadSVG(qrPlantaUrl(), qrFilename('s
 // Se dibuja en lib/pdfEtiquetas.js: misma pieza que la impresión en tanda. PDF del
 // tamaño exacto de la tira (160×26mm), así el plegado cae donde tiene que caer — en HTML el diálogo
 // de impresión le aplicaba su "ajustar a la página".
-const generandoEtiqueta = ref(false)
-async function imprimirEtiqueta() {
-  const p = planta.value
-  if (!p?.codigo_qr || generandoEtiqueta.value) return
-  generandoEtiqueta.value = true
-  try {
-    if (!club.data) { try { await club.fetch() } catch { /* la organización es opcional en la etiqueta */ } }
-    const { jsPDF } = await import('jspdf')
-    const qr = await generatePNG(qrPlantaUrl(), LAYOUT_PLANTA.qr)
-    const doc = new jsPDF({ unit: 'mm', format: [LAYOUT_PLANTA.ancho, LAYOUT_PLANTA.alto], orientation: 'landscape' })
-    dibujarBanderitaPlanta(doc, 0, 0, {
-      qrDataUrl: qr,
-      nombre:    p.nombre || p.codigo_qr,
-      genetica:  p.genetica?.nombre,
-      lote:      p.lote?.codigo,
-      inicio:    p.lote?.start_date,
-      clubName:  club.name,
-    })
-    doc.save(`etiqueta-${p.nombre || p.codigo_qr}.pdf`)
-  } catch {
-    toast.error('No se pudo generar la etiqueta')
-  } finally {
-    generandoEtiqueta.value = false
-  }
-}
+const { imprimir: imprimirBanderita, generando: generandoEtiqueta } = useEtiquetaPlanta()
+function imprimirEtiqueta() { return imprimirBanderita(planta.value) }
 
 // Modal registro
 const showModal   = ref(false)

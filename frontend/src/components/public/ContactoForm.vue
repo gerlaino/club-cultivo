@@ -99,7 +99,7 @@ async function enviar () {
 .cf__tipo { min-height: 38px; border: 1px solid var(--hb-regla); background: var(--hb-papel-claro); color: var(--hb-tinta-2); border-radius: 999px; padding: .4rem .95rem; font: 500 14px var(--hb-sans); cursor: pointer; }
 .cf__tipo--on { background: var(--hb-tinta); border-color: var(--hb-tinta); color: var(--hb-papel-claro); }
 .cf__aviso { border-left: 3px solid var(--hb-ambar); padding-left: 12px; color: var(--hb-tinta-2); font-size: .92rem; }
-.cf__campo { display: flex; flex-direction: column; gap: 5px; font: 500 12px var(--hb-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--hb-tinta-2); }
+.cf__campo { display: flex; flex-direction: column; gap: 6px; font: 600 15px var(--hb-sans); color: var(--hb-tinta); }
 .cf__campo em { font-style: normal; text-transform: none; letter-spacing: 0; opacity: .75; }
 .cf__campo input, .cf__campo textarea {
   font: 16px var(--hb-sans); text-transform: none; letter-spacing: 0; color: var(--hb-tinta);

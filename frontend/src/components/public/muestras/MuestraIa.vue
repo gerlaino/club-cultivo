@@ -25,10 +25,11 @@
 </template>
 
 <script setup>
+const props = defineProps({ casa: { type: Boolean, default: false } })
 const REGISTROS = [
   { que: 'Riego',     det: '3 plantas · 1,5 L c/u · pH 6,2' },
   { que: 'Nutriente', det: 'Flora · 2 ml/L · 4,5 L de solución' },
-  { que: 'Dónde',     det: 'Carpa · lote L-26-002' },
+  { que: 'Dónde',     det: props.casa ? 'Carpa · Gorilla 1, Gorilla 2 y Ananda 1' : 'Carpa · lote L-26-002' },
 ]
 </script>
 

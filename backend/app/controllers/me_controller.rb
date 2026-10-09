@@ -52,7 +52,7 @@ class MeController < ApplicationController
                                # La misma tabla para una genética automática (en floración
                                # sigue valiendo la sala de vege). La pantalla elige cuál usar
                                # según la genética; no escribe la excepción.
-                               'kinds_sala_por_estado_automatica' => Lote::KINDS_SALA_POR_ESTADO_AUTOMATICA,
+                               'kinds_sala_por_estado_automatica' => Lote.tabla_kinds_sala(automatica: true, personal: current_user.club&.personal?),
                                # A qué sedes se asigna cada rol: la pantalla ofrece sólo eso.
                                'sedes_por_rol'         => Sede::TIPOS_POR_ROL,
                                # Dónde puede enraizar un lote: el desplegable ofrece esto.

@@ -5,12 +5,12 @@
         <p class="hb__ceja hb__ceja--claro">La app</p>
         <h2 class="hb__h2">Llevala en el bolsillo</h2>
         <p>
-          Se instala en el teléfono desde el navegador, sin tiendas y en segundos. Abrís tu lote,
-          tocás «Registrar» y listo: riego, foto, ambiente. Te avisa cuando le toca algo a la planta.
+          Se instala en el teléfono desde el navegador, sin tiendas y en segundos. Abrís tu planta,
+          tocás «Regar» y listo: cuánto y con qué, una foto, una nota. Te avisa cuando le toca algo.
         </p>
         <ul class="hb__pasos">
           <li><span>1</span> Creá tu cuenta gratis</li>
-          <li><span>2</span> Cargá tu espacio y tu primer lote</li>
+          <li><span>2</span> Cargá tu espacio y tus plantas</li>
           <li><span>3</span> Instalala y anotá desde la planta</li>
         </ul>
         <div class="hb__acciones">
@@ -22,22 +22,22 @@
         </p>
       </div>
 
-      <!-- Un teléfono con la ficha del lote, como se ve de verdad en la app. -->
+      <!-- Un teléfono con la ficha de una planta, como se ve de verdad en la app (9-oct-2026). -->
       <div class="hb__tel hb-rev" aria-hidden="true">
         <div class="hb__tel-pantalla">
           <div class="hb__tel-hero">
             <span class="hb__tel-fase">VEGETATIVO <i>AUTO</i></span>
-            <b class="hb__tel-cod">L-26-002</b>
-            <span class="hb__tel-gen">King’s Juice</span>
+            <b class="hb__tel-cod">La petisa</b>
+            <span class="hb__tel-gen">King’s Juice · de semilla · Carpa grande</span>
             <span class="hb__tel-falta">→ Faltan 46 días para la cosecha</span>
             <div class="hb__tel-stats">
-              <div><b>3</b><small>Plantas</small></div>
-              <div><b>31</b><small>Días</small></div>
-              <div><b>Balcón</b><small>Espacio</small></div>
+              <div><b>31</b><small>Día</small></div>
+              <div><b>77</b><small>Ciclo</small></div>
+              <div><b>Carpa</b><small>Espacio</small></div>
               <div><b>10 L</b><small>Maceta</small></div>
             </div>
           </div>
-          <div class="hb__tel-cta">Registrar en el diario<small>Riego, pH/EC, ambiente, foto</small></div>
+          <div class="hb__tel-cta">Regar<small>Cuánto y con qué: receta, nutrientes o sólo agua</small></div>
           <div class="hb__tel-feed">
             <div v-for="r in telFeed" :key="r.t" class="hb__tel-item"><span><component :is="r.i" :size="16" :stroke-width="1.8" /></span><div><b>{{ r.t }}</b><small>{{ r.s }}</small></div></div>
           </div>
@@ -51,7 +51,7 @@
 </template>
 
 <script setup>
-// «LLEVALA EN EL BOLSILLO»: cómo se instala en el teléfono y cómo se ve la ficha de un lote. Salió
+// «LLEVALA EN EL BOLSILLO»: cómo se instala en el teléfono y cómo se ve la ficha de una planta. Salió
 // de la portada (5-oct-2026) para la página de casa. El teléfono replica la ficha real de la app.
 import { ref, onMounted, onBeforeUnmount } from 'vue'
 import { Droplets, Camera, BellRing } from 'lucide-vue-next'

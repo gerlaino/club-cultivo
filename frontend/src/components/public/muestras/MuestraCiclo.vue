@@ -4,8 +4,9 @@
   <div class="mcl">
     <div class="mcl__cab">
       <div>
-        <p class="mcl__lote">L-26-002 <span>King’s Juice · auto</span></p>
-        <p class="mcl__sub">3 plantas · Balcón · maceta de 10 L</p>
+        <!-- En casa se habla de la planta; en un proyecto, del lote (`casa`). -->
+        <p class="mcl__lote">{{ casa ? 'La petisa' : 'L-26-002' }} <span>King’s Juice · auto</span></p>
+        <p class="mcl__sub">{{ casa ? 'Carpa grande · maceta de 10 L' : '3 plantas · Balcón · maceta de 10 L' }}</p>
       </div>
       <p class="mcl__dia"><b>Día {{ DIA }}</b><span>de unos {{ TOTAL }}</span></p>
     </div>
@@ -26,6 +27,7 @@
 </template>
 
 <script setup>
+defineProps({ casa: { type: Boolean, default: false } })
 const DIA = 31
 const TOTAL = 77
 const PASOS = [

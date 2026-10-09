@@ -135,7 +135,17 @@ créditos `IaRecarga`). Detalle en `docs/REGLAS_Y_DECISIONES.md` («El modelo co
 - **Seguridad**: no hay contraseña por defecto; `render file:` no existe en modo API; `/me` no se
   cachea; el helper de specs prefija `/api` a todo.
 
-## Dónde retomar (7-oct-2026)
+## Dónde retomar (9-oct-2026)
+
+**Bloque (ek), SIN commitear**: autocultivo con PLANTAS y no lotes (el lote vive por debajo,
+`Lotes::Plantar`; autos y fotos en la misma carpa sólo en personal), plantas por voz (`nueva_planta`,
+vaso = 0,335 L), «Mi cultivo» en teléfono y compu, «Mis informes» (PDF/Excel, `Informes::Autocultivo`)
+y la página pública rearmada (dos puertas, celular en autocultivo, oficios con su pantalla, precios
+con «un pack / los dos»). Detalle en `docs/CHANGELOG.md` (ek) y `docs/REGLAS_Y_DECISIONES.md`.
+Pendiente de Germán: el correo de producción con Javi (SMTP + `APP_HOST`), su WhatsApp y cómo se paga
+en pesos para la página pública, y probar con Martín.
+
+### Retomada anterior (7-oct-2026)
 
 **Bloques (eh) y (ei)**: bajas de usuario que andan (`Acceso::DarDeBaja`), el total de una dispensa
 no se tipea (descuento en % o en pesos, `descuento_dispensa_ars`) y el rediseño aprobado: dispensa

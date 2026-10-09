@@ -277,7 +277,7 @@ class LoteSerializer
   # que se da vuelta es el espacio. La regla de qué admite cada sala es la del modelo.
   def self.avanza_con_el_espacio?(lote, proxima_fase)
     return false unless lote.en_cama? && proxima_fase.present? && lote.sala
-    permitidos = Lote.kinds_sala_para(proxima_fase, automatica: lote.automatica?)
+    permitidos = Lote.kinds_sala_para(proxima_fase, automatica: lote.automatica?, personal: lote.club&.personal?)
     kind = lote.sala.kind.presence || lote.sala.tipo
     permitidos.present? && kind.present? && !permitidos.include?(kind)
   end

@@ -9,7 +9,12 @@
           <RouterLink to="/contacto">Contacto</RouterLink>
         </nav>
         <RouterLink to="/login" class="pp__ingresar">Ingresar</RouterLink>
-        <RouterLink to="/registro" class="hb__btn hb__btn--chico">Probar gratis</RouterLink>
+        <!-- El botón de arriba es el de ESA página: en proyectos manda al contacto, no al alta de
+             autocultivo (antes una organización tocaba «Probar gratis» y caía en el registro personal). -->
+        <template v-if="accion">
+          <a v-if="accion.to.startsWith('#')" :href="accion.to" class="hb__btn hb__btn--chico">{{ accion.label }}</a>
+          <RouterLink v-else :to="accion.to" class="hb__btn hb__btn--chico">{{ accion.label }}</RouterLink>
+        </template>
       </div>
     </header>
 
@@ -41,6 +46,11 @@
 // El router de la app no tiene `scrollBehavior` (cambiarlo tocaría las 150 rutas de adentro), así
 // que al entrar a una de estas páginas se va arriba, o al ancla si vino con `#`.
 import { onMounted, onBeforeUnmount, nextTick } from 'vue'
+
+defineProps({
+  // { label, to } del botón de arriba, o null para no mostrarlo (la portada ya tiene las dos puertas).
+  accion: { type: Object, default: () => ({ label: 'Probar gratis', to: '/registro' }) },
+})
 import { useRoute } from 'vue-router'
 import { cargarFuentesHerbario } from '../../lib/fuentesHerbario.js'
 import '../../assets/herbario.css'

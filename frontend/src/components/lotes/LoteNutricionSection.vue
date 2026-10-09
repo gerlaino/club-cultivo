@@ -4,7 +4,7 @@
     <div v-else-if="error" class="lns__vacio">{{ error }}</div>
     <!-- Vacío sólo si no hay NADA: un lote regado con agua sola igual tiene qué mostrar. -->
     <div v-else-if="!data?.aplicaciones?.length && data?.totales?.agua_l == null" class="lns__vacio">
-      Todavía no se registró ningún riego con volumen ni fertilización. Se carga al regar: «Registrar lote» → Riego.
+      Todavía no se registró ningún riego con volumen ni fertilización. Se carga al regar: {{ esPersonal ? '«Regar», con cuánto y con qué.' : '«Registrar lote» → Riego.' }}
     </div>
     <template v-else>
       <!-- El resumen: qué recibió en todo el ciclo -->
@@ -105,6 +105,8 @@
 </template>
 
 <script setup>
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
+const { esPersonal } = useUsoPersonal()
 // «¿Qué recibió este lote?»: cada aplicación de nutrientes y los totales. Todo lo calcula el
 // backend (`Lotes::Nutricion`): la parte de lo compartido, la semana de la fase, la salvedad de
 // lo que no se descontó y si se ve la plata. Acá sólo se muestra.
