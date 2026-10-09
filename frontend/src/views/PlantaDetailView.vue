@@ -18,6 +18,7 @@ import RegistroPlantaModal   from '../components/plants/RegistroPlantaModal.vue'
 import RegistroLoteModal     from '../components/lotes/registro/RegistroLoteModal.vue'
 import { useToast }      from '../composables/useToast.js'
 import { useConfirm }   from '../composables/useConfirm.js'
+import { useUltimaPlanta } from '../composables/useUltimaPlanta.js'
 import { useBluelabBLE } from '../composables/useBluelabBLE.js'
 import DsSpinner from '../design-system/components/Spinner.vue'
 
@@ -29,6 +30,7 @@ const auth   = useAuthStore()
 const club   = useClubStore()
 const toast   = useToast()
 const { confirm } = useConfirm()
+const conAvisoDeCierre = useUltimaPlanta()
 const { registrarConJornada } = useManicuraJornada()
 
 const id           = Number(route.params.id)
@@ -528,7 +530,8 @@ async function confirmarDescartar() {
   descartando.value = true
   try {
     const loteId = planta.value?.lote?.id
-    await descartarPlant(id, motivo)
+    const r = await conAvisoDeCierre((cerrar) => descartarPlant(id, motivo, cerrar))
+    if (!r) return
     toast.success('Planta descartada')
     descartarOpen.value = false
     if (loteId) router.push({ name: 'lote-detail', params: { id: loteId } })
@@ -548,7 +551,8 @@ async function eliminarPlanta() {
   if (!ok) return
   try {
     const loteId = planta.value?.lote?.id
-    await deletePlant(id)
+    const r = await conAvisoDeCierre((cerrar) => deletePlant(id, cerrar))
+    if (!r) return
     toast.success('Planta eliminada')
     if (loteId) router.push({ name: 'lote-detail', params: { id: loteId } })
   } catch (e) { toast.error(e?.response?.data?.error || 'Error al eliminar') }

@@ -224,8 +224,9 @@ export const getPlantsKpis = () => api.get('/plants/kpis');
 export const getPlant = (id) => api.get(`/plants/${id}`);
 export const createPlant = (payload) => api.post('/plants', { plant: payload });
 export const updatePlant = (id, payload) => api.put(`/plants/${id}`, { plant: payload });
-export const deletePlant = (id) => api.delete(`/plants/${id}`);
-export const descartarPlant = (id, motivo) => api.put(`/plants/${id}`, { plant: { state: 'descartada' }, motivo });
+// `cerrarLote`: la confirmación de que es la última planta viva y el lote se cierra (`useUltimaPlanta`).
+export const deletePlant = (id, cerrarLote = false) => api.delete(`/plants/${id}`, { params: cerrarLote ? { cerrar_lote: true } : {} });
+export const descartarPlant = (id, motivo, cerrarLote = false) => api.put(`/plants/${id}`, { plant: { state: 'descartada' }, motivo, ...(cerrarLote ? { cerrar_lote: true } : {}) });
 
 // -------- PLANT ACTIVITIES --------
 export const getPlantActivities = (plantId) => api.get(`/plants/${plantId}/plant_activities`);

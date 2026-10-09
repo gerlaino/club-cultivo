@@ -23,7 +23,8 @@ class BenchmarkController < ApplicationController
     pacientes_activos = club.pacientes.where(deleted_at: nil).count
 
     lotes = club.lotes.where.not(estado: 'germinacion')
-    lotes_finalizados = lotes.select { |l| l.rendimiento_real_g.present? }
+    # Con 0 g es un lote que se cerró sin cosecha (`Lote.cerrados_sin_cosecha`): no es un rendimiento.
+    lotes_finalizados = lotes.select { |l| l.rendimiento_real_g.to_f.positive? }
     rendimiento_promedio = lotes_finalizados.any? ?
       (lotes_finalizados.sum { |l| l.rendimiento_real_g.to_f } / lotes_finalizados.size).round(1) : nil
 
@@ -72,7 +73,7 @@ class BenchmarkController < ApplicationController
 
     rendimientos = opted_clubs.flat_map do |c|
       c.lotes.where.not(estado: 'germinacion')
-       .select { |l| l.rendimiento_real_g.present? }
+       .select { |l| l.rendimiento_real_g.to_f.positive? }
        .map { |l| l.rendimiento_real_g.to_f }
     end
     avg_rendimiento = rendimientos.any? ? (rendimientos.sum / rendimientos.size).round(1) : nil

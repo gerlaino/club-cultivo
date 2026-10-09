@@ -32,7 +32,7 @@ module Informes
       producto_ant = producto_en(d_ant, h_ant)
 
       {
-        plantas:  resumen_plantas(plantas, plantas_ant),
+        plantas:  resumen_plantas(plantas, plantas_ant).merge(lotes_cerrados: lotes_cerrados_en(@desde, @hasta)),
         producto: resumen_producto(producto, producto_ant),
         filtros:  @filtros.to_h,
       }
@@ -59,6 +59,23 @@ module Informes
           motivo: p.motivo_descarte.presence || 'sin_motivo', fecha: fecha.to_date, fecha_estimada: estimada,
           costo_ars: costo_por_planta(p.lote) }
       end
+    end
+
+    # Los lotes que se cerraron porque se descartaron todas sus plantas (`Lote#cerrar_sin_plantas!`,
+    # o el de manicura al que se le descartó todo): no entran en ningún promedio de rendimiento, y
+    # éste es el lugar donde se ven. Por la fecha del cierre, que es la del evento.
+    def lotes_cerrados_en(desde, hasta)
+      cierres = LoteEvento.where(lote_id: lotes_base.cerrados_sin_cosecha.select(:id),
+                                 tipo: 'cambio_estado', estado_nuevo: 'finalizado')
+                          .where(registrado_en: desde..hasta).group(:lote_id).maximum(:registrado_en)
+      anteriores = LoteEvento.where(lote_id: cierres.keys, tipo: 'cambio_estado', estado_nuevo: 'finalizado')
+                             .order(:registrado_en).pluck(:lote_id, :estado_anterior).to_h
+      descartadas = Plant.where(lote_id: cierres.keys, state: 'descartada').group(:lote_id).count
+      Lote.where(id: cierres.keys).includes(:genetica, :costo_lote).map do |l|
+        { id: l.id, codigo: l.codigo, genetica: l.genetica&.nombre, fecha: cierres[l.id].to_date,
+          estaba_en: Lote.etiqueta_estado(anteriores[l.id], l.origen), plantas: descartadas[l.id] || 0,
+          costo_ars: l.costo_lote&.costo_total.to_f.positive? ? l.costo_lote.costo_total.to_f.round(2) : nil }
+      end.sort_by { |x| x[:fecha] }.reverse
     end
 
     def lotes_base

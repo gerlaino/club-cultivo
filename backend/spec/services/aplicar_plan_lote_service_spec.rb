@@ -25,6 +25,12 @@ RSpec.describe AplicarPlanLoteService do
     described_class.new(lote: lote, plan: plantilla, ejecutado_por: admin, **opts).aplicar!
   end
 
+  it '«Planes en curso» nombra el lote por su código (salía «#<Lote:0x…>»)' do
+    tarea_del_plan(plantilla, 0)
+    aplicacion, = aplicar
+    expect(aplicacion.objetivo_nombre).to eq(lote.codigo)
+  end
+
   it 'una plantilla se aplica desde el lote (antes fallaba) y cada tarea va a su día' do
     [0, 3, 21].each { |d| tarea_del_plan(plantilla, d) }
 

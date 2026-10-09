@@ -338,6 +338,16 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 
 ### Lo que NO hay que romper
 
+- **LA ÚLTIMA PLANTA VIVA CIERRA EL LOTE, CON AVISO** (9-oct-2026). Descartar o eliminar la
+  última planta de un lote en cultivo (enraizado/vegetativo/floración) responde 409
+  `ultima_planta` con el texto del aviso; con `cerrar_lote: true` sigue y `Lote#cerrar_sin_plantas!`
+  lo deja `finalizado` con 0 g, sin sala, con las tareas activas canceladas y el evento «lote
+  cerrado sin cosecha». El aviso lo escribe el backend (en autocultivo, sin la palabra lote); la
+  pantalla usa `useUltimaPlanta`. **Finalizado con 0 g = cerrado sin cosecha**
+  (`Lote.cerrados_sin_cosecha`, también el de manicura al que se le descartó todo): fuera de todo
+  promedio de rendimiento, y visible en el informe de pérdidas («Lotes que se cerraron sin
+  cosecha»). Un lote cerrado no recupera plantas (revertir el descarte da 422). Lo de antes:
+  `rake lotes:cerrar_vacios` (`CORREGIR=1`).
 - **SEMILLA GERMINA, ESQUEJE ENRAÍZA: ES LA PALABRA, NO LA FASE** (29-sep-2026). El estado es uno
   (`enraizado`); lo que se muestra sale del backend (`estado_label`, `Lote::ARRANQUE_POR_ORIGEN`,
   en `/me` para el alta). No volver a partir el estado ni escribir la palabra en el front según el

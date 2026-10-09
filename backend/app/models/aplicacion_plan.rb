@@ -26,7 +26,8 @@ class AplicacionPlan < ApplicationRecord
   def objetivo_nombre
     obj = objetivo
     return nil unless obj
-    obj.respond_to?(:nombre) ? obj.nombre : obj.to_s
+    # Un lote no tiene `nombre`: sin esto salía «#<Lote:0x00007f…>» en «Planes en curso».
+    obj.try(:nombre).presence || obj.try(:codigo).presence || obj.model_name.human
   end
 
   def porcentaje_completado

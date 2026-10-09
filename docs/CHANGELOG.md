@@ -1,5 +1,24 @@
 # Changelog
 
+## Octubre 2026 (en) — La última planta cierra el lote; Términos ajustados (9-oct)
+
+- **Lote sin plantas**: Germán descartó las tres semillas que no germinaron y L-26-001 quedó
+  «Germinación · 0 plantas». Ahora descartar o eliminar la última planta viva avisa («Es la última
+  planta…») y, confirmado, cierra el lote sin cosecha (`Lote#cerrar_sin_plantas!`): finalizado con
+  0 g, sin sala (libera la cama), tareas activas canceladas, evento en su historia. Sólo si el
+  contador también llega a 0 (un lote cargado con el número no se cierra por una planta). Un lote
+  cerrado no recupera plantas. El aviso lo da el backend (409 `ultima_planta`) y la pantalla lo
+  muestra con `useUltimaPlanta` en la ficha de la planta (teléfono y compu).
+- **Fuera de los promedios, pero a la vista**: finalizado con 0 g = `Lote.cerrados_sin_cosecha`.
+  El benchmark y los ciclos cerrados del año ya no los cuentan (Analítica y plan vs. real ya
+  filtraban `> 0`). El informe de pérdidas suma «Lotes que se cerraron sin cosecha» (pantalla,
+  PDF): cuándo, genética, en qué estaba, cuántas plantas y lo que costó.
+- **`rake lotes:cerrar_vacios`** (lista; `CORREGIR=1` cierra) para los que quedaron de antes.
+- **Términos** (pedido del abogado): «uso propio autorizado», la responsabilidad por lo que se
+  publica con terceros, y la suspensión «en caso de detectarse o advertirse» un uso indebido (no
+  revisamos cada cuenta). Versión `2026-10-09`.
+- Specs: `lote_cierra_sin_plantas_spec.rb` (13), `useUltimaPlanta.test.js`.
+
 ## Octubre 2026 (em) — «Mirá cómo se hace»: la app de verdad, grabada, en la página pública (9-oct)
 
 Pedido de Germán: mostrar cómo trabaja el administrador (genética, lote, paciente, dispensa) en

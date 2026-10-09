@@ -77,6 +77,24 @@
             </tbody>
           </table>
         </div>
+        <!-- Los lotes que se quedaron sin plantas se cierran solos y no entran en ningún promedio de
+             rendimiento: éste es el lugar donde se ven. -->
+        <template v-if="pl.lotes_cerrados?.length">
+          <h3 class="inf__subtitulo">Lotes que se cerraron sin cosecha</h3>
+          <table class="inf__table">
+            <thead><tr><th>Cierre</th><th>Lote</th><th>Genética</th><th>Estaba en</th><th class="num">Plantas</th><th class="num">Costó</th></tr></thead>
+            <tbody>
+              <tr v-for="l in pl.lotes_cerrados" :key="l.id">
+                <td>{{ fecha(l.fecha) }}</td>
+                <td class="mono">{{ l.codigo }}</td>
+                <td>{{ l.genetica || '—' }}</td>
+                <td>{{ l.estaba_en }}</td>
+                <td class="num">{{ l.plantas }}</td>
+                <td class="num">{{ l.costo_ars != null ? fmtArs(l.costo_ars) : '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </template>
       </section>
 
       <!-- ── 2. Lo que se perdió después ───────────────────────────────────── -->
@@ -142,7 +160,7 @@ const params  = computed(() => ({ ...periodo.value, ...filtros.value }))
 const loading = ref(false)
 const data    = ref(null)
 const listaAbierta = ref(false)
-const pl = computed(() => data.value?.plantas  || { total: 0, anterior: 0, en_cultivo: 0, porcentaje: 0, costo_ars: 0, sin_costo: 0, por_motivo: [], lista: [], omitidas: 0 })
+const pl = computed(() => data.value?.plantas  || { total: 0, anterior: 0, en_cultivo: 0, porcentaje: 0, costo_ars: 0, sin_costo: 0, por_motivo: [], lista: [], omitidas: 0, lotes_cerrados: [] })
 const pr = computed(() => data.value?.producto || { por_unidad: [], merma_por_unidad: [], mostrador_por_unidad: [], costo_ars: 0, sin_costo: 0, lista: [], omitidas: 0 })
 
 async function cargar() {
@@ -230,6 +248,7 @@ onMounted(cargar)
 .inf__hoja { background: #fff; }
 .inf__kpi--warn .inf__kpi-valor { color: var(--c-amber-500); }
 .inf__plegable { margin-top: var(--sp-3); }
+.inf__subtitulo { font-size: var(--fs-14); font-weight: 700; color: var(--c-ink-900); margin: var(--sp-5) 0 var(--sp-2); }
 .inf__plegar { background: none; border: none; padding: 0; margin-bottom: var(--sp-2); cursor: pointer; font: inherit; font-size: var(--fs-13); font-weight: 600; color: var(--c-leaf-700, #15803d); display: inline-flex; align-items: center; gap: .3rem; }
 .inf__aprox { font-size: var(--fs-12); color: var(--c-ink-500); }
 .inf__mas { color: var(--c-ink-500); font-size: var(--fs-13); font-style: italic; }

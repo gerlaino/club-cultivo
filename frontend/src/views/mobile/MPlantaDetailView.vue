@@ -216,6 +216,7 @@ import { useToast }          from '../../composables/useToast'
 import { useUsoPersonal }    from '../../composables/useUsoPersonal.js'
 import { useEtiquetaPlanta } from '../../composables/useEtiquetaPlanta.js'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
+import { useUltimaPlanta }   from '../../composables/useUltimaPlanta.js'
 import SheetBottom           from '../../components/cultivador/SheetBottom.vue'
 import RegistroPlantaModal   from '../../components/plants/RegistroPlantaModal.vue'
 import RegistroLoteModal     from '../../components/lotes/registro/RegistroLoteModal.vue'
@@ -225,6 +226,7 @@ const route  = useRoute()
 const router = useRouter()
 const toast  = useToast()
 const { esPersonal } = useUsoPersonal()
+const conAvisoDeCierre = useUltimaPlanta()
 const { imprimir: imprimirEtiqueta, generando: generandoEtiqueta } = useEtiquetaPlanta()
 const id = Number(route.params.id)
 
@@ -361,7 +363,8 @@ const motivoDescarte = ref('')
 async function descartar() {
   guardando.value = true
   try {
-    await descartarPlant(id, motivoDescarte.value)
+    const r = await conAvisoDeCierre((cerrar) => descartarPlant(id, motivoDescarte.value, cerrar))
+    if (!r) return
     showDescartar.value = false
     toast.success('Planta descartada')
     await cargar()

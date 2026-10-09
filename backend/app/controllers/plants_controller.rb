@@ -122,6 +122,16 @@ class PlantsController < ApplicationController
     if descartando && params[:motivo].to_s.strip.blank?
       return render json: { error: 'Indicá el motivo del descarte.' }, status: :unprocessable_entity
     end
+    # La última planta viva cierra el lote (`Lote#cerrar_sin_plantas!`): se avisa antes y hace falta
+    # confirmarlo. Y un lote ya cerrado no recupera plantas: revertir el descarte lo dejaría
+    # finalizado con una planta viva adentro.
+    if descartando && @plant.lote&.ultima_planta_viva?(@plant) && !confirma_cierre?
+      return render json: aviso_ultima_planta(@plant.lote, 'descartás'), status: :conflict
+    end
+    if old_state == 'descartada' && plant_params[:state].present? && plant_params[:state] != 'descartada' &&
+       @plant.lote&.estado == 'finalizado'
+      return render json: { error: 'El lote ya se cerró: esta planta no se puede recuperar.' }, status: :unprocessable_entity
+    end
 
     # El peso de una planta en manicura se registra SOLO por el flujo de pesaje
     # (registrar_peso, del manicura asignado), nunca por el "guardar" crudo del detalle:
@@ -167,6 +177,7 @@ class PlantsController < ApplicationController
           )
           # Una planta descartada deja de contar como planta viva del lote.
           @plant.lote.decrement!(:plants_count) if @plant.lote.plants_count.to_i > 0
+          @plant.lote.cerrar_sin_plantas!(usuario: current_user)
         elsif old_state == 'descartada' && @plant.state != 'descartada'
           @plant.update_column(:motivo_descarte, nil)   # revertir el descarte borra su motivo
           @plant.lote.increment!(:plants_count) # se revierte el descarte
@@ -187,8 +198,12 @@ class PlantsController < ApplicationController
     # Si ya estaba descartada, dejó de contar como viva → no restar de nuevo (evita el doble -1
     # cuando se descarta y después se elimina la misma planta).
     ya_descartada = @plant.state == 'descartada'
+    if lote&.ultima_planta_viva?(@plant) && !confirma_cierre?
+      return render json: aviso_ultima_planta(lote, 'eliminás'), status: :conflict
+    end
     @plant.soft_delete!
     lote.decrement!(:plants_count) if !ya_descartada && lote.plants_count.to_i > 0
+    lote.cerrar_sin_plantas!(usuario: current_user)
     finalizar_manicura_si_corresponde(lote)
     head :no_content
   end
@@ -321,6 +336,20 @@ class PlantsController < ApplicationController
             mia: pp.pesaje_manicura.manicurador_id == current_user.id }
   end
 
+
+  def confirma_cierre? = ActiveModel::Type::Boolean.new.cast(params[:cerrar_lote])
+
+  # 409 con lo que la pantalla muestra en el aviso; con `cerrar_lote: true` el mismo pedido sigue.
+  # En el autocultivo el lote no se nombra: son «las plantas de esta tanda».
+  def aviso_ultima_planta(lote, verbo)
+    cual = lote.genetica&.nombre
+    texto = if current_user.club&.personal?
+              "Es la última planta de esta tanda#{cual ? " de #{cual}" : ''}: si la #{verbo}, la tanda se cierra sin cosecha y deja de aparecer en tu cultivo."
+            else
+              "Es la última planta viva del lote #{lote.codigo}: si la #{verbo}, el lote se cierra sin cosecha y deja de aparecer en la sala. Queda en su historia y en el informe de pérdidas."
+            end
+    { codigo: 'ultima_planta', error: texto }
+  end
 
   # Tras borrar/descartar plantas de un lote en manicura, re-evaluar si ya se puede finalizar
   # (el flujo normal solo lo dispara al confirmar un pesaje). No-op si el lote no está en_manicura.

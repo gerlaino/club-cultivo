@@ -257,6 +257,10 @@ class Lote < ApplicationRecord
   scope :activos,     -> { where.not(estado: 'finalizado') }
   scope :en_ciclo,    -> { where(estado: CICLO_FASES + ['finalizado']) }
   scope :finalizados, -> { where(estado: 'finalizado') }
+  # Finalizados sin producir nada (se descartaron todas las plantas, en cultivo o en manicura):
+  # fuera de todo promedio de rendimiento, a la vista en el informe de pérdidas.
+  scope :cerrados_sin_cosecha, -> { where(estado: 'finalizado', rendimiento_real_g: 0) }
+  scope :con_cosecha,          -> { where('lotes.rendimiento_real_g > 0') }
   scope :por_sala,    ->(sala_id) { where(sala_id: sala_id) }
   scope :recientes,   -> { order(created_at: :desc) }
 
@@ -729,6 +733,40 @@ class Lote < ApplicationRecord
 
     update!(rendimiento_real_g: pesajes_manicura.confirmados.sum(:peso_confirmado_g).to_d)
   end
+
+  # UN LOTE EN CULTIVO QUE SE QUEDA SIN PLANTAS SE CIERRA (Germán, 9-oct-2026): descartó las tres
+  # semillas que no germinaron y el lote seguía en la lista, «Germinación · 0 plantas», para
+  # siempre. Lo dispara el descarte o el borrado de la última planta viva, y la pantalla avisa
+  # antes (`PlantsController`, `ultima_planta_viva?`). Queda `finalizado` con 0 g —como el lote de
+  # manicura al que se le descartó todo— y eso es lo que lo distingue de un ciclo cosechado: no
+  # entra en ningún promedio de rendimiento, pero se ve en el informe de pérdidas y en su historia.
+  #
+  # `plants_count` también tiene que llegar a cero: un lote viejo cargado sólo con el número (40
+  # plantas, una sola individualizada) no se cierra porque se descarte esa una.
+  def ultima_planta_viva?(plant)
+    CULTIVO_ESTADOS.include?(estado) && plant.state != 'descartada' && plants_count.to_i <= 1 &&
+      plants.where.not(state: 'descartada').where.not(id: plant.id).none?
+  end
+
+  def cerrar_sin_plantas!(usuario: nil)
+    return unless CULTIVO_ESTADOS.include?(estado) && plants_count.to_i.zero? &&
+                  Plant.unscoped.where(lote_id: id).exists? && plants.where.not(state: 'descartada').none?
+
+    anterior = estado
+    transaction do
+      update!(estado: 'finalizado', rendimiento_real_g: 0, sala_id: nil)
+      # Lo que quedaba programado para este lote (o sus plantas) ya no se va a hacer.
+      Tarea.activas.where(lote_id: id).or(Tarea.activas.where(plant_id: Plant.unscoped.where(lote_id: id).select(:id)))
+           .update_all(estado: 'cancelada', updated_at: Time.current)
+      lote_eventos.create!(
+        tipo: 'cambio_estado', estado_anterior: anterior, estado_nuevo: 'finalizado',
+        descripcion: 'Se descartaron todas las plantas — lote cerrado sin cosecha.',
+        user: usuario, club: club, registrado_en: Time.current,
+      )
+    end
+  end
+
+  def cerrado_sin_cosecha? = estado == 'finalizado' && rendimiento_real_g.present? && rendimiento_real_g.zero?
 
   def check_and_finalize_manicura!(finalizador: nil)
     return unless estado == 'en_manicura'

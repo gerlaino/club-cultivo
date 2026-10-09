@@ -471,7 +471,8 @@ class AnalyticsController < ApplicationController
 
     gramos_producidos = lotes_año.where.not(rendimiento_real_g: nil)
                                  .sum(:rendimiento_real_g).to_f.round(2)
-    ciclos_cerrados   = lotes_año.where(estado: 'finalizado').count
+    # Los cerrados sin cosecha (se descartaron todas las plantas) no son un ciclo que produjo.
+    ciclos_cerrados   = lotes_año.where(estado: 'finalizado').where.not(id: Lote.cerrados_sin_cosecha.select(:id)).count
 
     base_disps = Dispensacion.no_canceladas.joins(:stock)
                              .where(stocks: { club_id: club.id })

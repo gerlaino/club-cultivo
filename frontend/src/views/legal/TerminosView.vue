@@ -15,7 +15,7 @@
     <h2>1. Quiénes somos</h2>
     <p>
       Cultivo Espacial («la plataforma», «nosotros») es un software en internet para registrar y gestionar
-      cultivos de cannabis: el de una persona para su propio uso y el de organizaciones (asociaciones,
+      cultivos de cannabis: el de una persona para su propio uso autorizado y el de organizaciones (asociaciones,
       fundaciones, investigación y producción). Contacto: <a :href="`mailto:${TITULAR.mail}`">{{ TITULAR.mail }}</a>.
     </p>
 
@@ -81,7 +81,10 @@
         El permiso termina cuando borrás el contenido o te das de baja (salvo lo que la ley nos obligue a conservar).
       </li>
       <li>No vendemos tus datos ni los usamos para publicidad. Podemos usar información agregada y anonimizada, que no permita identificar a nadie, para mejorar la plataforma.</li>
-      <li>Sos responsable de tener derecho a subir lo que subís (por ejemplo, fotos donde aparezcan otras personas).</li>
+      <li>
+        Sos responsable de verificar que las publicaciones que realizás, incluidas aquellas en las que aparecen terceras
+        personas, cuenten con la debida autorización para su difusión, cuando esta resulte legalmente exigible.
+      </li>
       <li>Cómo tratamos los datos personales, y en particular los de salud, está en la <RouterLink to="/privacidad">Política de privacidad</RouterLink>.</li>
     </ul>
 
@@ -130,8 +133,9 @@
 
     <h2>13. Suspensión</h2>
     <p>
-      Podemos suspender o dar de baja una cuenta que incumpla estos términos o la ley, avisando antes cuando sea posible.
-      Mientras una cuenta está suspendida no se borran sus datos, y su titular puede pedir una copia.
+      No revisamos en forma permanente el uso de cada cuenta. En caso de detectarse o advertirse un uso
+      indebido —por nuestros propios medios o por requerimiento de una autoridad competente—, nos reservamos el
+      derecho de suspender o dar de baja la cuenta que incumpla estos términos o la ley, avisando antes cuando sea posible. Mientras una cuenta está suspendida no se borran sus datos, y su titular puede pedir una copia.
     </p>
 
     <h2>14. Cambios en estos términos</h2>

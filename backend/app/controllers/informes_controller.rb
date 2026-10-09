@@ -613,6 +613,14 @@ class InformesController < ApplicationController
           vacio: 'No se descartó ninguna planta en el período.',
         },
         {
+          titulo: 'Lotes que se cerraron sin cosecha',
+          headers: ['Cierre', 'Lote', 'Genética', 'Estaba en', 'Plantas', 'Costó'],
+          rows: pl[:lotes_cerrados].map { |l| [fmt_fecha(l[:fecha]), l[:codigo], l[:genetica] || '—', l[:estaba_en], l[:plantas], fmt_ars.call(l[:costo_ars])] },
+          aligns: { 4 => :right, 5 => :right },
+          col_min: { 0 => 68, 5 => 70 },
+          vacio: 'Ningún lote se cerró sin cosecha en el período.',
+        },
+        {
           titulo: 'Planta por planta',
           headers: ['Fecha', 'Lote', 'Planta', 'Genética', 'Motivo', 'Costó'],
           rows: pl[:lista].map { |p| [fmt_fecha(p[:fecha]) + (p[:fecha_estimada] ? ' (aprox.)' : ''), p[:lote], p[:nombre], p[:genetica] || '—', motivo_label.call(p[:motivo]), fmt_ars.call(p[:costo_ars])] },

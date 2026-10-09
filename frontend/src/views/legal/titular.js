@@ -10,4 +10,4 @@ export const TITULAR = {
   mail: 'cultivoespacial.arg@gmail.com',
 }
 
-export const VIGENCIA = '6 de octubre de 2026'
+export const VIGENCIA = '9 de octubre de 2026'
