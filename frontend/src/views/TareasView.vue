@@ -139,7 +139,7 @@
               <div class="sem__dia-num" :class="{ 'sem__dia-num--hoy': esDiaHoy(dia.fecha) }">
                 {{ new Date(dia.fecha + 'T00:00:00').getDate() }}
               </div>
-              <div class="sem__col-count" v-if="dia.tareas.length">{{ dia.tareas.length }}</div>
+              <div class="sem__col-count" v-if="dia.tareas.length + (dia.previstas?.length || 0)">{{ dia.tareas.length + (dia.previstas?.length || 0) }}</div>
             </div>
             <div class="sem__tareas">
               <div
@@ -165,6 +165,19 @@
                 <span v-if="t.asignada_a && !esPersonal" class="sem__asig" :title="t.asignada_a.nombre">
                   {{ t.asignada_a.nombre.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase() }}
                 </span>
+              </div>
+              <!-- Lo que un plan tiene programado y todavía no es tarea (se suma una semana antes):
+                   se ve, pero no se toca. -->
+              <div
+                v-for="p in (dia.previstas || [])"
+                :key="p.clave"
+                class="sem__tarea sem__tarea--prevista"
+                :title="`${p.origen_plan?.titulo ? 'Plan ' + p.origen_plan.titulo + ' · ' : ''}se suma a tus tareas el ${fechaCorta(p.aparece_el)}`"
+              >
+                <span class="sem__tarea-emoji">{{ TIPO_EMOJI[p.tipo] || '📋' }}</span>
+                <span class="sem__tarea-titulo">{{ p.titulo }}<small v-if="p.lote" class="sem__prevista-lote"> · {{ p.lote.codigo }}</small></span>
+                <span class="sem__plan-badge">Plan</span>
+                <small class="sem__prevista-cuando">se suma el {{ fechaCorta(p.aparece_el) }}</small>
               </div>
               <button class="sem__add" @click="nuevaTareaEnDia(dia.fecha)" title="Nueva tarea">
                 <i class="bi bi-plus"></i>
@@ -254,12 +267,10 @@
             </div>
 
             <div class="tv__panel-actions">
-              <button v-if="['pendiente','en_progreso'].includes(tareaDetalle.estado) && !esTareaFutura(tareaDetalle)" class="tv__panel-btn tv__panel-btn--primary" @click="abrirModalCompletar(tareaDetalle)">
+              <button v-if="['pendiente','en_progreso'].includes(tareaDetalle.estado)" class="tv__panel-btn tv__panel-btn--primary" @click="abrirModalCompletar(tareaDetalle)">
                 <i class="bi bi-check-circle"></i> Completar
               </button>
-              <p v-if="esTareaFutura(tareaDetalle) && ['pendiente','en_progreso'].includes(tareaDetalle.estado)" class="tv__futura-hint">
-                <i class="bi bi-calendar-event me-1"></i>Disponible el {{ tareaDetalle.fecha_programada }}
-              </p>
+              <!-- Una de más adelante también: el backend avisa y queda hecha hoy (9-oct-2026). -->
               <button v-if="puedeEditarTarea(tareaDetalle)" class="tv__panel-btn tv__panel-btn--ghost" @click="abrirModalEditar(tareaDetalle)">
                 <i class="bi bi-pencil"></i> Editar
               </button>
@@ -378,6 +389,7 @@ const semana       = ref({ desde: null, hasta: null, dias: [] })
 const loadingSem   = ref(false)
 
 // ISO local de un Date (ver hoyLocal: toISOString desfasa el día por UTC)
+const fechaCorta = (iso) => iso ? `${+iso.slice(8, 10)}/${+iso.slice(5, 7)}` : ''
 function isoLocal(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }
@@ -527,7 +539,7 @@ async function completarUna(t) {
   if (enCurso.value.has(t.id)) return
   enCurso.value.add(t.id)
   try {
-    await tareasStore.completar(t.id, null)
+    if (!await tareasStore.completar(t.id, null)) return
     seleccion.value.delete(t.id)
     toast.success('Tarea completada ✓')
     cargarSemana()
@@ -552,6 +564,7 @@ async function completarSeleccionadas() {
   bulkEnCurso.value = true
   try {
     const n = await tareasStore.completarMasivo(ids)
+    if (n === null) return
     limpiarSeleccion()
     toast.success(`${n} ${n === 1 ? 'tarea completada' : 'tareas completadas'} ✓`)
     cargarSemana()
@@ -646,11 +659,6 @@ function puedeEditarTarea(t) {
   return ['admin', 'cultivador', 'supervisor'].includes(u?.role)
 }
 
-function esTareaFutura(t) {
-  if (!t?.fecha_programada) return false
-  const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
-  return new Date(t.fecha_programada + 'T00:00:00') > hoy
-}
 
 function mostrarToast(mensaje, tipo = 'success') {
   if (tipo === 'error') toast.error(mensaje)
@@ -808,7 +816,6 @@ function mostrarToast(mensaje, tipo = 'success') {
 .tv__panel-hint { background: #fffbeb; border: 1px solid #fde68a; color: #78350f; padding: .75rem 1rem; border-radius: 9px; font-size: .82rem; display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
 .tv__estado-pill { font-size: .7rem; font-weight: 700; padding: .2em .65em; border-radius: 6px; text-transform: capitalize; }
 .tv__panel-actions { display: flex; flex-direction: column; gap: .5rem; padding-top: .5rem; }
-.tv__futura-hint { display: flex; align-items: center; gap: .4rem; font-size: .8rem; color: var(--c-slate-500); background: var(--c-slate-50); border: 1px solid var(--c-slate-200); border-radius: 8px; padding: .55rem .875rem; margin: 0; }
 .tv__panel-btn { display: flex; align-items: center; justify-content: center; gap: .5rem; padding: .65rem; border-radius: 9px; font-size: .875rem; font-weight: 600; cursor: pointer; border: none; transition: all .15s; }
 .tv__panel-btn--primary { background: #1b5e20; color: #fff; }
 .tv__panel-btn--primary:hover { background: #144a18; }
@@ -844,6 +851,10 @@ function mostrarToast(mensaje, tipo = 'success') {
 .sem__tareas { flex: 1; padding: .4rem; display: flex; flex-direction: column; gap: .3rem; }
 .sem__tarea { display: flex; align-items: center; gap: .3rem; padding: .35rem .45rem; border-radius: 6px; border-left: 3px solid var(--c-slate-200); background: var(--c-slate-50); cursor: pointer; font-size: .72rem; transition: opacity .12s; }
 .sem__tarea:hover { opacity: .8; }
+.sem__tarea--prevista { background: transparent; border: 1.5px dashed var(--c-slate-300); color: var(--c-slate-600); cursor: default; flex-wrap: wrap; }
+.sem__tarea--prevista:hover { opacity: 1; }
+.sem__prevista-lote { color: var(--c-slate-500); font-weight: 500; }
+.sem__prevista-cuando { flex-basis: 100%; font-size: .68rem; color: var(--c-slate-500); }
 .sem__tarea--urgente { border-left-color: #dc2626; }
 .sem__tarea--alta    { border-left-color: #f97316; }
 .sem__tarea--normal  { border-left-color: #3b82f6; }

@@ -142,6 +142,7 @@ async function confirmar() {
       notas.value  || null,
       extra
     )
+    if (!resultado) return
     emit('completada', resultado)
   } catch (e) {
     error.value = e.response?.data?.error || 'Error al completar la tarea'

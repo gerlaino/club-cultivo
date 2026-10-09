@@ -80,11 +80,13 @@
         </div>
         <!-- Lo de hoy se resuelve desde la tarjeta, con el pulgar (7-oct-2026): «Hecho» la cierra al
              toque; tocar la tarjeta abre la hoja para anotar horas o una nota. -->
-        <div v-if="!cerrada(t) && !esFutura(t) && !modoSeleccion" class="mta__acciones" @click.stop>
+        <!-- Una de más adelante también se puede dar por hecha: avisa y queda hecha hoy (9-oct-2026).
+             «No se hizo» no: todavía no llegó su día. -->
+        <div v-if="!cerrada(t) && !modoSeleccion" class="mta__acciones" @click.stop>
           <button class="mta__btn-hecho" :disabled="rapida === t.id" @click="hechoRapido(t)">
             <i v-if="rapida === t.id" class="bi bi-hourglass"></i><template v-else>Hecho</template>
           </button>
-          <button class="mta__btn-nohecho" :disabled="rapida === t.id" @click="noSeHizoRapido(t)">No se hizo</button>
+          <button v-if="!esFutura(t)" class="mta__btn-nohecho" :disabled="rapida === t.id" @click="noSeHizoRapido(t)">No se hizo</button>
         </div>
         <i v-else-if="t.estado === 'completada'" class="bi bi-check2-all mta__done-icon"></i>
         <i v-else-if="t.estado === 'no_realizada'" class="bi bi-x-lg mta__lock-icon"></i>
@@ -244,7 +246,7 @@ const modoSeleccion = ref(false)
 const seleccionadas = ref(new Set())
 const bulkEnCurso   = ref(false)
 
-const completable = (t) => !tareaCerrada(t) && !esFutura(t)
+const completable = (t) => !tareaCerrada(t)
 const completablesDelDia = computed(() => tareasDelDia.value.filter(completable))
 const hayCompletables    = computed(() => completablesDelDia.value.length > 1)
 
@@ -271,6 +273,7 @@ async function completarSeleccionadas() {
   bulkEnCurso.value = true
   try {
     const n = await tareasStore.completarMasivo(Array.from(seleccionadas.value))
+    if (n === null) return
     modoSeleccion.value = false
     seleccionadas.value = new Set()
     toast.success(`${n} ${n === 1 ? 'tarea completada' : 'tareas completadas'} ✓`)
@@ -303,7 +306,6 @@ const completarForm  = ref({ horas_reales: null, notas_completado: '' })
 
 function abrirCompletarSheet(t) {
   if (cerrada(t)) return
-  if (esFutura(t)) return   // no se completan tareas futuras
   tareaActiva.value    = t
   completarForm.value  = { horas_reales: null, notas_completado: '' }
   completarError.value = null
@@ -314,11 +316,12 @@ async function confirmarCompletar() {
   completando.value    = true
   completarError.value = null
   try {
-    await tareasStore.completar(
+    const hecha = await tareasStore.completar(
       tareaActiva.value.id,
       completarForm.value.horas_reales || undefined,
       completarForm.value.notas_completado || '',
     )
+    if (!hecha) return
     // Actualizar optimisticamente en semana.dias
     const diaData = diasProcesados.value.find(x => x.fecha === diaSeleccionado.value)
     if (diaData) {
@@ -355,7 +358,7 @@ function marcarEnDia(id, estado) {
 async function hechoRapido(t) {
   rapida.value = t.id
   try {
-    await tareasStore.completar(t.id, undefined, '')
+    if (!await tareasStore.completar(t.id, undefined, '')) return
     marcarEnDia(t.id, 'completada')
   } catch (e) {
     toast.error(e?.response?.data?.error || 'No se pudo completar la tarea')

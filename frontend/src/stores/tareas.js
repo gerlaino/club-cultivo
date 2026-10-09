@@ -2,6 +2,7 @@
 import { hoyISO } from '../utils/dates.js'
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
+import { useTareaFutura } from '../composables/useTareaFutura.js'
 import {
   listTareas,
   getTareasDashboard,
@@ -19,6 +20,7 @@ import {
 } from '../lib/api'
 
 export const useTareasStore = defineStore('tareas', () => {
+  const conAvisoFutura = useTareaFutura()
   // ── State ──────────────────────────────────────────────────────
   const tareas      = ref([])
   const dashboard   = ref({ hoy: [], pendientes: [], vencidas: [], proximas: [], stats: {} })
@@ -109,8 +111,12 @@ export const useTareasStore = defineStore('tareas', () => {
     return actualizada
   }
 
+  // Una de más adelante pide confirmación (`useTareaFutura`): si se cancela devuelve null y no
+  // toca nada; quien llama no tiene que decir «hecha».
   async function completar(id, horas_reales, notas_completado = '', extra = {}) {
-    const res  = await completarTarea(id, { horas_reales, notas_completado, ...extra })
+    const res  = await conAvisoFutura((adelantar) =>
+      completarTarea(id, { horas_reales, notas_completado, ...extra, ...(adelantar ? { adelantar: true } : {}) }))
+    if (!res) return null
     const { tarea: actualizada, tiene_horas_para_lote } = res.data
     const estabaPendiente = pendientes.value.some(t => t.id === id)
     _reemplazarEnDashboard(id, actualizada)
@@ -124,7 +130,8 @@ export const useTareasStore = defineStore('tareas', () => {
   // Cierra varias de un saque (sin horas ni notas) — para el listado de pendientes.
   // El backend ignora las que ya no estén pendiente/en_progreso.
   async function completarMasivo(ids) {
-    const res = await completarTareasMasivo(ids)
+    const res = await conAvisoFutura((adelantar) => completarTareasMasivo(ids, adelantar))
+    if (!res) return null
     ids.forEach(id => _eliminarDeDashboard(id))
     const n = res.data?.completadas || 0
     dashboard.value.stats.pendientes      = Math.max(0, (dashboard.value.stats.pendientes || 0) - n)

@@ -737,7 +737,8 @@ export const updateTarea       = (id, payload)  => api.patch(`/tareas/${id}`, { 
 export const deleteTarea       = (id)           => api.delete(`/tareas/${id}`)
 export const iniciarTarea      = (id)           => api.post(`/tareas/${id}/iniciar`)
 export const completarTarea    = (id, data)     => api.post(`/tareas/${id}/completar`, data)
-export const completarTareasMasivo = (ids)      => api.post('/tareas/completar_masivo', { ids })
+// `adelantar`: la confirmación de que alguna es para más adelante y queda hecha hoy (`useTareaFutura`).
+export const completarTareasMasivo = (ids, adelantar = false) => api.post('/tareas/completar_masivo', { ids, ...(adelantar ? { adelantar: true } : {}) })
 export const cancelarTarea     = (id)           => api.post(`/tareas/${id}/cancelar`)
 // «No se hizo»: el par de completar, con un motivo opcional.
 export const noRealizadaTarea  = (id, motivo)   => api.post(`/tareas/${id}/no_realizada`, { motivo })

@@ -635,7 +635,7 @@ async function finalizarTarea() {
   if (!tareaDetalle.value) return
   guardandoAccion.value = true
   try {
-    await tareasStore.completar(tareaDetalle.value.id, null, '')
+    if (!await tareasStore.completar(tareaDetalle.value.id, null, '')) return
     await cargarSemana()
     tareaDetalle.value = null
     toast.success('Tarea finalizada')

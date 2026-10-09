@@ -338,6 +338,18 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 
 ### Lo que NO hay que romper
 
+- **UNA TAREA DE MÁS ADELANTE SE PUEDE DAR POR HECHA, CON AVISO, Y QUEDA HECHA HOY** (9-oct-2026,
+  reemplaza «el calendario no se adelanta»). `completar` y `completar_masivo` responden 409
+  `tarea_futura` con la fecha; con `adelantar: true` la cierran con `fecha_completada` de hoy y la
+  nota «Hecha antes de tiempo: era para el …». `fecha_programada` NO se toca: es la clave con la que
+  `Planes::Materializar` reconoce sus tareas, y moverla haría que el plan la volviera a crear. El
+  calendario pone cada tarea hecha el día en que se hizo. «No se hizo» sigue sin ofrecerse para una
+  futura. En pantalla, el store de tareas (`useTareaFutura`) avisa por todas.
+- **EL CALENDARIO MUESTRA LO PREVISTO DE LOS PLANES** (9-oct-2026). Las tareas de un plan se crean una
+  semana antes de su día, pero la semana del calendario muestra también lo que el plan ya tiene
+  programado (`previstas`, de `Planes::Materializar.pendientes`: las mismas reglas que lo que se va a
+  crear), punteado y sin acciones. Nunca las dos: cuando se crea la tarea deja de ser prevista. Las
+  listas («Para hoy») no cambian. Al aplicar un plan a un lote cuenta desde el inicio del lote.
 - **LA ÚLTIMA PLANTA VIVA CIERRA EL LOTE, CON AVISO** (9-oct-2026). Descartar o eliminar la
   última planta de un lote en cultivo (enraizado/vegetativo/floración) responde 409
   `ultima_planta` con el texto del aviso; con `cerrar_lote: true` sigue y `Lote#cerrar_sin_plantas!`

@@ -71,7 +71,7 @@
                     <th>Tipo</th>
                     <th>Prioridad</th>
                     <th v-if="!esPersonal">Responsable</th>
-                    <th>Aparece</th>
+                    <th>Se suma a tus tareas</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -81,7 +81,7 @@
                     <td><span class="apm__tipo">{{ TIPO_LABELS[t.tipo] || t.tipo }}</span></td>
                     <td><span class="apm__pri" :class="`apm__pri--${t.prioridad}`">{{ t.prioridad }}</span></td>
                     <td v-if="!esPersonal" class="apm__td-resp">{{ t.responsable || '—' }}</td>
-                    <td class="apm__td-date">{{ t.en_el_pasado ? 'no se crea' : (t.aparece_el === hoy ? 'ya' : formatDate(t.aparece_el)) }}</td>
+                    <td class="apm__td-cuando">{{ t.en_el_pasado ? 'ya pasó: no se crea' : (t.aparece_el === hoy ? 'ya' : `el ${formatDate(t.aparece_el)}`) }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -324,4 +324,5 @@ function formatDate(iso) {
 }
 .apm__btn-primary:hover:not(:disabled) { background: #166534; }
 .apm__btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+.apm__td-cuando { font-size: .75rem; color: var(--c-slate-500); white-space: nowrap; }
 </style>

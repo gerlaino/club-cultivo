@@ -65,13 +65,13 @@ RSpec.describe 'POST /tareas/completar_masivo', type: :request do
       expect(JSON.parse(response.body)['error']).to match(/otra persona|cerradas/i)
     end
 
-    # La regla de las tareas futuras no cambia: no se adelanta el calendario.
-    it 'no puede completar una tarea programada para mañana' do
+    # Una de mañana pide confirmación también para él (9-oct-2026: se puede adelantar, con aviso).
+    it 'una tarea programada para mañana pide confirmación antes de cerrarla' do
       futura = tarea_para(manicurador, fecha: Time.zone.tomorrow)
 
       completar(futura.id)
 
-      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response).to have_http_status(:conflict)
       expect(futura.reload.estado).to eq('pendiente')
     end
   end

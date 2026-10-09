@@ -1,5 +1,21 @@
 # Changelog
 
+## Octubre 2026 (eo) — Planes en el calendario y tareas adelantadas (9-oct)
+
+Germán aplicó un plan y buscaba la poda el 16/10: era del 23/10, y el 16 era el día en que «aparece».
+- **El calendario muestra lo previsto de los planes** (punteado, «se suma el 16/10», sin acciones):
+  `Planes::Materializar.pendientes` con las mismas reglas que lo que crea; cuando la tarea se crea,
+  deja de ser prevista. Spec `tareas_semana_previstas_spec.rb`.
+- **Al aplicar un plan**, la fecha de cada tarea es lo principal y lo otro dice «se suma a tus
+  tareas el …»; elegido un lote, el plan cuenta desde su inicio (semana 3 del plan = semana 3 del
+  lote).
+- **Una tarea de más adelante se puede dar por hecha con aviso** («Es para el vie 23/10. Si la marcás
+  como hecha, queda hecha hoy…»): 409 `tarea_futura` + `adelantar`, en completar y en tanda. Queda
+  con la fecha de hoy y la nota «Hecha antes de tiempo»; el calendario la muestra el día en que se
+  hizo. «No se hizo» sigue sin ofrecerse para una futura. Lo usan todas las pantallas por el store
+  (`useTareaFutura`, sobre el genérico `useAvisoConfirmable`, que ahora también usa `useUltimaPlanta`).
+  `tareas_futuras_spec.rb` reescrito contra el AC nuevo.
+
 ## Octubre 2026 (en) — La última planta cierra el lote; Términos ajustados (9-oct)
 
 - **Lote sin plantas**: Germán descartó las tres semillas que no germinaron y L-26-001 quedó

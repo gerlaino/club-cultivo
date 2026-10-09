@@ -1,16 +1,14 @@
 class TareasController < ApplicationController
   PENDIENTES_LIMIT = 100
 
-  # El calendario no se adelanta. Si el trabajo se hizo antes de lo programado, se registra como
-  # lo que fue —una tarea hecha HOY— y la programada se cancela cuando llegue su día, con la
-  # observación. Así la fecha de cada registro sigue siendo la fecha real en que se trabajó.
+  # UNA TAREA DE MÁS ADELANTE SE PUEDE DAR POR HECHA, CON AVISO (9-oct-2026, Germán; antes se
+  # rechazaba). Queda hecha HOY: `fecha_completada` es la de hoy y el calendario la muestra el día
+  # en que se hizo, no el programado. `fecha_programada` no se toca a propósito: es la clave con la
+  # que el plan reconoce sus tareas, y moverla haría que el plan la volviera a crear ese día.
   #
   # Vive en el backend y no sólo en la UI porque hay varias pantallas que completan tareas
-  # (la semana del teléfono, el listado de escritorio, el bloque de tareas del lote) y cada una
-  # traía su propio criterio: la del lote dejaba marcar una futura tocándola a mano.
-  MSG_TAREA_FUTURA = 'Esa tarea está programada para más adelante y todavía no se puede dar por ' \
-                     'hecha. Si el trabajo ya se hizo, cargá una tarea de hoy describiéndolo y ' \
-                     'cancelá la programada cuando llegue su día.'.freeze
+  # (la semana del teléfono, el listado de escritorio, el bloque de tareas del lote): sin
+  # `adelantar` contesta 409 `tarea_futura` con el aviso escrito, y la pantalla lo muestra.
 
   # Cómo se dice en pantalla que una tarea ya se cerró (antes salía el estado crudo: «ya está no
   # realizada»).
@@ -170,12 +168,14 @@ class TareasController < ApplicationController
       return render json: { error: "No se puede completar una tarea #{@tarea.estado}" }, status: :unprocessable_entity
     end
 
-    if @tarea.programada_a_futuro?
-      return render json: { error: MSG_TAREA_FUTURA }, status: :unprocessable_entity
+    adelantada = @tarea.programada_a_futuro?
+    if adelantada && !adelanta?
+      return render json: aviso_adelantar([@tarea]), status: :conflict
     end
 
     horas = params[:horas_reales]&.to_f
     notas = params[:notas_completado]
+    notas = [nota_adelantada(@tarea), notas.presence].compact.join("\n") if adelantada
 
     @tarea.completar!(horas_reales: horas, notas: notas)
 
@@ -222,11 +222,11 @@ class TareasController < ApplicationController
       return render json: { error: 'Seleccioná al menos una tarea' }, status: :unprocessable_entity
     end
 
-    # Una tarea de mañana no se completa hoy — ni de a una ni en tanda. El registro retroactivo
-    # es para ponerse al día con lo atrasado, no para adelantar el calendario.
+    # Las de más adelante, igual que de a una: con aviso, y quedan hechas hoy.
     seleccionadas = @club.tareas.where(id: ids, estado: %w[pendiente en_progreso])
-    if seleccionadas.where('fecha_programada > ?', Time.zone.today).exists?
-      return render json: { error: MSG_TAREA_FUTURA }, status: :unprocessable_entity
+    futuras = seleccionadas.where('fecha_programada > ?', Time.zone.today)
+    if futuras.exists? && !adelanta?
+      return render json: aviso_adelantar(futuras.to_a), status: :conflict
     end
 
     # Quien no gestiona tareas sólo cierra las SUYAS. Esto es un `update_all`: sin el filtro, un
@@ -236,8 +236,10 @@ class TareasController < ApplicationController
     end
 
     ahora = Time.current
+    adelantadas = futuras.to_a
     completadas = seleccionadas
       .update_all(estado: 'completada', fecha_completada: ahora, updated_at: ahora)
+    adelantadas.each { |t| t.update_column(:notas_completado, nota_adelantada(t)) }
 
     # Cero completadas con tareas pedidas no es un éxito silencioso: o ya estaban cerradas o son
     # de otra persona. Sin este mensaje el botón parece no hacer nada.
@@ -280,17 +282,26 @@ class TareasController < ApplicationController
       @club.tareas.asignadas_a(current_user.id)
     end
 
-    tareas = base.where(fecha_programada: desde..hasta)
-                 .where.not(estado: %w[cancelada])
+    # Cada tarea va el día en que PASÓ: la hecha, el día en que se hizo (una adelantada no queda
+    # en su fecha futura, ni una atrasada en el día que se venció); el resto, el programado.
+    hecha = "tareas.estado = 'completada' AND tareas.fecha_completada IS NOT NULL"
+    tareas = base.where.not(estado: %w[cancelada])
+                 .where("(#{hecha} AND tareas.fecha_completada BETWEEN :t0 AND :t1) OR " \
+                        "(NOT (#{hecha}) AND tareas.fecha_programada BETWEEN :d0 AND :d1)",
+                        t0: desde.in_time_zone.beginning_of_day, t1: hasta.in_time_zone.end_of_day,
+                        d0: desde, d1: hasta)
                  .includes(:asignada_a, :sala, :lote, :origen_plan)
-                 .order(:fecha_programada, :prioridad)
+                 .order(:fecha_programada, :prioridad).to_a
+    dia_de = ->(t) { t.completada? && t.fecha_completada ? t.fecha_completada.in_time_zone.to_date : t.fecha_programada }
+    previstas = previstas_de_planes(desde, hasta)
 
     dias = (0..6).map do |offset|
       dia = desde + offset
       {
         fecha:      dia,
         dia_semana: I18n.l(dia, format: '%A').capitalize,
-        tareas:     tareas.select { |t| t.fecha_programada == dia }.map { |t| serialize_tarea(t) }
+        tareas:     tareas.select { |t| dia_de.(t) == dia }.map { |t| serialize_tarea(t) },
+        previstas:  previstas.select { |p| p[:fecha_programada] == dia },
       }
     end
 
@@ -308,6 +319,47 @@ class TareasController < ApplicationController
   end
 
   private
+
+  def adelanta? = ActiveModel::Type::Boolean.new.cast(params[:adelantar])
+
+  def fecha_corta(fecha) = I18n.l(fecha, format: '%a %-d/%-m')
+
+  def aviso_adelantar(futuras)
+    hoy = fecha_corta(Time.zone.today)
+    texto = if futuras.size == 1
+              "Esta tarea es para el #{fecha_corta(futuras.first.fecha_programada)}. Si la marcás como hecha, " \
+                "queda hecha hoy (#{hoy}) y deja de figurar en su fecha."
+            else
+              "#{futuras.size} de las tareas elegidas son para más adelante. Si las marcás como hechas, " \
+                "quedan hechas hoy (#{hoy}) y dejan de figurar en su fecha."
+            end
+    { codigo: 'tarea_futura', error: texto }
+  end
+
+  def nota_adelantada(t) = "Hecha antes de tiempo: era para el #{fecha_corta(t.fecha_programada)}."
+
+  # Lo que los planes tienen programado en la semana y todavía no es una tarea (se crea una semana
+  # antes de su día): el calendario lo muestra como previsto, sin acciones. Quien no gestiona
+  # tareas ve sólo lo que le va a tocar a él.
+  def previstas_de_planes(desde, hasta)
+    return [] if hasta <= Time.zone.today
+
+    @club.aplicacion_planes.activos.includes(:plan_trabajo).flat_map do |a|
+      Planes::Materializar.pendientes(a, desde: desde, hasta: hasta).filter_map do |oc|
+        next if !(current_user.admin? || current_user.super_admin?) && oc.asignada&.id != current_user.id
+
+        obj = a.objetivo
+        { clave: "#{a.id}-#{oc.plan_tarea.id}-#{oc.fecha}-#{oc.asignada&.id}", prevista: true,
+          titulo: oc.plan_tarea.titulo.presence || oc.plan_tarea.tipo.humanize, tipo: oc.plan_tarea.tipo,
+          prioridad: oc.plan_tarea.prioridad, fecha_programada: oc.fecha,
+          aparece_el: Planes::Materializar.aparece_el(oc.fecha),
+          asignada_a: oc.asignada ? { id: oc.asignada.id, nombre: oc.asignada.nombre_completo } : nil,
+          lote: obj.is_a?(Lote) ? { id: obj.id, codigo: obj.codigo } : nil,
+          sala: obj.is_a?(Sala) ? { id: obj.id, nombre: obj.nombre } : nil,
+          origen_plan: { id: a.plan_trabajo_id, titulo: a.plan_trabajo&.titulo } }
+      end
+    end.sort_by { |p| [p[:fecha_programada], p[:titulo]] }
+  end
 
   def set_club
     @club = current_user.club

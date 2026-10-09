@@ -211,7 +211,7 @@ async function noSeHizo(t) {
 async function completar(t) {
   completando.value = t.id
   try {
-    await tareas.completar(t.id, null, '')
+    if (!await tareas.completar(t.id, null, '')) return
     await tareas.fetchDashboard()
     toast.success('Hecha ✓')
   } catch (e) {

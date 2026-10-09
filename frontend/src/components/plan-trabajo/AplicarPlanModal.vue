@@ -91,7 +91,19 @@ const porSemana = computed(() => {
   }
   return [...grupos.entries()].sort((a, b) => a[0] - b[0]).map(([semana, tareas]) => ({ semana, tareas }))
 })
+// La fecha de la tarea es lo principal; cuándo se suma a las listas va chico y dicho entero («aparece
+// el 16/10» al lado de una tarea del 23 se leía como su fecha, 9-oct-2026).
+const cuandoSeSuma = (t) => t.en_el_pasado ? 'ya pasó: no se crea'
+  : t.aparece_el === isoHoy() ? 'ya está en tus tareas' : `se suma a tus tareas el ${formatFecha(t.aparece_el)}`
 const diaCorto = (iso) => new Date(iso + 'T00:00:00').toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'numeric' })
+
+// Las semanas del plan son las del ciclo del lote: al elegir un lote, el plan cuenta desde su inicio
+// (lo que ya pasó no se crea). Elegir otra fecha a mano sigue pudiéndose.
+watch(objetivoId, (id) => {
+  if (objetivoTipo.value !== 'Lote' || !id) return
+  const inicio = lotes.value.find(l => l.id === id)?.start_date
+  if (inicio) fechaInicio.value = String(inicio).slice(0, 10)
+})
 
 async function cargarLotes() {
   const { data } = await listLotes()
@@ -255,12 +267,13 @@ async function aplicar() {
                   <span v-if="t.titulo" class="apm__preview-subtitulo"> — {{ t.titulo }}</span>
                 </div>
                 <div v-if="t.responsable && !esPersonal" class="apm__preview-rol">{{ t.responsable }}</div>
-                <div class="apm__preview-rol">{{ t.en_el_pasado ? 'no se crea' : (t.aparece_el === isoHoy() ? 'ya' : `aparece el ${formatFecha(t.aparece_el)}`) }}</div>
+                <div class="apm__preview-cuando">{{ cuandoSeSuma(t) }}</div>
               </div>
               </template>
             </div>
             <p v-if="tareasPreview.length" class="apm__preview-nota">
-              Cada tarea aparece en tus tareas {{ preview?.ventana_dias || 7 }} días antes de su fecha.
+              La fecha de la izquierda es el día de cada tarea. Se suma a tus tareas
+              {{ preview?.ventana_dias || 7 }} días antes, y en el calendario se ve desde ya.
               <template v-if="preview?.en_el_pasado">{{ preview.en_el_pasado }} quedan antes de hoy y no se crean.</template>
             </p>
           </aside>
@@ -301,6 +314,7 @@ async function aplicar() {
 }
 .apm__preview-nota { margin: .6rem 0 0; font-size: .78rem; color: var(--c-slate-500); }
 .apm__preview-row--pasada { opacity: .45; }
+.apm__preview-cuando { flex-shrink: 0; font-size: .7rem; color: var(--c-slate-500); text-align: right; max-width: 9.5rem; line-height: 1.25; }
 .apm__overlay { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 1060; padding: 1rem; backdrop-filter: blur(3px); }
 .apm__panel   { background: #fff; border-radius: 16px; width: 100%; max-width: 1000px; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 64px rgba(0,0,0,.15); max-height: 92vh; }
 

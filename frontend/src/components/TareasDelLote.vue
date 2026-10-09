@@ -151,7 +151,7 @@
           </div>
           <div class="tl__modal-footer">
             <button class="tl__btn-ghost" @click="tareaCompletando = null">Cancelar</button>
-            <button class="tl__btn-ghost" @click="noSeHizoCompletando" :disabled="guardando">
+            <button v-if="esAlDia(tareaCompletando)" class="tl__btn-ghost" @click="noSeHizoCompletando" :disabled="guardando">
               <i class="bi bi-x-circle"></i> No se hizo
             </button>
             <button class="tl__btn-success" @click="confirmarCompletar" :disabled="guardando">
@@ -266,6 +266,7 @@ import { listTareas, updateTarea, createRegistroAmbiental, createLoteEvento, com
 import { useTareasStore } from '../stores/tareas'
 import { useToast } from '../composables/useToast.js'
 import { useConfirm } from '../composables/useConfirm.js'
+import { useTareaFutura } from '../composables/useTareaFutura.js'
 // `toISO` arma la fecha con los componentes LOCALES (ver utils/dates). Acá había quedado una
 // función local del mismo nombre que se llamaba a sí misma: la ficha de todo lote explotaba
 // con «Maximum call stack size exceeded» apenas montaba la solapa de tareas.
@@ -282,6 +283,7 @@ const props = defineProps({
 const emit = defineEmits(['tarea-completada', 'horas-aplicadas'])
 const toast = useToast()
 const confirm = useConfirm()
+const conAvisoFutura = useTareaFutura()
 
 // ── Plan ──────────────────────────────────────────────────
 const showAplicarPlan = ref(false)
@@ -329,14 +331,13 @@ const modoSeleccion = ref(false)
 const seleccion     = ref([])          // ids de tareas seleccionadas
 const aplicandoBulk = ref(false)
 
-// Una tarea programada para más adelante no se puede dar por hecha — mismo criterio que la
-// semana del teléfono y que el backend, que ahora lo rechaza. Antes esto sólo excluía las
-// futuras de "seleccionar todas" y dejaba marcarlas tocándolas de a una, que era la puerta por
-// la que se colaban. Sin fecha NO es futura: esas se completan cualquier día.
+// Una de más adelante también se puede dar por hecha (9-oct-2026): el backend avisa y queda hecha
+// hoy. «Seleccionar todas» sigue siendo para ponerse al día: deja afuera las futuras, que se
+// eligen a mano.
 function esSeleccionable(t) {
-  if (!['pendiente', 'en_progreso'].includes(t.estado)) return false
-  return !t.fecha_programada || t.fecha_programada <= hoyISO
+  return ['pendiente', 'en_progreso'].includes(t.estado)
 }
+const esAlDia = (t) => !t.fecha_programada || t.fecha_programada <= hoyISO
 function isSel(id) {
   return seleccion.value.includes(id)
 }
@@ -359,15 +360,17 @@ function salirSeleccion() {
   seleccion.value = []
 }
 function seleccionarTodasPendientes() {
-  // Registro retroactivo: para ponerse al día con lo atrasado. `esSeleccionable` ya deja
+  // Registro retroactivo: para ponerse al día con lo atrasado. `esAlDia` deja
   // afuera las futuras.
-  seleccion.value = tareas.value.filter(esSeleccionable).map(t => t.id)
+  seleccion.value = tareas.value.filter(t => esSeleccionable(t) && esAlDia(t)).map(t => t.id)
 }
 async function marcarRealizadas() {
   if (!seleccion.value.length) return
   aplicandoBulk.value = true
   try {
-    const { data } = await completarTareasMasivo(seleccion.value)
+    const res = await conAvisoFutura((adelantar) => completarTareasMasivo(seleccion.value, adelantar))
+    if (!res) return
+    const { data } = res
     toast.success(`${data.completadas} tarea${data.completadas !== 1 ? 's' : ''} marcada${data.completadas !== 1 ? 's' : ''} como realizada${data.completadas !== 1 ? 's' : ''}`)
     salirSeleccion()
     await cargarTareas()
@@ -542,7 +545,7 @@ async function confirmarCompletar() {
     if (tareaCompletando.value.estado === 'pendiente') {
       await tareasStore.iniciar(tareaCompletando.value.id)
     }
-    await tareasStore.completar(tareaCompletando.value.id, horasForm.value, notasForm.value)
+    if (!await tareasStore.completar(tareaCompletando.value.id, horasForm.value, notasForm.value)) return
     const found = tareas.value.find(x => x.id === tareaCompletando.value.id)
     if (found) found.estado = 'completada'
     emit('tarea-completada', tareaCompletando.value)
@@ -566,7 +569,7 @@ async function confirmarRegistroLote() {
       })
       props.lote.estado = registroForm.value.nuevo_estado
     }
-    await tareasStore.completar(tareaCompletando.value.id, horasForm.value, registroForm.value.observaciones)
+    if (!await tareasStore.completar(tareaCompletando.value.id, horasForm.value, registroForm.value.observaciones)) return
     const found = tareas.value.find(x => x.id === tareaCompletando.value.id)
     if (found) found.estado = 'completada'
     emit('tarea-completada', tareaCompletando.value)

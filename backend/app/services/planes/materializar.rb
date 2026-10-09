@@ -24,17 +24,29 @@ module Planes
       @hoy        = hoy
     end
 
-    def call
-      return [] unless @aplicacion.estado == 'activo'
+    # Lo que el plan tiene programado y TODAVÍA NO es una tarea, entre dos fechas: el calendario lo
+    # muestra como previsto (9-oct-2026, Germán: miraba la semana del 23 y estaba vacía aunque el
+    # plan ya sabía que ese viernes tocaba poda). Las mismas reglas que `call`: lo que `call` va a
+    # crear cuando entre en la ventana es exactamente lo que esto devuelve.
+    def self.pendientes(aplicacion, desde:, hasta:, hoy: Time.zone.today)
+      m = new(aplicacion, hoy)
+      objetivo = m.send(:objetivo_vigente)
+      return [] unless objetivo
 
-      objetivo = @aplicacion.objetivo
-      return [] if @aplicacion.objetivo_tipo.present? && objetivo.nil? # el lote o la sala ya no está
-      return [] if objetivo.is_a?(Lote) && LOTE_TERMINADO.include?(objetivo.estado)
+      ya = m.send(:ya_creadas)
+      m.send(:calendario, objetivo).ocurrencias.select do |oc|
+        oc.fecha >= desde && oc.fecha <= hasta && oc.fecha >= m.send(:desde) &&
+          !ya.include?([oc.plan_tarea.id, oc.fecha, oc.asignada&.id])
+      end
+    end
+
+    def call
+      objetivo = objetivo_vigente
+      return [] unless objetivo
 
       creadas = []
       @aplicacion.with_lock do
-        ya = Tarea.with_deleted.where(aplicacion_plan_id: @aplicacion.id)
-                  .pluck(:plan_tarea_id, :fecha_programada, :asignada_a_id).to_set
+        ya = ya_creadas
 
         calendario(objetivo).ocurrencias.each do |oc|
           next if oc.fecha < desde || oc.fecha > hasta
@@ -56,12 +68,31 @@ module Planes
 
     private
 
+    # El objetivo si el plan sigue corriendo sobre él; nil si ya no hay nada que crear. Una aplicación
+    # sin objetivo (todo el cultivo) devuelve `true`.
+    def objetivo_vigente
+      return nil unless @aplicacion.estado == 'activo'
+      return true if @aplicacion.objetivo_tipo.blank?
+
+      objetivo = @aplicacion.objetivo
+      return nil if objetivo.nil? # el lote o la sala ya no está
+      return nil if objetivo.is_a?(Lote) && LOTE_TERMINADO.include?(objetivo.estado)
+
+      objetivo
+    end
+
+    # Nunca dos veces la misma: se cuenta todo, también lo borrado.
+    def ya_creadas
+      Tarea.with_deleted.where(aplicacion_plan_id: @aplicacion.id)
+           .pluck(:plan_tarea_id, :fecha_programada, :asignada_a_id).to_set
+    end
+
     def desde = @aplicacion.created_at.in_time_zone.to_date
     def hasta = @hoy + VENTANA_DIAS.days
 
     def calendario(objetivo)
       Calendario.new(plan: @aplicacion.plan_trabajo, fecha_inicio: @aplicacion.fecha_inicio,
-                     objetivo: objetivo, corte: @aplicacion.created_at)
+                     objetivo: (objetivo unless objetivo == true), corte: @aplicacion.created_at)
     end
 
     def crear!(oc, objetivo)
