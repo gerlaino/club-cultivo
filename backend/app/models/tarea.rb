@@ -100,7 +100,10 @@ class Tarea < ApplicationRecord
   scope :completadas,      -> { where(estado: 'completada') }
   scope :activas,          -> { where(estado: %w[pendiente en_progreso]) }
   scope :de_hoy,           -> { where(fecha_programada: Time.zone.today) }
-  scope :vencidas,         -> { where('fecha_programada < ? AND estado NOT IN (?)', Time.zone.today, %w[completada cancelada]) }
+  # Vencida = sigue abierta y su día ya pasó (la misma definición que `vencida?`). Antes listaba los
+  # estados cerrados a mano y no sabía de `no_realizada` (7-oct): una tarea marcada «No se hizo»
+  # volvía a aparecer como vencida en el inicio (Germán, 9-oct-2026).
+  scope :vencidas,         -> { activas.where('fecha_programada < ?', Time.zone.today) }
   # Pendientes reales "del día": vencidas + las de hoy (y sin fecha). NO incluye futuras.
   scope :pendientes_al_dia, -> { activas.where('fecha_programada <= ? OR fecha_programada IS NULL', Time.zone.today) }
   scope :proximas,         -> { where(fecha_programada: Time.zone.today..7.days.from_now) }

@@ -1,0 +1,296 @@
+{
+  "genetica-compu": {
+    "titulo": "Una genética nueva",
+    "quien": "En la compu, desde Cultivo › Genéticas.",
+    "video": "/demos/genetica-compu.mp4",
+    "inicio": 4.91,
+    "duracion": 18.59,
+    "pasos": [
+      {
+        "t": 4.91,
+        "texto": "Tocás «Nueva genética»"
+      },
+      {
+        "t": 6.53,
+        "texto": "Le ponés nombre y tipo"
+      },
+      {
+        "t": 10.82,
+        "texto": "Cuánto dura cada fase"
+      },
+      {
+        "t": 14.82,
+        "texto": "La guardás y ya se puede plantar"
+      }
+    ],
+    "portada": "/demos/genetica-compu.jpg"
+  },
+  "lote-compu": {
+    "titulo": "Un lote nuevo",
+    "quien": "En la compu, desde Cultivo › Lotes.",
+    "video": "/demos/lote-compu.mp4",
+    "inicio": 6.34,
+    "duracion": 18.73,
+    "pasos": [
+      {
+        "t": 6.34,
+        "texto": "Tocás «Crear lote»"
+      },
+      {
+        "t": 8.07,
+        "texto": "Elegís la sala: el código sale solo"
+      },
+      {
+        "t": 9.85,
+        "texto": "Cuántas plantas y de qué genética"
+      },
+      {
+        "t": 14.63,
+        "texto": "Lo creás, con sus plantas y su QR"
+      }
+    ],
+    "portada": "/demos/lote-compu.jpg"
+  },
+  "paciente-compu": {
+    "titulo": "Un paciente nuevo",
+    "quien": "En la compu, desde Pacientes.",
+    "video": "/demos/paciente-compu.mp4",
+    "inicio": 4.98,
+    "duracion": 22.77,
+    "pasos": [
+      {
+        "t": 4.98,
+        "texto": "Tocás «Nuevo paciente»"
+      },
+      {
+        "t": 6.87,
+        "texto": "Sus datos"
+      },
+      {
+        "t": 13.54,
+        "texto": "Su REPROCANN, con el vencimiento"
+      },
+      {
+        "t": 17.36,
+        "texto": "Lo creás: ya se le puede dispensar"
+      }
+    ],
+    "portada": "/demos/paciente-compu.jpg"
+  },
+  "dispensa-compu": {
+    "titulo": "Una dispensa",
+    "quien": "En la compu, desde la ficha del paciente.",
+    "video": "/demos/dispensa-compu.mp4",
+    "inicio": 4.43,
+    "duracion": 40.66,
+    "pasos": [
+      {
+        "t": 4.43,
+        "texto": "Buscás al paciente"
+      },
+      {
+        "t": 8.33,
+        "texto": "Abrís una dispensa desde su ficha"
+      },
+      {
+        "t": 11.65,
+        "texto": "Elegís qué se lleva, del stock"
+      },
+      {
+        "t": 22.68,
+        "texto": "El total sale solo: no se tipea"
+      },
+      {
+        "t": 26.02,
+        "texto": "Cobrás como pague"
+      },
+      {
+        "t": 31.31,
+        "texto": "Confirmás, y el resto le queda a favor"
+      }
+    ],
+    "portada": "/demos/dispensa-compu.jpg"
+  },
+  "genetica-telefono": {
+    "titulo": "Una genética nueva",
+    "quien": "En el teléfono, desde Más › Genéticas.",
+    "video": "/demos/genetica-telefono.mp4",
+    "inicio": 6.53,
+    "duracion": 17.75,
+    "pasos": [
+      {
+        "t": 6.53,
+        "texto": "Tocás «Nueva genética»"
+      },
+      {
+        "t": 8.09,
+        "texto": "Le ponés nombre y tipo"
+      },
+      {
+        "t": 12.19,
+        "texto": "Cuánto dura cada fase"
+      },
+      {
+        "t": 14.13,
+        "texto": "La guardás y ya se puede plantar"
+      }
+    ],
+    "portada": "/demos/genetica-telefono.jpg"
+  },
+  "lote-telefono": {
+    "titulo": "Un lote nuevo",
+    "quien": "En el teléfono, desde el «+».",
+    "video": "/demos/lote-telefono.mp4",
+    "inicio": 7.73,
+    "duracion": 19.63,
+    "pasos": [
+      {
+        "t": 7.73,
+        "texto": "Tocás «+» y «Crear lote»"
+      },
+      {
+        "t": 10.64,
+        "texto": "Elegís la sala: el código sale solo"
+      },
+      {
+        "t": 12.39,
+        "texto": "Cuántas plantas y de qué genética"
+      },
+      {
+        "t": 15.6,
+        "texto": "Lo creás, con sus plantas y su QR"
+      }
+    ],
+    "portada": "/demos/lote-telefono.jpg"
+  },
+  "paciente-telefono": {
+    "titulo": "Un paciente nuevo",
+    "quien": "En el teléfono, desde Más › Pacientes.",
+    "video": "/demos/paciente-telefono.mp4",
+    "inicio": 7.88,
+    "duracion": 23.9,
+    "pasos": [
+      {
+        "t": 7.88,
+        "texto": "Tocás «Nuevo paciente»"
+      },
+      {
+        "t": 9.76,
+        "texto": "Sus datos"
+      },
+      {
+        "t": 15.24,
+        "texto": "Su REPROCANN, con el vencimiento"
+      },
+      {
+        "t": 18.88,
+        "texto": "Lo creás: ya se le puede dispensar"
+      }
+    ],
+    "portada": "/demos/paciente-telefono.jpg"
+  },
+  "dispensa-telefono": {
+    "titulo": "Una dispensa",
+    "quien": "En el teléfono, desde Dispensar.",
+    "video": "/demos/dispensa-telefono.mp4",
+    "inicio": 7.09,
+    "duracion": 30.16,
+    "pasos": [
+      {
+        "t": 7.09,
+        "texto": "Buscás al paciente"
+      },
+      {
+        "t": 12.24,
+        "texto": "Elegís qué se lleva"
+      },
+      {
+        "t": 17.73,
+        "texto": "El total sale solo: no se tipea"
+      },
+      {
+        "t": 20.13,
+        "texto": "Cobrás como pague"
+      },
+      {
+        "t": 23.82,
+        "texto": "Confirmás, y el resto le queda a favor"
+      }
+    ],
+    "portada": "/demos/dispensa-telefono.jpg"
+  },
+  "planta-autocultivo": {
+    "titulo": "Agregás tus plantas",
+    "quien": "Desde «Mi cultivo», en el teléfono.",
+    "video": "/demos/planta-autocultivo.mp4",
+    "inicio": 4.69,
+    "duracion": 18.57,
+    "pasos": [
+      {
+        "t": 4.69,
+        "texto": "Tocás «Nueva planta»"
+      },
+      {
+        "t": 6.15,
+        "texto": "La genética, aunque sea nueva"
+      },
+      {
+        "t": 11.75,
+        "texto": "Cuántas y dónde"
+      },
+      {
+        "t": 14.53,
+        "texto": "Listo: ya están en tu carpa"
+      }
+    ],
+    "portada": "/demos/planta-autocultivo.jpg"
+  },
+  "riego-autocultivo": {
+    "titulo": "Anotás al lado de la carpa",
+    "quien": "Desde la carpa, en el teléfono.",
+    "video": "/demos/riego-autocultivo.mp4",
+    "inicio": 5.47,
+    "duracion": 18.95,
+    "pasos": [
+      {
+        "t": 5.47,
+        "texto": "Entrás a la carpa"
+      },
+      {
+        "t": 7.52,
+        "texto": "Tocás «Regar»"
+      },
+      {
+        "t": 9.15,
+        "texto": "Cuánto, con qué pH y EC"
+      },
+      {
+        "t": 15.31,
+        "texto": "Guardás: queda en el diario de cada planta"
+      }
+    ],
+    "portada": "/demos/riego-autocultivo.jpg"
+  },
+  "avisa-autocultivo": {
+    "titulo": "La app te avisa lo que viene",
+    "quien": "En «Mi cultivo» y en cada planta.",
+    "video": "/demos/avisa-autocultivo.mp4",
+    "inicio": 4.49,
+    "duracion": 19.44,
+    "pasos": [
+      {
+        "t": 4.49,
+        "texto": "Cada planta, con lo que le falta"
+      },
+      {
+        "t": 6.69,
+        "texto": "Su ficha: el día, la fase y lo que le diste"
+      },
+      {
+        "t": 12.58,
+        "texto": "Y la carpa entera, con la cosecha estimada"
+      }
+    ],
+    "portada": "/demos/avisa-autocultivo.jpg"
+  }
+}

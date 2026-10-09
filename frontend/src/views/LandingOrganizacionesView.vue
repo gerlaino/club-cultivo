@@ -33,6 +33,11 @@
       </div>
     </section>
 
+    <!-- ── La app de verdad, grabada: lo de todos los días de administración, en compu y teléfono ── -->
+    <ComoSeHace ceja="Mirá cómo se hace" titulo="Así se trabaja desde administración"
+                intro="Cargar una genética, armar un lote, dar de alta un paciente y dispensarle. Es la app real, en la compu y en el teléfono."
+                :flujos="FLUJOS_ADMIN" />
+
     <!-- ── Lo que ve administración: una fortaleza por fila, con su pantalla ── -->
     <section class="hb__sec" id="que-hace">
       <div class="hb__wrap">
@@ -118,6 +123,7 @@ import { ref, onMounted } from 'vue'
 import PaginaPublica from '../components/public/PaginaPublica.vue'
 import PanelAdmin from '../components/public/PanelAdmin.vue'
 import Fortaleza from '../components/public/Fortaleza.vue'
+import ComoSeHace from '../components/public/ComoSeHace.vue'
 import PreguntasFrecuentes from '../components/public/PreguntasFrecuentes.vue'
 import ContactoForm from '../components/public/ContactoForm.vue'
 import OficiosVista from '../components/public/OficiosVista.vue'
@@ -130,6 +136,14 @@ import MuestraTurnero from '../components/public/muestras/MuestraTurnero.vue'
 import MuestraInforme from '../components/public/muestras/MuestraInforme.vue'
 import { getRegistroInfo } from '../lib/api.js'
 import { PREGUNTAS_PROYECTOS } from '../components/public/contenido.js'
+
+// Las grabaciones de «Mirá cómo se hace» (`npm run demos`), en el orden en que se trabaja.
+const FLUJOS_ADMIN = [
+  { etiqueta: 'Una genética nueva', ids: { compu: 'genetica-compu', telefono: 'genetica-telefono' } },
+  { etiqueta: 'Un lote',            ids: { compu: 'lote-compu',     telefono: 'lote-telefono' } },
+  { etiqueta: 'Un paciente',        ids: { compu: 'paciente-compu', telefono: 'paciente-telefono' } },
+  { etiqueta: 'Una dispensa',       ids: { compu: 'dispensa-compu', telefono: 'dispensa-telefono' } },
+]
 
 const ALCANCE = [
   { n: 8, que: 'áreas',     t: 'Cultivo, post-cosecha, stock, mostrador, consultorio, delivery, contabilidad e informes' },

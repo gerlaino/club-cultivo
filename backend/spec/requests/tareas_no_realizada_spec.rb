@@ -86,6 +86,36 @@ RSpec.describe 'POST /tareas/:id/no_realizada', type: :request do
     expect(response.status).to be_in([403, 404])
     expect(ajena.reload.estado).to eq('pendiente')
   end
+
+  # 9-oct-2026 (Germán, en el teléfono): marcó dos tareas vencidas como «No se hizo» y seguían en el
+  # inicio; al tocarlas otra vez, «Esa tarea ya está no realizada». El dashboard las traía como
+  # vencidas porque el scope no sabía de `no_realizada`.
+  describe 'una vencida marcada «No se hizo»' do
+    it 'deja de aparecer como vencida en el inicio, y la otra vencida sigue' do
+      no_hecha = tarea(titulo: 'Medir EC y pH', fecha_programada: Time.zone.today - 3)
+      sigue    = tarea(titulo: 'Inspección de plagas', fecha_programada: Time.zone.today - 3)
+      sign_in_as(admin)
+
+      post "/api/tareas/#{no_hecha.id}/no_realizada", as: :json
+      expect(response).to have_http_status(:ok)
+
+      get '/api/tareas/dashboard', as: :json
+      vencidas = response.parsed_body['vencidas'].map { |t| t['id'] }
+      expect(vencidas).to eq([sigue.id])
+      expect(response.parsed_body.dig('stats', 'vencidas')).to eq(1)
+    end
+
+    it 'tocarla de nuevo explica que ya está cerrada, en castellano' do
+      t = tarea(fecha_programada: Time.zone.today - 1)
+      t.marcar_no_realizada!
+      sign_in_as(admin)
+
+      post "/api/tareas/#{t.id}/no_realizada", as: :json
+
+      expect(response).to have_http_status(:unprocessable_entity)
+      expect(response.parsed_body['error']).to eq('Esa tarea ya está cerrada: ya se marcó que no se hizo.')
+    end
+  end
 end
 
 # Una tarea nueva tiene día; las viejas sin fecha siguen pudiendo cerrarse.

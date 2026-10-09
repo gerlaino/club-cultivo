@@ -8,6 +8,7 @@
   },
   "scripts": {
     "manuales": "node ../scripts/manuales.cjs",
+    "demos": "node scripts/demos/grabar.mjs",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",

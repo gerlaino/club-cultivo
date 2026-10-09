@@ -1,5 +1,54 @@
 # Changelog
 
+## Octubre 2026 (em) — «Mirá cómo se hace»: la app de verdad, grabada, en la página pública (9-oct)
+
+Pedido de Germán: mostrar cómo trabaja el administrador (genética, lote, paciente, dispensa) en
+compu y teléfono, y en autocultivo una simulación por cada uno de «Para arrancar, tres cosas».
+
+- **Grabaciones con Playwright** (`frontend/scripts/demos/`, `npm run demos [filtro]`): cada flujo
+  hace las cosas de verdad sobre un club demo y deja `public/demos/<id>.webm` y sus pasos (en qué
+  segundo empieza cada uno) en `src/components/public/demos/tiempos.json`. El cursor (o el dedo) se
+  dibuja a mano; los montos se ponen de una vez (tipeados, la app muestra un «Faltan $…» en rojo).
+  Al terminar cada toma, `scripts/demos/comprimir.mjs` la pasa a **MP4 H.264** (anda en el iPhone,
+  arranca antes de bajarse entera) con una portada `.jpg`: los 11 videos pasaron de 12 MB a 3,1 MB
+  y van en el repo, servidos por Rails como el resto de `public/`; el service worker no los toca
+  y sólo se pide el que está en pantalla. Necesita un `ffmpeg` con libx264 (el de Playwright no).
+  **Una toma en la que la app rechaza algo falla** (una toma que «se ve bien» sin haber guardado
+  nada es la peor). Necesita docker andando.
+- **`rake demo:preparar_tomas`** (lo corre el grabador): el club demo `asociacion_ejemplo` (crear
+  una vez con `rake club:demo SLUG=asociacion_ejemplo NOMBRE="Asociación Ejemplo" PASSWORD=…`) y
+  la cuenta de autocultivo `autocultivo@demo-video.example.com` (la crea como un autoregistro).
+  Aparta lo de la toma anterior —renombra, cambia el DNI, no borra—, deja una paciente limpia,
+  un precio redondo y el plan de 100 pacientes. Sólo toca clubs marcados demo. La carpa de
+  autocultivo la arma la app misma (`scripts/demos/base-autocultivo.mjs`).
+- **`ComoSeHace.vue`**: el reproductor (flujos a la izquierda con sus pasos que se marcan solos y
+  al tocarlos saltan, compu/teléfono, al terminar pasa al siguiente; el video se pide al aparecer).
+  En organizaciones, «Así se trabaja desde administración»; en autocultivo reemplaza las tres
+  tarjetas de «Para arrancar, tres cosas».
+- **`Clubs::SembrarDemo`**: el dominio de los mails sale del slug (con uno fijo no podían convivir
+  dos clubs demo; `club_modelo` sigue igual).
+
+### Bugs que aparecieron grabando
+- **Tareas «No se hizo» que volvían al inicio** (`Tarea.vencidas` no sabía de `no_realizada`):
+  ahora vencida = abierta y con el día pasado, como `vencida?`. El mensaje al tocarla de nuevo,
+  en castellano. Spec en `tareas_no_realizada_spec.rb`.
+- **Pantalla en blanco al tocar un espacio o una planta desde «Mi cultivo» (sólo en desarrollo)**:
+  la vista empezaba con un comentario antes del `<div>` y la `<Transition mode="out-in">` del
+  armazón móvil no terminaba nunca. Comentario adentro en `MPersonalCultivoView` y
+  `MPersonalInformesView`; test `vistasMovilUnaRaiz.test.js` que barre las vistas de `/m`.
+- **Topbar de las páginas públicas fijo**: `overflow-x: hidden` en `.hb-sitio` lo volvía
+  contenedor de scroll y el `sticky` se iba con el contenido; ahora `clip`.
+
+### Anotado, sin tocar (ver con Germán)
+Redondeo de plata en la dispensa con precios con centavos ($ 15.650 vs $ 15.650,25) · horas en UTC
+(«abrió la caja a las 01:36 p. m.» y el diario de la planta) y el doble punto «p. m..» · la tarjeta
+de caja sigue «cerrada» hasta recargar · `rake club:demo REGENERAR=1` falla por dependencias · el
+seed demo deja a casi todos debiendo, precios con centavos y el plan viejo `arbol` · en autocultivo
+se nombra el lote (inicio, «Registro guardado en 1 lote», «todos los lotes activos») y los días no
+coinciden entre «Hoy» y «Mi cultivo» · «Día 20 de su ciclo» y «enraizado» crudo en la ficha · el
+desplegable de genética del lote dice «Gelato 41 — hibrida» · en el teléfono, «Nuevo paciente» es
+la página de escritorio con la barra cortada.
+
 ## Octubre 2026 (el) — Página pública: la vitrina de lo que hace la app, organizaciones desde el administrador (9-oct)
 
 Feedback de Pablo (diseñador, conoce la app): «no representa el pedazo de sistema que tenés; lo

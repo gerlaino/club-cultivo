@@ -1,6 +1,6 @@
 <template>
-  <!-- «Mis informes» en el teléfono: una tarjeta por informe, con PDF y Excel. -->
   <div class="mpi">
+    <!-- «Mis informes» en el teléfono: una tarjeta por informe, con PDF y Excel. -->
     <h1 class="mpi__t">Mis informes</h1>
     <MisInformes variante="telefono" />
   </div>

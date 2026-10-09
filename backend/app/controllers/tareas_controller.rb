@@ -12,6 +12,14 @@ class TareasController < ApplicationController
                      'hecha. Si el trabajo ya se hizo, cargá una tarea de hoy describiéndolo y ' \
                      'cancelá la programada cuando llegue su día.'.freeze
 
+  # Cómo se dice en pantalla que una tarea ya se cerró (antes salía el estado crudo: «ya está no
+  # realizada»).
+  CERRADA_COMO = {
+    'completada'   => 'ya se marcó como hecha',
+    'no_realizada' => 'ya se marcó que no se hizo',
+    'cancelada'    => 'está cancelada',
+  }.freeze
+
   before_action :authenticate_user!
   before_action :check_tareas_role!
   before_action :set_club
@@ -193,7 +201,8 @@ class TareasController < ApplicationController
   # todavía no llegó (no se puede no haber hecho algo que no tocaba).
   def no_realizada
     if @tarea.cerrada?
-      return render json: { error: "Esa tarea ya está #{@tarea.estado.tr('_', ' ')}" }, status: :unprocessable_entity
+      return render json: { error: "Esa tarea ya está cerrada: #{CERRADA_COMO.fetch(@tarea.estado, @tarea.estado)}." },
+                    status: :unprocessable_entity
     end
     if @tarea.programada_a_futuro?
       return render json: { error: 'Esa tarea es para más adelante: todavía no se puede marcar que no se hizo.' },

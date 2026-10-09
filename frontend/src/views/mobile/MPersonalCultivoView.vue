@@ -1,9 +1,9 @@
 <template>
-  <!-- MI CULTIVO (autocultivo, 9-oct-2026): las carpas con sus PLANTAS. Quien cultiva en casa piensa
-       en plantas, no en lotes (Martín López se perdía entre lote, espacio y plantas): el lote sigue
-       existiendo por debajo y acá no se nombra. Cada espacio dice qué luz tiene y abre su pantalla;
-       cada planta abre su ficha. -->
   <div class="mmc">
+    <!-- MI CULTIVO (autocultivo, 9-oct-2026): las carpas con sus PLANTAS. Quien cultiva en casa piensa
+         en plantas, no en lotes (Martín López se perdía entre lote, espacio y plantas): el lote sigue
+         existiendo por debajo y acá no se nombra. Cada espacio dice qué luz tiene y abre su pantalla;
+         cada planta abre su ficha. -->
     <header class="mmc__cab">
       <div>
         <h1 class="mmc__titulo">Mi cultivo</h1>

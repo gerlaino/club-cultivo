@@ -35,7 +35,10 @@ module Clubs
                    pacientes: 40, dispensaciones: 200, lotes: 30)
       @nombre    = nombre
       @slug      = slug.downcase.gsub(/[^a-z0-9_]/, '_')
-      @admin_email    = admin_email.presence || 'admin@club-modelo.example.com'
+      # El dominio de los mails sale del slug: con uno fijo no podían convivir dos clubs demo
+      # (`club_modelo` sigue dando `@club-modelo.example.com`).
+      @dominio        = "#{@slug.tr('_', '-')}.example.com"
+      @admin_email    = admin_email.presence || "admin@#{@dominio}"
       @admin_password = admin_password.presence || SecureRandom.hex(12)
       @n_pacientes      = pacientes
       @n_dispensaciones = dispensaciones
@@ -94,7 +97,7 @@ module Clubs
         Club.create!(
           name: @nombre, slug: @slug, demo: true,
           legal_name: "#{@nombre} Asociación Civil",
-          email: 'contacto@club-modelo.example.com', phone: '+54 11 4000-0000',
+          email: "contacto@#{@dominio}", phone: '+54 11 4000-0000',
           city: 'Ciudad Autónoma de Buenos Aires', state: 'CABA', country: 'Argentina',
           timezone: 'America/Argentina/Buenos_Aires',
           plan: 'arbol', plan_trial: false,
@@ -115,7 +118,7 @@ module Clubs
         'supervisor' => 'Supervisión', 'medico' => 'Médico', 'manicura' => 'Manicura',
         'delivery' => 'Reparto' }.each do |rol, nom|
         u = User.create!(
-          email: rol == 'admin' ? @admin_email : "#{rol}@club-modelo.example.com",
+          email: rol == 'admin' ? @admin_email : "#{rol}@#{@dominio}",
           password: @admin_password, password_confirmation: @admin_password,
           role: rol, club: club, first_name: nom, last_name: 'Demo',
         )

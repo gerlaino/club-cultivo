@@ -29,22 +29,9 @@
 
     <CultivoEnPapeles />
 
-    <!-- ── Para arrancar: tres pasos ─────────────────────── -->
-    <section class="hb__sec hb__sec--claro">
-      <div class="hb__wrap">
-        <header class="hb__sec-h">
-          <p class="hb__ceja">Así se usa</p>
-          <h2 class="hb__h2">Para arrancar, tres cosas</h2>
-        </header>
-        <ol class="lc__pasos">
-          <li v-for="(p, i) in PASOS" :key="p.t" class="lc__paso hb-rev" :style="{ transitionDelay: `${i * 90}ms` }">
-            <span class="lc__paso-n">{{ i + 1 }}</span>
-            <h3 class="hb__h3">{{ p.t }}</h3>
-            <p>{{ p.d }}</p>
-          </li>
-        </ol>
-      </div>
-    </section>
+    <!-- ── Para arrancar: los tres pasos, cada uno con su grabación en el teléfono (9-oct-2026) ── -->
+    <ComoSeHace ceja="Así se usa" titulo="Para arrancar, tres cosas" tema="claro" ancla="para-arrancar"
+                intro="Tocá cada una y mirala en la app, tal como se usa en el teléfono." :flujos="PASOS" />
 
     <Packs :packs="packs" :accion="{ label: 'Crear mi cuenta', to: '/registro' }" />
 
@@ -83,14 +70,19 @@ import PreguntasFrecuentes from '../components/public/PreguntasFrecuentes.vue'
 import Packs from '../components/public/Packs.vue'
 import ContactoForm from '../components/public/ContactoForm.vue'
 import TelefonoMiCultivo from '../components/public/TelefonoMiCultivo.vue'
+import ComoSeHace from '../components/public/ComoSeHace.vue'
 import { PREGUNTAS_AUTOCULTIVO, packsAutocultivo } from '../components/public/contenido.js'
 import { getRegistroInfo } from '../lib/api.js'
 
 const diasPrueba = ref(30)
+// Los tres pasos, cada uno con su grabación (`npm run demos`).
 const PASOS = [
-  { t: 'Agregás tus plantas', d: 'De a una o varias juntas: la genética, si es auto o foto, dónde está y desde cuándo.' },
-  { t: 'Anotás al lado de la carpa', d: 'Regar con cuánto y con qué, una foto o una nota: un toque, a una planta o a toda la carpa. O dictándolo.' },
-  { t: 'La app te avisa lo que viene', d: 'El primer fertilizante, el cambio a flora, la cosecha. Al teléfono.' },
+  { etiqueta: 'Agregás tus plantas', texto: 'De a una o varias juntas: la genética, si es auto o foto, dónde está y desde cuándo.',
+    ids: { telefono: 'planta-autocultivo' } },
+  { etiqueta: 'Anotás al lado de la carpa', texto: 'Regar con cuánto y con qué, una foto o una nota: un toque, a una planta o a toda la carpa. O dictándolo.',
+    ids: { telefono: 'riego-autocultivo' } },
+  { etiqueta: 'La app te avisa lo que viene', texto: 'Cuánto le falta a cada planta, en su ficha y en la carpa. Y el aviso, al teléfono.',
+    ids: { telefono: 'avisa-autocultivo' } },
 ]
 // El precio lo dice el backend (`Precios.lista_publica`); acá sólo las palabras.
 const packs = ref([])
@@ -114,10 +106,6 @@ onMounted(async () => {
   .lc__portada-in { grid-template-columns: minmax(0, 1fr); }
   .lc__tel { width: min(280px, 80%); }
 }
-.lc__pasos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 20px; }
-.lc__paso { padding: 24px; background: var(--hb-papel-claro); border: 1px solid var(--hb-regla); display: flex; flex-direction: column; gap: 8px; }
-.lc__paso p { margin: 0; color: var(--hb-tinta-2); line-height: 1.55; }
-.lc__paso-n { font: 600 2rem/1 var(--hb-serif); color: var(--hb-verde); }
 .lc__contacto { display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr); gap: clamp(24px, 5vw, 64px); align-items: start; }
 @media (max-width: 860px) { .lc__contacto { grid-template-columns: minmax(0, 1fr); } }
 .lc__contacto-p { margin: 12px 0 0; color: var(--hb-tinta-2); }
