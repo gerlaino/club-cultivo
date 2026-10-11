@@ -223,4 +223,50 @@ describe('useReconocimientoVoz', () => {
       expect(voz.escuchando.value).toBe(false)
     })
   })
+
+  // Reporte de Germán (9-oct-2026): grabó, se equivocó, volvió a grabar y salió «Se interrumpió
+  // la grabación» aunque lo segundo se registró bien. El asistente leía en voz alta «¿Confirmás?»
+  // y el teléfono le sacaba el audio al dictado.
+  describe('la voz del asistente y los cortes de afuera', () => {
+    it('antes de grabar calla la voz del asistente si está hablando', async () => {
+      const cancel = vi.fn()
+      window.speechSynthesis = { speaking: true, pending: false, cancel }
+      const voz = useReconocimientoVoz()
+      expect(await voz.iniciar()).toBe(true)
+      expect(cancel).toHaveBeenCalled()
+      delete window.speechSynthesis
+    })
+
+    it('el error atrasado de una grabación cancelada no ensucia la siguiente', async () => {
+      const voz = useReconocimientoVoz()
+      await voz.iniciar()
+      const vieja = MotorFalso.ultima
+      voz.cancelar()
+
+      await voz.iniciar()
+      const nueva = MotorFalso.ultima
+      nueva.emitirInicio()
+      vieja.emitirError('aborted')          // llega tarde, de la que ya no está
+      nueva.emitirTexto('regué con un pulso')
+      voz.detener()
+      nueva.emitirFin()
+
+      expect(voz.error.value).toBeNull()
+      expect(voz.texto.value).toBe('regué con un pulso')
+    })
+
+    it('un corte de afuera se reintenta solo una vez; si se repite, dice qué hacer', async () => {
+      const voz = useReconocimientoVoz()
+      await voz.iniciar()
+      const m = MotorFalso.ultima
+      m.emitirInicio()
+      m.emitirError('aborted'); m.emitirFin()
+      expect(m.arranques).toBe(2)            // se levantó de nuevo, sin cartel
+      expect(voz.error.value).toBeNull()
+
+      m.emitirError('aborted'); m.emitirFin()
+      expect(m.arranques).toBe(2)
+      expect(voz.error.value).toMatch(/Tocá el micrófono de nuevo/)
+    })
+  })
 })

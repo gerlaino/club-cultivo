@@ -964,7 +964,8 @@ class Lote < ApplicationRecord
   def maceta_al_prender
     # En la cama no hay maceta: la tierra es la cama (siembra directa o plantado desde la bandeja).
     return if tamanio_maceta.present? || cama_id.present?
-    errors.add(:tamanio_maceta, 'es obligatorio al pasar a vegetativo: el esqueje que prendió va a maceta (o plantalo en una cama)')
+    # En :base y escrito entero: con el atributo salía «Tamanio maceta es obligatorio…» (9-oct-2026).
+    errors.add(:base, 'Falta la maceta: al pasar a vegetativo lo que prendió va a maceta (o se planta en una cama).')
   end
 
   # Ver el comentario del callback. `new_record?` entra a propósito: es el caso del lote hijo de

@@ -18,7 +18,9 @@ export const MENSAJE_ERROR_VOZ = {
   'audio-capture':       'No se detectó ningún micrófono.',
   'network':             'El dictado necesita internet y no pudo conectarse. Escribilo abajo.',
   'no-speech':           'No te escuché. Probá de nuevo, más cerca del micrófono.',
-  'aborted':             'Se interrumpió la grabación.',
+  // Lo nuestro (cancelar, cerrar el panel) no llega acá: esto es el teléfono cortándola desde
+  // afuera —la voz del asistente, una llamada, otra app con el audio—, y ya se reintentó una vez.
+  'aborted':             'Se cortó la grabación: el teléfono le dio el audio a otra cosa. Tocá el micrófono de nuevo.',
 }
 
 export const SOPORTA_VOZ = () =>
@@ -47,6 +49,7 @@ export function useReconocimientoVoz({ idioma = 'es-AR', alTerminar = null } = {
   let errorDelMotor = null   // el código que tiró el navegador, si tiró alguno
   let reinicios     = 0
   let arrancando    = false  // hay un `iniciar()` a mitad de camino
+  let abortosReintentados = false  // ya se reintentó un corte de afuera en esta grabación
 
   // Cuántas veces se vuelve a levantar la sesión sola. Con tope: si el servicio cortara al
   // instante una y otra vez, sin esto quedaría un bucle de arranques girando en el teléfono.
@@ -90,7 +93,7 @@ export function useReconocimientoVoz({ idioma = 'es-AR', alTerminar = null } = {
 
   async function arrancar() {
     error.value = null; texto.value = ''; interim.value = ''
-    errorDelMotor = null; arranco = false; cortePedido = false; reinicios = 0
+    errorDelMotor = null; arranco = false; cortePedido = false; reinicios = 0; abortosReintentados = false
 
     if (!soportado.value) {
       error.value = 'Este navegador no sabe dictar. Escribilo abajo, o abrí la app desde Chrome.'
@@ -98,16 +101,30 @@ export function useReconocimientoVoz({ idioma = 'es-AR', alTerminar = null } = {
     }
     if (!(await asegurarPermiso())) return false
 
+    // LA VOZ DEL ASISTENTE Y EL DICTADO NO PUEDEN SONAR A LA VEZ (9-oct-2026). Después de
+    // interpretar, el asistente lee en voz alta «…¿Confirmás?»; si se toca «Volver a grabar»
+    // mientras habla, el iPhone le saca el audio al dictado y llega un `aborted` sin texto. Se la
+    // calla y se espera un instante a que suelte el audio.
+    const tts = typeof window !== 'undefined' ? window.speechSynthesis : null
+    if (tts?.speaking || tts?.pending) {
+      tts.cancel()
+      await new Promise(r => setTimeout(r, 250))
+    }
+
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition
     rec = new SR()
+    // Cada handler mira que su instancia siga siendo LA del momento: el `onerror` atrasado de una
+    // grabación cancelada (`aborted`) llegaba después de arrancar la siguiente y la ensuciaba.
+    const este = rec
     rec.lang            = idioma
     rec.continuous      = !esMovil()
     rec.interimResults  = true
     rec.maxAlternatives = 1
 
-    rec.onstart = () => { arranco = true; escuchando.value = true }
+    rec.onstart = () => { if (rec !== este) return; arranco = true; escuchando.value = true }
 
     rec.onresult = (e) => {
+      if (rec !== este) return
       let final = '', enCurso = ''
       for (let i = 0; i < e.results.length; i++) {
         if (e.results[i].isFinal) final += e.results[i][0].transcript
@@ -123,15 +140,20 @@ export function useReconocimientoVoz({ idioma = 'es-AR', alTerminar = null } = {
 
     // No se muestra acá: se guarda. El cartel lo decide `cerrar()`, que es el único que sabe si
     // al final hubo texto o no.
-    rec.onerror = (e) => { errorDelMotor = e.error }
+    rec.onerror = (e) => { if (rec === este) errorDelMotor = e.error }
 
     // Sin `continuous` (el teléfono) el servicio cierra la sesión en CADA pausa. Si no se la
     // vuelve a levantar, todo lo que se dice después de la primera coma se pierde: quedaba
     // registrada la primera frase y nada más, sin ningún aviso. Se relevanta mientras la
     // persona no haya pedido parar.
     rec.onend = () => {
+      if (rec !== este) return
+      // `aborted` desde afuera (el teléfono le dio el audio a otra cosa) se reintenta UNA vez:
+      // casi siempre fue un instante. Si vuelve a pasar, se dice qué hacer.
+      const abortoAfuera = errorDelMotor === 'aborted' && !abortosReintentados
+      if (abortoAfuera) abortosReintentados = true
       const cortoSolo = !cortePedido && arranco &&
-                        (!errorDelMotor || errorDelMotor === 'no-speech')
+                        (!errorDelMotor || errorDelMotor === 'no-speech' || abortoAfuera)
       if (cortoSolo && reinicios < MAX_REINICIOS) {
         reinicios++
         errorDelMotor = null

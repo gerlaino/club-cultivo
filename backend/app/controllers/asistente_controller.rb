@@ -126,7 +126,7 @@ class AsistenteController < BaseController
         },
         { "tipo": "nota_lote", "lote_codigo": "L-26-003", "datos": { "contenido": "texto" } },
         { "tipo": "nota_sala", "sala_nombre": "Carpa grande", "datos": { "contenido": "texto" } },
-        { "tipo": "avance_ciclo", "lote_codigo": "L-26-003", "datos": { "estado_nuevo": "floracion", "descripcion": "motivo" } },
+        { "tipo": "avance_ciclo", "lote_codigo": "L-26-003", "datos": { "estado_nuevo": "vegetativo", "maceta_litros": 0.335, "descripcion": "motivo" } },
         { "tipo": "tarea", "datos": { "titulo": "Revisar plagas", "tipo_tarea": "revision_plagas", "descripcion": "...", "prioridad": "normal", "lote_codigo": "L-26-003", "sala_nombre": "Sala A", "dias_desde_hoy": 1, "asignar_a": "el cultivador" } }
       ]
     }
@@ -137,6 +137,10 @@ class AsistenteController < BaseController
     plagas:        ninguna | leve | moderada | severa
     prioridad:     baja | normal | alta | urgente
     estado_nuevo:  enraizado | vegetativo | floracion | cosecha | secado | curado | finalizado
+    avance_ciclo:  sólo al paso siguiente (enraizado → vegetativo → floracion). Pasar de germinando o
+                   enraizando a vegetativo es PONERLO EN MACETA: si dice a cuál, va en maceta_litros
+                   («vaso» o «vasito» = 0.335, «maceta de 7» = 7); si no lo dice, NO lo inventes (la app
+                   lo pide). La cosecha no se registra por voz.
     tipo_tarea:    riego | nutricion | poda | defoliacion | scrog_lst | revision_plagas | limpieza |
                    ajuste_luz | medicion | inspeccion | trasplante | cosecha | otro
     dias_desde_hoy: OBLIGATORIO en una tarea. Contalo desde la fecha de HOY que figura abajo:
@@ -1166,6 +1170,10 @@ class AsistenteController < BaseController
       ((parecidas = base.where('nombre ILIKE ?', "%#{Genetica.sanitize_sql_like(n)}%").limit(2).to_a).one? ? parecidas.first : nil)
   end
 
+  # AVANZAR DE FASE POR VOZ ES LO MISMO QUE EL BOTÓN (9-oct-2026). Hacía `update(estado:)`: no
+  # pedía la maceta al salir de germinación («poner en maceta es prender»), no movía de sala, no
+  # creaba las tareas de la fase y dejaba cosechar sin pesada. Ahora va por `Lote#avanzar_fase!`,
+  # sólo al paso siguiente, y la cosecha se registra con su formulario, como en la app.
   def ejecutar_avance_ciclo(accion, datos, club, contexto)
     lote_codigo = accion['lote_codigo'] || accion[:lote_codigo]
     lote = lotes_visibles(club).find_by(codigo: lote_codigo) if lote_codigo.present?
@@ -1179,28 +1187,43 @@ class AsistenteController < BaseController
     return { ok: false, error: 'Estado nuevo no especificado' } if estado_nuevo.blank?
     return { ok: false, error: "Estado inválido: #{estado_nuevo}" } unless Lote::ESTADOS.include?(estado_nuevo)
 
-    if current_user.cultivador?
-      estados_permitidos = %w[enraizado vegetativo floracion cosecha secado]
-      unless estados_permitidos.include?(lote.estado)
-        return { ok: false, error: "No tenés permiso para avanzar el lote desde '#{lote.estado}'" }
-      end
+    personal = club.personal?
+    quien = personal ? "las #{lote.genetica&.nombre || 'plantas'}" : lote.codigo
+    idx = Lote::AVANCE.index(lote.estado)
+    siguiente = idx && Lote::AVANCE[idx + 1]
+    if estado_nuevo == 'cosecha' || (lote.estado == 'floracion' && siguiente == estado_nuevo)
+      return { ok: false, error: "La cosecha de #{quien} se registra con su pesada: hacelo desde #{personal ? 'la planta' : 'la ficha del lote'}." }
+    end
+    unless siguiente == estado_nuevo
+      return { ok: false, error: "Por voz se avanza al paso siguiente (#{quien} está en #{lote.estado_label.downcase}). " \
+                                 "Para otro cambio usá #{personal ? 'la planta' : 'la ficha del lote'}." }
     end
 
-    estado_anterior = lote.estado
-    if lote.update(estado: estado_nuevo)
-      lote.lote_eventos.create!(
-        tipo:             'cambio_estado',
-        estado_anterior:  estado_anterior,
-        estado_nuevo:     estado_nuevo,
-        descripcion:      datos['descripcion'] || 'Avance de ciclo registrado por voz',
-        user:             current_user,
-        club:             club,
-        registrado_en:    Time.current
-      )
-      { ok: true, mensaje: "Ciclo avanzado: #{estado_anterior} → #{estado_nuevo} en #{lote.codigo}" }
-    else
-      { ok: false, error: lote.errors.full_messages.join(', ') }
+    litros = datos['maceta_litros'].presence&.to_f
+    litros = nil unless litros&.positive?
+    if lote.estado == 'enraizado' && lote.cama_id.blank? && litros.nil? && lote.tamanio_maceta.blank?
+      return { ok: false, error: "Para pasar #{quien} a vegetativo falta la maceta. Decí a cuál van " \
+                                 "(«al vaso», «a maceta de 7 litros») o hacelo desde #{personal ? 'la planta' : 'la ficha del lote'}." }
     end
+
+    estado_anterior  = lote.estado
+    sala_anterior_id = lote.sala_id
+    lote.avanzar_fase!(usuario: current_user, tamanio_maceta: litros)
+    lote.lote_eventos.create!(
+      tipo: 'cambio_estado', estado_anterior: estado_anterior, estado_nuevo: lote.estado,
+      descripcion: datos['descripcion'].presence ||
+                   "Avance de fase por voz: #{estado_anterior} → #{lote.estado}" +
+                   (estado_anterior == 'enraizado' && lote.tamanio_maceta ? " · a maceta de #{lote.tamanio_maceta.to_f.round(3)} L" : ''),
+      user: current_user, club: club, registrado_en: Time.current,
+      sala_origen_id:  sala_anterior_id != lote.sala_id ? sala_anterior_id : nil,
+      sala_destino_id: sala_anterior_id != lote.sala_id ? lote.sala_id : nil,
+    )
+    TareasAutoService.new(lote: lote, estado_nuevo: lote.estado, user: current_user, club: club).call
+    { ok: true, mensaje: "#{personal ? quien.capitalize : lote.codigo}: #{Lote.etiqueta_estado(estado_anterior, lote.origen).downcase} → #{lote.estado_label.downcase}" }
+  rescue ActiveRecord::RecordInvalid => e
+    { ok: false, error: e.record.errors.full_messages.join(', ') }
+  rescue ArgumentError, RuntimeError => e
+    { ok: false, error: e.message }
   end
 
 

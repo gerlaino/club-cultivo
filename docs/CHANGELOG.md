@@ -1,5 +1,18 @@
 # Changelog
 
+## Octubre 2026 (er) — Avanzar de fase por voz = el botón; el dictado y la voz del asistente (11-oct)
+
+- **«Avanzá de fase el lote que está germinando»** tiraba «Tamanio maceta es obligatorio…»: el
+  asistente hacía `update(estado:)` y se salteaba `avanzar_fase!` (maceta al prender, sala,
+  plantas, tareas de la fase) y hasta dejaba cosechar sin pesada. Ahora va por `avanzar_fase!`,
+  sólo al paso siguiente; la maceta sale de lo dicho («al vaso» = 0,335 L) o se pide en castellano;
+  la cosecha va por su formulario. El error del modelo dice «Falta la maceta…».
+  Spec `asistente_avance_ciclo_spec.rb`.
+- **«Se interrumpió la grabación»** al volver a grabar: la voz del asistente («…¿Confirmás?») le
+  sacaba el audio al dictado en el iPhone, y el error atrasado de la grabación cancelada ensuciaba
+  la siguiente. `useReconocimientoVoz` calla la voz antes de grabar, ignora eventos de instancias
+  viejas y reintenta una vez un corte de afuera.
+
 ## Octubre 2026 (eq) — Mayor de 18: declaración propia en el autoregistro (9-oct)
 
 Germán: «decimos que no permitimos menores de edad y no tenemos ningún bloqueo». Había un solo tilde
