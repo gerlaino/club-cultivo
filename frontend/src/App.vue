@@ -56,6 +56,15 @@ router.afterEach(() => { routeLoading.value = false })
 const { can, isAdmin, isSuperAdmin, isCultivador, isSupervisor, isDispensador, isManicura, isMedico, isAbogado, isAuditor, isDelivery } = usePermissions();
 const isMobileRoute = computed(() => route.path.startsWith('/m/'))
 
+// NINGÚN ARMAZÓN HASTA QUE TERMINE LA PRIMERA NAVEGACIÓN (11-oct-2026, Germán: «cuando abro la app,
+// por un momento me muestra el dashboard y después la vista correspondiente»). La sesión se
+// confirma antes de que la primera ruta termine de resolverse —las pantallas del teléfono se bajan
+// aparte—, y en ese hueco la ruta todavía es la inicial (`/`): el admin logueado veía la barra
+// lateral y la barra de arriba de escritorio hasta que llegaba su pantalla. `isReady` espera
+// también las redirecciones del guard.
+const primeraRutaLista = ref(false)
+router.isReady().finally(() => { primeraRutaLista.value = true })
+
 const adminDrawerOpen = ref(false);
 const cvdDrawerOpen  = ref(false);
 const svrDrawerOpen  = ref(false);
@@ -187,12 +196,12 @@ onMounted(async () => {
        pantalla que quede debajo sólo puede mostrar huecos. -->
   <OrganizacionSuspendida v-if="auth.clubSuspendido" />
   <!-- Uso personal autoregistrado: confirmar el mail / fin de la prueba. -->
-  <AvisoAutoregistro v-if="auth.isAuthenticated && !auth.clubSuspendido && !$route.meta.fullscreen" />
+  <AvisoAutoregistro v-if="primeraRutaLista && auth.isAuthenticated && !auth.clubSuspendido && !$route.meta.fullscreen" />
   <ToastProvider />
   <ConfirmDialog />
   <OfflineIndicator />
   <div v-if="routeLoading" class="route-loading-bar"></div>
-  <div class="app-shell" :class="{ 'app-shell--mobile-nav': auth.isAuthenticated && !$route.meta.fullscreen && auth.user?.role !== 'super_admin' && !isAdmin && !isCultivador && !isSupervisor && !isDispensador && !isManicura && !isMedico && !isAbogado && !isAuditor && !isDelivery }">
+  <div v-if="primeraRutaLista" class="app-shell" :class="{ 'app-shell--mobile-nav': auth.isAuthenticated && !$route.meta.fullscreen && auth.user?.role !== 'super_admin' && !isAdmin && !isCultivador && !isSupervisor && !isDispensador && !isManicura && !isMedico && !isAbogado && !isAuditor && !isDelivery }">
 
     <!-- ── MOBILE SHELL (rutas /m/*) — sin sidebar ni topbar ── -->
     <template v-if="isMobileRoute">

@@ -1,5 +1,15 @@
 # Changelog
 
+## Octubre 2026 (eu) — Al abrir la app no se ve el armazón de escritorio (11-oct)
+
+Germán: «cuando abro la app, por un momento me muestra el dashboard y después la vista
+correspondiente». La sesión se confirmaba antes de que terminara la primera navegación (las
+pantallas del teléfono se bajan aparte) y `App.vue` elegía el armazón con la ruta inicial `/`: el
+admin logueado veía la barra lateral y la de arriba de escritorio hasta que llegaba su pantalla.
+Ahora no se dibuja ningún armazón hasta `router.isReady()` (que espera las redirecciones del
+guard). Verificado con Playwright simulando la app instalada: antes `/ → [sidebar+topbar] →
+/m/personal/hoy`; ahora `/ → /m/personal/hoy`. La compu abre igual que siempre.
+
 ## Octubre 2026 (et) — La app ya no crea tareas sola al cambiar de fase (11-oct)
 
 Germán pasó un lote a vegetativo por voz (con maceta y riego) y le aparecieron «Primer riego en
