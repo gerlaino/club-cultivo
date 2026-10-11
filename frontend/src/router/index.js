@@ -4,6 +4,7 @@ import { useClubStore }   from "../stores/club";
 import { usePermissions } from "../composables/usePermissions";
 import { useToast }       from "../composables/useToast";
 import { usePWA }         from "../composables/usePWA";
+import { esUsoPersonal }  from "../composables/useUsoPersonal";
 
 const MOBILE_ROLES = ['admin', 'supervisor', 'cultivador', 'manicura', 'delivery', 'dispensador']
 const MOBILE_HOME  = {
@@ -306,7 +307,7 @@ const routes = [
     name: "mi-cultivo",
     component: () => import("../views/personal/MiCultivoView.vue"),
     meta: { requiresAuth: true },
-    beforeEnter: () => (useClubStore().data && !useClubStore().data.personal ? '/salas' : true),
+    beforeEnter: () => (esUsoPersonal() ? true : '/salas'),
   },
 
   {
@@ -1077,7 +1078,7 @@ const routes = [
           // Uso personal: el admin tiene su propio inicio. `club.data` puede no haber llegado
           // todavía en el primer arranque; en ese caso cae al home de admin, que en personal
           // redirige solo (ver MAdminHomeView).
-          if (role === 'admin' && useClubStore().data?.personal) return '/m/personal/hoy'
+          if (role === 'admin' && esUsoPersonal()) return '/m/personal/hoy'
           const homes = {
             admin:      '/m/admin/home',
             supervisor: '/m/admin/home', // supervisor comparte rutas mobile de admin
@@ -1463,7 +1464,10 @@ router.beforeEach(async (to) => {
     const enElShell = rutaEnShell(to, role)
     if (enElShell) return enElShell
 
-    return MOBILE_HOME[role]
+    // El admin de un autocultivo va DIRECTO a su inicio. Iba a `/m/admin/home` (el de una
+    // organización), que después lo rebotaba a «Hoy» al llegar las preferencias: al abrir la app
+    // se veía un instante la pantalla equivocada (Germán, 11-oct-2026).
+    return role === 'admin' && esUsoPersonal() ? '/m/personal/hoy' : MOBILE_HOME[role]
   }
 
   // Las páginas públicas (landing, carnet, pasaporte de dispensa, genética) no entran en la
@@ -1504,8 +1508,8 @@ router.beforeEach(async (to) => {
     // Acá SÍ se espera a las preferencias: escribir /usuarios a mano es una carga en frío, y
     // sin esto la regla pasaba de largo justo en el único caso en que hace falta. Sólo en
     // estas dos rutas, y con el error tragado: si no llegan, se deja pasar y el backend decide.
-    if (!club.data) await club.fetch().catch(() => {})
-    if (club.data?.personal) return ROLE_HOME[role] || '/'
+    if (!club.data && auth.user?.club_personal == null) await club.fetch().catch(() => {})
+    if (esUsoPersonal()) return ROLE_HOME[role] || '/'
   }
 
   return true;

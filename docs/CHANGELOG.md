@@ -1,5 +1,16 @@
 # Changelog
 
+## Octubre 2026 (es) — Al abrir la app ya no se ve un instante la pantalla equivocada (11-oct)
+
+Germán: «cada vez que entro a la app se ve una vista vieja y después la actual» (uso personal).
+El guard del teléfono mandaba al admin a `/m/admin/home` (el inicio de una organización) y esa
+pantalla lo rebotaba a «Hoy» cuando llegaban las preferencias del club, que cargan en segundo
+plano. `useUsoPersonal` contestaba `false` mientras tanto (lo decía su comentario), así que la barra
+de abajo y el inicio de la compu también se dibujaban como organización un instante.
+- `/me` trae `club_personal`; `useUsoPersonal` / `esUsoPersonal()` lo usan hasta que llegan las
+  preferencias. El guard manda al admin personal directo a `/m/personal/hoy`.
+- Specs `me_club_personal_spec.rb`, `usoPersonalDesdeMe.test.js`.
+
 ## Octubre 2026 (er) — Avanzar de fase por voz = el botón; el dictado y la voz del asistente (11-oct)
 
 - **«Avanzá de fase el lote que está germinando»** tiraba «Tamanio maceta es obligatorio…»: el

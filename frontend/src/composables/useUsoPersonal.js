@@ -5,14 +5,25 @@
 // teléfono, el inicio y el vocabulario preguntan esto, y si cada pantalla lo dedujera por su
 // cuenta (por el plan, por las features) un día dirían distinto.
 //
-// Con las preferencias todavía sin cargar contesta `false`: se dibuja como organización un
-// instante y se corrige; rebotar o esconder por una carrera de carga es peor.
+// Mientras las preferencias cargan (en segundo plano) vale lo que dijo `/me` (`club_personal`),
+// que el router espera antes de mostrar nada. Antes contestaba `false` en ese rato: al abrir la
+// app se dibujaba el inicio de una organización y después saltaba a «Hoy» (11-oct-2026).
 import { computed } from 'vue'
 import { useClubStore } from '../stores/club'
+import { useAuthStore } from '../stores/auth'
+
+// Para el router y los guards, que no están dentro de un componente.
+export function esUsoPersonal() {
+  const club = useClubStore()
+  if (club.data && typeof club.data.personal === 'boolean') return club.data.personal
+  return useAuthStore().user?.club_personal === true
+}
 
 export function useUsoPersonal() {
   const club = useClubStore()
-  const esPersonal = computed(() => club.data?.personal === true)
+  const auth = useAuthStore()
+  const esPersonal = computed(() =>
+    club.data && typeof club.data.personal === 'boolean' ? club.data.personal : auth.user?.club_personal === true)
 
   // El texto visible dice «tu cultivo» donde a una organización se le dice «la organización».
   // Sólo las formas que aparecen en pantalla; no es un diccionario.

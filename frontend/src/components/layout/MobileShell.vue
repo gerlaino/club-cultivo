@@ -160,6 +160,7 @@ import { computed, onMounted, onUnmounted, provide, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { useClubStore }  from '../../stores/club'
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
 import { useCajaDeliveryStore } from '../../stores/cajaDelivery.js'
 import { usePushNotifications, MOTIVOS } from '../../composables/usePushNotifications.js'
 import { useToast } from '../../composables/useToast.js'
@@ -185,7 +186,7 @@ const club   = useClubStore()
 const toast  = useToast()
 
 const role = computed(() => auth.user?.role || '')
-const esPersonal = computed(() => club.data?.personal === true)
+const { esPersonal } = useUsoPersonal()
 // Quién tiene «lo de todos los días» en el «+»: el cultivador de casa y el cultivador de una
 // organización. Los dos riegan; el admin de una organización no está en el pasillo.
 const ofreceHoy  = computed(() => esPersonal.value || role.value === 'cultivador')
@@ -198,7 +199,7 @@ const ROLE_LABELS = {
   admin: 'Administración', supervisor: 'Supervisión', cultivador: 'Cultivo',
   manicura: 'Manicura', delivery: 'Delivery', dispensador: 'Dispensa',
 }
-const roleLabel = computed(() => (club.data?.personal && role.value === 'admin' ? 'Mi cultivo' : ROLE_LABELS[role.value] || ''))
+const roleLabel = computed(() => (esPersonal.value && role.value === 'admin' ? 'Mi cultivo' : ROLE_LABELS[role.value] || ''))
 
 const isDetalle = computed(() =>
   /\/m\/(sede|sala-m|lote-m|cama-m|planta|mnc\/lotes)\//.test(route.path)
@@ -306,7 +307,7 @@ NAV.personal = { fab: true, items: [
 ] }
 
 // Qué barra corresponde: el rol, salvo en uso personal, donde el admin lleva la suya.
-const navKey = computed(() => (role.value === 'admin' && club.data?.personal ? 'personal' : role.value))
+const navKey = computed(() => (role.value === 'admin' && esPersonal.value ? 'personal' : role.value))
 
 // Un destino se ofrece sólo si la organización tiene lo que ese destino necesita. Misma regla que el
 // menú de escritorio (useNavContext), para que las dos superficies no se desincronicen.
@@ -401,7 +402,7 @@ const fabActions = computed(() => {
   }
   // Crear una SALA es decisión de infraestructura, no del que está en el pasillo.
   if (!esCultivador) {
-    acciones.push({ key: 'sala', label: club.data?.personal ? 'Crear espacio' : 'Crear sala', icon: 'bi-grid-3x3-gap',
+    acciones.push({ key: 'sala', label: esPersonal.value ? 'Crear espacio' : 'Crear sala', icon: 'bi-grid-3x3-gap',
                     tint: 'var(--c-sky-100)', color: 'var(--c-sky-600)', onClick: abrirNuevaSala })
     acciones.push({ key: 'scan', label: 'Escanear QR', icon: 'bi-qr-code-scan',
                     tint: '#ede9fe', color: '#7c3aed', onClick: irEscanear })

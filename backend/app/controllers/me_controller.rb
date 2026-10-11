@@ -82,6 +82,11 @@ class MeController < ApplicationController
     # no ofrece el botón.
     data['push_vapid_public_key'] = ENV['VAPID_PUBLIC_KEY'].presence
 
+    # ¿Uso personal? Viaja en /me (que el router espera) y no sólo en las preferencias del club,
+    # que cargan en segundo plano: con eso solo, al abrir la app se dibujaba el inicio de una
+    # organización un instante y después saltaba a «Hoy» (Germán, 11-oct-2026). Ver `useUsoPersonal`.
+    data['club_personal'] = u.club&.personal? == true
+
     # Uso personal que se registró solo: la app le pide confirmar el mail (con la fecha en que se
     # pausaría) y le dice hasta cuándo es la prueba. Nil para todos los demás.
     reg = u.club&.registro_personal if u.admin?
