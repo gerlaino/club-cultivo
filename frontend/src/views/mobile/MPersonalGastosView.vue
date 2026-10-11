@@ -43,7 +43,7 @@
       </li>
     </ul>
 
-    <p class="mpg__pie">Tocá un gasto para corregirlo. El costo por lote está en <RouterLink to="/contabilidad">Gastos</RouterLink> del escritorio.</p>
+    <p class="mpg__pie">Tocá un gasto para corregirlo. Lo que costó cada cosecha está en <RouterLink to="/contabilidad">Gastos</RouterLink>, en la compu.</p>
 
     <MobileSheet v-model="sheet" :title="g.form.id ? 'Corregir gasto' : 'Nuevo gasto'">
       <GastoForm :form="g.form" :categorias="g.categorias.value" :lotes="g.lotesAbiertos.value" :insumos="g.insumos.value" :hoy="g.hoy"

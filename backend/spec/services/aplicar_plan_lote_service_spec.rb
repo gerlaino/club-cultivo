@@ -31,6 +31,15 @@ RSpec.describe AplicarPlanLoteService do
     expect(aplicacion.objetivo_nombre).to eq(lote.codigo)
   end
 
+  # 11-oct-2026: en autocultivo el lote no se nombra; son las plantas de su genética.
+  it 'en autocultivo lo nombra por la genética' do
+    club.update_column(:plan, 'personal')
+    lote.update!(genetica: create(:genetica, club: club, nombre: 'Kings Juice'))
+    tarea_del_plan(plantilla, 0)
+    aplicacion, = aplicar
+    expect(aplicacion.objetivo_nombre).to eq('Kings Juice')
+  end
+
   it 'una plantilla se aplica desde el lote (antes fallaba) y cada tarea va a su día' do
     [0, 3, 21].each { |d| tarea_del_plan(plantilla, d) }
 

@@ -186,7 +186,7 @@ const club   = useClubStore()
 const toast  = useToast()
 
 const role = computed(() => auth.user?.role || '')
-const { esPersonal } = useUsoPersonal()
+const { esPersonal, nombreLote, cuantasPlantas } = useUsoPersonal()
 // Quién tiene «lo de todos los días» en el «+»: el cultivador de casa y el cultivador de una
 // organización. Los dos riegan; el admin de una organización no está en el pasillo.
 const ofreceHoy  = computed(() => esPersonal.value || role.value === 'cultivador')
@@ -451,7 +451,7 @@ function conRiego() {
   fabOpen.value = false
   const sueltos = lotesEnPie.value.filter(l => !l.en_cama)
   const opciones = [
-    ...camas.map(c => ({ id: `c${c.id}`, label: c.nombre, sub: `${c.sala_nombre} · ${c.lotes.length ? `${c.lotes.length} ${c.lotes.length === 1 ? 'lote' : 'lotes'}` : 'sin plantas'}`,
+    ...camas.map(c => ({ id: `c${c.id}`, label: c.nombre, sub: `${c.sala_nombre} · ${c.lotes.length ? (esPersonal.value ? cuantasPlantas(c.lotes.reduce((n, l) => n + (Number(l.plants_count) || 0), 0)) : `${c.lotes.length} ${c.lotes.length === 1 ? 'lote' : 'lotes'}`) : 'sin plantas'}`,
                          icon: 'bi-bricks', ir: () => router.push({ path: `/m/cama-m/${c.id}`, query: { accion: 'regar' } }) })),
     ...sueltos.map(l => ({ id: `l${l.id}`, label: nombreLote(l), sub: subLote(l), icon: 'bi-box-seam',
                            ir: () => router.push({ path: `/m/lote-m/${l.id}`, query: { accion: 'riego' } }) })),
@@ -481,10 +481,11 @@ const inputFoto    = ref(null)
 const fotoLoteId   = ref(null)
 
 // En casa se conoce el lote por su genética («la Ananda»); en una organización, por el código.
-function nombreLote(l) { return esPersonal.value ? (l.genetica?.nombre || l.strain || l.codigo) : l.codigo }
+// En autocultivo, «Auto Ananda — Carpa · 2 plantas»: el lote no se nombra (`useUsoPersonal`).
 function subLote(l) {
-  const plantas = `${l.plants_count || 0} plantas`
-  return esPersonal.value ? `${l.codigo} · ${plantas}` : [l.genetica?.nombre || l.strain, l.sala?.nombre, plantas].filter(Boolean).join(' · ')
+  const plantas = cuantasPlantas(l.plants_count)
+  return esPersonal.value ? [l.sala?.nombre, plantas].filter(Boolean).join(' · ')
+                          : [l.genetica?.nombre || l.strain, l.sala?.nombre, plantas].filter(Boolean).join(' · ')
 }
 
 // Regar y foto son de UN lote: si hay uno solo en pie se va derecho; si hay varios se pregunta.

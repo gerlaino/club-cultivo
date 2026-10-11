@@ -52,7 +52,7 @@ const cargando = ref(false)
 
 // Las fechas las calcula el backend (`Planes::Calendario`, la misma cuenta que al aplicar). Antes
 // esta pantalla las calculaba por su cuenta: la regla vivía en dos lados.
-const { esPersonal } = useUsoPersonal()
+const { esPersonal, nombreLote, cuantasPlantas } = useUsoPersonal()
 const preview = ref(null)
 const tareasPreview = computed(() => preview.value?.tareas || [])
 async function pedirPreview() {
@@ -191,7 +191,7 @@ async function aplicar() {
                 @click="objetivoTipo = ''"
               >
                 <i class="bi bi-building"></i>
-                <span>Toda la organización</span>
+                <span>{{ esPersonal ? 'Todo el cultivo' : 'Toda la organización' }}</span>
               </button>
               <button
                 class="apm__obj-btn"
@@ -199,7 +199,7 @@ async function aplicar() {
                 @click="objetivoTipo = 'Lote'"
               >
                 <i class="bi bi-flower1"></i>
-                <span>Un lote</span>
+                <span>{{ esPersonal ? 'Unas plantas' : 'Un lote' }}</span>
               </button>
               <button
                 class="apm__obj-btn"
@@ -207,28 +207,28 @@ async function aplicar() {
                 @click="objetivoTipo = 'Sala'"
               >
                 <i class="bi bi-grid-1x2"></i>
-                <span>Una sala</span>
+                <span>{{ esPersonal ? 'Un espacio' : 'Una sala' }}</span>
               </button>
             </div>
           </div>
 
           <!-- Selector de Lote -->
           <div v-if="objetivoTipo === 'Lote'" class="apm__field">
-            <label class="apm__label">Seleccionar lote</label>
-            <div v-if="cargando" class="apm__loading-sm"><DsSpinner :size="16" /> Cargando lotes…</div>
+            <label class="apm__label">{{ esPersonal ? '¿Qué plantas?' : 'Seleccionar lote' }}</label>
+            <div v-if="cargando" class="apm__loading-sm"><DsSpinner :size="16" /> Cargando…</div>
             <select v-else class="apm__input" v-model="objetivoId">
-              <option :value="null">— Elegir lote —</option>
+              <option :value="null">{{ esPersonal ? '— Elegir —' : '— Elegir lote —' }}</option>
               <option v-for="l in lotes" :key="l.id" :value="l.id">
-                {{ l.nombre || l.codigo || `Lote #${l.id}` }}
-                <template v-if="l.cepa"> — {{ l.cepa }}</template>
+                <template v-if="esPersonal">{{ [nombreLote(l), l.sala?.nombre, cuantasPlantas(l.plants_count)].filter(Boolean).join(' · ') }}</template>
+                <template v-else>{{ l.nombre || l.codigo || `Lote #${l.id}` }}<template v-if="l.cepa"> — {{ l.cepa }}</template></template>
               </option>
             </select>
           </div>
 
           <!-- Selector de Sala -->
           <div v-if="objetivoTipo === 'Sala'" class="apm__field">
-            <label class="apm__label">Seleccionar sala</label>
-            <div v-if="cargando" class="apm__loading-sm"><DsSpinner :size="16" /> Cargando salas…</div>
+            <label class="apm__label">{{ esPersonal ? '¿Qué espacio?' : 'Seleccionar sala' }}</label>
+            <div v-if="cargando" class="apm__loading-sm"><DsSpinner :size="16" /> Cargando…</div>
             <div v-else class="apm__sala-list">
               <label
                 v-for="s in salas" :key="s.id"
@@ -249,7 +249,7 @@ async function aplicar() {
               <i class="bi bi-calendar3"></i>
               <span>{{ preview?.total ?? 0 }} tarea{{ (preview?.total ?? 0) !== 1 ? 's' : '' }}</span>
               <span v-if="objetivoSeleccionado" class="apm__preview-objetivo">
-                en {{ objetivoSeleccionado.nombre || objetivoSeleccionado.codigo }}
+                en {{ objetivoTipo === 'Lote' && esPersonal ? nombreLote(objetivoSeleccionado) : (objetivoSeleccionado.nombre || objetivoSeleccionado.codigo) }}
               </span>
             </div>
 

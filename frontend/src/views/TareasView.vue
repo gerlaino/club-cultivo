@@ -80,7 +80,7 @@
                   <span class="pend__chip" :class="`pend__chip--${g.key}`">{{ etiquetaFecha(t, g.key) }}</span>
                   <span v-if="t.estado === 'en_progreso'" class="pend__chip pend__chip--prog">en progreso</span>
                   <span v-if="t.sala" class="pend__chip">{{ t.sala.nombre }}</span>
-                  <span v-if="t.lote" class="pend__chip">{{ t.lote.codigo }}</span>
+                  <span v-if="t.lote" class="pend__chip">{{ nombreLote(t.lote) }}</span>
                   <span v-if="t.origen_plan_id" class="pend__chip pend__chip--plan">Plan</span>
                 </span>
                 <span v-if="t.asignada_a && !esPersonal" class="pend__asig" :title="t.asignada_a.nombre">
@@ -175,7 +175,7 @@
                 :title="`${p.origen_plan?.titulo ? 'Plan ' + p.origen_plan.titulo + ' · ' : ''}se suma a tus tareas el ${fechaCorta(p.aparece_el)}`"
               >
                 <span class="sem__tarea-emoji">{{ TIPO_EMOJI[p.tipo] || '📋' }}</span>
-                <span class="sem__tarea-titulo">{{ p.titulo }}<small v-if="p.lote" class="sem__prevista-lote"> · {{ p.lote.codigo }}</small></span>
+                <span class="sem__tarea-titulo">{{ p.titulo }}<small v-if="p.lote" class="sem__prevista-lote"> · {{ nombreLote(p.lote) }}</small></span>
                 <span class="sem__plan-badge">Plan</span>
                 <small class="sem__prevista-cuando">se suma el {{ fechaCorta(p.aparece_el) }}</small>
               </div>
@@ -243,7 +243,7 @@
               <div v-if="tareaDetalle.lote" class="tv__panel-row">
                 <span class="tv__panel-key">Lote</span>
                 <RouterLink :to="`/lotes/${tareaDetalle.lote.id}`" class="tv__panel-link">
-                  {{ tareaDetalle.lote.codigo }} <i class="bi bi-arrow-right-short"></i>
+                  {{ nombreLote(tareaDetalle.lote) }} <i class="bi bi-arrow-right-short"></i>
                 </RouterLink>
               </div>
               <div v-if="tareaDetalle.fecha_programada" class="tv__panel-row">
@@ -325,7 +325,7 @@ import { useEliminarTarea } from '../composables/useEliminarTarea.js'
 import { useNoSeHizo } from '../composables/useNoSeHizo.js'
 import EmptyState from '../components/ui/EmptyState.vue'
 import { formatFechaLarga } from '../utils/fecha.js'
-const { esPersonal } = useUsoPersonal()
+const { esPersonal, nombreLote } = useUsoPersonal()
 
 const authStore   = useAuthStore()
 const tareasStore = useTareasStore()

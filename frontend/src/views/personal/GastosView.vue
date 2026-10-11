@@ -10,7 +10,7 @@
 
     <div class="gp__tabs">
       <button class="gp__tab" :class="{ 'gp__tab--on': tab === 'gastos' }" @click="tab = 'gastos'"><i class="bi bi-receipt"></i> Gastos</button>
-      <button class="gp__tab" :class="{ 'gp__tab--on': tab === 'lotes' }" @click="tab = 'lotes'"><i class="bi bi-box-seam"></i> Costo por lote</button>
+      <button class="gp__tab" :class="{ 'gp__tab--on': tab === 'lotes' }" @click="tab = 'lotes'"><i class="bi bi-box-seam"></i> Costo por cosecha</button>
       <button class="gp__tab" :class="{ 'gp__tab--on': tab === 'tipos' }" @click="tab = 'tipos'"><i class="bi bi-tags"></i> Tipos de gasto</button>
     </div>
 
@@ -99,16 +99,16 @@
          me costó este lote y cuánto cada gramo— y sale de los gastos que ató a cada lote. -->
     <template v-if="tab === 'lotes'">
       <div v-if="cargandoLotes" class="gp__loading"><DsSpinner :size="18" /> Cargando…</div>
-      <DsEmpty v-else-if="!lotesCosto.length" title="Todavía no hay costos por lote"
-               description="Cuando anotes un gasto «para un lote» y ese lote se pese, acá aparece cuánto costó cada gramo." />
+      <DsEmpty v-else-if="!lotesCosto.length" title="Todavía no hay costos por cosecha"
+               description="Cuando anotes un gasto «para» unas plantas y esas plantas se cosechen y se pesen, acá aparece cuánto costó cada gramo." />
       <table v-else class="gp__table">
         <thead>
-          <tr><th>Lote</th><th>Genética</th><th>Estado</th><th class="gp__num">Gastos</th><th class="gp__num">Producido</th><th class="gp__num">Costo por gramo</th></tr>
+          <tr><th>Plantas</th><th>Espacio</th><th>Estado</th><th class="gp__num">Gastos</th><th class="gp__num">Producido</th><th class="gp__num">Costo por gramo</th></tr>
         </thead>
         <tbody>
           <tr v-for="l in lotesCosto" :key="l.id">
-            <td class="gp__mono"><RouterLink :to="`/lotes/${l.id}`" class="gp__link">{{ l.codigo }}</RouterLink></td>
-            <td>{{ l.genetica || '—' }}</td>
+            <td><RouterLink :to="`/lotes/${l.id}`" class="gp__link">{{ l.genetica || 'Plantas' }}</RouterLink></td>
+            <td>{{ l.sala || '—' }}</td>
             <td>{{ ESTADO_META[l.estado]?.label || l.estado }}</td>
             <td class="gp__num">{{ g.ars(l.costo_total) }}</td>
             <td class="gp__num">{{ l.gramos_producidos != null ? `${fmt(l.gramos_producidos)} g` : '—' }}</td>
@@ -116,7 +116,7 @@
           </tr>
         </tbody>
       </table>
-      <p class="gp__nota">Los gastos sin lote («del cultivo en general») no se reparten: son el costo de tener el cultivo, no de un lote.</p>
+      <p class="gp__nota">Los gastos «del cultivo en general» no se reparten: son el costo de tener el cultivo, no de unas plantas.</p>
     </template>
 
     <!-- Modal alta/edición -->
@@ -219,7 +219,8 @@ async function cargarLotes() {
     const porId = Object.fromEntries((lts.data || []).map(l => [l.id, l]))
     lotesCosto.value = (pl.data?.lotes || [])
       .filter(l => l.tiene_costos)
-      .map(l => ({ ...l, gramos_producidos: porId[l.id]?.rendimiento_real_g ?? null }))
+      .map(l => ({ ...l, gramos_producidos: porId[l.id]?.rendimiento_real_g ?? null,
+                    sala: porId[l.id]?.sala?.nombre || porId[l.id]?.sala_nombre || null }))
     lotesCargados = true
   } catch { lotesCosto.value = [] } finally { cargandoLotes.value = false }
 }

@@ -140,14 +140,14 @@
             <template v-if="!mostrarSala">
               <button type="button" class="mt-sala-toggle" @click="mostrarSala = true">
                 <i class="bi bi-plus-circle"></i>
-                Asignar sala
+                {{ esPersonal ? '¿En qué espacio o plantas?' : 'Asignar sala' }}
                 <span class="mt-sala-toggle__opt">opcional</span>
               </button>
             </template>
             <template v-else>
               <div class="mt-field">
                 <label class="mt-label">
-                  Sala
+                  {{ sala.Corta }}
                   <button type="button" class="mt-sala-quitar" @click="mostrarSala = false; form.sala_id = ''; form.lote_id = ''">quitar</button>
                 </label>
                 <div v-if="form.asignada_a_id && !cargandoSalas && salasDisponibles.length === 0"
@@ -156,15 +156,17 @@
                 </div>
                 <select v-else v-model="form.sala_id" class="mt-input" @change="form.lote_id = ''"
                         :disabled="cargandoSalas">
-                  <option value="">{{ cargandoSalas ? 'Cargando…' : 'Sin sala específica' }}</option>
+                  <option value="">{{ cargandoSalas ? 'Cargando…' : `Sin ${sala.corta} específico${esPersonal ? '' : 'a'}` }}</option>
                   <option v-for="s in salasDisponibles" :key="s.id" :value="s.id">{{ s.nombre }}</option>
                 </select>
               </div>
               <div v-if="form.sala_id" class="mt-field">
-                <label class="mt-label">Lote <span class="mt-opt">opcional</span></label>
+                <label class="mt-label">{{ esPersonal ? 'Plantas' : 'Lote' }} <span class="mt-opt">opcional</span></label>
                 <select v-model="form.lote_id" class="mt-input">
-                  <option value="">Sin lote específico</option>
-                  <option v-for="l in lotesDeLaSala" :key="l.id" :value="l.id">{{ l.codigo }} — {{ l.estado }}</option>
+                  <option value="">{{ esPersonal ? `Todas las del ${sala.corta}` : 'Sin lote específico' }}</option>
+                  <option v-for="l in lotesDeLaSala" :key="l.id" :value="l.id">
+                    {{ esPersonal ? `${nombreLote(l)} · ${cuantasPlantas(l.plants_count)}` : `${l.codigo} — ${l.estado}` }}
+                  </option>
                 </select>
               </div>
             </template>
@@ -322,7 +324,7 @@ const currentStep    = ref(0)
 // USO PERSONAL: no hay a quién asignar —es él— así que el paso «¿A quién?» no existe. Se salta
 // el primer paso y la tarea queda a su nombre; los índices de los pasos no cambian, sólo el
 // piso desde el que se cuenta (`primerPaso`).
-const { esPersonal } = useUsoPersonal()
+const { esPersonal, sala, nombreLote, cuantasPlantas } = useUsoPersonal()
 const primerPaso = computed(() => (esPersonal.value ? 1 : 0))
 const pasosVisibles = computed(() => STEPS.slice(primerPaso.value))
 const conRepeticion  = ref(false)
@@ -366,7 +368,10 @@ const salasDelUsuario  = ref([])
 const cargandoSalas    = ref(false)
 
 const salasDisponibles = computed(() => {
-  if (!form.value.asignada_a_id) return props.salas
+  // En autocultivo la tarea es suya y los espacios son todos suyos: no hay «sede asignada» que
+  // filtrar. Filtraba por las salas del usuario asignado —que nunca se cargaban, porque se asigna
+  // solo— y decía «Este usuario no tiene salas disponibles en su sede asignada» (11-oct-2026).
+  if (esPersonal.value || !form.value.asignada_a_id) return props.salas
   if (cargandoSalas.value) return []
   const ids = salasDelUsuario.value.map(s => String(s.id))
   return props.salas.filter(s => ids.includes(String(s.id)))

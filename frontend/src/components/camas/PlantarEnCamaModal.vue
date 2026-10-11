@@ -41,7 +41,7 @@ import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
 const props = defineProps({ lote: { type: Object, required: true } })
 const emit = defineEmits(['close', 'plantado'])
 const toast = useToast()
-const { sala: salaTxt } = useUsoPersonal()
+const { sala: salaTxt, nombreLote, esPersonal } = useUsoPersonal()
 const hoy = hoyISO()
 
 const camas = ref([])
@@ -53,7 +53,8 @@ const error = ref(null)
 
 const cama = computed(() => camas.value.find(c => c.id === camaId.value) || null)
 const aviso = computed(() => avisoAlPlantar(cama.value))
-const sub = computed(() => `${props.lote.codigo}${props.lote.genetica?.nombre ? ` · ${props.lote.genetica.nombre}` : ''}`)
+const sub = computed(() => (esPersonal.value ? nombreLote(props.lote)
+  : `${props.lote.codigo}${props.lote.genetica?.nombre ? ` · ${props.lote.genetica.nombre}` : ''}`))
 
 onMounted(async () => {
   try {
@@ -70,7 +71,7 @@ async function guardar() {
   guardando.value = true
   try {
     const { data } = await plantarEnCama(props.lote.id, { cama_id: camaId.value, fecha: fecha.value })
-    toast.success(`${props.lote.codigo} plantado en la ${cama.value.nombre}`)
+    toast.success(esPersonal.value ? `${nombreLote(props.lote)}: plantadas en la ${cama.value.nombre}` : `${props.lote.codigo} plantado en la ${cama.value.nombre}`)
     emit('plantado', data)
   } catch (e) {
     error.value = e?.response?.data?.errors?.join(', ') || e?.response?.data?.error || 'No se pudo plantar'

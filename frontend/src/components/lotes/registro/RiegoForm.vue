@@ -11,17 +11,17 @@
       <div v-if="!porPlantas" class="rf__field" :class="{ 'rf__field--full': porLote }">
         <!-- En la sala es el TOTAL: el backend le da a cada lote su parte (Germán, 29-sep-2026).
              O, con «Cargar por lote» (30-sep), lo de cada uno y el total es la suma. -->
-        <label class="rf__label">{{ porLote ? 'Volumen de cada lote' : (salaId ? `Volumen total ${delEspacio}` : 'Volumen') }} <span class="rf__unit">L</span></label>
+        <label class="rf__label">{{ porLote ? (esPersonal ? 'Volumen de cada genética' : 'Volumen de cada lote') : (salaId ? `Volumen total ${delEspacio}` : 'Volumen') }} <span class="rf__unit">L</span></label>
         <template v-if="!porLote">
           <input type="number" step="0.5" min="0" class="rf__input" v-model.number="f.volumen" placeholder="20" />
-          <button v-if="lotes.length > 1" type="button" class="rf__link" @click="setPorLote(true)">Cargar por lote</button>
+          <button v-if="lotes.length > 1" type="button" class="rf__link" @click="setPorLote(true)">{{ esPersonal ? 'Cargar por genética' : 'Cargar por lote' }}</button>
         </template>
         <template v-else>
           <div class="rf__por-lote">
             <div v-for="l in lotes" :key="l.id" class="rf__por-lote-fila">
-              <span class="rf__por-lote-codigo">{{ l.codigo }}</span>
+              <span class="rf__por-lote-codigo">{{ nombreLote(l) }}</span>
               <input type="number" step="0.5" min="0" class="rf__input rf__input--sm" :value="f.volumenes?.[l.id] ?? ''"
-                     :aria-label="`Volumen de ${l.codigo}`" @input="setVolumenLote(l.id, $event.target.value)" />
+                     :aria-label="`Volumen de ${nombreLote(l)}`" @input="setVolumenLote(l.id, $event.target.value)" />
               <span class="rf__linea-unidad">L</span>
             </div>
             <div class="rf__por-lote-total">Total: {{ num(f.volumen) }} L</div>
@@ -200,7 +200,7 @@ const f     = computed({
   get: () => props.modelValue,
   set: v  => emit('update:modelValue', v),
 })
-const { esPersonal } = useUsoPersonal()
+const { esPersonal, nombreLote } = useUsoPersonal()
 const delEspacio = computed(() => (esPersonal.value ? 'del espacio' : 'de la sala'))
 const aguas = reglasSueloVivo().aguas
 // La última agua que se eligió (comodidad de quien usa este teléfono).

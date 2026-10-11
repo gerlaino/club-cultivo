@@ -72,12 +72,12 @@
     </div>
     <!-- En cuotas no se imputa a un lote ni carga nutrientes: la compra en cuotas no tiene esos
          datos, y ofrecerlos para tirarlos al guardar es el peor error. -->
-    <p v-if="enCuotas" class="gf__hint">En cuotas no se imputa a un lote ni suma a tus nutrientes.</p>
+    <p v-if="enCuotas" class="gf__hint">En cuotas no se carga a unas plantas ni suma a tus nutrientes.</p>
     <label v-if="!enCuotas" class="gf__field">
-      <span class="gf__label">Para un lote <span class="gf__opt">(opcional)</span></span>
+      <span class="gf__label">Para qué plantas <span class="gf__opt">(opcional)</span></span>
       <select v-model="f.lote_id" class="gf__input">
         <option :value="null">Del cultivo en general</option>
-        <option v-for="l in lotes" :key="l.id" :value="l.id">{{ l.codigo }} · {{ l.genetica?.nombre || l.strain || '' }}</option>
+        <option v-for="l in lotes" :key="l.id" :value="l.id">{{ [l.genetica?.nombre || l.strain || 'Plantas', l.sala?.nombre, l.plants_count != null ? `${l.plants_count} ${l.plants_count === 1 ? 'planta' : 'plantas'}` : null].filter(Boolean).join(' · ') }}</option>
       </select>
     </label>
 

@@ -338,6 +338,10 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 
 ### Lo que NO hay que romper
 
+- **EN AUTOCULTIVO NINGÚN MODAL DICE SALA, LOTE NI SEDE** (11-oct-2026). Espacio, plantas (por su
+  genética), todo el cultivo. Para nombrar un lote se usa `useUsoPersonal().nombreLote` (y
+  `nombre_de_lote` en el asistente); nada de `l.codigo` a la vista. Vale en el teléfono y en la compu:
+  la forma de autocultivo queda aislada de la de organizaciones.
 - **LAS TAREAS LAS GENERAN LOS USUARIOS, NO LA APP** (11-oct-2026, Germán). Cambiar de fase (botón,
   voz, sala) no crea tareas: se retiró `TareasAutoService`, que agendaba una lista fija por fase sin
   mirar lo hecho. Las tareas salen de lo que la persona agenda, de sus planes de trabajo o de lo que

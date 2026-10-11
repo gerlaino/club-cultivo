@@ -23,7 +23,7 @@
         <!-- Aviso propagación -->
         <!-- `display: block`, no flex: con flex el texto se partía en tres columnas en el teléfono. -->
         <div class="rls__info-bar">
-          El registro se aplicará a <strong>todos los lotes activos</strong> de {{ esPersonal ? 'este espacio' : 'esta sala' }}.
+          El registro se aplicará a <strong>{{ esPersonal ? 'todas las plantas' : 'todos los lotes activos' }}</strong> de {{ esPersonal ? 'este espacio' : 'esta sala' }}.
         </div>
 
         <!-- Body -->
@@ -106,7 +106,7 @@
                 </div>
                 <div class="rls__seccion-body">
                   <p v-if="accionId === 'riego' && sala?.camas?.length" class="rsm__cama-hint">
-                    🧱 En suelo vivo el riego va por cama: para regar una sola, «Regar» en su tarjeta. Esto riega todos los lotes del {{ esPersonal ? 'espacio' : 'cuarto' }}.
+                    🧱 En suelo vivo el riego va por cama: para regar una sola, «Regar» en su tarjeta. Esto riega {{ esPersonal ? 'todas las plantas del espacio' : 'todos los lotes del cuarto' }}.
                   </p>
                   <RiegoForm     v-if="accionId === 'riego'"     v-model="formData.riego" :suelo-vivo="todoEnCamas" :sala-id="sala?.id" :lotes="lotesQueRiegan" />
                   <PodaForm      v-if="accionId === 'poda'"      v-model="formData.poda" :total-plantas="sala?.plantas_totales" />

@@ -143,7 +143,8 @@ onMounted(async () => {
               <input class="mcr__input" v-model.number="form.m2" type="number" min="0" step="0.1" :placeholder="esPersonal ? '1' : '4'" />
               <span class="mcr__hint">Sirve para comparar el rendimiento en g/m² contra la ficha de la genética.</span>
             </div>
-            <div class="mcr__field">
+            <!-- Un espacio de casa nace en uso: «en mantenimiento» o «cerrada» son de una organización. -->
+            <div v-if="!esPersonal" class="mcr__field">
               <label class="mcr__label">Estado inicial</label>
               <select class="mcr__input" v-model="form.state">
                 <option value="activa">Activa</option>

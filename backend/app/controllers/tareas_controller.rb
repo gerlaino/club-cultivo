@@ -82,7 +82,7 @@ class TareasController < ApplicationController
     # sin fecha). Mismo scope que stats.pendientes, así el KPI y la lista coinciden.
     # Acotado a 100 — con stats.pendientes el front avisa si se truncó.
     pendientes = base.pendientes_al_dia
-                     .includes(:asignada_a, :sala, :lote, :origen_plan)
+                     .includes(:asignada_a, :sala, { lote: :genetica }, :origen_plan)
                      .order(Arel.sql('fecha_programada ASC NULLS LAST'))
                      .por_prioridad
                      .limit(PENDIENTES_LIMIT)
@@ -290,7 +290,7 @@ class TareasController < ApplicationController
                         "(NOT (#{hecha}) AND tareas.fecha_programada BETWEEN :d0 AND :d1)",
                         t0: desde.in_time_zone.beginning_of_day, t1: hasta.in_time_zone.end_of_day,
                         d0: desde, d1: hasta)
-                 .includes(:asignada_a, :sala, :lote, :origen_plan)
+                 .includes(:asignada_a, :sala, { lote: :genetica }, :origen_plan)
                  .order(:fecha_programada, :prioridad).to_a
     dia_de = ->(t) { t.completada? && t.fecha_completada ? t.fecha_completada.in_time_zone.to_date : t.fecha_programada }
     previstas = previstas_de_planes(desde, hasta)
@@ -354,7 +354,7 @@ class TareasController < ApplicationController
           prioridad: oc.plan_tarea.prioridad, fecha_programada: oc.fecha,
           aparece_el: Planes::Materializar.aparece_el(oc.fecha),
           asignada_a: oc.asignada ? { id: oc.asignada.id, nombre: oc.asignada.nombre_completo } : nil,
-          lote: obj.is_a?(Lote) ? { id: obj.id, codigo: obj.codigo } : nil,
+          lote: obj.is_a?(Lote) ? { id: obj.id, codigo: obj.codigo, genetica_nombre: obj.genetica&.nombre } : nil,
           sala: obj.is_a?(Sala) ? { id: obj.id, nombre: obj.nombre } : nil,
           origen_plan: { id: a.plan_trabajo_id, titulo: a.plan_trabajo&.titulo } }
       end
@@ -427,7 +427,8 @@ class TareasController < ApplicationController
       creada_por: t.creada_por ? { id: t.creada_por.id, nombre: t.creada_por.nombre_completo } : nil,
       asignada_a: t.asignada_a ? { id: t.asignada_a.id, nombre: t.asignada_a.nombre_completo } : nil,
       sala: t.sala ? { id: t.sala.id, nombre: t.sala.nombre, sede_id: t.sala.sede_id } : nil,
-      lote: t.lote ? { id: t.lote.id, codigo: t.lote.codigo } : nil,
+      # La genética viaja para que el autocultivo nombre «las plantas de tal genética» y no el código.
+      lote: t.lote ? { id: t.lote.id, codigo: t.lote.codigo, genetica_nombre: t.lote.genetica&.nombre } : nil,
       plant: t.plant ? { id: t.plant.id, codigo_qr: t.plant.codigo_qr, nombre: t.plant.nombre } : nil,
       recurrente:        t.recurrente,
       frecuencia:        t.frecuencia,

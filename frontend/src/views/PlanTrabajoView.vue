@@ -152,7 +152,8 @@ const OBJETIVO_LABEL = { Lote: 'Lote', Sala: 'Sala' }
 
 function describirObjetivo(a) {
   if (!a.objetivo_tipo) return esPersonal.value ? 'Todo el cultivo' : 'Toda la organización'
-  const tipo = OBJETIVO_LABEL[a.objetivo_tipo] || a.objetivo_tipo
+  const tipo = esPersonal.value ? ({ Lote: 'Plantas', Sala: 'Espacio' }[a.objetivo_tipo] || a.objetivo_tipo)
+                                : (OBJETIVO_LABEL[a.objetivo_tipo] || a.objetivo_tipo)
   return a.objetivo_nombre ? `${tipo} · ${a.objetivo_nombre}` : tipo
 }
 
@@ -209,7 +210,7 @@ onMounted(() => {
     <div class="ptv__hdr">
       <div>
         <h1 class="ptv__title">Planes</h1>
-        <p class="ptv__subtitle">Lo que se hace en cada semana del ciclo. Se arma una vez y se aplica a los lotes.</p>
+        <p class="ptv__subtitle">Lo que se hace en cada semana del ciclo. Se arma una vez y se aplica {{ esPersonal ? 'a tus plantas' : 'a los lotes' }}.</p>
       </div>
       <button class="ptv__btn-primary" @click="abrirEditar()"><i class="bi bi-plus-lg"></i> Plan nuevo</button>
     </div>
@@ -219,7 +220,7 @@ onMounted(() => {
     <div v-else-if="!plantillas.length" class="ptv__empty">
       <div class="ptv__empty-icon"><i class="bi bi-clipboard2-check"></i></div>
       <div class="ptv__empty-title">Todavía no hay planes</div>
-      <div class="ptv__empty-sub">Armá el primero: qué se hace cada semana, desde que el lote entra a la sala.</div>
+      <div class="ptv__empty-sub">Armá el primero: qué se hace cada semana, {{ esPersonal ? 'desde que las plantas arrancan' : 'desde que el lote entra a la sala' }}.</div>
       <button class="ptv__btn-primary" @click="abrirEditar()"><i class="bi bi-plus-lg"></i> Armar un plan</button>
     </div>
 
@@ -258,7 +259,7 @@ onMounted(() => {
             <!-- Un borrador no se puede aplicar: primero se publica. -->
             <button v-if="elegido.estado === 'borrador'" class="ptv__btn-primary" @click="publicar(elegido)"
                     title="Publicar — necesario para poder aplicarlo a un lote"><i class="bi bi-send-check"></i> Publicar</button>
-            <button v-else class="ptv__btn-primary" @click="abrirAplicar(elegido)"><i class="bi bi-play-fill"></i> Aplicar a lotes</button>
+            <button v-else class="ptv__btn-primary" @click="abrirAplicar(elegido)"><i class="bi bi-play-fill"></i> {{ esPersonal ? 'Aplicar a plantas' : 'Aplicar a lotes' }}</button>
           </div>
         </div>
         <PlanCalendario :tareas="tareasElegido" />
@@ -271,14 +272,14 @@ onMounted(() => {
       <div class="ptv__apl-hdr">
         <div>
           <h2 class="ptv__apl-title">{{ verHistorialApl ? 'Todos los planes aplicados' : 'Planes en curso' }}</h2>
-          <p class="ptv__subtitle">Sobre lotes, salas o {{ esPersonal ? 'todo el cultivo' : 'la organización' }}.</p>
+          <p class="ptv__subtitle">{{ esPersonal ? 'Sobre plantas, espacios o todo el cultivo.' : 'Sobre lotes, salas o la organización.' }}</p>
         </div>
         <button class="ptv__btn-ghost-txt" @click="toggleHistorialApl">{{ verHistorialApl ? 'Ver sólo los activos' : 'Ver historial' }}</button>
       </div>
 
       <div v-if="loadingAplicaciones" class="ptv__loading"><DsSpinner /></div>
       <p v-else-if="!aplicaciones.length" class="ptv__apl-empty">
-        {{ verHistorialApl ? 'Todavía no se aplicó ningún plan.' : 'No hay planes en curso. Elegí uno arriba y «Aplicar a lotes».' }}
+        {{ verHistorialApl ? 'Todavía no se aplicó ningún plan.' : (esPersonal ? 'No hay planes en curso. Elegí uno arriba y «Aplicar a plantas».' : 'No hay planes en curso. Elegí uno arriba y «Aplicar a lotes».') }}
       </p>
       <div v-else class="ptv__apl-list">
         <div v-for="a in aplicaciones" :key="a.id" class="ptv__apl-row">

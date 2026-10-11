@@ -63,7 +63,7 @@
         <i class="bi bi-door-open me-1"></i>{{ tarea.sala.nombre }}
       </span>
       <span v-if="tarea.lote" class="text-muted small ms-2">
-        <i class="bi bi-box me-1"></i>{{ tarea.lote.codigo }}
+        <i class="bi bi-box me-1"></i>{{ nombreLote(tarea.lote) }}
       </span>
     </div>
 
@@ -105,6 +105,8 @@
 import { computed } from 'vue'
 import { tareaCerrada } from '../lib/tareaEstado.js'
 import { useAuthStore } from '../stores/auth'
+import { useUsoPersonal } from '../composables/useUsoPersonal.js'
+const { nombreLote } = useUsoPersonal()
 
 const props = defineProps({
   tarea: { type: Object, required: true }

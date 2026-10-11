@@ -40,7 +40,7 @@
           <div class="mph__tarea-txt">
             <span class="mph__tarea-titulo">{{ t.titulo }}</span>
             <span class="mph__tarea-sub">
-              <template v-if="t.lote?.codigo">{{ t.lote.codigo }}</template>
+              <template v-if="t.lote">{{ nombreLote(t.lote) }}</template>
               <template v-else-if="t.sala?.nombre">{{ t.sala.nombre }}</template>
               <template v-if="t.vencida"> · venció</template>
             </span>
@@ -85,9 +85,9 @@
       </div>
       <div class="mph__fotos">
         <RouterLink v-for="f in fotosRecientes" :key="f.id" :to="`/m/lote-m/${f.lote_id}`" class="mph__foto">
-          <img :src="f.url" :alt="f.nota || f.lote_codigo" loading="lazy" />
+          <img :src="f.url" :alt="f.nota || f.genetica_nombre || f.lote_codigo" loading="lazy" />
           <span class="mph__foto-cap">
-            <b>{{ f.lote_codigo }}</b>{{ f.dia ? ` · día ${f.dia}` : '' }}
+            <b>{{ f.genetica_nombre || f.lote_codigo }}</b>{{ f.dia ? ` · día ${f.dia}` : '' }}
           </span>
         </RouterLink>
       </div>
@@ -167,6 +167,8 @@ import { getAmbienteSalas, getFotosRecientes } from '../../lib/api'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import { ESTADO_META, textoProximoPaso, estadoLoteLabel } from '../../lib/loteHelpers.js'
 import PuestaEnMarcha       from '../../components/PuestaEnMarcha.vue'
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
+const { nombreLote } = useUsoPersonal()
 
 const auth     = useAuthStore()
 const club     = useClubStore()

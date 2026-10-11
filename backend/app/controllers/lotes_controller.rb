@@ -977,9 +977,9 @@ class LotesController < ApplicationController
     lotes = current_user.club.lotes.where(estado: Lote::CULTIVO_ESTADOS).includes(:sala)
     lotes = lotes.where(sala_id: current_user.salas_ids_en_sedes_asignadas) if current_user.limitado_por_sede?
     ids   = LoteFoto.where(lote_id: lotes.select(:id)).group(:lote_id).maximum(:id).values
-    fotos = LoteFoto.where(id: ids).includes(:lote, imagen_attachment: :blob).sort_by { |f| -f.id }
+    fotos = LoteFoto.where(id: ids).includes({ lote: :genetica }, imagen_attachment: :blob).sort_by { |f| -f.id }
     render json: fotos.map { |f|
-      { id: f.id, lote_id: f.lote_id, lote_codigo: f.lote.codigo, sala: f.lote.sala&.nombre,
+      { id: f.id, lote_id: f.lote_id, lote_codigo: f.lote.codigo, genetica_nombre: f.lote.genetica&.nombre, sala: f.lote.sala&.nombre,
         url: url_for(f.imagen), tomada_el: f.tomada_el, dia: f.dia_de_vida, fase: f.fase, nota: f.nota }
     }
   end

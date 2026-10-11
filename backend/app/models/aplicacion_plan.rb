@@ -27,6 +27,9 @@ class AplicacionPlan < ApplicationRecord
     obj = objetivo
     return nil unless obj
     # Un lote no tiene `nombre`: sin esto salía «#<Lote:0x00007f…>» en «Planes en curso».
+    # En autocultivo el lote no se nombra: son las plantas de su genética.
+    return obj.genetica&.nombre || obj.codigo if obj.is_a?(Lote) && obj.club&.personal?
+
     obj.try(:nombre).presence || obj.try(:codigo).presence || obj.model_name.human
   end
 

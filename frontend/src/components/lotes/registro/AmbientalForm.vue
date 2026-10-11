@@ -24,7 +24,8 @@
       <span class="af__vpd-hint">{{ vpdStatus }}</span>
     </div>
 
-    <div class="af__field">
+    <!-- Sensores: cosa de una organización con equipos. En autocultivo no se ofrece (11-oct-2026). -->
+    <div v-if="!esPersonal" class="af__field">
       <label class="af__label">Subir CSV sensor <span class="af__optional">opcional (Bluelab, Apogee…)</span></label>
       <div class="af__csv-drop" @click="csvRef?.click()">
         <i class="bi bi-file-earmark-spreadsheet"></i>
@@ -38,6 +39,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { useUsoPersonal } from '../../../composables/useUsoPersonal.js'
 
 const props = defineProps({
   modelValue:  { type: Object, default: () => ({}) },
@@ -49,6 +51,7 @@ const f = computed({
   set: v => emit('update:modelValue', v),
 })
 
+const { esPersonal } = useUsoPersonal()
 const csvRef = ref(null)
 
 function handleCsv(e) {

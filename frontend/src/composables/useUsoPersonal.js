@@ -38,5 +38,15 @@ export function useUsoPersonal() {
     ? { una: 'espacio de cultivo', unas: 'espacios de cultivo', Una: 'Espacio de cultivo', Unas: 'Espacios de cultivo', corta: 'espacio', cortas: 'espacios', Corta: 'Espacio', Cortas: 'Espacios' }
     : { una: 'sala', unas: 'salas', Una: 'Sala', Unas: 'Salas', corta: 'sala', cortas: 'salas', Corta: 'Sala', Cortas: 'Salas' }))
 
-  return { esPersonal, org, sala }
+  // EN AUTOCULTIVO EL LOTE NO SE NOMBRA (9-oct-2026): vive por debajo, y para la persona son «las
+  // plantas de tal genética». Una organización lo sigue viendo por su código. Lo usan todos los
+  // modales que dejan elegir un lote (tarea, gasto, plan, riego), en el teléfono y en la compu.
+  const nombreLote = (l) => {
+    if (!l) return ''
+    if (!esPersonal.value) return l.codigo || ''
+    return l.genetica?.nombre || l.genetica_nombre || l.strain || 'Plantas'
+  }
+  const cuantasPlantas = (n) => `${n || 0} ${Number(n) === 1 ? 'planta' : 'plantas'}`
+
+  return { esPersonal, org, sala, nombreLote, cuantasPlantas }
 }

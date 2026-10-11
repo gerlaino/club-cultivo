@@ -1,5 +1,23 @@
 # Changelog
 
+## Octubre 2026 (ev) — Los modales de autocultivo hablan de espacios y plantas (11-oct)
+
+Germán: «al crear nueva tarea en autocultivo queda medio raro: pide sala… revisá todos los
+modales», en la compu y en el teléfono. Auditoría con Playwright como `casa_german` (teléfono y
+compu), modal por modal:
+- **Nueva tarea**: «¿En qué espacio o plantas?», Espacio y Plantas («Todas las del espacio» o
+  «Auto Ananda · 2 plantas»). Bug: filtraba los espacios por la sede asignada del usuario —que en
+  autocultivo no existe— y decía «Este usuario no tiene salas disponibles en su sede asignada».
+- **Registrar el espacio** (riego/ambiente): «todas las plantas», «Cargar por genética», sin el CSV
+  de sensores. El dictado: «Registro guardado en las plantas de Carpa», sin códigos.
+- **¿Qué regaste?**: «Carpa · 3 plantas», «Auto Ananda — Carpa · 2 plantas».
+- **Gastos**: «Para qué plantas», «Costo por cosecha» (columnas Plantas/Espacio), el pie del teléfono.
+- **Planes**: «Aplicar a plantas», «Unas plantas / Un espacio / Todo el cultivo», «Plantas · Kings
+  Juice» en curso (`AplicacionPlan#objetivo_nombre`).
+- **Nuevo espacio** sin «Estado inicial»; **plantar en una cama** y las **tareas** (Hoy, Tareas,
+  inicio, tarjeta) con la genética y no el código (`genetica_nombre` en la tarea y en las fotos).
+- Una sola regla para nombrar: `useUsoPersonal().nombreLote` / `cuantasPlantas`.
+
 ## Octubre 2026 (eu) — Al abrir la app no se ve el armazón de escritorio (11-oct)
 
 Germán: «cuando abro la app, por un momento me muestra el dashboard y después la vista

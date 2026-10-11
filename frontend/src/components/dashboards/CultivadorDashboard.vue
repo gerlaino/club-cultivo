@@ -294,7 +294,7 @@
             <div v-if="tareaDetalle.lote" class="cvd__panel-row">
               <span class="cvd__panel-key">Lote</span>
               <RouterLink :to="`/lotes/${tareaDetalle.lote.id}`" class="cvd__panel-link">
-                {{ tareaDetalle.lote.codigo }} <i class="bi bi-arrow-right-short"></i>
+                {{ nombreLote(tareaDetalle.lote) }} <i class="bi bi-arrow-right-short"></i>
               </RouterLink>
             </div>
             <div v-if="tareaDetalle.fecha_programada" class="cvd__panel-row">
@@ -403,6 +403,8 @@ import PuestaEnMarcha from '../PuestaEnMarcha.vue'
 // suma la puesta en marcha; el resto es la misma pantalla.
 defineProps({ personal: { type: Boolean, default: false } })
 import { LayoutGrid, Sprout, GitBranch, AlertTriangle, ChevronRight } from 'lucide-vue-next'
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
+const { nombreLote } = useUsoPersonal()
 
 const router        = useRouter()
 const auth          = useAuthStore()

@@ -7,7 +7,7 @@
         <div class="apm__header">
           <div>
             <h2 class="apm__title">Aplicar plan de trabajo</h2>
-            <p class="apm__sub">Lote {{ lote.codigo }} · inicio {{ lote.start_date }}</p>
+            <p class="apm__sub">{{ esPersonal ? `${nombreLote(lote)} · arrancaron el ${String(lote.start_date || '').slice(0, 10).split('-').reverse().join('/')}` : `Lote ${lote.codigo} · inicio ${lote.start_date}` }}</p>
           </div>
           <button class="apm__close" @click="$emit('close')"><i class="bi bi-x-lg"></i></button>
         </div>
@@ -140,7 +140,7 @@ const props = defineProps({
 const emit = defineEmits(['close', 'applied'])
 
 const toast = useToast()
-const { esPersonal } = useUsoPersonal()
+const { esPersonal, nombreLote } = useUsoPersonal()
 const hoy = hoyISO()
 
 const planes        = ref([])

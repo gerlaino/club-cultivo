@@ -841,7 +841,7 @@ class AsistenteController < BaseController
     registro = lote.registros_ambientales.build(campos)
     if registro.save
       tareas_cerradas = cerrar_tareas_por_registro(datos)
-      msg = "Registro ambiental guardado en #{lote.codigo}"
+      msg = "Registro guardado en #{nombre_de_lote(lote, club)}"
       msg += " · #{tareas_cerradas.size} tarea#{'s' if tareas_cerradas.size != 1} completada#{'s' if tareas_cerradas.size != 1}: #{tareas_cerradas.join(', ')}" if tareas_cerradas.any?
       { ok: true, mensaje: msg }
     else
@@ -962,7 +962,8 @@ class AsistenteController < BaseController
 
     if creados > 0
       tareas_cerradas = cerrar_tareas_por_registro(datos)
-      msg = "Registro ambiental guardado en #{creados} lote#{'s' if creados != 1} de #{sala.nombre}"
+      msg = club.personal? ? "Registro guardado en las plantas de #{sala.nombre}" \
+                           : "Registro ambiental guardado en #{creados} lote#{'s' if creados != 1} de #{sala.nombre}"
       msg += " (falló: #{fallidos.join(', ')})" if fallidos.any?
       msg += " · #{tareas_cerradas.size} tarea#{'s' if tareas_cerradas.size != 1} completada#{'s' if tareas_cerradas.size != 1}: #{tareas_cerradas.join(', ')}" if tareas_cerradas.any?
       { ok: true, mensaje: msg }
@@ -1108,7 +1109,7 @@ class AsistenteController < BaseController
     return { ok: false, error: 'Nota vacía' } if contenido.blank?
 
     nota = lote.notas.build(contenido: contenido, fuente: 'asistente_voz', club: club, user: current_user)
-    nota.save ? { ok: true, mensaje: "Nota guardada en #{lote.codigo}" } : { ok: false, error: nota.errors.full_messages.join(', ') }
+    nota.save ? { ok: true, mensaje: "Nota guardada en #{nombre_de_lote(lote, club)}" } : { ok: false, error: nota.errors.full_messages.join(', ') }
   end
 
   # «Puse dos semillas de Ananda en la carpa chica»: plantas nuevas, sólo en autocultivo. Usa la misma
@@ -1159,6 +1160,11 @@ class AsistenteController < BaseController
     { ok: true, mensaje: "#{nombres.to_sentence(two_words_connector: ' y ', last_word_connector: ' y ')} en #{sala.nombre}" }
   rescue ActiveRecord::RecordInvalid => e
     { ok: false, error: e.record.errors.full_messages.join(', ') }
+  end
+
+  # En autocultivo el lote no se nombra: son «las plantas de tal genética» (`useUsoPersonal`).
+  def nombre_de_lote(lote, club)
+    club.personal? ? "las #{lote.genetica&.nombre || 'plantas'}" : lote.codigo
   end
 
   def genetica_por_nombre(club, nombre)

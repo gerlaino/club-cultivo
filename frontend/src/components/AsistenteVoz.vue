@@ -143,7 +143,7 @@
                   <div class="av__accion-body">
                     <div class="av__accion-tipo">{{ labelTipo(accion.tipo) }}</div>
                     <div class="av__accion-titulo">
-                      <span v-if="accion.lote_codigo || accion.datos?.lote_codigo" class="av__accion-ref">{{ accion.lote_codigo || accion.datos.lote_codigo }}</span>
+                      <span v-if="!esPersonal && (accion.lote_codigo || accion.datos?.lote_codigo)" class="av__accion-ref">{{ accion.lote_codigo || accion.datos.lote_codigo }}</span>
                       <span v-if="accion.sala_nombre || accion.datos?.sala_nombre" class="av__accion-ref">{{ accion.sala_nombre || accion.datos.sala_nombre }}</span>
                       <span v-if="accion.planta_nombre" class="av__accion-ref">{{ accion.planta_nombre }}</span>
                       {{ descripcionAccion(accion) }}
@@ -175,7 +175,7 @@
                     <div v-if="accion._expandido" class="av__editor">
                       <template v-if="accion.tipo === 'registro_ambiental' || accion.tipo === 'registro_ambiental_sala'">
                         <div v-if="accion.tipo === 'registro_ambiental_sala'" class="av__sala-badge">
-                          Se guardará en todos los lotes activos de la sala
+                          {{ esPersonal ? 'Se guardará en todas las plantas del espacio' : 'Se guardará en todos los lotes activos de la sala' }}
                         </div>
                         <div class="av__editor-grid">
                           <div class="av__ef av__ef--full">
@@ -368,7 +368,9 @@ import api, { consumoIA } from '../lib/api'
 import DsSpinner from '../design-system/components/Spinner.vue'
 import { useReconocimientoVoz } from '../composables/useReconocimientoVoz.js'
 import { useAuthStore } from '../stores/auth.js'
+import { useUsoPersonal } from '../composables/useUsoPersonal.js'
 
+const { esPersonal } = useUsoPersonal()
 const auth = useAuthStore()
 // El cultivador se asigna sus propias tareas (lo decide el backend): no se le ofrece elegir a quién.
 const esCultivador = computed(() => auth.user?.role === 'cultivador')

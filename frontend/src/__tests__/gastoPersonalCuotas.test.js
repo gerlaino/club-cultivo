@@ -42,7 +42,7 @@ describe('Gasto personal en cuotas', () => {
   it('en cuotas no ofrece lote ni nutriente (la compra en cuotas no los guarda)', async () => {
     const form = reactive({ ...formVacio(5), plan: 'cuotas' })
     const w = montarForm(form)
-    expect(w.text()).toContain('En cuotas no se imputa a un lote')
+    expect(w.text()).toContain('En cuotas no se carga a unas plantas')
     expect(w.find('.gf__check').exists()).toBe(false)
   })
 
