@@ -14,7 +14,8 @@
 # organización tiene. Campos: `roles` = quién lo recibe en una organización · `feature` =
 # módulo que tiene que estar contratado (nil = siempre) · `personal` = si al cultivador de casa
 # (que es admin) se le ofrece; por defecto, sí cuando `roles` incluye admin · `default` =
-# prendido de entrada · `default_personal` = ídem en uso personal (si no está, vale `default`).
+# prendido de entrada · `default_personal` = ídem en uso personal (si no está, vale `default`) ·
+# `label_personal`/`desc_personal` = cómo se lee en uso personal, sin lotes ni depósitos (`textos`).
 module Notificaciones
   module Catalogo
     EQUIPO = %w[admin cultivador supervisor manicura dispensador delivery].freeze
@@ -59,25 +60,30 @@ module Notificaciones
         roles: EQUIPO, feature: nil, personal: true, default: true },
       { clave: 'hitos_cultivo',    grupo: RECORD, label: 'Próximos pasos del ciclo',
         desc: 'Cuándo un lote llega a sus días de vegetativo (¿pasa a floración?), a la cosecha estimada (mirar tricomas), al fin del secado y del curado. Te avisa unos días antes.',
-        roles: %w[admin], feature: 'cultivo', default: false, default_personal: true },
+        roles: %w[admin], feature: 'cultivo', default: false, default_personal: true,
+        desc_personal: 'Cuándo tus plantas llegan a los días de vegetativo que les pusiste (¿pasan a floración?), a la cosecha estimada (mirar tricomas), al fin del secado y del curado. Te avisa unos días antes.' },
       { clave: 'camas',            grupo: RECORD, label: 'Tus camas de suelo vivo',
         desc: 'El día que una cama termina de cocinarse, que termina su descanso o que le toca top dress (si le cargaste cada cuántos días).',
         roles: %w[admin cultivador], feature: 'cultivo', default: false, default_personal: true },
       { clave: 'cosecha_pendiente', grupo: RECORD, label: 'Cosecha pendiente',
         desc: 'Un lote pasó su fecha estimada de cosecha y sigue en floración.',
-        roles: %w[admin], feature: 'cultivo', default: false, default_personal: true },
+        roles: %w[admin], feature: 'cultivo', default: false, default_personal: true,
+        desc_personal: 'Tus plantas pasaron su fecha estimada de cosecha y siguen en floración.' },
       { clave: 'tarea_vencida',    grupo: RECORD, label: 'Tarea vencida',
         desc: 'Una tarea del cultivo quedó sin hacer.',
-        roles: %w[admin], feature: 'cultivo', default: false },
+        roles: %w[admin], feature: 'cultivo', default: false,
+        desc_personal: 'Una tarea importante (prioridad alta o urgente) lleva más de dos días sin hacerse.' },
       { clave: 'lote_critico',     grupo: RECORD, label: 'Lote en estado crítico',
         desc: 'Un lote con plantas enfermas o con problemas serios.',
-        roles: %w[admin], feature: 'cultivo', default: false },
+        roles: %w[admin], feature: 'cultivo', personal: false, default: false },
       { clave: 'ambiente',         grupo: RECORD, label: 'Ambiente fuera de rango',
         desc: 'Temperatura, humedad, pH o EC fuera de lo que configuraste, o un espacio sin registro.',
-        roles: %w[admin], feature: 'cultivo', default: false },
+        roles: %w[admin], feature: 'cultivo', default: false,
+        desc_personal: 'Temperatura, humedad, pH o EC fuera de lo esperado para la fase de tus plantas, o varios días sin anotar el ambiente.' },
       { clave: 'reponer_insumos',  grupo: RECORD, label: 'Reponer nutrientes o insumos',
         desc: 'Cuando un producto del depósito llega a su mínimo.',
-        roles: %w[admin supervisor], feature: 'cultivo', default: false, default_personal: true },
+        roles: %w[admin supervisor], feature: 'cultivo', default: false, default_personal: true,
+        label_personal: 'Reponer nutrientes', desc_personal: 'Cuando a un nutriente le queda menos del mínimo que le pusiste.' },
       { clave: 'saldo_cc_bajo',    grupo: RECORD, label: 'Saldo bajo de un paciente',
         desc: 'La cuenta corriente (o el crédito en gramos) de un paciente quedó por debajo del umbral.',
         roles: %w[admin], feature: 'produccion_dispensa', default: false },
@@ -99,6 +105,12 @@ module Notificaciones
         ofrecido = club.personal? ? t.fetch(:personal, t[:roles].include?('admin')) : t[:roles].include?(user.role)
         ofrecido && (t[:feature].nil? || club.feature?(t[:feature]))
       end
+    end
+
+    # El nombre y la explicación con que se muestra a ESTA organización.
+    def self.textos(tipo, club)
+      return { label: tipo[:label], desc: tipo[:desc] } unless club&.personal?
+      { label: tipo[:label_personal] || tipo[:label], desc: tipo[:desc_personal] || tipo[:desc] }
     end
 
     def self.default_de(tipo, club)

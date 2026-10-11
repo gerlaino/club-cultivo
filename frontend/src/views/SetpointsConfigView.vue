@@ -67,7 +67,7 @@
     <!-- Tab: Parámetros de alerta -->
     <section v-if="tabActivo === 'alertas'" class="spc__section">
       <p class="spc__section-desc">
-        Controlá cuándo el sistema genera alertas automáticas. {{ esPersonal ? 'Valen para todos tus lotes.' : 'Estos valores aplican a todos los lotes de la organización.' }}
+        Controlá cuándo el sistema genera alertas automáticas. {{ esPersonal ? 'Valen para todas tus plantas.' : 'Estos valores aplican a todos los lotes de la organización.' }}
       </p>
 
       <div v-if="loadingPrefs" class="spc__loading">Cargando…</div>

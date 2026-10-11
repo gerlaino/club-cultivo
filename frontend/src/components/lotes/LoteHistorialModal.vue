@@ -3,7 +3,7 @@
     <div v-modal="cerrar" v-if="modelValue" class="lhm__overlay" @click.self="cerrar">
       <div class="lhm__modal">
         <div class="lhm__head">
-          <h3>📜 Historial del lote</h3>
+          <h3>📜 {{ esPersonal ? 'Historial' : 'Historial del lote' }}</h3>
           <button class="lhm__close" @click="cerrar"><i class="bi bi-x-lg"></i></button>
         </div>
 
@@ -91,6 +91,8 @@
 </template>
 
 <script setup>
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
+const { esPersonal } = useUsoPersonal()
 import { ref, computed, watch } from 'vue'
 import { formatDateTime } from '../../lib/loteHelpers.js'
 import { KINDS, dotColor, metaDetalle } from '../../lib/historialHelpers.js'

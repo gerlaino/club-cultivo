@@ -1,4 +1,6 @@
 <script setup>
+import { useUsoPersonal } from '../composables/useUsoPersonal.js'
+const { esPersonal } = useUsoPersonal()
 import { onMounted, reactive, ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AppDatePicker from '../components/ui/AppDatePicker.vue'
@@ -364,7 +366,7 @@ onMounted(() => { fetchProfile(); fetchNotificaciones() })
               <div class="pfl__field">
                 <label class="pfl__label">Email personal</label>
                 <input v-model.trim="form.email_personal" type="email" class="pfl__input" placeholder="tu@gmail.com" />
-                <div class="pfl__hint">Tu mail real, donde la organización puede contactarte.</div>
+                <div class="pfl__hint">{{ esPersonal ? 'Tu mail real: ahí te llegan los avisos de tu cuenta.' : 'Tu mail real, donde la organización puede contactarte.' }}</div>
               </div>
             </div>
           </div>

@@ -6,7 +6,7 @@
         <!-- Header -->
         <div class="rls__header">
           <div class="rls__header-left">
-            <h2 class="rls__title">📋 Registro del lote</h2>
+            <h2 class="rls__title">📋 {{ esPersonal ? 'Registrar' : 'Registro del lote' }}</h2>
             <span class="rls__subtitle">{{ lote?.codigo }} · {{ fechaHoy }}</span>
           </div>
           <div class="rls__header-right">
@@ -140,6 +140,8 @@
 </template>
 
 <script setup>
+import { useUsoPersonal } from '../../../composables/useUsoPersonal.js'
+const { esPersonal } = useUsoPersonal()
 import { ref, computed, watch } from 'vue'
 import { registrarTrasplante, createRegistroAmbiental } from '../../../lib/api'
 import { hoyISO } from '../../../utils/dates.js'

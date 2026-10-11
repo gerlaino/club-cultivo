@@ -59,8 +59,8 @@
         @click="lotesListosItems.length && (showListosModal = true)"
       >
         <div class="cvd__kpi-ico" :class="{ 'cvd__kpi-ico--amber': lotesListos > 0 }"><GitBranch :size="18" :stroke-width="1.75" /></div>
-        <div class="cvd__kpi-val" :class="{ 'cvd__kpi-val--amber': lotesListos > 0 }">{{ lotesEnCiclo }}</div>
-        <div class="cvd__kpi-lbl">Lotes en cultivo</div>
+        <div class="cvd__kpi-val" :class="{ 'cvd__kpi-val--amber': lotesListos > 0 }">{{ esPersonal ? geneticasEnCiclo : lotesEnCiclo }}</div>
+        <div class="cvd__kpi-lbl">{{ esPersonal ? 'Genéticas en cultivo' : 'Lotes en cultivo' }}</div>
         <div class="cvd__kpi-sub" :class="{ 'cvd__kpi-sub--amber': lotesListos > 0 }">
           {{ lotesListos > 0 ? `${lotesListos} listo${lotesListos !== 1 ? 's' : ''} para avanzar →` : 'sin cambios pendientes' }}
         </div>
@@ -171,7 +171,7 @@
     <div v-if="proximasCosechas.length > 0" class="cvd__cosechas-wrap">
       <div class="cvd__cosechas-header">
         <span class="cvd__cosechas-title">Próximas cosechas</span>
-        <span class="cvd__cosechas-sub">{{ proximasCosechas.length }} lote{{ proximasCosechas.length !== 1 ? 's' : '' }} estimado{{ proximasCosechas.length !== 1 ? 's' : '' }}</span>
+        <span v-if="!esPersonal" class="cvd__cosechas-sub">{{ proximasCosechas.length }} lote{{ proximasCosechas.length !== 1 ? 's' : '' }} estimado{{ proximasCosechas.length !== 1 ? 's' : '' }}</span>
       </div>
       <div class="cvd__cosechas-strip">
         <RouterLink
@@ -356,8 +356,11 @@
           @click="irAlLote(l.id)"
         >
           <div class="cvd__listo-main">
-            <span class="cvd__listo-cod">{{ l.codigo }}</span>
-            <span class="cvd__listo-gen">{{ l.genetica?.nombre || l.strain || 'Sin genética' }}</span>
+            <span v-if="esPersonal" class="cvd__listo-cod">{{ nombreLote(l) }}</span>
+            <template v-else>
+              <span class="cvd__listo-cod">{{ l.codigo }}</span>
+              <span class="cvd__listo-gen">{{ l.genetica?.nombre || l.strain || 'Sin genética' }}</span>
+            </template>
           </div>
           <div class="cvd__listo-fase">
             {{ l.estado }} <span class="cvd__listo-arrow">→</span> {{ l.proxima_fase_posible || '—' }}
@@ -404,7 +407,7 @@ import PuestaEnMarcha from '../PuestaEnMarcha.vue'
 defineProps({ personal: { type: Boolean, default: false } })
 import { LayoutGrid, Sprout, GitBranch, AlertTriangle, ChevronRight } from 'lucide-vue-next'
 import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
-const { nombreLote } = useUsoPersonal()
+const { nombreLote, esPersonal } = useUsoPersonal()
 
 const router        = useRouter()
 const auth          = useAuthStore()
@@ -559,6 +562,10 @@ function stateLabel(state) {
 const totalPlantas    = computed(() => salas.value.reduce((acc, s) => acc + (s.plantas_totales || 0), 0))
 const plantasVeg      = computed(() => lotesStore.items.filter(l => l.estado === 'vegetativo').reduce((a, l) => a + (l.plants_count || 0), 0))
 const plantasFlor     = computed(() => lotesStore.items.filter(l => l.estado === 'floracion').reduce((a, l) => a + (l.plants_count || 0), 0))
+// En autocultivo el lote no se nombra: se cuentan las genéticas que están creciendo.
+const geneticasEnCiclo = computed(() => new Set(lotesStore.items
+  .filter(l => ['vegetativo', 'floracion'].includes(l.estado))
+  .map(l => l.genetica?.id ?? l.strain ?? l.id)).size)
 const lotesEnCiclo    = computed(() => lotesStore.items.filter(l => ['vegetativo', 'floracion'].includes(l.estado)).length)
 const lotesListosItems = computed(() => lotesStore.items.filter(l => l.puede_transicionar === true))
 const lotesListos      = computed(() => lotesListosItems.value.length)

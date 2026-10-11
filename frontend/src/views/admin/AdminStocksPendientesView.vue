@@ -5,7 +5,7 @@
     <div class="stk__header">
       <div>
         <div class="stk__header-row">
-          <h1 class="stk__title">Stock</h1>
+          <h1 class="stk__title">{{ esPersonal ? 'Frascos' : 'Stock' }}</h1>
           <span v-if="liveConectado" class="stk__live-dot">● en vivo</span>
         </div>
         <p class="stk__sub">{{ esPersonal ? 'Lo que cosechaste y lo que hiciste con eso: flor, hash, aceite, prerolls.' : 'Inventario de la organización · asignación de sedes · stock externo' }}</p>
@@ -209,13 +209,13 @@
       <!-- Frascos abiertos en 0 g: se dispensó lo último y se eligió no cerrarlos, para volver a
            llenarlos con otra cosecha. Se cierran acá; si era el último del lote, el lote se finaliza. -->
       <div v-if="tabActiva === 'vacios'">
-        <p class="stk__vac-hint">Quedaron abiertos al dispensar lo último, para volver a llenarlos con otra cosecha. Cerralos cuando ya no se usen: si es el último frasco del lote, el lote se finaliza.</p>
+        <p class="stk__vac-hint">{{ esPersonal ? 'Frascos que quedaron vacíos. Cerralos cuando ya no los uses.' : 'Quedaron abiertos al dispensar lo último, para volver a llenarlos con otra cosecha. Cerralos cuando ya no se usen: si es el último frasco del lote, el lote se finaliza.' }}</p>
         <div class="stk__pa-list">
           <div v-for="s in vacios" :key="s.id" class="stk__pa-card">
             <div class="stk__pa-left">
               <div class="stk__pa-forma">{{ s.numero_lote_producto || `Frasco #${s.id}` }} · {{ formaLabel(s.forma_producto) }}</div>
               <div class="stk__pa-chips">
-                <span v-if="s.lote_codigo" class="stk__chip stk__chip--lote">{{ s.lote_codigo }}</span>
+                <span v-if="s.lote_codigo && !esPersonal" class="stk__chip stk__chip--lote">{{ s.lote_codigo }}</span>
                 <span v-if="s.genetica_nombre" class="stk__chip stk__chip--gen">{{ s.genetica_nombre }}</span>
                 <span v-if="s.sede?.nombre" class="stk__chip stk__chip--muted">{{ s.sede.nombre }}</span>
                 <span class="stk__chip stk__chip--muted">vacío {{ timeAgo(s.updated_at) }}</span>

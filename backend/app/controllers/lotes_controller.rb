@@ -1025,7 +1025,7 @@ class LotesController < ApplicationController
         parte = nutri.parte_de_copia(n, @lote.id)
         prods = nutri.productos_de_copia(n, @lote.id).map { |p| Lotes::Nutricion.linea_producto(p) }
         chips << ["#{n['receta_nombre'] || 'productos sueltos'} · #{Lotes::Nutricion.num(n['litros'].to_f * parte)} L" \
-                  "#{parte < 1 ? ' (su parte de la sala)' : ''}" \
+                  "#{parte < 1 ? (current_user.club&.personal? ? ' (su parte del espacio)' : ' (su parte de la sala)') : ''}" \
                   "#{n['costo_ars'].to_f.positive? ? " · $#{(n['costo_ars'].to_f * parte).round(0)}" : ''}",
                   prods.join(', ').presence].compact.join(': ')
       elsif r.fertilizacion
@@ -1033,7 +1033,7 @@ class LotesController < ApplicationController
       end
       items << {
         kind: 'registro', source: 'registro_ambiental', id: r.id, fecha: r.registrado_en,
-        emoji: '📋', titulo: 'Registro del lote',
+        emoji: '📋', titulo: current_user.club&.personal? ? 'Registro' : 'Registro del lote',
         detalle: [chips.join(' · '), r.observaciones].reject(&:blank?).join(' — ').presence,
         categoria: nil, metadata: {}, usuario: r.user&.nombre_completo,
         editable: false, deletable: true,

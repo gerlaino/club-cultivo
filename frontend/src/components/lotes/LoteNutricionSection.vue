@@ -66,7 +66,8 @@
       <p v-if="t.aplicaciones || t.riegos_con_volumen < t.riegos" class="lns__nota">
         Agua: todo lo regado, con o sin nutrientes<template v-if="t.riegos_con_volumen < t.riegos"> ({{ t.riegos_con_volumen }} de {{ t.riegos }} riegos tienen el volumen cargado)</template>.
         Solución: lo preparado con receta o productos sueltos.
-        Lo compartido (la sala regada entera, la cama) cuenta la parte de este lote.
+        <template v-if="esPersonal">Si regaste el espacio entero o la cama, acá cuenta la parte de estas plantas.</template>
+        <template v-else>Lo compartido (la sala regada entera, la cama) cuenta la parte de este lote.</template>
         <template v-if="t.sin_cantidades"> {{ t.sin_cantidades }} {{ t.sin_cantidades === 1 ? 'fertilización quedó' : 'fertilizaciones quedaron' }} como texto, sin cantidades.</template>
       </p>
 
@@ -98,7 +99,7 @@
 
       <!-- La analítica es de administración (el backend la cierra al resto): no se ofrece. -->
       <RouterLink v-if="veAnalitica && conComparar" :to="{ path: '/analitica', query: { tab: 'nutricion', lotes: String(loteId) } }" class="lns__comparar">
-        Comparar con otros lotes <i class="bi bi-arrow-right"></i>
+        {{ esPersonal ? 'Comparar con otras plantas' : 'Comparar con otros lotes' }} <i class="bi bi-arrow-right"></i>
       </RouterLink>
     </template>
   </div>

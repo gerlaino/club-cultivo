@@ -3,7 +3,7 @@
 
   <div v-else-if="!lote" class="mlot--empty">
     <div class="mlot__empty-ico"><i class="bi bi-box-seam"></i></div>
-    <div class="mlot__empty-title">Lote no encontrado</div>
+    <div class="mlot__empty-title">{{ esPersonal ? 'No se encontraron estas plantas' : 'Lote no encontrado' }}</div>
     <button class="mlot__empty-back" @click="router.back()">← Volver</button>
   </div>
 
@@ -13,8 +13,10 @@
     <div class="mlot__hero" :style="{ background: estadoGradient(lote.estado) }">
       <button class="mlot__hero-more" @click="showAcciones = true" aria-label="Más"><i class="bi bi-three-dots"></i></button>
       <div class="mlot__hero-estado">{{ estadoEmoji(lote.estado) }} {{ estadoLoteLabel(lote) }}<span v-if="lote.automatica" class="mlot__auto">Auto</span></div>
-      <h2 class="mlot__hero-codigo">{{ lote.codigo }}</h2>
-      <div class="mlot__hero-gen">{{ lote.genetica?.nombre || 'Sin genética' }}</div>
+      <!-- En autocultivo el lote no se nombra: son las plantas de su genética. -->
+      <h2 class="mlot__hero-codigo">{{ esPersonal ? (lote.genetica?.nombre || lote.strain || 'Plantas') : lote.codigo }}</h2>
+      <div v-if="esPersonal" class="mlot__hero-gen">{{ lote.plants_count }} {{ lote.plants_count === 1 ? 'planta' : 'plantas' }}</div>
+      <div v-else class="mlot__hero-gen">{{ lote.genetica?.nombre || 'Sin genética' }}</div>
       <div v-if="textoProximoPaso(lote)" class="mlot__hero-prox"><i class="bi bi-arrow-right-short"></i>{{ textoProximoPaso(lote) }}</div>
 
       <div class="mlot__stats">
@@ -170,12 +172,12 @@
         </button>
         <button class="mlot__accion-item" @click="abrirEditarLote">
           <span class="mlot__accion-ico"><i class="bi bi-pencil"></i></span>
-          <span class="mlot__accion-lbl">Editar lote</span>
+          <span class="mlot__accion-lbl">{{ esPersonal ? 'Editar' : 'Editar lote' }}</span>
           <i class="bi bi-chevron-right mlot__accion-arr"></i>
         </button>
         <button class="mlot__accion-item mlot__accion-item--danger" @click="abrirEliminar">
           <span class="mlot__accion-ico"><i class="bi bi-trash"></i></span>
-          <span class="mlot__accion-lbl">Eliminar lote</span>
+          <span class="mlot__accion-lbl">{{ esPersonal ? 'Eliminar estas plantas' : 'Eliminar lote' }}</span>
           <i class="bi bi-chevron-right mlot__accion-arr"></i>
         </button>
       </div>
@@ -215,9 +217,9 @@
     <!-- Sheet: Nueva planta -->
 
     <!-- Sheet: Editar lote -->
-    <SheetBottom v-model="showEditarLote" title="Editar lote">
+    <SheetBottom v-model="showEditarLote" :title="esPersonal ? 'Editar' : 'Editar lote'">
       <div class="mlot__sheet-body">
-        <div class="mlot__field">
+        <div v-if="!esPersonal" class="mlot__field">
           <label class="mlot__label">Código *</label>
           <input v-model.trim="editForm.codigo" class="mlot__input" />
         </div>
@@ -233,9 +235,10 @@
     </SheetBottom>
 
     <!-- Sheet: Eliminar -->
-    <SheetBottom v-model="showEliminar" title="Eliminar lote">
+    <SheetBottom v-model="showEliminar" :title="esPersonal ? 'Eliminar estas plantas' : 'Eliminar lote'">
       <div class="mlot__sheet-body">
-        <p class="mlot__confirm-text">¿Eliminar el lote <strong>{{ lote.codigo }}</strong>? Esta acción no se puede deshacer.</p>
+        <p v-if="esPersonal" class="mlot__confirm-text">¿Eliminar las plantas de <strong>{{ lote.genetica?.nombre || 'este grupo' }}</strong>, con sus registros? Esta acción no se puede deshacer.</p>
+        <p v-else class="mlot__confirm-text">¿Eliminar el lote <strong>{{ lote.codigo }}</strong>? Esta acción no se puede deshacer.</p>
         <div v-if="eliminarError" class="mlot__error">{{ eliminarError }}</div>
         <div class="mlot__confirm-btns">
           <button class="mlot__btn-ghost" @click="showEliminar = false">Cancelar</button>
@@ -275,7 +278,7 @@ import { textoCambioDeFase } from '../../lib/textoCambioDeFase.js'
 const route  = useRoute()
 const router = useRouter()
 const toast  = useToast()
-const { sala: salaTxt } = useUsoPersonal()
+const { sala: salaTxt, esPersonal } = useUsoPersonal()
 const id     = Number(route.params.id)
 
 const lote    = ref(null)
@@ -412,7 +415,7 @@ async function guardarEditarLote() {
   try {
     const { data } = await updateLote(id, editForm.value)
     lote.value = { ...lote.value, ...data }
-    toast.success('Lote actualizado')
+    toast.success(esPersonal.value ? 'Guardado' : 'Lote actualizado')
     showEditarLote.value = false
   } catch (e) {
     editError.value = e?.response?.data?.error || 'Error al guardar'
@@ -428,7 +431,7 @@ async function confirmarEliminar() {
   eliminando.value = true; eliminarError.value = null
   try {
     await deleteLote(id)
-    toast.success('Lote eliminado')
+    toast.success(esPersonal.value ? 'Plantas eliminadas' : 'Lote eliminado')
     router.back()
   } catch (e) {
     eliminarError.value = e?.response?.data?.error || 'Error al eliminar'

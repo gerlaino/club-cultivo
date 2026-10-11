@@ -1,5 +1,27 @@
 # Changelog
 
+## Octubre 2026 (ew) — Avisos, fichas y configuración del autocultivo sin lotes, salas ni sedes (11-oct)
+
+Germán: «lo que es autocultivo tiene que ser lo más customizable posible, sin tocar lo de
+organizaciones». Segunda pasada después de los modales (ev), con Playwright como `casa_german`:
+- **Avisos (push y campana)**: `AlertaDetectorService` nombra «tus plantas de <genética>» (hitos,
+  ambiente sin anotar, fuera de rango, cosecha pendiente, tarea vencida) con la fase legible; el
+  recordatorio de tarea dice la genética; «Queda poco» abre Nutrientes y recetas (`/insumos` rebotaba);
+  el plan por vencer dice «Tu plan de Autocultivo». `Notificaciones::Catalogo` suma
+  `label_personal`/`desc_personal` (`textos`) y **no ofrece «Lote en estado crítico» en personal:
+  nada lo dispara** (en organizaciones sigue ofrecido: interruptor muerto, pendiente de decidir).
+- **Ficha del espacio (compu)**: «Nueva planta» (NuevaPlantaSheet) en vez de «Crear lote», las
+  plantas en tarjetas (`PlantasGrilla`, la misma de «Mi cultivo») en vez de la tabla de lotes,
+  KPI «Cosechas», sin Sede ni «Creado por».
+- **Ficha de las plantas (lote por debajo, compu y teléfono)**: título y miga = genética, «3 plantas»,
+  «Tareas de estas plantas», «Lo que costaron», edición sin código; próximo paso «les pusiste 30
+  de vege» (`loteHelpers`), historial «Registro» (backend). Planta: miga Mi cultivo › espacio.
+  Cama: plantas por genética.
+- **Configuración**: «Tu plan» muestra espacios y plantas (decía Sedes 1 de 1 y Pacientes 0 de 0
+  en rojo); sin razón social, sitio web ni correo de la organización. Menú: Inicio, Cosechas
+  (Frascos), Informes. Stock sin columna Lote.
+Tests: `alerta_detector_personal_spec`, `notificaciones_preferencias_spec`, `proximoPasoAutocultivo`.
+
 ## Octubre 2026 (ev) — Los modales de autocultivo hablan de espacios y plantas (11-oct)
 
 Germán: «al crear nueva tarea en autocultivo queda medio raro: pide sala… revisá todos los

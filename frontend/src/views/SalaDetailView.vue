@@ -15,6 +15,8 @@ import CamasSeccion           from '../components/camas/CamasSeccion.vue'
 import { useRecargaEnCambios } from '../composables/useRecargaEnCambios.js'
 import RegistroSalaModal      from '../components/salas/RegistroSalaModal.vue'
 import LotesTabla             from '../components/lotes/LotesTabla.vue'
+import PlantasGrilla          from '../components/personal/PlantasGrilla.vue'
+import NuevaPlantaSheet       from '../components/personal/NuevaPlantaSheet.vue'
 import EtiquetasLotesModal    from '../components/lotes/EtiquetasLotesModal.vue'
 import RegistroEnraizadoModal from '../components/salas/RegistroEnraizadoModal.vue'
 import ActionsDropdown        from '../components/ui/ActionsDropdown.vue'
@@ -41,8 +43,10 @@ const { confirm } = useConfirm()
 const deleting = ref(false)
 async function eliminarSala() {
   const ok = await confirm({
-    title: 'Eliminar sala',
-    message: `¿Seguro que querés eliminar "${sala.value?.nombre}"? Los lotes y plantas quedarán archivados (soft delete) y podrán recuperarse si es necesario.`,
+    title: `Eliminar ${salaTxt.value.corta}`,
+    message: esPersonal.value
+      ? `¿Seguro que querés eliminar "${sala.value?.nombre}"? Sus plantas quedan guardadas en tu historial.`
+      : `¿Seguro que querés eliminar "${sala.value?.nombre}"? Los lotes y plantas quedarán archivados (soft delete) y podrán recuperarse si es necesario.`,
     confirmText: 'Eliminar',
     variant: 'danger',
   })
@@ -50,10 +54,10 @@ async function eliminarSala() {
   deleting.value = true
   try {
     await deleteSala(salaId)
-    toast.success('Sala eliminada')
-    router.push({ name: 'salas' })
+    toast.success(`${salaTxt.value.Corta} eliminado${esPersonal.value ? '' : 'a'}`)
+    router.push(esPersonal.value ? '/mi-cultivo' : { name: 'salas' })
   } catch (e) {
-    toast.error(e?.response?.data?.error || 'Error al eliminar la sala')
+    toast.error(e?.response?.data?.error || `No se pudo eliminar ${esPersonal.value ? 'el espacio' : 'la sala'}`)
   } finally {
     deleting.value = false
   }
@@ -197,7 +201,7 @@ async function saveEditSala(confirmado = false) {
     await salas.fetchSala(salaId)
     await lotes.fetchBySala(salaId)
     showEditSala.value = false
-    toast.success('Sala actualizada')
+    toast.success(`${salaTxt.value.Corta} actualizado${esPersonal.value ? '' : 'a'}`)
   } catch (e) {
     // Cambiar el kind de la sala ARRASTRA a los lotes de adentro. El backend frena y devuelve
     // cuáles son; recién con el sí explícito se guarda. Mismo criterio que mover lotes de sala.
@@ -775,10 +779,27 @@ async function createLote() {
   }
 }
 function openCreate() {
+  // Autocultivo: se agrega una PLANTA (el lote se arma por debajo, `Lotes::Plantar`).
+  if (esPersonal.value) { showNuevaPlanta.value = true; return }
   // Sala de cosecha (legacy) usa su propio modal; el resto, el NuevoLoteModal compartido
   if (esSalaCosecha.value) { showCrearLoteCosecha.value = true; return }
   showCreate.value = true
 }
+
+// ── Autocultivo: las plantas del espacio ──────────────────────────────────────
+const showNuevaPlanta = ref(false)
+const plantasTodas    = ref([])
+async function cargarPlantas() {
+  if (!esPersonal.value) return
+  try { plantasTodas.value = (await listPlants()).data || [] } catch { plantasTodas.value = [] }
+}
+const plantasDelEspacio = computed(() => plantasTodas.value.filter(p =>
+  p.lote?.sala?.id === salaId && ['enraizado', 'vegetativo', 'floracion'].includes(p.state)))
+async function onPlantaCreada() {
+  await Promise.all([lotes.fetchBySala(salaId), salas.fetchSala(salaId), cargarPlantas()])
+}
+watch(esPersonal, (v) => { if (v) cargarPlantas() }, { immediate: true })
+useRecargaEnCambios(['plantas'], cargarPlantas)
 
 // Lote creado desde el NuevoLoteModal compartido
 async function onNuevoLoteCreado() {
@@ -842,7 +863,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 
     <div v-if="loading" class="sd__loading"><DsSpinner /></div>
     <div v-else-if="error" class="sd__error">{{ error }}</div>
-    <div v-else-if="!sala" class="sd__error">Sala no encontrada.</div>
+    <div v-else-if="!sala" class="sd__error">{{ salaTxt.Corta }} no encontrad{{ esPersonal ? 'o' : 'a' }}.</div>
 
     <template v-else>
 
@@ -879,13 +900,13 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
           </div>
           <p class="sd__subtitle">
             <span v-if="sala.kind">{{ kindLabel(sala.kind) }}</span>
-            <span v-if="sala.sede" class="sd__subtitle-sep">·</span>
-            <span v-if="sala.sede">{{ sala.sede.nombre }}</span>
+            <span v-if="sala.sede && !esPersonal" class="sd__subtitle-sep">·</span>
+            <span v-if="sala.sede && !esPersonal">{{ sala.sede.nombre }}</span>
           </p>
         </div>
         <div class="sd__hero-actions">
           <button v-if="(canEdit || isCultivador) && !esSalaManicura" class="sd__btn-primary" @click="openCreate">
-            <i class="bi bi-plus-lg"></i>Crear lote
+            <i class="bi bi-plus-lg"></i>{{ esPersonal ? 'Nueva planta' : 'Crear lote' }}
           </button>
           <ActionsDropdown v-if="(canEdit || isCultivador) && salaAcciones.length" :items="salaAcciones" />
         </div>
@@ -906,7 +927,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
             </div>
           </div>
         </div>
-        <div class="sd__kpi">
+        <div v-if="!esPersonal" class="sd__kpi">
           <div class="sd__kpi-icon">🌿</div>
           <div class="sd__kpi-body">
             <div class="sd__kpi-value" style="color:#16a34a">{{ kpis.enCiclo }}</div>
@@ -921,7 +942,15 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
             <div class="sd__kpi-label">Plantas activas</div>
           </div>
         </div>
-        <div class="sd__kpi">
+        <div v-if="esPersonal" class="sd__kpi">
+          <div class="sd__kpi-icon">🫙</div>
+          <div class="sd__kpi-body">
+            <div class="sd__kpi-value">{{ kpis.cosechados }}</div>
+            <div class="sd__kpi-label">{{ kpis.cosechados === 1 ? 'Cosecha' : 'Cosechas' }}</div>
+            <div class="sd__kpi-sub">en este espacio</div>
+          </div>
+        </div>
+        <div v-else class="sd__kpi">
           <div class="sd__kpi-icon">📦</div>
           <div class="sd__kpi-body">
             <div class="sd__kpi-value">{{ kpis.totalLotes }}</div>
@@ -945,7 +974,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
               <span v-if="amb.vpd != null" class="sd__amb-vpd" :class="`sd__amb-vpd--${amb.vpdNivel.cls}`"
                     :title="amb.vpdNivel.ayuda">VPD {{ amb.vpd }} kPa</span>
             </div>
-            <div class="sd__kpi-sub">{{ amb.hace }}<span v-if="amb.lote_codigo"> · {{ amb.lote_codigo }}</span></div>
+            <div class="sd__kpi-sub">{{ amb.hace }}<span v-if="amb.lote_codigo && !esPersonal"> · {{ amb.lote_codigo }}</span></div>
           </div>
         </div>
 
@@ -960,7 +989,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
             </div>
             <div class="sd__kpi-label">Incubadora</div>
             <div class="sd__kpi-sub">
-              {{ ambIncubadora.hace }}<span v-if="ambIncubadora.lote_codigo"> · {{ ambIncubadora.lote_codigo }}</span>
+              {{ ambIncubadora.hace }}<span v-if="ambIncubadora.lote_codigo && !esPersonal"> · {{ ambIncubadora.lote_codigo }}</span>
             </div>
           </div>
         </div>
@@ -973,15 +1002,35 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 
       <!-- Tabs -->
       <div class="sd__tabs">
-        <button class="sd__tab" :class="{ 'sd__tab--active': tabActiva === 'lotes' }" @click="tabActiva = 'lotes'">🌿 Lotes</button>
+        <button class="sd__tab" :class="{ 'sd__tab--active': tabActiva === 'lotes' }" @click="tabActiva = 'lotes'">🌿 {{ esPersonal ? 'Plantas' : 'Lotes' }}</button>
         <button class="sd__tab" :class="{ 'sd__tab--active': tabActiva === 'historial' }" @click="tabActiva = 'historial'">📋 Historial</button>
       </div>
 
       <div class="sd__layout">
         <div class="sd__main">
 
+          <!-- Autocultivo: las plantas del espacio, como en «Mi cultivo». El lote vive por debajo y
+               acá no se nombra (9-oct-2026); la tabla de lotes es de una organización. -->
+          <div v-if="esPersonal" v-show="tabActiva === 'lotes'" class="sd__section">
+            <div class="sd__section-toggle sd__section-toggle--fijo">
+              <div class="sd__section-toggle-left">
+                <span class="sd__section-emoji">🪴</span>
+                <span class="sd__section-title">Plantas</span>
+                <span class="sd__pill">{{ plantasDelEspacio.length }}</span>
+              </div>
+            </div>
+            <div class="sd__section-body">
+              <PlantasGrilla v-if="plantasDelEspacio.length" :plantas="plantasDelEspacio" :lotes="items" />
+              <EmptyState v-else icon="🪴" title="Sin plantas todavía" message="Este espacio no tiene plantas creciendo." compact>
+                <template #actions>
+                  <button class="sd__btn-outline" @click="openCreate">Agregar la primera</button>
+                </template>
+              </EmptyState>
+            </div>
+          </div>
+
           <!-- Lotes -->
-          <div v-show="tabActiva === 'lotes'" class="sd__section">
+          <div v-else v-show="tabActiva === 'lotes'" class="sd__section">
             <button class="sd__section-toggle" @click="lotesExpanded = !lotesExpanded">
               <div class="sd__section-toggle-left">
                 <span class="sd__section-emoji">🌿</span>
@@ -1081,7 +1130,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
             </button>
             <div v-show="fotosExpanded" class="sd__section-body">
               <div v-if="!fotosSala.length" class="sd__placeholder">
-                Sin fotos todavía. El cultivador las saca desde la app del celular.
+                {{ esPersonal ? 'Sin fotos todavía. Sacalas desde el celular, en la ficha de cada planta.' : 'Sin fotos todavía. El cultivador las saca desde la app del celular.' }}
               </div>
               <div v-else class="sd__fotos">
                 <div v-for="f in fotosSala" :key="f.id" class="sd__foto">
@@ -1128,7 +1177,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
               <table class="sd__hist-table">
                 <thead>
                   <tr>
-                    <th>Código</th>
+                    <th v-if="!esPersonal">Código</th>
                     <th>Genética</th>
                     <th>Inicio</th>
                     <!-- Días: el ciclo cerrado si ya cosechó, o los que lleva si sigue en curso.
@@ -1141,10 +1190,13 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                 </thead>
                 <tbody>
                   <tr v-for="l in historialLotes" :key="l.id">
-                    <td>
+                    <td v-if="!esPersonal">
                       <RouterLink :to="{ name: 'lote-detail', params: { id: l.id } }" class="sd__hist-link">{{ l.codigo }}</RouterLink>
                     </td>
-                    <td>{{ l.genetica_nombre || '—' }}</td>
+                    <td v-if="esPersonal">
+                      <RouterLink :to="{ name: 'lote-detail', params: { id: l.id } }" class="sd__hist-link">{{ l.genetica_nombre || 'Plantas' }}</RouterLink>
+                    </td>
+                    <td v-else>{{ l.genetica_nombre || '—' }}</td>
                     <td>{{ l.start_date || '—' }}</td>
                     <td>
                       <template v-if="l.duracion_dias != null">{{ l.duracion_dias }}</template>
@@ -1164,7 +1216,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                 </tbody>
               </table>
             </div>
-            <div v-else class="sd__hist-empty">Sin historial disponible para esta sala.</div>
+            <div v-else class="sd__hist-empty">Sin historial disponible para {{ esPersonal ? 'este espacio' : 'esta sala' }}.</div>
           </div>
 
         </div>
@@ -1205,8 +1257,10 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
                 </span>
               </dd>
               <dt>Tipo</dt><dd>{{ kindLabel(sala.kind) }}</dd>
-              <dt>Sede</dt><dd>{{ sala.sede?.nombre || "—" }}</dd>
-              <dt>Creado por</dt><dd>{{ sala.created_by_name || "—" }}</dd>
+              <template v-if="!esPersonal">
+                <dt>Sede</dt><dd>{{ sala.sede?.nombre || "—" }}</dd>
+                <dt>Creado por</dt><dd>{{ sala.created_by_name || "—" }}</dd>
+              </template>
               <dt>Creado</dt><dd>{{ formatDate(sala.created_at) }}</dd>
               <dt>Actualizado</dt><dd>{{ formatDate(sala.updated_at) }}</dd>
             </dl>
@@ -1321,6 +1375,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
     </template>
     <!-- Modal Crear Lote (componente compartido NuevoLoteModal) -->
     <NuevoLoteModal :show="showCreate" :sala="sala" @close="showCreate = false" @created="onNuevoLoteCreado" />
+    <NuevaPlantaSheet v-if="esPersonal" v-model="showNuevaPlanta" :salas="sala ? [sala] : []" :sala-id="salaId" @creada="onPlantaCreada" />
 
     <!-- Modal cambiar fase (vege ↔ flora) -->
     <Teleport to="body">
@@ -1491,6 +1546,7 @@ const historialKpis  = computed(() => sala.value?.historial_kpis  || null)
 @media (max-width: 900px) { .sd__layout { grid-template-columns: 1fr; } }
 
 .sd__section { background: #fff; border: 1px solid #d4e6d4; border-radius: 14px; overflow: hidden; }
+.sd__section-toggle.sd__section-toggle--fijo { cursor: default; }
 .sd__section-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: .9rem 1.1rem; background: transparent; border: none; cursor: pointer; transition: background .15s; text-align: left; }
 .sd__section-toggle:hover { background: #f0fdf4; }
 .sd__section-toggle-left { display: flex; align-items: center; gap: .6rem; }

@@ -45,7 +45,8 @@
         <h2>En la cama ahora</h2>
         <div class="cd__lotes">
           <RouterLink v-for="l in cama.lotes" :key="l.id" :to="rutaLote(l)" class="cd__lote">
-            <strong>{{ l.codigo }}</strong><span>{{ l.genetica || 'Sin genética' }} · {{ l.plants_count }} plantas · {{ ESTADO_LOTE[l.estado] || l.estado }}</span>
+            <template v-if="esPersonal"><strong>{{ l.genetica || 'Plantas' }}</strong><span>{{ l.plants_count }} {{ l.plants_count === 1 ? 'planta' : 'plantas' }} · {{ ESTADO_LOTE[l.estado] || l.estado }}</span></template>
+            <template v-else><strong>{{ l.codigo }}</strong><span>{{ l.genetica || 'Sin genética' }} · {{ l.plants_count }} plantas · {{ ESTADO_LOTE[l.estado] || l.estado }}</span></template>
             <span v-if="l.m2_ocupados" class="cd__lote-m2">{{ fmtNum(l.m2_ocupados) }} m²</span>
           </RouterLink>
         </div>
@@ -53,10 +54,10 @@
 
       <section class="cd__bloque">
         <h2>Cosecha tras cosecha</h2>
-        <p v-if="!cama.ciclos.length" class="cd__vacio">Todavía no pasó ningún lote por esta cama.</p>
+        <p v-if="!cama.ciclos.length" class="cd__vacio">Todavía no {{ esPersonal ? 'creció ninguna planta en' : 'pasó ningún lote por' }} esta cama.</p>
         <div v-else class="cd__tabla-wrap">
           <table class="cd__tabla">
-            <thead><tr><th>Ciclo</th><th>Fechas</th><th>Lotes</th><th class="num">Gramos</th><th class="num">g/m²</th><th v-if="cama.con_costo" class="num">Suelo</th></tr></thead>
+            <thead><tr><th>Ciclo</th><th>Fechas</th><th>{{ esPersonal ? 'Plantas' : 'Lotes' }}</th><th class="num">Gramos</th><th class="num">g/m²</th><th v-if="cama.con_costo" class="num">Suelo</th></tr></thead>
             <tbody>
               <tr v-for="(ci, i) in cama.ciclos" :key="ci.id">
                 <td><strong>{{ ci.numero }}</strong><span v-if="!ci.hasta" class="cd__abierto">en curso</span></td>
@@ -126,6 +127,8 @@
 </template>
 
 <script setup>
+import { useUsoPersonal } from '../composables/useUsoPersonal.js'
+const { esPersonal } = useUsoPersonal()
 // La ficha de una cama de suelo vivo. Es la misma pantalla en el escritorio (/camas/:id) y en el
 // teléfono (/m/cama-m/:id): lo que se hace todos los días (alimentar, regar) tiene que estar en los
 // dos. Lo que muestra lo calcula el backend (estado, qué viene, g/m² por ciclo, costo por gramo).

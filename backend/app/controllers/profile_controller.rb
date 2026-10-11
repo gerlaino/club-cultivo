@@ -72,7 +72,8 @@ class ProfileController < ApplicationController
   def serialize_notificaciones
     {
       tipos: Notificaciones::Catalogo.para(current_user).map { |t|
-        { clave: t[:clave], grupo: t[:grupo], label: t[:label], desc: t[:desc], activo: current_user.quiere_push?(t[:clave]) }
+        { clave: t[:clave], grupo: t[:grupo], **Notificaciones::Catalogo.textos(t, current_user.club),
+          activo: current_user.quiere_push?(t[:clave]) }
       },
       grupos: Notificaciones::Catalogo::GRUPOS,
       no_molestar: current_user.no_molestar?,

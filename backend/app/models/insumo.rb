@@ -347,7 +347,8 @@ class Insumo < ApplicationRecord
     )
     # Y al teléfono, si la persona lo quiere («Reponer nutrientes o insumos»).
     PushNotificationService.notify_roles_async(club, 'admin', 'supervisor', tipo: 'reponer_insumos',
-                                               title: 'Queda poco', body: mensaje, url: '/insumos')
+                                               title: 'Queda poco', body: mensaje,
+                                               url: club.personal? ? '/recetas' : '/insumos')
   rescue StandardError => e
     Rails.logger.error "[Insumo] aviso de reposición: #{e.message}"
   end

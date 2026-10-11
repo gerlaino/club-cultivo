@@ -78,6 +78,20 @@ class AlertaDetectorService
   DIAS_SECADO_HITO  = 10
   DIAS_CURADO_HITO  = 21
 
+  def personal? = @club.personal?
+
+  # Cómo se nombra un lote en un aviso de uso personal: no hay lotes, hay plantas de una genética.
+  def nombre(lote, minuscula: false)
+    gen = lote.genetica&.nombre
+    texto = gen ? "Tus plantas de #{gen}" : 'Tus plantas'
+    minuscula ? texto.sub('Tus', 'tus') : texto
+  end
+
+  CAMPO_LEGIBLE = {
+    ph: 'el pH', ec: 'la EC', temperatura: 'la temperatura', humedad: 'la humedad',
+    temperatura_sustrato: 'la temperatura del sustrato',
+  }.freeze
+
   def hitos_activos?
     cfg = @club.alertas_config || {}
     return cfg['hitos_cultivo'] != false if @club.personal?
@@ -90,24 +104,31 @@ class AlertaDetectorService
     desde = lote.fecha_estado_actual
     return if desde.blank?
 
+    # En uso personal no hay lotes: son «tus plantas de <genética>», y el verbo va en plural.
+    p = personal?
+    quien = nombre(lote)
     case lote.estado
     when 'vegetativo'
       if lote.dias_vegetativo_objetivo.present?
         hito(lote, 'vege_objetivo', desde + lote.dias_vegetativo_objetivo.days,
-             "#{lote.codigo} llega a los #{lote.dias_vegetativo_objetivo} días de vegetativo el %s. ¿Pasa a floración?")
+             p ? "#{quien} llegan a los #{lote.dias_vegetativo_objetivo} días de vegetativo el %s. ¿Pasan a floración?"
+               : "#{lote.codigo} llega a los #{lote.dias_vegetativo_objetivo} días de vegetativo el %s. ¿Pasa a floración?")
       end
     when 'floracion'
       inicio = lote.fecha_inicio_floracion || desde
       if lote.dias_floracion_objetivo.present?
         hito(lote, 'cosecha_estimada', inicio + lote.dias_floracion_objetivo.days,
-             "#{lote.codigo} tiene la cosecha estimada para el %s. Mirá los tricomas: lechosos con algo de ámbar es el punto.")
+             p ? "#{quien} tienen la cosecha estimada para el %s. Mirá los tricomas: lechosos con algo de ámbar es el punto."
+               : "#{lote.codigo} tiene la cosecha estimada para el %s. Mirá los tricomas: lechosos con algo de ámbar es el punto.")
       end
     when 'cosecha'
       hito(lote, 'secado', desde + (lote.dias_cosecha_objetivo.presence || DIAS_SECADO_HITO).to_i.days,
-           "#{lote.codigo} cumple los días de secado el %s. Si las ramas quiebran, está para manicurar.")
+           p ? "#{quien} cumplen los días de secado el %s. Si las ramas quiebran, están para manicurar."
+             : "#{lote.codigo} cumple los días de secado el %s. Si las ramas quiebran, está para manicurar.")
     when 'curado'
       hito(lote, 'curado', desde + DIAS_CURADO_HITO.days,
-           "#{lote.codigo} lleva tres semanas de curado el %s: ya podés pesarlo y disfrutarlo.")
+           p ? "#{quien} llevan tres semanas de curado el %s: ya podés pesarlas y disfrutarlas."
+             : "#{lote.codigo} lleva tres semanas de curado el %s: ya podés pesarlo y disfrutarlo.")
     end
   end
 
@@ -256,7 +277,12 @@ class AlertaDetectorService
       tipo:      'sin_registro_ambiental',
       lote:      lote,
       severidad: sev,
-      mensaje:   "#{lote.codigo} lleva #{dias} días sin registro ambiental (máx. recomendado: #{umbral}d en #{lote.estado})",
+      mensaje:   if personal?
+                   cuanto = dias >= 999 ? 'Todavía no anotaste' : "Hace #{dias} días que no anotás"
+                   "#{cuanto} el ambiente de #{nombre(lote, minuscula: true)} (en #{lote.estado_label.downcase}, conviene cada #{umbral} #{umbral == 1 ? 'día' : 'días'})."
+                 else
+                   "#{lote.codigo} lleva #{dias} días sin registro ambiental (máx. recomendado: #{umbral}d en #{lote.estado})"
+                 end,
       contexto:  { dias: dias, umbral: umbral, estado: lote.estado }
     )
   end
@@ -282,7 +308,11 @@ class AlertaDetectorService
         tipo:      tipo,
         lote:      lote,
         severidad: sev,
-        mensaje:   "#{lote.codigo}: #{campo} promedio #{avg} fuera de rango #{rango.min}–#{rango.max} (#{lote.estado}). #{fuera}/#{valores.size} registros afectados.",
+        mensaje:   if personal?
+                     "#{nombre(lote)}: #{CAMPO_LEGIBLE[campo]} viene en #{avg} y en #{lote.estado_label.downcase} lo esperado es #{rango.min}–#{rango.max} (#{fuera} de los últimos #{valores.size} registros)."
+                   else
+                     "#{lote.codigo}: #{campo} promedio #{avg} fuera de rango #{rango.min}–#{rango.max} (#{lote.estado}). #{fuera}/#{valores.size} registros afectados."
+                   end,
         contexto:  { campo: campo.to_s, avg: avg, rango_min: rango.min, rango_max: rango.max, valores: valores }
       )
     end
@@ -349,7 +379,11 @@ class AlertaDetectorService
       tipo:      'cosecha_pendiente',
       lote:      lote,
       severidad: sev,
-      mensaje:   "#{lote.codigo} completó sus #{dias_obj} días estimados de floración hace #{dias_pasados} días.",
+      mensaje:   if personal?
+                   "#{nombre(lote)} cumplieron sus #{dias_obj} días estimados de floración hace #{dias_pasados} días: mirá los tricomas."
+                 else
+                   "#{lote.codigo} completó sus #{dias_obj} días estimados de floración hace #{dias_pasados} días."
+                 end,
       contexto:  { dias_pasados: dias_pasados, dias_floracion_objetivo: dias_obj }
     )
   end
@@ -366,7 +400,11 @@ class AlertaDetectorService
         tipo:      'tarea_vencida_cultivo',
         lote:      lote,
         severidad: tarea.prioridad == 'urgente' ? 'error' : 'warning',
-        mensaje:   "Tarea '#{tarea.titulo}' (#{tarea.prioridad}) vencida hace #{dias} días en #{lote.codigo}.",
+        mensaje:   if personal?
+                     "«#{tarea.titulo}», de #{nombre(lote, minuscula: true)}, está vencida hace #{dias} días."
+                   else
+                     "Tarea '#{tarea.titulo}' (#{tarea.prioridad}) vencida hace #{dias} días en #{lote.codigo}."
+                   end,
         contexto:  { tarea_id: tarea.id, titulo: tarea.titulo, dias: dias, prioridad: tarea.prioridad }
       )
     end

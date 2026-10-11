@@ -9,7 +9,7 @@ import { listLotes, listPesajesManicuraAdmin, getTareasDashboard } from '../lib/
 
 // ── Grupos primarios + sub-pestañas ────────────────────────────────────────────
 export const NAV_GROUPS = [
-  { key: 'dashboard', label: 'Dashboard', to: '/', tabs: [] },
+  { key: 'dashboard', label: 'Dashboard', labelPersonal: 'Inicio', to: '/', tabs: [] },
   {
     // Sedes — SIN bandera, a propósito. Todo club tiene al menos una (el onboarding la exige) y
     // todo lo demás cuelga de ella: salas, depósitos, stock, dispensaciones. Estuvo colgada de
@@ -63,9 +63,10 @@ export const NAV_GROUPS = [
     tabs: [],
   },
   {
-    key: 'produccion', label: 'Producción', to: '/admin/stock', feature: 'cultivo',
+    // En autocultivo: lo cosechado y sus frascos (las mismas pantallas, con sus palabras).
+    key: 'produccion', label: 'Producción', labelPersonal: 'Cosechas', to: '/admin/stock', feature: 'cultivo',
     tabs: [
-      { to: '/admin/stock', label: 'Stock' },
+      { to: '/admin/stock', label: 'Stock', labelPersonal: 'Frascos' },
       { to: '/admin/cosechado', label: 'Cosecha' },
       // La cola de pesajes que OTROS mandan a confirmar: en uso personal no hay otros.
       { to: '/admin/pesajes-manicura', label: 'Manicura', badge: 'aprob', soloOrganizacion: true },
@@ -114,7 +115,7 @@ export const NAV_GROUPS = [
   {
     // En autocultivo, Reportes abre «Mis informes» (cosecha, de dónde salió, gastos); Analítica e
     // Informes siguen ahí, completos.
-    key: 'reportes', label: 'Reportes', to: '/analitica', toPersonal: '/mis-informes',
+    key: 'reportes', label: 'Reportes', labelPersonal: 'Informes', to: '/analitica', toPersonal: '/mis-informes',
     tabs: [
       { to: '/mis-informes', label: 'Mis informes', soloPersonal: true },
       { to: '/analitica', label: 'Analítica' },

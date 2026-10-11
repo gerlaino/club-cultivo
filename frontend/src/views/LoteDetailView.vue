@@ -99,8 +99,10 @@ async function descargarQR() {
 const deletingLote = ref(false)
 async function eliminarLote() {
   const ok = await confirm({
-    title: 'Eliminar lote',
-    message: `¿Seguro que querés eliminar el lote "${lote.value?.codigo}"? Quedará archivado (soft delete) junto a sus plantas y registros. Podrá recuperarse si es necesario.`,
+    title: esPersonal.value ? 'Eliminar estas plantas' : 'Eliminar lote',
+    message: esPersonal.value
+      ? `¿Seguro que querés eliminar las plantas de ${lote.value?.genetica?.nombre || 'este grupo'}, con sus registros?`
+      : `¿Seguro que querés eliminar el lote "${lote.value?.codigo}"? Quedará archivado (soft delete) junto a sus plantas y registros. Podrá recuperarse si es necesario.`,
     confirmText: 'Eliminar',
     variant: 'danger',
   })
@@ -109,11 +111,11 @@ async function eliminarLote() {
   try {
     const salaId = lote.value?.sala?.id
     await deleteLote(id)
-    toast.success('Lote eliminado')
+    toast.success(esPersonal.value ? 'Plantas eliminadas' : 'Lote eliminado')
     if (salaId) router.push({ name: 'sala-detail', params: { id: salaId } })
     else router.push({ name: 'salas' })
   } catch (e) {
-    toast.error(e?.response?.data?.error || 'Error al eliminar el lote')
+    toast.error(e?.response?.data?.error || (esPersonal.value ? 'No se pudieron eliminar' : 'Error al eliminar el lote'))
   } finally {
     deletingLote.value = false
   }
@@ -303,7 +305,7 @@ function onCamaGuardada() { camaModal.value = null; loadHistorial(); lotes.fetch
 const autoEnVege = computed(() => !!lote.value?.automatica && lote.value?.estado === 'vegetativo')
 const loteAcciones = computed(() => {
   const items = []
-  items.push({ emoji: '📋', label: 'Registrar lote', onClick: () => { showRegistroModalNew.value = true } })
+  items.push({ emoji: '📋', label: esPersonal.value ? 'Registrar' : 'Registrar lote', onClick: () => { showRegistroModalNew.value = true } })
   // Automática en vegetativo: se cosecha desde acá; que empezó a florecer es sólo una anotación
   // opcional, no un botón principal que parezca un paso obligatorio (4-oct-2026, Germán).
   if (autoEnVege.value && lote.value?.puede_transicionar && lote.value?.proxima_fase_posible) {
@@ -312,7 +314,7 @@ const loteAcciones = computed(() => {
   // Separar parte del lote: típicamente al prender, cuando la mitad va a una maceta y la mitad a
   // otra. Solo en cultivo y con más de una planta (desprender el lote entero lo dejaría vacío).
   if (puedeDesprender.value) {
-    items.push({ emoji: '🪴', label: 'Separar plantas a otro lote', onClick: () => { desprenderOpen.value = true } })
+    items.push({ emoji: '🪴', label: esPersonal.value ? 'Separar algunas plantas' : 'Separar plantas a otro lote', onClick: () => { desprenderOpen.value = true } })
   }
   // Suelo vivo: el último trasplante (a una cama), y lo que se le hace a la cama del lote.
   const enCultivo = ['enraizado', 'vegetativo', 'floracion'].includes(lote.value?.estado)
@@ -324,9 +326,9 @@ const loteAcciones = computed(() => {
     items.push({ emoji: '💧', label: `Regar la ${lote.value.cama.nombre}`, onClick: () => abrirCama('regar') })
   }
   if (canEdit.value) {
-    items.push({ emoji: '✏️', label: 'Editar lote', onClick: () => editarOpen.value = true })
+    items.push({ emoji: '✏️', label: esPersonal.value ? 'Editar' : 'Editar lote', onClick: () => editarOpen.value = true })
     items.push({ divider: true })
-    items.push({ emoji: '🗑️', label: 'Eliminar lote', danger: true, onClick: eliminarLote })
+    items.push({ emoji: '🗑️', label: esPersonal.value ? 'Eliminar' : 'Eliminar lote', danger: true, onClick: eliminarLote })
   }
   return items
 })
@@ -431,12 +433,12 @@ onUnmounted(() => {
       ...(!isCultivador && !esPersonal ? [{ label: 'Sedes', to: { name: 'sedes' } }] : []),
       ...(!isCultivador && !esPersonal && lote?.sala?.sede ? [{ label: lote.sala.sede.nombre, to: { name: 'sede-detail', params: { id: lote.sala.sede.id } } }] : []),
       ...(lote?.sala ? [{ label: lote.sala.nombre, to: { name: 'sala-detail', params: { id: lote.sala.id } } }] : []),
-      { label: lote?.codigo || `Lote #${id}` },
+      { label: esPersonal ? (lote?.genetica?.nombre || 'Plantas') : (lote?.codigo || `Lote #${id}`) },
     ]" />
 
     <div v-if="loading" class="ld__loading"><DsSpinner /></div>
     <div v-else-if="error" class="ld__error">{{ error }}</div>
-    <div v-else-if="!lote" class="ld__error">Lote no encontrado.</div>
+    <div v-else-if="!lote" class="ld__error">{{ esPersonal ? 'No se encontraron estas plantas.' : 'Lote no encontrado.' }}</div>
 
     <template v-else>
 
@@ -445,7 +447,8 @@ onUnmounted(() => {
         <div class="ld__hero-left">
           <div class="ld__hero-title-row">
             <span class="ld__hero-emoji">{{ em(lote.estado).emoji }}</span>
-            <h1 class="ld__title">{{ lote.codigo }}</h1>
+            <!-- En autocultivo el lote no se nombra: son las plantas de su genética. -->
+            <h1 class="ld__title">{{ esPersonal ? (lote.genetica?.nombre || lote.strain || 'Plantas') : lote.codigo }}</h1>
             <span class="ld__estado-pill" :style="{ background: em(lote.estado).bg, color: em(lote.estado).color }">
               {{ estadoLoteLabel(lote) }}
               <span v-if="lote.dias_en_estado != null" class="ld__estado-dias">· día {{ lote.dias_en_estado }}</span>
@@ -453,7 +456,8 @@ onUnmounted(() => {
             <span v-if="textoProximoPaso(lote)" class="ld__prox" :class="{ 'ld__prox--ya': lote.proximo_paso.faltan_dias <= 0 }"><i class="bi bi-arrow-right-short"></i>{{ textoProximoPaso(lote) }}</span>
           </div>
           <p class="ld__subtitle">
-            <span v-if="lote.genetica">🌿 {{ lote.genetica.nombre }}<span v-if="lote.automatica" class="ld__auto" title="Automática: florece sola, se cosecha desde vegetativo">Auto</span></span>
+            <span v-if="lote.genetica && esPersonal"><span v-if="lote.automatica" class="ld__auto" title="Automática: florece sola, se cosecha desde vegetativo">Auto</span> {{ lote.plants_count }} {{ lote.plants_count === 1 ? 'planta' : 'plantas' }}</span>
+            <span v-else-if="lote.genetica">🌿 {{ lote.genetica.nombre }}<span v-if="lote.automatica" class="ld__auto" title="Automática: florece sola, se cosecha desde vegetativo">Auto</span></span>
             <span v-else-if="lote.strain" class="ld__strain-fallback">🌿 {{ lote.strain }}</span>
             <span v-if="lote.sala" class="ld__subtitle-sep">·</span>
             <span v-if="lote.sala">📍 {{ lote.sala.nombre }}</span>
@@ -474,7 +478,8 @@ onUnmounted(() => {
             <template v-if="lote.desprendidos_count > 0">
               <span class="ld__subtitle-sep">·</span>
               <span class="ld__origen-txt">
-                {{ lote.desprendidos_count }} lote{{ lote.desprendidos_count === 1 ? '' : 's' }} desprendido{{ lote.desprendidos_count === 1 ? '' : 's' }}
+                <template v-if="esPersonal">{{ lote.desprendidos_count }} {{ lote.desprendidos_count === 1 ? 'grupo separado' : 'grupos separados' }}</template>
+                <template v-else>{{ lote.desprendidos_count }} lote{{ lote.desprendidos_count === 1 ? '' : 's' }} desprendido{{ lote.desprendidos_count === 1 ? '' : 's' }}</template>
               </span>
             </template>
             <!-- El ciclo arranca en vegetativo; el enraizado se muestra al lado para no perder el
@@ -523,7 +528,7 @@ onUnmounted(() => {
       <div v-if="lote.estado === 'finalizado'" class="ld__finalizado-banner">
         <i class="bi bi-lock-fill"></i>
         <div>
-          <strong>Lote cerrado — solo lectura.</strong>
+          <strong>{{ esPersonal ? 'Cerrado' : 'Lote cerrado' }} — solo lectura.</strong>
           Este lote completó su cultivo y sus datos son inmutables. Para correcciones contactá al soporte.
         </div>
       </div>
@@ -561,7 +566,7 @@ onUnmounted(() => {
             <button class="ld__section-toggle" @click="tareasExpanded = !tareasExpanded">
               <div class="ld__section-toggle-left">
                 <span class="ld__section-emoji">📋</span>
-                <span class="ld__section-title">Tareas del lote</span>
+                <span class="ld__section-title">{{ esPersonal ? 'Tareas de estas plantas' : 'Tareas del lote' }}</span>
               </div>
               <i class="bi ld__chevron" :class="tareasExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
             </button>
@@ -584,7 +589,7 @@ onUnmounted(() => {
             <button class="ld__section-toggle" @click="historialExpanded = !historialExpanded">
               <div class="ld__section-toggle-left">
                 <span class="ld__section-emoji">📜</span>
-                <span class="ld__section-title">Historial del lote</span>
+                <span class="ld__section-title">{{ esPersonal ? 'Historial' : 'Historial del lote' }}</span>
               </div>
               <i class="bi ld__chevron" :class="historialExpanded ? 'bi-chevron-up' : 'bi-chevron-down'"></i>
             </button>

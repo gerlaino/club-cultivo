@@ -2,7 +2,7 @@
   <div class="plc">
     <!-- Header -->
     <div class="plc__header">
-      <span class="plc__title">{{ esPersonal ? 'Costo del lote' : 'Ganancia del lote' }}</span>
+      <span class="plc__title">{{ esPersonal ? 'Lo que costaron' : 'Ganancia del lote' }}</span>
       <button class="plc__btn-edit" @click="openCostoForm">
         <Pencil :size="13" :stroke-width="2" />
         {{ costoLote ? 'Editar costos' : 'Cargar costos' }}
@@ -80,7 +80,7 @@
             <span v-if="pl.gramos_en_stock > 0">{{ pl.gramos_en_stock.toFixed(1) }} g en stock</span>
           </div>
           <div v-if="!pl.tiene_costos" class="plc__hints">
-            <span class="plc__hint">Anotá gastos «para este lote» en Gastos y el costo por gramo sale solo.</span>
+            <span class="plc__hint">Anotá gastos para estas plantas en Gastos y el costo por gramo sale solo.</span>
           </div>
         </template>
 
@@ -144,7 +144,7 @@
       </template>
 
       <div v-else class="plc__empty">
-        <span>{{ esPersonal ? 'Anotá gastos «para este lote» y acá ves cuánto costó cada gramo' : 'Cargá los costos para saber cuánto dejó este lote' }}</span>
+        <span>{{ esPersonal ? 'Anotá gastos para estas plantas y acá ves cuánto costó cada gramo' : 'Cargá los costos para saber cuánto dejó este lote' }}</span>
       </div>
     </template>
   </div>

@@ -23,7 +23,10 @@ class PlanVencimientoJob < ApplicationJob
   def avisar(club, dias)
     tipo  = dias.zero? ? 'plan_vencido' : 'plan_por_vencer'
     fecha = club.plan_activo_hasta.strftime('%d/%m/%Y')
-    texto = if dias.zero?
+    texto = if club.personal?
+              dias.zero? ? "Tu plan de Autocultivo vence hoy (#{fecha}). La app sigue andando; escribinos para renovarlo." :
+                           "Tu plan de Autocultivo vence el #{fecha}, en #{dias} días. Escribinos para renovarlo."
+            elsif dias.zero?
               "El plan de la organización vence hoy (#{fecha}). La app sigue andando; hablá con Cultivo Espacial para renovarlo."
             else
               "El plan de la organización vence el #{fecha}, en #{dias} días. Hablá con Cultivo Espacial para renovarlo."

@@ -57,17 +57,7 @@
               </button>
             </div>
           </div>
-          <div v-if="s.plantas.length" class="mic__grilla">
-            <RouterLink v-for="p in s.plantas" :key="p.id" :to="`/plantas/${p.id}`" class="mic__planta">
-              <span class="mic__planta-top">
-                <strong>{{ p.nombre }}</strong>
-                <span class="mic__chip" :class="p.auto ? 'mic__chip--auto' : 'mic__chip--foto'">{{ p.auto ? 'Auto' : 'Foto' }}</span>
-              </span>
-              <span class="mic__planta-l">{{ p.genetica }} · {{ p.dia }}</span>
-              <span v-if="p.pct != null" class="mic__barra"><span :style="{ width: `${p.pct}%` }"></span></span>
-              <span v-if="p.toca" class="mic__planta-toca">{{ p.toca }}</span>
-            </RouterLink>
-          </div>
+          <PlantasGrilla v-if="s.plantas.length" :plantas="s.plantas" :lotes="lotes" />
           <button v-else type="button" class="mic__sin" @click="abrirNueva(s.id)">Sin plantas · <strong>agregar</strong></button>
         </section>
       </div>
@@ -100,7 +90,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { listSalas, listLotes, listPlants, cambiarFaseSala, getFotosRecientes } from '../../lib/api'
-import { textoProximoPasoCorto, estadoPlantaLabel } from '../../lib/loteHelpers.js'
+import { textoProximoPasoCorto } from '../../lib/loteHelpers.js'
 import { textoCambioDeFase } from '../../lib/textoCambioDeFase.js'
 import { useRecargaEnCambios } from '../../composables/useRecargaEnCambios.js'
 import { useConfirm } from '../../composables/useConfirm.js'
@@ -108,6 +98,7 @@ import { useToast } from '../../composables/useToast'
 import { usePlan } from '../../composables/usePlan.js'
 import NuevaPlantaSheet from '../../components/personal/NuevaPlantaSheet.vue'
 import RegistroSalaModal from '../../components/salas/RegistroSalaModal.vue'
+import PlantasGrilla from '../../components/personal/PlantasGrilla.vue'
 
 const EN_CULTIVO = ['enraizado', 'vegetativo', 'floracion']
 const { confirm } = useConfirm()
@@ -160,19 +151,8 @@ const cupoDesglose = computed(() => {
 const LUZ = { vegetativo: '18/6 · vegetativo', floracion: '12/12 · floración', mixta: 'Mixto', clon: 'Esquejes', madre: 'Madres' }
 const luz = (s) => LUZ[s.kind] || s.kind
 
-const lotePorId = computed(() => Object.fromEntries(lotes.value.map(l => [l.id, l])))
-function tarjeta(p) {
-  const l = lotePorId.value[p.lote?.id] || {}
-  const auto = !!l.automatica
-  const obj = l.dias_ciclo_objetivo
-  const dia = auto && l.dias_ciclo != null
-    ? `día ${l.dias_ciclo}${obj ? ` de ${obj}` : ''}`
-    : `${estadoPlantaLabel(p).toLowerCase()}${p.dias_en_fase != null ? ` · día ${p.dias_en_fase}` : ''}`
-  const pct = auto && l.dias_ciclo != null && obj ? Math.min(100, Math.round(l.dias_ciclo / obj * 100)) : null
-  return { id: p.id, nombre: p.nombre, genetica: p.genetica?.nombre || l.genetica?.nombre || 'Sin genética', auto, dia, pct, toca: textoProximoPasoCorto(l) }
-}
 const salasConPlantas = computed(() => salas.value.map(s => ({
-  ...s, plantas: plantas.value.filter(p => p.lote?.sala?.id === s.id).map(tarjeta),
+  ...s, plantas: plantas.value.filter(p => p.lote?.sala?.id === s.id),
 })))
 
 // Lo que viene: los próximos pasos que calcula el backend (`proximo_paso` de cada lote), con las
@@ -254,17 +234,6 @@ async function cambiarLuz(s, confirmado = false) {
 .mic__espacio-nombre strong { font-size: var(--fs-18); }
 .mic__espacio-nombre span { font-size: var(--fs-13); color: var(--c-ink-700); }
 .mic__espacio-acc { display: flex; gap: var(--sp-2); flex-wrap: wrap; }
-.mic__grilla { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: var(--sp-2); }
-.mic__planta { border: 1px solid var(--c-leaf-100); border-radius: 12px; padding: var(--sp-3); display: flex; flex-direction: column; gap: 5px; text-decoration: none; color: var(--c-ink-900); background: var(--c-paper); }
-.mic__planta:hover { border-color: var(--c-leaf-300); }
-.mic__planta-top { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
-.mic__planta-l { font-size: var(--fs-12); color: var(--c-ink-700); }
-.mic__planta-toca { font-size: var(--fs-12); font-weight: 600; color: var(--c-gold-500); }
-.mic__barra { height: 6px; border-radius: 3px; background: var(--c-leaf-100); overflow: hidden; }
-.mic__barra span { display: block; height: 100%; background: var(--c-leaf-700); }
-.mic__chip { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
-.mic__chip--auto { background: var(--c-amber-100); color: var(--c-gold-500); }
-.mic__chip--foto { background: var(--c-leaf-100); color: var(--c-leaf-800); }
 .mic__sin { min-height: 48px; border-radius: 12px; border: 1px dashed var(--c-leaf-300); background: transparent; font: inherit; color: var(--c-ink-700); cursor: pointer; }
 .mic__sin strong { color: var(--c-leaf-700); }
 .mic__panel { background: var(--c-slate-50); border: 1px solid var(--c-leaf-100); border-radius: 16px; padding: var(--sp-4); display: flex; flex-direction: column; gap: var(--sp-2); }

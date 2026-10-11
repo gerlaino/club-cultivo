@@ -18,12 +18,22 @@ class RecordatoriosTareasJob < ApplicationJob
           PushNotificationService.notify_user_async(
             tarea.asignada_a, tipo: 'recordatorio_tarea',
             title: "Recordatorio: #{tarea.titulo}",
-            body:  "Es para #{cuando}#{tarea.lote ? " · #{tarea.lote.codigo}" : ''}#{tarea.sala ? " · #{tarea.sala.nombre}" : ''}",
+            body:  "Es para #{cuando}#{de_que(club, tarea)}#{tarea.sala ? " · #{tarea.sala.nombre}" : ''}",
             url:   '/tareas'
           )
         end
         tarea.update_column(:recordatorio_enviado_at, ahora)
       end
     end
+  end
+
+  private
+
+  # En uso personal no hay códigos de lote: se nombra la genética.
+  def de_que(club, tarea)
+    return '' unless tarea.lote
+    return " · #{tarea.lote.codigo}" unless club.personal?
+    gen = tarea.lote.genetica&.nombre
+    gen ? " · #{gen}" : ''
   end
 end

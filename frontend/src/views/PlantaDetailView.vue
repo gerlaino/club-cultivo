@@ -1,4 +1,6 @@
 <script setup>
+import { useUsoPersonal } from '../composables/useUsoPersonal.js'
+const { esPersonal } = useUsoPersonal()
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useQRCode } from '../composables/useQRCode'
@@ -614,7 +616,11 @@ onMounted(async () => {
 
     <template v-else>
 
-      <Breadcrumb :items="[
+      <Breadcrumb :items="esPersonal ? [
+        { label: 'Mi cultivo', to: '/mi-cultivo' },
+        ...(planta.lote?.sala ? [{ label: planta.lote.sala.nombre, to: { name: 'sala-detail', params: { id: planta.lote.sala.id } } }] : []),
+        { label: planta.nombre || planta.codigo_qr },
+      ] : [
         { label: 'Sedes', to: { name: 'sedes' } },
         ...(planta.lote?.sala?.sede ? [{ label: planta.lote.sala.sede.nombre, to: { name: 'sede-detail', params: { id: planta.lote.sala.sede.id } } }] : []),
         ...(planta.lote?.sala ? [{ label: planta.lote.sala.nombre, to: { name: 'sala-detail', params: { id: planta.lote.sala.id } } }] : []),
@@ -793,8 +799,8 @@ onMounted(async () => {
                       </template>
                       <template v-else-if="a.activity_type === 'registro_ambiental_lote'">
                         <div class="pd__act-titulo">
-                          🌿 Registro del lote
-                          <span class="pd__heredado-badge">heredado</span>
+                          🌿 {{ esPersonal ? 'Registro del espacio' : 'Registro del lote' }}
+                          <span class="pd__heredado-badge">{{ esPersonal ? 'para todas' : 'heredado' }}</span>
                         </div>
                         <div v-if="a.metadata?.tareas_realizadas?.length" class="pd__act-tareas">
                           <span v-for="t in a.metadata.tareas_realizadas" :key="t" class="pd__tarea-chip">
@@ -814,16 +820,16 @@ onMounted(async () => {
                       </template>
 
                       <template v-else-if="a.activity_type === 'lote_fase'">
-                        <div class="pd__act-titulo">🔄 {{ a.description }}<span class="pd__heredado-badge">fase del lote</span></div>
+                        <div class="pd__act-titulo">🔄 {{ a.description }}<span class="pd__heredado-badge">{{ esPersonal ? 'cambio de fase' : 'fase del lote' }}</span></div>
                       </template>
                       <template v-else-if="a.activity_type === 'lote_actividad'">
-                        <div class="pd__act-titulo">{{ a.description }}<span class="pd__heredado-badge">heredado</span></div>
+                        <div class="pd__act-titulo">{{ a.description }}<span class="pd__heredado-badge">{{ esPersonal ? 'para todas' : 'heredado' }}</span></div>
                       </template>
                       <template v-else-if="a.activity_type === 'lote_alerta'">
                         <div class="pd__act-titulo">⚠️ {{ a.description }}</div>
                       </template>
                       <template v-else-if="a.activity_type === 'lote_nota'">
-                        <div class="pd__act-titulo">📝 {{ a.description }}<span class="pd__heredado-badge">nota del lote</span></div>
+                        <div class="pd__act-titulo">📝 {{ a.description }}<span class="pd__heredado-badge">{{ esPersonal ? 'nota' : 'nota del lote' }}</span></div>
                       </template>
 
                       <template v-else>

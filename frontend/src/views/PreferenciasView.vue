@@ -24,8 +24,15 @@ const RECURSOS = [
   { clave: 'pacientes', label: 'Pacientes' },
 ]
 
+// En autocultivo sólo importan los espacios y las plantas: «Sedes 1 de 1» y «Pacientes 0 de 0»
+// salían en rojo, como si faltara algo, y son cosas que una persona que cultiva en casa no tiene.
+const RECURSOS_PERSONAL = [
+  { clave: 'salas',   label: 'Espacios de cultivo' },
+  { clave: 'plantas', label: 'Plantas en el cupo' },
+]
+
 // Sólo lo que tiene tope. En el plan Total los seis son `null` y la lista queda vacía.
-const topes = computed(() => RECURSOS
+const topes = computed(() => (esPersonal.value ? RECURSOS_PERSONAL : RECURSOS)
   .filter(r => limites.value[r.clave] != null)
   .map(r => ({ ...r, tope: limites.value[r.clave], usado: uso.value[r.clave] || 0 })))
 const toast = ref(null)
@@ -231,7 +238,7 @@ function showToast(type, msg) {
               <span v-if="errors.name" class="pv__err">{{ errors.name }}</span>
             </div>
 
-            <div class="pv__field">
+            <div v-if="!esPersonal" class="pv__field">
               <label class="pv__label">Razón social</label>
               <input class="pv__input" v-model.trim="form.legal_name" @input="onChange" placeholder="Nombre legal (opcional)" />
               <span class="pv__hint">Usado en documentos oficiales y trazabilidad REPROCANN</span>
@@ -314,7 +321,7 @@ function showToast(type, msg) {
             <div class="pv__grid">
               <div class="pv__field">
                 <label class="pv__label">Email de contacto</label>
-                <input type="email" class="pv__input" :class="{ 'pv__input--err': errors.email }" v-model.trim="form.email" @input="onChange" placeholder="contacto@miclub.org" />
+                <input type="email" class="pv__input" :class="{ 'pv__input--err': errors.email }" v-model.trim="form.email" @input="onChange" :placeholder="esPersonal ? 'tu@mail.com' : 'contacto@miclub.org'" />
                 <span v-if="errors.email" class="pv__err">{{ errors.email }}</span>
               </div>
               <div class="pv__field">
@@ -322,7 +329,7 @@ function showToast(type, msg) {
                 <input type="tel" class="pv__input" :class="{ 'pv__input--err': errors.phone }" v-model.trim="form.phone" @input="onChange" placeholder="+54 11 1234-5678" />
                 <span v-if="errors.phone" class="pv__err">{{ errors.phone }}</span>
               </div>
-              <div class="pv__field pv__field--full">
+              <div v-if="!esPersonal" class="pv__field pv__field--full">
                 <label class="pv__label">Sitio web</label>
                 <div class="pv__input-group">
                   <span class="pv__input-prefix"><i class="bi bi-globe"></i></span>
@@ -426,7 +433,7 @@ function showToast(type, msg) {
             <div class="pv__card-icon" style="background:rgba(180,83,9,.1);color:#b45309"><i class="bi bi-bell"></i></div>
             <div>
               <div class="pv__card-title">Alertas</div>
-              <div class="pv__card-sub">Setpoints por fase y cuándo avisarte de stock, REPROCANN y ambiente</div>
+              <div class="pv__card-sub">{{ esPersonal ? 'Los rangos de ambiente de cada fase y cuándo avisarte' : 'Setpoints por fase y cuándo avisarte de stock, REPROCANN y ambiente' }}</div>
             </div>
           </div>
           <div class="pv__card-body">
@@ -439,7 +446,7 @@ function showToast(type, msg) {
         <!-- El correo se mudó a Configuración → Correo electrónico. Estaba acá mezclado con el
              nombre y el logo, y ahora es un módulo aparte con su propia casilla y sus
              plantillas: dejar media configuración en dos pantallas era garantía de confusión. -->
-        <div class="pv__card pv__card--mt">
+        <div v-if="!esPersonal" class="pv__card pv__card--mt">
           <div class="pv__card-header">
             <div class="pv__card-icon" style="background:#f0fdf4;color:#15803d"><i class="bi bi-envelope-at"></i></div>
             <div>

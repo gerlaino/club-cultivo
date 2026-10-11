@@ -39,7 +39,8 @@ const COLUMNAS_INV_TODAS = [
   { campo: 'tipo',             label: 'Tipo',            dir: 'asc' },
   { campo: 'origen',           label: 'Origen',          dir: 'asc',  org: true },
   { campo: 'genetica',         label: 'Genética',        dir: 'asc' },
-  { campo: 'lote',             label: 'Lote',            dir: 'asc' },
+  // En autocultivo el lote no se nombra: la genética ya dice de qué plantas salió.
+  { campo: 'lote',             label: 'Lote',            dir: 'asc',  org: true },
   { campo: 'sede',             label: 'Sede',            dir: 'asc',  org: true },
   { campo: 'ingreso',          label: 'Ingresó',         dir: 'desc' },
   { campo: 'observaciones',    label: 'Observaciones',   dir: 'asc' },
@@ -117,7 +118,7 @@ function formatDate (dateStr) {
             </span>
           </td>
           <td class="stk__inv-td-cepa">{{ s.lote?.genetica?.nombre || s.genetica?.nombre || '—' }}</td>
-          <td>
+          <td v-if="!esPersonal">
             <span v-if="s.lote" class="stk__chip stk__chip--lote">{{ s.lote.codigo }}</span>
             <span v-else-if="!s.regulatorio || s.origen === 'compra_externa'" class="stk__chip stk__chip--ext">Externo</span>
             <span v-else class="stk__inv-td-mono">—</span>

@@ -4,7 +4,7 @@
     <button class="lps__toggle" @click="expanded = !expanded">
       <div class="lps__toggle-left">
         <span class="lps__emoji">🪴</span>
-        <span class="lps__title">Plantas del lote</span>
+        <span class="lps__title">{{ esPersonal ? 'Plantas' : 'Plantas del lote' }}</span>
         <span class="lps__pill">{{ plantasActivas.length }}</span>
         <span v-if="plantasCosechadas.length" class="lps__pill lps__pill--cosechada">{{ plantasCosechadas.length }} cosechadas</span>
       </div>
@@ -52,7 +52,7 @@
     <!-- Body -->
     <div v-show="expanded" class="lps__body">
       <div v-if="plantsStore.loading" class="lps__placeholder">Cargando plantas…</div>
-      <EmptyState v-else-if="!plantList.length" icon="🪴" title="Sin plantas" message="Sin plantas registradas en este lote." compact>
+      <EmptyState v-else-if="!plantList.length" icon="🪴" title="Sin plantas" :message="esPersonal ? 'Todavía no hay plantas cargadas.' : 'Sin plantas registradas en este lote.'" compact>
         <template #actions>
           <button v-if="canEdit || isCultivador" class="lps__btn-outline" @click="openAddPlanta">
             <i class="bi bi-plus-lg"></i> Agregar primera planta
@@ -265,6 +265,8 @@
 </template>
 
 <script setup>
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
+const { esPersonal } = useUsoPersonal()
 import { ref, computed } from 'vue'
 import { RouterLink } from 'vue-router'
 import { usePlantsStore } from '../../stores/plants'

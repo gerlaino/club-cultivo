@@ -1,3 +1,8 @@
+import { esUsoPersonal } from '../composables/useUsoPersonal.js'
+
+// ¿Autocultivo? Sin Pinia activa (tests de funciones puras) se lee como organización.
+function personal() { try { return esUsoPersonal() } catch { return false } }
+
 // ─────────────────────────────────────────────────────────────────────────
 // FUENTE ÚNICA DE VERDAD de los estados de Cultivo (front).
 // Espeja los enums del backend. Si el backend cambia, se actualiza ACÁ y todo
@@ -262,7 +267,9 @@ const PROXIMO_PASO_ACCION = { floracion: 'Pasar a floración', cosecha: 'Cosecha
 // La fase en la que está el lote, según lo que viene después.
 const FASE_ANTERIOR = { floracion: 'vege', cosecha: 'floración', curado: 'secado' }
 function porQueToca(p) {
-  const quien = p.objetivo_origen === 'genetica' ? 'la genética pide' : 'el plan del lote pide'
+  // En autocultivo el lote no se nombra: el objetivo es el que la persona les puso a sus plantas.
+  const quien = p.objetivo_origen === 'genetica' ? 'la genética pide'
+    : (personal() ? 'les pusiste' : 'el plan del lote pide')
   const lleva = p.lleva_dias != null ? `; lleva ${p.lleva_dias}` : ''
   if (p.objetivo_origen === 'fecha_estimada') {
     const f = p.fecha ? parseDate(p.fecha)?.toLocaleDateString('es-AR', { day: 'numeric', month: 'numeric' }) : null

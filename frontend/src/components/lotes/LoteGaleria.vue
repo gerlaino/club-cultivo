@@ -6,7 +6,7 @@
         <span class="lg__emoji">📷</span>
         <span class="lg__title">Fotos</span>
         <span v-if="fotos.length" class="lg__pill">{{ fotos.length }}</span>
-        <span v-if="diaActual" class="lg__dia">día {{ diaActual }} del lote</span>
+        <span v-if="diaActual" class="lg__dia">día {{ diaActual }}{{ esPersonal ? '' : ' del lote' }}</span>
         <!-- Cuántas fotos le quedan al plan (lo manda el backend). Se dice cuando empieza a
              importar: a partir del 80 %, y en rojo al llegar, que es cuando la cámara se apaga. -->
         <span v-if="cupoTexto" class="lg__cupo" :class="{ 'lg__cupo--alerta': cupoAlerta, 'lg__cupo--lleno': cupoLleno }" :title="cupoLleno ? 'Llegaste al tope de fotos de tu plan: borrá alguna o escribinos para ampliarlo' : ''">{{ cupoTexto }}</span>
@@ -172,6 +172,8 @@
 </template>
 
 <script setup>
+import { useUsoPersonal } from '../../composables/useUsoPersonal.js'
+const { esPersonal } = useUsoPersonal()
 // Ver crecer la planta. La galería del lote agrupa por semana de vida, filtra por etiqueta,
 // abre grande con su ficha y compara dos fotos lado a lado. Días, semanas y fases los manda el
 // backend (`FotosLoteController`); acá sólo se agrupa y se muestra.

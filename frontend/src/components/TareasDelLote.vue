@@ -123,7 +123,7 @@
       <!-- Empty total -->
       <div v-if="tareas.length === 0" class="tl__empty">
         <span>📅</span>
-        <p>Sin tareas para este lote</p>
+        <p>{{ esPersonal ? 'Sin tareas para estas plantas' : 'Sin tareas para este lote' }}</p>
       </div>
     </div>
 
@@ -169,7 +169,7 @@
         <div class="tl__modal tl__modal--wide">
           <div class="tl__modal-header">
             <div>
-              <h3 class="tl__modal-title">📋 Registro del lote</h3>
+              <h3 class="tl__modal-title">📋 {{ esPersonal ? 'Registro' : 'Registro del lote' }}</h3>
               <p class="tl__modal-sub">{{ lote.codigo }} · {{ new Date().toLocaleDateString('es-AR') }}</p>
             </div>
             <button class="tl__modal-close" @click="tareaCompletando = null"><i class="bi bi-x-lg"></i></button>
