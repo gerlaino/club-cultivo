@@ -45,6 +45,12 @@ RSpec.describe 'Asistente: avanzar de fase dictando', type: :request do
     expect(lote.lote_eventos.where(tipo: 'cambio_estado', estado_nuevo: 'vegetativo').count).to eq(1)
   end
 
+  # AC (11-oct-2026, Germán): «que las tareas las generen los usuarios, no nosotros». Pasar a
+  # vegetativo agendaba «Primer riego» y «Medir EC y pH» aunque el riego se acabara de registrar.
+  it 'avanzar de fase no crea tareas' do
+    expect { avanzar(estado_nuevo: 'vegetativo', maceta_litros: 0.335) }.not_to change(Tarea, :count)
+  end
+
   it 'saltear un paso no se hace por voz' do
     r = avanzar(estado_nuevo: 'floracion', maceta_litros: 7)
     expect(r['ejecutadas']).to eq(0)

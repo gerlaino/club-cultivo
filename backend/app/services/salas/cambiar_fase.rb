@@ -147,21 +147,18 @@ module Salas
           .order(registrado_en: :desc).first
     end
 
-    # Las tareas que la app le sugirió al entrar en floración (`TareasAutoService`) y nadie hizo
-    # todavía. No tienen marca de "automática": se las reconoce por el molde del que salieron y
+    # Las tareas que la app creaba sola al entrar en floración (hasta el 11-oct-2026, ver
+    # `Tareas::MoldesRetirados`) y nadie hizo todavía. No tienen marca de "automática": se las reconoce por el molde del que salieron y
     # por haber nacido con la floración. Las que alguien ya completó se quedan — se hicieron.
     def cancelar_tareas_de_floracion!(lote, desde)
-      moldes = TareasAutoService::SUGERENCIAS['floracion']
-      return 0 if moldes.blank?
-
-      alcance = Tarea.where(lote_id: lote.id, estado: 'pendiente', titulo: moldes.map { |m| m[:titulo] })
+      alcance = Tarea.where(lote_id: lote.id, estado: 'pendiente', titulo: Tareas::MoldesRetirados::POR_FASE['floracion'])
       alcance = alcance.where('created_at >= ?', desde) if desde
       alcance.update_all(estado: 'cancelada', updated_at: Time.current)
     end
 
     # ── LO QUE SE LE MUESTRA ANTES DE CONFIRMAR ────────────────────────────────────────────────
     def detalle_confirmacion(lotes, fase_actual)
-      moldes = TareasAutoService::SUGERENCIAS['floracion'].map { |m| m[:titulo] }
+      moldes = Tareas::MoldesRetirados::POR_FASE['floracion']
       lotes.map do |lote|
         desde = lote.lote_eventos.where(tipo: 'cambio_estado', estado_nuevo: fase_actual)
                     .order(registrado_en: :desc).first&.registrado_en&.to_date

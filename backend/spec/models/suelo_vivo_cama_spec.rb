@@ -91,21 +91,6 @@ RSpec.describe Cama, type: :model do
     end
   end
 
-  describe 'tareas automáticas en una cama' do
-    it 'al cosechar dice «cortar al ras y dejar las raíces», no «limpiar la sala»' do
-      l = plantar
-      TareasAutoService.new(lote: l, estado_nuevo: 'cosecha', user: admin, club: club).call
-      titulos = Tarea.where(lote_id: l.id).pluck(:titulo)
-      expect(titulos).to include('Cortar al ras y dejar las raíces; tapar la cama con mulch')
-      expect(titulos).not_to include('Limpiar y preparar sala post-cosecha')
-    end
-
-    it 'un lote sin cama sigue con las tareas de siempre' do
-      l = create(:lote, club: club, sala: sala)
-      TareasAutoService.new(lote: l, estado_nuevo: 'cosecha', user: admin, club: club).call
-      expect(Tarea.where(lote_id: l.id).pluck(:titulo)).to include('Limpiar y preparar sala post-cosecha')
-    end
-  end
 end
 
 RSpec.describe RecetaItem, type: :model do

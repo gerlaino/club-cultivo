@@ -1171,8 +1171,8 @@ class AsistenteController < BaseController
   end
 
   # AVANZAR DE FASE POR VOZ ES LO MISMO QUE EL BOTÓN (9-oct-2026). Hacía `update(estado:)`: no
-  # pedía la maceta al salir de germinación («poner en maceta es prender»), no movía de sala, no
-  # creaba las tareas de la fase y dejaba cosechar sin pesada. Ahora va por `Lote#avanzar_fase!`,
+  # pedía la maceta al salir de germinación («poner en maceta es prender»), no movía de sala ni
+  # las plantas, y dejaba cosechar sin pesada. (Cambiar de fase ya no crea tareas: 11-oct-2026.) Ahora va por `Lote#avanzar_fase!`,
   # sólo al paso siguiente, y la cosecha se registra con su formulario, como en la app.
   def ejecutar_avance_ciclo(accion, datos, club, contexto)
     lote_codigo = accion['lote_codigo'] || accion[:lote_codigo]
@@ -1218,7 +1218,6 @@ class AsistenteController < BaseController
       sala_origen_id:  sala_anterior_id != lote.sala_id ? sala_anterior_id : nil,
       sala_destino_id: sala_anterior_id != lote.sala_id ? lote.sala_id : nil,
     )
-    TareasAutoService.new(lote: lote, estado_nuevo: lote.estado, user: current_user, club: club).call
     { ok: true, mensaje: "#{personal ? quien.capitalize : lote.codigo}: #{Lote.etiqueta_estado(estado_anterior, lote.origen).downcase} → #{lote.estado_label.downcase}" }
   rescue ActiveRecord::RecordInvalid => e
     { ok: false, error: e.record.errors.full_messages.join(', ') }

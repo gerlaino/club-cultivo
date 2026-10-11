@@ -113,6 +113,14 @@ RSpec.describe 'Lotes enraizando', type: :request do
       lote
     end
 
+    # AC (11-oct-2026, Germán): «que las tareas las generen los usuarios, no nosotros». El botón
+    # agendaba «Primer riego» y «Medir EC y pH» al pasar a vegetativo.
+    it 'avanzar de fase con el botón no crea tareas' do
+      lote = lote_con(5)
+      expect { post "/api/lotes/#{lote.id}/avanzar_fase", params: { tamanio_maceta: 3 } }.not_to change(Tarea, :count)
+      expect(response).to have_http_status(:success)
+    end
+
     it 'descarta como "no prendió" las que faltan' do
       lote = lote_con(20)
 

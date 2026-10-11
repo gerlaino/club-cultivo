@@ -19,7 +19,7 @@ RSpec.describe 'Dar vuelta una sala', type: :request do
   def body = JSON.parse(response.body)
 
   # Un lote que entró a vegetativo hace 30 días y a floración hace 3, con las tareas que la app
-  # le sugirió al entrar en floración.
+  # creaba sola al entrar en floración (hasta el 11-oct-2026: las que quedaron de antes).
   let!(:lote) { create(:lote, club: club, sala: sala, estado: 'floracion', tamanio_maceta: 3) }
   let!(:planta) { create(:plant, lote: lote, club: club, state: 'floracion') }
   before do
@@ -28,14 +28,17 @@ RSpec.describe 'Dar vuelta una sala', type: :request do
                                 user: admin, club: club, registrado_en: 30.days.ago)
       lote.lote_eventos.create!(tipo: 'cambio_estado', estado_anterior: 'vegetativo', estado_nuevo: 'floracion',
                                 user: admin, club: club, registrado_en: 3.days.ago)
-      TareasAutoService.new(lote: lote, estado_nuevo: 'floracion', user: admin, club: club).call
+      Tareas::MoldesRetirados::POR_FASE['floracion'].each do |titulo|
+        Tarea.create!(club: club, creada_por: admin, asignada_a: admin, lote: lote, sala: sala, titulo: titulo,
+                      tipo: 'otro', prioridad: 'normal', estado: 'pendiente', fecha_programada: Time.zone.today)
+      end
       # Una foto y una nota cargadas en floración: hechos reales, no se tocan.
       lote.lote_eventos.create!(tipo: 'nota', descripcion: 'Riego con bloom', user: admin, club: club,
                                 registrado_en: 1.day.ago)
     end
   end
 
-  let(:tareas_flor) { Tarea.where(lote_id: lote.id, titulo: TareasAutoService::SUGERENCIAS['floracion'].map { |t| t[:titulo] }) }
+  let(:tareas_flor) { Tarea.where(lote_id: lote.id, titulo: Tareas::MoldesRetirados::POR_FASE['floracion']) }
 
   describe 'floración → vegetativo con lotes adentro' do
     it 'frena y dice qué se va a deshacer, lote por lote' do
@@ -77,8 +80,8 @@ RSpec.describe 'Dar vuelta una sala', type: :request do
 
       it 'cancela las tareas de floración que seguían pendientes' do
         expect(tareas_flor.where(estado: 'pendiente')).not_to exist
-        expect(tareas_flor.where(estado: 'cancelada').count).to eq(TareasAutoService::SUGERENCIAS['floracion'].size)
-        expect(body['tareas_canceladas']).to eq(TareasAutoService::SUGERENCIAS['floracion'].size)
+        expect(tareas_flor.where(estado: 'cancelada').count).to eq(Tareas::MoldesRetirados::POR_FASE['floracion'].size)
+        expect(body['tareas_canceladas']).to eq(Tareas::MoldesRetirados::POR_FASE['floracion'].size)
       end
 
       it 'deja las notas de esos días y anota que se deshizo' do

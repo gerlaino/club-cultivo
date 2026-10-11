@@ -1,5 +1,17 @@
 # Changelog
 
+## Octubre 2026 (et) — La app ya no crea tareas sola al cambiar de fase (11-oct)
+
+Germán pasó un lote a vegetativo por voz (con maceta y riego) y le aparecieron «Primer riego en
+vegetativo» y «Medir EC y pH del sustrato» para hoy: «que las tareas las generen los usuarios, no
+nosotros». Era `TareasAutoService`, una lista fija por fase (tres en vegetativo, cinco en floración…)
+que se creaba con el botón, por voz y al cambiar de fase la sala.
+- Retirado para todos. Quedan los títulos en `Tareas::MoldesRetirados` para reconocer las que
+  quedaron pendientes: deshacer una floración las sigue cancelando y
+  **`rake tareas:cancelar_automaticas`** (lista; `CORREGIR=1` cancela) limpia las viejas que nadie
+  empezó y que no vienen de un plan.
+- Specs: el botón y la voz no crean tareas; `salas_cambiar_fase_spec` arma las viejas a mano.
+
 ## Octubre 2026 (es) — Al abrir la app ya no se ve un instante la pantalla equivocada (11-oct)
 
 Germán: «cada vez que entro a la app se ve una vista vieja y después la actual» (uso personal).

@@ -338,6 +338,13 @@ lista de módulos en las vistas: ya había tres copias que se contradecían.
 
 ### Lo que NO hay que romper
 
+- **LAS TAREAS LAS GENERAN LOS USUARIOS, NO LA APP** (11-oct-2026, Germán). Cambiar de fase (botón,
+  voz, sala) no crea tareas: se retiró `TareasAutoService`, que agendaba una lista fija por fase sin
+  mirar lo hecho. Las tareas salen de lo que la persona agenda, de sus planes de trabajo o de lo que
+  confirma al dictar. Quedan, porque son otra cosa: la tarea de una regla de alerta configurada para
+  eso, y la asignación de manicura post-cosecha. Las viejas: `rake tareas:cancelar_automaticas`.
+  Idea para más adelante: una guía de cultivo (vendible al autocultivo) armada con conclusiones
+  agregadas de todas las cuentas, sin datos privados.
 - **LA EDAD EN EL AUTOREGISTRO ES UNA DECLARACIÓN PROPIA, OBLIGATORIA Y REGISTRADA** (9-oct-2026). Tilde
   aparte de los términos («Declaro que soy mayor de 18 años»); `Registros::CrearPersonal` rechaza el
   alta sin `mayor_de_edad` y guarda `registros_personales.mayor_edad_declarada_at`. No se verifica
